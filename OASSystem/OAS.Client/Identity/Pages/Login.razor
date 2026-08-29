@@ -25,12 +25,12 @@
                                   Options="_profileOptions"
                                   Disabled="@(_profilesLoading || _profiles.Count <= 1 || _databaseUpdating)"
                                   Size="ControlSize.Small" />
-                        <UiStatusAction Text="@L["Login_UpdateDatabase"]"
+                        <UiStatusAction Text="@DatabaseActionText"
                                         StatusText="@DatabaseStatusText"
                                         Tone="@DatabaseStatusTone"
                                         Disabled="@IsDatabaseUpdateButtonDisabled"
                                         Loading="@(_databaseState == DatabaseState.Checking || _databaseUpdating)"
-                                        OnClick="UpdateDatabaseAsync"
+                                        OnClick="HandleDatabaseActionAsync"
                                         AlignToLabeledControl="true"
                                         Size="ControlSize.Small" />
                     </UiGrid>
@@ -57,12 +57,18 @@
     private bool _profilesLoading = true;
     private bool _databaseUpdating;
     private bool _loading;
+    private string? _databaseErrorCode;
 
     [SupplyParameterFromQuery(Name = "returnUrl")]
     public string? ReturnUrl { get; set; }
 
     private bool LoginFieldsDisabled => _profilesLoading || _databaseUpdating || _databaseState != DatabaseState.UpToDate || _loading;
-    private bool IsDatabaseUpdateButtonDisabled => _profilesLoading || _databaseUpdating || _databaseState != DatabaseState.UpdateRequired;
+    private bool IsDatabaseUpdateButtonDisabled =>
+        _profilesLoading || _databaseUpdating || _databaseState is DatabaseState.NotChecked or DatabaseState.Checking or DatabaseState.UpToDate;
+
+    private string DatabaseActionText => _databaseState == DatabaseState.Failed
+        ? L["Login_RetryDatabase"]
+        : L["Login_UpdateDatabase"];
     private AlertTone DatabaseStatusTone => _databaseState switch
     {
         DatabaseState.UpToDate => AlertTone.Success,
@@ -73,8 +79,10 @@
     private string DatabaseStatusText => _databaseState switch
     {
         DatabaseState.UpToDate => L["Login_DatabaseUpToDate"],
+        DatabaseState.UpdateRequired when string.Equals(_databaseErrorCode, DatabaseErrorCodes.NotInitialized, StringComparison.OrdinalIgnoreCase)
+            => L["Login_DatabaseNotInitialized"],
         DatabaseState.UpdateRequired => L["Login_DatabaseUpdateRequired"],
-        DatabaseState.Failed => L["Login_DatabaseUnavailable"],
+        DatabaseState.Failed => GetDatabaseFailureText(),
         _ => L["Login_DatabaseChecking"]
     };
 
@@ -119,41 +127,89 @@
     private async Task CheckDatabaseStatusAsync()
     {
         _databaseState = DatabaseState.Checking;
+        _databaseErrorCode = null;
         try
         {
             var status = await DatabaseService.GetStatusAsync(_selectedProfileKey);
-            if (!status.CanConnect)
-            {
-                _databaseState = DatabaseState.Failed;
-                Snackbar.Error(L["Login_DatabaseUnavailable"]);
-                return;
-            }
-            _databaseState = status.IsUpToDate ? DatabaseState.UpToDate : DatabaseState.UpdateRequired;
+            ApplyDatabaseStatus(status);
+
+            if (_databaseState == DatabaseState.Failed)
+                Snackbar.Error(GetDatabaseFailureText());
         }
         catch (ApiClientException ex)
         {
             _databaseState = DatabaseState.Failed;
+            _databaseErrorCode = ex.Error.Code;
             ApiFeedback.Show(ex.Error);
         }
     }
 
-    private async Task UpdateDatabaseAsync(MouseEventArgs _)
+    private async Task HandleDatabaseActionAsync(MouseEventArgs _)
     {
-        if (IsDatabaseUpdateButtonDisabled) return;
+        if (IsDatabaseUpdateButtonDisabled)
+            return;
+
+        if (_databaseState == DatabaseState.Failed)
+        {
+            await CheckDatabaseStatusAsync();
+            return;
+        }
+
+        await UpdateDatabaseAsync();
+    }
+
+    private async Task UpdateDatabaseAsync()
+    {
         _databaseUpdating = true;
+        _databaseErrorCode = null;
         try
         {
             var status = await DatabaseService.UpdateAsync(_selectedProfileKey);
-            _databaseState = status.CanConnect && status.IsUpToDate ? DatabaseState.UpToDate : DatabaseState.UpdateRequired;
-            if (_databaseState != DatabaseState.UpToDate) Snackbar.Error(L["Login_DatabaseUpdateFailed"]);
+            ApplyDatabaseStatus(status);
+
+            if (_databaseState == DatabaseState.Failed)
+                Snackbar.Error(GetDatabaseFailureText());
+            else if (_databaseState != DatabaseState.UpToDate)
+                Snackbar.Error(L["Login_DatabaseUpdateFailed"]);
         }
         catch (ApiClientException ex)
         {
             _databaseState = DatabaseState.Failed;
+            _databaseErrorCode = ex.Error.Code;
             ApiFeedback.Show(ex.Error);
         }
-        finally { _databaseUpdating = false; }
+        finally
+        {
+            _databaseUpdating = false;
+        }
     }
+
+    private void ApplyDatabaseStatus(DatabaseUpdateStatusDto status)
+    {
+        _databaseErrorCode = status.ErrorCode;
+
+        if (!status.CanConnect)
+        {
+            _databaseState = DatabaseState.Failed;
+            return;
+        }
+
+        _databaseState = status.IsUpToDate
+            ? DatabaseState.UpToDate
+            : DatabaseState.UpdateRequired;
+    }
+
+    private string GetDatabaseFailureText() => _databaseErrorCode switch
+    {
+        DatabaseErrorCodes.ServerUnavailable => L["Login_DatabaseServerUnavailable"],
+        DatabaseErrorCodes.CertificateError => L["Login_DatabaseCertificateError"],
+        DatabaseErrorCodes.AuthenticationFailed => L["Login_DatabaseAuthenticationFailed"],
+        DatabaseErrorCodes.AccessDenied => L["Login_DatabaseAccessDenied"],
+        DatabaseErrorCodes.ConfigurationInvalid => L["Login_DatabaseConfigurationInvalid"],
+        DatabaseErrorCodes.StatusCheckFailed => L["Login_DatabaseStatusCheckFailed"],
+        DatabaseErrorCodes.UpdateFailed => L["Login_DatabaseUpdateFailed"],
+        _ => L["Login_DatabaseUnavailable"]
+    };
 
     private async Task LoginAsync()
     {

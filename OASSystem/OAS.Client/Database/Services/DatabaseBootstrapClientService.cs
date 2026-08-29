@@ -14,7 +14,7 @@ public sealed class DatabaseBootstrapClientService(OasApiClient apiClient, Datab
     {
         selection.SelectedProfileKey = profileKey;
         return await apiClient.GetAsync<DatabaseUpdateStatusDto>($"api/database/bootstrap/status?profileKey={Uri.EscapeDataString(profileKey)}", cancellationToken)
-            ?? new DatabaseUpdateStatusDto(profileKey, false, false, 0, "database_unavailable");
+            ?? new DatabaseUpdateStatusDto(profileKey, false, false, 0, DatabaseErrorCodes.Unavailable);
     }
 
     public async Task<DatabaseUpdateStatusDto> UpdateAsync(string profileKey, CancellationToken cancellationToken = default)
@@ -22,6 +22,6 @@ public sealed class DatabaseBootstrapClientService(OasApiClient apiClient, Datab
         selection.SelectedProfileKey = profileKey;
         return await apiClient.PostAsync<DatabaseUpdateRequest, DatabaseUpdateStatusDto>(
             "api/database/bootstrap/update", new DatabaseUpdateRequest(profileKey), cancellationToken)
-            ?? new DatabaseUpdateStatusDto(profileKey, false, false, 0, "database_update_failed");
+            ?? new DatabaseUpdateStatusDto(profileKey, false, false, 0, DatabaseErrorCodes.UpdateFailed);
     }
 }

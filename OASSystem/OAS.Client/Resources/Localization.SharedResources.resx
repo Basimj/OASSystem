@@ -318,4 +318,28 @@
   <data name="login_password_max_length" xml:space="preserve">
     <value>Password is too long.</value>
   </data>
+  <data name="Login_RetryDatabase" xml:space="preserve">
+    <value>Retry connection</value>
+  </data>
+  <data name="Login_DatabaseNotInitialized" xml:space="preserve">
+    <value>Database is not initialized; an update is required</value>
+  </data>
+  <data name="Login_DatabaseServerUnavailable" xml:space="preserve">
+    <value>SQL Server is unavailable or the configured instance cannot be reached</value>
+  </data>
+  <data name="Login_DatabaseCertificateError" xml:space="preserve">
+    <value>The SQL Server TLS certificate could not be validated</value>
+  </data>
+  <data name="Login_DatabaseAuthenticationFailed" xml:space="preserve">
+    <value>SQL Server authentication failed</value>
+  </data>
+  <data name="Login_DatabaseAccessDenied" xml:space="preserve">
+    <value>The application does not have permission to access the database</value>
+  </data>
+  <data name="Login_DatabaseConfigurationInvalid" xml:space="preserve">
+    <value>The database connection configuration is invalid</value>
+  </data>
+  <data name="Login_DatabaseStatusCheckFailed" xml:space="preserve">
+    <value>The database is reachable, but its migration status could not be checked</value>
+  </data>
 </root>

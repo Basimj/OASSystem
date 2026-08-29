@@ -318,4 +318,28 @@
   <data name="login_password_max_length" xml:space="preserve">
     <value>كلمة المرور أطول من الحد المسموح.</value>
   </data>
+  <data name="Login_RetryDatabase" xml:space="preserve">
+    <value>إعادة المحاولة</value>
+  </data>
+  <data name="Login_DatabaseNotInitialized" xml:space="preserve">
+    <value>قاعدة البيانات غير مهيأة بعد وتحتاج إلى تحديث</value>
+  </data>
+  <data name="Login_DatabaseServerUnavailable" xml:space="preserve">
+    <value>تعذر الوصول إلى SQL Server أو أن اسم الخادم/النسخة غير صحيح</value>
+  </data>
+  <data name="Login_DatabaseCertificateError" xml:space="preserve">
+    <value>تعذر التحقق من شهادة TLS الخاصة بـ SQL Server</value>
+  </data>
+  <data name="Login_DatabaseAuthenticationFailed" xml:space="preserve">
+    <value>فشلت مصادقة الاتصال بـ SQL Server</value>
+  </data>
+  <data name="Login_DatabaseAccessDenied" xml:space="preserve">
+    <value>حساب تشغيل النظام لا يملك صلاحية الوصول إلى قاعدة البيانات</value>
+  </data>
+  <data name="Login_DatabaseConfigurationInvalid" xml:space="preserve">
+    <value>إعدادات الاتصال بقاعدة البيانات غير صحيحة</value>
+  </data>
+  <data name="Login_DatabaseStatusCheckFailed" xml:space="preserve">
+    <value>تم الوصول إلى قاعدة البيانات لكن تعذر فحص حالة التحديثات</value>
+  </data>
 </root>
