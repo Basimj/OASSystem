@@ -10,3 +10,40 @@ TestResults/
 coverage/
 appsettings.*.local.json
 secrets.json
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# .NET build
+**/bin/
+**/obj/
+
+# Test results
+TestResults/
+**/TestResults/
+
+# IDE
+.idea/
+
+# Logs
+*.log
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Publish output
+**/publish/
+
+# NuGet
+*.nupkg
+*.snupkg
+
+# Temporary files
+*.tmp
+*.temp
+~$*
