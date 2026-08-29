@@ -1,0 +1,3 @@
+.ui-confirm-dialog__message { line-height: 1.7; }
+.ui-confirm-dialog__message--danger { color: var(--oas-color-danger); }
+.ui-confirm-dialog__message--warning { color: var(--oas-color-warning); }

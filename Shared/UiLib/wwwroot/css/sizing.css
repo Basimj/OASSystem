@@ -1,0 +1,10 @@
+:root {
+    --oas-font-sm: .8125rem;
+    --oas-font-md: .875rem;
+    --oas-font-lg: 1rem;
+    --oas-control-sm: 1.875rem;
+    --oas-control-md: 2.25rem;
+    --oas-control-lg: 2.75rem;
+}
+html, body, #app { min-height: 100%; margin: 0; }
+body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }

@@ -1,0 +1,58 @@
+.ui-snackbar-host {
+    position: fixed;
+    z-index: 4000;
+    display: flex;
+    flex-direction: column;
+    gap: var(--oas-space-2);
+    width: min(24rem, calc(100vw - 2rem));
+    pointer-events: none;
+}
+.ui-snackbar-host--top-left { top: 1rem; left: 1rem; }
+.ui-snackbar-host--top-center { top: 1rem; left: 50%; transform: translateX(-50%); }
+.ui-snackbar-host--top-right { top: 1rem; right: 1rem; }
+.ui-snackbar-host--center-left { top: 50%; left: 1rem; transform: translateY(-50%); }
+.ui-snackbar-host--center { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+.ui-snackbar-host--center-right { top: 50%; right: 1rem; transform: translateY(-50%); }
+.ui-snackbar-host--bottom-left { bottom: 1rem; left: 1rem; }
+.ui-snackbar-host--bottom-center { bottom: 1rem; left: 50%; transform: translateX(-50%); }
+.ui-snackbar-host--bottom-right { right: 1rem; bottom: 1rem; }
+.ui-snackbar {
+    pointer-events: auto;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--oas-space-2);
+    min-height: 2.75rem;
+    padding: var(--oas-space-2) var(--oas-space-3);
+    border: 1px solid var(--oas-color-border);
+    border-radius: var(--oas-radius-md);
+    background: var(--oas-color-surface);
+    color: var(--oas-color-text);
+    box-shadow: 0 10px 30px rgb(16 24 40 / 16%);
+    animation: ui-snackbar-in .16s ease-out;
+}
+.ui-snackbar__status { width: .6rem; height: .6rem; border-radius: 50%; background: var(--oas-color-info-border); }
+.ui-snackbar--success .ui-snackbar__status { background: var(--oas-color-success); }
+.ui-snackbar--warning .ui-snackbar__status { background: var(--oas-color-warning); }
+.ui-snackbar--danger .ui-snackbar__status { background: var(--oas-color-danger); }
+.ui-snackbar--success { border-color: color-mix(in srgb, var(--oas-color-success) 28%, var(--oas-color-border)); }
+.ui-snackbar--warning { border-color: color-mix(in srgb, var(--oas-color-warning) 28%, var(--oas-color-border)); }
+.ui-snackbar--danger { border-color: color-mix(in srgb, var(--oas-color-danger) 28%, var(--oas-color-border)); }
+.ui-snackbar__message { min-width: 0; overflow-wrap: anywhere; font-size: var(--oas-font-sm); }
+.ui-snackbar__close {
+    display: inline-grid;
+    place-items: center;
+    width: 1.8rem;
+    height: 1.8rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--oas-color-text-muted);
+    font: inherit;
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+}
+.ui-snackbar__close:hover { background: var(--oas-color-hover); color: var(--oas-color-text); }
+@keyframes ui-snackbar-in { from { opacity: 0; transform: translateY(-.35rem); } to { opacity: 1; transform: translateY(0); } }

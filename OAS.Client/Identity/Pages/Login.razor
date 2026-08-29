@@ -1,0 +1,194 @@
+@using OAS.Client.Database.Services
+@using OAS.Client.Database.State
+@using OAS.Contracts.Database
+@page "/login"
+@attribute [AllowAnonymous]
+@inject IAuthClientService AuthService
+@inject IDatabaseBootstrapClientService DatabaseService
+@inject DatabaseProfileSelectionState DatabaseSelection
+@inject OasAuthenticationStateProvider AuthState
+@inject NavigationManager Navigation
+@inject IApiFeedbackService ApiFeedback
+@inject IUiSnackbarService Snackbar
+
+<PageTitle>@L["Login_Title"]</PageTitle>
+
+<UiPage Placement="PagePlacement.Center">
+    <UiCard Width="SurfaceWidth.Medium">
+        <UiGrid Columns="2">
+            <UiForm Model="_model" OnSubmit="LoginAsync">
+                <UiStackLayout Gap="StackGap.Small">
+                    <UiGrid Columns="2" Ratio="GridRatio.Equal">
+                        <UiSelect @bind-Value="_selectedProfileKey"
+                                  OnValueChanged="OnProfileChangedAsync"
+                                  Label="@L["Login_Database"]"
+                                  Options="_profileOptions"
+                                  Disabled="@(_profilesLoading || _profiles.Count <= 1 || _databaseUpdating)"
+                                  Size="ControlSize.Small" />
+                        <UiStatusAction Text="@L["Login_UpdateDatabase"]"
+                                        StatusText="@DatabaseStatusText"
+                                        Tone="@DatabaseStatusTone"
+                                        Disabled="@IsDatabaseUpdateButtonDisabled"
+                                        Loading="@(_databaseState == DatabaseState.Checking || _databaseUpdating)"
+                                        OnClick="UpdateDatabaseAsync"
+                                        AlignToLabeledControl="true"
+                                        Size="ControlSize.Small" />
+                    </UiGrid>
+<UiInputText @bind-Value="_model.Login" Label="@L["Login_UserNameOrEmail"]" AutoComplete="username" Required="true" EnableNativeValidation="false" Disabled="@LoginFieldsDisabled" Size="ControlSize.Small" />
+                    <UiInputText @bind-Value="_model.Password" Type="password" RevealPassword="true" Label="@L["Login_Password"]" AutoComplete="current-password" Required="true" EnableNativeValidation="false" Disabled="@LoginFieldsDisabled" Size="ControlSize.Small" />
+                    <UiCheckbox @bind-Value="_model.RememberMe" Label="@L["Login_RememberMe"]" Disabled="@LoginFieldsDisabled" />
+                    <UiButton Type="submit" Text="@L["Login_Button"]" Loading="_loading" FullWidth="true" Disabled="@LoginFieldsDisabled" Size="ControlSize.Small" />
+                </UiStackLayout>
+            </UiForm>
+
+            <UiPictureBox Alt="@L["Login_SystemImage"]" FallbackText="OAS" />
+        </UiGrid>
+    </UiCard>
+</UiPage>
+
+@code {
+    private enum DatabaseState { NotChecked, Checking, UpToDate, UpdateRequired, Failed }
+
+    private readonly LoginFormModel _model = new();
+    private IReadOnlyList<DatabaseProfileDto> _profiles = [];
+    private IReadOnlyList<UiSelectOption> _profileOptions = [];
+    private string _selectedProfileKey = "Default";
+    private DatabaseState _databaseState = DatabaseState.NotChecked;
+    private bool _profilesLoading = true;
+    private bool _databaseUpdating;
+    private bool _loading;
+
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+
+    private bool LoginFieldsDisabled => _profilesLoading || _databaseUpdating || _databaseState != DatabaseState.UpToDate || _loading;
+    private bool IsDatabaseUpdateButtonDisabled => _profilesLoading || _databaseUpdating || _databaseState != DatabaseState.UpdateRequired;
+    private AlertTone DatabaseStatusTone => _databaseState switch
+    {
+        DatabaseState.UpToDate => AlertTone.Success,
+        DatabaseState.UpdateRequired => AlertTone.Warning,
+        DatabaseState.Failed => AlertTone.Danger,
+        _ => AlertTone.Info
+    };
+    private string DatabaseStatusText => _databaseState switch
+    {
+        DatabaseState.UpToDate => L["Login_DatabaseUpToDate"],
+        DatabaseState.UpdateRequired => L["Login_DatabaseUpdateRequired"],
+        DatabaseState.Failed => L["Login_DatabaseUnavailable"],
+        _ => L["Login_DatabaseChecking"]
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDatabaseProfilesAsync();
+        if (_databaseState == DatabaseState.UpToDate)
+        {
+            var state = await AuthState.GetAuthenticationStateAsync();
+            if (state.User.Identity?.IsAuthenticated == true)
+                Navigation.NavigateTo(AuthState.CurrentUser?.MustChangePassword == true ? "/identity/change-password" : "/", replace: true);
+        }
+    }
+
+    private async Task LoadDatabaseProfilesAsync()
+    {
+        _profilesLoading = true;
+        try
+        {
+            var response = await DatabaseService.GetProfilesAsync();
+            _profiles = response.Profiles;
+            _selectedProfileKey = _profiles.FirstOrDefault(x => x.IsDefault)?.Key ?? response.DefaultProfileKey;
+            DatabaseSelection.SelectedProfileKey = _selectedProfileKey;
+            _profileOptions = _profiles.Select(x => new UiSelectOption(x.Key, x.DisplayName)).ToArray();
+            await CheckDatabaseStatusAsync();
+        }
+        catch (ApiClientException ex)
+        {
+            _databaseState = DatabaseState.Failed;
+            ApiFeedback.Show(ex.Error);
+        }
+        finally { _profilesLoading = false; }
+    }
+
+    private async Task OnProfileChangedAsync(string? _)
+    {
+        DatabaseSelection.SelectedProfileKey = _selectedProfileKey;
+        AuthState.SetAnonymous();
+        await CheckDatabaseStatusAsync();
+    }
+
+    private async Task CheckDatabaseStatusAsync()
+    {
+        _databaseState = DatabaseState.Checking;
+        try
+        {
+            var status = await DatabaseService.GetStatusAsync(_selectedProfileKey);
+            if (!status.CanConnect)
+            {
+                _databaseState = DatabaseState.Failed;
+                Snackbar.Error(L["Login_DatabaseUnavailable"]);
+                return;
+            }
+            _databaseState = status.IsUpToDate ? DatabaseState.UpToDate : DatabaseState.UpdateRequired;
+        }
+        catch (ApiClientException ex)
+        {
+            _databaseState = DatabaseState.Failed;
+            ApiFeedback.Show(ex.Error);
+        }
+    }
+
+    private async Task UpdateDatabaseAsync(MouseEventArgs _)
+    {
+        if (IsDatabaseUpdateButtonDisabled) return;
+        _databaseUpdating = true;
+        try
+        {
+            var status = await DatabaseService.UpdateAsync(_selectedProfileKey);
+            _databaseState = status.CanConnect && status.IsUpToDate ? DatabaseState.UpToDate : DatabaseState.UpdateRequired;
+            if (_databaseState != DatabaseState.UpToDate) Snackbar.Error(L["Login_DatabaseUpdateFailed"]);
+        }
+        catch (ApiClientException ex)
+        {
+            _databaseState = DatabaseState.Failed;
+            ApiFeedback.Show(ex.Error);
+        }
+        finally { _databaseUpdating = false; }
+    }
+
+    private async Task LoginAsync()
+    {
+        if (LoginFieldsDisabled) return;
+
+        _loading = true;
+        DatabaseSelection.SelectedProfileKey = _selectedProfileKey;
+        try
+        {
+            var result = await AuthService.LoginAsync(new LoginRequest(_model.Login.Trim(), _model.Password, _model.RememberMe));
+            if (!result.Succeeded || result.Value is null)
+            {
+                if (result.Error is not null) ApiFeedback.Show(result.Error);
+                else ApiFeedback.ShowUnexpected();
+                return;
+            }
+
+            AuthState.SetAuthenticated(result.Value);
+            Navigation.NavigateTo(result.Value.MustChangePassword ? "/identity/change-password" : GetSafeReturnUrl(), replace: true);
+        }
+        catch (OperationCanceledException) { }
+        catch
+        {
+            ApiFeedback.ShowUnexpected();
+        }
+        finally { _loading = false; }
+    }
+
+    private string GetSafeReturnUrl() =>
+        !string.IsNullOrWhiteSpace(ReturnUrl) && ReturnUrl.StartsWith('/') && !ReturnUrl.StartsWith("//") ? ReturnUrl : "/";
+
+    private sealed class LoginFormModel
+    {
+        public string Login { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public bool RememberMe { get; set; }
+    }
+}

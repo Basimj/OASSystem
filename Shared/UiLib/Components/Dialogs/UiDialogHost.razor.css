@@ -1,0 +1,10 @@
+.ui-dialog-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 3900;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    background: rgb(16 24 40 / 45%);
+    outline: none;
+}

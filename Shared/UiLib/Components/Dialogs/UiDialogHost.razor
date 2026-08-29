@@ -1,0 +1,32 @@
+@if (Dialog.Current is { } request)
+{
+    <div class="ui-dialog-backdrop"
+         tabindex="-1"
+         @onclick="HandleBackdropClick"
+         @onkeydown="HandleKeyDown">
+        @if (request.IsConfirm)
+        {
+            <UiConfirmDialog Title="@(request.Title ?? string.Empty)"
+                             Message="@(request.Message ?? string.Empty)"
+                             Tone="@request.Tone"
+                             Size="@request.Options.Size"
+                             ShowCloseButton="@request.Options.ShowCloseButton"
+                             ConfirmText="@request.ConfirmText"
+                             CancelText="@request.CancelText"
+                             OnConfirm="ConfirmAsync"
+                             OnCancel="CancelAsync" />
+        }
+        else
+        {
+            <UiDialog Title="@request.Title"
+                      Size="@request.Options.Size"
+                      ShowCloseButton="@request.Options.ShowCloseButton"
+                      OnClose="CancelAsync">
+                @if (request.ComponentType is not null)
+                {
+                    <DynamicComponent Type="@request.ComponentType" Parameters="@request.Parameters" />
+                }
+            </UiDialog>
+        }
+    </div>
+}

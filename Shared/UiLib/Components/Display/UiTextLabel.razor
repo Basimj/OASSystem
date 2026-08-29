@@ -1,0 +1,14 @@
+@if (!string.IsNullOrWhiteSpace(For))
+{
+    <label for="@For" class="@LabelCssClass" @attributes="SafeAdditionalAttributes">
+        @LabelContent
+        @if (Required) { <span class="ui-text-label__required" aria-hidden="true">*</span> }
+    </label>
+}
+else
+{
+    <span class="@LabelCssClass" @attributes="SafeAdditionalAttributes">
+        @LabelContent
+        @if (Required) { <span class="ui-text-label__required" aria-hidden="true">*</span> }
+    </span>
+}

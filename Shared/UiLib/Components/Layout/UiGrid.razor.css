@@ -1,0 +1,12 @@
+.ui-grid { display: grid; gap: var(--oas-space-2); align-items: stretch; }
+.ui-grid--1 { grid-template-columns: 1fr; }
+.ui-grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ui-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ui-grid--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.ui-grid--2.ui-grid--twotoone { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+.ui-grid--2.ui-grid--onetotwo { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+@media (max-width: 48rem) {
+    .ui-grid,
+    .ui-grid--2.ui-grid--twotoone,
+    .ui-grid--2.ui-grid--onetotwo { grid-template-columns: 1fr; }
+}

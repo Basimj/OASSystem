@@ -1,0 +1,5 @@
+.ui-alert { padding: var(--oas-space-3); border-radius: var(--oas-radius-md); border: 1px solid transparent; font-size: var(--oas-font-md); }
+.ui-alert--info { background: var(--oas-color-info-surface); border-color: var(--oas-color-info-border); }
+.ui-alert--success { background: var(--oas-color-success-surface); border-color: var(--oas-color-success); }
+.ui-alert--warning { background: var(--oas-color-warning-surface); border-color: var(--oas-color-warning); }
+.ui-alert--danger { background: var(--oas-color-danger-surface); border-color: var(--oas-color-danger); }

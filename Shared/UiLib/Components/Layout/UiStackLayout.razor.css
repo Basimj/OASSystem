@@ -1,0 +1,4 @@
+.ui-stack { display: grid; }
+.ui-stack--small { gap: var(--oas-space-2); }
+.ui-stack--medium { gap: var(--oas-space-4); }
+.ui-stack--large { gap: var(--oas-space-5); }

@@ -1,0 +1,33 @@
+@typeparam TItem
+<div class="ui-data-table__container">
+    <table class="ui-data-table">
+        <thead>
+            <tr>
+                @foreach (var column in Columns)
+                {
+                    <th>@column.Header</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @if (Items.Count == 0)
+            {
+                <tr>
+                    <td colspan="@Math.Max(1, Columns.Count)" class="ui-data-table__empty">@EmptyText</td>
+                </tr>
+            }
+            else
+            {
+                @foreach (var item in Items)
+                {
+                    <tr>
+                        @foreach (var column in Columns)
+                        {
+                            <td>@column.ValueSelector(item)</td>
+                        }
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>

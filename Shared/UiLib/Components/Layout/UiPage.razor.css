@@ -1,0 +1,8 @@
+.ui-page { display: grid; gap: var(--oas-space-3); min-width: 0; }
+.ui-page--center { min-height: 100dvh; place-items: center; padding: var(--oas-space-3); box-sizing: border-box; }
+.ui-page--center > .ui-page__content { width: 100%; }
+.ui-page__header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--oas-space-3); }
+.ui-page__heading h1 { margin: 0; font-size: 1.25rem; line-height: 1.3; }
+.ui-page__heading p { margin: var(--oas-space-1) 0 0; color: var(--oas-color-text-muted); font-size: var(--oas-font-sm); }
+.ui-page__actions { display: flex; align-items: center; gap: var(--oas-space-2); }
+.ui-page__content { min-width: 0; }

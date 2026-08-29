@@ -1,0 +1,17 @@
+@inherits InputBase<string?>
+<div class="ui-select">
+    @if (!string.IsNullOrWhiteSpace(Label))
+    {
+        <UiTextLabel For="@InputId" Text="@Label" Required="@Required" Size="@Size" />
+    }
+    <select id="@InputId" class="@InputCssClass" value="@CurrentValueAsString" disabled="@Disabled" required="@(Required && EnableNativeValidation)" aria-required="@Required.ToString().ToLowerInvariant()" @onchange="HandleChangedAsync">
+        @if (!string.IsNullOrWhiteSpace(Placeholder))
+        {
+            <option value="">@Placeholder</option>
+        }
+        @foreach (var option in Options)
+        {
+            <option value="@option.Value">@option.Text</option>
+        }
+    </select>
+</div>

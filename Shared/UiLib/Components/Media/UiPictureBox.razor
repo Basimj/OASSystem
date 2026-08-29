@@ -1,0 +1,10 @@
+<figure class="ui-picture-box">
+    @if (!string.IsNullOrWhiteSpace(Src))
+    {
+        <img src="@Src" alt="@Alt" loading="lazy" />
+    }
+    else
+    {
+        <div class="ui-picture-box__fallback" role="img" aria-label="@Alt">@FallbackText</div>
+    }
+</figure>

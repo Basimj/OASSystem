@@ -1,0 +1,11 @@
+:root {
+    --oas-space-1: .25rem;
+    --oas-space-2: .5rem;
+    --oas-space-3: .75rem;
+    --oas-space-4: 1rem;
+    --oas-space-5: 1.25rem;
+    --oas-radius-sm: .25rem;
+    --oas-radius-md: .375rem;
+    --oas-radius-lg: .5rem;
+    --oas-shadow-sm: 0 1px 2px rgb(16 24 40 / 5%);
+}

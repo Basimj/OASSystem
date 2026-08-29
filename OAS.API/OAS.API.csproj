@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <RootNamespace>OAS.API</RootNamespace>
+    <AssemblyName>OAS.API</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="9.0.8" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.4" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\OAS.Application\OAS.Application.csproj" />
+    <ProjectReference Include="..\OAS.Contracts\OAS.Contracts.csproj" />
+    <ProjectReference Include="..\OAS.Infrastructure\OAS.Infrastructure.csproj" />
+    <ProjectReference Include="..\OAS.Client\OAS.Client.csproj" />
+    <ProjectReference Include="..\Shared\UiLib\OAS.UiLib.csproj" />
+  </ItemGroup>
+</Project>

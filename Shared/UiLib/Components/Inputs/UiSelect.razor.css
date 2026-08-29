@@ -1,0 +1,6 @@
+.ui-select { display: grid; gap: var(--oas-space-1); width: 100%; }
+.ui-select__control { width: 100%; box-sizing: border-box; border: 1px solid var(--oas-color-border); border-radius: var(--oas-radius-md); background: var(--oas-color-surface); color: var(--oas-color-text); font: inherit; outline: none; }
+.ui-select__control--small { min-height: var(--oas-control-sm); padding-inline: var(--oas-space-2); font-size: var(--oas-font-sm); }
+.ui-select__control--medium { min-height: var(--oas-control-md); padding-inline: var(--oas-space-3); font-size: var(--oas-font-md); }
+.ui-select__control--large { min-height: var(--oas-control-lg); padding-inline: var(--oas-space-4); font-size: var(--oas-font-lg); }
+.ui-select__control:focus { border-color: var(--oas-color-primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--oas-color-primary) 18%, transparent); }
