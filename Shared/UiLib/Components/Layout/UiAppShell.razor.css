@@ -1,0 +1,7 @@
+.ui-app-shell { min-height: 100vh; background: var(--oas-color-background); color: var(--oas-color-text); }
+.ui-app-shell__header { position: sticky; top: 0; z-index: 20; min-height: 3.5rem; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: var(--oas-space-4); padding: var(--oas-space-2) var(--oas-space-5); background: var(--oas-color-surface); border-bottom: 1px solid var(--oas-color-border); }
+.ui-app-shell__brand { font-size: var(--oas-font-lg); font-weight: 700; white-space: nowrap; }
+.ui-app-shell__nav { display: flex; align-items: center; gap: var(--oas-space-2); min-width: 0; }
+.ui-app-shell__actions { display: flex; align-items: center; gap: var(--oas-space-2); }
+.ui-app-shell__content { width: min(100%, 90rem); margin-inline: auto; padding: var(--oas-space-5); box-sizing: border-box; }
+@media (max-width: 44rem) { .ui-app-shell__header { grid-template-columns: 1fr auto; } .ui-app-shell__nav { grid-column: 1 / -1; order: 3; overflow-x: auto; } .ui-app-shell__content { padding: var(--oas-space-3); } }

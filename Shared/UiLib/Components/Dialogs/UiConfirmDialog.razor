@@ -1,0 +1,12 @@
+<UiDialog Title="@Title"
+          Size="@Size"
+          ShowCloseButton="@ShowCloseButton"
+          OnClose="CloseAsync">
+    <ChildContent>
+        <div class="@MessageCssClass">@Message</div>
+    </ChildContent>
+    <Footer>
+        <UiButton Variant="ButtonVariant.Secondary" Text="@ResolvedCancelText" OnClick="CancelAsync" />
+        <UiButton Variant="@ConfirmVariant" Text="@ResolvedConfirmText" OnClick="ConfirmAsync" />
+    </Footer>
+</UiDialog>

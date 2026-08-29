@@ -1,0 +1,3 @@
+.ui-nav-link { color: var(--oas-color-text-muted); text-decoration: none; border-radius: var(--oas-radius-md); padding: var(--oas-space-2) var(--oas-space-3); font-size: var(--oas-font-md); white-space: nowrap; }
+.ui-nav-link:hover { background: var(--oas-color-hover); color: var(--oas-color-text); }
+.ui-nav-link.active { background: var(--oas-color-primary-soft); color: var(--oas-color-primary); font-weight: 600; }

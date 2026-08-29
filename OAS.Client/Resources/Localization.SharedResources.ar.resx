@@ -1,0 +1,321 @@
+<?xml version='1.0' encoding='utf-8'?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms</value>
+  </resheader>
+  <data name="App_Name" xml:space="preserve">
+    <value>نظام OAS للبصريات</value>
+  </data>
+  <data name="App_Ready" xml:space="preserve">
+    <value>البنية الأساسية للنظام جاهزة.</value>
+  </data>
+  <data name="Home_Welcome" xml:space="preserve">
+    <value>مرحبًا بك في نظام OAS.</value>
+  </data>
+  <data name="Page_NotFound" xml:space="preserve">
+    <value>الصفحة غير موجودة.</value>
+  </data>
+  <data name="Nav_Home" xml:space="preserve">
+    <value>الرئيسية</value>
+  </data>
+  <data name="Nav_Users" xml:space="preserve">
+    <value>المستخدمون</value>
+  </data>
+  <data name="Logout" xml:space="preserve">
+    <value>تسجيل الخروج</value>
+  </data>
+  <data name="Loading" xml:space="preserve">
+    <value>جاري التحميل...</value>
+  </data>
+  <data name="Login_Title" xml:space="preserve">
+    <value>تسجيل الدخول</value>
+  </data>
+  <data name="Login_Subtitle" xml:space="preserve">
+    <value>أدخل بيانات حسابك للدخول إلى النظام.</value>
+  </data>
+  <data name="Login_UserNameOrEmail" xml:space="preserve">
+    <value>اسم المستخدم أو البريد الإلكتروني</value>
+  </data>
+  <data name="Login_Password" xml:space="preserve">
+    <value>كلمة المرور</value>
+  </data>
+  <data name="Login_RememberMe" xml:space="preserve">
+    <value>تذكر تسجيل الدخول</value>
+  </data>
+  <data name="Login_Button" xml:space="preserve">
+    <value>دخول</value>
+  </data>
+  <data name="Login_InvalidCredentials" xml:space="preserve">
+    <value>اسم المستخدم/البريد الإلكتروني أو كلمة المرور غير صحيحة.</value>
+  </data>
+  <data name="Users_Title" xml:space="preserve">
+    <value>إدارة المستخدمين</value>
+  </data>
+  <data name="Users_Subtitle" xml:space="preserve">
+    <value>إضافة مستخدمي النظام ومراجعة الحسابات الحالية.</value>
+  </data>
+  <data name="Users_AddUser" xml:space="preserve">
+    <value>إضافة مستخدم</value>
+  </data>
+  <data name="Users_List" xml:space="preserve">
+    <value>المستخدمون</value>
+  </data>
+  <data name="Users_FirstName" xml:space="preserve">
+    <value>الاسم الأول</value>
+  </data>
+  <data name="Users_LastName" xml:space="preserve">
+    <value>الاسم الأخير</value>
+  </data>
+  <data name="Users_Name" xml:space="preserve">
+    <value>الاسم</value>
+  </data>
+  <data name="Users_UserName" xml:space="preserve">
+    <value>اسم المستخدم</value>
+  </data>
+  <data name="Users_Email" xml:space="preserve">
+    <value>البريد الإلكتروني</value>
+  </data>
+  <data name="Users_Password" xml:space="preserve">
+    <value>كلمة المرور</value>
+  </data>
+  <data name="Users_ConfirmPassword" xml:space="preserve">
+    <value>تأكيد كلمة المرور</value>
+  </data>
+  <data name="Users_Role" xml:space="preserve">
+    <value>الدور</value>
+  </data>
+  <data name="Users_SelectRole" xml:space="preserve">
+    <value>اختر الدور</value>
+  </data>
+  <data name="Users_IsActive" xml:space="preserve">
+    <value>الحساب فعال</value>
+  </data>
+  <data name="Users_Create" xml:space="preserve">
+    <value>إنشاء المستخدم</value>
+  </data>
+  <data name="Users_CreateSuccess" xml:space="preserve">
+    <value>تم إنشاء المستخدم بنجاح.</value>
+  </data>
+  <data name="Users_Empty" xml:space="preserve">
+    <value>لا توجد حسابات مستخدمين.</value>
+  </data>
+  <data name="Users_Status" xml:space="preserve">
+    <value>الحالة</value>
+  </data>
+  <data name="Users_LastLogin" xml:space="preserve">
+    <value>آخر دخول</value>
+  </data>
+  <data name="Users_PasswordMismatch" xml:space="preserve">
+    <value>تأكيد كلمة المرور غير مطابق.</value>
+  </data>
+  <data name="Users_PasswordPolicy" xml:space="preserve">
+    <value>يجب ألا تقل كلمة المرور عن 8 أحرف وأن تحتوي على حرف كبير وصغير ورقم ورمز.</value>
+  </data>
+  <data name="Users_UserNameExists" xml:space="preserve">
+    <value>اسم المستخدم مستخدم مسبقًا.</value>
+  </data>
+  <data name="Users_EmailExists" xml:space="preserve">
+    <value>البريد الإلكتروني مستخدم مسبقًا.</value>
+  </data>
+  <data name="Users_RoleNotFound" xml:space="preserve">
+    <value>الدور المحدد لم يعد موجودًا.</value>
+  </data>
+  <data name="Status_Active" xml:space="preserve">
+    <value>فعال</value>
+  </data>
+  <data name="Status_Inactive" xml:space="preserve">
+    <value>غير فعال</value>
+  </data>
+  <data name="Validation_RequiredFields" xml:space="preserve">
+    <value>أكمل جميع الحقول المطلوبة.</value>
+  </data>
+  <data name="Validation_InvalidData" xml:space="preserve">
+    <value>بعض البيانات غير صحيحة، راجع القيم المدخلة.</value>
+  </data>
+  <data name="Error_Generic" xml:space="preserve">
+    <value>تعذر إكمال العملية.</value>
+  </data>
+  <data name="Role_Administrator" xml:space="preserve">
+    <value>مدير النظام</value>
+  </data>
+  <data name="Role_User" xml:space="preserve">
+    <value>مستخدم</value>
+  </data>
+  <data name="Login_Database" xml:space="preserve">
+    <value>قاعدة البيانات</value>
+  </data>
+  <data name="Login_UpdateDatabase" xml:space="preserve">
+    <value>تحديث قاعدة البيانات</value>
+  </data>
+  <data name="Login_DatabaseUpToDate" xml:space="preserve">
+    <value>قاعدة البيانات محدثة</value>
+  </data>
+  <data name="Login_DatabaseUpdateRequired" xml:space="preserve">
+    <value>يوجد تحديث معلق لقاعدة البيانات</value>
+  </data>
+  <data name="Login_DatabaseUnavailable" xml:space="preserve">
+    <value>تعذر الاتصال بقاعدة البيانات</value>
+  </data>
+  <data name="Login_DatabaseChecking" xml:space="preserve">
+    <value>جاري التحقق من قاعدة البيانات</value>
+  </data>
+  <data name="Login_DatabaseUpdateFailed" xml:space="preserve">
+    <value>فشل تحديث قاعدة البيانات</value>
+  </data>
+  <data name="Login_SystemImage" xml:space="preserve">
+    <value>صورة النظام</value>
+  </data>
+  <data name="ChangePassword_Title" xml:space="preserve">
+    <value>تغيير كلمة المرور</value>
+  </data>
+  <data name="ChangePassword_Current" xml:space="preserve">
+    <value>كلمة المرور الحالية</value>
+  </data>
+  <data name="ChangePassword_New" xml:space="preserve">
+    <value>كلمة المرور الجديدة</value>
+  </data>
+  <data name="ChangePassword_Confirm" xml:space="preserve">
+    <value>تأكيد كلمة المرور الجديدة</value>
+  </data>
+  <data name="ChangePassword_Button" xml:space="preserve">
+    <value>تغيير كلمة المرور</value>
+  </data>
+  <data name="ChangePassword_CurrentInvalid" xml:space="preserve">
+    <value>كلمة المرور الحالية غير صحيحة</value>
+  </data>
+  <data name="ChangePassword_Reused" xml:space="preserve">
+    <value>تم استخدام كلمة المرور هذه مؤخراً. اختر كلمة مرور مختلفة.</value>
+  </data>
+  <data name="Users_Privilege" xml:space="preserve">
+    <value>الصلاحية</value>
+  </data>
+  <data name="Users_SuperAdmin" xml:space="preserve">
+    <value>المستخدم الرئيسي</value>
+  </data>
+  <data name="current_password_required" xml:space="preserve">
+    <value>كلمة المرور الحالية مطلوبة.</value>
+  </data>
+  <data name="new_password_required" xml:space="preserve">
+    <value>كلمة المرور الجديدة مطلوبة.</value>
+  </data>
+  <data name="confirm_password_required" xml:space="preserve">
+    <value>تأكيد كلمة المرور مطلوب.</value>
+  </data>
+  <data name="password_min_length" xml:space="preserve">
+    <value>يجب ألا تقل كلمة المرور عن 8 أحرف.</value>
+  </data>
+  <data name="password_max_length" xml:space="preserve">
+    <value>يجب ألا تزيد كلمة المرور عن 128 حرفًا.</value>
+  </data>
+  <data name="password_uppercase_required" xml:space="preserve">
+    <value>يجب أن تحتوي كلمة المرور على حرف إنجليزي كبير.</value>
+  </data>
+  <data name="password_lowercase_required" xml:space="preserve">
+    <value>يجب أن تحتوي كلمة المرور على حرف إنجليزي صغير.</value>
+  </data>
+  <data name="password_digit_required" xml:space="preserve">
+    <value>يجب أن تحتوي كلمة المرور على رقم.</value>
+  </data>
+  <data name="password_special_required" xml:space="preserve">
+    <value>يجب أن تحتوي كلمة المرور على رمز.</value>
+  </data>
+  <data name="password_confirmation_mismatch" xml:space="preserve">
+    <value>تأكيد كلمة المرور غير مطابق.</value>
+  </data>
+  <data name="identity_current_password_invalid" xml:space="preserve">
+    <value>كلمة المرور الحالية غير صحيحة.</value>
+  </data>
+  <data name="identity_password_reused" xml:space="preserve">
+    <value>تم استخدام كلمة المرور هذه مؤخرًا. اختر كلمة مرور مختلفة.</value>
+  </data>
+  <data name="password_change_success" xml:space="preserve">
+    <value>تم تغيير كلمة المرور بنجاح.</value>
+  </data>
+  <data name="network_error" xml:space="preserve">
+    <value>تعذر الاتصال بالخادم. تحقق من الاتصال وحاول مرة أخرى.</value>
+  </data>
+  <data name="response_parse_error" xml:space="preserve">
+    <value>أعاد الخادم استجابة غير صالحة.</value>
+  </data>
+  <data name="validation_failed" xml:space="preserve">
+    <value>راجع البيانات المدخلة.</value>
+  </data>
+  <data name="unexpected_error" xml:space="preserve">
+    <value>حدث خطأ غير متوقع.</value>
+  </data>
+  <data name="http_error" xml:space="preserve">
+    <value>تعذر إكمال الطلب.</value>
+  </data>
+  <data name="login_required" xml:space="preserve">
+    <value>اسم المستخدم أو البريد الإلكتروني مطلوب.</value>
+  </data>
+  <data name="login_max_length" xml:space="preserve">
+    <value>اسم المستخدم أو البريد الإلكتروني أطول من الحد المسموح.</value>
+  </data>
+  <data name="password_required" xml:space="preserve">
+    <value>كلمة المرور مطلوبة.</value>
+  </data>
+  <data name="user_name_required" xml:space="preserve">
+    <value>اسم المستخدم مطلوب.</value>
+  </data>
+  <data name="user_name_min_length" xml:space="preserve">
+    <value>يجب ألا يقل اسم المستخدم عن 3 أحرف.</value>
+  </data>
+  <data name="user_name_max_length" xml:space="preserve">
+    <value>اسم المستخدم أطول من الحد المسموح.</value>
+  </data>
+  <data name="user_name_invalid_format" xml:space="preserve">
+    <value>اسم المستخدم يحتوي على رموز غير مسموحة.</value>
+  </data>
+  <data name="first_name_required" xml:space="preserve">
+    <value>الاسم الأول مطلوب.</value>
+  </data>
+  <data name="first_name_max_length" xml:space="preserve">
+    <value>الاسم الأول أطول من الحد المسموح.</value>
+  </data>
+  <data name="last_name_required" xml:space="preserve">
+    <value>اسم العائلة مطلوب.</value>
+  </data>
+  <data name="last_name_max_length" xml:space="preserve">
+    <value>اسم العائلة أطول من الحد المسموح.</value>
+  </data>
+  <data name="email_invalid" xml:space="preserve">
+    <value>البريد الإلكتروني غير صحيح.</value>
+  </data>
+  <data name="email_max_length" xml:space="preserve">
+    <value>البريد الإلكتروني أطول من الحد المسموح.</value>
+  </data>
+  <data name="role_required" xml:space="preserve">
+    <value>الدور مطلوب.</value>
+  </data>
+  <data name="identity_username_exists" xml:space="preserve">
+    <value>اسم المستخدم مستخدم مسبقًا.</value>
+  </data>
+  <data name="identity_email_exists" xml:space="preserve">
+    <value>البريد الإلكتروني مستخدم مسبقًا.</value>
+  </data>
+  <data name="identity_role_not_found" xml:space="preserve">
+    <value>الدور المحدد غير موجود.</value>
+  </data>
+  <data name="identity_super_admin_required" xml:space="preserve">
+    <value>المستخدم الرئيسي فقط يمكنه إنشاء مدير آخر.</value>
+  </data>
+  <data name="forbidden" xml:space="preserve">
+    <value>لا تملك صلاحية تنفيذ هذه العملية.</value>
+  </data>
+  <data name="identity_invalid_credentials" xml:space="preserve">
+    <value>اسم المستخدم أو البريد الإلكتروني أو كلمة المرور غير صحيحة.</value>
+  </data>
+  <data name="login_password_max_length" xml:space="preserve">
+    <value>كلمة المرور أطول من الحد المسموح.</value>
+  </data>
+</root>

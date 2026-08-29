@@ -1,0 +1,194 @@
+@using OAS.Client
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+
+@{
+    var defaultCulture = Configuration["Localization:DefaultCulture"] ?? "ar";
+    var systemName = Configuration["Application:Name"] ?? "OAS";
+}
+
+<!DOCTYPE html>
+<html lang="@defaultCulture" dir="@(defaultCulture.StartsWith("ar", StringComparison.OrdinalIgnoreCase) ? "rtl" : "ltr")">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <base href="/" />
+    <title>@systemName</title>
+    <link rel="stylesheet" href="_content/OAS.UiLib/css/variables.css" />
+    <link rel="stylesheet" href="_content/OAS.UiLib/css/colors.css" />
+    <link rel="stylesheet" href="_content/OAS.UiLib/css/sizing.css" />
+    <link rel="stylesheet" href="_content/OAS.UiLib/css/bootstrap-loader.css" />
+    <link rel="stylesheet" href="_content/OAS.UiLib/OAS.UiLib.bundle.scp.css" />
+    <HeadOutlet @rendermode="new InteractiveWebAssemblyRenderMode(prerender: false)" />
+</head>
+<body>
+    <div id="oas-startup-loader" class="oas-boot-screen" data-state="loading" role="status" aria-live="polite">
+        <div class="oas-boot-card">
+            <div id="oas-boot-brand" class="oas-boot-brand">@systemName</div>
+            <div class="oas-boot-ring" aria-hidden="true">
+                <div id="oas-boot-ring-segments" class="oas-boot-ring__segments"></div>
+                <div id="oas-startup-percent" class="oas-boot-percentage">1%</div>
+            </div>
+            <p id="oas-startup-caption" class="oas-boot-message">جاري تهيئة نظام @systemName</p>
+            <div class="oas-boot-error">
+                <p id="oas-startup-error" class="oas-boot-error-title">تعذر تهيئة النظام</p>
+                <button id="oas-startup-retry" class="oas-boot-retry" type="button">إعادة المحاولة</button>
+            </div>
+        </div>
+    </div>
+
+    <Routes @rendermode="new InteractiveWebAssemblyRenderMode(prerender: false)" />
+
+    <script>
+        (() => {
+            const segmentCount = 36;
+            const loader = document.getElementById('oas-startup-loader');
+            const percent = document.getElementById('oas-startup-percent');
+            const segmentsHost = document.getElementById('oas-boot-ring-segments');
+            const completed = new Set();
+            const discovered = new Set();
+            let configuredTotal = 0;
+            let currentProgress = 1;
+            let hidden = false;
+
+            const segments = [];
+            for (let index = 0; index < segmentCount; index++) {
+                const segment = document.createElement('span');
+                segment.className = 'oas-boot-ring__segment';
+                segment.style.setProperty('--oas-segment-index', String(index));
+                segmentsHost?.appendChild(segment);
+                segments.push(segment);
+            }
+
+            const renderProgress = value => {
+                const normalized = Math.max(currentProgress, Math.min(100, Math.max(1, Math.round(value))));
+                currentProgress = normalized;
+                if (percent) percent.textContent = `${normalized}%`;
+                const activeCount = normalized >= 100
+                    ? segmentCount
+                    : Math.floor((normalized / 100) * segmentCount);
+                segments.forEach((segment, index) => segment.classList.toggle('is-active', index < activeCount));
+            };
+
+            const countIntegrityResources = value => {
+                if (!value || typeof value !== 'object') return 0;
+                let count = 0;
+                for (const child of Object.values(value)) {
+                    if (typeof child === 'string') {
+                        if (child.startsWith('sha256-')) count++;
+                    } else {
+                        count += countIntegrityResources(child);
+                    }
+                }
+                return count;
+            };
+
+            const refreshFromResources = () => {
+                const total = Math.max(configuredTotal, discovered.size, 1);
+                const value = Math.min(99, Math.max(1, (completed.size / total) * 100));
+                renderProgress(value);
+            };
+
+            const completeResource = key => {
+                completed.add(key);
+                refreshFromResources();
+            };
+
+            window.configureOasBootResources = resources => {
+                configuredTotal = Math.max(configuredTotal, countIntegrityResources(resources));
+                refreshFromResources();
+            };
+
+            window.loadOasBootResource = (type, name, defaultUri, integrity) => {
+                const key = `${type}:${name || defaultUri}`;
+                discovered.add(key);
+                refreshFromResources();
+
+                if (type === 'dotnetjs') {
+                    completeResource(key);
+                    return defaultUri;
+                }
+
+                const options = { cache: 'no-cache', credentials: 'same-origin' };
+                if (integrity) options.integrity = integrity;
+
+                return fetch(defaultUri, options).then(response => {
+                    if (!response.ok) throw new Error(`Failed to load ${defaultUri}: ${response.status}`);
+                    response.clone().arrayBuffer()
+                        .then(() => completeResource(key))
+                        .catch(() => completeResource(key));
+                    return response;
+                });
+            };
+
+            window.hideOasStartup = () => {
+                renderProgress(100);
+                if (hidden) return;
+                hidden = true;
+                loader?.classList.add('oas-boot-screen--leaving');
+                setTimeout(() => loader?.remove(), 140);
+            };
+
+            window.failOasStartup = () => {
+                if (loader) loader.dataset.state = 'error';
+            };
+
+            document.getElementById('oas-startup-retry')?.addEventListener('click', () => location.reload());
+            renderProgress(1);
+        })();
+    </script>
+    <script src="_framework/blazor.web.js" autostart="false"></script>
+    <script>
+        (async () => {
+            const normalizeCulture = value => {
+                const culture = String(value || '').trim().toLowerCase();
+                if (culture === 'ar' || culture.startsWith('ar-')) return 'ar';
+                if (culture === 'en' || culture.startsWith('en-')) return 'en';
+                return null;
+            };
+
+            try {
+                let bootstrap = { systemName: 'OAS', defaultCulture: 'ar' };
+                try {
+                    const response = await fetch('api/bootstrap', { cache: 'no-store', credentials: 'same-origin' });
+                    if (response.ok) bootstrap = { ...bootstrap, ...(await response.json()) };
+                } catch { }
+
+                try {
+                    const bootResponse = await fetch('_framework/blazor.boot.json', { cache: 'no-store', credentials: 'same-origin' });
+                    if (bootResponse.ok) {
+                        const bootConfig = await bootResponse.json();
+                        window.configureOasBootResources(bootConfig.resources);
+                    }
+                } catch { }
+
+                let storedCulture = null;
+                try { storedCulture = localStorage.getItem('culture'); } catch { }
+                const culture = normalizeCulture(storedCulture) || normalizeCulture(bootstrap.defaultCulture) || 'ar';
+                document.documentElement.lang = culture;
+                document.documentElement.dir = culture === 'ar' ? 'rtl' : 'ltr';
+
+                const name = String(bootstrap.systemName || 'OAS').trim() || 'OAS';
+                document.title = name;
+                document.getElementById('oas-boot-brand').textContent = name;
+                document.getElementById('oas-startup-caption').textContent = culture === 'ar' ? `جاري تهيئة نظام ${name}` : `Initializing ${name}`;
+                document.getElementById('oas-startup-error').textContent = culture === 'ar' ? 'تعذر تهيئة النظام' : 'Unable to initialize the system';
+                document.getElementById('oas-startup-retry').textContent = culture === 'ar' ? 'إعادة المحاولة' : 'Retry';
+
+                await Blazor.start({
+                    webAssembly: {
+                        applicationCulture: culture,
+                        loadBootResource: window.loadOasBootResource
+                    }
+                });
+            } catch (error) {
+                console.error('OAS startup failed.', error);
+                window.failOasStartup();
+            }
+        })();
+    </script>
+</body>
+</html>

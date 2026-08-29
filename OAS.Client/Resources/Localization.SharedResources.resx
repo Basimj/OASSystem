@@ -1,0 +1,321 @@
+<?xml version='1.0' encoding='utf-8'?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms</value>
+  </resheader>
+  <data name="App_Name" xml:space="preserve">
+    <value>OAS Optical System</value>
+  </data>
+  <data name="App_Ready" xml:space="preserve">
+    <value>The system foundation is ready.</value>
+  </data>
+  <data name="Home_Welcome" xml:space="preserve">
+    <value>Welcome to OAS.</value>
+  </data>
+  <data name="Page_NotFound" xml:space="preserve">
+    <value>Page not found.</value>
+  </data>
+  <data name="Nav_Home" xml:space="preserve">
+    <value>Home</value>
+  </data>
+  <data name="Nav_Users" xml:space="preserve">
+    <value>Users</value>
+  </data>
+  <data name="Logout" xml:space="preserve">
+    <value>Sign out</value>
+  </data>
+  <data name="Loading" xml:space="preserve">
+    <value>Loading...</value>
+  </data>
+  <data name="Login_Title" xml:space="preserve">
+    <value>Sign in</value>
+  </data>
+  <data name="Login_Subtitle" xml:space="preserve">
+    <value>Enter your account credentials.</value>
+  </data>
+  <data name="Login_UserNameOrEmail" xml:space="preserve">
+    <value>User name or email</value>
+  </data>
+  <data name="Login_Password" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="Login_RememberMe" xml:space="preserve">
+    <value>Remember me</value>
+  </data>
+  <data name="Login_Button" xml:space="preserve">
+    <value>Sign in</value>
+  </data>
+  <data name="Login_InvalidCredentials" xml:space="preserve">
+    <value>The user name/email or password is incorrect.</value>
+  </data>
+  <data name="Users_Title" xml:space="preserve">
+    <value>User management</value>
+  </data>
+  <data name="Users_Subtitle" xml:space="preserve">
+    <value>Create system users and review existing accounts.</value>
+  </data>
+  <data name="Users_AddUser" xml:space="preserve">
+    <value>Add user</value>
+  </data>
+  <data name="Users_List" xml:space="preserve">
+    <value>Users</value>
+  </data>
+  <data name="Users_FirstName" xml:space="preserve">
+    <value>First name</value>
+  </data>
+  <data name="Users_LastName" xml:space="preserve">
+    <value>Last name</value>
+  </data>
+  <data name="Users_Name" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="Users_UserName" xml:space="preserve">
+    <value>User name</value>
+  </data>
+  <data name="Users_Email" xml:space="preserve">
+    <value>Email</value>
+  </data>
+  <data name="Users_Password" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="Users_ConfirmPassword" xml:space="preserve">
+    <value>Confirm password</value>
+  </data>
+  <data name="Users_Role" xml:space="preserve">
+    <value>Role</value>
+  </data>
+  <data name="Users_SelectRole" xml:space="preserve">
+    <value>Select a role</value>
+  </data>
+  <data name="Users_IsActive" xml:space="preserve">
+    <value>Active account</value>
+  </data>
+  <data name="Users_Create" xml:space="preserve">
+    <value>Create user</value>
+  </data>
+  <data name="Users_CreateSuccess" xml:space="preserve">
+    <value>User created successfully.</value>
+  </data>
+  <data name="Users_Empty" xml:space="preserve">
+    <value>No users found.</value>
+  </data>
+  <data name="Users_Status" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="Users_LastLogin" xml:space="preserve">
+    <value>Last sign-in</value>
+  </data>
+  <data name="Users_PasswordMismatch" xml:space="preserve">
+    <value>The password confirmation does not match.</value>
+  </data>
+  <data name="Users_PasswordPolicy" xml:space="preserve">
+    <value>Password must be at least 8 characters and include upper-case, lower-case, number, and symbol characters.</value>
+  </data>
+  <data name="Users_UserNameExists" xml:space="preserve">
+    <value>This user name is already in use.</value>
+  </data>
+  <data name="Users_EmailExists" xml:space="preserve">
+    <value>This email is already in use.</value>
+  </data>
+  <data name="Users_RoleNotFound" xml:space="preserve">
+    <value>The selected role no longer exists.</value>
+  </data>
+  <data name="Status_Active" xml:space="preserve">
+    <value>Active</value>
+  </data>
+  <data name="Status_Inactive" xml:space="preserve">
+    <value>Inactive</value>
+  </data>
+  <data name="Validation_RequiredFields" xml:space="preserve">
+    <value>Complete all required fields.</value>
+  </data>
+  <data name="Validation_InvalidData" xml:space="preserve">
+    <value>Some values are invalid. Review the entered data.</value>
+  </data>
+  <data name="Error_Generic" xml:space="preserve">
+    <value>The operation could not be completed.</value>
+  </data>
+  <data name="Role_Administrator" xml:space="preserve">
+    <value>Administrator</value>
+  </data>
+  <data name="Role_User" xml:space="preserve">
+    <value>User</value>
+  </data>
+  <data name="Login_Database" xml:space="preserve">
+    <value>Database</value>
+  </data>
+  <data name="Login_UpdateDatabase" xml:space="preserve">
+    <value>Update database</value>
+  </data>
+  <data name="Login_DatabaseUpToDate" xml:space="preserve">
+    <value>Database is up to date</value>
+  </data>
+  <data name="Login_DatabaseUpdateRequired" xml:space="preserve">
+    <value>Database update required</value>
+  </data>
+  <data name="Login_DatabaseUnavailable" xml:space="preserve">
+    <value>Unable to connect to the database</value>
+  </data>
+  <data name="Login_DatabaseChecking" xml:space="preserve">
+    <value>Checking database status</value>
+  </data>
+  <data name="Login_DatabaseUpdateFailed" xml:space="preserve">
+    <value>Database update failed</value>
+  </data>
+  <data name="Login_SystemImage" xml:space="preserve">
+    <value>System image</value>
+  </data>
+  <data name="ChangePassword_Title" xml:space="preserve">
+    <value>Change password</value>
+  </data>
+  <data name="ChangePassword_Current" xml:space="preserve">
+    <value>Current password</value>
+  </data>
+  <data name="ChangePassword_New" xml:space="preserve">
+    <value>New password</value>
+  </data>
+  <data name="ChangePassword_Confirm" xml:space="preserve">
+    <value>Confirm new password</value>
+  </data>
+  <data name="ChangePassword_Button" xml:space="preserve">
+    <value>Change password</value>
+  </data>
+  <data name="ChangePassword_CurrentInvalid" xml:space="preserve">
+    <value>Current password is incorrect</value>
+  </data>
+  <data name="ChangePassword_Reused" xml:space="preserve">
+    <value>This password was used recently. Choose a different password.</value>
+  </data>
+  <data name="Users_Privilege" xml:space="preserve">
+    <value>Privilege</value>
+  </data>
+  <data name="Users_SuperAdmin" xml:space="preserve">
+    <value>Super Admin</value>
+  </data>
+  <data name="current_password_required" xml:space="preserve">
+    <value>Current password is required.</value>
+  </data>
+  <data name="new_password_required" xml:space="preserve">
+    <value>New password is required.</value>
+  </data>
+  <data name="confirm_password_required" xml:space="preserve">
+    <value>Password confirmation is required.</value>
+  </data>
+  <data name="password_min_length" xml:space="preserve">
+    <value>Password must be at least 8 characters.</value>
+  </data>
+  <data name="password_max_length" xml:space="preserve">
+    <value>Password cannot exceed 128 characters.</value>
+  </data>
+  <data name="password_uppercase_required" xml:space="preserve">
+    <value>Password must contain an uppercase letter.</value>
+  </data>
+  <data name="password_lowercase_required" xml:space="preserve">
+    <value>Password must contain a lowercase letter.</value>
+  </data>
+  <data name="password_digit_required" xml:space="preserve">
+    <value>Password must contain a number.</value>
+  </data>
+  <data name="password_special_required" xml:space="preserve">
+    <value>Password must contain a symbol.</value>
+  </data>
+  <data name="password_confirmation_mismatch" xml:space="preserve">
+    <value>Password confirmation does not match.</value>
+  </data>
+  <data name="identity_current_password_invalid" xml:space="preserve">
+    <value>Current password is incorrect.</value>
+  </data>
+  <data name="identity_password_reused" xml:space="preserve">
+    <value>This password was used recently. Choose a different password.</value>
+  </data>
+  <data name="password_change_success" xml:space="preserve">
+    <value>Password changed successfully.</value>
+  </data>
+  <data name="network_error" xml:space="preserve">
+    <value>Unable to connect to the server. Check the connection and try again.</value>
+  </data>
+  <data name="response_parse_error" xml:space="preserve">
+    <value>The server returned an invalid response.</value>
+  </data>
+  <data name="validation_failed" xml:space="preserve">
+    <value>Please review the entered data.</value>
+  </data>
+  <data name="unexpected_error" xml:space="preserve">
+    <value>An unexpected error occurred.</value>
+  </data>
+  <data name="http_error" xml:space="preserve">
+    <value>The request could not be completed.</value>
+  </data>
+  <data name="login_required" xml:space="preserve">
+    <value>User name or email is required.</value>
+  </data>
+  <data name="login_max_length" xml:space="preserve">
+    <value>User name or email is too long.</value>
+  </data>
+  <data name="password_required" xml:space="preserve">
+    <value>Password is required.</value>
+  </data>
+  <data name="user_name_required" xml:space="preserve">
+    <value>User name is required.</value>
+  </data>
+  <data name="user_name_min_length" xml:space="preserve">
+    <value>User name must be at least 3 characters.</value>
+  </data>
+  <data name="user_name_max_length" xml:space="preserve">
+    <value>User name cannot exceed 64 characters.</value>
+  </data>
+  <data name="user_name_invalid_format" xml:space="preserve">
+    <value>User name contains invalid characters.</value>
+  </data>
+  <data name="first_name_required" xml:space="preserve">
+    <value>First name is required.</value>
+  </data>
+  <data name="first_name_max_length" xml:space="preserve">
+    <value>First name is too long.</value>
+  </data>
+  <data name="last_name_required" xml:space="preserve">
+    <value>Last name is required.</value>
+  </data>
+  <data name="last_name_max_length" xml:space="preserve">
+    <value>Last name is too long.</value>
+  </data>
+  <data name="email_invalid" xml:space="preserve">
+    <value>Email address is invalid.</value>
+  </data>
+  <data name="email_max_length" xml:space="preserve">
+    <value>Email address is too long.</value>
+  </data>
+  <data name="role_required" xml:space="preserve">
+    <value>Role is required.</value>
+  </data>
+  <data name="identity_username_exists" xml:space="preserve">
+    <value>This user name already exists.</value>
+  </data>
+  <data name="identity_email_exists" xml:space="preserve">
+    <value>This email address already exists.</value>
+  </data>
+  <data name="identity_role_not_found" xml:space="preserve">
+    <value>The selected role does not exist.</value>
+  </data>
+  <data name="identity_super_admin_required" xml:space="preserve">
+    <value>Only the super administrator can create another administrator.</value>
+  </data>
+  <data name="forbidden" xml:space="preserve">
+    <value>You are not allowed to perform this operation.</value>
+  </data>
+  <data name="identity_invalid_credentials" xml:space="preserve">
+    <value>User name/email or password is incorrect.</value>
+  </data>
+  <data name="login_password_max_length" xml:space="preserve">
+    <value>Password is too long.</value>
+  </data>
+</root>

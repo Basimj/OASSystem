@@ -1,0 +1,11 @@
+.ui-status-action { position: relative; min-width: 0; }
+.ui-status-action--labeled.ui-status-action--small { padding-top: calc(var(--oas-font-sm) * 1.35 + var(--oas-space-1)); }
+.ui-status-action--labeled.ui-status-action--medium { padding-top: calc(var(--oas-font-md) * 1.35 + var(--oas-space-1)); }
+.ui-status-action--labeled.ui-status-action--large { padding-top: calc(var(--oas-font-lg) * 1.35 + var(--oas-space-1)); }
+.ui-status-action__indicator { position: absolute; top: -.45rem; inset-inline-end: .45rem; z-index: 2; width: 1rem; height: 1rem; display: grid; place-items: center; border-radius: 50%; border: 2px solid var(--oas-color-surface); font-size: .65rem; line-height: 1; font-weight: 800; color: #fff; background: var(--oas-color-text-muted); box-shadow: 0 1px 4px rgb(16 24 40 / 14%); }
+.ui-status-action--labeled .ui-status-action__indicator { top: calc(1.35rem - .45rem); }
+.ui-status-action--success .ui-status-action__indicator { background: #16a34a; }
+.ui-status-action--warning .ui-status-action__indicator { background: #f59e0b; color: #352006; }
+.ui-status-action--danger .ui-status-action__indicator { background: #dc2626; }
+.ui-status-action--info .ui-status-action__indicator { background: #64748b; }
+::deep .ui-button { white-space: nowrap; }

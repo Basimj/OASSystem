@@ -1,0 +1,12 @@
+@inherits LayoutComponentBase
+@inject IJSRuntime JS
+
+@Body
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try { await JS.InvokeVoidAsync("hideOasStartup"); } catch { }
+    }
+}

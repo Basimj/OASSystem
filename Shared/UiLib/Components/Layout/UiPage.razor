@@ -1,0 +1,22 @@
+<section class="@CssClass">
+    @if (!string.IsNullOrWhiteSpace(Title) || !string.IsNullOrWhiteSpace(Subtitle) || Actions is not null)
+    {
+        <header class="ui-page__header">
+            <div class="ui-page__heading">
+                @if (!string.IsNullOrWhiteSpace(Title))
+                {
+                    <h1>@Title</h1>
+                }
+                @if (!string.IsNullOrWhiteSpace(Subtitle))
+                {
+                    <p>@Subtitle</p>
+                }
+            </div>
+            @if (Actions is not null)
+            {
+                <div class="ui-page__actions">@Actions</div>
+            }
+        </header>
+    }
+    <div class="ui-page__content">@ChildContent</div>
+</section>

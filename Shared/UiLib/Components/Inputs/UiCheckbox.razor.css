@@ -1,0 +1,3 @@
+.ui-checkbox { display: inline-flex; align-items: center; gap: var(--oas-space-2); color: var(--oas-color-text); font-size: var(--oas-font-md); cursor: pointer; }
+.ui-checkbox input { width: 1rem; height: 1rem; accent-color: var(--oas-color-primary); }
+.ui-checkbox:has(input:disabled) { color: var(--oas-color-text-muted); cursor: not-allowed; }

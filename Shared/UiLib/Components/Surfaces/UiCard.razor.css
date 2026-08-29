@@ -1,0 +1,9 @@
+.ui-card { background: var(--oas-color-surface); border: 1px solid var(--oas-color-border); border-radius: var(--oas-radius-lg); box-shadow: var(--oas-shadow-sm); overflow: hidden; }
+.ui-card--auto { width: auto; }
+.ui-card--compact { width: min(100%, 28rem); margin-inline: auto; }
+.ui-card--medium { width: min(100%, 48rem); margin-inline: auto; }
+.ui-card--full { width: 100%; }
+.ui-card__header { padding: var(--oas-space-3) var(--oas-space-3) 0; }
+.ui-card__header h2 { margin: 0; font-size: var(--oas-font-lg); }
+.ui-card__header p { margin: var(--oas-space-1) 0 0; color: var(--oas-color-text-muted); font-size: var(--oas-font-sm); }
+.ui-card__body { padding: var(--oas-space-3); }

@@ -1,0 +1,12 @@
+.ui-text-label { display: inline-flex; align-items: baseline; gap: var(--oas-space-1); color: var(--oas-color-text); line-height: 1.35; }
+.ui-text-label--size-small { font-size: var(--oas-font-sm); }
+.ui-text-label--size-medium { font-size: var(--oas-font-md); }
+.ui-text-label--size-large { font-size: var(--oas-font-lg); }
+.ui-text-label--weight-normal { font-weight: 400; }
+.ui-text-label--weight-medium { font-weight: 500; }
+.ui-text-label--weight-semibold { font-weight: 600; }
+.ui-text-label--weight-bold { font-weight: 700; }
+.ui-text-label--tone-muted { color: var(--oas-color-text-muted); }
+.ui-text-label--tone-danger { color: var(--oas-color-danger); }
+.ui-text-label--tone-success { color: var(--oas-color-success); }
+.ui-text-label__required { color: var(--oas-color-danger); }

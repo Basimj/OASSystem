@@ -1,0 +1,16 @@
+<div class="@HostCssClass" aria-live="polite" aria-relevant="additions removals">
+    @foreach (var item in Snackbar.Messages)
+    {
+        <div class="@GetItemCssClass(item)" role="@GetRole(item.Tone)">
+            <span class="ui-snackbar__status" aria-hidden="true"></span>
+            <span class="ui-snackbar__message">@item.Message</span>
+            @if (Snackbar.Options.ShowCloseButton)
+            {
+                <button type="button"
+                        class="ui-snackbar__close"
+                        aria-label="@L["Close"]"
+                        @onclick="() => Snackbar.Dismiss(item.Id)">×</button>
+            }
+        </div>
+    }
+</div>

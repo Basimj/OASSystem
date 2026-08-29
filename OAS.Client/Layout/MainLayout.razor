@@ -1,0 +1,52 @@
+@inherits LayoutComponentBase
+@inject IAuthClientService AuthService
+@inject OasAuthenticationStateProvider AuthState
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<UiAppShell Brand="@L["App_Name"]">
+    <NavigationContent>
+        <AuthorizeView>
+            <Authorized Context="authContext">
+                <UiNavLink Href="/" Match="NavLinkMatch.All" Text="@L["Nav_Home"]" />
+                @if (authContext.User.IsInRole("Administrator"))
+                {
+                    <UiNavLink Href="/identity/users" Text="@L["Nav_Users"]" />
+                }
+            </Authorized>
+        </AuthorizeView>
+    </NavigationContent>
+    <ActionsContent>
+        <AuthorizeView>
+            <Authorized>
+                <UiButton Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Text="@L["Logout"]" OnClick="LogoutAsync" />
+            </Authorized>
+        </AuthorizeView>
+    </ActionsContent>
+    <ChildContent>@Body</ChildContent>
+</UiAppShell>
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await JS.InvokeVoidAsync("hideOasStartup");
+        var state = await AuthState.GetAuthenticationStateAsync();
+        var relative = Navigation.ToBaseRelativePath(Navigation.Uri);
+        if (state.User.Identity?.IsAuthenticated == true && AuthState.CurrentUser?.MustChangePassword == true &&
+            !relative.StartsWith("identity/change-password", StringComparison.OrdinalIgnoreCase))
+        {
+            Navigation.NavigateTo("/identity/change-password", replace: true);
+        }
+    }
+
+    private async Task LogoutAsync(MouseEventArgs _)
+    {
+        try { await AuthService.LogoutAsync(); }
+        finally
+        {
+            AuthState.SetAnonymous();
+            Navigation.NavigateTo("/login", replace: true);
+        }
+    }
+}

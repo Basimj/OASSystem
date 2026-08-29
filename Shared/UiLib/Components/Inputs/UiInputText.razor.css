@@ -1,0 +1,30 @@
+.ui-input-text { display: grid; gap: var(--oas-space-1); width: 100%; }
+.ui-input-text__field { position: relative; width: 100%; }
+.ui-input-text__control { width: 100%; box-sizing: border-box; border: 1px solid var(--oas-color-border); border-radius: var(--oas-radius-md); background: var(--oas-color-surface); color: var(--oas-color-text); font: inherit; outline: none; transition: border-color .15s ease, box-shadow .15s ease; }
+.ui-input-text__control--small { min-height: var(--oas-control-sm); padding: 0 var(--oas-space-2); font-size: var(--oas-font-sm); }
+.ui-input-text__control--medium { min-height: var(--oas-control-md); padding: 0 var(--oas-space-3); font-size: var(--oas-font-md); }
+.ui-input-text__control--large { min-height: var(--oas-control-lg); padding: 0 var(--oas-space-4); font-size: var(--oas-font-lg); }
+.ui-input-text__control--reveal { padding-inline-end: 2.7rem; }
+.ui-input-text__control:focus { border-color: var(--oas-color-primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--oas-color-primary) 18%, transparent); }
+.ui-input-text__control:disabled { background: var(--oas-color-disabled-surface); color: var(--oas-color-text-muted); cursor: not-allowed; }
+.ui-input-text__control.invalid { border-color: var(--oas-color-danger); }
+.ui-input-text__reveal {
+    position: absolute;
+    inset-inline-end: .35rem;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--oas-color-text-muted);
+    cursor: pointer;
+}
+.ui-input-text__reveal:hover:not(:disabled) { background: var(--oas-color-hover); color: var(--oas-color-text); }
+.ui-input-text__reveal:disabled { cursor: not-allowed; opacity: .5; }
+.ui-input-text__reveal svg { width: 1.1rem; height: 1.1rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+::deep .validation-message { color: var(--oas-color-danger); font-size: var(--oas-font-sm); }
