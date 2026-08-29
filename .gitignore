@@ -1,0 +1,29 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# .NET build output
+**/bin/
+**/obj/
+
+# Test results
+TestResults/
+**/TestResults/
+
+# Publish
+**/publish/
+
+# IDE
+.idea/
+
+# Logs / temp
+*.log
+*.tmp
+*.temp
+
+# OS
+Thumbs.db
+.DS_Store
