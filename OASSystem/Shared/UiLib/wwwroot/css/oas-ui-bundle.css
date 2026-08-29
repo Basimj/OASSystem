@@ -1,0 +1,21 @@
+@charset "UTF-8";
+
+/*
+ * OAS.UiLib master stylesheet bundle.
+ *
+ * Keep third-party frameworks first so OAS tokens and component-isolated
+ * styles remain the final authority for the product visual language.
+ */
+
+/* Third-party UI foundations */
+@import "../lib/bootstrap/css/bootstrap.min.css";
+@import "../lib/font-awesome/css/all.min.css";
+
+/* OAS design tokens and global foundations */
+@import "./variables.css";
+@import "./colors.css";
+@import "./sizing.css";
+@import "./bootstrap-loader.css";
+
+/* Blazor CSS isolation output for all OAS.UiLib components */
+@import "../OAS.UiLib.bundle.scp.css";
