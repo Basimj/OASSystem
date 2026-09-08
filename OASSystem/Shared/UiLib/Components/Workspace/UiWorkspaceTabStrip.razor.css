@@ -1,0 +1,9 @@
+.ui-workspace-tabs { display:flex; align-items:stretch; gap:1px; overflow-x:auto; min-height:31px; }
+.ui-workspace-tab { display:flex; align-items:center; border-bottom:2px solid transparent; color:var(--oas-color-text-muted); min-width:max-content; }
+.ui-workspace-tab--active { border-bottom-color:var(--oas-color-primary); color:var(--oas-color-primary); background:#f7f3ff; }
+.ui-workspace-tab__select,.ui-workspace-tab__close { border:0; background:transparent; color:inherit; cursor:pointer; }
+.ui-workspace-tab__select { display:flex; align-items:center; gap:5px; padding:5px 8px; font-size:10px; font-weight:650; }
+.ui-workspace-tab__close { width:21px; height:25px; font-size:13px; }
+.ui-workspace-tab__close:hover { background:var(--oas-color-hover); }
+.ui-workspace-tab__dirty { width:5px; height:5px; border-radius:50%; background:var(--oas-color-danger); }
+.ui-workspace-tab__title { max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }

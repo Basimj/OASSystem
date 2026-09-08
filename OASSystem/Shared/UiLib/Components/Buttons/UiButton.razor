@@ -9,16 +9,24 @@
         <span class="ui-button__spinner" aria-hidden="true"></span>
         <span>@L["Loading"]</span>
     }
-    else if (ChildContent is not null)
-    {
-        @ChildContent
-    }
-    else if (!string.IsNullOrWhiteSpace(TextResourceKey))
-    {
-        @L[TextResourceKey]
-    }
     else
     {
-        @Text
+        @if (!string.IsNullOrWhiteSpace(IconCssClass))
+        {
+            <i class="ui-button__icon @IconCssClass" aria-hidden="true"></i>
+        }
+
+        @if (ChildContent is not null)
+        {
+            @ChildContent
+        }
+        else if (!string.IsNullOrWhiteSpace(TextResourceKey))
+        {
+            <span>@L[TextResourceKey]</span>
+        }
+        else if (!string.IsNullOrWhiteSpace(Text))
+        {
+            <span>@Text</span>
+        }
     }
 </button>

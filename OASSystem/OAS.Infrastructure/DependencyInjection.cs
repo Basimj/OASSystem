@@ -77,6 +77,10 @@ public static class DependencyInjection
             IPasswordService,
             AspNetPasswordService>();
 
+        services.AddSingleton<
+            ITemporaryPasswordGenerator,
+            CryptographicTemporaryPasswordGenerator>();
+
         services.AddScoped<
             IEmployeeExcelTemplateGenerator,
             EmployeeExcelTemplateGenerator>();

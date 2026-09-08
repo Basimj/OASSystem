@@ -15,6 +15,7 @@ public partial class UiButton
     [Parameter] public bool Loading { get; set; }
     [Parameter] public bool FullWidth { get; set; }
     [Parameter] public string? AdditionalCssClass { get; set; }
+    [Parameter] public string? IconCssClass { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
     [Parameter] public EventCallback<MouseEventArgs> OnClick { get; set; }
     [Parameter(CaptureUnmatchedValues = true)] public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }

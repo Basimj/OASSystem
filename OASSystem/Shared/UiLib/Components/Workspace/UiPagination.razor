@@ -1,0 +1,6 @@
+<div class="ui-pagination">
+    <button type="button" disabled="@(!HasPrevious)" @onclick="PreviousAsync">‹</button>
+    <span>@PageNumber / @TotalPages</span>
+    <button type="button" disabled="@(!HasNext)" @onclick="NextAsync">›</button>
+    <span>@TotalCount</span>
+</div>

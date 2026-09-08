@@ -1,5 +1,6 @@
 using OAS.Domain.Common.Entities;
 using OAS.Domain.Exceptions;
+using OAS.Domain.Identity.Constants;
 
 namespace OAS.Domain.Identity.Entities;
 
@@ -61,7 +62,17 @@ public sealed class UserAccount : AuditableEntity<Guid>
         PasswordHash = passwordHash;
     }
 
+    public void RequirePasswordChange() => MustChangePassword = true;
+
     public void CompleteRequiredPasswordChange() => MustChangePassword = false;
+
+    public bool CanUsePasswordlessBootstrap() =>
+        Id == IdentityBootstrap.SuperAdminId &&
+        IsSuperAdmin &&
+        IsActive &&
+        MustChangePassword &&
+        LastLoginAtUtc is null &&
+        string.Equals(PasswordHash, IdentityBootstrap.NoPasswordHash, StringComparison.Ordinal);
 
     public void SetActive(bool isActive)
     {

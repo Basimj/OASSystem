@@ -1,0 +1,9 @@
+.ui-workspace-actionbar {
+    display:flex;
+    align-items:center;
+    gap:6px;
+    flex-wrap:wrap;
+    min-height:31px;
+}
+.ui-workspace-actionbar ::deep .ui-button { white-space:nowrap; }
+.ui-workspace-actionbar ::deep .ui-button--small { min-height:30px; padding-inline:10px; font-size:10.5px; }

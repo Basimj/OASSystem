@@ -1,0 +1,1 @@
+.ui-key-value{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--oas-color-border-subtle)}.ui-key-value span{font-size:10px;color:var(--oas-color-text-muted)}.ui-key-value strong{font-size:10px;color:var(--oas-color-text);font-weight:600;max-width:65%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

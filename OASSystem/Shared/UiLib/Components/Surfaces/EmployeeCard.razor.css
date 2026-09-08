@@ -1,4 +1,4 @@
-﻿.employee-card {
+.employee-card {
     position: relative;
     width: 100%;
     min-height: 150px;
@@ -104,7 +104,7 @@
 
 
 .employee-actions:hover {
-    color: #5b21b6;
+    color: var(--oas-color-primary);
     background: #f3eff9;
 }
 
@@ -166,7 +166,7 @@
 
 .employee-menu-item:hover {
     background: #f5f2f9;
-    color: #5b21b6;
+    color: var(--oas-color-primary);
 }
 
 
@@ -323,7 +323,7 @@
     border-radius: 50%;
 
     background: #f0eafb;
-    color: #5b21b6;
+    color: var(--oas-color-primary);
 
     border: 1px solid #e1d7f1;
 
@@ -423,7 +423,7 @@
 
 .employee-badge-purple {
     background: #f0eafb;
-    color: #5b21b6;
+    color: var(--oas-color-primary);
     border: 1px solid #e4daf3;
 }
 

@@ -1,110 +1,51 @@
-<?xml version="1.0" encoding="utf-8"?>
-<root>
-  <!-- 
-    Microsoft ResX Schema 
-    
-    Version 2.0
-    
-    The primary goals of this format is to allow a simple XML format 
-    that is mostly human readable. The generation and parsing of the 
-    various data types are done through the TypeConverter classes 
-    associated with the data types.
-    
-    Example:
-    
-    ... ado.net/XML headers & schema ...
-    <resheader name="resmimetype">text/microsoft-resx</resheader>
-    <resheader name="version">2.0</resheader>
-    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
-    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
-    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
-    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
-    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
-        <value>[base64 mime encoded serialized .NET Framework object]</value>
-    </data>
-    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
-        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
-        <comment>This is a comment</comment>
-    </data>
-                
-    There are any number of "resheader" rows that contain simple 
-    name/value pairs.
-    
-    Each data row contains a name, and value. The row also contains a 
-    type or mimetype. Type corresponds to a .NET class that support 
-    text/value conversion through the TypeConverter architecture. 
-    Classes that don't support this are serialized and stored with the 
-    mimetype set.
-    
-    The mimetype is used for serialized objects, and tells the 
-    ResXResourceReader how to depersist the object. This is currently not 
-    extensible. For a given mimetype the value must be set accordingly:
-    
-    Note - application/x-microsoft.net.object.binary.base64 is the format 
-    that the ResXResourceWriter will generate, however the reader can 
-    read any of the formats listed below.
-    
-    mimetype: application/x-microsoft.net.object.binary.base64
-    value   : The object must be serialized with 
-            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
-            : and then encoded with base64 encoding.
-    
-    mimetype: application/x-microsoft.net.object.soap.base64
-    value   : The object must be serialized with 
-            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
-            : and then encoded with base64 encoding.
-
-    mimetype: application/x-microsoft.net.object.bytearray.base64
-    value   : The object must be serialized into a byte array 
-            : using a System.ComponentModel.TypeConverter
-            : and then encoded with base64 encoding.
-    -->
-  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
-    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
-    <xsd:element name="root" msdata:IsDataSet="true">
-      <xsd:complexType>
-        <xsd:choice maxOccurs="unbounded">
-          <xsd:element name="metadata">
-            <xsd:complexType>
-              <xsd:sequence>
-                <xsd:element name="value" type="xsd:string" minOccurs="0" />
-              </xsd:sequence>
-              <xsd:attribute name="name" use="required" type="xsd:string" />
-              <xsd:attribute name="type" type="xsd:string" />
-              <xsd:attribute name="mimetype" type="xsd:string" />
-              <xsd:attribute ref="xml:space" />
-            </xsd:complexType>
-          </xsd:element>
-          <xsd:element name="assembly">
-            <xsd:complexType>
-              <xsd:attribute name="alias" type="xsd:string" />
-              <xsd:attribute name="name" type="xsd:string" />
-            </xsd:complexType>
-          </xsd:element>
-          <xsd:element name="data">
-            <xsd:complexType>
-              <xsd:sequence>
-                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
-                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
-              </xsd:sequence>
-              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
-              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
-              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
-              <xsd:attribute ref="xml:space" />
-            </xsd:complexType>
-          </xsd:element>
-          <xsd:element name="resheader">
-            <xsd:complexType>
-              <xsd:sequence>
-                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
-              </xsd:sequence>
-              <xsd:attribute name="name" type="xsd:string" use="required" />
-            </xsd:complexType>
-          </xsd:element>
-        </xsd:choice>
-      </xsd:complexType>
-    </xsd:element>
-  </xsd:schema>
+<?xml version='1.0' encoding='utf-8'?>
+<root xmlns:ns1="urn:schemas-microsoft-com:xml-msdata" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:schema id="root">
+    <xs:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xs:element name="root" ns1:IsDataSet="true">
+      <xs:complexType>
+        <xs:choice maxOccurs="unbounded">
+          <xs:element name="metadata">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="value" type="xsd:string" minOccurs="0" />
+              </xs:sequence>
+              <xs:attribute name="name" use="required" type="xsd:string" />
+              <xs:attribute name="type" type="xsd:string" />
+              <xs:attribute name="mimetype" type="xsd:string" />
+              <xs:attribute ref="xml:space" />
+            </xs:complexType>
+          </xs:element>
+          <xs:element name="assembly">
+            <xs:complexType>
+              <xs:attribute name="alias" type="xsd:string" />
+              <xs:attribute name="name" type="xsd:string" />
+            </xs:complexType>
+          </xs:element>
+          <xs:element name="data">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="value" type="xsd:string" minOccurs="0" ns1:Ordinal="1" />
+                <xs:element name="comment" type="xsd:string" minOccurs="0" ns1:Ordinal="2" />
+              </xs:sequence>
+              <xs:attribute name="name" type="xsd:string" use="required" ns1:Ordinal="1" />
+              <xs:attribute name="type" type="xsd:string" ns1:Ordinal="3" />
+              <xs:attribute name="mimetype" type="xsd:string" ns1:Ordinal="4" />
+              <xs:attribute ref="xml:space" />
+            </xs:complexType>
+          </xs:element>
+          <xs:element name="resheader">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="value" type="xsd:string" minOccurs="0" ns1:Ordinal="1" />
+              </xs:sequence>
+              <xs:attribute name="name" type="xsd:string" use="required" />
+            </xs:complexType>
+          </xs:element>
+        </xs:choice>
+      </xs:complexType>
+    </xs:element>
+  </xs:schema>
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
   </resheader>
@@ -279,27 +220,6 @@
   <data name="Login_SystemImage" xml:space="preserve">
     <value>System image</value>
   </data>
-  <data name="ChangePassword_Title" xml:space="preserve">
-    <value>Change password</value>
-  </data>
-  <data name="ChangePassword_Current" xml:space="preserve">
-    <value>Current password</value>
-  </data>
-  <data name="ChangePassword_New" xml:space="preserve">
-    <value>New password</value>
-  </data>
-  <data name="ChangePassword_Confirm" xml:space="preserve">
-    <value>Confirm new password</value>
-  </data>
-  <data name="ChangePassword_Button" xml:space="preserve">
-    <value>Change password</value>
-  </data>
-  <data name="ChangePassword_CurrentInvalid" xml:space="preserve">
-    <value>Current password is incorrect</value>
-  </data>
-  <data name="ChangePassword_Reused" xml:space="preserve">
-    <value>This password was used recently. Choose a different password.</value>
-  </data>
   <data name="Users_Privilege" xml:space="preserve">
     <value>Privilege</value>
   </data>
@@ -319,7 +239,7 @@
     <value>Password must be at least 8 characters.</value>
   </data>
   <data name="password_max_length" xml:space="preserve">
-    <value>Password cannot exceed 128 characters.</value>
+    <value>Password is too long.</value>
   </data>
   <data name="password_uppercase_required" xml:space="preserve">
     <value>Password must contain an uppercase letter.</value>
@@ -331,7 +251,7 @@
     <value>Password must contain a number.</value>
   </data>
   <data name="password_special_required" xml:space="preserve">
-    <value>Password must contain a symbol.</value>
+    <value>Password must contain a special character.</value>
   </data>
   <data name="password_confirmation_mismatch" xml:space="preserve">
     <value>Password confirmation does not match.</value>
@@ -373,13 +293,13 @@
     <value>User name is required.</value>
   </data>
   <data name="user_name_min_length" xml:space="preserve">
-    <value>User name must be at least 3 characters.</value>
+    <value>User name must contain at least 3 characters.</value>
   </data>
   <data name="user_name_max_length" xml:space="preserve">
-    <value>User name cannot exceed 64 characters.</value>
+    <value>User name is too long.</value>
   </data>
   <data name="user_name_invalid_format" xml:space="preserve">
-    <value>User name contains invalid characters.</value>
+    <value>User name contains unsupported characters.</value>
   </data>
   <data name="first_name_required" xml:space="preserve">
     <value>First name is required.</value>
@@ -449,5 +369,248 @@
   </data>
   <data name="employee_code_exists" xml:space="preserve">
     <value>Employee code already exists. Please use another code.</value>
+  </data>
+  <data name="Common_Yes" xml:space="preserve">
+    <value>Yes</value>
+  </data>
+  <data name="Common_No" xml:space="preserve">
+    <value>No</value>
+  </data>
+  <data name="Common_Close" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="Common_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="Users_All" xml:space="preserve">
+    <value>All users</value>
+  </data>
+  <data name="Users_New" xml:space="preserve">
+    <value>New user</value>
+  </data>
+  <data name="Users_Search" xml:space="preserve">
+    <value>Search users...</value>
+  </data>
+  <data name="Users_Refresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="Users_Save" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="Users_SaveClose" xml:space="preserve">
+    <value>Save &amp; close</value>
+  </data>
+  <data name="Users_Revert" xml:space="preserve">
+    <value>Revert</value>
+  </data>
+  <data name="Users_Roles" xml:space="preserve">
+    <value>Roles</value>
+  </data>
+  <data name="Users_Active" xml:space="preserve">
+    <value>Active</value>
+  </data>
+  <data name="Users_Inactive" xml:space="preserve">
+    <value>Inactive</value>
+  </data>
+  <data name="Users_Locked" xml:space="preserve">
+    <value>Locked</value>
+  </data>
+  <data name="Users_Unlocked" xml:space="preserve">
+    <value>Unlocked</value>
+  </data>
+  <data name="Users_ResetPassword" xml:space="preserve">
+    <value>Reset password</value>
+  </data>
+  <data name="Users_Unlock" xml:space="preserve">
+    <value>Unlock account</value>
+  </data>
+  <data name="Users_Activate" xml:space="preserve">
+    <value>Activate</value>
+  </data>
+  <data name="Users_Deactivate" xml:space="preserve">
+    <value>Deactivate</value>
+  </data>
+  <data name="Users_BasicInfo" xml:space="preserve">
+    <value>Basic information</value>
+  </data>
+  <data name="Users_Security" xml:space="preserve">
+    <value>Security</value>
+  </data>
+  <data name="Users_SystemInfo" xml:space="preserve">
+    <value>System information</value>
+  </data>
+  <data name="Users_AccessFailedCount" xml:space="preserve">
+    <value>Failed sign-in attempts</value>
+  </data>
+  <data name="Users_LockoutEnd" xml:space="preserve">
+    <value>Lockout end</value>
+  </data>
+  <data name="Users_MustChangePassword" xml:space="preserve">
+    <value>Password setup required</value>
+  </data>
+  <data name="Users_CreatedAt" xml:space="preserve">
+    <value>Created at</value>
+  </data>
+  <data name="Users_CreatedBy" xml:space="preserve">
+    <value>Created by</value>
+  </data>
+  <data name="Users_ModifiedAt" xml:space="preserve">
+    <value>Modified at</value>
+  </data>
+  <data name="Users_ModifiedBy" xml:space="preserve">
+    <value>Modified by</value>
+  </data>
+  <data name="Users_UserId" xml:space="preserve">
+    <value>User ID</value>
+  </data>
+  <data name="Users_UpdateSuccess" xml:space="preserve">
+    <value>User updated successfully.</value>
+  </data>
+  <data name="Users_RolesUpdated" xml:space="preserve">
+    <value>Roles updated successfully.</value>
+  </data>
+  <data name="Users_StatusUpdated" xml:space="preserve">
+    <value>Account status updated successfully.</value>
+  </data>
+  <data name="Users_PasswordResetSuccess" xml:space="preserve">
+    <value>Password was reset successfully.</value>
+  </data>
+  <data name="Users_UnlockedSuccess" xml:space="preserve">
+    <value>Account unlocked successfully.</value>
+  </data>
+  <data name="Users_TotalFormat" xml:space="preserve">
+    <value>{0} users</value>
+  </data>
+  <data name="Users_PasswordSetupRequired" xml:space="preserve">
+    <value>Password setup required</value>
+  </data>
+  <data name="Users_NewAccountSubtitle" xml:space="preserve">
+    <value>Create an account. The system will generate a temporary password.</value>
+  </data>
+  <data name="Users_SecurityAvailableAfterCreate" xml:space="preserve">
+    <value>Security information is available after the user is created.</value>
+  </data>
+  <data name="Users_SystemInfoAvailableAfterCreate" xml:space="preserve">
+    <value>System information is available after the user is created.</value>
+  </data>
+  <data name="Users_UnsavedTitle" xml:space="preserve">
+    <value>Unsaved changes</value>
+  </data>
+  <data name="Users_CloseDirtyConfirm" xml:space="preserve">
+    <value>There are unsaved changes. Close this tab and discard them?</value>
+  </data>
+  <data name="Users_Discard" xml:space="preserve">
+    <value>Discard and close</value>
+  </data>
+  <data name="Users_RevertConfirm" xml:space="preserve">
+    <value>Discard the unsaved changes in this tab?</value>
+  </data>
+  <data name="Users_RefreshDirtyConfirm" xml:space="preserve">
+    <value>Refreshing will discard unsaved changes. Continue?</value>
+  </data>
+  <data name="Users_ActivateConfirm" xml:space="preserve">
+    <value>Activate this user account?</value>
+  </data>
+  <data name="Users_DeactivateConfirm" xml:space="preserve">
+    <value>Deactivate this user account?</value>
+  </data>
+  <data name="Users_ResetPasswordConfirm" xml:space="preserve">
+    <value>The current password will stop working and the system will generate a new temporary password. Continue?</value>
+  </data>
+  <data name="Users_TemporaryPasswordTitle" xml:space="preserve">
+    <value>Temporary password</value>
+  </data>
+  <data name="Users_TemporaryPasswordCreatedMessage" xml:space="preserve">
+    <value>The user was created. Copy this temporary password and send it to the user. They must set a new password on first sign-in.</value>
+  </data>
+  <data name="Users_TemporaryPasswordResetMessage" xml:space="preserve">
+    <value>A new temporary password was generated. Send it to the user. They must set a new password on the next sign-in.</value>
+  </data>
+  <data name="Users_TemporaryPasswordOneTime" xml:space="preserve">
+    <value>This password is shown once only. Closing this dialog removes it from the screen.</value>
+  </data>
+  <data name="Users_CopyPassword" xml:space="preserve">
+    <value>Copy</value>
+  </data>
+  <data name="Users_PasswordCopied" xml:space="preserve">
+    <value>Temporary password copied.</value>
+  </data>
+  <data name="Users_RoleRequired" xml:space="preserve">
+    <value>Select at least one role.</value>
+  </data>
+  <data name="PasswordSetup_Title" xml:space="preserve">
+    <value>Set your password</value>
+  </data>
+  <data name="PasswordSetup_Subtitle" xml:space="preserve">
+    <value>Choose the password you will use for future sign-ins.</value>
+  </data>
+  <data name="PasswordSetup_RequiredMessage" xml:space="preserve">
+    <value>Your temporary access is valid only for password setup. Set a new password before using the system.</value>
+  </data>
+  <data name="PasswordSetup_New" xml:space="preserve">
+    <value>New password</value>
+  </data>
+  <data name="PasswordSetup_Confirm" xml:space="preserve">
+    <value>Confirm password</value>
+  </data>
+  <data name="PasswordSetup_Button" xml:space="preserve">
+    <value>Set password</value>
+  </data>
+  <data name="PasswordSetup_Success" xml:space="preserve">
+    <value>Password setup completed successfully.</value>
+  </data>
+  <data name="identity_cannot_disable_current_user" xml:space="preserve">
+    <value>You cannot disable your own account.</value>
+  </data>
+  <data name="identity_last_super_admin_required" xml:space="preserve">
+    <value>At least one active Super Administrator must remain.</value>
+  </data>
+  <data name="identity_cannot_remove_own_administrator_role" xml:space="preserve">
+    <value>You cannot remove your own Administrator role.</value>
+  </data>
+  <data name="identity_super_admin_administrator_role_required" xml:space="preserve">
+    <value>The Super Administrator must keep the Administrator role.</value>
+  </data>
+  <data name="identity_password_setup_required" xml:space="preserve">
+    <value>You must set a new password before using the system.</value>
+  </data>
+  <data name="identity_password_setup_not_required" xml:space="preserve">
+    <value>Password setup is not required for this account.</value>
+  </data>
+  <data name="row_version_invalid" xml:space="preserve">
+    <value>The record version is invalid. Reload and try again.</value>
+  </data>
+  <data name="roles_required" xml:space="preserve">
+    <value>Select at least one role.</value>
+  </data>
+  <data name="roles_duplicate" xml:space="preserve">
+    <value>The selected roles contain duplicates.</value>
+  </data>
+  <data name="user_id_required" xml:space="preserve">
+    <value>User ID is required.</value>
+  </data>
+  <data name="Users_AllRoles" xml:space="preserve">
+    <value>All roles</value>
+  </data>
+  <data name="Users_AllStatuses" xml:space="preserve">
+    <value>All statuses</value>
+  </data>
+  <data name="Users_Export" xml:space="preserve">
+    <value>Export</value>
+  </data>
+  <data name="Users_ResetFilters" xml:space="preserve">
+    <value>Reset</value>
+  </data>
+  <data name="Users_RolesPermissions" xml:space="preserve">
+    <value>Roles &amp; permissions</value>
+  </data>
+  <data name="Users_ExportSuccess" xml:space="preserve">
+    <value>Users exported successfully.</value>
+  </data>
+  <data name="Users_Details" xml:space="preserve">
+    <value>Details</value>
+  </data>
+  <data name="Users_RolesEmpty" xml:space="preserve">
+    <value>No roles are configured.</value>
   </data>
 </root>

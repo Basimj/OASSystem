@@ -1,5 +1,6 @@
 namespace OAS.Contracts.Identity.Users;
 
+[Obsolete("Use UserSummaryDto or UserDetailsDto.")]
 public sealed record UserDto(
     Guid Id,
     string UserName,

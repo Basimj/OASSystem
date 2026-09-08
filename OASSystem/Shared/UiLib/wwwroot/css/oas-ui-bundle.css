@@ -16,6 +16,7 @@
 @import "./colors.css";
 @import "./sizing.css";
 @import "./bootstrap-loader.css";
+@import "./features/employees.css";
 
 /* Blazor CSS isolation output for all OAS.UiLib components */
 @import "../OAS.UiLib.bundle.scp.css";

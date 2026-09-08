@@ -46,7 +46,8 @@ public sealed class OasAuthenticationStateProvider(IAuthClientService authClient
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(ClaimTypes.Name, user.UserName),
             new("display_name", user.DisplayName),
-            new("is_super_admin", user.IsSuperAdmin ? "true" : "false")
+            new("is_super_admin", user.IsSuperAdmin ? "true" : "false"),
+            new("must_change_password", user.MustChangePassword ? "true" : "false")
         };
         if (!string.IsNullOrWhiteSpace(user.Email)) claims.Add(new Claim(ClaimTypes.Email, user.Email));
         claims.AddRange(user.Roles.Select(role => new Claim(ClaimTypes.Role, role)));

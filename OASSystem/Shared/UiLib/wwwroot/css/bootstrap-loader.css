@@ -56,7 +56,7 @@
     opacity: .86;
 }
 .oas-boot-ring__segment.is-active {
-    background: var(--oas-color-primary, #2457d6);
+    background: var(--oas-color-primary, #5A2DD6);
     opacity: 1;
 }
 
@@ -82,7 +82,7 @@
 .oas-boot-screen[data-state="error"] .oas-boot-message { display: none; }
 .oas-boot-screen[data-state="error"] .oas-boot-error { display: grid; }
 .oas-boot-error-title { margin: 0; color: var(--oas-color-danger, #b42318); font-size: .9rem; font-weight: 700; }
-.oas-boot-retry { justify-self: center; min-height: var(--oas-control-sm, 1.875rem); padding: 0 .8rem; border: 0; border-radius: var(--oas-radius-md, .375rem); background: var(--oas-color-primary, #2457d6); color: var(--oas-color-on-primary, #fff); font: inherit; font-size: var(--oas-font-sm, .8125rem); cursor: pointer; }
+.oas-boot-retry { justify-self: center; min-height: var(--oas-control-sm, 1.875rem); padding: 0 .8rem; border: 0; border-radius: var(--oas-radius-md, .375rem); background: var(--oas-color-primary, #5A2DD6); color: var(--oas-color-on-primary, #fff); font: inherit; font-size: var(--oas-font-sm, .8125rem); cursor: pointer; }
 .oas-boot-screen--leaving { opacity: 0; pointer-events: none; transition: opacity 140ms ease-out; }
 
 @media (max-width: 24rem) {

@@ -1,0 +1,28 @@
+.ui-record-list-header {
+    width: 100%;
+    min-height: 31px;
+    display: grid;
+    grid-template-columns: 38px minmax(150px,1.05fr) minmax(300px,2.2fr) minmax(120px,auto);
+    align-items: center;
+    gap: 8px;
+    padding: 5px 9px;
+    border-bottom: 1px solid #e9e7ef;
+    background: #fbfbfd;
+    color: #55586f;
+    font-size: 9.5px;
+    font-weight: 700;
+}
+.ui-record-list-header__content {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: repeat(3,minmax(0,1fr));
+    gap: 8px;
+}
+.ui-record-list-header__content span,
+.ui-record-list-header__primary,
+.ui-record-list-header__trailing { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ui-record-list-header__trailing { text-align:center; }
+@media(max-width:780px) {
+    .ui-record-list-header { grid-template-columns:38px 1fr auto; }
+    .ui-record-list-header__content { display:none; }
+}

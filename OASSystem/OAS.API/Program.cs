@@ -41,6 +41,7 @@ if (origins.Length > 0) app.UseCors("ConfiguredOrigins");
 
 app.UseRateLimiter();
 app.UseAuthentication();
+app.UseMiddleware<ForcedPasswordSetupMiddleware>();
 app.UseAuthorization();
 app.UseAntiforgery();
 

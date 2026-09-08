@@ -1,0 +1,21 @@
+<div class="ui-workspace">
+    @if (Actions is not null)
+    {
+        <div class="ui-workspace__actions">@Actions</div>
+    }
+    @if (Tabs is not null)
+    {
+        <div class="ui-workspace__tabs">@Tabs</div>
+    }
+    @if (ShowFilters && Filters is not null)
+    {
+        <div class="ui-workspace__filters">@Filters</div>
+    }
+    <div class="@((ShowAside && Aside is not null) ? "ui-workspace__body ui-workspace__body--split" : "ui-workspace__body")">
+        <main class="ui-workspace__main">@Content</main>
+        @if (ShowAside && Aside is not null)
+        {
+            <aside class="ui-workspace__aside">@Aside</aside>
+        }
+    </div>
+</div>

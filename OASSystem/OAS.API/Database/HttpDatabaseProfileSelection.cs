@@ -13,10 +13,22 @@ public sealed class HttpDatabaseProfileSelection(IHttpContextAccessor httpContex
         get
         {
             var context = httpContextAccessor.HttpContext;
-            var raw = context?.Request.Headers[HeaderName].FirstOrDefault();
-            if (string.IsNullOrWhiteSpace(raw)) raw = context?.User.FindFirst(ClaimName)?.Value;
-            try { return catalog.ResolveProfile(raw).Key; }
-            catch { return catalog.DefaultProfileKey; }
+
+            // Before authentication (login/bootstrap), the caller may select a database profile.
+            // After authentication, the database profile is bound to the authenticated session and
+            // cannot be overridden by a client-controlled request header.
+            var raw = context?.User.Identity?.IsAuthenticated == true
+                ? context.User.FindFirst(ClaimName)?.Value
+                : context?.Request.Headers[HeaderName].FirstOrDefault();
+
+            try
+            {
+                return catalog.ResolveProfile(raw).Key;
+            }
+            catch
+            {
+                return catalog.DefaultProfileKey;
+            }
         }
     }
 }

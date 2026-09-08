@@ -1,4 +1,4 @@
-﻿
+
 @page "/employees/new"
 @page "/employees/edit/{EmployeeId:guid}"
 
@@ -27,62 +27,62 @@
     @(IsEditMode ? "تعديل الموظف" : "إضافة موظف")
 </PageTitle>
 
-<div class="employee-editor-page" dir="rtl">
+<UiElement Tag="div" class="employee-editor-page" dir="rtl">
 
     @if (_isLoading)
     {
-        <div class="employee-editor-loading">
-            <div class="employee-editor-spinner"></div>
-            <span>
+        <UiElement Tag="div" class="employee-editor-loading">
+            <UiElement Tag="div" class="employee-editor-spinner"></UiElement>
+            <UiElement Tag="span">
                 @(IsEditMode
                             ? "جاري تحميل بيانات الموظف..."
                             : "جاري توليد كود الموظف...")
-        </span>
-    </div>
+        </UiElement>
+    </UiElement>
         }
     else
     {
         <EditForm Model="_form" OnSubmit="SaveAsync">
             <DataAnnotationsValidator />
 
-            <div class="employee-editor-shell">
+            <UiElement Tag="div" class="employee-editor-shell">
 
                 <!-- HEADER -->
-                <div class="employee-editor-header">
+                <UiElement Tag="div" class="employee-editor-header">
 
-                    <div class="employee-editor-heading">
+                    <UiElement Tag="div" class="employee-editor-heading">
 
-                        <button type="button"
+                        <UiElement Tag="button" type="button"
                                 class="employee-editor-back"
-                                @onclick="BackToEmployees">
+                                OnClick="BackToEmployees">
 
-                            <span class="employee-editor-back-icon">
-                                <i class="fa-solid fa-arrow-right"></i>
-                            </span>
+                            <UiElement Tag="span" class="employee-editor-back-icon">
+                                <UiElement Tag="i" class="fa-solid fa-arrow-right"></UiElement>
+                            </UiElement>
 
-                            <span>العودة إلى الموظفين</span>
+                            <UiElement Tag="span">العودة إلى الموظفين</UiElement>
 
-                        </button>
+                        </UiElement>
 
-                        <div>
+                        <UiElement Tag="div">
 
-                            <h1>
+                            <UiElement Tag="h1">
                                 @(IsEditMode
                                                             ? "تعديل الموظف"
                                                             : "إضافة موظف جديد")
-                                                                            </h1>
+                                                                            </UiElement>
 
-                            <p>
+                            <UiElement Tag="p">
                                 @(IsEditMode
                                                             ? "تعديل بيانات الموظف وحفظ التغييرات."
                                                             : "أدخل بيانات الموظف الأساسية لإنشاء سجل جديد.")
-                        </p>
+                        </UiElement>
 
-                        </div>
+                        </UiElement>
 
-                    </div>
+                    </UiElement>
 
-                    <div class="employee-editor-header-actions">
+                    <UiElement Tag="div" class="employee-editor-header-actions">
 
                         <UiButton Text="إلغاء"
                                   Variant="ButtonVariant.Secondary"
@@ -108,61 +108,61 @@
                                   OnClick="SaveAndCloseClicked">
                         </UiButton>
 
-                    </div>
+                    </UiElement>
 
-                </div>
+                </UiElement>
 
                 <!-- TABS -->
-                <div class="employee-editor-tabs">
+                <UiElement Tag="div" class="employee-editor-tabs">
 
-                    <button type="button"
-                            class="employee-editor-tab @(IsTab("basic") ? "active" : "")"
-                            @onclick='() => SetTab("basic")'>
+                    <UiElement Tag="button" type="button"
+                            class="@GetTabCssClass(TabBasic)"
+                            OnClick="() => SetTab(TabBasic)">
                         البيانات الأساسية
-                    </button>
+                    </UiElement>
 
-                    <button type="button"
-                            class="employee-editor-tab @(IsTab("job") ? "active" : "")"
-                            @onclick='() => SetTab("job")'>
+                    <UiElement Tag="button" type="button"
+                            class="@GetTabCssClass(TabJob)"
+                            OnClick="() => SetTab(TabJob)">
                         الوظيفة
-                    </button>
+                    </UiElement>
 
-                    <button type="button"
-                            class="employee-editor-tab @(IsTab("contact") ? "active" : "")"
-                            @onclick='() => SetTab("contact")'>
+                    <UiElement Tag="button" type="button"
+                            class="@GetTabCssClass(TabContact)"
+                            OnClick="() => SetTab(TabContact)">
                         التواصل
-                    </button>
+                    </UiElement>
 
-                    <button type="button"
-                            class="employee-editor-tab @(IsTab("files") ? "active" : "")"
-                            @onclick='() => SetTab("files")'>
+                    <UiElement Tag="button" type="button"
+                            class="@GetTabCssClass(TabFiles)"
+                            OnClick="() => SetTab(TabFiles)">
                         الملفات
-                    </button>
+                    </UiElement>
 
-                    <button type="button"
-                            class="employee-editor-tab @(IsTab("notes") ? "active" : "")"
-                            @onclick='() => SetTab("notes")'>
+                    <UiElement Tag="button" type="button"
+                            class="@GetTabCssClass(TabNotes)"
+                            OnClick="() => SetTab(TabNotes)">
                         الملاحظات
-                    </button>
+                    </UiElement>
 
-                </div>
+                </UiElement>
 
                 <!-- BASIC -->
-                @if (IsTab("basic"))
+                @if (IsTab(TabBasic))
                 {
-                    <section class="employee-editor-card">
+                    <UiElement Tag="section" class="employee-editor-card">
 
-                        <div class="employee-editor-card-header">
-                            <div>
-                                <h2>البيانات الأساسية</h2>
-                                <p>المعلومات الرئيسية للموظف.</p>
-                            </div>
-                        </div>
+                        <UiElement Tag="div" class="employee-editor-card-header">
+                            <UiElement Tag="div">
+                                <UiElement Tag="h2">البيانات الأساسية</UiElement>
+                                <UiElement Tag="p">المعلومات الرئيسية للموظف.</UiElement>
+                            </UiElement>
+                        </UiElement>
 
-                        <div class="employee-editor-grid">
+                        <UiElement Tag="div" class="employee-editor-grid">
 
                             <!-- EMPLOYEE CODE -->
-                            <div class="employee-editor-field">
+                            <UiElement Tag="div" class="employee-editor-field">
 
                                 <UiInputText Id="employee-code"
                                              Label="كود الموظف"
@@ -174,10 +174,10 @@
 
                                 <ValidationMessage For="@(() => _form.EmployeeCode)" />
 
-                            </div>
+                            </UiElement>
 
                             <!-- FIRST NAME -->
-                            <div class="employee-editor-field">
+                            <UiElement Tag="div" class="employee-editor-field">
 
                                 <UiInputText Id="employee-first-name"
                                              Label="الاسم الأول"
@@ -188,10 +188,10 @@
 
                                 <ValidationMessage For="@(() => _form.FirstName)" />
 
-                            </div>
+                            </UiElement>
 
                             <!-- LAST NAME -->
-                            <div class="employee-editor-field">
+                            <UiElement Tag="div" class="employee-editor-field">
 
                                 <UiInputText Id="employee-last-name"
                                              Label="اسم العائلة"
@@ -202,87 +202,87 @@
 
                                 <ValidationMessage For="@(() => _form.LastName)" />
 
-                            </div>
+                            </UiElement>
 
                             <!-- HIRE DATE -->
-                            <div class="employee-editor-field">
+                            <UiElement Tag="div" class="employee-editor-field">
 
-                                <label class="employee-editor-label"
+                                <UiElement Tag="label" class="employee-editor-label"
                                        for="employee-hire-date">
                                     تاريخ التوظيف
-                                </label>
+                                </UiElement>
 
-                                <input id="employee-hire-date"
+                                <UiElement Tag="input" id="employee-hire-date"
                                        type="date"
                                        class="employee-editor-native-input"
                                        value="@_form.HireDateText"
-                                       @onchange="OnHireDateChanged" />
+                                       OnChange="OnHireDateChanged" />
 
-                            </div>
+                            </UiElement>
 
-                        </div>
+                        </UiElement>
 
                         @if (!IsEditMode)
                         {
-                            <div class="employee-editor-status-box">
+                            <UiElement Tag="div" class="employee-editor-status-box">
 
-                                <div>
-                                    <strong>حالة الموظف عند الإنشاء</strong>
+                                <UiElement Tag="div">
+                                    <UiElement Tag="strong">حالة الموظف عند الإنشاء</UiElement>
 
-                                    <span>
+                                    <UiElement Tag="span">
                                         يمكنك إنشاء الموظف نشطًا أو غير نشط.
-                                    </span>
-                                </div>
+                                    </UiElement>
+                                </UiElement>
 
                                 <UiCheckbox Label="الموظف نشط"
                                             Value="_form.IsActive"
                                             ValueChanged="SetActive" />
 
-                            </div>
+                            </UiElement>
                         }
                         else
                         {
-                            <div class="employee-editor-info-box">
+                            <UiElement Tag="div" class="employee-editor-info-box">
 
-                                <div>
-                                    <strong>الحالة الحالية</strong>
+                                <UiElement Tag="div">
+                                    <UiElement Tag="strong">الحالة الحالية</UiElement>
 
-                                    <span>
+                                    <UiElement Tag="span">
                                         يمكن تغيير الحالة من صفحة الموظفين.
-                                    </span>
-                                </div>
+                                    </UiElement>
+                                </UiElement>
 
-                                <span class="@(_form.IsActive
+                                <UiElement Tag="span" class="@(_form.IsActive
                                                                                     ? "employee-status-active"
                                                                                     : "employee-status-inactive")">
 
                         @(_form.IsActive ? "نشط" : "غير نشط")
 
-                                </span>
+                                </UiElement>
 
-                            </div>
+                            </UiElement>
                                 }
 
-                    </section>
+                    </UiElement>
                 }
 
                 <!-- JOB -->
-                @if (IsTab("job"))
+                @if (IsTab(TabJob))
                 {
-                    <section class="employee-editor-card">
+                    <UiElement Tag="section" class="employee-editor-card">
 
-                        <div class="employee-editor-card-header">
+                        <UiElement Tag="div" class="employee-editor-card-header">
 
-                            <div>
-                                <h2>الوظيفة والأدوار التشغيلية</h2>
-                                <p>حدد المسمى الوظيفي والمهام التشغيلية.</p>
-                            </div>
+                            <UiElement Tag="div">
+                                <UiElement Tag="h2">الوظيفة والأدوار التشغيلية</UiElement>
+                                <UiElement Tag="p">حدد المسمى الوظيفي والمهام التشغيلية.</UiElement>
+                            </UiElement>
 
-                        </div>
+                        </UiElement>
 
-                        <div class="employee-editor-grid">
+                        <UiElement Tag="div" class="employee-editor-grid">
 
-                            <div class="employee-editor-field employee-editor-field-full">
+                            <UiElement Tag="div" class="employee-editor-field employee-editor-field-full">
 
                                 <UiInputText Id="employee-job-title"
                                              Label="المسمى الوظيفي"
@@ -292,70 +292,70 @@
 
                                 <ValidationMessage For="@(() => _form.JobTitle)" />
 
-                            </div>
+                            </UiElement>
 
-                        </div>
+                        </UiElement>
 
-                        <div class="employee-editor-capabilities">
+                        <UiElement Tag="div" class="employee-editor-capabilities">
 
-                            <div class="employee-editor-capability">
+                            <UiElement Tag="div" class="employee-editor-capability">
 
                                 <UiCheckbox Label="موظف مبيعات"
                                             Value="_form.IsSalesperson"
                                             ValueChanged="SetSalesperson" />
 
-                                <span>
+                                <UiElement Tag="span">
                                     يعمل ضمن فريق المبيعات.
-                                </span>
+                                </UiElement>
 
-                            </div>
+                            </UiElement>
 
-                            <div class="employee-editor-capability">
+                            <UiElement Tag="div" class="employee-editor-capability">
 
                                 <UiCheckbox Label="فني"
                                             Value="_form.IsTechnician"
                                             ValueChanged="SetTechnician" />
 
-                                <span>
+                                <UiElement Tag="span">
                                     يمكنه تنفيذ الأعمال الفنية.
-                                </span>
+                                </UiElement>
 
-                            </div>
+                            </UiElement>
 
-                            <div class="employee-editor-capability">
+                            <UiElement Tag="div" class="employee-editor-capability">
 
                                 <UiCheckbox Label="مستحق للعمولة"
                                             Value="_form.IsCommissionEligible"
                                             ValueChanged="SetCommissionEligible" />
 
-                                <span>
+                                <UiElement Tag="span">
                                     يسمح باحتساب العمولة.
-                                </span>
+                                </UiElement>
 
-                            </div>
+                            </UiElement>
 
-                        </div>
+                        </UiElement>
 
-                    </section>
+                    </UiElement>
                 }
 
                 <!-- CONTACT -->
-                @if (IsTab("contact"))
+                @if (IsTab(TabContact))
                 {
-                    <section class="employee-editor-card">
+                    <UiElement Tag="section" class="employee-editor-card">
 
-                        <div class="employee-editor-card-header">
+                        <UiElement Tag="div" class="employee-editor-card-header">
 
-                            <div>
-                                <h2>بيانات التواصل</h2>
-                                <p>بيانات الاتصال المتاحة للموظف.</p>
-                            </div>
+                            <UiElement Tag="div">
+                                <UiElement Tag="h2">بيانات التواصل</UiElement>
+                                <UiElement Tag="p">بيانات الاتصال المتاحة للموظف.</UiElement>
+                            </UiElement>
 
-                        </div>
+                        </UiElement>
 
-                        <div class="employee-editor-grid">
+                        <UiElement Tag="div" class="employee-editor-grid">
 
-                            <div class="employee-editor-field">
+                            <UiElement Tag="div" class="employee-editor-field">
 
                                 <UiInputText Id="employee-phone"
                                              Label="رقم الهاتف"
@@ -367,91 +367,91 @@
 
                                 <ValidationMessage For="@(() => _form.Phone)" />
 
-                            </div>
+                            </UiElement>
 
-                        </div>
+                        </UiElement>
 
-                    </section>
+                    </UiElement>
                 }
 
                 <!-- FILES -->
-                @if (IsTab("files"))
+                @if (IsTab(TabFiles))
                 {
-                    <section class="employee-editor-card">
+                    <UiElement Tag="section" class="employee-editor-card">
 
-                        <div class="employee-editor-card-header">
+                        <UiElement Tag="div" class="employee-editor-card-header">
 
-                            <div>
-                                <h2>ملفات الموظف</h2>
-                                <p>قسم الملفات جاهز للتطوير لاحقًا.</p>
-                            </div>
+                            <UiElement Tag="div">
+                                <UiElement Tag="h2">ملفات الموظف</UiElement>
+                                <UiElement Tag="p">قسم الملفات جاهز للتطوير لاحقًا.</UiElement>
+                            </UiElement>
 
-                        </div>
+                        </UiElement>
 
-                        <div class="employee-editor-placeholder">
+                        <UiElement Tag="div" class="employee-editor-placeholder">
 
-                            <div class="employee-editor-placeholder-icon">
-                                <i class="fa-solid fa-folder-open"></i>
-                            </div>
+                            <UiElement Tag="div" class="employee-editor-placeholder-icon">
+                                <UiElement Tag="i" class="fa-solid fa-folder-open"></UiElement>
+                            </UiElement>
 
-                            <strong>لا توجد ملفات حاليًا</strong>
+                            <UiElement Tag="strong">لا توجد ملفات حاليًا</UiElement>
 
-                            <span>
+                            <UiElement Tag="span">
                                 رفع الملفات ليس جزءًا من عقد Employees الحالي.
-                            </span>
+                            </UiElement>
 
-                        </div>
+                        </UiElement>
 
-                    </section>
+                    </UiElement>
                 }
 
                 <!-- NOTES -->
-                @if (IsTab("notes"))
+                @if (IsTab(TabNotes))
                 {
-                    <section class="employee-editor-card">
+                    <UiElement Tag="section" class="employee-editor-card">
 
-                        <div class="employee-editor-card-header">
+                        <UiElement Tag="div" class="employee-editor-card-header">
 
-                            <div>
-                                <h2>الملاحظات</h2>
-                                <p>أضف أي معلومات أو ملاحظات إضافية.</p>
-                            </div>
+                            <UiElement Tag="div">
+                                <UiElement Tag="h2">الملاحظات</UiElement>
+                                <UiElement Tag="p">أضف أي معلومات أو ملاحظات إضافية.</UiElement>
+                            </UiElement>
 
-                        </div>
+                        </UiElement>
 
-                        <div class="employee-editor-field employee-editor-field-full">
+                        <UiElement Tag="div" class="employee-editor-field employee-editor-field-full">
 
-                            <label class="employee-editor-label"
+                            <UiElement Tag="label" class="employee-editor-label"
                                    for="employee-notes">
                                 الملاحظات
-                            </label>
+                            </UiElement>
 
-                            <textarea id="employee-notes"
+                            <UiElement Tag="textarea" id="employee-notes"
                                       class="employee-editor-textarea"
                                       maxlength="1000"
-                                      @bind="_form.Notes"
+                                      @bind-Value="_form.Notes"
                                       placeholder="أدخل الملاحظات هنا...">
-                                    </textarea>
+                                    </UiElement>
 
                             <ValidationMessage For="@(() => _form.Notes)" />
 
-                        </div>
+                        </UiElement>
 
-                    </section>
+                    </UiElement>
                 }
 
                 <ValidationSummary class="employee-editor-validation-summary" />
 
                 <!-- FOOTER -->
-                <div class="employee-editor-footer">
+                <UiElement Tag="div" class="employee-editor-footer">
 
-                    <div class="employee-editor-footer-info">
-                        <span>
+                    <UiElement Tag="div" class="employee-editor-footer-info">
+                        <UiElement Tag="span">
                             الحقول الأساسية مطلوبة.
-                        </span>
-                    </div>
+                        </UiElement>
+                    </UiElement>
 
-                    <div class="employee-editor-footer-actions">
+                    <UiElement Tag="div" class="employee-editor-footer-actions">
 
                         <UiButton Text="إلغاء"
                                   Variant="ButtonVariant.Secondary"
@@ -468,16 +468,16 @@
                                   OnClick="SaveAndCloseClicked">
                         </UiButton>
 
-                    </div>
+                    </UiElement>
 
-                </div>
+                </UiElement>
 
-            </div>
+            </UiElement>
 
         </EditForm>
     }
 
-</div>
+</UiElement>
 
 @code {
 
@@ -494,7 +494,13 @@
     private bool _parametersInitialized;
     private Guid? _loadedEmployeeId;
 
-    private string _activeTab = "basic";
+    private const string TabBasic = "basic";
+    private const string TabJob = "job";
+    private const string TabContact = "contact";
+    private const string TabFiles = "files";
+    private const string TabNotes = "notes";
+
+    private string _activeTab = TabBasic;
 
     private bool IsEditMode =>
         EmployeeId.HasValue;
@@ -537,7 +543,7 @@
         };
 
         _rowVersion = null;
-        _activeTab = "basic";
+        _activeTab = TabBasic;
         _isLoading = true;
 
         try
@@ -646,7 +652,7 @@
             _rowVersion =
                 employee.RowVersion;
 
-            _activeTab = "basic";
+            _activeTab = TabBasic;
         }
         catch (ApiClientException ex)
         {
@@ -720,7 +726,7 @@
                     Snackbar.Error(
                         "كود الموظف غير متوفر.");
 
-                    SetTab("basic");
+                    SetTab(TabBasic);
 
                     return;
                 }
@@ -941,7 +947,7 @@
             Snackbar.Error(
                 "كود الموظف غير متوفر.");
 
-            SetTab("basic");
+            SetTab(TabBasic);
 
             return false;
         }
@@ -952,7 +958,7 @@
             Snackbar.Error(
                 "الاسم الأول مطلوب.");
 
-            SetTab("basic");
+            SetTab(TabBasic);
 
             return false;
         }
@@ -963,7 +969,7 @@
             Snackbar.Error(
                 "اسم العائلة مطلوب.");
 
-            SetTab("basic");
+            SetTab(TabBasic);
 
             return false;
         }
@@ -973,7 +979,7 @@
             Snackbar.Error(
                 "كود الموظف يجب ألا يتجاوز 32 حرفًا.");
 
-            SetTab("basic");
+            SetTab(TabBasic);
 
             return false;
         }
@@ -983,7 +989,7 @@
             Snackbar.Error(
                 "الاسم الأول يجب ألا يتجاوز 100 حرف.");
 
-            SetTab("basic");
+            SetTab(TabBasic);
 
             return false;
         }
@@ -993,7 +999,7 @@
             Snackbar.Error(
                 "اسم العائلة يجب ألا يتجاوز 100 حرف.");
 
-            SetTab("basic");
+            SetTab(TabBasic);
 
             return false;
         }
@@ -1005,7 +1011,7 @@
             Snackbar.Error(
                 "رقم الهاتف يجب ألا يتجاوز 32 حرفًا.");
 
-            SetTab("contact");
+            SetTab(TabContact);
 
             return false;
         }
@@ -1017,7 +1023,7 @@
             Snackbar.Error(
                 "المسمى الوظيفي يجب ألا يتجاوز 100 حرف.");
 
-            SetTab("job");
+            SetTab(TabJob);
 
             return false;
         }
@@ -1029,7 +1035,7 @@
             Snackbar.Error(
                 "الملاحظات يجب ألا تتجاوز 1000 حرف.");
 
-            SetTab("notes");
+            SetTab(TabNotes);
 
             return false;
         }
@@ -1098,6 +1104,14 @@
             _activeTab,
             tab,
             StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string GetTabCssClass(
+        string tab)
+    {
+        return IsTab(tab)
+            ? "employee-editor-tab active"
+            : "employee-editor-tab";
     }
 
     private void CancelClicked(

@@ -1,0 +1,14 @@
+<div class="ui-details-header">
+    <UiAvatar Initials="@Initials" />
+    <div class="ui-details-header__identity">
+        <strong>@Title</strong>
+        @if (!string.IsNullOrWhiteSpace(Subtitle))
+        {
+            <span>@Subtitle</span>
+        }
+    </div>
+    @if (!string.IsNullOrWhiteSpace(StatusText))
+    {
+        <UiBadge Text="@StatusText" Tone="@StatusTone" />
+    }
+</div>

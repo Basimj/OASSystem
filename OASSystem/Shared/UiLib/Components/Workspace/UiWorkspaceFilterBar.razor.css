@@ -1,0 +1,11 @@
+.ui-workspace-filterbar {
+    display:grid;
+    grid-template-columns:minmax(220px,1.25fr) minmax(145px,.7fr) minmax(155px,.75fr) auto auto;
+    align-items:end;
+    gap:7px;
+    width:100%;
+}
+.ui-workspace-filterbar ::deep .ui-input-text,
+.ui-workspace-filterbar ::deep .ui-select { width:100%; min-width:0; }
+@media (max-width:900px) { .ui-workspace-filterbar { grid-template-columns:1fr 1fr 1fr; } }
+@media (max-width:620px) { .ui-workspace-filterbar { grid-template-columns:1fr; } }

@@ -22,3 +22,6 @@
 .ui-button--full { width: 100%; }
 .ui-button__spinner { flex: 0 0 auto; width: 1em; height: 1em; border: 2px solid currentColor; border-inline-end-color: transparent; border-radius: 50%; animation: ui-button-spin .7s linear infinite; }
 @keyframes ui-button-spin { to { transform: rotate(360deg); } }
+.ui-button--primary:hover:not(:disabled) { background: var(--oas-color-primary-hover); }
+.ui-button--secondary:hover:not(:disabled), .ui-button--ghost:hover:not(:disabled) { background: var(--oas-color-primary-soft); color: var(--oas-color-primary); border-color: var(--oas-color-primary-border); }
+.ui-button__icon { flex: 0 0 auto; font-size: .95em; line-height: 1; }

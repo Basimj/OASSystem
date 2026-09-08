@@ -17,7 +17,7 @@ public sealed class ValidationBehavior<TRequest, TResponse>(IEnumerable<IValidat
         var errors = results.SelectMany(r => r.Errors)
             .Where(f => f is not null)
             .GroupBy(f => f.PropertyName)
-            .ToDictionary(g => g.Key, g => g.Select(f => f.ErrorMessage).Distinct().ToArray());
+            .ToDictionary(g => g.Key, g => g.Select(f => string.IsNullOrWhiteSpace(f.ErrorCode) ? f.ErrorMessage : f.ErrorCode).Distinct().ToArray());
 
         if (errors.Count != 0) throw new RequestValidationException(errors);
         return await next(cancellationToken);

@@ -8,8 +8,8 @@ public sealed class AuthClientService(OasApiClient apiClient) : IAuthClientServi
     public Task<ApiCallResult<CurrentUserDto>> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default) =>
         apiClient.PostResultAsync<LoginRequest, CurrentUserDto>("api/identity/auth/login", request, cancellationToken);
 
-    public Task<ApiCallResult<CurrentUserDto>> ChangePasswordAsync(ChangePasswordRequest request, CancellationToken cancellationToken = default) =>
-        apiClient.PostResultAsync<ChangePasswordRequest, CurrentUserDto>("api/identity/auth/change-password", request, cancellationToken);
+    public Task<ApiCallResult<CurrentUserDto>> CompletePasswordSetupAsync(CompletePasswordSetupRequest request, CancellationToken cancellationToken = default) =>
+        apiClient.PostResultAsync<CompletePasswordSetupRequest, CurrentUserDto>("api/identity/auth/complete-password-setup", request, cancellationToken);
 
     public Task LogoutAsync(CancellationToken cancellationToken = default) =>
         apiClient.PostAsync("api/identity/auth/logout", cancellationToken);

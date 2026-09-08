@@ -35,7 +35,7 @@
                                         Size="ControlSize.Small" />
                     </UiGrid>
 <UiInputText @bind-Value="_model.Login" Label="@L["Login_UserNameOrEmail"]" AutoComplete="username" Required="true" EnableNativeValidation="false" Disabled="@LoginFieldsDisabled" Size="ControlSize.Small" />
-                    <UiInputText @bind-Value="_model.Password" Type="password" RevealPassword="true" Label="@L["Login_Password"]" AutoComplete="current-password" Required="true" EnableNativeValidation="false" Disabled="@LoginFieldsDisabled" Size="ControlSize.Small" />
+                    <UiInputText @bind-Value="_model.Password" Type="password" RevealPassword="true" Label="@L["Login_Password"]" AutoComplete="current-password" Required="false" EnableNativeValidation="false" Disabled="@LoginFieldsDisabled" Size="ControlSize.Small" />
                     <UiCheckbox @bind-Value="_model.RememberMe" Label="@L["Login_RememberMe"]" Disabled="@LoginFieldsDisabled" />
                     <UiButton Type="submit" Text="@L["Login_Button"]" Loading="_loading" FullWidth="true" Disabled="@LoginFieldsDisabled" Size="ControlSize.Small" />
                 </UiStackLayout>
@@ -93,7 +93,7 @@
         {
             var state = await AuthState.GetAuthenticationStateAsync();
             if (state.User.Identity?.IsAuthenticated == true)
-                Navigation.NavigateTo(AuthState.CurrentUser?.MustChangePassword == true ? "/identity/change-password" : "/", replace: true);
+                Navigation.NavigateTo(AuthState.CurrentUser?.MustChangePassword == true ? "/identity/password-setup" : "/", replace: true);
         }
     }
 
@@ -228,7 +228,7 @@
             }
 
             AuthState.SetAuthenticated(result.Value);
-            Navigation.NavigateTo(result.Value.MustChangePassword ? "/identity/change-password" : GetSafeReturnUrl(), replace: true);
+            Navigation.NavigateTo(result.Value.MustChangePassword ? "/identity/password-setup" : GetSafeReturnUrl(), replace: true);
         }
         catch (OperationCanceledException) { }
         catch

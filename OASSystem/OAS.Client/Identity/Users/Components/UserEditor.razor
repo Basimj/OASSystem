@@ -1,0 +1,69 @@
+<UiStackLayout Gap="StackGap.Small">
+    <UiSectionTabStrip Tabs="@SectionTabs" OnSelect="SelectSectionAsync" />
+
+    @if (State.ActiveSection == "basic")
+    {
+        <UiCard Title="@L["Users_BasicInfo"]">
+            <UiGrid Columns="2">
+                <UiInputText @bind-Value="State.Form.FirstName" Label="@L["Users_FirstName"]" Required="true" EnableNativeValidation="false" Size="ControlSize.Small" />
+                <UiInputText @bind-Value="State.Form.LastName" Label="@L["Users_LastName"]" Required="true" EnableNativeValidation="false" Size="ControlSize.Small" />
+                <UiInputText @bind-Value="State.Form.UserName" Label="@L["Users_UserName"]" Required="true" EnableNativeValidation="false" Size="ControlSize.Small" AutoComplete="off" />
+                <UiInputText @bind-Value="State.Form.Email" Label="@L["Users_Email"]" Type="email" Size="ControlSize.Small" AutoComplete="off" />
+            </UiGrid>
+            @if (State.IsNew)
+            {
+                <UiCheckbox @bind-Value="State.Form.IsActive" Label="@L["Users_Active"]" />
+            }
+        </UiCard>
+    }
+    else if (State.ActiveSection == "roles")
+    {
+        <UiCard Title="@L["Users_Roles"]">
+            <UiGrid Columns="2">
+                @foreach (var role in Roles)
+                {
+                    <UiCheckbox Value="@State.IsRoleSelected(role.Id)"
+                                ValueChanged="@(value => RoleChanged(role.Id, value))"
+                                Disabled="@IsRoleDisabled(role)"
+                                Label="@TranslateRole(role.Name)" />
+                }
+            </UiGrid>
+        </UiCard>
+    }
+    else if (State.ActiveSection == "security")
+    {
+        <UiCard Title="@L["Users_Security"]">
+            @if (State.Details is null)
+            {
+                <UiAlert Message="@L["Users_SecurityAvailableAfterCreate"]" />
+            }
+            else
+            {
+                <UiKeyValue Label="@L["Users_Status"]" Value="@(State.Details.IsActive ? L["Users_Active"] : L["Users_Inactive"])" />
+                <UiKeyValue Label="@L["Users_Locked"]" Value="@(State.Details.IsLocked ? L["Users_Locked"] : L["Users_Unlocked"])" />
+                <UiKeyValue Label="@L["Users_AccessFailedCount"]" Value="@State.Details.AccessFailedCount.ToString()" />
+                <UiKeyValue Label="@L["Users_LockoutEnd"]" Value="@FormatDate(State.Details.LockoutEndUtc)" />
+                <UiKeyValue Label="@L["Users_MustChangePassword"]" Value="@(State.Details.MustChangePassword ? L["Common_Yes"] : L["Common_No"])" />
+                <UiKeyValue Label="@L["Users_LastLogin"]" Value="@FormatDate(State.Details.LastLoginAtUtc)" />
+            }
+        </UiCard>
+    }
+    else
+    {
+        <UiCard Title="@L["Users_SystemInfo"]">
+            @if (State.Details is null)
+            {
+                <UiAlert Message="@L["Users_SystemInfoAvailableAfterCreate"]" />
+            }
+            else
+            {
+                <UiKeyValue Label="@L["Users_UserId"]" Value="@State.Details.Id.ToString()" />
+                <UiKeyValue Label="@L["Users_CreatedAt"]" Value="@FormatDate(State.Details.CreatedAtUtc)" />
+                <UiKeyValue Label="@L["Users_CreatedBy"]" Value="@(State.Details.CreatedBy ?? "—")" />
+                <UiKeyValue Label="@L["Users_ModifiedAt"]" Value="@FormatDate(State.Details.LastModifiedAtUtc)" />
+                <UiKeyValue Label="@L["Users_ModifiedBy"]" Value="@(State.Details.LastModifiedBy ?? "—")" />
+                <UiKeyValue Label="@L["Users_SuperAdmin"]" Value="@(State.Details.IsSuperAdmin ? L["Common_Yes"] : L["Common_No"])" />
+            }
+        </UiCard>
+    }
+</UiStackLayout>

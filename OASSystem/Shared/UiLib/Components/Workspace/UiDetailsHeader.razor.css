@@ -1,0 +1,11 @@
+.ui-details-header {
+    display:grid;
+    grid-template-columns:36px minmax(0,1fr) auto;
+    align-items:center;
+    gap:8px;
+    padding:1px 0 3px;
+}
+.ui-details-header ::deep .ui-avatar { width:34px; height:34px; font-size:10px; }
+.ui-details-header__identity { min-width:0; display:flex; flex-direction:column; gap:1px; }
+.ui-details-header__identity strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; color:#34344a; font-weight:750; }
+.ui-details-header__identity span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:9px; color:var(--oas-color-text-muted); }

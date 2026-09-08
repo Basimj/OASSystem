@@ -1,22 +1,25 @@
 :root {
-    --oas-color-primary: #2457d6;
-    --oas-color-primary-soft: #eef4ff;
+    --oas-color-primary: #5A2DD6;
+    --oas-color-primary-hover: #4E25C4;
+    --oas-color-primary-soft: #f4f0ff;
+    --oas-color-primary-border: #d9ccff;
     --oas-color-on-primary: #ffffff;
-    --oas-color-danger: #b42318;
-    --oas-color-danger-surface: #fef3f2;
+    --oas-color-danger: #d92d20;
+    --oas-color-danger-surface: #fff1f0;
     --oas-color-on-danger: #ffffff;
     --oas-color-success: #067647;
     --oas-color-success-surface: #ecfdf3;
     --oas-color-warning: #b54708;
     --oas-color-warning-surface: #fffaeb;
-    --oas-color-info-border: #84adff;
-    --oas-color-info-surface: #eff4ff;
-    --oas-color-background: #f8fafc;
+    --oas-color-info-border: #c8b8ff;
+    --oas-color-info-surface: #f5f2ff;
+    --oas-color-background: #fbfbfd;
     --oas-color-surface: #ffffff;
-    --oas-color-subtle: #f9fafb;
-    --oas-color-hover: #f2f4f7;
-    --oas-color-disabled-surface: #f2f4f7;
-    --oas-color-text: #101828;
-    --oas-color-text-muted: #667085;
-    --oas-color-border: #d0d5dd;
+    --oas-color-subtle: #fafafa;
+    --oas-color-hover: #f7f4ff;
+    --oas-color-disabled-surface: #f4f4f5;
+    --oas-color-text: #27263b;
+    --oas-color-text-muted: #77758c;
+    --oas-color-border: #e7e5ef;
+    --oas-color-border-subtle: #f0eef5;
 }

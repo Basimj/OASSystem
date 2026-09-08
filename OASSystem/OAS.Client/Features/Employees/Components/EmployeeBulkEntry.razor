@@ -1,4 +1,4 @@
-﻿@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Components.Web
 @using OAS.Client.Features.Employees.Services
 @using OAS.Client.Services.Http
 @using OAS.Contracts.Features.Employees
@@ -7,149 +7,149 @@
 @inject IEmployeeClientService EmployeeService
 @inject IUiSnackbarService Snackbar
 
-<div class="employee-bulk-entry">
+<UiElement Tag="div" class="employee-bulk-entry">
 
-    <div class="employee-bulk-entry-header">
+    <UiElement Tag="div" class="employee-bulk-entry-header">
 
-        <div class="employee-bulk-entry-title-area">
-            <div class="employee-bulk-entry-icon">
-                <span>▦</span>
-            </div>
+        <UiElement Tag="div" class="employee-bulk-entry-title-area">
+            <UiElement Tag="div" class="employee-bulk-entry-icon">
+                <UiElement Tag="span">▦</UiElement>
+            </UiElement>
 
-            <div>
-                <h2>إدخال الموظفين</h2>
-                <p>أدخل بيانات عدة موظفين مباشرة داخل النظام</p>
-            </div>
-        </div>
+            <UiElement Tag="div">
+                <UiElement Tag="h2">إدخال الموظفين</UiElement>
+                <UiElement Tag="p">أدخل بيانات عدة موظفين مباشرة داخل النظام</UiElement>
+            </UiElement>
+        </UiElement>
 
-        <button type="button"
+        <UiElement Tag="button" type="button"
                 class="employee-bulk-close-button"
-                @onclick="CloseClicked"
+                OnClick="CloseClicked"
                 disabled="@(_isValidating || _isSaving)">
             ×
-        </button>
+        </UiElement>
 
-    </div>
+    </UiElement>
 
 
-    <div class="employee-bulk-entry-toolbar">
+    <UiElement Tag="div" class="employee-bulk-entry-toolbar">
 
-        <div class="employee-bulk-toolbar-left">
+        <UiElement Tag="div" class="employee-bulk-toolbar-left">
 
-            <button type="button"
+            <UiElement Tag="button" type="button"
                     class="employee-bulk-toolbar-button"
-                    @onclick="AddRowClicked"
+                    OnClick="AddRowClicked"
                     disabled="@(_isValidating || _isSaving)">
-                <span>＋</span>
-                <span>إضافة صف</span>
-            </button>
+                <UiElement Tag="span">＋</UiElement>
+                <UiElement Tag="span">إضافة صف</UiElement>
+            </UiElement>
 
-            <button type="button"
+            <UiElement Tag="button" type="button"
                     class="employee-bulk-toolbar-button"
-                    @onclick="ClearClicked"
+                    OnClick="ClearClicked"
                     disabled="@(_isValidating || _isSaving)">
-                <span>مسح الكل</span>
-            </button>
+                <UiElement Tag="span">مسح الكل</UiElement>
+            </UiElement>
 
-        </div>
+        </UiElement>
 
-        <div class="employee-bulk-toolbar-right">
+        <UiElement Tag="div" class="employee-bulk-toolbar-right">
 
-            <div class="employee-bulk-stat">
-                <span class="employee-bulk-stat-label">الصفوف</span>
-                <strong>@GetDataRowsCount()</strong>
-            </div>
+            <UiElement Tag="div" class="employee-bulk-stat">
+                <UiElement Tag="span" class="employee-bulk-stat-label">الصفوف</UiElement>
+                <UiElement Tag="strong">@GetDataRowsCount()</UiElement>
+            </UiElement>
 
-            <div class="employee-bulk-stat">
-                <span class="employee-bulk-stat-label">الصحيحة</span>
-                <strong>@GetValidRowsCount()</strong>
-            </div>
+            <UiElement Tag="div" class="employee-bulk-stat">
+                <UiElement Tag="span" class="employee-bulk-stat-label">الصحيحة</UiElement>
+                <UiElement Tag="strong">@GetValidRowsCount()</UiElement>
+            </UiElement>
 
-            <div class="employee-bulk-stat">
-                <span class="employee-bulk-stat-label">الأخطاء</span>
-                <strong>@GetInvalidRowsCount()</strong>
-            </div>
+            <UiElement Tag="div" class="employee-bulk-stat">
+                <UiElement Tag="span" class="employee-bulk-stat-label">الأخطاء</UiElement>
+                <UiElement Tag="strong">@GetInvalidRowsCount()</UiElement>
+            </UiElement>
 
-        </div>
+        </UiElement>
 
-    </div>
+    </UiElement>
 
 
     @if (_isValidating)
     {
-        <div class="employee-bulk-entry-status employee-bulk-entry-status-loading">
+        <UiElement Tag="div" class="employee-bulk-entry-status employee-bulk-entry-status-loading">
             جاري التحقق من البيانات...
-        </div>
+        </UiElement>
     }
     else if (_isSaving)
     {
-        <div class="employee-bulk-entry-status employee-bulk-entry-status-saving">
+        <UiElement Tag="div" class="employee-bulk-entry-status employee-bulk-entry-status-saving">
             جاري حفظ الموظفين...
             (@_savedCount من @_saveTotal)
-        </div>
+        </UiElement>
     }
     else if (_validationPerformed)
     {
         @if (GetInvalidRowsCount() == 0 && GetDataRowsCount() > 0)
         {
-            <div class="employee-bulk-entry-status employee-bulk-entry-status-success">
+            <UiElement Tag="div" class="employee-bulk-entry-status employee-bulk-entry-status-success">
                 جميع البيانات صحيحة ويمكن حفظها.
-            </div>
+            </UiElement>
         }
         else if (GetInvalidRowsCount() > 0)
         {
-            <div class="employee-bulk-entry-status employee-bulk-entry-status-error">
+            <UiElement Tag="div" class="employee-bulk-entry-status employee-bulk-entry-status-error">
                 يوجد @GetInvalidRowsCount() صف يحتاج إلى تصحيح.
-            </div>
+            </UiElement>
         }
     }
 
 
-    <div class="employee-bulk-entry-table-wrapper">
+    <UiElement Tag="div" class="employee-bulk-entry-table-wrapper">
 
-        <table class="employee-bulk-entry-table">
+        <UiElement Tag="table" class="employee-bulk-entry-table">
 
-            <thead>
-                <tr>
-                    <th class="employee-bulk-col-number">#</th>
-                    <th>رمز الموظف *</th>
-                    <th>الاسم الأول *</th>
-                    <th>اسم العائلة *</th>
-                    <th>رقم الهاتف</th>
-                    <th>المسمى الوظيفي</th>
-                    <th>تاريخ التوظيف</th>
-                    <th>مبيعات</th>
-                    <th>فني</th>
-                    <th>عمولة</th>
-                    <th>نشط</th>
-                    <th class="employee-bulk-col-delete"></th>
-                </tr>
-            </thead>
+            <UiElement Tag="thead">
+                <UiElement Tag="tr">
+                    <UiElement Tag="th" class="employee-bulk-col-number">#</UiElement>
+                    <UiElement Tag="th">رمز الموظف *</UiElement>
+                    <UiElement Tag="th">الاسم الأول *</UiElement>
+                    <UiElement Tag="th">اسم العائلة *</UiElement>
+                    <UiElement Tag="th">رقم الهاتف</UiElement>
+                    <UiElement Tag="th">المسمى الوظيفي</UiElement>
+                    <UiElement Tag="th">تاريخ التوظيف</UiElement>
+                    <UiElement Tag="th">مبيعات</UiElement>
+                    <UiElement Tag="th">فني</UiElement>
+                    <UiElement Tag="th">عمولة</UiElement>
+                    <UiElement Tag="th">نشط</UiElement>
+                    <UiElement Tag="th" class="employee-bulk-col-delete"></UiElement>
+                </UiElement>
+            </UiElement>
 
 
-            <tbody>
+            <UiElement Tag="tbody">
 
                 @for (var index = 0; index < _rows.Count; index++)
                 {
                     var row = _rows[index];
                     var rowIndex = index + 1;
 
-                    <tr class="@(row.Errors.Count > 0
+                    <UiElement Tag="tr" class="@(row.Errors.Count > 0
                                                 ? "employee-bulk-row-invalid"
                                                 : "")">
 
-                    <td class="employee-bulk-row-number">
+                    <UiElement Tag="td" class="employee-bulk-row-number">
                         @rowIndex
-                    </td>
+                    </UiElement>
 
 
                         <!-- Employee Code -->
-                        <td>
+                        <UiElement Tag="td">
 
-                            <input class="@GetInputClass(row, nameof(row.EmployeeCode))"
+                            <UiElement Tag="input" class="@GetInputClass(row, nameof(row.EmployeeCode))"
                                    type="text"
                                    value="@row.EmployeeCode"
-                                   @oninput="e => OnEmployeeCodeInput(row, e)"
+                                   OnInput="e => OnEmployeeCodeInput(row, e)"
                                    maxlength="32"
                                    autocomplete="off"
                                    placeholder="EMP001"
@@ -157,63 +157,63 @@
 
                         @if (HasFieldError(row, nameof(row.EmployeeCode)))
                             {
-                                <div class="employee-bulk-field-error">
+                                <UiElement Tag="div" class="employee-bulk-field-error">
                                     @GetFieldError(row, nameof(row.EmployeeCode))
-                                </div>
+                                </UiElement>
                             }
 
-                        </td>
+                        </UiElement>
 
 
                         <!-- First Name -->
-                        <td>
+                        <UiElement Tag="td">
 
-                            <input class="@GetInputClass(row, nameof(row.FirstName))"
+                            <UiElement Tag="input" class="@GetInputClass(row, nameof(row.FirstName))"
                                    type="text"
                                    value="@row.FirstName"
-                                   @oninput="e => OnTextInput(row, nameof(row.FirstName), e)"
+                                   OnInput="e => OnTextInput(row, nameof(row.FirstName), e)"
                                    maxlength="100"
                                    autocomplete="off"
                                    disabled="@IsInputLocked()" />
 
                             @if (HasFieldError(row, nameof(row.FirstName)))
                             {
-                                <div class="employee-bulk-field-error">
+                                <UiElement Tag="div" class="employee-bulk-field-error">
                                     @GetFieldError(row, nameof(row.FirstName))
-                                </div>
+                                </UiElement>
                             }
 
-                        </td>
+                        </UiElement>
 
 
                         <!-- Last Name -->
-                        <td>
+                        <UiElement Tag="td">
 
-                            <input class="@GetInputClass(row, nameof(row.LastName))"
+                            <UiElement Tag="input" class="@GetInputClass(row, nameof(row.LastName))"
                                    type="text"
                                    value="@row.LastName"
-                                   @oninput="e => OnTextInput(row, nameof(row.LastName), e)"
+                                   OnInput="e => OnTextInput(row, nameof(row.LastName), e)"
                                    maxlength="100"
                                    autocomplete="off"
                                    disabled="@IsInputLocked()" />
 
                             @if (HasFieldError(row, nameof(row.LastName)))
                             {
-                                <div class="employee-bulk-field-error">
+                                <UiElement Tag="div" class="employee-bulk-field-error">
                                     @GetFieldError(row, nameof(row.LastName))
-                                </div>
+                                </UiElement>
                             }
 
-                        </td>
+                        </UiElement>
 
 
                         <!-- Phone -->
-                        <td>
+                        <UiElement Tag="td">
 
-                            <input class="@GetInputClass(row, nameof(row.Phone))"
+                            <UiElement Tag="input" class="@GetInputClass(row, nameof(row.Phone))"
                                    type="text"
                                    value="@row.Phone"
-                                   @oninput="e => OnPhoneInput(row, e)"
+                                   OnInput="e => OnPhoneInput(row, e)"
                                    maxlength="32"
                                    autocomplete="off"
                                    inputmode="numeric"
@@ -222,236 +222,236 @@
 
                             @if (HasFieldError(row, nameof(row.Phone)))
                             {
-                                <div class="employee-bulk-field-error">
+                                <UiElement Tag="div" class="employee-bulk-field-error">
                                     @GetFieldError(row, nameof(row.Phone))
-                                </div>
+                                </UiElement>
                             }
 
-                        </td>
+                        </UiElement>
 
 
                         <!-- Job Title -->
-                        <td>
+                        <UiElement Tag="td">
 
-                            <input class="@GetInputClass(row, nameof(row.JobTitle))"
+                            <UiElement Tag="input" class="@GetInputClass(row, nameof(row.JobTitle))"
                                    type="text"
                                    value="@row.JobTitle"
-                                   @oninput="e => OnTextInput(row, nameof(row.JobTitle), e)"
+                                   OnInput="e => OnTextInput(row, nameof(row.JobTitle), e)"
                                    maxlength="100"
                                    autocomplete="off"
                                    disabled="@IsInputLocked()" />
 
                             @if (HasFieldError(row, nameof(row.JobTitle)))
                             {
-                                <div class="employee-bulk-field-error">
+                                <UiElement Tag="div" class="employee-bulk-field-error">
                                     @GetFieldError(row, nameof(row.JobTitle))
-                                </div>
+                                </UiElement>
                             }
 
-                        </td>
+                        </UiElement>
 
 
                         <!-- Hire Date -->
-                        <td>
+                        <UiElement Tag="td">
 
-                            <input class="@GetInputClass(row, nameof(row.HireDate))"
+                            <UiElement Tag="input" class="@GetInputClass(row, nameof(row.HireDate))"
                                    type="date"
                                    value="@GetDateInputValue(row.HireDate)"
-                                   @onchange="e => OnHireDateChanged(row, e)"
+                                   OnChange="e => OnHireDateChanged(row, e)"
                                    disabled="@IsInputLocked()" />
 
                             @if (HasFieldError(row, nameof(row.HireDate)))
                             {
-                                <div class="employee-bulk-field-error">
+                                <UiElement Tag="div" class="employee-bulk-field-error">
                                     @GetFieldError(row, nameof(row.HireDate))
-                                </div>
+                                </UiElement>
                             }
 
-                        </td>
+                        </UiElement>
 
 
                         <!-- Sales -->
-                        <td class="employee-bulk-checkbox-cell">
+                        <UiElement Tag="td" class="employee-bulk-checkbox-cell">
 
-                            <input type="checkbox"
+                            <UiElement Tag="input" type="checkbox"
                                    checked="@IsYes(row.IsSalesperson)"
-                                   @onchange="e => OnBooleanChanged(row, nameof(row.IsSalesperson), e)"
+                                   OnChange="e => OnBooleanChanged(row, nameof(row.IsSalesperson), e)"
                                    disabled="@IsInputLocked()" />
 
-                        </td>
+                        </UiElement>
 
 
                         <!-- Technician -->
-                        <td class="employee-bulk-checkbox-cell">
+                        <UiElement Tag="td" class="employee-bulk-checkbox-cell">
 
-                            <input type="checkbox"
+                            <UiElement Tag="input" type="checkbox"
                                    checked="@IsYes(row.IsTechnician)"
-                                   @onchange="e => OnBooleanChanged(row, nameof(row.IsTechnician), e)"
+                                   OnChange="e => OnBooleanChanged(row, nameof(row.IsTechnician), e)"
                                    disabled="@IsInputLocked()" />
 
-                        </td>
+                        </UiElement>
 
 
                         <!-- Commission -->
-                        <td class="employee-bulk-checkbox-cell">
+                        <UiElement Tag="td" class="employee-bulk-checkbox-cell">
 
-                            <input type="checkbox"
+                            <UiElement Tag="input" type="checkbox"
                                    checked="@IsYes(row.IsCommissionEligible)"
-                                   @onchange="e => OnBooleanChanged(row, nameof(row.IsCommissionEligible), e)"
+                                   OnChange="e => OnBooleanChanged(row, nameof(row.IsCommissionEligible), e)"
                                    disabled="@IsInputLocked()" />
 
-                        </td>
+                        </UiElement>
 
 
                         <!-- Active -->
-                        <td class="employee-bulk-checkbox-cell">
+                        <UiElement Tag="td" class="employee-bulk-checkbox-cell">
 
-                            <input type="checkbox"
+                            <UiElement Tag="input" type="checkbox"
                                    checked="@IsYes(row.IsActive)"
-                                   @onchange="e => OnBooleanChanged(row, nameof(row.IsActive), e)"
+                                   OnChange="e => OnBooleanChanged(row, nameof(row.IsActive), e)"
                                    disabled="@IsInputLocked()" />
 
-                        </td>
+                        </UiElement>
 
 
                         <!-- Delete -->
-                        <td class="employee-bulk-delete-cell">
+                        <UiElement Tag="td" class="employee-bulk-delete-cell">
 
-                            <button type="button"
+                            <UiElement Tag="button" type="button"
                                     class="employee-bulk-delete-button"
                                     title="حذف الصف"
-                                    @onclick="() => RemoveRow(row)"
+                                    OnClick="() => RemoveRow(row)"
                                     disabled="@(_isValidating || _isSaving)">
                                 ×
-                            </button>
+                            </UiElement>
 
-                        </td>
+                        </UiElement>
 
-                    </tr>
+                    </UiElement>
 
 
                     @if (row.Errors.Count > 0)
                     {
-                        <tr class="employee-bulk-error-row">
+                        <UiElement Tag="tr" class="employee-bulk-error-row">
 
-                            <td colspan="12">
+                            <UiElement Tag="td" colspan="12">
 
-                                <div class="employee-bulk-errors">
+                                <UiElement Tag="div" class="employee-bulk-errors">
 
                                     @foreach (var error in row.Errors.Distinct())
                                     {
-                                        <div class="employee-bulk-error-item">
-                                            <span>●</span>
-                                            <span>@error</span>
-                                        </div>
+                                        <UiElement Tag="div" class="employee-bulk-error-item">
+                                            <UiElement Tag="span">●</UiElement>
+                                            <UiElement Tag="span">@error</UiElement>
+                                        </UiElement>
                                     }
 
-                                </div>
+                                </UiElement>
 
-                            </td>
+                            </UiElement>
 
-                        </tr>
+                        </UiElement>
                     }
 
                 }
 
-            </tbody>
+            </UiElement>
 
-        </table>
+        </UiElement>
 
 
         @if (_rows.Count == 0)
         {
-            <div class="employee-bulk-entry-empty">
+            <UiElement Tag="div" class="employee-bulk-entry-empty">
                 لا توجد صفوف.
-            </div>
+            </UiElement>
         }
 
-    </div>
+    </UiElement>
 
 
     <!-- Footer -->
-    <div class="employee-bulk-entry-footer">
+    <UiElement Tag="div" class="employee-bulk-entry-footer">
 
-        <div class="employee-bulk-footer-info">
+        <UiElement Tag="div" class="employee-bulk-footer-info">
 
             @if (_validationPerformed)
             {
-                <span>
+                <UiElement Tag="span">
                     @GetDataRowsCount() موظف
-                </span>
+                </UiElement>
 
                 @if (GetInvalidRowsCount() > 0)
                 {
-                    <span class="employee-bulk-footer-error">
+                    <UiElement Tag="span" class="employee-bulk-footer-error">
                         • @GetInvalidRowsCount() به أخطاء
-                    </span>
+                    </UiElement>
                 }
             }
             else
             {
-                <span>
+                <UiElement Tag="span">
                     أدخل البيانات ثم اضغط على التحقق من البيانات.
-                </span>
+                </UiElement>
             }
 
-        </div>
+        </UiElement>
 
 
-        <div class="employee-bulk-footer-actions">
+        <UiElement Tag="div" class="employee-bulk-footer-actions">
 
-            <button type="button"
+            <UiElement Tag="button" type="button"
                     class="employee-bulk-cancel-button"
-                    @onclick="CloseClicked"
+                    OnClick="CloseClicked"
                     disabled="@(_isValidating || _isSaving)">
                 إلغاء
-            </button>
+            </UiElement>
 
 
             @if (_validationPerformed &&
                         GetDataRowsCount() > 0 &&
                         GetInvalidRowsCount() == 0)
             {
-                <button type="button"
+                <UiElement Tag="button" type="button"
                         class="employee-bulk-save-button"
-                        @onclick="SaveClicked"
+                        OnClick="SaveClicked"
                         disabled="@_isSaving">
 
                     @if (_isSaving)
                     {
-                        <span>جاري الحفظ...</span>
+                        <UiElement Tag="span">جاري الحفظ...</UiElement>
                     }
                     else
                     {
-                        <span>إضافة الموظفين</span>
+                        <UiElement Tag="span">إضافة الموظفين</UiElement>
                     }
 
-                </button>
+                </UiElement>
             }
             else
             {
-                <button type="button"
+                <UiElement Tag="button" type="button"
                         class="employee-bulk-validate-button"
-                        @onclick="ValidateClicked"
+                        OnClick="ValidateClicked"
                         disabled="@_isValidating">
 
                     @if (_isValidating)
                     {
-                        <span>جاري التحقق...</span>
+                        <UiElement Tag="span">جاري التحقق...</UiElement>
                     }
                     else
                     {
-                        <span>التحقق من البيانات</span>
+                        <UiElement Tag="span">التحقق من البيانات</UiElement>
                     }
 
-                </button>
+                </UiElement>
             }
 
-        </div>
+        </UiElement>
 
-    </div>
+    </UiElement>
 
-</div>
+</UiElement>
 
 
 @code {

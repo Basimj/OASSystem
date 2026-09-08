@@ -174,27 +174,6 @@
   <data name="Login_SystemImage" xml:space="preserve">
     <value>صورة النظام</value>
   </data>
-  <data name="ChangePassword_Title" xml:space="preserve">
-    <value>تغيير كلمة المرور</value>
-  </data>
-  <data name="ChangePassword_Current" xml:space="preserve">
-    <value>كلمة المرور الحالية</value>
-  </data>
-  <data name="ChangePassword_New" xml:space="preserve">
-    <value>كلمة المرور الجديدة</value>
-  </data>
-  <data name="ChangePassword_Confirm" xml:space="preserve">
-    <value>تأكيد كلمة المرور الجديدة</value>
-  </data>
-  <data name="ChangePassword_Button" xml:space="preserve">
-    <value>تغيير كلمة المرور</value>
-  </data>
-  <data name="ChangePassword_CurrentInvalid" xml:space="preserve">
-    <value>كلمة المرور الحالية غير صحيحة</value>
-  </data>
-  <data name="ChangePassword_Reused" xml:space="preserve">
-    <value>تم استخدام كلمة المرور هذه مؤخراً. اختر كلمة مرور مختلفة.</value>
-  </data>
   <data name="Users_Privilege" xml:space="preserve">
     <value>الصلاحية</value>
   </data>
@@ -214,7 +193,7 @@
     <value>يجب ألا تقل كلمة المرور عن 8 أحرف.</value>
   </data>
   <data name="password_max_length" xml:space="preserve">
-    <value>يجب ألا تزيد كلمة المرور عن 128 حرفًا.</value>
+    <value>كلمة المرور طويلة جدًا.</value>
   </data>
   <data name="password_uppercase_required" xml:space="preserve">
     <value>يجب أن تحتوي كلمة المرور على حرف إنجليزي كبير.</value>
@@ -226,7 +205,7 @@
     <value>يجب أن تحتوي كلمة المرور على رقم.</value>
   </data>
   <data name="password_special_required" xml:space="preserve">
-    <value>يجب أن تحتوي كلمة المرور على رمز.</value>
+    <value>يجب أن تحتوي كلمة المرور على رمز خاص.</value>
   </data>
   <data name="password_confirmation_mismatch" xml:space="preserve">
     <value>تأكيد كلمة المرور غير مطابق.</value>
@@ -271,28 +250,28 @@
     <value>يجب ألا يقل اسم المستخدم عن 3 أحرف.</value>
   </data>
   <data name="user_name_max_length" xml:space="preserve">
-    <value>اسم المستخدم أطول من الحد المسموح.</value>
+    <value>اسم المستخدم طويل جدًا.</value>
   </data>
   <data name="user_name_invalid_format" xml:space="preserve">
-    <value>اسم المستخدم يحتوي على رموز غير مسموحة.</value>
+    <value>اسم المستخدم يحتوي على أحرف غير مسموحة.</value>
   </data>
   <data name="first_name_required" xml:space="preserve">
     <value>الاسم الأول مطلوب.</value>
   </data>
   <data name="first_name_max_length" xml:space="preserve">
-    <value>الاسم الأول أطول من الحد المسموح.</value>
+    <value>الاسم الأول طويل جدًا.</value>
   </data>
   <data name="last_name_required" xml:space="preserve">
     <value>اسم العائلة مطلوب.</value>
   </data>
   <data name="last_name_max_length" xml:space="preserve">
-    <value>اسم العائلة أطول من الحد المسموح.</value>
+    <value>اسم العائلة طويل جدًا.</value>
   </data>
   <data name="email_invalid" xml:space="preserve">
-    <value>البريد الإلكتروني غير صحيح.</value>
+    <value>البريد الإلكتروني غير صالح.</value>
   </data>
   <data name="email_max_length" xml:space="preserve">
-    <value>البريد الإلكتروني أطول من الحد المسموح.</value>
+    <value>البريد الإلكتروني طويل جدًا.</value>
   </data>
   <data name="role_required" xml:space="preserve">
     <value>الدور مطلوب.</value>
@@ -342,7 +321,250 @@
   <data name="Login_DatabaseStatusCheckFailed" xml:space="preserve">
     <value>تم الوصول إلى قاعدة البيانات لكن تعذر فحص حالة التحديثات</value>
   </data>
-	<data name="employee_code_exists" xml:space="preserve">
-  <value>كود الموظف موجود مسبقًا، يرجى استخدام كود آخر.</value>
-</data>
+  <data name="employee_code_exists" xml:space="preserve">
+    <value>كود الموظف موجود مسبقًا، يرجى استخدام كود آخر.</value>
+  </data>
+  <data name="Common_Yes" xml:space="preserve">
+    <value>نعم</value>
+  </data>
+  <data name="Common_No" xml:space="preserve">
+    <value>لا</value>
+  </data>
+  <data name="Common_Close" xml:space="preserve">
+    <value>إغلاق</value>
+  </data>
+  <data name="Common_Cancel" xml:space="preserve">
+    <value>إلغاء</value>
+  </data>
+  <data name="Users_All" xml:space="preserve">
+    <value>جميع المستخدمين</value>
+  </data>
+  <data name="Users_New" xml:space="preserve">
+    <value>مستخدم جديد</value>
+  </data>
+  <data name="Users_Search" xml:space="preserve">
+    <value>البحث عن مستخدم...</value>
+  </data>
+  <data name="Users_Refresh" xml:space="preserve">
+    <value>تحديث</value>
+  </data>
+  <data name="Users_Save" xml:space="preserve">
+    <value>حفظ</value>
+  </data>
+  <data name="Users_SaveClose" xml:space="preserve">
+    <value>حفظ وإغلاق</value>
+  </data>
+  <data name="Users_Revert" xml:space="preserve">
+    <value>تراجع</value>
+  </data>
+  <data name="Users_Roles" xml:space="preserve">
+    <value>الأدوار</value>
+  </data>
+  <data name="Users_Active" xml:space="preserve">
+    <value>نشط</value>
+  </data>
+  <data name="Users_Inactive" xml:space="preserve">
+    <value>غير نشط</value>
+  </data>
+  <data name="Users_Locked" xml:space="preserve">
+    <value>مقفل</value>
+  </data>
+  <data name="Users_Unlocked" xml:space="preserve">
+    <value>غير مقفل</value>
+  </data>
+  <data name="Users_ResetPassword" xml:space="preserve">
+    <value>إعادة تعيين كلمة المرور</value>
+  </data>
+  <data name="Users_Unlock" xml:space="preserve">
+    <value>فك القفل</value>
+  </data>
+  <data name="Users_Activate" xml:space="preserve">
+    <value>تفعيل</value>
+  </data>
+  <data name="Users_Deactivate" xml:space="preserve">
+    <value>تعطيل</value>
+  </data>
+  <data name="Users_BasicInfo" xml:space="preserve">
+    <value>البيانات الأساسية</value>
+  </data>
+  <data name="Users_Security" xml:space="preserve">
+    <value>الأمان</value>
+  </data>
+  <data name="Users_SystemInfo" xml:space="preserve">
+    <value>معلومات النظام</value>
+  </data>
+  <data name="Users_AccessFailedCount" xml:space="preserve">
+    <value>محاولات الدخول الفاشلة</value>
+  </data>
+  <data name="Users_LockoutEnd" xml:space="preserve">
+    <value>نهاية القفل</value>
+  </data>
+  <data name="Users_MustChangePassword" xml:space="preserve">
+    <value>يتطلب تعيين كلمة مرور</value>
+  </data>
+  <data name="Users_CreatedAt" xml:space="preserve">
+    <value>تاريخ الإنشاء</value>
+  </data>
+  <data name="Users_CreatedBy" xml:space="preserve">
+    <value>أنشئ بواسطة</value>
+  </data>
+  <data name="Users_ModifiedAt" xml:space="preserve">
+    <value>آخر تعديل</value>
+  </data>
+  <data name="Users_ModifiedBy" xml:space="preserve">
+    <value>عُدل بواسطة</value>
+  </data>
+  <data name="Users_UserId" xml:space="preserve">
+    <value>معرف المستخدم</value>
+  </data>
+  <data name="Users_UpdateSuccess" xml:space="preserve">
+    <value>تم تحديث المستخدم بنجاح.</value>
+  </data>
+  <data name="Users_RolesUpdated" xml:space="preserve">
+    <value>تم تحديث الأدوار بنجاح.</value>
+  </data>
+  <data name="Users_StatusUpdated" xml:space="preserve">
+    <value>تم تحديث حالة الحساب بنجاح.</value>
+  </data>
+  <data name="Users_PasswordResetSuccess" xml:space="preserve">
+    <value>تمت إعادة تعيين كلمة المرور بنجاح.</value>
+  </data>
+  <data name="Users_UnlockedSuccess" xml:space="preserve">
+    <value>تم فك قفل الحساب بنجاح.</value>
+  </data>
+  <data name="Users_TotalFormat" xml:space="preserve">
+    <value>{0} مستخدم</value>
+  </data>
+  <data name="Users_PasswordSetupRequired" xml:space="preserve">
+    <value>يلزم تعيين كلمة المرور</value>
+  </data>
+  <data name="Users_NewAccountSubtitle" xml:space="preserve">
+    <value>أنشئ الحساب وسيقوم النظام بتوليد كلمة مرور مؤقتة.</value>
+  </data>
+  <data name="Users_SecurityAvailableAfterCreate" xml:space="preserve">
+    <value>تظهر معلومات الأمان بعد إنشاء المستخدم.</value>
+  </data>
+  <data name="Users_SystemInfoAvailableAfterCreate" xml:space="preserve">
+    <value>تظهر معلومات النظام بعد إنشاء المستخدم.</value>
+  </data>
+  <data name="Users_UnsavedTitle" xml:space="preserve">
+    <value>تغييرات غير محفوظة</value>
+  </data>
+  <data name="Users_CloseDirtyConfirm" xml:space="preserve">
+    <value>توجد تغييرات غير محفوظة. هل تريد إغلاق التبويبة وفقد التغييرات؟</value>
+  </data>
+  <data name="Users_Discard" xml:space="preserve">
+    <value>تجاهل وإغلاق</value>
+  </data>
+  <data name="Users_RevertConfirm" xml:space="preserve">
+    <value>هل تريد تجاهل التغييرات غير المحفوظة في هذه التبويبة؟</value>
+  </data>
+  <data name="Users_RefreshDirtyConfirm" xml:space="preserve">
+    <value>سيؤدي التحديث إلى فقد التغييرات غير المحفوظة. هل تريد المتابعة؟</value>
+  </data>
+  <data name="Users_ActivateConfirm" xml:space="preserve">
+    <value>هل تريد تفعيل حساب هذا المستخدم؟</value>
+  </data>
+  <data name="Users_DeactivateConfirm" xml:space="preserve">
+    <value>هل تريد تعطيل حساب هذا المستخدم؟</value>
+  </data>
+  <data name="Users_ResetPasswordConfirm" xml:space="preserve">
+    <value>ستتوقف كلمة المرور الحالية عن العمل وسيولد النظام كلمة مرور مؤقتة جديدة. هل تريد المتابعة؟</value>
+  </data>
+  <data name="Users_TemporaryPasswordTitle" xml:space="preserve">
+    <value>كلمة المرور المؤقتة</value>
+  </data>
+  <data name="Users_TemporaryPasswordCreatedMessage" xml:space="preserve">
+    <value>تم إنشاء المستخدم. انسخ كلمة المرور المؤقتة وأرسلها للمستخدم. سيُطلب منه تعيين كلمة مرور جديدة عند أول تسجيل دخول.</value>
+  </data>
+  <data name="Users_TemporaryPasswordResetMessage" xml:space="preserve">
+    <value>تم توليد كلمة مرور مؤقتة جديدة. أرسلها للمستخدم. سيُطلب منه تعيين كلمة مرور جديدة عند تسجيل الدخول التالي.</value>
+  </data>
+  <data name="Users_TemporaryPasswordOneTime" xml:space="preserve">
+    <value>تظهر كلمة المرور هذه مرة واحدة فقط. بعد إغلاق النافذة لن يمكن عرضها مجددًا.</value>
+  </data>
+  <data name="Users_CopyPassword" xml:space="preserve">
+    <value>نسخ</value>
+  </data>
+  <data name="Users_PasswordCopied" xml:space="preserve">
+    <value>تم نسخ كلمة المرور المؤقتة.</value>
+  </data>
+  <data name="Users_RoleRequired" xml:space="preserve">
+    <value>اختر دورًا واحدًا على الأقل.</value>
+  </data>
+  <data name="PasswordSetup_Title" xml:space="preserve">
+    <value>تعيين كلمة المرور</value>
+  </data>
+  <data name="PasswordSetup_Subtitle" xml:space="preserve">
+    <value>اختر كلمة المرور التي ستستخدمها في تسجيل الدخول لاحقًا.</value>
+  </data>
+  <data name="PasswordSetup_RequiredMessage" xml:space="preserve">
+    <value>الدخول المؤقت يسمح فقط بتعيين كلمة المرور. عيّن كلمة مرور جديدة قبل استخدام النظام.</value>
+  </data>
+  <data name="PasswordSetup_New" xml:space="preserve">
+    <value>كلمة المرور الجديدة</value>
+  </data>
+  <data name="PasswordSetup_Confirm" xml:space="preserve">
+    <value>تأكيد كلمة المرور</value>
+  </data>
+  <data name="PasswordSetup_Button" xml:space="preserve">
+    <value>تعيين كلمة المرور</value>
+  </data>
+  <data name="PasswordSetup_Success" xml:space="preserve">
+    <value>تم تعيين كلمة المرور بنجاح.</value>
+  </data>
+  <data name="identity_cannot_disable_current_user" xml:space="preserve">
+    <value>لا يمكنك تعطيل حسابك الحالي.</value>
+  </data>
+  <data name="identity_last_super_admin_required" xml:space="preserve">
+    <value>يجب أن يبقى مسؤول أعلى واحد نشط على الأقل.</value>
+  </data>
+  <data name="identity_cannot_remove_own_administrator_role" xml:space="preserve">
+    <value>لا يمكنك إزالة دور مدير النظام من حسابك الحالي.</value>
+  </data>
+  <data name="identity_super_admin_administrator_role_required" xml:space="preserve">
+    <value>يجب أن يحتفظ المسؤول الأعلى بدور مدير النظام.</value>
+  </data>
+  <data name="identity_password_setup_required" xml:space="preserve">
+    <value>يجب تعيين كلمة مرور جديدة قبل استخدام النظام.</value>
+  </data>
+  <data name="identity_password_setup_not_required" xml:space="preserve">
+    <value>هذا الحساب لا يحتاج إلى تعيين كلمة مرور.</value>
+  </data>
+  <data name="row_version_invalid" xml:space="preserve">
+    <value>إصدار السجل غير صالح. أعد التحميل وحاول مجددًا.</value>
+  </data>
+  <data name="roles_required" xml:space="preserve">
+    <value>اختر دورًا واحدًا على الأقل.</value>
+  </data>
+  <data name="roles_duplicate" xml:space="preserve">
+    <value>الأدوار المحددة تحتوي على تكرار.</value>
+  </data>
+  <data name="user_id_required" xml:space="preserve">
+    <value>معرف المستخدم مطلوب.</value>
+  </data>
+  <data name="Users_AllRoles" xml:space="preserve">
+    <value>جميع الأدوار</value>
+  </data>
+  <data name="Users_AllStatuses" xml:space="preserve">
+    <value>جميع الحالات</value>
+  </data>
+  <data name="Users_Export" xml:space="preserve">
+    <value>تصدير</value>
+  </data>
+  <data name="Users_ResetFilters" xml:space="preserve">
+    <value>إعادة تعيين</value>
+  </data>
+  <data name="Users_RolesPermissions" xml:space="preserve">
+    <value>الأدوار والصلاحيات</value>
+  </data>
+  <data name="Users_ExportSuccess" xml:space="preserve">
+    <value>تم تصدير المستخدمين بنجاح.</value>
+  </data>
+  <data name="Users_Details" xml:space="preserve">
+    <value>تفاصيل</value>
+  </data>
+  <data name="Users_RolesEmpty" xml:space="preserve">
+    <value>لا توجد أدوار معرفة في النظام.</value>
+  </data>
 </root>

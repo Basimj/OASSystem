@@ -4,32 +4,56 @@
 @inject OasAuthenticationStateProvider AuthState
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
-
+@inject DatabaseProfileSelectionState DatabaseSelection
 
 <AuthorizeView>
-
     <Authorized Context="authContext">
-
-        <OasMainShell IsAdministrator="@authContext.User.IsInRole("Administrator")"
-                      OnLogout="LogoutAsync">
-
+        @if (RequiresPasswordSetup(authContext.User))
+        {
             @Body
-
-        </OasMainShell>
-
+        }
+        else
+        {
+            <OasMainShell IsAdministrator='@authContext.User.IsInRole("Administrator")'
+                          Modules="@ShellModules"
+                          SystemName="OAS System"
+                          DatabaseName="@SelectedDatabaseName"
+                          ConnectionStatus="متصل"
+                          VersionText="@SystemVersion"
+                          OnLogout="LogoutAsync">
+                @Body
+            </OasMainShell>
+        }
     </Authorized>
-
-
     <NotAuthorized>
-
         @Body
-
     </NotAuthorized>
-
 </AuthorizeView>
 
-
 @code {
+
+    private static string SystemVersion =>
+        typeof(MainLayout).Assembly.GetName().Version?.ToString(3) ?? "1.0.0";
+
+    private string SelectedDatabaseName => DatabaseSelection.SelectedProfileKey ?? "Default";
+
+    private static readonly IReadOnlyList<UiShellModuleItem> ShellModules =
+    [
+        new("dashboard", "لوحة التحكم", "/", "fa-solid fa-house"),
+        new("sales", "المبيعات", "/sales", "fa-solid fa-cart-shopping"),
+        new("customers", "العملاء", "/customers", "fa-regular fa-user"),
+        new("products", "المنتجات", "/products", "fa-solid fa-glasses"),
+        new("inventory", "المخزون", "/inventory", "fa-solid fa-cube"),
+        new("daily-orders", "الطلبات اليومية", "/daily-orders", "fa-regular fa-calendar-check"),
+        new("purchases", "المشتريات", "/purchases", "fa-solid fa-bag-shopping"),
+        new("finance", "الحسابات", "/finance", "fa-regular fa-money-bill-1"),
+        new("reports", "التقارير", "/reports", "fa-regular fa-chart-bar"),
+        new("employees", "الموظفون", "/employees", "fa-solid fa-user-tie", DividerBefore: true),
+        new("departments", "الأقسام", "/departments", "fa-solid fa-sitemap"),
+        new("suppliers", "الموردون", "/suppliers", "fa-solid fa-truck-field"),
+        new("users", "المستخدمون", "/identity/users", "fa-solid fa-users", AdministratorOnly: true),
+        new("settings", "الإعدادات", "/settings", "fa-solid fa-gear")
+    ];
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -39,21 +63,18 @@
         await JS.InvokeVoidAsync("hideOasStartup");
 
         var state = await AuthState.GetAuthenticationStateAsync();
-
         var relative = Navigation.ToBaseRelativePath(Navigation.Uri);
 
         if (state.User.Identity?.IsAuthenticated == true &&
             AuthState.CurrentUser?.MustChangePassword == true &&
-            !relative.StartsWith(
-                "identity/change-password",
-                StringComparison.OrdinalIgnoreCase))
+            !relative.StartsWith("identity/password-setup", StringComparison.OrdinalIgnoreCase))
         {
-            Navigation.NavigateTo(
-                "/identity/change-password",
-                replace: true);
+            Navigation.NavigateTo("/identity/password-setup", replace: true);
         }
     }
 
+    private static bool RequiresPasswordSetup(System.Security.Claims.ClaimsPrincipal principal) =>
+        string.Equals(principal.FindFirst("must_change_password")?.Value, "true", StringComparison.OrdinalIgnoreCase);
 
     private async Task LogoutAsync(MouseEventArgs _)
     {
@@ -64,10 +85,7 @@
         finally
         {
             AuthState.SetAnonymous();
-
-            Navigation.NavigateTo(
-                "/login",
-                replace: true);
+            Navigation.NavigateTo("/login", replace: true);
         }
     }
 }

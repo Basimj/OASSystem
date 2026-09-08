@@ -5,18 +5,23 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using OAS.Application.Identity.Authentication.Commands;
-using OAS.Application.Identity.Authentication.Queries;
-using OAS.Application.Identity.Authentication.Models;
+using OAS.API.Security;
 using OAS.Application.Database.Abstractions;
-using OAS.Contracts.Identity.Authentication;
+using OAS.Application.Identity.Abstractions;
+using OAS.Application.Identity.Authentication.Commands;
+using OAS.Application.Identity.Authentication.Models;
+using OAS.Application.Identity.Authentication.Queries;
 using OAS.Contracts.Common.Errors;
+using OAS.Contracts.Identity.Authentication;
 
 namespace OAS.API.Identity.Controllers;
 
 [ApiController]
 [Route("api/identity/auth")]
-public sealed class AuthController(ISender sender, IDatabaseProfileSelection databaseProfileSelection) : ControllerBase
+public sealed class AuthController(
+    ISender sender,
+    IDatabaseProfileSelection databaseProfileSelection,
+    IIdentityRepository identityRepository) : ControllerBase
 {
     [AllowAnonymous]
     [EnableRateLimiting("login")]
@@ -39,52 +44,32 @@ public sealed class AuthController(ISender sender, IDatabaseProfileSelection dat
             };
         }
 
-        var user = result.User;
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new(ClaimTypes.Name, user.UserName),
-            new("display_name", user.DisplayName),
-            new("is_super_admin", user.IsSuperAdmin ? "true" : "false"),
-            new(OAS.API.Database.HttpDatabaseProfileSelection.ClaimName, databaseProfileSelection.ProfileKey ?? "Default")
-        };
-        if (!string.IsNullOrWhiteSpace(user.Email)) claims.Add(new Claim(ClaimTypes.Email, user.Email));
-        claims.AddRange(user.Roles.Select(role => new Claim(ClaimTypes.Role, role)));
-
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        var properties = new AuthenticationProperties
+        await SignInUserAsync(result.User, new AuthenticationProperties
         {
             IsPersistent = request.RememberMe,
             AllowRefresh = true,
-            IssuedUtc = DateTimeOffset.UtcNow
-        };
-        if (request.RememberMe) properties.ExpiresUtc = DateTimeOffset.UtcNow.AddDays(14);
-        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), properties);
-        return Ok(user);
+            IssuedUtc = DateTimeOffset.UtcNow,
+            ExpiresUtc = request.RememberMe ? DateTimeOffset.UtcNow.AddDays(14) : null
+        });
+        return Ok(result.User);
     }
 
     [Authorize]
-    [HttpPost("change-password")]
-    public async Task<ActionResult<CurrentUserDto>> ChangePassword(ChangePasswordRequest request, CancellationToken cancellationToken)
+    [HttpPost("complete-password-setup")]
+    public async Task<ActionResult<CurrentUserDto>> CompletePasswordSetup(
+        CompletePasswordSetupRequest request,
+        CancellationToken cancellationToken)
     {
-        var result = await sender.Send(new ChangePasswordCommand(request), cancellationToken);
-        if (result.Succeeded) return Ok(result.User);
-
-        var error = new ApiError
+        var user = await sender.Send(new CompletePasswordSetupCommand(request), cancellationToken);
+        var authentication = await HttpContext.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        var properties = authentication.Properties ?? new AuthenticationProperties
         {
-            Code = result.ErrorCode ?? "identity_password_change_failed",
-            Message = "The password change request could not be completed.",
-            Errors = result.Errors
+            IsPersistent = false,
+            AllowRefresh = true,
+            IssuedUtc = DateTimeOffset.UtcNow
         };
-
-        return result.FailureKind switch
-        {
-            ChangePasswordFailureKind.Validation => BadRequest(error with { Status = StatusCodes.Status400BadRequest }),
-            ChangePasswordFailureKind.CurrentPasswordInvalid => BadRequest(error with { Status = StatusCodes.Status400BadRequest }),
-            ChangePasswordFailureKind.PasswordReused => Conflict(error with { Status = StatusCodes.Status409Conflict }),
-            ChangePasswordFailureKind.Forbidden => StatusCode(StatusCodes.Status403Forbidden, error with { Status = StatusCodes.Status403Forbidden }),
-            _ => BadRequest(error with { Status = StatusCodes.Status400BadRequest })
-        };
+        await SignInUserAsync(user, properties);
+        return Ok(user);
     }
 
     [Authorize]
@@ -99,4 +84,29 @@ public sealed class AuthController(ISender sender, IDatabaseProfileSelection dat
     [HttpGet("me")]
     public async Task<ActionResult<CurrentUserDto>> Me(CancellationToken cancellationToken) =>
         Ok(await sender.Send(new GetCurrentUserQuery(), cancellationToken));
+
+    private async Task SignInUserAsync(CurrentUserDto user, AuthenticationProperties properties)
+    {
+        var record = await identityRepository.GetUserAsync(user.Id, false, HttpContext.RequestAborted)
+            ?? throw new InvalidOperationException("Cannot create an authentication session for a missing user account.");
+
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new(ClaimTypes.Name, user.UserName),
+            new(IdentityClaimTypes.DisplayName, user.DisplayName),
+            new(IdentityClaimTypes.IsSuperAdmin, user.IsSuperAdmin ? "true" : "false"),
+            new(IdentityClaimTypes.MustChangePassword, user.MustChangePassword ? "true" : "false"),
+            new(IdentityClaimTypes.PasswordVersion, IdentityPasswordVersion.Create(record.User.PasswordHash)),
+            new(OAS.API.Database.HttpDatabaseProfileSelection.ClaimName, databaseProfileSelection.ProfileKey ?? "Default")
+        };
+        if (!string.IsNullOrWhiteSpace(user.Email)) claims.Add(new Claim(ClaimTypes.Email, user.Email));
+        claims.AddRange(user.Roles.Select(role => new Claim(ClaimTypes.Role, role)));
+
+        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+        await HttpContext.SignInAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            new ClaimsPrincipal(identity),
+            properties);
+    }
 }

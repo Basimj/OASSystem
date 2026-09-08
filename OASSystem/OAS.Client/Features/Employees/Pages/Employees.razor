@@ -1,4 +1,4 @@
-﻿
+
 @page "/employees"
 
 @using Microsoft.AspNetCore.Authorization
@@ -28,36 +28,36 @@
 
 <PageTitle>الموظفون</PageTitle>
 
-<div class="employees-page" dir="rtl">
+<UiElement Tag="div" class="employees-page" dir="rtl">
 
     <!-- =========================
          HEADER
          ========================= -->
-    <div class="employees-header">
+    <UiElement Tag="div" class="employees-header">
 
-        <div class="employees-header-info">
+        <UiElement Tag="div" class="employees-header-info">
 
-            <div class="employees-title-row">
+            <UiElement Tag="div" class="employees-title-row">
 
-                <div class="employees-title-icon">
-                    <i class="fa-solid fa-users"></i>
-                </div>
+                <UiElement Tag="div" class="employees-title-icon">
+                    <UiElement Tag="i" class="fa-solid fa-users"></UiElement>
+                </UiElement>
 
-                <div>
+                <UiElement Tag="div">
 
-                    <h1>الموظفون</h1>
+                    <UiElement Tag="h1">الموظفون</UiElement>
 
-                    <p>
+                    <UiElement Tag="p">
                         إدارة الموظفين وبياناتهم وحالاتهم التشغيلية.
-                    </p>
+                    </UiElement>
 
-                </div>
+                </UiElement>
 
-            </div>
+            </UiElement>
 
-        </div>
+        </UiElement>
 
-        <div class="employees-header-actions">
+        <UiElement Tag="div" class="employees-header-actions">
 
             <UiButton Text="إضافة موظف"
                       Variant="ButtonVariant.Primary"
@@ -65,146 +65,146 @@
                       OnClick="OpenCreatePage">
             </UiButton>
 
-        </div>
+        </UiElement>
 
-    </div>
+    </UiElement>
 
 
     <!-- =========================
          SEARCH / FILTER / EXCEL
          ========================= -->
-    <div class="employees-toolbar">
+    <UiElement Tag="div" class="employees-toolbar">
 
         <!-- Search -->
-        <div class="employees-search-wrapper">
+        <UiElement Tag="div" class="employees-search-wrapper">
 
             <UiInputText Id="employee-search"
                          Placeholder="ابحث برقم الموظف أو الاسم أو الهاتف أو الوظيفة..."
                          @bind-Value="_searchText"
                          @onkeydown="HandleSearchKeyDown" />
 
-            <button type="button"
+            <UiElement Tag="button" type="button"
                     class="employees-search-button"
-                    @onclick="SearchAsync">
+                    OnClick="SearchAsync">
 
-                <i class="fa-solid fa-magnifying-glass"></i>
+                <UiElement Tag="i" class="fa-solid fa-magnifying-glass"></UiElement>
 
                 بحث
 
-            </button>
+            </UiElement>
 
             @if (!string.IsNullOrWhiteSpace(_searchText))
             {
-                <button type="button"
+                <UiElement Tag="button" type="button"
                         class="employees-clear-search"
-                        @onclick="ClearSearchAsync">
+                        OnClick="ClearSearchAsync">
 
-                    <i class="fa-solid fa-xmark"></i>
+                    <UiElement Tag="i" class="fa-solid fa-xmark"></UiElement>
 
                     مسح
 
-                </button>
+                </UiElement>
             }
 
-        </div>
+        </UiElement>
 
 
         <!-- Filters -->
-        <div class="employees-filter-wrapper">
+        <UiElement Tag="div" class="employees-filter-wrapper">
 
-            <button type="button"
+            <UiElement Tag="button" type="button"
                     class="employees-filter-button"
-                    @onclick="ToggleFilterMenu">
+                    OnClick="ToggleFilterMenu">
 
-                <i class="fa-solid fa-filter"></i>
+                <UiElement Tag="i" class="fa-solid fa-filter"></UiElement>
 
-                <span>
+                <UiElement Tag="span">
                     @GetFilterTitle()
-                </span>
+                </UiElement>
 
-                <i class="fa-solid fa-chevron-down"></i>
+                <UiElement Tag="i" class="fa-solid fa-chevron-down"></UiElement>
 
-            </button>
+            </UiElement>
 
             @if (_filterMenuOpen)
             {
-                <div class="employees-filter-menu">
+                <UiElement Tag="div" class="employees-filter-menu">
 
-                    <button type="button"
+                    <UiElement Tag="button" type="button"
                             class="@GetFilterClass(EmployeeFilter.All)"
-                            @onclick="() => SetFilter(EmployeeFilter.All)">
+                            OnClick="() => SetFilter(EmployeeFilter.All)">
                         جميع الموظفين
-                    </button>
+                    </UiElement>
 
-                    <button type="button"
+                    <UiElement Tag="button" type="button"
                             class="@GetFilterClass(EmployeeFilter.Active)"
-                            @onclick="() => SetFilter(EmployeeFilter.Active)">
+                            OnClick="() => SetFilter(EmployeeFilter.Active)">
                         الموظفون النشطون
-                    </button>
+                    </UiElement>
 
-                    <button type="button"
+                    <UiElement Tag="button" type="button"
                             class="@GetFilterClass(EmployeeFilter.Inactive)"
-                            @onclick="() => SetFilter(EmployeeFilter.Inactive)">
+                            OnClick="() => SetFilter(EmployeeFilter.Inactive)">
                         الموظفون غير النشطين
-                    </button>
+                    </UiElement>
 
-                    <button type="button"
+                    <UiElement Tag="button" type="button"
                             class="@GetFilterClass(EmployeeFilter.Sales)"
-                            @onclick="() => SetFilter(EmployeeFilter.Sales)">
+                            OnClick="() => SetFilter(EmployeeFilter.Sales)">
                         موظفو المبيعات
-                    </button>
+                    </UiElement>
 
-                    <button type="button"
+                    <UiElement Tag="button" type="button"
                             class="@GetFilterClass(EmployeeFilter.Technician)"
-                            @onclick="() => SetFilter(EmployeeFilter.Technician)">
+                            OnClick="() => SetFilter(EmployeeFilter.Technician)">
                         الفنيون
-                    </button>
+                    </UiElement>
 
-                    <button type="button"
+                    <UiElement Tag="button" type="button"
                             class="@GetFilterClass(EmployeeFilter.Commission)"
-                            @onclick="() => SetFilter(EmployeeFilter.Commission)">
+                            OnClick="() => SetFilter(EmployeeFilter.Commission)">
                         المستحقون للعمولة
-                    </button>
+                    </UiElement>
 
-                </div>
+                </UiElement>
             }
 
-        </div>
+        </UiElement>
 
 
         <!-- Excel -->
-        <div class="employees-excel-actions">
+        <UiElement Tag="div" class="employees-excel-actions">
 
             <!-- Import -->
-            <button type="button"
+            <UiElement Tag="button" type="button"
                     class="employees-excel-button employees-import-button"
-                    @onclick="OpenImportDialog">
+                    OnClick="OpenImportDialog">
 
-                <i class="fa-solid fa-file-import"></i>
+                <UiElement Tag="i" class="fa-solid fa-file-import"></UiElement>
 
-                <span>
+                <UiElement Tag="span">
                     استيراد Excel
-                </span>
+                </UiElement>
 
-            </button>
+            </UiElement>
 
 
             <!-- Export -->
-            <button type="button"
+            <UiElement Tag="button" type="button"
                     class="employees-excel-button employees-export-button"
-                    @onclick="OpenExportDialog">
+                    OnClick="OpenExportDialog">
 
-                <i class="fa-solid fa-file-export"></i>
+                <UiElement Tag="i" class="fa-solid fa-file-export"></UiElement>
 
-                <span>
+                <UiElement Tag="span">
                     تصدير Excel
-                </span>
+                </UiElement>
 
-            </button>
+            </UiElement>
 
-        </div>
+        </UiElement>
 
-    </div>
+    </UiElement>
 
 
     <!-- =========================
@@ -212,15 +212,15 @@
          ========================= -->
     @if (_isLoading)
     {
-        <div class="employees-loading">
+        <UiElement Tag="div" class="employees-loading">
 
-            <div class="employees-spinner"></div>
+            <UiElement Tag="div" class="employees-spinner"></UiElement>
 
-            <span>
+            <UiElement Tag="span">
                 جاري تحميل الموظفين...
-            </span>
+            </UiElement>
 
-        </div>
+        </UiElement>
     }
     else
     {
@@ -231,30 +231,30 @@
              ========================= -->
         @if (visibleEmployees.Count == 0)
         {
-            <div class="employees-empty">
+            <UiElement Tag="div" class="employees-empty">
 
-                <div class="employees-empty-icon">
+                <UiElement Tag="div" class="employees-empty-icon">
 
-                    <i class="fa-solid fa-users-slash"></i>
+                    <UiElement Tag="i" class="fa-solid fa-users-slash"></UiElement>
 
-                </div>
+                </UiElement>
 
-                <h3>
+                <UiElement Tag="h3">
                     لا توجد نتائج
-                </h3>
+                </UiElement>
 
-                <p>
+                <UiElement Tag="p">
                     لم يتم العثور على موظفين مطابقين للبحث أو الفلتر الحالي.
-                </p>
+                </UiElement>
 
-            </div>
+            </UiElement>
         }
         else
         {
             <!-- =========================
                  EMPLOYEE CARDS
                  ========================= -->
-            <div class="employees-grid">
+            <UiElement Tag="div" class="employees-grid">
 
                 @foreach (var employee in visibleEmployees)
                 {
@@ -270,7 +270,7 @@
                                   OnToggleStatus="@(() => ChangeStatusAsync(employee, !employee.IsActive))" />
                 }
 
-            </div>
+            </UiElement>
         }
 
 
@@ -279,67 +279,67 @@
              ========================= -->
         @if (_page.TotalPages > 0)
         {
-            <div class="employees-pagination">
+            <UiElement Tag="div" class="employees-pagination">
 
-                <div class="employees-pagination-summary">
+                <UiElement Tag="div" class="employees-pagination-summary">
 
                     عرض
 
-                    <strong>
+                    <UiElement Tag="strong">
                         @GetFirstItemNumber()
-                    </strong>
+                    </UiElement>
 
                     -
 
-                    <strong>
+                    <UiElement Tag="strong">
                         @GetLastItemNumber()
-                    </strong>
+                    </UiElement>
 
                     من
 
-                    <strong>
+                    <UiElement Tag="strong">
                         @_page.TotalCount
-                    </strong>
+                    </UiElement>
 
                     موظف
 
-                </div>
+                </UiElement>
 
-                <div class="employees-pagination-controls">
+                <UiElement Tag="div" class="employees-pagination-controls">
 
-                    <button type="button"
+                    <UiElement Tag="button" type="button"
                             class="employees-page-button"
                             disabled="@(!_page.HasPreviousPage)"
-                            @onclick="PreviousPageAsync">
+                            OnClick="PreviousPageAsync">
 
-                        <i class="fa-solid fa-chevron-right"></i>
+                        <UiElement Tag="i" class="fa-solid fa-chevron-right"></UiElement>
 
                         السابق
 
-                    </button>
+                    </UiElement>
 
-                    <div class="employees-page-number">
+                    <UiElement Tag="div" class="employees-page-number">
 
                         صفحة @_page.PageNumber
                         من
                         @_page.TotalPages
 
-                    </div>
+                    </UiElement>
 
-                    <button type="button"
+                    <UiElement Tag="button" type="button"
                             class="employees-page-button"
                             disabled="@(!_page.HasNextPage)"
-                            @onclick="NextPageAsync">
+                            OnClick="NextPageAsync">
 
                         التالي
 
-                        <i class="fa-solid fa-chevron-left"></i>
+                        <UiElement Tag="i" class="fa-solid fa-chevron-left"></UiElement>
 
-                    </button>
+                    </UiElement>
 
-                </div>
+                </UiElement>
 
-            </div>
+            </UiElement>
         }
 
     }
@@ -350,112 +350,112 @@
          ========================= -->
     @if (_importMenuOpen)
     {
-        <div class="employees-import-overlay">
+        <UiElement Tag="div" class="employees-import-overlay">
 
-            <div class="employees-import-backdrop"
-                 @onclick="CloseImportDialog">
-            </div>
+            <UiElement Tag="div" class="employees-import-backdrop"
+                 OnClick="CloseImportDialog">
+            </UiElement>
 
-            <div class="employees-import-modal employees-import-choice-modal">
+            <UiElement Tag="div" class="employees-import-modal employees-import-choice-modal">
 
                 <!-- Header -->
-                <div class="employees-export-modal-header">
+                <UiElement Tag="div" class="employees-export-modal-header">
 
-                    <div class="employees-export-modal-title">
+                    <UiElement Tag="div" class="employees-export-modal-title">
 
-                        <div class="employees-export-modal-icon">
+                        <UiElement Tag="div" class="employees-export-modal-icon">
 
-                            <i class="fa-solid fa-file-import"></i>
+                            <UiElement Tag="i" class="fa-solid fa-file-import"></UiElement>
 
-                        </div>
+                        </UiElement>
 
-                        <div>
+                        <UiElement Tag="div">
 
-                            <h2>
+                            <UiElement Tag="h2">
                                 استيراد الموظفين
-                            </h2>
+                            </UiElement>
 
-                            <p>
+                            <UiElement Tag="p">
                                 اختر طريقة إدخال بيانات الموظفين.
-                            </p>
+                            </UiElement>
 
-                        </div>
+                        </UiElement>
 
-                    </div>
+                    </UiElement>
 
-                    <button type="button"
+                    <UiElement Tag="button" type="button"
                             class="employees-export-modal-close"
-                            @onclick="CloseImportDialog">
+                            OnClick="CloseImportDialog">
 
-                        <i class="fa-solid fa-xmark"></i>
+                        <UiElement Tag="i" class="fa-solid fa-xmark"></UiElement>
 
-                    </button>
+                    </UiElement>
 
-                </div>
+                </UiElement>
 
 
-                <div class="employees-export-modal-content">
+                <UiElement Tag="div" class="employees-export-modal-content">
 
                     <!-- Internal Entry -->
-                    <button type="button"
+                    <UiElement Tag="button" type="button"
                             class="employees-export-option"
-                            @onclick="OpenEmployeeEntry">
+                            OnClick="OpenEmployeeEntry">
 
-                        <span class="employees-export-option-icon employees-export-option-icon-entry">
+                        <UiElement Tag="span" class="employees-export-option-icon employees-export-option-icon-entry">
 
-                            <i class="fa-solid fa-table"></i>
+                            <UiElement Tag="i" class="fa-solid fa-table"></UiElement>
 
-                        </span>
+                        </UiElement>
 
-                        <span class="employees-export-option-content">
+                        <UiElement Tag="span" class="employees-export-option-content">
 
-                            <strong>
+                            <UiElement Tag="strong">
                                 إدخال البيانات داخل النظام
-                            </strong>
+                            </UiElement>
 
-                            <span>
+                            <UiElement Tag="span">
                                 إدخال عدة موظفين مباشرة في جدول شبيه بـ Excel مع التحقق من البيانات قبل الحفظ.
-                            </span>
+                            </UiElement>
 
-                        </span>
+                        </UiElement>
 
-                        <i class="fa-solid fa-chevron-left employees-export-option-arrow"></i>
+                        <UiElement Tag="i" class="fa-solid fa-chevron-left employees-export-option-arrow"></UiElement>
 
-                    </button>
+                    </UiElement>
 
 
                     <!-- Excel Import -->
-                    <button type="button"
+                    <UiElement Tag="button" type="button"
                             class="employees-export-option"
-                            @onclick="OpenExcelImportDialog">
+                            OnClick="OpenExcelImportDialog">
 
-                        <span class="employees-export-option-icon employees-export-option-icon-main">
+                        <UiElement Tag="span" class="employees-export-option-icon employees-export-option-icon-main">
 
-                            <i class="fa-solid fa-file-excel"></i>
+                            <UiElement Tag="i" class="fa-solid fa-file-excel"></UiElement>
 
-                        </span>
+                        </UiElement>
 
-                        <span class="employees-export-option-content">
+                        <UiElement Tag="span" class="employees-export-option-content">
 
-                            <strong>
+                            <UiElement Tag="strong">
                                 استيراد من ملف Excel
-                            </strong>
+                            </UiElement>
 
-                            <span>
+                            <UiElement Tag="span">
                                 اختر ملف Excel يحتوي على بيانات الموظفين للتحقق منها واستيرادها.
-                            </span>
+                            </UiElement>
 
-                        </span>
+                        </UiElement>
 
-                        <i class="fa-solid fa-chevron-left employees-export-option-arrow"></i>
+                        <UiElement Tag="i" class="fa-solid fa-chevron-left employees-export-option-arrow"></UiElement>
 
-                    </button>
+                    </UiElement>
 
-                </div>
+                </UiElement>
 
-            </div>
+            </UiElement>
 
-        </div>
+        </UiElement>
     }
 
 
@@ -464,19 +464,19 @@
          ========================= -->
     @if (_importDialogOpen)
     {
-        <div class="employees-import-overlay">
+        <UiElement Tag="div" class="employees-import-overlay">
 
-            <div class="employees-import-backdrop"
-                 @onclick="CloseExcelImportDialog">
-            </div>
+            <UiElement Tag="div" class="employees-import-backdrop"
+                 OnClick="CloseExcelImportDialog">
+            </UiElement>
 
-            <div class="employees-import-modal">
+            <UiElement Tag="div" class="employees-import-modal">
 
                 <EmployeeImportDialog OnClose="RefreshAfterImport" />
 
-            </div>
+            </UiElement>
 
-        </div>
+        </UiElement>
     }
 
 
@@ -485,19 +485,19 @@
          ========================= -->
     @if (_employeeEntryOpen)
     {
-        <div class="employees-import-overlay">
+        <UiElement Tag="div" class="employees-import-overlay">
 
-            <div class="employees-import-backdrop"
-                 @onclick="CloseEmployeeEntry">
-            </div>
+            <UiElement Tag="div" class="employees-import-backdrop"
+                 OnClick="CloseEmployeeEntry">
+            </UiElement>
 
-            <div class="employees-import-modal employee-bulk-entry-modal">
+            <UiElement Tag="div" class="employees-import-modal employee-bulk-entry-modal">
 
                 <EmployeeBulkEntry OnClose="CloseEmployeeEntry" />
 
-            </div>
+            </UiElement>
 
-        </div>
+        </UiElement>
     }
 
 
@@ -506,116 +506,116 @@
          ========================= -->
     @if (_exportDialogOpen)
     {
-        <div class="employees-export-overlay">
+        <UiElement Tag="div" class="employees-export-overlay">
 
-            <div class="employees-export-backdrop"
-                 @onclick="CloseExportDialog">
-            </div>
+            <UiElement Tag="div" class="employees-export-backdrop"
+                 OnClick="CloseExportDialog">
+            </UiElement>
 
-            <div class="employees-export-modal">
+            <UiElement Tag="div" class="employees-export-modal">
 
                 <!-- Header -->
-                <div class="employees-export-modal-header">
+                <UiElement Tag="div" class="employees-export-modal-header">
 
-                    <div class="employees-export-modal-title">
+                    <UiElement Tag="div" class="employees-export-modal-title">
 
-                        <div class="employees-export-modal-icon">
+                        <UiElement Tag="div" class="employees-export-modal-icon">
 
-                            <i class="fa-solid fa-file-excel"></i>
+                            <UiElement Tag="i" class="fa-solid fa-file-excel"></UiElement>
 
-                        </div>
+                        </UiElement>
 
-                        <div>
+                        <UiElement Tag="div">
 
-                            <h2>
+                            <UiElement Tag="h2">
                                 تصدير Excel
-                            </h2>
+                            </UiElement>
 
-                            <p>
+                            <UiElement Tag="p">
                                 اختر العملية التي تريد تنفيذها.
-                            </p>
+                            </UiElement>
 
-                        </div>
+                        </UiElement>
 
-                    </div>
+                    </UiElement>
 
-                    <button type="button"
+                    <UiElement Tag="button" type="button"
                             class="employees-export-modal-close"
-                            @onclick="CloseExportDialog">
+                            OnClick="CloseExportDialog">
 
-                        <i class="fa-solid fa-xmark"></i>
+                        <UiElement Tag="i" class="fa-solid fa-xmark"></UiElement>
 
-                    </button>
+                    </UiElement>
 
-                </div>
+                </UiElement>
 
 
                 <!-- Export Options -->
-                <div class="employees-export-modal-content">
+                <UiElement Tag="div" class="employees-export-modal-content">
 
                     <!-- Export Employees -->
-                    <button type="button"
+                    <UiElement Tag="button" type="button"
                             class="employees-export-option"
-                            @onclick="ExportEmployeesAsync">
+                            OnClick="ExportEmployeesAsync">
 
-                        <span class="employees-export-option-icon employees-export-option-icon-main">
+                        <UiElement Tag="span" class="employees-export-option-icon employees-export-option-icon-main">
 
-                            <i class="fa-solid fa-download"></i>
+                            <UiElement Tag="i" class="fa-solid fa-download"></UiElement>
 
-                        </span>
+                        </UiElement>
 
-                        <span class="employees-export-option-content">
+                        <UiElement Tag="span" class="employees-export-option-content">
 
-                            <strong>
+                            <UiElement Tag="strong">
                                 تصدير الموظفين
-                            </strong>
+                            </UiElement>
 
-                            <span>
+                            <UiElement Tag="span">
                                 تنزيل بيانات الموظفين الحالية في ملف Excel.
-                            </span>
+                            </UiElement>
 
-                        </span>
+                        </UiElement>
 
-                        <i class="fa-solid fa-chevron-left employees-export-option-arrow"></i>
+                        <UiElement Tag="i" class="fa-solid fa-chevron-left employees-export-option-arrow"></UiElement>
 
-                    </button>
+                    </UiElement>
 
 
                     <!-- Template -->
-                    <button type="button"
+                    <UiElement Tag="button" type="button"
                             class="employees-export-option"
-                            @onclick="DownloadEmployeeTemplateAsync">
+                            OnClick="DownloadEmployeeTemplateAsync">
 
-                        <span class="employees-export-option-icon employees-export-option-icon-template">
+                        <UiElement Tag="span" class="employees-export-option-icon employees-export-option-icon-template">
 
-                            <i class="fa-solid fa-file-circle-plus"></i>
+                            <UiElement Tag="i" class="fa-solid fa-file-circle-plus"></UiElement>
 
-                        </span>
+                        </UiElement>
 
-                        <span class="employees-export-option-content">
+                        <UiElement Tag="span" class="employees-export-option-content">
 
-                            <strong>
+                            <UiElement Tag="strong">
                                 تنزيل قالب Excel
-                            </strong>
+                            </UiElement>
 
-                            <span>
+                            <UiElement Tag="span">
                                 قالب جاهز لإدخال بيانات الموظفين واستيرادها.
-                            </span>
+                            </UiElement>
 
-                        </span>
+                        </UiElement>
 
-                        <i class="fa-solid fa-chevron-left employees-export-option-arrow"></i>
+                        <UiElement Tag="i" class="fa-solid fa-chevron-left employees-export-option-arrow"></UiElement>
 
-                    </button>
+                    </UiElement>
 
-                </div>
+                </UiElement>
 
-            </div>
+            </UiElement>
 
-        </div>
+        </UiElement>
     }
 
-</div>
+</UiElement>
 
 
 @code {

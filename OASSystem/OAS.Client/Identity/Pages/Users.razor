@@ -1,144 +1,125 @@
 @page "/identity/users"
 @attribute [Authorize(Roles = "Administrator")]
-@inject IUserClientService UserService
-@inject OasAuthenticationStateProvider AuthState
-@inject IApiFeedbackService ApiFeedback
-@inject IUiSnackbarService Snackbar
 
 <PageTitle>@L["Users_Title"]</PageTitle>
 
-<UiPage Title="@L["Users_Title"]" Subtitle="@L["Users_Subtitle"]">
-    <UiStackLayout Gap="StackGap.Large">
-        <UiCard Title="@L["Users_AddUser"]">
-            <UiForm Model="_form" OnSubmit="CreateUserAsync">
-                <UiStackLayout>
-                    <UiGrid Columns="2">
-                        <UiInputText @bind-Value="_form.FirstName" Label="@L["Users_FirstName"]" Required="true" EnableNativeValidation="false" />
-                        <UiInputText @bind-Value="_form.LastName" Label="@L["Users_LastName"]" Required="true" EnableNativeValidation="false" />
-                        <UiInputText @bind-Value="_form.UserName" Label="@L["Users_UserName"]" AutoComplete="off" Required="true" EnableNativeValidation="false" />
-                        <UiInputText @bind-Value="_form.Email" Type="email" Label="@L["Users_Email"]" AutoComplete="off" />
-                        <UiInputText @bind-Value="_form.Password" Type="password" RevealPassword="true" Label="@L["Users_Password"]" AutoComplete="new-password" Required="true" EnableNativeValidation="false" />
-                        <UiInputText @bind-Value="_form.ConfirmPassword" Type="password" RevealPassword="true" Label="@L["Users_ConfirmPassword"]" AutoComplete="new-password" Required="true" EnableNativeValidation="false" />
-                        <UiSelect @bind-Value="_form.RoleId" Label="@L["Users_Role"]" Placeholder="@L["Users_SelectRole"]" Options="_roleOptions" Required="true" EnableNativeValidation="false" />
-                        <UiCheckbox @bind-Value="_form.IsActive" Label="@L["Users_IsActive"]" />
-                    </UiGrid>
-                    <UiButton Type="submit" Text="@L["Users_Create"]" Loading="_saving" />
-                </UiStackLayout>
-            </UiForm>
-        </UiCard>
-
-        <UiCard Title="@L["Users_List"]">
-            @if (_loading) { <UiAlert Message="@L["Loading"]" /> }
-            else { <UiDataTable TItem="UserDto" Items="_users" Columns="_columns" EmptyText="@L["Users_Empty"]" /> }
-        </UiCard>
-    </UiStackLayout>
-</UiPage>
-
-@code {
-    private CreateUserFormModel _form = new();
-    private IReadOnlyList<UserDto> _users = [];
-    private IReadOnlyList<RoleDto> _roles = [];
-    private IReadOnlyList<UiSelectOption> _roleOptions = [];
-    private IReadOnlyList<UiDataColumn<UserDto>> _columns = [];
-    private bool _loading = true;
-    private bool _saving;
-
-    protected override async Task OnInitializedAsync()
-    {
-        BuildColumns();
-        await LoadAsync();
-    }
-
-    private async Task LoadAsync()
-    {
-        _loading = true;
-        try
-        {
-            var roles = await UserService.GetRolesAsync();
-            _roles = AuthState.CurrentUser?.IsSuperAdmin == true
-                ? roles
-                : roles.Where(x => !string.Equals(x.Name, "Administrator", StringComparison.OrdinalIgnoreCase)).ToArray();
-            _users = await UserService.GetUsersAsync();
-            _roleOptions = _roles.Select(role => new UiSelectOption(role.Id.ToString(), TranslateRole(role.Name))).ToArray();
-            if (string.IsNullOrWhiteSpace(_form.RoleId) && _roleOptions.Count > 0) _form.RoleId = _roleOptions[0].Value;
-        }
-        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
-        finally { _loading = false; }
-    }
-
-    private async Task CreateUserAsync()
-    {
-        if (_saving) return;
-        var validationMessage = ValidateForm();
-        if (validationMessage is not null) { Snackbar.Error(validationMessage); return; }
-
-        _saving = true;
-        try
-        {
-            var request = new CreateUserRequest(
-                _form.UserName.Trim(), _form.FirstName.Trim(), _form.LastName.Trim(),
-                string.IsNullOrWhiteSpace(_form.Email) ? null : _form.Email.Trim(),
-                _form.Password, _form.ConfirmPassword, Guid.Parse(_form.RoleId), _form.IsActive);
-            var result = await UserService.CreateUserAsync(request);
-            if (!result.Succeeded || result.Value is null)
+<UiWorkspaceLayout ShowAside="@(Workspace.ActiveUserTab is not null)" ShowFilters="true">
+    <Actions>
+        <UiWorkspaceActionBar>
+            @if (Workspace.ActiveUserTab is null)
             {
-                if (result.Error is not null) ApiFeedback.Show(result.Error);
-                else ApiFeedback.ShowUnexpected();
-                return;
+                <UiButton Text="@L["Users_New"]" IconCssClass="fa-solid fa-user-plus" Size="ControlSize.Small" OnClick="OpenNewAsync" />
+                <UiButton Text="@L["Users_Refresh"]" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Loading="_loading" OnClick="RefreshAsync" />
+                <UiButton Text="@L["Users_Export"]" IconCssClass="fa-solid fa-download" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="_exporting" Loading="_exporting" OnClick="ExportUsersAsync" />
+                <UiButton Text="@L["Users_RolesPermissions"]" IconCssClass="fa-solid fa-shield-halved" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="ShowRolesOverviewAsync" />
             }
+            else
+            {
+                <UiButton Text="@L["Users_Save"]" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small" Loading="_saving" OnClick="SaveAsync" />
+                <UiButton Text="@L["Users_SaveClose"]" IconCssClass="fa-solid fa-check" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="_saving" OnClick="SaveAndCloseAsync" />
+                <UiButton Text="@L["Users_Revert"]" IconCssClass="fa-solid fa-rotate-left" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Disabled="@(!Workspace.ActiveUserTab.IsDirty)" OnClick="RevertAsync" />
+                <UiButton Text="@L["Users_New"]" IconCssClass="fa-solid fa-user-plus" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="OpenNewAsync" />
+                @if (!Workspace.ActiveUserTab.IsNew && Workspace.ActiveUserTab.Editor.Details is not null)
+                {
+                    <UiButton Text="@L["Users_ResetPassword"]" IconCssClass="fa-solid fa-key" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="ResetPasswordAsync" />
+                    <UiButton Text="@(Workspace.ActiveUserTab.Editor.Details.IsActive ? L["Users_Deactivate"] : L["Users_Activate"])" IconCssClass="fa-solid fa-power-off" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="ToggleStatusAsync" />
+                    @if (Workspace.ActiveUserTab.Editor.Details.IsLocked)
+                    {
+                        <UiButton Text="@L["Users_Unlock"]" IconCssClass="fa-solid fa-lock-open" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="UnlockAsync" />
+                    }
+                    <UiButton Text="@L["Users_Refresh"]" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="RefreshActiveAsync" />
+                }
+            }
+        </UiWorkspaceActionBar>
+    </Actions>
 
-            Snackbar.Success(L["Users_CreateSuccess"]);
-            _form = new CreateUserFormModel { IsActive = true, RoleId = _roleOptions.FirstOrDefault()?.Value ?? string.Empty };
-            _users = await UserService.GetUsersAsync();
+    <Tabs>
+        <UiWorkspaceTabStrip Tabs="@WorkspaceTabs" OnSelect="ActivateTabAsync" OnClose="CloseTabAsync" />
+    </Tabs>
+
+    <Filters>
+        <UiWorkspaceFilterBar>
+            <UiInputText @bind-Value="_search" Label="@L["Users_Search"]" Placeholder="@L["Users_Search"]" Size="ControlSize.Small" />
+            <UiSelect @bind-Value="_statusFilter" Label="@L["Users_Status"]" Options="@StatusFilterOptions" OnValueChanged="ApplyFiltersAsync" Size="ControlSize.Small" />
+            <UiSelect @bind-Value="_roleFilter" Label="@L["Users_Role"]" Placeholder="@L["Users_AllRoles"]" Options="@RoleFilterOptions" OnValueChanged="ApplyFiltersAsync" Size="ControlSize.Small" />
+            <UiButton Text="@L["Users_Search"]" IconCssClass="fa-solid fa-magnifying-glass" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="SearchAsync" />
+            <UiButton Text="@L["Users_ResetFilters"]" IconCssClass="fa-solid fa-arrow-rotate-left" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="ResetFiltersAsync" />
+        </UiWorkspaceFilterBar>
+    </Filters>
+
+    <Content>
+        <UiCard Title="@L["Users_All"]" Subtitle="@string.Format(L["Users_TotalFormat"], _page.TotalCount)">
+            @if (_loading)
+            {
+                <UiAlert Message="@L["Loading"]" />
+            }
+            else if (_page.Items.Count == 0)
+            {
+                <UiAlert Message="@L["Users_Empty"]" />
+            }
+            else
+            {
+                <UiRecordListHeader Primary="@L["Users_Name"]"
+                                    Column1="@L["Users_Email"]"
+                                    Column2="@L["Users_Role"]"
+                                    Column3="@L["Users_LastLogin"]"
+                                    Trailing="@L["Users_Status"]" />
+                @foreach (var user in _page.Items)
+                {
+                    <UiRecordRow Title="@user.DisplayName"
+                                 Subtitle="@user.UserName"
+                                 Selected="@(Workspace.ActiveUserTab?.UserId == user.Id)"
+                                 OnClick="@(() => OpenUserAsync(user))">
+                        <Leading><UiAvatar Initials="@GetInitials(user.DisplayName)" /></Leading>
+                        <Content>
+                            <UiGrid Columns="3">
+                                <UiTextLabel Text="@(user.Email ?? "—")" Size="ControlSize.Small" Tone="TextTone.Muted" />
+                                <UiTextLabel Text="@FormatRoles(user.Roles)" Size="ControlSize.Small" Tone="TextTone.Muted" />
+                                <UiTextLabel Text="@FormatDate(user.LastLoginAtUtc)" Size="ControlSize.Small" Tone="TextTone.Muted" />
+                            </UiGrid>
+                        </Content>
+                        <Trailing>
+                            @if (user.IsLocked)
+                            {
+                                <UiBadge Text="@L["Users_Locked"]" Tone="AlertTone.Danger" />
+                            }
+                            @if (user.MustChangePassword)
+                            {
+                                <UiBadge Text="@L["Users_PasswordSetupRequired"]" Tone="AlertTone.Warning" />
+                            }
+                            <UiBadge Text="@(user.IsActive ? L["Users_Active"] : L["Users_Inactive"])" Tone="@(user.IsActive ? AlertTone.Success : AlertTone.Danger)" />
+                        </Trailing>
+                    </UiRecordRow>
+                }
+            }
+            <UiPagination PageNumber="@_page.PageNumber" TotalPages="@_page.TotalPages" TotalCount="@_page.TotalCount" OnPrevious="PreviousPageAsync" OnNext="NextPageAsync" />
+        </UiCard>
+    </Content>
+
+    <Aside>
+        @if (Workspace.ActiveUserTab is not null)
+        {
+            <UiStackLayout Gap="StackGap.Small">
+                <UiCard Title="@L["Users_Details"]">
+                    @if (Workspace.ActiveUserTab.IsLoading)
+                    {
+                        <UiAlert Message="@L["Loading"]" />
+                    }
+                    else
+                    {
+                        <UiDetailsHeader Initials="@GetInitials(Workspace.ActiveUserTab.Title)"
+                                         Title="@Workspace.ActiveUserTab.Title"
+                                         Subtitle="@GetActiveUserSubtitle()"
+                                         StatusText="@GetActiveUserStatusText()"
+                                         StatusTone="@GetActiveUserStatusTone()" />
+                    }
+                </UiCard>
+
+                @if (!Workspace.ActiveUserTab.IsLoading)
+                {
+                    <UserEditor State="@Workspace.ActiveUserTab.Editor" Roles="@_roles" IsActorSuperAdmin="@(AuthState.CurrentUser?.IsSuperAdmin == true)" />
+                }
+            </UiStackLayout>
         }
-        catch (OperationCanceledException) { }
-        catch { ApiFeedback.ShowUnexpected(); }
-        finally { _saving = false; }
-    }
-
-    private string? ValidateForm()
-    {
-        if (string.IsNullOrWhiteSpace(_form.UserName) || string.IsNullOrWhiteSpace(_form.FirstName) ||
-            string.IsNullOrWhiteSpace(_form.LastName) || string.IsNullOrWhiteSpace(_form.Password) ||
-            string.IsNullOrWhiteSpace(_form.RoleId)) return L["Validation_RequiredFields"];
-        if (_form.Password != _form.ConfirmPassword) return L["Users_PasswordMismatch"];
-        if (_form.Password.Length < 8 || !_form.Password.Any(char.IsUpper) || !_form.Password.Any(char.IsLower) ||
-            !_form.Password.Any(char.IsDigit) || !_form.Password.Any(ch => !char.IsLetterOrDigit(ch)))
-            return L["Users_PasswordPolicy"];
-        if (!Guid.TryParse(_form.RoleId, out _)) return L["Users_SelectRole"];
-        return null;
-    }
-
-    private void BuildColumns()
-    {
-        _columns =
-        [
-            new(L["Users_UserName"], x => x.UserName),
-            new(L["Users_Name"], x => x.DisplayName),
-            new(L["Users_Email"], x => x.Email ?? "—"),
-            new(L["Users_Role"], x => string.Join(", ", x.Roles.Select(TranslateRole))),
-            new(L["Users_Privilege"], x => x.IsSuperAdmin ? L["Users_SuperAdmin"] : "—"),
-            new(L["Users_Status"], x => x.IsActive ? L["Status_Active"] : L["Status_Inactive"]),
-            new(L["Users_LastLogin"], x => x.LastLoginAtUtc?.ToLocalTime().ToString("g") ?? "—")
-        ];
-    }
-
-    private string TranslateRole(string role) => role switch
-    {
-        "Administrator" => L["Role_Administrator"],
-        "User" => L["Role_User"],
-        _ => role
-    };
-
-    private sealed class CreateUserFormModel
-    {
-        public string UserName { get; set; } = string.Empty;
-        public string FirstName { get; set; } = string.Empty;
-        public string LastName { get; set; } = string.Empty;
-        public string? Email { get; set; }
-        public string Password { get; set; } = string.Empty;
-        public string ConfirmPassword { get; set; } = string.Empty;
-        public string RoleId { get; set; } = string.Empty;
-        public bool IsActive { get; set; } = true;
-    }
-}
+    </Aside>
+</UiWorkspaceLayout>

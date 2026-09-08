@@ -6,5 +6,5 @@ namespace OAS.Application.Identity.Roles.Queries;
 
 public sealed record GetRolesQuery : IQuery<IReadOnlyList<RoleDto>>, IAuthorizedRequest
 {
-    public IReadOnlyCollection<string> RequiredPermissions { get; } = [IdentityPermissions.UsersManage];
+    public IReadOnlyCollection<string> RequiredPermissions { get; } = [IdentityPermissions.UsersView];
 }

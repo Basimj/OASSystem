@@ -53,7 +53,7 @@ public sealed class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Ex
         IdentityConflictException conflict => (409, conflict.Code, "Identity request conflicts with existing data.", EmptyErrors),
         ConflictException conflict =>(409, conflict.Code, conflict.Message, EmptyErrors),
         NotFoundException => (404, "not_found", ex.Message, EmptyErrors),
-        ForbiddenException => (403, "forbidden", ex.Message, EmptyErrors),
+        ForbiddenException forbidden => (403, forbidden.Code, forbidden.Message, EmptyErrors),
         ConcurrencyException => (409, "concurrency_conflict", ex.Message, EmptyErrors),
         DomainException => (422, "business_rule_failed", ex.Message, EmptyErrors),
         _ => (500, "unexpected_error", "An unexpected server error occurred.", EmptyErrors)

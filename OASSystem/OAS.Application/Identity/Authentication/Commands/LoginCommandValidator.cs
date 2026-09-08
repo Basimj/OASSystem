@@ -10,7 +10,6 @@ public sealed class LoginCommandValidator : AbstractValidator<LoginCommand>
             .NotEmpty().WithErrorCode("login_required")
             .MaximumLength(256).WithErrorCode("login_max_length");
         RuleFor(x => x.Request.Password)
-            .NotEmpty().WithErrorCode("password_required")
             .MaximumLength(256).WithErrorCode("login_password_max_length");
     }
 }

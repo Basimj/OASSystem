@@ -1,0 +1,9 @@
+<button type="button" class="@(Selected ? "ui-record-row ui-record-row--selected" : "ui-record-row")" @onclick="HandleClickAsync">
+    <div class="ui-record-row__leading">@Leading</div>
+    <div class="ui-record-row__identity">
+        <strong>@Title</strong>
+        <span>@Subtitle</span>
+    </div>
+    <div class="ui-record-row__content">@Content</div>
+    <div class="ui-record-row__trailing">@Trailing</div>
+</button>

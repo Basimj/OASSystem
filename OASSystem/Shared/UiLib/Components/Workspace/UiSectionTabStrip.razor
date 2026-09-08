@@ -1,0 +1,6 @@
+<div class="ui-section-tabs" role="tablist">
+    @foreach (var tab in Tabs)
+    {
+        <button type="button" class="@(tab.IsActive ? "ui-section-tab ui-section-tab--active" : "ui-section-tab")" @onclick="() => SelectAsync(tab.Key)">@tab.Title</button>
+    }
+</div>

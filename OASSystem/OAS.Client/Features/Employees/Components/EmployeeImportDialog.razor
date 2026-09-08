@@ -1,4 +1,4 @@
-﻿@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Web
 @using OAS.Client.Features.Employees.Services
 @using OAS.Contracts.Features.Employees.Import
@@ -8,194 +8,194 @@
 @inject IEmployeeClientService EmployeeService
 @inject IUiSnackbarService Snackbar
 
-<div class="employee-import-dialog">
+<UiElement Tag="div" class="employee-import-dialog">
 
-    <div class="employee-import-header">
+    <UiElement Tag="div" class="employee-import-header">
 
-        <div class="employee-import-title">
+        <UiElement Tag="div" class="employee-import-title">
 
-            <div class="employee-import-icon">
-                <i class="fa-solid fa-file-import"></i>
-            </div>
+            <UiElement Tag="div" class="employee-import-icon">
+                <UiElement Tag="i" class="fa-solid fa-file-import"></UiElement>
+            </UiElement>
 
-            <div>
-                <h2>استيراد الموظفين من Excel</h2>
+            <UiElement Tag="div">
+                <UiElement Tag="h2">استيراد الموظفين من Excel</UiElement>
 
-                <p>
+                <UiElement Tag="p">
                     اختر ملف Excel ثم قم بفحص البيانات قبل إدخالها.
-                </p>
-            </div>
+                </UiElement>
+            </UiElement>
 
-        </div>
+        </UiElement>
 
-        <button type="button"
+        <UiElement Tag="button" type="button"
                 class="employee-import-close"
-                @onclick="Close"
+                OnClick="Close"
                 disabled="@_isBusy">
-            <i class="fa-solid fa-xmark"></i>
-        </button>
+            <UiElement Tag="i" class="fa-solid fa-xmark"></UiElement>
+        </UiElement>
 
-    </div>
+    </UiElement>
 
-    <div class="employee-import-content">
+    <UiElement Tag="div" class="employee-import-content">
 
-        <div class="employee-import-picker"
+        <UiElement Tag="div" class="employee-import-picker"
              style="@(_selectedFile is null ? null : "display:none;")">
 
-            <label class="employee-import-dropzone">
+            <UiElement Tag="label" class="employee-import-dropzone">
 
                 <InputFile class="employee-import-input"
                            OnChange="OnFileSelected"
                            accept=".xlsx" />
 
-                <span class="employee-import-dropzone-icon">
-                    <i class="fa-solid fa-cloud-arrow-up"></i>
-                </span>
+                <UiElement Tag="span" class="employee-import-dropzone-icon">
+                    <UiElement Tag="i" class="fa-solid fa-cloud-arrow-up"></UiElement>
+                </UiElement>
 
-                <strong>
+                <UiElement Tag="strong">
                     اختر ملف Excel
-                </strong>
+                </UiElement>
 
-                <span>
+                <UiElement Tag="span">
                     الصيغة المدعومة: .xlsx
-                </span>
+                </UiElement>
 
-            </label>
+            </UiElement>
 
-        </div>
+        </UiElement>
 
         @if (_selectedFile is not null)
         {
-            <div class="employee-import-file">
+            <UiElement Tag="div" class="employee-import-file">
 
-                <div class="employee-import-file-icon">
-                    <i class="fa-solid fa-file-excel"></i>
-                </div>
+                <UiElement Tag="div" class="employee-import-file-icon">
+                    <UiElement Tag="i" class="fa-solid fa-file-excel"></UiElement>
+                </UiElement>
 
-                <div class="employee-import-file-info">
+                <UiElement Tag="div" class="employee-import-file-info">
 
-                    <strong title="@_selectedFile.Name">
+                    <UiElement Tag="strong" title="@_selectedFile.Name">
                         @_selectedFile.Name
-                    </strong>
+                    </UiElement>
 
-                    <span>
+                    <UiElement Tag="span">
                         @FormatFileSize(_selectedFile.Size)
-                    </span>
+                    </UiElement>
 
-                </div>
+                </UiElement>
 
-                <button type="button"
+                <UiElement Tag="button" type="button"
                         class="employee-import-remove"
-                        @onclick="ClearFile"
+                        OnClick="ClearFile"
                         disabled="@_isBusy">
 
-                    <i class="fa-solid fa-xmark"></i>
+                    <UiElement Tag="i" class="fa-solid fa-xmark"></UiElement>
 
-                </button>
+                </UiElement>
 
-            </div>
+            </UiElement>
         }
 
         @if (_preview is not null)
         {
-            <div class="employee-import-summary">
+            <UiElement Tag="div" class="employee-import-summary">
 
-                <div class="employee-import-stat">
-                    <strong>@_preview.TotalRows</strong>
-                    <span>إجمالي الصفوف</span>
-                </div>
+                <UiElement Tag="div" class="employee-import-stat">
+                    <UiElement Tag="strong">@_preview.TotalRows</UiElement>
+                    <UiElement Tag="span">إجمالي الصفوف</UiElement>
+                </UiElement>
 
-                <div class="employee-import-stat success">
-                    <strong>@_preview.ValidRows</strong>
-                    <span>صفوف صحيحة</span>
-                </div>
+                <UiElement Tag="div" class="employee-import-stat success">
+                    <UiElement Tag="strong">@_preview.ValidRows</UiElement>
+                    <UiElement Tag="span">صفوف صحيحة</UiElement>
+                </UiElement>
 
-                <div class="employee-import-stat danger">
-                    <strong>@_preview.InvalidRows</strong>
-                    <span>صفوف بها أخطاء</span>
-                </div>
+                <UiElement Tag="div" class="employee-import-stat danger">
+                    <UiElement Tag="strong">@_preview.InvalidRows</UiElement>
+                    <UiElement Tag="span">صفوف بها أخطاء</UiElement>
+                </UiElement>
 
-            </div>
+            </UiElement>
 
             @if (_preview.Errors.Count > 0)
             {
-                <div class="employee-import-errors">
+                <UiElement Tag="div" class="employee-import-errors">
 
-                    <div class="employee-import-errors-header">
-                        <strong>أخطاء الملف</strong>
+                    <UiElement Tag="div" class="employee-import-errors-header">
+                        <UiElement Tag="strong">أخطاء الملف</UiElement>
 
-                        <span>
+                        <UiElement Tag="span">
                             @_preview.Errors.Count خطأ
-                        </span>
-                    </div>
+                        </UiElement>
+                    </UiElement>
 
-                    <div class="employee-import-errors-table">
+                    <UiElement Tag="div" class="employee-import-errors-table">
 
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>الصف</th>
-                                    <th>العمود</th>
-                                    <th>الخطأ</th>
-                                </tr>
-                            </thead>
+                        <UiElement Tag="table">
+                            <UiElement Tag="thead">
+                                <UiElement Tag="tr">
+                                    <UiElement Tag="th">الصف</UiElement>
+                                    <UiElement Tag="th">العمود</UiElement>
+                                    <UiElement Tag="th">الخطأ</UiElement>
+                                </UiElement>
+                            </UiElement>
 
-                            <tbody>
+                            <UiElement Tag="tbody">
                                 @foreach (var error in _preview.Errors)
                                 {
-                                    <tr>
-                                        <td>@error.RowNumber</td>
-                                        <td>@error.Column</td>
-                                        <td>@error.Message</td>
-                                    </tr>
+                                    <UiElement Tag="tr">
+                                        <UiElement Tag="td">@error.RowNumber</UiElement>
+                                        <UiElement Tag="td">@error.Column</UiElement>
+                                        <UiElement Tag="td">@error.Message</UiElement>
+                                    </UiElement>
                                 }
-                            </tbody>
-                        </table>
+                            </UiElement>
+                        </UiElement>
 
-                    </div>
+                    </UiElement>
 
-                </div>
+                </UiElement>
             }
             else if (_preview.IsValid)
             {
-                <div class="employee-import-success">
+                <UiElement Tag="div" class="employee-import-success">
 
-                    <i class="fa-solid fa-circle-check"></i>
+                    <UiElement Tag="i" class="fa-solid fa-circle-check"></UiElement>
 
-                    <div>
-                        <strong>
+                    <UiElement Tag="div">
+                        <UiElement Tag="strong">
                             الملف جاهز للاستيراد
-                        </strong>
+                        </UiElement>
 
-                        <span>
+                        <UiElement Tag="span">
                             جميع الصفوف اجتازت التحقق.
-                        </span>
-                    </div>
+                        </UiElement>
+                    </UiElement>
 
-                </div>
+                </UiElement>
             }
         }
 
         @if (!string.IsNullOrWhiteSpace(_errorMessage))
         {
-            <div class="employee-import-error-message">
+            <UiElement Tag="div" class="employee-import-error-message">
 
-                <i class="fa-solid fa-triangle-exclamation"></i>
+                <UiElement Tag="i" class="fa-solid fa-triangle-exclamation"></UiElement>
 
-                <div>
-                    <strong>حدث خطأ</strong>
+                <UiElement Tag="div">
+                    <UiElement Tag="strong">حدث خطأ</UiElement>
 
-                    <span>
+                    <UiElement Tag="span">
                         @_errorMessage
-                    </span>
-                </div>
+                    </UiElement>
+                </UiElement>
 
-            </div>
+            </UiElement>
         }
 
-    </div>
+    </UiElement>
 
-    <div class="employee-import-footer">
+    <UiElement Tag="div" class="employee-import-footer">
 
         <UiButton Text="إلغاء"
                   Variant="ButtonVariant.Secondary"
@@ -222,9 +222,9 @@
             </UiButton>
         }
 
-    </div>
+    </UiElement>
 
-</div>
+</UiElement>
 
 @code {
 

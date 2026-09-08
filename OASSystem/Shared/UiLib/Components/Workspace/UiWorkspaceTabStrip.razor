@@ -1,0 +1,18 @@
+<div class="ui-workspace-tabs" role="tablist">
+    @foreach (var tab in Tabs)
+    {
+        <div class="@(tab.IsActive ? "ui-workspace-tab ui-workspace-tab--active" : "ui-workspace-tab")">
+            <button type="button" class="ui-workspace-tab__select" role="tab" aria-selected="@tab.IsActive" @onclick="() => SelectAsync(tab.Id)">
+                @if (tab.IsDirty)
+                {
+                    <span class="ui-workspace-tab__dirty" aria-label="unsaved"></span>
+                }
+                <span class="ui-workspace-tab__title">@tab.Title</span>
+            </button>
+            @if (tab.CanClose)
+            {
+                <button type="button" class="ui-workspace-tab__close" aria-label="close" @onclick="() => CloseAsync(tab.Id)">×</button>
+            }
+        </div>
+    }
+</div>

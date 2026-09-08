@@ -38,6 +38,29 @@ public sealed class LoginCommandHandler(
             return LoginResult.InvalidCredentials();
         }
 
+        if (record.User.CanUsePasswordlessBootstrap())
+        {
+            if (!string.IsNullOrEmpty(request.Request.Password))
+            {
+                passwordService.SimulateVerification(request.Request.Password);
+                record.User.RecordFailedAccess(now, MaximumFailedAttempts, LockoutDuration);
+                await unitOfWork.SaveChangesAsync(cancellationToken);
+                return LoginResult.InvalidCredentials();
+            }
+
+            record.User.ResetAccessFailures();
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return LoginResult.Success(ToDto(record));
+        }
+
+        if (string.IsNullOrEmpty(request.Request.Password))
+        {
+            passwordService.SimulateVerification(request.Request.Password);
+            record.User.RecordFailedAccess(now, MaximumFailedAttempts, LockoutDuration);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return LoginResult.InvalidCredentials();
+        }
+
         var passwordResult = passwordService.Verify(record.User, request.Request.Password);
         if (passwordResult == PasswordCheckResult.Failed)
         {

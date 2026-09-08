@@ -1,0 +1,54 @@
+.ui-application-tabs {
+    min-width: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 3px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 2px 7px 3px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--oas-color-primary-border) transparent;
+}
+.ui-application-tabs::-webkit-scrollbar { height: 2px; }
+.ui-application-tabs::-webkit-scrollbar-thumb { border-radius: 999px; background: var(--oas-color-primary-border); }
+.ui-application-tab {
+    min-width: max-content;
+    height: 29px;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    border: 1px solid #e8e5ef;
+    border-radius: 5px;
+    background: #fff;
+    color: #61647f;
+    box-shadow: 0 1px 2px rgba(34,31,64,.018);
+    transition: border-color .14s ease, background .14s ease, color .14s ease;
+}
+.ui-application-tab:hover { border-color: var(--oas-color-primary-border); background: #faf8ff; color: var(--oas-color-primary); }
+.ui-application-tab--active { border-color: #ded2ff; background: #f4efff; color: var(--oas-color-primary); }
+.ui-application-tab__select,
+.ui-application-tab__close {
+    height: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font-family: inherit;
+    cursor: pointer;
+}
+.ui-application-tab__select { gap: 6px; padding: 0 9px; font-size: 10.5px; font-weight: 650; white-space: nowrap; }
+.ui-application-tab__icon { width: 13px; font-size: 11px; text-align: center; }
+.ui-application-tab__title { max-width: 125px; overflow: hidden; text-overflow: ellipsis; }
+.ui-application-tab__close { width: 23px; margin-inline-start: -3px; font-size: 9px; opacity: .68; }
+.ui-application-tab__close:hover { background: rgba(90,45,214,.08); opacity: 1; }
+.ui-application-tab__select:focus-visible,
+.ui-application-tab__close:focus-visible { outline: 2px solid var(--oas-color-primary); outline-offset: -2px; }
+@media (max-width: 700px) {
+    .ui-application-tabs { padding-inline: 5px; }
+    .ui-application-tab__select { padding-inline: 7px; font-size: 10px; }
+    .ui-application-tab__title { max-width: 95px; }
+}
