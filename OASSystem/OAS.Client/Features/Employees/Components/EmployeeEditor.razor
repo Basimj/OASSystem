@@ -1,0 +1,1181 @@
+﻿
+@page "/employees/new"
+@page "/employees/edit/{EmployeeId:guid}"
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Web
+@using OAS.Client.Common.Feedback.Services
+@using OAS.Client.Features.Employees.Services
+@using OAS.Client.Services.Http
+@using OAS.Contracts.Features.Employees
+@using OAS.UiLib.Components.Buttons
+@using OAS.UiLib.Components.Inputs
+@using OAS.UiLib.Core.Enums
+@using OAS.UiLib.Services.Feedback
+
+@attribute [Authorize(Roles = "Administrator")]
+
+@inject IEmployeeClientService EmployeeService
+@inject IApiFeedbackService ApiFeedback
+@inject IUiSnackbarService Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>
+    @(IsEditMode ? "تعديل الموظف" : "إضافة موظف")
+</PageTitle>
+
+<div class="employee-editor-page" dir="rtl">
+
+    @if (_isLoading)
+    {
+        <div class="employee-editor-loading">
+            <div class="employee-editor-spinner"></div>
+            <span>
+                @(IsEditMode
+                            ? "جاري تحميل بيانات الموظف..."
+                            : "جاري توليد كود الموظف...")
+        </span>
+    </div>
+        }
+    else
+    {
+        <EditForm Model="_form" OnSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+
+            <div class="employee-editor-shell">
+
+                <!-- HEADER -->
+                <div class="employee-editor-header">
+
+                    <div class="employee-editor-heading">
+
+                        <button type="button"
+                                class="employee-editor-back"
+                                @onclick="BackToEmployees">
+
+                            <span class="employee-editor-back-icon">
+                                <i class="fa-solid fa-arrow-right"></i>
+                            </span>
+
+                            <span>العودة إلى الموظفين</span>
+
+                        </button>
+
+                        <div>
+
+                            <h1>
+                                @(IsEditMode
+                                                            ? "تعديل الموظف"
+                                                            : "إضافة موظف جديد")
+                                                                            </h1>
+
+                            <p>
+                                @(IsEditMode
+                                                            ? "تعديل بيانات الموظف وحفظ التغييرات."
+                                                            : "أدخل بيانات الموظف الأساسية لإنشاء سجل جديد.")
+                        </p>
+
+                        </div>
+
+                    </div>
+
+                    <div class="employee-editor-header-actions">
+
+                        <UiButton Text="إلغاء"
+                                  Variant="ButtonVariant.Secondary"
+                                  AdditionalCssClass="editor-cancel-button"
+                                  Disabled="@_isSaving"
+                                  OnClick="CancelClicked">
+                        </UiButton>
+
+                    @if (!IsEditMode)
+                        {
+                            <UiButton Text="حفظ"
+                                      Variant="ButtonVariant.Ghost"
+                                      AdditionalCssClass="editor-save-button"
+                                      Disabled="@_isSaving"
+                                      OnClick="SaveOnlyClicked">
+                            </UiButton>
+                        }
+
+                        <UiButton Text="حفظ وإغلاق"
+                                  Variant="ButtonVariant.Primary"
+                                  Disabled="@_isSaving"
+                                  Loading="@_isSaving"
+                                  OnClick="SaveAndCloseClicked">
+                        </UiButton>
+
+                    </div>
+
+                </div>
+
+                <!-- TABS -->
+                <div class="employee-editor-tabs">
+
+                    <button type="button"
+                            class="employee-editor-tab @(IsTab("basic") ? "active" : "")"
+                            @onclick='() => SetTab("basic")'>
+                        البيانات الأساسية
+                    </button>
+
+                    <button type="button"
+                            class="employee-editor-tab @(IsTab("job") ? "active" : "")"
+                            @onclick='() => SetTab("job")'>
+                        الوظيفة
+                    </button>
+
+                    <button type="button"
+                            class="employee-editor-tab @(IsTab("contact") ? "active" : "")"
+                            @onclick='() => SetTab("contact")'>
+                        التواصل
+                    </button>
+
+                    <button type="button"
+                            class="employee-editor-tab @(IsTab("files") ? "active" : "")"
+                            @onclick='() => SetTab("files")'>
+                        الملفات
+                    </button>
+
+                    <button type="button"
+                            class="employee-editor-tab @(IsTab("notes") ? "active" : "")"
+                            @onclick='() => SetTab("notes")'>
+                        الملاحظات
+                    </button>
+
+                </div>
+
+                <!-- BASIC -->
+                @if (IsTab("basic"))
+                {
+                    <section class="employee-editor-card">
+
+                        <div class="employee-editor-card-header">
+                            <div>
+                                <h2>البيانات الأساسية</h2>
+                                <p>المعلومات الرئيسية للموظف.</p>
+                            </div>
+                        </div>
+
+                        <div class="employee-editor-grid">
+
+                            <!-- EMPLOYEE CODE -->
+                            <div class="employee-editor-field">
+
+                                <UiInputText Id="employee-code"
+                                             Label="كود الموظف"
+                                             @bind-Value="_form.EmployeeCode"
+                                             Required="true"
+                                             MaxLength="32"
+                                             ReadOnly="true"
+                                             Placeholder="جاري توليد الكود..." />
+
+                                <ValidationMessage For="@(() => _form.EmployeeCode)" />
+
+                            </div>
+
+                            <!-- FIRST NAME -->
+                            <div class="employee-editor-field">
+
+                                <UiInputText Id="employee-first-name"
+                                             Label="الاسم الأول"
+                                             @bind-Value="_form.FirstName"
+                                             Required="true"
+                                             MaxLength="100"
+                                             Placeholder="الاسم الأول" />
+
+                                <ValidationMessage For="@(() => _form.FirstName)" />
+
+                            </div>
+
+                            <!-- LAST NAME -->
+                            <div class="employee-editor-field">
+
+                                <UiInputText Id="employee-last-name"
+                                             Label="اسم العائلة"
+                                             @bind-Value="_form.LastName"
+                                             Required="true"
+                                             MaxLength="100"
+                                             Placeholder="اسم العائلة" />
+
+                                <ValidationMessage For="@(() => _form.LastName)" />
+
+                            </div>
+
+                            <!-- HIRE DATE -->
+                            <div class="employee-editor-field">
+
+                                <label class="employee-editor-label"
+                                       for="employee-hire-date">
+                                    تاريخ التوظيف
+                                </label>
+
+                                <input id="employee-hire-date"
+                                       type="date"
+                                       class="employee-editor-native-input"
+                                       value="@_form.HireDateText"
+                                       @onchange="OnHireDateChanged" />
+
+                            </div>
+
+                        </div>
+
+                        @if (!IsEditMode)
+                        {
+                            <div class="employee-editor-status-box">
+
+                                <div>
+                                    <strong>حالة الموظف عند الإنشاء</strong>
+
+                                    <span>
+                                        يمكنك إنشاء الموظف نشطًا أو غير نشط.
+                                    </span>
+                                </div>
+
+                                <UiCheckbox Label="الموظف نشط"
+                                            Value="_form.IsActive"
+                                            ValueChanged="SetActive" />
+
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="employee-editor-info-box">
+
+                                <div>
+                                    <strong>الحالة الحالية</strong>
+
+                                    <span>
+                                        يمكن تغيير الحالة من صفحة الموظفين.
+                                    </span>
+                                </div>
+
+                                <span class="@(_form.IsActive
+                                                                                    ? "employee-status-active"
+                                                                                    : "employee-status-inactive")">
+
+                        @(_form.IsActive ? "نشط" : "غير نشط")
+
+                                </span>
+
+                            </div>
+                                }
+
+                    </section>
+                }
+
+                <!-- JOB -->
+                @if (IsTab("job"))
+                {
+                    <section class="employee-editor-card">
+
+                        <div class="employee-editor-card-header">
+
+                            <div>
+                                <h2>الوظيفة والأدوار التشغيلية</h2>
+                                <p>حدد المسمى الوظيفي والمهام التشغيلية.</p>
+                            </div>
+
+                        </div>
+
+                        <div class="employee-editor-grid">
+
+                            <div class="employee-editor-field employee-editor-field-full">
+
+                                <UiInputText Id="employee-job-title"
+                                             Label="المسمى الوظيفي"
+                                             @bind-Value="_form.JobTitle"
+                                             MaxLength="100"
+                                             Placeholder="مثال: فني نظارات" />
+
+                                <ValidationMessage For="@(() => _form.JobTitle)" />
+
+                            </div>
+
+                        </div>
+
+                        <div class="employee-editor-capabilities">
+
+                            <div class="employee-editor-capability">
+
+                                <UiCheckbox Label="موظف مبيعات"
+                                            Value="_form.IsSalesperson"
+                                            ValueChanged="SetSalesperson" />
+
+                                <span>
+                                    يعمل ضمن فريق المبيعات.
+                                </span>
+
+                            </div>
+
+                            <div class="employee-editor-capability">
+
+                                <UiCheckbox Label="فني"
+                                            Value="_form.IsTechnician"
+                                            ValueChanged="SetTechnician" />
+
+                                <span>
+                                    يمكنه تنفيذ الأعمال الفنية.
+                                </span>
+
+                            </div>
+
+                            <div class="employee-editor-capability">
+
+                                <UiCheckbox Label="مستحق للعمولة"
+                                            Value="_form.IsCommissionEligible"
+                                            ValueChanged="SetCommissionEligible" />
+
+                                <span>
+                                    يسمح باحتساب العمولة.
+                                </span>
+
+                            </div>
+
+                        </div>
+
+                    </section>
+                }
+
+                <!-- CONTACT -->
+                @if (IsTab("contact"))
+                {
+                    <section class="employee-editor-card">
+
+                        <div class="employee-editor-card-header">
+
+                            <div>
+                                <h2>بيانات التواصل</h2>
+                                <p>بيانات الاتصال المتاحة للموظف.</p>
+                            </div>
+
+                        </div>
+
+                        <div class="employee-editor-grid">
+
+                            <div class="employee-editor-field">
+
+                                <UiInputText Id="employee-phone"
+                                             Label="رقم الهاتف"
+                                             @bind-Value="_form.Phone"
+                                             MaxLength="32"
+                                             InputMode="tel"
+                                             AutoComplete="tel"
+                                             Placeholder="مثال: 777123456" />
+
+                                <ValidationMessage For="@(() => _form.Phone)" />
+
+                            </div>
+
+                        </div>
+
+                    </section>
+                }
+
+                <!-- FILES -->
+                @if (IsTab("files"))
+                {
+                    <section class="employee-editor-card">
+
+                        <div class="employee-editor-card-header">
+
+                            <div>
+                                <h2>ملفات الموظف</h2>
+                                <p>قسم الملفات جاهز للتطوير لاحقًا.</p>
+                            </div>
+
+                        </div>
+
+                        <div class="employee-editor-placeholder">
+
+                            <div class="employee-editor-placeholder-icon">
+                                <i class="fa-solid fa-folder-open"></i>
+                            </div>
+
+                            <strong>لا توجد ملفات حاليًا</strong>
+
+                            <span>
+                                رفع الملفات ليس جزءًا من عقد Employees الحالي.
+                            </span>
+
+                        </div>
+
+                    </section>
+                }
+
+                <!-- NOTES -->
+                @if (IsTab("notes"))
+                {
+                    <section class="employee-editor-card">
+
+                        <div class="employee-editor-card-header">
+
+                            <div>
+                                <h2>الملاحظات</h2>
+                                <p>أضف أي معلومات أو ملاحظات إضافية.</p>
+                            </div>
+
+                        </div>
+
+                        <div class="employee-editor-field employee-editor-field-full">
+
+                            <label class="employee-editor-label"
+                                   for="employee-notes">
+                                الملاحظات
+                            </label>
+
+                            <textarea id="employee-notes"
+                                      class="employee-editor-textarea"
+                                      maxlength="1000"
+                                      @bind="_form.Notes"
+                                      placeholder="أدخل الملاحظات هنا...">
+                                    </textarea>
+
+                            <ValidationMessage For="@(() => _form.Notes)" />
+
+                        </div>
+
+                    </section>
+                }
+
+                <ValidationSummary class="employee-editor-validation-summary" />
+
+                <!-- FOOTER -->
+                <div class="employee-editor-footer">
+
+                    <div class="employee-editor-footer-info">
+                        <span>
+                            الحقول الأساسية مطلوبة.
+                        </span>
+                    </div>
+
+                    <div class="employee-editor-footer-actions">
+
+                        <UiButton Text="إلغاء"
+                                  Variant="ButtonVariant.Secondary"
+                                  AdditionalCssClass="editor-cancel-button"
+                                  Disabled="@_isSaving"
+                                  OnClick="CancelClicked">
+                        </UiButton>
+
+                        <UiButton Text="حفظ وإغلاق"
+                                  Variant="ButtonVariant.Primary"
+                                  AdditionalCssClass="editor-save-close-button"
+                                  Disabled="@_isSaving"
+                                  Loading="@_isSaving"
+                                  OnClick="SaveAndCloseClicked">
+                        </UiButton>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </EditForm>
+    }
+
+</div>
+
+@code {
+
+    [Parameter]
+    public Guid? EmployeeId { get; set; }
+
+    private EmployeeFormModel _form = new();
+
+    private string? _rowVersion;
+
+    private bool _isLoading;
+    private bool _isSaving;
+
+    private bool _parametersInitialized;
+    private Guid? _loadedEmployeeId;
+
+    private string _activeTab = "basic";
+
+    private bool IsEditMode =>
+        EmployeeId.HasValue;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_parametersInitialized &&
+            EmployeeId == _loadedEmployeeId)
+        {
+            return;
+        }
+
+        _parametersInitialized = true;
+        _loadedEmployeeId = EmployeeId;
+
+        if (EmployeeId is null)
+        {
+            await InitializeNewAsync();
+            return;
+        }
+
+        await LoadEmployeeAsync(EmployeeId.Value);
+    }
+
+    private async Task InitializeNewAsync()
+    {
+        _form = new EmployeeFormModel
+        {
+            EmployeeCode = string.Empty,
+            FirstName = string.Empty,
+            LastName = string.Empty,
+            Phone = string.Empty,
+            JobTitle = string.Empty,
+            HireDateText = string.Empty,
+            Notes = string.Empty,
+            IsSalesperson = false,
+            IsTechnician = false,
+            IsCommissionEligible = false,
+            IsActive = true
+        };
+
+        _rowVersion = null;
+        _activeTab = "basic";
+        _isLoading = true;
+
+        try
+        {
+            var employeeCode =
+                await EmployeeService.GetNextEmployeeCodeAsync();
+
+            if (string.IsNullOrWhiteSpace(employeeCode))
+            {
+                Snackbar.Error(
+                    "تعذر الحصول على كود الموظف الجديد.");
+
+                return;
+            }
+
+            _form.EmployeeCode =
+                employeeCode.Trim();
+
+            /*
+             * إجبار Blazor على إعادة رسم المكون
+             * بعد استلام الكود من API.
+             */
+            await InvokeAsync(
+                StateHasChanged);
+        }
+        catch (ApiClientException ex)
+        {
+            ApiFeedback.Show(ex.Error);
+        }
+        catch
+        {
+            ApiFeedback.ShowUnexpected();
+        }
+        finally
+        {
+            _isLoading = false;
+
+            await InvokeAsync(
+                StateHasChanged);
+        }
+    }
+
+    private async Task LoadEmployeeAsync(
+        Guid employeeId)
+    {
+        _isLoading = true;
+
+        try
+        {
+            var employee =
+                await EmployeeService.GetByIdAsync(
+                    employeeId);
+
+            if (employee is null)
+            {
+                Snackbar.Error(
+                    "لم يتم العثور على الموظف.");
+
+                Navigation.NavigateTo(
+                    "/employees");
+
+                return;
+            }
+
+            _form = new EmployeeFormModel
+            {
+                EmployeeCode =
+                    employee.EmployeeCode,
+
+                FirstName =
+                    employee.FirstName,
+
+                LastName =
+                    employee.LastName,
+
+                Phone =
+                    employee.Phone ??
+                    string.Empty,
+
+                JobTitle =
+                    employee.JobTitle ??
+                    string.Empty,
+
+                HireDateText =
+                    employee.HireDate?
+                        .ToString("yyyy-MM-dd")
+                    ?? string.Empty,
+
+                Notes =
+                    employee.Notes ??
+                    string.Empty,
+
+                IsSalesperson =
+                    employee.IsSalesperson,
+
+                IsTechnician =
+                    employee.IsTechnician,
+
+                IsCommissionEligible =
+                    employee.IsCommissionEligible,
+
+                IsActive =
+                    employee.IsActive
+            };
+
+            _rowVersion =
+                employee.RowVersion;
+
+            _activeTab = "basic";
+        }
+        catch (ApiClientException ex)
+        {
+            ApiFeedback.Show(ex.Error);
+
+            Navigation.NavigateTo(
+                "/employees");
+        }
+        catch
+        {
+            ApiFeedback.ShowUnexpected();
+
+            Navigation.NavigateTo(
+                "/employees");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task SaveAsync(
+        EditContext _)
+    {
+        await SaveCoreAsync(true);
+    }
+
+    private async Task SaveOnlyClicked(
+        MouseEventArgs _)
+    {
+        await SaveCoreAsync(false);
+    }
+
+    private async Task SaveAndCloseClicked(
+        MouseEventArgs _)
+    {
+        await SaveCoreAsync(true);
+    }
+
+    private async Task SaveCoreAsync(
+        bool closeAfterSave)
+    {
+        if (_isSaving)
+        {
+            return;
+        }
+
+        _isSaving = true;
+
+        try
+        {
+            if (!ValidateForm())
+            {
+                return;
+            }
+
+            var hireDate =
+                ParseHireDate();
+
+            // ==================================================
+            // CREATE
+            // ==================================================
+            if (EmployeeId is null)
+            {
+                var employeeCode =
+                    _form.EmployeeCode.Trim();
+
+                if (string.IsNullOrWhiteSpace(
+                        employeeCode))
+                {
+                    Snackbar.Error(
+                        "كود الموظف غير متوفر.");
+
+                    SetTab("basic");
+
+                    return;
+                }
+
+                var request =
+                    new CreateEmployeeRequest(
+                        EmployeeCode:
+                            employeeCode,
+
+                        FirstName:
+                            _form.FirstName.Trim(),
+
+                        LastName:
+                            _form.LastName.Trim(),
+
+                        Phone:
+                            NullIfEmpty(
+                                _form.Phone),
+
+                        JobTitle:
+                            NullIfEmpty(
+                                _form.JobTitle),
+
+                        HireDate:
+                            hireDate,
+
+                        Notes:
+                            NullIfEmpty(
+                                _form.Notes),
+
+                        IsSalesperson:
+                            _form.IsSalesperson,
+
+                        IsTechnician:
+                            _form.IsTechnician,
+
+                        IsCommissionEligible:
+                            _form.IsCommissionEligible,
+
+                        IsActive:
+                            _form.IsActive,
+
+                        UserAccountId:
+                            null);
+
+                var result =
+                    await EmployeeService.CreateAsync(
+                        request);
+
+                if (!result.Succeeded)
+                {
+                    if (result.Error is not null)
+                    {
+                        ApiFeedback.Show(
+                            result.Error);
+                    }
+                    else
+                    {
+                        ApiFeedback.ShowUnexpected();
+                    }
+
+                    return;
+                }
+
+                if (result.Value is null)
+                {
+                    Snackbar.Error(
+                        "تم الإنشاء ولكن لم تتم إعادة بيانات الموظف.");
+
+                    if (closeAfterSave)
+                    {
+                        Navigation.NavigateTo(
+                            "/employees");
+                    }
+
+                    return;
+                }
+
+                Snackbar.Success(
+                    "تم إنشاء الموظف بنجاح.");
+
+                // ==================================================
+                // حفظ وإغلاق
+                // ==================================================
+                if (closeAfterSave)
+                {
+                    Navigation.NavigateTo(
+                        "/employees");
+
+                    return;
+                }
+
+                // ==================================================
+                // حفظ فقط
+                // ==================================================
+                // نبقى في صفحة الإضافة.
+                // يتم تنظيف النموذج.
+                // ثم يتم طلب رقم جديد من SQL SEQUENCE.
+                await InitializeNewAsync();
+
+                return;
+            }
+
+            // ==================================================
+            // UPDATE
+            // ==================================================
+            if (string.IsNullOrWhiteSpace(
+                    _rowVersion))
+            {
+                Snackbar.Error(
+                    "تعذر الحصول على RowVersion الحالي للموظف.");
+
+                return;
+            }
+
+            var updateRequest =
+                new UpdateEmployeeRequest(
+                    EmployeeCode:
+                        _form.EmployeeCode.Trim(),
+
+                    FirstName:
+                        _form.FirstName.Trim(),
+
+                    LastName:
+                        _form.LastName.Trim(),
+
+                    Phone:
+                        NullIfEmpty(
+                            _form.Phone),
+
+                    JobTitle:
+                        NullIfEmpty(
+                            _form.JobTitle),
+
+                    HireDate:
+                        hireDate,
+
+                    Notes:
+                        NullIfEmpty(
+                            _form.Notes),
+
+                    IsSalesperson:
+                        _form.IsSalesperson,
+
+                    IsTechnician:
+                        _form.IsTechnician,
+
+                    IsCommissionEligible:
+                        _form.IsCommissionEligible,
+
+                    UserAccountId:
+                        null,
+
+                    RowVersion:
+                        _rowVersion);
+
+            EmployeeDto updatedEmployee;
+
+            try
+            {
+                updatedEmployee =
+                    await EmployeeService.UpdateAsync(
+                        EmployeeId.Value,
+                        updateRequest);
+            }
+            catch (ApiClientException ex)
+                when (ex.StatusCode == 409)
+            {
+                ApiFeedback.Show(
+                    ex.Error);
+
+                await LoadEmployeeAsync(
+                    EmployeeId.Value);
+
+                return;
+            }
+
+            if (updatedEmployee is null)
+            {
+                Snackbar.Error(
+                    "تعذر تحديث الموظف.");
+
+                return;
+            }
+
+            _rowVersion =
+                updatedEmployee.RowVersion;
+
+            Snackbar.Success(
+                "تم تحديث بيانات الموظف بنجاح.");
+
+            if (closeAfterSave)
+            {
+                Navigation.NavigateTo(
+                    "/employees");
+            }
+        }
+        catch (ApiClientException ex)
+        {
+            ApiFeedback.Show(
+                ex.Error);
+        }
+        catch
+        {
+            ApiFeedback.ShowUnexpected();
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private bool ValidateForm()
+    {
+        if (string.IsNullOrWhiteSpace(
+                _form.EmployeeCode))
+        {
+            Snackbar.Error(
+                "كود الموظف غير متوفر.");
+
+            SetTab("basic");
+
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(
+                _form.FirstName))
+        {
+            Snackbar.Error(
+                "الاسم الأول مطلوب.");
+
+            SetTab("basic");
+
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(
+                _form.LastName))
+        {
+            Snackbar.Error(
+                "اسم العائلة مطلوب.");
+
+            SetTab("basic");
+
+            return false;
+        }
+
+        if (_form.EmployeeCode.Trim().Length > 32)
+        {
+            Snackbar.Error(
+                "كود الموظف يجب ألا يتجاوز 32 حرفًا.");
+
+            SetTab("basic");
+
+            return false;
+        }
+
+        if (_form.FirstName.Trim().Length > 100)
+        {
+            Snackbar.Error(
+                "الاسم الأول يجب ألا يتجاوز 100 حرف.");
+
+            SetTab("basic");
+
+            return false;
+        }
+
+        if (_form.LastName.Trim().Length > 100)
+        {
+            Snackbar.Error(
+                "اسم العائلة يجب ألا يتجاوز 100 حرف.");
+
+            SetTab("basic");
+
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(
+                _form.Phone) &&
+            _form.Phone.Trim().Length > 32)
+        {
+            Snackbar.Error(
+                "رقم الهاتف يجب ألا يتجاوز 32 حرفًا.");
+
+            SetTab("contact");
+
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(
+                _form.JobTitle) &&
+            _form.JobTitle.Trim().Length > 100)
+        {
+            Snackbar.Error(
+                "المسمى الوظيفي يجب ألا يتجاوز 100 حرف.");
+
+            SetTab("job");
+
+            return false;
+        }
+
+        if (!string.IsNullOrEmpty(
+                _form.Notes) &&
+            _form.Notes.Length > 1000)
+        {
+            Snackbar.Error(
+                "الملاحظات يجب ألا تتجاوز 1000 حرف.");
+
+            SetTab("notes");
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private DateOnly? ParseHireDate()
+    {
+        if (string.IsNullOrWhiteSpace(
+                _form.HireDateText))
+        {
+            return null;
+        }
+
+        return DateOnly.TryParseExact(
+            _form.HireDateText,
+            "yyyy-MM-dd",
+            out var value)
+            ? value
+            : null;
+    }
+
+    private void OnHireDateChanged(
+        ChangeEventArgs args)
+    {
+        _form.HireDateText =
+            args.Value?.ToString()
+            ?? string.Empty;
+    }
+
+    private void SetActive(
+        bool value)
+    {
+        _form.IsActive = value;
+    }
+
+    private void SetSalesperson(
+        bool value)
+    {
+        _form.IsSalesperson = value;
+    }
+
+    private void SetTechnician(
+        bool value)
+    {
+        _form.IsTechnician = value;
+    }
+
+    private void SetCommissionEligible(
+        bool value)
+    {
+        _form.IsCommissionEligible = value;
+    }
+
+    private void SetTab(
+        string tab)
+    {
+        _activeTab = tab;
+    }
+
+    private bool IsTab(
+        string tab)
+    {
+        return string.Equals(
+            _activeTab,
+            tab,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void CancelClicked(
+        MouseEventArgs _)
+    {
+        BackToEmployees();
+    }
+
+    private void BackToEmployees()
+    {
+        Navigation.NavigateTo(
+            "/employees");
+    }
+
+    private static string? NullIfEmpty(
+        string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? null
+            : value.Trim();
+    }
+
+    private sealed class EmployeeFormModel
+    {
+        [Required(
+            ErrorMessage = "كود الموظف مطلوب.")]
+        [MaxLength(
+            32,
+            ErrorMessage =
+                "كود الموظف يجب ألا يتجاوز 32 حرفًا.")]
+        public string EmployeeCode { get; set; } =
+            string.Empty;
+
+        [Required(
+            ErrorMessage = "الاسم الأول مطلوب.")]
+        [MaxLength(
+            100,
+            ErrorMessage =
+                "الاسم الأول يجب ألا يتجاوز 100 حرف.")]
+        public string FirstName { get; set; } =
+            string.Empty;
+
+        [Required(
+            ErrorMessage = "اسم العائلة مطلوب.")]
+        [MaxLength(
+            100,
+            ErrorMessage =
+                "اسم العائلة يجب ألا يتجاوز 100 حرف.")]
+        public string LastName { get; set; } =
+            string.Empty;
+
+        [MaxLength(
+            32,
+            ErrorMessage =
+                "رقم الهاتف يجب ألا يتجاوز 32 حرفًا.")]
+        public string? Phone { get; set; }
+
+        [MaxLength(
+            100,
+            ErrorMessage =
+                "المسمى الوظيفي يجب ألا يتجاوز 100 حرف.")]
+        public string? JobTitle { get; set; }
+
+        public string HireDateText { get; set; } =
+            string.Empty;
+
+        [MaxLength(
+            1000,
+            ErrorMessage =
+                "الملاحظات يجب ألا تتجاوز 1000 حرف.")]
+        public string? Notes { get; set; }
+
+        public bool IsSalesperson { get; set; }
+
+        public bool IsTechnician { get; set; }
+
+        public bool IsCommissionEligible { get; set; }
+
+        public bool IsActive { get; set; } = true;
+    }
+}

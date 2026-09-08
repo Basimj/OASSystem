@@ -19,6 +19,8 @@
     <title>@systemName</title>
     <link rel="stylesheet" href="_content/OAS.UiLib/css/oas-ui-bundle.css" />
     <HeadOutlet @rendermode="new InteractiveWebAssemblyRenderMode(prerender: false)" />
+    <link rel="stylesheet"
+          href="@Assets["OAS.Client.styles.css"]" />
 </head>
 <body>
     <div id="oas-startup-loader" class="oas-boot-screen" data-state="loading" role="status" aria-live="polite">
@@ -185,6 +187,76 @@
                 window.failOasStartup();
             }
         })();
+    </script>
+    <script>
+        window.oasDownloadFile = (fileName, contentType, content) => {
+            const blob = new Blob(
+                [new Uint8Array(content)],
+                { type: contentType }
+            );
+
+            const url = URL.createObjectURL(blob);
+
+            const anchor = document.createElement("a");
+            anchor.href = url;
+            anchor.download = fileName;
+
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+
+            URL.revokeObjectURL(url);
+        };
+
+        window.oasSaveFile = async (fileName, contentType, content) => {
+            // إذا كان المتصفح لا يدعم نافذة اختيار مكان الحفظ
+            // نرجع إلى التنزيل العادي.
+            if (!window.showSaveFilePicker) {
+                window.oasDownloadFile(
+                    fileName,
+                    contentType,
+                    content);
+
+                return true;
+            }
+
+            try {
+                const handle = await window.showSaveFilePicker({
+                    suggestedName: fileName,
+
+                    types: [
+                        {
+                            description: "Excel Files",
+                            accept: {
+                                [contentType]: [".xlsx"]
+                            }
+                        }
+                    ]
+                });
+
+                const writable = await handle.createWritable();
+
+                await writable.write(
+                    new Uint8Array(content));
+
+                await writable.close();
+
+                return true;
+            }
+            catch (error) {
+
+                // المستخدم أغلق نافذة الحفظ أو ضغط Cancel
+                if (error?.name === "AbortError") {
+                    return false;
+                }
+
+                console.error(
+                    "خطأ أثناء حفظ الملف:",
+                    error);
+
+                throw error;
+            }
+        };
     </script>
 </body>
 </html>

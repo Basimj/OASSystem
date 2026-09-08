@@ -2,10 +2,13 @@ using Microsoft.AspNetCore.Components.Authorization;
 using OAS.Client.Common.Feedback.Services;
 using OAS.Client.Database.Services;
 using OAS.Client.Database.State;
+using OAS.Client.Features.Employees.Services;
 using OAS.Client.Identity.Services;
 using OAS.Client.Identity.State;
+using OAS.Client.Services.Browser;
 using OAS.Client.Services.Http;
 using OAS.UiLib.Extensions;
+
 
 namespace OAS.Client.Services;
 
@@ -27,6 +30,10 @@ public static class ClientServices
         services.AddScoped<IUserClientService, UserClientService>();
         services.AddScoped<OasAuthenticationStateProvider>();
         services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<OasAuthenticationStateProvider>());
+        services.AddScoped<IEmployeeClientService, EmployeeClientService>();
+        services.AddScoped<OasApiClient>();
+        services.AddScoped<BrowserFileDownloadService>();
+
         return services;
     }
 }

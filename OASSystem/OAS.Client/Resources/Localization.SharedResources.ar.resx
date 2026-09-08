@@ -342,4 +342,7 @@
   <data name="Login_DatabaseStatusCheckFailed" xml:space="preserve">
     <value>تم الوصول إلى قاعدة البيانات لكن تعذر فحص حالة التحديثات</value>
   </data>
+	<data name="employee_code_exists" xml:space="preserve">
+  <value>كود الموظف موجود مسبقًا، يرجى استخدام كود آخر.</value>
+</data>
 </root>

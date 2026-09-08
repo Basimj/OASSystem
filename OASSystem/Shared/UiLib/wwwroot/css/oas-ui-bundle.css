@@ -19,3 +19,4 @@
 
 /* Blazor CSS isolation output for all OAS.UiLib components */
 @import "../OAS.UiLib.bundle.scp.css";
+@import "./oas-main-shell.css";

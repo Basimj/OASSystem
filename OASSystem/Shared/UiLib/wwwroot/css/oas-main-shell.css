@@ -1,0 +1,892 @@
+﻿/* =========================================================
+   OAS MAIN SHELL
+   Compact ERP Layout
+   ========================================================= */
+
+:root {
+    --oas-purple: #5b21b6;
+    --oas-purple-dark: #581c87;
+    --oas-purple-light: #f3e8ff;
+    --oas-purple-hover: #faf5ff;
+    --oas-text: #374151;
+    --oas-text-dark: #1f2937;
+    --oas-text-muted: #6b7280;
+    --oas-border: #e5e7eb;
+    --oas-border-light: #f1f5f9;
+    --oas-white: #ffffff;
+    --oas-bg: #f8fafc;
+    /* Compact sizes */
+    --oas-sidebar-width: 119px;
+    --oas-sidebar-collapsed-width: 42px;
+    --oas-header-height: 36px;
+    --oas-transition: 0.2s ease;
+}
+
+
+/* =========================================================
+   MAIN SHELL
+   ========================================================= */
+
+.oas-shell {
+    min-height: 100vh;
+    width: 100%;
+    background: var(--oas-bg);
+    color: var(--oas-text);
+    direction: rtl;
+}
+
+
+/* =========================================================
+   TOP HEADER
+   ========================================================= */
+
+.oas-top-header {
+    position: fixed;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: var(--oas-header-height);
+    min-height: var(--oas-header-height);
+    display: flex;
+    align-items: center;
+    background: var(--oas-white);
+    border-bottom: 1px solid var(--oas-border);
+    z-index: 1100;
+    padding: 0 10px;
+}
+
+
+/* =========================================================
+   HEADER SYSTEM
+   ========================================================= */
+
+.oas-header-system {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+
+/* Hamburger intentionally hidden */
+
+.oas-header-menu-button {
+    display: none !important;
+}
+
+
+.oas-header-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+
+.oas-header-logo-mark {
+    width: 25px;
+    height: 25px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    background: var(--oas-purple);
+    color: var(--oas-white);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+}
+
+
+.oas-header-system-name {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    line-height: 1.05;
+}
+
+
+    .oas-header-system-name span {
+        color: var(--oas-text-dark);
+        font-size: 10px;
+        font-weight: 700;
+    }
+
+
+    .oas-header-system-name small {
+        margin-top: 2px;
+        color: var(--oas-text-muted);
+        font-size: 7px;
+        font-weight: 400;
+    }
+
+
+/* =========================================================
+   HEADER INFO
+   ========================================================= */
+
+.oas-header-info {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-right: auto;
+    margin-left: 10px;
+    height: 100%;
+}
+
+
+.oas-header-info-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+
+.oas-header-info-icon {
+    width: 17px;
+    height: 17px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--oas-text-muted);
+}
+
+
+    .oas-header-info-icon svg {
+        width: 15px;
+        height: 15px;
+    }
+
+
+.oas-header-info-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1;
+}
+
+
+    .oas-header-info-text small {
+        color: var(--oas-text-muted);
+        font-size: 6px;
+    }
+
+
+    .oas-header-info-text strong {
+        margin-top: 2px;
+        color: var(--oas-text-dark);
+        font-size: 8px;
+        font-weight: 600;
+    }
+
+
+.oas-header-divider {
+    width: 1px;
+    height: 17px;
+    background: var(--oas-border);
+}
+
+
+/* =========================================================
+   HEADER VERSION
+   ========================================================= */
+
+.oas-header-version {
+    color: var(--oas-text-muted);
+    font-size: 7px;
+    white-space: nowrap;
+}
+
+
+/* =========================================================
+   CONNECTION STATUS
+   ========================================================= */
+
+.oas-header-status {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #4b5563;
+    font-size: 7px;
+    white-space: nowrap;
+}
+
+
+.oas-status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #22c55e;
+}
+
+
+/* =========================================================
+   HEADER ICON BUTTONS
+   ========================================================= */
+
+.oas-header-icon-button {
+    position: relative;
+    width: 25px;
+    height: 25px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--oas-text-muted);
+    cursor: pointer;
+    transition: background var(--oas-transition), color var(--oas-transition);
+}
+
+
+    .oas-header-icon-button:hover {
+        background: var(--oas-purple-hover);
+        color: var(--oas-purple);
+    }
+
+
+    .oas-header-icon-button svg {
+        width: 14px;
+        height: 14px;
+    }
+
+
+.oas-notification-badge {
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    min-width: 11px;
+    height: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 2px;
+    border-radius: 10px;
+    background: var(--oas-purple);
+    color: var(--oas-white);
+    font-size: 6px;
+    font-weight: 700;
+}
+
+
+/* =========================================================
+   HEADER USER
+   ========================================================= */
+
+.oas-header-user {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+}
+
+
+.oas-user-details {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    line-height: 1;
+}
+
+
+    .oas-user-details strong {
+        color: var(--oas-text-dark);
+        font-size: 8px;
+        font-weight: 700;
+    }
+
+
+    .oas-user-details span {
+        margin-top: 2px;
+        color: var(--oas-text-muted);
+        font-size: 6px;
+    }
+
+
+.oas-user-avatar {
+    width: 25px;
+    height: 25px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--oas-purple-light);
+    color: var(--oas-purple);
+    font-size: 9px;
+    font-weight: 700;
+}
+
+
+.oas-user-dropdown {
+    width: 18px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--oas-text-muted);
+    cursor: pointer;
+}
+
+
+    .oas-user-dropdown svg {
+        width: 12px;
+        height: 12px;
+    }
+
+
+/* =========================================================
+   SIDEBAR
+   ========================================================= */
+
+.oas-sidebar {
+    position: fixed;
+    top: var(--oas-header-height);
+    right: 0;
+    bottom: 0;
+    width: var(--oas-sidebar-width);
+    display: flex;
+    flex-direction: column;
+    background: var(--oas-white);
+    border-left: 1px solid var(--oas-border);
+    z-index: 1000;
+    transition: width var(--oas-transition), transform var(--oas-transition);
+}
+
+
+/* =========================================================
+   SIDEBAR HEADER
+   ========================================================= */
+
+.oas-sidebar-header {
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 0 7px;
+    border-bottom: 1px solid var(--oas-border-light);
+}
+
+
+.oas-collapse-btn {
+    width: 25px;
+    height: 25px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--oas-text-muted);
+    cursor: pointer;
+    transition: background var(--oas-transition), color var(--oas-transition);
+}
+
+
+    .oas-collapse-btn:hover {
+        background: var(--oas-purple-hover);
+        color: var(--oas-purple);
+    }
+
+
+    .oas-collapse-btn svg {
+        width: 15px;
+        height: 15px;
+    }
+
+
+/* =========================================================
+   NAVIGATION
+   ========================================================= */
+
+.oas-nav {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 5px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+
+/* =========================================================
+   NAV ITEM
+   ========================================================= */
+
+.oas-nav-item {
+    position: relative;
+    min-height: 29px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 7px;
+    border-radius: 5px;
+    color: var(--oas-text);
+    text-decoration: none;
+    font-size: 8px;
+    font-weight: 500;
+    transition: background var(--oas-transition), color var(--oas-transition);
+}
+
+
+    .oas-nav-item:hover {
+        background: var(--oas-purple-hover);
+        color: var(--oas-purple);
+    }
+
+
+    .oas-nav-item.active {
+        background: var(--oas-purple);
+        color: var(--oas-white);
+    }
+
+
+        .oas-nav-item.active:hover {
+            background: var(--oas-purple-dark);
+            color: var(--oas-white);
+        }
+
+
+        /* Purple arrow on active item */
+
+        .oas-nav-item.active::before {
+            content: "";
+            position: absolute;
+            left: -5px;
+            top: 50%;
+            width: 0;
+            height: 0;
+            border-top: 5px solid transparent;
+            border-bottom: 5px solid transparent;
+            border-right: 5px solid var(--oas-purple);
+            transform: translateY(-50%);
+        }
+
+
+/* =========================================================
+   NAV ICON
+   ========================================================= */
+
+.oas-nav-icon {
+    width: 17px;
+    height: 17px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+
+    .oas-nav-icon svg {
+        width: 14px;
+        height: 14px;
+    }
+
+
+.oas-nav-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+
+/* =========================================================
+   SETTINGS
+   ========================================================= */
+
+.oas-settings-box {
+    width: 100%;
+}
+
+
+.oas-settings-toggle {
+    position: relative;
+    width: 100%;
+    min-height: 29px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 7px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--oas-text);
+    font-family: inherit;
+    font-size: 8px;
+    font-weight: 500;
+    text-align: right;
+    cursor: pointer;
+    transition: background var(--oas-transition), color var(--oas-transition);
+}
+
+
+    .oas-settings-toggle:hover {
+        background: var(--oas-purple-hover);
+        color: var(--oas-purple);
+    }
+
+
+.oas-settings-icon {
+    width: 17px;
+    height: 17px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+
+    .oas-settings-icon svg {
+        width: 14px;
+        height: 14px;
+    }
+
+
+.oas-settings-text {
+    flex: 1;
+    white-space: nowrap;
+}
+
+
+.oas-settings-arrow {
+    width: 13px;
+    height: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform var(--oas-transition);
+}
+
+
+    .oas-settings-arrow svg {
+        width: 11px;
+        height: 11px;
+    }
+
+
+    .oas-settings-arrow.open {
+        transform: rotate(180deg);
+    }
+
+
+/* =========================================================
+   SETTINGS ITEMS
+   ========================================================= */
+
+.oas-settings-items {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin-top: 1px;
+    padding: 0 2px 2px 2px;
+}
+
+
+.oas-settings-item {
+    position: relative;
+    min-height: 25px;
+    display: flex;
+    align-items: center;
+    padding: 3px 7px 3px 5px;
+    border-radius: 4px;
+    color: var(--oas-text-muted);
+    text-decoration: none;
+    font-size: 7px;
+    transition: background var(--oas-transition), color var(--oas-transition);
+}
+
+
+    .oas-settings-item:hover {
+        background: var(--oas-purple-hover);
+        color: var(--oas-purple);
+    }
+
+
+    .oas-settings-item.active {
+        background: var(--oas-purple-light);
+        color: var(--oas-purple);
+        font-weight: 700;
+    }
+
+
+        .oas-settings-item.active::before {
+            content: "";
+            position: absolute;
+            left: -2px;
+            top: 50%;
+            width: 3px;
+            height: 13px;
+            border-radius: 0 3px 3px 0;
+            background: var(--oas-purple);
+            transform: translateY(-50%);
+        }
+
+
+.oas-settings-item-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+
+/* =========================================================
+   SIDEBAR FOOTER
+   ========================================================= */
+
+.oas-sidebar-footer {
+    padding: 5px;
+    border-top: 1px solid var(--oas-border-light);
+}
+
+
+.oas-logout-btn {
+    width: 100%;
+    min-height: 29px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 7px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: #6b7280;
+    font-family: inherit;
+    font-size: 8px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background var(--oas-transition), color var(--oas-transition);
+}
+
+
+    .oas-logout-btn:hover {
+        background: #fef2f2;
+        color: #dc2626;
+    }
+
+
+.oas-logout-icon {
+    width: 17px;
+    height: 17px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+
+    .oas-logout-icon svg {
+        width: 14px;
+        height: 14px;
+    }
+
+
+.oas-logout-text {
+    white-space: nowrap;
+}
+
+
+/* =========================================================
+   MAIN CONTENT
+   ========================================================= */
+
+.oas-main-content {
+    min-height: 100vh;
+    margin-right: var(--oas-sidebar-width);
+    padding-top: var(--oas-header-height);
+    transition: margin-right var(--oas-transition);
+}
+
+
+.oas-main-inner {
+    min-height: calc(100vh - var(--oas-header-height));
+    padding: 14px;
+}
+
+
+/* =========================================================
+   COLLAPSED SIDEBAR
+   ========================================================= */
+
+.oas-shell.sidebar-collapsed .oas-sidebar {
+    width: var(--oas-sidebar-collapsed-width);
+}
+
+
+.oas-shell.sidebar-collapsed .oas-main-content {
+    margin-right: var(--oas-sidebar-collapsed-width);
+}
+
+
+.oas-shell.sidebar-collapsed .oas-nav-text,
+.oas-shell.sidebar-collapsed .oas-settings-text,
+.oas-shell.sidebar-collapsed .oas-settings-arrow,
+.oas-shell.sidebar-collapsed .oas-settings-items,
+.oas-shell.sidebar-collapsed .oas-logout-text {
+    display: none;
+}
+
+
+.oas-shell.sidebar-collapsed .oas-nav-item,
+.oas-shell.sidebar-collapsed .oas-settings-toggle,
+.oas-shell.sidebar-collapsed .oas-logout-btn {
+    justify-content: center;
+    padding-left: 4px;
+    padding-right: 4px;
+}
+
+
+.oas-shell.sidebar-collapsed .oas-settings-icon,
+.oas-shell.sidebar-collapsed .oas-nav-icon,
+.oas-shell.sidebar-collapsed .oas-logout-icon {
+    margin: 0;
+}
+
+
+.oas-shell.sidebar-collapsed .oas-sidebar-header {
+    justify-content: center;
+    padding: 0;
+}
+
+
+/* =========================================================
+   MOBILE OVERLAY
+   ========================================================= */
+
+.oas-mobile-overlay {
+    display: none;
+}
+
+
+/* =========================================================
+   SCROLLBAR
+   ========================================================= */
+
+.oas-nav::-webkit-scrollbar {
+    width: 3px;
+}
+
+
+.oas-nav::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+
+.oas-nav::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 10px;
+}
+
+
+    .oas-nav::-webkit-scrollbar-thumb:hover {
+        background: #9ca3af;
+    }
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 1100px) {
+
+    .oas-header-info {
+        gap: 4px;
+        margin-left: 5px;
+    }
+
+    .oas-header-version {
+        display: none;
+    }
+
+    .oas-header-info .oas-header-divider:nth-of-type(3) {
+        display: none;
+    }
+}
+
+
+@media (max-width: 850px) {
+
+    .oas-header-info-item:first-child,
+    .oas-header-info-item:first-child + .oas-header-divider {
+        display: none;
+    }
+
+    .oas-user-details {
+        display: none;
+    }
+}
+
+
+@media (max-width: 700px) {
+
+    .oas-sidebar {
+        width: 119px;
+        transform: translateX(100%);
+    }
+
+    .oas-shell.mobile-menu-open .oas-sidebar {
+        transform: translateX(0);
+    }
+
+    .oas-main-content {
+        margin-right: 0;
+    }
+
+    .oas-shell.sidebar-collapsed .oas-main-content {
+        margin-right: 0;
+    }
+
+    .oas-shell.mobile-menu-open .oas-mobile-overlay {
+        display: block;
+        position: fixed;
+        top: var(--oas-header-height);
+        right: 0;
+        bottom: 0;
+        left: 0;
+        background: rgba(0, 0, 0, 0.15);
+        z-index: 900;
+    }
+
+    .oas-main-inner {
+        padding: 10px;
+    }
+}
+
+
+/* =========================================================
+   ACCESSIBILITY
+   ========================================================= */
+
+.oas-nav-item:focus-visible,
+.oas-settings-toggle:focus-visible,
+.oas-settings-item:focus-visible,
+.oas-logout-btn:focus-visible,
+.oas-collapse-btn:focus-visible,
+.oas-header-icon-button:focus-visible,
+.oas-user-dropdown:focus-visible {
+    outline: 2px solid var(--oas-purple);
+    outline-offset: 1px;
+}
+
+
+/* =========================================================
+   REDUCED MOTION
+   ========================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+
+    .oas-sidebar,
+    .oas-main-content,
+    .oas-settings-arrow,
+    .oas-nav-item,
+    .oas-settings-toggle,
+    .oas-settings-item,
+    .oas-logout-btn,
+    .oas-header-icon-button {
+        transition: none;
+    }
+}

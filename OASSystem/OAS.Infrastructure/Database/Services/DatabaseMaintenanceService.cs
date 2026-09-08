@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using OAS.Contracts.Database;
 using OAS.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace OAS.Infrastructure.Database.Services;
 
@@ -184,7 +185,12 @@ public sealed class DatabaseMaintenanceService(DatabaseProfileCatalog catalog, I
     {
         var options = new DbContextOptionsBuilder<OasDbContext>()
             .UseSqlServer(connectionString)
+            .ConfigureWarnings(warnings =>
+            {
+                warnings.Ignore(RelationalEventId.PendingModelChangesWarning);
+            })
             .Options;
+
         return new OasDbContext(options);
     }
 

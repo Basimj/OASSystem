@@ -1,0 +1,354 @@
+﻿<div class="employee-card"
+     dir="rtl"
+     @onclick="HandleCardClick">
+
+    <div class="employee-card-layout">
+
+        <!-- =====================================================
+             بيانات الموظف - الجهة اليسرى
+             ===================================================== -->
+        <div class="employee-main">
+
+            <div class="employee-code-row"
+                 @onclick:stopPropagation="true">
+
+                <div class="employee-menu-wrapper">
+
+                    <button type="button"
+                            class="employee-actions"
+                            aria-label="إجراءات الموظف"
+                            title="إجراءات"
+                            @onclick="ToggleMenu">
+
+                        <svg viewBox="0 0 24 24"
+                             fill="currentColor"
+                             aria-hidden="true">
+
+                            <circle cx="12" cy="5" r="1.7" />
+                            <circle cx="12" cy="12" r="1.7" />
+                            <circle cx="12" cy="19" r="1.7" />
+
+                        </svg>
+
+                    </button>
+
+                    @if (_showMenu)
+                    {
+                        <div class="employee-menu">
+
+                            <!-- حذف -->
+                            <button type="button"
+                                    class="employee-menu-item employee-menu-danger"
+                                    @onclick="DeleteNotImplemented">
+
+                                <svg viewBox="0 0 24 24"
+                                     fill="none"
+                                     stroke="currentColor"
+                                     stroke-width="1.8"
+                                     stroke-linecap="round"
+                                     stroke-linejoin="round"
+                                     aria-hidden="true">
+
+                                    <path d="M4 7h16" />
+                                    <path d="M10 11v6" />
+                                    <path d="M14 11v6" />
+                                    <path d="M6 7l1 13h10l1-13" />
+                                    <path d="M9 7V4h6v3" />
+
+                                </svg>
+
+                                <span>حذف</span>
+
+                            </button>
+
+
+                            <!-- تعطيل / تفعيل -->
+                            <button type="button"
+                                    class="employee-menu-item"
+                                    @onclick="HandleToggleStatus">
+
+                                @if (IsActive)
+                                {
+                                    <svg viewBox="0 0 24 24"
+                                         fill="none"
+                                         stroke="currentColor"
+                                         stroke-width="1.8"
+                                         stroke-linecap="round"
+                                         stroke-linejoin="round"
+                                         aria-hidden="true">
+
+                                        <rect x="5"
+                                              y="4"
+                                              width="14"
+                                              height="16"
+                                              rx="2" />
+
+                                        <path d="M10 9v6" />
+                                        <path d="M14 9v6" />
+
+                                    </svg>
+
+                                    <span>تعطيل</span>
+                                }
+                                else
+                                {
+                                    <svg viewBox="0 0 24 24"
+                                         fill="none"
+                                         stroke="currentColor"
+                                         stroke-width="1.8"
+                                         stroke-linecap="round"
+                                         stroke-linejoin="round"
+                                         aria-hidden="true">
+
+                                        <rect x="5"
+                                              y="4"
+                                              width="14"
+                                              height="16"
+                                              rx="2" />
+
+                                        <path d="M10 9l5 3-5 3z" />
+
+                                    </svg>
+
+                                    <span>تفعيل</span>
+                                }
+
+                            </button>
+
+
+                            <!-- طباعة -->
+                            <button type="button"
+                                    class="employee-menu-item"
+                                    @onclick="PrintNotImplemented">
+
+                                <svg viewBox="0 0 24 24"
+                                     fill="none"
+                                     stroke="currentColor"
+                                     stroke-width="1.8"
+                                     stroke-linecap="round"
+                                     stroke-linejoin="round"
+                                     aria-hidden="true">
+
+                                    <path d="M7 8V4h10v4" />
+
+                                    <rect x="4"
+                                          y="8"
+                                          width="16"
+                                          height="9"
+                                          rx="2" />
+
+                                    <path d="M7 17v3h10v-3" />
+
+                                    <path d="M17 11h.01" />
+
+                                </svg>
+
+                                <span>طباعة</span>
+
+                            </button>
+
+                        </div>
+                    }
+
+                </div>
+
+
+                <div class="employee-code">
+                    @EmployeeCode
+                </div>
+
+            </div>
+
+
+            <div class="employee-info">
+
+                <h3 class="employee-name">
+                    @Name
+                </h3>
+
+
+                <div class="employee-job-title">
+                    @(string.IsNullOrWhiteSpace(JobTitle)
+                                        ? "غير محدد"
+                                        : JobTitle)
+                </div>
+
+
+                <div class="employee-phone">
+
+                    <svg viewBox="0 0 24 24"
+                         fill="none"
+                         stroke="currentColor"
+                         stroke-width="1.8"
+                         stroke-linecap="round"
+                         stroke-linejoin="round"
+                         aria-hidden="true">
+
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2
+                                 19.79 19.79 0 0 1-8.63-3.07
+                                 19.5 19.5 0 0 1-6-6
+                                 19.79 19.79 0 0 1-3.07-8.67
+                                 A2 2 0 0 1 4.11 2h3
+                                 a2 2 0 0 1 2 1.72
+                                 12.84 12.84 0 0 0 .7 2.81
+                                 2 2 0 0 1-.45 2.11L8.09 9.91
+                                 a16 16 0 0 0 6 6l1.27-1.27
+                                 a2 2 0 0 1 2.11-.45
+                                 12.84 12.84 0 0 0 2.81.7
+                                 A2 2 0 0 1 22 16.92z" />
+
+                    </svg>
+
+                    <span>
+                        @(string.IsNullOrWhiteSpace(Phone)
+                                                ? "غير محدد"
+                                                : Phone)
+                    </span>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- =====================================================
+             الحالة والصفات - الجهة اليمنى
+             ===================================================== -->
+        <div class="employee-status-column">
+
+            <!-- الحالة -->
+            <div class="employee-status @(IsActive
+                                 ? "is-active"
+                                 : "is-inactive")">
+
+                <span>
+                    @(IsActive ? "نشط" : "غير نشط")
+                </span>
+
+                <!-- النقطة بعد كلمة نشط -->
+                <span class="employee-status-dot"></span>
+
+            </div>
+
+
+            <!-- الصفات -->
+            <div class="employee-badges">
+
+                @if (IsSalesperson)
+                {
+                    <span class="employee-badge employee-badge-purple">
+                        مبيعات
+                    </span>
+                }
+
+
+                @if (IsTechnician)
+                {
+                    <span class="employee-badge employee-badge-purple">
+                        فني
+                    </span>
+                }
+
+
+                @if (IsCommissionEligible)
+                {
+                    <span class="employee-badge employee-badge-green">
+                        عمولة
+                    </span>
+                }
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+@code {
+
+    [Parameter]
+    public string? EmployeeCode { get; set; }
+
+
+    [Parameter]
+    public string? Name { get; set; }
+
+
+    [Parameter]
+    public string? JobTitle { get; set; }
+
+
+    [Parameter]
+    public string? Phone { get; set; }
+
+
+    [Parameter]
+    public bool IsActive { get; set; }
+
+
+    [Parameter]
+    public bool IsSalesperson { get; set; }
+
+
+    [Parameter]
+    public bool IsTechnician { get; set; }
+
+
+    [Parameter]
+    public bool IsCommissionEligible { get; set; }
+
+
+    [Parameter]
+    public EventCallback OnEdit { get; set; }
+
+
+    [Parameter]
+    public EventCallback OnToggleStatus { get; set; }
+
+
+    private bool _showMenu;
+
+
+    private async Task HandleCardClick()
+    {
+        _showMenu = false;
+
+        if (OnEdit.HasDelegate)
+        {
+            await OnEdit.InvokeAsync();
+        }
+    }
+
+
+    private void ToggleMenu()
+    {
+        _showMenu = !_showMenu;
+    }
+
+
+    private async Task HandleToggleStatus()
+    {
+        _showMenu = false;
+
+        if (OnToggleStatus.HasDelegate)
+        {
+            await OnToggleStatus.InvokeAsync();
+        }
+    }
+
+
+    private void DeleteNotImplemented()
+    {
+        _showMenu = false;
+    }
+
+
+    private void PrintNotImplemented()
+    {
+        _showMenu = false;
+    }
+
+}

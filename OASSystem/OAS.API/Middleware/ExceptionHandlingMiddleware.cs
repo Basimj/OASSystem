@@ -4,6 +4,7 @@ using OAS.Application.Identity.Exceptions;
 using OAS.Contracts.Common.Errors;
 using OAS.Domain.Exceptions;
 
+
 namespace OAS.API.Middleware;
 
 public sealed class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger)
@@ -50,6 +51,7 @@ public sealed class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Ex
         RequestValidationException validation => (400, "validation_failed", validation.Message, validation.Errors),
         AuthenticationFailedException => (401, "identity_invalid_credentials", "Authentication failed.", EmptyErrors),
         IdentityConflictException conflict => (409, conflict.Code, "Identity request conflicts with existing data.", EmptyErrors),
+        ConflictException conflict =>(409, conflict.Code, conflict.Message, EmptyErrors),
         NotFoundException => (404, "not_found", ex.Message, EmptyErrors),
         ForbiddenException => (403, "forbidden", ex.Message, EmptyErrors),
         ConcurrencyException => (409, "concurrency_conflict", ex.Message, EmptyErrors),

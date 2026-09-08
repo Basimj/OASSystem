@@ -1,0 +1,1155 @@
+﻿
+@page "/employees"
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Web
+@using OAS.Client.Common.Feedback.Services
+@using OAS.Client.Features.Employees.Components
+@using OAS.Client.Features.Employees.Services
+@using OAS.Client.Services.Browser
+@using OAS.Client.Services.Http
+@using OAS.Contracts.Common.Pagination
+@using OAS.Contracts.Features.Employees
+@using OAS.UiLib.Components.Buttons
+@using OAS.UiLib.Components.Inputs
+@using OAS.UiLib.Components.Surfaces
+@using OAS.UiLib.Core.Enums
+@using OAS.UiLib.Services.Dialogs
+
+@attribute [Authorize(Roles = "Administrator")]
+
+@inject IEmployeeClientService EmployeeService
+@inject IUiDialogService Dialog
+@inject IUiSnackbarService Snackbar
+@inject IApiFeedbackService ApiFeedback
+@inject NavigationManager Navigation
+@inject BrowserFileDownloadService BrowserFileDownload
+
+<PageTitle>الموظفون</PageTitle>
+
+<div class="employees-page" dir="rtl">
+
+    <!-- =========================
+         HEADER
+         ========================= -->
+    <div class="employees-header">
+
+        <div class="employees-header-info">
+
+            <div class="employees-title-row">
+
+                <div class="employees-title-icon">
+                    <i class="fa-solid fa-users"></i>
+                </div>
+
+                <div>
+
+                    <h1>الموظفون</h1>
+
+                    <p>
+                        إدارة الموظفين وبياناتهم وحالاتهم التشغيلية.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="employees-header-actions">
+
+            <UiButton Text="إضافة موظف"
+                      Variant="ButtonVariant.Primary"
+                      AdditionalCssClass="employee-add-button"
+                      OnClick="OpenCreatePage">
+            </UiButton>
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================
+         SEARCH / FILTER / EXCEL
+         ========================= -->
+    <div class="employees-toolbar">
+
+        <!-- Search -->
+        <div class="employees-search-wrapper">
+
+            <UiInputText Id="employee-search"
+                         Placeholder="ابحث برقم الموظف أو الاسم أو الهاتف أو الوظيفة..."
+                         @bind-Value="_searchText"
+                         @onkeydown="HandleSearchKeyDown" />
+
+            <button type="button"
+                    class="employees-search-button"
+                    @onclick="SearchAsync">
+
+                <i class="fa-solid fa-magnifying-glass"></i>
+
+                بحث
+
+            </button>
+
+            @if (!string.IsNullOrWhiteSpace(_searchText))
+            {
+                <button type="button"
+                        class="employees-clear-search"
+                        @onclick="ClearSearchAsync">
+
+                    <i class="fa-solid fa-xmark"></i>
+
+                    مسح
+
+                </button>
+            }
+
+        </div>
+
+
+        <!-- Filters -->
+        <div class="employees-filter-wrapper">
+
+            <button type="button"
+                    class="employees-filter-button"
+                    @onclick="ToggleFilterMenu">
+
+                <i class="fa-solid fa-filter"></i>
+
+                <span>
+                    @GetFilterTitle()
+                </span>
+
+                <i class="fa-solid fa-chevron-down"></i>
+
+            </button>
+
+            @if (_filterMenuOpen)
+            {
+                <div class="employees-filter-menu">
+
+                    <button type="button"
+                            class="@GetFilterClass(EmployeeFilter.All)"
+                            @onclick="() => SetFilter(EmployeeFilter.All)">
+                        جميع الموظفين
+                    </button>
+
+                    <button type="button"
+                            class="@GetFilterClass(EmployeeFilter.Active)"
+                            @onclick="() => SetFilter(EmployeeFilter.Active)">
+                        الموظفون النشطون
+                    </button>
+
+                    <button type="button"
+                            class="@GetFilterClass(EmployeeFilter.Inactive)"
+                            @onclick="() => SetFilter(EmployeeFilter.Inactive)">
+                        الموظفون غير النشطين
+                    </button>
+
+                    <button type="button"
+                            class="@GetFilterClass(EmployeeFilter.Sales)"
+                            @onclick="() => SetFilter(EmployeeFilter.Sales)">
+                        موظفو المبيعات
+                    </button>
+
+                    <button type="button"
+                            class="@GetFilterClass(EmployeeFilter.Technician)"
+                            @onclick="() => SetFilter(EmployeeFilter.Technician)">
+                        الفنيون
+                    </button>
+
+                    <button type="button"
+                            class="@GetFilterClass(EmployeeFilter.Commission)"
+                            @onclick="() => SetFilter(EmployeeFilter.Commission)">
+                        المستحقون للعمولة
+                    </button>
+
+                </div>
+            }
+
+        </div>
+
+
+        <!-- Excel -->
+        <div class="employees-excel-actions">
+
+            <!-- Import -->
+            <button type="button"
+                    class="employees-excel-button employees-import-button"
+                    @onclick="OpenImportDialog">
+
+                <i class="fa-solid fa-file-import"></i>
+
+                <span>
+                    استيراد Excel
+                </span>
+
+            </button>
+
+
+            <!-- Export -->
+            <button type="button"
+                    class="employees-excel-button employees-export-button"
+                    @onclick="OpenExportDialog">
+
+                <i class="fa-solid fa-file-export"></i>
+
+                <span>
+                    تصدير Excel
+                </span>
+
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================
+         LOADING
+         ========================= -->
+    @if (_isLoading)
+    {
+        <div class="employees-loading">
+
+            <div class="employees-spinner"></div>
+
+            <span>
+                جاري تحميل الموظفين...
+            </span>
+
+        </div>
+    }
+    else
+    {
+        var visibleEmployees = GetVisibleEmployees().ToList();
+
+        <!-- =========================
+             EMPTY
+             ========================= -->
+        @if (visibleEmployees.Count == 0)
+        {
+            <div class="employees-empty">
+
+                <div class="employees-empty-icon">
+
+                    <i class="fa-solid fa-users-slash"></i>
+
+                </div>
+
+                <h3>
+                    لا توجد نتائج
+                </h3>
+
+                <p>
+                    لم يتم العثور على موظفين مطابقين للبحث أو الفلتر الحالي.
+                </p>
+
+            </div>
+        }
+        else
+        {
+            <!-- =========================
+                 EMPLOYEE CARDS
+                 ========================= -->
+            <div class="employees-grid">
+
+                @foreach (var employee in visibleEmployees)
+                {
+                    <EmployeeCard EmployeeCode="@employee.EmployeeCode"
+                                  Name="@employee.DisplayName"
+                                  JobTitle="@employee.JobTitle"
+                                  Phone="@employee.Phone"
+                                  IsActive="@employee.IsActive"
+                                  IsSalesperson="@employee.IsSalesperson"
+                                  IsTechnician="@employee.IsTechnician"
+                                  IsCommissionEligible="@employee.IsCommissionEligible"
+                                  OnEdit="@(() => OpenEditPage(employee.Id))"
+                                  OnToggleStatus="@(() => ChangeStatusAsync(employee, !employee.IsActive))" />
+                }
+
+            </div>
+        }
+
+
+        <!-- =========================
+             PAGINATION
+             ========================= -->
+        @if (_page.TotalPages > 0)
+        {
+            <div class="employees-pagination">
+
+                <div class="employees-pagination-summary">
+
+                    عرض
+
+                    <strong>
+                        @GetFirstItemNumber()
+                    </strong>
+
+                    -
+
+                    <strong>
+                        @GetLastItemNumber()
+                    </strong>
+
+                    من
+
+                    <strong>
+                        @_page.TotalCount
+                    </strong>
+
+                    موظف
+
+                </div>
+
+                <div class="employees-pagination-controls">
+
+                    <button type="button"
+                            class="employees-page-button"
+                            disabled="@(!_page.HasPreviousPage)"
+                            @onclick="PreviousPageAsync">
+
+                        <i class="fa-solid fa-chevron-right"></i>
+
+                        السابق
+
+                    </button>
+
+                    <div class="employees-page-number">
+
+                        صفحة @_page.PageNumber
+                        من
+                        @_page.TotalPages
+
+                    </div>
+
+                    <button type="button"
+                            class="employees-page-button"
+                            disabled="@(!_page.HasNextPage)"
+                            @onclick="NextPageAsync">
+
+                        التالي
+
+                        <i class="fa-solid fa-chevron-left"></i>
+
+                    </button>
+
+                </div>
+
+            </div>
+        }
+
+    }
+
+
+    <!-- =========================
+         IMPORT MENU
+         ========================= -->
+    @if (_importMenuOpen)
+    {
+        <div class="employees-import-overlay">
+
+            <div class="employees-import-backdrop"
+                 @onclick="CloseImportDialog">
+            </div>
+
+            <div class="employees-import-modal employees-import-choice-modal">
+
+                <!-- Header -->
+                <div class="employees-export-modal-header">
+
+                    <div class="employees-export-modal-title">
+
+                        <div class="employees-export-modal-icon">
+
+                            <i class="fa-solid fa-file-import"></i>
+
+                        </div>
+
+                        <div>
+
+                            <h2>
+                                استيراد الموظفين
+                            </h2>
+
+                            <p>
+                                اختر طريقة إدخال بيانات الموظفين.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+                    <button type="button"
+                            class="employees-export-modal-close"
+                            @onclick="CloseImportDialog">
+
+                        <i class="fa-solid fa-xmark"></i>
+
+                    </button>
+
+                </div>
+
+
+                <div class="employees-export-modal-content">
+
+                    <!-- Internal Entry -->
+                    <button type="button"
+                            class="employees-export-option"
+                            @onclick="OpenEmployeeEntry">
+
+                        <span class="employees-export-option-icon employees-export-option-icon-entry">
+
+                            <i class="fa-solid fa-table"></i>
+
+                        </span>
+
+                        <span class="employees-export-option-content">
+
+                            <strong>
+                                إدخال البيانات داخل النظام
+                            </strong>
+
+                            <span>
+                                إدخال عدة موظفين مباشرة في جدول شبيه بـ Excel مع التحقق من البيانات قبل الحفظ.
+                            </span>
+
+                        </span>
+
+                        <i class="fa-solid fa-chevron-left employees-export-option-arrow"></i>
+
+                    </button>
+
+
+                    <!-- Excel Import -->
+                    <button type="button"
+                            class="employees-export-option"
+                            @onclick="OpenExcelImportDialog">
+
+                        <span class="employees-export-option-icon employees-export-option-icon-main">
+
+                            <i class="fa-solid fa-file-excel"></i>
+
+                        </span>
+
+                        <span class="employees-export-option-content">
+
+                            <strong>
+                                استيراد من ملف Excel
+                            </strong>
+
+                            <span>
+                                اختر ملف Excel يحتوي على بيانات الموظفين للتحقق منها واستيرادها.
+                            </span>
+
+                        </span>
+
+                        <i class="fa-solid fa-chevron-left employees-export-option-arrow"></i>
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+    }
+
+
+    <!-- =========================
+         EXCEL IMPORT DIALOG
+         ========================= -->
+    @if (_importDialogOpen)
+    {
+        <div class="employees-import-overlay">
+
+            <div class="employees-import-backdrop"
+                 @onclick="CloseExcelImportDialog">
+            </div>
+
+            <div class="employees-import-modal">
+
+                <EmployeeImportDialog OnClose="RefreshAfterImport" />
+
+            </div>
+
+        </div>
+    }
+
+
+    <!-- =========================
+         EMPLOYEE BULK ENTRY
+         ========================= -->
+    @if (_employeeEntryOpen)
+    {
+        <div class="employees-import-overlay">
+
+            <div class="employees-import-backdrop"
+                 @onclick="CloseEmployeeEntry">
+            </div>
+
+            <div class="employees-import-modal employee-bulk-entry-modal">
+
+                <EmployeeBulkEntry OnClose="CloseEmployeeEntry" />
+
+            </div>
+
+        </div>
+    }
+
+
+    <!-- =========================
+         EXPORT DIALOG
+         ========================= -->
+    @if (_exportDialogOpen)
+    {
+        <div class="employees-export-overlay">
+
+            <div class="employees-export-backdrop"
+                 @onclick="CloseExportDialog">
+            </div>
+
+            <div class="employees-export-modal">
+
+                <!-- Header -->
+                <div class="employees-export-modal-header">
+
+                    <div class="employees-export-modal-title">
+
+                        <div class="employees-export-modal-icon">
+
+                            <i class="fa-solid fa-file-excel"></i>
+
+                        </div>
+
+                        <div>
+
+                            <h2>
+                                تصدير Excel
+                            </h2>
+
+                            <p>
+                                اختر العملية التي تريد تنفيذها.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+                    <button type="button"
+                            class="employees-export-modal-close"
+                            @onclick="CloseExportDialog">
+
+                        <i class="fa-solid fa-xmark"></i>
+
+                    </button>
+
+                </div>
+
+
+                <!-- Export Options -->
+                <div class="employees-export-modal-content">
+
+                    <!-- Export Employees -->
+                    <button type="button"
+                            class="employees-export-option"
+                            @onclick="ExportEmployeesAsync">
+
+                        <span class="employees-export-option-icon employees-export-option-icon-main">
+
+                            <i class="fa-solid fa-download"></i>
+
+                        </span>
+
+                        <span class="employees-export-option-content">
+
+                            <strong>
+                                تصدير الموظفين
+                            </strong>
+
+                            <span>
+                                تنزيل بيانات الموظفين الحالية في ملف Excel.
+                            </span>
+
+                        </span>
+
+                        <i class="fa-solid fa-chevron-left employees-export-option-arrow"></i>
+
+                    </button>
+
+
+                    <!-- Template -->
+                    <button type="button"
+                            class="employees-export-option"
+                            @onclick="DownloadEmployeeTemplateAsync">
+
+                        <span class="employees-export-option-icon employees-export-option-icon-template">
+
+                            <i class="fa-solid fa-file-circle-plus"></i>
+
+                        </span>
+
+                        <span class="employees-export-option-content">
+
+                            <strong>
+                                تنزيل قالب Excel
+                            </strong>
+
+                            <span>
+                                قالب جاهز لإدخال بيانات الموظفين واستيرادها.
+                            </span>
+
+                        </span>
+
+                        <i class="fa-solid fa-chevron-left employees-export-option-arrow"></i>
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+    }
+
+</div>
+
+
+@code {
+
+    private const int PageSize = 12;
+
+    private PagedResult<EmployeeDto> _page = new();
+
+    private string? _searchText;
+
+    private string? _appliedSearch;
+
+    private bool _isLoading;
+
+    private bool _filterMenuOpen;
+
+    // Import states
+    private bool _importMenuOpen;
+
+    private bool _importDialogOpen;
+
+    private bool _employeeEntryOpen;
+
+    // Export state
+    private bool _exportDialogOpen;
+
+    private int _pageNumber = 1;
+
+    private EmployeeFilter _filter = EmployeeFilter.All;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEmployeesAsync();
+    }
+
+
+    private async Task LoadEmployeesAsync()
+    {
+        if (_isLoading)
+            return;
+
+        _isLoading = true;
+
+        try
+        {
+            var request =
+                new PageRequest
+                {
+                    PageNumber = _pageNumber,
+                    PageSize = PageSize,
+                    Search = _appliedSearch,
+                    SortBy = "EmployeeCode",
+                    SortDirection = SortDirection.Ascending
+                };
+
+            _page =
+                await EmployeeService.GetPageAsync(
+                    request);
+
+            if (_page.PageNumber != _pageNumber)
+            {
+                _pageNumber = _page.PageNumber;
+            }
+        }
+        catch (ApiClientException ex)
+        {
+            ApiFeedback.Show(ex.Error);
+        }
+        catch
+        {
+            ApiFeedback.ShowUnexpected();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+
+    // =========================================================
+    // Search
+    // =========================================================
+
+    private async Task SearchAsync()
+    {
+        _appliedSearch =
+            string.IsNullOrWhiteSpace(_searchText)
+                ? null
+                : _searchText.Trim();
+
+        _pageNumber = 1;
+
+        await LoadEmployeesAsync();
+    }
+
+
+    private async Task ClearSearchAsync()
+    {
+        _searchText = string.Empty;
+
+        _appliedSearch = null;
+
+        _pageNumber = 1;
+
+        await LoadEmployeesAsync();
+    }
+
+
+    private async Task HandleSearchKeyDown(
+        KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            await SearchAsync();
+        }
+    }
+
+
+    // =========================================================
+    // Pagination
+    // =========================================================
+
+    private async Task PreviousPageAsync()
+    {
+        if (!_page.HasPreviousPage)
+            return;
+
+        _pageNumber--;
+
+        await LoadEmployeesAsync();
+    }
+
+
+    private async Task NextPageAsync()
+    {
+        if (!_page.HasNextPage)
+            return;
+
+        _pageNumber++;
+
+        await LoadEmployeesAsync();
+    }
+
+
+    // =========================================================
+    // Navigation
+    // =========================================================
+
+    private void OpenCreatePage(
+        MouseEventArgs _)
+    {
+        Navigation.NavigateTo(
+            "/employees/new");
+    }
+
+
+    private void OpenEditPage(
+        Guid employeeId)
+    {
+        Navigation.NavigateTo(
+            $"/employees/edit/{employeeId}");
+    }
+
+
+    // =========================================================
+    // Status
+    // =========================================================
+
+    private async Task ChangeStatusAsync(
+        EmployeeDto employee,
+        bool isActive)
+    {
+        var title =
+            isActive
+                ? "تفعيل الموظف"
+                : "تعطيل الموظف";
+
+        var message =
+            isActive
+                ? $"هل تريد تفعيل الموظف «{employee.DisplayName}»؟"
+                : $"هل تريد تعطيل الموظف «{employee.DisplayName}»؟";
+
+        var confirmText =
+            isActive
+                ? "تفعيل"
+                : "تعطيل";
+
+        var confirmed =
+            await Dialog.ConfirmAsync(
+                title,
+                message,
+                AlertTone.Warning,
+                confirmText,
+                "إلغاء");
+
+        if (!confirmed)
+            return;
+
+        try
+        {
+            var request =
+                new SetEmployeeStatusRequest(
+                    IsActive: isActive,
+                    RowVersion: employee.RowVersion);
+
+            var result =
+                await EmployeeService.SetStatusAsync(
+                    employee.Id,
+                    request);
+
+            if (!result.Succeeded)
+            {
+                if (result.Error is not null)
+                {
+                    ApiFeedback.Show(result.Error);
+                }
+                else
+                {
+                    ApiFeedback.ShowUnexpected();
+                }
+
+                return;
+            }
+
+            Snackbar.Success(
+                isActive
+                    ? "تم تفعيل الموظف بنجاح."
+                    : "تم تعطيل الموظف بنجاح.");
+
+            await LoadEmployeesAsync();
+        }
+        catch (ApiClientException ex)
+        {
+            ApiFeedback.Show(ex.Error);
+        }
+        catch
+        {
+            ApiFeedback.ShowUnexpected();
+        }
+    }
+
+
+    // =========================================================
+    // Filters
+    // =========================================================
+
+    private IEnumerable<EmployeeDto>
+        GetVisibleEmployees()
+    {
+        return _filter switch
+        {
+            EmployeeFilter.Active =>
+                _page.Items.Where(
+                    x => x.IsActive),
+
+            EmployeeFilter.Inactive =>
+                _page.Items.Where(
+                    x => !x.IsActive),
+
+            EmployeeFilter.Sales =>
+                _page.Items.Where(
+                    x => x.IsSalesperson),
+
+            EmployeeFilter.Technician =>
+                _page.Items.Where(
+                    x => x.IsTechnician),
+
+            EmployeeFilter.Commission =>
+                _page.Items.Where(
+                    x => x.IsCommissionEligible),
+
+            _ =>
+                _page.Items
+        };
+    }
+
+
+    private void ToggleFilterMenu()
+    {
+        _filterMenuOpen =
+            !_filterMenuOpen;
+    }
+
+
+    private void SetFilter(
+        EmployeeFilter filter)
+    {
+        _filter = filter;
+
+        _filterMenuOpen = false;
+    }
+
+
+    private string GetFilterTitle()
+    {
+        return _filter switch
+        {
+            EmployeeFilter.Active =>
+                "الموظفون النشطون",
+
+            EmployeeFilter.Inactive =>
+                "الموظفون غير النشطون",
+
+            EmployeeFilter.Sales =>
+                "موظفو المبيعات",
+
+            EmployeeFilter.Technician =>
+                "الفنيون",
+
+            EmployeeFilter.Commission =>
+                "المستحقون للعمولة",
+
+            _ =>
+                "جميع الموظفين"
+        };
+    }
+
+
+    private string GetFilterClass(
+        EmployeeFilter filter)
+    {
+        return _filter == filter
+            ? "employees-filter-option-active"
+            : string.Empty;
+    }
+
+
+    // =========================================================
+    // IMPORT
+    // =========================================================
+
+    private void OpenImportDialog()
+    {
+        _exportDialogOpen = false;
+        _employeeEntryOpen = false;
+        _importDialogOpen = false;
+
+        _importMenuOpen = true;
+    }
+
+
+    private void CloseImportDialog()
+    {
+        _importMenuOpen = false;
+    }
+
+
+    private void OpenExcelImportDialog()
+    {
+        _importMenuOpen = false;
+        _employeeEntryOpen = false;
+
+        _importDialogOpen = true;
+    }
+
+
+    private void CloseExcelImportDialog()
+    {
+        _importDialogOpen = false;
+    }
+
+
+    private void OpenEmployeeEntry()
+    {
+        _importMenuOpen = false;
+        _importDialogOpen = false;
+        _exportDialogOpen = false;
+
+        _employeeEntryOpen = true;
+    }
+
+
+    private void CloseEmployeeEntry()
+    {
+        _employeeEntryOpen = false;
+    }
+
+
+    private async Task RefreshAfterImport()
+    {
+        _importDialogOpen = false;
+
+        _pageNumber = 1;
+
+        await LoadEmployeesAsync();
+    }
+
+
+    // =========================================================
+    // EXPORT
+    // =========================================================
+
+    private void OpenExportDialog()
+    {
+        _importMenuOpen = false;
+        _importDialogOpen = false;
+        _employeeEntryOpen = false;
+
+        _exportDialogOpen = true;
+    }
+
+
+    private void CloseExportDialog()
+    {
+        _exportDialogOpen = false;
+    }
+
+
+    private async Task ExportEmployeesAsync()
+    {
+        _exportDialogOpen = false;
+
+        try
+        {
+            Snackbar.Info(
+                "جاري تجهيز ملف Excel للموظفين...");
+
+            var file =
+                await EmployeeService.ExportAsync();
+
+            var saved =
+                await BrowserFileDownload.SaveAsync(
+                    file,
+                    "Employees.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+
+            if (saved)
+            {
+                Snackbar.Success(
+                    "تم حفظ ملف الموظفين بنجاح.");
+            }
+            else
+            {
+                Snackbar.Info(
+                    "تم إلغاء عملية حفظ ملف الموظفين.");
+            }
+        }
+        catch (ApiClientException ex)
+        {
+            ApiFeedback.Show(ex.Error);
+        }
+        catch (HttpRequestException)
+        {
+            Snackbar.Error(
+                "تعذر الاتصال بالخادم لتصدير الموظفين.");
+        }
+        catch
+        {
+            Snackbar.Error(
+                "حدث خطأ أثناء تصدير الموظفين.");
+        }
+    }
+
+
+    private async Task DownloadEmployeeTemplateAsync()
+    {
+        _exportDialogOpen = false;
+
+        try
+        {
+            Snackbar.Info(
+                "جاري تجهيز قالب Excel...");
+
+            var file =
+                await EmployeeService.DownloadTemplateAsync();
+
+            var saved =
+                await BrowserFileDownload.SaveAsync(
+                    file,
+                    "Employees_Template.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+
+            if (saved)
+            {
+                Snackbar.Success(
+                    "تم حفظ قالب Excel بنجاح.");
+            }
+            else
+            {
+                Snackbar.Info(
+                    "تم إلغاء عملية حفظ قالب Excel.");
+            }
+        }
+        catch (ApiClientException ex)
+        {
+            ApiFeedback.Show(ex.Error);
+        }
+        catch (HttpRequestException)
+        {
+            Snackbar.Error(
+                "تعذر الاتصال بالخادم لتنزيل قالب Excel.");
+        }
+        catch
+        {
+            Snackbar.Error(
+                "حدث خطأ أثناء حفظ قالب Excel.");
+        }
+    }
+
+
+    // =========================================================
+    // Helpers
+    // =========================================================
+
+    private int GetFirstItemNumber()
+    {
+        if (_page.TotalCount == 0)
+            return 0;
+
+        return
+            ((_page.PageNumber - 1)
+             * _page.PageSize)
+            + 1;
+    }
+
+
+    private long GetLastItemNumber()
+    {
+        return Math.Min(
+            (long)_page.PageNumber
+            * _page.PageSize,
+            _page.TotalCount);
+    }
+
+
+    private enum EmployeeFilter
+    {
+        All,
+        Active,
+        Inactive,
+        Sales,
+        Technician,
+        Commission
+    }
+}
+
