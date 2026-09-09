@@ -613,4 +613,7 @@
   <data name="Users_RolesEmpty" xml:space="preserve">
     <value>No roles are configured.</value>
   </data>
+  <data name="Users_Edit" xml:space="preserve">
+    <value>Edit</value>
+  </data>
 </root>

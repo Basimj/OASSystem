@@ -44,6 +44,12 @@ public sealed class UserClientService(OasApiClient apiClient) : IUserClientServi
     public Task<ApiCallResult<UserDetailsDto>> UnlockUserAsync(Guid id, UnlockUserRequest request, CancellationToken cancellationToken = default) =>
         apiClient.PostResultAsync<UnlockUserRequest, UserDetailsDto>($"{Endpoint}/{id}/unlock", request, cancellationToken);
 
+    public Task<ApiCallResult<bool>> UploadProfileImageAsync(Guid id, Stream stream, string fileName, string contentType, CancellationToken cancellationToken = default) =>
+        apiClient.UploadFilePutResultAsync($"{Endpoint}/{id}/profile-image", stream, fileName, contentType, cancellationToken);
+
+    public Task<ApiCallResult<bool>> RemoveProfileImageAsync(Guid id, CancellationToken cancellationToken = default) =>
+        apiClient.DeleteResultAsync($"{Endpoint}/{id}/profile-image", cancellationToken);
+
     private static string BuildQuery(PageRequest request, bool? isActive, Guid? roleId)
     {
         var normalized = request.Normalize();

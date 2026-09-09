@@ -1,0 +1,18 @@
+<section class="ui-data-grid-panel">
+    <header class="ui-data-grid-panel__toolbar">
+        <div class="ui-data-grid-panel__title">
+            <strong>@Title</strong>
+            @if (!string.IsNullOrWhiteSpace(Subtitle)) { <span>@Subtitle</span> }
+        </div>
+        <div class="ui-data-grid-panel__tools">@Toolbar</div>
+    </header>
+    @if (Header is not null)
+    {
+        <div class="ui-data-grid-panel__header">@Header</div>
+    }
+    <div class="ui-data-grid-panel__body">@Body</div>
+    @if (Footer is not null)
+    {
+        <footer class="ui-data-grid-panel__footer">@Footer</footer>
+    }
+</section>

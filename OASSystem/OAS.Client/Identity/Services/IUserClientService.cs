@@ -20,4 +20,6 @@ public interface IUserClientService
     Task<ApiCallResult<UserDetailsDto>> SetUserRolesAsync(Guid id, SetUserRolesRequest request, CancellationToken cancellationToken = default);
     Task<ApiCallResult<ResetUserPasswordResultDto>> ResetUserPasswordAsync(Guid id, ResetUserPasswordRequest request, CancellationToken cancellationToken = default);
     Task<ApiCallResult<UserDetailsDto>> UnlockUserAsync(Guid id, UnlockUserRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<bool>> UploadProfileImageAsync(Guid id, Stream stream, string fileName, string contentType, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<bool>> RemoveProfileImageAsync(Guid id, CancellationToken cancellationToken = default);
 }

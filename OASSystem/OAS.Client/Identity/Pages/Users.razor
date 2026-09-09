@@ -3,123 +3,148 @@
 
 <PageTitle>@L["Users_Title"]</PageTitle>
 
-<UiWorkspaceLayout ShowAside="@(Workspace.ActiveUserTab is not null)" ShowFilters="true">
+<UiWorkspaceLayout ShowAside="true" ShowFilters="false">
     <Actions>
         <UiWorkspaceActionBar>
-            @if (Workspace.ActiveUserTab is null)
+            @if (Workspace.Mode is UserEditorMode.Create or UserEditorMode.Edit)
+            {
+                <UiButton Text="@L["Users_Save"]" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small" Loading="_saving" OnClick="SaveAsync" />
+                <UiButton Text="@L["Users_SaveClose"]" IconCssClass="fa-solid fa-check" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="_saving" OnClick="SaveAndCloseAsync" />
+                <UiButton Text="@L["Users_Revert"]" IconCssClass="fa-solid fa-rotate-left" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Disabled="@(!Workspace.IsDirty)" OnClick="RevertAsync" />
+            }
+            else
             {
                 <UiButton Text="@L["Users_New"]" IconCssClass="fa-solid fa-user-plus" Size="ControlSize.Small" OnClick="OpenNewAsync" />
+                @if (Workspace.SelectedUserId.HasValue)
+                {
+                    <UiButton Text="@L["Users_Edit"]" IconCssClass="fa-solid fa-pen" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="BeginEditAsync" />
+                    <UiButton Text="@L["Users_ResetPassword"]" IconCssClass="fa-solid fa-key" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="ResetPasswordAsync" />
+                    @if (Workspace.Editor.Details is { } details)
+                    {
+                        <UiButton Text="@(details.IsActive ? L["Users_Deactivate"] : L["Users_Activate"])" IconCssClass="fa-solid fa-power-off" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="ToggleStatusAsync" />
+                        @if (details.IsLocked)
+                        {
+                            <UiButton Text="@L["Users_Unlock"]" IconCssClass="fa-solid fa-lock-open" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="UnlockAsync" />
+                        }
+                    }
+                }
                 <UiButton Text="@L["Users_Refresh"]" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Loading="_loading" OnClick="RefreshAsync" />
                 <UiButton Text="@L["Users_Export"]" IconCssClass="fa-solid fa-download" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="_exporting" Loading="_exporting" OnClick="ExportUsersAsync" />
                 <UiButton Text="@L["Users_RolesPermissions"]" IconCssClass="fa-solid fa-shield-halved" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="ShowRolesOverviewAsync" />
             }
-            else
-            {
-                <UiButton Text="@L["Users_Save"]" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small" Loading="_saving" OnClick="SaveAsync" />
-                <UiButton Text="@L["Users_SaveClose"]" IconCssClass="fa-solid fa-check" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="_saving" OnClick="SaveAndCloseAsync" />
-                <UiButton Text="@L["Users_Revert"]" IconCssClass="fa-solid fa-rotate-left" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Disabled="@(!Workspace.ActiveUserTab.IsDirty)" OnClick="RevertAsync" />
-                <UiButton Text="@L["Users_New"]" IconCssClass="fa-solid fa-user-plus" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="OpenNewAsync" />
-                @if (!Workspace.ActiveUserTab.IsNew && Workspace.ActiveUserTab.Editor.Details is not null)
-                {
-                    <UiButton Text="@L["Users_ResetPassword"]" IconCssClass="fa-solid fa-key" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="ResetPasswordAsync" />
-                    <UiButton Text="@(Workspace.ActiveUserTab.Editor.Details.IsActive ? L["Users_Deactivate"] : L["Users_Activate"])" IconCssClass="fa-solid fa-power-off" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="ToggleStatusAsync" />
-                    @if (Workspace.ActiveUserTab.Editor.Details.IsLocked)
-                    {
-                        <UiButton Text="@L["Users_Unlock"]" IconCssClass="fa-solid fa-lock-open" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="UnlockAsync" />
-                    }
-                    <UiButton Text="@L["Users_Refresh"]" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="RefreshActiveAsync" />
-                }
-            }
+
+            <UiSearchInput @bind-Value="Workspace.Search"
+                           Placeholder="@L["Users_Search"]"
+                           AriaLabel="@L["Users_Search"]"
+                           ClearText="@L["Users_ResetFilters"]"
+                           DebounceMilliseconds="300"
+                           OnSearch="SearchChangedAsync" />
         </UiWorkspaceActionBar>
     </Actions>
 
-    <Tabs>
-        <UiWorkspaceTabStrip Tabs="@WorkspaceTabs" OnSelect="ActivateTabAsync" OnClose="CloseTabAsync" />
-    </Tabs>
-
-    <Filters>
-        <UiWorkspaceFilterBar>
-            <UiInputText @bind-Value="_search" Label="@L["Users_Search"]" Placeholder="@L["Users_Search"]" Size="ControlSize.Small" />
-            <UiSelect @bind-Value="_statusFilter" Label="@L["Users_Status"]" Options="@StatusFilterOptions" OnValueChanged="ApplyFiltersAsync" Size="ControlSize.Small" />
-            <UiSelect @bind-Value="_roleFilter" Label="@L["Users_Role"]" Placeholder="@L["Users_AllRoles"]" Options="@RoleFilterOptions" OnValueChanged="ApplyFiltersAsync" Size="ControlSize.Small" />
-            <UiButton Text="@L["Users_Search"]" IconCssClass="fa-solid fa-magnifying-glass" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="SearchAsync" />
-            <UiButton Text="@L["Users_ResetFilters"]" IconCssClass="fa-solid fa-arrow-rotate-left" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="ResetFiltersAsync" />
-        </UiWorkspaceFilterBar>
-    </Filters>
-
     <Content>
-        <UiCard Title="@L["Users_All"]" Subtitle="@string.Format(L["Users_TotalFormat"], _page.TotalCount)">
-            @if (_loading)
-            {
-                <UiAlert Message="@L["Loading"]" />
-            }
-            else if (_page.Items.Count == 0)
-            {
-                <UiAlert Message="@L["Users_Empty"]" />
-            }
-            else
-            {
+        <UiDataGridPanel Title="@L["Users_All"]" Subtitle="@string.Format(L["Users_TotalFormat"], _page.TotalCount)">
+            <Toolbar>
+                <UiSelect Value="@Workspace.StatusFilter"
+                          Options="@StatusFilterOptions"
+                          ValueChanged="StatusFilterChangedAsync"
+                          Size="ControlSize.Small" />
+                <UiSelect Value="@Workspace.RoleFilter"
+                          Placeholder="@L["Users_AllRoles"]"
+                          Options="@RoleFilterOptions"
+                          ValueChanged="RoleFilterChangedAsync"
+                          Size="ControlSize.Small" />
+                <UiButton IconCssClass="fa-solid fa-arrow-rotate-left"
+                          Variant="ButtonVariant.Ghost"
+                          Size="ControlSize.Small"
+                          OnClick="ResetFiltersAsync"
+                          title="@L["Users_ResetFilters"]" />
+            </Toolbar>
+            <Header>
                 <UiRecordListHeader Primary="@L["Users_Name"]"
                                     Column1="@L["Users_Email"]"
                                     Column2="@L["Users_Role"]"
                                     Column3="@L["Users_LastLogin"]"
                                     Trailing="@L["Users_Status"]" />
-                @foreach (var user in _page.Items)
+            </Header>
+            <Body>
+                @if (_loading)
                 {
-                    <UiRecordRow Title="@user.DisplayName"
-                                 Subtitle="@user.UserName"
-                                 Selected="@(Workspace.ActiveUserTab?.UserId == user.Id)"
-                                 OnClick="@(() => OpenUserAsync(user))">
-                        <Leading><UiAvatar Initials="@GetInitials(user.DisplayName)" /></Leading>
-                        <Content>
-                            <UiGrid Columns="3">
-                                <UiTextLabel Text="@(user.Email ?? "—")" Size="ControlSize.Small" Tone="TextTone.Muted" />
-                                <UiTextLabel Text="@FormatRoles(user.Roles)" Size="ControlSize.Small" Tone="TextTone.Muted" />
-                                <UiTextLabel Text="@FormatDate(user.LastLoginAtUtc)" Size="ControlSize.Small" Tone="TextTone.Muted" />
-                            </UiGrid>
-                        </Content>
-                        <Trailing>
-                            @if (user.IsLocked)
-                            {
-                                <UiBadge Text="@L["Users_Locked"]" Tone="AlertTone.Danger" />
-                            }
-                            @if (user.MustChangePassword)
-                            {
-                                <UiBadge Text="@L["Users_PasswordSetupRequired"]" Tone="AlertTone.Warning" />
-                            }
-                            <UiBadge Text="@(user.IsActive ? L["Users_Active"] : L["Users_Inactive"])" Tone="@(user.IsActive ? AlertTone.Success : AlertTone.Danger)" />
-                        </Trailing>
-                    </UiRecordRow>
+                    <UiAlert Message="@L["Loading"]" />
                 }
-            }
-            <UiPagination PageNumber="@_page.PageNumber" TotalPages="@_page.TotalPages" TotalCount="@_page.TotalCount" OnPrevious="PreviousPageAsync" OnNext="NextPageAsync" />
-        </UiCard>
+                else if (_page.Items.Count == 0)
+                {
+                    <UiAlert Message="@L["Users_Empty"]" />
+                }
+                else
+                {
+                    @foreach (var user in _page.Items)
+                    {
+                        <UiRecordRow Title="@user.DisplayName"
+                                     Subtitle="@user.UserName"
+                                     Selected="@(Workspace.SelectedUserId == user.Id)"
+                                     OnClick="@(() => SelectUserAsync(user))">
+                            <Leading>
+                                <UiAvatar Initials="@GetInitials(user.DisplayName)" ImageUrl="@GetUserImageUrl(user.Id)" AltText="@user.DisplayName" />
+                            </Leading>
+                            <Content>
+                                <UiGrid Columns="3">
+                                    <UiTextLabel Text="@(user.Email ?? "—")" Size="ControlSize.Small" Tone="TextTone.Muted" />
+                                    <UiTextLabel Text="@FormatRoles(user.Roles)" Size="ControlSize.Small" Tone="TextTone.Muted" />
+                                    <UiTextLabel Text="@FormatDate(user.LastLoginAtUtc)" Size="ControlSize.Small" Tone="TextTone.Muted" />
+                                </UiGrid>
+                            </Content>
+                            <Trailing>
+                                @if (user.IsLocked)
+                                {
+                                    <UiBadge Text="@L["Users_Locked"]" Tone="AlertTone.Danger" />
+                                }
+                                @if (user.MustChangePassword)
+                                {
+                                    <UiBadge Text="@L["Users_PasswordSetupRequired"]" Tone="AlertTone.Warning" />
+                                }
+                                <UiBadge Text="@(user.IsActive ? L["Users_Active"] : L["Users_Inactive"])" Tone="@(user.IsActive ? AlertTone.Success : AlertTone.Danger)" />
+                            </Trailing>
+                        </UiRecordRow>
+                    }
+                }
+            </Body>
+            <Footer>
+                <UiPagination PageNumber="@_page.PageNumber" TotalPages="@_page.TotalPages" TotalCount="@_page.TotalCount" OnPrevious="PreviousPageAsync" OnNext="NextPageAsync" />
+            </Footer>
+        </UiDataGridPanel>
     </Content>
 
     <Aside>
-        @if (Workspace.ActiveUserTab is not null)
-        {
-            <UiStackLayout Gap="StackGap.Small">
-                <UiCard Title="@L["Users_Details"]">
-                    @if (Workspace.ActiveUserTab.IsLoading)
-                    {
-                        <UiAlert Message="@L["Loading"]" />
-                    }
-                    else
-                    {
-                        <UiDetailsHeader Initials="@GetInitials(Workspace.ActiveUserTab.Title)"
-                                         Title="@Workspace.ActiveUserTab.Title"
-                                         Subtitle="@GetActiveUserSubtitle()"
-                                         StatusText="@GetActiveUserStatusText()"
-                                         StatusTone="@GetActiveUserStatusTone()" />
-                    }
-                </UiCard>
-
-                @if (!Workspace.ActiveUserTab.IsLoading)
+        <UiStackLayout Gap="StackGap.Small">
+            <UiCard Title="@L["Users_Details"]">
+                @if (Workspace.IsLoading)
                 {
-                    <UserEditor State="@Workspace.ActiveUserTab.Editor" Roles="@_roles" IsActorSuperAdmin="@(AuthState.CurrentUser?.IsSuperAdmin == true)" />
+                    <UiAlert Message="@L["Loading"]" />
                 }
-            </UiStackLayout>
-        }
+                else if (Workspace.Mode == UserEditorMode.Empty)
+                {
+                    <UiDetailsHeader Initials="" Title="@L["Users_Details"]" Subtitle="@L["Users_Empty"]" />
+                }
+                else
+                {
+                    <UiDetailsHeader Initials="@GetInitials(EditorTitle)"
+                                     ImageUrl="@SelectedImageUrl"
+                                     Title="@EditorTitle"
+                                     Subtitle="@GetEditorSubtitle()"
+                                     StatusText="@GetEditorStatusText()"
+                                     StatusTone="@GetEditorStatusTone()" />
+                }
+            </UiCard>
+
+            <UserEditor @ref="_editorComponent"
+                        State="@Workspace.Editor"
+                        Mode="@Workspace.Mode"
+                        Roles="@_roles"
+                        IsActorSuperAdmin="@(AuthState.CurrentUser?.IsSuperAdmin == true)"
+                        ImageUrl="@SelectedImageUrl"
+                        OnImageSelected="UserImageSelectedAsync"
+                        OnImageRemoved="UserImageRemovedAsync" />
+        </UiStackLayout>
     </Aside>
 </UiWorkspaceLayout>

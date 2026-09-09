@@ -7,6 +7,7 @@
 @using OAS.Client.Common.Feedback.Services
 @using OAS.Client.Features.Employees.Components
 @using OAS.Client.Features.Employees.Services
+@using OAS.Client.Features.Employees.Workspace
 @using OAS.Client.Services.Browser
 @using OAS.Client.Services.Http
 @using OAS.Contracts.Common.Pagination
@@ -20,6 +21,7 @@
 @attribute [Authorize(Roles = "Administrator")]
 
 @inject IEmployeeClientService EmployeeService
+@inject IEmployeesWorkspaceState Workspace
 @inject IUiDialogService Dialog
 @inject IUiSnackbarService Snackbar
 @inject IApiFeedbackService ApiFeedback
@@ -131,38 +133,38 @@
                 <UiElement Tag="div" class="employees-filter-menu">
 
                     <UiElement Tag="button" type="button"
-                            class="@GetFilterClass(EmployeeFilter.All)"
-                            OnClick="() => SetFilter(EmployeeFilter.All)">
+                            class="@GetFilterClass(EmployeeListFilter.All)"
+                            OnClick="() => SetFilter(EmployeeListFilter.All)">
                         جميع الموظفين
                     </UiElement>
 
                     <UiElement Tag="button" type="button"
-                            class="@GetFilterClass(EmployeeFilter.Active)"
-                            OnClick="() => SetFilter(EmployeeFilter.Active)">
+                            class="@GetFilterClass(EmployeeListFilter.Active)"
+                            OnClick="() => SetFilter(EmployeeListFilter.Active)">
                         الموظفون النشطون
                     </UiElement>
 
                     <UiElement Tag="button" type="button"
-                            class="@GetFilterClass(EmployeeFilter.Inactive)"
-                            OnClick="() => SetFilter(EmployeeFilter.Inactive)">
+                            class="@GetFilterClass(EmployeeListFilter.Inactive)"
+                            OnClick="() => SetFilter(EmployeeListFilter.Inactive)">
                         الموظفون غير النشطين
                     </UiElement>
 
                     <UiElement Tag="button" type="button"
-                            class="@GetFilterClass(EmployeeFilter.Sales)"
-                            OnClick="() => SetFilter(EmployeeFilter.Sales)">
+                            class="@GetFilterClass(EmployeeListFilter.Sales)"
+                            OnClick="() => SetFilter(EmployeeListFilter.Sales)">
                         موظفو المبيعات
                     </UiElement>
 
                     <UiElement Tag="button" type="button"
-                            class="@GetFilterClass(EmployeeFilter.Technician)"
-                            OnClick="() => SetFilter(EmployeeFilter.Technician)">
+                            class="@GetFilterClass(EmployeeListFilter.Technician)"
+                            OnClick="() => SetFilter(EmployeeListFilter.Technician)">
                         الفنيون
                     </UiElement>
 
                     <UiElement Tag="button" type="button"
-                            class="@GetFilterClass(EmployeeFilter.Commission)"
-                            OnClick="() => SetFilter(EmployeeFilter.Commission)">
+                            class="@GetFilterClass(EmployeeListFilter.Commission)"
+                            OnClick="() => SetFilter(EmployeeListFilter.Commission)">
                         المستحقون للعمولة
                     </UiElement>
 
@@ -622,11 +624,23 @@
 
     private const int PageSize = 12;
 
-    private PagedResult<EmployeeDto> _page = new();
+    private PagedResult<EmployeeDto> _page
+    {
+        get => Workspace.Page;
+        set => Workspace.Page = value;
+    }
 
-    private string? _searchText;
+    private string? _searchText
+    {
+        get => Workspace.SearchText;
+        set => Workspace.SearchText = value;
+    }
 
-    private string? _appliedSearch;
+    private string? _appliedSearch
+    {
+        get => Workspace.AppliedSearch;
+        set => Workspace.AppliedSearch = value;
+    }
 
     private bool _isLoading;
 
@@ -642,14 +656,27 @@
     // Export state
     private bool _exportDialogOpen;
 
-    private int _pageNumber = 1;
+    private int _pageNumber
+    {
+        get => Workspace.PageNumber;
+        set => Workspace.PageNumber = value;
+    }
 
-    private EmployeeFilter _filter = EmployeeFilter.All;
+    private EmployeeListFilter _filter
+    {
+        get => Workspace.Filter;
+        set => Workspace.Filter = value;
+    }
 
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadEmployeesAsync();
+        // Reaching the list is an explicit exit from the editor route. Keep list
+        // filters/page cached, but discard any stale editor draft left by a closed tab.
+        Workspace.Editor.Clear();
+
+        if (!Workspace.HasLoadedPage)
+            await LoadEmployeesAsync();
     }
 
 
@@ -680,6 +707,8 @@
             {
                 _pageNumber = _page.PageNumber;
             }
+
+            Workspace.HasLoadedPage = true;
         }
         catch (ApiClientException ex)
         {
@@ -868,23 +897,23 @@
     {
         return _filter switch
         {
-            EmployeeFilter.Active =>
+            EmployeeListFilter.Active =>
                 _page.Items.Where(
                     x => x.IsActive),
 
-            EmployeeFilter.Inactive =>
+            EmployeeListFilter.Inactive =>
                 _page.Items.Where(
                     x => !x.IsActive),
 
-            EmployeeFilter.Sales =>
+            EmployeeListFilter.Sales =>
                 _page.Items.Where(
                     x => x.IsSalesperson),
 
-            EmployeeFilter.Technician =>
+            EmployeeListFilter.Technician =>
                 _page.Items.Where(
                     x => x.IsTechnician),
 
-            EmployeeFilter.Commission =>
+            EmployeeListFilter.Commission =>
                 _page.Items.Where(
                     x => x.IsCommissionEligible),
 
@@ -902,7 +931,7 @@
 
 
     private void SetFilter(
-        EmployeeFilter filter)
+        EmployeeListFilter filter)
     {
         _filter = filter;
 
@@ -914,19 +943,19 @@
     {
         return _filter switch
         {
-            EmployeeFilter.Active =>
+            EmployeeListFilter.Active =>
                 "الموظفون النشطون",
 
-            EmployeeFilter.Inactive =>
+            EmployeeListFilter.Inactive =>
                 "الموظفون غير النشطون",
 
-            EmployeeFilter.Sales =>
+            EmployeeListFilter.Sales =>
                 "موظفو المبيعات",
 
-            EmployeeFilter.Technician =>
+            EmployeeListFilter.Technician =>
                 "الفنيون",
 
-            EmployeeFilter.Commission =>
+            EmployeeListFilter.Commission =>
                 "المستحقون للعمولة",
 
             _ =>
@@ -936,7 +965,7 @@
 
 
     private string GetFilterClass(
-        EmployeeFilter filter)
+        EmployeeListFilter filter)
     {
         return _filter == filter
             ? "employees-filter-option-active"
@@ -1142,14 +1171,5 @@
     }
 
 
-    private enum EmployeeFilter
-    {
-        All,
-        Active,
-        Inactive,
-        Sales,
-        Technician,
-        Commission
     }
-}
 

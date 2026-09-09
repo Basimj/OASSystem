@@ -56,6 +56,15 @@ public sealed class UserAccount : AuditableEntity<Guid>
         NormalizedEmail = Email is null ? null : Normalize(Email);
     }
 
+    public void UpdatePersonalName(string firstName, string lastName)
+    {
+        if (string.IsNullOrWhiteSpace(firstName)) throw new DomainException("First name is required.");
+        if (string.IsNullOrWhiteSpace(lastName)) throw new DomainException("Last name is required.");
+
+        FirstName = firstName.Trim();
+        LastName = lastName.Trim();
+    }
+
     public void SetPasswordHash(string passwordHash)
     {
         if (string.IsNullOrWhiteSpace(passwordHash)) throw new DomainException("Password hash is required.");

@@ -1,74 +1,66 @@
+using OAS.Contracts.Identity.Users;
+
 namespace OAS.Client.Identity.Users.Workspace;
 
 public sealed class UsersWorkspaceState : IUsersWorkspaceState
 {
-    private readonly List<UserWorkspaceTab> _tabs = [];
-    private int _newDraftCounter;
+    public Guid? SelectedUserId { get; private set; }
+    public string? SelectedTitle { get; private set; }
+    public UserEditorMode Mode { get; private set; } = UserEditorMode.Empty;
+    public UserEditorState Editor { get; } = new();
+    public bool IsLoading { get; set; }
+    public bool IsDirty => Editor.IsDirty;
+    public string? Search { get; set; }
+    public string StatusFilter { get; set; } = "all";
+    public string? RoleFilter { get; set; }
+    public int PageNumber { get; set; } = 1;
 
-    public Guid AllUsersTabId => Guid.Empty;
-    public Guid ActiveTabId { get; private set; } = Guid.Empty;
-    public IReadOnlyList<UserWorkspaceTab> UserTabs => _tabs;
-    public UserWorkspaceTab? ActiveUserTab => ActiveTabId == AllUsersTabId ? null : Find(ActiveTabId);
-
-    public void Activate(Guid workspaceTabId)
+    public void BeginCreate(IEnumerable<Guid>? defaultRoles = null)
     {
-        if (workspaceTabId == AllUsersTabId || _tabs.Any(x => x.WorkspaceTabId == workspaceTabId))
-            ActiveTabId = workspaceTabId;
+        SelectedUserId = null;
+        SelectedTitle = null;
+        Mode = UserEditorMode.Create;
+        Editor.InitializeNew(defaultRoles);
+        IsLoading = false;
     }
 
-    public UserWorkspaceTab OpenNew(string title, IEnumerable<Guid>? defaultRoles = null)
+    public void BeginEdit()
     {
-        _newDraftCounter++;
-        var editor = new UserEditorState(true);
-        editor.InitializeNew(defaultRoles);
-        var tab = new UserWorkspaceTab
-        {
-            WorkspaceTabId = Guid.NewGuid(),
-            UserId = null,
-            Title = $"{title} {_newDraftCounter}",
-            IsNew = true,
-            Editor = editor
-        };
-        _tabs.Add(tab);
-        ActiveTabId = tab.WorkspaceTabId;
-        return tab;
+        if (SelectedUserId.HasValue && Editor.Details is not null) Mode = UserEditorMode.Edit;
     }
 
-    public UserWorkspaceTab OpenExisting(Guid userId, string title)
+    public void SelectExisting(Guid userId, string title)
     {
-        var existing = FindByUserId(userId);
-        if (existing is not null)
-        {
-            ActiveTabId = existing.WorkspaceTabId;
-            return existing;
-        }
-
-        var tab = new UserWorkspaceTab
-        {
-            WorkspaceTabId = Guid.NewGuid(),
-            UserId = userId,
-            Title = title,
-            IsNew = false,
-            Editor = new UserEditorState(false),
-            IsLoading = true
-        };
-        _tabs.Add(tab);
-        ActiveTabId = tab.WorkspaceTabId;
-        return tab;
+        SelectedUserId = userId;
+        SelectedTitle = title;
+        Mode = UserEditorMode.View;
+        IsLoading = true;
     }
 
-    public UserWorkspaceTab? FindByUserId(Guid userId) => _tabs.FirstOrDefault(x => x.UserId == userId);
-    public UserWorkspaceTab? Find(Guid workspaceTabId) => _tabs.FirstOrDefault(x => x.WorkspaceTabId == workspaceTabId);
-
-    public void Close(Guid workspaceTabId)
+    public void LoadDetails(UserDetailsDto details)
     {
-        var tab = Find(workspaceTabId);
-        if (tab is null) return;
-        var index = _tabs.IndexOf(tab);
-        _tabs.Remove(tab);
-        if (ActiveTabId != workspaceTabId) return;
-        ActiveTabId = _tabs.Count == 0
-            ? AllUsersTabId
-            : _tabs[Math.Clamp(index - 1, 0, _tabs.Count - 1)].WorkspaceTabId;
+        SelectedUserId = details.Id;
+        SelectedTitle = string.IsNullOrWhiteSpace(details.DisplayName) ? details.UserName : details.DisplayName;
+        Editor.Load(details);
+        Mode = UserEditorMode.View;
+        IsLoading = false;
+    }
+
+    public void ReturnToView()
+    {
+        if (SelectedUserId.HasValue && Editor.Details is not null) Mode = UserEditorMode.View;
+        else Mode = UserEditorMode.Empty;
+    }
+
+    public void ClearSelection()
+    {
+        SelectedUserId = null; SelectedTitle = null; Mode = UserEditorMode.Empty; IsLoading = false;
+        Editor.Clear();
+    }
+
+    public void Revert()
+    {
+        Editor.Revert();
+        Mode = SelectedUserId.HasValue ? UserEditorMode.View : UserEditorMode.Create;
     }
 }

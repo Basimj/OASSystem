@@ -1,43 +1,16 @@
-<div class="oas-top-header">
+<div class="oas-top-header" @onclick="CloseAccountMenu">
+    <UiSystemBrand Name="@SystemName" LogoUrl="@SystemLogoUrl" />
+
     <div class="oas-header-system-meta" aria-label="معلومات النظام">
-        <div class="oas-system-name">
-            <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
-            <span>@SystemName</span>
-        </div>
-
+        <div class="oas-header-meta-item" title="الوقت"><i class="fa-regular fa-clock" aria-hidden="true"></i><span>@CurrentTimeText</span></div>
         <span class="oas-header-meta-separator" aria-hidden="true"></span>
-
-        <div class="oas-header-meta-item" title="الوقت">
-            <i class="fa-regular fa-clock" aria-hidden="true"></i>
-            <span>@CurrentTimeText</span>
-        </div>
-
+        <div class="oas-header-meta-item" title="التاريخ"><i class="fa-regular fa-calendar" aria-hidden="true"></i><span>@CurrentDateText</span></div>
         <span class="oas-header-meta-separator" aria-hidden="true"></span>
-
-        <div class="oas-header-meta-item" title="التاريخ">
-            <i class="fa-regular fa-calendar" aria-hidden="true"></i>
-            <span>@CurrentDateText</span>
-        </div>
-
+        <div class="oas-header-meta-item oas-header-connection" title="حالة الاتصال"><span class="oas-connection-dot" aria-hidden="true"></span><span>@ConnectionStatus</span></div>
         <span class="oas-header-meta-separator" aria-hidden="true"></span>
-
-        <div class="oas-header-meta-item oas-header-connection" title="حالة الاتصال">
-            <span class="oas-connection-dot" aria-hidden="true"></span>
-            <span>@ConnectionStatus</span>
-        </div>
-
+        <div class="oas-header-meta-item" title="قاعدة البيانات"><i class="fa-solid fa-database" aria-hidden="true"></i><span>@DatabaseName</span></div>
         <span class="oas-header-meta-separator" aria-hidden="true"></span>
-
-        <div class="oas-header-meta-item" title="قاعدة البيانات">
-            <i class="fa-solid fa-database" aria-hidden="true"></i>
-            <span>@DatabaseName</span>
-        </div>
-
-        <span class="oas-header-meta-separator" aria-hidden="true"></span>
-
-        <div class="oas-header-meta-item" title="الإصدار">
-            <span>إصدار @VersionText</span>
-        </div>
+        <div class="oas-header-meta-item" title="الإصدار"><span>إصدار @VersionText</span></div>
     </div>
 
     <div class="oas-header-spacer"></div>
@@ -47,22 +20,24 @@
             <i class="fa-regular fa-bell" aria-hidden="true"></i>
             <span class="oas-notification-badge">3</span>
         </button>
-
-        <button type="button" class="oas-header-icon-button" title="الإعدادات" aria-label="الإعدادات" @onclick="OpenSettings">
-            <i class="fa-solid fa-gear" aria-hidden="true"></i>
-        </button>
     </div>
 
-    <div class="oas-header-user">
-        <div class="oas-user-avatar" aria-hidden="true">@UserInitial</div>
-
-        <div class="oas-user-details">
-            <strong>@UserName</strong>
-            <span>@UserJobTitle</span>
-        </div>
-
-        <button type="button" class="oas-user-dropdown" aria-label="قائمة المستخدم" title="قائمة المستخدم">
-            <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+    <div class="oas-header-user-wrap">
+        <button type="button" class="oas-header-user" aria-expanded="@_accountMenuOpen" @onclick="ToggleAccountMenu" @onclick:stopPropagation="true">
+            <UiAvatar Initials="@UserInitials" ImageUrl="@UserImageUrl" AltText="@UserDisplayName" Size="32" />
+            <span class="oas-user-details"><strong>@UserDisplayName</strong><small>@UserName</small></span>
+            <i class="oas-user-chevron fa-solid fa-chevron-down" aria-hidden="true"></i>
         </button>
+
+        <UiAccountMenu Visible="@_accountMenuOpen"
+                       DisplayName="@UserDisplayName"
+                       UserName="@UserName"
+                       Email="@UserEmail"
+                       Initials="@UserInitials"
+                       ImageUrl="@UserImageUrl"
+                       OnEditProfile="EditProfileAsync"
+                       OnSettings="SettingsAsync"
+                       OnSupport="SupportAsync"
+                       OnLogout="LogoutAsync" />
     </div>
 </div>

@@ -567,4 +567,7 @@
   <data name="Users_RolesEmpty" xml:space="preserve">
     <value>لا توجد أدوار معرفة في النظام.</value>
   </data>
+  <data name="Users_Edit" xml:space="preserve">
+    <value>تعديل</value>
+  </data>
 </root>

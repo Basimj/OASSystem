@@ -20,6 +20,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ICurrentUser, HttpCurrentUser>();
         services.AddScoped<IPermissionChecker, ClaimsPermissionChecker>();
         services.AddScoped<IDatabaseProfileSelection, HttpDatabaseProfileSelection>();
+        services.AddScoped<IIdentityCookieSessionService, IdentityCookieSessionService>();
 
         services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
             .AddCookie(options =>

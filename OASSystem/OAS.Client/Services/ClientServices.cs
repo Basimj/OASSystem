@@ -3,6 +3,7 @@ using OAS.Client.Common.Feedback.Services;
 using OAS.Client.Database.Services;
 using OAS.Client.Database.State;
 using OAS.Client.Features.Employees.Services;
+using OAS.Client.Features.Employees.Workspace;
 using OAS.Client.Identity.Services;
 using OAS.Client.Identity.State;
 using OAS.Client.Identity.Users.Workspace;
@@ -29,10 +30,12 @@ public static class ClientServices
         services.AddScoped<IDatabaseBootstrapClientService, DatabaseBootstrapClientService>();
         services.AddScoped<IAuthClientService, AuthClientService>();
         services.AddScoped<IUserClientService, UserClientService>();
+        services.AddScoped<IProfileClientService, ProfileClientService>();
         services.AddScoped<IUsersWorkspaceState, UsersWorkspaceState>();
         services.AddScoped<OasAuthenticationStateProvider>();
         services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<OasAuthenticationStateProvider>());
         services.AddScoped<IEmployeeClientService, EmployeeClientService>();
+        services.AddScoped<IEmployeesWorkspaceState, EmployeesWorkspaceState>();
         services.AddScoped<BrowserFileDownloadService>();
 
         return services;

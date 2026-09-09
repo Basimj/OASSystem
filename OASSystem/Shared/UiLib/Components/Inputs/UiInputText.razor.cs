@@ -1,12 +1,14 @@
 
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.AspNetCore.Components.Web;
 using OAS.UiLib.Core.Enums;
 
 namespace OAS.UiLib.Components.Inputs;
 
 public partial class UiInputText
 {
+    private ElementReference _inputElement;
     [Parameter] public string? Id { get; set; }
 
     [Parameter] public string Type { get; set; } = "text";
@@ -117,6 +119,8 @@ public partial class UiInputText
 
         return true;
     }
+
+    public ValueTask FocusAsync() => _inputElement.FocusAsync();
 
     private void TogglePasswordVisibility() =>
         _passwordRevealed = !_passwordRevealed;

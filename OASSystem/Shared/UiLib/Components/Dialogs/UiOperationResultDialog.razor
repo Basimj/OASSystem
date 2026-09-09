@@ -1,0 +1,16 @@
+<div class="ui-operation-result ui-operation-result--@StatusCss">
+    <div class="ui-operation-result__icon" aria-hidden="true"><i class="@StatusIcon"></i></div>
+    <div class="ui-operation-result__copy">
+        <strong>@Title</strong>
+        @if (!string.IsNullOrWhiteSpace(Message)) { <p>@Message</p> }
+        @if (!string.IsNullOrWhiteSpace(Reason)) { <div class="ui-operation-result__reason">@Reason</div> }
+    </div>
+    @if (!string.IsNullOrWhiteSpace(SecretValue))
+    {
+        <div class="ui-operation-result__secret">
+            <UiSecretValue Value="@SecretValue" CopyText="@(_copied ? CopiedText : CopyText)" OnCopy="CopyAsync" />
+            @if (!string.IsNullOrWhiteSpace(SecretHint)) { <small>@SecretHint</small> }
+        </div>
+    }
+    <UiButton Text="@CloseText" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="CloseAsync" />
+</div>

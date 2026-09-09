@@ -1,10 +1,12 @@
 @inherits LayoutComponentBase
 
 @inject IAuthClientService AuthService
+@inject IProfileClientService ProfileService
 @inject OasAuthenticationStateProvider AuthState
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 @inject DatabaseProfileSelectionState DatabaseSelection
+@inject IUiDialogService Dialogs
 
 <AuthorizeView>
     <Authorized Context="authContext">
@@ -16,10 +18,19 @@
         {
             <OasMainShell IsAdministrator='@authContext.User.IsInRole("Administrator")'
                           Modules="@ShellModules"
+                          NavigationGroups="@ShellGroups"
                           SystemName="OAS System"
                           DatabaseName="@SelectedDatabaseName"
                           ConnectionStatus="متصل"
                           VersionText="@SystemVersion"
+                          ShellStateStorageKey="@ShellStateStorageKey"
+                          UserDisplayName="@CurrentDisplayName"
+                          UserName="@CurrentUserName"
+                          UserEmail="@CurrentEmail"
+                          UserImageUrl="@CurrentUserImageUrl"
+                          OnEditProfile="OpenProfileAsync"
+                          OnSettings="OpenSettingsAsync"
+                          OnSupport="OpenSupportAsync"
                           OnLogout="LogoutAsync">
                 @Body
             </OasMainShell>
@@ -31,11 +42,20 @@
 </AuthorizeView>
 
 @code {
+    private MyProfileDto? _loadedProfile;
+    private long _profileImageRevision = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
     private static string SystemVersion =>
         typeof(MainLayout).Assembly.GetName().Version?.ToString(3) ?? "1.0.0";
 
     private string SelectedDatabaseName => DatabaseSelection.SelectedProfileKey ?? "Default";
+    private string CurrentDisplayName => _loadedProfile?.DisplayName ?? AuthState.CurrentUser?.DisplayName ?? "المستخدم";
+    private string CurrentUserName => _loadedProfile?.UserName ?? AuthState.CurrentUser?.UserName ?? string.Empty;
+    private string? CurrentEmail => _loadedProfile?.Email ?? AuthState.CurrentUser?.Email;
+    private string? CurrentUserImageUrl => AuthState.CurrentUser is { } user
+        ? $"api/identity/profile-images/{user.Id:D}?v={_profileImageRevision}"
+        : null;
+    private string ShellStateStorageKey => $"oas.ui.shell.v2:{AuthState.CurrentUser?.Id:D}:{SelectedDatabaseName}";
 
     private static readonly IReadOnlyList<UiShellModuleItem> ShellModules =
     [
@@ -48,17 +68,25 @@
         new("purchases", "المشتريات", "/purchases", "fa-solid fa-bag-shopping"),
         new("finance", "الحسابات", "/finance", "fa-regular fa-money-bill-1"),
         new("reports", "التقارير", "/reports", "fa-regular fa-chart-bar"),
-        new("employees", "الموظفون", "/employees", "fa-solid fa-user-tie", DividerBefore: true),
+        new("employees", "الموظفون", "/employees", "fa-solid fa-user-tie"),
         new("departments", "الأقسام", "/departments", "fa-solid fa-sitemap"),
         new("suppliers", "الموردون", "/suppliers", "fa-solid fa-truck-field"),
         new("users", "المستخدمون", "/identity/users", "fa-solid fa-users", AdministratorOnly: true),
         new("settings", "الإعدادات", "/settings", "fa-solid fa-gear")
     ];
 
+    private static readonly IReadOnlyList<UiShellNavigationGroup> ShellGroups =
+    [
+        new("operations", "المبيعات والتشغيل", "fa-solid fa-store", ["sales", "customers", "products", "daily-orders"]),
+        new("stock", "المخزون والمشتريات", "fa-solid fa-boxes-stacked", ["inventory", "purchases", "suppliers"]),
+        new("administration", "الإدارة", "fa-solid fa-people-group", ["employees", "departments", "users"]),
+        new("finance", "المالية والتقارير", "fa-solid fa-chart-line", ["finance", "reports"]),
+        new("system", "النظام", "fa-solid fa-sliders", ["settings"], DefaultExpanded: false)
+    ];
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender)
-            return;
+        if (!firstRender) return;
 
         await JS.InvokeVoidAsync("hideOasStartup");
 
@@ -75,6 +103,114 @@
 
     private static bool RequiresPasswordSetup(System.Security.Claims.ClaimsPrincipal principal) =>
         string.Equals(principal.FindFirst("must_change_password")?.Value, "true", StringComparison.OrdinalIgnoreCase);
+
+    private async Task OpenProfileAsync(MouseEventArgs _)
+    {
+        var profileResult = await ProfileService.GetAsync();
+        if (!profileResult.Succeeded || profileResult.Value is null)
+        {
+            await ShowOperationAsync(UiOperationStatus.Failure, "تعذر فتح الملف الشخصي", null, GetErrorMessage(profileResult.Error));
+            return;
+        }
+
+        _loadedProfile = profileResult.Value;
+        var parameters = new Dictionary<string, object>
+        {
+            [nameof(UiProfileEditorDialog.FirstName)] = _loadedProfile.FirstName,
+            [nameof(UiProfileEditorDialog.LastName)] = _loadedProfile.LastName,
+            [nameof(UiProfileEditorDialog.UserName)] = _loadedProfile.UserName,
+            [nameof(UiProfileEditorDialog.Email)] = _loadedProfile.Email ?? string.Empty,
+            [nameof(UiProfileEditorDialog.ImageUrl)] = CurrentUserImageUrl ?? string.Empty,
+            [nameof(UiProfileEditorDialog.OnSaveProfile)] = (Func<UiProfilePersonalData, Task<UiOperationFeedback>>)SaveProfileAsync,
+            [nameof(UiProfileEditorDialog.OnChangePassword)] = (Func<UiPasswordChangeData, Task<UiOperationFeedback>>)ChangeMyPasswordAsync,
+            [nameof(UiProfileEditorDialog.OnUploadImage)] = (Func<IBrowserFile, Task<UiOperationFeedback>>)UploadMyImageAsync,
+            [nameof(UiProfileEditorDialog.OnRemoveImage)] = (Func<Task<UiOperationFeedback>>)RemoveMyImageAsync
+        };
+
+        await Dialogs.ShowAsync<UiProfileEditorDialog>(
+            "الملف الشخصي",
+            parameters,
+            new UiDialogOptions { Size = UiDialogSize.Medium, CloseOnBackdrop = false });
+    }
+
+    private async Task<UiOperationFeedback> SaveProfileAsync(UiProfilePersonalData data)
+    {
+        if (_loadedProfile is null) return new(false, "تعذر تحميل بيانات الملف الشخصي.");
+        var result = await ProfileService.UpdateAsync(new UpdateMyProfileRequest(data.FirstName, data.LastName, _loadedProfile.RowVersion));
+        if (!result.Succeeded || result.Value is null) return new(false, GetErrorMessage(result.Error));
+
+        _loadedProfile = result.Value;
+        if (AuthState.CurrentUser is { } current)
+            AuthState.SetAuthenticated(current with { DisplayName = result.Value.DisplayName });
+        await InvokeAsync(StateHasChanged);
+        return new(true, "تم حفظ البيانات الشخصية.");
+    }
+
+    private async Task<UiOperationFeedback> ChangeMyPasswordAsync(UiPasswordChangeData data)
+    {
+        var result = await ProfileService.ChangePasswordAsync(new ChangeMyPasswordRequest(data.CurrentPassword, data.NewPassword, data.ConfirmPassword));
+        if (!result.Succeeded || result.Value is null) return new(false, GetErrorMessage(result.Error));
+        AuthState.SetAuthenticated(result.Value);
+        return new(true, "تم تغيير كلمة المرور بنجاح.");
+    }
+
+    private async Task<UiOperationFeedback> UploadMyImageAsync(IBrowserFile file)
+    {
+        if (file.Size <= 0 || file.Size > 2_500_000) return new(false, "حجم الصورة يجب ألا يتجاوز 2.5 MB.");
+        var contentType = (file.ContentType ?? string.Empty).Trim().ToLowerInvariant();
+        if (contentType is not ("image/jpeg" or "image/png" or "image/webp"))
+            return new(false, "الصيغ المسموح بها هي JPEG وPNG وWebP فقط.");
+        try
+        {
+            await using var stream = file.OpenReadStream(2_500_000);
+            var result = await ProfileService.UploadImageAsync(stream, file.Name, file.ContentType);
+            if (!result.Succeeded) return new(false, GetErrorMessage(result.Error));
+            _profileImageRevision = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            await InvokeAsync(StateHasChanged);
+            return new(true, "تم تحديث الصورة الشخصية.", CurrentUserImageUrl);
+        }
+        catch (Exception)
+        {
+            return new(false, "تعذر قراءة ملف الصورة.");
+        }
+    }
+
+    private async Task<UiOperationFeedback> RemoveMyImageAsync()
+    {
+        var result = await ProfileService.RemoveImageAsync();
+        if (!result.Succeeded) return new(false, GetErrorMessage(result.Error));
+        _profileImageRevision = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        await InvokeAsync(StateHasChanged);
+        return new(true, "تم حذف الصورة الشخصية.");
+    }
+
+    private Task OpenSettingsAsync(MouseEventArgs _)
+    {
+        Navigation.NavigateTo("/settings");
+        return Task.CompletedTask;
+    }
+
+    private async Task OpenSupportAsync(MouseEventArgs _)
+    {
+        await ShowOperationAsync(UiOperationStatus.Information, "دعم المستخدم", "يمكن ربط هذه النافذة لاحقاً بقناة الدعم المعتمدة للنظام.", null);
+    }
+
+    private async Task ShowOperationAsync(UiOperationStatus status, string title, string? message, string? reason)
+    {
+        await Dialogs.ShowAsync<UiOperationResultDialog>(
+            null,
+            new Dictionary<string, object>
+            {
+                [nameof(UiOperationResultDialog.Status)] = status,
+                [nameof(UiOperationResultDialog.Title)] = title,
+                [nameof(UiOperationResultDialog.Message)] = message ?? string.Empty,
+                [nameof(UiOperationResultDialog.Reason)] = reason ?? string.Empty
+            },
+            new UiDialogOptions { Size = UiDialogSize.Small, ShowCloseButton = false });
+    }
+
+    private static string GetErrorMessage(OAS.Contracts.Common.Errors.ApiError? error) =>
+        !string.IsNullOrWhiteSpace(error?.Message) ? error.Message : error?.Code ?? "حدث خطأ غير متوقع.";
 
     private async Task LogoutAsync(MouseEventArgs _)
     {

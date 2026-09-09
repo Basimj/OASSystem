@@ -1,1 +1,10 @@
-<div class="ui-avatar" aria-hidden="true">@Initials</div>
+<div class="ui-avatar" style="@AvatarStyle" aria-label="@AltText">
+    @if (!string.IsNullOrWhiteSpace(ImageUrl) && !_imageFailed)
+    {
+        <img src="@ImageUrl" alt="@AltText" @onerror="ImageFailed" />
+    }
+    else
+    {
+        <span aria-hidden="true">@Initials</span>
+    }
+</div>

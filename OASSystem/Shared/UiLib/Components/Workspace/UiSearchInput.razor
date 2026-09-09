@@ -1,0 +1,8 @@
+<div class="ui-search-input">
+    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+    <input type="search" value="@_value" placeholder="@Placeholder" aria-label="@AriaLabel" @oninput="InputChanged" />
+    @if (!string.IsNullOrWhiteSpace(_value))
+    {
+        <button type="button" title="@ClearText" aria-label="@ClearText" @onclick="ClearAsync"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+    }
+</div>

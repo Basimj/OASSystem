@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using MediatR;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -6,8 +5,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using OAS.API.Security;
-using OAS.Application.Database.Abstractions;
-using OAS.Application.Identity.Abstractions;
 using OAS.Application.Identity.Authentication.Commands;
 using OAS.Application.Identity.Authentication.Models;
 using OAS.Application.Identity.Authentication.Queries;
@@ -20,8 +17,7 @@ namespace OAS.API.Identity.Controllers;
 [Route("api/identity/auth")]
 public sealed class AuthController(
     ISender sender,
-    IDatabaseProfileSelection databaseProfileSelection,
-    IIdentityRepository identityRepository) : ControllerBase
+    IIdentityCookieSessionService sessionService) : ControllerBase
 {
     [AllowAnonymous]
     [EnableRateLimiting("login")]
@@ -44,7 +40,7 @@ public sealed class AuthController(
             };
         }
 
-        await SignInUserAsync(result.User, new AuthenticationProperties
+        await sessionService.SignInAsync(HttpContext, result.User, new AuthenticationProperties
         {
             IsPersistent = request.RememberMe,
             AllowRefresh = true,
@@ -68,7 +64,7 @@ public sealed class AuthController(
             AllowRefresh = true,
             IssuedUtc = DateTimeOffset.UtcNow
         };
-        await SignInUserAsync(user, properties);
+        await sessionService.SignInAsync(HttpContext, user, properties);
         return Ok(user);
     }
 
@@ -85,28 +81,5 @@ public sealed class AuthController(
     public async Task<ActionResult<CurrentUserDto>> Me(CancellationToken cancellationToken) =>
         Ok(await sender.Send(new GetCurrentUserQuery(), cancellationToken));
 
-    private async Task SignInUserAsync(CurrentUserDto user, AuthenticationProperties properties)
-    {
-        var record = await identityRepository.GetUserAsync(user.Id, false, HttpContext.RequestAborted)
-            ?? throw new InvalidOperationException("Cannot create an authentication session for a missing user account.");
 
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new(ClaimTypes.Name, user.UserName),
-            new(IdentityClaimTypes.DisplayName, user.DisplayName),
-            new(IdentityClaimTypes.IsSuperAdmin, user.IsSuperAdmin ? "true" : "false"),
-            new(IdentityClaimTypes.MustChangePassword, user.MustChangePassword ? "true" : "false"),
-            new(IdentityClaimTypes.PasswordVersion, IdentityPasswordVersion.Create(record.User.PasswordHash)),
-            new(OAS.API.Database.HttpDatabaseProfileSelection.ClaimName, databaseProfileSelection.ProfileKey ?? "Default")
-        };
-        if (!string.IsNullOrWhiteSpace(user.Email)) claims.Add(new Claim(ClaimTypes.Email, user.Email));
-        claims.AddRange(user.Roles.Select(role => new Claim(ClaimTypes.Role, role)));
-
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        await HttpContext.SignInAsync(
-            CookieAuthenticationDefaults.AuthenticationScheme,
-            new ClaimsPrincipal(identity),
-            properties);
-    }
 }

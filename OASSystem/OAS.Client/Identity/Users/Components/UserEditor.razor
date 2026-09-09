@@ -4,16 +4,27 @@
     @if (State.ActiveSection == "basic")
     {
         <UiCard Title="@L["Users_BasicInfo"]">
-            <UiGrid Columns="2">
-                <UiInputText @bind-Value="State.Form.FirstName" Label="@L["Users_FirstName"]" Required="true" EnableNativeValidation="false" Size="ControlSize.Small" />
-                <UiInputText @bind-Value="State.Form.LastName" Label="@L["Users_LastName"]" Required="true" EnableNativeValidation="false" Size="ControlSize.Small" />
-                <UiInputText @bind-Value="State.Form.UserName" Label="@L["Users_UserName"]" Required="true" EnableNativeValidation="false" Size="ControlSize.Small" AutoComplete="off" />
-                <UiInputText @bind-Value="State.Form.Email" Label="@L["Users_Email"]" Type="email" Size="ControlSize.Small" AutoComplete="off" />
-            </UiGrid>
-            @if (State.IsNew)
-            {
-                <UiCheckbox @bind-Value="State.Form.IsActive" Label="@L["Users_Active"]" />
-            }
+            <UiStackLayout Gap="StackGap.Small">
+                <UiAvatarEditor Initials="@EditorInitials"
+                                ImageUrl="@EffectiveImageUrl"
+                                AltText="@EditorDisplayName"
+                                Size="72"
+                                ReadOnly="@(!IsEditable)"
+                                OnImageSelected="OnImageSelected"
+                                OnRemove="OnImageRemoved" />
+
+                <UiGrid Columns="2">
+                    <UiInputText @bind-Value="State.Form.FirstName" Label="@L["Users_FirstName"]" Required="true" EnableNativeValidation="false" Size="ControlSize.Small" Disabled="@(!IsEditable)" />
+                    <UiInputText @bind-Value="State.Form.LastName" Label="@L["Users_LastName"]" Required="true" EnableNativeValidation="false" Size="ControlSize.Small" Disabled="@(!IsEditable)" />
+                    <UiInputText @ref="_userNameInput" @bind-Value="State.Form.UserName" Label="@L["Users_UserName"]" Required="true" EnableNativeValidation="false" Size="ControlSize.Small" AutoComplete="off" Disabled="@(!IsEditable)" />
+                    <UiInputText @bind-Value="State.Form.Email" Label="@L["Users_Email"]" Type="email" Size="ControlSize.Small" AutoComplete="off" Disabled="@(!IsEditable)" />
+                </UiGrid>
+
+                @if (Mode == UserEditorMode.Create)
+                {
+                    <UiCheckbox @bind-Value="State.Form.IsActive" Label="@L["Users_Active"]" />
+                }
+            </UiStackLayout>
         </UiCard>
     }
     else if (State.ActiveSection == "roles")
@@ -24,7 +35,7 @@
                 {
                     <UiCheckbox Value="@State.IsRoleSelected(role.Id)"
                                 ValueChanged="@(value => RoleChanged(role.Id, value))"
-                                Disabled="@IsRoleDisabled(role)"
+                                Disabled="@(!IsEditable || IsRoleDisabled(role))"
                                 Label="@TranslateRole(role.Name)" />
                 }
             </UiGrid>

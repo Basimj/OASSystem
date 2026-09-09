@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Mvc;
 using OAS.Application.Identity.Users.Commands.CreateUser;
 using OAS.Application.Identity.Users.Commands.ResetUserPassword;
 using OAS.Application.Identity.Users.Commands.SetUserRoles;
+using OAS.Application.Identity.Users.Commands.SetUserProfileImage;
+using OAS.Application.Identity.Users.Commands.RemoveUserProfileImage;
 using OAS.Application.Identity.Users.Commands.SetUserStatus;
 using OAS.Application.Identity.Users.Commands.UnlockUser;
 using OAS.Application.Identity.Users.Commands.UpdateUser;
@@ -68,6 +70,26 @@ public sealed class UsersController(ISender sender) : ControllerBase
         var user = await sender.Send(new GetUserByIdQuery(id), cancellationToken);
         PreventSensitiveResponseCaching();
         return Ok(new ResetUserPasswordResultDto(temporaryPassword, user.RowVersion));
+    }
+
+
+    [HttpPut("{id:guid}/profile-image")]
+    [RequestSizeLimit(2_600_000)]
+    public async Task<IActionResult> SetProfileImage(Guid id, IFormFile file, CancellationToken cancellationToken)
+    {
+        if (file.Length <= 0 || file.Length > 2_500_000) return BadRequest();
+        await using var stream = file.OpenReadStream();
+        using var memory = new MemoryStream();
+        await stream.CopyToAsync(memory, cancellationToken);
+        await sender.Send(new SetUserProfileImageCommand(id, file.ContentType, memory.ToArray()), cancellationToken);
+        return NoContent();
+    }
+
+    [HttpDelete("{id:guid}/profile-image")]
+    public async Task<IActionResult> RemoveProfileImage(Guid id, CancellationToken cancellationToken)
+    {
+        await sender.Send(new RemoveUserProfileImageCommand(id), cancellationToken);
+        return NoContent();
     }
 
     [HttpPost("{id:guid}/unlock")]

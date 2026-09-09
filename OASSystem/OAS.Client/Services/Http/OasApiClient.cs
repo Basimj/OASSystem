@@ -349,6 +349,88 @@ public sealed class OasApiClient(
                };
     }
 
+
+    public async Task<ApiCallResult<T>> GetResultAsync<T>(
+        string uri,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var request = CreateRequest(HttpMethod.Get, uri);
+            using var response = await httpClient.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+                return ApiCallResult<T>.Failure(await ReadErrorAsync(response, cancellationToken));
+            if (response.StatusCode == System.Net.HttpStatusCode.NoContent)
+                return ApiCallResult<T>.Success(default);
+            var value = await response.Content.ReadFromJsonAsync<T>(cancellationToken: cancellationToken);
+            return ApiCallResult<T>.Success(value);
+        }
+        catch (HttpRequestException)
+        {
+            return ApiCallResult<T>.Failure(new ApiError { Status = 0, Code = "network_error", Message = "Unable to connect to the server." });
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return ApiCallResult<T>.Failure(new ApiError { Status = 0, Code = "network_error", Message = "The request timed out before the server responded." });
+        }
+        catch (JsonException)
+        {
+            return ApiCallResult<T>.Failure(new ApiError { Status = 0, Code = "response_parse_error", Message = "The server returned an invalid response." });
+        }
+    }
+
+    public async Task<ApiCallResult<bool>> UploadFilePutResultAsync(
+        string uri,
+        Stream fileStream,
+        string fileName,
+        string contentType,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var request = CreateRequest(HttpMethod.Put, uri);
+            using var content = new MultipartFormDataContent();
+            var fileContent = new StreamContent(fileStream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+            content.Add(fileContent, "file", fileName);
+            request.Content = content;
+            using var response = await httpClient.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+                return ApiCallResult<bool>.Failure(await ReadErrorAsync(response, cancellationToken));
+            return ApiCallResult<bool>.Success(true);
+        }
+        catch (HttpRequestException)
+        {
+            return ApiCallResult<bool>.Failure(new ApiError { Status = 0, Code = "network_error", Message = "Unable to connect to the server." });
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return ApiCallResult<bool>.Failure(new ApiError { Status = 0, Code = "network_error", Message = "The request timed out before the server responded." });
+        }
+    }
+
+    public async Task<ApiCallResult<bool>> DeleteResultAsync(
+        string uri,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var request = CreateRequest(HttpMethod.Delete, uri);
+            using var response = await httpClient.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+                return ApiCallResult<bool>.Failure(await ReadErrorAsync(response, cancellationToken));
+            return ApiCallResult<bool>.Success(true);
+        }
+        catch (HttpRequestException)
+        {
+            return ApiCallResult<bool>.Failure(new ApiError { Status = 0, Code = "network_error", Message = "Unable to connect to the server." });
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return ApiCallResult<bool>.Failure(new ApiError { Status = 0, Code = "network_error", Message = "The request timed out before the server responded." });
+        }
+    }
+
     public async Task<T?> UploadFileAsync<T>(
         string uri,
         Stream fileStream,

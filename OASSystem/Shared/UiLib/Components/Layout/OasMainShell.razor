@@ -1,56 +1,6 @@
 <div class="oas-shell @(isSidebarCollapsed ? "sidebar-collapsed" : "") @(isMobileMenuOpen ? "mobile-menu-open" : "")">
     <div class="oas-mobile-overlay" @onclick="CloseMobileMenu"></div>
 
-    <aside class="oas-sidebar">
-        <div class="oas-sidebar-brand">
-            <div class="oas-brand-copy">
-                <strong class="oas-brand-mark">OAS</strong>
-                <span class="oas-brand-subtitle">نظام إدارة المحلات البصرية</span>
-            </div>
-
-            <button type="button"
-                    class="oas-collapse-btn"
-                    title="@(isSidebarCollapsed ? "توسيع القائمة" : "طي القائمة")"
-                    aria-label="@(isSidebarCollapsed ? "توسيع القائمة" : "طي القائمة")"
-                    @onclick="ToggleSidebar">
-                <i class="fa-solid @(isSidebarCollapsed ? "fa-chevron-left" : "fa-chevron-right")" aria-hidden="true"></i>
-            </button>
-        </div>
-
-        <nav class="oas-nav" aria-label="التنقل الرئيسي">
-            @foreach (var module in VisibleModules)
-            {
-                @if (module.DividerBefore)
-                {
-                    <div class="oas-nav-divider" aria-hidden="true"></div>
-                }
-
-                <button type="button"
-                        class="@(IsModuleActive(module) ? "oas-nav-item active" : "oas-nav-item")"
-                        title="@module.Title"
-                        aria-current="@(IsModuleActive(module) ? "page" : null)"
-                        @onclick="() => NavigateModuleAsync(module)">
-                    <span class="oas-nav-icon" aria-hidden="true">
-                        <i class="@module.IconCssClass"></i>
-                    </span>
-                    <span class="oas-nav-text">@module.Title</span>
-                </button>
-            }
-        </nav>
-
-        <div class="oas-sidebar-footer">
-            <button type="button" class="oas-support-btn" title="دعم المستخدم">
-                <span class="oas-nav-icon" aria-hidden="true"><i class="fa-solid fa-headset"></i></span>
-                <span class="oas-support-text">دعم المستخدم</span>
-            </button>
-
-            <button type="button" class="oas-logout-btn" @onclick="LogoutAsync" title="تسجيل الخروج">
-                <span class="oas-nav-icon" aria-hidden="true"><i class="fa-solid fa-arrow-right-from-bracket"></i></span>
-                <span class="oas-logout-text">تسجيل الخروج</span>
-            </button>
-        </div>
-    </aside>
-
     <header class="oas-workspace-topbar">
         <div class="oas-global-header-row">
             <button type="button" class="oas-mobile-menu-btn" aria-label="فتح القائمة" title="فتح القائمة" @onclick="ToggleMobileMenu">
@@ -58,9 +8,18 @@
             </button>
 
             <OasTopHeader SystemName="@SystemName"
+                          SystemLogoUrl="@SystemLogoUrl"
                           DatabaseName="@DatabaseName"
                           ConnectionStatus="@ConnectionStatus"
-                          VersionText="@VersionText" />
+                          VersionText="@VersionText"
+                          UserDisplayName="@UserDisplayName"
+                          UserName="@UserName"
+                          UserEmail="@UserEmail"
+                          UserImageUrl="@UserImageUrl"
+                          OnEditProfile="OnEditProfile"
+                          OnSettings="OnSettings"
+                          OnSupport="OnSupport"
+                          OnLogout="OnLogout" />
         </div>
 
         <div class="oas-global-tabs-row">
@@ -72,7 +31,78 @@
         </div>
     </header>
 
-    <main class="oas-main-content">
+    <aside class="oas-sidebar">
+        <div class="oas-sidebar-toolbar">
+            <button type="button"
+                    class="oas-collapse-btn"
+                    title="@(isSidebarCollapsed ? "توسيع القائمة" : "طي القائمة")"
+                    aria-label="@(isSidebarCollapsed ? "توسيع القائمة" : "طي القائمة")"
+                    @onclick="ToggleSidebarAsync">
+                <i class="fa-solid @(isSidebarCollapsed ? "fa-chevron-left" : "fa-chevron-right")" aria-hidden="true"></i>
+            </button>
+        </div>
+
+        <nav class="oas-nav" aria-label="التنقل الرئيسي">
+            @foreach (var module in VisibleUngroupedModules)
+            {
+                <button type="button"
+                        class="@(IsModuleActive(module) ? "oas-nav-item oas-nav-item--root active" : "oas-nav-item oas-nav-item--root")"
+                        title="@module.Title"
+                        aria-current="@(IsModuleActive(module) ? "page" : null)"
+                        @onclick="() => NavigateModuleAsync(module)">
+                    <span class="oas-nav-icon" aria-hidden="true"><i class="@module.IconCssClass"></i></span>
+                    <span class="oas-nav-text">@module.Title</span>
+                </button>
+            }
+
+            @foreach (var group in VisibleNavigationGroups)
+            {
+                var groupModules = GetVisibleGroupModules(group);
+                var active = groupModules.Any(IsModuleActive);
+                var expanded = IsGroupExpanded(group);
+                <div class="@(active ? "oas-nav-group active" : "oas-nav-group")">
+                    <button type="button"
+                            class="oas-nav-group__header"
+                            title="@group.Title"
+                            aria-expanded="@(!isSidebarCollapsed && expanded)"
+                            @onclick="() => HandleGroupClickAsync(group)">
+                        <span class="oas-nav-icon" aria-hidden="true"><i class="@group.IconCssClass"></i></span>
+                        <span class="oas-nav-text">@group.Title</span>
+                        @if (!isSidebarCollapsed)
+                        {
+                            <i class="oas-nav-group__chevron fa-solid @(expanded ? "fa-chevron-up" : "fa-chevron-down")" aria-hidden="true"></i>
+                        }
+                    </button>
+
+                    @if (!isSidebarCollapsed && expanded)
+                    {
+                        <div class="oas-nav-group__items">
+                            @foreach (var module in groupModules)
+                            {
+                                <button type="button"
+                                        class="@(IsModuleActive(module) ? "oas-nav-item oas-nav-item--child active" : "oas-nav-item oas-nav-item--child")"
+                                        title="@module.Title"
+                                        aria-current="@(IsModuleActive(module) ? "page" : null)"
+                                        @onclick="() => NavigateModuleAsync(module)">
+                                    <span class="oas-nav-icon" aria-hidden="true"><i class="@module.IconCssClass"></i></span>
+                                    <span class="oas-nav-text">@module.Title</span>
+                                </button>
+                            }
+                        </div>
+                    }
+
+                    @if (isSidebarCollapsed)
+                    {
+                        <UiContextMenu Visible="@string.Equals(_contextGroupKey, group.Key, StringComparison.Ordinal)"
+                                       Items="@BuildContextItems(group)"
+                                       OnSelect="SelectCollapsedGroupItemAsync" />
+                    }
+                </div>
+            }
+        </nav>
+    </aside>
+
+    <main class="oas-main-content" @onclick="CloseTransientMenus">
         <div class="oas-main-inner">
             @ChildContent
         </div>

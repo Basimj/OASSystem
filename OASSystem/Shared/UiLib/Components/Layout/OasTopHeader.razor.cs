@@ -1,73 +1,36 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Components.Web;
 
 namespace OAS.UiLib.Components.Layout;
 
 public partial class OasTopHeader : IDisposable
 {
     private readonly CancellationTokenSource _clockCancellation = new();
-    [Inject]
-    private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = default!;
+    private bool _accountMenuOpen;
 
-    [Inject]
-    private NavigationManager Navigation { get; set; } = default!;
+    [Parameter] public string SystemName { get; set; } = "OAS System";
+    [Parameter] public string? SystemLogoUrl { get; set; }
+    [Parameter] public string DatabaseName { get; set; } = "Default";
+    [Parameter] public string ConnectionStatus { get; set; } = "متصل";
+    [Parameter] public string VersionText { get; set; } = "1.0.0";
+    [Parameter] public string UserDisplayName { get; set; } = "المستخدم";
+    [Parameter] public string UserName { get; set; } = string.Empty;
+    [Parameter] public string? UserEmail { get; set; }
+    [Parameter] public string? UserImageUrl { get; set; }
+    [Parameter] public EventCallback<MouseEventArgs> OnEditProfile { get; set; }
+    [Parameter] public EventCallback<MouseEventArgs> OnSettings { get; set; }
+    [Parameter] public EventCallback<MouseEventArgs> OnSupport { get; set; }
+    [Parameter] public EventCallback<MouseEventArgs> OnLogout { get; set; }
 
-    [Parameter]
-    public string SystemName { get; set; } = "OAS System";
-
-    [Parameter]
-    public string DatabaseName { get; set; } = "Default";
-
-    [Parameter]
-    public string ConnectionStatus { get; set; } = "متصل";
-
-    [Parameter]
-    public string VersionText { get; set; } = "1.0.0";
-
-    private string UserName { get; set; } = "المستخدم";
-    private string UserJobTitle { get; set; } = "مستخدم النظام";
-    private string UserInitial { get; set; } = "م";
     private DateTimeOffset CurrentLocalTime { get; set; } = DateTimeOffset.Now;
     private string CurrentTimeText => CurrentLocalTime.ToString("hh:mm tt");
     private string CurrentDateText => CurrentLocalTime.ToString("yyyy/MM/dd");
+    private string UserInitials => GetInitials(UserDisplayName);
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync()
     {
-        await LoadUserAsync();
         _ = RunClockAsync(_clockCancellation.Token);
-    }
-
-    private async Task LoadUserAsync()
-    {
-        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        var user = authState.User;
-
-        if (user.Identity?.IsAuthenticated != true)
-            return;
-
-        var firstName = user.FindFirst(ClaimTypes.GivenName)?.Value ?? user.FindFirst("given_name")?.Value;
-        var lastName = user.FindFirst(ClaimTypes.Surname)?.Value ?? user.FindFirst("family_name")?.Value;
-        var composedName = string.Join(' ', new[] { firstName, lastName }.Where(value => !string.IsNullOrWhiteSpace(value)));
-        var displayName = user.FindFirst("display_name")?.Value;
-
-        UserName = !string.IsNullOrWhiteSpace(displayName)
-            ? displayName
-            : !string.IsNullOrWhiteSpace(composedName)
-                ? composedName
-                : user.FindFirst(ClaimTypes.Name)?.Value
-                  ?? user.FindFirst("name")?.Value
-                  ?? user.FindFirst("preferred_username")?.Value
-                  ?? user.Identity.Name
-                  ?? "المستخدم";
-
-        UserJobTitle = user.IsInRole("Administrator")
-            ? "مدير النظام"
-            : user.FindFirst("job_title")?.Value
-              ?? user.FindFirst("JobTitle")?.Value
-              ?? "مستخدم النظام";
-
-        UserInitial = GetInitial(UserName);
+        return Task.CompletedTask;
     }
 
     private async Task RunClockAsync(CancellationToken cancellationToken)
@@ -81,18 +44,22 @@ public partial class OasTopHeader : IDisposable
                 await InvokeAsync(StateHasChanged);
             }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
     }
 
-    private static string GetInitial(string name)
+    private void ToggleAccountMenu() => _accountMenuOpen = !_accountMenuOpen;
+    private void CloseAccountMenu() => _accountMenuOpen = false;
+    private async Task EditProfileAsync(MouseEventArgs args) { _accountMenuOpen = false; await OnEditProfile.InvokeAsync(args); }
+    private async Task SettingsAsync(MouseEventArgs args) { _accountMenuOpen = false; await OnSettings.InvokeAsync(args); }
+    private async Task SupportAsync(MouseEventArgs args) { _accountMenuOpen = false; await OnSupport.InvokeAsync(args); }
+    private async Task LogoutAsync(MouseEventArgs args) { _accountMenuOpen = false; await OnLogout.InvokeAsync(args); }
+
+    private static string GetInitials(string value)
     {
-        var trimmed = name?.Trim();
-        return string.IsNullOrWhiteSpace(trimmed) ? "م" : trimmed[..1];
+        var parts = (value ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length == 0) return "م";
+        return string.Concat(parts.Take(2).Select(x => x[..1])).ToUpperInvariant();
     }
-
-    private void OpenSettings() => Navigation.NavigateTo("/settings");
 
     public void Dispose()
     {

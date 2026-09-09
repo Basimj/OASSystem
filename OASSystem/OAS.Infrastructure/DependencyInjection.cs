@@ -73,6 +73,8 @@ public static class DependencyInjection
             IIdentityRepository,
             IdentityRepository>();
 
+        services.AddScoped<IUserProfileImageStore, UserProfileImageStore>();
+
         services.AddScoped<
             IPasswordService,
             AspNetPasswordService>();

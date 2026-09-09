@@ -1,0 +1,11 @@
+<div class="ui-system-brand">
+    @if (!string.IsNullOrWhiteSpace(LogoUrl))
+    {
+        <img class="ui-system-brand__logo" src="@LogoUrl" alt="" />
+    }
+    else
+    {
+        <span class="ui-system-brand__fallback" aria-hidden="true"><i class="@IconCssClass"></i></span>
+    }
+    <span class="ui-system-brand__name">@Name</span>
+</div>

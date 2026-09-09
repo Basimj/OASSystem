@@ -1,0 +1,19 @@
+@if (Visible)
+{
+    <div class="ui-context-menu" role="menu" @onclick:stopPropagation="true">
+        @foreach (var item in Items)
+        {
+            <button type="button"
+                    class="@(item.IsActive ? "ui-context-menu__item active" : "ui-context-menu__item")"
+                    role="menuitem"
+                    disabled="@item.Disabled"
+                    @onclick="() => SelectAsync(item.Key)">
+                @if (!string.IsNullOrWhiteSpace(item.IconCssClass))
+                {
+                    <i class="@item.IconCssClass" aria-hidden="true"></i>
+                }
+                <span>@item.Text</span>
+            </button>
+        }
+    </div>
+}

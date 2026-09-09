@@ -2,13 +2,13 @@
 @page "/employees/new"
 @page "/employees/edit/{EmployeeId:guid}"
 
-@using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Web
 @using OAS.Client.Common.Feedback.Services
 @using OAS.Client.Features.Employees.Services
+@using OAS.Client.Features.Employees.Workspace
 @using OAS.Client.Services.Http
 @using OAS.Contracts.Features.Employees
 @using OAS.UiLib.Components.Buttons
@@ -19,6 +19,7 @@
 @attribute [Authorize(Roles = "Administrator")]
 
 @inject IEmployeeClientService EmployeeService
+@inject IEmployeesWorkspaceState Workspace
 @inject IApiFeedbackService ApiFeedback
 @inject IUiSnackbarService Snackbar
 @inject NavigationManager Navigation
@@ -484,9 +485,13 @@
     [Parameter]
     public Guid? EmployeeId { get; set; }
 
-    private EmployeeFormModel _form = new();
+    private EmployeeEditorFormState _form => Workspace.Editor.Form;
 
-    private string? _rowVersion;
+    private string? _rowVersion
+    {
+        get => Workspace.Editor.RowVersion;
+        set => Workspace.Editor.RowVersion = value;
+    }
 
     private bool _isLoading;
     private bool _isSaving;
@@ -500,21 +505,30 @@
     private const string TabFiles = "files";
     private const string TabNotes = "notes";
 
-    private string _activeTab = TabBasic;
+    private string _activeTab
+    {
+        get => Workspace.Editor.ActiveSection;
+        set => Workspace.Editor.ActiveSection = value;
+    }
 
     private bool IsEditMode =>
         EmployeeId.HasValue;
 
     protected override async Task OnParametersSetAsync()
     {
-        if (_parametersInitialized &&
-            EmployeeId == _loadedEmployeeId)
-        {
+        if (_parametersInitialized && EmployeeId == _loadedEmployeeId)
             return;
-        }
 
         _parametersInitialized = true;
         _loadedEmployeeId = EmployeeId;
+
+        // A scoped workspace state keeps the active employee draft alive while the
+        // user switches to another application tab. Do not reload from the API when
+        // the same editor route is restored.
+        if (Workspace.Editor.Matches(EmployeeId))
+            return;
+
+        Workspace.Editor.Begin(EmployeeId);
 
         if (EmployeeId is null)
         {
@@ -527,23 +541,7 @@
 
     private async Task InitializeNewAsync()
     {
-        _form = new EmployeeFormModel
-        {
-            EmployeeCode = string.Empty,
-            FirstName = string.Empty,
-            LastName = string.Empty,
-            Phone = string.Empty,
-            JobTitle = string.Empty,
-            HireDateText = string.Empty,
-            Notes = string.Empty,
-            IsSalesperson = false,
-            IsTechnician = false,
-            IsCommissionEligible = false,
-            IsActive = true
-        };
-
-        _rowVersion = null;
-        _activeTab = TabBasic;
+        Workspace.Editor.Begin(null);
         _isLoading = true;
 
         try
@@ -561,6 +559,8 @@
 
             _form.EmployeeCode =
                 employeeCode.Trim();
+
+            Workspace.Editor.MarkInitialized();
 
             /*
              * إجبار Blazor على إعادة رسم المكون
@@ -608,51 +608,21 @@
                 return;
             }
 
-            _form = new EmployeeFormModel
-            {
-                EmployeeCode =
-                    employee.EmployeeCode,
-
-                FirstName =
-                    employee.FirstName,
-
-                LastName =
-                    employee.LastName,
-
-                Phone =
-                    employee.Phone ??
-                    string.Empty,
-
-                JobTitle =
-                    employee.JobTitle ??
-                    string.Empty,
-
-                HireDateText =
-                    employee.HireDate?
-                        .ToString("yyyy-MM-dd")
-                    ?? string.Empty,
-
-                Notes =
-                    employee.Notes ??
-                    string.Empty,
-
-                IsSalesperson =
-                    employee.IsSalesperson,
-
-                IsTechnician =
-                    employee.IsTechnician,
-
-                IsCommissionEligible =
-                    employee.IsCommissionEligible,
-
-                IsActive =
-                    employee.IsActive
-            };
-
-            _rowVersion =
-                employee.RowVersion;
-
+            _form.EmployeeCode = employee.EmployeeCode;
+            _form.FirstName = employee.FirstName;
+            _form.LastName = employee.LastName;
+            _form.Phone = employee.Phone ?? string.Empty;
+            _form.JobTitle = employee.JobTitle ?? string.Empty;
+            _form.HireDateText = employee.HireDate?.ToString("yyyy-MM-dd") ?? string.Empty;
+            _form.Notes = employee.Notes ?? string.Empty;
+            _form.IsSalesperson = employee.IsSalesperson;
+            _form.IsTechnician = employee.IsTechnician;
+            _form.IsCommissionEligible = employee.IsCommissionEligible;
+            _form.IsActive = employee.IsActive;
+            _rowVersion = employee.RowVersion;
+            Workspace.Editor.UserAccountId = employee.UserAccountId;
             _activeTab = TabBasic;
+            Workspace.Editor.MarkInitialized();
         }
         catch (ApiClientException ex)
         {
@@ -813,6 +783,7 @@
                 // ==================================================
                 if (closeAfterSave)
                 {
+                    Workspace.Editor.Clear();
                     Navigation.NavigateTo(
                         "/employees");
 
@@ -878,7 +849,7 @@
                         _form.IsCommissionEligible,
 
                     UserAccountId:
-                        null,
+                        Workspace.Editor.UserAccountId,
 
                     RowVersion:
                         _rowVersion);
@@ -920,6 +891,7 @@
 
             if (closeAfterSave)
             {
+                Workspace.Editor.Clear();
                 Navigation.NavigateTo(
                     "/employees");
             }
@@ -1122,6 +1094,7 @@
 
     private void BackToEmployees()
     {
+        Workspace.Editor.Clear();
         Navigation.NavigateTo(
             "/employees");
     }
@@ -1134,62 +1107,4 @@
             : value.Trim();
     }
 
-    private sealed class EmployeeFormModel
-    {
-        [Required(
-            ErrorMessage = "كود الموظف مطلوب.")]
-        [MaxLength(
-            32,
-            ErrorMessage =
-                "كود الموظف يجب ألا يتجاوز 32 حرفًا.")]
-        public string EmployeeCode { get; set; } =
-            string.Empty;
-
-        [Required(
-            ErrorMessage = "الاسم الأول مطلوب.")]
-        [MaxLength(
-            100,
-            ErrorMessage =
-                "الاسم الأول يجب ألا يتجاوز 100 حرف.")]
-        public string FirstName { get; set; } =
-            string.Empty;
-
-        [Required(
-            ErrorMessage = "اسم العائلة مطلوب.")]
-        [MaxLength(
-            100,
-            ErrorMessage =
-                "اسم العائلة يجب ألا يتجاوز 100 حرف.")]
-        public string LastName { get; set; } =
-            string.Empty;
-
-        [MaxLength(
-            32,
-            ErrorMessage =
-                "رقم الهاتف يجب ألا يتجاوز 32 حرفًا.")]
-        public string? Phone { get; set; }
-
-        [MaxLength(
-            100,
-            ErrorMessage =
-                "المسمى الوظيفي يجب ألا يتجاوز 100 حرف.")]
-        public string? JobTitle { get; set; }
-
-        public string HireDateText { get; set; } =
-            string.Empty;
-
-        [MaxLength(
-            1000,
-            ErrorMessage =
-                "الملاحظات يجب ألا تتجاوز 1000 حرف.")]
-        public string? Notes { get; set; }
-
-        public bool IsSalesperson { get; set; }
-
-        public bool IsTechnician { get; set; }
-
-        public bool IsCommissionEligible { get; set; }
-
-        public bool IsActive { get; set; } = true;
-    }
 }

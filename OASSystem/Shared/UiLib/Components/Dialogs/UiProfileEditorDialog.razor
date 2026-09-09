@@ -1,0 +1,39 @@
+<div class="ui-profile-editor-dialog">
+    <div class="ui-profile-editor-dialog__summary">
+        <UiAvatarEditor Initials="@Initials" ImageUrl="@_imageUrl" AltText="@DisplayName" Size="76"
+                        OnImageSelected="ImageSelectedAsync" OnRemove="RemoveImageAsync" />
+        <div><strong>@DisplayName</strong><span>@UserName</span><span>@Email</span></div>
+    </div>
+
+    <UiSectionTabStrip Tabs="@Tabs" OnSelect="SelectSectionAsync" />
+
+    @if (!string.IsNullOrWhiteSpace(_message))
+    {
+        <UiAlert Tone="@(_messageIsError ? AlertTone.Danger : AlertTone.Success)" Message="@_message" />
+    }
+
+    @if (_section == "profile")
+    {
+        <UiGrid Columns="2">
+            <UiInputText @bind-Value="_firstName" Label="@FirstNameText" Required="true" Size="ControlSize.Small" />
+            <UiInputText @bind-Value="_lastName" Label="@LastNameText" Required="true" Size="ControlSize.Small" />
+            <UiInputText Value="@UserName" Label="@UserNameText" ReadOnly="true" Size="ControlSize.Small" />
+            <UiInputText Value="@Email" Label="@EmailText" ReadOnly="true" Size="ControlSize.Small" />
+        </UiGrid>
+        <div class="ui-profile-editor-dialog__actions">
+            <UiButton Text="@SaveText" Size="ControlSize.Small" Loading="@_savingProfile" OnClick="SaveProfileAsync" />
+        </div>
+    }
+    else
+    {
+        <UiStackLayout Gap="StackGap.Small">
+            <UiInputText @bind-Value="_currentPassword" Type="password" RevealPassword="true" Label="@CurrentPasswordText" Size="ControlSize.Small" />
+            <UiInputText @bind-Value="_newPassword" Type="password" RevealPassword="true" Label="@NewPasswordText" Size="ControlSize.Small" />
+            <UiInputText @bind-Value="_confirmPassword" Type="password" RevealPassword="true" Label="@ConfirmPasswordText" Size="ControlSize.Small" />
+            <UiTextLabel Text="@PasswordPolicyText" Tone="TextTone.Muted" Size="ControlSize.Small" />
+            <div class="ui-profile-editor-dialog__actions">
+                <UiButton Text="@ChangePasswordText" Size="ControlSize.Small" Loading="@_changingPassword" OnClick="ChangePasswordAsync" />
+            </div>
+        </UiStackLayout>
+    }
+</div>
