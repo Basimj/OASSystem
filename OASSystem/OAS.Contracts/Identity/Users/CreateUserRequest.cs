@@ -5,5 +5,6 @@ public sealed record CreateUserRequest(
     string FirstName,
     string LastName,
     string? Email,
+    string PhoneNumber,
     IReadOnlyList<Guid> RoleIds,
     bool IsActive = true);

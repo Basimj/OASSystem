@@ -1,0 +1,141 @@
+@page "/identity/roles"
+@attribute [Authorize(Roles = "Administrator")]
+
+<PageTitle>@L["Roles_Title"]</PageTitle>
+
+<UiWorkspaceLayout ShowAside="true" ShowFilters="false">
+    <Actions>
+        <UiWorkspaceActionBar>
+            <UiButton Text="@L["Common_New"]"
+                      IconCssClass="fa-solid fa-plus"
+                      Size="ControlSize.Small"
+                      Disabled="@IsEditing"
+                      OnClick="BeginCreateAsync" />
+            <UiButton Text="@L["Users_Save"]"
+                      IconCssClass="fa-solid fa-floppy-disk"
+                      Size="ControlSize.Small"
+                      Disabled="@(!CanSave)"
+                      Loading="@_saving"
+                      OnClick="SaveAsync" />
+            <UiButton Text="@L["Users_Edit"]"
+                      IconCssClass="fa-solid fa-pen"
+                      Variant="ButtonVariant.Secondary"
+                      Size="ControlSize.Small"
+                      Disabled="@(!CanEdit)"
+                      OnClick="BeginEditAsync" />
+            <UiButton Text="@L["Common_Cancel"]"
+                      IconCssClass="fa-solid fa-xmark"
+                      Variant="ButtonVariant.Ghost"
+                      Size="ControlSize.Small"
+                      Disabled="@(!IsEditing)"
+                      OnClick="CancelEditAsync" />
+            <UiButton Text="@L["Users_Refresh"]"
+                      IconCssClass="fa-solid fa-rotate"
+                      Variant="ButtonVariant.Secondary"
+                      Size="ControlSize.Small"
+                      Disabled="@IsEditing"
+                      Loading="@_loading"
+                      OnClick="RefreshAsync" />
+
+            <label class="roles-import-button @((_importing || IsEditing) ? "roles-import-button--disabled" : null)" title="@L["Roles_Import"]">
+                <i class="fa-solid fa-file-import" aria-hidden="true"></i>
+                <span>@L["Roles_Import"]</span>
+                <InputFile class="roles-import-input" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none;" accept=".csv,text/csv" OnChange="ImportAsync" />
+            </label>
+
+            <UiButton Text="@L["Roles_Export"]"
+                      IconCssClass="fa-solid fa-file-export"
+                      Variant="ButtonVariant.Secondary"
+                      Size="ControlSize.Small"
+                      Disabled="@_exporting"
+                      Loading="@_exporting"
+                      OnClick="ExportAsync" />
+
+            <UiSearchInput @bind-Value="_search"
+                           Placeholder="@L["Roles_Search"]"
+                           AriaLabel="@L["Roles_Search"]"
+                           ClearText="@L["Users_ResetFilters"]"
+                           DebounceMilliseconds="200"
+                           OnSearch="SearchChangedAsync" />
+        </UiWorkspaceActionBar>
+    </Actions>
+
+    <Content>
+        <UiDataGridPanel Title="@L["Roles_Title"]" Subtitle="@string.Format(L["Roles_TotalFormat"], FilteredRoles.Count)">
+            <Header>
+                <div class="roles-grid-header" aria-hidden="true">
+                    <span>@L["Roles_DisplayName"]</span>
+                    <span>@L["Roles_TechnicalKey"]</span>
+                    <span>@L["Roles_Type"]</span>
+                </div>
+            </Header>
+            <Body>
+                @if (_loading)
+                {
+                    <UiAlert Message="@L["Loading"]" />
+                }
+                else if (FilteredRoles.Count == 0)
+                {
+                    <UiAlert Message="@L["Roles_Empty"]" />
+                }
+                else
+                {
+                    <div class="roles-grid-body">
+                        @foreach (var role in FilteredRoles)
+                        {
+                            <button type="button"
+                                    class="@(role.Id == _selectedRole?.Id ? "roles-grid-row roles-grid-row--selected" : "roles-grid-row")"
+                                    @onclick="() => SelectRole(role)">
+                                <strong>@GetRoleDisplayName(role)</strong>
+                                <code>@role.Name</code>
+                                <span class="roles-grid-type">
+                                    <UiBadge Text="@(role.IsSystem ? L["Roles_System"] : L["Roles_Custom"])"
+                                             Tone="@(role.IsSystem ? AlertTone.Info : AlertTone.Success)" />
+                                </span>
+                            </button>
+                        }
+                    </div>
+                }
+            </Body>
+        </UiDataGridPanel>
+    </Content>
+
+    <Aside>
+        <div class="roles-aside-card">
+        <UiCard Title="@EditorTitle" Subtitle="@EditorSubtitle">
+            @if (_mode == RoleEditorMode.Empty)
+            {
+                <UiAlert Message="@L["Roles_SelectHint"]" />
+            }
+            else
+            {
+                <div class="roles-editor">
+                    <UiInputText @bind-Value="_formName"
+                                 Label="@L["Roles_TechnicalKey"]"
+                                 Required="true"
+                                 EnableNativeValidation="false"
+                                 MaxLength="64"
+                                 AutoComplete="off"
+                                 Disabled="@(_mode != RoleEditorMode.Create)"
+                                 Size="ControlSize.Small" />
+                    <UiInputText @bind-Value="_formDisplayName"
+                                 Label="@L["Roles_DisplayName"]"
+                                 Required="true"
+                                 EnableNativeValidation="false"
+                                 MaxLength="100"
+                                 AutoComplete="off"
+                                 Disabled="@(!IsEditing)"
+                                 Size="ControlSize.Small" />
+
+                    @if (_selectedRole is { } selected)
+                    {
+                        <UiKeyValue Label="@L["Roles_Type"]" Value="@(selected.IsSystem ? L["Roles_System"] : L["Roles_Custom"])" />
+                    }
+
+                    <UiTextLabel Text="@L["Roles_KeyHint"]" Tone="TextTone.Muted" Size="ControlSize.Small" />
+                </div>
+            }
+        </UiCard>
+        </div>
+    </Aside>
+</UiWorkspaceLayout>

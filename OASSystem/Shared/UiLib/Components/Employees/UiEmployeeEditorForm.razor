@@ -1,0 +1,160 @@
+<section class="ui-employee-editor-form" dir="rtl">
+    <div class="ui-employee-editor-form__top">
+        <aside class="ui-employee-editor-form__profile">
+            <UiAvatarEditor Initials="@Initials"
+                            ImageUrl="@ImageUrl"
+                            AltText="@DisplayName"
+                            Size="82"
+                            ReadOnly="@(!IsEditable)"
+                            ShowRemove="@ShowRemoveImage"
+                            EditText="تغيير الصورة"
+                            RemoveText="حذف الصورة"
+                            OnImageSelected="OnImageSelected"
+                            OnRemove="OnImageRemoved" />
+        </aside>
+
+        <div class="ui-employee-editor-form__primary">
+            <div class="ui-employee-editor-form__grid ui-employee-editor-form__grid--primary">
+                <UiInputText Value="@EmployeeCodeText"
+                             ValueExpression="@(() => EmployeeCodeText)"
+                             Label="كود الموظف"
+                             ReadOnly="true"
+                             Size="ControlSize.Small"
+                             EnableNativeValidation="false" />
+
+                <UiInputText Value="@Model.FirstName"
+                             ValueChanged="SetFirstNameAsync"
+                             ValueExpression="@(() => Model.FirstName)"
+                             Label="الاسم الأول"
+                             Required="true"
+                             Disabled="@(!IsEditable)"
+                             MaxLength="100"
+                             Size="ControlSize.Small"
+                             EnableNativeValidation="false" />
+
+                <UiInputText Value="@Model.LastName"
+                             ValueChanged="SetLastNameAsync"
+                             ValueExpression="@(() => Model.LastName)"
+                             Label="اسم العائلة"
+                             Required="true"
+                             Disabled="@(!IsEditable)"
+                             MaxLength="100"
+                             Size="ControlSize.Small"
+                             EnableNativeValidation="false" />
+
+                <UiSelect Value="@JobTitleValue"
+                          ValueChanged="SetJobTitleAsync"
+                          ValueExpression="@(() => JobTitleValue)"
+                          Label="المسمى الوظيفي"
+                          Placeholder="اختر المسمى الوظيفي"
+                          Options="@JobTitleOptions"
+                          Required="true"
+                          Disabled="@(!IsEditable)"
+                          Size="ControlSize.Small"
+                          EnableNativeValidation="false" />
+            </div>
+
+            <div class="ui-employee-editor-form__grid ui-employee-editor-form__grid--secondary">
+                <UiInputDate Value="@Model.HireDate"
+                             ValueChanged="SetHireDateAsync"
+                             ValueExpression="@(() => Model.HireDate)"
+                             Label="تاريخ التوظيف"
+                             Disabled="@(!IsEditable)"
+                             Size="ControlSize.Small"
+                             EnableNativeValidation="false" />
+
+                <div class="ui-employee-editor-form__checks">
+                    <UiCheckbox Value="@Model.IsActive"
+                                ValueChanged="SetActiveAsync"
+                                Label="موظف نشط"
+                                Disabled="@(!IsEditable)" />
+                    <UiCheckbox Value="@Model.IsCommissionEligible"
+                                ValueChanged="SetCommissionAsync"
+                                Label="مستحق للعمولة"
+                                Disabled="@(!IsEditable)" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="ui-employee-editor-form__contact-row">
+        <div class="ui-employee-editor-form__lookup-area">
+            <UiLookup Value="@UserAccountValue"
+                      ValueChanged="SetUserAccountAsync"
+                      SelectedItem="@LinkedUserItem"
+                      SearchAsync="@UserSearchAsync"
+                      Label="ربط الموظف بحساب مستخدم"
+                      Placeholder="ابحث بالاسم أو اسم المستخدم أو البريد..."
+                      EmptyText="لا توجد حسابات مستخدمين مطابقة."
+                      Disabled="@(!IsEditable || UserAccountLinkLocked)"
+                      MinimumSearchLength="0"
+                      DebounceMilliseconds="250" />
+            @if (UserAccountLinkLocked && LinkedUserItem is not null)
+            {
+                <div class="ui-employee-editor-form__link-note">
+                    تم تثبيت حساب المستخدم المرتبط بهذا الموظف، ويمكن تعديل بقية بيانات الموظف بشكل طبيعي.
+                </div>
+            }
+        </div>
+
+        <UiInputText Value="@Model.Phone"
+                     ValueChanged="SetPhoneAsync"
+                     ValueExpression="@(() => Model.Phone)"
+                     Label="رقم الهاتف"
+                     Disabled="@(!IsEditable)"
+                     MaxLength="32"
+                     InputMode="tel"
+                     AutoComplete="tel"
+                     Size="ControlSize.Small" />
+
+        <UiInputText Value="@Model.Email"
+                     ValueChanged="SetEmailAsync"
+                     ValueExpression="@(() => Model.Email)"
+                     Label="البريد الإلكتروني"
+                     Type="email"
+                     Disabled="@(!IsEditable)"
+                     MaxLength="256"
+                     AutoComplete="email"
+                     Size="ControlSize.Small" />
+    </div>
+
+    <div class="ui-employee-editor-form__address-grid">
+        <UiInputText Value="@Model.Country"
+                     ValueChanged="SetCountryAsync"
+                     ValueExpression="@(() => Model.Country)"
+                     Label="الدولة"
+                     Disabled="@(!IsEditable)"
+                     MaxLength="100"
+                     Size="ControlSize.Small" />
+        <UiInputText Value="@Model.Governorate"
+                     ValueChanged="SetGovernorateAsync"
+                     ValueExpression="@(() => Model.Governorate)"
+                     Label="المحافظة"
+                     Disabled="@(!IsEditable)"
+                     MaxLength="100"
+                     Size="ControlSize.Small" />
+        <UiInputText Value="@Model.City"
+                     ValueChanged="SetCityAsync"
+                     ValueExpression="@(() => Model.City)"
+                     Label="المدينة"
+                     Disabled="@(!IsEditable)"
+                     MaxLength="100"
+                     Size="ControlSize.Small" />
+        <UiInputText Value="@Model.PostalCode"
+                     ValueChanged="SetPostalCodeAsync"
+                     ValueExpression="@(() => Model.PostalCode)"
+                     Label="الرمز البريدي"
+                     Disabled="@(!IsEditable)"
+                     MaxLength="24"
+                     Size="ControlSize.Small" />
+        <div class="ui-employee-editor-form__address-line">
+            <UiInputText Value="@Model.ResidentialAddress"
+                         ValueChanged="SetResidentialAddressAsync"
+                         ValueExpression="@(() => Model.ResidentialAddress)"
+                         Label="عنوان السكن"
+                         Disabled="@(!IsEditable)"
+                         MaxLength="300"
+                         Size="ControlSize.Small" />
+        </div>
+    </div>
+</section>

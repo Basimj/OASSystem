@@ -1,9 +1,6 @@
 using MediatR;
-using OAS.Application.Abstractions.Security;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.Identity.Abstractions;
-using OAS.Application.Identity.Users.Common;
-using OAS.Domain.Identity.Constants;
 using OAS.Domain.Identity.Entities;
 
 namespace OAS.Application.Identity.Users.Commands.CreateUser;
@@ -11,8 +8,7 @@ namespace OAS.Application.Identity.Users.Commands.CreateUser;
 public sealed class CreateUserCommandHandler(
     IIdentityRepository repository,
     IPasswordService passwordService,
-    ITemporaryPasswordGenerator temporaryPasswordGenerator,
-    ICurrentUser currentUser) : IRequestHandler<CreateUserCommand, CreateUserOutcome>
+    ITemporaryPasswordGenerator temporaryPasswordGenerator) : IRequestHandler<CreateUserCommand, CreateUserOutcome>
 {
     public async Task<CreateUserOutcome> Handle(CreateUserCommand request, CancellationToken cancellationToken)
     {
@@ -30,14 +26,10 @@ public sealed class CreateUserCommandHandler(
         if (roles.Count != roleIds.Length)
             throw new ConflictException("identity_role_not_found", "One or more roles do not exist.");
 
-        if (roles.Any(x => string.Equals(x.Name, IdentityRoleNames.Administrator, StringComparison.OrdinalIgnoreCase)))
-        {
-            var actor = await UserManagementGuard.GetActorAsync(currentUser, repository, cancellationToken);
-            if (!actor.User.IsSuperAdmin)
-                throw new ForbiddenException("Super Administrator privileges are required.", "identity_super_admin_required");
-        }
-
-        var user = UserAccount.Create(Guid.NewGuid(), dto.UserName, dto.FirstName, dto.LastName, dto.Email, dto.IsActive, false, true);
+        // Administrator is a normal assignable account type. Super Administrator remains a separate protected identity flag.
+        var user = UserAccount.Create(
+            Guid.NewGuid(), dto.UserName, dto.FirstName, dto.LastName, dto.Email,
+            dto.IsActive, false, true, dto.PhoneNumber);
         var temporaryPassword = temporaryPasswordGenerator.Generate();
         user.SetPasswordHash(passwordService.Hash(user, temporaryPassword));
         user.RequirePasswordChange();
@@ -45,7 +37,6 @@ public sealed class CreateUserCommandHandler(
         await repository.AddUserAsync(user, cancellationToken);
         foreach (var role in roles)
             await repository.AddUserRoleAsync(UserRole.Create(Guid.NewGuid(), user.Id, role.Id), cancellationToken);
-
 
         return new CreateUserOutcome(user.Id, temporaryPassword);
     }

@@ -7,6 +7,7 @@ public sealed record UserDetailsDto(
     string LastName,
     string DisplayName,
     string? Email,
+    string? PhoneNumber,
     bool IsActive,
     bool IsSuperAdmin,
     bool MustChangePassword,

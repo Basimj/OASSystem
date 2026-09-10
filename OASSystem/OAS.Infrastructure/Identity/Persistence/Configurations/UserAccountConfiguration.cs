@@ -16,6 +16,7 @@ public sealed class UserAccountConfiguration : IEntityTypeConfiguration<UserAcco
         builder.Property(x => x.LastName).HasMaxLength(100).IsRequired();
         builder.Property(x => x.Email).HasMaxLength(256);
         builder.Property(x => x.NormalizedEmail).HasMaxLength(256);
+        builder.Property(x => x.PhoneNumber).HasMaxLength(32);
         builder.Property(x => x.PasswordHash).HasMaxLength(512).IsRequired();
         builder.Property(x => x.CreatedBy).HasMaxLength(64);
         builder.Property(x => x.LastModifiedBy).HasMaxLength(64);

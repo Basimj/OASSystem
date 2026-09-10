@@ -72,6 +72,8 @@
         new("departments", "الأقسام", "/departments", "fa-solid fa-sitemap"),
         new("suppliers", "الموردون", "/suppliers", "fa-solid fa-truck-field"),
         new("users", "المستخدمون", "/identity/users", "fa-solid fa-users", AdministratorOnly: true),
+        new("roles", "أنواع المستخدمين", "/identity/roles", "fa-solid fa-user-shield", AdministratorOnly: true),
+        new("job-titles", "المسميات الوظيفية", "/employees/job-titles", "fa-solid fa-briefcase", AdministratorOnly: true),
         new("settings", "الإعدادات", "/settings", "fa-solid fa-gear")
     ];
 
@@ -79,7 +81,7 @@
     [
         new("operations", "المبيعات والتشغيل", "fa-solid fa-store", ["sales", "customers", "products", "daily-orders"]),
         new("stock", "المخزون والمشتريات", "fa-solid fa-boxes-stacked", ["inventory", "purchases", "suppliers"]),
-        new("administration", "الإدارة", "fa-solid fa-people-group", ["employees", "departments", "users"]),
+        new("administration", "الإدارة", "fa-solid fa-people-group", ["employees", "departments", "users", "roles", "job-titles"]),
         new("finance", "المالية والتقارير", "fa-solid fa-chart-line", ["finance", "reports"]),
         new("system", "النظام", "fa-solid fa-sliders", ["settings"], DefaultExpanded: false)
     ];
@@ -120,6 +122,7 @@
             [nameof(UiProfileEditorDialog.LastName)] = _loadedProfile.LastName,
             [nameof(UiProfileEditorDialog.UserName)] = _loadedProfile.UserName,
             [nameof(UiProfileEditorDialog.Email)] = _loadedProfile.Email ?? string.Empty,
+            [nameof(UiProfileEditorDialog.PhoneNumber)] = _loadedProfile.PhoneNumber ?? string.Empty,
             [nameof(UiProfileEditorDialog.ImageUrl)] = CurrentUserImageUrl ?? string.Empty,
             [nameof(UiProfileEditorDialog.OnSaveProfile)] = (Func<UiProfilePersonalData, Task<UiOperationFeedback>>)SaveProfileAsync,
             [nameof(UiProfileEditorDialog.OnChangePassword)] = (Func<UiPasswordChangeData, Task<UiOperationFeedback>>)ChangeMyPasswordAsync,
@@ -130,13 +133,13 @@
         await Dialogs.ShowAsync<UiProfileEditorDialog>(
             "الملف الشخصي",
             parameters,
-            new UiDialogOptions { Size = UiDialogSize.Medium, CloseOnBackdrop = false });
+            new UiDialogOptions { Size = UiDialogSize.Small, CloseOnBackdrop = false });
     }
 
     private async Task<UiOperationFeedback> SaveProfileAsync(UiProfilePersonalData data)
     {
         if (_loadedProfile is null) return new(false, "تعذر تحميل بيانات الملف الشخصي.");
-        var result = await ProfileService.UpdateAsync(new UpdateMyProfileRequest(data.FirstName, data.LastName, _loadedProfile.RowVersion));
+        var result = await ProfileService.UpdateAsync(new UpdateMyProfileRequest(data.FirstName, data.LastName, data.PhoneNumber, _loadedProfile.RowVersion));
         if (!result.Succeeded || result.Value is null) return new(false, GetErrorMessage(result.Error));
 
         _loadedProfile = result.Value;

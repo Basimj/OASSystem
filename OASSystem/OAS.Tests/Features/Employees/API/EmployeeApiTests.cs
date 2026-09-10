@@ -1,8 +1,8 @@
-﻿using NUnit.Framework;
-using OAS.Contracts.Common.Errors;
-using OAS.Contracts.Common.Pagination;
+using NUnit.Framework;
 using OAS.Contracts.Features.Employees;
+using OAS.Contracts.Features.Employees.JobTitles;
 using OAS.Tests.Features.Employees.Integration;
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 
@@ -13,25 +13,25 @@ public sealed class EmployeeApiTests
 {
     private EmployeeApiFactory _factory = null!;
     private HttpClient _client = null!;
+    private Guid _jobTitleId;
 
     [OneTimeSetUp]
     public async Task Setup()
     {
         await TestDatabase.EnsureCreatedAndMigratedAsync();
-
         _factory = new EmployeeApiFactory();
+        _client = _factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+        {
+            HandleCookies = true,
+            AllowAutoRedirect = false
+        });
+        _client.DefaultRequestHeaders.Add("X-Test-Admin", "true");
 
-        _client = _factory.CreateClient(
-            new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
-            {
-                HandleCookies = true,
-                AllowAutoRedirect = false
-            });
-
-        _client.DefaultRequestHeaders.Add(
-            "X-Test-Admin",
-            "true");
+        var titles = await _client.GetFromJsonAsync<JobTitleDto[]>("/api/job-titles");
+        _jobTitleId = titles?.FirstOrDefault(x => x.IsActive)?.Id ?? Guid.Empty;
+        Assert.That(_jobTitleId, Is.Not.EqualTo(Guid.Empty), "Migration must seed at least one active job title.");
     }
+
     [OneTimeTearDown]
     public void TearDown()
     {
@@ -42,265 +42,130 @@ public sealed class EmployeeApiTests
     [Test]
     public async Task GetList_WithoutAuthentication_Returns401()
     {
-        using var client = _factory.CreateClient(
-            new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
-            {
-                AllowAutoRedirect = false
-            });
-
-        var response =
-            await client.GetAsync("/api/employees");
-
-        Assert.That(
-            response.StatusCode,
-            Is.EqualTo(HttpStatusCode.Unauthorized));
+        using var client = _factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var response = await client.GetAsync("/api/employees");
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
     }
 
     [Test]
     public async Task Admin_GetList_Returns200()
     {
-     
-        var response =
-            await _client.GetAsync(
-                "/api/employees?pageNumber=1&pageSize=20");
-
-        Assert.That(
-            response.StatusCode,
-            Is.EqualTo(HttpStatusCode.OK));
+        var response = await _client.GetAsync("/api/employees?pageNumber=1&pageSize=20");
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
     }
 
     [Test]
-    public async Task PostValid_Returns201()
+    public async Task ReserveNumber_Twice_ReturnsDistinctNumericCodes()
     {
-       
+        var firstResponse = await _client.PostAsync("/api/employees/number/reserve", null);
+        var secondResponse = await _client.PostAsync("/api/employees/number/reserve", null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(firstResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(secondResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        });
 
-        var request = new CreateEmployeeRequest(
-            $"API-{Guid.NewGuid():N}"[..10],
-            "Api",
-            "Employee",
-            "777000001",
-            "Sales",
-            null,
-            null,
-            true,
-            false,
-            true,
-            true,
-            null);
-
-        var response =
-            await _client.PostAsJsonAsync(
-                "/api/employees",
-                request);
-
-        Assert.That(
-            response.StatusCode,
-            Is.EqualTo(HttpStatusCode.Created));
-
-        var employee =
-            await response.Content.ReadFromJsonAsync<EmployeeDto>();
-
-        Assert.That(employee, Is.Not.Null);
-        Assert.That(employee!.Id, Is.Not.EqualTo(Guid.Empty));
+        var first = await firstResponse.Content.ReadFromJsonAsync<EmployeeNumberReservationDto>();
+        var second = await secondResponse.Content.ReadFromJsonAsync<EmployeeNumberReservationDto>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(first, Is.Not.Null);
+            Assert.That(second, Is.Not.Null);
+            Assert.That(second!.EmployeeNumber, Is.Not.EqualTo(first!.EmployeeNumber));
+            Assert.That(first.EmployeeCode, Is.EqualTo(first.EmployeeNumber.ToString(CultureInfo.InvariantCulture)));
+        });
     }
 
     [Test]
-    public async Task PostDuplicateCode_Returns409()
+    public async Task PostValid_Returns201WithNumericEmployeeCodeAndContactData()
     {
-        
-
-        var code =
-            $"DUP-{Guid.NewGuid():N}"[..10];
-
-        var request = new CreateEmployeeRequest(
-            code,
-            "First",
-            "Employee",
-            null,
-            null,
-            null,
-            null,
-            false,
-            false,
-            false,
-            true,
-            null);
-
-        var first =
-            await _client.PostAsJsonAsync(
-                "/api/employees",
-                request);
-
-        Assert.That(
-            first.StatusCode,
-            Is.EqualTo(HttpStatusCode.Created));
-
-        var second =
-            await _client.PostAsJsonAsync(
-                "/api/employees",
-                request);
-
-        Assert.That(
-            second.StatusCode,
-            Is.EqualTo(HttpStatusCode.Conflict));
+        var employee = await CreateEmployeeAsync();
+        Assert.Multiple(() =>
+        {
+            Assert.That(employee.Id, Is.Not.EqualTo(Guid.Empty));
+            Assert.That(employee.EmployeeNumber, Is.GreaterThan(0));
+            Assert.That(employee.EmployeeCode, Is.EqualTo(employee.EmployeeNumber.ToString(CultureInfo.InvariantCulture)));
+            Assert.That(employee.JobTitleId, Is.EqualTo(_jobTitleId));
+            Assert.That(employee.Email, Is.EqualTo("employee@example.com"));
+            Assert.That(employee.Country, Is.EqualTo("Yemen"));
+        });
     }
 
     [Test]
     public async Task GetUnknown_Returns404()
     {
-       
-
-        var response =
-            await _client.GetAsync(
-                $"/api/employees/{Guid.NewGuid()}");
-
-        Assert.That(
-            response.StatusCode,
-            Is.EqualTo(HttpStatusCode.NotFound));
+        var response = await _client.GetAsync($"/api/employees/{Guid.NewGuid()}");
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
     }
 
     [Test]
     public async Task PutValid_Returns200()
     {
-        
+        var created = await CreateEmployeeAsync();
+        var request = UpdateRequest(created, firstName: "Updated", city: "Aden");
 
-        var created =
-            await CreateEmployeeAsync();
-
-        var request = new UpdateEmployeeRequest(
-            created.EmployeeCode,
-            "Updated",
-            "Employee",
-            created.Phone,
-            created.JobTitle,
-            created.HireDate,
-            created.Notes,
-            created.IsSalesperson,
-            created.IsTechnician,
-            created.IsCommissionEligible,
-            null,
-            created.RowVersion);
-
-        var response =
-            await _client.PutAsJsonAsync(
-                $"/api/employees/{created.Id}",
-                request);
-
-        Assert.That(
-            response.StatusCode,
-            Is.EqualTo(HttpStatusCode.OK));
-
-        var employee =
-            await response.Content.ReadFromJsonAsync<EmployeeDto>();
-
-        Assert.That(employee, Is.Not.Null);
-        Assert.That(
-            employee!.FirstName,
-            Is.EqualTo("Updated"));
+        var response = await _client.PutAsJsonAsync($"/api/employees/{created.Id}", request);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var employee = await response.Content.ReadFromJsonAsync<EmployeeDto>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(employee!.FirstName, Is.EqualTo("Updated"));
+            Assert.That(employee.City, Is.EqualTo("Aden"));
+        });
     }
 
     [Test]
     public async Task PutStaleRowVersion_Returns409()
     {
-        
+        var created = await CreateEmployeeAsync();
+        var request = UpdateRequest(created) with { RowVersion = Convert.ToBase64String([1, 2, 3]) };
 
-        var created =
-            await CreateEmployeeAsync();
-
-        var request = new UpdateEmployeeRequest(
-            created.EmployeeCode,
-            "Updated",
-            "Employee",
-            null,
-            null,
-            null,
-            null,
-            false,
-            false,
-            false,
-            null,
-            Convert.ToBase64String([1, 2, 3]));
-
-        var response =
-            await _client.PutAsJsonAsync(
-                $"/api/employees/{created.Id}",
-                request);
-
-        Assert.That(
-            response.StatusCode,
-            Is.EqualTo(HttpStatusCode.Conflict));
+        var response = await _client.PutAsJsonAsync($"/api/employees/{created.Id}", request);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Conflict));
     }
 
     [Test]
     public async Task PostStatus_Returns200()
     {
-      
-
-        var created =
-            await CreateEmployeeAsync();
-
-        var request = new SetEmployeeStatusRequest(
-            false,
-            created.RowVersion);
-
-        var response =
-            await _client.PostAsJsonAsync(
-                $"/api/employees/{created.Id}/status",
-                request);
-
-        Assert.That(
-            response.StatusCode,
-            Is.EqualTo(HttpStatusCode.OK));
-
-        var employee =
-            await response.Content.ReadFromJsonAsync<EmployeeDto>();
-
-        Assert.That(employee, Is.Not.Null);
+        var created = await CreateEmployeeAsync();
+        var response = await _client.PostAsJsonAsync($"/api/employees/{created.Id}/status",
+            new SetEmployeeStatusRequest(false, created.RowVersion));
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var employee = await response.Content.ReadFromJsonAsync<EmployeeDto>();
         Assert.That(employee!.IsActive, Is.False);
     }
 
     [Test]
     public async Task DeleteEndpoint_DoesNotExist()
     {
-      
-
-        var response =
-            await _client.DeleteAsync(
-                $"/api/employees/{Guid.NewGuid()}");
-
-        Assert.That(
-       response.StatusCode,
-       Is.EqualTo(HttpStatusCode.MethodNotAllowed));
+        var response = await _client.DeleteAsync($"/api/employees/{Guid.NewGuid()}");
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.MethodNotAllowed));
     }
-
-    
 
     private async Task<EmployeeDto> CreateEmployeeAsync()
     {
-        var request = new CreateEmployeeRequest(
-            $"API-{Guid.NewGuid():N}"[..10],
-            "Test",
-            "Employee",
-            "777000002",
-            "Sales",
-            null,
-            null,
-            true,
-            false,
-            true,
-            true,
-            null);
-
-        var response =
-            await _client.PostAsJsonAsync(
-                "/api/employees",
-                request);
-
-        Assert.That(
-            response.StatusCode,
-            Is.EqualTo(HttpStatusCode.Created));
-
-        return (await response.Content
-            .ReadFromJsonAsync<EmployeeDto>())!;
+        var response = await _client.PostAsJsonAsync("/api/employees", new CreateEmployeeRequest(
+            "Test", "Employee", "777000002", "employee@example.com",
+            "Yemen", "Sana'a", "Sana'a", "10001", "Main Street",
+            _jobTitleId, null, true, true));
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Created));
+        return (await response.Content.ReadFromJsonAsync<EmployeeDto>())!;
     }
+
+    private static UpdateEmployeeRequest UpdateRequest(EmployeeDto employee, string? firstName = null, string? city = null) => new(
+        firstName ?? employee.FirstName,
+        employee.LastName,
+        employee.Phone,
+        employee.Email,
+        employee.Country,
+        employee.Governorate,
+        city ?? employee.City,
+        employee.PostalCode,
+        employee.ResidentialAddress,
+        employee.JobTitleId,
+        employee.HireDate,
+        employee.IsCommissionEligible,
+        employee.IsActive,
+        employee.UserAccountId,
+        employee.RowVersion);
 }

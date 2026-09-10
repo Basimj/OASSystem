@@ -21,6 +21,7 @@ public sealed class GetMyProfileQueryHandler(ICurrentUser currentUser, IIdentity
 
     internal static MyProfileDto Map(IdentityUserRecord record) => new(
         record.User.Id, record.User.UserName, record.User.FirstName, record.User.LastName,
-        record.User.DisplayName, record.User.Email, record.Roles.Select(x => x.Name).OrderBy(x => x).ToArray(),
+        record.User.DisplayName, record.User.Email, record.User.PhoneNumber,
+        record.Roles.Select(x => x.Name).OrderBy(x => x).ToArray(),
         Convert.ToBase64String(record.User.RowVersion));
 }

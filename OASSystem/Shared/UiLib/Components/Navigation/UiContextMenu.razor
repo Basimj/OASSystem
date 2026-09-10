@@ -1,6 +1,10 @@
 @if (Visible)
 {
     <div class="ui-context-menu" role="menu" @onclick:stopPropagation="true">
+        @if (!string.IsNullOrWhiteSpace(Title))
+        {
+            <div class="ui-context-menu__title">@Title</div>
+        }
         @foreach (var item in Items)
         {
             <button type="button"

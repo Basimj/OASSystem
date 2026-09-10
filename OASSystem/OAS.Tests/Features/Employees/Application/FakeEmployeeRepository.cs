@@ -144,13 +144,13 @@ public sealed class FakeEmployeeRepository : IRepository<Employee, Guid>
             Func<Employee, object?> keySelector =
                 sort.PropertyName switch
                 {
-                    "EmployeeCode" => x => x.EmployeeCode,
+                    "EmployeeNumber" => x => x.EmployeeNumber,
+                    "EmployeeCode" => x => x.EmployeeNumber,
                     "FirstName" => x => x.FirstName,
                     "LastName" => x => x.LastName,
-                    "JobTitle" => x => x.JobTitle,
                     "IsActive" => x => x.IsActive,
                     "CreatedAtUtc" => x => x.CreatedAtUtc,
-                    _ => x => x.EmployeeCode
+                    _ => x => x.EmployeeNumber
                 };
 
             if (ordered is null)

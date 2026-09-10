@@ -12,6 +12,7 @@ public sealed class OasDbContext(DbContextOptions<OasDbContext> options) : DbCon
     public DbSet<UserPasswordHistory> UserPasswordHistory => Set<UserPasswordHistory>();
 
     public DbSet<Employee> Employees => Set<Employee>();
+    public DbSet<JobTitle> JobTitles => Set<JobTitle>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

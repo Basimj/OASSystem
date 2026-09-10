@@ -1,0 +1,39 @@
+<article class="ui-employee-card" dir="rtl" @onclick="OpenAsync">
+    <div class="ui-employee-card__header">
+        <div class="ui-employee-card__identity">
+            <div class="ui-employee-card__avatar-wrap">
+                <UiAvatar Initials="@Initials" ImageUrl="@ImageUrl" AltText="@Name" Size="34" />
+                @if (IsActive)
+                {
+                    <span class="ui-employee-card__status-dot" title="نشط"></span>
+                }
+            </div>
+            <div class="ui-employee-card__name-wrap">
+                <strong class="ui-employee-card__name">@Name</strong>
+                <span class="ui-employee-card__code">@EmployeeCode</span>
+            </div>
+        </div>
+
+        <div class="ui-employee-card__menu-wrap" @onclick:stopPropagation="true">
+            <button type="button" class="ui-employee-card__menu-button" aria-label="إجراءات الموظف" title="إجراءات" @onclick="ToggleMenu">
+                <i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i>
+            </button>
+            @if (_menuOpen)
+            {
+                <div class="ui-employee-card__menu">
+                    <button type="button" @onclick="EditAsync"><i class="fa-solid fa-eye" aria-hidden="true"></i><span>فتح التفاصيل</span></button>
+                    <button type="button" @onclick="ToggleStatusAsync"><i class="fa-solid fa-power-off" aria-hidden="true"></i><span>@(IsActive ? "تعطيل" : "تفعيل")</span></button>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="ui-employee-card__content">
+        <span class="ui-employee-card__job">@EffectiveJobTitle</span>
+        <div class="ui-employee-card__phone" title="رقم الهاتف"><i class="fa-solid fa-phone" aria-hidden="true"></i><span>@EffectivePhone</span></div>
+        @if (IsCommissionEligible)
+        {
+            <div class="ui-employee-card__flags"><span class="ui-employee-card__badge">عمولة</span></div>
+        }
+    </div>
+</article>

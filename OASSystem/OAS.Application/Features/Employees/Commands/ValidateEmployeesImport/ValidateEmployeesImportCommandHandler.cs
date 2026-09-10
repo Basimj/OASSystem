@@ -1,296 +1,86 @@
-﻿using OAS.Application.Abstractions.Persistence;
-using OAS.Application.Common.Exceptions;
+using MediatR;
+using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Features.Employees.Abstractions;
-using OAS.Application.Features.Employees.Specifications;
 using OAS.Contracts.Features.Employees.Import;
 using OAS.Domain.Features.Employees.Entities;
-using MediatR;
 
 namespace OAS.Application.Features.Employees.Commands.ValidateEmployeesImport;
 
 public sealed class ValidateEmployeesImportCommandHandler(
     IEmployeeExcelReader excelReader,
-    IReadRepository<Employee, Guid> employeeRepository)
-    : IRequestHandler<
-        ValidateEmployeesImportCommand,
-        EmployeeImportPreviewDto>
+    IReadRepository<JobTitle, Guid> jobTitleRepository)
+    : IRequestHandler<ValidateEmployeesImportCommand, EmployeeImportPreviewDto>
 {
     public async Task<EmployeeImportPreviewDto> Handle(
         ValidateEmployeesImportCommand request,
         CancellationToken cancellationToken)
     {
-        using var stream =
-            new MemoryStream(request.FileContent);
-
+        using var stream = new MemoryStream(request.FileContent);
         IReadOnlyList<EmployeeImportRowDto> rows;
-
         try
         {
-            rows = await excelReader.ReadAsync(
-                stream,
-                cancellationToken);
+            rows = await excelReader.ReadAsync(stream, cancellationToken);
         }
         catch (Exception ex)
         {
-            return new EmployeeImportPreviewDto(
-                0,
-                0,
-                0,
-                [
-                    new EmployeeImportErrorDto(
-                        1,
-                        "الملف",
-                        ex.Message)
-                ]);
+            return new EmployeeImportPreviewDto(0, 0, 0, [new EmployeeImportErrorDto(1, "الملف", ex.Message)]);
         }
 
-        var errors =
-            new List<EmployeeImportErrorDto>();
+        var jobTitles = (await jobTitleRepository.ListAsync(cancellationToken: cancellationToken))
+            .Where(x => x.IsActive)
+            .Select(x => x.Name)
+            .ToHashSet(StringComparer.CurrentCultureIgnoreCase);
 
-        var seenCodes =
-            new Dictionary<string, int>(
-                StringComparer.OrdinalIgnoreCase);
-
+        var errors = new List<EmployeeImportErrorDto>();
         foreach (var row in rows)
         {
-            ValidateBasicFields(
-                row,
-                errors);
+            if (string.IsNullOrWhiteSpace(row.FirstName))
+                errors.Add(new(row.RowNumber, "الاسم الأول", "الاسم الأول مطلوب."));
+            else if (row.FirstName.Trim().Length > 100)
+                errors.Add(new(row.RowNumber, "الاسم الأول", "الاسم الأول يجب ألا يتجاوز 100 حرف."));
 
-            ValidateBooleanFields(
-                row,
-                errors);
+            if (string.IsNullOrWhiteSpace(row.LastName))
+                errors.Add(new(row.RowNumber, "اسم العائلة", "اسم العائلة مطلوب."));
+            else if (row.LastName.Trim().Length > 100)
+                errors.Add(new(row.RowNumber, "اسم العائلة", "اسم العائلة يجب ألا يتجاوز 100 حرف."));
 
-            ValidateDate(
-                row,
-                errors);
+            if (!string.IsNullOrWhiteSpace(row.Phone) && row.Phone.Trim().Length > 32)
+                errors.Add(new(row.RowNumber, "رقم الهاتف", "رقم الهاتف يجب ألا يتجاوز 32 حرفًا."));
 
-            var normalizedCode =
-                row.EmployeeCode
-                    .Trim()
-                    .ToUpperInvariant();
-
-            if (!string.IsNullOrWhiteSpace(normalizedCode))
+            if (!string.IsNullOrWhiteSpace(row.Email))
             {
-                if (seenCodes.TryGetValue(
-                        normalizedCode,
-                        out var firstRow))
-                {
-                    errors.Add(
-                        new EmployeeImportErrorDto(
-                            row.RowNumber,
-                            "رمز الموظف",
-                            $"رمز الموظف مكرر داخل الملف. ظهر أولاً في الصف {firstRow}."));
-                }
-                else
-                {
-                    seenCodes[normalizedCode] =
-                        row.RowNumber;
-                }
-
-                try
-                {
-                    var exists =
-                        await employeeRepository.CountAsync(
-                            new EmployeeCodeSpecification(
-                                normalizedCode),
-                            cancellationToken);
-
-                    if (exists > 0)
-                    {
-                        errors.Add(
-                            new EmployeeImportErrorDto(
-                                row.RowNumber,
-                                "رمز الموظف",
-                                "رمز الموظف موجود مسبقًا في قاعدة البيانات."));
-                    }
-                }
-                catch (Exception ex)
-                {
-                    errors.Add(
-                        new EmployeeImportErrorDto(
-                            row.RowNumber,
-                            "رمز الموظف",
-                            $"تعذر التحقق من قاعدة البيانات: {ex.Message}"));
-                }
+                var email = row.Email.Trim();
+                if (email.Length > 256 || !email.Contains('@') || email.StartsWith('@') || email.EndsWith('@'))
+                    errors.Add(new(row.RowNumber, "البريد الإلكتروني", "البريد الإلكتروني غير صالح."));
             }
+
+            ValidateLength(errors, row.RowNumber, "الدولة", row.Country, 100);
+            ValidateLength(errors, row.RowNumber, "المحافظة", row.Governorate, 100);
+            ValidateLength(errors, row.RowNumber, "المدينة", row.City, 100);
+            ValidateLength(errors, row.RowNumber, "الرمز البريدي", row.PostalCode, 24);
+            ValidateLength(errors, row.RowNumber, "عنوان السكن", row.ResidentialAddress, 300);
+
+            if (string.IsNullOrWhiteSpace(row.JobTitle))
+                errors.Add(new(row.RowNumber, "المسمى الوظيفي", "المسمى الوظيفي مطلوب."));
+            else if (!jobTitles.Contains(row.JobTitle.Trim()))
+                errors.Add(new(row.RowNumber, "المسمى الوظيفي", $"المسمى الوظيفي «{row.JobTitle.Trim()}» غير موجود أو غير نشط."));
+
+            if (!IsBoolean(row.IsCommissionEligible))
+                errors.Add(new(row.RowNumber, "مستحق للعمولة", "القيمة يجب أن تكون نعم أو لا."));
+            if (!IsBoolean(row.IsActive))
+                errors.Add(new(row.RowNumber, "نشط", "القيمة يجب أن تكون نعم أو لا."));
         }
 
-        var invalidRows =
-            rows
-                .Select(x => x.RowNumber)
-                .Distinct()
-                .Count(rowNumber =>
-                    errors.Any(e =>
-                        e.RowNumber == rowNumber));
-
-        return new EmployeeImportPreviewDto(
-            rows.Count,
-            rows.Count - invalidRows,
-            invalidRows,
-            errors);
+        var invalidRows = errors.Select(x => x.RowNumber).Distinct().Count();
+        return new EmployeeImportPreviewDto(rows.Count, rows.Count - invalidRows, invalidRows, errors);
     }
 
-    private static void ValidateBasicFields(
-        EmployeeImportRowDto row,
-        List<EmployeeImportErrorDto> errors)
+    private static void ValidateLength(List<EmployeeImportErrorDto> errors, int rowNumber, string field, string? value, int maximum)
     {
-        if (string.IsNullOrWhiteSpace(row.EmployeeCode))
-        {
-            errors.Add(
-                new EmployeeImportErrorDto(
-                    row.RowNumber,
-                    "رمز الموظف",
-                    "رمز الموظف مطلوب."));
-        }
-        else if (row.EmployeeCode.Trim().Length > 32)
-        {
-            errors.Add(
-                new EmployeeImportErrorDto(
-                    row.RowNumber,
-                    "رمز الموظف",
-                    "رمز الموظف يجب ألا يتجاوز 32 حرفًا."));
-        }
-
-        if (string.IsNullOrWhiteSpace(row.FirstName))
-        {
-            errors.Add(
-                new EmployeeImportErrorDto(
-                    row.RowNumber,
-                    "الاسم الأول",
-                    "الاسم الأول مطلوب."));
-        }
-        else if (row.FirstName.Trim().Length > 100)
-        {
-            errors.Add(
-                new EmployeeImportErrorDto(
-                    row.RowNumber,
-                    "الاسم الأول",
-                    "الاسم الأول يجب ألا يتجاوز 100 حرف."));
-        }
-
-        if (string.IsNullOrWhiteSpace(row.LastName))
-        {
-            errors.Add(
-                new EmployeeImportErrorDto(
-                    row.RowNumber,
-                    "اسم العائلة",
-                    "اسم العائلة مطلوب."));
-        }
-        else if (row.LastName.Trim().Length > 100)
-        {
-            errors.Add(
-                new EmployeeImportErrorDto(
-                    row.RowNumber,
-                    "اسم العائلة",
-                    "اسم العائلة يجب ألا يتجاوز 100 حرف."));
-        }
-
-        if (row.Phone?.Length > 32)
-        {
-            errors.Add(
-                new EmployeeImportErrorDto(
-                    row.RowNumber,
-                    "رقم الهاتف",
-                    "رقم الهاتف يجب ألا يتجاوز 32 حرفًا."));
-        }
-
-        if (row.JobTitle?.Length > 100)
-        {
-            errors.Add(
-                new EmployeeImportErrorDto(
-                    row.RowNumber,
-                    "المسمى الوظيفي",
-                    "المسمى الوظيفي يجب ألا يتجاوز 100 حرف."));
-        }
-
-        if (row.Notes?.Length > 1000)
-        {
-            errors.Add(
-                new EmployeeImportErrorDto(
-                    row.RowNumber,
-                    "الملاحظات",
-                    "الملاحظات يجب ألا تتجاوز 1000 حرف."));
-        }
+        if (!string.IsNullOrWhiteSpace(value) && value.Trim().Length > maximum)
+            errors.Add(new(rowNumber, field, $"{field} يجب ألا يتجاوز {maximum} حرفًا."));
     }
 
-    private static void ValidateBooleanFields(
-       EmployeeImportRowDto row,
-       List<EmployeeImportErrorDto> errors)
-    {
-        ValidateBoolean(
-            row,
-            row.IsSalesperson,
-            "موظف مبيعات",
-            errors);
-
-        ValidateBoolean(
-            row,
-            row.IsTechnician,
-            "فني",
-            errors);
-
-        ValidateBoolean(
-            row,
-            row.IsCommissionEligible,
-            "مستحق للعمولة",
-            errors);
-
-        ValidateBoolean(
-            row,
-            row.IsActive,
-            "نشط",
-            errors);
-    }
-
-    private static void ValidateBoolean(
-        EmployeeImportRowDto row,
-        string value,
-        string column,
-        List<EmployeeImportErrorDto> errors)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            errors.Add(
-                new EmployeeImportErrorDto(
-                    row.RowNumber,
-                    column,
-                    $"الحقل «{column}» مطلوب ويجب أن يكون نعم أو لا."));
-
-            return;
-        }
-
-        var normalized =
-            value.Trim().ToLowerInvariant();
-
-        var valid =
-            normalized is
-                "نعم" or
-                "لا" or
-                "yes" or
-                "no" or
-                "true" or
-                "false" or
-                "1" or
-                "0";
-
-        if (!valid)
-        {
-            errors.Add(
-                new EmployeeImportErrorDto(
-                    row.RowNumber,
-                    column,
-                    "القيمة يجب أن تكون نعم أو لا."));
-        }
-    }
-
-    private static void ValidateDate(
-       EmployeeImportRowDto row,
-       List<EmployeeImportErrorDto> errors)
-    {
-        if (string.IsNullOrWhiteSpace(row.HireDate?.ToString()))
-        {
-            return;
-        }
-    }
+    private static bool IsBoolean(string value) =>
+        value.Trim().ToLowerInvariant() is "نعم" or "لا" or "yes" or "no" or "true" or "false" or "1" or "0";
 }

@@ -8,10 +8,10 @@ public sealed class UserAccount : AuditableEntity<Guid>
 {
     private UserAccount() { }
 
-    private UserAccount(Guid id, string userName, string firstName, string lastName, string? email, bool isActive, bool isSuperAdmin, bool mustChangePassword)
+    private UserAccount(Guid id, string userName, string firstName, string lastName, string? email, string? phoneNumber, bool isActive, bool isSuperAdmin, bool mustChangePassword)
     {
         Id = id;
-        SetIdentity(userName, firstName, lastName, email);
+        SetIdentity(userName, firstName, lastName, email, phoneNumber);
         IsActive = isActive;
         IsSuperAdmin = isSuperAdmin;
         MustChangePassword = mustChangePassword;
@@ -23,6 +23,7 @@ public sealed class UserAccount : AuditableEntity<Guid>
     public string LastName { get; private set; } = string.Empty;
     public string? Email { get; private set; }
     public string? NormalizedEmail { get; private set; }
+    public string? PhoneNumber { get; private set; }
     public string PasswordHash { get; private set; } = string.Empty;
     public bool IsActive { get; private set; }
     public bool IsSuperAdmin { get; private set; }
@@ -34,15 +35,24 @@ public sealed class UserAccount : AuditableEntity<Guid>
 
     public string DisplayName => string.Join(' ', new[] { FirstName, LastName }.Where(x => !string.IsNullOrWhiteSpace(x)));
 
-    public static UserAccount Create(Guid id, string userName, string firstName, string lastName, string? email, bool isActive = true, bool isSuperAdmin = false, bool mustChangePassword = false)
+    public static UserAccount Create(
+        Guid id,
+        string userName,
+        string firstName,
+        string lastName,
+        string? email,
+        bool isActive = true,
+        bool isSuperAdmin = false,
+        bool mustChangePassword = false,
+        string? phoneNumber = null)
     {
         if (id == Guid.Empty) throw new DomainException("User id is required.");
-        return new UserAccount(id, userName, firstName, lastName, email, isActive, isSuperAdmin, mustChangePassword);
+        return new UserAccount(id, userName, firstName, lastName, email, phoneNumber, isActive, isSuperAdmin, mustChangePassword);
     }
 
     public static string Normalize(string value) => value.Trim().ToUpperInvariant();
 
-    public void SetIdentity(string userName, string firstName, string lastName, string? email)
+    public void SetIdentity(string userName, string firstName, string lastName, string? email, string? phoneNumber = null)
     {
         if (string.IsNullOrWhiteSpace(userName)) throw new DomainException("User name is required.");
         if (string.IsNullOrWhiteSpace(firstName)) throw new DomainException("First name is required.");
@@ -54,16 +64,30 @@ public sealed class UserAccount : AuditableEntity<Guid>
         LastName = lastName.Trim();
         Email = string.IsNullOrWhiteSpace(email) ? null : email.Trim();
         NormalizedEmail = Email is null ? null : Normalize(Email);
+        PhoneNumber = NormalizePhoneNumber(phoneNumber);
+    }
+
+    public void UpdatePersonalProfile(string firstName, string lastName, string phoneNumber)
+    {
+        if (string.IsNullOrWhiteSpace(firstName)) throw new DomainException("First name is required.");
+        if (string.IsNullOrWhiteSpace(lastName)) throw new DomainException("Last name is required.");
+        if (string.IsNullOrWhiteSpace(phoneNumber)) throw new DomainException("Phone number is required.");
+
+        FirstName = firstName.Trim();
+        LastName = lastName.Trim();
+        PhoneNumber = NormalizePhoneNumber(phoneNumber);
     }
 
     public void UpdatePersonalName(string firstName, string lastName)
     {
         if (string.IsNullOrWhiteSpace(firstName)) throw new DomainException("First name is required.");
         if (string.IsNullOrWhiteSpace(lastName)) throw new DomainException("Last name is required.");
-
         FirstName = firstName.Trim();
         LastName = lastName.Trim();
     }
+
+    private static string? NormalizePhoneNumber(string? phoneNumber) =>
+        string.IsNullOrWhiteSpace(phoneNumber) ? null : phoneNumber.Trim();
 
     public void SetPasswordHash(string passwordHash)
     {

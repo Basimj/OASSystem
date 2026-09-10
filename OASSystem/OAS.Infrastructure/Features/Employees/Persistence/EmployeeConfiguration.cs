@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using OAS.Domain.Features.Employees.Entities;
 
@@ -11,65 +11,72 @@ public sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         builder.ToTable("Employees", "hr");
 
         builder.HasKey(x => x.Id);
+        builder.Property(x => x.Id).ValueGeneratedNever();
 
-        builder.Property(x => x.Id)
-            .ValueGeneratedNever();
+        builder.Property(x => x.EmployeeNumber)
+            .ValueGeneratedOnAdd()
+            .HasDefaultValueSql("NEXT VALUE FOR [core].[EmployeeNumberSequence]");
 
-        builder.Property(x => x.EmployeeCode)
-            .IsRequired()
-            .HasMaxLength(32);
+        builder.Ignore(x => x.EmployeeCode);
+        builder.Ignore(x => x.DisplayName);
 
-        builder.Property(x => x.NormalizedEmployeeCode)
-            .IsRequired()
-            .HasMaxLength(32);
-
-        builder.Property(x => x.FirstName)
-            .IsRequired()
-            .HasMaxLength(100);
-
-        builder.Property(x => x.LastName)
-            .IsRequired()
-            .HasMaxLength(100);
-
-        builder.Property(x => x.Phone)
-            .HasMaxLength(32);
-
-        builder.Property(x => x.JobTitle)
-            .HasMaxLength(100);
-
-        builder.Property(x => x.HireDate)
-            .HasColumnType("date");
-
-        builder.Property(x => x.Notes)
-            .HasMaxLength(1000);
-
-        builder.Property(x => x.IsSalesperson)
-            .IsRequired();
-
-        builder.Property(x => x.IsTechnician)
-            .IsRequired();
-
-        builder.Property(x => x.IsCommissionEligible)
-            .IsRequired();
-
-        builder.Property(x => x.IsActive)
-            .IsRequired();
-
+        builder.Property(x => x.FirstName).IsRequired().HasMaxLength(100);
+        builder.Property(x => x.LastName).IsRequired().HasMaxLength(100);
+        builder.Property(x => x.JobTitleId).IsRequired();
+        builder.Property(x => x.HireDate).HasColumnType("date");
+        builder.Property(x => x.IsCommissionEligible).IsRequired();
+        builder.Property(x => x.IsActive).IsRequired();
         builder.Property(x => x.UserAccountId);
+        builder.Property(x => x.Photo).HasMaxLength(512);
+        builder.Property(x => x.RowVersion).IsRowVersion().IsConcurrencyToken();
+        builder.Property(x => x.CreatedBy).HasMaxLength(64);
+        builder.Property(x => x.LastModifiedBy).HasMaxLength(64);
 
-        builder.Property(x => x.RowVersion)
-            .IsRowVersion()
-            .IsConcurrencyToken();
+        builder.OwnsOne(x => x.ContactInfo, contact =>
+        {
+            contact.Property(x => x.Phone)
+                .HasColumnName("Phone")
+                .HasMaxLength(32);
+            contact.Property(x => x.Email)
+                .HasColumnName("Email")
+                .HasMaxLength(256);
 
-        builder.Property(x => x.CreatedBy)
-            .HasMaxLength(64);
+            contact.HasIndex(x => x.Phone)
+                .HasDatabaseName("IX_Employees_Phone")
+                .HasFilter("[Phone] IS NOT NULL");
+            contact.HasIndex(x => x.Email)
+                .HasDatabaseName("IX_Employees_Email")
+                .HasFilter("[Email] IS NOT NULL");
 
-        builder.Property(x => x.LastModifiedBy)
-            .HasMaxLength(64);
+            contact.OwnsOne(x => x.Address, address =>
+            {
+                address.Property(x => x.Country)
+                    .HasColumnName("Country")
+                    .HasMaxLength(100);
+                address.Property(x => x.Governorate)
+                    .HasColumnName("Governorate")
+                    .HasMaxLength(100);
+                address.Property(x => x.City)
+                    .HasColumnName("City")
+                    .HasMaxLength(100);
+                address.Property(x => x.PostalCode)
+                    .HasColumnName("PostalCode")
+                    .HasMaxLength(24);
+                address.Property(x => x.ResidentialAddress)
+                    .HasColumnName("ResidentialAddress")
+                    .HasMaxLength(300);
+            });
 
-        builder.HasIndex(x => x.NormalizedEmployeeCode)
+            contact.Navigation(x => x.Address).IsRequired();
+        });
+        builder.Navigation(x => x.ContactInfo).IsRequired();
+
+        builder.HasIndex(x => x.EmployeeNumber)
             .IsUnique()
-            .HasDatabaseName("UX_Employees_NormalizedEmployeeCode");
+            .HasDatabaseName("UX_Employees_EmployeeNumber");
+
+        builder.HasIndex(x => x.JobTitleId)
+            .HasDatabaseName("IX_Employees_JobTitleId");
 
         builder.HasIndex(x => x.UserAccountId)
             .IsUnique()
@@ -79,22 +86,20 @@ public sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         builder.HasIndex(x => x.IsActive)
             .HasDatabaseName("IX_Employees_IsActive");
 
-        builder.HasIndex(x => new
-        {
-            x.LastName,
-            x.FirstName
-        })
-        .HasDatabaseName("IX_Employees_LastName_FirstName");
+        builder.HasIndex(x => new { x.LastName, x.FirstName })
+            .HasDatabaseName("IX_Employees_LastName_FirstName");
 
-        builder.HasIndex(x => x.Phone)
-            .HasDatabaseName("IX_Employees_Phone")
-            .HasFilter("[Phone] IS NOT NULL");
+        builder.HasOne<JobTitle>()
+            .WithMany()
+            .HasForeignKey(x => x.JobTitleId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_Employees_JobTitles_JobTitleId");
 
         builder.HasOne<OAS.Domain.Identity.Entities.UserAccount>()
             .WithMany()
             .HasForeignKey(x => x.UserAccountId)
             .HasPrincipalKey(x => x.Id)
-            .OnDelete(DeleteBehavior.SetNull)
+            .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_Employees_Users_UserAccountId");
     }
 }

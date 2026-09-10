@@ -18,6 +18,6 @@ public sealed class UpdateMyProfileCommandHandler(ICurrentUser currentUser, IIde
             ?? throw new ForbiddenException();
 
         RowVersionCodec.EnsureMatches(record.User.RowVersion, request.Request.RowVersion);
-        record.User.UpdatePersonalName(request.Request.FirstName, request.Request.LastName);
+        record.User.UpdatePersonalProfile(request.Request.FirstName, request.Request.LastName, request.Request.PhoneNumber);
     }
 }

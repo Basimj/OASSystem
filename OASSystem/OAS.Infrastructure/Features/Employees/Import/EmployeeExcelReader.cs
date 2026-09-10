@@ -1,4 +1,4 @@
-﻿using ClosedXML.Excel;
+using ClosedXML.Excel;
 using OAS.Application.Features.Employees.Abstractions;
 using OAS.Contracts.Features.Employees.Import;
 
@@ -8,248 +8,96 @@ public sealed class EmployeeExcelReader : IEmployeeExcelReader
 {
     private static readonly string[] RequiredHeaders =
     [
-        "رمز الموظف",
         "الاسم الأول",
         "اسم العائلة",
         "رقم الهاتف",
         "المسمى الوظيفي",
         "تاريخ التوظيف",
-        "موظف مبيعات",
-        "فني",
         "مستحق للعمولة",
-        "نشط",
-        "الملاحظات"
+        "نشط"
     ];
 
-    public Task<IReadOnlyList<EmployeeImportRowDto>> ReadAsync(
-        Stream stream,
-        CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<EmployeeImportRowDto>> ReadAsync(Stream stream, CancellationToken cancellationToken = default)
     {
-        if (stream is null)
-            throw new ArgumentNullException(nameof(stream));
-
-        if (!stream.CanRead)
-            throw new InvalidOperationException(
-                "لا يمكن قراءة ملف Excel.");
-
-        if (stream.CanSeek)
-            stream.Position = 0;
+        if (stream is null) throw new ArgumentNullException(nameof(stream));
+        if (!stream.CanRead) throw new InvalidOperationException("لا يمكن قراءة ملف Excel.");
+        if (stream.CanSeek) stream.Position = 0;
 
         using var workbook = new XLWorkbook(stream);
+        var worksheet = workbook.Worksheets.FirstOrDefault()
+            ?? throw new InvalidOperationException("ملف Excel لا يحتوي على ورقة عمل.");
+        var headerRow = worksheet.FirstRowUsed()
+            ?? throw new InvalidOperationException("ملف Excel فارغ.");
 
-        var worksheet = workbook.Worksheets.FirstOrDefault();
-
-        if (worksheet is null)
-        {
-            throw new InvalidOperationException(
-                "ملف Excel لا يحتوي على ورقة عمل.");
-        }
-
-        var headerRow = worksheet.FirstRowUsed();
-
-        if (headerRow is null)
-        {
-            throw new InvalidOperationException(
-                "ملف Excel فارغ.");
-        }
-
-        var headers = new Dictionary<string, int>(
-            StringComparer.OrdinalIgnoreCase);
-
+        var headers = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         foreach (var cell in headerRow.CellsUsed())
         {
             var value = NormalizeHeader(cell.GetString());
-
-            if (string.IsNullOrWhiteSpace(value))
-                continue;
-
-            headers[value] = cell.Address.ColumnNumber;
+            if (!string.IsNullOrWhiteSpace(value)) headers[value] = cell.Address.ColumnNumber;
         }
 
-        foreach (var requiredHeader in RequiredHeaders)
-        {
-            var normalizedRequiredHeader =
-                NormalizeHeader(requiredHeader);
-
-            if (!headers.ContainsKey(normalizedRequiredHeader))
-            {
-                throw new InvalidOperationException(
-                    $"العمود «{requiredHeader}» غير موجود في ملف Excel.");
-            }
-        }
+        foreach (var header in RequiredHeaders)
+            if (!headers.ContainsKey(NormalizeHeader(header)))
+                throw new InvalidOperationException($"العمود «{header}» غير موجود في ملف Excel.");
 
         var rows = new List<EmployeeImportRowDto>();
-
         foreach (var row in worksheet.RowsUsed().Skip(1))
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (row.CellsUsed().All(cell => string.IsNullOrWhiteSpace(cell.GetFormattedString()))) continue;
 
-            if (IsEmptyRow(row))
-                continue;
-
-            var employeeCode =
-                GetString(row, headers, "رمز الموظف");
-
-            var firstName =
-                GetString(row, headers, "الاسم الأول");
-
-            var lastName =
-                GetString(row, headers, "اسم العائلة");
-
-            var phone =
-                GetNullableString(row, headers, "رقم الهاتف");
-
-            var jobTitle =
-                GetNullableString(row, headers, "المسمى الوظيفي");
-
-            var notes =
-                GetNullableString(row, headers, "الملاحظات");
-
-            var hireDate =
-                GetDate(row, headers, "تاريخ التوظيف");
-
-            var isSalesperson =
-                GetString(row, headers, "موظف مبيعات");
-
-            var isTechnician =
-                GetString(row, headers, "فني");
-
-            var isCommissionEligible =
-                GetString(row, headers, "مستحق للعمولة");
-
-            var isActive =
-                GetString(row, headers, "نشط");
-
-            rows.Add(
-                new EmployeeImportRowDto(
-                    row.RowNumber(),
-                    employeeCode,
-                    firstName,
-                    lastName,
-                    phone,
-                    jobTitle,
-                    hireDate,
-                    notes,
-                    isSalesperson,
-                    isTechnician,
-                    isCommissionEligible,
-                    isActive));
+            rows.Add(new EmployeeImportRowDto(
+                row.RowNumber(),
+                GetString(row, headers, "الاسم الأول"),
+                GetString(row, headers, "اسم العائلة"),
+                GetNullableString(row, headers, "رقم الهاتف"),
+                GetOptionalString(row, headers, "البريد الإلكتروني"),
+                GetOptionalString(row, headers, "الدولة"),
+                GetOptionalString(row, headers, "المحافظة"),
+                GetOptionalString(row, headers, "المدينة"),
+                GetOptionalString(row, headers, "الرمز البريدي"),
+                GetOptionalString(row, headers, "عنوان السكن"),
+                GetNullableString(row, headers, "المسمى الوظيفي"),
+                GetDate(row, headers, "تاريخ التوظيف"),
+                GetString(row, headers, "مستحق للعمولة"),
+                GetString(row, headers, "نشط")));
         }
 
         return Task.FromResult<IReadOnlyList<EmployeeImportRowDto>>(rows);
     }
 
-    private static bool IsEmptyRow(IXLRow row)
-    {
-        return row.CellsUsed()
-            .All(cell => string.IsNullOrWhiteSpace(cell.GetFormattedString()));
-    }
+    private static string GetString(IXLRow row, IReadOnlyDictionary<string, int> headers, string header) =>
+        row.Cell(headers[NormalizeHeader(header)]).GetFormattedString().Trim();
 
-    private static string GetString(
-        IXLRow row,
-        IReadOnlyDictionary<string, int> headers,
-        string header)
-    {
-        var columnNumber = headers[NormalizeHeader(header)];
-
-        return row.Cell(columnNumber)
-            .GetFormattedString()
-            .Trim();
-    }
-
-    private static string? GetNullableString(
-        IXLRow row,
-        IReadOnlyDictionary<string, int> headers,
-        string header)
+    private static string? GetNullableString(IXLRow row, IReadOnlyDictionary<string, int> headers, string header)
     {
         var value = GetString(row, headers, header);
-
-        return string.IsNullOrWhiteSpace(value)
-            ? null
-            : value;
+        return string.IsNullOrWhiteSpace(value) ? null : value;
     }
 
-    private static DateOnly? GetDate(
-        IXLRow row,
-        IReadOnlyDictionary<string, int> headers,
-        string header)
+    private static string? GetOptionalString(IXLRow row, IReadOnlyDictionary<string, int> headers, string header)
+    {
+        if (!headers.TryGetValue(NormalizeHeader(header), out var column)) return null;
+        var value = row.Cell(column).GetFormattedString().Trim();
+        return string.IsNullOrWhiteSpace(value) ? null : value;
+    }
+
+    private static DateOnly? GetDate(IXLRow row, IReadOnlyDictionary<string, int> headers, string header)
     {
         var cell = row.Cell(headers[NormalizeHeader(header)]);
-
-        // Excel date stored as an actual date/time value
-        if (cell.DataType == XLDataType.DateTime)
+        if (cell.DataType == XLDataType.DateTime) return DateOnly.FromDateTime(cell.GetDateTime());
+        if (cell.DataType == XLDataType.Number && cell.Style.DateFormat.Format != "General")
         {
-            return DateOnly.FromDateTime(cell.GetDateTime());
-        }
-
-        // Excel number formatted as a date
-        if (cell.DataType == XLDataType.Number &&
-            cell.Style.DateFormat.Format != "General")
-        {
-            try
-            {
-                return DateOnly.FromDateTime(cell.GetDateTime());
-            }
-            catch
-            {
-                // Continue with text parsing below.
-            }
+            try { return DateOnly.FromDateTime(cell.GetDateTime()); } catch { }
         }
 
         var value = cell.GetFormattedString().Trim();
-
-        if (string.IsNullOrWhiteSpace(value))
-            return null;
-
-        // ISO format
-        if (DateOnly.TryParseExact(
-                value,
-                "yyyy-MM-dd",
-                out var isoDate))
-        {
-            return isoDate;
-        }
-
-        // Common Excel/display formats
-        string[] formats =
-        [
-            "M/d/yyyy",
-            "MM/d/yyyy",
-            "M/dd/yyyy",
-            "MM/dd/yyyy",
-            "d/M/yyyy",
-            "dd/M/yyyy",
-            "d/MM/yyyy",
-            "dd/MM/yyyy"
-        ];
-
-        foreach (var format in formats)
-        {
-            if (DateOnly.TryParseExact(
-                    value,
-                    format,
-                    out var parsedDate))
-            {
-                return parsedDate;
-            }
-        }
-
-        // Final fallback
-        if (DateTime.TryParse(
-                value,
-                out var dateTime))
-        {
-            return DateOnly.FromDateTime(dateTime);
-        }
-
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        if (DateOnly.TryParse(value, out var parsed)) return parsed;
+        if (DateTime.TryParse(value, out var dateTime)) return DateOnly.FromDateTime(dateTime);
         return null;
     }
 
-    private static string NormalizeHeader(string value)
-    {
-        return value
-            .Trim()
-            .Replace('\u00A0', ' ')
-            .Replace("  ", " ");
-    }
+    private static string NormalizeHeader(string value) =>
+        value.Trim().Replace('\u00A0', ' ').Replace("  ", " ");
 }

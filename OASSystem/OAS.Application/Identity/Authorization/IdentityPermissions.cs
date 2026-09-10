@@ -10,4 +10,5 @@ public static class IdentityPermissions
     public const string UsersAssignRoles = "identity.users.assign_roles";
     public const string UsersResetPassword = "identity.users.reset_password";
     public const string UsersUnlock = "identity.users.unlock";
+    public const string RolesManage = "identity.roles.manage";
 }

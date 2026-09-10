@@ -33,6 +33,8 @@ public partial class OasMainShell : IAsyncDisposable
     private readonly List<OpenShellTab> _openTabs = [];
     private readonly Dictionary<string, bool> _groupExpanded = new(StringComparer.Ordinal);
     private Guid _activeTabId;
+    private OasTopHeader? _topHeader;
+    private OAS.UiLib.Components.Navigation.UiApplicationTabStrip? _applicationTabStrip;
     private string _currentPath = "/workspace";
     private bool isSidebarCollapsed;
     private bool isMobileMenuOpen;
@@ -135,6 +137,7 @@ public partial class OasMainShell : IAsyncDisposable
     private async Task NavigateModuleAsync(UiShellModuleItem module)
     {
         if (!IsVisible(module)) return;
+        _topHeader?.CloseAccountMenu();
         var tab = EnsureTab(module);
         _activeTabId = tab.Id;
         _currentPath = tab.LastHref;
@@ -146,6 +149,7 @@ public partial class OasMainShell : IAsyncDisposable
 
     private async Task SelectApplicationTabAsync(Guid tabId)
     {
+        _topHeader?.CloseAccountMenu();
         var tab = _openTabs.FirstOrDefault(item => item.Id == tabId);
         if (tab is null) return;
         _activeTabId = tab.Id;
@@ -181,6 +185,29 @@ public partial class OasMainShell : IAsyncDisposable
 
         await PersistStateAsync();
         StateHasChanged();
+    }
+
+    private async Task CloseOtherApplicationTabsAsync(Guid tabId)
+    {
+        var keep = _openTabs.FirstOrDefault(tab => tab.Id == tabId);
+        if (keep is null) return;
+
+        _openTabs.RemoveAll(tab => tab.Id != tabId);
+        _activeTabId = keep.Id;
+        _currentPath = keep.LastHref;
+        _topHeader?.CloseAccountMenu();
+        await PersistStateAsync();
+        Navigation.NavigateTo(keep.LastHref);
+    }
+
+    private async Task CloseAllApplicationTabsAsync()
+    {
+        _openTabs.Clear();
+        _activeTabId = Guid.Empty;
+        _currentPath = "/workspace";
+        _topHeader?.CloseAccountMenu();
+        await PersistStateAsync();
+        Navigation.NavigateTo("/workspace");
     }
 
     private bool IsModuleActive(UiShellModuleItem module)
@@ -237,6 +264,7 @@ public partial class OasMainShell : IAsyncDisposable
 
     private async Task ToggleSidebarAsync()
     {
+        _topHeader?.CloseAccountMenu();
         isSidebarCollapsed = !isSidebarCollapsed;
         _contextGroupKey = null;
         await PersistStateAsync();
@@ -244,6 +272,7 @@ public partial class OasMainShell : IAsyncDisposable
 
     private async Task HandleGroupClickAsync(UiShellNavigationGroup group)
     {
+        _topHeader?.CloseAccountMenu();
         if (isSidebarCollapsed)
         {
             _contextGroupKey = string.Equals(_contextGroupKey, group.Key, StringComparison.Ordinal) ? null : group.Key;
@@ -263,9 +292,10 @@ public partial class OasMainShell : IAsyncDisposable
         _contextGroupKey = null;
     }
 
-    private void ToggleMobileMenu() => isMobileMenuOpen = !isMobileMenuOpen;
-    private void CloseMobileMenu() => isMobileMenuOpen = false;
-    private void CloseTransientMenus() => _contextGroupKey = null;
+    private void ToggleMobileMenu() { _topHeader?.CloseAccountMenu(); isMobileMenuOpen = !isMobileMenuOpen; }
+    private void CloseMobileMenu() { isMobileMenuOpen = false; _topHeader?.CloseAccountMenu(); }
+    private void CloseTransientMenus() { _contextGroupKey = null; _topHeader?.CloseAccountMenu(); _applicationTabStrip?.DismissContextMenu(); }
+    private void CloseHeaderAccountMenu() => _topHeader?.CloseAccountMenu();
 
     private async Task RestoreStateAsync()
     {

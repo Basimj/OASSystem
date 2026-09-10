@@ -1,15 +1,18 @@
-﻿namespace OAS.Contracts.Features.Employees;
+namespace OAS.Contracts.Features.Employees;
 
 public sealed record CreateEmployeeRequest(
-    string EmployeeCode,
     string FirstName,
     string LastName,
     string? Phone,
-    string? JobTitle,
+    string? Email,
+    string? Country,
+    string? Governorate,
+    string? City,
+    string? PostalCode,
+    string? ResidentialAddress,
+    Guid JobTitleId,
     DateOnly? HireDate,
-    string? Notes,
-    bool IsSalesperson,
-    bool IsTechnician,
     bool IsCommissionEligible,
     bool IsActive = true,
-    Guid? UserAccountId = null);
+    Guid? UserAccountId = null,
+    int? EmployeeNumber = null);

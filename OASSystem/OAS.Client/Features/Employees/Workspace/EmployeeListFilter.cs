@@ -5,7 +5,5 @@ public enum EmployeeListFilter
     All,
     Active,
     Inactive,
-    Sales,
-    Technician,
     Commission
 }

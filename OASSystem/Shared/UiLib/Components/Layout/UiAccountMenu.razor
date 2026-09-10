@@ -2,18 +2,25 @@
 {
     <div class="ui-account-menu" @onclick:stopPropagation="true">
         <div class="ui-account-menu__profile">
-            <button type="button" class="ui-account-menu__avatar-button" title="@EditProfileText" @onclick="EditProfileAsync">
-                <UiAvatar Initials="@Initials" ImageUrl="@ImageUrl" AltText="@DisplayName" Size="58" />
-                <span class="ui-account-menu__edit"><i class="fa-solid fa-pen" aria-hidden="true"></i></span>
-            </button>
-            <strong>@DisplayName</strong>
-            <span>@UserName</span>
-            @if (!string.IsNullOrWhiteSpace(Email)) { <span>@Email</span> }
+            <div class="ui-account-menu__photo-column">
+                <button type="button" class="ui-account-menu__avatar-button" title="@EditProfileText" aria-label="@EditProfileText" @onclick="EditProfileAsync">
+                    <UiAvatar Initials="@Initials" ImageUrl="@ImageUrl" AltText="@DisplayName" Size="56" />
+                    <span class="ui-account-menu__edit"><i class="fa-solid fa-pen" aria-hidden="true"></i></span>
+                </button>
+            </div>
+            <div class="ui-account-menu__identity-column">
+                <strong>@DisplayName</strong>
+                <span>@UserName</span>
+                @if (!string.IsNullOrWhiteSpace(Email))
+                {
+                    <span>@Email</span>
+                }
+            </div>
         </div>
         <div class="ui-account-menu__actions">
-            <button type="button" @onclick="SettingsAsync"><i class="fa-solid fa-gear"></i><span>@SettingsText</span></button>
-            <button type="button" @onclick="SupportAsync"><i class="fa-solid fa-headset"></i><span>@SupportText</span></button>
-            <button type="button" class="danger" @onclick="LogoutAsync"><i class="fa-solid fa-arrow-right-from-bracket"></i><span>@LogoutText</span></button>
+            <button type="button" title="@SettingsText" aria-label="@SettingsText" @onclick="SettingsAsync"><i class="fa-solid fa-gear"></i></button>
+            <button type="button" title="@SupportText" aria-label="@SupportText" @onclick="SupportAsync"><i class="fa-solid fa-headset"></i></button>
+            <button type="button" class="danger" title="@LogoutText" aria-label="@LogoutText" @onclick="LogoutAsync"><i class="fa-solid fa-arrow-right-from-bracket"></i></button>
         </div>
     </div>
 }

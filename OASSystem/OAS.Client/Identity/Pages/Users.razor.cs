@@ -48,7 +48,7 @@ public partial class Users
     ];
 
     private IReadOnlyList<UiSelectOption> RoleFilterOptions =>
-        _roles.Select(role => new UiSelectOption(role.Id.ToString("D"), TranslateRole(role.Name))).ToArray();
+        _roles.Select(role => new UiSelectOption(role.Id.ToString("D"), GetRoleDisplayName(role))).ToArray();
 
     private bool? SelectedStatusFilter => Workspace.StatusFilter switch
     {
@@ -138,15 +138,6 @@ public partial class Users
             await ReloadSelectedAsync(false);
     }
 
-    private async Task ResetFiltersAsync(MouseEventArgs _)
-    {
-        Workspace.Search = null;
-        Workspace.StatusFilter = "all";
-        Workspace.RoleFilter = null;
-        Workspace.PageNumber = 1;
-        await LoadPageAsync();
-    }
-
     private async Task ExportUsersAsync(MouseEventArgs _)
     {
         if (_exporting) return;
@@ -205,14 +196,6 @@ public partial class Users
                    .Append(Csv(user.LastLoginAtUtc?.ToString("O"))).AppendLine();
         }
         return builder.ToString();
-    }
-
-    private async Task ShowRolesOverviewAsync(MouseEventArgs _)
-    {
-        await Dialogs.ShowAsync<RolesOverviewDialog>(
-            L["Users_RolesPermissions"],
-            new Dictionary<string, object> { [nameof(RolesOverviewDialog.Roles)] = _roles },
-            new UiDialogOptions { Size = UiDialogSize.Small });
     }
 
     private async Task OpenNewAsync(MouseEventArgs _)
@@ -302,7 +285,7 @@ public partial class Users
         var create = new CreateUserRequest(
             editor.Form.UserName.Trim(), editor.Form.FirstName.Trim(), editor.Form.LastName.Trim(),
             string.IsNullOrWhiteSpace(editor.Form.Email) ? null : editor.Form.Email.Trim(),
-            editor.RoleIds.ToArray(), editor.Form.IsActive);
+            editor.Form.PhoneNumber.Trim(), editor.RoleIds.ToArray(), editor.Form.IsActive);
 
         var result = await UserService.CreateUserAsync(create);
         if (!TryGet(result, out var created)) return;
@@ -312,16 +295,24 @@ public partial class Users
         if (pendingPhoto is not null)
         {
             var upload = await UploadUserPhotoAsync(created.User.Id, pendingPhoto);
-            if (!upload.Succeeded) photoError = GetErrorMessage(upload.Error);
-            else _photoRevision = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            if (!upload.Succeeded)
+            {
+                photoError = GetErrorMessage(upload.Error);
+                Snackbar.Error(photoError);
+            }
+            else
+            {
+                _photoRevision = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                Snackbar.Success(L["Users_PhotoSaved"]);
+            }
         }
 
         await LoadPageAsync();
         await ShowTemporaryPasswordAsync(
             created.TemporaryPassword,
             L["Users_TemporaryPasswordCreatedMessage"],
-            photoError is null ? UiOperationStatus.Success : UiOperationStatus.Warning,
-            photoError);
+            UiOperationStatus.Success,
+            null);
 
         if (photoError is not null && pendingPhoto is not null)
         {
@@ -343,7 +334,8 @@ public partial class Users
         {
             var update = new UpdateUserRequest(
                 editor.Form.UserName.Trim(), editor.Form.FirstName.Trim(), editor.Form.LastName.Trim(),
-                string.IsNullOrWhiteSpace(editor.Form.Email) ? null : editor.Form.Email.Trim(), editor.RowVersion);
+                string.IsNullOrWhiteSpace(editor.Form.Email) ? null : editor.Form.Email.Trim(),
+                editor.Form.PhoneNumber.Trim(), editor.RowVersion);
             var result = await UserService.UpdateUserAsync(userId, update);
             if (!TryGet(result, out var updated)) return;
             editor.AcceptBasicSave(updated);
@@ -368,7 +360,7 @@ public partial class Users
 
             if (!photoResult.Succeeded)
             {
-                await ShowOperationAsync(UiOperationStatus.Failure, L["Users_UpdateSuccess"], null, GetErrorMessage(photoResult.Error));
+                Snackbar.Error(GetErrorMessage(photoResult.Error));
                 return;
             }
             editor.MarkPhotoSaved();
@@ -389,14 +381,19 @@ public partial class Users
 
     private bool ValidateEditor(UserEditorState editor)
     {
-        if (string.IsNullOrWhiteSpace(editor.Form.UserName) || string.IsNullOrWhiteSpace(editor.Form.FirstName) || string.IsNullOrWhiteSpace(editor.Form.LastName))
+        if (string.IsNullOrWhiteSpace(editor.Form.UserName) || string.IsNullOrWhiteSpace(editor.Form.FirstName) || string.IsNullOrWhiteSpace(editor.Form.LastName) || string.IsNullOrWhiteSpace(editor.Form.PhoneNumber))
         {
             Snackbar.Error(L["Validation_RequiredFields"]);
             return false;
         }
-        if (editor.RoleIds.Count == 0)
+        if (editor.RoleIds.Count != 1)
         {
             Snackbar.Error(L["Users_RoleRequired"]);
+            return false;
+        }
+        if (!System.Text.RegularExpressions.Regex.IsMatch(editor.Form.PhoneNumber.Trim(), @"^[0-9+()\-\s]{7,32}$"))
+        {
+            Snackbar.Error(L["Users_PhoneInvalid"]);
             return false;
         }
         return true;
@@ -527,14 +524,14 @@ public partial class Users
         if (Workspace.Mode is not (UserEditorMode.Create or UserEditorMode.Edit)) return;
         if (file.Size <= 0 || file.Size > 2_500_000)
         {
-            await ShowOperationAsync(UiOperationStatus.Warning, "الصورة الشخصية", null, "حجم الصورة يجب ألا يتجاوز 2.5 MB.");
+            Snackbar.Warning(L["Users_PhotoTooLarge"]);
             return;
         }
 
         var contentType = (file.ContentType ?? string.Empty).Trim().ToLowerInvariant();
         if (contentType is not ("image/jpeg" or "image/png" or "image/webp"))
         {
-            await ShowOperationAsync(UiOperationStatus.Warning, "الصورة الشخصية", null, "الصيغ المسموح بها هي JPEG وPNG وWebP فقط.");
+            Snackbar.Warning(L["Users_PhotoInvalidType"]);
             return;
         }
         try
@@ -546,7 +543,7 @@ public partial class Users
         }
         catch
         {
-            await ShowOperationAsync(UiOperationStatus.Failure, "الصورة الشخصية", null, "تعذر قراءة ملف الصورة.");
+            Snackbar.Error(L["Users_PhotoReadFailed"]);
         }
     }
 
@@ -586,8 +583,23 @@ public partial class Users
     }
 
     private string GetUserImageUrl(Guid userId) => $"api/identity/profile-images/{userId:D}?v={_photoRevision}";
-    private string FormatRoles(IReadOnlyList<string> roles) => roles.Count == 0 ? "—" : string.Join("، ", roles.Select(TranslateRole));
-    private string TranslateRole(string role) => role switch { "Administrator" => L["Role_Administrator"], "User" => L["Role_User"], _ => role };
+    private string FormatRoles(IReadOnlyList<string> roles) => roles.Count == 0 ? "—" : string.Join("، ", roles.Select(GetRoleDisplayName));
+    private string GetRoleDisplayName(string roleName)
+    {
+        var role = _roles.FirstOrDefault(x => string.Equals(x.Name, roleName, StringComparison.OrdinalIgnoreCase));
+        return role is null ? roleName : GetRoleDisplayName(role);
+    }
+
+    private string GetRoleDisplayName(RoleDto role)
+    {
+        if (!string.Equals(role.DisplayName, role.Name, StringComparison.OrdinalIgnoreCase)) return role.DisplayName;
+        return role.Name switch
+        {
+            "Administrator" => L["Role_Administrator"],
+            "User" => L["Role_User"],
+            _ => role.DisplayName
+        };
+    }
     private static string FormatDate(DateTimeOffset? value) => value?.ToLocalTime().ToString("g") ?? "—";
     private string? GetEditorSubtitle() => Workspace.Mode == UserEditorMode.Create ? L["Users_NewAccountSubtitle"] : Workspace.Editor.Details?.Email ?? Workspace.Editor.Details?.UserName;
     private string? GetEditorStatusText() => Workspace.Editor.Details is { } details ? (details.IsActive ? L["Users_Active"] : L["Users_Inactive"]) : null;

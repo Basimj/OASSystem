@@ -1,15 +1,17 @@
-﻿namespace OAS.Contracts.Features.Employees.Import;
+namespace OAS.Contracts.Features.Employees.Import;
 
 public sealed record EmployeeImportRowDto(
     int RowNumber,
-    string EmployeeCode,
     string FirstName,
     string LastName,
     string? Phone,
+    string? Email,
+    string? Country,
+    string? Governorate,
+    string? City,
+    string? PostalCode,
+    string? ResidentialAddress,
     string? JobTitle,
     DateOnly? HireDate,
-    string? Notes,
-    string IsSalesperson,
-    string IsTechnician,
     string IsCommissionEligible,
     string IsActive);

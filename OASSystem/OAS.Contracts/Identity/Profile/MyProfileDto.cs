@@ -7,5 +7,6 @@ public sealed record MyProfileDto(
     string LastName,
     string DisplayName,
     string? Email,
+    string? PhoneNumber,
     IReadOnlyList<string> Roles,
     string RowVersion);

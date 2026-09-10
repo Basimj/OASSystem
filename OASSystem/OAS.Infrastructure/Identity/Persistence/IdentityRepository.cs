@@ -30,10 +30,14 @@ public sealed class IdentityRepository(OasDbContext dbContext) : IIdentityReposi
         PageRequest request,
         bool? isActive = null,
         Guid? roleId = null,
+        bool includeSuperAdmin = true,
         CancellationToken cancellationToken = default)
     {
         var normalized = request.Normalize();
         IQueryable<UserAccount> query = dbContext.Users.AsNoTracking();
+
+        if (!includeSuperAdmin)
+            query = query.Where(x => !x.IsSuperAdmin);
 
         if (!string.IsNullOrWhiteSpace(normalized.Search))
         {
@@ -101,6 +105,16 @@ public sealed class IdentityRepository(OasDbContext dbContext) : IIdentityReposi
         return await dbContext.Roles.AsNoTracking().Where(x => ids.Contains(x.Id)).ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyDictionary<Guid, string>> GetUserNamesAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken = default)
+    {
+        if (userIds.Count == 0) return new Dictionary<Guid, string>();
+        var ids = userIds.Distinct().ToArray();
+        return await dbContext.Users.AsNoTracking()
+            .Where(x => ids.Contains(x.Id) && !x.IsSuperAdmin)
+            .Select(x => new { x.Id, x.UserName })
+            .ToDictionaryAsync(x => x.Id, x => x.UserName, cancellationToken);
+    }
+
     public Task<bool> UserNameExistsAsync(string normalizedUserName, Guid? excludingUserId = null, CancellationToken cancellationToken = default) =>
         dbContext.Users.AsNoTracking().AnyAsync(
             x => x.NormalizedUserName == normalizedUserName && (!excludingUserId.HasValue || x.Id != excludingUserId.Value),
@@ -154,6 +168,7 @@ public sealed class IdentityRepository(OasDbContext dbContext) : IIdentityReposi
         dbContext.UserPasswordHistory.AddAsync(history, cancellationToken).AsTask();
 
     public void UpdateUser(UserAccount user) => dbContext.Users.Update(user);
+    public void UpdateRole(Role role) => dbContext.Roles.Update(role);
 
     private async Task<IReadOnlyList<Role>> GetRolesForUserAsync(Guid userId, CancellationToken cancellationToken)
     {

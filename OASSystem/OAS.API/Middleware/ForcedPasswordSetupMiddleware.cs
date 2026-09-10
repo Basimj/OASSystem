@@ -35,6 +35,17 @@ public sealed class ForcedPasswordSetupMiddleware(RequestDelegate next)
             return;
         }
 
+        // Database bootstrap must not depend on the current identity schema.
+        // A browser can still carry an authenticated cookie while the database is
+        // behind the application's EF model. Revalidating that cookie here would
+        // query new columns before pending migrations can be applied, which makes
+        // the bootstrap status/update endpoints unable to repair the database.
+        if (context.Request.Path.StartsWithSegments("/api/database/bootstrap"))
+        {
+            await next(context);
+            return;
+        }
+
         // Login must remain callable even when the browser still carries a stale
         // cookie invalidated by an administrative password reset. Logout must also
         // remain callable so the stale cookie can always be cleared explicitly.

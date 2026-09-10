@@ -10,6 +10,7 @@ internal static class UserMapping
         record.User.UserName,
         record.User.DisplayName,
         record.User.Email,
+        record.User.PhoneNumber,
         record.User.IsActive,
         record.User.IsSuperAdmin,
         record.User.MustChangePassword,
@@ -20,13 +21,18 @@ internal static class UserMapping
         record.User.CreatedAtUtc,
         Convert.ToBase64String(record.User.RowVersion));
 
-    public static UserDetailsDto ToDetails(IdentityUserRecord record, DateTimeOffset nowUtc) => new(
+    public static UserDetailsDto ToDetails(
+        IdentityUserRecord record,
+        DateTimeOffset nowUtc,
+        string? createdByUserName,
+        string? lastModifiedByUserName) => new(
         record.User.Id,
         record.User.UserName,
         record.User.FirstName,
         record.User.LastName,
         record.User.DisplayName,
         record.User.Email,
+        record.User.PhoneNumber,
         record.User.IsActive,
         record.User.IsSuperAdmin,
         record.User.MustChangePassword,
@@ -37,8 +43,8 @@ internal static class UserMapping
         record.Roles.Select(x => x.Id).ToArray(),
         record.Roles.Select(x => x.Name).OrderBy(x => x).ToArray(),
         record.User.CreatedAtUtc,
-        record.User.CreatedBy,
+        createdByUserName,
         record.User.LastModifiedAtUtc,
-        record.User.LastModifiedBy,
+        lastModifiedByUserName,
         Convert.ToBase64String(record.User.RowVersion));
 }

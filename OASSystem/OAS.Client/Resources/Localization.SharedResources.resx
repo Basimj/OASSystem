@@ -616,4 +616,175 @@
   <data name="Users_Edit" xml:space="preserve">
     <value>Edit</value>
   </data>
+  <data name="Users_PhoneNumber" xml:space="preserve">
+    <value>Phone number</value>
+  </data>
+  <data name="Users_PhoneInvalid" xml:space="preserve">
+    <value>Invalid phone number. Use digits, +, spaces, dashes, or parentheses only.</value>
+  </data>
+  <data name="Users_UserType" xml:space="preserve">
+    <value>User type</value>
+  </data>
+  <data name="Users_ChangePhoto" xml:space="preserve">
+    <value>Change photo</value>
+  </data>
+  <data name="Users_RemovePhoto" xml:space="preserve">
+    <value>Remove photo</value>
+  </data>
+  <data name="Users_PhotoTooLarge" xml:space="preserve">
+    <value>The image must not exceed 2.5 MB.</value>
+  </data>
+  <data name="Users_PhotoInvalidType" xml:space="preserve">
+    <value>Only JPEG, PNG, and WebP images are allowed.</value>
+  </data>
+  <data name="Users_PhotoReadFailed" xml:space="preserve">
+    <value>The image file could not be read.</value>
+  </data>
+  <data name="Users_PhotoSaved" xml:space="preserve">
+    <value>Profile photo saved successfully.</value>
+  </data>
+  <data name="Users_RolesManagement" xml:space="preserve">
+    <value>Manage user types</value>
+  </data>
+  <data name="Users_RolesManagementHint" xml:space="preserve">
+    <value>You can edit the visible user-type label. The technical key is fixed to preserve authorization rules.</value>
+  </data>
+  <data name="Users_RoleSystemKey" xml:space="preserve">
+    <value>Technical key</value>
+  </data>
+  <data name="Users_RoleDisplayName" xml:space="preserve">
+    <value>Display name</value>
+  </data>
+  <data name="Users_SaveRole" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="Users_RoleDisplayNameRequired" xml:space="preserve">
+    <value>Role display name is required.</value>
+  </data>
+  <data name="Users_RoleUpdated" xml:space="preserve">
+    <value>User type updated successfully.</value>
+  </data>
+  <data name="phone_number_required" xml:space="preserve">
+    <value>Phone number is required.</value>
+  </data>
+  <data name="phone_number_max_length" xml:space="preserve">
+    <value>Phone number is too long.</value>
+  </data>
+  <data name="phone_number_invalid" xml:space="preserve">
+    <value>Phone number format is invalid.</value>
+  </data>
+  <data name="role_display_name_required" xml:space="preserve">
+    <value>Role display name is required.</value>
+  </data>
+  <data name="role_display_name_max_length" xml:space="preserve">
+    <value>Role display name is too long.</value>
+  </data>
+  <data name="Common_New" xml:space="preserve">
+    <value>New</value>
+  </data>
+  <data name="Roles_Title" xml:space="preserve">
+    <value>User types</value>
+  </data>
+  <data name="Roles_New" xml:space="preserve">
+    <value>New user type</value>
+  </data>
+  <data name="Roles_Edit" xml:space="preserve">
+    <value>Edit user type</value>
+  </data>
+  <data name="Roles_Details" xml:space="preserve">
+    <value>User type details</value>
+  </data>
+  <data name="Roles_DisplayName" xml:space="preserve">
+    <value>Display name</value>
+  </data>
+  <data name="Roles_TechnicalKey" xml:space="preserve">
+    <value>Technical key</value>
+  </data>
+  <data name="Roles_Type" xml:space="preserve">
+    <value>Type</value>
+  </data>
+  <data name="Roles_System" xml:space="preserve">
+    <value>System</value>
+  </data>
+  <data name="Roles_Custom" xml:space="preserve">
+    <value>Custom</value>
+  </data>
+  <data name="Roles_TotalFormat" xml:space="preserve">
+    <value>{0} role(s)</value>
+  </data>
+  <data name="Roles_Empty" xml:space="preserve">
+    <value>No user types were found.</value>
+  </data>
+  <data name="Roles_SelectHint" xml:space="preserve">
+    <value>Select a user type from the table or click New.</value>
+  </data>
+  <data name="Roles_KeyHint" xml:space="preserve">
+    <value>The technical key is immutable after creation. System keys are protected so authorization is not broken.</value>
+  </data>
+  <data name="Roles_Search" xml:space="preserve">
+    <value>Search user types...</value>
+  </data>
+  <data name="Roles_Import" xml:space="preserve">
+    <value>Import</value>
+  </data>
+  <data name="Roles_Export" xml:space="preserve">
+    <value>Export</value>
+  </data>
+  <data name="Roles_Created" xml:space="preserve">
+    <value>User type created successfully.</value>
+  </data>
+  <data name="Roles_Updated" xml:space="preserve">
+    <value>User type updated successfully.</value>
+  </data>
+  <data name="Roles_Exported" xml:space="preserve">
+    <value>User types exported successfully.</value>
+  </data>
+  <data name="Roles_ImportSize" xml:space="preserve">
+    <value>The import file must not exceed 1 MB.</value>
+  </data>
+  <data name="Roles_ImportEmpty" xml:space="preserve">
+    <value>The import file contains no user types.</value>
+  </data>
+  <data name="Roles_ImportInvalid" xml:space="preserve">
+    <value>The import file is invalid. Use CSV columns Name,DisplayName.</value>
+  </data>
+  <data name="Roles_ImportSuccess" xml:space="preserve">
+    <value>Import completed: {0} created, {1} updated, {2} unchanged.</value>
+  </data>
+  <data name="Roles_KeyInvalid" xml:space="preserve">
+    <value>The technical key must start with an English letter and may contain letters, numbers, dot, dash, or underscore only.</value>
+  </data>
+  <data name="role_id_required" xml:space="preserve">
+    <value>Role identifier is required.</value>
+  </data>
+  <data name="role_name_required" xml:space="preserve">
+    <value>Technical key is required.</value>
+  </data>
+  <data name="role_name_max_length" xml:space="preserve">
+    <value>Technical key must not exceed 64 characters.</value>
+  </data>
+  <data name="role_name_invalid" xml:space="preserve">
+    <value>Technical key format is invalid.</value>
+  </data>
+  <data name="identity_role_exists" xml:space="preserve">
+    <value>A role with the same technical key already exists.</value>
+  </data>
+  <data name="roles_import_required" xml:space="preserve">
+    <value>The import file must contain roles.</value>
+  </data>
+  <data name="roles_import_count_invalid" xml:space="preserve">
+    <value>The import file must contain between 1 and 200 roles.</value>
+  </data>
+  <data name="roles_import_duplicate_name" xml:space="preserve">
+    <value>The import file contains duplicate technical keys.</value>
+  </data>
+  <data name="roles_single_required" xml:space="preserve">
+    <value>Exactly one user type must be selected.</value>
+  </data>
+  <data name="employee_image_size_invalid" xml:space="preserve">
+    <value>Employee image size must not exceed 2.5 MB.</value>
+  </data>
+  <data name="employee_image_type_invalid" xml:space="preserve">
+    <value>Employee image must be JPEG, PNG, or WebP.</value>
+  </data>
 </root>

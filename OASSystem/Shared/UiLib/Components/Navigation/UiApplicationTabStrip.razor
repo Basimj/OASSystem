@@ -1,7 +1,9 @@
-<div class="ui-application-tabs" role="tablist" aria-label="تبويبات النظام">
+<div class="ui-application-tabs" role="tablist" aria-label="@AriaLabel" @onclick="CloseContextMenu">
     @foreach (var tab in Tabs)
     {
-        <div class="@(tab.IsActive ? "ui-application-tab ui-application-tab--active" : "ui-application-tab")">
+        <div class="@(tab.IsActive ? "ui-application-tab ui-application-tab--active" : "ui-application-tab")"
+             @oncontextmenu="args => OpenContextMenu(tab.Id, args)"
+             @oncontextmenu:preventDefault="true">
             <button type="button"
                     class="ui-application-tab__select"
                     role="tab"
@@ -21,10 +23,32 @@
                         class="ui-application-tab__close"
                         title="إغلاق"
                         aria-label="إغلاق @tab.Title"
+                        @onclick:stopPropagation="true"
                         @onclick="() => CloseAsync(tab.Id)">
                     <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                 </button>
             }
+        </div>
+    }
+
+    @if (EnableContextMenu && _contextTabId.HasValue)
+    {
+        <div class="ui-tab-context-menu"
+             style="@ContextMenuStyle"
+             role="menu"
+             @onclick:stopPropagation="true">
+            <button type="button" role="menuitem" @onclick="CloseCurrentFromMenuAsync">
+                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                <span>غلق التبويبة الحالية</span>
+            </button>
+            <button type="button" role="menuitem" @onclick="CloseOthersFromMenuAsync" disabled="@(Tabs.Count <= 1)">
+                <i class="fa-regular fa-window-restore" aria-hidden="true"></i>
+                <span>غلق التبويبات الأخرى</span>
+            </button>
+            <button type="button" role="menuitem" @onclick="CloseAllFromMenuAsync">
+                <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                <span>غلق الكل</span>
+            </button>
         </div>
     }
 </div>

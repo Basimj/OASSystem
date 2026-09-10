@@ -10,6 +10,6 @@ public sealed class GetRolesQueryHandler(IIdentityRepository repository)
     public async Task<IReadOnlyList<RoleDto>> Handle(GetRolesQuery request, CancellationToken cancellationToken)
     {
         var roles = await repository.ListRolesAsync(cancellationToken);
-        return roles.Select(x => new RoleDto(x.Id, x.Name, x.DisplayName)).ToArray();
+        return roles.Select(x => new RoleDto(x.Id, x.Name, x.DisplayName, x.IsSystem)).ToArray();
     }
 }

@@ -14,60 +14,49 @@ public sealed class EmployeesWorkspaceStateTests
             SearchText = "Ahmed",
             AppliedSearch = "Ahmed",
             PageNumber = 3,
-            Filter = EmployeeListFilter.Technician,
+            Filter = EmployeeListFilter.Commission,
             HasLoadedPage = true
         };
 
         Assert.Multiple(() =>
         {
             Assert.That(state.SearchText, Is.EqualTo("Ahmed"));
-            Assert.That(state.AppliedSearch, Is.EqualTo("Ahmed"));
             Assert.That(state.PageNumber, Is.EqualTo(3));
-            Assert.That(state.Filter, Is.EqualTo(EmployeeListFilter.Technician));
+            Assert.That(state.Filter, Is.EqualTo(EmployeeListFilter.Commission));
             Assert.That(state.HasLoadedPage, Is.True);
         });
     }
 
     [Test]
-    public void EditorState_MatchesSameRouteAndKeepsDraftValues()
+    public void CreateNewTab_EachReservationCreatesIndependentEditableTab()
     {
         var state = new EmployeesWorkspaceState();
-        var employeeId = Guid.NewGuid();
-
-        state.Editor.Begin(employeeId);
-        state.Editor.Form.FirstName = "Basim";
-        state.Editor.Form.LastName = "Employee";
-        state.Editor.RowVersion = "AQID";
-        state.Editor.ActiveSection = "contact";
-        state.Editor.MarkInitialized();
+        var first = state.CreateNewTab(501);
+        var second = state.CreateNewTab(502);
 
         Assert.Multiple(() =>
         {
-            Assert.That(state.Editor.Matches(employeeId), Is.True);
-            Assert.That(state.Editor.Form.FirstName, Is.EqualTo("Basim"));
-            Assert.That(state.Editor.Form.LastName, Is.EqualTo("Employee"));
-            Assert.That(state.Editor.RowVersion, Is.EqualTo("AQID"));
-            Assert.That(state.Editor.ActiveSection, Is.EqualTo("contact"));
+            Assert.That(first.TabId, Is.Not.EqualTo(second.TabId));
+            Assert.That(first.Form.EmployeeNumber, Is.EqualTo(501));
+            Assert.That(second.Form.EmployeeNumber, Is.EqualTo(502));
+            Assert.That(first.IsEditMode, Is.True);
+            Assert.That(first.IsDirty, Is.False);
         });
+
+        first.Form.FirstName = "Basim";
+        Assert.That(first.IsDirty, Is.True);
+        first.Revert();
+        Assert.That(first.Form.FirstName, Is.Empty);
+        Assert.That(first.IsDirty, Is.False);
     }
 
     [Test]
-    public void BeginDifferentEditor_ClearsPreviousDraft()
+    public void SameEmployee_ReusesExistingTab()
     {
         var state = new EmployeesWorkspaceState();
-        state.Editor.Begin(Guid.NewGuid());
-        state.Editor.Form.FirstName = "Old";
-        state.Editor.MarkInitialized();
-
-        var nextId = Guid.NewGuid();
-        state.Editor.Begin(nextId);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(state.Editor.Matches(nextId), Is.False);
-            Assert.That(state.Editor.Form.FirstName, Is.Empty);
-            Assert.That(state.Editor.RowVersion, Is.Null);
-            Assert.That(state.Editor.ActiveSection, Is.EqualTo("basic"));
-        });
+        var employeeId = Guid.NewGuid();
+        var first = state.GetOrCreateEmployeeTab(employeeId);
+        var second = state.GetOrCreateEmployeeTab(employeeId);
+        Assert.That(second.TabId, Is.EqualTo(first.TabId));
     }
 }

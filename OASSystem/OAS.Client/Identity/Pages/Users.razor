@@ -30,7 +30,6 @@
                 }
                 <UiButton Text="@L["Users_Refresh"]" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Loading="_loading" OnClick="RefreshAsync" />
                 <UiButton Text="@L["Users_Export"]" IconCssClass="fa-solid fa-download" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="_exporting" Loading="_exporting" OnClick="ExportUsersAsync" />
-                <UiButton Text="@L["Users_RolesPermissions"]" IconCssClass="fa-solid fa-shield-halved" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="ShowRolesOverviewAsync" />
             }
 
             <UiSearchInput @bind-Value="Workspace.Search"
@@ -45,20 +44,17 @@
     <Content>
         <UiDataGridPanel Title="@L["Users_All"]" Subtitle="@string.Format(L["Users_TotalFormat"], _page.TotalCount)">
             <Toolbar>
-                <UiSelect Value="@Workspace.StatusFilter"
-                          Options="@StatusFilterOptions"
-                          ValueChanged="StatusFilterChangedAsync"
-                          Size="ControlSize.Small" />
-                <UiSelect Value="@Workspace.RoleFilter"
-                          Placeholder="@L["Users_AllRoles"]"
-                          Options="@RoleFilterOptions"
-                          ValueChanged="RoleFilterChangedAsync"
-                          Size="ControlSize.Small" />
-                <UiButton IconCssClass="fa-solid fa-arrow-rotate-left"
-                          Variant="ButtonVariant.Ghost"
-                          Size="ControlSize.Small"
-                          OnClick="ResetFiltersAsync"
-                          title="@L["Users_ResetFilters"]" />
+                <div class="users-grid-filters">
+                    <UiSelect @bind-Value="Workspace.StatusFilter"
+                              Options="@StatusFilterOptions"
+                              OnValueChanged="StatusFilterChangedAsync"
+                              Size="ControlSize.Small" />
+                    <UiSelect @bind-Value="Workspace.RoleFilter"
+                              Placeholder="@L["Users_AllRoles"]"
+                              Options="@RoleFilterOptions"
+                              OnValueChanged="RoleFilterChangedAsync"
+                              Size="ControlSize.Small" />
+                </div>
             </Toolbar>
             <Header>
                 <UiRecordListHeader Primary="@L["Users_Name"]"
@@ -116,7 +112,7 @@
     </Content>
 
     <Aside>
-        <UiStackLayout Gap="StackGap.Small">
+        <div class="users-aside-stack">
             <UiCard Title="@L["Users_Details"]">
                 @if (Workspace.IsLoading)
                 {
@@ -137,14 +133,15 @@
                 }
             </UiCard>
 
-            <UserEditor @ref="_editorComponent"
-                        State="@Workspace.Editor"
-                        Mode="@Workspace.Mode"
-                        Roles="@_roles"
-                        IsActorSuperAdmin="@(AuthState.CurrentUser?.IsSuperAdmin == true)"
-                        ImageUrl="@SelectedImageUrl"
-                        OnImageSelected="UserImageSelectedAsync"
-                        OnImageRemoved="UserImageRemovedAsync" />
-        </UiStackLayout>
+            <div class="users-editor-host">
+                <UserEditor @ref="_editorComponent"
+                            State="@Workspace.Editor"
+                            Mode="@Workspace.Mode"
+                            Roles="@_roles"
+                            ImageUrl="@SelectedImageUrl"
+                            OnImageSelected="UserImageSelectedAsync"
+                            OnImageRemoved="UserImageRemovedAsync" />
+            </div>
+        </div>
     </Aside>
 </UiWorkspaceLayout>

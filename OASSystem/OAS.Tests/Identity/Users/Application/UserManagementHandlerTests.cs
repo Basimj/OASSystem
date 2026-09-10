@@ -5,6 +5,9 @@ using OAS.Application.Identity.Users.Commands.CreateUser;
 using OAS.Application.Identity.Users.Commands.ResetUserPassword;
 using OAS.Application.Identity.Users.Commands.SetUserRoles;
 using OAS.Application.Identity.Users.Commands.SetUserStatus;
+using OAS.Application.Identity.Users.Queries.GetUserById;
+using OAS.Application.Identity.Users.Queries.GetUsers;
+using OAS.Contracts.Common.Pagination;
 using OAS.Contracts.Identity.Authentication;
 using OAS.Contracts.Identity.Users;
 using OAS.Domain.Identity.Entities;
@@ -24,8 +27,7 @@ public sealed class UserManagementHandlerTests
         var handler = new CreateUserCommandHandler(
             repository,
             passwordService,
-            new FixedTemporaryPasswordGenerator("Temp!Password42"),
-            new FakeCurrentUser(Guid.NewGuid()));
+            new FixedTemporaryPasswordGenerator("Temp!Password42"));
 
         var outcome = await handler.Handle(
             new CreateUserCommand(new CreateUserRequest(
@@ -33,6 +35,7 @@ public sealed class UserManagementHandlerTests
                 "New",
                 "User",
                 "new.user@example.com",
+                "+967771234567",
                 [userRole.Id],
                 true)),
             CancellationToken.None);
@@ -164,7 +167,7 @@ public sealed class UserManagementHandlerTests
     }
 
     [Test]
-    public void NonSuperAdmin_CannotAssignAdministratorRole()
+    public async Task Administrator_CanAssignAdministratorRole_ToRegularUser()
     {
         var repository = new FakeIdentityRepository();
         var administratorRole = Role.Create(Guid.NewGuid(), "Administrator", "Administrator", true);
@@ -174,18 +177,96 @@ public sealed class UserManagementHandlerTests
 
         var actor = UserAccount.Create(Guid.NewGuid(), "manager", "Manager", "User", null);
         actor.SetPasswordHash("hash::Password!42");
-        repository.SeedUser(actor, userRole.Id);
+        repository.SeedUser(actor, administratorRole.Id);
 
         var target = UserAccount.Create(Guid.NewGuid(), "target", "Target", "User", null);
         target.SetPasswordHash("hash::Password!42");
         repository.SeedUser(target, userRole.Id);
 
         var handler = new SetUserRolesCommandHandler(repository, new FakeCurrentUser(actor.Id));
-
-        var exception = Assert.ThrowsAsync<ForbiddenException>(() => handler.Handle(
+        await handler.Handle(
             new SetUserRolesCommand(target.Id, new SetUserRolesRequest([administratorRole.Id], Convert.ToBase64String(target.RowVersion))),
-            CancellationToken.None));
+            CancellationToken.None);
 
-        Assert.That(exception!.Code, Is.EqualTo("identity_super_admin_required"));
+        var updated = await repository.GetUserAsync(target.Id, false);
+        Assert.That(updated!.Roles.Select(x => x.Name), Does.Contain("Administrator"));
     }
+
+    [Test]
+    public async Task GetUsers_HidesSuperAdmin_FromRegularAdministrator()
+    {
+        var repository = new FakeIdentityRepository();
+        var administratorRole = Role.Create(Guid.NewGuid(), "Administrator", "Administrator", true);
+        repository.SeedRole(administratorRole);
+
+        var actor = UserAccount.Create(Guid.NewGuid(), "manager", "Manager", "User", null);
+        actor.SetPasswordHash("hash::Password!42");
+        repository.SeedUser(actor, administratorRole.Id);
+
+        var superAdmin = UserAccount.Create(Guid.NewGuid(), "root", "Super", "Admin", null, isSuperAdmin: true);
+        superAdmin.SetPasswordHash("hash::Password!42");
+        repository.SeedUser(superAdmin, administratorRole.Id);
+
+        var regular = UserAccount.Create(Guid.NewGuid(), "regular", "Regular", "User", null);
+        regular.SetPasswordHash("hash::Password!42");
+        repository.SeedUser(regular, administratorRole.Id);
+
+        var handler = new GetUsersQueryHandler(repository, new FakeCurrentUser(actor.Id), TimeProvider.System);
+        var result = await handler.Handle(new GetUsersQuery(new PageRequest { PageNumber = 1, PageSize = 20 }), CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Items.Any(x => x.Id == superAdmin.Id), Is.False);
+            Assert.That(result.Items.Any(x => x.Id == regular.Id), Is.True);
+            Assert.That(result.TotalCount, Is.EqualTo(2)); // actor + regular user
+        });
+    }
+
+    [Test]
+    public async Task GetUserById_ResolvesAuditUserIds_ToUserNames()
+    {
+        var repository = new FakeIdentityRepository();
+        var actor = UserAccount.Create(Guid.NewGuid(), "audit.admin", "Audit", "Admin", null);
+        actor.SetPasswordHash("hash::Password!42");
+        repository.SeedUser(actor);
+
+        var target = UserAccount.Create(Guid.NewGuid(), "audit.target", "Audit", "Target", null);
+        target.SetPasswordHash("hash::Password!42");
+        target.SetCreatedAudit(DateTimeOffset.UtcNow.AddDays(-1), actor.Id.ToString());
+        target.SetModifiedAudit(DateTimeOffset.UtcNow, actor.Id.ToString());
+        repository.SeedUser(target);
+
+        var handler = new GetUserByIdQueryHandler(repository, new FakeCurrentUser(actor.Id), TimeProvider.System);
+        var details = await handler.Handle(new GetUserByIdQuery(target.Id), CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(details.CreatedBy, Is.EqualTo("audit.admin"));
+            Assert.That(details.LastModifiedBy, Is.EqualTo("audit.admin"));
+        });
+    }
+
+    [Test]
+    public async Task GetUserById_DoesNotExposeSuperAdminUserName_ThroughAuditMetadata()
+    {
+        var repository = new FakeIdentityRepository();
+        var actor = UserAccount.Create(Guid.NewGuid(), "manager", "Manager", "User", null);
+        actor.SetPasswordHash("hash::Password!42");
+        repository.SeedUser(actor);
+
+        var superAdmin = UserAccount.Create(Guid.NewGuid(), "root.hidden", "Root", "Hidden", null, isSuperAdmin: true);
+        superAdmin.SetPasswordHash("hash::Password!42");
+        repository.SeedUser(superAdmin);
+
+        var target = UserAccount.Create(Guid.NewGuid(), "created.by.root", "Regular", "User", null);
+        target.SetPasswordHash("hash::Password!42");
+        target.SetCreatedAudit(DateTimeOffset.UtcNow, superAdmin.Id.ToString());
+        repository.SeedUser(target);
+
+        var handler = new GetUserByIdQueryHandler(repository, new FakeCurrentUser(actor.Id), TimeProvider.System);
+        var details = await handler.Handle(new GetUserByIdQuery(target.Id), CancellationToken.None);
+
+        Assert.That(details.CreatedBy, Is.Null);
+    }
+
 }

@@ -12,10 +12,12 @@ public interface IIdentityRepository
         PageRequest request,
         bool? isActive = null,
         Guid? roleId = null,
+        bool includeSuperAdmin = true,
         CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Role>> ListRolesAsync(CancellationToken cancellationToken = default);
     Task<Role?> GetRoleAsync(Guid roleId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Role>> GetRolesByIdsAsync(IReadOnlyCollection<Guid> roleIds, CancellationToken cancellationToken = default);
+    Task<IReadOnlyDictionary<Guid, string>> GetUserNamesAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken = default);
     Task<bool> UserNameExistsAsync(string normalizedUserName, Guid? excludingUserId = null, CancellationToken cancellationToken = default);
     Task<bool> EmailExistsAsync(string normalizedEmail, Guid? excludingUserId = null, CancellationToken cancellationToken = default);
     Task<bool> HasAnyUsersAsync(CancellationToken cancellationToken = default);
@@ -28,4 +30,5 @@ public interface IIdentityRepository
     Task ReplaceUserRolesAsync(Guid userId, IReadOnlyCollection<Guid> roleIds, CancellationToken cancellationToken = default);
     Task AddPasswordHistoryAsync(UserPasswordHistory history, CancellationToken cancellationToken = default);
     void UpdateUser(UserAccount user);
+    void UpdateRole(Role role);
 }

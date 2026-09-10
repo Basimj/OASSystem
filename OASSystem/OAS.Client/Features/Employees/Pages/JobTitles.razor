@@ -1,0 +1,127 @@
+@page "/employees/job-titles"
+@attribute [Authorize(Roles = "Administrator")]
+
+<PageTitle>المسميات الوظيفية</PageTitle>
+
+<UiWorkspaceLayout ShowAside="true" ShowFilters="false">
+    <Actions>
+        <UiWorkspaceActionBar>
+            <UiButton Text="جديد"
+                      IconCssClass="fa-solid fa-plus"
+                      Size="ControlSize.Small"
+                      Disabled="@IsEditing"
+                      OnClick="BeginCreateAsync" />
+            <UiButton Text="حفظ"
+                      IconCssClass="fa-solid fa-floppy-disk"
+                      Size="ControlSize.Small"
+                      Disabled="@(!CanSave)"
+                      Loading="@_saving"
+                      OnClick="SaveAsync" />
+            <UiButton Text="تعديل"
+                      IconCssClass="fa-solid fa-pen"
+                      Variant="ButtonVariant.Secondary"
+                      Size="ControlSize.Small"
+                      Disabled="@(!CanEdit)"
+                      OnClick="BeginEditAsync" />
+            <UiButton Text="إلغاء"
+                      IconCssClass="fa-solid fa-xmark"
+                      Variant="ButtonVariant.Ghost"
+                      Size="ControlSize.Small"
+                      Disabled="@(!IsEditing)"
+                      OnClick="CancelEditAsync" />
+            <UiButton Text="تحديث"
+                      IconCssClass="fa-solid fa-rotate"
+                      Variant="ButtonVariant.Secondary"
+                      Size="ControlSize.Small"
+                      Disabled="@IsEditing"
+                      Loading="@_loading"
+                      OnClick="RefreshAsync" />
+
+            <label class="job-title-import @((_importing || IsEditing) ? "job-title-import--disabled" : null)" title="استيراد">
+                <i class="fa-solid fa-file-import" aria-hidden="true"></i>
+                <span>استيراد</span>
+                <InputFile class="job-title-import__input" accept=".csv,text/csv" OnChange="ImportAsync" />
+            </label>
+
+            <UiButton Text="تصدير"
+                      IconCssClass="fa-solid fa-file-export"
+                      Variant="ButtonVariant.Secondary"
+                      Size="ControlSize.Small"
+                      Disabled="@_exporting"
+                      Loading="@_exporting"
+                      OnClick="ExportAsync" />
+
+            <UiSearchInput @bind-Value="_search"
+                           Placeholder="البحث عن مسمى وظيفي..."
+                           AriaLabel="البحث عن مسمى وظيفي"
+                           ClearText="مسح البحث"
+                           DebounceMilliseconds="200"
+                           OnSearch="SearchChangedAsync" />
+        </UiWorkspaceActionBar>
+    </Actions>
+
+    <Content>
+        <UiDataGridPanel Title="المسميات الوظيفية" Subtitle="@($"{FilteredItems.Count} مسمى")">
+            <Header>
+                <div class="job-title-grid-header">
+                    <span>المسمى الوظيفي</span>
+                    <span>الحالة</span>
+                    <span>آخر تعديل</span>
+                </div>
+            </Header>
+            <Body>
+                @if (_loading)
+                {
+                    <UiAlert Message="جاري التحميل..." />
+                }
+                else if (FilteredItems.Count == 0)
+                {
+                    <UiAlert Message="لا توجد مسميات وظيفية." />
+                }
+                else
+                {
+                    <div class="job-title-grid-body">
+                        @foreach (var item in FilteredItems)
+                        {
+                            <button type="button"
+                                    class="@(item.Id == _selected?.Id ? "job-title-grid-row job-title-grid-row--selected" : "job-title-grid-row")"
+                                    @onclick="() => SelectItem(item)">
+                                <strong>@item.Name</strong>
+                                <span><UiBadge Text="@(item.IsActive ? "نشط" : "غير نشط")"
+                                               Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" /></span>
+                                <span>@FormatDate(item.LastModifiedAtUtc ?? item.CreatedAtUtc)</span>
+                            </button>
+                        }
+                    </div>
+                }
+            </Body>
+        </UiDataGridPanel>
+    </Content>
+
+    <Aside>
+        <div class="job-title-aside-card">
+            <UiCard Title="@EditorTitle" Subtitle="@EditorSubtitle">
+                @if (_mode == EditorMode.Empty)
+                {
+                    <UiAlert Message="اختر مسمى وظيفيًا من الجدول أو اضغط جديد." />
+                }
+                else
+                {
+                    <div class="job-title-editor">
+                        <UiInputText @bind-Value="_formName"
+                                     Label="اسم المسمى الوظيفي"
+                                     Required="true"
+                                     EnableNativeValidation="false"
+                                     MaxLength="100"
+                                     AutoComplete="off"
+                                     Disabled="@(!IsEditing)"
+                                     Size="ControlSize.Small" />
+                        <UiCheckbox @bind-Value="_formIsActive"
+                                    Label="نشط"
+                                    Disabled="@(!IsEditing)" />
+                    </div>
+                }
+            </UiCard>
+        </div>
+    </Aside>
+</UiWorkspaceLayout>

@@ -18,7 +18,7 @@ public sealed class UserProfileImageStore(OasDbContext dbContext) : IUserProfile
             await using var command = connection.CreateCommand();
             EnlistCurrentTransaction(command);
             command.CommandText = "SELECT [ContentType],[ImageData],[UpdatedAtUtc] FROM [security].[UserProfileImages] WHERE [UserId]=@UserId";
-            var p = command.CreateParameter(); p.ParameterName = "@UserId"; p.Value = userId; command.Parameters.Add(p);
+            Add(command, "@UserId", userId);
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             if (!await reader.ReadAsync(cancellationToken)) return null;
             return new UserProfileImageData(userId, reader.GetString(0), (byte[])reader.GetValue(1), reader.GetFieldValue<DateTimeOffset>(2));
@@ -35,14 +35,21 @@ public sealed class UserProfileImageStore(OasDbContext dbContext) : IUserProfile
         {
             await using var command = connection.CreateCommand();
             EnlistCurrentTransaction(command);
+            // UPDLOCK/HOLDLOCK makes the update-then-insert path safe when two first uploads arrive concurrently.
             command.CommandText = @"
-UPDATE [security].[UserProfileImages]
+UPDATE [security].[UserProfileImages] WITH (UPDLOCK, HOLDLOCK)
 SET [ContentType]=@ContentType,[ImageData]=@ImageData,[FileSize]=@FileSize,[UpdatedAtUtc]=@UpdatedAtUtc
 WHERE [UserId]=@UserId;
 IF @@ROWCOUNT = 0
-INSERT INTO [security].[UserProfileImages]([UserId],[ContentType],[ImageData],[FileSize],[UpdatedAtUtc])
-VALUES(@UserId,@ContentType,@ImageData,@FileSize,@UpdatedAtUtc);";
-            Add(command,"@UserId",image.UserId); Add(command,"@ContentType",image.ContentType); Add(command,"@ImageData",image.Content); Add(command,"@FileSize",image.Content.Length); Add(command,"@UpdatedAtUtc",image.UpdatedAtUtc);
+BEGIN
+    INSERT INTO [security].[UserProfileImages]([UserId],[ContentType],[ImageData],[FileSize],[UpdatedAtUtc])
+    VALUES(@UserId,@ContentType,@ImageData,@FileSize,@UpdatedAtUtc);
+END";
+            Add(command, "@UserId", image.UserId);
+            Add(command, "@ContentType", image.ContentType);
+            Add(command, "@ImageData", image.Content);
+            Add(command, "@FileSize", image.Content.Length);
+            Add(command, "@UpdatedAtUtc", image.UpdatedAtUtc);
             await command.ExecuteNonQueryAsync(cancellationToken);
         }
         finally { if (shouldClose) await connection.CloseAsync(); }
@@ -58,7 +65,7 @@ VALUES(@UserId,@ContentType,@ImageData,@FileSize,@UpdatedAtUtc);";
             await using var command = connection.CreateCommand();
             EnlistCurrentTransaction(command);
             command.CommandText = "DELETE FROM [security].[UserProfileImages] WHERE [UserId]=@UserId";
-            Add(command,"@UserId",userId);
+            Add(command, "@UserId", userId);
             await command.ExecuteNonQueryAsync(cancellationToken);
         }
         finally { if (shouldClose) await connection.CloseAsync(); }
@@ -73,6 +80,9 @@ VALUES(@UserId,@ContentType,@ImageData,@FileSize,@UpdatedAtUtc);";
 
     private static void Add(System.Data.Common.DbCommand command, string name, object value)
     {
-        var p=command.CreateParameter(); p.ParameterName=name; p.Value=value; command.Parameters.Add(p);
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = name;
+        parameter.Value = value;
+        command.Parameters.Add(parameter);
     }
 }

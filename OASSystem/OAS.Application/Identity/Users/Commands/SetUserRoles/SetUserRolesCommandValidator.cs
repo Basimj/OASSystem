@@ -8,7 +8,7 @@ public sealed class SetUserRolesCommandValidator : AbstractValidator<SetUserRole
     public SetUserRolesCommandValidator()
     {
         RuleFor(x => x.UserId).NotEmpty().WithErrorCode("user_id_required");
-        RuleFor(x => x.Request.RoleIds).NotNull().WithErrorCode("roles_required").Must(x => x is { Count: > 0 }).WithErrorCode("roles_required");
+        RuleFor(x => x.Request.RoleIds).NotNull().WithErrorCode("roles_required").Must(x => x is { Count: 1 }).WithErrorCode("roles_single_required");
         RuleFor(x => x.Request.RoleIds).Must(x => x is null || x.Distinct().Count() == x.Count).WithErrorCode("roles_duplicate");
         RuleFor(x => x.Request.RowVersion).Must(RowVersionCodec.IsValid).WithErrorCode("row_version_invalid");
     }

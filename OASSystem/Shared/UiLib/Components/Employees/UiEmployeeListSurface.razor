@@ -1,0 +1,27 @@
+<section class="ui-employee-list-surface">
+    <div class="ui-employee-list-surface__body">
+        @if (Loading)
+        {
+            <div class="ui-employee-list-surface__state">
+                <i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i>
+                <span>@LoadingText</span>
+            </div>
+        }
+        else if (IsEmpty)
+        {
+            <div class="ui-employee-list-surface__state ui-employee-list-surface__state--empty">
+                <i class="fa-solid fa-users-slash" aria-hidden="true"></i>
+                <strong>@EmptyTitle</strong>
+                <span>@EmptyText</span>
+            </div>
+        }
+        else
+        {
+            <div class="ui-employee-list-surface__grid">@ChildContent</div>
+        }
+    </div>
+    @if (!Loading && !IsEmpty && Footer is not null)
+    {
+        <footer class="ui-employee-list-surface__footer">@Footer</footer>
+    }
+</section>

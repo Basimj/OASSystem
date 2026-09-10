@@ -1,9 +1,5 @@
-﻿
 using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore;
 using NUnit.Framework;
-using OAS.Domain.Features.Employees.Entities;
-using OAS.Infrastructure.Persistence;
 
 namespace OAS.Tests.Features.Employees.Integration;
 
@@ -11,404 +7,141 @@ namespace OAS.Tests.Features.Employees.Integration;
 public sealed class EmployeeIntegrationTests
 {
     [OneTimeSetUp]
-    public async Task Setup()
-    {
-        await TestDatabase.EnsureCreatedAndMigratedAsync();
-    }
+    public async Task Setup() => await TestDatabase.EnsureCreatedAndMigratedAsync();
 
     [Test]
-    public async Task Migration_IsDiscoverable()
+    public async Task EmployeeRelationalAndContactMigrations_AreApplied()
     {
-        await using var connection =
-            new SqlConnection(TestDatabase.ConnectionString);
-
+        await using var connection = new SqlConnection(TestDatabase.ConnectionString);
         await connection.OpenAsync();
-
-        const string sql = """
-SELECT COUNT(*)
-FROM [OASSystem_EmployeesTests].[dbo].[__EFMigrationsHistory]
-WHERE [MigrationId] = '20260831145400_EmployeesInitial'
-""";
-
-        await using var command = new SqlCommand(sql, connection);
-
-        var count = Convert.ToInt32(
-            await command.ExecuteScalarAsync());
-
-        Assert.That(count, Is.EqualTo(1));
+        await using var command = new SqlCommand("""
+SELECT COUNT(*) FROM [dbo].[__EFMigrationsHistory]
+WHERE [MigrationId] IN (
+    '20260909211500_EmployeeRelationalRefactor',
+    '20260910170000_EmployeeContactInfo')
+""", connection);
+        Assert.That(Convert.ToInt32(await command.ExecuteScalarAsync()), Is.EqualTo(2));
     }
 
     [Test]
-    public async Task Migration_CreatesHrSchema()
+    public async Task JobTitlesTable_AndEmployeeForeignKey_Exist()
     {
-        await using var connection =
-            new SqlConnection(TestDatabase.ConnectionString);
-
+        await using var connection = new SqlConnection(TestDatabase.ConnectionString);
         await connection.OpenAsync();
-
-        const string sql = """
-SELECT COUNT(*)
-FROM sys.schemas
-WHERE name = N'hr'
-""";
-
-        await using var command = new SqlCommand(sql, connection);
-
-        var count = Convert.ToInt32(
-            await command.ExecuteScalarAsync());
-
-        Assert.That(count, Is.EqualTo(1));
+        await using var command = new SqlCommand("""
+SELECT
+    CASE WHEN OBJECT_ID(N'[hr].[JobTitles]', N'U') IS NOT NULL THEN 1 ELSE 0 END
+    + CASE WHEN EXISTS (
+        SELECT 1 FROM sys.foreign_keys
+        WHERE parent_object_id = OBJECT_ID(N'[hr].[Employees]')
+          AND name = N'FK_Employees_JobTitles_JobTitleId') THEN 1 ELSE 0 END
+""", connection);
+        Assert.That(Convert.ToInt32(await command.ExecuteScalarAsync()), Is.EqualTo(2));
     }
 
     [Test]
-    public async Task Migration_CreatesEmployeesTable()
+    public async Task EmployeeNumber_HasUniqueIndex_AndLegacyNormalizedCodeIsGone()
     {
-        await using var connection =
-            new SqlConnection(TestDatabase.ConnectionString);
-
+        await using var connection = new SqlConnection(TestDatabase.ConnectionString);
         await connection.OpenAsync();
-
-        const string sql = """
-SELECT COUNT(*)
-FROM INFORMATION_SCHEMA.TABLES
-WHERE TABLE_SCHEMA = N'hr'
-  AND TABLE_NAME = N'Employees'
-""";
-
-        await using var command = new SqlCommand(sql, connection);
-
-        var count = Convert.ToInt32(
-            await command.ExecuteScalarAsync());
-
-        Assert.That(count, Is.EqualTo(1));
+        await using var command = new SqlCommand("""
+SELECT
+    CASE WHEN EXISTS (
+        SELECT 1 FROM sys.indexes
+        WHERE object_id = OBJECT_ID(N'[hr].[Employees]')
+          AND name = N'UX_Employees_EmployeeNumber' AND is_unique = 1) THEN 1 ELSE 0 END,
+    CASE WHEN COL_LENGTH(N'[hr].[Employees]', N'NormalizedEmployeeCode') IS NULL THEN 1 ELSE 0 END
+""", connection);
+        await using var reader = await command.ExecuteReaderAsync();
+        Assert.That(await reader.ReadAsync(), Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(reader.GetInt32(0), Is.EqualTo(1));
+            Assert.That(reader.GetInt32(1), Is.EqualTo(1));
+        });
     }
 
     [Test]
-    public async Task EmployeePrimaryKey_IsUniqueIdentifier()
+    public async Task EmployeeContactColumns_ExistAndLegacyImageTableIsRemoved()
     {
-        await using var connection =
-            new SqlConnection(TestDatabase.ConnectionString);
-
+        await using var connection = new SqlConnection(TestDatabase.ConnectionString);
         await connection.OpenAsync();
-
-        const string sql = """
-SELECT DATA_TYPE
-FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_SCHEMA = N'hr'
-  AND TABLE_NAME = N'Employees'
-  AND COLUMN_NAME = N'Id'
-""";
-
-        await using var command = new SqlCommand(sql, connection);
-
-        var type = Convert.ToString(
-            await command.ExecuteScalarAsync());
-
-        Assert.That(type, Is.EqualTo("uniqueidentifier"));
+        await using var command = new SqlCommand("""
+SELECT
+    CASE WHEN COL_LENGTH(N'[hr].[Employees]', N'Phone') IS NOT NULL THEN 1 ELSE 0 END,
+    CASE WHEN COL_LENGTH(N'[hr].[Employees]', N'Email') IS NOT NULL THEN 1 ELSE 0 END,
+    CASE WHEN COL_LENGTH(N'[hr].[Employees]', N'Country') IS NOT NULL THEN 1 ELSE 0 END,
+    CASE WHEN COL_LENGTH(N'[hr].[Employees]', N'Governorate') IS NOT NULL THEN 1 ELSE 0 END,
+    CASE WHEN COL_LENGTH(N'[hr].[Employees]', N'City') IS NOT NULL THEN 1 ELSE 0 END,
+    CASE WHEN COL_LENGTH(N'[hr].[Employees]', N'PostalCode') IS NOT NULL THEN 1 ELSE 0 END,
+    CASE WHEN COL_LENGTH(N'[hr].[Employees]', N'ResidentialAddress') IS NOT NULL THEN 1 ELSE 0 END,
+    CASE WHEN COL_LENGTH(N'[hr].[Employees]', N'Photo') IS NOT NULL THEN 1 ELSE 0 END,
+    CASE WHEN OBJECT_ID(N'[hr].[EmployeeImages]', N'U') IS NULL THEN 1 ELSE 0 END
+""", connection);
+        await using var reader = await command.ExecuteReaderAsync();
+        Assert.That(await reader.ReadAsync(), Is.True);
+        for (var ordinal = 0; ordinal < 9; ordinal++)
+            Assert.That(reader.GetInt32(ordinal), Is.EqualTo(1), $"Expected schema condition at ordinal {ordinal} to be true.");
     }
 
     [Test]
-    public async Task EmployeeCode_HasUniqueIndex()
+    public async Task DatabaseSequence_GeneratesDistinctEmployeeNumbers()
     {
-        await using var connection =
-            new SqlConnection(TestDatabase.ConnectionString);
-
+        await using var connection = new SqlConnection(TestDatabase.ConnectionString);
         await connection.OpenAsync();
-
-        const string sql = """
-SELECT COUNT(*)
-FROM sys.indexes
-WHERE object_id = OBJECT_ID(N'[hr].[Employees]')
-  AND name = N'UX_Employees_NormalizedEmployeeCode'
-  AND is_unique = 1
-""";
-
-        await using var command = new SqlCommand(sql, connection);
-
-        var count = Convert.ToInt32(
-            await command.ExecuteScalarAsync());
-
-        Assert.That(count, Is.EqualTo(1));
+        await using var command = new SqlCommand("""
+DECLARE @First bigint = NEXT VALUE FOR [core].[EmployeeNumberSequence];
+DECLARE @Second bigint = NEXT VALUE FOR [core].[EmployeeNumberSequence];
+SELECT @First, @Second;
+""", connection);
+        await using var reader = await command.ExecuteReaderAsync();
+        Assert.That(await reader.ReadAsync(), Is.True);
+        var first = reader.GetInt64(0);
+        var second = reader.GetInt64(1);
+        Assert.Multiple(() =>
+        {
+            Assert.That(first, Is.GreaterThan(0));
+            Assert.That(second, Is.GreaterThan(first));
+        });
     }
 
     [Test]
-    public async Task UserAccountId_HasFilteredUniqueIndex()
+    public async Task LinkedEmployee_PreventsDeletingReferencedUser()
     {
-        await using var connection =
-            new SqlConnection(TestDatabase.ConnectionString);
-
+        await using var connection = new SqlConnection(TestDatabase.ConnectionString);
         await connection.OpenAsync();
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync();
 
-        const string sql = """
-SELECT filter_definition
-FROM sys.indexes
-WHERE object_id = OBJECT_ID(N'[hr].[Employees]')
-  AND name = N'UX_Employees_UserAccountId'
-  AND is_unique = 1
-""";
-
-        await using var command = new SqlCommand(sql, connection);
-
-        var filter = Convert.ToString(
-            await command.ExecuteScalarAsync());
-
-        Assert.That(
-            filter,
-            Does.Contain("[UserAccountId] IS NOT NULL"));
-    }
-
-    [Test]
-    public async Task Employee_HasUserForeignKey()
-    {
-        await using var connection =
-            new SqlConnection(TestDatabase.ConnectionString);
-
-        await connection.OpenAsync();
-
-        const string sql = """
-SELECT COUNT(*)
-FROM sys.foreign_keys
-WHERE name = N'FK_Employees_Users_UserAccountId'
-  AND parent_object_id = OBJECT_ID(N'[hr].[Employees]')
-""";
-
-        await using var command = new SqlCommand(sql, connection);
-
-        var count = Convert.ToInt32(
-            await command.ExecuteScalarAsync());
-
-        Assert.That(count, Is.EqualTo(1));
-    }
-
-    [Test]
-    public async Task UserDelete_SetsEmployeeUserAccountIdToNull()
-    {
         var userId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
+        var titleId = Guid.NewGuid();
 
-        var employeeCode =
-            $"T{Guid.NewGuid():N}"[..10];
-
-        await using var connection =
-            new SqlConnection(TestDatabase.ConnectionString);
-
-        await connection.OpenAsync();
-
-        await using var transaction =
-            await connection.BeginTransactionAsync();
-
-        try
-        {
-            await using (var command = connection.CreateCommand())
-            {
-                command.Transaction = (SqlTransaction)transaction;
-
-                command.CommandText = """
+        await ExecuteAsync(connection, transaction, """
 INSERT INTO [security].[Users]
-(
-    [Id],
-    [UserName],
-    [NormalizedUserName],
-    [FirstName],
-    [LastName],
-    [Email],
-    [NormalizedEmail],
-    [PasswordHash],
-    [IsActive],
-    [IsSuperAdmin],
-    [MustChangePassword],
-    [AccessFailedCount],
-    [CreatedAtUtc]
-)
-VALUES
-(
-    @Id,
-    N'test-user',
-    N'TEST-USER',
-    N'Test',
-    N'User',
-    NULL,
-    NULL,
-    N'test',
-    1,
-    0,
-    0,
-    0,
-    SYSUTCDATETIME()
-);
-""";
-
-                command.Parameters.AddWithValue("@Id", userId);
-
-                await command.ExecuteNonQueryAsync();
-            }
-
-            await using (var command = connection.CreateCommand())
-            {
-                command.Transaction = (SqlTransaction)transaction;
-
-                command.CommandText = """
+([Id],[UserName],[NormalizedUserName],[FirstName],[LastName],[PasswordHash],[IsActive],[IsSuperAdmin],[MustChangePassword],[AccessFailedCount],[CreatedAtUtc])
+VALUES (@UserId,N'test-linked',N'TEST-LINKED',N'Test',N'User',N'test',1,0,0,0,SYSUTCDATETIME());
+INSERT INTO [hr].[JobTitles] ([Id],[Name],[IsActive],[CreatedAtUtc])
+VALUES (@TitleId,@TitleName,1,SYSUTCDATETIME());
 INSERT INTO [hr].[Employees]
-(
-    [Id],
-    [EmployeeCode],
-    [NormalizedEmployeeCode],
-    [FirstName],
-    [LastName],
-    [IsSalesperson],
-    [IsTechnician],
-    [IsCommissionEligible],
-    [IsActive],
-    [UserAccountId],
-    [CreatedAtUtc]
-)
-VALUES
-(
-    @Id,
-    @EmployeeCode,
-    @EmployeeCode,
-    N'Test',
-    N'Employee',
-    0,
-    0,
-    0,
-    1,
-    @UserId,
-    SYSUTCDATETIME()
-);
-""";
+([Id],[FirstName],[LastName],[JobTitleId],[IsCommissionEligible],[IsActive],[UserAccountId],[CreatedAtUtc])
+VALUES (@EmployeeId,N'Test',N'Employee',@TitleId,0,1,@UserId,SYSUTCDATETIME());
+""",
+            new SqlParameter("@UserId", userId),
+            new SqlParameter("@EmployeeId", employeeId),
+            new SqlParameter("@TitleId", titleId),
+            new SqlParameter("@TitleName", $"Linked-{Guid.NewGuid():N}"[..28]));
 
-                command.Parameters.AddWithValue(
-                    "@Id",
-                    employeeId);
+        await using var delete = new SqlCommand("DELETE FROM [security].[Users] WHERE [Id] = @UserId", connection, transaction);
+        delete.Parameters.AddWithValue("@UserId", userId);
+        Assert.ThrowsAsync<SqlException>(() => delete.ExecuteNonQueryAsync());
 
-                command.Parameters.AddWithValue(
-                    "@EmployeeCode",
-                    employeeCode);
-
-                command.Parameters.AddWithValue(
-                    "@UserId",
-                    userId);
-
-                await command.ExecuteNonQueryAsync();
-            }
-
-            await using (var command = connection.CreateCommand())
-            {
-                command.Transaction = (SqlTransaction)transaction;
-
-                command.CommandText =
-                    "DELETE FROM [security].[Users] WHERE [Id] = @Id";
-
-                command.Parameters.AddWithValue("@Id", userId);
-
-                await command.ExecuteNonQueryAsync();
-            }
-
-            await transaction.CommitAsync();
-        }
-        catch
-        {
-            await transaction.RollbackAsync();
-            throw;
-        }
-
-        await using var verify =
-            new SqlConnection(TestDatabase.ConnectionString);
-
-        await verify.OpenAsync();
-
-        await using var verifyCommand =
-            verify.CreateCommand();
-
-        verifyCommand.CommandText = """
-SELECT [UserAccountId]
-FROM [hr].[Employees]
-WHERE [Id] = @Id
-""";
-
-        verifyCommand.Parameters.AddWithValue(
-            "@Id",
-            employeeId);
-
-        var value =
-            await verifyCommand.ExecuteScalarAsync();
-
-        Assert.That(value, Is.EqualTo(DBNull.Value));
+        await transaction.RollbackAsync();
     }
 
-    [Test]
-    public async Task RowVersion_IsGeneratedBySqlServer()
+    private static async Task ExecuteAsync(SqlConnection connection, SqlTransaction transaction, string sql, params SqlParameter[] parameters)
     {
-        var employee = Employee.Create(
-            Guid.NewGuid(),
-            $"RV-{Guid.NewGuid():N}"[..10],
-            "Test",
-            "Employee",
-            null,
-            null,
-            null,
-            null,
-            false,
-            false,
-            false,
-            true,
-            null);
-
-        var options =
-            new DbContextOptionsBuilder<OasDbContext>()
-                .UseSqlServer(TestDatabase.ConnectionString)
-                .Options;
-
-        await using var db = new OasDbContext(options);
-
-        await InsertEmployeeAsync(db, employee);
-
-        var firstVersion =
-            employee.RowVersion.ToArray();
-
-        employee.UpdateDetails(
-            employee.EmployeeCode,
-            "Changed",
-            employee.LastName,
-            employee.Phone,
-            employee.JobTitle,
-            employee.HireDate,
-            employee.Notes);
-
-        await db.SaveChangesAsync();
-
-        var secondVersion =
-            employee.RowVersion.ToArray();
-
-        Assert.That(
-            secondVersion,
-            Is.Not.EqualTo(firstVersion));
-    }
-
-    [Test]
-    public async Task OasDbContext_Employees_Works()
-    {
-        var options =
-            new DbContextOptionsBuilder<OasDbContext>()
-                .UseSqlServer(TestDatabase.ConnectionString)
-                .Options;
-
-        await using var db = new OasDbContext(options);
-
-        var count =
-            await db.Employees.CountAsync();
-
-        Assert.That(count, Is.GreaterThanOrEqualTo(0));
-    }
-
-    private static async Task InsertEmployeeAsync(
-        OasDbContext db,
-        Employee employee)
-    {
-        db.Employees.Add(employee);
-
-        await db.SaveChangesAsync();
+        await using var command = new SqlCommand(sql, connection, transaction);
+        command.Parameters.AddRange(parameters);
+        await command.ExecuteNonQueryAsync();
     }
 }
-

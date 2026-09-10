@@ -1,0 +1,12 @@
+<div class="ui-employee-pager" dir="rtl">
+    <div class="ui-employee-pager__summary">عرض @FirstItem - @LastItem من @TotalCount موظفًا</div>
+    <div class="ui-employee-pager__pages">
+        <button type="button" disabled="@(!HasPrevious)" @onclick="PreviousAsync">السابق</button>
+        @foreach (var pageNumber in VisiblePages)
+        {
+            <button type="button" class="@(pageNumber == PageNumber ? "is-active" : null)" @onclick="() => SelectPageAsync(pageNumber)">@pageNumber</button>
+        }
+        <button type="button" disabled="@(!HasNext)" @onclick="NextAsync">التالي</button>
+    </div>
+    <div class="ui-employee-pager__size">لكل صفحة <span>@PageSize</span></div>
+</div>

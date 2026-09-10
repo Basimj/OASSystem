@@ -5,6 +5,7 @@ public sealed record UserSummaryDto(
     string UserName,
     string DisplayName,
     string? Email,
+    string? PhoneNumber,
     bool IsActive,
     bool IsSuperAdmin,
     bool MustChangePassword,

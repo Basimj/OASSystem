@@ -1,0 +1,21 @@
+<section class="ui-employee-choice" dir="rtl">
+    <header class="ui-employee-choice__header">
+        <div class="ui-employee-choice__title">
+            <span class="ui-employee-choice__icon"><i class="fa-solid fa-file-export" aria-hidden="true"></i></span>
+            <div><strong>تصدير Excel</strong><span>اختر العملية التي تريد تنفيذها.</span></div>
+        </div>
+        <button type="button" class="ui-employee-choice__close" aria-label="إغلاق" @onclick="CloseAsync"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+    </header>
+    <div class="ui-employee-choice__body">
+        <button type="button" class="ui-employee-choice__option" @onclick="ExportAsync">
+            <span class="ui-employee-choice__option-icon"><i class="fa-solid fa-download" aria-hidden="true"></i></span>
+            <span class="ui-employee-choice__option-copy"><strong>تصدير الموظفين</strong><span>تنزيل بيانات الموظفين الحالية في ملف Excel.</span></span>
+            <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="ui-employee-choice__option" @onclick="TemplateAsync">
+            <span class="ui-employee-choice__option-icon"><i class="fa-solid fa-file-circle-plus" aria-hidden="true"></i></span>
+            <span class="ui-employee-choice__option-copy"><strong>تنزيل قالب Excel</strong><span>قالب جاهز لإدخال بيانات الموظفين واستيرادها.</span></span>
+            <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+        </button>
+    </div>
+</section>

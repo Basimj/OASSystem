@@ -5,6 +5,8 @@ namespace OAS.Application.Identity.Users.Commands.UpdateUser;
 
 public sealed class UpdateUserCommandValidator : AbstractValidator<UpdateUserCommand>
 {
+    private const string PhonePattern = @"^[0-9+()\-\s]{7,32}$";
+
     public UpdateUserCommandValidator()
     {
         RuleFor(x => x.UserId).NotEmpty().WithErrorCode("user_id_required");
@@ -12,6 +14,9 @@ public sealed class UpdateUserCommandValidator : AbstractValidator<UpdateUserCom
         RuleFor(x => x.Request.FirstName).NotEmpty().WithErrorCode("first_name_required").MaximumLength(100).WithErrorCode("first_name_max_length");
         RuleFor(x => x.Request.LastName).NotEmpty().WithErrorCode("last_name_required").MaximumLength(100).WithErrorCode("last_name_max_length");
         RuleFor(x => x.Request.Email).EmailAddress().WithErrorCode("email_invalid").MaximumLength(256).WithErrorCode("email_max_length").When(x => !string.IsNullOrWhiteSpace(x.Request.Email));
+        RuleFor(x => x.Request.PhoneNumber).NotEmpty().WithErrorCode("phone_number_required")
+            .MaximumLength(32).WithErrorCode("phone_number_max_length")
+            .Matches(PhonePattern).WithErrorCode("phone_number_invalid");
         RuleFor(x => x.Request.RowVersion).Must(RowVersionCodec.IsValid).WithErrorCode("row_version_invalid");
     }
 }

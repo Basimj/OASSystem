@@ -1,8 +1,8 @@
-﻿using NUnit.Framework;
+using NUnit.Framework;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.Features.Employees.Queries.GetEmployeeById;
-using OAS.Contracts.Features.Employees;
 using OAS.Domain.Features.Employees.Entities;
+using OAS.Domain.Features.Employees.ValueObjects;
 
 namespace OAS.Tests.Features.Employees.Application;
 
@@ -10,51 +10,34 @@ namespace OAS.Tests.Features.Employees.Application;
 public sealed class GetEmployeeByIdQueryHandlerTests
 {
     [Test]
-    public async Task GetById_ExistingEmployee_ReturnsDto()
+    public async Task GetById_ExistingEmployee_ReturnsJobTitleContactAndNumericCode()
     {
+        var title = JobTitle.Create(Guid.NewGuid(), "فني", true);
         var employee = Employee.Create(
-            Guid.NewGuid(),
-            "EMP-001",
-            "Ahmed",
-            "Ali",
-            "777123456",
-            "Sales",
-            null,
-            null,
-            true,
-            false,
-            true,
-            true,
-            null);
+            Guid.NewGuid(), 7, "Ahmed", "Ali",
+            ContactInfo.Create("777123456", "a@example.com", Address.Create("Yemen", "Sana'a", "Sana'a", null, "Street")),
+            title.Id, null, true, true);
+        var handler = new GetEmployeeByIdQueryHandler(
+            new FakeEmployeeRepository(employee), new FakeJobTitleRepository(title), new FakeUserRepository());
 
-        var handler =
-            new GetEmployeeByIdQueryHandler(
-                new FakeEmployeeRepository(employee));
+        var result = await handler.Handle(new GetEmployeeByIdQuery(employee.Id), CancellationToken.None);
 
-        var result = await handler.Handle(
-            new GetEmployeeByIdQuery(employee.Id),
-            CancellationToken.None);
-
-        Assert.That(result, Is.Not.Null);
-        Assert.That(result.Id, Is.EqualTo(employee.Id));
-        Assert.That(result.EmployeeCode,
-            Is.EqualTo("EMP-001"));
-        Assert.That(result.DisplayName,
-            Is.EqualTo("Ahmed Ali"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.EmployeeCode, Is.EqualTo("7"));
+            Assert.That(result.JobTitleId, Is.EqualTo(title.Id));
+            Assert.That(result.JobTitleName, Is.EqualTo("فني"));
+            Assert.That(result.DisplayName, Is.EqualTo("Ahmed Ali"));
+            Assert.That(result.Email, Is.EqualTo("a@example.com"));
+            Assert.That(result.Country, Is.EqualTo("Yemen"));
+        });
     }
 
     [Test]
     public void GetById_UnknownEmployee_ThrowsNotFound()
     {
-        var handler =
-            new GetEmployeeByIdQueryHandler(
-                new FakeEmployeeRepository());
-
-        var id = Guid.NewGuid();
-
-        Assert.ThrowsAsync<NotFoundException>(
-            async () => await handler.Handle(
-                new GetEmployeeByIdQuery(id),
-                CancellationToken.None));
+        var handler = new GetEmployeeByIdQueryHandler(
+            new FakeEmployeeRepository(), new FakeJobTitleRepository(), new FakeUserRepository());
+        Assert.ThrowsAsync<NotFoundException>(() => handler.Handle(new GetEmployeeByIdQuery(Guid.NewGuid()), CancellationToken.None));
     }
 }

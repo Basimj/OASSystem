@@ -70,9 +70,11 @@ internal sealed class FakeIdentityRepository : IIdentityRepository
         PageRequest request,
         bool? isActive = null,
         Guid? roleId = null,
+        bool includeSuperAdmin = true,
         CancellationToken cancellationToken = default)
     {
         IEnumerable<UserAccount> query = _users.Values;
+        if (!includeSuperAdmin) query = query.Where(x => !x.IsSuperAdmin);
         if (isActive.HasValue) query = query.Where(x => x.IsActive == isActive.Value);
         if (roleId.HasValue) query = query.Where(x => RolesFor(x.Id).Any(role => role.Id == roleId.Value));
         var records = query.Select(ToRecord).ToArray();
@@ -87,6 +89,11 @@ internal sealed class FakeIdentityRepository : IIdentityRepository
 
     public Task<IReadOnlyList<Role>> GetRolesByIdsAsync(IReadOnlyCollection<Guid> roleIds, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<Role>>(roleIds.Distinct().Where(_roles.ContainsKey).Select(id => _roles[id]).ToArray());
+
+    public Task<IReadOnlyDictionary<Guid, string>> GetUserNamesAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyDictionary<Guid, string>>(userIds.Distinct()
+            .Where(id => _users.ContainsKey(id) && !_users[id].IsSuperAdmin)
+            .ToDictionary(id => id, id => _users[id].UserName));
 
     public Task<bool> UserNameExistsAsync(string normalizedUserName, Guid? excludingUserId = null, CancellationToken cancellationToken = default) =>
         Task.FromResult(_users.Values.Any(x => x.NormalizedUserName == normalizedUserName && x.Id != excludingUserId));
@@ -147,6 +154,7 @@ internal sealed class FakeIdentityRepository : IIdentityRepository
     }
 
     public void UpdateUser(UserAccount user) => _users[user.Id] = user;
+    public void UpdateRole(Role role) => _roles[role.Id] = role;
 
 
     private static void EnsureRowVersion(UserAccount user)

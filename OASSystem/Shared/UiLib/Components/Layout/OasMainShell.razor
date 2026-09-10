@@ -7,7 +7,7 @@
                 <i class="fa-solid fa-bars" aria-hidden="true"></i>
             </button>
 
-            <OasTopHeader SystemName="@SystemName"
+            <OasTopHeader @ref="_topHeader" SystemName="@SystemName"
                           SystemLogoUrl="@SystemLogoUrl"
                           DatabaseName="@DatabaseName"
                           ConnectionStatus="@ConnectionStatus"
@@ -22,16 +22,18 @@
                           OnLogout="OnLogout" />
         </div>
 
-        <div class="oas-global-tabs-row">
+        <div class="oas-global-tabs-row" @onclick="CloseHeaderAccountMenu" @oncontextmenu="CloseHeaderAccountMenu">
             <div class="oas-application-tabs-host">
-                <UiApplicationTabStrip Tabs="@ApplicationTabs"
+                <UiApplicationTabStrip @ref="_applicationTabStrip" Tabs="@ApplicationTabs"
                                        OnSelect="SelectApplicationTabAsync"
-                                       OnClose="CloseApplicationTabAsync" />
+                                       OnClose="CloseApplicationTabAsync"
+                                       OnCloseOthers="CloseOtherApplicationTabsAsync"
+                                       OnCloseAll="CloseAllApplicationTabsAsync" />
             </div>
         </div>
     </header>
 
-    <aside class="oas-sidebar">
+    <aside class="oas-sidebar" @onclick="CloseHeaderAccountMenu">
         <div class="oas-sidebar-toolbar">
             <button type="button"
                     class="oas-collapse-btn"
@@ -94,6 +96,7 @@
                     @if (isSidebarCollapsed)
                     {
                         <UiContextMenu Visible="@string.Equals(_contextGroupKey, group.Key, StringComparison.Ordinal)"
+                                       Title="@group.Title"
                                        Items="@BuildContextItems(group)"
                                        OnSelect="SelectCollapsedGroupItemAsync" />
                     }

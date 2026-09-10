@@ -1,31 +1,44 @@
 <div class="ui-profile-editor-dialog">
-    <div class="ui-profile-editor-dialog__summary">
-        <UiAvatarEditor Initials="@Initials" ImageUrl="@_imageUrl" AltText="@DisplayName" Size="76"
-                        OnImageSelected="ImageSelectedAsync" OnRemove="RemoveImageAsync" />
-        <div><strong>@DisplayName</strong><span>@UserName</span><span>@Email</span></div>
-    </div>
-
     <UiSectionTabStrip Tabs="@Tabs" OnSelect="SelectSectionAsync" />
-
-    @if (!string.IsNullOrWhiteSpace(_message))
-    {
-        <UiAlert Tone="@(_messageIsError ? AlertTone.Danger : AlertTone.Success)" Message="@_message" />
-    }
 
     @if (_section == "profile")
     {
-        <UiGrid Columns="2">
-            <UiInputText @bind-Value="_firstName" Label="@FirstNameText" Required="true" Size="ControlSize.Small" />
-            <UiInputText @bind-Value="_lastName" Label="@LastNameText" Required="true" Size="ControlSize.Small" />
-            <UiInputText Value="@UserName" Label="@UserNameText" ReadOnly="true" Size="ControlSize.Small" />
-            <UiInputText Value="@Email" Label="@EmailText" ReadOnly="true" Size="ControlSize.Small" />
-        </UiGrid>
+        <div class="ui-profile-editor-dialog__profile-layout">
+            <div class="ui-profile-editor-dialog__photo-column">
+                <UiAvatarEditor Initials="@Initials"
+                                ImageUrl="@_imageUrl"
+                                AltText="@DisplayName"
+                                Size="72"
+                                EditText="@ChangePhotoText"
+                                RemoveText="@RemovePhotoText"
+                                OnImageSelected="ImageSelectedAsync"
+                                OnRemove="RemoveImageAsync" />
+            </div>
+
+            <div class="ui-profile-editor-dialog__data-column">
+                <UiGrid Columns="2">
+                    <UiInputText @bind-Value="_firstName" Label="@FirstNameText" Required="true" Size="ControlSize.Small" />
+                    <UiInputText @bind-Value="_lastName" Label="@LastNameText" Required="true" Size="ControlSize.Small" />
+                    <UiInputText @bind-Value="_userName" Label="@UserNameText" ReadOnly="true" Size="ControlSize.Small" />
+                    <UiInputText @bind-Value="_email" Label="@EmailText" ReadOnly="true" Size="ControlSize.Small" />
+                    <UiInputText @bind-Value="_phoneNumber" Label="@PhoneNumberText" Required="true" AutoComplete="tel" Size="ControlSize.Small" />
+                </UiGrid>
+            </div>
+        </div>
+
         <div class="ui-profile-editor-dialog__actions">
-            <UiButton Text="@SaveText" Size="ControlSize.Small" Loading="@_savingProfile" OnClick="SaveProfileAsync" />
+            <UiButton Text="@SaveText" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small" Loading="@_savingProfile" OnClick="SaveProfileAsync" />
         </div>
     }
     else
     {
+        <div class="ui-profile-editor-dialog__password-identity">
+            <UiAvatar Initials="@Initials" ImageUrl="@_imageUrl" AltText="@DisplayName" Size="34" />
+            <div>
+                <strong>@DisplayName</strong>
+                <span>@_userName</span>
+            </div>
+        </div>
         <UiStackLayout Gap="StackGap.Small">
             <UiInputText @bind-Value="_currentPassword" Type="password" RevealPassword="true" Label="@CurrentPasswordText" Size="ControlSize.Small" />
             <UiInputText @bind-Value="_newPassword" Type="password" RevealPassword="true" Label="@NewPasswordText" Size="ControlSize.Small" />

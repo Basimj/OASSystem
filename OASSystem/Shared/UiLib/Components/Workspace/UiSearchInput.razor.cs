@@ -13,11 +13,13 @@ public partial class UiSearchInput : IDisposable
     [Parameter] public string AriaLabel { get; set; } = "بحث";
     [Parameter] public string ClearText { get; set; } = "مسح البحث";
     [Parameter] public int DebounceMilliseconds { get; set; } = 300;
+    [Parameter] public bool Disabled { get; set; }
 
     protected override void OnParametersSet() { if (!string.Equals(Value, _value, StringComparison.Ordinal)) _value = Value; }
 
     private async Task InputChanged(ChangeEventArgs args)
     {
+        if (Disabled) return;
         _value = args.Value?.ToString();
         await ValueChanged.InvokeAsync(_value);
         _debounce?.Cancel(); _debounce?.Dispose();
@@ -32,6 +34,7 @@ public partial class UiSearchInput : IDisposable
 
     private async Task ClearAsync()
     {
+        if (Disabled) return;
         _debounce?.Cancel();
         _value = string.Empty;
         await ValueChanged.InvokeAsync(_value);

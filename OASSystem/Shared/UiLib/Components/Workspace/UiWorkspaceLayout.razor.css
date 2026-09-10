@@ -1,5 +1,5 @@
 .ui-workspace {
-    height: calc(100dvh - var(--oas-header-height, 80px) - 16px);
+    height: 100%;
     min-height: 0;
     display: grid;
     grid-template-rows: auto auto auto minmax(0, 1fr);
@@ -8,6 +8,10 @@
     overflow: hidden;
     background: transparent;
 }
+.ui-workspace__actions { grid-row: 1; }
+.ui-workspace__tabs { grid-row: 2; }
+.ui-workspace__filters { grid-row: 3; }
+.ui-workspace__body { grid-row: 4; }
 .ui-workspace__actions,
 .ui-workspace__tabs,
 .ui-workspace__filters {
@@ -42,7 +46,7 @@
 .ui-workspace__aside::-webkit-scrollbar { width: 5px; }
 .ui-workspace__aside::-webkit-scrollbar-thumb { border-radius: 999px; background: #d8d3e2; }
 @media (max-width: 1050px) {
-    .ui-workspace { height: auto; min-height: calc(100dvh - var(--oas-header-height,80px) - 16px); overflow: visible; }
+    .ui-workspace { height: auto; min-height: 100%; overflow: visible; }
     .ui-workspace__body--split { grid-template-columns: 1fr; direction: rtl; overflow: visible; }
     .ui-workspace__main,
     .ui-workspace__aside { height: auto; overflow: visible; }

@@ -1,18 +1,24 @@
 <div class="ui-avatar-editor">
     <div class="ui-avatar-editor__avatar">
         <UiAvatar Initials="@Initials" ImageUrl="@ImageUrl" AltText="@AltText" Size="@Size" />
-        @if (!ReadOnly)
-        {
-            <label class="ui-avatar-editor__edit" title="@EditText">
-                <i class="fa-solid fa-pen" aria-hidden="true"></i>
-                <InputFile class="ui-avatar-editor__file" accept="@Accept" OnChange="HandleFileAsync" />
-            </label>
-        }
     </div>
-    @if (!ReadOnly && ShowRemove && !string.IsNullOrWhiteSpace(ImageUrl))
+    @if (!ReadOnly)
     {
-        <button type="button" class="ui-avatar-editor__remove" @onclick="RemoveAsync">
-            <i class="fa-regular fa-trash-can" aria-hidden="true"></i><span>@RemoveText</span>
-        </button>
+        <div class="ui-avatar-editor__actions" role="group" aria-label="إجراءات الصورة الشخصية">
+            <label class="ui-avatar-editor__icon-button" title="@EditText" aria-label="@EditText">
+                <i class="fa-solid fa-pen" aria-hidden="true"></i>
+                <InputFile class="ui-avatar-editor__file" style="position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;border:0;opacity:0;cursor:pointer;font-size:0;color:transparent;" accept="@Accept" OnChange="HandleFileAsync" />
+            </label>
+            @if (ShowRemove && !string.IsNullOrWhiteSpace(ImageUrl))
+            {
+                <button type="button"
+                        class="ui-avatar-editor__icon-button ui-avatar-editor__icon-button--danger"
+                        title="@RemoveText"
+                        aria-label="@RemoveText"
+                        @onclick="RemoveAsync">
+                    <i class="fa-regular fa-trash-can" aria-hidden="true"></i>
+                </button>
+            }
+        </div>
     }
 </div>

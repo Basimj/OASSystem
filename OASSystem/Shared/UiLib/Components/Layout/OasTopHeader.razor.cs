@@ -48,7 +48,12 @@ public partial class OasTopHeader : IDisposable
     }
 
     private void ToggleAccountMenu() => _accountMenuOpen = !_accountMenuOpen;
-    private void CloseAccountMenu() => _accountMenuOpen = false;
+    public void CloseAccountMenu()
+    {
+        if (!_accountMenuOpen) return;
+        _accountMenuOpen = false;
+        _ = InvokeAsync(StateHasChanged);
+    }
     private async Task EditProfileAsync(MouseEventArgs args) { _accountMenuOpen = false; await OnEditProfile.InvokeAsync(args); }
     private async Task SettingsAsync(MouseEventArgs args) { _accountMenuOpen = false; await OnSettings.InvokeAsync(args); }
     private async Task SupportAsync(MouseEventArgs args) { _accountMenuOpen = false; await OnSupport.InvokeAsync(args); }

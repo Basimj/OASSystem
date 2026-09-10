@@ -1,1175 +1,163 @@
-
 @page "/employees"
-
-@using Microsoft.AspNetCore.Authorization
-@using Microsoft.AspNetCore.Components
-@using Microsoft.AspNetCore.Components.Web
-@using OAS.Client.Common.Feedback.Services
-@using OAS.Client.Features.Employees.Components
-@using OAS.Client.Features.Employees.Services
-@using OAS.Client.Features.Employees.Workspace
-@using OAS.Client.Services.Browser
-@using OAS.Client.Services.Http
-@using OAS.Contracts.Common.Pagination
-@using OAS.Contracts.Features.Employees
-@using OAS.UiLib.Components.Buttons
-@using OAS.UiLib.Components.Inputs
-@using OAS.UiLib.Components.Surfaces
-@using OAS.UiLib.Core.Enums
-@using OAS.UiLib.Services.Dialogs
-
 @attribute [Authorize(Roles = "Administrator")]
-
-@inject IEmployeeClientService EmployeeService
-@inject IEmployeesWorkspaceState Workspace
-@inject IUiDialogService Dialog
-@inject IUiSnackbarService Snackbar
-@inject IApiFeedbackService ApiFeedback
-@inject NavigationManager Navigation
-@inject BrowserFileDownloadService BrowserFileDownload
 
 <PageTitle>الموظفون</PageTitle>
 
-<UiElement Tag="div" class="employees-page" dir="rtl">
+@{ var activeEditorTab = ActiveEditorTab; var isListTab = activeEditorTab is null; }
 
-    <!-- =========================
-         HEADER
-         ========================= -->
-    <UiElement Tag="div" class="employees-header">
+<UiEmployeeWorkspace>
+    <Actions>
+        <UiWorkspaceActionBar>
+            <UiButton Text="جديد"
+                      IconCssClass="fa-solid fa-user-plus"
+                      Size="ControlSize.Small"
+                      OnClick="OpenNewAsync" />
+            <UiButton Text="تعديل"
+                      IconCssClass="fa-solid fa-pen"
+                      Variant="ButtonVariant.Secondary"
+                      Size="ControlSize.Small"
+                      Disabled="@(!CanEditActive)"
+                      OnClick="BeginEditActiveAsync" />
+            <UiButton Text="حفظ"
+                      IconCssClass="fa-solid fa-floppy-disk"
+                      Size="ControlSize.Small"
+                      Disabled="@(!CanSaveActive)"
+                      Loading="@(activeEditorTab?.IsSaving == true)"
+                      OnClick="SaveActiveAsync" />
+            <UiButton Text="إغلاق"
+                      IconCssClass="fa-solid fa-xmark"
+                      Variant="ButtonVariant.Secondary"
+                      Size="ControlSize.Small"
+                      Disabled="@(!CanCloseActive)"
+                      OnClick="CloseActiveAsync" />
+            <UiButton Text="إلغاء"
+                      IconCssClass="fa-solid fa-ban"
+                      Variant="ButtonVariant.Ghost"
+                      Size="ControlSize.Small"
+                      Disabled="@(!CanCancelActive)"
+                      OnClick="CancelActiveEditAsync" />
+            <UiButton Text="حذف"
+                      IconCssClass="fa-regular fa-trash-can"
+                      Variant="ButtonVariant.Secondary"
+                      Size="ControlSize.Small"
+                      Disabled="true" />
+            <UiButton Text="تحديث"
+                      IconCssClass="fa-solid fa-rotate"
+                      Variant="ButtonVariant.Secondary"
+                      Size="ControlSize.Small"
+                      Disabled="@(!CanRefreshActive)"
+                      Loading="@(isListTab ? _isLoading : activeEditorTab?.IsLoading == true)"
+                      OnClick="RefreshActionAsync" />
+            <UiButton Text="استيراد"
+                      IconCssClass="fa-solid fa-file-import"
+                      Variant="ButtonVariant.Secondary"
+                      Size="ControlSize.Small"
+                      Disabled="@(!isListTab)"
+                      OnClick="OpenImportDialog" />
+            <UiButton Text="تصدير"
+                      IconCssClass="fa-solid fa-file-export"
+                      Variant="ButtonVariant.Secondary"
+                      Size="ControlSize.Small"
+                      Disabled="@(!isListTab)"
+                      OnClick="OpenExportDialog" />
+            <UiSearchInput @bind-Value="Workspace.SearchText"
+                           Placeholder="ابحث بالرقم أو الاسم أو الجوال أو البريد أو المسمى..."
+                           AriaLabel="البحث عن موظف"
+                           ClearText="مسح البحث"
+                           DebounceMilliseconds="300"
+                           Disabled="@(!isListTab)"
+                           OnSearch="SearchChangedAsync" />
+            <UiEmployeeFilterMenu Value="@Workspace.Filter.ToString()"
+                                  ValueChanged="FilterChangedAsync"
+                                  Options="@FilterOptions"
+                                  Disabled="@(!isListTab)" />
+        </UiWorkspaceActionBar>
+    </Actions>
 
-        <UiElement Tag="div" class="employees-header-info">
+    <Tabs>
+        <UiApplicationTabStrip Tabs="@WorkspaceTabs"
+                               AriaLabel="تبويبات الموظفين"
+                               EnableContextMenu="true"
+                               OnSelect="SelectWorkspaceTabAsync"
+                               OnClose="CloseWorkspaceTabAsync"
+                               OnCloseOthers="CloseOtherWorkspaceTabsAsync"
+                               OnCloseAll="CloseAllWorkspaceTabsAsync" />
+    </Tabs>
 
-            <UiElement Tag="div" class="employees-title-row">
-
-                <UiElement Tag="div" class="employees-title-icon">
-                    <UiElement Tag="i" class="fa-solid fa-users"></UiElement>
-                </UiElement>
-
-                <UiElement Tag="div">
-
-                    <UiElement Tag="h1">الموظفون</UiElement>
-
-                    <UiElement Tag="p">
-                        إدارة الموظفين وبياناتهم وحالاتهم التشغيلية.
-                    </UiElement>
-
-                </UiElement>
-
-            </UiElement>
-
-        </UiElement>
-
-        <UiElement Tag="div" class="employees-header-actions">
-
-            <UiButton Text="إضافة موظف"
-                      Variant="ButtonVariant.Primary"
-                      AdditionalCssClass="employee-add-button"
-                      OnClick="OpenCreatePage">
-            </UiButton>
-
-        </UiElement>
-
-    </UiElement>
-
-
-    <!-- =========================
-         SEARCH / FILTER / EXCEL
-         ========================= -->
-    <UiElement Tag="div" class="employees-toolbar">
-
-        <!-- Search -->
-        <UiElement Tag="div" class="employees-search-wrapper">
-
-            <UiInputText Id="employee-search"
-                         Placeholder="ابحث برقم الموظف أو الاسم أو الهاتف أو الوظيفة..."
-                         @bind-Value="_searchText"
-                         @onkeydown="HandleSearchKeyDown" />
-
-            <UiElement Tag="button" type="button"
-                    class="employees-search-button"
-                    OnClick="SearchAsync">
-
-                <UiElement Tag="i" class="fa-solid fa-magnifying-glass"></UiElement>
-
-                بحث
-
-            </UiElement>
-
-            @if (!string.IsNullOrWhiteSpace(_searchText))
-            {
-                <UiElement Tag="button" type="button"
-                        class="employees-clear-search"
-                        OnClick="ClearSearchAsync">
-
-                    <UiElement Tag="i" class="fa-solid fa-xmark"></UiElement>
-
-                    مسح
-
-                </UiElement>
-            }
-
-        </UiElement>
-
-
-        <!-- Filters -->
-        <UiElement Tag="div" class="employees-filter-wrapper">
-
-            <UiElement Tag="button" type="button"
-                    class="employees-filter-button"
-                    OnClick="ToggleFilterMenu">
-
-                <UiElement Tag="i" class="fa-solid fa-filter"></UiElement>
-
-                <UiElement Tag="span">
-                    @GetFilterTitle()
-                </UiElement>
-
-                <UiElement Tag="i" class="fa-solid fa-chevron-down"></UiElement>
-
-            </UiElement>
-
-            @if (_filterMenuOpen)
-            {
-                <UiElement Tag="div" class="employees-filter-menu">
-
-                    <UiElement Tag="button" type="button"
-                            class="@GetFilterClass(EmployeeListFilter.All)"
-                            OnClick="() => SetFilter(EmployeeListFilter.All)">
-                        جميع الموظفين
-                    </UiElement>
-
-                    <UiElement Tag="button" type="button"
-                            class="@GetFilterClass(EmployeeListFilter.Active)"
-                            OnClick="() => SetFilter(EmployeeListFilter.Active)">
-                        الموظفون النشطون
-                    </UiElement>
-
-                    <UiElement Tag="button" type="button"
-                            class="@GetFilterClass(EmployeeListFilter.Inactive)"
-                            OnClick="() => SetFilter(EmployeeListFilter.Inactive)">
-                        الموظفون غير النشطين
-                    </UiElement>
-
-                    <UiElement Tag="button" type="button"
-                            class="@GetFilterClass(EmployeeListFilter.Sales)"
-                            OnClick="() => SetFilter(EmployeeListFilter.Sales)">
-                        موظفو المبيعات
-                    </UiElement>
-
-                    <UiElement Tag="button" type="button"
-                            class="@GetFilterClass(EmployeeListFilter.Technician)"
-                            OnClick="() => SetFilter(EmployeeListFilter.Technician)">
-                        الفنيون
-                    </UiElement>
-
-                    <UiElement Tag="button" type="button"
-                            class="@GetFilterClass(EmployeeListFilter.Commission)"
-                            OnClick="() => SetFilter(EmployeeListFilter.Commission)">
-                        المستحقون للعمولة
-                    </UiElement>
-
-                </UiElement>
-            }
-
-        </UiElement>
-
-
-        <!-- Excel -->
-        <UiElement Tag="div" class="employees-excel-actions">
-
-            <!-- Import -->
-            <UiElement Tag="button" type="button"
-                    class="employees-excel-button employees-import-button"
-                    OnClick="OpenImportDialog">
-
-                <UiElement Tag="i" class="fa-solid fa-file-import"></UiElement>
-
-                <UiElement Tag="span">
-                    استيراد Excel
-                </UiElement>
-
-            </UiElement>
-
-
-            <!-- Export -->
-            <UiElement Tag="button" type="button"
-                    class="employees-excel-button employees-export-button"
-                    OnClick="OpenExportDialog">
-
-                <UiElement Tag="i" class="fa-solid fa-file-export"></UiElement>
-
-                <UiElement Tag="span">
-                    تصدير Excel
-                </UiElement>
-
-            </UiElement>
-
-        </UiElement>
-
-    </UiElement>
-
-
-    <!-- =========================
-         LOADING
-         ========================= -->
-    @if (_isLoading)
-    {
-        <UiElement Tag="div" class="employees-loading">
-
-            <UiElement Tag="div" class="employees-spinner"></UiElement>
-
-            <UiElement Tag="span">
-                جاري تحميل الموظفين...
-            </UiElement>
-
-        </UiElement>
-    }
-    else
-    {
-        var visibleEmployees = GetVisibleEmployees().ToList();
-
-        <!-- =========================
-             EMPTY
-             ========================= -->
-        @if (visibleEmployees.Count == 0)
+    <Content>
+        @if (activeEditorTab is null)
         {
-            <UiElement Tag="div" class="employees-empty">
-
-                <UiElement Tag="div" class="employees-empty-icon">
-
-                    <UiElement Tag="i" class="fa-solid fa-users-slash"></UiElement>
-
-                </UiElement>
-
-                <UiElement Tag="h3">
-                    لا توجد نتائج
-                </UiElement>
-
-                <UiElement Tag="p">
-                    لم يتم العثور على موظفين مطابقين للبحث أو الفلتر الحالي.
-                </UiElement>
-
-            </UiElement>
+            var visibleEmployees = VisibleEmployees;
+            <UiEmployeeListSurface Loading="@_isLoading" IsEmpty="@(visibleEmployees.Count == 0)">
+                <ChildContent>
+                    @foreach (var employee in visibleEmployees)
+                    {
+                        <UiEmployeeCard Name="@employee.DisplayName"
+                                        EmployeeCode="@employee.EmployeeCode"
+                                        ImageUrl="@GetEmployeeImageUrl(employee)"
+                                        JobTitle="@employee.JobTitleName"
+                                        Phone="@employee.Phone"
+                                        IsActive="@employee.IsActive"
+                                        IsCommissionEligible="@employee.IsCommissionEligible"
+                                        OnOpen="@(() => OpenEmployeeAsync(employee.Id))"
+                                        OnToggleStatus="@(() => ToggleEmployeeStatusAsync(employee))" />
+                    }
+                </ChildContent>
+                <Footer>
+                    <UiEmployeePager PageNumber="@_page.PageNumber"
+                                     TotalPages="@_page.TotalPages"
+                                     TotalCount="@_page.TotalCount"
+                                     PageSize="@PageSize"
+                                     OnPageChanged="PageChangedAsync" />
+                </Footer>
+            </UiEmployeeListSurface>
+        }
+        else if (activeEditorTab.IsLoading || !activeEditorTab.IsInitialized)
+        {
+            <UiEmployeeListSurface Loading="true" IsEmpty="false" LoadingText="جاري تحميل بيانات الموظف..." />
         }
         else
         {
-            <!-- =========================
-                 EMPLOYEE CARDS
-                 ========================= -->
-            <UiElement Tag="div" class="employees-grid">
-
-                @foreach (var employee in visibleEmployees)
-                {
-                    <EmployeeCard EmployeeCode="@employee.EmployeeCode"
-                                  Name="@employee.DisplayName"
-                                  JobTitle="@employee.JobTitle"
-                                  Phone="@employee.Phone"
-                                  IsActive="@employee.IsActive"
-                                  IsSalesperson="@employee.IsSalesperson"
-                                  IsTechnician="@employee.IsTechnician"
-                                  IsCommissionEligible="@employee.IsCommissionEligible"
-                                  OnEdit="@(() => OpenEditPage(employee.Id))"
-                                  OnToggleStatus="@(() => ChangeStatusAsync(employee, !employee.IsActive))" />
-                }
-
-            </UiElement>
+            <UiEmployeeEditorForm Model="@activeEditorTab.Form"
+                                  IsNew="@activeEditorTab.IsNew"
+                                  IsEditable="@(activeEditorTab.IsNew || activeEditorTab.IsEditMode)"
+                                  UserAccountLinkLocked="@activeEditorTab.IsUserAccountLinkLocked"
+                                  ImageUrl="@activeEditorTab.EffectiveImageUrl"
+                                  ShowRemoveImage="@activeEditorTab.ShowRemoveImage"
+                                  JobTitleOptions="@ActiveJobTitleOptions"
+                                  LinkedUserItem="@LinkedUserItem"
+                                  UserSearchAsync="@SearchUsersAsync"
+                                  OnChanged="EditorChangedAsync"
+                                  OnImageSelected="EmployeeImageSelectedAsync"
+                                  OnImageRemoved="EmployeeImageRemovedAsync" />
         }
-
-
-        <!-- =========================
-             PAGINATION
-             ========================= -->
-        @if (_page.TotalPages > 0)
-        {
-            <UiElement Tag="div" class="employees-pagination">
-
-                <UiElement Tag="div" class="employees-pagination-summary">
-
-                    عرض
-
-                    <UiElement Tag="strong">
-                        @GetFirstItemNumber()
-                    </UiElement>
-
-                    -
-
-                    <UiElement Tag="strong">
-                        @GetLastItemNumber()
-                    </UiElement>
-
-                    من
-
-                    <UiElement Tag="strong">
-                        @_page.TotalCount
-                    </UiElement>
-
-                    موظف
-
-                </UiElement>
-
-                <UiElement Tag="div" class="employees-pagination-controls">
-
-                    <UiElement Tag="button" type="button"
-                            class="employees-page-button"
-                            disabled="@(!_page.HasPreviousPage)"
-                            OnClick="PreviousPageAsync">
-
-                        <UiElement Tag="i" class="fa-solid fa-chevron-right"></UiElement>
-
-                        السابق
-
-                    </UiElement>
-
-                    <UiElement Tag="div" class="employees-page-number">
-
-                        صفحة @_page.PageNumber
-                        من
-                        @_page.TotalPages
-
-                    </UiElement>
-
-                    <UiElement Tag="button" type="button"
-                            class="employees-page-button"
-                            disabled="@(!_page.HasNextPage)"
-                            OnClick="NextPageAsync">
-
-                        التالي
-
-                        <UiElement Tag="i" class="fa-solid fa-chevron-left"></UiElement>
-
-                    </UiElement>
-
-                </UiElement>
-
-            </UiElement>
-        }
-
-    }
-
-
-    <!-- =========================
-         IMPORT MENU
-         ========================= -->
-    @if (_importMenuOpen)
-    {
-        <UiElement Tag="div" class="employees-import-overlay">
-
-            <UiElement Tag="div" class="employees-import-backdrop"
-                 OnClick="CloseImportDialog">
-            </UiElement>
-
-            <UiElement Tag="div" class="employees-import-modal employees-import-choice-modal">
-
-                <!-- Header -->
-                <UiElement Tag="div" class="employees-export-modal-header">
-
-                    <UiElement Tag="div" class="employees-export-modal-title">
-
-                        <UiElement Tag="div" class="employees-export-modal-icon">
-
-                            <UiElement Tag="i" class="fa-solid fa-file-import"></UiElement>
-
-                        </UiElement>
-
-                        <UiElement Tag="div">
-
-                            <UiElement Tag="h2">
-                                استيراد الموظفين
-                            </UiElement>
-
-                            <UiElement Tag="p">
-                                اختر طريقة إدخال بيانات الموظفين.
-                            </UiElement>
-
-                        </UiElement>
-
-                    </UiElement>
-
-                    <UiElement Tag="button" type="button"
-                            class="employees-export-modal-close"
-                            OnClick="CloseImportDialog">
-
-                        <UiElement Tag="i" class="fa-solid fa-xmark"></UiElement>
-
-                    </UiElement>
-
-                </UiElement>
-
-
-                <UiElement Tag="div" class="employees-export-modal-content">
-
-                    <!-- Internal Entry -->
-                    <UiElement Tag="button" type="button"
-                            class="employees-export-option"
-                            OnClick="OpenEmployeeEntry">
-
-                        <UiElement Tag="span" class="employees-export-option-icon employees-export-option-icon-entry">
-
-                            <UiElement Tag="i" class="fa-solid fa-table"></UiElement>
-
-                        </UiElement>
-
-                        <UiElement Tag="span" class="employees-export-option-content">
-
-                            <UiElement Tag="strong">
-                                إدخال البيانات داخل النظام
-                            </UiElement>
-
-                            <UiElement Tag="span">
-                                إدخال عدة موظفين مباشرة في جدول شبيه بـ Excel مع التحقق من البيانات قبل الحفظ.
-                            </UiElement>
-
-                        </UiElement>
-
-                        <UiElement Tag="i" class="fa-solid fa-chevron-left employees-export-option-arrow"></UiElement>
-
-                    </UiElement>
-
-
-                    <!-- Excel Import -->
-                    <UiElement Tag="button" type="button"
-                            class="employees-export-option"
-                            OnClick="OpenExcelImportDialog">
-
-                        <UiElement Tag="span" class="employees-export-option-icon employees-export-option-icon-main">
-
-                            <UiElement Tag="i" class="fa-solid fa-file-excel"></UiElement>
-
-                        </UiElement>
-
-                        <UiElement Tag="span" class="employees-export-option-content">
-
-                            <UiElement Tag="strong">
-                                استيراد من ملف Excel
-                            </UiElement>
-
-                            <UiElement Tag="span">
-                                اختر ملف Excel يحتوي على بيانات الموظفين للتحقق منها واستيرادها.
-                            </UiElement>
-
-                        </UiElement>
-
-                        <UiElement Tag="i" class="fa-solid fa-chevron-left employees-export-option-arrow"></UiElement>
-
-                    </UiElement>
-
-                </UiElement>
-
-            </UiElement>
-
-        </UiElement>
-    }
-
-
-    <!-- =========================
-         EXCEL IMPORT DIALOG
-         ========================= -->
-    @if (_importDialogOpen)
-    {
-        <UiElement Tag="div" class="employees-import-overlay">
-
-            <UiElement Tag="div" class="employees-import-backdrop"
-                 OnClick="CloseExcelImportDialog">
-            </UiElement>
-
-            <UiElement Tag="div" class="employees-import-modal">
-
-                <EmployeeImportDialog OnClose="RefreshAfterImport" />
-
-            </UiElement>
-
-        </UiElement>
-    }
-
-
-    <!-- =========================
-         EMPLOYEE BULK ENTRY
-         ========================= -->
-    @if (_employeeEntryOpen)
-    {
-        <UiElement Tag="div" class="employees-import-overlay">
-
-            <UiElement Tag="div" class="employees-import-backdrop"
-                 OnClick="CloseEmployeeEntry">
-            </UiElement>
-
-            <UiElement Tag="div" class="employees-import-modal employee-bulk-entry-modal">
-
-                <EmployeeBulkEntry OnClose="CloseEmployeeEntry" />
-
-            </UiElement>
-
-        </UiElement>
-    }
-
-
-    <!-- =========================
-         EXPORT DIALOG
-         ========================= -->
-    @if (_exportDialogOpen)
-    {
-        <UiElement Tag="div" class="employees-export-overlay">
-
-            <UiElement Tag="div" class="employees-export-backdrop"
-                 OnClick="CloseExportDialog">
-            </UiElement>
-
-            <UiElement Tag="div" class="employees-export-modal">
-
-                <!-- Header -->
-                <UiElement Tag="div" class="employees-export-modal-header">
-
-                    <UiElement Tag="div" class="employees-export-modal-title">
-
-                        <UiElement Tag="div" class="employees-export-modal-icon">
-
-                            <UiElement Tag="i" class="fa-solid fa-file-excel"></UiElement>
-
-                        </UiElement>
-
-                        <UiElement Tag="div">
-
-                            <UiElement Tag="h2">
-                                تصدير Excel
-                            </UiElement>
-
-                            <UiElement Tag="p">
-                                اختر العملية التي تريد تنفيذها.
-                            </UiElement>
-
-                        </UiElement>
-
-                    </UiElement>
-
-                    <UiElement Tag="button" type="button"
-                            class="employees-export-modal-close"
-                            OnClick="CloseExportDialog">
-
-                        <UiElement Tag="i" class="fa-solid fa-xmark"></UiElement>
-
-                    </UiElement>
-
-                </UiElement>
-
-
-                <!-- Export Options -->
-                <UiElement Tag="div" class="employees-export-modal-content">
-
-                    <!-- Export Employees -->
-                    <UiElement Tag="button" type="button"
-                            class="employees-export-option"
-                            OnClick="ExportEmployeesAsync">
-
-                        <UiElement Tag="span" class="employees-export-option-icon employees-export-option-icon-main">
-
-                            <UiElement Tag="i" class="fa-solid fa-download"></UiElement>
-
-                        </UiElement>
-
-                        <UiElement Tag="span" class="employees-export-option-content">
-
-                            <UiElement Tag="strong">
-                                تصدير الموظفين
-                            </UiElement>
-
-                            <UiElement Tag="span">
-                                تنزيل بيانات الموظفين الحالية في ملف Excel.
-                            </UiElement>
-
-                        </UiElement>
-
-                        <UiElement Tag="i" class="fa-solid fa-chevron-left employees-export-option-arrow"></UiElement>
-
-                    </UiElement>
-
-
-                    <!-- Template -->
-                    <UiElement Tag="button" type="button"
-                            class="employees-export-option"
-                            OnClick="DownloadEmployeeTemplateAsync">
-
-                        <UiElement Tag="span" class="employees-export-option-icon employees-export-option-icon-template">
-
-                            <UiElement Tag="i" class="fa-solid fa-file-circle-plus"></UiElement>
-
-                        </UiElement>
-
-                        <UiElement Tag="span" class="employees-export-option-content">
-
-                            <UiElement Tag="strong">
-                                تنزيل قالب Excel
-                            </UiElement>
-
-                            <UiElement Tag="span">
-                                قالب جاهز لإدخال بيانات الموظفين واستيرادها.
-                            </UiElement>
-
-                        </UiElement>
-
-                        <UiElement Tag="i" class="fa-solid fa-chevron-left employees-export-option-arrow"></UiElement>
-
-                    </UiElement>
-
-                </UiElement>
-
-            </UiElement>
-
-        </UiElement>
-    }
-
-</UiElement>
-
-
-@code {
-
-    private const int PageSize = 12;
-
-    private PagedResult<EmployeeDto> _page
-    {
-        get => Workspace.Page;
-        set => Workspace.Page = value;
-    }
-
-    private string? _searchText
-    {
-        get => Workspace.SearchText;
-        set => Workspace.SearchText = value;
-    }
-
-    private string? _appliedSearch
-    {
-        get => Workspace.AppliedSearch;
-        set => Workspace.AppliedSearch = value;
-    }
-
-    private bool _isLoading;
-
-    private bool _filterMenuOpen;
-
-    // Import states
-    private bool _importMenuOpen;
-
-    private bool _importDialogOpen;
-
-    private bool _employeeEntryOpen;
-
-    // Export state
-    private bool _exportDialogOpen;
-
-    private int _pageNumber
-    {
-        get => Workspace.PageNumber;
-        set => Workspace.PageNumber = value;
-    }
-
-    private EmployeeListFilter _filter
-    {
-        get => Workspace.Filter;
-        set => Workspace.Filter = value;
-    }
-
-
-    protected override async Task OnInitializedAsync()
-    {
-        // Reaching the list is an explicit exit from the editor route. Keep list
-        // filters/page cached, but discard any stale editor draft left by a closed tab.
-        Workspace.Editor.Clear();
-
-        if (!Workspace.HasLoadedPage)
-            await LoadEmployeesAsync();
-    }
-
-
-    private async Task LoadEmployeesAsync()
-    {
-        if (_isLoading)
-            return;
-
-        _isLoading = true;
-
-        try
-        {
-            var request =
-                new PageRequest
-                {
-                    PageNumber = _pageNumber,
-                    PageSize = PageSize,
-                    Search = _appliedSearch,
-                    SortBy = "EmployeeCode",
-                    SortDirection = SortDirection.Ascending
-                };
-
-            _page =
-                await EmployeeService.GetPageAsync(
-                    request);
-
-            if (_page.PageNumber != _pageNumber)
-            {
-                _pageNumber = _page.PageNumber;
-            }
-
-            Workspace.HasLoadedPage = true;
-        }
-        catch (ApiClientException ex)
-        {
-            ApiFeedback.Show(ex.Error);
-        }
-        catch
-        {
-            ApiFeedback.ShowUnexpected();
-        }
-        finally
-        {
-            _isLoading = false;
-        }
-    }
-
-
-    // =========================================================
-    // Search
-    // =========================================================
-
-    private async Task SearchAsync()
-    {
-        _appliedSearch =
-            string.IsNullOrWhiteSpace(_searchText)
-                ? null
-                : _searchText.Trim();
-
-        _pageNumber = 1;
-
-        await LoadEmployeesAsync();
-    }
-
-
-    private async Task ClearSearchAsync()
-    {
-        _searchText = string.Empty;
-
-        _appliedSearch = null;
-
-        _pageNumber = 1;
-
-        await LoadEmployeesAsync();
-    }
-
-
-    private async Task HandleSearchKeyDown(
-        KeyboardEventArgs args)
-    {
-        if (args.Key == "Enter")
-        {
-            await SearchAsync();
-        }
-    }
-
-
-    // =========================================================
-    // Pagination
-    // =========================================================
-
-    private async Task PreviousPageAsync()
-    {
-        if (!_page.HasPreviousPage)
-            return;
-
-        _pageNumber--;
-
-        await LoadEmployeesAsync();
-    }
-
-
-    private async Task NextPageAsync()
-    {
-        if (!_page.HasNextPage)
-            return;
-
-        _pageNumber++;
-
-        await LoadEmployeesAsync();
-    }
-
-
-    // =========================================================
-    // Navigation
-    // =========================================================
-
-    private void OpenCreatePage(
-        MouseEventArgs _)
-    {
-        Navigation.NavigateTo(
-            "/employees/new");
-    }
-
-
-    private void OpenEditPage(
-        Guid employeeId)
-    {
-        Navigation.NavigateTo(
-            $"/employees/edit/{employeeId}");
-    }
-
-
-    // =========================================================
-    // Status
-    // =========================================================
-
-    private async Task ChangeStatusAsync(
-        EmployeeDto employee,
-        bool isActive)
-    {
-        var title =
-            isActive
-                ? "تفعيل الموظف"
-                : "تعطيل الموظف";
-
-        var message =
-            isActive
-                ? $"هل تريد تفعيل الموظف «{employee.DisplayName}»؟"
-                : $"هل تريد تعطيل الموظف «{employee.DisplayName}»؟";
-
-        var confirmText =
-            isActive
-                ? "تفعيل"
-                : "تعطيل";
-
-        var confirmed =
-            await Dialog.ConfirmAsync(
-                title,
-                message,
-                AlertTone.Warning,
-                confirmText,
-                "إلغاء");
-
-        if (!confirmed)
-            return;
-
-        try
-        {
-            var request =
-                new SetEmployeeStatusRequest(
-                    IsActive: isActive,
-                    RowVersion: employee.RowVersion);
-
-            var result =
-                await EmployeeService.SetStatusAsync(
-                    employee.Id,
-                    request);
-
-            if (!result.Succeeded)
-            {
-                if (result.Error is not null)
-                {
-                    ApiFeedback.Show(result.Error);
-                }
-                else
-                {
-                    ApiFeedback.ShowUnexpected();
-                }
-
-                return;
-            }
-
-            Snackbar.Success(
-                isActive
-                    ? "تم تفعيل الموظف بنجاح."
-                    : "تم تعطيل الموظف بنجاح.");
-
-            await LoadEmployeesAsync();
-        }
-        catch (ApiClientException ex)
-        {
-            ApiFeedback.Show(ex.Error);
-        }
-        catch
-        {
-            ApiFeedback.ShowUnexpected();
-        }
-    }
-
-
-    // =========================================================
-    // Filters
-    // =========================================================
-
-    private IEnumerable<EmployeeDto>
-        GetVisibleEmployees()
-    {
-        return _filter switch
-        {
-            EmployeeListFilter.Active =>
-                _page.Items.Where(
-                    x => x.IsActive),
-
-            EmployeeListFilter.Inactive =>
-                _page.Items.Where(
-                    x => !x.IsActive),
-
-            EmployeeListFilter.Sales =>
-                _page.Items.Where(
-                    x => x.IsSalesperson),
-
-            EmployeeListFilter.Technician =>
-                _page.Items.Where(
-                    x => x.IsTechnician),
-
-            EmployeeListFilter.Commission =>
-                _page.Items.Where(
-                    x => x.IsCommissionEligible),
-
-            _ =>
-                _page.Items
-        };
-    }
-
-
-    private void ToggleFilterMenu()
-    {
-        _filterMenuOpen =
-            !_filterMenuOpen;
-    }
-
-
-    private void SetFilter(
-        EmployeeListFilter filter)
-    {
-        _filter = filter;
-
-        _filterMenuOpen = false;
-    }
-
-
-    private string GetFilterTitle()
-    {
-        return _filter switch
-        {
-            EmployeeListFilter.Active =>
-                "الموظفون النشطون",
-
-            EmployeeListFilter.Inactive =>
-                "الموظفون غير النشطون",
-
-            EmployeeListFilter.Sales =>
-                "موظفو المبيعات",
-
-            EmployeeListFilter.Technician =>
-                "الفنيون",
-
-            EmployeeListFilter.Commission =>
-                "المستحقون للعمولة",
-
-            _ =>
-                "جميع الموظفين"
-        };
-    }
-
-
-    private string GetFilterClass(
-        EmployeeListFilter filter)
-    {
-        return _filter == filter
-            ? "employees-filter-option-active"
-            : string.Empty;
-    }
-
-
-    // =========================================================
-    // IMPORT
-    // =========================================================
-
-    private void OpenImportDialog()
-    {
-        _exportDialogOpen = false;
-        _employeeEntryOpen = false;
-        _importDialogOpen = false;
-
-        _importMenuOpen = true;
-    }
-
-
-    private void CloseImportDialog()
-    {
-        _importMenuOpen = false;
-    }
-
-
-    private void OpenExcelImportDialog()
-    {
-        _importMenuOpen = false;
-        _employeeEntryOpen = false;
-
-        _importDialogOpen = true;
-    }
-
-
-    private void CloseExcelImportDialog()
-    {
-        _importDialogOpen = false;
-    }
-
-
-    private void OpenEmployeeEntry()
-    {
-        _importMenuOpen = false;
-        _importDialogOpen = false;
-        _exportDialogOpen = false;
-
-        _employeeEntryOpen = true;
-    }
-
-
-    private void CloseEmployeeEntry()
-    {
-        _employeeEntryOpen = false;
-    }
-
-
-    private async Task RefreshAfterImport()
-    {
-        _importDialogOpen = false;
-
-        _pageNumber = 1;
-
-        await LoadEmployeesAsync();
-    }
-
-
-    // =========================================================
-    // EXPORT
-    // =========================================================
-
-    private void OpenExportDialog()
-    {
-        _importMenuOpen = false;
-        _importDialogOpen = false;
-        _employeeEntryOpen = false;
-
-        _exportDialogOpen = true;
-    }
-
-
-    private void CloseExportDialog()
-    {
-        _exportDialogOpen = false;
-    }
-
-
-    private async Task ExportEmployeesAsync()
-    {
-        _exportDialogOpen = false;
-
-        try
-        {
-            Snackbar.Info(
-                "جاري تجهيز ملف Excel للموظفين...");
-
-            var file =
-                await EmployeeService.ExportAsync();
-
-            var saved =
-                await BrowserFileDownload.SaveAsync(
-                    file,
-                    "Employees.xlsx",
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-
-            if (saved)
-            {
-                Snackbar.Success(
-                    "تم حفظ ملف الموظفين بنجاح.");
-            }
-            else
-            {
-                Snackbar.Info(
-                    "تم إلغاء عملية حفظ ملف الموظفين.");
-            }
-        }
-        catch (ApiClientException ex)
-        {
-            ApiFeedback.Show(ex.Error);
-        }
-        catch (HttpRequestException)
-        {
-            Snackbar.Error(
-                "تعذر الاتصال بالخادم لتصدير الموظفين.");
-        }
-        catch
-        {
-            Snackbar.Error(
-                "حدث خطأ أثناء تصدير الموظفين.");
-        }
-    }
-
-
-    private async Task DownloadEmployeeTemplateAsync()
-    {
-        _exportDialogOpen = false;
-
-        try
-        {
-            Snackbar.Info(
-                "جاري تجهيز قالب Excel...");
-
-            var file =
-                await EmployeeService.DownloadTemplateAsync();
-
-            var saved =
-                await BrowserFileDownload.SaveAsync(
-                    file,
-                    "Employees_Template.xlsx",
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-
-            if (saved)
-            {
-                Snackbar.Success(
-                    "تم حفظ قالب Excel بنجاح.");
-            }
-            else
-            {
-                Snackbar.Info(
-                    "تم إلغاء عملية حفظ قالب Excel.");
-            }
-        }
-        catch (ApiClientException ex)
-        {
-            ApiFeedback.Show(ex.Error);
-        }
-        catch (HttpRequestException)
-        {
-            Snackbar.Error(
-                "تعذر الاتصال بالخادم لتنزيل قالب Excel.");
-        }
-        catch
-        {
-            Snackbar.Error(
-                "حدث خطأ أثناء حفظ قالب Excel.");
-        }
-    }
-
-
-    // =========================================================
-    // Helpers
-    // =========================================================
-
-    private int GetFirstItemNumber()
-    {
-        if (_page.TotalCount == 0)
-            return 0;
-
-        return
-            ((_page.PageNumber - 1)
-             * _page.PageSize)
-            + 1;
-    }
-
-
-    private long GetLastItemNumber()
-    {
-        return Math.Min(
-            (long)_page.PageNumber
-            * _page.PageSize,
-            _page.TotalCount);
-    }
-
-
-    }
-
+    </Content>
+</UiEmployeeWorkspace>
+
+@if (_importMenuOpen)
+{
+    <UiEmployeeModalHost OnClose="CloseImportDialog">
+        <UiEmployeeImportChoiceDialog OnClose="CloseImportDialog" OnInternalEntry="OpenEmployeeEntry" OnExcelImport="OpenExcelImportDialog" />
+    </UiEmployeeModalHost>
+}
+
+@if (_importDialogOpen)
+{
+    <UiEmployeeModalHost OnClose="CloseExcelImportDialog">
+        <EmployeeImportDialog OnClose="RefreshAfterImport" />
+    </UiEmployeeModalHost>
+}
+
+@if (_employeeEntryOpen)
+{
+    <UiEmployeeModalHost Wide="true" OnClose="CloseEmployeeEntry">
+        <EmployeeBulkEntry OnClose="CloseEmployeeEntry" />
+    </UiEmployeeModalHost>
+}
+
+@if (_exportDialogOpen)
+{
+    <UiEmployeeModalHost OnClose="CloseExportDialog">
+        <UiEmployeeExportChoiceDialog OnClose="CloseExportDialog" OnExport="ExportEmployeesAsync" OnDownloadTemplate="DownloadEmployeeTemplateAsync" />
+    </UiEmployeeModalHost>
+}

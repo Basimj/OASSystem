@@ -29,7 +29,7 @@ public sealed class UserEditorState
     public void Clear()
     {
         Details = null; _saved = null; RowVersion = null;
-        Form.Load(string.Empty, string.Empty, string.Empty, null, true);
+        Form.Load(string.Empty, string.Empty, string.Empty, null, string.Empty, true);
         _roleIds.Clear(); _newDefaultRoleIds = [];
         BasicDirty = RolesDirty = PhotoDirty = PhotoRemoved = false; PendingPhoto = null; ActiveSection = "basic";
     }
@@ -37,7 +37,7 @@ public sealed class UserEditorState
     public void Load(UserDetailsDto details)
     {
         Details = details; _saved = details; RowVersion = details.RowVersion;
-        Form.Load(details.UserName, details.FirstName, details.LastName, details.Email, details.IsActive);
+        Form.Load(details.UserName, details.FirstName, details.LastName, details.Email, details.PhoneNumber, details.IsActive);
         _roleIds.Clear(); foreach (var id in details.RoleIds) _roleIds.Add(id);
         BasicDirty = RolesDirty = PhotoDirty = PhotoRemoved = false; PendingPhoto = null;
     }
@@ -45,7 +45,7 @@ public sealed class UserEditorState
     public void InitializeNew(IEnumerable<Guid>? defaultRoles = null)
     {
         Details = null; _saved = null; RowVersion = null;
-        Form.Load(string.Empty, string.Empty, string.Empty, null, true);
+        Form.Load(string.Empty, string.Empty, string.Empty, null, string.Empty, true);
         _newDefaultRoleIds = defaultRoles?.Distinct().ToArray() ?? [];
         _roleIds.Clear(); foreach (var id in _newDefaultRoleIds) _roleIds.Add(id);
         BasicDirty = RolesDirty = PhotoDirty = PhotoRemoved = false; PendingPhoto = null; ActiveSection = "basic";
@@ -56,6 +56,15 @@ public sealed class UserEditorState
     {
         var changed = selected ? _roleIds.Add(roleId) : _roleIds.Remove(roleId);
         if (changed) RolesDirty = true;
+    }
+
+    public void SetSingleRole(Guid? roleId)
+    {
+        if (roleId.HasValue && _roleIds.Count == 1 && _roleIds.Contains(roleId.Value)) return;
+        if (!roleId.HasValue && _roleIds.Count == 0) return;
+        _roleIds.Clear();
+        if (roleId.HasValue) _roleIds.Add(roleId.Value);
+        RolesDirty = true;
     }
 
     public void SetPhoto(PendingUserPhoto photo)
@@ -79,7 +88,7 @@ public sealed class UserEditorState
     public void AcceptBasicSave(UserDetailsDto details)
     {
         Details = details; _saved = details; RowVersion = details.RowVersion;
-        Form.Load(details.UserName, details.FirstName, details.LastName, details.Email, details.IsActive);
+        Form.Load(details.UserName, details.FirstName, details.LastName, details.Email, details.PhoneNumber, details.IsActive);
         BasicDirty = false;
     }
 

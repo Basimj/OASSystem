@@ -570,4 +570,175 @@
   <data name="Users_Edit" xml:space="preserve">
     <value>تعديل</value>
   </data>
+  <data name="Users_PhoneNumber" xml:space="preserve">
+    <value>رقم الجوال</value>
+  </data>
+  <data name="Users_PhoneInvalid" xml:space="preserve">
+    <value>رقم الجوال غير صالح. استخدم أرقامًا ورمز + والشرطات أو الأقواس فقط.</value>
+  </data>
+  <data name="Users_UserType" xml:space="preserve">
+    <value>نوع المستخدم</value>
+  </data>
+  <data name="Users_ChangePhoto" xml:space="preserve">
+    <value>تغيير الصورة</value>
+  </data>
+  <data name="Users_RemovePhoto" xml:space="preserve">
+    <value>حذف الصورة</value>
+  </data>
+  <data name="Users_PhotoTooLarge" xml:space="preserve">
+    <value>حجم الصورة يجب ألا يتجاوز 2.5 MB.</value>
+  </data>
+  <data name="Users_PhotoInvalidType" xml:space="preserve">
+    <value>الصيغ المسموح بها هي JPEG وPNG وWebP فقط.</value>
+  </data>
+  <data name="Users_PhotoReadFailed" xml:space="preserve">
+    <value>تعذر قراءة ملف الصورة.</value>
+  </data>
+  <data name="Users_PhotoSaved" xml:space="preserve">
+    <value>تم حفظ الصورة الشخصية بنجاح.</value>
+  </data>
+  <data name="Users_RolesManagement" xml:space="preserve">
+    <value>إدارة أنواع المستخدمين</value>
+  </data>
+  <data name="Users_RolesManagementHint" xml:space="preserve">
+    <value>يمكن تعديل الاسم الظاهر لنوع المستخدم. المفتاح التقني ثابت لحماية الصلاحيات وعدم كسر التفويض.</value>
+  </data>
+  <data name="Users_RoleSystemKey" xml:space="preserve">
+    <value>المفتاح التقني</value>
+  </data>
+  <data name="Users_RoleDisplayName" xml:space="preserve">
+    <value>الاسم الظاهر</value>
+  </data>
+  <data name="Users_SaveRole" xml:space="preserve">
+    <value>حفظ</value>
+  </data>
+  <data name="Users_RoleDisplayNameRequired" xml:space="preserve">
+    <value>الاسم الظاهر للدور مطلوب.</value>
+  </data>
+  <data name="Users_RoleUpdated" xml:space="preserve">
+    <value>تم تحديث نوع المستخدم بنجاح.</value>
+  </data>
+  <data name="phone_number_required" xml:space="preserve">
+    <value>رقم الجوال مطلوب.</value>
+  </data>
+  <data name="phone_number_max_length" xml:space="preserve">
+    <value>رقم الجوال أطول من الحد المسموح.</value>
+  </data>
+  <data name="phone_number_invalid" xml:space="preserve">
+    <value>صيغة رقم الجوال غير صحيحة.</value>
+  </data>
+  <data name="role_display_name_required" xml:space="preserve">
+    <value>الاسم الظاهر للدور مطلوب.</value>
+  </data>
+  <data name="role_display_name_max_length" xml:space="preserve">
+    <value>الاسم الظاهر للدور أطول من الحد المسموح.</value>
+  </data>
+  <data name="Common_New" xml:space="preserve">
+    <value>جديد</value>
+  </data>
+  <data name="Roles_Title" xml:space="preserve">
+    <value>أنواع المستخدمين</value>
+  </data>
+  <data name="Roles_New" xml:space="preserve">
+    <value>نوع مستخدم جديد</value>
+  </data>
+  <data name="Roles_Edit" xml:space="preserve">
+    <value>تعديل نوع المستخدم</value>
+  </data>
+  <data name="Roles_Details" xml:space="preserve">
+    <value>تفاصيل نوع المستخدم</value>
+  </data>
+  <data name="Roles_DisplayName" xml:space="preserve">
+    <value>الاسم الظاهر</value>
+  </data>
+  <data name="Roles_TechnicalKey" xml:space="preserve">
+    <value>المفتاح التقني</value>
+  </data>
+  <data name="Roles_Type" xml:space="preserve">
+    <value>النوع</value>
+  </data>
+  <data name="Roles_System" xml:space="preserve">
+    <value>نظامي</value>
+  </data>
+  <data name="Roles_Custom" xml:space="preserve">
+    <value>مخصص</value>
+  </data>
+  <data name="Roles_TotalFormat" xml:space="preserve">
+    <value>{0} دور</value>
+  </data>
+  <data name="Roles_Empty" xml:space="preserve">
+    <value>لا توجد أنواع مستخدمين مطابقة.</value>
+  </data>
+  <data name="Roles_SelectHint" xml:space="preserve">
+    <value>اختر نوع مستخدم من الجدول أو اضغط جديد.</value>
+  </data>
+  <data name="Roles_KeyHint" xml:space="preserve">
+    <value>المفتاح التقني ثابت بعد الإنشاء، ومفاتيح الأدوار النظامية محمية حتى لا تنكسر صلاحيات النظام.</value>
+  </data>
+  <data name="Roles_Search" xml:space="preserve">
+    <value>البحث عن نوع مستخدم...</value>
+  </data>
+  <data name="Roles_Import" xml:space="preserve">
+    <value>استيراد</value>
+  </data>
+  <data name="Roles_Export" xml:space="preserve">
+    <value>تصدير</value>
+  </data>
+  <data name="Roles_Created" xml:space="preserve">
+    <value>تم إنشاء نوع المستخدم بنجاح.</value>
+  </data>
+  <data name="Roles_Updated" xml:space="preserve">
+    <value>تم تحديث نوع المستخدم بنجاح.</value>
+  </data>
+  <data name="Roles_Exported" xml:space="preserve">
+    <value>تم تصدير أنواع المستخدمين بنجاح.</value>
+  </data>
+  <data name="Roles_ImportSize" xml:space="preserve">
+    <value>يجب ألا يتجاوز ملف الاستيراد 1 MB.</value>
+  </data>
+  <data name="Roles_ImportEmpty" xml:space="preserve">
+    <value>ملف الاستيراد لا يحتوي على أنواع مستخدمين.</value>
+  </data>
+  <data name="Roles_ImportInvalid" xml:space="preserve">
+    <value>ملف الاستيراد غير صالح. استخدم أعمدة CSV: Name,DisplayName.</value>
+  </data>
+  <data name="Roles_ImportSuccess" xml:space="preserve">
+    <value>تم الاستيراد: {0} جديد، {1} محدث، {2} بدون تغيير.</value>
+  </data>
+  <data name="Roles_KeyInvalid" xml:space="preserve">
+    <value>يجب أن يبدأ المفتاح التقني بحرف إنجليزي ويحتوي فقط على حروف وأرقام ونقطة وشرطة وشرطة سفلية.</value>
+  </data>
+  <data name="role_id_required" xml:space="preserve">
+    <value>معرف الدور مطلوب.</value>
+  </data>
+  <data name="role_name_required" xml:space="preserve">
+    <value>المفتاح التقني مطلوب.</value>
+  </data>
+  <data name="role_name_max_length" xml:space="preserve">
+    <value>يجب ألا يتجاوز المفتاح التقني 64 حرفاً.</value>
+  </data>
+  <data name="role_name_invalid" xml:space="preserve">
+    <value>صيغة المفتاح التقني غير صالحة.</value>
+  </data>
+  <data name="identity_role_exists" xml:space="preserve">
+    <value>يوجد دور آخر بنفس المفتاح التقني.</value>
+  </data>
+  <data name="roles_import_required" xml:space="preserve">
+    <value>يجب أن يحتوي ملف الاستيراد على أدوار.</value>
+  </data>
+  <data name="roles_import_count_invalid" xml:space="preserve">
+    <value>يجب أن يحتوي ملف الاستيراد على 1 إلى 200 دور.</value>
+  </data>
+  <data name="roles_import_duplicate_name" xml:space="preserve">
+    <value>ملف الاستيراد يحتوي على مفاتيح تقنية مكررة.</value>
+  </data>
+  <data name="roles_single_required" xml:space="preserve">
+    <value>يجب تحديد نوع مستخدم واحد فقط.</value>
+  </data>
+  <data name="employee_image_size_invalid" xml:space="preserve">
+    <value>حجم صورة الموظف يجب ألا يتجاوز 2.5 MB.</value>
+  </data>
+  <data name="employee_image_type_invalid" xml:space="preserve">
+    <value>يجب أن تكون صورة الموظف بصيغة JPEG أو PNG أو WebP.</value>
+  </data>
 </root>

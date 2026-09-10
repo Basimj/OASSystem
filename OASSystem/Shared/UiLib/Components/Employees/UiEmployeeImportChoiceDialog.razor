@@ -1,0 +1,21 @@
+<section class="ui-employee-choice" dir="rtl">
+    <header class="ui-employee-choice__header">
+        <div class="ui-employee-choice__title">
+            <span class="ui-employee-choice__icon"><i class="fa-solid fa-file-import" aria-hidden="true"></i></span>
+            <div><strong>استيراد الموظفين</strong><span>اختر طريقة إدخال بيانات الموظفين.</span></div>
+        </div>
+        <button type="button" class="ui-employee-choice__close" aria-label="إغلاق" @onclick="CloseAsync"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+    </header>
+    <div class="ui-employee-choice__body">
+        <button type="button" class="ui-employee-choice__option" @onclick="InternalEntryAsync">
+            <span class="ui-employee-choice__option-icon"><i class="fa-solid fa-table" aria-hidden="true"></i></span>
+            <span class="ui-employee-choice__option-copy"><strong>إدخال البيانات داخل النظام</strong><span>إدخال عدة موظفين مباشرة مع التحقق من البيانات قبل الحفظ.</span></span>
+            <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="ui-employee-choice__option" @onclick="ExcelAsync">
+            <span class="ui-employee-choice__option-icon"><i class="fa-solid fa-file-excel" aria-hidden="true"></i></span>
+            <span class="ui-employee-choice__option-copy"><strong>استيراد من ملف Excel</strong><span>اختر ملف Excel للتحقق منه واستيراد الموظفين.</span></span>
+            <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+        </button>
+    </div>
+</section>

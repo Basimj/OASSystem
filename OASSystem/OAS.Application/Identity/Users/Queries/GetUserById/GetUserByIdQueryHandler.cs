@@ -21,6 +21,21 @@ public sealed class GetUserByIdQueryHandler(
             ?? throw new NotFoundException(nameof(UserAccount), request.UserId);
 
         await UserManagementGuard.EnsureCanManageTargetAsync(record, currentUser, repository, cancellationToken);
-        return UserMapping.ToDetails(record, timeProvider.GetUtcNow());
+
+        var auditUserIds = new HashSet<Guid>();
+        if (Guid.TryParse(record.User.CreatedBy, out var createdById)) auditUserIds.Add(createdById);
+        if (Guid.TryParse(record.User.LastModifiedBy, out var modifiedById)) auditUserIds.Add(modifiedById);
+        var auditUserNames = await repository.GetUserNamesAsync(auditUserIds, cancellationToken);
+
+        var createdBy = ResolveAuditActor(record.User.CreatedBy, auditUserNames);
+        var modifiedBy = ResolveAuditActor(record.User.LastModifiedBy, auditUserNames);
+        return UserMapping.ToDetails(record, timeProvider.GetUtcNow(), createdBy, modifiedBy);
+    }
+
+    private static string? ResolveAuditActor(string? auditValue, IReadOnlyDictionary<Guid, string> userNames)
+    {
+        if (string.IsNullOrWhiteSpace(auditValue)) return null;
+        if (!Guid.TryParse(auditValue, out var userId)) return auditValue;
+        return userNames.TryGetValue(userId, out var userName) ? userName : null;
     }
 }

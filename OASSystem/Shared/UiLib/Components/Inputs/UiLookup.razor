@@ -1,0 +1,66 @@
+<div class="ui-lookup">
+    @if (!string.IsNullOrWhiteSpace(Label))
+    {
+        <label class="ui-lookup__label">@Label@if (Required){<span class="ui-lookup__required">*</span>}</label>
+    }
+
+    <div class="@RootClass">
+        <i class="ui-lookup__search-icon fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+        <input class="ui-lookup__input"
+               value="@_query"
+               placeholder="@Placeholder"
+               disabled="@Disabled"
+               autocomplete="off"
+               aria-label="@AriaLabel"
+               @oninput="HandleInputAsync"
+               @onfocus="HandleFocusAsync"
+               @onkeydown="HandleKeyDownAsync" />
+
+        @if (_loading)
+        {
+            <i class="ui-lookup__spinner fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i>
+        }
+        else if (!Disabled && !string.IsNullOrWhiteSpace(Value))
+        {
+            <button type="button" class="ui-lookup__clear" title="@ClearText" aria-label="@ClearText" @onclick="ClearAsync">
+                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            </button>
+        }
+    </div>
+
+    @if (_open && !Disabled)
+    {
+        <div class="ui-lookup__results">
+            @if (_loading)
+            {
+                <div class="ui-lookup__empty">جاري البحث...</div>
+            }
+            else if (_items.Count == 0)
+            {
+                <div class="ui-lookup__empty">@EmptyText</div>
+            }
+            else
+            {
+                @foreach (var item in _items)
+                {
+                    <button type="button"
+                            class="ui-lookup__item"
+                            disabled="@item.Disabled"
+                            @onclick="() => SelectAsync(item)">
+                        @if (!string.IsNullOrWhiteSpace(item.IconCssClass))
+                        {
+                            <i class="@item.IconCssClass" aria-hidden="true"></i>
+                        }
+                        <span class="ui-lookup__item-text">
+                            <strong>@item.PrimaryText</strong>
+                            @if (!string.IsNullOrWhiteSpace(item.SecondaryText))
+                            {
+                                <small>@item.SecondaryText</small>
+                            }
+                        </span>
+                    </button>
+                }
+            }
+        </div>
+    }
+</div>

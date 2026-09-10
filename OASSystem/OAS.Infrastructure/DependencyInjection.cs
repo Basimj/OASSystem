@@ -10,6 +10,7 @@ using OAS.Infrastructure.Database.Configuration;
 using OAS.Infrastructure.Database.Services;
 using OAS.Infrastructure.Features.Employees.Export;
 using OAS.Infrastructure.Features.Employees.Import;
+using OAS.Infrastructure.Features.Employees.Images;
 using OAS.Infrastructure.Identity.Persistence;
 using OAS.Infrastructure.Identity.Security;
 using OAS.Infrastructure.Numbering;
@@ -74,6 +75,7 @@ public static class DependencyInjection
             IdentityRepository>();
 
         services.AddScoped<IUserProfileImageStore, UserProfileImageStore>();
+        services.AddScoped<IEmployeeImageStore, EmployeeImageStore>();
 
         services.AddScoped<
             IPasswordService,

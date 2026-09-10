@@ -25,10 +25,7 @@ public sealed class SetUserRolesCommandHandler(IIdentityRepository repository, I
 
         var hadAdministrator = target.Roles.Any(IsAdministrator);
         var willHaveAdministrator = requestedRoles.Any(IsAdministrator);
-        var actor = await UserManagementGuard.GetActorAsync(currentUser, repository, cancellationToken);
-
-        if (hadAdministrator != willHaveAdministrator && !actor.User.IsSuperAdmin)
-            throw new ForbiddenException("Super Administrator privileges are required.", "identity_super_admin_required");
+        _ = await UserManagementGuard.GetActorAsync(currentUser, repository, cancellationToken);
 
         if (Guid.TryParse(currentUser.UserId, out var actorId) && actorId == target.User.Id && hadAdministrator && !willHaveAdministrator)
             throw new ConflictException("identity_cannot_remove_own_administrator_role", "The current user cannot remove their own Administrator role.");

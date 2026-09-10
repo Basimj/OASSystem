@@ -13,7 +13,7 @@ public sealed class Role : AuditableEntity<Guid>
         if (string.IsNullOrWhiteSpace(name)) throw new DomainException("Role name is required.");
         Name = name.Trim();
         NormalizedName = UserAccount.Normalize(Name);
-        DisplayName = string.IsNullOrWhiteSpace(displayName) ? Name : displayName.Trim();
+        UpdateDisplayName(displayName);
         IsSystem = isSystem;
     }
 
@@ -26,5 +26,11 @@ public sealed class Role : AuditableEntity<Guid>
     {
         if (id == Guid.Empty) throw new DomainException("Role id is required.");
         return new Role(id, name, displayName, isSystem);
+    }
+
+    public void UpdateDisplayName(string displayName)
+    {
+        if (string.IsNullOrWhiteSpace(displayName)) throw new DomainException("Role display name is required.");
+        DisplayName = displayName.Trim();
     }
 }

@@ -26,6 +26,15 @@ public sealed class UserClientService(OasApiClient apiClient) : IUserClientServi
     public async Task<IReadOnlyList<RoleDto>> GetRolesAsync(CancellationToken cancellationToken = default) =>
         await apiClient.GetAsync<RoleDto[]>("api/identity/roles", cancellationToken) ?? [];
 
+    public Task<ApiCallResult<RoleDto>> CreateRoleAsync(CreateRoleRequest request, CancellationToken cancellationToken = default) =>
+        apiClient.PostResultAsync<CreateRoleRequest, RoleDto>("api/identity/roles", request, cancellationToken);
+
+    public Task<ApiCallResult<RoleDto>> UpdateRoleDisplayNameAsync(Guid id, UpdateRoleDisplayNameRequest request, CancellationToken cancellationToken = default) =>
+        apiClient.PutResultAsync<UpdateRoleDisplayNameRequest, RoleDto>($"api/identity/roles/{id:D}/display-name", request, cancellationToken);
+
+    public Task<ApiCallResult<ImportRolesResultDto>> ImportRolesAsync(ImportRolesRequest request, CancellationToken cancellationToken = default) =>
+        apiClient.PostResultAsync<ImportRolesRequest, ImportRolesResultDto>("api/identity/roles/import", request, cancellationToken);
+
     public Task<ApiCallResult<CreateUserResultDto>> CreateUserAsync(CreateUserRequest request, CancellationToken cancellationToken = default) =>
         apiClient.PostResultAsync<CreateUserRequest, CreateUserResultDto>(Endpoint, request, cancellationToken);
 

@@ -13,6 +13,7 @@ public sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
         builder.Property(x => x.Name).HasMaxLength(64).IsRequired();
         builder.Property(x => x.NormalizedName).HasMaxLength(64).IsRequired();
         builder.Property(x => x.DisplayName).HasMaxLength(100).IsRequired();
+        builder.Property(x => x.IsSystem).IsRequired();
         builder.Property(x => x.CreatedBy).HasMaxLength(64);
         builder.Property(x => x.LastModifiedBy).HasMaxLength(64);
         builder.Ignore(x => x.DomainEvents);

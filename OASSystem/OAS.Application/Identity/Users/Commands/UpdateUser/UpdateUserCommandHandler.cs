@@ -25,7 +25,7 @@ public sealed class UpdateUserCommandHandler(IIdentityRepository repository, ICu
         if (normalizedEmail is not null && await repository.EmailExistsAsync(normalizedEmail, request.UserId, cancellationToken))
             throw new ConflictException("identity_email_exists", "Email already exists.");
 
-        record.User.SetIdentity(request.Request.UserName, request.Request.FirstName, request.Request.LastName, request.Request.Email);
+        record.User.SetIdentity(request.Request.UserName, request.Request.FirstName, request.Request.LastName, request.Request.Email, request.Request.PhoneNumber);
         return record.User.Id;
     }
 }

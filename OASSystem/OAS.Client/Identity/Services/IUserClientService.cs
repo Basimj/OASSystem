@@ -14,6 +14,9 @@ public interface IUserClientService
         CancellationToken cancellationToken = default);
     Task<UserDetailsDto> GetUserByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<RoleDto>> GetRolesAsync(CancellationToken cancellationToken = default);
+    Task<ApiCallResult<RoleDto>> CreateRoleAsync(CreateRoleRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<RoleDto>> UpdateRoleDisplayNameAsync(Guid id, UpdateRoleDisplayNameRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<ImportRolesResultDto>> ImportRolesAsync(ImportRolesRequest request, CancellationToken cancellationToken = default);
     Task<ApiCallResult<CreateUserResultDto>> CreateUserAsync(CreateUserRequest request, CancellationToken cancellationToken = default);
     Task<ApiCallResult<UserDetailsDto>> UpdateUserAsync(Guid id, UpdateUserRequest request, CancellationToken cancellationToken = default);
     Task<ApiCallResult<UserDetailsDto>> SetUserStatusAsync(Guid id, SetUserStatusRequest request, CancellationToken cancellationToken = default);

@@ -7,6 +7,7 @@ public sealed class UserEditorFormModel
     private string _firstName = string.Empty;
     private string _lastName = string.Empty;
     private string? _email;
+    private string _phoneNumber = string.Empty;
     private bool _isActive = true;
     private bool _suppressNotifications;
 
@@ -36,19 +37,26 @@ public sealed class UserEditorFormModel
         set => Set(ref _email, value);
     }
 
+    public string PhoneNumber
+    {
+        get => _phoneNumber;
+        set => Set(ref _phoneNumber, value ?? string.Empty);
+    }
+
     public bool IsActive
     {
         get => _isActive;
         set => Set(ref _isActive, value);
     }
 
-    public void Load(string userName, string firstName, string lastName, string? email, bool isActive)
+    public void Load(string userName, string firstName, string lastName, string? email, string? phoneNumber, bool isActive)
     {
         _suppressNotifications = true;
         _userName = userName;
         _firstName = firstName;
         _lastName = lastName;
         _email = email;
+        _phoneNumber = phoneNumber ?? string.Empty;
         _isActive = isActive;
         _suppressNotifications = false;
     }

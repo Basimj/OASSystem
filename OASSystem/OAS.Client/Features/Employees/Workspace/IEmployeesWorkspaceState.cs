@@ -5,12 +5,19 @@ namespace OAS.Client.Features.Employees.Workspace;
 
 public interface IEmployeesWorkspaceState
 {
+    Guid AllEmployeesTabId { get; }
+    Guid ActiveTabId { get; set; }
     string? SearchText { get; set; }
     string? AppliedSearch { get; set; }
     int PageNumber { get; set; }
     EmployeeListFilter Filter { get; set; }
     PagedResult<EmployeeDto> Page { get; set; }
     bool HasLoadedPage { get; set; }
-    EmployeeEditorWorkspaceState Editor { get; }
+    IReadOnlyList<EmployeeWorkspaceTabState> EditorTabs { get; }
+    EmployeeWorkspaceTabState? ActiveEditorTab { get; }
+    EmployeeWorkspaceTabState GetOrCreateEmployeeTab(Guid employeeId);
+    EmployeeWorkspaceTabState CreateNewTab(int employeeNumber);
+    EmployeeWorkspaceTabState? FindEditorTab(Guid tabId);
+    bool RemoveEditorTab(Guid tabId);
     void ResetList();
 }

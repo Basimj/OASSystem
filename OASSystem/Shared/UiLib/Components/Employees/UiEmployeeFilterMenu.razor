@@ -1,0 +1,24 @@
+<div class="@(Disabled ? "ui-employee-filter ui-employee-filter--disabled" : "ui-employee-filter")" @onclick:stopPropagation="true">
+    <button type="button"
+            class="ui-employee-filter__trigger"
+            title="@($"فلترة الموظفين: {SelectedText}")"
+            aria-label="@($"فلترة الموظفين: {SelectedText}")"
+            aria-expanded="@_open"
+            disabled="@Disabled"
+            @onclick="Toggle">
+        <i class="fa-solid fa-filter" aria-hidden="true"></i>
+    </button>
+    @if (_open && !Disabled)
+    {
+        <div class="ui-employee-filter__menu">
+            @foreach (var option in Options)
+            {
+                <button type="button"
+                        class="@(string.Equals(option.Value, Value, StringComparison.Ordinal) ? "is-selected" : null)"
+                        @onclick="() => SelectAsync(option.Value)">
+                    @option.Text
+                </button>
+            }
+        </div>
+    }
+</div>

@@ -84,6 +84,12 @@ public sealed class EfUnitOfWork(OasDbContext dbContext) : IUnitOfWork
             return true;
         }
 
+        if (message.Contains("IX_Roles_NormalizedName", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("identity_role_exists", "Role already exists.");
+            return true;
+        }
+
         conflict = new ConflictException("unique_constraint_conflict", "A unique value already exists.");
         return true;
     }

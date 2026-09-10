@@ -1,0 +1,17 @@
+@inherits InputBase<DateOnly?>
+
+<div class="ui-input-date">
+    @if (!string.IsNullOrWhiteSpace(Label))
+    {
+        <UiTextLabel For="@InputId" Text="@Label" Required="@Required" Size="@Size" />
+    }
+    <input id="@InputId"
+           type="date"
+           class="ui-input-date__control ui-input-date__control--@SizeCss"
+           value="@CurrentValueAsString"
+           @onchange="HandleChange"
+           disabled="@Disabled"
+           readonly="@ReadOnly"
+           required="@(Required && EnableNativeValidation)"
+           aria-required="@Required.ToString().ToLowerInvariant()" />
+</div>

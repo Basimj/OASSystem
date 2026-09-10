@@ -1,8 +1,13 @@
-<div class="ui-search-input">
+<div class="@(Disabled ? "ui-search-input ui-search-input--disabled" : "ui-search-input")">
     <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-    <input type="search" value="@_value" placeholder="@Placeholder" aria-label="@AriaLabel" @oninput="InputChanged" />
+    <input type="search"
+           value="@_value"
+           placeholder="@Placeholder"
+           aria-label="@AriaLabel"
+           disabled="@Disabled"
+           @oninput="InputChanged" />
     @if (!string.IsNullOrWhiteSpace(_value))
     {
-        <button type="button" title="@ClearText" aria-label="@ClearText" @onclick="ClearAsync"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+        <button type="button" disabled="@Disabled" title="@ClearText" aria-label="@ClearText" @onclick="ClearAsync"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
     }
 </div>

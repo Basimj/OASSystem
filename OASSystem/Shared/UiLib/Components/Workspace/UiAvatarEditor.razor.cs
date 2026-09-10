@@ -11,7 +11,7 @@ public partial class UiAvatarEditor
     [Parameter] public int Size { get; set; } = 68;
     [Parameter] public bool ReadOnly { get; set; }
     [Parameter] public bool ShowRemove { get; set; } = true;
-    [Parameter] public string EditText { get; set; } = "تعديل الصورة";
+    [Parameter] public string EditText { get; set; } = "تغيير الصورة";
     [Parameter] public string RemoveText { get; set; } = "حذف الصورة";
     [Parameter] public string Accept { get; set; } = "image/jpeg,image/png,image/webp";
     [Parameter] public EventCallback<IBrowserFile> OnImageSelected { get; set; }

@@ -1,1434 +1,292 @@
-@using Microsoft.AspNetCore.Components.Web
 @using OAS.Client.Features.Employees.Services
 @using OAS.Client.Services.Http
 @using OAS.Contracts.Features.Employees
 @using OAS.Contracts.Features.Employees.Import
+@using OAS.Contracts.Features.Employees.JobTitles
+@using OAS.UiLib.Core.Models
 
 @inject IEmployeeClientService EmployeeService
 @inject IUiSnackbarService Snackbar
 
 <UiElement Tag="div" class="employee-bulk-entry">
-
     <UiElement Tag="div" class="employee-bulk-entry-header">
-
         <UiElement Tag="div" class="employee-bulk-entry-title-area">
-            <UiElement Tag="div" class="employee-bulk-entry-icon">
-                <UiElement Tag="span">▦</UiElement>
-            </UiElement>
-
+            <UiElement Tag="div" class="employee-bulk-entry-icon"><UiElement Tag="span">▦</UiElement></UiElement>
             <UiElement Tag="div">
                 <UiElement Tag="h2">إدخال الموظفين</UiElement>
-                <UiElement Tag="p">أدخل بيانات عدة موظفين مباشرة داخل النظام</UiElement>
+                <UiElement Tag="p">أدخل بيانات عدة موظفين؛ كود الموظف يُولد تلقائيًا من قاعدة البيانات.</UiElement>
             </UiElement>
         </UiElement>
-
-        <UiElement Tag="button" type="button"
-                class="employee-bulk-close-button"
-                OnClick="CloseClicked"
-                disabled="@(_isValidating || _isSaving)">
-            ×
-        </UiElement>
-
+        <UiElement Tag="button" type="button" class="employee-bulk-close-button" OnClick="CloseClicked" disabled="@IsBusy">×</UiElement>
     </UiElement>
-
 
     <UiElement Tag="div" class="employee-bulk-entry-toolbar">
-
         <UiElement Tag="div" class="employee-bulk-toolbar-left">
-
-            <UiElement Tag="button" type="button"
-                    class="employee-bulk-toolbar-button"
-                    OnClick="AddRowClicked"
-                    disabled="@(_isValidating || _isSaving)">
-                <UiElement Tag="span">＋</UiElement>
-                <UiElement Tag="span">إضافة صف</UiElement>
-            </UiElement>
-
-            <UiElement Tag="button" type="button"
-                    class="employee-bulk-toolbar-button"
-                    OnClick="ClearClicked"
-                    disabled="@(_isValidating || _isSaving)">
-                <UiElement Tag="span">مسح الكل</UiElement>
-            </UiElement>
-
+            <UiElement Tag="button" type="button" class="employee-bulk-toolbar-button" OnClick="AddRowClicked" disabled="@IsBusy">＋ إضافة صف</UiElement>
+            <UiElement Tag="button" type="button" class="employee-bulk-toolbar-button" OnClick="ClearClicked" disabled="@IsBusy">مسح الكل</UiElement>
         </UiElement>
-
         <UiElement Tag="div" class="employee-bulk-toolbar-right">
-
-            <UiElement Tag="div" class="employee-bulk-stat">
-                <UiElement Tag="span" class="employee-bulk-stat-label">الصفوف</UiElement>
-                <UiElement Tag="strong">@GetDataRowsCount()</UiElement>
-            </UiElement>
-
-            <UiElement Tag="div" class="employee-bulk-stat">
-                <UiElement Tag="span" class="employee-bulk-stat-label">الصحيحة</UiElement>
-                <UiElement Tag="strong">@GetValidRowsCount()</UiElement>
-            </UiElement>
-
-            <UiElement Tag="div" class="employee-bulk-stat">
-                <UiElement Tag="span" class="employee-bulk-stat-label">الأخطاء</UiElement>
-                <UiElement Tag="strong">@GetInvalidRowsCount()</UiElement>
-            </UiElement>
-
+            <UiElement Tag="div" class="employee-bulk-stat"><UiElement Tag="span" class="employee-bulk-stat-label">الصفوف</UiElement><UiElement Tag="strong">@DataRows.Count</UiElement></UiElement>
+            <UiElement Tag="div" class="employee-bulk-stat"><UiElement Tag="span" class="employee-bulk-stat-label">الأخطاء</UiElement><UiElement Tag="strong">@_rows.Count(x => x.Errors.Count > 0)</UiElement></UiElement>
         </UiElement>
-
     </UiElement>
-
 
     @if (_isValidating)
     {
-        <UiElement Tag="div" class="employee-bulk-entry-status employee-bulk-entry-status-loading">
-            جاري التحقق من البيانات...
-        </UiElement>
+        <UiElement Tag="div" class="employee-bulk-entry-status employee-bulk-entry-status-loading">جاري التحقق من البيانات...</UiElement>
     }
     else if (_isSaving)
     {
-        <UiElement Tag="div" class="employee-bulk-entry-status employee-bulk-entry-status-saving">
-            جاري حفظ الموظفين...
-            (@_savedCount من @_saveTotal)
-        </UiElement>
+        <UiElement Tag="div" class="employee-bulk-entry-status employee-bulk-entry-status-saving">جاري حفظ الموظفين... (@_savedCount من @_saveTotal)</UiElement>
     }
-    else if (_validationPerformed)
-    {
-        @if (GetInvalidRowsCount() == 0 && GetDataRowsCount() > 0)
-        {
-            <UiElement Tag="div" class="employee-bulk-entry-status employee-bulk-entry-status-success">
-                جميع البيانات صحيحة ويمكن حفظها.
-            </UiElement>
-        }
-        else if (GetInvalidRowsCount() > 0)
-        {
-            <UiElement Tag="div" class="employee-bulk-entry-status employee-bulk-entry-status-error">
-                يوجد @GetInvalidRowsCount() صف يحتاج إلى تصحيح.
-            </UiElement>
-        }
-    }
-
 
     <UiElement Tag="div" class="employee-bulk-entry-table-wrapper">
-
         <UiElement Tag="table" class="employee-bulk-entry-table">
-
             <UiElement Tag="thead">
                 <UiElement Tag="tr">
                     <UiElement Tag="th" class="employee-bulk-col-number">#</UiElement>
-                    <UiElement Tag="th">رمز الموظف *</UiElement>
                     <UiElement Tag="th">الاسم الأول *</UiElement>
                     <UiElement Tag="th">اسم العائلة *</UiElement>
                     <UiElement Tag="th">رقم الهاتف</UiElement>
-                    <UiElement Tag="th">المسمى الوظيفي</UiElement>
+                    <UiElement Tag="th">المسمى الوظيفي *</UiElement>
                     <UiElement Tag="th">تاريخ التوظيف</UiElement>
-                    <UiElement Tag="th">مبيعات</UiElement>
-                    <UiElement Tag="th">فني</UiElement>
                     <UiElement Tag="th">عمولة</UiElement>
                     <UiElement Tag="th">نشط</UiElement>
                     <UiElement Tag="th" class="employee-bulk-col-delete"></UiElement>
                 </UiElement>
             </UiElement>
-
-
             <UiElement Tag="tbody">
-
                 @for (var index = 0; index < _rows.Count; index++)
                 {
                     var row = _rows[index];
                     var rowIndex = index + 1;
-
-                    <UiElement Tag="tr" class="@(row.Errors.Count > 0
-                                                ? "employee-bulk-row-invalid"
-                                                : "")">
-
-                    <UiElement Tag="td" class="employee-bulk-row-number">
-                        @rowIndex
-                    </UiElement>
-
-
-                        <!-- Employee Code -->
+                    <UiElement Tag="tr" class="@(row.Errors.Count > 0 ? "employee-bulk-row-invalid" : "")">
+                        <UiElement Tag="td" class="employee-bulk-row-number">@rowIndex</UiElement>
                         <UiElement Tag="td">
-
-                            <UiElement Tag="input" class="@GetInputClass(row, nameof(row.EmployeeCode))"
-                                   type="text"
-                                   value="@row.EmployeeCode"
-                                   OnInput="e => OnEmployeeCodeInput(row, e)"
-                                   maxlength="32"
-                                   autocomplete="off"
-                                   placeholder="EMP001"
-                                   disabled="@IsInputLocked()" />
-
-                        @if (HasFieldError(row, nameof(row.EmployeeCode)))
-                            {
-                                <UiElement Tag="div" class="employee-bulk-field-error">
-                                    @GetFieldError(row, nameof(row.EmployeeCode))
-                                </UiElement>
-                            }
-
+                            <UiInputText Value="@row.FirstName" ValueChanged="v => SetFirstName(row, v)" ValueExpression="@(() => row.FirstName)" Disabled="@IsBusy" Size="ControlSize.Small" />
                         </UiElement>
-
-
-                        <!-- First Name -->
                         <UiElement Tag="td">
-
-                            <UiElement Tag="input" class="@GetInputClass(row, nameof(row.FirstName))"
-                                   type="text"
-                                   value="@row.FirstName"
-                                   OnInput="e => OnTextInput(row, nameof(row.FirstName), e)"
-                                   maxlength="100"
-                                   autocomplete="off"
-                                   disabled="@IsInputLocked()" />
-
-                            @if (HasFieldError(row, nameof(row.FirstName)))
-                            {
-                                <UiElement Tag="div" class="employee-bulk-field-error">
-                                    @GetFieldError(row, nameof(row.FirstName))
-                                </UiElement>
-                            }
-
+                            <UiInputText Value="@row.LastName" ValueChanged="v => SetLastName(row, v)" ValueExpression="@(() => row.LastName)" Disabled="@IsBusy" Size="ControlSize.Small" />
                         </UiElement>
-
-
-                        <!-- Last Name -->
                         <UiElement Tag="td">
-
-                            <UiElement Tag="input" class="@GetInputClass(row, nameof(row.LastName))"
-                                   type="text"
-                                   value="@row.LastName"
-                                   OnInput="e => OnTextInput(row, nameof(row.LastName), e)"
-                                   maxlength="100"
-                                   autocomplete="off"
-                                   disabled="@IsInputLocked()" />
-
-                            @if (HasFieldError(row, nameof(row.LastName)))
-                            {
-                                <UiElement Tag="div" class="employee-bulk-field-error">
-                                    @GetFieldError(row, nameof(row.LastName))
-                                </UiElement>
-                            }
-
+                            <UiInputText Value="@row.Phone" ValueChanged="v => SetPhone(row, v)" ValueExpression="@(() => row.Phone)" Disabled="@IsBusy" Size="ControlSize.Small" InputMode="tel" />
                         </UiElement>
-
-
-                        <!-- Phone -->
                         <UiElement Tag="td">
-
-                            <UiElement Tag="input" class="@GetInputClass(row, nameof(row.Phone))"
-                                   type="text"
-                                   value="@row.Phone"
-                                   OnInput="e => OnPhoneInput(row, e)"
-                                   maxlength="32"
-                                   autocomplete="off"
-                                   inputmode="numeric"
-                                   placeholder="7xxxxxxxx"
-                                   disabled="@IsInputLocked()" />
-
-                            @if (HasFieldError(row, nameof(row.Phone)))
-                            {
-                                <UiElement Tag="div" class="employee-bulk-field-error">
-                                    @GetFieldError(row, nameof(row.Phone))
-                                </UiElement>
-                            }
-
+                            <UiSelect Value="@row.JobTitleId" ValueChanged="v => SetJobTitle(row, v)" ValueExpression="@(() => row.JobTitleId)"
+                                      Options="@JobTitleOptions" Placeholder="اختر المسمى" Disabled="@IsBusy" Size="ControlSize.Small" />
                         </UiElement>
-
-
-                        <!-- Job Title -->
                         <UiElement Tag="td">
-
-                            <UiElement Tag="input" class="@GetInputClass(row, nameof(row.JobTitle))"
-                                   type="text"
-                                   value="@row.JobTitle"
-                                   OnInput="e => OnTextInput(row, nameof(row.JobTitle), e)"
-                                   maxlength="100"
-                                   autocomplete="off"
-                                   disabled="@IsInputLocked()" />
-
-                            @if (HasFieldError(row, nameof(row.JobTitle)))
-                            {
-                                <UiElement Tag="div" class="employee-bulk-field-error">
-                                    @GetFieldError(row, nameof(row.JobTitle))
-                                </UiElement>
-                            }
-
+                            <UiInputDate Value="@row.HireDate" ValueChanged="v => SetHireDate(row, v)" ValueExpression="@(() => row.HireDate)" Disabled="@IsBusy" Size="ControlSize.Small" />
                         </UiElement>
-
-
-                        <!-- Hire Date -->
-                        <UiElement Tag="td">
-
-                            <UiElement Tag="input" class="@GetInputClass(row, nameof(row.HireDate))"
-                                   type="date"
-                                   value="@GetDateInputValue(row.HireDate)"
-                                   OnChange="e => OnHireDateChanged(row, e)"
-                                   disabled="@IsInputLocked()" />
-
-                            @if (HasFieldError(row, nameof(row.HireDate)))
-                            {
-                                <UiElement Tag="div" class="employee-bulk-field-error">
-                                    @GetFieldError(row, nameof(row.HireDate))
-                                </UiElement>
-                            }
-
-                        </UiElement>
-
-
-                        <!-- Sales -->
                         <UiElement Tag="td" class="employee-bulk-checkbox-cell">
-
-                            <UiElement Tag="input" type="checkbox"
-                                   checked="@IsYes(row.IsSalesperson)"
-                                   OnChange="e => OnBooleanChanged(row, nameof(row.IsSalesperson), e)"
-                                   disabled="@IsInputLocked()" />
-
+                            <UiCheckbox Value="@row.IsCommissionEligible" ValueChanged="v => SetCommission(row, v)" Disabled="@IsBusy" />
                         </UiElement>
-
-
-                        <!-- Technician -->
                         <UiElement Tag="td" class="employee-bulk-checkbox-cell">
-
-                            <UiElement Tag="input" type="checkbox"
-                                   checked="@IsYes(row.IsTechnician)"
-                                   OnChange="e => OnBooleanChanged(row, nameof(row.IsTechnician), e)"
-                                   disabled="@IsInputLocked()" />
-
+                            <UiCheckbox Value="@row.IsActive" ValueChanged="v => SetActive(row, v)" Disabled="@IsBusy" />
                         </UiElement>
-
-
-                        <!-- Commission -->
-                        <UiElement Tag="td" class="employee-bulk-checkbox-cell">
-
-                            <UiElement Tag="input" type="checkbox"
-                                   checked="@IsYes(row.IsCommissionEligible)"
-                                   OnChange="e => OnBooleanChanged(row, nameof(row.IsCommissionEligible), e)"
-                                   disabled="@IsInputLocked()" />
-
-                        </UiElement>
-
-
-                        <!-- Active -->
-                        <UiElement Tag="td" class="employee-bulk-checkbox-cell">
-
-                            <UiElement Tag="input" type="checkbox"
-                                   checked="@IsYes(row.IsActive)"
-                                   OnChange="e => OnBooleanChanged(row, nameof(row.IsActive), e)"
-                                   disabled="@IsInputLocked()" />
-
-                        </UiElement>
-
-
-                        <!-- Delete -->
                         <UiElement Tag="td" class="employee-bulk-delete-cell">
-
-                            <UiElement Tag="button" type="button"
-                                    class="employee-bulk-delete-button"
-                                    title="حذف الصف"
-                                    OnClick="() => RemoveRow(row)"
-                                    disabled="@(_isValidating || _isSaving)">
-                                ×
-                            </UiElement>
-
+                            <UiElement Tag="button" type="button" class="employee-bulk-delete-button" OnClick="() => RemoveRow(row)" disabled="@IsBusy">×</UiElement>
                         </UiElement>
-
                     </UiElement>
-
 
                     @if (row.Errors.Count > 0)
                     {
                         <UiElement Tag="tr" class="employee-bulk-error-row">
-
-                            <UiElement Tag="td" colspan="12">
-
+                            <UiElement Tag="td" colspan="9">
                                 <UiElement Tag="div" class="employee-bulk-errors">
-
                                     @foreach (var error in row.Errors.Distinct())
                                     {
-                                        <UiElement Tag="div" class="employee-bulk-error-item">
-                                            <UiElement Tag="span">●</UiElement>
-                                            <UiElement Tag="span">@error</UiElement>
-                                        </UiElement>
+                                        <UiElement Tag="div" class="employee-bulk-error-item"><UiElement Tag="span">●</UiElement><UiElement Tag="span">@error</UiElement></UiElement>
                                     }
-
                                 </UiElement>
-
                             </UiElement>
-
                         </UiElement>
                     }
-
                 }
-
             </UiElement>
-
         </UiElement>
-
-
-        @if (_rows.Count == 0)
-        {
-            <UiElement Tag="div" class="employee-bulk-entry-empty">
-                لا توجد صفوف.
-            </UiElement>
-        }
-
     </UiElement>
 
-
-    <!-- Footer -->
     <UiElement Tag="div" class="employee-bulk-entry-footer">
-
-        <UiElement Tag="div" class="employee-bulk-footer-info">
-
-            @if (_validationPerformed)
-            {
-                <UiElement Tag="span">
-                    @GetDataRowsCount() موظف
-                </UiElement>
-
-                @if (GetInvalidRowsCount() > 0)
-                {
-                    <UiElement Tag="span" class="employee-bulk-footer-error">
-                        • @GetInvalidRowsCount() به أخطاء
-                    </UiElement>
-                }
-            }
-            else
-            {
-                <UiElement Tag="span">
-                    أدخل البيانات ثم اضغط على التحقق من البيانات.
-                </UiElement>
-            }
-
-        </UiElement>
-
-
+        <UiElement Tag="div" class="employee-bulk-footer-info">أدخل البيانات ثم تحقق منها قبل الحفظ.</UiElement>
         <UiElement Tag="div" class="employee-bulk-footer-actions">
-
-            <UiElement Tag="button" type="button"
-                    class="employee-bulk-cancel-button"
-                    OnClick="CloseClicked"
-                    disabled="@(_isValidating || _isSaving)">
-                إلغاء
-            </UiElement>
-
-
-            @if (_validationPerformed &&
-                        GetDataRowsCount() > 0 &&
-                        GetInvalidRowsCount() == 0)
+            <UiButton Text="إلغاء" Variant="ButtonVariant.Secondary" Disabled="@IsBusy" OnClick="CloseClicked" />
+            @if (_validated && DataRows.Count > 0 && _rows.All(x => x.Errors.Count == 0))
             {
-                <UiElement Tag="button" type="button"
-                        class="employee-bulk-save-button"
-                        OnClick="SaveClicked"
-                        disabled="@_isSaving">
-
-                    @if (_isSaving)
-                    {
-                        <UiElement Tag="span">جاري الحفظ...</UiElement>
-                    }
-                    else
-                    {
-                        <UiElement Tag="span">إضافة الموظفين</UiElement>
-                    }
-
-                </UiElement>
+                <UiButton Text="إضافة الموظفين" Loading="@_isSaving" Disabled="@IsBusy" OnClick="SaveClicked" />
             }
             else
             {
-                <UiElement Tag="button" type="button"
-                        class="employee-bulk-validate-button"
-                        OnClick="ValidateClicked"
-                        disabled="@_isValidating">
-
-                    @if (_isValidating)
-                    {
-                        <UiElement Tag="span">جاري التحقق...</UiElement>
-                    }
-                    else
-                    {
-                        <UiElement Tag="span">التحقق من البيانات</UiElement>
-                    }
-
-                </UiElement>
+                <UiButton Text="التحقق من البيانات" Loading="@_isValidating" Disabled="@IsBusy" OnClick="ValidateClicked" />
             }
-
         </UiElement>
-
     </UiElement>
-
 </UiElement>
 
-
 @code {
+    [Parameter] public EventCallback OnClose { get; set; }
 
-    [Parameter]
-    public EventCallback OnClose { get; set; }
-
-
-    private readonly List<EmployeeBulkEntryRow> _rows = [];
-
-
+    private readonly List<RowModel> _rows = [];
+    private IReadOnlyList<JobTitleDto> _jobTitles = [];
     private bool _isValidating;
     private bool _isSaving;
-    private bool _validationPerformed;
-
-
+    private bool _validated;
     private int _savedCount;
     private int _saveTotal;
 
+    private bool IsBusy => _isValidating || _isSaving;
+    private IReadOnlyList<RowModel> DataRows => _rows.Where(IsNotEmpty).ToArray();
+    private IReadOnlyList<UiSelectOption> JobTitleOptions =>
+        _jobTitles.Where(x => x.IsActive).OrderBy(x => x.Name)
+            .Select(x => new UiSelectOption(x.Id.ToString("D"), x.Name)).ToArray();
 
-    // =========================================================
-    // Initialization
-    // =========================================================
-
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
+        _jobTitles = await EmployeeService.GetJobTitlesAsync(activeOnly: true);
         AddRow();
     }
 
+    private void AddRow() => _rows.Add(new RowModel());
+    private void AddRowClicked() { if (!IsBusy) { AddRow(); ResetValidation(); } }
+    private void RemoveRow(RowModel row) { if (!IsBusy) { _rows.Remove(row); if (_rows.Count == 0) AddRow(); ResetValidation(); } }
+    private void ClearClicked() { if (!IsBusy) { _rows.Clear(); AddRow(); ResetValidation(); } }
+    private Task CloseClicked() => IsBusy ? Task.CompletedTask : OnClose.InvokeAsync();
 
-    // =========================================================
-    // Input Lock
-    // =========================================================
-
-    private bool IsInputLocked()
-    {
-        return
-            _isValidating ||
-            _isSaving ||
-            (
-                _validationPerformed &&
-                GetDataRowsCount() > 0 &&
-                GetInvalidRowsCount() == 0
-            );
-    }
-
-
-    // =========================================================
-    // Row Management
-    // =========================================================
-
-    private void AddRow()
-    {
-        _rows.Add(
-            new EmployeeBulkEntryRow
-            {
-                IsActive = "نعم"
-            });
-
-        ResetValidationState();
-    }
-
-
-    private void AddRowClicked()
-    {
-        if (_isValidating || _isSaving)
-            return;
-
-        AddRow();
-    }
-
-
-    private void RemoveRow(
-        EmployeeBulkEntryRow row)
-    {
-        if (_isValidating || _isSaving)
-            return;
-
-        _rows.Remove(row);
-
-        if (_rows.Count == 0)
-        {
-            AddRow();
-        }
-
-        ResetValidationState();
-    }
-
-
-    private void ClearClicked()
-    {
-        if (_isValidating || _isSaving)
-            return;
-
-        _rows.Clear();
-
-        AddRow();
-
-        _validationPerformed = false;
-
-        ClearValidationErrors();
-    }
-
-
-    private async Task CloseClicked()
-    {
-        if (_isValidating || _isSaving)
-            return;
-
-        await OnClose.InvokeAsync();
-    }
-
-
-    // =========================================================
-    // Inputs
-    // =========================================================
-
-    private void OnEmployeeCodeInput(
-        EmployeeBulkEntryRow row,
-        ChangeEventArgs e)
-    {
-        var value =
-            e.Value?.ToString() ??
-            string.Empty;
-
-        row.EmployeeCode =
-            new string(
-                value
-                    .Where(
-                        character =>
-                            (character >= 'A' && character <= 'Z') ||
-                            (character >= 'a' && character <= 'z') ||
-                            (character >= '0' && character <= '9') ||
-                            character == '-' ||
-                            character == '_')
-                    .Take(32)
-                    .ToArray());
-
-        ResetValidationAfterEdit(row);
-    }
-
-
-    private void OnPhoneInput(
-        EmployeeBulkEntryRow row,
-        ChangeEventArgs e)
-    {
-        var value =
-            e.Value?.ToString() ??
-            string.Empty;
-
-        row.Phone =
-            new string(
-                value
-                    .Where(
-                        character =>
-                            character >= '0' &&
-                            character <= '9')
-                    .Take(32)
-                    .ToArray());
-
-        ResetValidationAfterEdit(row);
-    }
-
-
-    private void OnTextInput(
-        EmployeeBulkEntryRow row,
-        string field,
-        ChangeEventArgs e)
-    {
-        var value =
-            e.Value?.ToString() ??
-            string.Empty;
-
-        switch (field)
-        {
-            case nameof(EmployeeBulkEntryRow.FirstName):
-                row.FirstName = value;
-                break;
-
-            case nameof(EmployeeBulkEntryRow.LastName):
-                row.LastName = value;
-                break;
-
-            case nameof(EmployeeBulkEntryRow.JobTitle):
-                row.JobTitle = value;
-                break;
-        }
-
-        ResetValidationAfterEdit(row);
-    }
-
-
-    private void OnHireDateChanged(
-        EmployeeBulkEntryRow row,
-        ChangeEventArgs e)
-    {
-        var value =
-            e.Value?.ToString();
-
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            row.HireDate = null;
-        }
-        else if (DateTime.TryParse(
-                     value,
-                     out var date))
-        {
-            row.HireDate = date;
-        }
-        else
-        {
-            row.HireDate = null;
-        }
-
-        ResetValidationAfterEdit(row);
-    }
-
-
-    private void OnBooleanChanged(
-        EmployeeBulkEntryRow row,
-        string field,
-        ChangeEventArgs e)
-    {
-        var checkedValue =
-            e.Value is bool booleanValue
-                ? booleanValue
-                : string.Equals(
-                    e.Value?.ToString(),
-                    "true",
-                    StringComparison.OrdinalIgnoreCase);
-
-        var value =
-            checkedValue
-                ? "نعم"
-                : "لا";
-
-        switch (field)
-        {
-            case nameof(EmployeeBulkEntryRow.IsSalesperson):
-                row.IsSalesperson = value;
-                break;
-
-            case nameof(EmployeeBulkEntryRow.IsTechnician):
-                row.IsTechnician = value;
-                break;
-
-            case nameof(EmployeeBulkEntryRow.IsCommissionEligible):
-                row.IsCommissionEligible = value;
-                break;
-
-            case nameof(EmployeeBulkEntryRow.IsActive):
-                row.IsActive = value;
-                break;
-        }
-
-        ResetValidationAfterEdit(row);
-    }
-
-
-    // =========================================================
-    // Validation
-    // =========================================================
+    private void SetFirstName(RowModel row, string? value) { row.FirstName = value ?? ""; ResetRow(row); }
+    private void SetLastName(RowModel row, string? value) { row.LastName = value ?? ""; ResetRow(row); }
+    private void SetPhone(RowModel row, string? value) { row.Phone = value ?? ""; ResetRow(row); }
+    private void SetJobTitle(RowModel row, string? value) { row.JobTitleId = value; ResetRow(row); }
+    private void SetHireDate(RowModel row, DateOnly? value) { row.HireDate = value; ResetRow(row); }
+    private void SetCommission(RowModel row, bool value) { row.IsCommissionEligible = value; ResetRow(row); }
+    private void SetActive(RowModel row, bool value) { row.IsActive = value; ResetRow(row); }
 
     private async Task ValidateClicked()
     {
-        if (_isValidating || _isSaving)
-            return;
-
+        if (IsBusy) return;
         _isValidating = true;
-        _validationPerformed = false;
-
-        ClearValidationErrors();
-
+        foreach (var row in _rows) row.Errors.Clear();
         try
         {
-            var dataRows =
-                _rows
-                    .Where(IsNotEmptyRow)
-                    .ToList();
+            var dataRows = DataRows;
+            if (dataRows.Count == 0) { Snackbar.Error("لا توجد بيانات للتحقق."); return; }
 
-            if (dataRows.Count == 0)
+            var requestRows = dataRows.Select(row => new EmployeeBulkValidationRowDto(
+                _rows.IndexOf(row) + 1,
+                row.FirstName.Trim(),
+                row.LastName.Trim(),
+                NullIfEmpty(row.Phone),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                ResolveJobTitleName(row.JobTitleId),
+                row.HireDate,
+                row.IsCommissionEligible,
+                row.IsActive)).ToArray();
+
+            var result = await EmployeeService.ValidateBulkAsync(new EmployeeBulkValidationRequest(requestRows));
+            if (!result.Succeeded || result.Value is null)
             {
-                Snackbar.Error(
-                    "لا توجد بيانات للتحقق.");
-
+                Snackbar.Error(result.Error?.Message ?? "تعذر التحقق من البيانات.");
                 return;
             }
 
-            ValidateRowsLocally(dataRows);
-
-            ValidateDuplicateCodesInsideRequest(dataRows);
-
-            var requestRows =
-                dataRows
-                    .Select(
-                        row =>
-                            new EmployeeBulkValidationRowDto(
-                                RowNumber:
-                                    _rows.IndexOf(row) + 1,
-
-                                EmployeeCode:
-                                    row.EmployeeCode.Trim(),
-
-                                FirstName:
-                                    row.FirstName.Trim(),
-
-                                LastName:
-                                    row.LastName.Trim(),
-
-                                Phone:
-                                    string.IsNullOrWhiteSpace(row.Phone)
-                                        ? null
-                                        : row.Phone.Trim(),
-
-                                JobTitle:
-                                    string.IsNullOrWhiteSpace(row.JobTitle)
-                                        ? null
-                                        : row.JobTitle.Trim(),
-
-                                HireDate:
-                                    row.HireDate.HasValue
-                                        ? DateOnly.FromDateTime(
-                                            row.HireDate.Value)
-                                        : null,
-
-                                IsSalesperson:
-                                    IsYes(row.IsSalesperson),
-
-                                IsTechnician:
-                                    IsYes(row.IsTechnician),
-
-                                IsCommissionEligible:
-                                    IsYes(row.IsCommissionEligible),
-
-                                IsActive:
-                                    IsYes(row.IsActive)))
-                    .ToList();
-
-            var request =
-                new EmployeeBulkValidationRequest(
-                    requestRows);
-
-
-            try
+            foreach (var error in result.Value.Errors)
             {
-                var result =
-                    await EmployeeService.ValidateBulkAsync(
-                        request);
-
-                if (result.Succeeded)
-                {
-                    if (result.Value is not null)
-                    {
-                        ApplyServerValidationResult(
-                            result.Value);
-                    }
-                }
-                else
-                {
-                    Snackbar.Error(
-                        result.Error?.Message ??
-                        "تعذر التحقق من البيانات من الخادم.");
-                }
-            }
-            catch (ApiClientException ex)
-            {
-                Snackbar.Error(
-                    $"تعذر التحقق من البيانات: {ex.Message}");
-            }
-            catch (HttpRequestException ex)
-            {
-                Snackbar.Error(
-                    $"تعذر الاتصال بالخادم: {ex.Message}");
-            }
-            catch (Exception ex)
-            {
-                Snackbar.Error(
-                    $"حدث خطأ أثناء التحقق: {ex.Message}");
+                var index = error.RowNumber - 1;
+                if (index >= 0 && index < _rows.Count)
+                    _rows[index].Errors.Add($"{error.Field}: {error.Message}");
             }
 
-
-            _validationPerformed = true;
-
-
-            if (GetInvalidRowsCount() == 0)
-            {
-                Snackbar.Success(
-                    $"البيانات صحيحة. عدد الموظفين: {GetDataRowsCount()}");
-            }
-            else
-            {
-                Snackbar.Error(
-                    $"يوجد {GetInvalidRowsCount()} صف به أخطاء.");
-            }
+            _validated = true;
+            if (_rows.All(x => x.Errors.Count == 0)) Snackbar.Success("جميع البيانات صحيحة.");
+            else Snackbar.Error($"يوجد {_rows.Count(x => x.Errors.Count > 0)} صف به أخطاء.");
         }
-        finally
-        {
-            _isValidating = false;
-
-            await InvokeAsync(
-                StateHasChanged);
-        }
+        catch (ApiClientException ex) { Snackbar.Error(ex.Message); }
+        finally { _isValidating = false; }
     }
-
-
-    private void ValidateRowsLocally(
-        List<EmployeeBulkEntryRow> rows)
-    {
-        foreach (var row in rows)
-        {
-            if (string.IsNullOrWhiteSpace(row.EmployeeCode))
-            {
-                AddError(
-                    row,
-                    "رمز الموظف",
-                    "رمز الموظف مطلوب.");
-            }
-            else
-            {
-                var code =
-                    row.EmployeeCode.Trim();
-
-                if (code.Length > 32)
-                {
-                    AddError(
-                        row,
-                        "رمز الموظف",
-                        "رمز الموظف يجب ألا يتجاوز 32 حرفًا.");
-                }
-
-                if (!code.All(
-                        c =>
-                            (c >= 'A' && c <= 'Z') ||
-                            (c >= 'a' && c <= 'z') ||
-                            (c >= '0' && c <= '9') ||
-                            c == '-' ||
-                            c == '_'))
-                {
-                    AddError(
-                        row,
-                        "رمز الموظف",
-                        "رمز الموظف يسمح بالحروف الإنجليزية والأرقام والشرطة والشرطة السفلية فقط.");
-                }
-            }
-
-
-            if (string.IsNullOrWhiteSpace(row.FirstName))
-            {
-                AddError(
-                    row,
-                    "الاسم الأول",
-                    "الاسم الأول مطلوب.");
-            }
-            else if (row.FirstName.Trim().Length > 100)
-            {
-                AddError(
-                    row,
-                    "الاسم الأول",
-                    "الاسم الأول يجب ألا يتجاوز 100 حرفًا.");
-            }
-
-
-            if (string.IsNullOrWhiteSpace(row.LastName))
-            {
-                AddError(
-                    row,
-                    "اسم العائلة",
-                    "اسم العائلة مطلوب.");
-            }
-            else if (row.LastName.Trim().Length > 100)
-            {
-                AddError(
-                    row,
-                    "اسم العائلة",
-                    "اسم العائلة يجب ألا يتجاوز 100 حرفًا.");
-            }
-
-
-            if (!string.IsNullOrWhiteSpace(row.Phone))
-            {
-                if (row.Phone.Length > 32)
-                {
-                    AddError(
-                        row,
-                        "رقم الهاتف",
-                        "رقم الهاتف يجب ألا يتجاوز 32 رقمًا.");
-                }
-
-                if (!row.Phone.All(
-                        c =>
-                            c >= '0' &&
-                            c <= '9'))
-                {
-                    AddError(
-                        row,
-                        "رقم الهاتف",
-                        "رقم الهاتف يجب أن يحتوي على أرقام فقط.");
-                }
-            }
-
-
-            if (!string.IsNullOrWhiteSpace(row.JobTitle) &&
-                row.JobTitle.Length > 100)
-            {
-                AddError(
-                    row,
-                    "المسمى الوظيفي",
-                    "المسمى الوظيفي يجب ألا يتجاوز 100 حرفًا.");
-            }
-        }
-    }
-
-
-    private void ValidateDuplicateCodesInsideRequest(
-        List<EmployeeBulkEntryRow> rows)
-    {
-        var groups =
-            rows
-                .Where(
-                    row =>
-                        !string.IsNullOrWhiteSpace(
-                            row.EmployeeCode))
-                .GroupBy(
-                    row =>
-                        row.EmployeeCode.Trim(),
-                    StringComparer.OrdinalIgnoreCase);
-
-
-        foreach (var group in groups)
-        {
-            if (group.Count() <= 1)
-                continue;
-
-
-            foreach (var row in group)
-            {
-                AddError(
-                    row,
-                    "رمز الموظف",
-                    $"رمز الموظف «{group.Key}» مكرر داخل البيانات.");
-            }
-        }
-    }
-
-
-    private void ApplyServerValidationResult(
-        EmployeeBulkValidationResultDto result)
-    {
-        foreach (var error in result.Errors)
-        {
-            var index =
-                error.RowNumber - 1;
-
-            if (index < 0 ||
-                index >= _rows.Count)
-            {
-                continue;
-            }
-
-            var row =
-                _rows[index];
-
-            row.Errors.Add(
-                $"{error.Field}: {error.Message}");
-        }
-    }
-
-
-    // =========================================================
-    // Save
-    // =========================================================
 
     private async Task SaveClicked()
     {
-        if (_isSaving ||
-            _isValidating)
-        {
-            return;
-        }
-
-
-        if (!_validationPerformed)
-        {
-            Snackbar.Error(
-                "يجب التحقق من البيانات أولًا.");
-
-            return;
-        }
-
-
-        var dataRows =
-            _rows
-                .Where(IsNotEmptyRow)
-                .ToList();
-
-
-        if (dataRows.Count == 0)
-        {
-            Snackbar.Error(
-                "لا توجد بيانات لإضافتها.");
-
-            return;
-        }
-
-
-        var invalidRows =
-            dataRows.Count(
-                row =>
-                    row.Errors.Count > 0);
-
-
-        if (invalidRows > 0)
-        {
-            Snackbar.Error(
-                $"لا يمكن الحفظ. يوجد {invalidRows} صف به أخطاء.");
-
-            return;
-        }
-
+        if (IsBusy || !_validated) return;
+        var rows = DataRows;
+        if (rows.Any(x => x.Errors.Count > 0)) return;
 
         _isSaving = true;
         _savedCount = 0;
-        _saveTotal = dataRows.Count;
-
-
-        ClearValidationErrors();
-
-
+        _saveTotal = rows.Count;
         try
         {
-            foreach (var row in dataRows)
+            foreach (var row in rows)
             {
-                var request =
-                    new CreateEmployeeRequest(
-                        row.EmployeeCode.Trim(),
-
-                        row.FirstName.Trim(),
-
-                        row.LastName.Trim(),
-
-                        string.IsNullOrWhiteSpace(row.Phone)
-                            ? null
-                            : row.Phone.Trim(),
-
-                        string.IsNullOrWhiteSpace(row.JobTitle)
-                            ? null
-                            : row.JobTitle.Trim(),
-
-                        row.HireDate.HasValue
-                            ? DateOnly.FromDateTime(
-                                row.HireDate.Value)
-                            : null,
-
-                        null,
-
-                        IsYes(row.IsSalesperson),
-
-                        IsYes(row.IsTechnician),
-
-                        IsYes(row.IsCommissionEligible),
-
-                        IsYes(row.IsActive),
-
-                        null);
-
-
-                try
+                if (!Guid.TryParse(row.JobTitleId, out var jobTitleId))
                 {
-                    var result =
-                        await EmployeeService.CreateAsync(
-                            request);
-
-
-                    if (result.Succeeded)
-                    {
-                        _savedCount++;
-                    }
-                    else
-                    {
-                        row.Errors.Add(
-                            result.Error?.Message ??
-                            "تعذر إنشاء الموظف.");
-                    }
-                }
-                catch (ApiClientException ex)
-                {
-                    row.Errors.Add(
-                        $"خطأ من الخادم: {ex.Message}");
-                }
-                catch (HttpRequestException ex)
-                {
-                    row.Errors.Add(
-                        $"تعذر الاتصال بالخادم: {ex.Message}");
-                }
-                catch (Exception ex)
-                {
-                    row.Errors.Add(
-                        $"حدث خطأ أثناء إنشاء الموظف: {ex.Message}");
+                    row.Errors.Add("المسمى الوظيفي مطلوب.");
+                    continue;
                 }
 
+                var result = await EmployeeService.CreateAsync(new CreateEmployeeRequest(
+                    row.FirstName.Trim(),
+                    row.LastName.Trim(),
+                    NullIfEmpty(row.Phone),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    jobTitleId,
+                    row.HireDate,
+                    row.IsCommissionEligible,
+                    row.IsActive,
+                    null,
+                    null));
 
-                await InvokeAsync(
-                    StateHasChanged);
+                if (result.Succeeded) _savedCount++;
+                else row.Errors.Add(result.Error?.Message ?? "تعذر إنشاء الموظف.");
             }
 
-
-            var failedRows =
-                dataRows.Count(
-                    row =>
-                        row.Errors.Count > 0);
-
-
-            if (failedRows == 0)
+            if (_savedCount == _saveTotal)
             {
-                Snackbar.Success(
-                    $"تمت إضافة {_savedCount} موظف بنجاح.");
-
+                Snackbar.Success($"تمت إضافة {_savedCount} موظف بنجاح.");
                 await OnClose.InvokeAsync();
-
-                return;
-            }
-
-
-            _validationPerformed = true;
-
-
-            if (_savedCount > 0)
-            {
-                Snackbar.Error(
-                    $"تمت إضافة {_savedCount} من {_saveTotal} موظف، وفشل حفظ {failedRows}.");
             }
             else
             {
-                Snackbar.Error(
-                    "لم يتم إضافة أي موظف. راجع الأخطاء الظاهرة في الصفوف.");
+                Snackbar.Error($"تمت إضافة {_savedCount} من {_saveTotal} موظف.");
+                _validated = true;
             }
         }
-        catch (Exception ex)
-        {
-            _validationPerformed = true;
-
-
-            foreach (var row in dataRows)
-            {
-                if (row.Errors.Count == 0)
-                {
-                    row.Errors.Add(
-                        $"حدث خطأ أثناء الحفظ: {ex.Message}");
-                }
-            }
-
-
-            Snackbar.Error(
-                $"حدث خطأ أثناء الحفظ: {ex.Message}");
-        }
-        finally
-        {
-            _isSaving = false;
-
-            await InvokeAsync(
-                StateHasChanged);
-        }
+        finally { _isSaving = false; }
     }
 
+    private string? ResolveJobTitleName(string? id) =>
+        Guid.TryParse(id, out var guid) ? _jobTitles.FirstOrDefault(x => x.Id == guid)?.Name : null;
 
-    // =========================================================
-    // Helpers
-    // =========================================================
+    private static bool IsNotEmpty(RowModel row) =>
+        !string.IsNullOrWhiteSpace(row.FirstName) ||
+        !string.IsNullOrWhiteSpace(row.LastName) ||
+        !string.IsNullOrWhiteSpace(row.Phone) ||
+        !string.IsNullOrWhiteSpace(row.JobTitleId) ||
+        row.HireDate.HasValue ||
+        row.IsCommissionEligible ||
+        !row.IsActive;
 
-    private static bool IsNotEmptyRow(
-        EmployeeBulkEntryRow row)
+    private void ResetRow(RowModel row) { row.Errors.Clear(); _validated = false; }
+    private void ResetValidation() { foreach (var row in _rows) row.Errors.Clear(); _validated = false; }
+    private static string? NullIfEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private sealed class RowModel
     {
-        return
-            !string.IsNullOrWhiteSpace(row.EmployeeCode) ||
-            !string.IsNullOrWhiteSpace(row.FirstName) ||
-            !string.IsNullOrWhiteSpace(row.LastName) ||
-            !string.IsNullOrWhiteSpace(row.Phone) ||
-            !string.IsNullOrWhiteSpace(row.JobTitle) ||
-            row.HireDate.HasValue ||
-            !string.IsNullOrWhiteSpace(row.IsSalesperson) ||
-            !string.IsNullOrWhiteSpace(row.IsTechnician) ||
-            !string.IsNullOrWhiteSpace(row.IsCommissionEligible);
-    }
-
-
-    private int GetDataRowsCount()
-    {
-        return
-            _rows.Count(
-                IsNotEmptyRow);
-    }
-
-
-    private int GetInvalidRowsCount()
-    {
-        return
-            _rows.Count(
-                row =>
-                    IsNotEmptyRow(row) &&
-                    row.Errors.Count > 0);
-    }
-
-
-    private int GetValidRowsCount()
-    {
-        return
-            _rows.Count(
-                row =>
-                    IsNotEmptyRow(row) &&
-                    row.Errors.Count == 0);
-    }
-
-
-    private static bool IsYes(
-        string? value)
-    {
-        return
-            string.Equals(
-                value,
-                "نعم",
-                StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(
-                value,
-                "true",
-                StringComparison.OrdinalIgnoreCase);
-    }
-
-
-    private static string GetDateInputValue(
-        DateTime? value)
-    {
-        return
-            value.HasValue
-                ? value.Value.ToString("yyyy-MM-dd")
-                : string.Empty;
-    }
-
-
-    private static void AddError(
-        EmployeeBulkEntryRow row,
-        string field,
-        string message)
-    {
-        row.Errors.Add(
-            $"{field}: {message}");
-    }
-
-
-    private void ResetValidationAfterEdit(
-        EmployeeBulkEntryRow row)
-    {
-        row.Errors.Clear();
-
-        _validationPerformed = false;
-    }
-
-
-    private void ResetValidationState()
-    {
-        _validationPerformed = false;
-
-        foreach (var row in _rows)
-        {
-            row.Errors.Clear();
-        }
-    }
-
-
-    private void ClearValidationErrors()
-    {
-        foreach (var row in _rows)
-        {
-            row.Errors.Clear();
-        }
-    }
-
-
-    private static bool HasFieldError(
-        EmployeeBulkEntryRow row,
-        string field)
-    {
-        return
-            row.Errors.Any(
-                error =>
-                    error.StartsWith(
-                        field,
-                        StringComparison.OrdinalIgnoreCase) ||
-                    error.Contains(
-                        GetArabicFieldName(field),
-                        StringComparison.OrdinalIgnoreCase));
-    }
-
-
-    private static string? GetFieldError(
-        EmployeeBulkEntryRow row,
-        string field)
-    {
-        var arabicField =
-            GetArabicFieldName(field);
-
-        return
-            row.Errors.FirstOrDefault(
-                error =>
-                    error.StartsWith(
-                        field,
-                        StringComparison.OrdinalIgnoreCase) ||
-                    error.Contains(
-                        arabicField,
-                        StringComparison.OrdinalIgnoreCase));
-    }
-
-
-    private static string GetArabicFieldName(
-        string field)
-    {
-        return field switch
-        {
-            nameof(EmployeeBulkEntryRow.EmployeeCode)
-                => "رمز الموظف",
-
-            nameof(EmployeeBulkEntryRow.FirstName)
-                => "الاسم الأول",
-
-            nameof(EmployeeBulkEntryRow.LastName)
-                => "اسم العائلة",
-
-            nameof(EmployeeBulkEntryRow.Phone)
-                => "رقم الهاتف",
-
-            nameof(EmployeeBulkEntryRow.JobTitle)
-                => "المسمى الوظيفي",
-
-            nameof(EmployeeBulkEntryRow.HireDate)
-                => "تاريخ التوظيف",
-
-            _ => field
-        };
-    }
-
-
-    private string GetInputClass(
-        EmployeeBulkEntryRow row,
-        string field)
-    {
-        return
-            HasFieldError(row, field)
-                ? "employee-bulk-input employee-bulk-input-invalid"
-                : "employee-bulk-input";
-    }
-
-
-    // =========================================================
-    // Row Model
-    // =========================================================
-
-    private sealed class EmployeeBulkEntryRow
-    {
-        public string EmployeeCode { get; set; } = string.Empty;
-
-        public string FirstName { get; set; } = string.Empty;
-
-        public string LastName { get; set; } = string.Empty;
-
+        public string FirstName { get; set; } = "";
+        public string LastName { get; set; } = "";
         public string? Phone { get; set; }
-
-        public string? JobTitle { get; set; }
-
-        public DateTime? HireDate { get; set; }
-
-        public string IsSalesperson { get; set; } = "لا";
-
-        public string IsTechnician { get; set; } = "لا";
-
-        public string IsCommissionEligible { get; set; } = "لا";
-
-        public string IsActive { get; set; } = "نعم";
-
+        public string? JobTitleId { get; set; }
+        public DateOnly? HireDate { get; set; }
+        public bool IsCommissionEligible { get; set; }
+        public bool IsActive { get; set; } = true;
         public List<string> Errors { get; } = [];
     }
 }
