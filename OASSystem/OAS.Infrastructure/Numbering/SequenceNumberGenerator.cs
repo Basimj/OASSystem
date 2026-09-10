@@ -1,6 +1,6 @@
-﻿
 using System.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using OAS.Application.Abstractions.Numbering;
 using OAS.Infrastructure.Persistence;
 
@@ -14,33 +14,31 @@ public sealed class SequenceNumberGenerator(
         CancellationToken cancellationToken = default)
     {
         var sql = GetSequenceSql(sequenceName);
-
-        var connection =
-            dbContext.Database.GetDbConnection();
-
-        var shouldCloseConnection =
-            connection.State != ConnectionState.Open;
+        var connection = dbContext.Database.GetDbConnection();
+        var shouldCloseConnection = connection.State != ConnectionState.Open;
 
         if (shouldCloseConnection)
         {
-            await connection.OpenAsync(
-                cancellationToken);
+            await connection.OpenAsync(cancellationToken);
         }
 
         try
         {
-            await using var command =
-                connection.CreateCommand();
-
+            await using var command = connection.CreateCommand();
             command.CommandText = sql;
             command.CommandType = CommandType.Text;
 
-            var result =
-                await command.ExecuteScalarAsync(
-                    cancellationToken);
+            // The generator can run inside MediatR's TransactionBehavior. A raw
+            // DbCommand created from the DbContext connection must explicitly
+            // enlist in the current EF transaction or SqlClient rejects it.
+            if (dbContext.Database.CurrentTransaction is { } currentTransaction)
+            {
+                command.Transaction = currentTransaction.GetDbTransaction();
+            }
 
-            if (result is null ||
-                result == DBNull.Value)
+            var result = await command.ExecuteScalarAsync(cancellationToken);
+
+            if (result is null || result == DBNull.Value)
             {
                 throw new InvalidOperationException(
                     $"Sequence '{sequenceName}' did not return a value.");
@@ -57,8 +55,7 @@ public sealed class SequenceNumberGenerator(
         }
     }
 
-    private static string GetSequenceSql(
-        string sequenceName)
+    private static string GetSequenceSql(string sequenceName)
     {
         return sequenceName switch
         {
