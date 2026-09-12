@@ -28,11 +28,14 @@ public sealed class EmployeesWorkspaceState : IEmployeesWorkspaceState
         return tab;
     }
 
-    public EmployeeWorkspaceTabState CreateNewTab(int employeeNumber)
+    public EmployeeWorkspaceTabState CreateNewTab(string employeeCode)
     {
         var tab = new EmployeeWorkspaceTabState(null);
-        tab.InitializeNew(employeeNumber);
+
+        tab.InitializeNew(employeeCode);
+
         _editorTabs.Add(tab);
+
         return tab;
     }
 

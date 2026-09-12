@@ -76,10 +76,12 @@ public sealed class UsersWorkspaceStateTests
     private static UserDetailsDto CreateDetails(Guid id) => new(
         id,
         "admin",
+      
         "System",
         "Administrator",
         "System Administrator",
         "admin@gmail.com",
+          "EMP-00501",
         true,
         true,
         false,

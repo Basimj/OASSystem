@@ -4,12 +4,18 @@ namespace OAS.Domain.Features.Employees;
 
 public static class EmployeeCodeFormatter
 {
-    public static string Format(int employeeNumber, string? prefix = null, int minimumDigits = 0)
+    public static string Format(
+        long sequenceNumber,
+        string prefix = "EMP-",
+        int minimumDigits = 5)
     {
-        if (employeeNumber <= 0) return string.Empty;
-        var digits = minimumDigits > 0
-            ? employeeNumber.ToString($"D{minimumDigits}", CultureInfo.InvariantCulture)
-            : employeeNumber.ToString(CultureInfo.InvariantCulture);
-        return string.IsNullOrWhiteSpace(prefix) ? digits : $"{prefix.Trim()}{digits}";
+        if (sequenceNumber <= 0)
+            return string.Empty;
+
+        var digits = sequenceNumber.ToString(
+            $"D{minimumDigits}",
+            CultureInfo.InvariantCulture);
+
+        return $"{prefix.Trim()}{digits}";
     }
 }

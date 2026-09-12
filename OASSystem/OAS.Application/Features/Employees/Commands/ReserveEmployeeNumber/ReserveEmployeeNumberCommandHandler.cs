@@ -6,16 +6,27 @@ using OAS.Domain.Features.Employees;
 
 namespace OAS.Application.Features.Employees.Commands.ReserveEmployeeNumber;
 
-public sealed class ReserveEmployeeNumberCommandHandler(ISequenceNumberGenerator sequenceNumberGenerator)
+public sealed class ReserveEmployeeNumberCommandHandler(
+    ISequenceNumberGenerator sequenceNumberGenerator)
     : IRequestHandler<ReserveEmployeeNumberCommand, EmployeeNumberReservationDto>
 {
-    public async Task<EmployeeNumberReservationDto> Handle(ReserveEmployeeNumberCommand request, CancellationToken cancellationToken)
+    public async Task<EmployeeNumberReservationDto> Handle(
+        ReserveEmployeeNumberCommand request,
+        CancellationToken cancellationToken)
     {
-        var next = await sequenceNumberGenerator.NextAsync("EmployeeNumberSequence", cancellationToken);
-        if (next <= 0 || next > int.MaxValue)
-            throw new ConflictException("employee_number_exhausted", "Employee number sequence exceeded the supported range.");
+        var next = await sequenceNumberGenerator.NextAsync(
+            "EmployeeNumberSequence",
+            cancellationToken);
 
-        var number = checked((int)next);
-        return new EmployeeNumberReservationDto(number, EmployeeCodeFormatter.Format(number));
+        if (next <= 0)
+        {
+            throw new ConflictException(
+                "employee_code_exhausted",
+                "Employee code sequence exceeded the supported range.");
+        }
+
+        var employeeCode = EmployeeCodeFormatter.Format(next);
+
+        return new EmployeeNumberReservationDto(employeeCode);
     }
 }

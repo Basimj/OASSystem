@@ -144,7 +144,7 @@ public partial class Employees
                 PageNumber = Workspace.PageNumber,
                 PageSize = PageSize,
                 Search = Workspace.AppliedSearch,
-                SortBy = "EmployeeNumber",
+                SortBy = "EmployeeCode",
                 SortDirection = SortDirection.Ascending
             };
 
@@ -209,8 +209,10 @@ public partial class Employees
     {
         try
         {
-            var reservation = await EmployeeService.ReserveEmployeeNumberAsync();
-            var tab = Workspace.CreateNewTab(reservation.EmployeeNumber);
+            var reservation =
+                await EmployeeService.ReserveEmployeeNumberAsync();
+
+            var tab = Workspace.CreateNewTab(reservation.EmployeeCode);
             Workspace.ActiveTabId = tab.TabId;
             await InvokeAsync(StateHasChanged);
         }
@@ -227,7 +229,7 @@ public partial class Employees
             if (tab.IsNew)
             {
                 var reservation = await EmployeeService.ReserveEmployeeNumberAsync();
-                tab.InitializeNew(reservation.EmployeeNumber);
+                tab.InitializeNew(reservation.EmployeeCode);
             }
             else if (tab.EmployeeId is Guid employeeId)
                 tab.Load(await EmployeeService.GetByIdAsync(employeeId));
@@ -525,7 +527,7 @@ public partial class Employees
         tab.Form.IsCommissionEligible,
         tab.Form.IsActive,
         tab.Form.UserAccountId,
-        tab.Form.EmployeeNumber);
+        tab.Form.EmployeeCode);
 
     private static UpdateEmployeeRequest BuildUpdateRequest(EmployeeWorkspaceTabState tab, string rowVersion) => new(
         tab.Form.FirstName.Trim(),
@@ -615,9 +617,15 @@ public partial class Employees
             Snackbar.Error("أحد حقول العنوان يتجاوز الطول المسموح به.");
             return false;
         }
-        if (tab.Form.EmployeeNumber <= 0)
+        if (string.IsNullOrWhiteSpace(tab.Form.EmployeeCode))
         {
-            Snackbar.Error("تعذر حجز رقم الموظف. أغلق التبويبة وافتح موظفًا جديدًا مرة أخرى.");
+            Snackbar.Error("كود الموظف مطلوب.");
+            return false;
+        }
+
+        if (tab.Form.EmployeeCode.Trim().Length > 32)
+        {
+            Snackbar.Error("كود الموظف يجب ألا يتجاوز 32 حرفًا.");
             return false;
         }
         if (tab.Form.JobTitleId is null || tab.Form.JobTitleId == Guid.Empty)

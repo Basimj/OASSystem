@@ -2,7 +2,6 @@ namespace OAS.Contracts.Features.Employees;
 
 public sealed record EmployeeDto(
     Guid Id,
-    int EmployeeNumber,
     string EmployeeCode,
     string FirstName,
     string LastName,

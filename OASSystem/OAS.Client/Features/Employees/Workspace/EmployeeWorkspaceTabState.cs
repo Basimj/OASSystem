@@ -55,9 +55,10 @@ public sealed class EmployeeWorkspaceTabState
         }
     }
 
-    public void InitializeNew(int employeeNumber)
+    public void InitializeNew(string employeeCode)
     {
-        Form.Reset(employeeNumber);
+        Form.Reset(employeeCode);
+
         EmployeeId = null;
         RowVersion = null;
         HasPersistedPhoto = false;
@@ -85,7 +86,8 @@ public sealed class EmployeeWorkspaceTabState
         UserAccountUserName = employee.UserAccountUserName;
         UserAccountEmail = employee.UserAccountEmail;
 
-        Form.EmployeeNumber = employee.EmployeeNumber;
+        Form.EmployeeCode = employee.EmployeeCode;
+
         Form.FirstName = employee.FirstName;
         Form.LastName = employee.LastName;
         Form.Phone = employee.Phone ?? string.Empty;

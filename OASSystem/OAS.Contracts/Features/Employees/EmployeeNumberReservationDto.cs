@@ -1,3 +1,4 @@
 namespace OAS.Contracts.Features.Employees;
 
-public sealed record EmployeeNumberReservationDto(int EmployeeNumber, string EmployeeCode);
+public sealed record EmployeeNumberReservationDto(
+    string EmployeeCode);

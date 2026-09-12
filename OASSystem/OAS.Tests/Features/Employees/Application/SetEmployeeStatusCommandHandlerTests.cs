@@ -14,7 +14,7 @@ public sealed class SetEmployeeStatusCommandHandlerTests
     public async Task SetStatus_WorksRegardlessOfUserAccountLink(bool linked)
     {
         var employee = Employee.Create(
-            Guid.NewGuid(), 1, "A", "B", ContactInfo.Empty, Guid.NewGuid(), null, false, true,
+            Guid.NewGuid(), "EMP-00501", "A", "B", ContactInfo.Empty, Guid.NewGuid(), null, false, true,
             linked ? Guid.NewGuid() : null);
         var handler = new SetEmployeeStatusCommandHandler(new FakeEmployeeRepository(employee));
 

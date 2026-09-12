@@ -81,7 +81,10 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
             b.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("datetimeoffset");
             b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
-            b.Property<int>("EmployeeNumber").ValueGeneratedOnAdd().HasColumnType("int").HasDefaultValueSql("NEXT VALUE FOR [core].[EmployeeNumberSequence]");
+            b.Property<string>("EmployeeCode")
+      .IsRequired()
+      .HasMaxLength(32)
+      .HasColumnType("nvarchar(32)");
             b.Property<string>("FirstName").IsRequired().HasMaxLength(100).HasColumnType("nvarchar(100)");
             b.Property<DateOnly?>("HireDate").HasColumnType("date");
             b.Property<bool>("IsActive").HasColumnType("bit");
@@ -94,7 +97,9 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
             b.Property<Guid?>("UserAccountId").HasColumnType("uniqueidentifier");
             b.HasKey("Id");
-            b.HasIndex("EmployeeNumber").IsUnique().HasDatabaseName("UX_Employees_EmployeeNumber");
+            b.HasIndex("EmployeeCode")
+                .IsUnique()
+                .HasDatabaseName("UX_Employees_EmployeeCode");
             b.HasIndex("IsActive").HasDatabaseName("IX_Employees_IsActive");
             b.HasIndex("JobTitleId").HasDatabaseName("IX_Employees_JobTitleId");
             b.HasIndex("LastName", "FirstName").HasDatabaseName("IX_Employees_LastName_FirstName");

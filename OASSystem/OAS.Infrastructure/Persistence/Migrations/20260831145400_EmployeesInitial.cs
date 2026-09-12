@@ -23,8 +23,9 @@ BEGIN
     CREATE TABLE [hr].[Employees]
     (
         [Id] uniqueidentifier NOT NULL,
+
         [EmployeeCode] nvarchar(32) NOT NULL,
-        [NormalizedEmployeeCode] nvarchar(32) NOT NULL,
+
         [FirstName] nvarchar(100) NOT NULL,
         [LastName] nvarchar(100) NOT NULL,
         [Phone] nvarchar(32) NULL,
@@ -70,10 +71,10 @@ IF NOT EXISTS
     SELECT 1
     FROM sys.indexes
     WHERE object_id = OBJECT_ID(N'[hr].[Employees]')
-      AND name = N'UX_Employees_NormalizedEmployeeCode'
+      AND name = N'UX_Employees_EmployeeCode'
 )
-    CREATE UNIQUE INDEX [UX_Employees_NormalizedEmployeeCode]
-        ON [hr].[Employees]([NormalizedEmployeeCode]);
+    CREATE UNIQUE INDEX [UX_Employees_EmployeeCode]
+        ON [hr].[Employees]([EmployeeCode]);
 """);
 
         migrationBuilder.Sql("""

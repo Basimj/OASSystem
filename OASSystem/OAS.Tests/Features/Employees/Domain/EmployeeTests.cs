@@ -9,20 +9,27 @@ namespace OAS.Tests.Features.Employees.Domain;
 [TestFixture]
 public sealed class EmployeeTests
 {
-    private static readonly Guid JobTitleId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    private static readonly Guid JobTitleId =
+        Guid.Parse("11111111-1111-1111-1111-111111111111");
 
     [Test]
     public void Create_ValidEmployee_SetsBusinessAndContactFields()
     {
         var id = Guid.NewGuid();
+
         var contact = ContactInfo.Create(
             " 777123456 ",
             " employee@example.com ",
-            Address.Create(" Yemen ", " Sana'a ", " Sana'a ", " 10001 ", " Main Street "));
+            Address.Create(
+                " Yemen ",
+                " Sana'a ",
+                " Sana'a ",
+                " 10001 ",
+                " Main Street "));
 
         var employee = Employee.Create(
             id,
-            17,
+            "EMP-00501",
             " Ahmed ",
             " Ali ",
             contact,
@@ -34,68 +41,165 @@ public sealed class EmployeeTests
         Assert.Multiple(() =>
         {
             Assert.That(employee.Id, Is.EqualTo(id));
-            Assert.That(employee.EmployeeNumber, Is.EqualTo(17));
-            Assert.That(employee.EmployeeCode, Is.EqualTo("17"));
+            Assert.That(employee.EmployeeCode, Is.EqualTo("EMP-00501"));
             Assert.That(employee.FirstName, Is.EqualTo("Ahmed"));
             Assert.That(employee.LastName, Is.EqualTo("Ali"));
-            Assert.That(employee.ContactInfo.Phone, Is.EqualTo("777123456"));
-            Assert.That(employee.ContactInfo.Email, Is.EqualTo("employee@example.com"));
-            Assert.That(employee.ContactInfo.Address.Country, Is.EqualTo("Yemen"));
-            Assert.That(employee.ContactInfo.Address.City, Is.EqualTo("Sana'a"));
-            Assert.That(employee.JobTitleId, Is.EqualTo(JobTitleId));
-            Assert.That(employee.IsCommissionEligible, Is.True);
-            Assert.That(employee.IsActive, Is.True);
+
+            Assert.That(
+                employee.ContactInfo.Phone,
+                Is.EqualTo("777123456"));
+
+            Assert.That(
+                employee.ContactInfo.Email,
+                Is.EqualTo("employee@example.com"));
+
+            Assert.That(
+                employee.ContactInfo.Address.Country,
+                Is.EqualTo("Yemen"));
+
+            Assert.That(
+                employee.ContactInfo.Address.City,
+                Is.EqualTo("Sana'a"));
+
+            Assert.That(
+                employee.JobTitleId,
+                Is.EqualTo(JobTitleId));
+
+            Assert.That(
+                employee.IsCommissionEligible,
+                Is.True);
+
+            Assert.That(
+                employee.IsActive,
+                Is.True);
         });
     }
 
     [TestCase("", "Ali")]
     [TestCase("Ahmed", "")]
-    public void Create_MissingRequiredName_Throws(string firstName, string lastName)
+    public void Create_MissingRequiredName_Throws(
+        string firstName,
+        string lastName)
     {
-        Assert.Throws<DomainException>(() => Employee.Create(
-            Guid.NewGuid(), 1, firstName, lastName, ContactInfo.Empty, JobTitleId, null, false, true));
+        Assert.Throws<DomainException>(() =>
+            Employee.Create(
+                Guid.NewGuid(),
+                "EMP-00501",
+                firstName,
+                lastName,
+                ContactInfo.Empty,
+                JobTitleId,
+                null,
+                false,
+                true));
     }
 
     [Test]
-    public void Create_InvalidEmployeeNumber_Throws()
+    public void Create_MissingEmployeeCode_Throws()
     {
-        Assert.Throws<DomainException>(() => Employee.Create(
-            Guid.NewGuid(), 0, "Ahmed", "Ali", ContactInfo.Empty, JobTitleId, null, false, true));
+        Assert.Throws<DomainException>(() =>
+            Employee.Create(
+                Guid.NewGuid(),
+                "",
+                "Ahmed",
+                "Ali",
+                ContactInfo.Empty,
+                JobTitleId,
+                null,
+                false,
+                true));
+    }
+
+    [Test]
+    public void Create_EmployeeCodeTooLong_Throws()
+    {
+        var employeeCode = new string('A', 33);
+
+        Assert.Throws<DomainException>(() =>
+            Employee.Create(
+                Guid.NewGuid(),
+                employeeCode,
+                "Ahmed",
+                "Ali",
+                ContactInfo.Empty,
+                JobTitleId,
+                null,
+                false,
+                true));
     }
 
     [Test]
     public void Create_MissingJobTitle_Throws()
     {
-        Assert.Throws<DomainException>(() => Employee.Create(
-            Guid.NewGuid(), 1, "Ahmed", "Ali", ContactInfo.Empty, Guid.Empty, null, false, true));
+        Assert.Throws<DomainException>(() =>
+            Employee.Create(
+                Guid.NewGuid(),
+                "EMP-00501",
+                "Ahmed",
+                "Ali",
+                ContactInfo.Empty,
+                Guid.Empty,
+                null,
+                false,
+                true));
     }
 
     [Test]
     public void UpdateDetails_LinkedEmployee_RemainsEditable()
     {
         var employee = CreateEmployee();
+
         var userId = Guid.NewGuid();
         var newTitleId = Guid.NewGuid();
+
         employee.LinkUserAccount(userId);
 
         employee.UpdateDetails(
             "Mohammed",
             "Hassan",
-            ContactInfo.Create("771111111", "updated@example.com", Address.Create("Yemen", "Aden", "Aden", null, "Crater")),
+            ContactInfo.Create(
+                "771111111",
+                "updated@example.com",
+                Address.Create(
+                    "Yemen",
+                    "Aden",
+                    "Aden",
+                    null,
+                    "Crater")),
             newTitleId,
             new DateOnly(2026, 2, 1),
             isCommissionEligible: false,
             isActive: false);
-        employee.SetPhoto("Resources/Employees/Photos/test.jpg");
+
+        employee.SetPhoto(
+            "Resources/Employees/Photos/test.jpg");
 
         Assert.Multiple(() =>
         {
-            Assert.That(employee.FirstName, Is.EqualTo("Mohammed"));
-            Assert.That(employee.ContactInfo.Phone, Is.EqualTo("771111111"));
-            Assert.That(employee.JobTitleId, Is.EqualTo(newTitleId));
-            Assert.That(employee.IsActive, Is.False);
-            Assert.That(employee.Photo, Is.EqualTo("Resources/Employees/Photos/test.jpg"));
-            Assert.That(employee.UserAccountId, Is.EqualTo(userId));
+            Assert.That(
+                employee.FirstName,
+                Is.EqualTo("Mohammed"));
+
+            Assert.That(
+                employee.ContactInfo.Phone,
+                Is.EqualTo("771111111"));
+
+            Assert.That(
+                employee.JobTitleId,
+                Is.EqualTo(newTitleId));
+
+            Assert.That(
+                employee.IsActive,
+                Is.False);
+
+            Assert.That(
+                employee.Photo,
+                Is.EqualTo(
+                    "Resources/Employees/Photos/test.jpg"));
+
+            Assert.That(
+                employee.UserAccountId,
+                Is.EqualTo(userId));
         });
     }
 
@@ -103,13 +207,49 @@ public sealed class EmployeeTests
     public void SetUserAccountLink_AfterInitialLink_CannotChangeOrRemoveLink()
     {
         var employee = CreateEmployee();
+
         var userId = Guid.NewGuid();
+
         employee.SetUserAccountLink(userId);
 
-        Assert.That(employee.UserAccountId, Is.EqualTo(userId));
-        Assert.DoesNotThrow(() => employee.SetUserAccountLink(userId));
-        Assert.Throws<DomainException>(() => employee.SetUserAccountLink(Guid.NewGuid()));
-        Assert.Throws<DomainException>(() => employee.SetUserAccountLink(null));
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                employee.UserAccountId,
+                Is.EqualTo(userId));
+
+            Assert.DoesNotThrow(() =>
+                employee.SetUserAccountLink(userId));
+
+            Assert.Throws<DomainException>(() =>
+                employee.SetUserAccountLink(Guid.NewGuid()));
+
+            Assert.Throws<DomainException>(() =>
+                employee.SetUserAccountLink(null));
+        });
+    }
+
+    [Test]
+    public void EmployeeCodeFormatter_FormatsEmployeeCode()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                EmployeeCodeFormatter.Format(1),
+                Is.EqualTo("EMP-00001"));
+
+            Assert.That(
+                EmployeeCodeFormatter.Format(42),
+                Is.EqualTo("EMP-00042"));
+
+            Assert.That(
+                EmployeeCodeFormatter.Format(123),
+                Is.EqualTo("EMP-00123"));
+
+            Assert.That(
+                EmployeeCodeFormatter.Format(700),
+                Is.EqualTo("EMP-00700"));
+        });
     }
 
     [Test]
@@ -117,19 +257,49 @@ public sealed class EmployeeTests
     {
         Assert.Multiple(() =>
         {
-            Assert.That(EmployeeCodeFormatter.Format(42), Is.EqualTo("42"));
-            Assert.That(EmployeeCodeFormatter.Format(42, "EMP-", 5), Is.EqualTo("EMP-00042"));
+            Assert.That(
+                EmployeeCodeFormatter.Format(
+                    42,
+                    "STAFF-",
+                    4),
+                Is.EqualTo("STAFF-0042"));
+
+            Assert.That(
+                EmployeeCodeFormatter.Format(
+                    42,
+                    "EMP-",
+                    5),
+                Is.EqualTo("EMP-00042"));
         });
     }
 
-    private static Employee CreateEmployee() => Employee.Create(
-        Guid.NewGuid(),
-        1,
-        "Ahmed",
-        "Ali",
-        ContactInfo.Create("777123456", null, Address.Empty),
-        JobTitleId,
-        new DateOnly(2026, 1, 10),
-        isCommissionEligible: true,
-        isActive: true);
+    [Test]
+    public void EmployeeCodeFormatter_InvalidNumber_ReturnsEmpty()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                EmployeeCodeFormatter.Format(0),
+                Is.EqualTo(string.Empty));
+
+            Assert.That(
+                EmployeeCodeFormatter.Format(-1),
+                Is.EqualTo(string.Empty));
+        });
+    }
+
+    private static Employee CreateEmployee() =>
+        Employee.Create(
+            Guid.NewGuid(),
+            "EMP-00501",
+            "Ahmed",
+            "Ali",
+            ContactInfo.Create(
+                "777123456",
+                null,
+                Address.Empty),
+            JobTitleId,
+            new DateOnly(2026, 1, 10),
+            isCommissionEligible: true,
+            isActive: true);
 }

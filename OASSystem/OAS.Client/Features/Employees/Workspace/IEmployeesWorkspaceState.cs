@@ -16,7 +16,7 @@ public interface IEmployeesWorkspaceState
     IReadOnlyList<EmployeeWorkspaceTabState> EditorTabs { get; }
     EmployeeWorkspaceTabState? ActiveEditorTab { get; }
     EmployeeWorkspaceTabState GetOrCreateEmployeeTab(Guid employeeId);
-    EmployeeWorkspaceTabState CreateNewTab(int employeeNumber);
+    EmployeeWorkspaceTabState CreateNewTab(string employeeCode);
     EmployeeWorkspaceTabState? FindEditorTab(Guid tabId);
     bool RemoveEditorTab(Guid tabId);
     void ResetList();
