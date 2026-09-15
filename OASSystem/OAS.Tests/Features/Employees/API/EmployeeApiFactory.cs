@@ -39,17 +39,21 @@ public sealed class EmployeeApiFactory
 
                 config.AddInMemoryCollection(settings);
             });
+
         builder.ConfigureTestServices(services =>
         {
-            services.AddAuthentication(options =>
-            {
-                options.DefaultAuthenticateScheme = "Test";
-                options.DefaultChallengeScheme = "Test";
-                options.DefaultScheme = "Test";
-            })
-            .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(
-                "Test",
-                _ => { });
+            services
+                .AddAuthentication(options =>
+                {
+                    options.DefaultAuthenticateScheme = "Test";
+                    options.DefaultChallengeScheme = "Test";
+                    options.DefaultScheme = "Test";
+                })
+                .AddScheme<
+                    AuthenticationSchemeOptions,
+                    TestAuthenticationHandler>(
+                    "Test",
+                    _ => { });
         });
     }
 }

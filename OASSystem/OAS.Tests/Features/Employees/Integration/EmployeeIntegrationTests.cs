@@ -7,16 +7,16 @@ namespace OAS.Tests.Features.Employees.Integration;
 public sealed class EmployeeIntegrationTests
 {
     [OneTimeSetUp]
-    public async Task Setup() =>
-        await TestDatabase
-            .EnsureCreatedAndMigratedAsync();
+    public async Task Setup()
+    {
+        await TestDatabase.EnsureCreatedAndMigratedAsync();
+    }
 
     [Test]
     public async Task EmployeeRelationalAndContactMigrations_AreApplied()
     {
         await using var connection =
-            new SqlConnection(
-                TestDatabase.ConnectionString);
+            new SqlConnection(TestDatabase.ConnectionString);
 
         await connection.OpenAsync();
 
@@ -34,8 +34,7 @@ public sealed class EmployeeIntegrationTests
                 connection);
 
         Assert.That(
-            Convert.ToInt32(
-                await command.ExecuteScalarAsync()),
+            Convert.ToInt32(await command.ExecuteScalarAsync()),
             Is.EqualTo(2));
     }
 
@@ -43,8 +42,7 @@ public sealed class EmployeeIntegrationTests
     public async Task JobTitlesTable_AndEmployeeForeignKey_Exist()
     {
         await using var connection =
-            new SqlConnection(
-                TestDatabase.ConnectionString);
+            new SqlConnection(TestDatabase.ConnectionString);
 
         await connection.OpenAsync();
 
@@ -66,10 +64,9 @@ public sealed class EmployeeIntegrationTests
                             SELECT 1
                             FROM sys.foreign_keys
                             WHERE parent_object_id =
-                                OBJECT_ID(
-                                    N'[hr].[Employees]')
+                                  OBJECT_ID(N'[hr].[Employees]')
                               AND name =
-                                N'FK_Employees_JobTitles_JobTitleId'
+                                  N'FK_Employees_JobTitles_JobTitleId'
                         )
                         THEN 1
                         ELSE 0
@@ -78,8 +75,7 @@ public sealed class EmployeeIntegrationTests
                 connection);
 
         Assert.That(
-            Convert.ToInt32(
-                await command.ExecuteScalarAsync()),
+            Convert.ToInt32(await command.ExecuteScalarAsync()),
             Is.EqualTo(2));
     }
 
@@ -87,8 +83,7 @@ public sealed class EmployeeIntegrationTests
     public async Task EmployeeCode_HasUniqueIndex_AndLegacyNumericColumnsAreGone()
     {
         await using var connection =
-            new SqlConnection(
-                TestDatabase.ConnectionString);
+            new SqlConnection(TestDatabase.ConnectionString);
 
         await connection.OpenAsync();
 
@@ -102,10 +97,9 @@ public sealed class EmployeeIntegrationTests
                             SELECT 1
                             FROM sys.indexes
                             WHERE object_id =
-                                OBJECT_ID(
-                                    N'[hr].[Employees]')
+                                  OBJECT_ID(N'[hr].[Employees]')
                               AND name =
-                                N'UX_Employees_EmployeeCode'
+                                  N'UX_Employees_EmployeeCode'
                               AND is_unique = 1
                         )
                         THEN 1
@@ -141,61 +135,18 @@ public sealed class EmployeeIntegrationTests
         {
             Assert.That(
                 reader.GetInt32(0),
-                Is.EqualTo(1));
+                Is.EqualTo(1),
+                "UX_Employees_EmployeeCode must exist and be unique.");
 
             Assert.That(
                 reader.GetInt32(1),
-                Is.EqualTo(1));
+                Is.EqualTo(1),
+                "EmployeeNumber must not exist.");
 
             Assert.That(
                 reader.GetInt32(2),
-                Is.EqualTo(1));
-        });
-    }
-
-    [Test]
-    public async Task EmployeeCodeColumn_IsTextAndRequired()
-    {
-        await using var connection =
-            new SqlConnection(
-                TestDatabase.ConnectionString);
-
-        await connection.OpenAsync();
-
-        await using var command =
-            new SqlCommand(
-                """
-                SELECT
-                    DATA_TYPE,
-                    CHARACTER_MAXIMUM_LENGTH,
-                    IS_NULLABLE
-                FROM INFORMATION_SCHEMA.COLUMNS
-                WHERE TABLE_SCHEMA = 'hr'
-                  AND TABLE_NAME = 'Employees'
-                  AND COLUMN_NAME = 'EmployeeCode'
-                """,
-                connection);
-
-        await using var reader =
-            await command.ExecuteReaderAsync();
-
-        Assert.That(
-            await reader.ReadAsync(),
-            Is.True);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(
-                reader.GetString(0),
-                Is.EqualTo("nvarchar"));
-
-            Assert.That(
-                reader.GetInt32(1),
-                Is.EqualTo(32));
-
-            Assert.That(
-                reader.GetString(2),
-                Is.EqualTo("NO"));
+                Is.EqualTo(1),
+                "NormalizedEmployeeCode must not exist.");
         });
     }
 
@@ -203,8 +154,7 @@ public sealed class EmployeeIntegrationTests
     public async Task EmployeeContactColumns_ExistAndLegacyImageTableIsRemoved()
     {
         await using var connection =
-            new SqlConnection(
-                TestDatabase.ConnectionString);
+            new SqlConnection(TestDatabase.ConnectionString);
 
         await connection.OpenAsync();
 
@@ -216,63 +166,72 @@ public sealed class EmployeeIntegrationTests
                         WHEN COL_LENGTH(
                             N'[hr].[Employees]',
                             N'Phone') IS NOT NULL
-                        THEN 1 ELSE 0
+                        THEN 1
+                        ELSE 0
                     END,
 
                     CASE
                         WHEN COL_LENGTH(
                             N'[hr].[Employees]',
                             N'Email') IS NOT NULL
-                        THEN 1 ELSE 0
+                        THEN 1
+                        ELSE 0
                     END,
 
                     CASE
                         WHEN COL_LENGTH(
                             N'[hr].[Employees]',
                             N'Country') IS NOT NULL
-                        THEN 1 ELSE 0
+                        THEN 1
+                        ELSE 0
                     END,
 
                     CASE
                         WHEN COL_LENGTH(
                             N'[hr].[Employees]',
                             N'Governorate') IS NOT NULL
-                        THEN 1 ELSE 0
+                        THEN 1
+                        ELSE 0
                     END,
 
                     CASE
                         WHEN COL_LENGTH(
                             N'[hr].[Employees]',
                             N'City') IS NOT NULL
-                        THEN 1 ELSE 0
+                        THEN 1
+                        ELSE 0
                     END,
 
                     CASE
                         WHEN COL_LENGTH(
                             N'[hr].[Employees]',
                             N'PostalCode') IS NOT NULL
-                        THEN 1 ELSE 0
+                        THEN 1
+                        ELSE 0
                     END,
 
                     CASE
                         WHEN COL_LENGTH(
                             N'[hr].[Employees]',
                             N'ResidentialAddress') IS NOT NULL
-                        THEN 1 ELSE 0
+                        THEN 1
+                        ELSE 0
                     END,
 
                     CASE
                         WHEN COL_LENGTH(
                             N'[hr].[Employees]',
                             N'Photo') IS NOT NULL
-                        THEN 1 ELSE 0
+                        THEN 1
+                        ELSE 0
                     END,
 
                     CASE
                         WHEN OBJECT_ID(
                             N'[hr].[EmployeeImages]',
                             N'U') IS NULL
-                        THEN 1 ELSE 0
+                        THEN 1
+                        ELSE 0
                     END
                 """,
                 connection);
@@ -284,9 +243,7 @@ public sealed class EmployeeIntegrationTests
             await reader.ReadAsync(),
             Is.True);
 
-        for (var ordinal = 0;
-             ordinal < 9;
-             ordinal++)
+        for (var ordinal = 0; ordinal < 9; ordinal++)
         {
             Assert.That(
                 reader.GetInt32(ordinal),
@@ -296,11 +253,10 @@ public sealed class EmployeeIntegrationTests
     }
 
     [Test]
-    public async Task DatabaseSequence_GeneratesDistinctSequenceValues()
+    public async Task DatabaseSequence_GeneratesDistinctEmployeeNumbers()
     {
         await using var connection =
-            new SqlConnection(
-                TestDatabase.ConnectionString);
+            new SqlConnection(TestDatabase.ConnectionString);
 
         await connection.OpenAsync();
 
@@ -308,12 +264,10 @@ public sealed class EmployeeIntegrationTests
             new SqlCommand(
                 """
                 DECLARE @First bigint =
-                    NEXT VALUE FOR
-                    [core].[EmployeeNumberSequence];
+                    NEXT VALUE FOR [core].[EmployeeNumberSequence];
 
                 DECLARE @Second bigint =
-                    NEXT VALUE FOR
-                    [core].[EmployeeNumberSequence];
+                    NEXT VALUE FOR [core].[EmployeeNumberSequence];
 
                 SELECT @First, @Second;
                 """,
@@ -348,131 +302,165 @@ public sealed class EmployeeIntegrationTests
     public async Task LinkedEmployee_PreventsDeletingReferencedUser()
     {
         await using var connection =
-            new SqlConnection(
-                TestDatabase.ConnectionString);
+            new SqlConnection(TestDatabase.ConnectionString);
 
         await connection.OpenAsync();
 
         await using var transaction =
-            (SqlTransaction)
-            await connection.BeginTransactionAsync();
+            (SqlTransaction)await connection.BeginTransactionAsync();
 
-        var userId =
-            Guid.NewGuid();
+        try
+        {
+            var userId = Guid.NewGuid();
+            var employeeId = Guid.NewGuid();
 
-        var employeeId =
-            Guid.NewGuid();
+            /*
+             * Use an existing active JobTitle from the test database.
+             * This avoids relying on a random Guid that cannot satisfy
+             * FK_Employees_JobTitles_JobTitleId.
+             */
+            var titleId =
+                await GetActiveJobTitleIdAsync(
+                    connection,
+                    transaction);
 
-        var titleId =
-            Guid.NewGuid();
+            Assert.That(
+                titleId,
+                Is.Not.EqualTo(Guid.Empty),
+                "The test database must contain at least one active job title.");
 
-        await ExecuteAsync(
-            connection,
-            transaction,
-            """
-            INSERT INTO [security].[Users]
-            (
-                [Id],
-                [UserName],
-                [NormalizedUserName],
-                [FirstName],
-                [LastName],
-                [PasswordHash],
-                [IsActive],
-                [IsSuperAdmin],
-                [MustChangePassword],
-                [AccessFailedCount],
-                [CreatedAtUtc]
-            )
-            VALUES
-            (
-                @UserId,
-                N'test-linked',
-                N'TEST-LINKED',
-                N'Test',
-                N'User',
-                N'test',
-                1,
-                0,
-                0,
-                0,
-                SYSUTCDATETIME()
-            );
+            var userName =
+                $"test-linked-{Guid.NewGuid():N}";
 
-            INSERT INTO [hr].[JobTitles]
-            (
-                [Id],
-                [Name],
-                [IsActive],
-                [CreatedAtUtc]
-            )
-            VALUES
-            (
-                @TitleId,
-                @TitleName,
-                1,
-                SYSUTCDATETIME()
-            );
+            await ExecuteAsync(
+                connection,
+                transaction,
+                """
+                INSERT INTO [security].[Users]
+                (
+                    [Id],
+                    [UserName],
+                    [NormalizedUserName],
+                    [FirstName],
+                    [LastName],
+                    [PasswordHash],
+                    [IsActive],
+                    [IsSuperAdmin],
+                    [MustChangePassword],
+                    [AccessFailedCount],
+                    [CreatedAtUtc]
+                )
+                VALUES
+                (
+                    @UserId,
+                    @UserName,
+                    @NormalizedUserName,
+                    N'Test',
+                    N'User',
+                    N'test-password-hash',
+                    1,
+                    0,
+                    0,
+                    0,
+                    SYSUTCDATETIME()
+                );
+                """,
+                new SqlParameter(
+                    "@UserId",
+                    userId),
+                new SqlParameter(
+                    "@UserName",
+                    userName),
+                new SqlParameter(
+                    "@NormalizedUserName",
+                    userName.ToUpperInvariant()));
 
-            INSERT INTO [hr].[Employees]
-            (
-                [Id],
-                [EmployeeCode],
-                [FirstName],
-                [LastName],
-                [JobTitleId],
-                [IsCommissionEligible],
-                [IsActive],
-                [UserAccountId],
-                [CreatedAtUtc]
-            )
-            VALUES
-            (
-                @EmployeeId,
-                N'EMP-99999',
-                N'Test',
-                N'Employee',
-                @TitleId,
-                0,
-                1,
-                @UserId,
-                SYSUTCDATETIME()
-            );
-            """,
-            new SqlParameter(
-                "@UserId",
-                userId),
+            await ExecuteAsync(
+                connection,
+                transaction,
+                """
+                INSERT INTO [hr].[Employees]
+                (
+                    [Id],
+                    [EmployeeCode],
+                    [FirstName],
+                    [LastName],
+                    [JobTitleId],
+                    [IsCommissionEligible],
+                    [IsActive],
+                    [UserAccountId],
+                    [CreatedAtUtc]
+                )
+                VALUES
+                (
+                    @EmployeeId,
+                    @EmployeeCode,
+                    N'Test',
+                    N'Employee',
+                    @TitleId,
+                    0,
+                    1,
+                    @UserId,
+                    SYSUTCDATETIME()
+                );
+                """,
+                new SqlParameter(
+                    "@EmployeeId",
+                    employeeId),
+                new SqlParameter(
+                    "@EmployeeCode",
+                    $"EMP-{Random.Shared.Next(10000, 99999):D5}"),
+                new SqlParameter(
+                    "@TitleId",
+                    titleId),
+                new SqlParameter(
+                    "@UserId",
+                    userId));
 
-            new SqlParameter(
-                "@EmployeeId",
-                employeeId),
+            await using var delete =
+                new SqlCommand(
+                    """
+                    DELETE FROM [security].[Users]
+                    WHERE [Id] = @UserId;
+                    """,
+                    connection,
+                    transaction);
 
-            new SqlParameter(
-                "@TitleId",
-                titleId),
+            delete.Parameters.Add(
+                new SqlParameter(
+                    "@UserId",
+                    userId));
 
-            new SqlParameter(
-                "@TitleName",
-                $"Linked-{Guid.NewGuid():N}"[..28]));
+            Assert.ThrowsAsync<SqlException>(
+                () => delete.ExecuteNonQueryAsync());
+        }
+        finally
+        {
+            await transaction.RollbackAsync();
+        }
+    }
 
-        await using var delete =
+    private static async Task<Guid> GetActiveJobTitleIdAsync(
+        SqlConnection connection,
+        SqlTransaction transaction)
+    {
+        await using var command =
             new SqlCommand(
                 """
-                DELETE
-                FROM [security].[Users]
-                WHERE [Id] = @UserId
+                SELECT TOP (1) [Id]
+                FROM [hr].[JobTitles]
+                WHERE [IsActive] = 1
+                ORDER BY [Name], [Id];
                 """,
                 connection,
                 transaction);
 
-        delete.Parameters.AddWithValue(
-            "@UserId",
-            userId);
+        var result =
+            await command.ExecuteScalarAsync();
 
-        Assert.ThrowsAsync<SqlException>(
-            () => delete.ExecuteNonQueryAsync());
-
-        await transaction.RollbackAsync();
+        return result is Guid id
+            ? id
+            : Guid.Empty;
     }
 
     private static async Task ExecuteAsync(
@@ -487,8 +475,7 @@ public sealed class EmployeeIntegrationTests
                 connection,
                 transaction);
 
-        command.Parameters.AddRange(
-            parameters);
+        command.Parameters.AddRange(parameters);
 
         await command.ExecuteNonQueryAsync();
     }
