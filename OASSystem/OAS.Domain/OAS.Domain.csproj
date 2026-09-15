@@ -9,4 +9,9 @@
     <RootNamespace>OAS.Domain</RootNamespace>
     <AssemblyName>OAS.Domain</AssemblyName>
   </PropertyGroup>
+  <ItemGroup>
+    <Folder Include="Accounting\Events\" />
+    <Folder Include="Accounting\ValueObjects\" />
+    <Folder Include="Accounting\Rules\" />
+  </ItemGroup>
 </Project>
