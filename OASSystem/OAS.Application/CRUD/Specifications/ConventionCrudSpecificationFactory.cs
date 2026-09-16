@@ -6,7 +6,7 @@ using OAS.Contracts.Common.Pagination;
 
 namespace OAS.Application.CRUD.Specifications;
 
-public sealed class ConventionCrudSpecificationFactory<TEntity> : ICrudSpecificationFactory<TEntity>
+public  class ConventionCrudSpecificationFactory<TEntity> : ICrudSpecificationFactory<TEntity>
 {
     public ISpecification<TEntity> CreatePageSpecification(PageRequest request)
     {

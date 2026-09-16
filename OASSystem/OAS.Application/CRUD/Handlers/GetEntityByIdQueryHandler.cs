@@ -7,7 +7,7 @@ using OAS.Domain.Common.Entities;
 
 namespace OAS.Application.CRUD.Handlers;
 
-public sealed class GetEntityByIdQueryHandler<TEntity, TKey, TReadDto, TCreateDto, TUpdateDto>(
+public  class GetEntityByIdQueryHandler<TEntity, TKey, TReadDto, TCreateDto, TUpdateDto>(
     IReadRepository<TEntity, TKey> repository,
     ICrudMapper<TEntity, TKey, TReadDto, TCreateDto, TUpdateDto> mapper)
     : IRequestHandler<GetEntityByIdQuery<TEntity, TKey, TReadDto>, TReadDto>

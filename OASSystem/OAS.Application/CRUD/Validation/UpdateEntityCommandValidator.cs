@@ -4,7 +4,7 @@ using OAS.Domain.Common.Entities;
 
 namespace OAS.Application.CRUD.Validation;
 
-public sealed class UpdateEntityCommandValidator<TEntity, TKey, TUpdateDto> : AbstractValidator<UpdateEntityCommand<TEntity, TKey, TUpdateDto>>
+public  class UpdateEntityCommandValidator<TEntity, TKey, TUpdateDto> : AbstractValidator<UpdateEntityCommand<TEntity, TKey, TUpdateDto>>
     where TEntity : Entity<TKey> where TKey : notnull
 {
     public UpdateEntityCommandValidator(IEnumerable<IValidator<TUpdateDto>> validators)

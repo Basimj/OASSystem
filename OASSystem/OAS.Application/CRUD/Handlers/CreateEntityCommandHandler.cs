@@ -6,7 +6,7 @@ using OAS.Domain.Common.Entities;
 
 namespace OAS.Application.CRUD.Handlers;
 
-public sealed class CreateEntityCommandHandler<TEntity, TKey, TCreateDto, TReadDto, TUpdateDto>(
+public  class CreateEntityCommandHandler<TEntity, TKey, TCreateDto, TReadDto, TUpdateDto>(
     IRepository<TEntity, TKey> repository,
     ICrudMapper<TEntity, TKey, TReadDto, TCreateDto, TUpdateDto> mapper)
     : IRequestHandler<CreateEntityCommand<TEntity, TKey, TCreateDto>, TEntity>

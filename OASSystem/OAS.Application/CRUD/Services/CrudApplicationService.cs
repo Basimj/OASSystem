@@ -8,7 +8,7 @@ using OAS.Domain.Common.Entities;
 
 namespace OAS.Application.CRUD.Services;
 
-public sealed class CrudApplicationService<TEntity, TKey, TReadDto, TCreateDto, TUpdateDto>(
+public  class CrudApplicationService<TEntity, TKey, TReadDto, TCreateDto, TUpdateDto>(
     ISender sender,
     ICrudMapper<TEntity, TKey, TReadDto, TCreateDto, TUpdateDto> mapper)
     : ICrudApplicationService<TKey, TReadDto, TCreateDto, TUpdateDto>

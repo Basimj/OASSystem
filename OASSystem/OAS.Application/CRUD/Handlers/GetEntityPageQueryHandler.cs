@@ -8,7 +8,7 @@ using OAS.Domain.Common.Entities;
 
 namespace OAS.Application.CRUD.Handlers;
 
-public sealed class GetEntityPageQueryHandler<TEntity, TKey, TReadDto, TCreateDto, TUpdateDto>(
+public  class GetEntityPageQueryHandler<TEntity, TKey, TReadDto, TCreateDto, TUpdateDto>(
     IReadRepository<TEntity, TKey> repository,
     ICrudSpecificationFactory<TEntity> specificationFactory,
     ICrudMapper<TEntity, TKey, TReadDto, TCreateDto, TUpdateDto> mapper)

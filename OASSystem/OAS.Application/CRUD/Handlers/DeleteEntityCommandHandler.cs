@@ -8,7 +8,7 @@ using OAS.Domain.Common.Interfaces;
 
 namespace OAS.Application.CRUD.Handlers;
 
-public sealed class DeleteEntityCommandHandler<TEntity, TKey>(IRepository<TEntity, TKey> repository, TimeProvider timeProvider, ICurrentUser currentUser)
+public  class DeleteEntityCommandHandler<TEntity, TKey>(IRepository<TEntity, TKey> repository, TimeProvider timeProvider, ICurrentUser currentUser)
     : IRequestHandler<DeleteEntityCommand<TEntity, TKey>>
     where TEntity : Entity<TKey> where TKey : notnull
 {

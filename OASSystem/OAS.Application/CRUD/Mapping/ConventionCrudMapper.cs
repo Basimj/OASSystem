@@ -3,7 +3,7 @@ using OAS.Domain.Common.Entities;
 
 namespace OAS.Application.CRUD.Mapping;
 
-public sealed class ConventionCrudMapper<TEntity, TKey, TReadDto, TCreateDto, TUpdateDto>
+public  class ConventionCrudMapper<TEntity, TKey, TReadDto, TCreateDto, TUpdateDto>
     : ICrudMapper<TEntity, TKey, TReadDto, TCreateDto, TUpdateDto>
     where TEntity : Entity<TKey>
     where TKey : notnull

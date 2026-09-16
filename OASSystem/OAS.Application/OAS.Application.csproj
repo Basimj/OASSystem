@@ -19,4 +19,7 @@
     <ProjectReference Include="..\OAS.Contracts\OAS.Contracts.csproj" />
     <ProjectReference Include="..\OAS.Domain\OAS.Domain.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Accounting\Abstractions\" />
+  </ItemGroup>
 </Project>

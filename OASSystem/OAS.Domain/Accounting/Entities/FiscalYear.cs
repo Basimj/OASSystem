@@ -96,4 +96,33 @@ public sealed class FiscalYear : Entity<Guid>
         ClosedBy = closedBy;
         ClosedAtUtc = closedAtUtc;
     }
+    public void UpdateDetails(
+    string code,
+    string name,
+    DateOnly startDate,
+    DateOnly endDate)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+            throw new ArgumentException(
+                "Fiscal year code is required.",
+                nameof(code));
+
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException(
+                "Fiscal year name is required.",
+                nameof(name));
+
+        if (endDate < startDate)
+            throw new ArgumentException(
+                "End date cannot be before start date.");
+
+        if (Status != FiscalYearStatus.Future)
+            throw new InvalidOperationException(
+                "Only a future fiscal year can be edited.");
+
+        Code = code.Trim();
+        Name = name.Trim();
+        StartDate = startDate;
+        EndDate = endDate;
+    }
 }

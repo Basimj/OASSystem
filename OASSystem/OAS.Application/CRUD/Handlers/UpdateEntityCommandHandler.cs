@@ -7,7 +7,7 @@ using OAS.Domain.Common.Entities;
 
 namespace OAS.Application.CRUD.Handlers;
 
-public sealed class UpdateEntityCommandHandler<TEntity, TKey, TUpdateDto, TReadDto, TCreateDto>(
+public  class UpdateEntityCommandHandler<TEntity, TKey, TUpdateDto, TReadDto, TCreateDto>(
     IRepository<TEntity, TKey> repository,
     ICrudMapper<TEntity, TKey, TReadDto, TCreateDto, TUpdateDto> mapper)
     : IRequestHandler<UpdateEntityCommand<TEntity, TKey, TUpdateDto>, TEntity>
