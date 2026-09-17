@@ -33,7 +33,7 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 
         builder.Property(x => x.ProductType)
             .IsRequired()
-            .HasMaxLength(32);
+            .HasConversion<int>();
 
         builder.Property(x => x.Description)
             .HasMaxLength(1000);
@@ -79,4 +79,5 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_Products_Brands_BrandId");
     }
+
 }

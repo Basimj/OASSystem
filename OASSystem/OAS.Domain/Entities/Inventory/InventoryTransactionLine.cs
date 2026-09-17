@@ -21,16 +21,18 @@ public class InventoryTransactionLine : Entity<Guid>
         Guid transactionId,
         Guid productVariantId,
         decimal quantity,
-        decimal unitCost = 0,
+        decimal unitCost,
         string? notes = null)
     {
         Id = Guid.NewGuid();
 
         TransactionId = transactionId;
         ProductVariantId = productVariantId;
+
         Quantity = quantity;
         UnitCost = unitCost;
         TotalCost = quantity * unitCost;
+
         Notes = notes;
     }
 }

@@ -1,16 +1,17 @@
 ﻿using OAS.Domain.Common.Entities;
+using OAS.Domain.Enums.Inventory;
 
 namespace OAS.Domain.Entities.Inventory;
 
 public class InventoryTransaction : AuditableEntity<Guid>
 {
     public string TransactionNumber { get; private set; } = null!;
-    public string TransactionType { get; private set; } = null!;
+    public InventoryTransactionType TransactionType { get; private set; }
 
     public Guid? SourceWarehouseId { get; private set; }
     public Guid? DestinationWarehouseId { get; private set; }
 
-    public string Status { get; private set; } = null!;
+    public InventoryTransactionStatus Status { get; private set; }
 
     public DateTimeOffset TransactionDate { get; private set; }
 
@@ -22,6 +23,7 @@ public class InventoryTransaction : AuditableEntity<Guid>
 
     public DateTimeOffset? PostedAtUtc { get; private set; }
     public string? PostedBy { get; private set; }
+
     public byte[] RowVersion { get; private set; } = [];
 
     private InventoryTransaction()
@@ -30,7 +32,7 @@ public class InventoryTransaction : AuditableEntity<Guid>
 
     public InventoryTransaction(
         string transactionNumber,
-        string transactionType,
+        InventoryTransactionType transactionType,
         DateTimeOffset transactionDate,
         Guid? sourceWarehouseId = null,
         Guid? destinationWarehouseId = null,
@@ -47,7 +49,7 @@ public class InventoryTransaction : AuditableEntity<Guid>
         SourceWarehouseId = sourceWarehouseId;
         DestinationWarehouseId = destinationWarehouseId;
 
-        Status = "Draft";
+        Status = InventoryTransactionStatus.Draft;
         TransactionDate = transactionDate;
 
         ReferenceType = referenceType;
@@ -59,10 +61,10 @@ public class InventoryTransaction : AuditableEntity<Guid>
 
     public void Post(DateTimeOffset postedAtUtc, string? postedBy)
     {
-        if (Status == "Posted")
+        if (Status == InventoryTransactionStatus.Posted)
             return;
 
-        Status = "Posted";
+        Status = InventoryTransactionStatus.Posted;
         PostedAtUtc = postedAtUtc;
         PostedBy = postedBy;
     }

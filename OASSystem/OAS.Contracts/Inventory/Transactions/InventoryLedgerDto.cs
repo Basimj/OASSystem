@@ -1,4 +1,7 @@
-﻿namespace OAS.Contracts.Inventory.Transactions;
+﻿using OAS.Contracts.Enums.Inventory;
+using OAS.Contracts.Inventory;
+
+namespace OAS.Contracts.Inventory.Transactions;
 
 public sealed record InventoryLedgerDto(
     Guid Id,
@@ -7,7 +10,7 @@ public sealed record InventoryLedgerDto(
     Guid TransactionLineId,
     Guid WarehouseId,
     Guid ProductVariantId,
-    string MovementType,
+    InventoryMovementType MovementType,
     decimal QuantityIn,
     decimal QuantityOut,
     decimal BalanceAfter,

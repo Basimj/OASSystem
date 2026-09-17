@@ -1,4 +1,5 @@
 ﻿using OAS.Domain.Common.Entities;
+using OAS.Domain.Enums.Inventory;
 
 namespace OAS.Domain.Entities.Inventory;
 
@@ -12,7 +13,7 @@ public class InventoryLedger : Entity<Guid>
     public Guid WarehouseId { get; private set; }
     public Guid ProductVariantId { get; private set; }
 
-    public string MovementType { get; private set; } = null!;
+    public InventoryMovementType MovementType { get; private set; }
 
     public decimal QuantityIn { get; private set; }
     public decimal QuantityOut { get; private set; }
@@ -24,8 +25,9 @@ public class InventoryLedger : Entity<Guid>
     public decimal InventoryValueAfter { get; private set; }
 
     public DateTimeOffset MovementDate { get; private set; }
+
     public DateTimeOffset CreatedAtUtc { get; private set; }
-    public string? CreatedBy { get; private set; }
+    public string CreatedBy { get; private set; } = null!;
 
     private InventoryLedger()
     {
@@ -37,7 +39,7 @@ public class InventoryLedger : Entity<Guid>
         Guid transactionLineId,
         Guid warehouseId,
         Guid productVariantId,
-        string movementType,
+        InventoryMovementType movementType,
         decimal quantityIn,
         decimal quantityOut,
         decimal balanceAfter,
@@ -46,7 +48,7 @@ public class InventoryLedger : Entity<Guid>
         decimal inventoryValueAfter,
         DateTimeOffset movementDate,
         DateTimeOffset createdAtUtc,
-        string? createdBy = null)
+        string createdBy)
     {
         Id = Guid.NewGuid();
 
@@ -70,7 +72,9 @@ public class InventoryLedger : Entity<Guid>
         InventoryValueAfter = inventoryValueAfter;
 
         MovementDate = movementDate;
+
         CreatedAtUtc = createdAtUtc;
         CreatedBy = createdBy;
     }
+
 }

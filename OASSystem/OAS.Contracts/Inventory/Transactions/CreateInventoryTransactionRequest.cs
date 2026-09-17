@@ -1,8 +1,11 @@
-﻿namespace OAS.Contracts.Inventory.Transactions;
+﻿using OAS.Contracts.Enums.Inventory;
+using OAS.Contracts.Inventory;
+
+namespace OAS.Contracts.Inventory.Transactions;
 
 public sealed record CreateInventoryTransactionRequest(
     string TransactionNumber,
-    string TransactionType,
+    InventoryTransactionType TransactionType,
     Guid? SourceWarehouseId,
     Guid? DestinationWarehouseId,
     DateTimeOffset TransactionDate,

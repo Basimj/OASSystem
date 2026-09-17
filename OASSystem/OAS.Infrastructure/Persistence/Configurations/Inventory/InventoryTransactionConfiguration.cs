@@ -5,7 +5,7 @@ using OAS.Domain.Entities.Inventory;
 namespace OAS.Infrastructure.Persistence.Configurations.Inventory;
 
 public sealed class InventoryTransactionConfiguration
-    : IEntityTypeConfiguration<InventoryTransaction>
+: IEntityTypeConfiguration<InventoryTransaction>
 {
     public void Configure(EntityTypeBuilder<InventoryTransaction> builder)
     {
@@ -22,7 +22,7 @@ public sealed class InventoryTransactionConfiguration
 
         builder.Property(x => x.TransactionType)
             .IsRequired()
-            .HasMaxLength(32);
+            .HasConversion<int>();
 
         builder.Property(x => x.SourceWarehouseId);
 
@@ -30,7 +30,7 @@ public sealed class InventoryTransactionConfiguration
 
         builder.Property(x => x.Status)
             .IsRequired()
-            .HasMaxLength(32);
+            .HasConversion<int>();
 
         builder.Property(x => x.TransactionDate)
             .IsRequired();
@@ -87,4 +87,5 @@ public sealed class InventoryTransactionConfiguration
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_InventoryTransactions_DestinationWarehouse");
     }
+
 }
