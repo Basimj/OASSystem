@@ -1,4 +1,4 @@
-﻿using OAS.Domain.Common.Entities;
+using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
 
@@ -33,6 +33,8 @@ public sealed class CustomerAccount : Entity<Guid>
     public bool IsActive { get; private set; }
 
     public DateTime CreatedAtUtc { get; private set; }
+
+    public byte[] RowVersion { get; private set; } = [];
 
     public static CustomerAccount Create(
         Guid id,

@@ -1,12 +1,27 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using MediatR;
+using OAS.Application.Abstractions.Persistence;
+using OAS.Application.Accounting.Accounts.Mapping;
+using OAS.Application.Common.Exceptions;
+using OAS.Contracts.Accounting.Accounts;
+using OAS.Domain.Accounting.Entities;
 
-namespace OAS.Application.Accounting.Accounts.Queries.GetAccountById
+namespace OAS.Application.Accounting.Accounts.Queries.GetAccountById;
+
+public sealed class GetAccountByIdQueryHandler(
+    IReadRepository<Account, Guid> repository,
+    AccountMapper mapper)
+    : IRequestHandler<GetAccountByIdQuery, AccountDto>
 {
-    internal class GetAccountByIdQueryHandler
+    public async Task<AccountDto> Handle(
+        GetAccountByIdQuery request,
+        CancellationToken cancellationToken)
     {
+        var entity = await repository.GetByIdAsync(request.Id, cancellationToken);
+        if (entity is null)
+        {
+            throw new NotFoundException(nameof(Account), request.Id);
+        }
+
+        return mapper.ToRead(entity);
     }
 }

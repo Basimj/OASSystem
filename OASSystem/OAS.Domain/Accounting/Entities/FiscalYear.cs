@@ -1,4 +1,4 @@
-﻿using OAS.Domain.Accounting.Enums;
+using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
@@ -38,6 +38,8 @@ public sealed class FiscalYear : Entity<Guid>
     public DateTime? ClosedAtUtc { get; private set; }
 
     public Guid? ClosedBy { get; private set; }
+
+    public byte[] RowVersion { get; private set; } = [];
 
     public static FiscalYear Create(
         Guid id,

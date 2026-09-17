@@ -1,4 +1,4 @@
-﻿using OAS.Domain.Accounting.Enums;
+using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
@@ -70,6 +70,8 @@ public sealed class Account : Entity<Guid>
     public bool IsActive { get; private set; }
 
     public DateOnly? EffectiveDate { get; private set; }
+
+    public byte[] RowVersion { get; private set; } = [];
 
     public static Account Create(
         Guid id,
@@ -166,5 +168,16 @@ public sealed class Account : Entity<Guid>
             && IsPostingAccount
             && AccountType != AccountType.Header
             && AllowManualPosting;
+    }
+
+    public bool CanReceivePosting(bool isManual = false)
+    {
+        if (!IsActive || !IsPostingAccount || AccountType == AccountType.Header)
+            return false;
+
+        if (isManual && !AllowManualPosting)
+            return false;
+
+        return true;
     }
 }

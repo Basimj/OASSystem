@@ -1,4 +1,4 @@
-﻿namespace OAS.Application.Accounting.Authorization;
+namespace OAS.Application.Accounting.Authorization;
 
 public static class AccountingPermissions
 {
@@ -113,6 +113,14 @@ public static class AccountingPermissions
         public const string Create = "accounting.cash_shifts.create";
         public const string Close = "accounting.cash_shifts.close";
         public const string Approve = "accounting.cash_shifts.approve";
+    }
+
+    public static class ExpenseTypes
+    {
+        public const string View = "accounting.expense_types.view";
+        public const string Create = "accounting.expense_types.create";
+        public const string Edit = "accounting.expense_types.edit";
+        public const string Disable = "accounting.expense_types.disable";
     }
 
     public static class Expenses

@@ -1,4 +1,4 @@
-﻿using OAS.Domain.Accounting.Enums;
+using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
@@ -75,6 +75,11 @@ public sealed class PaymentVoucher : Entity<Guid>
 
     public DateTime? PostedAtUtc { get; private set; }
 
+    public byte[] RowVersion { get; private set; } = [];
+
+    private readonly List<PaymentVoucherLine> _lines = [];
+    public IReadOnlyCollection<PaymentVoucherLine> Lines => _lines.AsReadOnly();
+
     public static PaymentVoucher Create(
         Guid id,
         string voucherNumber,
@@ -126,6 +131,62 @@ public sealed class PaymentVoucher : Entity<Guid>
             createdAtUtc);
     }
 
+    public void AddLine(PaymentVoucherLine line)
+    {
+        ArgumentNullException.ThrowIfNull(line);
+        EnsureDraft();
+
+        if (line.PaymentVoucherId != Id)
+            throw new InvalidOperationException("Line does not belong to this payment voucher.");
+
+        _lines.Add(line);
+    }
+
+    public void ClearLines()
+    {
+        EnsureDraft();
+        _lines.Clear();
+    }
+
+    public void ReplaceLines(IEnumerable<PaymentVoucherLine> lines)
+    {
+        EnsureDraft();
+        ArgumentNullException.ThrowIfNull(lines);
+        _lines.Clear();
+        foreach (var line in lines)
+        {
+            if (line.PaymentVoucherId != Id)
+                throw new InvalidOperationException("Line does not belong to this payment voucher.");
+            _lines.Add(line);
+        }
+    }
+
+    public void UpdateDetails(
+        DateOnly voucherDate,
+        PaymentPartyType partyType,
+        Guid? supplierId,
+        string? beneficiaryName,
+        PaymentMethod paymentMethod,
+        Guid? cashAccountId,
+        Guid? bankAccountId,
+        decimal totalAmount,
+        string? description)
+    {
+        EnsureDraft();
+        if (totalAmount <= 0)
+            throw new ArgumentOutOfRangeException(nameof(totalAmount), "Total amount must be greater than zero.");
+
+        VoucherDate = voucherDate;
+        PartyType = partyType;
+        SupplierId = supplierId;
+        BeneficiaryName = Normalize(beneficiaryName);
+        PaymentMethod = paymentMethod;
+        CashAccountId = cashAccountId;
+        BankAccountId = bankAccountId;
+        TotalAmount = totalAmount;
+        Description = Normalize(description);
+    }
+
     public void SetJournalEntry(Guid journalEntryId)
     {
         if (journalEntryId == Guid.Empty)
@@ -134,6 +195,12 @@ public sealed class PaymentVoucher : Entity<Guid>
                 nameof(journalEntryId));
 
         JournalEntryId = journalEntryId;
+    }
+
+    private void EnsureDraft()
+    {
+        if (Status != PaymentVoucherStatus.Draft)
+            throw new InvalidOperationException("Only draft payment vouchers can be modified.");
     }
 
     public void Approve()

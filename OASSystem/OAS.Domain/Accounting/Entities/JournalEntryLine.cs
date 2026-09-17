@@ -1,4 +1,5 @@
-﻿using OAS.Domain.Common.Entities;
+﻿
+using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
 
@@ -73,7 +74,9 @@ public sealed class JournalEntryLine : Entity<Guid>
         Guid? warehouseId)
     {
         if (id == Guid.Empty)
-            throw new ArgumentException("Line id is required.", nameof(id));
+            throw new ArgumentException(
+                "Line id is required.",
+                nameof(id));
 
         if (journalEntryId == Guid.Empty)
             throw new ArgumentException(
@@ -81,24 +84,17 @@ public sealed class JournalEntryLine : Entity<Guid>
                 nameof(journalEntryId));
 
         if (lineNumber <= 0)
-            throw new ArgumentOutOfRangeException(nameof(lineNumber));
+            throw new ArgumentOutOfRangeException(
+                nameof(lineNumber));
 
         if (accountId == Guid.Empty)
-            throw new ArgumentException("Account id is required.", nameof(accountId));
+            throw new ArgumentException(
+                "Account id is required.",
+                nameof(accountId));
 
-        if (debitAmount < 0)
-            throw new ArgumentOutOfRangeException(nameof(debitAmount));
-
-        if (creditAmount < 0)
-            throw new ArgumentOutOfRangeException(nameof(creditAmount));
-
-        if (debitAmount > 0 && creditAmount > 0)
-            throw new InvalidOperationException(
-                "A journal line cannot contain both debit and credit.");
-
-        if (debitAmount == 0 && creditAmount == 0)
-            throw new InvalidOperationException(
-                "A journal line must contain either debit or credit.");
+        ValidateAmounts(
+            debitAmount,
+            creditAmount);
 
         return new JournalEntryLine(
             id,
@@ -127,21 +123,13 @@ public sealed class JournalEntryLine : Entity<Guid>
         Guid? warehouseId)
     {
         if (accountId == Guid.Empty)
-            throw new ArgumentException("Account id is required.", nameof(accountId));
+            throw new ArgumentException(
+                "Account id is required.",
+                nameof(accountId));
 
-        if (debitAmount < 0)
-            throw new ArgumentOutOfRangeException(nameof(debitAmount));
-
-        if (creditAmount < 0)
-            throw new ArgumentOutOfRangeException(nameof(creditAmount));
-
-        if (debitAmount > 0 && creditAmount > 0)
-            throw new InvalidOperationException(
-                "A journal line cannot contain both debit and credit.");
-
-        if (debitAmount == 0 && creditAmount == 0)
-            throw new InvalidOperationException(
-                "A journal line must contain either debit or credit.");
+        ValidateAmounts(
+            debitAmount,
+            creditAmount);
 
         AccountId = accountId;
         DebitAmount = debitAmount;
@@ -152,6 +140,40 @@ public sealed class JournalEntryLine : Entity<Guid>
         CostCenterId = costCenterId;
         ProductVariantId = productVariantId;
         WarehouseId = warehouseId;
+    }
+
+    internal void SetLineNumber(int lineNumber)
+    {
+        if (lineNumber <= 0)
+            throw new ArgumentOutOfRangeException(
+                nameof(lineNumber));
+
+        LineNumber = lineNumber;
+    }
+
+    private static void ValidateAmounts(
+        decimal debitAmount,
+        decimal creditAmount)
+    {
+        if (debitAmount < 0)
+            throw new ArgumentOutOfRangeException(
+                nameof(debitAmount));
+
+        if (creditAmount < 0)
+            throw new ArgumentOutOfRangeException(
+                nameof(creditAmount));
+
+        if (debitAmount > 0 && creditAmount > 0)
+        {
+            throw new InvalidOperationException(
+                "A journal line cannot contain both debit and credit.");
+        }
+
+        if (debitAmount == 0 && creditAmount == 0)
+        {
+            throw new InvalidOperationException(
+                "A journal line must contain either debit or credit.");
+        }
     }
 
     private static string? Normalize(string? value)

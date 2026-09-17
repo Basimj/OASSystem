@@ -1,4 +1,4 @@
-﻿using OAS.Domain.Accounting.Enums;
+using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
@@ -54,6 +54,8 @@ public sealed class FiscalPeriod : Entity<Guid>
     public DateTime? ClosedAtUtc { get; private set; }
 
     public Guid? ClosedBy { get; private set; }
+
+    public byte[] RowVersion { get; private set; } = [];
 
     public static FiscalPeriod Create(
         Guid id,
@@ -131,5 +133,27 @@ public sealed class FiscalPeriod : Entity<Guid>
     {
         return Status != FiscalPeriodStatus.Closed
             && !AccountingLocked;
+    }
+    public void UpdateDetails(
+    string name,
+    DateOnly startDate,
+    DateOnly endDate)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException(
+                "Period name is required.",
+                nameof(name));
+
+        if (endDate < startDate)
+            throw new ArgumentException(
+                "End date cannot be before start date.");
+
+        if (Status != FiscalPeriodStatus.Open)
+            throw new InvalidOperationException(
+                "Only an open fiscal period can be edited.");
+
+        Name = name.Trim();
+        StartDate = startDate;
+        EndDate = endDate;
     }
 }

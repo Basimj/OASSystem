@@ -1,4 +1,4 @@
-﻿using OAS.Domain.Accounting.Enums;
+using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
@@ -48,6 +48,8 @@ public sealed class CashShift : Entity<Guid>
     public DateTime? ClosedAtUtc { get; private set; }
 
     public CashShiftStatus Status { get; private set; }
+
+    public byte[] RowVersion { get; private set; } = [];
 
     public static CashShift Create(
         Guid id,

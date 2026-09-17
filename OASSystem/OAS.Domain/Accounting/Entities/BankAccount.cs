@@ -1,4 +1,4 @@
-﻿using OAS.Domain.Common.Entities;
+using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
 
@@ -41,6 +41,8 @@ public sealed class BankAccount : Entity<Guid>
     public Guid AccountId { get; private set; }
 
     public bool IsActive { get; private set; }
+
+    public byte[] RowVersion { get; private set; } = [];
 
     public static BankAccount Create(
         Guid id,

@@ -1,4 +1,4 @@
-﻿using OAS.Domain.Common.Entities;
+using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
 
@@ -33,6 +33,8 @@ public sealed class CashAccount : Entity<Guid>
     public bool IsDefault { get; private set; }
 
     public bool IsActive { get; private set; }
+
+    public byte[] RowVersion { get; private set; } = [];
 
     public static CashAccount Create(
         Guid id,

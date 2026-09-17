@@ -1,4 +1,4 @@
-﻿using OAS.Domain.Common.Entities;
+using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
 
@@ -33,6 +33,11 @@ public sealed class PostingProfile : Entity<Guid>
     public string DocumentType { get; private set; } = null!;
 
     public bool IsActive { get; private set; }
+
+    public byte[] RowVersion { get; private set; } = [];
+
+    private readonly List<PostingProfileLine> _lines = [];
+    public IReadOnlyCollection<PostingProfileLine> Lines => _lines.AsReadOnly();
 
     public static PostingProfile Create(
         Guid id,
@@ -93,5 +98,30 @@ public sealed class PostingProfile : Entity<Guid>
     public void SetActive(bool isActive)
     {
         IsActive = isActive;
+    }
+
+    public void AddLine(PostingProfileLine line)
+    {
+        ArgumentNullException.ThrowIfNull(line);
+        if (line.PostingProfileId != Id)
+            throw new InvalidOperationException("Line does not belong to this posting profile.");
+        _lines.Add(line);
+    }
+
+    public void ClearLines()
+    {
+        _lines.Clear();
+    }
+
+    public void ReplaceLines(IEnumerable<PostingProfileLine> lines)
+    {
+        ArgumentNullException.ThrowIfNull(lines);
+        _lines.Clear();
+        foreach (var line in lines)
+        {
+            if (line.PostingProfileId != Id)
+                throw new InvalidOperationException("Line does not belong to this posting profile.");
+            _lines.Add(line);
+        }
     }
 }

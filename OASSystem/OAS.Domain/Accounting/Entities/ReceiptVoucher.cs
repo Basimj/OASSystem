@@ -1,4 +1,4 @@
-﻿using OAS.Domain.Accounting.Enums;
+using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
@@ -75,6 +75,11 @@ public sealed class ReceiptVoucher : Entity<Guid>
 
     public DateTime? PostedAtUtc { get; private set; }
 
+    public byte[] RowVersion { get; private set; } = [];
+
+    private readonly List<ReceiptVoucherLine> _lines = [];
+    public IReadOnlyCollection<ReceiptVoucherLine> Lines => _lines.AsReadOnly();
+
     public static ReceiptVoucher Create(
         Guid id,
         string voucherNumber,
@@ -123,6 +128,61 @@ public sealed class ReceiptVoucher : Entity<Guid>
             createdAtUtc);
     }
 
+    public void AddLine(ReceiptVoucherLine line)
+    {
+        ArgumentNullException.ThrowIfNull(line);
+        EnsureDraft();
+
+        if (line.ReceiptVoucherId != Id)
+            throw new InvalidOperationException("Line does not belong to this receipt voucher.");
+
+        _lines.Add(line);
+    }
+
+    public void ClearLines()
+    {
+        EnsureDraft();
+        _lines.Clear();
+    }
+
+    public void ReplaceLines(IEnumerable<ReceiptVoucherLine> lines)
+    {
+        EnsureDraft();
+        ArgumentNullException.ThrowIfNull(lines);
+        _lines.Clear();
+        foreach (var line in lines)
+        {
+            if (line.ReceiptVoucherId != Id)
+                throw new InvalidOperationException("Line does not belong to this receipt voucher.");
+            _lines.Add(line);
+        }
+    }
+
+    public void UpdateDetails(
+        DateOnly voucherDate,
+        ReceiptPartyType partyType,
+        Guid? customerId,
+        string? receivedFrom,
+        PaymentMethod paymentMethod,
+        Guid? cashAccountId,
+        Guid? bankAccountId,
+        decimal totalAmount,
+        string? description)
+    {
+        EnsureDraft();
+        ValidateAmount(totalAmount);
+
+        VoucherDate = voucherDate;
+        PartyType = partyType;
+        CustomerId = customerId;
+        ReceivedFrom = Normalize(receivedFrom);
+        PaymentMethod = paymentMethod;
+        CashAccountId = cashAccountId;
+        BankAccountId = bankAccountId;
+        TotalAmount = totalAmount;
+        Description = Normalize(description);
+    }
+
     public void SetJournalEntry(Guid journalEntryId)
     {
         if (journalEntryId == Guid.Empty)
@@ -131,6 +191,12 @@ public sealed class ReceiptVoucher : Entity<Guid>
                 nameof(journalEntryId));
 
         JournalEntryId = journalEntryId;
+    }
+
+    private void EnsureDraft()
+    {
+        if (Status != ReceiptVoucherStatus.Draft)
+            throw new InvalidOperationException("Only draft receipt vouchers can be modified.");
     }
 
     public void Approve()

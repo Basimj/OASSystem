@@ -1,4 +1,4 @@
-﻿using OAS.Domain.Accounting.Enums;
+using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
@@ -73,6 +73,8 @@ public sealed class Expense : Entity<Guid>
 
     public DateTime? PostedAtUtc { get; private set; }
 
+    public byte[] RowVersion { get; private set; } = [];
+
     public static Expense Create(
         Guid id,
         string expenseNumber,
@@ -136,6 +138,39 @@ public sealed class Expense : Entity<Guid>
             createdAtUtc);
     }
 
+    public void UpdateDetails(
+        DateOnly expenseDate,
+        Guid expenseTypeId,
+        Guid expenseAccountId,
+        string? beneficiary,
+        decimal amount,
+        PaymentMethod paymentMethod,
+        Guid? cashAccountId,
+        Guid? bankAccountId,
+        string? description)
+    {
+        EnsureDraft();
+
+        if (expenseTypeId == Guid.Empty)
+            throw new ArgumentException("Expense type id is required.", nameof(expenseTypeId));
+
+        if (expenseAccountId == Guid.Empty)
+            throw new ArgumentException("Expense account id is required.", nameof(expenseAccountId));
+
+        if (amount <= 0)
+            throw new ArgumentOutOfRangeException(nameof(amount), "Amount must be greater than zero.");
+
+        ExpenseDate = expenseDate;
+        ExpenseTypeId = expenseTypeId;
+        ExpenseAccountId = expenseAccountId;
+        Beneficiary = Normalize(beneficiary);
+        Amount = amount;
+        PaymentMethod = paymentMethod;
+        CashAccountId = cashAccountId;
+        BankAccountId = bankAccountId;
+        Description = Normalize(description);
+    }
+
     public void SetJournalEntry(Guid journalEntryId)
     {
         if (journalEntryId == Guid.Empty)
@@ -144,6 +179,12 @@ public sealed class Expense : Entity<Guid>
                 nameof(journalEntryId));
 
         JournalEntryId = journalEntryId;
+    }
+
+    private void EnsureDraft()
+    {
+        if (Status != ExpenseStatus.Draft)
+            throw new InvalidOperationException("Only draft expenses can be modified.");
     }
 
     public void Approve()

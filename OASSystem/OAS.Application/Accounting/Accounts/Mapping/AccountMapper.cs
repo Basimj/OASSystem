@@ -1,4 +1,4 @@
-﻿using OAS.Application.CRUD.Mapping;
+using OAS.Application.CRUD.Mapping;
 using OAS.Contracts.Accounting.Accounts;
 using OAS.Domain.Accounting.Entities;
 using DomainAccountClass = OAS.Domain.Accounting.Enums.AccountClass;
@@ -58,7 +58,22 @@ public sealed class AccountMapper
 
     public AccountDto ToRead(Account source)
     {
-        throw new NotSupportedException(
-            "Account mapping to AccountDto requires RowVersion from EF.");
+        return new AccountDto(
+            source.Id,
+            source.Code,
+            source.NameAr,
+            source.NameEn,
+            source.ParentAccountId,
+            source.Level,
+            (OAS.Contracts.Accounting.Enums.AccountClass)(byte)source.AccountClass,
+            (OAS.Contracts.Accounting.Enums.AccountType)(byte)source.AccountType,
+            (OAS.Contracts.Accounting.Enums.NormalBalance)(byte)source.NormalBalance,
+            source.IsPostingAccount,
+            source.IsControlAccount,
+            source.AllowManualPosting,
+            source.IsSystemAccount,
+            source.IsActive,
+            source.EffectiveDate,
+            Convert.ToBase64String(source.RowVersion));
     }
 }
