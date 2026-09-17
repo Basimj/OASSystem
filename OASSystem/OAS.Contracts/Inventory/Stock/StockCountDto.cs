@@ -1,10 +1,13 @@
-﻿namespace OAS.Contracts.Inventory.Stock;
+﻿using OAS.Contracts.Enums.Inventory;
+using OAS.Contracts.Inventory;
+
+namespace OAS.Contracts.Inventory.Stock;
 
 public sealed record StockCountDto(
     Guid Id,
     string CountNumber,
     Guid WarehouseId,
-    string Status,
+    StockCountStatus Status,
     DateOnly CountDate,
     DateTimeOffset? StartedAtUtc,
     DateTimeOffset? CompletedAtUtc,

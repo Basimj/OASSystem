@@ -1,4 +1,7 @@
-﻿namespace OAS.Contracts.Inventory.Products;
+﻿using OAS.Contracts.Enums.Inventory;
+using OAS.Contracts.Inventory;
+
+namespace OAS.Contracts.Inventory.Products;
 
 public sealed record ProductDto(
     Guid Id,
@@ -7,7 +10,7 @@ public sealed record ProductDto(
     string? NameEn,
     Guid CategoryId,
     Guid? BrandId,
-    string ProductType,
+    ProductType ProductType,
     string? Description,
     bool IsStockItem,
     bool IsActive);

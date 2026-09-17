@@ -24,7 +24,7 @@ public sealed class StockCountConfiguration : IEntityTypeConfiguration<StockCoun
 
         builder.Property(x => x.Status)
             .IsRequired()
-            .HasMaxLength(32);
+            .HasConversion<int>();
 
         builder.Property(x => x.CountDate)
             .IsRequired();
@@ -67,4 +67,5 @@ public sealed class StockCountConfiguration : IEntityTypeConfiguration<StockCoun
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_StockCounts_Warehouses_WarehouseId");
     }
+
 }

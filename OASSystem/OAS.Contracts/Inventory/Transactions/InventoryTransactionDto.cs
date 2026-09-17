@@ -1,12 +1,15 @@
-﻿namespace OAS.Contracts.Inventory.Transactions;
+﻿using OAS.Contracts.Enums.Inventory;
+using OAS.Contracts.Inventory;
+
+namespace OAS.Contracts.Inventory.Transactions;
 
 public sealed record InventoryTransactionDto(
     Guid Id,
     string TransactionNumber,
-    string TransactionType,
+    InventoryTransactionType TransactionType,
     Guid? SourceWarehouseId,
     Guid? DestinationWarehouseId,
-    string Status,
+    InventoryTransactionStatus Status,
     DateTimeOffset TransactionDate,
     string? ReferenceType,
     Guid? ReferenceId,

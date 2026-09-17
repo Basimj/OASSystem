@@ -1,4 +1,5 @@
 ﻿using OAS.Domain.Common.Entities;
+using OAS.Domain.Enums.Inventory;
 
 namespace OAS.Domain.Entities.Inventory;
 
@@ -11,7 +12,8 @@ public class Product : AuditableEntity<Guid>
     public Guid CategoryId { get; private set; }
     public Guid? BrandId { get; private set; }
 
-    public string ProductType { get; private set; } = null!;
+    public ProductType ProductType { get; private set; }
+
     public string? Description { get; private set; }
 
     public bool IsStockItem { get; private set; }
@@ -27,7 +29,7 @@ public class Product : AuditableEntity<Guid>
         string productCode,
         string nameAr,
         Guid categoryId,
-        string productType,
+        ProductType productType,
         bool isStockItem = true,
         string? nameEn = null,
         Guid? brandId = null,

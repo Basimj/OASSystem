@@ -1,4 +1,5 @@
 ﻿using OAS.Domain.Common.Entities;
+using OAS.Domain.Enums.Inventory;
 
 namespace OAS.Domain.Entities.Inventory;
 
@@ -7,9 +8,9 @@ public class StockCount : AuditableEntity<Guid>
     public string CountNumber { get; private set; } = null!;
     public Guid WarehouseId { get; private set; }
 
-    public string Status { get; private set; } = null!;
+    public StockCountStatus Status { get; private set; }
 
-    public DateTimeOffset CountDate { get; private set; }
+    public DateOnly CountDate { get; private set; }
 
     public DateTimeOffset? StartedAtUtc { get; private set; }
     public DateTimeOffset? CompletedAtUtc { get; private set; }
@@ -31,7 +32,7 @@ public class StockCount : AuditableEntity<Guid>
     public StockCount(
         string countNumber,
         Guid warehouseId,
-        DateTimeOffset countDate,
+        DateOnly countDate,
         string? notes = null)
     {
         Id = Guid.NewGuid();
@@ -39,46 +40,60 @@ public class StockCount : AuditableEntity<Guid>
         CountNumber = countNumber;
         WarehouseId = warehouseId;
         CountDate = countDate;
-        Notes = notes;
 
-        Status = "Draft";
+        Status = StockCountStatus.Draft;
+
+        Notes = notes;
     }
 
     public void Start(DateTimeOffset startedAtUtc)
     {
-        if (Status != "Draft")
+        if (Status != StockCountStatus.Draft)
             return;
 
-        Status = "Counting";
+        Status = StockCountStatus.Counting;
         StartedAtUtc = startedAtUtc;
     }
 
     public void Complete(DateTimeOffset completedAtUtc)
     {
-        if (Status != "Counting")
+        if (Status != StockCountStatus.Counting)
             return;
 
-        Status = "Review";
+        Status = StockCountStatus.Review;
         CompletedAtUtc = completedAtUtc;
     }
 
-    public void Approve(DateTimeOffset approvedAtUtc, string? approvedBy)
+    public void Approve(
+        DateTimeOffset approvedAtUtc,
+        string? approvedBy)
     {
-        if (Status != "Review")
+        if (Status != StockCountStatus.Review)
             return;
 
-        Status = "Approved";
+        Status = StockCountStatus.Approved;
         ApprovedAtUtc = approvedAtUtc;
         ApprovedBy = approvedBy;
     }
 
-    public void Post(DateTimeOffset postedAtUtc, string? postedBy)
+    public void Post(
+        DateTimeOffset postedAtUtc,
+        string? postedBy)
     {
-        if (Status != "Approved")
+        if (Status != StockCountStatus.Approved)
             return;
 
-        Status = "Posted";
+        Status = StockCountStatus.Posted;
         PostedAtUtc = postedAtUtc;
         PostedBy = postedBy;
     }
+
+    public void Cancel()
+    {
+        if (Status == StockCountStatus.Posted)
+            return;
+
+        Status = StockCountStatus.Cancelled;
+    }
+
 }

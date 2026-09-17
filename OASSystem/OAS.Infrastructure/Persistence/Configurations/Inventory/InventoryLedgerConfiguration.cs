@@ -5,7 +5,7 @@ using OAS.Domain.Entities.Inventory;
 namespace OAS.Infrastructure.Persistence.Configurations.Inventory;
 
 public sealed class InventoryLedgerConfiguration
-    : IEntityTypeConfiguration<InventoryLedger>
+: IEntityTypeConfiguration<InventoryLedger>
 {
     public void Configure(EntityTypeBuilder<InventoryLedger> builder)
     {
@@ -33,7 +33,7 @@ public sealed class InventoryLedgerConfiguration
 
         builder.Property(x => x.MovementType)
             .IsRequired()
-            .HasMaxLength(32);
+            .HasConversion<int>();
 
         builder.Property(x => x.QuantityIn)
             .HasPrecision(18, 3);
@@ -104,4 +104,5 @@ public sealed class InventoryLedgerConfiguration
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_InventoryLedger_ProductVariants_ProductVariantId");
     }
+
 }
