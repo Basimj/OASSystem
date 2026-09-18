@@ -57,15 +57,28 @@ public sealed class SequenceNumberGenerator(
 
     private static string GetSequenceSql(string sequenceName)
     {
-        return sequenceName switch
+        if (sequenceName == "EmployeeNumberSequence")
         {
-            "EmployeeNumberSequence" =>
-                "SELECT NEXT VALUE FOR [core].[EmployeeNumberSequence];",
+            return "SELECT NEXT VALUE FOR [core].[EmployeeNumberSequence];";
+        }
 
-            _ => throw new ArgumentOutOfRangeException(
-                nameof(sequenceName),
-                sequenceName,
-                "Unknown sequence name.")
-        };
+        if (string.IsNullOrWhiteSpace(sequenceName) || !System.Text.RegularExpressions.Regex.IsMatch(sequenceName, @"^[a-zA-Z0-9_\-]+$"))
+        {
+            throw new ArgumentOutOfRangeException(nameof(sequenceName), sequenceName, "Invalid sequence name.");
+        }
+
+        var sanitized = sequenceName.Replace("-", "_");
+        return $"""
+            DECLARE @seqName sysname = N'Seq_{sanitized}';
+            IF NOT EXISTS (
+                SELECT 1 FROM sys.sequences 
+                WHERE name = @seqName AND schema_id = SCHEMA_ID(N'accounting')
+            )
+            BEGIN
+                EXEC(N'CREATE SEQUENCE [accounting].[' + @seqName + N'] AS BIGINT START WITH 1 INCREMENT BY 1 NO CYCLE;');
+            END;
+            DECLARE @sql nvarchar(500) = N'SELECT NEXT VALUE FOR [accounting].' + QUOTENAME(@seqName);
+            EXEC sp_executesql @sql;
+            """;
     }
 }
