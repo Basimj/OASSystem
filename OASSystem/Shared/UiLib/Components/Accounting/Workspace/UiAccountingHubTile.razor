@@ -1,0 +1,16 @@
+@namespace OAS.UiLib.Components.Accounting.Workspace
+
+<a href="@Href" class="ui-acc-hub-card">
+    <div class="ui-acc-hub-card__icon">
+        <i class="@IconCssClass" aria-hidden="true"></i>
+    </div>
+    <div class="ui-acc-hub-card__title">@Title</div>
+    <div class="ui-acc-hub-card__desc">@Description</div>
+</a>
+
+@code {
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string Description { get; set; } = string.Empty;
+    [Parameter] public string Href { get; set; } = string.Empty;
+    [Parameter] public string IconCssClass { get; set; } = "fa-solid fa-folder-open";
+}

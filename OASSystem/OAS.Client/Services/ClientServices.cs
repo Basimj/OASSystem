@@ -37,6 +37,7 @@ public static class ClientServices
         services.AddScoped<IEmployeeClientService, EmployeeClientService>();
         services.AddScoped<IEmployeesWorkspaceState, EmployeesWorkspaceState>();
         services.AddScoped<BrowserFileDownloadService>();
+        services.AddScoped<OAS.Client.Accounting.Services.IAccountingClientService, OAS.Client.Accounting.Services.AccountingClientService>();
 
         return services;
     }

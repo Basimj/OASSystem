@@ -1,0 +1,32 @@
+@namespace OAS.UiLib.Components.Accounting.Workspace
+
+<div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(15, 23, 42, 0.6); backdrop-filter: blur(2px);">
+    <div class="modal-dialog modal-dialog-centered @(Wide ? "modal-lg" : "")">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header border-bottom py-3">
+                <h5 class="modal-title fs-6 fw-bold text-dark d-flex align-items-center gap-2">
+                    <i class="fa-solid fa-calculator text-primary" aria-hidden="true"></i>
+                    @Title
+                </h5>
+                <button type="button" class="btn-close" aria-label="إغلاق" @onclick="OnClose"></button>
+            </div>
+            <div class="modal-body p-4">
+                @ChildContent
+            </div>
+            @if (Footer is not null)
+            {
+                <div class="modal-footer border-top bg-light py-2">
+                    @Footer
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public bool Wide { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? Footer { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+}

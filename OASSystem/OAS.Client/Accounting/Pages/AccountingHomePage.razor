@@ -1,0 +1,31 @@
+@page "/accounting"
+@attribute [Authorize]
+@inject NavigationManager NavManager
+
+<PageTitle>المحاسبة المالية | OAS</PageTitle>
+
+<UiAccountingWorkspace>
+    <Metrics>
+        <UiAccountingMetricTile Label="شجرة الحسابات" Value="دليل متكامل" IconCssClass="fa-solid fa-folder-tree" Variant="UiAccountingMetricTile.MetricVariant.Default" />
+        <UiAccountingMetricTile Label="القيود اليومية" Value="متزنة ومرحلة" IconCssClass="fa-solid fa-book-journal-whills" Variant="UiAccountingMetricTile.MetricVariant.Balance" />
+        <UiAccountingMetricTile Label="سندات القبض" Value="مدفوعات العملاء" IconCssClass="fa-solid fa-file-invoice-dollar" Variant="UiAccountingMetricTile.MetricVariant.Debit" />
+        <UiAccountingMetricTile Label="سندات الصرف" Value="مدفوعات الموردين" IconCssClass="fa-solid fa-money-bill-transfer" Variant="UiAccountingMetricTile.MetricVariant.Credit" />
+    </Metrics>
+
+    <Body>
+        <UiCard Title="وحدات المحاسبة والمالية" Subtitle="الوصول السريع إلى أقسام النظام المالي المحاسبي">
+            <UiAccountingHubTile Title="دليل شجرة الحسابات" Description="هيكل الحسابات، المستويات، طبيعة الأرصدة، وحسابات المراقبة" Href="/accounting/accounts" IconCssClass="fa-solid fa-folder-tree" />
+            <UiAccountingHubTile Title="القيود المحاسبية" Description="إدارة قيود اليومية، القيود الافتتاحية والتسويات والترحيل المالي" Href="/accounting/journals" IconCssClass="fa-solid fa-book-journal-whills" />
+            <UiAccountingHubTile Title="سندات القبض" Description="إصدار سندات القبض النقدية والبنكية وتخصيصها على الفواتير" Href="/accounting/receipt-vouchers" IconCssClass="fa-solid fa-file-invoice-dollar" />
+            <UiAccountingHubTile Title="سندات الصرف" Description="إصدار سندات الصرف والشيكات والتحويلات وتخصيصها على الموردين" Href="/accounting/payment-vouchers" IconCssClass="fa-solid fa-money-bill-transfer" />
+            <UiAccountingHubTile Title="الصندوق والبنوك" Description="إدارة الخزائن النقدية، الحسابات البنكية، والورديات اليومية" Href="/accounting/cash-bank" IconCssClass="fa-solid fa-vault" />
+            <UiAccountingHubTile Title="ورديات الصندوق" Description="متابعة ورديات الكاشير، رصيد الافتتاح، الجرد الفعلي، واعتماد الفروقات" Href="/accounting/cash-shifts" IconCssClass="fa-solid fa-cash-register" />
+            <UiAccountingHubTile Title="إدارة المصروفات" Description="تسجيل المصروفات التشغيلية والضريبية وتبويب بنود الصرف" Href="/accounting/expenses" IconCssClass="fa-solid fa-receipt" />
+            <UiAccountingHubTile Title="حسابات العملاء المحاسبية" Description="ضبط شروط الدفع، الحدود الائتمانية، وحسابات الأستاذ المساعد للعملاء" Href="/accounting/customer-accounts" IconCssClass="fa-solid fa-users-line" />
+            <UiAccountingHubTile Title="حسابات الموردين المحاسبية" Description="إعدادات الموردين، حسابات المراقبة، وأرصدة الأستاذ المساعد" Href="/accounting/supplier-accounts" IconCssClass="fa-solid fa-boxes-packing" />
+            <UiAccountingHubTile Title="السنوات والفترات المالية" Description="فتح وإغلاق الفترات المحاسبية وضبط أقفال المبيعات والمشتريات" Href="/accounting/fiscal-years" IconCssClass="fa-solid fa-calendar-days" />
+            <UiAccountingHubTile Title="مراكز التكلفة" Description="الهيكل الشجري لمراكز التكلفة وربطها بالأنشطة والمصروفات" Href="/accounting/cost-centers" IconCssClass="fa-solid fa-network-wired" />
+            <UiAccountingHubTile Title="ملفات الترحيل الآلي" Description="Posting Profiles للربط التلقائي بين العمليات التشغيلية والحسابات" Href="/accounting/posting-profiles" IconCssClass="fa-solid fa-sliders" />
+        </UiCard>
+    </Body>
+</UiAccountingWorkspace>

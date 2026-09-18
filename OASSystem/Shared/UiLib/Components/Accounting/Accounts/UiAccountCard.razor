@@ -1,0 +1,60 @@
+@namespace OAS.UiLib.Components.Accounting.Accounts
+
+<div class="ui-acc-card">
+    <div class="ui-acc-card__header">
+        <div class="ui-acc-card__title">
+            <i class="fa-solid fa-folder-tree" aria-hidden="true"></i>
+            <span>@Code — @NameAr</span>
+            @if (!string.IsNullOrWhiteSpace(NameEn))
+            {
+                <span class="text-muted small">(@NameEn)</span>
+            }
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            @if (IsPostingAccount)
+            {
+                <span class="badge bg-light text-dark border">يقبل ترحيل</span>
+            }
+            @if (IsControlAccount)
+            {
+                <span class="badge bg-light text-primary border">حساب مراقبة</span>
+            }
+            <OAS.UiLib.Components.Accounting.Workspace.UiAccountingStatusBadge Text="@(IsActive ? "نشط" : "معطل")" State="@(IsActive ? "active" : "inactive")" />
+        </div>
+    </div>
+    <div class="ui-acc-card__body">
+        <div><strong>المستوى:</strong> @Level</div>
+        <div><strong>التصنيف:</strong> @AccountClassText</div>
+        <div><strong>النوع:</strong> @AccountTypeText</div>
+        <div><strong>طبيعة الرصيد:</strong> <span class="@(NormalBalanceText == "مدين" ? "ui-acc-val--debit" : "ui-acc-val--credit")">@NormalBalanceText</span></div>
+    </div>
+    <div class="ui-acc-card__footer">
+        @if (OnEdit.HasDelegate)
+        {
+            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="OnEdit">
+                <i class="fa-solid fa-pen" aria-hidden="true"></i> تعديل
+            </button>
+        }
+        @if (OnToggleStatus.HasDelegate)
+        {
+            <button type="button" class="btn btn-sm @(IsActive ? "btn-outline-danger" : "btn-outline-success")" @onclick="OnToggleStatus">
+                <i class="fa-solid @(IsActive ? "fa-ban" : "fa-check")" aria-hidden="true"></i> @(IsActive ? "تعطيل" : "تفعيل")
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Code { get; set; } = string.Empty;
+    [Parameter] public string NameAr { get; set; } = string.Empty;
+    [Parameter] public string? NameEn { get; set; }
+    [Parameter] public byte Level { get; set; } = 1;
+    [Parameter] public string AccountClassText { get; set; } = string.Empty;
+    [Parameter] public string AccountTypeText { get; set; } = string.Empty;
+    [Parameter] public string NormalBalanceText { get; set; } = string.Empty;
+    [Parameter] public bool IsPostingAccount { get; set; }
+    [Parameter] public bool IsControlAccount { get; set; }
+    [Parameter] public bool IsActive { get; set; }
+    [Parameter] public EventCallback OnEdit { get; set; }
+    [Parameter] public EventCallback OnToggleStatus { get; set; }
+}

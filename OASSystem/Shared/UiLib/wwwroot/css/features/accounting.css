@@ -1,0 +1,339 @@
+@charset "UTF-8";
+
+/* ==========================================================================
+   OAS.UiLib — Accounting Module Design System & Component Styles
+   ========================================================================== */
+
+:root {
+    --oas-acc-primary: #1e3a8a;
+    --oas-acc-primary-rgb: 30, 58, 138;
+    --oas-acc-primary-light: #3b82f6;
+    --oas-acc-debit: #059669;
+    --oas-acc-debit-bg: #ecfdf5;
+    --oas-acc-credit: #dc2626;
+    --oas-acc-credit-bg: #fef2f2;
+    --oas-acc-balance: #4f46e5;
+    --oas-acc-card-bg: #ffffff;
+    --oas-acc-card-border: #e2e8f0;
+    --oas-acc-card-hover-border: #cbd5e1;
+    --oas-acc-muted: #64748b;
+    --oas-acc-surface-bg: #f8fafc;
+}
+
+/* Workspace container */
+.ui-acc-workspace {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.25rem;
+    background-color: var(--oas-acc-surface-bg);
+    min-height: 100%;
+    font-family: inherit;
+}
+
+.ui-acc-workspace__actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    background: #ffffff;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--oas-acc-card-border);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.ui-acc-workspace__body {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+/* Metrics Ribbon */
+.ui-acc-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.ui-acc-metric-tile {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    background: #ffffff;
+    border-radius: 0.5rem;
+    border: 1px solid var(--oas-acc-card-border);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ui-acc-metric-tile:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
+}
+
+.ui-acc-metric-tile__icon {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem;
+    font-size: 1.25rem;
+    background: rgba(30, 58, 138, 0.08);
+    color: var(--oas-acc-primary);
+}
+
+.ui-acc-metric-tile--debit .ui-acc-metric-tile__icon {
+    background: var(--oas-acc-debit-bg);
+    color: var(--oas-acc-debit);
+}
+
+.ui-acc-metric-tile--credit .ui-acc-metric-tile__icon {
+    background: var(--oas-acc-credit-bg);
+    color: var(--oas-acc-credit);
+}
+
+.ui-acc-metric-tile--balance .ui-acc-metric-tile__icon {
+    background: #eef2ff;
+    color: var(--oas-acc-balance);
+}
+
+.ui-acc-metric-tile__content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.ui-acc-metric-tile__label {
+    font-size: 0.8rem;
+    color: var(--oas-acc-muted);
+    font-weight: 500;
+}
+
+.ui-acc-metric-tile__value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #0f172a;
+    letter-spacing: -0.02em;
+}
+
+/* Status Badges */
+.ui-acc-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.ui-acc-badge--draft {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+}
+
+.ui-acc-badge--posted,
+.ui-acc-badge--approved,
+.ui-acc-badge--active {
+    background: #ecfdf5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+}
+
+.ui-acc-badge--closed,
+.ui-acc-badge--locked {
+    background: #fff7ed;
+    color: #9a3412;
+    border: 1px solid #fed7aa;
+}
+
+.ui-acc-badge--inactive,
+.ui-acc-badge--cancelled,
+.ui-acc-badge--reversed {
+    background: #fef2f2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+}
+
+/* Cards & Surfaces */
+.ui-acc-card {
+    background: #ffffff;
+    border-radius: 0.5rem;
+    border: 1px solid var(--oas-acc-card-border);
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ui-acc-card:hover {
+    border-color: var(--oas-acc-card-hover-border);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.06);
+}
+
+.ui-acc-card__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.ui-acc-card__title {
+    font-weight: 600;
+    font-size: 1rem;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.ui-acc-card__body {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 0.75rem;
+    font-size: 0.85rem;
+}
+
+.ui-acc-card__footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #f1f5f9;
+}
+
+/* Entry Line Grid / Table */
+.ui-acc-grid-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: #ffffff;
+    border: 1px solid var(--oas-acc-card-border);
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.ui-acc-grid-table th {
+    background: #f8fafc;
+    color: #475569;
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-align: right;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--oas-acc-card-border);
+}
+
+.ui-acc-grid-table td {
+    padding: 0.65rem 1rem;
+    font-size: 0.85rem;
+    color: #1e293b;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+}
+
+.ui-acc-grid-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.ui-acc-grid-table tbody tr:hover {
+    background-color: #f8fafc;
+}
+
+.ui-acc-grid-table tfoot td {
+    background: #f8fafc;
+    font-weight: 700;
+    border-top: 2px solid var(--oas-acc-card-border);
+    padding: 0.75rem 1rem;
+}
+
+/* Debit & Credit styling */
+.ui-acc-val--debit {
+    color: var(--oas-acc-debit);
+    font-weight: 600;
+}
+
+.ui-acc-val--credit {
+    color: var(--oas-acc-credit);
+    font-weight: 600;
+}
+
+.ui-acc-balanced-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.ui-acc-balanced-badge--balanced {
+    background: #ecfdf5;
+    color: #065f46;
+}
+
+.ui-acc-balanced-badge--unbalanced {
+    background: #fef2f2;
+    color: #991b1b;
+}
+
+/* Home hub grid */
+.ui-acc-hub-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.25rem;
+}
+
+.ui-acc-hub-card {
+    background: #ffffff;
+    border-radius: 0.75rem;
+    border: 1px solid var(--oas-acc-card-border);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    text-decoration: none;
+    color: inherit;
+}
+
+.ui-acc-hub-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+    border-color: var(--oas-acc-primary-light);
+}
+
+.ui-acc-hub-card__icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 0.5rem;
+    background: #eff6ff;
+    color: var(--oas-acc-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+
+.ui-acc-hub-card__title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.ui-acc-hub-card__desc {
+    font-size: 0.85rem;
+    color: var(--oas-acc-muted);
+    line-height: 1.5;
+}

@@ -1,0 +1,34 @@
+@namespace OAS.UiLib.Components.Accounting.PostingProfiles
+
+<div class="ui-acc-card">
+    <div class="ui-acc-card__header">
+        <div class="ui-acc-card__title">
+            <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+            <span>@Code — @Name</span>
+        </div>
+        <OAS.UiLib.Components.Accounting.Workspace.UiAccountingStatusBadge Text="@(IsActive ? "نشط" : "معطل")" State="@(IsActive ? "active" : "inactive")" />
+    </div>
+    <div class="ui-acc-card__body">
+        <div><strong>الموديول المصدر:</strong> @SourceModuleText</div>
+        <div><strong>نوع المستند:</strong> @DocumentTypeText</div>
+        <div><strong>عدد أسطر الترحيل:</strong> @LinesCount سطر</div>
+    </div>
+    <div class="ui-acc-card__footer">
+        @if (OnEdit.HasDelegate)
+        {
+            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="OnEdit">
+                <i class="fa-solid fa-pen" aria-hidden="true"></i> تعديل القواعد
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Code { get; set; } = string.Empty;
+    [Parameter] public string Name { get; set; } = string.Empty;
+    [Parameter] public string SourceModuleText { get; set; } = string.Empty;
+    [Parameter] public string DocumentTypeText { get; set; } = string.Empty;
+    [Parameter] public int LinesCount { get; set; }
+    [Parameter] public bool IsActive { get; set; }
+    [Parameter] public EventCallback OnEdit { get; set; }
+}

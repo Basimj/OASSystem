@@ -1,0 +1,34 @@
+@namespace OAS.UiLib.Components.Accounting.Workspace
+
+<div class="ui-acc-metric-tile @VariantClass">
+    <div class="ui-acc-metric-tile__icon">
+        <i class="@IconCssClass" aria-hidden="true"></i>
+    </div>
+    <div class="ui-acc-metric-tile__content">
+        <span class="ui-acc-metric-tile__label">@Label</span>
+        <span class="ui-acc-metric-tile__value">@Value</span>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = string.Empty;
+    [Parameter] public string Value { get; set; } = string.Empty;
+    [Parameter] public string IconCssClass { get; set; } = "fa-solid fa-coins";
+    [Parameter] public MetricVariant Variant { get; set; } = MetricVariant.Default;
+
+    public enum MetricVariant
+    {
+        Default,
+        Debit,
+        Credit,
+        Balance
+    }
+
+    private string VariantClass => Variant switch
+    {
+        MetricVariant.Debit => "ui-acc-metric-tile--debit",
+        MetricVariant.Credit => "ui-acc-metric-tile--credit",
+        MetricVariant.Balance => "ui-acc-metric-tile--balance",
+        _ => string.Empty
+    };
+}

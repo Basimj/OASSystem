@@ -1,0 +1,35 @@
+@namespace OAS.UiLib.Components.Accounting.Workspace
+
+<section class="ui-acc-workspace" dir="rtl">
+    @if (Actions is not null)
+    {
+        <div class="ui-acc-workspace__actions">
+            @Actions
+        </div>
+    }
+
+    @if (Metrics is not null)
+    {
+        <div class="ui-acc-metrics">
+            @Metrics
+        </div>
+    }
+
+    @if (Tabs is not null)
+    {
+        <div class="ui-acc-workspace__tabs">
+            @Tabs
+        </div>
+    }
+
+    <div class="ui-acc-workspace__body">
+        @Body
+    </div>
+</section>
+
+@code {
+    [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public RenderFragment? Metrics { get; set; }
+    [Parameter] public RenderFragment? Tabs { get; set; }
+    [Parameter] public RenderFragment? Body { get; set; }
+}

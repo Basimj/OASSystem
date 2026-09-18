@@ -1,0 +1,216 @@
+@page "/accounting/fiscal-years"
+@attribute [Authorize]
+@inject IAccountingClientService AccountingService
+@inject IUiSnackbarService Snackbar
+@using OAS.Contracts.Accounting.FiscalYears
+@using OAS.Contracts.Accounting.FiscalPeriods
+@using OAS.Contracts.Accounting.Enums
+
+<PageTitle>السنوات والفترات المالية | OAS</PageTitle>
+
+<UiAccountingWorkspace>
+    <Actions>
+        <UiButton Text="سنة مالية جديدة"
+                  IconCssClass="fa-solid fa-plus"
+                  Size="ControlSize.Small"
+                  OnClick="OpenCreateYearModal" />
+        <UiButton Text="تحديث"
+                  IconCssClass="fa-solid fa-rotate"
+                  Variant="ButtonVariant.Secondary"
+                  Size="ControlSize.Small"
+                  Loading="@_loading"
+                  OnClick="LoadDataAsync" />
+        <UiSearchInput @bind-Value="_searchTerm"
+                       Placeholder="ابحث باسم السنة أو الكود..."
+                       DebounceMilliseconds="300"
+                       OnSearch="SearchChangedAsync" />
+    </Actions>
+
+    <Metrics>
+        <UiAccountingMetricTile Label="السنوات المالية" Value="@_years.Count.ToString()" IconCssClass="fa-solid fa-calendar-days" />
+        <UiAccountingMetricTile Label="الفترات المالية" Value="@_periods.Count.ToString()" IconCssClass="fa-solid fa-calendar-week" Variant="UiAccountingMetricTile.MetricVariant.Balance" />
+    </Metrics>
+
+    <Body>
+        <UiCard Title="السنوات المالية" Subtitle="إدارة الدورات المحاسبية السنوية">
+            @if (_loading)
+            {
+                <UiAlert Message="جاري تحميل السنوات المالية..." Tone="AlertTone.Info" />
+            }
+            else if (_years.Count == 0)
+            {
+                <UiAlert Message="لا توجد سنوات مالية مسجلة." Tone="AlertTone.Warning" />
+            }
+            else
+            {
+                @foreach (var yr in _years)
+                {
+                    <UiFiscalYearCard Code="@yr.Code"
+                                      Name="@yr.Name"
+                                      StartDateText="@yr.StartDate.ToString("yyyy-MM-dd")"
+                                      EndDateText="@yr.EndDate.ToString("yyyy-MM-dd")"
+                                      PeriodsCount="12"
+                                      StatusText="@yr.Status.ToString()"
+                                      StatusState="@(yr.Status == FiscalYearStatus.Open ? "open" : "closed")"
+                                      OnSelect="@(() => SelectYear(yr))" />
+                }
+            }
+        </UiCard>
+
+        @if (_selectedYear is not null)
+        {
+            <UiCard Title="@($"فترات السنة المالية: {_selectedYear.Name}")" Subtitle="ضبط أقفال الفترات الشهرية">
+                @if (_periods.Count == 0)
+                {
+                    <UiAlert Message="لا توجد فترات مالية لهذه السنة." Tone="AlertTone.Info" />
+                }
+                else
+                {
+                    @foreach (var p in _periods.Where(x => x.FiscalYearId == _selectedYear.Id))
+                    {
+                        <UiFiscalPeriodCard PeriodNumber="@p.PeriodNumber"
+                                            Name="@p.Name"
+                                            StartDateText="@p.StartDate.ToString("yyyy-MM-dd")"
+                                            EndDateText="@p.EndDate.ToString("yyyy-MM-dd")"
+                                            StatusText="@p.Status.ToString()"
+                                            StatusState="@(p.Status == FiscalPeriodStatus.Open ? "open" : "closed")"
+                                            IsSalesLocked="@p.SalesLocked"
+                                            IsInventoryLocked="@p.InventoryLocked"
+                                            IsAccountingLocked="@p.AccountingLocked"
+                                            OnToggleLocks="@(() => TogglePeriodLockAsync(p))" />
+                    }
+                }
+            </UiCard>
+        }
+    </Body>
+</UiAccountingWorkspace>
+
+@if (_showCreateModal)
+{
+    <UiAccountingDialog Title="إنشاء سنة مالية جديدة" OnClose="CloseCreateYearModal">
+        <ChildContent>
+            <UiInputText Label="كود السنة (مثال: FY-2026)" @bind-Value="_createCode" />
+            <UiInputText Label="اسم السنة (مثال: السنة المالية 2026)" @bind-Value="_createName" />
+        </ChildContent>
+        <Footer>
+            <UiButton Text="حفظ السنة والفترات" IconCssClass="fa-solid fa-floppy-disk" Loading="@_saving" OnClick="SaveYearAsync" />
+            <UiButton Text="إلغاء" Variant="ButtonVariant.Ghost" OnClick="CloseCreateYearModal" />
+        </Footer>
+    </UiAccountingDialog>
+}
+
+@code {
+    private bool _loading = true;
+    private bool _saving;
+    private string _searchTerm = string.Empty;
+    private IReadOnlyList<FiscalYearDto> _years = [];
+    private IReadOnlyList<FiscalPeriodDto> _periods = [];
+    private FiscalYearDto? _selectedYear;
+
+    private bool _showCreateModal;
+    private string _createCode = string.Empty;
+    private string _createName = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        try
+        {
+            var res = await AccountingService.GetFiscalYearsPageAsync(new PageRequest { PageNumber = 1, PageSize = 50, Search = _searchTerm });
+            _years = res.Items ?? [];
+
+            var periodsRes = await AccountingService.GetFiscalPeriodsPageAsync(new PageRequest { PageNumber = 1, PageSize = 100 });
+            _periods = periodsRes.Items ?? [];
+
+            if (_selectedYear is not null)
+            {
+                _selectedYear = _years.FirstOrDefault(x => x.Id == _selectedYear.Id);
+            }
+            else if (_years.Count > 0)
+            {
+                SelectYear(_years[0]);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Error("تعذر تحميل السنوات المالية: " + ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SearchChangedAsync(string text)
+    {
+        _searchTerm = text;
+        await LoadDataAsync();
+    }
+
+    private void SelectYear(FiscalYearDto yr)
+    {
+        _selectedYear = yr;
+    }
+
+    private async Task TogglePeriodLockAsync(FiscalPeriodDto p)
+    {
+        var nextLock = !p.AccountingLocked;
+        var req = new SetFiscalPeriodLocksRequest(nextLock, nextLock, nextLock, p.RowVersion);
+        var success = await AccountingService.SetPeriodLocksAsync(p.Id, req);
+        if (success)
+        {
+            Snackbar.Success(nextLock ? "تم إقفال الفترة." : "تم فتح الفترة.");
+            await LoadDataAsync();
+        }
+        else
+        {
+            Snackbar.Error("تعذر تحديث إقفال الفترة.");
+        }
+    }
+
+    private void OpenCreateYearModal()
+    {
+        _createCode = $"FY-{DateTime.Today.Year}";
+        _createName = $"السنة المالية {DateTime.Today.Year}";
+        _showCreateModal = true;
+    }
+
+    private void CloseCreateYearModal() => _showCreateModal = false;
+
+    private async Task SaveYearAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_createCode) || string.IsNullOrWhiteSpace(_createName))
+        {
+            Snackbar.Warning("يرجى ملء جميع الحقول المطلوبة.");
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var start = new DateOnly(DateTime.Today.Year, 1, 1);
+            var end = new DateOnly(DateTime.Today.Year, 12, 31);
+            var req = new CreateFiscalYearRequest(_createCode, _createName, start, end);
+            var res = await AccountingService.CreateFiscalYearAsync(req);
+            if (res is not null)
+            {
+                Snackbar.Success("تم إنشاء السنة المالية بنجاح.");
+                CloseCreateYearModal();
+                await LoadDataAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Error("فشل إنشاء السنة: " + ex.Message);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

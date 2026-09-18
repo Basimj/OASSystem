@@ -1,0 +1,86 @@
+@page "/accounting/customer-accounts"
+@attribute [Authorize]
+@inject IAccountingClientService AccountingService
+@inject IUiSnackbarService Snackbar
+@using OAS.Contracts.Accounting.CustomerAccounts
+
+<PageTitle>حسابات العملاء المحاسبية | OAS</PageTitle>
+
+<UiAccountingWorkspace>
+    <Actions>
+        <UiButton Text="تحديث"
+                  IconCssClass="fa-solid fa-rotate"
+                  Variant="ButtonVariant.Secondary"
+                  Size="ControlSize.Small"
+                  Loading="@_loading"
+                  OnClick="LoadDataAsync" />
+        <UiSearchInput @bind-Value="_searchTerm"
+                       Placeholder="ابحث برقم حساب العميل أو الكود..."
+                       DebounceMilliseconds="300"
+                       OnSearch="SearchChangedAsync" />
+    </Actions>
+
+    <Metrics>
+        <UiAccountingMetricTile Label="إجمالي حسابات العملاء" Value="@_items.Count.ToString()" IconCssClass="fa-solid fa-users-line" />
+        <UiAccountingMetricTile Label="الحسابات النشطة" Value="@_items.Count(x => x.IsActive).ToString()" IconCssClass="fa-solid fa-user-check" Variant="UiAccountingMetricTile.MetricVariant.Debit" />
+    </Metrics>
+
+    <Body>
+        @if (_loading)
+        {
+            <UiAlert Message="جاري تحميل حسابات العملاء..." Tone="AlertTone.Info" />
+        }
+        else if (_items.Count == 0)
+        {
+            <UiAlert Message="لا توجد حسابات عملاء مسجلة." Tone="AlertTone.Warning" />
+        }
+        else
+        {
+            @foreach (var c in _items)
+            {
+                <UiPartyAccountCard PartyName="@($"العميل: {c.CustomerId}")"
+                                    AccountCode="@c.AccountId.ToString()[..8]"
+                                    CreditLimit="0"
+                                    PaymentTermsDays="0"
+                                    GlAccountCode="@c.ControlAccountId.ToString()[..8]"
+                                    OpeningBalance="0"
+                                    IsActive="@c.IsActive" />
+            }
+        }
+    </Body>
+</UiAccountingWorkspace>
+
+@code {
+    private bool _loading = true;
+    private string _searchTerm = string.Empty;
+    private IReadOnlyList<CustomerAccountDto> _items = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        try
+        {
+            var res = await AccountingService.GetCustomerAccountsPageAsync(new PageRequest { PageNumber = 1, PageSize = 50, Search = _searchTerm });
+            _items = res.Items ?? [];
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Error("تعذر تحميل حسابات العملاء: " + ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SearchChangedAsync(string text)
+    {
+        _searchTerm = text;
+        await LoadDataAsync();
+    }
+}

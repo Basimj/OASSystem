@@ -1,0 +1,153 @@
+@page "/accounting/posting-profiles"
+@attribute [Authorize]
+@inject IAccountingClientService AccountingService
+@inject IUiSnackbarService Snackbar
+@using OAS.Contracts.Accounting.PostingProfiles
+
+<PageTitle>ملفات الترحيل التلقائي | OAS</PageTitle>
+
+<UiAccountingWorkspace>
+    <Actions>
+        <UiButton Text="ملف ترحيل جديد"
+                  IconCssClass="fa-solid fa-plus"
+                  Size="ControlSize.Small"
+                  OnClick="OpenCreateModal" />
+        <UiButton Text="تحديث"
+                  IconCssClass="fa-solid fa-rotate"
+                  Variant="ButtonVariant.Secondary"
+                  Size="ControlSize.Small"
+                  Loading="@_loading"
+                  OnClick="LoadDataAsync" />
+        <UiSearchInput @bind-Value="_searchTerm"
+                       Placeholder="ابحث باسم الملف أو الكود..."
+                       DebounceMilliseconds="300"
+                       OnSearch="SearchChangedAsync" />
+    </Actions>
+
+    <Metrics>
+        <UiAccountingMetricTile Label="إجمالي ملفات الترحيل" Value="@_items.Count.ToString()" IconCssClass="fa-solid fa-sliders" />
+        <UiAccountingMetricTile Label="الملفات النشطة" Value="@_items.Count(x => x.IsActive).ToString()" IconCssClass="fa-solid fa-check-circle" Variant="UiAccountingMetricTile.MetricVariant.Debit" />
+    </Metrics>
+
+    <Body>
+        @if (_loading)
+        {
+            <UiAlert Message="جاري تحميل ملفات الترحيل..." Tone="AlertTone.Info" />
+        }
+        else if (_items.Count == 0)
+        {
+            <UiAlert Message="لا توجد ملفات ترحيل مسجلة." Tone="AlertTone.Warning" />
+        }
+        else
+        {
+            @foreach (var p in _items)
+            {
+                <UiPostingProfileCard Code="@p.Code"
+                                      Name="@p.Name"
+                                      SourceModuleText="@p.Module"
+                                      DocumentTypeText="@p.DocumentType"
+                                      LinesCount="@p.Lines.Count"
+                                      IsActive="@p.IsActive" />
+            }
+        }
+    </Body>
+</UiAccountingWorkspace>
+
+@if (_showCreateModal)
+{
+    <UiAccountingDialog Title="إضافة ملف ترحيل جديد" OnClose="CloseCreateModal">
+        <ChildContent>
+            <UiInputText Label="كود الملف" @bind-Value="_createCode" />
+            <UiInputText Label="اسم ملف الترحيل" @bind-Value="_createName" />
+        </ChildContent>
+        <Footer>
+            <UiButton Text="حفظ الملف" IconCssClass="fa-solid fa-floppy-disk" Loading="@_saving" OnClick="SaveProfileAsync" />
+            <UiButton Text="إلغاء" Variant="ButtonVariant.Ghost" OnClick="CloseCreateModal" />
+        </Footer>
+    </UiAccountingDialog>
+}
+
+@code {
+    private bool _loading = true;
+    private bool _saving;
+    private string _searchTerm = string.Empty;
+    private IReadOnlyList<PostingProfileDto> _items = [];
+
+    private bool _showCreateModal;
+    private string _createCode = string.Empty;
+    private string _createName = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        try
+        {
+            var res = await AccountingService.GetPostingProfilesPageAsync(new PageRequest { PageNumber = 1, PageSize = 50, Search = _searchTerm });
+            _items = res.Items ?? [];
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Error("تعذر تحميل ملفات الترحيل: " + ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SearchChangedAsync(string text)
+    {
+        _searchTerm = text;
+        await LoadDataAsync();
+    }
+
+    private void OpenCreateModal()
+    {
+        _createCode = string.Empty;
+        _createName = string.Empty;
+        _showCreateModal = true;
+    }
+
+    private void CloseCreateModal() => _showCreateModal = false;
+
+    private async Task SaveProfileAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_createCode) || string.IsNullOrWhiteSpace(_createName))
+        {
+            Snackbar.Warning("يرجى ملء الكود والاسم.");
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var req = new CreatePostingProfileRequest(
+                _createCode,
+                _createName,
+                "Sales",
+                "Invoice",
+                []);
+
+            var res = await AccountingService.CreatePostingProfileAsync(req);
+            if (res is not null)
+            {
+                Snackbar.Success("تم إنشاء ملف الترحيل بنجاح.");
+                CloseCreateModal();
+                await LoadDataAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Error("فشل إنشاء ملف الترحيل: " + ex.Message);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

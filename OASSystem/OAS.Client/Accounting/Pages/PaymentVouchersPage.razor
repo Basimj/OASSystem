@@ -1,0 +1,190 @@
+@page "/accounting/payment-vouchers"
+@attribute [Authorize]
+@inject IAccountingClientService AccountingService
+@inject IUiSnackbarService Snackbar
+@using OAS.Contracts.Accounting.PaymentVouchers
+@using OAS.Contracts.Accounting.Enums
+
+<PageTitle>سندات الصرف | OAS</PageTitle>
+
+<UiAccountingWorkspace>
+    <Actions>
+        <UiButton Text="سند صرف جديد"
+                  IconCssClass="fa-solid fa-plus"
+                  Size="ControlSize.Small"
+                  OnClick="OpenCreateModal" />
+        <UiButton Text="تحديث"
+                  IconCssClass="fa-solid fa-rotate"
+                  Variant="ButtonVariant.Secondary"
+                  Size="ControlSize.Small"
+                  Loading="@_loading"
+                  OnClick="LoadDataAsync" />
+        <UiSearchInput @bind-Value="_searchTerm"
+                       Placeholder="ابحث برقم السند أو اسم المستفيد..."
+                       DebounceMilliseconds="300"
+                       OnSearch="SearchChangedAsync" />
+    </Actions>
+
+    <Metrics>
+        <UiAccountingMetricTile Label="إجمالي السندات" Value="@_totalCount.ToString()" IconCssClass="fa-solid fa-file-invoice" />
+        <UiAccountingMetricTile Label="إجمالي المبالغ المصروفة" Value="@_items.Sum(x => x.TotalAmount).ToString("N2")" IconCssClass="fa-solid fa-money-bill-transfer" Variant="UiAccountingMetricTile.MetricVariant.Credit" />
+    </Metrics>
+
+    <Body>
+        @if (_loading)
+        {
+            <UiAlert Message="جاري تحميل سندات الصرف..." Tone="AlertTone.Info" />
+        }
+        else if (_items.Count == 0)
+        {
+            <UiAlert Message="لا توجد سندات صرف مسجلة." Tone="AlertTone.Warning" />
+        }
+        else
+        {
+            @foreach (var v in _items)
+            {
+                <UiVoucherCard IsReceipt="false"
+                               VoucherNumber="@v.VoucherNumber"
+                               DateText="@v.VoucherDate.ToString("yyyy-MM-dd")"
+                               Amount="@v.TotalAmount"
+                               PartyName="@(string.IsNullOrWhiteSpace(v.BeneficiaryName) ? "غير محدد" : v.BeneficiaryName)"
+                               PaymentMethodText="@v.PaymentMethod.ToString()"
+                               AccountName="الصندوق / البنك"
+                               ReferenceNumber=""
+                               AllocatedAmount="@v.TotalAmount"
+                               StatusText="@v.Status.ToString()"
+                               StatusState="@(v.Status == PaymentVoucherStatus.Posted ? "posted" : "draft")"
+                               CanPost="@(v.Status == PaymentVoucherStatus.Draft)"
+                               OnPost="@(() => PostVoucherAsync(v))" />
+            }
+        }
+    </Body>
+</UiAccountingWorkspace>
+
+@if (_showCreateModal)
+{
+    <UiAccountingDialog Title="إنشاء سند صرف جديد" OnClose="CloseCreateModal">
+        <ChildContent>
+            <UiInputText Label="اسم المستفيد / الجهة" @bind-Value="_createPayeeName" />
+            <UiAccountingMoneyInput @bind-Value="_createAmount" Currency="ر.س" IsCredit="true" />
+            <UiInputText Label="البيان" @bind-Value="_createDescription" />
+        </ChildContent>
+        <Footer>
+            <UiButton Text="حفظ السند" IconCssClass="fa-solid fa-floppy-disk" Loading="@_saving" OnClick="SaveVoucherAsync" />
+            <UiButton Text="إلغاء" Variant="ButtonVariant.Ghost" OnClick="CloseCreateModal" />
+        </Footer>
+    </UiAccountingDialog>
+}
+
+@code {
+    private bool _loading = true;
+    private bool _saving;
+    private string _searchTerm = string.Empty;
+    private int _pageNumber = 1;
+    private int _pageSize = 50;
+    private long _totalCount;
+    private IReadOnlyList<PaymentVoucherDto> _items = [];
+
+    private bool _showCreateModal;
+    private string _createPayeeName = string.Empty;
+    private decimal _createAmount;
+    private string _createDescription = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        try
+        {
+            var req = new PageRequest { PageNumber = _pageNumber, PageSize = _pageSize, Search = _searchTerm };
+            var res = await AccountingService.GetPaymentVouchersPageAsync(req);
+            _items = res.Items ?? [];
+            _totalCount = res.TotalCount;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Error("تعذر تحميل سندات الصرف: " + ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SearchChangedAsync(string text)
+    {
+        _searchTerm = text;
+        _pageNumber = 1;
+        await LoadDataAsync();
+    }
+
+    private async Task PostVoucherAsync(PaymentVoucherDto v)
+    {
+        var req = new SetPaymentVoucherStatusRequest(PaymentVoucherStatus.Posted, v.RowVersion);
+        var ok = await AccountingService.SetPaymentVoucherStatusAsync(v.Id, req);
+        if (ok)
+        {
+            Snackbar.Success("تم ترحيل سند الصرف بنجاح.");
+            await LoadDataAsync();
+        }
+        else
+        {
+            Snackbar.Error("تعذر ترحيل السند.");
+        }
+    }
+
+    private void OpenCreateModal()
+    {
+        _createPayeeName = string.Empty;
+        _createAmount = 0;
+        _createDescription = string.Empty;
+        _showCreateModal = true;
+    }
+
+    private void CloseCreateModal() => _showCreateModal = false;
+
+    private async Task SaveVoucherAsync()
+    {
+        if (_createAmount <= 0)
+        {
+            Snackbar.Warning("يرجى إدخال مبلغ صحيح للسند.");
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var req = new CreatePaymentVoucherRequest(
+                DateOnly.FromDateTime(DateTime.Today),
+                PaymentPartyType.Other,
+                null,
+                _createPayeeName,
+                PaymentMethod.Cash,
+                null,
+                null,
+                _createAmount,
+                _createDescription,
+                []);
+
+            var res = await AccountingService.CreatePaymentVoucherAsync(req);
+            if (res is not null)
+            {
+                Snackbar.Success("تم حفظ سند الصرف بنجاح.");
+                CloseCreateModal();
+                await LoadDataAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Error("فشل حفظ السند: " + ex.Message);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

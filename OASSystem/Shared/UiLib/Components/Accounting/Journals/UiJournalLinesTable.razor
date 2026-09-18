@@ -1,0 +1,61 @@
+@namespace OAS.UiLib.Components.Accounting.Journals
+
+<table class="ui-acc-grid-table">
+    <thead>
+        <tr>
+            <th>#</th>
+            <th>كود الحساب</th>
+            <th>اسم الحساب</th>
+            <th>البيان</th>
+            <th>مركز التكلفة</th>
+            <th>مدين</th>
+            <th>دائن</th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (Lines.Count == 0)
+        {
+            <tr>
+                <td colspan="7" class="text-center text-muted py-3">لا توجد أسطر في القيد</td>
+            </tr>
+        }
+        else
+        {
+            var idx = 1;
+            foreach (var line in Lines)
+            {
+                <tr>
+                    <td>@idx</td>
+                    <td><code>@line.AccountCode</code></td>
+                    <td>@line.AccountName</td>
+                    <td>@line.Description</td>
+                    <td>@(string.IsNullOrWhiteSpace(line.CostCenterName) ? "-" : line.CostCenterName)</td>
+                    <td class="ui-acc-val--debit">@(line.Debit > 0 ? line.Debit.ToString("N2") : "-")</td>
+                    <td class="ui-acc-val--credit">@(line.Credit > 0 ? line.Credit.ToString("N2") : "-")</td>
+                </tr>
+                idx++;
+            }
+        }
+    </tbody>
+    <tfoot>
+        <tr>
+            <td colspan="5" class="text-start">الإجمالي</td>
+            <td class="ui-acc-val--debit">@TotalDebit.ToString("N2")</td>
+            <td class="ui-acc-val--credit">@TotalCredit.ToString("N2")</td>
+        </tr>
+    </tfoot>
+</table>
+
+@code {
+    public sealed record JournalLineItem(
+        string AccountCode,
+        string AccountName,
+        string Description,
+        string? CostCenterName,
+        decimal Debit,
+        decimal Credit);
+
+    [Parameter] public IReadOnlyList<JournalLineItem> Lines { get; set; } = [];
+    [Parameter] public decimal TotalDebit { get; set; }
+    [Parameter] public decimal TotalCredit { get; set; }
+}

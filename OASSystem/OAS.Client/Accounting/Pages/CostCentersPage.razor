@@ -1,0 +1,163 @@
+@page "/accounting/cost-centers"
+@attribute [Authorize]
+@inject IAccountingClientService AccountingService
+@inject IUiSnackbarService Snackbar
+@using OAS.Contracts.Accounting.CostCenters
+
+<PageTitle>مراكز التكلفة | OAS</PageTitle>
+
+<UiAccountingWorkspace>
+    <Actions>
+        <UiButton Text="مركز تكلفة جديد"
+                  IconCssClass="fa-solid fa-plus"
+                  Size="ControlSize.Small"
+                  OnClick="OpenCreateModal" />
+        <UiButton Text="تحديث"
+                  IconCssClass="fa-solid fa-rotate"
+                  Variant="ButtonVariant.Secondary"
+                  Size="ControlSize.Small"
+                  Loading="@_loading"
+                  OnClick="LoadDataAsync" />
+        <UiSearchInput @bind-Value="_searchTerm"
+                       Placeholder="ابحث برقم المركز أو الاسم..."
+                       DebounceMilliseconds="300"
+                       OnSearch="SearchChangedAsync" />
+    </Actions>
+
+    <Metrics>
+        <UiAccountingMetricTile Label="إجمالي مراكز التكلفة" Value="@_items.Count.ToString()" IconCssClass="fa-solid fa-network-wired" />
+        <UiAccountingMetricTile Label="المراكز النشطة" Value="@_items.Count(x => x.IsActive).ToString()" IconCssClass="fa-solid fa-check" Variant="UiAccountingMetricTile.MetricVariant.Debit" />
+    </Metrics>
+
+    <Body>
+        @if (_loading)
+        {
+            <UiAlert Message="جاري تحميل مراكز التكلفة..." Tone="AlertTone.Info" />
+        }
+        else if (_items.Count == 0)
+        {
+            <UiAlert Message="لا توجد مراكز تكلفة مسجلة." Tone="AlertTone.Warning" />
+        }
+        else
+        {
+            @foreach (var c in _items)
+            {
+                <UiCostCenterCard Code="@c.Code"
+                                  NameAr="@c.NameAr"
+                                  Level="1"
+                                  AllowPosting="true"
+                                  IsActive="@c.IsActive"
+                                  OnToggleStatus="@(() => ToggleStatusAsync(c))" />
+            }
+        }
+    </Body>
+</UiAccountingWorkspace>
+
+@if (_showCreateModal)
+{
+    <UiAccountingDialog Title="إضافة مركز تكلفة جديد" OnClose="CloseCreateModal">
+        <ChildContent>
+            <UiInputText Label="كود المركز" @bind-Value="_createCode" />
+            <UiInputText Label="اسم المركز" @bind-Value="_createNameAr" />
+        </ChildContent>
+        <Footer>
+            <UiButton Text="حفظ المركز" IconCssClass="fa-solid fa-floppy-disk" Loading="@_saving" OnClick="SaveCostCenterAsync" />
+            <UiButton Text="إلغاء" Variant="ButtonVariant.Ghost" OnClick="CloseCreateModal" />
+        </Footer>
+    </UiAccountingDialog>
+}
+
+@code {
+    private bool _loading = true;
+    private bool _saving;
+    private string _searchTerm = string.Empty;
+    private IReadOnlyList<CostCenterDto> _items = [];
+
+    private bool _showCreateModal;
+    private string _createCode = string.Empty;
+    private string _createNameAr = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _loading = true;
+        try
+        {
+            var res = await AccountingService.GetCostCentersPageAsync(new PageRequest { PageNumber = 1, PageSize = 50, Search = _searchTerm });
+            _items = res.Items ?? [];
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Error("تعذر تحميل مراكز التكلفة: " + ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SearchChangedAsync(string text)
+    {
+        _searchTerm = text;
+        await LoadDataAsync();
+    }
+
+    private async Task ToggleStatusAsync(CostCenterDto c)
+    {
+        var next = !c.IsActive;
+        var req = new SetCostCenterStatusRequest(next, c.RowVersion);
+        var ok = await AccountingService.SetCostCenterStatusAsync(c.Id, req);
+        if (ok)
+        {
+            Snackbar.Success(next ? "تم تفعيل مركز التكلفة." : "تم تعطيل مركز التكلفة.");
+            await LoadDataAsync();
+        }
+        else
+        {
+            Snackbar.Error("تعذر تحديث حالة مركز التكلفة.");
+        }
+    }
+
+    private void OpenCreateModal()
+    {
+        _createCode = string.Empty;
+        _createNameAr = string.Empty;
+        _showCreateModal = true;
+    }
+
+    private void CloseCreateModal() => _showCreateModal = false;
+
+    private async Task SaveCostCenterAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_createCode) || string.IsNullOrWhiteSpace(_createNameAr))
+        {
+            Snackbar.Warning("يرجى إدخال الكود والاسم.");
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var req = new CreateCostCenterRequest(_createCode, _createNameAr, null, null);
+            var res = await AccountingService.CreateCostCenterAsync(req);
+            if (res is not null)
+            {
+                Snackbar.Success("تم حفظ مركز التكلفة.");
+                CloseCreateModal();
+                await LoadDataAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Error("فشل حفظ مركز التكلفة: " + ex.Message);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}
