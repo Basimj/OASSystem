@@ -1,0 +1,98 @@
+@namespace OAS.Client.Accounting.Components
+@using OAS.Contracts.Accounting.BankAccounts
+@using OAS.UiLib.Components.Accounting.Workspace
+@using OAS.UiLib.Components.Inputs
+@using OAS.UiLib.Core.Models
+
+<div class="ui-acc-editor" dir="rtl">
+    <UiAccountingFormSection Title="بيانات الحساب البنكي"
+                             Subtitle="اسم البنك، رقم الحساب، واسم الحساب والآيبان"
+                             IconCssClass="fa-solid fa-building-columns">
+        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+            <UiInputText Label="كود الحساب البنكي"
+                         Value="@Model.Code"
+                         ValueChanged="@(v => { Model.Code = v; OnChanged(); })"
+                         Required="true"
+                         Placeholder="مثال: BANK-01"
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+
+            <UiInputText Label="اسم البنك"
+                         Value="@Model.BankName"
+                         ValueChanged="@(v => { Model.BankName = v; OnChanged(); })"
+                         Required="true"
+                         Placeholder="مثال: بنك اليمن والكويت"
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+
+            <UiInputText Label="اسم الحساب الرسمي"
+                         Value="@Model.AccountName"
+                         ValueChanged="@(v => { Model.AccountName = v; OnChanged(); })"
+                         Required="true"
+                         Placeholder="مثال: حساب العمليات الجاري"
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+
+            <UiInputText Label="رقم الحساب البنكي"
+                         Value="@Model.AccountNumber"
+                         ValueChanged="@(v => { Model.AccountNumber = v; OnChanged(); })"
+                         Required="true"
+                         Placeholder="مثال: 1020304050"
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+
+            <UiInputText Label="رقم الآيبان (IBAN)"
+                         Value="@Model.IBAN"
+                         ValueChanged="@(v => { Model.IBAN = v; OnChanged(); })"
+                         Placeholder="اختياري..."
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+
+            <UiLookup Label="الحساب المحاسبي في الدليل"
+                      Value="@Model.AccountId?.ToString("D")"
+                      ValueChanged="OnAccountChanged"
+                      SelectedItem="@AccountLookupItem"
+                      SearchAsync="AccountSearchAsync"
+                      Placeholder="ابحث عن حساب البنك في الدليل..."
+                      Disabled="@(!IsEditable)"
+                      Required="true"
+                      MinimumSearchLength="0"
+                      DebounceMilliseconds="250" />
+
+            <div class="ui-acc-checks-group d-flex align-items-center mt-4">
+                <UiCheckbox Label="الحساب البنكي نشط"
+                            Value="@Model.IsActive"
+                            ValueChanged="@(v => { Model.IsActive = v; OnChanged(); })"
+                            Disabled="@(!IsEditable)" />
+            </div>
+        </div>
+    </UiAccountingFormSection>
+</div>
+
+@code {
+    public sealed class FormModel
+    {
+        public string Code { get; set; } = string.Empty;
+        public string BankName { get; set; } = string.Empty;
+        public string AccountName { get; set; } = string.Empty;
+        public string AccountNumber { get; set; } = string.Empty;
+        public string? IBAN { get; set; }
+        public Guid? AccountId { get; set; }
+        public bool IsActive { get; set; } = true;
+    }
+
+    [Parameter] public FormModel Model { get; set; } = new();
+    [Parameter] public bool IsEditable { get; set; }
+    [Parameter] public bool IsNew { get; set; }
+    [Parameter] public UiLookupItem? AccountLookupItem { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? AccountSearchAsync { get; set; }
+    [Parameter] public EventCallback OnModelChanged { get; set; }
+
+    private void OnChanged() => OnModelChanged.InvokeAsync();
+
+    private void OnAccountChanged(string? val)
+    {
+        Model.AccountId = Guid.TryParse(val, out var id) ? id : null;
+        OnChanged();
+    }
+}

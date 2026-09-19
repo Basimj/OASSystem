@@ -1,0 +1,79 @@
+@namespace OAS.Client.Accounting.Components
+@using OAS.Contracts.Accounting.Expenses
+@using OAS.UiLib.Components.Accounting.Workspace
+@using OAS.UiLib.Components.Inputs
+@using OAS.UiLib.Core.Models
+
+<div class="ui-acc-editor" dir="rtl">
+    <UiAccountingFormSection Title="بيانات نوع وبند المصروف"
+                             Subtitle="الرمز، التسمية، والحساب المحاسبي الافتراضي المرتبط"
+                             IconCssClass="fa-solid fa-tags">
+        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+            <UiInputText Label="كود نوع المصروف"
+                         Value="@Model.Code"
+                         ValueChanged="@(v => { Model.Code = v; OnChanged(); })"
+                         Required="true"
+                         Placeholder="مثال: EXP-RENT"
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+
+            <UiInputText Label="اسم نوع المصروف (بالعربي)"
+                         Value="@Model.NameAr"
+                         ValueChanged="@(v => { Model.NameAr = v; OnChanged(); })"
+                         Required="true"
+                         Placeholder="مثال: إيجارات المقرات"
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+
+            <UiInputText Label="اسم نوع المصروف (بالإنجليزي)"
+                         Value="@Model.NameEn"
+                         ValueChanged="@(v => { Model.NameEn = v; OnChanged(); })"
+                         Placeholder="مثال: Office Rent"
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+
+            <UiLookup Label="الحساب المحاسبي الافتراضي للمصروف"
+                      Value="@Model.DefaultExpenseAccountId?.ToString("D")"
+                      ValueChanged="OnAccountChanged"
+                      SelectedItem="@AccountLookupItem"
+                      SearchAsync="AccountSearchAsync"
+                      Placeholder="ابحث عن حساب المصروف في الدليل..."
+                      Disabled="@(!IsEditable)"
+                      MinimumSearchLength="0"
+                      DebounceMilliseconds="250" />
+
+            <div class="ui-acc-checks-group d-flex align-items-center mt-4">
+                <UiCheckbox Label="نوع المصروف نشط"
+                            Value="@Model.IsActive"
+                            ValueChanged="@(v => { Model.IsActive = v; OnChanged(); })"
+                            Disabled="@(!IsEditable)" />
+            </div>
+        </div>
+    </UiAccountingFormSection>
+</div>
+
+@code {
+    public sealed class FormModel
+    {
+        public string Code { get; set; } = string.Empty;
+        public string NameAr { get; set; } = string.Empty;
+        public string? NameEn { get; set; }
+        public Guid? DefaultExpenseAccountId { get; set; }
+        public bool IsActive { get; set; } = true;
+    }
+
+    [Parameter] public FormModel Model { get; set; } = new();
+    [Parameter] public bool IsEditable { get; set; }
+    [Parameter] public bool IsNew { get; set; }
+    [Parameter] public UiLookupItem? AccountLookupItem { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? AccountSearchAsync { get; set; }
+    [Parameter] public EventCallback OnModelChanged { get; set; }
+
+    private void OnChanged() => OnModelChanged.InvokeAsync();
+
+    private void OnAccountChanged(string? val)
+    {
+        Model.DefaultExpenseAccountId = Guid.TryParse(val, out var id) ? id : null;
+        OnChanged();
+    }
+}

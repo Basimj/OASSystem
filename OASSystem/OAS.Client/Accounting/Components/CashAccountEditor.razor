@@ -1,0 +1,78 @@
+@namespace OAS.Client.Accounting.Components
+@using OAS.Contracts.Accounting.CashAccounts
+@using OAS.UiLib.Components.Accounting.Workspace
+@using OAS.UiLib.Components.Inputs
+@using OAS.UiLib.Core.Models
+
+<div class="ui-acc-editor" dir="rtl">
+    <UiAccountingFormSection Title="بيانات الصندوق / الخزينة النقدية"
+                             Subtitle="الرمز، الاسم، وربطه بالحساب المحاسبي بدليل الحسابات"
+                             IconCssClass="fa-solid fa-vault">
+        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+            <UiInputText Label="كود الصندوق"
+                         Value="@Model.Code"
+                         ValueChanged="@(v => { Model.Code = v; OnChanged(); })"
+                         Required="true"
+                         Placeholder="مثال: CASH-MAIN"
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+
+            <UiInputText Label="اسم الصندوق"
+                         Value="@Model.Name"
+                         ValueChanged="@(v => { Model.Name = v; OnChanged(); })"
+                         Required="true"
+                         Placeholder="مثال: الخزينة الرئيسية"
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+
+            <UiLookup Label="الحساب المحاسبي المرتبط"
+                      Value="@Model.AccountId?.ToString("D")"
+                      ValueChanged="OnAccountChanged"
+                      SelectedItem="@AccountLookupItem"
+                      SearchAsync="AccountSearchAsync"
+                      Placeholder="ابحث في دليل الحسابات..."
+                      Disabled="@(!IsEditable)"
+                      Required="true"
+                      MinimumSearchLength="0"
+                      DebounceMilliseconds="250" />
+
+            <div class="ui-acc-checks-group d-flex align-items-center gap-4 mt-4">
+                <UiCheckbox Label="الصندوق الافتراضي للفرع"
+                            Value="@Model.IsDefault"
+                            ValueChanged="@(v => { Model.IsDefault = v; OnChanged(); })"
+                            Disabled="@(!IsEditable)" />
+
+                <UiCheckbox Label="الصندوق نشط"
+                            Value="@Model.IsActive"
+                            ValueChanged="@(v => { Model.IsActive = v; OnChanged(); })"
+                            Disabled="@(!IsEditable)" />
+            </div>
+        </div>
+    </UiAccountingFormSection>
+</div>
+
+@code {
+    public sealed class FormModel
+    {
+        public string Code { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public Guid? AccountId { get; set; }
+        public bool IsDefault { get; set; }
+        public bool IsActive { get; set; } = true;
+    }
+
+    [Parameter] public FormModel Model { get; set; } = new();
+    [Parameter] public bool IsEditable { get; set; }
+    [Parameter] public bool IsNew { get; set; }
+    [Parameter] public UiLookupItem? AccountLookupItem { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? AccountSearchAsync { get; set; }
+    [Parameter] public EventCallback OnModelChanged { get; set; }
+
+    private void OnChanged() => OnModelChanged.InvokeAsync();
+
+    private void OnAccountChanged(string? val)
+    {
+        Model.AccountId = Guid.TryParse(val, out var id) ? id : null;
+        OnChanged();
+    }
+}

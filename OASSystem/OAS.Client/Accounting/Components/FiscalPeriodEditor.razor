@@ -1,0 +1,103 @@
+@namespace OAS.Client.Accounting.Components
+@using OAS.Contracts.Accounting.FiscalPeriods
+@using OAS.Contracts.Accounting.Enums
+@using OAS.Client.Accounting.Common
+@using OAS.UiLib.Components.Accounting.Workspace
+@using OAS.UiLib.Components.Inputs
+@using OAS.UiLib.Core.Models
+
+<div class="ui-acc-editor" dir="rtl">
+    <UiAccountingFormSection Title="بيانات الفترة المالية"
+                             Subtitle="رقم الفترة، المسمى، ونطاق التاريخ"
+                             IconCssClass="fa-solid fa-calendar-week">
+        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+            <UiInputText Label="اسم الفترة (مثال: يناير 2026)"
+                         Value="@Model.Name"
+                         ValueChanged="@(v => { Model.Name = v; OnChanged(); })"
+                         Required="true"
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+
+            <UiInputText Label="رقم الفترة (1-12)"
+                         Value="@Model.PeriodNumber.ToString()"
+                         ReadOnly="true"
+                         Disabled="true"
+                         Size="ControlSize.Small" />
+
+            <UiInputDate Label="تاريخ البداية"
+                         Value="@Model.StartDate"
+                         ValueChanged="@(v => { if (v.HasValue) { Model.StartDate = v.Value; OnChanged(); } })"
+                         Required="true"
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+
+            <UiInputDate Label="تاريخ النهاية"
+                         Value="@Model.EndDate"
+                         ValueChanged="@(v => { if (v.HasValue) { Model.EndDate = v.Value; OnChanged(); } })"
+                         Required="true"
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+        </div>
+    </UiAccountingFormSection>
+
+    <UiAccountingFormSection Title="حالة الفترة وأقفال الوحدات التشغيلية"
+                             Subtitle="التحكم في إمكانية إجراء العمليات المحاسبية والمخزنية والمبيعات"
+                             IconCssClass="fa-solid fa-shield-halved">
+        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+            <UiSelect Label="حالة الفترة"
+                      Value="@Model.Status.ToString()"
+                      ValueChanged="OnStatusChanged"
+                      Options="@AccountingArabicPresenter.FiscalPeriodStatusOptions"
+                      Disabled="@(!IsEditable)"
+                      Size="ControlSize.Small" />
+        </div>
+
+        <div class="ui-acc-checks-group mt-3">
+            <UiCheckbox Label="قفل المبيعات (منع ترحيل فواتير المبيعات)"
+                        Value="@Model.SalesLocked"
+                        ValueChanged="@(v => { Model.SalesLocked = v; OnChanged(); })"
+                        Disabled="@(!IsEditable)" />
+
+            <UiCheckbox Label="قفل المخزون (منع حركات الجرد والتحويل)"
+                        Value="@Model.InventoryLocked"
+                        ValueChanged="@(v => { Model.InventoryLocked = v; OnChanged(); })"
+                        Disabled="@(!IsEditable)" />
+
+            <UiCheckbox Label="قفل المحاسبة (منع القيود اليومية والتسويات)"
+                        Value="@Model.AccountingLocked"
+                        ValueChanged="@(v => { Model.AccountingLocked = v; OnChanged(); })"
+                        Disabled="@(!IsEditable)" />
+        </div>
+    </UiAccountingFormSection>
+</div>
+
+@code {
+    public sealed class FormModel
+    {
+        public Guid FiscalYearId { get; set; }
+        public int PeriodNumber { get; set; } = 1;
+        public string Name { get; set; } = string.Empty;
+        public DateOnly StartDate { get; set; }
+        public DateOnly EndDate { get; set; }
+        public FiscalPeriodStatus Status { get; set; } = FiscalPeriodStatus.Open;
+        public bool SalesLocked { get; set; }
+        public bool InventoryLocked { get; set; }
+        public bool AccountingLocked { get; set; }
+    }
+
+    [Parameter] public FormModel Model { get; set; } = new();
+    [Parameter] public bool IsEditable { get; set; }
+    [Parameter] public string? RowVersion { get; set; }
+    [Parameter] public EventCallback OnModelChanged { get; set; }
+
+    private void OnChanged() => OnModelChanged.InvokeAsync();
+
+    private void OnStatusChanged(string val)
+    {
+        if (Enum.TryParse<FiscalPeriodStatus>(val, out var res))
+        {
+            Model.Status = res;
+            OnChanged();
+        }
+    }
+}

@@ -22,6 +22,7 @@ public class AccountingControllersRoutingAndSecurityTests
         typeof(FiscalYearsController),
         typeof(JournalEntriesController),
         typeof(PaymentVouchersController),
+        typeof(PaymentAllocationsController),
         typeof(PostingProfilesController),
         typeof(ReceiptVouchersController),
         typeof(SupplierAccountsController)

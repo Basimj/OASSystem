@@ -1,0 +1,121 @@
+@namespace OAS.Client.Accounting.Components
+@using OAS.Contracts.Accounting.Journals
+@using OAS.Contracts.Accounting.Enums
+@using OAS.Client.Accounting.Common
+@using OAS.UiLib.Components.Accounting.Workspace
+@using OAS.UiLib.Components.Accounting.Journals
+@using OAS.UiLib.Components.Inputs
+@using OAS.UiLib.Core.Models
+
+<div class="ui-acc-editor" dir="rtl">
+    <UiAccountingFormSection Title="ترويسة وبيانات القيد"
+                             Subtitle="نوع القيد، التواريخ، والبيان العام"
+                             IconCssClass="fa-solid fa-file-invoice">
+        <div class="ui-acc-form-grid ui-acc-form-grid--3col">
+            <UiInputText Label="رقم القيد"
+                         Value="@Model.JournalNumber"
+                         ReadOnly="true"
+                         Disabled="true"
+                         Placeholder="توليد تلقائي..."
+                         Size="ControlSize.Small" />
+
+            <UiSelect Label="نوع القيد"
+                      Value="@Model.JournalType.ToString()"
+                      ValueChanged="OnTypeChanged"
+                      Options="@AccountingArabicPresenter.JournalTypeOptions"
+                      Disabled="@(!IsEditable)"
+                      Size="ControlSize.Small" />
+
+            <UiLookup Label="الفترة المالية"
+                      Value="@Model.FiscalPeriodId?.ToString("D")"
+                      ValueChanged="OnPeriodChanged"
+                      SelectedItem="@FiscalPeriodLookupItem"
+                      SearchAsync="FiscalPeriodSearchAsync"
+                      Placeholder="اختر الفترة المالية..."
+                      Disabled="@(!IsEditable)"
+                      MinimumSearchLength="0"
+                      DebounceMilliseconds="250" />
+
+            <UiInputDate Label="تاريخ الترحيل"
+                         Value="@Model.PostingDate"
+                         ValueChanged="@(v => { if (v.HasValue) { Model.PostingDate = v.Value; OnChanged(); } })"
+                         Required="true"
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+
+            <UiInputDate Label="تاريخ المستند"
+                         Value="@Model.DocumentDate"
+                         ValueChanged="@(v => { if (v.HasValue) { Model.DocumentDate = v.Value; OnChanged(); } })"
+                         Required="true"
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+
+            <UiInputText Label="الرقم المرجعي (اختياري)"
+                         Value="@Model.ReferenceNumber"
+                         ValueChanged="@(v => { Model.ReferenceNumber = v; OnChanged(); })"
+                         Disabled="@(!IsEditable)"
+                         Placeholder="رقم الشيك أو الإشعار..."
+                         Size="ControlSize.Small" />
+        </div>
+
+        <div class="mt-3">
+            <UiInputText Label="البيان العام للقيد"
+                         Value="@Model.Description"
+                         ValueChanged="@(v => { Model.Description = v; OnChanged(); })"
+                         Required="true"
+                         Disabled="@(!IsEditable)"
+                         Placeholder="شرح وافٍ عن طبيعة القيد والعملية المالية..." />
+        </div>
+    </UiAccountingFormSection>
+
+    <UiAccountingFormSection Title="أسطر القيد اليومي (الحسابات والمدين والدائن)"
+                             Subtitle="إدخال الحسابات المحاسبية ومراكز التكلفة والمبالغ المتوازنة"
+                             IconCssClass="fa-solid fa-scale-balanced">
+        <UiJournalLinesEditor Lines="@Model.Lines"
+                              IsEditable="@IsEditable"
+                              AccountSearchAsync="@AccountSearchAsync"
+                              CostCenterSearchAsync="@CostCenterSearchAsync"
+                              OnLinesChanged="@OnChanged" />
+    </UiAccountingFormSection>
+</div>
+
+@code {
+    public sealed class FormModel
+    {
+        public string JournalNumber { get; set; } = string.Empty;
+        public JournalType JournalType { get; set; } = JournalType.Manual;
+        public DateOnly PostingDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+        public DateOnly DocumentDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+        public Guid? FiscalPeriodId { get; set; }
+        public string Description { get; set; } = string.Empty;
+        public string? ReferenceNumber { get; set; }
+        public JournalEntryStatus Status { get; set; } = JournalEntryStatus.Draft;
+        public List<UiJournalLinesEditor.EditableJournalLine> Lines { get; set; } = [];
+    }
+
+    [Parameter] public FormModel Model { get; set; } = new();
+    [Parameter] public bool IsEditable { get; set; }
+    [Parameter] public bool IsNew { get; set; }
+    [Parameter] public UiLookupItem? FiscalPeriodLookupItem { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? FiscalPeriodSearchAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? AccountSearchAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CostCenterSearchAsync { get; set; }
+    [Parameter] public EventCallback OnModelChanged { get; set; }
+
+    private void OnChanged() => OnModelChanged.InvokeAsync();
+
+    private void OnTypeChanged(string val)
+    {
+        if (Enum.TryParse<JournalType>(val, out var res))
+        {
+            Model.JournalType = res;
+            OnChanged();
+        }
+    }
+
+    private void OnPeriodChanged(string? val)
+    {
+        Model.FiscalPeriodId = Guid.TryParse(val, out var id) ? id : null;
+        OnChanged();
+    }
+}

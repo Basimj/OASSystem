@@ -9,6 +9,7 @@ using OAS.Contracts.Accounting.Expenses;
 using OAS.Contracts.Accounting.FiscalPeriods;
 using OAS.Contracts.Accounting.FiscalYears;
 using OAS.Contracts.Accounting.Journals;
+using OAS.Contracts.Accounting.PaymentAllocations;
 using OAS.Contracts.Accounting.PaymentVouchers;
 using OAS.Contracts.Accounting.PostingProfiles;
 using OAS.Contracts.Accounting.ReceiptVouchers;
@@ -178,4 +179,14 @@ public sealed class AccountingClientService(OasApiClient apiClient) : IAccountin
 
     public async Task<PagedResult<ExpenseTypeDto>> GetExpenseTypesPageAsync(PageRequest request, CancellationToken cancellationToken = default) =>
         await apiClient.GetAsync<PagedResult<ExpenseTypeDto>>($"api/accounting/expenses/types{Query(request)}", cancellationToken) ?? new();
+
+    // Payment Allocations
+    public async Task<PagedResult<PaymentAllocationDto>> GetPaymentAllocationsPageAsync(PageRequest request, CancellationToken cancellationToken = default) =>
+        await apiClient.GetAsync<PagedResult<PaymentAllocationDto>>($"api/accounting/payment-allocations{Query(request)}", cancellationToken) ?? new();
+
+    public Task<PaymentAllocationDto?> GetPaymentAllocationByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        apiClient.GetAsync<PaymentAllocationDto>($"api/accounting/payment-allocations/{id}", cancellationToken);
+
+    public Task<PaymentAllocationDto?> CreatePaymentAllocationAsync(CreatePaymentAllocationRequest request, CancellationToken cancellationToken = default) =>
+        apiClient.PostAsync<CreatePaymentAllocationRequest, PaymentAllocationDto>("api/accounting/payment-allocations", request, cancellationToken);
 }

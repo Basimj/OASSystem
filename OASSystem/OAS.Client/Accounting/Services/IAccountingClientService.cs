@@ -9,6 +9,7 @@ using OAS.Contracts.Accounting.FiscalPeriods;
 using OAS.Contracts.Accounting.FiscalYears;
 using OAS.Contracts.Accounting.Journals;
 using OAS.Contracts.Accounting.PaymentVouchers;
+using OAS.Contracts.Accounting.PaymentAllocations;
 using OAS.Contracts.Accounting.PostingProfiles;
 using OAS.Contracts.Accounting.ReceiptVouchers;
 using OAS.Contracts.Accounting.SupplierAccounts;
@@ -79,4 +80,9 @@ public interface IAccountingClientService
     Task<ExpenseDto?> CreateExpenseAsync(CreateExpenseRequest request, CancellationToken cancellationToken = default);
     Task<bool> SetExpenseStatusAsync(Guid id, SetExpenseStatusRequest request, CancellationToken cancellationToken = default);
     Task<PagedResult<ExpenseTypeDto>> GetExpenseTypesPageAsync(PageRequest request, CancellationToken cancellationToken = default);
+
+    // Payment Allocations
+    Task<PagedResult<PaymentAllocationDto>> GetPaymentAllocationsPageAsync(PageRequest request, CancellationToken cancellationToken = default);
+    Task<PaymentAllocationDto?> GetPaymentAllocationByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<PaymentAllocationDto?> CreatePaymentAllocationAsync(CreatePaymentAllocationRequest request, CancellationToken cancellationToken = default);
 }

@@ -1,86 +1,8 @@
 @page "/accounting/supplier-accounts"
 @attribute [Authorize]
-@inject IAccountingClientService AccountingService
-@inject IUiSnackbarService Snackbar
-@using OAS.Contracts.Accounting.SupplierAccounts
+@using OAS.Client.Accounting.Components
+@using OAS.Client.Accounting.Workspace
 
 <PageTitle>حسابات الموردين المحاسبية | OAS</PageTitle>
 
-<UiAccountingWorkspace>
-    <Actions>
-        <UiButton Text="تحديث"
-                  IconCssClass="fa-solid fa-rotate"
-                  Variant="ButtonVariant.Secondary"
-                  Size="ControlSize.Small"
-                  Loading="@_loading"
-                  OnClick="LoadDataAsync" />
-        <UiSearchInput @bind-Value="_searchTerm"
-                       Placeholder="ابحث برقم حساب المورد..."
-                       DebounceMilliseconds="300"
-                       OnSearch="SearchChangedAsync" />
-    </Actions>
-
-    <Metrics>
-        <UiAccountingMetricTile Label="إجمالي حسابات الموردين" Value="@_items.Count.ToString()" IconCssClass="fa-solid fa-boxes-packing" />
-        <UiAccountingMetricTile Label="الحسابات النشطة" Value="@_items.Count(x => x.IsActive).ToString()" IconCssClass="fa-solid fa-check-circle" Variant="UiAccountingMetricTile.MetricVariant.Credit" />
-    </Metrics>
-
-    <Body>
-        @if (_loading)
-        {
-            <UiAlert Message="جاري تحميل حسابات الموردين..." Tone="AlertTone.Info" />
-        }
-        else if (_items.Count == 0)
-        {
-            <UiAlert Message="لا توجد حسابات موردين مسجلة." Tone="AlertTone.Warning" />
-        }
-        else
-        {
-            @foreach (var s in _items)
-            {
-                <UiPartyAccountCard PartyName="@($"المورد: {s.SupplierId}")"
-                                    AccountCode="@s.AccountId.ToString()[..8]"
-                                    CreditLimit="0"
-                                    PaymentTermsDays="0"
-                                    GlAccountCode="@s.ControlAccountId.ToString()[..8]"
-                                    OpeningBalance="0"
-                                    IsActive="@s.IsActive" />
-            }
-        }
-    </Body>
-</UiAccountingWorkspace>
-
-@code {
-    private bool _loading = true;
-    private string _searchTerm = string.Empty;
-    private IReadOnlyList<SupplierAccountDto> _items = [];
-
-    protected override async Task OnInitializedAsync()
-    {
-        await LoadDataAsync();
-    }
-
-    private async Task LoadDataAsync()
-    {
-        _loading = true;
-        try
-        {
-            var res = await AccountingService.GetSupplierAccountsPageAsync(new PageRequest { PageNumber = 1, PageSize = 50, Search = _searchTerm });
-            _items = res.Items ?? [];
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Error("تعذر تحميل حسابات الموردين: " + ex.Message);
-        }
-        finally
-        {
-            _loading = false;
-        }
-    }
-
-    private async Task SearchChangedAsync(string text)
-    {
-        _searchTerm = text;
-        await LoadDataAsync();
-    }
-}
+<AccountingWorkspaceHost Section="AccountingEntityType.SupplierAccounts" />
