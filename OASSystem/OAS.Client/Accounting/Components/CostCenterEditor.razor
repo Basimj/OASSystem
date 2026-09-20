@@ -5,13 +5,17 @@
 @using OAS.UiLib.Core.Models
 
 <div class="ui-acc-editor" dir="rtl">
+
     <UiAccountingFormSection Title="بيانات مركز التكلفة"
                              Subtitle="الرمز، التسمية، والتبعية الهيكلية"
                              IconCssClass="fa-solid fa-network-wired">
+
         <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+
             <UiInputText Label="كود مركز التكلفة"
                          Value="@Model.Code"
-                         ValueChanged="@(v => { Model.Code = v; OnChanged(); })"
+                         ValueExpression="@(() => Model.Code)"
+                         ValueChanged="OnCodeChanged"
                          Required="true"
                          Placeholder="مثال: CC-100"
                          Disabled="@(!IsEditable)"
@@ -19,7 +23,8 @@
 
             <UiInputText Label="اسم مركز التكلفة (بالعربي)"
                          Value="@Model.NameAr"
-                         ValueChanged="@(v => { Model.NameAr = v; OnChanged(); })"
+                         ValueExpression="@(() => Model.NameAr)"
+                         ValueChanged="OnNameArChanged"
                          Required="true"
                          Placeholder="مثال: الإدارة العامة / فرع صنعاء"
                          Disabled="@(!IsEditable)"
@@ -27,7 +32,8 @@
 
             <UiInputText Label="اسم مركز التكلفة (بالإنجليزي)"
                          Value="@Model.NameEn"
-                         ValueChanged="@(v => { Model.NameEn = v; OnChanged(); })"
+                         ValueExpression="@(() => Model.NameEn)"
+                         ValueChanged="OnNameEnChanged"
                          Placeholder="مثال: General Management"
                          Disabled="@(!IsEditable)"
                          Size="ControlSize.Small" />
@@ -45,35 +51,91 @@
             <div class="ui-acc-checks-group d-flex align-items-center mt-4">
                 <UiCheckbox Label="مركز التكلفة نشط"
                             Value="@Model.IsActive"
-                            ValueChanged="@(v => { Model.IsActive = v; OnChanged(); })"
+                            ValueChanged="OnActiveChanged"
                             Disabled="@(!IsEditable)" />
             </div>
+
         </div>
+
     </UiAccountingFormSection>
+
 </div>
 
 @code {
+
     public sealed class FormModel
     {
         public string Code { get; set; } = string.Empty;
+
         public string NameAr { get; set; } = string.Empty;
+
         public string? NameEn { get; set; }
+
         public Guid? ParentCostCenterId { get; set; }
+
         public bool IsActive { get; set; } = true;
     }
 
-    [Parameter] public FormModel Model { get; set; } = new();
-    [Parameter] public bool IsEditable { get; set; }
-    [Parameter] public bool IsNew { get; set; }
-    [Parameter] public UiLookupItem? ParentCostCenterLookupItem { get; set; }
-    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CostCenterSearchAsync { get; set; }
-    [Parameter] public EventCallback OnModelChanged { get; set; }
+    [Parameter]
+    public FormModel Model { get; set; } = new();
 
-    private void OnChanged() => OnModelChanged.InvokeAsync();
+    [Parameter]
+    public bool IsEditable { get; set; }
 
-    private void OnParentCostCenterChanged(string? val)
+    [Parameter]
+    public bool IsNew { get; set; }
+
+    [Parameter]
+    public UiLookupItem? ParentCostCenterLookupItem { get; set; }
+
+    [Parameter]
+    public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CostCenterSearchAsync { get; set; }
+
+    [Parameter]
+    public EventCallback OnModelChanged { get; set; }
+
+
+    private Task OnChanged()
     {
-        Model.ParentCostCenterId = Guid.TryParse(val, out var id) ? id : null;
-        OnChanged();
+        return OnModelChanged.InvokeAsync();
+    }
+
+
+    private async Task OnCodeChanged(string? value)
+    {
+        Model.Code = value ?? string.Empty;
+        await OnChanged();
+    }
+
+
+    private async Task OnNameArChanged(string? value)
+    {
+        Model.NameAr = value ?? string.Empty;
+        await OnChanged();
+    }
+
+
+    private async Task OnNameEnChanged(string? value)
+    {
+        Model.NameEn = value;
+        await OnChanged();
+    }
+
+
+    private async Task OnParentCostCenterChanged(string? value)
+    {
+        Model.ParentCostCenterId =
+            Guid.TryParse(value, out var id)
+                ? id
+                : null;
+
+        await OnChanged();
+    }
+
+
+    private async Task OnActiveChanged(bool value)
+    {
+        Model.IsActive = value;
+        await OnChanged();
     }
 }

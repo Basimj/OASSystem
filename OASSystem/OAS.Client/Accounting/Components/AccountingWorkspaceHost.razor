@@ -1068,21 +1068,47 @@
                 case AccountingEntityType.FiscalYears:
                     if (tab.Model is FiscalYearEditor.FormModel fyModel)
                     {
-                        if (string.IsNullOrWhiteSpace(fyModel.Code) || string.IsNullOrWhiteSpace(fyModel.Name))
+                        if (string.IsNullOrWhiteSpace(fyModel.Code) ||
+                            string.IsNullOrWhiteSpace(fyModel.Name))
                         {
                             Snackbar.Warning("يرجى إدخال كود واسم السنة المالية.");
                             return;
                         }
 
-                        var req = new CreateFiscalYearRequest(fyModel.Code, fyModel.Name, fyModel.StartDate, fyModel.EndDate);
+                        if (!fyModel.StartDate.HasValue ||
+                            !fyModel.EndDate.HasValue)
+                        {
+                            Snackbar.Warning("يرجى تحديد تاريخ بداية ونهاية السنة المالية.");
+                            return;
+                        }
+
+                        if (fyModel.StartDate.Value > fyModel.EndDate.Value)
+                        {
+                            Snackbar.Warning("تاريخ بداية السنة المالية يجب أن يكون قبل تاريخ النهاية.");
+                            return;
+                        }
+
+                        var req = new CreateFiscalYearRequest(
+                            fyModel.Code,
+                            fyModel.Name,
+                            fyModel.StartDate.Value,
+                            fyModel.EndDate.Value);
+
                         var res = await AccountingService.CreateFiscalYearAsync(req);
+
                         if (res is not null)
                         {
                             Snackbar.Success("تم إنشاء السنة المالية وفتراتها بنجاح.");
-                            tab.CompleteSave(res.Id, res.Name, fyModel, System.Text.Json.JsonSerializer.Serialize(fyModel));
+
+                            tab.CompleteSave(
+                                res.Id,
+                                res.Name,
+                                fyModel,
+                                System.Text.Json.JsonSerializer.Serialize(fyModel));
                         }
                     }
                     break;
+                    
 
                 case AccountingEntityType.CustomerAccounts:
                     if (tab.Model is CustomerAccountEditor.FormModel custModel)
@@ -1795,14 +1821,19 @@
             {
                 @foreach (var cc in _costCentersPage.Items)
                 {
-                    <div @onclick="@(() => OpenRecordInTab(AccountingEntityType.CostCenters, cc.Id, cc.NameAr))" style="cursor: pointer;">
+                    <div @onclick="@(() => OpenRecordInTab(
+                                         AccountingEntityType.CostCenters,
+                                         cc.Id,
+                                         cc.NameAr))"
+         style="cursor: pointer;">
+
                         <UiCostCenterCard Code="@cc.Code"
-                                          Name="@cc.NameAr"
+                                          NameAr="@cc.NameAr"
                                           Level="1"
-                                          ParentName="المركز الرئيسي"
+                                          AllowPosting="true"
                                           IsActive="@cc.IsActive" />
                     </div>
-                }
+        }
             }
         </UiCard>
     };
@@ -1850,22 +1881,32 @@
     };
 
     private RenderFragment RenderPostingProfilesList() => __builder =>
-    {
-        <UiCard Title="ملفات الترحيل الآلي" Subtitle="Posting Profiles للربط التلقائي بين العمليات والحسابات">
-            @if (_postingProfilesPage.Items is not null)
-            {
-                @foreach (var pp in _postingProfilesPage.Items)
-                {
-                    <div @onclick="@(() => OpenRecordInTab(AccountingEntityType.PostingProfiles, pp.Id, pp.Name))" style="cursor: pointer;">
-                        <UiPostingProfileCard Name="@pp.Name"
-                                              Description="@($"{pp.Module} - {pp.DocumentType}")"
-                                              LinesCount="@pp.Lines.Count"
-                                              IsActive="@pp.IsActive" />
-                    </div>
-                }
-            }
-        </UiCard>
-    };
+  {
+      <UiCard Title="ملفات الترحيل الآلي"
+              Subtitle="Posting Profiles للربط التلقائي بين العمليات والحسابات">
+
+          @if (_postingProfilesPage.Items is not null)
+          {
+              @foreach (var pp in _postingProfilesPage.Items)
+              {
+                  <div @onclick="@(() => OpenRecordInTab(
+                                         AccountingEntityType.PostingProfiles,
+                                         pp.Id,
+                                         pp.Name))"
+         style="cursor: pointer;">
+
+                      <UiPostingProfileCard Code="@pp.Code"
+                                            Name="@pp.Name"
+                                            SourceModuleText="@pp.Module"
+                                            DocumentTypeText="@pp.DocumentType"
+                                            LinesCount="@(pp.Lines?.Count ?? 0)"
+                                            IsActive="@pp.IsActive" />
+                  </div>
+          }
+          }
+
+      </UiCard>
+  };
 
     private RenderFragment RenderPaymentAllocationsList() => __builder =>
     {
