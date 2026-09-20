@@ -1,4 +1,4 @@
-﻿using OAS.Domain.Common.Entities;
+using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Entities.Inventory;
 
@@ -48,5 +48,25 @@ public class ProductVariant : AuditableEntity<Guid>
         PurchasePrice = purchasePrice;
         SellingPrice = sellingPrice;
         IsActive = true;
+    }
+
+    public void UpdateDetails(
+        string? barcode,
+        string? variantName,
+        string? color,
+        string? size,
+        Guid? unitId,
+        decimal purchasePrice,
+        decimal sellingPrice,
+        bool isActive)
+    {
+        Barcode = barcode;
+        VariantName = variantName;
+        Color = color;
+        Size = size;
+        UnitId = unitId;
+        PurchasePrice = purchasePrice;
+        SellingPrice = sellingPrice;
+        IsActive = isActive;
     }
 }

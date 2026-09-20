@@ -1,4 +1,4 @@
-﻿using OAS.Domain.Common.Entities;
+using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Entities.Inventory;
 
@@ -29,5 +29,17 @@ public class ProductCategory : AuditableEntity<Guid>
         NameEn = nameEn;
         ParentCategoryId = parentCategoryId;
         IsActive = true;
+    }
+
+    public void UpdateDetails(
+        string nameAr,
+        string? nameEn,
+        Guid? parentCategoryId,
+        bool isActive)
+    {
+        NameAr = nameAr;
+        NameEn = nameEn;
+        ParentCategoryId = parentCategoryId;
+        IsActive = isActive;
     }
 }

@@ -13,6 +13,7 @@ using OAS.Application.CRUD.Mapping;
 using OAS.Application.CRUD.Services;
 using OAS.Application.CRUD.Specifications;
 using OAS.Application.CRUD.Validation;
+using OAS.Application.Inventory;
 using OAS.Domain.Common.Entities;
 
 namespace OAS.Application;
@@ -24,6 +25,7 @@ public static class DependencyInjection
         var assembly = typeof(DependencyInjection).Assembly;
         services.AddMediatR(configuration => configuration.RegisterServicesFromAssembly(assembly));
         services.AddValidatorsFromAssembly(assembly);
+        services.AddApplicationMappers(assembly);
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(AuthorizationBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(PerformanceBehavior<,>));
@@ -31,6 +33,44 @@ public static class DependencyInjection
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         services.TryAddScoped<ICurrentUser, AnonymousCurrentUser>();
         services.TryAddScoped<IPermissionChecker, DenyAllPermissionChecker>();
+        services.AddInventoryApplication();
+        return services;
+    }
+
+    private static IServiceCollection AddApplicationMappers(this IServiceCollection services, System.Reflection.Assembly assembly)
+    {
+        var mapperTypes = assembly.GetTypes()
+            .Where(t => t is { IsClass: true, IsAbstract: false } && t.Name.EndsWith("Mapper", StringComparison.Ordinal));
+
+        foreach (var mapperType in mapperTypes)
+        {
+            services.TryAddScoped(mapperType);
+
+            foreach (var iface in mapperType.GetInterfaces())
+            {
+                if (iface.IsGenericType && iface.GetGenericTypeDefinition() == typeof(ICrudMapper<,,,,>))
+                {
+                    services.TryAddScoped(iface, mapperType);
+                }
+            }
+        }
+
+        var specFactoryTypes = assembly.GetTypes()
+            .Where(t => t is { IsClass: true, IsAbstract: false } && t.Name.EndsWith("SpecificationFactory", StringComparison.Ordinal));
+
+        foreach (var specFactoryType in specFactoryTypes)
+        {
+            services.TryAddScoped(specFactoryType);
+
+            foreach (var iface in specFactoryType.GetInterfaces())
+            {
+                if (iface.IsGenericType && iface.GetGenericTypeDefinition() == typeof(ICrudSpecificationFactory<>))
+                {
+                    services.TryAddScoped(iface, specFactoryType);
+                }
+            }
+        }
+
         return services;
     }
 
