@@ -1,0 +1,21 @@
+.inventory-warehouses__header,
+.inventory-warehouses__row {
+    display: grid;
+    grid-template-columns: 1fr 2fr .8fr .9fr;
+    gap: .75rem;
+    align-items: center;
+}
+.inventory-warehouses__header { padding: .55rem .75rem; font-size: .82rem; font-weight: 700; }
+.inventory-warehouses__rows { display: grid; }
+.inventory-warehouses__row {
+    width: 100%; border: 0; border-top: 1px solid var(--ui-border-color, #e3e7ee);
+    background: transparent; color: inherit; text-align: start; padding: .7rem .75rem;
+    cursor: pointer; font: inherit;
+}
+.inventory-warehouses__row:hover { background: var(--ui-surface-hover, #f7f9fc); }
+.inventory-warehouses__row--selected { background: var(--ui-surface-selected, #eef4ff); }
+.inventory-warehouses__editor { display: grid; gap: .85rem; }
+@media (max-width: 850px) {
+    .inventory-warehouses__header, .inventory-warehouses__row { grid-template-columns: 1fr 2fr .9fr; }
+    .inventory-warehouses__header span:nth-child(3), .inventory-warehouses__row span:nth-child(3) { display: none; }
+}

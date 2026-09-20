@@ -1,0 +1,223 @@
+@page "/inventory/ledger"
+@attribute [Authorize]
+@using OAS.Client.Inventory.Common
+@using OAS.Client.Inventory.Services
+@using OAS.Contracts.Enums.Inventory
+@using OAS.Contracts.Inventory.Products
+@using OAS.Contracts.Inventory.Transactions
+@using OAS.Contracts.Inventory.Warehouses
+
+<PageTitle>حركات المخزون | OAS</PageTitle>
+
+<UiWorkspaceLayout ShowAside="false" ShowFilters="true">
+    <Actions>
+        <UiWorkspaceActionBar>
+            <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary"
+                      Size="ControlSize.Small" Loading="@_loading" OnClick="RefreshAsync" />
+            @if (VariantIdFromQuery.HasValue || TransactionIdFromQuery.HasValue)
+            {
+                <UiButton Text="إلغاء التصفية المرتبطة" IconCssClass="fa-solid fa-filter-circle-xmark" Variant="ButtonVariant.Ghost"
+                          Size="ControlSize.Small" OnClick="ClearLinkedFilterAsync" />
+            }
+            <UiSearchInput @bind-Value="_search" Placeholder="ابحث برقم الحركة أو المنتج أو SKU..."
+                           AriaLabel="البحث في حركات المخزون" ClearText="مسح البحث"
+                           DebounceMilliseconds="250" OnSearch="SearchChangedAsync" />
+        </UiWorkspaceActionBar>
+    </Actions>
+
+    <Filters>
+        <div class="inventory-ledger__filters">
+            <UiSelect Label="المخزن"
+                      Value="@_warehouseFilter"
+                      ValueExpression="@(() => _warehouseFilter)"
+                      ValueChanged="@(v => _warehouseFilter = v)"
+                      Options="@WarehouseFilterOptions"
+                      Size="ControlSize.Small" />
+            <UiSelect Label="الحركة"
+                      Value="@_movementFilter"
+                      ValueExpression="@(() => _movementFilter)"
+                      ValueChanged="@(v => _movementFilter = v)"
+                      Options="@InventoryArabicPresenter.MovementTypeOptions"
+                      Size="ControlSize.Small" />
+            <UiInputDate Label="من تاريخ"
+                         Value="@_fromDate"
+                         ValueExpression="@(() => _fromDate)"
+                         ValueChanged="@(v => _fromDate = v)"
+                         Size="ControlSize.Small" />
+            <UiInputDate Label="إلى تاريخ"
+                         Value="@_toDate"
+                         ValueExpression="@(() => _toDate)"
+                         ValueChanged="@(v => _toDate = v)"
+                         Size="ControlSize.Small" />
+        </div>
+    </Filters>
+
+    <Content>
+        <UiDataGridPanel Title="حركات المخزون" Subtitle="@($"{FilteredEntries.Count} حركة")">
+            <Header>
+                <div class="inventory-ledger__header">
+                    <span>التاريخ</span>
+                    <span>رقم الحركة</span>
+                    <span>النوع</span>
+                    <span>المنتج / SKU</span>
+                    <span>المخزن</span>
+                    <span>داخل</span>
+                    <span>خارج</span>
+                    <span>الرصيد</span>
+                    <span>التكلفة</span>
+                    <span>متوسط التكلفة</span>
+                    <span>القيمة</span>
+                    <span>المصدر</span>
+                    <span>إجراءات</span>
+                </div>
+            </Header>
+            <Body>
+                @if (_loading)
+                {
+                    <UiAlert Message="جاري تحميل حركات المخزون..." />
+                }
+                else if (FilteredEntries.Count == 0)
+                {
+                    <UiAlert Message="لا توجد حركات مطابقة للفلاتر الحالية." />
+                }
+                else
+                {
+                    <div class="inventory-ledger__rows">
+                        @foreach (var entry in FilteredEntries)
+                        {
+                            var transaction = Transaction(entry.TransactionId);
+                            <div class="inventory-ledger__row">
+                                <span>@entry.MovementDate.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</span>
+                                <strong>@(transaction?.TransactionNumber ?? entry.SequenceNumber.ToString())</strong>
+                                <span>@InventoryArabicPresenter.MovementTypeText(entry.MovementType)</span>
+                                <div class="inventory-ledger__product"><strong>@VariantLabel(entry.ProductVariantId)</strong><span>@VariantSku(entry.ProductVariantId)</span></div>
+                                <span>@WarehouseName(entry.WarehouseId)</span>
+                                <span>@entry.QuantityIn.ToString("N2")</span>
+                                <span>@entry.QuantityOut.ToString("N2")</span>
+                                <strong>@entry.BalanceAfter.ToString("N2")</strong>
+                                <span>@entry.UnitCost.ToString("N2")</span>
+                                <span>@entry.AverageCostAfter.ToString("N2")</span>
+                                <strong>@entry.InventoryValueAfter.ToString("N2")</strong>
+                                <span>@SourceText(transaction)</span>
+                                <div class="inventory-ledger__actions">
+                                    <button type="button" @onclick="() => OpenTransaction(entry.TransactionId)">الحركة</button>
+                                    <button type="button" @onclick="() => OpenProduct(entry.ProductVariantId)">الصنف</button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </Body>
+        </UiDataGridPanel>
+    </Content>
+</UiWorkspaceLayout>
+
+@code {
+    [Inject] private IInventoryClientService Inventory { get; set; } = default!;
+    [Inject] private IApiFeedbackService ApiFeedback { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+
+    [Parameter, SupplyParameterFromQuery(Name = "variantId")]
+    public Guid? VariantIdFromQuery { get; set; }
+
+    [Parameter, SupplyParameterFromQuery(Name = "transactionId")]
+    public Guid? TransactionIdFromQuery { get; set; }
+
+    private IReadOnlyList<InventoryLedgerDto> _entries = [];
+    private IReadOnlyList<InventoryTransactionDto> _transactions = [];
+    private IReadOnlyList<WarehouseDto> _warehouses = [];
+    private IReadOnlyList<ProductDto> _products = [];
+    private IReadOnlyList<ProductVariantDto> _variants = [];
+    private bool _loading = true;
+    private string? _search;
+    private string? _warehouseFilter;
+    private string? _movementFilter;
+    private DateOnly? _fromDate;
+    private DateOnly? _toDate;
+
+    private IReadOnlyList<UiSelectOption> WarehouseFilterOptions =>
+        [new UiSelectOption(string.Empty, "كل المخازن"), .. _warehouses.Select(x => new UiSelectOption(x.Id.ToString("D"), x.NameAr))];
+
+    private IReadOnlyList<InventoryLedgerDto> FilteredEntries => _entries.Where(x =>
+    {
+        if (Guid.TryParse(_warehouseFilter, out var warehouseId) && x.WarehouseId != warehouseId) return false;
+        if (int.TryParse(_movementFilter, out var movement) && (int)x.MovementType != movement) return false;
+        var date = DateOnly.FromDateTime(x.MovementDate.ToLocalTime().DateTime);
+        if (_fromDate.HasValue && date < _fromDate.Value) return false;
+        if (_toDate.HasValue && date > _toDate.Value) return false;
+        if (string.IsNullOrWhiteSpace(_search)) return true;
+        var transaction = Transaction(x.TransactionId);
+        return Match(_search,
+            transaction?.TransactionNumber,
+            VariantLabel(x.ProductVariantId),
+            VariantSku(x.ProductVariantId),
+            WarehouseName(x.WarehouseId),
+            SourceText(transaction));
+    }).OrderByDescending(x => x.SequenceNumber).ToArray();
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var page = new PageRequest { PageNumber = 1, PageSize = PageRequest.MaximumPageSize };
+            var entriesTask = Inventory.GetInventoryLedgerAsync(page, productVariantId: VariantIdFromQuery, transactionId: TransactionIdFromQuery);
+            var transactionsTask = Inventory.GetInventoryTransactionsAsync(page);
+            var warehousesTask = Inventory.GetWarehousesAsync(page);
+            var productsTask = Inventory.GetProductsAsync(page);
+            var variantsTask = Inventory.GetProductVariantsAsync(page);
+            await Task.WhenAll(entriesTask, transactionsTask, warehousesTask, productsTask, variantsTask);
+            _entries = entriesTask.Result.Items;
+            _transactions = transactionsTask.Result.Items;
+            _warehouses = warehousesTask.Result.Items;
+            _products = productsTask.Result.Items;
+            _variants = variantsTask.Result.Items;
+        }
+        catch (ApiClientException ex)
+        {
+            ApiFeedback.Show(ex.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private Task RefreshAsync(MouseEventArgs args) => LoadAsync();
+    private Task SearchChangedAsync(string? _) => Task.CompletedTask;
+    private async Task ClearLinkedFilterAsync(MouseEventArgs args)
+    {
+        VariantIdFromQuery = null;
+        TransactionIdFromQuery = null;
+        Navigation.NavigateTo("/inventory/ledger");
+        await LoadAsync();
+    }
+
+    private InventoryTransactionDto? Transaction(Guid id) => _transactions.FirstOrDefault(x => x.Id == id);
+    private ProductVariantDto? Variant(Guid id) => _variants.FirstOrDefault(x => x.Id == id);
+    private string WarehouseName(Guid id) => _warehouses.FirstOrDefault(x => x.Id == id)?.NameAr ?? "—";
+    private string ProductName(Guid id) => _products.FirstOrDefault(x => x.Id == id)?.NameAr ?? "—";
+    private string VariantLabel(Guid id) { var v = Variant(id); return v is null ? "—" : $"{ProductName(v.ProductId)}{(string.IsNullOrWhiteSpace(v.VariantName) ? string.Empty : $" - {v.VariantName}")}"; }
+    private string VariantSku(Guid id) => Variant(id)?.SKU ?? "—";
+    private static string SourceText(InventoryTransactionDto? transaction) => transaction is null
+        ? "—"
+        : string.IsNullOrWhiteSpace(transaction.ReferenceType)
+            ? InventoryArabicPresenter.TransactionTypeText(transaction.TransactionType)
+            : $"{InventoryArabicPresenter.TransactionTypeText(transaction.TransactionType)} / {transaction.ReferenceType}";
+
+    private void OpenTransaction(Guid id) => Navigation.NavigateTo($"/inventory/transactions?transactionId={id:D}");
+    private void OpenProduct(Guid variantId)
+    {
+        var variant = Variant(variantId);
+        if (variant is not null) Navigation.NavigateTo($"/products?productId={variant.ProductId:D}");
+    }
+
+    private static bool Match(string? search, params string?[] values)
+    {
+        if (string.IsNullOrWhiteSpace(search)) return true;
+        var term = search.Trim();
+        return values.Any(x => x?.Contains(term, StringComparison.CurrentCultureIgnoreCase) == true);
+    }
+}

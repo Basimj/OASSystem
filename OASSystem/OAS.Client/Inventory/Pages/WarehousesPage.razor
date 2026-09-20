@@ -1,0 +1,297 @@
+@page "/inventory/warehouses"
+@attribute [Authorize]
+@using OAS.Client.Inventory.Services
+@using OAS.Contracts.Inventory.Warehouses
+
+<PageTitle>المخازن | OAS</PageTitle>
+
+<UiWorkspaceLayout ShowAside="true" ShowFilters="false">
+    <Actions>
+        <UiWorkspaceActionBar>
+            <UiButton Text="جديد" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small"
+                      Disabled="@IsEditing" OnClick="BeginCreateAsync" />
+            <UiButton Text="حفظ" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small"
+                      Disabled="@(!IsEditing)" Loading="@_saving" OnClick="SaveAsync" />
+            <UiButton Text="تعديل" IconCssClass="fa-solid fa-pen" Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
+                      Disabled="@(!CanEdit)" OnClick="BeginEditAsync" />
+            <UiButton Text="إلغاء" IconCssClass="fa-solid fa-xmark" Variant="ButtonVariant.Ghost" Size="ControlSize.Small"
+                      Disabled="@(!IsEditing)" OnClick="CancelAsync" />
+            <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
+                      Disabled="@IsEditing" Loading="@_loading" OnClick="RefreshAsync" />
+            <UiSearchInput @bind-Value="_search" Placeholder="ابحث بالكود أو اسم المخزن..."
+                           AriaLabel="البحث في المخازن" ClearText="مسح البحث"
+                           DebounceMilliseconds="250" OnSearch="SearchChangedAsync" />
+        </UiWorkspaceActionBar>
+    </Actions>
+
+    <Content>
+        <UiDataGridPanel Title="المخازن" Subtitle="@($"{FilteredWarehouses.Count} مخزن")">
+            <Header>
+                <div class="inventory-warehouses__header">
+                    <span>الكود</span>
+                    <span>اسم المخزن</span>
+                    <span>الافتراضي</span>
+                    <span>الحالة</span>
+                </div>
+            </Header>
+            <Body>
+                @if (_loading)
+                {
+                    <UiAlert Message="جاري تحميل المخازن..." />
+                }
+                else if (FilteredWarehouses.Count == 0)
+                {
+                    <UiAlert Message="لا توجد مخازن مطابقة." />
+                }
+                else
+                {
+                    <div class="inventory-warehouses__rows">
+                        @foreach (var warehouse in FilteredWarehouses)
+                        {
+                            <button type="button"
+                                    class="@RowCss(warehouse.Id)"
+                                    @onclick="() => Select(warehouse.Id)">
+                                <span>@warehouse.Code</span>
+                                <strong>@warehouse.NameAr</strong>
+                                <span>@(warehouse.IsDefault ? "نعم" : "—")</span>
+                                <span>@(warehouse.IsActive ? "نشط" : "غير نشط")</span>
+                            </button>
+                        }
+                    </div>
+                }
+            </Body>
+        </UiDataGridPanel>
+    </Content>
+
+    <Aside>
+        <UiCard Title="@EditorTitle" Subtitle="@(_selectedId.HasValue ? _code : null)">
+            @if (_mode == EditorMode.Empty)
+            {
+                <UiAlert Message="اختر مخزنًا من القائمة أو اضغط «جديد»." />
+            }
+            else
+            {
+                <div class="inventory-warehouses__editor">
+                    <UiInputText Label="كود المخزن"
+                                 Value="@_code"
+                                 ValueExpression="@(() => _code)"
+                                 ValueChanged="@(v => _code = v ?? string.Empty)"
+                                 Required="true"
+                                 Disabled="@(_mode != EditorMode.Create)"
+                                 Size="ControlSize.Small" />
+
+                    <UiInputText Label="اسم المخزن بالعربية"
+                                 Value="@_nameAr"
+                                 ValueExpression="@(() => _nameAr)"
+                                 ValueChanged="@(v => _nameAr = v ?? string.Empty)"
+                                 Required="true"
+                                 Disabled="@(!IsEditing)"
+                                 Size="ControlSize.Small" />
+
+                    <UiInputText Label="اسم المخزن بالإنجليزية"
+                                 Value="@_nameEn"
+                                 ValueExpression="@(() => _nameEn)"
+                                 ValueChanged="@(v => _nameEn = v)"
+                                 Disabled="@(!IsEditing)"
+                                 Size="ControlSize.Small" />
+
+                    <UiInputText Label="الوصف"
+                                 Value="@_description"
+                                 ValueExpression="@(() => _description)"
+                                 ValueChanged="@(v => _description = v)"
+                                 Disabled="@(!IsEditing)"
+                                 Size="ControlSize.Small" />
+
+                    <UiCheckbox Label="المخزن الافتراضي"
+                                Value="@_isDefault"
+                                ValueChanged="@(v => _isDefault = v)"
+                                Disabled="@(!IsEditing)" />
+
+                    <UiCheckbox Label="المخزن نشط"
+                                Value="@_isActive"
+                                ValueChanged="@(v => _isActive = v)"
+                                Disabled="@(!IsEditing || _mode == EditorMode.Create)" />
+                </div>
+            }
+        </UiCard>
+    </Aside>
+</UiWorkspaceLayout>
+
+@code {
+    private enum EditorMode { Empty, View, Create, Edit }
+
+    [Inject] private IInventoryClientService Inventory { get; set; } = default!;
+    [Inject] private IApiFeedbackService ApiFeedback { get; set; } = default!;
+    [Inject] private IUiSnackbarService Snackbar { get; set; } = default!;
+
+    private IReadOnlyList<WarehouseDto> _warehouses = [];
+    private EditorMode _mode = EditorMode.Empty;
+    private Guid? _selectedId;
+    private bool _loading = true;
+    private bool _saving;
+    private string? _search;
+
+    private string _code = string.Empty;
+    private string _nameAr = string.Empty;
+    private string? _nameEn;
+    private string? _description;
+    private bool _isDefault;
+    private bool _isActive = true;
+
+    private bool IsEditing => _mode is EditorMode.Create or EditorMode.Edit;
+    private bool CanEdit => _mode == EditorMode.View && _selectedId.HasValue;
+    private string EditorTitle => _mode switch
+    {
+        EditorMode.Create => "مخزن جديد",
+        EditorMode.Edit => "تعديل المخزن",
+        EditorMode.View => "تفاصيل المخزن",
+        _ => "تفاصيل المخزن"
+    };
+
+    private IReadOnlyList<WarehouseDto> FilteredWarehouses => _warehouses
+        .Where(x => string.IsNullOrWhiteSpace(_search) ||
+                    Match(_search, x.Code, x.NameAr, x.NameEn, x.Description))
+        .ToArray();
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var page = await Inventory.GetWarehousesAsync(new PageRequest { PageNumber = 1, PageSize = PageRequest.MaximumPageSize });
+            _warehouses = page.Items;
+            if (_selectedId.HasValue && !_warehouses.Any(x => x.Id == _selectedId.Value))
+            {
+                _selectedId = null;
+                _mode = EditorMode.Empty;
+                ClearForm();
+            }
+        }
+        catch (ApiClientException ex)
+        {
+            ApiFeedback.Show(ex.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private Task RefreshAsync(MouseEventArgs args) => LoadAsync();
+    private Task SearchChangedAsync(string? _) => Task.CompletedTask;
+
+    private Task BeginCreateAsync(MouseEventArgs args)
+    {
+        _selectedId = null;
+        _mode = EditorMode.Create;
+        ClearForm();
+        _isActive = true;
+        return Task.CompletedTask;
+    }
+
+    private Task BeginEditAsync(MouseEventArgs args)
+    {
+        if (CanEdit) _mode = EditorMode.Edit;
+        return Task.CompletedTask;
+    }
+
+    private Task CancelAsync(MouseEventArgs args)
+    {
+        if (_selectedId.HasValue)
+        {
+            _mode = EditorMode.View;
+            LoadSelected(_selectedId.Value);
+        }
+        else
+        {
+            _mode = EditorMode.Empty;
+            ClearForm();
+        }
+        return Task.CompletedTask;
+    }
+
+    private async Task SaveAsync(MouseEventArgs args)
+    {
+        if (!IsEditing || _saving) return;
+        if (string.IsNullOrWhiteSpace(_code) || string.IsNullOrWhiteSpace(_nameAr))
+        {
+            Snackbar.Error("كود المخزن واسمه العربي مطلوبان.");
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            WarehouseDto? saved;
+            if (_mode == EditorMode.Create)
+            {
+                saved = await Inventory.CreateWarehouseAsync(new CreateWarehouseRequest(
+                    _code.Trim(), _nameAr.Trim(), NullIfBlank(_nameEn), NullIfBlank(_description), _isDefault));
+            }
+            else
+            {
+                saved = await Inventory.UpdateWarehouseAsync(_selectedId!.Value, new UpdateWarehouseRequest(
+                    _nameAr.Trim(), NullIfBlank(_nameEn), NullIfBlank(_description), _isDefault, _isActive));
+            }
+
+            if (saved is null) return;
+            _selectedId = saved.Id;
+            _mode = EditorMode.View;
+            await LoadAsync();
+            LoadSelected(saved.Id);
+            Snackbar.Success("تم حفظ المخزن بنجاح.");
+        }
+        catch (ApiClientException ex)
+        {
+            ApiFeedback.Show(ex.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Select(Guid id)
+    {
+        if (IsEditing || _saving) return;
+        _selectedId = id;
+        _mode = EditorMode.View;
+        LoadSelected(id);
+    }
+
+    private void LoadSelected(Guid id)
+    {
+        var item = _warehouses.FirstOrDefault(x => x.Id == id);
+        if (item is null) return;
+        _code = item.Code;
+        _nameAr = item.NameAr;
+        _nameEn = item.NameEn;
+        _description = item.Description;
+        _isDefault = item.IsDefault;
+        _isActive = item.IsActive;
+    }
+
+    private void ClearForm()
+    {
+        _code = string.Empty;
+        _nameAr = string.Empty;
+        _nameEn = null;
+        _description = null;
+        _isDefault = false;
+        _isActive = true;
+    }
+
+    private string RowCss(Guid id) =>
+        $"inventory-warehouses__row {(id == _selectedId ? "inventory-warehouses__row--selected" : string.Empty)}";
+
+    private static bool Match(string? search, params string?[] values)
+    {
+        if (string.IsNullOrWhiteSpace(search)) return true;
+        var term = search.Trim();
+        return values.Any(x => x?.Contains(term, StringComparison.CurrentCultureIgnoreCase) == true);
+    }
+
+    private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+}

@@ -1,0 +1,511 @@
+@page "/inventory/transactions"
+@attribute [Authorize]
+@using OAS.Client.Inventory.Common
+@using OAS.Client.Inventory.Services
+@using OAS.Contracts.Enums.Inventory
+@using OAS.Contracts.Inventory.Products
+@using OAS.Contracts.Inventory.Transactions
+@using OAS.Contracts.Inventory.Warehouses
+
+<PageTitle>عمليات المخزون | OAS</PageTitle>
+
+<UiWorkspaceLayout ShowAside="true" ShowFilters="true">
+    <Actions>
+        <UiWorkspaceActionBar>
+            <UiButton Text="عملية جديدة" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small"
+                      Disabled="@(_mode == ViewMode.Create)" OnClick="BeginCreateAsync" />
+            <UiButton Text="حفظ" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small"
+                      Disabled="@(_mode != ViewMode.Create)" Loading="@_saving" OnClick="SaveAsync" />
+            <UiButton Text="ترحيل" IconCssClass="fa-solid fa-check-double" Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
+                      Disabled="@(!CanPost)" Loading="@_posting" OnClick="PostAsync" />
+            <UiButton Text="إلغاء" IconCssClass="fa-solid fa-xmark" Variant="ButtonVariant.Ghost" Size="ControlSize.Small"
+                      Disabled="@(_mode != ViewMode.Create)" OnClick="CancelCreateAsync" />
+            <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
+                      Loading="@_loading" OnClick="RefreshAsync" />
+            <UiSearchInput @bind-Value="_search" Placeholder="ابحث برقم العملية أو المرجع..."
+                           AriaLabel="البحث في عمليات المخزون" ClearText="مسح البحث"
+                           DebounceMilliseconds="250" OnSearch="SearchChangedAsync" />
+        </UiWorkspaceActionBar>
+    </Actions>
+
+    <Filters>
+        <div class="inventory-transactions__filters">
+            <UiSelect Label="نوع العملية"
+                      Value="@_typeFilter"
+                      ValueExpression="@(() => _typeFilter)"
+                      ValueChanged="@(v => _typeFilter = v)"
+                      Options="@TransactionTypeFilterOptions"
+                      Size="ControlSize.Small" />
+            <UiSelect Label="الحالة"
+                      Value="@_statusFilter"
+                      ValueExpression="@(() => _statusFilter)"
+                      ValueChanged="@(v => _statusFilter = v)"
+                      Options="@InventoryArabicPresenter.TransactionStatusOptions"
+                      Size="ControlSize.Small" />
+            <UiSelect Label="المخزن"
+                      Value="@_warehouseFilter"
+                      ValueExpression="@(() => _warehouseFilter)"
+                      ValueChanged="@(v => _warehouseFilter = v)"
+                      Options="@WarehouseFilterOptions"
+                      Size="ControlSize.Small" />
+        </div>
+    </Filters>
+
+    <Content>
+        <UiDataGridPanel Title="عمليات المخزون" Subtitle="@($"{FilteredTransactions.Count} عملية")">
+            <Header>
+                <div class="inventory-transactions__header">
+                    <span>رقم العملية</span>
+                    <span>النوع</span>
+                    <span>التاريخ</span>
+                    <span>من مخزن</span>
+                    <span>إلى مخزن</span>
+                    <span>الحالة</span>
+                </div>
+            </Header>
+            <Body>
+                @if (_loading)
+                {
+                    <UiAlert Message="جاري تحميل عمليات المخزون..." />
+                }
+                else if (FilteredTransactions.Count == 0)
+                {
+                    <UiAlert Message="لا توجد عمليات مطابقة." />
+                }
+                else
+                {
+                    <div class="inventory-transactions__rows">
+                        @foreach (var transaction in FilteredTransactions)
+                        {
+                            <button type="button" class="@RowCss(transaction.Id)" @onclick="() => SelectAsync(transaction.Id)">
+                                <strong>@transaction.TransactionNumber</strong>
+                                <span>@InventoryArabicPresenter.TransactionTypeText(transaction.TransactionType)</span>
+                                <span>@transaction.TransactionDate.ToLocalTime().ToString("yyyy-MM-dd")</span>
+                                <span>@WarehouseName(transaction.SourceWarehouseId)</span>
+                                <span>@WarehouseName(transaction.DestinationWarehouseId)</span>
+                                <span>@InventoryArabicPresenter.TransactionStatusText(transaction.Status)</span>
+                            </button>
+                        }
+                    </div>
+                }
+            </Body>
+        </UiDataGridPanel>
+    </Content>
+
+    <Aside>
+        <UiCard Title="@AsideTitle" Subtitle="@AsideSubtitle">
+            @if (_mode == ViewMode.Empty)
+            {
+                <UiAlert Message="اختر عملية من القائمة أو أنشئ عملية جديدة." />
+            }
+            else if (_mode == ViewMode.Create)
+            {
+                <div class="inventory-transactions__editor">
+                    <UiSelect Label="نوع العملية"
+                              Value="@_transactionType"
+                              ValueExpression="@(() => _transactionType)"
+                              ValueChanged="OnTransactionTypeChanged"
+                              Options="@InventoryArabicPresenter.TransactionTypeOptions"
+                              Required="true"
+                              Size="ControlSize.Small" />
+
+                    <UiInputDate Label="تاريخ العملية"
+                                 Value="@_transactionDate"
+                                 ValueExpression="@(() => _transactionDate)"
+                                 ValueChanged="@(v => _transactionDate = v)"
+                                 Required="true"
+                                 Size="ControlSize.Small" />
+
+                    @if (RequiresSourceWarehouse)
+                    {
+                        <UiSelect Label="من مخزن"
+                                  Value="@_sourceWarehouseId"
+                                  ValueExpression="@(() => _sourceWarehouseId)"
+                                  ValueChanged="@(v => _sourceWarehouseId = v)"
+                                  Options="@WarehouseOptions"
+                                  Required="true"
+                                  Size="ControlSize.Small" />
+                    }
+
+                    @if (RequiresDestinationWarehouse)
+                    {
+                        <UiSelect Label="إلى مخزن"
+                                  Value="@_destinationWarehouseId"
+                                  ValueExpression="@(() => _destinationWarehouseId)"
+                                  ValueChanged="@(v => _destinationWarehouseId = v)"
+                                  Options="@WarehouseOptions"
+                                  Required="true"
+                                  Size="ControlSize.Small" />
+                    }
+
+                    @if (IsAdjustment)
+                    {
+                        <UiInputText Label="سبب التعديل"
+                                     Value="@_reason"
+                                     ValueExpression="@(() => _reason)"
+                                     ValueChanged="@(v => _reason = v)"
+                                     Required="true"
+                                     Size="ControlSize.Small" />
+                    }
+                    else
+                    {
+                        <UiInputText Label="السبب / المرجع"
+                                     Value="@_reason"
+                                     ValueExpression="@(() => _reason)"
+                                     ValueChanged="@(v => _reason = v)"
+                                     Size="ControlSize.Small" />
+                    }
+
+                    <UiInputText Label="ملاحظات"
+                                 Value="@_notes"
+                                 ValueExpression="@(() => _notes)"
+                                 ValueChanged="@(v => _notes = v)"
+                                 Size="ControlSize.Small" />
+
+                    <div class="inventory-transactions__lines-title">
+                        <strong>الأصناف والكميات</strong>
+                        <button type="button" @onclick="AddLine">+ إضافة صنف</button>
+                    </div>
+
+                    @for (var i = 0; i < _draftLines.Count; i++)
+                    {
+                        var line = _draftLines[i];
+                        <div class="inventory-transactions__line-editor">
+                            <UiSelect Label="الصنف / SKU"
+                                      Value="@line.ProductVariantId"
+                                      ValueExpression="@(() => line.ProductVariantId)"
+                                      ValueChanged="@(v => line.ProductVariantId = v)"
+                                      Options="@VariantOptions"
+                                      Required="true"
+                                      Size="ControlSize.Small" />
+                            <UiInputText Label="الكمية"
+                                         Value="@line.Quantity"
+                                         ValueExpression="@(() => line.Quantity)"
+                                         ValueChanged="@(v => line.Quantity = v ?? string.Empty)"
+                                         Type="number"
+                                         Required="true"
+                                         Size="ControlSize.Small" />
+                            <UiInputText Label="تكلفة الوحدة"
+                                         Value="@line.UnitCost"
+                                         ValueExpression="@(() => line.UnitCost)"
+                                         ValueChanged="@(v => line.UnitCost = v ?? string.Empty)"
+                                         Type="number"
+                                         Required="true"
+                                         Size="ControlSize.Small" />
+                            <button type="button" class="inventory-transactions__remove" disabled="@(_draftLines.Count == 1)" @onclick="() => RemoveLine(line)">حذف</button>
+                        </div>
+                    }
+                </div>
+            }
+            else if (_selectedTransaction is not null)
+            {
+                <div class="inventory-transactions__details">
+                    <div><span>النوع</span><strong>@InventoryArabicPresenter.TransactionTypeText(_selectedTransaction.TransactionType)</strong></div>
+                    <div><span>التاريخ</span><strong>@_selectedTransaction.TransactionDate.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</strong></div>
+                    <div><span>من مخزن</span><strong>@WarehouseName(_selectedTransaction.SourceWarehouseId)</strong></div>
+                    <div><span>إلى مخزن</span><strong>@WarehouseName(_selectedTransaction.DestinationWarehouseId)</strong></div>
+                    <div><span>الحالة</span><strong>@InventoryArabicPresenter.TransactionStatusText(_selectedTransaction.Status)</strong></div>
+                    <div><span>السبب</span><strong>@(_selectedTransaction.Reason ?? "—")</strong></div>
+                    <div class="inventory-transactions__wide"><span>الملاحظات</span><strong>@(_selectedTransaction.Notes ?? "—")</strong></div>
+                </div>
+
+                <div class="inventory-transactions__view-lines">
+                    <strong>بنود العملية</strong>
+                    @if (_selectedLines.Count == 0)
+                    {
+                        <UiAlert Message="لا توجد بنود." />
+                    }
+                    else
+                    {
+                        @foreach (var line in _selectedLines)
+                        {
+                            <div class="inventory-transactions__view-line">
+                                <div><strong>@VariantLabel(line.ProductVariantId)</strong><span>@VariantSku(line.ProductVariantId)</span></div>
+                                <span>الكمية: @line.Quantity.ToString("N2")</span>
+                                <span>التكلفة: @line.UnitCost.ToString("N2")</span>
+                                <strong>@line.TotalCost.ToString("N2")</strong>
+                            </div>
+                        }
+                    }
+                </div>
+            }
+        </UiCard>
+    </Aside>
+</UiWorkspaceLayout>
+
+@code {
+    private enum ViewMode { Empty, View, Create }
+    private sealed class TransactionLineForm
+    {
+        public string? ProductVariantId { get; set; }
+        public string Quantity { get; set; } = "1";
+        public string UnitCost { get; set; } = "0";
+    }
+
+    [Inject] private IInventoryClientService Inventory { get; set; } = default!;
+    [Inject] private IApiFeedbackService ApiFeedback { get; set; } = default!;
+    [Inject] private IUiSnackbarService Snackbar { get; set; } = default!;
+
+    [Parameter, SupplyParameterFromQuery(Name = "transactionId")]
+    public Guid? TransactionIdFromQuery { get; set; }
+
+    private IReadOnlyList<InventoryTransactionDto> _transactions = [];
+    private IReadOnlyList<WarehouseDto> _warehouses = [];
+    private IReadOnlyList<ProductDto> _products = [];
+    private IReadOnlyList<ProductVariantDto> _variants = [];
+    private IReadOnlyList<InventoryTransactionLineDto> _selectedLines = [];
+    private InventoryTransactionDto? _selectedTransaction;
+    private Guid? _selectedId;
+    private ViewMode _mode = ViewMode.Empty;
+    private bool _loading = true;
+    private bool _saving;
+    private bool _posting;
+    private string? _search;
+    private string? _typeFilter;
+    private string? _statusFilter;
+    private string? _warehouseFilter;
+
+    private string _transactionType = ((int)InventoryTransactionType.Receipt).ToString();
+    private DateOnly? _transactionDate = DateOnly.FromDateTime(DateTime.Today);
+    private string? _sourceWarehouseId;
+    private string? _destinationWarehouseId;
+    private string? _reason;
+    private string? _notes;
+    private readonly List<TransactionLineForm> _draftLines = [];
+
+    private IReadOnlyList<UiSelectOption> TransactionTypeFilterOptions =>
+        [new UiSelectOption(string.Empty, "كل الأنواع"), .. InventoryArabicPresenter.TransactionTypeOptions];
+
+    private IReadOnlyList<UiSelectOption> WarehouseFilterOptions =>
+        [new UiSelectOption(string.Empty, "كل المخازن"), .. _warehouses.Select(x => new UiSelectOption(x.Id.ToString("D"), x.NameAr))];
+
+    private IReadOnlyList<UiSelectOption> WarehouseOptions =>
+        [new UiSelectOption(string.Empty, "اختر المخزن"), .. _warehouses.Where(x => x.IsActive).Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.NameAr}"))];
+
+    private IReadOnlyList<UiSelectOption> VariantOptions => _variants.Where(x => x.IsActive)
+        .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{ProductName(x.ProductId)} - {x.SKU}{(string.IsNullOrWhiteSpace(x.VariantName) ? string.Empty : $" - {x.VariantName}")}"))
+        .ToArray();
+
+    private InventoryTransactionType CurrentType => Enum.TryParse<InventoryTransactionType>(_transactionType, out var parsedByName)
+        ? parsedByName
+        : int.TryParse(_transactionType, out var raw) ? (InventoryTransactionType)raw : InventoryTransactionType.Receipt;
+
+    private bool RequiresSourceWarehouse => CurrentType is InventoryTransactionType.Issue
+        or InventoryTransactionType.Transfer
+        or InventoryTransactionType.AdjustmentDecrease
+        or InventoryTransactionType.PurchaseReturn
+        or InventoryTransactionType.Scrap;
+
+    private bool RequiresDestinationWarehouse => CurrentType is InventoryTransactionType.Opening
+        or InventoryTransactionType.Receipt
+        or InventoryTransactionType.Transfer
+        or InventoryTransactionType.AdjustmentIncrease
+        or InventoryTransactionType.SalesReturn;
+
+    private bool IsAdjustment => CurrentType is InventoryTransactionType.AdjustmentIncrease or InventoryTransactionType.AdjustmentDecrease;
+    private bool CanPost => _mode == ViewMode.View && _selectedTransaction?.Status == InventoryTransactionStatus.Draft && !_posting;
+    private string AsideTitle => _mode == ViewMode.Create ? "عملية مخزون جديدة" : "تفاصيل العملية";
+    private string? AsideSubtitle => _selectedTransaction?.TransactionNumber ?? (_mode == ViewMode.Create ? "سيتم توليد الرقم تلقائيًا" : null);
+
+    private IReadOnlyList<InventoryTransactionDto> FilteredTransactions => _transactions.Where(x =>
+    {
+        if (int.TryParse(_typeFilter, out var type) && (int)x.TransactionType != type) return false;
+        if (int.TryParse(_statusFilter, out var status) && (int)x.Status != status) return false;
+        if (Guid.TryParse(_warehouseFilter, out var warehouseId) && x.SourceWarehouseId != warehouseId && x.DestinationWarehouseId != warehouseId) return false;
+        if (string.IsNullOrWhiteSpace(_search)) return true;
+        return Match(_search, x.TransactionNumber, x.ReferenceType, x.Reason, x.Notes, WarehouseName(x.SourceWarehouseId), WarehouseName(x.DestinationWarehouseId));
+    }).OrderByDescending(x => x.TransactionDate).ToArray();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        if (TransactionIdFromQuery.HasValue && _transactions.Any(x => x.Id == TransactionIdFromQuery.Value))
+            await SelectAsync(TransactionIdFromQuery.Value);
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var page = new PageRequest { PageNumber = 1, PageSize = PageRequest.MaximumPageSize };
+            var transactionsTask = Inventory.GetInventoryTransactionsAsync(page);
+            var warehousesTask = Inventory.GetWarehousesAsync(page);
+            var productsTask = Inventory.GetProductsAsync(page);
+            var variantsTask = Inventory.GetProductVariantsAsync(page);
+            await Task.WhenAll(transactionsTask, warehousesTask, productsTask, variantsTask);
+            _transactions = transactionsTask.Result.Items;
+            _warehouses = warehousesTask.Result.Items;
+            _products = productsTask.Result.Items;
+            _variants = variantsTask.Result.Items;
+
+            if (_selectedId.HasValue && _transactions.FirstOrDefault(x => x.Id == _selectedId.Value) is { } selected)
+                _selectedTransaction = selected;
+        }
+        catch (ApiClientException ex)
+        {
+            ApiFeedback.Show(ex.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private Task RefreshAsync(MouseEventArgs args) => LoadAsync();
+    private Task SearchChangedAsync(string? _) => Task.CompletedTask;
+
+    private Task BeginCreateAsync(MouseEventArgs args)
+    {
+        _mode = ViewMode.Create;
+        _selectedId = null;
+        _selectedTransaction = null;
+        _selectedLines = [];
+        _transactionType = ((int)InventoryTransactionType.Receipt).ToString();
+        _transactionDate = DateOnly.FromDateTime(DateTime.Today);
+        _sourceWarehouseId = null;
+        _destinationWarehouseId = null;
+        _reason = null;
+        _notes = null;
+        _draftLines.Clear();
+        _draftLines.Add(new TransactionLineForm());
+        return Task.CompletedTask;
+    }
+
+    private Task CancelCreateAsync(MouseEventArgs args)
+    {
+        _mode = ViewMode.Empty;
+        _draftLines.Clear();
+        return Task.CompletedTask;
+    }
+
+    private void OnTransactionTypeChanged(string? value)
+    {
+        _transactionType = value ?? ((int)InventoryTransactionType.Receipt).ToString();
+        if (!RequiresSourceWarehouse) _sourceWarehouseId = null;
+        if (!RequiresDestinationWarehouse) _destinationWarehouseId = null;
+    }
+
+    private void AddLine() => _draftLines.Add(new TransactionLineForm());
+    private void RemoveLine(TransactionLineForm line) { if (_draftLines.Count > 1) _draftLines.Remove(line); }
+
+    private async Task SaveAsync(MouseEventArgs args)
+    {
+        if (_mode != ViewMode.Create || _saving) return;
+        if (!_transactionDate.HasValue)
+        {
+            Snackbar.Error("تاريخ العملية مطلوب.");
+            return;
+        }
+        if (RequiresSourceWarehouse && !Guid.TryParse(_sourceWarehouseId, out _))
+        {
+            Snackbar.Error("المخزن المصدر مطلوب لهذه العملية.");
+            return;
+        }
+        if (RequiresDestinationWarehouse && !Guid.TryParse(_destinationWarehouseId, out _))
+        {
+            Snackbar.Error("المخزن الوجهة مطلوب لهذه العملية.");
+            return;
+        }
+        if (CurrentType == InventoryTransactionType.Transfer && _sourceWarehouseId == _destinationWarehouseId)
+        {
+            Snackbar.Error("يجب أن يختلف مخزن المصدر عن مخزن الوجهة.");
+            return;
+        }
+        if (IsAdjustment && string.IsNullOrWhiteSpace(_reason))
+        {
+            Snackbar.Error("سبب التعديل مطلوب.");
+            return;
+        }
+
+        var lines = new List<CreateInventoryTransactionLineRequest>();
+        foreach (var line in _draftLines)
+        {
+            if (!Guid.TryParse(line.ProductVariantId, out var variantId) ||
+                !decimal.TryParse(line.Quantity, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var quantity) || quantity <= 0 ||
+                !decimal.TryParse(line.UnitCost, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var unitCost) || unitCost < 0)
+            {
+                Snackbar.Error("تحقق من الصنف والكمية والتكلفة في جميع البنود.");
+                return;
+            }
+            lines.Add(new CreateInventoryTransactionLineRequest(variantId, quantity, unitCost, null));
+        }
+
+        _saving = true;
+        try
+        {
+            var dateTime = DateTime.SpecifyKind(_transactionDate.Value.ToDateTime(new TimeOnly(12, 0)), DateTimeKind.Utc);
+            var request = new CreateInventoryTransactionRequest(
+                string.Empty,
+                CurrentType,
+                ParseGuid(_sourceWarehouseId),
+                ParseGuid(_destinationWarehouseId),
+                new DateTimeOffset(dateTime),
+                null,
+                null,
+                NullIfBlank(_reason),
+                NullIfBlank(_notes),
+                lines);
+
+            var saved = await Inventory.CreateInventoryTransactionAsync(request);
+            if (saved is null) return;
+            await LoadAsync();
+            await SelectAsync(saved.Id);
+            Snackbar.Success("تم إنشاء عملية المخزون.");
+        }
+        catch (ApiClientException ex)
+        {
+            ApiFeedback.Show(ex.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task SelectAsync(Guid id)
+    {
+        if (_mode == ViewMode.Create || _saving) return;
+        _selectedId = id;
+        _selectedTransaction = _transactions.FirstOrDefault(x => x.Id == id) ?? await Inventory.GetInventoryTransactionAsync(id);
+        _selectedLines = await Inventory.GetInventoryTransactionLinesAsync(id);
+        _mode = ViewMode.View;
+    }
+
+    private async Task PostAsync(MouseEventArgs args)
+    {
+        if (!CanPost || !_selectedId.HasValue) return;
+        _posting = true;
+        try
+        {
+            var posted = await Inventory.PostInventoryTransactionAsync(_selectedId.Value, new PostInventoryTransactionRequest());
+            if (posted is null) return;
+            await LoadAsync();
+            await SelectAsync(posted.Id);
+            Snackbar.Success("تم ترحيل عملية المخزون بنجاح.");
+        }
+        catch (ApiClientException ex)
+        {
+            ApiFeedback.Show(ex.Error);
+        }
+        finally
+        {
+            _posting = false;
+        }
+    }
+
+    private string RowCss(Guid id) => $"inventory-transactions__row {(id == _selectedId ? "inventory-transactions__row--selected" : string.Empty)}";
+    private string WarehouseName(Guid? id) => id.HasValue ? _warehouses.FirstOrDefault(x => x.Id == id.Value)?.NameAr ?? "—" : "—";
+    private string ProductName(Guid id) => _products.FirstOrDefault(x => x.Id == id)?.NameAr ?? "—";
+    private ProductVariantDto? Variant(Guid id) => _variants.FirstOrDefault(x => x.Id == id);
+    private string VariantLabel(Guid id) { var v = Variant(id); return v is null ? "—" : $"{ProductName(v.ProductId)}{(string.IsNullOrWhiteSpace(v.VariantName) ? string.Empty : $" - {v.VariantName}")}"; }
+    private string VariantSku(Guid id) => Variant(id)?.SKU ?? "—";
+    private static Guid? ParseGuid(string? value) => Guid.TryParse(value, out var id) ? id : null;
+    private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static bool Match(string? search, params string?[] values)
+    {
+        if (string.IsNullOrWhiteSpace(search)) return true;
+        var term = search.Trim();
+        return values.Any(x => x?.Contains(term, StringComparison.CurrentCultureIgnoreCase) == true);
+    }
+}

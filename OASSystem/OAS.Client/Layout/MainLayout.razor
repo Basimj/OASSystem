@@ -63,7 +63,11 @@
         new("sales", "المبيعات", "/sales", "fa-solid fa-cart-shopping"),
         new("customers", "العملاء", "/customers", "fa-regular fa-user"),
         new("products", "المنتجات", "/products", "fa-solid fa-glasses"),
-        new("inventory", "المخزون", "/inventory", "fa-solid fa-cube"),
+        new("inventory-warehouses", "المخازن", "/inventory/warehouses", "fa-solid fa-warehouse"),
+        new("inventory-balances", "أرصدة المخزون", "/inventory/balances", "fa-solid fa-boxes-stacked"),
+        new("inventory-transactions", "عمليات المخزون", "/inventory/transactions", "fa-solid fa-arrow-right-arrow-left"),
+        new("inventory-ledger", "حركات المخزون", "/inventory/ledger", "fa-solid fa-list-ol"),
+        new("inventory-stock-counts", "الجرد المخزني", "/inventory/stock-counts", "fa-solid fa-clipboard-check"),
         new("daily-orders", "الطلبات اليومية", "/daily-orders", "fa-regular fa-calendar-check"),
         new("purchases", "المشتريات", "/purchases", "fa-solid fa-bag-shopping"),
         new("finance", "المحاسبة العامة", "/accounting", "fa-solid fa-calculator"),
@@ -91,7 +95,7 @@
 
     private static readonly IReadOnlyList<UiShellNavigationGroup> ShellGroups =
     [
-        new("operations", "المبيعات والتشغيل", "fa-solid fa-store", ["sales", "customers", "products", "daily-orders"]),
+        new("operations", "المبيعات والتشغيل", "fa-solid fa-store", ["sales", "customers", "daily-orders"]),
         new("accounting", "المحاسبة والمالية", "fa-solid fa-scale-balanced", [
             "finance",
             "accounting-accounts",
@@ -107,7 +111,15 @@
             "accounting-cost-centers",
             "accounting-posting-profiles"
         ]),
-        new("stock", "المخزون والمشتريات", "fa-solid fa-boxes-stacked", ["inventory", "purchases", "suppliers"]),
+        new("stock", "المخزون", "fa-solid fa-boxes-stacked", [
+            "products",
+            "inventory-warehouses",
+            "inventory-balances",
+            "inventory-transactions",
+            "inventory-ledger",
+            "inventory-stock-counts"
+        ]),
+        new("purchasing", "المشتريات والموردون", "fa-solid fa-bag-shopping", ["purchases", "suppliers"]),
         new("administration", "الإدارة", "fa-solid fa-people-group", ["employees", "departments", "users", "roles", "job-titles"]),
         new("reports-group", "التقارير", "fa-solid fa-chart-line", ["reports"]),
         new("system", "النظام", "fa-solid fa-sliders", ["settings"], DefaultExpanded: false)

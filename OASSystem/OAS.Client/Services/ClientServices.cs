@@ -7,6 +7,7 @@ using OAS.Client.Features.Employees.Workspace;
 using OAS.Client.Identity.Services;
 using OAS.Client.Identity.State;
 using OAS.Client.Identity.Users.Workspace;
+using OAS.Client.Inventory.Services;
 using OAS.Client.Services.Browser;
 using OAS.Client.Services.Http;
 using OAS.UiLib.Extensions;
@@ -36,6 +37,7 @@ public static class ClientServices
         services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<OasAuthenticationStateProvider>());
         services.AddScoped<IEmployeeClientService, EmployeeClientService>();
         services.AddScoped<IEmployeesWorkspaceState, EmployeesWorkspaceState>();
+        services.AddScoped<IInventoryClientService, InventoryClientService>();
         services.AddScoped<BrowserFileDownloadService>();
         services.AddScoped<OAS.Client.Accounting.Services.IAccountingClientService, OAS.Client.Accounting.Services.AccountingClientService>();
         services.AddScoped<OAS.Client.Accounting.Workspace.IAccountingWorkspaceState, OAS.Client.Accounting.Workspace.AccountingWorkspaceState>();

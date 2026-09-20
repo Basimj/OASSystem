@@ -45,6 +45,12 @@ public sealed class ProductVariantConfiguration : IEntityTypeConfiguration<Produ
         builder.Property(x => x.IsActive)
             .IsRequired();
 
+        builder.Property(x => x.CreatedBy)
+            .HasMaxLength(64);
+
+        builder.Property(x => x.LastModifiedBy)
+            .HasMaxLength(64);
+
         builder.Property(x => x.RowVersion)
             .IsRowVersion()
             .IsConcurrencyToken();

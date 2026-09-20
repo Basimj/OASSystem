@@ -1,0 +1,162 @@
+@page "/inventory"
+@page "/inventory/balances"
+@attribute [Authorize]
+@using OAS.Client.Inventory.Services
+@using OAS.Contracts.Inventory.Products
+@using OAS.Contracts.Inventory.Stock
+@using OAS.Contracts.Inventory.Warehouses
+
+<PageTitle>أرصدة المخزون | OAS</PageTitle>
+
+<UiWorkspaceLayout ShowAside="false" ShowFilters="true">
+    <Actions>
+        <UiWorkspaceActionBar>
+            <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary"
+                      Size="ControlSize.Small" Loading="@_loading" OnClick="RefreshAsync" />
+            <UiSearchInput @bind-Value="_search" Placeholder="ابحث بالمنتج أو SKU أو Barcode..."
+                           AriaLabel="البحث في أرصدة المخزون" ClearText="مسح البحث"
+                           DebounceMilliseconds="250" OnSearch="SearchChangedAsync" />
+        </UiWorkspaceActionBar>
+    </Actions>
+
+    <Filters>
+        <div class="inventory-balance__filters">
+            <UiSelect Value="@_warehouseFilter"
+                      ValueExpression="@(() => _warehouseFilter)"
+                      ValueChanged="@(v => _warehouseFilter = v)"
+                      Label="المخزن"
+                      Options="@WarehouseFilterOptions"
+                      Size="ControlSize.Small" />
+        </div>
+    </Filters>
+
+    <Content>
+        <UiDataGridPanel Title="أرصدة المخزون" Subtitle="@($"{FilteredBalances.Count} رصيد")">
+            <Header>
+                <div class="inventory-balance__header">
+                    <span>المنتج</span>
+                    <span>Variant / SKU</span>
+                    <span>المخزن</span>
+                    <span>On Hand</span>
+                    <span>Reserved</span>
+                    <span>Available</span>
+                    <span>On Order</span>
+                    <span>متوسط التكلفة</span>
+                    <span>القيمة</span>
+                    <span>إجراءات</span>
+                </div>
+            </Header>
+            <Body>
+                @if (_loading)
+                {
+                    <UiAlert Message="جاري تحميل أرصدة المخزون..." />
+                }
+                else if (FilteredBalances.Count == 0)
+                {
+                    <UiAlert Message="لا توجد أرصدة مطابقة للفلتر الحالي." />
+                }
+                else
+                {
+                    <div class="inventory-balance__rows">
+                        @foreach (var balance in FilteredBalances)
+                        {
+                            var variant = FindVariant(balance.ProductVariantId);
+                            var product = variant is null ? null : FindProduct(variant.ProductId);
+                            <div class="inventory-balance__row">
+                                <div class="inventory-balance__product">
+                                    <strong>@(product?.NameAr ?? "—")</strong>
+                                    <span>@(product?.ProductCode ?? "—")</span>
+                                </div>
+                                <div class="inventory-balance__product">
+                                    <strong>@(variant?.VariantName ?? "—")</strong>
+                                    <span>@(variant?.SKU ?? "—") · @(variant?.Barcode ?? "—")</span>
+                                </div>
+                                <span>@WarehouseName(balance.WarehouseId)</span>
+                                <span>@balance.OnHandQuantity.ToString("N2")</span>
+                                <span>@balance.ReservedQuantity.ToString("N2")</span>
+                                <strong>@balance.AvailableQuantity.ToString("N2")</strong>
+                                <span>@balance.OnOrderQuantity.ToString("N2")</span>
+                                <span>@balance.AverageUnitCost.ToString("N2")</span>
+                                <strong>@balance.InventoryValue.ToString("N2")</strong>
+                                <div class="inventory-balance__actions">
+                                    <button type="button" @onclick="() => OpenProduct(balance.ProductVariantId)">الصنف</button>
+                                    <button type="button" @onclick="() => OpenMovements(balance.ProductVariantId)">الحركات</button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </Body>
+        </UiDataGridPanel>
+    </Content>
+</UiWorkspaceLayout>
+
+@code {
+    [Inject] private IInventoryClientService Inventory { get; set; } = default!;
+    [Inject] private IApiFeedbackService ApiFeedback { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+
+    private bool _loading = true;
+    private string? _search;
+    private string? _warehouseFilter;
+    private IReadOnlyList<InventoryBalanceDto> _balances = [];
+    private IReadOnlyList<WarehouseDto> _warehouses = [];
+    private IReadOnlyList<ProductDto> _products = [];
+    private IReadOnlyList<ProductVariantDto> _variants = [];
+
+    private IReadOnlyList<UiSelectOption> WarehouseFilterOptions =>
+        [new UiSelectOption(string.Empty, "كل المخازن"), .. _warehouses.Where(x => x.IsActive).Select(x => new UiSelectOption(x.Id.ToString("D"), x.NameAr))];
+
+    private IReadOnlyList<InventoryBalanceDto> FilteredBalances => _balances.Where(balance =>
+    {
+        if (Guid.TryParse(_warehouseFilter, out var warehouseId) && balance.WarehouseId != warehouseId) return false;
+        if (string.IsNullOrWhiteSpace(_search)) return true;
+        var variant = FindVariant(balance.ProductVariantId);
+        var product = variant is null ? null : FindProduct(variant.ProductId);
+        var term = _search.Trim();
+        return new[] { variant?.SKU, variant?.Barcode, variant?.VariantName, product?.ProductCode, product?.NameAr, product?.NameEn, WarehouseName(balance.WarehouseId) }
+            .Any(x => x?.Contains(term, StringComparison.CurrentCultureIgnoreCase) == true);
+    }).ToArray();
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var page = new PageRequest { PageNumber = 1, PageSize = PageRequest.MaximumPageSize };
+            var balancesTask = Inventory.GetInventoryBalancesAsync(page);
+            var warehousesTask = Inventory.GetWarehousesAsync(page);
+            var productsTask = Inventory.GetProductsAsync(page);
+            var variantsTask = Inventory.GetProductVariantsAsync(page);
+            await Task.WhenAll(balancesTask, warehousesTask, productsTask, variantsTask);
+            _balances = balancesTask.Result.Items;
+            _warehouses = warehousesTask.Result.Items;
+            _products = productsTask.Result.Items;
+            _variants = variantsTask.Result.Items;
+        }
+        catch (ApiClientException ex)
+        {
+            ApiFeedback.Show(ex.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private Task RefreshAsync(MouseEventArgs args) => LoadAsync();
+    private Task SearchChangedAsync(string? _) => Task.CompletedTask;
+    private ProductVariantDto? FindVariant(Guid id) => _variants.FirstOrDefault(x => x.Id == id);
+    private ProductDto? FindProduct(Guid id) => _products.FirstOrDefault(x => x.Id == id);
+    private string WarehouseName(Guid id) => _warehouses.FirstOrDefault(x => x.Id == id)?.NameAr ?? "—";
+
+    private void OpenProduct(Guid variantId)
+    {
+        var variant = FindVariant(variantId);
+        if (variant is not null) Navigation.NavigateTo($"/products?productId={variant.ProductId:D}");
+    }
+
+    private void OpenMovements(Guid variantId) => Navigation.NavigateTo($"/inventory/ledger?variantId={variantId:D}");
+}

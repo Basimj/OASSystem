@@ -1,0 +1,112 @@
+@page "/products"
+@attribute [Authorize]
+@using OAS.Client.Inventory.Services
+@using OAS.Contracts.Enums.Inventory
+@using OAS.Contracts.Inventory.Products
+
+<PageTitle>المنتجات | OAS</PageTitle>
+
+<UiWorkspaceLayout ShowAside="true" ShowFilters="false">
+    <Actions>
+        <UiWorkspaceActionBar>
+            <UiButton Text="جديد" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small"
+                      Disabled="@IsEditing" OnClick="BeginCreateAsync" />
+            <UiButton Text="حفظ" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small"
+                      Disabled="@(!CanSave)" Loading="@_saving" OnClick="SaveAsync" />
+            <UiButton Text="تعديل" IconCssClass="fa-solid fa-pen" Variant="ButtonVariant.Secondary"
+                      Size="ControlSize.Small" Disabled="@(!CanEdit)" OnClick="BeginEditAsync" />
+            <UiButton Text="إلغاء" IconCssClass="fa-solid fa-xmark" Variant="ButtonVariant.Ghost"
+                      Size="ControlSize.Small" Disabled="@(!IsEditing)" OnClick="CancelEditAsync" />
+            <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary"
+                      Size="ControlSize.Small" Disabled="@IsEditing" Loading="@_loading" OnClick="RefreshAsync" />
+            <UiSearchInput @bind-Value="_search" Placeholder="ابحث في القسم الحالي..."
+                           AriaLabel="البحث في المنتجات" ClearText="مسح البحث"
+                           DebounceMilliseconds="250" OnSearch="SearchChangedAsync" />
+        </UiWorkspaceActionBar>
+    </Actions>
+
+    <Content>
+        <div class="inventory-products">
+            <div class="inventory-products__tabs" role="tablist" aria-label="أقسام المنتجات">
+                @foreach (var tab in Sections)
+                {
+                    <button type="button"
+                            class="@(tab.Value == _section ? "inventory-products__tab inventory-products__tab--active" : "inventory-products__tab")"
+                            @onclick="() => ChangeSectionAsync(tab.Value)">
+                        <i class="@tab.Icon" aria-hidden="true"></i>
+                        <span>@tab.Text</span>
+                    </button>
+                }
+            </div>
+
+            <UiDataGridPanel Title="@SectionTitle" Subtitle="@SectionSubtitle">
+                <Header>@RenderHeader()</Header>
+                <Body>
+                    @if (_loading)
+                    {
+                        <UiAlert Message="جاري تحميل البيانات..." />
+                    }
+                    else if (VisibleCount == 0)
+                    {
+                        <UiAlert Message="لا توجد سجلات مطابقة." />
+                    }
+                    else
+                    {
+                        @RenderRows()
+                    }
+                </Body>
+            </UiDataGridPanel>
+        </div>
+    </Content>
+
+    <Aside>
+        <div class="inventory-products__aside">
+            <UiCard Title="@EditorTitle" Subtitle="@EditorSubtitle">
+                @if (_mode == EditorMode.Empty)
+                {
+                    <UiAlert Message="اختر سجلًا من القائمة أو اضغط «جديد»." />
+                }
+                else
+                {
+                    @RenderEditor()
+
+                    @if (ShowsFrameDetails)
+                    {
+                        <div class="inventory-products__specialized">
+                            <h4>تفاصيل الإطار</h4>
+                            <UiInputText Label="الموديل" Value="@_frameModel" ValueExpression="@(() => _frameModel)" ValueChanged="@(v => _frameModel = v ?? string.Empty)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText Label="الخامة" Value="@_frameMaterial" ValueExpression="@(() => _frameMaterial)" ValueChanged="@(v => _frameMaterial = v)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText Label="نوع الإطار / Rim" Value="@_frameRimType" ValueExpression="@(() => _frameRimType)" ValueChanged="@(v => _frameRimType = v)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText Label="الجنس" Value="@_frameGender" ValueExpression="@(() => _frameGender)" ValueChanged="@(v => _frameGender = v)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText Label="الشكل" Value="@_frameShape" ValueExpression="@(() => _frameShape)" ValueChanged="@(v => _frameShape = v)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <div class="inventory-products__specialized-grid">
+                                <UiInputText Label="طول الذراع" Value="@_templeLength" ValueExpression="@(() => _templeLength)" ValueChanged="@(v => _templeLength = v)" Type="number" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                <UiInputText Label="مقاس الجسر" Value="@_bridgeSize" ValueExpression="@(() => _bridgeSize)" ValueChanged="@(v => _bridgeSize = v)" Type="number" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                <UiInputText Label="عرض العدسة" Value="@_lensWidth" ValueExpression="@(() => _lensWidth)" ValueChanged="@(v => _lensWidth = v)" Type="number" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            </div>
+                        </div>
+                    }
+                    else if (ShowsLensDetails)
+                    {
+                        <div class="inventory-products__specialized">
+                            <h4>تفاصيل العدسة</h4>
+                            <UiInputText Label="نوع العدسة" Value="@_lensType" ValueExpression="@(() => _lensType)" ValueChanged="@(v => _lensType = v ?? string.Empty)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText Label="الخامة" Value="@_lensMaterial" ValueExpression="@(() => _lensMaterial)" ValueChanged="@(v => _lensMaterial = v)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText Label="الطلاء / Coating" Value="@_lensCoating" ValueExpression="@(() => _lensCoating)" ValueChanged="@(v => _lensCoating = v)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText Label="معامل الانكسار" Value="@_refractiveIndex" ValueExpression="@(() => _refractiveIndex)" ValueChanged="@(v => _refractiveIndex = v)" Type="number" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <div class="inventory-products__specialized-grid">
+                                <UiInputText Label="Sphere Min" Value="@_sphereMin" ValueExpression="@(() => _sphereMin)" ValueChanged="@(v => _sphereMin = v)" Type="number" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                <UiInputText Label="Sphere Max" Value="@_sphereMax" ValueExpression="@(() => _sphereMax)" ValueChanged="@(v => _sphereMax = v)" Type="number" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                <UiInputText Label="Cylinder Min" Value="@_cylinderMin" ValueExpression="@(() => _cylinderMin)" ValueChanged="@(v => _cylinderMin = v)" Type="number" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                <UiInputText Label="Cylinder Max" Value="@_cylinderMax" ValueExpression="@(() => _cylinderMax)" ValueChanged="@(v => _cylinderMax = v)" Type="number" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                <UiInputText Label="Add Min" Value="@_addMin" ValueExpression="@(() => _addMin)" ValueChanged="@(v => _addMin = v)" Type="number" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                <UiInputText Label="Add Max" Value="@_addMax" ValueExpression="@(() => _addMax)" ValueChanged="@(v => _addMax = v)" Type="number" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            </div>
+                            <UiCheckbox Label="عدسة طبية / Prescription" Value="@_isPrescriptionLens" ValueChanged="@(v => _isPrescriptionLens = v)" Disabled="@(!IsEditing)" />
+                        </div>
+                    }
+                }
+            </UiCard>
+        </div>
+    </Aside>
+</UiWorkspaceLayout>
