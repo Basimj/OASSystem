@@ -1,4 +1,4 @@
-﻿using OAS.Domain.Common;
+using OAS.Domain.Common;
 using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Entities.Inventory;
@@ -26,5 +26,12 @@ public sealed class Unit : AuditableEntity<Guid>
         NameAr = nameAr;
         NameEn = nameEn;
         IsActive = true;
+    }
+
+    public void UpdateDetails(string nameAr, string? nameEn, bool isActive)
+    {
+        NameAr = nameAr;
+        NameEn = nameEn;
+        IsActive = isActive;
     }
 }

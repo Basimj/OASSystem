@@ -1,4 +1,4 @@
-﻿using OAS.Domain.Common.Entities;
+using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Entities.Inventory;
 
@@ -19,5 +19,11 @@ public class Brand : AuditableEntity<Guid>
         Code = code;
         Name = name;
         IsActive = true;
+    }
+
+    public void UpdateDetails(string name, bool isActive)
+    {
+        Name = name;
+        IsActive = isActive;
     }
 }

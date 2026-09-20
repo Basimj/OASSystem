@@ -1,4 +1,4 @@
-﻿using OAS.Domain.Common.Entities;
+using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Entities.Inventory;
 
@@ -45,4 +45,59 @@ public class InventoryBalance : AuditableEntity<Guid>
 
     public decimal AvailableQuantity =>
         OnHandQuantity - ReservedQuantity;
+
+    public void ApplyInbound(decimal quantity, decimal unitCost, DateTimeOffset movementAtUtc)
+    {
+        if (quantity <= 0)
+            throw new ArgumentOutOfRangeException(nameof(quantity), "Inbound quantity must be greater than zero.");
+
+        var oldOnHand = OnHandQuantity;
+        var oldInventoryValue = InventoryValue;
+        var incomingValue = quantity * unitCost;
+
+        OnHandQuantity += quantity;
+
+        if (OnHandQuantity > 0)
+        {
+            if (oldOnHand <= 0)
+            {
+                AverageUnitCost = unitCost;
+                InventoryValue = Math.Round(OnHandQuantity * unitCost, 2);
+            }
+            else
+            {
+                var newTotalValue = Math.Max(0, oldInventoryValue) + incomingValue;
+                AverageUnitCost = Math.Round(newTotalValue / OnHandQuantity, 4);
+                InventoryValue = Math.Round(OnHandQuantity * AverageUnitCost, 2);
+            }
+        }
+        else
+        {
+            InventoryValue = 0;
+        }
+
+        LastMovementAtUtc = movementAtUtc;
+    }
+
+    public void ApplyOutbound(decimal quantity, DateTimeOffset movementAtUtc)
+    {
+        if (quantity <= 0)
+            throw new ArgumentOutOfRangeException(nameof(quantity), "Outbound quantity must be greater than zero.");
+
+        OnHandQuantity -= quantity;
+        InventoryValue = Math.Round(Math.Max(0, OnHandQuantity * AverageUnitCost), 2);
+        LastMovementAtUtc = movementAtUtc;
+    }
+
+    public void ApplyAdjustment(decimal differenceQuantity, decimal unitCostSnapshot, DateTimeOffset movementAtUtc)
+    {
+        if (differenceQuantity > 0)
+        {
+            ApplyInbound(differenceQuantity, unitCostSnapshot > 0 ? unitCostSnapshot : AverageUnitCost, movementAtUtc);
+        }
+        else if (differenceQuantity < 0)
+        {
+            ApplyOutbound(Math.Abs(differenceQuantity), movementAtUtc);
+        }
+    }
 }

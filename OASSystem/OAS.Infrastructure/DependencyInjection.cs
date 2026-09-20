@@ -74,6 +74,18 @@ public static class DependencyInjection
             IIdentityRepository,
             IdentityRepository>();
 
+        services.AddScoped<
+            OAS.Application.Inventory.Repositories.IInventoryBalanceRepository,
+            OAS.Infrastructure.Persistence.Repositories.Inventory.InventoryBalanceRepository>();
+
+        services.AddScoped<
+            OAS.Application.Inventory.Repositories.IInventoryTransactionRepository,
+            OAS.Infrastructure.Persistence.Repositories.Inventory.InventoryTransactionRepository>();
+
+        services.AddScoped<
+            OAS.Application.Inventory.Repositories.IStockCountRepository,
+            OAS.Infrastructure.Persistence.Repositories.Inventory.StockCountRepository>();
+
         services.AddScoped<IUserProfileImageStore, UserProfileImageStore>();
         services.AddScoped<IEmployeeImageStore, EmployeeImageStore>();
 

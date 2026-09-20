@@ -1,4 +1,4 @@
-﻿using OAS.Domain.Common.Entities;
+using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Entities.Inventory;
 
@@ -32,5 +32,19 @@ public class Warehouse : AuditableEntity<Guid>
         Description = description;
         IsDefault = isDefault;
         IsActive = true;
+    }
+
+    public void UpdateDetails(
+        string nameAr,
+        string? nameEn,
+        string? description,
+        bool isDefault,
+        bool isActive)
+    {
+        NameAr = nameAr;
+        NameEn = nameEn;
+        Description = description;
+        IsDefault = isDefault;
+        IsActive = isActive;
     }
 }
