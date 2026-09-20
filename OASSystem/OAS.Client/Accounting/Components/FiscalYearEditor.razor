@@ -7,13 +7,17 @@
 @using OAS.UiLib.Core.Models
 
 <div class="ui-acc-editor" dir="rtl">
+
     <UiAccountingFormSection Title="بيانات السنة المالية"
                              Subtitle="الرمز، الاسم، وتحديد فترة الدورة المحاسبية"
                              IconCssClass="fa-solid fa-calendar-days">
+
         <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+
             <UiInputText Label="كود السنة المالية"
                          Value="@Model.Code"
-                         ValueChanged="@(v => { Model.Code = v; OnChanged(); })"
+                         ValueExpression="@(() => Model.Code)"
+                         ValueChanged="OnCodeChanged"
                          Required="true"
                          Placeholder="مثال: FY-2026"
                          Disabled="@(!IsEditable)"
@@ -21,7 +25,8 @@
 
             <UiInputText Label="اسم السنة المالية"
                          Value="@Model.Name"
-                         ValueChanged="@(v => { Model.Name = v; OnChanged(); })"
+                         ValueExpression="@(() => Model.Name)"
+                         ValueChanged="OnNameChanged"
                          Required="true"
                          Placeholder="مثال: السنة المالية 2026"
                          Disabled="@(!IsEditable)"
@@ -29,26 +34,34 @@
 
             <UiInputDate Label="تاريخ بداية السنة"
                          Value="@Model.StartDate"
-                         ValueChanged="@(v => { if (v.HasValue) { Model.StartDate = v.Value; OnChanged(); } })"
+                         ValueExpression="@(() => Model.StartDate)"
+                         ValueChanged="OnStartDateChanged"
                          Required="true"
                          Disabled="@(!IsEditable)"
                          Size="ControlSize.Small" />
 
             <UiInputDate Label="تاريخ نهاية السنة"
                          Value="@Model.EndDate"
-                         ValueChanged="@(v => { if (v.HasValue) { Model.EndDate = v.Value; OnChanged(); } })"
+                         ValueExpression="@(() => Model.EndDate)"
+                         ValueChanged="OnEndDateChanged"
                          Required="true"
                          Disabled="@(!IsEditable)"
                          Size="ControlSize.Small" />
+
         </div>
+
     </UiAccountingFormSection>
+
 
     <UiAccountingFormSection Title="حالة السنة المالية"
                              Subtitle="إدارة دورة الإقفال والعمليات المحاسبية"
                              IconCssClass="fa-solid fa-lock">
+
         <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+
             <UiSelect Label="حالة السنة"
-                      Value="@Model.Status.ToString()"
+                      Value="@StatusValue"
+                      ValueExpression="@(() => StatusValue)"
                       ValueChanged="OnStatusChanged"
                       Options="@AccountingArabicPresenter.FiscalYearStatusOptions"
                       Disabled="@(!IsEditable)"
@@ -58,38 +71,112 @@
             {
                 <UiInputText Label="إصدار السجل (RowVersion)"
                              Value="@RowVersion"
+                             ValueExpression="@(() => RowVersion)"
                              ReadOnly="true"
                              Disabled="true"
                              Size="ControlSize.Small" />
             }
+
         </div>
+
     </UiAccountingFormSection>
+
 </div>
 
+
 @code {
+
     public sealed class FormModel
     {
         public string Code { get; set; } = string.Empty;
+
         public string Name { get; set; } = string.Empty;
-        public DateOnly StartDate { get; set; } = new(DateTime.Today.Year, 1, 1);
-        public DateOnly EndDate { get; set; } = new(DateTime.Today.Year, 12, 31);
+
+        public DateOnly? StartDate { get; set; }
+
+        public DateOnly? EndDate { get; set; }
+
         public FiscalYearStatus Status { get; set; } = FiscalYearStatus.Open;
     }
 
-    [Parameter] public FormModel Model { get; set; } = new();
-    [Parameter] public bool IsEditable { get; set; }
-    [Parameter] public bool IsNew { get; set; }
-    [Parameter] public string? RowVersion { get; set; }
-    [Parameter] public EventCallback OnModelChanged { get; set; }
 
-    private void OnChanged() => OnModelChanged.InvokeAsync();
-
-    private void OnStatusChanged(string val)
+    [Parameter]
+    public FormModel Model { get; set; } = new()
     {
-        if (Enum.TryParse<FiscalYearStatus>(val, out var res))
+        StartDate = new DateOnly(DateTime.Today.Year, 1, 1),
+        EndDate = new DateOnly(DateTime.Today.Year, 12, 31)
+    };
+
+
+    [Parameter]
+    public bool IsEditable { get; set; }
+
+
+    [Parameter]
+    public bool IsNew { get; set; }
+
+
+    [Parameter]
+    public string? RowVersion { get; set; }
+
+
+    [Parameter]
+    public EventCallback OnModelChanged { get; set; }
+
+
+    private string StatusValue
+    {
+        get => Model.Status.ToString();
+        set
         {
-            Model.Status = res;
-            OnChanged();
+            if (Enum.TryParse<FiscalYearStatus>(value, out var result))
+            {
+                Model.Status = result;
+            }
+        }
+    }
+
+
+    private Task OnChanged()
+        => OnModelChanged.InvokeAsync();
+
+
+    private async Task OnCodeChanged(string? value)
+    {
+        Model.Code = value ?? string.Empty;
+        await OnChanged();
+    }
+
+
+    private async Task OnNameChanged(string? value)
+    {
+        Model.Name = value ?? string.Empty;
+        await OnChanged();
+    }
+
+
+    private async Task OnStartDateChanged(DateOnly? value)
+    {
+        Model.StartDate = value;
+        await OnChanged();
+    }
+
+
+    private async Task OnEndDateChanged(DateOnly? value)
+    {
+        Model.EndDate = value;
+        await OnChanged();
+    }
+
+
+    private async Task OnStatusChanged(string? value)
+    {
+        if (Enum.TryParse<FiscalYearStatus>(
+                value,
+                out var result))
+        {
+            Model.Status = result;
+            await OnChanged();
         }
     }
 }

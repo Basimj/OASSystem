@@ -1,37 +1,112 @@
 @namespace OAS.UiLib.Components.Accounting.Parties
 
 <div class="ui-acc-card">
+
     <div class="ui-acc-card__header">
+
         <div class="ui-acc-card__title">
+
             <i class="fa-solid fa-user-tag" aria-hidden="true"></i>
-            <span>@PartyName</span>
-            <span class="text-muted small">(رقم الحساب: @AccountCode)</span>
+
+            <span>
+                @PartyName
+            </span>
+
+            @if (!string.IsNullOrWhiteSpace(PartyTypeText))
+            {
+                <span class="text-muted small">
+                    (@PartyTypeText)
+                </span>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(AccountCode))
+            {
+                <span class="text-muted small">
+                    — رقم الحساب: @AccountCode
+                </span>
+            }
+
         </div>
-        <OAS.UiLib.Components.Accounting.Workspace.UiAccountingStatusBadge Text="@(IsActive ? "نشط" : "معطل")" State="@(IsActive ? "active" : "inactive")" />
+
+        <OAS.UiLib.Components.Accounting.Workspace.UiAccountingStatusBadge Text="@(IsActive ? "نشط" : "معطل")"
+                                                                           State="@(IsActive ? "active" : "inactive")" />
+
     </div>
+
+
     <div class="ui-acc-card__body">
-        <div><strong>الحد الائتماني:</strong> @CreditLimit.ToString("N2") ر.س</div>
-        <div><strong>شروط الدفع:</strong> @PaymentTermsDays يوم</div>
-        <div><strong>حساب المراقبة (GL):</strong> @GlAccountCode</div>
-        <div><strong>الرصيد الافتتاحي:</strong> @OpeningBalance.ToString("N2")</div>
+
+        @if (!string.IsNullOrWhiteSpace(AccountName))
+        {
+            <div>
+                <strong>الحساب المحاسبي:</strong>
+                @AccountName
+            </div>
+        }
+
+        <div>
+            <strong>الحد الائتماني:</strong>
+            @CreditLimit.ToString("N2") ر.س
+        </div>
+
+        <div>
+            <strong>شروط الدفع:</strong>
+            @PaymentTermsDays يوم
+        </div>
+
     </div>
+
+
     <div class="ui-acc-card__footer">
+
         @if (OnEdit.HasDelegate)
         {
-            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="OnEdit">
-                <i class="fa-solid fa-pen" aria-hidden="true"></i> تعديل الإعدادات
+            <button type="button"
+                    class="btn btn-sm btn-outline-primary"
+                    @onclick="OnEdit">
+
+                <i class="fa-solid fa-pen" aria-hidden="true"></i>
+
+                تعديل الإعدادات
+
             </button>
         }
+
     </div>
+
 </div>
 
+
 @code {
-    [Parameter] public string PartyName { get; set; } = string.Empty;
-    [Parameter] public string AccountCode { get; set; } = string.Empty;
-    [Parameter] public decimal CreditLimit { get; set; }
-    [Parameter] public int PaymentTermsDays { get; set; }
-    [Parameter] public string GlAccountCode { get; set; } = string.Empty;
-    [Parameter] public decimal OpeningBalance { get; set; }
-    [Parameter] public bool IsActive { get; set; } = true;
-    [Parameter] public EventCallback OnEdit { get; set; }
+
+    [Parameter]
+    public string PartyName { get; set; } = string.Empty;
+
+
+    [Parameter]
+    public string PartyTypeText { get; set; } = string.Empty;
+
+
+    [Parameter]
+    public string AccountCode { get; set; } = string.Empty;
+
+
+    [Parameter]
+    public string AccountName { get; set; } = string.Empty;
+
+
+    [Parameter]
+    public decimal CreditLimit { get; set; }
+
+
+    [Parameter]
+    public int PaymentTermsDays { get; set; }
+
+
+    [Parameter]
+    public bool IsActive { get; set; } = true;
+
+
+    [Parameter]
+    public EventCallback OnEdit { get; set; }
 }
