@@ -5,13 +5,17 @@
 @using OAS.UiLib.Core.Models
 
 <div class="ui-acc-editor" dir="rtl">
+
     <UiAccountingFormSection Title="بيانات الصندوق / الخزينة النقدية"
                              Subtitle="الرمز، الاسم، وربطه بالحساب المحاسبي بدليل الحسابات"
                              IconCssClass="fa-solid fa-vault">
+
         <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+
             <UiInputText Label="كود الصندوق"
                          Value="@Model.Code"
-                         ValueChanged="@(v => { Model.Code = v; OnChanged(); })"
+                         ValueExpression="@(() => Model.Code)"
+                         ValueChanged="OnCodeChanged"
                          Required="true"
                          Placeholder="مثال: CASH-MAIN"
                          Disabled="@(!IsEditable)"
@@ -19,7 +23,8 @@
 
             <UiInputText Label="اسم الصندوق"
                          Value="@Model.Name"
-                         ValueChanged="@(v => { Model.Name = v; OnChanged(); })"
+                         ValueExpression="@(() => Model.Name)"
+                         ValueChanged="OnNameChanged"
                          Required="true"
                          Placeholder="مثال: الخزينة الرئيسية"
                          Disabled="@(!IsEditable)"
@@ -37,42 +42,116 @@
                       DebounceMilliseconds="250" />
 
             <div class="ui-acc-checks-group d-flex align-items-center gap-4 mt-4">
+
                 <UiCheckbox Label="الصندوق الافتراضي للفرع"
                             Value="@Model.IsDefault"
-                            ValueChanged="@(v => { Model.IsDefault = v; OnChanged(); })"
+                            ValueChanged="OnDefaultChanged"
                             Disabled="@(!IsEditable)" />
 
                 <UiCheckbox Label="الصندوق نشط"
                             Value="@Model.IsActive"
-                            ValueChanged="@(v => { Model.IsActive = v; OnChanged(); })"
+                            ValueChanged="OnActiveChanged"
                             Disabled="@(!IsEditable)" />
+
             </div>
+
         </div>
+
     </UiAccountingFormSection>
+
 </div>
 
+
 @code {
+
     public sealed class FormModel
     {
         public string Code { get; set; } = string.Empty;
+
         public string Name { get; set; } = string.Empty;
+
         public Guid? AccountId { get; set; }
+
         public bool IsDefault { get; set; }
+
         public bool IsActive { get; set; } = true;
     }
 
-    [Parameter] public FormModel Model { get; set; } = new();
-    [Parameter] public bool IsEditable { get; set; }
-    [Parameter] public bool IsNew { get; set; }
-    [Parameter] public UiLookupItem? AccountLookupItem { get; set; }
-    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? AccountSearchAsync { get; set; }
-    [Parameter] public EventCallback OnModelChanged { get; set; }
 
-    private void OnChanged() => OnModelChanged.InvokeAsync();
+    [Parameter]
+    public FormModel Model { get; set; } = new();
 
-    private void OnAccountChanged(string? val)
+
+    [Parameter]
+    public bool IsEditable { get; set; }
+
+
+    [Parameter]
+    public bool IsNew { get; set; }
+
+
+    [Parameter]
+    public UiLookupItem? AccountLookupItem { get; set; }
+
+
+    [Parameter]
+    public Func<
+        string,
+        CancellationToken,
+        Task<IReadOnlyList<UiLookupItem>>>?
+        AccountSearchAsync
+    { get; set; }
+
+
+    [Parameter]
+    public EventCallback OnModelChanged { get; set; }
+
+
+    private Task OnChanged()
+        => OnModelChanged.InvokeAsync();
+
+
+    private async Task OnCodeChanged(string? value)
     {
-        Model.AccountId = Guid.TryParse(val, out var id) ? id : null;
-        OnChanged();
+        Model.Code = value ?? string.Empty;
+
+        await OnChanged();
+    }
+
+
+    private async Task OnNameChanged(string? value)
+    {
+        Model.Name = value ?? string.Empty;
+
+        await OnChanged();
+    }
+
+
+    private async Task OnAccountChanged(string? value)
+    {
+        Model.AccountId =
+            Guid.TryParse(
+                value,
+                out var id)
+                ? id
+                : null;
+
+        await OnChanged();
+    }
+
+
+    private async Task OnDefaultChanged(bool value)
+    {
+        Model.IsDefault = value;
+
+        await OnChanged();
+    }
+
+
+    private async Task OnActiveChanged(bool value)
+    {
+        Model.IsActive = value;
+
+        await OnChanged();
     }
 }

@@ -23,8 +23,8 @@
                          Size="ControlSize.Small" />
 
             <UiInputDate Label="تاريخ المصروف"
-                         Value="@Model.ExpenseDate"
-                         ValueExpression="@(() => (DateOnly?)Model.ExpenseDate)"
+                         Value="@Model.ExpenseDateInput"
+                         ValueExpression="@(() => Model.ExpenseDateInput)"
                          ValueChanged="OnExpenseDateChanged"
                          Required="true"
                          Disabled="@(!IsEditable)"
@@ -100,13 +100,15 @@
                        @onchange="OnAmountChanged" />
             </div>
 
+
             <UiSelect Label="طريقة الدفع"
-                      Value="@Model.PaymentMethod.ToString()"
-                      ValueExpression="@(() => Model.PaymentMethod.ToString())"
+                      Value="@Model.PaymentMethodValue"
+                      ValueExpression="@(() => Model.PaymentMethodValue)"
                       ValueChanged="OnPaymentMethodChanged"
                       Options="@AccountingArabicPresenter.PaymentMethodOptions"
                       Disabled="@(!IsEditable)"
                       Size="ControlSize.Small" />
+
 
             @if (Model.PaymentMethod == PaymentMethod.Cash)
             {
@@ -148,8 +150,30 @@
     {
         public string ExpenseNumber { get; set; } = string.Empty;
 
-        public DateOnly ExpenseDate { get; set; } =
-            DateOnly.FromDateTime(DateTime.Today);
+
+        /*
+         * المجال Domain/Contract يحتاج DateOnly.
+         *
+         * UiInputDate يستخدم DateOnly? لأنه InputBase<DateOnly?>.
+         * لذلك نستخدم خاصية UI وسيطة بدون تغيير ExpenseDate الأصلية.
+         */
+        public DateOnly ExpenseDate { get; set; }
+            = DateOnly.FromDateTime(DateTime.Today);
+
+
+        public DateOnly? ExpenseDateInput
+        {
+            get => ExpenseDate;
+
+            set
+            {
+                if (value.HasValue)
+                {
+                    ExpenseDate = value.Value;
+                }
+            }
+        }
+
 
         public Guid? ExpenseTypeId { get; set; }
 
@@ -159,8 +183,34 @@
 
         public decimal Amount { get; set; }
 
-        public PaymentMethod PaymentMethod { get; set; } =
-            PaymentMethod.Cash;
+
+        public PaymentMethod PaymentMethod { get; set; }
+            = PaymentMethod.Cash;
+
+
+        /*
+         * UiSelect يعمل على string.
+         * لا نستخدم:
+         *
+         * ValueExpression="@(() => Model.PaymentMethod.ToString())"
+         *
+         * لأن Blazor لا يقبل MethodCallExpression هنا.
+         */
+        public string PaymentMethodValue
+        {
+            get => PaymentMethod.ToString();
+
+            set
+            {
+                if (Enum.TryParse<PaymentMethod>(
+                        value,
+                        out var result))
+                {
+                    PaymentMethod = result;
+                }
+            }
+        }
+
 
         public Guid? CashAccountId { get; set; }
 
@@ -168,8 +218,8 @@
 
         public string? Description { get; set; }
 
-        public ExpenseStatus Status { get; set; } =
-            ExpenseStatus.Draft;
+        public ExpenseStatus Status { get; set; }
+            = ExpenseStatus.Draft;
     }
 
 
@@ -242,75 +292,98 @@
 
 
     private Task OnChanged()
-    {
-        return OnModelChanged.InvokeAsync();
-    }
+        => OnModelChanged.InvokeAsync();
 
 
-    private async Task OnExpenseDateChanged(DateOnly? value)
+    private async Task OnExpenseDateChanged(
+        DateOnly? value)
     {
         if (value.HasValue)
         {
             Model.ExpenseDate = value.Value;
-            await OnChanged();
         }
+
+        await OnChanged();
     }
 
 
-    private async Task OnBeneficiaryChanged(string? value)
+    private async Task OnBeneficiaryChanged(
+        string? value)
     {
         Model.Beneficiary = value;
+
         await OnChanged();
     }
 
 
-    private async Task OnDescriptionChanged(string? value)
+    private async Task OnDescriptionChanged(
+        string? value)
     {
         Model.Description = value;
+
         await OnChanged();
     }
 
 
-    private async Task OnAmountChanged(ChangeEventArgs e)
+    private async Task OnAmountChanged(
+        ChangeEventArgs e)
     {
         if (decimal.TryParse(
                 e.Value?.ToString(),
                 out var amount))
         {
             Model.Amount = amount;
+
             await OnChanged();
         }
     }
 
 
-    private async Task OnPaymentMethodChanged(string? value)
+    private async Task OnPaymentMethodChanged(
+        string? value)
     {
-        if (Enum.TryParse<PaymentMethod>(
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+
+        if (!Enum.TryParse<PaymentMethod>(
                 value,
                 out var paymentMethod))
         {
-            Model.PaymentMethod = paymentMethod;
-
-            // عند تغيير طريقة الدفع:
-            // تنظيف الحساب غير المستخدم.
-            if (paymentMethod == PaymentMethod.Cash)
-            {
-                Model.BankAccountId = null;
-            }
-            else
-            {
-                Model.CashAccountId = null;
-            }
-
-            await OnChanged();
+            return;
         }
+
+
+        Model.PaymentMethod = paymentMethod;
+
+
+        /*
+         * إذا تغيرت طريقة الدفع،
+         * لا نحتفظ بالحساب الخاص بالطريقة السابقة.
+         */
+        if (paymentMethod == PaymentMethod.Cash)
+        {
+            Model.BankAccountId = null;
+        }
+        else
+        {
+            Model.CashAccountId = null;
+        }
+
+
+        await OnChanged();
     }
 
 
-    private async Task OnExpenseTypeChanged(string? value)
+    private async Task OnExpenseTypeChanged(
+        string? value)
     {
         Model.ExpenseTypeId =
-            Guid.TryParse(value, out var id)
+            Guid.TryParse(
+                value,
+                out var id)
                 ? id
                 : null;
 
@@ -318,10 +391,13 @@
     }
 
 
-    private async Task OnExpenseAccountChanged(string? value)
+    private async Task OnExpenseAccountChanged(
+        string? value)
     {
         Model.ExpenseAccountId =
-            Guid.TryParse(value, out var id)
+            Guid.TryParse(
+                value,
+                out var id)
                 ? id
                 : null;
 
@@ -329,10 +405,13 @@
     }
 
 
-    private async Task OnCashAccountChanged(string? value)
+    private async Task OnCashAccountChanged(
+        string? value)
     {
         Model.CashAccountId =
-            Guid.TryParse(value, out var id)
+            Guid.TryParse(
+                value,
+                out var id)
                 ? id
                 : null;
 
@@ -340,10 +419,13 @@
     }
 
 
-    private async Task OnBankAccountChanged(string? value)
+    private async Task OnBankAccountChanged(
+        string? value)
     {
         Model.BankAccountId =
-            Guid.TryParse(value, out var id)
+            Guid.TryParse(
+                value,
+                out var id)
                 ? id
                 : null;
 

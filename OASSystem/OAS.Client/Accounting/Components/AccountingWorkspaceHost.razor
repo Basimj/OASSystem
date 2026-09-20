@@ -1347,7 +1347,9 @@
                                        OnModelChanged="@(() => tab.CheckDirty(System.Text.Json.JsonSerializer.Serialize(accModel)))" />
                         break;
 
-                    case AccountingEntityType.Journals when tab.Model is JournalEntryEditor.FormModel jModel:
+                    case AccountingEntityType.Journals
+                when tab.Model is JournalEntryEditor.FormModel jModel:
+
                         <JournalEntryEditor Model="@jModel"
                                             IsEditable="@(tab.IsNew || tab.IsEditMode)"
                                             IsNew="@tab.IsNew"
@@ -1357,16 +1359,21 @@
                                             OnModelChanged="@(() => tab.CheckDirty(System.Text.Json.JsonSerializer.Serialize(jModel)))" />
                         break;
 
-                    case AccountingEntityType.ReceiptVouchers when tab.Model is ReceiptVoucherEditor.FormModel rvModel:
+                    case AccountingEntityType.ReceiptVouchers
+                when tab.Model is ReceiptVoucherEditor.FormModel rvModel:
+
                         <ReceiptVoucherEditor Model="@rvModel"
                                               IsEditable="@(tab.IsNew || tab.IsEditMode)"
                                               IsNew="@tab.IsNew"
                                               CustomerSearchAsync="@SearchCustomersAsync"
                                               CashAccountSearchAsync="@SearchCashAccountsAsync"
                                               BankAccountSearchAsync="@SearchBankAccountsAsync"
-                                              OnModelChanged="@(() => tab.CheckDirty(System.Text.Json.JsonSerializer.Serialize(rvModel)))" />
+                                              OnModelChanged="@(() => tab.CheckDirty(
+                                                                            System.Text.Json.JsonSerializer.Serialize(rvModel)))" />
                         break;
-                    case AccountingEntityType.PaymentVouchers when tab.Model is PaymentVoucherEditor.FormModel pvModel:
+                    case AccountingEntityType.PaymentVouchers
+                when tab.Model is PaymentVoucherEditor.FormModel pvModel:
+
                         <PaymentVoucherEditor Model="@pvModel"
                                               IsEditable="@(tab.IsNew || tab.IsEditMode)"
                                               IsNew="@tab.IsNew"
@@ -1416,7 +1423,9 @@
                                            OnModelChanged="@(() => tab.CheckDirty(System.Text.Json.JsonSerializer.Serialize(baModel)))" />
                         break;
 
-                    case AccountingEntityType.CashShifts when tab.Model is CashShiftEditor.FormModel csModel:
+                    case AccountingEntityType.CashShifts
+                when tab.Model is CashShiftEditor.FormModel csModel:
+
                         <CashShiftEditor Model="@csModel"
                                          IsEditable="@(tab.IsNew || tab.IsEditMode)"
                                          IsNew="@tab.IsNew"
@@ -1627,32 +1636,79 @@
     };
 
     private RenderFragment RenderCashBankList() => __builder =>
-    {
-        <UiCard Title="الحسابات النقدية (الصناديق)" Subtitle="الخزائن ونقاط التحصيل النقدية">
-            @if (_cashAccountsPage.Items is not null)
+{
+    <div class="d-flex flex-column gap-3" dir="rtl">
+
+        <UiCard Title="الحسابات النقدية (الصناديق)"
+                Subtitle="الخزائن ونقاط التحصيل النقدية">
+
+            @if (_cashAccountsPage.Items is not null &&
+                    _cashAccountsPage.Items.Count > 0)
             {
                 @foreach (var ca in _cashAccountsPage.Items)
                 {
-                    <div @onclick="@(() => OpenRecordInTab(AccountingEntityType.CashAccounts, ca.Id, ca.Name))" style="cursor: pointer;">
-                        <UiCashAccountCard Code="@ca.Code" Name="@ca.Name" IsActive="@ca.IsActive" BalanceText="0.00 YER" />
+                    <div @onclick="@(() => OpenRecordInTab(
+                                                                 AccountingEntityType.CashAccounts,
+                                                                 ca.Id,
+                                                                 ca.Name))"
+             style="cursor: pointer;">
+
+                        <UiCashAccountCard Code="@ca.Code"
+                                           NameAr="@ca.Name"
+                                           BranchName=""
+                                           GlAccountCode=""
+                                           CurrencyCode="YER"
+                                           RequiresShift="false"
+                                           IsActive="@ca.IsActive" />
+
                     </div>
                 }
             }
+            else if (!_isLoading)
+            {
+                <UiAlert Message="لا توجد حسابات نقدية مسجلة حالياً."
+                         Tone="AlertTone.Info" />
+            }
+
         </UiCard>
 
-        <UiCard Title="الحسابات البنكية" Subtitle="الحسابات الجارية وبنوك العمليات" Class="mt-3">
-            @if (_bankAccountsPage.Items is not null)
+
+        <UiCard Title="الحسابات البنكية"
+                Subtitle="الحسابات الجارية وبنوك العمليات">
+
+            @if (_bankAccountsPage.Items is not null &&
+                    _bankAccountsPage.Items.Count > 0)
             {
                 @foreach (var ba in _bankAccountsPage.Items)
                 {
-                    <div @onclick="@(() => OpenRecordInTab(AccountingEntityType.BankAccounts, ba.Id, ba.BankName))" style="cursor: pointer;">
-                        <UiBankAccountCard BankName="@ba.BankName" AccountNumber="@ba.AccountNumber" CurrencyCode="YER" IsActive="@ba.IsActive" BalanceText="@ba.AccountName" />
+                    <div @onclick="@(() => OpenRecordInTab(
+                                                                 AccountingEntityType.BankAccounts,
+                                                                 ba.Id,
+                                                                 ba.BankName))"
+             style="cursor: pointer;">
+
+                        <UiBankAccountCard Code="@ba.Code"
+                                           BankName="@ba.BankName"
+                                           AccountName="@ba.AccountName"
+                                           AccountNumber="@ba.AccountNumber"
+                                           Iban="@ba.IBAN"
+                                           GlAccountCode=""
+                                           CurrencyCode="YER"
+                                           IsActive="@ba.IsActive" />
+
                     </div>
                 }
             }
-        </UiCard>
-    };
+            else if (!_isLoading)
+            {
+                <UiAlert Message="لا توجد حسابات بنكية مسجلة حالياً."
+                         Tone="AlertTone.Info" />
+            }
 
+        </UiCard>
+
+    </div>
+};
     private RenderFragment RenderCashShiftsList() => __builder =>
     {
         <div class="ui-acc-metrics">
