@@ -1,0 +1,8 @@
+@page "/accounting/expenses"
+@attribute [Authorize]
+@using OAS.Client.Accounting.Components
+@using OAS.Client.Accounting.Workspace
+
+<PageTitle>المصروفات العامة | OAS</PageTitle>
+
+<AccountingWorkspaceHost Section="AccountingEntityType.Expenses" />

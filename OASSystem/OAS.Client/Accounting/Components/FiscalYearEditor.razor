@@ -1,0 +1,95 @@
+@namespace OAS.Client.Accounting.Components
+@using OAS.Contracts.Accounting.FiscalYears
+@using OAS.Contracts.Accounting.Enums
+@using OAS.Client.Accounting.Common
+@using OAS.UiLib.Components.Accounting.Workspace
+@using OAS.UiLib.Components.Inputs
+@using OAS.UiLib.Core.Models
+
+<div class="ui-acc-editor" dir="rtl">
+    <UiAccountingFormSection Title="بيانات السنة المالية"
+                             Subtitle="الرمز، الاسم، وتحديد فترة الدورة المحاسبية"
+                             IconCssClass="fa-solid fa-calendar-days">
+        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+            <UiInputText Label="كود السنة المالية"
+                         Value="@Model.Code"
+                         ValueChanged="@(v => { Model.Code = v; OnChanged(); })"
+                         Required="true"
+                         Placeholder="مثال: FY-2026"
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+
+            <UiInputText Label="اسم السنة المالية"
+                         Value="@Model.Name"
+                         ValueChanged="@(v => { Model.Name = v; OnChanged(); })"
+                         Required="true"
+                         Placeholder="مثال: السنة المالية 2026"
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+
+            <UiInputDate Label="تاريخ بداية السنة"
+                         Value="@Model.StartDate"
+                         ValueChanged="@(v => { if (v.HasValue) { Model.StartDate = v.Value; OnChanged(); } })"
+                         Required="true"
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+
+            <UiInputDate Label="تاريخ نهاية السنة"
+                         Value="@Model.EndDate"
+                         ValueChanged="@(v => { if (v.HasValue) { Model.EndDate = v.Value; OnChanged(); } })"
+                         Required="true"
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+        </div>
+    </UiAccountingFormSection>
+
+    <UiAccountingFormSection Title="حالة السنة المالية"
+                             Subtitle="إدارة دورة الإقفال والعمليات المحاسبية"
+                             IconCssClass="fa-solid fa-lock">
+        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+            <UiSelect Label="حالة السنة"
+                      Value="@Model.Status.ToString()"
+                      ValueChanged="OnStatusChanged"
+                      Options="@AccountingArabicPresenter.FiscalYearStatusOptions"
+                      Disabled="@(!IsEditable)"
+                      Size="ControlSize.Small" />
+
+            @if (!string.IsNullOrWhiteSpace(RowVersion))
+            {
+                <UiInputText Label="إصدار السجل (RowVersion)"
+                             Value="@RowVersion"
+                             ReadOnly="true"
+                             Disabled="true"
+                             Size="ControlSize.Small" />
+            }
+        </div>
+    </UiAccountingFormSection>
+</div>
+
+@code {
+    public sealed class FormModel
+    {
+        public string Code { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public DateOnly StartDate { get; set; } = new(DateTime.Today.Year, 1, 1);
+        public DateOnly EndDate { get; set; } = new(DateTime.Today.Year, 12, 31);
+        public FiscalYearStatus Status { get; set; } = FiscalYearStatus.Open;
+    }
+
+    [Parameter] public FormModel Model { get; set; } = new();
+    [Parameter] public bool IsEditable { get; set; }
+    [Parameter] public bool IsNew { get; set; }
+    [Parameter] public string? RowVersion { get; set; }
+    [Parameter] public EventCallback OnModelChanged { get; set; }
+
+    private void OnChanged() => OnModelChanged.InvokeAsync();
+
+    private void OnStatusChanged(string val)
+    {
+        if (Enum.TryParse<FiscalYearStatus>(val, out var res))
+        {
+            Model.Status = res;
+            OnChanged();
+        }
+    }
+}

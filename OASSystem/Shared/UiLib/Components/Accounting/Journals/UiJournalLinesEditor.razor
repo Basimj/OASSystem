@@ -1,0 +1,273 @@
+@namespace OAS.UiLib.Components.Accounting.Journals
+@using OAS.UiLib.Components.Buttons
+@using OAS.UiLib.Components.Inputs
+@using OAS.UiLib.Core.Models
+
+<div class="ui-acc-lines-editor" dir="rtl">
+    <div class="table-responsive">
+        <table class="ui-acc-grid-table">
+            <thead>
+                <tr>
+                    <th style="width: 40px;">#</th>
+                    <th style="width: 32%;">الحساب المحاسبي</th>
+                    <th style="width: 25%;">البيان</th>
+                    <th style="width: 20%;">مركز التكلفة</th>
+                    <th style="width: 10%;">مدين</th>
+                    <th style="width: 10%;">دائن</th>
+                    @if (IsEditable)
+                    {
+                        <th style="width: 40px;">إجراء</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @if (Lines.Count == 0)
+                {
+                    <tr>
+                        <td colspan="@(IsEditable ? 7 : 6)" class="text-center text-muted py-3">لا توجد أسطر بعد. انقر على «إضافة سطر» بالأسفل.</td>
+                    </tr>
+                }
+                else
+                {
+                    var idx = 1;
+                    foreach (var line in Lines)
+                    {
+                        var currentLine = line;
+                        <tr>
+                            <td>@idx</td>
+                            <td>
+                                @if (IsEditable)
+                                {
+                                    <UiLookup Value="@currentLine.AccountId?.ToString("D")"
+                                              ValueChanged="@(val => OnAccountSelected(currentLine, val))"
+                                              SelectedItem="@currentLine.AccountLookupItem"
+                                              SearchAsync="AccountSearchAsync"
+                                              Placeholder="ابحث برقم أو اسم الحساب..."
+                                              Required="true"
+                                              MinimumSearchLength="0"
+                                              DebounceMilliseconds="250" />
+                                }
+                                else
+                                {
+                                    <span>@(currentLine.AccountLookupItem?.PrimaryText ?? currentLine.AccountDisplay)</span>
+                                }
+                            </td>
+                            <td>
+                                @if (IsEditable)
+                                {
+                                    <UiInputText Value="@currentLine.Description"
+                                                 ValueChanged="@(val => OnDescriptionChanged(currentLine, val))"
+                                                 Placeholder="بيان السطر..."
+                                                 Size="ControlSize.Small" />
+                                }
+                                else
+                                {
+                                    <span>@currentLine.Description</span>
+                                }
+                            </td>
+                            <td>
+                                @if (IsEditable)
+                                {
+                                    <UiLookup Value="@currentLine.CostCenterId?.ToString("D")"
+                                              ValueChanged="@(val => OnCostCenterSelected(currentLine, val))"
+                                              SelectedItem="@currentLine.CostCenterLookupItem"
+                                              SearchAsync="CostCenterSearchAsync"
+                                              Placeholder="اختياري: مركز التكلفة..."
+                                              MinimumSearchLength="0"
+                                              DebounceMilliseconds="250" />
+                                }
+                                else
+                                {
+                                    <span>@(currentLine.CostCenterLookupItem?.PrimaryText ?? currentLine.CostCenterDisplay ?? "-")</span>
+                                }
+                            </td>
+                            <td>
+                                @if (IsEditable)
+                                {
+                                    <input type="number" step="0.01" min="0"
+                                           class="ui-input-text__field text-start"
+                                           value="@currentLine.DebitAmount"
+                                           @onchange="@(e => OnDebitChanged(currentLine, e.Value?.ToString()))" />
+                                }
+                                else
+                                {
+                                    <span class="ui-acc-val--debit">@(currentLine.DebitAmount > 0 ? currentLine.DebitAmount.ToString("N2") : "-")</span>
+                                }
+                            </td>
+                            <td>
+                                @if (IsEditable)
+                                {
+                                    <input type="number" step="0.01" min="0"
+                                           class="ui-input-text__field text-start"
+                                           value="@currentLine.CreditAmount"
+                                           @onchange="@(e => OnCreditChanged(currentLine, e.Value?.ToString()))" />
+                                }
+                                else
+                                {
+                                    <span class="ui-acc-val--credit">@(currentLine.CreditAmount > 0 ? currentLine.CreditAmount.ToString("N2") : "-")</span>
+                                }
+                            </td>
+                            @if (IsEditable)
+                            {
+                                <td>
+                                    <button type="button" class="btn btn-sm text-danger" title="حذف السطر" @onclick="@(() => RemoveLine(currentLine))">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </td>
+                            }
+                        </tr>
+                        idx++;
+                    }
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="4" class="text-start font-bold">
+                        <span>الإجمالي</span>
+                        <span class="ms-3">
+                            @if (IsBalanced)
+                            {
+                                <span class="badge bg-success-subtle text-success p-1 ms-2">
+                                    <i class="fa-solid fa-check me-1"></i> متوازن ✓
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-danger-subtle text-danger p-1 ms-2">
+                                    <i class="fa-solid fa-triangle-exclamation me-1"></i> غير متوازن (الفرق: @Difference.ToString("N2"))
+                                </span>
+                            }
+                        </span>
+                    </td>
+                    <td class="ui-acc-val--debit font-bold">@TotalDebit.ToString("N2")</td>
+                    <td class="ui-acc-val--credit font-bold">@TotalCredit.ToString("N2")</td>
+                    @if (IsEditable)
+                    {
+                        <td></td>
+                    }
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    @if (IsEditable)
+    {
+        <div class="mt-2">
+            <UiButton Text="إضافة سطر جديد"
+                      IconCssClass="fa-solid fa-plus"
+                      Variant="ButtonVariant.Secondary"
+                      Size="ControlSize.Small"
+                      OnClick="AddLine" />
+        </div>
+    }
+</div>
+
+@code {
+    public sealed class EditableJournalLine
+    {
+        public Guid? AccountId { get; set; }
+        public string AccountDisplay { get; set; } = string.Empty;
+        public UiLookupItem? AccountLookupItem { get; set; }
+        public string Description { get; set; } = string.Empty;
+        public Guid? CostCenterId { get; set; }
+        public string? CostCenterDisplay { get; set; }
+        public UiLookupItem? CostCenterLookupItem { get; set; }
+        public decimal DebitAmount { get; set; }
+        public decimal CreditAmount { get; set; }
+    }
+
+    [Parameter] public List<EditableJournalLine> Lines { get; set; } = [];
+    [Parameter] public bool IsEditable { get; set; } = true;
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? AccountSearchAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CostCenterSearchAsync { get; set; }
+    [Parameter] public EventCallback OnLinesChanged { get; set; }
+
+    public decimal TotalDebit => Lines.Sum(l => l.DebitAmount);
+    public decimal TotalCredit => Lines.Sum(l => l.CreditAmount);
+    public decimal Difference => Math.Abs(TotalDebit - TotalCredit);
+    public bool IsBalanced => TotalDebit == TotalCredit && TotalDebit > 0;
+
+    private async Task AddLine()
+    {
+        Lines.Add(new EditableJournalLine());
+        await OnLinesChanged.InvokeAsync();
+    }
+
+    private async Task RemoveLine(EditableJournalLine line)
+    {
+        Lines.Remove(line);
+        await OnLinesChanged.InvokeAsync();
+    }
+
+    private async Task OnAccountSelected(EditableJournalLine line, string? val)
+    {
+        if (Guid.TryParse(val, out var id))
+        {
+            line.AccountId = id;
+            if (AccountSearchAsync is not null)
+            {
+                var items = await AccountSearchAsync(string.Empty, CancellationToken.None);
+                line.AccountLookupItem = items.FirstOrDefault(x => x.Value == val);
+            }
+        }
+        else
+        {
+            line.AccountId = null;
+            line.AccountLookupItem = null;
+        }
+        await OnLinesChanged.InvokeAsync();
+    }
+
+    private async Task OnCostCenterSelected(EditableJournalLine line, string? val)
+    {
+        if (Guid.TryParse(val, out var id))
+        {
+            line.CostCenterId = id;
+            if (CostCenterSearchAsync is not null)
+            {
+                var items = await CostCenterSearchAsync(string.Empty, CancellationToken.None);
+                line.CostCenterLookupItem = items.FirstOrDefault(x => x.Value == val);
+            }
+        }
+        else
+        {
+            line.CostCenterId = null;
+            line.CostCenterLookupItem = null;
+        }
+        await OnLinesChanged.InvokeAsync();
+    }
+
+    private async Task OnDescriptionChanged(EditableJournalLine line, string? val)
+    {
+        line.Description = val ?? string.Empty;
+        await OnLinesChanged.InvokeAsync();
+    }
+
+    private async Task OnDebitChanged(EditableJournalLine line, string? val)
+    {
+        if (decimal.TryParse(val, out var amount))
+        {
+            line.DebitAmount = amount;
+            if (amount > 0) line.CreditAmount = 0; // standard dual entry rule
+        }
+        else
+        {
+            line.DebitAmount = 0;
+        }
+        await OnLinesChanged.InvokeAsync();
+    }
+
+    private async Task OnCreditChanged(EditableJournalLine line, string? val)
+    {
+        if (decimal.TryParse(val, out var amount))
+        {
+            line.CreditAmount = amount;
+            if (amount > 0) line.DebitAmount = 0;
+        }
+        else
+        {
+            line.CreditAmount = 0;
+        }
+        await OnLinesChanged.InvokeAsync();
+    }
+}

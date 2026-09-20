@@ -1,0 +1,29 @@
+@namespace OAS.UiLib.Components.Accounting.Workspace
+
+<span class="ui-acc-badge @BadgeClass">
+    <i class="@IconClass" aria-hidden="true"></i>
+    <span>@Text</span>
+</span>
+
+@code {
+    [Parameter] public string Text { get; set; } = string.Empty;
+    [Parameter] public string State { get; set; } = "draft";
+
+    private string BadgeClass => State.ToLowerInvariant() switch
+    {
+        "draft" => "ui-acc-badge--draft",
+        "posted" or "approved" or "active" or "open" => "ui-acc-badge--posted",
+        "closed" or "locked" => "ui-acc-badge--closed",
+        "inactive" or "cancelled" or "reversed" or "void" => "ui-acc-badge--cancelled",
+        _ => "ui-acc-badge--draft"
+    };
+
+    private string IconClass => State.ToLowerInvariant() switch
+    {
+        "draft" => "fa-regular fa-file-lines",
+        "posted" or "approved" or "active" or "open" => "fa-solid fa-check-circle",
+        "closed" or "locked" => "fa-solid fa-lock",
+        "inactive" or "cancelled" or "reversed" or "void" => "fa-solid fa-ban",
+        _ => "fa-solid fa-circle-info"
+    };
+}

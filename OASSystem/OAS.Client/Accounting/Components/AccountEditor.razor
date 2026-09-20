@@ -1,0 +1,444 @@
+@namespace OAS.Client.Accounting.Components
+@using OAS.Contracts.Accounting.Accounts
+@using OAS.Contracts.Accounting.Enums
+@using OAS.Client.Accounting.Common
+@using OAS.UiLib.Components.Accounting.Workspace
+@using OAS.UiLib.Components.Inputs
+@using OAS.UiLib.Core.Models
+
+<div class="ui-acc-editor" dir="rtl">
+
+    ```
+    <UiAccountingFormSection Title="المعلومات الأساسية"
+                             Subtitle="الرمز، المسميات، وربط التبعية الشجرية"
+                             IconCssClass="fa-solid fa-circle-info">
+
+        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+
+            <UiInputText Label="كود الحساب"
+                         Value="@Model.Code"
+                         ValueExpression="@(() => Model.Code)"
+                         ValueChanged="OnCodeChanged"
+                         Required="true"
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+
+            <UiInputText Label="اسم الحساب (بالعربية)"
+                         Value="@Model.NameAr"
+                         ValueExpression="@(() => Model.NameAr)"
+                         ValueChanged="OnNameArChanged"
+                         Required="true"
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+
+            <UiInputText Label="اسم الحساب (بالإنجليزية)"
+                         Value="@Model.NameEn"
+                         ValueExpression="@(() => Model.NameEn)"
+                         ValueChanged="OnNameEnChanged"
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+
+            <UiLookup Label="الحساب الأب"
+                      Value="@Model.ParentAccountId?.ToString("D")"
+                      ValueChanged="OnParentAccountChanged"
+                      SelectedItem="@ParentAccountLookupItem"
+                      SearchAsync="AccountSearchAsync"
+                      Placeholder="ابحث عن الحساب الأب..."
+                      Disabled="@(!IsEditable)"
+                      MinimumSearchLength="0"
+                      DebounceMilliseconds="250" />
+
+        </div>
+
+    </UiAccountingFormSection>
+
+
+    <UiAccountingFormSection Title="التصنيف المحاسبي"
+                             Subtitle="نوع الحساب، طبيعة الرصيد والمستوى الشجري"
+                             IconCssClass="fa-solid fa-sitemap">
+
+        <div class="ui-acc-form-grid ui-acc-form-grid--4col">
+
+            <UiSelect Label="تصنيف الحساب"
+                      Value="@Model.AccountClassValue"
+                      ValueExpression="@(() => Model.AccountClassValue)"
+                      ValueChanged="OnClassChanged"
+                      Options="@AccountingArabicPresenter.AccountClassOptions"
+                      Disabled="@(!IsEditable)"
+                      Size="ControlSize.Small" />
+
+            <UiSelect Label="نوع الحساب"
+                      Value="@Model.AccountTypeValue"
+                      ValueExpression="@(() => Model.AccountTypeValue)"
+                      ValueChanged="OnTypeChanged"
+                      Options="@AccountingArabicPresenter.AccountTypeOptions"
+                      Disabled="@(!IsEditable)"
+                      Size="ControlSize.Small" />
+
+            <UiSelect Label="طبيعة الحساب"
+                      Value="@Model.NormalBalanceValue"
+                      ValueExpression="@(() => Model.NormalBalanceValue)"
+                      ValueChanged="OnNormalBalanceChanged"
+                      Options="@AccountingArabicPresenter.NormalBalanceOptions"
+                      Disabled="@(!IsEditable)"
+                      Size="ControlSize.Small" />
+
+            <UiInputText Label="المستوى الشجري"
+                         Value="@Model.Level.ToString()"
+                         ValueExpression="@(() => Model.LevelText)"
+                         ReadOnly="true"
+                         Disabled="true"
+                         Size="ControlSize.Small" />
+
+        </div>
+
+    </UiAccountingFormSection>
+
+
+    <UiAccountingFormSection Title="خصائص وتشغيل الحساب"
+                             Subtitle="صلاحيات الترحيل والتحكم وحالة النشاط"
+                             IconCssClass="fa-solid fa-sliders">
+
+        <div class="ui-acc-checks-group">
+
+            <UiCheckbox Label="حساب ترحيل (يقبل القيود)"
+                        Value="@Model.IsPostingAccount"
+                        ValueChanged="OnIsPostingAccountChanged"
+                        Disabled="@(!IsEditable)" />
+
+            <UiCheckbox Label="حساب تحكمي (أستاذ مساعد)"
+                        Value="@Model.IsControlAccount"
+                        ValueChanged="OnIsControlAccountChanged"
+                        Disabled="@(!IsEditable)" />
+
+            <UiCheckbox Label="السماح بالترحيل اليدوي"
+                        Value="@Model.AllowManualPosting"
+                        ValueChanged="OnAllowManualPostingChanged"
+                        Disabled="@(!IsEditable)" />
+
+            <UiCheckbox Label="حساب نظامي (أساسي)"
+                        Value="@Model.IsSystemAccount"
+                        ValueChanged="OnIsSystemAccountChanged"
+                        Disabled="@(!IsEditable || !IsNew)" />
+
+            <UiCheckbox Label="الحساب نشط"
+                        Value="@Model.IsActive"
+                        ValueChanged="OnIsActiveChanged"
+                        Disabled="@(!IsEditable)" />
+
+        </div>
+
+    </UiAccountingFormSection>
+
+
+    <UiAccountingFormSection Title="الإعدادات الزمنية والنظامية"
+                             Subtitle="تاريخ السريان والبيانات التدقيقية"
+                             IconCssClass="fa-regular fa-clock"
+                             Collapsible="true">
+
+        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+
+            <UiInputDate Label="تاريخ السريان"
+                         Value="@Model.EffectiveDate"
+                         ValueExpression="@(() => Model.EffectiveDate)"
+                         ValueChanged="OnEffectiveDateChanged"
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+
+            @if (!string.IsNullOrWhiteSpace(RowVersion))
+            {
+                <UiInputText Label="إصدار السجل (RowVersion)"
+                             Value="@RowVersion"
+                             ValueExpression="@(() => RowVersion)"
+                             ReadOnly="true"
+                             Disabled="true"
+                             Size="ControlSize.Small" />
+            }
+
+        </div>
+
+    </UiAccountingFormSection>
+    ```
+
+</div>
+
+@code {
+
+public sealed class FormModel
+    {
+        public string Code { get; set; } = string.Empty;
+
+        public string NameAr { get; set; } = string.Empty;
+
+        public string? NameEn { get; set; }
+
+        public Guid? ParentAccountId { get; set; }
+
+        public int Level { get; set; } = 1;
+
+        public AccountClass AccountClass { get; set; }
+            = AccountClass.Asset;
+
+        public AccountType AccountType { get; set; }
+            = AccountType.Posting;
+
+        public NormalBalance NormalBalance { get; set; }
+            = NormalBalance.Debit;
+
+        public bool IsPostingAccount { get; set; } = true;
+
+        public bool IsControlAccount { get; set; }
+
+        public bool AllowManualPosting { get; set; } = true;
+
+        public bool IsSystemAccount { get; set; }
+
+        public bool IsActive { get; set; } = true;
+
+        public DateOnly? EffectiveDate { get; set; }
+            = DateOnly.FromDateTime(DateTime.Today);
+
+
+        /*
+         * UiSelect يعمل مع string.
+         * لا نستخدم ToString() مباشرة داخل ValueExpression.
+         */
+        public string AccountClassValue
+        {
+            get => AccountClass.ToString();
+
+            set
+            {
+                if (Enum.TryParse<AccountClass>(
+                        value,
+                        out var result))
+                {
+                    AccountClass = result;
+                }
+            }
+        }
+
+
+        public string AccountTypeValue
+        {
+            get => AccountType.ToString();
+
+            set
+            {
+                if (Enum.TryParse<AccountType>(
+                        value,
+                        out var result))
+                {
+                    AccountType = result;
+                }
+            }
+        }
+
+
+        public string NormalBalanceValue
+        {
+            get => NormalBalance.ToString();
+
+            set
+            {
+                if (Enum.TryParse<NormalBalance>(
+                        value,
+                        out var result))
+                {
+                    NormalBalance = result;
+                }
+            }
+        }
+
+
+        /*
+         * خاصية مستقلة حتى لا نضع ToString()
+         * مباشرة داخل ValueExpression.
+         */
+        public string LevelText
+            => Level.ToString();
+    }
+
+
+    [Parameter]
+    public FormModel Model { get; set; } = new();
+
+
+    [Parameter]
+    public bool IsEditable { get; set; }
+
+
+    [Parameter]
+    public bool IsNew { get; set; }
+
+
+    [Parameter]
+    public string? RowVersion { get; set; }
+
+
+    [Parameter]
+    public UiLookupItem? ParentAccountLookupItem { get; set; }
+
+
+    [Parameter]
+    public Func<
+        string,
+        CancellationToken,
+        Task<IReadOnlyList<UiLookupItem>>>?
+        AccountSearchAsync
+    { get; set; }
+
+
+    [Parameter]
+    public EventCallback OnModelChanged { get; set; }
+
+
+    private Task OnChanged()
+        => OnModelChanged.InvokeAsync();
+
+
+    private async Task OnCodeChanged(string? value)
+    {
+        Model.Code = value ?? string.Empty;
+
+        await OnChanged();
+    }
+
+
+    private async Task OnNameArChanged(string? value)
+    {
+        Model.NameAr = value ?? string.Empty;
+
+        await OnChanged();
+    }
+
+
+    private async Task OnNameEnChanged(string? value)
+    {
+        Model.NameEn = value;
+
+        await OnChanged();
+    }
+
+
+    private async Task OnClassChanged(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        if (Enum.TryParse<AccountClass>(
+                value,
+                out var result))
+        {
+            Model.AccountClass = result;
+
+            await OnChanged();
+        }
+    }
+
+
+    private async Task OnTypeChanged(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        if (Enum.TryParse<AccountType>(
+                value,
+                out var result))
+        {
+            Model.AccountType = result;
+
+            await OnChanged();
+        }
+    }
+
+
+    private async Task OnNormalBalanceChanged(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        if (Enum.TryParse<NormalBalance>(
+                value,
+                out var result))
+        {
+            Model.NormalBalance = result;
+
+            await OnChanged();
+        }
+    }
+
+
+    private async Task OnParentAccountChanged(string? value)
+    {
+        Model.ParentAccountId =
+            Guid.TryParse(
+                value,
+                out var id)
+                ? id
+                : null;
+
+        /*
+         * الحساب الأب يؤثر على المستوى الشجري.
+         * لا نغيّر منطق الحساب هنا؛ فقط نعيد
+         * إشعار الـHost بأن الـModel تغير.
+         */
+        await OnChanged();
+    }
+
+
+    private async Task OnEffectiveDateChanged(DateOnly? value)
+    {
+        Model.EffectiveDate = value;
+
+        await OnChanged();
+    }
+
+
+    private async Task OnIsPostingAccountChanged(bool value)
+    {
+        Model.IsPostingAccount = value;
+
+        await OnChanged();
+    }
+
+
+    private async Task OnIsControlAccountChanged(bool value)
+    {
+        Model.IsControlAccount = value;
+
+        await OnChanged();
+    }
+
+
+    private async Task OnAllowManualPostingChanged(bool value)
+    {
+        Model.AllowManualPosting = value;
+
+        await OnChanged();
+    }
+
+
+    private async Task OnIsSystemAccountChanged(bool value)
+    {
+        Model.IsSystemAccount = value;
+
+        await OnChanged();
+    }
+
+
+    private async Task OnIsActiveChanged(bool value)
+    {
+        Model.IsActive = value;
+
+        await OnChanged();
+    }
+
+
+}

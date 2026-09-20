@@ -1,0 +1,56 @@
+@namespace OAS.UiLib.Components.Accounting.Workspace
+
+<div class="ui-acc-section" dir="rtl">
+    <div class="ui-acc-section__header" @onclick="ToggleCollapsed">
+        <div class="ui-acc-section__title-group">
+            @if (!string.IsNullOrWhiteSpace(IconCssClass))
+            {
+                <i class="@IconCssClass ui-acc-section__icon" aria-hidden="true"></i>
+            }
+            <div>
+                <h4 class="ui-acc-section__title">@Title</h4>
+                @if (!string.IsNullOrWhiteSpace(Subtitle))
+                {
+                    <p class="ui-acc-section__subtitle">@Subtitle</p>
+                }
+            </div>
+        </div>
+        @if (Collapsible)
+        {
+            <button type="button" class="ui-acc-section__toggle" aria-label="طي القسم">
+                <i class="fa-solid @(_isCollapsed ? "fa-chevron-down" : "fa-chevron-up")"></i>
+            </button>
+        }
+    </div>
+
+    @if (!_isCollapsed)
+    {
+        <div class="ui-acc-section__body">
+            @ChildContent
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public string? IconCssClass { get; set; }
+    [Parameter] public bool Collapsible { get; set; }
+    [Parameter] public bool DefaultCollapsed { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private bool _isCollapsed;
+
+    protected override void OnInitialized()
+    {
+        _isCollapsed = DefaultCollapsed;
+    }
+
+    private void ToggleCollapsed()
+    {
+        if (Collapsible)
+        {
+            _isCollapsed = !_isCollapsed;
+        }
+    }
+}

@@ -1,0 +1,134 @@
+@namespace OAS.Client.Accounting.Components
+@using OAS.Contracts.Accounting.PaymentAllocations
+@using OAS.Contracts.Accounting.Enums
+@using OAS.Client.Accounting.Common
+@using OAS.UiLib.Components.Accounting.Workspace
+@using OAS.UiLib.Components.Inputs
+@using OAS.UiLib.Core.Models
+
+<div class="ui-acc-editor" dir="rtl">
+    <UiAccountingFormSection Title="مصدر السداد (الدفعة)"
+                             Subtitle="نوع السند أو الدفعة المقدمة المُراد تخصيصها"
+                             IconCssClass="fa-solid fa-money-check-dollar">
+        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+            <UiSelect Label="نوع مصدر السداد"
+                      Value="@Model.PaymentSourceType.ToString()"
+                      ValueChanged="OnSourceTypeChanged"
+                      Options="@AccountingArabicPresenter.PaymentSourceTypeOptions"
+                      Disabled="@(!IsEditable)"
+                      Size="ControlSize.Small" />
+
+            <UiLookup Label="سند السداد / الدفعة"
+                      Value="@Model.PaymentSourceId?.ToString("D")"
+                      ValueChanged="OnSourceIdChanged"
+                      SelectedItem="@SourceLookupItem"
+                      SearchAsync="SourceSearchAsync"
+                      Placeholder="ابحث برقم السند..."
+                      Disabled="@(!IsEditable)"
+                      Required="true"
+                      MinimumSearchLength="0"
+                      DebounceMilliseconds="250" />
+        </div>
+    </UiAccountingFormSection>
+
+    <UiAccountingFormSection Title="المستند الهدف المراد تسويته"
+                             Subtitle="فاتورة مبيعات، فاتورة مشتريات، أو إشعار تسوية"
+                             IconCssClass="fa-solid fa-file-invoice">
+        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+            <UiSelect Label="نوع المستند الهدف"
+                      Value="@Model.TargetDocumentType.ToString()"
+                      ValueChanged="OnTargetTypeChanged"
+                      Options="@AccountingArabicPresenter.AllocationTargetDocumentTypeOptions"
+                      Disabled="@(!IsEditable)"
+                      Size="ControlSize.Small" />
+
+            <UiLookup Label="المستند المستهدف"
+                      Value="@Model.TargetDocumentId?.ToString("D")"
+                      ValueChanged="OnTargetIdChanged"
+                      SelectedItem="@TargetLookupItem"
+                      SearchAsync="TargetSearchAsync"
+                      Placeholder="ابحث برقم الفاتورة أو المستند..."
+                      Disabled="@(!IsEditable)"
+                      Required="true"
+                      MinimumSearchLength="0"
+                      DebounceMilliseconds="250" />
+        </div>
+    </UiAccountingFormSection>
+
+    <UiAccountingFormSection Title="مبلغ التخصيص والبيانات الزمنية"
+                             Subtitle="المبلغ المخصص على الفاتورة وتاريخ التسوية"
+                             IconCssClass="fa-solid fa-receipt">
+        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+            <div>
+                <label class="ui-input-text__label mb-1 d-block">المبلغ المخصص</label>
+                <input type="number" step="0.01" min="0.01"
+                       class="ui-input-text__field text-start font-bold fs-5 text-primary"
+                       value="@Model.AllocatedAmount"
+                       disabled="@(!IsEditable)"
+                       @onchange="@(e => { if (decimal.TryParse(e.Value?.ToString(), out var amt)) { Model.AllocatedAmount = amt; OnChanged(); } })" />
+            </div>
+
+            @if (!IsNew)
+            {
+                <UiInputText Label="تاريخ التخصيص (UTC)"
+                             Value="@Model.AllocatedAtUtc.ToString("yyyy-MM-dd HH:mm")"
+                             ReadOnly="true"
+                             Disabled="true"
+                             Size="ControlSize.Small" />
+            }
+        </div>
+    </UiAccountingFormSection>
+</div>
+
+@code {
+    public sealed class FormModel
+    {
+        public PaymentSourceType PaymentSourceType { get; set; } = PaymentSourceType.ReceiptVoucher;
+        public Guid? PaymentSourceId { get; set; }
+        public AllocationTargetDocumentType TargetDocumentType { get; set; } = AllocationTargetDocumentType.SalesInvoice;
+        public Guid? TargetDocumentId { get; set; }
+        public decimal AllocatedAmount { get; set; }
+        public DateTimeOffset AllocatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
+    }
+
+    [Parameter] public FormModel Model { get; set; } = new();
+    [Parameter] public bool IsEditable { get; set; }
+    [Parameter] public bool IsNew { get; set; }
+    [Parameter] public UiLookupItem? SourceLookupItem { get; set; }
+    [Parameter] public UiLookupItem? TargetLookupItem { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SourceSearchAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? TargetSearchAsync { get; set; }
+    [Parameter] public EventCallback OnModelChanged { get; set; }
+
+    private void OnChanged() => OnModelChanged.InvokeAsync();
+
+    private void OnSourceTypeChanged(string val)
+    {
+        if (Enum.TryParse<PaymentSourceType>(val, out var res))
+        {
+            Model.PaymentSourceType = res;
+            OnChanged();
+        }
+    }
+
+    private void OnTargetTypeChanged(string val)
+    {
+        if (Enum.TryParse<AllocationTargetDocumentType>(val, out var res))
+        {
+            Model.TargetDocumentType = res;
+            OnChanged();
+        }
+    }
+
+    private void OnSourceIdChanged(string? val)
+    {
+        Model.PaymentSourceId = Guid.TryParse(val, out var id) ? id : null;
+        OnChanged();
+    }
+
+    private void OnTargetIdChanged(string? val)
+    {
+        Model.TargetDocumentId = Guid.TryParse(val, out var id) ? id : null;
+        OnChanged();
+    }
+}

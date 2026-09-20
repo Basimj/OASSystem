@@ -1,0 +1,40 @@
+@namespace OAS.UiLib.Components.Accounting.Fiscal
+
+<div class="ui-acc-card">
+    <div class="ui-acc-card__header">
+        <div class="ui-acc-card__title">
+            <i class="fa-solid fa-calendar-week" aria-hidden="true"></i>
+            <span>الفترة @PeriodNumber: @Name</span>
+        </div>
+        <OAS.UiLib.Components.Accounting.Workspace.UiAccountingStatusBadge Text="@StatusText" State="@StatusState" />
+    </div>
+    <div class="ui-acc-card__body">
+        <div><strong>من:</strong> @StartDateText <strong>إلى:</strong> @EndDateText</div>
+        <div class="d-flex align-items-center gap-1 flex-wrap">
+            <span class="badge @(IsSalesLocked ? "bg-danger" : "bg-success")">مبيعات: @(IsSalesLocked ? "مغلق" : "مفتوح")</span>
+            <span class="badge @(IsInventoryLocked ? "bg-danger" : "bg-success")">مخزون: @(IsInventoryLocked ? "مغلق" : "مفتوح")</span>
+            <span class="badge @(IsAccountingLocked ? "bg-danger" : "bg-success")">محاسبة: @(IsAccountingLocked ? "مغلق" : "مفتوح")</span>
+        </div>
+    </div>
+    <div class="ui-acc-card__footer">
+        @if (OnToggleLocks.HasDelegate)
+        {
+            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="OnToggleLocks">
+                <i class="fa-solid fa-lock" aria-hidden="true"></i> تعديل الإقفال
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public byte PeriodNumber { get; set; }
+    [Parameter] public string Name { get; set; } = string.Empty;
+    [Parameter] public string StartDateText { get; set; } = string.Empty;
+    [Parameter] public string EndDateText { get; set; } = string.Empty;
+    [Parameter] public string StatusText { get; set; } = string.Empty;
+    [Parameter] public string StatusState { get; set; } = "open";
+    [Parameter] public bool IsSalesLocked { get; set; }
+    [Parameter] public bool IsInventoryLocked { get; set; }
+    [Parameter] public bool IsAccountingLocked { get; set; }
+    [Parameter] public EventCallback OnToggleLocks { get; set; }
+}

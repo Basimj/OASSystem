@@ -1,0 +1,467 @@
+@namespace OAS.Client.Accounting.Components
+@using OAS.Contracts.Accounting.ReceiptVouchers
+@using OAS.Contracts.Accounting.Enums
+@using OAS.Client.Accounting.Common
+@using OAS.UiLib.Components.Accounting.Workspace
+@using OAS.UiLib.Components.Inputs
+@using OAS.UiLib.Core.Models
+
+<div class="ui-acc-editor" dir="rtl">
+
+    ```
+    <UiAccountingFormSection Title="بيانات سند القبض الأساسية"
+                             Subtitle="رقم السند، التاريخ، والمبلغ المقبوض"
+                             IconCssClass="fa-solid fa-file-invoice-dollar">
+
+        <div class="ui-acc-form-grid ui-acc-form-grid--3col">
+
+            <UiInputText Label="رقم السند"
+                         Value="@Model.VoucherNumber"
+                         ValueExpression="@(() => Model.VoucherNumber)"
+                         ReadOnly="true"
+                         Disabled="true"
+                         Placeholder="توليد تلقائي..."
+                         Size="ControlSize.Small" />
+
+            <UiInputDate Label="تاريخ السند"
+                         Value="@Model.VoucherDateInput"
+                         ValueExpression="@(() => Model.VoucherDateInput)"
+                         ValueChanged="OnVoucherDateChanged"
+                         Required="true"
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+
+            <div>
+                <label class="ui-input-text__label mb-1 d-block">
+                    المبلغ المقبوض
+                </label>
+
+                <input type="number"
+                       step="0.01"
+                       min="0.01"
+                       class="ui-input-text__field text-start font-bold fs-5 text-success"
+                       value="@Model.TotalAmount"
+                       disabled="@(!IsEditable)"
+                       @onchange="OnTotalAmountChanged" />
+            </div>
+
+        </div>
+
+    </UiAccountingFormSection>
+
+
+    <UiAccountingFormSection Title="الجهة الدافعة (الطرف الثاني)"
+                             Subtitle="تحديد نوع الطرف (عميل أو جهة أخرى)"
+                             IconCssClass="fa-solid fa-user-tag">
+
+        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+
+            <UiSelect Label="نوع الطرف"
+                      Value="@Model.PartyTypeValue"
+                      ValueExpression="@(() => Model.PartyTypeValue)"
+                      ValueChanged="OnPartyTypeChanged"
+                      Options="@AccountingArabicPresenter.ReceiptPartyTypeOptions"
+                      Disabled="@(!IsEditable)"
+                      Size="ControlSize.Small" />
+
+            @if (Model.PartyType == ReceiptPartyType.Customer)
+            {
+                <UiLookup Label="العميل"
+                          Value="@Model.CustomerId?.ToString("D")"
+                          ValueChanged="OnCustomerChanged"
+                          SelectedItem="@CustomerLookupItem"
+                          SearchAsync="CustomerSearchAsync"
+                          Placeholder="ابحث باسم أو كود العميل..."
+                          Disabled="@(!IsEditable)"
+                          Required="true"
+                          MinimumSearchLength="0"
+                          DebounceMilliseconds="250" />
+            }
+            else
+            {
+                <UiInputText Label="اسم الجهة الدافعة"
+                             Value="@Model.ReceivedFrom"
+                             ValueExpression="@(() => Model.ReceivedFrom)"
+                             ValueChanged="OnReceivedFromChanged"
+                             Required="true"
+                             Disabled="@(!IsEditable)"
+                             Placeholder="اكتب اسم الشخص أو الجهة..."
+                             Size="ControlSize.Small" />
+            }
+
+        </div>
+
+    </UiAccountingFormSection>
+
+
+    <UiAccountingFormSection Title="طريقة التحصيل والجهة المالية"
+                             Subtitle="نقداً عبر الصندوق أو تحويل/شيك عبر البنك"
+                             IconCssClass="fa-solid fa-money-bill-transfer">
+
+        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+
+            <UiSelect Label="طريقة الدفع"
+                      Value="@Model.PaymentMethodValue"
+                      ValueExpression="@(() => Model.PaymentMethodValue)"
+                      ValueChanged="OnPaymentMethodChanged"
+                      Options="@AccountingArabicPresenter.PaymentMethodOptions"
+                      Disabled="@(!IsEditable)"
+                      Size="ControlSize.Small" />
+
+            @if (Model.PaymentMethod == PaymentMethod.Cash)
+            {
+                <UiLookup Label="الصندوق / الخزينة النقدية"
+                          Value="@Model.CashAccountId?.ToString("D")"
+                          ValueChanged="OnCashAccountChanged"
+                          SelectedItem="@CashAccountLookupItem"
+                          SearchAsync="CashAccountSearchAsync"
+                          Placeholder="اختر الصندوق..."
+                          Disabled="@(!IsEditable)"
+                          Required="true"
+                          MinimumSearchLength="0"
+                          DebounceMilliseconds="250" />
+            }
+            else
+            {
+                <UiLookup Label="الحساب البنكي"
+                          Value="@Model.BankAccountId?.ToString("D")"
+                          ValueChanged="OnBankAccountChanged"
+                          SelectedItem="@BankAccountLookupItem"
+                          SearchAsync="BankAccountSearchAsync"
+                          Placeholder="اختر الحساب البنكي..."
+                          Disabled="@(!IsEditable)"
+                          Required="true"
+                          MinimumSearchLength="0"
+                          DebounceMilliseconds="250" />
+            }
+
+        </div>
+
+        <div class="mt-3">
+
+            <UiInputText Label="البيان / الوصف"
+                         Value="@Model.Description"
+                         ValueExpression="@(() => Model.Description)"
+                         ValueChanged="OnDescriptionChanged"
+                         Required="true"
+                         Disabled="@(!IsEditable)"
+                         Placeholder="شرح موجز لسبب القبض أو الفاتورة المرتبطة..." />
+
+        </div>
+
+    </UiAccountingFormSection>
+    ```
+
+</div>
+
+@code {
+
+
+public sealed class FormModel
+    {
+        public string VoucherNumber { get; set; } = string.Empty;
+
+
+        public DateOnly VoucherDate { get; set; }
+            = DateOnly.FromDateTime(DateTime.Today);
+
+
+        /*
+         * UiInputDate يعمل مع DateOnly?
+         * بينما الـModel الداخلي والـContract يستخدمان DateOnly.
+         */
+        public DateOnly? VoucherDateInput
+        {
+            get => VoucherDate;
+
+            set
+            {
+                if (value.HasValue)
+                {
+                    VoucherDate = value.Value;
+                }
+            }
+        }
+
+
+        public ReceiptPartyType PartyType { get; set; }
+            = ReceiptPartyType.Customer;
+
+
+        public string PartyTypeValue
+        {
+            get => PartyType.ToString();
+
+            set
+            {
+                if (Enum.TryParse<ReceiptPartyType>(
+                        value,
+                        out var result))
+                {
+                    PartyType = result;
+                }
+            }
+        }
+
+
+        public Guid? CustomerId { get; set; }
+
+
+        public string? ReceivedFrom { get; set; }
+
+
+        public Guid? CashAccountId { get; set; }
+
+
+        public Guid? BankAccountId { get; set; }
+
+
+        public PaymentMethod PaymentMethod { get; set; }
+            = PaymentMethod.Cash;
+
+
+        public string PaymentMethodValue
+        {
+            get => PaymentMethod.ToString();
+
+            set
+            {
+                if (Enum.TryParse<PaymentMethod>(
+                        value,
+                        out var result))
+                {
+                    PaymentMethod = result;
+                }
+            }
+        }
+
+
+        public decimal TotalAmount { get; set; }
+
+
+        public string Description { get; set; } = string.Empty;
+
+
+        public ReceiptVoucherStatus Status { get; set; }
+            = ReceiptVoucherStatus.Draft;
+    }
+
+
+    [Parameter]
+    public FormModel Model { get; set; } = new();
+
+
+    [Parameter]
+    public bool IsEditable { get; set; }
+
+
+    [Parameter]
+    public bool IsNew { get; set; }
+
+
+    [Parameter]
+    public UiLookupItem? CustomerLookupItem { get; set; }
+
+
+    [Parameter]
+    public UiLookupItem? CashAccountLookupItem { get; set; }
+
+
+    [Parameter]
+    public UiLookupItem? BankAccountLookupItem { get; set; }
+
+
+    [Parameter]
+    public Func<
+        string,
+        CancellationToken,
+        Task<IReadOnlyList<UiLookupItem>>>?
+        CustomerSearchAsync
+    { get; set; }
+
+
+    [Parameter]
+    public Func<
+        string,
+        CancellationToken,
+        Task<IReadOnlyList<UiLookupItem>>>?
+        CashAccountSearchAsync
+    { get; set; }
+
+
+    [Parameter]
+    public Func<
+        string,
+        CancellationToken,
+        Task<IReadOnlyList<UiLookupItem>>>?
+        BankAccountSearchAsync
+    { get; set; }
+
+
+    [Parameter]
+    public EventCallback OnModelChanged { get; set; }
+
+
+    private Task OnChanged()
+        => OnModelChanged.InvokeAsync();
+
+
+    private async Task OnVoucherDateChanged(
+        DateOnly? value)
+    {
+        if (value.HasValue)
+        {
+            Model.VoucherDate = value.Value;
+        }
+
+        await OnChanged();
+    }
+
+
+    private async Task OnTotalAmountChanged(
+        ChangeEventArgs e)
+    {
+        if (decimal.TryParse(
+                e.Value?.ToString(),
+                out var amount))
+        {
+            Model.TotalAmount = amount;
+
+            await OnChanged();
+        }
+    }
+
+
+    private async Task OnPartyTypeChanged(
+        string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        if (!Enum.TryParse<ReceiptPartyType>(
+                value,
+                out var result))
+        {
+            return;
+        }
+
+        Model.PartyType = result;
+
+
+        /*
+         * إذا أصبح الطرف عميلًا،
+         * لا نحتفظ باسم جهة أخرى.
+         */
+        if (result == ReceiptPartyType.Customer)
+        {
+            Model.ReceivedFrom = null;
+        }
+        else
+        {
+            Model.CustomerId = null;
+        }
+
+
+        await OnChanged();
+    }
+
+
+    private async Task OnPaymentMethodChanged(
+        string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        if (!Enum.TryParse<PaymentMethod>(
+                value,
+                out var result))
+        {
+            return;
+        }
+
+        Model.PaymentMethod = result;
+
+
+        /*
+         * عند تغيير طريقة التحصيل،
+         * نزيل الحساب الخاص بالطريقة السابقة.
+         */
+        if (result == PaymentMethod.Cash)
+        {
+            Model.BankAccountId = null;
+        }
+        else
+        {
+            Model.CashAccountId = null;
+        }
+
+
+        await OnChanged();
+    }
+
+
+    private async Task OnCustomerChanged(
+        string? value)
+    {
+        Model.CustomerId =
+            Guid.TryParse(
+                value,
+                out var id)
+                ? id
+                : null;
+
+        await OnChanged();
+    }
+
+
+    private async Task OnReceivedFromChanged(
+        string? value)
+    {
+        Model.ReceivedFrom = value;
+
+        await OnChanged();
+    }
+
+
+    private async Task OnCashAccountChanged(
+        string? value)
+    {
+        Model.CashAccountId =
+            Guid.TryParse(
+                value,
+                out var id)
+                ? id
+                : null;
+
+        await OnChanged();
+    }
+
+
+    private async Task OnBankAccountChanged(
+        string? value)
+    {
+        Model.BankAccountId =
+            Guid.TryParse(
+                value,
+                out var id)
+                ? id
+                : null;
+
+        await OnChanged();
+    }
+
+
+    private async Task OnDescriptionChanged(
+        string? value)
+    {
+        Model.Description = value ?? string.Empty;
+
+        await OnChanged();
+    }
+
+
+}

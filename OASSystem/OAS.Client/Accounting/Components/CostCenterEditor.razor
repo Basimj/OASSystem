@@ -1,0 +1,79 @@
+@namespace OAS.Client.Accounting.Components
+@using OAS.Contracts.Accounting.CostCenters
+@using OAS.UiLib.Components.Accounting.Workspace
+@using OAS.UiLib.Components.Inputs
+@using OAS.UiLib.Core.Models
+
+<div class="ui-acc-editor" dir="rtl">
+    <UiAccountingFormSection Title="بيانات مركز التكلفة"
+                             Subtitle="الرمز، التسمية، والتبعية الهيكلية"
+                             IconCssClass="fa-solid fa-network-wired">
+        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+            <UiInputText Label="كود مركز التكلفة"
+                         Value="@Model.Code"
+                         ValueChanged="@(v => { Model.Code = v; OnChanged(); })"
+                         Required="true"
+                         Placeholder="مثال: CC-100"
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+
+            <UiInputText Label="اسم مركز التكلفة (بالعربي)"
+                         Value="@Model.NameAr"
+                         ValueChanged="@(v => { Model.NameAr = v; OnChanged(); })"
+                         Required="true"
+                         Placeholder="مثال: الإدارة العامة / فرع صنعاء"
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+
+            <UiInputText Label="اسم مركز التكلفة (بالإنجليزي)"
+                         Value="@Model.NameEn"
+                         ValueChanged="@(v => { Model.NameEn = v; OnChanged(); })"
+                         Placeholder="مثال: General Management"
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+
+            <UiLookup Label="مركز التكلفة الأب"
+                      Value="@Model.ParentCostCenterId?.ToString("D")"
+                      ValueChanged="OnParentCostCenterChanged"
+                      SelectedItem="@ParentCostCenterLookupItem"
+                      SearchAsync="CostCenterSearchAsync"
+                      Placeholder="ابحث عن مركز التكلفة الأب..."
+                      Disabled="@(!IsEditable)"
+                      MinimumSearchLength="0"
+                      DebounceMilliseconds="250" />
+
+            <div class="ui-acc-checks-group d-flex align-items-center mt-4">
+                <UiCheckbox Label="مركز التكلفة نشط"
+                            Value="@Model.IsActive"
+                            ValueChanged="@(v => { Model.IsActive = v; OnChanged(); })"
+                            Disabled="@(!IsEditable)" />
+            </div>
+        </div>
+    </UiAccountingFormSection>
+</div>
+
+@code {
+    public sealed class FormModel
+    {
+        public string Code { get; set; } = string.Empty;
+        public string NameAr { get; set; } = string.Empty;
+        public string? NameEn { get; set; }
+        public Guid? ParentCostCenterId { get; set; }
+        public bool IsActive { get; set; } = true;
+    }
+
+    [Parameter] public FormModel Model { get; set; } = new();
+    [Parameter] public bool IsEditable { get; set; }
+    [Parameter] public bool IsNew { get; set; }
+    [Parameter] public UiLookupItem? ParentCostCenterLookupItem { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CostCenterSearchAsync { get; set; }
+    [Parameter] public EventCallback OnModelChanged { get; set; }
+
+    private void OnChanged() => OnModelChanged.InvokeAsync();
+
+    private void OnParentCostCenterChanged(string? val)
+    {
+        Model.ParentCostCenterId = Guid.TryParse(val, out var id) ? id : null;
+        OnChanged();
+    }
+}

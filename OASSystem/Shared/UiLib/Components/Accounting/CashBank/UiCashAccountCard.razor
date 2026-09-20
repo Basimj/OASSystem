@@ -1,0 +1,36 @@
+@namespace OAS.UiLib.Components.Accounting.CashBank
+
+<div class="ui-acc-card">
+    <div class="ui-acc-card__header">
+        <div class="ui-acc-card__title">
+            <i class="fa-solid fa-vault" aria-hidden="true"></i>
+            <span>@Code — @NameAr</span>
+        </div>
+        <OAS.UiLib.Components.Accounting.Workspace.UiAccountingStatusBadge Text="@(IsActive ? "نشط" : "معطل")" State="@(IsActive ? "active" : "inactive")" />
+    </div>
+    <div class="ui-acc-card__body">
+        <div><strong>الفرع:</strong> @BranchName</div>
+        <div><strong>حساب الأستاذ (GL):</strong> @GlAccountCode</div>
+        <div><strong>العملة:</strong> @CurrencyCode</div>
+        <div><strong>يتطلب ورديات:</strong> @(RequiresShift ? "نعم" : "لا")</div>
+    </div>
+    <div class="ui-acc-card__footer">
+        @if (OnEdit.HasDelegate)
+        {
+            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="OnEdit">
+                <i class="fa-solid fa-pen" aria-hidden="true"></i> تعديل
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Code { get; set; } = string.Empty;
+    [Parameter] public string NameAr { get; set; } = string.Empty;
+    [Parameter] public string BranchName { get; set; } = string.Empty;
+    [Parameter] public string GlAccountCode { get; set; } = string.Empty;
+    [Parameter] public string CurrencyCode { get; set; } = "SAR";
+    [Parameter] public bool RequiresShift { get; set; }
+    [Parameter] public bool IsActive { get; set; } = true;
+    [Parameter] public EventCallback OnEdit { get; set; }
+}

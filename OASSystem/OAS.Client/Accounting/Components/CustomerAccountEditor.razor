@@ -1,0 +1,93 @@
+@namespace OAS.Client.Accounting.Components
+@using OAS.Contracts.Accounting.CustomerAccounts
+@using OAS.UiLib.Components.Accounting.Workspace
+@using OAS.UiLib.Components.Inputs
+@using OAS.UiLib.Core.Models
+
+<div class="ui-acc-editor" dir="rtl">
+    <UiAccountingFormSection Title="بيانات حساب العميل المحاسبي"
+                             Subtitle="ربط العميل بحساب الأستاذ المساعد وحساب المراقبة العام بدليل الحسابات"
+                             IconCssClass="fa-solid fa-users-line">
+        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+            <UiLookup Label="العميل"
+                      Value="@Model.CustomerId?.ToString("D")"
+                      ValueChanged="OnCustomerChanged"
+                      SelectedItem="@CustomerLookupItem"
+                      SearchAsync="CustomerSearchAsync"
+                      Placeholder="ابحث باسم أو كود العميل..."
+                      Disabled="@(!IsEditable || !IsNew)"
+                      Required="true"
+                      MinimumSearchLength="0"
+                      DebounceMilliseconds="250" />
+
+            <UiLookup Label="حساب الأستاذ المساعد للعميل"
+                      Value="@Model.AccountId?.ToString("D")"
+                      ValueChanged="OnAccountChanged"
+                      SelectedItem="@AccountLookupItem"
+                      SearchAsync="AccountSearchAsync"
+                      Placeholder="ابحث عن حساب العميل المساعد..."
+                      Disabled="@(!IsEditable)"
+                      Required="true"
+                      MinimumSearchLength="0"
+                      DebounceMilliseconds="250" />
+
+            <UiLookup Label="حساب المراقبة العام (Control Account)"
+                      Value="@Model.ControlAccountId?.ToString("D")"
+                      ValueChanged="OnControlAccountChanged"
+                      SelectedItem="@ControlAccountLookupItem"
+                      SearchAsync="AccountSearchAsync"
+                      Placeholder="ابحث عن حساب مراقبة العملاء (مثل: 1120)..."
+                      Disabled="@(!IsEditable)"
+                      Required="true"
+                      MinimumSearchLength="0"
+                      DebounceMilliseconds="250" />
+
+            <div class="ui-acc-checks-group d-flex align-items-center mt-4">
+                <UiCheckbox Label="الحساب المحاسبي للعميل نشط"
+                            Value="@Model.IsActive"
+                            ValueChanged="@(v => { Model.IsActive = v; OnChanged(); })"
+                            Disabled="@(!IsEditable)" />
+            </div>
+        </div>
+    </UiAccountingFormSection>
+</div>
+
+@code {
+    public sealed class FormModel
+    {
+        public Guid? CustomerId { get; set; }
+        public Guid? AccountId { get; set; }
+        public Guid? ControlAccountId { get; set; }
+        public bool IsActive { get; set; } = true;
+    }
+
+    [Parameter] public FormModel Model { get; set; } = new();
+    [Parameter] public bool IsEditable { get; set; }
+    [Parameter] public bool IsNew { get; set; }
+    [Parameter] public UiLookupItem? CustomerLookupItem { get; set; }
+    [Parameter] public UiLookupItem? AccountLookupItem { get; set; }
+    [Parameter] public UiLookupItem? ControlAccountLookupItem { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CustomerSearchAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? AccountSearchAsync { get; set; }
+    [Parameter] public EventCallback OnModelChanged { get; set; }
+
+    private void OnChanged() => OnModelChanged.InvokeAsync();
+
+    private void OnCustomerChanged(string? val)
+    {
+        Model.CustomerId = Guid.TryParse(val, out var id) ? id : null;
+        OnChanged();
+    }
+
+    private void OnAccountChanged(string? val)
+    {
+        Model.AccountId = Guid.TryParse(val, out var id) ? id : null;
+        OnChanged();
+    }
+
+    private void OnControlAccountChanged(string? val)
+    {
+        Model.ControlAccountId = Guid.TryParse(val, out var id) ? id : null;
+        OnChanged();
+    }
+}

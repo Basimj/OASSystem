@@ -1,0 +1,35 @@
+@namespace OAS.UiLib.Components.Accounting.Fiscal
+
+<div class="ui-acc-card">
+    <div class="ui-acc-card__header">
+        <div class="ui-acc-card__title">
+            <i class="fa-solid fa-calendar-days" aria-hidden="true"></i>
+            <span>@Code — @Name</span>
+        </div>
+        <OAS.UiLib.Components.Accounting.Workspace.UiAccountingStatusBadge Text="@StatusText" State="@StatusState" />
+    </div>
+    <div class="ui-acc-card__body">
+        <div><strong>تاريخ البدء:</strong> @StartDateText</div>
+        <div><strong>تاريخ الانتهاء:</strong> @EndDateText</div>
+        <div><strong>الفترات:</strong> @PeriodsCount فترة</div>
+    </div>
+    <div class="ui-acc-card__footer">
+        @if (OnSelect.HasDelegate)
+        {
+            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="OnSelect">
+                <i class="fa-solid fa-folder-open" aria-hidden="true"></i> عرض الفترات
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Code { get; set; } = string.Empty;
+    [Parameter] public string Name { get; set; } = string.Empty;
+    [Parameter] public string StartDateText { get; set; } = string.Empty;
+    [Parameter] public string EndDateText { get; set; } = string.Empty;
+    [Parameter] public int PeriodsCount { get; set; }
+    [Parameter] public string StatusText { get; set; } = string.Empty;
+    [Parameter] public string StatusState { get; set; } = "open";
+    [Parameter] public EventCallback OnSelect { get; set; }
+}

@@ -1,0 +1,39 @@
+@namespace OAS.UiLib.Components.Accounting.CostCenters
+
+<div class="ui-acc-card">
+    <div class="ui-acc-card__header">
+        <div class="ui-acc-card__title">
+            <i class="fa-solid fa-network-wired" aria-hidden="true"></i>
+            <span>@Code — @NameAr</span>
+        </div>
+        <OAS.UiLib.Components.Accounting.Workspace.UiAccountingStatusBadge Text="@(IsActive ? "نشط" : "معطل")" State="@(IsActive ? "active" : "inactive")" />
+    </div>
+    <div class="ui-acc-card__body">
+        <div><strong>المستوى:</strong> @Level</div>
+        <div><strong>يقبل إسناد قيود:</strong> @(AllowPosting ? "نعم" : "لا (رئيسي)")</div>
+    </div>
+    <div class="ui-acc-card__footer">
+        @if (OnEdit.HasDelegate)
+        {
+            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="OnEdit">
+                <i class="fa-solid fa-pen" aria-hidden="true"></i> تعديل
+            </button>
+        }
+        @if (OnToggleStatus.HasDelegate)
+        {
+            <button type="button" class="btn btn-sm @(IsActive ? "btn-outline-danger" : "btn-outline-success")" @onclick="OnToggleStatus">
+                <i class="fa-solid @(IsActive ? "fa-ban" : "fa-check")" aria-hidden="true"></i> @(IsActive ? "تعطيل" : "تفعيل")
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Code { get; set; } = string.Empty;
+    [Parameter] public string NameAr { get; set; } = string.Empty;
+    [Parameter] public byte Level { get; set; } = 1;
+    [Parameter] public bool AllowPosting { get; set; } = true;
+    [Parameter] public bool IsActive { get; set; } = true;
+    [Parameter] public EventCallback OnEdit { get; set; }
+    [Parameter] public EventCallback OnToggleStatus { get; set; }
+}

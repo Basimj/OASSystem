@@ -1,0 +1,50 @@
+@namespace OAS.UiLib.Components.Accounting.CashBank
+
+<div class="ui-acc-card">
+    <div class="ui-acc-card__header">
+        <div class="ui-acc-card__title">
+            <i class="fa-solid fa-cash-register" aria-hidden="true"></i>
+            <span>وردية رقم: @ShiftNumber</span>
+            <span class="text-muted small">(@CashierName)</span>
+        </div>
+        <OAS.UiLib.Components.Accounting.Workspace.UiAccountingStatusBadge Text="@StatusText" State="@StatusState" />
+    </div>
+    <div class="ui-acc-card__body">
+        <div><strong>وقت البدء:</strong> @StartedAtText</div>
+        <div><strong>رصيد الافتتاح:</strong> @OpeningCash.ToString("N2") ر.س</div>
+        @if (EndingCash.HasValue)
+        {
+            <div><strong>رصيد الإغلاق الفعلي:</strong> @EndingCash.Value.ToString("N2") ر.س</div>
+            <div><strong>الفارق:</strong> <span class="@(Variance == 0 ? "text-success" : "text-danger fw-bold")">@Variance?.ToString("N2") ر.س</span></div>
+        }
+    </div>
+    <div class="ui-acc-card__footer">
+        @if (CanClose && OnClose.HasDelegate)
+        {
+            <button type="button" class="btn btn-sm btn-outline-warning" @onclick="OnClose">
+                <i class="fa-solid fa-lock" aria-hidden="true"></i> إغلاق الوردية
+            </button>
+        }
+        @if (CanApprove && OnApprove.HasDelegate)
+        {
+            <button type="button" class="btn btn-sm btn-success" @onclick="OnApprove">
+                <i class="fa-solid fa-check-double" aria-hidden="true"></i> اعتماد المشرف
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string ShiftNumber { get; set; } = string.Empty;
+    [Parameter] public string CashierName { get; set; } = string.Empty;
+    [Parameter] public string StartedAtText { get; set; } = string.Empty;
+    [Parameter] public decimal OpeningCash { get; set; }
+    [Parameter] public decimal? EndingCash { get; set; }
+    [Parameter] public decimal? Variance { get; set; }
+    [Parameter] public string StatusText { get; set; } = string.Empty;
+    [Parameter] public string StatusState { get; set; } = "open";
+    [Parameter] public bool CanClose { get; set; }
+    [Parameter] public bool CanApprove { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnApprove { get; set; }
+}

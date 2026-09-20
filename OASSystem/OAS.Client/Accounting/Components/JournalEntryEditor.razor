@@ -1,0 +1,291 @@
+@namespace OAS.Client.Accounting.Components
+@using OAS.Contracts.Accounting.Journals
+@using OAS.Contracts.Accounting.Enums
+@using OAS.Client.Accounting.Common
+@using OAS.UiLib.Components.Accounting.Workspace
+@using OAS.UiLib.Components.Accounting.Journals
+@using OAS.UiLib.Components.Inputs
+@using OAS.UiLib.Core.Models
+
+<div class="ui-acc-editor" dir="rtl">
+
+    <UiAccountingFormSection Title="ترويسة وبيانات القيد"
+                             Subtitle="نوع القيد، التواريخ، والبيان العام"
+                             IconCssClass="fa-solid fa-file-invoice">
+
+        <div class="ui-acc-form-grid ui-acc-form-grid--3col">
+
+            <UiInputText Label="رقم القيد"
+                         Value="@Model.JournalNumber"
+                         ValueExpression="@(() => Model.JournalNumber)"
+                         ReadOnly="true"
+                         Disabled="true"
+                         Placeholder="توليد تلقائي..."
+                         Size="ControlSize.Small" />
+
+            <UiSelect Label="نوع القيد"
+                      Value="@Model.JournalTypeValue"
+                      ValueExpression="@(() => Model.JournalTypeValue)"
+                      ValueChanged="OnTypeChanged"
+                      Options="@AccountingArabicPresenter.JournalTypeOptions"
+                      Disabled="@(!IsEditable)"
+                      Size="ControlSize.Small" />
+
+            <UiLookup Label="الفترة المالية"
+                      Value="@Model.FiscalPeriodId?.ToString("D")"
+                      ValueChanged="OnPeriodChanged"
+                      SelectedItem="@FiscalPeriodLookupItem"
+                      SearchAsync="FiscalPeriodSearchAsync"
+                      Placeholder="اختر الفترة المالية..."
+                      Disabled="@(!IsEditable)"
+                      MinimumSearchLength="0"
+                      DebounceMilliseconds="250" />
+
+            <UiInputDate Label="تاريخ الترحيل"
+                         Value="@Model.PostingDateInput"
+                         ValueExpression="@(() => Model.PostingDateInput)"
+                         ValueChanged="OnPostingDateChanged"
+                         Required="true"
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+
+            <UiInputDate Label="تاريخ المستند"
+                         Value="@Model.DocumentDateInput"
+                         ValueExpression="@(() => Model.DocumentDateInput)"
+                         ValueChanged="OnDocumentDateChanged"
+                         Required="true"
+                         Disabled="@(!IsEditable)"
+                         Size="ControlSize.Small" />
+
+            <UiInputText Label="الرقم المرجعي (اختياري)"
+                         Value="@Model.ReferenceNumber"
+                         ValueExpression="@(() => Model.ReferenceNumber)"
+                         ValueChanged="OnReferenceNumberChanged"
+                         Disabled="@(!IsEditable)"
+                         Placeholder="رقم الشيك أو الإشعار..."
+                         Size="ControlSize.Small" />
+
+        </div>
+
+        <div class="mt-3">
+
+            <UiInputText Label="البيان العام للقيد"
+                         Value="@Model.Description"
+                         ValueExpression="@(() => Model.Description)"
+                         ValueChanged="OnDescriptionChanged"
+                         Required="true"
+                         Disabled="@(!IsEditable)"
+                         Placeholder="شرح وافٍ عن طبيعة القيد والعملية المالية..." />
+
+        </div>
+
+    </UiAccountingFormSection>
+
+
+    <UiAccountingFormSection Title="أسطر القيد اليومي (الحسابات والمدين والدائن)"
+                             Subtitle="إدخال الحسابات المحاسبية ومراكز التكلفة والمبالغ المتوازنة"
+                             IconCssClass="fa-solid fa-scale-balanced">
+
+        <UiJournalLinesEditor Lines="@Model.Lines"
+                              IsEditable="@IsEditable"
+                              AccountSearchAsync="@AccountSearchAsync"
+                              CostCenterSearchAsync="@CostCenterSearchAsync"
+                              OnLinesChanged="@OnChanged" />
+
+    </UiAccountingFormSection>
+
+</div>
+
+
+@code {
+
+    public sealed class FormModel
+    {
+        public string JournalNumber { get; set; } = string.Empty;
+
+        public JournalType JournalType { get; set; }
+            = JournalType.Manual;
+
+        public string JournalTypeValue
+        {
+            get => JournalType.ToString();
+
+            set
+            {
+                if (Enum.TryParse<JournalType>(
+                        value,
+                        out var result))
+                {
+                    JournalType = result;
+                }
+            }
+        }
+
+        public DateOnly PostingDate { get; set; }
+            = DateOnly.FromDateTime(DateTime.Today);
+
+        public DateOnly? PostingDateInput
+        {
+            get => PostingDate;
+
+            set
+            {
+                if (value.HasValue)
+                {
+                    PostingDate = value.Value;
+                }
+            }
+        }
+
+        public DateOnly DocumentDate { get; set; }
+            = DateOnly.FromDateTime(DateTime.Today);
+
+        public DateOnly? DocumentDateInput
+        {
+            get => DocumentDate;
+
+            set
+            {
+                if (value.HasValue)
+                {
+                    DocumentDate = value.Value;
+                }
+            }
+        }
+
+        public Guid? FiscalPeriodId { get; set; }
+
+        public string Description { get; set; }
+            = string.Empty;
+
+        public string? ReferenceNumber { get; set; }
+
+        public JournalEntryStatus Status { get; set; }
+            = JournalEntryStatus.Draft;
+
+        public List<UiJournalLinesEditor.EditableJournalLine> Lines { get; set; }
+            = [];
+    }
+
+
+    [Parameter]
+    public FormModel Model { get; set; } = new();
+
+
+    [Parameter]
+    public bool IsEditable { get; set; }
+
+
+    [Parameter]
+    public bool IsNew { get; set; }
+
+
+    [Parameter]
+    public UiLookupItem? FiscalPeriodLookupItem { get; set; }
+
+
+    [Parameter]
+    public Func<
+        string,
+        CancellationToken,
+        Task<IReadOnlyList<UiLookupItem>>>?
+        FiscalPeriodSearchAsync
+    { get; set; }
+
+
+    [Parameter]
+    public Func<
+        string,
+        CancellationToken,
+        Task<IReadOnlyList<UiLookupItem>>>?
+        AccountSearchAsync
+    { get; set; }
+
+
+    [Parameter]
+    public Func<
+        string,
+        CancellationToken,
+        Task<IReadOnlyList<UiLookupItem>>>?
+        CostCenterSearchAsync
+    { get; set; }
+
+
+    [Parameter]
+    public EventCallback OnModelChanged { get; set; }
+
+
+    private Task OnChanged()
+        => OnModelChanged.InvokeAsync();
+
+
+    private async Task OnTypeChanged(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        if (!Enum.TryParse<JournalType>(
+                value,
+                out var result))
+        {
+            return;
+        }
+
+        Model.JournalType = result;
+
+        await OnChanged();
+    }
+
+
+    private async Task OnPostingDateChanged(DateOnly? value)
+    {
+        if (value.HasValue)
+        {
+            Model.PostingDate = value.Value;
+        }
+
+        await OnChanged();
+    }
+
+
+    private async Task OnDocumentDateChanged(DateOnly? value)
+    {
+        if (value.HasValue)
+        {
+            Model.DocumentDate = value.Value;
+        }
+
+        await OnChanged();
+    }
+
+
+    private async Task OnPeriodChanged(string? value)
+    {
+        Model.FiscalPeriodId =
+            Guid.TryParse(
+                value,
+                out var id)
+                ? id
+                : null;
+
+        await OnChanged();
+    }
+
+
+    private async Task OnReferenceNumberChanged(string? value)
+    {
+        Model.ReferenceNumber = value;
+
+        await OnChanged();
+    }
+
+
+    private async Task OnDescriptionChanged(string? value)
+    {
+        Model.Description = value ?? string.Empty;
+
+        await OnChanged();
+    }
+}

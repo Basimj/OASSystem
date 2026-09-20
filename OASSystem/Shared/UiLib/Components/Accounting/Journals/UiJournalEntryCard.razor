@@ -1,0 +1,62 @@
+@namespace OAS.UiLib.Components.Accounting.Journals
+
+<div class="ui-acc-card">
+    <div class="ui-acc-card__header">
+        <div class="ui-acc-card__title">
+            <i class="fa-solid fa-book-journal-whills" aria-hidden="true"></i>
+            <span>قيد رقم: @EntryNumber</span>
+            <span class="text-muted small">(@DateText)</span>
+        </div>
+        <OAS.UiLib.Components.Accounting.Workspace.UiAccountingStatusBadge Text="@StatusText" State="@StatusState" />
+    </div>
+    <div class="ui-acc-card__body">
+        <div><strong>النوع:</strong> @EntryTypeText</div>
+        <div><strong>البيان:</strong> @Description</div>
+        <div><strong>إجمالي المدين:</strong> <span class="ui-acc-val--debit">@TotalDebit.ToString("N2")</span></div>
+        <div><strong>إجمالي الدائن:</strong> <span class="ui-acc-val--credit">@TotalCredit.ToString("N2")</span></div>
+        <div>
+            <strong>الحالة الحسابية:</strong>
+            <span class="ui-acc-balanced-badge @(IsBalanced ? "ui-acc-balanced-badge--balanced" : "ui-acc-balanced-badge--unbalanced")">
+                <i class="fa-solid @(IsBalanced ? "fa-scale-balanced" : "fa-scale-unbalanced")" aria-hidden="true"></i>
+                @(IsBalanced ? "متزن" : "غير متزن")
+            </span>
+        </div>
+    </div>
+    <div class="ui-acc-card__footer">
+        @if (OnView.HasDelegate)
+        {
+            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="OnView">
+                <i class="fa-solid fa-eye" aria-hidden="true"></i> تفاصيل القيد
+            </button>
+        }
+        @if (CanPost && OnPost.HasDelegate)
+        {
+            <button type="button" class="btn btn-sm btn-success" @onclick="OnPost">
+                <i class="fa-solid fa-check-double" aria-hidden="true"></i> ترحيل
+            </button>
+        }
+        @if (CanReverse && OnReverse.HasDelegate)
+        {
+            <button type="button" class="btn btn-sm btn-outline-danger" @onclick="OnReverse">
+                <i class="fa-solid fa-arrow-rotate-left" aria-hidden="true"></i> عكس القيد
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string EntryNumber { get; set; } = string.Empty;
+    [Parameter] public string DateText { get; set; } = string.Empty;
+    [Parameter] public string EntryTypeText { get; set; } = string.Empty;
+    [Parameter] public string Description { get; set; } = string.Empty;
+    [Parameter] public decimal TotalDebit { get; set; }
+    [Parameter] public decimal TotalCredit { get; set; }
+    [Parameter] public bool IsBalanced { get; set; } = true;
+    [Parameter] public string StatusText { get; set; } = string.Empty;
+    [Parameter] public string StatusState { get; set; } = "draft";
+    [Parameter] public bool CanPost { get; set; }
+    [Parameter] public bool CanReverse { get; set; }
+    [Parameter] public EventCallback OnView { get; set; }
+    [Parameter] public EventCallback OnPost { get; set; }
+    [Parameter] public EventCallback OnReverse { get; set; }
+}
