@@ -6,91 +6,125 @@
 @using OAS.UiLib.Components.Inputs
 @using OAS.UiLib.Core.Models
 
-<div class="ui-acc-editor" dir="rtl">
+<UiAccountingEditorSurface>
     <UiAccountingFormSection Title="بيانات الفترة المالية"
                              Subtitle="رقم الفترة، المسمى، ونطاق التاريخ"
                              IconCssClass="fa-solid fa-calendar-week">
-        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+        <UiAccountingFormGrid Columns="2">
+            <UiLookup Label="السنة المالية"
+                      Value='@(Model.FiscalYearId == Guid.Empty ? null : Model.FiscalYearId.ToString("D"))'
+                      ValueChanged="OnFiscalYearChanged"
+                      SelectedItem="@FiscalYearLookupItem"
+                      SearchAsync="FiscalYearSearchAsync"
+                      Placeholder="اختر السنة المالية..."
+                      Required="true"
+                      Disabled="@(!CanEditIdentity)"
+                      MinimumSearchLength="0"
+                      DebounceMilliseconds="250" />
+
             <UiInputText Label="اسم الفترة (مثال: يناير 2026)"
                          Value="@Model.Name"
                          ValueChanged="@(v => { Model.Name = v; OnChanged(); })"
                          Required="true"
-                         Disabled="@(!IsEditable)"
+                         Disabled="@(!CanEditDetails)"
                          Size="ControlSize.Small" />
 
             <UiInputText Label="رقم الفترة (1-12)"
-                         Value="@Model.PeriodNumber.ToString()"
-                         ReadOnly="true"
-                         Disabled="true"
+                         Value="@Model.PeriodNumberText"
+                         ValueChanged="OnPeriodNumberChanged"
+                         ReadOnly="@(!IsNew)"
+                         Disabled="@(!CanEditIdentity)"
                          Size="ControlSize.Small" />
 
             <UiInputDate Label="تاريخ البداية"
                          Value="@Model.StartDate"
                          ValueChanged="@(v => { if (v.HasValue) { Model.StartDate = v.Value; OnChanged(); } })"
                          Required="true"
-                         Disabled="@(!IsEditable)"
+                         Disabled="@(!CanEditDetails)"
                          Size="ControlSize.Small" />
 
             <UiInputDate Label="تاريخ النهاية"
                          Value="@Model.EndDate"
                          ValueChanged="@(v => { if (v.HasValue) { Model.EndDate = v.Value; OnChanged(); } })"
                          Required="true"
-                         Disabled="@(!IsEditable)"
+                         Disabled="@(!CanEditDetails)"
                          Size="ControlSize.Small" />
-        </div>
+        </UiAccountingFormGrid>
     </UiAccountingFormSection>
 
     <UiAccountingFormSection Title="حالة الفترة وأقفال الوحدات التشغيلية"
                              Subtitle="التحكم في إمكانية إجراء العمليات المحاسبية والمخزنية والمبيعات"
                              IconCssClass="fa-solid fa-shield-halved">
-        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+        <UiAccountingFormGrid Columns="2">
             <UiSelect Label="حالة الفترة"
                       Value="@Model.Status.ToString()"
                       ValueChanged="OnStatusChanged"
                       Options="@AccountingArabicPresenter.FiscalPeriodStatusOptions"
-                      Disabled="@(!IsEditable)"
+                      Disabled="@(!CanEditWorkflow)"
                       Size="ControlSize.Small" />
-        </div>
+        </UiAccountingFormGrid>
 
-        <div class="ui-acc-checks-group mt-3">
+        <UiAccountingCheckGroup>
             <UiCheckbox Label="قفل المبيعات (منع ترحيل فواتير المبيعات)"
                         Value="@Model.SalesLocked"
                         ValueChanged="@(v => { Model.SalesLocked = v; OnChanged(); })"
-                        Disabled="@(!IsEditable)" />
+                        Disabled="@(!CanEditLocks)" />
 
             <UiCheckbox Label="قفل المخزون (منع حركات الجرد والتحويل)"
                         Value="@Model.InventoryLocked"
                         ValueChanged="@(v => { Model.InventoryLocked = v; OnChanged(); })"
-                        Disabled="@(!IsEditable)" />
+                        Disabled="@(!CanEditLocks)" />
 
             <UiCheckbox Label="قفل المحاسبة (منع القيود اليومية والتسويات)"
                         Value="@Model.AccountingLocked"
                         ValueChanged="@(v => { Model.AccountingLocked = v; OnChanged(); })"
-                        Disabled="@(!IsEditable)" />
-        </div>
+                        Disabled="@(!CanEditLocks)" />
+        </UiAccountingCheckGroup>
     </UiAccountingFormSection>
-</div>
+</UiAccountingEditorSurface>
 
 @code {
     public sealed class FormModel
     {
         public Guid FiscalYearId { get; set; }
         public int PeriodNumber { get; set; } = 1;
+        public string PeriodNumberText { get => PeriodNumber.ToString(); set { if (int.TryParse(value, out var number)) PeriodNumber = Math.Clamp(number, 1, 255); } }
         public string Name { get; set; } = string.Empty;
         public DateOnly StartDate { get; set; }
         public DateOnly EndDate { get; set; }
         public FiscalPeriodStatus Status { get; set; } = FiscalPeriodStatus.Open;
+        public FiscalPeriodStatus OriginalStatus { get; set; } = FiscalPeriodStatus.Open;
         public bool SalesLocked { get; set; }
         public bool InventoryLocked { get; set; }
         public bool AccountingLocked { get; set; }
+        public string RowVersion { get; set; } = string.Empty;
     }
 
     [Parameter] public FormModel Model { get; set; } = new();
     [Parameter] public bool IsEditable { get; set; }
-    [Parameter] public string? RowVersion { get; set; }
+    [Parameter] public bool IsNew { get; set; }
+    [Parameter] public UiLookupItem? FiscalYearLookupItem { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? FiscalYearSearchAsync { get; set; }
     [Parameter] public EventCallback OnModelChanged { get; set; }
 
+    private bool CanEditIdentity => IsEditable && IsNew;
+    private bool CanEditDetails => IsEditable && (IsNew || Model.OriginalStatus == FiscalPeriodStatus.Open);
+    private bool CanEditWorkflow => IsEditable && Model.OriginalStatus != FiscalPeriodStatus.Closed;
+    private bool CanEditLocks => IsEditable && Model.OriginalStatus != FiscalPeriodStatus.Closed;
+
     private void OnChanged() => OnModelChanged.InvokeAsync();
+
+    private void OnFiscalYearChanged(string? value)
+    {
+        Model.FiscalYearId = Guid.TryParse(value, out var id) ? id : Guid.Empty;
+        OnChanged();
+    }
+
+    private void OnPeriodNumberChanged(string? value)
+    {
+        Model.PeriodNumberText = value ?? string.Empty;
+        OnChanged();
+    }
 
     private void OnStatusChanged(string val)
     {

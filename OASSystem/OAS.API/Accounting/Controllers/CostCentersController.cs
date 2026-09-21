@@ -21,8 +21,10 @@ public sealed class CostCentersController(ISender sender) : ControllerBase
     [HttpGet]
     public async Task<ActionResult<PagedResult<CostCenterDto>>> Get(
         [FromQuery] PageRequest request,
+        [FromQuery(Name = "searchTerm")] string? searchTerm,
         CancellationToken cancellationToken)
     {
+        request = AccountingPageRequestCompatibility.Apply(request, searchTerm);
         var result = await sender.Send(new GetCostCentersQuery(request), cancellationToken);
         return Ok(result);
     }
@@ -58,12 +60,13 @@ public sealed class CostCentersController(ISender sender) : ControllerBase
     }
 
     [HttpPost("{id:guid}/status")]
-    public async Task<IActionResult> SetStatus(
+    public async Task<ActionResult<CostCenterDto>> SetStatus(
         Guid id,
         [FromBody] SetCostCenterStatusRequest request,
         CancellationToken cancellationToken)
     {
         await sender.Send(new SetCostCenterStatusCommand(id, request), cancellationToken);
-        return NoContent();
+        var dto = await sender.Send(new GetCostCenterByIdQuery(id), cancellationToken);
+        return Ok(dto);
     }
 }

@@ -4,11 +4,11 @@
 @using OAS.UiLib.Components.Inputs
 @using OAS.UiLib.Core.Models
 
-<div class="ui-acc-editor" dir="rtl">
+<UiAccountingEditorSurface>
     <UiAccountingFormSection Title="بيانات نوع وبند المصروف"
                              Subtitle="الرمز، التسمية، والحساب المحاسبي الافتراضي المرتبط"
                              IconCssClass="fa-solid fa-tags">
-        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+        <UiAccountingFormGrid Columns="2">
             <UiInputText Label="كود نوع المصروف"
                          Value="@Model.Code"
                          ValueChanged="@(v => { Model.Code = v; OnChanged(); })"
@@ -33,7 +33,7 @@
                          Size="ControlSize.Small" />
 
             <UiLookup Label="الحساب المحاسبي الافتراضي للمصروف"
-                      Value="@Model.DefaultExpenseAccountId?.ToString("D")"
+                      Value='@Model.DefaultExpenseAccountId?.ToString("D")'
                       ValueChanged="OnAccountChanged"
                       SelectedItem="@AccountLookupItem"
                       SearchAsync="AccountSearchAsync"
@@ -42,15 +42,15 @@
                       MinimumSearchLength="0"
                       DebounceMilliseconds="250" />
 
-            <div class="ui-acc-checks-group d-flex align-items-center mt-4">
+            <UiAccountingCheckGroup>
                 <UiCheckbox Label="نوع المصروف نشط"
                             Value="@Model.IsActive"
                             ValueChanged="@(v => { Model.IsActive = v; OnChanged(); })"
                             Disabled="@(!IsEditable)" />
-            </div>
-        </div>
+            </UiAccountingCheckGroup>
+        </UiAccountingFormGrid>
     </UiAccountingFormSection>
-</div>
+</UiAccountingEditorSurface>
 
 @code {
     public sealed class FormModel
@@ -60,6 +60,7 @@
         public string? NameEn { get; set; }
         public Guid? DefaultExpenseAccountId { get; set; }
         public bool IsActive { get; set; } = true;
+        public string RowVersion { get; set; } = string.Empty;
     }
 
     [Parameter] public FormModel Model { get; set; } = new();

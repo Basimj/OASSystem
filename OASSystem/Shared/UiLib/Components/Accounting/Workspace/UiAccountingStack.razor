@@ -1,0 +1,9 @@
+@namespace OAS.UiLib.Components.Accounting.Workspace
+
+<div class="ui-acc-stack">
+    @ChildContent
+</div>
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

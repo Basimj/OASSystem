@@ -5,19 +5,19 @@
    ========================================================================== */
 
 :root {
-    --oas-acc-primary: #1e3a8a;
-    --oas-acc-primary-rgb: 30, 58, 138;
-    --oas-acc-primary-light: #3b82f6;
+    --oas-acc-primary: var(--oas-color-primary, #5A2DD6);
+    --oas-acc-primary-rgb: 90, 45, 214;
+    --oas-acc-primary-light: var(--oas-color-primary-hover, #4E25C4);
     --oas-acc-debit: #059669;
     --oas-acc-debit-bg: #ecfdf5;
     --oas-acc-credit: #dc2626;
     --oas-acc-credit-bg: #fef2f2;
     --oas-acc-balance: #4f46e5;
-    --oas-acc-card-bg: #ffffff;
-    --oas-acc-card-border: #e2e8f0;
-    --oas-acc-card-hover-border: #cbd5e1;
-    --oas-acc-muted: #64748b;
-    --oas-acc-surface-bg: #f8fafc;
+    --oas-acc-card-bg: var(--oas-color-surface, #ffffff);
+    --oas-acc-card-border: var(--oas-color-border, #e7e5ef);
+    --oas-acc-card-hover-border: var(--oas-color-primary-border, #d9ccff);
+    --oas-acc-muted: var(--oas-color-text-muted, #77758c);
+    --oas-acc-surface-bg: var(--oas-color-background, #fbfbfd);
 }
 
 /* Workspace container */
@@ -81,7 +81,7 @@
     justify-content: center;
     border-radius: 0.5rem;
     font-size: 1.25rem;
-    background: rgba(30, 58, 138, 0.08);
+    background: var(--oas-color-primary-soft, #f4f0ff);
     color: var(--oas-acc-primary);
 }
 
@@ -318,7 +318,7 @@
     width: 48px;
     height: 48px;
     border-radius: 0.5rem;
-    background: #eff6ff;
+    background: var(--oas-color-primary-soft, #f4f0ff);
     color: var(--oas-acc-primary);
     display: flex;
     align-items: center;
@@ -486,3 +486,121 @@
     }
 }
 
+
+/* Accounting presentation primitives — aligned with the global OAS identity */
+.ui-acc-editor {
+    display: flex;
+    flex-direction: column;
+    gap: var(--oas-space-3, .75rem);
+}
+
+.ui-acc-stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--oas-space-3, .75rem);
+}
+
+.ui-acc-clickable-surface {
+    border-radius: var(--oas-radius-lg, .5rem);
+    cursor: pointer;
+    outline: none;
+}
+
+.ui-acc-clickable-surface:focus-visible {
+    box-shadow: 0 0 0 2px var(--oas-color-primary-border, #d9ccff);
+}
+
+.ui-acc-number-field,
+.ui-acc-readonly-field {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: .35rem;
+}
+
+.ui-acc-number-field__label,
+.ui-acc-readonly-field__label {
+    color: var(--oas-color-text, #27263b);
+    font-size: .78rem;
+    font-weight: 700;
+}
+
+.ui-acc-number-field__input,
+.ui-acc-readonly-field__value {
+    width: 100%;
+    min-height: 2.15rem;
+    border: 1px solid var(--oas-color-border, #e7e5ef);
+    border-radius: var(--oas-radius-md, .375rem);
+    background: var(--oas-color-surface, #fff);
+    color: var(--oas-color-text, #27263b);
+    padding: .45rem .65rem;
+    font: inherit;
+    text-align: start;
+}
+
+.ui-acc-number-field__input:focus {
+    border-color: var(--oas-color-primary, #5A2DD6);
+    box-shadow: 0 0 0 2px var(--oas-color-primary-soft, #f4f0ff);
+    outline: none;
+}
+
+.ui-acc-number-field__input:disabled,
+.ui-acc-readonly-field__value {
+    background: var(--oas-color-disabled-surface, #f4f4f5);
+    color: var(--oas-color-text-muted, #77758c);
+}
+
+.ui-acc-number-field__input--primary,
+.ui-acc-readonly-field__value--primary { color: var(--oas-color-primary, #5A2DD6); font-weight: 750; }
+.ui-acc-number-field__input--success,
+.ui-acc-readonly-field__value--success { color: var(--oas-color-success, #067647); font-weight: 750; }
+.ui-acc-number-field__input--danger,
+.ui-acc-readonly-field__value--danger { color: var(--oas-color-danger, #d92d20); font-weight: 750; }
+.ui-acc-number-field__hint { color: var(--oas-color-text-muted, #77758c); font-size: .72rem; }
+
+.ui-acc-empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .75rem;
+    min-height: 7rem;
+    border: 1px dashed var(--oas-color-border, #e7e5ef);
+    border-radius: var(--oas-radius-lg, .5rem);
+    background: var(--oas-color-subtle, #fafafa);
+    color: var(--oas-color-text-muted, #77758c);
+    padding: 1rem;
+    text-align: right;
+}
+
+.ui-acc-empty-state > i { color: var(--oas-color-primary, #5A2DD6); font-size: 1.35rem; }
+.ui-acc-empty-state__content { display: flex; flex-direction: column; gap: .2rem; }
+.ui-acc-empty-state__content strong { color: var(--oas-color-text, #27263b); font-size: .88rem; }
+.ui-acc-empty-state__content span { font-size: .78rem; }
+
+.ui-acc-lines-editor__actions {
+    display: flex;
+    justify-content: flex-start;
+    padding-top: .65rem;
+}
+
+.ui-acc-grid-table__clickable-row { cursor: pointer; }
+.ui-acc-grid-table__clickable-row:focus-within,
+.ui-acc-grid-table__clickable-row:hover { background: var(--oas-color-hover, #f7f4ff); }
+
+.ui-acc-status-action-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    padding: .7rem .85rem;
+    border: 1px solid var(--oas-color-border, #e7e5ef);
+    border-radius: var(--oas-radius-lg, .5rem);
+    background: var(--oas-color-subtle, #fafafa);
+}
+.ui-acc-status-action-bar__status,
+.ui-acc-status-action-bar__actions { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.ui-acc-status-action-bar__label { color: var(--oas-color-text, #27263b); font-size: .8rem; font-weight: 750; }
+@media (max-width: 640px) { .ui-acc-status-action-bar { align-items: flex-start; flex-direction: column; } }
+
+/* Unified accounting record lists */
+.ui-acc-record-list{display:flex;flex-direction:column;gap:8px}.ui-acc-record-row{width:100%;display:grid;grid-template-columns:42px minmax(0,1fr) auto;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--oas-acc-card-border);border-radius:10px;background:var(--oas-acc-card-bg);color:var(--oas-color-text,#2f2d3a);font-family:inherit;text-align:start;cursor:pointer;transition:border-color .14s ease,box-shadow .14s ease,transform .14s ease,background .14s ease}.ui-acc-record-row:hover{border-color:var(--oas-color-primary-border);background:var(--oas-color-primary-soft);box-shadow:0 6px 18px rgba(47,37,86,.08);transform:translateY(-1px)}.ui-acc-record-row:focus-visible{outline:0;border-color:var(--oas-color-primary);box-shadow:0 0 0 3px var(--oas-color-primary-soft)}.ui-acc-record-row__icon{width:38px;height:38px;display:inline-flex;align-items:center;justify-content:center;border-radius:9px;background:var(--oas-color-primary-soft);color:var(--oas-color-primary);font-size:14px}.ui-acc-record-row__content{min-width:0;display:flex;flex-direction:column;gap:7px}.ui-acc-record-row__heading{min-width:0;display:flex;align-items:baseline;gap:7px;flex-wrap:wrap}.ui-acc-record-row__heading strong{font-size:12px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ui-acc-record-row__heading small{color:var(--oas-acc-muted);font-size:9.5px}.ui-acc-record-row__details{display:flex;align-items:center;gap:8px 18px;flex-wrap:wrap}.ui-acc-record-detail{display:inline-flex;align-items:center;gap:4px}.ui-acc-record-detail small{color:var(--oas-acc-muted);font-size:8.5px}.ui-acc-record-detail strong{font-size:9.5px;font-weight:700}.ui-acc-record-row__status{display:flex;align-items:center;gap:8px}.ui-acc-record-row__chevron{color:var(--oas-acc-muted);font-size:9px}@media(max-width:680px){.ui-acc-record-row{grid-template-columns:34px minmax(0,1fr)}.ui-acc-record-row__icon{width:32px;height:32px}.ui-acc-record-row__status{grid-column:2;justify-content:flex-start}.ui-acc-record-row__details{gap:5px 10px}}
