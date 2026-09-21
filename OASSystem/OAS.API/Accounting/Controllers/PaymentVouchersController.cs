@@ -21,8 +21,10 @@ public sealed class PaymentVouchersController(ISender sender) : ControllerBase
     [HttpGet]
     public async Task<ActionResult<PagedResult<PaymentVoucherDto>>> Get(
         [FromQuery] PageRequest request,
+        [FromQuery(Name = "searchTerm")] string? searchTerm,
         CancellationToken cancellationToken)
     {
+        request = AccountingPageRequestCompatibility.Apply(request, searchTerm);
         var result = await sender.Send(new GetPaymentVouchersQuery(request), cancellationToken);
         return Ok(result);
     }
@@ -58,12 +60,13 @@ public sealed class PaymentVouchersController(ISender sender) : ControllerBase
     }
 
     [HttpPost("{id:guid}/status")]
-    public async Task<IActionResult> SetStatus(
+    public async Task<ActionResult<PaymentVoucherDto>> SetStatus(
         Guid id,
         [FromBody] SetPaymentVoucherStatusRequest request,
         CancellationToken cancellationToken)
     {
         await sender.Send(new SetPaymentVoucherStatusCommand(id, request), cancellationToken);
-        return NoContent();
+        var dto = await sender.Send(new GetPaymentVoucherByIdQuery(id), cancellationToken);
+        return Ok(dto);
     }
 }

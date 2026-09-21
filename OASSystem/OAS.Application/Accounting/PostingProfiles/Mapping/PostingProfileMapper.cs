@@ -48,22 +48,16 @@ public sealed class PostingProfileMapper
             source.DocumentType);
 
         destination.SetActive(source.IsActive);
-
-        if (source.Lines is not null)
-        {
-            var lines = source.Lines.Select(l => PostingProfileLine.Create(
-                Guid.NewGuid(),
-                destination.Id,
-                l.AccountRole,
-                l.AccountId,
-                l.IsRequired)).ToList();
-            destination.ReplaceLines(lines);
-        }
     }
 
     public PostingProfileDto ToRead(PostingProfile source)
+        => ToRead(source, source.Lines);
+
+    public PostingProfileDto ToRead(
+        PostingProfile source,
+        IEnumerable<PostingProfileLine> sourceLines)
     {
-        var lines = source.Lines
+        var lines = sourceLines
             .Select(l => new PostingProfileLineDto(
                 l.Id,
                 l.PostingProfileId,
@@ -79,7 +73,7 @@ public sealed class PostingProfileMapper
             source.Module,
             source.DocumentType,
             source.IsActive,
-            source.RowVersion is not null ? Convert.ToBase64String(source.RowVersion) : string.Empty,
+            Convert.ToBase64String(source.RowVersion),
             lines);
     }
 }

@@ -22,8 +22,10 @@ public sealed class JournalEntriesController(ISender sender) : ControllerBase
     [HttpGet]
     public async Task<ActionResult<PagedResult<JournalEntryDto>>> Get(
         [FromQuery] PageRequest request,
+        [FromQuery(Name = "searchTerm")] string? searchTerm,
         CancellationToken cancellationToken)
     {
+        request = AccountingPageRequestCompatibility.Apply(request, searchTerm);
         var result = await sender.Send(new GetJournalEntriesQuery(request), cancellationToken);
         return Ok(result);
     }

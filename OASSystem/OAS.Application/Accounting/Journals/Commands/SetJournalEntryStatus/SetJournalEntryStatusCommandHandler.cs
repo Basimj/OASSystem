@@ -1,15 +1,16 @@
 using MediatR;
 using OAS.Application.Abstractions.Persistence;
+using OAS.Application.Abstractions.Persistence.Specifications;
 using OAS.Application.Abstractions.Security;
 using OAS.Application.Common.Exceptions;
 using OAS.Domain.Accounting.Entities;
-using DomainJournalEntryStatus =
-    OAS.Domain.Accounting.Enums.JournalEntryStatus;
+using DomainJournalEntryStatus = OAS.Domain.Accounting.Enums.JournalEntryStatus;
 
 namespace OAS.Application.Accounting.Journals.Commands.SetJournalEntryStatus;
 
 public sealed class SetJournalEntryStatusCommandHandler(
     IRepository<JournalEntry, Guid> repository,
+    IReadRepository<JournalEntryLine, Guid> lineRepository,
     IReadRepository<FiscalPeriod, Guid> periodRepository,
     IReadRepository<Account, Guid> accountRepository,
     ICurrentUser currentUser,
@@ -20,34 +21,30 @@ public sealed class SetJournalEntryStatusCommandHandler(
         SetJournalEntryStatusCommand request,
         CancellationToken cancellationToken)
     {
-        var journal =
-            await repository.GetForUpdateAsync(
-                request.JournalEntryId,
-                cancellationToken);
-
+        var journal = await repository.GetForUpdateAsync(request.JournalEntryId, cancellationToken);
         if (journal is null)
-        {
-            throw new NotFoundException(
-                "journal_entry_not_found",
-                request.JournalEntryId);
-        }
+            throw new NotFoundException("journal_entry_not_found", request.JournalEntryId);
 
-        var requestedRowVersion =
-            Convert.FromBase64String(
-                request.Request.RowVersion);
-
+        var requestedRowVersion = Convert.FromBase64String(request.Request.RowVersion);
         if (!journal.RowVersion.SequenceEqual(requestedRowVersion))
-        {
-            throw new ConcurrencyException(
-                "The journal entry has been modified by another user.");
-        }
+            throw new ConcurrencyException("The journal entry has been modified by another user.");
 
         if (!Guid.TryParse(currentUser.UserId, out var userId))
             throw new ForbiddenException();
 
-        var status =
-            (DomainJournalEntryStatus)(int)request.Request.Status;
+        // The generic aggregate repository does not eager-load child rows. Hydrate the
+        // domain aggregate explicitly so balance/state rules operate on the real journal.
+        var lines = await lineRepository.ListAsync(
+            new Specification<JournalEntryLine>()
+                .Where(x => x.JournalEntryId == journal.Id)
+                .AddSort(nameof(JournalEntryLine.LineNumber), OAS.Contracts.Common.Pagination.SortDirection.Ascending)
+                .Tracking(),
+            cancellationToken);
 
+        foreach (var line in lines)
+            journal.AddLine(line);
+
+        var status = (DomainJournalEntryStatus)(int)request.Request.Status;
         var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
 
         switch (status)
@@ -57,22 +54,13 @@ public sealed class SetJournalEntryStatusCommandHandler(
                 break;
 
             case DomainJournalEntryStatus.Approved:
-                journal.Approve(
-                    userId,
-                    nowUtc);
+                journal.Approve(userId, nowUtc);
                 break;
 
             case DomainJournalEntryStatus.Posted:
-                var period = await periodRepository.GetByIdAsync(
-                    journal.FiscalPeriodId,
-                    cancellationToken);
-
+                var period = await periodRepository.GetByIdAsync(journal.FiscalPeriodId, cancellationToken);
                 if (period is null)
-                {
-                    throw new NotFoundException(
-                        nameof(FiscalPeriod),
-                        journal.FiscalPeriodId);
-                }
+                    throw new NotFoundException(nameof(FiscalPeriod), journal.FiscalPeriodId);
 
                 if (!period.CanPostAccounting())
                 {
@@ -82,19 +70,11 @@ public sealed class SetJournalEntryStatusCommandHandler(
                 }
 
                 var isManual = journal.JournalType == OAS.Domain.Accounting.Enums.JournalType.Manual;
-
                 foreach (var line in journal.Lines)
                 {
-                    var account = await accountRepository.GetByIdAsync(
-                        line.AccountId,
-                        cancellationToken);
-
+                    var account = await accountRepository.GetByIdAsync(line.AccountId, cancellationToken);
                     if (account is null)
-                    {
-                        throw new NotFoundException(
-                            nameof(Account),
-                            line.AccountId);
-                    }
+                        throw new NotFoundException(nameof(Account), line.AccountId);
 
                     if (!account.IsActive)
                     {
@@ -118,9 +98,7 @@ public sealed class SetJournalEntryStatusCommandHandler(
                     }
                 }
 
-                journal.Post(
-                    userId,
-                    nowUtc);
+                journal.Post(userId, nowUtc);
                 break;
 
             default:
@@ -129,7 +107,6 @@ public sealed class SetJournalEntryStatusCommandHandler(
         }
 
         repository.Update(journal);
-
         return journal.Id;
     }
 }

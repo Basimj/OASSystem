@@ -1,0 +1,37 @@
+@namespace OAS.UiLib.Components.Accounting.Vouchers
+
+<div class="table-responsive">
+    <table class="ui-acc-grid-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>مصدر السداد</th>
+                <th>المستند الهدف</th>
+                <th>المبلغ المخصص</th>
+                <th>تاريخ التخصيص</th>
+            </tr>
+        </thead>
+        <tbody>
+            @for (var i = 0; i < Items.Count; i++)
+            {
+                var item = Items[i];
+                <tr class="ui-acc-grid-table__clickable-row" @onclick="@(() => SelectAsync(item.Id))">
+                    <td>@(i + 1)</td>
+                    <td>@item.SourceText</td>
+                    <td>@item.TargetText</td>
+                    <td class="ui-acc-val--debit">@item.Amount.ToString("N2")</td>
+                    <td>@item.AllocatedAtText</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    public sealed record AllocationListItem(Guid Id, string SourceText, string TargetText, decimal Amount, string AllocatedAtText);
+
+    [Parameter] public IReadOnlyList<AllocationListItem> Items { get; set; } = [];
+    [Parameter] public EventCallback<Guid> OnSelect { get; set; }
+
+    private Task SelectAsync(Guid id) => OnSelect.InvokeAsync(id);
+}

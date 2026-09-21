@@ -4,13 +4,13 @@
 @using OAS.UiLib.Components.Inputs
 @using OAS.UiLib.Core.Models
 
-<div class="ui-acc-editor" dir="rtl">
+<UiAccountingEditorSurface>
 
     <UiAccountingFormSection Title="بيانات الصندوق / الخزينة النقدية"
                              Subtitle="الرمز، الاسم، وربطه بالحساب المحاسبي بدليل الحسابات"
                              IconCssClass="fa-solid fa-vault">
 
-        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+        <UiAccountingFormGrid Columns="2">
 
             <UiInputText Label="كود الصندوق"
                          Value="@Model.Code"
@@ -32,7 +32,7 @@
                          Size="ControlSize.Small" />
 
             <UiLookup Label="الحساب المحاسبي المرتبط"
-                      Value="@Model.AccountId?.ToString("D")"
+                      Value='@Model.AccountId?.ToString("D")'
                       ValueChanged="OnAccountChanged"
                       SelectedItem="@AccountLookupItem"
                       SearchAsync="AccountSearchAsync"
@@ -42,7 +42,7 @@
                       MinimumSearchLength="0"
                       DebounceMilliseconds="250" />
 
-            <div class="ui-acc-checks-group d-flex align-items-center gap-4 mt-4">
+            <UiAccountingCheckGroup>
 
                 <UiCheckbox Label="الصندوق الافتراضي للفرع"
                             Value="@Model.IsDefault"
@@ -54,13 +54,13 @@
                             ValueChanged="OnActiveChanged"
                             Disabled="@(!IsEditable)" />
 
-            </div>
+            </UiAccountingCheckGroup>
 
-        </div>
+        </UiAccountingFormGrid>
 
     </UiAccountingFormSection>
 
-</div>
+</UiAccountingEditorSurface>
 
 
 @code {
@@ -76,6 +76,8 @@
         public bool IsDefault { get; set; }
 
         public bool IsActive { get; set; } = true;
+
+        public string RowVersion { get; set; } = string.Empty;
     }
 
 

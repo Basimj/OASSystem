@@ -7,18 +7,11 @@
     }
     <input id="@InputId"
            type="date"
-           class="@InputCssClass"
+           class="ui-input-date__control ui-input-date__control--@SizeCss"
            value="@CurrentValueAsString"
            @onchange="HandleChange"
            disabled="@Disabled"
            readonly="@ReadOnly"
            required="@(Required && EnableNativeValidation)"
-           aria-required="@Required.ToString().ToLowerInvariant()"
-           aria-invalid="@AriaInvalid"
-           aria-describedby="@(HasError ? ErrorId : null)" />
-
-    @if (HasError)
-    {
-        <div id="@ErrorId" class="ui-input-date__error" role="alert">@ErrorText</div>
-    }
+           aria-required="@Required.ToString().ToLowerInvariant()" />
 </div>

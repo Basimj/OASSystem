@@ -1,0 +1,57 @@
+@namespace OAS.UiLib.Components.Accounting.Workspace
+@using System.Globalization
+
+<div class="ui-acc-number-field">
+    @if (!string.IsNullOrWhiteSpace(Label))
+    {
+        <label class="ui-acc-number-field__label">@Label</label>
+    }
+    <input type="number"
+           class="@InputCssClass"
+           value="@Value.ToString(CultureInfo.InvariantCulture)"
+           min="@Min"
+           step="@Step"
+           disabled="@Disabled"
+           @onchange="HandleChangeAsync" />
+    @if (!string.IsNullOrWhiteSpace(Hint))
+    {
+        <span class="ui-acc-number-field__hint">@Hint</span>
+    }
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = string.Empty;
+    [Parameter] public decimal Value { get; set; }
+    [Parameter] public EventCallback<decimal> ValueChanged { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string Step { get; set; } = "0.01";
+    [Parameter] public string Min { get; set; } = "0";
+    [Parameter] public string? Hint { get; set; }
+    [Parameter] public NumberTone Tone { get; set; }
+
+    private string InputCssClass => Tone switch
+    {
+        NumberTone.Success => "ui-acc-number-field__input ui-acc-number-field__input--success",
+        NumberTone.Danger => "ui-acc-number-field__input ui-acc-number-field__input--danger",
+        NumberTone.Primary => "ui-acc-number-field__input ui-acc-number-field__input--primary",
+        _ => "ui-acc-number-field__input"
+    };
+
+    private async Task HandleChangeAsync(ChangeEventArgs args)
+    {
+        var raw = args.Value?.ToString();
+        if (decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out var value) ||
+            decimal.TryParse(raw, NumberStyles.Number, CultureInfo.CurrentCulture, out value))
+        {
+            await ValueChanged.InvokeAsync(value);
+        }
+    }
+
+    public enum NumberTone
+    {
+        Default,
+        Primary,
+        Success,
+        Danger
+    }
+}

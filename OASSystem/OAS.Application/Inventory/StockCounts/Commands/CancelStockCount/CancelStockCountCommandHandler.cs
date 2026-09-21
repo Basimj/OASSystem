@@ -24,9 +24,6 @@ public sealed class CancelStockCountCommandHandler(
         if (stockCount.Status == StockCountStatus.Posted)
             throw new ConflictException("cannot_cancel_posted_count", "Cannot cancel a stock count that has already been posted.");
 
-        if (stockCount.Status == StockCountStatus.Cancelled)
-            throw new ConflictException("stock_count_already_cancelled", "Stock count has already been cancelled.");
-
         stockCount.Cancel();
         stockCountRepository.Update(stockCount);
 

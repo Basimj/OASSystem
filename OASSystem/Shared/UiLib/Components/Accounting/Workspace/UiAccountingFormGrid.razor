@@ -1,0 +1,21 @@
+@namespace OAS.UiLib.Components.Accounting.Workspace
+
+<div class="@CssClass">
+    @ChildContent
+</div>
+
+@code {
+    [Parameter] public int Columns { get; set; } = 2;
+    [Parameter] public string? AdditionalCssClass { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private string CssClass
+    {
+        get
+        {
+            var cols = Math.Clamp(Columns, 1, 4);
+            var core = cols == 1 ? "ui-acc-form-grid" : $"ui-acc-form-grid ui-acc-form-grid--{cols}col";
+            return string.IsNullOrWhiteSpace(AdditionalCssClass) ? core : $"{core} {AdditionalCssClass}";
+        }
+    }
+}

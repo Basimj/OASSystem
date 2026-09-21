@@ -1,10 +1,4 @@
-<div class="ui-checkbox-field">
-    <label class="ui-checkbox @(string.IsNullOrWhiteSpace(ErrorText) ? null : "ui-checkbox--error")">
-        <input type="checkbox" checked="@Value" disabled="@Disabled" @onchange="HandleChangedAsync" />
-        <span>@Label</span>
-    </label>
-    @if (!string.IsNullOrWhiteSpace(ErrorText))
-    {
-        <div class="ui-checkbox-field__error" role="alert">@ErrorText</div>
-    }
-</div>
+<label class="ui-checkbox">
+    <input type="checkbox" checked="@Value" disabled="@Disabled" @onchange="HandleChangedAsync" />
+    <span>@Label</span>
+</label>

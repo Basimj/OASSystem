@@ -1,4 +1,4 @@
-﻿using OAS.Application.CRUD.Mapping;
+using OAS.Application.CRUD.Mapping;
 using OAS.Contracts.Accounting.FiscalYears;
 using OAS.Domain.Accounting.Entities;
 using ContractFiscalYearStatus =
@@ -53,6 +53,6 @@ public sealed class FiscalYearMapper
                     TimeSpan.Zero)
                 : null,
             source.ClosedBy,
-            string.Empty);
+            Convert.ToBase64String(source.RowVersion));
     }
 }

@@ -1,0 +1,210 @@
+@namespace OAS.UiLib.Components.Accounting.Vouchers
+@using OAS.UiLib.Components.Accounting.Workspace
+
+<div class="ui-acc-lines-editor" dir="rtl">
+    <div class="table-responsive">
+        <table class="ui-acc-grid-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>الحساب المقابل</th>
+                    <th>المبلغ</th>
+                    <th>نوع المرجع</th>
+                    <th>معرف المرجع</th>
+                    <th>البيان</th>
+                    @if (IsEditable)
+                    {
+                        <th>إجراء</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @if (Lines.Count == 0)
+                {
+                    <tr>
+                        <td colspan="@(IsEditable ? 7 : 6)" class="text-center text-muted py-3">
+                            لا توجد أسطر. أضف حساباً مقابلاً ومبلغاً للسند.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @for (var i = 0; i < Lines.Count; i++)
+                    {
+                        var line = Lines[i];
+                        <tr>
+                            <td>@(i + 1)</td>
+                            <td>
+                                @if (IsEditable)
+                                {
+                                    <UiLookup Value='@line.AccountId?.ToString("D")'
+                                              ValueChanged="@(value => AccountChangedAsync(line, value))"
+                                              SelectedItem="@line.AccountLookupItem"
+                                              SearchAsync="AccountSearchAsync"
+                                              Placeholder="اختر الحساب المقابل..."
+                                              Required="true"
+                                              MinimumSearchLength="0"
+                                              DebounceMilliseconds="250" />
+                                }
+                                else
+                                {
+                                    <span>@(line.AccountLookupItem?.PrimaryText ?? line.AccountDisplay)</span>
+                                }
+                            </td>
+                            <td>
+                                @if (IsEditable)
+                                {
+                                    <UiAccountingNumberField Label=""
+                                                             Value="@line.Amount"
+                                                             ValueChanged="@(value => AmountChangedAsync(line, value))"
+                                                             Min="0.01"
+                                                             Tone="@UiAccountingNumberField.NumberTone.Primary" />
+                                }
+                                else
+                                {
+                                    <span class="ui-acc-val--debit">@line.Amount.ToString("N2")</span>
+                                }
+                            </td>
+                            <td>
+                                @if (IsEditable)
+                                {
+                                    <UiInputText Value="@line.ReferenceType"
+                                                 ValueChanged="@(value => ReferenceTypeChangedAsync(line, value))"
+                                                 Placeholder="اختياري" />
+                                }
+                                else
+                                {
+                                    <span>@(string.IsNullOrWhiteSpace(line.ReferenceType) ? "-" : line.ReferenceType)</span>
+                                }
+                            </td>
+                            <td>
+                                @if (IsEditable)
+                                {
+                                    <UiInputText Value="@line.ReferenceIdText"
+                                                 ValueChanged="@(value => ReferenceIdChangedAsync(line, value))"
+                                                 Placeholder="GUID اختياري" />
+                                }
+                                else
+                                {
+                                    <span>@(line.ReferenceId?.ToString("D") ?? "-")</span>
+                                }
+                            </td>
+                            <td>
+                                @if (IsEditable)
+                                {
+                                    <UiInputText Value="@line.Description"
+                                                 ValueChanged="@(value => DescriptionChangedAsync(line, value))"
+                                                 Placeholder="بيان السطر..." />
+                                }
+                                else
+                                {
+                                    <span>@(string.IsNullOrWhiteSpace(line.Description) ? "-" : line.Description)</span>
+                                }
+                            </td>
+                            @if (IsEditable)
+                            {
+                                <td>
+                                    <UiButton Text=""
+                                              IconCssClass="fa-solid fa-trash-can"
+                                              Variant="ButtonVariant.Ghost"
+                                              Size="ControlSize.Small"
+                                              OnClick="@(() => RemoveAsync(line))" />
+                                </td>
+                            }
+                        </tr>
+                    }
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="2"><strong>إجمالي الأسطر</strong></td>
+                    <td class="ui-acc-val--debit">@Lines.Sum(x => x.Amount).ToString("N2")</td>
+                    <td colspan="@(IsEditable ? 4 : 3)"></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    @if (IsEditable)
+    {
+        <div class="ui-acc-lines-editor__actions">
+            <UiButton Text="إضافة سطر"
+                      IconCssClass="fa-solid fa-plus"
+                      Variant="ButtonVariant.Secondary"
+                      Size="ControlSize.Small"
+                      OnClick="AddAsync" />
+        </div>
+    }
+</div>
+
+@code {
+    public sealed class EditableVoucherLine
+    {
+        public Guid? AccountId { get; set; }
+        public string AccountDisplay { get; set; } = string.Empty;
+        public UiLookupItem? AccountLookupItem { get; set; }
+        public decimal Amount { get; set; }
+        public string? ReferenceType { get; set; }
+        public Guid? ReferenceId { get; set; }
+        public string? Description { get; set; }
+        public string ReferenceIdText
+        {
+            get => ReferenceId?.ToString("D") ?? string.Empty;
+            set => ReferenceId = Guid.TryParse(value, out var id) ? id : null;
+        }
+    }
+
+    [Parameter] public List<EditableVoucherLine> Lines { get; set; } = [];
+    [Parameter] public bool IsEditable { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? AccountSearchAsync { get; set; }
+    [Parameter] public EventCallback OnLinesChanged { get; set; }
+
+    private async Task AddAsync()
+    {
+        Lines.Add(new EditableVoucherLine());
+        await OnLinesChanged.InvokeAsync();
+    }
+
+    private async Task RemoveAsync(EditableVoucherLine line)
+    {
+        Lines.Remove(line);
+        await OnLinesChanged.InvokeAsync();
+    }
+
+    private async Task AccountChangedAsync(EditableVoucherLine line, string? value)
+    {
+        line.AccountId = Guid.TryParse(value, out var id) ? id : null;
+        if (line.AccountId is Guid accountId && AccountSearchAsync is not null)
+        {
+            var items = await AccountSearchAsync(string.Empty, CancellationToken.None);
+            line.AccountLookupItem = items.FirstOrDefault(x => string.Equals(x.Value, accountId.ToString("D"), StringComparison.OrdinalIgnoreCase));
+            if (line.AccountLookupItem is not null)
+                line.AccountDisplay = line.AccountLookupItem.PrimaryText;
+        }
+        await OnLinesChanged.InvokeAsync();
+    }
+
+    private async Task AmountChangedAsync(EditableVoucherLine line, decimal value)
+    {
+        line.Amount = value;
+        await OnLinesChanged.InvokeAsync();
+    }
+
+    private async Task ReferenceTypeChangedAsync(EditableVoucherLine line, string? value)
+    {
+        line.ReferenceType = value;
+        await OnLinesChanged.InvokeAsync();
+    }
+
+    private async Task ReferenceIdChangedAsync(EditableVoucherLine line, string? value)
+    {
+        line.ReferenceIdText = value ?? string.Empty;
+        await OnLinesChanged.InvokeAsync();
+    }
+
+    private async Task DescriptionChangedAsync(EditableVoucherLine line, string? value)
+    {
+        line.Description = value;
+        await OnLinesChanged.InvokeAsync();
+    }
+}

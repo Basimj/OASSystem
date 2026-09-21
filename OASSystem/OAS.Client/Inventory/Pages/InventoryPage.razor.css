@@ -1,2 +1,26 @@
 .inventory-balance__filters { display: flex; gap: .75rem; align-items: end; min-width: 15rem; }
-.inventory-balance__actions { display: flex; flex-wrap: wrap; gap: .25rem; }
+.inventory-balance__header,
+.inventory-balance__row {
+    display: grid;
+    grid-template-columns: minmax(10rem,1.5fr) minmax(10rem,1.4fr) minmax(8rem,1fr) .7fr .7fr .7fr .7fr .9fr .9fr minmax(7rem,.8fr);
+    gap: .65rem;
+    align-items: center;
+}
+.inventory-balance__header { padding: .55rem .75rem; font-size: .78rem; font-weight: 700; }
+.inventory-balance__rows { display: grid; }
+.inventory-balance__row { padding: .7rem .75rem; border-top: 1px solid var(--ui-border-color, #e3e7ee); }
+.inventory-balance__product { min-width: 0; display: grid; gap: .12rem; }
+.inventory-balance__product strong, .inventory-balance__product span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inventory-balance__product span { font-size: .78rem; opacity: .7; }
+.inventory-balance__actions { display: flex; flex-wrap: wrap; gap: .3rem; }
+.inventory-balance__actions button {
+    border: 1px solid var(--ui-border-color, #d8dee8); background: transparent; color: inherit;
+    border-radius: .4rem; padding: .28rem .45rem; cursor: pointer; font: inherit; font-size: .76rem;
+}
+.inventory-balance__actions button:hover { background: var(--ui-surface-hover, #f6f8fb); }
+@media (max-width: 1200px) {
+    .inventory-balance__header, .inventory-balance__row { grid-template-columns: minmax(10rem,1.6fr) minmax(9rem,1.3fr) minmax(8rem,1fr) .7fr .7fr .7fr minmax(7rem,.8fr); }
+    .inventory-balance__header span:nth-child(7), .inventory-balance__row > span:nth-child(7),
+    .inventory-balance__header span:nth-child(8), .inventory-balance__row > span:nth-child(8),
+    .inventory-balance__header span:nth-child(9), .inventory-balance__row > strong:nth-child(9) { display: none; }
+}

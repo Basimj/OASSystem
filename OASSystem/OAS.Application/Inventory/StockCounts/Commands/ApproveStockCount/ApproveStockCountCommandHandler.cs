@@ -27,14 +27,7 @@ public sealed class ApproveStockCountCommandHandler(
         if (stockCount.Status != StockCountStatus.Review)
             throw new ConflictException("invalid_status_transition", $"Cannot approve stock count from status '{stockCount.Status}'.");
 
-        var lines = await stockCountRepository.GetLinesAsync(command.StockCountId, cancellationToken);
-        if (lines.Count == 0)
-            throw new ConflictException("stock_count_has_no_lines", "Cannot approve a stock count without lines.");
-
-        if (lines.Any(x => !x.CountedAtUtc.HasValue))
-            throw new ConflictException("stock_count_incomplete_lines", "All stock count lines must be counted before approval.");
-
-        var nowUtc = timeProvider.GetUtcNow();
+        var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
         var userId = currentUser.UserId ?? "system";
 
         stockCount.Approve(nowUtc, userId);

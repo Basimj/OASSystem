@@ -21,8 +21,10 @@ public sealed class FiscalYearsController(ISender sender) : ControllerBase
     [HttpGet]
     public async Task<ActionResult<PagedResult<FiscalYearDto>>> Get(
         [FromQuery] PageRequest request,
+        [FromQuery(Name = "searchTerm")] string? searchTerm,
         CancellationToken cancellationToken)
     {
+        request = AccountingPageRequestCompatibility.Apply(request, searchTerm);
         var result = await sender.Send(new GetFiscalYearsQuery(request), cancellationToken);
         return Ok(result);
     }
@@ -58,12 +60,13 @@ public sealed class FiscalYearsController(ISender sender) : ControllerBase
     }
 
     [HttpPost("{id:guid}/status")]
-    public async Task<IActionResult> SetStatus(
+    public async Task<ActionResult<FiscalYearDto>> SetStatus(
         Guid id,
         [FromBody] SetFiscalYearStatusRequest request,
         CancellationToken cancellationToken)
     {
         await sender.Send(new SetFiscalYearStatusCommand(id, request), cancellationToken);
-        return NoContent();
+        var dto = await sender.Send(new GetFiscalYearByIdQuery(id), cancellationToken);
+        return Ok(dto);
     }
 }

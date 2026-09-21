@@ -1,4 +1,4 @@
-
+using System.Linq.Expressions;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
@@ -8,39 +8,55 @@ namespace OAS.UiLib.Components.Inputs;
 
 public partial class UiInputText
 {
+    private readonly string _generatedInputId =
+        $"oas-input-{Guid.NewGuid():N}";
+
     private ElementReference _inputElement;
-    [Parameter] public string? Id { get; set; }
 
-    [Parameter] public string Type { get; set; } = "text";
+    [Parameter]
+    public string? Id { get; set; }
 
-    [Parameter] public string? Label { get; set; }
+    [Parameter]
+    public string Type { get; set; } = "text";
 
-    [Parameter] public string? LabelResourceKey { get; set; }
+    [Parameter]
+    public string? Label { get; set; }
 
-    [Parameter] public string? Placeholder { get; set; }
+    [Parameter]
+    public string? LabelResourceKey { get; set; }
 
-    [Parameter] public string? PlaceholderResourceKey { get; set; }
+    [Parameter]
+    public string? Placeholder { get; set; }
 
-    [Parameter] public string? ErrorText { get; set; }
+    [Parameter]
+    public string? PlaceholderResourceKey { get; set; }
 
-    [Parameter] public bool Required { get; set; }
+    [Parameter]
+    public bool Required { get; set; }
 
-    [Parameter] public bool EnableNativeValidation { get; set; } = true;
+    [Parameter]
+    public bool EnableNativeValidation { get; set; } = true;
 
-    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter]
+    public bool ReadOnly { get; set; }
 
-    [Parameter] public bool Disabled { get; set; }
+    [Parameter]
+    public bool Disabled { get; set; }
 
-    [Parameter] public int? MaxLength { get; set; }
+    [Parameter]
+    public int? MaxLength { get; set; }
 
-    [Parameter] public string? AutoComplete { get; set; }
+    [Parameter]
+    public string? AutoComplete { get; set; }
 
-    [Parameter] public string? InputMode { get; set; }
+    [Parameter]
+    public string? InputMode { get; set; }
 
     [Parameter]
     public bool ShowValidationMessage { get; set; } = true;
 
-    [Parameter] public bool RevealPassword { get; set; }
+    [Parameter]
+    public bool RevealPassword { get; set; }
 
     [Parameter]
     public ControlSize Size { get; set; } = ControlSize.Medium;
@@ -49,6 +65,20 @@ public partial class UiInputText
     private EditContext? EditContext { get; set; }
 
     private bool _passwordRevealed;
+
+    public override Task SetParametersAsync(
+        ParameterView parameters)
+    {
+        if (!parameters.TryGetValue<Expression<Func<string?>>>(
+                nameof(ValueExpression),
+                out var valueExpression) ||
+            valueExpression is null)
+        {
+            ValueExpression = () => Value;
+        }
+
+        return base.SetParametersAsync(parameters);
+    }
 
     private bool CanRevealPassword =>
         RevealPassword &&
@@ -69,7 +99,7 @@ public partial class UiInputText
 
     private string InputId =>
         string.IsNullOrWhiteSpace(Id)
-            ? $"oas-input-{FieldIdentifier.FieldName}"
+            ? _generatedInputId
             : Id;
 
     private string ResolvedPlaceholder =>
@@ -77,15 +107,10 @@ public partial class UiInputText
             ? L[PlaceholderResourceKey].Value
             : Placeholder ?? string.Empty;
 
-    private bool HasError => !string.IsNullOrWhiteSpace(ErrorText);
-    private string ErrorId => $"{InputId}-error";
-    private string? AriaInvalid => HasError ? "true" : null;
-
     private string InputCssClass =>
         $"ui-input-text__control " +
         $"ui-input-text__control--{Size.ToString().ToLowerInvariant()} " +
         $"{(CanRevealPassword ? "ui-input-text__control--reveal" : null)} " +
-        $"{(HasError ? "ui-input-text__control--invalid" : null)} " +
         $"{CssClass}"
         .Trim();
 
@@ -127,9 +152,13 @@ public partial class UiInputText
         return true;
     }
 
-    public ValueTask FocusAsync() => _inputElement.FocusAsync();
+    public ValueTask FocusAsync()
+    {
+        return _inputElement.FocusAsync();
+    }
 
-    private void TogglePasswordVisibility() =>
+    private void TogglePasswordVisibility()
+    {
         _passwordRevealed = !_passwordRevealed;
+    }
 }
-

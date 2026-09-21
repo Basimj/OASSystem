@@ -21,6 +21,12 @@ public sealed class UpdateFiscalPeriodCommandHandler(
             throw new NotFoundException(nameof(FiscalPeriod), request.Id);
         }
 
+        var requestedRowVersion = Convert.FromBase64String(request.Data.RowVersion);
+        if (!entity.RowVersion.SequenceEqual(requestedRowVersion))
+        {
+            throw new ConcurrencyException("The fiscal period has been modified by another user.");
+        }
+
         mapper.Update(request.Data, entity);
         repository.Update(entity);
         return entity;

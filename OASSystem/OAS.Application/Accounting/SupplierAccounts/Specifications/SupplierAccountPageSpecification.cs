@@ -13,6 +13,15 @@ public sealed class SupplierAccountPageSpecification
         var normalized = request.Normalize();
         var specification = new Specification<SupplierAccount>();
 
+        if (!string.IsNullOrWhiteSpace(normalized.Search) &&
+            Guid.TryParse(normalized.Search.Trim(), out var searchId))
+        {
+            specification.Where(x =>
+                x.SupplierId == searchId ||
+                x.AccountId == searchId ||
+                x.ControlAccountId == searchId);
+        }
+
         var sortBy = ResolveSortProperty(normalized.SortBy);
         specification.AddSort(sortBy, normalized.SortDirection);
 

@@ -1,6 +1,5 @@
 @page "/inventory/stock-counts"
 @attribute [Authorize]
-@using System.Globalization
 @using OAS.Client.Inventory.Common
 @using OAS.Client.Inventory.Services
 @using OAS.Contracts.Enums.Inventory
@@ -56,25 +55,40 @@
 
     <Content>
         <UiDataGridPanel Title="الجرد المخزني" Subtitle="@($"{FilteredCounts.Count} جرد")">
+            <Header>
+                <div class="stock-counts__header">
+                    <span>رقم الجرد</span>
+                    <span>المخزن</span>
+                    <span>تاريخ الجرد</span>
+                    <span>الحالة</span>
+                    <span>بدأ</span>
+                    <span>اكتمل</span>
+                </div>
+            </Header>
             <Body>
                 @if (_loading)
                 {
                     <UiAlert Message="جاري تحميل عمليات الجرد..." />
                 }
+                else if (FilteredCounts.Count == 0)
+                {
+                    <UiAlert Message="لا توجد عمليات جرد مطابقة." />
+                }
                 else
                 {
-                    <UiDataTable TItem="StockCountDto" Items="@FilteredCounts" Headers="@StockCountHeaders" EmptyText="لا توجد عمليات جرد مطابقة."
-                                 SidebarTypography="true"
-                                 OnRowClick="@(x => SelectAsync(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
-                        <RowTemplate Context="count">
-                            <td><strong>@count.CountNumber</strong></td>
-                            <td>@WarehouseName(count.WarehouseId)</td>
-                            <td>@count.CountDate.ToString("yyyy-MM-dd")</td>
-                            <td><UiBadge Text="@InventoryArabicPresenter.StockCountStatusText(count.Status)" Tone="@StockCountTone(count.Status)" /></td>
-                            <td>@FormatDate(count.StartedAtUtc)</td>
-                            <td>@FormatDate(count.CompletedAtUtc)</td>
-                        </RowTemplate>
-                    </UiDataTable>
+                    <div class="stock-counts__rows">
+                        @foreach (var count in FilteredCounts)
+                        {
+                            <button type="button" class="@RowCss(count.Id)" @onclick="() => SelectAsync(count.Id)">
+                                <strong>@count.CountNumber</strong>
+                                <span>@WarehouseName(count.WarehouseId)</span>
+                                <span>@count.CountDate.ToString("yyyy-MM-dd")</span>
+                                <span>@InventoryArabicPresenter.StockCountStatusText(count.Status)</span>
+                                <span>@FormatDate(count.StartedAtUtc)</span>
+                                <span>@FormatDate(count.CompletedAtUtc)</span>
+                            </button>
+                        }
+                    </div>
                 }
             </Body>
         </UiDataGridPanel>
@@ -92,27 +106,22 @@
                     <UiSelect Label="المخزن"
                               Value="@_createWarehouseId"
                               ValueExpression="@(() => _createWarehouseId)"
-                              ValueChanged="CreateWarehouseChanged"
+                              ValueChanged="@(v => _createWarehouseId = v)"
                               Options="@WarehouseOptions"
                               Required="true"
-                              ErrorText="@_createWarehouseError"
                               Size="ControlSize.Small" />
                     <UiInputDate Label="تاريخ الجرد"
                                  Value="@_createDate"
                                  ValueExpression="@(() => _createDate)"
-                                 ValueChanged="CreateDateChanged"
+                                 ValueChanged="@(v => _createDate = v)"
                                  Required="true"
-                                 ErrorText="@_createDateError"
                                  Size="ControlSize.Small" />
                     <UiInputText Label="ملاحظات"
                                  Value="@_createNotes"
                                  ValueExpression="@(() => _createNotes)"
-                                 ValueChanged="CreateNotesChanged"
-                                 Placeholder="(اختياري)"
-                                 MaxLength="500"
-                                 ErrorText="@_createNotesError"
+                                 ValueChanged="@(v => _createNotes = v)"
                                  Size="ControlSize.Small" />
-                    <UiAlert Message="سيتم التقاط أصناف ورصيد المخزن الحالي تلقائيًا عند إنشاء الجرد. لا يمكن إنشاء جرد ثانٍ مفتوح لنفس المخزن." />
+                    <UiAlert Message="سيتم التقاط أصناف ورصيد المخزن الحالي تلقائيًا عند إنشاء الجرد." />
                 </div>
             }
             else if (_selectedCount is not null)
@@ -121,43 +130,32 @@
                     <div><span>المخزن</span><strong>@WarehouseName(_selectedCount.WarehouseId)</strong></div>
                     <div><span>التاريخ</span><strong>@_selectedCount.CountDate.ToString("yyyy-MM-dd")</strong></div>
                     <div><span>الحالة</span><strong>@InventoryArabicPresenter.StockCountStatusText(_selectedCount.Status)</strong></div>
-                    <div><span>بدأ</span><strong>@FormatDate(_selectedCount.StartedAtUtc)</strong></div>
-                    <div><span>اكتمل</span><strong>@FormatDate(_selectedCount.CompletedAtUtc)</strong></div>
-                    <div><span>اعتمد</span><strong>@FormatDate(_selectedCount.ApprovedAtUtc)</strong></div>
-                    <div><span>اعتمد بواسطة</span><strong>@(_selectedCount.ApprovedBy ?? "—")</strong></div>
-                    <div><span>رُحّل</span><strong>@FormatDate(_selectedCount.PostedAtUtc)</strong></div>
-                    <div><span>رُحّل بواسطة</span><strong>@(_selectedCount.PostedBy ?? "—")</strong></div>
                     <div><span>الملاحظات</span><strong>@(_selectedCount.Notes ?? "—")</strong></div>
                 </div>
 
                 <div class="stock-counts__workflow">
-                    <span class="@WorkflowCss(StockCountStatus.Draft)">إنشاء</span>
+                    <span class="@WorkflowCss(StockCountStatus.Draft)">Create</span>
                     <i class="fa-solid fa-arrow-left"></i>
-                    <span class="@WorkflowCss(StockCountStatus.Counting)">بدء العد</span>
+                    <span class="@WorkflowCss(StockCountStatus.Counting)">Start Counting</span>
                     <i class="fa-solid fa-arrow-left"></i>
-                    <span class="@WorkflowCss(StockCountStatus.Review)">مراجعة</span>
+                    <span class="@WorkflowCss(StockCountStatus.Review)">Review</span>
                     <i class="fa-solid fa-arrow-left"></i>
-                    <span class="@WorkflowCss(StockCountStatus.Approved)">اعتماد</span>
+                    <span class="@WorkflowCss(StockCountStatus.Approved)">Approved</span>
                     <i class="fa-solid fa-arrow-left"></i>
-                    <span class="@WorkflowCss(StockCountStatus.Posted)">ترحيل</span>
+                    <span class="@WorkflowCss(StockCountStatus.Posted)">Posted</span>
                 </div>
 
                 <div class="stock-counts__lines-title">
                     <strong>أصناف الجرد</strong>
-                    <span>@CountedLinesCount / @_lineForms.Count تم عدّها</span>
+                    <span>@_lineForms.Count صنف</span>
                 </div>
 
                 @if (_lineForms.Count == 0)
                 {
-                    <UiAlert Message="لا توجد أرصدة في المخزن لإنشاء بنود جرد." Tone="AlertTone.Warning" />
+                    <UiAlert Message="لا توجد أرصدة في المخزن لإنشاء بنود جرد." />
                 }
                 else
                 {
-                    @if (_selectedCount.Status is StockCountStatus.Counting or StockCountStatus.Review)
-                    {
-                        <UiAlert Message="يجب تسجيل الكمية الفعلية لكل صنف قبل إكمال العد. يمكن تعديل الكميات أثناء مرحلة المراجعة قبل الاعتماد." />
-                    }
-
                     <div class="stock-counts__lines">
                         @foreach (var form in _lineForms)
                         {
@@ -166,25 +164,20 @@
                                     <strong>@VariantLabel(form.Line.ProductVariantId)</strong>
                                     <span>@VariantSku(form.Line.ProductVariantId)</span>
                                 </div>
-                                <div><span>كمية النظام</span><strong>@form.Line.SystemQuantity.ToString("N3")</strong></div>
+                                <div><span>كمية النظام</span><strong>@form.Line.SystemQuantity.ToString("N2")</strong></div>
                                 <div class="stock-counts__count-input">
                                     <UiInputText Label="الكمية الفعلية"
                                                  Value="@form.CountedQuantity"
                                                  ValueExpression="@(() => form.CountedQuantity)"
-                                                 ValueChanged="@(v => CountedQuantityChanged(form, v))"
+                                                 ValueChanged="@(v => form.CountedQuantity = v ?? string.Empty)"
                                                  Type="number"
-                                                 InputMode="decimal"
-                                                 step="0.001"
-                                                 Required="true"
-                                                 ErrorText="@form.Error"
                                                  Disabled="@(!CanRecord)"
                                                  Size="ControlSize.Small" />
-                                    <UiButton Text="تسجيل" IconCssClass="fa-solid fa-check" Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
-                                              Disabled="@(!CanRecord || _busy)" OnClick="@(_ => RecordLineAsync(form))" />
+                                    <button type="button" disabled="@(!CanRecord || _busy)" @onclick="() => RecordLineAsync(form)">تسجيل</button>
                                 </div>
-                                <div><span>الفرق</span><strong>@FormatDifference(form.Line)</strong></div>
-                                <div><span>قيمة الفرق</span><strong>@FormatVariance(form.Line)</strong></div>
-                                <div><span>آخر عد</span><strong>@FormatDate(form.Line.CountedAtUtc)</strong><span>@(form.Line.CountedBy ?? "—")</span></div>
+                                <div><span>الفرق</span><strong>@form.Line.DifferenceQuantity.ToString("N2")</strong></div>
+                                <div><span>قيمة الفرق</span><strong>@form.Line.VarianceValue.ToString("N2")</strong></div>
+                                <div><span>آخر عد</span><strong>@FormatDate(form.Line.CountedAtUtc)</strong></div>
                             </div>
                         }
                     </div>
@@ -196,12 +189,10 @@
 
 @code {
     private enum ViewMode { Empty, View, Create }
-
     private sealed class CountLineForm
     {
         public required StockCountLineDto Line { get; init; }
         public string CountedQuantity { get; set; } = string.Empty;
-        public string? Error { get; set; }
     }
 
     [Inject] private IInventoryClientService Inventory { get; set; } = default!;
@@ -209,7 +200,6 @@
     [Inject] private IUiSnackbarService Snackbar { get; set; } = default!;
 
     private IReadOnlyList<StockCountDto> _counts = [];
-    private static readonly IReadOnlyList<string> StockCountHeaders = ["رقم الجرد", "المخزن", "تاريخ الجرد", "الحالة", "بدأ", "اكتمل"];
     private IReadOnlyList<WarehouseDto> _warehouses = [];
     private IReadOnlyList<ProductDto> _products = [];
     private IReadOnlyList<ProductVariantDto> _variants = [];
@@ -226,22 +216,18 @@
     private string? _createWarehouseId;
     private DateOnly? _createDate = DateOnly.FromDateTime(DateTime.Today);
     private string? _createNotes;
-    private string? _createWarehouseError;
-    private string? _createDateError;
-    private string? _createNotesError;
 
     private bool CanStart => _mode == ViewMode.View && _selectedCount?.Status == StockCountStatus.Draft && !_busy;
-    private bool CanRecord => _mode == ViewMode.View && _selectedCount?.Status is StockCountStatus.Counting or StockCountStatus.Review && !_busy;
+    private bool CanRecord => _mode == ViewMode.View && _selectedCount?.Status is StockCountStatus.Counting or StockCountStatus.Review;
     private bool CanComplete => _mode == ViewMode.View && _selectedCount?.Status == StockCountStatus.Counting && !_busy;
     private bool CanApprove => _mode == ViewMode.View && _selectedCount?.Status == StockCountStatus.Review && !_busy;
     private bool CanPost => _mode == ViewMode.View && _selectedCount?.Status == StockCountStatus.Approved && !_busy;
     private bool CanCancel => _mode == ViewMode.View && _selectedCount is not null && _selectedCount.Status is not (StockCountStatus.Posted or StockCountStatus.Cancelled) && !_busy;
-    private int CountedLinesCount => _lineForms.Count(x => x.Line.CountedAtUtc.HasValue);
     private string AsideTitle => _mode == ViewMode.Create ? "جرد جديد" : "تفاصيل الجرد";
     private string? AsideSubtitle => _selectedCount?.CountNumber ?? (_mode == ViewMode.Create ? "سيتم توليد الرقم تلقائيًا" : null);
 
     private IReadOnlyList<UiSelectOption> WarehouseFilterOptions =>
-        [new UiSelectOption(string.Empty, "كل المخازن"), .. _warehouses.Select(x => new UiSelectOption(x.Id.ToString("D"), x.IsActive ? x.NameAr : $"{x.NameAr} (غير نشط)"))];
+        [new UiSelectOption(string.Empty, "كل المخازن"), .. _warehouses.Select(x => new UiSelectOption(x.Id.ToString("D"), x.NameAr))];
 
     private IReadOnlyList<UiSelectOption> WarehouseOptions =>
         [new UiSelectOption(string.Empty, "اختر المخزن"), .. _warehouses.Where(x => x.IsActive).Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.NameAr}"))];
@@ -251,7 +237,7 @@
         if (Guid.TryParse(_warehouseFilter, out var warehouseId) && x.WarehouseId != warehouseId) return false;
         if (int.TryParse(_statusFilter, out var status) && (int)x.Status != status) return false;
         return string.IsNullOrWhiteSpace(_search) || Match(_search, x.CountNumber, x.Notes, WarehouseName(x.WarehouseId));
-    }).OrderByDescending(x => x.CountDate).ThenByDescending(x => x.CountNumber).ToArray();
+    }).OrderByDescending(x => x.CountDate).ToArray();
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -260,17 +246,16 @@
         _loading = true;
         try
         {
-            var countsTask = LoadAllPagesAsync(page => Inventory.GetStockCountsAsync(page));
-            var warehousesTask = LoadAllPagesAsync(page => Inventory.GetWarehousesAsync(page));
-            var productsTask = LoadAllPagesAsync(page => Inventory.GetProductsAsync(page));
-            var variantsTask = LoadAllPagesAsync(page => Inventory.GetProductVariantsAsync(page));
+            var page = new PageRequest { PageNumber = 1, PageSize = PageRequest.MaximumPageSize };
+            var countsTask = Inventory.GetStockCountsAsync(page);
+            var warehousesTask = Inventory.GetWarehousesAsync(page);
+            var productsTask = Inventory.GetProductsAsync(page);
+            var variantsTask = Inventory.GetProductVariantsAsync(page);
             await Task.WhenAll(countsTask, warehousesTask, productsTask, variantsTask);
-
-            _counts = countsTask.Result;
-            _warehouses = warehousesTask.Result;
-            _products = productsTask.Result;
-            _variants = variantsTask.Result;
-
+            _counts = countsTask.Result.Items;
+            _warehouses = warehousesTask.Result.Items;
+            _products = productsTask.Result.Items;
+            _variants = variantsTask.Result.Items;
             if (_selectedId.HasValue)
                 _selectedCount = _counts.FirstOrDefault(x => x.Id == _selectedId.Value);
         }
@@ -278,41 +263,14 @@
         {
             ApiFeedback.Show(ex.Error);
         }
-        catch (Exception)
-        {
-            ApiFeedback.ShowUnexpected();
-        }
         finally
         {
             _loading = false;
         }
     }
 
-    private static async Task<IReadOnlyList<T>> LoadAllPagesAsync<T>(Func<PageRequest, Task<PagedResult<T>>> loader)
-    {
-        var items = new List<T>();
-        var pageNumber = 1;
-
-        while (true)
-        {
-            var result = await loader(new PageRequest
-            {
-                PageNumber = pageNumber,
-                PageSize = PageRequest.MaximumPageSize
-            });
-
-            items.AddRange(result.Items);
-            if (!result.HasNextPage)
-                break;
-
-            pageNumber++;
-        }
-
-        return items;
-    }
-
     private Task RefreshAsync(MouseEventArgs args) => LoadAsync();
-    private Task SearchChangedAsync(string? value) => Task.CompletedTask;
+    private Task SearchChangedAsync(string? _) => Task.CompletedTask;
 
     private Task BeginCreateAsync(MouseEventArgs args)
     {
@@ -323,56 +281,28 @@
         _createWarehouseId = null;
         _createDate = DateOnly.FromDateTime(DateTime.Today);
         _createNotes = null;
-        ClearCreateErrors();
         return Task.CompletedTask;
     }
 
     private Task CancelCreateAsync(MouseEventArgs args)
     {
         _mode = ViewMode.Empty;
-        ClearCreateErrors();
-        return Task.CompletedTask;
-    }
-
-    private Task CreateWarehouseChanged(string? value)
-    {
-        _createWarehouseId = value;
-        _createWarehouseError = null;
-        return Task.CompletedTask;
-    }
-
-    private Task CreateDateChanged(DateOnly? value)
-    {
-        _createDate = value;
-        _createDateError = null;
-        return Task.CompletedTask;
-    }
-
-    private Task CreateNotesChanged(string? value)
-    {
-        _createNotes = value;
-        _createNotesError = null;
         return Task.CompletedTask;
     }
 
     private async Task SaveCreateAsync(MouseEventArgs args)
     {
         if (_mode != ViewMode.Create || _busy) return;
-        if (!ValidateCreate(out var warehouseId))
+        if (!Guid.TryParse(_createWarehouseId, out var warehouseId) || !_createDate.HasValue)
         {
-            Snackbar.Error("هناك بيانات إجبارية أو غير صحيحة، يرجى مراجعة الحقول المحددة.");
+            Snackbar.Error("المخزن وتاريخ الجرد مطلوبان.");
             return;
         }
 
         _busy = true;
         try
         {
-            var saved = await Inventory.CreateStockCountAsync(new CreateStockCountRequest(
-                string.Empty,
-                warehouseId,
-                _createDate!.Value,
-                NullIfBlank(_createNotes)));
-
+            var saved = await Inventory.CreateStockCountAsync(new CreateStockCountRequest(string.Empty, warehouseId, _createDate.Value, NullIfBlank(_createNotes)));
             if (saved is null) return;
             await LoadAsync();
             await SelectAsync(saved.Id);
@@ -380,14 +310,7 @@
         }
         catch (ApiClientException ex)
         {
-            if (ex.Error.Code is "stock_count_open_exists" or "stock_count_warehouse_inactive" or "stock_count_warehouse_has_no_balance")
-                _createWarehouseError = ResolveCreateWarehouseError(ex.Error.Code);
-
             ApiFeedback.Show(ex.Error);
-        }
-        catch (Exception)
-        {
-            ApiFeedback.ShowUnexpected();
         }
         finally
         {
@@ -395,111 +318,40 @@
         }
     }
 
-    private bool ValidateCreate(out Guid warehouseId)
-    {
-        ClearCreateErrors();
-        warehouseId = Guid.Empty;
-
-        if (!Guid.TryParse(_createWarehouseId, out var parsedWarehouseId))
-        {
-            _createWarehouseError = "هذا الحقل إجباري.";
-        }
-        else
-        {
-            var warehouse = _warehouses.FirstOrDefault(x => x.Id == parsedWarehouseId);
-            if (warehouse is null)
-                _createWarehouseError = "المخزن المحدد غير موجود.";
-            else if (!warehouse.IsActive)
-                _createWarehouseError = "لا يمكن إنشاء جرد لمخزن غير نشط.";
-            else if (_counts.Any(x => x.WarehouseId == parsedWarehouseId && x.Status is not (StockCountStatus.Posted or StockCountStatus.Cancelled)))
-                _createWarehouseError = "يوجد جرد مفتوح لهذا المخزن بالفعل.";
-            else
-                warehouseId = parsedWarehouseId;
-        }
-
-        if (!_createDate.HasValue)
-            _createDateError = "هذا الحقل إجباري.";
-
-        if ((_createNotes?.Trim().Length ?? 0) > 500)
-            _createNotesError = "الملاحظات يجب ألا تتجاوز 500 حرف.";
-
-        return _createWarehouseError is null && _createDateError is null && _createNotesError is null;
-    }
-
-    private void ClearCreateErrors()
-    {
-        _createWarehouseError = null;
-        _createDateError = null;
-        _createNotesError = null;
-    }
-
     private async Task SelectAsync(Guid id)
     {
         if (_mode == ViewMode.Create || _busy) return;
-
-        try
+        _selectedId = id;
+        _selectedCount = _counts.FirstOrDefault(x => x.Id == id) ?? await Inventory.GetStockCountAsync(id);
+        var lines = await Inventory.GetStockCountLinesAsync(id);
+        _lineForms.Clear();
+        _lineForms.AddRange(lines.Select(x => new CountLineForm
         {
-            _selectedId = id;
-            _selectedCount = _counts.FirstOrDefault(x => x.Id == id) ?? await Inventory.GetStockCountAsync(id);
-            if (_selectedCount is null)
-            {
-                Snackbar.Error("تعذر العثور على الجرد المحدد.");
-                _mode = ViewMode.Empty;
-                return;
-            }
-
-            var lines = await Inventory.GetStockCountLinesAsync(id);
-            LoadLineForms(lines);
-            _mode = ViewMode.View;
-        }
-        catch (ApiClientException ex)
-        {
-            ApiFeedback.Show(ex.Error);
-        }
-        catch (Exception)
-        {
-            ApiFeedback.ShowUnexpected();
-        }
-    }
-
-    private Task CountedQuantityChanged(CountLineForm form, string? value)
-    {
-        form.CountedQuantity = value ?? string.Empty;
-        form.Error = null;
-        return Task.CompletedTask;
+            Line = x,
+            CountedQuantity = x.CountedAtUtc.HasValue ? x.CountedQuantity.ToString(System.Globalization.CultureInfo.InvariantCulture) : string.Empty
+        }));
+        _mode = ViewMode.View;
     }
 
     private async Task RecordLineAsync(CountLineForm form)
     {
         if (!CanRecord || !_selectedId.HasValue || _busy) return;
-
-        form.Error = ValidateCountedQuantity(form.CountedQuantity, out var quantity);
-        if (form.Error is not null)
+        if (!decimal.TryParse(form.CountedQuantity, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var quantity) || quantity < 0)
         {
-            Snackbar.Error(form.Error == "هذا الحقل إجباري."
-                ? "هناك بيانات إجبارية لم يتم إدخالها."
-                : "الكمية الفعلية غير صحيحة، يرجى مراجعة الحقل.");
+            Snackbar.Error("الكمية الفعلية يجب أن تكون رقمًا صفرًا أو أكبر.");
             return;
         }
 
         _busy = true;
         try
         {
-            await Inventory.RecordStockCountAsync(
-                _selectedId.Value,
-                form.Line.Id,
-                new RecordStockCountRequest(quantity, DateTimeOffset.UtcNow, null));
-
+            await Inventory.RecordStockCountAsync(_selectedId.Value, form.Line.Id, new RecordStockCountRequest(quantity, DateTimeOffset.UtcNow, null));
             await ReloadSelectedAsync();
             Snackbar.Success("تم تسجيل الكمية الفعلية.");
         }
         catch (ApiClientException ex)
         {
             ApiFeedback.Show(ex.Error);
-        }
-        catch (Exception)
-        {
-            ApiFeedback.ShowUnexpected();
         }
         finally
         {
@@ -508,47 +360,19 @@
     }
 
     private Task StartAsync(MouseEventArgs args) => RunTransitionAsync(
-        () => Inventory.StartStockCountAsync(_selectedId!.Value, new StartStockCountRequest()),
-        "تم بدء العد.");
+        () => Inventory.StartStockCountAsync(_selectedId!.Value, new StartStockCountRequest()), "تم بدء العد.");
 
-    private async Task CompleteAsync(MouseEventArgs args)
-    {
-        if (!CanComplete || !_selectedId.HasValue) return;
-
-        if (_lineForms.Count == 0)
-        {
-            Snackbar.Error("لا يمكن إكمال جرد لا يحتوي على أصناف.");
-            return;
-        }
-
-        var missing = _lineForms.Where(x => !x.Line.CountedAtUtc.HasValue).ToArray();
-        if (missing.Length > 0)
-        {
-            foreach (var form in missing)
-                form.Error = string.IsNullOrWhiteSpace(form.CountedQuantity)
-                    ? "هذا الحقل إجباري."
-                    : "اضغط تسجيل لحفظ الكمية الفعلية قبل إكمال العد.";
-
-            Snackbar.Error($"هناك {missing.Length} صنف لم يتم تسجيل كميته الفعلية.");
-            return;
-        }
-
-        await RunTransitionAsync(
-            () => Inventory.CompleteStockCountAsync(_selectedId.Value, new CompleteStockCountRequest()),
-            "تم إكمال العد ونقل الجرد للمراجعة.");
-    }
+    private Task CompleteAsync(MouseEventArgs args) => RunTransitionAsync(
+        () => Inventory.CompleteStockCountAsync(_selectedId!.Value, new CompleteStockCountRequest()), "تم إكمال العد ونقل الجرد للمراجعة.");
 
     private Task ApproveAsync(MouseEventArgs args) => RunTransitionAsync(
-        () => Inventory.ApproveStockCountAsync(_selectedId!.Value, new ApproveStockCountRequest()),
-        "تم اعتماد الجرد.");
+        () => Inventory.ApproveStockCountAsync(_selectedId!.Value, new ApproveStockCountRequest()), "تم اعتماد الجرد.");
 
     private Task PostAsync(MouseEventArgs args) => RunTransitionAsync(
-        () => Inventory.PostStockCountAsync(_selectedId!.Value, new PostStockCountRequest()),
-        "تم ترحيل فروقات الجرد.");
+        () => Inventory.PostStockCountAsync(_selectedId!.Value, new PostStockCountRequest()), "تم ترحيل فروقات الجرد.");
 
     private Task CancelStockCountAsync(MouseEventArgs args) => RunTransitionAsync(
-        () => Inventory.CancelStockCountAsync(_selectedId!.Value, new CancelStockCountRequest()),
-        "تم إلغاء الجرد.");
+        () => Inventory.CancelStockCountAsync(_selectedId!.Value, new CancelStockCountRequest()), "تم إلغاء الجرد.");
 
     private async Task RunTransitionAsync(Func<Task<StockCountDto?>> action, string successMessage)
     {
@@ -566,10 +390,6 @@
         {
             ApiFeedback.Show(ex.Error);
         }
-        catch (Exception)
-        {
-            ApiFeedback.ShowUnexpected();
-        }
         finally
         {
             _busy = false;
@@ -579,125 +399,26 @@
     private async Task ReloadSelectedAsync()
     {
         if (!_selectedId.HasValue) return;
-
-        try
-        {
-            _selectedCount = await Inventory.GetStockCountAsync(_selectedId.Value);
-            if (_selectedCount is null)
-            {
-                _mode = ViewMode.Empty;
-                return;
-            }
-
-            var lines = await Inventory.GetStockCountLinesAsync(_selectedId.Value);
-            LoadLineForms(lines);
-            _mode = ViewMode.View;
-        }
-        catch (ApiClientException ex)
-        {
-            ApiFeedback.Show(ex.Error);
-        }
-        catch (Exception)
-        {
-            ApiFeedback.ShowUnexpected();
-        }
-    }
-
-    private void LoadLineForms(IReadOnlyList<StockCountLineDto> lines)
-    {
+        _selectedCount = await Inventory.GetStockCountAsync(_selectedId.Value);
+        var lines = await Inventory.GetStockCountLinesAsync(_selectedId.Value);
         _lineForms.Clear();
         _lineForms.AddRange(lines.Select(x => new CountLineForm
         {
             Line = x,
-            CountedQuantity = x.CountedAtUtc.HasValue
-                ? x.CountedQuantity.ToString("0.###", CultureInfo.InvariantCulture)
-                : string.Empty
+            CountedQuantity = x.CountedAtUtc.HasValue ? x.CountedQuantity.ToString(System.Globalization.CultureInfo.InvariantCulture) : string.Empty
         }));
+        _mode = ViewMode.View;
     }
 
-    private static string? ValidateCountedQuantity(string? raw, out decimal quantity)
-    {
-        quantity = 0;
-        if (string.IsNullOrWhiteSpace(raw))
-            return "هذا الحقل إجباري.";
-
-        if (!TryParseDecimal(raw, out quantity))
-            return "الكمية الفعلية يجب أن تكون رقمًا صحيحًا.";
-
-        if (quantity < 0)
-            return "الكمية الفعلية يجب أن تكون صفرًا أو أكبر.";
-
-        if (!FitsPrecision(quantity, 18, 3))
-            return "الكمية الفعلية تسمح بحد أقصى 3 منازل عشرية و15 رقمًا قبل الفاصلة.";
-
-        return null;
-    }
-
-    private static bool TryParseDecimal(string raw, out decimal value) =>
-        decimal.TryParse(raw, NumberStyles.Number, CultureInfo.CurrentCulture, out value) ||
-        decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out value);
-
-    private static bool FitsPrecision(decimal value, int precision, int scale)
-    {
-        if (value == decimal.MinValue)
-            return false;
-
-        var absolute = Math.Abs(value);
-        var integerLimit = Pow10(precision - scale);
-        if (absolute >= integerLimit)
-            return false;
-
-        var factor = Pow10(scale);
-        return decimal.Truncate(absolute * factor) == absolute * factor;
-    }
-
-    private static decimal Pow10(int exponent)
-    {
-        var value = 1m;
-        for (var i = 0; i < exponent; i++)
-            value *= 10m;
-        return value;
-    }
-
-    private string WarehouseName(Guid id)
-    {
-        var warehouse = _warehouses.FirstOrDefault(x => x.Id == id);
-        return warehouse is null ? "—" : warehouse.IsActive ? warehouse.NameAr : $"{warehouse.NameAr} (غير نشط)";
-    }
-
+    private string RowCss(Guid id) => $"stock-counts__row {(id == _selectedId ? "stock-counts__row--selected" : string.Empty)}";
+    private string WarehouseName(Guid id) => _warehouses.FirstOrDefault(x => x.Id == id)?.NameAr ?? "—";
     private ProductVariantDto? Variant(Guid id) => _variants.FirstOrDefault(x => x.Id == id);
     private string ProductName(Guid id) => _products.FirstOrDefault(x => x.Id == id)?.NameAr ?? "—";
-    private string VariantLabel(Guid id)
-    {
-        var variant = Variant(id);
-        return variant is null
-            ? "—"
-            : $"{ProductName(variant.ProductId)}{(string.IsNullOrWhiteSpace(variant.VariantName) ? string.Empty : $" - {variant.VariantName}")}";
-    }
-
+    private string VariantLabel(Guid id) { var v = Variant(id); return v is null ? "—" : $"{ProductName(v.ProductId)}{(string.IsNullOrWhiteSpace(v.VariantName) ? string.Empty : $" - {v.VariantName}")}"; }
     private string VariantSku(Guid id) => Variant(id)?.SKU ?? "—";
     private static string FormatDate(DateTimeOffset? value) => value.HasValue ? value.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm") : "—";
-    private static string FormatDifference(StockCountLineDto line) => line.CountedAtUtc.HasValue ? line.DifferenceQuantity.ToString("N3") : "—";
-    private static string FormatVariance(StockCountLineDto line) => line.CountedAtUtc.HasValue ? line.VarianceValue.ToString("N2") : "—";
     private string WorkflowCss(StockCountStatus status) => $"stock-counts__workflow-step {(_selectedCount?.Status == status ? "stock-counts__workflow-step--active" : string.Empty)}";
     private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-    private static string ResolveCreateWarehouseError(string? code) => code switch
-    {
-        "stock_count_open_exists" => "يوجد جرد مفتوح لهذا المخزن بالفعل.",
-        "stock_count_warehouse_inactive" => "لا يمكن إنشاء جرد لمخزن غير نشط.",
-        "stock_count_warehouse_has_no_balance" => "لا توجد أرصدة في هذا المخزن لإنشاء بنود الجرد.",
-        _ => "تعذر استخدام المخزن المحدد لإنشاء الجرد."
-    };
-
-    private static AlertTone StockCountTone(StockCountStatus status) => status switch
-    {
-        StockCountStatus.Posted => AlertTone.Success,
-        StockCountStatus.Approved => AlertTone.Success,
-        StockCountStatus.Cancelled => AlertTone.Danger,
-        StockCountStatus.Review => AlertTone.Warning,
-        _ => AlertTone.Info
-    };
-
     private static bool Match(string? search, params string?[] values)
     {
         if (string.IsNullOrWhiteSpace(search)) return true;

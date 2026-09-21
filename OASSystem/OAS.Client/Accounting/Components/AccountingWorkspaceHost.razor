@@ -1,51 +1,11 @@
 @using OAS.UiLib.Components.Spreadsheets
 @namespace OAS.Client.Accounting.Components
-@inject IAccountingWorkspaceState Workspace
-@inject IAccountingClientService AccountingService
-@inject IUiSnackbarService Snackbar
-@inject IUiDialogService Dialog
-@implements IDisposable
-
 @using OAS.Client.Accounting.Workspace
-@using OAS.Client.Accounting.Common
-@using OAS.Contracts.Accounting.Accounts
-@using OAS.Contracts.Accounting.BankAccounts
-@using OAS.Contracts.Accounting.CashAccounts
-@using OAS.Contracts.Accounting.CashShifts
-@using OAS.Contracts.Accounting.CostCenters
-@using OAS.Contracts.Accounting.CustomerAccounts
 @using OAS.Contracts.Accounting.Enums
-<<<<<<< HEAD
-@using OAS.Contracts.Accounting.Expenses
-@using OAS.Contracts.Accounting.FiscalPeriods
-@using OAS.Contracts.Accounting.FiscalYears
-@using OAS.Contracts.Accounting.Journals
-@using OAS.Contracts.Accounting.PaymentAllocations
-@using OAS.Contracts.Accounting.PaymentVouchers
-@using OAS.Contracts.Accounting.PostingProfiles
-@using OAS.Contracts.Accounting.ReceiptVouchers
-@using OAS.Contracts.Accounting.SupplierAccounts
-@using OAS.Contracts.Common.Pagination
 @using OAS.UiLib.Components.Accounting.Accounts
-@using OAS.UiLib.Components.Accounting.CashBank
-@using OAS.UiLib.Components.Accounting.CostCenters
-@using OAS.UiLib.Components.Accounting.Expenses
-@using OAS.UiLib.Components.Accounting.Fiscal
-@using OAS.UiLib.Components.Accounting.Journals
-@using OAS.UiLib.Components.Accounting.Parties
-@using OAS.UiLib.Components.Accounting.PostingProfiles
-@using OAS.UiLib.Components.Accounting.Vouchers
-=======
-@using OAS.UiLib.Components.Accounting.Accounts
->>>>>>> 9fed33eb9aa5ef442faad30eb44b74fc939187b9
 @using OAS.UiLib.Components.Accounting.Workspace
-@using OAS.UiLib.Components.Buttons
-@using OAS.UiLib.Components.Feedback
-@using OAS.UiLib.Components.Inputs
 @using OAS.UiLib.Components.Navigation
-@using OAS.UiLib.Components.Surfaces
 @using OAS.UiLib.Components.Workspace
-@using OAS.UiLib.Core.Models
 
 @{
     var activeTab = Workspace.ActiveTab;
@@ -55,54 +15,8 @@
 <UiAccountingWorkspace ShowTabs="@Section.HasValue">
     <Actions>
         <UiWorkspaceActionBar>
-            <UiButton Text="جديد"
-                      IconCssClass="fa-solid fa-plus"
-                      Size="ControlSize.Small"
-                      OnClick="OpenNewRecord" />
-
-            <UiButton Text="تعديل"
-                      IconCssClass="fa-solid fa-pen-to-square"
-                      Variant="ButtonVariant.Secondary"
-                      Size="ControlSize.Small"
-                      Disabled="@(!CanEditActive)"
-                      OnClick="BeginEditActive" />
-
-            <UiButton Text="حفظ"
-                      IconCssClass="fa-solid fa-floppy-disk"
-                      Size="ControlSize.Small"
-                      Disabled="@(!CanSaveActive)"
-                      Loading="@(activeTab?.IsSaving == true)"
-                      OnClick="SaveActiveAsync" />
-
-            <UiButton Text="إلغاء"
-                      IconCssClass="fa-solid fa-ban"
-                      Variant="ButtonVariant.Ghost"
-                      Size="ControlSize.Small"
-                      Disabled="@(!CanCancelActive)"
-                      OnClick="CancelActiveEdit" />
-
-            <UiButton Text="إغلاق"
-                      IconCssClass="fa-solid fa-xmark"
-                      Variant="ButtonVariant.Secondary"
-                      Size="ControlSize.Small"
-                      Disabled="@(!CanCloseActive)"
-                      OnClick="CloseActiveTabAsync" />
-
-            <UiButton Text="تحديث"
-                      IconCssClass="fa-solid fa-rotate"
-                      Variant="ButtonVariant.Secondary"
-                      Size="ControlSize.Small"
-                      Loading="@_isLoading"
-                      OnClick="RefreshActiveAsync" />
-
-            @if (isList)
+            @if (Section is null)
             {
-<<<<<<< HEAD
-                <UiSearchInput @bind-Value="_searchText"
-                               Placeholder="ابحث في السجلات..."
-                               DebounceMilliseconds="300"
-                               OnSearch="OnSearchAsync" />
-=======
                 <UiButton Text="تحديث"
                           IconCssClass="fa-solid fa-rotate"
                           Variant="ButtonVariant.Secondary"
@@ -234,21 +148,11 @@
                 }
 
                 <UiButton Text="إغلاق" IconCssClass="fa-solid fa-xmark" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Disabled="@(!CanCloseActive)" OnClick="CloseActiveTabAsync" />
->>>>>>> 9fed33eb9aa5ef442faad30eb44b74fc939187b9
             }
         </UiWorkspaceActionBar>
     </Actions>
 
     <Tabs>
-<<<<<<< HEAD
-        <UiApplicationTabStrip Tabs="@WorkspaceTabs"
-                               AriaLabel="تبويبات المحاسبة العامة"
-                               EnableContextMenu="true"
-                               OnSelect="SelectTabAsync"
-                               OnClose="CloseTabByIdAsync"
-                               OnCloseOthers="CloseOtherTabsAsync"
-                               OnCloseAll="CloseAllTabsAsync" />
-=======
         @if (Section.HasValue)
         {
             <UiApplicationTabStrip Tabs="@WorkspaceTabs"
@@ -259,20 +163,11 @@
                                    OnCloseOthers="CloseOtherTabsAsync"
                                    OnCloseAll="CloseAllTabsAsync" />
         }
->>>>>>> 9fed33eb9aa5ef442faad30eb44b74fc939187b9
     </Tabs>
 
     <Body>
-        @if (activeTab is null || activeTab.IsListTab)
+        @if (Section is null)
         {
-<<<<<<< HEAD
-            var entityType = activeTab?.EntityType ?? Section ?? AccountingEntityType.Accounts;
-            @RenderListTabContent(entityType)
-        }
-        else
-        {
-            @RenderEditorTabContent(activeTab)
-=======
             <UiAccountingFormSection Title="المحاسبة المالية"
                                      Subtitle="إدارة الدليل المحاسبي والقيود والتحصيل والصرف والصندوق والمصروفات من نقطة واحدة"
                                      IconCssClass="fa-solid fa-scale-balanced">
@@ -491,7 +386,6 @@
                 <UiAccountingRecordList Items="@CurrentRecordItems" EmptyTitle="@CurrentEmptyTitle" EmptyDescription="@CurrentEmptyDescription" EmptyIconCssClass="@CurrentEmptyIcon" OnOpen="OpenCurrentRecordAsync" />
                 <UiPagination PageNumber="@CurrentPageNumber" TotalPages="@CurrentTotalPages" TotalCount="@CurrentTotalCount" OnPrevious="@(() => ChangePageAsync(CurrentListEntity, -1))" OnNext="@(() => ChangePageAsync(CurrentListEntity, 1))" />
             }
->>>>>>> 9fed33eb9aa5ef442faad30eb44b74fc939187b9
         }
     </Body>
 </UiAccountingWorkspace>

@@ -4,13 +4,15 @@
 @using OAS.UiLib.Components.Inputs
 @using OAS.UiLib.Core.Models
 
-<div class="ui-acc-editor" dir="rtl">
+<UiAccountingEditorSurface>
     <UiAccountingFormSection Title="بيانات حساب العميل المحاسبي"
                              Subtitle="ربط العميل بحساب الأستاذ المساعد وحساب المراقبة العام بدليل الحسابات"
                              IconCssClass="fa-solid fa-users-line">
-        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
-            <UiLookup Label="العميل"
-                      Value="@Model.CustomerId?.ToString("D")"
+        <UiAccountingFormGrid Columns="2">
+            @if (CustomerSearchAsync is not null)
+            {
+                <UiLookup Label="العميل"
+                      Value='@Model.CustomerId?.ToString("D")'
                       ValueChanged="OnCustomerChanged"
                       SelectedItem="@CustomerLookupItem"
                       SearchAsync="CustomerSearchAsync"
@@ -19,9 +21,18 @@
                       Required="true"
                       MinimumSearchLength="0"
                       DebounceMilliseconds="250" />
+            }
+            else
+            {
+                <UiInputText Label="معرف العميل (GUID)"
+                             Value="@Model.CustomerIdText"
+                             ValueChanged="OnCustomerIdTextChanged"
+                             Placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                             Disabled="@(!IsEditable || !IsNew)" />
+            }
 
             <UiLookup Label="حساب الأستاذ المساعد للعميل"
-                      Value="@Model.AccountId?.ToString("D")"
+                      Value='@Model.AccountId?.ToString("D")'
                       ValueChanged="OnAccountChanged"
                       SelectedItem="@AccountLookupItem"
                       SearchAsync="AccountSearchAsync"
@@ -32,7 +43,7 @@
                       DebounceMilliseconds="250" />
 
             <UiLookup Label="حساب المراقبة العام (Control Account)"
-                      Value="@Model.ControlAccountId?.ToString("D")"
+                      Value='@Model.ControlAccountId?.ToString("D")'
                       ValueChanged="OnControlAccountChanged"
                       SelectedItem="@ControlAccountLookupItem"
                       SearchAsync="AccountSearchAsync"
@@ -42,23 +53,25 @@
                       MinimumSearchLength="0"
                       DebounceMilliseconds="250" />
 
-            <div class="ui-acc-checks-group d-flex align-items-center mt-4">
+            <UiAccountingCheckGroup>
                 <UiCheckbox Label="الحساب المحاسبي للعميل نشط"
                             Value="@Model.IsActive"
                             ValueChanged="@(v => { Model.IsActive = v; OnChanged(); })"
                             Disabled="@(!IsEditable)" />
-            </div>
-        </div>
+            </UiAccountingCheckGroup>
+        </UiAccountingFormGrid>
     </UiAccountingFormSection>
-</div>
+</UiAccountingEditorSurface>
 
 @code {
     public sealed class FormModel
     {
         public Guid? CustomerId { get; set; }
+        public string CustomerIdText { get => CustomerId?.ToString("D") ?? string.Empty; set => CustomerId = Guid.TryParse(value, out var id) ? id : null; }
         public Guid? AccountId { get; set; }
         public Guid? ControlAccountId { get; set; }
         public bool IsActive { get; set; } = true;
+        public string RowVersion { get; set; } = string.Empty;
     }
 
     [Parameter] public FormModel Model { get; set; } = new();
@@ -72,6 +85,12 @@
     [Parameter] public EventCallback OnModelChanged { get; set; }
 
     private void OnChanged() => OnModelChanged.InvokeAsync();
+
+    private void OnCustomerIdTextChanged(string? val)
+    {
+        Model.CustomerIdText = val ?? string.Empty;
+        OnChanged();
+    }
 
     private void OnCustomerChanged(string? val)
     {

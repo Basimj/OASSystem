@@ -4,13 +4,13 @@
 @using OAS.UiLib.Components.Inputs
 @using OAS.UiLib.Core.Models
 
-<div class="ui-acc-editor" dir="rtl">
+<UiAccountingEditorSurface>
 
     <UiAccountingFormSection Title="بيانات مركز التكلفة"
                              Subtitle="الرمز، التسمية، والتبعية الهيكلية"
                              IconCssClass="fa-solid fa-network-wired">
 
-        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+        <UiAccountingFormGrid Columns="2">
 
             <UiInputText Label="كود مركز التكلفة"
                          Value="@Model.Code"
@@ -40,7 +40,7 @@
                          Size="ControlSize.Small" />
 
             <UiLookup Label="مركز التكلفة الأب"
-                      Value="@Model.ParentCostCenterId?.ToString("D")"
+                      Value='@Model.ParentCostCenterId?.ToString("D")'
                       ValueChanged="OnParentCostCenterChanged"
                       SelectedItem="@ParentCostCenterLookupItem"
                       SearchAsync="CostCenterSearchAsync"
@@ -49,18 +49,18 @@
                       MinimumSearchLength="0"
                       DebounceMilliseconds="250" />
 
-            <div class="ui-acc-checks-group d-flex align-items-center mt-4">
+            <UiAccountingCheckGroup>
                 <UiCheckbox Label="مركز التكلفة نشط"
                             Value="@Model.IsActive"
                             ValueChanged="OnActiveChanged"
                             Disabled="@(!IsEditable)" />
-            </div>
+            </UiAccountingCheckGroup>
 
-        </div>
+        </UiAccountingFormGrid>
 
     </UiAccountingFormSection>
 
-</div>
+</UiAccountingEditorSurface>
 
 @code {
 
@@ -75,6 +75,8 @@
         public Guid? ParentCostCenterId { get; set; }
 
         public bool IsActive { get; set; } = true;
+
+        public string RowVersion { get; set; } = string.Empty;
     }
 
     [Parameter]
