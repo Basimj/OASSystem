@@ -26,7 +26,7 @@ public sealed class CashAccountMapper
     public void Update(UpdateCashAccountRequest source, CashAccount destination)
     {
         destination.UpdateDetails(
-            destination.Code,
+            source.Code,
             source.Name,
             source.AccountId,
             source.IsDefault);

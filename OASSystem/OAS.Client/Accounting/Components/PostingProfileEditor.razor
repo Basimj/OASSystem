@@ -20,8 +20,7 @@
                          ValueChanged="OnCodeChanged"
                          Required="true"
                          Placeholder="مثال: PP-SALES-INV"
-                         ReadOnly="@(!IsNew)"
-                         Disabled="@(!IsEditable || !IsNew)"
+                         Disabled="@(!IsEditable)"
                          Size="ControlSize.Small" />
 
             <UiInputText Label="اسم ملف الترحيل"

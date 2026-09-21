@@ -40,7 +40,7 @@ public sealed class AccountMapper
         Account destination)
     {
         destination.UpdateDetails(
-            destination.Code,
+            source.Code,
             source.NameAr,
             source.NameEn,
             source.ParentAccountId,

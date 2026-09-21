@@ -21,20 +21,6 @@ public sealed class UpdateBankAccountCommandHandler(
             throw new NotFoundException(nameof(BankAccount), request.Id);
         }
 
-        if (!string.Equals(entity.Code, request.Data.Code.Trim(), StringComparison.OrdinalIgnoreCase))
-        {
-            throw new ConflictException(
-                "accounting_bank_account_code_immutable",
-                "The bank account code cannot be changed after creation.");
-        }
-
-        if (!string.Equals(entity.AccountNumber, request.Data.AccountNumber.Trim(), StringComparison.OrdinalIgnoreCase))
-        {
-            throw new ConflictException(
-                "accounting_bank_account_number_immutable",
-                "The bank account number cannot be changed after creation.");
-        }
-
         var requestedRowVersion = Convert.FromBase64String(request.Data.RowVersion);
         if (!entity.RowVersion.SequenceEqual(requestedRowVersion))
         {

@@ -28,10 +28,10 @@ public sealed class BankAccountMapper
     public void Update(UpdateBankAccountRequest source, BankAccount destination)
     {
         destination.UpdateDetails(
-            destination.Code,
+            source.Code,
             source.BankName,
             source.AccountName,
-            destination.AccountNumber,
+            source.AccountNumber,
             source.IBAN,
             source.AccountId);
 

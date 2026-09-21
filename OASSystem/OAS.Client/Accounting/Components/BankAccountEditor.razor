@@ -18,8 +18,7 @@
                          ValueChanged="OnCodeChanged"
                          Required="true"
                          Placeholder="مثال: BANK-01"
-                         ReadOnly="@(!IsNew)"
-                         Disabled="@(!IsEditable || !IsNew)"
+                         Disabled="@(!IsEditable)"
                          Size="ControlSize.Small" />
 
             <UiInputText Label="اسم البنك"
@@ -46,8 +45,7 @@
                          ValueChanged="OnAccountNumberChanged"
                          Required="true"
                          Placeholder="مثال: 1020304050"
-                         ReadOnly="@(!IsNew)"
-                         Disabled="@(!IsEditable || !IsNew)"
+                         Disabled="@(!IsEditable)"
                          Size="ControlSize.Small" />
 
             <UiInputText Label="رقم الآيبان (IBAN)"

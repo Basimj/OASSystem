@@ -10,7 +10,7 @@ public sealed class AccountingWorkspaceState : IAccountingWorkspaceState
             AccountingEntityType.Accounts,
             entityId: null,
             isListTab: true,
-            title: "جميع الحسابات",
+            title: "شجرة الحسابات",
             canClose: false);
 
         _tabs.Add(defaultTab);
@@ -48,7 +48,7 @@ public sealed class AccountingWorkspaceState : IAccountingWorkspaceState
             entityType,
             entityId: null,
             isListTab: true,
-            canClose: false);
+            canClose: true);
 
         _tabs.Add(tab);
         ActiveTabId = tab.TabId;
@@ -149,7 +149,7 @@ public sealed class AccountingWorkspaceState : IAccountingWorkspaceState
                     AccountingEntityType.Accounts,
                     entityId: null,
                     isListTab: true,
-                    title: "جميع الحسابات",
+                    title: "شجرة الحسابات",
                     canClose: false);
 
                 _tabs.Add(defaultTab);
