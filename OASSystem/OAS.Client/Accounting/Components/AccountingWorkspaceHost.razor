@@ -13,8 +13,11 @@
 }
 
 <UiAccountingWorkspace ShowTabs="@Section.HasValue">
+
     <Actions>
+
         <UiWorkspaceActionBar>
+
             @if (Section is null)
             {
                 <UiButton Text="تحديث"
@@ -27,37 +30,78 @@
             {
                 @if (Section == AccountingEntityType.CashAccounts)
                 {
-                    <UiButton Text="صندوق جديد" IconCssClass="fa-solid fa-vault" Size="ControlSize.Small" OnClick="@(() => OpenNewRecord(AccountingEntityType.CashAccounts))" />
+                    <UiButton Text="صندوق جديد"
+                              IconCssClass="fa-solid fa-vault"
+                              Size="ControlSize.Small"
+                              OnClick="@(() => OpenNewRecord(AccountingEntityType.CashAccounts))" />
                 }
                 else if (Section == AccountingEntityType.BankAccounts)
                 {
-                    <UiButton Text="حساب بنكي جديد" IconCssClass="fa-solid fa-building-columns" Size="ControlSize.Small" OnClick="@(() => OpenNewRecord(AccountingEntityType.BankAccounts))" />
+                    <UiButton Text="حساب بنكي جديد"
+                              IconCssClass="fa-solid fa-building-columns"
+                              Size="ControlSize.Small"
+                              OnClick="@(() => OpenNewRecord(AccountingEntityType.BankAccounts))" />
                 }
                 else if (Section == AccountingEntityType.FiscalYears)
                 {
-                    <UiButton Text="سنة مالية جديدة" IconCssClass="fa-solid fa-calendar-plus" Size="ControlSize.Small" OnClick="@(() => OpenNewRecord(AccountingEntityType.FiscalYears))" />
-                    <UiButton Text="فترة مالية جديدة" IconCssClass="fa-solid fa-calendar-week" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="@(() => OpenNewRecord(AccountingEntityType.FiscalPeriods))" />
+                    <UiButton Text="سنة مالية جديدة"
+                              IconCssClass="fa-solid fa-calendar-plus"
+                              Size="ControlSize.Small"
+                              OnClick="@(() => OpenNewRecord(AccountingEntityType.FiscalYears))" />
+
+                    <UiButton Text="فترة مالية جديدة"
+                              IconCssClass="fa-solid fa-calendar-week"
+                              Variant="ButtonVariant.Secondary"
+                              Size="ControlSize.Small"
+                              OnClick="@(() => OpenNewRecord(AccountingEntityType.FiscalPeriods))" />
                 }
                 else if (Section == AccountingEntityType.Expenses)
                 {
-                    <UiButton Text="مصروف جديد" IconCssClass="fa-solid fa-receipt" Size="ControlSize.Small" OnClick="@(() => OpenNewRecord(AccountingEntityType.Expenses))" />
-                    <UiButton Text="نوع مصروف جديد" IconCssClass="fa-solid fa-tags" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="@(() => OpenNewRecord(AccountingEntityType.ExpenseTypes))" />
+                    <UiButton Text="مصروف جديد"
+                              IconCssClass="fa-solid fa-receipt"
+                              Size="ControlSize.Small"
+                              OnClick="@(() => OpenNewRecord(AccountingEntityType.Expenses))" />
+
+                    <UiButton Text="نوع مصروف جديد"
+                              IconCssClass="fa-solid fa-tags"
+                              Variant="ButtonVariant.Secondary"
+                              Size="ControlSize.Small"
+                              OnClick="@(() => OpenNewRecord(AccountingEntityType.ExpenseTypes))" />
                 }
                 else
                 {
-                    <UiButton Text="جديد" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" OnClick="OpenNewRecord" />
+                    <UiButton Text="جديد"
+                              IconCssClass="fa-solid fa-plus"
+                              Size="ControlSize.Small"
+                              OnClick="OpenNewRecord" />
                 }
 
-                @if (Section is AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers)
+                @if (Section is AccountingEntityType.ReceiptVouchers
+                            or AccountingEntityType.PaymentVouchers)
                 {
-                    <UiButton Text="تخصيص دفعة" IconCssClass="fa-solid fa-link" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="@(() => OpenNewRecord(AccountingEntityType.PaymentAllocations))" />
+                    <UiButton Text="تخصيص دفعة"
+                              IconCssClass="fa-solid fa-link"
+                              Variant="ButtonVariant.Secondary"
+                              Size="ControlSize.Small"
+                              OnClick="@(() => OpenNewRecord(AccountingEntityType.PaymentAllocations))" />
                 }
 
-                <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Loading="@_isLoading" OnClick="RefreshActiveAsync" />
+                <UiButton Text="تحديث"
+                          IconCssClass="fa-solid fa-rotate"
+                          Variant="ButtonVariant.Ghost"
+                          Size="ControlSize.Small"
+                          Loading="@_isLoading"
+                          OnClick="RefreshActiveAsync" />
+
                 @if (SpreadsheetSection(Section) is not null)
                 {
-                    <UiSpreadsheetActions CanImport="@SpreadsheetCanImport(Section)" Busy="_spreadsheetBusy" OnImport="@(() => OpenSpreadsheet(Section!.Value))" OnTemplate="@(() => DownloadSpreadsheet(Section!.Value,true))" OnExport="@(() => DownloadSpreadsheet(Section!.Value,false))" />
+                    <UiSpreadsheetActions CanImport="@SpreadsheetCanImport(Section)"
+                                          Busy="_spreadsheetBusy"
+                                          OnImport="@(() => OpenSpreadsheet(Section!.Value))"
+                                          OnTemplate="@(() => DownloadSpreadsheet(Section!.Value, true))"
+                                          OnExport="@(() => DownloadSpreadsheet(Section!.Value, false))" />
                 }
+
                 <UiSearchInput Value="@CurrentSearch"
                                ValueChanged="SetCurrentSearch"
                                OnSearch="OnSearchAsync"
@@ -72,18 +116,21 @@
                           Size="ControlSize.Small"
                           Disabled="@(!CanEditActive)"
                           OnClick="BeginEditActive" />
+
                 <UiButton Text="حفظ"
                           IconCssClass="fa-solid fa-floppy-disk"
                           Size="ControlSize.Small"
                           Disabled="@(!CanSaveActive)"
                           Loading="@(activeTab?.IsSaving == true)"
                           OnClick="SaveActiveAsync" />
+
                 <UiButton Text="إلغاء"
                           IconCssClass="fa-solid fa-arrow-rotate-left"
                           Variant="ButtonVariant.Ghost"
                           Size="ControlSize.Small"
                           Disabled="@(!CanCancelActive)"
                           OnClick="CancelActiveEdit" />
+
                 <UiButton Text="تحديث"
                           IconCssClass="fa-solid fa-rotate"
                           Variant="ButtonVariant.Ghost"
@@ -93,66 +140,114 @@
 
                 @if (activeTab is not null)
                 {
-                    @if (activeTab.EntityType == AccountingEntityType.Journals && activeTab.Model is JournalEntryEditor.FormModel journal)
+                    @if (activeTab.EntityType == AccountingEntityType.Journals &&
+                                activeTab.Model is JournalEntryEditor.FormModel journal)
                     {
                         @if (journal.Status == JournalEntryStatus.Draft)
                         {
-                            <UiButton Text="إرسال للاعتماد" IconCssClass="fa-solid fa-paper-plane" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="@(() => ChangeJournalStatusAsync(JournalEntryStatus.PendingApproval))" />
+                            <UiButton Text="إرسال للاعتماد"
+                                      IconCssClass="fa-solid fa-paper-plane"
+                                      Variant="ButtonVariant.Secondary"
+                                      Size="ControlSize.Small"
+                                      OnClick="@(() => ChangeJournalStatusAsync(JournalEntryStatus.PendingApproval))" />
                         }
                         else if (journal.Status == JournalEntryStatus.PendingApproval)
                         {
-                            <UiButton Text="اعتماد" IconCssClass="fa-solid fa-circle-check" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="@(() => ChangeJournalStatusAsync(JournalEntryStatus.Approved))" />
+                            <UiButton Text="اعتماد"
+                                      IconCssClass="fa-solid fa-circle-check"
+                                      Variant="ButtonVariant.Secondary"
+                                      Size="ControlSize.Small"
+                                      OnClick="@(() => ChangeJournalStatusAsync(JournalEntryStatus.Approved))" />
                         }
                         else if (journal.Status == JournalEntryStatus.Approved)
                         {
-                            <UiButton Text="ترحيل" IconCssClass="fa-solid fa-check-double" Size="ControlSize.Small" OnClick="@(() => ChangeJournalStatusAsync(JournalEntryStatus.Posted))" />
+                            <UiButton Text="ترحيل"
+                                      IconCssClass="fa-solid fa-check-double"
+                                      Size="ControlSize.Small"
+                                      OnClick="@(() => ChangeJournalStatusAsync(JournalEntryStatus.Posted))" />
                         }
                         else if (journal.Status == JournalEntryStatus.Posted)
                         {
-                            <UiButton Text="عكس القيد" IconCssClass="fa-solid fa-arrow-rotate-left" Variant="ButtonVariant.Danger" Size="ControlSize.Small" OnClick="ReverseActiveJournalAsync" />
+                            <UiButton Text="عكس القيد"
+                                      IconCssClass="fa-solid fa-arrow-rotate-left"
+                                      Variant="ButtonVariant.Danger"
+                                      Size="ControlSize.Small"
+                                      OnClick="ReverseActiveJournalAsync" />
                         }
                     }
-                    else if (activeTab.EntityType == AccountingEntityType.ReceiptVouchers && activeTab.Model is ReceiptVoucherEditor.FormModel receipt)
+                    else if (activeTab.EntityType == AccountingEntityType.ReceiptVouchers &&
+                    activeTab.Model is ReceiptVoucherEditor.FormModel receipt)
                     {
                         @if (receipt.Status == ReceiptVoucherStatus.Draft)
                         {
-                            <UiButton Text="اعتماد" IconCssClass="fa-solid fa-circle-check" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="@(() => ChangeReceiptStatusAsync(ReceiptVoucherStatus.Approved))" />
+                            <UiButton Text="اعتماد"
+                                      IconCssClass="fa-solid fa-circle-check"
+                                      Variant="ButtonVariant.Secondary"
+                                      Size="ControlSize.Small"
+                                      OnClick="@(() => ChangeReceiptStatusAsync(ReceiptVoucherStatus.Approved))" />
                         }
                         else if (receipt.Status == ReceiptVoucherStatus.Approved)
                         {
-                            <UiButton Text="ترحيل" IconCssClass="fa-solid fa-check-double" Size="ControlSize.Small" OnClick="@(() => ChangeReceiptStatusAsync(ReceiptVoucherStatus.Posted))" />
+                            <UiButton Text="ترحيل"
+                                      IconCssClass="fa-solid fa-check-double"
+                                      Size="ControlSize.Small"
+                                      OnClick="@(() => ChangeReceiptStatusAsync(ReceiptVoucherStatus.Posted))" />
                         }
                     }
-                    else if (activeTab.EntityType == AccountingEntityType.PaymentVouchers && activeTab.Model is PaymentVoucherEditor.FormModel payment)
+                    else if (activeTab.EntityType == AccountingEntityType.PaymentVouchers &&
+                    activeTab.Model is PaymentVoucherEditor.FormModel payment)
                     {
                         @if (payment.Status == PaymentVoucherStatus.Draft)
                         {
-                            <UiButton Text="اعتماد" IconCssClass="fa-solid fa-circle-check" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="@(() => ChangePaymentStatusAsync(PaymentVoucherStatus.Approved))" />
+                            <UiButton Text="اعتماد"
+                                      IconCssClass="fa-solid fa-circle-check"
+                                      Variant="ButtonVariant.Secondary"
+                                      Size="ControlSize.Small"
+                                      OnClick="@(() => ChangePaymentStatusAsync(PaymentVoucherStatus.Approved))" />
                         }
                         else if (payment.Status == PaymentVoucherStatus.Approved)
                         {
-                            <UiButton Text="ترحيل" IconCssClass="fa-solid fa-check-double" Size="ControlSize.Small" OnClick="@(() => ChangePaymentStatusAsync(PaymentVoucherStatus.Posted))" />
+                            <UiButton Text="ترحيل"
+                                      IconCssClass="fa-solid fa-check-double"
+                                      Size="ControlSize.Small"
+                                      OnClick="@(() => ChangePaymentStatusAsync(PaymentVoucherStatus.Posted))" />
                         }
                     }
-                    else if (activeTab.EntityType == AccountingEntityType.Expenses && activeTab.Model is ExpenseEditor.FormModel expense)
+                    else if (activeTab.EntityType == AccountingEntityType.Expenses &&
+                    activeTab.Model is ExpenseEditor.FormModel expense)
                     {
                         @if (expense.Status == ExpenseStatus.Draft)
                         {
-                            <UiButton Text="اعتماد" IconCssClass="fa-solid fa-circle-check" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="@(() => ChangeExpenseStatusAsync(ExpenseStatus.Approved))" />
+                            <UiButton Text="اعتماد"
+                                      IconCssClass="fa-solid fa-circle-check"
+                                      Variant="ButtonVariant.Secondary"
+                                      Size="ControlSize.Small"
+                                      OnClick="@(() => ChangeExpenseStatusAsync(ExpenseStatus.Approved))" />
                         }
                         else if (expense.Status == ExpenseStatus.Approved)
                         {
-                            <UiButton Text="ترحيل" IconCssClass="fa-solid fa-check-double" Size="ControlSize.Small" OnClick="@(() => ChangeExpenseStatusAsync(ExpenseStatus.Posted))" />
+                            <UiButton Text="ترحيل"
+                                      IconCssClass="fa-solid fa-check-double"
+                                      Size="ControlSize.Small"
+                                      OnClick="@(() => ChangeExpenseStatusAsync(ExpenseStatus.Posted))" />
                         }
                     }
                 }
 
-                <UiButton Text="إغلاق" IconCssClass="fa-solid fa-xmark" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Disabled="@(!CanCloseActive)" OnClick="CloseActiveTabAsync" />
+                <UiButton Text="إغلاق"
+                          IconCssClass="fa-solid fa-xmark"
+                          Variant="ButtonVariant.Ghost"
+                          Size="ControlSize.Small"
+                          Disabled="@(!CanCloseActive)"
+                          OnClick="CloseActiveTabAsync" />
             }
+
         </UiWorkspaceActionBar>
+
     </Actions>
 
     <Tabs>
+
         @if (Section.HasValue)
         {
             <UiApplicationTabStrip Tabs="@WorkspaceTabs"
@@ -163,56 +258,122 @@
                                    OnCloseOthers="CloseOtherTabsAsync"
                                    OnCloseAll="CloseAllTabsAsync" />
         }
+
     </Tabs>
 
     <Body>
+
         @if (Section is null)
         {
             <UiAccountingFormSection Title="المحاسبة المالية"
                                      Subtitle="إدارة الدليل المحاسبي والقيود والتحصيل والصرف والصندوق والمصروفات من نقطة واحدة"
                                      IconCssClass="fa-solid fa-scale-balanced">
+
                 <UiAccountingFormGrid Columns="3">
-                    <UiAccountingHubTile Title="شجرة الحسابات" Description="بناء وتصنيف حسابات الأستاذ العام" Href="/accounting/accounts" IconCssClass="fa-solid fa-folder-tree" />
-                    <UiAccountingHubTile Title="السنوات والفترات" Description="إدارة السنة المالية وفترات الترحيل والإقفال" Href="/accounting/fiscal-years" IconCssClass="fa-solid fa-calendar-days" />
-                    <UiAccountingHubTile Title="القيود اليومية" Description="إنشاء واعتماد وترحيل وعكس القيود المحاسبية" Href="/accounting/journals" IconCssClass="fa-solid fa-book-journal-whills" />
-                    <UiAccountingHubTile Title="ملفات الترحيل" Description="ربط أدوار العمليات بالحسابات" Href="/accounting/posting-profiles" IconCssClass="fa-solid fa-sliders" />
-                    <UiAccountingHubTile Title="حسابات العملاء" Description="ربط العملاء بحسابات الأستاذ والمراقبة" Href="/accounting/customer-accounts" IconCssClass="fa-solid fa-users-line" />
-                    <UiAccountingHubTile Title="حسابات الموردين" Description="ربط الموردين بحسابات الأستاذ والمراقبة" Href="/accounting/supplier-accounts" IconCssClass="fa-solid fa-boxes-packing" />
-                    <UiAccountingHubTile Title="سندات القبض" Description="إدارة المقبوضات وربطها بالقيود" Href="/accounting/receipt-vouchers" IconCssClass="fa-solid fa-money-bill-trend-up" />
-                    <UiAccountingHubTile Title="سندات الصرف" Description="إدارة المدفوعات وربطها بالقيود" Href="/accounting/payment-vouchers" IconCssClass="fa-solid fa-money-bill-transfer" />
-                    <UiAccountingHubTile Title="الصناديق" Description="تعريف الصناديق والخزائن وربطها بحسابات الأستاذ العام" Href="/accounting/cash-accounts" IconCssClass="fa-solid fa-vault" />
-                    <UiAccountingHubTile Title="الحسابات البنكية" Description="تعريف الحسابات البنكية وربطها بحسابات الأستاذ العام" Href="/accounting/bank-accounts" IconCssClass="fa-solid fa-building-columns" />
-                    <UiAccountingHubTile Title="ورديات الصندوق" Description="فتح وإغلاق واعتماد ورديات النقدية" Href="/accounting/cash-shifts" IconCssClass="fa-solid fa-cash-register" />
-                    <UiAccountingHubTile Title="المصروفات" Description="المصروفات وأنواعها وحساباتها" Href="/accounting/expenses" IconCssClass="fa-solid fa-receipt" />
-                    <UiAccountingHubTile Title="مراكز التكلفة" Description="هيكل اختياري لتوزيع وتحليل التكلفة" Href="/accounting/cost-centers" IconCssClass="fa-solid fa-network-wired" />
+
+                    <UiAccountingHubTile Title="شجرة الحسابات"
+                                         Description="بناء وتصنيف حسابات الأستاذ العام"
+                                         Href="/accounting/accounts"
+                                         IconCssClass="fa-solid fa-folder-tree" />
+
+                    <UiAccountingHubTile Title="السنوات والفترات"
+                                         Description="إدارة السنة المالية وفترات الترحيل والإقفال"
+                                         Href="/accounting/fiscal-years"
+                                         IconCssClass="fa-solid fa-calendar-days" />
+
+                    <UiAccountingHubTile Title="القيود اليومية"
+                                         Description="إنشاء واعتماد وترحيل وعكس القيود المحاسبية"
+                                         Href="/accounting/journals"
+                                         IconCssClass="fa-solid fa-book-journal-whills" />
+
+                    <UiAccountingHubTile Title="ملفات الترحيل"
+                                         Description="ربط أدوار العمليات بالحسابات"
+                                         Href="/accounting/posting-profiles"
+                                         IconCssClass="fa-solid fa-sliders" />
+
+                    <UiAccountingHubTile Title="حسابات العملاء"
+                                         Description="ربط العملاء بحسابات الأستاذ والمراقبة"
+                                         Href="/accounting/customer-accounts"
+                                         IconCssClass="fa-solid fa-users-line" />
+
+                    <UiAccountingHubTile Title="حسابات الموردين"
+                                         Description="ربط الموردين بحسابات الأستاذ والمراقبة"
+                                         Href="/accounting/supplier-accounts"
+                                         IconCssClass="fa-solid fa-boxes-packing" />
+
+                    <UiAccountingHubTile Title="سندات القبض"
+                                         Description="إدارة المقبوضات وربطها بالقيود"
+                                         Href="/accounting/receipt-vouchers"
+                                         IconCssClass="fa-solid fa-money-bill-trend-up" />
+
+                    <UiAccountingHubTile Title="سندات الصرف"
+                                         Description="إدارة المدفوعات وربطها بالقيود"
+                                         Href="/accounting/payment-vouchers"
+                                         IconCssClass="fa-solid fa-money-bill-transfer" />
+
+                    <UiAccountingHubTile Title="الصناديق"
+                                         Description="تعريف الصناديق والخزائن وربطها بحسابات الأستاذ العام"
+                                         Href="/accounting/cash-accounts"
+                                         IconCssClass="fa-solid fa-vault" />
+
+                    <UiAccountingHubTile Title="الحسابات البنكية"
+                                         Description="تعريف الحسابات البنكية وربطها بحسابات الأستاذ العام"
+                                         Href="/accounting/bank-accounts"
+                                         IconCssClass="fa-solid fa-building-columns" />
+
+                    <UiAccountingHubTile Title="ورديات الصندوق"
+                                         Description="فتح وإغلاق واعتماد ورديات النقدية"
+                                         Href="/accounting/cash-shifts"
+                                         IconCssClass="fa-solid fa-cash-register" />
+
+                    <UiAccountingHubTile Title="المصروفات"
+                                         Description="المصروفات وأنواعها وحساباتها"
+                                         Href="/accounting/expenses"
+                                         IconCssClass="fa-solid fa-receipt" />
+
+                    <UiAccountingHubTile Title="مراكز التكلفة"
+                                         Description="هيكل اختياري لتوزيع وتحليل التكلفة"
+                                         Href="/accounting/cost-centers"
+                                         IconCssClass="fa-solid fa-network-wired" />
+
                 </UiAccountingFormGrid>
+
             </UiAccountingFormSection>
         }
         else if (Section == AccountingEntityType.Accounts)
         {
             <UiAccountingSplitView>
+
                 <Tree>
+
                     <UiAccountingFormSection Title="شجرة الحسابات"
                                              Subtitle="عرض هرمي لكل الحسابات مع التبعية بين الحسابات الأب والفرعية"
                                              IconCssClass="fa-solid fa-folder-tree">
+
                         <UiAccountTreeView Nodes="@AccountTreeNodes"
                                            SelectedAccountId="@SelectedAccountId"
                                            OnSelect="OpenAccountFromTreeAsync" />
+
                     </UiAccountingFormSection>
+
                 </Tree>
 
                 <Detail>
-                    @if (activeTab is { IsListTab: false } && activeTab.Model is AccountEditor.FormModel accountModel)
+
+                    @if (activeTab is { IsListTab: false } &&
+                                    activeTab.Model is AccountEditor.FormModel accountModel)
                     {
                         <UiAccountingFormSection Title="بيانات الحساب"
                                                  Subtitle="تفاصيل الحساب المحدد أو الحساب الجديد"
                                                  IconCssClass="fa-solid fa-file-pen">
+
                             <AccountEditor Model="@accountModel"
                                            IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
                                            IsNew="@activeTab.IsNew"
                                            ParentAccountLookupItem="@GetAccountLookup(accountModel.ParentAccountId)"
                                            AccountSearchAsync="SearchAccountsAsync"
                                            OnModelChanged="MarkActiveDirty" />
+
                         </UiAccountingFormSection>
                     }
                     else if (_isLoading)
@@ -227,170 +388,493 @@
                                                 Description="من القسم الأيسر افتح أي حساب لعرض بياناته هنا، أو اضغط &quot;جديد&quot; لإنشاء حساب جديد في هذا القسم."
                                                 IconCssClass="fa-solid fa-hand-pointer" />
                     }
+
                 </Detail>
+
             </UiAccountingSplitView>
         }
         else if (activeTab is { IsListTab: false })
         {
             @switch (activeTab.EntityType)
             {
-                case AccountingEntityType.Accounts when activeTab.Model is AccountEditor.FormModel model:
-                    <AccountEditor Model="@model" IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)" IsNew="@activeTab.IsNew" ParentAccountLookupItem="@GetAccountLookup(model.ParentAccountId)" AccountSearchAsync="SearchAccountsAsync" OnModelChanged="MarkActiveDirty" />
+                case AccountingEntityType.Accounts
+                    when activeTab.Model is AccountEditor.FormModel model:
+
+                    <AccountEditor Model="@model"
+                                   IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
+                                   IsNew="@activeTab.IsNew"
+                                   ParentAccountLookupItem="@GetAccountLookup(model.ParentAccountId)"
+                                   AccountSearchAsync="SearchAccountsAsync"
+                                   OnModelChanged="MarkActiveDirty" />
+
                     break;
-                case AccountingEntityType.FiscalYears when activeTab.Model is FiscalYearEditor.FormModel model:
-                    <FiscalYearEditor Model="@model" IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)" IsNew="@activeTab.IsNew" OnModelChanged="MarkActiveDirty" />
+
+                case AccountingEntityType.FiscalYears
+                    when activeTab.Model is FiscalYearEditor.FormModel model:
+
+                    <FiscalYearEditor Model="@model"
+                                      IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
+                                      IsNew="@activeTab.IsNew"
+                                      OnModelChanged="MarkActiveDirty" />
+
                     break;
-                case AccountingEntityType.FiscalPeriods when activeTab.Model is FiscalPeriodEditor.FormModel model:
-                    <FiscalPeriodEditor Model="@model" IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)" IsNew="@activeTab.IsNew" FiscalYearLookupItem="@GetFiscalYearLookup(model.FiscalYearId == Guid.Empty ? null : model.FiscalYearId)" FiscalYearSearchAsync="SearchFiscalYearsAsync" OnModelChanged="MarkActiveDirty" />
+
+                case AccountingEntityType.FiscalPeriods
+                    when activeTab.Model is FiscalPeriodEditor.FormModel model:
+
+                    <FiscalPeriodEditor Model="@model"
+                                        IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
+                                        IsNew="@activeTab.IsNew"
+                                        FiscalYearLookupItem="@GetFiscalYearLookup(model.FiscalYearId == Guid.Empty ? null : model.FiscalYearId)"
+                                        FiscalYearSearchAsync="SearchFiscalYearsAsync"
+                                        OnModelChanged="MarkActiveDirty" />
+
                     break;
-                case AccountingEntityType.Journals when activeTab.Model is JournalEntryEditor.FormModel model:
-                    <JournalEntryEditor Model="@model" IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)" IsNew="@activeTab.IsNew" FiscalPeriodLookupItem="@GetFiscalPeriodLookup(model.FiscalPeriodId)" FiscalPeriodSearchAsync="SearchFiscalPeriodsAsync" AccountSearchAsync="SearchAccountsAsync" CostCenterSearchAsync="SearchCostCentersAsync" OnModelChanged="MarkActiveDirty" />
+
+                case AccountingEntityType.Journals
+                    when activeTab.Model is JournalEntryEditor.FormModel model:
+
+                    <JournalEntryEditor Model="@model"
+                                        IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
+                                        IsNew="@activeTab.IsNew"
+                                        FiscalPeriodLookupItem="@GetFiscalPeriodLookup(model.FiscalPeriodId)"
+                                        FiscalPeriodSearchAsync="SearchFiscalPeriodsAsync"
+                                        AccountSearchAsync="SearchAccountsAsync"
+                                        CostCenterSearchAsync="SearchCostCentersAsync"
+                                        OnModelChanged="MarkActiveDirty" />
+
                     break;
-                case AccountingEntityType.PostingProfiles when activeTab.Model is PostingProfileEditor.FormModel model:
-                    <PostingProfileEditor Model="@model" IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)" IsNew="@activeTab.IsNew" AccountSearchAsync="SearchAccountsAsync" OnModelChanged="MarkActiveDirty" />
+
+                case AccountingEntityType.PostingProfiles
+                    when activeTab.Model is PostingProfileEditor.FormModel model:
+
+                    <PostingProfileEditor Model="@model"
+                                          IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
+                                          IsNew="@activeTab.IsNew"
+                                          AccountSearchAsync="SearchAccountsAsync"
+                                          OnModelChanged="MarkActiveDirty" />
+
                     break;
-                case AccountingEntityType.CostCenters when activeTab.Model is CostCenterEditor.FormModel model:
-                    <CostCenterEditor Model="@model" IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)" IsNew="@activeTab.IsNew" ParentCostCenterLookupItem="@GetCostCenterLookup(model.ParentCostCenterId)" CostCenterSearchAsync="SearchCostCentersAsync" OnModelChanged="MarkActiveDirty" />
+
+                case AccountingEntityType.CostCenters
+                    when activeTab.Model is CostCenterEditor.FormModel model:
+
+                    <CostCenterEditor Model="@model"
+                                      IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
+                                      IsNew="@activeTab.IsNew"
+                                      ParentCostCenterLookupItem="@GetCostCenterLookup(model.ParentCostCenterId)"
+                                      CostCenterSearchAsync="SearchCostCentersAsync"
+                                      OnModelChanged="MarkActiveDirty" />
+
                     break;
-                case AccountingEntityType.CustomerAccounts when activeTab.Model is CustomerAccountEditor.FormModel model:
-                    <CustomerAccountEditor Model="@model" IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)" IsNew="@activeTab.IsNew" CustomerLookupItem='@GetExternalReferenceLookup(model.CustomerId, "عميل")' AccountLookupItem="@GetAccountLookup(model.AccountId)" ControlAccountLookupItem="@GetAccountLookup(model.ControlAccountId)" CustomerSearchAsync="@null" AccountSearchAsync="SearchAccountsAsync" OnModelChanged="MarkActiveDirty" />
+
+                case AccountingEntityType.CustomerAccounts
+                    when activeTab.Model is CustomerAccountEditor.FormModel model:
+
+                    <CustomerAccountEditor Model="@model"
+                                           IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
+                                           IsNew="@activeTab.IsNew"
+                                           CustomerLookupItem='@GetExternalReferenceLookup(model.CustomerId, "عميل")'
+                                           AccountLookupItem="@GetAccountLookup(model.AccountId)"
+                                           ControlAccountLookupItem="@GetAccountLookup(model.ControlAccountId)"
+                                           CustomerSearchAsync="@null"
+                                           AccountSearchAsync="SearchAccountsAsync"
+                                           OnModelChanged="MarkActiveDirty" />
+
                     break;
-                case AccountingEntityType.SupplierAccounts when activeTab.Model is SupplierAccountEditor.FormModel model:
-                    <SupplierAccountEditor Model="@model" IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)" IsNew="@activeTab.IsNew" SupplierLookupItem='@GetExternalReferenceLookup(model.SupplierId, "مورد")' AccountLookupItem="@GetAccountLookup(model.AccountId)" ControlAccountLookupItem="@GetAccountLookup(model.ControlAccountId)" SupplierSearchAsync="@null" AccountSearchAsync="SearchAccountsAsync" OnModelChanged="MarkActiveDirty" />
+
+                case AccountingEntityType.SupplierAccounts
+                    when activeTab.Model is SupplierAccountEditor.FormModel model:
+
+                    <SupplierAccountEditor Model="@model"
+                                           IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
+                                           IsNew="@activeTab.IsNew"
+                                           SupplierLookupItem='@GetExternalReferenceLookup(model.SupplierId, "مورد")'
+                                           AccountLookupItem="@GetAccountLookup(model.AccountId)"
+                                           ControlAccountLookupItem="@GetAccountLookup(model.ControlAccountId)"
+                                           SupplierSearchAsync="@null"
+                                           AccountSearchAsync="SearchAccountsAsync"
+                                           OnModelChanged="MarkActiveDirty" />
+
                     break;
-                case AccountingEntityType.ReceiptVouchers when activeTab.Model is ReceiptVoucherEditor.FormModel model:
-                    <ReceiptVoucherEditor Model="@model" IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)" IsNew="@activeTab.IsNew" CustomerLookupItem='@GetExternalReferenceLookup(model.CustomerId, "عميل")' CashAccountLookupItem="@GetCashAccountLookup(model.CashAccountId)" BankAccountLookupItem="@GetBankAccountLookup(model.BankAccountId)" CustomerSearchAsync="@null" CashAccountSearchAsync="SearchCashAccountsAsync" BankAccountSearchAsync="SearchBankAccountsAsync" AccountSearchAsync="SearchAccountsAsync" OnModelChanged="MarkActiveDirty" />
+
+                case AccountingEntityType.ReceiptVouchers
+                    when activeTab.Model is ReceiptVoucherEditor.FormModel model:
+
+                    <ReceiptVoucherEditor Model="@model"
+                                          IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
+                                          IsNew="@activeTab.IsNew"
+                                          CustomerLookupItem='@GetExternalReferenceLookup(model.CustomerId, "عميل")'
+                                          CashAccountLookupItem="@GetCashAccountLookup(model.CashAccountId)"
+                                          BankAccountLookupItem="@GetBankAccountLookup(model.BankAccountId)"
+                                          CustomerSearchAsync="@null"
+                                          CashAccountSearchAsync="SearchCashAccountsAsync"
+                                          BankAccountSearchAsync="SearchBankAccountsAsync"
+                                          AccountSearchAsync="SearchAccountsAsync"
+                                          OnModelChanged="MarkActiveDirty" />
+
                     break;
-                case AccountingEntityType.PaymentVouchers when activeTab.Model is PaymentVoucherEditor.FormModel model:
-                    <PaymentVoucherEditor Model="@model" IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)" IsNew="@activeTab.IsNew" SupplierLookupItem='@GetExternalReferenceLookup(model.SupplierId, "مورد")' CashAccountLookupItem="@GetCashAccountLookup(model.CashAccountId)" BankAccountLookupItem="@GetBankAccountLookup(model.BankAccountId)" SupplierSearchAsync="@null" CashAccountSearchAsync="SearchCashAccountsAsync" BankAccountSearchAsync="SearchBankAccountsAsync" AccountSearchAsync="SearchAccountsAsync" OnModelChanged="MarkActiveDirty" />
+
+                case AccountingEntityType.PaymentVouchers
+                    when activeTab.Model is PaymentVoucherEditor.FormModel model:
+
+                    <PaymentVoucherEditor Model="@model"
+                                          IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
+                                          IsNew="@activeTab.IsNew"
+                                          SupplierLookupItem='@GetExternalReferenceLookup(model.SupplierId, "مورد")'
+                                          CashAccountLookupItem="@GetCashAccountLookup(model.CashAccountId)"
+                                          BankAccountLookupItem="@GetBankAccountLookup(model.BankAccountId)"
+                                          SupplierSearchAsync="@null"
+                                          CashAccountSearchAsync="SearchCashAccountsAsync"
+                                          BankAccountSearchAsync="SearchBankAccountsAsync"
+                                          AccountSearchAsync="SearchAccountsAsync"
+                                          OnModelChanged="MarkActiveDirty" />
+
                     break;
-                case AccountingEntityType.PaymentAllocations when activeTab.Model is PaymentAllocationEditor.FormModel model:
-                    <PaymentAllocationEditor Model="@model" IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)" IsNew="@activeTab.IsNew" SourceLookupItem="@GetPaymentSourceLookup(model.PaymentSourceId)" TargetLookupItem='@GetExternalReferenceLookup(model.TargetDocumentId, "مستند")' SourceSearchAsync="@(model.PaymentSourceType == PaymentSourceType.CustomerAdvance ? null : SearchPaymentSourcesAsync)" TargetSearchAsync="@null" OnModelChanged="MarkActiveDirty" />
+
+                case AccountingEntityType.PaymentAllocations
+                    when activeTab.Model is PaymentAllocationEditor.FormModel model:
+
+                    <PaymentAllocationEditor Model="@model"
+                                             IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
+                                             IsNew="@activeTab.IsNew"
+                                             SourceLookupItem="@GetPaymentSourceLookup(model.PaymentSourceId)"
+                                             TargetLookupItem='@GetExternalReferenceLookup(model.TargetDocumentId, "مستند")'
+                                             SourceSearchAsync="@(model.PaymentSourceType == PaymentSourceType.CustomerAdvance ? null : SearchPaymentSourcesAsync)"
+                                             TargetSearchAsync="@null"
+                                             OnModelChanged="MarkActiveDirty" />
+
                     break;
-                case AccountingEntityType.CashAccounts when activeTab.Model is CashAccountEditor.FormModel model:
-                    <CashAccountEditor Model="@model" IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)" IsNew="@activeTab.IsNew" AccountLookupItem="@GetAccountLookup(model.AccountId)" AccountSearchAsync="SearchAccountsAsync" OnModelChanged="MarkActiveDirty" />
+
+                case AccountingEntityType.CashAccounts
+                    when activeTab.Model is CashAccountEditor.FormModel model:
+
+                    <CashAccountEditor Model="@model"
+                                       IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
+                                       IsNew="@activeTab.IsNew"
+                                       AccountLookupItem="@GetAccountLookup(model.AccountId)"
+                                       AccountSearchAsync="SearchAccountsAsync"
+                                       OnModelChanged="MarkActiveDirty" />
+
                     break;
-                case AccountingEntityType.BankAccounts when activeTab.Model is BankAccountEditor.FormModel model:
-                    <BankAccountEditor Model="@model" IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)" IsNew="@activeTab.IsNew" AccountLookupItem="@GetAccountLookup(model.AccountId)" AccountSearchAsync="SearchAccountsAsync" OnModelChanged="MarkActiveDirty" />
+
+                case AccountingEntityType.BankAccounts
+                    when activeTab.Model is BankAccountEditor.FormModel model:
+
+                    <BankAccountEditor Model="@model"
+                                       IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
+                                       IsNew="@activeTab.IsNew"
+                                       AccountLookupItem="@GetAccountLookup(model.AccountId)"
+                                       AccountSearchAsync="SearchAccountsAsync"
+                                       OnModelChanged="MarkActiveDirty" />
+
                     break;
-                case AccountingEntityType.CashShifts when activeTab.Model is CashShiftEditor.FormModel model:
-                    <CashShiftEditor Model="@model" IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)" IsNew="@activeTab.IsNew" CashAccountLookupItem="@GetCashAccountLookup(model.CashAccountId)" CashAccountSearchAsync="SearchCashAccountsAsync" OnModelChanged="MarkActiveDirty">
+
+                case AccountingEntityType.CashShifts
+                    when activeTab.Model is CashShiftEditor.FormModel model:
+
+                    <CashShiftEditor Model="@model"
+                                     IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
+                                     IsNew="@activeTab.IsNew"
+                                     CashAccountLookupItem="@GetCashAccountLookup(model.CashAccountId)"
+                                     CashAccountSearchAsync="SearchCashAccountsAsync"
+                                     OnModelChanged="MarkActiveDirty">
+
                         <Actions>
+
                             @if (model.Status == CashShiftStatus.Open)
                             {
-                                <UiButton Text="إغلاق الوردية" IconCssClass="fa-solid fa-lock" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="CloseActiveCashShiftAsync" />
+                                <UiButton Text="إغلاق الوردية"
+                                          IconCssClass="fa-solid fa-lock"
+                                          Variant="ButtonVariant.Secondary"
+                                          Size="ControlSize.Small"
+                                          OnClick="CloseActiveCashShiftAsync" />
                             }
                             else if (model.Status == CashShiftStatus.Closed)
                             {
-                                <UiButton Text="اعتماد الوردية" IconCssClass="fa-solid fa-circle-check" Size="ControlSize.Small" OnClick="ApproveActiveCashShiftAsync" />
+                                <UiButton Text="اعتماد الوردية"
+                                          IconCssClass="fa-solid fa-circle-check"
+                                          Size="ControlSize.Small"
+                                          OnClick="ApproveActiveCashShiftAsync" />
                             }
+
                         </Actions>
+
                     </CashShiftEditor>
+
                     break;
-                case AccountingEntityType.Expenses when activeTab.Model is ExpenseEditor.FormModel model:
-                    <ExpenseEditor Model="@model" IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)" IsNew="@activeTab.IsNew" ExpenseTypeLookupItem="@GetExpenseTypeLookup(model.ExpenseTypeId)" ExpenseAccountLookupItem="@GetAccountLookup(model.ExpenseAccountId)" CashAccountLookupItem="@GetCashAccountLookup(model.CashAccountId)" BankAccountLookupItem="@GetBankAccountLookup(model.BankAccountId)" ExpenseTypeSearchAsync="SearchExpenseTypesAsync" AccountSearchAsync="SearchAccountsAsync" CashAccountSearchAsync="SearchCashAccountsAsync" BankAccountSearchAsync="SearchBankAccountsAsync" OnModelChanged="MarkActiveDirty" />
+
+                case AccountingEntityType.Expenses
+                    when activeTab.Model is ExpenseEditor.FormModel model:
+
+                    <ExpenseEditor Model="@model"
+                                   IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
+                                   IsNew="@activeTab.IsNew"
+                                   ExpenseTypeLookupItem="@GetExpenseTypeLookup(model.ExpenseTypeId)"
+                                   ExpenseAccountLookupItem="@GetAccountLookup(model.ExpenseAccountId)"
+                                   CashAccountLookupItem="@GetCashAccountLookup(model.CashAccountId)"
+                                   BankAccountLookupItem="@GetBankAccountLookup(model.BankAccountId)"
+                                   ExpenseTypeSearchAsync="SearchExpenseTypesAsync"
+                                   AccountSearchAsync="SearchAccountsAsync"
+                                   CashAccountSearchAsync="SearchCashAccountsAsync"
+                                   BankAccountSearchAsync="SearchBankAccountsAsync"
+                                   OnModelChanged="MarkActiveDirty" />
+
                     break;
-                case AccountingEntityType.ExpenseTypes when activeTab.Model is ExpenseTypeEditor.FormModel model:
-                    <ExpenseTypeEditor Model="@model" IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)" IsNew="@activeTab.IsNew" AccountLookupItem="@GetAccountLookup(model.DefaultExpenseAccountId)" AccountSearchAsync="SearchAccountsAsync" OnModelChanged="MarkActiveDirty" />
+
+                case AccountingEntityType.ExpenseTypes
+                    when activeTab.Model is ExpenseTypeEditor.FormModel model:
+
+                    <ExpenseTypeEditor Model="@model"
+                                       IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
+                                       IsNew="@activeTab.IsNew"
+                                       AccountLookupItem="@GetAccountLookup(model.DefaultExpenseAccountId)"
+                                       AccountSearchAsync="SearchAccountsAsync"
+                                       OnModelChanged="MarkActiveDirty" />
+
                     break;
+
                 default:
-                    <UiAccountingEmptyState Title="تعذر عرض السجل" Description="نوع السجل المفتوح غير مدعوم في واجهة المحاسبة." IconCssClass="fa-solid fa-triangle-exclamation" />
+
+                    <UiAccountingEmptyState Title="تعذر عرض السجل"
+                                            Description="نوع السجل المفتوح غير مدعوم في واجهة المحاسبة."
+                                            IconCssClass="fa-solid fa-triangle-exclamation" />
+
                     break;
             }
         }
         else if (_isLoading)
         {
-            <UiAccountingEmptyState Title="جاري تحميل البيانات" Description="يتم الآن جلب أحدث البيانات من النظام..." IconCssClass="fa-solid fa-circle-notch fa-spin" />
+            <UiAccountingEmptyState Title="جاري تحميل البيانات"
+                                    Description="يتم الآن جلب أحدث البيانات من النظام..."
+                                    IconCssClass="fa-solid fa-circle-notch fa-spin" />
         }
         else
         {
             @if (Section == AccountingEntityType.CashAccounts)
             {
-                <UiAccountingFormSection Title="الصناديق والخزائن" Subtitle="الصناديق النقدية المرتبطة بحسابات الأستاذ العام" IconCssClass="fa-solid fa-vault">
-                    <UiAccountingRecordList Items="@BuildCashAccountItems()" EmptyTitle="لا توجد صناديق" OnOpen='@(id => OpenRecordInTab(AccountingEntityType.CashAccounts, id, "صندوق"))' />
-                    <UiPagination PageNumber="@_cashAccountsPage.PageNumber" TotalPages="@_cashAccountsPage.TotalPages" TotalCount="@_cashAccountsPage.TotalCount" OnPrevious="@(() => ChangePageAsync(AccountingEntityType.CashAccounts, -1))" OnNext="@(() => ChangePageAsync(AccountingEntityType.CashAccounts, 1))" />
+                <UiAccountingFormSection Title="الصناديق والخزائن"
+                                         Subtitle="الصناديق النقدية المرتبطة بحسابات الأستاذ العام"
+                                         IconCssClass="fa-solid fa-vault">
+
+                    <UiAccountingRecordList Items="@BuildCashAccountItems()"
+                                            EmptyTitle="لا توجد صناديق"
+                                            OnOpen='@(id => OpenRecordInTab(AccountingEntityType.CashAccounts, id, "صندوق"))' />
+
+                    <UiPagination PageNumber="@_cashAccountsPage.PageNumber"
+                                  TotalPages="@_cashAccountsPage.TotalPages"
+                                  TotalCount="@_cashAccountsPage.TotalCount"
+                                  OnPrevious="@(() => ChangePageAsync(AccountingEntityType.CashAccounts, -1))"
+                                  OnNext="@(() => ChangePageAsync(AccountingEntityType.CashAccounts, 1))" />
+
                 </UiAccountingFormSection>
             }
             else if (Section == AccountingEntityType.BankAccounts)
             {
-                <UiAccountingFormSection Title="الحسابات البنكية" Subtitle="الحسابات البنكية المرتبطة بدليل الحسابات" IconCssClass="fa-solid fa-building-columns">
-                    <UiAccountingRecordList Items="@BuildBankAccountItems()" EmptyTitle="لا توجد حسابات بنكية" OnOpen='@(id => OpenRecordInTab(AccountingEntityType.BankAccounts, id, "حساب بنكي"))' />
-                    <UiPagination PageNumber="@_bankAccountsPage.PageNumber" TotalPages="@_bankAccountsPage.TotalPages" TotalCount="@_bankAccountsPage.TotalCount" OnPrevious="@(() => ChangePageAsync(AccountingEntityType.BankAccounts, -1))" OnNext="@(() => ChangePageAsync(AccountingEntityType.BankAccounts, 1))" />
+                <UiAccountingFormSection Title="الحسابات البنكية"
+                                         Subtitle="الحسابات البنكية المرتبطة بدليل الحسابات"
+                                         IconCssClass="fa-solid fa-building-columns">
+
+                    <UiAccountingRecordList Items="@BuildBankAccountItems()"
+                                            EmptyTitle="لا توجد حسابات بنكية"
+                                            OnOpen='@(id => OpenRecordInTab(AccountingEntityType.BankAccounts, id, "حساب بنكي"))' />
+
+                    <UiPagination PageNumber="@_bankAccountsPage.PageNumber"
+                                  TotalPages="@_bankAccountsPage.TotalPages"
+                                  TotalCount="@_bankAccountsPage.TotalCount"
+                                  OnPrevious="@(() => ChangePageAsync(AccountingEntityType.BankAccounts, -1))"
+                                  OnNext="@(() => ChangePageAsync(AccountingEntityType.BankAccounts, 1))" />
+
                 </UiAccountingFormSection>
             }
             else if (Section == AccountingEntityType.FiscalYears)
             {
-                <UiAccountingFormSection Title="السنوات المالية" Subtitle="تعريف نطاقات السنة وحالتها" IconCssClass="fa-solid fa-calendar-days">
-                    <UiAccountingRecordList Items="@BuildFiscalYearItems()" EmptyTitle="لا توجد سنوات مالية" OnOpen='@(id => OpenRecordInTab(AccountingEntityType.FiscalYears, id, "سنة مالية"))' />
-                    <UiPagination PageNumber="@_fiscalYearsPage.PageNumber" TotalPages="@_fiscalYearsPage.TotalPages" TotalCount="@_fiscalYearsPage.TotalCount" OnPrevious="@(() => ChangePageAsync(AccountingEntityType.FiscalYears, -1))" OnNext="@(() => ChangePageAsync(AccountingEntityType.FiscalYears, 1))" />
+                <UiAccountingFormSection Title="السنوات المالية"
+                                         Subtitle="تعريف نطاقات السنة وحالتها"
+                                         IconCssClass="fa-solid fa-calendar-days">
+
+                    <UiAccountingRecordList Items="@BuildFiscalYearItems()"
+                                            EmptyTitle="لا توجد سنوات مالية"
+                                            OnOpen='@(id => OpenRecordInTab(AccountingEntityType.FiscalYears, id, "سنة مالية"))' />
+
+                    <UiPagination PageNumber="@_fiscalYearsPage.PageNumber"
+                                  TotalPages="@_fiscalYearsPage.TotalPages"
+                                  TotalCount="@_fiscalYearsPage.TotalCount"
+                                  OnPrevious="@(() => ChangePageAsync(AccountingEntityType.FiscalYears, -1))"
+                                  OnNext="@(() => ChangePageAsync(AccountingEntityType.FiscalYears, 1))" />
+
                 </UiAccountingFormSection>
-                <UiAccountingFormSection Title="الفترات المالية" Subtitle="الفترات وحالات إقفال المبيعات والمخزون والمحاسبة" IconCssClass="fa-solid fa-calendar-week">
-                    <UiWorkspaceActionBar><UiSpreadsheetActions CanImport="false" Busy="_spreadsheetBusy" OnImport="@(() => OpenSpreadsheet(AccountingEntityType.FiscalPeriods))" OnTemplate="@(() => DownloadSpreadsheet(AccountingEntityType.FiscalPeriods,true))" OnExport="@(() => DownloadSpreadsheet(AccountingEntityType.FiscalPeriods,false))" /></UiWorkspaceActionBar>
-                    <UiAccountingRecordList Items="@BuildFiscalPeriodItems()" EmptyTitle="لا توجد فترات مالية" OnOpen='@(id => OpenRecordInTab(AccountingEntityType.FiscalPeriods, id, "فترة مالية"))' />
-                    <UiPagination PageNumber="@_fiscalPeriodsPage.PageNumber" TotalPages="@_fiscalPeriodsPage.TotalPages" TotalCount="@_fiscalPeriodsPage.TotalCount" OnPrevious="@(() => ChangePageAsync(AccountingEntityType.FiscalPeriods, -1))" OnNext="@(() => ChangePageAsync(AccountingEntityType.FiscalPeriods, 1))" />
+
+                <UiAccountingFormSection Title="الفترات المالية"
+                                         Subtitle="الفترات وحالات إقفال المبيعات والمخزون والمحاسبة"
+                                         IconCssClass="fa-solid fa-calendar-week">
+
+                    <UiWorkspaceActionBar>
+
+                        <UiSpreadsheetActions CanImport="false"
+                                              Busy="_spreadsheetBusy"
+                                              OnImport="@(() => OpenSpreadsheet(AccountingEntityType.FiscalPeriods))"
+                                              OnTemplate="@(() => DownloadSpreadsheet(AccountingEntityType.FiscalPeriods, true))"
+                                              OnExport="@(() => DownloadSpreadsheet(AccountingEntityType.FiscalPeriods, false))" />
+
+                    </UiWorkspaceActionBar>
+
+                    <UiAccountingRecordList Items="@BuildFiscalPeriodItems()"
+                                            EmptyTitle="لا توجد فترات مالية"
+                                            OnOpen='@(id => OpenRecordInTab(AccountingEntityType.FiscalPeriods, id, "فترة مالية"))' />
+
+                    <UiPagination PageNumber="@_fiscalPeriodsPage.PageNumber"
+                                  TotalPages="@_fiscalPeriodsPage.TotalPages"
+                                  TotalCount="@_fiscalPeriodsPage.TotalCount"
+                                  OnPrevious="@(() => ChangePageAsync(AccountingEntityType.FiscalPeriods, -1))"
+                                  OnNext="@(() => ChangePageAsync(AccountingEntityType.FiscalPeriods, 1))" />
+
                 </UiAccountingFormSection>
             }
             else if (Section == AccountingEntityType.Expenses)
             {
-                <UiAccountingFormSection Title="المصروفات" Subtitle="المصروفات التشغيلية وحالة اعتمادها وترحيلها" IconCssClass="fa-solid fa-receipt">
-                    <UiAccountingRecordList Items="@BuildExpenseItems()" EmptyTitle="لا توجد مصروفات" OnOpen='@(id => OpenRecordInTab(AccountingEntityType.Expenses, id, "مصروف"))' />
-                    <UiPagination PageNumber="@_expensesPage.PageNumber" TotalPages="@_expensesPage.TotalPages" TotalCount="@_expensesPage.TotalCount" OnPrevious="@(() => ChangePageAsync(AccountingEntityType.Expenses, -1))" OnNext="@(() => ChangePageAsync(AccountingEntityType.Expenses, 1))" />
+                <UiAccountingFormSection Title="المصروفات"
+                                         Subtitle="المصروفات التشغيلية وحالة اعتمادها وترحيلها"
+                                         IconCssClass="fa-solid fa-receipt">
+
+                    <UiAccountingRecordList Items="@BuildExpenseItems()"
+                                            EmptyTitle="لا توجد مصروفات"
+                                            OnOpen='@(id => OpenRecordInTab(AccountingEntityType.Expenses, id, "مصروف"))' />
+
+                    <UiPagination PageNumber="@_expensesPage.PageNumber"
+                                  TotalPages="@_expensesPage.TotalPages"
+                                  TotalCount="@_expensesPage.TotalCount"
+                                  OnPrevious="@(() => ChangePageAsync(AccountingEntityType.Expenses, -1))"
+                                  OnNext="@(() => ChangePageAsync(AccountingEntityType.Expenses, 1))" />
+
                 </UiAccountingFormSection>
-                <UiAccountingFormSection Title="أنواع المصروفات" Subtitle="التصنيف والحساب الافتراضي لكل نوع" IconCssClass="fa-solid fa-tags">
-                    <UiWorkspaceActionBar><UiSpreadsheetActions CanImport="true" Busy="_spreadsheetBusy" OnImport="@(() => OpenSpreadsheet(AccountingEntityType.ExpenseTypes))" OnTemplate="@(() => DownloadSpreadsheet(AccountingEntityType.ExpenseTypes,true))" OnExport="@(() => DownloadSpreadsheet(AccountingEntityType.ExpenseTypes,false))" /></UiWorkspaceActionBar>
-                    <UiAccountingRecordList Items="@BuildExpenseTypeItems()" EmptyTitle="لا توجد أنواع مصروفات" OnOpen='@(id => OpenRecordInTab(AccountingEntityType.ExpenseTypes, id, "نوع مصروف"))' />
-                    <UiPagination PageNumber="@_expenseTypesPage.PageNumber" TotalPages="@_expenseTypesPage.TotalPages" TotalCount="@_expenseTypesPage.TotalCount" OnPrevious="@(() => ChangePageAsync(AccountingEntityType.ExpenseTypes, -1))" OnNext="@(() => ChangePageAsync(AccountingEntityType.ExpenseTypes, 1))" />
+
+                <UiAccountingFormSection Title="أنواع المصروفات"
+                                         Subtitle="التصنيف والحساب الافتراضي لكل نوع"
+                                         IconCssClass="fa-solid fa-tags">
+
+                    <UiWorkspaceActionBar>
+
+                        <UiSpreadsheetActions CanImport="true"
+                                              Busy="_spreadsheetBusy"
+                                              OnImport="@(() => OpenSpreadsheet(AccountingEntityType.ExpenseTypes))"
+                                              OnTemplate="@(() => DownloadSpreadsheet(AccountingEntityType.ExpenseTypes, true))"
+                                              OnExport="@(() => DownloadSpreadsheet(AccountingEntityType.ExpenseTypes, false))" />
+
+                    </UiWorkspaceActionBar>
+
+                    <UiAccountingRecordList Items="@BuildExpenseTypeItems()"
+                                            EmptyTitle="لا توجد أنواع مصروفات"
+                                            OnOpen='@(id => OpenRecordInTab(AccountingEntityType.ExpenseTypes, id, "نوع مصروف"))' />
+
+                    <UiPagination PageNumber="@_expenseTypesPage.PageNumber"
+                                  TotalPages="@_expenseTypesPage.TotalPages"
+                                  TotalCount="@_expenseTypesPage.TotalCount"
+                                  OnPrevious="@(() => ChangePageAsync(AccountingEntityType.ExpenseTypes, -1))"
+                                  OnNext="@(() => ChangePageAsync(AccountingEntityType.ExpenseTypes, 1))" />
+
                 </UiAccountingFormSection>
             }
-            else if (Section is AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers)
+            else if (Section is AccountingEntityType.ReceiptVouchers
+            or AccountingEntityType.PaymentVouchers)
             {
                 <UiAccountingFormSection Title='@(Section == AccountingEntityType.ReceiptVouchers ? "سندات القبض" : "سندات الصرف")'
                                          Subtitle="عرض السندات وفتحها للتفاصيل أو التعديل حسب حالتها"
                                          IconCssClass='@(Section == AccountingEntityType.ReceiptVouchers ? "fa-solid fa-money-bill-trend-up" : "fa-solid fa-money-bill-transfer")'>
+
                     <UiAccountingRecordList Items="@(Section == AccountingEntityType.ReceiptVouchers ? BuildReceiptItems() : BuildPaymentItems())"
                                             EmptyTitle='@(Section == AccountingEntityType.ReceiptVouchers ? "لا توجد سندات قبض" : "لا توجد سندات صرف")'
                                             OnOpen="OpenCurrentRecordAsync" />
-                    <UiPagination PageNumber="@CurrentPageNumber" TotalPages="@CurrentTotalPages" TotalCount="@CurrentTotalCount" OnPrevious="@(() => ChangePageAsync(CurrentListEntity, -1))" OnNext="@(() => ChangePageAsync(CurrentListEntity, 1))" />
+
+                    <UiPagination PageNumber="@CurrentPageNumber"
+                                  TotalPages="@CurrentTotalPages"
+                                  TotalCount="@CurrentTotalCount"
+                                  OnPrevious="@(() => ChangePageAsync(CurrentListEntity, -1))"
+                                  OnNext="@(() => ChangePageAsync(CurrentListEntity, 1))" />
+
                 </UiAccountingFormSection>
+
                 <UiAccountingFormSection Title="تخصيصات الدفعات"
                                          Subtitle="التخصيصات المرتبطة بهذا النوع من السندات؛ افتح السجل لتعديل المبلغ المخصص"
                                          IconCssClass="fa-solid fa-link"
                                          Collapsible="true">
-                    <UiWorkspaceActionBar><UiSpreadsheetActions Busy="_spreadsheetBusy" OnExport="@(() => DownloadSpreadsheet(AccountingEntityType.PaymentAllocations,false))" /></UiWorkspaceActionBar>
-                    <UiAccountingRecordList Items="@BuildAllocationItems()" EmptyTitle="لا توجد تخصيصات سداد" EmptyDescription="أنشئ تخصيصاً من زر تخصيص دفعة عند الحاجة." OnOpen='@(id => OpenRecordInTab(AccountingEntityType.PaymentAllocations, id, "تخصيص سداد"))' />
-                    <UiPagination PageNumber="@_allocationsPage.PageNumber" TotalPages="@_allocationsPage.TotalPages" TotalCount="@_allocationsPage.TotalCount" OnPrevious="@(() => ChangeAllocationPageAsync(-1))" OnNext="@(() => ChangeAllocationPageAsync(1))" />
+
+                    <UiWorkspaceActionBar>
+
+                        <UiSpreadsheetActions Busy="_spreadsheetBusy"
+                                              OnExport="@(() => DownloadSpreadsheet(AccountingEntityType.PaymentAllocations, false))" />
+
+                    </UiWorkspaceActionBar>
+
+                    <UiAccountingRecordList Items="@BuildAllocationItems()"
+                                            EmptyTitle="لا توجد تخصيصات سداد"
+                                            EmptyDescription="أنشئ تخصيصاً من زر تخصيص دفعة عند الحاجة."
+                                            OnOpen='@(id => OpenRecordInTab(AccountingEntityType.PaymentAllocations, id, "تخصيص سداد"))' />
+
+                    <UiPagination PageNumber="@_allocationsPage.PageNumber"
+                                  TotalPages="@_allocationsPage.TotalPages"
+                                  TotalCount="@_allocationsPage.TotalCount"
+                                  OnPrevious="@(() => ChangeAllocationPageAsync(-1))"
+                                  OnNext="@(() => ChangeAllocationPageAsync(1))" />
+
                 </UiAccountingFormSection>
             }
             else if (Section == AccountingEntityType.Accounts)
             {
                 <UiAccountingSplitView>
+
                     <Tree>
+
                         <UiAccountingFormSection Title="شجرة الحسابات"
                                                  Subtitle="عرض هرمي لكل الحسابات مع إمكانية التوسيع والطي"
                                                  IconCssClass="fa-solid fa-folder-tree">
+
                             <UiAccountTreeView Nodes="@AccountTreeNodes"
                                                SelectedAccountId="@SelectedAccountId"
                                                OnSelect="OpenAccountFromTreeAsync" />
+
                         </UiAccountingFormSection>
+
                     </Tree>
 
                     <Detail>
+
                         <UiAccountingEmptyState Title="اختر حساباً أو أنشئ حساباً جديداً"
                                                 Description="اضغط على أي حساب في الشجرة لعرض بياناته هنا، أو استخدم زر جديد لفتح تبويب حساب جديد في القسم الثاني."
                                                 IconCssClass="fa-solid fa-file-circle-plus" />
+
                     </Detail>
+
                 </UiAccountingSplitView>
             }
             else
             {
-                <UiAccountingRecordList Items="@CurrentRecordItems" EmptyTitle="@CurrentEmptyTitle" EmptyDescription="@CurrentEmptyDescription" EmptyIconCssClass="@CurrentEmptyIcon" OnOpen="OpenCurrentRecordAsync" />
-                <UiPagination PageNumber="@CurrentPageNumber" TotalPages="@CurrentTotalPages" TotalCount="@CurrentTotalCount" OnPrevious="@(() => ChangePageAsync(CurrentListEntity, -1))" OnNext="@(() => ChangePageAsync(CurrentListEntity, 1))" />
+                <UiAccountingRecordList Items="@CurrentRecordItems"
+                                        EmptyTitle="@CurrentEmptyTitle"
+                                        EmptyDescription="@CurrentEmptyDescription"
+                                        EmptyIconCssClass="@CurrentEmptyIcon"
+                                        OnOpen="OpenCurrentRecordAsync" />
+
+                <UiPagination PageNumber="@CurrentPageNumber"
+                              TotalPages="@CurrentTotalPages"
+                              TotalCount="@CurrentTotalCount"
+                              OnPrevious="@(() => ChangePageAsync(CurrentListEntity, -1))"
+                              OnNext="@(() => ChangePageAsync(CurrentListEntity, 1))" />
             }
         }
+
     </Body>
+
 </UiAccountingWorkspace>
 
 @if (_spreadsheetOpen)
 {
-    <UiSpreadsheetImport Title="@_spreadsheetSection" Busy="_spreadsheetBusy" Preview="SpreadsheetUiPreview" OnFile="PreviewSpreadsheet" OnConfirm="ConfirmSpreadsheet" OnClose="CloseSpreadsheet" />
+    <UiSpreadsheetImport @key="_spreadsheetImportSession"
+                         Title="@SpreadsheetTitle"
+                         Busy="_spreadsheetBusy"
+                         Preview="SpreadsheetUiPreview"
+                         OnValidate="PreviewSpreadsheet"
+                         OnConfirm="ConfirmSpreadsheet"
+                         OnClear="ClearSpreadsheetFile"
+                         OnClose="CloseSpreadsheet" />
 }

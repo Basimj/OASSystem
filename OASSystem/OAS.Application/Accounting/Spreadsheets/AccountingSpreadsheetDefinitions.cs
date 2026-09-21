@@ -6,18 +6,62 @@ public static class AccountingSpreadsheetDefinitions
 {
     public static readonly string[] ImportSections = ["accounts","cost-centers","cash-accounts","bank-accounts","expense-types","posting-profiles","journals"];
     public static readonly string[] ExportSections = [.. ImportSections,"fiscal-years","fiscal-periods","receipt-vouchers","payment-vouchers","payment-allocations","expenses","cash-shifts"];
-    private static SpreadsheetColumn Text(string key, bool required=false) => new(key,required);
-    private static SpreadsheetColumn Bool(string key, bool value=false) => new(key,false,"bool",value.ToString(),["True","False"]);
-    private static SpreadsheetColumn Enum<T>(string key) where T:struct,Enum => new(key,true,"enum",null,System.Enum.GetNames<T>());
+
+    private static SpreadsheetColumn Text(string key, string header, bool required=false) => new(key,required,Header:header);
+    private static SpreadsheetColumn Bool(string key, string header, bool value=false) => new(key,false,"bool",value ? "نعم" : "لا",["نعم","لا"],Header:header);
+    private static SpreadsheetColumn Enum<T>(string key, string header) where T:struct,Enum => new(key,true,"enum",null,System.Enum.GetNames<T>(),Header:header);
+    private static SpreadsheetColumn Date(string key,string header,bool required=false)=>new(key,required,"date",Format:"yyyy-mm-dd",Header:header);
+    private static SpreadsheetColumn Decimal(string key,string header,bool required=false)=>new(key,required,"decimal",Header:header);
+
+    public static string SheetName(string section) => section switch
+    {
+        "accounts"=>"الحسابات",
+        "cost-centers"=>"مراكز التكلفة",
+        "cash-accounts"=>"الصناديق",
+        "bank-accounts"=>"الحسابات البنكية",
+        "expense-types"=>"أنواع المصروفات",
+        "posting-profiles"=>"ملفات الترحيل",
+        "journals"=>"القيود",
+        "fiscal-years"=>"السنوات المالية",
+        "fiscal-periods"=>"الفترات المالية",
+        "receipt-vouchers"=>"سندات القبض",
+        "payment-vouchers"=>"سندات الصرف",
+        "payment-allocations"=>"تخصيصات الدفعات",
+        "expenses"=>"المصروفات",
+        "cash-shifts"=>"ورديات الصندوق",
+        _=>section
+    };
+
+    public static string Header(string key) => key switch
+    {
+        "Code"=>"الكود", "Name"=>"الاسم", "NameAr"=>"الاسم العربي", "NameEn"=>"الاسم الإنجليزي", "Level"=>"المستوى",
+        "ParentCode"=>"كود الأب", "AccountClass"=>"تصنيف الحساب", "AccountType"=>"نوع الحساب", "NormalBalance"=>"طبيعة الرصيد",
+        "IsPostingAccount"=>"حساب ترحيل", "IsControlAccount"=>"حساب مراقبة", "AllowManualPosting"=>"يسمح بالقيد اليدوي", "IsSystemAccount"=>"حساب نظام", "IsActive"=>"نشط", "EffectiveDate"=>"تاريخ السريان",
+        "AccountCode"=>"كود الحساب العام", "IsDefault"=>"افتراضي", "BankName"=>"اسم البنك", "AccountName"=>"اسم الحساب", "AccountNumber"=>"رقم الحساب", "IBAN"=>"الآيبان",
+        "DefaultExpenseAccountCode"=>"كود حساب المصروف الافتراضي", "Module"=>"الموديول", "DocumentType"=>"نوع المستند", "ProfileCode"=>"كود ملف الترحيل", "AccountRole"=>"دور الحساب", "IsRequired"=>"إلزامي",
+        "JournalKey"=>"مفتاح القيد", "JournalType"=>"نوع القيد", "PostingDate"=>"تاريخ الترحيل", "DocumentDate"=>"تاريخ المستند", "Description"=>"البيان", "Debit"=>"مدين", "Credit"=>"دائن", "CostCenterCode"=>"كود مركز التكلفة", "LineDescription"=>"بيان السطر",
+        "Status"=>"الحالة", "JournalNumber"=>"رقم القيد", "PeriodNumber"=>"رقم الفترة", "StartDate"=>"تاريخ البداية", "EndDate"=>"تاريخ النهاية",
+        "SalesLocked"=>"المبيعات مقفلة", "InventoryLocked"=>"المخزون مقفل", "AccountingLocked"=>"الحسابات مقفلة", "ClosedAtUtc"=>"وقت الإقفال", "ClosedBy"=>"مغلق بواسطة",
+        "VoucherNumber"=>"رقم السند", "VoucherDate"=>"تاريخ السند", "PartyType"=>"نوع الطرف", "CustomerId"=>"معرف العميل", "SupplierId"=>"معرف المورد", "ReceivedFrom"=>"مستلم من", "BeneficiaryName"=>"اسم المستفيد", "PaymentMethod"=>"طريقة الدفع", "TotalAmount"=>"الإجمالي",
+        "CashAccountCode"=>"كود الصندوق", "BankAccountCode"=>"كود الحساب البنكي", "JournalEntryCode"=>"رقم القيد", "JournalEntryNumber"=>"رقم القيد", "ReceiptVoucherId"=>"معرف سند القبض", "PaymentVoucherId"=>"معرف سند الصرف", "PostingProfileId"=>"معرف ملف الترحيل", "JournalEntryId"=>"معرف القيد", "ReferenceType"=>"نوع المرجع", "ReferenceId"=>"معرف المرجع", "LineNumber"=>"رقم السطر",
+        "PaymentSourceType"=>"نوع مصدر الدفعة", "PaymentSourceNumber"=>"رقم مصدر الدفعة", "TargetDocumentType"=>"نوع المستند المستهدف", "TargetDocumentId"=>"معرف المستند المستهدف", "AllocatedAmount"=>"المبلغ المخصص", "AllocatedAtUtc"=>"وقت التخصيص", "CreatedBy"=>"أنشئ بواسطة", "CreatedAtUtc"=>"وقت الإنشاء",
+        "ExpenseNumber"=>"رقم المصروف", "ExpenseDate"=>"تاريخ المصروف", "ExpenseTypeCode"=>"كود نوع المصروف", "ExpenseAccountCode"=>"كود حساب المصروف", "Beneficiary"=>"المستفيد", "Amount"=>"المبلغ", "PostedAtUtc"=>"وقت الترحيل",
+        "ShiftNumber"=>"رقم الوردية", "OpenedBy"=>"فتح بواسطة", "OpenedAtUtc"=>"وقت الفتح", "OpeningBalance"=>"رصيد البداية", "ExpectedClosingBalance"=>"الرصيد المتوقع", "ActualClosingBalance"=>"الرصيد الفعلي", "DifferenceAmount"=>"الفرق", "CashAccountId"=>"معرف الصندوق", "BankAccountId"=>"معرف الحساب البنكي",
+        "FiscalYearCode"=>"كود السنة المالية", "FiscalPeriodCode"=>"كود الفترة المالية", "FiscalYearId"=>"معرف السنة المالية", "FiscalPeriodId"=>"معرف الفترة المالية", "ExpenseTypeId"=>"معرف نوع المصروف", "ExpenseAccountId"=>"معرف حساب المصروف",
+        "ParentAccountCode"=>"كود الحساب الأب", "ParentCostCenterCode"=>"كود مركز التكلفة الأب", "ReversedJournalCode"=>"رقم القيد المعكوس",
+        "ApprovedBy"=>"اعتمد بواسطة", "ApprovedAtUtc"=>"وقت الاعتماد", "PostedBy"=>"رحّل بواسطة", "SourceModule"=>"الموديول المصدر", "SourceDocumentType"=>"نوع المستند المصدر", "SourceDocumentId"=>"معرف المستند المصدر",
+        _=>key
+    };
+
     public static IReadOnlyList<SpreadsheetSheet> Get(string section) => section switch
     {
-        "accounts" => [new("Accounts",[Text("Code",true),Text("NameAr",true),Text("NameEn"),Text("ParentCode"),Enum<AccountClass>("AccountClass"),Enum<AccountType>("AccountType"),Enum<NormalBalance>("NormalBalance"),Bool("IsPostingAccount",true),Bool("IsControlAccount"),Bool("AllowManualPosting",true),Bool("IsSystemAccount"),Bool("IsActive",true),new("EffectiveDate",false,"date")])],
-        "cost-centers" => [new("CostCenters",[Text("Code",true),Text("NameAr",true),Text("NameEn"),Text("ParentCode"),Bool("IsActive",true)])],
-        "cash-accounts" => [new("CashAccounts",[Text("Code",true),Text("Name",true),Text("AccountCode",true),Bool("IsDefault"),Bool("IsActive",true)])],
-        "bank-accounts" => [new("BankAccounts",[Text("Code",true),Text("BankName",true),Text("AccountName",true),Text("AccountNumber",true),Text("IBAN"),Text("AccountCode",true),Bool("IsActive",true)])],
-        "expense-types" => [new("ExpenseTypes",[Text("Code",true),Text("NameAr",true),Text("NameEn"),Text("DefaultExpenseAccountCode"),Bool("IsActive",true)])],
-        "posting-profiles" => [new("PostingProfiles",[Text("Code",true),Text("Name",true),Text("Module",true),Text("DocumentType",true),Bool("IsActive",true)]),new("Lines",[Text("ProfileCode",true),Text("AccountRole",true),Text("AccountCode",true),Bool("IsRequired",true)])],
-        "journals" => [new("Journals",[Text("JournalKey",true),new("JournalType",true,"enum",null,["Manual","Opening","Closing"]),new("PostingDate",true,"date"),new("DocumentDate",true,"date"),Text("Description",true),Text("AccountCode",true),new("Debit",true,"decimal"),new("Credit",true,"decimal"),Text("CostCenterCode"),Text("LineDescription")])],
+        "accounts" => [new("Accounts",[Text("Code","كود الحساب",true),Text("NameAr",Header("NameAr"),true),Text("NameEn",Header("NameEn")),Text("ParentCode","كود الحساب الأب"),Enum<AccountClass>("AccountClass",Header("AccountClass")),Enum<AccountType>("AccountType",Header("AccountType")),Enum<NormalBalance>("NormalBalance",Header("NormalBalance")),Bool("IsPostingAccount",Header("IsPostingAccount"),true),Bool("IsControlAccount",Header("IsControlAccount")),Bool("AllowManualPosting",Header("AllowManualPosting"),true),Bool("IsSystemAccount",Header("IsSystemAccount")),Bool("IsActive",Header("IsActive"),true),Date("EffectiveDate",Header("EffectiveDate"))],SheetName(section))],
+        "cost-centers" => [new("CostCenters",[Text("Code","كود مركز التكلفة",true),Text("NameAr",Header("NameAr"),true),Text("NameEn",Header("NameEn")),Text("ParentCode","كود مركز التكلفة الأب"),Bool("IsActive",Header("IsActive"),true)],SheetName(section))],
+        "cash-accounts" => [new("CashAccounts",[Text("Code","كود الصندوق",true),Text("Name",Header("Name"),true),Text("AccountCode",Header("AccountCode"),true),Bool("IsDefault",Header("IsDefault")),Bool("IsActive",Header("IsActive"),true)],SheetName(section))],
+        "bank-accounts" => [new("BankAccounts",[Text("Code","كود الحساب البنكي",true),Text("BankName",Header("BankName"),true),Text("AccountName",Header("AccountName"),true),Text("AccountNumber",Header("AccountNumber"),true),Text("IBAN",Header("IBAN")),Text("AccountCode",Header("AccountCode"),true),Bool("IsActive",Header("IsActive"),true)],SheetName(section))],
+        "expense-types" => [new("ExpenseTypes",[Text("Code","كود نوع المصروف",true),Text("NameAr",Header("NameAr"),true),Text("NameEn",Header("NameEn")),Text("DefaultExpenseAccountCode",Header("DefaultExpenseAccountCode")),Bool("IsActive",Header("IsActive"),true)],SheetName(section))],
+        "posting-profiles" => [new("PostingProfiles",[Text("Code","كود ملف الترحيل",true),Text("Name",Header("Name"),true),Text("Module",Header("Module"),true),Text("DocumentType",Header("DocumentType"),true),Bool("IsActive",Header("IsActive"),true)],SheetName(section)),new("Lines",[Text("ProfileCode",Header("ProfileCode"),true),Text("AccountRole",Header("AccountRole"),true),Text("AccountCode",Header("AccountCode"),true),Bool("IsRequired",Header("IsRequired"),true)],"أدوار الحسابات")],
+        "journals" => [new("Journals",[Text("JournalKey",Header("JournalKey"),true),new("JournalType",true,"enum",null,["Manual","Opening","Closing"],Header:Header("JournalType")),Date("PostingDate",Header("PostingDate"),true),Date("DocumentDate",Header("DocumentDate"),true),Text("Description",Header("Description"),true),Text("AccountCode",Header("AccountCode"),true),Decimal("Debit",Header("Debit"),true),Decimal("Credit",Header("Credit"),true),Text("CostCenterCode",Header("CostCenterCode")),Text("LineDescription",Header("LineDescription"))],SheetName(section))],
         _ => throw new NotFoundException("spreadsheet template",section)
     };
 }

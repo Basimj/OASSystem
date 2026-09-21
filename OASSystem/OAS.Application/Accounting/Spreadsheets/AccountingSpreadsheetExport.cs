@@ -112,7 +112,7 @@ public sealed partial class AccountingSpreadsheetService
                 foreach(var line in detail.Lines)
                     rows.Add(new Dictionary<string,string> { ["JournalKey"]=item.JournalNumber,["JournalType"]=item.JournalType.ToString(),["PostingDate"]=Format(item.PostingDate),["DocumentDate"]=Format(item.DocumentDate),["Description"]=item.Description,["AccountCode"]=accounts.GetValueOrDefault(line.AccountId)??"",["Debit"]=Format(line.DebitAmount),["Credit"]=Format(line.CreditAmount),["CostCenterCode"]=line.CostCenterId is Guid id?centers.GetValueOrDefault(id)??"":"",["LineDescription"]=line.Description??"",["Status"]=item.Status.ToString(),["JournalNumber"]=item.JournalNumber });
             }
-            tables.Add(new(definition with { Columns=[..definition.Columns,new("Status"),new("JournalNumber")] },rows));
+            tables.Add(new(definition with { Columns=[..definition.Columns,new("Status",Header:AccountingSpreadsheetDefinitions.Header("Status")),new("JournalNumber",Header:AccountingSpreadsheetDefinitions.Header("JournalNumber"))] },rows));
         }
         else if(section=="posting-profiles")
         {
@@ -136,7 +136,7 @@ public sealed partial class AccountingSpreadsheetService
                 // Reflect the actual DTO, including on an empty result set, so headers never disappear.
                 var type=ExportDtoType(section);
                 var keys=type.GetProperties().Where(x=>x.Name is not ("Id" or "RowVersion" or "Lines")).Select(x=>references.ContainsKey(x.Name)?x.Name[..^2]+"Code":x.Name=="PaymentSourceId"?"PaymentSourceNumber":x.Name);
-                definition=new(section.Replace("-",""),keys.Select(x=>new SpreadsheetColumn(x,DataType:ExportDataType(type,x))).ToArray());
+                definition=new(section.Replace("-",""),keys.Select(x=>new SpreadsheetColumn(x,DataType:ExportDataType(type,x),Header:AccountingSpreadsheetDefinitions.Header(x))).ToArray(),AccountingSpreadsheetDefinitions.SheetName(section));
             }
             tables.Add(new(definition,mapped));
             if(section is "receipt-vouchers" or "payment-vouchers")
@@ -151,7 +151,7 @@ public sealed partial class AccountingSpreadsheetService
                     foreach(var line in (IEnumerable)detail.GetType().GetProperty("Lines")!.GetValue(detail)!)
                     { var row=Map(line);row["VoucherNumber"]=Value(item,"VoucherNumber");lineRows.Add(row); }
                 }
-                if(lineRows.Count>0) tables.Add(new(new("Lines",lineRows[0].Keys.Select(x=>new SpreadsheetColumn(x)).ToArray()),lineRows));
+                if(lineRows.Count>0) tables.Add(new(new("Lines",lineRows[0].Keys.Select(x=>new SpreadsheetColumn(x,Header:AccountingSpreadsheetDefinitions.Header(x))).ToArray(),"تفاصيل السند"),lineRows));
             }
         }
         return workbook.Write(tables);
@@ -163,7 +163,7 @@ public sealed partial class AccountingSpreadsheetService
         return type==typeof(decimal) || type==typeof(int) || type==typeof(byte)?"decimal":type==typeof(DateOnly)?"date":"text";
     }
     private static string Value(object item,string property)=>Format(item.GetType().GetProperty(property)?.GetValue(item));
-    private static string Format(object? value)=>value switch { null=>"",DateOnly date=>date.ToString("yyyy-MM-dd",CultureInfo.InvariantCulture),IFormattable f=>f.ToString(null,CultureInfo.InvariantCulture),_=>value.ToString()??"" };
+    private static string Format(object? value)=>value switch { null=>"",bool b=>b?"نعم":"لا",DateOnly date=>date.ToString("yyyy-MM-dd",CultureInfo.InvariantCulture),IFormattable f=>f.ToString(null,CultureInfo.InvariantCulture),_=>value.ToString()??"" };
     private static Type ExportDtoType(string section)=>section switch
     {
         "accounts"=>typeof(AccountDto),
