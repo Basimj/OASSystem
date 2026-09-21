@@ -47,7 +47,12 @@ public sealed partial class AccountingSpreadsheetService(
         public List<string> Warnings { get; } = [];
         public string Get(string key) => Source.Values.GetValueOrDefault(key)?.Trim() ?? "";
         public string? Optional(string key) => Get(key) is { Length: > 0 } value ? value : null;
-        public bool Bool(string key,bool fallback=false) => Get(key).Length==0?fallback:bool.Parse(Get(key));
+        public bool Bool(string key,bool fallback=false)
+        {
+            var value=Get(key);
+            if(value.Length==0) return fallback;
+            return value.Trim().ToLowerInvariant() switch { "نعم" or "yes" or "true" or "1" => true, "لا" or "no" or "false" or "0" => false, _ => throw new FormatException($"{key}: قيمة منطقية غير صالحة.") };
+        }
         public T Enum<T>(string key) where T:struct,Enum => System.Enum.Parse<T>(Get(key),true);
         public DateOnly Date(string key) => DateOnly.ParseExact(Get(key),"yyyy-MM-dd",CultureInfo.InvariantCulture);
         public decimal Decimal(string key) => decimal.Parse(Get(key),NumberStyles.Number,CultureInfo.InvariantCulture);
@@ -57,16 +62,35 @@ public sealed partial class AccountingSpreadsheetService(
     public async Task<SpreadsheetPreview> PreviewAsync(string section,byte[] bytes,CancellationToken ct)
     {
         await Authorize(section,"create",ct);
-        var plan=await Prepare(section,bytes,ct);
-        return new(plan.Rows.Select(x=>x.Result()).ToArray());
+        try
+        {
+            var plan=await Prepare(section,bytes,ct);
+            return new(plan.Rows.Select(x=>x.Result()).ToArray());
+        }
+        catch(RequestValidationException ex)
+        {
+            return FileValidationPreview(ex);
+        }
+        catch(Exception ex) when (ex is InvalidDataException or IOException or ArgumentException or FormatException or InvalidOperationException or System.Xml.XmlException)
+        {
+            return FileValidationPreview("تعذر قراءة ملف Excel. استخدم قالب Excel الخاص بهذه الشاشة.");
+        }
     }
+    private static SpreadsheetPreview FileValidationPreview(RequestValidationException ex)
+        => FileValidationPreview(ex.Errors.SelectMany(x=>x.Value).FirstOrDefault() ?? "ملف Excel غير صالح.");
+    private static SpreadsheetPreview FileValidationPreview(string message)
+        => new([new SpreadsheetRowResult("الملف",1,new Dictionary<string,string>(),[message],[])]);
     public async Task<SpreadsheetPreview> ImportAsync(string section,byte[] bytes,CancellationToken ct)
     {
         await Authorize(section,"create",ct);
         // Re-parse and validate authoritative bytes on every confirmation; never trust client preview.
         return await unitOfWork.ExecuteInTransactionAsync(async token =>
         {
-            var plan=await Prepare(section,bytes,token);
+            Prepared plan;
+            try { plan=await Prepare(section,bytes,token); }
+            catch(RequestValidationException ex) { return FileValidationPreview(ex); }
+            catch(Exception ex) when (ex is InvalidDataException or IOException or ArgumentException or FormatException or InvalidOperationException or System.Xml.XmlException)
+            { return FileValidationPreview("تعذر قراءة ملف Excel. استخدم قالب Excel الخاص بهذه الشاشة."); }
             var preview=new SpreadsheetPreview(plan.Rows.Select(x=>x.Result()).ToArray());
             if(!preview.CanImport) return preview;
             var accountIds=new Dictionary<string,Guid>(StringComparer.OrdinalIgnoreCase);
@@ -101,15 +125,15 @@ public sealed partial class AccountingSpreadsheetService(
             foreach(var column in definition.Columns)
             {
                 var value=row.Get(column.Key);
-                if(value.Length==0) { if(column.Required) row.Errors.Add($"{column.Key}: مطلوب."); continue; }
-                if(column.DataType=="bool" && !bool.TryParse(value,out _)) row.Errors.Add($"{column.Key}: استخدم True أو False.");
-                if(column.DataType=="date" && !DateOnly.TryParseExact(value,"yyyy-MM-dd",CultureInfo.InvariantCulture,DateTimeStyles.None,out _)) row.Errors.Add($"{column.Key}: التاريخ غير صالح؛ استخدم yyyy-MM-dd.");
+                if(value.Length==0) { if(column.Required) row.Errors.Add($"{column.Header ?? column.Key}: مطلوب."); continue; }
+                if(column.DataType=="bool" && value.Trim().ToLowerInvariant() is not ("نعم" or "لا" or "yes" or "no" or "true" or "false" or "1" or "0")) row.Errors.Add($"{column.Header ?? column.Key}: استخدم نعم أو لا.");
+                if(column.DataType=="date" && !DateOnly.TryParseExact(value,"yyyy-MM-dd",CultureInfo.InvariantCulture,DateTimeStyles.None,out _)) row.Errors.Add($"{column.Header ?? column.Key}: التاريخ غير صالح؛ استخدم yyyy-MM-dd.");
                 if(column.DataType=="decimal")
                 {
-                    if(!decimal.TryParse(value,NumberStyles.Number,CultureInfo.InvariantCulture,out var amount)) row.Errors.Add($"{column.Key}: رقم غير صالح.");
-                    else if(amount<0 || amount>999999999999999m || decimal.Round(amount,4)!=amount) row.Errors.Add($"{column.Key}: استخدم مبلغاً موجباً لا يتجاوز 15 رقماً و4 منازل عشرية.");
+                    if(!decimal.TryParse(value,NumberStyles.Number,CultureInfo.InvariantCulture,out var amount)) row.Errors.Add($"{column.Header ?? column.Key}: رقم غير صالح.");
+                    else if(amount<0 || amount>999999999999999m || decimal.Round(amount,4)!=amount) row.Errors.Add($"{column.Header ?? column.Key}: استخدم مبلغاً موجباً لا يتجاوز 15 رقماً و4 منازل عشرية.");
                 }
-                if(column.AllowedValues is not null && !column.AllowedValues.Contains(value,StringComparer.OrdinalIgnoreCase)) row.Errors.Add($"{column.Key}: قيمة غير مسموحة.");
+                if(column.DataType!="bool" && column.AllowedValues is not null && !column.AllowedValues.Contains(value,StringComparer.OrdinalIgnoreCase)) row.Errors.Add($"{column.Header ?? column.Key}: قيمة غير مسموحة.");
             }
         }
         var accounts=await List<Account>(ct);

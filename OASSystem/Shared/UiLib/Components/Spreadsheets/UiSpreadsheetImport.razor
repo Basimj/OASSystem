@@ -1,39 +1,380 @@
 @namespace OAS.UiLib.Components.Spreadsheets
+@using Microsoft.AspNetCore.Components.Forms
 @using OAS.UiLib.Components.Employees
-<UiEmployeeModalHost Wide="true" OnClose="@(() => { if (!Busy) return OnClose.InvokeAsync(); return Task.CompletedTask; })">
-<section class="ui-spreadsheet" dir="rtl" aria-label="استيراد Excel">
-    <h2>استيراد Excel — @Title</h2>
-    <p>اختر الملف ثم راجع المعاينة قبل تأكيد الاستيراد. أي خطأ يمنع حفظ الملف بالكامل.</p>
-    <InputFile accept=".xlsx" OnChange="OnFile" disabled="@Busy" />
-    @if(Busy) { <p role="status">جاري معالجة الملف...</p> }
-    @if(Preview is not null)
-    {
-        <p role="status">صالحة: @Preview.ValidRows • تحذيرات: @Preview.WarningRows • غير صالحة: @Preview.InvalidRows</p>
-        @if(Preview.ImportedRecords>0) { <p role="status">تم استيراد @Preview.ImportedRecords سجل بنجاح.</p> }
-        <div class="ui-spreadsheet__preview">
-        <table><thead><tr><th>الورقة</th><th>الصف</th><th>البيانات</th><th>النتيجة</th></tr></thead><tbody>
-        @foreach(var row in Preview.Rows)
-        {
-            <tr><td>@row.Sheet</td><td>@row.RowNumber</td><td>@string.Join(" | ",row.Values.Select(x=>$"{x.Key}: {x.Value}"))</td><td>
-            @if(row.Errors.Count==0) { <span>صالح للاستيراد</span> }
-            @foreach(var error in row.Errors) { <p class="ui-spreadsheet__error">@error</p> }
-            @foreach(var warning in row.Warnings) { <p>@warning</p> }
-            </td></tr>
-        }
-        </tbody></table>
-        </div>
-    }
-    <footer>
-        <UiButton Text="تأكيد الاستيراد" IconCssClass="fa-solid fa-file-import" Size="ControlSize.Small" Disabled="@(Busy || Preview?.CanImport != true || Preview.ImportedRecords>0)" OnClick="@(_ => OnConfirm.InvokeAsync())" />
-        <UiButton Text="إغلاق" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Disabled="Busy" OnClick="@(_ => OnClose.InvokeAsync())" />
-    </footer>
-</section>
+
+<UiEmployeeModalHost Wide="true" OnClose="CloseAsync">
+    <UiElement Tag="div" class="employee-import-dialog">
+        <UiElement Tag="div" class="employee-import-header">
+            <UiElement Tag="div" class="employee-import-title">
+                <UiElement Tag="div" class="employee-import-icon">
+                    <UiElement Tag="i" class="fa-solid fa-file-excel"></UiElement>
+                </UiElement>
+
+                <UiElement Tag="div">
+                    <UiElement Tag="h2">استيراد @Title</UiElement>
+                    <UiElement Tag="p">
+                        اختر ملف Excel ثم افحص البيانات قبل اعتماد الاستيراد
+                    </UiElement>
+                </UiElement>
+            </UiElement>
+
+            <UiElement Tag="button"
+                       type="button"
+                       class="employee-import-close"
+                       OnClick="CloseAsync"
+                       disabled="@Busy">
+                <UiElement Tag="i" class="fa-solid fa-xmark"></UiElement>
+            </UiElement>
+        </UiElement>
+
+        <UiElement Tag="div" class="employee-import-content">
+
+            <UiElement Tag="div"
+                       class="employee-import-picker"
+                       style="@(_selectedFile is null ? null : "display:none;")">
+
+                <UiElement Tag="label" class="employee-import-dropzone">
+
+                    <InputFile @key="_inputFileKey"
+                               class="employee-import-input"
+                               OnChange="OnFileSelected"
+                               accept=".xlsx"
+                               disabled="@Busy" />
+
+                    <UiElement Tag="span" class="employee-import-dropzone-icon">
+                        <UiElement Tag="i" class="fa-solid fa-cloud-arrow-up"></UiElement>
+                    </UiElement>
+
+                    <UiElement Tag="strong">
+                        اختر ملف Excel
+                    </UiElement>
+
+                    <UiElement Tag="span">
+                        الصيغة المدعومة: .xlsx — الحد الأقصى 10 MB
+                    </UiElement>
+
+                </UiElement>
+
+            </UiElement>
+
+            @if (_selectedFile is not null)
+            {
+                <UiElement Tag="div" class="employee-import-file">
+
+                    <UiElement Tag="div" class="employee-import-file-icon">
+                        <UiElement Tag="i" class="fa-solid fa-file-excel"></UiElement>
+                    </UiElement>
+
+                    <UiElement Tag="div" class="employee-import-file-info">
+                        <UiElement Tag="strong" title="@_selectedFile.Name">
+                            @_selectedFile.Name
+                        </UiElement>
+
+                        <UiElement Tag="span">
+                            @FormatFileSize(_selectedFile.Size)
+                        </UiElement>
+                    </UiElement>
+
+                    <UiElement Tag="button"
+                               type="button"
+                               class="employee-import-remove"
+                               OnClick="ClearFileAsync"
+                               disabled="@Busy">
+                        <UiElement Tag="i" class="fa-solid fa-xmark"></UiElement>
+                    </UiElement>
+
+                </UiElement>
+            }
+
+            @if (Preview is not null)
+            {
+                <UiElement Tag="div" class="employee-import-summary">
+
+                    <UiElement Tag="div" class="employee-import-stat">
+                        <UiElement Tag="strong">
+                            @Preview.Rows.Count
+                        </UiElement>
+                        <UiElement Tag="span">
+                            إجمالي الصفوف
+                        </UiElement>
+                    </UiElement>
+
+                    <UiElement Tag="div" class="employee-import-stat success">
+                        <UiElement Tag="strong">
+                            @Preview.ValidRows
+                        </UiElement>
+                        <UiElement Tag="span">
+                            صفوف صحيحة
+                        </UiElement>
+                    </UiElement>
+
+                    <UiElement Tag="div" class="employee-import-stat danger">
+                        <UiElement Tag="strong">
+                            @Preview.InvalidRows
+                        </UiElement>
+                        <UiElement Tag="span">
+                            صفوف بها أخطاء
+                        </UiElement>
+                    </UiElement>
+
+                </UiElement>
+
+                @if (Preview.Rows.Any(x => x.Errors.Count > 0))
+                {
+                    var errorCount = Preview.Rows.Sum(x => x.Errors.Count);
+
+                    <UiElement Tag="div" class="employee-import-errors">
+
+                        <UiElement Tag="div" class="employee-import-errors-header">
+                            <UiElement Tag="strong">
+                                أخطاء الملف
+                            </UiElement>
+
+                            <UiElement Tag="span">
+                                @errorCount خطأ
+                            </UiElement>
+                        </UiElement>
+
+                        <UiElement Tag="div" class="employee-import-errors-table">
+
+                            <UiElement Tag="table">
+
+                                <UiElement Tag="thead">
+                                    <UiElement Tag="tr">
+                                        <UiElement Tag="th">الصف</UiElement>
+                                        <UiElement Tag="th">العمود</UiElement>
+                                        <UiElement Tag="th">الخطأ</UiElement>
+                                    </UiElement>
+                                </UiElement>
+
+                                <UiElement Tag="tbody">
+
+                                    @foreach (var row in Preview.Rows)
+                                    {
+                                        @foreach (var error in row.Errors)
+                                        {
+                                            <UiElement Tag="tr">
+                                                <UiElement Tag="td">
+                                                    @row.RowNumber
+                                                </UiElement>
+
+                                                <UiElement Tag="td">
+                                                    @ErrorColumn(row, error)
+                                                </UiElement>
+
+                                                <UiElement Tag="td">
+                                                    @ErrorMessage(error)
+                                                </UiElement>
+                                            </UiElement>
+                                        }
+                                    }
+
+                                </UiElement>
+
+                            </UiElement>
+
+                        </UiElement>
+
+                    </UiElement>
+                }
+                else if (Preview.CanImport && Preview.ImportedRecords == 0)
+                {
+                    <UiElement Tag="div" class="employee-import-success">
+
+                        <UiElement Tag="i" class="fa-solid fa-circle-check"></UiElement>
+
+                        <UiElement Tag="div">
+                            <UiElement Tag="strong">
+                                الملف جاهز للاستيراد
+                            </UiElement>
+
+                            <UiElement Tag="span">
+                                جميع الصفوف اجتازت التحقق.
+                            </UiElement>
+                        </UiElement>
+
+                    </UiElement>
+                }
+                else if (Preview.ImportedRecords > 0)
+                {
+                    <UiElement Tag="div" class="employee-import-success">
+
+                        <UiElement Tag="i" class="fa-solid fa-circle-check"></UiElement>
+
+                        <UiElement Tag="div">
+                            <UiElement Tag="strong">
+                                تم الاستيراد بنجاح
+                            </UiElement>
+
+                            <UiElement Tag="span">
+                                تم استيراد @Preview.ImportedRecords سجل.
+                            </UiElement>
+                        </UiElement>
+
+                    </UiElement>
+                }
+            }
+
+        </UiElement>
+
+        <UiElement Tag="div" class="employee-import-footer">
+
+            <UiButton Text="إلغاء"
+                      Variant="ButtonVariant.Secondary"
+                      Disabled="@Busy"
+                      OnClick="CloseAsync">
+            </UiButton>
+
+            @if (Preview is null)
+            {
+                <UiButton Text="فحص الملف"
+                          Variant="ButtonVariant.Primary"
+                          Disabled="@(_selectedFile is null || Busy)"
+                          Loading="@Busy"
+                          OnClick="ValidateAsync">
+                </UiButton>
+            }
+            else
+            {
+                <UiButton Text="اعتماد الاستيراد"
+                          Variant="ButtonVariant.Primary"
+                          Disabled="@(!Preview.CanImport || Busy || Preview.ImportedRecords > 0)"
+                          Loading="@Busy"
+                          OnClick="ConfirmAsync">
+                </UiButton>
+            }
+
+        </UiElement>
+
+    </UiElement>
 </UiEmployeeModalHost>
+
 @code {
-    [Parameter] public string? Title { get; set; }
-    [Parameter] public bool Busy { get; set; }
-    [Parameter] public UiSpreadsheetPreview? Preview { get; set; }
-    [Parameter] public EventCallback<InputFileChangeEventArgs> OnFile { get; set; }
-    [Parameter] public EventCallback OnConfirm { get; set; }
-    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter]
+    public string? Title { get; set; }
+
+    [Parameter]
+    public bool Busy { get; set; }
+
+    [Parameter]
+    public UiSpreadsheetPreview? Preview { get; set; }
+
+    [Parameter]
+    public EventCallback<IBrowserFile> OnValidate { get; set; }
+
+    [Parameter]
+    public EventCallback OnConfirm { get; set; }
+
+    [Parameter]
+    public EventCallback OnClear { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    private IBrowserFile? _selectedFile;
+
+    private int _inputFileKey;
+
+    private async Task OnFileSelected(InputFileChangeEventArgs args)
+    {
+        if (Busy)
+        {
+            return;
+        }
+
+        // مسح أي Preview / Bytes خاصة بالملف السابق.
+        await OnClear.InvokeAsync();
+
+        // الاحتفاظ فقط بالملف الجديد.
+        _selectedFile = args.File;
+    }
+
+    private Task ValidateAsync()
+    {
+        if (_selectedFile is null || Busy)
+        {
+            return Task.CompletedTask;
+        }
+
+        return OnValidate.InvokeAsync(_selectedFile);
+    }
+
+    private Task ConfirmAsync()
+    {
+        if (Busy ||
+            Preview is null ||
+            !Preview.CanImport ||
+            Preview.ImportedRecords > 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        return OnConfirm.InvokeAsync();
+    }
+
+    private async Task ClearFileAsync()
+    {
+        if (Busy)
+        {
+            return;
+        }
+
+        _selectedFile = null;
+
+        // هذا مهم جدًا:
+        // يجبر Blazor على التخلص من InputFile السابق وإنشاء واحد جديد.
+        _inputFileKey++;
+
+        await OnClear.InvokeAsync();
+    }
+
+    private Task CloseAsync()
+    {
+        if (Busy)
+        {
+            return Task.CompletedTask;
+        }
+
+        return OnClose.InvokeAsync();
+    }
+
+    private static string FormatFileSize(long size)
+    {
+        if (size < 1024)
+        {
+            return $"{size} بايت";
+        }
+
+        if (size < 1024L * 1024L)
+        {
+            return $"{size / 1024d:0.#} كيلوبايت";
+        }
+
+        return $"{size / 1024d / 1024d:0.#} ميجابايت";
+    }
+
+    private static string ErrorColumn(
+        UiSpreadsheetRow row,
+        string error)
+    {
+        if (row.Sheet == "الملف")
+        {
+            return "الملف";
+        }
+
+        var index = error.IndexOf(':');
+
+        return index > 0
+            ? error[..index].Trim()
+            : row.Sheet;
+    }
+
+    private static string ErrorMessage(string error)
+    {
+        var index = error.IndexOf(':');
+
+        return index > 0
+            ? error[(index + 1)..].Trim()
+            : error;
+    }
 }

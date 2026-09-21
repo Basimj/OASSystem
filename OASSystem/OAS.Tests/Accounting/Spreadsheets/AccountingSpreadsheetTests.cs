@@ -55,7 +55,7 @@ public sealed class AccountingSpreadsheetTests
     {
         using var book=new XLWorkbook(new MemoryStream(await Service.TemplateAsync(section,default)));
         foreach(var definition in AccountingSpreadsheetDefinitions.Get(section))
-            Assert.That(book.Worksheet(definition.Name).Row(1).CellsUsed().Select(x=>x.GetString()),Is.EqualTo(definition.Columns.Select(x=>x.Key)));
+            Assert.That(book.Worksheet(definition.DisplayName ?? definition.Name).Row(1).CellsUsed().Select(x=>x.GetString()),Is.EqualTo(definition.Columns.Select(x=>x.Header ?? x.Key)));
         Assert.That(AccountingSpreadsheetDefinitions.Get(section).SelectMany(x=>x.Columns).Any(x=>x.Key.EndsWith("Id")),Is.False);
     }
     [Test] public async Task AccountForwardParentResolvesAndLevelIsCalculated()
@@ -133,7 +133,8 @@ public sealed class AccountingSpreadsheetTests
     {
         for(var i=0;i<225;i++) await Repo<Account>().AddAsync(Account.Create(Guid.NewGuid(),$"X{i:000}","match",null,null,1,AccountClass.Asset,AccountType.Posting,NormalBalance.Debit,true,false,true,false,true,null));
         var bytes=await Service.ExportAsync("accounts",new PageRequest { Search="match",PageSize=25 },null,default);
-        using var book=new XLWorkbook(new MemoryStream(bytes));Assert.That(book.Worksheet("Accounts").RowsUsed().Count(),Is.EqualTo(226));
+        using var book=new XLWorkbook(new MemoryStream(bytes));Assert.That(book.Worksheet("الحسابات").RowsUsed().Count(),Is.EqualTo(226));
+        Assert.That(book.Worksheet("الحسابات").Cell(1,1).GetString(),Is.EqualTo("كود الحساب"));
     }
     [TestCase("customer-accounts")][TestCase("supplier-accounts")]
     public void ExcludedSectionsHaveNoSpreadsheetEndpoints(string section)
@@ -154,7 +155,7 @@ public sealed class AccountingSpreadsheetTests
     {
         var definitions=AccountingSpreadsheetDefinitions.Get("journals");
         var bytes=Book("journals",JournalRow("123.125","0",account:"00110"));
-        using var book=new XLWorkbook(new MemoryStream(bytes));var sheet=book.Worksheet("Journals");
+        using var book=new XLWorkbook(new MemoryStream(bytes));var sheet=book.Worksheet("القيود");
         Assert.That(sheet.Cell(2,7).DataType,Is.EqualTo(XLDataType.Number));
         Assert.That(sheet.Cell(2,6).GetString(),Is.EqualTo("00110"));
         Assert.That(_workbook.Read(bytes,definitions)[0].Values["Debit"],Is.EqualTo("123.125"));
@@ -165,7 +166,7 @@ public sealed class AccountingSpreadsheetTests
     {
         Assert.Throws<OAS.Application.Common.Exceptions.RequestValidationException>(()=>_workbook.Read([1,2,3],AccountingSpreadsheetDefinitions.Get("accounts")));
         var bytes=Book("accounts",AccountRow("X"));
-        using var book=new XLWorkbook(new MemoryStream(bytes));book.Worksheet("Accounts").Cell(2,1).FormulaA1="1+1";
+        using var book=new XLWorkbook(new MemoryStream(bytes));book.Worksheet("الحسابات").Cell(2,1).FormulaA1="1+1";
         using var output=new MemoryStream();book.SaveAs(output);
         Assert.Throws<OAS.Application.Common.Exceptions.RequestValidationException>(()=>_workbook.Read(output.ToArray(),AccountingSpreadsheetDefinitions.Get("accounts")));
     }
@@ -188,4 +189,23 @@ public sealed class AccountingSpreadsheetTests
         Assert.That(sheet.Cell(1,1).GetString(),Is.EqualTo("كود الموظف"));Assert.That(sheet.Cell(2,1).GetString(),Is.EqualTo("001"));
         Assert.That(sheet.Cell(2,7).GetDateTime(),Is.EqualTo(new DateTime(2026,9,21)));Assert.That(sheet.Cell(2,13).GetString(),Is.EqualTo("نعم"));Assert.That(sheet.Cell(2,14).GetString(),Is.EqualTo("لا"));
     }
+    [Test] public async Task ArbitraryExcelReturnsPreviewErrorInsteadOfThrowing()
+    {
+        using var book=new XLWorkbook();
+        var sheet=book.Worksheets.Add("أي ملف");sheet.Cell(1,1).Value="عمود مختلف";sheet.Cell(2,1).Value="بيانات";
+        using var stream=new MemoryStream();book.SaveAs(stream);
+        var preview=await Service.PreviewAsync("accounts",stream.ToArray(),default);
+        Assert.That(preview.CanImport,Is.False);
+        Assert.That(preview.Rows.SelectMany(x=>x.Errors).Any(),Is.True);
+    }
+    [Test] public async Task AccountTemplateUsesArabicHeadersAndBooleanChoices()
+    {
+        using var book=new XLWorkbook(new MemoryStream(await Service.TemplateAsync("accounts",default)));
+        var sheet=book.Worksheet("الحسابات");
+        Assert.That(sheet.Cell(1,1).GetString(),Is.EqualTo("كود الحساب"));
+        Assert.That(sheet.Cell(1,2).GetString(),Is.EqualTo("الاسم العربي"));
+        Assert.That(sheet.Cell(1,8).GetString(),Is.EqualTo("حساب ترحيل"));
+        Assert.That(book.Worksheets.Any(x=>x.Name=="التعليمات"),Is.True);
+    }
+
 }
