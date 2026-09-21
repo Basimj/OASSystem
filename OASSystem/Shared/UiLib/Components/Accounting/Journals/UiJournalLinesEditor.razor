@@ -1,6 +1,7 @@
 @namespace OAS.UiLib.Components.Accounting.Journals
 @using OAS.UiLib.Components.Buttons
 @using OAS.UiLib.Components.Inputs
+@using OAS.UiLib.Components.Accounting.Workspace
 @using OAS.UiLib.Core.Models
 
 <div class="ui-acc-lines-editor" dir="rtl">
@@ -38,7 +39,7 @@
                             <td>
                                 @if (IsEditable)
                                 {
-                                    <UiLookup Value="@currentLine.AccountId?.ToString("D")"
+                                    <UiLookup Value='@currentLine.AccountId?.ToString("D")'
                                               ValueChanged="@(val => OnAccountSelected(currentLine, val))"
                                               SelectedItem="@currentLine.AccountLookupItem"
                                               SearchAsync="AccountSearchAsync"
@@ -68,7 +69,7 @@
                             <td>
                                 @if (IsEditable)
                                 {
-                                    <UiLookup Value="@currentLine.CostCenterId?.ToString("D")"
+                                    <UiLookup Value='@currentLine.CostCenterId?.ToString("D")'
                                               ValueChanged="@(val => OnCostCenterSelected(currentLine, val))"
                                               SelectedItem="@currentLine.CostCenterLookupItem"
                                               SearchAsync="CostCenterSearchAsync"
@@ -84,10 +85,12 @@
                             <td>
                                 @if (IsEditable)
                                 {
-                                    <input type="number" step="0.01" min="0"
-                                           class="ui-input-text__field text-start"
-                                           value="@currentLine.DebitAmount"
-                                           @onchange="@(e => OnDebitChanged(currentLine, e.Value?.ToString()))" />
+                                    <UiAccountingNumberField Label=""
+                                                             Value="@currentLine.DebitAmount"
+                                                             ValueChanged="@(value => OnDebitChanged(currentLine, value))"
+                                                             Min="0"
+                                                             Step="0.01"
+                                                             Tone="@UiAccountingNumberField.NumberTone.Success" />
                                 }
                                 else
                                 {
@@ -97,10 +100,12 @@
                             <td>
                                 @if (IsEditable)
                                 {
-                                    <input type="number" step="0.01" min="0"
-                                           class="ui-input-text__field text-start"
-                                           value="@currentLine.CreditAmount"
-                                           @onchange="@(e => OnCreditChanged(currentLine, e.Value?.ToString()))" />
+                                    <UiAccountingNumberField Label=""
+                                                             Value="@currentLine.CreditAmount"
+                                                             ValueChanged="@(value => OnCreditChanged(currentLine, value))"
+                                                             Min="0"
+                                                             Step="0.01"
+                                                             Tone="@UiAccountingNumberField.NumberTone.Danger" />
                                 }
                                 else
                                 {
@@ -110,9 +115,11 @@
                             @if (IsEditable)
                             {
                                 <td>
-                                    <button type="button" class="btn btn-sm text-danger" title="حذف السطر" @onclick="@(() => RemoveLine(currentLine))">
-                                        <i class="fa-solid fa-trash-can"></i>
-                                    </button>
+                                    <UiButton Text=""
+                                              IconCssClass="fa-solid fa-trash-can"
+                                              Variant="ButtonVariant.Ghost"
+                                              Size="ControlSize.Small"
+                                              OnClick="@(() => RemoveLine(currentLine))" />
                                 </td>
                             }
                         </tr>
@@ -152,7 +159,7 @@
 
     @if (IsEditable)
     {
-        <div class="mt-2">
+        <div class="ui-acc-lines-editor__actions">
             <UiButton Text="إضافة سطر جديد"
                       IconCssClass="fa-solid fa-plus"
                       Variant="ButtonVariant.Secondary"
@@ -170,6 +177,10 @@
         public UiLookupItem? AccountLookupItem { get; set; }
         public string Description { get; set; } = string.Empty;
         public Guid? CostCenterId { get; set; }
+        public Guid? CustomerId { get; set; }
+        public Guid? SupplierId { get; set; }
+        public Guid? ProductVariantId { get; set; }
+        public Guid? WarehouseId { get; set; }
         public string? CostCenterDisplay { get; set; }
         public UiLookupItem? CostCenterLookupItem { get; set; }
         public decimal DebitAmount { get; set; }
@@ -243,31 +254,17 @@
         await OnLinesChanged.InvokeAsync();
     }
 
-    private async Task OnDebitChanged(EditableJournalLine line, string? val)
+    private async Task OnDebitChanged(EditableJournalLine line, decimal amount)
     {
-        if (decimal.TryParse(val, out var amount))
-        {
-            line.DebitAmount = amount;
-            if (amount > 0) line.CreditAmount = 0; // standard dual entry rule
-        }
-        else
-        {
-            line.DebitAmount = 0;
-        }
+        line.DebitAmount = Math.Max(0, amount);
+        if (line.DebitAmount > 0) line.CreditAmount = 0;
         await OnLinesChanged.InvokeAsync();
     }
 
-    private async Task OnCreditChanged(EditableJournalLine line, string? val)
+    private async Task OnCreditChanged(EditableJournalLine line, decimal amount)
     {
-        if (decimal.TryParse(val, out var amount))
-        {
-            line.CreditAmount = amount;
-            if (amount > 0) line.DebitAmount = 0;
-        }
-        else
-        {
-            line.CreditAmount = 0;
-        }
+        line.CreditAmount = Math.Max(0, amount);
+        if (line.CreditAmount > 0) line.DebitAmount = 0;
         await OnLinesChanged.InvokeAsync();
     }
 }

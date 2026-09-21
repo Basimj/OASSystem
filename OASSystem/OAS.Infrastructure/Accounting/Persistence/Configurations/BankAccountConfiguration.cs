@@ -48,6 +48,10 @@ public sealed class BankAccountConfiguration : IEntityTypeConfiguration<BankAcco
             .IsUnique()
             .HasDatabaseName("UX_BankAccounts_Code");
 
+        builder.HasIndex(x => x.AccountNumber)
+            .IsUnique()
+            .HasDatabaseName("UX_BankAccounts_AccountNumber");
+
         builder.HasIndex(x => x.AccountId)
             .HasDatabaseName("IX_BankAccounts_AccountId");
 

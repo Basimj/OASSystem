@@ -4,8 +4,6 @@
 :root {
     --oas-sidebar-width: 172px;
     --oas-sidebar-collapsed-width: 60px;
-    --oas-sidebar-nav-font-size: 10.3px;
-    --oas-sidebar-child-font-size: 9.7px;
     --oas-header-row-height: 46px;
     --oas-tabs-row-height: 34px;
     --oas-topbar-height: calc(var(--oas-header-row-height) + var(--oas-tabs-row-height));
@@ -33,10 +31,10 @@
 .oas-sidebar{position:fixed;top:var(--oas-topbar-height);bottom:0;right:0;width:var(--oas-sidebar-width);display:flex;flex-direction:column;background:#fff;border-inline-end:1px solid #eeedf4;box-shadow:var(--oas-shell-shadow);z-index:1200;transition:width var(--oas-shell-transition),transform var(--oas-shell-transition)}
 .oas-sidebar-toolbar{height:31px;min-height:31px;display:flex;align-items:center;justify-content:flex-start;padding:3px 7px;border-bottom:1px solid #f0eef5}.oas-collapse-btn{width:23px;height:23px;display:inline-flex;align-items:center;justify-content:center;border:1px solid #ebe8f1;border-radius:6px;background:#fff;color:#85839a;cursor:pointer}.oas-collapse-btn:hover{border-color:var(--oas-color-primary-border);background:var(--oas-color-primary-soft);color:var(--oas-color-primary)}.oas-collapse-btn i{font-size:8px}
 .oas-nav{flex:1;min-height:0;display:flex;flex-direction:column;gap:4px;padding:7px 8px 10px;overflow-x:hidden;overflow-y:auto}
-.oas-nav-item,.oas-nav-group__header{position:relative;width:100%;min-height:34px;display:flex;align-items:center;gap:9px;padding:5px 9px;border:0;border-radius:5px;background:transparent;color:#242532;font-family:inherit;font-size:var(--oas-sidebar-nav-font-size);font-weight:720;text-align:right;cursor:pointer;transition:background var(--oas-shell-transition),color var(--oas-shell-transition)}
+.oas-nav-item,.oas-nav-group__header{position:relative;width:100%;min-height:34px;display:flex;align-items:center;gap:9px;padding:5px 9px;border:0;border-radius:5px;background:transparent;color:#242532;font-family:inherit;font-size:10.3px;font-weight:720;text-align:right;cursor:pointer;transition:background var(--oas-shell-transition),color var(--oas-shell-transition)}
 .oas-nav-item:hover,.oas-nav-group__header:hover{background:#f8f6ff;color:var(--oas-color-primary)}.oas-nav-item.active{background:#f4efff;color:var(--oas-color-primary);font-weight:780}.oas-nav-item.active::before{content:"";position:absolute;inset-inline-end:-8px;top:0;bottom:0;width:3px;border-radius:3px 0 0 3px;background:var(--oas-color-primary)}
 .oas-nav-icon{width:18px;min-width:18px;display:inline-flex;align-items:center;justify-content:center;color:inherit}.oas-nav-icon i{font-size:12px}.oas-nav-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.oas-nav-group{position:relative;border-radius:6px}.oas-nav-group.active>.oas-nav-group__header{color:var(--oas-color-primary)}.oas-nav-group__chevron{margin-inline-start:auto;font-size:7px;color:#767786}.oas-nav-group__items{position:relative;display:flex;flex-direction:column;gap:1px;margin:1px 8px 3px 0;padding-inline-start:0;padding-inline-end:8px;border-inline-end:1px solid #ece8f5}.oas-nav-item--child{min-height:30px;padding-inline-start:7px;color:#30313d;font-size:var(--oas-sidebar-child-font-size);font-weight:680}.oas-nav-item--child .oas-nav-icon{width:16px;min-width:16px}.oas-nav-item--child .oas-nav-icon i{font-size:10px}
+.oas-nav-group{position:relative;border-radius:6px}.oas-nav-group.active>.oas-nav-group__header{color:var(--oas-color-primary)}.oas-nav-group__chevron{margin-inline-start:auto;font-size:7px;color:#767786}.oas-nav-group__items{position:relative;display:flex;flex-direction:column;gap:1px;margin:1px 8px 3px 0;padding-inline-start:0;padding-inline-end:8px;border-inline-end:1px solid #ece8f5}.oas-nav-item--child{min-height:30px;padding-inline-start:7px;color:#30313d;font-size:9.7px;font-weight:680}.oas-nav-item--child .oas-nav-icon{width:16px;min-width:16px}.oas-nav-item--child .oas-nav-icon i{font-size:10px}
 
 /* MAIN CONTENT */
 .oas-main-content{min-height:100vh;margin-right:var(--oas-sidebar-width);padding-top:var(--oas-topbar-height);transition:margin-right var(--oas-shell-transition)}.oas-main-inner{height:calc(100dvh - var(--oas-topbar-height));min-height:0;padding:7px 9px 9px;overflow:auto}

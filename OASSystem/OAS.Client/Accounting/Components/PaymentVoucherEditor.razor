@@ -3,16 +3,34 @@
 @using OAS.Contracts.Accounting.Enums
 @using OAS.Client.Accounting.Common
 @using OAS.UiLib.Components.Accounting.Workspace
+@using OAS.UiLib.Components.Accounting.Vouchers
 @using OAS.UiLib.Components.Inputs
 @using OAS.UiLib.Core.Models
 
-<div class="ui-acc-editor" dir="rtl">
+<UiAccountingEditorSurface>
+
+    @if (!IsNew)
+    {
+        <UiAccountingFormSection Title="حالة السند والترحيل"
+                                 Subtitle="الحالة التشغيلية ومرجع القيد المحاسبي الناتج"
+                                 IconCssClass="fa-solid fa-circle-check">
+            <UiAccountingStatusActionBar Label="الحالة الحالية"
+                                         StatusText="@AccountingArabicPresenter.GetPaymentVoucherStatusText(Model.Status)"
+                                         StatusState="@Model.Status.ToString().ToLowerInvariant()" />
+            @if (Model.JournalEntryId.HasValue)
+            {
+                <UiAccountingReadOnlyValue Label="القيد المحاسبي الناتج"
+                                           Value='@Model.JournalEntryId.Value.ToString("D")'
+                                           Tone="@UiAccountingReadOnlyValue.ValueTone.Primary" />
+            }
+        </UiAccountingFormSection>
+    }
 
     <UiAccountingFormSection Title="بيانات سند الصرف الأساسية"
                              Subtitle="رقم السند، التاريخ، والمبلغ المدفوع"
                              IconCssClass="fa-solid fa-money-bill-transfer">
 
-        <div class="ui-acc-form-grid ui-acc-form-grid--3col">
+        <UiAccountingFormGrid Columns="3">
 
             <UiInputText Label="رقم السند"
                          Value="@Model.VoucherNumber"
@@ -30,21 +48,14 @@
                          Disabled="@(!IsEditable)"
                          Size="ControlSize.Small" />
 
-            <div>
-                <label class="ui-input-text__label mb-1 d-block">
-                    المبلغ المدفوع
-                </label>
+            <UiAccountingNumberField Label="المبلغ المدفوع"
+                                     Value="@Model.TotalAmount"
+                                     ValueChanged="OnTotalAmountChanged"
+                                     Min="0.01"
+                                     Tone="@UiAccountingNumberField.NumberTone.Danger"
+                                     Disabled="@(!IsEditable)" />
 
-                <input type="number"
-                       step="0.01"
-                       min="0.01"
-                       class="ui-input-text__field text-start font-bold fs-5 text-danger"
-                       value="@Model.TotalAmount"
-                       disabled="@(!IsEditable)"
-                       @onchange="OnTotalAmountChanged" />
-            </div>
-
-        </div>
+        </UiAccountingFormGrid>
 
     </UiAccountingFormSection>
 
@@ -53,7 +64,7 @@
                              Subtitle="مورد، موظف، أو جهة أخرى"
                              IconCssClass="fa-solid fa-user-tag">
 
-        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+        <UiAccountingFormGrid Columns="2">
 
             <UiSelect Label="نوع المستفيد"
                       Value="@Model.PartyTypeValue"
@@ -65,8 +76,10 @@
 
             @if (Model.PartyType == PaymentPartyType.Supplier)
             {
-                <UiLookup Label="المورد"
-                          Value="@Model.SupplierId?.ToString("D")"
+                @if (SupplierSearchAsync is not null)
+                {
+                    <UiLookup Label="المورد"
+                          Value='@Model.SupplierId?.ToString("D")'
                           ValueChanged="OnSupplierChanged"
                           SelectedItem="@SupplierLookupItem"
                           SearchAsync="SupplierSearchAsync"
@@ -75,6 +88,15 @@
                           Required="true"
                           MinimumSearchLength="0"
                           DebounceMilliseconds="250" />
+                }
+                else
+                {
+                    <UiInputText Label="معرف المورد (GUID)"
+                                 Value="@Model.SupplierIdText"
+                                 ValueChanged="OnSupplierIdTextChanged"
+                                 Placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                                 Disabled="@(!IsEditable)" />
+                }
             }
             else
             {
@@ -88,7 +110,7 @@
                              Size="ControlSize.Small" />
             }
 
-        </div>
+        </UiAccountingFormGrid>
 
     </UiAccountingFormSection>
 
@@ -97,7 +119,7 @@
                              Subtitle="نقداً عبر الصندوق أو تحويل/شيك عبر البنك"
                              IconCssClass="fa-solid fa-credit-card">
 
-        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+        <UiAccountingFormGrid Columns="2">
 
             <UiSelect Label="طريقة الدفع"
                       Value="@Model.PaymentMethodValue"
@@ -110,7 +132,7 @@
             @if (Model.PaymentMethod == PaymentMethod.Cash)
             {
                 <UiLookup Label="الصندوق / الخزينة النقدية"
-                          Value="@Model.CashAccountId?.ToString("D")"
+                          Value='@Model.CashAccountId?.ToString("D")'
                           ValueChanged="OnCashAccountChanged"
                           SelectedItem="@CashAccountLookupItem"
                           SearchAsync="CashAccountSearchAsync"
@@ -123,7 +145,7 @@
             else
             {
                 <UiLookup Label="الحساب البنكي"
-                          Value="@Model.BankAccountId?.ToString("D")"
+                          Value='@Model.BankAccountId?.ToString("D")'
                           ValueChanged="OnBankAccountChanged"
                           SelectedItem="@BankAccountLookupItem"
                           SearchAsync="BankAccountSearchAsync"
@@ -134,23 +156,31 @@
                           DebounceMilliseconds="250" />
             }
 
-        </div>
+        </UiAccountingFormGrid>
 
-        <div class="mt-3">
+        <UiAccountingStack>
 
             <UiInputText Label="البيان / الوصف"
                          Value="@Model.Description"
                          ValueExpression="@(() => Model.Description)"
                          ValueChanged="OnDescriptionChanged"
-                         Required="true"
                          Disabled="@(!IsEditable)"
                          Placeholder="شرح سبب الصرف أو أرقام الفواتير والمطالبات..." />
 
-        </div>
+        </UiAccountingStack>
 
     </UiAccountingFormSection>
 
-</div>
+    <UiAccountingFormSection Title="تفاصيل سند الصرف"
+                             Subtitle="الحسابات المقابلة والمراجع المرتبطة بالسند"
+                             IconCssClass="fa-solid fa-list-ol">
+        <UiVoucherLinesEditor Lines="@Model.Lines"
+                              IsEditable="@IsEditable"
+                              AccountSearchAsync="@AccountSearchAsync"
+                              OnLinesChanged="OnChanged" />
+    </UiAccountingFormSection>
+
+</UiAccountingEditorSurface>
 
 
 @code {
@@ -200,6 +230,8 @@
 
         public Guid? SupplierId { get; set; }
 
+        public string SupplierIdText { get => SupplierId?.ToString("D") ?? string.Empty; set => SupplierId = Guid.TryParse(value, out var id) ? id : null; }
+
 
         public string? BeneficiaryName { get; set; }
 
@@ -239,6 +271,12 @@
 
         public PaymentVoucherStatus Status { get; set; }
             = PaymentVoucherStatus.Draft;
+
+        public Guid? JournalEntryId { get; set; }
+
+        public string RowVersion { get; set; } = string.Empty;
+
+        public List<UiVoucherLinesEditor.EditableVoucherLine> Lines { get; set; } = [];
     }
 
 
@@ -292,6 +330,9 @@
         BankAccountSearchAsync
     { get; set; }
 
+    [Parameter]
+    public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? AccountSearchAsync { get; set; }
+
 
     [Parameter]
     public EventCallback OnModelChanged { get; set; }
@@ -313,17 +354,10 @@
     }
 
 
-    private async Task OnTotalAmountChanged(
-        ChangeEventArgs e)
+    private async Task OnTotalAmountChanged(decimal amount)
     {
-        if (decimal.TryParse(
-                e.Value?.ToString(),
-                out var amount))
-        {
-            Model.TotalAmount = amount;
-
-            await OnChanged();
-        }
+        Model.TotalAmount = amount;
+        await OnChanged();
     }
 
 
@@ -383,6 +417,13 @@
             Model.CashAccountId = null;
         }
 
+        await OnChanged();
+    }
+
+
+    private async Task OnSupplierIdTextChanged(string? value)
+    {
+        Model.SupplierIdText = value ?? string.Empty;
         await OnChanged();
     }
 

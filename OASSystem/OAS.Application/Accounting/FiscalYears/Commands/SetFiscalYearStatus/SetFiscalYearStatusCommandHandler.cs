@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Abstractions.Security;
 using OAS.Application.Common.Exceptions;
@@ -25,6 +25,12 @@ public sealed class SetFiscalYearStatusCommandHandler(
             throw new NotFoundException(
                 nameof(FiscalYear),
                 request.Id);
+        }
+
+        var requestedRowVersion = Convert.FromBase64String(request.Data.RowVersion);
+        if (!fiscalYear.RowVersion.SequenceEqual(requestedRowVersion))
+        {
+            throw new ConcurrencyException("The fiscal year has been modified by another user.");
         }
 
         switch (request.Data.Status)

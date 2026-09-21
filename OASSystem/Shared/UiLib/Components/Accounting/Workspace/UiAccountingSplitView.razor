@@ -1,0 +1,9 @@
+@namespace OAS.UiLib.Components.Accounting.Workspace
+<div class="ui-acc-accounts-split">
+    <div class="ui-acc-accounts-split__tree">@Tree</div>
+    <div class="ui-acc-accounts-split__detail">@Detail</div>
+</div>
+@code {
+    [Parameter] public RenderFragment? Tree { get; set; }
+    [Parameter] public RenderFragment? Detail { get; set; }
+}

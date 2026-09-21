@@ -1,15 +1,28 @@
+.inventory-transactions__filters { display: flex; flex-wrap: wrap; gap: .65rem; align-items: end; }
+.inventory-transactions__header,
+.inventory-transactions__row { display: grid; grid-template-columns: 1.1fr 1.3fr .9fr 1fr 1fr .75fr; gap: .65rem; align-items: center; }
+.inventory-transactions__header { padding: .55rem .75rem; font-size: .8rem; font-weight: 700; }
+.inventory-transactions__rows { display: grid; }
+.inventory-transactions__row { width: 100%; padding: .7rem .75rem; border: 0; border-top: 1px solid var(--ui-border-color,#e3e7ee); background: transparent; color: inherit; text-align: start; cursor: pointer; font: inherit; }
+.inventory-transactions__row:hover { background: var(--ui-surface-hover,#f7f9fc); }
+.inventory-transactions__row--selected { background: var(--ui-surface-selected,#eef4ff); }
 .inventory-transactions__editor { display: grid; gap: .8rem; }
 .inventory-transactions__lines-title { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-top: .35rem; }
-.inventory-transactions__line-editor { display: grid; grid-template-columns: 1.8fr .7fr .8fr auto; gap: .5rem; align-items: end; padding: .65rem; border: 1px solid var(--oas-color-border); border-radius: var(--oas-radius-md); }
+.inventory-transactions__lines-title button,
+.inventory-transactions__remove { border: 1px solid var(--ui-border-color,#d8dee8); background: transparent; color: inherit; border-radius: .45rem; padding: .35rem .55rem; cursor: pointer; font: inherit; }
+.inventory-transactions__line-editor { display: grid; grid-template-columns: 1.8fr .7fr .8fr auto; gap: .5rem; align-items: end; padding: .65rem; border: 1px solid var(--ui-border-color,#e3e7ee); border-radius: .55rem; }
+.inventory-transactions__remove:disabled { opacity: .45; cursor: default; }
 .inventory-transactions__details { display: grid; grid-template-columns: 1fr 1fr; gap: .65rem; }
-.inventory-transactions__details > div { display: grid; gap: .15rem; padding: .55rem; border: 1px solid var(--oas-color-border); border-radius: var(--oas-radius-md); }
-.inventory-transactions__details span { font-size: var(--oas-font-sm); color: var(--oas-color-text-muted); }
-.inventory-transactions__details strong { font-size: var(--oas-font-sm); line-height: 1.35; }
+.inventory-transactions__details > div { display: grid; gap: .15rem; padding: .55rem; border: 1px solid var(--ui-border-color,#e3e7ee); border-radius: .45rem; }
+.inventory-transactions__details span { font-size: .76rem; opacity: .7; }
 .inventory-transactions__wide { grid-column: 1 / -1; }
-.inventory-transactions__view-lines { display: grid; gap: .55rem; margin-top: 1rem; font-size: var(--oas-font-sm); }
-.inventory-transactions__view-line { display: grid; grid-template-columns: 1.8fr .8fr .8fr .8fr; gap: .5rem; align-items: center; padding: .55rem; border-top: 1px solid var(--oas-color-border); }
+.inventory-transactions__view-lines { display: grid; gap: .55rem; margin-top: 1rem; }
+.inventory-transactions__view-line { display: grid; grid-template-columns: 1.8fr .8fr .8fr .8fr; gap: .5rem; align-items: center; padding: .55rem; border-top: 1px solid var(--ui-border-color,#e3e7ee); }
 .inventory-transactions__view-line > div { display: grid; }
-.inventory-transactions__view-line > div span { font-size: var(--oas-font-sm); color: var(--oas-color-text-muted); }
-.inventory-transactions__view-line > span,
-.inventory-transactions__view-line strong { font-size: var(--oas-font-sm); line-height: 1.35; }
-@media (max-width: 1000px) { .inventory-transactions__line-editor { grid-template-columns: 1fr 1fr; } }
+.inventory-transactions__view-line > div span { font-size: .76rem; opacity: .7; }
+@media (max-width: 1000px) {
+    .inventory-transactions__header, .inventory-transactions__row { grid-template-columns: 1.1fr 1.3fr .9fr .75fr; }
+    .inventory-transactions__header span:nth-child(4), .inventory-transactions__row span:nth-child(4),
+    .inventory-transactions__header span:nth-child(5), .inventory-transactions__row span:nth-child(5) { display: none; }
+    .inventory-transactions__line-editor { grid-template-columns: 1fr 1fr; }
+}

@@ -1,0 +1,18 @@
+@namespace OAS.UiLib.Components.Accounting.Workspace
+
+<div class="ui-acc-empty-state">
+    <i class="@IconCssClass" aria-hidden="true"></i>
+    <div class="ui-acc-empty-state__content">
+        <strong>@Title</strong>
+        @if (!string.IsNullOrWhiteSpace(Description))
+        {
+            <span>@Description</span>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "لا توجد بيانات";
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public string IconCssClass { get; set; } = "fa-regular fa-folder-open";
+}

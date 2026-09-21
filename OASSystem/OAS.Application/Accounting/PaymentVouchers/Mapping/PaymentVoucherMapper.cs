@@ -9,17 +9,15 @@ namespace OAS.Application.Accounting.PaymentVouchers.Mapping;
 public sealed class PaymentVoucherMapper
 {
     public PaymentVoucherDto ToRead(PaymentVoucher source)
+        => ToRead(source, source.Lines);
+
+    public PaymentVoucherDto ToRead(
+        PaymentVoucher source,
+        IEnumerable<PaymentVoucherLine> sourceLines)
     {
-        var lines = source.Lines
-            .Select(l => new PaymentVoucherLineDto(
-                l.Id,
-                l.PaymentVoucherId,
-                l.LineNumber,
-                l.AccountId,
-                l.Amount,
-                l.ReferenceType,
-                l.ReferenceId,
-                l.Description))
+        var lines = sourceLines
+            .OrderBy(l => l.LineNumber)
+            .Select(ToLineDto)
             .ToList();
 
         return new PaymentVoucherDto(
@@ -40,7 +38,18 @@ public sealed class PaymentVoucherMapper
             source.CreatedAtUtc,
             source.PostedBy,
             source.PostedAtUtc,
-            source.RowVersion is not null ? Convert.ToBase64String(source.RowVersion) : string.Empty,
+            Convert.ToBase64String(source.RowVersion),
             lines);
     }
+
+    public static PaymentVoucherLineDto ToLineDto(PaymentVoucherLine line)
+        => new(
+            line.Id,
+            line.PaymentVoucherId,
+            line.LineNumber,
+            line.AccountId,
+            line.Amount,
+            line.ReferenceType,
+            line.ReferenceId,
+            line.Description);
 }

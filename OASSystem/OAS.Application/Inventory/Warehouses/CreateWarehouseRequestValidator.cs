@@ -13,10 +13,10 @@ public sealed class CreateWarehouseRequestValidator : AbstractValidator<CreateWa
 
         RuleFor(x => x.NameAr)
             .NotEmpty().WithErrorCode("warehouse_name_ar_required")
-            .MaximumLength(100).WithErrorCode("warehouse_name_ar_max_length");
+            .MaximumLength(150).WithErrorCode("warehouse_name_ar_max_length");
 
         RuleFor(x => x.NameEn)
-            .MaximumLength(100).WithErrorCode("warehouse_name_en_max_length");
+            .MaximumLength(150).WithErrorCode("warehouse_name_en_max_length");
 
         RuleFor(x => x.Description)
             .MaximumLength(500).WithErrorCode("warehouse_description_max_length");

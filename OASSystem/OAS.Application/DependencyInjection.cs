@@ -3,6 +3,7 @@ using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using OAS.Application.Abstractions.Security;
+using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Accounting.Accounts.Mapping;
 using OAS.Application.Accounting.BankAccounts.Mapping;
 using OAS.Application.Accounting.CashAccounts.Mapping;
@@ -15,6 +16,7 @@ using OAS.Application.Accounting.FiscalPeriods.Mapping;
 using OAS.Application.Accounting.FiscalYears.Mapping;
 using OAS.Application.Accounting.PaymentAllocations.Mapping;
 using OAS.Application.Accounting.PaymentVouchers.Mapping;
+using OAS.Application.Accounting.Posting;
 using OAS.Application.Accounting.PostingProfiles.Mapping;
 using OAS.Application.Accounting.ReceiptVouchers.Mapping;
 using OAS.Application.Accounting.SupplierAccounts.Mapping;
@@ -48,7 +50,9 @@ public static class DependencyInjection
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         services.TryAddScoped<ICurrentUser, AnonymousCurrentUser>();
         services.TryAddScoped<IPermissionChecker, DenyAllPermissionChecker>();
+        services.TryAddScoped<IAccountingDocumentPostingService, AccountingDocumentPostingService>();
         services.AddInventoryApplication();
+        services.AddScoped<OAS.Application.Accounting.Spreadsheets.AccountingSpreadsheetService>();
         return services;
     }
 

@@ -51,10 +51,7 @@ public class StockCountLine : Entity<Guid>
         CountedQuantity = countedQuantity;
         DifferenceQuantity = countedQuantity - SystemQuantity;
 
-        VarianceValue = Math.Round(
-            DifferenceQuantity * AverageCostSnapshot,
-            2,
-            MidpointRounding.AwayFromZero);
+        VarianceValue = DifferenceQuantity * AverageCostSnapshot;
 
         CountedAtUtc = countedAtUtc;
         CountedBy = countedBy;

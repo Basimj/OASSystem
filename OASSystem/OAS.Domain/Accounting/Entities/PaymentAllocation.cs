@@ -1,4 +1,4 @@
-﻿using OAS.Domain.Accounting.Enums;
+using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
@@ -42,6 +42,17 @@ public sealed class PaymentAllocation : Entity<Guid>
     public DateTime AllocatedAtUtc { get; private set; }
 
     public Guid CreatedBy { get; private set; }
+
+
+    public void UpdateAllocatedAmount(decimal allocatedAmount)
+    {
+        if (allocatedAmount <= 0)
+            throw new ArgumentOutOfRangeException(
+                nameof(allocatedAmount),
+                "Allocated amount must be greater than zero.");
+
+        AllocatedAmount = allocatedAmount;
+    }
 
     public static PaymentAllocation Create(
         Guid id,

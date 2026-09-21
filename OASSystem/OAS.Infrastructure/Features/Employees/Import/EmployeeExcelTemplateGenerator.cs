@@ -54,7 +54,7 @@ public sealed class EmployeeExcelTemplateGenerator : IEmployeeExcelTemplateGener
         var widths = new double[] { 20, 20, 18, 28, 24, 18, 18, 18, 18, 16, 34, 20, 14 };
         for (var i = 0; i < widths.Length; i++) worksheet.Column(i + 1).Width = widths[i];
 
-        worksheet.SheetView.FreezeRows(1);
+        OAS.Infrastructure.Spreadsheets.SpreadsheetWorkbookStyle.ApplyHeader(worksheet, Headers.Length);
         worksheet.Range(1, 1, lastDataRow, Headers.Length).SetAutoFilter();
 
         using var stream = new MemoryStream();
