@@ -21,6 +21,13 @@ public sealed class UpdateCostCenterCommandHandler(
             throw new NotFoundException(nameof(CostCenter), request.Id);
         }
 
+        if (!string.Equals(entity.Code, request.Data.Code.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ConflictException(
+                "accounting_cost_center_code_immutable",
+                "The cost center code cannot be changed after creation.");
+        }
+
         var requestedRowVersion = Convert.FromBase64String(request.Data.RowVersion);
         if (!entity.RowVersion.SequenceEqual(requestedRowVersion))
         {

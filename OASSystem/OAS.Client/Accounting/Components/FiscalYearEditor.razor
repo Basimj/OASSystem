@@ -18,7 +18,8 @@
                          @bind-Value:after="NotifyModelChangedAsync"
                          Required="true"
                          Placeholder="مثال: FY-2026"
-                         Disabled="@(!CanEditDetails)"
+                         ReadOnly="@(!IsNew)"
+                         Disabled="@(!IsEditable || !IsNew)"
                          Size="ControlSize.Small" />
 
             <UiInputText Label="اسم السنة المالية"

@@ -14,7 +14,8 @@
                          ValueChanged="@(v => { Model.Code = v; OnChanged(); })"
                          Required="true"
                          Placeholder="مثال: EXP-RENT"
-                         Disabled="@(!IsEditable)"
+                         ReadOnly="@(!IsNew)"
+                         Disabled="@(!IsEditable || !IsNew)"
                          Size="ControlSize.Small" />
 
             <UiInputText Label="اسم نوع المصروف (بالعربي)"

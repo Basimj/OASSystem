@@ -1,7 +1,8 @@
 @charset "UTF-8";
 
 /* ==========================================================================
-   OAS.UiLib — Accounting Module Design System & Component Styles
+   OAS.UiLib — Accounting Module
+   Compact / Professional / OAS Identity
    ========================================================================== */
 
 :root {
@@ -18,69 +19,137 @@
     --oas-acc-card-hover-border: var(--oas-color-primary-border, #d9ccff);
     --oas-acc-muted: var(--oas-color-text-muted, #77758c);
     --oas-acc-surface-bg: var(--oas-color-background, #fbfbfd);
+    --oas-acc-radius: 0.45rem;
+    --oas-acc-gap: 0.55rem;
 }
 
-/* Workspace container */
+/* ==========================================================================
+   Workspace
+   ========================================================================== */
+
 .ui-acc-workspace {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
-    padding: 1.25rem;
-    background-color: var(--oas-acc-surface-bg);
+    width: 100%;
+    min-width: 0;
     min-height: 100%;
+    gap: 0.55rem;
+    padding: 0.65rem;
+    background: var(--oas-acc-surface-bg);
     font-family: inherit;
 }
 
 .ui-acc-workspace__actions {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    background: #ffffff;
-    padding: 0.75rem 1rem;
-    border-radius: 0.5rem;
+    display: block;
+    width: 100%;
+    min-width: 0;
+    padding: 0.4rem 0.6rem;
+    background: var(--oas-acc-card-bg);
     border: 1px solid var(--oas-acc-card-border);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    border-radius: var(--oas-acc-radius);
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.035);
+}
+
+    .ui-acc-workspace__actions .ui-workspace-actionbar {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        min-width: 0;
+        gap: 0.25rem;
+        flex-wrap: nowrap;
+    }
+
+    /* Search remains in same toolbar row on desktop */
+    .ui-acc-workspace__actions .ui-search-input {
+        width: 280px;
+        min-width: 220px;
+        max-width: 360px;
+        flex: 0 1 280px;
+        margin-inline-start: auto;
+    }
+
+/* Tabs */
+.ui-acc-workspace__tabs {
+    min-width: 0;
+    padding: 0 0.3rem;
+    background: var(--oas-acc-card-bg);
+    border: 1px solid var(--oas-acc-card-border);
+    border-radius: var(--oas-acc-radius);
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.025);
 }
 
 .ui-acc-workspace__body {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    min-width: 0;
+    gap: 0.55rem;
+    overflow: visible;
 }
 
-/* Metrics Ribbon */
+/* ==========================================================================
+   Accounting Accounts Split View
+   ========================================================================== */
+
+.ui-acc-accounts-split {
+    display: grid;
+    grid-template-columns: minmax(250px, 28%) minmax(0, 1fr);
+    align-items: start;
+    gap: 0.65rem;
+    width: 100%;
+    min-width: 0;
+}
+
+.ui-acc-accounts-split__tree,
+.ui-acc-accounts-split__detail {
+    min-width: 0;
+}
+
+.ui-acc-accounts-split__tree {
+    position: sticky;
+    top: 0.25rem;
+}
+
+.ui-acc-accounts-split__detail {
+    overflow: visible;
+}
+
+/* ==========================================================================
+   Metrics
+   ========================================================================== */
+
 .ui-acc-metrics {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.6rem;
 }
 
 .ui-acc-metric-tile {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    padding: 1rem 1.25rem;
-    background: #ffffff;
-    border-radius: 0.5rem;
+    gap: 0.65rem;
+    padding: 0.65rem 0.75rem;
+    background: var(--oas-acc-card-bg);
     border: 1px solid var(--oas-acc-card-border);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    border-radius: var(--oas-acc-radius);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.035);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
-.ui-acc-metric-tile:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
-}
+    .ui-acc-metric-tile:hover {
+        transform: translateY(-1px);
+        border-color: var(--oas-acc-card-hover-border);
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.055);
+    }
 
 .ui-acc-metric-tile__icon {
-    width: 44px;
-    height: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 0.5rem;
-    font-size: 1.25rem;
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+    border-radius: 0.4rem;
+    font-size: 0.95rem;
     background: var(--oas-color-primary-soft, #f4f0ff);
     color: var(--oas-acc-primary);
 }
@@ -103,32 +172,36 @@
 .ui-acc-metric-tile__content {
     display: flex;
     flex-direction: column;
-    gap: 0.15rem;
+    gap: 0.05rem;
+    min-width: 0;
 }
 
 .ui-acc-metric-tile__label {
-    font-size: 0.8rem;
-    color: var(--oas-acc-muted);
+    font-size: 0.68rem;
     font-weight: 500;
+    color: var(--oas-acc-muted);
 }
 
 .ui-acc-metric-tile__value {
-    font-size: 1.25rem;
-    font-weight: 700;
+    font-size: 0.95rem;
+    font-weight: 750;
     color: #0f172a;
-    letter-spacing: -0.02em;
 }
 
-/* Status Badges */
+/* ==========================================================================
+   Status Badges
+   ========================================================================== */
+
 .ui-acc-badge {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    padding: 0.2rem 0.6rem;
-    border-radius: 9999px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    line-height: 1;
+    gap: 0.25rem;
+    padding: 0.12rem 0.42rem;
+    border-radius: 999px;
+    font-size: 0.65rem;
+    font-weight: 650;
+    line-height: 1.1;
+    white-space: nowrap;
 }
 
 .ui-acc-badge--draft {
@@ -160,120 +233,674 @@
     border: 1px solid #fecaca;
 }
 
-/* Cards & Surfaces */
+/* ==========================================================================
+   Cards
+   ========================================================================== */
+
 .ui-acc-card {
-    background: #ffffff;
-    border-radius: 0.5rem;
-    border: 1px solid var(--oas-acc-card-border);
-    padding: 1.25rem;
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    gap: 0.45rem;
+    padding: 0.65rem;
+    background: var(--oas-acc-card-bg);
+    border: 1px solid var(--oas-acc-card-border);
+    border-radius: var(--oas-acc-radius);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.035);
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.ui-acc-card:hover {
-    border-color: var(--oas-acc-card-hover-border);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.06);
-}
+    .ui-acc-card:hover {
+        border-color: var(--oas-acc-card-hover-border);
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
+    }
 
 .ui-acc-card__header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding-bottom: 0.5rem;
+    gap: 0.5rem;
+    padding-bottom: 0.35rem;
     border-bottom: 1px solid #f1f5f9;
 }
 
 .ui-acc-card__title {
-    font-weight: 600;
-    font-size: 1rem;
-    color: #0f172a;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.35rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #0f172a;
 }
 
 .ui-acc-card__body {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 0.75rem;
-    font-size: 0.85rem;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.45rem;
+    font-size: 0.74rem;
 }
 
 .ui-acc-card__footer {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 0.5rem;
-    padding-top: 0.5rem;
+    gap: 0.35rem;
+    padding-top: 0.35rem;
     border-top: 1px solid #f1f5f9;
 }
 
-/* Entry Line Grid / Table */
+/* ==========================================================================
+   Accounting Form Sections
+   ========================================================================== */
+
+.ui-acc-section {
+    position: relative;
+    margin-bottom: 0.5rem;
+    background: var(--oas-acc-card-bg);
+    border: 1px solid var(--oas-acc-card-border);
+    border-radius: var(--oas-acc-radius);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.025);
+    overflow: visible;
+}
+
+    /* Keep lookups above following sections */
+    .ui-acc-section:focus-within {
+        z-index: 30;
+    }
+
+.ui-acc-section__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.42rem 0.6rem;
+    background: #f8fafc;
+    border-bottom: 1px solid var(--oas-acc-card-border);
+    cursor: pointer;
+}
+
+.ui-acc-section__title-group {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+}
+
+.ui-acc-section__icon {
+    flex: 0 0 auto;
+    font-size: 0.8rem;
+    color: var(--oas-acc-primary);
+}
+
+.ui-acc-section__title {
+    margin: 0;
+    font-size: 0.8rem;
+    font-weight: 750;
+    color: #1e293b;
+}
+
+.ui-acc-section__subtitle {
+    margin: 0;
+    font-size: 0.65rem;
+    color: var(--oas-acc-muted);
+}
+
+.ui-acc-section__body {
+    position: relative;
+    padding: 0.6rem;
+    overflow: visible;
+}
+
+/* ==========================================================================
+   Accounting Editor
+   ========================================================================== */
+
+.ui-acc-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    min-width: 0;
+    overflow: visible;
+}
+
+.ui-acc-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+/* ==========================================================================
+   Form Grids
+   ========================================================================== */
+
+.ui-acc-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 0.5rem 0.6rem;
+    min-width: 0;
+    overflow: visible;
+}
+
+.ui-acc-form-grid--2col {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem 0.6rem;
+    overflow: visible;
+}
+
+.ui-acc-form-grid--3col {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem 0.6rem;
+    overflow: visible;
+}
+
+.ui-acc-form-grid--4col {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.5rem 0.6rem;
+    overflow: visible;
+}
+
+/* Checkbox groups */
+.ui-acc-checks-group {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.45rem 0.85rem;
+    padding: 0.2rem 0;
+}
+
+/* ==========================================================================
+   Lookup
+   ========================================================================== */
+
+.ui-acc-workspace .ui-lookup {
+    position: relative;
+}
+
+.ui-acc-workspace .ui-lookup__results {
+    z-index: 2000;
+}
+
+.ui-acc-editor,
+.ui-acc-workspace__body,
+.ui-acc-form-grid,
+.ui-acc-form-grid--2col,
+.ui-acc-form-grid--3col,
+.ui-acc-form-grid--4col {
+    overflow: visible;
+}
+
+/* ==========================================================================
+   Number / Readonly Fields
+   ========================================================================== */
+
+.ui-acc-number-field,
+.ui-acc-readonly-field {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    gap: 0.25rem;
+}
+
+.ui-acc-number-field__label,
+.ui-acc-readonly-field__label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--oas-color-text, #27263b);
+}
+
+.ui-acc-number-field__input,
+.ui-acc-readonly-field__value {
+    width: 100%;
+    min-height: 1.95rem;
+    padding: 0.32rem 0.5rem;
+    border: 1px solid var(--oas-color-border, #e7e5ef);
+    border-radius: 0.35rem;
+    background: var(--oas-color-surface, #fff);
+    color: var(--oas-color-text, #27263b);
+    font: inherit;
+    font-size: 0.75rem;
+    text-align: start;
+}
+
+    .ui-acc-number-field__input:focus {
+        border-color: var(--oas-color-primary, #5A2DD6);
+        box-shadow: 0 0 0 2px var(--oas-color-primary-soft, #f4f0ff);
+        outline: none;
+    }
+
+    .ui-acc-number-field__input:disabled,
+    .ui-acc-readonly-field__value {
+        background: var(--oas-color-disabled-surface, #f4f4f5);
+        color: var(--oas-color-text-muted, #77758c);
+    }
+
+.ui-acc-number-field__input--primary,
+.ui-acc-readonly-field__value--primary {
+    color: var(--oas-color-primary, #5A2DD6);
+    font-weight: 750;
+}
+
+.ui-acc-number-field__input--success,
+.ui-acc-readonly-field__value--success {
+    color: var(--oas-color-success, #067647);
+    font-weight: 750;
+}
+
+.ui-acc-number-field__input--danger,
+.ui-acc-readonly-field__value--danger {
+    color: var(--oas-color-danger, #d92d20);
+    font-weight: 750;
+}
+
+.ui-acc-number-field__hint {
+    font-size: 0.62rem;
+    color: var(--oas-color-text-muted, #77758c);
+}
+
+/* ==========================================================================
+   Empty State
+   ========================================================================== */
+
+.ui-acc-empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.55rem;
+    min-height: 5rem;
+    padding: 0.65rem;
+    background: var(--oas-color-subtle, #fafafa);
+    border: 1px dashed var(--oas-color-border, #e7e5ef);
+    border-radius: var(--oas-radius-lg, 0.5rem);
+    color: var(--oas-color-text-muted, #77758c);
+    text-align: right;
+}
+
+    .ui-acc-empty-state > i {
+        font-size: 1rem;
+        color: var(--oas-color-primary, #5A2DD6);
+    }
+
+.ui-acc-empty-state__content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+    .ui-acc-empty-state__content strong {
+        font-size: 0.76rem;
+        color: var(--oas-color-text, #27263b);
+    }
+
+    .ui-acc-empty-state__content span {
+        font-size: 0.67rem;
+    }
+
+/* ==========================================================================
+   Status Action Bar
+   ========================================================================== */
+
+.ui-acc-status-action-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.45rem;
+    padding: 0.42rem 0.55rem;
+    background: var(--oas-color-subtle, #fafafa);
+    border: 1px solid var(--oas-color-border, #e7e5ef);
+    border-radius: var(--oas-radius-lg, 0.5rem);
+}
+
+.ui-acc-status-action-bar__status,
+.ui-acc-status-action-bar__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
+
+.ui-acc-status-action-bar__label {
+    font-size: 0.7rem;
+    font-weight: 750;
+    color: var(--oas-color-text, #27263b);
+}
+
+/* ==========================================================================
+   Accounting Record Lists
+   ========================================================================== */
+
+.ui-acc-record-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.ui-acc-record-row {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+    align-items: center;
+    width: 100%;
+    gap: 0.5rem;
+    padding: 0.45rem 0.55rem;
+    background: var(--oas-acc-card-bg);
+    border: 1px solid var(--oas-acc-card-border);
+    border-radius: 0.5rem;
+    color: var(--oas-color-text, #2f2d3a);
+    font-family: inherit;
+    text-align: start;
+    cursor: pointer;
+    transition: border-color 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
+}
+
+    .ui-acc-record-row:hover {
+        border-color: var(--oas-color-primary-border);
+        background: var(--oas-color-primary-soft);
+        box-shadow: 0 3px 10px rgba(47, 37, 86, 0.06);
+    }
+
+    .ui-acc-record-row:focus-visible {
+        outline: 0;
+        border-color: var(--oas-color-primary);
+        box-shadow: 0 0 0 2px var(--oas-color-primary-soft);
+    }
+
+.ui-acc-record-row__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 0.4rem;
+    background: var(--oas-color-primary-soft);
+    color: var(--oas-color-primary);
+    font-size: 0.75rem;
+}
+
+.ui-acc-record-row__content {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    gap: 0.25rem;
+}
+
+.ui-acc-record-row__heading {
+    display: flex;
+    align-items: baseline;
+    min-width: 0;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
+
+    .ui-acc-record-row__heading strong {
+        overflow: hidden;
+        font-size: 0.72rem;
+        font-weight: 800;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .ui-acc-record-row__heading small {
+        font-size: 0.6rem;
+        color: var(--oas-acc-muted);
+    }
+
+.ui-acc-record-row__details {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem 0.8rem;
+    flex-wrap: wrap;
+}
+
+.ui-acc-record-detail {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+}
+
+    .ui-acc-record-detail small {
+        font-size: 0.56rem;
+        color: var(--oas-acc-muted);
+    }
+
+    .ui-acc-record-detail strong {
+        font-size: 0.62rem;
+        font-weight: 700;
+    }
+
+.ui-acc-record-row__status {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.ui-acc-record-row__chevron {
+    font-size: 0.6rem;
+    color: var(--oas-acc-muted);
+}
+
+/* ==========================================================================
+   Accounting Tree
+   ========================================================================== */
+
+.ui-acc-tree {
+    display: flex;
+    flex-direction: column;
+    gap: 0.03rem;
+    max-height: 72vh;
+    overflow: auto;
+    padding-inline-end: 0.1rem;
+    font-size: 0.75rem;
+}
+
+.ui-acc-tree--empty {
+    justify-content: center;
+    min-height: 10rem;
+}
+
+.ui-acc-tree__empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    min-height: 9rem;
+    color: var(--oas-acc-muted);
+    border: 1px dashed var(--oas-acc-card-border);
+    border-radius: 0.45rem;
+}
+
+.ui-acc-tree__node {
+    min-width: 0;
+}
+
+.ui-acc-tree__row {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+    min-width: 0;
+    padding-inline-start: calc(var(--ui-acc-tree-level, 0) * 0.72rem);
+}
+
+.ui-acc-tree__toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 1.2rem;
+    min-width: 1.2rem;
+    height: 1.2rem;
+    padding: 0;
+    border: none;
+    border-radius: 0.3rem;
+    background: transparent;
+    color: var(--oas-acc-primary);
+    font-size: 0.58rem;
+    cursor: pointer;
+}
+
+    .ui-acc-tree__toggle:hover {
+        background: rgba(var(--oas-acc-primary-rgb), 0.08);
+    }
+
+.ui-acc-tree__toggle--spacer {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.ui-acc-tree__link {
+    display: inline-flex;
+    align-items: center;
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    min-height: 1.65rem;
+    gap: 0.25rem;
+    padding: 0.19rem 0.35rem;
+    border: 1px solid transparent;
+    border-radius: 0.35rem;
+    background: transparent;
+    color: #1f2937;
+    text-align: start;
+    cursor: pointer;
+}
+
+    .ui-acc-tree__link:hover {
+        background: rgba(var(--oas-acc-primary-rgb), 0.055);
+        border-color: rgba(var(--oas-acc-primary-rgb), 0.12);
+    }
+
+.ui-acc-tree__row.is-selected .ui-acc-tree__link {
+    background: rgba(var(--oas-acc-primary-rgb), 0.1);
+    border-color: rgba(var(--oas-acc-primary-rgb), 0.22);
+    color: var(--oas-acc-primary);
+}
+
+.ui-acc-tree__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 0.8rem;
+    color: var(--oas-acc-primary);
+    font-size: 0.65rem;
+}
+
+.ui-acc-tree__text {
+    display: inline-flex;
+    align-items: baseline;
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 0.27rem;
+}
+
+.ui-acc-tree__code {
+    flex: 0 0 auto;
+    font-size: 0.68rem;
+    font-weight: 800;
+    color: #111827;
+    white-space: nowrap;
+}
+
+.ui-acc-tree__name {
+    overflow: hidden;
+    min-width: 0;
+    font-size: 0.68rem;
+    color: #4b5563;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ui-acc-tree__row.is-selected .ui-acc-tree__code,
+.ui-acc-tree__row.is-selected .ui-acc-tree__name {
+    color: var(--oas-acc-primary);
+}
+
+.ui-acc-tree__badge {
+    flex: 0 0 auto;
+    padding: 0.03rem 0.25rem;
+    border: 1px solid #fecdca;
+    border-radius: 999px;
+    background: #fef3f2;
+    color: #b42318;
+    font-size: 0.55rem;
+    white-space: nowrap;
+}
+
+/* ==========================================================================
+   Tables / Journal Lines
+   ========================================================================== */
+
 .ui-acc-grid-table {
     width: 100%;
     border-collapse: separate;
     border-spacing: 0;
-    background: #ffffff;
+    background: var(--oas-acc-card-bg);
     border: 1px solid var(--oas-acc-card-border);
-    border-radius: 0.5rem;
+    border-radius: var(--oas-acc-radius);
     overflow: hidden;
 }
 
-.ui-acc-grid-table th {
-    background: #f8fafc;
-    color: #475569;
-    font-weight: 600;
-    font-size: 0.8rem;
-    text-align: right;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--oas-acc-card-border);
+    .ui-acc-grid-table th {
+        padding: 0.42rem 0.5rem;
+        background: #f8fafc;
+        border-bottom: 1px solid var(--oas-acc-card-border);
+        color: #475569;
+        font-size: 0.68rem;
+        font-weight: 700;
+        text-align: right;
+    }
+
+    .ui-acc-grid-table td {
+        padding: 0.38rem 0.5rem;
+        border-bottom: 1px solid #f1f5f9;
+        color: #1e293b;
+        font-size: 0.7rem;
+        vertical-align: middle;
+    }
+
+    .ui-acc-grid-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    .ui-acc-grid-table tbody tr:hover {
+        background: #f8fafc;
+    }
+
+    .ui-acc-grid-table tfoot td {
+        padding: 0.42rem 0.5rem;
+        background: #f8fafc;
+        border-top: 2px solid var(--oas-acc-card-border);
+        font-weight: 750;
+    }
+
+.ui-acc-grid-table__clickable-row {
+    cursor: pointer;
 }
 
-.ui-acc-grid-table td {
-    padding: 0.65rem 1rem;
-    font-size: 0.85rem;
-    color: #1e293b;
-    border-bottom: 1px solid #f1f5f9;
-    vertical-align: middle;
-}
+    .ui-acc-grid-table__clickable-row:hover,
+    .ui-acc-grid-table__clickable-row:focus-within {
+        background: var(--oas-color-hover, #f7f4ff);
+    }
 
-.ui-acc-grid-table tbody tr:last-child td {
-    border-bottom: none;
-}
-
-.ui-acc-grid-table tbody tr:hover {
-    background-color: #f8fafc;
-}
-
-.ui-acc-grid-table tfoot td {
-    background: #f8fafc;
-    font-weight: 700;
-    border-top: 2px solid var(--oas-acc-card-border);
-    padding: 0.75rem 1rem;
-}
-
-/* Debit & Credit styling */
+/* Debit / Credit */
 .ui-acc-val--debit {
     color: var(--oas-acc-debit);
-    font-weight: 600;
+    font-weight: 700;
 }
 
 .ui-acc-val--credit {
     color: var(--oas-acc-credit);
-    font-weight: 600;
+    font-weight: 700;
 }
 
 .ui-acc-balanced-badge {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    padding: 0.3rem 0.75rem;
-    border-radius: 0.375rem;
-    font-size: 0.85rem;
-    font-weight: 600;
+    gap: 0.25rem;
+    padding: 0.15rem 0.42rem;
+    border-radius: 0.32rem;
+    font-size: 0.67rem;
+    font-weight: 700;
 }
 
 .ui-acc-balanced-badge--balanced {
@@ -286,321 +913,237 @@
     color: #991b1b;
 }
 
-/* Home hub grid */
+/* ==========================================================================
+   Lines Editor
+   ========================================================================== */
+
+.ui-acc-lines-editor__actions {
+    display: flex;
+    justify-content: flex-start;
+    padding-top: 0.35rem;
+}
+
+/* ==========================================================================
+   Hub
+   ========================================================================== */
+
 .ui-acc-hub-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 1.25rem;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 0.65rem;
 }
 
 .ui-acc-hub-card {
-    background: #ffffff;
-    border-radius: 0.75rem;
-    border: 1px solid var(--oas-acc-card-border);
-    padding: 1.5rem;
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0.45rem;
+    padding: 0.8rem;
+    background: var(--oas-acc-card-bg);
+    border: 1px solid var(--oas-acc-card-border);
+    border-radius: 0.55rem;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.035);
     cursor: pointer;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
     text-decoration: none;
     color: inherit;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
-.ui-acc-hub-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
-    border-color: var(--oas-acc-primary-light);
-}
+    .ui-acc-hub-card:hover {
+        transform: translateY(-2px);
+        border-color: var(--oas-acc-primary-light);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.065);
+    }
 
 .ui-acc-hub-card__icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 0.5rem;
-    background: var(--oas-color-primary-soft, #f4f0ff);
-    color: var(--oas-acc-primary);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.5rem;
+    width: 36px;
+    height: 36px;
+    border-radius: 0.4rem;
+    background: var(--oas-color-primary-soft, #f4f0ff);
+    color: var(--oas-acc-primary);
+    font-size: 1rem;
 }
 
 .ui-acc-hub-card__title {
-    font-size: 1.1rem;
-    font-weight: 700;
+    font-size: 0.85rem;
+    font-weight: 750;
     color: #0f172a;
 }
 
 .ui-acc-hub-card__desc {
-    font-size: 0.85rem;
+    font-size: 0.68rem;
+    line-height: 1.4;
     color: var(--oas-acc-muted);
-    line-height: 1.5;
 }
 
-/* Tab dirty indicator */
-.ui-acc-workspace ::deep .ui-application-tab__icon.ui-accounting-tab-icon--dirty,
-.ui-accounting-tab-icon--dirty {
-    position: relative;
-}
+/* ==========================================================================
+   Document Header
+   ========================================================================== */
 
-.ui-acc-workspace ::deep .ui-application-tab__icon.ui-accounting-tab-icon--dirty::after,
-.ui-accounting-tab-icon--dirty::after {
-    content: "";
-    position: absolute;
-    inset-block-start: -2px;
-    inset-inline-end: -4px;
-    width: 7px;
-    height: 7px;
-    border: 1px solid #fff;
-    border-radius: 50%;
-    background: #dc2626;
-    box-sizing: border-box;
-}
-
-/* Document Header Bar */
 .ui-acc-doc-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
-    gap: 1rem;
-    padding: 1rem 1.25rem;
-    background: #ffffff;
-    border-radius: 0.5rem;
+    gap: 0.5rem;
+    padding: 0.55rem 0.65rem;
+    background: var(--oas-acc-card-bg);
     border: 1px solid var(--oas-acc-card-border);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    border-radius: var(--oas-acc-radius);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
 .ui-acc-doc-header__title-row {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.4rem;
 }
 
 .ui-acc-doc-header__title {
     margin: 0;
-    font-size: 1.25rem;
-    font-weight: 700;
+    font-size: 0.88rem;
+    font-weight: 750;
     color: #0f172a;
 }
 
 .ui-acc-doc-header__subtitle {
-    font-size: 0.85rem;
+    margin-top: 0.1rem;
+    font-size: 0.67rem;
     color: var(--oas-acc-muted);
-    margin-top: 0.25rem;
 }
 
 .ui-acc-doc-header__actions {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.3rem;
     flex-wrap: wrap;
 }
 
-/* Grouped Form Sections */
-.ui-acc-section {
-    background: #ffffff;
-    border-radius: 0.5rem;
-    border: 1px solid var(--oas-acc-card-border);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-    margin-bottom: 1rem;
-    overflow: hidden;
+/* ==========================================================================
+   Dirty Tab Indicator
+   ========================================================================== */
+
+.ui-acc-workspace ::deep
+.ui-application-tab__icon.ui-accounting-tab-icon--dirty,
+.ui-accounting-tab-icon--dirty {
+    position: relative;
 }
 
-.ui-acc-section__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.85rem 1.25rem;
-    background: #f8fafc;
-    border-bottom: 1px solid var(--oas-acc-card-border);
+    .ui-acc-workspace ::deep
+    .ui-application-tab__icon.ui-accounting-tab-icon--dirty::after,
+    .ui-accounting-tab-icon--dirty::after {
+        content: "";
+        position: absolute;
+        inset-block-start: -2px;
+        inset-inline-end: -3px;
+        width: 6px;
+        height: 6px;
+        border: 1px solid #fff;
+        border-radius: 50%;
+        background: #dc2626;
+    }
+
+/* ==========================================================================
+   Focusable Surfaces
+   ========================================================================== */
+
+.ui-acc-clickable-surface {
+    border-radius: var(--oas-radius-lg, 0.5rem);
     cursor: pointer;
+    outline: none;
 }
 
-.ui-acc-section__title-group {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
+    .ui-acc-clickable-surface:focus-visible {
+        box-shadow: 0 0 0 2px var(--oas-color-primary-border, #d9ccff);
+    }
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+
+@media (max-width: 1100px) {
+    .ui-acc-accounts-split {
+        grid-template-columns: minmax(230px, 32%) minmax(0, 1fr);
+    }
+
+    .ui-acc-form-grid--4col {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .ui-acc-form-grid--3col {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 
-.ui-acc-section__icon {
-    font-size: 1.1rem;
-    color: var(--oas-acc-primary);
+@media (max-width: 960px) {
+    .ui-acc-accounts-split {
+        grid-template-columns: 1fr;
+    }
+
+    .ui-acc-accounts-split__tree {
+        position: static;
+    }
+
+    .ui-acc-tree {
+        max-height: 320px;
+    }
 }
 
-.ui-acc-section__title {
-    margin: 0;
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: #1e293b;
-}
+@media (max-width: 760px) {
+    .ui-acc-workspace {
+        padding: 0.4rem;
+    }
 
-.ui-acc-section__subtitle {
-    margin: 0;
-    font-size: 0.8rem;
-    color: var(--oas-acc-muted);
-}
+    .ui-acc-workspace__actions
+    .ui-workspace-actionbar {
+        flex-wrap: wrap;
+    }
 
-.ui-acc-section__body {
-    padding: 1.25rem;
-}
+    .ui-acc-workspace__actions
+    .ui-search-input {
+        order: 100;
+        flex: 1 1 100%;
+        width: 100%;
+        min-width: 0;
+        max-width: none;
+        margin-inline-start: 0;
+    }
 
-/* Grid Layouts for Accounting Forms */
-.ui-acc-form-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 1rem;
-}
-
-.ui-acc-form-grid--2col {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
-}
-
-.ui-acc-form-grid--3col {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
-}
-
-.ui-acc-form-grid--4col {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1rem;
-}
-
-.ui-acc-checks-group {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1.25rem;
-    padding: 0.5rem 0;
-}
-
-@media (max-width: 768px) {
+    .ui-acc-form-grid,
     .ui-acc-form-grid--2col,
     .ui-acc-form-grid--3col,
     .ui-acc-form-grid--4col {
         grid-template-columns: 1fr;
     }
+
+    .ui-acc-metrics {
+        grid-template-columns: 1fr;
+    }
+
+    .ui-acc-record-row {
+        grid-template-columns: 30px minmax(0, 1fr);
+    }
+
+    .ui-acc-record-row__status {
+        grid-column: 2;
+        justify-content: flex-start;
+    }
+
+    .ui-acc-status-action-bar {
+        align-items: flex-start;
+        flex-direction: column;
+    }
 }
 
+@media (max-width: 520px) {
+    .ui-acc-tree__row {
+        padding-inline-start: calc(var(--ui-acc-tree-level, 0) * 0.48rem);
+    }
 
-/* Accounting presentation primitives — aligned with the global OAS identity */
-.ui-acc-editor {
-    display: flex;
-    flex-direction: column;
-    gap: var(--oas-space-3, .75rem);
+    .ui-acc-tree__code,
+    .ui-acc-tree__name {
+        font-size: 0.64rem;
+    }
 }
-
-.ui-acc-stack {
-    display: flex;
-    flex-direction: column;
-    gap: var(--oas-space-3, .75rem);
-}
-
-.ui-acc-clickable-surface {
-    border-radius: var(--oas-radius-lg, .5rem);
-    cursor: pointer;
-    outline: none;
-}
-
-.ui-acc-clickable-surface:focus-visible {
-    box-shadow: 0 0 0 2px var(--oas-color-primary-border, #d9ccff);
-}
-
-.ui-acc-number-field,
-.ui-acc-readonly-field {
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-    gap: .35rem;
-}
-
-.ui-acc-number-field__label,
-.ui-acc-readonly-field__label {
-    color: var(--oas-color-text, #27263b);
-    font-size: .78rem;
-    font-weight: 700;
-}
-
-.ui-acc-number-field__input,
-.ui-acc-readonly-field__value {
-    width: 100%;
-    min-height: 2.15rem;
-    border: 1px solid var(--oas-color-border, #e7e5ef);
-    border-radius: var(--oas-radius-md, .375rem);
-    background: var(--oas-color-surface, #fff);
-    color: var(--oas-color-text, #27263b);
-    padding: .45rem .65rem;
-    font: inherit;
-    text-align: start;
-}
-
-.ui-acc-number-field__input:focus {
-    border-color: var(--oas-color-primary, #5A2DD6);
-    box-shadow: 0 0 0 2px var(--oas-color-primary-soft, #f4f0ff);
-    outline: none;
-}
-
-.ui-acc-number-field__input:disabled,
-.ui-acc-readonly-field__value {
-    background: var(--oas-color-disabled-surface, #f4f4f5);
-    color: var(--oas-color-text-muted, #77758c);
-}
-
-.ui-acc-number-field__input--primary,
-.ui-acc-readonly-field__value--primary { color: var(--oas-color-primary, #5A2DD6); font-weight: 750; }
-.ui-acc-number-field__input--success,
-.ui-acc-readonly-field__value--success { color: var(--oas-color-success, #067647); font-weight: 750; }
-.ui-acc-number-field__input--danger,
-.ui-acc-readonly-field__value--danger { color: var(--oas-color-danger, #d92d20); font-weight: 750; }
-.ui-acc-number-field__hint { color: var(--oas-color-text-muted, #77758c); font-size: .72rem; }
-
-.ui-acc-empty-state {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: .75rem;
-    min-height: 7rem;
-    border: 1px dashed var(--oas-color-border, #e7e5ef);
-    border-radius: var(--oas-radius-lg, .5rem);
-    background: var(--oas-color-subtle, #fafafa);
-    color: var(--oas-color-text-muted, #77758c);
-    padding: 1rem;
-    text-align: right;
-}
-
-.ui-acc-empty-state > i { color: var(--oas-color-primary, #5A2DD6); font-size: 1.35rem; }
-.ui-acc-empty-state__content { display: flex; flex-direction: column; gap: .2rem; }
-.ui-acc-empty-state__content strong { color: var(--oas-color-text, #27263b); font-size: .88rem; }
-.ui-acc-empty-state__content span { font-size: .78rem; }
-
-.ui-acc-lines-editor__actions {
-    display: flex;
-    justify-content: flex-start;
-    padding-top: .65rem;
-}
-
-.ui-acc-grid-table__clickable-row { cursor: pointer; }
-.ui-acc-grid-table__clickable-row:focus-within,
-.ui-acc-grid-table__clickable-row:hover { background: var(--oas-color-hover, #f7f4ff); }
-
-.ui-acc-status-action-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: .75rem;
-    padding: .7rem .85rem;
-    border: 1px solid var(--oas-color-border, #e7e5ef);
-    border-radius: var(--oas-radius-lg, .5rem);
-    background: var(--oas-color-subtle, #fafafa);
-}
-.ui-acc-status-action-bar__status,
-.ui-acc-status-action-bar__actions { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
-.ui-acc-status-action-bar__label { color: var(--oas-color-text, #27263b); font-size: .8rem; font-weight: 750; }
-@media (max-width: 640px) { .ui-acc-status-action-bar { align-items: flex-start; flex-direction: column; } }
-
-/* Unified accounting record lists */
-.ui-acc-record-list{display:flex;flex-direction:column;gap:8px}.ui-acc-record-row{width:100%;display:grid;grid-template-columns:42px minmax(0,1fr) auto;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--oas-acc-card-border);border-radius:10px;background:var(--oas-acc-card-bg);color:var(--oas-color-text,#2f2d3a);font-family:inherit;text-align:start;cursor:pointer;transition:border-color .14s ease,box-shadow .14s ease,transform .14s ease,background .14s ease}.ui-acc-record-row:hover{border-color:var(--oas-color-primary-border);background:var(--oas-color-primary-soft);box-shadow:0 6px 18px rgba(47,37,86,.08);transform:translateY(-1px)}.ui-acc-record-row:focus-visible{outline:0;border-color:var(--oas-color-primary);box-shadow:0 0 0 3px var(--oas-color-primary-soft)}.ui-acc-record-row__icon{width:38px;height:38px;display:inline-flex;align-items:center;justify-content:center;border-radius:9px;background:var(--oas-color-primary-soft);color:var(--oas-color-primary);font-size:14px}.ui-acc-record-row__content{min-width:0;display:flex;flex-direction:column;gap:7px}.ui-acc-record-row__heading{min-width:0;display:flex;align-items:baseline;gap:7px;flex-wrap:wrap}.ui-acc-record-row__heading strong{font-size:12px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ui-acc-record-row__heading small{color:var(--oas-acc-muted);font-size:9.5px}.ui-acc-record-row__details{display:flex;align-items:center;gap:8px 18px;flex-wrap:wrap}.ui-acc-record-detail{display:inline-flex;align-items:center;gap:4px}.ui-acc-record-detail small{color:var(--oas-acc-muted);font-size:8.5px}.ui-acc-record-detail strong{font-size:9.5px;font-weight:700}.ui-acc-record-row__status{display:flex;align-items:center;gap:8px}.ui-acc-record-row__chevron{color:var(--oas-acc-muted);font-size:9px}@media(max-width:680px){.ui-acc-record-row{grid-template-columns:34px minmax(0,1fr)}.ui-acc-record-row__icon{width:32px;height:32px}.ui-acc-record-row__status{grid-column:2;justify-content:flex-start}.ui-acc-record-row__details{gap:5px 10px}}

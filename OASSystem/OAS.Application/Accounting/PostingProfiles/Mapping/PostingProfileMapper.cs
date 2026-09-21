@@ -42,7 +42,7 @@ public sealed class PostingProfileMapper
     public void Update(UpdatePostingProfileRequest source, PostingProfile destination)
     {
         destination.UpdateDetails(
-            source.Code,
+            destination.Code,
             source.Name,
             source.Module,
             source.DocumentType);

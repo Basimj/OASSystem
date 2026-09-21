@@ -1,6 +1,7 @@
 @namespace OAS.Client.Accounting.Components
 @using OAS.Client.Accounting.Workspace
 @using OAS.Contracts.Accounting.Enums
+@using OAS.UiLib.Components.Accounting.Accounts
 @using OAS.UiLib.Components.Accounting.Workspace
 @using OAS.UiLib.Components.Navigation
 @using OAS.UiLib.Components.Workspace
@@ -10,7 +11,7 @@
     var isList = activeTab is null || activeTab.IsListTab;
 }
 
-<UiAccountingWorkspace>
+<UiAccountingWorkspace ShowTabs="@Section.HasValue">
     <Actions>
         <UiWorkspaceActionBar>
             @if (Section is null)
@@ -26,7 +27,10 @@
                 @if (Section == AccountingEntityType.CashAccounts)
                 {
                     <UiButton Text="صندوق جديد" IconCssClass="fa-solid fa-vault" Size="ControlSize.Small" OnClick="@(() => OpenNewRecord(AccountingEntityType.CashAccounts))" />
-                    <UiButton Text="حساب بنكي جديد" IconCssClass="fa-solid fa-building-columns" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="@(() => OpenNewRecord(AccountingEntityType.BankAccounts))" />
+                }
+                else if (Section == AccountingEntityType.BankAccounts)
+                {
+                    <UiButton Text="حساب بنكي جديد" IconCssClass="fa-solid fa-building-columns" Size="ControlSize.Small" OnClick="@(() => OpenNewRecord(AccountingEntityType.BankAccounts))" />
                 }
                 else if (Section == AccountingEntityType.FiscalYears)
                 {
@@ -143,6 +147,19 @@
         </UiWorkspaceActionBar>
     </Actions>
 
+    <Tabs>
+        @if (Section.HasValue)
+        {
+            <UiApplicationTabStrip Tabs="@WorkspaceTabs"
+                                   AriaLabel="@CurrentTabsAriaLabel"
+                                   EnableContextMenu="true"
+                                   OnSelect="SelectTabAsync"
+                                   OnClose="CloseTabByIdAsync"
+                                   OnCloseOthers="CloseOtherTabsAsync"
+                                   OnCloseAll="CloseAllTabsAsync" />
+        }
+    </Tabs>
+
     <Body>
         @if (Section is null)
         {
@@ -158,12 +175,55 @@
                     <UiAccountingHubTile Title="حسابات الموردين" Description="ربط الموردين بحسابات الأستاذ والمراقبة" Href="/accounting/supplier-accounts" IconCssClass="fa-solid fa-boxes-packing" />
                     <UiAccountingHubTile Title="سندات القبض" Description="إدارة المقبوضات وربطها بالقيود" Href="/accounting/receipt-vouchers" IconCssClass="fa-solid fa-money-bill-trend-up" />
                     <UiAccountingHubTile Title="سندات الصرف" Description="إدارة المدفوعات وربطها بالقيود" Href="/accounting/payment-vouchers" IconCssClass="fa-solid fa-money-bill-transfer" />
-                    <UiAccountingHubTile Title="الصندوق والبنوك" Description="تعريف الصناديق والحسابات البنكية" Href="/accounting/cash-bank" IconCssClass="fa-solid fa-building-columns" />
+                    <UiAccountingHubTile Title="الصناديق" Description="تعريف الصناديق والخزائن وربطها بحسابات الأستاذ العام" Href="/accounting/cash-accounts" IconCssClass="fa-solid fa-vault" />
+                    <UiAccountingHubTile Title="الحسابات البنكية" Description="تعريف الحسابات البنكية وربطها بحسابات الأستاذ العام" Href="/accounting/bank-accounts" IconCssClass="fa-solid fa-building-columns" />
                     <UiAccountingHubTile Title="ورديات الصندوق" Description="فتح وإغلاق واعتماد ورديات النقدية" Href="/accounting/cash-shifts" IconCssClass="fa-solid fa-cash-register" />
                     <UiAccountingHubTile Title="المصروفات" Description="المصروفات وأنواعها وحساباتها" Href="/accounting/expenses" IconCssClass="fa-solid fa-receipt" />
                     <UiAccountingHubTile Title="مراكز التكلفة" Description="هيكل اختياري لتوزيع وتحليل التكلفة" Href="/accounting/cost-centers" IconCssClass="fa-solid fa-network-wired" />
                 </UiAccountingFormGrid>
             </UiAccountingFormSection>
+        }
+        else if (Section == AccountingEntityType.Accounts)
+        {
+            <div class="ui-acc-accounts-split">
+                <div class="ui-acc-accounts-split__tree">
+                    <UiAccountingFormSection Title="شجرة الحسابات"
+                                             Subtitle="عرض هرمي لكل الحسابات مع التبعية بين الحسابات الأب والفرعية"
+                                             IconCssClass="fa-solid fa-folder-tree">
+                        <UiAccountTreeView Nodes="@AccountTreeNodes"
+                                           SelectedAccountId="@SelectedAccountId"
+                                           OnSelect="OpenAccountFromTreeAsync" />
+                    </UiAccountingFormSection>
+                </div>
+
+                <div class="ui-acc-accounts-split__detail">
+                    @if (activeTab is { IsListTab: false } && activeTab.Model is AccountEditor.FormModel accountModel)
+                    {
+                        <UiAccountingFormSection Title="بيانات الحساب"
+                                                 Subtitle="تفاصيل الحساب المحدد أو الحساب الجديد"
+                                                 IconCssClass="fa-solid fa-file-pen">
+                            <AccountEditor Model="@accountModel"
+                                           IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
+                                           IsNew="@activeTab.IsNew"
+                                           ParentAccountLookupItem="@GetAccountLookup(accountModel.ParentAccountId)"
+                                           AccountSearchAsync="SearchAccountsAsync"
+                                           OnModelChanged="MarkActiveDirty" />
+                        </UiAccountingFormSection>
+                    }
+                    else if (_isLoading)
+                    {
+                        <UiAccountingEmptyState Title="جاري تحميل شجرة الحسابات"
+                                                Description="يتم الآن جلب الحسابات وإعداد الشجرة المحاسبية..."
+                                                IconCssClass="fa-solid fa-circle-notch fa-spin" />
+                    }
+                    else
+                    {
+                        <UiAccountingEmptyState Title="اختر حساباً من الشجرة"
+                                                Description="من القسم الأيسر افتح أي حساب لعرض بياناته هنا، أو اضغط &quot;جديد&quot; لإنشاء حساب جديد في هذا القسم."
+                                                IconCssClass="fa-solid fa-hand-pointer" />
+                    }
+                </div>
+            </div>
         }
         else if (activeTab is { IsListTab: false })
         {
@@ -245,6 +305,9 @@
                     <UiAccountingRecordList Items="@BuildCashAccountItems()" EmptyTitle="لا توجد صناديق" OnOpen='@(id => OpenRecordInTab(AccountingEntityType.CashAccounts, id, "صندوق"))' />
                     <UiPagination PageNumber="@_cashAccountsPage.PageNumber" TotalPages="@_cashAccountsPage.TotalPages" TotalCount="@_cashAccountsPage.TotalCount" OnPrevious="@(() => ChangePageAsync(AccountingEntityType.CashAccounts, -1))" OnNext="@(() => ChangePageAsync(AccountingEntityType.CashAccounts, 1))" />
                 </UiAccountingFormSection>
+            }
+            else if (Section == AccountingEntityType.BankAccounts)
+            {
                 <UiAccountingFormSection Title="الحسابات البنكية" Subtitle="الحسابات البنكية المرتبطة بدليل الحسابات" IconCssClass="fa-solid fa-building-columns">
                     <UiAccountingRecordList Items="@BuildBankAccountItems()" EmptyTitle="لا توجد حسابات بنكية" OnOpen='@(id => OpenRecordInTab(AccountingEntityType.BankAccounts, id, "حساب بنكي"))' />
                     <UiPagination PageNumber="@_bankAccountsPage.PageNumber" TotalPages="@_bankAccountsPage.TotalPages" TotalCount="@_bankAccountsPage.TotalCount" OnPrevious="@(() => ChangePageAsync(AccountingEntityType.BankAccounts, -1))" OnNext="@(() => ChangePageAsync(AccountingEntityType.BankAccounts, 1))" />
@@ -289,6 +352,26 @@
                     <UiAccountingRecordList Items="@BuildAllocationItems()" EmptyTitle="لا توجد تخصيصات سداد" EmptyDescription="أنشئ تخصيصاً من زر تخصيص دفعة عند الحاجة." OnOpen='@(id => OpenRecordInTab(AccountingEntityType.PaymentAllocations, id, "تخصيص سداد"))' />
                     <UiPagination PageNumber="@_allocationsPage.PageNumber" TotalPages="@_allocationsPage.TotalPages" TotalCount="@_allocationsPage.TotalCount" OnPrevious="@(() => ChangeAllocationPageAsync(-1))" OnNext="@(() => ChangeAllocationPageAsync(1))" />
                 </UiAccountingFormSection>
+            }
+            else if (Section == AccountingEntityType.Accounts)
+            {
+                <div class="ui-acc-accounts-split">
+                    <div class="ui-acc-accounts-split__tree">
+                        <UiAccountingFormSection Title="شجرة الحسابات"
+                                                 Subtitle="عرض هرمي لكل الحسابات مع إمكانية التوسيع والطي"
+                                                 IconCssClass="fa-solid fa-folder-tree">
+                            <UiAccountTreeView Nodes="@AccountTreeNodes"
+                                               SelectedAccountId="@SelectedAccountId"
+                                               OnSelect="OpenAccountFromTreeAsync" />
+                        </UiAccountingFormSection>
+                    </div>
+
+                    <div class="ui-acc-accounts-split__detail">
+                        <UiAccountingEmptyState Title="اختر حساباً أو أنشئ حساباً جديداً"
+                                                Description="اضغط على أي حساب في الشجرة لعرض بياناته هنا، أو استخدم زر جديد لفتح تبويب حساب جديد في القسم الثاني."
+                                                IconCssClass="fa-solid fa-file-circle-plus" />
+                    </div>
+                </div>
             }
             else
             {

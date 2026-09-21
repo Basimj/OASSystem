@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Components;
 using OAS.Client.Accounting.Common;
 using OAS.Client.Accounting.Services;
 using OAS.Client.Accounting.Workspace;
+using OAS.Client.Common.Feedback.Services;
+using OAS.Client.Services.Http;
 using OAS.Contracts.Accounting.Accounts;
 using OAS.Contracts.Accounting.BankAccounts;
 using OAS.Contracts.Accounting.CashAccounts;
@@ -20,6 +22,7 @@ using OAS.Contracts.Accounting.PostingProfiles;
 using OAS.Contracts.Accounting.ReceiptVouchers;
 using OAS.Contracts.Accounting.SupplierAccounts;
 using OAS.Contracts.Common.Pagination;
+using OAS.UiLib.Components.Accounting.Accounts;
 using OAS.UiLib.Components.Accounting.Journals;
 using OAS.UiLib.Components.Accounting.PostingProfiles;
 using OAS.UiLib.Components.Accounting.Vouchers;
@@ -39,10 +42,12 @@ public partial class AccountingWorkspaceHost : IDisposable
     [Inject] private IAccountingClientService AccountingService { get; set; } = default!;
     [Inject] private IUiSnackbarService Snackbar { get; set; } = default!;
     [Inject] private IUiDialogService Dialog { get; set; } = default!;
+    [Inject] private IApiFeedbackService ApiFeedback { get; set; } = default!;
 
     [Parameter] public AccountingEntityType? Section { get; set; }
 
     private const int PageSize = 25;
+    private const int AccountTreePageSize = 2000;
     private bool _isLoading;
     private bool _initialized;
     private AccountingEntityType? _loadedSection;
@@ -76,29 +81,38 @@ public partial class AccountingWorkspaceHost : IDisposable
     private PagedResult<PostingProfileDto> _postingProfilesPage = new();
     private PagedResult<PaymentAllocationDto> _allocationsPage = new();
 
-    // Only editor tabs that belong to the currently opened accounting page are shown.
-    // This keeps the global OAS application tab bar as the module-level navigation and
-    // avoids introducing a second Accounting-wide navigation strip.
-    private IReadOnlyList<UiApplicationTabItem> EditorTabs
+    // Each accounting page owns its own visible tab strip: one permanent list tab
+    // plus the new/open records that belong to that page. Tabs from other accounting
+    // pages remain in state but are never mixed into the current page strip.
+    private IReadOnlyList<UiApplicationTabItem> WorkspaceTabs
     {
         get
         {
             if (!Section.HasValue) return [];
-            var allowed = GetEditorEntityTypesForSection(Section.Value);
+
+            var section = Section.Value;
+            var allowedEditors = GetEditorEntityTypesForSection(section);
+
             return Workspace.Tabs
-                .Where(t => !t.IsListTab && allowed.Contains(t.EntityType))
+                .Where(t =>
+                    (t.IsListTab && t.EntityType == section) ||
+                    (!t.IsListTab && allowedEditors.Contains(t.EntityType)))
                 .Select(t => new UiApplicationTabItem(
                     t.TabId,
                     t.Title,
-                    "/accounting",
+                    GetSectionRoute(section),
                     t.GetIconCss(),
                     Workspace.ActiveTabId == t.TabId,
-                    CanClose: t.CanClose))
+                    CanClose: !t.IsListTab && t.CanClose))
                 .ToArray();
         }
     }
 
     private AccountingEntityType CurrentListEntity => Section ?? AccountingEntityType.Accounts;
+
+    private string CurrentTabsAriaLabel => Section.HasValue
+        ? $"تبويبات {Workspace.Tabs.FirstOrDefault(t => t.IsListTab && t.EntityType == Section.Value)?.Title ?? "المحاسبة"}"
+        : "تبويبات المحاسبة";
 
     private string CurrentSearch => GetSearch(CurrentListEntity);
 
@@ -108,7 +122,8 @@ public partial class AccountingWorkspaceHost : IDisposable
         AccountingEntityType.Journals => "بحث برقم القيد أو البيان...",
         AccountingEntityType.ReceiptVouchers => "بحث برقم سند القبض أو البيان...",
         AccountingEntityType.PaymentVouchers => "بحث برقم سند الصرف أو البيان...",
-        AccountingEntityType.CashAccounts => "بحث في الصناديق والبنوك...",
+        AccountingEntityType.CashAccounts => "بحث بالكود أو اسم الصندوق...",
+        AccountingEntityType.BankAccounts => "بحث بالكود أو اسم البنك أو رقم الحساب...",
         AccountingEntityType.CashShifts => "بحث برقم الوردية...",
         AccountingEntityType.Expenses => "بحث في المصروفات وأنواعها...",
         AccountingEntityType.FiscalYears => "بحث في السنوات والفترات المالية...",
@@ -118,6 +133,15 @@ public partial class AccountingWorkspaceHost : IDisposable
         AccountingEntityType.SupplierAccounts => "بحث بمعرف المورد أو الحساب...",
         _ => "بحث..."
     };
+
+
+    private Guid? SelectedAccountId =>
+        Section == AccountingEntityType.Accounts &&
+        Workspace.ActiveTab is { IsListTab: false, EntityType: AccountingEntityType.Accounts, EntityId: Guid id }
+            ? id
+            : null;
+
+    private IReadOnlyList<AccountTreeNode> AccountTreeNodes => BuildAccountTreeNodes();
 
     private bool CanEditActive =>
         Workspace.ActiveTab is { IsListTab: false, IsNew: false, IsEditMode: false, IsLoading: false, IsSaving: false } tab &&
@@ -218,13 +242,19 @@ public partial class AccountingWorkspaceHost : IDisposable
             if (!confirmed) return;
         }
 
+        var wasActive = Workspace.ActiveTabId == tabId;
+        var pageTabsBeforeClose = Workspace.Tabs.Where(IsTabForCurrentSection).ToArray();
+        var closedIndex = Array.FindIndex(pageTabsBeforeClose, x => x.TabId == tabId);
+
         Workspace.RemoveTab(tabId);
-        ReturnToSectionListIfNeeded();
+
+        if (wasActive)
+            ActivateNearestCurrentPageTab(closedIndex);
     }
 
     private async Task CloseOtherTabsAsync(Guid tabId)
     {
-        var others = Workspace.Tabs.Where(x => !x.IsListTab && x.TabId != tabId && x.CanClose).ToArray();
+        var others = Workspace.Tabs.Where(x => IsTabForCurrentSection(x) && !x.IsListTab && x.TabId != tabId && x.CanClose).ToArray();
         foreach (var tab in others)
         {
             if (tab.IsDirty)
@@ -239,11 +269,21 @@ public partial class AccountingWorkspaceHost : IDisposable
             }
             Workspace.RemoveTab(tab.TabId);
         }
+
+        if (Workspace.FindTab(tabId) is { } keptTab && IsTabForCurrentSection(keptTab))
+        {
+            Workspace.ActiveTabId = keptTab.TabId;
+            Workspace.NotifyStateChanged();
+        }
+        else
+        {
+            ReturnToSectionListIfNeeded();
+        }
     }
 
     private async Task CloseAllTabsAsync()
     {
-        var tabs = Workspace.Tabs.Where(x => !x.IsListTab && x.CanClose).ToArray();
+        var tabs = Workspace.Tabs.Where(x => IsTabForCurrentSection(x) && !x.IsListTab && x.CanClose).ToArray();
         foreach (var tab in tabs)
         {
             if (tab.IsDirty)
@@ -261,10 +301,29 @@ public partial class AccountingWorkspaceHost : IDisposable
         ReturnToSectionListIfNeeded();
     }
 
+    private void ActivateNearestCurrentPageTab(int previousIndex)
+    {
+        if (!Section.HasValue) return;
+
+        var remaining = Workspace.Tabs.Where(IsTabForCurrentSection).ToArray();
+        if (remaining.Length == 0)
+        {
+            Workspace.OpenOrActivateListTab(Section.Value);
+            return;
+        }
+
+        var index = Math.Clamp(previousIndex < 0 ? 0 : previousIndex, 0, remaining.Length - 1);
+        Workspace.ActiveTabId = remaining[index].TabId;
+        Workspace.NotifyStateChanged();
+    }
+
     private void ReturnToSectionListIfNeeded()
     {
-        if (Section.HasValue && (Workspace.ActiveTab is null || !Workspace.ActiveTab.IsListTab))
+        if (Section.HasValue &&
+            (Workspace.ActiveTab is null || !IsTabForCurrentSection(Workspace.ActiveTab) || !Workspace.ActiveTab.IsListTab))
+        {
             Workspace.OpenOrActivateListTab(Section.Value);
+        }
     }
 
     private void BeginEditActive()
@@ -282,8 +341,10 @@ public partial class AccountingWorkspaceHost : IDisposable
 
         if (tab.IsNew)
         {
+            var pageTabs = Workspace.Tabs.Where(IsTabForCurrentSection).ToArray();
+            var index = Array.FindIndex(pageTabs, x => x.TabId == tab.TabId);
             Workspace.RemoveTab(tab.TabId);
-            ReturnToSectionListIfNeeded();
+            ActivateNearestCurrentPageTab(index);
             return;
         }
 
@@ -387,14 +448,13 @@ public partial class AccountingWorkspaceHost : IDisposable
 
     private PageRequest BuildPageRequest(AccountingEntityType type) => new()
     {
-        PageNumber = GetPage(type),
-        PageSize = PageSize,
+        PageNumber = type == AccountingEntityType.Accounts ? 1 : GetPage(type),
+        PageSize = type == AccountingEntityType.Accounts ? AccountTreePageSize : PageSize,
         Search = string.IsNullOrWhiteSpace(GetSearch(type)) ? null : GetSearch(type)
     };
 
     private static IReadOnlyList<AccountingEntityType> GetSectionEntityTypes(AccountingEntityType section) => section switch
     {
-        AccountingEntityType.CashAccounts => [AccountingEntityType.CashAccounts, AccountingEntityType.BankAccounts],
         AccountingEntityType.FiscalYears => [AccountingEntityType.FiscalYears, AccountingEntityType.FiscalPeriods],
         AccountingEntityType.Expenses => [AccountingEntityType.Expenses, AccountingEntityType.ExpenseTypes],
         _ => [section]
@@ -402,13 +462,37 @@ public partial class AccountingWorkspaceHost : IDisposable
 
     private static IReadOnlySet<AccountingEntityType> GetEditorEntityTypesForSection(AccountingEntityType section) => section switch
     {
-        AccountingEntityType.CashAccounts => new HashSet<AccountingEntityType> { AccountingEntityType.CashAccounts, AccountingEntityType.BankAccounts },
         AccountingEntityType.FiscalYears => new HashSet<AccountingEntityType> { AccountingEntityType.FiscalYears, AccountingEntityType.FiscalPeriods },
         AccountingEntityType.Expenses => new HashSet<AccountingEntityType> { AccountingEntityType.Expenses, AccountingEntityType.ExpenseTypes },
         AccountingEntityType.ReceiptVouchers => new HashSet<AccountingEntityType> { AccountingEntityType.ReceiptVouchers, AccountingEntityType.PaymentAllocations },
         AccountingEntityType.PaymentVouchers => new HashSet<AccountingEntityType> { AccountingEntityType.PaymentVouchers, AccountingEntityType.PaymentAllocations },
         _ => new HashSet<AccountingEntityType> { section }
     };
+
+    private static string GetSectionRoute(AccountingEntityType section) => section switch
+    {
+        AccountingEntityType.Accounts => "/accounting/accounts",
+        AccountingEntityType.FiscalYears => "/accounting/fiscal-years",
+        AccountingEntityType.Journals => "/accounting/journals",
+        AccountingEntityType.PostingProfiles => "/accounting/posting-profiles",
+        AccountingEntityType.CustomerAccounts => "/accounting/customer-accounts",
+        AccountingEntityType.SupplierAccounts => "/accounting/supplier-accounts",
+        AccountingEntityType.ReceiptVouchers => "/accounting/receipt-vouchers",
+        AccountingEntityType.PaymentVouchers => "/accounting/payment-vouchers",
+        AccountingEntityType.CashAccounts => "/accounting/cash-accounts",
+        AccountingEntityType.BankAccounts => "/accounting/bank-accounts",
+        AccountingEntityType.CashShifts => "/accounting/cash-shifts",
+        AccountingEntityType.Expenses => "/accounting/expenses",
+        AccountingEntityType.CostCenters => "/accounting/cost-centers",
+        _ => "/accounting"
+    };
+
+    private bool IsTabForCurrentSection(AccountingTabState tab)
+    {
+        if (!Section.HasValue) return false;
+        if (tab.IsListTab) return tab.EntityType == Section.Value;
+        return GetEditorEntityTypesForSection(Section.Value).Contains(tab.EntityType);
+    }
 
     private async Task ChangePageAsync(AccountingEntityType type, int delta)
     {
@@ -530,6 +614,9 @@ public partial class AccountingWorkspaceHost : IDisposable
 
     private Task OpenCurrentRecordAsync(Guid id) =>
         OpenRecordInTab(CurrentListEntity, id, GetEntityDisplayName(CurrentListEntity));
+
+    private Task OpenAccountFromTreeAsync(Guid id) =>
+        OpenRecordInTab(AccountingEntityType.Accounts, id, "حساب");
 
     private async Task OpenRecordInTab(AccountingEntityType entityType, Guid id, string title)
     {
@@ -1015,9 +1102,15 @@ public partial class AccountingWorkspaceHost : IDisposable
                     break;
             }
         }
-        catch (Exception ex)
+        catch (ApiClientException ex)
         {
-            Snackbar.Error("فشلت عملية الحفظ: " + ex.Message);
+            // أخطاء التحقق/التعارض القادمة من الـ API يجب أن تظهر للمستخدم
+            // كرسالة واضحة بدون إسقاط واجهة Blazor أو إغلاق التبويب الحالي.
+            ApiFeedback.Show(ex.Error);
+        }
+        catch (Exception)
+        {
+            ApiFeedback.ShowUnexpected();
         }
         finally
         {
@@ -2162,6 +2255,116 @@ public partial class AccountingWorkspaceHost : IDisposable
         AccountingEntityType.ExpenseTypes => (_expenseTypesPage.PageNumber, _expenseTypesPage.TotalPages, _expenseTypesPage.TotalCount),
         _ => (1, 0, 0)
     };
+
+    private IReadOnlyList<AccountTreeNode> BuildAccountTreeNodes()
+    {
+        if (_accountsPage.Items.Count == 0)
+            return [];
+
+        var accounts = _accountsPage.Items
+            .OrderBy(x => x.Code, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var knownIds = accounts
+            .Select(x => x.Id)
+            .ToHashSet();
+
+        /*
+         * لا نضع ParentAccountId = null داخل Dictionary.
+         * الحسابات التي ParentAccountId لها null هي Roots
+         * ويتم التعامل معها بشكل مستقل بالأسفل.
+         */
+        var childrenByParent = accounts
+            .Where(x => x.ParentAccountId.HasValue)
+            .GroupBy(x => x.ParentAccountId!.Value)
+            .ToDictionary(
+                g => g.Key,
+                g => g
+                    .OrderBy(x => x.Code, StringComparer.OrdinalIgnoreCase)
+                    .ToList());
+
+        IReadOnlyList<AccountTreeNode> BuildChildren(
+            Guid parentId,
+            HashSet<Guid> path)
+        {
+            if (!childrenByParent.TryGetValue(
+                    parentId,
+                    out var children))
+            {
+                return [];
+            }
+
+            var result = new List<AccountTreeNode>();
+
+            foreach (var account in children)
+            {
+                /*
+                 * حماية من بيانات خاطئة تحتوي Cycle:
+                 *
+                 * A -> B -> A
+                 *
+                 * حتى لا يحدث StackOverflow.
+                 */
+                if (path.Contains(account.Id))
+                    continue;
+
+                var childPath = new HashSet<Guid>(path)
+            {
+                account.Id
+            };
+
+                result.Add(
+                    new AccountTreeNode(
+                        account.Id,
+                        account.Code,
+                        account.NameAr,
+                        account.IsActive,
+                        BuildChildren(
+                            account.Id,
+                            childPath)));
+            }
+
+            return result;
+        }
+
+        /*
+         * Root:
+         * 1- ليس له ParentAccountId.
+         * 2- أو يشير إلى Parent غير موجود ضمن البيانات الحالية.
+         *
+         * الحالة الثانية مهمة أيضاً عند استخدام البحث.
+         */
+        var rootAccounts = accounts
+            .Where(x =>
+                !x.ParentAccountId.HasValue ||
+                !knownIds.Contains(x.ParentAccountId.Value))
+            .OrderBy(
+                x => x.Code,
+                StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var roots = new List<AccountTreeNode>();
+
+        foreach (var account in rootAccounts)
+        {
+            var path = new HashSet<Guid>
+        {
+            account.Id
+        };
+
+            roots.Add(
+                new AccountTreeNode(
+                    account.Id,
+                    account.Code,
+                    account.NameAr,
+                    account.IsActive,
+                    BuildChildren(
+                        account.Id,
+                        path)));
+        }
+
+        return roots;
+    }
 
     private IReadOnlyList<AccountingRecordItem> BuildAccountItems() => _accountsPage.Items.Select(x =>
         new AccountingRecordItem(
