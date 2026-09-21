@@ -21,6 +21,13 @@ public sealed class UpdateCashAccountCommandHandler(
             throw new NotFoundException(nameof(CashAccount), request.Id);
         }
 
+        if (!string.Equals(entity.Code, request.Data.Code.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ConflictException(
+                "accounting_cash_account_code_immutable",
+                "The cash account code cannot be changed after creation.");
+        }
+
         var requestedRowVersion = Convert.FromBase64String(request.Data.RowVersion);
         if (!entity.RowVersion.SequenceEqual(requestedRowVersion))
         {

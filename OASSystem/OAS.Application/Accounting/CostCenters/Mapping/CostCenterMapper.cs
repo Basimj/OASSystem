@@ -26,7 +26,7 @@ public sealed class CostCenterMapper
     public void Update(UpdateCostCenterRequest source, CostCenter destination)
     {
         destination.UpdateDetails(
-            source.Code,
+            destination.Code,
             source.NameAr,
             source.NameEn,
             source.ParentCostCenterId);

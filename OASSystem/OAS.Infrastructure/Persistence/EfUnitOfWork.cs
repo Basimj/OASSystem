@@ -90,6 +90,96 @@ public sealed class EfUnitOfWork(OasDbContext dbContext) : IUnitOfWork
             return true;
         }
 
+        if (message.Contains("UX_Accounts_Code", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("accounting_account_code_exists", "An account with this code already exists.");
+            return true;
+        }
+
+        if (message.Contains("UX_FiscalYears_Code", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("accounting_fiscal_year_code_exists", "A fiscal year with this code already exists.");
+            return true;
+        }
+
+        if (message.Contains("UX_FiscalPeriods_FiscalYearId_PeriodNumber", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("accounting_fiscal_period_number_exists", "This period number already exists in the selected fiscal year.");
+            return true;
+        }
+
+        if (message.Contains("UX_CostCenters_Code", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("accounting_cost_center_code_exists", "A cost center with this code already exists.");
+            return true;
+        }
+
+        if (message.Contains("UX_JournalEntries_JournalNumber", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("accounting_journal_number_exists", "A journal entry with this number already exists.");
+            return true;
+        }
+
+        if (message.Contains("UX_PostingProfiles_Code", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("accounting_posting_profile_code_exists", "A posting profile with this code already exists.");
+            return true;
+        }
+
+        if (message.Contains("UX_CashAccounts_Code", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("accounting_cash_account_code_exists", "A cash account with this code already exists.");
+            return true;
+        }
+
+        if (message.Contains("UX_BankAccounts_Code", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("accounting_bank_account_code_exists", "A bank account with this code already exists.");
+            return true;
+        }
+
+        if (message.Contains("UX_CustomerAccounts_CustomerId", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("accounting_customer_account_exists", "This customer is already linked to an accounting account.");
+            return true;
+        }
+
+        if (message.Contains("UX_SupplierAccounts_SupplierId", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("accounting_supplier_account_exists", "This supplier is already linked to an accounting account.");
+            return true;
+        }
+
+        if (message.Contains("UX_ReceiptVouchers_VoucherNumber", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("accounting_receipt_number_exists", "A receipt voucher with this number already exists.");
+            return true;
+        }
+
+        if (message.Contains("UX_PaymentVouchers_VoucherNumber", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("accounting_payment_number_exists", "A payment voucher with this number already exists.");
+            return true;
+        }
+
+        if (message.Contains("UX_CashShifts_ShiftNumber", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("accounting_cash_shift_number_exists", "A cash shift with this number already exists.");
+            return true;
+        }
+
+        if (message.Contains("UX_ExpenseTypes_Code", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("accounting_expense_type_code_exists", "An expense type with this code already exists.");
+            return true;
+        }
+
+        if (message.Contains("UX_Expenses_ExpenseNumber", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("accounting_expense_number_exists", "An expense with this number already exists.");
+            return true;
+        }
+
         conflict = new ConflictException("unique_constraint_conflict", "A unique value already exists.");
         return true;
     }

@@ -21,6 +21,19 @@ public sealed class UpdateFiscalYearCommandHandler(
             throw new NotFoundException(nameof(FiscalYear), request.Id);
         }
 
+        if (!string.Equals(entity.Code, request.Data.Code.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ConflictException(
+                "accounting_fiscal_year_code_immutable",
+                "The fiscal year code cannot be changed after creation.");
+        }
+
+        var requestedRowVersion = Convert.FromBase64String(request.Data.RowVersion);
+        if (!entity.RowVersion.SequenceEqual(requestedRowVersion))
+        {
+            throw new ConcurrencyException("The fiscal year has been modified by another user.");
+        }
+
         mapper.Update(request.Data, entity);
         repository.Update(entity);
         return entity;

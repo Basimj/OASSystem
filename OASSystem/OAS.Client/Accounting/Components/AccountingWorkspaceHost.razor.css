@@ -1,0 +1,17 @@
+.ui-acc-accounts-split {
+    display: grid;
+    grid-template-columns: minmax(320px, 34%) minmax(0, 1fr);
+    gap: 1rem;
+    align-items: start;
+}
+
+.ui-acc-accounts-split__tree,
+.ui-acc-accounts-split__detail {
+    min-width: 0;
+}
+
+@media (max-width: 960px) {
+    .ui-acc-accounts-split {
+        grid-template-columns: 1fr;
+    }
+}

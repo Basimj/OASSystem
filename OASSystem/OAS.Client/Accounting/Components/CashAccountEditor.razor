@@ -18,7 +18,8 @@
                          ValueChanged="OnCodeChanged"
                          Required="true"
                          Placeholder="مثال: CASH-MAIN"
-                         Disabled="@(!IsEditable)"
+                         ReadOnly="@(!IsNew)"
+                         Disabled="@(!IsEditable || !IsNew)"
                          Size="ControlSize.Small" />
 
             <UiInputText Label="اسم الصندوق"

@@ -20,7 +20,8 @@
                          ValueExpression="@(() => Model.Code)"
                          ValueChanged="OnCodeChanged"
                          Required="true"
-                         Disabled="@(!IsEditable)"
+                         ReadOnly="@(!IsNew)"
+                         Disabled="@(!IsEditable || !IsNew)"
                          Size="ControlSize.Small" />
 
             <UiInputText Label="اسم الحساب (بالعربية)"

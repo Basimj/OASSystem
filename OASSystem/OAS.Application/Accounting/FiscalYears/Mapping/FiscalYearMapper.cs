@@ -32,7 +32,7 @@ public sealed class FiscalYearMapper
         FiscalYear destination)
     {
         destination.UpdateDetails(
-            source.Code,
+            destination.Code,
             source.Name,
             source.StartDate,
             source.EndDate);

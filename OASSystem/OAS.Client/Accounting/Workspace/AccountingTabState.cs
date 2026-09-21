@@ -106,22 +106,22 @@ public sealed class AccountingTabState
             return type switch
             {
                 AccountingEntityType.Overview => "لوحة المحاسبة",
-                AccountingEntityType.Accounts => "شجرة الحسابات",
-                AccountingEntityType.FiscalYears => "السنوات المالية",
+                AccountingEntityType.Accounts => "جميع الحسابات",
+                AccountingEntityType.FiscalYears => "السنوات والفترات المالية",
                 AccountingEntityType.FiscalPeriods => "الفترات المالية",
-                AccountingEntityType.Journals => "القيود اليومية",
-                AccountingEntityType.PostingProfiles => "ملفات الترحيل",
-                AccountingEntityType.CustomerAccounts => "حسابات العملاء",
-                AccountingEntityType.SupplierAccounts => "حسابات الموردين",
-                AccountingEntityType.ReceiptVouchers => "سندات القبض",
-                AccountingEntityType.PaymentVouchers => "سندات الصرف",
+                AccountingEntityType.Journals => "جميع القيود اليومية",
+                AccountingEntityType.PostingProfiles => "جميع ملفات الترحيل",
+                AccountingEntityType.CustomerAccounts => "جميع حسابات العملاء",
+                AccountingEntityType.SupplierAccounts => "جميع حسابات الموردين",
+                AccountingEntityType.ReceiptVouchers => "جميع سندات القبض",
+                AccountingEntityType.PaymentVouchers => "جميع سندات الصرف",
                 AccountingEntityType.PaymentAllocations => "تخصيصات السداد",
-                AccountingEntityType.CashAccounts => "الحسابات النقدية",
-                AccountingEntityType.BankAccounts => "الحسابات البنكية",
-                AccountingEntityType.CashShifts => "ورديات الصندوق",
+                AccountingEntityType.CashAccounts => "جميع الصناديق",
+                AccountingEntityType.BankAccounts => "جميع الحسابات البنكية",
+                AccountingEntityType.CashShifts => "جميع ورديات الصندوق",
                 AccountingEntityType.ExpenseTypes => "أنواع المصروفات",
-                AccountingEntityType.Expenses => "المصروفات",
-                AccountingEntityType.CostCenters => "مراكز التكلفة",
+                AccountingEntityType.Expenses => "المصروفات وأنواعها",
+                AccountingEntityType.CostCenters => "جميع مراكز التكلفة",
                 _ => "المحاسبة"
             };
         }
@@ -130,7 +130,7 @@ public sealed class AccountingTabState
         {
             return type switch
             {
-                AccountingEntityType.Accounts => "إضافة حساب",
+                AccountingEntityType.Accounts => "حساب جديد",
                 AccountingEntityType.FiscalYears => "سنة مالية جديدة",
                 AccountingEntityType.FiscalPeriods => "فترة مالية جديدة",
                 AccountingEntityType.Journals => "قيد يومية جديد",
@@ -140,7 +140,7 @@ public sealed class AccountingTabState
                 AccountingEntityType.ReceiptVouchers => "سند قبض جديد",
                 AccountingEntityType.PaymentVouchers => "سند صرف جديد",
                 AccountingEntityType.PaymentAllocations => "تخصيص سداد جديد",
-                AccountingEntityType.CashAccounts => "حساب نقدي جديد",
+                AccountingEntityType.CashAccounts => "صندوق جديد",
                 AccountingEntityType.BankAccounts => "حساب بنكي جديد",
                 AccountingEntityType.CashShifts => "فتح وردية جديدة",
                 AccountingEntityType.ExpenseTypes => "نوع مصروف جديد",

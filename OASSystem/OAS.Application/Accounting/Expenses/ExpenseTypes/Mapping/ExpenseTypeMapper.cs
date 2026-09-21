@@ -26,7 +26,7 @@ public sealed class ExpenseTypeMapper
     public void Update(UpdateExpenseTypeRequest source, ExpenseType destination)
     {
         destination.UpdateDetails(
-            source.Code,
+            destination.Code,
             source.NameAr,
             source.NameEn,
             source.DefaultExpenseAccountId);

@@ -21,6 +21,13 @@ public sealed class UpdateExpenseTypeCommandHandler(
             throw new NotFoundException(nameof(ExpenseType), request.Id);
         }
 
+        if (!string.Equals(entity.Code, request.Data.Code.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ConflictException(
+                "accounting_expense_type_code_immutable",
+                "The expense type code cannot be changed after creation.");
+        }
+
         var requestedRowVersion = Convert.FromBase64String(request.Data.RowVersion);
         if (!entity.RowVersion.SequenceEqual(requestedRowVersion))
         {

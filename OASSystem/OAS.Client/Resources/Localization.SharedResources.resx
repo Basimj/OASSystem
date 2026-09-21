@@ -1,4 +1,4 @@
-﻿<?xml version='1.0' encoding='utf-8'?>
+<?xml version='1.0' encoding='utf-8'?>
 <root xmlns:ns1="urn:schemas-microsoft-com:xml-msdata" xmlns:xs="http://www.w3.org/2001/XMLSchema">
   <xs:schema id="root">
     <xs:import namespace="http://www.w3.org/XML/1998/namespace" />
@@ -787,122 +787,79 @@
   <data name="employee_image_type_invalid" xml:space="preserve">
     <value>Employee image must be JPEG, PNG, or WebP.</value>
   </data>
-
-  <data name="transaction_number_too_long" xml:space="preserve">
-    <value>Transaction number exceeds the allowed length.</value>
+  <data name="accounting_account_code_exists" xml:space="preserve">
+    <value>An account with this code already exists.</value>
   </data>
-  <data name="transaction_type_invalid" xml:space="preserve">
-    <value>Inventory transaction type is invalid.</value>
+  <data name="accounting_fiscal_year_code_exists" xml:space="preserve">
+    <value>A fiscal year with this code already exists.</value>
   </data>
-  <data name="transaction_date_required" xml:space="preserve">
-    <value>Transaction date is required.</value>
+  <data name="accounting_fiscal_period_number_exists" xml:space="preserve">
+    <value>This period number already exists in the selected fiscal year.</value>
   </data>
-  <data name="transaction_reference_type_too_long" xml:space="preserve">
-    <value>Reference type exceeds the allowed length.</value>
+  <data name="accounting_cost_center_code_exists" xml:space="preserve">
+    <value>A cost center with this code already exists.</value>
   </data>
-  <data name="transaction_reason_too_long" xml:space="preserve">
-    <value>Transaction reason exceeds the allowed length.</value>
+  <data name="accounting_journal_number_exists" xml:space="preserve">
+    <value>A journal entry with this number already exists.</value>
   </data>
-  <data name="transaction_notes_too_long" xml:space="preserve">
-    <value>Transaction notes exceed the allowed length.</value>
+  <data name="accounting_posting_profile_code_exists" xml:space="preserve">
+    <value>A posting profile with this code already exists.</value>
   </data>
-  <data name="transaction_lines_required" xml:space="preserve">
-    <value>At least one transaction line is required.</value>
+  <data name="accounting_cash_account_code_exists" xml:space="preserve">
+    <value>A cash account with this code already exists.</value>
   </data>
-  <data name="transaction_duplicate_variant_lines" xml:space="preserve">
-    <value>The same product variant cannot appear in more than one line.</value>
+  <data name="accounting_bank_account_code_exists" xml:space="preserve">
+    <value>A bank account with this code already exists.</value>
   </data>
-  <data name="product_variant_id_required" xml:space="preserve">
-    <value>Product variant is required.</value>
+  <data name="accounting_customer_account_exists" xml:space="preserve">
+    <value>This customer is already linked to an accounting account.</value>
   </data>
-  <data name="line_quantity_must_be_positive" xml:space="preserve">
-    <value>Line quantity must be greater than zero.</value>
+  <data name="accounting_supplier_account_exists" xml:space="preserve">
+    <value>This supplier is already linked to an accounting account.</value>
   </data>
-  <data name="line_quantity_precision_invalid" xml:space="preserve">
-    <value>Line quantity exceeds the allowed precision.</value>
+  <data name="accounting_receipt_number_exists" xml:space="preserve">
+    <value>A receipt voucher with this number already exists.</value>
   </data>
-  <data name="line_unit_cost_invalid" xml:space="preserve">
-    <value>Unit cost is invalid.</value>
+  <data name="accounting_payment_number_exists" xml:space="preserve">
+    <value>A payment voucher with this number already exists.</value>
   </data>
-  <data name="line_unit_cost_precision_invalid" xml:space="preserve">
-    <value>Unit cost exceeds the allowed precision.</value>
+  <data name="accounting_cash_shift_number_exists" xml:space="preserve">
+    <value>A cash shift with this number already exists.</value>
   </data>
-  <data name="line_notes_too_long" xml:space="preserve">
-    <value>Line notes exceed the allowed length.</value>
+  <data name="accounting_expense_type_code_exists" xml:space="preserve">
+    <value>An expense type with this code already exists.</value>
   </data>
-  <data name="line_total_cost_precision_invalid" xml:space="preserve">
-    <value>Line total exceeds the database precision limit.</value>
+  <data name="accounting_expense_number_exists" xml:space="preserve">
+    <value>An expense with this number already exists.</value>
   </data>
-  <data name="destination_warehouse_required" xml:space="preserve">
-    <value>Destination warehouse is required for this transaction.</value>
+  <data name="accounting_account_code_immutable" xml:space="preserve">
+    <value>The account code cannot be changed after creation.</value>
   </data>
-  <data name="source_warehouse_required" xml:space="preserve">
-    <value>Source warehouse is required for this transaction.</value>
+  <data name="accounting_cash_account_code_immutable" xml:space="preserve">
+    <value>The cash account code cannot be changed after creation.</value>
   </data>
-  <data name="transfer_warehouses_must_differ" xml:space="preserve">
-    <value>Source and destination warehouses must be different.</value>
+  <data name="accounting_bank_account_code_immutable" xml:space="preserve">
+    <value>The bank account code cannot be changed after creation.</value>
   </data>
-  <data name="adjustment_reason_required" xml:space="preserve">
-    <value>Adjustment reason is required.</value>
+  <data name="accounting_bank_account_number_immutable" xml:space="preserve">
+    <value>The bank account number cannot be changed after creation.</value>
   </data>
-  <data name="transaction_already_posted" xml:space="preserve">
-    <value>This transaction has already been posted.</value>
+  <data name="accounting_cost_center_code_immutable" xml:space="preserve">
+    <value>The cost center code cannot be changed after creation.</value>
   </data>
-  <data name="transaction_has_no_lines" xml:space="preserve">
-    <value>A transaction without lines cannot be posted.</value>
+  <data name="accounting_posting_profile_code_immutable" xml:space="preserve">
+    <value>The posting profile code cannot be changed after creation.</value>
   </data>
-  <data name="insufficient_stock" xml:space="preserve">
-    <value>Available stock is insufficient for this issue.</value>
+  <data name="accounting_fiscal_year_code_immutable" xml:space="preserve">
+    <value>The fiscal year code cannot be changed after creation.</value>
   </data>
-  <data name="stock_count_number_too_long" xml:space="preserve">
-    <value>Stock count number exceeds the allowed length.</value>
+  <data name="accounting_expense_type_code_immutable" xml:space="preserve">
+    <value>The expense type code cannot be changed after creation.</value>
   </data>
-  <data name="warehouse_id_required" xml:space="preserve">
-    <value>Warehouse is required.</value>
+  <data name="unique_constraint_conflict" xml:space="preserve">
+    <value>The entered value already exists. Change the number or code and try again.</value>
   </data>
-  <data name="count_date_required" xml:space="preserve">
-    <value>Stock count date is required.</value>
-  </data>
-  <data name="stock_count_notes_max_length" xml:space="preserve">
-    <value>Stock count notes must not exceed 500 characters.</value>
-  </data>
-  <data name="counted_quantity_invalid" xml:space="preserve">
-    <value>Counted quantity must be zero or greater.</value>
-  </data>
-  <data name="counted_quantity_precision_invalid" xml:space="preserve">
-    <value>Counted quantity supports at most 3 decimal places and 15 integer digits.</value>
-  </data>
-  <data name="counted_by_too_long" xml:space="preserve">
-    <value>Counter identifier exceeds the allowed length.</value>
-  </data>
-  <data name="stock_count_warehouse_inactive" xml:space="preserve">
-    <value>A stock count cannot be created for an inactive warehouse.</value>
-  </data>
-  <data name="stock_count_open_exists" xml:space="preserve">
-    <value>An open stock count already exists for this warehouse.</value>
-  </data>
-  <data name="stock_count_number_exists" xml:space="preserve">
-    <value>Another stock count already uses this number.</value>
-  </data>
-  <data name="stock_count_warehouse_has_no_balance" xml:space="preserve">
-    <value>This warehouse has no inventory balance rows to count.</value>
-  </data>
-  <data name="stock_count_has_no_lines" xml:space="preserve">
-    <value>The operation cannot be performed on a stock count without lines.</value>
-  </data>
-  <data name="stock_count_incomplete_lines" xml:space="preserve">
-    <value>All stock count lines must have a recorded counted quantity before continuing.</value>
-  </data>
-  <data name="invalid_status_for_counting" xml:space="preserve">
-    <value>Counts cannot be recorded in the current stock-count status.</value>
-  </data>
-  <data name="cannot_cancel_posted_count" xml:space="preserve">
-    <value>A posted stock count cannot be cancelled.</value>
-  </data>
-  <data name="invalid_status_transition" xml:space="preserve">
-    <value>This action is not valid for the current status.</value>
-  </data>
-  <data name="stock_count_already_cancelled" xml:space="preserve">
-    <value>This stock count has already been cancelled.</value>
+  <data name="concurrency_conflict" xml:space="preserve">
+    <value>The record was changed by another operation. Refresh the data and try again.</value>
   </data>
 </root>
