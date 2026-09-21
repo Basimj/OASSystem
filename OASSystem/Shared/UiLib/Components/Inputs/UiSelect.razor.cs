@@ -21,6 +21,9 @@ public partial class UiSelect
     public string? Placeholder { get; set; }
 
     [Parameter]
+    public string? ErrorText { get; set; }
+
+    [Parameter]
     public IReadOnlyList<UiSelectOption> Options { get; set; } = [];
 
     [Parameter]
@@ -58,9 +61,14 @@ public partial class UiSelect
             ? _generatedInputId
             : Id;
 
+    private bool HasError => !string.IsNullOrWhiteSpace(ErrorText);
+    private string ErrorId => $"{InputId}-error";
+    private string? AriaInvalid => HasError ? "true" : null;
+
     private string InputCssClass =>
         $"ui-select__control " +
         $"ui-select__control--{Size.ToString().ToLowerInvariant()} " +
+        $"{(HasError ? "ui-select__control--invalid" : null)} " +
         $"{CssClass}"
         .Trim();
 

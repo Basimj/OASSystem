@@ -39,6 +39,7 @@ public static class ClientServices
         services.AddScoped<OAS.Client.Accounting.Services.AccountingSpreadsheetClient>();
         services.AddScoped<IEmployeesWorkspaceState, EmployeesWorkspaceState>();
         services.AddScoped<IInventoryClientService, InventoryClientService>();
+        services.AddScoped<InventorySpreadsheetClient>();
         services.AddScoped<BrowserFileDownloadService>();
         services.AddScoped<OAS.Client.Accounting.Services.IAccountingClientService, OAS.Client.Accounting.Services.AccountingClientService>();
         services.AddScoped<OAS.Client.Accounting.Workspace.IAccountingWorkspaceState, OAS.Client.Accounting.Workspace.AccountingWorkspaceState>();

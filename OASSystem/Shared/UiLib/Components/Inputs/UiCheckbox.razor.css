@@ -1,3 +1,7 @@
 .ui-checkbox { display: inline-flex; align-items: center; gap: var(--oas-space-2); color: var(--oas-color-text); font-size: var(--oas-font-md); cursor: pointer; }
 .ui-checkbox input { width: 1rem; height: 1rem; accent-color: var(--oas-color-primary); }
 .ui-checkbox:has(input:disabled) { color: var(--oas-color-text-muted); cursor: not-allowed; }
+.ui-checkbox-field { display: inline-flex; flex-direction: column; gap: 0.2rem; }
+.ui-checkbox--error { color: var(--oas-color-danger, #b42318); }
+.ui-checkbox--error input { outline: 1px solid var(--oas-color-danger, #b42318); outline-offset: 2px; }
+.ui-checkbox-field__error { color: var(--oas-color-danger, #b42318); font-size: var(--oas-font-xs, 0.75rem); line-height: 1.25; }

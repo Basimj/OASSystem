@@ -21,6 +21,13 @@ public sealed class UpdateAccountCommandHandler(
             throw new NotFoundException(nameof(Account), request.Id);
         }
 
+        if (!string.Equals(entity.Code, request.Data.Code.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ConflictException(
+                "accounting_account_code_immutable",
+                "The account code cannot be changed after creation.");
+        }
+
         mapper.Update(request.Data, entity);
         repository.Update(entity);
         return entity;

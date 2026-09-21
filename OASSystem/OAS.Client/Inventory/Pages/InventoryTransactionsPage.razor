@@ -2,11 +2,14 @@
 @attribute [Authorize]
 @using OAS.Client.Inventory.Common
 @using OAS.Client.Inventory.Services
+@using OAS.Client.Services.Browser
 @using OAS.Contracts.Enums.Inventory
 @using OAS.Contracts.Inventory.Products
 @using OAS.Contracts.Inventory.Transactions
 @using OAS.Contracts.Inventory.Warehouses
+@using System.Globalization
 
+@using OAS.UiLib.Components.Spreadsheets
 <PageTitle>عمليات المخزون | OAS</PageTitle>
 
 <UiWorkspaceLayout ShowAside="true" ShowFilters="true">
@@ -22,6 +25,7 @@
                       Disabled="@(_mode != ViewMode.Create)" OnClick="CancelCreateAsync" />
             <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
                       Loading="@_loading" OnClick="RefreshAsync" />
+            <UiSpreadsheetActions CanImport="false" Busy="@_exporting" OnExport="ExportAsync" />
             <UiSearchInput @bind-Value="_search" Placeholder="ابحث برقم العملية أو المرجع..."
                            AriaLabel="البحث في عمليات المخزون" ClearText="مسح البحث"
                            DebounceMilliseconds="250" OnSearch="SearchChangedAsync" />
@@ -29,7 +33,7 @@
     </Actions>
 
     <Filters>
-        <div class="inventory-transactions__filters">
+        <UiWorkspaceFilterBar Compact="true">
             <UiSelect Label="نوع العملية"
                       Value="@_typeFilter"
                       ValueExpression="@(() => _typeFilter)"
@@ -48,45 +52,34 @@
                       ValueChanged="@(v => _warehouseFilter = v)"
                       Options="@WarehouseFilterOptions"
                       Size="ControlSize.Small" />
-        </div>
+        </UiWorkspaceFilterBar>
     </Filters>
 
     <Content>
         <UiDataGridPanel Title="عمليات المخزون" Subtitle="@($"{FilteredTransactions.Count} عملية")">
-            <Header>
-                <div class="inventory-transactions__header">
-                    <span>رقم العملية</span>
-                    <span>النوع</span>
-                    <span>التاريخ</span>
-                    <span>من مخزن</span>
-                    <span>إلى مخزن</span>
-                    <span>الحالة</span>
-                </div>
-            </Header>
             <Body>
                 @if (_loading)
                 {
                     <UiAlert Message="جاري تحميل عمليات المخزون..." />
                 }
-                else if (FilteredTransactions.Count == 0)
-                {
-                    <UiAlert Message="لا توجد عمليات مطابقة." />
-                }
                 else
                 {
-                    <div class="inventory-transactions__rows">
-                        @foreach (var transaction in FilteredTransactions)
-                        {
-                            <button type="button" class="@RowCss(transaction.Id)" @onclick="() => SelectAsync(transaction.Id)">
-                                <strong>@transaction.TransactionNumber</strong>
-                                <span>@InventoryArabicPresenter.TransactionTypeText(transaction.TransactionType)</span>
-                                <span>@transaction.TransactionDate.ToLocalTime().ToString("yyyy-MM-dd")</span>
-                                <span>@WarehouseName(transaction.SourceWarehouseId)</span>
-                                <span>@WarehouseName(transaction.DestinationWarehouseId)</span>
-                                <span>@InventoryArabicPresenter.TransactionStatusText(transaction.Status)</span>
-                            </button>
-                        }
-                    </div>
+                    <UiDataTable TItem="InventoryTransactionDto" Items="@FilteredTransactions" Headers="@TransactionHeaders" EmptyText="لا توجد عمليات مطابقة."
+                                 SidebarTypography="true"
+                                 UniformCellTypography="true"
+                                 OnRowClick="@(x => SelectAsync(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
+                        <RowTemplate Context="transaction">
+                            <td>@transaction.TransactionNumber</td>
+                            <td>@InventoryArabicPresenter.TransactionTypeText(transaction.TransactionType)</td>
+                            <td>@transaction.TransactionDate.ToLocalTime().ToString("yyyy-MM-dd")</td>
+                            <td>@WarehouseName(transaction.SourceWarehouseId)</td>
+                            <td>@WarehouseName(transaction.DestinationWarehouseId)</td>
+                            <td>
+                                <UiBadge Text="@InventoryArabicPresenter.TransactionStatusText(transaction.Status)"
+                                         Tone="@(transaction.Status == InventoryTransactionStatus.Posted ? AlertTone.Success : AlertTone.Info)" />
+                            </td>
+                        </RowTemplate>
+                    </UiDataTable>
                 }
             </Body>
         </UiDataGridPanel>
@@ -101,18 +94,29 @@
             else if (_mode == ViewMode.Create)
             {
                 <div class="inventory-transactions__editor">
+                    @if (!_warehouses.Any(x => x.IsActive))
+                    {
+                        <UiAlert Tone="AlertTone.Danger" Message="لا يوجد مخزن نشط يمكن استخدامه في عملية مخزون جديدة." />
+                    }
+                    @if (!_variants.Any(IsUsableVariant))
+                    {
+                        <UiAlert Tone="AlertTone.Danger" Message="لا يوجد Product Variant نشط يمكن إضافته إلى العملية." />
+                    }
+
                     <UiSelect Label="نوع العملية"
                               Value="@_transactionType"
                               ValueExpression="@(() => _transactionType)"
                               ValueChanged="OnTransactionTypeChanged"
                               Options="@InventoryArabicPresenter.TransactionTypeOptions"
+                              ErrorText="@_transactionTypeError"
                               Required="true"
                               Size="ControlSize.Small" />
 
                     <UiInputDate Label="تاريخ العملية"
                                  Value="@_transactionDate"
                                  ValueExpression="@(() => _transactionDate)"
-                                 ValueChanged="@(v => _transactionDate = v)"
+                                 ValueChanged="OnTransactionDateChanged"
+                                 ErrorText="@_transactionDateError"
                                  Required="true"
                                  Size="ControlSize.Small" />
 
@@ -121,8 +125,9 @@
                         <UiSelect Label="من مخزن"
                                   Value="@_sourceWarehouseId"
                                   ValueExpression="@(() => _sourceWarehouseId)"
-                                  ValueChanged="@(v => _sourceWarehouseId = v)"
+                                  ValueChanged="OnSourceWarehouseChanged"
                                   Options="@WarehouseOptions"
+                                  ErrorText="@_sourceWarehouseError"
                                   Required="true"
                                   Size="ControlSize.Small" />
                     }
@@ -132,8 +137,9 @@
                         <UiSelect Label="إلى مخزن"
                                   Value="@_destinationWarehouseId"
                                   ValueExpression="@(() => _destinationWarehouseId)"
-                                  ValueChanged="@(v => _destinationWarehouseId = v)"
+                                  ValueChanged="OnDestinationWarehouseChanged"
                                   Options="@WarehouseOptions"
+                                  ErrorText="@_destinationWarehouseError"
                                   Required="true"
                                   Size="ControlSize.Small" />
                     }
@@ -143,28 +149,36 @@
                         <UiInputText Label="سبب التعديل"
                                      Value="@_reason"
                                      ValueExpression="@(() => _reason)"
-                                     ValueChanged="@(v => _reason = v)"
+                                     ValueChanged="OnReasonChanged"
+                                     ErrorText="@_reasonError"
+                                     MaxLength="500"
                                      Required="true"
                                      Size="ControlSize.Small" />
                     }
                     else
                     {
-                        <UiInputText Label="السبب / المرجع"
+                        <UiInputText Label="السبب"
                                      Value="@_reason"
                                      ValueExpression="@(() => _reason)"
-                                     ValueChanged="@(v => _reason = v)"
+                                     ValueChanged="OnReasonChanged"
+                                     ErrorText="@_reasonError"
+                                     Placeholder="(اختياري)"
+                                     MaxLength="500"
                                      Size="ControlSize.Small" />
                     }
 
                     <UiInputText Label="ملاحظات"
                                  Value="@_notes"
                                  ValueExpression="@(() => _notes)"
-                                 ValueChanged="@(v => _notes = v)"
+                                 ValueChanged="OnNotesChanged"
+                                 ErrorText="@_notesError"
+                                 Placeholder="(اختياري)"
+                                 MaxLength="1000"
                                  Size="ControlSize.Small" />
 
                     <div class="inventory-transactions__lines-title">
                         <strong>الأصناف والكميات</strong>
-                        <button type="button" @onclick="AddLine">+ إضافة صنف</button>
+                        <UiButton Text="إضافة صنف" IconCssClass="fa-solid fa-plus" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="@(_ => AddLine())" />
                     </div>
 
                     @for (var i = 0; i < _draftLines.Count; i++)
@@ -174,25 +188,32 @@
                             <UiSelect Label="الصنف / SKU"
                                       Value="@line.ProductVariantId"
                                       ValueExpression="@(() => line.ProductVariantId)"
-                                      ValueChanged="@(v => line.ProductVariantId = v)"
+                                      ValueChanged="@(v => OnLineVariantChanged(line, v))"
                                       Options="@VariantOptions"
+                                      ErrorText="@line.ProductVariantError"
                                       Required="true"
                                       Size="ControlSize.Small" />
                             <UiInputText Label="الكمية"
                                          Value="@line.Quantity"
                                          ValueExpression="@(() => line.Quantity)"
-                                         ValueChanged="@(v => line.Quantity = v ?? string.Empty)"
+                                         ValueChanged="@(v => OnLineQuantityChanged(line, v))"
+                                         ErrorText="@line.QuantityError"
                                          Type="number"
+                                         InputMode="decimal"
+                                         step="0.001" min="0.001"
                                          Required="true"
                                          Size="ControlSize.Small" />
                             <UiInputText Label="تكلفة الوحدة"
                                          Value="@line.UnitCost"
                                          ValueExpression="@(() => line.UnitCost)"
-                                         ValueChanged="@(v => line.UnitCost = v ?? string.Empty)"
+                                         ValueChanged="@(v => OnLineUnitCostChanged(line, v))"
+                                         ErrorText="@line.UnitCostError"
                                          Type="number"
+                                         InputMode="decimal"
+                                         step="0.01" min="0"
                                          Required="true"
                                          Size="ControlSize.Small" />
-                            <button type="button" class="inventory-transactions__remove" disabled="@(_draftLines.Count == 1)" @onclick="() => RemoveLine(line)">حذف</button>
+                            <UiButton Text="حذف" IconCssClass="fa-solid fa-trash" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Disabled="@(_draftLines.Count == 1)" OnClick="@(_ => RemoveLine(line))" />
                         </div>
                     }
                 </div>
@@ -221,7 +242,7 @@
                         {
                             <div class="inventory-transactions__view-line">
                                 <div><strong>@VariantLabel(line.ProductVariantId)</strong><span>@VariantSku(line.ProductVariantId)</span></div>
-                                <span>الكمية: @line.Quantity.ToString("N2")</span>
+                                <span>الكمية: @line.Quantity.ToString("N3")</span>
                                 <span>التكلفة: @line.UnitCost.ToString("N2")</span>
                                 <strong>@line.TotalCost.ToString("N2")</strong>
                             </div>
@@ -240,9 +261,14 @@
         public string? ProductVariantId { get; set; }
         public string Quantity { get; set; } = "1";
         public string UnitCost { get; set; } = "0";
+        public string? ProductVariantError { get; set; }
+        public string? QuantityError { get; set; }
+        public string? UnitCostError { get; set; }
     }
 
     [Inject] private IInventoryClientService Inventory { get; set; } = default!;
+    [Inject] private InventorySpreadsheetClient SpreadsheetClient { get; set; } = default!;
+    [Inject] private BrowserFileDownloadService SpreadsheetDownload { get; set; } = default!;
     [Inject] private IApiFeedbackService ApiFeedback { get; set; } = default!;
     [Inject] private IUiSnackbarService Snackbar { get; set; } = default!;
 
@@ -250,6 +276,7 @@
     public Guid? TransactionIdFromQuery { get; set; }
 
     private IReadOnlyList<InventoryTransactionDto> _transactions = [];
+    private static readonly IReadOnlyList<string> TransactionHeaders = ["رقم العملية", "النوع", "التاريخ", "من مخزن", "إلى مخزن", "الحالة"];
     private IReadOnlyList<WarehouseDto> _warehouses = [];
     private IReadOnlyList<ProductDto> _products = [];
     private IReadOnlyList<ProductVariantDto> _variants = [];
@@ -258,6 +285,7 @@
     private Guid? _selectedId;
     private ViewMode _mode = ViewMode.Empty;
     private bool _loading = true;
+    private bool _exporting;
     private bool _saving;
     private bool _posting;
     private string? _search;
@@ -271,6 +299,12 @@
     private string? _destinationWarehouseId;
     private string? _reason;
     private string? _notes;
+    private string? _transactionTypeError;
+    private string? _transactionDateError;
+    private string? _sourceWarehouseError;
+    private string? _destinationWarehouseError;
+    private string? _reasonError;
+    private string? _notesError;
     private readonly List<TransactionLineForm> _draftLines = [];
 
     private IReadOnlyList<UiSelectOption> TransactionTypeFilterOptions =>
@@ -282,7 +316,7 @@
     private IReadOnlyList<UiSelectOption> WarehouseOptions =>
         [new UiSelectOption(string.Empty, "اختر المخزن"), .. _warehouses.Where(x => x.IsActive).Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.NameAr}"))];
 
-    private IReadOnlyList<UiSelectOption> VariantOptions => _variants.Where(x => x.IsActive)
+    private IReadOnlyList<UiSelectOption> VariantOptions => _variants.Where(IsUsableVariant)
         .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{ProductName(x.ProductId)} - {x.SKU}{(string.IsNullOrWhiteSpace(x.VariantName) ? string.Empty : $" - {x.VariantName}")}"))
         .ToArray();
 
@@ -328,16 +362,16 @@
         _loading = true;
         try
         {
-            var page = new PageRequest { PageNumber = 1, PageSize = PageRequest.MaximumPageSize };
-            var transactionsTask = Inventory.GetInventoryTransactionsAsync(page);
-            var warehousesTask = Inventory.GetWarehousesAsync(page);
-            var productsTask = Inventory.GetProductsAsync(page);
-            var variantsTask = Inventory.GetProductVariantsAsync(page);
+            var transactionsTask = LoadAllPagesAsync(page => Inventory.GetInventoryTransactionsAsync(page));
+            var warehousesTask = LoadAllPagesAsync(page => Inventory.GetWarehousesAsync(page));
+            var productsTask = LoadAllPagesAsync(page => Inventory.GetProductsAsync(page));
+            var variantsTask = LoadAllPagesAsync(page => Inventory.GetProductVariantsAsync(page));
             await Task.WhenAll(transactionsTask, warehousesTask, productsTask, variantsTask);
-            _transactions = transactionsTask.Result.Items;
-            _warehouses = warehousesTask.Result.Items;
-            _products = productsTask.Result.Items;
-            _variants = variantsTask.Result.Items;
+
+            _transactions = transactionsTask.Result;
+            _warehouses = warehousesTask.Result;
+            _products = productsTask.Result;
+            _variants = variantsTask.Result;
 
             if (_selectedId.HasValue && _transactions.FirstOrDefault(x => x.Id == _selectedId.Value) is { } selected)
                 _selectedTransaction = selected;
@@ -346,10 +380,37 @@
         {
             ApiFeedback.Show(ex.Error);
         }
+        catch (Exception)
+        {
+            ApiFeedback.ShowUnexpected();
+        }
         finally
         {
             _loading = false;
         }
+    }
+
+    private static async Task<IReadOnlyList<T>> LoadAllPagesAsync<T>(Func<PageRequest, Task<PagedResult<T>>> loader)
+    {
+        var items = new List<T>();
+        var pageNumber = 1;
+
+        while (true)
+        {
+            var result = await loader(new PageRequest
+            {
+                PageNumber = pageNumber,
+                PageSize = PageRequest.MaximumPageSize
+            });
+
+            items.AddRange(result.Items);
+            if (!result.HasNextPage)
+                break;
+
+            pageNumber++;
+        }
+
+        return items;
     }
 
     private Task RefreshAsync(MouseEventArgs args) => LoadAsync();
@@ -367,6 +428,7 @@
         _destinationWarehouseId = null;
         _reason = null;
         _notes = null;
+        ClearValidationErrors();
         _draftLines.Clear();
         _draftLines.Add(new TransactionLineForm());
         return Task.CompletedTask;
@@ -376,79 +438,113 @@
     {
         _mode = ViewMode.Empty;
         _draftLines.Clear();
+        ClearValidationErrors();
         return Task.CompletedTask;
     }
 
     private void OnTransactionTypeChanged(string? value)
     {
-        _transactionType = value ?? ((int)InventoryTransactionType.Receipt).ToString();
-        if (!RequiresSourceWarehouse) _sourceWarehouseId = null;
-        if (!RequiresDestinationWarehouse) _destinationWarehouseId = null;
+        _transactionType = value ?? string.Empty;
+        _transactionTypeError = null;
+
+        if (!RequiresSourceWarehouse)
+        {
+            _sourceWarehouseId = null;
+            _sourceWarehouseError = null;
+        }
+
+        if (!RequiresDestinationWarehouse)
+        {
+            _destinationWarehouseId = null;
+            _destinationWarehouseError = null;
+        }
+
+        if (!IsAdjustment)
+            _reasonError = null;
+    }
+
+    private void OnTransactionDateChanged(DateOnly? value)
+    {
+        _transactionDate = value;
+        _transactionDateError = null;
+    }
+
+    private void OnSourceWarehouseChanged(string? value)
+    {
+        _sourceWarehouseId = value;
+        _sourceWarehouseError = null;
+        if (_sourceWarehouseId != _destinationWarehouseId)
+            _destinationWarehouseError = null;
+    }
+
+    private void OnDestinationWarehouseChanged(string? value)
+    {
+        _destinationWarehouseId = value;
+        _destinationWarehouseError = null;
+        if (_sourceWarehouseId != _destinationWarehouseId)
+            _sourceWarehouseError = null;
+    }
+
+    private void OnReasonChanged(string? value)
+    {
+        _reason = value;
+        _reasonError = null;
+    }
+
+    private void OnNotesChanged(string? value)
+    {
+        _notes = value;
+        _notesError = null;
     }
 
     private void AddLine() => _draftLines.Add(new TransactionLineForm());
-    private void RemoveLine(TransactionLineForm line) { if (_draftLines.Count > 1) _draftLines.Remove(line); }
+
+    private void RemoveLine(TransactionLineForm line)
+    {
+        if (_draftLines.Count > 1)
+            _draftLines.Remove(line);
+    }
+
+    private void OnLineVariantChanged(TransactionLineForm line, string? value)
+    {
+        line.ProductVariantId = value;
+        line.ProductVariantError = null;
+    }
+
+    private void OnLineQuantityChanged(TransactionLineForm line, string? value)
+    {
+        line.Quantity = value ?? string.Empty;
+        line.QuantityError = null;
+        line.UnitCostError = null;
+    }
+
+    private void OnLineUnitCostChanged(TransactionLineForm line, string? value)
+    {
+        line.UnitCost = value ?? string.Empty;
+        line.UnitCostError = null;
+        line.QuantityError = null;
+    }
 
     private async Task SaveAsync(MouseEventArgs args)
     {
-        if (_mode != ViewMode.Create || _saving) return;
-        if (!_transactionDate.HasValue)
-        {
-            Snackbar.Error("تاريخ العملية مطلوب.");
+        if (_mode != ViewMode.Create || _saving)
             return;
-        }
-        if (RequiresSourceWarehouse && !Guid.TryParse(_sourceWarehouseId, out _))
-        {
-            Snackbar.Error("المخزن المصدر مطلوب لهذه العملية.");
-            return;
-        }
-        if (RequiresDestinationWarehouse && !Guid.TryParse(_destinationWarehouseId, out _))
-        {
-            Snackbar.Error("المخزن الوجهة مطلوب لهذه العملية.");
-            return;
-        }
-        if (CurrentType == InventoryTransactionType.Transfer && _sourceWarehouseId == _destinationWarehouseId)
-        {
-            Snackbar.Error("يجب أن يختلف مخزن المصدر عن مخزن الوجهة.");
-            return;
-        }
-        if (IsAdjustment && string.IsNullOrWhiteSpace(_reason))
-        {
-            Snackbar.Error("سبب التعديل مطلوب.");
-            return;
-        }
 
-        var lines = new List<CreateInventoryTransactionLineRequest>();
-        foreach (var line in _draftLines)
+        if (!TryBuildCreateRequest(out var request, out var hasRequiredErrors))
         {
-            if (!Guid.TryParse(line.ProductVariantId, out var variantId) ||
-                !decimal.TryParse(line.Quantity, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var quantity) || quantity <= 0 ||
-                !decimal.TryParse(line.UnitCost, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var unitCost) || unitCost < 0)
-            {
-                Snackbar.Error("تحقق من الصنف والكمية والتكلفة في جميع البنود.");
-                return;
-            }
-            lines.Add(new CreateInventoryTransactionLineRequest(variantId, quantity, unitCost, null));
+            Snackbar.Error(hasRequiredErrors
+                ? "هناك بيانات إجبارية لم يتم إدخالها."
+                : "توجد قيم غير صحيحة. يرجى مراجعة الحقول المميزة باللون الأحمر.");
+            return;
         }
 
         _saving = true;
         try
         {
-            var dateTime = DateTime.SpecifyKind(_transactionDate.Value.ToDateTime(new TimeOnly(12, 0)), DateTimeKind.Utc);
-            var request = new CreateInventoryTransactionRequest(
-                string.Empty,
-                CurrentType,
-                ParseGuid(_sourceWarehouseId),
-                ParseGuid(_destinationWarehouseId),
-                new DateTimeOffset(dateTime),
-                null,
-                null,
-                NullIfBlank(_reason),
-                NullIfBlank(_notes),
-                lines);
-
             var saved = await Inventory.CreateInventoryTransactionAsync(request);
-            if (saved is null) return;
+            if (saved is null)
+                return;
+
             await LoadAsync();
             await SelectAsync(saved.Id);
             Snackbar.Success("تم إنشاء عملية المخزون.");
@@ -457,29 +553,254 @@
         {
             ApiFeedback.Show(ex.Error);
         }
+        catch (Exception)
+        {
+            ApiFeedback.ShowUnexpected();
+        }
         finally
         {
             _saving = false;
         }
     }
 
+    private bool TryBuildCreateRequest(out CreateInventoryTransactionRequest request, out bool hasRequiredErrors)
+    {
+        ClearValidationErrors();
+        hasRequiredErrors = false;
+        var isValid = true;
+
+        if (!int.TryParse(_transactionType, out var transactionTypeValue) ||
+            !Enum.IsDefined(typeof(InventoryTransactionType), transactionTypeValue) ||
+            transactionTypeValue == (int)InventoryTransactionType.ProductionIssue)
+        {
+            _transactionTypeError = "نوع العملية غير صحيح.";
+            isValid = false;
+        }
+
+        if (!_transactionDate.HasValue)
+        {
+            _transactionDateError = "هذا الحقل إجباري.";
+            hasRequiredErrors = true;
+            isValid = false;
+        }
+
+        Guid? sourceWarehouseId = null;
+        if (RequiresSourceWarehouse)
+        {
+            if (!Guid.TryParse(_sourceWarehouseId, out var sourceId))
+            {
+                _sourceWarehouseError = "هذا الحقل إجباري.";
+                hasRequiredErrors = true;
+                isValid = false;
+            }
+            else
+            {
+                sourceWarehouseId = sourceId;
+            }
+        }
+
+        Guid? destinationWarehouseId = null;
+        if (RequiresDestinationWarehouse)
+        {
+            if (!Guid.TryParse(_destinationWarehouseId, out var destinationId))
+            {
+                _destinationWarehouseError = "هذا الحقل إجباري.";
+                hasRequiredErrors = true;
+                isValid = false;
+            }
+            else
+            {
+                destinationWarehouseId = destinationId;
+            }
+        }
+
+        if (CurrentType == InventoryTransactionType.Transfer &&
+            sourceWarehouseId.HasValue && destinationWarehouseId.HasValue &&
+            sourceWarehouseId.Value == destinationWarehouseId.Value)
+        {
+            const string message = "يجب أن يختلف مخزن المصدر عن مخزن الوجهة.";
+            _sourceWarehouseError = message;
+            _destinationWarehouseError = message;
+            isValid = false;
+        }
+
+        var reason = NullIfBlank(_reason);
+        if (IsAdjustment && string.IsNullOrWhiteSpace(reason))
+        {
+            _reasonError = "هذا الحقل إجباري.";
+            hasRequiredErrors = true;
+            isValid = false;
+        }
+        else if (reason?.Length > 500)
+        {
+            _reasonError = "الحد الأقصى 500 حرف.";
+            isValid = false;
+        }
+
+        var notes = NullIfBlank(_notes);
+        if (notes?.Length > 1000)
+        {
+            _notesError = "الحد الأقصى 1000 حرف.";
+            isValid = false;
+        }
+
+        var lines = new List<CreateInventoryTransactionLineRequest>();
+        var parsedVariants = new List<Guid?>();
+
+        foreach (var line in _draftLines)
+        {
+            Guid? variantId = null;
+            if (!Guid.TryParse(line.ProductVariantId, out var parsedVariantId))
+            {
+                line.ProductVariantError = "هذا الحقل إجباري.";
+                hasRequiredErrors = true;
+                isValid = false;
+            }
+            else if (!_variants.Any(x => x.Id == parsedVariantId && IsUsableVariant(x)))
+            {
+                line.ProductVariantError = "الصنف المحدد غير نشط أو غير معرف كصنف مخزني.";
+                isValid = false;
+            }
+            else
+            {
+                variantId = parsedVariantId;
+            }
+
+            decimal quantity = 0;
+            if (string.IsNullOrWhiteSpace(line.Quantity))
+            {
+                line.QuantityError = "هذا الحقل إجباري.";
+                hasRequiredErrors = true;
+                isValid = false;
+            }
+            else if (!TryParseDecimal(line.Quantity, out quantity))
+            {
+                line.QuantityError = "أدخل كمية رقمية صحيحة.";
+                isValid = false;
+            }
+            else if (quantity <= 0)
+            {
+                line.QuantityError = "يجب أن تكون الكمية أكبر من صفر.";
+                isValid = false;
+            }
+            else if (!FitsPrecision(quantity, 18, 3))
+            {
+                line.QuantityError = "الكمية تسمح بحد أقصى 15 رقمًا صحيحًا و3 منازل عشرية.";
+                isValid = false;
+            }
+
+            decimal unitCost = 0;
+            if (string.IsNullOrWhiteSpace(line.UnitCost))
+            {
+                line.UnitCostError = "هذا الحقل إجباري.";
+                hasRequiredErrors = true;
+                isValid = false;
+            }
+            else if (!TryParseDecimal(line.UnitCost, out unitCost))
+            {
+                line.UnitCostError = "أدخل تكلفة رقمية صحيحة.";
+                isValid = false;
+            }
+            else if (unitCost < 0)
+            {
+                line.UnitCostError = "لا يمكن أن تكون التكلفة سالبة.";
+                isValid = false;
+            }
+            else if (!FitsPrecision(unitCost, 18, 2))
+            {
+                line.UnitCostError = "التكلفة تسمح بحد أقصى 16 رقمًا صحيحًا ومنزلتين عشريتين.";
+                isValid = false;
+            }
+
+            if (quantity > 0 && unitCost >= 0 &&
+                FitsPrecision(quantity, 18, 3) && FitsPrecision(unitCost, 18, 2) &&
+                !TotalCostFitsDatabase(quantity, unitCost))
+            {
+                line.UnitCostError = "إجمالي السطر أكبر من الحد الذي تسمح به قاعدة البيانات.";
+                isValid = false;
+            }
+
+            parsedVariants.Add(variantId);
+            if (variantId.HasValue && line.QuantityError is null && line.UnitCostError is null)
+                lines.Add(new CreateInventoryTransactionLineRequest(variantId.Value, quantity, unitCost, null));
+        }
+
+        var duplicateIds = parsedVariants
+            .Where(x => x.HasValue)
+            .Select(x => x!.Value)
+            .GroupBy(x => x)
+            .Where(x => x.Count() > 1)
+            .Select(x => x.Key)
+            .ToHashSet();
+
+        if (duplicateIds.Count > 0)
+        {
+            foreach (var line in _draftLines)
+            {
+                if (Guid.TryParse(line.ProductVariantId, out var id) && duplicateIds.Contains(id))
+                    line.ProductVariantError = "الصنف مكرر في أكثر من بند.";
+            }
+            isValid = false;
+        }
+
+        if (_draftLines.Count == 0)
+        {
+            hasRequiredErrors = true;
+            isValid = false;
+        }
+
+        var transactionDate = _transactionDate ?? DateOnly.FromDateTime(DateTime.Today);
+        var dateTime = DateTime.SpecifyKind(transactionDate.ToDateTime(new TimeOnly(12, 0)), DateTimeKind.Utc);
+
+        request = new CreateInventoryTransactionRequest(
+            string.Empty,
+            CurrentType,
+            sourceWarehouseId,
+            destinationWarehouseId,
+            new DateTimeOffset(dateTime),
+            null,
+            null,
+            reason,
+            notes,
+            lines);
+
+        return isValid && lines.Count == _draftLines.Count;
+    }
+
     private async Task SelectAsync(Guid id)
     {
-        if (_mode == ViewMode.Create || _saving) return;
-        _selectedId = id;
-        _selectedTransaction = _transactions.FirstOrDefault(x => x.Id == id) ?? await Inventory.GetInventoryTransactionAsync(id);
-        _selectedLines = await Inventory.GetInventoryTransactionLinesAsync(id);
-        _mode = ViewMode.View;
+        if (_mode == ViewMode.Create || _saving)
+            return;
+
+        try
+        {
+            _selectedId = id;
+            _selectedTransaction = _transactions.FirstOrDefault(x => x.Id == id) ?? await Inventory.GetInventoryTransactionAsync(id);
+            _selectedLines = await Inventory.GetInventoryTransactionLinesAsync(id);
+            _mode = ViewMode.View;
+        }
+        catch (ApiClientException ex)
+        {
+            ApiFeedback.Show(ex.Error);
+        }
+        catch (Exception)
+        {
+            ApiFeedback.ShowUnexpected();
+        }
     }
 
     private async Task PostAsync(MouseEventArgs args)
     {
-        if (!CanPost || !_selectedId.HasValue) return;
+        if (!CanPost || !_selectedId.HasValue)
+            return;
+
         _posting = true;
         try
         {
             var posted = await Inventory.PostInventoryTransactionAsync(_selectedId.Value, new PostInventoryTransactionRequest());
-            if (posted is null) return;
+            if (posted is null)
+                return;
+
             await LoadAsync();
             await SelectAsync(posted.Id);
             Snackbar.Success("تم ترحيل عملية المخزون بنجاح.");
@@ -488,13 +809,75 @@
         {
             ApiFeedback.Show(ex.Error);
         }
+        catch (Exception)
+        {
+            ApiFeedback.ShowUnexpected();
+        }
         finally
         {
             _posting = false;
         }
     }
 
-    private string RowCss(Guid id) => $"inventory-transactions__row {(id == _selectedId ? "inventory-transactions__row--selected" : string.Empty)}";
+    private void ClearValidationErrors()
+    {
+        _transactionTypeError = null;
+        _transactionDateError = null;
+        _sourceWarehouseError = null;
+        _destinationWarehouseError = null;
+        _reasonError = null;
+        _notesError = null;
+
+        foreach (var line in _draftLines)
+        {
+            line.ProductVariantError = null;
+            line.QuantityError = null;
+            line.UnitCostError = null;
+        }
+    }
+
+    private static bool TryParseDecimal(string? text, out decimal value)
+    {
+        if (decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out value))
+            return true;
+
+        return decimal.TryParse(text, NumberStyles.Number, CultureInfo.CurrentCulture, out value);
+    }
+
+    private static bool FitsPrecision(decimal value, int precision, int scale)
+    {
+        if (value == decimal.MinValue)
+            return false;
+
+        var absolute = Math.Abs(value);
+        var integerLimit = Pow10(precision - scale);
+        if (absolute >= integerLimit)
+            return false;
+
+        var factor = Pow10(scale);
+        return decimal.Truncate(absolute * factor) == absolute * factor;
+    }
+
+    private static bool TotalCostFitsDatabase(decimal quantity, decimal unitCost)
+    {
+        if (unitCost == 0)
+            return true;
+
+        const decimal maxTotal = 9999999999999999.99m;
+        return quantity <= maxTotal / unitCost;
+    }
+
+    private static decimal Pow10(int exponent)
+    {
+        var value = 1m;
+        for (var i = 0; i < exponent; i++)
+            value *= 10m;
+        return value;
+    }
+
+    private bool IsUsableVariant(ProductVariantDto variant) =>
+        variant.IsActive && _products.Any(x => x.Id == variant.ProductId && x.IsActive && x.IsStockItem);
+
     private string WarehouseName(Guid? id) => id.HasValue ? _warehouses.FirstOrDefault(x => x.Id == id.Value)?.NameAr ?? "—" : "—";
     private string ProductName(Guid id) => _products.FirstOrDefault(x => x.Id == id)?.NameAr ?? "—";
     private ProductVariantDto? Variant(Guid id) => _variants.FirstOrDefault(x => x.Id == id);
@@ -507,5 +890,26 @@
         if (string.IsNullOrWhiteSpace(search)) return true;
         var term = search.Trim();
         return values.Any(x => x?.Contains(term, StringComparison.CurrentCultureIgnoreCase) == true);
+    }
+
+    private async Task ExportAsync()
+    {
+        if (_exporting) return;
+        _exporting = true;
+        try
+        {
+            InventoryTransactionType? type = int.TryParse(_typeFilter, out var typeValue) && Enum.IsDefined(typeof(InventoryTransactionType), typeValue)
+                ? (InventoryTransactionType)typeValue : null;
+            InventoryTransactionStatus? status = int.TryParse(_statusFilter, out var statusValue) && Enum.IsDefined(typeof(InventoryTransactionStatus), statusValue)
+                ? (InventoryTransactionStatus)statusValue : null;
+            var warehouseId = Guid.TryParse(_warehouseFilter, out var parsedWarehouseId) ? parsedWarehouseId : (Guid?)null;
+            var bytes = await SpreadsheetClient.ExportAsync(
+                "transactions", new PageRequest { Search = _search, SortDirection = SortDirection.Descending }, warehouseId: warehouseId,
+                transactionType: type, transactionStatus: status);
+            await SpreadsheetDownload.SaveAsync(bytes, "inventory-transactions.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch (Exception) { ApiFeedback.ShowUnexpected(); }
+        finally { _exporting = false; }
     }
 }

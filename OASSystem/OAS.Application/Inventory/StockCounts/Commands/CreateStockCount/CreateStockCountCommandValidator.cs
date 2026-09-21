@@ -6,6 +6,9 @@ public sealed class CreateStockCountCommandValidator : AbstractValidator<CreateS
 {
     public CreateStockCountCommandValidator()
     {
+        RuleFor(x => x.Request.CountNumber)
+            .MaximumLength(32).WithErrorCode("stock_count_number_too_long");
+
         RuleFor(x => x.Request.WarehouseId)
             .NotEmpty().WithErrorCode("warehouse_id_required");
 

@@ -53,6 +53,7 @@ public static class DependencyInjection
         services.TryAddScoped<IAccountingDocumentPostingService, AccountingDocumentPostingService>();
         services.AddInventoryApplication();
         services.AddScoped<OAS.Application.Accounting.Spreadsheets.AccountingSpreadsheetService>();
+        services.AddScoped<OAS.Application.Inventory.Spreadsheets.InventorySpreadsheetService>();
         return services;
     }
 

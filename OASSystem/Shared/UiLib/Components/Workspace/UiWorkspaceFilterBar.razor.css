@@ -9,3 +9,17 @@
 .ui-workspace-filterbar ::deep .ui-select { width:100%; min-width:0; }
 @media (max-width:900px) { .ui-workspace-filterbar { grid-template-columns:1fr 1fr 1fr; } }
 @media (max-width:620px) { .ui-workspace-filterbar { grid-template-columns:1fr; } }
+
+.ui-workspace-filterbar--compact {
+    grid-template-columns: repeat(auto-fit, minmax(145px, 180px));
+    justify-content: start;
+    align-items: end;
+    gap: 5px;
+    width: auto;
+    max-width: 100%;
+}
+.ui-workspace-filterbar--compact ::deep .ui-input-text,
+.ui-workspace-filterbar--compact ::deep .ui-input-date,
+.ui-workspace-filterbar--compact ::deep .ui-select { width: 100%; min-width: 0; }
+@media (max-width: 720px) { .ui-workspace-filterbar--compact { grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; } }
+@media (max-width: 480px) { .ui-workspace-filterbar--compact { grid-template-columns: 1fr; } }

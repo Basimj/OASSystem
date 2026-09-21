@@ -18,6 +18,9 @@ public partial class UiInputDate
     public string? Label { get; set; }
 
     [Parameter]
+    public string? ErrorText { get; set; }
+
+    [Parameter]
     public bool Required { get; set; }
 
     [Parameter]
@@ -54,6 +57,12 @@ public partial class UiInputDate
 
     private string SizeCss =>
         Size.ToString().ToLowerInvariant();
+
+    private bool HasError => !string.IsNullOrWhiteSpace(ErrorText);
+    private string ErrorId => $"{InputId}-error";
+    private string? AriaInvalid => HasError ? "true" : null;
+    private string InputCssClass =>
+        $"ui-input-date__control ui-input-date__control--{SizeCss} {(HasError ? "ui-input-date__control--invalid" : null)}".Trim();
 
     private void HandleChange(ChangeEventArgs args)
     {

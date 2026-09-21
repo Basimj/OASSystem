@@ -26,6 +26,8 @@
                maxlength="@MaxLength"
                autocomplete="@AutoComplete"
                inputmode="@InputMode"
+               aria-invalid="@AriaInvalid"
+               aria-describedby="@(HasError ? ErrorId : null)"
                @attributes="SafeAdditionalAttributes" />
 
         @if (CanRevealPassword)
@@ -58,7 +60,11 @@
         }
     </div>
 
-    @if (ShowValidationMessage &&
+    @if (HasError)
+    {
+        <div id="@ErrorId" class="ui-input-text__error" role="alert">@ErrorText</div>
+    }
+    else if (ShowValidationMessage &&
         ValueExpression is not null &&
         EditContext is not null)
     {
