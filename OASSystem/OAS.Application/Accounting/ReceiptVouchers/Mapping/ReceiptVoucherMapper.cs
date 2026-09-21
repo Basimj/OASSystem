@@ -9,15 +9,17 @@ namespace OAS.Application.Accounting.ReceiptVouchers.Mapping;
 public sealed class ReceiptVoucherMapper
 {
     public ReceiptVoucherDto ToRead(ReceiptVoucher source)
-        => ToRead(source, source.Lines);
-
-    public ReceiptVoucherDto ToRead(
-        ReceiptVoucher source,
-        IEnumerable<ReceiptVoucherLine> sourceLines)
     {
-        var lines = sourceLines
-            .OrderBy(l => l.LineNumber)
-            .Select(ToLineDto)
+        var lines = source.Lines
+            .Select(l => new ReceiptVoucherLineDto(
+                l.Id,
+                l.ReceiptVoucherId,
+                l.LineNumber,
+                l.AccountId,
+                l.Amount,
+                l.ReferenceType,
+                l.ReferenceId,
+                l.Description))
             .ToList();
 
         return new ReceiptVoucherDto(
@@ -38,18 +40,7 @@ public sealed class ReceiptVoucherMapper
             source.CreatedAtUtc,
             source.PostedBy,
             source.PostedAtUtc,
-            Convert.ToBase64String(source.RowVersion),
+            source.RowVersion is not null ? Convert.ToBase64String(source.RowVersion) : string.Empty,
             lines);
     }
-
-    public static ReceiptVoucherLineDto ToLineDto(ReceiptVoucherLine line)
-        => new(
-            line.Id,
-            line.ReceiptVoucherId,
-            line.LineNumber,
-            line.AccountId,
-            line.Amount,
-            line.ReferenceType,
-            line.ReferenceId,
-            line.Description);
 }

@@ -26,10 +26,8 @@ public sealed class ExpensesController(ISender sender) : ControllerBase
     [HttpGet]
     public async Task<ActionResult<PagedResult<ExpenseDto>>> Get(
         [FromQuery] PageRequest request,
-        [FromQuery(Name = "searchTerm")] string? searchTerm,
         CancellationToken cancellationToken)
     {
-        request = AccountingPageRequestCompatibility.Apply(request, searchTerm);
         var result = await sender.Send(new GetExpensesQuery(request), cancellationToken);
         return Ok(result);
     }
@@ -65,14 +63,13 @@ public sealed class ExpensesController(ISender sender) : ControllerBase
     }
 
     [HttpPost("{id:guid}/status")]
-    public async Task<ActionResult<ExpenseDto>> SetStatus(
+    public async Task<IActionResult> SetStatus(
         Guid id,
         [FromBody] SetExpenseStatusRequest request,
         CancellationToken cancellationToken)
     {
         await sender.Send(new SetExpenseStatusCommand(id, request), cancellationToken);
-        var dto = await sender.Send(new GetExpenseByIdQuery(id), cancellationToken);
-        return Ok(dto);
+        return NoContent();
     }
 
     // --- Expense Types ---
@@ -80,10 +77,8 @@ public sealed class ExpensesController(ISender sender) : ControllerBase
     [HttpGet("types")]
     public async Task<ActionResult<PagedResult<ExpenseTypeDto>>> GetTypes(
         [FromQuery] PageRequest request,
-        [FromQuery(Name = "searchTerm")] string? searchTerm,
         CancellationToken cancellationToken)
     {
-        request = AccountingPageRequestCompatibility.Apply(request, searchTerm);
         var result = await sender.Send(new GetExpenseTypesQuery(request), cancellationToken);
         return Ok(result);
     }
@@ -119,13 +114,12 @@ public sealed class ExpensesController(ISender sender) : ControllerBase
     }
 
     [HttpPost("types/{id:guid}/status")]
-    public async Task<ActionResult<ExpenseTypeDto>> SetTypeStatus(
+    public async Task<IActionResult> SetTypeStatus(
         Guid id,
         [FromBody] SetExpenseTypeStatusRequest request,
         CancellationToken cancellationToken)
     {
         await sender.Send(new SetExpenseTypeStatusCommand(id, request), cancellationToken);
-        var dto = await sender.Send(new GetExpenseTypeByIdQuery(id), cancellationToken);
-        return Ok(dto);
+        return NoContent();
     }
 }

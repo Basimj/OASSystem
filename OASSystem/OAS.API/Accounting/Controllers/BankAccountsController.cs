@@ -21,10 +21,8 @@ public sealed class BankAccountsController(ISender sender) : ControllerBase
     [HttpGet]
     public async Task<ActionResult<PagedResult<BankAccountDto>>> Get(
         [FromQuery] PageRequest request,
-        [FromQuery(Name = "searchTerm")] string? searchTerm,
         CancellationToken cancellationToken)
     {
-        request = AccountingPageRequestCompatibility.Apply(request, searchTerm);
         var result = await sender.Send(new GetBankAccountsQuery(request), cancellationToken);
         return Ok(result);
     }
@@ -60,13 +58,12 @@ public sealed class BankAccountsController(ISender sender) : ControllerBase
     }
 
     [HttpPost("{id:guid}/status")]
-    public async Task<ActionResult<BankAccountDto>> SetStatus(
+    public async Task<IActionResult> SetStatus(
         Guid id,
         [FromBody] SetBankAccountStatusRequest request,
         CancellationToken cancellationToken)
     {
         await sender.Send(new SetBankAccountStatusCommand(id, request), cancellationToken);
-        var dto = await sender.Send(new GetBankAccountByIdQuery(id), cancellationToken);
-        return Ok(dto);
+        return NoContent();
     }
 }

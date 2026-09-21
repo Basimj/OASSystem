@@ -61,8 +61,6 @@ public static class AccountingArabicPresenter
     public static string GetJournalStatusText(JournalEntryStatus value) => value switch
     {
         JournalEntryStatus.Draft => "مسودة",
-        JournalEntryStatus.PendingApproval => "بانتظار الاعتماد",
-        JournalEntryStatus.Approved => "معتمد",
         JournalEntryStatus.Posted => "مرحّل",
         JournalEntryStatus.Reversed => "معكوس",
         _ => value.ToString()

@@ -1,4 +1,4 @@
-using OAS.Application.CRUD.Mapping;
+﻿using OAS.Application.CRUD.Mapping;
 using OAS.Contracts.Accounting.Enums;
 using OAS.Contracts.Accounting.FiscalPeriods;
 using OAS.Domain.Accounting.Entities;
@@ -60,6 +60,6 @@ public sealed class FiscalPeriodMapper
                     TimeSpan.Zero)
                 : null,
             source.ClosedBy,
-            Convert.ToBase64String(source.RowVersion));
+            string.Empty);
     }
 }

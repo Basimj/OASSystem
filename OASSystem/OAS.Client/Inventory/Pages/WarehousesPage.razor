@@ -26,38 +26,33 @@
 
     <Content>
         <UiDataGridPanel Title="المخازن" Subtitle="@($"{FilteredWarehouses.Count} مخزن")">
-            <Header>
-                <div class="inventory-warehouses__header">
-                    <span>الكود</span>
-                    <span>اسم المخزن</span>
-                    <span>الافتراضي</span>
-                    <span>الحالة</span>
-                </div>
-            </Header>
             <Body>
                 @if (_loading)
                 {
                     <UiAlert Message="جاري تحميل المخازن..." />
                 }
-                else if (FilteredWarehouses.Count == 0)
-                {
-                    <UiAlert Message="لا توجد مخازن مطابقة." />
-                }
                 else
                 {
-                    <div class="inventory-warehouses__rows">
-                        @foreach (var warehouse in FilteredWarehouses)
-                        {
-                            <button type="button"
-                                    class="@RowCss(warehouse.Id)"
-                                    @onclick="() => Select(warehouse.Id)">
-                                <span>@warehouse.Code</span>
-                                <strong>@warehouse.NameAr</strong>
-                                <span>@(warehouse.IsDefault ? "نعم" : "—")</span>
-                                <span>@(warehouse.IsActive ? "نشط" : "غير نشط")</span>
-                            </button>
-                        }
-                    </div>
+                    <UiDataTable TItem="WarehouseDto" Items="@FilteredWarehouses" Headers="@WarehouseHeaders" EmptyText="لا توجد مخازن مطابقة."
+                                 SidebarTypography="true"
+                                 UniformCellTypography="true"
+                                 OnRowClick="@(x => Select(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
+                        <RowTemplate Context="warehouse">
+                            <td>@warehouse.Code</td>
+                            <td>@warehouse.NameAr</td>
+                            <td>
+                                @if (warehouse.IsDefault)
+                                {
+                                    <UiBadge Text="افتراضي" Tone="AlertTone.Info" />
+                                }
+                                else
+                                {
+                                    <span>—</span>
+                                }
+                            </td>
+                            <td><UiBadge Text="@(warehouse.IsActive ? "نشط" : "غير نشط")" Tone="@(warehouse.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
+                        </RowTemplate>
+                    </UiDataTable>
                 }
             </Body>
         </UiDataGridPanel>
@@ -75,41 +70,53 @@
                     <UiInputText Label="كود المخزن"
                                  Value="@_code"
                                  ValueExpression="@(() => _code)"
-                                 ValueChanged="@(v => _code = v ?? string.Empty)"
+                                 ValueChanged="@(v => SetField(CodeField, () => _code = v ?? string.Empty))"
                                  Required="true"
+                                 ErrorText="@ErrorFor(CodeField)"
+                                 MaxLength="32"
                                  Disabled="@(_mode != EditorMode.Create)"
                                  Size="ControlSize.Small" />
 
                     <UiInputText Label="اسم المخزن بالعربية"
                                  Value="@_nameAr"
                                  ValueExpression="@(() => _nameAr)"
-                                 ValueChanged="@(v => _nameAr = v ?? string.Empty)"
+                                 ValueChanged="@(v => SetField(NameArField, () => _nameAr = v ?? string.Empty))"
                                  Required="true"
+                                 ErrorText="@ErrorFor(NameArField)"
+                                 MaxLength="100"
                                  Disabled="@(!IsEditing)"
                                  Size="ControlSize.Small" />
 
                     <UiInputText Label="اسم المخزن بالإنجليزية"
                                  Value="@_nameEn"
                                  ValueExpression="@(() => _nameEn)"
-                                 ValueChanged="@(v => _nameEn = v)"
+                                 ValueChanged="@(v => SetField(NameEnField, () => _nameEn = v))"
+                                 Placeholder="(اختياري)"
+                                 ErrorText="@ErrorFor(NameEnField)"
+                                 MaxLength="100"
                                  Disabled="@(!IsEditing)"
                                  Size="ControlSize.Small" />
 
                     <UiInputText Label="الوصف"
                                  Value="@_description"
                                  ValueExpression="@(() => _description)"
-                                 ValueChanged="@(v => _description = v)"
+                                 ValueChanged="@(v => SetField(DescriptionField, () => _description = v))"
+                                 Placeholder="(اختياري)"
+                                 ErrorText="@ErrorFor(DescriptionField)"
+                                 MaxLength="500"
                                  Disabled="@(!IsEditing)"
                                  Size="ControlSize.Small" />
 
                     <UiCheckbox Label="المخزن الافتراضي"
                                 Value="@_isDefault"
-                                ValueChanged="@(v => _isDefault = v)"
+                                ValueChanged="SetDefaultAsync"
+                                ErrorText="@ErrorFor(DefaultField)"
                                 Disabled="@(!IsEditing)" />
 
                     <UiCheckbox Label="المخزن نشط"
                                 Value="@_isActive"
-                                ValueChanged="@(v => _isActive = v)"
+                                ValueChanged="SetActiveAsync"
+                                ErrorText="@ErrorFor(ActiveField)"
                                 Disabled="@(!IsEditing || _mode == EditorMode.Create)" />
                 </div>
             }
@@ -120,11 +127,20 @@
 @code {
     private enum EditorMode { Empty, View, Create, Edit }
 
+    private const string CodeField = "كود المخزن";
+    private const string NameArField = "اسم المخزن بالعربية";
+    private const string NameEnField = "اسم المخزن بالإنجليزية";
+    private const string DescriptionField = "الوصف";
+    private const string DefaultField = "المخزن الافتراضي";
+    private const string ActiveField = "المخزن نشط";
+
     [Inject] private IInventoryClientService Inventory { get; set; } = default!;
     [Inject] private IApiFeedbackService ApiFeedback { get; set; } = default!;
     [Inject] private IUiSnackbarService Snackbar { get; set; } = default!;
 
     private IReadOnlyList<WarehouseDto> _warehouses = [];
+    private static readonly IReadOnlyList<string> WarehouseHeaders = ["الكود", "اسم المخزن", "الافتراضي", "الحالة"];
+    private readonly Dictionary<string, string> _fieldErrors = new(StringComparer.Ordinal);
     private EditorMode _mode = EditorMode.Empty;
     private Guid? _selectedId;
     private bool _loading = true;
@@ -173,6 +189,10 @@
         {
             ApiFeedback.Show(ex.Error);
         }
+        catch
+        {
+            ApiFeedback.ShowUnexpected();
+        }
         finally
         {
             _loading = false;
@@ -180,7 +200,7 @@
     }
 
     private Task RefreshAsync(MouseEventArgs args) => LoadAsync();
-    private Task SearchChangedAsync(string? _) => Task.CompletedTask;
+    private Task SearchChangedAsync(string? value) => Task.CompletedTask;
 
     private Task BeginCreateAsync(MouseEventArgs args)
     {
@@ -193,12 +213,17 @@
 
     private Task BeginEditAsync(MouseEventArgs args)
     {
-        if (CanEdit) _mode = EditorMode.Edit;
+        if (CanEdit)
+        {
+            ClearValidation();
+            _mode = EditorMode.Edit;
+        }
         return Task.CompletedTask;
     }
 
     private Task CancelAsync(MouseEventArgs args)
     {
+        ClearValidation();
         if (_selectedId.HasValue)
         {
             _mode = EditorMode.View;
@@ -215,11 +240,7 @@
     private async Task SaveAsync(MouseEventArgs args)
     {
         if (!IsEditing || _saving) return;
-        if (string.IsNullOrWhiteSpace(_code) || string.IsNullOrWhiteSpace(_nameAr))
-        {
-            Snackbar.Error("كود المخزن واسمه العربي مطلوبان.");
-            return;
-        }
+        if (!ValidateForm()) return;
 
         _saving = true;
         try
@@ -245,7 +266,27 @@
         }
         catch (ApiClientException ex)
         {
-            ApiFeedback.Show(ex.Error);
+            if (string.Equals(ex.Error.Code, "unique_constraint_conflict", StringComparison.OrdinalIgnoreCase))
+            {
+                await LoadAsync();
+                if (_mode == EditorMode.Create && _warehouses.Any(x => string.Equals(x.Code, _code.Trim(), StringComparison.OrdinalIgnoreCase)))
+                {
+                    SetError(CodeField, "هذا الكود مستخدم مسبقًا.");
+                    Snackbar.Error("توجد بيانات غير صحيحة. راجع الحقول المميزة باللون الأحمر.");
+                }
+                else
+                {
+                    ApiFeedback.Show(ex.Error);
+                }
+            }
+            else
+            {
+                ApiFeedback.Show(ex.Error);
+            }
+        }
+        catch
+        {
+            ApiFeedback.ShowUnexpected();
         }
         finally
         {
@@ -253,9 +294,81 @@
         }
     }
 
+    private bool ValidateForm()
+    {
+        ClearValidation();
+        var missingRequired = false;
+
+        if (string.IsNullOrWhiteSpace(_code))
+        {
+            SetError(CodeField, "هذا الحقل إجباري.");
+            missingRequired = true;
+        }
+        if (string.IsNullOrWhiteSpace(_nameAr))
+        {
+            SetError(NameArField, "هذا الحقل إجباري.");
+            missingRequired = true;
+        }
+
+        ValidateMaxLength(CodeField, _code, 32);
+        ValidateMaxLength(NameArField, _nameAr, 100);
+        ValidateMaxLength(NameEnField, _nameEn, 100);
+        ValidateMaxLength(DescriptionField, _description, 500);
+
+        if (_mode == EditorMode.Create &&
+            !string.IsNullOrWhiteSpace(_code) &&
+            _warehouses.Any(x => string.Equals(x.Code, _code.Trim(), StringComparison.OrdinalIgnoreCase)))
+        {
+            SetError(CodeField, "هذا الكود مستخدم مسبقًا.");
+        }
+
+        if (_isDefault)
+        {
+            var anotherDefault = _warehouses.Any(x => x.IsDefault && x.Id != _selectedId);
+            if (anotherDefault)
+                SetError(DefaultField, "يوجد مخزن افتراضي آخر. ألغِ تعيينه أولًا.");
+
+            if (!_isActive)
+            {
+                SetError(DefaultField, "المخزن الافتراضي يجب أن يكون نشطًا.");
+                SetError(ActiveField, "لا يمكن تعطيل المخزن وهو المخزن الافتراضي.");
+            }
+        }
+
+        if (_fieldErrors.Count == 0) return true;
+
+        Snackbar.Error(missingRequired
+            ? "هناك بيانات إجبارية لم يتم إدخالها."
+            : "توجد بيانات غير صحيحة. راجع الحقول المميزة باللون الأحمر.");
+        return false;
+    }
+
+    private void ValidateMaxLength(string key, string? value, int max)
+    {
+        if (!string.IsNullOrEmpty(value) && value.Length > max)
+            SetError(key, $"الحد الأقصى {max} حرفًا.");
+    }
+
+    private Task SetDefaultAsync(bool value)
+    {
+        _isDefault = value;
+        ClearFieldError(DefaultField);
+        if (!value) ClearFieldError(ActiveField);
+        return Task.CompletedTask;
+    }
+
+    private Task SetActiveAsync(bool value)
+    {
+        _isActive = value;
+        ClearFieldError(ActiveField);
+        if (value) ClearFieldError(DefaultField);
+        return Task.CompletedTask;
+    }
+
     private void Select(Guid id)
     {
         if (IsEditing || _saving) return;
+        ClearValidation();
         _selectedId = id;
         _mode = EditorMode.View;
         LoadSelected(id);
@@ -263,6 +376,7 @@
 
     private void LoadSelected(Guid id)
     {
+        ClearValidation();
         var item = _warehouses.FirstOrDefault(x => x.Id == id);
         if (item is null) return;
         _code = item.Code;
@@ -275,6 +389,7 @@
 
     private void ClearForm()
     {
+        ClearValidation();
         _code = string.Empty;
         _nameAr = string.Empty;
         _nameEn = null;
@@ -283,8 +398,16 @@
         _isActive = true;
     }
 
-    private string RowCss(Guid id) =>
-        $"inventory-warehouses__row {(id == _selectedId ? "inventory-warehouses__row--selected" : string.Empty)}";
+    private string? ErrorFor(string key) => _fieldErrors.TryGetValue(key, out var error) ? error : null;
+    private void SetError(string key, string message) => _fieldErrors[key] = message;
+    private void ClearFieldError(string key) => _fieldErrors.Remove(key);
+    private void ClearValidation() => _fieldErrors.Clear();
+
+    private void SetField(string key, Action setter)
+    {
+        setter();
+        ClearFieldError(key);
+    }
 
     private static bool Match(string? search, params string?[] values)
     {

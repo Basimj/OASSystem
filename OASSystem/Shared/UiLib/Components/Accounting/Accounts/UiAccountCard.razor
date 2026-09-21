@@ -19,14 +19,14 @@
             {
                 <span class="badge bg-light text-primary border">حساب مراقبة</span>
             }
-            <OAS.UiLib.Components.Accounting.Workspace.UiAccountingStatusBadge Text='@(IsActive ? "نشط" : "معطل")' State='@(IsActive ? "active" : "inactive")' />
+            <OAS.UiLib.Components.Accounting.Workspace.UiAccountingStatusBadge Text="@(IsActive ? "نشط" : "معطل")" State="@(IsActive ? "active" : "inactive")" />
         </div>
     </div>
     <div class="ui-acc-card__body">
         <div><strong>المستوى:</strong> @Level</div>
         <div><strong>التصنيف:</strong> @AccountClassText</div>
         <div><strong>النوع:</strong> @AccountTypeText</div>
-        <div><strong>طبيعة الرصيد:</strong> <span class='@(NormalBalanceText == "مدين" ? "ui-acc-val--debit" : "ui-acc-val--credit")'>@NormalBalanceText</span></div>
+        <div><strong>طبيعة الرصيد:</strong> <span class="@(NormalBalanceText == "مدين" ? "ui-acc-val--debit" : "ui-acc-val--credit")">@NormalBalanceText</span></div>
     </div>
     <div class="ui-acc-card__footer">
         @if (OnEdit.HasDelegate)

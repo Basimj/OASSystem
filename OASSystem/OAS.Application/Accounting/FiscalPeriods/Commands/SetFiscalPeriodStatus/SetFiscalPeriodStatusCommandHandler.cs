@@ -1,4 +1,4 @@
-using MediatR;
+﻿using MediatR;
 using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Abstractions.Security;
 using OAS.Application.Common.Exceptions;
@@ -29,12 +29,6 @@ public sealed class SetFiscalPeriodStatusCommandHandler(
             throw new NotFoundException(
                 "fiscal_period_not_found",
                 "The specified fiscal period was not found.");
-        }
-
-        var requestedRowVersion = Convert.FromBase64String(request.Request.RowVersion);
-        if (!period.RowVersion.SequenceEqual(requestedRowVersion))
-        {
-            throw new ConcurrencyException("The fiscal period has been modified by another user.");
         }
 
         switch (request.Request.Status)

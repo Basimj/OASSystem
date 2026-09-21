@@ -6,14 +6,14 @@
 @using OAS.UiLib.Components.Inputs
 @using OAS.UiLib.Core.Models
 
-<UiAccountingEditorSurface>
+<div class="ui-acc-editor" dir="rtl">
 
-    
+    ```
     <UiAccountingFormSection Title="المعلومات الأساسية"
                              Subtitle="الرمز، المسميات، وربط التبعية الشجرية"
                              IconCssClass="fa-solid fa-circle-info">
 
-        <UiAccountingFormGrid Columns="2">
+        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
 
             <UiInputText Label="كود الحساب"
                          Value="@Model.Code"
@@ -40,7 +40,7 @@
                          Size="ControlSize.Small" />
 
             <UiLookup Label="الحساب الأب"
-                      Value='@Model.ParentAccountId?.ToString("D")'
+                      Value="@Model.ParentAccountId?.ToString("D")"
                       ValueChanged="OnParentAccountChanged"
                       SelectedItem="@ParentAccountLookupItem"
                       SearchAsync="AccountSearchAsync"
@@ -49,7 +49,7 @@
                       MinimumSearchLength="0"
                       DebounceMilliseconds="250" />
 
-        </UiAccountingFormGrid>
+        </div>
 
     </UiAccountingFormSection>
 
@@ -58,7 +58,7 @@
                              Subtitle="نوع الحساب، طبيعة الرصيد والمستوى الشجري"
                              IconCssClass="fa-solid fa-sitemap">
 
-        <UiAccountingFormGrid Columns="4">
+        <div class="ui-acc-form-grid ui-acc-form-grid--4col">
 
             <UiSelect Label="تصنيف الحساب"
                       Value="@Model.AccountClassValue"
@@ -84,15 +84,14 @@
                       Disabled="@(!IsEditable)"
                       Size="ControlSize.Small" />
 
-            <UiAccountingNumberField Label="المستوى الشجري"
-                                     Value="@Model.Level"
-                                     ValueChanged="OnLevelChanged"
-                                     Min="1"
-                                     Step="1"
-                                     Disabled="@(!IsEditable)"
-                                     Hint="من 1 إلى 255 حسب مستوى الحساب في الشجرة" />
+            <UiInputText Label="المستوى الشجري"
+                         Value="@Model.Level.ToString()"
+                         ValueExpression="@(() => Model.LevelText)"
+                         ReadOnly="true"
+                         Disabled="true"
+                         Size="ControlSize.Small" />
 
-        </UiAccountingFormGrid>
+        </div>
 
     </UiAccountingFormSection>
 
@@ -101,7 +100,7 @@
                              Subtitle="صلاحيات الترحيل والتحكم وحالة النشاط"
                              IconCssClass="fa-solid fa-sliders">
 
-        <UiAccountingCheckGroup>
+        <div class="ui-acc-checks-group">
 
             <UiCheckbox Label="حساب ترحيل (يقبل القيود)"
                         Value="@Model.IsPostingAccount"
@@ -128,7 +127,7 @@
                         ValueChanged="OnIsActiveChanged"
                         Disabled="@(!IsEditable)" />
 
-        </UiAccountingCheckGroup>
+        </div>
 
     </UiAccountingFormSection>
 
@@ -138,7 +137,7 @@
                              IconCssClass="fa-regular fa-clock"
                              Collapsible="true">
 
-        <UiAccountingFormGrid Columns="2">
+        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
 
             <UiInputDate Label="تاريخ السريان"
                          Value="@Model.EffectiveDate"
@@ -147,13 +146,22 @@
                          Disabled="@(!IsEditable)"
                          Size="ControlSize.Small" />
 
+            @if (!string.IsNullOrWhiteSpace(RowVersion))
+            {
+                <UiInputText Label="إصدار السجل (RowVersion)"
+                             Value="@RowVersion"
+                             ValueExpression="@(() => RowVersion)"
+                             ReadOnly="true"
+                             Disabled="true"
+                             Size="ControlSize.Small" />
+            }
 
-        </UiAccountingFormGrid>
+        </div>
 
     </UiAccountingFormSection>
-    
+    ```
 
-</UiAccountingEditorSurface>
+</div>
 
 @code {
 
@@ -190,8 +198,6 @@ public sealed class FormModel
 
         public DateOnly? EffectiveDate { get; set; }
             = DateOnly.FromDateTime(DateTime.Today);
-
-        public string RowVersion { get; set; } = string.Empty;
 
 
         /*
@@ -244,6 +250,14 @@ public sealed class FormModel
                 }
             }
         }
+
+
+        /*
+         * خاصية مستقلة حتى لا نضع ToString()
+         * مباشرة داخل ValueExpression.
+         */
+        public string LevelText
+            => Level.ToString();
     }
 
 
@@ -258,6 +272,9 @@ public sealed class FormModel
     [Parameter]
     public bool IsNew { get; set; }
 
+
+    [Parameter]
+    public string? RowVersion { get; set; }
 
 
     [Parameter]
@@ -356,13 +373,6 @@ public sealed class FormModel
 
             await OnChanged();
         }
-    }
-
-
-    private async Task OnLevelChanged(decimal value)
-    {
-        Model.Level = Math.Clamp((int)value, 1, 255);
-        await OnChanged();
     }
 
 

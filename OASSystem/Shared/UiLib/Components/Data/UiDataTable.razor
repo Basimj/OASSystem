@@ -1,11 +1,21 @@
 @typeparam TItem
-<div class="ui-data-table__container">
-    <table class="ui-data-table">
+<div class="@ContainerCssClass">
+    <table class="@TableCssClass">
         <thead>
             <tr>
-                @foreach (var column in Columns)
+                @if (Headers.Count > 0)
                 {
-                    <th>@column.Header</th>
+                    @foreach (var header in Headers)
+                    {
+                        <th scope="col">@header</th>
+                    }
+                }
+                else
+                {
+                    @foreach (var column in Columns)
+                    {
+                        <th scope="col">@column.Header</th>
+                    }
                 }
             </tr>
         </thead>
@@ -13,17 +23,24 @@
             @if (Items.Count == 0)
             {
                 <tr>
-                    <td colspan="@Math.Max(1, Columns.Count)" class="ui-data-table__empty">@EmptyText</td>
+                    <td colspan="@ColumnCount" class="ui-data-table__empty">@EmptyText</td>
                 </tr>
             }
             else
             {
                 @foreach (var item in Items)
                 {
-                    <tr>
-                        @foreach (var column in Columns)
+                    <tr class="@GetRowCss(item)" @onclick="() => HandleRowClickAsync(item)">
+                        @if (RowTemplate is not null)
                         {
-                            <td>@column.ValueSelector(item)</td>
+                            @RowTemplate(item)
+                        }
+                        else
+                        {
+                            @foreach (var column in Columns)
+                            {
+                                <td>@column.ValueSelector(item)</td>
+                            }
                         }
                     </tr>
                 }

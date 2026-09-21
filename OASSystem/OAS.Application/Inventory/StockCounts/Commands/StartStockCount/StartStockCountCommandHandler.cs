@@ -25,7 +25,11 @@ public sealed class StartStockCountCommandHandler(
         if (stockCount.Status != StockCountStatus.Draft)
             throw new ConflictException("invalid_status_transition", $"Cannot start stock count from status '{stockCount.Status}'.");
 
-        var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
+        var lines = await stockCountRepository.GetLinesAsync(command.StockCountId, cancellationToken);
+        if (lines.Count == 0)
+            throw new ConflictException("stock_count_has_no_lines", "Cannot start a stock count without lines.");
+
+        var nowUtc = timeProvider.GetUtcNow();
         stockCount.Start(nowUtc);
         stockCountRepository.Update(stockCount);
 

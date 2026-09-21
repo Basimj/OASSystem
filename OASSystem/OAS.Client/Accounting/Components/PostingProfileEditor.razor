@@ -1,84 +1,362 @@
 @namespace OAS.Client.Accounting.Components
-@using OAS.UiLib.Components.Accounting.PostingProfiles
+@using OAS.Contracts.Accounting.PostingProfiles
+@using OAS.Client.Accounting.Common
 @using OAS.UiLib.Components.Accounting.Workspace
+@using OAS.UiLib.Components.Buttons
 @using OAS.UiLib.Components.Inputs
 @using OAS.UiLib.Core.Models
 
-<UiAccountingEditorSurface>
+<div class="ui-acc-editor" dir="rtl">
+
     <UiAccountingFormSection Title="بيانات ملف الترحيل الآلي"
                              Subtitle="الرمز، الاسم، الوحدة التشغيلية، ونوع المستند"
                              IconCssClass="fa-solid fa-sliders">
-        <UiAccountingFormGrid Columns="2">
+
+        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+
             <UiInputText Label="كود ملف الترحيل"
                          Value="@Model.Code"
+                         ValueExpression="@(() => Model.Code)"
                          ValueChanged="OnCodeChanged"
                          Required="true"
                          Placeholder="مثال: PP-SALES-INV"
                          ReadOnly="@(!IsNew)"
                          Disabled="@(!IsEditable || !IsNew)"
                          Size="ControlSize.Small" />
+
             <UiInputText Label="اسم ملف الترحيل"
                          Value="@Model.Name"
+                         ValueExpression="@(() => Model.Name)"
                          ValueChanged="OnNameChanged"
                          Required="true"
                          Placeholder="مثال: ملف ترحيل فواتير المبيعات"
                          Disabled="@(!IsEditable)"
                          Size="ControlSize.Small" />
-            <UiInputText Label="الوحدة / النظام"
+
+            <UiInputText Label="الوحدة / النظام (Module)"
                          Value="@Model.Module"
+                         ValueExpression="@(() => Model.Module)"
                          ValueChanged="OnModuleChanged"
                          Required="true"
-                         Placeholder="Sales / Purchasing / Inventory"
+                         Placeholder="مثال: Sales أو Purchasing أو Inventory"
                          Disabled="@(!IsEditable)"
                          Size="ControlSize.Small" />
-            <UiInputText Label="نوع المستند"
+
+            <UiInputText Label="نوع المستند (Document Type)"
                          Value="@Model.DocumentType"
+                         ValueExpression="@(() => Model.DocumentType)"
                          ValueChanged="OnDocumentTypeChanged"
                          Required="true"
-                         Placeholder="SalesInvoice / PurchaseInvoice"
+                         Placeholder="مثال: SalesInvoice أو PurchaseInvoice"
                          Disabled="@(!IsEditable)"
                          Size="ControlSize.Small" />
-        </UiAccountingFormGrid>
-        <UiAccountingCheckGroup>
+
+        </div>
+
+        <div class="ui-acc-checks-group mt-3">
             <UiCheckbox Label="ملف الترحيل نشط"
                         Value="@Model.IsActive"
                         ValueChanged="OnActiveChanged"
                         Disabled="@(!IsEditable)" />
-        </UiAccountingCheckGroup>
+        </div>
+
     </UiAccountingFormSection>
 
-    <UiAccountingFormSection Title="قواعد توجيه الحسابات"
-                             Subtitle="ربط الأدوار المحاسبية بالحسابات المقابلة في دليل الحسابات"
+
+    <UiAccountingFormSection Title="قواعد توجيه الحسابات (أسطر ملف الترحيل)"
+                             Subtitle="ربط كل دور محاسبي تشغيلي بالحساب المقابل له في الدليل"
                              IconCssClass="fa-solid fa-route">
-        <UiPostingProfileLinesEditor Lines="@Model.Lines"
-                                     IsEditable="@IsEditable"
-                                     AccountSearchAsync="@AccountSearchAsync"
-                                     OnLinesChanged="OnChanged" />
+
+        <div class="table-responsive">
+
+            <table class="ui-acc-grid-table">
+
+                <thead>
+                    <tr>
+                        <th style="width: 40px;">#</th>
+                        <th style="width: 35%;">الدور المحاسبي (Role)</th>
+                        <th style="width: 45%;">الحساب المحاسبي المرتبط</th>
+                        <th style="width: 12%;">إلزامي</th>
+
+                        @if (IsEditable)
+                        {
+                            <th style="width: 40px;">إجراء</th>
+                        }
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    @if (Model.Lines.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="@(IsEditable ? 5 : 4)"
+                                class="text-center text-muted py-3">
+
+                                لا توجد أدوار مضافة في هذا الملف.
+                                انقر على «إضافة دور محاسبي» أدناه.
+
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @for (var i = 0; i < Model.Lines.Count; i++)
+                        {
+                            var index = i;
+                            var line = Model.Lines[index];
+
+                            <tr>
+
+                                <td class="text-center">
+                                    @(index + 1)
+                                </td>
+
+                                <td>
+                                    @if (IsEditable)
+                                    {
+                                        <input type="text"
+                                               class="ui-input-text__field"
+                                               value="@line.AccountRole"
+                                               placeholder="مثال: AR, Revenue, Tax..."
+                                               @onchange="@(e => OnLineRoleChanged(line, e.Value?.ToString()))" />
+                                    }
+                                    else
+                                    {
+                                        <span class="fw-bold font-mono">
+                                            @line.AccountRole
+                                        </span>
+                                    }
+                                </td>
+
+                                <td>
+                                    @if (IsEditable)
+                                    {
+                                        <UiLookup Value="@line.AccountId?.ToString("D")"
+                                                  ValueChanged="@(v => OnLineAccountChanged(line, v))"
+                                                  SelectedItem="@line.AccountLookupItem"
+                                                  SearchAsync="AccountSearchAsync"
+                                                  Placeholder="اختر الحساب..."
+                                                  MinimumSearchLength="0"
+                                                  DebounceMilliseconds="250" />
+                                    }
+                                    else
+                                    {
+                                        <span>
+                                            @line.AccountDisplay
+                                        </span>
+                                    }
+                                </td>
+
+                                <td class="text-center">
+
+                                    <UiCheckbox Value="@line.IsRequired"
+                                                ValueChanged="@(v => OnLineRequiredChanged(line, v))"
+                                                Disabled="@(!IsEditable)" />
+
+                                </td>
+
+                                @if (IsEditable)
+                                {
+                                    <td class="text-center">
+
+                                        <button type="button"
+                                                class="btn btn-sm btn-link text-danger p-0"
+                                                title="حذف الدور"
+                                                @onclick="() => RemoveLine(line)">
+
+                                            <i class="fa-solid fa-trash-can"></i>
+
+                                        </button>
+
+                                    </td>
+                                }
+
+                            </tr>
+                        }
+                    }
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+
+        @if (IsEditable)
+        {
+            <div class="mt-2">
+
+                <UiButton Text="إضافة دور محاسبي"
+                          IconCssClass="fa-solid fa-plus"
+                          Variant="ButtonVariant.Secondary"
+                          Size="ControlSize.Small"
+                          OnClick="AddLine" />
+
+            </div>
+        }
+
     </UiAccountingFormSection>
-</UiAccountingEditorSurface>
+
+</div>
+
 
 @code {
+
+    public sealed class EditablePostingProfileLine
+    {
+        public string AccountRole { get; set; } = "AR";
+
+        public Guid? AccountId { get; set; }
+
+        public string AccountDisplay { get; set; } = string.Empty;
+
+        public UiLookupItem? AccountLookupItem { get; set; }
+
+        public bool IsRequired { get; set; } = true;
+    }
+
+
     public sealed class FormModel
     {
         public string Code { get; set; } = string.Empty;
+
         public string Name { get; set; } = string.Empty;
+
         public string Module { get; set; } = "Sales";
+
         public string DocumentType { get; set; } = "SalesInvoice";
+
         public bool IsActive { get; set; } = true;
-        public string RowVersion { get; set; } = string.Empty;
-        public List<UiPostingProfileLinesEditor.EditablePostingProfileLine> Lines { get; set; } = [];
+
+        public List<EditablePostingProfileLine> Lines { get; set; } = [];
     }
 
-    [Parameter] public FormModel Model { get; set; } = new();
-    [Parameter] public bool IsEditable { get; set; }
-    [Parameter] public bool IsNew { get; set; }
-    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? AccountSearchAsync { get; set; }
-    [Parameter] public EventCallback OnModelChanged { get; set; }
 
-    private Task OnChanged() => OnModelChanged.InvokeAsync();
-    private async Task OnCodeChanged(string? value) { Model.Code = value ?? string.Empty; await OnChanged(); }
-    private async Task OnNameChanged(string? value) { Model.Name = value ?? string.Empty; await OnChanged(); }
-    private async Task OnModuleChanged(string? value) { Model.Module = value ?? string.Empty; await OnChanged(); }
-    private async Task OnDocumentTypeChanged(string? value) { Model.DocumentType = value ?? string.Empty; await OnChanged(); }
-    private async Task OnActiveChanged(bool value) { Model.IsActive = value; await OnChanged(); }
+    [Parameter]
+    public FormModel Model { get; set; } = new();
+
+
+    [Parameter]
+    public bool IsEditable { get; set; }
+
+
+    [Parameter]
+    public bool IsNew { get; set; }
+
+
+    [Parameter]
+    public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>?
+        AccountSearchAsync
+    { get; set; }
+
+
+    [Parameter]
+    public EventCallback OnModelChanged { get; set; }
+
+
+    private Task OnChanged()
+    {
+        return OnModelChanged.InvokeAsync();
+    }
+
+
+    private async Task OnCodeChanged(string? value)
+    {
+        Model.Code = value ?? string.Empty;
+        await OnChanged();
+    }
+
+
+    private async Task OnNameChanged(string? value)
+    {
+        Model.Name = value ?? string.Empty;
+        await OnChanged();
+    }
+
+
+    private async Task OnModuleChanged(string? value)
+    {
+        Model.Module = value ?? string.Empty;
+        await OnChanged();
+    }
+
+
+    private async Task OnDocumentTypeChanged(string? value)
+    {
+        Model.DocumentType = value ?? string.Empty;
+        await OnChanged();
+    }
+
+
+    private async Task OnActiveChanged(bool value)
+    {
+        Model.IsActive = value;
+        await OnChanged();
+    }
+
+
+    private async Task OnLineRoleChanged(
+        EditablePostingProfileLine line,
+        string? value)
+    {
+        line.AccountRole = value ?? string.Empty;
+        await OnChanged();
+    }
+
+
+    private async Task OnLineRequiredChanged(
+        EditablePostingProfileLine line,
+        bool value)
+    {
+        line.IsRequired = value;
+        await OnChanged();
+    }
+
+
+    private void AddLine()
+    {
+        Model.Lines.Add(new EditablePostingProfileLine());
+
+        _ = OnChanged();
+    }
+
+
+    private void RemoveLine(EditablePostingProfileLine line)
+    {
+        Model.Lines.Remove(line);
+
+        _ = OnChanged();
+    }
+
+
+    private async Task OnLineAccountChanged(
+     EditablePostingProfileLine line,
+     string? value)
+    {
+        if (Guid.TryParse(value, out var id))
+        {
+            line.AccountId = id;
+
+            if (AccountSearchAsync is not null)
+            {
+                var items = await AccountSearchAsync(
+                    string.Empty,
+                    CancellationToken.None);
+
+                line.AccountLookupItem =
+                    items.FirstOrDefault(x => x.Value == value);
+
+                line.AccountDisplay = id.ToString();
+            }
+        }
+        else
+        {
+            line.AccountId = null;
+            line.AccountLookupItem = null;
+            line.AccountDisplay = string.Empty;
+        }
+
+        await OnChanged();
+    }
 }

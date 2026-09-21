@@ -11,7 +11,7 @@ public sealed class UpdateProductVariantRequestValidator : AbstractValidator<Upd
             .MaximumLength(64).WithErrorCode("barcode_max_length");
 
         RuleFor(x => x.VariantName)
-            .MaximumLength(150).WithErrorCode("variant_name_max_length");
+            .MaximumLength(100).WithErrorCode("variant_name_max_length");
 
         RuleFor(x => x.Color)
             .MaximumLength(50).WithErrorCode("color_max_length");

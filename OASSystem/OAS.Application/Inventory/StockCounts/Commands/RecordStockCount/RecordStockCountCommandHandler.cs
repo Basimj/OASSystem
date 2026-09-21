@@ -1,5 +1,6 @@
 using MediatR;
 using OAS.Application.Abstractions.Persistence;
+using OAS.Application.Abstractions.Security;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.Inventory.Repositories;
 using OAS.Domain.Entities.Inventory;
@@ -9,7 +10,9 @@ namespace OAS.Application.Inventory.StockCounts.Commands.RecordStockCount;
 
 public sealed class RecordStockCountCommandHandler(
     IStockCountRepository stockCountRepository,
-    IRepository<StockCountLine, Guid> lineRepository)
+    IRepository<StockCountLine, Guid> lineRepository,
+    ICurrentUser currentUser,
+    TimeProvider timeProvider)
     : IRequestHandler<RecordStockCountCommand, Guid>
 {
     public async Task<Guid> Handle(
@@ -34,10 +37,13 @@ public sealed class RecordStockCountCommandHandler(
         if (line is null)
             throw new NotFoundException(nameof(StockCountLine), command.LineId);
 
+        var countedAtUtc = timeProvider.GetUtcNow();
+        var countedBy = currentUser.UserId ?? "system";
+
         line.RecordCount(
             command.Request.CountedQuantity,
-            command.Request.CountedAtUtc,
-            command.Request.CountedBy);
+            countedAtUtc,
+            countedBy);
 
         lineRepository.Update(line);
 

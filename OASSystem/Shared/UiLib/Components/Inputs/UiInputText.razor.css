@@ -7,7 +7,8 @@
 .ui-input-text__control--reveal { padding-inline-end: 2.7rem; }
 .ui-input-text__control:focus { border-color: var(--oas-color-primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--oas-color-primary) 18%, transparent); }
 .ui-input-text__control:disabled { background: var(--oas-color-disabled-surface); color: var(--oas-color-text-muted); cursor: not-allowed; }
-.ui-input-text__control.invalid { border-color: var(--oas-color-danger); }
+.ui-input-text__control.invalid,
+.ui-input-text__control--invalid { border-color: var(--oas-color-danger); box-shadow: 0 0 0 2px color-mix(in srgb, var(--oas-color-danger) 18%, transparent); }
 .ui-input-text__reveal {
     position: absolute;
     inset-inline-end: .35rem;
@@ -28,3 +29,5 @@
 .ui-input-text__reveal:disabled { cursor: not-allowed; opacity: .5; }
 .ui-input-text__reveal svg { width: 1.1rem; height: 1.1rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 ::deep .validation-message { color: var(--oas-color-danger); font-size: var(--oas-font-sm); }
+
+.ui-input-text__error { color: var(--oas-color-danger); font-size: var(--oas-font-sm); line-height: 1.35; }

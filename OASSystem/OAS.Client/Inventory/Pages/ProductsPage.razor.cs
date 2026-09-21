@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.Rendering;
 using System.Linq.Expressions;
+using System.Globalization;
 using OAS.Client.Common.Feedback.Services;
 using OAS.Client.Inventory.Services;
 using OAS.Client.Services.Http;
@@ -21,6 +22,25 @@ public partial class ProductsPage
 
     private sealed record SectionItem(ProductSection Value, string Text, string Icon);
 
+    private const string FrameModelField = "الموديل";
+    private const string FrameMaterialField = "الخامة";
+    private const string FrameRimField = "نوع الإطار / Rim";
+    private const string FrameGenderField = "الجنس";
+    private const string FrameShapeField = "الشكل";
+    private const string TempleLengthField = "طول الذراع";
+    private const string BridgeSizeField = "مقاس الجسر";
+    private const string LensWidthField = "عرض العدسة";
+    private const string LensTypeField = "نوع العدسة";
+    private const string LensMaterialField = "خامة العدسة";
+    private const string LensCoatingField = "الطلاء / Coating";
+    private const string RefractiveIndexField = "معامل الانكسار";
+    private const string SphereMinField = "Sphere Min";
+    private const string SphereMaxField = "Sphere Max";
+    private const string CylinderMinField = "Cylinder Min";
+    private const string CylinderMaxField = "Cylinder Max";
+    private const string AddMinField = "Add Min";
+    private const string AddMaxField = "Add Max";
+
     [Inject] private IInventoryClientService Inventory { get; set; } = default!;
     [Inject] private IApiFeedbackService ApiFeedback { get; set; } = default!;
     [Inject] private IUiSnackbarService Snackbar { get; set; } = default!;
@@ -37,11 +57,16 @@ public partial class ProductsPage
         new(ProductSection.Variants, "المتغيرات", "fa-solid fa-barcode")
     ];
 
+    private IReadOnlyList<UiSectionTabItem> SectionTabs => Sections
+        .Select(x => new UiSectionTabItem(x.Value.ToString(), x.Text, x.Value == _section))
+        .ToArray();
+
     private ProductSection _section = ProductSection.Products;
     private EditorMode _mode = EditorMode.Empty;
     private bool _loading = true;
     private bool _saving;
     private string? _search;
+    private readonly Dictionary<string, string> _fieldErrors = new(StringComparer.Ordinal);
 
     private IReadOnlyList<ProductCategoryDto> _categories = [];
     private IReadOnlyList<BrandDto> _brands = [];
@@ -123,6 +148,11 @@ public partial class ProductsPage
     };
 
     private string SectionSubtitle => $"{VisibleCount} سجل";
+
+    private static readonly IReadOnlyList<string> SimpleHeaders = ["الكود", "الاسم", "الحالة"];
+    private static readonly IReadOnlyList<string> ProductHeaders = ["الكود", "المنتج", "النوع", "الحالة"];
+    private static readonly IReadOnlyList<string> VariantHeaders = ["SKU", "المتغير", "الباركود", "سعر البيع", "الحالة"];
+
 
     private int VisibleCount => _section switch
     {
@@ -220,6 +250,10 @@ public partial class ProductsPage
         {
             ApiFeedback.Show(ex.Error);
         }
+        catch
+        {
+            ApiFeedback.ShowUnexpected();
+        }
         finally
         {
             _loading = false;
@@ -229,10 +263,15 @@ public partial class ProductsPage
     private Task RefreshAsync(MouseEventArgs args) => LoadAsync();
     private Task SearchChangedAsync(string? _) => Task.CompletedTask;
 
+
+    private Task ChangeSectionKeyAsync(string key) =>
+        Enum.TryParse<ProductSection>(key, out var section) ? ChangeSectionAsync(section) : Task.CompletedTask;
+
     private async Task ChangeSectionAsync(ProductSection section)
     {
         if (IsEditing || _saving || _section == section) return;
         _section = section;
+        ClearValidation();
         _selectedId = null;
         _mode = EditorMode.Empty;
         _search = null;
@@ -254,12 +293,14 @@ public partial class ProductsPage
     private Task BeginEditAsync(MouseEventArgs args)
     {
         if (!CanEdit) return Task.CompletedTask;
+        ClearValidation();
         _mode = EditorMode.Edit;
         return Task.CompletedTask;
     }
 
     private Task CancelEditAsync(MouseEventArgs args)
     {
+        ClearValidation();
         if (_selectedId.HasValue)
         {
             _mode = EditorMode.View;
@@ -301,7 +342,20 @@ public partial class ProductsPage
         }
         catch (ApiClientException ex)
         {
-            ApiFeedback.Show(ex.Error);
+            if (string.Equals(ex.Error.Code, "unique_constraint_conflict", StringComparison.OrdinalIgnoreCase))
+            {
+                await LoadAsync();
+                if (ValidateForm())
+                    Snackbar.Error("توجد قيمة مستخدمة مسبقًا. حدّث البيانات وحاول مرة أخرى.");
+            }
+            else
+            {
+                ApiFeedback.Show(ex.Error);
+            }
+        }
+        catch
+        {
+            ApiFeedback.ShowUnexpected();
         }
         finally
         {
@@ -342,7 +396,7 @@ public partial class ProductsPage
 
     private async Task<Guid?> SaveProductAsync()
     {
-        var categoryId = Guid.Parse(_categoryId!);
+        if (!Guid.TryParse(_categoryId, out var categoryId)) return null;
         var brandId = ParseGuid(_brandId);
         var type = CurrentProductType;
         ProductDto? result;
@@ -388,10 +442,9 @@ public partial class ProductsPage
 
     private async Task<Guid?> SaveVariantAsync()
     {
-        var productId = Guid.Parse(_productId!);
+        if (!Guid.TryParse(_productId, out var productId)) return null;
         var unitId = ParseGuid(_unitId);
-        var purchasePrice = decimal.Parse(_purchasePrice, System.Globalization.CultureInfo.InvariantCulture);
-        var sellingPrice = decimal.Parse(_sellingPrice, System.Globalization.CultureInfo.InvariantCulture);
+        if (!TryParseDecimalInput(_purchasePrice, out var purchasePrice) || !TryParseDecimalInput(_sellingPrice, out var sellingPrice)) return null;
         ProductVariantDto? result;
         if (_mode == EditorMode.Create)
             result = await Inventory.CreateProductVariantAsync(new(productId, _code.Trim(), NullIfBlank(_barcode), NullIfBlank(_variantName), NullIfBlank(_color), NullIfBlank(_size), unitId, purchasePrice, sellingPrice));
@@ -402,85 +455,226 @@ public partial class ProductsPage
 
     private bool ValidateForm()
     {
-        if (string.IsNullOrWhiteSpace(_code))
+        ClearValidation();
+        var missingRequired = false;
+
+        void Required(string key, string? value)
         {
-            Snackbar.Error(_section == ProductSection.Variants ? "SKU مطلوب." : "الكود مطلوب.");
-            return false;
+            if (!string.IsNullOrWhiteSpace(value)) return;
+            SetError(key, "هذا الحقل إجباري.");
+            missingRequired = true;
         }
 
-        if ((_section is ProductSection.Categories or ProductSection.Units or ProductSection.Products) && string.IsNullOrWhiteSpace(_nameAr))
+        void MaxLength(string key, string? value, int max)
         {
-            Snackbar.Error("الاسم العربي مطلوب.");
-            return false;
+            if (!string.IsNullOrEmpty(value) && value.Length > max)
+                SetError(key, $"الحد الأقصى {max} حرفًا.");
         }
 
-        if (_section == ProductSection.Brands && string.IsNullOrWhiteSpace(_brandName))
+        switch (_section)
         {
-            Snackbar.Error("اسم العلامة التجارية مطلوب.");
-            return false;
+            case ProductSection.Categories:
+                Required("الكود", _code);
+                Required("الاسم بالعربية", _nameAr);
+                MaxLength("الكود", _code, 32);
+                MaxLength("الاسم بالعربية", _nameAr, 100);
+                MaxLength("الاسم بالإنجليزية", _nameEn, 100);
+                if (_mode == EditorMode.Create && _categories.Any(x => string.Equals(x.Code, _code.Trim(), StringComparison.OrdinalIgnoreCase)))
+                    SetError("الكود", "هذا الكود مستخدم مسبقًا.");
+                break;
+
+            case ProductSection.Brands:
+                Required("الكود", _code);
+                Required("اسم العلامة", _brandName);
+                MaxLength("الكود", _code, 32);
+                MaxLength("اسم العلامة", _brandName, 100);
+                if (_mode == EditorMode.Create && _brands.Any(x => string.Equals(x.Code, _code.Trim(), StringComparison.OrdinalIgnoreCase)))
+                    SetError("الكود", "هذا الكود مستخدم مسبقًا.");
+                if (_brands.Any(x => x.Id != _selectedId && string.Equals(x.Name, _brandName.Trim(), StringComparison.CurrentCultureIgnoreCase)))
+                    SetError("اسم العلامة", "اسم العلامة مستخدم مسبقًا.");
+                break;
+
+            case ProductSection.Units:
+                Required("الكود", _code);
+                Required("الاسم بالعربية", _nameAr);
+                MaxLength("الكود", _code, 32);
+                MaxLength("الاسم بالعربية", _nameAr, 100);
+                MaxLength("الاسم بالإنجليزية", _nameEn, 100);
+                if (_mode == EditorMode.Create && _units.Any(x => string.Equals(x.Code, _code.Trim(), StringComparison.OrdinalIgnoreCase)))
+                    SetError("الكود", "هذا الكود مستخدم مسبقًا.");
+                break;
+
+            case ProductSection.Products:
+                Required("كود المنتج", _code);
+                Required("الاسم بالعربية", _nameAr);
+                Required("التصنيف", _categoryId);
+                Required("نوع المنتج", _productType);
+                MaxLength("كود المنتج", _code, 32);
+                MaxLength("الاسم بالعربية", _nameAr, 150);
+                MaxLength("الاسم بالإنجليزية", _nameEn, 150);
+                MaxLength("الوصف", _description, 500);
+
+                if (_mode == EditorMode.Create && _products.Any(x => string.Equals(x.ProductCode, _code.Trim(), StringComparison.OrdinalIgnoreCase)))
+                    SetError("كود المنتج", "كود المنتج مستخدم مسبقًا.");
+                if (!string.IsNullOrWhiteSpace(_categoryId) && !Guid.TryParse(_categoryId, out _))
+                    SetError("التصنيف", "قيمة التصنيف غير صحيحة.");
+                if (!int.TryParse(_productType, out var productTypeValue) || !Enum.IsDefined(typeof(ProductType), productTypeValue))
+                    SetError("نوع المنتج", "نوع المنتج غير صحيح.");
+
+                ValidateSpecializedProductFields(ref missingRequired);
+                break;
+
+            case ProductSection.Variants:
+                Required("المنتج", _productId);
+                Required("SKU", _code);
+                Required("سعر الشراء", _purchasePrice);
+                Required("سعر البيع", _sellingPrice);
+                MaxLength("SKU", _code, 64);
+                MaxLength("الباركود", _barcode, 64);
+                MaxLength("اسم المتغير", _variantName, 100);
+                MaxLength("اللون", _color, 50);
+                MaxLength("المقاس", _size, 50);
+
+                if (!string.IsNullOrWhiteSpace(_productId) && !Guid.TryParse(_productId, out _))
+                    SetError("المنتج", "قيمة المنتج غير صحيحة.");
+                if (_mode == EditorMode.Create && _variants.Any(x => string.Equals(x.SKU, _code.Trim(), StringComparison.OrdinalIgnoreCase)))
+                    SetError("SKU", "SKU مستخدم مسبقًا.");
+                if (!string.IsNullOrWhiteSpace(_barcode) && _variants.Any(x => x.Id != _selectedId && string.Equals(x.Barcode, _barcode.Trim(), StringComparison.OrdinalIgnoreCase)))
+                    SetError("الباركود", "الباركود مستخدم مسبقًا.");
+
+                ValidateDecimalField("سعر الشراء", _purchasePrice, required: true, precision: 18, scale: 2, nonNegative: true, ref missingRequired);
+                ValidateDecimalField("سعر البيع", _sellingPrice, required: true, precision: 18, scale: 2, nonNegative: true, ref missingRequired);
+                break;
         }
 
-        if (_section == ProductSection.Products && !Guid.TryParse(_categoryId, out _))
-        {
-            Snackbar.Error("تصنيف المنتج مطلوب.");
-            return false;
-        }
+        if (_fieldErrors.Count == 0) return true;
 
-        if (_section == ProductSection.Products && ShowsFrameDetails)
+        Snackbar.Error(missingRequired
+            ? "هناك بيانات إجبارية لم يتم إدخالها."
+            : "توجد بيانات غير صحيحة. راجع الحقول المميزة باللون الأحمر.");
+        return false;
+    }
+
+    private void ValidateSpecializedProductFields(ref bool missingRequired)
+    {
+        if (ShowsFrameDetails)
         {
-            var hasFrameValues = !string.IsNullOrWhiteSpace(_frameModel) || !string.IsNullOrWhiteSpace(_frameMaterial) ||
-                !string.IsNullOrWhiteSpace(_frameRimType) || !string.IsNullOrWhiteSpace(_frameGender) || !string.IsNullOrWhiteSpace(_frameShape) ||
-                !string.IsNullOrWhiteSpace(_templeLength) || !string.IsNullOrWhiteSpace(_bridgeSize) || !string.IsNullOrWhiteSpace(_lensWidth);
-            if (hasFrameValues && string.IsNullOrWhiteSpace(_frameModel))
+            var hasValues = HasFrameDetailsInput();
+            if (hasValues && string.IsNullOrWhiteSpace(_frameModel))
             {
-                Snackbar.Error("الموديل مطلوب عند إدخال تفاصيل الإطار.");
-                return false;
+                SetError("الموديل", "هذا الحقل إجباري عند إدخال تفاصيل الإطار.");
+                missingRequired = true;
             }
-            if (!ValidateOptionalDecimals(_templeLength, _bridgeSize, _lensWidth))
-            {
-                Snackbar.Error("مقاسات الإطار يجب أن تكون أرقامًا صحيحة.");
-                return false;
-            }
+            ValidateMaxLength("الموديل", _frameModel, 100);
+            ValidateMaxLength("الخامة", _frameMaterial, 50);
+            ValidateMaxLength("نوع الإطار / Rim", _frameRimType, 50);
+            ValidateMaxLength("الجنس", _frameGender, 20);
+            ValidateMaxLength("الشكل", _frameShape, 50);
+            ValidateDecimalField("طول الذراع", _templeLength, false, 6, 2, false, ref missingRequired);
+            ValidateDecimalField("مقاس الجسر", _bridgeSize, false, 6, 2, false, ref missingRequired);
+            ValidateDecimalField("عرض العدسة", _lensWidth, false, 6, 2, false, ref missingRequired);
         }
-
-        if (_section == ProductSection.Products && ShowsLensDetails)
+        else if (ShowsLensDetails)
         {
-            var hasLensValues = !string.IsNullOrWhiteSpace(_lensType) || !string.IsNullOrWhiteSpace(_lensMaterial) || !string.IsNullOrWhiteSpace(_lensCoating) ||
-                !string.IsNullOrWhiteSpace(_refractiveIndex) || !string.IsNullOrWhiteSpace(_sphereMin) || !string.IsNullOrWhiteSpace(_sphereMax) ||
-                !string.IsNullOrWhiteSpace(_cylinderMin) || !string.IsNullOrWhiteSpace(_cylinderMax) || !string.IsNullOrWhiteSpace(_addMin) || !string.IsNullOrWhiteSpace(_addMax);
-            if (hasLensValues && string.IsNullOrWhiteSpace(_lensType))
+            var hasValues = HasLensDetailsInput();
+            if (hasValues && string.IsNullOrWhiteSpace(_lensType))
             {
-                Snackbar.Error("نوع العدسة مطلوب عند إدخال تفاصيل العدسة.");
-                return false;
+                SetError("نوع العدسة", "هذا الحقل إجباري عند إدخال تفاصيل العدسة.");
+                missingRequired = true;
             }
-            if (!ValidateOptionalDecimals(_refractiveIndex, _sphereMin, _sphereMax, _cylinderMin, _cylinderMax, _addMin, _addMax))
-            {
-                Snackbar.Error("قيم تفاصيل العدسة الرقمية غير صحيحة.");
-                return false;
-            }
+            ValidateMaxLength("نوع العدسة", _lensType, 50);
+            ValidateMaxLength("خامة العدسة", _lensMaterial, 50);
+            ValidateMaxLength("الطلاء / Coating", _lensCoating, 50);
+            ValidateDecimalField("معامل الانكسار", _refractiveIndex, false, 5, 3, false, ref missingRequired);
+            ValidateDecimalField("Sphere Min", _sphereMin, false, 6, 2, false, ref missingRequired);
+            ValidateDecimalField("Sphere Max", _sphereMax, false, 6, 2, false, ref missingRequired);
+            ValidateDecimalField("Cylinder Min", _cylinderMin, false, 6, 2, false, ref missingRequired);
+            ValidateDecimalField("Cylinder Max", _cylinderMax, false, 6, 2, false, ref missingRequired);
+            ValidateDecimalField("Add Min", _addMin, false, 6, 2, false, ref missingRequired);
+            ValidateDecimalField("Add Max", _addMax, false, 6, 2, false, ref missingRequired);
         }
+    }
 
-        if (_section == ProductSection.Variants)
+    private void ValidateMaxLength(string key, string? value, int max)
+    {
+        if (!string.IsNullOrEmpty(value) && value.Length > max)
+            SetError(key, $"الحد الأقصى {max} حرفًا.");
+    }
+
+    private void ValidateDecimalField(string key, string? value, bool required, int precision, int scale, bool nonNegative, ref bool missingRequired)
+    {
+        if (string.IsNullOrWhiteSpace(value))
         {
-            if (!Guid.TryParse(_productId, out _))
+            if (required)
             {
-                Snackbar.Error("المنتج مطلوب.");
-                return false;
+                SetError(key, "هذا الحقل إجباري.");
+                missingRequired = true;
             }
-            if (!decimal.TryParse(_purchasePrice, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out _) ||
-                !decimal.TryParse(_sellingPrice, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out _))
-            {
-                Snackbar.Error("أسعار المتغير يجب أن تكون أرقامًا صحيحة.");
-                return false;
-            }
+            return;
         }
 
-        return true;
+        if (!TryParseDecimalInput(value, out var parsed))
+        {
+            SetError(key, "يجب إدخال قيمة رقمية صحيحة.");
+            return;
+        }
+
+        if (nonNegative && parsed < 0)
+        {
+            SetError(key, "يجب أن تكون القيمة صفرًا أو أكبر.");
+            return;
+        }
+
+        if (decimal.Round(parsed, scale, MidpointRounding.ToEven) != parsed)
+        {
+            SetError(key, $"يسمح بحد أقصى {scale} منازل عشرية.");
+            return;
+        }
+
+        var integerDigits = precision - scale;
+        var maxAbs = Pow10(integerDigits);
+        if (parsed <= -maxAbs || parsed >= maxAbs)
+            SetError(key, $"القيمة أكبر من الحد المسموح ({integerDigits} أرقام قبل الفاصلة)." );
+    }
+
+    private static decimal Pow10(int power)
+    {
+        decimal value = 1;
+        for (var i = 0; i < power; i++) value *= 10;
+        return value;
+    }
+
+    private bool HasFrameDetailsInput() =>
+        _frameDetails.Any(x => x.ProductId == _selectedId) ||
+        !string.IsNullOrWhiteSpace(_frameModel) || !string.IsNullOrWhiteSpace(_frameMaterial) ||
+        !string.IsNullOrWhiteSpace(_frameRimType) || !string.IsNullOrWhiteSpace(_frameGender) ||
+        !string.IsNullOrWhiteSpace(_frameShape) || !string.IsNullOrWhiteSpace(_templeLength) ||
+        !string.IsNullOrWhiteSpace(_bridgeSize) || !string.IsNullOrWhiteSpace(_lensWidth);
+
+    private bool HasLensDetailsInput() =>
+        _lensDetails.Any(x => x.ProductId == _selectedId) ||
+        !string.IsNullOrWhiteSpace(_lensType) || !string.IsNullOrWhiteSpace(_lensMaterial) ||
+        !string.IsNullOrWhiteSpace(_lensCoating) || !string.IsNullOrWhiteSpace(_refractiveIndex) ||
+        !string.IsNullOrWhiteSpace(_sphereMin) || !string.IsNullOrWhiteSpace(_sphereMax) ||
+        !string.IsNullOrWhiteSpace(_cylinderMin) || !string.IsNullOrWhiteSpace(_cylinderMax) ||
+        !string.IsNullOrWhiteSpace(_addMin) || !string.IsNullOrWhiteSpace(_addMax);
+
+    private string? ErrorFor(string key) => _fieldErrors.TryGetValue(key, out var error) ? error : null;
+    private static string? OptionalPlaceholder(bool required) => required ? null : "(اختياري)";
+    private void SetError(string key, string message) => _fieldErrors.TryAdd(key, message);
+    private void ClearFieldError(string key) => _fieldErrors.Remove(key);
+    private void ClearValidation() => _fieldErrors.Clear();
+
+    private void SetField(string key, Action setter)
+    {
+        setter();
+        ClearFieldError(key);
     }
 
     private void Select(Guid id)
     {
         if (IsEditing || _saving) return;
+        ClearValidation();
         _selectedId = id;
         _mode = EditorMode.View;
         LoadSelectedIntoForm(id);
@@ -536,6 +730,7 @@ public partial class ProductsPage
 
     private void ClearForm()
     {
+        ClearValidation();
         _code = string.Empty; _nameAr = string.Empty; _nameEn = null; _isActive = true;
         _parentCategoryId = null; _brandName = string.Empty;
         _categoryId = null; _brandId = null; _productType = ((int)ProductType.Frame).ToString();
@@ -601,55 +796,6 @@ public partial class ProductsPage
         return values.Any(x => x?.Contains(term, StringComparison.CurrentCultureIgnoreCase) == true);
     }
 
-    private RenderFragment RenderHeader() => builder =>
-    {
-        var columns = _section switch
-        {
-            ProductSection.Products => new[] { "الكود", "المنتج", "النوع", "الحالة" },
-            ProductSection.Variants => new[] { "SKU", "المتغير", "الباركود", "سعر البيع", "الحالة" },
-            _ => new[] { "الكود", "الاسم", "الحالة" }
-        };
-        builder.OpenElement(0, "div");
-        builder.AddAttribute(1, "class", $"inventory-products__grid-header inventory-products__grid-header--{columns.Length}");
-        for (var i = 0; i < columns.Length; i++) { builder.OpenElement(2 + i * 2, "span"); builder.AddContent(3 + i * 2, columns[i]); builder.CloseElement(); }
-        builder.CloseElement();
-    };
-
-    private RenderFragment RenderRows() => builder =>
-    {
-        builder.OpenElement(0, "div"); builder.AddAttribute(1, "class", "inventory-products__rows");
-        var seq = 2;
-        switch (_section)
-        {
-            case ProductSection.Categories:
-                foreach (var x in FilterCategories()) { RenderRow(builder, ref seq, x.Id, 3, x.Code, x.NameAr, StatusText(x.IsActive)); }
-                break;
-            case ProductSection.Brands:
-                foreach (var x in FilterBrands()) { RenderRow(builder, ref seq, x.Id, 3, x.Code, x.Name, StatusText(x.IsActive)); }
-                break;
-            case ProductSection.Units:
-                foreach (var x in FilterUnits()) { RenderRow(builder, ref seq, x.Id, 3, x.Code, x.NameAr, StatusText(x.IsActive)); }
-                break;
-            case ProductSection.Products:
-                foreach (var x in FilterProducts()) { RenderRow(builder, ref seq, x.Id, 4, x.ProductCode, x.NameAr, ProductTypeText(x.ProductType), StatusText(x.IsActive)); }
-                break;
-            case ProductSection.Variants:
-                foreach (var x in FilterVariants()) { RenderRow(builder, ref seq, x.Id, 5, x.SKU, x.VariantName ?? ProductName(x.ProductId), x.Barcode ?? "—", x.SellingPrice.ToString("N2"), StatusText(x.IsActive)); }
-                break;
-        }
-        builder.CloseElement();
-    };
-
-    private void RenderRow(RenderTreeBuilder builder, ref int seq, Guid id, int columns, params string[] cells)
-    {
-        builder.OpenElement(seq++, "button");
-        builder.AddAttribute(seq++, "type", "button");
-        builder.AddAttribute(seq++, "class", $"inventory-products__row inventory-products__row--{columns} {(id == _selectedId ? "inventory-products__row--selected" : string.Empty)}");
-        builder.AddAttribute(seq++, "onclick", EventCallback.Factory.Create(this, () => Select(id)));
-        foreach (var cell in cells) { builder.OpenElement(seq++, "span"); builder.AddContent(seq++, cell); builder.CloseElement(); }
-        builder.CloseElement();
-    }
-
     private RenderFragment RenderEditor() => builder =>
     {
         var seq = 0;
@@ -667,37 +813,37 @@ public partial class ProductsPage
 
     private void RenderCategoryEditor(RenderTreeBuilder b, ref int s)
     {
-        AddText(b, ref s, "الكود", _code, v => _code = v, () => _code, _mode != EditorMode.Create, true);
-        AddText(b, ref s, "الاسم بالعربية", _nameAr, v => _nameAr = v, () => _nameAr, !IsEditing, true);
-        AddText(b, ref s, "الاسم بالإنجليزية", _nameEn, v => _nameEn = v, () => _nameEn, !IsEditing);
+        AddText(b, ref s, "الكود", _code, v => _code = v, () => _code, _mode != EditorMode.Create, true, 32);
+        AddText(b, ref s, "الاسم بالعربية", _nameAr, v => _nameAr = v, () => _nameAr, !IsEditing, true, 100);
+        AddText(b, ref s, "الاسم بالإنجليزية", _nameEn, v => _nameEn = v, () => _nameEn, !IsEditing, false, 100);
         AddSelect(b, ref s, "التصنيف الأب", _parentCategoryId, v => _parentCategoryId = v, () => _parentCategoryId, CategoryOptions.Where(x => x.Value != _selectedId?.ToString("D")).ToArray());
         AddActive(b, ref s);
     }
 
     private void RenderBrandEditor(RenderTreeBuilder b, ref int s)
     {
-        AddText(b, ref s, "الكود", _code, v => _code = v, () => _code, _mode != EditorMode.Create, true);
-        AddText(b, ref s, "اسم العلامة", _brandName, v => _brandName = v, () => _brandName, !IsEditing, true);
+        AddText(b, ref s, "الكود", _code, v => _code = v, () => _code, _mode != EditorMode.Create, true, 32);
+        AddText(b, ref s, "اسم العلامة", _brandName, v => _brandName = v, () => _brandName, !IsEditing, true, 100);
         AddActive(b, ref s);
     }
 
     private void RenderUnitEditor(RenderTreeBuilder b, ref int s)
     {
-        AddText(b, ref s, "الكود", _code, v => _code = v, () => _code, _mode != EditorMode.Create, true);
-        AddText(b, ref s, "الاسم بالعربية", _nameAr, v => _nameAr = v, () => _nameAr, !IsEditing, true);
-        AddText(b, ref s, "الاسم بالإنجليزية", _nameEn, v => _nameEn = v, () => _nameEn, !IsEditing);
+        AddText(b, ref s, "الكود", _code, v => _code = v, () => _code, _mode != EditorMode.Create, true, 32);
+        AddText(b, ref s, "الاسم بالعربية", _nameAr, v => _nameAr = v, () => _nameAr, !IsEditing, true, 100);
+        AddText(b, ref s, "الاسم بالإنجليزية", _nameEn, v => _nameEn = v, () => _nameEn, !IsEditing, false, 100);
         AddActive(b, ref s);
     }
 
     private void RenderProductEditor(RenderTreeBuilder b, ref int s)
     {
-        AddText(b, ref s, "كود المنتج", _code, v => _code = v, () => _code, _mode != EditorMode.Create, true);
-        AddText(b, ref s, "الاسم بالعربية", _nameAr, v => _nameAr = v, () => _nameAr, !IsEditing, true);
-        AddText(b, ref s, "الاسم بالإنجليزية", _nameEn, v => _nameEn = v, () => _nameEn, !IsEditing);
+        AddText(b, ref s, "كود المنتج", _code, v => _code = v, () => _code, _mode != EditorMode.Create, true, 32);
+        AddText(b, ref s, "الاسم بالعربية", _nameAr, v => _nameAr = v, () => _nameAr, !IsEditing, true, 150);
+        AddText(b, ref s, "الاسم بالإنجليزية", _nameEn, v => _nameEn = v, () => _nameEn, !IsEditing, false, 150);
         AddSelect(b, ref s, "التصنيف", _categoryId, v => _categoryId = v, () => _categoryId, CategoryOptions.Where(x => !string.IsNullOrEmpty(x.Value)).ToArray(), true);
         AddSelect(b, ref s, "العلامة التجارية", _brandId, v => _brandId = v, () => _brandId, BrandOptions);
         AddSelect(b, ref s, "نوع المنتج", _productType, v => _productType = v ?? ((int)ProductType.Frame).ToString(), () => _productType, ProductTypeOptions, true);
-        AddText(b, ref s, "الوصف", _description, v => _description = v, () => _description, !IsEditing);
+        AddText(b, ref s, "الوصف", _description, v => _description = v, () => _description, !IsEditing, false, 500);
         AddCheckbox(b, ref s, "صنف مخزني", _isStockItem, v => _isStockItem = v);
         AddActive(b, ref s);
     }
@@ -705,11 +851,11 @@ public partial class ProductsPage
     private void RenderVariantEditor(RenderTreeBuilder b, ref int s)
     {
         AddSelect(b, ref s, "المنتج", _productId, v => _productId = v, () => _productId, ProductOptions, true, _mode != EditorMode.Create);
-        AddText(b, ref s, "SKU", _code, v => _code = v, () => _code, _mode != EditorMode.Create, true);
-        AddText(b, ref s, "الباركود", _barcode, v => _barcode = v, () => _barcode, !IsEditing);
-        AddText(b, ref s, "اسم المتغير", _variantName, v => _variantName = v, () => _variantName, !IsEditing);
-        AddText(b, ref s, "اللون", _color, v => _color = v, () => _color, !IsEditing);
-        AddText(b, ref s, "المقاس", _size, v => _size = v, () => _size, !IsEditing);
+        AddText(b, ref s, "SKU", _code, v => _code = v, () => _code, _mode != EditorMode.Create, true, 64);
+        AddText(b, ref s, "الباركود", _barcode, v => _barcode = v, () => _barcode, !IsEditing, false, 64);
+        AddText(b, ref s, "اسم المتغير", _variantName, v => _variantName = v, () => _variantName, !IsEditing, false, 100);
+        AddText(b, ref s, "اللون", _color, v => _color = v, () => _color, !IsEditing, false, 50);
+        AddText(b, ref s, "المقاس", _size, v => _size = v, () => _size, !IsEditing, false, 50);
         AddSelect(b, ref s, "الوحدة", _unitId, v => _unitId = v, () => _unitId, UnitOptions);
         AddText(b, ref s, "سعر الشراء", _purchasePrice, v => _purchasePrice = v, () => _purchasePrice, !IsEditing, true);
         AddText(b, ref s, "سعر البيع", _sellingPrice, v => _sellingPrice = v, () => _sellingPrice, !IsEditing, true);
@@ -718,13 +864,16 @@ public partial class ProductsPage
 
     private void AddActive(RenderTreeBuilder b, ref int s) => AddCheckbox(b, ref s, "نشط", _isActive, v => _isActive = v, _mode == EditorMode.Create);
 
-    private void AddText(RenderTreeBuilder b, ref int s, string label, string? value, Action<string> changed, Expression<Func<string?>> expression, bool disabled, bool required = false)
+    private void AddText(RenderTreeBuilder b, ref int s, string label, string? value, Action<string> changed, Expression<Func<string?>> expression, bool disabled, bool required = false, int? maxLength = null)
     {
         b.OpenComponent<OAS.UiLib.Components.Inputs.UiInputText>(s++);
         b.AddAttribute(s++, "Label", label); b.AddAttribute(s++, "Value", value ?? string.Empty);
-        b.AddAttribute(s++, "ValueChanged", EventCallback.Factory.Create<string?>(this, v => changed(v ?? string.Empty)));
+        b.AddAttribute(s++, "ValueChanged", EventCallback.Factory.Create<string?>(this, v => SetField(label, () => changed(v ?? string.Empty))));
         b.AddAttribute(s++, "ValueExpression", expression);
         b.AddAttribute(s++, "Disabled", disabled); b.AddAttribute(s++, "Required", required); b.AddAttribute(s++, "Size", ControlSize.Small);
+        b.AddAttribute(s++, "ErrorText", ErrorFor(label));
+        if (!required) b.AddAttribute(s++, "Placeholder", "(اختياري)");
+        if (maxLength.HasValue) b.AddAttribute(s++, "MaxLength", maxLength.Value);
         b.CloseComponent();
     }
 
@@ -732,10 +881,13 @@ public partial class ProductsPage
     {
         b.OpenComponent<OAS.UiLib.Components.Inputs.UiSelect>(s++);
         b.AddAttribute(s++, "Label", label); b.AddAttribute(s++, "Value", value ?? string.Empty);
-        b.AddAttribute(s++, "ValueChanged", EventCallback.Factory.Create<string?>(this, changed));
+        b.AddAttribute(s++, "ValueChanged", EventCallback.Factory.Create<string?>(this, v => SetField(label, () => changed(v))));
         b.AddAttribute(s++, "ValueExpression", expression);
-        b.AddAttribute(s++, "Options", options); b.AddAttribute(s++, "Disabled", !IsEditing || forceDisabled);
+        b.AddAttribute(s++, "Options", options.Where(x => !string.IsNullOrWhiteSpace(x.Value)).ToArray());
+        b.AddAttribute(s++, "Placeholder", required ? "اختر..." : "(اختياري)");
+        b.AddAttribute(s++, "Disabled", !IsEditing || forceDisabled);
         b.AddAttribute(s++, "Required", required); b.AddAttribute(s++, "Size", ControlSize.Small);
+        b.AddAttribute(s++, "ErrorText", ErrorFor(label));
         b.CloseComponent();
     }
 
@@ -758,10 +910,15 @@ public partial class ProductsPage
     private static decimal? ParseNullableDecimal(string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return null;
-        return decimal.TryParse(value, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var parsed) ? parsed : null;
+        return TryParseDecimalInput(value, out var parsed) ? parsed : null;
     }
-    private static bool ValidateOptionalDecimals(params string?[] values) => values.All(value =>
-        string.IsNullOrWhiteSpace(value) || decimal.TryParse(value, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out _));
-    private static string? FormatNullableDecimal(decimal? value) => value?.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    private static bool TryParseDecimalInput(string? value, out decimal parsed)
+    {
+        if (decimal.TryParse(value, NumberStyles.Number, CultureInfo.CurrentCulture, out parsed)) return true;
+        return decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out parsed);
+    }
+
+    private static string? FormatNullableDecimal(decimal? value) => value?.ToString(CultureInfo.InvariantCulture);
     private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
