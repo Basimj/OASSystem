@@ -52,6 +52,7 @@ public static class DependencyInjection
         services.TryAddScoped<IPermissionChecker, DenyAllPermissionChecker>();
         services.TryAddScoped<IAccountingDocumentPostingService, AccountingDocumentPostingService>();
         services.AddInventoryApplication();
+        services.AddScoped<OAS.Application.Accounting.Spreadsheets.AccountingSpreadsheetService>();
         return services;
     }
 

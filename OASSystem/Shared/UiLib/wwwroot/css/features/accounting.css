@@ -1147,3 +1147,9 @@
         font-size: 0.64rem;
     }
 }
+
+.ui-acc-accounts-split { display:grid; grid-template-columns:minmax(220px,28%) minmax(0,1fr); gap:.65rem; align-items:start; }
+.ui-acc-accounts-split__tree,.ui-acc-accounts-split__detail { min-width:0; }
+@media(max-width:960px) { .ui-acc-accounts-split { grid-template-columns:1fr; } }
+
+@media(min-width:1200px){.ui-acc-workspace .ui-workspace-actionbar{flex-wrap:nowrap}.ui-acc-workspace .ui-search-input{min-width:150px;flex:1;max-width:340px}}

@@ -1,0 +1,39 @@
+@namespace OAS.UiLib.Components.Spreadsheets
+@using OAS.UiLib.Components.Employees
+<UiEmployeeModalHost Wide="true" OnClose="@(() => { if (!Busy) return OnClose.InvokeAsync(); return Task.CompletedTask; })">
+<section class="ui-spreadsheet" dir="rtl" aria-label="استيراد Excel">
+    <h2>استيراد Excel — @Title</h2>
+    <p>اختر الملف ثم راجع المعاينة قبل تأكيد الاستيراد. أي خطأ يمنع حفظ الملف بالكامل.</p>
+    <InputFile accept=".xlsx" OnChange="OnFile" disabled="@Busy" />
+    @if(Busy) { <p role="status">جاري معالجة الملف...</p> }
+    @if(Preview is not null)
+    {
+        <p role="status">صالحة: @Preview.ValidRows • تحذيرات: @Preview.WarningRows • غير صالحة: @Preview.InvalidRows</p>
+        @if(Preview.ImportedRecords>0) { <p role="status">تم استيراد @Preview.ImportedRecords سجل بنجاح.</p> }
+        <div class="ui-spreadsheet__preview">
+        <table><thead><tr><th>الورقة</th><th>الصف</th><th>البيانات</th><th>النتيجة</th></tr></thead><tbody>
+        @foreach(var row in Preview.Rows)
+        {
+            <tr><td>@row.Sheet</td><td>@row.RowNumber</td><td>@string.Join(" | ",row.Values.Select(x=>$"{x.Key}: {x.Value}"))</td><td>
+            @if(row.Errors.Count==0) { <span>صالح للاستيراد</span> }
+            @foreach(var error in row.Errors) { <p class="ui-spreadsheet__error">@error</p> }
+            @foreach(var warning in row.Warnings) { <p>@warning</p> }
+            </td></tr>
+        }
+        </tbody></table>
+        </div>
+    }
+    <footer>
+        <UiButton Text="تأكيد الاستيراد" IconCssClass="fa-solid fa-file-import" Size="ControlSize.Small" Disabled="@(Busy || Preview?.CanImport != true || Preview.ImportedRecords>0)" OnClick="@(_ => OnConfirm.InvokeAsync())" />
+        <UiButton Text="إغلاق" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Disabled="Busy" OnClick="@(_ => OnClose.InvokeAsync())" />
+    </footer>
+</section>
+</UiEmployeeModalHost>
+@code {
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public UiSpreadsheetPreview? Preview { get; set; }
+    [Parameter] public EventCallback<InputFileChangeEventArgs> OnFile { get; set; }
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+}

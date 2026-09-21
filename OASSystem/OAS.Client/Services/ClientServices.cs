@@ -36,6 +36,7 @@ public static class ClientServices
         services.AddScoped<OasAuthenticationStateProvider>();
         services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<OasAuthenticationStateProvider>());
         services.AddScoped<IEmployeeClientService, EmployeeClientService>();
+        services.AddScoped<OAS.Client.Accounting.Services.AccountingSpreadsheetClient>();
         services.AddScoped<IEmployeesWorkspaceState, EmployeesWorkspaceState>();
         services.AddScoped<IInventoryClientService, InventoryClientService>();
         services.AddScoped<BrowserFileDownloadService>();

@@ -132,6 +132,12 @@ public sealed class EfUnitOfWork(OasDbContext dbContext) : IUnitOfWork
             return true;
         }
 
+        if (message.Contains("UX_BankAccounts_AccountNumber", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("accounting_bank_account_number_exists", "رقم الحساب البنكي مستخدم مسبقاً.");
+            return true;
+        }
+
         if (message.Contains("UX_BankAccounts_Code", StringComparison.OrdinalIgnoreCase))
         {
             conflict = new ConflictException("accounting_bank_account_code_exists", "A bank account with this code already exists.");

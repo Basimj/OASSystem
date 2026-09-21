@@ -527,7 +527,14 @@ public partial class AccountingWorkspaceHost : IDisposable
         switch (type)
         {
             case AccountingEntityType.Accounts:
-                _accountsPage = await AccountingService.GetAccountsPageAsync(request);
+                var accountRows = new List<AccountDto>();
+                for (var pageNumber = 1; ; pageNumber++)
+                {
+                    var page = await AccountingService.GetAccountsPageAsync(request with { PageNumber = pageNumber, PageSize = PageRequest.MaximumPageSize });
+                    accountRows.AddRange(page.Items);
+                    if (page.Items.Count == 0 || accountRows.Count >= page.TotalCount) break;
+                }
+                _accountsPage = new PagedResult<AccountDto> { Items = accountRows, PageNumber = 1, PageSize = Math.Max(1, accountRows.Count), TotalCount = accountRows.Count };
                 RememberAccountLookups(_accountsPage.Items);
                 break;
             case AccountingEntityType.FiscalYears:

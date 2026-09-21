@@ -1,0 +1,14 @@
+@namespace OAS.UiLib.Components.Spreadsheets
+@if (CanImport)
+{
+    <UiButton Text="استيراد Excel" IconCssClass="fa-solid fa-file-import" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="Busy" OnClick="@(_ => OnImport.InvokeAsync())" />
+    <UiButton Text="تنزيل القالب" IconCssClass="fa-solid fa-download" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="Busy" OnClick="@(_ => OnTemplate.InvokeAsync())" />
+}
+<UiButton Text="تصدير Excel" IconCssClass="fa-solid fa-file-export" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="Busy" OnClick="@(_ => OnExport.InvokeAsync())" />
+@code {
+    [Parameter] public bool CanImport { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public EventCallback OnImport { get; set; }
+    [Parameter] public EventCallback OnTemplate { get; set; }
+    [Parameter] public EventCallback OnExport { get; set; }
+}

@@ -26,6 +26,7 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        services.AddScoped<OAS.Application.Spreadsheets.ISpreadsheetWorkbook, OAS.Infrastructure.Spreadsheets.ClosedXmlSpreadsheetWorkbook>();
         services.Configure<DatabaseProfilesOptions>(
             configuration.GetSection(
                 DatabaseProfilesOptions.SectionName));

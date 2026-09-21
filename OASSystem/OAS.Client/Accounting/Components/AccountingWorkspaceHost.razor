@@ -1,3 +1,4 @@
+@using OAS.UiLib.Components.Spreadsheets
 @namespace OAS.Client.Accounting.Components
 @using OAS.Client.Accounting.Workspace
 @using OAS.Contracts.Accounting.Enums
@@ -53,6 +54,10 @@
                 }
 
                 <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Loading="@_isLoading" OnClick="RefreshActiveAsync" />
+                @if (SpreadsheetSection(Section) is not null)
+                {
+                    <UiSpreadsheetActions CanImport="@SpreadsheetCanImport(Section)" Busy="_spreadsheetBusy" OnImport="@(() => OpenSpreadsheet(Section!.Value))" OnTemplate="@(() => DownloadSpreadsheet(Section!.Value,true))" OnExport="@(() => DownloadSpreadsheet(Section!.Value,false))" />
+                }
                 <UiSearchInput Value="@CurrentSearch"
                                ValueChanged="SetCurrentSearch"
                                OnSearch="OnSearchAsync"
@@ -185,8 +190,8 @@
         }
         else if (Section == AccountingEntityType.Accounts)
         {
-            <div class="ui-acc-accounts-split">
-                <div class="ui-acc-accounts-split__tree">
+            <UiAccountingSplitView>
+                <Tree>
                     <UiAccountingFormSection Title="شجرة الحسابات"
                                              Subtitle="عرض هرمي لكل الحسابات مع التبعية بين الحسابات الأب والفرعية"
                                              IconCssClass="fa-solid fa-folder-tree">
@@ -194,9 +199,9 @@
                                            SelectedAccountId="@SelectedAccountId"
                                            OnSelect="OpenAccountFromTreeAsync" />
                     </UiAccountingFormSection>
-                </div>
+                </Tree>
 
-                <div class="ui-acc-accounts-split__detail">
+                <Detail>
                     @if (activeTab is { IsListTab: false } && activeTab.Model is AccountEditor.FormModel accountModel)
                     {
                         <UiAccountingFormSection Title="بيانات الحساب"
@@ -222,8 +227,8 @@
                                                 Description="من القسم الأيسر افتح أي حساب لعرض بياناته هنا، أو اضغط &quot;جديد&quot; لإنشاء حساب جديد في هذا القسم."
                                                 IconCssClass="fa-solid fa-hand-pointer" />
                     }
-                </div>
-            </div>
+                </Detail>
+            </UiAccountingSplitView>
         }
         else if (activeTab is { IsListTab: false })
         {
@@ -320,6 +325,7 @@
                     <UiPagination PageNumber="@_fiscalYearsPage.PageNumber" TotalPages="@_fiscalYearsPage.TotalPages" TotalCount="@_fiscalYearsPage.TotalCount" OnPrevious="@(() => ChangePageAsync(AccountingEntityType.FiscalYears, -1))" OnNext="@(() => ChangePageAsync(AccountingEntityType.FiscalYears, 1))" />
                 </UiAccountingFormSection>
                 <UiAccountingFormSection Title="الفترات المالية" Subtitle="الفترات وحالات إقفال المبيعات والمخزون والمحاسبة" IconCssClass="fa-solid fa-calendar-week">
+                    <UiWorkspaceActionBar><UiSpreadsheetActions CanImport="false" Busy="_spreadsheetBusy" OnImport="@(() => OpenSpreadsheet(AccountingEntityType.FiscalPeriods))" OnTemplate="@(() => DownloadSpreadsheet(AccountingEntityType.FiscalPeriods,true))" OnExport="@(() => DownloadSpreadsheet(AccountingEntityType.FiscalPeriods,false))" /></UiWorkspaceActionBar>
                     <UiAccountingRecordList Items="@BuildFiscalPeriodItems()" EmptyTitle="لا توجد فترات مالية" OnOpen='@(id => OpenRecordInTab(AccountingEntityType.FiscalPeriods, id, "فترة مالية"))' />
                     <UiPagination PageNumber="@_fiscalPeriodsPage.PageNumber" TotalPages="@_fiscalPeriodsPage.TotalPages" TotalCount="@_fiscalPeriodsPage.TotalCount" OnPrevious="@(() => ChangePageAsync(AccountingEntityType.FiscalPeriods, -1))" OnNext="@(() => ChangePageAsync(AccountingEntityType.FiscalPeriods, 1))" />
                 </UiAccountingFormSection>
@@ -331,6 +337,7 @@
                     <UiPagination PageNumber="@_expensesPage.PageNumber" TotalPages="@_expensesPage.TotalPages" TotalCount="@_expensesPage.TotalCount" OnPrevious="@(() => ChangePageAsync(AccountingEntityType.Expenses, -1))" OnNext="@(() => ChangePageAsync(AccountingEntityType.Expenses, 1))" />
                 </UiAccountingFormSection>
                 <UiAccountingFormSection Title="أنواع المصروفات" Subtitle="التصنيف والحساب الافتراضي لكل نوع" IconCssClass="fa-solid fa-tags">
+                    <UiWorkspaceActionBar><UiSpreadsheetActions CanImport="true" Busy="_spreadsheetBusy" OnImport="@(() => OpenSpreadsheet(AccountingEntityType.ExpenseTypes))" OnTemplate="@(() => DownloadSpreadsheet(AccountingEntityType.ExpenseTypes,true))" OnExport="@(() => DownloadSpreadsheet(AccountingEntityType.ExpenseTypes,false))" /></UiWorkspaceActionBar>
                     <UiAccountingRecordList Items="@BuildExpenseTypeItems()" EmptyTitle="لا توجد أنواع مصروفات" OnOpen='@(id => OpenRecordInTab(AccountingEntityType.ExpenseTypes, id, "نوع مصروف"))' />
                     <UiPagination PageNumber="@_expenseTypesPage.PageNumber" TotalPages="@_expenseTypesPage.TotalPages" TotalCount="@_expenseTypesPage.TotalCount" OnPrevious="@(() => ChangePageAsync(AccountingEntityType.ExpenseTypes, -1))" OnNext="@(() => ChangePageAsync(AccountingEntityType.ExpenseTypes, 1))" />
                 </UiAccountingFormSection>
@@ -349,14 +356,15 @@
                                          Subtitle="التخصيصات المرتبطة بهذا النوع من السندات؛ افتح السجل لتعديل المبلغ المخصص"
                                          IconCssClass="fa-solid fa-link"
                                          Collapsible="true">
+                    <UiWorkspaceActionBar><UiSpreadsheetActions Busy="_spreadsheetBusy" OnExport="@(() => DownloadSpreadsheet(AccountingEntityType.PaymentAllocations,false))" /></UiWorkspaceActionBar>
                     <UiAccountingRecordList Items="@BuildAllocationItems()" EmptyTitle="لا توجد تخصيصات سداد" EmptyDescription="أنشئ تخصيصاً من زر تخصيص دفعة عند الحاجة." OnOpen='@(id => OpenRecordInTab(AccountingEntityType.PaymentAllocations, id, "تخصيص سداد"))' />
                     <UiPagination PageNumber="@_allocationsPage.PageNumber" TotalPages="@_allocationsPage.TotalPages" TotalCount="@_allocationsPage.TotalCount" OnPrevious="@(() => ChangeAllocationPageAsync(-1))" OnNext="@(() => ChangeAllocationPageAsync(1))" />
                 </UiAccountingFormSection>
             }
             else if (Section == AccountingEntityType.Accounts)
             {
-                <div class="ui-acc-accounts-split">
-                    <div class="ui-acc-accounts-split__tree">
+                <UiAccountingSplitView>
+                    <Tree>
                         <UiAccountingFormSection Title="شجرة الحسابات"
                                                  Subtitle="عرض هرمي لكل الحسابات مع إمكانية التوسيع والطي"
                                                  IconCssClass="fa-solid fa-folder-tree">
@@ -364,14 +372,14 @@
                                                SelectedAccountId="@SelectedAccountId"
                                                OnSelect="OpenAccountFromTreeAsync" />
                         </UiAccountingFormSection>
-                    </div>
+                    </Tree>
 
-                    <div class="ui-acc-accounts-split__detail">
+                    <Detail>
                         <UiAccountingEmptyState Title="اختر حساباً أو أنشئ حساباً جديداً"
                                                 Description="اضغط على أي حساب في الشجرة لعرض بياناته هنا، أو استخدم زر جديد لفتح تبويب حساب جديد في القسم الثاني."
                                                 IconCssClass="fa-solid fa-file-circle-plus" />
-                    </div>
-                </div>
+                    </Detail>
+                </UiAccountingSplitView>
             }
             else
             {
@@ -381,3 +389,8 @@
         }
     </Body>
 </UiAccountingWorkspace>
+
+@if (_spreadsheetOpen)
+{
+    <UiSpreadsheetImport Title="@_spreadsheetSection" Busy="_spreadsheetBusy" Preview="SpreadsheetUiPreview" OnFile="PreviewSpreadsheet" OnConfirm="ConfirmSpreadsheet" OnClose="CloseSpreadsheet" />
+}
