@@ -21,10 +21,8 @@ public sealed class PostingProfilesController(ISender sender) : ControllerBase
     [HttpGet]
     public async Task<ActionResult<PagedResult<PostingProfileDto>>> Get(
         [FromQuery] PageRequest request,
-        [FromQuery(Name = "searchTerm")] string? searchTerm,
         CancellationToken cancellationToken)
     {
-        request = AccountingPageRequestCompatibility.Apply(request, searchTerm);
         var result = await sender.Send(new GetPostingProfilesQuery(request), cancellationToken);
         return Ok(result);
     }
@@ -60,13 +58,12 @@ public sealed class PostingProfilesController(ISender sender) : ControllerBase
     }
 
     [HttpPost("{id:guid}/status")]
-    public async Task<ActionResult<PostingProfileDto>> SetStatus(
+    public async Task<IActionResult> SetStatus(
         Guid id,
         [FromBody] SetPostingProfileStatusRequest request,
         CancellationToken cancellationToken)
     {
         await sender.Send(new SetPostingProfileStatusCommand(id, request), cancellationToken);
-        var dto = await sender.Send(new GetPostingProfileByIdQuery(id), cancellationToken);
-        return Ok(dto);
+        return NoContent();
     }
 }

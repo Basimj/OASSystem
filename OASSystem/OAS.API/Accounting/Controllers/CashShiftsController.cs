@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using OAS.Application.Accounting.CashShifts.Commands.ApproveCashShift;
 using OAS.Application.Accounting.CashShifts.Commands.CloseCashShift;
 using OAS.Application.Accounting.CashShifts.Commands.CreateCashShift;
+using OAS.Application.Accounting.CashShifts.Commands.SetCashShiftStatus;
 using OAS.Application.Accounting.CashShifts.Queries.GetCashShiftById;
 using OAS.Application.Accounting.CashShifts.Queries.GetCashShifts;
 using OAS.Contracts.Accounting.CashShifts;
@@ -21,10 +22,8 @@ public sealed class CashShiftsController(ISender sender) : ControllerBase
     [HttpGet]
     public async Task<ActionResult<PagedResult<CashShiftDto>>> Get(
         [FromQuery] PageRequest request,
-        [FromQuery(Name = "searchTerm")] string? searchTerm,
         CancellationToken cancellationToken)
     {
-        request = AccountingPageRequestCompatibility.Apply(request, searchTerm);
         var result = await sender.Send(new GetCashShiftsQuery(request), cancellationToken);
         return Ok(result);
     }
@@ -62,12 +61,23 @@ public sealed class CashShiftsController(ISender sender) : ControllerBase
     [HttpPost("{id:guid}/approve")]
     public async Task<ActionResult<CashShiftDto>> Approve(
         Guid id,
-        [FromQuery] string rowVersion,
+        [FromQuery] string? rowVersion,
+        [FromBody] string? bodyRowVersion,
         CancellationToken cancellationToken)
     {
-        await sender.Send(new ApproveCashShiftCommand(id, rowVersion), cancellationToken);
+        var version = !string.IsNullOrWhiteSpace(rowVersion) ? rowVersion : (bodyRowVersion ?? string.Empty);
+        await sender.Send(new ApproveCashShiftCommand(id, version), cancellationToken);
         var dto = await sender.Send(new GetCashShiftByIdQuery(id), cancellationToken);
         return Ok(dto);
     }
 
+    [HttpPost("{id:guid}/status")]
+    public async Task<IActionResult> SetStatus(
+        Guid id,
+        [FromBody] SetCashShiftStatusRequest request,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new SetCashShiftStatusCommand(id, request), cancellationToken);
+        return NoContent();
+    }
 }

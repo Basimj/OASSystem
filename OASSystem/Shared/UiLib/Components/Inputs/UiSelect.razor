@@ -4,7 +4,7 @@
     {
         <UiTextLabel For="@InputId" Text="@Label" Required="@Required" Size="@Size" />
     }
-    <select id="@InputId" class="@InputCssClass" value="@CurrentValueAsString" disabled="@Disabled" required="@(Required && EnableNativeValidation)" aria-required="@Required.ToString().ToLowerInvariant()" @onchange="HandleChangedAsync">
+    <select id="@InputId" class="@InputCssClass" value="@CurrentValueAsString" disabled="@Disabled" required="@(Required && EnableNativeValidation)" aria-required="@Required.ToString().ToLowerInvariant()" aria-invalid="@AriaInvalid" aria-describedby="@(HasError ? ErrorId : null)" @onchange="HandleChangedAsync">
         @if (!string.IsNullOrWhiteSpace(Placeholder))
         {
             <option value="">@Placeholder</option>
@@ -14,4 +14,8 @@
             <option value="@option.Value">@option.Text</option>
         }
     </select>
+    @if (HasError)
+    {
+        <div id="@ErrorId" class="ui-select__error" role="alert">@ErrorText</div>
+    }
 </div>

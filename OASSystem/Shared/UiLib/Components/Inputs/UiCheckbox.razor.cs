@@ -8,6 +8,7 @@ public partial class UiCheckbox
     [Parameter] public EventCallback<bool> ValueChanged { get; set; }
     [Parameter] public string? Label { get; set; }
     [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string? ErrorText { get; set; }
 
     private Task HandleChangedAsync(ChangeEventArgs args) =>
         ValueChanged.InvokeAsync(args.Value is bool value && value);

@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Linq.Expressions;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using OAS.UiLib.Core.Enums;
@@ -8,71 +7,30 @@ namespace OAS.UiLib.Components.Inputs;
 
 public partial class UiInputDate
 {
-    private readonly string _generatedInputId =
-        $"oas-date-{Guid.NewGuid():N}";
+    [Parameter] public string? Id { get; set; }
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public string? ErrorText { get; set; }
+    [Parameter] public bool Required { get; set; }
+    [Parameter] public bool EnableNativeValidation { get; set; } = true;
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public ControlSize Size { get; set; } = ControlSize.Medium;
 
-    [Parameter]
-    public string? Id { get; set; }
+    private string InputId => string.IsNullOrWhiteSpace(Id) ? $"oas-date-{FieldIdentifier.FieldName}" : Id;
+    private string SizeCss => Size.ToString().ToLowerInvariant();
+    private bool HasError => !string.IsNullOrWhiteSpace(ErrorText);
+    private string ErrorId => $"{InputId}-error";
+    private string? AriaInvalid => HasError ? "true" : null;
+    private string InputCssClass =>
+        $"ui-input-date__control ui-input-date__control--{SizeCss} {(HasError ? "ui-input-date__control--invalid" : null)}".Trim();
 
-    [Parameter]
-    public string? Label { get; set; }
+    private void HandleChange(ChangeEventArgs args) =>
+        CurrentValueAsString = args.Value?.ToString();
 
-    [Parameter]
-    public bool Required { get; set; }
+    protected override string? FormatValueAsString(DateOnly? value) =>
+        value?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
-    [Parameter]
-    public bool EnableNativeValidation { get; set; } = true;
-
-    [Parameter]
-    public bool Disabled { get; set; }
-
-    [Parameter]
-    public bool ReadOnly { get; set; }
-
-    [Parameter]
-    public ControlSize Size { get; set; } =
-        ControlSize.Medium;
-
-    public override Task SetParametersAsync(
-        ParameterView parameters)
-    {
-        if (!parameters.TryGetValue<Expression<Func<DateOnly?>>>(
-                nameof(ValueExpression),
-                out var valueExpression) ||
-            valueExpression is null)
-        {
-            ValueExpression = () => Value;
-        }
-
-        return base.SetParametersAsync(parameters);
-    }
-
-    private string InputId =>
-        string.IsNullOrWhiteSpace(Id)
-            ? _generatedInputId
-            : Id;
-
-    private string SizeCss =>
-        Size.ToString().ToLowerInvariant();
-
-    private void HandleChange(ChangeEventArgs args)
-    {
-        CurrentValueAsString =
-            args.Value?.ToString();
-    }
-
-    protected override string? FormatValueAsString(
-        DateOnly? value)
-    {
-        return value?.ToString(
-            "yyyy-MM-dd",
-            CultureInfo.InvariantCulture);
-    }
-
-    protected override bool TryParseValueFromString(
-        string? value,
-        out DateOnly? result,
-        out string validationErrorMessage)
+    protected override bool TryParseValueFromString(string? value, out DateOnly? result, out string validationErrorMessage)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -81,12 +39,7 @@ public partial class UiInputDate
             return true;
         }
 
-        if (DateOnly.TryParseExact(
-                value,
-                "yyyy-MM-dd",
-                CultureInfo.InvariantCulture,
-                DateTimeStyles.None,
-                out var parsed))
+        if (DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
         {
             result = parsed;
             validationErrorMessage = string.Empty;
@@ -94,9 +47,7 @@ public partial class UiInputDate
         }
 
         result = null;
-        validationErrorMessage =
-            "قيمة التاريخ غير صحيحة.";
-
+        validationErrorMessage = "قيمة التاريخ غير صحيحة.";
         return false;
     }
 }

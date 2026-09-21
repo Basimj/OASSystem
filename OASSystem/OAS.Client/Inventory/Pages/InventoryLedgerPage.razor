@@ -19,14 +19,14 @@
                 <UiButton Text="إلغاء التصفية المرتبطة" IconCssClass="fa-solid fa-filter-circle-xmark" Variant="ButtonVariant.Ghost"
                           Size="ControlSize.Small" OnClick="ClearLinkedFilterAsync" />
             }
-            <UiSearchInput @bind-Value="_search" Placeholder="ابحث برقم الحركة أو المنتج أو SKU..."
+            <UiSearchInput @bind-Value="_search" Placeholder="ابحث برقم الحركة أو المنتج أو SKU أو Barcode..."
                            AriaLabel="البحث في حركات المخزون" ClearText="مسح البحث"
                            DebounceMilliseconds="250" OnSearch="SearchChangedAsync" />
         </UiWorkspaceActionBar>
     </Actions>
 
     <Filters>
-        <div class="inventory-ledger__filters">
+        <UiWorkspaceFilterBar Compact="true">
             <UiSelect Label="المخزن"
                       Value="@_warehouseFilter"
                       ValueExpression="@(() => _warehouseFilter)"
@@ -42,70 +42,58 @@
             <UiInputDate Label="من تاريخ"
                          Value="@_fromDate"
                          ValueExpression="@(() => _fromDate)"
-                         ValueChanged="@(v => _fromDate = v)"
+                         ValueChanged="FromDateChanged"
+                         ErrorText="@_dateFilterError"
                          Size="ControlSize.Small" />
             <UiInputDate Label="إلى تاريخ"
                          Value="@_toDate"
                          ValueExpression="@(() => _toDate)"
-                         ValueChanged="@(v => _toDate = v)"
+                         ValueChanged="ToDateChanged"
+                         ErrorText="@_dateFilterError"
                          Size="ControlSize.Small" />
-        </div>
+        </UiWorkspaceFilterBar>
     </Filters>
 
     <Content>
         <UiDataGridPanel Title="حركات المخزون" Subtitle="@($"{FilteredEntries.Count} حركة")">
-            <Header>
-                <div class="inventory-ledger__header">
-                    <span>التاريخ</span>
-                    <span>رقم الحركة</span>
-                    <span>النوع</span>
-                    <span>المنتج / SKU</span>
-                    <span>المخزن</span>
-                    <span>داخل</span>
-                    <span>خارج</span>
-                    <span>الرصيد</span>
-                    <span>التكلفة</span>
-                    <span>متوسط التكلفة</span>
-                    <span>القيمة</span>
-                    <span>المصدر</span>
-                    <span>إجراءات</span>
-                </div>
-            </Header>
             <Body>
                 @if (_loading)
                 {
                     <UiAlert Message="جاري تحميل حركات المخزون..." />
                 }
-                else if (FilteredEntries.Count == 0)
+                else if (!string.IsNullOrWhiteSpace(_dateFilterError))
                 {
-                    <UiAlert Message="لا توجد حركات مطابقة للفلاتر الحالية." />
+                    <UiAlert Message="نطاق التاريخ غير صحيح. راجع حقلي من تاريخ وإلى تاريخ." />
                 }
                 else
                 {
-                    <div class="inventory-ledger__rows">
-                        @foreach (var entry in FilteredEntries)
-                        {
-                            var transaction = Transaction(entry.TransactionId);
-                            <div class="inventory-ledger__row">
-                                <span>@entry.MovementDate.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</span>
-                                <strong>@(transaction?.TransactionNumber ?? entry.SequenceNumber.ToString())</strong>
-                                <span>@InventoryArabicPresenter.MovementTypeText(entry.MovementType)</span>
-                                <div class="inventory-ledger__product"><strong>@VariantLabel(entry.ProductVariantId)</strong><span>@VariantSku(entry.ProductVariantId)</span></div>
-                                <span>@WarehouseName(entry.WarehouseId)</span>
-                                <span>@entry.QuantityIn.ToString("N2")</span>
-                                <span>@entry.QuantityOut.ToString("N2")</span>
-                                <strong>@entry.BalanceAfter.ToString("N2")</strong>
-                                <span>@entry.UnitCost.ToString("N2")</span>
-                                <span>@entry.AverageCostAfter.ToString("N2")</span>
-                                <strong>@entry.InventoryValueAfter.ToString("N2")</strong>
-                                <span>@SourceText(transaction)</span>
+                    <UiDataTable TItem="InventoryLedgerDto" Items="@FilteredEntries" Headers="@LedgerHeaders" EmptyText="لا توجد حركات مطابقة للفلاتر الحالية."
+                                 SidebarTypography="true"
+                                 UniformCellTypography="true" Compact="true">
+                        <RowTemplate Context="entry">
+                            <td>@entry.MovementDate.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                            <td>@TransactionNumber(entry)</td>
+                            <td>@InventoryArabicPresenter.MovementTypeText(entry.MovementType)</td>
+                            <td>
+                                @VariantLabel(entry.ProductVariantId)<br />
+                                <UiTextLabel Text="@VariantSku(entry.ProductVariantId)" Size="ControlSize.Small" Tone="TextTone.Muted" />
+                            </td>
+                            <td>@WarehouseName(entry.WarehouseId)</td>
+                            <td>@entry.QuantityIn.ToString("N3")</td>
+                            <td>@entry.QuantityOut.ToString("N3")</td>
+                            <td>@entry.BalanceAfter.ToString("N3")</td>
+                            <td>@entry.UnitCost.ToString("N2")</td>
+                            <td>@entry.AverageCostAfter.ToString("N2")</td>
+                            <td>@entry.InventoryValueAfter.ToString("N2")</td>
+                            <td>@SourceText(Transaction(entry.TransactionId))</td>
+                            <td>
                                 <div class="inventory-ledger__actions">
-                                    <button type="button" @onclick="() => OpenTransaction(entry.TransactionId)">الحركة</button>
-                                    <button type="button" @onclick="() => OpenProduct(entry.ProductVariantId)">الصنف</button>
+                                    <UiButton Text="الحركة" IconCssClass="fa-solid fa-arrow-right-arrow-left" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="@(_ => OpenTransaction(entry.TransactionId))" />
+                                    <UiButton Text="الصنف" IconCssClass="fa-solid fa-box" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="@(_ => OpenProduct(entry.ProductVariantId))" />
                                 </div>
-                            </div>
-                        }
-                    </div>
+                            </td>
+                        </RowTemplate>
+                    </UiDataTable>
                 }
             </Body>
         </UiDataGridPanel>
@@ -124,6 +112,7 @@
     public Guid? TransactionIdFromQuery { get; set; }
 
     private IReadOnlyList<InventoryLedgerDto> _entries = [];
+    private static readonly IReadOnlyList<string> LedgerHeaders = ["التاريخ", "رقم الحركة", "النوع", "المنتج / SKU", "المخزن", "داخل", "خارج", "الرصيد", "التكلفة", "متوسط التكلفة", "القيمة", "المصدر", "إجراءات"];
     private IReadOnlyList<InventoryTransactionDto> _transactions = [];
     private IReadOnlyList<WarehouseDto> _warehouses = [];
     private IReadOnlyList<ProductDto> _products = [];
@@ -134,26 +123,31 @@
     private string? _movementFilter;
     private DateOnly? _fromDate;
     private DateOnly? _toDate;
+    private string? _dateFilterError;
 
     private IReadOnlyList<UiSelectOption> WarehouseFilterOptions =>
-        [new UiSelectOption(string.Empty, "كل المخازن"), .. _warehouses.Select(x => new UiSelectOption(x.Id.ToString("D"), x.NameAr))];
+        [new UiSelectOption(string.Empty, "كل المخازن"), .. _warehouses.Select(x => new UiSelectOption(x.Id.ToString("D"), x.IsActive ? x.NameAr : $"{x.NameAr} (غير نشط)"))];
 
-    private IReadOnlyList<InventoryLedgerDto> FilteredEntries => _entries.Where(x =>
-    {
-        if (Guid.TryParse(_warehouseFilter, out var warehouseId) && x.WarehouseId != warehouseId) return false;
-        if (int.TryParse(_movementFilter, out var movement) && (int)x.MovementType != movement) return false;
-        var date = DateOnly.FromDateTime(x.MovementDate.ToLocalTime().DateTime);
-        if (_fromDate.HasValue && date < _fromDate.Value) return false;
-        if (_toDate.HasValue && date > _toDate.Value) return false;
-        if (string.IsNullOrWhiteSpace(_search)) return true;
-        var transaction = Transaction(x.TransactionId);
-        return Match(_search,
-            transaction?.TransactionNumber,
-            VariantLabel(x.ProductVariantId),
-            VariantSku(x.ProductVariantId),
-            WarehouseName(x.WarehouseId),
-            SourceText(transaction));
-    }).OrderByDescending(x => x.SequenceNumber).ToArray();
+    private IReadOnlyList<InventoryLedgerDto> FilteredEntries => string.IsNullOrWhiteSpace(_dateFilterError)
+        ? _entries.Where(x =>
+        {
+            if (Guid.TryParse(_warehouseFilter, out var warehouseId) && x.WarehouseId != warehouseId) return false;
+            if (int.TryParse(_movementFilter, out var movement) && (int)x.MovementType != movement) return false;
+            var date = DateOnly.FromDateTime(x.MovementDate.ToLocalTime().DateTime);
+            if (_fromDate.HasValue && date < _fromDate.Value) return false;
+            if (_toDate.HasValue && date > _toDate.Value) return false;
+            if (string.IsNullOrWhiteSpace(_search)) return true;
+            var transaction = Transaction(x.TransactionId);
+            return Match(_search,
+                transaction?.TransactionNumber,
+                VariantLabel(x.ProductVariantId),
+                VariantSku(x.ProductVariantId),
+                VariantBarcode(x.ProductVariantId),
+                ProductCode(x.ProductVariantId),
+                WarehouseName(x.WarehouseId),
+                SourceText(transaction));
+        }).OrderByDescending(x => x.SequenceNumber).ToArray()
+        : [];
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -162,22 +156,29 @@
         _loading = true;
         try
         {
-            var page = new PageRequest { PageNumber = 1, PageSize = PageRequest.MaximumPageSize };
-            var entriesTask = Inventory.GetInventoryLedgerAsync(page, productVariantId: VariantIdFromQuery, transactionId: TransactionIdFromQuery);
-            var transactionsTask = Inventory.GetInventoryTransactionsAsync(page);
-            var warehousesTask = Inventory.GetWarehousesAsync(page);
-            var productsTask = Inventory.GetProductsAsync(page);
-            var variantsTask = Inventory.GetProductVariantsAsync(page);
+            var entriesTask = LoadAllPagesAsync(page => Inventory.GetInventoryLedgerAsync(
+                page,
+                productVariantId: VariantIdFromQuery,
+                transactionId: TransactionIdFromQuery));
+            var transactionsTask = LoadAllPagesAsync(page => Inventory.GetInventoryTransactionsAsync(page));
+            var warehousesTask = LoadAllPagesAsync(page => Inventory.GetWarehousesAsync(page));
+            var productsTask = LoadAllPagesAsync(page => Inventory.GetProductsAsync(page));
+            var variantsTask = LoadAllPagesAsync(page => Inventory.GetProductVariantsAsync(page));
+
             await Task.WhenAll(entriesTask, transactionsTask, warehousesTask, productsTask, variantsTask);
-            _entries = entriesTask.Result.Items;
-            _transactions = transactionsTask.Result.Items;
-            _warehouses = warehousesTask.Result.Items;
-            _products = productsTask.Result.Items;
-            _variants = variantsTask.Result.Items;
+            _entries = entriesTask.Result;
+            _transactions = transactionsTask.Result;
+            _warehouses = warehousesTask.Result;
+            _products = productsTask.Result;
+            _variants = variantsTask.Result;
         }
         catch (ApiClientException ex)
         {
             ApiFeedback.Show(ex.Error);
+        }
+        catch (Exception)
+        {
+            ApiFeedback.ShowUnexpected();
         }
         finally
         {
@@ -185,8 +186,51 @@
         }
     }
 
+    private static async Task<IReadOnlyList<T>> LoadAllPagesAsync<T>(Func<PageRequest, Task<PagedResult<T>>> loader)
+    {
+        var items = new List<T>();
+        var pageNumber = 1;
+
+        while (true)
+        {
+            var result = await loader(new PageRequest
+            {
+                PageNumber = pageNumber,
+                PageSize = PageRequest.MaximumPageSize
+            });
+
+            items.AddRange(result.Items);
+            if (!result.HasNextPage) break;
+            pageNumber++;
+        }
+
+        return items;
+    }
+
     private Task RefreshAsync(MouseEventArgs args) => LoadAsync();
-    private Task SearchChangedAsync(string? _) => Task.CompletedTask;
+    private Task SearchChangedAsync(string? search) => Task.CompletedTask;
+
+    private Task FromDateChanged(DateOnly? value)
+    {
+        _fromDate = value;
+        ValidateDateRange();
+        return Task.CompletedTask;
+    }
+
+    private Task ToDateChanged(DateOnly? value)
+    {
+        _toDate = value;
+        ValidateDateRange();
+        return Task.CompletedTask;
+    }
+
+    private void ValidateDateRange()
+    {
+        _dateFilterError = _fromDate.HasValue && _toDate.HasValue && _fromDate.Value > _toDate.Value
+            ? "يجب أن يكون من تاريخ أقدم من أو مساويًا إلى تاريخ."
+            : null;
+    }
+
     private async Task ClearLinkedFilterAsync(MouseEventArgs args)
     {
         VariantIdFromQuery = null;
@@ -196,11 +240,31 @@
     }
 
     private InventoryTransactionDto? Transaction(Guid id) => _transactions.FirstOrDefault(x => x.Id == id);
+    private string TransactionNumber(InventoryLedgerDto entry) => Transaction(entry.TransactionId)?.TransactionNumber ?? entry.SequenceNumber.ToString();
     private ProductVariantDto? Variant(Guid id) => _variants.FirstOrDefault(x => x.Id == id);
-    private string WarehouseName(Guid id) => _warehouses.FirstOrDefault(x => x.Id == id)?.NameAr ?? "—";
+    private ProductDto? ProductForVariant(Guid variantId)
+    {
+        var variant = Variant(variantId);
+        return variant is null ? null : _products.FirstOrDefault(x => x.Id == variant.ProductId);
+    }
+
+    private string WarehouseName(Guid id)
+    {
+        var warehouse = _warehouses.FirstOrDefault(x => x.Id == id);
+        return warehouse is null ? "—" : warehouse.IsActive ? warehouse.NameAr : $"{warehouse.NameAr} (غير نشط)";
+    }
+
     private string ProductName(Guid id) => _products.FirstOrDefault(x => x.Id == id)?.NameAr ?? "—";
-    private string VariantLabel(Guid id) { var v = Variant(id); return v is null ? "—" : $"{ProductName(v.ProductId)}{(string.IsNullOrWhiteSpace(v.VariantName) ? string.Empty : $" - {v.VariantName}")}"; }
+    private string ProductCode(Guid variantId) => ProductForVariant(variantId)?.ProductCode ?? "—";
+    private string VariantLabel(Guid id)
+    {
+        var v = Variant(id);
+        return v is null ? "—" : $"{ProductName(v.ProductId)}{(string.IsNullOrWhiteSpace(v.VariantName) ? string.Empty : $" - {v.VariantName}")}";
+    }
+
     private string VariantSku(Guid id) => Variant(id)?.SKU ?? "—";
+    private string VariantBarcode(Guid id) => Variant(id)?.Barcode ?? "—";
+
     private static string SourceText(InventoryTransactionDto? transaction) => transaction is null
         ? "—"
         : string.IsNullOrWhiteSpace(transaction.ReferenceType)

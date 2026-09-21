@@ -4,3 +4,6 @@
 .ui-select__control--medium { min-height: var(--oas-control-md); padding-inline: var(--oas-space-3); font-size: var(--oas-font-md); }
 .ui-select__control--large { min-height: var(--oas-control-lg); padding-inline: var(--oas-space-4); font-size: var(--oas-font-lg); }
 .ui-select__control:focus { border-color: var(--oas-color-primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--oas-color-primary) 18%, transparent); }
+
+.ui-select__control--invalid { border-color: var(--oas-color-danger); box-shadow: 0 0 0 2px color-mix(in srgb, var(--oas-color-danger) 18%, transparent); }
+.ui-select__error { color: var(--oas-color-danger); font-size: var(--oas-font-sm); line-height: 1.35; }

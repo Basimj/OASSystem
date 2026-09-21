@@ -25,7 +25,14 @@ public sealed class CompleteStockCountCommandHandler(
         if (stockCount.Status != StockCountStatus.Counting)
             throw new ConflictException("invalid_status_transition", $"Cannot complete stock count from status '{stockCount.Status}'.");
 
-        var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
+        var lines = await stockCountRepository.GetLinesAsync(command.StockCountId, cancellationToken);
+        if (lines.Count == 0)
+            throw new ConflictException("stock_count_has_no_lines", "Cannot complete a stock count without lines.");
+
+        if (lines.Any(x => !x.CountedAtUtc.HasValue))
+            throw new ConflictException("stock_count_incomplete_lines", "All stock count lines must be counted before completion.");
+
+        var nowUtc = timeProvider.GetUtcNow();
         stockCount.Complete(nowUtc);
         stockCountRepository.Update(stockCount);
 

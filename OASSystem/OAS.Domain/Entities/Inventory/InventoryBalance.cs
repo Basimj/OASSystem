@@ -67,7 +67,7 @@ public class InventoryBalance : AuditableEntity<Guid>
             else
             {
                 var newTotalValue = Math.Max(0, oldInventoryValue) + incomingValue;
-                AverageUnitCost = Math.Round(newTotalValue / OnHandQuantity, 4);
+                AverageUnitCost = Math.Round(newTotalValue / OnHandQuantity, 2);
                 InventoryValue = Math.Round(OnHandQuantity * AverageUnitCost, 2);
             }
         }

@@ -9,9 +9,9 @@ public sealed class UpdateProductCategoryRequestValidator : AbstractValidator<Up
     {
         RuleFor(x => x.NameAr)
             .NotEmpty().WithErrorCode("category_name_ar_required")
-            .MaximumLength(150).WithErrorCode("category_name_ar_max_length");
+            .MaximumLength(100).WithErrorCode("category_name_ar_max_length");
 
         RuleFor(x => x.NameEn)
-            .MaximumLength(150).WithErrorCode("category_name_en_max_length");
+            .MaximumLength(100).WithErrorCode("category_name_en_max_length");
     }
 }

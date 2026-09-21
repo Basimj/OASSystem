@@ -1,4 +1,4 @@
-<?xml version='1.0' encoding='utf-8'?>
+﻿<?xml version='1.0' encoding='utf-8'?>
 <root>
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
@@ -740,5 +740,123 @@
   </data>
   <data name="employee_image_type_invalid" xml:space="preserve">
     <value>يجب أن تكون صورة الموظف بصيغة JPEG أو PNG أو WebP.</value>
+  </data>
+
+  <data name="transaction_number_too_long" xml:space="preserve">
+    <value>رقم العملية أطول من الحد المسموح.</value>
+  </data>
+  <data name="transaction_type_invalid" xml:space="preserve">
+    <value>نوع عملية المخزون غير صحيح.</value>
+  </data>
+  <data name="transaction_date_required" xml:space="preserve">
+    <value>تاريخ العملية مطلوب.</value>
+  </data>
+  <data name="transaction_reference_type_too_long" xml:space="preserve">
+    <value>نوع المرجع أطول من الحد المسموح.</value>
+  </data>
+  <data name="transaction_reason_too_long" xml:space="preserve">
+    <value>سبب العملية أطول من الحد المسموح.</value>
+  </data>
+  <data name="transaction_notes_too_long" xml:space="preserve">
+    <value>ملاحظات العملية أطول من الحد المسموح.</value>
+  </data>
+  <data name="transaction_lines_required" xml:space="preserve">
+    <value>يجب إضافة صنف واحد على الأقل إلى العملية.</value>
+  </data>
+  <data name="transaction_duplicate_variant_lines" xml:space="preserve">
+    <value>لا يمكن تكرار الصنف نفسه في أكثر من بند داخل العملية.</value>
+  </data>
+  <data name="product_variant_id_required" xml:space="preserve">
+    <value>الصنف مطلوب.</value>
+  </data>
+  <data name="line_quantity_must_be_positive" xml:space="preserve">
+    <value>يجب أن تكون كمية البند أكبر من صفر.</value>
+  </data>
+  <data name="line_quantity_precision_invalid" xml:space="preserve">
+    <value>صيغة كمية البند لا تطابق الدقة المسموحة.</value>
+  </data>
+  <data name="line_unit_cost_invalid" xml:space="preserve">
+    <value>تكلفة الوحدة غير صحيحة.</value>
+  </data>
+  <data name="line_unit_cost_precision_invalid" xml:space="preserve">
+    <value>صيغة تكلفة الوحدة لا تطابق الدقة المسموحة.</value>
+  </data>
+  <data name="line_notes_too_long" xml:space="preserve">
+    <value>ملاحظات البند أطول من الحد المسموح.</value>
+  </data>
+  <data name="line_total_cost_precision_invalid" xml:space="preserve">
+    <value>إجمالي البند أكبر من الحد الذي تسمح به قاعدة البيانات.</value>
+  </data>
+  <data name="destination_warehouse_required" xml:space="preserve">
+    <value>المخزن الوجهة مطلوب لهذه العملية.</value>
+  </data>
+  <data name="source_warehouse_required" xml:space="preserve">
+    <value>المخزن المصدر مطلوب لهذه العملية.</value>
+  </data>
+  <data name="transfer_warehouses_must_differ" xml:space="preserve">
+    <value>يجب أن يختلف مخزن المصدر عن مخزن الوجهة.</value>
+  </data>
+  <data name="adjustment_reason_required" xml:space="preserve">
+    <value>سبب التعديل مطلوب.</value>
+  </data>
+  <data name="transaction_already_posted" xml:space="preserve">
+    <value>تم ترحيل هذه العملية مسبقًا.</value>
+  </data>
+  <data name="transaction_has_no_lines" xml:space="preserve">
+    <value>لا يمكن ترحيل عملية لا تحتوي على بنود.</value>
+  </data>
+  <data name="insufficient_stock" xml:space="preserve">
+    <value>الرصيد المتاح غير كافٍ لإتمام عملية الصرف.</value>
+  </data>
+  <data name="stock_count_number_too_long" xml:space="preserve">
+    <value>رقم الجرد أطول من الحد المسموح.</value>
+  </data>
+  <data name="warehouse_id_required" xml:space="preserve">
+    <value>المخزن مطلوب.</value>
+  </data>
+  <data name="count_date_required" xml:space="preserve">
+    <value>تاريخ الجرد مطلوب.</value>
+  </data>
+  <data name="stock_count_notes_max_length" xml:space="preserve">
+    <value>ملاحظات الجرد يجب ألا تتجاوز 500 حرف.</value>
+  </data>
+  <data name="counted_quantity_invalid" xml:space="preserve">
+    <value>الكمية الفعلية يجب أن تكون صفرًا أو أكبر.</value>
+  </data>
+  <data name="counted_quantity_precision_invalid" xml:space="preserve">
+    <value>الكمية الفعلية تسمح بحد أقصى 3 منازل عشرية و15 رقمًا قبل الفاصلة.</value>
+  </data>
+  <data name="counted_by_too_long" xml:space="preserve">
+    <value>معرّف منفذ العد أطول من الحد المسموح.</value>
+  </data>
+  <data name="stock_count_warehouse_inactive" xml:space="preserve">
+    <value>لا يمكن إنشاء جرد لمخزن غير نشط.</value>
+  </data>
+  <data name="stock_count_open_exists" xml:space="preserve">
+    <value>يوجد جرد مفتوح لهذا المخزن بالفعل.</value>
+  </data>
+  <data name="stock_count_number_exists" xml:space="preserve">
+    <value>يوجد جرد آخر بنفس الرقم.</value>
+  </data>
+  <data name="stock_count_warehouse_has_no_balance" xml:space="preserve">
+    <value>لا توجد أرصدة في هذا المخزن لإنشاء بنود الجرد.</value>
+  </data>
+  <data name="stock_count_has_no_lines" xml:space="preserve">
+    <value>لا يمكن تنفيذ العملية على جرد لا يحتوي على أصناف.</value>
+  </data>
+  <data name="stock_count_incomplete_lines" xml:space="preserve">
+    <value>يجب تسجيل الكمية الفعلية لجميع الأصناف قبل متابعة دورة الجرد.</value>
+  </data>
+  <data name="invalid_status_for_counting" xml:space="preserve">
+    <value>لا يمكن تسجيل العد في الحالة الحالية للجرد.</value>
+  </data>
+  <data name="cannot_cancel_posted_count" xml:space="preserve">
+    <value>لا يمكن إلغاء جرد تم ترحيله.</value>
+  </data>
+  <data name="invalid_status_transition" xml:space="preserve">
+    <value>لا يمكن تنفيذ هذه الخطوة من الحالة الحالية.</value>
+  </data>
+  <data name="stock_count_already_cancelled" xml:space="preserve">
+    <value>تم إلغاء هذا الجرد مسبقًا.</value>
   </data>
 </root>

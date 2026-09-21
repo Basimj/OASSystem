@@ -22,10 +22,8 @@ public sealed class FiscalPeriodsController(ISender sender) : ControllerBase
     [HttpGet]
     public async Task<ActionResult<PagedResult<FiscalPeriodDto>>> Get(
         [FromQuery] PageRequest request,
-        [FromQuery(Name = "searchTerm")] string? searchTerm,
         CancellationToken cancellationToken)
     {
-        request = AccountingPageRequestCompatibility.Apply(request, searchTerm);
         var result = await sender.Send(new GetFiscalPeriodsQuery(request), cancellationToken);
         return Ok(result);
     }
@@ -61,14 +59,13 @@ public sealed class FiscalPeriodsController(ISender sender) : ControllerBase
     }
 
     [HttpPost("{id:guid}/status")]
-    public async Task<ActionResult<FiscalPeriodDto>> SetStatus(
+    public async Task<IActionResult> SetStatus(
         Guid id,
         [FromBody] SetFiscalPeriodStatusRequest request,
         CancellationToken cancellationToken)
     {
         await sender.Send(new SetFiscalPeriodStatusCommand(id, request), cancellationToken);
-        var dto = await sender.Send(new GetFiscalPeriodByIdQuery(id), cancellationToken);
-        return Ok(dto);
+        return NoContent();
     }
 
     [HttpPost("{id:guid}/locks")]

@@ -7,30 +7,13 @@
 @using OAS.UiLib.Components.Inputs
 @using OAS.UiLib.Core.Models
 
-<UiAccountingEditorSurface>
-
-    @if (!IsNew)
-    {
-        <UiAccountingFormSection Title="حالة القيد"
-                                 Subtitle="حالة دورة الاعتماد والترحيل وعلاقة القيد العكسي"
-                                 IconCssClass="fa-solid fa-circle-check">
-            <UiAccountingStatusActionBar Label="الحالة الحالية"
-                                         StatusText="@AccountingArabicPresenter.GetJournalStatusText(Model.Status)"
-                                         StatusState="@Model.Status.ToString().ToLowerInvariant()" />
-            @if (Model.ReversedJournalId.HasValue)
-            {
-                <UiAccountingReadOnlyValue Label="القيد المرتبط بالعكس"
-                                           Value='@Model.ReversedJournalId.Value.ToString("D")'
-                                           Tone="@UiAccountingReadOnlyValue.ValueTone.Primary" />
-            }
-        </UiAccountingFormSection>
-    }
+<div class="ui-acc-editor" dir="rtl">
 
     <UiAccountingFormSection Title="ترويسة وبيانات القيد"
                              Subtitle="نوع القيد، التواريخ، والبيان العام"
                              IconCssClass="fa-solid fa-file-invoice">
 
-        <UiAccountingFormGrid Columns="3">
+        <div class="ui-acc-form-grid ui-acc-form-grid--3col">
 
             <UiInputText Label="رقم القيد"
                          Value="@Model.JournalNumber"
@@ -49,7 +32,7 @@
                       Size="ControlSize.Small" />
 
             <UiLookup Label="الفترة المالية"
-                      Value='@Model.FiscalPeriodId?.ToString("D")'
+                      Value="@Model.FiscalPeriodId?.ToString("D")"
                       ValueChanged="OnPeriodChanged"
                       SelectedItem="@FiscalPeriodLookupItem"
                       SearchAsync="FiscalPeriodSearchAsync"
@@ -74,9 +57,17 @@
                          Disabled="@(!IsEditable)"
                          Size="ControlSize.Small" />
 
-        </UiAccountingFormGrid>
+            <UiInputText Label="الرقم المرجعي (اختياري)"
+                         Value="@Model.ReferenceNumber"
+                         ValueExpression="@(() => Model.ReferenceNumber)"
+                         ValueChanged="OnReferenceNumberChanged"
+                         Disabled="@(!IsEditable)"
+                         Placeholder="رقم الشيك أو الإشعار..."
+                         Size="ControlSize.Small" />
 
-        <UiAccountingStack>
+        </div>
+
+        <div class="mt-3">
 
             <UiInputText Label="البيان العام للقيد"
                          Value="@Model.Description"
@@ -86,23 +77,10 @@
                          Disabled="@(!IsEditable)"
                          Placeholder="شرح وافٍ عن طبيعة القيد والعملية المالية..." />
 
-        </UiAccountingStack>
+        </div>
 
     </UiAccountingFormSection>
 
-
-    @if (!IsNew && (!string.IsNullOrWhiteSpace(Model.SourceModule) || !string.IsNullOrWhiteSpace(Model.SourceDocumentType) || Model.SourceDocumentId.HasValue))
-    {
-        <UiAccountingFormSection Title="مرجع العملية المصدر"
-                                 Subtitle="بيانات الربط بالمستند الذي أنشأ القيد تلقائياً"
-                                 IconCssClass="fa-solid fa-link">
-            <UiAccountingFormGrid Columns="3">
-                <UiAccountingReadOnlyValue Label="الوحدة المصدر" Value="@SourceModuleText" />
-                <UiAccountingReadOnlyValue Label="نوع المستند" Value="@SourceDocumentTypeText" />
-                <UiAccountingReadOnlyValue Label="معرف المستند" Value="@SourceDocumentIdText" Tone="@UiAccountingReadOnlyValue.ValueTone.Primary" />
-            </UiAccountingFormGrid>
-        </UiAccountingFormSection>
-    }
 
     <UiAccountingFormSection Title="أسطر القيد اليومي (الحسابات والمدين والدائن)"
                              Subtitle="إدخال الحسابات المحاسبية ومراكز التكلفة والمبالغ المتوازنة"
@@ -116,7 +94,7 @@
 
     </UiAccountingFormSection>
 
-</UiAccountingEditorSurface>
+</div>
 
 
 @code {
@@ -180,17 +158,10 @@
         public string Description { get; set; }
             = string.Empty;
 
-        // Preserve source references when editing an automatic/source journal.
-        public string? SourceModule { get; set; }
-        public string? SourceDocumentType { get; set; }
-        public Guid? SourceDocumentId { get; set; }
+        public string? ReferenceNumber { get; set; }
 
         public JournalEntryStatus Status { get; set; }
             = JournalEntryStatus.Draft;
-
-        public Guid? ReversedJournalId { get; set; }
-
-        public string RowVersion { get; set; } = string.Empty;
 
         public List<UiJournalLinesEditor.EditableJournalLine> Lines { get; set; }
             = [];
@@ -243,10 +214,6 @@
     [Parameter]
     public EventCallback OnModelChanged { get; set; }
 
-
-    private string SourceModuleText => Model.SourceModule ?? "-";
-    private string SourceDocumentTypeText => Model.SourceDocumentType ?? "-";
-    private string SourceDocumentIdText => Model.SourceDocumentId?.ToString("D") ?? "-";
 
     private Task OnChanged()
         => OnModelChanged.InvokeAsync();
@@ -302,6 +269,14 @@
                 out var id)
                 ? id
                 : null;
+
+        await OnChanged();
+    }
+
+
+    private async Task OnReferenceNumberChanged(string? value)
+    {
+        Model.ReferenceNumber = value;
 
         await OnChanged();
     }

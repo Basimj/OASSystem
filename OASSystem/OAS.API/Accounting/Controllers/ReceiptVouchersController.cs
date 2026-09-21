@@ -21,10 +21,8 @@ public sealed class ReceiptVouchersController(ISender sender) : ControllerBase
     [HttpGet]
     public async Task<ActionResult<PagedResult<ReceiptVoucherDto>>> Get(
         [FromQuery] PageRequest request,
-        [FromQuery(Name = "searchTerm")] string? searchTerm,
         CancellationToken cancellationToken)
     {
-        request = AccountingPageRequestCompatibility.Apply(request, searchTerm);
         var result = await sender.Send(new GetReceiptVouchersQuery(request), cancellationToken);
         return Ok(result);
     }
@@ -60,13 +58,12 @@ public sealed class ReceiptVouchersController(ISender sender) : ControllerBase
     }
 
     [HttpPost("{id:guid}/status")]
-    public async Task<ActionResult<ReceiptVoucherDto>> SetStatus(
+    public async Task<IActionResult> SetStatus(
         Guid id,
         [FromBody] SetReceiptVoucherStatusRequest request,
         CancellationToken cancellationToken)
     {
         await sender.Send(new SetReceiptVoucherStatusCommand(id, request), cancellationToken);
-        var dto = await sender.Send(new GetReceiptVoucherByIdQuery(id), cancellationToken);
-        return Ok(dto);
+        return NoContent();
     }
 }

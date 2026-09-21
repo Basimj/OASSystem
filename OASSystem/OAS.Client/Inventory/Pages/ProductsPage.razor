@@ -27,32 +27,77 @@
 
     <Content>
         <div class="inventory-products">
-            <div class="inventory-products__tabs" role="tablist" aria-label="أقسام المنتجات">
-                @foreach (var tab in Sections)
-                {
-                    <button type="button"
-                            class="@(tab.Value == _section ? "inventory-products__tab inventory-products__tab--active" : "inventory-products__tab")"
-                            @onclick="() => ChangeSectionAsync(tab.Value)">
-                        <i class="@tab.Icon" aria-hidden="true"></i>
-                        <span>@tab.Text</span>
-                    </button>
-                }
-            </div>
+            <UiSectionTabStrip Tabs="@SectionTabs" OnSelect="ChangeSectionKeyAsync" />
 
             <UiDataGridPanel Title="@SectionTitle" Subtitle="@SectionSubtitle">
-                <Header>@RenderHeader()</Header>
                 <Body>
                     @if (_loading)
                     {
                         <UiAlert Message="جاري تحميل البيانات..." />
                     }
-                    else if (VisibleCount == 0)
+                    else if (_section == ProductSection.Categories)
                     {
-                        <UiAlert Message="لا توجد سجلات مطابقة." />
+                        <UiDataTable TItem="ProductCategoryDto" Items="@FilterCategories()" Headers="@SimpleHeaders" EmptyText="لا توجد تصنيفات مطابقة."
+                                     SidebarTypography="true"
+                                     OnRowClick="@(x => Select(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
+                            <RowTemplate Context="item">
+                                <td><strong>@item.Code</strong></td>
+                                <td>@item.NameAr</td>
+                                <td><UiBadge Text="@StatusText(item.IsActive)" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
+                            </RowTemplate>
+                        </UiDataTable>
+                    }
+                    else if (_section == ProductSection.Brands)
+                    {
+                        <UiDataTable TItem="BrandDto" Items="@FilterBrands()" Headers="@SimpleHeaders" EmptyText="لا توجد علامات تجارية مطابقة."
+                                     SidebarTypography="true"
+                                     OnRowClick="@(x => Select(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
+                            <RowTemplate Context="item">
+                                <td><strong>@item.Code</strong></td>
+                                <td>@item.Name</td>
+                                <td><UiBadge Text="@StatusText(item.IsActive)" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
+                            </RowTemplate>
+                        </UiDataTable>
+                    }
+                    else if (_section == ProductSection.Units)
+                    {
+                        <UiDataTable TItem="UnitDto" Items="@FilterUnits()" Headers="@SimpleHeaders" EmptyText="لا توجد وحدات مطابقة."
+                                     SidebarTypography="true"
+                                     OnRowClick="@(x => Select(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
+                            <RowTemplate Context="item">
+                                <td><strong>@item.Code</strong></td>
+                                <td>@item.NameAr</td>
+                                <td><UiBadge Text="@StatusText(item.IsActive)" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
+                            </RowTemplate>
+                        </UiDataTable>
+                    }
+                    else if (_section == ProductSection.Products)
+                    {
+                        <UiDataTable TItem="ProductDto" Items="@FilterProducts()" Headers="@ProductHeaders" EmptyText="لا توجد منتجات مطابقة."
+                                     SidebarTypography="true"
+                                     UniformCellTypography="true"
+                                     OnRowClick="@(x => Select(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
+                            <RowTemplate Context="item">
+                                <td>@item.ProductCode</td>
+                                <td>@item.NameAr</td>
+                                <td>@ProductTypeText(item.ProductType)</td>
+                                <td><UiBadge Text="@StatusText(item.IsActive)" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
+                            </RowTemplate>
+                        </UiDataTable>
                     }
                     else
                     {
-                        @RenderRows()
+                        <UiDataTable TItem="ProductVariantDto" Items="@FilterVariants()" Headers="@VariantHeaders" EmptyText="لا توجد متغيرات مطابقة."
+                                     SidebarTypography="true"
+                                     OnRowClick="@(x => Select(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
+                            <RowTemplate Context="item">
+                                <td><strong>@item.SKU</strong></td>
+                                <td>@(item.VariantName ?? ProductName(item.ProductId))</td>
+                                <td>@(item.Barcode ?? "—")</td>
+                                <td>@item.SellingPrice.ToString("N2")</td>
+                                <td><UiBadge Text="@StatusText(item.IsActive)" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
+                            </RowTemplate>
+                        </UiDataTable>
                     }
                 </Body>
             </UiDataGridPanel>
@@ -74,15 +119,32 @@
                     {
                         <div class="inventory-products__specialized">
                             <h4>تفاصيل الإطار</h4>
-                            <UiInputText Label="الموديل" Value="@_frameModel" ValueExpression="@(() => _frameModel)" ValueChanged="@(v => _frameModel = v ?? string.Empty)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
-                            <UiInputText Label="الخامة" Value="@_frameMaterial" ValueExpression="@(() => _frameMaterial)" ValueChanged="@(v => _frameMaterial = v)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
-                            <UiInputText Label="نوع الإطار / Rim" Value="@_frameRimType" ValueExpression="@(() => _frameRimType)" ValueChanged="@(v => _frameRimType = v)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
-                            <UiInputText Label="الجنس" Value="@_frameGender" ValueExpression="@(() => _frameGender)" ValueChanged="@(v => _frameGender = v)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
-                            <UiInputText Label="الشكل" Value="@_frameShape" ValueExpression="@(() => _frameShape)" ValueChanged="@(v => _frameShape = v)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText Label="الموديل" Value="@_frameModel" ValueExpression="@(() => _frameModel)"
+                                         ValueChanged="@(v => SetField(FrameModelField, () => _frameModel = v ?? string.Empty))"
+                                         Required="@HasFrameDetailsInput()" Placeholder="@OptionalPlaceholder(HasFrameDetailsInput())"
+                                         ErrorText="@ErrorFor(FrameModelField)" MaxLength="100" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText Label="الخامة" Value="@_frameMaterial" ValueExpression="@(() => _frameMaterial)"
+                                         ValueChanged="@(v => SetField(FrameMaterialField, () => _frameMaterial = v))" Placeholder="(اختياري)"
+                                         ErrorText="@ErrorFor(FrameMaterialField)" MaxLength="50" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText Label="نوع الإطار / Rim" Value="@_frameRimType" ValueExpression="@(() => _frameRimType)"
+                                         ValueChanged="@(v => SetField(FrameRimField, () => _frameRimType = v))" Placeholder="(اختياري)"
+                                         ErrorText="@ErrorFor(FrameRimField)" MaxLength="50" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText Label="الجنس" Value="@_frameGender" ValueExpression="@(() => _frameGender)"
+                                         ValueChanged="@(v => SetField(FrameGenderField, () => _frameGender = v))" Placeholder="(اختياري)"
+                                         ErrorText="@ErrorFor(FrameGenderField)" MaxLength="20" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText Label="الشكل" Value="@_frameShape" ValueExpression="@(() => _frameShape)"
+                                         ValueChanged="@(v => SetField(FrameShapeField, () => _frameShape = v))" Placeholder="(اختياري)"
+                                         ErrorText="@ErrorFor(FrameShapeField)" MaxLength="50" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
                             <div class="inventory-products__specialized-grid">
-                                <UiInputText Label="طول الذراع" Value="@_templeLength" ValueExpression="@(() => _templeLength)" ValueChanged="@(v => _templeLength = v)" Type="number" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
-                                <UiInputText Label="مقاس الجسر" Value="@_bridgeSize" ValueExpression="@(() => _bridgeSize)" ValueChanged="@(v => _bridgeSize = v)" Type="number" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
-                                <UiInputText Label="عرض العدسة" Value="@_lensWidth" ValueExpression="@(() => _lensWidth)" ValueChanged="@(v => _lensWidth = v)" Type="number" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                <UiInputText Label="طول الذراع" Value="@_templeLength" ValueExpression="@(() => _templeLength)"
+                                             ValueChanged="@(v => SetField(TempleLengthField, () => _templeLength = v))" Type="number" InputMode="decimal" Placeholder="(اختياري)"
+                                             ErrorText="@ErrorFor(TempleLengthField)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                <UiInputText Label="مقاس الجسر" Value="@_bridgeSize" ValueExpression="@(() => _bridgeSize)"
+                                             ValueChanged="@(v => SetField(BridgeSizeField, () => _bridgeSize = v))" Type="number" InputMode="decimal" Placeholder="(اختياري)"
+                                             ErrorText="@ErrorFor(BridgeSizeField)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                <UiInputText Label="عرض العدسة" Value="@_lensWidth" ValueExpression="@(() => _lensWidth)"
+                                             ValueChanged="@(v => SetField(LensWidthField, () => _lensWidth = v))" Type="number" InputMode="decimal" Placeholder="(اختياري)"
+                                             ErrorText="@ErrorFor(LensWidthField)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
                             </div>
                         </div>
                     }
@@ -90,17 +152,26 @@
                     {
                         <div class="inventory-products__specialized">
                             <h4>تفاصيل العدسة</h4>
-                            <UiInputText Label="نوع العدسة" Value="@_lensType" ValueExpression="@(() => _lensType)" ValueChanged="@(v => _lensType = v ?? string.Empty)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
-                            <UiInputText Label="الخامة" Value="@_lensMaterial" ValueExpression="@(() => _lensMaterial)" ValueChanged="@(v => _lensMaterial = v)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
-                            <UiInputText Label="الطلاء / Coating" Value="@_lensCoating" ValueExpression="@(() => _lensCoating)" ValueChanged="@(v => _lensCoating = v)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
-                            <UiInputText Label="معامل الانكسار" Value="@_refractiveIndex" ValueExpression="@(() => _refractiveIndex)" ValueChanged="@(v => _refractiveIndex = v)" Type="number" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText Label="نوع العدسة" Value="@_lensType" ValueExpression="@(() => _lensType)"
+                                         ValueChanged="@(v => SetField(LensTypeField, () => _lensType = v ?? string.Empty))"
+                                         Required="@HasLensDetailsInput()" Placeholder="@OptionalPlaceholder(HasLensDetailsInput())"
+                                         ErrorText="@ErrorFor(LensTypeField)" MaxLength="50" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText Label="خامة العدسة" Value="@_lensMaterial" ValueExpression="@(() => _lensMaterial)"
+                                         ValueChanged="@(v => SetField(LensMaterialField, () => _lensMaterial = v))" Placeholder="(اختياري)"
+                                         ErrorText="@ErrorFor(LensMaterialField)" MaxLength="50" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText Label="الطلاء / Coating" Value="@_lensCoating" ValueExpression="@(() => _lensCoating)"
+                                         ValueChanged="@(v => SetField(LensCoatingField, () => _lensCoating = v))" Placeholder="(اختياري)"
+                                         ErrorText="@ErrorFor(LensCoatingField)" MaxLength="50" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText Label="معامل الانكسار" Value="@_refractiveIndex" ValueExpression="@(() => _refractiveIndex)"
+                                         ValueChanged="@(v => SetField(RefractiveIndexField, () => _refractiveIndex = v))" Type="number" InputMode="decimal" Placeholder="(اختياري)"
+                                         ErrorText="@ErrorFor(RefractiveIndexField)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
                             <div class="inventory-products__specialized-grid">
-                                <UiInputText Label="Sphere Min" Value="@_sphereMin" ValueExpression="@(() => _sphereMin)" ValueChanged="@(v => _sphereMin = v)" Type="number" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
-                                <UiInputText Label="Sphere Max" Value="@_sphereMax" ValueExpression="@(() => _sphereMax)" ValueChanged="@(v => _sphereMax = v)" Type="number" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
-                                <UiInputText Label="Cylinder Min" Value="@_cylinderMin" ValueExpression="@(() => _cylinderMin)" ValueChanged="@(v => _cylinderMin = v)" Type="number" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
-                                <UiInputText Label="Cylinder Max" Value="@_cylinderMax" ValueExpression="@(() => _cylinderMax)" ValueChanged="@(v => _cylinderMax = v)" Type="number" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
-                                <UiInputText Label="Add Min" Value="@_addMin" ValueExpression="@(() => _addMin)" ValueChanged="@(v => _addMin = v)" Type="number" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
-                                <UiInputText Label="Add Max" Value="@_addMax" ValueExpression="@(() => _addMax)" ValueChanged="@(v => _addMax = v)" Type="number" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                <UiInputText Label="Sphere Min" Value="@_sphereMin" ValueExpression="@(() => _sphereMin)" ValueChanged="@(v => SetField(SphereMinField, () => _sphereMin = v))" Type="number" InputMode="decimal" Placeholder="(اختياري)" ErrorText="@ErrorFor(SphereMinField)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                <UiInputText Label="Sphere Max" Value="@_sphereMax" ValueExpression="@(() => _sphereMax)" ValueChanged="@(v => SetField(SphereMaxField, () => _sphereMax = v))" Type="number" InputMode="decimal" Placeholder="(اختياري)" ErrorText="@ErrorFor(SphereMaxField)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                <UiInputText Label="Cylinder Min" Value="@_cylinderMin" ValueExpression="@(() => _cylinderMin)" ValueChanged="@(v => SetField(CylinderMinField, () => _cylinderMin = v))" Type="number" InputMode="decimal" Placeholder="(اختياري)" ErrorText="@ErrorFor(CylinderMinField)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                <UiInputText Label="Cylinder Max" Value="@_cylinderMax" ValueExpression="@(() => _cylinderMax)" ValueChanged="@(v => SetField(CylinderMaxField, () => _cylinderMax = v))" Type="number" InputMode="decimal" Placeholder="(اختياري)" ErrorText="@ErrorFor(CylinderMaxField)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                <UiInputText Label="Add Min" Value="@_addMin" ValueExpression="@(() => _addMin)" ValueChanged="@(v => SetField(AddMinField, () => _addMin = v))" Type="number" InputMode="decimal" Placeholder="(اختياري)" ErrorText="@ErrorFor(AddMinField)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                <UiInputText Label="Add Max" Value="@_addMax" ValueExpression="@(() => _addMax)" ValueChanged="@(v => SetField(AddMaxField, () => _addMax = v))" Type="number" InputMode="decimal" Placeholder="(اختياري)" ErrorText="@ErrorFor(AddMaxField)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
                             </div>
                             <UiCheckbox Label="عدسة طبية / Prescription" Value="@_isPrescriptionLens" ValueChanged="@(v => _isPrescriptionLens = v)" Disabled="@(!IsEditing)" />
                         </div>

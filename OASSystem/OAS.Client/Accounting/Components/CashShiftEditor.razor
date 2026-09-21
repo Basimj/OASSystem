@@ -1,50 +1,88 @@
 @namespace OAS.Client.Accounting.Components
+@using OAS.Contracts.Accounting.CashShifts
 @using OAS.Contracts.Accounting.Enums
 @using OAS.Client.Accounting.Common
 @using OAS.UiLib.Components.Accounting.Workspace
+@using OAS.UiLib.Components.Buttons
 @using OAS.UiLib.Components.Inputs
 @using OAS.UiLib.Core.Models
 
-<UiAccountingEditorSurface>
+<div class="ui-acc-editor" dir="rtl">
+
     <UiAccountingFormSection Title="دورة حياة الوردية النقدية"
                              Subtitle="متابعة حالة الوردية الحالية والتحولات المعتمدة"
                              IconCssClass="fa-solid fa-timeline">
-        <UiAccountingStatusActionBar Label="الحالة الحالية"
-                                     StatusText="@AccountingArabicPresenter.GetCashShiftStatusText(Model.Status)"
-                                     StatusState="@StatusState"
-                                     Actions="@StatusActions" />
+
+        <div class="d-flex align-items-center justify-content-between p-3 bg-light rounded border">
+
+            <div class="d-flex align-items-center gap-2">
+
+                <span class="fw-bold">
+                    الحالة الحالية:
+                </span>
+
+                <UiAccountingStatusBadge Text="@AccountingArabicPresenter.GetCashShiftStatusText(Model.Status)"
+                                         State="@Model.Status.ToString().ToLowerInvariant()" />
+
+            </div>
+
+            @if (!IsNew && Actions is not null)
+            {
+                <div class="d-flex gap-2">
+                    @Actions
+                </div>
+            }
+
+        </div>
+
     </UiAccountingFormSection>
+
 
     <UiAccountingFormSection Title="بيانات فتح الوردية والصندوق"
                              Subtitle="رقم الوردية، الصندوق، ورصيد البداية"
                              IconCssClass="fa-solid fa-cash-register">
 
-        <UiAccountingFormGrid Columns="2">
+        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+
             <UiInputText Label="رقم الوردية"
                          Value="@Model.ShiftNumber"
+                         ValueExpression="@(() => Model.ShiftNumber)"
                          ReadOnly="true"
                          Disabled="true"
                          Placeholder="توليد تلقائي..."
                          Size="ControlSize.Small" />
 
             <UiLookup Label="الصندوق / الخزينة"
-                      Value="@CashAccountValue"
+                      Value="@Model.CashAccountId?.ToString("D")"
                       ValueChanged="OnCashAccountChanged"
                       SelectedItem="@CashAccountLookupItem"
-                      SearchAsync="@CashAccountSearchAsync"
+                      SearchAsync="CashAccountSearchAsync"
                       Placeholder="اختر الصندوق..."
-                      Disabled="@CashAccountDisabled"
+                      Disabled="@(!IsEditable || !IsNew)"
                       Required="true"
                       MinimumSearchLength="0"
                       DebounceMilliseconds="250" />
 
-            <UiAccountingNumberField Label="رصيد الافتتاح (العهدة المستلمة)"
-                                     Value="@Model.OpeningBalance"
-                                     ValueChanged="OnOpeningBalanceChanged"
-                                     Min="0"
-                                     Disabled="@OpeningBalanceDisabled" />
-        </UiAccountingFormGrid>
+            <div>
+
+                <label class="ui-input-text__label mb-1 d-block">
+                    رصيد الافتتاح (العُهدة المستلمة)
+                </label>
+
+                <input type="number"
+                       step="0.01"
+                       min="0"
+                       class="ui-input-text__field text-start font-bold fs-5"
+                       value="@Model.OpeningBalance"
+                       disabled="@(!IsEditable || !IsNew)"
+                       @onchange="OnOpeningBalanceChanged" />
+
+            </div>
+
+        </div>
+
     </UiAccountingFormSection>
+
 
     @if (!IsNew)
     {
@@ -52,34 +90,62 @@
                                  Subtitle="المبالغ المتوقعة والجرد الفعلي والفارق المحسوب"
                                  IconCssClass="fa-solid fa-calculator">
 
-            <UiAccountingFormGrid Columns="3">
-                <UiAccountingReadOnlyValue Label="المبلغ المتوقع بالصندوق"
-                                           Value="@ExpectedClosingBalanceText" />
+            <div class="ui-acc-form-grid ui-acc-form-grid--3col">
 
-                @if (Model.Status == CashShiftStatus.Open)
-                {
-                    <UiAccountingNumberField Label="الجرد الفعلي عند الإغلاق"
-                                             Value="@ActualClosingBalanceValue"
-                                             ValueChanged="OnActualClosingBalanceChanged"
-                                             Min="0"
-                                             Tone="@UiAccountingNumberField.NumberTone.Primary" />
-                }
-                else
-                {
-                    <UiAccountingReadOnlyValue Label="الجرد الفعلي المسجل"
-                                               Value="@ActualClosingBalanceText"
-                                               Tone="@UiAccountingReadOnlyValue.ValueTone.Primary" />
-                }
+                <div>
 
-                <UiAccountingReadOnlyValue Label="الفارق (عجز / زيادة)"
-                                           Value="@DifferenceAmountText"
-                                           Tone="@DifferenceTone" />
-            </UiAccountingFormGrid>
+                    <label class="ui-input-text__label mb-1 d-block">
+                        المبلغ المتوقع بالصندوق
+                    </label>
+
+                    <div class="p-2 border rounded bg-light font-bold text-start">
+                        @(Model.ExpectedClosingBalance.HasValue
+                                            ? Model.ExpectedClosingBalance.Value.ToString("N2")
+                                            : "0.00")
+                                                 </div>
+
+                </div>
+
+
+                <div>
+
+                    <label class="ui-input-text__label mb-1 d-block">
+                        الجرد الفعلي المسجل
+                    </label>
+
+                    <div class="p-2 border rounded bg-light font-bold text-start text-primary">
+                        @(Model.ActualClosingBalance.HasValue
+                                            ? Model.ActualClosingBalance.Value.ToString("N2")
+                                            : "لم يتم الجرد بعد")
+                                                             </div>
+
+                </div>
+
+
+                <div>
+
+                    <label class="ui-input-text__label mb-1 d-block">
+                        الفارق (عجز / زيادة)
+                    </label>
+
+                    <div class="p-2 border rounded bg-light font-bold text-start @(GetDifferenceCssClass())">
+                        @(Model.DifferenceAmount.HasValue
+                                            ? Model.DifferenceAmount.Value.ToString("N2")
+                                            : "-")
+                </div>
+
+                </div>
+
+            </div>
+
         </UiAccountingFormSection>
-    }
-</UiAccountingEditorSurface>
+        }
+
+</div>
+
 
 @code {
+
     public sealed class FormModel
     {
         public string ShiftNumber { get; set; } = string.Empty;
@@ -94,160 +160,93 @@
 
         public decimal? DifferenceAmount { get; set; }
 
-        public CashShiftStatus Status { get; set; } = CashShiftStatus.Open;
-
-        public string RowVersion { get; set; } = string.Empty;
+        public CashShiftStatus Status { get; set; }
+            = CashShiftStatus.Open;
     }
+
 
     [Parameter]
     public FormModel Model { get; set; } = new();
 
+
     [Parameter]
     public bool IsEditable { get; set; }
+
 
     [Parameter]
     public bool IsNew { get; set; }
 
+
     [Parameter]
     public UiLookupItem? CashAccountLookupItem { get; set; }
 
+
     [Parameter]
-    public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>?
+    public Func<
+        string,
+        CancellationToken,
+        Task<IReadOnlyList<UiLookupItem>>>?
         CashAccountSearchAsync
     { get; set; }
+
 
     [Parameter]
     public RenderFragment? Actions { get; set; }
 
+
     [Parameter]
     public EventCallback OnModelChanged { get; set; }
 
-    private string? CashAccountValue
-    {
-        get
-        {
-            return Model.CashAccountId.HasValue
-                ? Model.CashAccountId.Value.ToString("D")
-                : null;
-        }
-    }
-
-    private string StatusState
-    {
-        get
-        {
-            return Model.Status.ToString().ToLowerInvariant();
-        }
-    }
-
-    private RenderFragment? StatusActions
-    {
-        get
-        {
-            return IsNew ? null : Actions;
-        }
-    }
-
-    private bool CashAccountDisabled
-    {
-        get
-        {
-            return !IsEditable || !IsNew;
-        }
-    }
-
-    private bool OpeningBalanceDisabled
-    {
-        get
-        {
-            return !IsEditable || !IsNew;
-        }
-    }
-
-    private decimal ActualClosingBalanceValue
-    {
-        get
-        {
-            return Model.ActualClosingBalance ?? 0m;
-        }
-    }
-
-    private string ExpectedClosingBalanceText
-    {
-        get
-        {
-            return Model.ExpectedClosingBalance.HasValue
-                ? Model.ExpectedClosingBalance.Value.ToString("N2")
-                : "0.00";
-        }
-    }
-
-    private string ActualClosingBalanceText
-    {
-        get
-        {
-            return Model.ActualClosingBalance.HasValue
-                ? Model.ActualClosingBalance.Value.ToString("N2")
-                : "لم يتم الجرد بعد";
-        }
-    }
-
-    private string DifferenceAmountText
-    {
-        get
-        {
-            return Model.DifferenceAmount.HasValue
-                ? Model.DifferenceAmount.Value.ToString("N2")
-                : "-";
-        }
-    }
-
-    private UiAccountingReadOnlyValue.ValueTone DifferenceTone
-    {
-        get
-        {
-            if (!Model.DifferenceAmount.HasValue)
-            {
-                return UiAccountingReadOnlyValue.ValueTone.Default;
-            }
-
-            if (Model.DifferenceAmount.Value < 0m)
-            {
-                return UiAccountingReadOnlyValue.ValueTone.Danger;
-            }
-
-            if (Model.DifferenceAmount.Value > 0m)
-            {
-                return UiAccountingReadOnlyValue.ValueTone.Success;
-            }
-
-            return UiAccountingReadOnlyValue.ValueTone.Default;
-        }
-    }
 
     private Task OnChanged()
-    {
-        return OnModelChanged.InvokeAsync();
-    }
+        => OnModelChanged.InvokeAsync();
 
-    private async Task OnCashAccountChanged(string? value)
+
+    private async Task OnCashAccountChanged(
+        string? value)
     {
-        Model.CashAccountId = Guid.TryParse(value, out var id)
-            ? id
-            : null;
+        Model.CashAccountId =
+            Guid.TryParse(
+                value,
+                out var id)
+                ? id
+                : null;
 
         await OnChanged();
     }
 
-    private async Task OnOpeningBalanceChanged(decimal amount)
+
+    private async Task OnOpeningBalanceChanged(
+        ChangeEventArgs e)
     {
-        Model.OpeningBalance = amount;
-        await OnChanged();
+        if (decimal.TryParse(
+                e.Value?.ToString(),
+                out var amount))
+        {
+            Model.OpeningBalance = amount;
+
+            await OnChanged();
+        }
     }
 
-    private async Task OnActualClosingBalanceChanged(decimal amount)
+
+    private string GetDifferenceCssClass()
     {
-        Model.ActualClosingBalance = amount;
-        await OnChanged();
+        if (!Model.DifferenceAmount.HasValue)
+        {
+            return string.Empty;
+        }
+
+        if (Model.DifferenceAmount.Value < 0)
+        {
+            return "text-danger";
+        }
+
+        if (Model.DifferenceAmount.Value > 0)
+        {
+            return "text-success";
+        }
+
+        return string.Empty;
     }
 }

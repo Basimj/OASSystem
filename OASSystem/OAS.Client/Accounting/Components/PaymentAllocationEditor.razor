@@ -6,113 +6,87 @@
 @using OAS.UiLib.Components.Inputs
 @using OAS.UiLib.Core.Models
 
-<UiAccountingEditorSurface>
+<div class="ui-acc-editor" dir="rtl">
     <UiAccountingFormSection Title="مصدر السداد (الدفعة)"
                              Subtitle="نوع السند أو الدفعة المقدمة المُراد تخصيصها"
                              IconCssClass="fa-solid fa-money-check-dollar">
-        <UiAccountingFormGrid Columns="2">
+        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
             <UiSelect Label="نوع مصدر السداد"
                       Value="@Model.PaymentSourceType.ToString()"
                       ValueChanged="OnSourceTypeChanged"
                       Options="@AccountingArabicPresenter.PaymentSourceTypeOptions"
-                      Disabled="@(!IsEditable || !IsNew)"
+                      Disabled="@(!IsEditable)"
                       Size="ControlSize.Small" />
 
-            @if (SourceSearchAsync is not null)
-            {
-                <UiLookup Label="سند السداد / الدفعة"
-                          Value='@Model.PaymentSourceId?.ToString("D")'
-                          ValueChanged="OnSourceIdChanged"
-                          SelectedItem="@SourceLookupItem"
-                          SearchAsync="SourceSearchAsync"
-                          Placeholder="ابحث برقم السند..."
-                          Disabled="@(!IsEditable || !IsNew)"
-                          Required="true"
-                          MinimumSearchLength="0"
-                          DebounceMilliseconds="250" />
-            }
-            else
-            {
-                <UiInputText Label="معرف مصدر السداد"
-                             Value="@Model.PaymentSourceIdText"
-                             ValueChanged="OnSourceIdTextChanged"
-                             Placeholder="00000000-0000-0000-0000-000000000000"
-                             Disabled="@(!IsEditable || !IsNew)"
-                             Required="true"
-                             Size="ControlSize.Small" />
-            }
-        </UiAccountingFormGrid>
+            <UiLookup Label="سند السداد / الدفعة"
+                      Value="@Model.PaymentSourceId?.ToString("D")"
+                      ValueChanged="OnSourceIdChanged"
+                      SelectedItem="@SourceLookupItem"
+                      SearchAsync="SourceSearchAsync"
+                      Placeholder="ابحث برقم السند..."
+                      Disabled="@(!IsEditable)"
+                      Required="true"
+                      MinimumSearchLength="0"
+                      DebounceMilliseconds="250" />
+        </div>
     </UiAccountingFormSection>
 
     <UiAccountingFormSection Title="المستند الهدف المراد تسويته"
                              Subtitle="فاتورة مبيعات، فاتورة مشتريات، أو إشعار تسوية"
                              IconCssClass="fa-solid fa-file-invoice">
-        <UiAccountingFormGrid Columns="2">
+        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
             <UiSelect Label="نوع المستند الهدف"
                       Value="@Model.TargetDocumentType.ToString()"
                       ValueChanged="OnTargetTypeChanged"
                       Options="@AccountingArabicPresenter.AllocationTargetDocumentTypeOptions"
-                      Disabled="@(!IsEditable || !IsNew)"
+                      Disabled="@(!IsEditable)"
                       Size="ControlSize.Small" />
 
-            @if (TargetSearchAsync is not null)
-            {
-                <UiLookup Label="المستند المستهدف"
-                          Value='@Model.TargetDocumentId?.ToString("D")'
-                          ValueChanged="OnTargetIdChanged"
-                          SelectedItem="@TargetLookupItem"
-                          SearchAsync="TargetSearchAsync"
-                          Placeholder="ابحث برقم الفاتورة أو المستند..."
-                          Disabled="@(!IsEditable || !IsNew)"
-                          Required="true"
-                          MinimumSearchLength="0"
-                          DebounceMilliseconds="250" />
-            }
-            else
-            {
-                <UiInputText Label="معرف المستند المستهدف"
-                             Value="@Model.TargetDocumentIdText"
-                             ValueChanged="OnTargetIdTextChanged"
-                             Placeholder="00000000-0000-0000-0000-000000000000"
-                             Disabled="@(!IsEditable || !IsNew)"
-                             Required="true"
-                             Size="ControlSize.Small" />
-            }
-        </UiAccountingFormGrid>
+            <UiLookup Label="المستند المستهدف"
+                      Value="@Model.TargetDocumentId?.ToString("D")"
+                      ValueChanged="OnTargetIdChanged"
+                      SelectedItem="@TargetLookupItem"
+                      SearchAsync="TargetSearchAsync"
+                      Placeholder="ابحث برقم الفاتورة أو المستند..."
+                      Disabled="@(!IsEditable)"
+                      Required="true"
+                      MinimumSearchLength="0"
+                      DebounceMilliseconds="250" />
+        </div>
     </UiAccountingFormSection>
 
     <UiAccountingFormSection Title="مبلغ التخصيص والبيانات الزمنية"
                              Subtitle="المبلغ المخصص على الفاتورة وتاريخ التسوية"
                              IconCssClass="fa-solid fa-receipt">
-        <UiAccountingFormGrid Columns="2">
-            <UiAccountingNumberField Label="المبلغ المخصص"
-                                     Value="@Model.AllocatedAmount"
-                                     ValueChanged="OnAllocatedAmountChanged"
-                                     Min="0.01"
-                                     Tone="@UiAccountingNumberField.NumberTone.Primary"
-                                     Disabled="@(!IsEditable)" />
+        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
+            <div>
+                <label class="ui-input-text__label mb-1 d-block">المبلغ المخصص</label>
+                <input type="number" step="0.01" min="0.01"
+                       class="ui-input-text__field text-start font-bold fs-5 text-primary"
+                       value="@Model.AllocatedAmount"
+                       disabled="@(!IsEditable)"
+                       @onchange="@(e => { if (decimal.TryParse(e.Value?.ToString(), out var amt)) { Model.AllocatedAmount = amt; OnChanged(); } })" />
+            </div>
 
             @if (!IsNew)
             {
                 <UiInputText Label="تاريخ التخصيص (UTC)"
-                             Value='@Model.AllocatedAtUtc.ToString("yyyy-MM-dd HH:mm")'
+                             Value="@Model.AllocatedAtUtc.ToString("yyyy-MM-dd HH:mm")"
                              ReadOnly="true"
                              Disabled="true"
                              Size="ControlSize.Small" />
             }
-        </UiAccountingFormGrid>
+        </div>
     </UiAccountingFormSection>
-</UiAccountingEditorSurface>
+</div>
 
 @code {
     public sealed class FormModel
     {
         public PaymentSourceType PaymentSourceType { get; set; } = PaymentSourceType.ReceiptVoucher;
         public Guid? PaymentSourceId { get; set; }
-        public string PaymentSourceIdText { get => PaymentSourceId?.ToString("D") ?? string.Empty; set => PaymentSourceId = Guid.TryParse(value, out var id) ? id : null; }
         public AllocationTargetDocumentType TargetDocumentType { get; set; } = AllocationTargetDocumentType.SalesInvoice;
         public Guid? TargetDocumentId { get; set; }
-        public string TargetDocumentIdText { get => TargetDocumentId?.ToString("D") ?? string.Empty; set => TargetDocumentId = Guid.TryParse(value, out var id) ? id : null; }
         public decimal AllocatedAmount { get; set; }
         public DateTimeOffset AllocatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
     }
@@ -152,27 +126,9 @@
         OnChanged();
     }
 
-    private void OnSourceIdTextChanged(string? val)
-    {
-        Model.PaymentSourceIdText = val ?? string.Empty;
-        OnChanged();
-    }
-
-    private void OnAllocatedAmountChanged(decimal value)
-    {
-        Model.AllocatedAmount = value;
-        OnChanged();
-    }
-
     private void OnTargetIdChanged(string? val)
     {
         Model.TargetDocumentId = Guid.TryParse(val, out var id) ? id : null;
-        OnChanged();
-    }
-
-    private void OnTargetIdTextChanged(string? val)
-    {
-        Model.TargetDocumentIdText = val ?? string.Empty;
         OnChanged();
     }
 }

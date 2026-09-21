@@ -1,81 +1,91 @@
 @namespace OAS.Client.Accounting.Components
+@using OAS.Contracts.Accounting.FiscalYears
 @using OAS.Contracts.Accounting.Enums
 @using OAS.Client.Accounting.Common
 @using OAS.UiLib.Components.Accounting.Workspace
 @using OAS.UiLib.Components.Inputs
 @using OAS.UiLib.Core.Models
 
-<UiAccountingEditorSurface>
+<div class="ui-acc-editor" dir="rtl">
 
     <UiAccountingFormSection Title="بيانات السنة المالية"
                              Subtitle="الرمز، الاسم، وتحديد فترة الدورة المحاسبية"
                              IconCssClass="fa-solid fa-calendar-days">
 
-        <UiAccountingFormGrid Columns="2">
+        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
 
             <UiInputText Label="كود السنة المالية"
-                         @bind-Value="Model.Code"
-                         @bind-Value:after="NotifyModelChangedAsync"
+                         Value="@Model.Code"
+                         ValueExpression="@(() => Model.Code)"
+                         ValueChanged="OnCodeChanged"
                          Required="true"
                          Placeholder="مثال: FY-2026"
-                         Disabled="@(!CanEditDetails)"
+                         Disabled="@(!IsEditable)"
                          Size="ControlSize.Small" />
 
             <UiInputText Label="اسم السنة المالية"
-                         @bind-Value="Model.Name"
-                         @bind-Value:after="NotifyModelChangedAsync"
+                         Value="@Model.Name"
+                         ValueExpression="@(() => Model.Name)"
+                         ValueChanged="OnNameChanged"
                          Required="true"
                          Placeholder="مثال: السنة المالية 2026"
-                         Disabled="@(!CanEditDetails)"
+                         Disabled="@(!IsEditable)"
                          Size="ControlSize.Small" />
 
             <UiInputDate Label="تاريخ بداية السنة"
-                         @bind-Value="Model.StartDate"
-                         @bind-Value:after="NotifyModelChangedAsync"
+                         Value="@Model.StartDate"
+                         ValueExpression="@(() => Model.StartDate)"
+                         ValueChanged="OnStartDateChanged"
                          Required="true"
-                         Disabled="@(!CanEditDetails)"
+                         Disabled="@(!IsEditable)"
                          Size="ControlSize.Small" />
 
             <UiInputDate Label="تاريخ نهاية السنة"
-                         @bind-Value="Model.EndDate"
-                         @bind-Value:after="NotifyModelChangedAsync"
+                         Value="@Model.EndDate"
+                         ValueExpression="@(() => Model.EndDate)"
+                         ValueChanged="OnEndDateChanged"
                          Required="true"
-                         Disabled="@(!CanEditDetails)"
+                         Disabled="@(!IsEditable)"
                          Size="ControlSize.Small" />
 
-        </UiAccountingFormGrid>
+        </div>
 
     </UiAccountingFormSection>
 
+
     <UiAccountingFormSection Title="حالة السنة المالية"
-                             Subtitle="إدارة دورة السنة المالية"
+                             Subtitle="إدارة دورة الإقفال والعمليات المحاسبية"
                              IconCssClass="fa-solid fa-lock">
 
-        <UiAccountingFormGrid Columns="2">
+        <div class="ui-acc-form-grid ui-acc-form-grid--2col">
 
             <UiSelect Label="حالة السنة"
-                      @bind-Value="StatusValue"
-                      @bind-Value:after="NotifyModelChangedAsync"
+                      Value="@StatusValue"
+                      ValueExpression="@(() => StatusValue)"
+                      ValueChanged="OnStatusChanged"
                       Options="@AccountingArabicPresenter.FiscalYearStatusOptions"
-                      Disabled="@(!CanEditWorkflow)"
+                      Disabled="@(!IsEditable)"
                       Size="ControlSize.Small" />
 
-            @if (!string.IsNullOrWhiteSpace(Model.RowVersion))
+            @if (!string.IsNullOrWhiteSpace(RowVersion))
             {
-                <UiInputText Label="إصدار السجل"
-                             @bind-Value="Model.RowVersion"
+                <UiInputText Label="إصدار السجل (RowVersion)"
+                             Value="@RowVersion"
+                             ValueExpression="@(() => RowVersion)"
                              ReadOnly="true"
                              Disabled="true"
                              Size="ControlSize.Small" />
             }
 
-        </UiAccountingFormGrid>
+        </div>
 
     </UiAccountingFormSection>
 
-</UiAccountingEditorSurface>
+</div>
+
 
 @code {
+
     public sealed class FormModel
     {
         public string Code { get; set; } = string.Empty;
@@ -86,83 +96,87 @@
 
         public DateOnly? EndDate { get; set; }
 
-        public FiscalYearStatus Status { get; set; } =
-            FiscalYearStatus.Open;
-
-        public FiscalYearStatus OriginalStatus { get; set; } =
-            FiscalYearStatus.Future;
-
-        public string RowVersion { get; set; } = string.Empty;
+        public FiscalYearStatus Status { get; set; } = FiscalYearStatus.Open;
     }
+
 
     [Parameter]
     public FormModel Model { get; set; } = new()
     {
-        StartDate = new DateOnly(
-            DateTime.Today.Year,
-            1,
-            1),
-
-        EndDate = new DateOnly(
-            DateTime.Today.Year,
-            12,
-            31),
-
-        Status = FiscalYearStatus.Open,
-
-        OriginalStatus = FiscalYearStatus.Future
+        StartDate = new DateOnly(DateTime.Today.Year, 1, 1),
+        EndDate = new DateOnly(DateTime.Today.Year, 12, 31)
     };
+
 
     [Parameter]
     public bool IsEditable { get; set; }
 
+
     [Parameter]
     public bool IsNew { get; set; }
+
+
+    [Parameter]
+    public string? RowVersion { get; set; }
+
 
     [Parameter]
     public EventCallback OnModelChanged { get; set; }
 
-    private bool CanEditDetails
-    {
-        get
-        {
-            return IsEditable &&
-                   (IsNew ||
-                    Model.OriginalStatus ==
-                    FiscalYearStatus.Future);
-        }
-    }
-
-    private bool CanEditWorkflow
-    {
-        get
-        {
-            return IsEditable &&
-                   Model.Status !=
-                   FiscalYearStatus.Closed;
-        }
-    }
 
     private string StatusValue
     {
-        get
-        {
-            return Model.Status.ToString();
-        }
+        get => Model.Status.ToString();
         set
         {
-            if (Enum.TryParse<FiscalYearStatus>(
-                    value,
-                    true,
-                    out var status))
+            if (Enum.TryParse<FiscalYearStatus>(value, out var result))
             {
-                Model.Status = status;
+                Model.Status = result;
             }
         }
     }
 
-    private Task NotifyModelChangedAsync()
+
+    private Task OnChanged()
+        => OnModelChanged.InvokeAsync();
+
+
+    private async Task OnCodeChanged(string? value)
     {
-        return OnModelChanged.InvokeAsync();
+        Model.Code = value ?? string.Empty;
+        await OnChanged();
+    }
+
+
+    private async Task OnNameChanged(string? value)
+    {
+        Model.Name = value ?? string.Empty;
+        await OnChanged();
+    }
+
+
+    private async Task OnStartDateChanged(DateOnly? value)
+    {
+        Model.StartDate = value;
+        await OnChanged();
+    }
+
+
+    private async Task OnEndDateChanged(DateOnly? value)
+    {
+        Model.EndDate = value;
+        await OnChanged();
+    }
+
+
+    private async Task OnStatusChanged(string? value)
+    {
+        if (Enum.TryParse<FiscalYearStatus>(
+                value,
+                out var result))
+        {
+            Model.Status = result;
+            await OnChanged();
+        }
     }
 }
