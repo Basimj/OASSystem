@@ -8,7 +8,7 @@ public sealed class PaymentVoucherConfiguration : IEntityTypeConfiguration<Payme
 {
     public void Configure(EntityTypeBuilder<PaymentVoucher> builder)
     {
-        builder.ToTable("tbl_PaymentVouchers", "accounting");
+        builder.ToTable("tbl_PaymentVouchers", "dbo");
 
         builder.HasKey(x => x.Id);
 

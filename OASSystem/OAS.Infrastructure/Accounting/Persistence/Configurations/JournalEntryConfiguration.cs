@@ -8,7 +8,7 @@ public sealed class JournalEntryConfiguration : IEntityTypeConfiguration<Journal
 {
     public void Configure(EntityTypeBuilder<JournalEntry> builder)
     {
-        builder.ToTable("tbl_JournalEntries", "accounting");
+        builder.ToTable("tbl_JournalEntries", "dbo");
 
         builder.HasKey(x => x.Id);
 

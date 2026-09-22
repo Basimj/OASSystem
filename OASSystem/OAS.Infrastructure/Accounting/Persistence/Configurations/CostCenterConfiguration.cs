@@ -8,7 +8,7 @@ public sealed class CostCenterConfiguration : IEntityTypeConfiguration<CostCente
 {
     public void Configure(EntityTypeBuilder<CostCenter> builder)
     {
-        builder.ToTable("tbl_CostCenters", "accounting");
+        builder.ToTable("tbl_CostCenters", "dbo");
 
         builder.HasKey(x => x.Id);
 

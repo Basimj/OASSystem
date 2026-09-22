@@ -8,7 +8,7 @@ public sealed class CashShiftConfiguration : IEntityTypeConfiguration<CashShift>
 {
     public void Configure(EntityTypeBuilder<CashShift> builder)
     {
-        builder.ToTable("tbl_CashShifts", "accounting");
+        builder.ToTable("tbl_CashShifts", "dbo");
 
         builder.HasKey(x => x.Id);
 

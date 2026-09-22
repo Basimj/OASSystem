@@ -8,7 +8,7 @@ public sealed class CustomerAccountConfiguration : IEntityTypeConfiguration<Cust
 {
     public void Configure(EntityTypeBuilder<CustomerAccount> builder)
     {
-        builder.ToTable("tbl_CustomerAccounts", "accounting");
+        builder.ToTable("tbl_CustomerAccounts", "dbo");
 
         builder.HasKey(x => x.Id);
 

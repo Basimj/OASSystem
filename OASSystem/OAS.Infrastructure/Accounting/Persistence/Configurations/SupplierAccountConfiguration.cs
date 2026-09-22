@@ -8,7 +8,7 @@ public sealed class SupplierAccountConfiguration : IEntityTypeConfiguration<Supp
 {
     public void Configure(EntityTypeBuilder<SupplierAccount> builder)
     {
-        builder.ToTable("tbl_SupplierAccounts", "accounting");
+        builder.ToTable("tbl_SupplierAccounts", "dbo");
 
         builder.HasKey(x => x.Id);
 

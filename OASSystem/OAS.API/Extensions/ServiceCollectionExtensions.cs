@@ -17,7 +17,10 @@ public static class ServiceCollectionExtensions
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen();
         services.AddHttpContextAccessor();
+
         services.AddScoped<ICurrentUser, HttpCurrentUser>();
+        services.AddScoped<ICurrentRequestInfo, HttpCurrentRequestInfo>();
+
         services.AddScoped<IPermissionChecker, ClaimsPermissionChecker>();
         services.AddScoped<IDatabaseProfileSelection, HttpDatabaseProfileSelection>();
         services.AddScoped<IIdentityCookieSessionService, IdentityCookieSessionService>();

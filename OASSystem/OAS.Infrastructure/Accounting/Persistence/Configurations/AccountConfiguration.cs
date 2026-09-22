@@ -8,7 +8,7 @@ public sealed class AccountConfiguration : IEntityTypeConfiguration<Account>
 {
     public void Configure(EntityTypeBuilder<Account> builder)
     {
-        builder.ToTable("tbl_Accounts", "accounting");
+        builder.ToTable("tbl_Accounts", "dbo");
 
         builder.HasKey(x => x.Id);
 

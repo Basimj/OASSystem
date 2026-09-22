@@ -8,7 +8,7 @@ public sealed class PaymentAllocationConfiguration : IEntityTypeConfiguration<Pa
 {
     public void Configure(EntityTypeBuilder<PaymentAllocation> builder)
     {
-        builder.ToTable("tbl_PaymentAllocations", "accounting");
+        builder.ToTable("tbl_PaymentAllocations", "dbo");
 
         builder.HasKey(x => x.Id);
 

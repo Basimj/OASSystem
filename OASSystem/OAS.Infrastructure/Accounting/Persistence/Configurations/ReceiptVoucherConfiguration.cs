@@ -8,7 +8,7 @@ public sealed class ReceiptVoucherConfiguration : IEntityTypeConfiguration<Recei
 {
     public void Configure(EntityTypeBuilder<ReceiptVoucher> builder)
     {
-        builder.ToTable("tbl_ReceiptVouchers", "accounting");
+        builder.ToTable("tbl_ReceiptVouchers", "dbo");
 
         builder.HasKey(x => x.Id);
 

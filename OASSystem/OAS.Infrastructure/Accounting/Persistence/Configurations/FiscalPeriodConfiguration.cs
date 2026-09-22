@@ -8,7 +8,7 @@ public sealed class FiscalPeriodConfiguration : IEntityTypeConfiguration<FiscalP
 {
     public void Configure(EntityTypeBuilder<FiscalPeriod> builder)
     {
-        builder.ToTable("tbl_FiscalPeriods", "accounting");
+        builder.ToTable("tbl_FiscalPeriods", "dbo");
 
         builder.HasKey(x => x.Id);
 
