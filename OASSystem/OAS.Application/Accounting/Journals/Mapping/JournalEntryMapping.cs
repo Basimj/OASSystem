@@ -26,7 +26,7 @@ public static class JournalEntryMapping
             (OAS.Contracts.Accounting.Enums.JournalEntryStatus)(int)journal.Status,
             journal.ReversedJournalId,
             journal.CreatedBy,
-            new DateTimeOffset(DateTime.SpecifyKind(journal.CreatedAtUtc, DateTimeKind.Utc)),
+            journal.CreatedAtUtc,
             journal.ApprovedBy,
             journal.ApprovedAtUtc.HasValue
                 ? new DateTimeOffset(DateTime.SpecifyKind(journal.ApprovedAtUtc.Value, DateTimeKind.Utc))

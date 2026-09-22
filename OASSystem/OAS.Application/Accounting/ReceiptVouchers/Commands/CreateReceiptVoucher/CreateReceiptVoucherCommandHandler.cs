@@ -1,8 +1,6 @@
 using MediatR;
 using OAS.Application.Abstractions.Numbering;
 using OAS.Application.Abstractions.Persistence;
-using OAS.Application.Abstractions.Security;
-using OAS.Application.Common.Exceptions;
 using OAS.Contracts.Accounting.ReceiptVouchers;
 using OAS.Domain.Accounting.Entities;
 using DomainPaymentMethod = OAS.Domain.Accounting.Enums.PaymentMethod;
@@ -13,18 +11,13 @@ namespace OAS.Application.Accounting.ReceiptVouchers.Commands.CreateReceiptVouch
 
 public sealed class CreateReceiptVoucherCommandHandler(
     IRepository<ReceiptVoucher, Guid> repository,
-    ISequenceNumberGenerator sequenceNumberGenerator,
-    ICurrentUser currentUser,
-    TimeProvider timeProvider)
+    ISequenceNumberGenerator sequenceNumberGenerator)
     : IRequestHandler<CreateReceiptVoucherCommand, Guid>
 {
     public async Task<Guid> Handle(
         CreateReceiptVoucherCommand request,
         CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(currentUser.UserId, out var userId))
-            throw new ForbiddenException();
-
         var data = request.Data;
 
         var sequenceName = $"ReceiptVoucher-{data.VoucherDate.Year}";
@@ -46,9 +39,7 @@ public sealed class CreateReceiptVoucherCommandHandler(
             data.TotalAmount,
             DomainReceiptVoucherStatus.Draft,
             data.Description,
-            journalEntryId: null,
-            userId,
-            timeProvider.GetUtcNow().UtcDateTime);
+            journalEntryId: null);
 
         var lineNumber = 1;
         foreach (var lineRequest in data.Lines)

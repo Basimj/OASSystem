@@ -3,7 +3,7 @@ using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
 
-public sealed class Account : Entity<Guid>
+public sealed class Account : AuditableEntity<Guid>
 {
     private Account()
     {

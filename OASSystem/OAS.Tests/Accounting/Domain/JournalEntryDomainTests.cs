@@ -37,9 +37,7 @@ public class JournalEntryDomainTests
             sourceModule: null,
             sourceDocumentType: null,
             sourceDocumentId: null,
-            status: JournalEntryStatus.Draft,
-            createdBy: _userId,
-            createdAtUtc: DateTime.UtcNow);
+            status: JournalEntryStatus.Draft);
 
         Assert.That(entry.Id, Is.EqualTo(_journalId));
         Assert.That(entry.JournalNumber, Is.EqualTo("JV-2026-0001"));
@@ -188,8 +186,6 @@ public class JournalEntryDomainTests
             _periodId,
             "قيد تجريبي",
             null, null, null,
-            JournalEntryStatus.Draft,
-            _userId,
-            DateTime.UtcNow);
+            JournalEntryStatus.Draft);
     }
 }

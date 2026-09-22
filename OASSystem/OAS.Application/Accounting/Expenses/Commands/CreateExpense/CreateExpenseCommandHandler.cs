@@ -1,8 +1,6 @@
 using MediatR;
 using OAS.Application.Abstractions.Numbering;
 using OAS.Application.Abstractions.Persistence;
-using OAS.Application.Abstractions.Security;
-using OAS.Application.Common.Exceptions;
 using OAS.Contracts.Accounting.Expenses;
 using OAS.Domain.Accounting.Entities;
 using DomainExpenseStatus = OAS.Domain.Accounting.Enums.ExpenseStatus;
@@ -12,18 +10,13 @@ namespace OAS.Application.Accounting.Expenses.Commands.CreateExpense;
 
 public sealed class CreateExpenseCommandHandler(
     IRepository<Expense, Guid> repository,
-    ISequenceNumberGenerator sequenceNumberGenerator,
-    ICurrentUser currentUser,
-    TimeProvider timeProvider)
+    ISequenceNumberGenerator sequenceNumberGenerator)
     : IRequestHandler<CreateExpenseCommand, Guid>
 {
     public async Task<Guid> Handle(
         CreateExpenseCommand request,
         CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(currentUser.UserId, out var userId))
-            throw new ForbiddenException();
-
         var data = request.Data;
 
         var sequenceName = $"Expense-{data.ExpenseDate.Year}";
@@ -43,9 +36,7 @@ public sealed class CreateExpenseCommandHandler(
             data.BankAccountId,
             data.Description,
             DomainExpenseStatus.Draft,
-            journalEntryId: null,
-            userId,
-            timeProvider.GetUtcNow().UtcDateTime);
+            journalEntryId: null);
 
         await repository.AddAsync(expense, cancellationToken);
         return expense.Id;

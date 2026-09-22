@@ -3,7 +3,7 @@ using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
 
-public sealed class PaymentVoucher : Entity<Guid>
+public sealed class PaymentVoucher : AuditableEntity<Guid>
 {
     private PaymentVoucher()
     {
@@ -22,9 +22,7 @@ public sealed class PaymentVoucher : Entity<Guid>
         decimal totalAmount,
         PaymentVoucherStatus status,
         string? description,
-        Guid? journalEntryId,
-        Guid createdBy,
-        DateTime createdAtUtc)
+        Guid? journalEntryId)
     {
         Id = id;
         VoucherNumber = voucherNumber;
@@ -39,8 +37,6 @@ public sealed class PaymentVoucher : Entity<Guid>
         Status = status;
         Description = description;
         JournalEntryId = journalEntryId;
-        CreatedBy = createdBy;
-        CreatedAtUtc = createdAtUtc;
     }
 
     public string VoucherNumber { get; private set; } = null!;
@@ -67,9 +63,6 @@ public sealed class PaymentVoucher : Entity<Guid>
 
     public Guid? JournalEntryId { get; private set; }
 
-    public Guid CreatedBy { get; private set; }
-
-    public DateTime CreatedAtUtc { get; private set; }
 
     public Guid? PostedBy { get; private set; }
 
@@ -93,9 +86,7 @@ public sealed class PaymentVoucher : Entity<Guid>
         decimal totalAmount,
         PaymentVoucherStatus status,
         string? description,
-        Guid? journalEntryId,
-        Guid createdBy,
-        DateTime createdAtUtc)
+        Guid? journalEntryId)
     {
         if (id == Guid.Empty)
             throw new ArgumentException("Id is required.", nameof(id));
@@ -110,9 +101,6 @@ public sealed class PaymentVoucher : Entity<Guid>
                 nameof(totalAmount),
                 "Total amount must be greater than zero.");
 
-        if (createdBy == Guid.Empty)
-            throw new ArgumentException("Created by is required.", nameof(createdBy));
-
         return new PaymentVoucher(
             id,
             voucherNumber.Trim(),
@@ -126,9 +114,7 @@ public sealed class PaymentVoucher : Entity<Guid>
             totalAmount,
             status,
             Normalize(description),
-            journalEntryId,
-            createdBy,
-            createdAtUtc);
+            journalEntryId);
     }
 
     public void AddLine(PaymentVoucherLine line)

@@ -37,9 +37,7 @@ public class ReceiptVoucherDomainTests
             5000m,
             ReceiptVoucherStatus.Draft,
             "سند قبض نقدي",
-            null,
-            _userId,
-            DateTime.UtcNow);
+            null);
 
         Assert.That(voucher.Id, Is.EqualTo(_voucherId));
         Assert.That(voucher.VoucherNumber, Is.EqualTo("RV-2026-0001"));
@@ -57,7 +55,7 @@ public class ReceiptVoucherDomainTests
                 _voucherId, "RV-2026-0001", new DateOnly(2026, 1, 15),
                 ReceiptPartyType.Other, null, "أحمد", PaymentMethod.Cash,
                 _cashAccountId, null, 0m, ReceiptVoucherStatus.Draft,
-                null, null, _userId, DateTime.UtcNow));
+                null, null));
     }
 
     [Test]
@@ -67,7 +65,7 @@ public class ReceiptVoucherDomainTests
             _voucherId, "RV-2026-0001", new DateOnly(2026, 1, 15),
             ReceiptPartyType.Customer, _customerId, "شركة الأمل", PaymentMethod.Cash,
             _cashAccountId, null, 5000m, ReceiptVoucherStatus.Draft,
-            "سند قبض", null, _userId, DateTime.UtcNow);
+            "سند قبض", null);
 
         var journalId = Guid.NewGuid();
         var postedAt = DateTime.UtcNow;
@@ -89,7 +87,7 @@ public class ReceiptVoucherDomainTests
             _voucherId, "RV-2026-0001", new DateOnly(2026, 1, 15),
             ReceiptPartyType.Customer, _customerId, "شركة الأمل", PaymentMethod.Cash,
             _cashAccountId, null, 5000m, ReceiptVoucherStatus.Draft,
-            "سند قبض", null, _userId, DateTime.UtcNow);
+            "سند قبض", null);
 
         voucher.Cancel();
 

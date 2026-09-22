@@ -37,9 +37,7 @@ public class PaymentVoucherDomainTests
             8500m,
             PaymentVoucherStatus.Draft,
             "سند صرف للمورد",
-            null,
-            _userId,
-            DateTime.UtcNow);
+            null);
 
         Assert.That(voucher.Id, Is.EqualTo(_voucherId));
         Assert.That(voucher.VoucherNumber, Is.EqualTo("PV-2026-0001"));
@@ -56,7 +54,7 @@ public class PaymentVoucherDomainTests
             _voucherId, "PV-2026-0001", new DateOnly(2026, 1, 15),
             PaymentPartyType.Supplier, _supplierId, "مؤسسة النور", PaymentMethod.BankTransfer,
             null, _bankAccountId, 8500m, PaymentVoucherStatus.Draft,
-            "سند صرف", null, _userId, DateTime.UtcNow);
+            "سند صرف", null);
 
         var journalId = Guid.NewGuid();
         var postedAt = DateTime.UtcNow;
@@ -78,7 +76,7 @@ public class PaymentVoucherDomainTests
             _voucherId, "PV-2026-0001", new DateOnly(2026, 1, 15),
             PaymentPartyType.Supplier, _supplierId, "مؤسسة النور", PaymentMethod.BankTransfer,
             null, _bankAccountId, 8500m, PaymentVoucherStatus.Draft,
-            "سند صرف", null, _userId, DateTime.UtcNow);
+            "سند صرف", null);
 
         voucher.Cancel();
 

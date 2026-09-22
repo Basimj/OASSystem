@@ -1,4 +1,4 @@
-﻿using OAS.Contracts.Accounting.Enums;
+using OAS.Contracts.Accounting.Enums;
 
 namespace OAS.Contracts.Accounting.Expenses;
 
@@ -16,7 +16,7 @@ public sealed record ExpenseDto(
     string? Description,
     ExpenseStatus Status,
     Guid? JournalEntryId,
-    Guid CreatedBy,
+    string? CreatedBy,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset? PostedAtUtc,
     string RowVersion);

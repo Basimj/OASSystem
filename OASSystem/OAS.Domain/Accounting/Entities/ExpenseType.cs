@@ -2,7 +2,7 @@ using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
 
-public sealed class ExpenseType : Entity<Guid>
+public sealed class ExpenseType : AuditableEntity<Guid>
 {
     private ExpenseType()
     {

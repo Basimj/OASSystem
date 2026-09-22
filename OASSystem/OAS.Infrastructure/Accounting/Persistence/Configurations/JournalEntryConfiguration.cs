@@ -8,9 +8,11 @@ public sealed class JournalEntryConfiguration : IEntityTypeConfiguration<Journal
 {
     public void Configure(EntityTypeBuilder<JournalEntry> builder)
     {
-        builder.ToTable("JournalEntries", "accounting");
+        builder.ToTable("tbl_JournalEntries", "accounting");
 
         builder.HasKey(x => x.Id);
+
+        builder.ConfigureAccountingAudit();
 
         builder.Property(x => x.Id)
             .ValueGeneratedNever();
@@ -51,14 +53,6 @@ public sealed class JournalEntryConfiguration : IEntityTypeConfiguration<Journal
             .HasConversion<byte>();
 
         builder.Property(x => x.ReversedJournalId);
-
-        builder.Property(x => x.CreatedBy)
-            .IsRequired();
-
-        builder.Property(x => x.CreatedAtUtc)
-            .IsRequired()
-            .HasColumnType("datetime2(3)");
-
         builder.Property(x => x.ApprovedBy);
 
         builder.Property(x => x.ApprovedAtUtc)

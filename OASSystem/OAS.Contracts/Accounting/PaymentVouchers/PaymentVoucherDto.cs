@@ -1,4 +1,4 @@
-﻿using OAS.Contracts.Accounting.Enums;
+using OAS.Contracts.Accounting.Enums;
 
 namespace OAS.Contracts.Accounting.PaymentVouchers;
 
@@ -16,7 +16,7 @@ public sealed record PaymentVoucherDto(
     PaymentVoucherStatus Status,
     string? Description,
     Guid? JournalEntryId,
-    Guid CreatedBy,
+    string? CreatedBy,
     DateTimeOffset CreatedAtUtc,
     Guid? PostedBy,
     DateTimeOffset? PostedAtUtc,

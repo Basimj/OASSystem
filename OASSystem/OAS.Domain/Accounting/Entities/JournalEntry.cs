@@ -1,10 +1,10 @@
-﻿
+
 using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
 
-public sealed class JournalEntry : Entity<Guid>
+public sealed class JournalEntry : AuditableEntity<Guid>
 {
     private readonly List<JournalEntryLine> _lines = [];
 
@@ -23,9 +23,7 @@ public sealed class JournalEntry : Entity<Guid>
         string? sourceModule,
         string? sourceDocumentType,
         Guid? sourceDocumentId,
-        JournalEntryStatus status,
-        Guid createdBy,
-        DateTime createdAtUtc)
+        JournalEntryStatus status)
     {
         Id = id;
         JournalNumber = journalNumber;
@@ -38,8 +36,6 @@ public sealed class JournalEntry : Entity<Guid>
         SourceDocumentType = sourceDocumentType;
         SourceDocumentId = sourceDocumentId;
         Status = status;
-        CreatedBy = createdBy;
-        CreatedAtUtc = createdAtUtc;
     }
 
     public string JournalNumber { get; private set; } = null!;
@@ -64,9 +60,6 @@ public sealed class JournalEntry : Entity<Guid>
 
     public Guid? ReversedJournalId { get; private set; }
 
-    public Guid CreatedBy { get; private set; }
-
-    public DateTime CreatedAtUtc { get; private set; }
 
     public Guid? ApprovedBy { get; private set; }
 
@@ -91,9 +84,7 @@ public sealed class JournalEntry : Entity<Guid>
         string? sourceModule,
         string? sourceDocumentType,
         Guid? sourceDocumentId,
-        JournalEntryStatus status,
-        Guid createdBy,
-        DateTime createdAtUtc)
+        JournalEntryStatus status)
     {
         if (id == Guid.Empty)
             throw new ArgumentException(
@@ -115,11 +106,6 @@ public sealed class JournalEntry : Entity<Guid>
                 "Journal description is required.",
                 nameof(description));
 
-        if (createdBy == Guid.Empty)
-            throw new ArgumentException(
-                "Created by is required.",
-                nameof(createdBy));
-
         return new JournalEntry(
             id,
             journalNumber.Trim(),
@@ -131,9 +117,7 @@ public sealed class JournalEntry : Entity<Guid>
             Normalize(sourceModule),
             Normalize(sourceDocumentType),
             sourceDocumentId,
-            status,
-            createdBy,
-            createdAtUtc);
+            status);
     }
 
     public void AddLine(JournalEntryLine line)

@@ -52,8 +52,7 @@ public class JournalCommandAndQueryTests
     {
         var handler = new CreateJournalEntryCommandHandler(
             _journalRepository,
-            _sequenceGenerator,
-            _currentUser);
+            _sequenceGenerator);
 
         var request = new CreateJournalEntryRequest(
             JournalType: JournalType.Manual,
@@ -170,9 +169,7 @@ public class JournalCommandAndQueryTests
             null,
             null,
             null,
-            DomainJournalStatus.Draft,
-            Guid.Parse(_currentUser.UserId!),
-            DateTime.UtcNow);
+            DomainJournalStatus.Draft);
 
         var debitLine = JournalEntryLine.Create(
             Guid.NewGuid(),
@@ -267,9 +264,7 @@ public class JournalCommandAndQueryTests
             null,
             null,
             null,
-            DomainJournalStatus.Draft,
-            Guid.Parse(_currentUser.UserId!),
-            DateTime.UtcNow);
+            DomainJournalStatus.Draft);
 
         var debitLine = JournalEntryLine.Create(
             Guid.NewGuid(),
@@ -325,9 +320,7 @@ public class JournalCommandAndQueryTests
         var handler = new ReverseJournalEntryCommandHandler(
             _journalRepository,
             _lineRepository,
-            _sequenceGenerator,
-            _currentUser,
-            TimeProvider.System);
+            _sequenceGenerator);
 
         var command = new ReverseJournalEntryCommand(journal.Id);
 
@@ -381,9 +374,7 @@ public class JournalCommandAndQueryTests
             null,
             null,
             null,
-            DomainJournalStatus.Draft,
-            Guid.Parse(_currentUser.UserId!),
-            DateTime.UtcNow);
+            DomainJournalStatus.Draft);
 
         var debitLine = JournalEntryLine.Create(
             Guid.NewGuid(),

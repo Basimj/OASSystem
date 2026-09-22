@@ -8,9 +8,11 @@ public sealed class ReceiptVoucherConfiguration : IEntityTypeConfiguration<Recei
 {
     public void Configure(EntityTypeBuilder<ReceiptVoucher> builder)
     {
-        builder.ToTable("ReceiptVouchers", "accounting");
+        builder.ToTable("tbl_ReceiptVouchers", "accounting");
 
         builder.HasKey(x => x.Id);
+
+        builder.ConfigureAccountingAudit();
 
         builder.Property(x => x.Id)
             .ValueGeneratedNever();
@@ -52,14 +54,6 @@ public sealed class ReceiptVoucherConfiguration : IEntityTypeConfiguration<Recei
             .HasMaxLength(500);
 
         builder.Property(x => x.JournalEntryId);
-
-        builder.Property(x => x.CreatedBy)
-            .IsRequired();
-
-        builder.Property(x => x.CreatedAtUtc)
-            .IsRequired()
-            .HasColumnType("datetime2(3)");
-
         builder.Property(x => x.PostedBy);
 
         builder.Property(x => x.PostedAtUtc)

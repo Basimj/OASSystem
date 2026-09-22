@@ -3,7 +3,7 @@ using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
 
-public sealed class PaymentAllocation : Entity<Guid>
+public sealed class PaymentAllocation : AuditableEntity<Guid>
 {
     private PaymentAllocation()
     {
@@ -16,8 +16,7 @@ public sealed class PaymentAllocation : Entity<Guid>
         AllocationTargetDocumentType targetDocumentType,
         Guid targetDocumentId,
         decimal allocatedAmount,
-        DateTime allocatedAtUtc,
-        Guid createdBy)
+        DateTime allocatedAtUtc)
     {
         Id = id;
         PaymentSourceType = paymentSourceType;
@@ -26,7 +25,6 @@ public sealed class PaymentAllocation : Entity<Guid>
         TargetDocumentId = targetDocumentId;
         AllocatedAmount = allocatedAmount;
         AllocatedAtUtc = allocatedAtUtc;
-        CreatedBy = createdBy;
     }
 
     public PaymentSourceType PaymentSourceType { get; private set; }
@@ -41,7 +39,6 @@ public sealed class PaymentAllocation : Entity<Guid>
 
     public DateTime AllocatedAtUtc { get; private set; }
 
-    public Guid CreatedBy { get; private set; }
 
 
     public void UpdateAllocatedAmount(decimal allocatedAmount)
@@ -61,8 +58,7 @@ public sealed class PaymentAllocation : Entity<Guid>
         AllocationTargetDocumentType targetDocumentType,
         Guid targetDocumentId,
         decimal allocatedAmount,
-        DateTime allocatedAtUtc,
-        Guid createdBy)
+        DateTime allocatedAtUtc)
     {
         if (id == Guid.Empty)
             throw new ArgumentException("Id is required.", nameof(id));
@@ -82,9 +78,6 @@ public sealed class PaymentAllocation : Entity<Guid>
                 nameof(allocatedAmount),
                 "Allocated amount must be greater than zero.");
 
-        if (createdBy == Guid.Empty)
-            throw new ArgumentException("Created by is required.", nameof(createdBy));
-
         return new PaymentAllocation(
             id,
             paymentSourceType,
@@ -92,7 +85,6 @@ public sealed class PaymentAllocation : Entity<Guid>
             targetDocumentType,
             targetDocumentId,
             allocatedAmount,
-            allocatedAtUtc,
-            createdBy);
+            allocatedAtUtc);
     }
 }

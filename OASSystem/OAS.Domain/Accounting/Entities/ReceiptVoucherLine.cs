@@ -1,8 +1,8 @@
-﻿using OAS.Domain.Common.Entities;
+using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
 
-public sealed class ReceiptVoucherLine : Entity<Guid>
+public sealed class ReceiptVoucherLine : AuditableEntity<Guid>
 {
     private ReceiptVoucherLine()
     {

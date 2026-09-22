@@ -1,7 +1,6 @@
 using MediatR;
 using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Abstractions.Persistence.Specifications;
-using OAS.Application.Abstractions.Security;
 using OAS.Application.Common.Exceptions;
 using OAS.Domain.Accounting.Entities;
 using DomainAllocationTargetDocumentType = OAS.Domain.Accounting.Enums.AllocationTargetDocumentType;
@@ -13,7 +12,6 @@ public sealed class CreatePaymentAllocationCommandHandler(
     IRepository<PaymentAllocation, Guid> repository,
     IRepository<ReceiptVoucher, Guid> receiptVoucherRepository,
     IRepository<PaymentVoucher, Guid> paymentVoucherRepository,
-    ICurrentUser currentUser,
     TimeProvider timeProvider)
     : IRequestHandler<CreatePaymentAllocationCommand, Guid>
 {
@@ -21,9 +19,6 @@ public sealed class CreatePaymentAllocationCommandHandler(
         CreatePaymentAllocationCommand request,
         CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(currentUser.UserId, out var userId))
-            throw new ForbiddenException();
-
         var data = request.Data;
         var sourceType = (DomainPaymentSourceType)(int)data.PaymentSourceType;
         var sourceAmount = await GetSourceAmountAsync(
@@ -52,8 +47,7 @@ public sealed class CreatePaymentAllocationCommandHandler(
             (DomainAllocationTargetDocumentType)(int)data.TargetDocumentType,
             data.TargetDocumentId,
             data.AllocatedAmount,
-            timeProvider.GetUtcNow().UtcDateTime,
-            userId);
+            timeProvider.GetUtcNow().UtcDateTime);
 
         await repository.AddAsync(entity, cancellationToken);
         return entity.Id;

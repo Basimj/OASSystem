@@ -1,8 +1,6 @@
-﻿using MediatR;
+using MediatR;
 using OAS.Application.Abstractions.Numbering;
 using OAS.Application.Abstractions.Persistence;
-using OAS.Application.Abstractions.Security;
-using OAS.Application.Common.Exceptions;
 using OAS.Contracts.Accounting.Journals;
 using OAS.Domain.Accounting.Entities;
 using DomainJournalEntryStatus = OAS.Domain.Accounting.Enums.JournalEntryStatus;
@@ -12,17 +10,13 @@ namespace OAS.Application.Accounting.Journals.Commands.CreateJournalEntry;
 
 public sealed class CreateJournalEntryCommandHandler(
     IRepository<JournalEntry, Guid> repository,
-    ISequenceNumberGenerator sequenceNumberGenerator,
-    ICurrentUser currentUser)
+    ISequenceNumberGenerator sequenceNumberGenerator)
     : IRequestHandler<CreateJournalEntryCommand, Guid>
 {
     public async Task<Guid> Handle(
         CreateJournalEntryCommand request,
         CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(currentUser.UserId, out var userId))
-            throw new ForbiddenException();
-
         var data = request.Request;
 
         var sequenceName =
@@ -50,9 +44,7 @@ public sealed class CreateJournalEntryCommandHandler(
                 data.SourceModule,
                 data.SourceDocumentType,
                 data.SourceDocumentId,
-                DomainJournalEntryStatus.Draft,
-                userId,
-                DateTime.UtcNow);
+                DomainJournalEntryStatus.Draft);
 
         var lineNumber = 1;
 

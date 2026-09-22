@@ -19,8 +19,7 @@ public sealed class CustomerAccountMapper
             source.CustomerId,
             source.AccountId,
             source.ControlAccountId,
-            source.IsActive,
-            DateTime.UtcNow);
+            source.IsActive);
     }
 
     public void Update(UpdateCustomerAccountRequest source, CustomerAccount destination)

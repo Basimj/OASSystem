@@ -1,8 +1,8 @@
-﻿using OAS.Domain.Common.Entities;
+using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
 
-public sealed class PostingProfileLine : Entity<Guid>
+public sealed class PostingProfileLine : AuditableEntity<Guid>
 {
     private PostingProfileLine()
     {

@@ -2,7 +2,7 @@ using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
 
-public sealed class SupplierAccount : Entity<Guid>
+public sealed class SupplierAccount : AuditableEntity<Guid>
 {
     private SupplierAccount()
     {
@@ -13,15 +13,13 @@ public sealed class SupplierAccount : Entity<Guid>
         Guid supplierId,
         Guid accountId,
         Guid controlAccountId,
-        bool isActive,
-        DateTime createdAtUtc)
+        bool isActive)
     {
         Id = id;
         SupplierId = supplierId;
         AccountId = accountId;
         ControlAccountId = controlAccountId;
         IsActive = isActive;
-        CreatedAtUtc = createdAtUtc;
     }
 
     public Guid SupplierId { get; private set; }
@@ -32,7 +30,6 @@ public sealed class SupplierAccount : Entity<Guid>
 
     public bool IsActive { get; private set; }
 
-    public DateTime CreatedAtUtc { get; private set; }
 
     public byte[] RowVersion { get; private set; } = [];
 
@@ -41,8 +38,7 @@ public sealed class SupplierAccount : Entity<Guid>
         Guid supplierId,
         Guid accountId,
         Guid controlAccountId,
-        bool isActive,
-        DateTime createdAtUtc)
+        bool isActive)
     {
         if (id == Guid.Empty)
             throw new ArgumentException("Id is required.", nameof(id));
@@ -63,8 +59,7 @@ public sealed class SupplierAccount : Entity<Guid>
             supplierId,
             accountId,
             controlAccountId,
-            isActive,
-            createdAtUtc);
+            isActive);
     }
 
     public void UpdateAccounts(

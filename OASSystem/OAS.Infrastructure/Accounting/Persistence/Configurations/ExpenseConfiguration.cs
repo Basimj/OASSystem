@@ -8,9 +8,11 @@ public sealed class ExpenseConfiguration : IEntityTypeConfiguration<Expense>
 {
     public void Configure(EntityTypeBuilder<Expense> builder)
     {
-        builder.ToTable("Expenses", "accounting");
+        builder.ToTable("tbl_Expenses", "accounting");
 
         builder.HasKey(x => x.Id);
+
+        builder.ConfigureAccountingAudit();
 
         builder.Property(x => x.Id)
             .ValueGeneratedNever();
@@ -52,14 +54,6 @@ public sealed class ExpenseConfiguration : IEntityTypeConfiguration<Expense>
             .HasConversion<byte>();
 
         builder.Property(x => x.JournalEntryId);
-
-        builder.Property(x => x.CreatedBy)
-            .IsRequired();
-
-        builder.Property(x => x.CreatedAtUtc)
-            .IsRequired()
-            .HasColumnType("datetime2(3)");
-
         builder.Property(x => x.PostedAtUtc)
             .HasColumnType("datetime2(3)");
 

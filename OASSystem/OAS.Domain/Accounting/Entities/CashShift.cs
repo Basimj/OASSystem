@@ -3,7 +3,7 @@ using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
 
-public sealed class CashShift : Entity<Guid>
+public sealed class CashShift : AuditableEntity<Guid>
 {
     private CashShift()
     {

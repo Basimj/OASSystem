@@ -47,7 +47,6 @@ public class PaymentAllocationCommandAndQueryTests
             _allocationRepository,
             _receiptRepository,
             _paymentRepository,
-            _currentUser,
             TimeProvider.System);
 
         var request = new CreatePaymentAllocationRequest(
@@ -81,7 +80,6 @@ public class PaymentAllocationCommandAndQueryTests
             _allocationRepository,
             _receiptRepository,
             _paymentRepository,
-            _currentUser,
             TimeProvider.System);
 
         var request = new CreatePaymentAllocationRequest(
@@ -107,7 +105,6 @@ public class PaymentAllocationCommandAndQueryTests
             _allocationRepository,
             _receiptRepository,
             _paymentRepository,
-            _currentUser,
             TimeProvider.System);
 
         var request = new CreatePaymentAllocationRequest(
@@ -189,8 +186,7 @@ public class PaymentAllocationCommandAndQueryTests
             DomainAllocationTargetDocumentType.SalesInvoice,
             Guid.NewGuid(),
             250m,
-            DateTime.UtcNow,
-            Guid.NewGuid());
+            DateTime.UtcNow);
 
         await _allocationRepository.AddAsync(allocation);
 
@@ -224,9 +220,7 @@ public class PaymentAllocationCommandAndQueryTests
             totalAmount,
             DomainReceiptVoucherStatus.Posted,
             "سند اختبار",
-            Guid.NewGuid(),
-            Guid.Parse(_currentUser.UserId!),
-            DateTime.UtcNow);
+            Guid.NewGuid());
 
     private static PaymentAllocation CreateAllocation(Guid sourceId, decimal amount) =>
         PaymentAllocation.Create(
@@ -236,6 +230,5 @@ public class PaymentAllocationCommandAndQueryTests
             DomainAllocationTargetDocumentType.SalesInvoice,
             Guid.NewGuid(),
             amount,
-            DateTime.UtcNow,
-            Guid.NewGuid());
+            DateTime.UtcNow);
 }

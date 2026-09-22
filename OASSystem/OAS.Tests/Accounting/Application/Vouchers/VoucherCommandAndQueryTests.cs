@@ -86,9 +86,7 @@ public class VoucherCommandAndQueryTests
         var handler =
             new CreateReceiptVoucherCommandHandler(
                 _receiptRepository,
-                _sequenceGenerator,
-                _currentUser,
-                TimeProvider.System);
+                _sequenceGenerator);
 
         var request = new CreateReceiptVoucherRequest(
             VoucherDate: new DateOnly(2026, 1, 15),
@@ -151,9 +149,7 @@ public class VoucherCommandAndQueryTests
         var handler =
             new CreatePaymentVoucherCommandHandler(
                 _paymentRepository,
-                _sequenceGenerator,
-                _currentUser,
-                TimeProvider.System);
+                _sequenceGenerator);
 
         var request = new CreatePaymentVoucherRequest(
             VoucherDate: new DateOnly(2026, 1, 15),
@@ -226,9 +222,7 @@ public class VoucherCommandAndQueryTests
             1500m,
             DomainReceiptStatus.Draft,
             "سند",
-            null,
-            Guid.Parse(_currentUser.UserId!),
-            DateTime.UtcNow);
+            null);
 
         await _receiptRepository.AddAsync(voucher);
 
@@ -297,9 +291,7 @@ public class VoucherCommandAndQueryTests
             2200m,
             DomainPaymentStatus.Draft,
             "سند صرف",
-            null,
-            Guid.Parse(_currentUser.UserId!),
-            DateTime.UtcNow);
+            null);
 
         await _paymentRepository.AddAsync(voucher);
 

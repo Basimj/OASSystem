@@ -2,7 +2,7 @@ using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
 
-public sealed class BankAccount : Entity<Guid>
+public sealed class BankAccount : AuditableEntity<Guid>
 {
     private BankAccount()
     {

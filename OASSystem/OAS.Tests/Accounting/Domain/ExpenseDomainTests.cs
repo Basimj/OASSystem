@@ -39,9 +39,7 @@ public class ExpenseDomainTests
             null,
             "مصاريف مرافق شهر يناير",
             ExpenseStatus.Draft,
-            null,
-            _userId,
-            DateTime.UtcNow);
+            null);
 
         Assert.That(expense.Id, Is.EqualTo(_expenseId));
         Assert.That(expense.ExpenseNumber, Is.EqualTo("EXP-2026-0001"));
@@ -57,7 +55,7 @@ public class ExpenseDomainTests
             _expenseId, "EXP-2026-0001", new DateOnly(2026, 1, 20),
             _expenseTypeId, _expenseAccountId, "المورد", 300m,
             PaymentMethod.Cash, _cashAccountId, null, "مصروف",
-            ExpenseStatus.Draft, null, _userId, DateTime.UtcNow);
+            ExpenseStatus.Draft, null);
 
         expense.Approve();
 
@@ -71,7 +69,7 @@ public class ExpenseDomainTests
             _expenseId, "EXP-2026-0001", new DateOnly(2026, 1, 20),
             _expenseTypeId, _expenseAccountId, "المورد", 300m,
             PaymentMethod.Cash, _cashAccountId, null, "مصروف",
-            ExpenseStatus.Draft, null, _userId, DateTime.UtcNow);
+            ExpenseStatus.Draft, null);
 
         expense.Approve();
 

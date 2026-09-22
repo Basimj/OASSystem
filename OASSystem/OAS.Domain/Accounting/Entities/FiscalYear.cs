@@ -3,7 +3,7 @@ using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
 
-public sealed class FiscalYear : Entity<Guid>
+public sealed class FiscalYear : AuditableEntity<Guid>
 {
     private FiscalYear()
     {

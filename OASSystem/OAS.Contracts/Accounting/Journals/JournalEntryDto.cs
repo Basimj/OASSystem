@@ -1,4 +1,4 @@
-﻿using OAS.Contracts.Accounting.Enums;
+using OAS.Contracts.Accounting.Enums;
 
 namespace OAS.Contracts.Accounting.Journals;
 
@@ -15,7 +15,7 @@ public sealed record JournalEntryDto(
     Guid? SourceDocumentId,
     JournalEntryStatus Status,
     Guid? ReversedJournalId,
-    Guid CreatedBy,
+    string? CreatedBy,
     DateTimeOffset CreatedAtUtc,
     Guid? ApprovedBy,
     DateTimeOffset? ApprovedAtUtc,

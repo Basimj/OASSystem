@@ -1,9 +1,9 @@
-﻿
+
 using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
 
-public sealed class JournalEntryLine : Entity<Guid>
+public sealed class JournalEntryLine : AuditableEntity<Guid>
 {
     private JournalEntryLine()
     {

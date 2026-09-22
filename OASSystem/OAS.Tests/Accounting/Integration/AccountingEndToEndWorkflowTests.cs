@@ -71,7 +71,7 @@ public class AccountingEndToEndWorkflowTests
             Guid.NewGuid(), "JV-2026-000001", JournalType.Manual,
             today, today, fiscalPeriod.Id, "قيد تسوية إيراد",
             null, null, null,
-            JournalEntryStatus.Draft, adminUserId, now);
+            JournalEntryStatus.Draft);
 
         var debitLine = JournalEntryLine.Create(
             Guid.NewGuid(), journal.Id, 1, cashAccount.Id,
@@ -96,7 +96,7 @@ public class AccountingEndToEndWorkflowTests
             ReceiptPartyType.Customer, Guid.NewGuid(), "عميل نقدي",
             PaymentMethod.Cash, cashAccount.Id, null,
             1500m, ReceiptVoucherStatus.Draft, "سند قبض نقدي",
-            null, adminUserId, now);
+            null);
 
         var rvLine = ReceiptVoucherLine.Create(
             Guid.NewGuid(), rv.Id, 1, salesRevenueAccount.Id,
@@ -115,7 +115,7 @@ public class AccountingEndToEndWorkflowTests
             PaymentPartyType.Supplier, Guid.NewGuid(), "مؤسسة النور",
             PaymentMethod.BankTransfer, null, bankAccount.Id,
             800m, PaymentVoucherStatus.Draft, "سند صرف بنكي",
-            null, adminUserId, now);
+            null);
 
         var pvLine = PaymentVoucherLine.Create(
             Guid.NewGuid(), pv.Id, 1, maintenanceExpenseAccount.Id,
@@ -132,8 +132,7 @@ public class AccountingEndToEndWorkflowTests
             Guid.NewGuid(), "EXP-2026-000001", today,
             Guid.NewGuid(), maintenanceExpenseAccount.Id, "فني الصيانة",
             200m, PaymentMethod.Cash, cashAccount.Id, null,
-            "إصلاح مكيفات", ExpenseStatus.Draft, null,
-            adminUserId, now);
+            "إصلاح مكيفات", ExpenseStatus.Draft, null);
 
         expense.Approve();
         Assert.That(expense.Status, Is.EqualTo(ExpenseStatus.Approved));

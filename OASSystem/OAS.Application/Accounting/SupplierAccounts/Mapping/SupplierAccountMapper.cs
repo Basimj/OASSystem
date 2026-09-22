@@ -19,8 +19,7 @@ public sealed class SupplierAccountMapper
             source.SupplierId,
             source.AccountId,
             source.ControlAccountId,
-            source.IsActive,
-            DateTime.UtcNow);
+            source.IsActive);
     }
 
     public void Update(UpdateSupplierAccountRequest source, SupplierAccount destination)

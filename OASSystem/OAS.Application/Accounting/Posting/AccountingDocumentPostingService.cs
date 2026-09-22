@@ -51,8 +51,6 @@ public sealed class AccountingDocumentPostingService(
             BuildDescription("Receipt voucher", voucher.VoucherNumber, voucher.Description),
             "ReceiptVoucher",
             voucher.Id,
-            postedBy,
-            postedAtUtc,
             cancellationToken);
 
         journal.AddLine(JournalEntryLine.Create(
@@ -108,8 +106,6 @@ public sealed class AccountingDocumentPostingService(
             BuildDescription("Payment voucher", voucher.VoucherNumber, voucher.Description),
             "PaymentVoucher",
             voucher.Id,
-            postedBy,
-            postedAtUtc,
             cancellationToken);
 
         var lineNumber = 1;
@@ -153,8 +149,6 @@ public sealed class AccountingDocumentPostingService(
             BuildDescription("Expense", expense.ExpenseNumber, expense.Description),
             "Expense",
             expense.Id,
-            postedBy,
-            postedAtUtc,
             cancellationToken);
 
         journal.AddLine(JournalEntryLine.Create(
@@ -178,8 +172,6 @@ public sealed class AccountingDocumentPostingService(
         string description,
         string sourceDocumentType,
         Guid sourceDocumentId,
-        Guid createdBy,
-        DateTime createdAtUtc,
         CancellationToken cancellationToken)
     {
         var period = await ResolveFiscalPeriodAsync(postingDate, cancellationToken);
@@ -198,9 +190,7 @@ public sealed class AccountingDocumentPostingService(
             "Accounting",
             sourceDocumentType,
             sourceDocumentId,
-            JournalEntryStatus.Draft,
-            createdBy,
-            createdAtUtc);
+            JournalEntryStatus.Draft);
     }
 
     private async Task<FiscalPeriod> ResolveFiscalPeriodAsync(

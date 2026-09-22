@@ -47,9 +47,7 @@ public class ExpenseCommandAndQueryTests
     {
         var handler = new CreateExpenseCommandHandler(
             _repository,
-            _sequenceGenerator,
-            _currentUser,
-            TimeProvider.System);
+            _sequenceGenerator);
 
         var request = new CreateExpenseRequest(
             ExpenseDate: new DateOnly(2026, 1, 20),
@@ -107,9 +105,7 @@ public class ExpenseCommandAndQueryTests
             null,
             "وصف",
             DomainExpenseStatus.Draft,
-            null,
-            Guid.Parse(_currentUser.UserId!),
-            DateTime.UtcNow);
+            null);
 
         await _repository.AddAsync(expense);
 
@@ -157,9 +153,7 @@ public class ExpenseCommandAndQueryTests
             null,
             "مصروف مرحل",
             DomainExpenseStatus.Draft,
-            null,
-            Guid.Parse(_currentUser.UserId!),
-            DateTime.UtcNow);
+            null);
 
         await _repository.AddAsync(expense);
 
@@ -233,9 +227,7 @@ public class ExpenseCommandAndQueryTests
             null,
             "وصف",
             DomainExpenseStatus.Draft,
-            null,
-            Guid.Parse(_currentUser.UserId!),
-            DateTime.UtcNow);
+            null);
 
         await _repository.AddAsync(expense);
 

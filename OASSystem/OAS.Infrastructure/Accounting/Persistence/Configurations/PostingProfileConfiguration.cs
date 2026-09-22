@@ -8,9 +8,11 @@ public sealed class PostingProfileConfiguration : IEntityTypeConfiguration<Posti
 {
     public void Configure(EntityTypeBuilder<PostingProfile> builder)
     {
-        builder.ToTable("PostingProfiles", "accounting");
+        builder.ToTable("tbl_PostingProfiles", "accounting");
 
         builder.HasKey(x => x.Id);
+
+        builder.ConfigureAccountingAudit();
 
         builder.Property(x => x.Id)
             .ValueGeneratedNever();

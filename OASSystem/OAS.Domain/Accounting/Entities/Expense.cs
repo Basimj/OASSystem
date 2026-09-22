@@ -3,7 +3,7 @@ using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
 
-public sealed class Expense : Entity<Guid>
+public sealed class Expense : AuditableEntity<Guid>
 {
     private Expense()
     {
@@ -22,9 +22,7 @@ public sealed class Expense : Entity<Guid>
         Guid? bankAccountId,
         string? description,
         ExpenseStatus status,
-        Guid? journalEntryId,
-        Guid createdBy,
-        DateTime createdAtUtc)
+        Guid? journalEntryId)
     {
         Id = id;
         ExpenseNumber = expenseNumber;
@@ -39,8 +37,6 @@ public sealed class Expense : Entity<Guid>
         Description = description;
         Status = status;
         JournalEntryId = journalEntryId;
-        CreatedBy = createdBy;
-        CreatedAtUtc = createdAtUtc;
     }
 
     public string ExpenseNumber { get; private set; } = null!;
@@ -67,9 +63,6 @@ public sealed class Expense : Entity<Guid>
 
     public Guid? JournalEntryId { get; private set; }
 
-    public Guid CreatedBy { get; private set; }
-
-    public DateTime CreatedAtUtc { get; private set; }
 
     public DateTime? PostedAtUtc { get; private set; }
 
@@ -88,9 +81,7 @@ public sealed class Expense : Entity<Guid>
         Guid? bankAccountId,
         string? description,
         ExpenseStatus status,
-        Guid? journalEntryId,
-        Guid createdBy,
-        DateTime createdAtUtc)
+        Guid? journalEntryId)
     {
         if (id == Guid.Empty)
             throw new ArgumentException("Id is required.", nameof(id));
@@ -115,11 +106,6 @@ public sealed class Expense : Entity<Guid>
                 nameof(amount),
                 "Amount must be greater than zero.");
 
-        if (createdBy == Guid.Empty)
-            throw new ArgumentException(
-                "Created by is required.",
-                nameof(createdBy));
-
         return new Expense(
             id,
             expenseNumber.Trim(),
@@ -133,9 +119,7 @@ public sealed class Expense : Entity<Guid>
             bankAccountId,
             Normalize(description),
             status,
-            journalEntryId,
-            createdBy,
-            createdAtUtc);
+            journalEntryId);
     }
 
     public void UpdateDetails(

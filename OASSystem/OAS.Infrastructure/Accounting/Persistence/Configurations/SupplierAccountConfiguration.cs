@@ -8,9 +8,11 @@ public sealed class SupplierAccountConfiguration : IEntityTypeConfiguration<Supp
 {
     public void Configure(EntityTypeBuilder<SupplierAccount> builder)
     {
-        builder.ToTable("SupplierAccounts", "accounting");
+        builder.ToTable("tbl_SupplierAccounts", "accounting");
 
         builder.HasKey(x => x.Id);
+
+        builder.ConfigureAccountingAudit();
 
         builder.Property(x => x.Id)
             .ValueGeneratedNever();
@@ -26,11 +28,6 @@ public sealed class SupplierAccountConfiguration : IEntityTypeConfiguration<Supp
 
         builder.Property(x => x.IsActive)
             .IsRequired();
-
-        builder.Property(x => x.CreatedAtUtc)
-            .IsRequired()
-            .HasColumnType("datetime2(3)");
-
         builder.Property(x => x.RowVersion)
             .IsRowVersion()
             .IsConcurrencyToken();

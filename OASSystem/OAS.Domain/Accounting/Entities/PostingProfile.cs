@@ -2,7 +2,7 @@ using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
 
-public sealed class PostingProfile : Entity<Guid>
+public sealed class PostingProfile : AuditableEntity<Guid>
 {
     private PostingProfile()
     {

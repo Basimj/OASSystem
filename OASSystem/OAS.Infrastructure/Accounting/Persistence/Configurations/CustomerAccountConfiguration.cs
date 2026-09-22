@@ -8,9 +8,11 @@ public sealed class CustomerAccountConfiguration : IEntityTypeConfiguration<Cust
 {
     public void Configure(EntityTypeBuilder<CustomerAccount> builder)
     {
-        builder.ToTable("CustomerAccounts", "accounting");
+        builder.ToTable("tbl_CustomerAccounts", "accounting");
 
         builder.HasKey(x => x.Id);
+
+        builder.ConfigureAccountingAudit();
 
         builder.Property(x => x.Id)
             .ValueGeneratedNever();
@@ -26,11 +28,6 @@ public sealed class CustomerAccountConfiguration : IEntityTypeConfiguration<Cust
 
         builder.Property(x => x.IsActive)
             .IsRequired();
-
-        builder.Property(x => x.CreatedAtUtc)
-            .IsRequired()
-            .HasColumnType("datetime2(3)");
-
         builder.Property(x => x.RowVersion)
             .IsRowVersion()
             .IsConcurrencyToken();

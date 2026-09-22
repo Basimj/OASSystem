@@ -3,7 +3,7 @@ using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
 
-public sealed class ReceiptVoucher : Entity<Guid>
+public sealed class ReceiptVoucher : AuditableEntity<Guid>
 {
     private ReceiptVoucher()
     {
@@ -22,9 +22,7 @@ public sealed class ReceiptVoucher : Entity<Guid>
         decimal totalAmount,
         ReceiptVoucherStatus status,
         string? description,
-        Guid? journalEntryId,
-        Guid createdBy,
-        DateTime createdAtUtc)
+        Guid? journalEntryId)
     {
         Id = id;
         VoucherNumber = voucherNumber;
@@ -39,8 +37,6 @@ public sealed class ReceiptVoucher : Entity<Guid>
         Status = status;
         Description = description;
         JournalEntryId = journalEntryId;
-        CreatedBy = createdBy;
-        CreatedAtUtc = createdAtUtc;
     }
 
     public string VoucherNumber { get; private set; } = null!;
@@ -67,9 +63,6 @@ public sealed class ReceiptVoucher : Entity<Guid>
 
     public Guid? JournalEntryId { get; private set; }
 
-    public Guid CreatedBy { get; private set; }
-
-    public DateTime CreatedAtUtc { get; private set; }
 
     public Guid? PostedBy { get; private set; }
 
@@ -93,9 +86,7 @@ public sealed class ReceiptVoucher : Entity<Guid>
         decimal totalAmount,
         ReceiptVoucherStatus status,
         string? description,
-        Guid? journalEntryId,
-        Guid createdBy,
-        DateTime createdAtUtc)
+        Guid? journalEntryId)
     {
         ValidateAmount(totalAmount);
 
@@ -106,9 +97,6 @@ public sealed class ReceiptVoucher : Entity<Guid>
             throw new ArgumentException(
                 "Voucher number is required.",
                 nameof(voucherNumber));
-
-        if (createdBy == Guid.Empty)
-            throw new ArgumentException("Created by is required.", nameof(createdBy));
 
         return new ReceiptVoucher(
             id,
@@ -123,9 +111,7 @@ public sealed class ReceiptVoucher : Entity<Guid>
             totalAmount,
             status,
             Normalize(description),
-            journalEntryId,
-            createdBy,
-            createdAtUtc);
+            journalEntryId);
     }
 
     public void AddLine(ReceiptVoucherLine line)

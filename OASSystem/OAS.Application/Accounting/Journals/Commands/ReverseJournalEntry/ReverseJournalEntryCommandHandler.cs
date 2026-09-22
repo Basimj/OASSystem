@@ -2,7 +2,6 @@ using MediatR;
 using OAS.Application.Abstractions.Numbering;
 using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Abstractions.Persistence.Specifications;
-using OAS.Application.Abstractions.Security;
 using OAS.Application.Common.Exceptions;
 using OAS.Domain.Accounting.Entities;
 using DomainJournalEntryStatus = OAS.Domain.Accounting.Enums.JournalEntryStatus;
@@ -13,9 +12,7 @@ namespace OAS.Application.Accounting.Journals.Commands.ReverseJournalEntry;
 public sealed class ReverseJournalEntryCommandHandler(
     IRepository<JournalEntry, Guid> repository,
     IReadRepository<JournalEntryLine, Guid> lineRepository,
-    ISequenceNumberGenerator sequenceNumberGenerator,
-    ICurrentUser currentUser,
-    TimeProvider timeProvider)
+    ISequenceNumberGenerator sequenceNumberGenerator)
     : IRequestHandler<ReverseJournalEntryCommand, Guid>
 {
     public async Task<Guid> Handle(
@@ -28,9 +25,6 @@ public sealed class ReverseJournalEntryCommandHandler(
 
         if (original.Status != DomainJournalEntryStatus.Posted)
             throw new InvalidOperationException("Only posted journal entries can be reversed.");
-
-        if (!Guid.TryParse(currentUser.UserId, out var userId))
-            throw new ForbiddenException();
 
         var originalLines = await lineRepository.ListAsync(
             new Specification<JournalEntryLine>()
@@ -61,9 +55,7 @@ public sealed class ReverseJournalEntryCommandHandler(
             "Accounting",
             "JournalEntryReversal",
             original.Id,
-            DomainJournalEntryStatus.Draft,
-            userId,
-            timeProvider.GetUtcNow().UtcDateTime);
+            DomainJournalEntryStatus.Draft);
 
         foreach (var originalLine in originalLines)
         {

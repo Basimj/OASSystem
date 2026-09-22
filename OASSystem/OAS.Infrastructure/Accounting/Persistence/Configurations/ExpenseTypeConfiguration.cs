@@ -8,9 +8,11 @@ public sealed class ExpenseTypeConfiguration : IEntityTypeConfiguration<ExpenseT
 {
     public void Configure(EntityTypeBuilder<ExpenseType> builder)
     {
-        builder.ToTable("ExpenseTypes", "accounting");
+        builder.ToTable("tbl_ExpenseTypes", "accounting");
 
         builder.HasKey(x => x.Id);
+
+        builder.ConfigureAccountingAudit();
 
         builder.Property(x => x.Id)
             .ValueGeneratedNever();

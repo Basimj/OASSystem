@@ -8,9 +8,11 @@ public sealed class JournalEntryLineConfiguration : IEntityTypeConfiguration<Jou
 {
     public void Configure(EntityTypeBuilder<JournalEntryLine> builder)
     {
-        builder.ToTable("JournalEntryLines", "accounting");
+        builder.ToTable("tbl_JournalEntryLines", "accounting");
 
         builder.HasKey(x => x.Id);
+
+        builder.ConfigureAccountingAudit();
 
         builder.Property(x => x.Id)
             .ValueGeneratedNever();

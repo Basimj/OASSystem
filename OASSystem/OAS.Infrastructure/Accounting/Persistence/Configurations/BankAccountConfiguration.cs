@@ -8,9 +8,11 @@ public sealed class BankAccountConfiguration : IEntityTypeConfiguration<BankAcco
 {
     public void Configure(EntityTypeBuilder<BankAccount> builder)
     {
-        builder.ToTable("BankAccounts", "accounting");
+        builder.ToTable("tbl_BankAccounts", "accounting");
 
         builder.HasKey(x => x.Id);
+
+        builder.ConfigureAccountingAudit();
 
         builder.Property(x => x.Id)
             .ValueGeneratedNever();

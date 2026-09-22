@@ -1,4 +1,4 @@
-﻿using OAS.Contracts.Accounting.Enums;
+using OAS.Contracts.Accounting.Enums;
 
 namespace OAS.Contracts.Accounting.PaymentAllocations;
 
@@ -10,4 +10,4 @@ public sealed record PaymentAllocationDto(
     Guid TargetDocumentId,
     decimal AllocatedAmount,
     DateTimeOffset AllocatedAtUtc,
-    Guid CreatedBy);
+    string? CreatedBy);

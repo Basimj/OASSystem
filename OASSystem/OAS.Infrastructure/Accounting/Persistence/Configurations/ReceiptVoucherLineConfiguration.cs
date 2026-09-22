@@ -8,9 +8,11 @@ public sealed class ReceiptVoucherLineConfiguration : IEntityTypeConfiguration<R
 {
     public void Configure(EntityTypeBuilder<ReceiptVoucherLine> builder)
     {
-        builder.ToTable("ReceiptVoucherLines", "accounting");
+        builder.ToTable("tbl_ReceiptVoucherLines", "accounting");
 
         builder.HasKey(x => x.Id);
+
+        builder.ConfigureAccountingAudit();
 
         builder.Property(x => x.Id)
             .ValueGeneratedNever();

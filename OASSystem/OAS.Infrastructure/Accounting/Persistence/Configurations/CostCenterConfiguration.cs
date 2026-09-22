@@ -8,9 +8,11 @@ public sealed class CostCenterConfiguration : IEntityTypeConfiguration<CostCente
 {
     public void Configure(EntityTypeBuilder<CostCenter> builder)
     {
-        builder.ToTable("CostCenters", "accounting");
+        builder.ToTable("tbl_CostCenters", "accounting");
 
         builder.HasKey(x => x.Id);
+
+        builder.ConfigureAccountingAudit();
 
         builder.Property(x => x.Id)
             .ValueGeneratedNever();

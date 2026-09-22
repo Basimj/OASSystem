@@ -8,9 +8,11 @@ public sealed class PaymentAllocationConfiguration : IEntityTypeConfiguration<Pa
 {
     public void Configure(EntityTypeBuilder<PaymentAllocation> builder)
     {
-        builder.ToTable("PaymentAllocations", "accounting");
+        builder.ToTable("tbl_PaymentAllocations", "accounting");
 
         builder.HasKey(x => x.Id);
+
+        builder.ConfigureAccountingAudit();
 
         builder.Property(x => x.Id)
             .ValueGeneratedNever();
@@ -36,10 +38,6 @@ public sealed class PaymentAllocationConfiguration : IEntityTypeConfiguration<Pa
         builder.Property(x => x.AllocatedAtUtc)
             .IsRequired()
             .HasColumnType("datetime2(3)");
-
-        builder.Property(x => x.CreatedBy)
-            .IsRequired();
-
         builder.HasIndex(x => x.PaymentSourceId)
             .HasDatabaseName("IX_PaymentAllocations_PaymentSourceId");
 
