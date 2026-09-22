@@ -13,6 +13,7 @@
                          Value="@Model.Code"
                          ValueChanged="OnCodeChanged"
                          Required="true"
+                         ErrorText="@Model.CodeError"
                          Placeholder="مثال: PP-SALES-INV"
                          ReadOnly="@(!IsNew)"
                          Disabled="@(!IsEditable || !IsNew)"
@@ -61,6 +62,7 @@
     public sealed class FormModel
     {
         public string Code { get; set; } = string.Empty;
+        public string? CodeError { get; set; }
         public string Name { get; set; } = string.Empty;
         public string Module { get; set; } = "Sales";
         public string DocumentType { get; set; } = "SalesInvoice";
@@ -76,7 +78,7 @@
     [Parameter] public EventCallback OnModelChanged { get; set; }
 
     private Task OnChanged() => OnModelChanged.InvokeAsync();
-    private async Task OnCodeChanged(string? value) { Model.Code = value ?? string.Empty; await OnChanged(); }
+    private async Task OnCodeChanged(string? value) { Model.Code = value ?? string.Empty; Model.CodeError = null; await OnChanged(); }
     private async Task OnNameChanged(string? value) { Model.Name = value ?? string.Empty; await OnChanged(); }
     private async Task OnModuleChanged(string? value) { Model.Module = value ?? string.Empty; await OnChanged(); }
     private async Task OnDocumentTypeChanged(string? value) { Model.DocumentType = value ?? string.Empty; await OnChanged(); }

@@ -1054,6 +1054,9 @@ public partial class AccountingWorkspaceHost : IDisposable
 
         try
         {
+            if (!await ValidateUniqueFieldsBeforeSaveAsync(tab))
+                return;
+
             switch (tab.EntityType)
             {
                 case AccountingEntityType.Accounts:
@@ -1111,9 +1114,10 @@ public partial class AccountingWorkspaceHost : IDisposable
         }
         catch (ApiClientException ex)
         {
-            // أخطاء التحقق/التعارض القادمة من الـ API يجب أن تظهر للمستخدم
-            // كرسالة واضحة بدون إسقاط واجهة Blazor أو إغلاق التبويب الحالي.
-            ApiFeedback.Show(ex.Error);
+            // القيود الفريدة تُفحص قبل الحفظ، وهذا الفرع مجرد حماية احتياطية
+            // لسباق نادر بين عمليتي حفظ متزامنتين.
+            if (!TryApplyUniqueConflictToModel(tab, ex.Error.Code))
+                ApiFeedback.Show(ex.Error);
         }
         catch (Exception)
         {

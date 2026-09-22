@@ -20,6 +20,7 @@
                          ValueExpression="@(() => Model.Code)"
                          ValueChanged="OnCodeChanged"
                          Required="true"
+                         ErrorText="@Model.CodeError"
                          ReadOnly="@(!IsNew)"
                          Disabled="@(!IsEditable || !IsNew)"
                          Size="ControlSize.Small" />
@@ -161,6 +162,8 @@ public sealed class FormModel
     {
         public string Code { get; set; } = string.Empty;
 
+        public string? CodeError { get; set; }
+
         public string NameAr { get; set; } = string.Empty;
 
         public string? NameEn { get; set; }
@@ -284,6 +287,7 @@ public sealed class FormModel
     private async Task OnCodeChanged(string? value)
     {
         Model.Code = value ?? string.Empty;
+        Model.CodeError = null;
 
         await OnChanged();
     }

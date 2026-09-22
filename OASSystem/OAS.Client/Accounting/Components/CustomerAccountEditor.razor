@@ -27,6 +27,7 @@
                 <UiInputText Label="معرف العميل (GUID)"
                              Value="@Model.CustomerIdText"
                              ValueChanged="OnCustomerIdTextChanged"
+                             ErrorText="@Model.CustomerIdError"
                              Placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                              Disabled="@(!IsEditable || !IsNew)" />
             }
@@ -67,6 +68,7 @@
     public sealed class FormModel
     {
         public Guid? CustomerId { get; set; }
+        public string? CustomerIdError { get; set; }
         public string CustomerIdText { get => CustomerId?.ToString("D") ?? string.Empty; set => CustomerId = Guid.TryParse(value, out var id) ? id : null; }
         public Guid? AccountId { get; set; }
         public Guid? ControlAccountId { get; set; }
@@ -89,12 +91,14 @@
     private void OnCustomerIdTextChanged(string? val)
     {
         Model.CustomerIdText = val ?? string.Empty;
+        Model.CustomerIdError = null;
         OnChanged();
     }
 
     private void OnCustomerChanged(string? val)
     {
         Model.CustomerId = Guid.TryParse(val, out var id) ? id : null;
+        Model.CustomerIdError = null;
         OnChanged();
     }
 

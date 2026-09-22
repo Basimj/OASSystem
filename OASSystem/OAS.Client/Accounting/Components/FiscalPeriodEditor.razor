@@ -32,6 +32,7 @@
             <UiInputText Label="رقم الفترة (1-12)"
                          Value="@Model.PeriodNumberText"
                          ValueChanged="OnPeriodNumberChanged"
+                         ErrorText="@Model.PeriodNumberError"
                          ReadOnly="@(!IsNew)"
                          Disabled="@(!CanEditIdentity)"
                          Size="ControlSize.Small" />
@@ -88,6 +89,7 @@
     {
         public Guid FiscalYearId { get; set; }
         public int PeriodNumber { get; set; } = 1;
+        public string? PeriodNumberError { get; set; }
         public string PeriodNumberText { get => PeriodNumber.ToString(); set { if (int.TryParse(value, out var number)) PeriodNumber = Math.Clamp(number, 1, 255); } }
         public string Name { get; set; } = string.Empty;
         public DateOnly StartDate { get; set; }
@@ -117,12 +119,14 @@
     private void OnFiscalYearChanged(string? value)
     {
         Model.FiscalYearId = Guid.TryParse(value, out var id) ? id : Guid.Empty;
+        Model.PeriodNumberError = null;
         OnChanged();
     }
 
     private void OnPeriodNumberChanged(string? value)
     {
         Model.PeriodNumberText = value ?? string.Empty;
+        Model.PeriodNumberError = null;
         OnChanged();
     }
 

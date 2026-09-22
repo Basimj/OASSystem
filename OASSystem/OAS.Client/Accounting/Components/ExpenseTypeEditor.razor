@@ -11,8 +11,9 @@
         <UiAccountingFormGrid Columns="2">
             <UiInputText Label="كود نوع المصروف"
                          Value="@Model.Code"
-                         ValueChanged="@(v => { Model.Code = v; OnChanged(); })"
+                         ValueChanged="OnCodeChanged"
                          Required="true"
+                         ErrorText="@Model.CodeError"
                          Placeholder="مثال: EXP-RENT"
                          ReadOnly="@(!IsNew)"
                          Disabled="@(!IsEditable || !IsNew)"
@@ -57,6 +58,7 @@
     public sealed class FormModel
     {
         public string Code { get; set; } = string.Empty;
+        public string? CodeError { get; set; }
         public string NameAr { get; set; } = string.Empty;
         public string? NameEn { get; set; }
         public Guid? DefaultExpenseAccountId { get; set; }
@@ -72,6 +74,13 @@
     [Parameter] public EventCallback OnModelChanged { get; set; }
 
     private void OnChanged() => OnModelChanged.InvokeAsync();
+
+    private void OnCodeChanged(string? value)
+    {
+        Model.Code = value ?? string.Empty;
+        Model.CodeError = null;
+        OnChanged();
+    }
 
     private void OnAccountChanged(string? val)
     {

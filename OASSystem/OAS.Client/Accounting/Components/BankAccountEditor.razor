@@ -17,6 +17,7 @@
                          ValueExpression="@(() => Model.Code)"
                          ValueChanged="OnCodeChanged"
                          Required="true"
+                         ErrorText="@Model.CodeError"
                          Placeholder="مثال: BANK-01"
                          ReadOnly="@(!IsNew)"
                          Disabled="@(!IsEditable || !IsNew)"
@@ -45,6 +46,7 @@
                          ValueExpression="@(() => Model.AccountNumber)"
                          ValueChanged="OnAccountNumberChanged"
                          Required="true"
+                         ErrorText="@Model.AccountNumberError"
                          Placeholder="مثال: 1020304050"
                          ReadOnly="@(!IsNew)"
                          Disabled="@(!IsEditable || !IsNew)"
@@ -91,11 +93,15 @@
     {
         public string Code { get; set; } = string.Empty;
 
+        public string? CodeError { get; set; }
+
         public string BankName { get; set; } = string.Empty;
 
         public string AccountName { get; set; } = string.Empty;
 
         public string AccountNumber { get; set; } = string.Empty;
+
+        public string? AccountNumberError { get; set; }
 
         public string? IBAN { get; set; }
 
@@ -143,6 +149,7 @@
     private async Task OnCodeChanged(string? value)
     {
         Model.Code = value ?? string.Empty;
+        Model.CodeError = null;
 
         await OnChanged();
     }
@@ -167,6 +174,7 @@
     private async Task OnAccountNumberChanged(string? value)
     {
         Model.AccountNumber = value ?? string.Empty;
+        Model.AccountNumberError = null;
 
         await OnChanged();
     }

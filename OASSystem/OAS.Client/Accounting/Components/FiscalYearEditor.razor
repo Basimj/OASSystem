@@ -14,9 +14,10 @@
         <UiAccountingFormGrid Columns="2">
 
             <UiInputText Label="كود السنة المالية"
-                         @bind-Value="Model.Code"
-                         @bind-Value:after="NotifyModelChangedAsync"
+                         Value="@Model.Code"
+                         ValueChanged="OnCodeChanged"
                          Required="true"
+                         ErrorText="@Model.CodeError"
                          Placeholder="مثال: FY-2026"
                          ReadOnly="@(!IsNew)"
                          Disabled="@(!IsEditable || !IsNew)"
@@ -80,6 +81,8 @@
     public sealed class FormModel
     {
         public string Code { get; set; } = string.Empty;
+
+        public string? CodeError { get; set; }
 
         public string Name { get; set; } = string.Empty;
 
@@ -160,6 +163,13 @@
                 Model.Status = status;
             }
         }
+    }
+
+    private async Task OnCodeChanged(string? value)
+    {
+        Model.Code = value ?? string.Empty;
+        Model.CodeError = null;
+        await OnModelChanged.InvokeAsync();
     }
 
     private Task NotifyModelChangedAsync()
