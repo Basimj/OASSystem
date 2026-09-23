@@ -10,7 +10,8 @@ namespace OAS.Application.Accounting.PaymentVouchers.Commands.UpdatePaymentVouch
 
 public sealed class UpdatePaymentVoucherCommandHandler(
     IRepository<PaymentVoucher, Guid> repository,
-    IRepository<PaymentVoucherLine, Guid> lineRepository)
+    IRepository<PaymentVoucherLine, Guid> lineRepository,
+    IReadRepository<Supplier, Guid> suppliers)
     : IRequestHandler<UpdatePaymentVoucherCommand>
 {
     public async Task Handle(
@@ -26,6 +27,13 @@ public sealed class UpdatePaymentVoucherCommandHandler(
             throw new ConcurrencyException("The payment voucher has been modified by another user.");
 
         var data = request.Data;
+        if ((DomainPaymentPartyType)(int)data.PartyType == DomainPaymentPartyType.Supplier)
+        {
+            if (!data.SupplierId.HasValue) throw new ConflictException("payment_supplier_required", "Supplier is required for a supplier payment.");
+            var supplier = await suppliers.GetByIdAsync(data.SupplierId.Value, cancellationToken);
+            if (supplier is null) throw new NotFoundException(nameof(Supplier), data.SupplierId.Value);
+            if (!supplier.IsActive) throw new ConflictException("payment_supplier_inactive", "The selected supplier is inactive.");
+        }
         voucher.UpdateDetails(
             data.VoucherDate,
             (DomainPaymentPartyType)(int)data.PartyType,

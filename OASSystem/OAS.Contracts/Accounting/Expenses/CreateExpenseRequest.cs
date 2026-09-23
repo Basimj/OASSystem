@@ -1,4 +1,4 @@
-﻿using OAS.Contracts.Accounting.Enums;
+using OAS.Contracts.Accounting.Enums;
 
 namespace OAS.Contracts.Accounting.Expenses;
 
@@ -11,4 +11,5 @@ public sealed record CreateExpenseRequest(
     PaymentMethod PaymentMethod,
     Guid? CashAccountId,
     Guid? BankAccountId,
-    string? Description);
+    string? Description,
+    string? ExpenseNumber = null);

@@ -1,4 +1,4 @@
-﻿using OAS.Contracts.Accounting.Enums;
+using OAS.Contracts.Accounting.Enums;
 
 namespace OAS.Contracts.Accounting.PaymentVouchers;
 
@@ -12,4 +12,5 @@ public sealed record CreatePaymentVoucherRequest(
     Guid? BankAccountId,
     decimal TotalAmount,
     string? Description,
-    IReadOnlyList<CreatePaymentVoucherLineRequest> Lines);
+    IReadOnlyList<CreatePaymentVoucherLineRequest> Lines,
+    string? VoucherNumber = null);

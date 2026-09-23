@@ -1,0 +1,2 @@
+using MediatR;using OAS.Application.Accounting.Abstractions;using OAS.Application.Common.Exceptions;using OAS.Contracts.Accounting.Customers;using OAS.Domain.Accounting.Entities;
+namespace OAS.Application.Accounting.Customers.Queries.GetCustomerById;public sealed class GetCustomerByIdQueryHandler(IAccountingPartyQueryService q):IRequestHandler<GetCustomerByIdQuery,CustomerDto>{public async Task<CustomerDto> Handle(GetCustomerByIdQuery r,CancellationToken ct)=>await q.GetCustomerAsync(r.Id,ct)??throw new NotFoundException(nameof(Customer),r.Id);}

@@ -61,7 +61,7 @@
     [
         new("dashboard", "لوحة التحكم", "/", "fa-solid fa-house"),
         new("sales", "المبيعات", "/sales", "fa-solid fa-cart-shopping"),
-        new("customers", "العملاء", "/customers", "fa-regular fa-user"),
+        new("accounting-customers", "العملاء", "/accounting/customers", "fa-regular fa-user"),
         new("products", "المنتجات", "/products", "fa-solid fa-glasses"),
         new("inventory-product-categories", "تصنيفات المنتجات", "/inventory/product-categories", "fa-solid fa-layer-group"),
         new("inventory-brands", "العلامات التجارية", "/inventory/brands", "fa-solid fa-tags"),
@@ -82,15 +82,13 @@
         new("accounting-bank-accounts", "الحسابات البنكية", "/accounting/bank-accounts", "fa-solid fa-building-columns"),
         new("accounting-cash-shifts", "ورديات الصندوق", "/accounting/cash-shifts", "fa-solid fa-cash-register"),
         new("accounting-expenses", "المصروفات", "/accounting/expenses", "fa-solid fa-receipt"),
-        new("accounting-customers", "حسابات العملاء", "/accounting/customer-accounts", "fa-solid fa-users-line"),
-        new("accounting-suppliers", "حسابات الموردين", "/accounting/supplier-accounts", "fa-solid fa-boxes-packing"),
         new("accounting-fiscal", "السنوات المالية", "/accounting/fiscal-years", "fa-solid fa-calendar-days"),
         new("accounting-cost-centers", "مراكز التكلفة", "/accounting/cost-centers", "fa-solid fa-network-wired"),
         new("accounting-posting-profiles", "ملفات الترحيل", "/accounting/posting-profiles", "fa-solid fa-sliders"),
         new("reports", "التقارير", "/reports", "fa-regular fa-chart-bar"),
         new("employees", "الموظفون", "/employees", "fa-solid fa-user-tie"),
         new("departments", "الأقسام", "/departments", "fa-solid fa-sitemap"),
-        new("suppliers", "الموردون", "/suppliers", "fa-solid fa-truck-field"),
+        new("accounting-suppliers", "الموردون", "/accounting/suppliers", "fa-solid fa-truck-field"),
         new("users", "المستخدمون", "/identity/users", "fa-solid fa-users", AdministratorOnly: true),
         new("roles", "أنواع المستخدمين", "/identity/roles", "fa-solid fa-user-shield", AdministratorOnly: true),
         new("job-titles", "المسميات الوظيفية", "/employees/job-titles", "fa-solid fa-briefcase", AdministratorOnly: true),
@@ -99,7 +97,7 @@
 
     private static readonly IReadOnlyList<UiShellNavigationGroup> ShellGroups =
     [
-        new("operations", "المبيعات والتشغيل", "fa-solid fa-store", ["sales", "customers", "daily-orders"]),
+        new("operations", "المبيعات والتشغيل", "fa-solid fa-store", ["sales", "daily-orders"]),
         new("accounting", "المحاسبة والمالية", "fa-solid fa-scale-balanced", [
             "finance",
             "accounting-accounts",
@@ -127,7 +125,7 @@
             "inventory-ledger",
             "inventory-stock-counts"
         ]),
-        new("purchasing", "المشتريات والموردون", "fa-solid fa-bag-shopping", ["purchases", "suppliers"]),
+        new("purchasing", "المشتريات", "fa-solid fa-bag-shopping", ["purchases"]),
         new("administration", "الإدارة", "fa-solid fa-people-group", ["employees", "departments", "users", "roles", "job-titles"]),
         new("reports-group", "التقارير", "fa-solid fa-chart-line", ["reports"]),
         new("system", "النظام", "fa-solid fa-sliders", ["settings"], DefaultExpanded: false)

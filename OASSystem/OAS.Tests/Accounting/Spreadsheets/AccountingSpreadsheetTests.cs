@@ -33,10 +33,12 @@ public sealed class AccountingSpreadsheetTests
         services.AddSingleton<IUnitOfWork>(new FakeUnitOfWork());
         Register<Account>(services);Register<CostCenter>(services);Register<CashAccount>(services);Register<BankAccount>(services);
         Register<ExpenseType>(services);Register<PostingProfile>(services);Register<PostingProfileLine>(services);Register<JournalEntry>(services);Register<JournalEntryLine>(services);
-        Register<CashShift>(services);Register<Expense>(services);Register<PaymentAllocation>(services);Register<ReceiptVoucherLine>(services);Register<PaymentVoucherLine>(services);Register<FiscalPeriod>(services);Register<FiscalYear>(services);Register<ReceiptVoucher>(services);Register<PaymentVoucher>(services);
+        Register<CashShift>(services);Register<Expense>(services);Register<PaymentAllocation>(services);Register<ReceiptVoucherLine>(services);Register<PaymentVoucherLine>(services);Register<FiscalPeriod>(services);Register<FiscalYear>(services);Register<ReceiptVoucher>(services);Register<PaymentVoucher>(services);Register<Customer>(services);Register<Supplier>(services);
         _provider=services.BuildServiceProvider();
         await Repo<Account>().AddAsync(Account.Create(Guid.NewGuid(),"1110","صندوق",null,null,1,AccountClass.Asset,AccountType.Posting,NormalBalance.Debit,true,false,true,false,true,null));
         await Repo<Account>().AddAsync(Account.Create(Guid.NewGuid(),"3000","رأس المال",null,null,1,AccountClass.Equity,AccountType.Posting,NormalBalance.Credit,true,false,true,false,true,null));
+        await Repo<Account>().AddAsync(Account.Create(Guid.NewGuid(),"110200","العملاء",null,null,1,AccountClass.Asset,AccountType.Control,NormalBalance.Debit,false,true,false,false,true,null));
+        await Repo<Account>().AddAsync(Account.Create(Guid.NewGuid(),"210200","الموردون",null,null,1,AccountClass.Liability,AccountType.Control,NormalBalance.Credit,false,true,false,false,true,null));
         await Repo<FiscalPeriod>().AddAsync(FiscalPeriod.Create(Guid.NewGuid(),Guid.NewGuid(),1,"2026",new(2026,1,1),new(2026,12,31),FiscalPeriodStatus.Open,false,false,false));
     }
     private sealed class newPermissionChecker:IPermissionChecker { public Task<bool> HasPermissionAsync(string permission,CancellationToken ct=default)=>Task.FromResult(true); }
@@ -50,7 +52,7 @@ public sealed class AccountingSpreadsheetTests
     }
     private static Dictionary<string,string> AccountRow(string code,string parent="")=>Row("Code",code,"NameAr","حساب "+code,"ParentCode",parent,"AccountClass","Asset","AccountType","Posting","NormalBalance","Debit");
     private static Dictionary<string,string> JournalRow(string debit,string credit,string key="JV1",string account="1110")=>Row("JournalKey",key,"JournalType","Manual","PostingDate","2026-09-21","DocumentDate","2026-09-21","Description","قيد","AccountCode",account,"Debit",debit,"Credit",credit);
-    [TestCase("accounts")][TestCase("cost-centers")][TestCase("cash-accounts")][TestCase("bank-accounts")][TestCase("expense-types")][TestCase("posting-profiles")][TestCase("journals")]
+    [TestCase("accounts")][TestCase("cost-centers")][TestCase("cash-accounts")][TestCase("bank-accounts")][TestCase("expense-types")][TestCase("posting-profiles")][TestCase("journals")][TestCase("customers")][TestCase("suppliers")]
     public async Task TemplateContainsDefinedSheetsAndNoGuids(string section)
     {
         using var book=new XLWorkbook(new MemoryStream(await Service.TemplateAsync(section,default)));
@@ -58,12 +60,30 @@ public sealed class AccountingSpreadsheetTests
             Assert.That(book.Worksheet(definition.DisplayName ?? definition.Name).Row(1).CellsUsed().Select(x=>x.GetString()),Is.EqualTo(definition.Columns.Select(x=>x.Header ?? x.Key)));
         Assert.That(AccountingSpreadsheetDefinitions.Get(section).SelectMany(x=>x.Columns).Any(x=>x.Key.EndsWith("Id")),Is.False);
     }
+    [Test] public async Task CustomerAndSupplierImportsGenerateOperationalAndAccountCodes()
+    {
+        var customerRow=Row("ParentAccountCode","110200","EntityType","Individual","NameAr","عميل اختبار","Gender","Unspecified","PreferredContactMethod","Mobile","Mobile","777000001","CreditLimit","0","PaymentTermDays","0","IsActive","نعم");
+        var supplierRow=Row("ParentAccountCode","210200","EntityType","Organization","SupplierScope","Local","NameAr","مورد اختبار","PreferredContactMethod","Phone","Phone","0123456","CreditLimit","1000","PaymentTermDays","30","IsActive","نعم");
+
+        var customerResult=await Service.ImportAsync("customers",Book("customers",customerRow),default);
+        var supplierResult=await Service.ImportAsync("suppliers",Book("suppliers",supplierRow),default);
+
+        Assert.That(customerResult.ImportedRecords,Is.EqualTo(1));
+        Assert.That(supplierResult.ImportedRecords,Is.EqualTo(1));
+        var customer=Repo<Customer>().Items.Single();
+        var supplier=Repo<Supplier>().Items.Single();
+        Assert.That(customer.CustomerCode,Does.StartWith("CUS-"));
+        Assert.That(supplier.SupplierCode,Does.StartWith("SUP-"));
+        Assert.That(Repo<Account>().Items.Single(x=>x.Id==customer.AccountId).Code,Does.StartWith("AR-"));
+        Assert.That(Repo<Account>().Items.Single(x=>x.Id==supplier.AccountId).Code,Does.StartWith("AP-"));
+    }
+
     [Test] public async Task AccountForwardParentResolvesAndLevelIsCalculated()
     {
         var bytes=Book("accounts",AccountRow("1201","1200"),AccountRow("1200"));
         var preview=await Service.PreviewAsync("accounts",bytes,default);
         Assert.That(preview.CanImport,Is.True,string.Join(";",preview.Rows.SelectMany(x=>x.Errors)));
-        Assert.That(Repo<Account>().Items.Count,Is.EqualTo(2));
+        Assert.That(Repo<Account>().Items.Count,Is.EqualTo(4));
         var result=await Service.ImportAsync("accounts",bytes,default);
         Assert.That(result.ImportedRecords,Is.EqualTo(2));
         var parent=Repo<Account>().Items.Single(x=>x.Code=="1200");var child=Repo<Account>().Items.Single(x=>x.Code=="1201");
@@ -71,7 +91,7 @@ public sealed class AccountingSpreadsheetTests
     }
     [TestCase("1110","")][TestCase("1200","missing")][TestCase("1200","1200")]
     public async Task InvalidAccountsCannotSave(string code,string parent)
-    { var result=await Service.ImportAsync("accounts",Book("accounts",AccountRow(code,parent)),default);Assert.That(result.InvalidRows,Is.GreaterThan(0));Assert.That(Repo<Account>().Items.Count,Is.EqualTo(2)); }
+    { var result=await Service.ImportAsync("accounts",Book("accounts",AccountRow(code,parent)),default);Assert.That(result.InvalidRows,Is.GreaterThan(0));Assert.That(Repo<Account>().Items.Count,Is.EqualTo(4)); }
     [Test] public async Task CyclesAndFileDuplicatesAreRejected()
     {
         Assert.That((await Service.PreviewAsync("accounts",Book("accounts",AccountRow("A","B"),AccountRow("B","A")),default)).InvalidRows,Is.EqualTo(2));
@@ -108,7 +128,7 @@ public sealed class AccountingSpreadsheetTests
     {
         var bytes=Book("posting-profiles",Row("Code","P","Name","ملف","Module","Sales","DocumentType","Invoice"),Row("ProfileCode","P","AccountRole","Revenue","AccountCode","3000"));
         var result=await Service.ImportAsync("posting-profiles",bytes,default);
-        Assert.That(result.ImportedRecords,Is.EqualTo(1));Assert.That(Repo<PostingProfile>().Items.Single().Lines.Single().AccountId,Is.EqualTo(Repo<Account>().Items.Last().Id));
+        Assert.That(result.ImportedRecords,Is.EqualTo(1));Assert.That(Repo<PostingProfile>().Items.Single().Lines.Single().AccountId,Is.EqualTo(Repo<Account>().Items.Single(x=>x.Code=="3000").Id));
     }
     [Test] public async Task JournalGroupsCreateDraftOnlyWithGeneratedNumbers()
     {
@@ -136,11 +156,7 @@ public sealed class AccountingSpreadsheetTests
         using var book=new XLWorkbook(new MemoryStream(bytes));Assert.That(book.Worksheet("الحسابات").RowsUsed().Count(),Is.EqualTo(226));
         Assert.That(book.Worksheet("الحسابات").Cell(1,1).GetString(),Is.EqualTo("كود الحساب"));
     }
-    [TestCase("customer-accounts")][TestCase("supplier-accounts")]
-    public void ExcludedSectionsHaveNoSpreadsheetEndpoints(string section)
-    { Assert.ThrowsAsync<OAS.Application.Common.Exceptions.NotFoundException>(async()=>await Service.TemplateAsync(section,default)); }
-
-    [TestCase("accounts")][TestCase("cost-centers")][TestCase("cash-accounts")][TestCase("bank-accounts")][TestCase("expense-types")][TestCase("posting-profiles")][TestCase("journals")]
+        [TestCase("accounts")][TestCase("cost-centers")][TestCase("cash-accounts")][TestCase("bank-accounts")][TestCase("expense-types")][TestCase("posting-profiles")][TestCase("journals")][TestCase("customers")][TestCase("suppliers")]
     [TestCase("fiscal-years")][TestCase("fiscal-periods")][TestCase("receipt-vouchers")][TestCase("payment-vouchers")][TestCase("payment-allocations")][TestCase("expenses")][TestCase("cash-shifts")]
     public async Task EveryExportSectionProducesHeadersEvenWithNoMatches(string section)
     {

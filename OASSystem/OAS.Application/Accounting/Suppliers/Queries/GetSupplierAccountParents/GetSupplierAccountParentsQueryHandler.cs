@@ -1,0 +1,2 @@
+using MediatR;using OAS.Application.Accounting.Abstractions;using OAS.Contracts.Accounting.Suppliers;
+namespace OAS.Application.Accounting.Suppliers.Queries.GetSupplierAccountParents;public sealed class GetSupplierAccountParentsQueryHandler(IAccountingPartyQueryService q):IRequestHandler<GetSupplierAccountParentsQuery,IReadOnlyList<SupplierAccountParentDto>>{public Task<IReadOnlyList<SupplierAccountParentDto>> Handle(GetSupplierAccountParentsQuery r,CancellationToken ct)=>q.GetSupplierParentsAsync(r.Search,Math.Clamp(r.Take,1,100),ct);}

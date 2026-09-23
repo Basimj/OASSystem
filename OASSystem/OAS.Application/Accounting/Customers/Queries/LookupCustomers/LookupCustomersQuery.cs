@@ -1,0 +1,2 @@
+using OAS.Application.Abstractions.Messaging;using OAS.Application.Accounting.Authorization;using OAS.Contracts.Accounting.Customers;
+namespace OAS.Application.Accounting.Customers.Queries.LookupCustomers;public sealed record LookupCustomersQuery(string? Search,int Take=30):IQuery<IReadOnlyList<CustomerLookupDto>>,IAuthorizedRequest{public IReadOnlyCollection<string> RequiredPermissions{get;}=[AccountingPermissions.Customers.View];}

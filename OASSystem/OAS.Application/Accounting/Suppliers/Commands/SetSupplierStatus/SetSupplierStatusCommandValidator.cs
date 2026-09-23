@@ -1,0 +1,1 @@
+using FluentValidation;namespace OAS.Application.Accounting.Suppliers.Commands.SetSupplierStatus;public sealed class SetSupplierStatusCommandValidator:AbstractValidator<SetSupplierStatusCommand>{public SetSupplierStatusCommandValidator(){RuleFor(x=>x.Id).NotEmpty();RuleFor(x=>x.Request.RowVersion).NotEmpty();}}

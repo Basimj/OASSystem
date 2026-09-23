@@ -7,6 +7,7 @@ using OAS.Application.Accounting.CashShifts.Commands.CloseCashShift;
 using OAS.Application.Accounting.CashShifts.Commands.CreateCashShift;
 using OAS.Application.Accounting.CashShifts.Queries.GetCashShiftById;
 using OAS.Application.Accounting.CashShifts.Queries.GetCashShifts;
+using OAS.Application.Accounting.CashShifts.Commands.ReserveCashShiftNumber;
 using OAS.Contracts.Accounting.CashShifts;
 using OAS.Contracts.Common.Pagination;
 
@@ -37,6 +38,10 @@ public sealed class CashShiftsController(ISender sender) : ControllerBase
         var result = await sender.Send(new GetCashShiftByIdQuery(id), cancellationToken);
         return Ok(result);
     }
+
+    [HttpPost("number/reserve")]
+    public async Task<ActionResult<OAS.Contracts.Accounting.Common.AccountingNumberReservationDto>> ReserveNumber(CancellationToken cancellationToken)
+        => Ok(await sender.Send(new ReserveCashShiftNumberCommand(), cancellationToken));
 
     [HttpPost]
     public async Task<ActionResult<CashShiftDto>> Create(

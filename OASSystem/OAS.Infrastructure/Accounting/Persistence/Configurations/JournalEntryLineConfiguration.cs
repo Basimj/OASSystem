@@ -56,11 +56,30 @@ public sealed class JournalEntryLineConfiguration : IEntityTypeConfiguration<Jou
         builder.HasIndex(x => x.CostCenterId)
             .HasDatabaseName("IX_JournalEntryLines_CostCenterId");
 
+        builder.HasIndex(x => x.CustomerId)
+            .HasDatabaseName("IX_JournalEntryLines_CustomerId");
+
+        builder.HasIndex(x => x.SupplierId)
+            .HasDatabaseName("IX_JournalEntryLines_SupplierId");
+
+
         builder.HasOne<Account>()
             .WithMany()
             .HasForeignKey(x => x.AccountId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_JournalEntryLines_Account");
+
+        builder.HasOne<Customer>()
+            .WithMany()
+            .HasForeignKey(x => x.CustomerId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_JournalEntryLines_Customer");
+
+        builder.HasOne<Supplier>()
+            .WithMany()
+            .HasForeignKey(x => x.SupplierId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_JournalEntryLines_Supplier");
 
         builder.HasOne<CostCenter>()
             .WithMany()
