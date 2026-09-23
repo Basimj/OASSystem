@@ -62,6 +62,20 @@ public sealed class SequenceNumberGenerator(
             return "SELECT NEXT VALUE FOR [core].[EmployeeNumberSequence];";
         }
 
+        var explicitSequence = sequenceName switch
+        {
+            "CustomerCodeSequence" => "[dbo].[CustomerCodeSequence]",
+            "SupplierCodeSequence" => "[dbo].[SupplierCodeSequence]",
+            "CustomerAccountCodeSequence" => "[dbo].[CustomerAccountCodeSequence]",
+            "SupplierAccountCodeSequence" => "[dbo].[SupplierAccountCodeSequence]",
+            _ => null
+        };
+
+        if (explicitSequence is not null)
+        {
+            return $"SELECT NEXT VALUE FOR {explicitSequence};";
+        }
+
         if (string.IsNullOrWhiteSpace(sequenceName) || !System.Text.RegularExpressions.Regex.IsMatch(sequenceName, @"^[a-zA-Z0-9_\-]+$"))
         {
             throw new ArgumentOutOfRangeException(nameof(sequenceName), sequenceName, "Invalid sequence name.");

@@ -1,0 +1,2 @@
+using OAS.Application.Abstractions.Messaging;using OAS.Application.Accounting.Authorization;using OAS.Contracts.Accounting.Suppliers;using OAS.Contracts.Common.Pagination;
+namespace OAS.Application.Accounting.Suppliers.Queries.GetSuppliers;public sealed record GetSuppliersQuery(PageRequest Request,string? Filter=null):IQuery<PagedResult<SupplierDto>>,IAuthorizedRequest{public IReadOnlyCollection<string> RequiredPermissions{get;}=[AccountingPermissions.Suppliers.View];}

@@ -1,0 +1,2 @@
+using MediatR;using OAS.Application.Accounting.Abstractions;using OAS.Contracts.Accounting.Customers;
+namespace OAS.Application.Accounting.Customers.Queries.GetCustomerAccountParents;public sealed class GetCustomerAccountParentsQueryHandler(IAccountingPartyQueryService q):IRequestHandler<GetCustomerAccountParentsQuery,IReadOnlyList<CustomerAccountParentDto>>{public Task<IReadOnlyList<CustomerAccountParentDto>> Handle(GetCustomerAccountParentsQuery r,CancellationToken ct)=>q.GetCustomerParentsAsync(r.Search,Math.Clamp(r.Take,1,100),ct);}

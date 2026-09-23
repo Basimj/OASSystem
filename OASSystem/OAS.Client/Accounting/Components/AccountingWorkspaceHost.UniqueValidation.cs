@@ -3,12 +3,10 @@ using OAS.Contracts.Accounting.Accounts;
 using OAS.Contracts.Accounting.BankAccounts;
 using OAS.Contracts.Accounting.CashAccounts;
 using OAS.Contracts.Accounting.CostCenters;
-using OAS.Contracts.Accounting.CustomerAccounts;
 using OAS.Contracts.Accounting.Expenses;
 using OAS.Contracts.Accounting.FiscalPeriods;
 using OAS.Contracts.Accounting.FiscalYears;
 using OAS.Contracts.Accounting.PostingProfiles;
-using OAS.Contracts.Accounting.SupplierAccounts;
 using OAS.Contracts.Common.Pagination;
 
 namespace OAS.Client.Accounting.Components;
@@ -18,8 +16,6 @@ public partial class AccountingWorkspaceHost
     private const string DuplicateCodeMessage = "هذا الكود مستخدم مسبقًا.";
     private const string DuplicateBankAccountNumberMessage = "رقم الحساب البنكي مستخدم مسبقًا.";
     private const string DuplicateFiscalPeriodMessage = "رقم الفترة مستخدم مسبقًا في السنة المالية المحددة.";
-    private const string DuplicateCustomerMessage = "هذا العميل مرتبط بحساب محاسبي مسبقًا.";
-    private const string DuplicateSupplierMessage = "هذا المورد مرتبط بحساب محاسبي مسبقًا.";
 
     /// <summary>
     /// يفحص القيود الفريدة قبل إرسال أمر الحفظ إلى قاعدة البيانات.
@@ -38,8 +34,6 @@ public partial class AccountingWorkspaceHost
             FiscalPeriodEditor.FormModel model => await ValidateFiscalPeriodUniqueAsync(model),
             PostingProfileEditor.FormModel model => await ValidatePostingProfileUniqueAsync(model),
             CostCenterEditor.FormModel model => await ValidateCostCenterUniqueAsync(model),
-            CustomerAccountEditor.FormModel model => await ValidateCustomerAccountUniqueAsync(model),
-            SupplierAccountEditor.FormModel model => await ValidateSupplierAccountUniqueAsync(model),
             CashAccountEditor.FormModel model => await ValidateCashAccountUniqueAsync(model),
             BankAccountEditor.FormModel model => await ValidateBankAccountUniqueAsync(model),
             ExpenseTypeEditor.FormModel model => await ValidateExpenseTypeUniqueAsync(model),
@@ -137,40 +131,6 @@ public partial class AccountingWorkspaceHost
 
         if (!duplicate) return true;
         model.CodeError = DuplicateCodeMessage;
-        return false;
-    }
-
-    private async Task<bool> ValidateCustomerAccountUniqueAsync(CustomerAccountEditor.FormModel model)
-    {
-        model.CustomerIdError = null;
-        if (!model.CustomerId.HasValue) return true;
-
-        var id = model.CustomerId.Value;
-        var duplicate = _customerAccountsPage.Items.Any(x => x.CustomerId == id) ||
-                        await ExistsExactAsync(
-                            request => AccountingService.GetCustomerAccountsPageAsync(request),
-                            id.ToString("D"),
-                            x => x.CustomerId == id);
-
-        if (!duplicate) return true;
-        model.CustomerIdError = DuplicateCustomerMessage;
-        return false;
-    }
-
-    private async Task<bool> ValidateSupplierAccountUniqueAsync(SupplierAccountEditor.FormModel model)
-    {
-        model.SupplierIdError = null;
-        if (!model.SupplierId.HasValue) return true;
-
-        var id = model.SupplierId.Value;
-        var duplicate = _supplierAccountsPage.Items.Any(x => x.SupplierId == id) ||
-                        await ExistsExactAsync(
-                            request => AccountingService.GetSupplierAccountsPageAsync(request),
-                            id.ToString("D"),
-                            x => x.SupplierId == id);
-
-        if (!duplicate) return true;
-        model.SupplierIdError = DuplicateSupplierMessage;
         return false;
     }
 
@@ -305,14 +265,6 @@ public partial class AccountingWorkspaceHost
 
             case "accounting_cost_center_code_exists" when tab.Model is CostCenterEditor.FormModel model:
                 model.CodeError = DuplicateCodeMessage;
-                break;
-
-            case "accounting_customer_account_exists" when tab.Model is CustomerAccountEditor.FormModel model:
-                model.CustomerIdError = DuplicateCustomerMessage;
-                break;
-
-            case "accounting_supplier_account_exists" when tab.Model is SupplierAccountEditor.FormModel model:
-                model.SupplierIdError = DuplicateSupplierMessage;
                 break;
 
             case "accounting_cash_account_code_exists" when tab.Model is CashAccountEditor.FormModel model:

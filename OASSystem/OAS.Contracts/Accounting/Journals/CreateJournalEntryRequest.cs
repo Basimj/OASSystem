@@ -1,4 +1,4 @@
-﻿using OAS.Contracts.Accounting.Enums;
+using OAS.Contracts.Accounting.Enums;
 
 namespace OAS.Contracts.Accounting.Journals;
 
@@ -11,4 +11,5 @@ public sealed record CreateJournalEntryRequest(
     string? SourceModule,
     string? SourceDocumentType,
     Guid? SourceDocumentId,
-    IReadOnlyList<CreateJournalEntryLineRequest> Lines);
+    IReadOnlyList<CreateJournalEntryLineRequest> Lines,
+    string? JournalNumber = null);

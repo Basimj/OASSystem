@@ -8,6 +8,7 @@ using OAS.Application.Accounting.Journals.Commands.SetJournalEntryStatus;
 using OAS.Application.Accounting.Journals.Commands.UpdateJournalEntry;
 using OAS.Application.Accounting.Journals.Queries.GetJournalEntries;
 using OAS.Application.Accounting.Journals.Queries.GetJournalEntryById;
+using OAS.Application.Accounting.Journals.Commands.ReserveJournalNumber;
 using OAS.Contracts.Accounting.Journals;
 using OAS.Contracts.Common.Pagination;
 
@@ -38,6 +39,10 @@ public sealed class JournalEntriesController(ISender sender) : ControllerBase
         var result = await sender.Send(new GetJournalEntryByIdQuery(id), cancellationToken);
         return Ok(result);
     }
+
+    [HttpPost("number/reserve")]
+    public async Task<ActionResult<OAS.Contracts.Accounting.Common.AccountingNumberReservationDto>> ReserveNumber([FromQuery] DateOnly postingDate, CancellationToken cancellationToken)
+        => Ok(await sender.Send(new ReserveJournalNumberCommand(postingDate), cancellationToken));
 
     [HttpPost]
     public async Task<ActionResult<JournalEntryDto>> Create(

@@ -12,6 +12,7 @@ using OAS.Application.Accounting.Expenses.ExpenseTypes.Queries.GetExpenseTypeByI
 using OAS.Application.Accounting.Expenses.ExpenseTypes.Queries.GetExpenseTypes;
 using OAS.Application.Accounting.Expenses.Queries.GetExpenseById;
 using OAS.Application.Accounting.Expenses.Queries.GetExpenses;
+using OAS.Application.Accounting.Expenses.Commands.ReserveExpenseNumber;
 using OAS.Contracts.Accounting.Expenses;
 using OAS.Contracts.Common.Pagination;
 
@@ -42,6 +43,10 @@ public sealed class ExpensesController(ISender sender) : ControllerBase
         var result = await sender.Send(new GetExpenseByIdQuery(id), cancellationToken);
         return Ok(result);
     }
+
+    [HttpPost("number/reserve")]
+    public async Task<ActionResult<OAS.Contracts.Accounting.Common.AccountingNumberReservationDto>> ReserveNumber([FromQuery] DateOnly expenseDate, CancellationToken cancellationToken)
+        => Ok(await sender.Send(new ReserveExpenseNumberCommand(expenseDate), cancellationToken));
 
     [HttpPost]
     public async Task<ActionResult<ExpenseDto>> Create(

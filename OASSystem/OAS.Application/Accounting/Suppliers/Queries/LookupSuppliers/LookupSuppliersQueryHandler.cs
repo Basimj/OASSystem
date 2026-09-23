@@ -1,0 +1,2 @@
+using MediatR;using OAS.Application.Accounting.Abstractions;using OAS.Contracts.Accounting.Suppliers;
+namespace OAS.Application.Accounting.Suppliers.Queries.LookupSuppliers;public sealed class LookupSuppliersQueryHandler(IAccountingPartyQueryService q):IRequestHandler<LookupSuppliersQuery,IReadOnlyList<SupplierLookupDto>>{public Task<IReadOnlyList<SupplierLookupDto>> Handle(LookupSuppliersQuery r,CancellationToken ct)=>q.LookupSuppliersAsync(r.Search,Math.Clamp(r.Take,1,100),ct);}

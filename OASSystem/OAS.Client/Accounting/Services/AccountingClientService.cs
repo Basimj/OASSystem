@@ -4,7 +4,8 @@ using OAS.Contracts.Accounting.BankAccounts;
 using OAS.Contracts.Accounting.CashAccounts;
 using OAS.Contracts.Accounting.CashShifts;
 using OAS.Contracts.Accounting.CostCenters;
-using OAS.Contracts.Accounting.CustomerAccounts;
+using OAS.Contracts.Accounting.Customers;
+using OAS.Contracts.Accounting.Common;
 using OAS.Contracts.Accounting.Expenses;
 using OAS.Contracts.Accounting.FiscalPeriods;
 using OAS.Contracts.Accounting.FiscalYears;
@@ -13,7 +14,7 @@ using OAS.Contracts.Accounting.PaymentAllocations;
 using OAS.Contracts.Accounting.PaymentVouchers;
 using OAS.Contracts.Accounting.PostingProfiles;
 using OAS.Contracts.Accounting.ReceiptVouchers;
-using OAS.Contracts.Accounting.SupplierAccounts;
+using OAS.Contracts.Accounting.Suppliers;
 using OAS.Contracts.Common.Pagination;
 
 namespace OAS.Client.Accounting.Services;
@@ -31,8 +32,12 @@ public sealed class AccountingClientService(OasApiClient apiClient) : IAccountin
         return query;
     }
 
-    private async Task<PagedResult<T>> GetPageAsync<T>(string route, PageRequest request, CancellationToken cancellationToken) =>
-        await apiClient.GetAsync<PagedResult<T>>($"{route}{Query(request)}", cancellationToken) ?? new();
+    private async Task<PagedResult<T>> GetPageAsync<T>(string route, PageRequest request, CancellationToken cancellationToken)
+    {
+        var pageQuery = Query(request);
+        if (route.Contains('?')) pageQuery = "&" + pageQuery[1..];
+        return await apiClient.GetAsync<PagedResult<T>>($"{route}{pageQuery}", cancellationToken) ?? new();
+    }
 
     public Task<PagedResult<AccountDto>> GetAccountsPageAsync(PageRequest request, CancellationToken cancellationToken = default) => GetPageAsync<AccountDto>("api/accounting/accounts", request, cancellationToken);
     public Task<AccountDto?> GetAccountByIdAsync(Guid id, CancellationToken cancellationToken = default) => apiClient.GetAsync<AccountDto>($"api/accounting/accounts/{id}", cancellationToken);
@@ -72,17 +77,29 @@ public sealed class AccountingClientService(OasApiClient apiClient) : IAccountin
     public Task<CostCenterDto?> UpdateCostCenterAsync(Guid id, UpdateCostCenterRequest request, CancellationToken cancellationToken = default) => apiClient.PutAsync<UpdateCostCenterRequest, CostCenterDto>($"api/accounting/cost-centers/{id}", request, cancellationToken);
     public Task<CostCenterDto?> SetCostCenterStatusAsync(Guid id, SetCostCenterStatusRequest request, CancellationToken cancellationToken = default) => apiClient.PostAsync<SetCostCenterStatusRequest, CostCenterDto>($"api/accounting/cost-centers/{id}/status", request, cancellationToken);
 
-    public Task<PagedResult<CustomerAccountDto>> GetCustomerAccountsPageAsync(PageRequest request, CancellationToken cancellationToken = default) => GetPageAsync<CustomerAccountDto>("api/accounting/customer-accounts", request, cancellationToken);
-    public Task<CustomerAccountDto?> GetCustomerAccountByIdAsync(Guid id, CancellationToken cancellationToken = default) => apiClient.GetAsync<CustomerAccountDto>($"api/accounting/customer-accounts/{id}", cancellationToken);
-    public Task<CustomerAccountDto?> CreateCustomerAccountAsync(CreateCustomerAccountRequest request, CancellationToken cancellationToken = default) => apiClient.PostAsync<CreateCustomerAccountRequest, CustomerAccountDto>("api/accounting/customer-accounts", request, cancellationToken);
-    public Task<CustomerAccountDto?> UpdateCustomerAccountAsync(Guid id, UpdateCustomerAccountRequest request, CancellationToken cancellationToken = default) => apiClient.PutAsync<UpdateCustomerAccountRequest, CustomerAccountDto>($"api/accounting/customer-accounts/{id}", request, cancellationToken);
-    public Task<CustomerAccountDto?> SetCustomerAccountStatusAsync(Guid id, SetCustomerAccountStatusRequest request, CancellationToken cancellationToken = default) => apiClient.PostAsync<SetCustomerAccountStatusRequest, CustomerAccountDto>($"api/accounting/customer-accounts/{id}/status", request, cancellationToken);
+    public Task<PagedResult<CustomerDto>> GetCustomersPageAsync(PageRequest request, string? filter = null, CancellationToken cancellationToken = default) => GetPageAsync<CustomerDto>($"api/accounting/customers{(string.IsNullOrWhiteSpace(filter) || filter == "all" ? string.Empty : $"?filter={Uri.EscapeDataString(filter)}")}", request, cancellationToken);
+    public Task<CustomerDto?> GetCustomerByIdAsync(Guid id, CancellationToken cancellationToken = default) => apiClient.GetAsync<CustomerDto>($"api/accounting/customers/{id}", cancellationToken);
+    public Task<CustomerDto?> CreateCustomerAsync(CreateCustomerRequest request, CancellationToken cancellationToken = default) => apiClient.PostAsync<CreateCustomerRequest, CustomerDto>("api/accounting/customers", request, cancellationToken);
+    public Task<CustomerDto?> UpdateCustomerAsync(Guid id, UpdateCustomerRequest request, CancellationToken cancellationToken = default) => apiClient.PutAsync<UpdateCustomerRequest, CustomerDto>($"api/accounting/customers/{id}", request, cancellationToken);
+    public Task<CustomerDto?> SetCustomerStatusAsync(Guid id, SetCustomerStatusRequest request, CancellationToken cancellationToken = default) => apiClient.PostAsync<SetCustomerStatusRequest, CustomerDto>($"api/accounting/customers/{id}/status", request, cancellationToken);
+    public Task<CustomerCodeReservationDto?> ReserveCustomerCodeAsync(CancellationToken cancellationToken = default) => apiClient.PostAsync<object, CustomerCodeReservationDto>("api/accounting/customers/code/reserve", new { }, cancellationToken);
+    public Task<IReadOnlyList<CustomerAccountParentDto>?> GetCustomerAccountParentsAsync(CancellationToken cancellationToken = default) => apiClient.GetAsync<IReadOnlyList<CustomerAccountParentDto>>("api/accounting/customers/account-parents", cancellationToken);
+    public Task<IReadOnlyList<CustomerLookupDto>?> LookupCustomersAsync(string? search, CancellationToken cancellationToken = default) => apiClient.GetAsync<IReadOnlyList<CustomerLookupDto>>($"api/accounting/customers/lookup?search={Uri.EscapeDataString(search ?? string.Empty)}", cancellationToken);
 
-    public Task<PagedResult<SupplierAccountDto>> GetSupplierAccountsPageAsync(PageRequest request, CancellationToken cancellationToken = default) => GetPageAsync<SupplierAccountDto>("api/accounting/supplier-accounts", request, cancellationToken);
-    public Task<SupplierAccountDto?> GetSupplierAccountByIdAsync(Guid id, CancellationToken cancellationToken = default) => apiClient.GetAsync<SupplierAccountDto>($"api/accounting/supplier-accounts/{id}", cancellationToken);
-    public Task<SupplierAccountDto?> CreateSupplierAccountAsync(CreateSupplierAccountRequest request, CancellationToken cancellationToken = default) => apiClient.PostAsync<CreateSupplierAccountRequest, SupplierAccountDto>("api/accounting/supplier-accounts", request, cancellationToken);
-    public Task<SupplierAccountDto?> UpdateSupplierAccountAsync(Guid id, UpdateSupplierAccountRequest request, CancellationToken cancellationToken = default) => apiClient.PutAsync<UpdateSupplierAccountRequest, SupplierAccountDto>($"api/accounting/supplier-accounts/{id}", request, cancellationToken);
-    public Task<SupplierAccountDto?> SetSupplierAccountStatusAsync(Guid id, SetSupplierAccountStatusRequest request, CancellationToken cancellationToken = default) => apiClient.PostAsync<SetSupplierAccountStatusRequest, SupplierAccountDto>($"api/accounting/supplier-accounts/{id}/status", request, cancellationToken);
+    public Task<PagedResult<SupplierDto>> GetSuppliersPageAsync(PageRequest request, string? filter = null, CancellationToken cancellationToken = default) => GetPageAsync<SupplierDto>($"api/accounting/suppliers{(string.IsNullOrWhiteSpace(filter) || filter == "all" ? string.Empty : $"?filter={Uri.EscapeDataString(filter)}")}", request, cancellationToken);
+    public Task<SupplierDto?> GetSupplierByIdAsync(Guid id, CancellationToken cancellationToken = default) => apiClient.GetAsync<SupplierDto>($"api/accounting/suppliers/{id}", cancellationToken);
+    public Task<SupplierDto?> CreateSupplierAsync(CreateSupplierRequest request, CancellationToken cancellationToken = default) => apiClient.PostAsync<CreateSupplierRequest, SupplierDto>("api/accounting/suppliers", request, cancellationToken);
+    public Task<SupplierDto?> UpdateSupplierAsync(Guid id, UpdateSupplierRequest request, CancellationToken cancellationToken = default) => apiClient.PutAsync<UpdateSupplierRequest, SupplierDto>($"api/accounting/suppliers/{id}", request, cancellationToken);
+    public Task<SupplierDto?> SetSupplierStatusAsync(Guid id, SetSupplierStatusRequest request, CancellationToken cancellationToken = default) => apiClient.PostAsync<SetSupplierStatusRequest, SupplierDto>($"api/accounting/suppliers/{id}/status", request, cancellationToken);
+    public Task<SupplierCodeReservationDto?> ReserveSupplierCodeAsync(CancellationToken cancellationToken = default) => apiClient.PostAsync<object, SupplierCodeReservationDto>("api/accounting/suppliers/code/reserve", new { }, cancellationToken);
+    public Task<IReadOnlyList<SupplierAccountParentDto>?> GetSupplierAccountParentsAsync(CancellationToken cancellationToken = default) => apiClient.GetAsync<IReadOnlyList<SupplierAccountParentDto>>("api/accounting/suppliers/account-parents", cancellationToken);
+    public Task<IReadOnlyList<SupplierLookupDto>?> LookupSuppliersAsync(string? search, CancellationToken cancellationToken = default) => apiClient.GetAsync<IReadOnlyList<SupplierLookupDto>>($"api/accounting/suppliers/lookup?search={Uri.EscapeDataString(search ?? string.Empty)}", cancellationToken);
+
+    public Task<AccountingNumberReservationDto?> ReserveJournalNumberAsync(DateOnly postingDate, CancellationToken cancellationToken = default) => apiClient.PostAsync<object, AccountingNumberReservationDto>($"api/accounting/journals/number/reserve?postingDate={postingDate:yyyy-MM-dd}", new { }, cancellationToken);
+    public Task<AccountingNumberReservationDto?> ReserveReceiptVoucherNumberAsync(DateOnly voucherDate, CancellationToken cancellationToken = default) => apiClient.PostAsync<object, AccountingNumberReservationDto>($"api/accounting/receipt-vouchers/number/reserve?voucherDate={voucherDate:yyyy-MM-dd}", new { }, cancellationToken);
+    public Task<AccountingNumberReservationDto?> ReservePaymentVoucherNumberAsync(DateOnly voucherDate, CancellationToken cancellationToken = default) => apiClient.PostAsync<object, AccountingNumberReservationDto>($"api/accounting/payment-vouchers/number/reserve?voucherDate={voucherDate:yyyy-MM-dd}", new { }, cancellationToken);
+    public Task<AccountingNumberReservationDto?> ReserveExpenseNumberAsync(DateOnly expenseDate, CancellationToken cancellationToken = default) => apiClient.PostAsync<object, AccountingNumberReservationDto>($"api/accounting/expenses/number/reserve?expenseDate={expenseDate:yyyy-MM-dd}", new { }, cancellationToken);
+    public Task<AccountingNumberReservationDto?> ReserveCashShiftNumberAsync(CancellationToken cancellationToken = default) => apiClient.PostAsync<object, AccountingNumberReservationDto>("api/accounting/cash-shifts/number/reserve", new { }, cancellationToken);
 
     public Task<PagedResult<ReceiptVoucherDto>> GetReceiptVouchersPageAsync(PageRequest request, CancellationToken cancellationToken = default) => GetPageAsync<ReceiptVoucherDto>("api/accounting/receipt-vouchers", request, cancellationToken);
     public Task<ReceiptVoucherDto?> GetReceiptVoucherByIdAsync(Guid id, CancellationToken cancellationToken = default) => apiClient.GetAsync<ReceiptVoucherDto>($"api/accounting/receipt-vouchers/{id}", cancellationToken);

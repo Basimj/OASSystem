@@ -7,6 +7,7 @@ using OAS.Application.Accounting.PaymentVouchers.Commands.SetPaymentVoucherStatu
 using OAS.Application.Accounting.PaymentVouchers.Commands.UpdatePaymentVoucher;
 using OAS.Application.Accounting.PaymentVouchers.Queries.GetPaymentVoucherById;
 using OAS.Application.Accounting.PaymentVouchers.Queries.GetPaymentVouchers;
+using OAS.Application.Accounting.PaymentVouchers.Commands.ReservePaymentVoucherNumber;
 using OAS.Contracts.Accounting.PaymentVouchers;
 using OAS.Contracts.Common.Pagination;
 
@@ -37,6 +38,10 @@ public sealed class PaymentVouchersController(ISender sender) : ControllerBase
         var result = await sender.Send(new GetPaymentVoucherByIdQuery(id), cancellationToken);
         return Ok(result);
     }
+
+    [HttpPost("number/reserve")]
+    public async Task<ActionResult<OAS.Contracts.Accounting.Common.AccountingNumberReservationDto>> ReserveNumber([FromQuery] DateOnly voucherDate, CancellationToken cancellationToken)
+        => Ok(await sender.Send(new ReservePaymentVoucherNumberCommand(voucherDate), cancellationToken));
 
     [HttpPost]
     public async Task<ActionResult<PaymentVoucherDto>> Create(

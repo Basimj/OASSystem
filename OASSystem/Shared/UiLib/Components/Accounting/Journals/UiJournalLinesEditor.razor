@@ -12,7 +12,9 @@
                     <th style="width: 40px;">#</th>
                     <th style="width: 32%;">الحساب المحاسبي</th>
                     <th style="width: 25%;">البيان</th>
-                    <th style="width: 20%;">مركز التكلفة</th>
+                    <th style="width: 16%;">مركز التكلفة</th>
+                    <th style="width: 16%;">العميل</th>
+                    <th style="width: 16%;">المورد</th>
                     <th style="width: 10%;">مدين</th>
                     <th style="width: 10%;">دائن</th>
                     @if (IsEditable)
@@ -25,7 +27,7 @@
                 @if (Lines.Count == 0)
                 {
                     <tr>
-                        <td colspan="@(IsEditable ? 7 : 6)" class="text-center text-muted py-3">لا توجد أسطر بعد. انقر على «إضافة سطر» بالأسفل.</td>
+                        <td colspan="@(IsEditable ? 9 : 8)" class="text-center text-muted py-3">لا توجد أسطر بعد. انقر على «إضافة سطر» بالأسفل.</td>
                     </tr>
                 }
                 else
@@ -85,6 +87,38 @@
                             <td>
                                 @if (IsEditable)
                                 {
+                                    <UiLookup Value='@currentLine.CustomerId?.ToString("D")'
+                                              ValueChanged="@(val => OnCustomerSelected(currentLine, val))"
+                                              SelectedItem="@currentLine.CustomerLookupItem"
+                                              SearchAsync="CustomerSearchAsync"
+                                              Placeholder="اختياري: العميل..."
+                                              MinimumSearchLength="0"
+                                              DebounceMilliseconds="250" />
+                                }
+                                else
+                                {
+                                    <span>@(currentLine.CustomerLookupItem?.PrimaryText ?? "-")</span>
+                                }
+                            </td>
+                            <td>
+                                @if (IsEditable)
+                                {
+                                    <UiLookup Value='@currentLine.SupplierId?.ToString("D")'
+                                              ValueChanged="@(val => OnSupplierSelected(currentLine, val))"
+                                              SelectedItem="@currentLine.SupplierLookupItem"
+                                              SearchAsync="SupplierSearchAsync"
+                                              Placeholder="اختياري: المورد..."
+                                              MinimumSearchLength="0"
+                                              DebounceMilliseconds="250" />
+                                }
+                                else
+                                {
+                                    <span>@(currentLine.SupplierLookupItem?.PrimaryText ?? "-")</span>
+                                }
+                            </td>
+                            <td>
+                                @if (IsEditable)
+                                {
                                     <UiAccountingNumberField Label=""
                                                              Value="@currentLine.DebitAmount"
                                                              ValueChanged="@(value => OnDebitChanged(currentLine, value))"
@@ -129,7 +163,7 @@
             </tbody>
             <tfoot>
                 <tr>
-                    <td colspan="4" class="text-start font-bold">
+                    <td colspan="6" class="text-start font-bold">
                         <span>الإجمالي</span>
                         <span class="ms-3">
                             @if (IsBalanced)
@@ -178,7 +212,9 @@
         public string Description { get; set; } = string.Empty;
         public Guid? CostCenterId { get; set; }
         public Guid? CustomerId { get; set; }
+        public UiLookupItem? CustomerLookupItem { get; set; }
         public Guid? SupplierId { get; set; }
+        public UiLookupItem? SupplierLookupItem { get; set; }
         public Guid? ProductVariantId { get; set; }
         public Guid? WarehouseId { get; set; }
         public string? CostCenterDisplay { get; set; }
@@ -191,6 +227,8 @@
     [Parameter] public bool IsEditable { get; set; } = true;
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? AccountSearchAsync { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CostCenterSearchAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CustomerSearchAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SupplierSearchAsync { get; set; }
     [Parameter] public EventCallback OnLinesChanged { get; set; }
 
     public decimal TotalDebit => Lines.Sum(l => l.DebitAmount);
@@ -245,6 +283,30 @@
             line.CostCenterId = null;
             line.CostCenterLookupItem = null;
         }
+        await OnLinesChanged.InvokeAsync();
+    }
+
+    private async Task OnCustomerSelected(EditableJournalLine line, string? val)
+    {
+        line.CustomerId = Guid.TryParse(val, out var id) ? id : null;
+        if (line.CustomerId.HasValue)
+        {
+            line.SupplierId = null;
+            line.SupplierLookupItem = null;
+        }
+        if (!line.CustomerId.HasValue) line.CustomerLookupItem = null;
+        await OnLinesChanged.InvokeAsync();
+    }
+
+    private async Task OnSupplierSelected(EditableJournalLine line, string? val)
+    {
+        line.SupplierId = Guid.TryParse(val, out var id) ? id : null;
+        if (line.SupplierId.HasValue)
+        {
+            line.CustomerId = null;
+            line.CustomerLookupItem = null;
+        }
+        if (!line.SupplierId.HasValue) line.SupplierLookupItem = null;
         await OnLinesChanged.InvokeAsync();
     }
 

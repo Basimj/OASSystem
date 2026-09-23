@@ -7,6 +7,7 @@ using OAS.Application.Accounting.ReceiptVouchers.Commands.SetReceiptVoucherStatu
 using OAS.Application.Accounting.ReceiptVouchers.Commands.UpdateReceiptVoucher;
 using OAS.Application.Accounting.ReceiptVouchers.Queries.GetReceiptVoucherById;
 using OAS.Application.Accounting.ReceiptVouchers.Queries.GetReceiptVouchers;
+using OAS.Application.Accounting.ReceiptVouchers.Commands.ReserveReceiptVoucherNumber;
 using OAS.Contracts.Accounting.ReceiptVouchers;
 using OAS.Contracts.Common.Pagination;
 
@@ -37,6 +38,10 @@ public sealed class ReceiptVouchersController(ISender sender) : ControllerBase
         var result = await sender.Send(new GetReceiptVoucherByIdQuery(id), cancellationToken);
         return Ok(result);
     }
+
+    [HttpPost("number/reserve")]
+    public async Task<ActionResult<OAS.Contracts.Accounting.Common.AccountingNumberReservationDto>> ReserveNumber([FromQuery] DateOnly voucherDate, CancellationToken cancellationToken)
+        => Ok(await sender.Send(new ReserveReceiptVoucherNumberCommand(voucherDate), cancellationToken));
 
     [HttpPost]
     public async Task<ActionResult<ReceiptVoucherDto>> Create(
