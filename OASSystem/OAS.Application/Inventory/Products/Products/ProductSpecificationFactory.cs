@@ -44,7 +44,7 @@ public sealed class ProductSpecificationFactory : ICrudSpecificationFactory<Prod
             "name" => nameof(Product.NameAr),
             "namear" => nameof(Product.NameAr),
             "nameen" => nameof(Product.NameEn),
-            "producttype" => nameof(Product.ProductType),
+            "producttypeid" => nameof(Product.ProductTypeId),
             "isstockitem" => nameof(Product.IsStockItem),
             "isactive" => nameof(Product.IsActive),
             _ => nameof(Product.ProductCode)

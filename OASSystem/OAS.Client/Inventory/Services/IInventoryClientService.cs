@@ -1,5 +1,6 @@
 using OAS.Contracts.Common.Pagination;
 using OAS.Contracts.Enums.Inventory;
+using OAS.Contracts.Inventory;
 using OAS.Contracts.Inventory.Products;
 using OAS.Contracts.Inventory.Stock;
 using OAS.Contracts.Inventory.Transactions;
@@ -9,6 +10,8 @@ namespace OAS.Client.Inventory.Services;
 
 public interface IInventoryClientService
 {
+    Task<InventoryCodeSuggestionDto?> GetNextCodeAsync(string kind, CancellationToken cancellationToken = default);
+
     // Product categories
     Task<PagedResult<ProductCategoryDto>> GetProductCategoriesAsync(PageRequest request, CancellationToken cancellationToken = default);
     Task<ProductCategoryDto?> GetProductCategoryAsync(Guid id, CancellationToken cancellationToken = default);
@@ -21,6 +24,12 @@ public interface IInventoryClientService
     Task<BrandDto?> CreateBrandAsync(CreateBrandRequest request, CancellationToken cancellationToken = default);
     Task<BrandDto?> UpdateBrandAsync(Guid id, UpdateBrandRequest request, CancellationToken cancellationToken = default);
 
+    // Product types
+    Task<PagedResult<ProductTypeDto>> GetProductTypesAsync(PageRequest request, CancellationToken cancellationToken = default);
+    Task<ProductTypeDto?> GetProductTypeAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<ProductTypeDto?> CreateProductTypeAsync(CreateProductTypeRequest request, CancellationToken cancellationToken = default);
+    Task<ProductTypeDto?> UpdateProductTypeAsync(Guid id, UpdateProductTypeRequest request, CancellationToken cancellationToken = default);
+
     // Units
     Task<PagedResult<UnitDto>> GetUnitsAsync(PageRequest request, CancellationToken cancellationToken = default);
     Task<UnitDto?> GetUnitAsync(Guid id, CancellationToken cancellationToken = default);
@@ -31,6 +40,7 @@ public interface IInventoryClientService
     Task<PagedResult<ProductDto>> GetProductsAsync(PageRequest request, CancellationToken cancellationToken = default);
     Task<ProductDto?> GetProductAsync(Guid id, CancellationToken cancellationToken = default);
     Task<ProductDto?> CreateProductAsync(CreateProductRequest request, CancellationToken cancellationToken = default);
+    Task<CreateStockProductResult?> CreateStockProductAsync(CreateStockProductRequest request, CancellationToken cancellationToken = default);
     Task<ProductDto?> UpdateProductAsync(Guid id, UpdateProductRequest request, CancellationToken cancellationToken = default);
 
     // Product variants

@@ -21,8 +21,9 @@ public class Brand : AuditableEntity<Guid>
         IsActive = true;
     }
 
-    public void UpdateDetails(string name, bool isActive)
+    public void UpdateDetails(string code, string name, bool isActive)
     {
+        Code = code;
         Name = name;
         IsActive = isActive;
     }

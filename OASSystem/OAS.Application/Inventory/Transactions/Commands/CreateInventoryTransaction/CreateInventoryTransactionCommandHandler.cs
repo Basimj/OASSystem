@@ -13,6 +13,7 @@ public sealed class CreateInventoryTransactionCommandHandler(
     IRepository<InventoryTransactionLine, Guid> lineRepository,
     IReadRepository<Warehouse, Guid> warehouseRepository,
     IReadRepository<ProductVariant, Guid> variantRepository,
+    IReadRepository<Product, Guid> productRepository,
     ISequenceNumberGenerator sequenceNumberGenerator)
     : IRequestHandler<CreateInventoryTransactionCommand, Guid>
 {
@@ -24,16 +25,18 @@ public sealed class CreateInventoryTransactionCommandHandler(
 
         if (request.SourceWarehouseId.HasValue)
         {
-            var sourceExists = await warehouseRepository.ExistsAsync(request.SourceWarehouseId.Value, cancellationToken);
-            if (!sourceExists)
+            var source = await warehouseRepository.GetByIdAsync(request.SourceWarehouseId.Value, cancellationToken);
+            if (source is null)
                 throw new NotFoundException(nameof(Warehouse), request.SourceWarehouseId.Value);
+            EnsureActiveWarehouse(source);
         }
 
         if (request.DestinationWarehouseId.HasValue)
         {
-            var destExists = await warehouseRepository.ExistsAsync(request.DestinationWarehouseId.Value, cancellationToken);
-            if (!destExists)
+            var destination = await warehouseRepository.GetByIdAsync(request.DestinationWarehouseId.Value, cancellationToken);
+            if (destination is null)
                 throw new NotFoundException(nameof(Warehouse), request.DestinationWarehouseId.Value);
+            EnsureActiveWarehouse(destination);
         }
 
         var transactionNumber = request.TransactionNumber;
@@ -58,9 +61,15 @@ public sealed class CreateInventoryTransactionCommandHandler(
 
         foreach (var lineReq in request.Lines)
         {
-            var variantExists = await variantRepository.ExistsAsync(lineReq.ProductVariantId, cancellationToken);
-            if (!variantExists)
+            var variant = await variantRepository.GetByIdAsync(lineReq.ProductVariantId, cancellationToken);
+            if (variant is null)
                 throw new NotFoundException(nameof(ProductVariant), lineReq.ProductVariantId);
+            EnsureVariantActive(variant);
+
+            var product = await productRepository.GetByIdAsync(variant.ProductId, cancellationToken);
+            if (product is null)
+                throw new NotFoundException(nameof(Product), variant.ProductId);
+            EnsureProductEligible(product);
 
             var line = new InventoryTransactionLine(
                 transaction.Id,
@@ -74,4 +83,27 @@ public sealed class CreateInventoryTransactionCommandHandler(
 
         return transaction.Id;
     }
+
+    private static void EnsureActiveWarehouse(Warehouse warehouse)
+    {
+        if (!warehouse.IsActive)
+            throw Validation("warehouse_inactive", "Warehouse must be active for inventory transactions.");
+    }
+
+    private static void EnsureVariantActive(ProductVariant variant)
+    {
+        if (!variant.IsActive)
+            throw Validation("product_variant_inactive", "Product variant must be active for inventory transactions.");
+    }
+
+    private static void EnsureProductEligible(Product product)
+    {
+        if (!product.IsActive)
+            throw Validation("product_inactive", "Product must be active for inventory transactions.");
+        if (!product.IsStockItem)
+            throw Validation("product_not_stock_item", "Only stock products can be used in inventory transactions.");
+    }
+
+    private static RequestValidationException Validation(string code, string message) =>
+        new(new Dictionary<string, string[]> { ["inventory"] = [$"{code}: {message}"] });
 }

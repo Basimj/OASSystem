@@ -33,7 +33,7 @@ public sealed class InventorySpreadsheetService(
 {
     public static readonly string[] ExportSections =
     [
-        "product-categories", "brands", "units", "products", "product-variants",
+        "product-categories", "brands", "product-types", "units", "products", "product-variants",
         "warehouses", "balances", "transactions", "ledger", "stock-counts"
     ];
 
@@ -61,6 +61,7 @@ public sealed class InventorySpreadsheetService(
         {
             "product-categories" => await ExportCategoriesAsync(request, cancellationToken),
             "brands" => await ExportBrandsAsync(request, cancellationToken),
+            "product-types" => await ExportProductTypesAsync(request, cancellationToken),
             "units" => await ExportUnitsAsync(request, cancellationToken),
             "products" => await ExportProductsAsync(request, cancellationToken),
             "product-variants" => await ExportVariantsAsync(request, cancellationToken),
@@ -81,6 +82,7 @@ public sealed class InventorySpreadsheetService(
         {
             "product-categories" => InventoryPermissions.ProductCategories.View,
             "brands" => InventoryPermissions.Brands.View,
+            "product-types" => InventoryPermissions.Products.View,
             "units" => InventoryPermissions.Units.View,
             "products" => InventoryPermissions.Products.View,
             "product-variants" => InventoryPermissions.ProductVariants.View,
@@ -125,6 +127,9 @@ public sealed class InventorySpreadsheetService(
     private Task<IReadOnlyList<BrandDto>> BrandsAsync(PageRequest request, CancellationToken ct) =>
         ReadAllAsync(p => Crud<BrandDto, CreateBrandRequest, UpdateBrandRequest>().GetPageAsync(p, ct), request);
 
+    private Task<IReadOnlyList<ProductTypeDto>> ProductTypesAsync(PageRequest request, CancellationToken ct) =>
+        ReadAllAsync(p => Crud<ProductTypeDto, CreateProductTypeRequest, UpdateProductTypeRequest>().GetPageAsync(p, ct), request);
+
     private Task<IReadOnlyList<UnitDto>> UnitsAsync(PageRequest request, CancellationToken ct) =>
         ReadAllAsync(p => Crud<UnitDto, CreateUnitRequest, UpdateUnitRequest>().GetPageAsync(p, ct), request);
 
@@ -160,6 +165,18 @@ public sealed class InventorySpreadsheetService(
             items.Select(x => Row(("الكود", x.Code), ("الاسم", x.Name), ("الحالة", Active(x.IsActive)))))];
     }
 
+    private async Task<IReadOnlyList<SpreadsheetTable>> ExportProductTypesAsync(PageRequest request, CancellationToken ct)
+    {
+        var items = await ProductTypesAsync(request, ct);
+        return [Table("أنواع المنتجات",
+            [Text("الكود"), Text("الاسم العربي"), Text("الاسم الإنجليزي"), Text("الحالة")],
+            items.Select(x => Row(
+                ("الكود", x.Code),
+                ("الاسم العربي", x.NameAr),
+                ("الاسم الإنجليزي", x.NameEn),
+                ("الحالة", Active(x.IsActive)))))];
+    }
+
     private async Task<IReadOnlyList<SpreadsheetTable>> ExportUnitsAsync(PageRequest request, CancellationToken ct)
     {
         var items = await UnitsAsync(request, ct);
@@ -173,6 +190,7 @@ public sealed class InventorySpreadsheetService(
         var items = await ProductsAsync(request, ct);
         var categories = (await CategoriesAsync(new PageRequest(), ct)).ToDictionary(x => x.Id, x => $"{x.Code} - {x.NameAr}");
         var brands = (await BrandsAsync(new PageRequest(), ct)).ToDictionary(x => x.Id, x => $"{x.Code} - {x.Name}");
+        var productTypes = (await ProductTypesAsync(new PageRequest(), ct)).ToDictionary(x => x.Id, x => $"{x.Code} - {x.NameAr}");
         return [Table("المنتجات",
             [Text("كود المنتج"), Text("الاسم العربي"), Text("الاسم الإنجليزي"), Text("التصنيف"), Text("الماركة"), Text("نوع المنتج"), Text("الوصف"), Text("صنف مخزني"), Text("الحالة")],
             items.Select(x => Row(
@@ -181,7 +199,7 @@ public sealed class InventorySpreadsheetService(
                 ("الاسم الإنجليزي", x.NameEn),
                 ("التصنيف", categories.GetValueOrDefault(x.CategoryId)),
                 ("الماركة", x.BrandId is Guid brandId ? brands.GetValueOrDefault(brandId) : null),
-                ("نوع المنتج", ProductTypeText(x.ProductType)),
+                ("نوع المنتج", productTypes.GetValueOrDefault(x.ProductTypeId)),
                 ("الوصف", x.Description),
                 ("صنف مخزني", YesNo(x.IsStockItem)),
                 ("الحالة", Active(x.IsActive)))))];
@@ -483,16 +501,6 @@ public sealed class InventorySpreadsheetService(
     private static string Active(bool value) => value ? "نشط" : "غير نشط";
     private static string YesNo(bool value) => value ? "نعم" : "لا";
 
-    private static string ProductTypeText(ProductType type) => type switch
-    {
-        ProductType.Frame => "إطار",
-        ProductType.Lens => "عدسة",
-        ProductType.Sunglasses => "نظارة شمسية",
-        ProductType.Accessory => "إكسسوار",
-        ProductType.Other => "أخرى",
-        ProductType.Service => "خدمة",
-        _ => type.ToString()
-    };
 
     private static string TransactionTypeText(InventoryTransactionType type) => type switch
     {

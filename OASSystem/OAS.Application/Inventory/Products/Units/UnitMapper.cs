@@ -14,7 +14,7 @@ public sealed class UnitMapper
 
     public void Update(UpdateUnitRequest source, Unit destination)
     {
-        destination.UpdateDetails(source.NameAr, source.NameEn, source.IsActive);
+        destination.UpdateDetails(source.Code.Trim(), source.NameAr, source.NameEn, source.IsActive);
     }
 
     public UnitDto ToRead(Unit source)

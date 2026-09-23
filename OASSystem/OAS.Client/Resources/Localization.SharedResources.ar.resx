@@ -1022,9 +1022,6 @@
   <data name="product_name_en_max_length" xml:space="preserve">
     <value>اسم المنتج بالإنجليزية يجب ألا يتجاوز 150 حرفًا.</value>
   </data>
-  <data name="product_type_invalid" xml:space="preserve">
-    <value>نوع المنتج غير صحيح.</value>
-  </data>
   <data name="purchase_price_invalid" xml:space="preserve">
     <value>سعر الشراء يجب أن يكون صفرًا أو أكبر.</value>
   </data>
@@ -1087,5 +1084,23 @@
   </data>
   <data name="warehouse_name_en_max_length" xml:space="preserve">
     <value>اسم المخزن بالإنجليزية يجب ألا يتجاوز 100 حرف.</value>
+  </data>
+  <data name="product_type_id_required" xml:space="preserve">
+    <value>نوع المنتج حقل إجباري.</value>
+  </data>
+  <data name="product_type_code_required" xml:space="preserve">
+    <value>كود نوع المنتج حقل إجباري.</value>
+  </data>
+  <data name="product_type_code_max_length" xml:space="preserve">
+    <value>كود نوع المنتج يجب ألا يتجاوز 32 حرفًا.</value>
+  </data>
+  <data name="product_type_name_ar_required" xml:space="preserve">
+    <value>اسم نوع المنتج بالعربية حقل إجباري.</value>
+  </data>
+  <data name="product_type_name_ar_max_length" xml:space="preserve">
+    <value>اسم نوع المنتج بالعربية يجب ألا يتجاوز 100 حرف.</value>
+  </data>
+  <data name="product_type_name_en_max_length" xml:space="preserve">
+    <value>اسم نوع المنتج بالإنجليزية يجب ألا يتجاوز 100 حرف.</value>
   </data>
 </root>

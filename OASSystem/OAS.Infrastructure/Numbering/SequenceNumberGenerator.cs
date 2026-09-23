@@ -68,6 +68,25 @@ public sealed class SequenceNumberGenerator(
         }
 
         var sanitized = sequenceName.Replace("-", "_");
+
+        // Inventory master-data codes use their own dbo sequences. Existing accounting
+        // and inventory document-number sequences keep their historical schema/behavior.
+        if (sequenceName.StartsWith("InventoryCode_", StringComparison.Ordinal))
+        {
+            return $"""
+                DECLARE @seqName sysname = N'Seq_{sanitized}';
+                IF NOT EXISTS (
+                    SELECT 1 FROM sys.sequences
+                    WHERE name = @seqName AND schema_id = SCHEMA_ID(N'dbo')
+                )
+                BEGIN
+                    EXEC(N'CREATE SEQUENCE [dbo].[' + @seqName + N'] AS BIGINT START WITH 1 INCREMENT BY 1 NO CYCLE;');
+                END;
+                DECLARE @sql nvarchar(500) = N'SELECT NEXT VALUE FOR [dbo].' + QUOTENAME(@seqName);
+                EXEC sp_executesql @sql;
+                """;
+        }
+
         return $"""
             DECLARE @seqName sysname = N'Seq_{sanitized}';
             IF NOT EXISTS (

@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using OAS.Infrastructure.Persistence;
 
@@ -58,21 +58,28 @@ AND EXISTS (
 BEGIN
     UPDATE [dbo].[tbl_Products]
     SET [ProductType] = CASE LOWER(LTRIM(RTRIM(CONVERT(nvarchar(32), [ProductType]))))
+        WHEN N'1' THEN N'1'
         WHEN N'frame' THEN N'1'
+        WHEN N'إطار' THEN N'1'
+        WHEN N'2' THEN N'2'
         WHEN N'lens' THEN N'2'
+        WHEN N'عدسة' THEN N'2'
+        WHEN N'3' THEN N'3'
         WHEN N'sunglasses' THEN N'3'
+        WHEN N'نظارة شمسية' THEN N'3'
+        WHEN N'4' THEN N'4'
         WHEN N'accessory' THEN N'4'
+        WHEN N'accessories' THEN N'4'
+        WHEN N'إكسسوار' THEN N'4'
+        WHEN N'5' THEN N'5'
         WHEN N'other' THEN N'5'
+        WHEN N'أخرى' THEN N'5'
+        WHEN N'6' THEN N'6'
         WHEN N'service' THEN N'6'
-        ELSE LTRIM(RTRIM(CONVERT(nvarchar(32), [ProductType])))
+        WHEN N'services' THEN N'6'
+        WHEN N'خدمة' THEN N'6'
+        ELSE N'5'
     END;
-
-    IF EXISTS (
-        SELECT 1 FROM [dbo].[tbl_Products]
-        WHERE TRY_CONVERT(int, [ProductType]) IS NULL
-           OR TRY_CONVERT(int, [ProductType]) NOT BETWEEN 1 AND 6
-    )
-        THROW 51001, 'Cannot convert dbo.tbl_Products.ProductType to int because unsupported values exist.', 1;
 
     ALTER TABLE [dbo].[tbl_Products]
         ALTER COLUMN [ProductType] int NOT NULL;

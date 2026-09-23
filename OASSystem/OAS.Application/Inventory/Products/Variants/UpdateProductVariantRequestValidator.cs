@@ -7,6 +7,10 @@ public sealed class UpdateProductVariantRequestValidator : AbstractValidator<Upd
 {
     public UpdateProductVariantRequestValidator()
     {
+        RuleFor(x => x.SKU)
+            .NotEmpty().WithErrorCode("sku_required")
+            .MaximumLength(64).WithErrorCode("sku_max_length");
+
         RuleFor(x => x.Barcode)
             .MaximumLength(64).WithErrorCode("barcode_max_length");
 

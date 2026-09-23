@@ -1,3 +1,4 @@
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -5,6 +6,7 @@ using OAS.Application.Abstractions.Security;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.CRUD.Abstractions;
 using OAS.Application.Inventory.Authorization;
+using OAS.Application.Inventory.Products.Variants.Commands.UpdateProductVariant;
 using OAS.Contracts.Common.Pagination;
 using OAS.Contracts.Inventory.Products;
 
@@ -16,7 +18,8 @@ namespace OAS.API.Inventory.Controllers;
 [Route("api/inventory/product-variants")]
 public sealed class ProductVariantsController(
     ICrudApplicationService<Guid, ProductVariantDto, CreateProductVariantRequest, UpdateProductVariantRequest> service,
-    IPermissionChecker permissionChecker) : ControllerBase
+    IPermissionChecker permissionChecker,
+    ISender sender) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<ProductVariantDto>>> Get(
@@ -50,8 +53,7 @@ public sealed class ProductVariantsController(
         [FromBody] UpdateProductVariantRequest request,
         CancellationToken cancellationToken)
     {
-        await EnsurePermissionAsync(InventoryPermissions.ProductVariants.Edit, cancellationToken);
-        return Ok(await service.UpdateAsync(id, request, cancellationToken));
+        return Ok(await sender.Send(new UpdateProductVariantCommand(id, request), cancellationToken));
     }
 
     private async Task EnsurePermissionAsync(string permission, CancellationToken cancellationToken)

@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @using OAS.Client.Inventory.Services
 @using OAS.Client.Services.Browser
+@using OAS.Contracts.Inventory
 @using OAS.Contracts.Inventory.Warehouses
 
 @using OAS.UiLib.Components.Spreadsheets
@@ -77,7 +78,7 @@
                                  Required="true"
                                  ErrorText="@ErrorFor(CodeField)"
                                  MaxLength="32"
-                                 Disabled="@(_mode != EditorMode.Create)"
+                                 Disabled="@(!IsEditing)"
                                  Size="ControlSize.Small" />
 
                     <UiInputText Label="اسم المخزن بالعربية"
@@ -208,13 +209,14 @@
     private Task RefreshAsync(MouseEventArgs args) => LoadAsync();
     private Task SearchChangedAsync(string? value) => Task.CompletedTask;
 
-    private Task BeginCreateAsync(MouseEventArgs args)
+    private async Task BeginCreateAsync(MouseEventArgs args)
     {
+        if (IsEditing) return;
         _selectedId = null;
         _mode = EditorMode.Create;
         ClearForm();
         _isActive = true;
-        return Task.CompletedTask;
+        await AssignGeneratedCodeAsync(InventoryCodeKinds.Warehouse);
     }
 
     private Task BeginEditAsync(MouseEventArgs args)
@@ -260,7 +262,7 @@
             else
             {
                 saved = await Inventory.UpdateWarehouseAsync(_selectedId!.Value, new UpdateWarehouseRequest(
-                    _nameAr.Trim(), NullIfBlank(_nameEn), NullIfBlank(_description), _isDefault, _isActive));
+                    _code.Trim(), _nameAr.Trim(), NullIfBlank(_nameEn), NullIfBlank(_description), _isDefault, _isActive));
             }
 
             if (saved is null) return;
@@ -275,7 +277,7 @@
             if (string.Equals(ex.Error.Code, "unique_constraint_conflict", StringComparison.OrdinalIgnoreCase))
             {
                 await LoadAsync();
-                if (_mode == EditorMode.Create && _warehouses.Any(x => string.Equals(x.Code, _code.Trim(), StringComparison.OrdinalIgnoreCase)))
+                if (_warehouses.Any(x => x.Id != _selectedId && string.Equals(x.Code, _code.Trim(), StringComparison.OrdinalIgnoreCase)))
                 {
                     SetError(CodeField, "هذا الكود مستخدم مسبقًا.");
                     Snackbar.Error("توجد بيانات غير صحيحة. راجع الحقول المميزة باللون الأحمر.");
@@ -321,9 +323,8 @@
         ValidateMaxLength(NameEnField, _nameEn, 100);
         ValidateMaxLength(DescriptionField, _description, 500);
 
-        if (_mode == EditorMode.Create &&
-            !string.IsNullOrWhiteSpace(_code) &&
-            _warehouses.Any(x => string.Equals(x.Code, _code.Trim(), StringComparison.OrdinalIgnoreCase)))
+        if (!string.IsNullOrWhiteSpace(_code) &&
+            _warehouses.Any(x => x.Id != _selectedId && string.Equals(x.Code, _code.Trim(), StringComparison.OrdinalIgnoreCase)))
         {
             SetError(CodeField, "هذا الكود مستخدم مسبقًا.");
         }
@@ -361,6 +362,18 @@
         ClearFieldError(DefaultField);
         if (!value) ClearFieldError(ActiveField);
         return Task.CompletedTask;
+    }
+
+    private async Task AssignGeneratedCodeAsync(string kind)
+    {
+        try
+        {
+            var suggestion = await Inventory.GetNextCodeAsync(kind);
+            if (_mode == EditorMode.Create && suggestion is not null)
+                _code = suggestion.Code;
+        }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
     }
 
     private Task SetActiveAsync(bool value)

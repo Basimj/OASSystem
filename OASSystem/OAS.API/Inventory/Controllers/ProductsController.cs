@@ -1,3 +1,4 @@
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -5,6 +6,8 @@ using OAS.Application.Abstractions.Security;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.CRUD.Abstractions;
 using OAS.Application.Inventory.Authorization;
+using OAS.Application.Inventory.Products.Products.Commands.CreateStockProduct;
+using OAS.Application.Inventory.Products.Products.Commands.UpdateProduct;
 using OAS.Contracts.Common.Pagination;
 using OAS.Contracts.Inventory.Products;
 
@@ -16,7 +19,8 @@ namespace OAS.API.Inventory.Controllers;
 [Route("api/inventory/products")]
 public sealed class ProductsController(
     ICrudApplicationService<Guid, ProductDto, CreateProductRequest, UpdateProductRequest> service,
-    IPermissionChecker permissionChecker) : ControllerBase
+    IPermissionChecker permissionChecker,
+    ISender sender) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<ProductDto>>> Get(
@@ -40,8 +44,24 @@ public sealed class ProductsController(
         CancellationToken cancellationToken)
     {
         await EnsurePermissionAsync(InventoryPermissions.Products.Create, cancellationToken);
-        var result = await service.CreateAsync(request, cancellationToken);
+
+        // Keep the legacy endpoint safe: stock products must go through the integrated
+        // workflow so the final state always contains a valid initial variant.
+        var created = await sender.Send(
+            new CreateStockProductCommand(new CreateStockProductRequest(request, null, null)),
+            cancellationToken);
+        var result = await service.GetByIdAsync(created.ProductId, cancellationToken);
         return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
+    }
+
+
+    [HttpPost("stock-product")]
+    public async Task<ActionResult<CreateStockProductResult>> CreateStockProduct(
+        [FromBody] CreateStockProductRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new CreateStockProductCommand(request), cancellationToken);
+        return CreatedAtAction(nameof(GetById), new { id = result.ProductId }, result);
     }
 
     [HttpPut("{id:guid}")]
@@ -50,8 +70,7 @@ public sealed class ProductsController(
         [FromBody] UpdateProductRequest request,
         CancellationToken cancellationToken)
     {
-        await EnsurePermissionAsync(InventoryPermissions.Products.Edit, cancellationToken);
-        return Ok(await service.UpdateAsync(id, request, cancellationToken));
+        return Ok(await sender.Send(new UpdateProductCommand(id, request), cancellationToken));
     }
 
     private async Task EnsurePermissionAsync(string permission, CancellationToken cancellationToken)

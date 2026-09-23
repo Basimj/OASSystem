@@ -32,11 +32,13 @@ public class ProductCategory : AuditableEntity<Guid>
     }
 
     public void UpdateDetails(
+        string code,
         string nameAr,
         string? nameEn,
         Guid? parentCategoryId,
         bool isActive)
     {
+        Code = code;
         NameAr = nameAr;
         NameEn = nameEn;
         ParentCategoryId = parentCategoryId;

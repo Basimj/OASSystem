@@ -1,4 +1,5 @@
 using MediatR;
+using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Abstractions.Security;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.Inventory.Repositories;
@@ -11,6 +12,9 @@ namespace OAS.Application.Inventory.Transactions.Commands.PostInventoryTransacti
 public sealed class PostInventoryTransactionCommandHandler(
     IInventoryTransactionRepository transactionRepository,
     IInventoryPostingService postingService,
+    IReadRepository<Warehouse, Guid> warehouseRepository,
+    IReadRepository<ProductVariant, Guid> variantRepository,
+    IReadRepository<Product, Guid> productRepository,
     ICurrentUser currentUser,
     TimeProvider timeProvider)
     : IRequestHandler<PostInventoryTransactionCommand, Guid>
@@ -38,6 +42,18 @@ public sealed class PostInventoryTransactionCommandHandler(
 
         foreach (var line in lines)
         {
+            var variant = await variantRepository.GetByIdAsync(line.ProductVariantId, cancellationToken)
+                ?? throw new NotFoundException(nameof(ProductVariant), line.ProductVariantId);
+            if (!variant.IsActive)
+                throw Validation("product_variant_inactive", "Product variant must be active before posting inventory.");
+
+            var product = await productRepository.GetByIdAsync(variant.ProductId, cancellationToken)
+                ?? throw new NotFoundException(nameof(Product), variant.ProductId);
+            if (!product.IsActive)
+                throw Validation("product_inactive", "Product must be active before posting inventory.");
+            if (!product.IsStockItem)
+                throw Validation("product_not_stock_item", "Only stock products can be posted to inventory.");
+
             switch (transaction.TransactionType)
             {
                 case InventoryTransactionType.Receipt:
@@ -48,6 +64,7 @@ public sealed class PostInventoryTransactionCommandHandler(
                     var warehouseId = transaction.DestinationWarehouseId ?? transaction.SourceWarehouseId;
                     if (!warehouseId.HasValue)
                         throw new ConflictException("destination_warehouse_required", "Destination warehouse is required for inbound transactions.");
+                    await EnsureWarehouseActiveAsync(warehouseId.Value, cancellationToken);
 
                     await postingService.PostMovementAsync(
                         warehouseId.Value,
@@ -72,6 +89,7 @@ public sealed class PostInventoryTransactionCommandHandler(
                     var warehouseId = transaction.SourceWarehouseId ?? transaction.DestinationWarehouseId;
                     if (!warehouseId.HasValue)
                         throw new ConflictException("source_warehouse_required", "Source warehouse is required for outbound transactions.");
+                    await EnsureWarehouseActiveAsync(warehouseId.Value, cancellationToken);
 
                     await postingService.PostMovementAsync(
                         warehouseId.Value,
@@ -93,6 +111,8 @@ public sealed class PostInventoryTransactionCommandHandler(
                         throw new ConflictException("source_warehouse_required", "Source warehouse is required for transfer.");
                     if (!transaction.DestinationWarehouseId.HasValue)
                         throw new ConflictException("destination_warehouse_required", "Destination warehouse is required for transfer.");
+                    await EnsureWarehouseActiveAsync(transaction.SourceWarehouseId.Value, cancellationToken);
+                    await EnsureWarehouseActiveAsync(transaction.DestinationWarehouseId.Value, cancellationToken);
 
                     var (sourceBal, _) = await postingService.PostMovementAsync(
                         transaction.SourceWarehouseId.Value,
@@ -132,4 +152,15 @@ public sealed class PostInventoryTransactionCommandHandler(
 
         return transaction.Id;
     }
+
+    private async Task EnsureWarehouseActiveAsync(Guid warehouseId, CancellationToken cancellationToken)
+    {
+        var warehouse = await warehouseRepository.GetByIdAsync(warehouseId, cancellationToken)
+            ?? throw new NotFoundException(nameof(Warehouse), warehouseId);
+        if (!warehouse.IsActive)
+            throw Validation("warehouse_inactive", "Warehouse must be active before posting inventory.");
+    }
+
+    private static RequestValidationException Validation(string code, string message) =>
+        new(new Dictionary<string, string[]> { ["inventory"] = [$"{code}: {message}"] });
 }

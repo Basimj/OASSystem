@@ -24,6 +24,7 @@ public sealed class ProductVariantMapper
     public void Update(UpdateProductVariantRequest source, ProductVariant destination)
     {
         destination.UpdateDetails(
+            source.SKU,
             source.Barcode,
             source.VariantName,
             source.Color,

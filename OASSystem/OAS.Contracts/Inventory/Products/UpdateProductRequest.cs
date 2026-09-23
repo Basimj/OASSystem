@@ -1,14 +1,12 @@
-﻿using OAS.Contracts.Enums.Inventory;
-using OAS.Contracts.Inventory;
-
 namespace OAS.Contracts.Inventory.Products;
 
 public sealed record UpdateProductRequest(
+    string ProductCode,
     string NameAr,
     string? NameEn,
     Guid CategoryId,
     Guid? BrandId,
-    ProductType ProductType,
+    Guid ProductTypeId,
     string? Description,
     bool IsStockItem,
     bool IsActive);

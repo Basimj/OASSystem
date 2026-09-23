@@ -1,0 +1,304 @@
+@page "/inventory/brands"
+@attribute [Authorize]
+@using OAS.Client.Inventory.Services
+@using OAS.Client.Services.Browser
+@using OAS.Contracts.Inventory
+@using OAS.Contracts.Inventory.Products
+@using OAS.UiLib.Components.Spreadsheets
+
+<PageTitle>العلامات التجارية | OAS</PageTitle>
+
+<UiWorkspaceLayout ShowAside="true" ShowFilters="false">
+    <Actions>
+        <UiWorkspaceActionBar>
+            <UiButton Text="جديد" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small"
+                      Disabled="@IsEditing" OnClick="BeginCreateAsync" />
+            <UiButton Text="حفظ" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small"
+                      Disabled="@(!IsEditing)" Loading="@_saving" OnClick="SaveAsync" />
+            <UiButton Text="تعديل" IconCssClass="fa-solid fa-pen" Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
+                      Disabled="@(!CanEdit)" OnClick="BeginEditAsync" />
+            <UiButton Text="إلغاء" IconCssClass="fa-solid fa-xmark" Variant="ButtonVariant.Ghost" Size="ControlSize.Small"
+                      Disabled="@(!IsEditing)" OnClick="CancelAsync" />
+            <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
+                      Disabled="@IsEditing" Loading="@_loading" OnClick="RefreshAsync" />
+            <UiSpreadsheetActions CanImport="false" Busy="@_exporting" OnExport="ExportAsync" />
+            <UiSearchInput @bind-Value="_search" Placeholder="ابحث بالكود أو اسم العلامة التجارية..."
+                           AriaLabel="البحث في العلامات التجارية" ClearText="مسح البحث"
+                           DebounceMilliseconds="250" OnSearch="SearchChangedAsync" />
+        </UiWorkspaceActionBar>
+    </Actions>
+
+    <Content>
+        <UiDataGridPanel Title="العلامات التجارية" Subtitle="@($"{FilteredBrands.Count} علامة تجارية")">
+            <Body>
+                @if (_loading)
+                {
+                    <UiAlert Message="جاري تحميل العلامات التجارية..." />
+                }
+                else
+                {
+                    <UiDataTable TItem="BrandDto" Items="@FilteredBrands" Headers="@Headers" EmptyText="لا توجد علامات تجارية مطابقة."
+                                 SidebarTypography="true" UniformCellTypography="true"
+                                 OnRowClick="@(x => Select(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
+                        <RowTemplate Context="item">
+                            <td><strong>@item.Code</strong></td>
+                            <td>@item.Name</td>
+                            <td><UiBadge Text="@(item.IsActive ? "نشط" : "غير نشط")" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
+                        </RowTemplate>
+                    </UiDataTable>
+                }
+            </Body>
+        </UiDataGridPanel>
+    </Content>
+
+    <Aside>
+        <UiCard Title="@EditorTitle" Subtitle="@(_selectedId.HasValue ? _code : null)">
+            @if (_mode == EditorMode.Empty)
+            {
+                <UiAlert Message="اختر علامة تجارية من القائمة أو اضغط «جديد»." />
+            }
+            else
+            {
+                <div class="inventory-master-editor">
+                    <UiInputText Label="كود العلامة التجارية"
+                                 Value="@_code" ValueExpression="@(() => _code)"
+                                 ValueChanged="@(v => SetField(CodeField, () => _code = v ?? string.Empty))"
+                                 Required="true" ErrorText="@ErrorFor(CodeField)" MaxLength="32"
+                                 Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+
+                    <UiInputText Label="اسم العلامة التجارية"
+                                 Value="@_name" ValueExpression="@(() => _name)"
+                                 ValueChanged="@(v => SetField(NameField, () => _name = v ?? string.Empty))"
+                                 Required="true" ErrorText="@ErrorFor(NameField)" MaxLength="100"
+                                 Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+
+                    <UiCheckbox Label="العلامة التجارية نشطة"
+                                Value="@_isActive" ValueChanged="SetActiveAsync"
+                                Disabled="@(!IsEditing || _mode == EditorMode.Create)" />
+                </div>
+            }
+        </UiCard>
+    </Aside>
+</UiWorkspaceLayout>
+
+@code {
+    private enum EditorMode { Empty, View, Create, Edit }
+
+    private const string CodeField = "كود العلامة التجارية";
+    private const string NameField = "اسم العلامة التجارية";
+
+    [Inject] private IInventoryClientService Inventory { get; set; } = default!;
+    [Inject] private InventorySpreadsheetClient SpreadsheetClient { get; set; } = default!;
+    [Inject] private BrowserFileDownloadService SpreadsheetDownload { get; set; } = default!;
+    [Inject] private IApiFeedbackService ApiFeedback { get; set; } = default!;
+    [Inject] private IUiSnackbarService Snackbar { get; set; } = default!;
+
+    private static readonly IReadOnlyList<string> Headers = ["الكود", "الاسم", "الحالة"];
+    private IReadOnlyList<BrandDto> _brands = [];
+    private readonly Dictionary<string, string> _fieldErrors = new(StringComparer.Ordinal);
+    private EditorMode _mode = EditorMode.Empty;
+    private Guid? _selectedId;
+    private bool _loading = true;
+    private bool _saving;
+    private bool _exporting;
+    private string? _search;
+    private string _code = string.Empty;
+    private string _name = string.Empty;
+    private bool _isActive = true;
+
+    private bool IsEditing => _mode is EditorMode.Create or EditorMode.Edit;
+    private bool CanEdit => _mode == EditorMode.View && _selectedId.HasValue;
+    private string EditorTitle => _mode switch
+    {
+        EditorMode.Create => "علامة تجارية جديدة",
+        EditorMode.Edit => "تعديل العلامة التجارية",
+        EditorMode.View => "تفاصيل العلامة التجارية",
+        _ => "تفاصيل العلامة التجارية"
+    };
+
+    private IReadOnlyList<BrandDto> FilteredBrands => _brands
+        .Where(x => Match(_search, x.Code, x.Name))
+        .OrderBy(x => x.Code, StringComparer.CurrentCultureIgnoreCase)
+        .ToArray();
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var page = await Inventory.GetBrandsAsync(new PageRequest { PageNumber = 1, PageSize = PageRequest.MaximumPageSize });
+            _brands = page.Items;
+            if (_selectedId.HasValue && !_brands.Any(x => x.Id == _selectedId.Value))
+            {
+                _selectedId = null;
+                _mode = EditorMode.Empty;
+                ClearForm();
+            }
+        }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
+        finally { _loading = false; }
+    }
+
+    private Task RefreshAsync(MouseEventArgs args) => LoadAsync();
+    private Task SearchChangedAsync(string? value) => Task.CompletedTask;
+
+    private async Task BeginCreateAsync(MouseEventArgs args)
+    {
+        if (IsEditing) return;
+        _selectedId = null;
+        _mode = EditorMode.Create;
+        ClearForm();
+        _isActive = true;
+        await AssignGeneratedCodeAsync(InventoryCodeKinds.Brand);
+    }
+
+    private Task BeginEditAsync(MouseEventArgs args)
+    {
+        if (!CanEdit) return Task.CompletedTask;
+        ClearValidation();
+        _mode = EditorMode.Edit;
+        return Task.CompletedTask;
+    }
+
+    private Task CancelAsync(MouseEventArgs args)
+    {
+        ClearValidation();
+        if (_selectedId.HasValue)
+        {
+            _mode = EditorMode.View;
+            LoadSelected(_selectedId.Value);
+        }
+        else
+        {
+            _mode = EditorMode.Empty;
+            ClearForm();
+        }
+        return Task.CompletedTask;
+    }
+
+    private async Task SaveAsync(MouseEventArgs args)
+    {
+        if (!IsEditing || _saving || !ValidateForm()) return;
+        _saving = true;
+        try
+        {
+            BrandDto? saved = _mode == EditorMode.Create
+                ? await Inventory.CreateBrandAsync(new CreateBrandRequest(_code.Trim(), _name.Trim()))
+                : await Inventory.UpdateBrandAsync(_selectedId!.Value, new UpdateBrandRequest(_code.Trim(), _name.Trim(), _isActive));
+
+            if (saved is null) return;
+            _selectedId = saved.Id;
+            _mode = EditorMode.View;
+            await LoadAsync();
+            LoadSelected(saved.Id);
+            Snackbar.Success("تم حفظ العلامة التجارية بنجاح.");
+        }
+        catch (ApiClientException ex)
+        {
+            if (string.Equals(ex.Error.Code, "unique_constraint_conflict", StringComparison.OrdinalIgnoreCase))
+            {
+                await LoadAsync();
+                ApplyDuplicateErrors();
+                Snackbar.Error("توجد بيانات مكررة. راجع الحقول المميزة باللون الأحمر.");
+            }
+            else ApiFeedback.Show(ex.Error);
+        }
+        catch { ApiFeedback.ShowUnexpected(); }
+        finally { _saving = false; }
+    }
+
+    private bool ValidateForm()
+    {
+        ClearValidation();
+        var missing = false;
+        if (string.IsNullOrWhiteSpace(_code)) { SetError(CodeField, "هذا الحقل إجباري."); missing = true; }
+        if (string.IsNullOrWhiteSpace(_name)) { SetError(NameField, "هذا الحقل إجباري."); missing = true; }
+        ValidateMaxLength(CodeField, _code, 32);
+        ValidateMaxLength(NameField, _name, 100);
+        ApplyDuplicateErrors();
+
+        if (_fieldErrors.Count == 0) return true;
+        Snackbar.Error(missing ? "هناك بيانات إجبارية لم يتم إدخالها." : "توجد بيانات غير صحيحة. راجع الحقول المميزة باللون الأحمر.");
+        return false;
+    }
+
+    private void ApplyDuplicateErrors()
+    {
+        if (!string.IsNullOrWhiteSpace(_code) &&
+            _brands.Any(x => x.Id != _selectedId && string.Equals(x.Code, _code.Trim(), StringComparison.OrdinalIgnoreCase)))
+            SetError(CodeField, "هذا الكود مستخدم مسبقًا.");
+
+        if (!string.IsNullOrWhiteSpace(_name) &&
+            _brands.Any(x => x.Id != _selectedId && string.Equals(x.Name, _name.Trim(), StringComparison.CurrentCultureIgnoreCase)))
+            SetError(NameField, "اسم العلامة التجارية مستخدم مسبقًا.");
+    }
+
+    private void Select(Guid id)
+    {
+        if (IsEditing || _saving) return;
+        _selectedId = id;
+        _mode = EditorMode.View;
+        LoadSelected(id);
+    }
+
+    private void LoadSelected(Guid id)
+    {
+        ClearValidation();
+        var item = _brands.FirstOrDefault(x => x.Id == id);
+        if (item is null) return;
+        _code = item.Code;
+        _name = item.Name;
+        _isActive = item.IsActive;
+    }
+
+    private void ClearForm()
+    {
+        ClearValidation();
+        _code = string.Empty;
+        _name = string.Empty;
+        _isActive = true;
+    }
+
+    private async Task AssignGeneratedCodeAsync(string kind)
+    {
+        try
+        {
+            var suggestion = await Inventory.GetNextCodeAsync(kind);
+            if (_mode == EditorMode.Create && suggestion is not null)
+                _code = suggestion.Code;
+        }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
+    }
+
+    private Task SetActiveAsync(bool value) { _isActive = value; return Task.CompletedTask; }
+    private void ValidateMaxLength(string key, string? value, int max) { if (!string.IsNullOrEmpty(value) && value.Length > max) SetError(key, $"الحد الأقصى {max} حرفًا."); }
+    private string? ErrorFor(string key) => _fieldErrors.TryGetValue(key, out var value) ? value : null;
+    private void SetError(string key, string message) => _fieldErrors[key] = message;
+    private void ClearFieldError(string key) => _fieldErrors.Remove(key);
+    private void ClearValidation() => _fieldErrors.Clear();
+    private void SetField(string key, Action setter) { setter(); ClearFieldError(key); }
+    private static bool Match(string? search, params string?[] values)
+    {
+        if (string.IsNullOrWhiteSpace(search)) return true;
+        var term = search.Trim();
+        return values.Any(x => x?.Contains(term, StringComparison.CurrentCultureIgnoreCase) == true);
+    }
+
+    private async Task ExportAsync()
+    {
+        if (_exporting) return;
+        _exporting = true;
+        try
+        {
+            var bytes = await SpreadsheetClient.ExportAsync("brands", new PageRequest { Search = _search });
+            await SpreadsheetDownload.SaveAsync(bytes, "inventory-brands.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
+        finally { _exporting = false; }
+    }
+}

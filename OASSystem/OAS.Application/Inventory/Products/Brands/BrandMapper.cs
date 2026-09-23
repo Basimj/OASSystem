@@ -14,7 +14,7 @@ public sealed class BrandMapper
 
     public void Update(UpdateBrandRequest source, Brand destination)
     {
-        destination.UpdateDetails(source.Name, source.IsActive);
+        destination.UpdateDetails(source.Code.Trim(), source.Name.Trim(), source.IsActive);
     }
 
     public BrandDto ToRead(Brand source)

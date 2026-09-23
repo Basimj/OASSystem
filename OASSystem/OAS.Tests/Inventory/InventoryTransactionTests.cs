@@ -20,6 +20,7 @@ public sealed class InventoryTransactionTests
     private FakeGenericRepository<InventoryTransactionLine, Guid> _lineRepository = null!;
     private FakeGenericRepository<Warehouse, Guid> _warehouseRepository = null!;
     private FakeGenericRepository<ProductVariant, Guid> _variantRepository = null!;
+    private FakeGenericRepository<Product, Guid> _productRepository = null!;
     private FakeInventoryBalanceRepository _balanceRepository = null!;
     private FakeGenericRepository<InventoryLedger, Guid> _ledgerRepository = null!;
     private FakeInventorySequenceNumberGenerator _sequenceGenerator = null!;
@@ -39,6 +40,7 @@ public sealed class InventoryTransactionTests
         _lineRepository = new FakeGenericRepository<InventoryTransactionLine, Guid>(_lineItems);
         _warehouseRepository = new FakeGenericRepository<Warehouse, Guid>();
         _variantRepository = new FakeGenericRepository<ProductVariant, Guid>();
+        _productRepository = new FakeGenericRepository<Product, Guid>();
         _balanceRepository = new FakeInventoryBalanceRepository();
         _ledgerRepository = new FakeGenericRepository<InventoryLedger, Guid>();
         _sequenceGenerator = new FakeInventorySequenceNumberGenerator();
@@ -57,7 +59,9 @@ public sealed class InventoryTransactionTests
         _warehouseBId = warehouseB.Id;
         _warehouseRepository.Items.Add(warehouseB);
 
-        var variant = new ProductVariant(Guid.NewGuid(), "VAR-01", 20m, 50m, variantName: "Variant 01");
+        var product = new Product("PRD-01", "Test Product", Guid.NewGuid(), Guid.NewGuid(), isStockItem: true);
+        _productRepository.Items.Add(product);
+        var variant = new ProductVariant(product.Id, "VAR-01", 20m, 50m, variantName: "Variant 01");
         _variantId = variant.Id;
         _variantRepository.Items.Add(variant);
     }
@@ -70,6 +74,7 @@ public sealed class InventoryTransactionTests
             _lineRepository,
             _warehouseRepository,
             _variantRepository,
+            _productRepository,
             _sequenceGenerator);
 
         var request = new CreateInventoryTransactionRequest(
@@ -104,6 +109,88 @@ public sealed class InventoryTransactionTests
         Assert.That(lines[0].UnitCost, Is.EqualTo(25m));
     }
 
+
+    [Test]
+    public void CreateTransaction_InactiveWarehouse_IsRejectedServerSide()
+    {
+        var warehouse = _warehouseRepository.Items.Single(x => x.Id == _warehouseAId);
+        warehouse.UpdateDetails(warehouse.Code, warehouse.NameAr, warehouse.NameEn, warehouse.Description, warehouse.IsDefault, isActive: false);
+
+        var handler = CreateTransactionHandler();
+        var request = CreateReceiptRequest();
+
+        Assert.ThrowsAsync<RequestValidationException>(() =>
+            handler.Handle(new CreateInventoryTransactionCommand(request), CancellationToken.None));
+    }
+
+    [Test]
+    public void CreateTransaction_InactiveVariant_IsRejectedServerSide()
+    {
+        var variant = _variantRepository.Items.Single(x => x.Id == _variantId);
+        variant.UpdateDetails(
+            variant.SKU,
+            variant.Barcode,
+            variant.VariantName,
+            variant.Color,
+            variant.Size,
+            variant.UnitId,
+            variant.PurchasePrice,
+            variant.SellingPrice,
+            isActive: false);
+
+        var handler = CreateTransactionHandler();
+        var request = CreateReceiptRequest();
+
+        Assert.ThrowsAsync<RequestValidationException>(() =>
+            handler.Handle(new CreateInventoryTransactionCommand(request), CancellationToken.None));
+    }
+
+    [Test]
+    public void CreateTransaction_InactiveProduct_IsRejectedServerSide()
+    {
+        var variant = _variantRepository.Items.Single(x => x.Id == _variantId);
+        var product = _productRepository.Items.Single(x => x.Id == variant.ProductId);
+        product.UpdateDetails(
+            product.ProductCode,
+            product.NameAr,
+            product.NameEn,
+            product.CategoryId,
+            product.BrandId,
+            product.ProductTypeId,
+            product.Description,
+            product.IsStockItem,
+            isActive: false);
+
+        var handler = CreateTransactionHandler();
+        var request = CreateReceiptRequest();
+
+        Assert.ThrowsAsync<RequestValidationException>(() =>
+            handler.Handle(new CreateInventoryTransactionCommand(request), CancellationToken.None));
+    }
+
+    [Test]
+    public void CreateTransaction_NonStockProduct_IsRejectedServerSide()
+    {
+        var variant = _variantRepository.Items.Single(x => x.Id == _variantId);
+        var product = _productRepository.Items.Single(x => x.Id == variant.ProductId);
+        product.UpdateDetails(
+            product.ProductCode,
+            product.NameAr,
+            product.NameEn,
+            product.CategoryId,
+            product.BrandId,
+            product.ProductTypeId,
+            product.Description,
+            isStockItem: false,
+            isActive: product.IsActive);
+
+        var handler = CreateTransactionHandler();
+        var request = CreateReceiptRequest();
+
+        Assert.ThrowsAsync<RequestValidationException>(() =>
+            handler.Handle(new CreateInventoryTransactionCommand(request), CancellationToken.None));
+    }
+
     [Test]
     public async Task PostTransaction_InboundReceipt_IncreasesBalanceAndCreatesLedger()
     {
@@ -121,6 +208,9 @@ public sealed class InventoryTransactionTests
         var postHandler = new PostInventoryTransactionCommandHandler(
             _transactionRepository,
             _postingService,
+            _warehouseRepository,
+            _variantRepository,
+            _productRepository,
             _currentUser,
             TimeProvider.System);
 
@@ -165,6 +255,9 @@ public sealed class InventoryTransactionTests
         var postHandler = new PostInventoryTransactionCommandHandler(
             _transactionRepository,
             _postingService,
+            _warehouseRepository,
+            _variantRepository,
+            _productRepository,
             _currentUser,
             TimeProvider.System);
 
@@ -204,6 +297,9 @@ public sealed class InventoryTransactionTests
         var postHandler = new PostInventoryTransactionCommandHandler(
             _transactionRepository,
             _postingService,
+            _warehouseRepository,
+            _variantRepository,
+            _productRepository,
             _currentUser,
             TimeProvider.System);
 
@@ -238,6 +334,9 @@ public sealed class InventoryTransactionTests
         var postHandler = new PostInventoryTransactionCommandHandler(
             _transactionRepository,
             _postingService,
+            _warehouseRepository,
+            _variantRepository,
+            _productRepository,
             _currentUser,
             TimeProvider.System);
 
@@ -267,6 +366,9 @@ public sealed class InventoryTransactionTests
         var postHandler = new PostInventoryTransactionCommandHandler(
             _transactionRepository,
             _postingService,
+            _warehouseRepository,
+            _variantRepository,
+            _productRepository,
             _currentUser,
             TimeProvider.System);
 
@@ -274,4 +376,31 @@ public sealed class InventoryTransactionTests
             postHandler.Handle(new PostInventoryTransactionCommand(txn.Id), CancellationToken.None));
         Assert.That(ex!.Code, Is.EqualTo("insufficient_stock"));
     }
+
+    private CreateInventoryTransactionCommandHandler CreateTransactionHandler() => new(
+        _transactionRepository,
+        _lineRepository,
+        _warehouseRepository,
+        _variantRepository,
+        _productRepository,
+        _sequenceGenerator);
+
+    private CreateInventoryTransactionRequest CreateReceiptRequest() => new(
+        TransactionNumber: null,
+        TransactionType: ContractType.Receipt,
+        SourceWarehouseId: null,
+        DestinationWarehouseId: _warehouseAId,
+        TransactionDate: DateTimeOffset.UtcNow,
+        ReferenceType: null,
+        ReferenceId: null,
+        Reason: null,
+        Notes: null,
+        Lines:
+        [
+            new CreateInventoryTransactionLineRequest(
+                ProductVariantId: _variantId,
+                Quantity: 1m,
+                UnitCost: 10m,
+                Notes: null)
+        ]);
 }

@@ -7,6 +7,10 @@ public sealed class UpdateWarehouseRequestValidator : AbstractValidator<UpdateWa
 {
     public UpdateWarehouseRequestValidator()
     {
+        RuleFor(x => x.Code)
+            .NotEmpty().WithErrorCode("warehouse_code_required")
+            .MaximumLength(32).WithErrorCode("warehouse_code_max_length");
+
         RuleFor(x => x.NameAr)
             .NotEmpty().WithErrorCode("warehouse_name_ar_required")
             .MaximumLength(100).WithErrorCode("warehouse_name_ar_max_length");

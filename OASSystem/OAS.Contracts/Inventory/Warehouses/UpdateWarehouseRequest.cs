@@ -1,6 +1,7 @@
-﻿namespace OAS.Contracts.Inventory.Warehouses;
+namespace OAS.Contracts.Inventory.Warehouses;
 
 public sealed record UpdateWarehouseRequest(
+    string Code,
     string NameAr,
     string? NameEn,
     string? Description,
