@@ -50,21 +50,20 @@ public static class AccountingPermissions
         public const string Disable = "accounting.cost_centers.disable";
     }
 
-
-    public static class Customers
+    public static class CustomerAccounts
     {
-        public const string View = "accounting.customers.view";
-        public const string Create = "accounting.customers.create";
-        public const string Edit = "accounting.customers.edit";
-        public const string Disable = "accounting.customers.disable";
+        public const string View = "accounting.customer_accounts.view";
+        public const string Create = "accounting.customer_accounts.create";
+        public const string Edit = "accounting.customer_accounts.edit";
+        public const string Disable = "accounting.customer_accounts.disable";
     }
 
-    public static class Suppliers
+    public static class SupplierAccounts
     {
-        public const string View = "accounting.suppliers.view";
-        public const string Create = "accounting.suppliers.create";
-        public const string Edit = "accounting.suppliers.edit";
-        public const string Disable = "accounting.suppliers.disable";
+        public const string View = "accounting.supplier_accounts.view";
+        public const string Create = "accounting.supplier_accounts.create";
+        public const string Edit = "accounting.supplier_accounts.edit";
+        public const string Disable = "accounting.supplier_accounts.disable";
     }
 
     public static class ReceiptVouchers

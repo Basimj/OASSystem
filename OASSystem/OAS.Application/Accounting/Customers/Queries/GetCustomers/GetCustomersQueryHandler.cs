@@ -1,2 +1,0 @@
-using MediatR;using OAS.Application.Accounting.Abstractions;using OAS.Contracts.Accounting.Customers;using OAS.Contracts.Common.Pagination;
-namespace OAS.Application.Accounting.Customers.Queries.GetCustomers;public sealed class GetCustomersQueryHandler(IAccountingPartyQueryService queries):IRequestHandler<GetCustomersQuery,PagedResult<CustomerDto>>{public Task<PagedResult<CustomerDto>> Handle(GetCustomersQuery r,CancellationToken ct)=>queries.GetCustomersAsync(r.Request,r.Filter,ct);}

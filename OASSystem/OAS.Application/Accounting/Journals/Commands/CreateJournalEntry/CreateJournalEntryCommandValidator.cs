@@ -1,4 +1,4 @@
-using FluentValidation;
+﻿using FluentValidation;
 
 namespace OAS.Application.Accounting.Journals.Commands.CreateJournalEntry;
 
@@ -43,10 +43,6 @@ public sealed class CreateJournalEntryCommandValidator
                 line.RuleFor(x => x.Description)
                     .MaximumLength(300)
                     .WithErrorCode("journal_line_description_max_length");
-
-                line.RuleFor(x => x)
-                    .Must(x => !(x.CustomerId.HasValue && x.SupplierId.HasValue))
-                    .WithErrorCode("journal_line_party_conflict");
             });
     }
 }

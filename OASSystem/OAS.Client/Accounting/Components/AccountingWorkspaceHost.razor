@@ -291,15 +291,15 @@
                                          Href="/accounting/posting-profiles"
                                          IconCssClass="fa-solid fa-sliders" />
 
-                    <UiAccountingHubTile Title="العملاء"
-                                         Description="إدارة العملاء وربط كل عميل بحسابه المحاسبي تلقائيًا"
-                                         Href="/accounting/customers"
-                                         IconCssClass="fa-solid fa-users" />
+                    <UiAccountingHubTile Title="حسابات العملاء"
+                                         Description="ربط العملاء بحسابات الأستاذ والمراقبة"
+                                         Href="/accounting/customer-accounts"
+                                         IconCssClass="fa-solid fa-users-line" />
 
-                    <UiAccountingHubTile Title="الموردون"
-                                         Description="إدارة الموردين وربط كل مورد بحسابه المحاسبي تلقائيًا"
-                                         Href="/accounting/suppliers"
-                                         IconCssClass="fa-solid fa-truck-field" />
+                    <UiAccountingHubTile Title="حسابات الموردين"
+                                         Description="ربط الموردين بحسابات الأستاذ والمراقبة"
+                                         Href="/accounting/supplier-accounts"
+                                         IconCssClass="fa-solid fa-boxes-packing" />
 
                     <UiAccountingHubTile Title="سندات القبض"
                                          Description="إدارة المقبوضات وربطها بالقيود"
@@ -441,8 +441,6 @@
                                         FiscalPeriodSearchAsync="SearchFiscalPeriodsAsync"
                                         AccountSearchAsync="SearchAccountsAsync"
                                         CostCenterSearchAsync="SearchCostCentersAsync"
-                                        CustomerSearchAsync="SearchCustomersAsync"
-                                        SupplierSearchAsync="SearchSuppliersAsync"
                                         OnModelChanged="MarkActiveDirty" />
 
                     break;
@@ -470,16 +468,46 @@
 
                     break;
 
+                case AccountingEntityType.CustomerAccounts
+                    when activeTab.Model is CustomerAccountEditor.FormModel model:
+
+                    <CustomerAccountEditor Model="@model"
+                                           IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
+                                           IsNew="@activeTab.IsNew"
+                                           CustomerLookupItem='@GetExternalReferenceLookup(model.CustomerId, "عميل")'
+                                           AccountLookupItem="@GetAccountLookup(model.AccountId)"
+                                           ControlAccountLookupItem="@GetAccountLookup(model.ControlAccountId)"
+                                           CustomerSearchAsync="@null"
+                                           AccountSearchAsync="SearchAccountsAsync"
+                                           OnModelChanged="MarkActiveDirty" />
+
+                    break;
+
+                case AccountingEntityType.SupplierAccounts
+                    when activeTab.Model is SupplierAccountEditor.FormModel model:
+
+                    <SupplierAccountEditor Model="@model"
+                                           IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
+                                           IsNew="@activeTab.IsNew"
+                                           SupplierLookupItem='@GetExternalReferenceLookup(model.SupplierId, "مورد")'
+                                           AccountLookupItem="@GetAccountLookup(model.AccountId)"
+                                           ControlAccountLookupItem="@GetAccountLookup(model.ControlAccountId)"
+                                           SupplierSearchAsync="@null"
+                                           AccountSearchAsync="SearchAccountsAsync"
+                                           OnModelChanged="MarkActiveDirty" />
+
+                    break;
+
                 case AccountingEntityType.ReceiptVouchers
                     when activeTab.Model is ReceiptVoucherEditor.FormModel model:
 
                     <ReceiptVoucherEditor Model="@model"
                                           IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
                                           IsNew="@activeTab.IsNew"
-                                          CustomerLookupItem="@GetCustomerLookup(model.CustomerId)"
+                                          CustomerLookupItem='@GetExternalReferenceLookup(model.CustomerId, "عميل")'
                                           CashAccountLookupItem="@GetCashAccountLookup(model.CashAccountId)"
                                           BankAccountLookupItem="@GetBankAccountLookup(model.BankAccountId)"
-                                          CustomerSearchAsync="SearchCustomersAsync"
+                                          CustomerSearchAsync="@null"
                                           CashAccountSearchAsync="SearchCashAccountsAsync"
                                           BankAccountSearchAsync="SearchBankAccountsAsync"
                                           AccountSearchAsync="SearchAccountsAsync"
@@ -493,10 +521,10 @@
                     <PaymentVoucherEditor Model="@model"
                                           IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
                                           IsNew="@activeTab.IsNew"
-                                          SupplierLookupItem="@GetSupplierLookup(model.SupplierId)"
+                                          SupplierLookupItem='@GetExternalReferenceLookup(model.SupplierId, "مورد")'
                                           CashAccountLookupItem="@GetCashAccountLookup(model.CashAccountId)"
                                           BankAccountLookupItem="@GetBankAccountLookup(model.BankAccountId)"
-                                          SupplierSearchAsync="SearchSuppliersAsync"
+                                          SupplierSearchAsync="@null"
                                           CashAccountSearchAsync="SearchCashAccountsAsync"
                                           BankAccountSearchAsync="SearchBankAccountsAsync"
                                           AccountSearchAsync="SearchAccountsAsync"

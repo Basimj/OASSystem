@@ -3,8 +3,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using OAS.Application.Abstractions.Numbering;
 using OAS.Application.Abstractions.Persistence;
-using OAS.Infrastructure.Accounting.Persistence.Queries;
-using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Database.Abstractions;
 using OAS.Application.Features.Employees.Abstractions;
 using OAS.Application.Identity.Abstractions;
@@ -72,7 +70,6 @@ public static class DependencyInjection
             typeof(EfRepository<,>));
 
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
-        services.AddScoped<IAccountingPartyQueryService, AccountingPartyQueryService>();
 
         services.AddScoped<
             IIdentityRepository,

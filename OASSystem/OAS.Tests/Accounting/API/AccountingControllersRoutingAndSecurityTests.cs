@@ -16,7 +16,7 @@ public class AccountingControllersRoutingAndSecurityTests
         typeof(CashAccountsController),
         typeof(CashShiftsController),
         typeof(CostCentersController),
-        typeof(CustomersController),
+        typeof(CustomerAccountsController),
         typeof(ExpensesController),
         typeof(FiscalPeriodsController),
         typeof(FiscalYearsController),
@@ -25,7 +25,7 @@ public class AccountingControllersRoutingAndSecurityTests
         typeof(PaymentAllocationsController),
         typeof(PostingProfilesController),
         typeof(ReceiptVouchersController),
-        typeof(SuppliersController)
+        typeof(SupplierAccountsController)
     ];
 
     [Test]

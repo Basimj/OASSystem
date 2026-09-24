@@ -5,7 +5,6 @@ using OAS.Application.Accounting.Accounts.Commands.UpdateAccount;
 using OAS.Application.Accounting.Accounts.Mapping;
 using OAS.Application.Accounting.Accounts.Queries.GetAccountById;
 using OAS.Application.Accounting.Accounts.Queries.GetAccounts;
-using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Common.Exceptions;
 using OAS.Contracts.Accounting.Accounts;
 using OAS.Contracts.Accounting.Enums;
@@ -70,7 +69,7 @@ public class AccountCommandAndQueryTests
         var existing = CreateAccountEntity("1101", "الصندوق");
         await _repository.AddAsync(existing);
 
-        var handler = new UpdateAccountCommandHandler(_repository, _mapper, new UnmanagedAccountGuard());
+        var handler = new UpdateAccountCommandHandler(_repository, _mapper);
         var request = new UpdateAccountRequest(
             Code: "1101",
             NameAr: "الصندوق الرئيسي المعدل",
@@ -108,7 +107,7 @@ public class AccountCommandAndQueryTests
         var existing = CreateAccountEntity("1101", "الصندوق");
         _repository.AddAsync(existing).GetAwaiter().GetResult();
 
-        var handler = new UpdateAccountCommandHandler(_repository, _mapper, new UnmanagedAccountGuard());
+        var handler = new UpdateAccountCommandHandler(_repository, _mapper);
         var request = new UpdateAccountRequest(
             Code: "9999",
             NameAr: "الصندوق",
@@ -141,7 +140,7 @@ public class AccountCommandAndQueryTests
         var existing = CreateAccountEntity("1101", "الصندوق");
         await _repository.AddAsync(existing);
 
-        var handler = new SetAccountStatusCommandHandler(_repository, new UnmanagedAccountGuard());
+        var handler = new SetAccountStatusCommandHandler(_repository);
         var request = new SetAccountStatusRequest(
             IsActive: false,
             RowVersion: Convert.ToBase64String(existing.RowVersion));
@@ -223,9 +222,4 @@ public class AccountCommandAndQueryTests
             Guid.NewGuid(), code, name, null, null, 1,
             DomainAccountClass.Asset, DomainAccountType.Posting, DomainNormalBalance.Debit,
             true, false, true, false, true, null);
-    private sealed class UnmanagedAccountGuard : IManagedAccountGuard
-    {
-        public Task<bool> IsManagedAsync(Guid accountId, CancellationToken cancellationToken = default) => Task.FromResult(false);
-    }
-
 }

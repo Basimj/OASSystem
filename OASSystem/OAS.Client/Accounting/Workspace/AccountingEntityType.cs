@@ -8,6 +8,8 @@ public enum AccountingEntityType
     FiscalPeriods,
     Journals,
     PostingProfiles,
+    CustomerAccounts,
+    SupplierAccounts,
     ReceiptVouchers,
     PaymentVouchers,
     PaymentAllocations,

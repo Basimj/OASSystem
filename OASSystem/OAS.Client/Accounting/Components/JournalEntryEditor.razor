@@ -112,8 +112,6 @@
                               IsEditable="@IsEditable"
                               AccountSearchAsync="@AccountSearchAsync"
                               CostCenterSearchAsync="@CostCenterSearchAsync"
-                              CustomerSearchAsync="@CustomerSearchAsync"
-                              SupplierSearchAsync="@SupplierSearchAsync"
                               OnLinesChanged="@OnChanged" />
 
     </UiAccountingFormSection>
@@ -239,24 +237,6 @@
         CancellationToken,
         Task<IReadOnlyList<UiLookupItem>>>?
         CostCenterSearchAsync
-    { get; set; }
-
-
-    [Parameter]
-    public Func<
-        string,
-        CancellationToken,
-        Task<IReadOnlyList<UiLookupItem>>>?
-        CustomerSearchAsync
-    { get; set; }
-
-
-    [Parameter]
-    public Func<
-        string,
-        CancellationToken,
-        Task<IReadOnlyList<UiLookupItem>>>?
-        SupplierSearchAsync
     { get; set; }
 
 

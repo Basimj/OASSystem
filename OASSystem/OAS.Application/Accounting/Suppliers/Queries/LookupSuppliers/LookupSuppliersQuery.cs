@@ -1,2 +1,0 @@
-using OAS.Application.Abstractions.Messaging;using OAS.Application.Accounting.Authorization;using OAS.Contracts.Accounting.Suppliers;
-namespace OAS.Application.Accounting.Suppliers.Queries.LookupSuppliers;public sealed record LookupSuppliersQuery(string? Search,int Take=30):IQuery<IReadOnlyList<SupplierLookupDto>>,IAuthorizedRequest{public IReadOnlyCollection<string> RequiredPermissions{get;}=[AccountingPermissions.Suppliers.View];}

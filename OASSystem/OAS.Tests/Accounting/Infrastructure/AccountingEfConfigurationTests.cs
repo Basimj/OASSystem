@@ -20,7 +20,7 @@ public class AccountingEfConfigurationTests
     }
 
     [Test]
-    public void ModelBuilder_ConfiguresAllAccountingEntitiesWithDboSchemaAndExpectedTables()
+    public void ModelBuilder_ConfiguresAllAccountingEntitiesWithAccountingSchemaAndExpectedTables()
     {
         using var context = new OasDbContext(_options);
         var model = context.Model;
@@ -35,8 +35,8 @@ public class AccountingEfConfigurationTests
             (typeof(PostingProfile), "tbl_PostingProfiles"),
             (typeof(PostingProfileLine), "tbl_PostingProfileLines"),
             (typeof(CostCenter), "tbl_CostCenters"),
-            (typeof(Customer), "tbl_Customers"),
-            (typeof(Supplier), "tbl_Suppliers"),
+            (typeof(CustomerAccount), "tbl_CustomerAccounts"),
+            (typeof(SupplierAccount), "tbl_SupplierAccounts"),
             (typeof(ReceiptVoucher), "tbl_ReceiptVouchers"),
             (typeof(ReceiptVoucherLine), "tbl_ReceiptVoucherLines"),
             (typeof(PaymentVoucher), "tbl_PaymentVouchers"),
@@ -55,7 +55,7 @@ public class AccountingEfConfigurationTests
             {
                 var entity = model.FindEntityType(entityType);
                 Assert.That(entity, Is.Not.Null, $"{entityType.Name} must be configured in EF Core.");
-                Assert.That(entity!.GetSchema(), Is.EqualTo("dbo"), $"{entityType.Name} schema mismatch.");
+                Assert.That(entity!.GetSchema(), Is.EqualTo("accounting"), $"{entityType.Name} schema mismatch.");
                 Assert.That(entity.GetTableName(), Is.EqualTo(tableName), $"{entityType.Name} table mismatch.");
                 Assert.That(entity.FindPrimaryKey(), Is.Not.Null, $"{entityType.Name} must have a primary key.");
             }
@@ -68,8 +68,8 @@ public class AccountingEfConfigurationTests
     [TestCase(typeof(JournalEntry))]
     [TestCase(typeof(PostingProfile))]
     [TestCase(typeof(CostCenter))]
-    [TestCase(typeof(Customer))]
-    [TestCase(typeof(Supplier))]
+    [TestCase(typeof(CustomerAccount))]
+    [TestCase(typeof(SupplierAccount))]
     [TestCase(typeof(ReceiptVoucher))]
     [TestCase(typeof(PaymentVoucher))]
     [TestCase(typeof(CashAccount))]
@@ -104,8 +104,8 @@ public class AccountingEfConfigurationTests
             typeof(PostingProfile),
             typeof(PostingProfileLine),
             typeof(CostCenter),
-            typeof(Customer),
-            typeof(Supplier),
+            typeof(CustomerAccount),
+            typeof(SupplierAccount),
             typeof(ReceiptVoucher),
             typeof(ReceiptVoucherLine),
             typeof(PaymentVoucher),

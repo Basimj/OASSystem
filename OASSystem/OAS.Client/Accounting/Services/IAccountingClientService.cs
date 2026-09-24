@@ -3,8 +3,7 @@ using OAS.Contracts.Accounting.BankAccounts;
 using OAS.Contracts.Accounting.CashAccounts;
 using OAS.Contracts.Accounting.CashShifts;
 using OAS.Contracts.Accounting.CostCenters;
-using OAS.Contracts.Accounting.Customers;
-using OAS.Contracts.Accounting.Common;
+using OAS.Contracts.Accounting.CustomerAccounts;
 using OAS.Contracts.Accounting.Expenses;
 using OAS.Contracts.Accounting.FiscalPeriods;
 using OAS.Contracts.Accounting.FiscalYears;
@@ -13,7 +12,7 @@ using OAS.Contracts.Accounting.PaymentAllocations;
 using OAS.Contracts.Accounting.PaymentVouchers;
 using OAS.Contracts.Accounting.PostingProfiles;
 using OAS.Contracts.Accounting.ReceiptVouchers;
-using OAS.Contracts.Accounting.Suppliers;
+using OAS.Contracts.Accounting.SupplierAccounts;
 using OAS.Contracts.Common.Pagination;
 
 namespace OAS.Client.Accounting.Services;
@@ -58,29 +57,17 @@ public interface IAccountingClientService
     Task<CostCenterDto?> UpdateCostCenterAsync(Guid id, UpdateCostCenterRequest request, CancellationToken cancellationToken = default);
     Task<CostCenterDto?> SetCostCenterStatusAsync(Guid id, SetCostCenterStatusRequest request, CancellationToken cancellationToken = default);
 
-    Task<PagedResult<CustomerDto>> GetCustomersPageAsync(PageRequest request, string? filter = null, CancellationToken cancellationToken = default);
-    Task<CustomerDto?> GetCustomerByIdAsync(Guid id, CancellationToken cancellationToken = default);
-    Task<CustomerDto?> CreateCustomerAsync(CreateCustomerRequest request, CancellationToken cancellationToken = default);
-    Task<CustomerDto?> UpdateCustomerAsync(Guid id, UpdateCustomerRequest request, CancellationToken cancellationToken = default);
-    Task<CustomerDto?> SetCustomerStatusAsync(Guid id, SetCustomerStatusRequest request, CancellationToken cancellationToken = default);
-    Task<CustomerCodeReservationDto?> ReserveCustomerCodeAsync(CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<CustomerAccountParentDto>?> GetCustomerAccountParentsAsync(CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<CustomerLookupDto>?> LookupCustomersAsync(string? search, CancellationToken cancellationToken = default);
+    Task<PagedResult<CustomerAccountDto>> GetCustomerAccountsPageAsync(PageRequest request, CancellationToken cancellationToken = default);
+    Task<CustomerAccountDto?> GetCustomerAccountByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<CustomerAccountDto?> CreateCustomerAccountAsync(CreateCustomerAccountRequest request, CancellationToken cancellationToken = default);
+    Task<CustomerAccountDto?> UpdateCustomerAccountAsync(Guid id, UpdateCustomerAccountRequest request, CancellationToken cancellationToken = default);
+    Task<CustomerAccountDto?> SetCustomerAccountStatusAsync(Guid id, SetCustomerAccountStatusRequest request, CancellationToken cancellationToken = default);
 
-    Task<PagedResult<SupplierDto>> GetSuppliersPageAsync(PageRequest request, string? filter = null, CancellationToken cancellationToken = default);
-    Task<SupplierDto?> GetSupplierByIdAsync(Guid id, CancellationToken cancellationToken = default);
-    Task<SupplierDto?> CreateSupplierAsync(CreateSupplierRequest request, CancellationToken cancellationToken = default);
-    Task<SupplierDto?> UpdateSupplierAsync(Guid id, UpdateSupplierRequest request, CancellationToken cancellationToken = default);
-    Task<SupplierDto?> SetSupplierStatusAsync(Guid id, SetSupplierStatusRequest request, CancellationToken cancellationToken = default);
-    Task<SupplierCodeReservationDto?> ReserveSupplierCodeAsync(CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<SupplierAccountParentDto>?> GetSupplierAccountParentsAsync(CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<SupplierLookupDto>?> LookupSuppliersAsync(string? search, CancellationToken cancellationToken = default);
-
-    Task<AccountingNumberReservationDto?> ReserveJournalNumberAsync(DateOnly postingDate, CancellationToken cancellationToken = default);
-    Task<AccountingNumberReservationDto?> ReserveReceiptVoucherNumberAsync(DateOnly voucherDate, CancellationToken cancellationToken = default);
-    Task<AccountingNumberReservationDto?> ReservePaymentVoucherNumberAsync(DateOnly voucherDate, CancellationToken cancellationToken = default);
-    Task<AccountingNumberReservationDto?> ReserveExpenseNumberAsync(DateOnly expenseDate, CancellationToken cancellationToken = default);
-    Task<AccountingNumberReservationDto?> ReserveCashShiftNumberAsync(CancellationToken cancellationToken = default);
+    Task<PagedResult<SupplierAccountDto>> GetSupplierAccountsPageAsync(PageRequest request, CancellationToken cancellationToken = default);
+    Task<SupplierAccountDto?> GetSupplierAccountByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<SupplierAccountDto?> CreateSupplierAccountAsync(CreateSupplierAccountRequest request, CancellationToken cancellationToken = default);
+    Task<SupplierAccountDto?> UpdateSupplierAccountAsync(Guid id, UpdateSupplierAccountRequest request, CancellationToken cancellationToken = default);
+    Task<SupplierAccountDto?> SetSupplierAccountStatusAsync(Guid id, SetSupplierAccountStatusRequest request, CancellationToken cancellationToken = default);
 
     Task<PagedResult<ReceiptVoucherDto>> GetReceiptVouchersPageAsync(PageRequest request, CancellationToken cancellationToken = default);
     Task<ReceiptVoucherDto?> GetReceiptVoucherByIdAsync(Guid id, CancellationToken cancellationToken = default);

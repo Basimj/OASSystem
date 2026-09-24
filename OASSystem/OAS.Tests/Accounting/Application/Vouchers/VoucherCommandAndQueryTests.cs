@@ -86,13 +86,12 @@ public class VoucherCommandAndQueryTests
         var handler =
             new CreateReceiptVoucherCommandHandler(
                 _receiptRepository,
-                new FakeRepository<Customer, Guid>(),
                 _sequenceGenerator);
 
         var request = new CreateReceiptVoucherRequest(
             VoucherDate: new DateOnly(2026, 1, 15),
-            PartyType: ReceiptPartyType.Other,
-            CustomerId: null,
+            PartyType: ReceiptPartyType.Customer,
+            CustomerId: Guid.NewGuid(),
             ReceivedFrom: "عميل تجريبي",
             PaymentMethod: PaymentMethod.Cash,
             CashAccountId: _cashAccountId,
@@ -150,13 +149,12 @@ public class VoucherCommandAndQueryTests
         var handler =
             new CreatePaymentVoucherCommandHandler(
                 _paymentRepository,
-                new FakeRepository<Supplier, Guid>(),
                 _sequenceGenerator);
 
         var request = new CreatePaymentVoucherRequest(
             VoucherDate: new DateOnly(2026, 1, 15),
-            PartyType: PaymentPartyType.Other,
-            SupplierId: null,
+            PartyType: PaymentPartyType.Supplier,
+            SupplierId: Guid.NewGuid(),
             BeneficiaryName: "مورد تجريبي",
             PaymentMethod: PaymentMethod.BankTransfer,
             CashAccountId: null,

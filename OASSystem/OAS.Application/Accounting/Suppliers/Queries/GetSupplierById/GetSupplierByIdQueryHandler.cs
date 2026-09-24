@@ -1,2 +1,0 @@
-using MediatR;using OAS.Application.Accounting.Abstractions;using OAS.Application.Common.Exceptions;using OAS.Contracts.Accounting.Suppliers;using OAS.Domain.Accounting.Entities;
-namespace OAS.Application.Accounting.Suppliers.Queries.GetSupplierById;public sealed class GetSupplierByIdQueryHandler(IAccountingPartyQueryService q):IRequestHandler<GetSupplierByIdQuery,SupplierDto>{public async Task<SupplierDto> Handle(GetSupplierByIdQuery r,CancellationToken ct)=>await q.GetSupplierAsync(r.Id,ct)??throw new NotFoundException(nameof(Supplier),r.Id);}

@@ -1,2 +1,0 @@
-using OAS.Application.Abstractions.Messaging;using OAS.Application.Accounting.Authorization;using OAS.Contracts.Accounting.Customers;using OAS.Contracts.Common.Pagination;
-namespace OAS.Application.Accounting.Customers.Queries.GetCustomers;public sealed record GetCustomersQuery(PageRequest Request,string? Filter=null):IQuery<PagedResult<CustomerDto>>,IAuthorizedRequest{public IReadOnlyCollection<string> RequiredPermissions{get;}=[AccountingPermissions.Customers.View];}

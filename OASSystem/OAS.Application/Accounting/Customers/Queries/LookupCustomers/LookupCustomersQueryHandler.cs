@@ -1,2 +1,0 @@
-using MediatR;using OAS.Application.Accounting.Abstractions;using OAS.Contracts.Accounting.Customers;
-namespace OAS.Application.Accounting.Customers.Queries.LookupCustomers;public sealed class LookupCustomersQueryHandler(IAccountingPartyQueryService q):IRequestHandler<LookupCustomersQuery,IReadOnlyList<CustomerLookupDto>>{public Task<IReadOnlyList<CustomerLookupDto>> Handle(LookupCustomersQuery r,CancellationToken ct)=>q.LookupCustomersAsync(r.Search,Math.Clamp(r.Take,1,100),ct);}

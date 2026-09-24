@@ -12,8 +12,6 @@ using OAS.Application.Accounting.PaymentAllocations.Queries.GetPaymentAllocation
 using OAS.Application.Accounting.PaymentVouchers.Queries.GetPaymentVouchers;
 using OAS.Application.Accounting.PostingProfiles.Queries.GetPostingProfiles;
 using OAS.Application.Accounting.ReceiptVouchers.Queries.GetReceiptVouchers;
-using OAS.Application.Accounting.Customers.Queries.GetCustomers;
-using OAS.Application.Accounting.Suppliers.Queries.GetSuppliers;
 using OAS.Contracts.Accounting.Accounts;
 using OAS.Contracts.Accounting.BankAccounts;
 using OAS.Contracts.Accounting.CashAccounts;
@@ -27,8 +25,6 @@ using OAS.Contracts.Accounting.PaymentAllocations;
 using OAS.Contracts.Accounting.PaymentVouchers;
 using OAS.Contracts.Accounting.PostingProfiles;
 using OAS.Contracts.Accounting.ReceiptVouchers;
-using OAS.Contracts.Accounting.Customers;
-using OAS.Contracts.Accounting.Suppliers;
 using System.Collections;
 using System.Globalization;
 using MediatR;
@@ -50,7 +46,7 @@ public sealed partial class AccountingSpreadsheetService
         }
         return result;
     }
-    public async Task<byte[]> ExportAsync(string section,PageRequest request,string? sourceType,CancellationToken ct,string? filter=null)
+    public async Task<byte[]> ExportAsync(string section,PageRequest request,string? sourceType,CancellationToken ct)
     {
         await Authorize(section,"view",ct);
         var items=section switch
@@ -69,8 +65,6 @@ public sealed partial class AccountingSpreadsheetService
             "payment-allocations" => await ReadAll<PaymentAllocationDto>(p=>new GetPaymentAllocationsQuery(p),request,ct),
             "expenses" => await ReadAll<ExpenseDto>(p=>new GetExpensesQuery(p),request,ct),
             "cash-shifts" => await ReadAll<CashShiftDto>(p=>new GetCashShiftsQuery(p),request,ct),
-            "customers" => await ReadAll<CustomerDto>(p=>new GetCustomersQuery(p,filter),request,ct),
-            "suppliers" => await ReadAll<SupplierDto>(p=>new GetSuppliersQuery(p,filter),request,ct),
             _=>throw new NotFoundException("spreadsheet",section)
         };
         // The same queries/specifications as the screen are used for every matching page.
@@ -186,8 +180,6 @@ public sealed partial class AccountingSpreadsheetService
         "payment-allocations"=>typeof(PaymentAllocationDto),
         "expenses"=>typeof(ExpenseDto),
         "cash-shifts"=>typeof(CashShiftDto),
-        "customers"=>typeof(CustomerDto),
-        "suppliers"=>typeof(SupplierDto),
         _=>throw new NotFoundException("spreadsheet",section)
     };
 }

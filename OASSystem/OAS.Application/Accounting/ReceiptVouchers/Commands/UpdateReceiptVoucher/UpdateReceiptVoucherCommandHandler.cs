@@ -10,8 +10,7 @@ namespace OAS.Application.Accounting.ReceiptVouchers.Commands.UpdateReceiptVouch
 
 public sealed class UpdateReceiptVoucherCommandHandler(
     IRepository<ReceiptVoucher, Guid> repository,
-    IRepository<ReceiptVoucherLine, Guid> lineRepository,
-    IReadRepository<Customer, Guid> customers)
+    IRepository<ReceiptVoucherLine, Guid> lineRepository)
     : IRequestHandler<UpdateReceiptVoucherCommand>
 {
     public async Task Handle(
@@ -27,13 +26,6 @@ public sealed class UpdateReceiptVoucherCommandHandler(
             throw new ConcurrencyException("The receipt voucher has been modified by another user.");
 
         var data = request.Data;
-        if ((DomainReceiptPartyType)(int)data.PartyType == DomainReceiptPartyType.Customer)
-        {
-            if (!data.CustomerId.HasValue) throw new ConflictException("receipt_customer_required", "Customer is required for a customer receipt.");
-            var customer = await customers.GetByIdAsync(data.CustomerId.Value, cancellationToken);
-            if (customer is null) throw new NotFoundException(nameof(Customer), data.CustomerId.Value);
-            if (!customer.IsActive) throw new ConflictException("receipt_customer_inactive", "The selected customer is inactive.");
-        }
         voucher.UpdateDetails(
             data.VoucherDate,
             (DomainReceiptPartyType)(int)data.PartyType,

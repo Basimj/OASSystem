@@ -1,4 +1,4 @@
-using OAS.Contracts.Accounting.Enums;
+﻿using OAS.Contracts.Accounting.Enums;
 
 namespace OAS.Contracts.Accounting.ReceiptVouchers;
 
@@ -12,5 +12,4 @@ public sealed record CreateReceiptVoucherRequest(
     Guid? BankAccountId,
     decimal TotalAmount,
     string? Description,
-    IReadOnlyList<CreateReceiptVoucherLineRequest> Lines,
-    string? VoucherNumber = null);
+    IReadOnlyList<CreateReceiptVoucherLineRequest> Lines);

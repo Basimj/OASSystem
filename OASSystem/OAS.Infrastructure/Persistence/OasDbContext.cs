@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using OAS.Domain.Accounting.Entities;
 using OAS.Domain.Entities.Inventory;
 using OAS.Domain.Features.Employees.Entities;
 using OAS.Domain.Identity.Entities;
@@ -15,8 +14,6 @@ public sealed class OasDbContext(DbContextOptions<OasDbContext> options) : DbCon
 
     public DbSet<Employee> Employees => Set<Employee>();
     public DbSet<JobTitle> JobTitles => Set<JobTitle>();
-    public DbSet<Customer> Customers => Set<Customer>();
-    public DbSet<Supplier> Suppliers => Set<Supplier>();
     public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
     public DbSet<Brand> Brands => Set<Brand>();
     public DbSet<ProductType> ProductTypes => Set<ProductType>();

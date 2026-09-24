@@ -4,7 +4,7 @@ using OAS.Contracts.Accounting.Enums;
 namespace OAS.Application.Accounting.Spreadsheets;
 public static class AccountingSpreadsheetDefinitions
 {
-    public static readonly string[] ImportSections = ["accounts","cost-centers","cash-accounts","bank-accounts","expense-types","posting-profiles","journals","customers","suppliers"];
+    public static readonly string[] ImportSections = ["accounts","cost-centers","cash-accounts","bank-accounts","expense-types","posting-profiles","journals"];
     public static readonly string[] ExportSections = [.. ImportSections,"fiscal-years","fiscal-periods","receipt-vouchers","payment-vouchers","payment-allocations","expenses","cash-shifts"];
 
     private static SpreadsheetColumn Text(string key, string header, bool required=false) => new(key,required,Header:header);
@@ -29,8 +29,6 @@ public static class AccountingSpreadsheetDefinitions
         "payment-allocations"=>"تخصيصات الدفعات",
         "expenses"=>"المصروفات",
         "cash-shifts"=>"ورديات الصندوق",
-        "customers"=>"العملاء",
-        "suppliers"=>"الموردون",
         _=>section
     };
 
@@ -52,12 +50,6 @@ public static class AccountingSpreadsheetDefinitions
         "FiscalYearCode"=>"كود السنة المالية", "FiscalPeriodCode"=>"كود الفترة المالية", "FiscalYearId"=>"معرف السنة المالية", "FiscalPeriodId"=>"معرف الفترة المالية", "ExpenseTypeId"=>"معرف نوع المصروف", "ExpenseAccountId"=>"معرف حساب المصروف",
         "ParentAccountCode"=>"كود الحساب الأب", "ParentCostCenterCode"=>"كود مركز التكلفة الأب", "ReversedJournalCode"=>"رقم القيد المعكوس",
         "ApprovedBy"=>"اعتمد بواسطة", "ApprovedAtUtc"=>"وقت الاعتماد", "PostedBy"=>"رحّل بواسطة", "SourceModule"=>"الموديول المصدر", "SourceDocumentType"=>"نوع المستند المصدر", "SourceDocumentId"=>"معرف المستند المصدر",
-        "CustomerCode"=>"كود العميل", "SupplierCode"=>"كود المورد", "EntityType"=>"نوع الطرف", "SupplierScope"=>"نطاق المورد", "TradeName"=>"الاسم التجاري",
-        "NationalId"=>"رقم الهوية", "CommercialRegistrationNo"=>"السجل التجاري", "TaxNumber"=>"الرقم الضريبي", "DateOfBirth"=>"تاريخ الميلاد", "Gender"=>"الجنس",
-        "ContactPersonName"=>"مسؤول التواصل", "ContactPersonTitle"=>"صفة مسؤول التواصل", "Phone"=>"الهاتف", "Mobile"=>"الجوال", "AlternatePhone"=>"هاتف بديل", "WhatsAppNumber"=>"واتساب",
-        "Email"=>"البريد الإلكتروني", "Website"=>"الموقع", "PreferredContactMethod"=>"وسيلة التواصل المفضلة", "Country"=>"الدولة", "Governorate"=>"المحافظة", "City"=>"المدينة", "District"=>"الحي/المنطقة",
-        "Street"=>"الشارع", "Building"=>"المبنى", "PostalCode"=>"الرمز البريدي", "AddressDetails"=>"تفاصيل العنوان", "IsCreditAllowed"=>"السماح بالآجل", "CreditLimit"=>"الحد الائتماني",
-        "PaymentTermDays"=>"أيام السداد", "CustomerSince"=>"بداية التعامل", "SupplierSince"=>"بداية التعامل", "DefaultLeadTimeDays"=>"مدة التوريد الافتراضية", "Notes"=>"ملاحظات",
         _=>key
     };
 
@@ -70,8 +62,6 @@ public static class AccountingSpreadsheetDefinitions
         "expense-types" => [new("ExpenseTypes",[Text("Code","كود نوع المصروف",true),Text("NameAr",Header("NameAr"),true),Text("NameEn",Header("NameEn")),Text("DefaultExpenseAccountCode",Header("DefaultExpenseAccountCode")),Bool("IsActive",Header("IsActive"),true)],SheetName(section))],
         "posting-profiles" => [new("PostingProfiles",[Text("Code","كود ملف الترحيل",true),Text("Name",Header("Name"),true),Text("Module",Header("Module"),true),Text("DocumentType",Header("DocumentType"),true),Bool("IsActive",Header("IsActive"),true)],SheetName(section)),new("Lines",[Text("ProfileCode",Header("ProfileCode"),true),Text("AccountRole",Header("AccountRole"),true),Text("AccountCode",Header("AccountCode"),true),Bool("IsRequired",Header("IsRequired"),true)],"أدوار الحسابات")],
         "journals" => [new("Journals",[Text("JournalKey",Header("JournalKey"),true),new("JournalType",true,"enum",null,["Manual","Opening","Closing"],Header:Header("JournalType")),Date("PostingDate",Header("PostingDate"),true),Date("DocumentDate",Header("DocumentDate"),true),Text("Description",Header("Description"),true),Text("AccountCode",Header("AccountCode"),true),Decimal("Debit",Header("Debit"),true),Decimal("Credit",Header("Credit"),true),Text("CostCenterCode",Header("CostCenterCode")),Text("LineDescription",Header("LineDescription"))],SheetName(section))],
-        "customers" => [new("Customers",[Text("ParentAccountCode",Header("ParentAccountCode"),true),new("EntityType",true,"enum",null,["Individual","Organization"],Header:Header("EntityType")),Text("NameAr",Header("NameAr"),true),Text("NameEn",Header("NameEn")),Text("TradeName",Header("TradeName")),Text("NationalId",Header("NationalId")),Text("CommercialRegistrationNo",Header("CommercialRegistrationNo")),Text("TaxNumber",Header("TaxNumber")),Date("DateOfBirth",Header("DateOfBirth")),Enum<Gender>("Gender",Header("Gender")),Text("ContactPersonName",Header("ContactPersonName")),Text("ContactPersonTitle",Header("ContactPersonTitle")),Text("Phone",Header("Phone")),Text("Mobile",Header("Mobile")),Text("AlternatePhone",Header("AlternatePhone")),Text("WhatsAppNumber",Header("WhatsAppNumber")),Text("Email",Header("Email")),Text("Website",Header("Website")),new("PreferredContactMethod",true,"enum",null,["Phone","Mobile","WhatsApp","Email"],Header:Header("PreferredContactMethod")),Text("Country",Header("Country")),Text("Governorate",Header("Governorate")),Text("City",Header("City")),Text("District",Header("District")),Text("Street",Header("Street")),Text("Building",Header("Building")),Text("PostalCode",Header("PostalCode")),Text("AddressDetails",Header("AddressDetails")),Bool("IsCreditAllowed",Header("IsCreditAllowed")),Decimal("CreditLimit",Header("CreditLimit"),true),Decimal("PaymentTermDays",Header("PaymentTermDays"),true),Date("CustomerSince",Header("CustomerSince")),Bool("IsActive",Header("IsActive"),true),Text("Notes",Header("Notes"))],SheetName(section))],
-        "suppliers" => [new("Suppliers",[Text("ParentAccountCode",Header("ParentAccountCode"),true),new("EntityType",true,"enum",null,["Individual","Organization"],Header:Header("EntityType")),new("SupplierScope",true,"enum",null,["Local","International"],Header:Header("SupplierScope")),Text("NameAr",Header("NameAr"),true),Text("NameEn",Header("NameEn")),Text("TradeName",Header("TradeName")),Text("NationalId",Header("NationalId")),Text("CommercialRegistrationNo",Header("CommercialRegistrationNo")),Text("TaxNumber",Header("TaxNumber")),Text("ContactPersonName",Header("ContactPersonName")),Text("ContactPersonTitle",Header("ContactPersonTitle")),Text("Phone",Header("Phone")),Text("Mobile",Header("Mobile")),Text("AlternatePhone",Header("AlternatePhone")),Text("WhatsAppNumber",Header("WhatsAppNumber")),Text("Email",Header("Email")),Text("Website",Header("Website")),new("PreferredContactMethod",true,"enum",null,["Phone","Mobile","WhatsApp","Email"],Header:Header("PreferredContactMethod")),Text("Country",Header("Country")),Text("Governorate",Header("Governorate")),Text("City",Header("City")),Text("District",Header("District")),Text("Street",Header("Street")),Text("Building",Header("Building")),Text("PostalCode",Header("PostalCode")),Text("AddressDetails",Header("AddressDetails")),Decimal("CreditLimit",Header("CreditLimit"),true),Decimal("PaymentTermDays",Header("PaymentTermDays"),true),Decimal("DefaultLeadTimeDays",Header("DefaultLeadTimeDays")),Date("SupplierSince",Header("SupplierSince")),Bool("IsActive",Header("IsActive"),true),Text("Notes",Header("Notes"))],SheetName(section))],
         _ => throw new NotFoundException("spreadsheet template",section)
     };
 }

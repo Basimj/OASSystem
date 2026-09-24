@@ -1,2 +1,0 @@
-using MediatR;using OAS.Application.Accounting.Abstractions;using OAS.Contracts.Accounting.Suppliers;using OAS.Contracts.Common.Pagination;
-namespace OAS.Application.Accounting.Suppliers.Queries.GetSuppliers;public sealed class GetSuppliersQueryHandler(IAccountingPartyQueryService q):IRequestHandler<GetSuppliersQuery,PagedResult<SupplierDto>>{public Task<PagedResult<SupplierDto>> Handle(GetSuppliersQuery r,CancellationToken ct)=>q.GetSuppliersAsync(r.Request,r.Filter,ct);}
