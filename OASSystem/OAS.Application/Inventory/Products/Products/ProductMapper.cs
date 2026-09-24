@@ -1,8 +1,6 @@
 using OAS.Application.CRUD.Mapping;
 using OAS.Contracts.Inventory.Products;
 using OAS.Domain.Entities.Inventory;
-using ContractProductType = OAS.Contracts.Enums.Inventory.ProductType;
-using DomainProductType = OAS.Domain.Enums.Inventory.ProductType;
 
 namespace OAS.Application.Inventory.Products.Products;
 
@@ -15,7 +13,7 @@ public sealed class ProductMapper
             source.ProductCode,
             source.NameAr,
             source.CategoryId,
-            (DomainProductType)(int)source.ProductType,
+            source.ProductTypeId,
             source.IsStockItem,
             source.NameEn,
             source.BrandId,
@@ -25,11 +23,12 @@ public sealed class ProductMapper
     public void Update(UpdateProductRequest source, Product destination)
     {
         destination.UpdateDetails(
+            source.ProductCode,
             source.NameAr,
             source.NameEn,
             source.CategoryId,
             source.BrandId,
-            (DomainProductType)(int)source.ProductType,
+            source.ProductTypeId,
             source.Description,
             source.IsStockItem,
             source.IsActive);
@@ -44,7 +43,7 @@ public sealed class ProductMapper
             source.NameEn,
             source.CategoryId,
             source.BrandId,
-            (ContractProductType)(int)source.ProductType,
+            source.ProductTypeId,
             source.Description,
             source.IsStockItem,
             source.IsActive);

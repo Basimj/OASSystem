@@ -234,6 +234,30 @@ public sealed class EfUnitOfWork(OasDbContext dbContext) : IUnitOfWork
             return true;
         }
 
+        if (message.Contains("UX_Warehouses_ActiveDefault", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("inventory_default_warehouse_exists", "يوجد مخزن افتراضي فعال بالفعل. لا يمكن تعيين أكثر من مخزن افتراضي فعال.");
+            return true;
+        }
+
+        if (message.Contains("UX_Products_ProductCode", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("inventory_product_code_exists", "كود المنتج مستخدم مسبقاً.");
+            return true;
+        }
+
+        if (message.Contains("UX_ProductVariants_SKU", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("inventory_variant_sku_exists", "SKU مستخدم مسبقاً.");
+            return true;
+        }
+
+        if (message.Contains("UX_ProductVariants_Barcode", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("inventory_variant_barcode_exists", "الباركود مستخدم مسبقاً.");
+            return true;
+        }
+
         conflict = new ConflictException("unique_constraint_conflict", "A unique value already exists.");
         return true;
     }

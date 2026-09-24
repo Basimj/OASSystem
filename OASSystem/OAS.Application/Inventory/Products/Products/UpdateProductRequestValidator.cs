@@ -7,6 +7,10 @@ public sealed class UpdateProductRequestValidator : AbstractValidator<UpdateProd
 {
     public UpdateProductRequestValidator()
     {
+        RuleFor(x => x.ProductCode)
+            .NotEmpty().WithErrorCode("product_code_required")
+            .MaximumLength(32).WithErrorCode("product_code_max_length");
+
         RuleFor(x => x.NameAr)
             .NotEmpty().WithErrorCode("product_name_ar_required")
             .MaximumLength(150).WithErrorCode("product_name_ar_max_length");
@@ -17,8 +21,8 @@ public sealed class UpdateProductRequestValidator : AbstractValidator<UpdateProd
         RuleFor(x => x.CategoryId)
             .NotEmpty().WithErrorCode("category_id_required");
 
-        RuleFor(x => x.ProductType)
-            .IsInEnum().WithErrorCode("product_type_invalid");
+        RuleFor(x => x.ProductTypeId)
+            .NotEmpty().WithErrorCode("product_type_id_required");
 
         RuleFor(x => x.Description)
             .MaximumLength(500).WithErrorCode("product_description_max_length");

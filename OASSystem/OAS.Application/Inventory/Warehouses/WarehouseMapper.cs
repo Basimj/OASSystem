@@ -20,6 +20,7 @@ public sealed class WarehouseMapper
     public void Update(UpdateWarehouseRequest source, Warehouse destination)
     {
         destination.UpdateDetails(
+            source.Code.Trim(),
             source.NameAr,
             source.NameEn,
             source.Description,

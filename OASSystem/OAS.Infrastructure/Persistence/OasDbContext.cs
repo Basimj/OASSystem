@@ -19,6 +19,7 @@ public sealed class OasDbContext(DbContextOptions<OasDbContext> options) : DbCon
     public DbSet<Supplier> Suppliers => Set<Supplier>();
     public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
     public DbSet<Brand> Brands => Set<Brand>();
+    public DbSet<ProductType> ProductTypes => Set<ProductType>();
     public DbSet<Product> Products => Set<Product>();
     public DbSet<ProductVariant> ProductVariants => Set<ProductVariant>();
     public DbSet<FrameDetails> FrameDetails => Set<FrameDetails>();

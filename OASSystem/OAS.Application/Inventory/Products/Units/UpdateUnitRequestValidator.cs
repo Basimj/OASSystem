@@ -7,6 +7,10 @@ public sealed class UpdateUnitRequestValidator : AbstractValidator<UpdateUnitReq
 {
     public UpdateUnitRequestValidator()
     {
+        RuleFor(x => x.Code)
+            .NotEmpty().WithErrorCode("unit_code_required")
+            .MaximumLength(32).WithErrorCode("unit_code_max_length");
+
         RuleFor(x => x.NameAr)
             .NotEmpty().WithErrorCode("unit_name_ar_required")
             .MaximumLength(100).WithErrorCode("unit_name_ar_max_length");

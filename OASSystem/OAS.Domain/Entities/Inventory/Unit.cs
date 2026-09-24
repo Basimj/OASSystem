@@ -28,8 +28,9 @@ public sealed class Unit : AuditableEntity<Guid>
         IsActive = true;
     }
 
-    public void UpdateDetails(string nameAr, string? nameEn, bool isActive)
+    public void UpdateDetails(string code, string nameAr, string? nameEn, bool isActive)
     {
+        Code = code;
         NameAr = nameAr;
         NameEn = nameEn;
         IsActive = isActive;

@@ -2,6 +2,7 @@ using System.Globalization;
 using OAS.Client.Services.Http;
 using OAS.Contracts.Common.Pagination;
 using OAS.Contracts.Enums.Inventory;
+using OAS.Contracts.Inventory;
 using OAS.Contracts.Inventory.Products;
 using OAS.Contracts.Inventory.Stock;
 using OAS.Contracts.Inventory.Transactions;
@@ -12,6 +13,9 @@ namespace OAS.Client.Inventory.Services;
 public sealed class InventoryClientService(OasApiClient apiClient) : IInventoryClientService
 {
     private const string BaseEndpoint = "api/inventory";
+
+    public Task<InventoryCodeSuggestionDto?> GetNextCodeAsync(string kind, CancellationToken cancellationToken = default) =>
+        apiClient.GetAsync<InventoryCodeSuggestionDto>($"{BaseEndpoint}/codes/next/{Uri.EscapeDataString(kind)}", cancellationToken);
 
     // Product categories
     public async Task<PagedResult<ProductCategoryDto>> GetProductCategoriesAsync(PageRequest request, CancellationToken cancellationToken = default) =>
@@ -39,6 +43,19 @@ public sealed class InventoryClientService(OasApiClient apiClient) : IInventoryC
     public Task<BrandDto?> UpdateBrandAsync(Guid id, UpdateBrandRequest request, CancellationToken cancellationToken = default) =>
         apiClient.PutAsync<UpdateBrandRequest, BrandDto>($"{BaseEndpoint}/brands/{id:D}", request, cancellationToken);
 
+    // Product types
+    public async Task<PagedResult<ProductTypeDto>> GetProductTypesAsync(PageRequest request, CancellationToken cancellationToken = default) =>
+        await GetPageAsync<ProductTypeDto>($"{BaseEndpoint}/product-types", request, cancellationToken);
+
+    public Task<ProductTypeDto?> GetProductTypeAsync(Guid id, CancellationToken cancellationToken = default) =>
+        apiClient.GetAsync<ProductTypeDto>($"{BaseEndpoint}/product-types/{id:D}", cancellationToken);
+
+    public Task<ProductTypeDto?> CreateProductTypeAsync(CreateProductTypeRequest request, CancellationToken cancellationToken = default) =>
+        apiClient.PostAsync<CreateProductTypeRequest, ProductTypeDto>($"{BaseEndpoint}/product-types", request, cancellationToken);
+
+    public Task<ProductTypeDto?> UpdateProductTypeAsync(Guid id, UpdateProductTypeRequest request, CancellationToken cancellationToken = default) =>
+        apiClient.PutAsync<UpdateProductTypeRequest, ProductTypeDto>($"{BaseEndpoint}/product-types/{id:D}", request, cancellationToken);
+
     // Units
     public async Task<PagedResult<UnitDto>> GetUnitsAsync(PageRequest request, CancellationToken cancellationToken = default) =>
         await GetPageAsync<UnitDto>($"{BaseEndpoint}/units", request, cancellationToken);
@@ -61,6 +78,9 @@ public sealed class InventoryClientService(OasApiClient apiClient) : IInventoryC
 
     public Task<ProductDto?> CreateProductAsync(CreateProductRequest request, CancellationToken cancellationToken = default) =>
         apiClient.PostAsync<CreateProductRequest, ProductDto>($"{BaseEndpoint}/products", request, cancellationToken);
+
+    public Task<CreateStockProductResult?> CreateStockProductAsync(CreateStockProductRequest request, CancellationToken cancellationToken = default) =>
+        apiClient.PostAsync<CreateStockProductRequest, CreateStockProductResult>($"{BaseEndpoint}/products/stock-product", request, cancellationToken);
 
     public Task<ProductDto?> UpdateProductAsync(Guid id, UpdateProductRequest request, CancellationToken cancellationToken = default) =>
         apiClient.PutAsync<UpdateProductRequest, ProductDto>($"{BaseEndpoint}/products/{id:D}", request, cancellationToken);

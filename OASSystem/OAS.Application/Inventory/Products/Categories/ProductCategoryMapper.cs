@@ -19,6 +19,7 @@ public sealed class ProductCategoryMapper
     public void Update(UpdateProductCategoryRequest source, ProductCategory destination)
     {
         destination.UpdateDetails(
+            source.Code.Trim(),
             source.NameAr,
             source.NameEn,
             source.ParentCategoryId,

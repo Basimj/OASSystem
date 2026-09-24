@@ -53,6 +53,8 @@ public sealed class WarehouseConfiguration : IEntityTypeConfiguration<Warehouse>
             .HasDatabaseName("IX_Warehouses_IsActive");
 
         builder.HasIndex(x => x.IsDefault)
-            .HasDatabaseName("IX_Warehouses_IsDefault");
+            .IsUnique()
+            .HasFilter("[IsDefault] = 1 AND [IsActive] = 1")
+            .HasDatabaseName("UX_Warehouses_ActiveDefault");
     }
 }

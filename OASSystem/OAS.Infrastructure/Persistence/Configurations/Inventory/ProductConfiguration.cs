@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using OAS.Domain.Entities.Inventory;
 
@@ -31,9 +31,8 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 
         builder.Property(x => x.BrandId);
 
-        builder.Property(x => x.ProductType)
-            .IsRequired()
-            .HasConversion<int>();
+        builder.Property(x => x.ProductTypeId)
+            .IsRequired();
 
         builder.Property(x => x.Description)
             .HasMaxLength(1000);
@@ -64,6 +63,9 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.HasIndex(x => x.BrandId)
             .HasDatabaseName("IX_Products_BrandId");
 
+        builder.HasIndex(x => x.ProductTypeId)
+            .HasDatabaseName("IX_Products_ProductTypeId");
+
         builder.HasIndex(x => x.IsActive)
             .HasDatabaseName("IX_Products_IsActive");
 
@@ -78,6 +80,12 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             .HasForeignKey(x => x.BrandId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_Products_Brands_BrandId");
+
+        builder.HasOne<ProductType>()
+            .WithMany()
+            .HasForeignKey(x => x.ProductTypeId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_Products_ProductTypes_ProductTypeId");
     }
 
 }

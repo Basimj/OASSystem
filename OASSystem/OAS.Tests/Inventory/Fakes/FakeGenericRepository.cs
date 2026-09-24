@@ -26,17 +26,21 @@ public class FakeGenericRepository<TEntity, TKey> : IRepository<TEntity, TKey>
     public Task<IReadOnlyList<TEntity>> ListAsync(
         ISpecification<TEntity>? specification = null,
         CancellationToken cancellationToken = default) =>
-        Task.FromResult<IReadOnlyList<TEntity>>(_items.ToList());
+        Task.FromResult<IReadOnlyList<TEntity>>(Apply(specification, applyPaging: true).ToList());
 
     public Task<PagedData<TEntity>> GetPageAsync(
         ISpecification<TEntity> specification,
-        CancellationToken cancellationToken = default) =>
-        Task.FromResult(new PagedData<TEntity>(_items, _items.Count));
+        CancellationToken cancellationToken = default)
+    {
+        var filtered = Apply(specification, applyPaging: false).ToList();
+        var paged = ApplyPaging(filtered, specification).ToList();
+        return Task.FromResult(new PagedData<TEntity>(paged, filtered.Count));
+    }
 
     public Task<long> CountAsync(
         ISpecification<TEntity>? specification = null,
         CancellationToken cancellationToken = default) =>
-        Task.FromResult((long)_items.Count);
+        Task.FromResult(Apply(specification, applyPaging: false).LongCount());
 
     public Task<bool> ExistsAsync(TKey id, CancellationToken cancellationToken = default) =>
         Task.FromResult(_items.Any(x => EqualityComparer<TKey>.Default.Equals(x.Id, id)));
@@ -66,5 +70,25 @@ public class FakeGenericRepository<TEntity, TKey> : IRepository<TEntity, TKey>
     {
         var ids = entities.Select(e => e.Id).ToHashSet();
         _items.RemoveAll(x => ids.Contains(x.Id));
+    }
+
+    private IEnumerable<TEntity> Apply(ISpecification<TEntity>? specification, bool applyPaging)
+    {
+        IEnumerable<TEntity> query = _items;
+        if (specification?.Criteria is not null)
+            query = query.Where(specification.Criteria.Compile());
+
+        return applyPaging && specification is not null
+            ? ApplyPaging(query, specification)
+            : query;
+    }
+
+    private static IEnumerable<TEntity> ApplyPaging(IEnumerable<TEntity> query, ISpecification<TEntity> specification)
+    {
+        if (specification.Skip.HasValue)
+            query = query.Skip(specification.Skip.Value);
+        if (specification.Take.HasValue)
+            query = query.Take(specification.Take.Value);
+        return query;
     }
 }

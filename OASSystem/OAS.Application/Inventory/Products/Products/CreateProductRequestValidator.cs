@@ -21,8 +21,8 @@ public sealed class CreateProductRequestValidator : AbstractValidator<CreateProd
         RuleFor(x => x.CategoryId)
             .NotEmpty().WithErrorCode("category_id_required");
 
-        RuleFor(x => x.ProductType)
-            .IsInEnum().WithErrorCode("product_type_invalid");
+        RuleFor(x => x.ProductTypeId)
+            .NotEmpty().WithErrorCode("product_type_id_required");
 
         RuleFor(x => x.Description)
             .MaximumLength(500).WithErrorCode("product_description_max_length");

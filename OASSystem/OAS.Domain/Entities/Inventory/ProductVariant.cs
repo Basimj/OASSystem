@@ -51,6 +51,7 @@ public class ProductVariant : AuditableEntity<Guid>
     }
 
     public void UpdateDetails(
+        string sku,
         string? barcode,
         string? variantName,
         string? color,
@@ -60,6 +61,7 @@ public class ProductVariant : AuditableEntity<Guid>
         decimal sellingPrice,
         bool isActive)
     {
+        SKU = sku;
         Barcode = barcode;
         VariantName = variantName;
         Color = color;

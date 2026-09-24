@@ -4,12 +4,11 @@
     Scope: Inventory tables only
 
     IMPORTANT:
-    - Run EF migrations first, including 20260920120000_InventorySchemaAlignment.
+    - Run EF migrations first, including 20260923070000_AddProductTypesLookup.
     - This script expects the Inventory tables to be empty.
     - Inventory enum columns are inserted as INT, matching Domain/Contracts/EF configuration.
 
     Enum values:
-      ProductType:                Frame=1, Lens=2, Sunglasses=3, Accessory=4, Other=5, Service=6
       InventoryTransactionType:   Opening=1, Receipt=2, Issue=3, Transfer=4,
                                   AdjustmentIncrease=5, AdjustmentDecrease=6,
                                   SalesReturn=7, PurchaseReturn=8, ProductionIssue=9, Scrap=10
@@ -30,6 +29,7 @@ BEGIN TRY
     IF OBJECT_ID(N'dbo.tbl_ProductCategories', N'U') IS NULL
        OR OBJECT_ID(N'dbo.tbl_Brands', N'U') IS NULL
        OR OBJECT_ID(N'dbo.tbl_Units', N'U') IS NULL
+       OR OBJECT_ID(N'dbo.tbl_productTypes', N'U') IS NULL
        OR OBJECT_ID(N'dbo.tbl_Products', N'U') IS NULL
        OR OBJECT_ID(N'dbo.tbl_ProductVariants', N'U') IS NULL
        OR OBJECT_ID(N'dbo.tbl_FrameDetails', N'U') IS NULL
@@ -53,12 +53,22 @@ BEGIN TRY
         THROW 52001, 'InventorySchemaAlignment is not applied: ProductVariant audit columns are missing.', 1;
     END;
 
+    IF COL_LENGTH(N'dbo.tbl_Products', N'ProductType') IS NOT NULL
+       OR COL_LENGTH(N'dbo.tbl_Products', N'ProductTypeId') IS NULL
+    BEGIN
+        THROW 52004, 'Product type schema is not aligned. Apply RemoveProductTypeFromProducts and AddProductTypesLookup first.', 1;
+    END;
+
+    IF (SELECT COUNT(*) FROM dbo.tbl_productTypes WHERE Code IN (N'FRAME', N'LENS', N'SUNGLASSES', N'ACCESSORY', N'OTHER', N'SERVICE')) < 6
+    BEGIN
+        THROW 52005, 'Required product type lookup rows are missing from dbo.tbl_productTypes.', 1;
+    END;
+
     IF EXISTS (
         SELECT 1
         FROM sys.columns c
         JOIN sys.types t ON c.user_type_id = t.user_type_id
-        WHERE (c.object_id = OBJECT_ID(N'dbo.tbl_Products') AND c.name = N'ProductType' AND t.name <> N'int')
-           OR (c.object_id = OBJECT_ID(N'dbo.tbl_InventoryTransactions') AND c.name IN (N'TransactionType', N'Status') AND t.name <> N'int')
+        WHERE (c.object_id = OBJECT_ID(N'dbo.tbl_InventoryTransactions') AND c.name IN (N'TransactionType', N'Status') AND t.name <> N'int')
            OR (c.object_id = OBJECT_ID(N'dbo.tbl_InventoryLedger') AND c.name = N'MovementType' AND t.name <> N'int')
            OR (c.object_id = OBJECT_ID(N'dbo.tbl_StockCounts') AND c.name = N'Status' AND t.name <> N'int')
     )
@@ -156,7 +166,17 @@ BEGIN TRY
         (@UnitBox,   N'BOX',  N'علبة', N'Box',   1, @D14, @SeedUser, NULL, NULL);
 
     ---------------------------------------------------------------------------
-    -- Products: all ProductType enum values are represented
+    -- Product types (seeded by AddProductTypesLookup migration)
+    ---------------------------------------------------------------------------
+    DECLARE @TypeFrame      uniqueidentifier = (SELECT Id FROM dbo.tbl_productTypes WHERE Code = N'FRAME');
+    DECLARE @TypeLens       uniqueidentifier = (SELECT Id FROM dbo.tbl_productTypes WHERE Code = N'LENS');
+    DECLARE @TypeSunglasses uniqueidentifier = (SELECT Id FROM dbo.tbl_productTypes WHERE Code = N'SUNGLASSES');
+    DECLARE @TypeAccessory  uniqueidentifier = (SELECT Id FROM dbo.tbl_productTypes WHERE Code = N'ACCESSORY');
+    DECLARE @TypeOther      uniqueidentifier = (SELECT Id FROM dbo.tbl_productTypes WHERE Code = N'OTHER');
+    DECLARE @TypeService    uniqueidentifier = (SELECT Id FROM dbo.tbl_productTypes WHERE Code = N'SERVICE');
+
+    ---------------------------------------------------------------------------
+    -- Products across the seeded categories
     ---------------------------------------------------------------------------
     DECLARE @ProdFrame      uniqueidentifier = '40000000-0000-0000-0000-000000000001';
     DECLARE @ProdLens       uniqueidentifier = '40000000-0000-0000-0000-000000000002';
@@ -166,15 +186,15 @@ BEGIN TRY
     DECLARE @ProdService    uniqueidentifier = '40000000-0000-0000-0000-000000000006';
 
     INSERT dbo.tbl_Products
-        (Id, ProductCode, NameAr, NameEn, CategoryId, BrandId, ProductType, Description,
+        (Id, ProductCode, NameAr, NameEn, CategoryId, BrandId, ProductTypeId, Description,
          IsStockItem, IsActive, CreatedAtUtc, CreatedBy, LastModifiedAtUtc, LastModifiedBy)
     VALUES
-        (@ProdFrame,      N'PRD-FRM-RB001', N'إطار راي بان كلاسيك',       N'Ray-Ban Classic Frame', @CatFrames,      @BrandRayBan,  1, N'إطار طبي للاختبار متعدد المتغيرات.',        1, 1, @D14, @SeedUser, NULL, NULL),
-        (@ProdLens,       N'PRD-LNS-ES001', N'عدسة إسيلور أحادية الرؤية', N'Essilor Single Vision', @CatLenses,      @BrandEssilor, 2, N'عدسة طبية بدرجات انكسار متعددة.',             1, 1, @D14, @SeedUser, NULL, NULL),
-        (@ProdSunglasses, N'PRD-SUN-OK001', N'نظارة أوكلي شمسية',         N'Oakley Sunglasses',     @CatSunglasses, @BrandOakley,  3, N'نظارة شمسية مع تفاصيل إطار.',              1, 1, @D14, @SeedUser, NULL, NULL),
-        (@ProdAccessory,  N'PRD-ACC-CL001', N'بخاخ تنظيف العدسات',        N'Lens Cleaning Spray',   @CatAccessories, @BrandGeneric, 4, N'عبوة تنظيف 60 مل.',                         1, 1, @D14, @SeedUser, NULL, NULL),
-        (@ProdOther,      N'PRD-OTH-CS001', N'حافظة نظارات',              N'Glasses Case',          @CatAccessories, @BrandGeneric, 5, N'حافظة صلبة للنظارات.',                     1, 1, @D14, @SeedUser, NULL, NULL),
-        (@ProdService,    N'PRD-SRV-EX001', N'فحص نظر',                   N'Eye Examination',       @CatServices,    NULL,          6, N'خدمة غير مخزنية لاختبار نوع Service.',       0, 1, @D14, @SeedUser, NULL, NULL);
+        (@ProdFrame,      N'PRD-FRM-RB001', N'إطار راي بان كلاسيك',       N'Ray-Ban Classic Frame', @CatFrames,       @BrandRayBan,  @TypeFrame,      N'إطار طبي للاختبار متعدد المتغيرات.', 1, 1, @D14, @SeedUser, NULL, NULL),
+        (@ProdLens,       N'PRD-LNS-ES001', N'عدسة إسيلور أحادية الرؤية', N'Essilor Single Vision', @CatLenses,       @BrandEssilor, @TypeLens,       N'عدسة طبية بدرجات انكسار متعددة.',      1, 1, @D14, @SeedUser, NULL, NULL),
+        (@ProdSunglasses, N'PRD-SUN-OK001', N'نظارة أوكلي شمسية',         N'Oakley Sunglasses',     @CatSunglasses,  @BrandOakley,  @TypeSunglasses,N'نظارة شمسية مع تفاصيل إطار.',           1, 1, @D14, @SeedUser, NULL, NULL),
+        (@ProdAccessory,  N'PRD-ACC-CL001', N'بخاخ تنظيف العدسات',        N'Lens Cleaning Spray',   @CatAccessories, @BrandGeneric, @TypeAccessory, N'عبوة تنظيف 60 مل.',                      1, 1, @D14, @SeedUser, NULL, NULL),
+        (@ProdOther,      N'PRD-OTH-CS001', N'حافظة نظارات',              N'Glasses Case',          @CatAccessories, @BrandGeneric, @TypeOther,     N'حافظة صلبة للنظارات.',                  1, 1, @D14, @SeedUser, NULL, NULL),
+        (@ProdService,    N'PRD-SRV-EX001', N'فحص نظر',                   N'Eye Examination',       @CatServices,    NULL,          @TypeService,   N'خدمة غير مخزنية للاختبار.',            0, 1, @D14, @SeedUser, NULL, NULL);
 
     ---------------------------------------------------------------------------
     -- Product Variants / SKU / Barcode / Prices
@@ -444,6 +464,7 @@ BEGIN TRY
     SELECT N'tbl_ProductCategories'          AS [TableName], COUNT_BIG(*) AS [RowCount] FROM dbo.tbl_ProductCategories
     UNION ALL SELECT N'tbl_Brands',                          COUNT_BIG(*) FROM dbo.tbl_Brands
     UNION ALL SELECT N'tbl_Units',                           COUNT_BIG(*) FROM dbo.tbl_Units
+    UNION ALL SELECT N'tbl_productTypes',                    COUNT_BIG(*) FROM dbo.tbl_productTypes
     UNION ALL SELECT N'tbl_Products',                        COUNT_BIG(*) FROM dbo.tbl_Products
     UNION ALL SELECT N'tbl_ProductVariants',                 COUNT_BIG(*) FROM dbo.tbl_ProductVariants
     UNION ALL SELECT N'tbl_FrameDetails',                    COUNT_BIG(*) FROM dbo.tbl_FrameDetails

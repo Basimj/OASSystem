@@ -118,4 +118,22 @@ public sealed class InventoryPostingServiceTests
                 createdBy: "user1");
         });
     }
+    [Test]
+    public void PostMovement_NegativeUnitCost_IsRejected()
+    {
+        Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () =>
+        {
+            await _service.PostMovementAsync(
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                InventoryMovementType.In,
+                quantity: 1m,
+                unitCost: -1m,
+                transactionId: Guid.NewGuid(),
+                transactionLineId: Guid.NewGuid(),
+                movementDate: DateTimeOffset.UtcNow,
+                createdBy: "user1");
+        });
+    }
+
 }

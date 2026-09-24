@@ -1,7 +1,6 @@
 @page "/products"
 @attribute [Authorize]
 @using OAS.Client.Inventory.Services
-@using OAS.Contracts.Enums.Inventory
 @using OAS.Contracts.Inventory.Products
 @using OAS.UiLib.Components.Spreadsheets
 
@@ -61,6 +60,18 @@
                             </RowTemplate>
                         </UiDataTable>
                     }
+                    else if (_section == ProductSection.ProductTypes)
+                    {
+                        <UiDataTable TItem="ProductTypeDto" Items="@FilterProductTypes()" Headers="@SimpleHeaders" EmptyText="لا توجد أنواع منتجات مطابقة."
+                                     SidebarTypography="true"
+                                     OnRowClick="@(x => Select(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
+                            <RowTemplate Context="item">
+                                <td><strong>@item.Code</strong></td>
+                                <td>@item.NameAr</td>
+                                <td><UiBadge Text="@StatusText(item.IsActive)" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
+                            </RowTemplate>
+                        </UiDataTable>
+                    }
                     else if (_section == ProductSection.Units)
                     {
                         <UiDataTable TItem="UnitDto" Items="@FilterUnits()" Headers="@SimpleHeaders" EmptyText="لا توجد وحدات مطابقة."
@@ -82,7 +93,10 @@
                             <RowTemplate Context="item">
                                 <td>@item.ProductCode</td>
                                 <td>@item.NameAr</td>
-                                <td>@ProductTypeText(item.ProductType)</td>
+                                <td>@ProductTypeName(item.ProductTypeId)</td>
+                                <td><UiBadge Text="@(item.IsStockItem ? "نعم" : "لا")" Tone="@(item.IsStockItem ? AlertTone.Success : AlertTone.Info)" /></td>
+                                <td>@ProductVariantCount(item.Id)</td>
+                                <td>@ProductInventoryStatus(item)</td>
                                 <td><UiBadge Text="@StatusText(item.IsActive)" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
                             </RowTemplate>
                         </UiDataTable>
@@ -117,6 +131,68 @@
                 {
                     @RenderEditor()
 
+                    @if (_section == ProductSection.Products && IsServiceProductType)
+                    {
+                        <UiAlert Tone="AlertTone.Info" Message="المنتج من نوع خدمة؛ لذلك لا يمكن تفعيله كصنف مخزني ولا إضافة رصيد افتتاحي له." />
+                    }
+
+                    @if (ShowInitialVariantSection)
+                    {
+                        <UiCard Title="الصنف الأول القابل للبيع والتخزين" Subtitle="يتم إنشاؤه مع المنتج في نفس العملية">
+                            <UiStackLayout Gap="StackGap.Small">
+                                <UiInputText Label="SKU الأول" Value="@_initialSku" ValueExpression="@(() => _initialSku)"
+                                             ValueChanged="@(v => SetField(InitialSkuField, () => _initialSku = v ?? string.Empty))"
+                                             Required="true" ErrorText="@ErrorFor(InitialSkuField)" MaxLength="64" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                <UiInputText Label="باركود الصنف الأول" Value="@_initialBarcode" ValueExpression="@(() => _initialBarcode)"
+                                             ValueChanged="@(v => SetField(InitialBarcodeField, () => _initialBarcode = v))"
+                                             Placeholder="(اختياري)" ErrorText="@ErrorFor(InitialBarcodeField)" MaxLength="64" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                <UiInputText Label="اسم الصنف الأول" Value="@_initialVariantName" ValueExpression="@(() => _initialVariantName)"
+                                             ValueChanged="@(v => _initialVariantName = v)" Placeholder="(اختياري)" MaxLength="100" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                <UiGrid Columns="2">
+                                    <UiInputText Label="اللون" Value="@_initialColor" ValueExpression="@(() => _initialColor)" ValueChanged="@(v => _initialColor = v)" Placeholder="(اختياري)" MaxLength="50" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                    <UiInputText Label="المقاس" Value="@_initialSize" ValueExpression="@(() => _initialSize)" ValueChanged="@(v => _initialSize = v)" Placeholder="(اختياري)" MaxLength="50" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                </UiGrid>
+                                <UiSelect Label="الوحدة" Value="@(_initialUnitId ?? string.Empty)" ValueExpression="@(() => _initialUnitId)"
+                                          ValueChanged="@(v => _initialUnitId = v)" Options="@UnitOptions.Where(x => !string.IsNullOrWhiteSpace(x.Value)).ToArray()"
+                                          Placeholder="(اختياري)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                <UiGrid Columns="2">
+                                    <UiInputText Label="سعر شراء الصنف الأول" Value="@_initialPurchasePrice" ValueExpression="@(() => _initialPurchasePrice)"
+                                                 ValueChanged="@(v => SetField(InitialPurchasePriceField, () => _initialPurchasePrice = v ?? string.Empty))" Type="number" InputMode="decimal" Required="true"
+                                                 ErrorText="@ErrorFor(InitialPurchasePriceField)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                    <UiInputText Label="سعر بيع الصنف الأول" Value="@_initialSellingPrice" ValueExpression="@(() => _initialSellingPrice)"
+                                                 ValueChanged="@(v => SetField(InitialSellingPriceField, () => _initialSellingPrice = v ?? string.Empty))" Type="number" InputMode="decimal" Required="true"
+                                                 ErrorText="@ErrorFor(InitialSellingPriceField)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                </UiGrid>
+                            </UiStackLayout>
+                        </UiCard>
+                    }
+
+                    @if (ShowOpeningInventorySection)
+                    {
+                        <UiCard Title="الرصيد الافتتاحي" Subtitle="اختياري — يتم ترحيله كحركة Opening حقيقية">
+                            <UiStackLayout Gap="StackGap.Small">
+                                <UiCheckbox Label="إضافة رصيد افتتاحي" Value="@_addOpeningInventory"
+                                            ValueChanged="ToggleOpeningInventory"
+                                            Disabled="@(!IsEditing)" />
+                                @if (_addOpeningInventory)
+                                {
+                                    <UiSelect Label="مخزن الرصيد الافتتاحي" Value="@(_openingWarehouseId ?? string.Empty)" ValueExpression="@(() => _openingWarehouseId)"
+                                              ValueChanged="@(v => SetField(OpeningWarehouseField, () => _openingWarehouseId = v))" Options="@OpeningWarehouseOptions"
+                                              Placeholder="اختر مخزنًا فعالًا..." Required="true" ErrorText="@ErrorFor(OpeningWarehouseField)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                    <UiGrid Columns="2">
+                                        <UiInputText Label="الكمية الافتتاحية" Value="@_openingQuantity" ValueExpression="@(() => _openingQuantity)"
+                                                     ValueChanged="@(v => SetField(OpeningQuantityField, () => _openingQuantity = v ?? string.Empty))" Type="number" InputMode="decimal" Required="true"
+                                                     ErrorText="@ErrorFor(OpeningQuantityField)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                        <UiInputText Label="تكلفة الوحدة الافتتاحية" Value="@_openingUnitCost" ValueExpression="@(() => _openingUnitCost)"
+                                                     ValueChanged="@(v => SetField(OpeningUnitCostField, () => _openingUnitCost = v ?? string.Empty))" Type="number" InputMode="decimal" Required="true"
+                                                     ErrorText="@ErrorFor(OpeningUnitCostField)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                    </UiGrid>
+                                    <UiKeyValue Label="القيمة الإجمالية" Value="@OpeningTotalValueText" />
+                                }
+                            </UiStackLayout>
+                        </UiCard>
+                    }
+
                     @if (ShowsFrameDetails)
                     {
                         <div class="inventory-products__specialized">
@@ -150,7 +226,7 @@
                             </div>
                         </div>
                     }
-                    else if (ShowsLensDetails)
+                    @if (ShowsLensDetails)
                     {
                         <div class="inventory-products__specialized">
                             <h4>تفاصيل العدسة</h4>

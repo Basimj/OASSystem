@@ -35,12 +35,14 @@ public class Warehouse : AuditableEntity<Guid>
     }
 
     public void UpdateDetails(
+        string code,
         string nameAr,
         string? nameEn,
         string? description,
         bool isDefault,
         bool isActive)
     {
+        Code = code;
         NameAr = nameAr;
         NameEn = nameEn;
         Description = description;

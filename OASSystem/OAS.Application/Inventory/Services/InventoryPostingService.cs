@@ -28,6 +28,8 @@ public sealed class InventoryPostingService(
     {
         if (quantity <= 0)
             throw new ArgumentOutOfRangeException(nameof(quantity), "Quantity must be greater than zero.");
+        if (unitCost < 0)
+            throw new ArgumentOutOfRangeException(nameof(unitCost), "Unit cost cannot be negative.");
 
         var balance = await balanceRepository.GetByWarehouseAndVariantAsync(
             warehouseId,

@@ -1,6 +1,3 @@
-﻿using OAS.Contracts.Enums.Inventory;
-using OAS.Contracts.Inventory;
-
 namespace OAS.Contracts.Inventory.Products;
 
 public sealed record CreateProductRequest(
@@ -9,6 +6,6 @@ public sealed record CreateProductRequest(
     string? NameEn,
     Guid CategoryId,
     Guid? BrandId,
-    ProductType ProductType,
+    Guid ProductTypeId,
     string? Description,
     bool IsStockItem = true);

@@ -1,5 +1,4 @@
 using OAS.Domain.Common.Entities;
-using OAS.Domain.Enums.Inventory;
 
 namespace OAS.Domain.Entities.Inventory;
 
@@ -11,8 +10,7 @@ public class Product : AuditableEntity<Guid>
 
     public Guid CategoryId { get; private set; }
     public Guid? BrandId { get; private set; }
-
-    public ProductType ProductType { get; private set; }
+    public Guid ProductTypeId { get; private set; }
 
     public string? Description { get; private set; }
 
@@ -29,7 +27,7 @@ public class Product : AuditableEntity<Guid>
         string productCode,
         string nameAr,
         Guid categoryId,
-        ProductType productType,
+        Guid productTypeId,
         bool isStockItem = true,
         string? nameEn = null,
         Guid? brandId = null,
@@ -42,27 +40,29 @@ public class Product : AuditableEntity<Guid>
         NameEn = nameEn;
         CategoryId = categoryId;
         BrandId = brandId;
-        ProductType = productType;
+        ProductTypeId = productTypeId;
         Description = description;
         IsStockItem = isStockItem;
         IsActive = true;
     }
 
     public void UpdateDetails(
+        string productCode,
         string nameAr,
         string? nameEn,
         Guid categoryId,
         Guid? brandId,
-        ProductType productType,
+        Guid productTypeId,
         string? description,
         bool isStockItem,
         bool isActive)
     {
+        ProductCode = productCode;
         NameAr = nameAr;
         NameEn = nameEn;
         CategoryId = categoryId;
         BrandId = brandId;
-        ProductType = productType;
+        ProductTypeId = productTypeId;
         Description = description;
         IsStockItem = isStockItem;
         IsActive = isActive;

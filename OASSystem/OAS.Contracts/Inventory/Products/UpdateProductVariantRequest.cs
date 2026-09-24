@@ -1,6 +1,7 @@
-﻿namespace OAS.Contracts.Inventory.Products;
+namespace OAS.Contracts.Inventory.Products;
 
 public sealed record UpdateProductVariantRequest(
+    string SKU,
     string? Barcode,
     string? VariantName,
     string? Color,

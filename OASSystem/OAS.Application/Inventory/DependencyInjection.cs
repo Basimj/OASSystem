@@ -10,6 +10,7 @@ using OAS.Application.Inventory.Products.Categories;
 using OAS.Application.Inventory.Products.FrameDetails;
 using OAS.Application.Inventory.Products.LensDetails;
 using OAS.Application.Inventory.Products.Products;
+using OAS.Application.Inventory.Products.ProductTypes;
 using OAS.Application.Inventory.Products.Units;
 using OAS.Application.Inventory.Products.Variants;
 using OAS.Application.Inventory.Services;
@@ -41,6 +42,11 @@ public static class DependencyInjection
         services.AddScoped<ICrudMapper<Brand, Guid, BrandDto, CreateBrandRequest, UpdateBrandRequest>, BrandMapper>();
         services.AddScoped<BrandMapper>();
 
+        services.AddCrudFeature<ProductType, Guid, ProductTypeDto, CreateProductTypeRequest, UpdateProductTypeRequest>();
+        services.AddScoped<ICrudSpecificationFactory<ProductType>, ProductTypeSpecificationFactory>();
+        services.AddScoped<ICrudMapper<ProductType, Guid, ProductTypeDto, CreateProductTypeRequest, UpdateProductTypeRequest>, ProductTypeMapper>();
+        services.AddScoped<ProductTypeMapper>();
+
         services.AddCrudFeature<Unit, Guid, UnitDto, CreateUnitRequest, UpdateUnitRequest>();
         services.AddScoped<ICrudSpecificationFactory<Unit>, UnitSpecificationFactory>();
         services.AddScoped<ICrudMapper<Unit, Guid, UnitDto, CreateUnitRequest, UpdateUnitRequest>, UnitMapper>();
@@ -70,6 +76,8 @@ public static class DependencyInjection
         services.AddScoped<ICrudSpecificationFactory<DomainLensDetails>, LensDetailsSpecificationFactory>();
         services.AddScoped<ICrudMapper<DomainLensDetails, Guid, LensDetailsDto, CreateLensDetailsRequest, UpdateLensDetailsRequest>, LensDetailsMapper>();
         services.AddScoped<LensDetailsMapper>();
+
+        services.AddScoped<IInventoryCodeGenerator, InventoryCodeGenerator>();
 
         // 2. Balances & Ledger
         services.AddScoped<InventoryBalanceMapper>();
