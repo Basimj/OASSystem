@@ -52,6 +52,8 @@ public class JournalCommandAndQueryTests
     {
         var handler = new CreateJournalEntryCommandHandler(
             _journalRepository,
+            new FakeRepository<Customer, Guid>(),
+            new FakeRepository<Supplier, Guid>(),
             _sequenceGenerator);
 
         var request = new CreateJournalEntryRequest(

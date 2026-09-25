@@ -77,9 +77,45 @@ public sealed class ClosedXmlSpreadsheetWorkbook : ISpreadsheetWorkbook
                 for (var i=0;i<table.Rows.Count;i++)
                 {
                     var value=table.Rows[i].GetValueOrDefault(column.Key) ?? "";
-                    if(column.DataType=="decimal" && decimal.TryParse(value,NumberStyles.Number,CultureInfo.InvariantCulture,out var amount)) sheet.Cell(i+2,c+1).Value=amount;
-                    else if(column.DataType=="date" && DateOnly.TryParseExact(value,"yyyy-MM-dd",CultureInfo.InvariantCulture,DateTimeStyles.None,out var date)) sheet.Cell(i+2,c+1).Value=date.ToDateTime(TimeOnly.MinValue);
-                    else sheet.Cell(i+2,c+1).Value=value;
+                    var cell = sheet.Cell(i + 2, c + 1);
+
+                    if (column.DataType == "decimal" &&
+                        decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var amount))
+                    {
+                        cell.Value = amount;
+                    }
+                    else if (column.DataType == "date" &&
+                             DateOnly.TryParseExact(
+                                 value,
+                                 "yyyy-MM-dd",
+                                 CultureInfo.InvariantCulture,
+                                 DateTimeStyles.None,
+                                 out var date))
+                    {
+                        // ClosedXML ultimately uses OLE Automation dates. Very old/default
+                        // DateOnly values (especially 0001-01-01) cannot be written as an
+                        // Excel DateTime and throw "Not a legal OleAut date".
+                        if (date == DateOnly.MinValue)
+                        {
+                            // Treat the CLR default date as "not supplied".
+                            cell.Value = string.Empty;
+                        }
+                        else if (date < new DateOnly(1900, 1, 1))
+                        {
+                            // Preserve a genuine historical date without asking ClosedXML
+                            // to convert it to an Excel/OLE date serial.
+                            cell.Style.NumberFormat.Format = "@";
+                            cell.Value = value;
+                        }
+                        else
+                        {
+                            cell.Value = date.ToDateTime(TimeOnly.MinValue);
+                        }
+                    }
+                    else
+                    {
+                        cell.Value = value;
+                    }
                 }
             }
             SpreadsheetWorkbookStyle.ApplyHeader(sheet, table.Definition.Columns.Count);

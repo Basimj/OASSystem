@@ -10,7 +10,7 @@ using OAS.Contracts.Accounting.BankAccounts;
 using OAS.Contracts.Accounting.CashAccounts;
 using OAS.Contracts.Accounting.CashShifts;
 using OAS.Contracts.Accounting.CostCenters;
-using OAS.Contracts.Accounting.CustomerAccounts;
+using OAS.Contracts.Accounting.Customers;
 using OAS.Contracts.Accounting.Enums;
 using OAS.Contracts.Accounting.Expenses;
 using OAS.Contracts.Accounting.FiscalPeriods;
@@ -20,7 +20,7 @@ using OAS.Contracts.Accounting.PaymentAllocations;
 using OAS.Contracts.Accounting.PaymentVouchers;
 using OAS.Contracts.Accounting.PostingProfiles;
 using OAS.Contracts.Accounting.ReceiptVouchers;
-using OAS.Contracts.Accounting.SupplierAccounts;
+using OAS.Contracts.Accounting.Suppliers;
 using OAS.Contracts.Common.Pagination;
 using OAS.UiLib.Components.Accounting.Accounts;
 using OAS.UiLib.Components.Accounting.Journals;
@@ -63,6 +63,8 @@ public partial class AccountingWorkspaceHost : IDisposable
     private readonly Dictionary<Guid, UiLookupItem> _bankAccountLookups = [];
     private readonly Dictionary<Guid, UiLookupItem> _expenseTypeLookups = [];
     private readonly Dictionary<Guid, UiLookupItem> _paymentSourceLookups = [];
+    private readonly Dictionary<Guid, UiLookupItem> _customerLookups = [];
+    private readonly Dictionary<Guid, UiLookupItem> _supplierLookups = [];
 
     private PagedResult<AccountDto> _accountsPage = new();
     private PagedResult<JournalEntryDto> _journalsPage = new();
@@ -73,8 +75,6 @@ public partial class AccountingWorkspaceHost : IDisposable
     private PagedResult<CashShiftDto> _cashShiftsPage = new();
     private PagedResult<ExpenseDto> _expensesPage = new();
     private PagedResult<ExpenseTypeDto> _expenseTypesPage = new();
-    private PagedResult<CustomerAccountDto> _customerAccountsPage = new();
-    private PagedResult<SupplierAccountDto> _supplierAccountsPage = new();
     private PagedResult<FiscalYearDto> _fiscalYearsPage = new();
     private PagedResult<FiscalPeriodDto> _fiscalPeriodsPage = new();
     private PagedResult<CostCenterDto> _costCentersPage = new();
@@ -129,8 +129,6 @@ public partial class AccountingWorkspaceHost : IDisposable
         AccountingEntityType.FiscalYears => "بحث في السنوات والفترات المالية...",
         AccountingEntityType.PostingProfiles => "بحث بكود أو اسم ملف الترحيل...",
         AccountingEntityType.CostCenters => "بحث بكود أو اسم مركز التكلفة...",
-        AccountingEntityType.CustomerAccounts => "بحث بمعرف العميل أو الحساب...",
-        AccountingEntityType.SupplierAccounts => "بحث بمعرف المورد أو الحساب...",
         _ => "بحث..."
     };
 
@@ -359,20 +357,43 @@ public partial class AccountingWorkspaceHost : IDisposable
         Workspace.NotifyStateChanged();
     }
 
-    private void OpenNewRecord() => OpenNewRecord(CurrentListEntity);
+    private Task OpenNewRecord() => OpenNewRecord(CurrentListEntity);
 
-    private void OpenNewRecord(AccountingEntityType entityType)
+    private async Task OpenNewRecord(AccountingEntityType entityType)
     {
         try
         {
             var tab = Workspace.OpenNewEntityTab(entityType);
             InitializeNewModel(tab);
+            await ReserveAutomaticNumberAsync(tab);
             tab.CaptureBaseline(SerializeModel(tab.Model));
             Workspace.NotifyStateChanged();
         }
         catch (Exception ex)
         {
             Snackbar.Error($"تعذر فتح نموذج جديد: {ex.Message}");
+        }
+    }
+
+    private async Task ReserveAutomaticNumberAsync(AccountingTabState tab)
+    {
+        switch (tab.Model)
+        {
+            case JournalEntryEditor.FormModel model:
+                model.JournalNumber = (await AccountingService.ReserveJournalNumberAsync(model.PostingDate))?.Number ?? string.Empty;
+                break;
+            case ReceiptVoucherEditor.FormModel model:
+                model.VoucherNumber = (await AccountingService.ReserveReceiptVoucherNumberAsync(model.VoucherDate))?.Number ?? string.Empty;
+                break;
+            case PaymentVoucherEditor.FormModel model:
+                model.VoucherNumber = (await AccountingService.ReservePaymentVoucherNumberAsync(model.VoucherDate))?.Number ?? string.Empty;
+                break;
+            case ExpenseEditor.FormModel model:
+                model.ExpenseNumber = (await AccountingService.ReserveExpenseNumberAsync(model.ExpenseDate))?.Number ?? string.Empty;
+                break;
+            case CashShiftEditor.FormModel model:
+                model.ShiftNumber = (await AccountingService.ReserveCashShiftNumberAsync())?.Number ?? string.Empty;
+                break;
         }
     }
 
@@ -397,8 +418,6 @@ public partial class AccountingWorkspaceHost : IDisposable
             AccountingEntityType.Journals => new JournalEntryEditor.FormModel(),
             AccountingEntityType.PostingProfiles => new PostingProfileEditor.FormModel(),
             AccountingEntityType.CostCenters => new CostCenterEditor.FormModel(),
-            AccountingEntityType.CustomerAccounts => new CustomerAccountEditor.FormModel(),
-            AccountingEntityType.SupplierAccounts => new SupplierAccountEditor.FormModel(),
             AccountingEntityType.ReceiptVouchers => new ReceiptVoucherEditor.FormModel(),
             AccountingEntityType.PaymentVouchers => new PaymentVoucherEditor.FormModel(),
             AccountingEntityType.PaymentAllocations => new PaymentAllocationEditor.FormModel(),
@@ -475,8 +494,6 @@ public partial class AccountingWorkspaceHost : IDisposable
         AccountingEntityType.FiscalYears => "/accounting/fiscal-years",
         AccountingEntityType.Journals => "/accounting/journals",
         AccountingEntityType.PostingProfiles => "/accounting/posting-profiles",
-        AccountingEntityType.CustomerAccounts => "/accounting/customer-accounts",
-        AccountingEntityType.SupplierAccounts => "/accounting/supplier-accounts",
         AccountingEntityType.ReceiptVouchers => "/accounting/receipt-vouchers",
         AccountingEntityType.PaymentVouchers => "/accounting/payment-vouchers",
         AccountingEntityType.CashAccounts => "/accounting/cash-accounts",
@@ -554,12 +571,6 @@ public partial class AccountingWorkspaceHost : IDisposable
             case AccountingEntityType.CostCenters:
                 _costCentersPage = await AccountingService.GetCostCentersPageAsync(request);
                 RememberCostCenterLookups(_costCentersPage.Items);
-                break;
-            case AccountingEntityType.CustomerAccounts:
-                _customerAccountsPage = await AccountingService.GetCustomerAccountsPageAsync(request);
-                break;
-            case AccountingEntityType.SupplierAccounts:
-                _supplierAccountsPage = await AccountingService.GetSupplierAccountsPageAsync(request);
                 break;
             case AccountingEntityType.ReceiptVouchers:
                 _receiptsPage = await AccountingService.GetReceiptVouchersPageAsync(request);
@@ -714,6 +725,8 @@ public partial class AccountingWorkspaceHost : IDisposable
                     {
                         var account = await EnsureAccountLookupAsync(line.AccountId);
                         var costCenter = await EnsureCostCenterLookupAsync(line.CostCenterId);
+                        var customer = await EnsureCustomerLookupAsync(line.CustomerId);
+                        var supplier = await EnsureSupplierLookupAsync(line.SupplierId);
                         lines.Add(new UiJournalLinesEditor.EditableJournalLine
                         {
                             AccountId = line.AccountId,
@@ -726,7 +739,9 @@ public partial class AccountingWorkspaceHost : IDisposable
                             DebitAmount = line.DebitAmount,
                             CreditAmount = line.CreditAmount,
                             CustomerId = line.CustomerId,
+                            CustomerLookupItem = customer,
                             SupplierId = line.SupplierId,
+                            SupplierLookupItem = supplier,
                             ProductVariantId = line.ProductVariantId,
                             WarehouseId = line.WarehouseId
                         });
@@ -797,41 +812,10 @@ public partial class AccountingWorkspaceHost : IDisposable
                     CompleteLoadedTab(tab, dto.Id, $"{dto.Code} - {dto.NameAr}", model);
                     break;
                 }
-                case AccountingEntityType.CustomerAccounts:
-                {
-                    var dto = await AccountingService.GetCustomerAccountByIdAsync(id) ?? throw NotFound("حساب العميل");
-                    await EnsureAccountLookupAsync(dto.AccountId);
-                    await EnsureAccountLookupAsync(dto.ControlAccountId);
-                    var model = new CustomerAccountEditor.FormModel
-                    {
-                        CustomerId = dto.CustomerId,
-                        AccountId = dto.AccountId,
-                        ControlAccountId = dto.ControlAccountId,
-                        IsActive = dto.IsActive,
-                        RowVersion = dto.RowVersion
-                    };
-                    CompleteLoadedTab(tab, dto.Id, $"حساب عميل {ShortId(dto.CustomerId)}", model);
-                    break;
-                }
-                case AccountingEntityType.SupplierAccounts:
-                {
-                    var dto = await AccountingService.GetSupplierAccountByIdAsync(id) ?? throw NotFound("حساب المورد");
-                    await EnsureAccountLookupAsync(dto.AccountId);
-                    await EnsureAccountLookupAsync(dto.ControlAccountId);
-                    var model = new SupplierAccountEditor.FormModel
-                    {
-                        SupplierId = dto.SupplierId,
-                        AccountId = dto.AccountId,
-                        ControlAccountId = dto.ControlAccountId,
-                        IsActive = dto.IsActive,
-                        RowVersion = dto.RowVersion
-                    };
-                    CompleteLoadedTab(tab, dto.Id, $"حساب مورد {ShortId(dto.SupplierId)}", model);
-                    break;
-                }
                 case AccountingEntityType.ReceiptVouchers:
                 {
                     var dto = await AccountingService.GetReceiptVoucherByIdAsync(id) ?? throw NotFound("سند القبض");
+                    await EnsureCustomerLookupAsync(dto.CustomerId);
                     await EnsureCashAccountLookupAsync(dto.CashAccountId);
                     await EnsureBankAccountLookupAsync(dto.BankAccountId);
                     var lines = await MapVoucherLinesAsync(dto.Lines.Select(x => (x.AccountId, x.Amount, x.ReferenceType, x.ReferenceId, x.Description)));
@@ -858,6 +842,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                 case AccountingEntityType.PaymentVouchers:
                 {
                     var dto = await AccountingService.GetPaymentVoucherByIdAsync(id) ?? throw NotFound("سند الصرف");
+                    await EnsureSupplierLookupAsync(dto.SupplierId);
                     await EnsureCashAccountLookupAsync(dto.CashAccountId);
                     await EnsureBankAccountLookupAsync(dto.BankAccountId);
                     var lines = await MapVoucherLinesAsync(dto.Lines.Select(x => (x.AccountId, x.Amount, x.ReferenceType, x.ReferenceId, x.Description)));
@@ -1076,12 +1061,6 @@ public partial class AccountingWorkspaceHost : IDisposable
                     break;
                 case AccountingEntityType.CostCenters:
                     await SaveCostCenterAsync(tab, (CostCenterEditor.FormModel)tab.Model);
-                    break;
-                case AccountingEntityType.CustomerAccounts:
-                    await SaveCustomerAccountAsync(tab, (CustomerAccountEditor.FormModel)tab.Model);
-                    break;
-                case AccountingEntityType.SupplierAccounts:
-                    await SaveSupplierAccountAsync(tab, (SupplierAccountEditor.FormModel)tab.Model);
                     break;
                 case AccountingEntityType.ReceiptVouchers:
                     await SaveReceiptVoucherAsync(tab, (ReceiptVoucherEditor.FormModel)tab.Model);
@@ -1303,7 +1282,7 @@ public partial class AccountingWorkspaceHost : IDisposable
         {
             result = await AccountingService.CreateJournalAsync(new CreateJournalEntryRequest(
                 model.JournalType, model.PostingDate, model.DocumentDate, model.FiscalPeriodId.Value,
-                model.Description.Trim(), model.SourceModule, model.SourceDocumentType, model.SourceDocumentId, lines));
+                model.Description.Trim(), model.SourceModule, model.SourceDocumentType, model.SourceDocumentId, lines, model.JournalNumber));
         }
         else
         {
@@ -1376,54 +1355,6 @@ public partial class AccountingWorkspaceHost : IDisposable
         await CompleteSaveAsync(tab, result?.Id, result is null ? null : $"{result.Code} - {result.NameAr}", "تم حفظ مركز التكلفة بنجاح.");
     }
 
-    private async Task SaveCustomerAccountAsync(AccountingTabState tab, CustomerAccountEditor.FormModel model)
-    {
-        if (!model.CustomerId.HasValue || !model.AccountId.HasValue || !model.ControlAccountId.HasValue)
-        {
-            Snackbar.Warning("معرف العميل والحساب الفرعي وحساب المراقبة مطلوبة.");
-            return;
-        }
-
-        CustomerAccountDto? result;
-        if (tab.IsNew)
-        {
-            result = await AccountingService.CreateCustomerAccountAsync(new CreateCustomerAccountRequest(
-                model.CustomerId.Value, model.AccountId.Value, model.ControlAccountId.Value, model.IsActive));
-        }
-        else
-        {
-            EnsureEntityIdAndRowVersion(tab, model.RowVersion);
-            result = await AccountingService.UpdateCustomerAccountAsync(tab.EntityId!.Value, new UpdateCustomerAccountRequest(
-                model.AccountId.Value, model.ControlAccountId.Value, model.IsActive, model.RowVersion));
-        }
-
-        await CompleteSaveAsync(tab, result?.Id, result is null ? null : $"حساب عميل {ShortId(result.CustomerId)}", "تم حفظ الربط المحاسبي للعميل بنجاح.");
-    }
-
-    private async Task SaveSupplierAccountAsync(AccountingTabState tab, SupplierAccountEditor.FormModel model)
-    {
-        if (!model.SupplierId.HasValue || !model.AccountId.HasValue || !model.ControlAccountId.HasValue)
-        {
-            Snackbar.Warning("معرف المورد والحساب الفرعي وحساب المراقبة مطلوبة.");
-            return;
-        }
-
-        SupplierAccountDto? result;
-        if (tab.IsNew)
-        {
-            result = await AccountingService.CreateSupplierAccountAsync(new CreateSupplierAccountRequest(
-                model.SupplierId.Value, model.AccountId.Value, model.ControlAccountId.Value, model.IsActive));
-        }
-        else
-        {
-            EnsureEntityIdAndRowVersion(tab, model.RowVersion);
-            result = await AccountingService.UpdateSupplierAccountAsync(tab.EntityId!.Value, new UpdateSupplierAccountRequest(
-                model.AccountId.Value, model.ControlAccountId.Value, model.IsActive, model.RowVersion));
-        }
-
-        await CompleteSaveAsync(tab, result?.Id, result is null ? null : $"حساب مورد {ShortId(result.SupplierId)}", "تم حفظ الربط المحاسبي للمورد بنجاح.");
-    }
-
     private async Task SaveReceiptVoucherAsync(AccountingTabState tab, ReceiptVoucherEditor.FormModel model)
     {
         if (model.TotalAmount <= 0)
@@ -1459,7 +1390,7 @@ public partial class AccountingWorkspaceHost : IDisposable
             result = await AccountingService.CreateReceiptVoucherAsync(new CreateReceiptVoucherRequest(
                 model.VoucherDate, model.PartyType, model.CustomerId, NullIfBlank(model.ReceivedFrom),
                 model.PaymentMethod, model.CashAccountId, model.BankAccountId, model.TotalAmount,
-                NullIfBlank(model.Description), lines));
+                NullIfBlank(model.Description), lines, model.VoucherNumber));
         }
         else
         {
@@ -1508,7 +1439,7 @@ public partial class AccountingWorkspaceHost : IDisposable
             result = await AccountingService.CreatePaymentVoucherAsync(new CreatePaymentVoucherRequest(
                 model.VoucherDate, model.PartyType, model.SupplierId, NullIfBlank(model.BeneficiaryName),
                 model.PaymentMethod, model.CashAccountId, model.BankAccountId, model.TotalAmount,
-                NullIfBlank(model.Description), lines));
+                NullIfBlank(model.Description), lines, model.VoucherNumber));
         }
         else
         {
@@ -1623,7 +1554,7 @@ public partial class AccountingWorkspaceHost : IDisposable
         }
 
         var result = await AccountingService.CreateCashShiftAsync(new CreateCashShiftRequest(
-            model.CashAccountId.Value, model.OpeningBalance));
+            model.CashAccountId.Value, model.OpeningBalance, model.ShiftNumber));
         await CompleteSaveAsync(tab, result?.Id, result is null ? null : $"وردية {result.ShiftNumber}", "تم فتح الوردية بنجاح.");
     }
 
@@ -1643,7 +1574,7 @@ public partial class AccountingWorkspaceHost : IDisposable
             result = await AccountingService.CreateExpenseAsync(new CreateExpenseRequest(
                 model.ExpenseDate, model.ExpenseTypeId.Value, model.ExpenseAccountId.Value,
                 NullIfBlank(model.Beneficiary), model.Amount, model.PaymentMethod,
-                model.CashAccountId, model.BankAccountId, NullIfBlank(model.Description)));
+                model.CashAccountId, model.BankAccountId, NullIfBlank(model.Description), model.ExpenseNumber));
         }
         else
         {
@@ -1947,6 +1878,20 @@ public partial class AccountingWorkspaceHost : IDisposable
         return result.Items.Select(ToExpenseTypeLookup).ToArray();
     }
 
+    private async Task<IReadOnlyList<UiLookupItem>> SearchCustomersAsync(string text, CancellationToken cancellationToken)
+    {
+        var result = await AccountingService.LookupCustomersAsync(text, cancellationToken) ?? [];
+        foreach (var customer in result) _customerLookups[customer.Id] = ToCustomerLookup(customer);
+        return result.Where(x => x.IsActive).Select(ToCustomerLookup).ToArray();
+    }
+
+    private async Task<IReadOnlyList<UiLookupItem>> SearchSuppliersAsync(string text, CancellationToken cancellationToken)
+    {
+        var result = await AccountingService.LookupSuppliersAsync(text, cancellationToken) ?? [];
+        foreach (var supplier in result) _supplierLookups[supplier.Id] = ToSupplierLookup(supplier);
+        return result.Where(x => x.IsActive).Select(ToSupplierLookup).ToArray();
+    }
+
     private async Task<IReadOnlyList<UiLookupItem>> SearchPaymentSourcesAsync(string text, CancellationToken cancellationToken)
     {
         if (Workspace.ActiveTab?.Model is not PaymentAllocationEditor.FormModel model)
@@ -1977,6 +1922,8 @@ public partial class AccountingWorkspaceHost : IDisposable
     private UiLookupItem? GetBankAccountLookup(Guid? id) => GetLookup(_bankAccountLookups, id);
     private UiLookupItem? GetExpenseTypeLookup(Guid? id) => GetLookup(_expenseTypeLookups, id);
     private UiLookupItem? GetPaymentSourceLookup(Guid? id) => GetLookup(_paymentSourceLookups, id);
+    private UiLookupItem? GetCustomerLookup(Guid? id) => GetLookup(_customerLookups, id);
+    private UiLookupItem? GetSupplierLookup(Guid? id) => GetLookup(_supplierLookups, id);
 
     private static UiLookupItem? GetLookup(IReadOnlyDictionary<Guid, UiLookupItem> source, Guid? id) =>
         id.HasValue && source.TryGetValue(id.Value, out var item) ? item : null;
@@ -1985,6 +1932,28 @@ public partial class AccountingWorkspaceHost : IDisposable
         id.HasValue
             ? new UiLookupItem(id.Value.ToString("D"), $"{label} مرتبط", id.Value.ToString("D"), "fa-solid fa-link")
             : null;
+
+    private async Task<UiLookupItem?> EnsureCustomerLookupAsync(Guid? id)
+    {
+        if (!id.HasValue) return null;
+        if (_customerLookups.TryGetValue(id.Value, out var existing)) return existing;
+        var dto = await AccountingService.GetCustomerByIdAsync(id.Value);
+        if (dto is null) return null;
+        var item = new UiLookupItem(dto.Id.ToString("D"), $"{dto.CustomerCode} | {dto.AccountCode} | {dto.NameAr}", dto.IsActive ? "نشط" : "غير نشط", "fa-solid fa-user-tie");
+        _customerLookups[dto.Id] = item;
+        return item;
+    }
+
+    private async Task<UiLookupItem?> EnsureSupplierLookupAsync(Guid? id)
+    {
+        if (!id.HasValue) return null;
+        if (_supplierLookups.TryGetValue(id.Value, out var existing)) return existing;
+        var dto = await AccountingService.GetSupplierByIdAsync(id.Value);
+        if (dto is null) return null;
+        var item = new UiLookupItem(dto.Id.ToString("D"), $"{dto.SupplierCode} | {dto.AccountCode} | {dto.NameAr}", dto.IsActive ? "نشط" : "غير نشط", "fa-solid fa-truck-field");
+        _supplierLookups[dto.Id] = item;
+        return item;
+    }
 
     private async Task<UiLookupItem?> EnsureAccountLookupAsync(Guid? id)
     {
@@ -2080,6 +2049,10 @@ public partial class AccountingWorkspaceHost : IDisposable
         return item;
     }
 
+    private static UiLookupItem ToCustomerLookup(CustomerLookupDto x) =>
+        new(x.Id.ToString("D"), x.DisplayText, x.IsActive ? "نشط" : "غير نشط", "fa-solid fa-user-tie");
+    private static UiLookupItem ToSupplierLookup(SupplierLookupDto x) =>
+        new(x.Id.ToString("D"), x.DisplayText, x.IsActive ? "نشط" : "غير نشط", "fa-solid fa-truck-field");
     private static UiLookupItem ToAccountLookup(AccountDto x) =>
         new(x.Id.ToString("D"), $"{x.Code} - {x.NameAr}", AccountingArabicPresenter.GetAccountTypeText(x.AccountType), "fa-solid fa-folder-tree");
     private static UiLookupItem ToCostCenterLookup(CostCenterDto x) =>
@@ -2145,14 +2118,6 @@ public partial class AccountingWorkspaceHost : IDisposable
                 foreach (var id in _postingProfilesPage.Items.SelectMany(x => x.Lines).Select(x => x.AccountId).Distinct())
                     await EnsureAccountLookupAsync(id);
                 break;
-            case AccountingEntityType.CustomerAccounts:
-                foreach (var id in _customerAccountsPage.Items.SelectMany(x => new[] { x.AccountId, x.ControlAccountId }).Distinct())
-                    await EnsureAccountLookupAsync(id);
-                break;
-            case AccountingEntityType.SupplierAccounts:
-                foreach (var id in _supplierAccountsPage.Items.SelectMany(x => new[] { x.AccountId, x.ControlAccountId }).Distinct())
-                    await EnsureAccountLookupAsync(id);
-                break;
             case AccountingEntityType.ReceiptVouchers:
                 foreach (var x in _receiptsPage.Items)
                 {
@@ -2200,8 +2165,6 @@ public partial class AccountingWorkspaceHost : IDisposable
         AccountingEntityType.Journals => BuildJournalItems(),
         AccountingEntityType.PostingProfiles => BuildPostingProfileItems(),
         AccountingEntityType.CostCenters => BuildCostCenterItems(),
-        AccountingEntityType.CustomerAccounts => BuildCustomerAccountItems(),
-        AccountingEntityType.SupplierAccounts => BuildSupplierAccountItems(),
         AccountingEntityType.ReceiptVouchers => BuildReceiptItems(),
         AccountingEntityType.PaymentVouchers => BuildPaymentItems(),
         AccountingEntityType.PaymentAllocations => BuildAllocationItems(),
@@ -2215,8 +2178,6 @@ public partial class AccountingWorkspaceHost : IDisposable
         AccountingEntityType.Journals => "لا توجد قيود يومية",
         AccountingEntityType.PostingProfiles => "لا توجد ملفات ترحيل",
         AccountingEntityType.CostCenters => "لا توجد مراكز تكلفة",
-        AccountingEntityType.CustomerAccounts => "لا توجد روابط محاسبية للعملاء",
-        AccountingEntityType.SupplierAccounts => "لا توجد روابط محاسبية للموردين",
         AccountingEntityType.ReceiptVouchers => "لا توجد سندات قبض",
         AccountingEntityType.PaymentVouchers => "لا توجد سندات صرف",
         AccountingEntityType.CashShifts => "لا توجد ورديات صندوق",
@@ -2234,8 +2195,6 @@ public partial class AccountingWorkspaceHost : IDisposable
         AccountingEntityType.Journals => "fa-solid fa-book-journal-whills",
         AccountingEntityType.PostingProfiles => "fa-solid fa-sliders",
         AccountingEntityType.CostCenters => "fa-solid fa-network-wired",
-        AccountingEntityType.CustomerAccounts => "fa-solid fa-users-line",
-        AccountingEntityType.SupplierAccounts => "fa-solid fa-boxes-packing",
         AccountingEntityType.ReceiptVouchers => "fa-solid fa-money-bill-trend-up",
         AccountingEntityType.PaymentVouchers => "fa-solid fa-money-bill-transfer",
         AccountingEntityType.CashShifts => "fa-solid fa-cash-register",
@@ -2254,8 +2213,6 @@ public partial class AccountingWorkspaceHost : IDisposable
         AccountingEntityType.Journals => (_journalsPage.PageNumber, _journalsPage.TotalPages, _journalsPage.TotalCount),
         AccountingEntityType.PostingProfiles => (_postingProfilesPage.PageNumber, _postingProfilesPage.TotalPages, _postingProfilesPage.TotalCount),
         AccountingEntityType.CostCenters => (_costCentersPage.PageNumber, _costCentersPage.TotalPages, _costCentersPage.TotalCount),
-        AccountingEntityType.CustomerAccounts => (_customerAccountsPage.PageNumber, _customerAccountsPage.TotalPages, _customerAccountsPage.TotalCount),
-        AccountingEntityType.SupplierAccounts => (_supplierAccountsPage.PageNumber, _supplierAccountsPage.TotalPages, _supplierAccountsPage.TotalCount),
         AccountingEntityType.ReceiptVouchers => (_receiptsPage.PageNumber, _receiptsPage.TotalPages, _receiptsPage.TotalCount),
         AccountingEntityType.PaymentVouchers => (_paymentsPage.PageNumber, _paymentsPage.TotalPages, _paymentsPage.TotalCount),
         AccountingEntityType.PaymentAllocations => (_allocationsPage.PageNumber, _allocationsPage.TotalPages, _allocationsPage.TotalCount),
@@ -2451,32 +2408,6 @@ public partial class AccountingWorkspaceHost : IDisposable
             x.IsActive ? "نشط" : "معطل",
             x.IsActive ? "active" : "inactive")).ToArray();
 
-    private IReadOnlyList<AccountingRecordItem> BuildCustomerAccountItems() => _customerAccountsPage.Items.Select(x =>
-        new AccountingRecordItem(
-            x.Id,
-            $"عميل {ShortId(x.CustomerId)}",
-            x.CustomerId.ToString("D"),
-            "fa-solid fa-user-tag",
-            [
-                new("الحساب", GetAccountLookup(x.AccountId)?.PrimaryText ?? ShortId(x.AccountId)),
-                new("حساب المراقبة", GetAccountLookup(x.ControlAccountId)?.PrimaryText ?? ShortId(x.ControlAccountId))
-            ],
-            x.IsActive ? "نشط" : "معطل",
-            x.IsActive ? "active" : "inactive")).ToArray();
-
-    private IReadOnlyList<AccountingRecordItem> BuildSupplierAccountItems() => _supplierAccountsPage.Items.Select(x =>
-        new AccountingRecordItem(
-            x.Id,
-            $"مورد {ShortId(x.SupplierId)}",
-            x.SupplierId.ToString("D"),
-            "fa-solid fa-boxes-packing",
-            [
-                new("الحساب", GetAccountLookup(x.AccountId)?.PrimaryText ?? ShortId(x.AccountId)),
-                new("حساب المراقبة", GetAccountLookup(x.ControlAccountId)?.PrimaryText ?? ShortId(x.ControlAccountId))
-            ],
-            x.IsActive ? "نشط" : "معطل",
-            x.IsActive ? "active" : "inactive")).ToArray();
-
     private IReadOnlyList<AccountingRecordItem> BuildReceiptItems() => _receiptsPage.Items.Select(x =>
         new AccountingRecordItem(
             x.Id,
@@ -2656,8 +2587,6 @@ public partial class AccountingWorkspaceHost : IDisposable
         AccountingEntityType.Journals => "قيد يومية",
         AccountingEntityType.PostingProfiles => "ملف ترحيل",
         AccountingEntityType.CostCenters => "مركز تكلفة",
-        AccountingEntityType.CustomerAccounts => "حساب عميل",
-        AccountingEntityType.SupplierAccounts => "حساب مورد",
         AccountingEntityType.ReceiptVouchers => "سند قبض",
         AccountingEntityType.PaymentVouchers => "سند صرف",
         AccountingEntityType.PaymentAllocations => "تخصيص دفعة",

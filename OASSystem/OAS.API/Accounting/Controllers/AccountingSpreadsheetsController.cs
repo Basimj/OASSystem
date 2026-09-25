@@ -13,7 +13,7 @@ public sealed class AccountingSpreadsheetsController(AccountingSpreadsheetServic
     [HttpGet("template")]
     public async Task<IActionResult> Template(string section,CancellationToken ct)=>File(await service.TemplateAsync(section,ct),Mime,$"{section}-template.xlsx");
     [HttpGet("export")]
-    public async Task<IActionResult> Export(string section,[FromQuery] PageRequest request,[FromQuery] string? sourceType,CancellationToken ct)=>File(await service.ExportAsync(section,request,sourceType,ct),Mime,$"{section}.xlsx");
+    public async Task<IActionResult> Export(string section,[FromQuery] PageRequest request,[FromQuery] string? sourceType,[FromQuery] string? filter,CancellationToken ct)=>File(await service.ExportAsync(section,request,sourceType,ct,filter),Mime,$"{section}.xlsx");
     [HttpPost("preview"),RequestSizeLimit(11*1024*1024)]
     public Task<ActionResult<SpreadsheetPreview>> Preview(string section,IFormFile file,CancellationToken ct)=>Upload(section,file,false,ct);
     [HttpPost("import"),RequestSizeLimit(11*1024*1024)]

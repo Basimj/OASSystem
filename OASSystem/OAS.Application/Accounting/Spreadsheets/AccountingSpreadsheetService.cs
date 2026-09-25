@@ -18,8 +18,12 @@ using OAS.Application.Common.Exceptions;
 using OAS.Application.Spreadsheets;
 using OAS.Application.Accounting.Expenses.ExpenseTypes.Commands.CreateExpenseType;
 using OAS.Application.Accounting.Journals.Commands.CreateJournalEntry;
+using OAS.Application.Accounting.Customers.Commands.CreateCustomer;
+using OAS.Application.Accounting.Suppliers.Commands.CreateSupplier;
 using OAS.Contracts.Accounting.Expenses;
 using OAS.Contracts.Accounting.Journals;
+using OAS.Contracts.Accounting.Customers;
+using OAS.Contracts.Accounting.Suppliers;
 using OAS.Contracts.Accounting.Enums;
 using OAS.Contracts.Spreadsheets;
 using OAS.Domain.Accounting.Entities;
@@ -140,7 +144,7 @@ public sealed partial class AccountingSpreadsheetService(
         var centers=await List<CostCenter>(ct);
         var accountMap=accounts.ToDictionary(x=>x.Code,StringComparer.OrdinalIgnoreCase);
         var centerMap=centers.ToDictionary(x=>x.Code,StringComparer.OrdinalIgnoreCase);
-        var codeLabel=section switch { "accounts"=>"كود الحساب", "cost-centers"=>"كود مركز التكلفة", "cash-accounts"=>"كود الصندوق", "bank-accounts"=>"كود الحساب البنكي", "expense-types"=>"كود نوع المصروف", "posting-profiles"=>"كود ملف الترحيل", _=>"الكود" };
+        var codeLabel=section switch { "accounts"=>"كود الحساب", "cost-centers"=>"كود مركز التكلفة", "cash-accounts"=>"كود الصندوق", "bank-accounts"=>"كود الحساب البنكي", "expense-types"=>"كود نوع المصروف", "posting-profiles"=>"كود ملف الترحيل", "customers"=>"كود العميل", "suppliers"=>"كود المورد", _=>"الكود" };
         var headers=rows.Where(x=>x.Source.Sheet==definitions[0].Name).ToList();
         IReadOnlyList<string> existing=section switch
         {
@@ -152,19 +156,59 @@ public sealed partial class AccountingSpreadsheetService(
             "posting-profiles"=>(await List<PostingProfile>(ct)).Select(x=>x.Code).ToArray(),
             _=>[]
         };
-        if(section!="journals")
+        if(section is not ("journals" or "customers" or "suppliers"))
             foreach(var group in headers.GroupBy(x=>x.Get("Code"),StringComparer.OrdinalIgnoreCase))
                 foreach(var row in group)
                 {
                     if(group.Count()>1) row.Errors.Add($"الكود {group.Key} مكرر داخل الملف.");
                     if(existing.Contains(group.Key,StringComparer.OrdinalIgnoreCase)) row.Errors.Add($"{codeLabel} {group.Key} مستخدم مسبقاً.");
                 }
+        if(section=="customers")
+        {
+            var existingCustomers=await List<Customer>(ct);
+            foreach(var row in headers)
+            {
+                if(row.Get("CustomerCode").Length>0) row.Warnings.Add("كود العميل في الملف للعرض فقط؛ سيتم توليد كود جديد عند الاستيراد.");
+                if(row.Get("AccountCode").Length>0) row.Warnings.Add("كود الحساب في الملف للعرض فقط؛ سيُنشأ حساب محاسبي جديد تلقائياً.");
+                var parent=row.Get("ParentAccountCode");
+                if(!accountMap.TryGetValue(parent,out var parentAccount) || !parentAccount.IsActive || parentAccount.AccountClass!=OAS.Domain.Accounting.Enums.AccountClass.Asset || parentAccount.AccountType!=OAS.Domain.Accounting.Enums.AccountType.Control || !parentAccount.IsControlAccount || parentAccount.NormalBalance!=OAS.Domain.Accounting.Enums.NormalBalance.Debit)
+                    row.Errors.Add($"حساب العملاء الرئيسي {parent} غير موجود أو غير مؤهل.");
+            }
+            ValidateOptionalUnique(headers,existingCustomers.Select(x=>x.NationalId),"NationalId","رقم الهوية");
+            ValidateOptionalUnique(headers,existingCustomers.Select(x=>x.TaxNumber),"TaxNumber","الرقم الضريبي");
+            ValidateOptionalUnique(headers,existingCustomers.Select(x=>x.CommercialRegistrationNo),"CommercialRegistrationNo","السجل التجاري");
+        }
+        if(section=="suppliers")
+        {
+            var existingSuppliers=await List<Supplier>(ct);
+            foreach(var row in headers)
+            {
+                if(row.Get("SupplierCode").Length>0) row.Warnings.Add("كود المورد في الملف للعرض فقط؛ سيتم توليد كود جديد عند الاستيراد.");
+                if(row.Get("AccountCode").Length>0) row.Warnings.Add("كود الحساب في الملف للعرض فقط؛ سيُنشأ حساب محاسبي جديد تلقائياً.");
+                var parent=row.Get("ParentAccountCode");
+                if(!accountMap.TryGetValue(parent,out var parentAccount) || !parentAccount.IsActive || parentAccount.AccountClass!=OAS.Domain.Accounting.Enums.AccountClass.Liability || parentAccount.AccountType!=OAS.Domain.Accounting.Enums.AccountType.Control || !parentAccount.IsControlAccount || parentAccount.NormalBalance!=OAS.Domain.Accounting.Enums.NormalBalance.Credit)
+                    row.Errors.Add($"حساب الموردين الرئيسي {parent} غير موجود أو غير مؤهل.");
+            }
+            ValidateOptionalUnique(headers,existingSuppliers.Select(x=>x.NationalId),"NationalId","رقم الهوية");
+            ValidateOptionalUnique(headers,existingSuppliers.Select(x=>x.TaxNumber),"TaxNumber","الرقم الضريبي");
+            ValidateOptionalUnique(headers,existingSuppliers.Select(x=>x.CommercialRegistrationNo),"CommercialRegistrationNo","السجل التجاري");
+        }
         if(section=="bank-accounts")
         {
             var banks=await List<BankAccount>(ct);
             foreach(var group in headers.GroupBy(x=>x.Get("AccountNumber"),StringComparer.OrdinalIgnoreCase))
                 foreach(var row in group)
                     if(group.Count()>1 || banks.Any(x=>string.Equals(x.AccountNumber,group.Key,StringComparison.OrdinalIgnoreCase))) row.Errors.Add("رقم الحساب البنكي مستخدم مسبقاً.");
+        }
+        void ValidateOptionalUnique(IEnumerable<Row> source,IEnumerable<string?> existingValues,string key,string label)
+        {
+            var existingSet=existingValues.Where(x=>!string.IsNullOrWhiteSpace(x)).Select(x=>x!.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach(var group in source.Where(x=>x.Get(key).Length>0).GroupBy(x=>x.Get(key),StringComparer.OrdinalIgnoreCase))
+                foreach(var row in group)
+                {
+                    if(group.Count()>1) row.Errors.Add($"{label} {group.Key} مكرر داخل الملف.");
+                    if(existingSet.Contains(group.Key)) row.Errors.Add($"{label} {group.Key} مستخدم مسبقاً.");
+                }
         }
         var levels=new Dictionary<string,int>(StringComparer.OrdinalIgnoreCase);
         if(section is "accounts" or "cost-centers")
@@ -196,7 +240,7 @@ public sealed partial class AccountingSpreadsheetService(
         }
         foreach(var row in rows)
         {
-            if(row.Source.Values.ContainsKey("AccountCode")) Resolve(row,"AccountCode");
+            if(section is not ("customers" or "suppliers") && row.Source.Values.ContainsKey("AccountCode")) Resolve(row,"AccountCode");
             if(row.Source.Values.ContainsKey("DefaultExpenseAccountCode")) Resolve(row,"DefaultExpenseAccountCode",true);
         }
         var commands=new List<object>();
@@ -248,6 +292,8 @@ public sealed partial class AccountingSpreadsheetService(
                 "cash-accounts"=>new CreateCashAccountCommand(new(code,row.Get("Name"),Resolve(row,"AccountCode")!.Value,row.Bool("IsDefault"),row.Bool("IsActive",true))),
                 "bank-accounts"=>new CreateBankAccountCommand(new(code,row.Get("BankName"),row.Get("AccountName"),row.Get("AccountNumber"),row.Optional("IBAN"),Resolve(row,"AccountCode")!.Value,row.Bool("IsActive",true))),
                 "expense-types"=>new CreateExpenseTypeCommand(new(code,row.Get("NameAr"),row.Optional("NameEn"),Resolve(row,"DefaultExpenseAccountCode",true),row.Bool("IsActive",true))),
+                "customers"=>new CreateCustomerCommand(new CreateCustomerRequest(null,accountMap[row.Get("ParentAccountCode")].Id,row.Enum<OAS.Contracts.Accounting.Enums.PartyEntityType>("EntityType"),row.Get("NameAr"),row.Optional("NameEn"),row.Optional("TradeName"),row.Optional("NationalId"),row.Optional("CommercialRegistrationNo"),row.Optional("TaxNumber"),row.Optional("DateOfBirth") is null?null:row.Date("DateOfBirth"),row.Enum<OAS.Contracts.Accounting.Enums.Gender>("Gender"),row.Optional("ContactPersonName"),row.Optional("ContactPersonTitle"),row.Optional("Phone"),row.Optional("Mobile"),row.Optional("AlternatePhone"),row.Optional("WhatsAppNumber"),row.Optional("Email"),row.Optional("Website"),row.Enum<OAS.Contracts.Accounting.Enums.ContactMethod>("PreferredContactMethod"),row.Optional("Country"),row.Optional("Governorate"),row.Optional("City"),row.Optional("District"),row.Optional("Street"),row.Optional("Building"),row.Optional("PostalCode"),row.Optional("AddressDetails"),row.Bool("IsCreditAllowed"),row.Decimal("CreditLimit"),decimal.ToInt32(row.Decimal("PaymentTermDays")),row.Optional("CustomerSince") is null?null:row.Date("CustomerSince"),row.Bool("IsActive",true),row.Optional("Notes"))),
+                "suppliers"=>new CreateSupplierCommand(new CreateSupplierRequest(null,accountMap[row.Get("ParentAccountCode")].Id,row.Enum<OAS.Contracts.Accounting.Enums.PartyEntityType>("EntityType"),row.Enum<OAS.Contracts.Accounting.Enums.SupplierScope>("SupplierScope"),row.Get("NameAr"),row.Optional("NameEn"),row.Optional("TradeName"),row.Optional("NationalId"),row.Optional("CommercialRegistrationNo"),row.Optional("TaxNumber"),row.Optional("ContactPersonName"),row.Optional("ContactPersonTitle"),row.Optional("Phone"),row.Optional("Mobile"),row.Optional("AlternatePhone"),row.Optional("WhatsAppNumber"),row.Optional("Email"),row.Optional("Website"),row.Enum<OAS.Contracts.Accounting.Enums.ContactMethod>("PreferredContactMethod"),row.Optional("Country"),row.Optional("Governorate"),row.Optional("City"),row.Optional("District"),row.Optional("Street"),row.Optional("Building"),row.Optional("PostalCode"),row.Optional("AddressDetails"),row.Decimal("CreditLimit"),decimal.ToInt32(row.Decimal("PaymentTermDays")),row.Optional("DefaultLeadTimeDays") is null?null:decimal.ToInt32(row.Decimal("DefaultLeadTimeDays")),row.Optional("SupplierSince") is null?null:row.Date("SupplierSince"),row.Bool("IsActive",true),row.Optional("Notes"))),
                 _=>null
             };
             if(section=="posting-profiles")

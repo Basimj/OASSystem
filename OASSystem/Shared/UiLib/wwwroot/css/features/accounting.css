@@ -917,6 +917,32 @@
    Lines Editor
    ========================================================================== */
 
+/* Journal entry lines: keep debit/credit inputs readable after party columns were added. */
+.ui-acc-journal-lines-table {
+    min-width: 1380px;
+    table-layout: auto;
+}
+
+.ui-acc-journal-lines-table .ui-acc-journal-amount-col {
+    width: 145px;
+    min-width: 145px;
+    max-width: 145px;
+}
+
+.ui-acc-journal-lines-table .ui-acc-journal-amount-col .ui-acc-number-field {
+    width: 100%;
+    min-width: 130px;
+}
+
+.ui-acc-journal-lines-table .ui-acc-journal-amount-col .ui-acc-number-field__input {
+    width: 100%;
+    min-width: 130px;
+    text-align: end;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+
 .ui-acc-lines-editor__actions {
     display: flex;
     justify-content: flex-start;

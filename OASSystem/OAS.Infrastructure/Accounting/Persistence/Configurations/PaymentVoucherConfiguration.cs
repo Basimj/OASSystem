@@ -85,6 +85,12 @@ public sealed class PaymentVoucherConfiguration : IEntityTypeConfiguration<Payme
         builder.HasIndex(x => x.Status)
             .HasDatabaseName("IX_PaymentVouchers_Status");
 
+        builder.HasOne<Supplier>()
+            .WithMany()
+            .HasForeignKey(x => x.SupplierId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_PaymentVouchers_Supplier");
+
         builder.HasOne<CashAccount>()
             .WithMany()
             .HasForeignKey(x => x.CashAccountId)

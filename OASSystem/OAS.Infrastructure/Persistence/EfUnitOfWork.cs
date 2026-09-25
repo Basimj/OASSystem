@@ -144,15 +144,63 @@ public sealed class EfUnitOfWork(OasDbContext dbContext) : IUnitOfWork
             return true;
         }
 
-        if (message.Contains("UX_CustomerAccounts_CustomerId", StringComparison.OrdinalIgnoreCase))
+        if (message.Contains("UX_Customers_CustomerCode", StringComparison.OrdinalIgnoreCase))
         {
-            conflict = new ConflictException("accounting_customer_account_exists", "This customer is already linked to an accounting account.");
+            conflict = new ConflictException("accounting_customer_code_duplicate", "Customer code is already in use.");
             return true;
         }
 
-        if (message.Contains("UX_SupplierAccounts_SupplierId", StringComparison.OrdinalIgnoreCase))
+        if (message.Contains("UX_Customers_AccountId", StringComparison.OrdinalIgnoreCase))
         {
-            conflict = new ConflictException("accounting_supplier_account_exists", "This supplier is already linked to an accounting account.");
+            conflict = new ConflictException("accounting_customer_account_duplicate", "This accounting account is already assigned to a customer.");
+            return true;
+        }
+
+        if (message.Contains("UX_Customers_NationalId", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("accounting_customer_national_id_duplicate", "National id is already in use.");
+            return true;
+        }
+
+        if (message.Contains("UX_Customers_TaxNumber", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("accounting_customer_tax_number_duplicate", "Tax number is already in use.");
+            return true;
+        }
+
+        if (message.Contains("UX_Customers_CommercialRegistrationNo", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("accounting_customer_cr_duplicate", "Commercial registration number is already in use.");
+            return true;
+        }
+
+        if (message.Contains("UX_Suppliers_SupplierCode", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("accounting_supplier_code_duplicate", "Supplier code is already in use.");
+            return true;
+        }
+
+        if (message.Contains("UX_Suppliers_AccountId", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("accounting_supplier_account_duplicate", "This accounting account is already assigned to a supplier.");
+            return true;
+        }
+
+        if (message.Contains("UX_Suppliers_NationalId", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("accounting_supplier_national_id_duplicate", "National id is already in use.");
+            return true;
+        }
+
+        if (message.Contains("UX_Suppliers_TaxNumber", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("accounting_supplier_tax_number_duplicate", "Tax number is already in use.");
+            return true;
+        }
+
+        if (message.Contains("UX_Suppliers_CommercialRegistrationNo", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("accounting_supplier_cr_duplicate", "Commercial registration number is already in use.");
             return true;
         }
 
@@ -185,6 +233,7 @@ public sealed class EfUnitOfWork(OasDbContext dbContext) : IUnitOfWork
             conflict = new ConflictException("accounting_expense_number_exists", "An expense with this number already exists.");
             return true;
         }
+
 
         if (message.Contains("UX_Warehouses_ActiveDefault", StringComparison.OrdinalIgnoreCase))
         {

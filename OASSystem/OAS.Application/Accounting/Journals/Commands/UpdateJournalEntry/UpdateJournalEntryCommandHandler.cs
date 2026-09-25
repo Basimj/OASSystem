@@ -9,7 +9,9 @@ namespace OAS.Application.Accounting.Journals.Commands.UpdateJournalEntry;
 
 public sealed class UpdateJournalEntryCommandHandler(
     IRepository<JournalEntry, Guid> repository,
-    IRepository<JournalEntryLine, Guid> lineRepository)
+    IRepository<JournalEntryLine, Guid> lineRepository,
+    IReadRepository<Customer, Guid> customers,
+    IReadRepository<Supplier, Guid> suppliers)
     : IRequestHandler<UpdateJournalEntryCommand, Guid>
 {
     public async Task<Guid> Handle(
@@ -25,6 +27,18 @@ public sealed class UpdateJournalEntryCommandHandler(
             throw new ConcurrencyException("The journal entry has been modified by another user.");
 
         journal.EnsureEditable();
+        foreach (var customerId in request.Request.Lines.Where(x => x.CustomerId.HasValue).Select(x => x.CustomerId!.Value).Distinct())
+        {
+            var customer = await customers.GetByIdAsync(customerId, cancellationToken);
+            if (customer is null) throw new NotFoundException(nameof(Customer), customerId);
+            if (!customer.IsActive) throw new ConflictException("journal_customer_inactive", "The selected customer is inactive.");
+        }
+        foreach (var supplierId in request.Request.Lines.Where(x => x.SupplierId.HasValue).Select(x => x.SupplierId!.Value).Distinct())
+        {
+            var supplier = await suppliers.GetByIdAsync(supplierId, cancellationToken);
+            if (supplier is null) throw new NotFoundException(nameof(Supplier), supplierId);
+            if (!supplier.IsActive) throw new ConflictException("journal_supplier_inactive", "The selected supplier is inactive.");
+        }
         journal.UpdateDraft(
             (DomainJournalType)(int)request.Request.JournalType,
             request.Request.PostingDate,

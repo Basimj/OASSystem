@@ -85,6 +85,12 @@ public sealed class ReceiptVoucherConfiguration : IEntityTypeConfiguration<Recei
         builder.HasIndex(x => x.Status)
             .HasDatabaseName("IX_ReceiptVouchers_Status");
 
+        builder.HasOne<Customer>()
+            .WithMany()
+            .HasForeignKey(x => x.CustomerId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_ReceiptVouchers_Customer");
+
         builder.HasOne<CashAccount>()
             .WithMany()
             .HasForeignKey(x => x.CashAccountId)
