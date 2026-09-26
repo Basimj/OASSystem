@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using OAS.Application.Accounting.Journals.Commands.CreateJournalEntry;
+using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Accounting.Journals.Commands.ReverseJournalEntry;
 using OAS.Application.Accounting.Journals.Commands.SetJournalEntryStatus;
 using OAS.Application.Accounting.Journals.Queries.GetJournalEntryById;
@@ -9,6 +10,8 @@ using OAS.Domain.Accounting.Entities;
 using OAS.Tests.Accounting.Application.Common;
 using DomainAccountClass = OAS.Domain.Accounting.Enums.AccountClass;
 using DomainAccountType = OAS.Domain.Accounting.Enums.AccountType;
+using DomainExchangeRateSource = OAS.Domain.Accounting.Enums.ExchangeRateSource;
+using DomainExchangeRateType = OAS.Domain.Accounting.Enums.ExchangeRateType;
 using DomainFiscalPeriodStatus = OAS.Domain.Accounting.Enums.FiscalPeriodStatus;
 using DomainJournalStatus = OAS.Domain.Accounting.Enums.JournalEntryStatus;
 using DomainJournalType = OAS.Domain.Accounting.Enums.JournalType;
@@ -48,12 +51,36 @@ public class JournalCommandAndQueryTests
     }
 
     [Test]
-    public async Task CreateJournalEntryCommandHandler_CreatesDraftJournalWithLines()
+    public async Task CreateJournalEntryCommandHandler_CreatesDraftMultiCurrencyJournalWithLines()
     {
+        var currencyId = Guid.NewGuid();
+        var currency = Currency.Create(currencyId, "YER", "الريال اليمني", null, "﷼", 2);
+        var settings = AccountingSettings.Create(currencyId);
+
+        var debitAccount = Account.Create(
+            _accountDebitId, "1101", "الصندوق", null, null, 1,
+            DomainAccountClass.Asset, DomainAccountType.Posting, DomainNormalBalance.Debit,
+            true, false, true, false, true, null);
+        var creditAccount = Account.Create(
+            _accountCreditId, "4101", "الإيرادات", null, null, 1,
+            DomainAccountClass.Revenue, DomainAccountType.Posting, DomainNormalBalance.Credit,
+            true, false, true, false, true, null);
+
+        var accountRepository = new FakeRepository<Account, Guid>([debitAccount, creditAccount]);
+        var currencyRepository = new FakeRepository<Currency, Guid>([currency]);
+        var settingsRepository = new FakeRepository<AccountingSettings, Guid>([settings]);
+
         var handler = new CreateJournalEntryCommandHandler(
             _journalRepository,
+            accountRepository,
             new FakeRepository<Customer, Guid>(),
             new FakeRepository<Supplier, Guid>(),
+            new FakeRepository<OAS.Domain.Features.Employees.Entities.Employee, Guid>(),
+            settingsRepository,
+            currencyRepository,
+            new FixedExchangeRateResolver(currency),
+            new TestCurrencyRoundingService(),
+            new FakePermissionChecker(),
             _sequenceGenerator);
 
         var request = new CreateJournalEntryRequest(
@@ -69,41 +96,34 @@ public class JournalCommandAndQueryTests
             [
                 new CreateJournalEntryLineRequest(
                     AccountId: _accountDebitId,
-                    DebitAmount: 2000m,
-                    CreditAmount: 0m,
-                    Description: "مدين",
-                    CustomerId: null,
-                    SupplierId: null,
-                    CostCenterId: null,
-                    ProductVariantId: null,
-                    WarehouseId: null),
+                    TransactionDebitAmount: 2000m,
+                    TransactionCreditAmount: 0m,
+                    TransactionCurrencyId: currencyId,
+                    Description: "مدين"),
 
                 new CreateJournalEntryLineRequest(
                     AccountId: _accountCreditId,
-                    DebitAmount: 0m,
-                    CreditAmount: 2000m,
-                    Description: "دائن",
-                    CustomerId: null,
-                    SupplierId: null,
-                    CostCenterId: null,
-                    ProductVariantId: null,
-                    WarehouseId: null)
+                    TransactionDebitAmount: 0m,
+                    TransactionCreditAmount: 2000m,
+                    TransactionCurrencyId: currencyId,
+                    Description: "دائن")
             ]);
 
-        var command = new CreateJournalEntryCommand(request);
-
         var journalId = await handler.Handle(
-            command,
+            new CreateJournalEntryCommand(request),
             CancellationToken.None);
 
         Assert.That(journalId, Is.Not.EqualTo(Guid.Empty));
         Assert.That(_journalRepository.Items.Count, Is.EqualTo(1));
 
         var saved = _journalRepository.Items[0];
-
         Assert.That(saved.Lines.Count, Is.EqualTo(2));
         Assert.That(saved.JournalNumber, Does.StartWith("JV-2026-"));
         Assert.That(saved.Status, Is.EqualTo(DomainJournalStatus.Draft));
+        Assert.That(saved.BaseCurrencyId, Is.EqualTo(currencyId));
+        Assert.That(saved.Lines.Sum(x => x.DebitAmount), Is.EqualTo(2000m));
+        Assert.That(saved.Lines.Sum(x => x.CreditAmount), Is.EqualTo(2000m));
+        Assert.That(saved.Lines.All(x => x.TransactionCurrencyId == currencyId), Is.True);
     }
 
     [Test]
@@ -442,4 +462,37 @@ public class JournalCommandAndQueryTests
             dto.Lines.Sum(x => x.CreditAmount),
             Is.EqualTo(100m));
     }
+
+    private sealed class FixedExchangeRateResolver(Currency currency) : IExchangeRateResolver
+    {
+        public Task<ExchangeRateResolution> ResolveAsync(
+            Guid currencyId,
+            DateOnly documentDate,
+            DomainExchangeRateType rateType = DomainExchangeRateType.Accounting,
+            decimal? manualRate = null,
+            bool manualOverrideAllowed = false,
+            CancellationToken cancellationToken = default)
+        {
+            if (currencyId != currency.Id)
+                throw new InvalidOperationException("Unexpected test currency.");
+
+            return Task.FromResult(new ExchangeRateResolution(
+                currency.Id, currency.Code, currency.Symbol, currency.DecimalPlaces,
+                1m, documentDate, rateType, DomainExchangeRateSource.System, true));
+        }
+    }
+
+    private sealed class TestCurrencyRoundingService : ICurrencyRoundingService
+    {
+        public decimal Round(decimal amount, byte decimalPlaces)
+            => Math.Round(amount, decimalPlaces, MidpointRounding.AwayFromZero);
+
+        public decimal CalculateBaseAmount(
+            decimal transactionAmount,
+            decimal exchangeRate,
+            byte transactionDecimalPlaces,
+            byte baseDecimalPlaces)
+            => Round(Round(transactionAmount, transactionDecimalPlaces) * exchangeRate, baseDecimalPlaces);
+    }
+
 }

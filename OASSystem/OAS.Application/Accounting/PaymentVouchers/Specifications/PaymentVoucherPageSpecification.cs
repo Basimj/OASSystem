@@ -16,7 +16,6 @@ public sealed class PaymentVoucherPageSpecification
             var search = normalized.Search.Trim();
             specification.Where(x =>
                 x.VoucherNumber.Contains(search) ||
-                (x.BeneficiaryName != null && x.BeneficiaryName.Contains(search)) ||
                 (x.Description != null && x.Description.Contains(search)));
         }
 
@@ -39,8 +38,8 @@ public sealed class PaymentVoucherPageSpecification
         {
             "vouchernumber" => nameof(PaymentVoucher.VoucherNumber),
             "voucherdate" => nameof(PaymentVoucher.VoucherDate),
-            "totalamount" => nameof(PaymentVoucher.TotalAmount),
-            "partytype" => nameof(PaymentVoucher.PartyType),
+            "totalamount" => nameof(PaymentVoucher.BaseTotalAmount),
+            "basetotalamount" => nameof(PaymentVoucher.BaseTotalAmount),
             "status" => nameof(PaymentVoucher.Status),
             "createdatutc" => nameof(PaymentVoucher.CreatedAtUtc),
             _ => nameof(PaymentVoucher.VoucherDate)

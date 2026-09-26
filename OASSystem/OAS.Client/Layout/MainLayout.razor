@@ -1,4 +1,4 @@
-@inherits LayoutComponentBase
+﻿@inherits LayoutComponentBase
 
 @inject IAuthClientService AuthService
 @inject IProfileClientService ProfileService
@@ -84,6 +84,10 @@
         new("accounting-expenses", "المصروفات", "/accounting/expenses", "fa-solid fa-receipt"),
         new("accounting-fiscal", "السنوات المالية", "/accounting/fiscal-years", "fa-solid fa-calendar-days"),
         new("accounting-cost-centers", "مراكز التكلفة", "/accounting/cost-centers", "fa-solid fa-network-wired"),
+        new("accounting-currencies", "العملات", "/accounting/currencies", "fa-solid fa-coins"),
+        new("accounting-exchange-rates", "أسعار الصرف", "/accounting/exchange-rates", "fa-solid fa-arrow-right-arrow-left"),
+        new("accounting-employee-accounts", "حسابات الموظفين", "/accounting/employee-accounts", "fa-solid fa-user-tie"),
+        new("accounting-settings", "إعدادات المحاسبة", "/accounting/settings", "fa-solid fa-sliders"),
         new("accounting-posting-profiles", "ملفات الترحيل", "/accounting/posting-profiles", "fa-solid fa-sliders"),
         new("reports", "التقارير", "/reports", "fa-regular fa-chart-bar"),
         new("employees", "الموظفون", "/employees", "fa-solid fa-user-tie"),
@@ -112,6 +116,10 @@
             "accounting-suppliers",
             "accounting-fiscal",
             "accounting-cost-centers",
+            "accounting-currencies",
+            "accounting-exchange-rates",
+            "accounting-employee-accounts",
+            "accounting-settings",
             "accounting-posting-profiles"
         ]),
         new("stock", "المخزون", "fa-solid fa-boxes-stacked", [

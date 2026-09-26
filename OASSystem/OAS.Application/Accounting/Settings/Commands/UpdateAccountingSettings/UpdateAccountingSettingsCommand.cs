@@ -1,0 +1,2 @@
+using OAS.Application.Abstractions.Messaging;using OAS.Application.Abstractions.Security;using OAS.Application.Accounting.Authorization;using OAS.Contracts.Accounting.Settings;
+namespace OAS.Application.Accounting.Settings.Commands.UpdateAccountingSettings;public sealed record UpdateAccountingSettingsCommand(UpdateAccountingSettingsRequest Request):ICommand,IAuthorizedRequest{public IReadOnlyCollection<string> RequiredPermissions{get;}=[AccountingPermissions.Settings.Manage];}

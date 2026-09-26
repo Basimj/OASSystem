@@ -8,10 +8,9 @@ public sealed class CreateCashAccountCommandValidator
     public CreateCashAccountCommandValidator()
     {
         RuleFor(x => x.Data.Code)
-            .NotEmpty()
-            .WithErrorCode("cash_account_code_required")
             .MaximumLength(30)
-            .WithErrorCode("cash_account_code_max_length");
+            .WithErrorCode("cash_account_code_max_length")
+            .When(x => !string.IsNullOrWhiteSpace(x.Data.Code));
 
         RuleFor(x => x.Data.Name)
             .NotEmpty()
@@ -19,8 +18,8 @@ public sealed class CreateCashAccountCommandValidator
             .MaximumLength(150)
             .WithErrorCode("cash_account_name_max_length");
 
-        RuleFor(x => x.Data.AccountId)
+        RuleFor(x => x.Data.CurrencyId)
             .NotEmpty()
-            .WithErrorCode("account_id_required");
+            .WithErrorCode("currency_id_required");
     }
 }

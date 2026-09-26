@@ -1,64 +1,8 @@
-using MediatR;
-using OAS.Application.Abstractions.Numbering;
-using OAS.Application.Abstractions.Persistence;
-using OAS.Application.Abstractions.Persistence.Specifications;
-using OAS.Application.Common.Exceptions;
-using OAS.Domain.Accounting.Entities;
-using DomainPaymentMethod = OAS.Domain.Accounting.Enums.PaymentMethod;
-using DomainReceiptPartyType = OAS.Domain.Accounting.Enums.ReceiptPartyType;
-using DomainReceiptVoucherStatus = OAS.Domain.Accounting.Enums.ReceiptVoucherStatus;
-
+using MediatR;using OAS.Application.Abstractions.Numbering;using OAS.Application.Abstractions.Persistence;using OAS.Application.Abstractions.Persistence.Specifications;using OAS.Application.Accounting.Abstractions;using OAS.Application.Common.Exceptions;using OAS.Contracts.Accounting.ReceiptVouchers;using OAS.Domain.Accounting.Entities;using DomainPartyType=OAS.Domain.Accounting.Enums.SettlementPartyType;using DomainPaymentMethod=OAS.Domain.Accounting.Enums.PaymentMethod;using DomainRateType=OAS.Domain.Accounting.Enums.ExchangeRateType;
 namespace OAS.Application.Accounting.ReceiptVouchers.Commands.CreateReceiptVoucher;
-
-public sealed class CreateReceiptVoucherCommandHandler(
-    IRepository<ReceiptVoucher, Guid> repository,
-    IReadRepository<Customer, Guid> customers,
-    ISequenceNumberGenerator sequenceNumberGenerator)
-    : IRequestHandler<CreateReceiptVoucherCommand, Guid>
+public sealed class CreateReceiptVoucherCommandHandler(IRepository<ReceiptVoucher,Guid> repository,ISequenceNumberGenerator sequenceNumberGenerator,IVoucherSettlementResolver settlements,IReadRepository<AccountingSettings,Guid> settingsRepository,IReadRepository<Currency,Guid> currencies):IRequestHandler<CreateReceiptVoucherCommand,Guid>
 {
-    public async Task<Guid> Handle(CreateReceiptVoucherCommand request, CancellationToken cancellationToken)
-    {
-        var data = request.Data;
-        var voucherNumber = await ResolveNumberAsync(data.VoucherNumber, data.VoucherDate.Year, cancellationToken);
-        if ((DomainReceiptPartyType)(int)data.PartyType == DomainReceiptPartyType.Customer)
-        {
-            if (!data.CustomerId.HasValue) throw new ConflictException("receipt_customer_required", "Customer is required for a customer receipt.");
-            var customer = await customers.GetByIdAsync(data.CustomerId.Value, cancellationToken);
-            if (customer is null) throw new NotFoundException(nameof(Customer), data.CustomerId.Value);
-            if (!customer.IsActive) throw new ConflictException("receipt_customer_inactive", "The selected customer is inactive.");
-        }
-
-        var voucherId = Guid.NewGuid();
-        var voucher = ReceiptVoucher.Create(voucherId, voucherNumber, data.VoucherDate,
-            (DomainReceiptPartyType)(int)data.PartyType, data.CustomerId, data.ReceivedFrom,
-            (DomainPaymentMethod)(int)data.PaymentMethod, data.CashAccountId, data.BankAccountId,
-            data.TotalAmount, DomainReceiptVoucherStatus.Draft, data.Description, null);
-        var lineNumber = 1;
-        foreach (var lineRequest in data.Lines)
-            voucher.AddLine(ReceiptVoucherLine.Create(Guid.NewGuid(), voucherId, lineNumber++, lineRequest.AccountId,
-                lineRequest.Amount, lineRequest.ReferenceType, lineRequest.ReferenceId, lineRequest.Description));
-        await repository.AddAsync(voucher, cancellationToken);
-        return voucher.Id;
-    }
-
-    private async Task<string> ResolveNumberAsync(string? requested, int year, CancellationToken ct)
-    {
-        var number = requested?.Trim();
-        if (!string.IsNullOrEmpty(number) && !number.StartsWith($"RV-{year:0000}-", StringComparison.OrdinalIgnoreCase))
-            throw new ConflictException("receipt_voucher_number_period_mismatch", "Reserved receipt voucher number does not match the voucher year.");
-        if (string.IsNullOrEmpty(number))
-        {
-            for (var attempt = 0; attempt < 100; attempt++)
-            {
-                var sequence = await sequenceNumberGenerator.NextAsync($"ReceiptVoucher-{year}", ct);
-                number = $"RV-{year:0000}-{sequence:000000}";
-                if (!await ExistsAsync(number, ct)) break;
-            }
-        }
-        if (string.IsNullOrEmpty(number) || await ExistsAsync(number, ct))
-            throw new ConflictException("receipt_voucher_number_duplicate", "Receipt voucher number is already in use.");
-        return number;
-    }
-    private async Task<bool> ExistsAsync(string number, CancellationToken ct) =>
-        await repository.CountAsync(new Specification<ReceiptVoucher>().Where(x => x.VoucherNumber == number), ct) > 0;
+ public async Task<Guid> Handle(CreateReceiptVoucherCommand request,CancellationToken ct){var d=request.Data;var number=await ResolveNumberAsync(d.VoucherNumber,d.VoucherDate.Year,ct);var settings=await settingsRepository.GetByIdAsync(AccountingSettings.SingletonId,ct)??throw new ConflictException("accounting_settings_required","Accounting settings and base currency must be configured first.");var baseCurrency=await currencies.GetByIdAsync(settings.BaseCurrencyId,ct)??throw new ConflictException("base_currency_missing","Configured base currency does not exist.");var resolved=new List<(CreateReceiptVoucherLineRequest Request,VoucherSettlementResolution Value)>();foreach(var line in d.Lines){var x=await settlements.ResolveAsync(d.VoucherDate,(DomainPartyType)(byte)line.PartyType,line.CustomerId,line.SupplierId,line.EmployeeId,line.PartyName,line.CounterpartyAccountId,(DomainPaymentMethod)(byte)line.PaymentMethod,line.CashAccountId,line.BankAccountId,line.SettlementAccountId,line.CurrencyId,line.Amount,line.ExchangeRate,(DomainRateType)(byte)line.ExchangeRateType,line.ReferenceNumber,ct);resolved.Add((line,x));}var total=resolved.Sum(x=>x.Value.BaseAmount);if(total<=0)throw new ConflictException("receipt_voucher_total_invalid","Receipt voucher must have a positive base total.");var id=Guid.NewGuid();var voucher=ReceiptVoucher.CreateSettlementDocument(id,number,d.VoucherDate,baseCurrency.Id,baseCurrency.Code,baseCurrency.DecimalPlaces,total,d.Description);var n=1;foreach(var item in resolved){var r=item.Request;var x=item.Value;voucher.AddLine(ReceiptVoucherLine.CreateSettlement(Guid.NewGuid(),id,n++,x.PartyType,x.CustomerId,x.SupplierId,x.EmployeeId,x.PartyNameSnapshot,x.CounterpartyAccountId,x.PaymentMethod,x.CashAccountId,x.BankAccountId,x.SettlementAccountId,x.CurrencyId,x.CurrencyCode,x.CurrencySymbol,x.CurrencyDecimalPlaces,x.Amount,x.ExchangeRate,x.ExchangeRateDate,x.ExchangeRateType,x.ExchangeRateSource,x.BaseAmount,r.ReferenceNumber,r.ReferenceDate,r.ReferenceType,r.ReferenceId,r.Description));}await repository.AddAsync(voucher,ct);return id;}
+ private async Task<string> ResolveNumberAsync(string? requested,int year,CancellationToken ct){var number=requested?.Trim();if(!string.IsNullOrEmpty(number)&&!number.StartsWith($"RV-{year:0000}-",StringComparison.OrdinalIgnoreCase))throw new ConflictException("receipt_voucher_number_period_mismatch","Reserved receipt voucher number does not match the voucher year.");if(string.IsNullOrEmpty(number)){for(var i=0;i<100;i++){number=$"RV-{year:0000}-{await sequenceNumberGenerator.NextAsync($"ReceiptVoucher-{year}",ct):000000}";if(!await ExistsAsync(number,ct))break;}}if(string.IsNullOrEmpty(number)||await ExistsAsync(number,ct))throw new ConflictException("receipt_voucher_number_duplicate","Receipt voucher number is already in use.");return number;}
+ private Task<long> CountAsync(string number,CancellationToken ct)=>repository.CountAsync(new Specification<ReceiptVoucher>().Where(x=>x.VoucherNumber==number),ct);private async Task<bool> ExistsAsync(string number,CancellationToken ct)=>await CountAsync(number,ct)>0;
 }

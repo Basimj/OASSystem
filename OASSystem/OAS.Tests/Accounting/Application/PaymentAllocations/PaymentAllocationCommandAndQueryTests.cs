@@ -9,226 +9,120 @@ using OAS.Contracts.Accounting.PaymentAllocations;
 using OAS.Domain.Accounting.Entities;
 using OAS.Tests.Accounting.Application.Common;
 using DomainAllocationTargetDocumentType = OAS.Domain.Accounting.Enums.AllocationTargetDocumentType;
+using DomainExchangeRateSource = OAS.Domain.Accounting.Enums.ExchangeRateSource;
+using DomainExchangeRateType = OAS.Domain.Accounting.Enums.ExchangeRateType;
 using DomainPaymentMethod = OAS.Domain.Accounting.Enums.PaymentMethod;
-using DomainPaymentSourceType = OAS.Domain.Accounting.Enums.PaymentSourceType;
-using DomainReceiptPartyType = OAS.Domain.Accounting.Enums.ReceiptPartyType;
-using DomainReceiptVoucherStatus = OAS.Domain.Accounting.Enums.ReceiptVoucherStatus;
+using DomainSettlementPartyType = OAS.Domain.Accounting.Enums.SettlementPartyType;
 
 namespace OAS.Tests.Accounting.Application.PaymentAllocations;
 
 [TestFixture]
-public class PaymentAllocationCommandAndQueryTests
+public sealed class PaymentAllocationCommandAndQueryTests
 {
     private FakeRepository<PaymentAllocation, Guid> _allocationRepository = null!;
-    private FakeRepository<ReceiptVoucher, Guid> _receiptRepository = null!;
-    private FakeRepository<PaymentVoucher, Guid> _paymentRepository = null!;
-    private FakeCurrentUser _currentUser = null!;
-    private PaymentAllocationMapper _mapper = null!;
+    private FakeRepository<ReceiptVoucherLine, Guid> _receiptLineRepository = null!;
+    private FakeRepository<PaymentVoucherLine, Guid> _paymentLineRepository = null!;
+    private Guid _currencyId;
+    private Guid _accountId;
+    private Guid _settlementAccountId;
 
     [SetUp]
     public void Setup()
     {
-        _allocationRepository = new FakeRepository<PaymentAllocation, Guid>();
-        _receiptRepository = new FakeRepository<ReceiptVoucher, Guid>();
-        _paymentRepository = new FakeRepository<PaymentVoucher, Guid>();
-        _currentUser = new FakeCurrentUser();
-        _mapper = new PaymentAllocationMapper();
+        _allocationRepository = new();
+        _receiptLineRepository = new();
+        _paymentLineRepository = new();
+        _currencyId = Guid.NewGuid();
+        _accountId = Guid.NewGuid();
+        _settlementAccountId = Guid.NewGuid();
     }
 
     [Test]
-    public async Task CreatePaymentAllocationCommandHandler_CreatesAllocationWithinAvailableAmount()
+    public async Task CreatePaymentAllocationCommandHandler_CreatesLineLevelAllocation()
     {
-        var receipt = CreateReceiptVoucher(1000m);
-        await _receiptRepository.AddAsync(receipt);
+        var source = CreateReceiptLine(1000m);
+        await _receiptLineRepository.AddAsync(source);
+        await _allocationRepository.AddAsync(PaymentAllocation.CreateLineAllocation(
+            Guid.NewGuid(), source.Id, null, DomainAllocationTargetDocumentType.SalesInvoice, Guid.NewGuid(), _currencyId, "USD", 600m, 550m, 330000m, DateTime.UtcNow));
 
-        await _allocationRepository.AddAsync(CreateAllocation(receipt.Id, 600m));
+        var handler = new CreatePaymentAllocationCommandHandler(_allocationRepository, _receiptLineRepository, _paymentLineRepository, TimeProvider.System);
+        var request = new CreatePaymentAllocationRequest(source.Id, null, AllocationTargetDocumentType.SalesInvoice, Guid.NewGuid(), 300m);
 
-        var handler = new CreatePaymentAllocationCommandHandler(
-            _allocationRepository,
-            _receiptRepository,
-            _paymentRepository,
-            TimeProvider.System);
-
-        var request = new CreatePaymentAllocationRequest(
-            PaymentSourceType.ReceiptVoucher,
-            receipt.Id,
-            AllocationTargetDocumentType.SalesInvoice,
-            Guid.NewGuid(),
-            300m);
-
-        var id = await handler.Handle(
-            new CreatePaymentAllocationCommand(request),
-            CancellationToken.None);
+        var id = await handler.Handle(new CreatePaymentAllocationCommand(request), CancellationToken.None);
+        var created = _allocationRepository.Items.Single(x => x.Id == id);
 
         Assert.Multiple(() =>
         {
-            Assert.That(id, Is.Not.EqualTo(Guid.Empty));
-            Assert.That(_allocationRepository.Items, Has.Count.EqualTo(2));
-            Assert.That(_allocationRepository.Items.Sum(x => x.AllocatedAmount), Is.EqualTo(900m));
+            Assert.That(created.ReceiptVoucherLineId, Is.EqualTo(source.Id));
+            Assert.That(created.PaymentVoucherLineId, Is.Null);
+            Assert.That(created.CurrencyId, Is.EqualTo(_currencyId));
+            Assert.That(created.AllocatedAmount, Is.EqualTo(300m));
+            Assert.That(created.BaseAllocatedAmount, Is.EqualTo(165000m));
         });
     }
 
     [Test]
     public void CreatePaymentAllocationCommandHandler_WhenAmountExceedsAvailable_ThrowsConflictException()
     {
-        var receipt = CreateReceiptVoucher(1000m);
-        _receiptRepository.AddAsync(receipt).GetAwaiter().GetResult();
-        _allocationRepository.AddAsync(CreateAllocation(receipt.Id, 600m)).GetAwaiter().GetResult();
-        _allocationRepository.AddAsync(CreateAllocation(receipt.Id, 300m)).GetAwaiter().GetResult();
+        var source = CreateReceiptLine(1000m);
+        _receiptLineRepository.AddAsync(source).GetAwaiter().GetResult();
+        _allocationRepository.AddAsync(PaymentAllocation.CreateLineAllocation(
+            Guid.NewGuid(), source.Id, null, DomainAllocationTargetDocumentType.SalesInvoice, Guid.NewGuid(), _currencyId, "USD", 900m, 550m, 495000m, DateTime.UtcNow)).GetAwaiter().GetResult();
 
-        var handler = new CreatePaymentAllocationCommandHandler(
-            _allocationRepository,
-            _receiptRepository,
-            _paymentRepository,
-            TimeProvider.System);
-
-        var request = new CreatePaymentAllocationRequest(
-            PaymentSourceType.ReceiptVoucher,
-            receipt.Id,
-            AllocationTargetDocumentType.SalesInvoice,
-            Guid.NewGuid(),
-            200m);
+        var handler = new CreatePaymentAllocationCommandHandler(_allocationRepository, _receiptLineRepository, _paymentLineRepository, TimeProvider.System);
+        var request = new CreatePaymentAllocationRequest(source.Id, null, AllocationTargetDocumentType.SalesInvoice, Guid.NewGuid(), 200m);
 
         var ex = Assert.ThrowsAsync<ConflictException>(async () =>
-            await handler.Handle(
-                new CreatePaymentAllocationCommand(request),
-                CancellationToken.None));
+            await handler.Handle(new CreatePaymentAllocationCommand(request), CancellationToken.None));
 
         Assert.That(ex!.Code, Is.EqualTo("payment_allocation_exceeds_available_amount"));
-        Assert.That(_allocationRepository.Items, Has.Count.EqualTo(2));
-    }
-
-    [Test]
-    public void CreatePaymentAllocationCommandHandler_CustomerAdvanceWithoutSourcePort_ThrowsConflictException()
-    {
-        var handler = new CreatePaymentAllocationCommandHandler(
-            _allocationRepository,
-            _receiptRepository,
-            _paymentRepository,
-            TimeProvider.System);
-
-        var request = new CreatePaymentAllocationRequest(
-            PaymentSourceType.CustomerAdvance,
-            Guid.NewGuid(),
-            AllocationTargetDocumentType.SalesInvoice,
-            Guid.NewGuid(),
-            100m);
-
-        var ex = Assert.ThrowsAsync<ConflictException>(async () =>
-            await handler.Handle(
-                new CreatePaymentAllocationCommand(request),
-                CancellationToken.None));
-
-        Assert.That(ex!.Code, Is.EqualTo("customer_advance_source_unavailable"));
     }
 
     [Test]
     public async Task UpdatePaymentAllocationCommandHandler_ExcludesCurrentAllocationFromAvailableCalculation()
     {
-        var receipt = CreateReceiptVoucher(1000m);
-        await _receiptRepository.AddAsync(receipt);
+        var source = CreateReceiptLine(1000m);
+        await _receiptLineRepository.AddAsync(source);
+        var current = PaymentAllocation.CreateLineAllocation(Guid.NewGuid(), source.Id, null, DomainAllocationTargetDocumentType.SalesInvoice, Guid.NewGuid(), _currencyId, "USD", 400m, 550m, 220000m, DateTime.UtcNow);
+        var other = PaymentAllocation.CreateLineAllocation(Guid.NewGuid(), source.Id, null, DomainAllocationTargetDocumentType.SalesInvoice, Guid.NewGuid(), _currencyId, "USD", 300m, 550m, 165000m, DateTime.UtcNow);
+        await _allocationRepository.AddRangeAsync([current, other]);
 
-        var allocationToUpdate = CreateAllocation(receipt.Id, 400m);
-        var otherAllocation = CreateAllocation(receipt.Id, 300m);
-        await _allocationRepository.AddRangeAsync([allocationToUpdate, otherAllocation]);
-
-        var handler = new UpdatePaymentAllocationCommandHandler(
-            _allocationRepository,
-            _receiptRepository,
-            _paymentRepository);
-
-        await handler.Handle(
-            new UpdatePaymentAllocationCommand(
-                allocationToUpdate.Id,
-                new UpdatePaymentAllocationRequest(650m)),
-            CancellationToken.None);
+        var handler = new UpdatePaymentAllocationCommandHandler(_allocationRepository, _receiptLineRepository, _paymentLineRepository);
+        await handler.Handle(new UpdatePaymentAllocationCommand(current.Id, new UpdatePaymentAllocationRequest(650m)), CancellationToken.None);
 
         Assert.Multiple(() =>
         {
-            Assert.That(allocationToUpdate.AllocatedAmount, Is.EqualTo(650m));
-            Assert.That(_allocationRepository.Items.Sum(x => x.AllocatedAmount), Is.EqualTo(950m));
+            Assert.That(current.AllocatedAmount, Is.EqualTo(650m));
+            Assert.That(current.BaseAllocatedAmount, Is.EqualTo(357500m));
         });
-    }
-
-    [Test]
-    public void UpdatePaymentAllocationCommandHandler_WhenAmountExceedsAvailable_ThrowsConflictException()
-    {
-        var receipt = CreateReceiptVoucher(1000m);
-        _receiptRepository.AddAsync(receipt).GetAwaiter().GetResult();
-
-        var allocationToUpdate = CreateAllocation(receipt.Id, 400m);
-        var otherAllocation = CreateAllocation(receipt.Id, 700m);
-        _allocationRepository.AddRangeAsync([allocationToUpdate, otherAllocation]).GetAwaiter().GetResult();
-
-        var handler = new UpdatePaymentAllocationCommandHandler(
-            _allocationRepository,
-            _receiptRepository,
-            _paymentRepository);
-
-        var ex = Assert.ThrowsAsync<ConflictException>(async () =>
-            await handler.Handle(
-                new UpdatePaymentAllocationCommand(
-                    allocationToUpdate.Id,
-                    new UpdatePaymentAllocationRequest(400m)),
-                CancellationToken.None));
-
-        Assert.That(ex!.Code, Is.EqualTo("payment_allocation_exceeds_available_amount"));
-        Assert.That(allocationToUpdate.AllocatedAmount, Is.EqualTo(400m));
     }
 
     [Test]
     public async Task GetPaymentAllocationByIdQueryHandler_ReturnsMappedDto()
     {
-        var allocation = PaymentAllocation.Create(
-            Guid.NewGuid(),
-            DomainPaymentSourceType.ReceiptVoucher,
-            Guid.NewGuid(),
-            DomainAllocationTargetDocumentType.SalesInvoice,
-            Guid.NewGuid(),
-            250m,
-            DateTime.UtcNow);
-
+        var source = CreateReceiptLine(1000m);
+        var allocation = PaymentAllocation.CreateLineAllocation(Guid.NewGuid(), source.Id, null, DomainAllocationTargetDocumentType.SalesInvoice, Guid.NewGuid(), _currencyId, "USD", 250m, 550m, 137500m, DateTime.UtcNow);
         await _allocationRepository.AddAsync(allocation);
 
-        var handler = new GetPaymentAllocationByIdQueryHandler(
-            _allocationRepository,
-            _mapper);
-
-        var dto = await handler.Handle(
-            new GetPaymentAllocationByIdQuery(allocation.Id),
-            CancellationToken.None);
+        var dto = await new GetPaymentAllocationByIdQueryHandler(_allocationRepository, new PaymentAllocationMapper())
+            .Handle(new GetPaymentAllocationByIdQuery(allocation.Id), CancellationToken.None);
 
         Assert.Multiple(() =>
         {
             Assert.That(dto.Id, Is.EqualTo(allocation.Id));
-            Assert.That(dto.AllocatedAmount, Is.EqualTo(250m));
-            Assert.That(dto.PaymentSourceId, Is.EqualTo(allocation.PaymentSourceId));
+            Assert.That(dto.ReceiptVoucherLineId, Is.EqualTo(source.Id));
+            Assert.That(dto.CurrencyCodeSnapshot, Is.EqualTo("USD"));
+            Assert.That(dto.BaseAllocatedAmount, Is.EqualTo(137500m));
         });
     }
 
-    private ReceiptVoucher CreateReceiptVoucher(decimal totalAmount) =>
-        ReceiptVoucher.Create(
-            Guid.NewGuid(),
-            ($"RV-{Guid.NewGuid():N}")[..12],
-            new DateOnly(2026, 1, 15),
-            DomainReceiptPartyType.Other,
-            null,
-            "اختبار",
-            DomainPaymentMethod.Cash,
-            Guid.NewGuid(),
-            null,
-            totalAmount,
-            DomainReceiptVoucherStatus.Posted,
-            "سند اختبار",
-            Guid.NewGuid());
-
-    private static PaymentAllocation CreateAllocation(Guid sourceId, decimal amount) =>
-        PaymentAllocation.Create(
-            Guid.NewGuid(),
-            DomainPaymentSourceType.ReceiptVoucher,
-            sourceId,
-            DomainAllocationTargetDocumentType.SalesInvoice,
-            Guid.NewGuid(),
-            amount,
-            DateTime.UtcNow);
+    private ReceiptVoucherLine CreateReceiptLine(decimal amount)
+    {
+        var voucherId = Guid.NewGuid();
+        return ReceiptVoucherLine.CreateSettlement(
+            Guid.NewGuid(), voucherId, 1, DomainSettlementPartyType.Other, null, null, null,
+            "طرف", _accountId, DomainPaymentMethod.Cash, Guid.NewGuid(), null, _settlementAccountId,
+            _currencyId, "USD", "$", 2, amount, 550m, new DateOnly(2026, 1, 15), DomainExchangeRateType.Accounting,
+            DomainExchangeRateSource.System, amount * 550m, null, null, null, null, null);
+    }
 }

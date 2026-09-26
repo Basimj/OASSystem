@@ -132,4 +132,29 @@ public static class AccountingPermissions
         public const string Approve = "accounting.expenses.approve";
         public const string Post = "accounting.expenses.post";
     }
+
+    public static class Currencies
+    {
+        public const string View = "accounting.currencies.view";
+        public const string Manage = "accounting.currencies.manage";
+    }
+
+    public static class ExchangeRates
+    {
+        public const string View = "accounting.exchange_rates.view";
+        public const string Manage = "accounting.exchange_rates.manage";
+        public const string Override = "accounting.exchange_rates.override";
+    }
+
+    public static class Settings
+    {
+        public const string View = "accounting.settings.view";
+        public const string Manage = "accounting.settings.manage";
+    }
+
+    public static class EmployeeAccounts
+    {
+        public const string View = "accounting.employee_accounts.view";
+        public const string Manage = "accounting.employee_accounts.manage";
+    }
 }

@@ -1,14 +1,12 @@
 @namespace OAS.Client.Accounting.Components
-@using OAS.Contracts.Accounting.PaymentVouchers
 @using OAS.Contracts.Accounting.Enums
 @using OAS.Client.Accounting.Common
-@using OAS.UiLib.Components.Accounting.Workspace
 @using OAS.UiLib.Components.Accounting.Vouchers
+@using OAS.UiLib.Components.Accounting.Workspace
 @using OAS.UiLib.Components.Inputs
 @using OAS.UiLib.Core.Models
 
 <UiAccountingEditorSurface>
-
     @if (!IsNew)
     {
         <UiAccountingFormSection Title="حالة السند والترحيل"
@@ -26,12 +24,10 @@
         </UiAccountingFormSection>
     }
 
-    <UiAccountingFormSection Title="بيانات سند الصرف الأساسية"
-                             Subtitle="رقم السند، التاريخ، والمبلغ المدفوع"
+    <UiAccountingFormSection Title="بيانات سند الصرف"
+                             Subtitle="الرأس يحتوي بيانات المستند فقط، بينما الطرف وطريقة الدفع والعملة موجودة على مستوى كل سطر."
                              IconCssClass="fa-solid fa-money-bill-transfer">
-
         <UiAccountingFormGrid Columns="3">
-
             <UiInputText Label="رقم السند"
                          Value="@Model.VoucherNumber"
                          ValueExpression="@(() => Model.VoucherNumber)"
@@ -48,442 +44,113 @@
                          Disabled="@(!IsEditable)"
                          Size="ControlSize.Small" />
 
-            <UiAccountingNumberField Label="المبلغ المدفوع"
-                                     Value="@Model.TotalAmount"
-                                     ValueChanged="OnTotalAmountChanged"
-                                     Min="0.01"
-                                     Tone="@UiAccountingNumberField.NumberTone.Danger"
-                                     Disabled="@(!IsEditable)" />
-
-        </UiAccountingFormGrid>
-
-    </UiAccountingFormSection>
-
-
-    <UiAccountingFormSection Title="الجهة المستفيدة (الطرف الثاني)"
-                             Subtitle="مورد، موظف، أو جهة أخرى"
-                             IconCssClass="fa-solid fa-user-tag">
-
-        <UiAccountingFormGrid Columns="2">
-
-            <UiSelect Label="نوع المستفيد"
-                      Value="@Model.PartyTypeValue"
-                      ValueExpression="@(() => Model.PartyTypeValue)"
-                      ValueChanged="OnPartyTypeChanged"
-                      Options="@AccountingArabicPresenter.PaymentPartyTypeOptions"
-                      Disabled="@(!IsEditable)"
-                      Size="ControlSize.Small" />
-
-            @if (Model.PartyType == PaymentPartyType.Supplier)
-            {
-                @if (SupplierSearchAsync is not null)
-                {
-                    <UiLookup Label="المورد"
-                          Value='@Model.SupplierId?.ToString("D")'
-                          ValueChanged="OnSupplierChanged"
-                          SelectedItem="@SupplierLookupItem"
-                          SearchAsync="SupplierSearchAsync"
-                          Placeholder="ابحث باسم أو كود المورد..."
-                          Disabled="@(!IsEditable)"
-                          Required="true"
-                          MinimumSearchLength="0"
-                          DebounceMilliseconds="250" />
-                }
-                else
-                {
-                    <UiInputText Label="معرف المورد (GUID)"
-                                 Value="@Model.SupplierIdText"
-                                 ValueChanged="OnSupplierIdTextChanged"
-                                 Placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                                 Disabled="@(!IsEditable)" />
-                }
-            }
-            else
-            {
-                <UiInputText Label="اسم المستفيد"
-                             Value="@Model.BeneficiaryName"
-                             ValueExpression="@(() => Model.BeneficiaryName)"
-                             ValueChanged="OnBeneficiaryNameChanged"
-                             Required="true"
-                             Disabled="@(!IsEditable)"
-                             Placeholder="اكتب اسم الشخص أو المستفيد..."
-                             Size="ControlSize.Small" />
-            }
-
-        </UiAccountingFormGrid>
-
-    </UiAccountingFormSection>
-
-
-    <UiAccountingFormSection Title="طريقة الصرف وحساب الدفع"
-                             Subtitle="نقداً عبر الصندوق أو تحويل/شيك عبر البنك"
-                             IconCssClass="fa-solid fa-credit-card">
-
-        <UiAccountingFormGrid Columns="2">
-
-            <UiSelect Label="طريقة الدفع"
-                      Value="@Model.PaymentMethodValue"
-                      ValueExpression="@(() => Model.PaymentMethodValue)"
-                      ValueChanged="OnPaymentMethodChanged"
-                      Options="@AccountingArabicPresenter.PaymentMethodOptions"
-                      Disabled="@(!IsEditable)"
-                      Size="ControlSize.Small" />
-
-            @if (Model.PaymentMethod == PaymentMethod.Cash)
-            {
-                <UiLookup Label="الصندوق / الخزينة النقدية"
-                          Value='@Model.CashAccountId?.ToString("D")'
-                          ValueChanged="OnCashAccountChanged"
-                          SelectedItem="@CashAccountLookupItem"
-                          SearchAsync="CashAccountSearchAsync"
-                          Placeholder="اختر الصندوق..."
-                          Disabled="@(!IsEditable)"
-                          Required="true"
-                          MinimumSearchLength="0"
-                          DebounceMilliseconds="250" />
-            }
-            else
-            {
-                <UiLookup Label="الحساب البنكي"
-                          Value='@Model.BankAccountId?.ToString("D")'
-                          ValueChanged="OnBankAccountChanged"
-                          SelectedItem="@BankAccountLookupItem"
-                          SearchAsync="BankAccountSearchAsync"
-                          Placeholder="اختر الحساب البنكي..."
-                          Disabled="@(!IsEditable)"
-                          Required="true"
-                          MinimumSearchLength="0"
-                          DebounceMilliseconds="250" />
-            }
-
+            <UiAccountingReadOnlyValue Label="الإجمالي بالعملة الأساسية"
+                                       Value="@FormatBaseTotal()"
+                                       Tone="@UiAccountingReadOnlyValue.ValueTone.Primary" />
         </UiAccountingFormGrid>
 
         <UiAccountingStack>
-
-            <UiInputText Label="البيان / الوصف"
+            <UiInputText Label="البيان العام"
                          Value="@Model.Description"
                          ValueExpression="@(() => Model.Description)"
                          ValueChanged="OnDescriptionChanged"
                          Disabled="@(!IsEditable)"
-                         Placeholder="شرح سبب الصرف أو أرقام الفواتير والمطالبات..." />
-
+                         Placeholder="بيان عام للسند..." />
         </UiAccountingStack>
 
+        @if (!string.IsNullOrWhiteSpace(Model.BaseCurrencyCode))
+        {
+            <UiAccountingReadOnlyValue Label="العملة الأساسية"
+                                       Value="@Model.BaseCurrencyCode"
+                                       Tone="@UiAccountingReadOnlyValue.ValueTone.Default" />
+        }
     </UiAccountingFormSection>
 
-    <UiAccountingFormSection Title="تفاصيل سند الصرف"
-                             Subtitle="الحسابات المقابلة والمراجع المرتبطة بالسند"
-                             IconCssClass="fa-solid fa-list-ol">
-        <UiVoucherLinesEditor Lines="@Model.Lines"
-                              IsEditable="@IsEditable"
-                              AccountSearchAsync="@AccountSearchAsync"
-                              OnLinesChanged="OnChanged" />
+    <UiAccountingFormSection Title="أسطر الصرف"
+                             Subtitle="يمكن للسند الواحد أن يحتوي عدة أطراف وطرق دفع وصناديق/بنوك وعملات."
+                             IconCssClass="fa-solid fa-list-check">
+        <UiVoucherSettlementLinesEditor Lines="@Model.Lines"
+                                        IsEditable="@IsEditable"
+                                        PartyTypeOptions="@AccountingArabicPresenter.SettlementPartyTypeOptions"
+                                        PaymentMethodOptions="@AccountingArabicPresenter.PaymentMethodOptions"
+                                        CustomerSearchAsync="CustomerSearchAsync"
+                                        SupplierSearchAsync="SupplierSearchAsync"
+                                        EmployeeSearchAsync="EmployeeSearchAsync"
+                                        CashAccountSearchAsync="CashAccountSearchAsync"
+                                        BankAccountSearchAsync="BankAccountSearchAsync"
+                                        CurrencySearchAsync="CurrencySearchAsync"
+                                        AccountSearchAsync="AccountSearchAsync"
+                                        EffectiveRateAsync="EffectiveRateAsync"
+                                        RateDate="@Model.VoucherDate"
+                                        OnLinesChanged="OnChanged" />
     </UiAccountingFormSection>
-
 </UiAccountingEditorSurface>
 
-
 @code {
-
     public sealed class FormModel
     {
         public string VoucherNumber { get; set; } = string.Empty;
-
-
-        public DateOnly VoucherDate { get; set; }
-            = DateOnly.FromDateTime(DateTime.Today);
-
-
+        public DateOnly VoucherDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
         public DateOnly? VoucherDateInput
         {
             get => VoucherDate;
-
-            set
-            {
-                if (value.HasValue)
-                {
-                    VoucherDate = value.Value;
-                }
-            }
+            set { if (value.HasValue) VoucherDate = value.Value; }
         }
-
-
-        public PaymentPartyType PartyType { get; set; }
-            = PaymentPartyType.Supplier;
-
-
-        public string PartyTypeValue
-        {
-            get => PartyType.ToString();
-
-            set
-            {
-                if (Enum.TryParse<PaymentPartyType>(
-                        value,
-                        out var result))
-                {
-                    PartyType = result;
-                }
-            }
-        }
-
-
-        public Guid? SupplierId { get; set; }
-
-        public string SupplierIdText { get => SupplierId?.ToString("D") ?? string.Empty; set => SupplierId = Guid.TryParse(value, out var id) ? id : null; }
-
-
-        public string? BeneficiaryName { get; set; }
-
-
-        public Guid? CashAccountId { get; set; }
-
-
-        public Guid? BankAccountId { get; set; }
-
-
-        public PaymentMethod PaymentMethod { get; set; }
-            = PaymentMethod.Cash;
-
-
-        public string PaymentMethodValue
-        {
-            get => PaymentMethod.ToString();
-
-            set
-            {
-                if (Enum.TryParse<PaymentMethod>(
-                        value,
-                        out var result))
-                {
-                    PaymentMethod = result;
-                }
-            }
-        }
-
-
-        public decimal TotalAmount { get; set; }
-
-
-        public string Description { get; set; }
-            = string.Empty;
-
-
-        public PaymentVoucherStatus Status { get; set; }
-            = PaymentVoucherStatus.Draft;
-
+        public Guid? BaseCurrencyId { get; set; }
+        public string? BaseCurrencyCode { get; set; }
+        public byte? BaseCurrencyDecimalPlaces { get; set; }
+        public decimal? BaseTotalAmount { get; set; }
+        public string Description { get; set; } = string.Empty;
+        public PaymentVoucherStatus Status { get; set; } = PaymentVoucherStatus.Draft;
         public Guid? JournalEntryId { get; set; }
-
         public string RowVersion { get; set; } = string.Empty;
-
-        public List<UiVoucherLinesEditor.EditableVoucherLine> Lines { get; set; } = [];
+        public List<UiVoucherSettlementLinesEditor.EditableSettlementLine> Lines { get; set; } = [];
     }
 
+    [Parameter] public FormModel Model { get; set; } = new();
+    [Parameter] public bool IsEditable { get; set; }
+    [Parameter] public bool IsNew { get; set; }
 
-    [Parameter]
-    public FormModel Model { get; set; } = new();
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CustomerSearchAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SupplierSearchAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? EmployeeSearchAsync { get; set; }
+    [Parameter] public Func<Guid?, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CashAccountSearchAsync { get; set; }
+    [Parameter] public Func<Guid?, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? BankAccountSearchAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CurrencySearchAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? AccountSearchAsync { get; set; }
+    [Parameter] public Func<Guid, DateOnly, CancellationToken, Task<decimal?>>? EffectiveRateAsync { get; set; }
+    [Parameter] public EventCallback OnModelChanged { get; set; }
 
+    private Task OnChanged() => OnModelChanged.InvokeAsync();
 
-    [Parameter]
-    public bool IsEditable { get; set; }
-
-
-    [Parameter]
-    public bool IsNew { get; set; }
-
-
-    [Parameter]
-    public UiLookupItem? SupplierLookupItem { get; set; }
-
-
-    [Parameter]
-    public UiLookupItem? CashAccountLookupItem { get; set; }
-
-
-    [Parameter]
-    public UiLookupItem? BankAccountLookupItem { get; set; }
-
-
-    [Parameter]
-    public Func<
-        string,
-        CancellationToken,
-        Task<IReadOnlyList<UiLookupItem>>>?
-        SupplierSearchAsync
-    { get; set; }
-
-
-    [Parameter]
-    public Func<
-        string,
-        CancellationToken,
-        Task<IReadOnlyList<UiLookupItem>>>?
-        CashAccountSearchAsync
-    { get; set; }
-
-
-    [Parameter]
-    public Func<
-        string,
-        CancellationToken,
-        Task<IReadOnlyList<UiLookupItem>>>?
-        BankAccountSearchAsync
-    { get; set; }
-
-    [Parameter]
-    public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? AccountSearchAsync { get; set; }
-
-
-    [Parameter]
-    public EventCallback OnModelChanged { get; set; }
-
-
-    private Task OnChanged()
-        => OnModelChanged.InvokeAsync();
-
-
-    private async Task OnVoucherDateChanged(
-        DateOnly? value)
+    private async Task OnVoucherDateChanged(DateOnly? value)
     {
         if (value.HasValue)
         {
             Model.VoucherDate = value.Value;
+            foreach (var line in Model.Lines)
+            {
+                if (line.ExchangeRateSource != UiVoucherSettlementLinesEditor.ExchangeRateSourceKind.Manual)
+                {
+                    line.ResolvedExchangeRate = null;
+                    line.ExchangeRateDate = null;
+                    line.BaseAmount = null;
+                    if (line.CurrencyId is Guid currencyId && EffectiveRateAsync is not null)
+                        line.ResolvedExchangeRate = await EffectiveRateAsync(currencyId, Model.VoucherDate, CancellationToken.None);
+                }
+            }
         }
-
         await OnChanged();
     }
 
-
-    private async Task OnTotalAmountChanged(decimal amount)
-    {
-        Model.TotalAmount = amount;
-        await OnChanged();
-    }
-
-
-    private async Task OnPartyTypeChanged(
-        string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return;
-        }
-
-        if (!Enum.TryParse<PaymentPartyType>(
-                value,
-                out var result))
-        {
-            return;
-        }
-
-        Model.PartyType = result;
-
-        if (result == PaymentPartyType.Supplier)
-        {
-            Model.BeneficiaryName = null;
-        }
-        else
-        {
-            Model.SupplierId = null;
-        }
-
-        await OnChanged();
-    }
-
-
-    private async Task OnPaymentMethodChanged(
-        string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return;
-        }
-
-        if (!Enum.TryParse<PaymentMethod>(
-                value,
-                out var result))
-        {
-            return;
-        }
-
-        Model.PaymentMethod = result;
-
-        if (result == PaymentMethod.Cash)
-        {
-            Model.BankAccountId = null;
-        }
-        else
-        {
-            Model.CashAccountId = null;
-        }
-
-        await OnChanged();
-    }
-
-
-    private async Task OnSupplierIdTextChanged(string? value)
-    {
-        Model.SupplierIdText = value ?? string.Empty;
-        await OnChanged();
-    }
-
-
-    private async Task OnSupplierChanged(
-        string? value)
-    {
-        Model.SupplierId =
-            Guid.TryParse(
-                value,
-                out var id)
-                ? id
-                : null;
-
-        await OnChanged();
-    }
-
-
-    private async Task OnBeneficiaryNameChanged(
-        string? value)
-    {
-        Model.BeneficiaryName = value;
-
-        await OnChanged();
-    }
-
-
-    private async Task OnCashAccountChanged(
-        string? value)
-    {
-        Model.CashAccountId =
-            Guid.TryParse(
-                value,
-                out var id)
-                ? id
-                : null;
-
-        await OnChanged();
-    }
-
-
-    private async Task OnBankAccountChanged(
-        string? value)
-    {
-        Model.BankAccountId =
-            Guid.TryParse(
-                value,
-                out var id)
-                ? id
-                : null;
-
-        await OnChanged();
-    }
-
-
-    private async Task OnDescriptionChanged(
-        string? value)
+    private async Task OnDescriptionChanged(string? value)
     {
         Model.Description = value ?? string.Empty;
-
         await OnChanged();
     }
+
+    private string FormatBaseTotal() =>
+        Model.BaseTotalAmount.HasValue
+            ? $"{Model.BaseTotalAmount.Value:N4} {Model.BaseCurrencyCode}".Trim()
+            : "يحسب عند الحفظ";
 }

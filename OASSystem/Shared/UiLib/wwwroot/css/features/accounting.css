@@ -1179,3 +1179,68 @@
 @media(max-width:960px) { .ui-acc-accounts-split { grid-template-columns:1fr; } }
 
 @media(min-width:1200px){.ui-acc-workspace .ui-workspace-actionbar{flex-wrap:nowrap}.ui-acc-workspace .ui-search-input{min-width:150px;flex:1;max-width:340px}}
+
+/* Multi-currency voucher settlement lines */
+.ui-acc-settlement-lines {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.ui-acc-settlement-line {
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.6rem;
+    padding: 0.75rem;
+    background: var(--bs-body-bg, #fff);
+}
+
+.ui-acc-settlement-line__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.65rem;
+}
+
+.ui-acc-settlement-line__rate {
+    min-width: 11rem;
+}
+
+.ui-acc-settlement-line__snapshot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.85rem;
+    margin-top: 0.65rem;
+    padding-top: 0.55rem;
+    border-top: 1px dashed var(--bs-border-color, #dee2e6);
+    font-size: 0.78rem;
+}
+
+.ui-acc-journal-lines-table--multicurrency {
+    min-width: 1900px;
+}
+
+.ui-acc-journal-lines-table--multicurrency .ui-acc-journal-account-col {
+    min-width: 190px;
+}
+
+.ui-acc-journal-lines-table--multicurrency .ui-acc-journal-description-col {
+    min-width: 160px;
+}
+
+.ui-acc-journal-lines-table--multicurrency .ui-acc-journal-dimension-col,
+.ui-acc-journal-lines-table--multicurrency .ui-acc-journal-party-col {
+    min-width: 145px;
+}
+
+.ui-acc-journal-lines-table--multicurrency .ui-acc-journal-currency-col {
+    min-width: 125px;
+}
+
+.ui-acc-journal-lines-table--multicurrency .ui-acc-journal-rate-col {
+    min-width: 150px;
+}
+
+.ui-acc-journal-lines-table--multicurrency .ui-acc-journal-base-col {
+    min-width: 120px;
+    white-space: nowrap;
+}

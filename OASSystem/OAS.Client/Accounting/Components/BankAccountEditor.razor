@@ -1,26 +1,20 @@
 @namespace OAS.Client.Accounting.Components
-@using OAS.Contracts.Accounting.BankAccounts
 @using OAS.UiLib.Components.Accounting.Workspace
 @using OAS.UiLib.Components.Inputs
 @using OAS.UiLib.Core.Models
 
 <UiAccountingEditorSurface>
-
     <UiAccountingFormSection Title="بيانات الحساب البنكي"
-                             Subtitle="اسم البنك، رقم الحساب، واسم الحساب والآيبان"
+                             Subtitle="عند إنشاء حساب بنكي جديد ينشئ النظام حساب GL رقمياً تلقائياً تحت الحساب الرئيسي المحدد في إعدادات المحاسبة."
                              IconCssClass="fa-solid fa-building-columns">
-
         <UiAccountingFormGrid Columns="2">
-
-            <UiInputText Label="كود الحساب البنكي"
+            <UiInputText Label="كود الحساب البنكي (تلقائي)"
                          Value="@Model.Code"
                          ValueExpression="@(() => Model.Code)"
                          ValueChanged="OnCodeChanged"
                          Required="true"
-                         ErrorText="@Model.CodeError"
-                         Placeholder="مثال: BANK-01"
-                         ReadOnly="@(!IsNew)"
-                         Disabled="@(!IsEditable || !IsNew)"
+                         ReadOnly="true"
+                         Disabled="@(!IsEditable)"
                          Size="ControlSize.Small" />
 
             <UiInputText Label="اسم البنك"
@@ -28,7 +22,6 @@
                          ValueExpression="@(() => Model.BankName)"
                          ValueChanged="OnBankNameChanged"
                          Required="true"
-                         Placeholder="مثال: بنك اليمن والكويت"
                          Disabled="@(!IsEditable)"
                          Size="ControlSize.Small" />
 
@@ -37,7 +30,6 @@
                          ValueExpression="@(() => Model.AccountName)"
                          ValueChanged="OnAccountNameChanged"
                          Required="true"
-                         Placeholder="مثال: حساب العمليات الجاري"
                          Disabled="@(!IsEditable)"
                          Size="ControlSize.Small" />
 
@@ -47,7 +39,6 @@
                          ValueChanged="OnAccountNumberChanged"
                          Required="true"
                          ErrorText="@Model.AccountNumberError"
-                         Placeholder="مثال: 1020304050"
                          ReadOnly="@(!IsNew)"
                          Disabled="@(!IsEditable || !IsNew)"
                          Size="ControlSize.Small" />
@@ -56,155 +47,67 @@
                          Value="@Model.IBAN"
                          ValueExpression="@(() => Model.IBAN)"
                          ValueChanged="OnIbanChanged"
-                         Placeholder="اختياري..."
                          Disabled="@(!IsEditable)"
                          Size="ControlSize.Small" />
 
-            <UiLookup Label="الحساب المحاسبي في الدليل"
-                      Value='@Model.AccountId?.ToString("D")'
-                      ValueChanged="OnAccountChanged"
-                      SelectedItem="@AccountLookupItem"
-                      SearchAsync="AccountSearchAsync"
-                      Placeholder="ابحث عن حساب البنك في الدليل..."
+            <UiLookup Label="العملة"
+                      Value='@Model.CurrencyId?.ToString("D")'
+                      ValueChanged="OnCurrencyChanged"
+                      SelectedItem="@CurrencyLookupItem"
+                      SearchAsync="CurrencySearchAsync"
+                      Placeholder="اختر عملة الحساب البنكي..."
                       Disabled="@(!IsEditable)"
                       Required="true"
                       MinimumSearchLength="0"
                       DebounceMilliseconds="250" />
 
-            <UiAccountingCheckGroup>
+            @if (Model.AccountId.HasValue)
+            {
+                <UiAccountingReadOnlyValue Label="الحساب المحاسبي المرتبط"
+                                           Value="@(AccountLookupItem?.PrimaryText ?? Model.AccountId.Value.ToString("D"))"
+                                           Tone="@UiAccountingReadOnlyValue.ValueTone.Primary" />
+            }
 
+            <UiAccountingCheckGroup>
                 <UiCheckbox Label="الحساب البنكي نشط"
                             Value="@Model.IsActive"
                             ValueChanged="OnActiveChanged"
                             Disabled="@(!IsEditable)" />
-
             </UiAccountingCheckGroup>
-
         </UiAccountingFormGrid>
-
     </UiAccountingFormSection>
-
 </UiAccountingEditorSurface>
 
-
 @code {
-
     public sealed class FormModel
     {
         public string Code { get; set; } = string.Empty;
-
         public string? CodeError { get; set; }
-
         public string BankName { get; set; } = string.Empty;
-
         public string AccountName { get; set; } = string.Empty;
-
         public string AccountNumber { get; set; } = string.Empty;
-
         public string? AccountNumberError { get; set; }
-
         public string? IBAN { get; set; }
-
         public Guid? AccountId { get; set; }
-
+        public Guid? CurrencyId { get; set; }
         public bool IsActive { get; set; } = true;
-
         public string RowVersion { get; set; } = string.Empty;
     }
 
+    [Parameter] public FormModel Model { get; set; } = new();
+    [Parameter] public bool IsEditable { get; set; }
+    [Parameter] public bool IsNew { get; set; }
+    [Parameter] public UiLookupItem? AccountLookupItem { get; set; }
+    [Parameter] public UiLookupItem? CurrencyLookupItem { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CurrencySearchAsync { get; set; }
+    [Parameter] public EventCallback OnModelChanged { get; set; }
 
-    [Parameter]
-    public FormModel Model { get; set; } = new();
-
-
-    [Parameter]
-    public bool IsEditable { get; set; }
-
-
-    [Parameter]
-    public bool IsNew { get; set; }
-
-
-    [Parameter]
-    public UiLookupItem? AccountLookupItem { get; set; }
-
-
-    [Parameter]
-    public Func<
-        string,
-        CancellationToken,
-        Task<IReadOnlyList<UiLookupItem>>>?
-        AccountSearchAsync
-    { get; set; }
-
-
-    [Parameter]
-    public EventCallback OnModelChanged { get; set; }
-
-
-    private Task OnChanged()
-        => OnModelChanged.InvokeAsync();
-
-
-    private async Task OnCodeChanged(string? value)
-    {
-        Model.Code = value ?? string.Empty;
-        Model.CodeError = null;
-
-        await OnChanged();
-    }
-
-
-    private async Task OnBankNameChanged(string? value)
-    {
-        Model.BankName = value ?? string.Empty;
-
-        await OnChanged();
-    }
-
-
-    private async Task OnAccountNameChanged(string? value)
-    {
-        Model.AccountName = value ?? string.Empty;
-
-        await OnChanged();
-    }
-
-
-    private async Task OnAccountNumberChanged(string? value)
-    {
-        Model.AccountNumber = value ?? string.Empty;
-        Model.AccountNumberError = null;
-
-        await OnChanged();
-    }
-
-
-    private async Task OnIbanChanged(string? value)
-    {
-        Model.IBAN = value;
-
-        await OnChanged();
-    }
-
-
-    private async Task OnAccountChanged(string? value)
-    {
-        Model.AccountId =
-            Guid.TryParse(
-                value,
-                out var id)
-                ? id
-                : null;
-
-        await OnChanged();
-    }
-
-
-    private async Task OnActiveChanged(bool value)
-    {
-        Model.IsActive = value;
-
-        await OnChanged();
-    }
+    private Task OnChanged()=>OnModelChanged.InvokeAsync();
+    private async Task OnCodeChanged(string? value){Model.Code=value??string.Empty;Model.CodeError=null;await OnChanged();}
+    private async Task OnBankNameChanged(string? value){Model.BankName=value??string.Empty;await OnChanged();}
+    private async Task OnAccountNameChanged(string? value){Model.AccountName=value??string.Empty;await OnChanged();}
+    private async Task OnAccountNumberChanged(string? value){Model.AccountNumber=value??string.Empty;Model.AccountNumberError=null;await OnChanged();}
+    private async Task OnIbanChanged(string? value){Model.IBAN=value;await OnChanged();}
+    private async Task OnCurrencyChanged(string? value){Model.CurrencyId=Guid.TryParse(value,out var id)?id:null;await OnChanged();}
+    private async Task OnActiveChanged(bool value){Model.IsActive=value;await OnChanged();}
 }

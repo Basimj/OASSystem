@@ -1,0 +1,2 @@
+using OAS.Application.Abstractions.Messaging;using OAS.Application.Abstractions.Security;using OAS.Application.Accounting.Authorization;using OAS.Contracts.Accounting.EmployeeAccounts;
+namespace OAS.Application.Accounting.EmployeeAccounts.Commands.ActivateEmployeeAccount;public sealed record ActivateEmployeeAccountCommand(ActivateEmployeeAccountRequest Request):ICommand<Guid>,IAuthorizedRequest{public IReadOnlyCollection<string> RequiredPermissions{get;}=[AccountingPermissions.EmployeeAccounts.Manage];}

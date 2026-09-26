@@ -1,3 +1,7 @@
+using OAS.Contracts.Accounting.EmployeeAccounts;
+using OAS.Contracts.Accounting.Settings;
+using OAS.Contracts.Accounting.ExchangeRates;
+using OAS.Contracts.Accounting.Currencies;
 using OAS.Contracts.Accounting.Accounts;
 using OAS.Contracts.Accounting.BankAccounts;
 using OAS.Contracts.Accounting.CashAccounts;
@@ -97,12 +101,14 @@ public interface IAccountingClientService
     Task<PagedResult<CashAccountDto>> GetCashAccountsPageAsync(PageRequest request, CancellationToken cancellationToken = default);
     Task<CashAccountDto?> GetCashAccountByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<CashAccountDto?> CreateCashAccountAsync(CreateCashAccountRequest request, CancellationToken cancellationToken = default);
+    Task<CashAccountCodeReservationDto?> ReserveCashAccountCodeAsync(CancellationToken cancellationToken = default);
     Task<CashAccountDto?> UpdateCashAccountAsync(Guid id, UpdateCashAccountRequest request, CancellationToken cancellationToken = default);
     Task<CashAccountDto?> SetCashAccountStatusAsync(Guid id, SetCashAccountStatusRequest request, CancellationToken cancellationToken = default);
 
     Task<PagedResult<BankAccountDto>> GetBankAccountsPageAsync(PageRequest request, CancellationToken cancellationToken = default);
     Task<BankAccountDto?> GetBankAccountByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<BankAccountDto?> CreateBankAccountAsync(CreateBankAccountRequest request, CancellationToken cancellationToken = default);
+    Task<BankAccountCodeReservationDto?> ReserveBankAccountCodeAsync(CancellationToken cancellationToken = default);
     Task<BankAccountDto?> UpdateBankAccountAsync(Guid id, UpdateBankAccountRequest request, CancellationToken cancellationToken = default);
     Task<BankAccountDto?> SetBankAccountStatusAsync(Guid id, SetBankAccountStatusRequest request, CancellationToken cancellationToken = default);
 
@@ -128,4 +134,23 @@ public interface IAccountingClientService
     Task<PaymentAllocationDto?> GetPaymentAllocationByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<PaymentAllocationDto?> CreatePaymentAllocationAsync(CreatePaymentAllocationRequest request, CancellationToken cancellationToken = default);
     Task<PaymentAllocationDto?> UpdatePaymentAllocationAsync(Guid id, UpdatePaymentAllocationRequest request, CancellationToken cancellationToken = default);
+
+    Task<PagedResult<CurrencyDto>> GetCurrenciesPageAsync(PageRequest request, CancellationToken cancellationToken = default);
+    Task<CurrencyDto?> GetCurrencyByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<CurrencyDto?> CreateCurrencyAsync(CreateCurrencyRequest request, CancellationToken cancellationToken = default);
+    Task<CurrencyDto?> UpdateCurrencyAsync(Guid id, UpdateCurrencyRequest request, CancellationToken cancellationToken = default);
+
+    Task<PagedResult<ExchangeRateDto>> GetExchangeRatesPageAsync(PageRequest request, CancellationToken cancellationToken = default);
+    Task<ExchangeRateDto?> GetExchangeRateByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<ExchangeRateDto?> CreateExchangeRateAsync(CreateExchangeRateRequest request, CancellationToken cancellationToken = default);
+    Task<ExchangeRateDto?> UpdateExchangeRateAsync(Guid id, UpdateExchangeRateRequest request, CancellationToken cancellationToken = default);
+    Task<EffectiveExchangeRateDto?> GetEffectiveExchangeRateAsync(Guid currencyId, DateOnly date, OAS.Contracts.Accounting.Enums.ExchangeRateType rateType = OAS.Contracts.Accounting.Enums.ExchangeRateType.Accounting, CancellationToken cancellationToken = default);
+
+    Task<AccountingSettingsDto?> GetAccountingSettingsAsync(CancellationToken cancellationToken = default);
+    Task<AccountingSettingsDto?> UpdateAccountingSettingsAsync(UpdateAccountingSettingsRequest request, CancellationToken cancellationToken = default);
+
+    Task<PagedResult<EmployeeAccountDto>> GetEmployeeAccountsPageAsync(PageRequest request, CancellationToken cancellationToken = default);
+    Task<EmployeeAccountDto?> GetEmployeeAccountByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<EmployeeAccountDto?> ActivateEmployeeAccountAsync(ActivateEmployeeAccountRequest request, CancellationToken cancellationToken = default);
+    Task<EmployeeAccountDto?> SetEmployeeAccountStatusAsync(Guid id, SetEmployeeAccountStatusRequest request, CancellationToken cancellationToken = default);
 }

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using OAS.Application.Accounting.BankAccounts.Commands.CreateBankAccount;
+using OAS.Application.Accounting.BankAccounts.Commands.ReserveBankAccountCode;
 using OAS.Application.Accounting.BankAccounts.Commands.SetBankAccountStatus;
 using OAS.Application.Accounting.BankAccounts.Commands.UpdateBankAccount;
 using OAS.Application.Accounting.BankAccounts.Queries.GetBankAccountById;
@@ -35,6 +36,17 @@ public sealed class BankAccountsController(ISender sender) : ControllerBase
         CancellationToken cancellationToken)
     {
         var result = await sender.Send(new GetBankAccountByIdQuery(id), cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("code/reserve")]
+    public async Task<ActionResult<BankAccountCodeReservationDto>> ReserveCode(
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(
+            new ReserveBankAccountCodeCommand(),
+            cancellationToken);
+
         return Ok(result);
     }
 

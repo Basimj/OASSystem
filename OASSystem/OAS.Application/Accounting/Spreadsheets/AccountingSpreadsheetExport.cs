@@ -13,6 +13,10 @@ using OAS.Application.Accounting.PaymentVouchers.Queries.GetPaymentVouchers;
 using OAS.Application.Accounting.PostingProfiles.Queries.GetPostingProfiles;
 using OAS.Application.Accounting.ReceiptVouchers.Queries.GetReceiptVouchers;
 using OAS.Application.Accounting.Customers.Queries.GetCustomers;
+using OAS.Application.Accounting.Currencies.Queries.GetCurrencies;
+using OAS.Application.Accounting.ExchangeRates.Queries.GetExchangeRates;
+using OAS.Contracts.Accounting.Currencies;
+using OAS.Contracts.Accounting.ExchangeRates;
 using OAS.Application.Accounting.Suppliers.Queries.GetSuppliers;
 using OAS.Contracts.Accounting.Accounts;
 using OAS.Contracts.Accounting.BankAccounts;
@@ -71,6 +75,8 @@ public sealed partial class AccountingSpreadsheetService
             "cash-shifts" => await ReadAll<CashShiftDto>(p=>new GetCashShiftsQuery(p),request,ct),
             "customers" => await ReadAll<CustomerDto>(p=>new GetCustomersQuery(p,filter),request,ct),
             "suppliers" => await ReadAll<SupplierDto>(p=>new GetSuppliersQuery(p,filter),request,ct),
+            "currencies" => await ReadAll<CurrencyDto>(p=>new GetCurrenciesQuery(p),request,ct),
+            "exchange-rates" => await ReadAll<ExchangeRateDto>(p=>new GetExchangeRatesQuery(p),request,ct),
             _=>throw new NotFoundException("spreadsheet",section)
         };
         // The same queries/specifications as the screen are used for every matching page.
@@ -80,6 +86,7 @@ public sealed partial class AccountingSpreadsheetService
         var centers=(await List<CostCenter>(ct)).ToDictionary(x=>x.Id,x=>x.Code);
         var cash=(await List<CashAccount>(ct)).ToDictionary(x=>x.Id,x=>x.Code);
         var banks=(await List<BankAccount>(ct)).ToDictionary(x=>x.Id,x=>x.Code);
+        var currencies=(await List<Currency>(ct)).ToDictionary(x=>x.Id,x=>x.Code);
         var expenseTypes=(await List<ExpenseType>(ct)).ToDictionary(x=>x.Id,x=>x.Code);
         var years=(await List<FiscalYear>(ct)).ToDictionary(x=>x.Id,x=>x.Code);
         var periods=(await List<FiscalPeriod>(ct)).ToDictionary(x=>x.Id,x=>$"{years.GetValueOrDefault(x.FiscalYearId)}/{x.PeriodNumber}");
@@ -89,7 +96,7 @@ public sealed partial class AccountingSpreadsheetService
         var references=new Dictionary<string,Dictionary<Guid,string>>
         {
             ["ParentAccountId"]=accounts,["AccountId"]=accounts,["ExpenseAccountId"]=accounts,["DefaultExpenseAccountId"]=accounts,
-            ["ParentCostCenterId"]=centers,["CostCenterId"]=centers,["CashAccountId"]=cash,["BankAccountId"]=banks,
+            ["ParentCostCenterId"]=centers,["CostCenterId"]=centers,["CashAccountId"]=cash,["BankAccountId"]=banks,["CurrencyId"]=currencies,["TransactionCurrencyId"]=currencies,
             ["FiscalYearId"]=years,["FiscalPeriodId"]=periods,["ExpenseTypeId"]=expenseTypes,["JournalEntryId"]=journals,["ReversedJournalId"]=journals
         };
         Dictionary<string,string> Map(object item)
@@ -116,9 +123,38 @@ public sealed partial class AccountingSpreadsheetService
             {
                 var detail=await sender.Send(new OAS.Application.Accounting.Journals.Queries.GetJournalEntryById.GetJournalEntryByIdQuery(item.Id),ct);
                 foreach(var line in detail.Lines)
-                    rows.Add(new Dictionary<string,string> { ["JournalKey"]=item.JournalNumber,["JournalType"]=item.JournalType.ToString(),["PostingDate"]=Format(item.PostingDate),["DocumentDate"]=Format(item.DocumentDate),["Description"]=item.Description,["AccountCode"]=accounts.GetValueOrDefault(line.AccountId)??"",["Debit"]=Format(line.DebitAmount),["Credit"]=Format(line.CreditAmount),["CostCenterCode"]=line.CostCenterId is Guid id?centers.GetValueOrDefault(id)??"":"",["LineDescription"]=line.Description??"",["Status"]=item.Status.ToString(),["JournalNumber"]=item.JournalNumber });
+                    rows.Add(new Dictionary<string,string>
+                    {
+                        ["JournalKey"]=item.JournalNumber,
+                        ["JournalType"]=item.JournalType.ToString(),
+                        ["PostingDate"]=Format(item.PostingDate),
+                        ["DocumentDate"]=Format(item.DocumentDate),
+                        ["Description"]=item.Description,
+                        ["AccountCode"]=accounts.GetValueOrDefault(line.AccountId)??"",
+                        ["Debit"]=Format(line.TransactionDebitAmount ?? line.DebitAmount),
+                        ["Credit"]=Format(line.TransactionCreditAmount ?? line.CreditAmount),
+                        ["CurrencyCode"]=line.TransactionCurrencyCodeSnapshot ?? (line.TransactionCurrencyId is Guid currencyId ? currencies.GetValueOrDefault(currencyId) ?? "" : ""),
+                        ["ExchangeRate"]=Format(line.ExchangeRate),
+                        ["BaseDebit"]=Format(line.DebitAmount),
+                        ["BaseCredit"]=Format(line.CreditAmount),
+                        ["CostCenterCode"]=line.CostCenterId is Guid id?centers.GetValueOrDefault(id)??"" : "",
+                        ["LineDescription"]=line.Description??"",
+                        ["Status"]=item.Status.ToString(),
+                        ["JournalNumber"]=item.JournalNumber
+                    });
             }
-            tables.Add(new(definition with { Columns=[..definition.Columns,new("Status",Header:AccountingSpreadsheetDefinitions.Header("Status")),new("JournalNumber",Header:AccountingSpreadsheetDefinitions.Header("JournalNumber"))] },rows));
+            tables.Add(new(definition with
+            {
+                Columns=
+                [
+                    ..definition.Columns,
+                    new("ExchangeRate",DataType:"decimal",Header:AccountingSpreadsheetDefinitions.Header("ExchangeRate")),
+                    new("BaseDebit",DataType:"decimal",Header:AccountingSpreadsheetDefinitions.Header("BaseDebit")),
+                    new("BaseCredit",DataType:"decimal",Header:AccountingSpreadsheetDefinitions.Header("BaseCredit")),
+                    new("Status",Header:AccountingSpreadsheetDefinitions.Header("Status")),
+                    new("JournalNumber",Header:AccountingSpreadsheetDefinitions.Header("JournalNumber"))
+                ]
+            },rows));
         }
         else if(section=="posting-profiles")
         {
@@ -188,6 +224,8 @@ public sealed partial class AccountingSpreadsheetService
         "cash-shifts"=>typeof(CashShiftDto),
         "customers"=>typeof(CustomerDto),
         "suppliers"=>typeof(SupplierDto),
+        "currencies"=>typeof(CurrencyDto),
+        "exchange-rates"=>typeof(ExchangeRateDto),
         _=>throw new NotFoundException("spreadsheet",section)
     };
 }

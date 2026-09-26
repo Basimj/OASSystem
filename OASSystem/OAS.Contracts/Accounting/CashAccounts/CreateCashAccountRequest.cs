@@ -1,8 +1,8 @@
-﻿namespace OAS.Contracts.Accounting.CashAccounts;
+namespace OAS.Contracts.Accounting.CashAccounts;
 
 public sealed record CreateCashAccountRequest(
-    string Code,
+    string? Code,
     string Name,
-    Guid AccountId,
+    Guid CurrencyId,
     bool IsDefault = false,
     bool IsActive = true);

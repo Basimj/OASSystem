@@ -114,6 +114,10 @@
                               CostCenterSearchAsync="@CostCenterSearchAsync"
                               CustomerSearchAsync="@CustomerSearchAsync"
                               SupplierSearchAsync="@SupplierSearchAsync"
+                              EmployeeSearchAsync="@EmployeeSearchAsync"
+                              CurrencySearchAsync="@CurrencySearchAsync"
+                              EffectiveRateAsync="@EffectiveRateAsync"
+                              RateDate="@Model.DocumentDate"
                               OnLinesChanged="@OnChanged" />
 
     </UiAccountingFormSection>
@@ -259,6 +263,35 @@
         SupplierSearchAsync
     { get; set; }
 
+
+
+
+    [Parameter]
+    public Func<
+        string,
+        CancellationToken,
+        Task<IReadOnlyList<UiLookupItem>>>?
+        EmployeeSearchAsync
+    { get; set; }
+
+
+    [Parameter]
+    public Func<
+        string,
+        CancellationToken,
+        Task<IReadOnlyList<UiLookupItem>>>?
+        CurrencySearchAsync
+    { get; set; }
+
+
+    [Parameter]
+    public Func<
+        Guid,
+        DateOnly,
+        CancellationToken,
+        Task<decimal?>>?
+        EffectiveRateAsync
+    { get; set; }
 
     [Parameter]
     public EventCallback OnModelChanged { get; set; }

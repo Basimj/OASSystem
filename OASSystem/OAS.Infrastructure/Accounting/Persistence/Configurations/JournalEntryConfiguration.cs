@@ -53,6 +53,13 @@ public sealed class JournalEntryConfiguration : IEntityTypeConfiguration<Journal
             .HasConversion<byte>();
 
         builder.Property(x => x.ReversedJournalId);
+
+        builder.Property(x => x.BaseCurrencyId);
+
+        builder.Property(x => x.BaseCurrencyCodeSnapshot)
+            .HasMaxLength(8);
+
+        builder.Property(x => x.BaseCurrencyDecimalPlacesSnapshot);
         builder.Property(x => x.ApprovedBy);
 
         builder.Property(x => x.ApprovedAtUtc)
@@ -83,11 +90,20 @@ public sealed class JournalEntryConfiguration : IEntityTypeConfiguration<Journal
         builder.HasIndex(x => x.ReversedJournalId)
             .HasDatabaseName("IX_JournalEntries_ReversedJournalId");
 
+        builder.HasIndex(x => x.BaseCurrencyId)
+            .HasDatabaseName("IX_JournalEntries_BaseCurrencyId");
+
         builder.HasOne<FiscalPeriod>()
             .WithMany()
             .HasForeignKey(x => x.FiscalPeriodId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_JournalEntries_FiscalPeriod");
+
+        builder.HasOne<Currency>()
+            .WithMany()
+            .HasForeignKey(x => x.BaseCurrencyId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_JournalEntries_BaseCurrency");
 
         builder.HasOne<JournalEntry>()
             .WithMany()

@@ -1,0 +1,17 @@
+using MediatR;using OAS.Application.Abstractions.Persistence;using OAS.Application.Abstractions.Persistence.Specifications;using OAS.Application.Common.Exceptions;using OAS.Domain.Accounting.Entities;using OAS.Domain.Accounting.Enums;using DomainRateType=OAS.Domain.Accounting.Enums.ExchangeRateType;
+namespace OAS.Application.Accounting.Settings.Commands.UpdateAccountingSettings;
+public sealed class UpdateAccountingSettingsCommandHandler(IRepository<AccountingSettings,Guid> repository,IReadRepository<Currency,Guid> currencies,IReadRepository<Account,Guid> accounts,IReadRepository<JournalEntry,Guid> journals):IRequestHandler<UpdateAccountingSettingsCommand>
+{
+ public async Task Handle(UpdateAccountingSettingsCommand r,CancellationToken ct)
+ {
+  var d=r.Request;var currency=await currencies.GetByIdAsync(d.BaseCurrencyId,ct)??throw new NotFoundException(nameof(Currency),d.BaseCurrencyId);if(!currency.IsActive)throw new ConflictException("base_currency_inactive","Base currency must be active.");
+  await ValidateAssetControlAsync(d.EmployeeParentAccountId,"employee_parent_account_invalid",ct);await ValidateAssetControlAsync(d.CashParentAccountId,"cash_parent_account_invalid",ct);await ValidateAssetControlAsync(d.BankParentAccountId,"bank_parent_account_invalid",ct);await ValidatePostingAsync(d.ExchangeGainAccountId,"exchange_gain_account_invalid",ct);await ValidatePostingAsync(d.ExchangeLossAccountId,"exchange_loss_account_invalid",ct);
+  var e=await repository.GetForUpdateAsync(AccountingSettings.SingletonId,ct);
+  if(e is null){e=AccountingSettings.Create(currency.Id,d.EmployeeParentAccountId,d.CashParentAccountId,d.BankParentAccountId,d.ExchangeGainAccountId,d.ExchangeLossAccountId,(DomainRateType)(byte)d.DefaultExchangeRateType);await repository.AddAsync(e,ct);return;}
+  if(string.IsNullOrWhiteSpace(d.RowVersion))throw new ConcurrencyException("Accounting settings row version is required.");byte[] rv;try{rv=Convert.FromBase64String(d.RowVersion);}catch(FormatException ex){throw new ConcurrencyException("Accounting settings row version is invalid.",ex);}if(!e.RowVersion.SequenceEqual(rv))throw new ConcurrencyException("Accounting settings were modified by another user.");
+  if(e.BaseCurrencyId!=currency.Id && await journals.CountAsync(new Specification<JournalEntry>().Where(x=>x.Status==JournalEntryStatus.Posted||x.Status==JournalEntryStatus.Reversed),ct)>0)throw new ConflictException("base_currency_change_blocked","Base currency cannot be changed after posted journals exist.");
+  e.Update(currency.Id,d.EmployeeParentAccountId,d.CashParentAccountId,d.BankParentAccountId,d.ExchangeGainAccountId,d.ExchangeLossAccountId,(DomainRateType)(byte)d.DefaultExchangeRateType);repository.Update(e);
+ }
+ private async Task ValidateAssetControlAsync(Guid? id,string code,CancellationToken ct){if(!id.HasValue)return;var a=await accounts.GetByIdAsync(id.Value,ct)??throw new NotFoundException(nameof(Account),id.Value);if(!a.IsActive||!a.IsControlAccount||a.AccountType!=AccountType.Control||a.AccountClass!=AccountClass.Asset||a.NormalBalance!=NormalBalance.Debit)throw new ConflictException(code,"Parent account must be an active Asset/Debit control account.");}
+ private async Task ValidatePostingAsync(Guid? id,string code,CancellationToken ct){if(!id.HasValue)return;var a=await accounts.GetByIdAsync(id.Value,ct)??throw new NotFoundException(nameof(Account),id.Value);if(!a.CanReceivePosting())throw new ConflictException(code,"Configured account must be active and posting-capable.");}
+}

@@ -17,6 +17,10 @@ public sealed class OasDbContext(DbContextOptions<OasDbContext> options) : DbCon
     public DbSet<JobTitle> JobTitles => Set<JobTitle>();
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<Supplier> Suppliers => Set<Supplier>();
+    public DbSet<Currency> Currencies => Set<Currency>();
+    public DbSet<ExchangeRate> ExchangeRates => Set<ExchangeRate>();
+    public DbSet<AccountingSettings> AccountingSettings => Set<AccountingSettings>();
+    public DbSet<EmployeeAccount> EmployeeAccounts => Set<EmployeeAccount>();
     public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
     public DbSet<Brand> Brands => Set<Brand>();
     public DbSet<ProductType> ProductTypes => Set<ProductType>();

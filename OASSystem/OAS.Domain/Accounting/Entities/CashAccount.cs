@@ -13,6 +13,7 @@ public sealed class CashAccount : AuditableEntity<Guid>
         string code,
         string name,
         Guid accountId,
+        Guid? currencyId,
         bool isDefault,
         bool isActive)
     {
@@ -20,6 +21,7 @@ public sealed class CashAccount : AuditableEntity<Guid>
         Code = code;
         Name = name;
         AccountId = accountId;
+        CurrencyId = currencyId;
         IsDefault = isDefault;
         IsActive = isActive;
     }
@@ -30,17 +32,30 @@ public sealed class CashAccount : AuditableEntity<Guid>
 
     public Guid AccountId { get; private set; }
 
+    public Guid? CurrencyId { get; private set; }
+
     public bool IsDefault { get; private set; }
 
     public bool IsActive { get; private set; }
 
     public byte[] RowVersion { get; private set; } = [];
 
+    // Compatibility overload for pre-currency tests/data factories.
     public static CashAccount Create(
         Guid id,
         string code,
         string name,
         Guid accountId,
+        bool isDefault,
+        bool isActive) =>
+        Create(id, code, name, accountId, null, isDefault, isActive);
+
+    public static CashAccount Create(
+        Guid id,
+        string code,
+        string name,
+        Guid accountId,
+        Guid? currencyId,
         bool isDefault,
         bool isActive)
     {
@@ -61,6 +76,7 @@ public sealed class CashAccount : AuditableEntity<Guid>
             code.Trim(),
             name.Trim(),
             accountId,
+            currencyId,
             isDefault,
             isActive);
     }
@@ -69,6 +85,7 @@ public sealed class CashAccount : AuditableEntity<Guid>
         string code,
         string name,
         Guid accountId,
+        Guid? currencyId,
         bool isDefault)
     {
         if (string.IsNullOrWhiteSpace(code))
@@ -83,6 +100,7 @@ public sealed class CashAccount : AuditableEntity<Guid>
         Code = code.Trim();
         Name = name.Trim();
         AccountId = accountId;
+        CurrencyId = currencyId;
         IsDefault = isDefault;
     }
 

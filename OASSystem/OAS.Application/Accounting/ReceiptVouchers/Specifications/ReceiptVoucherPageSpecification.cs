@@ -16,7 +16,6 @@ public sealed class ReceiptVoucherPageSpecification
             var search = normalized.Search.Trim();
             specification.Where(x =>
                 x.VoucherNumber.Contains(search) ||
-                (x.ReceivedFrom != null && x.ReceivedFrom.Contains(search)) ||
                 (x.Description != null && x.Description.Contains(search)));
         }
 
@@ -39,8 +38,8 @@ public sealed class ReceiptVoucherPageSpecification
         {
             "vouchernumber" => nameof(ReceiptVoucher.VoucherNumber),
             "voucherdate" => nameof(ReceiptVoucher.VoucherDate),
-            "totalamount" => nameof(ReceiptVoucher.TotalAmount),
-            "partytype" => nameof(ReceiptVoucher.PartyType),
+            "totalamount" => nameof(ReceiptVoucher.BaseTotalAmount),
+            "basetotalamount" => nameof(ReceiptVoucher.BaseTotalAmount),
             "status" => nameof(ReceiptVoucher.Status),
             "createdatutc" => nameof(ReceiptVoucher.CreatedAtUtc),
             _ => nameof(ReceiptVoucher.VoucherDate)

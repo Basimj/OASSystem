@@ -11,21 +11,15 @@ public sealed class UpdateCashAccountCommandValidator
             .NotEmpty()
             .WithErrorCode("cash_account_id_required");
 
-        RuleFor(x => x.Data.Code)
-            .NotEmpty()
-            .WithErrorCode("cash_account_code_required")
-            .MaximumLength(30)
-            .WithErrorCode("cash_account_code_max_length");
-
         RuleFor(x => x.Data.Name)
             .NotEmpty()
             .WithErrorCode("cash_account_name_required")
             .MaximumLength(150)
             .WithErrorCode("cash_account_name_max_length");
 
-        RuleFor(x => x.Data.AccountId)
+        RuleFor(x => x.Data.CurrencyId)
             .NotEmpty()
-            .WithErrorCode("account_id_required");
+            .WithErrorCode("currency_id_required");
 
         RuleFor(x => x.Data.RowVersion)
             .NotEmpty()

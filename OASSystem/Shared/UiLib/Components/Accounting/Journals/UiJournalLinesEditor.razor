@@ -6,17 +6,22 @@
 
 <div class="ui-acc-lines-editor" dir="rtl">
     <div class="table-responsive">
-        <table class="ui-acc-grid-table ui-acc-journal-lines-table">
+        <table class="ui-acc-grid-table ui-acc-journal-lines-table ui-acc-journal-lines-table--multicurrency">
             <thead>
                 <tr>
                     <th style="width: 40px;">#</th>
-                    <th style="width: 32%;">الحساب المحاسبي</th>
-                    <th style="width: 25%;">البيان</th>
-                    <th style="width: 16%;">مركز التكلفة</th>
-                    <th style="width: 16%;">العميل</th>
-                    <th style="width: 16%;">المورد</th>
-                    <th class="ui-acc-journal-amount-col">مدين</th>
-                    <th class="ui-acc-journal-amount-col">دائن</th>
+                    <th class="ui-acc-journal-account-col">الحساب المحاسبي</th>
+                    <th class="ui-acc-journal-description-col">البيان</th>
+                    <th class="ui-acc-journal-dimension-col">مركز التكلفة</th>
+                    <th class="ui-acc-journal-party-col">العميل</th>
+                    <th class="ui-acc-journal-party-col">المورد</th>
+                    <th class="ui-acc-journal-party-col">الموظف</th>
+                    <th class="ui-acc-journal-currency-col">العملة</th>
+                    <th class="ui-acc-journal-rate-col">سعر الصرف</th>
+                    <th class="ui-acc-journal-amount-col">مدين (أصلي)</th>
+                    <th class="ui-acc-journal-amount-col">دائن (أصلي)</th>
+                    <th class="ui-acc-journal-base-col">مدين أساسي</th>
+                    <th class="ui-acc-journal-base-col">دائن أساسي</th>
                     @if (IsEditable)
                     {
                         <th style="width: 40px;">إجراء</th>
@@ -27,7 +32,9 @@
                 @if (Lines.Count == 0)
                 {
                     <tr>
-                        <td colspan="@(IsEditable ? 9 : 8)" class="text-center text-muted py-3">لا توجد أسطر بعد. انقر على «إضافة سطر» بالأسفل.</td>
+                        <td colspan="@(IsEditable ? 14 : 13)" class="text-center text-muted py-3">
+                            لا توجد أسطر بعد. انقر على «إضافة سطر» بالأسفل.
+                        </td>
                     </tr>
                 }
                 else
@@ -59,6 +66,7 @@
                                 @if (IsEditable)
                                 {
                                     <UiInputText Value="@currentLine.Description"
+                                                 ValueExpression="@(() => currentLine.Description)"
                                                  ValueChanged="@(val => OnDescriptionChanged(currentLine, val))"
                                                  Placeholder="بيان السطر..."
                                                  Size="ControlSize.Small" />
@@ -116,6 +124,59 @@
                                     <span>@(currentLine.SupplierLookupItem?.PrimaryText ?? "-")</span>
                                 }
                             </td>
+                            <td>
+                                @if (IsEditable)
+                                {
+                                    <UiLookup Value='@currentLine.EmployeeId?.ToString("D")'
+                                              ValueChanged="@(val => OnEmployeeSelected(currentLine, val))"
+                                              SelectedItem="@currentLine.EmployeeLookupItem"
+                                              SearchAsync="EmployeeSearchAsync"
+                                              Placeholder="اختياري: الموظف..."
+                                              MinimumSearchLength="0"
+                                              DebounceMilliseconds="250" />
+                                }
+                                else
+                                {
+                                    <span>@(currentLine.EmployeeLookupItem?.PrimaryText ?? "-")</span>
+                                }
+                            </td>
+                            <td>
+                                @if (IsEditable)
+                                {
+                                    <UiLookup Value='@currentLine.TransactionCurrencyId?.ToString("D")'
+                                              ValueChanged="@(val => OnCurrencySelected(currentLine, val))"
+                                              SelectedItem="@currentLine.CurrencyLookupItem"
+                                              SearchAsync="CurrencySearchAsync"
+                                              Placeholder="العملة الأساسية افتراضياً..."
+                                              MinimumSearchLength="0"
+                                              DebounceMilliseconds="250" />
+                                }
+                                else
+                                {
+                                    <span>@(currentLine.CurrencyLookupItem?.PrimaryText ?? currentLine.CurrencyCode ?? "-")</span>
+                                }
+                            </td>
+                            <td class="ui-acc-journal-rate-col">
+                                @if (IsEditable)
+                                {
+                                    <div class="ui-acc-journal-rate-editor">
+                                        <span class="text-muted small">
+                                            تلقائي: @(currentLine.ResolvedExchangeRate?.ToString("N8") ?? "-")
+                                        </span>
+                                        <UiAccountingNumberField Label=""
+                                                                 Value="@(currentLine.ManualExchangeRate ?? 0m)"
+                                                                 ValueChanged="@(value => OnManualRateChanged(currentLine, value))"
+                                                                 Min="0"
+                                                                 Step="0.00000001"
+                                                                 Tone="@UiAccountingNumberField.NumberTone.Default" />
+                                        <span class="text-muted small">0 = استخدام السعر التلقائي</span>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span>@(currentLine.EffectiveExchangeRate?.ToString("N8") ?? "-")</span>
+                                }
+                            </td>
                             <td class="ui-acc-journal-amount-col">
                                 @if (IsEditable)
                                 {
@@ -128,7 +189,9 @@
                                 }
                                 else
                                 {
-                                    <span class="ui-acc-val--debit">@(currentLine.DebitAmount > 0 ? currentLine.DebitAmount.ToString("N2") : "-")</span>
+                                    <span class="ui-acc-val--debit">
+                                        @(currentLine.DebitAmount > 0 ? currentLine.DebitAmount.ToString("N4") : "-")
+                                    </span>
                                 }
                             </td>
                             <td class="ui-acc-journal-amount-col">
@@ -143,8 +206,16 @@
                                 }
                                 else
                                 {
-                                    <span class="ui-acc-val--credit">@(currentLine.CreditAmount > 0 ? currentLine.CreditAmount.ToString("N2") : "-")</span>
+                                    <span class="ui-acc-val--credit">
+                                        @(currentLine.CreditAmount > 0 ? currentLine.CreditAmount.ToString("N4") : "-")
+                                    </span>
                                 }
+                            </td>
+                            <td class="ui-acc-journal-base-col ui-acc-val--debit">
+                                @(currentLine.BaseDebitAmount > 0 ? currentLine.BaseDebitAmount.ToString("N4") : "-")
+                            </td>
+                            <td class="ui-acc-journal-base-col ui-acc-val--credit">
+                                @(currentLine.BaseCreditAmount > 0 ? currentLine.BaseCreditAmount.ToString("N4") : "-")
                             </td>
                             @if (IsEditable)
                             {
@@ -163,8 +234,8 @@
             </tbody>
             <tfoot>
                 <tr>
-                    <td colspan="6" class="text-start font-bold">
-                        <span>الإجمالي</span>
+                    <td colspan="11" class="text-start font-bold">
+                        <span>الإجمالي بالعملة الأساسية</span>
                         <span class="ms-3">
                             @if (IsBalanced)
                             {
@@ -175,13 +246,14 @@
                             else
                             {
                                 <span class="badge bg-danger-subtle text-danger p-1 ms-2">
-                                    <i class="fa-solid fa-triangle-exclamation me-1"></i> غير متوازن (الفرق: @Difference.ToString("N2"))
+                                    <i class="fa-solid fa-triangle-exclamation me-1"></i>
+                                    غير متوازن (الفرق: @Difference.ToString("N4"))
                                 </span>
                             }
                         </span>
                     </td>
-                    <td class="ui-acc-val--debit font-bold">@TotalDebit.ToString("N2")</td>
-                    <td class="ui-acc-val--credit font-bold">@TotalCredit.ToString("N2")</td>
+                    <td class="ui-acc-val--debit font-bold">@TotalDebit.ToString("N4")</td>
+                    <td class="ui-acc-val--credit font-bold">@TotalCredit.ToString("N4")</td>
                     @if (IsEditable)
                     {
                         <td></td>
@@ -209,30 +281,65 @@
         public Guid? AccountId { get; set; }
         public string AccountDisplay { get; set; } = string.Empty;
         public UiLookupItem? AccountLookupItem { get; set; }
+
         public string Description { get; set; } = string.Empty;
+
         public Guid? CostCenterId { get; set; }
-        public Guid? CustomerId { get; set; }
-        public UiLookupItem? CustomerLookupItem { get; set; }
-        public Guid? SupplierId { get; set; }
-        public UiLookupItem? SupplierLookupItem { get; set; }
-        public Guid? ProductVariantId { get; set; }
-        public Guid? WarehouseId { get; set; }
         public string? CostCenterDisplay { get; set; }
         public UiLookupItem? CostCenterLookupItem { get; set; }
+
+        public Guid? CustomerId { get; set; }
+        public UiLookupItem? CustomerLookupItem { get; set; }
+
+        public Guid? SupplierId { get; set; }
+        public UiLookupItem? SupplierLookupItem { get; set; }
+
+        public Guid? EmployeeId { get; set; }
+        public UiLookupItem? EmployeeLookupItem { get; set; }
+
+        public Guid? ProductVariantId { get; set; }
+        public Guid? WarehouseId { get; set; }
+
+        public Guid? TransactionCurrencyId { get; set; }
+        public string? CurrencyCode { get; set; }
+        public UiLookupItem? CurrencyLookupItem { get; set; }
+
+        // System rate is preview-only. ManualExchangeRate is sent only when the user
+        // explicitly enters a non-zero override, so normal users do not accidentally
+        // trigger the override permission rule.
+        public decimal? ResolvedExchangeRate { get; set; }
+        public decimal? ManualExchangeRate { get; set; }
+
+        // Debit/Credit here are transaction-currency amounts.
         public decimal DebitAmount { get; set; }
         public decimal CreditAmount { get; set; }
+
+        public decimal? EffectiveExchangeRate =>
+            ManualExchangeRate is > 0 ? ManualExchangeRate : ResolvedExchangeRate;
+
+        public decimal BaseDebitAmount =>
+            DebitAmount <= 0 ? 0m : DebitAmount * (EffectiveExchangeRate ?? 1m);
+
+        public decimal BaseCreditAmount =>
+            CreditAmount <= 0 ? 0m : CreditAmount * (EffectiveExchangeRate ?? 1m);
     }
 
     [Parameter] public List<EditableJournalLine> Lines { get; set; } = [];
     [Parameter] public bool IsEditable { get; set; } = true;
+    [Parameter] public DateOnly RateDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? AccountSearchAsync { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CostCenterSearchAsync { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CustomerSearchAsync { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SupplierSearchAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? EmployeeSearchAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CurrencySearchAsync { get; set; }
+    [Parameter] public Func<Guid, DateOnly, CancellationToken, Task<decimal?>>? EffectiveRateAsync { get; set; }
+
     [Parameter] public EventCallback OnLinesChanged { get; set; }
 
-    public decimal TotalDebit => Lines.Sum(l => l.DebitAmount);
-    public decimal TotalCredit => Lines.Sum(l => l.CreditAmount);
+    public decimal TotalDebit => Lines.Sum(l => l.BaseDebitAmount);
+    public decimal TotalCredit => Lines.Sum(l => l.BaseCreditAmount);
     public decimal Difference => Math.Abs(TotalDebit - TotalCredit);
     public bool IsBalanced => TotalDebit == TotalCredit && TotalDebit > 0;
 
@@ -250,63 +357,79 @@
 
     private async Task OnAccountSelected(EditableJournalLine line, string? val)
     {
-        if (Guid.TryParse(val, out var id))
-        {
-            line.AccountId = id;
-            if (AccountSearchAsync is not null)
-            {
-                var items = await AccountSearchAsync(string.Empty, CancellationToken.None);
-                line.AccountLookupItem = items.FirstOrDefault(x => x.Value == val);
-            }
-        }
-        else
-        {
-            line.AccountId = null;
-            line.AccountLookupItem = null;
-        }
+        line.AccountId = Parse(val);
+        line.AccountLookupItem = await ResolveAsync(AccountSearchAsync, line.AccountId);
         await OnLinesChanged.InvokeAsync();
     }
 
     private async Task OnCostCenterSelected(EditableJournalLine line, string? val)
     {
-        if (Guid.TryParse(val, out var id))
-        {
-            line.CostCenterId = id;
-            if (CostCenterSearchAsync is not null)
-            {
-                var items = await CostCenterSearchAsync(string.Empty, CancellationToken.None);
-                line.CostCenterLookupItem = items.FirstOrDefault(x => x.Value == val);
-            }
-        }
-        else
-        {
-            line.CostCenterId = null;
-            line.CostCenterLookupItem = null;
-        }
+        line.CostCenterId = Parse(val);
+        line.CostCenterLookupItem = await ResolveAsync(CostCenterSearchAsync, line.CostCenterId);
         await OnLinesChanged.InvokeAsync();
     }
 
     private async Task OnCustomerSelected(EditableJournalLine line, string? val)
     {
-        line.CustomerId = Guid.TryParse(val, out var id) ? id : null;
+        line.CustomerId = Parse(val);
         if (line.CustomerId.HasValue)
         {
             line.SupplierId = null;
             line.SupplierLookupItem = null;
+            line.EmployeeId = null;
+            line.EmployeeLookupItem = null;
         }
-        if (!line.CustomerId.HasValue) line.CustomerLookupItem = null;
+        line.CustomerLookupItem = await ResolveAsync(CustomerSearchAsync, line.CustomerId);
         await OnLinesChanged.InvokeAsync();
     }
 
     private async Task OnSupplierSelected(EditableJournalLine line, string? val)
     {
-        line.SupplierId = Guid.TryParse(val, out var id) ? id : null;
+        line.SupplierId = Parse(val);
         if (line.SupplierId.HasValue)
         {
             line.CustomerId = null;
             line.CustomerLookupItem = null;
+            line.EmployeeId = null;
+            line.EmployeeLookupItem = null;
         }
-        if (!line.SupplierId.HasValue) line.SupplierLookupItem = null;
+        line.SupplierLookupItem = await ResolveAsync(SupplierSearchAsync, line.SupplierId);
+        await OnLinesChanged.InvokeAsync();
+    }
+
+    private async Task OnEmployeeSelected(EditableJournalLine line, string? val)
+    {
+        line.EmployeeId = Parse(val);
+        if (line.EmployeeId.HasValue)
+        {
+            line.CustomerId = null;
+            line.CustomerLookupItem = null;
+            line.SupplierId = null;
+            line.SupplierLookupItem = null;
+        }
+        line.EmployeeLookupItem = await ResolveAsync(EmployeeSearchAsync, line.EmployeeId);
+        await OnLinesChanged.InvokeAsync();
+    }
+
+    private async Task OnCurrencySelected(EditableJournalLine line, string? val)
+    {
+        line.TransactionCurrencyId = Parse(val);
+        line.CurrencyLookupItem = await ResolveAsync(CurrencySearchAsync, line.TransactionCurrencyId);
+        line.CurrencyCode = line.CurrencyLookupItem?.PrimaryText?.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+        line.ManualExchangeRate = null;
+        line.ResolvedExchangeRate = null;
+
+        if (line.TransactionCurrencyId is Guid currencyId && EffectiveRateAsync is not null)
+        {
+            line.ResolvedExchangeRate = await EffectiveRateAsync(currencyId, RateDate, CancellationToken.None);
+        }
+
+        await OnLinesChanged.InvokeAsync();
+    }
+
+    private async Task OnManualRateChanged(EditableJournalLine line, decimal value)
+    {
+        line.ManualExchangeRate = value > 0 ? value : null;
         await OnLinesChanged.InvokeAsync();
     }
 
@@ -328,5 +451,18 @@
         line.CreditAmount = Math.Max(0, amount);
         if (line.CreditAmount > 0) line.DebitAmount = 0;
         await OnLinesChanged.InvokeAsync();
+    }
+
+    private static Guid? Parse(string? value) =>
+        Guid.TryParse(value, out var id) ? id : null;
+
+    private static async Task<UiLookupItem?> ResolveAsync(
+        Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? search,
+        Guid? id)
+    {
+        if (!id.HasValue || search is null) return null;
+        var items = await search(string.Empty, CancellationToken.None);
+        return items.FirstOrDefault(x =>
+            string.Equals(x.Value, id.Value.ToString("D"), StringComparison.OrdinalIgnoreCase));
     }
 }

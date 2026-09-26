@@ -33,12 +33,16 @@ public sealed class AccountingSpreadsheetTests
         services.AddSingleton<IUnitOfWork>(new FakeUnitOfWork());
         Register<Account>(services);Register<CostCenter>(services);Register<CashAccount>(services);Register<BankAccount>(services);
         Register<ExpenseType>(services);Register<PostingProfile>(services);Register<PostingProfileLine>(services);Register<JournalEntry>(services);Register<JournalEntryLine>(services);
-        Register<CashShift>(services);Register<Expense>(services);Register<PaymentAllocation>(services);Register<ReceiptVoucherLine>(services);Register<PaymentVoucherLine>(services);Register<FiscalPeriod>(services);Register<FiscalYear>(services);Register<ReceiptVoucher>(services);Register<PaymentVoucher>(services);Register<Customer>(services);Register<Supplier>(services);
+        Register<CashShift>(services);Register<Expense>(services);Register<PaymentAllocation>(services);Register<ReceiptVoucherLine>(services);Register<PaymentVoucherLine>(services);Register<FiscalPeriod>(services);Register<FiscalYear>(services);Register<ReceiptVoucher>(services);Register<PaymentVoucher>(services);Register<Customer>(services);Register<Supplier>(services);Register<Currency>(services);Register<AccountingSettings>(services);
         _provider=services.BuildServiceProvider();
         await Repo<Account>().AddAsync(Account.Create(Guid.NewGuid(),"1110","صندوق",null,null,1,AccountClass.Asset,AccountType.Posting,NormalBalance.Debit,true,false,true,false,true,null));
         await Repo<Account>().AddAsync(Account.Create(Guid.NewGuid(),"3000","رأس المال",null,null,1,AccountClass.Equity,AccountType.Posting,NormalBalance.Credit,true,false,true,false,true,null));
         await Repo<Account>().AddAsync(Account.Create(Guid.NewGuid(),"110200","العملاء",null,null,1,AccountClass.Asset,AccountType.Control,NormalBalance.Debit,false,true,false,false,true,null));
         await Repo<Account>().AddAsync(Account.Create(Guid.NewGuid(),"210200","الموردون",null,null,1,AccountClass.Liability,AccountType.Control,NormalBalance.Credit,false,true,false,false,true,null));
+        var yer=Currency.Create(Guid.NewGuid(),"YER","الريال اليمني","Yemeni Rial","ر.ي",2,true);
+        await Repo<Currency>().AddAsync(yer);
+        var assetControl=Repo<Account>().Items.Single(x=>x.Code=="110200");
+        await Repo<AccountingSettings>().AddAsync(AccountingSettings.Create(yer.Id,null,assetControl.Id,assetControl.Id));
         await Repo<FiscalPeriod>().AddAsync(FiscalPeriod.Create(Guid.NewGuid(),Guid.NewGuid(),1,"2026",new(2026,1,1),new(2026,12,31),FiscalPeriodStatus.Open,false,false,false));
     }
     private sealed class newPermissionChecker:IPermissionChecker { public Task<bool> HasPermissionAsync(string permission,CancellationToken ct=default)=>Task.FromResult(true); }
@@ -108,20 +112,41 @@ public sealed class AccountingSpreadsheetTests
         Assert.That(Repo<CostCenter>().Items.Single(x=>x.Code=="C2").ParentCostCenterId,Is.EqualTo(Repo<CostCenter>().Items.Single(x=>x.Code=="C1").Id));
         Assert.That((await Service.PreviewAsync("cost-centers",bytes,default)).InvalidRows,Is.EqualTo(2));
     }
-    [Test] public async Task CashDuplicateAndMissingAccountRejected()
+    [Test] public async Task CashImportGeneratesOperationalAndLinkedAccountCodes()
     {
-        var row=Row("Code","C","Name","الصندوق","AccountCode","1110");
-        Assert.That((await Service.ImportAsync("cash-accounts",Book("cash-accounts",row),default)).ImportedRecords,Is.EqualTo(1));
-        Assert.That((await Service.PreviewAsync("cash-accounts",Book("cash-accounts",row),default)).InvalidRows,Is.EqualTo(1));
-        row["Code"]="D";row["AccountCode"]="unknown";
+        var row=Row("Name","الصندوق","CurrencyCode","YER","IsDefault","لا","IsActive","نعم");
+        var first=await Service.ImportAsync("cash-accounts",Book("cash-accounts",row),default);
+        var second=await Service.ImportAsync("cash-accounts",Book("cash-accounts",row),default);
+        Assert.That(first.ImportedRecords,Is.EqualTo(1));
+        Assert.That(second.ImportedRecords,Is.EqualTo(1));
+        var cash=Repo<CashAccount>().Items.OrderBy(x=>x.Code).ToArray();
+        Assert.That(cash,Has.Length.EqualTo(2));
+        Assert.That(cash[0].Code,Does.StartWith("CASH-"));
+        Assert.That(cash[1].Code,Does.StartWith("CASH-"));
+        Assert.That(cash[0].Code,Is.Not.EqualTo(cash[1].Code));
+        foreach(var item in cash)
+        {
+            var linked=Repo<Account>().Items.Single(x=>x.Id==item.AccountId);
+            Assert.That(linked.Code,Does.StartWith("110200"));
+            Assert.That(linked.Code.All(char.IsDigit),Is.True);
+        }
+    }
+    [Test] public async Task CashImportRejectsUnknownCurrency()
+    {
+        var row=Row("Name","الصندوق","CurrencyCode","XXX","IsActive","نعم");
         Assert.That((await Service.PreviewAsync("cash-accounts",Book("cash-accounts",row),default)).InvalidRows,Is.EqualTo(1));
     }
-    [Test] public async Task BankNumberAndCodeDuplicatesRejected()
+    [Test] public async Task BankImportGeneratesCodeAndRejectsDuplicateAccountNumber()
     {
-        var row=Row("Code","B","BankName","بنك","AccountName","حساب","AccountNumber","001234","AccountCode","1110");
-        Assert.That((await Service.ImportAsync("bank-accounts",Book("bank-accounts",row),default)).ImportedRecords,Is.EqualTo(1));
-        Assert.That((await Service.PreviewAsync("bank-accounts",Book("bank-accounts",row),default)).Rows[0].Errors.Count,Is.EqualTo(2));
-        row["Code"]="B2";Assert.That((await Service.PreviewAsync("bank-accounts",Book("bank-accounts",row),default)).InvalidRows,Is.EqualTo(1));
+        var row=Row("BankName","بنك","AccountName","حساب","AccountNumber","001234","CurrencyCode","YER","IsActive","نعم");
+        var imported=await Service.ImportAsync("bank-accounts",Book("bank-accounts",row),default);
+        Assert.That(imported.ImportedRecords,Is.EqualTo(1));
+        var bank=Repo<BankAccount>().Items.Single();
+        Assert.That(bank.Code,Does.StartWith("BANK-"));
+        var linked=Repo<Account>().Items.Single(x=>x.Id==bank.AccountId);
+        Assert.That(linked.Code,Does.StartWith("110200"));
+        Assert.That(linked.Code.All(char.IsDigit),Is.True);
+        Assert.That((await Service.PreviewAsync("bank-accounts",Book("bank-accounts",row),default)).InvalidRows,Is.EqualTo(1));
     }
     [Test] public async Task ExpenseTypeResolvesAccount()
     {

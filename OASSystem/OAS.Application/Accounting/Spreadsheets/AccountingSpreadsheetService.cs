@@ -1,3 +1,4 @@
+using OAS.Application.Accounting.Authorization;
 using OAS.Application.Accounting.Accounts.Commands.CreateAccount;
 using OAS.Contracts.Accounting.Accounts;
 using OAS.Application.Accounting.CostCenters.Commands.CreateCostCenter;
@@ -19,6 +20,10 @@ using OAS.Application.Spreadsheets;
 using OAS.Application.Accounting.Expenses.ExpenseTypes.Commands.CreateExpenseType;
 using OAS.Application.Accounting.Journals.Commands.CreateJournalEntry;
 using OAS.Application.Accounting.Customers.Commands.CreateCustomer;
+using OAS.Application.Accounting.Currencies.Commands.CreateCurrency;
+using OAS.Contracts.Accounting.Currencies;
+using OAS.Application.Accounting.ExchangeRates.Commands.CreateExchangeRate;
+using OAS.Contracts.Accounting.ExchangeRates;
 using OAS.Application.Accounting.Suppliers.Commands.CreateSupplier;
 using OAS.Contracts.Accounting.Expenses;
 using OAS.Contracts.Accounting.Journals;
@@ -35,8 +40,22 @@ public sealed partial class AccountingSpreadsheetService(
 {
     private async Task Authorize(string section, string action, CancellationToken ct)
     {
-        if (!AccountingSpreadsheetDefinitions.ExportSections.Contains(section)) throw new NotFoundException("spreadsheet",section);
-        if (!await permissions.HasPermissionAsync($"accounting.{section.Replace('-', '_')}.{action}",ct)) throw new ForbiddenException();
+        if (!AccountingSpreadsheetDefinitions.ExportSections.Contains(section))
+            throw new NotFoundException("spreadsheet", section);
+
+        var permission = section switch
+        {
+            "currencies" => action == "view"
+                ? AccountingPermissions.Currencies.View
+                : AccountingPermissions.Currencies.Manage,
+            "exchange-rates" => action == "view"
+                ? AccountingPermissions.ExchangeRates.View
+                : AccountingPermissions.ExchangeRates.Manage,
+            _ => $"accounting.{section.Replace('-', '_')}.{action}"
+        };
+
+        if (!await permissions.HasPermissionAsync(permission, ct))
+            throw new ForbiddenException();
     }
     public async Task<byte[]> TemplateAsync(string section, CancellationToken ct)
     {
@@ -142,9 +161,11 @@ public sealed partial class AccountingSpreadsheetService(
         }
         var accounts=await List<Account>(ct);
         var centers=await List<CostCenter>(ct);
+        var currencies=await List<Currency>(ct);
         var accountMap=accounts.ToDictionary(x=>x.Code,StringComparer.OrdinalIgnoreCase);
         var centerMap=centers.ToDictionary(x=>x.Code,StringComparer.OrdinalIgnoreCase);
-        var codeLabel=section switch { "accounts"=>"كود الحساب", "cost-centers"=>"كود مركز التكلفة", "cash-accounts"=>"كود الصندوق", "bank-accounts"=>"كود الحساب البنكي", "expense-types"=>"كود نوع المصروف", "posting-profiles"=>"كود ملف الترحيل", "customers"=>"كود العميل", "suppliers"=>"كود المورد", _=>"الكود" };
+        var currencyMap=currencies.ToDictionary(x=>x.Code,StringComparer.OrdinalIgnoreCase);
+        var codeLabel=section switch { "accounts"=>"كود الحساب", "cost-centers"=>"كود مركز التكلفة", "cash-accounts"=>"كود الصندوق", "bank-accounts"=>"كود الحساب البنكي", "expense-types"=>"كود نوع المصروف", "posting-profiles"=>"كود ملف الترحيل",  "customers"=>"كود العميل", "suppliers"=>"كود المورد", "currencies"=>"كود العملة", _=>"الكود" };
         var headers=rows.Where(x=>x.Source.Sheet==definitions[0].Name).ToList();
         IReadOnlyList<string> existing=section switch
         {
@@ -154,9 +175,10 @@ public sealed partial class AccountingSpreadsheetService(
             "bank-accounts"=>(await List<BankAccount>(ct)).Select(x=>x.Code).ToArray(),
             "expense-types"=>(await List<ExpenseType>(ct)).Select(x=>x.Code).ToArray(),
             "posting-profiles"=>(await List<PostingProfile>(ct)).Select(x=>x.Code).ToArray(),
+            "currencies"=>currencies.Select(x=>x.Code).ToArray(),
             _=>[]
         };
-        if(section is not ("journals" or "customers" or "suppliers"))
+        if(section is not ("journals" or "customers" or "suppliers" or "cash-accounts" or "bank-accounts" or "exchange-rates"))
             foreach(var group in headers.GroupBy(x=>x.Get("Code"),StringComparer.OrdinalIgnoreCase))
                 foreach(var row in group)
                 {
@@ -193,12 +215,64 @@ public sealed partial class AccountingSpreadsheetService(
             ValidateOptionalUnique(headers,existingSuppliers.Select(x=>x.TaxNumber),"TaxNumber","الرقم الضريبي");
             ValidateOptionalUnique(headers,existingSuppliers.Select(x=>x.CommercialRegistrationNo),"CommercialRegistrationNo","السجل التجاري");
         }
+        if(section=="cash-accounts")
+        {
+            foreach(var row in headers)
+                if(row.Get("Code").Length>0)
+                    row.Warnings.Add("كود الصندوق في الملف للعرض فقط؛ سيتم توليد كود جديد عند الاستيراد.");
+        }
         if(section=="bank-accounts")
         {
             var banks=await List<BankAccount>(ct);
+            foreach(var row in headers)
+                if(row.Get("Code").Length>0)
+                    row.Warnings.Add("كود الحساب البنكي في الملف للعرض فقط؛ سيتم توليد كود جديد عند الاستيراد.");
             foreach(var group in headers.GroupBy(x=>x.Get("AccountNumber"),StringComparer.OrdinalIgnoreCase))
                 foreach(var row in group)
                     if(group.Count()>1 || banks.Any(x=>string.Equals(x.AccountNumber,group.Key,StringComparison.OrdinalIgnoreCase))) row.Errors.Add("رقم الحساب البنكي مستخدم مسبقاً.");
+        }
+        if(section is "cash-accounts" or "bank-accounts")
+        {
+            foreach(var row in headers)
+            {
+                var currencyCode=row.Get("CurrencyCode");
+                if(!currencyMap.TryGetValue(currencyCode,out var currency) || !currency.IsActive)
+                    row.Errors.Add($"العملة {currencyCode} غير موجودة أو غير نشطة.");
+            }
+        }
+        if(section=="currencies")
+        {
+            foreach(var row in headers)
+            {
+                var places=row.Decimal("DecimalPlaces");
+                if(places<0 || places>6 || decimal.Truncate(places)!=places)
+                    row.Errors.Add("المنازل العشرية يجب أن تكون عدداً صحيحاً من 0 إلى 6.");
+            }
+        }
+        if(section=="exchange-rates")
+        {
+            var existingRates=await List<ExchangeRate>(ct);
+            foreach(var row in headers)
+            {
+                var code=row.Get("CurrencyCode");
+                if(!currencyMap.TryGetValue(code,out var currency) || !currency.IsActive)
+                {
+                    row.Errors.Add($"العملة {code} غير موجودة أو غير نشطة.");
+                    continue;
+                }
+                if(row.Decimal("Rate")<=0) row.Errors.Add("سعر الصرف يجب أن يكون أكبر من صفر.");
+                if(DateOnly.TryParseExact(row.Get("RateDate"),"yyyy-MM-dd",CultureInfo.InvariantCulture,DateTimeStyles.None,out var rateDate)
+                   && Enum.TryParse<OAS.Contracts.Accounting.Enums.ExchangeRateType>(row.Get("RateType"),true,out var rateType))
+                {
+                    var domainType=(OAS.Domain.Accounting.Enums.ExchangeRateType)(byte)rateType;
+                    var duplicateInFile=headers.Count(x =>
+                        string.Equals(x.Get("CurrencyCode"),code,StringComparison.OrdinalIgnoreCase)
+                        && x.Get("RateDate")==row.Get("RateDate")
+                        && string.Equals(x.Get("RateType"),row.Get("RateType"),StringComparison.OrdinalIgnoreCase))>1;
+                    if(duplicateInFile || existingRates.Any(x=>x.CurrencyId==currency.Id && x.RateDate==rateDate && x.RateType==domainType))
+                        row.Errors.Add("يوجد سعر صرف لنفس العملة والتاريخ ونوع السعر مسبقاً.");
+                }
+            }
         }
         void ValidateOptionalUnique(IEnumerable<Row> source,IEnumerable<string?> existingValues,string key,string label)
         {
@@ -278,7 +352,31 @@ public sealed partial class AccountingSpreadsheetService(
                 if(group.Sum(x=>x.Decimal("Debit"))!=group.Sum(x=>x.Decimal("Credit"))) { foreach(var row in group) row.Errors.Add("القيد غير متوازن: مجموع المدين لا يساوي مجموع الدائن.");continue; }
                 var matching=periods.Where(x=>x.StartDate<=first.Date("PostingDate") && x.EndDate>=first.Date("PostingDate")).ToArray();
                 if(matching.Length!=1 || !matching[0].CanPostAccounting() || matching[0].Status!=OAS.Domain.Accounting.Enums.FiscalPeriodStatus.Open) { foreach(var row in group) row.Errors.Add("لا توجد فترة مالية واحدة مفتوحة مناسبة لتاريخ الترحيل.");continue; }
-                var lines=group.Select(x=>new CreateJournalEntryLineRequest(accountMap[x.Get("AccountCode")].Id,x.Decimal("Debit"),x.Decimal("Credit"),x.Optional("LineDescription"),CostCenterId:x.Optional("CostCenterCode") is { } code?centerMap[code].Id:null)).ToArray();
+                var lines=group.Select(x=>
+                {
+                    Guid? currencyId=null;
+                    if(x.Optional("CurrencyCode") is { } currencyCode)
+                    {
+                        if(!currencyMap.TryGetValue(currencyCode,out var currency) || !currency.IsActive)
+                        {
+                            x.Errors.Add($"العملة {currencyCode} غير موجودة أو غير نشطة.");
+                        }
+                        else currencyId=currency.Id;
+                    }
+                    return new CreateJournalEntryLineRequest(
+                        accountMap[x.Get("AccountCode")].Id,
+                        x.Decimal("Debit"),
+                        x.Decimal("Credit"),
+                        currencyId,
+                        x.Optional("ExchangeRate") is null ? null : x.Decimal("ExchangeRate"),
+                        OAS.Contracts.Accounting.Enums.ExchangeRateType.Accounting,
+                        x.Optional("LineDescription"),
+                        null,
+                        null,
+                        null,
+                        x.Optional("CostCenterCode") is { } code?centerMap[code].Id:null);
+                }).ToArray();
+                if(group.Any(x=>x.Errors.Count>0)) continue;
                 await Add(first,new CreateJournalEntryCommand(new(first.Enum<JournalType>("JournalType"),first.Date("PostingDate"),first.Date("DocumentDate"),matching[0].Id,first.Get("Description"),null,null,null,lines)));
             }
         }
@@ -289,9 +387,11 @@ public sealed partial class AccountingSpreadsheetService(
             {
                 "accounts"=>new CreateAccountCommand(new(code,row.Get("NameAr"),row.Optional("NameEn"),accountMap.GetValueOrDefault(parent)?.Id,(byte)levels[code],row.Enum<AccountClass>("AccountClass"),row.Enum<AccountType>("AccountType"),row.Enum<NormalBalance>("NormalBalance"),row.Bool("IsPostingAccount",true),row.Bool("IsControlAccount"),row.Bool("AllowManualPosting",true),row.Bool("IsSystemAccount"),row.Bool("IsActive",true),row.Optional("EffectiveDate") is null?null:row.Date("EffectiveDate"))),
                 "cost-centers"=>new CreateCostCenterCommand(new(code,row.Get("NameAr"),row.Optional("NameEn"),centerMap.GetValueOrDefault(parent)?.Id,row.Bool("IsActive",true))),
-                "cash-accounts"=>new CreateCashAccountCommand(new(code,row.Get("Name"),Resolve(row,"AccountCode")!.Value,row.Bool("IsDefault"),row.Bool("IsActive",true))),
-                "bank-accounts"=>new CreateBankAccountCommand(new(code,row.Get("BankName"),row.Get("AccountName"),row.Get("AccountNumber"),row.Optional("IBAN"),Resolve(row,"AccountCode")!.Value,row.Bool("IsActive",true))),
+                "cash-accounts"=>new CreateCashAccountCommand(new(null,row.Get("Name"),currencyMap[row.Get("CurrencyCode")].Id,row.Bool("IsDefault"),row.Bool("IsActive",true))),
+                "bank-accounts"=>new CreateBankAccountCommand(new(null,row.Get("BankName"),row.Get("AccountName"),row.Get("AccountNumber"),row.Optional("IBAN"),currencyMap[row.Get("CurrencyCode")].Id,row.Bool("IsActive",true))),
                 "expense-types"=>new CreateExpenseTypeCommand(new(code,row.Get("NameAr"),row.Optional("NameEn"),Resolve(row,"DefaultExpenseAccountCode",true),row.Bool("IsActive",true))),
+                "currencies"=>new CreateCurrencyCommand(new CreateCurrencyRequest(code,row.Get("NameAr"),row.Optional("NameEn"),row.Optional("Symbol"),checked((byte)row.Decimal("DecimalPlaces")),row.Bool("IsActive",true))),
+                "exchange-rates"=>new CreateExchangeRateCommand(new CreateExchangeRateRequest(currencyMap[row.Get("CurrencyCode")].Id,row.Date("RateDate"),row.Decimal("Rate"),row.Enum<OAS.Contracts.Accounting.Enums.ExchangeRateType>("RateType"),row.Bool("IsActive",true))),
                 "customers"=>new CreateCustomerCommand(new CreateCustomerRequest(null,accountMap[row.Get("ParentAccountCode")].Id,row.Enum<OAS.Contracts.Accounting.Enums.PartyEntityType>("EntityType"),row.Get("NameAr"),row.Optional("NameEn"),row.Optional("TradeName"),row.Optional("NationalId"),row.Optional("CommercialRegistrationNo"),row.Optional("TaxNumber"),row.Optional("DateOfBirth") is null?null:row.Date("DateOfBirth"),row.Enum<OAS.Contracts.Accounting.Enums.Gender>("Gender"),row.Optional("ContactPersonName"),row.Optional("ContactPersonTitle"),row.Optional("Phone"),row.Optional("Mobile"),row.Optional("AlternatePhone"),row.Optional("WhatsAppNumber"),row.Optional("Email"),row.Optional("Website"),row.Enum<OAS.Contracts.Accounting.Enums.ContactMethod>("PreferredContactMethod"),row.Optional("Country"),row.Optional("Governorate"),row.Optional("City"),row.Optional("District"),row.Optional("Street"),row.Optional("Building"),row.Optional("PostalCode"),row.Optional("AddressDetails"),row.Bool("IsCreditAllowed"),row.Decimal("CreditLimit"),decimal.ToInt32(row.Decimal("PaymentTermDays")),row.Optional("CustomerSince") is null?null:row.Date("CustomerSince"),row.Bool("IsActive",true),row.Optional("Notes"))),
                 "suppliers"=>new CreateSupplierCommand(new CreateSupplierRequest(null,accountMap[row.Get("ParentAccountCode")].Id,row.Enum<OAS.Contracts.Accounting.Enums.PartyEntityType>("EntityType"),row.Enum<OAS.Contracts.Accounting.Enums.SupplierScope>("SupplierScope"),row.Get("NameAr"),row.Optional("NameEn"),row.Optional("TradeName"),row.Optional("NationalId"),row.Optional("CommercialRegistrationNo"),row.Optional("TaxNumber"),row.Optional("ContactPersonName"),row.Optional("ContactPersonTitle"),row.Optional("Phone"),row.Optional("Mobile"),row.Optional("AlternatePhone"),row.Optional("WhatsAppNumber"),row.Optional("Email"),row.Optional("Website"),row.Enum<OAS.Contracts.Accounting.Enums.ContactMethod>("PreferredContactMethod"),row.Optional("Country"),row.Optional("Governorate"),row.Optional("City"),row.Optional("District"),row.Optional("Street"),row.Optional("Building"),row.Optional("PostalCode"),row.Optional("AddressDetails"),row.Decimal("CreditLimit"),decimal.ToInt32(row.Decimal("PaymentTermDays")),row.Optional("DefaultLeadTimeDays") is null?null:decimal.ToInt32(row.Decimal("DefaultLeadTimeDays")),row.Optional("SupplierSince") is null?null:row.Date("SupplierSince"),row.Bool("IsActive",true),row.Optional("Notes"))),
                 _=>null

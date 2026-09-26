@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using OAS.Application.Accounting.CashAccounts.Commands.CreateCashAccount;
+using OAS.Application.Accounting.CashAccounts.Commands.ReserveCashAccountCode;
 using OAS.Application.Accounting.CashAccounts.Commands.SetCashAccountStatus;
 using OAS.Application.Accounting.CashAccounts.Commands.UpdateCashAccount;
 using OAS.Application.Accounting.CashAccounts.Queries.GetCashAccountById;
@@ -35,6 +36,17 @@ public sealed class CashAccountsController(ISender sender) : ControllerBase
         CancellationToken cancellationToken)
     {
         var result = await sender.Send(new GetCashAccountByIdQuery(id), cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("code/reserve")]
+    public async Task<ActionResult<CashAccountCodeReservationDto>> ReserveCode(
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(
+            new ReserveCashAccountCodeCommand(),
+            cancellationToken);
+
         return Ok(result);
     }
 

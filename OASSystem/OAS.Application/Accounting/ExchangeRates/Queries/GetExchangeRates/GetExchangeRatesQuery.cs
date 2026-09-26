@@ -1,0 +1,2 @@
+using OAS.Application.Abstractions.Messaging;using OAS.Application.Abstractions.Security;using OAS.Application.Accounting.Authorization;using OAS.Contracts.Accounting.ExchangeRates;using OAS.Contracts.Common.Pagination;
+namespace OAS.Application.Accounting.ExchangeRates.Queries.GetExchangeRates;public sealed record GetExchangeRatesQuery(PageRequest Request):IQuery<PagedResult<ExchangeRateDto>>,IAuthorizedRequest{public IReadOnlyCollection<string> RequiredPermissions{get;}=[AccountingPermissions.ExchangeRates.View];}

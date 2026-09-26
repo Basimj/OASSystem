@@ -1,0 +1,2 @@
+using OAS.Application.Abstractions.Messaging;using OAS.Application.Abstractions.Security;using OAS.Application.Accounting.Authorization;using OAS.Contracts.Accounting.Enums;using OAS.Contracts.Accounting.ExchangeRates;
+namespace OAS.Application.Accounting.ExchangeRates.Queries.GetEffectiveExchangeRate;public sealed record GetEffectiveExchangeRateQuery(Guid CurrencyId,DateOnly Date,ExchangeRateType RateType):IQuery<EffectiveExchangeRateDto>,IAuthorizedRequest{public IReadOnlyCollection<string> RequiredPermissions{get;}=[AccountingPermissions.ExchangeRates.View];}

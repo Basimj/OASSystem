@@ -10,6 +10,8 @@ using OAS.Contracts.Accounting.BankAccounts;
 using OAS.Contracts.Accounting.CashAccounts;
 using OAS.Contracts.Accounting.CashShifts;
 using OAS.Contracts.Accounting.CostCenters;
+using OAS.Contracts.Accounting.Currencies;
+using OAS.Contracts.Accounting.EmployeeAccounts;
 using OAS.Contracts.Accounting.Customers;
 using OAS.Contracts.Accounting.Enums;
 using OAS.Contracts.Accounting.Expenses;
@@ -33,6 +35,9 @@ using OAS.UiLib.Services.Dialogs;
 using OAS.UiLib.Services.Feedback;
 using AccountingRecordItem = OAS.UiLib.Components.Accounting.Workspace.UiAccountingRecordList.RecordItem;
 using AccountingDetailItem = OAS.UiLib.Components.Accounting.Workspace.UiAccountingRecordList.DetailItem;
+using UiSettlementPartyKind = OAS.UiLib.Components.Accounting.Vouchers.UiVoucherSettlementLinesEditor.SettlementPartyKind;
+using UiPaymentMethodKind = OAS.UiLib.Components.Accounting.Vouchers.UiVoucherSettlementLinesEditor.PaymentMethodKind;
+using UiExchangeRateSourceKind = OAS.UiLib.Components.Accounting.Vouchers.UiVoucherSettlementLinesEditor.ExchangeRateSourceKind;
 
 namespace OAS.Client.Accounting.Components;
 
@@ -65,6 +70,8 @@ public partial class AccountingWorkspaceHost : IDisposable
     private readonly Dictionary<Guid, UiLookupItem> _paymentSourceLookups = [];
     private readonly Dictionary<Guid, UiLookupItem> _customerLookups = [];
     private readonly Dictionary<Guid, UiLookupItem> _supplierLookups = [];
+    private readonly Dictionary<Guid, UiLookupItem> _currencyLookups = [];
+    private readonly Dictionary<Guid, UiLookupItem> _employeeAccountLookups = [];
 
     private PagedResult<AccountDto> _accountsPage = new();
     private PagedResult<JournalEntryDto> _journalsPage = new();
@@ -394,6 +401,12 @@ public partial class AccountingWorkspaceHost : IDisposable
             case CashShiftEditor.FormModel model:
                 model.ShiftNumber = (await AccountingService.ReserveCashShiftNumberAsync())?.Number ?? string.Empty;
                 break;
+            case CashAccountEditor.FormModel model:
+                model.Code = (await AccountingService.ReserveCashAccountCodeAsync())?.CashAccountCode ?? string.Empty;
+                break;
+            case BankAccountEditor.FormModel model:
+                model.Code = (await AccountingService.ReserveBankAccountCodeAsync())?.BankAccountCode ?? string.Empty;
+                break;
         }
     }
 
@@ -653,332 +666,342 @@ public partial class AccountingWorkspaceHost : IDisposable
             switch (tab.EntityType)
             {
                 case AccountingEntityType.Accounts:
-                {
-                    var dto = await AccountingService.GetAccountByIdAsync(id) ?? throw NotFound("الحساب");
-                    await EnsureAccountLookupAsync(dto.ParentAccountId);
-                    var model = new AccountEditor.FormModel
                     {
-                        Code = dto.Code,
-                        NameAr = dto.NameAr,
-                        NameEn = dto.NameEn,
-                        ParentAccountId = dto.ParentAccountId,
-                        Level = dto.Level,
-                        AccountClass = dto.AccountClass,
-                        AccountType = dto.AccountType,
-                        NormalBalance = dto.NormalBalance,
-                        IsPostingAccount = dto.IsPostingAccount,
-                        IsControlAccount = dto.IsControlAccount,
-                        AllowManualPosting = dto.AllowManualPosting,
-                        IsSystemAccount = dto.IsSystemAccount,
-                        IsActive = dto.IsActive,
-                        EffectiveDate = dto.EffectiveDate,
-                        RowVersion = dto.RowVersion
-                    };
-                    CompleteLoadedTab(tab, dto.Id, $"{dto.Code} - {dto.NameAr}", model);
-                    break;
-                }
+                        var dto = await AccountingService.GetAccountByIdAsync(id) ?? throw NotFound("الحساب");
+                        await EnsureAccountLookupAsync(dto.ParentAccountId);
+                        var model = new AccountEditor.FormModel
+                        {
+                            Code = dto.Code,
+                            NameAr = dto.NameAr,
+                            NameEn = dto.NameEn,
+                            ParentAccountId = dto.ParentAccountId,
+                            Level = dto.Level,
+                            AccountClass = dto.AccountClass,
+                            AccountType = dto.AccountType,
+                            NormalBalance = dto.NormalBalance,
+                            IsPostingAccount = dto.IsPostingAccount,
+                            IsControlAccount = dto.IsControlAccount,
+                            AllowManualPosting = dto.AllowManualPosting,
+                            IsSystemAccount = dto.IsSystemAccount,
+                            IsActive = dto.IsActive,
+                            EffectiveDate = dto.EffectiveDate,
+                            RowVersion = dto.RowVersion
+                        };
+                        CompleteLoadedTab(tab, dto.Id, $"{dto.Code} - {dto.NameAr}", model);
+                        break;
+                    }
                 case AccountingEntityType.FiscalYears:
-                {
-                    var dto = await AccountingService.GetFiscalYearByIdAsync(id) ?? throw NotFound("السنة المالية");
-                    RememberFiscalYearLookups([dto]);
-                    var model = new FiscalYearEditor.FormModel
                     {
-                        Code = dto.Code,
-                        Name = dto.Name,
-                        StartDate = dto.StartDate,
-                        EndDate = dto.EndDate,
-                        Status = dto.Status,
-                        OriginalStatus = dto.Status,
-                        RowVersion = dto.RowVersion
-                    };
-                    CompleteLoadedTab(tab, dto.Id, $"{dto.Code} - {dto.Name}", model);
-                    break;
-                }
+                        var dto = await AccountingService.GetFiscalYearByIdAsync(id) ?? throw NotFound("السنة المالية");
+                        RememberFiscalYearLookups([dto]);
+                        var model = new FiscalYearEditor.FormModel
+                        {
+                            Code = dto.Code,
+                            Name = dto.Name,
+                            StartDate = dto.StartDate,
+                            EndDate = dto.EndDate,
+                            Status = dto.Status,
+                            OriginalStatus = dto.Status,
+                            RowVersion = dto.RowVersion
+                        };
+                        CompleteLoadedTab(tab, dto.Id, $"{dto.Code} - {dto.Name}", model);
+                        break;
+                    }
                 case AccountingEntityType.FiscalPeriods:
-                {
-                    var dto = await AccountingService.GetFiscalPeriodByIdAsync(id) ?? throw NotFound("الفترة المالية");
-                    await EnsureFiscalYearLookupAsync(dto.FiscalYearId);
-                    RememberFiscalPeriodLookups([dto]);
-                    var model = new FiscalPeriodEditor.FormModel
                     {
-                        FiscalYearId = dto.FiscalYearId,
-                        PeriodNumber = dto.PeriodNumber,
-                        Name = dto.Name,
-                        StartDate = dto.StartDate,
-                        EndDate = dto.EndDate,
-                        Status = dto.Status,
-                        OriginalStatus = dto.Status,
-                        SalesLocked = dto.SalesLocked,
-                        InventoryLocked = dto.InventoryLocked,
-                        AccountingLocked = dto.AccountingLocked,
-                        RowVersion = dto.RowVersion
-                    };
-                    CompleteLoadedTab(tab, dto.Id, $"الفترة {dto.PeriodNumber} - {dto.Name}", model);
-                    break;
-                }
+                        var dto = await AccountingService.GetFiscalPeriodByIdAsync(id) ?? throw NotFound("الفترة المالية");
+                        await EnsureFiscalYearLookupAsync(dto.FiscalYearId);
+                        RememberFiscalPeriodLookups([dto]);
+                        var model = new FiscalPeriodEditor.FormModel
+                        {
+                            FiscalYearId = dto.FiscalYearId,
+                            PeriodNumber = dto.PeriodNumber,
+                            Name = dto.Name,
+                            StartDate = dto.StartDate,
+                            EndDate = dto.EndDate,
+                            Status = dto.Status,
+                            OriginalStatus = dto.Status,
+                            SalesLocked = dto.SalesLocked,
+                            InventoryLocked = dto.InventoryLocked,
+                            AccountingLocked = dto.AccountingLocked,
+                            RowVersion = dto.RowVersion
+                        };
+                        CompleteLoadedTab(tab, dto.Id, $"الفترة {dto.PeriodNumber} - {dto.Name}", model);
+                        break;
+                    }
                 case AccountingEntityType.Journals:
-                {
-                    var dto = await AccountingService.GetJournalByIdAsync(id) ?? throw NotFound("القيد");
-                    await EnsureFiscalPeriodLookupAsync(dto.FiscalPeriodId);
-                    var lines = new List<UiJournalLinesEditor.EditableJournalLine>();
-                    foreach (var line in dto.Lines.OrderBy(x => x.LineNumber))
                     {
-                        var account = await EnsureAccountLookupAsync(line.AccountId);
-                        var costCenter = await EnsureCostCenterLookupAsync(line.CostCenterId);
-                        var customer = await EnsureCustomerLookupAsync(line.CustomerId);
-                        var supplier = await EnsureSupplierLookupAsync(line.SupplierId);
-                        lines.Add(new UiJournalLinesEditor.EditableJournalLine
+                        var dto = await AccountingService.GetJournalByIdAsync(id) ?? throw NotFound("القيد");
+                        await EnsureFiscalPeriodLookupAsync(dto.FiscalPeriodId);
+                        var lines = new List<UiJournalLinesEditor.EditableJournalLine>();
+                        foreach (var line in dto.Lines.OrderBy(x => x.LineNumber))
                         {
-                            AccountId = line.AccountId,
-                            AccountDisplay = account?.PrimaryText ?? line.AccountId.ToString("D"),
-                            AccountLookupItem = account,
-                            Description = line.Description ?? string.Empty,
-                            CostCenterId = line.CostCenterId,
-                            CostCenterDisplay = costCenter?.PrimaryText,
-                            CostCenterLookupItem = costCenter,
-                            DebitAmount = line.DebitAmount,
-                            CreditAmount = line.CreditAmount,
-                            CustomerId = line.CustomerId,
-                            CustomerLookupItem = customer,
-                            SupplierId = line.SupplierId,
-                            SupplierLookupItem = supplier,
-                            ProductVariantId = line.ProductVariantId,
-                            WarehouseId = line.WarehouseId
-                        });
-                    }
+                            var account = await EnsureAccountLookupAsync(line.AccountId);
+                            var costCenter = await EnsureCostCenterLookupAsync(line.CostCenterId);
+                            var customer = await EnsureCustomerLookupAsync(line.CustomerId);
+                            var supplier = await EnsureSupplierLookupAsync(line.SupplierId);
+                            var employee = await EnsureEmployeeAccountLookupAsync(line.EmployeeId);
+                            var currency = await EnsureCurrencyLookupAsync(line.TransactionCurrencyId);
+                            lines.Add(new UiJournalLinesEditor.EditableJournalLine
+                            {
+                                AccountId = line.AccountId,
+                                AccountDisplay = account?.PrimaryText ?? line.AccountId.ToString("D"),
+                                AccountLookupItem = account,
+                                Description = line.Description ?? string.Empty,
+                                CostCenterId = line.CostCenterId,
+                                CostCenterDisplay = costCenter?.PrimaryText,
+                                CostCenterLookupItem = costCenter,
+                                DebitAmount = line.TransactionDebitAmount ?? line.DebitAmount,
+                                CreditAmount = line.TransactionCreditAmount ?? line.CreditAmount,
+                                CustomerId = line.CustomerId,
+                                CustomerLookupItem = customer,
+                                SupplierId = line.SupplierId,
+                                SupplierLookupItem = supplier,
+                                EmployeeId = line.EmployeeId,
+                                EmployeeLookupItem = employee,
+                                ProductVariantId = line.ProductVariantId,
+                                WarehouseId = line.WarehouseId,
+                                TransactionCurrencyId = line.TransactionCurrencyId,
+                                CurrencyCode = line.TransactionCurrencyCodeSnapshot,
+                                CurrencyLookupItem = currency,
+                                ResolvedExchangeRate = line.ExchangeRateSource == ExchangeRateSource.Manual ? null : line.ExchangeRate,
+                                ManualExchangeRate = line.ExchangeRateSource == ExchangeRateSource.Manual ? line.ExchangeRate : null
+                            });
+                        }
 
-                    var model = new JournalEntryEditor.FormModel
-                    {
-                        JournalNumber = dto.JournalNumber,
-                        JournalType = dto.JournalType,
-                        PostingDate = dto.PostingDate,
-                        DocumentDate = dto.DocumentDate,
-                        FiscalPeriodId = dto.FiscalPeriodId,
-                        Description = dto.Description,
-                        SourceModule = dto.SourceModule,
-                        SourceDocumentType = dto.SourceDocumentType,
-                        SourceDocumentId = dto.SourceDocumentId,
-                        Status = dto.Status,
-                        ReversedJournalId = dto.ReversedJournalId,
-                        RowVersion = dto.RowVersion,
-                        Lines = lines
-                    };
-                    CompleteLoadedTab(tab, dto.Id, dto.JournalNumber, model);
-                    break;
-                }
-                case AccountingEntityType.PostingProfiles:
-                {
-                    var dto = await AccountingService.GetPostingProfileByIdAsync(id) ?? throw NotFound("ملف الترحيل");
-                    var lines = new List<UiPostingProfileLinesEditor.EditablePostingProfileLine>();
-                    foreach (var line in dto.Lines)
-                    {
-                        var account = await EnsureAccountLookupAsync(line.AccountId);
-                        lines.Add(new UiPostingProfileLinesEditor.EditablePostingProfileLine
+                        var model = new JournalEntryEditor.FormModel
                         {
-                            AccountRole = line.AccountRole,
-                            AccountId = line.AccountId,
-                            AccountDisplay = account?.PrimaryText ?? line.AccountId.ToString("D"),
-                            AccountLookupItem = account,
-                            IsRequired = line.IsRequired
-                        });
+                            JournalNumber = dto.JournalNumber,
+                            JournalType = dto.JournalType,
+                            PostingDate = dto.PostingDate,
+                            DocumentDate = dto.DocumentDate,
+                            FiscalPeriodId = dto.FiscalPeriodId,
+                            Description = dto.Description,
+                            SourceModule = dto.SourceModule,
+                            SourceDocumentType = dto.SourceDocumentType,
+                            SourceDocumentId = dto.SourceDocumentId,
+                            Status = dto.Status,
+                            ReversedJournalId = dto.ReversedJournalId,
+                            RowVersion = dto.RowVersion,
+                            Lines = lines
+                        };
+                        CompleteLoadedTab(tab, dto.Id, dto.JournalNumber, model);
+                        break;
                     }
-                    var model = new PostingProfileEditor.FormModel
+                case AccountingEntityType.PostingProfiles:
                     {
-                        Code = dto.Code,
-                        Name = dto.Name,
-                        Module = dto.Module,
-                        DocumentType = dto.DocumentType,
-                        IsActive = dto.IsActive,
-                        RowVersion = dto.RowVersion,
-                        Lines = lines
-                    };
-                    CompleteLoadedTab(tab, dto.Id, $"{dto.Code} - {dto.Name}", model);
-                    break;
-                }
+                        var dto = await AccountingService.GetPostingProfileByIdAsync(id) ?? throw NotFound("ملف الترحيل");
+                        var lines = new List<UiPostingProfileLinesEditor.EditablePostingProfileLine>();
+                        foreach (var line in dto.Lines)
+                        {
+                            var account = await EnsureAccountLookupAsync(line.AccountId);
+                            lines.Add(new UiPostingProfileLinesEditor.EditablePostingProfileLine
+                            {
+                                AccountRole = line.AccountRole,
+                                AccountId = line.AccountId,
+                                AccountDisplay = account?.PrimaryText ?? line.AccountId.ToString("D"),
+                                AccountLookupItem = account,
+                                IsRequired = line.IsRequired
+                            });
+                        }
+                        var model = new PostingProfileEditor.FormModel
+                        {
+                            Code = dto.Code,
+                            Name = dto.Name,
+                            Module = dto.Module,
+                            DocumentType = dto.DocumentType,
+                            IsActive = dto.IsActive,
+                            RowVersion = dto.RowVersion,
+                            Lines = lines
+                        };
+                        CompleteLoadedTab(tab, dto.Id, $"{dto.Code} - {dto.Name}", model);
+                        break;
+                    }
                 case AccountingEntityType.CostCenters:
-                {
-                    var dto = await AccountingService.GetCostCenterByIdAsync(id) ?? throw NotFound("مركز التكلفة");
-                    await EnsureCostCenterLookupAsync(dto.ParentCostCenterId);
-                    RememberCostCenterLookups([dto]);
-                    var model = new CostCenterEditor.FormModel
                     {
-                        Code = dto.Code,
-                        NameAr = dto.NameAr,
-                        NameEn = dto.NameEn,
-                        ParentCostCenterId = dto.ParentCostCenterId,
-                        IsActive = dto.IsActive,
-                        RowVersion = dto.RowVersion
-                    };
-                    CompleteLoadedTab(tab, dto.Id, $"{dto.Code} - {dto.NameAr}", model);
-                    break;
-                }
+                        var dto = await AccountingService.GetCostCenterByIdAsync(id) ?? throw NotFound("مركز التكلفة");
+                        await EnsureCostCenterLookupAsync(dto.ParentCostCenterId);
+                        RememberCostCenterLookups([dto]);
+                        var model = new CostCenterEditor.FormModel
+                        {
+                            Code = dto.Code,
+                            NameAr = dto.NameAr,
+                            NameEn = dto.NameEn,
+                            ParentCostCenterId = dto.ParentCostCenterId,
+                            IsActive = dto.IsActive,
+                            RowVersion = dto.RowVersion
+                        };
+                        CompleteLoadedTab(tab, dto.Id, $"{dto.Code} - {dto.NameAr}", model);
+                        break;
+                    }
                 case AccountingEntityType.ReceiptVouchers:
-                {
-                    var dto = await AccountingService.GetReceiptVoucherByIdAsync(id) ?? throw NotFound("سند القبض");
-                    await EnsureCustomerLookupAsync(dto.CustomerId);
-                    await EnsureCashAccountLookupAsync(dto.CashAccountId);
-                    await EnsureBankAccountLookupAsync(dto.BankAccountId);
-                    var lines = await MapVoucherLinesAsync(dto.Lines.Select(x => (x.AccountId, x.Amount, x.ReferenceType, x.ReferenceId, x.Description)));
-                    var model = new ReceiptVoucherEditor.FormModel
                     {
-                        VoucherNumber = dto.VoucherNumber,
-                        VoucherDate = dto.VoucherDate,
-                        PartyType = dto.PartyType,
-                        CustomerId = dto.CustomerId,
-                        ReceivedFrom = dto.ReceivedFrom,
-                        PaymentMethod = dto.PaymentMethod,
-                        CashAccountId = dto.CashAccountId,
-                        BankAccountId = dto.BankAccountId,
-                        TotalAmount = dto.TotalAmount,
-                        Description = dto.Description ?? string.Empty,
-                        Status = dto.Status,
-                        RowVersion = dto.RowVersion,
-                        Lines = lines
-                    };
-                    RememberPaymentSourceLookups([dto]);
-                    CompleteLoadedTab(tab, dto.Id, dto.VoucherNumber, model);
-                    break;
-                }
+                        var dto = await AccountingService.GetReceiptVoucherByIdAsync(id) ?? throw NotFound("سند القبض");
+                        var lines = await MapReceiptSettlementLinesAsync(dto.Lines);
+                        var model = new ReceiptVoucherEditor.FormModel
+                        {
+                            VoucherNumber = dto.VoucherNumber,
+                            VoucherDate = dto.VoucherDate,
+                            BaseCurrencyId = dto.BaseCurrencyId,
+                            BaseCurrencyCode = dto.BaseCurrencyCodeSnapshot,
+                            BaseCurrencyDecimalPlaces = dto.BaseCurrencyDecimalPlacesSnapshot,
+                            BaseTotalAmount = dto.BaseTotalAmount,
+                            Description = dto.Description ?? string.Empty,
+                            Status = dto.Status,
+                            JournalEntryId = dto.JournalEntryId,
+                            RowVersion = dto.RowVersion,
+                            Lines = lines
+                        };
+                        RememberPaymentSourceLookups([dto]);
+                        CompleteLoadedTab(tab, dto.Id, dto.VoucherNumber, model);
+                        break;
+                    }
                 case AccountingEntityType.PaymentVouchers:
-                {
-                    var dto = await AccountingService.GetPaymentVoucherByIdAsync(id) ?? throw NotFound("سند الصرف");
-                    await EnsureSupplierLookupAsync(dto.SupplierId);
-                    await EnsureCashAccountLookupAsync(dto.CashAccountId);
-                    await EnsureBankAccountLookupAsync(dto.BankAccountId);
-                    var lines = await MapVoucherLinesAsync(dto.Lines.Select(x => (x.AccountId, x.Amount, x.ReferenceType, x.ReferenceId, x.Description)));
-                    var model = new PaymentVoucherEditor.FormModel
                     {
-                        VoucherNumber = dto.VoucherNumber,
-                        VoucherDate = dto.VoucherDate,
-                        PartyType = dto.PartyType,
-                        SupplierId = dto.SupplierId,
-                        BeneficiaryName = dto.BeneficiaryName,
-                        PaymentMethod = dto.PaymentMethod,
-                        CashAccountId = dto.CashAccountId,
-                        BankAccountId = dto.BankAccountId,
-                        TotalAmount = dto.TotalAmount,
-                        Description = dto.Description ?? string.Empty,
-                        Status = dto.Status,
-                        RowVersion = dto.RowVersion,
-                        Lines = lines
-                    };
-                    RememberPaymentSourceLookups([dto]);
-                    CompleteLoadedTab(tab, dto.Id, dto.VoucherNumber, model);
-                    break;
-                }
+                        var dto = await AccountingService.GetPaymentVoucherByIdAsync(id) ?? throw NotFound("سند الصرف");
+                        var lines = await MapPaymentSettlementLinesAsync(dto.Lines);
+                        var model = new PaymentVoucherEditor.FormModel
+                        {
+                            VoucherNumber = dto.VoucherNumber,
+                            VoucherDate = dto.VoucherDate,
+                            BaseCurrencyId = dto.BaseCurrencyId,
+                            BaseCurrencyCode = dto.BaseCurrencyCodeSnapshot,
+                            BaseCurrencyDecimalPlaces = dto.BaseCurrencyDecimalPlacesSnapshot,
+                            BaseTotalAmount = dto.BaseTotalAmount,
+                            Description = dto.Description ?? string.Empty,
+                            Status = dto.Status,
+                            JournalEntryId = dto.JournalEntryId,
+                            RowVersion = dto.RowVersion,
+                            Lines = lines
+                        };
+                        RememberPaymentSourceLookups([dto]);
+                        CompleteLoadedTab(tab, dto.Id, dto.VoucherNumber, model);
+                        break;
+                    }
                 case AccountingEntityType.PaymentAllocations:
-                {
-                    var dto = await AccountingService.GetPaymentAllocationByIdAsync(id) ?? throw NotFound("تخصيص السداد");
-                    await EnsurePaymentSourceLookupAsync(dto.PaymentSourceType, dto.PaymentSourceId);
-                    var model = new PaymentAllocationEditor.FormModel
                     {
-                        PaymentSourceType = dto.PaymentSourceType,
-                        PaymentSourceId = dto.PaymentSourceId,
-                        TargetDocumentType = dto.TargetDocumentType,
-                        TargetDocumentId = dto.TargetDocumentId,
-                        AllocatedAmount = dto.AllocatedAmount,
-                        AllocatedAtUtc = dto.AllocatedAtUtc
-                    };
-                    CompleteLoadedTab(tab, dto.Id, $"تخصيص {dto.AllocatedAmount:N2}", model);
-                    break;
-                }
+                        var dto = await AccountingService.GetPaymentAllocationByIdAsync(id) ?? throw NotFound("تخصيص السداد");
+                        var sourceType = dto.ReceiptVoucherLineId.HasValue ? PaymentSourceType.ReceiptVoucher : PaymentSourceType.PaymentVoucher;
+                        var sourceLineId = dto.ReceiptVoucherLineId ?? dto.PaymentVoucherLineId;
+                        if (sourceLineId.HasValue) await EnsurePaymentSourceLineLookupAsync(sourceType, sourceLineId.Value);
+                        var model = new PaymentAllocationEditor.FormModel
+                        {
+                            PaymentSourceType = sourceType,
+                            ReceiptVoucherLineId = dto.ReceiptVoucherLineId,
+                            PaymentVoucherLineId = dto.PaymentVoucherLineId,
+                            TargetDocumentType = dto.TargetDocumentType,
+                            TargetDocumentId = dto.TargetDocumentId,
+                            CurrencyId = dto.CurrencyId,
+                            CurrencyCodeSnapshot = dto.CurrencyCodeSnapshot,
+                            AllocatedAmount = dto.AllocatedAmount,
+                            ExchangeRate = dto.ExchangeRate,
+                            BaseAllocatedAmount = dto.BaseAllocatedAmount,
+                            AllocatedAtUtc = dto.AllocatedAtUtc
+                        };
+                        CompleteLoadedTab(tab, dto.Id, $"تخصيص {dto.AllocatedAmount:N2} {dto.CurrencyCodeSnapshot}", model);
+                        break;
+                    }
                 case AccountingEntityType.CashAccounts:
-                {
-                    var dto = await AccountingService.GetCashAccountByIdAsync(id) ?? throw NotFound("الصندوق");
-                    await EnsureAccountLookupAsync(dto.AccountId);
-                    RememberCashAccountLookups([dto]);
-                    var model = new CashAccountEditor.FormModel
                     {
-                        Code = dto.Code,
-                        Name = dto.Name,
-                        AccountId = dto.AccountId,
-                        IsDefault = dto.IsDefault,
-                        IsActive = dto.IsActive,
-                        RowVersion = dto.RowVersion
-                    };
-                    CompleteLoadedTab(tab, dto.Id, $"{dto.Code} - {dto.Name}", model);
-                    break;
-                }
+                        var dto = await AccountingService.GetCashAccountByIdAsync(id) ?? throw NotFound("الصندوق");
+                        await EnsureAccountLookupAsync(dto.AccountId);
+                        await EnsureCurrencyLookupAsync(dto.CurrencyId);
+                        RememberCashAccountLookups([dto]);
+                        var model = new CashAccountEditor.FormModel
+                        {
+                            Code = dto.Code,
+                            Name = dto.Name,
+                            AccountId = dto.AccountId,
+                            CurrencyId = dto.CurrencyId,
+                            IsDefault = dto.IsDefault,
+                            IsActive = dto.IsActive,
+                            RowVersion = dto.RowVersion
+                        };
+                        CompleteLoadedTab(tab, dto.Id, $"{dto.Code} - {dto.Name}", model);
+                        break;
+                    }
                 case AccountingEntityType.BankAccounts:
-                {
-                    var dto = await AccountingService.GetBankAccountByIdAsync(id) ?? throw NotFound("الحساب البنكي");
-                    await EnsureAccountLookupAsync(dto.AccountId);
-                    RememberBankAccountLookups([dto]);
-                    var model = new BankAccountEditor.FormModel
                     {
-                        Code = dto.Code,
-                        BankName = dto.BankName,
-                        AccountName = dto.AccountName,
-                        AccountNumber = dto.AccountNumber,
-                        IBAN = dto.IBAN,
-                        AccountId = dto.AccountId,
-                        IsActive = dto.IsActive,
-                        RowVersion = dto.RowVersion
-                    };
-                    CompleteLoadedTab(tab, dto.Id, $"{dto.BankName} - {dto.AccountName}", model);
-                    break;
-                }
+                        var dto = await AccountingService.GetBankAccountByIdAsync(id) ?? throw NotFound("الحساب البنكي");
+                        await EnsureAccountLookupAsync(dto.AccountId);
+                        await EnsureCurrencyLookupAsync(dto.CurrencyId);
+                        RememberBankAccountLookups([dto]);
+                        var model = new BankAccountEditor.FormModel
+                        {
+                            Code = dto.Code,
+                            BankName = dto.BankName,
+                            AccountName = dto.AccountName,
+                            AccountNumber = dto.AccountNumber,
+                            IBAN = dto.IBAN,
+                            AccountId = dto.AccountId,
+                            CurrencyId = dto.CurrencyId,
+                            IsActive = dto.IsActive,
+                            RowVersion = dto.RowVersion
+                        };
+                        CompleteLoadedTab(tab, dto.Id, $"{dto.BankName} - {dto.AccountName}", model);
+                        break;
+                    }
                 case AccountingEntityType.CashShifts:
-                {
-                    var dto = await AccountingService.GetCashShiftByIdAsync(id) ?? throw NotFound("وردية الصندوق");
-                    await EnsureCashAccountLookupAsync(dto.CashAccountId);
-                    var model = new CashShiftEditor.FormModel
                     {
-                        ShiftNumber = dto.ShiftNumber,
-                        CashAccountId = dto.CashAccountId,
-                        OpeningBalance = dto.OpeningBalance,
-                        ExpectedClosingBalance = dto.ExpectedClosingBalance,
-                        ActualClosingBalance = dto.ActualClosingBalance,
-                        DifferenceAmount = dto.DifferenceAmount,
-                        Status = dto.Status,
-                        RowVersion = dto.RowVersion
-                    };
-                    CompleteLoadedTab(tab, dto.Id, $"وردية {dto.ShiftNumber}", model);
-                    break;
-                }
+                        var dto = await AccountingService.GetCashShiftByIdAsync(id) ?? throw NotFound("وردية الصندوق");
+                        await EnsureCashAccountLookupAsync(dto.CashAccountId);
+                        var model = new CashShiftEditor.FormModel
+                        {
+                            ShiftNumber = dto.ShiftNumber,
+                            CashAccountId = dto.CashAccountId,
+                            OpeningBalance = dto.OpeningBalance,
+                            ExpectedClosingBalance = dto.ExpectedClosingBalance,
+                            ActualClosingBalance = dto.ActualClosingBalance,
+                            DifferenceAmount = dto.DifferenceAmount,
+                            Status = dto.Status,
+                            RowVersion = dto.RowVersion
+                        };
+                        CompleteLoadedTab(tab, dto.Id, $"وردية {dto.ShiftNumber}", model);
+                        break;
+                    }
                 case AccountingEntityType.Expenses:
-                {
-                    var dto = await AccountingService.GetExpenseByIdAsync(id) ?? throw NotFound("المصروف");
-                    await EnsureExpenseTypeLookupAsync(dto.ExpenseTypeId);
-                    await EnsureAccountLookupAsync(dto.ExpenseAccountId);
-                    await EnsureCashAccountLookupAsync(dto.CashAccountId);
-                    await EnsureBankAccountLookupAsync(dto.BankAccountId);
-                    var model = new ExpenseEditor.FormModel
                     {
-                        ExpenseNumber = dto.ExpenseNumber,
-                        ExpenseDate = dto.ExpenseDate,
-                        ExpenseTypeId = dto.ExpenseTypeId,
-                        ExpenseAccountId = dto.ExpenseAccountId,
-                        Beneficiary = dto.Beneficiary,
-                        Amount = dto.Amount,
-                        PaymentMethod = dto.PaymentMethod,
-                        CashAccountId = dto.CashAccountId,
-                        BankAccountId = dto.BankAccountId,
-                        Description = dto.Description,
-                        Status = dto.Status,
-                        JournalEntryId = dto.JournalEntryId,
-                        RowVersion = dto.RowVersion
-                    };
-                    CompleteLoadedTab(tab, dto.Id, dto.ExpenseNumber, model);
-                    break;
-                }
+                        var dto = await AccountingService.GetExpenseByIdAsync(id) ?? throw NotFound("المصروف");
+                        await EnsureExpenseTypeLookupAsync(dto.ExpenseTypeId);
+                        await EnsureAccountLookupAsync(dto.ExpenseAccountId);
+                        await EnsureCashAccountLookupAsync(dto.CashAccountId);
+                        await EnsureBankAccountLookupAsync(dto.BankAccountId);
+                        var model = new ExpenseEditor.FormModel
+                        {
+                            ExpenseNumber = dto.ExpenseNumber,
+                            ExpenseDate = dto.ExpenseDate,
+                            ExpenseTypeId = dto.ExpenseTypeId,
+                            ExpenseAccountId = dto.ExpenseAccountId,
+                            Beneficiary = dto.Beneficiary,
+                            Amount = dto.Amount,
+                            PaymentMethod = dto.PaymentMethod,
+                            CashAccountId = dto.CashAccountId,
+                            BankAccountId = dto.BankAccountId,
+                            Description = dto.Description,
+                            Status = dto.Status,
+                            JournalEntryId = dto.JournalEntryId,
+                            RowVersion = dto.RowVersion
+                        };
+                        CompleteLoadedTab(tab, dto.Id, dto.ExpenseNumber, model);
+                        break;
+                    }
                 case AccountingEntityType.ExpenseTypes:
-                {
-                    var dto = await AccountingService.GetExpenseTypeByIdAsync(id) ?? throw NotFound("نوع المصروف");
-                    await EnsureAccountLookupAsync(dto.DefaultExpenseAccountId);
-                    RememberExpenseTypeLookups([dto]);
-                    var model = new ExpenseTypeEditor.FormModel
                     {
-                        Code = dto.Code,
-                        NameAr = dto.NameAr,
-                        NameEn = dto.NameEn,
-                        DefaultExpenseAccountId = dto.DefaultExpenseAccountId,
-                        IsActive = dto.IsActive,
-                        RowVersion = dto.RowVersion
-                    };
-                    CompleteLoadedTab(tab, dto.Id, $"{dto.Code} - {dto.NameAr}", model);
-                    break;
-                }
+                        var dto = await AccountingService.GetExpenseTypeByIdAsync(id) ?? throw NotFound("نوع المصروف");
+                        await EnsureAccountLookupAsync(dto.DefaultExpenseAccountId);
+                        RememberExpenseTypeLookups([dto]);
+                        var model = new ExpenseTypeEditor.FormModel
+                        {
+                            Code = dto.Code,
+                            NameAr = dto.NameAr,
+                            NameEn = dto.NameEn,
+                            DefaultExpenseAccountId = dto.DefaultExpenseAccountId,
+                            IsActive = dto.IsActive,
+                            RowVersion = dto.RowVersion
+                        };
+                        CompleteLoadedTab(tab, dto.Id, $"{dto.Code} - {dto.NameAr}", model);
+                        break;
+                    }
                 default:
                     throw new InvalidOperationException("نوع السجل غير مدعوم.");
             }
@@ -1008,25 +1031,94 @@ public partial class AccountingWorkspaceHost : IDisposable
         tab.IsLoading = false;
     }
 
-    private async Task<List<UiVoucherLinesEditor.EditableVoucherLine>> MapVoucherLinesAsync(
-        IEnumerable<(Guid AccountId, decimal Amount, string? ReferenceType, Guid? ReferenceId, string? Description)> source)
+    private async Task<List<UiVoucherSettlementLinesEditor.EditableSettlementLine>> MapReceiptSettlementLinesAsync(
+        IEnumerable<ReceiptVoucherLineDto> source)
     {
-        var result = new List<UiVoucherLinesEditor.EditableVoucherLine>();
+        var result = new List<UiVoucherSettlementLinesEditor.EditableSettlementLine>();
         foreach (var line in source)
         {
-            var account = await EnsureAccountLookupAsync(line.AccountId);
-            result.Add(new UiVoucherLinesEditor.EditableVoucherLine
-            {
-                AccountId = line.AccountId,
-                AccountDisplay = account?.PrimaryText ?? line.AccountId.ToString("D"),
-                AccountLookupItem = account,
-                Amount = line.Amount,
-                ReferenceType = line.ReferenceType,
-                ReferenceId = line.ReferenceId,
-                Description = line.Description
-            });
+            result.Add(await MapSettlementLineAsync(
+                line.PartyType, line.CustomerId, line.SupplierId, line.EmployeeId,
+                line.PartyNameSnapshot, line.CounterpartyAccountId,
+                line.PaymentMethod, line.CashAccountId, line.BankAccountId, line.SettlementAccountId,
+                line.CurrencyId, line.CurrencyCodeSnapshot, line.Amount, line.ExchangeRate,
+                line.ExchangeRateDate, line.ExchangeRateSource, line.BaseAmount,
+                line.ReferenceNumber, line.ReferenceDate, line.ReferenceType, line.ReferenceId,
+                line.Description, line.AccountId));
         }
         return result;
+    }
+
+    private async Task<List<UiVoucherSettlementLinesEditor.EditableSettlementLine>> MapPaymentSettlementLinesAsync(
+        IEnumerable<PaymentVoucherLineDto> source)
+    {
+        var result = new List<UiVoucherSettlementLinesEditor.EditableSettlementLine>();
+        foreach (var line in source)
+        {
+            result.Add(await MapSettlementLineAsync(
+                line.PartyType, line.CustomerId, line.SupplierId, line.EmployeeId,
+                line.PartyNameSnapshot, line.CounterpartyAccountId,
+                line.PaymentMethod, line.CashAccountId, line.BankAccountId, line.SettlementAccountId,
+                line.CurrencyId, line.CurrencyCodeSnapshot, line.Amount, line.ExchangeRate,
+                line.ExchangeRateDate, line.ExchangeRateSource, line.BaseAmount,
+                line.ReferenceNumber, line.ReferenceDate, line.ReferenceType, line.ReferenceId,
+                line.Description, line.AccountId));
+        }
+        return result;
+    }
+
+    private async Task<UiVoucherSettlementLinesEditor.EditableSettlementLine> MapSettlementLineAsync(
+        SettlementPartyType? partyType, Guid? customerId, Guid? supplierId, Guid? employeeId,
+        string? partyName, Guid? counterpartyAccountId, PaymentMethod? paymentMethod,
+        Guid? cashAccountId, Guid? bankAccountId, Guid? settlementAccountId,
+        Guid? currencyId, string? currencyCode, decimal amount, decimal? exchangeRate,
+        DateOnly? exchangeRateDate, ExchangeRateSource? exchangeRateSource, decimal? baseAmount,
+        string? referenceNumber, DateOnly? referenceDate, string? referenceType, Guid? referenceId,
+        string? description, Guid legacyAccountId)
+    {
+        UiLookupItem? partyLookup = null;
+        if (customerId.HasValue) partyLookup = await EnsureCustomerLookupAsync(customerId);
+        else if (supplierId.HasValue) partyLookup = await EnsureSupplierLookupAsync(supplierId);
+        else if (employeeId.HasValue) partyLookup = await EnsureEmployeeAccountLookupAsync(employeeId);
+
+        var counterpartyLookup = await EnsureAccountLookupAsync(counterpartyAccountId ?? (partyType is null ? legacyAccountId : null));
+        UiLookupItem? settlementLookup = null;
+        if (cashAccountId.HasValue) settlementLookup = await EnsureCashAccountLookupAsync(cashAccountId);
+        else if (bankAccountId.HasValue) settlementLookup = await EnsureBankAccountLookupAsync(bankAccountId);
+        else if (settlementAccountId.HasValue) settlementLookup = await EnsureAccountLookupAsync(settlementAccountId);
+
+        var currencyLookup = await EnsureCurrencyLookupAsync(currencyId);
+
+        return new UiVoucherSettlementLinesEditor.EditableSettlementLine
+        {
+            PartyType = (UiSettlementPartyKind)(byte)(partyType ?? SettlementPartyType.Other),
+            CustomerId = customerId,
+            SupplierId = supplierId,
+            EmployeeId = employeeId,
+            PartyName = partyName ?? (partyType is null ? "سطر تاريخي" : null),
+            CounterpartyAccountId = counterpartyAccountId ?? (partyType is null ? legacyAccountId : null),
+            PaymentMethod = (UiPaymentMethodKind)(byte)(paymentMethod ?? PaymentMethod.Other),
+            CashAccountId = cashAccountId,
+            BankAccountId = bankAccountId,
+            SettlementAccountId = settlementAccountId,
+            CurrencyId = currencyId,
+            CurrencyCodeSnapshot = currencyCode,
+            Amount = amount,
+            ResolvedExchangeRate = exchangeRateSource == ExchangeRateSource.Manual ? null : exchangeRate,
+            ManualExchangeRate = exchangeRateSource == ExchangeRateSource.Manual ? exchangeRate : null,
+            ExchangeRateDate = exchangeRateDate,
+            ExchangeRateSource = exchangeRateSource.HasValue ? (UiExchangeRateSourceKind?)(byte)exchangeRateSource.Value : null,
+            BaseAmount = baseAmount,
+            ReferenceNumber = referenceNumber,
+            ReferenceDate = referenceDate,
+            ReferenceType = referenceType,
+            ReferenceId = referenceId,
+            Description = description,
+            PartyLookupItem = partyLookup,
+            CounterpartyAccountLookupItem = counterpartyLookup,
+            SettlementLookupItem = settlementLookup,
+            CurrencyLookupItem = currencyLookup
+        };
     }
 
     private async Task SaveActiveAsync()
@@ -1265,8 +1357,8 @@ public partial class AccountingWorkspaceHost : IDisposable
             Snackbar.Warning("لا يمكن أن يكون السطر مديناً ودائناً في نفس الوقت.");
             return;
         }
-        var totalDebit = validLines.Sum(x => x.DebitAmount);
-        var totalCredit = validLines.Sum(x => x.CreditAmount);
+        var totalDebit = validLines.Sum(x => x.BaseDebitAmount);
+        var totalCredit = validLines.Sum(x => x.BaseCreditAmount);
         if (totalDebit != totalCredit)
         {
             Snackbar.Warning($"القيد غير متزن. المدين {totalDebit:N2} والدائن {totalCredit:N2}.");
@@ -1274,8 +1366,19 @@ public partial class AccountingWorkspaceHost : IDisposable
         }
 
         var lines = validLines.Select(x => new CreateJournalEntryLineRequest(
-            x.AccountId!.Value, x.DebitAmount, x.CreditAmount, NullIfBlank(x.Description),
-            x.CustomerId, x.SupplierId, x.CostCenterId, x.ProductVariantId, x.WarehouseId)).ToArray();
+            x.AccountId!.Value,
+            x.DebitAmount,
+            x.CreditAmount,
+            x.TransactionCurrencyId,
+            x.ManualExchangeRate,
+            ExchangeRateType.Accounting,
+            NullIfBlank(x.Description),
+            x.CustomerId,
+            x.SupplierId,
+            x.EmployeeId,
+            x.CostCenterId,
+            x.ProductVariantId,
+            x.WarehouseId)).ToArray();
 
         JournalEntryDto? result;
         if (tab.IsNew)
@@ -1357,48 +1460,26 @@ public partial class AccountingWorkspaceHost : IDisposable
 
     private async Task SaveReceiptVoucherAsync(AccountingTabState tab, ReceiptVoucherEditor.FormModel model)
     {
-        if (model.TotalAmount <= 0)
-        {
-            Snackbar.Warning("مبلغ سند القبض يجب أن يكون أكبر من صفر.");
-            return;
-        }
-        if (model.PartyType == ReceiptPartyType.Customer && !model.CustomerId.HasValue)
-        {
-            Snackbar.Warning("معرف العميل مطلوب عندما يكون نوع الطرف عميلاً.");
-            return;
-        }
-        if (model.PartyType == ReceiptPartyType.Other && string.IsNullOrWhiteSpace(model.ReceivedFrom))
-        {
-            Snackbar.Warning("اسم الجهة الدافعة مطلوب.");
-            return;
-        }
-        if (!ValidatePaymentAccount(model.PaymentMethod, model.CashAccountId, model.BankAccountId))
-            return;
+        if (!ValidateSettlementLines(model.Lines)) return;
 
-        var lines = model.Lines
-            .Where(x => x.AccountId.HasValue && x.Amount > 0)
-            .Select(x => new CreateReceiptVoucherLineRequest(
-                x.AccountId!.Value, x.Amount, NullIfBlank(x.ReferenceType), x.ReferenceId, NullIfBlank(x.Description)))
-            .ToArray();
-
-        if (!ValidateVoucherLines(model.TotalAmount, lines.Select(x => x.Amount)))
-            return;
+        var lines = model.Lines.Select(x => new CreateReceiptVoucherLineRequest(
+            (SettlementPartyType)(byte)x.PartyType, x.CustomerId, x.SupplierId, x.EmployeeId, NullIfBlank(x.PartyName), x.CounterpartyAccountId,
+            (PaymentMethod)(byte)x.PaymentMethod, x.CashAccountId, x.BankAccountId, x.SettlementAccountId,
+            x.CurrencyId!.Value, x.Amount, x.ManualExchangeRate, ExchangeRateType.Accounting,
+            NullIfBlank(x.ReferenceNumber), x.ReferenceDate, NullIfBlank(x.ReferenceType), x.ReferenceId,
+            NullIfBlank(x.Description))).ToArray();
 
         ReceiptVoucherDto? result;
         if (tab.IsNew)
         {
             result = await AccountingService.CreateReceiptVoucherAsync(new CreateReceiptVoucherRequest(
-                model.VoucherDate, model.PartyType, model.CustomerId, NullIfBlank(model.ReceivedFrom),
-                model.PaymentMethod, model.CashAccountId, model.BankAccountId, model.TotalAmount,
-                NullIfBlank(model.Description), lines, model.VoucherNumber));
+                model.VoucherDate, NullIfBlank(model.Description), lines, model.VoucherNumber));
         }
         else
         {
             EnsureEntityIdAndRowVersion(tab, model.RowVersion);
             result = await AccountingService.UpdateReceiptVoucherAsync(tab.EntityId!.Value, new UpdateReceiptVoucherRequest(
-                model.VoucherDate, model.PartyType, model.CustomerId, NullIfBlank(model.ReceivedFrom),
-                model.PaymentMethod, model.CashAccountId, model.BankAccountId, model.TotalAmount,
-                NullIfBlank(model.Description), lines, model.RowVersion));
+                model.VoucherDate, NullIfBlank(model.Description), lines, model.RowVersion));
         }
 
         await CompleteSaveAsync(tab, result?.Id, result?.VoucherNumber, "تم حفظ سند القبض بنجاح.");
@@ -1406,64 +1487,59 @@ public partial class AccountingWorkspaceHost : IDisposable
 
     private async Task SavePaymentVoucherAsync(AccountingTabState tab, PaymentVoucherEditor.FormModel model)
     {
-        if (model.TotalAmount <= 0)
-        {
-            Snackbar.Warning("مبلغ سند الصرف يجب أن يكون أكبر من صفر.");
-            return;
-        }
-        if (model.PartyType == PaymentPartyType.Supplier && !model.SupplierId.HasValue)
-        {
-            Snackbar.Warning("معرف المورد مطلوب عندما يكون نوع المستفيد مورداً.");
-            return;
-        }
-        if (model.PartyType != PaymentPartyType.Supplier && string.IsNullOrWhiteSpace(model.BeneficiaryName))
-        {
-            Snackbar.Warning("اسم المستفيد مطلوب.");
-            return;
-        }
-        if (!ValidatePaymentAccount(model.PaymentMethod, model.CashAccountId, model.BankAccountId))
-            return;
+        if (!ValidateSettlementLines(model.Lines)) return;
 
-        var lines = model.Lines
-            .Where(x => x.AccountId.HasValue && x.Amount > 0)
-            .Select(x => new CreatePaymentVoucherLineRequest(
-                x.AccountId!.Value, x.Amount, NullIfBlank(x.ReferenceType), x.ReferenceId, NullIfBlank(x.Description)))
-            .ToArray();
-
-        if (!ValidateVoucherLines(model.TotalAmount, lines.Select(x => x.Amount)))
-            return;
+        var lines = model.Lines.Select(x => new CreatePaymentVoucherLineRequest(
+            (SettlementPartyType)(byte)x.PartyType, x.CustomerId, x.SupplierId, x.EmployeeId, NullIfBlank(x.PartyName), x.CounterpartyAccountId,
+            (PaymentMethod)(byte)x.PaymentMethod, x.CashAccountId, x.BankAccountId, x.SettlementAccountId,
+            x.CurrencyId!.Value, x.Amount, x.ManualExchangeRate, ExchangeRateType.Accounting,
+            NullIfBlank(x.ReferenceNumber), x.ReferenceDate, NullIfBlank(x.ReferenceType), x.ReferenceId,
+            NullIfBlank(x.Description))).ToArray();
 
         PaymentVoucherDto? result;
         if (tab.IsNew)
         {
             result = await AccountingService.CreatePaymentVoucherAsync(new CreatePaymentVoucherRequest(
-                model.VoucherDate, model.PartyType, model.SupplierId, NullIfBlank(model.BeneficiaryName),
-                model.PaymentMethod, model.CashAccountId, model.BankAccountId, model.TotalAmount,
-                NullIfBlank(model.Description), lines, model.VoucherNumber));
+                model.VoucherDate, NullIfBlank(model.Description), lines, model.VoucherNumber));
         }
         else
         {
             EnsureEntityIdAndRowVersion(tab, model.RowVersion);
             result = await AccountingService.UpdatePaymentVoucherAsync(tab.EntityId!.Value, new UpdatePaymentVoucherRequest(
-                model.VoucherDate, model.PartyType, model.SupplierId, NullIfBlank(model.BeneficiaryName),
-                model.PaymentMethod, model.CashAccountId, model.BankAccountId, model.TotalAmount,
-                NullIfBlank(model.Description), lines, model.RowVersion));
+                model.VoucherDate, NullIfBlank(model.Description), lines, model.RowVersion));
         }
 
         await CompleteSaveAsync(tab, result?.Id, result?.VoucherNumber, "تم حفظ سند الصرف بنجاح.");
     }
 
+    private bool ValidateSettlementLines(IReadOnlyList<UiVoucherSettlementLinesEditor.EditableSettlementLine> lines)
+    {
+        if (lines.Count == 0) { Snackbar.Warning("يجب إضافة سطر تسوية واحد على الأقل."); return false; }
+        for (var i = 0; i < lines.Count; i++)
+        {
+            var line = lines[i]; var number = i + 1;
+            if (line.Amount <= 0 || !line.CurrencyId.HasValue) { Snackbar.Warning($"السطر {number}: العملة والمبلغ الأكبر من صفر مطلوبان."); return false; }
+            var invalidParty =
+                (line.PartyType == UiSettlementPartyKind.Customer && !line.CustomerId.HasValue) ||
+                (line.PartyType == UiSettlementPartyKind.Supplier && !line.SupplierId.HasValue) ||
+                (line.PartyType == UiSettlementPartyKind.Employee && !line.EmployeeId.HasValue) ||
+                (line.PartyType == UiSettlementPartyKind.Other && (string.IsNullOrWhiteSpace(line.PartyName) || !line.CounterpartyAccountId.HasValue));
+            if (invalidParty) { Snackbar.Warning($"السطر {number}: أكمل بيانات الطرف والحساب المقابل."); return false; }
+            var invalidSettlement =
+                (line.PaymentMethod == UiPaymentMethodKind.Cash && !line.CashAccountId.HasValue) ||
+                (line.PaymentMethod is UiPaymentMethodKind.BankTransfer or UiPaymentMethodKind.Cheque or UiPaymentMethodKind.Card && !line.BankAccountId.HasValue) ||
+                (line.PaymentMethod == UiPaymentMethodKind.Other && !line.SettlementAccountId.HasValue);
+            if (invalidSettlement) { Snackbar.Warning($"السطر {number}: اختر حساب التسوية الموافق لطريقة الدفع."); return false; }
+            if (line.PaymentMethod == UiPaymentMethodKind.Cheque && string.IsNullOrWhiteSpace(line.ReferenceNumber)) { Snackbar.Warning($"السطر {number}: رقم الشيك مطلوب."); return false; }
+        }
+        return true;
+    }
+
     private async Task SavePaymentAllocationAsync(AccountingTabState tab, PaymentAllocationEditor.FormModel model)
     {
-        if (model.PaymentSourceType == PaymentSourceType.CustomerAdvance)
+        if (!model.SourceLineId.HasValue || !model.TargetDocumentId.HasValue || model.AllocatedAmount <= 0)
         {
-            Snackbar.Warning("تخصيص سلفة العميل غير متاح حتى يتم ربط مصدر Customer Advance من موديول العملاء. استخدم سند قبض أو سند صرف متاح حالياً.");
-            return;
-        }
-
-        if (!model.PaymentSourceId.HasValue || !model.TargetDocumentId.HasValue || model.AllocatedAmount <= 0)
-        {
-            Snackbar.Warning("مصدر الدفعة والمستند الهدف ومبلغ التخصيص مطلوبة.");
+            Snackbar.Warning("سطر السداد والمستند الهدف ومبلغ التخصيص مطلوبة.");
             return;
         }
 
@@ -1471,67 +1547,55 @@ public partial class AccountingWorkspaceHost : IDisposable
         if (tab.IsNew)
         {
             result = await AccountingService.CreatePaymentAllocationAsync(new CreatePaymentAllocationRequest(
-                model.PaymentSourceType, model.PaymentSourceId.Value,
+                model.PaymentSourceType == PaymentSourceType.ReceiptVoucher ? model.SourceLineId : null,
+                model.PaymentSourceType == PaymentSourceType.PaymentVoucher ? model.SourceLineId : null,
                 model.TargetDocumentType, model.TargetDocumentId.Value, model.AllocatedAmount));
         }
         else
         {
             if (!tab.EntityId.HasValue) throw new InvalidOperationException("معرف التخصيص غير متوفر.");
-            result = await AccountingService.UpdatePaymentAllocationAsync(tab.EntityId.Value,
-                new UpdatePaymentAllocationRequest(model.AllocatedAmount));
+            result = await AccountingService.UpdatePaymentAllocationAsync(tab.EntityId.Value, new UpdatePaymentAllocationRequest(model.AllocatedAmount));
         }
 
-        await CompleteSaveAsync(tab, result?.Id, result is null ? null : $"تخصيص {result.AllocatedAmount:N2}", "تم حفظ تخصيص السداد بنجاح.");
+        await CompleteSaveAsync(tab, result?.Id, result is null ? null : $"تخصيص {result.AllocatedAmount:N2} {result.CurrencyCodeSnapshot}", "تم حفظ تخصيص السداد بنجاح.");
     }
 
     private async Task SaveCashAccountAsync(AccountingTabState tab, CashAccountEditor.FormModel model)
     {
-        if (string.IsNullOrWhiteSpace(model.Code) || string.IsNullOrWhiteSpace(model.Name) || !model.AccountId.HasValue)
+        if (string.IsNullOrWhiteSpace(model.Name) || !model.CurrencyId.HasValue)
         {
-            Snackbar.Warning("كود الصندوق واسمه والحساب المحاسبي المرتبط مطلوبة.");
+            Snackbar.Warning("اسم الصندوق وعملته مطلوبان.");
             return;
         }
 
         CashAccountDto? result;
         if (tab.IsNew)
-        {
-            result = await AccountingService.CreateCashAccountAsync(new CreateCashAccountRequest(
-                model.Code.Trim(), model.Name.Trim(), model.AccountId.Value, model.IsDefault, model.IsActive));
-        }
+            result = await AccountingService.CreateCashAccountAsync(new CreateCashAccountRequest(model.Code.Trim(), model.Name.Trim(), model.CurrencyId.Value, model.IsDefault, model.IsActive));
         else
         {
             EnsureEntityIdAndRowVersion(tab, model.RowVersion);
-            result = await AccountingService.UpdateCashAccountAsync(tab.EntityId!.Value, new UpdateCashAccountRequest(
-                model.Code.Trim(), model.Name.Trim(), model.AccountId.Value, model.IsDefault, model.IsActive, model.RowVersion));
+            result = await AccountingService.UpdateCashAccountAsync(tab.EntityId!.Value, new UpdateCashAccountRequest(model.Name.Trim(), model.CurrencyId.Value, model.IsDefault, model.IsActive, model.RowVersion));
         }
-
         await CompleteSaveAsync(tab, result?.Id, result is null ? null : $"{result.Code} - {result.Name}", "تم حفظ الصندوق بنجاح.");
     }
 
     private async Task SaveBankAccountAsync(AccountingTabState tab, BankAccountEditor.FormModel model)
     {
-        if (string.IsNullOrWhiteSpace(model.Code) || string.IsNullOrWhiteSpace(model.BankName) ||
-            string.IsNullOrWhiteSpace(model.AccountName) || string.IsNullOrWhiteSpace(model.AccountNumber) || !model.AccountId.HasValue)
+        if (string.IsNullOrWhiteSpace(model.BankName) ||
+            string.IsNullOrWhiteSpace(model.AccountName) || string.IsNullOrWhiteSpace(model.AccountNumber) || !model.CurrencyId.HasValue)
         {
-            Snackbar.Warning("أكمل بيانات الحساب البنكي والحساب المحاسبي المرتبط.");
+            Snackbar.Warning("أكمل بيانات الحساب البنكي وحدد العملة.");
             return;
         }
 
         BankAccountDto? result;
         if (tab.IsNew)
-        {
-            result = await AccountingService.CreateBankAccountAsync(new CreateBankAccountRequest(
-                model.Code.Trim(), model.BankName.Trim(), model.AccountName.Trim(), model.AccountNumber.Trim(),
-                NullIfBlank(model.IBAN), model.AccountId.Value, model.IsActive));
-        }
+            result = await AccountingService.CreateBankAccountAsync(new CreateBankAccountRequest(model.Code.Trim(), model.BankName.Trim(), model.AccountName.Trim(), model.AccountNumber.Trim(), NullIfBlank(model.IBAN), model.CurrencyId.Value, model.IsActive));
         else
         {
             EnsureEntityIdAndRowVersion(tab, model.RowVersion);
-            result = await AccountingService.UpdateBankAccountAsync(tab.EntityId!.Value, new UpdateBankAccountRequest(
-                model.Code.Trim(), model.BankName.Trim(), model.AccountName.Trim(), model.AccountNumber.Trim(),
-                NullIfBlank(model.IBAN), model.AccountId.Value, model.IsActive, model.RowVersion));
+            result = await AccountingService.UpdateBankAccountAsync(tab.EntityId!.Value, new UpdateBankAccountRequest(model.BankName.Trim(), model.AccountName.Trim(), model.AccountNumber.Trim(), NullIfBlank(model.IBAN), model.CurrencyId.Value, model.IsActive, model.RowVersion));
         }
-
         await CompleteSaveAsync(tab, result?.Id, result is null ? null : $"{result.BankName} - {result.AccountName}", "تم حفظ الحساب البنكي بنجاح.");
     }
 
@@ -1871,6 +1935,68 @@ public partial class AccountingWorkspaceHost : IDisposable
         return result.Items.Select(ToBankAccountLookup).ToArray();
     }
 
+    private async Task<IReadOnlyList<UiLookupItem>> SearchCashAccountsByCurrencyAsync(
+        Guid? currencyId,
+        string text,
+        CancellationToken cancellationToken)
+    {
+        if (!currencyId.HasValue)
+            return Array.Empty<UiLookupItem>();
+
+        var result = await AccountingService.GetCashAccountsPageAsync(
+            new PageRequest
+            {
+                PageNumber = 1,
+                PageSize = 200,
+                Search = text
+            },
+            cancellationToken);
+
+        var items = result.Items
+            .Where(x =>
+                x.IsActive &&
+                x.CurrencyId.HasValue &&
+                x.CurrencyId.Value == currencyId.Value)
+            .ToArray();
+
+        RememberCashAccountLookups(items);
+
+        return items
+            .Select(ToCashAccountLookup)
+            .ToArray();
+    }
+
+    private async Task<IReadOnlyList<UiLookupItem>> SearchBankAccountsByCurrencyAsync(
+        Guid? currencyId,
+        string text,
+        CancellationToken cancellationToken)
+    {
+        if (!currencyId.HasValue)
+            return Array.Empty<UiLookupItem>();
+
+        var result = await AccountingService.GetBankAccountsPageAsync(
+            new PageRequest
+            {
+                PageNumber = 1,
+                PageSize = 200,
+                Search = text
+            },
+            cancellationToken);
+
+        var items = result.Items
+            .Where(x =>
+                x.IsActive &&
+                x.CurrencyId.HasValue &&
+                x.CurrencyId.Value == currencyId.Value)
+            .ToArray();
+
+        RememberBankAccountLookups(items);
+
+        return items
+            .Select(ToBankAccountLookup)
+            .ToArray();
+    }
+
     private async Task<IReadOnlyList<UiLookupItem>> SearchExpenseTypesAsync(string text, CancellationToken cancellationToken)
     {
         var result = await AccountingService.GetExpenseTypesPageAsync(new PageRequest { PageNumber = 1, PageSize = 20, Search = text }, cancellationToken);
@@ -1892,26 +2018,69 @@ public partial class AccountingWorkspaceHost : IDisposable
         return result.Where(x => x.IsActive).Select(ToSupplierLookup).ToArray();
     }
 
+    private async Task<IReadOnlyList<UiLookupItem>> SearchCurrenciesAsync(string text, CancellationToken cancellationToken)
+    {
+        var result = await AccountingService.GetCurrenciesPageAsync(new PageRequest { PageNumber = 1, PageSize = 50, Search = text }, cancellationToken);
+        foreach (var currency in result.Items) _currencyLookups[currency.Id] = ToCurrencyLookup(currency);
+        return result.Items.Where(x => x.IsActive).Select(ToCurrencyLookup).ToArray();
+    }
+
+    private async Task<IReadOnlyList<UiLookupItem>> SearchEmployeeAccountsAsync(string text, CancellationToken cancellationToken)
+    {
+        var result = await AccountingService.GetEmployeeAccountsPageAsync(new PageRequest { PageNumber = 1, PageSize = 100, Search = text }, cancellationToken);
+        foreach (var mapping in result.Items) _employeeAccountLookups[mapping.EmployeeId] = ToEmployeeAccountLookup(mapping);
+        return result.Items.Where(x => x.IsActive).Select(ToEmployeeAccountLookup).ToArray();
+    }
+
+    private async Task<decimal?> ResolveEffectiveRatePreviewAsync(
+        Guid currencyId,
+        DateOnly date,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await AccountingService.GetEffectiveExchangeRateAsync(
+                currencyId,
+                date,
+                ExchangeRateType.Accounting,
+                cancellationToken);
+            return result?.Rate;
+        }
+        catch
+        {
+            // Saving remains server-authoritative. A missing preview must not make
+            // the editor crash; the command handler will return the real business error.
+            return null;
+        }
+    }
+
     private async Task<IReadOnlyList<UiLookupItem>> SearchPaymentSourcesAsync(string text, CancellationToken cancellationToken)
     {
-        if (Workspace.ActiveTab?.Model is not PaymentAllocationEditor.FormModel model)
-            return [];
-
+        if (Workspace.ActiveTab?.Model is not PaymentAllocationEditor.FormModel model) return [];
+        var items = new List<UiLookupItem>();
         if (model.PaymentSourceType == PaymentSourceType.ReceiptVoucher)
         {
-            var result = await AccountingService.GetReceiptVouchersPageAsync(new PageRequest { PageNumber = 1, PageSize = 20, Search = text }, cancellationToken);
-            RememberPaymentSourceLookups(result.Items);
-            return result.Items.Select(x => new UiLookupItem(x.Id.ToString("D"), x.VoucherNumber, $"{x.TotalAmount:N2} · {AccountingArabicPresenter.GetReceiptVoucherStatusText(x.Status)}", "fa-solid fa-money-bill-trend-up")).ToArray();
+            var page = await AccountingService.GetReceiptVouchersPageAsync(new PageRequest { PageNumber = 1, PageSize = 50, Search = text }, cancellationToken);
+            foreach (var voucher in page.Items)
+                foreach (var line in voucher.Lines.Where(x => x.CurrencyId.HasValue && x.ExchangeRate is > 0))
+                {
+                    var item = ToReceiptSourceLineLookup(voucher, line);
+                    _paymentSourceLookups[line.Id] = item;
+                    items.Add(item);
+                }
         }
-
-        if (model.PaymentSourceType == PaymentSourceType.PaymentVoucher)
+        else if (model.PaymentSourceType == PaymentSourceType.PaymentVoucher)
         {
-            var result = await AccountingService.GetPaymentVouchersPageAsync(new PageRequest { PageNumber = 1, PageSize = 20, Search = text }, cancellationToken);
-            RememberPaymentSourceLookups(result.Items);
-            return result.Items.Select(x => new UiLookupItem(x.Id.ToString("D"), x.VoucherNumber, $"{x.TotalAmount:N2} · {AccountingArabicPresenter.GetPaymentVoucherStatusText(x.Status)}", "fa-solid fa-money-bill-transfer")).ToArray();
+            var page = await AccountingService.GetPaymentVouchersPageAsync(new PageRequest { PageNumber = 1, PageSize = 50, Search = text }, cancellationToken);
+            foreach (var voucher in page.Items)
+                foreach (var line in voucher.Lines.Where(x => x.CurrencyId.HasValue && x.ExchangeRate is > 0))
+                {
+                    var item = ToPaymentSourceLineLookup(voucher, line);
+                    _paymentSourceLookups[line.Id] = item;
+                    items.Add(item);
+                }
         }
-
-        return [];
+        return items;
     }
 
     private UiLookupItem? GetAccountLookup(Guid? id) => GetLookup(_accountLookups, id);
@@ -1924,6 +2093,8 @@ public partial class AccountingWorkspaceHost : IDisposable
     private UiLookupItem? GetPaymentSourceLookup(Guid? id) => GetLookup(_paymentSourceLookups, id);
     private UiLookupItem? GetCustomerLookup(Guid? id) => GetLookup(_customerLookups, id);
     private UiLookupItem? GetSupplierLookup(Guid? id) => GetLookup(_supplierLookups, id);
+    private UiLookupItem? GetCurrencyLookup(Guid? id) => GetLookup(_currencyLookups, id);
+    private UiLookupItem? GetEmployeeAccountLookup(Guid? employeeId) => GetLookup(_employeeAccountLookups, employeeId);
 
     private static UiLookupItem? GetLookup(IReadOnlyDictionary<Guid, UiLookupItem> source, Guid? id) =>
         id.HasValue && source.TryGetValue(id.Value, out var item) ? item : null;
@@ -1953,6 +2124,26 @@ public partial class AccountingWorkspaceHost : IDisposable
         var item = new UiLookupItem(dto.Id.ToString("D"), $"{dto.SupplierCode} | {dto.AccountCode} | {dto.NameAr}", dto.IsActive ? "نشط" : "غير نشط", "fa-solid fa-truck-field");
         _supplierLookups[dto.Id] = item;
         return item;
+    }
+
+    private async Task<UiLookupItem?> EnsureCurrencyLookupAsync(Guid? id)
+    {
+        if (!id.HasValue) return null;
+        if (_currencyLookups.TryGetValue(id.Value, out var existing)) return existing;
+        var dto = await AccountingService.GetCurrencyByIdAsync(id.Value);
+        if (dto is null) return null;
+        var item = ToCurrencyLookup(dto);
+        _currencyLookups[dto.Id] = item;
+        return item;
+    }
+
+    private async Task<UiLookupItem?> EnsureEmployeeAccountLookupAsync(Guid? employeeId)
+    {
+        if (!employeeId.HasValue) return null;
+        if (_employeeAccountLookups.TryGetValue(employeeId.Value, out var existing)) return existing;
+        var page = await AccountingService.GetEmployeeAccountsPageAsync(new PageRequest { PageNumber = 1, PageSize = 500 });
+        foreach (var dto in page.Items) _employeeAccountLookups[dto.EmployeeId] = ToEmployeeAccountLookup(dto);
+        return _employeeAccountLookups.TryGetValue(employeeId.Value, out var item) ? item : null;
     }
 
     private async Task<UiLookupItem?> EnsureAccountLookupAsync(Guid? id)
@@ -2029,30 +2220,50 @@ public partial class AccountingWorkspaceHost : IDisposable
         return item;
     }
 
-    private async Task<UiLookupItem?> EnsurePaymentSourceLookupAsync(PaymentSourceType type, Guid id)
+    private async Task<UiLookupItem?> EnsurePaymentSourceLineLookupAsync(PaymentSourceType type, Guid lineId)
     {
-        if (_paymentSourceLookups.TryGetValue(id, out var existing)) return existing;
-        UiLookupItem? item = null;
+        if (_paymentSourceLookups.TryGetValue(lineId, out var existing)) return existing;
         if (type == PaymentSourceType.ReceiptVoucher)
         {
-            var dto = await AccountingService.GetReceiptVoucherByIdAsync(id);
-            if (dto is not null)
-                item = new UiLookupItem(dto.Id.ToString("D"), dto.VoucherNumber, $"{dto.TotalAmount:N2}", "fa-solid fa-money-bill-trend-up");
+            var page = await AccountingService.GetReceiptVouchersPageAsync(new PageRequest { PageNumber = 1, PageSize = 200 });
+            foreach (var voucher in page.Items)
+            {
+                var line = voucher.Lines.FirstOrDefault(x => x.Id == lineId);
+                if (line is null) continue;
+                var item = ToReceiptSourceLineLookup(voucher, line);
+                _paymentSourceLookups[lineId] = item;
+                return item;
+            }
         }
-        else if (type == PaymentSourceType.PaymentVoucher)
+        else
         {
-            var dto = await AccountingService.GetPaymentVoucherByIdAsync(id);
-            if (dto is not null)
-                item = new UiLookupItem(dto.Id.ToString("D"), dto.VoucherNumber, $"{dto.TotalAmount:N2}", "fa-solid fa-money-bill-transfer");
+            var page = await AccountingService.GetPaymentVouchersPageAsync(new PageRequest { PageNumber = 1, PageSize = 200 });
+            foreach (var voucher in page.Items)
+            {
+                var line = voucher.Lines.FirstOrDefault(x => x.Id == lineId);
+                if (line is null) continue;
+                var item = ToPaymentSourceLineLookup(voucher, line);
+                _paymentSourceLookups[lineId] = item;
+                return item;
+            }
         }
-        if (item is not null) _paymentSourceLookups[id] = item;
-        return item;
+        return null;
     }
+
+    private static UiLookupItem ToReceiptSourceLineLookup(ReceiptVoucherDto voucher, ReceiptVoucherLineDto line) =>
+        new(line.Id.ToString("D"), $"{voucher.VoucherNumber} / سطر {line.LineNumber}", $"{line.PartyNameSnapshot ?? "طرف"} · {line.Amount:N4} {line.CurrencyCodeSnapshot}", "fa-solid fa-money-bill-trend-up");
+
+    private static UiLookupItem ToPaymentSourceLineLookup(PaymentVoucherDto voucher, PaymentVoucherLineDto line) =>
+        new(line.Id.ToString("D"), $"{voucher.VoucherNumber} / سطر {line.LineNumber}", $"{line.PartyNameSnapshot ?? "طرف"} · {line.Amount:N4} {line.CurrencyCodeSnapshot}", "fa-solid fa-money-bill-transfer");
 
     private static UiLookupItem ToCustomerLookup(CustomerLookupDto x) =>
         new(x.Id.ToString("D"), x.DisplayText, x.IsActive ? "نشط" : "غير نشط", "fa-solid fa-user-tie");
     private static UiLookupItem ToSupplierLookup(SupplierLookupDto x) =>
         new(x.Id.ToString("D"), x.DisplayText, x.IsActive ? "نشط" : "غير نشط", "fa-solid fa-truck-field");
+    private static UiLookupItem ToCurrencyLookup(CurrencyDto x) =>
+        new(x.Id.ToString("D"), $"{x.Code} - {x.NameAr}", $"{x.Symbol} · {x.DecimalPlaces} منازل", "fa-solid fa-coins");
+    private static UiLookupItem ToEmployeeAccountLookup(EmployeeAccountDto x) =>
+        new(x.EmployeeId.ToString("D"), $"{x.EmployeeCode} - {x.EmployeeName}", $"{x.AccountCode} - {x.AccountName}", "fa-solid fa-user-gear");
     private static UiLookupItem ToAccountLookup(AccountDto x) =>
         new(x.Id.ToString("D"), $"{x.Code} - {x.NameAr}", AccountingArabicPresenter.GetAccountTypeText(x.AccountType), "fa-solid fa-folder-tree");
     private static UiLookupItem ToCostCenterLookup(CostCenterDto x) =>
@@ -2098,13 +2309,15 @@ public partial class AccountingWorkspaceHost : IDisposable
     }
     private void RememberPaymentSourceLookups(IEnumerable<ReceiptVoucherDto> items)
     {
-        foreach (var x in items)
-            _paymentSourceLookups[x.Id] = new UiLookupItem(x.Id.ToString("D"), x.VoucherNumber, $"{x.TotalAmount:N2}", "fa-solid fa-money-bill-trend-up");
+        foreach (var voucher in items)
+            foreach (var line in voucher.Lines.Where(x => x.CurrencyId.HasValue))
+                _paymentSourceLookups[line.Id] = ToReceiptSourceLineLookup(voucher, line);
     }
     private void RememberPaymentSourceLookups(IEnumerable<PaymentVoucherDto> items)
     {
-        foreach (var x in items)
-            _paymentSourceLookups[x.Id] = new UiLookupItem(x.Id.ToString("D"), x.VoucherNumber, $"{x.TotalAmount:N2}", "fa-solid fa-money-bill-transfer");
+        foreach (var voucher in items)
+            foreach (var line in voucher.Lines.Where(x => x.CurrencyId.HasValue))
+                _paymentSourceLookups[line.Id] = ToPaymentSourceLineLookup(voucher, line);
     }
 
     private async Task HydrateListLookupsAsync(AccountingEntityType type)
@@ -2120,26 +2333,35 @@ public partial class AccountingWorkspaceHost : IDisposable
                 break;
             case AccountingEntityType.ReceiptVouchers:
                 foreach (var x in _receiptsPage.Items)
-                {
-                    await EnsureCashAccountLookupAsync(x.CashAccountId);
-                    await EnsureBankAccountLookupAsync(x.BankAccountId);
-                }
+                    foreach (var line in x.Lines)
+                    {
+                        await EnsureCashAccountLookupAsync(line.CashAccountId);
+                        await EnsureBankAccountLookupAsync(line.BankAccountId);
+                        await EnsureCurrencyLookupAsync(line.CurrencyId);
+                    }
                 break;
             case AccountingEntityType.PaymentVouchers:
                 foreach (var x in _paymentsPage.Items)
-                {
-                    await EnsureCashAccountLookupAsync(x.CashAccountId);
-                    await EnsureBankAccountLookupAsync(x.BankAccountId);
-                }
+                    foreach (var line in x.Lines)
+                    {
+                        await EnsureCashAccountLookupAsync(line.CashAccountId);
+                        await EnsureBankAccountLookupAsync(line.BankAccountId);
+                        await EnsureCurrencyLookupAsync(line.CurrencyId);
+                    }
                 break;
             case AccountingEntityType.PaymentAllocations:
-                foreach (var x in _allocationsPage.Items) await EnsurePaymentSourceLookupAsync(x.PaymentSourceType, x.PaymentSourceId);
+                foreach (var x in _allocationsPage.Items)
+                {
+                    var sourceType = x.ReceiptVoucherLineId.HasValue ? PaymentSourceType.ReceiptVoucher : PaymentSourceType.PaymentVoucher;
+                    var sourceId = x.ReceiptVoucherLineId ?? x.PaymentVoucherLineId;
+                    if (sourceId.HasValue) await EnsurePaymentSourceLineLookupAsync(sourceType, sourceId.Value);
+                }
                 break;
             case AccountingEntityType.CashAccounts:
-                foreach (var x in _cashAccountsPage.Items) await EnsureAccountLookupAsync(x.AccountId);
+                foreach (var x in _cashAccountsPage.Items) { await EnsureAccountLookupAsync(x.AccountId); await EnsureCurrencyLookupAsync(x.CurrencyId); }
                 break;
             case AccountingEntityType.BankAccounts:
-                foreach (var x in _bankAccountsPage.Items) await EnsureAccountLookupAsync(x.AccountId);
+                foreach (var x in _bankAccountsPage.Items) { await EnsureAccountLookupAsync(x.AccountId); await EnsureCurrencyLookupAsync(x.CurrencyId); }
                 break;
             case AccountingEntityType.CashShifts:
                 foreach (var x in _cashShiftsPage.Items) await EnsureCashAccountLookupAsync(x.CashAccountId);
@@ -2412,15 +2634,13 @@ public partial class AccountingWorkspaceHost : IDisposable
         new AccountingRecordItem(
             x.Id,
             x.VoucherNumber,
-            x.PartyType == ReceiptPartyType.Customer
-                ? (x.CustomerId.HasValue ? $"عميل {ShortId(x.CustomerId.Value)}" : "عميل")
-                : x.ReceivedFrom,
+            x.Description ?? $"{x.Lines.Count} سطر تسوية",
             "fa-solid fa-money-bill-trend-up",
             [
                 new("التاريخ", x.VoucherDate.ToString("yyyy-MM-dd")),
-                new("المبلغ", x.TotalAmount.ToString("N2"), "ui-acc-val--debit"),
-                new("الطريقة", AccountingArabicPresenter.GetPaymentMethodText(x.PaymentMethod)),
-                new("الحساب", GetMoneyAccountText(x.PaymentMethod, x.CashAccountId, x.BankAccountId))
+                new("الأسطر", x.Lines.Count.ToString()),
+                new("الإجمالي الأساسي", $"{x.BaseTotalAmount?.ToString("N4") ?? "-"} {x.BaseCurrencyCodeSnapshot}".Trim(), "ui-acc-val--debit"),
+                new("العملات", string.Join("، ", x.Lines.Select(l => l.CurrencyCodeSnapshot).Where(v => !string.IsNullOrWhiteSpace(v)).Distinct()))
             ],
             AccountingArabicPresenter.GetReceiptVoucherStatusText(x.Status),
             VoucherState(x.Status.ToString()))).ToArray();
@@ -2429,15 +2649,13 @@ public partial class AccountingWorkspaceHost : IDisposable
         new AccountingRecordItem(
             x.Id,
             x.VoucherNumber,
-            x.PartyType == PaymentPartyType.Supplier
-                ? (x.SupplierId.HasValue ? $"مورد {ShortId(x.SupplierId.Value)}" : "مورد")
-                : x.BeneficiaryName,
+            x.Description ?? $"{x.Lines.Count} سطر تسوية",
             "fa-solid fa-money-bill-transfer",
             [
                 new("التاريخ", x.VoucherDate.ToString("yyyy-MM-dd")),
-                new("المبلغ", x.TotalAmount.ToString("N2"), "ui-acc-val--credit"),
-                new("الطريقة", AccountingArabicPresenter.GetPaymentMethodText(x.PaymentMethod)),
-                new("الحساب", GetMoneyAccountText(x.PaymentMethod, x.CashAccountId, x.BankAccountId))
+                new("الأسطر", x.Lines.Count.ToString()),
+                new("الإجمالي الأساسي", $"{x.BaseTotalAmount?.ToString("N4") ?? "-"} {x.BaseCurrencyCodeSnapshot}".Trim(), "ui-acc-val--credit"),
+                new("العملات", string.Join("، ", x.Lines.Select(l => l.CurrencyCodeSnapshot).Where(v => !string.IsNullOrWhiteSpace(v)).Distinct()))
             ],
             AccountingArabicPresenter.GetPaymentVoucherStatusText(x.Status),
             VoucherState(x.Status.ToString()))).ToArray();
@@ -2448,7 +2666,7 @@ public partial class AccountingWorkspaceHost : IDisposable
             $"{x.Code} - {x.Name}",
             x.IsDefault ? "الصندوق الافتراضي" : null,
             "fa-solid fa-vault",
-            [new("حساب GL", GetAccountLookup(x.AccountId)?.PrimaryText ?? ShortId(x.AccountId))],
+            [new("حساب GL", GetAccountLookup(x.AccountId)?.PrimaryText ?? ShortId(x.AccountId)), new("العملة", GetCurrencyLookup(x.CurrencyId)?.PrimaryText ?? "-")],
             x.IsActive ? "نشط" : "معطل",
             x.IsActive ? "active" : "inactive")).ToArray();
 
@@ -2461,6 +2679,7 @@ public partial class AccountingWorkspaceHost : IDisposable
             [
                 new("رقم الحساب", x.AccountNumber),
                 new("IBAN", string.IsNullOrWhiteSpace(x.IBAN) ? "-" : x.IBAN),
+                new("العملة", GetCurrencyLookup(x.CurrencyId)?.PrimaryText ?? "-"),
                 new("حساب GL", GetAccountLookup(x.AccountId)?.PrimaryText ?? ShortId(x.AccountId))
             ],
             x.IsActive ? "نشط" : "معطل",
@@ -2507,18 +2726,23 @@ public partial class AccountingWorkspaceHost : IDisposable
             x.IsActive ? "active" : "inactive")).ToArray();
 
     private IReadOnlyList<AccountingRecordItem> BuildAllocationItems() => _allocationsPage.Items.Select(x =>
-        new AccountingRecordItem(
+    {
+        var sourceType = x.ReceiptVoucherLineId.HasValue ? PaymentSourceType.ReceiptVoucher : PaymentSourceType.PaymentVoucher;
+        var sourceId = x.ReceiptVoucherLineId ?? x.PaymentVoucherLineId;
+        return new AccountingRecordItem(
             x.Id,
-            $"{AccountingArabicPresenter.GetPaymentSourceTypeText(x.PaymentSourceType)} - {GetPaymentSourceLookup(x.PaymentSourceId)?.PrimaryText ?? ShortId(x.PaymentSourceId)}",
+            $"{AccountingArabicPresenter.GetPaymentSourceTypeText(sourceType)} - {(sourceId.HasValue ? GetPaymentSourceLookup(sourceId)?.PrimaryText ?? ShortId(sourceId.Value) : "مصدر تاريخي")}",
             AccountingArabicPresenter.GetAllocationTargetDocumentTypeText(x.TargetDocumentType),
             "fa-solid fa-link",
             [
                 new("المستند الهدف", ShortId(x.TargetDocumentId)),
-                new("المبلغ", x.AllocatedAmount.ToString("N2"), "ui-acc-val--debit"),
+                new("المبلغ", $"{x.AllocatedAmount:N4} {x.CurrencyCodeSnapshot}", "ui-acc-val--debit"),
+                new("الأساسي", x.BaseAllocatedAmount?.ToString("N4") ?? "-"),
                 new("التاريخ", x.AllocatedAtUtc.LocalDateTime.ToString("yyyy-MM-dd HH:mm"))
             ],
             "مخصص",
-            "active")).ToArray();
+            "active");
+    }).ToArray();
 
     private string GetMoneyAccountText(PaymentMethod method, Guid? cashId, Guid? bankId) =>
         method == PaymentMethod.Cash

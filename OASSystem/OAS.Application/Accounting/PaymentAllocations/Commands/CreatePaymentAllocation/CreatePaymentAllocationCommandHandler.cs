@@ -4,90 +4,52 @@ using OAS.Application.Abstractions.Persistence.Specifications;
 using OAS.Application.Common.Exceptions;
 using OAS.Domain.Accounting.Entities;
 using DomainAllocationTargetDocumentType = OAS.Domain.Accounting.Enums.AllocationTargetDocumentType;
-using DomainPaymentSourceType = OAS.Domain.Accounting.Enums.PaymentSourceType;
-
 namespace OAS.Application.Accounting.PaymentAllocations.Commands.CreatePaymentAllocation;
-
 public sealed class CreatePaymentAllocationCommandHandler(
     IRepository<PaymentAllocation, Guid> repository,
-    IRepository<ReceiptVoucher, Guid> receiptVoucherRepository,
-    IRepository<PaymentVoucher, Guid> paymentVoucherRepository,
-    TimeProvider timeProvider)
-    : IRequestHandler<CreatePaymentAllocationCommand, Guid>
+    IReadRepository<ReceiptVoucherLine, Guid> receiptLines,
+    IReadRepository<PaymentVoucherLine, Guid> paymentLines,
+    TimeProvider timeProvider) : IRequestHandler<CreatePaymentAllocationCommand, Guid>
 {
-    public async Task<Guid> Handle(
-        CreatePaymentAllocationCommand request,
-        CancellationToken cancellationToken)
+    public async Task<Guid> Handle(CreatePaymentAllocationCommand request, CancellationToken ct)
     {
-        var data = request.Data;
-        var sourceType = (DomainPaymentSourceType)(int)data.PaymentSourceType;
-        var sourceAmount = await GetSourceAmountAsync(
-            sourceType, data.PaymentSourceId, cancellationToken);
-
-        var existingAllocations = await repository.ListAsync(
-            new Specification<PaymentAllocation>()
-                .Where(x => x.PaymentSourceType == sourceType &&
-                            x.PaymentSourceId == data.PaymentSourceId),
-            cancellationToken);
-
-        var alreadyAllocated = existingAllocations.Sum(x => x.AllocatedAmount);
-        var availableAmount = sourceAmount - alreadyAllocated;
-
-        if (data.AllocatedAmount > availableAmount)
-        {
-            throw new ConflictException(
-                "payment_allocation_exceeds_available_amount",
-                $"The requested allocation ({data.AllocatedAmount}) exceeds the available payment amount ({availableAmount}).");
-        }
-
-        var entity = PaymentAllocation.Create(
-            Guid.NewGuid(),
-            sourceType,
-            data.PaymentSourceId,
-            (DomainAllocationTargetDocumentType)(int)data.TargetDocumentType,
-            data.TargetDocumentId,
-            data.AllocatedAmount,
+        var d = request.Data;
+        var source = await ResolveSourceAsync(d.ReceiptVoucherLineId, d.PaymentVoucherLineId, ct);
+        var existing = await repository.ListAsync(new Specification<PaymentAllocation>().Where(x =>
+            d.ReceiptVoucherLineId.HasValue
+                ? x.ReceiptVoucherLineId == d.ReceiptVoucherLineId
+                : x.PaymentVoucherLineId == d.PaymentVoucherLineId), ct);
+        var available = source.Amount - existing.Sum(x => x.AllocatedAmount);
+        if (d.AllocatedAmount > available)
+            throw new ConflictException("payment_allocation_exceeds_available_amount", $"The requested allocation ({d.AllocatedAmount}) exceeds the available source-line amount ({available}).");
+        var baseAmount = Math.Round(d.AllocatedAmount * source.ExchangeRate, 4, MidpointRounding.AwayFromZero);
+        var entity = PaymentAllocation.CreateLineAllocation(Guid.NewGuid(), d.ReceiptVoucherLineId, d.PaymentVoucherLineId,
+            (DomainAllocationTargetDocumentType)(byte)d.TargetDocumentType, d.TargetDocumentId,
+            source.CurrencyId, source.CurrencyCode, d.AllocatedAmount, source.ExchangeRate, baseAmount,
             timeProvider.GetUtcNow().UtcDateTime);
-
-        await repository.AddAsync(entity, cancellationToken);
+        await repository.AddAsync(entity, ct);
         return entity.Id;
     }
 
-    private async Task<decimal> GetSourceAmountAsync(
-        DomainPaymentSourceType sourceType,
-        Guid sourceId,
-        CancellationToken cancellationToken)
+    private async Task<SourceInfo> ResolveSourceAsync(Guid? receiptLineId, Guid? paymentLineId, CancellationToken ct)
     {
-        switch (sourceType)
+        if (receiptLineId is Guid rid)
         {
-            case DomainPaymentSourceType.ReceiptVoucher:
-                var receipt = await receiptVoucherRepository.GetForUpdateAsync(sourceId, cancellationToken);
-                if (receipt is null)
-                    throw new NotFoundException(nameof(ReceiptVoucher), sourceId);
-                // Touch the source aggregate so its rowversion acts as an optimistic
-                // concurrency guard against two allocations overspending the same source.
-                receiptVoucherRepository.Update(receipt);
-                return receipt.TotalAmount;
-
-            case DomainPaymentSourceType.PaymentVoucher:
-                var payment = await paymentVoucherRepository.GetForUpdateAsync(sourceId, cancellationToken);
-                if (payment is null)
-                    throw new NotFoundException(nameof(PaymentVoucher), sourceId);
-                paymentVoucherRepository.Update(payment);
-                return payment.TotalAmount;
-
-            case DomainPaymentSourceType.CustomerAdvance:
-                // The task defines CustomerAdvance as a source type, but this codebase has no
-                // CustomerAdvance aggregate or application port that can supply its balance.
-                // Rejecting it here is safer than allowing an unbounded allocation.
-                throw new ConflictException(
-                    "customer_advance_source_unavailable",
-                    "Customer advance balance cannot be validated because no customer-advance source is available in the current Accounting core.");
-
-            default:
-                throw new ConflictException(
-                    "payment_source_type_invalid",
-                    $"Payment source type '{sourceType}' is not supported.");
+            var line = await receiptLines.GetByIdAsync(rid, ct) ?? throw new NotFoundException(nameof(ReceiptVoucherLine), rid);
+            return ToSource(line.CurrencyId, line.CurrencyCodeSnapshot, line.Amount, line.ExchangeRate, "receipt");
         }
+        if (paymentLineId is Guid pid)
+        {
+            var line = await paymentLines.GetByIdAsync(pid, ct) ?? throw new NotFoundException(nameof(PaymentVoucherLine), pid);
+            return ToSource(line.CurrencyId, line.CurrencyCodeSnapshot, line.Amount, line.ExchangeRate, "payment");
+        }
+        throw new ConflictException("payment_source_line_required", "Exactly one receipt or payment voucher line must be selected.");
     }
+    private static SourceInfo ToSource(Guid? id, string? code, decimal amount, decimal? rate, string type)
+    {
+        if (id is not Guid currencyId || string.IsNullOrWhiteSpace(code) || rate is null or <= 0)
+            throw new ConflictException("payment_source_line_not_migrated", $"The selected {type} voucher line does not contain multi-currency settlement data.");
+        return new SourceInfo(currencyId, code, amount, rate.Value);
+    }
+    private sealed record SourceInfo(Guid CurrencyId, string CurrencyCode, decimal Amount, decimal ExchangeRate);
 }

@@ -11,12 +11,6 @@ public sealed class UpdateBankAccountCommandValidator
             .NotEmpty()
             .WithErrorCode("bank_account_id_required");
 
-        RuleFor(x => x.Data.Code)
-            .NotEmpty()
-            .WithErrorCode("bank_account_code_required")
-            .MaximumLength(30)
-            .WithErrorCode("bank_account_code_max_length");
-
         RuleFor(x => x.Data.BankName)
             .NotEmpty()
             .WithErrorCode("bank_name_required")
@@ -40,9 +34,9 @@ public sealed class UpdateBankAccountCommandValidator
             .WithErrorCode("iban_max_length")
             .When(x => !string.IsNullOrWhiteSpace(x.Data.IBAN));
 
-        RuleFor(x => x.Data.AccountId)
+        RuleFor(x => x.Data.CurrencyId)
             .NotEmpty()
-            .WithErrorCode("account_id_required");
+            .WithErrorCode("currency_id_required");
 
         RuleFor(x => x.Data.RowVersion)
             .NotEmpty()

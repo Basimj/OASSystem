@@ -1,4 +1,4 @@
-﻿namespace OAS.Contracts.Accounting.BankAccounts;
+namespace OAS.Contracts.Accounting.BankAccounts;
 
 public sealed record BankAccountDto(
     Guid Id,
@@ -8,5 +8,6 @@ public sealed record BankAccountDto(
     string AccountNumber,
     string? IBAN,
     Guid AccountId,
+    Guid? CurrencyId,
     bool IsActive,
     string RowVersion);

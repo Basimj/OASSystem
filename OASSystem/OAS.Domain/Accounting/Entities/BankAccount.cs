@@ -16,6 +16,7 @@ public sealed class BankAccount : AuditableEntity<Guid>
         string accountNumber,
         string? iban,
         Guid accountId,
+        Guid? currencyId,
         bool isActive)
     {
         Id = id;
@@ -25,6 +26,7 @@ public sealed class BankAccount : AuditableEntity<Guid>
         AccountNumber = accountNumber;
         IBAN = iban;
         AccountId = accountId;
+        CurrencyId = currencyId;
         IsActive = isActive;
     }
 
@@ -40,9 +42,23 @@ public sealed class BankAccount : AuditableEntity<Guid>
 
     public Guid AccountId { get; private set; }
 
+    public Guid? CurrencyId { get; private set; }
+
     public bool IsActive { get; private set; }
 
     public byte[] RowVersion { get; private set; } = [];
+
+    // Compatibility overload for pre-currency tests/data factories.
+    public static BankAccount Create(
+        Guid id,
+        string code,
+        string bankName,
+        string accountName,
+        string accountNumber,
+        string? iban,
+        Guid accountId,
+        bool isActive) =>
+        Create(id, code, bankName, accountName, accountNumber, iban, accountId, null, isActive);
 
     public static BankAccount Create(
         Guid id,
@@ -52,6 +68,7 @@ public sealed class BankAccount : AuditableEntity<Guid>
         string accountNumber,
         string? iban,
         Guid accountId,
+        Guid? currencyId,
         bool isActive)
     {
         if (id == Guid.Empty)
@@ -84,6 +101,7 @@ public sealed class BankAccount : AuditableEntity<Guid>
             accountNumber.Trim(),
             string.IsNullOrWhiteSpace(iban) ? null : iban.Trim(),
             accountId,
+            currencyId,
             isActive);
     }
 
@@ -93,7 +111,8 @@ public sealed class BankAccount : AuditableEntity<Guid>
         string accountName,
         string accountNumber,
         string? iban,
-        Guid accountId)
+        Guid accountId,
+        Guid? currencyId)
     {
         if (string.IsNullOrWhiteSpace(code))
             throw new ArgumentException("Code is required.", nameof(code));
@@ -120,6 +139,7 @@ public sealed class BankAccount : AuditableEntity<Guid>
         AccountNumber = accountNumber.Trim();
         IBAN = string.IsNullOrWhiteSpace(iban) ? null : iban.Trim();
         AccountId = accountId;
+        CurrencyId = currencyId;
     }
 
     public void SetActive(bool isActive)

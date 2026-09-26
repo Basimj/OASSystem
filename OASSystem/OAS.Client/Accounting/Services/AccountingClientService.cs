@@ -1,3 +1,7 @@
+using OAS.Contracts.Accounting.EmployeeAccounts;
+using OAS.Contracts.Accounting.Settings;
+using OAS.Contracts.Accounting.ExchangeRates;
+using OAS.Contracts.Accounting.Currencies;
 using OAS.Client.Services.Http;
 using OAS.Contracts.Accounting.Accounts;
 using OAS.Contracts.Accounting.BankAccounts;
@@ -116,12 +120,14 @@ public sealed class AccountingClientService(OasApiClient apiClient) : IAccountin
     public Task<PagedResult<CashAccountDto>> GetCashAccountsPageAsync(PageRequest request, CancellationToken cancellationToken = default) => GetPageAsync<CashAccountDto>("api/accounting/cash-accounts", request, cancellationToken);
     public Task<CashAccountDto?> GetCashAccountByIdAsync(Guid id, CancellationToken cancellationToken = default) => apiClient.GetAsync<CashAccountDto>($"api/accounting/cash-accounts/{id}", cancellationToken);
     public Task<CashAccountDto?> CreateCashAccountAsync(CreateCashAccountRequest request, CancellationToken cancellationToken = default) => apiClient.PostAsync<CreateCashAccountRequest, CashAccountDto>("api/accounting/cash-accounts", request, cancellationToken);
+    public Task<CashAccountCodeReservationDto?> ReserveCashAccountCodeAsync(CancellationToken cancellationToken = default) => apiClient.PostAsync<object, CashAccountCodeReservationDto>("api/accounting/cash-accounts/code/reserve", new { }, cancellationToken);
     public Task<CashAccountDto?> UpdateCashAccountAsync(Guid id, UpdateCashAccountRequest request, CancellationToken cancellationToken = default) => apiClient.PutAsync<UpdateCashAccountRequest, CashAccountDto>($"api/accounting/cash-accounts/{id}", request, cancellationToken);
     public Task<CashAccountDto?> SetCashAccountStatusAsync(Guid id, SetCashAccountStatusRequest request, CancellationToken cancellationToken = default) => apiClient.PostAsync<SetCashAccountStatusRequest, CashAccountDto>($"api/accounting/cash-accounts/{id}/status", request, cancellationToken);
 
     public Task<PagedResult<BankAccountDto>> GetBankAccountsPageAsync(PageRequest request, CancellationToken cancellationToken = default) => GetPageAsync<BankAccountDto>("api/accounting/bank-accounts", request, cancellationToken);
     public Task<BankAccountDto?> GetBankAccountByIdAsync(Guid id, CancellationToken cancellationToken = default) => apiClient.GetAsync<BankAccountDto>($"api/accounting/bank-accounts/{id}", cancellationToken);
     public Task<BankAccountDto?> CreateBankAccountAsync(CreateBankAccountRequest request, CancellationToken cancellationToken = default) => apiClient.PostAsync<CreateBankAccountRequest, BankAccountDto>("api/accounting/bank-accounts", request, cancellationToken);
+    public Task<BankAccountCodeReservationDto?> ReserveBankAccountCodeAsync(CancellationToken cancellationToken = default) => apiClient.PostAsync<object, BankAccountCodeReservationDto>("api/accounting/bank-accounts/code/reserve", new { }, cancellationToken);
     public Task<BankAccountDto?> UpdateBankAccountAsync(Guid id, UpdateBankAccountRequest request, CancellationToken cancellationToken = default) => apiClient.PutAsync<UpdateBankAccountRequest, BankAccountDto>($"api/accounting/bank-accounts/{id}", request, cancellationToken);
     public Task<BankAccountDto?> SetBankAccountStatusAsync(Guid id, SetBankAccountStatusRequest request, CancellationToken cancellationToken = default) => apiClient.PostAsync<SetBankAccountStatusRequest, BankAccountDto>($"api/accounting/bank-accounts/{id}/status", request, cancellationToken);
 
@@ -147,4 +153,23 @@ public sealed class AccountingClientService(OasApiClient apiClient) : IAccountin
     public Task<PaymentAllocationDto?> GetPaymentAllocationByIdAsync(Guid id, CancellationToken cancellationToken = default) => apiClient.GetAsync<PaymentAllocationDto>($"api/accounting/payment-allocations/{id}", cancellationToken);
     public Task<PaymentAllocationDto?> CreatePaymentAllocationAsync(CreatePaymentAllocationRequest request, CancellationToken cancellationToken = default) => apiClient.PostAsync<CreatePaymentAllocationRequest, PaymentAllocationDto>("api/accounting/payment-allocations", request, cancellationToken);
     public Task<PaymentAllocationDto?> UpdatePaymentAllocationAsync(Guid id, UpdatePaymentAllocationRequest request, CancellationToken cancellationToken = default) => apiClient.PutAsync<UpdatePaymentAllocationRequest, PaymentAllocationDto>($"api/accounting/payment-allocations/{id}", request, cancellationToken);
+
+    public Task<PagedResult<CurrencyDto>> GetCurrenciesPageAsync(PageRequest request, CancellationToken cancellationToken = default) => GetPageAsync<CurrencyDto>("api/accounting/currencies", request, cancellationToken);
+    public Task<CurrencyDto?> GetCurrencyByIdAsync(Guid id, CancellationToken cancellationToken = default) => apiClient.GetAsync<CurrencyDto>($"api/accounting/currencies/{id}", cancellationToken);
+    public Task<CurrencyDto?> CreateCurrencyAsync(CreateCurrencyRequest request, CancellationToken cancellationToken = default) => apiClient.PostAsync<CreateCurrencyRequest, CurrencyDto>("api/accounting/currencies", request, cancellationToken);
+    public Task<CurrencyDto?> UpdateCurrencyAsync(Guid id, UpdateCurrencyRequest request, CancellationToken cancellationToken = default) => apiClient.PutAsync<UpdateCurrencyRequest, CurrencyDto>($"api/accounting/currencies/{id}", request, cancellationToken);
+
+    public Task<PagedResult<ExchangeRateDto>> GetExchangeRatesPageAsync(PageRequest request, CancellationToken cancellationToken = default) => GetPageAsync<ExchangeRateDto>("api/accounting/exchange-rates", request, cancellationToken);
+    public Task<ExchangeRateDto?> GetExchangeRateByIdAsync(Guid id, CancellationToken cancellationToken = default) => apiClient.GetAsync<ExchangeRateDto>($"api/accounting/exchange-rates/{id}", cancellationToken);
+    public Task<ExchangeRateDto?> CreateExchangeRateAsync(CreateExchangeRateRequest request, CancellationToken cancellationToken = default) => apiClient.PostAsync<CreateExchangeRateRequest, ExchangeRateDto>("api/accounting/exchange-rates", request, cancellationToken);
+    public Task<ExchangeRateDto?> UpdateExchangeRateAsync(Guid id, UpdateExchangeRateRequest request, CancellationToken cancellationToken = default) => apiClient.PutAsync<UpdateExchangeRateRequest, ExchangeRateDto>($"api/accounting/exchange-rates/{id}", request, cancellationToken);
+    public Task<EffectiveExchangeRateDto?> GetEffectiveExchangeRateAsync(Guid currencyId, DateOnly date, OAS.Contracts.Accounting.Enums.ExchangeRateType rateType = OAS.Contracts.Accounting.Enums.ExchangeRateType.Accounting, CancellationToken cancellationToken = default) => apiClient.GetAsync<EffectiveExchangeRateDto>($"api/accounting/exchange-rates/effective?currencyId={currencyId:D}&date={date:yyyy-MM-dd}&rateType={rateType}", cancellationToken);
+
+    public Task<AccountingSettingsDto?> GetAccountingSettingsAsync(CancellationToken cancellationToken = default) => apiClient.GetAsync<AccountingSettingsDto>("api/accounting/accounting-settings", cancellationToken);
+    public Task<AccountingSettingsDto?> UpdateAccountingSettingsAsync(UpdateAccountingSettingsRequest request, CancellationToken cancellationToken = default) => apiClient.PutAsync<UpdateAccountingSettingsRequest, AccountingSettingsDto>("api/accounting/accounting-settings", request, cancellationToken);
+
+    public Task<PagedResult<EmployeeAccountDto>> GetEmployeeAccountsPageAsync(PageRequest request, CancellationToken cancellationToken = default) => GetPageAsync<EmployeeAccountDto>("api/accounting/employee-accounts", request, cancellationToken);
+    public Task<EmployeeAccountDto?> GetEmployeeAccountByIdAsync(Guid id, CancellationToken cancellationToken = default) => apiClient.GetAsync<EmployeeAccountDto>($"api/accounting/employee-accounts/{id}", cancellationToken);
+    public Task<EmployeeAccountDto?> ActivateEmployeeAccountAsync(ActivateEmployeeAccountRequest request, CancellationToken cancellationToken = default) => apiClient.PostAsync<ActivateEmployeeAccountRequest, EmployeeAccountDto>("api/accounting/employee-accounts/activate", request, cancellationToken);
+    public Task<EmployeeAccountDto?> SetEmployeeAccountStatusAsync(Guid id, SetEmployeeAccountStatusRequest request, CancellationToken cancellationToken = default) => apiClient.PostAsync<SetEmployeeAccountStatusRequest, EmployeeAccountDto>($"api/accounting/employee-accounts/{id}/status", request, cancellationToken);
 }

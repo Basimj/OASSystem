@@ -1,0 +1,1 @@
+using FluentValidation;namespace OAS.Application.Accounting.EmployeeAccounts.Commands.ActivateEmployeeAccount;public sealed class ActivateEmployeeAccountCommandValidator:AbstractValidator<ActivateEmployeeAccountCommand>{public ActivateEmployeeAccountCommandValidator(){RuleFor(x=>x.Request.EmployeeId).NotEmpty();}}

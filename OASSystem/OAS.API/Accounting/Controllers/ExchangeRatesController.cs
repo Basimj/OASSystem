@@ -1,0 +1,11 @@
+using MediatR;using Microsoft.AspNetCore.Authorization;using Microsoft.AspNetCore.Mvc;using Microsoft.AspNetCore.RateLimiting;using OAS.Application.Accounting.ExchangeRates.Commands.CreateExchangeRate;using OAS.Application.Accounting.ExchangeRates.Commands.UpdateExchangeRate;using OAS.Application.Accounting.ExchangeRates.Queries.GetEffectiveExchangeRate;using OAS.Application.Accounting.ExchangeRates.Queries.GetExchangeRateById;using OAS.Application.Accounting.ExchangeRates.Queries.GetExchangeRates;using OAS.Contracts.Accounting.Enums;using OAS.Contracts.Accounting.ExchangeRates;using OAS.Contracts.Common.Pagination;
+namespace OAS.API.Accounting.Controllers;
+[ApiController,Authorize,EnableRateLimiting("api"),Route("api/accounting/exchange-rates")]
+public sealed class ExchangeRatesController(ISender sender):ControllerBase
+{
+ [HttpGet] public async Task<ActionResult<PagedResult<ExchangeRateDto>>> Get([FromQuery]PageRequest request,[FromQuery(Name="searchTerm")]string? searchTerm,CancellationToken ct){request=AccountingPageRequestCompatibility.Apply(request,searchTerm);return Ok(await sender.Send(new GetExchangeRatesQuery(request),ct));}
+ [HttpGet("{id:guid}")] public async Task<ActionResult<ExchangeRateDto>> GetById(Guid id,CancellationToken ct)=>Ok(await sender.Send(new GetExchangeRateByIdQuery(id),ct));
+ [HttpGet("effective")] public async Task<ActionResult<EffectiveExchangeRateDto>> Effective([FromQuery]Guid currencyId,[FromQuery]DateOnly date,[FromQuery]ExchangeRateType rateType=ExchangeRateType.Accounting,CancellationToken ct=default)=>Ok(await sender.Send(new GetEffectiveExchangeRateQuery(currencyId,date,rateType),ct));
+ [HttpPost] public async Task<ActionResult<ExchangeRateDto>> Create(CreateExchangeRateRequest request,CancellationToken ct){var id=await sender.Send(new CreateExchangeRateCommand(request),ct);return CreatedAtAction(nameof(GetById),new{id},await sender.Send(new GetExchangeRateByIdQuery(id),ct));}
+ [HttpPut("{id:guid}")] public async Task<ActionResult<ExchangeRateDto>> Update(Guid id,UpdateExchangeRateRequest request,CancellationToken ct){await sender.Send(new UpdateExchangeRateCommand(id,request),ct);return Ok(await sender.Send(new GetExchangeRateByIdQuery(id),ct));}
+}

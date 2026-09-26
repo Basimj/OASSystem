@@ -46,6 +46,16 @@ public sealed class ReceiptVoucherConfiguration : IEntityTypeConfiguration<Recei
             .IsRequired()
             .HasPrecision(19, 4);
 
+        builder.Property(x => x.BaseCurrencyId);
+
+        builder.Property(x => x.BaseCurrencyCodeSnapshot)
+            .HasMaxLength(8);
+
+        builder.Property(x => x.BaseCurrencyDecimalPlacesSnapshot);
+
+        builder.Property(x => x.BaseTotalAmount)
+            .HasPrecision(19, 4);
+
         builder.Property(x => x.Status)
             .IsRequired()
             .HasConversion<byte>();
@@ -79,6 +89,9 @@ public sealed class ReceiptVoucherConfiguration : IEntityTypeConfiguration<Recei
         builder.HasIndex(x => x.BankAccountId)
             .HasDatabaseName("IX_ReceiptVouchers_BankAccountId");
 
+        builder.HasIndex(x => x.BaseCurrencyId)
+            .HasDatabaseName("IX_ReceiptVouchers_BaseCurrencyId");
+
         builder.HasIndex(x => x.JournalEntryId)
             .HasDatabaseName("IX_ReceiptVouchers_JournalEntryId");
 
@@ -102,6 +115,12 @@ public sealed class ReceiptVoucherConfiguration : IEntityTypeConfiguration<Recei
             .HasForeignKey(x => x.BankAccountId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_ReceiptVouchers_BankAccount");
+
+        builder.HasOne<Currency>()
+            .WithMany()
+            .HasForeignKey(x => x.BaseCurrencyId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_ReceiptVouchers_BaseCurrency");
 
         builder.HasOne<JournalEntry>()
             .WithMany()

@@ -1149,4 +1149,10 @@
   <data name="product_type_name_en_max_length" xml:space="preserve">
     <value>English product type name must not exceed 100 characters.</value>
   </data>
+  <data name="accounting_cash_account_code_exhausted" xml:space="preserve">
+    <value>Unable to generate a unique cash account code. Try again.</value>
+  </data>
+  <data name="accounting_bank_account_code_exhausted" xml:space="preserve">
+    <value>Unable to generate a unique bank account code. Try again.</value>
+  </data>
 </root>

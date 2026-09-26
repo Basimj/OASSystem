@@ -129,6 +129,28 @@ public static class AccountingArabicPresenter
         _ => value.ToString()
     };
 
+    public static string GetSettlementPartyTypeText(SettlementPartyType value) => value switch
+    {
+        SettlementPartyType.Customer => "عميل",
+        SettlementPartyType.Supplier => "مورد",
+        SettlementPartyType.Employee => "موظف",
+        SettlementPartyType.Other => "أخرى",
+        _ => value.ToString()
+    };
+
+    public static string GetExchangeRateTypeText(ExchangeRateType value) => value switch
+    {
+        ExchangeRateType.Accounting => "محاسبي",
+        _ => value.ToString()
+    };
+
+    public static string GetExchangeRateSourceText(ExchangeRateSource value) => value switch
+    {
+        ExchangeRateSource.System => "تلقائي",
+        ExchangeRateSource.Manual => "يدوي",
+        _ => value.ToString()
+    };
+
     public static string GetPaymentSourceTypeText(PaymentSourceType value) => value switch
     {
         PaymentSourceType.ReceiptVoucher => "سند قبض",
@@ -232,6 +254,20 @@ public static class AccountingArabicPresenter
         new(nameof(PaymentMethod.BankTransfer), "تحويل بنكي"),
         new(nameof(PaymentMethod.Cheque), "شيك"),
         new(nameof(PaymentMethod.Other), "أخرى")
+    ];
+
+
+    public static readonly IReadOnlyList<UiSelectOption> SettlementPartyTypeOptions =
+    [
+        new(nameof(SettlementPartyType.Customer), "عميل"),
+        new(nameof(SettlementPartyType.Supplier), "مورد"),
+        new(nameof(SettlementPartyType.Employee), "موظف"),
+        new(nameof(SettlementPartyType.Other), "أخرى")
+    ];
+
+    public static readonly IReadOnlyList<UiSelectOption> ExchangeRateTypeOptions =
+    [
+        new(nameof(ExchangeRateType.Accounting), "محاسبي")
     ];
 
     public static readonly IReadOnlyList<UiSelectOption> PaymentSourceTypeOptions =

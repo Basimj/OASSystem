@@ -443,6 +443,9 @@
                                         CostCenterSearchAsync="SearchCostCentersAsync"
                                         CustomerSearchAsync="SearchCustomersAsync"
                                         SupplierSearchAsync="SearchSuppliersAsync"
+                                        EmployeeSearchAsync="SearchEmployeeAccountsAsync"
+                                        CurrencySearchAsync="SearchCurrenciesAsync"
+                                        EffectiveRateAsync="ResolveEffectiveRatePreviewAsync"
                                         OnModelChanged="MarkActiveDirty" />
 
                     break;
@@ -476,13 +479,14 @@
                     <ReceiptVoucherEditor Model="@model"
                                           IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
                                           IsNew="@activeTab.IsNew"
-                                          CustomerLookupItem="@GetCustomerLookup(model.CustomerId)"
-                                          CashAccountLookupItem="@GetCashAccountLookup(model.CashAccountId)"
-                                          BankAccountLookupItem="@GetBankAccountLookup(model.BankAccountId)"
                                           CustomerSearchAsync="SearchCustomersAsync"
-                                          CashAccountSearchAsync="SearchCashAccountsAsync"
-                                          BankAccountSearchAsync="SearchBankAccountsAsync"
+                                          SupplierSearchAsync="SearchSuppliersAsync"
+                                          EmployeeSearchAsync="SearchEmployeeAccountsAsync"
+                                          CashAccountSearchAsync="SearchCashAccountsByCurrencyAsync"
+                                          BankAccountSearchAsync="SearchBankAccountsByCurrencyAsync"
+                                          CurrencySearchAsync="SearchCurrenciesAsync"
                                           AccountSearchAsync="SearchAccountsAsync"
+                                          EffectiveRateAsync="ResolveEffectiveRatePreviewAsync"
                                           OnModelChanged="MarkActiveDirty" />
 
                     break;
@@ -493,13 +497,14 @@
                     <PaymentVoucherEditor Model="@model"
                                           IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
                                           IsNew="@activeTab.IsNew"
-                                          SupplierLookupItem="@GetSupplierLookup(model.SupplierId)"
-                                          CashAccountLookupItem="@GetCashAccountLookup(model.CashAccountId)"
-                                          BankAccountLookupItem="@GetBankAccountLookup(model.BankAccountId)"
+                                          CustomerSearchAsync="SearchCustomersAsync"
                                           SupplierSearchAsync="SearchSuppliersAsync"
-                                          CashAccountSearchAsync="SearchCashAccountsAsync"
-                                          BankAccountSearchAsync="SearchBankAccountsAsync"
+                                          EmployeeSearchAsync="SearchEmployeeAccountsAsync"
+                                          CashAccountSearchAsync="SearchCashAccountsByCurrencyAsync"
+                                          BankAccountSearchAsync="SearchBankAccountsByCurrencyAsync"
+                                          CurrencySearchAsync="SearchCurrenciesAsync"
                                           AccountSearchAsync="SearchAccountsAsync"
+                                          EffectiveRateAsync="ResolveEffectiveRatePreviewAsync"
                                           OnModelChanged="MarkActiveDirty" />
 
                     break;
@@ -510,9 +515,9 @@
                     <PaymentAllocationEditor Model="@model"
                                              IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
                                              IsNew="@activeTab.IsNew"
-                                             SourceLookupItem="@GetPaymentSourceLookup(model.PaymentSourceId)"
+                                             SourceLookupItem="@GetPaymentSourceLookup(model.SourceLineId)"
                                              TargetLookupItem='@GetExternalReferenceLookup(model.TargetDocumentId, "مستند")'
-                                             SourceSearchAsync="@(model.PaymentSourceType == PaymentSourceType.CustomerAdvance ? null : SearchPaymentSourcesAsync)"
+                                             SourceSearchAsync="SearchPaymentSourcesAsync"
                                              TargetSearchAsync="@null"
                                              OnModelChanged="MarkActiveDirty" />
 
@@ -525,7 +530,8 @@
                                        IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
                                        IsNew="@activeTab.IsNew"
                                        AccountLookupItem="@GetAccountLookup(model.AccountId)"
-                                       AccountSearchAsync="SearchAccountsAsync"
+                                       CurrencyLookupItem="@GetCurrencyLookup(model.CurrencyId)"
+                                       CurrencySearchAsync="SearchCurrenciesAsync"
                                        OnModelChanged="MarkActiveDirty" />
 
                     break;
@@ -537,7 +543,8 @@
                                        IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
                                        IsNew="@activeTab.IsNew"
                                        AccountLookupItem="@GetAccountLookup(model.AccountId)"
-                                       AccountSearchAsync="SearchAccountsAsync"
+                                       CurrencyLookupItem="@GetCurrencyLookup(model.CurrencyId)"
+                                       CurrencySearchAsync="SearchCurrenciesAsync"
                                        OnModelChanged="MarkActiveDirty" />
 
                     break;

@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Accounting.PaymentVouchers.Commands.CreatePaymentVoucher;
 using OAS.Application.Accounting.PaymentVouchers.Mapping;
 using OAS.Application.Accounting.PaymentVouchers.Queries.GetPaymentVoucherById;
@@ -10,339 +11,178 @@ using OAS.Contracts.Accounting.PaymentVouchers;
 using OAS.Contracts.Accounting.ReceiptVouchers;
 using OAS.Domain.Accounting.Entities;
 using OAS.Tests.Accounting.Application.Common;
-using DomainPaymentStatus =
-    OAS.Domain.Accounting.Enums.PaymentVoucherStatus;
-using DomainReceiptStatus =
-    OAS.Domain.Accounting.Enums.ReceiptVoucherStatus;
+using DomainExchangeRateSource = OAS.Domain.Accounting.Enums.ExchangeRateSource;
+using DomainExchangeRateType = OAS.Domain.Accounting.Enums.ExchangeRateType;
+using DomainPaymentMethod = OAS.Domain.Accounting.Enums.PaymentMethod;
+using DomainPartyType = OAS.Domain.Accounting.Enums.SettlementPartyType;
 
 namespace OAS.Tests.Accounting.Application.Vouchers;
 
 [TestFixture]
-public class VoucherCommandAndQueryTests
+public sealed class VoucherCommandAndQueryTests
 {
-    private FakeRepository<ReceiptVoucher, Guid>
-        _receiptRepository = null!;
-
-    private FakeRepository<ReceiptVoucherLine, Guid>
-        _receiptLineRepository = null!;
-
-    private FakeRepository<PaymentVoucher, Guid>
-        _paymentRepository = null!;
-
-    private FakeRepository<PaymentVoucherLine, Guid>
-        _paymentLineRepository = null!;
-
-    private FakeCurrentUser _currentUser = null!;
-
-    private FakeSequenceNumberGenerator
-        _sequenceGenerator = null!;
-
-    private ReceiptVoucherMapper
-        _receiptMapper = null!;
-
-    private PaymentVoucherMapper
-        _paymentMapper = null!;
-
-    private Guid _cashAccountId;
-    private Guid _bankAccountId;
-    private Guid _revenueAccountId;
-    private Guid _expenseAccountId;
+    private FakeRepository<ReceiptVoucher, Guid> _receiptRepository = null!;
+    private FakeRepository<ReceiptVoucherLine, Guid> _receiptLineRepository = null!;
+    private FakeRepository<PaymentVoucher, Guid> _paymentRepository = null!;
+    private FakeRepository<PaymentVoucherLine, Guid> _paymentLineRepository = null!;
+    private FakeRepository<AccountingSettings, Guid> _settingsRepository = null!;
+    private FakeRepository<Currency, Guid> _currencyRepository = null!;
+    private FakeSequenceNumberGenerator _sequence = null!;
+    private Guid _currencyId;
+    private Guid _counterpartyAccountId;
+    private Guid _settlementAccountId;
 
     [SetUp]
-    public void Setup()
+    public async Task Setup()
     {
-        _receiptRepository =
-            new FakeRepository<ReceiptVoucher, Guid>();
-
-        _receiptLineRepository =
-            new FakeRepository<ReceiptVoucherLine, Guid>();
-
-        _paymentRepository =
-            new FakeRepository<PaymentVoucher, Guid>();
-
-        _paymentLineRepository =
-            new FakeRepository<PaymentVoucherLine, Guid>();
-
-        _currentUser = new FakeCurrentUser();
-
-        _sequenceGenerator =
-            new FakeSequenceNumberGenerator();
-
-        _receiptMapper =
-            new ReceiptVoucherMapper();
-
-        _paymentMapper =
-            new PaymentVoucherMapper();
-
-        _cashAccountId = Guid.NewGuid();
-        _bankAccountId = Guid.NewGuid();
-        _revenueAccountId = Guid.NewGuid();
-        _expenseAccountId = Guid.NewGuid();
+        _receiptRepository = new();
+        _receiptLineRepository = new();
+        _paymentRepository = new();
+        _paymentLineRepository = new();
+        _settingsRepository = new();
+        _currencyRepository = new();
+        _sequence = new();
+        _currencyId = Guid.NewGuid();
+        _counterpartyAccountId = Guid.NewGuid();
+        _settlementAccountId = Guid.NewGuid();
+        await _currencyRepository.AddAsync(Currency.Create(_currencyId, "YER", "الريال اليمني", null, "ر.ي", 2, true));
+        await _settingsRepository.AddAsync(AccountingSettings.Create(_currencyId));
     }
 
     [Test]
-    public async Task CreateReceiptVoucherCommandHandler_CreatesVoucherWithLines()
+    public async Task CreateReceiptVoucherCommandHandler_CreatesSettlementVoucher()
     {
-        var handler =
-            new CreateReceiptVoucherCommandHandler(
-                _receiptRepository,
-                new FakeRepository<Customer, Guid>(),
-                _sequenceGenerator);
-
+        var resolver = new FakeSettlementResolver(_counterpartyAccountId, _settlementAccountId, _currencyId, 1m);
+        var handler = new CreateReceiptVoucherCommandHandler(_receiptRepository, _sequence, resolver, _settingsRepository, _currencyRepository);
         var request = new CreateReceiptVoucherRequest(
-            VoucherDate: new DateOnly(2026, 1, 15),
-            PartyType: ReceiptPartyType.Other,
-            CustomerId: null,
-            ReceivedFrom: "عميل تجريبي",
-            PaymentMethod: PaymentMethod.Cash,
-            CashAccountId: _cashAccountId,
-            BankAccountId: null,
-            TotalAmount: 3500m,
-            Description: "سند قبض نقدي",
-            Lines:
-            [
-                new CreateReceiptVoucherLineRequest(
-                    AccountId: _revenueAccountId,
-                    Amount: 3500m,
-                    ReferenceType: null,
-                    ReferenceId: null,
-                    Description: "إيراد مبيعات")
-            ]);
-
-        var command =
-            new CreateReceiptVoucherCommand(request);
-
-        var voucherId = await handler.Handle(
-            command,
-            CancellationToken.None);
-
-        Assert.That(
-            voucherId,
-            Is.Not.EqualTo(Guid.Empty));
-
-        Assert.That(
-            _receiptRepository.Items.Count,
-            Is.EqualTo(1));
-
-        var saved =
-            _receiptRepository.Items[0];
-
-        Assert.That(
-            saved.VoucherNumber,
-            Does.StartWith("RV-2026-"));
-
-        Assert.That(
-            saved.TotalAmount,
-            Is.EqualTo(3500m));
-
-        Assert.That(
-            saved.Status,
-            Is.EqualTo(DomainReceiptStatus.Draft));
-
-        Assert.That(
-            saved.Lines.Count,
-            Is.EqualTo(1));
-    }
-
-    [Test]
-    public async Task CreatePaymentVoucherCommandHandler_CreatesPaymentVoucherWithLines()
-    {
-        var handler =
-            new CreatePaymentVoucherCommandHandler(
-                _paymentRepository,
-                new FakeRepository<Supplier, Guid>(),
-                _sequenceGenerator);
-
-        var request = new CreatePaymentVoucherRequest(
-            VoucherDate: new DateOnly(2026, 1, 15),
-            PartyType: PaymentPartyType.Other,
-            SupplierId: null,
-            BeneficiaryName: "مورد تجريبي",
-            PaymentMethod: PaymentMethod.BankTransfer,
-            CashAccountId: null,
-            BankAccountId: _bankAccountId,
-            TotalAmount: 4200m,
-            Description: "سند صرف بنكي",
-            Lines:
-            [
-                new CreatePaymentVoucherLineRequest(
-                    AccountId: _expenseAccountId,
-                    Amount: 4200m,
-                    ReferenceType: null,
-                    ReferenceId: null,
-                    Description: "دفعة من الحساب")
-            ]);
-
-        var command =
-            new CreatePaymentVoucherCommand(request);
-
-        var voucherId = await handler.Handle(
-            command,
-            CancellationToken.None);
-
-        Assert.That(
-            voucherId,
-            Is.Not.EqualTo(Guid.Empty));
-
-        Assert.That(
-            _paymentRepository.Items.Count,
-            Is.EqualTo(1));
-
-        var saved =
-            _paymentRepository.Items[0];
-
-        Assert.That(
-            saved.VoucherNumber,
-            Does.StartWith("PV-2026-"));
-
-        Assert.That(
-            saved.TotalAmount,
-            Is.EqualTo(4200m));
-
-        Assert.That(
-            saved.Status,
-            Is.EqualTo(DomainPaymentStatus.Draft));
-
-        Assert.That(
-            saved.Lines.Count,
-            Is.EqualTo(1));
-    }
-
-    [Test]
-    public async Task GetReceiptVoucherByIdQueryHandler_ReturnsDtoWithLines()
-    {
-        var voucher = ReceiptVoucher.Create(
-            Guid.NewGuid(),
-            "RV-2026-000001",
             new DateOnly(2026, 1, 15),
-            OAS.Domain.Accounting.Enums.ReceiptPartyType.Customer,
-            Guid.NewGuid(),
-            "عميل",
-            OAS.Domain.Accounting.Enums.PaymentMethod.Cash,
-            _cashAccountId,
-            null,
-            1500m,
-            DomainReceiptStatus.Draft,
-            "سند",
-            null);
+            "سند قبض",
+            [new CreateReceiptVoucherLineRequest(SettlementPartyType.Other, null, null, null, "عميل نقدي", _counterpartyAccountId, PaymentMethod.Cash, Guid.NewGuid(), null, null, _currencyId, 3500m)]);
 
+        var id = await handler.Handle(new CreateReceiptVoucherCommand(request), CancellationToken.None);
+        var saved = _receiptRepository.Items.Single(x => x.Id == id);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(saved.VoucherNumber, Does.StartWith("RV-2026-"));
+            Assert.That(saved.BaseCurrencyId, Is.EqualTo(_currencyId));
+            Assert.That(saved.BaseTotalAmount, Is.EqualTo(3500m));
+            Assert.That(saved.Lines, Has.Count.EqualTo(1));
+            Assert.That(saved.Lines.Single().CounterpartyAccountId, Is.EqualTo(_counterpartyAccountId));
+            Assert.That(saved.Lines.Single().SettlementAccountId, Is.EqualTo(_settlementAccountId));
+        });
+    }
+
+    [Test]
+    public async Task CreatePaymentVoucherCommandHandler_CreatesSettlementVoucher()
+    {
+        var resolver = new FakeSettlementResolver(_counterpartyAccountId, _settlementAccountId, _currencyId, 1m);
+        var handler = new CreatePaymentVoucherCommandHandler(_paymentRepository, _sequence, resolver, _settingsRepository, _currencyRepository);
+        var request = new CreatePaymentVoucherRequest(
+            new DateOnly(2026, 1, 15),
+            "سند صرف",
+            [new CreatePaymentVoucherLineRequest(SettlementPartyType.Other, null, null, null, "مورد نقدي", _counterpartyAccountId, PaymentMethod.BankTransfer, null, Guid.NewGuid(), null, _currencyId, 4200m)]);
+
+        var id = await handler.Handle(new CreatePaymentVoucherCommand(request), CancellationToken.None);
+        var saved = _paymentRepository.Items.Single(x => x.Id == id);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(saved.VoucherNumber, Does.StartWith("PV-2026-"));
+            Assert.That(saved.BaseCurrencyId, Is.EqualTo(_currencyId));
+            Assert.That(saved.BaseTotalAmount, Is.EqualTo(4200m));
+            Assert.That(saved.Lines, Has.Count.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public async Task GetReceiptVoucherByIdQueryHandler_ReturnsSettlementSnapshot()
+    {
+        var voucher = ReceiptVoucher.CreateSettlementDocument(Guid.NewGuid(), "RV-2026-000001", new DateOnly(2026, 1, 15), _currencyId, "YER", 2, 1500m, "سند");
         await _receiptRepository.AddAsync(voucher);
-
-        var line = ReceiptVoucherLine.Create(
-            Guid.NewGuid(),
-            voucher.Id,
-            1,
-            _revenueAccountId,
-            1500m,
-            null,
-            null,
-            "إيراد");
-
+        var line = ReceiptVoucherLine.CreateSettlement(Guid.NewGuid(), voucher.Id, 1, DomainPartyType.Other, null, null, null,
+            "عميل نقدي", _counterpartyAccountId, DomainPaymentMethod.Cash, Guid.NewGuid(), null, _settlementAccountId,
+            _currencyId, "YER", "ر.ي", 2, 1500m, 1m, voucher.VoucherDate, DomainExchangeRateType.Accounting,
+            DomainExchangeRateSource.System, 1500m, null, null, null, null, "إيراد");
         await _receiptLineRepository.AddAsync(line);
 
-        var handler =
-            new GetReceiptVoucherByIdQueryHandler(
-                _receiptRepository,
-                _receiptLineRepository,
-                _receiptMapper);
+        var dto = await new GetReceiptVoucherByIdQueryHandler(_receiptRepository, _receiptLineRepository, new ReceiptVoucherMapper())
+            .Handle(new GetReceiptVoucherByIdQuery(voucher.Id), CancellationToken.None);
 
-        var query =
-            new GetReceiptVoucherByIdQuery(
-                voucher.Id);
-
-        var dto = await handler.Handle(
-            query,
-            CancellationToken.None);
-
-        Assert.That(dto, Is.Not.Null);
-
-        Assert.That(
-            dto.VoucherNumber,
-            Is.EqualTo("RV-2026-000001"));
-
-        Assert.That(
-            dto.TotalAmount,
-            Is.EqualTo(1500m));
-
-        Assert.That(
-            dto.Lines.Count,
-            Is.EqualTo(1));
-
-        Assert.That(
-            dto.Lines[0].Amount,
-            Is.EqualTo(1500m));
-
-        Assert.That(
-            dto.Lines[0].AccountId,
-            Is.EqualTo(_revenueAccountId));
+        Assert.Multiple(() =>
+        {
+            Assert.That(dto.BaseTotalAmount, Is.EqualTo(1500m));
+            Assert.That(dto.Lines, Has.Count.EqualTo(1));
+            Assert.That(dto.Lines[0].CurrencyCodeSnapshot, Is.EqualTo("YER"));
+            Assert.That(dto.Lines[0].BaseAmount, Is.EqualTo(1500m));
+        });
     }
 
     [Test]
-    public async Task GetPaymentVoucherByIdQueryHandler_ReturnsDtoWithLines()
+    public async Task GetPaymentVoucherByIdQueryHandler_ReturnsSettlementSnapshot()
     {
-        var voucher = PaymentVoucher.Create(
-            Guid.NewGuid(),
-            "PV-2026-000001",
-            new DateOnly(2026, 1, 15),
-            OAS.Domain.Accounting.Enums.PaymentPartyType.Supplier,
-            Guid.NewGuid(),
-            "مورد",
-            OAS.Domain.Accounting.Enums.PaymentMethod.BankTransfer,
-            null,
-            _bankAccountId,
-            2200m,
-            DomainPaymentStatus.Draft,
-            "سند صرف",
-            null);
-
+        var voucher = PaymentVoucher.CreateSettlementDocument(Guid.NewGuid(), "PV-2026-000001", new DateOnly(2026, 1, 15), _currencyId, "YER", 2, 2200m, "سند صرف");
         await _paymentRepository.AddAsync(voucher);
-
-        var line = PaymentVoucherLine.Create(
-            Guid.NewGuid(),
-            voucher.Id,
-            1,
-            _expenseAccountId,
-            2200m,
-            null,
-            null,
-            "مصروف");
-
+        var line = PaymentVoucherLine.CreateSettlement(Guid.NewGuid(), voucher.Id, 1, DomainPartyType.Other, null, null, null,
+            "مورد", _counterpartyAccountId, DomainPaymentMethod.BankTransfer, null, Guid.NewGuid(), _settlementAccountId,
+            _currencyId, "YER", "ر.ي", 2, 2200m, 1m, voucher.VoucherDate, DomainExchangeRateType.Accounting,
+            DomainExchangeRateSource.System, 2200m, null, null, null, null, "مصروف");
         await _paymentLineRepository.AddAsync(line);
 
-        var handler =
-            new GetPaymentVoucherByIdQueryHandler(
-                _paymentRepository,
-                _paymentLineRepository,
-                _paymentMapper);
+        var dto = await new GetPaymentVoucherByIdQueryHandler(_paymentRepository, _paymentLineRepository, new PaymentVoucherMapper())
+            .Handle(new GetPaymentVoucherByIdQuery(voucher.Id), CancellationToken.None);
 
-        var query =
-            new GetPaymentVoucherByIdQuery(
-                voucher.Id);
+        Assert.Multiple(() =>
+        {
+            Assert.That(dto.BaseTotalAmount, Is.EqualTo(2200m));
+            Assert.That(dto.Lines, Has.Count.EqualTo(1));
+            Assert.That(dto.Lines[0].CurrencyCodeSnapshot, Is.EqualTo("YER"));
+        });
+    }
 
-        var dto = await handler.Handle(
-            query,
-            CancellationToken.None);
-
-        Assert.That(dto, Is.Not.Null);
-
-        Assert.That(
-            dto.VoucherNumber,
-            Is.EqualTo("PV-2026-000001"));
-
-        Assert.That(
-            dto.TotalAmount,
-            Is.EqualTo(2200m));
-
-        Assert.That(
-            dto.Lines.Count,
-            Is.EqualTo(1));
-
-        Assert.That(
-            dto.Lines[0].Amount,
-            Is.EqualTo(2200m));
-
-        Assert.That(
-            dto.Lines[0].AccountId,
-            Is.EqualTo(_expenseAccountId));
+    private sealed class FakeSettlementResolver(Guid counterpartyAccountId, Guid settlementAccountId, Guid currencyId, decimal rate) : IVoucherSettlementResolver
+    {
+        public Task<VoucherSettlementResolution> ResolveAsync(
+            DateOnly voucherDate,
+            DomainPartyType partyType,
+            Guid? customerId,
+            Guid? supplierId,
+            Guid? employeeId,
+            string? partyName,
+            Guid? otherCounterpartyAccountId,
+            DomainPaymentMethod paymentMethod,
+            Guid? cashAccountId,
+            Guid? bankAccountId,
+            Guid? otherSettlementAccountId,
+            Guid requestedCurrencyId,
+            decimal amount,
+            decimal? manualExchangeRate,
+            DomainExchangeRateType exchangeRateType,
+            string? referenceNumber,
+            CancellationToken cancellationToken = default)
+        {
+            var effectiveRate = manualExchangeRate is > 0 ? manualExchangeRate.Value : rate;
+            return Task.FromResult(new VoucherSettlementResolution(
+                partyType,
+                customerId,
+                supplierId,
+                employeeId,
+                string.IsNullOrWhiteSpace(partyName) ? "طرف" : partyName,
+                otherCounterpartyAccountId ?? counterpartyAccountId,
+                paymentMethod,
+                cashAccountId,
+                bankAccountId,
+                otherSettlementAccountId ?? settlementAccountId,
+                requestedCurrencyId == Guid.Empty ? currencyId : requestedCurrencyId,
+                "YER",
+                "ر.ي",
+                2,
+                amount,
+                effectiveRate,
+                voucherDate,
+                exchangeRateType,
+                manualExchangeRate is > 0 ? DomainExchangeRateSource.Manual : DomainExchangeRateSource.System,
+                amount * effectiveRate));
+        }
     }
 }

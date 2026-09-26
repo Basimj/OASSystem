@@ -4,45 +4,19 @@ using OAS.Domain.Accounting.Entities;
 
 namespace OAS.Application.Accounting.CashAccounts.Mapping;
 
-public sealed class CashAccountMapper
-    : ICrudMapper<
-        CashAccount,
-        Guid,
-        CashAccountDto,
-        CreateCashAccountRequest,
-        UpdateCashAccountRequest>
+public sealed class CashAccountMapper : ICrudMapper<CashAccount, Guid, CashAccountDto, CreateCashAccountRequest, UpdateCashAccountRequest>
 {
-    public CashAccount Create(CreateCashAccountRequest source)
-    {
-        return CashAccount.Create(
-            Guid.NewGuid(),
-            source.Code,
-            source.Name,
-            source.AccountId,
-            source.IsDefault,
-            source.IsActive);
-    }
+    public CashAccount Create(CreateCashAccountRequest source) =>
+        throw new NotSupportedException("Cash accounts require server-side linked-account provisioning. Use CreateCashAccountCommandHandler.");
 
     public void Update(UpdateCashAccountRequest source, CashAccount destination)
     {
-        destination.UpdateDetails(
-            destination.Code,
-            source.Name,
-            source.AccountId,
-            source.IsDefault);
-
+        destination.UpdateDetails(destination.Code, source.Name, destination.AccountId, source.CurrencyId, source.IsDefault);
         destination.SetActive(source.IsActive);
     }
 
-    public CashAccountDto ToRead(CashAccount source)
-    {
-        return new CashAccountDto(
-            source.Id,
-            source.Code,
-            source.Name,
-            source.AccountId,
-            source.IsDefault,
-            source.IsActive,
-            source.RowVersion is not null ? Convert.ToBase64String(source.RowVersion) : string.Empty);
-    }
+    public CashAccountDto ToRead(CashAccount source) => new(
+        source.Id, source.Code, source.Name, source.AccountId, source.CurrencyId,
+        source.IsDefault, source.IsActive,
+        source.RowVersion is not null ? Convert.ToBase64String(source.RowVersion) : string.Empty);
 }

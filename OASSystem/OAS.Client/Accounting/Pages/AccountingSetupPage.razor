@@ -1,0 +1,504 @@
+@page "/accounting/settings"
+@page "/accounting/currencies"
+@page "/accounting/exchange-rates"
+@page "/accounting/employee-accounts"
+@attribute [Authorize]
+@using OAS.Contracts.Accounting.Currencies
+@using OAS.Contracts.Accounting.EmployeeAccounts
+@using OAS.Contracts.Accounting.Enums
+@using OAS.Contracts.Accounting.ExchangeRates
+@using OAS.Contracts.Accounting.Settings
+@using OAS.Contracts.Accounting.Accounts
+@using OAS.Contracts.Features.Employees
+
+<PageTitle>إعدادات المحاسبة والعملات | OAS</PageTitle>
+
+<UiAccountingWorkspace ShowTabs="false">
+    <Actions>
+        <UiWorkspaceActionBar>
+            <UiButton Text="تحديث"
+                      IconCssClass="fa-solid fa-rotate"
+                      Variant="ButtonVariant.Secondary"
+                      Size="ControlSize.Small"
+                      Loading="@_busy"
+                      OnClick="LoadAsync" />
+        </UiWorkspaceActionBar>
+    </Actions>
+
+    <Body>
+        <UiAccountingEditorSurface>
+            <UiAccountingFormSection Title="إعدادات المحاسبة الأساسية"
+                                     Subtitle="حدد العملة الأساسية والحسابات الرئيسية التي يستخدمها النظام عند إنشاء حسابات الموظفين والصناديق والبنوك تلقائيًا."
+                                     IconCssClass="fa-solid fa-sliders">
+                <div class="row g-3">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label">العملة الأساسية</label>
+                        <select class="form-select form-select-sm"
+                                @bind="_settingsBaseCurrencyId">
+                            <option value="">-- اختر العملة --</option>
+
+                            @foreach (var currency in _currencies.Where(x => x.IsActive))
+                            {
+                                <option value="@currency.Id">
+                                    @currency.Code - @currency.NameAr
+                                </option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                        <label class="form-label">
+                            الحساب الرئيسي لذمم الموظفين
+                        </label>
+
+                        <select class="form-select form-select-sm"
+                                @bind="_settingsEmployeeParentAccountId">
+                            <option value="">-- غير محدد --</option>
+
+                            @foreach (var account in ParentAccountOptions)
+                            {
+                                <option value="@account.Id">
+                                    @account.Code - @account.NameAr
+                                </option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                        <label class="form-label">
+                            الحساب الرئيسي للصناديق
+                        </label>
+
+                        <select class="form-select form-select-sm"
+                                @bind="_settingsCashParentAccountId">
+                            <option value="">-- غير محدد --</option>
+
+                            @foreach (var account in ParentAccountOptions)
+                            {
+                                <option value="@account.Id">
+                                    @account.Code - @account.NameAr
+                                </option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                        <label class="form-label">
+                            الحساب الرئيسي للبنوك
+                        </label>
+
+                        <select class="form-select form-select-sm"
+                                @bind="_settingsBankParentAccountId">
+                            <option value="">-- غير محدد --</option>
+
+                            @foreach (var account in ParentAccountOptions)
+                            {
+                                <option value="@account.Id">
+                                    @account.Code - @account.NameAr
+                                </option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                        <label class="form-label">
+                            حساب أرباح فروقات الصرف
+                        </label>
+
+                        <select class="form-select form-select-sm"
+                                @bind="_settingsExchangeGainAccountId">
+                            <option value="">-- اختياري --</option>
+
+                            @foreach (var account in PostingAccountOptions)
+                            {
+                                <option value="@account.Id">
+                                    @account.Code - @account.NameAr
+                                </option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                        <label class="form-label">
+                            حساب خسائر فروقات الصرف
+                        </label>
+
+                        <select class="form-select form-select-sm"
+                                @bind="_settingsExchangeLossAccountId">
+                            <option value="">-- اختياري --</option>
+
+                            @foreach (var account in PostingAccountOptions)
+                            {
+                                <option value="@account.Id">
+                                    @account.Code - @account.NameAr
+                                </option>
+                            }
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mt-3 d-flex gap-2">
+                    <UiButton Text="حفظ الإعدادات"
+                              IconCssClass="fa-solid fa-floppy-disk"
+                              Size="ControlSize.Small"
+                              Disabled="@_busy"
+                              OnClick="SaveSettingsAsync" />
+
+                    @if (_settings is null)
+                    {
+                        <span class="text-muted small align-self-center">
+                            لن يبدأ استخدام Multi-Currency في المستندات الجديدة قبل حفظ هذه الإعدادات.
+                        </span>
+                    }
+                </div>
+            </UiAccountingFormSection>
+
+
+            <UiAccountingFormSection Title="العملات"
+                                     Subtitle="إدارة العملات ودقتها. كود العملة لا يتغير بعد الإنشاء."
+                                     IconCssClass="fa-solid fa-coins">
+
+                <div class="row g-2 align-items-end mb-3">
+                    <div class="col-12 col-md-2">
+                        <UiInputText Label="الكود"
+                                     @bind-Value="_currencyCode"
+                                     Disabled="@(_editingCurrencyId.HasValue)" />
+                    </div>
+
+                    <div class="col-12 col-md-3">
+                        <UiInputText Label="الاسم العربي"
+                                     @bind-Value="_currencyNameAr" />
+                    </div>
+
+                    <div class="col-12 col-md-3">
+                        <UiInputText Label="الاسم الإنجليزي"
+                                     @bind-Value="_currencyNameEn" />
+                    </div>
+
+                    <div class="col-6 col-md-1">
+                        <UiInputText Label="الرمز"
+                                     @bind-Value="_currencySymbol" />
+                    </div>
+
+                    <div class="col-6 col-md-1">
+                        <label class="form-label">الدقة</label>
+
+                        <input class="form-control form-control-sm"
+                               type="number"
+                               min="0"
+                               max="6"
+                               @bind="_currencyDecimalPlaces" />
+                    </div>
+
+                    <div class="col-6 col-md-1 form-check mt-4">
+                        <input class="form-check-input"
+                               type="checkbox"
+                               @bind="_currencyIsActive"
+                               id="currencyActive" />
+
+                        <label class="form-check-label"
+                               for="currencyActive">
+                            نشطة
+                        </label>
+                    </div>
+
+                    <div class="col-6 col-md-1 d-flex gap-1">
+                        <UiButton Text="@(_editingCurrencyId.HasValue ? "حفظ" : "إضافة")"
+                                  IconCssClass="fa-solid fa-check"
+                                  Size="ControlSize.Small"
+                                  OnClick="SaveCurrencyAsync" />
+
+                        @if (_editingCurrencyId.HasValue)
+                        {
+                            <UiButton Text=""
+                                      IconCssClass="fa-solid fa-xmark"
+                                      Variant="ButtonVariant.Ghost"
+                                      Size="ControlSize.Small"
+                                      OnClick="CancelCurrencyEdit" />
+                        }
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="ui-acc-grid-table">
+                        <thead>
+                            <tr>
+                                <th>الكود</th>
+                                <th>الاسم</th>
+                                <th>الرمز</th>
+                                <th>الدقة</th>
+                                <th>الحالة</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            @foreach (var currency in _currencies)
+                            {
+                                <tr>
+                                    <td>
+                                        @currency.Code
+
+                                        @if (IsBaseCurrency(currency.Id))
+                                        {
+                                            <span class="badge text-bg-primary ms-1">
+                                                العملة الأساسية
+                                            </span>
+                                        }
+                                    </td>
+
+                                    <td>@currency.NameAr</td>
+                                    <td>@(currency.Symbol ?? "—")</td>
+                                    <td>@currency.DecimalPlaces</td>
+                                    <td>@(currency.IsActive ? "نشطة" : "معطلة")</td>
+
+                                    <td>
+                                        <UiButton Text="تعديل"
+                                                  IconCssClass="fa-solid fa-pen"
+                                                  Variant="ButtonVariant.Ghost"
+                                                  Size="ControlSize.Small"
+                                                  OnClick="@(() => EditCurrency(currency))" />
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </UiAccountingFormSection>
+
+
+            <UiAccountingFormSection Title="أسعار الصرف"
+                                     Subtitle="السعر = عدد وحدات العملة الأساسية مقابل وحدة واحدة من العملة المحددة."
+                                     IconCssClass="fa-solid fa-arrow-right-arrow-left">
+
+                <div class="row g-2 align-items-end mb-3">
+                    <div class="col-12 col-md-3">
+                        <label class="form-label">العملة</label>
+
+                        <select class="form-select form-select-sm"
+                                @bind="_rateCurrencyId"
+                                @bind:after="OnRateCurrencyChanged"
+                                disabled="@_editingRateId.HasValue">
+
+                            <option value="">-- اختر العملة --</option>
+
+                            @foreach (var currency in _currencies.Where(x => x.IsActive))
+                            {
+                                <option value="@currency.Id">
+                                    @currency.Code - @currency.NameAr@(IsBaseCurrency(currency.Id) ? " (العملة الأساسية)" : "")
+                                </option>
+                            }
+                        </select>
+
+                        @if (IsSelectedRateBaseCurrency)
+                        {
+                            <div class="form-text text-primary">
+                                <i class="fa-solid fa-circle-info me-1"></i>
+                                هذه هي العملة الأساسية وسعر صرفها ثابت = 1.
+                            </div>
+                        }
+                    </div>
+
+                    <div class="col-12 col-md-2">
+                        <UiInputDate Label="تاريخ السعر"
+                                     Value="@_rateDate"
+                                     ValueExpression="@(() => _rateDate)"
+                                     ValueChanged="@(value => _rateDate = value)"
+                                     Required="true"
+                                     Size="ControlSize.Small" />
+                    </div>
+
+                    <div class="col-12 col-md-2">
+                        <label class="form-label">السعر</label>
+
+                        <input class="form-control form-control-sm"
+                               type="number"
+                               step="0.00000001"
+                               min="0.00000001"
+                               @bind="_rateValue"
+                               disabled="@IsSelectedRateBaseCurrency" />
+
+                        @if (IsSelectedRateBaseCurrency)
+                        {
+                            <div class="form-text">
+                                السعر ثابت ولا يمكن تغييره.
+                            </div>
+                        }
+                    </div>
+
+                    <div class="col-6 col-md-2">
+                        <label class="form-label">نوع السعر</label>
+
+                        <select class="form-select form-select-sm"
+                                @bind="_rateType">
+                            <option value="@ExchangeRateType.Accounting">
+                                محاسبي
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="col-6 col-md-1 form-check mt-4">
+                        <input class="form-check-input"
+                               type="checkbox"
+                               @bind="_rateIsActive"
+                               id="rateActive" />
+
+                        <label class="form-check-label"
+                               for="rateActive">
+                            نشط
+                        </label>
+                    </div>
+
+                    <div class="col-12 col-md-2 d-flex gap-1">
+                        <UiButton Text="@(_editingRateId.HasValue ? "حفظ" : "إضافة")"
+                                  IconCssClass="fa-solid fa-check"
+                                  Size="ControlSize.Small"
+                                  OnClick="SaveRateAsync" />
+
+                        @if (_editingRateId.HasValue)
+                        {
+                            <UiButton Text=""
+                                      IconCssClass="fa-solid fa-xmark"
+                                      Variant="ButtonVariant.Ghost"
+                                      Size="ControlSize.Small"
+                                      OnClick="CancelRateEdit" />
+                        }
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="ui-acc-grid-table">
+                        <thead>
+                            <tr>
+                                <th>العملة</th>
+                                <th>التاريخ</th>
+                                <th>السعر</th>
+                                <th>النوع</th>
+                                <th>الحالة</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            @foreach (var rate in _rates)
+                            {
+                                <tr>
+                                    <td>
+                                        @rate.CurrencyCode
+
+                                        @if (IsBaseCurrency(rate.CurrencyId))
+                                        {
+                                            <span class="badge text-bg-primary ms-1">
+                                                العملة الأساسية
+                                            </span>
+                                        }
+                                </td>
+
+                                <td>
+                                    @rate.RateDate.ToString("yyyy-MM-dd")
+                                </td>
+
+                                <td>
+                                    @FormatExchangeRate(rate.Rate)
+                                </td>
+
+                                <td>
+                                    @(rate.RateType == ExchangeRateType.Accounting
+                                                                        ? "محاسبي"
+                                                                        : rate.RateType.ToString())
+                                </td>
+
+                                    <td>
+                                        @(rate.IsActive ? "نشط" : "معطل")
+                                    </td>
+
+                                    <td>
+                                        <UiButton Text="تعديل"
+                                                  IconCssClass="fa-solid fa-pen"
+                                                  Variant="ButtonVariant.Ghost"
+                                                  Size="ControlSize.Small"
+                                                  OnClick="@(() => EditRate(rate))" />
+                                    </td>
+                                </tr>
+                                                        }
+                        </tbody>
+                    </table>
+                </div>
+            </UiAccountingFormSection>
+
+
+            <UiAccountingFormSection Title="الربط المحاسبي للموظفين"
+                                     Subtitle="لا ينشأ حساب محاسبي لكل موظف عند إنشائه في الموارد البشرية. يتم إنشاء الحساب تلقائيًا فقط عند تفعيله محاسبيًا هنا."
+                                     IconCssClass="fa-solid fa-user-tie">
+
+                <div class="row g-2 align-items-end mb-3">
+                    <div class="col-12 col-md-8">
+                        <label class="form-label">الموظف</label>
+
+                        <select class="form-select form-select-sm"
+                                @bind="_employeeToActivateId">
+
+                            <option value="">-- اختر موظفًا --</option>
+
+                            @foreach (var employee in AvailableEmployees)
+                            {
+                                <option value="@employee.Id">
+                                    @employee.EmployeeCode - @employee.DisplayName
+                                </option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                        <UiButton Text="تفعيل محاسبي"
+                                  IconCssClass="fa-solid fa-user-plus"
+                                  Size="ControlSize.Small"
+                                  Disabled="@(!_employeeToActivateId.HasValue)"
+                                  OnClick="ActivateEmployeeAsync" />
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="ui-acc-grid-table">
+                        <thead>
+                            <tr>
+                                <th>الموظف</th>
+                                <th>الحساب</th>
+                                <th>الحالة</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            @foreach (var item in _employeeAccounts)
+                            {
+                                <tr>
+                                    <td>
+                                        @item.EmployeeCode - @item.EmployeeName
+                                    </td>
+
+                                    <td>
+                                        @item.AccountCode - @item.AccountName
+                                    </td>
+
+                                    <td>
+                                        @(item.IsActive ? "نشط" : "معطل")
+                                    </td>
+
+                                    <td>
+                                        <UiButton Text="@(item.IsActive ? "تعطيل" : "تفعيل")"
+                                                  IconCssClass="fa-solid fa-power-off"
+                                                  Variant="ButtonVariant.Ghost"
+                                                  Size="ControlSize.Small"
+                                                  OnClick="@(() => ToggleEmployeeAccountAsync(item))" />
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </UiAccountingFormSection>
+
+        </UiAccountingEditorSurface>
+    </Body>
+</UiAccountingWorkspace>

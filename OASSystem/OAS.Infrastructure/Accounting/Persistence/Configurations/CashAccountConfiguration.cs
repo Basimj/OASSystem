@@ -28,6 +28,8 @@ public sealed class CashAccountConfiguration : IEntityTypeConfiguration<CashAcco
         builder.Property(x => x.AccountId)
             .IsRequired();
 
+        builder.Property(x => x.CurrencyId);
+
         builder.Property(x => x.IsDefault)
             .IsRequired();
 
@@ -45,10 +47,21 @@ public sealed class CashAccountConfiguration : IEntityTypeConfiguration<CashAcco
         builder.HasIndex(x => x.AccountId)
             .HasDatabaseName("IX_CashAccounts_AccountId");
 
+        builder.HasIndex(x => x.CurrencyId)
+            .IsUnique()
+            .HasFilter("[IsDefault] = 1 AND [IsActive] = 1 AND [CurrencyId] IS NOT NULL")
+            .HasDatabaseName("UX_CashAccounts_DefaultPerCurrency");
+
         builder.HasOne<Account>()
             .WithMany()
             .HasForeignKey(x => x.AccountId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_CashAccounts_Account");
+
+        builder.HasOne<Currency>()
+            .WithMany()
+            .HasForeignKey(x => x.CurrencyId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_CashAccounts_Currency");
     }
 }

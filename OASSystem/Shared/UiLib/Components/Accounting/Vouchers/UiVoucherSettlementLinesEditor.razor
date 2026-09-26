@@ -1,0 +1,547 @@
+@namespace OAS.UiLib.Components.Accounting.Vouchers
+@using OAS.UiLib.Components.Accounting.Workspace
+@using OAS.UiLib.Components.Inputs
+@using OAS.UiLib.Core.Models
+
+<div class="ui-acc-settlement-lines" dir="rtl">
+    @if (Lines.Count == 0)
+    {
+        <UiAccountingEmptyState Title="لا توجد أسطر تسوية"
+                                Description="أضف سطر قبض/صرف وحدد الطرف وطريقة الدفع والعملة والمبلغ."
+                                IconCssClass="fa-solid fa-money-bill-transfer" />
+    }
+
+    @for (var i = 0; i < Lines.Count; i++)
+    {
+        var line = Lines[i];
+
+        <div class="ui-acc-settlement-line">
+            <div class="ui-acc-settlement-line__header">
+                <div>
+                    <strong>سطر @(i + 1)</strong>
+                    @if (!string.IsNullOrWhiteSpace(line.CurrencyCodeSnapshot))
+                    {
+                        <span class="text-muted"> · @line.CurrencyCodeSnapshot</span>
+                    }
+                </div>
+
+                @if (IsEditable)
+                {
+                    <UiButton Text=""
+                              IconCssClass="fa-solid fa-trash-can"
+                              Variant="ButtonVariant.Ghost"
+                              Size="ControlSize.Small"
+                              OnClick="@(() => RemoveAsync(line))" />
+                }
+            </div>
+
+            <UiAccountingFormGrid Columns="3">
+                <UiSelect Label="نوع الطرف"
+                          Value="@line.PartyTypeValue"
+                          ValueExpression="@(() => line.PartyTypeValue)"
+                          ValueChanged="@(value => PartyTypeChangedAsync(line, value))"
+                          Options="@PartyTypeOptions"
+                          Disabled="@(!IsEditable)"
+                          Size="ControlSize.Small" />
+
+                @switch (line.PartyType)
+                {
+                    case SettlementPartyKind.Customer:
+                        <UiLookup Label="العميل"
+                                  Value='@line.CustomerId?.ToString("D")'
+                                  ValueChanged="@(value => CustomerChangedAsync(line, value))"
+                                  SelectedItem="@line.PartyLookupItem"
+                                  SearchAsync="CustomerSearchAsync"
+                                  Placeholder="ابحث باسم أو كود العميل..."
+                                  Disabled="@(!IsEditable)"
+                                  Required="true"
+                                  MinimumSearchLength="0"
+                                  DebounceMilliseconds="250" />
+                        break;
+
+                    case SettlementPartyKind.Supplier:
+                        <UiLookup Label="المورد"
+                                  Value='@line.SupplierId?.ToString("D")'
+                                  ValueChanged="@(value => SupplierChangedAsync(line, value))"
+                                  SelectedItem="@line.PartyLookupItem"
+                                  SearchAsync="SupplierSearchAsync"
+                                  Placeholder="ابحث باسم أو كود المورد..."
+                                  Disabled="@(!IsEditable)"
+                                  Required="true"
+                                  MinimumSearchLength="0"
+                                  DebounceMilliseconds="250" />
+                        break;
+
+                    case SettlementPartyKind.Employee:
+                        <UiLookup Label="الموظف"
+                                  Value='@line.EmployeeId?.ToString("D")'
+                                  ValueChanged="@(value => EmployeeChangedAsync(line, value))"
+                                  SelectedItem="@line.PartyLookupItem"
+                                  SearchAsync="EmployeeSearchAsync"
+                                  Placeholder="ابحث عن موظف مفعل محاسبياً..."
+                                  Disabled="@(!IsEditable)"
+                                  Required="true"
+                                  MinimumSearchLength="0"
+                                  DebounceMilliseconds="250" />
+                        break;
+
+                    default:
+                        <UiInputText Label="اسم الطرف"
+                                     Value="@line.PartyName"
+                                     ValueExpression="@(() => line.PartyName)"
+                                     ValueChanged="@(value => PartyNameChangedAsync(line, value))"
+                                     Disabled="@(!IsEditable)"
+                                     Required="true"
+                                     Placeholder="اسم الشخص أو الجهة..." />
+
+                        <UiLookup Label="الحساب المقابل"
+                                  Value='@line.CounterpartyAccountId?.ToString("D")'
+                                  ValueChanged="@(value => CounterpartyAccountChangedAsync(line, value))"
+                                  SelectedItem="@line.CounterpartyAccountLookupItem"
+                                  SearchAsync="AccountSearchAsync"
+                                  Placeholder="اختر حساب ترحيل مسموح..."
+                                  Disabled="@(!IsEditable)"
+                                  Required="true"
+                                  MinimumSearchLength="0"
+                                  DebounceMilliseconds="250" />
+                        break;
+                }
+
+                <UiSelect Label="طريقة الدفع"
+                          Value="@line.PaymentMethodValue"
+                          ValueExpression="@(() => line.PaymentMethodValue)"
+                          ValueChanged="@(value => PaymentMethodChangedAsync(line, value))"
+                          Options="@PaymentMethodOptions"
+                          Disabled="@(!IsEditable)"
+                          Size="ControlSize.Small" />
+
+                <UiLookup Label="العملة"
+                          Value='@line.CurrencyId?.ToString("D")'
+                          ValueChanged="@(value => CurrencyChangedAsync(line, value))"
+                          SelectedItem="@line.CurrencyLookupItem"
+                          SearchAsync="CurrencySearchAsync"
+                          Placeholder="اختر العملة..."
+                          Disabled="@(!IsEditable)"
+                          Required="true"
+                          MinimumSearchLength="0"
+                          DebounceMilliseconds="250" />
+
+                <UiAccountingNumberField Label="المبلغ"
+                                         Value="@line.Amount"
+                                         ValueChanged="@(value => AmountChangedAsync(line, value))"
+                                         Min="0.0001"
+                                         Disabled="@(!IsEditable)"
+                                         Tone="@UiAccountingNumberField.NumberTone.Primary" />
+
+                <div class="ui-acc-settlement-line__rate">
+                    <span class="text-muted small">
+                        السعر التلقائي: @(line.ResolvedExchangeRate?.ToString("0.########") ?? "-")
+                    </span>
+                    <UiAccountingNumberField Label="سعر صرف يدوي (اختياري)"
+                                             Value="@(line.ManualExchangeRate ?? 0m)"
+                                             ValueChanged="@(value => RateChangedAsync(line, value))"
+                                             Min="0"
+                                             Disabled="@(!IsEditable)"
+                                             Tone="@UiAccountingNumberField.NumberTone.Default" />
+                    <span class="text-muted small">0 = استخدام السعر التلقائي</span>
+                </div>
+
+                @if (line.PaymentMethod == PaymentMethodKind.Cash)
+                {
+                    <UiLookup Label="الصندوق"
+                              Value='@line.CashAccountId?.ToString("D")'
+                              ValueChanged="@(value => CashAccountChangedAsync(line, value))"
+                              SelectedItem="@line.SettlementLookupItem"
+                              SearchAsync="@((text, ct) => SearchCashAccountsForLineAsync(line, text, ct))"
+                              Placeholder="اختر صندوقاً بنفس عملة السطر..."
+                              Disabled="@(!IsEditable)"
+                              Required="true"
+                              MinimumSearchLength="0"
+                              DebounceMilliseconds="250" />
+                }
+                else if (line.PaymentMethod is PaymentMethodKind.BankTransfer or PaymentMethodKind.Cheque or PaymentMethodKind.Card)
+                {
+                    <UiLookup Label="الحساب البنكي"
+                              Value='@line.BankAccountId?.ToString("D")'
+                              ValueChanged="@(value => BankAccountChangedAsync(line, value))"
+                              SelectedItem="@line.SettlementLookupItem"
+                              SearchAsync="@((text, ct) => SearchBankAccountsForLineAsync(line, text, ct))"
+                              Placeholder="اختر حساباً بنكياً بنفس عملة السطر..."
+                              Disabled="@(!IsEditable)"
+                              Required="true"
+                              MinimumSearchLength="0"
+                              DebounceMilliseconds="250" />
+                }
+                else
+                {
+                    <UiLookup Label="حساب التسوية"
+                              Value='@line.SettlementAccountId?.ToString("D")'
+                              ValueChanged="@(value => SettlementAccountChangedAsync(line, value))"
+                              SelectedItem="@line.SettlementLookupItem"
+                              SearchAsync="AccountSearchAsync"
+                              Placeholder="اختر حساب التسوية..."
+                              Disabled="@(!IsEditable)"
+                              Required="true"
+                              MinimumSearchLength="0"
+                              DebounceMilliseconds="250" />
+                }
+
+                <UiInputText Label="رقم المرجع"
+                             Value="@line.ReferenceNumber"
+                             ValueExpression="@(() => line.ReferenceNumber)"
+                             ValueChanged="@(value => ReferenceNumberChangedAsync(line, value))"
+                             Disabled="@(!IsEditable)"
+                             Required="@(line.PaymentMethod == PaymentMethodKind.Cheque)"
+                             Placeholder="رقم شيك/تحويل/مرجع..." />
+
+                <UiInputDate Label="تاريخ المرجع"
+                             Value="@line.ReferenceDate"
+                             ValueExpression="@(() => line.ReferenceDate)"
+                             ValueChanged="@(value => ReferenceDateChangedAsync(line, value))"
+                             Disabled="@(!IsEditable)"
+                             Size="ControlSize.Small" />
+            </UiAccountingFormGrid>
+
+            <UiAccountingStack>
+                <UiInputText Label="بيان السطر"
+                             Value="@line.Description"
+                             ValueExpression="@(() => line.Description)"
+                             ValueChanged="@(value => DescriptionChangedAsync(line, value))"
+                             Disabled="@(!IsEditable)"
+                             Placeholder="بيان مختصر للسطر..." />
+            </UiAccountingStack>
+
+            @if (line.BaseAmount.HasValue || line.ExchangeRateDate.HasValue)
+            {
+                <div class="ui-acc-settlement-line__snapshot">
+                    @if (line.BaseAmount.HasValue)
+                    {
+                        <span>المبلغ الأساسي: <strong>@line.BaseAmount.Value.ToString("N4")</strong></span>
+                    }
+                    @if (line.ExchangeRateDate.HasValue)
+                    {
+                        <span>تاريخ السعر: @line.ExchangeRateDate.Value.ToString("yyyy-MM-dd")</span>
+                    }
+                    @if (line.ExchangeRateSource.HasValue)
+                    {
+                        <span>المصدر: @(line.ExchangeRateSource == ExchangeRateSourceKind.Manual ? "يدوي" : "تلقائي")</span>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    @if (IsEditable)
+    {
+        <div class="ui-acc-lines-editor__actions">
+            <UiButton Text="إضافة سطر تسوية"
+                      IconCssClass="fa-solid fa-plus"
+                      Variant="ButtonVariant.Secondary"
+                      Size="ControlSize.Small"
+                      OnClick="AddAsync" />
+        </div>
+    }
+</div>
+
+@code {
+    public enum SettlementPartyKind : byte
+    {
+        Customer = 1,
+        Supplier = 2,
+        Employee = 3,
+        Other = 4
+    }
+
+    public enum PaymentMethodKind : byte
+    {
+        Cash = 1,
+        Card = 2,
+        BankTransfer = 3,
+        Cheque = 4,
+        Other = 5
+    }
+
+    public enum ExchangeRateSourceKind : byte
+    {
+        System = 1,
+        Manual = 2
+    }
+
+    public sealed class EditableSettlementLine
+    {
+        public SettlementPartyKind PartyType { get; set; } = SettlementPartyKind.Customer;
+        public Guid? CustomerId { get; set; }
+        public Guid? SupplierId { get; set; }
+        public Guid? EmployeeId { get; set; }
+        public string? PartyName { get; set; }
+        public Guid? CounterpartyAccountId { get; set; }
+
+        public PaymentMethodKind PaymentMethod { get; set; } = PaymentMethodKind.Cash;
+        public Guid? CashAccountId { get; set; }
+        public Guid? BankAccountId { get; set; }
+        public Guid? SettlementAccountId { get; set; }
+
+        public Guid? CurrencyId { get; set; }
+        public string? CurrencyCodeSnapshot { get; set; }
+        public decimal Amount { get; set; }
+        public decimal? ResolvedExchangeRate { get; set; }
+        public decimal? ManualExchangeRate { get; set; }
+        public DateOnly? ExchangeRateDate { get; set; }
+        public ExchangeRateSourceKind? ExchangeRateSource { get; set; }
+        public decimal? BaseAmount { get; set; }
+
+        public decimal? EffectiveExchangeRate =>
+            ManualExchangeRate is > 0 ? ManualExchangeRate : ResolvedExchangeRate;
+
+        public string? ReferenceNumber { get; set; }
+        public DateOnly? ReferenceDate { get; set; }
+        public string? ReferenceType { get; set; }
+        public Guid? ReferenceId { get; set; }
+        public string? Description { get; set; }
+
+        public UiLookupItem? PartyLookupItem { get; set; }
+        public UiLookupItem? CounterpartyAccountLookupItem { get; set; }
+        public UiLookupItem? SettlementLookupItem { get; set; }
+        public UiLookupItem? CurrencyLookupItem { get; set; }
+
+        public string PartyTypeValue
+        {
+            get => PartyType.ToString();
+            set { if (Enum.TryParse<SettlementPartyKind>(value, out var parsed)) PartyType = parsed; }
+        }
+
+        public string PaymentMethodValue
+        {
+            get => PaymentMethod.ToString();
+            set { if (Enum.TryParse<PaymentMethodKind>(value, out var parsed)) PaymentMethod = parsed; }
+        }
+    }
+
+    [Parameter] public List<EditableSettlementLine> Lines { get; set; } = [];
+    [Parameter] public bool IsEditable { get; set; }
+    [Parameter] public IReadOnlyList<UiSelectOption> PartyTypeOptions { get; set; } = [];
+    [Parameter] public IReadOnlyList<UiSelectOption> PaymentMethodOptions { get; set; } = [];
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CustomerSearchAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SupplierSearchAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? EmployeeSearchAsync { get; set; }
+    [Parameter] public Func<Guid?, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CashAccountSearchAsync { get; set; }
+    [Parameter] public Func<Guid?, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? BankAccountSearchAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CurrencySearchAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? AccountSearchAsync { get; set; }
+    [Parameter] public Func<Guid, DateOnly, CancellationToken, Task<decimal?>>? EffectiveRateAsync { get; set; }
+    [Parameter] public DateOnly RateDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+    [Parameter] public EventCallback OnLinesChanged { get; set; }
+
+    private async Task AddAsync()
+    {
+        Lines.Add(new EditableSettlementLine());
+        await ChangedAsync();
+    }
+
+    private async Task RemoveAsync(EditableSettlementLine line)
+    {
+        Lines.Remove(line);
+        await ChangedAsync();
+    }
+
+    private async Task PartyTypeChangedAsync(EditableSettlementLine line, string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value) && Enum.TryParse<SettlementPartyKind>(value, out var parsed))
+            line.PartyType = parsed;
+        line.CustomerId = null;
+        line.SupplierId = null;
+        line.EmployeeId = null;
+        line.PartyLookupItem = null;
+        if (line.PartyType != SettlementPartyKind.Other)
+        {
+            line.PartyName = null;
+            line.CounterpartyAccountId = null;
+            line.CounterpartyAccountLookupItem = null;
+        }
+        await ChangedAsync();
+    }
+
+    private async Task PaymentMethodChangedAsync(EditableSettlementLine line, string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value) && Enum.TryParse<PaymentMethodKind>(value, out var parsed))
+            line.PaymentMethod = parsed;
+        line.CashAccountId = null;
+        line.BankAccountId = null;
+        line.SettlementAccountId = null;
+        line.SettlementLookupItem = null;
+        await ChangedAsync();
+    }
+
+    private async Task CustomerChangedAsync(EditableSettlementLine line, string? value)
+    {
+        line.CustomerId = Parse(value); line.SupplierId = null; line.EmployeeId = null;
+        line.PartyLookupItem = await ResolveAsync(CustomerSearchAsync, line.CustomerId);
+        await ChangedAsync();
+    }
+
+    private async Task SupplierChangedAsync(EditableSettlementLine line, string? value)
+    {
+        line.SupplierId = Parse(value); line.CustomerId = null; line.EmployeeId = null;
+        line.PartyLookupItem = await ResolveAsync(SupplierSearchAsync, line.SupplierId);
+        await ChangedAsync();
+    }
+
+    private async Task EmployeeChangedAsync(EditableSettlementLine line, string? value)
+    {
+        line.EmployeeId = Parse(value); line.CustomerId = null; line.SupplierId = null;
+        line.PartyLookupItem = await ResolveAsync(EmployeeSearchAsync, line.EmployeeId);
+        await ChangedAsync();
+    }
+
+    private async Task CounterpartyAccountChangedAsync(EditableSettlementLine line, string? value)
+    {
+        line.CounterpartyAccountId = Parse(value);
+        line.CounterpartyAccountLookupItem = await ResolveAsync(AccountSearchAsync, line.CounterpartyAccountId);
+        await ChangedAsync();
+    }
+
+    private async Task CashAccountChangedAsync(EditableSettlementLine line, string? value)
+    {
+        line.CashAccountId = Parse(value);
+        line.BankAccountId = null;
+        line.SettlementAccountId = null;
+
+        line.SettlementLookupItem = null;
+        if (line.CashAccountId.HasValue)
+        {
+            var items = await SearchCashAccountsForLineAsync(
+                line,
+                string.Empty,
+                CancellationToken.None);
+
+            line.SettlementLookupItem = items.FirstOrDefault(
+                x => string.Equals(
+                    x.Value,
+                    line.CashAccountId.Value.ToString("D"),
+                    StringComparison.OrdinalIgnoreCase));
+        }
+
+        await ChangedAsync();
+    }
+
+    private async Task BankAccountChangedAsync(EditableSettlementLine line, string? value)
+    {
+        line.BankAccountId = Parse(value);
+        line.CashAccountId = null;
+        line.SettlementAccountId = null;
+
+        line.SettlementLookupItem = null;
+        if (line.BankAccountId.HasValue)
+        {
+            var items = await SearchBankAccountsForLineAsync(
+                line,
+                string.Empty,
+                CancellationToken.None);
+
+            line.SettlementLookupItem = items.FirstOrDefault(
+                x => string.Equals(
+                    x.Value,
+                    line.BankAccountId.Value.ToString("D"),
+                    StringComparison.OrdinalIgnoreCase));
+        }
+
+        await ChangedAsync();
+    }
+
+    private async Task SettlementAccountChangedAsync(EditableSettlementLine line, string? value)
+    {
+        line.SettlementAccountId = Parse(value); line.CashAccountId = null; line.BankAccountId = null;
+        line.SettlementLookupItem = await ResolveAsync(AccountSearchAsync, line.SettlementAccountId);
+        await ChangedAsync();
+    }
+
+    private async Task CurrencyChangedAsync(EditableSettlementLine line, string? value)
+    {
+        var oldCurrencyId = line.CurrencyId;
+
+        line.CurrencyId = Parse(value);
+        line.CurrencyLookupItem = await ResolveAsync(CurrencySearchAsync, line.CurrencyId);
+        line.CurrencyCodeSnapshot = line.CurrencyLookupItem?.PrimaryText?
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .FirstOrDefault();
+
+        // A cash/bank account is currency-specific. If the currency changes,
+        // any previously selected settlement source must be cleared.
+        if (oldCurrencyId != line.CurrencyId)
+        {
+            line.CashAccountId = null;
+            line.BankAccountId = null;
+
+            if (line.PaymentMethod != PaymentMethodKind.Other)
+                line.SettlementAccountId = null;
+
+            line.SettlementLookupItem = null;
+        }
+
+        line.ManualExchangeRate = null;
+        line.ResolvedExchangeRate = null;
+        line.ExchangeRateDate = null;
+        line.ExchangeRateSource = null;
+        line.BaseAmount = null;
+
+        if (line.CurrencyId is Guid currencyId && EffectiveRateAsync is not null)
+            line.ResolvedExchangeRate = await EffectiveRateAsync(
+                currencyId,
+                RateDate,
+                CancellationToken.None);
+
+        await ChangedAsync();
+    }
+
+    private async Task<IReadOnlyList<UiLookupItem>> SearchCashAccountsForLineAsync(
+        EditableSettlementLine line,
+        string text,
+        CancellationToken cancellationToken)
+    {
+        if (!line.CurrencyId.HasValue || CashAccountSearchAsync is null)
+            return Array.Empty<UiLookupItem>();
+
+        return await CashAccountSearchAsync(
+            line.CurrencyId,
+            text,
+            cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<UiLookupItem>> SearchBankAccountsForLineAsync(
+        EditableSettlementLine line,
+        string text,
+        CancellationToken cancellationToken)
+    {
+        if (!line.CurrencyId.HasValue || BankAccountSearchAsync is null)
+            return Array.Empty<UiLookupItem>();
+
+        return await BankAccountSearchAsync(
+            line.CurrencyId,
+            text,
+            cancellationToken);
+    }
+
+    private async Task PartyNameChangedAsync(EditableSettlementLine line, string? value) { line.PartyName = value; await ChangedAsync(); }
+    private async Task AmountChangedAsync(EditableSettlementLine line, decimal value) { line.Amount = value; await ChangedAsync(); }
+    private async Task RateChangedAsync(EditableSettlementLine line, decimal value)
+    {
+        line.ManualExchangeRate = value > 0 ? value : null;
+        await ChangedAsync();
+    }
+    private async Task ReferenceNumberChangedAsync(EditableSettlementLine line, string? value) { line.ReferenceNumber = value; await ChangedAsync(); }
+    private async Task ReferenceDateChangedAsync(EditableSettlementLine line, DateOnly? value) { line.ReferenceDate = value; await ChangedAsync(); }
+    private async Task DescriptionChangedAsync(EditableSettlementLine line, string? value) { line.Description = value; await ChangedAsync(); }
+
+    private Task ChangedAsync() => OnLinesChanged.InvokeAsync();
+
+    private static Guid? Parse(string? value) => Guid.TryParse(value, out var id) ? id : null;
+
+    private static async Task<UiLookupItem?> ResolveAsync(
+        Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? search,
+        Guid? id)
+    {
+        if (!id.HasValue || search is null) return null;
+        var items = await search(string.Empty, CancellationToken.None);
+        return items.FirstOrDefault(x => string.Equals(x.Value, id.Value.ToString("D"), StringComparison.OrdinalIgnoreCase));
+    }
+}

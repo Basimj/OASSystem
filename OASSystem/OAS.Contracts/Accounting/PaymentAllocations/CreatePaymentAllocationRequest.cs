@@ -1,10 +1,8 @@
-﻿using OAS.Contracts.Accounting.Enums;
-
+using OAS.Contracts.Accounting.Enums;
 namespace OAS.Contracts.Accounting.PaymentAllocations;
-
 public sealed record CreatePaymentAllocationRequest(
-    PaymentSourceType PaymentSourceType,
-    Guid PaymentSourceId,
+    Guid? ReceiptVoucherLineId,
+    Guid? PaymentVoucherLineId,
     AllocationTargetDocumentType TargetDocumentType,
     Guid TargetDocumentId,
     decimal AllocatedAmount);

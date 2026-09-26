@@ -1,0 +1,1 @@
+using FluentValidation;namespace OAS.Application.Accounting.Settings.Commands.UpdateAccountingSettings;public sealed class UpdateAccountingSettingsCommandValidator:AbstractValidator<UpdateAccountingSettingsCommand>{public UpdateAccountingSettingsCommandValidator(){RuleFor(x=>x.Request.BaseCurrencyId).NotEmpty();}}

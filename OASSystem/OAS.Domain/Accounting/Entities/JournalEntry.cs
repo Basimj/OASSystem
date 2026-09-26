@@ -60,6 +60,10 @@ public sealed class JournalEntry : AuditableEntity<Guid>
 
     public Guid? ReversedJournalId { get; private set; }
 
+    public Guid? BaseCurrencyId { get; private set; }
+    public string? BaseCurrencyCodeSnapshot { get; private set; }
+    public byte? BaseCurrencyDecimalPlacesSnapshot { get; private set; }
+
 
     public Guid? ApprovedBy { get; private set; }
 
@@ -118,6 +122,21 @@ public sealed class JournalEntry : AuditableEntity<Guid>
             Normalize(sourceDocumentType),
             sourceDocumentId,
             status);
+    }
+
+    public void SetBaseCurrencySnapshot(Guid baseCurrencyId, string code, byte decimalPlaces)
+    {
+        EnsureEditable();
+        if (baseCurrencyId == Guid.Empty)
+            throw new ArgumentException("Base currency is required.", nameof(baseCurrencyId));
+        if (string.IsNullOrWhiteSpace(code))
+            throw new ArgumentException("Base currency code is required.", nameof(code));
+        if (decimalPlaces > 6)
+            throw new ArgumentOutOfRangeException(nameof(decimalPlaces));
+
+        BaseCurrencyId = baseCurrencyId;
+        BaseCurrencyCodeSnapshot = code.Trim().ToUpperInvariant();
+        BaseCurrencyDecimalPlacesSnapshot = decimalPlaces;
     }
 
     public void AddLine(JournalEntryLine line)

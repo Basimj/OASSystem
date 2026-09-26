@@ -1,0 +1,2 @@
+using OAS.Application.Abstractions.Messaging;using OAS.Application.Abstractions.Security;using OAS.Application.Accounting.Authorization;using OAS.Contracts.Accounting.Currencies;
+namespace OAS.Application.Accounting.Currencies.Queries.GetCurrencyById;public sealed record GetCurrencyByIdQuery(Guid Id):IQuery<CurrencyDto>,IAuthorizedRequest{public IReadOnlyCollection<string> RequiredPermissions{get;}=[AccountingPermissions.Currencies.View];}

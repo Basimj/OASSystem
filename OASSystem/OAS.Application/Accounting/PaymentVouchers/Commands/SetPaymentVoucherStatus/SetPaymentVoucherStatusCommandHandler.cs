@@ -33,6 +33,18 @@ public sealed class SetPaymentVoucherStatusCommandHandler(
 
         var targetStatus = (DomainPaymentVoucherStatus)(int)request.Request.Status;
 
+        IReadOnlyList<PaymentVoucherLine>? lines = null;
+        if (targetStatus is DomainPaymentVoucherStatus.Approved or DomainPaymentVoucherStatus.Posted)
+        {
+            lines = await lineRepository.ListAsync(
+                new Specification<PaymentVoucherLine>()
+                    .Where(x => x.PaymentVoucherId == voucher.Id)
+                    .AddSort(nameof(PaymentVoucherLine.LineNumber), OAS.Contracts.Common.Pagination.SortDirection.Ascending),
+                cancellationToken);
+
+            ValidateReadyForApproval(voucher, lines);
+        }
+
         switch (targetStatus)
         {
             case DomainPaymentVoucherStatus.Approved:
@@ -47,15 +59,9 @@ public sealed class SetPaymentVoucherStatusCommandHandler(
                 if (!Guid.TryParse(currentUser.UserId, out var userId))
                     throw new ForbiddenException();
 
-                var lines = await lineRepository.ListAsync(
-                    new Specification<PaymentVoucherLine>()
-                        .Where(x => x.PaymentVoucherId == voucher.Id)
-                        .AddSort(nameof(PaymentVoucherLine.LineNumber), OAS.Contracts.Common.Pagination.SortDirection.Ascending),
-                    cancellationToken);
-
                 var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
                 var journalId = await postingService.PostPaymentVoucherAsync(
-                    voucher, lines, userId, nowUtc, cancellationToken);
+                    voucher, lines!, userId, nowUtc, cancellationToken);
 
                 voucher.SetJournalEntry(journalId);
                 voucher.Post(userId, nowUtc);
@@ -71,5 +77,40 @@ public sealed class SetPaymentVoucherStatusCommandHandler(
         }
 
         repository.Update(voucher);
+    }
+
+    private static void ValidateReadyForApproval(
+        PaymentVoucher voucher,
+        IReadOnlyList<PaymentVoucherLine> lines)
+    {
+        if (lines.Count == 0)
+            throw new ConflictException("voucher_lines_required", "The voucher must contain at least one line before approval or posting.");
+
+        // Legacy vouchers are intentionally allowed during the Expand phase.
+        if (!voucher.BaseCurrencyId.HasValue)
+            return;
+
+        if (lines.Any(x =>
+            !x.CurrencyId.HasValue ||
+            !x.CounterpartyAccountId.HasValue ||
+            !x.SettlementAccountId.HasValue ||
+            !x.BaseAmount.HasValue || x.BaseAmount.Value <= 0 ||
+            !x.ExchangeRate.HasValue || x.ExchangeRate.Value <= 0 ||
+            !x.ExchangeRateDate.HasValue ||
+            !x.ExchangeRateType.HasValue ||
+            !x.ExchangeRateSource.HasValue))
+        {
+            throw new ConflictException(
+                "voucher_settlement_line_incomplete",
+                "All settlement lines must contain resolved party, settlement, currency and exchange-rate snapshots.");
+        }
+
+        var expected = lines.Sum(x => x.BaseAmount!.Value);
+        if (!voucher.BaseTotalAmount.HasValue || voucher.BaseTotalAmount.Value != expected)
+        {
+            throw new ConflictException(
+                "voucher_base_total_mismatch",
+                "Voucher base total does not match the sum of settlement line base amounts.");
+        }
     }
 }

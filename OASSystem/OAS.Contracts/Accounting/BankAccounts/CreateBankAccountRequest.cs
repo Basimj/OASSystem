@@ -1,10 +1,10 @@
-﻿namespace OAS.Contracts.Accounting.BankAccounts;
+namespace OAS.Contracts.Accounting.BankAccounts;
 
 public sealed record CreateBankAccountRequest(
-    string Code,
+    string? Code,
     string BankName,
     string AccountName,
     string AccountNumber,
     string? IBAN,
-    Guid AccountId,
+    Guid CurrencyId,
     bool IsActive = true);

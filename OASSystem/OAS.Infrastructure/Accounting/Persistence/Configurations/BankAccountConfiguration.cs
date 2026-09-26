@@ -39,6 +39,8 @@ public sealed class BankAccountConfiguration : IEntityTypeConfiguration<BankAcco
         builder.Property(x => x.AccountId)
             .IsRequired();
 
+        builder.Property(x => x.CurrencyId);
+
         builder.Property(x => x.IsActive)
             .IsRequired();
 
@@ -54,6 +56,9 @@ public sealed class BankAccountConfiguration : IEntityTypeConfiguration<BankAcco
             .IsUnique()
             .HasDatabaseName("UX_BankAccounts_AccountNumber");
 
+        builder.HasIndex(x => x.CurrencyId)
+            .HasDatabaseName("IX_BankAccounts_CurrencyId");
+
         builder.HasIndex(x => x.AccountId)
             .HasDatabaseName("IX_BankAccounts_AccountId");
 
@@ -62,5 +67,11 @@ public sealed class BankAccountConfiguration : IEntityTypeConfiguration<BankAcco
             .HasForeignKey(x => x.AccountId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_BankAccounts_Account");
+
+        builder.HasOne<Currency>()
+            .WithMany()
+            .HasForeignKey(x => x.CurrencyId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_BankAccounts_Currency");
     }
 }
