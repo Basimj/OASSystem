@@ -96,8 +96,9 @@ public sealed class UpdateProductIntegrationRulesTests
         Assert.ThrowsAsync<RequestValidationException>(() =>
             handler.Handle(new UpdateProductCommand(product.Id, request), CancellationToken.None));
     }
-    [Test]
-    public void ProductWithInventoryHistory_CannotBeChangedToService()
+    [TestCase(true)]
+    [TestCase(false)]
+    public void ProductWithInventoryHistory_CannotBecomeNonStock(bool changeToService)
     {
         var category = new ProductCategory("CAT", "تصنيف");
         var frameType = new ProductType("FRAME", "إطار", systemKey: ProductTypeSystemKeys.Frame);
@@ -121,7 +122,7 @@ public sealed class UpdateProductIntegrationRulesTests
             types,
             new ProductMapper());
 
-        var request = new UpdateProductRequest(product.ProductCode, product.NameAr, null, category.Id, null, serviceType.Id, null, false, true);
+        var request = new UpdateProductRequest(product.ProductCode, product.NameAr, null, category.Id, null, changeToService ? serviceType.Id : frameType.Id, null, false, true);
 
         Assert.ThrowsAsync<RequestValidationException>(() =>
             handler.Handle(new UpdateProductCommand(product.Id, request), CancellationToken.None));

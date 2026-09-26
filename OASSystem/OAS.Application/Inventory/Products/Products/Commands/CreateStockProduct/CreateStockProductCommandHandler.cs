@@ -185,7 +185,7 @@ public sealed class CreateStockProductCommandHandler(
                 cancellationToken);
 
             transaction.Post(now, userId);
-            transactionRepository.Update(transaction);
+            // Already tracked as Added; keep its first INSERT inside the outer transaction.
             transactionId = transaction.Id;
         }
 

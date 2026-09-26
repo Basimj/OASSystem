@@ -116,7 +116,8 @@ public sealed class CreateInventoryTransactionCommandValidator : AbstractValidat
             return true;
 
         const decimal maxTotal = 9999999999999999.99m;
-        if (line.UnitCost == 0)
+        // Quantity precision is validated separately; costs <= 1 cannot overflow its total.
+        if (line.UnitCost <= 1)
             return true;
 
         return line.Quantity <= maxTotal / line.UnitCost;

@@ -248,9 +248,16 @@ public partial class ProductsPage
     private bool IsServiceProductType => CurrentProductType?.SystemKey == ProductTypeSystemKeys.Service;
     private bool ShowInitialVariantSection => _section == ProductSection.Products && _mode == EditorMode.Create && _isStockItem && !IsServiceProductType;
     private bool ShowOpeningInventorySection => ShowInitialVariantSection;
-    private decimal OpeningTotalValue =>
-        TryParseDecimalInput(_openingQuantity, out var quantity) && TryParseDecimalInput(_openingUnitCost, out var cost) ? quantity * cost : 0m;
-    private string OpeningTotalValueText => OpeningTotalValue.ToString("N2");
+    private string OpeningTotalValueText
+    {
+        get
+        {
+            if (!TryParseDecimalInput(_openingQuantity, out var quantity) ||
+                !TryParseDecimalInput(_openingUnitCost, out var cost)) return "—";
+            try { return checked(quantity * cost).ToString("N2"); }
+            catch (OverflowException) { return "القيمة تتجاوز الحد المسموح"; }
+        }
+    }
 
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
@@ -356,7 +363,7 @@ public partial class ProductsPage
         _mode = EditorMode.Create;
         ClearForm();
         _isActive = true;
-        _isStockItem = true;
+        _isStockItem = !IsServiceProductType;
 
         var kind = CodeKindForSection(_section);
         if (kind is not null)
@@ -376,6 +383,7 @@ public partial class ProductsPage
 
     private Task CancelEditAsync(MouseEventArgs args)
     {
+        if (_saving) return Task.CompletedTask;
         ClearValidation();
         if (_selectedId.HasValue)
         {
@@ -937,7 +945,7 @@ public partial class ProductsPage
         _categoryId = null; _brandId = null;
         _productTypeId = _productTypes.FirstOrDefault(x => x.IsActive && x.SystemKey == ProductTypeSystemKeys.Frame)?.Id.ToString("D")
             ?? _productTypes.FirstOrDefault(x => x.IsActive)?.Id.ToString("D");
-        _description = null; _isStockItem = true;
+        _description = null; _isStockItem = !IsServiceProductType;
         _frameModel = string.Empty; _frameMaterial = null; _frameRimType = null; _frameGender = null; _frameShape = null;
         _templeLength = null; _bridgeSize = null; _lensWidth = null;
         _lensType = string.Empty; _lensMaterial = null; _lensCoating = null; _refractiveIndex = null;
@@ -1085,45 +1093,45 @@ public partial class ProductsPage
 
     private void RenderCategoryEditor(RenderTreeBuilder b, ref int s)
     {
-        AddText(b, ref s, "الكود", _code, v => _code = v, () => _code, !IsEditing, true, 32);
-        AddText(b, ref s, "الاسم بالعربية", _nameAr, v => _nameAr = v, () => _nameAr, !IsEditing, true, 100);
-        AddText(b, ref s, "الاسم بالإنجليزية", _nameEn, v => _nameEn = v, () => _nameEn, !IsEditing, false, 100);
+        AddText(b, ref s, "الكود", _code, v => _code = v, () => _code, (!IsEditing || _saving), true, 32);
+        AddText(b, ref s, "الاسم بالعربية", _nameAr, v => _nameAr = v, () => _nameAr, (!IsEditing || _saving), true, 100);
+        AddText(b, ref s, "الاسم بالإنجليزية", _nameEn, v => _nameEn = v, () => _nameEn, (!IsEditing || _saving), false, 100);
         AddSelect(b, ref s, "التصنيف الأب", _parentCategoryId, v => _parentCategoryId = v, () => _parentCategoryId, CategoryOptions.Where(x => x.Value != _selectedId?.ToString("D")).ToArray());
         AddActive(b, ref s);
     }
 
     private void RenderBrandEditor(RenderTreeBuilder b, ref int s)
     {
-        AddText(b, ref s, "الكود", _code, v => _code = v, () => _code, !IsEditing, true, 32);
-        AddText(b, ref s, "اسم العلامة", _brandName, v => _brandName = v, () => _brandName, !IsEditing, true, 100);
+        AddText(b, ref s, "الكود", _code, v => _code = v, () => _code, (!IsEditing || _saving), true, 32);
+        AddText(b, ref s, "اسم العلامة", _brandName, v => _brandName = v, () => _brandName, (!IsEditing || _saving), true, 100);
         AddActive(b, ref s);
     }
 
     private void RenderProductTypeEditor(RenderTreeBuilder b, ref int s)
     {
-        AddText(b, ref s, "الكود", _code, v => _code = v.ToUpperInvariant(), () => _code, !IsEditing, true, 32);
-        AddText(b, ref s, "الاسم بالعربية", _nameAr, v => _nameAr = v, () => _nameAr, !IsEditing, true, 100);
-        AddText(b, ref s, "الاسم بالإنجليزية", _nameEn, v => _nameEn = v, () => _nameEn, !IsEditing, false, 100);
+        AddText(b, ref s, "الكود", _code, v => _code = v.ToUpperInvariant(), () => _code, (!IsEditing || _saving), true, 32);
+        AddText(b, ref s, "الاسم بالعربية", _nameAr, v => _nameAr = v, () => _nameAr, (!IsEditing || _saving), true, 100);
+        AddText(b, ref s, "الاسم بالإنجليزية", _nameEn, v => _nameEn = v, () => _nameEn, (!IsEditing || _saving), false, 100);
         AddActive(b, ref s);
     }
 
     private void RenderUnitEditor(RenderTreeBuilder b, ref int s)
     {
-        AddText(b, ref s, "الكود", _code, v => _code = v, () => _code, !IsEditing, true, 32);
-        AddText(b, ref s, "الاسم بالعربية", _nameAr, v => _nameAr = v, () => _nameAr, !IsEditing, true, 100);
-        AddText(b, ref s, "الاسم بالإنجليزية", _nameEn, v => _nameEn = v, () => _nameEn, !IsEditing, false, 100);
+        AddText(b, ref s, "الكود", _code, v => _code = v, () => _code, (!IsEditing || _saving), true, 32);
+        AddText(b, ref s, "الاسم بالعربية", _nameAr, v => _nameAr = v, () => _nameAr, (!IsEditing || _saving), true, 100);
+        AddText(b, ref s, "الاسم بالإنجليزية", _nameEn, v => _nameEn = v, () => _nameEn, (!IsEditing || _saving), false, 100);
         AddActive(b, ref s);
     }
 
     private void RenderProductEditor(RenderTreeBuilder b, ref int s)
     {
-        AddText(b, ref s, "كود المنتج", _code, v => _code = v, () => _code, !IsEditing, true, 32);
-        AddText(b, ref s, "الاسم بالعربية", _nameAr, v => _nameAr = v, () => _nameAr, !IsEditing, true, 150);
-        AddText(b, ref s, "الاسم بالإنجليزية", _nameEn, v => _nameEn = v, () => _nameEn, !IsEditing, false, 150);
+        AddText(b, ref s, "كود المنتج", _code, v => _code = v, () => _code, (!IsEditing || _saving), true, 32);
+        AddText(b, ref s, "الاسم بالعربية", _nameAr, v => _nameAr = v, () => _nameAr, (!IsEditing || _saving), true, 150);
+        AddText(b, ref s, "الاسم بالإنجليزية", _nameEn, v => _nameEn = v, () => _nameEn, (!IsEditing || _saving), false, 150);
         AddSelect(b, ref s, "التصنيف", _categoryId, v => _categoryId = v, () => _categoryId, CategoryOptions.Where(x => !string.IsNullOrEmpty(x.Value)).ToArray(), true);
         AddSelect(b, ref s, "العلامة التجارية", _brandId, v => _brandId = v, () => _brandId, BrandOptions);
         AddSelect(b, ref s, "نوع المنتج", _productTypeId, SetProductType, () => _productTypeId, ProductTypeOptions, true);
-        AddText(b, ref s, "الوصف", _description, v => _description = v, () => _description, !IsEditing, false, 500);
+        AddText(b, ref s, "الوصف", _description, v => _description = v, () => _description, (!IsEditing || _saving), false, 500);
         AddCheckbox(b, ref s, "صنف مخزني", _isStockItem, SetStockItem, forceDisabled: IsServiceProductType);
         AddActive(b, ref s);
     }
@@ -1131,14 +1139,14 @@ public partial class ProductsPage
     private void RenderVariantEditor(RenderTreeBuilder b, ref int s)
     {
         AddSelect(b, ref s, "المنتج", _productId, v => _productId = v, () => _productId, ProductOptions, true, _mode != EditorMode.Create);
-        AddText(b, ref s, "SKU", _code, v => _code = v, () => _code, !IsEditing, true, 64);
-        AddText(b, ref s, "الباركود", _barcode, v => _barcode = v, () => _barcode, !IsEditing, false, 64);
-        AddText(b, ref s, "اسم المتغير", _variantName, v => _variantName = v, () => _variantName, !IsEditing, false, 100);
-        AddText(b, ref s, "اللون", _color, v => _color = v, () => _color, !IsEditing, false, 50);
-        AddText(b, ref s, "المقاس", _size, v => _size = v, () => _size, !IsEditing, false, 50);
+        AddText(b, ref s, "SKU", _code, v => _code = v, () => _code, (!IsEditing || _saving), true, 64);
+        AddText(b, ref s, "الباركود", _barcode, v => _barcode = v, () => _barcode, (!IsEditing || _saving), false, 64);
+        AddText(b, ref s, "اسم المتغير", _variantName, v => _variantName = v, () => _variantName, (!IsEditing || _saving), false, 100);
+        AddText(b, ref s, "اللون", _color, v => _color = v, () => _color, (!IsEditing || _saving), false, 50);
+        AddText(b, ref s, "المقاس", _size, v => _size = v, () => _size, (!IsEditing || _saving), false, 50);
         AddSelect(b, ref s, "الوحدة", _unitId, v => _unitId = v, () => _unitId, UnitOptions);
-        AddText(b, ref s, "سعر الشراء", _purchasePrice, v => _purchasePrice = v, () => _purchasePrice, !IsEditing, true);
-        AddText(b, ref s, "سعر البيع", _sellingPrice, v => _sellingPrice = v, () => _sellingPrice, !IsEditing, true);
+        AddText(b, ref s, "سعر الشراء", _purchasePrice, v => _purchasePrice = v, () => _purchasePrice, (!IsEditing || _saving), true);
+        AddText(b, ref s, "سعر البيع", _sellingPrice, v => _sellingPrice = v, () => _sellingPrice, (!IsEditing || _saving), true);
         AddActive(b, ref s);
     }
 
@@ -1197,6 +1205,10 @@ public partial class ProductsPage
         if (TryParseDecimalInput(_openingQuantity, out var quantity) && quantity <= 0)
             SetError(OpeningQuantityField, "يجب أن تكون الكمية أكبر من صفر.");
         ValidateDecimalField(OpeningUnitCostField, _openingUnitCost, true, 18, 2, true, ref missingRequired);
+        if (TryParseDecimalInput(_openingQuantity, out var totalQuantity) &&
+            TryParseDecimalInput(_openingUnitCost, out var cost) && cost > 1 &&
+            totalQuantity > 9999999999999999.99m / cost)
+            SetError(OpeningUnitCostField, "القيمة الإجمالية تتجاوز الحد المسموح.");
     }
 
     private int ProductVariantCount(Guid productId) => _variants.Count(x => x.ProductId == productId);
@@ -1205,10 +1217,10 @@ public partial class ProductsPage
         if (!product.IsStockItem) return "غير مخزني";
 
         var variants = _variants.Where(x => x.ProductId == product.Id).ToArray();
-        if (variants.Length == 0) return "بدون Variant";
+        if (variants.Length == 0) return "بدون صنف قابل للتخزين";
 
         var activeVariantIds = variants.Where(x => x.IsActive).Select(x => x.Id).ToHashSet();
-        if (activeVariantIds.Count == 0) return "بدون Variant فعال";
+        if (activeVariantIds.Count == 0) return "بدون صنف فعال";
 
         var balances = _balances.Where(x => activeVariantIds.Contains(x.ProductVariantId)).ToArray();
         if (balances.Length == 0) return "بدون حركة مخزنية";
@@ -1238,7 +1250,7 @@ public partial class ProductsPage
         b.AddAttribute(s++, "ValueExpression", expression);
         b.AddAttribute(s++, "Options", options.Where(x => !string.IsNullOrWhiteSpace(x.Value)).ToArray());
         b.AddAttribute(s++, "Placeholder", required ? "اختر..." : "(اختياري)");
-        b.AddAttribute(s++, "Disabled", !IsEditing || forceDisabled);
+        b.AddAttribute(s++, "Disabled", (!IsEditing || _saving) || forceDisabled);
         b.AddAttribute(s++, "Required", required); b.AddAttribute(s++, "Size", ControlSize.Small);
         b.AddAttribute(s++, "ErrorText", ErrorFor(label));
         b.CloseComponent();
@@ -1249,7 +1261,7 @@ public partial class ProductsPage
         b.OpenComponent<OAS.UiLib.Components.Inputs.UiCheckbox>(s++);
         b.AddAttribute(s++, "Label", label); b.AddAttribute(s++, "Value", value);
         b.AddAttribute(s++, "ValueChanged", EventCallback.Factory.Create<bool>(this, changed));
-        b.AddAttribute(s++, "Disabled", !IsEditing || forceDisabled); b.CloseComponent();
+        b.AddAttribute(s++, "Disabled", (!IsEditing || _saving) || forceDisabled); b.CloseComponent();
     }
 
     private string ProductName(Guid id) => _products.FirstOrDefault(x => x.Id == id)?.NameAr ?? "—";

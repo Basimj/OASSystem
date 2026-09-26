@@ -65,7 +65,8 @@ public sealed class InventoryPostingService(
                     $"Insufficient stock for variant '{productVariantId}' in warehouse '{warehouseId}'. Available: {available}, Required: {quantity}");
             }
 
-            appliedUnitCost = balance.AverageUnitCost > 0 ? balance.AverageUnitCost : unitCost;
+            // Zero is a valid weighted-average cost (for example a free opening balance).
+            appliedUnitCost = balance.AverageUnitCost;
             balance.ApplyOutbound(quantity, movementDate);
             balanceRepository.Update(balance);
 

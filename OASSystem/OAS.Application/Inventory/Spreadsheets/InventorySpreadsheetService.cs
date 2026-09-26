@@ -248,6 +248,19 @@ public sealed class InventorySpreadsheetService(
         var variantMap = variants.ToDictionary(x => x.Id);
         var warehouseMap = warehouses.ToDictionary(x => x.Id);
 
+        // Match the selected-warehouse screen, including active stock variants that
+        // have never moved. These DTOs are display-only; no balance rows are inserted.
+        if (warehouseId.HasValue)
+        {
+            var balancesByVariant = items.ToDictionary(x => x.ProductVariantId);
+            items = variants
+                .Where(x => x.IsActive && (!productVariantId.HasValue || x.Id == productVariantId.Value) &&
+                    productMap.TryGetValue(x.ProductId, out var product) && product.IsActive && product.IsStockItem)
+                .Select(x => balancesByVariant.GetValueOrDefault(x.Id) ?? new InventoryBalanceDto(
+                    Guid.Empty, warehouseId.Value, x.Id, 0m, 0m, 0m, 0m, 0m, 0m, null))
+                .ToArray();
+        }
+
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var term = request.Search.Trim();

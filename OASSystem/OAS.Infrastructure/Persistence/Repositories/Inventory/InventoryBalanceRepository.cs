@@ -13,9 +13,23 @@ public sealed class InventoryBalanceRepository(OasDbContext dbContext)
         Guid productVariantId,
         CancellationToken cancellationToken = default)
     {
+        // A previous line in the same unit of work may have created this balance.
+        // Database queries do not return Added entities before SaveChanges.
+        var tracked = Set.Local.FirstOrDefault(
+            b => b.WarehouseId == warehouseId && b.ProductVariantId == productVariantId);
+        if (tracked is not null)
+            return tracked;
+
         return await Set.FirstOrDefaultAsync(
             b => b.WarehouseId == warehouseId && b.ProductVariantId == productVariantId,
             cancellationToken);
+    }
+
+    // Reimplement the repository interface here without changing shared CRUD behavior.
+    public new void Update(InventoryBalance balance)
+    {
+        if (DbContext.Entry(balance).State != EntityState.Added)
+            base.Update(balance);
     }
 
     public async Task<IReadOnlyList<InventoryBalance>> GetByWarehouseAsync(

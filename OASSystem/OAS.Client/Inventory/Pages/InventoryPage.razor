@@ -14,8 +14,8 @@
     <Actions>
         <UiWorkspaceActionBar>
             <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary"
-                      Size="ControlSize.Small" Loading="@_loading" OnClick="RefreshAsync" />
-            <UiSpreadsheetActions CanImport="false" Busy="@_exporting" OnExport="ExportAsync" />
+                      Size="ControlSize.Small" Loading="@(_loading || _loadingBalances)" OnClick="RefreshAsync" />
+            <UiSpreadsheetActions CanImport="false" Busy="@(_exporting || _loading || _loadingBalances || _balanceLoadFailed)" OnExport="ExportAsync" />
             <UiSearchInput @bind-Value="_search" Placeholder="ابحث بالمنتج أو SKU أو Barcode..."
                            AriaLabel="البحث في أرصدة المخزون" ClearText="مسح البحث"
                            DebounceMilliseconds="250" OnSearch="SearchChangedAsync" />
@@ -37,13 +37,17 @@
     <Content>
         <UiDataGridPanel Title="أرصدة المخزون" Subtitle="@($"{FilteredBalances.Count} صنف")">
             <Body>
-                @if (_loading)
+                @if (_loading || _loadingBalances)
                 {
                     <UiAlert Message="جاري تحميل أرصدة المخزون..." />
                 }
                 else if (!Guid.TryParse(_warehouseFilter, out _))
                 {
                     <UiAlert Message="اختر مخزنًا لعرض جميع الأصناف المخزنية وأرصدتها، بما فيها الأرصدة الصفرية." />
+                }
+                else if (_balanceLoadFailed)
+                {
+                    <UiAlert Message="تعذر تحميل أرصدة المخزن. اضغط تحديث لإعادة المحاولة." />
                 }
                 else
                 {
@@ -87,10 +91,13 @@
 
     private bool _loading = true;
     private bool _exporting;
+    private bool _loadingBalances;
+    private bool _balanceLoadFailed;
+    private int _balanceLoadVersion;
     private string? _search;
     private string? _warehouseFilter;
     private IReadOnlyList<InventoryBalanceDto> _balances = [];
-    private static readonly IReadOnlyList<string> BalanceHeaders = ["المنتج", "Variant / SKU / Barcode", "المخزن", "On Hand", "Reserved", "Available", "On Order", "متوسط التكلفة", "القيمة", "إجراءات"];
+    private static readonly IReadOnlyList<string> BalanceHeaders = ["المنتج", "الصنف / SKU / الباركود", "المخزن", "الكمية الفعلية", "المحجوز", "المتاح", "قيد الطلب", "متوسط التكلفة", "القيمة", "إجراءات"];
     private IReadOnlyList<WarehouseDto> _warehouses = [];
     private IReadOnlyList<ProductDto> _products = [];
     private IReadOnlyList<ProductVariantDto> _variants = [];
@@ -151,6 +158,8 @@
     private async Task LoadAsync()
     {
         _loading = true;
+        _balances = [];
+        _balanceLoadFailed = false;
         try
         {
             var warehousesTask = LoadAllPagesAsync(page => Inventory.GetWarehousesAsync(page));
@@ -170,10 +179,12 @@
         }
         catch (ApiClientException ex)
         {
+            _balanceLoadFailed = true;
             ApiFeedback.Show(ex.Error);
         }
         catch (Exception)
         {
+            _balanceLoadFailed = true;
             ApiFeedback.ShowUnexpected();
         }
         finally
@@ -211,34 +222,45 @@
     private async Task OnWarehouseChangedAsync(string? value)
     {
         _warehouseFilter = value;
-        _loading = true;
-        try
-        {
-            await LoadBalancesForSelectedWarehouseAsync();
-        }
-        catch (ApiClientException ex)
-        {
-            ApiFeedback.Show(ex.Error);
-        }
-        catch (Exception)
-        {
-            ApiFeedback.ShowUnexpected();
-        }
-        finally
-        {
-            _loading = false;
-        }
+        await LoadBalancesForSelectedWarehouseAsync();
     }
 
     private async Task LoadBalancesForSelectedWarehouseAsync()
     {
-        if (!Guid.TryParse(_warehouseFilter, out var warehouseId))
-        {
-            _balances = [];
-            return;
-        }
+        var version = ++_balanceLoadVersion;
+        _balances = [];
+        _balanceLoadFailed = false;
+        _loadingBalances = false;
+        if (!Guid.TryParse(_warehouseFilter, out var warehouseId)) return;
 
-        _balances = await LoadAllPagesAsync(page => Inventory.GetInventoryBalancesAsync(page, warehouseId));
+        _loadingBalances = true;
+        try
+        {
+            var balances = await LoadAllPagesAsync(page => Inventory.GetInventoryBalancesAsync(page, warehouseId));
+            if (version == _balanceLoadVersion)
+                _balances = balances;
+        }
+        catch (ApiClientException ex)
+        {
+            if (version == _balanceLoadVersion)
+            {
+                _balanceLoadFailed = true;
+                ApiFeedback.Show(ex.Error);
+            }
+        }
+        catch (Exception)
+        {
+            if (version == _balanceLoadVersion)
+            {
+                _balanceLoadFailed = true;
+                ApiFeedback.ShowUnexpected();
+            }
+        }
+        finally
+        {
+            if (version == _balanceLoadVersion)
+                _loadingBalances = false;
+        }
     }
 
     private Task SearchChangedAsync(string? _) => Task.CompletedTask;
@@ -256,7 +278,7 @@
 
     private async Task ExportAsync()
     {
-        if (_exporting) return;
+        if (_exporting || _loading || _loadingBalances || _balanceLoadFailed || !Guid.TryParse(_warehouseFilter, out _)) return;
         _exporting = true;
         try
         {

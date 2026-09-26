@@ -114,7 +114,7 @@ public sealed class PostInventoryTransactionCommandHandler(
                     await EnsureWarehouseActiveAsync(transaction.SourceWarehouseId.Value, cancellationToken);
                     await EnsureWarehouseActiveAsync(transaction.DestinationWarehouseId.Value, cancellationToken);
 
-                    var (sourceBal, _) = await postingService.PostMovementAsync(
+                    var (_, outgoingLedger) = await postingService.PostMovementAsync(
                         transaction.SourceWarehouseId.Value,
                         line.ProductVariantId,
                         InventoryMovementType.Out,
@@ -126,7 +126,7 @@ public sealed class PostInventoryTransactionCommandHandler(
                         userId,
                         cancellationToken);
 
-                    var transferCost = sourceBal.AverageUnitCost > 0 ? sourceBal.AverageUnitCost : line.UnitCost;
+                    var transferCost = outgoingLedger.UnitCost;
 
                     await postingService.PostMovementAsync(
                         transaction.DestinationWarehouseId.Value,

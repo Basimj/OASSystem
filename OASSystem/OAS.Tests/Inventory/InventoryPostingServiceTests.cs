@@ -136,4 +136,18 @@ public sealed class InventoryPostingServiceTests
         });
     }
 
+    [Test]
+    public async Task ZeroCostOpening_OutboundLedgerPreservesZeroCost()
+    {
+        var warehouse = Guid.NewGuid();
+        var variant = Guid.NewGuid();
+        var date = DateTimeOffset.UtcNow;
+        await _service.PostMovementAsync(warehouse, variant, InventoryMovementType.In,
+            10m, 0m, Guid.NewGuid(), Guid.NewGuid(), date, "tester");
+        var (balance, ledger) = await _service.PostMovementAsync(warehouse, variant, InventoryMovementType.Out,
+            2m, 999m, Guid.NewGuid(), Guid.NewGuid(), date, "tester");
+        Assert.That(ledger.UnitCost, Is.Zero);
+        Assert.That(balance.InventoryValue, Is.Zero);
+        Assert.That(balance.OnHandQuantity, Is.EqualTo(8m));
+    }
 }

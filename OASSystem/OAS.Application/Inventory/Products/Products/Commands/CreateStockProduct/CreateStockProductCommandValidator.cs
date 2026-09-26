@@ -47,9 +47,11 @@ public sealed class CreateStockProductCommandValidator : AbstractValidator<Creat
             RuleFor(x => x.Request.Variant!.Size)
                 .MaximumLength(50).WithErrorCode("size_max_length");
             RuleFor(x => x.Request.Variant!.PurchasePrice)
-                .GreaterThanOrEqualTo(0).WithErrorCode("purchase_price_invalid");
+                .GreaterThanOrEqualTo(0).WithErrorCode("purchase_price_invalid")
+                .Must(x => FitsNullableDecimal(x, 18, 2)).WithErrorCode("purchase_price_precision_invalid");
             RuleFor(x => x.Request.Variant!.SellingPrice)
-                .GreaterThanOrEqualTo(0).WithErrorCode("selling_price_invalid");
+                .GreaterThanOrEqualTo(0).WithErrorCode("selling_price_invalid")
+                .Must(x => FitsNullableDecimal(x, 18, 2)).WithErrorCode("selling_price_precision_invalid");
         });
 
         When(x => x.Request.FrameDetails is not null, () =>
@@ -91,9 +93,14 @@ public sealed class CreateStockProductCommandValidator : AbstractValidator<Creat
             RuleFor(x => x.Request.OpeningInventory!.WarehouseId)
                 .NotEmpty().WithErrorCode("opening_warehouse_required");
             RuleFor(x => x.Request.OpeningInventory!.Quantity)
-                .GreaterThan(0).WithErrorCode("opening_quantity_must_be_positive");
+                .GreaterThan(0).WithErrorCode("opening_quantity_must_be_positive")
+                .Must(x => FitsNullableDecimal(x, 18, 3)).WithErrorCode("opening_quantity_precision_invalid");
             RuleFor(x => x.Request.OpeningInventory!.UnitCost)
-                .GreaterThanOrEqualTo(0).WithErrorCode("opening_unit_cost_invalid");
+                .GreaterThanOrEqualTo(0).WithErrorCode("opening_unit_cost_invalid")
+                .Must(x => FitsNullableDecimal(x, 18, 2)).WithErrorCode("opening_unit_cost_precision_invalid");
+            RuleFor(x => x.Request.OpeningInventory!)
+                .Must(x => x.Quantity <= 0 || x.UnitCost <= 1 || x.Quantity <= 9999999999999999.99m / x.UnitCost)
+                .WithErrorCode("opening_total_cost_precision_invalid");
         });
     }
     private static bool FitsNullableDecimal6x2(decimal? value) => FitsNullableDecimal(value, 6, 2);
@@ -101,6 +108,7 @@ public sealed class CreateStockProductCommandValidator : AbstractValidator<Creat
     private static bool FitsNullableDecimal(decimal? value, int precision, int scale)
     {
         if (!value.HasValue) return true;
+        if (value.Value == decimal.MinValue) return false;
         var absolute = Math.Abs(value.Value);
         var max = Pow10(precision - scale);
         if (absolute >= max) return false;

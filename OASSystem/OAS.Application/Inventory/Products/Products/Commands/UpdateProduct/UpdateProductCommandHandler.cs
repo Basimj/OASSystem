@@ -55,7 +55,7 @@ public sealed class UpdateProductCommandHandler(
                 "A stock product must have at least one active product variant.");
         }
 
-        if (isService && productVariants.Count > 0)
+        if (!request.IsStockItem && productVariants.Count > 0)
         {
             var variantIds = productVariants.Select(x => x.Id).ToArray();
             var hasBalance = await balanceRepository.CountAsync(
@@ -68,9 +68,9 @@ public sealed class UpdateProductCommandHandler(
             if (hasBalance || hasLedger)
             {
                 throw Validation(
-                    "product_type",
-                    "service_product_has_inventory_history",
-                    "A product with inventory balance or movement history cannot be changed to a service product.");
+                    "is_stock_item",
+                    isService ? "service_product_has_inventory_history" : "stock_product_has_inventory_history",
+                    "A product with inventory balance or movement history must remain a stock product.");
             }
         }
 

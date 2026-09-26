@@ -1,3 +1,7 @@
+using Microsoft.EntityFrameworkCore;
+using OAS.Application.Inventory.Repositories;
+using OAS.Infrastructure.Persistence;
+using OAS.Infrastructure.Persistence.Repositories.Inventory;
 using NUnit.Framework;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.Inventory.Products.Products.Commands.CreateStockProduct;
@@ -133,7 +137,23 @@ public sealed class CreateStockProductTests
             handler.Handle(new CreateStockProductCommand(request), CancellationToken.None));
     }
 
-    private CreateStockProductCommandHandler CreateHandler() => new(
+    [Test]
+    public async Task OpeningTransaction_RemainsAddedUntilUnitOfWorkCommits()
+    {
+        using var context = new OasDbContext(new DbContextOptionsBuilder<OasDbContext>()
+            .UseSqlServer("Server=(localdb)\\mssqllocaldb;Database=tracking_only;Trusted_Connection=True;").Options);
+        var request = new CreateStockProductRequest(
+            new CreateProductRequest("P-TRACK", "منتج", null, _category.Id, null, _frameType.Id, null, true),
+            new InitialProductVariantRequest("SKU-TRACK", null, null, null, null, null, 100m, 150m),
+            new OpeningInventoryRequest(_warehouse.Id, 10m, 100m));
+        await CreateHandler(new InventoryTransactionRepository(context))
+            .Handle(new CreateStockProductCommand(request), CancellationToken.None);
+        var transaction = context.InventoryTransactions.Local.Single();
+        Assert.That(transaction.Status, Is.EqualTo(InventoryTransactionStatus.Posted));
+        Assert.That(context.Entry(transaction).State, Is.EqualTo(EntityState.Added));
+    }
+
+    private CreateStockProductCommandHandler CreateHandler(IInventoryTransactionRepository? transactions = null) => new(
         _products,
         _variants,
         _frameDetails,
@@ -143,7 +163,7 @@ public sealed class CreateStockProductTests
         _types,
         _units,
         _warehouses,
-        _transactions,
+        transactions ?? _transactions,
         _lines,
         _posting,
         _sequence,
