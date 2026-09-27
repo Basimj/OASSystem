@@ -82,5 +82,12 @@
     { "CurrencyCode": "YER", "Amount": 25000.00, "BaseAmount": 25000.00 },
     { "CurrencyCode": "USD", "Amount": 100.00, "BaseAmount": 55000.00 },
     { "CurrencyCode": "SAR", "Amount": 500.00, "BaseAmount": 73500.00 }
-  ]
+  ],
+  "CreatedBy": "admin",
+  "CreatedAt": "27/09/2026 10:00",
+  "Signatures": {
+    "Accountant": "المحاسب",
+    "Receiver": "المستلم",
+    "Approval": "الاعتماد"
+  }
 }

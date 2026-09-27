@@ -15,7 +15,15 @@ public sealed class TemplateRenderer
 {
     public const double DipPerMm = 96d / 25.4d;
 
-    public Canvas BuildCanvas(TemplateDefinition template, JsonElement data, bool designMode = false)
+    public Canvas BuildCanvas(TemplateDefinition template, JsonElement data, bool designMode = false) =>
+        BuildCanvasCore(template, data, designMode, null, null);
+
+    private Canvas BuildCanvasCore(
+        TemplateDefinition template,
+        JsonElement data,
+        bool designMode,
+        TablePageSlice? tableSlice,
+        Func<TemplateElement, bool>? includeElement)
     {
         var canvas = new Canvas
         {
@@ -28,7 +36,10 @@ public sealed class TemplateRenderer
 
         foreach (var element in template.Elements)
         {
-            var visual = BuildElement(element, data, designMode);
+            if (includeElement is not null && !includeElement(element))
+                continue;
+
+            var visual = BuildElement(element, data, designMode, tableSlice);
             visual.Tag = element;
             Canvas.SetLeft(visual, Mm(element.Xmm));
             Canvas.SetTop(visual, Mm(element.Ymm));
@@ -45,6 +56,57 @@ public sealed class TemplateRenderer
         var document = new FixedDocument();
         document.DocumentPaginator.PageSize = new Size(pageWidth, pageHeight);
 
+        // Voucher line tables can exceed the visual capacity of one page. Instead of silently
+        // dropping rows after MaxRows, split the main Lines table across pages and keep the
+        // totals/signatures on the final page only. This preserves every voucher line while
+        // keeping the compact template layout intact.
+        var pagedTable = template.Elements
+            .FirstOrDefault(x =>
+                x.Type == TemplateElementType.Table &&
+                string.Equals(x.FieldPath, "Lines", StringComparison.OrdinalIgnoreCase));
+
+        var items = pagedTable is null
+            ? null
+            : JsonValueResolver.ResolveElement(data, pagedTable.FieldPath);
+
+        if (pagedTable is null || items is not { ValueKind: JsonValueKind.Array })
+        {
+            AddPage(document, pageWidth, pageHeight, BuildCanvasCore(template, data, false, null, null));
+            return document;
+        }
+
+        var totalRows = items.Value.GetArrayLength();
+        var rowsPerPage = Math.Max(1, pagedTable.MaxRows);
+        if (totalRows <= rowsPerPage)
+        {
+            AddPage(document, pageWidth, pageHeight, BuildCanvasCore(template, data, false, null, null));
+            return document;
+        }
+
+        var pageCount = (int)Math.Ceiling(totalRows / (double)rowsPerPage);
+        var tableBottom = pagedTable.Ymm + pagedTable.HeightMm;
+
+        for (var pageIndex = 0; pageIndex < pageCount; pageIndex++)
+        {
+            var isLastPage = pageIndex == pageCount - 1;
+            var slice = new TablePageSlice(pagedTable.Id, pageIndex * rowsPerPage, rowsPerPage);
+
+            bool IncludeElement(TemplateElement element) =>
+                isLastPage || element.Ymm <= tableBottom + 0.01;
+
+            var canvas = BuildCanvasCore(template, data, false, slice, IncludeElement);
+            AddPage(document, pageWidth, pageHeight, canvas);
+        }
+
+        return document;
+    }
+
+    private static void AddPage(
+        FixedDocument document,
+        double pageWidth,
+        double pageHeight,
+        Canvas canvas)
+    {
         var page = new FixedPage
         {
             Width = pageWidth,
@@ -52,14 +114,17 @@ public sealed class TemplateRenderer
             Background = Brushes.White
         };
 
-        page.Children.Add(BuildCanvas(template, data, false));
+        page.Children.Add(canvas);
         var content = new PageContent();
         ((IAddChild)content).AddChild(page);
         document.Pages.Add(content);
-        return document;
     }
 
-    private FrameworkElement BuildElement(TemplateElement element, JsonElement data, bool designMode) =>
+    private FrameworkElement BuildElement(
+        TemplateElement element,
+        JsonElement data,
+        bool designMode,
+        TablePageSlice? tableSlice) =>
         element.Type switch
         {
             TemplateElementType.Text => BuildText(element, element.Text, designMode),
@@ -70,7 +135,7 @@ public sealed class TemplateRenderer
             TemplateElementType.Rectangle => BuildRectangle(element, designMode),
             TemplateElementType.Line => BuildLine(element, designMode),
             TemplateElementType.Image => BuildImage(element, designMode),
-            TemplateElementType.Table => BuildTable(element, data, designMode),
+            TemplateElementType.Table => BuildTable(element, data, designMode, tableSlice),
             _ => BuildText(element, element.Text, designMode)
         };
 
@@ -178,7 +243,7 @@ public sealed class TemplateRenderer
         return border;
     }
 
-    private FrameworkElement BuildTable(TemplateElement element, JsonElement data, bool designMode)
+    private FrameworkElement BuildTable(TemplateElement element, JsonElement data, bool designMode, TablePageSlice? tableSlice)
     {
         var grid = new Grid
         {
@@ -199,22 +264,47 @@ public sealed class TemplateRenderer
                 Width = new GridLength(Math.Max(1, column.WidthMm), GridUnitType.Star)
             });
 
+        var items = JsonValueResolver.ResolveElement(data, element.FieldPath);
+        var resolvedRows = items is { ValueKind: JsonValueKind.Array }
+            ? items.Value.EnumerateArray().ToArray()
+            : [];
+
+        IEnumerable<JsonElement> rowsToRender = resolvedRows;
+        var rowHeightMm = element.RowHeightMm;
+
+        if (tableSlice is { } slice && slice.TableId == element.Id)
+        {
+            rowsToRender = resolvedRows.Skip(slice.Skip).Take(slice.Take);
+        }
+        else if (string.Equals(element.FieldPath, "CurrencySummary", StringComparison.OrdinalIgnoreCase) &&
+                 resolvedRows.Length > Math.Max(1, element.MaxRows))
+        {
+            // Currency summaries are normally short. If they contain more currencies than the
+            // designed row count, keep all currencies visible by fitting the rows into the
+            // configured table height rather than truncating the data.
+            var rowCount = resolvedRows.Length + (element.ShowHeader ? 1 : 0);
+            rowHeightMm = rowCount > 0 ? element.HeightMm / rowCount : element.RowHeightMm;
+        }
+        else
+        {
+            rowsToRender = resolvedRows.Take(Math.Max(1, element.MaxRows));
+        }
+
         var rowIndex = 0;
         if (element.ShowHeader)
         {
-            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(Mm(element.RowHeightMm)) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(Mm(rowHeightMm)) });
             for (var c = 0; c < columns.Count; c++)
                 grid.Children.Add(MakeCell(element, columns[c].Header, rowIndex, c, true, columns[c].Alignment));
             rowIndex++;
         }
 
-        var items = JsonValueResolver.ResolveElement(data, element.FieldPath);
-        if (items is { ValueKind: JsonValueKind.Array })
+        if (resolvedRows.Length > 0)
         {
             var dataRow = 0;
-            foreach (var item in items.Value.EnumerateArray().Take(Math.Max(1, element.MaxRows)))
+            foreach (var item in rowsToRender)
             {
-                grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(Mm(element.RowHeightMm)) });
+                grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(Mm(rowHeightMm)) });
                 for (var c = 0; c < columns.Count; c++)
                 {
                     var col = columns[c];
@@ -227,7 +317,7 @@ public sealed class TemplateRenderer
         }
         else if (designMode)
         {
-            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(Mm(element.RowHeightMm)) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(Mm(rowHeightMm)) });
             for (var c = 0; c < columns.Count; c++)
                 grid.Children.Add(MakeCell(element, "{{" + columns[c].FieldPath + "}}", rowIndex, c, false, columns[c].Alignment, 0));
         }
@@ -266,13 +356,14 @@ public sealed class TemplateRenderer
             BorderBrush = BrushFrom(element.BorderColor, Brushes.LightGray),
             BorderThickness = new Thickness(0.35),
             Background = background,
-            Padding = new Thickness(2.5, 1.5, 2.5, 1.5)
+            Padding = new Thickness(2.0, 1.0, 2.0, 1.0)
         };
 
         border.Child = new TextBlock
         {
             Text = text,
-            FontSize = header ? Math.Max(8.5, element.FontSize - 1) : Math.Max(7.5, element.FontSize - 2),
+            FontFamily = new FontFamily(string.IsNullOrWhiteSpace(element.FontFamily) ? "Segoe UI" : element.FontFamily),
+            FontSize = header ? Math.Max(9.5, element.FontSize - 1) : Math.Max(9.0, element.FontSize - 2),
             FontWeight = header ? FontWeights.SemiBold : FontWeights.Normal,
             Foreground = header
                 ? BrushFrom(element.HeaderForegroundColor, Brushes.White)
@@ -288,6 +379,8 @@ public sealed class TemplateRenderer
         Grid.SetColumn(border, column);
         return border;
     }
+
+    private readonly record struct TablePageSlice(Guid TableId, int Skip, int Take);
 
     private static string? ResolveImagePath(string? value)
     {

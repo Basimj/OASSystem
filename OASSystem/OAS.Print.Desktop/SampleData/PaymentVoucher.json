@@ -64,5 +64,12 @@
   "CurrencySummary": [
     { "CurrencyCode": "YER", "Amount": 27500.00, "BaseAmount": 27500.00 },
     { "CurrencyCode": "USD", "Amount": 100.00, "BaseAmount": 55000.00 }
-  ]
+  ],
+  "CreatedBy": "admin",
+  "CreatedAt": "27/09/2026 10:00",
+  "Signatures": {
+    "Accountant": "المحاسب",
+    "Beneficiary": "المستفيد",
+    "Approval": "الاعتماد"
+  }
 }

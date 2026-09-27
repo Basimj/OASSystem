@@ -15,6 +15,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Templates\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Templates\Assets\*.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="SampleData\*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

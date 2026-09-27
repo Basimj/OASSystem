@@ -20,6 +20,8 @@ public static class DocumentFieldCatalog
                 new("BankAccountName", "البنك", "الدفع"),
                 new("BaseCurrencyCode", "كود العملة الأساسية", "العملة"),
                 new("BaseCurrencyName", "اسم العملة الأساسية", "العملة"),
+                new("BaseCurrencySymbol", "رمز العملة الأساسية", "العملة"),
+                new("BaseCurrencyDecimalPlaces", "منازل العملة العشرية", "العملة"),
                 new("TotalAmount", "الإجمالي الأساسي", "الإجماليات"),
                 new("TotalAmountWords", "المبلغ كتابة", "الإجماليات"),
                 new("Company.Name", "اسم المنشأة", "المنشأة"),
@@ -27,7 +29,12 @@ public static class DocumentFieldCatalog
                 new("Company.Phone", "هاتف المنشأة", "المنشأة"),
                 new("Company.CommercialRegistration", "السجل التجاري", "المنشأة"),
                 new("Company.TaxNumber", "الرقم الضريبي", "المنشأة"),
-                new("PrintedAt", "وقت الطباعة", "الطباعة")
+                new("CreatedBy", "أنشئ بواسطة", "التدقيق"),
+                new("CreatedAt", "وقت الإنشاء", "التدقيق"),
+                new("PrintedAt", "وقت الطباعة", "الطباعة"),
+                new("Signatures.Accountant", "توقيع المحاسب", "التواقيع"),
+                new("Signatures.Receiver", "توقيع المستلم", "التواقيع"),
+                new("Signatures.Approval", "توقيع الاعتماد", "التواقيع")
             ],
             ["PaymentVoucher"] =
             [
@@ -42,6 +49,8 @@ public static class DocumentFieldCatalog
                 new("BankAccountName", "البنك", "الدفع"),
                 new("BaseCurrencyCode", "كود العملة الأساسية", "العملة"),
                 new("BaseCurrencyName", "اسم العملة الأساسية", "العملة"),
+                new("BaseCurrencySymbol", "رمز العملة الأساسية", "العملة"),
+                new("BaseCurrencyDecimalPlaces", "منازل العملة العشرية", "العملة"),
                 new("TotalAmount", "الإجمالي الأساسي", "الإجماليات"),
                 new("TotalAmountWords", "المبلغ كتابة", "الإجماليات"),
                 new("Company.Name", "اسم المنشأة", "المنشأة"),
@@ -49,7 +58,12 @@ public static class DocumentFieldCatalog
                 new("Company.Phone", "هاتف المنشأة", "المنشأة"),
                 new("Company.CommercialRegistration", "السجل التجاري", "المنشأة"),
                 new("Company.TaxNumber", "الرقم الضريبي", "المنشأة"),
-                new("PrintedAt", "وقت الطباعة", "الطباعة")
+                new("CreatedBy", "أنشئ بواسطة", "التدقيق"),
+                new("CreatedAt", "وقت الإنشاء", "التدقيق"),
+                new("PrintedAt", "وقت الطباعة", "الطباعة"),
+                new("Signatures.Accountant", "توقيع المحاسب", "التواقيع"),
+                new("Signatures.Beneficiary", "توقيع المستفيد", "التواقيع"),
+                new("Signatures.Approval", "توقيع الاعتماد", "التواقيع")
             ],
             ["Expense"] =
             [
