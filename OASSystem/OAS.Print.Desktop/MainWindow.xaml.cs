@@ -509,37 +509,185 @@ public partial class MainWindow : Window
     {
         try
         {
+            // 1) البحث عن القالب المطلوب
             var template = !string.IsNullOrWhiteSpace(job.TemplateCode)
-                ? _templates.FirstOrDefault(x => string.Equals(x.Code, job.TemplateCode, StringComparison.OrdinalIgnoreCase))
+                ? _templates.FirstOrDefault(x =>
+                    string.Equals(
+                        x.Code,
+                        job.TemplateCode,
+                        StringComparison.OrdinalIgnoreCase))
                 : null;
-            template ??= _templates.FirstOrDefault(x => string.Equals(x.DocumentType, job.DocumentType, StringComparison.OrdinalIgnoreCase) && x.IsDefault);
-            template ??= _templates.FirstOrDefault(x => string.Equals(x.DocumentType, job.DocumentType, StringComparison.OrdinalIgnoreCase));
-            if (template is null) throw new InvalidOperationException($"لا يوجد قالب للمستند {job.DocumentType}.");
+
+            // القالب الافتراضي لنوع المستند
+            template ??= _templates.FirstOrDefault(x =>
+                string.Equals(
+                    x.DocumentType,
+                    job.DocumentType,
+                    StringComparison.OrdinalIgnoreCase)
+                && x.IsDefault);
+
+            // أي قالب من نفس النوع
+            template ??= _templates.FirstOrDefault(x =>
+                string.Equals(
+                    x.DocumentType,
+                    job.DocumentType,
+                    StringComparison.OrdinalIgnoreCase));
+
+            if (template is null)
+            {
+                throw new InvalidOperationException(
+                    $"لا يوجد قالب للمستند {job.DocumentType}.");
+            }
+
+            // ----------------------------------------------------
+            // 2) عرض القالب الصحيح داخل المصمم
+            // ----------------------------------------------------
+
+            if (!ReferenceEquals(TemplatesList.SelectedItem, template))
+            {
+                TemplatesList.SelectedItem = template;
+                TemplatesList.ScrollIntoView(template);
+            }
+
+            _currentTemplate = template;
+
+            // مهم:
+            // استخدام البيانات الحقيقية القادمة من OAS
+            // وليس SampleData
+            _previewData = job.Data.Clone();
+
+            // تحديث خصائص القالب
+            LoadTemplateUi();
+
+            // إعادة وضع البيانات الحقيقية لأن LoadTemplateUi
+            // لا يفترض أن يغيرها، ولكن نثبتها هنا احتياطياً.
+            _previewData = job.Data.Clone();
+
+            // إعادة رسم القالب بالبيانات الحقيقية
+            RefreshDesigner();
+
+            // ----------------------------------------------------
+            // 3) تحديد الطابعة
+            // ----------------------------------------------------
 
             var printer = job.PrinterName;
-            if (string.IsNullOrWhiteSpace(printer) && _settings.PrinterBindings.TryGetValue(job.DocumentType, out var binding)) printer = binding;
-            if (string.IsNullOrWhiteSpace(printer)) printer = _settings.DefaultPrinterName;
-            if (string.IsNullOrWhiteSpace(printer)) printer = PrinterCombo.SelectedItem as string;
-            if (string.IsNullOrWhiteSpace(printer)) throw new InvalidOperationException("لا توجد طابعة محددة لمهمة الطباعة.");
+
+            if (string.IsNullOrWhiteSpace(printer) &&
+                _settings.PrinterBindings.TryGetValue(
+                    job.DocumentType,
+                    out var binding))
+            {
+                printer = binding;
+            }
+
+            if (string.IsNullOrWhiteSpace(printer))
+            {
+                printer = _settings.DefaultPrinterName;
+            }
+
+            if (string.IsNullOrWhiteSpace(printer))
+            {
+                printer = PrinterCombo.SelectedItem as string;
+            }
+
+            if (string.IsNullOrWhiteSpace(printer))
+            {
+                throw new InvalidOperationException(
+                    "لا توجد طابعة محددة لمهمة الطباعة.");
+            }
+
+            // إظهار الطابعة المستخدمة في الواجهة
+            if (PrinterCombo.Items
+                .Cast<string>()
+                .Any(x => string.Equals(
+                    x,
+                    printer,
+                    StringComparison.OrdinalIgnoreCase)))
+            {
+                PrinterCombo.SelectedItem = printer;
+            }
+
+            // ----------------------------------------------------
+            // 4) تحديث حالة البرنامج قبل الطباعة
+            // ----------------------------------------------------
+
+            StatusText.Text =
+                $"جاري تنفيذ {GetDocumentTypeArabicName(job.DocumentType)}"
+                + $" - المهمة {job.JobId}";
+
+            // إجبار WPF على تحديث الشاشة قبل فتح المعاينة/الطباعة
+            Dispatcher.Invoke(
+                System.Windows.Threading.DispatcherPriority.Render,
+                new Action(() => { }));
+
+            // ----------------------------------------------------
+            // 5) معاينة أو طباعة
+            // ----------------------------------------------------
 
             if (job.ShowPreview)
             {
-                var preview = new PreviewWindow(_renderer.BuildCanvas(template, job.Data, false)) { Owner = this };
+                var previewCanvas =
+                    _renderer.BuildCanvas(
+                        template,
+                        job.Data,
+                        false);
+
+                var preview = new PreviewWindow(previewCanvas)
+                {
+                    Owner = this
+                };
+
                 preview.ShowDialog();
             }
             else
             {
-                _printerService.Print(_renderer.BuildDocument(template, job.Data), printer, job.Copies);
+                var document =
+                    _renderer.BuildDocument(
+                        template,
+                        job.Data);
+
+                _printerService.Print(
+                    document,
+                    printer,
+                    Math.Max(1, job.Copies));
             }
 
-            StatusText.Text = $"تم تنفيذ مهمة الطباعة {job.JobId}.";
+            // ----------------------------------------------------
+            // 6) إبقاء البيانات الحقيقية ظاهرة بعد الطباعة
+            // ----------------------------------------------------
+
+            _previewData = job.Data.Clone();
+            RefreshDesigner();
+
+            StatusText.Text =
+                $"تم تنفيذ مهمة الطباعة {job.JobId}.";
+
             return true;
         }
         catch (Exception ex)
         {
-            StatusText.Text = "فشل تنفيذ مهمة الطباعة: " + ex.Message;
+            StatusText.Text =
+                "فشل تنفيذ مهمة الطباعة: " + ex.Message;
+
+            MessageBox.Show(
+                ex.Message,
+                "خطأ في تنفيذ الطباعة",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+
             return false;
         }
+    }
+    private static string GetDocumentTypeArabicName(string documentType)
+    {
+        return documentType switch
+        {
+            "ReceiptVoucher" => "سند قبض",
+            "PaymentVoucher" => "سند صرف",
+            "Expense" => "مستند مصروف",
+            "JournalEntry" => "قيد يومية",
+            _ => documentType
+        };
     }
     private void SetZoom(double percent)
     {
