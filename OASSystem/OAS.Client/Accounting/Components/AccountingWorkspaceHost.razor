@@ -117,6 +117,20 @@
                           Disabled="@(!CanEditActive)"
                           OnClick="BeginEditActive" />
 
+                @if (activeTab is not null &&
+                           !activeTab.IsNew &&
+                           activeTab.EntityType is AccountingEntityType.ReceiptVouchers
+                                                   or AccountingEntityType.PaymentVouchers)
+                {
+                    <UiButton Text="طباعة"
+                              IconCssClass="fa-solid fa-print"
+                              Variant="ButtonVariant.Secondary"
+                              Size="ControlSize.Small"
+                              Loading="@_isPrinting"
+                              Disabled="@(_isPrinting || activeTab.IsDirty || activeTab.IsSaving)"
+                              OnClick="PrintActiveVoucherAsync" />
+                }
+
                 <UiButton Text="حفظ"
                           IconCssClass="fa-solid fa-floppy-disk"
                           Size="ControlSize.Small"

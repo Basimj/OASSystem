@@ -1,0 +1,28 @@
+{
+  "VoucherNumber": "RV-000125",
+  "VoucherDate": "2026-09-27",
+  "CustomerName": "شركة النور للبصريات",
+  "ReceivedFrom": "محمد أحمد",
+  "PaymentMethod": "نقدي",
+  "CashAccountName": "الصندوق الرئيسي",
+  "BankAccountName": "",
+  "TotalAmount": 150000.0,
+  "TotalAmountWords": "مائة وخمسون ألف ريال",
+  "Description": "دفعة من حساب العميل",
+  "Company": {
+    "Name": "OAS للبصريات",
+    "Phone": "01-000000"
+  },
+  "Lines": [
+    {
+      "AccountName": "ذمم العملاء",
+      "Description": "دفعة على الحساب",
+      "Amount": 100000
+    },
+    {
+      "AccountName": "إيرادات أخرى",
+      "Description": "تسوية",
+      "Amount": 50000
+    }
+  ]
+}

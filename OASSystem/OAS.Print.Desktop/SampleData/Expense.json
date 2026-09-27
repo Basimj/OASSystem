@@ -1,0 +1,10 @@
+{
+  "ExpenseNumber": "EXP-000089",
+  "ExpenseDate": "2026-09-27",
+  "ExpenseTypeName": "مصروفات تشغيلية",
+  "Beneficiary": "مكتب الخدمات",
+  "Amount": 25000.0,
+  "AmountWords": "خمسة وعشرون ألف ريال",
+  "PaymentMethod": "نقدي",
+  "Description": "مصروف خدمات وتشغيل"
+}

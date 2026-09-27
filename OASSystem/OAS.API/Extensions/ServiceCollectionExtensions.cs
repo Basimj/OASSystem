@@ -2,6 +2,7 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.RateLimiting;
 using OAS.API.Database;
+using OAS.API.Printing;
 using OAS.API.Security;
 using OAS.Application.Abstractions.Security;
 using OAS.Application.Database.Abstractions;
@@ -17,6 +18,11 @@ public static class ServiceCollectionExtensions
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen();
         services.AddHttpContextAccessor();
+
+        services.AddSingleton<TimeProvider>(TimeProvider.System);
+        services.AddSingleton<IPrintJobQueue, PrintJobQueue>();
+        services.AddSingleton<DesktopPrintApiKeyValidator>();
+        services.AddScoped<VoucherPrintPayloadFactory>();
 
         services.AddScoped<ICurrentUser, HttpCurrentUser>();
         services.AddScoped<ICurrentRequestInfo, HttpCurrentRequestInfo>();

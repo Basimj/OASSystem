@@ -1,0 +1,23 @@
+{
+  "VoucherNumber": "PV-000041",
+  "VoucherDate": "2026-09-27",
+  "SupplierName": "مورد العدسات",
+  "BeneficiaryName": "مؤسسة الرؤية للتوريدات",
+  "PaymentMethod": "تحويل بنكي",
+  "CashAccountName": "",
+  "BankAccountName": "بنك الشركة",
+  "TotalAmount": 82500.0,
+  "TotalAmountWords": "اثنان وثمانون ألفًا وخمسمائة ريال",
+  "Description": "دفعة للمورد",
+  "Company": {
+    "Name": "OAS للبصريات",
+    "Phone": "01-000000"
+  },
+  "Lines": [
+    {
+      "AccountName": "ذمم الموردين",
+      "Description": "دفعة فاتورة مشتريات",
+      "Amount": 82500
+    }
+  ]
+}

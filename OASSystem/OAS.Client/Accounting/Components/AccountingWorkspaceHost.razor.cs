@@ -4,6 +4,7 @@ using OAS.Client.Accounting.Common;
 using OAS.Client.Accounting.Services;
 using OAS.Client.Accounting.Workspace;
 using OAS.Client.Common.Feedback.Services;
+using OAS.Client.Printing.Services;
 using OAS.Client.Services.Http;
 using OAS.Contracts.Accounting.Accounts;
 using OAS.Contracts.Accounting.BankAccounts;
@@ -48,12 +49,14 @@ public partial class AccountingWorkspaceHost : IDisposable
     [Inject] private IUiSnackbarService Snackbar { get; set; } = default!;
     [Inject] private IUiDialogService Dialog { get; set; } = default!;
     [Inject] private IApiFeedbackService ApiFeedback { get; set; } = default!;
+    [Inject] private IPrintingClientService PrintingService { get; set; } = default!;
 
     [Parameter] public AccountingEntityType? Section { get; set; }
 
     private const int PageSize = 25;
     private const int AccountTreePageSize = 2000;
     private bool _isLoading;
+    private bool _isPrinting;
     private bool _initialized;
     private AccountingEntityType? _loadedSection;
 
@@ -1800,6 +1803,52 @@ public partial class AccountingWorkspaceHost : IDisposable
             Snackbar.Success("تم إنشاء القيد العكسي بنجاح.");
         }
         catch (Exception ex) { Snackbar.Error("تعذر عكس القيد: " + ex.Message); }
+    }
+
+    private async Task PrintActiveVoucherAsync()
+    {
+        var tab = Workspace.ActiveTab;
+        if (tab?.EntityId is not Guid documentId || tab.IsNew)
+        {
+            Snackbar.Warning("احفظ السند أولاً قبل الطباعة.");
+            return;
+        }
+
+        if (tab.EntityType is not (AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers))
+            return;
+
+        if (tab.IsDirty)
+        {
+            Snackbar.Warning("احفظ التعديلات قبل إرسال السند للطباعة.");
+            return;
+        }
+
+        _isPrinting = true;
+        Workspace.NotifyStateChanged();
+
+        try
+        {
+            var queued = tab.EntityType == AccountingEntityType.ReceiptVouchers
+                ? await PrintingService.PrintReceiptVoucherAsync(documentId)
+                : await PrintingService.PrintPaymentVoucherAsync(documentId);
+
+            if (queued is null)
+            {
+                Snackbar.Error("تعذر إرسال مهمة الطباعة إلى خدمة الطباعة.");
+                return;
+            }
+
+            Snackbar.Success("تم إرسال السند إلى OAS Print للطباعة.");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Error("تعذر إرسال السند للطباعة: " + ex.Message);
+        }
+        finally
+        {
+            _isPrinting = false;
+            Workspace.NotifyStateChanged();
+        }
     }
 
     private async Task ChangeReceiptStatusAsync(ReceiptVoucherStatus status)

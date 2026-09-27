@@ -1,0 +1,253 @@
+<Window x:Class="OAS.Print.Desktop.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="OAS Print"
+        Width="1280"
+        Height="720"
+        MinWidth="1000"
+        MinHeight="600"
+        WindowStartupLocation="CenterScreen"
+        WindowState="Normal"
+        ResizeMode="CanResize"
+        SizeToContent="Manual">
+    <Grid Background="#F3F5F8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="32"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="White" BorderBrush="#D8DEE8" BorderThickness="0,0,0,1" Padding="8">
+            <DockPanel LastChildFill="False">
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                    <Button Content="قالب جديد" Click="NewTemplate_Click"/>
+                    <Button Content="حفظ" Click="SaveTemplate_Click"/>
+                    <Button Content="نسخ القالب" Click="DuplicateTemplate_Click"/>
+                    <Button Content="معاينة" Click="Preview_Click"/>
+                    <Button Content="طباعة" Click="Print_Click"/>
+                    <Button Content="بيانات JSON" Click="LoadData_Click"/>
+                    <Button Content="الإعدادات" Click="Settings_Click"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
+                    <TextBlock Text="الطابعة:" VerticalAlignment="Center" Margin="8,0,3,0"/>
+                    <ComboBox x:Name="PrinterCombo" Width="260" FlowDirection="LeftToRight"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <Grid Grid.Row="1" Margin="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="230"/>
+                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="330"/>
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Background="White" BorderBrush="#D8DEE8" BorderThickness="1" CornerRadius="6" Padding="8">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="160"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="القوالب" FontSize="18" FontWeight="SemiBold" Margin="3,3,3,8"/>
+                    <ListBox x:Name="TemplatesList" Grid.Row="1" DisplayMemberPath="Name" SelectionChanged="TemplatesList_SelectionChanged"/>
+                    <TextBlock Grid.Row="2" Text="إضافة عنصر" FontSize="16" FontWeight="SemiBold" Margin="3,12,3,5"/>
+                    <UniformGrid Grid.Row="3" Columns="2" VerticalAlignment="Top">
+                        <Button Content="نص" Click="AddText_Click"/>
+                        <Button Content="حقل" Click="AddField_Click"/>
+                        <Button Content="جدول" Click="AddTable_Click"/>
+                        <Button Content="صورة" Click="AddImage_Click"/>
+                        <Button Content="مستطيل" Click="AddRectangle_Click"/>
+                        <Button Content="خط" Click="AddLine_Click"/>
+                        <Button Content="حذف العنصر" Click="DeleteElement_Click"/>
+                        <Button Content="حذف القالب" Click="DeleteTemplate_Click"/>
+                    </UniformGrid>
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="2"
+        Background="#DDE2E8"
+        BorderBrush="#C7CDD7"
+        BorderThickness="1"
+        CornerRadius="6"
+        Padding="0">
+
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="42"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- شريط التحكم في حجم العرض -->
+                    <Border Grid.Row="0"
+                Background="#F8F9FB"
+                BorderBrush="#C7CDD7"
+                BorderThickness="0,0,0,1"
+                Padding="6">
+
+                        <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        FlowDirection="LeftToRight">
+
+                            <Button Content="−"
+                        Width="34"
+                        Height="28"
+                        Click="ZoomOut_Click"/>
+
+                            <Slider x:Name="ZoomSlider"
+                        Width="180"
+                        Height="28"
+                        Minimum="25"
+                        Maximum="200"
+                        Value="100"
+                        TickFrequency="25"
+                        IsSnapToTickEnabled="False"
+                        ValueChanged="ZoomSlider_ValueChanged"
+                        Margin="6,0"/>
+
+                            <Button Content="+"
+                        Width="34"
+                        Height="28"
+                        Click="ZoomIn_Click"/>
+
+                            <TextBlock x:Name="ZoomText"
+                           Text="100%"
+                           Width="55"
+                           VerticalAlignment="Center"
+                           TextAlignment="Center"
+                           Margin="8,0"/>
+
+                            <Button Content="100%"
+                        Height="28"
+                        Padding="10,0"
+                        Click="ActualSize_Click"
+                        Margin="3,0"/>
+
+                            <Button Content="احتواء"
+                        Height="28"
+                        Padding="10,0"
+                        Click="FitToScreen_Click"
+                        Margin="3,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- منطقة القالب -->
+                    <ScrollViewer x:Name="DesignerScrollViewer"
+                      Grid.Row="1"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalContentAlignment="Center"
+                      VerticalContentAlignment="Top"
+                      PreviewMouseWheel="DesignerScrollViewer_PreviewMouseWheel">
+
+                        <Border x:Name="DesignerPageBorder"
+                    Background="White"
+                    BorderBrush="#AAB2BF"
+                    BorderThickness="1"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Top"
+                    Margin="0"
+                    SnapsToDevicePixels="True">
+
+                            <Border.LayoutTransform>
+                                <ScaleTransform x:Name="DesignerScaleTransform"
+                                    ScaleX="1"
+                                    ScaleY="1"/>
+                            </Border.LayoutTransform>
+
+                            <Canvas x:Name="DesignerCanvas"
+                        Background="White"
+                        PreviewMouseLeftButtonDown="DesignerCanvas_MouseLeftButtonDown"
+                        PreviewMouseMove="DesignerCanvas_MouseMove"
+                        PreviewMouseLeftButtonUp="DesignerCanvas_MouseLeftButtonUp"/>
+                        </Border>
+
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="4" Background="White" BorderBrush="#D8DEE8" BorderThickness="1" CornerRadius="6" Padding="8">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBlock Text="خصائص القالب" FontSize="18" FontWeight="SemiBold" Margin="3,3,3,8"/>
+                        <TextBlock Text="الاسم"/>
+                        <TextBox x:Name="TemplateNameText" TextChanged="TemplateHeader_Changed"/>
+                        <TextBlock Text="الكود"/>
+                        <TextBox x:Name="TemplateCodeText" TextChanged="TemplateHeader_Changed" FlowDirection="LeftToRight"/>
+                        <TextBlock Text="نوع المستند"/>
+                        <ComboBox x:Name="DocumentTypeCombo" SelectionChanged="DocumentTypeCombo_SelectionChanged"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="عرض الورق (مم)"/>
+                                <TextBox x:Name="PaperWidthText" TextChanged="TemplateHeader_Changed" FlowDirection="LeftToRight"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="ارتفاع الورق (مم)"/>
+                                <TextBox x:Name="PaperHeightText" TextChanged="TemplateHeader_Changed" FlowDirection="LeftToRight"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Separator Margin="0,12"/>
+                        <TextBlock Text="خصائص العنصر المحدد" FontSize="18" FontWeight="SemiBold" Margin="3,0,3,8"/>
+                        <TextBlock x:Name="SelectedElementTypeText" Text="لم يتم تحديد عنصر" Foreground="#5C6675"/>
+                        <TextBlock Text="اسم العنصر"/>
+                        <TextBox x:Name="ElementNameText"/>
+                        <TextBlock Text="النص"/>
+                        <TextBox x:Name="ContentText" AcceptsReturn="True" Height="65" TextWrapping="Wrap"/>
+                        <TextBlock Text="مسار الحقل"/>
+                        <ComboBox x:Name="FieldPathCombo" IsEditable="True" DisplayMemberPath="DisplayName" SelectedValuePath="Path"/>
+                        <TextBlock Text="التنسيق (مثال N2 أو yyyy/MM/dd)"/>
+                        <TextBox x:Name="FormatText" FlowDirection="LeftToRight"/>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="X مم"/>
+                                <TextBox x:Name="XText" FlowDirection="LeftToRight"/>
+                                <TextBlock Text="العرض مم"/>
+                                <TextBox x:Name="WidthText" FlowDirection="LeftToRight"/>
+                                <TextBlock Text="حجم الخط"/>
+                                <TextBox x:Name="FontSizeText" FlowDirection="LeftToRight"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Y مم"/>
+                                <TextBox x:Name="YText" FlowDirection="LeftToRight"/>
+                                <TextBlock Text="الارتفاع مم"/>
+                                <TextBox x:Name="HeightText" FlowDirection="LeftToRight"/>
+                                <TextBlock Text="سمك الحد/الخط"/>
+                                <TextBox x:Name="BorderText" FlowDirection="LeftToRight"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <TextBlock Text="المحاذاة"/>
+                        <ComboBox x:Name="AlignmentCombo" SelectedValuePath="Tag">
+                            <ComboBoxItem Content="يمين" Tag="Right"/>
+                            <ComboBoxItem Content="وسط" Tag="Center"/>
+                            <ComboBoxItem Content="يسار" Tag="Left"/>
+                        </ComboBox>
+                        <CheckBox x:Name="BoldCheck" Content="عريض Bold" Margin="5"/>
+                        <CheckBox x:Name="RtlCheck" Content="اتجاه عربي RTL" Margin="5"/>
+                        <TextBlock Text="مسار الصورة/الشعار"/>
+                        <DockPanel>
+                            <Button Content="..." Width="42" Click="BrowseImage_Click" DockPanel.Dock="Left"/>
+                            <TextBox x:Name="ImagePathText" FlowDirection="LeftToRight"/>
+                        </DockPanel>
+                        <Button Content="تطبيق خصائص العنصر" FontWeight="SemiBold" Click="ApplyElement_Click" Margin="3,10,3,3"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="2" Background="#263241" Padding="8,5">
+            <DockPanel>
+                <TextBlock x:Name="StatusText" Foreground="White" Text="جاهز" DockPanel.Dock="Right"/>
+                <TextBlock x:Name="ConnectionText" Foreground="#C9D4E2" Text="OAS Print" DockPanel.Dock="Left" FlowDirection="LeftToRight"/>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>

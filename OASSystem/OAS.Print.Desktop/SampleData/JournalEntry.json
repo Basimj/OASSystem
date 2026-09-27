@@ -1,0 +1,22 @@
+{
+  "JournalNumber": "JV-000311",
+  "PostingDate": "2026-09-27",
+  "Description": "قيد تحصيل سند قبض",
+  "Status": "مرحل",
+  "TotalDebit": 150000.0,
+  "TotalCredit": 150000.0,
+  "Lines": [
+    {
+      "AccountName": "الصندوق الرئيسي",
+      "Description": "تحصيل نقدي",
+      "DebitAmount": 150000,
+      "CreditAmount": 0
+    },
+    {
+      "AccountName": "ذمم العملاء",
+      "Description": "تسوية حساب العميل",
+      "DebitAmount": 0,
+      "CreditAmount": 150000
+    }
+  ]
+}
