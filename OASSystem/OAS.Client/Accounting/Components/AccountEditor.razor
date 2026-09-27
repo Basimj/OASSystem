@@ -1,4 +1,5 @@
 @namespace OAS.Client.Accounting.Components
+
 @using OAS.Contracts.Accounting.Accounts
 @using OAS.Contracts.Accounting.Enums
 @using OAS.Client.Accounting.Common
@@ -8,9 +9,8 @@
 
 <UiAccountingEditorSurface>
 
-    
     <UiAccountingFormSection Title="المعلومات الأساسية"
-                             Subtitle="الرمز، المسميات، وربط التبعية الشجرية"
+                             Subtitle="كود الحساب، المسميات، وربط التبعية الشجرية"
                              IconCssClass="fa-solid fa-circle-info">
 
         <UiAccountingFormGrid Columns="2">
@@ -20,6 +20,9 @@
                          ValueExpression="@(() => Model.Code)"
                          ValueChanged="OnCodeChanged"
                          Required="true"
+                         MaxLength="30"
+                         InputMode="numeric"
+                         Placeholder="أدخل رقم الحساب"
                          ErrorText="@Model.CodeError"
                          ReadOnly="@(!IsNew)"
                          Disabled="@(!IsEditable || !IsNew)"
@@ -148,17 +151,16 @@
                          Disabled="@(!IsEditable)"
                          Size="ControlSize.Small" />
 
-
         </UiAccountingFormGrid>
 
     </UiAccountingFormSection>
-    
 
 </UiAccountingEditorSurface>
 
+
 @code {
 
-public sealed class FormModel
+    public sealed class FormModel
     {
         public string Code { get; set; } = string.Empty;
 
@@ -194,13 +196,10 @@ public sealed class FormModel
         public DateOnly? EffectiveDate { get; set; }
             = DateOnly.FromDateTime(DateTime.Today);
 
-        public string RowVersion { get; set; } = string.Empty;
+        public string RowVersion { get; set; }
+            = string.Empty;
 
 
-        /*
-         * UiSelect يعمل مع string.
-         * لا نستخدم ToString() مباشرة داخل ValueExpression.
-         */
         public string AccountClassValue
         {
             get => AccountClass.ToString();
@@ -262,7 +261,6 @@ public sealed class FormModel
     public bool IsNew { get; set; }
 
 
-
     [Parameter]
     public UiLookupItem? ParentAccountLookupItem { get; set; }
 
@@ -286,16 +284,61 @@ public sealed class FormModel
 
     private async Task OnCodeChanged(string? value)
     {
-        Model.Code = value ?? string.Empty;
-        Model.CodeError = null;
+        var code =
+            value?.Trim() ??
+            string.Empty;
+
+        Model.Code = code;
+
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            Model.CodeError =
+                "كود الحساب مطلوب.";
+        }
+        else if (!IsNumericAccountCode(code))
+        {
+            Model.CodeError =
+                "كود الحساب يجب أن يتكون من أرقام فقط.";
+        }
+        else if (code.Length > 30)
+        {
+            Model.CodeError =
+                "كود الحساب يجب ألا يزيد عن 30 رقمًا.";
+        }
+        else
+        {
+            Model.CodeError = null;
+        }
 
         await OnChanged();
     }
 
 
+    private static bool IsNumericAccountCode(
+        string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        foreach (var character in value)
+        {
+            if (character < '0' ||
+                character > '9')
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+
     private async Task OnNameArChanged(string? value)
     {
-        Model.NameAr = value ?? string.Empty;
+        Model.NameAr =
+            value ?? string.Empty;
 
         await OnChanged();
     }
@@ -345,7 +388,8 @@ public sealed class FormModel
     }
 
 
-    private async Task OnNormalBalanceChanged(string? value)
+    private async Task OnNormalBalanceChanged(
+        string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -363,14 +407,21 @@ public sealed class FormModel
     }
 
 
-    private async Task OnLevelChanged(decimal value)
+    private async Task OnLevelChanged(
+        decimal value)
     {
-        Model.Level = Math.Clamp((int)value, 1, 255);
+        Model.Level =
+            Math.Clamp(
+                (int)value,
+                1,
+                255);
+
         await OnChanged();
     }
 
 
-    private async Task OnParentAccountChanged(string? value)
+    private async Task OnParentAccountChanged(
+        string? value)
     {
         Model.ParentAccountId =
             Guid.TryParse(
@@ -379,16 +430,12 @@ public sealed class FormModel
                 ? id
                 : null;
 
-        /*
-         * الحساب الأب يؤثر على المستوى الشجري.
-         * لا نغيّر منطق الحساب هنا؛ فقط نعيد
-         * إشعار الـHost بأن الـModel تغير.
-         */
         await OnChanged();
     }
 
 
-    private async Task OnEffectiveDateChanged(DateOnly? value)
+    private async Task OnEffectiveDateChanged(
+        DateOnly? value)
     {
         Model.EffectiveDate = value;
 
@@ -396,7 +443,8 @@ public sealed class FormModel
     }
 
 
-    private async Task OnIsPostingAccountChanged(bool value)
+    private async Task OnIsPostingAccountChanged(
+        bool value)
     {
         Model.IsPostingAccount = value;
 
@@ -404,7 +452,8 @@ public sealed class FormModel
     }
 
 
-    private async Task OnIsControlAccountChanged(bool value)
+    private async Task OnIsControlAccountChanged(
+        bool value)
     {
         Model.IsControlAccount = value;
 
@@ -412,7 +461,8 @@ public sealed class FormModel
     }
 
 
-    private async Task OnAllowManualPostingChanged(bool value)
+    private async Task OnAllowManualPostingChanged(
+        bool value)
     {
         Model.AllowManualPosting = value;
 
@@ -420,7 +470,8 @@ public sealed class FormModel
     }
 
 
-    private async Task OnIsSystemAccountChanged(bool value)
+    private async Task OnIsSystemAccountChanged(
+        bool value)
     {
         Model.IsSystemAccount = value;
 
@@ -428,12 +479,11 @@ public sealed class FormModel
     }
 
 
-    private async Task OnIsActiveChanged(bool value)
+    private async Task OnIsActiveChanged(
+        bool value)
     {
         Model.IsActive = value;
 
         await OnChanged();
     }
-
-
 }
