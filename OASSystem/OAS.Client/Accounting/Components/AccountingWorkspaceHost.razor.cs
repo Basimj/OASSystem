@@ -2688,7 +2688,7 @@ public partial class AccountingWorkspaceHost : IDisposable
             [
                 new("التاريخ", x.VoucherDate.ToString("yyyy-MM-dd")),
                 new("الأسطر", x.Lines.Count.ToString()),
-                new("الإجمالي الأساسي", $"{x.BaseTotalAmount?.ToString("N4") ?? "-"} {x.BaseCurrencyCodeSnapshot}".Trim(), "ui-acc-val--debit"),
+                new("الإجمالي الأساسي", x.BaseTotalAmount?.ToString($"N{Math.Clamp((int)(x.BaseCurrencyDecimalPlacesSnapshot ?? 2), 0, 6)}") ?? "-", "ui-acc-val--debit"),
                 new("العملات", string.Join("، ", x.Lines.Select(l => l.CurrencyCodeSnapshot).Where(v => !string.IsNullOrWhiteSpace(v)).Distinct()))
             ],
             AccountingArabicPresenter.GetReceiptVoucherStatusText(x.Status),
@@ -2703,7 +2703,7 @@ public partial class AccountingWorkspaceHost : IDisposable
             [
                 new("التاريخ", x.VoucherDate.ToString("yyyy-MM-dd")),
                 new("الأسطر", x.Lines.Count.ToString()),
-                new("الإجمالي الأساسي", $"{x.BaseTotalAmount?.ToString("N4") ?? "-"} {x.BaseCurrencyCodeSnapshot}".Trim(), "ui-acc-val--credit"),
+                new("الإجمالي الأساسي", x.BaseTotalAmount?.ToString($"N{Math.Clamp((int)(x.BaseCurrencyDecimalPlacesSnapshot ?? 2), 0, 6)}") ?? "-", "ui-acc-val--credit"),
                 new("العملات", string.Join("، ", x.Lines.Select(l => l.CurrencyCodeSnapshot).Where(v => !string.IsNullOrWhiteSpace(v)).Distinct()))
             ],
             AccountingArabicPresenter.GetPaymentVoucherStatusText(x.Status),

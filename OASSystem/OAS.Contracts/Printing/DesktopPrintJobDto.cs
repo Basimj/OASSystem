@@ -9,4 +9,5 @@ public sealed record DesktopPrintJobDto(
     string? PrinterName,
     int Copies,
     bool ShowPreview,
+    string? RequestedBy,
     JsonElement Data);

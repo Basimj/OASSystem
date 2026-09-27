@@ -1,5 +1,3 @@
-using System.Globalization;
-using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
@@ -24,7 +22,8 @@ public sealed class TemplateRenderer
             Width = Mm(template.Landscape ? template.PaperHeightMm : template.PaperWidthMm),
             Height = Mm(template.Landscape ? template.PaperWidthMm : template.PaperHeightMm),
             Background = Brushes.White,
-            FlowDirection = FlowDirection.LeftToRight
+            FlowDirection = FlowDirection.LeftToRight,
+            ClipToBounds = true
         };
 
         foreach (var element in template.Elements)
@@ -46,22 +45,26 @@ public sealed class TemplateRenderer
         var document = new FixedDocument();
         document.DocumentPaginator.PageSize = new Size(pageWidth, pageHeight);
 
-        var page = new FixedPage { Width = pageWidth, Height = pageHeight, Background = Brushes.White };
-        var canvas = BuildCanvas(template, data, false);
-        page.Children.Add(canvas);
+        var page = new FixedPage
+        {
+            Width = pageWidth,
+            Height = pageHeight,
+            Background = Brushes.White
+        };
 
+        page.Children.Add(BuildCanvas(template, data, false));
         var content = new PageContent();
         ((IAddChild)content).AddChild(page);
         document.Pages.Add(content);
         return document;
     }
 
-    private FrameworkElement BuildElement(TemplateElement element, JsonElement data, bool designMode)
-    {
-        return element.Type switch
+    private FrameworkElement BuildElement(TemplateElement element, JsonElement data, bool designMode) =>
+        element.Type switch
         {
             TemplateElementType.Text => BuildText(element, element.Text, designMode),
-            TemplateElementType.Field => BuildText(element,
+            TemplateElementType.Field => BuildText(
+                element,
                 element.Prefix + JsonValueResolver.ResolveText(data, element.FieldPath, element.Format) + element.Suffix,
                 designMode),
             TemplateElementType.Rectangle => BuildRectangle(element, designMode),
@@ -70,52 +73,70 @@ public sealed class TemplateRenderer
             TemplateElementType.Table => BuildTable(element, data, designMode),
             _ => BuildText(element, element.Text, designMode)
         };
-    }
 
     private FrameworkElement BuildText(TemplateElement element, string text, bool designMode)
     {
         var block = new TextBlock
         {
             Text = text,
-            FontFamily = new FontFamily(element.FontFamily),
+            FontFamily = new FontFamily(string.IsNullOrWhiteSpace(element.FontFamily) ? "Segoe UI" : element.FontFamily),
             FontSize = element.FontSize,
             FontWeight = element.Bold ? FontWeights.Bold : FontWeights.Normal,
             FontStyle = element.Italic ? FontStyles.Italic : FontStyles.Normal,
+            Foreground = BrushFrom(element.ForegroundColor, Brushes.Black),
             TextAlignment = ToTextAlignment(element.Alignment),
             FlowDirection = element.RightToLeft ? FlowDirection.RightToLeft : FlowDirection.LeftToRight,
             VerticalAlignment = VerticalAlignment.Center,
             TextWrapping = TextWrapping.Wrap,
-            Padding = new Thickness(2)
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            Padding = new Thickness(Mm(Math.Max(0, element.PaddingMm)))
         };
-        var border = new Border
+
+        var borderThickness = designMode && element.BorderThickness <= 0
+            ? new Thickness(0.65)
+            : new Thickness(Math.Max(0, element.BorderThickness));
+
+        return new Border
         {
             Width = Mm(element.WidthMm),
             Height = Mm(element.HeightMm),
-            BorderBrush = designMode ? Brushes.SteelBlue : Brushes.Black,
-            BorderThickness = designMode ? new Thickness(0.7) : new Thickness(element.BorderThickness),
+            Background = BrushFrom(element.BackgroundColor, Brushes.Transparent),
+            BorderBrush = designMode && element.BorderThickness <= 0
+                ? Brushes.SteelBlue
+                : BrushFrom(element.BorderColor, Brushes.Black),
+            BorderThickness = borderThickness,
+            CornerRadius = new CornerRadius(Mm(Math.Max(0, element.CornerRadiusMm))),
+            ClipToBounds = true,
             Child = block
         };
-        return border;
     }
 
     private FrameworkElement BuildRectangle(TemplateElement element, bool designMode) => new Border
     {
         Width = Mm(element.WidthMm),
         Height = Mm(element.HeightMm),
-        BorderBrush = designMode ? Brushes.SteelBlue : Brushes.Black,
-        BorderThickness = new Thickness(Math.Max(designMode ? 0.7 : 0, element.BorderThickness > 0 ? element.BorderThickness : 1))
+        Background = BrushFrom(element.BackgroundColor, Brushes.Transparent),
+        BorderBrush = designMode && element.BorderThickness <= 0
+            ? Brushes.SteelBlue
+            : BrushFrom(element.BorderColor, Brushes.Black),
+        BorderThickness = new Thickness(Math.Max(designMode ? 0.65 : 0, element.BorderThickness)),
+        CornerRadius = new CornerRadius(Mm(Math.Max(0, element.CornerRadiusMm)))
     };
 
     private FrameworkElement BuildLine(TemplateElement element, bool designMode)
     {
-        var grid = new Grid { Width = Mm(element.WidthMm), Height = Math.Max(Mm(element.HeightMm), 6) };
+        var grid = new Grid
+        {
+            Width = Mm(element.WidthMm),
+            Height = Math.Max(Mm(element.HeightMm), 6)
+        };
         grid.Children.Add(new Line
         {
             X1 = 0,
             Y1 = grid.Height / 2,
             X2 = grid.Width,
             Y2 = grid.Height / 2,
-            Stroke = designMode ? Brushes.SteelBlue : Brushes.Black,
+            Stroke = designMode ? Brushes.SteelBlue : BrushFrom(element.BorderColor, Brushes.Black),
             StrokeThickness = Math.Max(0.5, element.LineThickness)
         });
         return grid;
@@ -127,21 +148,33 @@ public sealed class TemplateRenderer
         {
             Width = Mm(element.WidthMm),
             Height = Mm(element.HeightMm),
-            BorderBrush = designMode ? Brushes.SteelBlue : Brushes.Transparent,
-            BorderThickness = designMode ? new Thickness(0.7) : new Thickness(0)
+            Background = BrushFrom(element.BackgroundColor, Brushes.Transparent),
+            BorderBrush = designMode ? Brushes.SteelBlue : BrushFrom(element.BorderColor, Brushes.Transparent),
+            BorderThickness = designMode ? new Thickness(0.65) : new Thickness(Math.Max(0, element.BorderThickness)),
+            CornerRadius = new CornerRadius(Mm(Math.Max(0, element.CornerRadiusMm))),
+            ClipToBounds = true
         };
-        if (!string.IsNullOrWhiteSpace(element.ImagePath) && File.Exists(element.ImagePath))
+
+        var imagePath = ResolveImagePath(element.ImagePath);
+        if (!string.IsNullOrWhiteSpace(imagePath) && File.Exists(imagePath))
         {
             border.Child = new Image
             {
-                Source = new BitmapImage(new Uri(element.ImagePath, UriKind.Absolute)),
+                Source = new BitmapImage(new Uri(imagePath, UriKind.Absolute)),
                 Stretch = Stretch.Uniform
             };
         }
         else if (designMode)
         {
-            border.Child = new TextBlock { Text = "صورة / شعار", HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            border.Child = new TextBlock
+            {
+                Text = "صورة / شعار",
+                Foreground = Brushes.SlateGray,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
         }
+
         return border;
     }
 
@@ -152,7 +185,8 @@ public sealed class TemplateRenderer
             Width = Mm(element.WidthMm),
             Height = Mm(element.HeightMm),
             ClipToBounds = true,
-            FlowDirection = element.RightToLeft ? FlowDirection.RightToLeft : FlowDirection.LeftToRight
+            FlowDirection = element.RightToLeft ? FlowDirection.RightToLeft : FlowDirection.LeftToRight,
+            Background = BrushFrom(element.BackgroundColor, Brushes.White)
         };
 
         var columns = element.Columns.Count > 0
@@ -160,16 +194,24 @@ public sealed class TemplateRenderer
             : [new TemplateTableColumn { Header = "البيان", FieldPath = "Description", WidthMm = element.WidthMm }];
 
         foreach (var column in columns)
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Max(1, column.WidthMm), GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition
+            {
+                Width = new GridLength(Math.Max(1, column.WidthMm), GridUnitType.Star)
+            });
 
-        grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(Mm(element.RowHeightMm)) });
-        for (var c = 0; c < columns.Count; c++)
-            grid.Children.Add(MakeCell(columns[c].Header, 0, c, true, columns[c].Alignment));
+        var rowIndex = 0;
+        if (element.ShowHeader)
+        {
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(Mm(element.RowHeightMm)) });
+            for (var c = 0; c < columns.Count; c++)
+                grid.Children.Add(MakeCell(element, columns[c].Header, rowIndex, c, true, columns[c].Alignment));
+            rowIndex++;
+        }
 
         var items = JsonValueResolver.ResolveElement(data, element.FieldPath);
-        var row = 1;
         if (items is { ValueKind: JsonValueKind.Array })
         {
+            var dataRow = 0;
             foreach (var item in items.Value.EnumerateArray().Take(Math.Max(1, element.MaxRows)))
             {
                 grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(Mm(element.RowHeightMm)) });
@@ -177,45 +219,106 @@ public sealed class TemplateRenderer
                 {
                     var col = columns[c];
                     var text = JsonValueResolver.ResolveText(item, col.FieldPath, col.Format);
-                    grid.Children.Add(MakeCell(text, row, c, false, col.Alignment));
+                    grid.Children.Add(MakeCell(element, text, rowIndex, c, false, col.Alignment, dataRow));
                 }
-                row++;
+                rowIndex++;
+                dataRow++;
             }
         }
         else if (designMode)
         {
             grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(Mm(element.RowHeightMm)) });
             for (var c = 0; c < columns.Count; c++)
-                grid.Children.Add(MakeCell("{{" + columns[c].FieldPath + "}}", 1, c, false, columns[c].Alignment));
+                grid.Children.Add(MakeCell(element, "{{" + columns[c].FieldPath + "}}", rowIndex, c, false, columns[c].Alignment, 0));
         }
 
-        var border = new Border
+        return new Border
         {
             Width = Mm(element.WidthMm),
             Height = Mm(element.HeightMm),
-            BorderBrush = Brushes.Black,
-            BorderThickness = new Thickness(designMode ? 0.8 : Math.Max(0.5, element.BorderThickness)),
+            BorderBrush = designMode && element.BorderThickness <= 0
+                ? Brushes.SteelBlue
+                : BrushFrom(element.BorderColor, Brushes.Black),
+            BorderThickness = new Thickness(designMode && element.BorderThickness <= 0 ? 0.65 : Math.Max(0.35, element.BorderThickness)),
+            CornerRadius = new CornerRadius(Mm(Math.Max(0, element.CornerRadiusMm))),
+            ClipToBounds = true,
             Child = grid
         };
-        return border;
     }
 
-    private static FrameworkElement MakeCell(string text, int row, int column, bool header, TemplateTextAlignment alignment)
+    private static FrameworkElement MakeCell(
+        TemplateElement element,
+        string text,
+        int row,
+        int column,
+        bool header,
+        TemplateTextAlignment alignment,
+        int dataRow = 0)
     {
-        var border = new Border { BorderBrush = Brushes.Black, BorderThickness = new Thickness(0.35), Padding = new Thickness(2) };
+        var background = header
+            ? BrushFrom(element.HeaderBackgroundColor, Brushes.DarkSlateBlue)
+            : dataRow % 2 == 1
+                ? BrushFrom(element.AlternateRowBackgroundColor, Brushes.Transparent)
+                : Brushes.White;
+
+        var border = new Border
+        {
+            BorderBrush = BrushFrom(element.BorderColor, Brushes.LightGray),
+            BorderThickness = new Thickness(0.35),
+            Background = background,
+            Padding = new Thickness(2.5, 1.5, 2.5, 1.5)
+        };
+
         border.Child = new TextBlock
         {
             Text = text,
-            FontSize = header ? 10 : 9,
+            FontSize = header ? Math.Max(8.5, element.FontSize - 1) : Math.Max(7.5, element.FontSize - 2),
             FontWeight = header ? FontWeights.SemiBold : FontWeights.Normal,
+            Foreground = header
+                ? BrushFrom(element.HeaderForegroundColor, Brushes.White)
+                : BrushFrom(element.ForegroundColor, Brushes.Black),
             TextAlignment = ToTextAlignment(alignment),
             VerticalAlignment = VerticalAlignment.Center,
-            FlowDirection = FlowDirection.RightToLeft,
+            FlowDirection = element.RightToLeft ? FlowDirection.RightToLeft : FlowDirection.LeftToRight,
+            TextWrapping = TextWrapping.Wrap,
             TextTrimming = TextTrimming.CharacterEllipsis
         };
+
         Grid.SetRow(border, row);
         Grid.SetColumn(border, column);
         return border;
+    }
+
+    private static string? ResolveImagePath(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        if (System.IO.Path.IsPathRooted(value))
+            return value;
+
+        return System.IO.Path.Combine(AppContext.BaseDirectory, value);
+    }
+    private static Brush BrushFrom(string? value, Brush fallback)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return fallback;
+
+        try
+        {
+            var brush = new BrushConverter().ConvertFromString(value) as Brush;
+            if (brush is not null)
+            {
+                if (brush.CanFreeze) brush.Freeze();
+                return brush;
+            }
+        }
+        catch
+        {
+            // Keep rendering even when a user typed an invalid color.
+        }
+
+        return fallback;
     }
 
     private static TextAlignment ToTextAlignment(TemplateTextAlignment alignment) => alignment switch

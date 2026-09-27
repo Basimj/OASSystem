@@ -43,5 +43,6 @@ public sealed class PrintJobQueueTests
         null,
         1,
         false,
+        "test-user",
         JsonSerializer.SerializeToElement(new { VoucherNumber = "RV-TEST" }));
 }

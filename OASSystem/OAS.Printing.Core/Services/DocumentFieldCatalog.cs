@@ -9,21 +9,47 @@ public static class DocumentFieldCatalog
         {
             ["ReceiptVoucher"] =
             [
-                new("VoucherNumber", "رقم السند"), new("VoucherDate", "تاريخ السند"),
-                new("CustomerName", "العميل"), new("ReceivedFrom", "استلمنا من"),
-                new("PaymentMethod", "طريقة القبض"), new("CashAccountName", "الصندوق"),
-                new("BankAccountName", "البنك"), new("TotalAmount", "المبلغ"),
-                new("TotalAmountWords", "المبلغ كتابة"), new("Description", "البيان"),
-                new("Company.Name", "اسم المنشأة", "المنشأة"), new("Company.Phone", "هاتف المنشأة", "المنشأة")
+                new("VoucherNumber", "رقم السند", "السند"),
+                new("VoucherDate", "تاريخ السند", "السند"),
+                new("StatusText", "الحالة", "السند"),
+                new("Description", "البيان العام", "السند"),
+                new("CustomerName", "العميل", "الطرف"),
+                new("ReceivedFrom", "استلمنا من", "الطرف"),
+                new("PaymentMethod", "طرق القبض", "الدفع"),
+                new("CashAccountName", "الصندوق", "الدفع"),
+                new("BankAccountName", "البنك", "الدفع"),
+                new("BaseCurrencyCode", "كود العملة الأساسية", "العملة"),
+                new("BaseCurrencyName", "اسم العملة الأساسية", "العملة"),
+                new("TotalAmount", "الإجمالي الأساسي", "الإجماليات"),
+                new("TotalAmountWords", "المبلغ كتابة", "الإجماليات"),
+                new("Company.Name", "اسم المنشأة", "المنشأة"),
+                new("Company.Address", "عنوان المنشأة", "المنشأة"),
+                new("Company.Phone", "هاتف المنشأة", "المنشأة"),
+                new("Company.CommercialRegistration", "السجل التجاري", "المنشأة"),
+                new("Company.TaxNumber", "الرقم الضريبي", "المنشأة"),
+                new("PrintedAt", "وقت الطباعة", "الطباعة")
             ],
             ["PaymentVoucher"] =
             [
-                new("VoucherNumber", "رقم السند"), new("VoucherDate", "تاريخ السند"),
-                new("SupplierName", "المورد"), new("BeneficiaryName", "المستفيد"),
-                new("PaymentMethod", "طريقة الدفع"), new("CashAccountName", "الصندوق"),
-                new("BankAccountName", "البنك"), new("TotalAmount", "المبلغ"),
-                new("TotalAmountWords", "المبلغ كتابة"), new("Description", "البيان"),
-                new("Company.Name", "اسم المنشأة", "المنشأة"), new("Company.Phone", "هاتف المنشأة", "المنشأة")
+                new("VoucherNumber", "رقم السند", "السند"),
+                new("VoucherDate", "تاريخ السند", "السند"),
+                new("StatusText", "الحالة", "السند"),
+                new("Description", "البيان العام", "السند"),
+                new("SupplierName", "المورد", "الطرف"),
+                new("BeneficiaryName", "المستفيد", "الطرف"),
+                new("PaymentMethod", "طرق الدفع", "الدفع"),
+                new("CashAccountName", "الصندوق", "الدفع"),
+                new("BankAccountName", "البنك", "الدفع"),
+                new("BaseCurrencyCode", "كود العملة الأساسية", "العملة"),
+                new("BaseCurrencyName", "اسم العملة الأساسية", "العملة"),
+                new("TotalAmount", "الإجمالي الأساسي", "الإجماليات"),
+                new("TotalAmountWords", "المبلغ كتابة", "الإجماليات"),
+                new("Company.Name", "اسم المنشأة", "المنشأة"),
+                new("Company.Address", "عنوان المنشأة", "المنشأة"),
+                new("Company.Phone", "هاتف المنشأة", "المنشأة"),
+                new("Company.CommercialRegistration", "السجل التجاري", "المنشأة"),
+                new("Company.TaxNumber", "الرقم الضريبي", "المنشأة"),
+                new("PrintedAt", "وقت الطباعة", "الطباعة")
             ],
             ["Expense"] =
             [

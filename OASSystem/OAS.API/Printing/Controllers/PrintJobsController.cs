@@ -34,6 +34,13 @@ public sealed class PrintJobsController(
             request.DocumentId,
             cancellationToken);
 
+        var requestedBy =
+            User.Identity?.Name
+            ?? User.FindFirst("name")?.Value
+            ?? User.FindFirst("preferred_username")?.Value
+            ?? User.FindFirst("email")?.Value
+            ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
         var job = new DesktopPrintJobDto(
             Guid.NewGuid(),
             request.DocumentType,
@@ -41,6 +48,7 @@ public sealed class PrintJobsController(
             request.PrinterName,
             request.Copies,
             request.ShowPreview,
+            requestedBy,
             JsonSerializer.SerializeToElement(data));
 
         return Ok(queue.Enqueue(request.WorkstationCode, job));

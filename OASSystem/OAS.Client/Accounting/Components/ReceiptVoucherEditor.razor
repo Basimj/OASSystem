@@ -58,12 +58,6 @@
                          Placeholder="بيان عام للسند..." />
         </UiAccountingStack>
 
-        @if (!string.IsNullOrWhiteSpace(Model.BaseCurrencyCode))
-        {
-            <UiAccountingReadOnlyValue Label="العملة الأساسية"
-                                       Value="@Model.BaseCurrencyCode"
-                                       Tone="@UiAccountingReadOnlyValue.ValueTone.Default" />
-        }
     </UiAccountingFormSection>
 
     <UiAccountingFormSection Title="أسطر التحصيل"
@@ -149,8 +143,12 @@
         await OnChanged();
     }
 
-    private string FormatBaseTotal() =>
-        Model.BaseTotalAmount.HasValue
-            ? $"{Model.BaseTotalAmount.Value:N4} {Model.BaseCurrencyCode}".Trim()
-            : "يحسب عند الحفظ";
+    private string FormatBaseTotal()
+    {
+        if (!Model.BaseTotalAmount.HasValue)
+            return "يحسب عند الحفظ";
+
+        var decimals = Math.Clamp((int)(Model.BaseCurrencyDecimalPlaces ?? 2), 0, 6);
+        return Model.BaseTotalAmount.Value.ToString($"N{decimals}");
+    }
 }

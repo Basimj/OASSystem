@@ -1,9 +1,5 @@
-using System;
-using System.Net.Http;
 using System.Text;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
 using OAS.Print.Desktop.Models;
 using OAS.Printing.Core.Models;
 using OAS.Printing.Core.Services;
@@ -22,10 +18,15 @@ public sealed class JobPollingService : IDisposable
     public void Start(AppSettings settings)
     {
         Stop();
-
-        if (!settings.PollEnabled ||
-            string.IsNullOrWhiteSpace(settings.ApiBaseUrl))
+        if (!settings.PollEnabled)
         {
+            StatusChanged?.Invoke("استقبال المهام متوقف");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(settings.ApiBaseUrl))
+        {
+            StatusChanged?.Invoke("غير متصل: عنوان API غير محدد");
             return;
         }
 
@@ -35,107 +36,57 @@ public sealed class JobPollingService : IDisposable
 
     public void Stop()
     {
-        if (_cts is null)
-            return;
-
+        if (_cts is null) return;
         _cts.Cancel();
         _cts.Dispose();
-
         _cts = null;
         _loop = null;
     }
 
-    private async Task RunAsync(
-        AppSettings settings,
-        CancellationToken token)
+    private async Task RunAsync(AppSettings settings, CancellationToken token)
     {
         var baseUrl = settings.ApiBaseUrl.TrimEnd('/');
-
         while (!token.IsCancellationRequested)
         {
             try
             {
-                var workstationCode =
-                    Uri.EscapeDataString(settings.WorkstationCode);
+                using var request = new HttpRequestMessage(HttpMethod.Get,
+                    $"{baseUrl}/api/printing/desktop/jobs/next?workstationCode={Uri.EscapeDataString(settings.WorkstationCode)}");
+                if (!string.IsNullOrWhiteSpace(settings.ApiKey))
+                    request.Headers.TryAddWithoutValidation("X-OAS-Print-Key", settings.ApiKey);
 
-                var url =
-                    $"{baseUrl}/api/printing/desktop/jobs/next" +
-                    $"?workstationCode={workstationCode}";
-
-                using var request =
-                    new HttpRequestMessage(HttpMethod.Get, url);
-
-                AddApiKey(request, settings);
-
-                using var response =
-                    await _client.SendAsync(request, token);
-
-                if (response.StatusCode ==
-                    System.Net.HttpStatusCode.NoContent)
+                using var response = await _client.SendAsync(request, token);
+                if (response.StatusCode == System.Net.HttpStatusCode.NoContent)
                 {
-                    StatusChanged?.Invoke(
-                        "متصل - لا توجد مهام جديدة");
+                    StatusChanged?.Invoke("متصل - لا توجد مهام جديدة");
                 }
                 else if (response.IsSuccessStatusCode)
                 {
-                    var json =
-                        await response.Content.ReadAsStringAsync(token);
-
-                    var job =
-                        JsonSerializer.Deserialize<PrintJob>(
-                            json,
-                            TemplateSerializer.Options);
-
+                    var json = await response.Content.ReadAsStringAsync(token);
+                    var job = JsonSerializer.Deserialize<PrintJob>(json, TemplateSerializer.Options);
                     if (job is not null)
                     {
-                        var success = true;
-
-                        if (JobReceived is not null)
-                        {
-                            success =
-                                await JobReceived.Invoke(job);
-                        }
-
-                        await AcknowledgeAsync(
-                            baseUrl,
-                            settings,
-                            job.JobId,
-                            success,
-                            success
-                                ? null
-                                : "تعذر تنفيذ مهمة الطباعة.",
-                            token);
+                        var ok = JobReceived is null || await JobReceived.Invoke(job);
+                        await AcknowledgeAsync(baseUrl, settings, job.JobId, ok, ok ? null : "تعذر تنفيذ مهمة الطباعة.", token);
                     }
                 }
                 else
                 {
-                    StatusChanged?.Invoke(
-                        $"API: {(int)response.StatusCode} " +
-                        $"{response.ReasonPhrase}");
+                    StatusChanged?.Invoke($"API: {(int)response.StatusCode} {response.ReasonPhrase}");
                 }
             }
-            catch (OperationCanceledException)
-                when (token.IsCancellationRequested)
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
                 break;
             }
             catch (Exception ex)
             {
-                StatusChanged?.Invoke(
-                    "غير متصل: " + ex.Message);
+                StatusChanged?.Invoke("غير متصل: " + ex.Message);
             }
 
             try
             {
-                var seconds =
-                    Math.Clamp(
-                        settings.PollIntervalSeconds,
-                        1,
-                        60);
-
-                await Task.Delay(
-                    TimeSpan.FromSeconds(seconds),
-                    token);
+                await Task.Delay(TimeSpan.FromSeconds(Math.Clamp(settings.PollIntervalSeconds, 1, 60)), token);
             }
             catch (OperationCanceledException)
             {
@@ -144,70 +95,20 @@ public sealed class JobPollingService : IDisposable
         }
     }
 
-    private async Task AcknowledgeAsync(
-        string baseUrl,
-        AppSettings settings,
-        Guid jobId,
-        bool success,
-        string? error,
-        CancellationToken token)
+    private async Task AcknowledgeAsync(string baseUrl, AppSettings settings, Guid jobId, bool success, string? error, CancellationToken token)
     {
-        var action = success
-            ? "complete"
-            : "failed";
-
-        var url =
-            $"{baseUrl}/api/printing/desktop/jobs/" +
-            $"{jobId}/{action}";
-
-        using var request =
-            new HttpRequestMessage(
-                HttpMethod.Post,
-                url);
-
-        AddApiKey(request, settings);
-
+        var suffix = success ? "complete" : "failed";
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/api/printing/desktop/jobs/{jobId}/{suffix}");
+        if (!string.IsNullOrWhiteSpace(settings.ApiKey))
+            request.Headers.TryAddWithoutValidation("X-OAS-Print-Key", settings.ApiKey);
         if (!success)
-        {
-            var json =
-                JsonSerializer.Serialize(
-                    new
-                    {
-                        error
-                    });
-
-            request.Content =
-                new StringContent(
-                    json,
-                    Encoding.UTF8,
-                    "application/json");
-        }
-
-        using var response =
-            await _client.SendAsync(
-                request,
-                token);
-
-        response.EnsureSuccessStatusCode();
-    }
-
-    private static void AddApiKey(
-        HttpRequestMessage request,
-        AppSettings settings)
-    {
-        if (string.IsNullOrWhiteSpace(settings.ApiKey))
-            return;
-
-        request.Headers.TryAddWithoutValidation(
-            "X-OAS-Print-Key",
-            settings.ApiKey);
+            request.Content = new StringContent(JsonSerializer.Serialize(new { error }), Encoding.UTF8, "application/json");
+        using var _ = await _client.SendAsync(request, token);
     }
 
     public void Dispose()
     {
         Stop();
         _client.Dispose();
-
-        GC.SuppressFinalize(this);
     }
 }

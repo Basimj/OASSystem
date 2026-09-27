@@ -1,23 +1,68 @@
 {
-  "VoucherNumber": "PV-000041",
-  "VoucherDate": "2026-09-27",
-  "SupplierName": "مورد العدسات",
-  "BeneficiaryName": "مؤسسة الرؤية للتوريدات",
-  "PaymentMethod": "تحويل بنكي",
-  "CashAccountName": "",
-  "BankAccountName": "بنك الشركة",
-  "TotalAmount": 82500.0,
-  "TotalAmountWords": "اثنان وثمانون ألفًا وخمسمائة ريال",
-  "Description": "دفعة للمورد",
+  "DocumentTitleAr": "سند صرف",
+  "DocumentTitleEn": "PAYMENT VOUCHER",
+  "VoucherNumber": "PV-000001",
+  "VoucherDate": "27/09/2026",
+  "Status": "Draft",
+  "StatusText": "مسودة",
+  "SupplierName": "مؤسسة الأمل",
+  "BeneficiaryName": "مؤسسة الأمل، مكتب الخدمات",
+  "PaymentMethod": "متعدد: نقدي، تحويل بنكي",
+  "CashAccountName": "الصندوق الرئيسي",
+  "BankAccountName": "بنك اليمن الدولي",
+  "BaseCurrencyCode": "YER",
+  "BaseCurrencyName": "ريال يمني",
+  "BaseCurrencySymbol": "ر.ي",
+  "BaseCurrencyDecimalPlaces": 2,
+  "TotalAmount": 82500.00,
+  "TotalAmountWords": "فقط اثنان وثمانون ألفًا وخمسمائة ريال يمني لا غير",
+  "Description": "سداد مصروفات ومستحقات لأطراف متعددة.",
+  "PrintedAt": "27/09/2026 10:30",
   "Company": {
-    "Name": "OAS للبصريات",
-    "Phone": "01-000000"
+    "Name": "شركة النور للتجارة العامة",
+    "Address": "الجمهورية اليمنية - صنعاء",
+    "Phone": "+967 1 000000",
+    "CommercialRegistration": "123456",
+    "TaxNumber": ""
   },
   "Lines": [
     {
-      "AccountName": "ذمم الموردين",
-      "Description": "دفعة فاتورة مشتريات",
-      "Amount": 82500
+      "LineNumber": 1,
+      "PartyType": "مورد",
+      "PartyName": "مؤسسة الأمل",
+      "AccountName": "مؤسسة الأمل",
+      "PaymentMethod": "نقدي",
+      "SettlementAccountName": "الصندوق الرئيسي",
+      "CurrencyCode": "YER",
+      "CurrencySymbol": "ر.ي",
+      "Amount": 27500.00,
+      "ExchangeRate": 1.0000,
+      "BaseAmount": 27500.00,
+      "ReferenceNumber": "PUR-00091",
+      "ReferenceDate": "27/09/2026",
+      "ReferenceType": "PurchaseInvoice",
+      "Description": "دفعة فاتورة مشتريات"
+    },
+    {
+      "LineNumber": 2,
+      "PartyType": "أخرى",
+      "PartyName": "مكتب الخدمات",
+      "AccountName": "مصروفات تشغيلية",
+      "PaymentMethod": "تحويل بنكي",
+      "SettlementAccountName": "بنك اليمن الدولي",
+      "CurrencyCode": "USD",
+      "CurrencySymbol": "$",
+      "Amount": 100.00,
+      "ExchangeRate": 550.0000,
+      "BaseAmount": 55000.00,
+      "ReferenceNumber": "EXP-00089",
+      "ReferenceDate": "27/09/2026",
+      "ReferenceType": "Expense",
+      "Description": "خدمات وتشغيل"
     }
+  ],
+  "CurrencySummary": [
+    { "CurrencyCode": "YER", "Amount": 27500.00, "BaseAmount": 27500.00 },
+    { "CurrencyCode": "USD", "Amount": 100.00, "BaseAmount": 55000.00 }
   ]
 }
