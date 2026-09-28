@@ -23,14 +23,17 @@ using DomainTransactionType = OAS.Domain.Enums.Inventory.InventoryTransactionTyp
 namespace OAS.Application.Inventory.Spreadsheets;
 
 /// <summary>
-/// Read-only Excel exports for the Inventory V1 screens. The export intentionally
-/// uses the same application services/specifications as the UI and never writes data.
+/// Excel import/export for the Inventory screens. Master data supports templates,
+/// preview validation and transactional import; operational screens remain export-only.
 /// </summary>
-public sealed class InventorySpreadsheetService(
+public sealed partial class InventorySpreadsheetService(
     ISpreadsheetWorkbook workbook,
     IServiceProvider services,
     IPermissionChecker permissions)
 {
+    private ISpreadsheetWorkbook Workbook { get; } = workbook;
+    private IServiceProvider Services { get; } = services;
+    private IPermissionChecker Permissions { get; } = permissions;
     public static readonly string[] ExportSections =
     [
         "product-categories", "brands", "product-types", "units", "products", "product-variants",
@@ -139,6 +142,12 @@ public sealed class InventorySpreadsheetService(
     private Task<IReadOnlyList<ProductVariantDto>> VariantsAsync(PageRequest request, CancellationToken ct) =>
         ReadAllAsync(p => Crud<ProductVariantDto, CreateProductVariantRequest, UpdateProductVariantRequest>().GetPageAsync(p, ct), request);
 
+    private Task<IReadOnlyList<FrameDetailsDto>> FrameDetailsAsync(PageRequest request, CancellationToken ct) =>
+        ReadAllAsync(p => Crud<FrameDetailsDto, CreateFrameDetailsRequest, UpdateFrameDetailsRequest>().GetPageAsync(p, ct), request);
+
+    private Task<IReadOnlyList<LensDetailsDto>> LensDetailsAsync(PageRequest request, CancellationToken ct) =>
+        ReadAllAsync(p => Crud<LensDetailsDto, CreateLensDetailsRequest, UpdateLensDetailsRequest>().GetPageAsync(p, ct), request);
+
     private Task<IReadOnlyList<WarehouseDto>> WarehousesAsync(PageRequest request, CancellationToken ct) =>
         ReadAllAsync(p => Crud<WarehouseDto, CreateWarehouseRequest, UpdateWarehouseRequest>().GetPageAsync(p, ct), request);
 
@@ -191,18 +200,55 @@ public sealed class InventorySpreadsheetService(
         var categories = (await CategoriesAsync(new PageRequest(), ct)).ToDictionary(x => x.Id, x => $"{x.Code} - {x.NameAr}");
         var brands = (await BrandsAsync(new PageRequest(), ct)).ToDictionary(x => x.Id, x => $"{x.Code} - {x.Name}");
         var productTypes = (await ProductTypesAsync(new PageRequest(), ct)).ToDictionary(x => x.Id, x => $"{x.Code} - {x.NameAr}");
+        var canViewFrameDetails = await permissions.HasPermissionAsync(InventoryPermissions.FrameDetails.View, ct);
+        var canViewLensDetails = await permissions.HasPermissionAsync(InventoryPermissions.LensDetails.View, ct);
+        var frameDetails = canViewFrameDetails
+            ? (await FrameDetailsAsync(new PageRequest(), ct)).ToDictionary(x => x.ProductId)
+            : new Dictionary<Guid, FrameDetailsDto>();
+        var lensDetails = canViewLensDetails
+            ? (await LensDetailsAsync(new PageRequest(), ct)).ToDictionary(x => x.ProductId)
+            : new Dictionary<Guid, LensDetailsDto>();
+
         return [Table("المنتجات",
-            [Text("كود المنتج"), Text("الاسم العربي"), Text("الاسم الإنجليزي"), Text("التصنيف"), Text("الماركة"), Text("نوع المنتج"), Text("الوصف"), Text("صنف مخزني"), Text("الحالة")],
-            items.Select(x => Row(
-                ("كود المنتج", x.ProductCode),
-                ("الاسم العربي", x.NameAr),
-                ("الاسم الإنجليزي", x.NameEn),
-                ("التصنيف", categories.GetValueOrDefault(x.CategoryId)),
-                ("الماركة", x.BrandId is Guid brandId ? brands.GetValueOrDefault(brandId) : null),
-                ("نوع المنتج", productTypes.GetValueOrDefault(x.ProductTypeId)),
-                ("الوصف", x.Description),
-                ("صنف مخزني", YesNo(x.IsStockItem)),
-                ("الحالة", Active(x.IsActive)))))];
+            [
+                Text("كود المنتج"), Text("الاسم العربي"), Text("الاسم الإنجليزي"), Text("التصنيف"), Text("الماركة"), Text("نوع المنتج"), Text("الوصف"), Text("صنف مخزني"), Text("الحالة"),
+                Text("موديل الإطار"), Text("خامة الإطار"), Text("نوع الإطار / Rim"), Text("جنس الإطار"), Text("شكل الإطار"), Number("طول ذراع الإطار"), Number("مقاس جسر الإطار"), Number("عرض عدسة الإطار"),
+                Text("نوع العدسة"), Text("خامة العدسة"), Text("طلاء العدسة"), Number("معامل الانكسار"), Number("Sphere Min"), Number("Sphere Max"), Number("Cylinder Min"), Number("Cylinder Max"), Number("Add Min"), Number("Add Max"), Text("عدسة طبية")
+            ],
+            items.Select(x =>
+            {
+                frameDetails.TryGetValue(x.Id, out var frame);
+                lensDetails.TryGetValue(x.Id, out var lens);
+                return Row(
+                    ("كود المنتج", x.ProductCode),
+                    ("الاسم العربي", x.NameAr),
+                    ("الاسم الإنجليزي", x.NameEn),
+                    ("التصنيف", categories.GetValueOrDefault(x.CategoryId)),
+                    ("الماركة", x.BrandId is Guid brandId ? brands.GetValueOrDefault(brandId) : null),
+                    ("نوع المنتج", productTypes.GetValueOrDefault(x.ProductTypeId)),
+                    ("الوصف", x.Description),
+                    ("صنف مخزني", YesNo(x.IsStockItem)),
+                    ("الحالة", Active(x.IsActive)),
+                    ("موديل الإطار", frame?.Model),
+                    ("خامة الإطار", frame?.Material),
+                    ("نوع الإطار / Rim", frame?.RimType),
+                    ("جنس الإطار", frame?.Gender),
+                    ("شكل الإطار", frame?.Shape),
+                    ("طول ذراع الإطار", frame?.TempleLength is decimal temple ? F(temple) : null),
+                    ("مقاس جسر الإطار", frame?.BridgeSize is decimal bridge ? F(bridge) : null),
+                    ("عرض عدسة الإطار", frame?.LensWidth is decimal width ? F(width) : null),
+                    ("نوع العدسة", lens?.LensType),
+                    ("خامة العدسة", lens?.Material),
+                    ("طلاء العدسة", lens?.Coating),
+                    ("معامل الانكسار", lens?.RefractiveIndex is decimal refractive ? F(refractive) : null),
+                    ("Sphere Min", lens?.SphereMin is decimal sphereMin ? F(sphereMin) : null),
+                    ("Sphere Max", lens?.SphereMax is decimal sphereMax ? F(sphereMax) : null),
+                    ("Cylinder Min", lens?.CylinderMin is decimal cylinderMin ? F(cylinderMin) : null),
+                    ("Cylinder Max", lens?.CylinderMax is decimal cylinderMax ? F(cylinderMax) : null),
+                    ("Add Min", lens?.AddMin is decimal addMin ? F(addMin) : null),
+                    ("Add Max", lens?.AddMax is decimal addMax ? F(addMax) : null),
+                    ("عدسة طبية", lens is null ? null : YesNo(lens.IsPrescriptionLens)));
+            }))];
     }
 
     private async Task<IReadOnlyList<SpreadsheetTable>> ExportVariantsAsync(PageRequest request, CancellationToken ct)

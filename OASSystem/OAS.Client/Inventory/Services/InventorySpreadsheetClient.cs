@@ -2,11 +2,36 @@ using System.Globalization;
 using OAS.Client.Services.Http;
 using OAS.Contracts.Common.Pagination;
 using OAS.Contracts.Enums.Inventory;
+using OAS.Contracts.Spreadsheets;
 
 namespace OAS.Client.Inventory.Services;
 
 public sealed class InventorySpreadsheetClient(OasApiClient api)
 {
+    private static string BaseUrl(string section) =>
+        $"api/inventory/spreadsheets/{Uri.EscapeDataString(section)}";
+
+    public Task<byte[]> TemplateAsync(
+        string section,
+        CancellationToken cancellationToken = default) =>
+        api.GetFileAsync($"{BaseUrl(section)}/template", cancellationToken);
+
+    public async Task<SpreadsheetPreview> UploadAsync(
+        string section,
+        byte[] bytes,
+        string fileName,
+        bool confirm,
+        CancellationToken cancellationToken = default)
+    {
+        using var stream = new MemoryStream(bytes, writable: false);
+        return await api.UploadFileAsync<SpreadsheetPreview>(
+                   $"{BaseUrl(section)}/{(confirm ? "import" : "preview")}",
+                   stream,
+                   fileName,
+                   cancellationToken: cancellationToken)
+               ?? new SpreadsheetPreview([]);
+    }
+
     public Task<byte[]> ExportAsync(
         string section,
         PageRequest request,
@@ -44,7 +69,7 @@ public sealed class InventorySpreadsheetClient(OasApiClient api)
         AddEnum(query, "stockCountStatus", stockCountStatus);
 
         return api.GetFileAsync(
-            $"api/inventory/spreadsheets/{Uri.EscapeDataString(section)}/export?{string.Join("&", query)}",
+            $"{BaseUrl(section)}/export?{string.Join("&", query)}",
             cancellationToken);
     }
 

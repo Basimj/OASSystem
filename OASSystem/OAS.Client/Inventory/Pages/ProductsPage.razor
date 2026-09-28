@@ -19,7 +19,7 @@
                       Size="ControlSize.Small" Disabled="@((!IsEditing || _saving))" OnClick="CancelEditAsync" />
             <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary"
                       Size="ControlSize.Small" Disabled="@(IsEditing || _saving)" Loading="@_loading" OnClick="RefreshAsync" />
-            <UiSpreadsheetActions CanImport="false" Busy="@_exporting" OnExport="ExportAsync" />
+            <UiSpreadsheetActions CanImport="true" Busy="@(_exporting || _spreadsheetBusy)" OnImport="OpenSpreadsheetImportAsync" OnTemplate="DownloadTemplateAsync" OnExport="ExportAsync" />
             <UiSearchInput @bind-Value="_search" Placeholder="ابحث في القسم الحالي..."
                            AriaLabel="البحث في المنتجات" ClearText="مسح البحث"
                            DebounceMilliseconds="250" OnSearch="SearchChangedAsync" />
@@ -259,3 +259,11 @@
         </div>
     </Aside>
 </UiWorkspaceLayout>
+
+@if (_spreadsheetImportOpen)
+{
+    <InventorySpreadsheetImportHost Section="@CurrentSpreadsheetSection"
+                                    Title="@SectionTitle"
+                                    OnClose="CloseSpreadsheetImportAsync"
+                                    OnImported="ReloadAfterSpreadsheetImportAsync" />
+}

@@ -126,8 +126,13 @@ public sealed class ClosedXmlSpreadsheetWorkbook : ISpreadsheetWorkbook
             var help = book.Worksheets.Add("التعليمات");
             help.RightToLeft = true;
             help.Cell(1,1).Value = "أدخل البيانات بدءاً من الصف الثاني. لا تغيّر أسماء الأوراق أو الأعمدة. استخدم الأكواد وليس GUID. التواريخ yyyy-MM-dd. إنشاء جديد فقط.";
-            help.Cell(2,1).Value = "تظهر المعاينة قبل التأكيد. أي صف غير صالح يمنع استيراد الملف كله. القيود تنشأ مسودات فقط. JournalKey يجمع أسطر القيد.";
+            help.Cell(2,1).Value = "تظهر المعاينة قبل التأكيد، وأي صف غير صالح يمنع استيراد الملف كله حتى يتم تصحيح الأخطاء.";
             var row = 4;
+            if (tables.SelectMany(x => x.Definition.Columns).Any(x => string.Equals(x.Key, "JournalKey", StringComparison.OrdinalIgnoreCase)))
+            {
+                help.Cell(3,1).Value = "في القيود اليومية: JournalKey يجمع أسطر القيد الواحد، وتُنشأ القيود المستوردة وفق قواعد شاشة القيود.";
+                row = 5;
+            }
             foreach(var table in tables)
                 foreach(var column in table.Definition.Columns)
                 { help.Cell(row,1).Value=table.Definition.DisplayName ?? table.Definition.Name; help.Cell(row,2).Value=column.Header ?? column.Key; help.Cell(row,3).Value=column.Required?"مطلوب":"اختياري"; help.Cell(row,4).Value=column.DataType; help.Cell(row++,5).Value=column.DefaultValue??""; }

@@ -1,0 +1,155 @@
+@using Microsoft.AspNetCore.Components.Forms
+@using OAS.Client.Inventory.Services
+@using OAS.Client.Services.Http
+@using OAS.Contracts.Spreadsheets
+@using OAS.UiLib.Components.Spreadsheets
+
+<UiSpreadsheetImport Title="@Title"
+                     Busy="@_busy"
+                     Preview="@UiPreview"
+                     OnValidate="ValidateAsync"
+                     OnConfirm="ConfirmAsync"
+                     OnClear="ClearAsync"
+                     OnClose="CloseAsync" />
+
+@code {
+    private const long MaximumFileSize = 10 * 1024 * 1024;
+
+    [Inject] private InventorySpreadsheetClient SpreadsheetClient { get; set; } = default!;
+    [Inject] private IUiSnackbarService Snackbar { get; set; } = default!;
+
+    [Parameter, EditorRequired] public string Section { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnImported { get; set; }
+
+    private bool _busy;
+    private byte[]? _fileBytes;
+    private string? _fileName;
+    private SpreadsheetPreview? _preview;
+
+    private UiSpreadsheetPreview? UiPreview => _preview is null
+        ? null
+        : new UiSpreadsheetPreview(
+            _preview.Rows.Select(x => new UiSpreadsheetRow(x.Sheet, x.RowNumber, x.Values, x.Errors, x.Warnings)).ToArray(),
+            _preview.ValidRows,
+            _preview.InvalidRows,
+            _preview.WarningRows,
+            _preview.CanImport,
+            _preview.ImportedRecords);
+
+    private async Task ValidateAsync(IBrowserFile file)
+    {
+        if (_busy) return;
+        _busy = true;
+        _preview = null;
+        _fileBytes = null;
+        _fileName = null;
+
+        try
+        {
+            if (!file.Name.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+            {
+                SetFileError("الصيغة المدعومة هي xlsx فقط.");
+                return;
+            }
+
+            if (file.Size <= 0 || file.Size > MaximumFileSize)
+            {
+                SetFileError("حجم الملف يجب أن يكون أكبر من صفر ولا يتجاوز 10 MB.");
+                return;
+            }
+
+            await using var input = file.OpenReadStream(MaximumFileSize);
+            using var memory = new MemoryStream();
+            await input.CopyToAsync(memory);
+
+            _fileBytes = memory.ToArray();
+            _fileName = file.Name;
+            _preview = await SpreadsheetClient.UploadAsync(Section, _fileBytes, _fileName, confirm: false);
+
+            if (_preview.CanImport)
+                Snackbar.Success("تم فحص الملف بنجاح وهو جاهز للاستيراد.");
+            else
+                Snackbar.Error($"يوجد {_preview.InvalidRows} صف يحتوي على أخطاء.");
+        }
+        catch (ApiClientException ex)
+        {
+            SetFileError(ex.Error.Message);
+            Snackbar.Error(ex.Error.Message);
+        }
+        catch (Exception)
+        {
+            SetFileError("تعذر فحص ملف Excel. تحقق من الملف ثم حاول مرة أخرى.");
+            Snackbar.Error("تعذر فحص ملف Excel.");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task ConfirmAsync()
+    {
+        if (_busy || _fileBytes is null || string.IsNullOrWhiteSpace(_fileName) || _preview?.CanImport != true)
+            return;
+
+        _busy = true;
+        try
+        {
+            _preview = await SpreadsheetClient.UploadAsync(Section, _fileBytes, _fileName, confirm: true);
+            if (_preview.ImportedRecords > 0)
+            {
+                Snackbar.Success($"تم استيراد {_preview.ImportedRecords} سجل بنجاح.");
+                await OnImported.InvokeAsync();
+                await OnClose.InvokeAsync();
+            }
+            else if (!_preview.CanImport)
+            {
+                Snackbar.Error("تعذر الاستيراد لأن الملف لم يعد صالحًا. راجع الأخطاء وأعد الفحص.");
+            }
+        }
+        catch (ApiClientException ex)
+        {
+            SetFileError(ex.Error.Message);
+            Snackbar.Error(ex.Error.Message);
+        }
+        catch (Exception)
+        {
+            SetFileError("تعذر اعتماد الاستيراد. لم يتم حفظ أي صف من الملف.");
+            Snackbar.Error("تعذر اعتماد الاستيراد.");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private Task ClearAsync()
+    {
+        if (_busy) return Task.CompletedTask;
+        _fileBytes = null;
+        _fileName = null;
+        _preview = null;
+        return Task.CompletedTask;
+    }
+
+    private Task CloseAsync()
+    {
+        if (_busy) return Task.CompletedTask;
+        return OnClose.InvokeAsync();
+    }
+
+    private void SetFileError(string? message)
+    {
+        _preview = new SpreadsheetPreview(
+        [
+            new SpreadsheetRowResult(
+                "الملف",
+                1,
+                new Dictionary<string, string>(),
+                [string.IsNullOrWhiteSpace(message) ? "ملف Excel غير صالح." : message],
+                [])
+        ]);
+    }
+}

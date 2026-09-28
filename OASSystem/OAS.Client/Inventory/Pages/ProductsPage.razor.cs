@@ -76,6 +76,8 @@ public partial class ProductsPage
     private bool _loading = true;
     private bool _saving;
     private bool _exporting;
+    private bool _spreadsheetBusy;
+    private bool _spreadsheetImportOpen;
     private string? _search;
     private readonly Dictionary<string, string> _fieldErrors = new(StringComparer.Ordinal);
 
@@ -182,6 +184,17 @@ public partial class ProductsPage
     };
 
     private string SectionSubtitle => $"{VisibleCount} سجل";
+
+    private string CurrentSpreadsheetSection => _section switch
+    {
+        ProductSection.Categories => "product-categories",
+        ProductSection.Brands => "brands",
+        ProductSection.ProductTypes => "product-types",
+        ProductSection.Units => "units",
+        ProductSection.Products => "products",
+        ProductSection.Variants => "product-variants",
+        _ => "products"
+    };
 
     private static readonly IReadOnlyList<string> SimpleHeaders = ["الكود", "الاسم", "الحالة"];
     private static readonly IReadOnlyList<string> ProductHeaders = ["الكود", "المنتج", "النوع", "مخزني", "المتغيرات", "حالة المخزون", "الحالة"];
@@ -1025,6 +1038,50 @@ public partial class ProductsPage
         {
             ApiFeedback.ShowUnexpected();
             return null;
+        }
+    }
+
+    private Task OpenSpreadsheetImportAsync()
+    {
+        _spreadsheetImportOpen = true;
+        return Task.CompletedTask;
+    }
+
+    private Task CloseSpreadsheetImportAsync()
+    {
+        _spreadsheetImportOpen = false;
+        return Task.CompletedTask;
+    }
+
+    private async Task ReloadAfterSpreadsheetImportAsync()
+    {
+        _selectedId = null;
+        _mode = EditorMode.Empty;
+        ClearForm();
+        await LoadAsync();
+    }
+
+    private async Task DownloadTemplateAsync()
+    {
+        if (_spreadsheetBusy) return;
+        _spreadsheetBusy = true;
+        try
+        {
+            var section = CurrentSpreadsheetSection;
+            var bytes = await SpreadsheetClient.TemplateAsync(section);
+            await SpreadsheetDownload.SaveAsync(bytes, $"inventory-{section}-template.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        }
+        catch (ApiClientException ex)
+        {
+            ApiFeedback.Show(ex.Error);
+        }
+        catch (Exception)
+        {
+            ApiFeedback.ShowUnexpected();
+        }
+        finally
+        {
+            _spreadsheetBusy = false;
         }
     }
 
