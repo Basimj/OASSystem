@@ -1,10 +1,11 @@
 @namespace OAS.UiLib.Components.Accounting.Parties
 @using OAS.UiLib.Components.Accounting.Workspace
 @using OAS.UiLib.Components.Spreadsheets
+@using OAS.UiLib.Components.Navigation
 @using OAS.UiLib.Core.Models
 @using OAS.UiLib.Core.Models.Accounting
 
-<UiAccountingWorkspace ShowTabs="false">
+<UiAccountingWorkspace ShowTabs="true">
     <Actions>
         <UiWorkspaceActionBar>
             @if (!EditorOpen)
@@ -26,6 +27,15 @@
             }
         </UiWorkspaceActionBar>
     </Actions>
+    <Tabs>
+        <UiApplicationTabStrip Tabs="@WorkspaceTabs"
+                               AriaLabel="@(IsSupplier ? "تبويبات الموردين" : "تبويبات العملاء")"
+                               EnableContextMenu="true"
+                               OnSelect="OnSelectTab"
+                               OnClose="OnCloseTab"
+                               OnCloseOthers="OnCloseOtherTabs"
+                               OnCloseAll="OnCloseAllTabs" />
+    </Tabs>
     <Body>
         @if (!EditorOpen)
         {
@@ -128,6 +138,12 @@
     [Parameter] public bool IsNew { get; set; }
     [Parameter] public UiAccountingPartyFormModel Form { get; set; } = new();
     [Parameter] public IReadOnlyList<UiAccountingPartyListItem> Items { get; set; } = [];
+    [Parameter] public IReadOnlyList<UiApplicationTabItem> WorkspaceTabs { get; set; } = [];
+    [Parameter] public EventCallback<Guid> OnSelectTab { get; set; }
+    [Parameter] public EventCallback<Guid> OnCloseTab { get; set; }
+    [Parameter] public EventCallback<Guid> OnCloseOtherTabs { get; set; }
+    [Parameter] public EventCallback OnCloseAllTabs { get; set; }
+    [Parameter] public EventCallback OnFormChanged { get; set; }
     [Parameter] public UiLookupItem? ParentLookupItem { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? ParentSearchAsync { get; set; }
     [Parameter] public string Search { get; set; } = string.Empty;
@@ -163,40 +179,44 @@
         ? [new("all", "الكل"), new("active", "نشط"), new("inactive", "غير نشط"), new("individual", "أفراد"), new("organization", "منشآت"), new("local", "محلي"), new("international", "دولي")]
         : [new("all", "الكل"), new("active", "نشط"), new("inactive", "غير نشط"), new("individual", "أفراد"), new("organization", "منشآت"), new("credit", "بيع آجل"), new("cash", "نقدي فقط")];
 
-    private Task Changed() => InvokeAsync(StateHasChanged);
-    private Task SetParent(string? v){Form.ParentAccountId=v??"";return Changed();}
-    private Task SetEntityType(string? v){Form.EntityType=v??"1";return Changed();}
-    private Task SetSupplierScope(string? v){Form.SupplierScope=v??"1";return Changed();}
-    private Task SetGender(string? v){Form.Gender=v??"0";return Changed();}
-    private Task SetPreferredContactMethod(string? v){Form.PreferredContactMethod=v??"2";return Changed();}
-    private Task SetNameAr(string? v){Form.NameAr=v??"";return Changed();}
-    private Task SetNameEn(string? v){Form.NameEn=v;return Changed();}
-    private Task SetTradeName(string? v){Form.TradeName=v;return Changed();}
-    private Task SetNationalId(string? v){Form.NationalId=v;return Changed();}
-    private Task SetCommercialRegistration(string? v){Form.CommercialRegistrationNo=v;return Changed();}
-    private Task SetTaxNumber(string? v){Form.TaxNumber=v;return Changed();}
-    private Task SetDateOfBirth(DateOnly? v){Form.DateOfBirth=v;return Changed();}
-    private Task SetSince(DateOnly? v){Form.Since=v;return Changed();}
-    private Task SetContactPersonName(string? v){Form.ContactPersonName=v;return Changed();}
-    private Task SetContactPersonTitle(string? v){Form.ContactPersonTitle=v;return Changed();}
-    private Task SetPhone(string? v){Form.Phone=v;return Changed();}
-    private Task SetMobile(string? v){Form.Mobile=v;return Changed();}
-    private Task SetAlternatePhone(string? v){Form.AlternatePhone=v;return Changed();}
-    private Task SetWhatsApp(string? v){Form.WhatsAppNumber=v;return Changed();}
-    private Task SetEmail(string? v){Form.Email=v;return Changed();}
-    private Task SetWebsite(string? v){Form.Website=v;return Changed();}
-    private Task SetCountry(string? v){Form.Country=v;return Changed();}
-    private Task SetGovernorate(string? v){Form.Governorate=v;return Changed();}
-    private Task SetCity(string? v){Form.City=v;return Changed();}
-    private Task SetDistrict(string? v){Form.District=v;return Changed();}
-    private Task SetStreet(string? v){Form.Street=v;return Changed();}
-    private Task SetBuilding(string? v){Form.Building=v;return Changed();}
-    private Task SetPostalCode(string? v){Form.PostalCode=v;return Changed();}
-    private Task SetAddressDetails(string? v){Form.AddressDetails=v;return Changed();}
-    private Task SetCreditAllowed(bool v){Form.IsCreditAllowed=v;if(!v){Form.CreditLimit=0;Form.PaymentTermDays=0;}return Changed();}
-    private Task SetCreditLimit(decimal v){Form.CreditLimit=v;return Changed();}
-    private Task SetPaymentTermDays(decimal v){Form.PaymentTermDays=(int)v;return Changed();}
-    private Task SetLeadTime(decimal v){Form.DefaultLeadTimeDays=(int)v;return Changed();}
-    private Task SetActive(bool v){Form.IsActive=v;return Changed();}
-    private Task SetNotes(string? v){Form.Notes=v;return Changed();}
+    private async Task Changed()
+    {
+        await OnFormChanged.InvokeAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+    private Task SetParent(string? v) { Form.ParentAccountId = v ?? ""; return Changed(); }
+    private Task SetEntityType(string? v) { Form.EntityType = v ?? "1"; return Changed(); }
+    private Task SetSupplierScope(string? v) { Form.SupplierScope = v ?? "1"; return Changed(); }
+    private Task SetGender(string? v) { Form.Gender = v ?? "0"; return Changed(); }
+    private Task SetPreferredContactMethod(string? v) { Form.PreferredContactMethod = v ?? "2"; return Changed(); }
+    private Task SetNameAr(string? v) { Form.NameAr = v ?? ""; return Changed(); }
+    private Task SetNameEn(string? v) { Form.NameEn = v; return Changed(); }
+    private Task SetTradeName(string? v) { Form.TradeName = v; return Changed(); }
+    private Task SetNationalId(string? v) { Form.NationalId = v; return Changed(); }
+    private Task SetCommercialRegistration(string? v) { Form.CommercialRegistrationNo = v; return Changed(); }
+    private Task SetTaxNumber(string? v) { Form.TaxNumber = v; return Changed(); }
+    private Task SetDateOfBirth(DateOnly? v) { Form.DateOfBirth = v; return Changed(); }
+    private Task SetSince(DateOnly? v) { Form.Since = v; return Changed(); }
+    private Task SetContactPersonName(string? v) { Form.ContactPersonName = v; return Changed(); }
+    private Task SetContactPersonTitle(string? v) { Form.ContactPersonTitle = v; return Changed(); }
+    private Task SetPhone(string? v) { Form.Phone = v; return Changed(); }
+    private Task SetMobile(string? v) { Form.Mobile = v; return Changed(); }
+    private Task SetAlternatePhone(string? v) { Form.AlternatePhone = v; return Changed(); }
+    private Task SetWhatsApp(string? v) { Form.WhatsAppNumber = v; return Changed(); }
+    private Task SetEmail(string? v) { Form.Email = v; return Changed(); }
+    private Task SetWebsite(string? v) { Form.Website = v; return Changed(); }
+    private Task SetCountry(string? v) { Form.Country = v; return Changed(); }
+    private Task SetGovernorate(string? v) { Form.Governorate = v; return Changed(); }
+    private Task SetCity(string? v) { Form.City = v; return Changed(); }
+    private Task SetDistrict(string? v) { Form.District = v; return Changed(); }
+    private Task SetStreet(string? v) { Form.Street = v; return Changed(); }
+    private Task SetBuilding(string? v) { Form.Building = v; return Changed(); }
+    private Task SetPostalCode(string? v) { Form.PostalCode = v; return Changed(); }
+    private Task SetAddressDetails(string? v) { Form.AddressDetails = v; return Changed(); }
+    private Task SetCreditAllowed(bool v) { Form.IsCreditAllowed = v; if (!v) { Form.CreditLimit = 0; Form.PaymentTermDays = 0; } return Changed(); }
+    private Task SetCreditLimit(decimal v) { Form.CreditLimit = v; return Changed(); }
+    private Task SetPaymentTermDays(decimal v) { Form.PaymentTermDays = (int)v; return Changed(); }
+    private Task SetLeadTime(decimal v) { Form.DefaultLeadTimeDays = (int)v; return Changed(); }
+    private Task SetActive(bool v) { Form.IsActive = v; return Changed(); }
+    private Task SetNotes(string? v) { Form.Notes = v; return Changed(); }
 }
