@@ -2720,7 +2720,17 @@ public partial class AccountingWorkspaceHost : IDisposable
         if (_accountDtos.TryGetValue(id, out var cached))
             return cached;
 
-        var account = await AccountingService.GetAccountByIdAsync(id, cancellationToken);
+        /*
+         * This is a secondary lookup used while composing cash/bank lookup
+         * rows. It must not be aborted merely because the user typed another
+         * character in the parent lookup. UiLookup now protects all searches
+         * globally, and this extra guard also keeps this N+1 enrichment safe
+         * if the method is called from another cancellable flow later.
+         */
+        var account = await AccountingService.GetAccountByIdAsync(
+            id,
+            CancellationToken.None);
+
         if (account is not null)
         {
             _accountDtos[id] = account;
