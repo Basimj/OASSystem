@@ -11,5 +11,6 @@ public enum InventoryTransactionType
     SalesReturn = 7,
     PurchaseReturn = 8,
     ProductionIssue = 9,
-    Scrap = 10
+    Scrap = 10,
+    Sale = 11
 }

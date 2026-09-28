@@ -1,4 +1,5 @@
 using OAS.Domain.Common.Entities;
+using OAS.Domain.Exceptions;
 
 namespace OAS.Domain.Entities.Inventory;
 
@@ -46,6 +47,42 @@ public class InventoryBalance : AuditableEntity<Guid>
     public decimal AvailableQuantity =>
         OnHandQuantity - ReservedQuantity;
 
+    public void Reserve(decimal quantity)
+    {
+        EnsurePositive(quantity, "Reservation quantity");
+
+        if (AvailableQuantity < quantity)
+            throw new DomainException("Insufficient available inventory quantity for reservation.");
+
+        ReservedQuantity += quantity;
+    }
+
+    public void ReleaseReservation(decimal quantity)
+    {
+        EnsurePositive(quantity, "Reservation release quantity");
+
+        if (ReservedQuantity < quantity)
+            throw new DomainException("Reservation release quantity exceeds the reserved quantity.");
+
+        ReservedQuantity -= quantity;
+    }
+
+    public void ConsumeReservation(decimal quantity, DateTimeOffset movementAtUtc)
+    {
+        EnsurePositive(quantity, "Reservation consumption quantity");
+
+        if (ReservedQuantity < quantity)
+            throw new DomainException("Reservation consumption quantity exceeds the reserved quantity.");
+
+        if (OnHandQuantity < quantity)
+            throw new DomainException("Insufficient on-hand inventory quantity to consume the reservation.");
+
+        ReservedQuantity -= quantity;
+        OnHandQuantity -= quantity;
+        RecalculateInventoryValue();
+        LastMovementAtUtc = movementAtUtc;
+    }
+
     public void ApplyInbound(decimal quantity, decimal unitCost, DateTimeOffset movementAtUtc)
     {
         if (quantity <= 0)
@@ -84,8 +121,11 @@ public class InventoryBalance : AuditableEntity<Guid>
         if (quantity <= 0)
             throw new ArgumentOutOfRangeException(nameof(quantity), "Outbound quantity must be greater than zero.");
 
+        if (AvailableQuantity < quantity)
+            throw new DomainException("Insufficient available inventory quantity. Reserved stock cannot be issued by a normal outbound movement.");
+
         OnHandQuantity -= quantity;
-        InventoryValue = Math.Round(Math.Max(0, OnHandQuantity * AverageUnitCost), 2);
+        RecalculateInventoryValue();
         LastMovementAtUtc = movementAtUtc;
     }
 
@@ -99,5 +139,16 @@ public class InventoryBalance : AuditableEntity<Guid>
         {
             ApplyOutbound(Math.Abs(differenceQuantity), movementAtUtc);
         }
+    }
+
+    private void RecalculateInventoryValue()
+    {
+        InventoryValue = Math.Round(Math.Max(0, OnHandQuantity * AverageUnitCost), 2);
+    }
+
+    private static void EnsurePositive(decimal quantity, string name)
+    {
+        if (quantity <= 0)
+            throw new DomainException($"{name} must be greater than zero.");
     }
 }
