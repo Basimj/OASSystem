@@ -27,11 +27,27 @@ public sealed class SetPaymentVoucherStatusCommandHandler(
         if (voucher is null)
             throw new NotFoundException(nameof(PaymentVoucher), request.Id);
 
-        var requestedRowVersion = Convert.FromBase64String(request.Request.RowVersion);
+        byte[] requestedRowVersion;
+        try
+        {
+            requestedRowVersion = Convert.FromBase64String(request.Request.RowVersion);
+        }
+        catch (FormatException ex)
+        {
+            throw new ConcurrencyException("بيانات التزامن الخاصة بسند الصرف غير صالحة. أعد تحميل السند ثم حاول مرة أخرى.", ex);
+        }
+
         if (!voucher.RowVersion.SequenceEqual(requestedRowVersion))
-            throw new ConcurrencyException("The payment voucher has been modified by another user.");
+            throw new ConcurrencyException("تم تعديل سند الصرف بواسطة مستخدم آخر. أعد تحميل السند ثم حاول مرة أخرى.");
 
         var targetStatus = (DomainPaymentVoucherStatus)(int)request.Request.Status;
+
+        if (!IsAllowedTransition(voucher.Status, targetStatus))
+        {
+            throw new ConflictException(
+                "payment_status_transition_invalid",
+                "انتقال حالة سند الصرف المطلوب غير مسموح من الحالة الحالية.");
+        }
 
         IReadOnlyList<PaymentVoucherLine>? lines = null;
         if (targetStatus is DomainPaymentVoucherStatus.Approved or DomainPaymentVoucherStatus.Posted)
@@ -50,7 +66,7 @@ public sealed class SetPaymentVoucherStatusCommandHandler(
             case DomainPaymentVoucherStatus.Approved:
                 if (!await permissionChecker.HasPermissionAsync(AccountingPermissions.PaymentVouchers.Approve, cancellationToken))
                     throw new ForbiddenException();
-                voucher.Approve();
+                voucher.Approve(lines!);
                 break;
 
             case DomainPaymentVoucherStatus.Posted:
@@ -64,7 +80,7 @@ public sealed class SetPaymentVoucherStatusCommandHandler(
                     voucher, lines!, userId, nowUtc, cancellationToken);
 
                 voucher.SetJournalEntry(journalId);
-                voucher.Post(userId, nowUtc);
+                voucher.Post(userId, nowUtc, lines!);
                 break;
 
             case DomainPaymentVoucherStatus.Cancelled:
@@ -72,8 +88,9 @@ public sealed class SetPaymentVoucherStatusCommandHandler(
                 break;
 
             default:
-                throw new InvalidOperationException(
-                    $"Payment voucher status '{targetStatus}' is not supported for manual transition.");
+                throw new ConflictException(
+                    "payment_status_transition_invalid",
+                    "حالة سند الصرف المطلوبة غير مدعومة لهذا الإجراء.");
         }
 
         repository.Update(voucher);
@@ -84,7 +101,7 @@ public sealed class SetPaymentVoucherStatusCommandHandler(
         IReadOnlyList<PaymentVoucherLine> lines)
     {
         if (lines.Count == 0)
-            throw new ConflictException("voucher_lines_required", "The voucher must contain at least one line before approval or posting.");
+            throw new ConflictException("voucher_lines_required", "يجب أن يحتوي سند الصرف على سطر واحد على الأقل قبل الاعتماد أو الترحيل.");
 
         // Legacy vouchers are intentionally allowed during the Expand phase.
         if (!voucher.BaseCurrencyId.HasValue)
@@ -102,7 +119,7 @@ public sealed class SetPaymentVoucherStatusCommandHandler(
         {
             throw new ConflictException(
                 "voucher_settlement_line_incomplete",
-                "All settlement lines must contain resolved party, settlement, currency and exchange-rate snapshots.");
+                "يجب استكمال بيانات الطرف والتسوية والعملة وسعر الصرف لجميع أسطر سند الصرف قبل الاعتماد أو الترحيل.");
         }
 
         var expected = lines.Sum(x => x.BaseAmount!.Value);
@@ -110,7 +127,18 @@ public sealed class SetPaymentVoucherStatusCommandHandler(
         {
             throw new ConflictException(
                 "voucher_base_total_mismatch",
-                "Voucher base total does not match the sum of settlement line base amounts.");
+                "إجمالي سند الصرف بالعملة الأساسية لا يطابق مجموع مبالغ الأسطر.");
         }
     }
+    private static bool IsAllowedTransition(
+        DomainPaymentVoucherStatus current,
+        DomainPaymentVoucherStatus target) =>
+        target switch
+        {
+            DomainPaymentVoucherStatus.Approved => current == DomainPaymentVoucherStatus.Draft,
+            DomainPaymentVoucherStatus.Posted => current == DomainPaymentVoucherStatus.Approved,
+            DomainPaymentVoucherStatus.Cancelled => current is DomainPaymentVoucherStatus.Draft or DomainPaymentVoucherStatus.Approved,
+            _ => false
+        };
+
 }

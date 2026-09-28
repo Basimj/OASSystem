@@ -185,18 +185,26 @@ public sealed class PaymentVoucher : AuditableEntity<Guid>
         JournalEntryId = journalEntryId;
     }
 
-    public void Approve()
+    public void Approve() => Approve(_lines);
+
+    public void Approve(IReadOnlyCollection<PaymentVoucherLine> persistedLines)
     {
         if (Status != PaymentVoucherStatus.Draft) throw new InvalidOperationException("Only draft payment vouchers can be approved.");
-        EnsureReadyForPosting();
+        EnsureReadyForPosting(persistedLines);
         Status = PaymentVoucherStatus.Approved;
     }
 
-    public void Post(Guid postedBy, DateTime postedAtUtc)
+    public void Post(Guid postedBy, DateTime postedAtUtc) =>
+        Post(postedBy, postedAtUtc, _lines);
+
+    public void Post(
+        Guid postedBy,
+        DateTime postedAtUtc,
+        IReadOnlyCollection<PaymentVoucherLine> persistedLines)
     {
         if (postedBy == Guid.Empty) throw new ArgumentException("Posted by is required.", nameof(postedBy));
         if (Status != PaymentVoucherStatus.Approved) throw new InvalidOperationException("Only approved payment vouchers can be posted.");
-        EnsureReadyForPosting();
+        EnsureReadyForPosting(persistedLines);
         Status = PaymentVoucherStatus.Posted;
         PostedBy = postedBy;
         PostedAtUtc = postedAtUtc;
@@ -208,13 +216,14 @@ public sealed class PaymentVoucher : AuditableEntity<Guid>
         Status = PaymentVoucherStatus.Cancelled;
     }
 
-    private void EnsureReadyForPosting()
+    private void EnsureReadyForPosting(IReadOnlyCollection<PaymentVoucherLine> persistedLines)
     {
-        if (_lines.Count == 0) throw new InvalidOperationException("A payment voucher must contain at least one line.");
+        ArgumentNullException.ThrowIfNull(persistedLines);
+        if (persistedLines.Count == 0) throw new InvalidOperationException("A payment voucher must contain at least one line.");
         if (BaseCurrencyId.HasValue)
         {
-            if (_lines.Any(x => !x.BaseAmount.HasValue || x.BaseAmount.Value <= 0)) throw new InvalidOperationException("All settlement lines must contain a valid base amount.");
-            var expected = _lines.Sum(x => x.BaseAmount!.Value);
+            if (persistedLines.Any(x => !x.BaseAmount.HasValue || x.BaseAmount.Value <= 0)) throw new InvalidOperationException("All settlement lines must contain a valid base amount.");
+            var expected = persistedLines.Sum(x => x.BaseAmount!.Value);
             if (BaseTotalAmount != expected) throw new InvalidOperationException("Payment voucher base total is inconsistent with its lines.");
         }
     }

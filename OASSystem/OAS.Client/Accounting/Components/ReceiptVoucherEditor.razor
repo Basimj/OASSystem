@@ -73,7 +73,8 @@
                                         CashAccountSearchAsync="CashAccountSearchAsync"
                                         BankAccountSearchAsync="BankAccountSearchAsync"
                                         CurrencySearchAsync="CurrencySearchAsync"
-                                        AccountSearchAsync="AccountSearchAsync"
+                                        CounterpartyAccountSearchAsync="CounterpartyAccountSearchAsync"
+                                        SettlementAccountSearchAsync="SettlementAccountSearchAsync"
                                         EffectiveRateAsync="EffectiveRateAsync"
                                         RateDate="@Model.VoucherDate"
                                         OnLinesChanged="OnChanged" />
@@ -111,7 +112,8 @@
     [Parameter] public Func<Guid?, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CashAccountSearchAsync { get; set; }
     [Parameter] public Func<Guid?, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? BankAccountSearchAsync { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CurrencySearchAsync { get; set; }
-    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? AccountSearchAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CounterpartyAccountSearchAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SettlementAccountSearchAsync { get; set; }
     [Parameter] public Func<Guid, DateOnly, CancellationToken, Task<decimal?>>? EffectiveRateAsync { get; set; }
     [Parameter] public EventCallback OnModelChanged { get; set; }
 

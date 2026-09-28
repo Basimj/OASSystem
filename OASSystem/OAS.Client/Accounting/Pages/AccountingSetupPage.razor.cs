@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
+using OAS.Client.Accounting.Common;
 using OAS.Client.Accounting.Services;
 using OAS.Client.Common.Feedback.Services;
 using OAS.Client.Features.Employees.Services;
@@ -120,6 +121,35 @@ public partial class AccountingSetupPage
         IsBaseCurrency(
             _rateCurrencyId.Value);
 
+    private IReadOnlyList<UiSelectOption> BaseCurrencyOptions =>
+        _currencies
+            .Where(x => x.IsActive)
+            .OrderBy(x => x.Code)
+            .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.NameAr}"))
+            .ToArray();
+
+    private static IReadOnlyList<UiSelectOption> CurrencyDecimalOptions { get; } =
+        Enumerable.Range(0, 7)
+            .Select(x => new UiSelectOption(x.ToString(), x.ToString()))
+            .ToArray();
+
+    private IReadOnlyList<UiSelectOption> RateCurrencyOptions =>
+        _currencies
+            .Where(x => x.IsActive)
+            .OrderBy(x => x.Code)
+            .Select(x => new UiSelectOption(
+                x.Id.ToString("D"),
+                $"{x.Code} - {x.NameAr}{(IsBaseCurrency(x.Id) ? " (العملة الأساسية)" : string.Empty)}"))
+            .ToArray();
+
+    private static IReadOnlyList<UiSelectOption> RateTypeOptions { get; } =
+    [
+        new(((int)ExchangeRateType.Accounting).ToString(), "محاسبي")
+    ];
+
+    private string RateTypeValue =>
+        ((int)_rateType).ToString();
+
 
     // ================================================================
     // الموظفين
@@ -127,14 +157,18 @@ public partial class AccountingSetupPage
 
     private Guid? _employeeToActivateId;
 
+    private IReadOnlyList<UiSelectOption> AvailableEmployeeOptions =>
+        AvailableEmployees
+            .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.EmployeeCode} - {x.DisplayName}"))
+            .ToArray();
+
 
     // ================================================================
     // الحساب المختار لذمم الموظفين
     // ================================================================
 
     private UiLookupItem? EmployeeParentAccountLookupItem =>
-        GetAccountLookupItem(
-            _settingsEmployeeParentAccountId);
+        GetAccountLookupItem(_settingsEmployeeParentAccountId, AccountingAccountEligibilityContext.AssetControlParent);
 
 
     // ================================================================
@@ -142,8 +176,7 @@ public partial class AccountingSetupPage
     // ================================================================
 
     private UiLookupItem? CashParentAccountLookupItem =>
-        GetAccountLookupItem(
-            _settingsCashParentAccountId);
+        GetAccountLookupItem(_settingsCashParentAccountId, AccountingAccountEligibilityContext.AssetControlParent);
 
 
     // ================================================================
@@ -151,203 +184,100 @@ public partial class AccountingSetupPage
     // ================================================================
 
     private UiLookupItem? BankParentAccountLookupItem =>
-        GetAccountLookupItem(
-            _settingsBankParentAccountId);
+        GetAccountLookupItem(_settingsBankParentAccountId, AccountingAccountEligibilityContext.AssetControlParent);
+
+    private UiLookupItem? ExchangeGainAccountLookupItem =>
+        GetAccountLookupItem(_settingsExchangeGainAccountId, AccountingAccountEligibilityContext.ExchangeGain);
+
+    private UiLookupItem? ExchangeLossAccountLookupItem =>
+        GetAccountLookupItem(_settingsExchangeLossAccountId, AccountingAccountEligibilityContext.ExchangeLoss);
 
 
     // ================================================================
-    // البحث في جميع الحسابات
+    // البحث في الحسابات - Server-side + سياق الأهلية
     // ================================================================
 
-    private Task<IReadOnlyList<UiLookupItem>>
-        SearchAllAccountsAsync(
-            string search,
-            CancellationToken cancellationToken)
+    private Task<IReadOnlyList<UiLookupItem>> SearchParentAccountsAsync(
+        string search,
+        CancellationToken cancellationToken) =>
+        SearchAccountsAsync(search, AccountingAccountEligibilityContext.AssetControlParent, cancellationToken);
+
+    private Task<IReadOnlyList<UiLookupItem>> SearchExchangeGainAccountsAsync(
+        string search,
+        CancellationToken cancellationToken) =>
+        SearchAccountsAsync(search, AccountingAccountEligibilityContext.ExchangeGain, cancellationToken);
+
+    private Task<IReadOnlyList<UiLookupItem>> SearchExchangeLossAccountsAsync(
+        string search,
+        CancellationToken cancellationToken) =>
+        SearchAccountsAsync(search, AccountingAccountEligibilityContext.ExchangeLoss, cancellationToken);
+
+    private async Task<IReadOnlyList<UiLookupItem>> SearchAccountsAsync(
+        string search,
+        AccountingAccountEligibilityContext context,
+        CancellationToken cancellationToken)
     {
-        cancellationToken
-            .ThrowIfCancellationRequested();
+        var normalizedSearch = string.IsNullOrWhiteSpace(search) ? null : search.Trim();
+        var matches = new List<AccountDto>();
+        var pageNumber = 1;
 
-        var query =
-            search?.Trim() ??
-            string.Empty;
-
-        IEnumerable<AccountDto> accounts =
-            _accounts;
-
-
-        if (!string.IsNullOrWhiteSpace(query))
+        while (true)
         {
-            accounts =
-                accounts.Where(
-                    account =>
-                        account.Code.Contains(
-                            query,
-                            StringComparison.OrdinalIgnoreCase)
-                        ||
-                        account.NameAr.Contains(
-                            query,
-                            StringComparison.OrdinalIgnoreCase)
-                        ||
-                        (
-                            !string.IsNullOrWhiteSpace(
-                                account.NameEn)
-                            &&
-                            account.NameEn.Contains(
-                                query,
-                                StringComparison.OrdinalIgnoreCase)
-                        ));
+            var page = await Accounting.GetAccountsPageAsync(
+                new PageRequest
+                {
+                    PageNumber = pageNumber,
+                    PageSize = PageRequest.MaximumPageSize,
+                    Search = normalizedSearch,
+                    SortBy = "Code",
+                    SortDirection = SortDirection.Ascending
+                },
+                cancellationToken);
+
+            matches.AddRange(page.Items);
+
+            if (normalizedSearch is null || !page.HasNextPage)
+                break;
+
+            pageNumber++;
         }
 
+        foreach (var account in matches)
+        {
+            var index = _accounts.FindIndex(x => x.Id == account.Id);
+            if (index >= 0) _accounts[index] = account;
+            else _accounts.Add(account);
+        }
 
-        IReadOnlyList<UiLookupItem> result =
-            accounts
-                .OrderBy(x => x.Code)
-                .Select(
-                    CreateAccountLookupItem)
-                .ToArray();
-
-
-        return Task.FromResult(
-            result);
+        return matches
+            .Select(x => AccountingLookupEligibility.ToAccountLookup(x, context))
+            .ToArray();
     }
-
 
     // ================================================================
     // الحصول على الحساب المحدد
     // ================================================================
 
-    private UiLookupItem?
-        GetAccountLookupItem(
-            Guid? accountId)
+    private UiLookupItem? GetAccountLookupItem(
+        Guid? accountId,
+        AccountingAccountEligibilityContext context)
     {
-        if (!accountId.HasValue)
-        {
-            return null;
-        }
+        if (!accountId.HasValue) return null;
 
-
-        var account =
-            _accounts.FirstOrDefault(
-                x =>
-                    x.Id ==
-                    accountId.Value);
-
-
-        if (account is null)
-        {
-            return null;
-        }
-
-
-        return CreateAccountLookupItem(
-            account);
+        var account = _accounts.FirstOrDefault(x => x.Id == accountId.Value);
+        return account is null
+            ? null
+            : AccountingLookupEligibility.ToAccountLookup(account, context);
     }
-
 
     // ================================================================
     // تحويل الحساب إلى عنصر Lookup
     // ================================================================
 
-    private static UiLookupItem
-        CreateAccountLookupItem(
-            AccountDto account)
-    {
-        var eligible =
-            IsEligibleParentAccount(
-                account);
-
-
-        var eligibilityText =
-            eligible
-                ? "مؤهل كحساب رئيسي"
-                : GetParentAccountEligibilityMessage(
-                    account);
-
-
-        var secondary =
-            !string.IsNullOrWhiteSpace(
-                account.NameEn)
-                ? $"{account.NameEn} • {eligibilityText}"
-                : eligibilityText;
-
-
-        return new UiLookupItem(
-            account.Id.ToString("D"),
-            $"{account.Code} - {account.NameAr}",
-            secondary,
-            GetAccountIcon(account),
-            Disabled: !eligible);
-    }
-
-
-    // ================================================================
-    // شروط أهلية الحساب الرئيسي
-    // ================================================================
-
-    private static bool
-        IsEligibleParentAccount(
-            AccountDto account)
-    {
-        return
-            account.IsActive
-            &&
-            account.IsControlAccount
-            &&
-            account.AccountType ==
-            AccountType.Control
-            &&
-            account.AccountClass ==
-            AccountClass.Asset
-            &&
-            account.NormalBalance ==
-            NormalBalance.Debit;
-    }
-
-
-    // ================================================================
-    // سبب عدم أهلية الحساب
-    // ================================================================
-
-    private static string
-        GetParentAccountEligibilityMessage(
-            AccountDto account)
-    {
-        if (!account.IsActive)
-        {
-            return "غير نشط";
-        }
-
-
-        if (account.AccountClass !=
-            AccountClass.Asset)
-        {
-            return "ليس من حسابات الأصول";
-        }
-
-
-        if (account.NormalBalance !=
-            NormalBalance.Debit)
-        {
-            return "طبيعته ليست مدينة";
-        }
-
-
-        if (account.AccountType !=
-            AccountType.Control)
-        {
-            return "ليس من نوع حساب تحكم";
-        }
-
-
-        if (!account.IsControlAccount)
-        {
-            return "غير معرف كحساب تحكم";
-        }
-
-
-        return "غير مؤهل";
-    }
-
+    private static UiLookupItem CreateAccountLookupItem(
+        AccountDto account,
+        AccountingAccountEligibilityContext context) =>
+        AccountingLookupEligibility.ToAccountLookup(account, context);
 
     // ================================================================
     // أيقونة الحساب
@@ -389,6 +319,42 @@ public partial class AccountingSetupPage
             .ToString("D");
     }
 
+
+    private Task SetBaseCurrency(string? value)
+    {
+        _settingsBaseCurrencyId = ParseNullableGuid(value);
+        return Task.CompletedTask;
+    }
+
+    private Task SetCurrencyDecimalPlaces(string? value)
+    {
+        if (int.TryParse(value, out var parsed) && parsed is >= 0 and <= 6)
+            _currencyDecimalPlaces = parsed;
+        return Task.CompletedTask;
+    }
+
+    private Task SetRateCurrency(string? value)
+    {
+        _rateCurrencyId = ParseNullableGuid(value);
+        OnRateCurrencyChanged();
+        return Task.CompletedTask;
+    }
+
+    private Task SetRateType(string? value)
+    {
+        if (int.TryParse(value, out var parsed) &&
+            Enum.IsDefined(typeof(ExchangeRateType), parsed))
+        {
+            _rateType = (ExchangeRateType)parsed;
+        }
+        return Task.CompletedTask;
+    }
+
+    private Task SetEmployeeToActivate(string? value)
+    {
+        _employeeToActivateId = ParseNullableGuid(value);
+        return Task.CompletedTask;
+    }
 
     // ================================================================
     // اختيار حساب ذمم الموظفين
@@ -438,6 +404,18 @@ public partial class AccountingSetupPage
     }
 
 
+    private Task SetExchangeGainAccount(string? value)
+    {
+        _settingsExchangeGainAccountId = ParseNullableGuid(value);
+        return Task.CompletedTask;
+    }
+
+    private Task SetExchangeLossAccount(string? value)
+    {
+        _settingsExchangeLossAccountId = ParseNullableGuid(value);
+        return Task.CompletedTask;
+    }
+
     // ================================================================
     // تحويل النص إلى Guid
     // ================================================================
@@ -452,21 +430,6 @@ public partial class AccountingSetupPage
                 ? id
                 : null;
     }
-
-
-    // ================================================================
-    // حسابات الترحيل
-    // ================================================================
-
-    private IEnumerable<AccountDto>
-        PostingAccountOptions =>
-            _accounts
-                .Where(
-                    x =>
-                        x.IsActive &&
-                        x.IsPostingAccount)
-                .OrderBy(
-                    x => x.Code);
 
 
     // ================================================================
@@ -527,27 +490,17 @@ public partial class AccountingSetupPage
         try
         {
             var currencies =
-                await Accounting
-                    .GetCurrenciesPageAsync(
-                        new PageRequest
-                        {
-                            PageNumber = 1,
-                            PageSize = 500,
-                            SortBy = "Code"
-                        });
+                await LoadAllPagesAsync<CurrencyDto>(
+                    request => Accounting.GetCurrenciesPageAsync(request),
+                    "Code",
+                    SortDirection.Ascending);
 
 
             var rates =
-                await Accounting
-                    .GetExchangeRatesPageAsync(
-                        new PageRequest
-                        {
-                            PageNumber = 1,
-                            PageSize = 500,
-                            SortBy = "RateDate",
-                            SortDirection =
-                                SortDirection.Descending
-                        });
+                await LoadAllPagesAsync<ExchangeRateDto>(
+                    request => Accounting.GetExchangeRatesPageAsync(request),
+                    "RateDate",
+                    SortDirection.Descending);
 
 
             /*
@@ -560,48 +513,31 @@ public partial class AccountingSetupPage
 
 
             var employees =
-                await Employees
-                    .GetPageAsync(
-                        new PageRequest
-                        {
-                            PageNumber = 1,
-                            PageSize = 1000,
-                            SortBy = "EmployeeCode"
-                        });
+                await LoadAllPagesAsync<EmployeeDto>(
+                    request => Employees.GetPageAsync(request),
+                    "EmployeeCode",
+                    SortDirection.Ascending);
 
 
             var employeeAccounts =
-                await Accounting
-                    .GetEmployeeAccountsPageAsync(
-                        new PageRequest
-                        {
-                            PageNumber = 1,
-                            PageSize = 1000
-                        });
+                await LoadAllPagesAsync<EmployeeAccountDto>(
+                    request => Accounting.GetEmployeeAccountsPageAsync(request));
 
 
-            _currencies =
-                currencies.Items
-                    .ToList();
+            _currencies = currencies;
 
 
-            _rates =
-                rates.Items
-                    .ToList();
+            _rates = rates;
 
 
             _accounts =
                 accounts;
 
 
-            _employees =
-                employees.Items
-                    .ToList();
+            _employees = employees;
 
 
-            _employeeAccounts =
-                employeeAccounts.Items
-                    .ToList();
+            _employeeAccounts = employeeAccounts;
 
 
             _settings =
@@ -614,8 +550,7 @@ public partial class AccountingSetupPage
         }
         catch (ApiClientException ex)
         {
-            ApiFeedback.Show(
-                ex.Error);
+            ShowAccountingError(ex.Error);
         }
         catch
         {
@@ -625,6 +560,34 @@ public partial class AccountingSetupPage
         finally
         {
             _busy = false;
+        }
+    }
+
+
+    private static async Task<List<T>> LoadAllPagesAsync<T>(
+        Func<PageRequest, Task<PagedResult<T>>> loader,
+        string? sortBy = null,
+        SortDirection sortDirection = SortDirection.Ascending)
+    {
+        var result = new List<T>();
+        var pageNumber = 1;
+
+        while (true)
+        {
+            var page = await loader(
+                new PageRequest
+                {
+                    PageNumber = pageNumber,
+                    PageSize = PageRequest.MaximumPageSize,
+                    SortBy = sortBy,
+                    SortDirection = sortDirection
+                });
+
+            result.AddRange(page.Items);
+            if (!page.HasNextPage)
+                return result;
+
+            pageNumber++;
         }
     }
 
@@ -740,6 +703,46 @@ public partial class AccountingSetupPage
                 }
 
 
+                if (!await ValidateSettingsAccountAsync(
+                        _settingsEmployeeParentAccountId,
+                        AccountingAccountEligibilityContext.AssetControlParent,
+                        "الحساب الرئيسي لذمم الموظفين"))
+                {
+                    return;
+                }
+
+                if (!await ValidateSettingsAccountAsync(
+                        _settingsCashParentAccountId,
+                        AccountingAccountEligibilityContext.AssetControlParent,
+                        "الحساب الرئيسي للصناديق"))
+                {
+                    return;
+                }
+
+                if (!await ValidateSettingsAccountAsync(
+                        _settingsBankParentAccountId,
+                        AccountingAccountEligibilityContext.AssetControlParent,
+                        "الحساب الرئيسي للبنوك"))
+                {
+                    return;
+                }
+
+                if (!await ValidateSettingsAccountAsync(
+                        _settingsExchangeGainAccountId,
+                        AccountingAccountEligibilityContext.ExchangeGain,
+                        "حساب أرباح فروق العملة"))
+                {
+                    return;
+                }
+
+                if (!await ValidateSettingsAccountAsync(
+                        _settingsExchangeLossAccountId,
+                        AccountingAccountEligibilityContext.ExchangeLoss,
+                        "حساب خسائر فروق العملة"))
+                {
+                    return;
+                }
+
                 var updated =
                     await Accounting
                         .UpdateAccountingSettingsAsync(
@@ -785,6 +788,40 @@ public partial class AccountingSetupPage
                 Snackbar.Success(
                     "تم حفظ إعدادات المحاسبة.");
             });
+    }
+
+
+    private async Task<bool> ValidateSettingsAccountAsync(
+        Guid? accountId,
+        AccountingAccountEligibilityContext context,
+        string fieldLabel)
+    {
+        if (!accountId.HasValue)
+        {
+            return true;
+        }
+
+        var account = await Accounting.GetAccountByIdAsync(accountId.Value);
+        if (account is null)
+        {
+            Snackbar.Warning($"{fieldLabel}: الحساب المحدد لم يعد موجودًا.");
+            return false;
+        }
+
+        var index = _accounts.FindIndex(x => x.Id == account.Id);
+        if (index >= 0) _accounts[index] = account;
+        else _accounts.Add(account);
+
+        var eligibility = AccountingAccountEligibility.Evaluate(account, context);
+        if (eligibility.IsEligible)
+        {
+            return true;
+        }
+
+        Snackbar.Warning(
+            $"{fieldLabel}: {eligibility.Reason ?? "الحساب المحدد غير صالح لهذه العملية."}");
+
+        return false;
     }
 
 
@@ -1296,6 +1333,25 @@ public partial class AccountingSetupPage
                 }
 
 
+                var settings =
+                    await Accounting
+                        .GetAccountingSettingsAsync();
+
+                if (settings?.EmployeeParentAccountId is null)
+                {
+                    Snackbar.Warning(
+                        "يجب تحديد الحساب الرئيسي لذمم الموظفين في إعدادات المحاسبة أولاً.");
+                    return;
+                }
+
+                if (!await ValidateSettingsAccountAsync(
+                        settings.EmployeeParentAccountId,
+                        AccountingAccountEligibilityContext.AssetControlParent,
+                        "الحساب الرئيسي لذمم الموظفين"))
+                {
+                    return;
+                }
+
                 var result =
                     await Accounting
                         .ActivateEmployeeAccountAsync(
@@ -1369,38 +1425,18 @@ public partial class AccountingSetupPage
     private async Task
         ReloadReferenceListsAsync()
     {
-        var currencies =
-            await Accounting
-                .GetCurrenciesPageAsync(
-                    new PageRequest
-                    {
-                        PageNumber = 1,
-                        PageSize = 500,
-                        SortBy = "Code"
-                    });
-
-
-        var rates =
-            await Accounting
-                .GetExchangeRatesPageAsync(
-                    new PageRequest
-                    {
-                        PageNumber = 1,
-                        PageSize = 500,
-                        SortBy = "RateDate",
-                        SortDirection =
-                            SortDirection.Descending
-                    });
-
-
         _currencies =
-            currencies.Items
-                .ToList();
+            await LoadAllPagesAsync<CurrencyDto>(
+                request => Accounting.GetCurrenciesPageAsync(request),
+                "Code",
+                SortDirection.Ascending);
 
 
         _rates =
-            rates.Items
-                .ToList();
+            await LoadAllPagesAsync<ExchangeRateDto>(
+                request => Accounting.GetExchangeRatesPageAsync(request),
+                "RateDate",
+                SortDirection.Descending);
     }
 
 
@@ -1411,19 +1447,9 @@ public partial class AccountingSetupPage
     private async Task
         ReloadEmployeeAccountsAsync()
     {
-        var page =
-            await Accounting
-                .GetEmployeeAccountsPageAsync(
-                    new PageRequest
-                    {
-                        PageNumber = 1,
-                        PageSize = 1000
-                    });
-
-
         _employeeAccounts =
-            page.Items
-                .ToList();
+            await LoadAllPagesAsync<EmployeeAccountDto>(
+                request => Accounting.GetEmployeeAccountsPageAsync(request));
     }
 
 
@@ -1450,8 +1476,7 @@ public partial class AccountingSetupPage
         }
         catch (ApiClientException ex)
         {
-            ApiFeedback.Show(
-                ex.Error);
+            ShowAccountingError(ex.Error);
         }
         catch
         {
@@ -1478,4 +1503,16 @@ public partial class AccountingSetupPage
                 ? null
                 : value.Trim();
     }
+
+    private void ShowAccountingError(OAS.Contracts.Common.Errors.ApiError error)
+    {
+        if (AccountingApiErrorPresenter.TryGetMessage(error, out var message))
+        {
+            Snackbar.Error(message);
+            return;
+        }
+
+        ApiFeedback.Show(error);
+    }
+
 }

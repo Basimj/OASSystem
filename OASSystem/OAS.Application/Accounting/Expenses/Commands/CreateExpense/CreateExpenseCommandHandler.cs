@@ -11,12 +11,15 @@ namespace OAS.Application.Accounting.Expenses.Commands.CreateExpense;
 
 public sealed class CreateExpenseCommandHandler(
     IRepository<Expense, Guid> repository,
+    IReadRepository<Account, Guid> accountRepository,
     ISequenceNumberGenerator sequenceNumberGenerator)
     : IRequestHandler<CreateExpenseCommand, Guid>
 {
     public async Task<Guid> Handle(CreateExpenseCommand request, CancellationToken cancellationToken)
     {
         var data = request.Data;
+        await EnsurePostingAccountAsync(data.ExpenseAccountId, cancellationToken);
+
         var expenseNumber = await ResolveNumberAsync(data.ExpenseNumber, data.ExpenseDate.Year, cancellationToken);
         var expense = Expense.Create(Guid.NewGuid(), expenseNumber, data.ExpenseDate, data.ExpenseTypeId,
             data.ExpenseAccountId, data.Beneficiary, data.Amount, (DomainPaymentMethod)(int)data.PaymentMethod,
@@ -43,4 +46,18 @@ public sealed class CreateExpenseCommandHandler(
         return number;
     }
     private async Task<bool> ExistsAsync(string number,CancellationToken ct)=>await repository.CountAsync(new Specification<Expense>().Where(x=>x.ExpenseNumber==number),ct)>0;
+    private async Task EnsurePostingAccountAsync(Guid accountId, CancellationToken cancellationToken)
+    {
+        var account = await accountRepository.GetByIdAsync(accountId, cancellationToken);
+        if (account is null)
+            throw new NotFoundException(nameof(Account), accountId);
+
+        if (!account.CanReceivePosting())
+        {
+            throw new ConflictException(
+                "expense_account_invalid",
+                $"الحساب {account.Code} - {account.NameAr} غير صالح كحساب مصروف للترحيل.");
+        }
+    }
+
 }

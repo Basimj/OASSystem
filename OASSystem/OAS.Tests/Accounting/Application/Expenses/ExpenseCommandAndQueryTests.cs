@@ -4,12 +4,16 @@ using OAS.Application.Accounting.Expenses.Commands.CreateExpense;
 using OAS.Application.Accounting.Expenses.Commands.SetExpenseStatus;
 using OAS.Application.Accounting.Expenses.Mapping;
 using OAS.Application.Accounting.Expenses.Queries.GetExpenseById;
+using OAS.Application.Common.Exceptions;
 using OAS.Contracts.Accounting.Enums;
 using OAS.Contracts.Accounting.Expenses;
 using OAS.Domain.Accounting.Entities;
 using OAS.Tests.Accounting.Application.Common;
 using DomainExpenseStatus = OAS.Domain.Accounting.Enums.ExpenseStatus;
 using DomainPaymentMethod = OAS.Domain.Accounting.Enums.PaymentMethod;
+using DomainAccountClass = OAS.Domain.Accounting.Enums.AccountClass;
+using DomainAccountType = OAS.Domain.Accounting.Enums.AccountType;
+using DomainNormalBalance = OAS.Domain.Accounting.Enums.NormalBalance;
 
 namespace OAS.Tests.Accounting.Application.Expenses;
 
@@ -17,6 +21,7 @@ namespace OAS.Tests.Accounting.Application.Expenses;
 public class ExpenseCommandAndQueryTests
 {
     private FakeRepository<Expense, Guid> _repository = null!;
+    private FakeRepository<Account, Guid> _accountRepository = null!;
     private FakeCurrentUser _currentUser = null!;
     private FakePermissionChecker _permissionChecker = null!;
     private FakeSequenceNumberGenerator _sequenceGenerator = null!;
@@ -31,6 +36,7 @@ public class ExpenseCommandAndQueryTests
     public void Setup()
     {
         _repository = new FakeRepository<Expense, Guid>();
+        _accountRepository = new FakeRepository<Account, Guid>();
         _currentUser = new FakeCurrentUser();
         _permissionChecker = new FakePermissionChecker();
         _sequenceGenerator = new FakeSequenceNumberGenerator();
@@ -40,6 +46,23 @@ public class ExpenseCommandAndQueryTests
         _expenseTypeId = Guid.NewGuid();
         _expenseAccountId = Guid.NewGuid();
         _cashAccountId = Guid.NewGuid();
+
+        _accountRepository.AddAsync(Account.Create(
+            _expenseAccountId,
+            "510100",
+            "مصروفات تشغيلية",
+            null,
+            null,
+            1,
+            DomainAccountClass.Expense,
+            DomainAccountType.Posting,
+            DomainNormalBalance.Debit,
+            isPostingAccount: true,
+            isControlAccount: false,
+            allowManualPosting: true,
+            isSystemAccount: false,
+            isActive: true,
+            effectiveDate: null)).GetAwaiter().GetResult();
     }
 
     [Test]
@@ -47,6 +70,7 @@ public class ExpenseCommandAndQueryTests
     {
         var handler = new CreateExpenseCommandHandler(
             _repository,
+            _accountRepository,
             _sequenceGenerator);
 
         var request = new CreateExpenseRequest(
@@ -87,6 +111,47 @@ public class ExpenseCommandAndQueryTests
         Assert.That(
             saved.Status,
             Is.EqualTo(DomainExpenseStatus.Draft));
+    }
+
+    [Test]
+    public void CreateExpenseCommandHandler_RejectsInvalidExpenseAccount()
+    {
+        var invalidId = Guid.NewGuid();
+        _accountRepository.AddAsync(Account.Create(
+            invalidId,
+            "5000",
+            "رئيسي المصروفات",
+            null,
+            null,
+            1,
+            DomainAccountClass.Expense,
+            DomainAccountType.Header,
+            DomainNormalBalance.Debit,
+            isPostingAccount: false,
+            isControlAccount: false,
+            allowManualPosting: false,
+            isSystemAccount: false,
+            isActive: true,
+            effectiveDate: null)).GetAwaiter().GetResult();
+
+        var handler = new CreateExpenseCommandHandler(
+            _repository,
+            _accountRepository,
+            _sequenceGenerator);
+
+        var request = new CreateExpenseRequest(
+            ExpenseDate: new DateOnly(2026, 1, 20),
+            ExpenseTypeId: _expenseTypeId,
+            ExpenseAccountId: invalidId,
+            Beneficiary: "اختبار",
+            Amount: 100m,
+            PaymentMethod: PaymentMethod.Cash,
+            CashAccountId: _cashAccountId,
+            BankAccountId: null,
+            Description: null);
+
+        Assert.ThrowsAsync<ConflictException>(async () =>
+            await handler.Handle(new CreateExpenseCommand(request), CancellationToken.None));
     }
 
     [Test]

@@ -8,6 +8,7 @@ namespace OAS.Application.Accounting.Expenses.ExpenseTypes.Commands.UpdateExpens
 
 public sealed class UpdateExpenseTypeCommandHandler(
     IRepository<ExpenseType, Guid> repository,
+    IReadRepository<Account, Guid> accountRepository,
     ExpenseTypeMapper mapper)
     : IRequestHandler<UpdateExpenseTypeCommand, ExpenseType>
 {
@@ -25,13 +26,24 @@ public sealed class UpdateExpenseTypeCommandHandler(
         {
             throw new ConflictException(
                 "accounting_expense_type_code_immutable",
-                "The expense type code cannot be changed after creation.");
+                "لا يمكن تغيير كود نوع المصروف بعد الإنشاء.");
         }
 
         var requestedRowVersion = Convert.FromBase64String(request.Data.RowVersion);
         if (!entity.RowVersion.SequenceEqual(requestedRowVersion))
         {
-            throw new ConcurrencyException("The expense type has been modified by another user.");
+            throw new ConcurrencyException("تم تعديل نوع المصروف بواسطة مستخدم آخر. أعد تحميله ثم حاول مرة أخرى.");
+        }
+
+        if (request.Data.DefaultExpenseAccountId.HasValue)
+        {
+            var account = await accountRepository.GetByIdAsync(request.Data.DefaultExpenseAccountId.Value, cancellationToken);
+            if (account is null)
+                throw new NotFoundException(nameof(Account), request.Data.DefaultExpenseAccountId.Value);
+            if (!account.CanReceivePosting())
+                throw new ConflictException(
+                    "default_expense_account_invalid",
+                    $"الحساب {account.Code} - {account.NameAr} غير صالح كحساب مصروف افتراضي.");
         }
 
         mapper.Update(request.Data, entity);

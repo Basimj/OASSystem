@@ -167,7 +167,7 @@ public partial class AccountingWorkspaceHost
         }
         catch (ApiClientException ex)
         {
-            ApiFeedback.Show(ex.Error);
+            ShowAccountingError(ex.Error);
         }
         catch
         {

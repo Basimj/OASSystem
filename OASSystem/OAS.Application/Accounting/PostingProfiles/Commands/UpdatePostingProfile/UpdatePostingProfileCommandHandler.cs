@@ -10,6 +10,7 @@ namespace OAS.Application.Accounting.PostingProfiles.Commands.UpdatePostingProfi
 public sealed class UpdatePostingProfileCommandHandler(
     IRepository<PostingProfile, Guid> repository,
     IRepository<PostingProfileLine, Guid> lineRepository,
+    IReadRepository<Account, Guid> accountRepository,
     PostingProfileMapper mapper)
     : IRequestHandler<UpdatePostingProfileCommand, PostingProfile>
 {
@@ -25,12 +26,14 @@ public sealed class UpdatePostingProfileCommandHandler(
         {
             throw new ConflictException(
                 "accounting_posting_profile_code_immutable",
-                "The posting profile code cannot be changed after creation.");
+                "لا يمكن تغيير كود ملف الترحيل بعد الإنشاء.");
         }
 
         var requestedRowVersion = Convert.FromBase64String(request.Data.RowVersion);
         if (!entity.RowVersion.SequenceEqual(requestedRowVersion))
-            throw new ConcurrencyException("The posting profile has been modified by another user.");
+            throw new ConcurrencyException("تم تعديل ملف الترحيل بواسطة مستخدم آخر. أعد تحميله ثم حاول مرة أخرى.");
+
+        await ValidateAccountsAsync(request.Data.Lines.Select(x => x.AccountId), cancellationToken);
 
         mapper.Update(request.Data, entity);
 
@@ -54,5 +57,24 @@ public sealed class UpdatePostingProfileCommandHandler(
 
         repository.Update(entity);
         return entity;
+    }
+
+    private async Task ValidateAccountsAsync(
+        IEnumerable<Guid> accountIds,
+        CancellationToken cancellationToken)
+    {
+        foreach (var accountId in accountIds.Distinct())
+        {
+            var account = await accountRepository.GetByIdAsync(accountId, cancellationToken);
+            if (account is null)
+                throw new NotFoundException(nameof(Account), accountId);
+
+            if (!account.CanReceivePosting())
+            {
+                throw new ConflictException(
+                    "posting_profile_account_invalid",
+                    $"الحساب {account.Code} - {account.NameAr} غير صالح للاستخدام في ملف الترحيل.");
+            }
+        }
     }
 }

@@ -14,15 +14,18 @@
         <UiAccountingFormSection Title="حالة القيد"
                                  Subtitle="حالة دورة الاعتماد والترحيل وعلاقة القيد العكسي"
                                  IconCssClass="fa-solid fa-circle-check">
+
             <UiAccountingStatusActionBar Label="الحالة الحالية"
                                          StatusText="@AccountingArabicPresenter.GetJournalStatusText(Model.Status)"
                                          StatusState="@Model.Status.ToString().ToLowerInvariant()" />
+
             @if (Model.ReversedJournalId.HasValue)
             {
                 <UiAccountingReadOnlyValue Label="القيد المرتبط بالعكس"
-                                           Value='@Model.ReversedJournalId.Value.ToString("D")'
+                                           Value="@ReversedJournalCodeText"
                                            Tone="@UiAccountingReadOnlyValue.ValueTone.Primary" />
             }
+
         </UiAccountingFormSection>
     }
 
@@ -91,18 +94,32 @@
     </UiAccountingFormSection>
 
 
-    @if (!IsNew && (!string.IsNullOrWhiteSpace(Model.SourceModule) || !string.IsNullOrWhiteSpace(Model.SourceDocumentType) || Model.SourceDocumentId.HasValue))
+    @if (!IsNew &&
+        (!string.IsNullOrWhiteSpace(Model.SourceModule) ||
+        !string.IsNullOrWhiteSpace(Model.SourceDocumentType) ||
+        Model.SourceDocumentId.HasValue))
     {
         <UiAccountingFormSection Title="مرجع العملية المصدر"
                                  Subtitle="بيانات الربط بالمستند الذي أنشأ القيد تلقائياً"
                                  IconCssClass="fa-solid fa-link">
+
             <UiAccountingFormGrid Columns="3">
-                <UiAccountingReadOnlyValue Label="الوحدة المصدر" Value="@SourceModuleText" />
-                <UiAccountingReadOnlyValue Label="نوع المستند" Value="@SourceDocumentTypeText" />
-                <UiAccountingReadOnlyValue Label="معرف المستند" Value="@SourceDocumentIdText" Tone="@UiAccountingReadOnlyValue.ValueTone.Primary" />
+
+                <UiAccountingReadOnlyValue Label="الوحدة المصدر"
+                                           Value="@SourceModuleText" />
+
+                <UiAccountingReadOnlyValue Label="نوع المستند"
+                                           Value="@SourceDocumentTypeText" />
+
+                <UiAccountingReadOnlyValue Label="رقم المستند"
+                                           Value="@SourceDocumentCodeText"
+                                           Tone="@UiAccountingReadOnlyValue.ValueTone.Primary" />
+
             </UiAccountingFormGrid>
+
         </UiAccountingFormSection>
     }
+
 
     <UiAccountingFormSection Title="أسطر القيد اليومي (الحسابات والمدين والدائن)"
                              Subtitle="إدخال الحسابات المحاسبية ومراكز التكلفة والمبالغ المتوازنة"
@@ -129,10 +146,11 @@
 
     public sealed class FormModel
     {
-        public string JournalNumber { get; set; } = string.Empty;
+        public string JournalNumber { get; set; } =
+            string.Empty;
 
-        public JournalType JournalType { get; set; }
-            = JournalType.Manual;
+        public JournalType JournalType { get; set; } =
+            JournalType.Manual;
 
         public string JournalTypeValue
         {
@@ -149,8 +167,8 @@
             }
         }
 
-        public DateOnly PostingDate { get; set; }
-            = DateOnly.FromDateTime(DateTime.Today);
+        public DateOnly PostingDate { get; set; } =
+            DateOnly.FromDateTime(DateTime.Today);
 
         public DateOnly? PostingDateInput
         {
@@ -165,8 +183,8 @@
             }
         }
 
-        public DateOnly DocumentDate { get; set; }
-            = DateOnly.FromDateTime(DateTime.Today);
+        public DateOnly DocumentDate { get; set; } =
+            DateOnly.FromDateTime(DateTime.Today);
 
         public DateOnly? DocumentDateInput
         {
@@ -183,28 +201,54 @@
 
         public Guid? FiscalPeriodId { get; set; }
 
-        public string Description { get; set; }
-            = string.Empty;
+        public string Description { get; set; } =
+            string.Empty;
 
-        // Preserve source references when editing an automatic/source journal.
+        /*
+         * هذه البيانات تبقى كما هي داخلياً.
+         * لكن SourceDocumentId لا يظهر للمستخدم.
+         */
         public string? SourceModule { get; set; }
+
         public string? SourceDocumentType { get; set; }
+
         public Guid? SourceDocumentId { get; set; }
 
-        public JournalEntryStatus Status { get; set; }
-            = JournalEntryStatus.Draft;
+        /*
+         * رقم المستند المعروض للمستخدم.
+         *
+         * مثال:
+         * EXP-000001
+         * RV-000001
+         * PV-000001
+         * JV-000001
+         */
+        public string? SourceDocumentCode { get; set; }
+
+        public JournalEntryStatus Status { get; set; } =
+            JournalEntryStatus.Draft;
 
         public Guid? ReversedJournalId { get; set; }
 
-        public string RowVersion { get; set; } = string.Empty;
+        /*
+         * رقم القيد المرتبط بالعكس.
+         * لا نعرض ReversedJournalId.
+         */
+        public string? ReversedJournalCode { get; set; }
 
-        public List<UiJournalLinesEditor.EditableJournalLine> Lines { get; set; }
-            = [];
+        public string RowVersion { get; set; } =
+            string.Empty;
+
+        public List<UiJournalLinesEditor.EditableJournalLine>
+            Lines
+        { get; set; } =
+            [];
     }
 
 
     [Parameter]
-    public FormModel Model { get; set; } = new();
+    public FormModel Model { get; set; } =
+        new();
 
 
     [Parameter]
@@ -225,7 +269,10 @@
         CancellationToken,
         Task<IReadOnlyList<UiLookupItem>>>?
         FiscalPeriodSearchAsync
-    { get; set; }
+    {
+        get;
+        set;
+    }
 
 
     [Parameter]
@@ -234,7 +281,10 @@
         CancellationToken,
         Task<IReadOnlyList<UiLookupItem>>>?
         AccountSearchAsync
-    { get; set; }
+    {
+        get;
+        set;
+    }
 
 
     [Parameter]
@@ -243,7 +293,10 @@
         CancellationToken,
         Task<IReadOnlyList<UiLookupItem>>>?
         CostCenterSearchAsync
-    { get; set; }
+    {
+        get;
+        set;
+    }
 
 
     [Parameter]
@@ -252,7 +305,10 @@
         CancellationToken,
         Task<IReadOnlyList<UiLookupItem>>>?
         CustomerSearchAsync
-    { get; set; }
+    {
+        get;
+        set;
+    }
 
 
     [Parameter]
@@ -261,9 +317,10 @@
         CancellationToken,
         Task<IReadOnlyList<UiLookupItem>>>?
         SupplierSearchAsync
-    { get; set; }
-
-
+    {
+        get;
+        set;
+    }
 
 
     [Parameter]
@@ -272,7 +329,10 @@
         CancellationToken,
         Task<IReadOnlyList<UiLookupItem>>>?
         EmployeeSearchAsync
-    { get; set; }
+    {
+        get;
+        set;
+    }
 
 
     [Parameter]
@@ -281,7 +341,10 @@
         CancellationToken,
         Task<IReadOnlyList<UiLookupItem>>>?
         CurrencySearchAsync
-    { get; set; }
+    {
+        get;
+        set;
+    }
 
 
     [Parameter]
@@ -291,21 +354,120 @@
         CancellationToken,
         Task<decimal?>>?
         EffectiveRateAsync
-    { get; set; }
+    {
+        get;
+        set;
+    }
+
 
     [Parameter]
     public EventCallback OnModelChanged { get; set; }
 
 
-    private string SourceModuleText => Model.SourceModule ?? "-";
-    private string SourceDocumentTypeText => Model.SourceDocumentType ?? "-";
-    private string SourceDocumentIdText => Model.SourceDocumentId?.ToString("D") ?? "-";
+    private string SourceModuleText =>
+        Model.SourceModule?.Trim() switch
+        {
+            "Accounting" =>
+                "المحاسبة",
+
+            "Sales" =>
+                "المبيعات",
+
+            "Purchasing" =>
+                "المشتريات",
+
+            "Inventory" =>
+                "المخزون",
+
+            "Employees" =>
+                "الموظفون",
+
+            "Customers" =>
+                "العملاء",
+
+            "Suppliers" =>
+                "الموردون",
+
+            null or "" =>
+                "-",
+
+            _ =>
+                "وحدة أخرى"
+        };
+
+
+    private string SourceDocumentTypeText =>
+        Model.SourceDocumentType?.Trim() switch
+        {
+            "Expense" =>
+                "مصروف",
+
+            "ReceiptVoucher" =>
+                "سند قبض",
+
+            "PaymentVoucher" =>
+                "سند صرف",
+
+            "JournalEntry" =>
+                "قيد يومية",
+
+            "JournalEntryReversal" =>
+                "قيد عكسي",
+
+            "SalesInvoice" =>
+                "فاتورة مبيعات",
+
+            "PurchaseInvoice" =>
+                "فاتورة مشتريات",
+
+            "DebitAdjustment" =>
+                "إشعار مدين",
+
+            "CreditAdjustment" =>
+                "إشعار دائن",
+
+            "StockCount" =>
+                "جرد مخزون",
+
+            "InventoryTransaction" =>
+                "حركة مخزون",
+
+            "CashShift" =>
+                "وردية صندوق",
+
+            null or "" =>
+                "-",
+
+            _ =>
+                "مستند آخر"
+        };
+
+
+    /*
+     * لا يوجد fallback إلى GUID.
+     */
+    private string SourceDocumentCodeText =>
+        string.IsNullOrWhiteSpace(
+            Model.SourceDocumentCode)
+                ? "غير متاح"
+                : Model.SourceDocumentCode;
+
+
+    private string ReversedJournalCodeText =>
+        string.IsNullOrWhiteSpace(
+            Model.ReversedJournalCode)
+                ? "غير متاح"
+                : Model.ReversedJournalCode;
+
 
     private Task OnChanged()
-        => OnModelChanged.InvokeAsync();
+    {
+        return OnModelChanged.InvokeAsync();
+    }
 
 
-    private async Task OnTypeChanged(string? value)
+    private async Task OnTypeChanged(
+        string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -319,35 +481,41 @@
             return;
         }
 
-        Model.JournalType = result;
+        Model.JournalType =
+            result;
 
         await OnChanged();
     }
 
 
-    private async Task OnPostingDateChanged(DateOnly? value)
+    private async Task OnPostingDateChanged(
+        DateOnly? value)
     {
         if (value.HasValue)
         {
-            Model.PostingDate = value.Value;
+            Model.PostingDate =
+                value.Value;
         }
 
         await OnChanged();
     }
 
 
-    private async Task OnDocumentDateChanged(DateOnly? value)
+    private async Task OnDocumentDateChanged(
+        DateOnly? value)
     {
         if (value.HasValue)
         {
-            Model.DocumentDate = value.Value;
+            Model.DocumentDate =
+                value.Value;
         }
 
         await OnChanged();
     }
 
 
-    private async Task OnPeriodChanged(string? value)
+    private async Task OnPeriodChanged(
+        string? value)
     {
         Model.FiscalPeriodId =
             Guid.TryParse(
@@ -360,9 +528,12 @@
     }
 
 
-    private async Task OnDescriptionChanged(string? value)
+    private async Task OnDescriptionChanged(
+        string? value)
     {
-        Model.Description = value ?? string.Empty;
+        Model.Description =
+            value ??
+            string.Empty;
 
         await OnChanged();
     }

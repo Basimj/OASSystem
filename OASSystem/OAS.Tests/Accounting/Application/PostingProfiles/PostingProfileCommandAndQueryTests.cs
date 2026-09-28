@@ -2,8 +2,10 @@ using NUnit.Framework;
 using OAS.Application.Accounting.PostingProfiles.Commands.CreatePostingProfile;
 using OAS.Application.Accounting.PostingProfiles.Mapping;
 using OAS.Application.Accounting.PostingProfiles.Queries.GetPostingProfileById;
+using OAS.Application.Common.Exceptions;
 using OAS.Contracts.Accounting.PostingProfiles;
 using OAS.Domain.Accounting.Entities;
+using OAS.Domain.Accounting.Enums;
 using OAS.Tests.Accounting.Application.Common;
 
 namespace OAS.Tests.Accounting.Application.PostingProfiles;
@@ -16,6 +18,8 @@ public class PostingProfileCommandAndQueryTests
     private FakeRepository<PostingProfileLine, Guid>
         _lineRepository = null!;
 
+    private FakeRepository<Account, Guid> _accountRepository = null!;
+
     private PostingProfileMapper _mapper = null!;
 
     [SetUp]
@@ -27,14 +31,21 @@ public class PostingProfileCommandAndQueryTests
         _lineRepository =
             new FakeRepository<PostingProfileLine, Guid>();
 
+        _accountRepository =
+            new FakeRepository<Account, Guid>();
+
         _mapper = new PostingProfileMapper();
     }
 
     [Test]
     public async Task CreatePostingProfileCommandHandler_CreatesProfileWithLines()
     {
+        var account = CreatePostingAccount();
+        await _accountRepository.AddAsync(account);
+
         var handler = new CreatePostingProfileCommandHandler(
             _repository,
+            _accountRepository,
             _mapper);
 
         var request = new CreatePostingProfileRequest(
@@ -47,7 +58,7 @@ public class PostingProfileCommandAndQueryTests
             [
                 new CreatePostingProfileLineRequest(
                     AccountRole: "Customer",
-                    AccountId: Guid.NewGuid(),
+                    AccountId: account.Id,
                     IsRequired: true)
             ]);
 
@@ -70,6 +81,53 @@ public class PostingProfileCommandAndQueryTests
         Assert.That(
             _repository.Items[0].Lines.Count,
             Is.EqualTo(1));
+    }
+
+    [Test]
+    public void CreatePostingProfileCommandHandler_RejectsInvalidPostingAccount()
+    {
+        var invalidAccount = Account.Create(
+            Guid.NewGuid(),
+            "1000",
+            "الأصول",
+            null,
+            null,
+            1,
+            AccountClass.Asset,
+            AccountType.Header,
+            NormalBalance.Debit,
+            isPostingAccount: false,
+            isControlAccount: false,
+            allowManualPosting: false,
+            isSystemAccount: false,
+            isActive: true,
+            effectiveDate: null);
+
+        _accountRepository.AddAsync(invalidAccount).GetAwaiter().GetResult();
+
+        var handler = new CreatePostingProfileCommandHandler(
+            _repository,
+            _accountRepository,
+            _mapper);
+
+        var request = new CreatePostingProfileRequest(
+            Code: "PP-BAD",
+            Name: "ملف غير صالح",
+            Module: "Accounting",
+            DocumentType: "Test",
+            IsActive: true,
+            Lines:
+            [
+                new CreatePostingProfileLineRequest(
+                    AccountRole: "Cash",
+                    AccountId: invalidAccount.Id,
+                    IsRequired: true)
+            ]);
+
+        Assert.ThrowsAsync<ConflictException>(async () =>
+            await handler.Handle(
+                new CreatePostingProfileCommand(request),
+                CancellationToken.None));
     }
 
     [Test]
@@ -129,4 +187,22 @@ public class PostingProfileCommandAndQueryTests
             dto.Lines[0].AccountId,
             Is.EqualTo(accountId));
     }
+    private static Account CreatePostingAccount() =>
+        Account.Create(
+            Guid.NewGuid(),
+            "410100",
+            "حساب ترحيل",
+            null,
+            null,
+            1,
+            AccountClass.Revenue,
+            AccountType.Posting,
+            NormalBalance.Credit,
+            isPostingAccount: true,
+            isControlAccount: false,
+            allowManualPosting: false,
+            isSystemAccount: false,
+            isActive: true,
+            effectiveDate: null);
+
 }

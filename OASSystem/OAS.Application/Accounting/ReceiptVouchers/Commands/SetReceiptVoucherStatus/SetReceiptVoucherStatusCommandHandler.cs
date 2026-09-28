@@ -27,11 +27,27 @@ public sealed class SetReceiptVoucherStatusCommandHandler(
         if (voucher is null)
             throw new NotFoundException(nameof(ReceiptVoucher), request.Id);
 
-        var requestedRowVersion = Convert.FromBase64String(request.Request.RowVersion);
+        byte[] requestedRowVersion;
+        try
+        {
+            requestedRowVersion = Convert.FromBase64String(request.Request.RowVersion);
+        }
+        catch (FormatException ex)
+        {
+            throw new ConcurrencyException("بيانات التزامن الخاصة بسند القبض غير صالحة. أعد تحميل السند ثم حاول مرة أخرى.", ex);
+        }
+
         if (!voucher.RowVersion.SequenceEqual(requestedRowVersion))
-            throw new ConcurrencyException("The receipt voucher has been modified by another user.");
+            throw new ConcurrencyException("تم تعديل سند القبض بواسطة مستخدم آخر. أعد تحميل السند ثم حاول مرة أخرى.");
 
         var targetStatus = (DomainReceiptVoucherStatus)(int)request.Request.Status;
+
+        if (!IsAllowedTransition(voucher.Status, targetStatus))
+        {
+            throw new ConflictException(
+                "receipt_status_transition_invalid",
+                "انتقال حالة سند القبض المطلوب غير مسموح من الحالة الحالية.");
+        }
 
         IReadOnlyList<ReceiptVoucherLine>? lines = null;
         if (targetStatus is DomainReceiptVoucherStatus.Approved or DomainReceiptVoucherStatus.Posted)
@@ -50,7 +66,7 @@ public sealed class SetReceiptVoucherStatusCommandHandler(
             case DomainReceiptVoucherStatus.Approved:
                 if (!await permissionChecker.HasPermissionAsync(AccountingPermissions.ReceiptVouchers.Approve, cancellationToken))
                     throw new ForbiddenException();
-                voucher.Approve();
+                voucher.Approve(lines!);
                 break;
 
             case DomainReceiptVoucherStatus.Posted:
@@ -64,7 +80,7 @@ public sealed class SetReceiptVoucherStatusCommandHandler(
                     voucher, lines!, userId, nowUtc, cancellationToken);
 
                 voucher.SetJournalEntry(journalId);
-                voucher.Post(userId, nowUtc);
+                voucher.Post(userId, nowUtc, lines!);
                 break;
 
             case DomainReceiptVoucherStatus.Cancelled:
@@ -72,8 +88,9 @@ public sealed class SetReceiptVoucherStatusCommandHandler(
                 break;
 
             default:
-                throw new InvalidOperationException(
-                    $"Receipt voucher status '{targetStatus}' is not supported for manual transition.");
+                throw new ConflictException(
+                    "receipt_status_transition_invalid",
+                    "حالة سند القبض المطلوبة غير مدعومة لهذا الإجراء.");
         }
 
         repository.Update(voucher);
@@ -84,7 +101,7 @@ public sealed class SetReceiptVoucherStatusCommandHandler(
         IReadOnlyList<ReceiptVoucherLine> lines)
     {
         if (lines.Count == 0)
-            throw new ConflictException("voucher_lines_required", "The voucher must contain at least one line before approval or posting.");
+            throw new ConflictException("voucher_lines_required", "يجب أن يحتوي سند القبض على سطر واحد على الأقل قبل الاعتماد أو الترحيل.");
 
         // Legacy vouchers are intentionally allowed during the Expand phase.
         if (!voucher.BaseCurrencyId.HasValue)
@@ -102,7 +119,7 @@ public sealed class SetReceiptVoucherStatusCommandHandler(
         {
             throw new ConflictException(
                 "voucher_settlement_line_incomplete",
-                "All settlement lines must contain resolved party, settlement, currency and exchange-rate snapshots.");
+                "يجب استكمال بيانات الطرف والتسوية والعملة وسعر الصرف لجميع أسطر سند القبض قبل الاعتماد أو الترحيل.");
         }
 
         var expected = lines.Sum(x => x.BaseAmount!.Value);
@@ -110,7 +127,18 @@ public sealed class SetReceiptVoucherStatusCommandHandler(
         {
             throw new ConflictException(
                 "voucher_base_total_mismatch",
-                "Voucher base total does not match the sum of settlement line base amounts.");
+                "إجمالي سند القبض بالعملة الأساسية لا يطابق مجموع مبالغ الأسطر.");
         }
     }
+    private static bool IsAllowedTransition(
+        DomainReceiptVoucherStatus current,
+        DomainReceiptVoucherStatus target) =>
+        target switch
+        {
+            DomainReceiptVoucherStatus.Approved => current == DomainReceiptVoucherStatus.Draft,
+            DomainReceiptVoucherStatus.Posted => current == DomainReceiptVoucherStatus.Approved,
+            DomainReceiptVoucherStatus.Cancelled => current is DomainReceiptVoucherStatus.Draft or DomainReceiptVoucherStatus.Approved,
+            _ => false
+        };
+
 }

@@ -1,14 +1,17 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
+using OAS.Client.Accounting.Common;
 using OAS.Client.Accounting.Services;
 using OAS.Client.Common.Feedback.Services;
 using OAS.Client.Services.Browser;
 using OAS.Client.Services.Http;
+using OAS.Contracts.Accounting.Accounts;
 using OAS.Contracts.Accounting.Suppliers;
 using OAS.Contracts.Accounting.Enums;
 using OAS.Contracts.Common.Pagination;
 using OAS.Contracts.Spreadsheets;
 using OAS.UiLib.Components.Spreadsheets;
+using OAS.UiLib.Core.Models;
 using OAS.UiLib.Core.Models.Accounting;
 using OAS.UiLib.Services.Feedback;
 
@@ -31,17 +34,52 @@ public partial class SuppliersPage
     private SpreadsheetPreview? _preview;
     private UiAccountingPartyFormModel _form = new();
     private IReadOnlyList<UiAccountingPartyListItem> _items = [];
-    private IReadOnlyList<UiAccountingPartyParentOption> _parents = [];
+    private readonly Dictionary<Guid, AccountDto> _accountLookups = [];
     private UiSpreadsheetPreview? UiPreview => _preview is null ? null : new UiSpreadsheetPreview(_preview.Rows.Select(x => new UiSpreadsheetRow(x.Sheet,x.RowNumber,x.Values,x.Errors,x.Warnings)).ToArray(),_preview.ValidRows,_preview.InvalidRows,_preview.WarningRows,_preview.CanImport,_preview.ImportedRecords);
 
-    protected override async Task OnInitializedAsync(){await LoadParentsAsync();await LoadAsync();}
+    protected override async Task OnInitializedAsync(){await LoadAsync();}
     private Task SetSearch(string? v){_search=v??"";return Task.CompletedTask;}
     private async Task SearchAsync(string? v){_search=v??"";_pageNumber=1;await LoadAsync();}
     private async Task FilterChangedAsync(string? value){_filter=string.IsNullOrWhiteSpace(value)?"all":value;_pageNumber=1;await LoadAsync();}
     private async Task LoadAsync()=>await RunAsync(async()=>{var page=await Accounting.GetSuppliersPageAsync(new PageRequest{PageNumber=_pageNumber,PageSize=PageSize,Search=_search,SortBy="SupplierCode"},_filter);_pageNumber=page.PageNumber<=0?1:page.PageNumber;_totalPages=Math.Max(1,page.TotalPages);_totalCount=page.TotalCount;_items=page.Items.Select(ToListItem).ToArray();});
-    private async Task LoadParentsAsync(){var values=await Accounting.GetSupplierAccountParentsAsync()??[];_parents=values.Select(x=>new UiAccountingPartyParentOption(x.Id,x.Code,x.NameAr)).ToArray();}
-    private async Task NewAsync()=>await RunAsync(async()=>{if(_parents.Count==0)await LoadParentsAsync();var reserved=await Accounting.ReserveSupplierCodeAsync();_form=new UiAccountingPartyFormModel{Code=reserved?.SupplierCode??"",EntityType="2",SupplierScope="1",PreferredContactMethod="2",IsActive=true};if(_parents.Count==1)_form.ParentAccountId=_parents[0].Id.ToString("D");_isNew=true;_editorOpen=true;});
-    private async Task OpenAsync(Guid id)=>await RunAsync(async()=>{var dto=await Accounting.GetSupplierByIdAsync(id);if(dto is null){Snackbar.Warning("تعذر العثور على المورد.");return;}_form=FromDto(dto);_isNew=false;_editorOpen=true;});
+    private UiLookupItem? ParentAccountLookupItem =>
+        Guid.TryParse(_form.ParentAccountId,out var id)&&_accountLookups.TryGetValue(id,out var account)
+            ? AccountingLookupEligibility.ToAccountLookup(account,AccountingAccountEligibilityContext.LiabilityControlParent)
+            : null;
+    private Task<IReadOnlyList<UiLookupItem>> SearchParentAccountsAsync(string text,CancellationToken ct)=>SearchParentAccountsAsync(text,AccountingAccountEligibilityContext.LiabilityControlParent,ct);
+    private async Task<IReadOnlyList<UiLookupItem>> SearchParentAccountsAsync(string text,AccountingAccountEligibilityContext context,CancellationToken ct)
+    {
+        var search=string.IsNullOrWhiteSpace(text)?null:text.Trim();
+        var accounts=new List<AccountDto>();
+        var pageNumber=1;
+        while(true)
+        {
+            var page=await Accounting.GetAccountsPageAsync(new PageRequest{PageNumber=pageNumber,PageSize=PageRequest.MaximumPageSize,Search=search,SortBy="Code",SortDirection=SortDirection.Ascending},ct);
+            accounts.AddRange(page.Items);
+            foreach(var account in page.Items)_accountLookups[account.Id]=account;
+            if(search is null||!page.HasNextPage)break;
+            pageNumber++;
+        }
+        return accounts.Select(x=>AccountingLookupEligibility.ToAccountLookup(x,context)).ToArray();
+    }
+    private async Task EnsureParentLookupAsync(Guid? accountId)
+    {
+        if(!accountId.HasValue||_accountLookups.ContainsKey(accountId.Value))return;
+        var account=await Accounting.GetAccountByIdAsync(accountId.Value);
+        if(account is not null)_accountLookups[account.Id]=account;
+    }
+    private async Task<bool> ValidateParentAccountAsync(Guid parentId)
+    {
+        var account=await Accounting.GetAccountByIdAsync(parentId);
+        if(account is null){Snackbar.Warning("الحساب الرئيسي المحدد غير موجود.");return false;}
+        _accountLookups[account.Id]=account;
+        var eligibility=AccountingAccountEligibility.Evaluate(account,AccountingAccountEligibilityContext.LiabilityControlParent);
+        if(eligibility.IsEligible)return true;
+        Snackbar.Warning(eligibility.Reason??"الحساب الرئيسي المحدد غير صالح لحسابات الموردين.");
+        return false;
+    }
+    private async Task NewAsync()=>await RunAsync(async()=>{var reserved=await Accounting.ReserveSupplierCodeAsync();_form=new UiAccountingPartyFormModel{Code=reserved?.SupplierCode??"",EntityType="2",SupplierScope="1",PreferredContactMethod="2",IsActive=true};_isNew=true;_editorOpen=true;});
+    private async Task OpenAsync(Guid id)=>await RunAsync(async()=>{var dto=await Accounting.GetSupplierByIdAsync(id);if(dto is null){Snackbar.Warning("تعذر العثور على المورد.");return;}_form=FromDto(dto);await EnsureParentLookupAsync(dto.ParentAccountId);_isNew=false;_editorOpen=true;});
 
     private async Task SaveAsync()=>await RunAsync(async()=>
     {
@@ -53,6 +91,7 @@ public partial class SuppliersPage
         if(_isNew)
         {
             if(!Guid.TryParse(_form.ParentAccountId,out var parent)){Snackbar.Warning("اختر حساب الموردين الرئيسي.");return;}
+            if(!await ValidateParentAccountAsync(parent))return;
             result=await Accounting.CreateSupplierAsync(new CreateSupplierRequest(_form.Code,parent,entityType,scope,_form.NameAr.Trim(),N(_form.NameEn),N(_form.TradeName),N(_form.NationalId),N(_form.CommercialRegistrationNo),N(_form.TaxNumber),N(_form.ContactPersonName),N(_form.ContactPersonTitle),N(_form.Phone),N(_form.Mobile),N(_form.AlternatePhone),N(_form.WhatsAppNumber),N(_form.Email),N(_form.Website),contact,N(_form.Country),N(_form.Governorate),N(_form.City),N(_form.District),N(_form.Street),N(_form.Building),N(_form.PostalCode),N(_form.AddressDetails),_form.CreditLimit,_form.PaymentTermDays,_form.DefaultLeadTimeDays,_form.Since,_form.IsActive,N(_form.Notes)));
         }
         else
@@ -74,8 +113,13 @@ public partial class SuppliersPage
     private async Task ConfirmImportAsync()=>await RunSpreadsheetAsync(async()=>{if(_fileBytes is null||_preview is null||!_preview.CanImport)return;_preview=await Spreadsheets.UploadAsync("suppliers",_fileBytes,_fileName,true);if(_preview.ImportedRecords>0){Snackbar.Success($"تم استيراد {_preview.ImportedRecords} مورد.");await LoadAsync();}});
     private async Task DownloadTemplateAsync()=>await RunSpreadsheetAsync(async()=>await Download.SaveAsync(await Spreadsheets.TemplateAsync("suppliers"),"suppliers-template.xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
     private async Task ExportAsync()=>await RunSpreadsheetAsync(async()=>await Download.SaveAsync(await Spreadsheets.ExportAsync("suppliers",_search,null,_filter),"suppliers.xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
-    private async Task RunAsync(Func<Task> action){if(_busy)return;_busy=true;try{await action();}catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}catch{ApiFeedback.ShowUnexpected();}finally{_busy=false;}}
-    private async Task RunSpreadsheetAsync(Func<Task> action){if(_spreadsheetBusy)return;_spreadsheetBusy=true;try{await action();}catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}catch{ApiFeedback.ShowUnexpected();}finally{_spreadsheetBusy=false;}}
+    private async Task RunAsync(Func<Task> action){if(_busy)return;_busy=true;try{await action();}catch(ApiClientException ex){ShowAccountingError(ex.Error);}catch{ApiFeedback.ShowUnexpected();}finally{_busy=false;}}
+    private async Task RunSpreadsheetAsync(Func<Task> action){if(_spreadsheetBusy)return;_spreadsheetBusy=true;try{await action();}catch(ApiClientException ex){ShowAccountingError(ex.Error);}catch{ApiFeedback.ShowUnexpected();}finally{_spreadsheetBusy=false;}}
+    private void ShowAccountingError(OAS.Contracts.Common.Errors.ApiError error)
+    {
+        if(AccountingApiErrorPresenter.TryGetMessage(error,out var message)){Snackbar.Error(message);return;}
+        ApiFeedback.Show(error);
+    }
     private static string? N(string? v)=>string.IsNullOrWhiteSpace(v)?null:v.Trim();
     private static SpreadsheetPreview InvalidFile()=>new([new SpreadsheetRowResult("الملف",1,new Dictionary<string,string>(),["اختر ملف xlsx بحجم لا يتجاوز 10 MB."],[])]);
     private static UiAccountingPartyListItem ToListItem(SupplierDto x)=>new(x.Id,x.SupplierCode,x.AccountCode,x.NameAr,x.TradeName??x.NameEn,x.Mobile??x.Phone,string.Join(" / ",new[]{x.City,x.Country}.Where(v=>!string.IsNullOrWhiteSpace(v))),x.TaxNumber??x.CommercialRegistrationNo,$"{(x.EntityType switch { PartyEntityType.Individual => "فرد", PartyEntityType.Organization => "منشأة", _ => "غير محدد" })} · {(x.SupplierScope switch { SupplierScope.Local => "محلي", SupplierScope.International => "دولي", _ => "غير محدد" })}",$"{x.PaymentTermDays} يوم · توريد {x.DefaultLeadTimeDays?.ToString()??"—"}",x.IsActive);

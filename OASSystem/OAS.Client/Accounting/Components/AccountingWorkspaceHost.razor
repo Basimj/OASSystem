@@ -1,3 +1,4 @@
+@using OAS.Client.Accounting.Common
 @using OAS.UiLib.Components.Spreadsheets
 @namespace OAS.Client.Accounting.Components
 @using OAS.Client.Accounting.Workspace
@@ -110,12 +111,29 @@
             }
             else
             {
-                <UiButton Text="تعديل"
-                          IconCssClass="fa-solid fa-pen-to-square"
-                          Variant="ButtonVariant.Secondary"
-                          Size="ControlSize.Small"
-                          Disabled="@(!CanEditActive)"
-                          OnClick="BeginEditActive" />
+                @if (ShowStandardEditActions)
+                {
+                    <UiButton Text="تعديل"
+                              IconCssClass="fa-solid fa-pen-to-square"
+                              Variant="ButtonVariant.Secondary"
+                              Size="ControlSize.Small"
+                              Disabled="@(!CanEditActive)"
+                              OnClick="BeginEditActive" />
+
+                    <UiButton Text="حفظ"
+                              IconCssClass="fa-solid fa-floppy-disk"
+                              Size="ControlSize.Small"
+                              Disabled="@(!CanSaveActive)"
+                              Loading="@(activeTab?.IsSaving == true)"
+                              OnClick="SaveActiveAsync" />
+
+                    <UiButton Text="إلغاء التعديل"
+                              IconCssClass="fa-solid fa-arrow-rotate-left"
+                              Variant="ButtonVariant.Ghost"
+                              Size="ControlSize.Small"
+                              Disabled="@(!CanCancelActive)"
+                              OnClick="CancelActiveEdit" />
+                }
 
                 @if (activeTab is not null &&
                            !activeTab.IsNew &&
@@ -127,23 +145,9 @@
                               Variant="ButtonVariant.Secondary"
                               Size="ControlSize.Small"
                               Loading="@_isPrinting"
-                              Disabled="@(_isPrinting || activeTab.IsDirty || activeTab.IsSaving)"
+                              Disabled="@(!CanPrintActive || _isPrinting)"
                               OnClick="PrintActiveVoucherAsync" />
                 }
-
-                <UiButton Text="حفظ"
-                          IconCssClass="fa-solid fa-floppy-disk"
-                          Size="ControlSize.Small"
-                          Disabled="@(!CanSaveActive)"
-                          Loading="@(activeTab?.IsSaving == true)"
-                          OnClick="SaveActiveAsync" />
-
-                <UiButton Text="إلغاء"
-                          IconCssClass="fa-solid fa-arrow-rotate-left"
-                          Variant="ButtonVariant.Ghost"
-                          Size="ControlSize.Small"
-                          Disabled="@(!CanCancelActive)"
-                          OnClick="CancelActiveEdit" />
 
                 <UiButton Text="تحديث"
                           IconCssClass="fa-solid fa-rotate"
@@ -198,14 +202,39 @@
                                       IconCssClass="fa-solid fa-circle-check"
                                       Variant="ButtonVariant.Secondary"
                                       Size="ControlSize.Small"
+                                      Disabled="@(!CanApproveActiveVoucher)"
                                       OnClick="@(() => ChangeReceiptStatusAsync(ReceiptVoucherStatus.Approved))" />
+
+                            <UiButton Text="إلغاء السند"
+                                      IconCssClass="fa-solid fa-ban"
+                                      Variant="ButtonVariant.Danger"
+                                      Size="ControlSize.Small"
+                                      Disabled="@(!CanCancelActiveVoucher)"
+                                      OnClick="@(() => ChangeReceiptStatusAsync(ReceiptVoucherStatus.Cancelled))" />
                         }
                         else if (receipt.Status == ReceiptVoucherStatus.Approved)
                         {
                             <UiButton Text="ترحيل"
                                       IconCssClass="fa-solid fa-check-double"
                                       Size="ControlSize.Small"
+                                      Disabled="@(!CanPostActiveVoucher)"
                                       OnClick="@(() => ChangeReceiptStatusAsync(ReceiptVoucherStatus.Posted))" />
+
+                            <UiButton Text="إلغاء السند"
+                                      IconCssClass="fa-solid fa-ban"
+                                      Variant="ButtonVariant.Danger"
+                                      Size="ControlSize.Small"
+                                      Disabled="@(!CanCancelActiveVoucher)"
+                                      OnClick="@(() => ChangeReceiptStatusAsync(ReceiptVoucherStatus.Cancelled))" />
+                        }
+                        else if (receipt.Status == ReceiptVoucherStatus.Posted && receipt.JournalEntryId.HasValue)
+                        {
+                            <UiButton Text="عرض القيد"
+                                      IconCssClass="fa-solid fa-book-open"
+                                      Variant="ButtonVariant.Secondary"
+                                      Size="ControlSize.Small"
+                                      Disabled="@(!CanViewGeneratedJournal)"
+                                      OnClick="ViewGeneratedJournalAsync" />
                         }
                     }
                     else if (activeTab.EntityType == AccountingEntityType.PaymentVouchers &&
@@ -217,14 +246,39 @@
                                       IconCssClass="fa-solid fa-circle-check"
                                       Variant="ButtonVariant.Secondary"
                                       Size="ControlSize.Small"
+                                      Disabled="@(!CanApproveActiveVoucher)"
                                       OnClick="@(() => ChangePaymentStatusAsync(PaymentVoucherStatus.Approved))" />
+
+                            <UiButton Text="إلغاء السند"
+                                      IconCssClass="fa-solid fa-ban"
+                                      Variant="ButtonVariant.Danger"
+                                      Size="ControlSize.Small"
+                                      Disabled="@(!CanCancelActiveVoucher)"
+                                      OnClick="@(() => ChangePaymentStatusAsync(PaymentVoucherStatus.Cancelled))" />
                         }
                         else if (payment.Status == PaymentVoucherStatus.Approved)
                         {
                             <UiButton Text="ترحيل"
                                       IconCssClass="fa-solid fa-check-double"
                                       Size="ControlSize.Small"
+                                      Disabled="@(!CanPostActiveVoucher)"
                                       OnClick="@(() => ChangePaymentStatusAsync(PaymentVoucherStatus.Posted))" />
+
+                            <UiButton Text="إلغاء السند"
+                                      IconCssClass="fa-solid fa-ban"
+                                      Variant="ButtonVariant.Danger"
+                                      Size="ControlSize.Small"
+                                      Disabled="@(!CanCancelActiveVoucher)"
+                                      OnClick="@(() => ChangePaymentStatusAsync(PaymentVoucherStatus.Cancelled))" />
+                        }
+                        else if (payment.Status == PaymentVoucherStatus.Posted && payment.JournalEntryId.HasValue)
+                        {
+                            <UiButton Text="عرض القيد"
+                                      IconCssClass="fa-solid fa-book-open"
+                                      Variant="ButtonVariant.Secondary"
+                                      Size="ControlSize.Small"
+                                      Disabled="@(!CanViewGeneratedJournal)"
+                                      OnClick="ViewGeneratedJournalAsync" />
                         }
                     }
                     else if (activeTab.EntityType == AccountingEntityType.Expenses &&
@@ -453,7 +507,7 @@
                                         IsNew="@activeTab.IsNew"
                                         FiscalPeriodLookupItem="@GetFiscalPeriodLookup(model.FiscalPeriodId)"
                                         FiscalPeriodSearchAsync="SearchFiscalPeriodsAsync"
-                                        AccountSearchAsync="SearchAccountsAsync"
+                                        AccountSearchAsync="SearchManualJournalAccountsAsync"
                                         CostCenterSearchAsync="SearchCostCentersAsync"
                                         CustomerSearchAsync="SearchCustomersAsync"
                                         SupplierSearchAsync="SearchSuppliersAsync"
@@ -470,7 +524,7 @@
                     <PostingProfileEditor Model="@model"
                                           IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
                                           IsNew="@activeTab.IsNew"
-                                          AccountSearchAsync="SearchAccountsAsync"
+                                          AccountSearchAsync="SearchPostingProfileAccountsAsync"
                                           OnModelChanged="MarkActiveDirty" />
 
                     break;
@@ -499,7 +553,8 @@
                                           CashAccountSearchAsync="SearchCashAccountsByCurrencyAsync"
                                           BankAccountSearchAsync="SearchBankAccountsByCurrencyAsync"
                                           CurrencySearchAsync="SearchCurrenciesAsync"
-                                          AccountSearchAsync="SearchAccountsAsync"
+                                          CounterpartyAccountSearchAsync="SearchOtherCounterpartyAccountsAsync"
+                                          SettlementAccountSearchAsync="SearchOtherSettlementAccountsAsync"
                                           EffectiveRateAsync="ResolveEffectiveRatePreviewAsync"
                                           OnModelChanged="MarkActiveDirty" />
 
@@ -517,7 +572,8 @@
                                           CashAccountSearchAsync="SearchCashAccountsByCurrencyAsync"
                                           BankAccountSearchAsync="SearchBankAccountsByCurrencyAsync"
                                           CurrencySearchAsync="SearchCurrenciesAsync"
-                                          AccountSearchAsync="SearchAccountsAsync"
+                                          CounterpartyAccountSearchAsync="SearchOtherCounterpartyAccountsAsync"
+                                          SettlementAccountSearchAsync="SearchOtherSettlementAccountsAsync"
                                           EffectiveRateAsync="ResolveEffectiveRatePreviewAsync"
                                           OnModelChanged="MarkActiveDirty" />
 
@@ -604,11 +660,11 @@
                                    IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
                                    IsNew="@activeTab.IsNew"
                                    ExpenseTypeLookupItem="@GetExpenseTypeLookup(model.ExpenseTypeId)"
-                                   ExpenseAccountLookupItem="@GetAccountLookup(model.ExpenseAccountId)"
+                                   ExpenseAccountLookupItem="@GetAccountLookup(model.ExpenseAccountId, AccountingAccountEligibilityContext.ExpenseAccount)"
                                    CashAccountLookupItem="@GetCashAccountLookup(model.CashAccountId)"
                                    BankAccountLookupItem="@GetBankAccountLookup(model.BankAccountId)"
                                    ExpenseTypeSearchAsync="SearchExpenseTypesAsync"
-                                   AccountSearchAsync="SearchAccountsAsync"
+                                   AccountSearchAsync="SearchExpenseAccountsAsync"
                                    CashAccountSearchAsync="SearchCashAccountsAsync"
                                    BankAccountSearchAsync="SearchBankAccountsAsync"
                                    OnModelChanged="MarkActiveDirty" />
@@ -621,8 +677,8 @@
                     <ExpenseTypeEditor Model="@model"
                                        IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
                                        IsNew="@activeTab.IsNew"
-                                       AccountLookupItem="@GetAccountLookup(model.DefaultExpenseAccountId)"
-                                       AccountSearchAsync="SearchAccountsAsync"
+                                       AccountLookupItem="@GetAccountLookup(model.DefaultExpenseAccountId, AccountingAccountEligibilityContext.ExpenseAccount)"
+                                       AccountSearchAsync="SearchExpenseAccountsAsync"
                                        OnModelChanged="MarkActiveDirty" />
 
                     break;

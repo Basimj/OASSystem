@@ -56,6 +56,9 @@ public class PaymentVoucherDomainTests
             null, _bankAccountId, 8500m, PaymentVoucherStatus.Draft,
             "سند صرف", null);
 
+        voucher.AddLine(PaymentVoucherLine.Create(
+            Guid.NewGuid(), voucher.Id, 1, Guid.NewGuid(), 8500m, null, null, "سطر اختبار"));
+
         var journalId = Guid.NewGuid();
         var postedAt = DateTime.UtcNow;
 
@@ -81,5 +84,37 @@ public class PaymentVoucherDomainTests
         voucher.Cancel();
 
         Assert.That(voucher.Status, Is.EqualTo(PaymentVoucherStatus.Cancelled));
+    }
+
+    [Test]
+    public void Post_DraftPaymentVoucher_IsRejected()
+    {
+        var voucher = PaymentVoucher.Create(
+            _voucherId, "PV-2026-0002", new DateOnly(2026, 1, 15),
+            PaymentPartyType.Other, null, "طرف", PaymentMethod.Other,
+            null, null, 100m, PaymentVoucherStatus.Draft, null, null);
+        var line = PaymentVoucherLine.Create(
+            Guid.NewGuid(), voucher.Id, 1, Guid.NewGuid(), 100m, null, null, null);
+
+        Assert.Throws<InvalidOperationException>(() => voucher.Post(_userId, DateTime.UtcNow, [line]));
+    }
+
+    [Test]
+    public void PostedPaymentVoucher_CannotBeEditedOrCancelled()
+    {
+        var voucher = PaymentVoucher.Create(
+            _voucherId, "PV-2026-0003", new DateOnly(2026, 1, 15),
+            PaymentPartyType.Other, null, "طرف", PaymentMethod.Other,
+            null, null, 100m, PaymentVoucherStatus.Draft, null, null);
+        var line = PaymentVoucherLine.Create(
+            Guid.NewGuid(), voucher.Id, 1, Guid.NewGuid(), 100m, null, null, null);
+
+        voucher.Approve([line]);
+        voucher.Post(_userId, DateTime.UtcNow, [line]);
+
+        Assert.Throws<InvalidOperationException>(() => voucher.UpdateDetails(
+            new DateOnly(2026, 1, 16), PaymentPartyType.Other, null, "طرف",
+            PaymentMethod.Other, null, null, 100m, "تعديل"));
+        Assert.Throws<InvalidOperationException>(() => voucher.Cancel());
     }
 }

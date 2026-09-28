@@ -8,7 +8,8 @@ using DomainPaymentMethod = OAS.Domain.Accounting.Enums.PaymentMethod;
 namespace OAS.Application.Accounting.Expenses.Commands.UpdateExpense;
 
 public sealed class UpdateExpenseCommandHandler(
-    IRepository<Expense, Guid> repository)
+    IRepository<Expense, Guid> repository,
+    IReadRepository<Account, Guid> accountRepository)
     : IRequestHandler<UpdateExpenseCommand>
 {
     public async Task Handle(
@@ -24,10 +25,18 @@ public sealed class UpdateExpenseCommandHandler(
         var requestedRowVersion = Convert.FromBase64String(request.Data.RowVersion);
         if (!expense.RowVersion.SequenceEqual(requestedRowVersion))
         {
-            throw new ConcurrencyException("The expense has been modified by another user.");
+            throw new ConcurrencyException("تم تعديل المصروف بواسطة مستخدم آخر. أعد تحميله ثم حاول مرة أخرى.");
         }
 
         var data = request.Data;
+        var account = await accountRepository.GetByIdAsync(data.ExpenseAccountId, cancellationToken);
+        if (account is null)
+            throw new NotFoundException(nameof(Account), data.ExpenseAccountId);
+        if (!account.CanReceivePosting())
+            throw new ConflictException(
+                "expense_account_invalid",
+                $"الحساب {account.Code} - {account.NameAr} غير صالح كحساب مصروف للترحيل.");
+
         expense.UpdateDetails(
             data.ExpenseDate,
             data.ExpenseTypeId,

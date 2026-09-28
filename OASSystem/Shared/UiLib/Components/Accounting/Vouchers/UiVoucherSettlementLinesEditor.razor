@@ -98,8 +98,8 @@
                                   Value='@line.CounterpartyAccountId?.ToString("D")'
                                   ValueChanged="@(value => CounterpartyAccountChangedAsync(line, value))"
                                   SelectedItem="@line.CounterpartyAccountLookupItem"
-                                  SearchAsync="AccountSearchAsync"
-                                  Placeholder="اختر حساب ترحيل مسموح..."
+                                  SearchAsync="CounterpartyAccountSearchAsync"
+                                  Placeholder="اختر حساباً مقابلاً صالحاً..."
                                   Disabled="@(!IsEditable)"
                                   Required="true"
                                   MinimumSearchLength="0"
@@ -178,8 +178,8 @@
                               Value='@line.SettlementAccountId?.ToString("D")'
                               ValueChanged="@(value => SettlementAccountChangedAsync(line, value))"
                               SelectedItem="@line.SettlementLookupItem"
-                              SearchAsync="AccountSearchAsync"
-                              Placeholder="اختر حساب التسوية..."
+                              SearchAsync="SettlementAccountSearchAsync"
+                              Placeholder="اختر حساب تسوية صالحاً..."
                               Disabled="@(!IsEditable)"
                               Required="true"
                               MinimumSearchLength="0"
@@ -327,7 +327,8 @@
     [Parameter] public Func<Guid?, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CashAccountSearchAsync { get; set; }
     [Parameter] public Func<Guid?, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? BankAccountSearchAsync { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CurrencySearchAsync { get; set; }
-    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? AccountSearchAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CounterpartyAccountSearchAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SettlementAccountSearchAsync { get; set; }
     [Parameter] public Func<Guid, DateOnly, CancellationToken, Task<decimal?>>? EffectiveRateAsync { get; set; }
     [Parameter] public DateOnly RateDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
     [Parameter] public EventCallback OnLinesChanged { get; set; }
@@ -396,7 +397,7 @@
     private async Task CounterpartyAccountChangedAsync(EditableSettlementLine line, string? value)
     {
         line.CounterpartyAccountId = Parse(value);
-        line.CounterpartyAccountLookupItem = await ResolveAsync(AccountSearchAsync, line.CounterpartyAccountId);
+        line.CounterpartyAccountLookupItem = await ResolveAsync(CounterpartyAccountSearchAsync, line.CounterpartyAccountId);
         await ChangedAsync();
     }
 
@@ -451,7 +452,7 @@
     private async Task SettlementAccountChangedAsync(EditableSettlementLine line, string? value)
     {
         line.SettlementAccountId = Parse(value); line.CashAccountId = null; line.BankAccountId = null;
-        line.SettlementLookupItem = await ResolveAsync(AccountSearchAsync, line.SettlementAccountId);
+        line.SettlementLookupItem = await ResolveAsync(SettlementAccountSearchAsync, line.SettlementAccountId);
         await ChangedAsync();
     }
 
