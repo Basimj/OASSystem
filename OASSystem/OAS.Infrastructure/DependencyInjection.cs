@@ -16,6 +16,10 @@ using OAS.Infrastructure.Features.Employees.Images;
 using OAS.Infrastructure.Identity.Persistence;
 using OAS.Infrastructure.Identity.Security;
 using OAS.Infrastructure.Numbering;
+using OAS.Application.Purchasing;
+using OAS.Application.Purchasing.Abstractions;
+using OAS.Infrastructure.Purchasing.Persistence.Repositories;
+using OAS.Infrastructure.Purchasing.Services;
 using OAS.Infrastructure.Persistence;
 using OAS.Infrastructure.Persistence.Interceptors;
 using OAS.Infrastructure.Persistence.Repositories.Generic;
@@ -108,6 +112,21 @@ public static class DependencyInjection
         services.AddScoped<
             IEmployeeExcelExporter,
             EmployeeExcelExporter>();
+
+        services.AddScoped<ISupplierCatalogRepository, SupplierCatalogRepository>();
+        services.AddScoped<IPurchaseRequestRepository, PurchaseRequestRepository>();
+        services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>();
+        services.AddScoped<IPurchaseReceiptRepository, PurchaseReceiptRepository>();
+        services.AddScoped<IPurchaseInvoiceRepository, PurchaseInvoiceRepository>();
+        services.AddScoped<IPurchasingReferenceDataPort, PurchasingReferenceDataPort>();
+        services.AddScoped<IPurchaseMatchingDataPort, PurchaseMatchingDataPort>();
+        services.AddScoped<IPurchasingSettingsPort, PurchasingSettingsPort>();
+        services.AddScoped<IPurchasingInventoryPort, PurchasingInventoryPort>();
+        services.AddScoped<IPurchasingAccountingPort, PurchasingAccountingPort>();
+
+        // Purchasing handlers are activated only after every repository/port above
+        // has a concrete Infrastructure implementation. This keeps ValidateOnBuild safe.
+        services.AddPurchasingApplication();
 
         return services;
     }

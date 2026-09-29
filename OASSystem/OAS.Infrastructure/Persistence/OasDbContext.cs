@@ -3,6 +3,7 @@ using OAS.Domain.Accounting.Entities;
 using OAS.Domain.Entities.Inventory;
 using OAS.Domain.Features.Employees.Entities;
 using OAS.Domain.Identity.Entities;
+using OAS.Domain.Purchasing.Entities;
 
 namespace OAS.Infrastructure.Persistence;
 
@@ -38,10 +39,28 @@ public sealed class OasDbContext(DbContextOptions<OasDbContext> options) : DbCon
     public DbSet<StockCountLine> StockCountLines => Set<StockCountLine>();
     public DbSet<Unit> Units => Set<Unit>();
 
+    public DbSet<SupplierCatalogItem> SupplierCatalogItems => Set<SupplierCatalogItem>();
+    public DbSet<SupplierPriceHistory> SupplierPriceHistory => Set<SupplierPriceHistory>();
+    public DbSet<PurchaseRequest> PurchaseRequests => Set<PurchaseRequest>();
+    public DbSet<PurchaseRequestLine> PurchaseRequestLines => Set<PurchaseRequestLine>();
+    public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
+    public DbSet<PurchaseOrderLine> PurchaseOrderLines => Set<PurchaseOrderLine>();
+    public DbSet<PurchaseOrderLineSource> PurchaseOrderLineSources => Set<PurchaseOrderLineSource>();
+    public DbSet<PurchaseReceipt> PurchaseReceipts => Set<PurchaseReceipt>();
+    public DbSet<PurchaseReceiptLine> PurchaseReceiptLines => Set<PurchaseReceiptLine>();
+    public DbSet<PurchaseInvoice> PurchaseInvoices => Set<PurchaseInvoice>();
+    public DbSet<PurchaseInvoiceLine> PurchaseInvoiceLines => Set<PurchaseInvoiceLine>();
+    public DbSet<PurchaseInvoiceReceiptAllocation> PurchaseInvoiceReceiptAllocations => Set<PurchaseInvoiceReceiptAllocation>();
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.HasSequence<long>("PurchaseRequestCodeSequence", "dbo");
+        modelBuilder.HasSequence<long>("PurchaseOrderCodeSequence", "dbo");
+        modelBuilder.HasSequence<long>("PurchaseReceiptCodeSequence", "dbo");
+        modelBuilder.HasSequence<long>("PurchaseInvoiceCodeSequence", "dbo");
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(OasDbContext).Assembly);
     }
 }

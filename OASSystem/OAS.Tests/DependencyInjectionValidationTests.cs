@@ -43,4 +43,25 @@ public sealed class DependencyInjectionValidationTests
             using var provider = services.BuildServiceProvider(options);
         });
     }
+    [Test]
+    public void AddApplication_DefersPurchasingHandlersUntilPurchasingInfrastructureIsRegistered()
+    {
+        var services = new ServiceCollection();
+
+        services.AddApplication();
+
+        var prematurePurchasingHandlers = services
+            .Where(descriptor =>
+                descriptor.ImplementationType?.Namespace?.StartsWith("OAS.Application.Purchasing", StringComparison.Ordinal) == true
+                && descriptor.ServiceType.Namespace == "MediatR"
+                && descriptor.ServiceType.Name.StartsWith("IRequestHandler", StringComparison.Ordinal))
+            .ToArray();
+
+        Assert.That(prematurePurchasingHandlers, Is.Empty,
+            "Purchasing MediatR handlers must not be activated until Purchasing Infrastructure repositories/ports are registered.");
+
+        Assert.That(services.Any(descriptor => descriptor.ImplementationType?.FullName == "OAS.Application.Purchasing.Mapping.PurchasingMapper"), Is.False);
+        Assert.That(services.Any(descriptor => descriptor.ImplementationType?.FullName == "OAS.Application.Purchasing.Matching.PurchaseMatchingService"), Is.False);
+    }
+
 }

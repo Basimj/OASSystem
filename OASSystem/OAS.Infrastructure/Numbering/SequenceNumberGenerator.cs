@@ -71,6 +71,10 @@ public sealed class SequenceNumberGenerator(
             "PrescriptionCodeSequence" => "[dbo].[PrescriptionCodeSequence]",
             "CustomerOrderCodeSequence" => "[dbo].[CustomerOrderCodeSequence]",
             "SalesInvoiceCodeSequence" => "[dbo].[SalesInvoiceCodeSequence]",
+            "PurchaseRequestCodeSequence" => "[dbo].[PurchaseRequestCodeSequence]",
+            "PurchaseOrderCodeSequence" => "[dbo].[PurchaseOrderCodeSequence]",
+            "PurchaseReceiptCodeSequence" => "[dbo].[PurchaseReceiptCodeSequence]",
+            "PurchaseInvoiceCodeSequence" => "[dbo].[PurchaseInvoiceCodeSequence]",
             _ => null
         };
 

@@ -1,0 +1,25 @@
+namespace OAS.Contracts.Purchasing.SupplierCatalog;
+
+public sealed record SupplierCatalogItemDto(
+    Guid Id,
+    Guid SupplierId,
+    string? SupplierCode,
+    string? SupplierName,
+    Guid ProductVariantId,
+    string? ProductCode,
+    string? ProductName,
+    string? SupplierProductCode,
+    string? SupplierProductName,
+    Guid PurchaseUnitId,
+    string? PurchaseUnitName,
+    decimal UnitConversionFactor,
+    int? LeadTimeDays,
+    decimal MinimumOrderQuantity,
+    bool IsPreferred,
+    bool IsActive,
+    IReadOnlyList<SupplierPriceHistoryDto> PriceHistory,
+    string RowVersion,
+    DateTimeOffset CreatedAtUtc,
+    string? CreatedBy,
+    DateTimeOffset? LastModifiedAtUtc,
+    string? LastModifiedBy);

@@ -1,0 +1,35 @@
+using OAS.Contracts.Purchasing.Enums;
+
+namespace OAS.Contracts.Purchasing.PurchaseReceipts;
+
+public sealed record PurchaseReceiptDto(
+    Guid Id,
+    string ReceiptCode,
+    Guid PurchaseOrderId,
+    string? PurchaseOrderCode,
+    Guid SupplierId,
+    string? SupplierCode,
+    string? SupplierName,
+    Guid WarehouseId,
+    string? WarehouseCode,
+    string? WarehouseName,
+    DateOnly ReceiptDate,
+    DateOnly PostingDate,
+    string? SupplierDeliveryCode,
+    PurchaseReceiptStatus Status,
+    Guid? InventoryTransactionId,
+    Guid? JournalEntryId,
+    string? Notes,
+    string? ConfirmedBy,
+    DateTimeOffset? ConfirmedAt,
+    string? PostedBy,
+    DateTimeOffset? PostedAt,
+    string? CancelledBy,
+    DateTimeOffset? CancelledAt,
+    string? CancellationReason,
+    IReadOnlyList<PurchaseReceiptLineDto> Lines,
+    string RowVersion,
+    DateTimeOffset CreatedAtUtc,
+    string? CreatedBy,
+    DateTimeOffset? LastModifiedAtUtc,
+    string? LastModifiedBy);

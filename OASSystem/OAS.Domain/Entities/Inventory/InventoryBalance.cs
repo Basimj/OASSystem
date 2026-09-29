@@ -83,6 +83,22 @@ public class InventoryBalance : AuditableEntity<Guid>
         LastMovementAtUtc = movementAtUtc;
     }
 
+    public void IncreaseOnOrder(decimal quantity)
+    {
+        EnsurePositive(quantity, "On-order quantity");
+        OnOrderQuantity += quantity;
+    }
+
+    public void DecreaseOnOrder(decimal quantity)
+    {
+        EnsurePositive(quantity, "On-order quantity");
+
+        if (OnOrderQuantity < quantity)
+            throw new DomainException("On-order quantity cannot become negative.");
+
+        OnOrderQuantity -= quantity;
+    }
+
     public void ApplyInbound(decimal quantity, decimal unitCost, DateTimeOffset movementAtUtc)
     {
         if (quantity <= 0)

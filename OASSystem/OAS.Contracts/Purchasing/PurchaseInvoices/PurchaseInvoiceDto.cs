@@ -1,0 +1,42 @@
+using OAS.Contracts.Purchasing.Enums;
+using OAS.Contracts.Sales.Enums;
+
+namespace OAS.Contracts.Purchasing.PurchaseInvoices;
+
+public sealed record PurchaseInvoiceDto(
+    Guid Id,
+    string PurchaseInvoiceCode,
+    string? SupplierInvoiceCode,
+    Guid SupplierId,
+    string? SupplierCode,
+    string? SupplierName,
+    DateOnly InvoiceDate,
+    DateOnly PostingDate,
+    Guid CurrencyId,
+    string? CurrencyCode,
+    decimal ExchangeRate,
+    DateOnly ExchangeRateDate,
+    TaxCalculationMode TaxCalculationMode,
+    PurchaseInvoiceStatus Status,
+    decimal Subtotal,
+    decimal DiscountAmount,
+    decimal TaxAmount,
+    decimal TotalAmount,
+    decimal BaseSubtotal,
+    decimal BaseTaxAmount,
+    decimal BaseTotalAmount,
+    Guid? JournalEntryId,
+    string? Notes,
+    string? ConfirmedBy,
+    DateTimeOffset? ConfirmedAt,
+    string? PostedBy,
+    DateTimeOffset? PostedAt,
+    string? CancelledBy,
+    DateTimeOffset? CancelledAt,
+    string? CancellationReason,
+    IReadOnlyList<PurchaseInvoiceLineDto> Lines,
+    string RowVersion,
+    DateTimeOffset CreatedAtUtc,
+    string? CreatedBy,
+    DateTimeOffset? LastModifiedAtUtc,
+    string? LastModifiedBy);

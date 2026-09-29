@@ -259,6 +259,84 @@ public sealed class EfUnitOfWork(OasDbContext dbContext) : IUnitOfWork
             return true;
         }
 
+        if (message.Contains("UX_SupplierCatalogItems_Supplier_ProductVariant_PurchaseUnit", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("purchasing_supplier_catalog_duplicate", "هذا المورد مرتبط مسبقًا بنفس المنتج ووحدة الشراء.");
+            return true;
+        }
+
+        if (message.Contains("UX_SupplierPriceHistory_Current_Catalog_Currency", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("purchasing_supplier_current_price_exists", "يوجد سعر حالي فعال مسبقًا لنفس عنصر كتالوج المورد والعملة.");
+            return true;
+        }
+
+        if (message.Contains("UX_PurchaseRequests_RequestCode", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("purchasing_request_code_exists", "كود طلب الشراء مستخدم مسبقًا.");
+            return true;
+        }
+
+        if (message.Contains("UX_PurchaseRequestLines_Request_LineSequence", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("purchasing_request_line_sequence_exists", "رقم سطر طلب الشراء مكرر داخل نفس الطلب.");
+            return true;
+        }
+
+        if (message.Contains("UX_PurchaseOrders_PurchaseOrderCode", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("purchasing_order_code_exists", "كود أمر الشراء مستخدم مسبقًا.");
+            return true;
+        }
+
+        if (message.Contains("UX_PurchaseOrderLines_Order_LineSequence", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("purchasing_order_line_sequence_exists", "رقم سطر أمر الشراء مكرر داخل نفس الأمر.");
+            return true;
+        }
+
+        if (message.Contains("UX_PurchaseOrderLineSources_OrderLine_RequestLine", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("purchasing_order_line_source_duplicate", "تم ربط سطر طلب الشراء بهذا السطر من أمر الشراء مسبقًا.");
+            return true;
+        }
+
+        if (message.Contains("UX_PurchaseReceipts_ReceiptCode", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("purchasing_receipt_code_exists", "كود استلام المشتريات مستخدم مسبقًا.");
+            return true;
+        }
+
+        if (message.Contains("UX_PurchaseReceiptLines_Receipt_LineSequence", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("purchasing_receipt_line_sequence_exists", "رقم سطر الاستلام مكرر داخل نفس السند.");
+            return true;
+        }
+
+        if (message.Contains("UX_PurchaseInvoices_Supplier_SupplierInvoiceCode", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("purchasing_supplier_invoice_duplicate", "فاتورة المورد مسجلة مسبقًا لنفس المورد.");
+            return true;
+        }
+
+        if (message.Contains("UX_PurchaseInvoices_PurchaseInvoiceCode", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("purchasing_invoice_code_exists", "كود فاتورة المشتريات مستخدم مسبقًا.");
+            return true;
+        }
+
+        if (message.Contains("UX_PurchaseInvoiceLines_Invoice_LineSequence", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("purchasing_invoice_line_sequence_exists", "رقم سطر فاتورة المشتريات مكرر داخل نفس الفاتورة.");
+            return true;
+        }
+
+        if (message.Contains("UX_PurchaseInvoiceReceiptAllocations_InvoiceLine_ReceiptLine", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("purchasing_match_allocation_duplicate", "تمت إضافة نفس علاقة المطابقة بين سطر الفاتورة وسطر الاستلام مسبقًا.");
+            return true;
+        }
+
         conflict = new ConflictException("unique_constraint_conflict", "A unique value already exists.");
         return true;
     }

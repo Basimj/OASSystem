@@ -1,0 +1,27 @@
+namespace OAS.Contracts.Purchasing.PurchaseOrders;
+
+public sealed record PurchaseOrderLineDto(
+    Guid Id,
+    Guid PurchaseOrderId,
+    int LineSequence,
+    Guid ProductVariantId,
+    Guid? SupplierCatalogItemId,
+    Guid PurchaseUnitId,
+    decimal UnitConversionFactor,
+    string? ProductCodeSnapshot,
+    string ProductNameSnapshot,
+    string? UnitNameSnapshot,
+    decimal OrderedQuantity,
+    decimal BaseQuantity,
+    decimal ReceivedBaseQuantity,
+    decimal RemainingBaseQuantity,
+    decimal UnitPrice,
+    decimal DiscountAmount,
+    decimal NetAmount,
+    decimal TaxRate,
+    decimal TaxAmount,
+    decimal FinalAmount,
+    DateOnly? ExpectedDeliveryDate,
+    string? Notes,
+    IReadOnlyList<PurchaseOrderLineSourceDto> Sources,
+    string RowVersion);

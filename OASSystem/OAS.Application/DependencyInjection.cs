@@ -40,7 +40,15 @@ public static class DependencyInjection
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         var assembly = typeof(DependencyInjection).Assembly;
-        services.AddMediatR(configuration => configuration.RegisterServicesFromAssembly(assembly));
+        services.AddMediatR(configuration =>
+        {
+            // Purchasing handlers are activated by AddPurchasingApplication only after
+            // their Infrastructure repositories/ports have been registered. Keeping
+            // them out of the base scan makes the project runnable while Purchasing
+            // is being delivered layer-by-layer.
+            configuration.TypeEvaluator = type => !IsPurchasingApplicationType(type);
+            configuration.RegisterServicesFromAssembly(assembly);
+        });
         services.AddValidatorsFromAssembly(assembly);
         services.AddApplicationMappers(assembly);
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
@@ -68,7 +76,9 @@ public static class DependencyInjection
     public static IServiceCollection AddApplicationMappers(this IServiceCollection services, System.Reflection.Assembly assembly)
     {
         var mapperTypes = assembly.GetTypes()
-            .Where(t => t is { IsClass: true, IsAbstract: false } && t.Name.EndsWith("Mapper", StringComparison.Ordinal));
+            .Where(t => t is { IsClass: true, IsAbstract: false }
+                && t.Name.EndsWith("Mapper", StringComparison.Ordinal)
+                && !IsPurchasingApplicationType(t));
 
         foreach (var mapperType in mapperTypes)
         {
@@ -101,6 +111,9 @@ public static class DependencyInjection
 
         return services;
     }
+
+    private static bool IsPurchasingApplicationType(Type type) =>
+        type.Namespace?.StartsWith("OAS.Application.Purchasing", StringComparison.Ordinal) == true;
 
     public static IServiceCollection AddCrudFeature<TEntity, TKey, TReadDto, TCreateDto, TUpdateDto>(this IServiceCollection services)
         where TEntity : Entity<TKey> where TKey : notnull
