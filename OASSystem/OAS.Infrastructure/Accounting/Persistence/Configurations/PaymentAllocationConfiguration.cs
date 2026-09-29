@@ -32,6 +32,7 @@ public sealed class PaymentAllocationConfiguration : IEntityTypeConfiguration<Pa
         builder.HasIndex(x => x.ReceiptVoucherLineId).HasDatabaseName("IX_PaymentAllocations_ReceiptVoucherLineId");
         builder.HasIndex(x => x.PaymentVoucherLineId).HasDatabaseName("IX_PaymentAllocations_PaymentVoucherLineId");
         builder.HasIndex(x => x.TargetDocumentId).HasDatabaseName("IX_PaymentAllocations_TargetDocumentId");
+        builder.HasIndex(x => new { x.TargetDocumentType, x.TargetDocumentId }).HasDatabaseName("IX_PaymentAllocations_TargetDocument");
         builder.HasIndex(x => x.CurrencyId).HasDatabaseName("IX_PaymentAllocations_CurrencyId");
 
         builder.HasOne<ReceiptVoucherLine>().WithMany().HasForeignKey(x => x.ReceiptVoucherLineId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_PaymentAllocations_ReceiptVoucherLine");

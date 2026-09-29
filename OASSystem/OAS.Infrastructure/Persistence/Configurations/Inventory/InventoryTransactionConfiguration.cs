@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using OAS.Domain.Entities.Inventory;
 
@@ -74,6 +74,9 @@ public sealed class InventoryTransactionConfiguration
 
         builder.HasIndex(x => x.DestinationWarehouseId)
             .HasDatabaseName("IX_InventoryTransactions_DestinationWarehouseId");
+
+        builder.HasIndex(x => new { x.ReferenceType, x.ReferenceId })
+            .HasDatabaseName("IX_InventoryTransactions_Reference");
 
         builder.HasOne<Warehouse>()
             .WithMany()

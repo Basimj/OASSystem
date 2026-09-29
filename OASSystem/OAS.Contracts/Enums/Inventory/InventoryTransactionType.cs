@@ -1,4 +1,4 @@
-﻿namespace OAS.Contracts.Enums.Inventory;
+namespace OAS.Contracts.Enums.Inventory;
 
 public enum InventoryTransactionType
 {
@@ -11,5 +11,6 @@ public enum InventoryTransactionType
     SalesReturn = 7,
     PurchaseReturn = 8,
     ProductionIssue = 9,
-    Scrap = 10
+    Scrap = 10,
+    Sale = 11
 }
