@@ -1,4 +1,4 @@
-using Microsoft.Data.SqlClient;
+﻿using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using NUnit.Framework;
 using OAS.Application.Common.Exceptions;
@@ -195,5 +195,26 @@ public sealed class ProductOpeningSqlServerTests
             await context.SaveChangesAsync(cancellationToken);
             throw new InvalidOperationException("Injected failure after writing opening inventory.");
         }
+
+        public Task<decimal> GetOutboundUnitCostAsync(
+            Guid warehouseId,
+            Guid productVariantId,
+            decimal quantity,
+            CancellationToken cancellationToken = default)
+            => inner.GetOutboundUnitCostAsync(
+                warehouseId, productVariantId, quantity, cancellationToken);
+
+        public Task<(InventoryBalance Balance, InventoryLedger Ledger)> PostReservedOutboundAsync(
+            Guid warehouseId,
+            Guid productVariantId,
+            decimal quantity,
+            Guid transactionId,
+            Guid transactionLineId,
+            DateTimeOffset movementDate,
+            string createdBy,
+            CancellationToken cancellationToken = default)
+            => inner.PostReservedOutboundAsync(
+                warehouseId, productVariantId, quantity, transactionId, transactionLineId,
+                movementDate, createdBy, cancellationToken);
     }
 }

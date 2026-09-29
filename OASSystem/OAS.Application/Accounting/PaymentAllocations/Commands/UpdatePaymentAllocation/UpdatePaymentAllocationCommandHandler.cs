@@ -2,12 +2,15 @@ using MediatR;
 using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Abstractions.Persistence.Specifications;
 using OAS.Application.Common.Exceptions;
+using OAS.Application.Sales.Abstractions;
 using OAS.Domain.Accounting.Entities;
+using OAS.Domain.Accounting.Enums;
 namespace OAS.Application.Accounting.PaymentAllocations.Commands.UpdatePaymentAllocation;
 public sealed class UpdatePaymentAllocationCommandHandler(
     IRepository<PaymentAllocation, Guid> repository,
     IReadRepository<ReceiptVoucherLine, Guid> receiptLines,
-    IReadRepository<PaymentVoucherLine, Guid> paymentLines) : IRequestHandler<UpdatePaymentAllocationCommand>
+    IReadRepository<PaymentVoucherLine, Guid> paymentLines,
+    ISalesPaymentAllocationTargetValidator salesInvoiceValidator) : IRequestHandler<UpdatePaymentAllocationCommand>
 {
     public async Task Handle(UpdatePaymentAllocationCommand request, CancellationToken ct)
     {
@@ -21,7 +24,13 @@ public sealed class UpdatePaymentAllocationCommandHandler(
         if (request.Data.AllocatedAmount > available)
             throw new ConflictException("payment_allocation_exceeds_available_amount", $"The requested allocation ({request.Data.AllocatedAmount}) exceeds the available source-line amount ({available}).");
         var rate = allocation.ExchangeRate ?? 1m;
-        allocation.UpdateAllocatedAmount(request.Data.AllocatedAmount, Math.Round(request.Data.AllocatedAmount * rate, 4, MidpointRounding.AwayFromZero));
+        var baseAmount = Math.Round(request.Data.AllocatedAmount * rate, 4, MidpointRounding.AwayFromZero);
+        if (allocation.TargetDocumentType == AllocationTargetDocumentType.SalesInvoice && allocation.CurrencyId.HasValue)
+        {
+            await salesInvoiceValidator.ValidateAsync(
+                allocation.TargetDocumentId, allocation.CurrencyId.Value, request.Data.AllocatedAmount, baseAmount, allocation.Id, ct);
+        }
+        allocation.UpdateAllocatedAmount(request.Data.AllocatedAmount, baseAmount);
         repository.Update(allocation);
     }
     private async Task<decimal> GetSourceAmountAsync(PaymentAllocation a, CancellationToken ct)

@@ -1,0 +1,19 @@
+@namespace OAS.UiLib.Components.Sales.Workspace
+
+<section class="ui-sales-workspace" dir="rtl">
+    @if (Actions is not null)
+    {
+        <div class="ui-sales-workspace__actions">@Actions</div>
+    }
+    @if (Tabs is not null)
+    {
+        <div class="ui-sales-workspace__tabs">@Tabs</div>
+    }
+    <div class="ui-sales-workspace__body">@Body</div>
+</section>
+
+@code {
+    [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public RenderFragment? Tabs { get; set; }
+    [Parameter] public RenderFragment? Body { get; set; }
+}

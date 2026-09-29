@@ -1,0 +1,55 @@
+@namespace OAS.UiLib.Components.Sales.Orders
+@using OAS.UiLib.Core.Models.Sales
+
+<UiSalesFormSection Title="بيانات الطلب" IconCss="fa-solid fa-clipboard-list">
+    <div class="ui-sales-form-grid">
+        <UiInputText Label="كود الطلب" Value="@Model.OrderCode" ReadOnly="true" />
+        <UiLookup Label="العميل" Value="@Model.CustomerId" ValueChanged="CustomerChanged" SelectedItem="@CustomerItem"
+                  SearchAsync="SearchCustomersAsync" Placeholder="ابحث عن العميل..." Required="true" Disabled="@ReadOnly" />
+        <UiLookup Label="Revision الوصفة" Value="@Model.PrescriptionRevisionId" ValueChanged="PrescriptionChanged" SelectedItem="@PrescriptionItem"
+                  SearchAsync="SearchPrescriptionsAsync" Placeholder="اختياري" Disabled="@ReadOnly" />
+        <UiInputDate Label="تاريخ الطلب" Value="@Model.OrderDate" ValueChanged="OrderDateChanged" Required="true" ReadOnly="@ReadOnly" />
+        <UiInputDate Label="التاريخ المطلوب" Value="@Model.RequiredDate" ValueChanged="RequiredDateChanged" ReadOnly="@ReadOnly" />
+        <UiLookup Label="العملة" Value="@Model.CurrencyId" ValueChanged="CurrencyChanged" SelectedItem="@CurrencyItem"
+                  SearchAsync="SearchCurrenciesAsync" Placeholder="اختر العملة..." Required="true" Disabled="@ReadOnly" />
+        <UiSelect Label="طريقة الضريبة" Value="@Model.TaxCalculationMode" ValueChanged="TaxModeChanged" Disabled="@ReadOnly" Options="@TaxOptions" />
+        <UiSelect Label="شروط السداد" Value="@Model.PaymentTermType" ValueChanged="PaymentTermChanged" Disabled="@ReadOnly" Options="@PaymentOptions" />
+        <UiInputText Label="ملاحظات" Value="@Model.Notes" ValueChanged="NotesChanged" ReadOnly="@ReadOnly" />
+    </div>
+</UiSalesFormSection>
+
+<UiSalesFormSection Title="أسطر الطلب" Description="يتم احتساب الإجماليات النهائية داخل Domain/Application عند الحفظ والتأكيد." IconCss="fa-solid fa-list">
+    <UiSalesLinesEditor Model="@Model.Lines" ReadOnly="@ReadOnly" SearchProductsAsync="SearchProductsAsync"
+                        SearchWarehousesAsync="SearchWarehousesAsync" SearchPrescriptionRevisionsAsync="SearchPrescriptionRevisionsAsync"
+                        OnProductSelected="OnProductSelected" OnWarehouseSelected="OnWarehouseSelected" OnChanged="OnChanged" />
+</UiSalesFormSection>
+
+<UiSalesTotalsPanel CurrencyCode="@Model.CurrencyCode" Subtotal="@Model.Subtotal" DiscountAmount="@Model.DiscountAmount" TaxAmount="@Model.TaxAmount" TotalAmount="@Model.TotalAmount" />
+
+@code {
+    private static readonly IReadOnlyList<UiSelectOption> TaxOptions = [new("Exclusive", "غير شامل الضريبة"), new("Inclusive", "شامل الضريبة")];
+    private static readonly IReadOnlyList<UiSelectOption> PaymentOptions = [new("Immediate", "فوري"), new("Credit", "آجل")];
+    [Parameter, EditorRequired] public UiCustomerOrderFormModel Model { get; set; } = new();
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchCustomersAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchPrescriptionsAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchCurrenciesAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchProductsAsync { get; set; }
+    [Parameter] public Func<UiSalesLineModel, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchWarehousesAsync { get; set; }
+    [Parameter] public Func<UiSalesLineModel, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchPrescriptionRevisionsAsync { get; set; }
+    [Parameter] public EventCallback<UiSalesSelectionChange> OnSelectionChanged { get; set; }
+    [Parameter] public EventCallback<UiSalesLineSelectionChange> OnProductSelected { get; set; }
+    [Parameter] public EventCallback<UiSalesLineSelectionChange> OnWarehouseSelected { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+    private UiLookupItem? CustomerItem => string.IsNullOrWhiteSpace(Model.CustomerId) ? null : new(Model.CustomerId, Model.CustomerDisplay ?? Model.CustomerId);
+    private UiLookupItem? PrescriptionItem => string.IsNullOrWhiteSpace(Model.PrescriptionRevisionId) ? null : new(Model.PrescriptionRevisionId, Model.PrescriptionDisplay ?? Model.PrescriptionRevisionId);
+    private UiLookupItem? CurrencyItem => string.IsNullOrWhiteSpace(Model.CurrencyId) ? null : new(Model.CurrencyId, Model.CurrencyDisplay ?? Model.CurrencyCode ?? Model.CurrencyId);
+    private async Task CustomerChanged(string? v) { Model.CustomerId = v ?? string.Empty; await OnSelectionChanged.InvokeAsync(new("Customer", v)); await OnChanged.InvokeAsync(); }
+    private async Task PrescriptionChanged(string? v) { Model.PrescriptionRevisionId = v ?? string.Empty; await OnSelectionChanged.InvokeAsync(new("PrescriptionRevision", v)); await OnChanged.InvokeAsync(); }
+    private async Task CurrencyChanged(string? v) { Model.CurrencyId = v ?? string.Empty; await OnSelectionChanged.InvokeAsync(new("Currency", v)); await OnChanged.InvokeAsync(); }
+    private async Task OrderDateChanged(DateOnly? v) { Model.OrderDate = v; await OnChanged.InvokeAsync(); }
+    private async Task RequiredDateChanged(DateOnly? v) { Model.RequiredDate = v; await OnChanged.InvokeAsync(); }
+    private async Task TaxModeChanged(string? v) { Model.TaxCalculationMode = v ?? "Exclusive"; await OnChanged.InvokeAsync(); }
+    private async Task PaymentTermChanged(string? v) { Model.PaymentTermType = v ?? "Immediate"; await OnChanged.InvokeAsync(); }
+    private async Task NotesChanged(string? v) { Model.Notes = v; await OnChanged.InvokeAsync(); }
+}

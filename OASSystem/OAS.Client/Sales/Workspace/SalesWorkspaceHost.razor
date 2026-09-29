@@ -1,0 +1,142 @@
+@namespace OAS.Client.Sales.Workspace
+@using OAS.Client.Sales.Workspace
+@using OAS.UiLib.Core.Models.Sales
+@using OAS.UiLib.Components.Sales.Workspace
+@using OAS.UiLib.Components.Sales.Prescriptions
+@using OAS.UiLib.Components.Sales.Orders
+@using OAS.UiLib.Components.Sales.Invoices
+
+<UiSalesWorkspace>
+    <Actions>
+        <UiWorkspaceActionBar>
+            <UiButton Text="جديد" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" OnClick="NewAsync" />
+            <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Loading="@_isLoading" OnClick="RefreshAsync" />
+            <UiSearchInput Value="@_search" ValueChanged="SearchValueChanged" OnSearch="SearchAsync" Placeholder="بحث بالكود أو العميل..." />
+        </UiWorkspaceActionBar>
+    </Actions>
+    <Tabs>
+        <UiApplicationTabStrip Tabs="@TabItems" AriaLabel="تبويبات المبيعات" OnSelect="SelectTabAsync" OnClose="CloseTabAsync" OnCloseOthers="CloseOtherTabsAsync" OnCloseAll="CloseAllTabsAsync" />
+    </Tabs>
+    <Body>
+        @if (ActiveTab is null)
+        {
+            <UiSalesDocumentList Title="المبيعات" IsLoading="true" />
+        }
+        else if (ActiveTab.IsListTab)
+        {
+            <UiSalesDocumentList Title="@ListTitle" Subtitle="@ListSubtitle" Items="@ListItems" IsLoading="@_isLoading"
+                                 TotalCount="@_totalCount" PageNumber="@_pageNumber" TotalPages="@_totalPages"
+                                 EmptyTitle="@EmptyTitle" EmptyText="@EmptyText" EmptyIconCss="@ListIcon"
+                                 OnOpen="OpenEntityAsync" OnPrevious="PreviousPageAsync" OnNext="NextPageAsync" />
+        }
+        else if (ActiveTab.Model is UiPrescriptionFormModel prescription)
+        {
+            <UiSalesEditorSurface Title="@(prescription.Id.HasValue ? prescription.PrescriptionCode : "وصفة جديدة")"
+                                  Subtitle="الوصفة الطبية وإصدارات قياسات العين" IconCss="fa-solid fa-glasses"
+                                  StatusText="@prescription.StatusText" StatusCssClass="@StatusCss(prescription.Status)"
+                                  ErrorText="@_error" SuccessText="@_success">
+                <Actions>
+                    @if (ActiveTab.IsEditMode)
+                    {
+                        <UiButton Text="حفظ" IconCssClass="fa-solid fa-floppy-disk" Loading="@ActiveTab.IsSaving" Size="ControlSize.Small" OnClick="SaveAsync" />
+                        @if (!ActiveTab.IsNew) { <UiButton Text="إلغاء التعديل" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CancelEditAsync" /> }
+                    }
+                    else
+                    {
+                        <UiButton Text="تعديل" IconCssClass="fa-solid fa-pen" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="BeginEditAsync" />
+                        @if (prescription.Status == "Draft")
+                        {
+                            <UiButton Text="تفعيل" IconCssClass="fa-solid fa-circle-check" Size="ControlSize.Small" OnClick="ActivatePrescriptionAsync" />
+                        }
+                        @if (prescription.Status != "Cancelled")
+                        {
+                            <UiButton Text="إلغاء الوصفة" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" OnClick="CancelPrescriptionAsync" />
+                        }
+                        <UiButton Text="Revision جديد" IconCssClass="fa-solid fa-code-branch" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="BeginRevisionAsync" />
+                    }
+                </Actions>
+                <ChildContent>
+                <UiSalesFormSection Title="بيانات الوصفة" IconCss="fa-solid fa-file-medical">
+                    <UiPrescriptionEditor Model="@prescription" ReadOnly="@(!ActiveTab.IsEditMode)" SearchCustomersAsync="SearchCustomerItemsAsync" OnCustomerSelected="PrescriptionCustomerChangedAsync" OnChanged="MarkDirtyAsync" />
+                </UiSalesFormSection>
+                @if (_revisionDraft is not null)
+                {
+                    <UiSalesFormSection Title="إصدار وصفة جديد" Description="سيصبح هذا الإصدار هو الإصدار الحالي بعد نجاح الحفظ." IconCss="fa-solid fa-code-branch">
+                        <UiPrescriptionRevisionEditor Model="@_revisionDraft" OnChanged="MarkDirtyAsync" />
+                        <UiWorkspaceActionBar>
+                            <UiButton Text="حفظ الإصدار" IconCssClass="fa-solid fa-check" Size="ControlSize.Small" OnClick="SaveRevisionAsync" />
+                            <UiButton Text="إلغاء" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CancelRevisionAsync" />
+                        </UiWorkspaceActionBar>
+                    </UiSalesFormSection>
+                }
+                </ChildContent>
+            </UiSalesEditorSurface>
+        }
+        else if (ActiveTab.Model is UiCustomerOrderFormModel order)
+        {
+            <UiSalesEditorSurface Title="@(order.Id.HasValue ? order.OrderCode : "طلب عميل جديد")" Subtitle="طلب العميل وحجز المخزون" IconCss="fa-solid fa-clipboard-list"
+                                  StatusText="@order.StatusText" StatusCssClass="@StatusCss(order.Status)" ErrorText="@_error" SuccessText="@_success">
+                <Actions>
+                    @if (ActiveTab.IsEditMode)
+                    {
+                        <UiButton Text="حفظ" IconCssClass="fa-solid fa-floppy-disk" Loading="@ActiveTab.IsSaving" Size="ControlSize.Small" OnClick="SaveAsync" />
+                        @if (!ActiveTab.IsNew) { <UiButton Text="إلغاء التعديل" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CancelEditAsync" /> }
+                    }
+                    else if (order.Status == "Draft")
+                    {
+                        <UiButton Text="تعديل" IconCssClass="fa-solid fa-pen" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="BeginEditAsync" />
+                        <UiButton Text="تأكيد الطلب" IconCssClass="fa-solid fa-check" Size="ControlSize.Small" OnClick="ConfirmOrderAsync" />
+                        <UiButton Text="إلغاء الطلب" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" OnClick="CancelOrderAsync" />
+                    }
+                    else if (order.Status != "Cancelled" && order.Status != "Completed")
+                    {
+                        <UiButton Text="إلغاء الطلب" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" OnClick="CancelOrderAsync" />
+                    }
+                </Actions>
+                <ChildContent>
+                <UiCustomerOrderEditor Model="@order" ReadOnly="@(!ActiveTab.IsEditMode)" SearchCustomersAsync="SearchCustomerItemsAsync"
+                                       SearchPrescriptionsAsync="SearchPrescriptionRevisionItemsAsync" SearchCurrenciesAsync="SearchCurrencyItemsAsync"
+                                       SearchProductsAsync="SearchProductItemsAsync" SearchWarehousesAsync="SearchWarehouseItemsAsync"
+                                       SearchPrescriptionRevisionsAsync="SearchLinePrescriptionItemsAsync" OnSelectionChanged="SelectionChangedAsync"
+                                       OnProductSelected="ProductSelectedAsync" OnWarehouseSelected="WarehouseSelectedAsync" OnChanged="MarkDirtyAsync" />
+                </ChildContent>
+            </UiSalesEditorSurface>
+        }
+        else if (ActiveTab.Model is UiSalesInvoiceFormModel invoice)
+        {
+            <UiSalesEditorSurface Title="@(invoice.Id.HasValue ? invoice.InvoiceCode : "فاتورة مبيعات جديدة")" Subtitle="فاتورة المبيعات والترحيل المخزني والمحاسبي" IconCss="fa-solid fa-file-invoice-dollar"
+                                  StatusText="@invoice.StatusText" StatusCssClass="@StatusCss(invoice.Status)" ErrorText="@_error" SuccessText="@_success">
+                <Actions>
+                    @if (ActiveTab.IsEditMode)
+                    {
+                        <UiButton Text="حفظ" IconCssClass="fa-solid fa-floppy-disk" Loading="@ActiveTab.IsSaving" Size="ControlSize.Small" OnClick="SaveAsync" />
+                        @if (!ActiveTab.IsNew) { <UiButton Text="إلغاء التعديل" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CancelEditAsync" /> }
+                    }
+                    else if (invoice.Status == "Draft")
+                    {
+                        <UiButton Text="تعديل" IconCssClass="fa-solid fa-pen" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="BeginEditAsync" />
+                        <UiButton Text="تأكيد" IconCssClass="fa-solid fa-check" Size="ControlSize.Small" OnClick="ConfirmInvoiceAsync" />
+                        <UiButton Text="إلغاء" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" OnClick="CancelInvoiceAsync" />
+                    }
+                    else if (invoice.Status == "Confirmed")
+                    {
+                        <UiButton Text="ترحيل" IconCssClass="fa-solid fa-arrow-up-right-dots" Size="ControlSize.Small" OnClick="PostInvoiceAsync" />
+                        <UiButton Text="إلغاء" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" OnClick="CancelInvoiceAsync" />
+                    }
+                    else if (invoice.Status == "Posted")
+                    {
+                        <UiButton Text="عرض القيد" IconCssClass="fa-solid fa-book-journal-whills" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="ViewJournalAsync" />
+                        <UiButton Text="عرض حركة المخزون" IconCssClass="fa-solid fa-boxes-stacked" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="ViewInventoryAsync" />
+                    }
+                </Actions>
+                <ChildContent>
+                <UiSalesInvoiceEditor Model="@invoice" ReadOnly="@InvoiceReadOnly(invoice)"
+                                      SearchCustomersAsync="SearchCustomerItemsAsync" SearchOrdersAsync="SearchOrderItemsAsync" SearchPrescriptionsAsync="SearchPrescriptionRevisionItemsAsync" SearchCurrenciesAsync="SearchCurrencyItemsAsync"
+                                      SearchProductsAsync="SearchProductItemsAsync" SearchWarehousesAsync="SearchWarehouseItemsAsync"
+                                      SearchPrescriptionRevisionsAsync="SearchLinePrescriptionItemsAsync" OnSelectionChanged="SelectionChangedAsync"
+                                      OnProductSelected="ProductSelectedAsync" OnWarehouseSelected="WarehouseSelectedAsync" OnRequestPriceOverride="RequestPriceOverrideAsync" OnChanged="MarkDirtyAsync" />
+                </ChildContent>
+            </UiSalesEditorSurface>
+        }
+    </Body>
+</UiSalesWorkspace>

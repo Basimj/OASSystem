@@ -1,0 +1,3 @@
+using MediatR;using OAS.Application.Common.Exceptions;using OAS.Application.Sales.Abstractions;using OAS.Application.Sales.Services;using OAS.Contracts.Sales.SalesInvoices;using OAS.Domain.Sales.Entities;
+namespace OAS.Application.Sales.SalesInvoices.Queries;
+public sealed class GetSalesInvoiceByIdQueryHandler(ISalesInvoiceAggregateRepository repository,SalesDtoAssembler assembler):IRequestHandler<GetSalesInvoiceByIdQuery,SalesInvoiceDto>{public async Task<SalesInvoiceDto> Handle(GetSalesInvoiceByIdQuery r,CancellationToken ct){var x=await repository.GetAggregateAsync(r.Id,false,ct)??throw new NotFoundException(nameof(SalesInvoice),r.Id);return await assembler.InvoiceAsync(x,ct);}}

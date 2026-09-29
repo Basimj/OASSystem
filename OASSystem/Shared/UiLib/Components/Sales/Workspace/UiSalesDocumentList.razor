@@ -1,0 +1,75 @@
+@namespace OAS.UiLib.Components.Sales.Workspace
+@using OAS.UiLib.Core.Models.Sales
+
+<div class="ui-sales-list" dir="rtl">
+    <div class="ui-sales-list__header">
+        <div>
+            <h2>@Title</h2>
+            @if (!string.IsNullOrWhiteSpace(Subtitle))
+            {
+                <p>@Subtitle</p>
+            }
+        </div>
+        <span class="ui-sales-list__count">@TotalCount سجل</span>
+    </div>
+
+    @if (IsLoading)
+    {
+        <div class="ui-sales-empty"><i class="fa-solid fa-circle-notch fa-spin"></i><span>جاري تحميل البيانات...</span></div>
+    }
+    else if (Items.Count == 0)
+    {
+        <div class="ui-sales-empty">
+            <i class="@EmptyIconCss"></i>
+            <strong>@EmptyTitle</strong>
+            <span>@EmptyText</span>
+        </div>
+    }
+    else
+    {
+        <div class="ui-sales-list__grid">
+            @foreach (var item in Items)
+            {
+                <button type="button" class="ui-sales-document-card" @onclick="() => OpenAsync(item.Id)">
+                    <div class="ui-sales-document-card__top">
+                        <span class="ui-sales-document-card__code">@item.Code</span>
+                        <span class="ui-sales-status @item.StatusCssClass">@item.StatusText</span>
+                    </div>
+                    <strong class="ui-sales-document-card__title">@item.PrimaryText</strong>
+                    @if (!string.IsNullOrWhiteSpace(item.SecondaryText))
+                    {
+                        <span class="ui-sales-document-card__secondary">@item.SecondaryText</span>
+                    }
+                    <div class="ui-sales-document-card__meta">
+                        @if (!string.IsNullOrWhiteSpace(item.DateText)) { <span><i class="fa-regular fa-calendar"></i>@item.DateText</span> }
+                        @if (!string.IsNullOrWhiteSpace(item.AmountText)) { <span><i class="fa-solid fa-coins"></i>@item.AmountText</span> }
+                        @if (!string.IsNullOrWhiteSpace(item.MetaText)) { <span>@item.MetaText</span> }
+                    </div>
+                </button>
+            }
+        </div>
+    }
+
+    @if (!IsLoading && TotalPages > 1)
+    {
+        <UiPagination PageNumber="@PageNumber" TotalPages="@TotalPages" TotalCount="@TotalCount"
+                      OnPrevious="OnPrevious" OnNext="OnNext" />
+    }
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public IReadOnlyList<UiSalesDocumentListItem> Items { get; set; } = [];
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public long TotalCount { get; set; }
+    [Parameter] public int PageNumber { get; set; } = 1;
+    [Parameter] public int TotalPages { get; set; }
+    [Parameter] public string EmptyTitle { get; set; } = "لا توجد بيانات";
+    [Parameter] public string EmptyText { get; set; } = "ابدأ بإنشاء سجل جديد.";
+    [Parameter] public string EmptyIconCss { get; set; } = "fa-regular fa-folder-open";
+    [Parameter] public EventCallback<Guid> OnOpen { get; set; }
+    [Parameter] public EventCallback OnPrevious { get; set; }
+    [Parameter] public EventCallback OnNext { get; set; }
+    private Task OpenAsync(Guid id) => OnOpen.InvokeAsync(id);
+}

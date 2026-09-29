@@ -16,4 +16,20 @@ public interface IInventoryPostingService
         DateTimeOffset movementDate,
         string createdBy,
         CancellationToken cancellationToken = default);
+
+    Task<decimal> GetOutboundUnitCostAsync(
+        Guid warehouseId,
+        Guid productVariantId,
+        decimal quantity,
+        CancellationToken cancellationToken = default);
+
+    Task<(InventoryBalance Balance, InventoryLedger Ledger)> PostReservedOutboundAsync(
+        Guid warehouseId,
+        Guid productVariantId,
+        decimal quantity,
+        Guid transactionId,
+        Guid transactionLineId,
+        DateTimeOffset movementDate,
+        string createdBy,
+        CancellationToken cancellationToken = default);
 }

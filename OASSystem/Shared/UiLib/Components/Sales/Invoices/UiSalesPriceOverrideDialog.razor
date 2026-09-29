@@ -1,0 +1,31 @@
+@namespace OAS.UiLib.Components.Sales.Invoices
+@using OAS.UiLib.Core.Models.Sales
+@inject IUiDialogService Dialogs
+
+<div class="ui-sales-price-override" dir="rtl">
+    <div class="ui-sales-price-override__summary"><span>السعر الأساسي</span><strong>@OriginalPrice.ToString("N2")</strong></div>
+    <label>السعر المطلوب اعتماده<input type="number" min="0" step="0.01" @bind="_overridePrice" /></label>
+    <label>سبب تغيير السعر<textarea rows="4" @bind="_reason" placeholder="اكتب سببًا واضحًا لاعتماد السعر..."></textarea></label>
+    @if (!string.IsNullOrWhiteSpace(_error)) { <div class="ui-sales-alert ui-sales-alert--error">@_error</div> }
+    <div class="ui-sales-price-override__actions">
+        <UiButton Text="إرسال طلب الاعتماد" IconCssClass="fa-solid fa-paper-plane" Size="ControlSize.Small" OnClick="SubmitAsync" />
+        <UiButton Text="إلغاء" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CancelAsync" />
+    </div>
+</div>
+
+@code {
+    [Parameter] public decimal OriginalPrice { get; set; }
+    [Parameter] public decimal OverridePrice { get; set; }
+    private decimal _overridePrice;
+    private string _reason = string.Empty;
+    private string? _error;
+    protected override void OnParametersSet() { if (_overridePrice == 0m && OverridePrice >= 0m) _overridePrice = OverridePrice; }
+    private Task CancelAsync(MouseEventArgs _) { Dialogs.Cancel(); return Task.CompletedTask; }
+    private Task SubmitAsync(MouseEventArgs _)
+    {
+        if (_overridePrice < 0) { _error = "السعر المطلوب لا يمكن أن يكون سالبًا."; return Task.CompletedTask; }
+        if (string.IsNullOrWhiteSpace(_reason)) { _error = "سبب تغيير السعر مطلوب."; return Task.CompletedTask; }
+        Dialogs.Close(new UiSalesPriceOverrideRequestModel(_overridePrice, _reason.Trim()));
+        return Task.CompletedTask;
+    }
+}

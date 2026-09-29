@@ -1,0 +1,16 @@
+@namespace OAS.UiLib.Components.Sales.Workspace
+
+<section class="ui-sales-section">
+    <div class="ui-sales-section__header">
+        @if (!string.IsNullOrWhiteSpace(IconCss)) { <i class="@IconCss"></i> }
+        <div><h3>@Title</h3>@if (!string.IsNullOrWhiteSpace(Description)){<p>@Description</p>}</div>
+    </div>
+    <div class="ui-sales-section__body">@ChildContent</div>
+</section>
+
+@code {
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public string? IconCss { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

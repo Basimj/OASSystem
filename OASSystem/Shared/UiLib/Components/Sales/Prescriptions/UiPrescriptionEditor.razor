@@ -1,0 +1,60 @@
+@namespace OAS.UiLib.Components.Sales.Prescriptions
+@using OAS.UiLib.Core.Models.Sales
+
+<div class="ui-sales-form-grid">
+    <UiInputText Label="كود الوصفة" Value="@Model.PrescriptionCode" ValueChanged="CodeChanged" ReadOnly="true" />
+    <UiLookup Label="العميل" Value="@Model.CustomerId" ValueChanged="CustomerChanged" SearchAsync="SearchCustomersAsync"
+              SelectedItem="@CustomerItem" Placeholder="ابحث بالكود أو الاسم أو الجوال..." Required="true" Disabled="@ReadOnly" />
+    <UiInputDate Label="تاريخ الوصفة" Value="@Model.PrescriptionDate" ValueChanged="DateChanged" Required="true" ReadOnly="@ReadOnly" />
+    <UiInputText Label="الطبيب / الفاحص" Value="@Model.PrescribedBy" ValueChanged="PrescriberChanged" ReadOnly="@ReadOnly" />
+    <UiInputText Label="العيادة" Value="@Model.ClinicName" ValueChanged="ClinicChanged" ReadOnly="@ReadOnly" />
+    <UiInputText Label="ملاحظات" Value="@Model.Notes" ValueChanged="NotesChanged" ReadOnly="@ReadOnly" />
+</div>
+
+@if (Model.Revisions.Count > 0)
+{
+    <div class="ui-sales-revisions">
+        <div class="ui-sales-revisions__title"><strong>إصدارات الوصفة</strong><span>@Model.Revisions.Count إصدار</span></div>
+        @foreach (var revision in Model.Revisions.OrderByDescending(x => x.RevisionNumber))
+        {
+            <div class="ui-sales-revision-card">
+                <div class="ui-sales-revision-card__header">
+                    <strong>الإصدار @revision.RevisionNumber</strong>
+                    @if (revision.IsCurrent) { <span class="ui-sales-status ui-sales-status--active">الحالي</span> }
+                    <span>@revision.EffectiveDate?.ToString("yyyy-MM-dd")</span>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(revision.Reason)) { <p>@revision.Reason</p> }
+                <div class="ui-sales-eye-grid">
+                    @foreach (var eye in revision.Eyes)
+                    {
+                        <div class="ui-sales-eye-card">
+                            <strong>@eye.EyeText</strong>
+                            <span>SPH: @(eye.SPH?.ToString("0.00") ?? "-")</span>
+                            <span>CYL: @(eye.CYL?.ToString("0.00") ?? "-")</span>
+                            <span>Axis: @(eye.Axis?.ToString() ?? "-")</span>
+                            <span>ADD: @(eye.ADD?.ToString("0.00") ?? "-")</span>
+                            <span>PD: @(eye.PD?.ToString("0.00") ?? "-")</span>
+                            <span>VA: @(eye.VA ?? "-")</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public UiPrescriptionFormModel Model { get; set; } = new();
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchCustomersAsync { get; set; }
+    [Parameter] public EventCallback<string?> OnCustomerSelected { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private UiLookupItem? CustomerItem => string.IsNullOrWhiteSpace(Model.CustomerId) ? null : new(Model.CustomerId, Model.CustomerDisplay ?? Model.CustomerId);
+    private async Task CodeChanged(string? value) { Model.PrescriptionCode = value ?? string.Empty; await OnChanged.InvokeAsync(); }
+    private async Task CustomerChanged(string? value) { Model.CustomerId = value ?? string.Empty; await OnCustomerSelected.InvokeAsync(value); await OnChanged.InvokeAsync(); }
+    private async Task DateChanged(DateOnly? value) { Model.PrescriptionDate = value; await OnChanged.InvokeAsync(); }
+    private async Task PrescriberChanged(string? value) { Model.PrescribedBy = value; await OnChanged.InvokeAsync(); }
+    private async Task ClinicChanged(string? value) { Model.ClinicName = value; await OnChanged.InvokeAsync(); }
+    private async Task NotesChanged(string? value) { Model.Notes = value; await OnChanged.InvokeAsync(); }
+}

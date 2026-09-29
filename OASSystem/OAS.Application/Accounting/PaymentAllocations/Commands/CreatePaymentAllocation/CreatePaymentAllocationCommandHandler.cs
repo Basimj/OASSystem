@@ -2,6 +2,7 @@ using MediatR;
 using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Abstractions.Persistence.Specifications;
 using OAS.Application.Common.Exceptions;
+using OAS.Application.Sales.Abstractions;
 using OAS.Domain.Accounting.Entities;
 using DomainAllocationTargetDocumentType = OAS.Domain.Accounting.Enums.AllocationTargetDocumentType;
 namespace OAS.Application.Accounting.PaymentAllocations.Commands.CreatePaymentAllocation;
@@ -9,6 +10,7 @@ public sealed class CreatePaymentAllocationCommandHandler(
     IRepository<PaymentAllocation, Guid> repository,
     IReadRepository<ReceiptVoucherLine, Guid> receiptLines,
     IReadRepository<PaymentVoucherLine, Guid> paymentLines,
+    ISalesPaymentAllocationTargetValidator salesInvoiceValidator,
     TimeProvider timeProvider) : IRequestHandler<CreatePaymentAllocationCommand, Guid>
 {
     public async Task<Guid> Handle(CreatePaymentAllocationCommand request, CancellationToken ct)
@@ -23,6 +25,11 @@ public sealed class CreatePaymentAllocationCommandHandler(
         if (d.AllocatedAmount > available)
             throw new ConflictException("payment_allocation_exceeds_available_amount", $"The requested allocation ({d.AllocatedAmount}) exceeds the available source-line amount ({available}).");
         var baseAmount = Math.Round(d.AllocatedAmount * source.ExchangeRate, 4, MidpointRounding.AwayFromZero);
+        if ((DomainAllocationTargetDocumentType)(byte)d.TargetDocumentType == DomainAllocationTargetDocumentType.SalesInvoice)
+        {
+            await salesInvoiceValidator.ValidateAsync(
+                d.TargetDocumentId, source.CurrencyId, d.AllocatedAmount, baseAmount, null, ct);
+        }
         var entity = PaymentAllocation.CreateLineAllocation(Guid.NewGuid(), d.ReceiptVoucherLineId, d.PaymentVoucherLineId,
             (DomainAllocationTargetDocumentType)(byte)d.TargetDocumentType, d.TargetDocumentId,
             source.CurrencyId, source.CurrencyCode, d.AllocatedAmount, source.ExchangeRate, baseAmount,
