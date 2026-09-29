@@ -1,0 +1,4 @@
+.ui-purchasing-number { display:grid; gap:var(--oas-space-1); }
+.ui-purchasing-number label { font-size:var(--oas-font-sm); color:var(--oas-color-text-muted); }
+.ui-purchasing-number input { width:100%; box-sizing:border-box; min-height:var(--oas-control-sm); border:1px solid var(--oas-color-border); border-radius:var(--oas-radius-md); background:var(--oas-color-surface); color:var(--oas-color-text); padding-inline:var(--oas-space-2); }
+.ui-purchasing-number input:focus { outline:none; border-color:var(--oas-color-primary); box-shadow:0 0 0 2px color-mix(in srgb,var(--oas-color-primary) 18%,transparent); }

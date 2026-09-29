@@ -73,6 +73,11 @@
         new("inventory-stock-counts", "الجرد المخزني", "/inventory/stock-counts", "fa-solid fa-clipboard-check"),
         new("daily-orders", "الطلبات اليومية", "/daily-orders", "fa-regular fa-calendar-check"),
         new("purchases", "المشتريات", "/purchases", "fa-solid fa-bag-shopping"),
+        new("purchasing-requests", "طلبات الشراء", "/purchases/requests", "fa-solid fa-clipboard-list"),
+        new("purchasing-orders", "أوامر الشراء", "/purchases/orders", "fa-solid fa-file-signature"),
+        new("purchasing-receipts", "استلام المشتريات", "/purchases/receipts", "fa-solid fa-truck-ramp-box"),
+        new("purchasing-invoices", "فواتير المشتريات", "/purchases/invoices", "fa-solid fa-file-invoice-dollar"),
+        new("purchasing-catalog", "كتالوج المورد", "/purchases/supplier-catalog", "fa-solid fa-box-open"),
         new("finance", "المحاسبة العامة", "/accounting", "fa-solid fa-calculator"),
         new("accounting-accounts", "شجرة الحسابات", "/accounting/accounts", "fa-solid fa-folder-tree"),
         new("accounting-journals", "القيود اليومية", "/accounting/journals", "fa-solid fa-book-journal-whills"),
@@ -133,7 +138,7 @@
             "inventory-ledger",
             "inventory-stock-counts"
         ]),
-        new("purchasing", "المشتريات", "fa-solid fa-bag-shopping", ["purchases"]),
+        new("purchasing", "المشتريات", "fa-solid fa-bag-shopping", ["purchases", "purchasing-requests", "purchasing-orders", "purchasing-receipts", "purchasing-invoices", "purchasing-catalog"]),
         new("administration", "الإدارة", "fa-solid fa-people-group", ["employees", "departments", "users", "roles", "job-titles"]),
         new("reports-group", "التقارير", "fa-solid fa-chart-line", ["reports"]),
         new("system", "النظام", "fa-solid fa-sliders", ["settings"], DefaultExpanded: false)

@@ -1,0 +1,83 @@
+@namespace OAS.UiLib.Components.Purchasing
+@using OAS.UiLib.Core.Models.Purchasing
+@using OAS.UiLib.Core.Models
+
+<UiPurchasingEditorShell Title="@Model.PurchaseInvoiceCode" Subtitle="فاتورة المورد والمطابقة الثلاثية" StatusText="@Model.StatusText">
+    <UiPurchasingSection Title="بيانات الفاتورة">
+        <UiPurchasingFormGrid>
+            <UiInputText Label="رقم فاتورة المورد" Value="Model.SupplierInvoiceCode" ValueChanged="SupplierInvoiceCodeChanged" Disabled="@(!IsEditable)" MaxLength="100" />
+            <UiLookup Label="المورد" Required="true" Value="@GuidText(Model.SupplierId)" SelectedItem="@Selected(Model.SupplierId,Model.SupplierName,"fa-solid fa-truck-field")" SearchAsync="SupplierSearchAsync" ValueChanged="SupplierChanged" Disabled="@(!IsEditable)" />
+            <UiInputDate Label="تاريخ الفاتورة" Value="Model.InvoiceDate" ValueChanged="InvoiceDateChanged" Disabled="@(!IsEditable)" />
+            <UiInputDate Label="تاريخ الترحيل" Value="Model.PostingDate" ValueChanged="PostingDateChanged" Disabled="@(!IsEditable)" />
+            <UiLookup Label="العملة" Required="true" Value="@GuidText(Model.CurrencyId)" SelectedItem="@Selected(Model.CurrencyId,Model.CurrencyCode,"fa-solid fa-coins")" SearchAsync="CurrencySearchAsync" ValueChanged="CurrencyChanged" Disabled="@(!IsEditable)" />
+            <UiPurchasingNumberField Label="سعر الصرف" Value="Model.ExchangeRate" ValueChanged="ExchangeRateChanged" Disabled="@(!IsEditable)" Step="0.00000001" Min="0.00000001" />
+            <UiInputDate Label="تاريخ سعر الصرف" Value="Model.ExchangeRateDate" ValueChanged="ExchangeRateDateChanged" Disabled="@(!IsEditable)" />
+            <UiSelect Label="طريقة الضريبة" Value="@Model.TaxCalculationMode.ToString()" Options="TaxModeOptions" Disabled="@(!IsEditable)" OnValueChanged="TaxModeChanged" />
+            <UiInputText Label="ملاحظات" Value="Model.Notes" ValueChanged="NotesChanged" Disabled="@(!IsEditable)" MaxLength="1000" />
+        </UiPurchasingFormGrid>
+    </UiPurchasingSection>
+
+    <UiPurchasingSection Title="بنود الفاتورة">
+        @if(IsEditable){<UiButton Text="إضافة بند" IconCssClass="fa-solid fa-plus" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="AddLineAsync" />}
+        <UiPurchasingLineTable>
+            @foreach(var line in Model.Lines.OrderBy(x=>x.LineSequence))
+            {
+                <div class="ui-purchasing-invoice-line">
+                    <div class="ui-purchasing-invoice-line__head"><strong>البند @line.LineSequence</strong>@if(IsEditable){<UiButton Text="حذف" IconCssClass="fa-regular fa-trash-can" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="@(_=>RemoveLineAsync(line))" />}</div>
+                    <UiPurchasingFormGrid>
+                        <UiLookup Label="المنتج" Required="true" Value="@GuidText(line.ProductVariantId)" SelectedItem="@Selected(line.ProductVariantId,line.ProductName,"fa-solid fa-box")" SearchAsync="ProductSearchAsync" ValueChanged="@(v=>ProductChanged(line,v))" Disabled="@(!IsEditable)" />
+                        <UiPurchasingNumberField Label="الكمية" Value="line.Quantity" ValueChanged="@(v=>QuantityChanged(line,v))" Disabled="@(!IsEditable)" />
+                        <UiPurchasingNumberField Label="سعر الوحدة" Value="line.UnitPrice" ValueChanged="@(v=>PriceChanged(line,v))" Disabled="@(!IsEditable)" Step="0.0001" />
+                        <UiPurchasingNumberField Label="الخصم" Value="line.DiscountAmount" ValueChanged="@(v=>DiscountChanged(line,v))" Disabled="@(!IsEditable)" Step="0.0001" />
+                        <UiPurchasingNumberField Label="نسبة الضريبة" Value="line.TaxRate" ValueChanged="@(v=>TaxChanged(line,v))" Disabled="@(!IsEditable)" Step="0.000001" />
+                        <UiPurchasingNumberField Label="الإجمالي" Value="line.FinalAmount" Disabled="true" Step="0.0001" />
+                    </UiPurchasingFormGrid>
+                </div>
+            }
+        </UiPurchasingLineTable>
+    </UiPurchasingSection>
+
+    <UiPurchasingSection Title="الإجماليات">
+        <div class="ui-purchasing-invoice-totals">
+            <span><small>الصافي</small><strong>@Model.Subtotal.ToString("N2")</strong></span>
+            <span><small>الخصم</small><strong>@Model.DiscountAmount.ToString("N2")</strong></span>
+            <span><small>الضريبة</small><strong>@Model.TaxAmount.ToString("N2")</strong></span>
+            <span><small>الإجمالي</small><strong>@Model.TotalAmount.ToString("N2")</strong></span>
+        </div>
+    </UiPurchasingSection>
+
+    @if(Model.Match is not null)
+    {
+        <UiPurchaseMatchPanel Model="Model.Match" />
+        <UiPurchaseVariancePanel Model="Model.Match" />
+    }
+</UiPurchasingEditorShell>
+
+@code {
+    [Parameter,EditorRequired] public UiPurchaseInvoiceEditorModel Model {get;set;}=new();
+    [Parameter] public bool IsEditable {get;set;}=true;
+    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SupplierSearchAsync {get;set;}
+    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? CurrencySearchAsync {get;set;}
+    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? ProductSearchAsync {get;set;}
+    [Parameter] public EventCallback OnChanged {get;set;}
+    private static readonly IReadOnlyList<UiSelectOption> TaxModeOptions=[new("1","غير شامل"),new("2","شامل")];
+    private static string? GuidText(Guid? id)=>id?.ToString("D"); private static Guid? Parse(string? v)=>Guid.TryParse(v,out var x)?x:null;
+    private static UiLookupItem? Selected(Guid? id,string? text,string icon)=>id.HasValue?new(id.Value.ToString("D"),text??id.Value.ToString("D"),null,icon):null;
+    private Task Changed()=>OnChanged.InvokeAsync();
+    private async Task SupplierInvoiceCodeChanged(string? v){Model.SupplierInvoiceCode=v;await Changed();}
+    private async Task SupplierChanged(string? v){Model.SupplierId=Parse(v);await Changed();}
+    private async Task InvoiceDateChanged(DateOnly? v){if(v.HasValue)Model.InvoiceDate=v.Value;await Changed();}
+    private async Task PostingDateChanged(DateOnly? v){if(v.HasValue)Model.PostingDate=v.Value;await Changed();}
+    private async Task CurrencyChanged(string? v){Model.CurrencyId=Parse(v);await Changed();}
+    private async Task ExchangeRateChanged(decimal v){Model.ExchangeRate=v;await Changed();}
+    private async Task ExchangeRateDateChanged(DateOnly? v){if(v.HasValue)Model.ExchangeRateDate=v.Value;await Changed();}
+    private async Task TaxModeChanged(string? v){if(byte.TryParse(v,out var x))Model.TaxCalculationMode=x;await Changed();}
+    private async Task NotesChanged(string? v){Model.Notes=v;await Changed();}
+    private async Task AddLineAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _){Model.Lines.Add(new(){LineSequence=Model.Lines.Count+1});await Changed();}
+    private async Task RemoveLineAsync(UiPurchaseInvoiceLineModel l){Model.Lines.Remove(l);for(var i=0;i<Model.Lines.Count;i++)Model.Lines[i].LineSequence=i+1;await Changed();}
+    private async Task ProductChanged(UiPurchaseInvoiceLineModel l,string? v){l.ProductVariantId=Parse(v);await Changed();}
+    private async Task QuantityChanged(UiPurchaseInvoiceLineModel l,decimal v){l.Quantity=v;await Changed();}
+    private async Task PriceChanged(UiPurchaseInvoiceLineModel l,decimal v){l.UnitPrice=v;await Changed();}
+    private async Task DiscountChanged(UiPurchaseInvoiceLineModel l,decimal v){l.DiscountAmount=v;await Changed();}
+    private async Task TaxChanged(UiPurchaseInvoiceLineModel l,decimal v){l.TaxRate=v;await Changed();}
+}

@@ -1,0 +1,4 @@
+.ui-purchasing-editor-note { padding:var(--oas-space-3); border:1px dashed var(--oas-color-border); border-radius:var(--oas-radius-md); color:var(--oas-color-text-muted); }
+.ui-purchasing-price-list { display:grid; gap:var(--oas-space-2); }
+.ui-purchasing-price-row { display:grid; grid-template-columns:1fr 1.2fr auto; gap:var(--oas-space-2); padding:var(--oas-space-2); border:1px solid var(--oas-color-border); border-radius:var(--oas-radius-md); align-items:center; }
+.ui-purchasing-price-row span { color:var(--oas-color-text-muted); font-size:var(--oas-font-sm); }

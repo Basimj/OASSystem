@@ -1,0 +1,101 @@
+@using OAS.Client.Purchasing.Workspace
+@using OAS.UiLib.Components.Purchasing
+@using OAS.UiLib.Core.Models.Purchasing
+
+<UiPurchasingWorkspace>
+    <Actions>
+        <UiWorkspaceActionBar>
+            @if (IsListTab)
+            {
+                <UiButton Text="جديد" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" OnClick="OpenNewAsync" />
+                <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Loading="_isLoadingList" OnClick="RefreshListAsync" />
+                <UiSearchInput Value="_search" ValueChanged="SearchTextChanged" OnSearch="SearchAsync" Placeholder="بحث في السجلات..." DebounceMilliseconds="300" />
+            }
+            else
+            {
+                <UiButton Text="تعديل" IconCssClass="fa-solid fa-pen-to-square" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(!CanBeginEdit)" OnClick="BeginEditAsync" />
+                <UiButton Text="حفظ" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small" Loading="@(ActiveTab?.IsSaving==true)" Disabled="@(!CanSave)" OnClick="SaveAsync" />
+                <UiButton Text="إلغاء التعديل" IconCssClass="fa-solid fa-arrow-rotate-left" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Disabled="@(!CanCancelEdit)" OnClick="CancelEditAsync" />
+                <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Disabled="@(ActiveTab?.IsNew==true)" OnClick="RefreshActiveAsync" />
+                <UiButton Text="إغلاق" IconCssClass="fa-solid fa-xmark" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CloseActiveAsync" />
+                @if (ShowSubmitRequest) { <UiButton Text="إرسال للاعتماد" IconCssClass="fa-solid fa-paper-plane" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="SubmitRequestAsync" /> }
+                @if (ShowApproveRequest) { <UiButton Text="اعتماد" IconCssClass="fa-solid fa-circle-check" Size="ControlSize.Small" OnClick="ApproveRequestAsync" /><UiButton Text="رفض" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" OnClick="RejectRequestAsync" /> }
+                @if (ShowCancelRequest) { <UiButton Text="إلغاء الطلب" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" OnClick="CancelRequestAsync" /> }
+                @if (ShowCreateOrderFromRequest) { <UiButton Text="إنشاء أمر شراء" IconCssClass="fa-solid fa-file-circle-plus" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="CreateOrderFromRequestAsync" /> }
+
+                @if (ShowSubmitOrder) { <UiButton Text="إرسال للاعتماد" IconCssClass="fa-solid fa-paper-plane" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="SubmitOrderAsync" /> }
+                @if (ShowApproveOrder) { <UiButton Text="اعتماد" IconCssClass="fa-solid fa-circle-check" Size="ControlSize.Small" OnClick="ApproveOrderAsync" /><UiButton Text="رفض" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" OnClick="RejectOrderAsync" /> }
+                @if (ShowSendOrder) { <UiButton Text="إرسال للمورد" IconCssClass="fa-solid fa-paper-plane" Size="ControlSize.Small" OnClick="SendOrderAsync" /> }
+                @if (ShowCreateReceipt) { <UiButton Text="إنشاء استلام" IconCssClass="fa-solid fa-truck-ramp-box" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="CreateReceiptFromOrderAsync" /> }
+                @if (ShowCloseOrder) { <UiButton Text="إغلاق الأمر" IconCssClass="fa-solid fa-lock" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="CloseOrderAsync" /> }
+                @if (ShowCancelOrder) { <UiButton Text="إلغاء الأمر" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" OnClick="CancelOrderAsync" /> }
+
+                @if (ShowConfirmReceipt) { <UiButton Text="تأكيد" IconCssClass="fa-solid fa-circle-check" Size="ControlSize.Small" OnClick="ConfirmReceiptAsync" /> }
+                @if (ShowPostReceipt) { <UiButton Text="ترحيل" IconCssClass="fa-solid fa-check-double" Size="ControlSize.Small" OnClick="PostReceiptAsync" /> }
+                @if (ShowCancelReceipt) { <UiButton Text="إلغاء الاستلام" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" OnClick="CancelReceiptAsync" /> }
+                @if (ShowReceiptInventory) { <UiButton Text="عرض حركة المخزون" IconCssClass="fa-solid fa-arrow-right-arrow-left" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="OpenReceiptInventoryAsync" /> }
+                @if (ShowReceiptJournal) { <UiButton Text="عرض القيد" IconCssClass="fa-solid fa-book-journal-whills" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="OpenReceiptJournalAsync" /> }
+
+                @if (ShowMatchInvoice) { <UiButton Text="تشغيل المطابقة" IconCssClass="fa-solid fa-code-compare" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="MatchInvoiceAsync" /> }
+                @if (ShowConfirmInvoice) { <UiButton Text="تأكيد" IconCssClass="fa-solid fa-circle-check" Size="ControlSize.Small" OnClick="ConfirmInvoiceAsync" /> }
+                @if (ShowApproveVariance) { <UiButton Text="اعتماد الفروقات" IconCssClass="fa-solid fa-check" Size="ControlSize.Small" OnClick="ApproveVariancesAsync" /> }
+                @if (ShowPostInvoice) { <UiButton Text="ترحيل الفاتورة" IconCssClass="fa-solid fa-check-double" Size="ControlSize.Small" OnClick="PostInvoiceAsync" /> }
+                @if (ShowCancelInvoice) { <UiButton Text="إلغاء الفاتورة" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" OnClick="CancelInvoiceAsync" /> }
+                @if (ShowInvoiceJournal) { <UiButton Text="عرض القيد" IconCssClass="fa-solid fa-book-journal-whills" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="OpenInvoiceJournalAsync" /> }
+            }
+        </UiWorkspaceActionBar>
+    </Actions>
+    <Tabs>
+        <UiApplicationTabStrip Tabs="WorkspaceTabs" AriaLabel="@TabsAriaLabel" OnSelect="SelectTabAsync" OnClose="CloseTabAsync" OnCloseOthers="CloseOtherTabsAsync" OnCloseAll="CloseAllTabsAsync" />
+    </Tabs>
+    <Content>
+        @if (IsListTab)
+        {
+            @if (Section == PurchasingEntityType.SupplierCatalog)
+            {
+                <UiSupplierCatalogList Items="CurrentListItems" Loading="_isLoadingList" EmptyText="لا توجد أصناف في كتالوج المورد." OnOpen="OpenRecordAsync" />
+            }
+            else if (Section == PurchasingEntityType.PurchaseRequests)
+            {
+                <UiPurchaseRequestList Items="CurrentListItems" Loading="_isLoadingList" EmptyText="لا توجد طلبات شراء." OnOpen="OpenRecordAsync" />
+            }
+            else if (Section == PurchasingEntityType.PurchaseOrders)
+            {
+                <UiPurchaseOrderList Items="CurrentListItems" Loading="_isLoadingList" EmptyText="لا توجد أوامر شراء." OnOpen="OpenRecordAsync" />
+            }
+            else if (Section == PurchasingEntityType.PurchaseReceipts)
+            {
+                <UiPurchaseReceiptList Items="CurrentListItems" Loading="_isLoadingList" EmptyText="لا توجد سندات استلام." OnOpen="OpenRecordAsync" />
+            }
+            else if (Section == PurchasingEntityType.PurchaseInvoices)
+            {
+                <UiPurchaseInvoiceList Items="CurrentListItems" Loading="_isLoadingList" EmptyText="لا توجد فواتير مشتريات." OnOpen="OpenRecordAsync" />
+            }
+            <UiPagination PageNumber="_pageNumber" TotalPages="_totalPages" TotalCount="_totalCount" OnPrevious="PreviousPageAsync" OnNext="NextPageAsync" />
+        }
+        else if (ActiveTab?.IsLoading == true)
+        {
+            <UiPurchasingList Items="Array.Empty<UiPurchasingListItem>()" Loading="true" />
+        }
+        else if (ActiveTab?.Model is UiSupplierCatalogEditorModel catalog)
+        {
+            <UiSupplierCatalogEditor Model="catalog" IsEditable="@IsEditable" SupplierSearchAsync="SearchSuppliersAsync" ProductSearchAsync="SearchProductsAsync" UnitSearchAsync="SearchUnitsAsync" CurrencySearchAsync="SearchCurrenciesAsync" OnAddPrice="AddCatalogPriceAsync" OnChanged="EditorChangedAsync" />
+        }
+        else if (ActiveTab?.Model is UiPurchaseRequestEditorModel request)
+        {
+            <UiPurchaseRequestEditor Model="request" IsEditable="@IsEditable" WarehouseSearchAsync="SearchWarehousesAsync" ProductSearchAsync="SearchProductsAsync" SupplierSearchAsync="SearchSuppliersAsync" OnChanged="EditorChangedAsync" />
+        }
+        else if (ActiveTab?.Model is UiPurchaseOrderEditorModel order)
+        {
+            <UiPurchaseOrderEditor Model="order" IsEditable="@IsEditable" SupplierSearchAsync="SearchSuppliersAsync" WarehouseSearchAsync="SearchWarehousesAsync" ProductSearchAsync="SearchProductsAsync" UnitSearchAsync="SearchUnitsAsync" CurrencySearchAsync="SearchCurrenciesAsync" OnChanged="EditorChangedAsync" />
+        }
+        else if (ActiveTab?.Model is UiPurchaseReceiptEditorModel receipt)
+        {
+            <UiPurchaseReceiptEditor Model="receipt" IsEditable="@IsEditable" PurchaseOrderSearchAsync="SearchReceivableOrdersAsync" OnPurchaseOrderChanged="ReceiptPurchaseOrderChangedAsync" OnChanged="EditorChangedAsync" />
+        }
+        else if (ActiveTab?.Model is UiPurchaseInvoiceEditorModel invoice)
+        {
+            <UiPurchaseInvoiceEditor Model="invoice" IsEditable="@IsEditable" SupplierSearchAsync="SearchSuppliersAsync" CurrencySearchAsync="SearchCurrenciesAsync" ProductSearchAsync="SearchProductsAsync" OnChanged="EditorChangedAsync" />
+        }
+    </Content>
+</UiPurchasingWorkspace>

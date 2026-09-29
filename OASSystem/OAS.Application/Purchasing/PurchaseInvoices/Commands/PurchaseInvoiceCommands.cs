@@ -1,5 +1,6 @@
 using MediatR;
 using OAS.Application.Abstractions.Messaging;
+using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Abstractions.Security;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.Purchasing.Abstractions;
@@ -122,7 +123,8 @@ public sealed class UpdatePurchaseInvoiceCommandHandler(
 public sealed class MatchPurchaseInvoiceCommandHandler(
     IPurchaseInvoiceRepository invoiceRepository,
     IPurchaseMatchingService matching,
-    PurchasingMapper mapper) : IRequestHandler<MatchPurchaseInvoiceCommand,PurchaseMatchResultDto>
+    PurchasingMapper mapper,
+    IUnitOfWork unitOfWork) : IRequestHandler<MatchPurchaseInvoiceCommand,PurchaseMatchResultDto>
 {
     public async Task<PurchaseMatchResultDto> Handle(MatchPurchaseInvoiceCommand command,CancellationToken ct)
     {
@@ -135,6 +137,10 @@ public sealed class MatchPurchaseInvoiceCommandHandler(
         if(invoice.Status==DomainInvoiceStatus.Confirmed && evaluation.RequiresApproval)invoice.MarkMatchApprovalRequired();
         else if(invoice.Status==DomainInvoiceStatus.PendingMatchApproval && !evaluation.RequiresApproval)invoice.MarkMatchApproved();
         invoiceRepository.Update(invoice);
+        // Persist the new allocations inside the current command transaction before mapping.
+        // SQL Server generates RowVersion values on SaveChanges; variance approval needs those
+        // values immediately in the match response. TransactionBehavior still owns commit/rollback.
+        await unitOfWork.SaveChangesAsync(ct);
         return await mapper.ToMatchDtoAsync(invoice,evaluation,ct);
     }
 }

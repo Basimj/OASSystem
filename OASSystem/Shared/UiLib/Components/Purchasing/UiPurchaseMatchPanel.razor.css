@@ -1,0 +1,4 @@
+.ui-purchase-match-summary { display:flex; justify-content:space-between; gap:1rem; padding:var(--oas-space-3); border:1px solid var(--oas-color-border); border-radius:var(--oas-radius-md); }
+.ui-purchase-match-summary span { color:var(--oas-color-text-muted); }
+.ui-purchase-match-grid { display:grid; gap:var(--oas-space-2); }
+.ui-purchase-match-row { display:grid; grid-template-columns:repeat(4,1fr); gap:var(--oas-space-2); border-bottom:1px solid var(--oas-color-border); padding:var(--oas-space-2) 0; font-size:var(--oas-font-sm); }

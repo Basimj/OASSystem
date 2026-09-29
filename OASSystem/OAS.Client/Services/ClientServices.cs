@@ -45,6 +45,8 @@ public static class ClientServices
         services.AddScoped<IPrintingClientService, PrintingClientService>();
         services.AddScoped<OAS.Client.Accounting.Services.IAccountingClientService, OAS.Client.Accounting.Services.AccountingClientService>();
         services.AddScoped<OAS.Client.Accounting.Workspace.IAccountingWorkspaceState, OAS.Client.Accounting.Workspace.AccountingWorkspaceState>();
+        services.AddScoped<OAS.Client.Purchasing.Services.IPurchasingClientService, OAS.Client.Purchasing.Services.PurchasingClientService>();
+        services.AddScoped<OAS.Client.Purchasing.Workspace.IPurchasingWorkspaceState, OAS.Client.Purchasing.Workspace.PurchasingWorkspaceState>();
 
         return services;
     }

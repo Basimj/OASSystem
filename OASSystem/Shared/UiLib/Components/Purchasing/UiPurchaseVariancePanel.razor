@@ -1,0 +1,15 @@
+@namespace OAS.UiLib.Components.Purchasing
+@using OAS.UiLib.Core.Models.Purchasing
+<UiPurchasingSection Title="الفروقات" Subtitle="الكمية والسعر والضريبة">
+    @if(Model.Variances.Count==0){<div class="ui-purchase-variance-empty">لا توجد فروقات.</div>}
+    else
+    {
+        <div class="ui-purchase-variance-list">
+            @foreach(var variance in Model.Variances)
+            {
+                <div class="ui-purchase-variance-row"><strong>@variance.Type</strong><span>المتوقع: @variance.ExpectedValue.ToString("N3")</span><span>الفعلي: @variance.ActualValue.ToString("N3")</span><span>الفرق: @variance.Variance.ToString("N3")</span><span>الحد: @variance.Tolerance.ToString("N3")</span><b>@variance.Status</b>@if(!string.IsNullOrWhiteSpace(variance.Message)){<small>@variance.Message</small>}</div>
+            }
+        </div>
+    }
+</UiPurchasingSection>
+@code { [Parameter,EditorRequired] public UiPurchaseMatchModel Model {get;set;}=new(); }

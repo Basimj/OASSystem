@@ -1,0 +1,13 @@
+.ui-purchasing-list { min-width: 0; }
+.ui-purchasing-list__grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(250px,1fr)); gap: var(--oas-space-3); }
+.ui-purchasing-list__card { border:1px solid var(--oas-color-border); background:var(--oas-color-surface); border-radius:var(--oas-radius-lg); padding:var(--oas-space-3); display:flex; gap:var(--oas-space-3); text-align:start; color:inherit; cursor:pointer; min-width:0; }
+.ui-purchasing-list__card:hover { border-color:var(--oas-color-primary); background:var(--oas-color-hover); }
+.ui-purchasing-list__icon { width:2.2rem; height:2.2rem; border-radius:var(--oas-radius-md); display:grid; place-items:center; background:color-mix(in srgb,var(--oas-color-primary) 10%,transparent); color:var(--oas-color-primary); flex:none; }
+.ui-purchasing-list__body { display:grid; gap:.2rem; min-width:0; flex:1; }
+.ui-purchasing-list__head { display:flex; align-items:center; justify-content:space-between; gap:.5rem; }
+.ui-purchasing-list__status { font-size:var(--oas-font-xs); border:1px solid var(--oas-color-border); border-radius:999px; padding:.12rem .45rem; color:var(--oas-color-text-muted); white-space:nowrap; }
+.ui-purchasing-list__title { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ui-purchasing-list small { color:var(--oas-color-text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ui-purchasing-list__meta { font-size:var(--oas-font-xs); }
+.ui-purchasing-list__empty { min-height:14rem; display:grid; place-items:center; align-content:center; gap:.75rem; color:var(--oas-color-text-muted); border:1px dashed var(--oas-color-border); border-radius:var(--oas-radius-lg); }
+.ui-purchasing-list__empty i { font-size:1.6rem; }

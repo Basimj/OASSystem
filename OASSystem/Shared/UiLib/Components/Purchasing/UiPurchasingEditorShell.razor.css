@@ -1,0 +1,7 @@
+.ui-purchasing-editor { border:1px solid var(--oas-color-border); border-radius:var(--oas-radius-lg); background:var(--oas-color-surface); overflow:hidden; }
+.ui-purchasing-editor__header { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--oas-space-3); padding:var(--oas-space-4); border-bottom:1px solid var(--oas-color-border); }
+.ui-purchasing-editor__header small { color:var(--oas-color-primary); font-weight:600; }
+.ui-purchasing-editor__header h2 { margin:.2rem 0; font-size:1.15rem; }
+.ui-purchasing-editor__header p { margin:0; color:var(--oas-color-text-muted); font-size:var(--oas-font-sm); }
+.ui-purchasing-editor__status { border:1px solid var(--oas-color-border); border-radius:999px; padding:.3rem .65rem; color:var(--oas-color-text-muted); white-space:nowrap; }
+.ui-purchasing-editor__content { padding:var(--oas-space-4); display:grid; gap:var(--oas-space-4); }

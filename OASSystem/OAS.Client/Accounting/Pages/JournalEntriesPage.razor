@@ -5,4 +5,10 @@
 
 <PageTitle>القيود المحاسبية | OAS</PageTitle>
 
-<AccountingWorkspaceHost Section="AccountingEntityType.Journals" />
+<AccountingWorkspaceHost Section="AccountingEntityType.Journals" InitialRecordId="JournalIdFromQuery" />
+
+
+@code {
+    [Parameter, SupplyParameterFromQuery(Name = "journalId")]
+    public Guid? JournalIdFromQuery { get; set; }
+}

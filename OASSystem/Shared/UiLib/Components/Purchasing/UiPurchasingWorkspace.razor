@@ -1,0 +1,17 @@
+@namespace OAS.UiLib.Components.Purchasing
+
+<UiWorkspaceLayout ShowFilters="false" ShowAside="false">
+    <Actions>@Actions</Actions>
+    <Tabs>@Tabs</Tabs>
+    <Content>
+        <div class="ui-purchasing-workspace">
+            @Content
+        </div>
+    </Content>
+</UiWorkspaceLayout>
+
+@code {
+    [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public RenderFragment? Tabs { get; set; }
+    [Parameter, EditorRequired] public RenderFragment? Content { get; set; }
+}

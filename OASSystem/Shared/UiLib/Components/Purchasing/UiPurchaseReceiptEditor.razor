@@ -1,0 +1,64 @@
+@namespace OAS.UiLib.Components.Purchasing
+@using OAS.UiLib.Core.Models.Purchasing
+@using OAS.UiLib.Core.Models
+
+<UiPurchasingEditorShell Title="@Model.ReceiptCode" Subtitle="استلام مشتريات مرتبط بأمر شراء" StatusText="@Model.StatusText">
+    <UiPurchasingSection Title="بيانات الاستلام">
+        <UiPurchasingFormGrid>
+            <UiLookup Label="أمر الشراء" Required="true" Value="@GuidText(Model.PurchaseOrderId)" SelectedItem="@Selected(Model.PurchaseOrderId,Model.PurchaseOrderCode,"fa-solid fa-file-signature")" SearchAsync="PurchaseOrderSearchAsync" ValueChanged="PurchaseOrderChangedAsync" Disabled="@(!IsEditable || Model.Id.HasValue)" />
+            <UiInputText Label="المورد" Value="Model.SupplierName" ReadOnly="true" />
+            <UiInputText Label="المخزن" Value="Model.WarehouseName" ReadOnly="true" />
+            <UiInputDate Label="تاريخ الاستلام" Value="Model.ReceiptDate" ValueChanged="ReceiptDateChanged" Disabled="@(!IsEditable)" />
+            <UiInputDate Label="تاريخ الترحيل" Value="Model.PostingDate" ValueChanged="PostingDateChanged" Disabled="@(!IsEditable)" />
+            <UiInputText Label="كود تسليم المورد" Value="Model.SupplierDeliveryCode" ValueChanged="DeliveryCodeChanged" Disabled="@(!IsEditable)" />
+            <UiInputText Label="ملاحظات" Value="Model.Notes" ValueChanged="NotesChanged" Disabled="@(!IsEditable)" />
+        </UiPurchasingFormGrid>
+    </UiPurchasingSection>
+    <UiPurchasingSection Title="بنود الاستلام" Subtitle="الكمية المرفوضة لا تدخل المخزون ولا تغلق الالتزام تلقائياً">
+        <UiPurchasingLineTable>
+            @foreach(var line in Model.Lines.OrderBy(x=>x.LineSequence))
+            {
+                <div class="ui-purchasing-receipt-line">
+                    <div class="ui-purchasing-receipt-line__head"><strong>@line.ProductName</strong><span>المتبقي: @line.RemainingReceivableQuantity.ToString("N3")</span></div>
+                    <UiPurchasingFormGrid>
+                        <UiPurchasingNumberField Label="المطلوب" Value="line.OrderedQuantitySnapshot" Disabled="true" />
+                        <UiPurchasingNumberField Label="مستلم سابقاً" Value="line.PreviouslyReceivedQty" Disabled="true" />
+                        <UiPurchasingNumberField Label="المستلم الآن" Value="line.ReceivedQuantity" ValueChanged="@(v=>ReceivedChanged(line,v))" Disabled="@(!IsEditable)" />
+                        <UiPurchasingNumberField Label="المقبول" Value="line.AcceptedQuantity" ValueChanged="@(v=>AcceptedChanged(line,v))" Disabled="@(!IsEditable)" />
+                        <UiPurchasingNumberField Label="المرفوض" Value="line.RejectedQuantity" ValueChanged="@(v=>RejectedChanged(line,v))" Disabled="@(!IsEditable)" />
+                        <UiPurchasingNumberField Label="التكلفة الفعلية" Value="line.ActualUnitCost" ValueChanged="@(v=>CostChanged(line,v))" Disabled="@(!IsEditable)" Step="0.0001" />
+                        <UiInputDate Label="تاريخ الانتهاء" Value="line.ExpiryDate" ValueChanged="@(v=>ExpiryChanged(line,v))" Disabled="@(!IsEditable)" />
+                        <UiInputText Label="Batch" Value="line.BatchCode" ValueChanged="@(v=>BatchChanged(line,v))" Disabled="@(!IsEditable)" />
+                    </UiPurchasingFormGrid>
+                    <div class="ui-purchasing-receipt-line__summary">إجمالي تكلفة المقبول: @line.TotalAcceptedCost.ToString("N2")</div>
+                </div>
+            }
+        </UiPurchasingLineTable>
+    </UiPurchasingSection>
+    @if(Model.InventoryTransactionId.HasValue || Model.JournalEntryId.HasValue)
+    {
+        <UiPurchasingSection Title="نتيجة الترحيل"><div class="ui-purchasing-post-links">@if(Model.InventoryTransactionId.HasValue){<span><i class="fa-solid fa-boxes-stacked"></i> حركة مخزون مرتبطة</span>}@if(Model.JournalEntryId.HasValue){<span><i class="fa-solid fa-book"></i> قيد محاسبي مرتبط</span>}</div></UiPurchasingSection>
+    }
+</UiPurchasingEditorShell>
+
+@code {
+    [Parameter,EditorRequired] public UiPurchaseReceiptEditorModel Model {get;set;}=new();
+    [Parameter] public bool IsEditable {get;set;}=true;
+    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? PurchaseOrderSearchAsync {get;set;}
+    [Parameter] public EventCallback<Guid?> OnPurchaseOrderChanged {get;set;}
+    [Parameter] public EventCallback OnChanged {get;set;}
+    private static string? GuidText(Guid? id)=>id?.ToString("D"); private static Guid? Parse(string? v)=>Guid.TryParse(v,out var x)?x:null;
+    private static UiLookupItem? Selected(Guid? id,string? text,string icon)=>id.HasValue?new(id.Value.ToString("D"),text??id.Value.ToString("D"),null,icon):null;
+    private Task Changed()=>OnChanged.InvokeAsync();
+    private async Task PurchaseOrderChangedAsync(string? v){Model.PurchaseOrderId=Parse(v);await OnPurchaseOrderChanged.InvokeAsync(Model.PurchaseOrderId);await Changed();}
+    private async Task ReceiptDateChanged(DateOnly? v){if(v.HasValue)Model.ReceiptDate=v.Value;await Changed();}
+    private async Task PostingDateChanged(DateOnly? v){if(v.HasValue)Model.PostingDate=v.Value;await Changed();}
+    private async Task DeliveryCodeChanged(string? v){Model.SupplierDeliveryCode=v;await Changed();}
+    private async Task NotesChanged(string? v){Model.Notes=v;await Changed();}
+    private async Task ReceivedChanged(UiPurchaseReceiptLineModel l,decimal v){l.ReceivedQuantity=v;await Changed();}
+    private async Task AcceptedChanged(UiPurchaseReceiptLineModel l,decimal v){l.AcceptedQuantity=v;await Changed();}
+    private async Task RejectedChanged(UiPurchaseReceiptLineModel l,decimal v){l.RejectedQuantity=v;await Changed();}
+    private async Task CostChanged(UiPurchaseReceiptLineModel l,decimal v){l.ActualUnitCost=v;await Changed();}
+    private async Task ExpiryChanged(UiPurchaseReceiptLineModel l,DateOnly? v){l.ExpiryDate=v;await Changed();}
+    private async Task BatchChanged(UiPurchaseReceiptLineModel l,string? v){l.BatchCode=v;await Changed();}
+}

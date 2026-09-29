@@ -1,0 +1,15 @@
+@namespace OAS.UiLib.Components.Purchasing
+<section class="ui-purchasing-editor">
+    <header class="ui-purchasing-editor__header">
+        <div><small>@Eyebrow</small><h2>@Title</h2>@if(!string.IsNullOrWhiteSpace(Subtitle)){<p>@Subtitle</p>}</div>
+        @if(!string.IsNullOrWhiteSpace(StatusText)){<span class="ui-purchasing-editor__status">@StatusText</span>}
+    </header>
+    <div class="ui-purchasing-editor__content">@ChildContent</div>
+</section>
+@code {
+    [Parameter] public string Eyebrow { get; set; } = "المشتريات";
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public string? StatusText { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

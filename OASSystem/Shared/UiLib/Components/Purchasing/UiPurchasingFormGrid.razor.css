@@ -1,0 +1,1 @@
+.ui-purchasing-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:var(--oas-space-3); align-items:end; }

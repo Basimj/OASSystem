@@ -1,0 +1,37 @@
+@namespace OAS.UiLib.Components.Purchasing
+@using OAS.UiLib.Core.Models.Purchasing
+
+<section class="ui-purchasing-list" aria-busy="@Loading.ToString().ToLowerInvariant()">
+    @if (Loading)
+    {
+        <div class="ui-purchasing-list__empty"><i class="fa-solid fa-circle-notch fa-spin"></i><span>جاري تحميل البيانات...</span></div>
+    }
+    else if (Items.Count == 0)
+    {
+        <div class="ui-purchasing-list__empty"><i class="fa-regular fa-folder-open"></i><span>@EmptyText</span></div>
+    }
+    else
+    {
+        <div class="ui-purchasing-list__grid">
+            @foreach (var item in Items)
+            {
+                <button type="button" class="ui-purchasing-list__card" @onclick="() => OnOpen.InvokeAsync(item.Id)">
+                    <span class="ui-purchasing-list__icon"><i class="@item.IconCssClass"></i></span>
+                    <span class="ui-purchasing-list__body">
+                        <span class="ui-purchasing-list__head"><strong>@item.Code</strong><span class="ui-purchasing-list__status">@item.StatusText</span></span>
+                        <span class="ui-purchasing-list__title">@item.Title</span>
+                        @if (!string.IsNullOrWhiteSpace(item.Subtitle)) { <small>@item.Subtitle</small> }
+                        @if (!string.IsNullOrWhiteSpace(item.MetaText)) { <small class="ui-purchasing-list__meta">@item.MetaText</small> }
+                    </span>
+                </button>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter] public IReadOnlyList<UiPurchasingListItem> Items { get; set; } = [];
+    [Parameter] public bool Loading { get; set; }
+    [Parameter] public string EmptyText { get; set; } = "لا توجد بيانات.";
+    [Parameter] public EventCallback<Guid> OnOpen { get; set; }
+}

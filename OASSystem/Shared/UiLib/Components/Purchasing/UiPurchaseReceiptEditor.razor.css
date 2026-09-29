@@ -1,0 +1,5 @@
+.ui-purchasing-receipt-line { display:grid; gap:var(--oas-space-3); border:1px solid var(--oas-color-border); border-radius:var(--oas-radius-md); padding:var(--oas-space-3); min-width:850px; }
+.ui-purchasing-receipt-line__head { display:flex; align-items:center; justify-content:space-between; gap:1rem; }
+.ui-purchasing-receipt-line__head span,.ui-purchasing-receipt-line__summary { color:var(--oas-color-text-muted); font-size:var(--oas-font-sm); }
+.ui-purchasing-post-links { display:flex; flex-wrap:wrap; gap:var(--oas-space-2); }
+.ui-purchasing-post-links span { border:1px solid var(--oas-color-border); border-radius:var(--oas-radius-md); padding:var(--oas-space-2) var(--oas-space-3); }

@@ -1,0 +1,91 @@
+@namespace OAS.UiLib.Components.Purchasing
+@using OAS.UiLib.Core.Models.Purchasing
+@using OAS.UiLib.Core.Models
+
+<UiPurchasingEditorShell Title="@(Model.Id.HasValue ? "بيانات كتالوج المورد" : "إضافة صنف إلى كتالوج المورد")" Subtitle="ربط المورد بالصنف ووحدة الشراء وشروط التوريد" StatusText="@(Model.IsActive ? "فعال" : "غير فعال")">
+    <UiPurchasingSection Title="البيانات الأساسية">
+        <UiPurchasingFormGrid>
+            <UiLookup Label="المورد" Required="true" Disabled="@(!IsEditable || Model.Id.HasValue)"
+                      Value="@GuidText(Model.SupplierId)" SelectedItem="@Selected(Model.SupplierId, Model.SupplierName, "fa-solid fa-truck-field")"
+                      SearchAsync="SupplierSearchAsync" ValueChanged="SupplierChangedAsync" Placeholder="ابحث عن المورد..." />
+            <UiLookup Label="المنتج" Required="true" Disabled="@(!IsEditable || Model.Id.HasValue)"
+                      Value="@GuidText(Model.ProductVariantId)" SelectedItem="@Selected(Model.ProductVariantId, Model.ProductName, "fa-solid fa-box")"
+                      SearchAsync="ProductSearchAsync" ValueChanged="ProductChangedAsync" Placeholder="ابحث عن المنتج..." />
+            <UiLookup Label="وحدة الشراء" Required="true" Disabled="@(!IsEditable)"
+                      Value="@GuidText(Model.PurchaseUnitId)" SelectedItem="@Selected(Model.PurchaseUnitId, Model.PurchaseUnitName, "fa-solid fa-ruler")"
+                      SearchAsync="UnitSearchAsync" ValueChanged="UnitChangedAsync" Placeholder="اختر الوحدة..." />
+            <UiInputText Label="كود المنتج لدى المورد" Value="Model.SupplierProductCode" ValueChanged="SetSupplierCode" Disabled="@(!IsEditable)" MaxLength="64" />
+            <UiInputText Label="اسم المنتج لدى المورد" Value="Model.SupplierProductName" ValueChanged="SetSupplierName" Disabled="@(!IsEditable)" MaxLength="200" />
+            <UiPurchasingNumberField Label="معامل التحويل" Value="Model.UnitConversionFactor" ValueChanged="SetConversion" Disabled="@(!IsEditable)" Step="0.000001" Min="0.000001" />
+            <UiPurchasingNumberField Label="الحد الأدنى للطلب" Value="Model.MinimumOrderQuantity" ValueChanged="SetMoq" Disabled="@(!IsEditable)" />
+            <UiPurchasingNumberField Label="مدة التوريد بالأيام" Value="@(Model.LeadTimeDays ?? 0)" ValueChanged="SetLeadTime" Disabled="@(!IsEditable)" Step="1" />
+            <UiCheckbox Label="مورد مفضل لهذا الصنف" Value="Model.IsPreferred" ValueChanged="SetPreferred" Disabled="@(!IsEditable)" />
+            <UiCheckbox Label="فعال" Value="Model.IsActive" ValueChanged="SetActive" Disabled="@(!IsEditable)" />
+        </UiPurchasingFormGrid>
+    </UiPurchasingSection>
+
+    @if (Model.Id.HasValue)
+    {
+
+        <UiPurchasingSection Title="إضافة سعر جديد" Subtitle="يتم حفظ السعر الجديد كسجل تاريخي مستقل">
+            <UiPurchasingFormGrid>
+                <UiLookup Label="العملة" Required="true" Value="@GuidText(Model.NewPriceCurrencyId)" SelectedItem="@Selected(Model.NewPriceCurrencyId,Model.NewPriceCurrencyCode,"fa-solid fa-coins")" SearchAsync="CurrencySearchAsync" ValueChanged="NewCurrencyChangedAsync" />
+                <UiPurchasingNumberField Label="سعر الوحدة" Value="Model.NewPriceUnitPrice" ValueChanged="NewPriceChangedAsync" Step="0.0001" />
+                <UiInputDate Label="ساري من" Value="Model.NewPriceEffectiveFrom" ValueChanged="NewPriceFromChangedAsync" />
+                <UiInputDate Label="ساري حتى" Value="Model.NewPriceEffectiveTo" ValueChanged="NewPriceToChangedAsync" />
+                <UiInputText Label="ملاحظات السعر" Value="Model.NewPriceNotes" ValueChanged="NewPriceNotesChangedAsync" />
+                <UiButton Text="إضافة السعر" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" OnClick="AddPriceAsync" />
+            </UiPurchasingFormGrid>
+        </UiPurchasingSection>
+
+        <UiPurchasingSection Title="سجل الأسعار" Subtitle="الأسعار التاريخية محفوظة ولا تُستبدل">
+            @if (Model.PriceHistory.Count == 0)
+            {
+                <div class="ui-purchasing-editor-note">لا توجد أسعار مسجلة حتى الآن.</div>
+            }
+            else
+            {
+                <div class="ui-purchasing-price-list">
+                    @foreach (var price in Model.PriceHistory.OrderByDescending(x => x.EffectiveFrom))
+                    {
+                        <div class="ui-purchasing-price-row">
+                            <strong>@price.UnitPrice.ToString("N2") @price.CurrencyCode</strong>
+                            <span>@price.EffectiveFrom.ToString("yyyy-MM-dd") → @(price.EffectiveTo?.ToString("yyyy-MM-dd") ?? "مستمر")</span>
+                            <span>@(price.IsCurrent ? "السعر الحالي" : "تاريخي")</span>
+                        </div>
+                    }
+                </div>
+            }
+        </UiPurchasingSection>
+    }
+</UiPurchasingEditorShell>
+
+@code {
+    [Parameter, EditorRequired] public UiSupplierCatalogEditorModel Model { get; set; } = new();
+    [Parameter] public bool IsEditable { get; set; } = true;
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SupplierSearchAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? ProductSearchAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? UnitSearchAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CurrencySearchAsync { get; set; }
+    [Parameter] public EventCallback OnAddPrice { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+    private static string? GuidText(Guid? id) => id?.ToString("D");
+    private static UiLookupItem? Selected(Guid? id, string? text, string icon) => id.HasValue ? new(id.Value.ToString("D"), text ?? id.Value.ToString("D"), null, icon) : null;
+    private async Task SupplierChangedAsync(string? value){Model.SupplierId=Parse(value); await OnChanged.InvokeAsync();}
+    private async Task ProductChangedAsync(string? value){Model.ProductVariantId=Parse(value); await OnChanged.InvokeAsync();}
+    private async Task UnitChangedAsync(string? value){Model.PurchaseUnitId=Parse(value); await OnChanged.InvokeAsync();}
+    private async Task SetSupplierCode(string? v){Model.SupplierProductCode=v; await OnChanged.InvokeAsync();}
+    private async Task SetSupplierName(string? v){Model.SupplierProductName=v; await OnChanged.InvokeAsync();}
+    private async Task SetConversion(decimal v){Model.UnitConversionFactor=v; await OnChanged.InvokeAsync();}
+    private async Task SetMoq(decimal v){Model.MinimumOrderQuantity=v; await OnChanged.InvokeAsync();}
+    private async Task SetLeadTime(decimal v){Model.LeadTimeDays=(int)v; await OnChanged.InvokeAsync();}
+    private async Task SetPreferred(bool v){Model.IsPreferred=v; await OnChanged.InvokeAsync();}
+    private async Task SetActive(bool v){Model.IsActive=v; await OnChanged.InvokeAsync();}
+    private async Task NewCurrencyChangedAsync(string? v){Model.NewPriceCurrencyId=Parse(v); await OnChanged.InvokeAsync();}
+    private async Task NewPriceChangedAsync(decimal v){Model.NewPriceUnitPrice=v; await OnChanged.InvokeAsync();}
+    private async Task NewPriceFromChangedAsync(DateOnly? v){if(v.HasValue)Model.NewPriceEffectiveFrom=v.Value; await OnChanged.InvokeAsync();}
+    private async Task NewPriceToChangedAsync(DateOnly? v){Model.NewPriceEffectiveTo=v; await OnChanged.InvokeAsync();}
+    private async Task NewPriceNotesChangedAsync(string? v){Model.NewPriceNotes=v; await OnChanged.InvokeAsync();}
+    private Task AddPriceAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _)=>OnAddPrice.InvokeAsync();
+    private static Guid? Parse(string? value)=>Guid.TryParse(value,out var id)?id:null;
+}

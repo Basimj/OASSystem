@@ -52,12 +52,14 @@ public partial class AccountingWorkspaceHost : IDisposable
     [Inject] private IPrintingClientService PrintingService { get; set; } = default!;
 
     [Parameter] public AccountingEntityType? Section { get; set; }
+    [Parameter] public Guid? InitialRecordId { get; set; }
 
     private const int PageSize = 25;
     private bool _isLoading;
     private bool _isPrinting;
     private bool _initialized;
     private AccountingEntityType? _loadedSection;
+    private Guid? _loadedInitialRecordId;
 
     private readonly Dictionary<AccountingEntityType, string> _searchByEntity = [];
     private readonly Dictionary<AccountingEntityType, int> _pageByEntity = [];
@@ -243,16 +245,24 @@ public partial class AccountingWorkspaceHost : IDisposable
             return;
         }
 
-        if (_loadedSection == Section.Value)
-            return;
+        var sectionChanged = _loadedSection != Section.Value;
+        if (sectionChanged)
+        {
+            _loadedSection = Section.Value;
+            _loadedInitialRecordId = null;
+            Workspace.OpenOrActivateListTab(Section.Value);
 
-        _loadedSection = Section.Value;
-        Workspace.OpenOrActivateListTab(Section.Value);
+            if (Section.Value is AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers)
+                _pageByEntity[AccountingEntityType.PaymentAllocations] = 1;
 
-        if (Section.Value is AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers)
-            _pageByEntity[AccountingEntityType.PaymentAllocations] = 1;
+            await LoadSectionDataAsync(Section.Value);
+        }
 
-        await LoadSectionDataAsync(Section.Value);
+        if (InitialRecordId.HasValue && _loadedInitialRecordId != InitialRecordId)
+        {
+            _loadedInitialRecordId = InitialRecordId;
+            await OpenRecordInTab(Section.Value, InitialRecordId.Value, GetEntityDisplayName(Section.Value));
+        }
     }
 
     public void Dispose()

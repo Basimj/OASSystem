@@ -1,0 +1,4 @@
+.ui-purchase-variance-empty { color:var(--oas-color-text-muted); }
+.ui-purchase-variance-list { display:grid; gap:var(--oas-space-2); }
+.ui-purchase-variance-row { display:grid; grid-template-columns:.8fr repeat(5,1fr); gap:var(--oas-space-2); align-items:center; border:1px solid var(--oas-color-border); border-radius:var(--oas-radius-md); padding:var(--oas-space-2); font-size:var(--oas-font-sm); }
+.ui-purchase-variance-row small { grid-column:1/-1; color:var(--oas-color-text-muted); }

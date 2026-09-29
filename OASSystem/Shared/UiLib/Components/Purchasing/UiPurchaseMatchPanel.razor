@@ -1,0 +1,15 @@
+@namespace OAS.UiLib.Components.Purchasing
+@using OAS.UiLib.Core.Models.Purchasing
+<UiPurchasingSection Title="المطابقة الثلاثية" Subtitle="Purchase Order ↔ Receipt ↔ Invoice">
+    <div class="ui-purchase-match-summary"><strong>@Model.OverallStatus</strong><span>@(Model.RequiresApproval ? "يوجد فرق يحتاج اعتماد" : "لا توجد فروقات معلقة للاعتماد")</span></div>
+    @if(Model.Allocations.Count>0)
+    {
+        <div class="ui-purchase-match-grid">
+            @foreach(var allocation in Model.Allocations)
+            {
+                <div class="ui-purchase-match-row"><span>كمية المطابقة: @allocation.MatchedQuantity.ToString("N3")</span><span>الصافي: @allocation.MatchedNetAmount.ToString("N2")</span><span>فرق السعر: @allocation.PriceVarianceAmount.ToString("N2")</span><strong>@allocation.Status</strong></div>
+            }
+        </div>
+    }
+</UiPurchasingSection>
+@code { [Parameter,EditorRequired] public UiPurchaseMatchModel Model {get;set;}=new(); }

@@ -1,0 +1,5 @@
+@page "/purchases"
+@attribute [Authorize]
+@inject NavigationManager Navigation
+<PageTitle>المشتريات | OAS</PageTitle>
+@code { protected override void OnInitialized()=>Navigation.NavigateTo("/purchases/requests",replace:true); }

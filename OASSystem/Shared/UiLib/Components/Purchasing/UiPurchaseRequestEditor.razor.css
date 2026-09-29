@@ -1,0 +1,3 @@
+.ui-purchasing-line-card { display:grid; gap:var(--oas-space-3); border:1px solid var(--oas-color-border); border-radius:var(--oas-radius-md); padding:var(--oas-space-3); min-width:720px; }
+.ui-purchasing-line-card__head { display:flex; align-items:center; justify-content:space-between; gap:var(--oas-space-2); }
+.ui-purchasing-line-card__summary { font-size:var(--oas-font-sm); color:var(--oas-color-text-muted); }
