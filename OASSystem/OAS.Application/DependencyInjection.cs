@@ -31,6 +31,7 @@ using OAS.Application.CRUD.Services;
 using OAS.Application.CRUD.Specifications;
 using OAS.Application.CRUD.Validation;
 using OAS.Application.Inventory;
+using OAS.Application.Sales;
 using OAS.Domain.Common.Entities;
 
 namespace OAS.Application;
@@ -60,6 +61,7 @@ public static class DependencyInjection
         services.TryAddScoped<IVoucherSettlementResolver, VoucherSettlementResolver>();
         services.TryAddScoped<ILinkedAccountingAccountProvisioningService, LinkedAccountingAccountProvisioningService>();
         services.AddInventoryApplication();
+        services.AddSalesApplication();
         services.AddScoped<OAS.Application.Accounting.Spreadsheets.AccountingSpreadsheetService>();
         services.AddScoped<OAS.Application.Inventory.Spreadsheets.InventorySpreadsheetService>();
         return services;

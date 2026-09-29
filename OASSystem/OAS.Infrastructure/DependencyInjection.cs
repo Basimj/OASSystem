@@ -8,6 +8,7 @@ using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Database.Abstractions;
 using OAS.Application.Features.Employees.Abstractions;
 using OAS.Application.Identity.Abstractions;
+using OAS.Application.Sales.Abstractions;
 using OAS.Infrastructure.Database.Configuration;
 using OAS.Infrastructure.Database.Services;
 using OAS.Infrastructure.Features.Employees.Export;
@@ -19,6 +20,7 @@ using OAS.Infrastructure.Numbering;
 using OAS.Infrastructure.Persistence;
 using OAS.Infrastructure.Persistence.Interceptors;
 using OAS.Infrastructure.Persistence.Repositories.Generic;
+using OAS.Infrastructure.Sales.Persistence.Repositories;
 
 namespace OAS.Infrastructure;
 
@@ -70,6 +72,10 @@ public static class DependencyInjection
         services.AddScoped(
             typeof(IRepository<,>),
             typeof(EfRepository<,>));
+
+        services.AddScoped<IPrescriptionAggregateRepository, PrescriptionAggregateRepository>();
+        services.AddScoped<ICustomerOrderAggregateRepository, CustomerOrderAggregateRepository>();
+        services.AddScoped<ISalesInvoiceAggregateRepository, SalesInvoiceAggregateRepository>();
 
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IAccountingPartyQueryService, AccountingPartyQueryService>();

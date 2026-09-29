@@ -4,6 +4,7 @@ using OAS.Application.Accounting.PaymentAllocations.Commands.UpdatePaymentAlloca
 using OAS.Application.Accounting.PaymentAllocations.Mapping;
 using OAS.Application.Accounting.PaymentAllocations.Queries.GetPaymentAllocationById;
 using OAS.Application.Common.Exceptions;
+using OAS.Application.Sales.Abstractions;
 using OAS.Contracts.Accounting.Enums;
 using OAS.Contracts.Accounting.PaymentAllocations;
 using OAS.Domain.Accounting.Entities;
@@ -45,7 +46,7 @@ public sealed class PaymentAllocationCommandAndQueryTests
         await _allocationRepository.AddAsync(PaymentAllocation.CreateLineAllocation(
             Guid.NewGuid(), source.Id, null, DomainAllocationTargetDocumentType.SalesInvoice, Guid.NewGuid(), _currencyId, "USD", 600m, 550m, 330000m, DateTime.UtcNow));
 
-        var handler = new CreatePaymentAllocationCommandHandler(_allocationRepository, _receiptLineRepository, _paymentLineRepository, TimeProvider.System);
+        var handler = new CreatePaymentAllocationCommandHandler(_allocationRepository, _receiptLineRepository, _paymentLineRepository, new NoOpSalesPaymentAllocationTargetValidator(), TimeProvider.System);
         var request = new CreatePaymentAllocationRequest(source.Id, null, AllocationTargetDocumentType.SalesInvoice, Guid.NewGuid(), 300m);
 
         var id = await handler.Handle(new CreatePaymentAllocationCommand(request), CancellationToken.None);
@@ -69,7 +70,7 @@ public sealed class PaymentAllocationCommandAndQueryTests
         _allocationRepository.AddAsync(PaymentAllocation.CreateLineAllocation(
             Guid.NewGuid(), source.Id, null, DomainAllocationTargetDocumentType.SalesInvoice, Guid.NewGuid(), _currencyId, "USD", 900m, 550m, 495000m, DateTime.UtcNow)).GetAwaiter().GetResult();
 
-        var handler = new CreatePaymentAllocationCommandHandler(_allocationRepository, _receiptLineRepository, _paymentLineRepository, TimeProvider.System);
+        var handler = new CreatePaymentAllocationCommandHandler(_allocationRepository, _receiptLineRepository, _paymentLineRepository, new NoOpSalesPaymentAllocationTargetValidator(), TimeProvider.System);
         var request = new CreatePaymentAllocationRequest(source.Id, null, AllocationTargetDocumentType.SalesInvoice, Guid.NewGuid(), 200m);
 
         var ex = Assert.ThrowsAsync<ConflictException>(async () =>
@@ -87,7 +88,7 @@ public sealed class PaymentAllocationCommandAndQueryTests
         var other = PaymentAllocation.CreateLineAllocation(Guid.NewGuid(), source.Id, null, DomainAllocationTargetDocumentType.SalesInvoice, Guid.NewGuid(), _currencyId, "USD", 300m, 550m, 165000m, DateTime.UtcNow);
         await _allocationRepository.AddRangeAsync([current, other]);
 
-        var handler = new UpdatePaymentAllocationCommandHandler(_allocationRepository, _receiptLineRepository, _paymentLineRepository);
+        var handler = new UpdatePaymentAllocationCommandHandler(_allocationRepository, _receiptLineRepository, _paymentLineRepository, new NoOpSalesPaymentAllocationTargetValidator());
         await handler.Handle(new UpdatePaymentAllocationCommand(current.Id, new UpdatePaymentAllocationRequest(650m)), CancellationToken.None);
 
         Assert.Multiple(() =>
@@ -125,4 +126,16 @@ public sealed class PaymentAllocationCommandAndQueryTests
             _currencyId, "USD", "$", 2, amount, 550m, new DateOnly(2026, 1, 15), DomainExchangeRateType.Accounting,
             DomainExchangeRateSource.System, amount * 550m, null, null, null, null, null);
     }
+    private sealed class NoOpSalesPaymentAllocationTargetValidator : ISalesPaymentAllocationTargetValidator
+    {
+        public Task ValidateAsync(
+            Guid salesInvoiceId,
+            Guid sourceCurrencyId,
+            decimal allocatedAmount,
+            decimal baseAllocatedAmount,
+            Guid? excludingAllocationId = null,
+            CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+    }
+
 }

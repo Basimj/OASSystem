@@ -1,0 +1,78 @@
+using MediatR;
+using OAS.Application.Abstractions.Numbering;
+using OAS.Application.Abstractions.Persistence;
+using OAS.Application.Abstractions.Persistence.Specifications;
+using OAS.Application.Accounting.Abstractions;
+using OAS.Application.Common.Exceptions;
+using OAS.Application.Sales.Abstractions;
+using OAS.Application.Sales.Common;
+using OAS.Application.Sales.Services;
+using OAS.Contracts.Sales.CustomerOrders;
+using OAS.Domain.Accounting.Entities;
+using OAS.Domain.Accounting.Enums;
+using OAS.Domain.Sales;
+using OAS.Domain.Sales.Entities;
+using OAS.Domain.Sales.Enums;
+
+namespace OAS.Application.Sales.CustomerOrders.Commands;
+
+public sealed class CreateCustomerOrderCommandHandler(
+    ICustomerOrderAggregateRepository repository,
+    IReadRepository<Customer, Guid> customers,
+    IExchangeRateResolver rates,
+    ISalesLineResolver lineResolver,
+    ISalesPrescriptionValidator prescriptionValidator,
+    ISequenceNumberGenerator sequences) : IRequestHandler<CreateCustomerOrderCommand, CustomerOrder>
+{
+    public async Task<CustomerOrder> Handle(CreateCustomerOrderCommand request, CancellationToken ct)
+    {
+        var d = request.Data;
+        var customer = await customers.GetByIdAsync(d.CustomerId, ct) ?? throw new NotFoundException(nameof(Customer), d.CustomerId);
+        EnsureCustomer(customer, (SalesPaymentTermType)(byte)d.PaymentTermType);
+        if (d.Lines.Count == 0) throw new ConflictException("sales_order_lines_required", "يجب أن يحتوي الطلب على سطر واحد على الأقل.");
+
+        var code = d.OrderCode?.Trim();
+        if (string.IsNullOrWhiteSpace(code))
+            code = CustomerOrderCodeFormatter.Format(await sequences.NextAsync("CustomerOrderCodeSequence", ct), d.OrderDate);
+        if (await repository.CountAsync(new Specification<CustomerOrder>().Where(x => x.OrderCode == code), ct) > 0)
+            throw new ConflictException(SalesErrorCodes.DuplicateOrderCode, "كود طلب العميل مستخدم مسبقًا.");
+
+        var rate = await rates.ResolveAsync(d.CurrencyId, d.OrderDate, ExchangeRateType.Accounting, cancellationToken: ct);
+        var order = CustomerOrder.Create(
+            Guid.NewGuid(), code, customer.Id, d.PrescriptionRevisionId, d.OrderDate, d.RequiredDate,
+            rate.CurrencyId, rate.CurrencyCode, rate.CurrencySymbol, rate.CurrencyDecimalPlaces, rate.Rate,
+            rate.RateDate, rate.RateType, rate.Source, (TaxCalculationMode)(byte)d.TaxCalculationMode,
+            (SalesPaymentTermType)(byte)d.PaymentTermType, customer.PaymentTermDays, d.Notes);
+
+        var lineNo = 1;
+        foreach (var req in d.Lines)
+        {
+            var line = await BuildLineAsync(order, lineNo++, req, ct);
+            order.AddLine(line);
+        }
+        await repository.AddAsync(order, ct);
+        return order;
+    }
+
+    private async Task<CustomerOrderLine> BuildLineAsync(CustomerOrder order, int lineNo, CustomerOrderLineRequest req, CancellationToken ct)
+    {
+        var lineType = (SalesLineType)(byte)req.LineType;
+        var resolved = await lineResolver.ResolveAsync(lineType, req.ProductVariantId, req.WarehouseId, req.Description, ct);
+        var prescriptionRevision = req.PrescriptionRevisionId ?? order.PrescriptionRevisionId;
+        var eye = req.PrescriptionEye.HasValue ? (EyeSide?)(byte)req.PrescriptionEye.Value : null;
+        await prescriptionValidator.ValidateLineAsync(prescriptionRevision, eye, resolved.PrescriptionRequired, resolved.OpticalPolicy, ct);
+
+        return CustomerOrderLine.Create(
+            Guid.NewGuid(), order.Id, lineNo, req.GroupId, lineType, resolved.ProductVariantId, resolved.WarehouseId,
+            resolved.Description, req.Quantity, resolved.BaseUnitPrice, req.ActualUnitPrice,
+            (SalesDiscountType)(byte)req.DiscountType, req.DiscountValue, req.TaxRate, prescriptionRevision, eye,
+            req.RequiresProduction, req.Notes, order.TaxCalculationMode, order.CurrencyDecimalPlacesSnapshot);
+    }
+
+    private static void EnsureCustomer(Customer customer, SalesPaymentTermType paymentTerm)
+    {
+        if (!customer.IsActive) throw new ConflictException(SalesErrorCodes.CustomerInactive, "العميل غير فعال.");
+        if (paymentTerm == SalesPaymentTermType.Credit && !customer.IsCreditAllowed)
+            throw new ConflictException(SalesErrorCodes.CreditNotAllowed, "البيع الآجل غير مسموح لهذا العميل.");
+    }
+}

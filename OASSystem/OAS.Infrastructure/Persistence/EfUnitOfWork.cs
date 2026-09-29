@@ -235,6 +235,55 @@ public sealed class EfUnitOfWork(OasDbContext dbContext) : IUnitOfWork
         }
 
 
+        if (message.Contains("UX_Prescriptions_PrescriptionCode", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("sales_duplicate_prescription_code", "كود الوصفة مستخدم مسبقًا.");
+            return true;
+        }
+
+        if (message.Contains("UX_CustomerOrders_OrderCode", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("sales_duplicate_order_code", "كود طلب العميل مستخدم مسبقًا.");
+            return true;
+        }
+
+        if (message.Contains("UX_SalesInvoices_InvoiceCode", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("sales_duplicate_invoice_code", "كود فاتورة المبيعات مستخدم مسبقًا.");
+            return true;
+        }
+
+        if (message.Contains("UX_PrescriptionRevisions_Current", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("UX_PrescriptionRevisions_Prescription_Revision", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("sales_prescription_revision_conflict", "تم إنشاء أو تعديل إصدار الوصفة بالتزامن. أعد تحميل الوصفة وحاول مرة أخرى.");
+            return true;
+        }
+
+        if (message.Contains("UX_PrescriptionEyeDetails_Revision_Eye", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("sales_prescription_eye_duplicate", "لا يمكن تكرار نفس العين داخل إصدار الوصفة.");
+            return true;
+        }
+
+        if (message.Contains("UX_CustomerOrderLines_Order_LineNumber", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("sales_order_line_number_conflict", "حدث تعارض في ترتيب أسطر طلب العميل. أعد تحميل الطلب وحاول مرة أخرى.");
+            return true;
+        }
+
+        if (message.Contains("UX_SalesInvoiceLines_Invoice_LineNumber", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("sales_invoice_line_number_conflict", "حدث تعارض في ترتيب أسطر الفاتورة. أعد تحميل الفاتورة وحاول مرة أخرى.");
+            return true;
+        }
+
+        if (message.Contains("UX_SalesInvoicePrescriptionSnapshots_LineId", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("sales_prescription_snapshot_conflict", "تم حفظ Snapshot للوصفة لهذا السطر مسبقًا.");
+            return true;
+        }
+
         if (message.Contains("UX_Warehouses_ActiveDefault", StringComparison.OrdinalIgnoreCase))
         {
             conflict = new ConflictException("inventory_default_warehouse_exists", "يوجد مخزن افتراضي فعال بالفعل. لا يمكن تعيين أكثر من مخزن افتراضي فعال.");
