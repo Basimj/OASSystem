@@ -42,10 +42,16 @@ public partial class SalesWorkspaceHost : IDisposable
     private long _totalCount;
     private string? _error;
     private string? _success;
-    private UiPrescriptionRevisionModel? _revisionDraft;
+    private readonly Dictionary<Guid, UiPrescriptionRevisionModel> _revisionDrafts = [];
+    private readonly HashSet<Guid> _dirtyRevisionDraftTabs = [];
+    private bool _isSavingRevision;
     private SalesEntityType? _lastSection;
 
     private SalesWorkspaceTabState? ActiveTab => Workspace.ActiveTab;
+    private UiPrescriptionRevisionModel? ActiveRevisionDraft =>
+        ActiveTab is not null && _revisionDrafts.TryGetValue(ActiveTab.TabId, out var draft)
+            ? draft
+            : null;
     private SalesEntityType ActiveEntityType => ActiveTab?.EntityType ?? Section;
     private IReadOnlyList<UiSalesDocumentListItem> ListItems => _listItems;
     private string ListTitle => ActiveEntityType switch { SalesEntityType.Prescriptions => "الوصفات", SalesEntityType.CustomerOrders => "طلبات العملاء", _ => "فواتير المبيعات" };
@@ -117,7 +123,13 @@ public partial class SalesWorkspaceHost : IDisposable
             {
                 case SalesEntityType.Prescriptions:
                     var rx = await Sales.ReservePrescriptionCodeAsync();
-                    tab.Model = new UiPrescriptionFormModel { PrescriptionCode = rx?.Code ?? string.Empty };
+                    tab.Model = new UiPrescriptionFormModel
+                    {
+                        PrescriptionCode = rx?.Code ?? string.Empty,
+                        Status = PrescriptionStatus.Draft.ToString(),
+                        StatusText = "جديدة - ستصبح مفعلة بعد الحفظ"
+                    };
+                    _revisionDrafts[tab.TabId] = CreateRevisionDraft(1);
                     break;
                 case SalesEntityType.CustomerOrders:
                     var orderCode = await Sales.ReserveCustomerOrderCodeAsync(DateOnly.FromDateTime(DateTime.Today));
@@ -175,10 +187,42 @@ public partial class SalesWorkspaceHost : IDisposable
             switch (ActiveTab.Model)
             {
                 case UiPrescriptionFormModel model:
+                {
                     RequireGuid(model.CustomerId, "يجب تحديد العميل.");
-                    var p = model.Id.HasValue ? await Sales.UpdatePrescriptionAsync(model.Id.Value, SalesUiMapper.ToUpdate(model)) : await Sales.CreatePrescriptionAsync(SalesUiMapper.ToCreate(model));
-                    if (p is not null) CompleteSave(ActiveTab, p.Id, p.PrescriptionCode, SalesUiMapper.ToUi(p));
+
+                    PrescriptionDto? prescription;
+
+                    if (model.Id.HasValue)
+                    {
+                        prescription = await Sales.UpdatePrescriptionAsync(
+                            model.Id.Value,
+                            SalesUiMapper.ToUpdate(model));
+                    }
+                    else
+                    {
+                        var initialRevision = ActiveRevisionDraft
+                            ?? throw new InvalidOperationException(
+                                "لا يمكن حفظ الوصفة بدون الإصدار الأول.");
+
+                        ValidateRevisionDraft(initialRevision);
+
+                        prescription = await Sales.CreatePrescriptionAsync(
+                            SalesUiMapper.ToCreate(model, initialRevision));
+                    }
+
+                    if (prescription is not null)
+                    {
+                        _revisionDrafts.Remove(ActiveTab.TabId);
+                        _dirtyRevisionDraftTabs.Remove(ActiveTab.TabId);
+                        CompleteSave(
+                            ActiveTab,
+                            prescription.Id,
+                            prescription.PrescriptionCode,
+                            SalesUiMapper.ToUi(prescription));
+                    }
+
                     break;
+                }
                 case UiCustomerOrderFormModel model:
                     RequireGuid(model.CustomerId, "يجب تحديد العميل."); RequireGuid(model.CurrencyId, "يجب تحديد العملة.");
                     if (model.Lines.Count == 0) throw new InvalidOperationException("يجب إضافة سطر واحد على الأقل.");
@@ -288,31 +332,197 @@ public partial class SalesWorkspaceHost : IDisposable
         catch (ApiClientException ex) { _error = SalesApiErrorPresenter.GetMessage(ex.Error); }
     }
 
-    private async Task ActivatePrescriptionAsync(MouseEventArgs _) => await SetPrescriptionStatusAsync(PrescriptionStatus.Active);
     private async Task CancelPrescriptionAsync(MouseEventArgs _)
     {
-        if (!await Dialogs.ConfirmAsync("إلغاء الوصفة", "هل تريد تغيير حالة الوصفة إلى ملغاة؟", AlertTone.Warning, "إلغاء الوصفة", "رجوع")) return;
+        if (!await Dialogs.ConfirmAsync(
+                "إلغاء الوصفة",
+                "هل تريد تغيير حالة الوصفة إلى ملغاة؟",
+                AlertTone.Warning,
+                "إلغاء الوصفة",
+                "رجوع"))
+        {
+            return;
+        }
+
         await SetPrescriptionStatusAsync(PrescriptionStatus.Cancelled);
     }
+
     private async Task SetPrescriptionStatusAsync(PrescriptionStatus status)
     {
-        if (ActiveTab?.Model is not UiPrescriptionFormModel m || !m.Id.HasValue || !EnsureSaved(ActiveTab)) return;
-        try { var dto = await Sales.SetPrescriptionStatusAsync(m.Id.Value, new SetPrescriptionStatusRequest(status, m.RowVersion)); if (dto is not null) ActiveTab.Model = SalesUiMapper.ToUi(dto); Workspace.NotifyStateChanged(); await LoadListAsync(SalesEntityType.Prescriptions); }
-        catch (ApiClientException ex) { _error = SalesApiErrorPresenter.GetMessage(ex.Error); }
+        if (ActiveTab?.Model is not UiPrescriptionFormModel model ||
+            !model.Id.HasValue ||
+            !EnsureSaved(ActiveTab))
+        {
+            return;
+        }
+
+        try
+        {
+            var dto = await Sales.SetPrescriptionStatusAsync(
+                model.Id.Value,
+                new SetPrescriptionStatusRequest(status, model.RowVersion));
+
+            if (dto is not null)
+                ActiveTab.Model = SalesUiMapper.ToUi(dto);
+
+            Workspace.NotifyStateChanged();
+            await LoadListAsync(SalesEntityType.Prescriptions);
+        }
+        catch (ApiClientException ex)
+        {
+            _error = SalesApiErrorPresenter.GetMessage(ex.Error);
+        }
     }
 
     private Task BeginRevisionAsync(MouseEventArgs _)
     {
-        if (ActiveTab?.Model is not UiPrescriptionFormModel) return Task.CompletedTask;
-        _revisionDraft = new UiPrescriptionRevisionModel { EffectiveDate = DateOnly.FromDateTime(DateTime.Today), Eyes = [new() { Eye = EyeSide.RightOD.ToString(), EyeText = SalesArabicPresenter.EyeText(EyeSide.RightOD) }, new() { Eye = EyeSide.LeftOS.ToString(), EyeText = SalesArabicPresenter.EyeText(EyeSide.LeftOS) }] };
-        Workspace.NotifyStateChanged(); return Task.CompletedTask;
+        if (ActiveTab?.Model is not UiPrescriptionFormModel model ||
+            !model.Id.HasValue)
+        {
+            return Task.CompletedTask;
+        }
+
+        ClearMessages();
+
+        var nextRevisionNumber = model.Revisions.Count == 0
+            ? 1
+            : model.Revisions.Max(x => x.RevisionNumber) + 1;
+
+        _revisionDrafts[ActiveTab.TabId] = CreateRevisionDraft(nextRevisionNumber);
+        _dirtyRevisionDraftTabs.Remove(ActiveTab.TabId);
+        Workspace.NotifyStateChanged();
+        return Task.CompletedTask;
     }
-    private Task CancelRevisionAsync(MouseEventArgs _) { _revisionDraft = null; Workspace.NotifyStateChanged(); return Task.CompletedTask; }
+
+    private async Task CancelRevisionAsync(MouseEventArgs _)
+    {
+        if (ActiveTab is null)
+            return;
+
+        if (_dirtyRevisionDraftTabs.Contains(ActiveTab.TabId))
+        {
+            var confirmed = await Dialogs.ConfirmAsync(
+                "إلغاء الإصدار الجديد",
+                "توجد قياسات غير محفوظة في الإصدار الجديد. هل تريد إلغاءها؟",
+                AlertTone.Warning,
+                "إلغاء الإصدار",
+                "رجوع");
+
+            if (!confirmed)
+                return;
+        }
+
+        _revisionDrafts.Remove(ActiveTab.TabId);
+        _dirtyRevisionDraftTabs.Remove(ActiveTab.TabId);
+        ClearMessages();
+        Workspace.NotifyStateChanged();
+    }
+
+    private Task RevisionDraftChangedAsync()
+    {
+        if (ActiveTab is null)
+            return Task.CompletedTask;
+
+        // في الوصفة الجديدة الإصدار الأول جزء من عملية إنشاء الوصفة نفسها.
+        if (ActiveTab.IsNew)
+            return MarkDirtyAsync();
+
+        // في الوصفة الموجودة نحفظ الإصدار بعملية مستقلة، فلا نوسّخ بيانات الوصفة الرئيسية.
+        _dirtyRevisionDraftTabs.Add(ActiveTab.TabId);
+        Workspace.NotifyStateChanged();
+        return Task.CompletedTask;
+    }
+
     private async Task SaveRevisionAsync(MouseEventArgs _)
     {
-        if (ActiveTab?.Model is not UiPrescriptionFormModel p || !p.Id.HasValue || _revisionDraft is null) return;
-        try { var dto = await Sales.CreatePrescriptionRevisionAsync(p.Id.Value, SalesUiMapper.ToRevisionRequest(_revisionDraft, p.RowVersion)); if (dto is not null) ActiveTab.Model = SalesUiMapper.ToUi(dto); _revisionDraft = null; _success = "تم إنشاء Revision جديد للوصفة."; Workspace.NotifyStateChanged(); }
-        catch (ApiClientException ex) { _error = SalesApiErrorPresenter.GetMessage(ex.Error); }
+        if (_isSavingRevision ||
+            ActiveTab?.Model is not UiPrescriptionFormModel prescription ||
+            !prescription.Id.HasValue ||
+            ActiveRevisionDraft is not { } revisionDraft)
+        {
+            return;
+        }
+
+        ClearMessages();
+        _isSavingRevision = true;
+        Workspace.NotifyStateChanged();
+
+        try
+        {
+            ValidateRevisionDraft(revisionDraft);
+
+            var dto = await Sales.CreatePrescriptionRevisionAsync(
+                prescription.Id.Value,
+                SalesUiMapper.ToRevisionRequest(
+                    revisionDraft,
+                    prescription.RowVersion));
+
+            if (dto is not null)
+                ActiveTab.Model = SalesUiMapper.ToUi(dto);
+
+            _revisionDrafts.Remove(ActiveTab.TabId);
+            _dirtyRevisionDraftTabs.Remove(ActiveTab.TabId);
+            _success = "تم حفظ الإصدار الجديد وأصبح هو الإصدار الحالي للوصفة.";
+            Workspace.NotifyStateChanged();
+            await LoadListAsync(SalesEntityType.Prescriptions);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _error = ex.Message;
+        }
+        catch (ApiClientException ex)
+        {
+            _error = SalesApiErrorPresenter.GetMessage(ex.Error);
+        }
+        finally
+        {
+            _isSavingRevision = false;
+            Workspace.NotifyStateChanged();
+        }
+    }
+
+    private static UiPrescriptionRevisionModel CreateRevisionDraft(int revisionNumber) => new()
+    {
+        RevisionNumber = revisionNumber,
+        EffectiveDate = DateOnly.FromDateTime(DateTime.Today),
+        Eyes =
+        [
+            new UiPrescriptionEyeModel
+            {
+                Eye = EyeSide.RightOD.ToString(),
+                EyeText = SalesArabicPresenter.EyeText(EyeSide.RightOD)
+            },
+            new UiPrescriptionEyeModel
+            {
+                Eye = EyeSide.LeftOS.ToString(),
+                EyeText = SalesArabicPresenter.EyeText(EyeSide.LeftOS)
+            }
+        ]
+    };
+
+    private static void ValidateRevisionDraft(UiPrescriptionRevisionModel revision)
+    {
+        if (!revision.EffectiveDate.HasValue)
+            throw new InvalidOperationException("يجب تحديد تاريخ سريان الإصدار.");
+
+        if (revision.Eyes.Count == 0)
+            throw new InvalidOperationException("يجب إضافة بيانات عين واحدة على الأقل.");
+
+        if (revision.Eyes
+            .GroupBy(x => x.Eye, StringComparer.OrdinalIgnoreCase)
+            .Any(group => group.Count() > 1))
+        {
+            throw new InvalidOperationException("لا يمكن تكرار نفس العين داخل الإصدار.");
+        }
+
+        if (revision.Eyes.Any(x => x.Axis is < 0 or > 180))
+            throw new InvalidOperationException("قيمة Axis يجب أن تكون بين 0 و180.");
+
+        if (revision.Eyes.Any(x => x.ADD < 0 || x.Prism < 0))
+            throw new InvalidOperationException("قيم ADD وPrism لا يمكن أن تكون سالبة.");
+
+        if (revision.Eyes.Any(x => x.PD is <= 0 || x.MonocularPD is <= 0 || x.FittingHeight is <= 0))
+            throw new InvalidOperationException("قيم PD وMono PD وFitting Height يجب أن تكون أكبر من صفر عند إدخالها.");
     }
 
     private bool EnsureSaved(SalesWorkspaceTabState tab)
@@ -332,7 +542,22 @@ public partial class SalesWorkspaceHost : IDisposable
     private async Task CloseTabAsync(Guid tabId)
     {
         var tab = Workspace.FindTab(tabId); if (tab is null || !tab.CanClose) return;
-        if (tab.IsDirty && !await Dialogs.ConfirmAsync("إغلاق التبويب", "يوجد تغييرات غير محفوظة في هذا التبويب. هل تريد إغلاقه؟", AlertTone.Warning, "إغلاق", "رجوع")) return;
+        var hasUnsavedRevision = _dirtyRevisionDraftTabs.Contains(tabId);
+        if ((tab.IsDirty || hasUnsavedRevision) &&
+            !await Dialogs.ConfirmAsync(
+                "إغلاق التبويب",
+                hasUnsavedRevision
+                    ? "يوجد إصدار جديد غير محفوظ في هذا التبويب. هل تريد إغلاقه؟"
+                    : "يوجد تغييرات غير محفوظة في هذا التبويب. هل تريد إغلاقه؟",
+                AlertTone.Warning,
+                "إغلاق",
+                "رجوع"))
+        {
+            return;
+        }
+
+        _revisionDrafts.Remove(tabId);
+        _dirtyRevisionDraftTabs.Remove(tabId);
         Workspace.RemoveTab(tabId);
     }
 
@@ -366,86 +591,63 @@ public partial class SalesWorkspaceHost : IDisposable
     }
     private Task<IReadOnlyList<UiLookupItem>> SearchLinePrescriptionItemsAsync(UiSalesLineModel _, string q, CancellationToken ct) => SearchPrescriptionRevisionItemsAsync(q, ct);
     private async Task<IReadOnlyList<UiLookupItem>> SearchCurrencyItemsAsync(
-    string q,
-    CancellationToken ct)
+        string q,
+        CancellationToken ct)
     {
-        var date =
-            ActiveTab?.Model switch
-            {
-                UiCustomerOrderFormModel order
-                    => order.OrderDate,
+        var date = ActiveTab?.Model switch
+        {
+            UiCustomerOrderFormModel order => order.OrderDate,
+            UiSalesInvoiceFormModel invoice => invoice.InvoiceDate,
+            _ => null
+        } ?? DateOnly.FromDateTime(DateTime.Today);
 
-                UiSalesInvoiceFormModel invoice
-                    => invoice.InvoiceDate,
-
-                _ => null
-            }
-            ?? DateOnly.FromDateTime(DateTime.Today);
-
-        var rows =
-            await Sales.SearchCurrenciesAsync(
-                date,
-                q,
-                20,
-                ct);
+        var rows = await Sales.SearchCurrenciesAsync(date, q, 20, ct);
 
         foreach (var currency in rows)
-        {
             _currencies[currency.Id] = currency;
-        }
 
-        return rows
-            .Select(currency =>
+        return rows.Select(currency =>
+        {
+            var disabled =
+                !currency.IsActive ||
+                !currency.HasEffectiveExchangeRate;
+
+            string secondaryText;
+
+            if (!currency.IsActive)
             {
-                /*
-                 * العملة تكون غير قابلة للاختيار في حالتين:
-                 *
-                 * 1. غير نشطة.
-                 * 2. لا يوجد لها سعر صرف فعال لتاريخ المستند.
-                 */
-                var disabled =
-                    !currency.IsActive ||
-                    !currency.HasEffectiveExchangeRate;
+                secondaryText = "العملة غير نشطة";
+            }
+            else if (!currency.HasEffectiveExchangeRate)
+            {
+                secondaryText =
+                    currency.AvailabilityMessage
+                    ?? $"لا يوجد سعر صرف فعال حتى {date:yyyy-MM-dd}";
+            }
+            else if (currency.IsBaseCurrency)
+            {
+                secondaryText =
+                    string.IsNullOrWhiteSpace(currency.Symbol)
+                        ? "العملة الأساسية • سعر الصرف: 1"
+                        : $"{currency.Symbol} • العملة الأساسية • سعر الصرف: 1";
+            }
+            else
+            {
+                secondaryText =
+                    string.IsNullOrWhiteSpace(currency.Symbol)
+                        ? $"السعر: {currency.EffectiveExchangeRate:N4} • تاريخ السعر: {currency.EffectiveRateDate:yyyy-MM-dd}"
+                        : $"{currency.Symbol} • السعر: {currency.EffectiveExchangeRate:N4} • تاريخ السعر: {currency.EffectiveRateDate:yyyy-MM-dd}";
+            }
 
-                string secondaryText;
-
-                if (!currency.IsActive)
-                {
-                    secondaryText =
-                        "العملة غير نشطة";
-                }
-                else if (!currency.HasEffectiveExchangeRate)
-                {
-                    secondaryText =
-                        currency.AvailabilityMessage
-                        ?? $"لا يوجد سعر صرف فعال حتى {date:yyyy-MM-dd}";
-                }
-                else if (currency.IsBaseCurrency)
-                {
-                    secondaryText =
-                        string.IsNullOrWhiteSpace(currency.Symbol)
-                            ? "العملة الأساسية • سعر الصرف: 1"
-                            : $"{currency.Symbol} • العملة الأساسية • سعر الصرف: 1";
-                }
-                else
-                {
-                    secondaryText =
-                        string.IsNullOrWhiteSpace(currency.Symbol)
-                            ? $"السعر: {currency.EffectiveExchangeRate:N4} • تاريخ السعر: {currency.EffectiveRateDate:yyyy-MM-dd}"
-                            : $"{currency.Symbol} • السعر: {currency.EffectiveExchangeRate:N4} • تاريخ السعر: {currency.EffectiveRateDate:yyyy-MM-dd}";
-                }
-
-                return new UiLookupItem(
-                    Value: currency.Id.ToString(),
-                    PrimaryText:
-                        $"{currency.Code} - {currency.NameAr}",
-                    SecondaryText: secondaryText,
-                    IconCssClass: currency.HasEffectiveExchangeRate
-                        ? "fa-solid fa-coins"
-                        : "fa-solid fa-triangle-exclamation",
-                    Disabled: disabled);
-            })
-            .ToArray();
+            return new UiLookupItem(
+                currency.Id.ToString(),
+                $"{currency.Code} - {currency.NameAr}",
+                secondaryText,
+                currency.HasEffectiveExchangeRate
+                    ? "fa-solid fa-coins"
+                    : "fa-solid fa-triangle-exclamation",
+                disabled);
+        }).ToArray();
     }
     private async Task<IReadOnlyList<UiLookupItem>> SearchProductItemsAsync(string q, CancellationToken ct)
     {
@@ -498,8 +700,14 @@ public partial class SalesWorkspaceHost : IDisposable
     {
         if (Guid.TryParse(change.Value, out var id) && _products.TryGetValue(id, out var product))
         {
-            change.Line.ProductDisplay = string.IsNullOrWhiteSpace(product.VariantName) ? product.ProductNameAr : $"{product.ProductNameAr} - {product.VariantName}";
-            change.Line.ProductCodeSnapshot = product.ProductCode; change.Line.Description = change.Line.ProductDisplay; if (change.Line.ActualUnitPrice <= 0) change.Line.ActualUnitPrice = product.SellingPrice;
+            change.Line.ProductDisplay = string.IsNullOrWhiteSpace(product.VariantName)
+                ? product.ProductNameAr
+                : $"{product.ProductNameAr} - {product.VariantName}";
+
+            change.Line.ProductCodeSnapshot = product.ProductCode;
+            change.Line.Description = change.Line.ProductDisplay;
+            change.Line.BaseUnitPrice = product.SellingPrice;
+            change.Line.ActualUnitPrice = product.SellingPrice;
         }
         return Task.CompletedTask;
     }

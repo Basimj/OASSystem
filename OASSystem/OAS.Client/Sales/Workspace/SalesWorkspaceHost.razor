@@ -36,38 +36,49 @@
                                   StatusText="@prescription.StatusText" StatusCssClass="@StatusCss(prescription.Status)"
                                   ErrorText="@_error" SuccessText="@_success">
                 <Actions>
-                    @if (ActiveTab.IsEditMode)
+                    @if (ActiveTab.IsNew)
                     {
-                        <UiButton Text="حفظ" IconCssClass="fa-solid fa-floppy-disk" Loading="@ActiveTab.IsSaving" Size="ControlSize.Small" OnClick="SaveAsync" />
-                        @if (!ActiveTab.IsNew) { <UiButton Text="إلغاء التعديل" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CancelEditAsync" /> }
+                        <UiButton Text="حفظ الوصفة" IconCssClass="fa-solid fa-floppy-disk" Loading="@ActiveTab.IsSaving" Size="ControlSize.Small" OnClick="SaveAsync" />
                     }
-                    else
+                    else if (ActiveRevisionDraft is not null)
                     {
-                        <UiButton Text="تعديل" IconCssClass="fa-solid fa-pen" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="BeginEditAsync" />
-                        @if (prescription.Status == "Draft")
-                        {
-                            <UiButton Text="تفعيل" IconCssClass="fa-solid fa-circle-check" Size="ControlSize.Small" OnClick="ActivatePrescriptionAsync" />
-                        }
-                        @if (prescription.Status != "Cancelled")
-                        {
-                            <UiButton Text="إلغاء الوصفة" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" OnClick="CancelPrescriptionAsync" />
-                        }
-                        <UiButton Text="Revision جديد" IconCssClass="fa-solid fa-code-branch" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="BeginRevisionAsync" />
+                        <UiButton Text="حفظ الإصدار" IconCssClass="fa-solid fa-floppy-disk" Loading="@_isSavingRevision" Size="ControlSize.Small" OnClick="SaveRevisionAsync" />
+                        <UiButton Text="إلغاء الإصدار" IconCssClass="fa-solid fa-xmark" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CancelRevisionAsync" />
+                    }
+                    else if (ActiveTab.IsEditMode)
+                    {
+                        <UiButton Text="حفظ بيانات الوصفة" IconCssClass="fa-solid fa-floppy-disk" Loading="@ActiveTab.IsSaving" Size="ControlSize.Small" OnClick="SaveAsync" />
+                        <UiButton Text="إلغاء التعديل" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CancelEditAsync" />
+                    }
+                    else if (prescription.Status != "Cancelled" && prescription.Status != "Superseded")
+                    {
+                        <UiButton Text="تعديل بيانات الوصفة" IconCssClass="fa-solid fa-pen" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="BeginEditAsync" />
+                        <UiButton Text="إضافة إصدار جديد" IconCssClass="fa-solid fa-code-branch" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="BeginRevisionAsync" />
+                        <UiButton Text="إلغاء الوصفة" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" OnClick="CancelPrescriptionAsync" />
                     }
                 </Actions>
                 <ChildContent>
                 <UiSalesFormSection Title="بيانات الوصفة" IconCss="fa-solid fa-file-medical">
                     <UiPrescriptionEditor Model="@prescription" ReadOnly="@(!ActiveTab.IsEditMode)" SearchCustomersAsync="SearchCustomerItemsAsync" OnCustomerSelected="PrescriptionCustomerChangedAsync" OnChanged="MarkDirtyAsync" />
                 </UiSalesFormSection>
-                @if (_revisionDraft is not null)
+                @if (ActiveRevisionDraft is not null)
                 {
-                    <UiSalesFormSection Title="إصدار وصفة جديد" Description="سيصبح هذا الإصدار هو الإصدار الحالي بعد نجاح الحفظ." IconCss="fa-solid fa-code-branch">
-                        <UiPrescriptionRevisionEditor Model="@_revisionDraft" OnChanged="MarkDirtyAsync" />
-                        <UiWorkspaceActionBar>
-                            <UiButton Text="حفظ الإصدار" IconCssClass="fa-solid fa-check" Size="ControlSize.Small" OnClick="SaveRevisionAsync" />
-                            <UiButton Text="إلغاء" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CancelRevisionAsync" />
-                        </UiWorkspaceActionBar>
-                    </UiSalesFormSection>
+                    @if (ActiveTab.IsNew)
+                    {
+                        <UiSalesFormSection Title="الإصدار الأول"
+                                                Description="الإصدار الأول إلزامي. يتم حفظ الوصفة والإصدار والقياسات معًا، وبعد نجاح الحفظ تصبح الوصفة مفعلة تلقائيًا."
+                                                IconCss="fa-solid fa-code-branch">
+                            <UiPrescriptionRevisionEditor Model="@ActiveRevisionDraft" OnChanged="MarkDirtyAsync" />
+                        </UiSalesFormSection>
+                    }
+                    else
+                    {
+                        <UiSalesFormSection Title="@($"الإصدار {ActiveRevisionDraft.RevisionNumber} - إصدار جديد")"
+                                                Description="أدخل القياسات ثم اضغط «حفظ الإصدار» من شريط الإجراءات أعلى الصفحة. لا تحتاج إلى الدخول في تعديل الوصفة لحفظ الإصدار."
+                                                IconCss="fa-solid fa-code-branch">
+                            <UiPrescriptionRevisionEditor Model="@ActiveRevisionDraft" OnChanged="RevisionDraftChangedAsync" />
+                        </UiSalesFormSection>
+                    }
                 }
                 </ChildContent>
             </UiSalesEditorSurface>

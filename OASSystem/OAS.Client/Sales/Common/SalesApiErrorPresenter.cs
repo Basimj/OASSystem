@@ -37,6 +37,7 @@ public static class SalesApiErrorPresenter
         ["sales_prescription_delete_forbidden"] = "لا يمكن حذف الوصفة في حالتها الحالية.",
         ["sales_prescription_eye_duplicate"] = "يوجد قياس مكرر لنفس العين داخل Revision الوصفة.",
         ["sales_prescription_eye_required"] = "بيانات العين المطلوبة غير مكتملة.",
+        ["sales_prescription_revision_required"] = "لا يمكن حفظ الوصفة بدون الإصدار الأول.",
         ["sales_prescription_id_required"] = "معرف الوصفة مطلوب.",
         ["sales_prescription_required"] = "يجب تحديد وصفة وإصدار صالح لهذا السطر.",
         ["sales_prescription_status_invalid"] = "حالة الوصفة الحالية لا تسمح بهذه العملية.",

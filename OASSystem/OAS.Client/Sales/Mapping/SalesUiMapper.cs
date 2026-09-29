@@ -93,11 +93,44 @@ public static class SalesUiMapper
         RequiresProduction = x.RequiresProduction, Notes = x.Notes, RowVersion = x.RowVersion
     };
 
-    public static CreatePrescriptionRequest ToCreate(UiPrescriptionFormModel m) => new(m.PrescriptionCode, Guid.Parse(m.CustomerId), m.PrescriptionDate ?? DateOnly.FromDateTime(DateTime.Today), m.PrescribedBy, m.ClinicName, m.Notes);
+    public static CreatePrescriptionRequest ToCreate(
+        UiPrescriptionFormModel m,
+        UiPrescriptionRevisionModel initialRevision) =>
+        new(
+            m.PrescriptionCode,
+            Guid.Parse(m.CustomerId),
+            m.PrescriptionDate ?? DateOnly.FromDateTime(DateTime.Today),
+            m.PrescribedBy,
+            m.ClinicName,
+            m.Notes,
+            new CreatePrescriptionInitialRevisionRequest(
+                initialRevision.EffectiveDate ?? DateOnly.FromDateTime(DateTime.Today),
+                initialRevision.Reason,
+                initialRevision.Eyes.Select(ToEyeRequest).ToArray()));
     public static UpdatePrescriptionRequest ToUpdate(UiPrescriptionFormModel m) => new(m.PrescriptionDate ?? DateOnly.FromDateTime(DateTime.Today), m.PrescribedBy, m.ClinicName, m.Notes, m.RowVersion);
-    public static CreatePrescriptionRevisionRequest ToRevisionRequest(UiPrescriptionRevisionModel m, string prescriptionRowVersion) => new(
-        m.EffectiveDate ?? DateOnly.FromDateTime(DateTime.Today), m.Reason,
-        m.Eyes.Select(x => new PrescriptionEyeDetailRequest(Parse<EyeSide>(x.Eye, EyeSide.RightOD), x.SPH, x.CYL, x.Axis, x.ADD, x.Prism, ParseNullable<PrismBaseDirection>(x.PrismBase), x.PD, x.MonocularPD, x.VA, x.FittingHeight, x.Notes)).ToArray(), prescriptionRowVersion);
+    public static CreatePrescriptionRevisionRequest ToRevisionRequest(
+        UiPrescriptionRevisionModel m,
+        string prescriptionRowVersion) =>
+        new(
+            m.EffectiveDate ?? DateOnly.FromDateTime(DateTime.Today),
+            m.Reason,
+            m.Eyes.Select(ToEyeRequest).ToArray(),
+            prescriptionRowVersion);
+
+    private static PrescriptionEyeDetailRequest ToEyeRequest(UiPrescriptionEyeModel x) =>
+        new(
+            Parse<EyeSide>(x.Eye, EyeSide.RightOD),
+            x.SPH,
+            x.CYL,
+            x.Axis,
+            x.ADD,
+            x.Prism,
+            ParseNullable<PrismBaseDirection>(x.PrismBase),
+            x.PD,
+            x.MonocularPD,
+            x.VA,
+            x.FittingHeight,
+            x.Notes);
 
     public static CreateCustomerOrderRequest ToCreate(UiCustomerOrderFormModel m) => new(m.OrderCode, Guid.Parse(m.CustomerId), ParseGuid(m.PrescriptionRevisionId), m.OrderDate ?? DateOnly.FromDateTime(DateTime.Today), m.RequiredDate, Guid.Parse(m.CurrencyId), Parse<TaxCalculationMode>(m.TaxCalculationMode, TaxCalculationMode.Exclusive), Parse<SalesPaymentTermType>(m.PaymentTermType, SalesPaymentTermType.Immediate), m.Notes, m.Lines.Select(ToOrderLineRequest).ToArray());
     public static UpdateCustomerOrderRequest ToUpdate(UiCustomerOrderFormModel m) => new(Guid.Parse(m.CustomerId), ParseGuid(m.PrescriptionRevisionId), m.OrderDate ?? DateOnly.FromDateTime(DateTime.Today), m.RequiredDate, Guid.Parse(m.CurrencyId), Parse<TaxCalculationMode>(m.TaxCalculationMode, TaxCalculationMode.Exclusive), Parse<SalesPaymentTermType>(m.PaymentTermType, SalesPaymentTermType.Immediate), m.Notes, m.Lines.Select(ToOrderLineRequest).ToArray(), m.RowVersion);

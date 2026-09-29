@@ -12,8 +12,13 @@ public sealed class Prescription : AuditableEntity<Guid>
     private Prescription() { }
 
     private Prescription(
-        Guid id, string prescriptionCode, Guid customerId, DateOnly prescriptionDate,
-        string? prescribedBy, string? clinicName, string? notes)
+        Guid id,
+        string prescriptionCode,
+        Guid customerId,
+        DateOnly prescriptionDate,
+        string? prescribedBy,
+        string? clinicName,
+        string? notes)
     {
         Id = SalesDomainGuard.Required(id, "Prescription id");
         PrescriptionCode = SalesDomainGuard.Required(prescriptionCode, 40, "Prescription code");
@@ -38,12 +43,20 @@ public sealed class Prescription : AuditableEntity<Guid>
     public IReadOnlyCollection<PrescriptionRevision> Revisions => _revisions.AsReadOnly();
 
     public static Prescription Create(
-        Guid id, string prescriptionCode, Guid customerId, DateOnly prescriptionDate,
-        string? prescribedBy = null, string? clinicName = null, string? notes = null) =>
+        Guid id,
+        string prescriptionCode,
+        Guid customerId,
+        DateOnly prescriptionDate,
+        string? prescribedBy = null,
+        string? clinicName = null,
+        string? notes = null) =>
         new(id, prescriptionCode, customerId, prescriptionDate, prescribedBy, clinicName, notes);
 
     public void UpdateDetails(
-        DateOnly prescriptionDate, string? prescribedBy, string? clinicName, string? notes)
+        DateOnly prescriptionDate,
+        string? prescribedBy,
+        string? clinicName,
+        string? notes)
     {
         EnsureEditable();
         PrescriptionDate = prescriptionDate;
@@ -53,15 +66,28 @@ public sealed class Prescription : AuditableEntity<Guid>
     }
 
     public PrescriptionRevision AddRevision(
-        Guid revisionId, DateOnly effectiveDate, string? reason = null)
+        Guid revisionId,
+        DateOnly effectiveDate,
+        string? reason = null)
     {
         EnsureEditable();
 
         foreach (var current in _revisions.Where(x => x.IsCurrent))
             current.MarkSuperseded();
 
-        var nextRevision = _revisions.Count == 0 ? 1 : _revisions.Max(x => x.RevisionNumber) + 1;
-        var revision = PrescriptionRevision.Create(revisionId, Id, nextRevision, effectiveDate, reason, true, true);
+        var nextRevision = _revisions.Count == 0
+            ? 1
+            : _revisions.Max(x => x.RevisionNumber) + 1;
+
+        var revision = PrescriptionRevision.Create(
+            revisionId,
+            Id,
+            nextRevision,
+            effectiveDate,
+            reason,
+            isCurrent: true,
+            isActive: true);
+
         _revisions.Add(revision);
         return revision;
     }
@@ -69,8 +95,12 @@ public sealed class Prescription : AuditableEntity<Guid>
     public void SetStatus(PrescriptionStatus status)
     {
         SalesDomainGuard.Defined(status, "Prescription status");
+
         if (status == Status)
             return;
+
+        if (status == PrescriptionStatus.Active)
+            EnsureReadyForActivation();
 
         var allowed = Status switch
         {
@@ -90,6 +120,17 @@ public sealed class Prescription : AuditableEntity<Guid>
             foreach (var revision in _revisions.Where(x => x.IsCurrent))
                 revision.MarkSuperseded();
         }
+    }
+
+    private void EnsureReadyForActivation()
+    {
+        var currentRevision = _revisions.SingleOrDefault(x => x.IsCurrent && x.IsActive);
+
+        if (currentRevision is null)
+            throw new DomainException("A prescription cannot be activated without a current active revision.");
+
+        if (currentRevision.EyeDetails.Count == 0)
+            throw new DomainException("A prescription cannot be activated without eye details in its current revision.");
     }
 
     private void EnsureEditable()

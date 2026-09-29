@@ -6,4 +6,5 @@ public sealed record CreatePrescriptionRequest(
     DateOnly PrescriptionDate,
     string? PrescribedBy,
     string? ClinicName,
-    string? Notes);
+    string? Notes,
+    CreatePrescriptionInitialRevisionRequest InitialRevision);

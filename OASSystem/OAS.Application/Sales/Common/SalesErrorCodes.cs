@@ -16,6 +16,9 @@ public static class SalesErrorCodes
     public const string CreditNotAllowed = "sales_credit_not_allowed";
     public const string CreditLimitExceeded = "sales_credit_limit_exceeded";
     public const string PrescriptionRequired = "sales_prescription_required";
+    public const string PrescriptionRevisionRequired = "sales_prescription_revision_required";
+    public const string PrescriptionEyeRequired = "sales_prescription_eye_required";
+    public const string PrescriptionEyeDuplicate = "sales_prescription_eye_duplicate";
     public const string InvalidPrescriptionRevision = "sales_invalid_prescription_revision";
     public const string DuplicateInvoiceCode = "sales_duplicate_invoice_code";
     public const string DuplicateOrderCode = "sales_duplicate_order_code";
