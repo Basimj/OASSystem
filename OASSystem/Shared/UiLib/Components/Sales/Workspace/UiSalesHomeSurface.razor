@@ -1,0 +1,21 @@
+@namespace OAS.UiLib.Components.Sales.Workspace
+
+<div class="ui-sales-home" dir="rtl">
+    <div class="ui-sales-home__hero">
+        <div><span class="ui-sales-home__eyebrow">OAS Sales</span><h1>المبيعات</h1><p>إدارة الوصفات وطلبات العملاء وفواتير المبيعات من شاشة تشغيل موحدة.</p></div>
+        <i class="fa-solid fa-cart-shopping"></i>
+    </div>
+    <div class="ui-sales-home__grid">
+        <button type="button" @onclick="() => NavigateAsync(PrescriptionsRoute)"><i class="fa-solid fa-glasses"></i><strong>الوصفات</strong><span>الوصفات الطبية وإصدارات قياسات العين</span></button>
+        <button type="button" @onclick="() => NavigateAsync(OrdersRoute)"><i class="fa-solid fa-clipboard-list"></i><strong>طلبات العملاء</strong><span>الطلبات وحجز الكميات ومتابعة الجاهزية</span></button>
+        <button type="button" @onclick="() => NavigateAsync(InvoicesRoute)"><i class="fa-solid fa-file-invoice-dollar"></i><strong>فواتير المبيعات</strong><span>التأكيد والترحيل المحاسبي والمخزني</span></button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string PrescriptionsRoute { get; set; } = "/sales/prescriptions";
+    [Parameter] public string OrdersRoute { get; set; } = "/sales/customer-orders";
+    [Parameter] public string InvoicesRoute { get; set; } = "/sales/invoices";
+    [Parameter] public EventCallback<string> OnNavigate { get; set; }
+    private Task NavigateAsync(string route) => OnNavigate.InvokeAsync(route);
+}

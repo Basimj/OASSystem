@@ -9,4 +9,6 @@ public sealed record SalesCurrencyLookupDto(
     decimal EffectiveExchangeRate,
     DateOnly EffectiveRateDate,
     bool IsBaseCurrency,
-    bool IsActive);
+    bool IsActive,
+    bool HasEffectiveExchangeRate,
+    string? AvailabilityMessage);

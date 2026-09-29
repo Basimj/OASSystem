@@ -21,4 +21,5 @@
 @import "../OAS.UiLib.bundle.scp.css";
 @import "./features/employee-import-bulk.css";
 @import "./features/accounting.css";
+@import "./features/sales.css";
 @import "./oas-main-shell.css";

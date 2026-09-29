@@ -61,6 +61,9 @@
     [
         new("dashboard", "لوحة التحكم", "/", "fa-solid fa-house"),
         new("sales", "المبيعات", "/sales", "fa-solid fa-cart-shopping"),
+        new("sales-prescriptions", "الوصفات", "/sales/prescriptions", "fa-solid fa-glasses"),
+        new("sales-orders", "طلبات العملاء", "/sales/customer-orders", "fa-solid fa-clipboard-list"),
+        new("sales-invoices", "فواتير المبيعات", "/sales/invoices", "fa-solid fa-file-invoice-dollar"),
         new("accounting-customers", "العملاء", "/accounting/customers", "fa-regular fa-user"),
         new("products", "المنتجات", "/products", "fa-solid fa-glasses"),
         new("inventory-product-categories", "تصنيفات المنتجات", "/inventory/product-categories", "fa-solid fa-layer-group"),
@@ -101,7 +104,7 @@
 
     private static readonly IReadOnlyList<UiShellNavigationGroup> ShellGroups =
     [
-        new("operations", "المبيعات والتشغيل", "fa-solid fa-store", ["sales", "daily-orders"]),
+        new("operations", "المبيعات والتشغيل", "fa-solid fa-store", ["sales", "sales-prescriptions", "sales-orders", "sales-invoices", "daily-orders"]),
         new("accounting", "المحاسبة والمالية", "fa-solid fa-scale-balanced", [
             "finance",
             "accounting-accounts",

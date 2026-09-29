@@ -9,6 +9,8 @@ using OAS.Client.Identity.State;
 using OAS.Client.Identity.Users.Workspace;
 using OAS.Client.Inventory.Services;
 using OAS.Client.Printing.Services;
+using OAS.Client.Sales.Services;
+using OAS.Client.Sales.Workspace;
 using OAS.Client.Services.Browser;
 using OAS.Client.Services.Http;
 using OAS.UiLib.Extensions;
@@ -45,6 +47,8 @@ public static class ClientServices
         services.AddScoped<IPrintingClientService, PrintingClientService>();
         services.AddScoped<OAS.Client.Accounting.Services.IAccountingClientService, OAS.Client.Accounting.Services.AccountingClientService>();
         services.AddScoped<OAS.Client.Accounting.Workspace.IAccountingWorkspaceState, OAS.Client.Accounting.Workspace.AccountingWorkspaceState>();
+        services.AddScoped<ISalesClientService, SalesClientService>();
+        services.AddScoped<ISalesWorkspaceState, SalesWorkspaceState>();
 
         return services;
     }

@@ -1,0 +1,30 @@
+@namespace OAS.UiLib.Components.Sales.Workspace
+
+<div class="ui-sales-editor" dir="rtl">
+    <div class="ui-sales-editor__header">
+        <div class="ui-sales-editor__title">
+            <i class="@IconCss"></i>
+            <div><h2>@Title</h2>@if (!string.IsNullOrWhiteSpace(Subtitle)){<p>@Subtitle</p>}</div>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(StatusText))
+        {
+            <span class="ui-sales-status @StatusCssClass">@StatusText</span>
+        }
+    </div>
+    @if (Actions is not null) { <div class="ui-sales-editor__actions">@Actions</div> }
+    @if (!string.IsNullOrWhiteSpace(ErrorText)) { <div class="ui-sales-alert ui-sales-alert--error"><i class="fa-solid fa-circle-exclamation"></i><span>@ErrorText</span></div> }
+    @if (!string.IsNullOrWhiteSpace(SuccessText)) { <div class="ui-sales-alert ui-sales-alert--success"><i class="fa-solid fa-circle-check"></i><span>@SuccessText</span></div> }
+    <div class="ui-sales-editor__content">@ChildContent</div>
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public string IconCss { get; set; } = "fa-solid fa-file";
+    [Parameter] public string? StatusText { get; set; }
+    [Parameter] public string StatusCssClass { get; set; } = "ui-sales-status--draft";
+    [Parameter] public string? ErrorText { get; set; }
+    [Parameter] public string? SuccessText { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

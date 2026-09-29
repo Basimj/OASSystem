@@ -1,0 +1,49 @@
+@namespace OAS.UiLib.Components.Sales.Prescriptions
+@using OAS.UiLib.Core.Models.Sales
+
+<div class="ui-sales-revision-editor" dir="rtl">
+    <div class="ui-sales-form-grid">
+        <UiInputDate Label="تاريخ السريان" Value="@Model.EffectiveDate" ValueChanged="EffectiveDateChanged" Required="true" />
+        <UiInputText Label="سبب الإصدار" Value="@Model.Reason" ValueChanged="ReasonChanged" />
+    </div>
+    <div class="ui-sales-eye-grid ui-sales-eye-grid--editor">
+        @foreach (var eye in Model.Eyes)
+        {
+            <div class="ui-sales-eye-card ui-sales-eye-card--editor">
+                <strong>@eye.EyeText</strong>
+                <label>SPH<input type="number" step="0.25" value="@eye.SPH" @onchange="e => DecimalChanged(eye, nameof(eye.SPH), e)" /></label>
+                <label>CYL<input type="number" step="0.25" value="@eye.CYL" @onchange="e => DecimalChanged(eye, nameof(eye.CYL), e)" /></label>
+                <label>Axis<input type="number" min="0" max="180" value="@eye.Axis" @onchange="e => AxisChanged(eye, e)" /></label>
+                <label>ADD<input type="number" step="0.25" min="0" value="@eye.ADD" @onchange="e => DecimalChanged(eye, nameof(eye.ADD), e)" /></label>
+                <label>Prism<input type="number" step="0.25" min="0" value="@eye.Prism" @onchange="e => DecimalChanged(eye, nameof(eye.Prism), e)" /></label>
+                <label>Prism Base
+                    <select value="@eye.PrismBase" @onchange="e => PrismBaseChanged(eye, e)">
+                        <option value="None">بدون</option><option value="Up">أعلى</option><option value="Down">أسفل</option><option value="In">للداخل</option><option value="Out">للخارج</option>
+                    </select>
+                </label>
+                <label>PD<input type="number" step="0.5" min="0" value="@eye.PD" @onchange="e => DecimalChanged(eye, nameof(eye.PD), e)" /></label>
+                <label>Mono PD<input type="number" step="0.5" min="0" value="@eye.MonocularPD" @onchange="e => DecimalChanged(eye, nameof(eye.MonocularPD), e)" /></label>
+                <label>VA<input value="@eye.VA" @onchange="e => TextChanged(eye, nameof(eye.VA), e)" /></label>
+                <label>Fitting Height<input type="number" step="0.5" min="0" value="@eye.FittingHeight" @onchange="e => DecimalChanged(eye, nameof(eye.FittingHeight), e)" /></label>
+                <label class="ui-sales-eye-card__wide">ملاحظات<input value="@eye.Notes" @onchange="e => NotesChanged(eye, e)" /></label>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public UiPrescriptionRevisionModel Model { get; set; } = new();
+    [Parameter] public EventCallback OnChanged { get; set; }
+    private async Task EffectiveDateChanged(DateOnly? value) { Model.EffectiveDate = value; await OnChanged.InvokeAsync(); }
+    private async Task ReasonChanged(string? value) { Model.Reason = value; await OnChanged.InvokeAsync(); }
+    private async Task DecimalChanged(UiPrescriptionEyeModel eye, string field, ChangeEventArgs args)
+    {
+        decimal? value = decimal.TryParse(args.Value?.ToString(), out var parsed) ? parsed : null;
+        switch (field) { case nameof(eye.SPH): eye.SPH = value; break; case nameof(eye.CYL): eye.CYL = value; break; case nameof(eye.ADD): eye.ADD = value; break; case nameof(eye.Prism): eye.Prism = value; break; case nameof(eye.PD): eye.PD = value; break; case nameof(eye.MonocularPD): eye.MonocularPD = value; break; case nameof(eye.FittingHeight): eye.FittingHeight = value; break; }
+        await OnChanged.InvokeAsync();
+    }
+    private async Task AxisChanged(UiPrescriptionEyeModel eye, ChangeEventArgs args) { eye.Axis = short.TryParse(args.Value?.ToString(), out var value) ? value : null; await OnChanged.InvokeAsync(); }
+    private async Task PrismBaseChanged(UiPrescriptionEyeModel eye, ChangeEventArgs args) { eye.PrismBase = args.Value?.ToString() ?? "None"; await OnChanged.InvokeAsync(); }
+    private async Task NotesChanged(UiPrescriptionEyeModel eye, ChangeEventArgs args) { eye.Notes = args.Value?.ToString(); await OnChanged.InvokeAsync(); }
+    private async Task TextChanged(UiPrescriptionEyeModel eye, string field, ChangeEventArgs args) { if (field == nameof(eye.VA)) eye.VA = args.Value?.ToString(); await OnChanged.InvokeAsync(); }
+}

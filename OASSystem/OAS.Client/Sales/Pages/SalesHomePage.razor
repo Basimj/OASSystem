@@ -1,0 +1,10 @@
+@page "/sales"
+@attribute [Authorize]
+@using OAS.UiLib.Components.Sales.Workspace
+@inject NavigationManager Navigation
+
+<UiSalesHomeSurface OnNavigate="NavigateAsync" />
+
+@code {
+    private Task NavigateAsync(string route) { Navigation.NavigateTo(route); return Task.CompletedTask; }
+}

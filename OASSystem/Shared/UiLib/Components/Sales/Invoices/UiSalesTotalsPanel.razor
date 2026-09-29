@@ -1,0 +1,16 @@
+@namespace OAS.UiLib.Components.Sales.Invoices
+
+<div class="ui-sales-totals" dir="rtl">
+    <div><span>الإجمالي قبل الخصم</span><strong>@Subtotal.ToString("N2") @CurrencyCode</strong></div>
+    <div><span>الخصم</span><strong>@DiscountAmount.ToString("N2") @CurrencyCode</strong></div>
+    <div><span>الضريبة</span><strong>@TaxAmount.ToString("N2") @CurrencyCode</strong></div>
+    <div class="ui-sales-totals__grand"><span>إجمالي المستند</span><strong>@TotalAmount.ToString("N2") @CurrencyCode</strong></div>
+</div>
+
+@code {
+    [Parameter] public string CurrencyCode { get; set; } = string.Empty;
+    [Parameter] public decimal Subtotal { get; set; }
+    [Parameter] public decimal DiscountAmount { get; set; }
+    [Parameter] public decimal TaxAmount { get; set; }
+    [Parameter] public decimal TotalAmount { get; set; }
+}
