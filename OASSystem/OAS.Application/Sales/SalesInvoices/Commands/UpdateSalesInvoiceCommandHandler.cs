@@ -26,20 +26,47 @@ public sealed class UpdateSalesInvoiceCommandHandler(
     ISalesPrescriptionValidator prescriptionValidator)
     : IRequestHandler<UpdateSalesInvoiceCommand, SalesInvoice>
 {
-    public async Task<SalesInvoice> Handle(UpdateSalesInvoiceCommand request, CancellationToken ct)
+    public async Task<SalesInvoice> Handle(
+        UpdateSalesInvoiceCommand request,
+        CancellationToken ct)
     {
-        var invoice = await repository.GetAggregateAsync(request.Id, true, ct)
-            ?? throw new NotFoundException(nameof(SalesInvoice), request.Id);
-        SalesConcurrency.Ensure(request.Data.RowVersion, invoice.RowVersion, "فاتورة المبيعات");
+        var invoice = await repository.GetAggregateAsync(
+                          request.Id,
+                          true,
+                          ct)
+                      ?? throw new NotFoundException(
+                          nameof(SalesInvoice),
+                          request.Id);
 
-        var customer = await customers.GetByIdAsync(request.Data.CustomerId, ct)
-            ?? throw new NotFoundException(nameof(Customer), request.Data.CustomerId);
+        SalesConcurrency.Ensure(
+            request.Data.RowVersion,
+            invoice.RowVersion,
+            "فاتورة المبيعات");
+
+        var customer = await customers.GetByIdAsync(
+                           request.Data.CustomerId,
+                           ct)
+                       ?? throw new NotFoundException(
+                           nameof(Customer),
+                           request.Data.CustomerId);
+
         if (!customer.IsActive)
-            throw new ConflictException(SalesErrorCodes.CustomerInactive, "العميل غير فعال.");
+        {
+            throw new ConflictException(
+                SalesErrorCodes.CustomerInactive,
+                "العميل غير فعال.");
+        }
 
-        var term = (SalesPaymentTermType)(byte)request.Data.PaymentTermType;
-        if (term == SalesPaymentTermType.Credit && !customer.IsCreditAllowed)
-            throw new ConflictException(SalesErrorCodes.CreditNotAllowed, "البيع الآجل غير مسموح لهذا العميل.");
+        var term =
+            (SalesPaymentTermType)(byte)request.Data.PaymentTermType;
+
+        if (term == SalesPaymentTermType.Credit &&
+            !customer.IsCreditAllowed)
+        {
+            throw new ConflictException(
+                SalesErrorCodes.CreditNotAllowed,
+                "البيع الآجل غير مسموح لهذا العميل.");
+        }
 
         invoice.UpdateHeader(
             customer.Id,
@@ -59,7 +86,10 @@ public sealed class UpdateSalesInvoiceCommandHandler(
                 request.Data.InvoiceDate,
                 ExchangeRateType.Accounting,
                 cancellationToken: ct);
-            var baseCurrency = await GetBaseAsync(ct);
+
+            var baseCurrency =
+                await GetBaseAsync(ct);
+
             invoice.ChangeCurrency(
                 rate.CurrencyId,
                 rate.CurrencyCode,
@@ -74,7 +104,11 @@ public sealed class UpdateSalesInvoiceCommandHandler(
                 baseCurrency.DecimalPlaces);
         }
 
-        await SynchronizeLinesAsync(invoice, request.Data.Lines, ct);
+        await SynchronizeLinesAsync(
+            invoice,
+            request.Data.Lines,
+            ct);
+
         return invoice;
     }
 
@@ -84,58 +118,122 @@ public sealed class UpdateSalesInvoiceCommandHandler(
         CancellationToken ct)
     {
         if (requested.Count == 0)
-            throw new ConflictException("sales_invoice_lines_required", "يجب أن تحتوي الفاتورة على سطر واحد على الأقل.");
-
-        var requestedIds = requested.Where(x => x.Id.HasValue).Select(x => x.Id!.Value).ToHashSet();
-        foreach (var old in invoice.Lines.Where(x => !requestedIds.Contains(x.Id)).ToList())
         {
-            await EnsureLineCanBeRemovedAsync(old.Id, ct);
+            throw new ConflictException(
+                "sales_invoice_lines_required",
+                "يجب أن تحتوي الفاتورة على سطر واحد على الأقل.");
+        }
+
+        var requestedIds = requested
+            .Where(x => x.Id.HasValue)
+            .Select(x => x.Id!.Value)
+            .ToHashSet();
+
+        foreach (var old in invoice.Lines
+                     .Where(x => !requestedIds.Contains(x.Id))
+                     .ToList())
+        {
+            await EnsureLineCanBeRemovedAsync(
+                old.Id,
+                ct);
+
             invoice.RemoveLine(old.Id);
+
             lineRepository.Delete(old);
         }
 
-        var nextLineNumber = invoice.Lines.Count == 0 ? 1 : invoice.Lines.Max(x => x.LineNumber) + 1;
+        var nextLineNumber =
+            invoice.Lines.Count == 0
+                ? 1
+                : invoice.Lines.Max(
+                    x => x.LineNumber) + 1;
+
         foreach (var req in requested)
         {
             var existing = req.Id.HasValue
-                ? invoice.Lines.SingleOrDefault(x => x.Id == req.Id.Value)
+                ? invoice.Lines.SingleOrDefault(
+                    x => x.Id == req.Id.Value)
                 : null;
 
-            if (existing is not null && HasSameStructure(existing, req, invoice))
+            if (existing is not null &&
+                HasSameStructure(
+                    existing,
+                    req,
+                    invoice))
             {
-                if (!string.IsNullOrWhiteSpace(req.RowVersion))
-                    SalesConcurrency.Ensure(req.RowVersion, existing.RowVersion, "سطر الفاتورة");
+                if (!string.IsNullOrWhiteSpace(
+                        req.RowVersion))
+                {
+                    SalesConcurrency.Ensure(
+                        req.RowVersion,
+                        existing.RowVersion,
+                        "سطر الفاتورة");
+                }
 
-                await InvalidatePriceOverridesWhenPriceChangesAsync(existing, req.ActualUnitPrice, ct);
+                // للأسطر المرتبطة بمنتج:
+                // لا نأخذ السعر من Client.
+                //
+                // إذا كان هناك Price Override معتمد،
+                // ActualUnitPrice المحفوظة هي السعر
+                // الذي نعتمد عليه ونبقيه كما هو.
+                //
+                // البنود بدون ProductVariant فقط
+                // يمكن تعديل السعر فيها مباشرة.
+                var existingActualUnitPrice =
+                    existing.ProductVariantId.HasValue
+                        ? existing.ActualUnitPrice
+                        : req.ActualUnitPrice;
+
+                await InvalidatePriceOverridesWhenPriceChangesAsync(
+                    existing,
+                    existingActualUnitPrice,
+                    ct);
+
                 invoice.UpdateLinePricing(
                     existing.Id,
                     req.Quantity,
                     existing.BaseUnitPrice,
-                    req.ActualUnitPrice,
+                    existingActualUnitPrice,
                     (SalesDiscountType)(byte)req.DiscountType,
                     req.DiscountValue,
                     req.TaxRate);
+
                 continue;
             }
 
             if (existing is not null)
             {
-                await EnsureLineCanBeRemovedAsync(existing.Id, ct);
-                invoice.RemoveLine(existing.Id);
-                lineRepository.Delete(existing);
+                await EnsureLineCanBeRemovedAsync(
+                    existing.Id,
+                    ct);
+
+                invoice.RemoveLine(
+                    existing.Id);
+
+                lineRepository.Delete(
+                    existing);
             }
 
-            var type = (SalesLineType)(byte)req.LineType;
-            var resolved = await lineResolver.ResolveAsync(
-                type,
-                req.ProductVariantId,
-                req.WarehouseId,
-                req.Description,
-                ct);
-            var revision = req.PrescriptionRevisionId ?? invoice.PrescriptionRevisionId;
-            var eye = req.PrescriptionEye.HasValue
-                ? (EyeSide?)(byte)req.PrescriptionEye.Value
-                : null;
+            var type =
+                (SalesLineType)(byte)req.LineType;
+
+            var resolved =
+                await lineResolver.ResolveAsync(
+                    type,
+                    req.ProductVariantId,
+                    req.WarehouseId,
+                    req.Description,
+                    ct);
+
+            var revision =
+                req.PrescriptionRevisionId ??
+                invoice.PrescriptionRevisionId;
+
+            var eye =
+                req.PrescriptionEye.HasValue
+                    ? (EyeSide?)(byte)req.PrescriptionEye.Value
+                    : null;
+
             await prescriptionValidator.ValidateLineAsync(
                 revision,
                 eye,
@@ -143,35 +241,49 @@ public sealed class UpdateSalesInvoiceCommandHandler(
                 resolved.OpticalPolicy,
                 ct);
 
-            var newLine = SalesInvoiceLine.Create(
-                Guid.NewGuid(),
-                invoice.Id,
-                nextLineNumber++,
-                req.CustomerOrderLineId,
-                req.GroupId,
-                type,
-                resolved.ProductVariantId,
-                resolved.WarehouseId,
-                resolved.ProductCode,
-                resolved.ProductName,
-                resolved.Description,
-                resolved.UnitName,
-                req.Quantity,
-                resolved.BaseUnitPrice,
-                req.ActualUnitPrice,
-                (SalesDiscountType)(byte)req.DiscountType,
-                req.DiscountValue,
-                req.TaxRate,
-                revision,
-                eye,
-                req.RequiresProduction,
-                req.Notes,
-                invoice.TaxCalculationMode,
-                invoice.CurrencyDecimalPlacesSnapshot,
-                invoice.ExchangeRate,
-                invoice.BaseCurrencyDecimalPlacesSnapshot);
+            // المنتج يأخذ السعر المخزن مسبقًا.
+            //
+            // إذا لم يكن السطر مرتبطًا بمنتج
+            // يسمح بالقيمة اليدوية مثل Service.
+            var resolvedActualUnitPrice =
+                resolved.ProductVariantId.HasValue
+                    ? resolved.BaseUnitPrice
+                    : req.ActualUnitPrice;
+
+            var newLine =
+                SalesInvoiceLine.Create(
+                    Guid.NewGuid(),
+                    invoice.Id,
+                    nextLineNumber++,
+                    req.CustomerOrderLineId,
+                    req.GroupId,
+                    type,
+                    resolved.ProductVariantId,
+                    resolved.WarehouseId,
+                    resolved.ProductCode,
+                    resolved.ProductName,
+                    resolved.Description,
+                    resolved.UnitName,
+                    req.Quantity,
+                    resolved.BaseUnitPrice,
+                    resolvedActualUnitPrice,
+                    (SalesDiscountType)(byte)req.DiscountType,
+                    req.DiscountValue,
+                    req.TaxRate,
+                    revision,
+                    eye,
+                    req.RequiresProduction,
+                    req.Notes,
+                    invoice.TaxCalculationMode,
+                    invoice.CurrencyDecimalPlacesSnapshot,
+                    invoice.ExchangeRate,
+                    invoice.BaseCurrencyDecimalPlacesSnapshot);
+
             invoice.AddLine(newLine);
-            await lineRepository.AddAsync(newLine, ct);
+
+            await lineRepository.AddAsync(
+                newLine,
+                ct);
         }
     }
 
@@ -180,35 +292,60 @@ public sealed class UpdateSalesInvoiceCommandHandler(
         decimal newActualUnitPrice,
         CancellationToken ct)
     {
-        if (line.ActualUnitPrice == newActualUnitPrice)
+        if (line.ActualUnitPrice ==
+            newActualUnitPrice)
+        {
             return;
+        }
 
-        var spec = new Specification<SalesPriceOverride>()
-            .Where(x => x.SalesInvoiceLineId == line.Id && x.IsActive &&
-                        (x.Status == SalesPriceOverrideStatus.Pending || x.Status == SalesPriceOverrideStatus.Approved))
-            .Tracking();
-        var activeOverrides = await priceOverrides.ListAsync(spec, ct);
+        var spec =
+            new Specification<SalesPriceOverride>()
+                .Where(x =>
+                    x.SalesInvoiceLineId == line.Id &&
+                    x.IsActive &&
+                    (
+                        x.Status ==
+                            SalesPriceOverrideStatus.Pending ||
+                        x.Status ==
+                            SalesPriceOverrideStatus.Approved
+                    ))
+                .Tracking();
+
+        var activeOverrides =
+            await priceOverrides.ListAsync(
+                spec,
+                ct);
 
         foreach (var priceOverride in activeOverrides)
         {
-            // Applying the exact price that was already approved is not a new override.
-            // Any other price change invalidates the existing approval/request.
-            if (priceOverride.Status == SalesPriceOverrideStatus.Approved &&
-                priceOverride.IsApprovedFor(newActualUnitPrice))
+            // إذا كانت نفس القيمة التي سبق اعتمادها
+            // فلا تعتبر تغيير سعر جديد.
+            if (priceOverride.Status ==
+                    SalesPriceOverrideStatus.Approved &&
+                priceOverride.IsApprovedFor(
+                    newActualUnitPrice))
             {
                 continue;
             }
 
             priceOverride.Cancel();
-            priceOverrides.Update(priceOverride);
+
+            priceOverrides.Update(
+                priceOverride);
         }
     }
 
-    private async Task EnsureLineCanBeRemovedAsync(Guid lineId, CancellationToken ct)
+    private async Task EnsureLineCanBeRemovedAsync(
+        Guid lineId,
+        CancellationToken ct)
     {
-        var count = await priceOverrides.CountAsync(
-            new Specification<SalesPriceOverride>().Where(x => x.SalesInvoiceLineId == lineId),
-            ct);
+        var count =
+            await priceOverrides.CountAsync(
+                new Specification<SalesPriceOverride>()
+                    .Where(x =>
+                        x.SalesInvoiceLineId == lineId),
+                ct);
+
         if (count > 0)
         {
             throw new ConflictException(
@@ -222,27 +359,55 @@ public sealed class UpdateSalesInvoiceCommandHandler(
         SalesInvoiceLineRequest request,
         SalesInvoice invoice)
     {
-        var revision = request.PrescriptionRevisionId ?? invoice.PrescriptionRevisionId;
-        var eye = request.PrescriptionEye.HasValue
-            ? (EyeSide?)(byte)request.PrescriptionEye.Value
-            : null;
+        var revision =
+            request.PrescriptionRevisionId ??
+            invoice.PrescriptionRevisionId;
 
-        return line.CustomerOrderLineId == request.CustomerOrderLineId &&
-               line.GroupId == request.GroupId &&
-               line.LineType == (SalesLineType)(byte)request.LineType &&
-               line.ProductVariantId == request.ProductVariantId &&
-               line.WarehouseId == request.WarehouseId &&
-               line.PrescriptionRevisionId == revision &&
-               line.PrescriptionEye == eye &&
-               line.RequiresProduction == request.RequiresProduction &&
-               line.Notes == (string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim());
+        var eye =
+            request.PrescriptionEye.HasValue
+                ? (EyeSide?)(byte)request.PrescriptionEye.Value
+                : null;
+
+        return
+            line.CustomerOrderLineId ==
+                request.CustomerOrderLineId &&
+            line.GroupId ==
+                request.GroupId &&
+            line.LineType ==
+                (SalesLineType)(byte)request.LineType &&
+            line.ProductVariantId ==
+                request.ProductVariantId &&
+            line.WarehouseId ==
+                request.WarehouseId &&
+            line.PrescriptionRevisionId ==
+                revision &&
+            line.PrescriptionEye ==
+                eye &&
+            line.RequiresProduction ==
+                request.RequiresProduction &&
+            line.Notes ==
+                (string.IsNullOrWhiteSpace(
+                    request.Notes)
+                    ? null
+                    : request.Notes.Trim());
     }
 
-    private async Task<Currency> GetBaseAsync(CancellationToken ct)
+    private async Task<Currency> GetBaseAsync(
+        CancellationToken ct)
     {
-        var settingsEntity = await settings.GetByIdAsync(AccountingSettings.SingletonId, ct)
-            ?? throw new ConflictException("accounting_settings_required", "يجب إعداد المحاسبة والعملة الأساسية أولًا.");
-        return await currencies.GetByIdAsync(settingsEntity.BaseCurrencyId, ct)
-            ?? throw new ConflictException("base_currency_missing", "العملة الأساسية غير موجودة.");
+        var settingsEntity =
+            await settings.GetByIdAsync(
+                AccountingSettings.SingletonId,
+                ct)
+            ?? throw new ConflictException(
+                "accounting_settings_required",
+                "يجب إعداد المحاسبة والعملة الأساسية أولًا.");
+
+        return await currencies.GetByIdAsync(
+                   settingsEntity.BaseCurrencyId,
+                   ct)
+               ?? throw new ConflictException(
+                   "base_currency_missing",
+                   "العملة الأساسية غير موجودة.");
     }
 }

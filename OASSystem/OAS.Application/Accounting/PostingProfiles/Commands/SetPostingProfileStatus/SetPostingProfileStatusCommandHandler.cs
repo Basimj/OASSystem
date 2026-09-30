@@ -25,6 +25,14 @@ public sealed class SetPostingProfileStatusCommandHandler(
             throw new ConcurrencyException("The posting profile has been modified by another user.");
         }
 
+        await PostingProfileActivationPolicy.DeactivateCompetingProfilesAsync(
+            repository,
+            entity.Id,
+            entity.Module,
+            entity.DocumentType,
+            request.Request.IsActive,
+            cancellationToken);
+
         entity.SetActive(request.Request.IsActive);
         repository.Update(entity);
     }

@@ -8,6 +8,7 @@ public sealed class PostingProfileLineConfiguration : IEntityTypeConfiguration<P
 {
     public void Configure(EntityTypeBuilder<PostingProfileLine> builder)
     {
+        // Final database naming after AccountingAuditTableNaming + MoveAccountingTablesToDbo.
         builder.ToTable("tbl_PostingProfileLines", "dbo");
 
         builder.HasKey(x => x.Id);

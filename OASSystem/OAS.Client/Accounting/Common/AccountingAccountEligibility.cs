@@ -15,7 +15,11 @@ public enum AccountingAccountEligibilityContext
     AssetControlParent = 7,
     LiabilityControlParent = 8,
     ExchangeGain = 9,
-    ExchangeLoss = 10
+    ExchangeLoss = 10,
+    TaxPayable = 11,
+    SalesRevenue = 12,
+    Inventory = 13,
+    CostOfGoodsSold = 14
 }
 
 public sealed record AccountingAccountEligibilityResult(
@@ -53,8 +57,73 @@ public static class AccountingAccountEligibility
             AccountingAccountEligibilityContext.PostingProfile or
             AccountingAccountEligibilityContext.ExchangeGain or
             AccountingAccountEligibilityContext.ExchangeLoss => EvaluateAutomaticPosting(account),
+            AccountingAccountEligibilityContext.TaxPayable => EvaluateTaxPayable(account),
+            AccountingAccountEligibilityContext.SalesRevenue => EvaluateSalesRevenue(account),
+            AccountingAccountEligibilityContext.Inventory => EvaluateInventory(account),
+            AccountingAccountEligibilityContext.CostOfGoodsSold => EvaluateCostOfGoodsSold(account),
             _ => AccountingAccountEligibilityResult.Eligible
         };
+    }
+
+
+    private static AccountingAccountEligibilityResult EvaluateSalesRevenue(AccountDto account)
+    {
+        var posting = EvaluateAutomaticPosting(account);
+        if (!posting.IsEligible)
+            return posting;
+
+        if (account.AccountClass != AccountClass.Revenue)
+            return Invalid("sales_revenue_wrong_class", "يجب أن يكون حساب إيرادات المبيعات من حسابات الإيرادات.");
+
+        if (account.NormalBalance != NormalBalance.Credit)
+            return Invalid("sales_revenue_wrong_balance", "يجب أن تكون طبيعة حساب إيرادات المبيعات دائنة.");
+
+        return AccountingAccountEligibilityResult.Eligible;
+    }
+
+    private static AccountingAccountEligibilityResult EvaluateInventory(AccountDto account)
+    {
+        var posting = EvaluateAutomaticPosting(account);
+        if (!posting.IsEligible)
+            return posting;
+
+        if (account.AccountClass != AccountClass.Asset)
+            return Invalid("inventory_wrong_class", "يجب أن يكون حساب المخزون من حسابات الأصول.");
+
+        if (account.NormalBalance != NormalBalance.Debit)
+            return Invalid("inventory_wrong_balance", "يجب أن تكون طبيعة حساب المخزون مدينة.");
+
+        return AccountingAccountEligibilityResult.Eligible;
+    }
+
+    private static AccountingAccountEligibilityResult EvaluateCostOfGoodsSold(AccountDto account)
+    {
+        var posting = EvaluateAutomaticPosting(account);
+        if (!posting.IsEligible)
+            return posting;
+
+        if (account.AccountClass != AccountClass.Expense)
+            return Invalid("cogs_wrong_class", "يجب أن يكون حساب تكلفة البضاعة المباعة من حسابات المصروفات.");
+
+        if (account.NormalBalance != NormalBalance.Debit)
+            return Invalid("cogs_wrong_balance", "يجب أن تكون طبيعة حساب تكلفة البضاعة المباعة مدينة.");
+
+        return AccountingAccountEligibilityResult.Eligible;
+    }
+
+    private static AccountingAccountEligibilityResult EvaluateTaxPayable(AccountDto account)
+    {
+        var posting = EvaluateAutomaticPosting(account);
+        if (!posting.IsEligible)
+            return posting;
+
+        if (account.AccountClass != AccountClass.Liability)
+            return Invalid("tax_payable_wrong_class", "يجب أن يكون حساب الضرائب المستحقة من حسابات الالتزامات.");
+
+        if (account.NormalBalance != NormalBalance.Credit)
+            return Invalid("tax_payable_wrong_balance", "يجب أن تكون طبيعة حساب الضرائب المستحقة دائنة.");
+
+        return AccountingAccountEligibilityResult.Eligible;
     }
 
     private static AccountingAccountEligibilityResult EvaluateManualPosting(AccountDto account)

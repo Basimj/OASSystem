@@ -16,9 +16,24 @@ public sealed class CreatePostingProfileCommandHandler(
         CreatePostingProfileCommand request,
         CancellationToken cancellationToken)
     {
-        await ValidateAccountsAsync(request.Data.Lines.Select(x => x.AccountId), cancellationToken);
+        // Preserve the existing accounting rule: every account referenced by the
+        // posting profile must exist and be eligible to receive postings.
+        await ValidateAccountsAsync(
+            request.Data.Lines.Select(x => x.AccountId),
+            cancellationToken);
 
         var entity = mapper.Create(request.Data);
+
+        // Root invariant: there may be only one active profile for the same
+        // Module + DocumentType scope. Historical profiles are kept inactive.
+        await PostingProfileActivationPolicy.DeactivateCompetingProfilesAsync(
+            repository,
+            currentProfileId: null,
+            entity.Module,
+            entity.DocumentType,
+            entity.IsActive,
+            cancellationToken);
+
         await repository.AddAsync(entity, cancellationToken);
         return entity;
     }
@@ -29,7 +44,10 @@ public sealed class CreatePostingProfileCommandHandler(
     {
         foreach (var accountId in accountIds.Distinct())
         {
-            var account = await accountRepository.GetByIdAsync(accountId, cancellationToken);
+            var account = await accountRepository.GetByIdAsync(
+                accountId,
+                cancellationToken);
+
             if (account is null)
                 throw new NotFoundException(nameof(Account), accountId);
 

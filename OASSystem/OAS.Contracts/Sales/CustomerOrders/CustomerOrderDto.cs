@@ -39,4 +39,6 @@ public sealed record CustomerOrderDto(
     string? CreatedBy,
     DateTimeOffset? LastModifiedAtUtc,
     string? LastModifiedBy,
-    IReadOnlyList<CustomerOrderLineDto> Lines);
+    IReadOnlyList<CustomerOrderLineDto> Lines,
+    string? PrescriptionCode = null,
+    int? PrescriptionRevisionNumber = null);

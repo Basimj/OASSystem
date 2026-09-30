@@ -1,4 +1,5 @@
 using FluentValidation;
+using OAS.Contracts.Accounting.PostingProfiles;
 
 namespace OAS.Application.Accounting.PostingProfiles.Commands.CreatePostingProfile;
 
@@ -31,6 +32,11 @@ public sealed class CreatePostingProfileCommandValidator
             .MaximumLength(50)
             .WithErrorCode("posting_profile_document_type_max_length");
 
+        RuleFor(x => x.Data.Lines)
+            .Must(HaveUniqueRoles)
+            .WithMessage("لا يمكن تكرار نفس دور الحساب داخل Posting Profile واحد.")
+            .WithErrorCode("posting_profile_duplicate_role");
+
         RuleForEach(x => x.Data.Lines)
             .ChildRules(line =>
             {
@@ -44,5 +50,17 @@ public sealed class CreatePostingProfileCommandValidator
                     .NotEmpty()
                     .WithErrorCode("posting_profile_line_account_required");
             });
+    }
+
+    private static bool HaveUniqueRoles(IReadOnlyList<CreatePostingProfileLineRequest>? lines)
+    {
+        if (lines is null || lines.Count <= 1)
+            return true;
+
+        return lines
+            .Where(x => !string.IsNullOrWhiteSpace(x.AccountRole))
+            .Select(x => x.AccountRole.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count() == lines.Count(x => !string.IsNullOrWhiteSpace(x.AccountRole));
     }
 }

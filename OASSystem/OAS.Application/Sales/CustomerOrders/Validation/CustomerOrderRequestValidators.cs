@@ -10,6 +10,12 @@ public sealed class CreateCustomerOrderRequestValidator : AbstractValidator<Crea
     {
         RuleFor(x => x.CustomerId).NotEmpty();
         RuleFor(x => x.CurrencyId).NotEmpty();
+        RuleFor(x => x.OrderDate)
+            .NotEmpty()
+            .WithMessage("يجب تحديد تاريخ الطلب.");
+        RuleFor(x => x.RequiredDate)
+            .Must((request, requiredDate) => !requiredDate.HasValue || requiredDate.Value >= request.OrderDate)
+            .WithMessage("تاريخ التسليم المطلوب لا يمكن أن يكون قبل تاريخ الطلب.");
         RuleFor(x => x.OrderCode).MaximumLength(40);
         RuleFor(x => x.Notes).MaximumLength(1000);
         RuleFor(x => x.Lines).NotEmpty();
@@ -23,6 +29,12 @@ public sealed class UpdateCustomerOrderRequestValidator : AbstractValidator<Upda
     {
         RuleFor(x => x.CustomerId).NotEmpty();
         RuleFor(x => x.CurrencyId).NotEmpty();
+        RuleFor(x => x.OrderDate)
+            .NotEmpty()
+            .WithMessage("يجب تحديد تاريخ الطلب.");
+        RuleFor(x => x.RequiredDate)
+            .Must((request, requiredDate) => !requiredDate.HasValue || requiredDate.Value >= request.OrderDate)
+            .WithMessage("تاريخ التسليم المطلوب لا يمكن أن يكون قبل تاريخ الطلب.");
         RuleFor(x => x.RowVersion).NotEmpty();
         RuleFor(x => x.Lines).NotEmpty();
         RuleForEach(x => x.Lines).SetValidator(new CustomerOrderLineRequestValidator());

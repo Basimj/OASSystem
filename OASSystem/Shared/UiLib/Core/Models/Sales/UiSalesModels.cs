@@ -86,6 +86,8 @@ public sealed class UiSalesLineModel
     public string PrescriptionRevisionId { get; set; } = string.Empty;
     public string? PrescriptionRevisionDisplay { get; set; }
     public string PrescriptionEye { get; set; } = string.Empty;
+    // UI metadata فقط: تحدد إن كان المنتج المختار عدسة طبية تحتاج وصفة.
+    public bool PrescriptionRequired { get; set; }
     public bool RequiresProduction { get; set; }
     public string? Notes { get; set; }
     public string RowVersion { get; set; } = string.Empty;
@@ -96,8 +98,10 @@ public sealed class UiCustomerOrderFormModel
     public Guid? Id { get; set; }
     public string OrderCode { get; set; } = string.Empty;
     public string CustomerId { get; set; } = string.Empty;
+    public string CustomerCode { get; set; } = string.Empty;
     public string? CustomerDisplay { get; set; }
     public string PrescriptionRevisionId { get; set; } = string.Empty;
+    public string PrescriptionCode { get; set; } = string.Empty;
     public string? PrescriptionDisplay { get; set; }
     public DateOnly? OrderDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
     public DateOnly? RequiredDate { get; set; }
@@ -125,10 +129,12 @@ public sealed class UiSalesInvoiceFormModel
     public Guid? Id { get; set; }
     public string InvoiceCode { get; set; } = string.Empty;
     public string CustomerId { get; set; } = string.Empty;
+    public string CustomerCode { get; set; } = string.Empty;
     public string? CustomerDisplay { get; set; }
     public string CustomerOrderId { get; set; } = string.Empty;
     public string? CustomerOrderDisplay { get; set; }
     public string PrescriptionRevisionId { get; set; } = string.Empty;
+    public string PrescriptionCode { get; set; } = string.Empty;
     public string? PrescriptionDisplay { get; set; }
     public DateOnly? InvoiceDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
     public DateOnly? PostingDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);

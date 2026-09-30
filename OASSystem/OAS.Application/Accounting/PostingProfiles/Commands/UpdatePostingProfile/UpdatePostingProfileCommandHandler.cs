@@ -18,11 +18,17 @@ public sealed class UpdatePostingProfileCommandHandler(
         UpdatePostingProfileCommand request,
         CancellationToken cancellationToken)
     {
-        var entity = await repository.GetForUpdateAsync(request.Id, cancellationToken);
+        var entity = await repository.GetForUpdateAsync(
+            request.Id,
+            cancellationToken);
+
         if (entity is null)
             throw new NotFoundException(nameof(PostingProfile), request.Id);
 
-        if (!string.Equals(entity.Code, request.Data.Code.Trim(), StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(
+                entity.Code,
+                request.Data.Code.Trim(),
+                StringComparison.OrdinalIgnoreCase))
         {
             throw new ConflictException(
                 "accounting_posting_profile_code_immutable",
@@ -31,9 +37,24 @@ public sealed class UpdatePostingProfileCommandHandler(
 
         var requestedRowVersion = Convert.FromBase64String(request.Data.RowVersion);
         if (!entity.RowVersion.SequenceEqual(requestedRowVersion))
-            throw new ConcurrencyException("تم تعديل ملف الترحيل بواسطة مستخدم آخر. أعد تحميله ثم حاول مرة أخرى.");
+        {
+            throw new ConcurrencyException(
+                "تم تعديل ملف الترحيل بواسطة مستخدم آخر. أعد تحميله ثم حاول مرة أخرى.");
+        }
 
-        await ValidateAccountsAsync(request.Data.Lines.Select(x => x.AccountId), cancellationToken);
+        await ValidateAccountsAsync(
+            request.Data.Lines.Select(x => x.AccountId),
+            cancellationToken);
+
+        // If this profile is being kept/changed to Active, deactivate any other
+        // active profile in the target Module + DocumentType scope before update.
+        await PostingProfileActivationPolicy.DeactivateCompetingProfilesAsync(
+            repository,
+            entity.Id,
+            request.Data.Module,
+            request.Data.DocumentType,
+            request.Data.IsActive,
+            cancellationToken);
 
         mapper.Update(request.Data, entity);
 
@@ -48,10 +69,15 @@ public sealed class UpdatePostingProfileCommandHandler(
 
         var newLines = request.Data.Lines
             .Select(line => PostingProfileLine.Create(
-                Guid.NewGuid(), entity.Id, line.AccountRole, line.AccountId, line.IsRequired))
+                Guid.NewGuid(),
+                entity.Id,
+                line.AccountRole,
+                line.AccountId,
+                line.IsRequired))
             .ToList();
 
         entity.ReplaceLines(newLines);
+
         if (newLines.Count > 0)
             await lineRepository.AddRangeAsync(newLines, cancellationToken);
 
@@ -65,7 +91,10 @@ public sealed class UpdatePostingProfileCommandHandler(
     {
         foreach (var accountId in accountIds.Distinct())
         {
-            var account = await accountRepository.GetByIdAsync(accountId, cancellationToken);
+            var account = await accountRepository.GetByIdAsync(
+                accountId,
+                cancellationToken);
+
             if (account is null)
                 throw new NotFoundException(nameof(Account), accountId);
 

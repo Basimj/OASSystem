@@ -68,6 +68,14 @@ public partial class AccountingSetupPage
 
     private Guid? _settingsExchangeLossAccountId;
 
+    private Guid? _settingsSalesRevenueAccountId;
+
+    private Guid? _settingsTaxPayableAccountId;
+
+    private Guid? _settingsInventoryAccountId;
+
+    private Guid? _settingsCogsAccountId;
+
 
     // ================================================================
     // العملات
@@ -186,6 +194,18 @@ public partial class AccountingSetupPage
     private UiLookupItem? BankParentAccountLookupItem =>
         GetAccountLookupItem(_settingsBankParentAccountId, AccountingAccountEligibilityContext.AssetControlParent);
 
+    private UiLookupItem? SalesRevenueAccountLookupItem =>
+        GetAccountLookupItem(_settingsSalesRevenueAccountId, AccountingAccountEligibilityContext.SalesRevenue);
+
+    private UiLookupItem? TaxPayableAccountLookupItem =>
+        GetAccountLookupItem(_settingsTaxPayableAccountId, AccountingAccountEligibilityContext.TaxPayable);
+
+    private UiLookupItem? InventoryAccountLookupItem =>
+        GetAccountLookupItem(_settingsInventoryAccountId, AccountingAccountEligibilityContext.Inventory);
+
+    private UiLookupItem? CogsAccountLookupItem =>
+        GetAccountLookupItem(_settingsCogsAccountId, AccountingAccountEligibilityContext.CostOfGoodsSold);
+
     private UiLookupItem? ExchangeGainAccountLookupItem =>
         GetAccountLookupItem(_settingsExchangeGainAccountId, AccountingAccountEligibilityContext.ExchangeGain);
 
@@ -201,6 +221,26 @@ public partial class AccountingSetupPage
         string search,
         CancellationToken cancellationToken) =>
         SearchAccountsAsync(search, AccountingAccountEligibilityContext.AssetControlParent, cancellationToken);
+
+    private Task<IReadOnlyList<UiLookupItem>> SearchSalesRevenueAccountsAsync(
+        string search,
+        CancellationToken cancellationToken) =>
+        SearchAccountsAsync(search, AccountingAccountEligibilityContext.SalesRevenue, cancellationToken);
+
+    private Task<IReadOnlyList<UiLookupItem>> SearchTaxPayableAccountsAsync(
+        string search,
+        CancellationToken cancellationToken) =>
+        SearchAccountsAsync(search, AccountingAccountEligibilityContext.TaxPayable, cancellationToken);
+
+    private Task<IReadOnlyList<UiLookupItem>> SearchInventoryAccountsAsync(
+        string search,
+        CancellationToken cancellationToken) =>
+        SearchAccountsAsync(search, AccountingAccountEligibilityContext.Inventory, cancellationToken);
+
+    private Task<IReadOnlyList<UiLookupItem>> SearchCogsAccountsAsync(
+        string search,
+        CancellationToken cancellationToken) =>
+        SearchAccountsAsync(search, AccountingAccountEligibilityContext.CostOfGoodsSold, cancellationToken);
 
     private Task<IReadOnlyList<UiLookupItem>> SearchExchangeGainAccountsAsync(
         string search,
@@ -403,6 +443,30 @@ public partial class AccountingSetupPage
         return Task.CompletedTask;
     }
 
+
+    private Task SetSalesRevenueAccount(string? value)
+    {
+        _settingsSalesRevenueAccountId = ParseNullableGuid(value);
+        return Task.CompletedTask;
+    }
+
+    private Task SetTaxPayableAccount(string? value)
+    {
+        _settingsTaxPayableAccountId = ParseNullableGuid(value);
+        return Task.CompletedTask;
+    }
+
+    private Task SetInventoryAccount(string? value)
+    {
+        _settingsInventoryAccountId = ParseNullableGuid(value);
+        return Task.CompletedTask;
+    }
+
+    private Task SetCogsAccount(string? value)
+    {
+        _settingsCogsAccountId = ParseNullableGuid(value);
+        return Task.CompletedTask;
+    }
 
     private Task SetExchangeGainAccount(string? value)
     {
@@ -680,6 +744,26 @@ public partial class AccountingSetupPage
         _settingsExchangeLossAccountId =
             settings?
                 .ExchangeLossAccountId;
+
+
+        _settingsSalesRevenueAccountId =
+            settings?
+                .SalesRevenueAccountId;
+
+
+        _settingsTaxPayableAccountId =
+            settings?
+                .TaxPayableAccountId;
+
+
+        _settingsInventoryAccountId =
+            settings?
+                .InventoryAccountId;
+
+
+        _settingsCogsAccountId =
+            settings?
+                .CogsAccountId;
     }
 
 
@@ -728,6 +812,54 @@ public partial class AccountingSetupPage
                 }
 
                 if (!await ValidateSettingsAccountAsync(
+                        _settingsSalesRevenueAccountId,
+                        AccountingAccountEligibilityContext.SalesRevenue,
+                        "حساب إيرادات المبيعات"))
+                {
+                    return;
+                }
+
+                if (!await ValidateSettingsAccountAsync(
+                        _settingsTaxPayableAccountId,
+                        AccountingAccountEligibilityContext.TaxPayable,
+                        "حساب الضرائب المستحقة"))
+                {
+                    return;
+                }
+
+                if (!await ValidateSettingsAccountAsync(
+                        _settingsInventoryAccountId,
+                        AccountingAccountEligibilityContext.Inventory,
+                        "حساب المخزون"))
+                {
+                    return;
+                }
+
+                if (!await ValidateSettingsAccountAsync(
+                        _settingsCogsAccountId,
+                        AccountingAccountEligibilityContext.CostOfGoodsSold,
+                        "حساب تكلفة البضاعة المباعة"))
+                {
+                    return;
+                }
+
+                var salesPostingAccounts = new[]
+                {
+                    _settingsSalesRevenueAccountId,
+                    _settingsTaxPayableAccountId,
+                    _settingsInventoryAccountId,
+                    _settingsCogsAccountId
+                };
+
+                if (salesPostingAccounts.Any(x => x.HasValue) &&
+                    salesPostingAccounts.Any(x => !x.HasValue))
+                {
+                    Snackbar.Warning(
+                        "حدد حسابات ترحيل المبيعات الأربعة: الإيرادات، الضرائب، المخزون، وتكلفة البضاعة المباعة.");
+                    return;
+                }
+
+                if (!await ValidateSettingsAccountAsync(
                         _settingsExchangeGainAccountId,
                         AccountingAccountEligibilityContext.ExchangeGain,
                         "حساب أرباح فروق العملة"))
@@ -758,6 +890,14 @@ public partial class AccountingSetupPage
                                 _settingsExchangeGainAccountId,
 
                                 _settingsExchangeLossAccountId,
+
+                                _settingsSalesRevenueAccountId,
+
+                                _settingsTaxPayableAccountId,
+
+                                _settingsInventoryAccountId,
+
+                                _settingsCogsAccountId,
 
                                 ExchangeRateType.Accounting,
 

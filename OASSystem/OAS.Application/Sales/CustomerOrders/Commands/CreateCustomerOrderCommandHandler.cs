@@ -58,13 +58,30 @@ public sealed class CreateCustomerOrderCommandHandler(
     {
         var lineType = (SalesLineType)(byte)req.LineType;
         var resolved = await lineResolver.ResolveAsync(lineType, req.ProductVariantId, req.WarehouseId, req.Description, ct);
-        var prescriptionRevision = req.PrescriptionRevisionId ?? order.PrescriptionRevisionId;
         var eye = req.PrescriptionEye.HasValue ? (EyeSide?)(byte)req.PrescriptionEye.Value : null;
-        await prescriptionValidator.ValidateLineAsync(prescriptionRevision, eye, resolved.PrescriptionRequired, resolved.OpticalPolicy, ct);
+
+        // لا نورّث وصفة رأس الطلب لكل سطر بشكل أعمى.
+        // تستخدم Revision الرأس فقط عندما يقرر الـApplication أن المنتج نفسه يحتاج وصفة.
+        var prescriptionRevision = req.PrescriptionRevisionId;
+        if (resolved.PrescriptionRequired && !prescriptionRevision.HasValue)
+            prescriptionRevision = order.PrescriptionRevisionId;
+
+        await prescriptionValidator.ValidateLineAsync(
+            prescriptionRevision,
+            eye,
+            resolved.PrescriptionRequired,
+            resolved.OpticalPolicy,
+            ct);
+
+        // إذا كان السطر مرتبطًا بمنتج، فالسعر يأتي من ProductVariant.SellingPrice عبر SalesLineResolver.
+        // لا نثق بقيمة السعر القادمة من الـClient للأسطر التي لها منتج.
+        var actualUnitPrice = resolved.ProductVariantId.HasValue
+            ? resolved.BaseUnitPrice
+            : req.ActualUnitPrice;
 
         return CustomerOrderLine.Create(
             Guid.NewGuid(), order.Id, lineNo, req.GroupId, lineType, resolved.ProductVariantId, resolved.WarehouseId,
-            resolved.Description, req.Quantity, resolved.BaseUnitPrice, req.ActualUnitPrice,
+            resolved.Description, req.Quantity, resolved.BaseUnitPrice, actualUnitPrice,
             (SalesDiscountType)(byte)req.DiscountType, req.DiscountValue, req.TaxRate, prescriptionRevision, eye,
             req.RequiresProduction, req.Notes, order.TaxCalculationMode, order.CurrencyDecimalPlacesSnapshot);
     }

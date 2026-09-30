@@ -26,4 +26,10 @@ public sealed record CustomerOrderLineDto(
     bool RequiresProduction,
     string? Notes,
     bool IsActive,
-    string RowVersion);
+    string RowVersion,
+    string? ProductCode = null,
+    string? ProductName = null,
+    string? WarehouseCode = null,
+    string? WarehouseName = null,
+    string? PrescriptionCode = null,
+    int? PrescriptionRevisionNumber = null);

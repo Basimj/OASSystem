@@ -48,7 +48,15 @@
                             }
                         </td>
                         <td><input type="number" min="0.0001" step="0.01" value="@line.Quantity" disabled="@ReadOnly" @onchange="e => DecimalChanged(line, nameof(line.Quantity), e)" /></td>
-                        <td><input type="number" min="0" step="0.01" value="@line.ActualUnitPrice" disabled="@ReadOnly" @onchange="e => DecimalChanged(line, nameof(line.ActualUnitPrice), e)" /></td>
+                        <td>
+                            <input type="number"
+                                   min="0"
+                                   step="0.01"
+                                   value="@line.ActualUnitPrice"
+                                   disabled="@(ReadOnly || HasStoredProductPrice(line))"
+                                   title="@PriceTitle(line)"
+                                   @onchange="e => DecimalChanged(line, nameof(line.ActualUnitPrice), e)" />
+                        </td>
                         <td>
                             <div class="ui-sales-lines__discount">
                                 <select disabled="@ReadOnly" value="@line.DiscountType" @onchange="e => DiscountTypeChanged(line, e)"><option value="None">بدون</option><option value="Percentage">%</option><option value="FixedAmount">مبلغ</option></select>
@@ -58,16 +66,20 @@
                         <td><input type="number" min="0" step="0.01" value="@line.TaxRate" disabled="@ReadOnly" @onchange="e => NullableDecimalChanged(line, nameof(line.TaxRate), e)" /></td>
                         <td class="ui-sales-lines__amount">@line.FinalAmount.ToString("N2")</td>
                         <td>
-                            @if (line.LineType == "Lens")
+                            @if (line.PrescriptionRequired)
                             {
-                                <select disabled="@ReadOnly" value="@line.PrescriptionEye" @onchange="e => EyeChanged(line, e)"><option value="">-</option><option value="RightOD">OD</option><option value="LeftOS">OS</option></select>
+                                <select disabled="@ReadOnly" value="@line.PrescriptionEye" @onchange="e => EyeChanged(line, e)">
+                                    <option value="">اختر العين</option>
+                                    <option value="RightOD">OD</option>
+                                    <option value="LeftOS">OS</option>
+                                </select>
                             }
                         </td>
                         <td>
                             <div class="ui-sales-lines__row-actions">
-                                @if (EnablePriceOverride && line.Id.HasValue && line.ActualUnitPrice != line.BaseUnitPrice)
+                                @if (EnablePriceOverride && !ReadOnly && line.Id.HasValue && HasStoredProductPrice(line))
                                 {
-                                    <button type="button" class="ui-sales-icon-button" title="طلب اعتماد السعر" @onclick="() => OnRequestPriceOverride.InvokeAsync(line)"><i class="fa-solid fa-tag"></i></button>
+                                    <button type="button" class="ui-sales-icon-button" title="طلب تغيير السعر" @onclick="() => OnRequestPriceOverride.InvokeAsync(line)"><i class="fa-solid fa-tag"></i></button>
                                 }
                                 @if (!ReadOnly)
                                 {
@@ -80,7 +92,17 @@
                     {
                         <tr class="ui-sales-lines__detail-row"><td colspan="11">
                             <div class="ui-sales-lines__detail-fields">
-                                <UiLookup Label="إصدار الوصفة" Value="@line.PrescriptionRevisionId" ValueChanged="v => PrescriptionRevisionChanged(line, v)" SelectedItem="@PrescriptionItem(line)" SearchAsync="(q, ct) => SearchPrescription(line, q, ct)" Placeholder="اختر Revision..." />
+                                @if (line.PrescriptionRequired)
+                                {
+                                    @if (!string.IsNullOrWhiteSpace(HeaderPrescriptionRevisionId))
+                                    {
+                                        <UiInputText Label="إصدار الوصفة" Value="@(HeaderPrescriptionRevisionDisplay ?? HeaderPrescriptionRevisionId)" ReadOnly="true" />
+                                    }
+                                    else
+                                    {
+                                        <UiLookup Label="إصدار الوصفة" Value="@line.PrescriptionRevisionId" ValueChanged="v => PrescriptionRevisionChanged(line, v)" SelectedItem="@PrescriptionItem(line)" SearchAsync="(q, ct) => SearchPrescription(line, q, ct)" Placeholder="اختر Revision..." />
+                                    }
+                                }
                                 <UiCheckbox Label="يتطلب تجهيز/إنتاج" Value="@line.RequiresProduction" ValueChanged="v => ProductionChanged(line, v)" />
                                 <UiInputText Label="ملاحظات السطر" Value="@line.Notes" ValueChanged="v => NotesChanged(line, v)" />
                             </div>
@@ -99,12 +121,16 @@
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchProductsAsync { get; set; }
     [Parameter] public Func<UiSalesLineModel, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchWarehousesAsync { get; set; }
     [Parameter] public Func<UiSalesLineModel, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchPrescriptionRevisionsAsync { get; set; }
+    [Parameter] public string? HeaderPrescriptionRevisionId { get; set; }
+    [Parameter] public string? HeaderPrescriptionRevisionDisplay { get; set; }
     [Parameter] public EventCallback<UiSalesLineSelectionChange> OnProductSelected { get; set; }
     [Parameter] public EventCallback<UiSalesLineSelectionChange> OnWarehouseSelected { get; set; }
     [Parameter] public bool EnablePriceOverride { get; set; }
     [Parameter] public EventCallback<UiSalesLineModel> OnRequestPriceOverride { get; set; }
     [Parameter] public EventCallback OnChanged { get; set; }
 
+    private static bool HasStoredProductPrice(UiSalesLineModel line) => !string.IsNullOrWhiteSpace(line.ProductVariantId);
+    private static string? PriceTitle(UiSalesLineModel line) => HasStoredProductPrice(line) ? "السعر يُجلب تلقائيًا من بطاقة المنتج" : null;
     private UiLookupItem? ProductItem(UiSalesLineModel line) => string.IsNullOrWhiteSpace(line.ProductVariantId) ? null : new(line.ProductVariantId, line.ProductDisplay ?? line.ProductNameSnapshot ?? line.ProductVariantId, line.ProductCodeSnapshot);
     private UiLookupItem? WarehouseItem(UiSalesLineModel line) => string.IsNullOrWhiteSpace(line.WarehouseId) ? null : new(line.WarehouseId, line.WarehouseDisplay ?? line.WarehouseId);
     private UiLookupItem? PrescriptionItem(UiSalesLineModel line) => string.IsNullOrWhiteSpace(line.PrescriptionRevisionId) ? null : new(line.PrescriptionRevisionId, line.PrescriptionRevisionDisplay ?? line.PrescriptionRevisionId);
@@ -113,7 +139,28 @@
 
     private async Task AddLineAsync(MouseEventArgs _) { Model.Add(new UiSalesLineModel { LineNumber = Model.Count + 1 }); await OnChanged.InvokeAsync(); }
     private async Task RemoveLineAsync(UiSalesLineModel line) { Model.Remove(line); for (var i = 0; i < Model.Count; i++) Model[i].LineNumber = i + 1; await OnChanged.InvokeAsync(); }
-    private async Task LineTypeChanged(UiSalesLineModel line, ChangeEventArgs e) { line.LineType = e.Value?.ToString() ?? "Frame"; if (line.LineType == "Service") { line.ProductVariantId = string.Empty; line.WarehouseId = string.Empty; line.PrescriptionRevisionId = string.Empty; line.PrescriptionEye = string.Empty; } await OnChanged.InvokeAsync(); }
+    private async Task LineTypeChanged(UiSalesLineModel line, ChangeEventArgs e)
+    {
+        line.LineType = e.Value?.ToString() ?? "Frame";
+
+        if (line.LineType == "Service")
+        {
+            line.ProductVariantId = string.Empty;
+            line.ProductDisplay = null;
+            line.WarehouseId = string.Empty;
+            line.WarehouseDisplay = null;
+        }
+
+        if (line.LineType != "Lens")
+        {
+            line.PrescriptionRequired = false;
+            line.PrescriptionRevisionId = string.Empty;
+            line.PrescriptionRevisionDisplay = null;
+            line.PrescriptionEye = string.Empty;
+        }
+
+        await OnChanged.InvokeAsync();
+    }
     private async Task ProductChanged(UiSalesLineModel line, string? value) { line.ProductVariantId = value ?? string.Empty; line.WarehouseId = string.Empty; await OnProductSelected.InvokeAsync(new(line, value)); await OnChanged.InvokeAsync(); }
     private async Task WarehouseChanged(UiSalesLineModel line, string? value) { line.WarehouseId = value ?? string.Empty; await OnWarehouseSelected.InvokeAsync(new(line, value)); await OnChanged.InvokeAsync(); }
     private async Task PrescriptionRevisionChanged(UiSalesLineModel line, string? value) { line.PrescriptionRevisionId = value ?? string.Empty; await OnChanged.InvokeAsync(); }

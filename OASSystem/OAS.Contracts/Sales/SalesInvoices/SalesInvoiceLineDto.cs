@@ -36,4 +36,8 @@ public sealed record SalesInvoiceLineDto(
     string? Notes,
     bool IsActive,
     string RowVersion,
-    SalesInvoiceLinePrescriptionSnapshotDto? PrescriptionSnapshot);
+    SalesInvoiceLinePrescriptionSnapshotDto? PrescriptionSnapshot,
+    string? WarehouseCode = null,
+    string? WarehouseName = null,
+    string? PrescriptionCode = null,
+    int? PrescriptionRevisionNumber = null);

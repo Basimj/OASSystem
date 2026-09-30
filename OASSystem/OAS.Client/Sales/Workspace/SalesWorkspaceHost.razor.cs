@@ -224,10 +224,27 @@ public partial class SalesWorkspaceHost : IDisposable
                     break;
                 }
                 case UiCustomerOrderFormModel model:
-                    RequireGuid(model.CustomerId, "يجب تحديد العميل."); RequireGuid(model.CurrencyId, "يجب تحديد العملة.");
-                    if (model.Lines.Count == 0) throw new InvalidOperationException("يجب إضافة سطر واحد على الأقل.");
-                    var o = model.Id.HasValue ? await Sales.UpdateCustomerOrderAsync(model.Id.Value, SalesUiMapper.ToUpdate(model)) : await Sales.CreateCustomerOrderAsync(SalesUiMapper.ToCreate(model));
-                    if (o is not null) CompleteSave(ActiveTab, o.Id, o.OrderCode, SalesUiMapper.ToUi(o));
+                    RequireGuid(model.CustomerId, "يجب تحديد العميل.");
+                    RequireGuid(model.CurrencyId, "يجب تحديد العملة.");
+
+                    if (!ValidateCreditSale(model.CustomerId, model.PaymentTermType))
+                        return;
+
+                    if (!model.OrderDate.HasValue)
+                        throw new InvalidOperationException("يجب تحديد تاريخ الطلب.");
+
+                    if (model.RequiredDate.HasValue && model.RequiredDate.Value < model.OrderDate.Value)
+                        throw new InvalidOperationException("تاريخ التسليم المطلوب لا يمكن أن يكون قبل تاريخ الطلب.");
+
+                    if (model.Lines.Count == 0)
+                        throw new InvalidOperationException("يجب إضافة سطر واحد على الأقل.");
+
+                    var o = model.Id.HasValue
+                        ? await Sales.UpdateCustomerOrderAsync(model.Id.Value, SalesUiMapper.ToUpdate(model))
+                        : await Sales.CreateCustomerOrderAsync(SalesUiMapper.ToCreate(model));
+
+                    if (o is not null)
+                        CompleteSave(ActiveTab, o.Id, o.OrderCode, SalesUiMapper.ToUi(o));
                     break;
                 case UiSalesInvoiceFormModel model:
                     SalesInvoiceDto? i;
@@ -238,6 +255,8 @@ public partial class SalesWorkspaceHost : IDisposable
                     else
                     {
                         RequireGuid(model.CustomerId, "يجب تحديد العميل."); RequireGuid(model.CurrencyId, "يجب تحديد العملة.");
+                        if (!ValidateCreditSale(model.CustomerId, model.PaymentTermType))
+                            return;
                         if (model.Lines.Count == 0) throw new InvalidOperationException("يجب إضافة سطر واحد على الأقل.");
                         i = model.Id.HasValue ? await Sales.UpdateSalesInvoiceAsync(model.Id.Value, SalesUiMapper.ToUpdate(model)) : await Sales.CreateSalesInvoiceAsync(SalesUiMapper.ToCreate(model));
                     }
@@ -663,8 +682,24 @@ public partial class SalesWorkspaceHost : IDisposable
     private async Task<IReadOnlyList<UiLookupItem>> SearchOrderItemsAsync(string q, CancellationToken ct)
     {
         Guid? customerId = ActiveTab?.Model is UiSalesInvoiceFormModel i && Guid.TryParse(i.CustomerId, out var id) ? id : null;
-        var rows = await Sales.SearchCustomerOrdersAsync(customerId, q, 20, ct); foreach (var x in rows) _orders[x.Id] = x;
-        return rows.Select(x => new UiLookupItem(x.Id.ToString(), x.OrderCode, $"{x.OrderDate:yyyy-MM-dd} • {x.TotalAmount:N2} {x.CurrencyCode}", "fa-solid fa-clipboard-list", x.Status == CustomerOrderStatus.Cancelled)).ToArray();
+        var rows = await Sales.SearchCustomerOrdersAsync(customerId, q, 20, ct);
+
+        foreach (var x in rows)
+            _orders[x.Id] = x;
+
+        return rows.Select(x =>
+        {
+            var disabled = !CanCreateInvoiceFromOrder(x.Status);
+            var statusText = SalesArabicPresenter.OrderStatusText(x.Status);
+            var secondary = $"{statusText} • {x.OrderDate:yyyy-MM-dd} • {x.TotalAmount:N2} {x.CurrencyCode}";
+
+            return new UiLookupItem(
+                x.Id.ToString(),
+                x.OrderCode,
+                secondary,
+                "fa-solid fa-clipboard-list",
+                disabled);
+        }).ToArray();
     }
 
     private Task PrescriptionCustomerChangedAsync(string? value)
@@ -678,22 +713,167 @@ public partial class SalesWorkspaceHost : IDisposable
         return Task.CompletedTask;
     }
 
-    private Task SelectionChangedAsync(UiSalesSelectionChange change)
+    private async Task SelectionChangedAsync(UiSalesSelectionChange change)
     {
         if (ActiveTab?.Model is UiCustomerOrderFormModel order)
         {
-            if (change.Field == "Customer" && Guid.TryParse(change.Value, out var cid) && _customers.TryGetValue(cid, out var c)) order.CustomerDisplay = $"{c.CustomerCode} - {c.NameAr}";
-            if (change.Field == "Currency" && Guid.TryParse(change.Value, out var curId) && _currencies.TryGetValue(curId, out var cur)) { order.CurrencyDisplay = $"{cur.Code} - {cur.NameAr}"; order.CurrencyCode = cur.Code; order.CurrencyDecimalPlaces = cur.DecimalPlaces; order.ExchangeRate = cur.EffectiveExchangeRate; }
-            if (change.Field == "PrescriptionRevision" && Guid.TryParse(change.Value, out var rid) && _revisions.TryGetValue(rid, out var rev)) order.PrescriptionDisplay = $"{rev.PrescriptionCode} / Revision {rev.RevisionNumber}";
+            if (change.Field == "Customer" && Guid.TryParse(change.Value, out var cid) && _customers.TryGetValue(cid, out var c))
+            {
+                order.CustomerCode = c.CustomerCode;
+                order.CustomerDisplay = $"{c.CustomerCode} - {c.NameAr}";
+                if (!ValidateCreditSale(order.CustomerId, order.PaymentTermType))
+                    order.PaymentTermType = "Immediate";
+            }
+
+            if (change.Field == "PaymentTermType")
+                if (!ValidateCreditSale(order.CustomerId, order.PaymentTermType))
+                    order.PaymentTermType = "Immediate";
+
+            if (change.Field == "Currency" && Guid.TryParse(change.Value, out var curId) && _currencies.TryGetValue(curId, out var cur))
+            {
+                order.CurrencyDisplay = $"{cur.Code} - {cur.NameAr}";
+                order.CurrencyCode = cur.Code;
+                order.CurrencyDecimalPlaces = cur.DecimalPlaces;
+                order.ExchangeRate = cur.EffectiveExchangeRate;
+            }
+
+            if (change.Field == "PrescriptionRevision")
+            {
+                if (Guid.TryParse(change.Value, out var rid) && _revisions.TryGetValue(rid, out var rev))
+                {
+                    order.PrescriptionCode = rev.PrescriptionCode;
+                    order.PrescriptionDisplay = $"{rev.PrescriptionCode} / إصدار {rev.RevisionNumber}";
+                }
+                else
+                {
+                    order.PrescriptionCode = string.Empty;
+                    order.PrescriptionDisplay = null;
+                }
+
+                // عند تغيير وصفة رأس الطلب لا نحتفظ بمرجع Revision قديم داخل أسطر العدسات.
+                // الـApplication سيربط Revision الرأس فقط بالأسطر التي تحتاج وصفة فعليًا.
+                foreach (var line in order.Lines.Where(x => x.PrescriptionRequired))
+                {
+                    line.PrescriptionRevisionId = string.Empty;
+                    line.PrescriptionRevisionDisplay = null;
+                }
+            }
         }
         else if (ActiveTab?.Model is UiSalesInvoiceFormModel invoice)
         {
-            if (change.Field == "Customer" && Guid.TryParse(change.Value, out var cid) && _customers.TryGetValue(cid, out var c)) invoice.CustomerDisplay = $"{c.CustomerCode} - {c.NameAr}";
-            if (change.Field == "Currency" && Guid.TryParse(change.Value, out var curId) && _currencies.TryGetValue(curId, out var cur)) { invoice.CurrencyDisplay = $"{cur.Code} - {cur.NameAr}"; invoice.CurrencyCode = cur.Code; invoice.CurrencyDecimalPlaces = cur.DecimalPlaces; invoice.ExchangeRate = cur.EffectiveExchangeRate; }
-            if (change.Field == "CustomerOrder" && Guid.TryParse(change.Value, out var oid) && _orders.TryGetValue(oid, out var source)) { invoice.CustomerOrderDisplay = source.OrderCode; invoice.CustomerId = source.CustomerId.ToString(); }
-            if (change.Field == "PrescriptionRevision" && Guid.TryParse(change.Value, out var rid) && _revisions.TryGetValue(rid, out var rev)) invoice.PrescriptionDisplay = $"{rev.PrescriptionCode} / Revision {rev.RevisionNumber}";
+            if (change.Field == "Customer" && Guid.TryParse(change.Value, out var cid) && _customers.TryGetValue(cid, out var c))
+            {
+                invoice.CustomerCode = c.CustomerCode;
+                invoice.CustomerDisplay = $"{c.CustomerCode} - {c.NameAr}";
+                if (!ValidateCreditSale(invoice.CustomerId, invoice.PaymentTermType))
+                    invoice.PaymentTermType = "Immediate";
+            }
+
+            if (change.Field == "PaymentTermType")
+                if (!ValidateCreditSale(invoice.CustomerId, invoice.PaymentTermType))
+                    invoice.PaymentTermType = "Immediate";
+
+            if (change.Field == "Currency" && Guid.TryParse(change.Value, out var curId) && _currencies.TryGetValue(curId, out var cur))
+            {
+                invoice.CurrencyDisplay = $"{cur.Code} - {cur.NameAr}";
+                invoice.CurrencyCode = cur.Code;
+                invoice.CurrencyDecimalPlaces = cur.DecimalPlaces;
+                invoice.ExchangeRate = cur.EffectiveExchangeRate;
+            }
+
+            if (change.Field == "CustomerOrder")
+            {
+                if (string.IsNullOrWhiteSpace(change.Value))
+                {
+                    if (!invoice.Id.HasValue)
+                        SalesUiMapper.ClearOrderFromNewInvoice(invoice);
+                }
+                else if (Guid.TryParse(change.Value, out var orderId))
+                {
+                    ClearMessages();
+
+                    try
+                    {
+                        var source = await Sales.GetCustomerOrderByIdAsync(orderId);
+                        if (source is null)
+                        {
+                            if (!invoice.Id.HasValue)
+                                SalesUiMapper.ClearOrderFromNewInvoice(invoice);
+                            _error = "تعذر تحميل بيانات طلب العميل المحدد.";
+                        }
+                        else if (!CanCreateInvoiceFromOrder(source.Status))
+                        {
+                            if (!invoice.Id.HasValue)
+                                SalesUiMapper.ClearOrderFromNewInvoice(invoice);
+                            else
+                            {
+                                invoice.CustomerOrderId = string.Empty;
+                                invoice.CustomerOrderDisplay = null;
+                            }
+                            _error = "يمكن إنشاء الفاتورة فقط من طلب مؤكد أو جاهز للإنتاج.";
+                        }
+                        else
+                        {
+                            SalesUiMapper.ApplyOrderToInvoice(invoice, source);
+                            _orders[source.Id] = new CustomerOrderLookupDto(
+                                source.Id,
+                                source.OrderCode,
+                                source.CustomerId,
+                                source.OrderDate,
+                                source.Status,
+                                source.TotalAmount,
+                                source.CurrencyCodeSnapshot,
+                                source.RowVersion);
+
+                            _success = $"تم تحميل بيانات الطلب {source.OrderCode} وأسطر البيع تلقائيًا.";
+                        }
+                    }
+                    catch (ApiClientException ex)
+                    {
+                        if (!invoice.Id.HasValue)
+                            SalesUiMapper.ClearOrderFromNewInvoice(invoice);
+                        _error = SalesApiErrorPresenter.GetMessage(ex.Error);
+                    }
+                }
+            }
+
+            if (change.Field == "PrescriptionRevision")
+            {
+                if (Guid.TryParse(change.Value, out var rid) && _revisions.TryGetValue(rid, out var rev))
+                {
+                    invoice.PrescriptionCode = rev.PrescriptionCode;
+                    invoice.PrescriptionDisplay = $"{rev.PrescriptionCode} / إصدار {rev.RevisionNumber}";
+                }
+                else
+                {
+                    invoice.PrescriptionCode = string.Empty;
+                    invoice.PrescriptionDisplay = null;
+                }
+            }
         }
-        return MarkDirtyAsync();
+
+        await MarkDirtyAsync();
+    }
+
+    private bool ValidateCreditSale(string? customerIdValue, string? paymentTermType)
+    {
+        if (!string.Equals(paymentTermType, "Credit", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (!Guid.TryParse(customerIdValue, out var customerId) ||
+            !_customers.TryGetValue(customerId, out var customer))
+        {
+            // يبقى التحقق النهائي في الـApplication إذا لم تكن بيانات العميل محملة في الـClient.
+            return true;
+        }
+
+        if (customer.IsCreditAllowed)
+            return true;
+
+        _error = "البيع الآجل غير مسموح لهذا العميل. اختر السداد الفوري.";
+        _success = null;
+        Workspace.NotifyStateChanged();
+        return false;
     }
 
     private Task ProductSelectedAsync(UiSalesLineSelectionChange change)
@@ -708,6 +888,25 @@ public partial class SalesWorkspaceHost : IDisposable
             change.Line.Description = change.Line.ProductDisplay;
             change.Line.BaseUnitPrice = product.SellingPrice;
             change.Line.ActualUnitPrice = product.SellingPrice;
+            change.Line.PrescriptionRequired = product.IsPrescriptionLens;
+
+            if (product.IsPrescriptionLens)
+            {
+                // العدسة الطبية يجب أن تعامل كسطر Lens ويحدد المستخدم العين فقط
+                // عندما توجد Revision في رأس طلب العميل.
+                change.Line.LineType = "Lens";
+                if (ActiveTab?.Model is UiCustomerOrderFormModel)
+                {
+                    change.Line.PrescriptionRevisionId = string.Empty;
+                    change.Line.PrescriptionRevisionDisplay = null;
+                }
+            }
+            else
+            {
+                change.Line.PrescriptionRevisionId = string.Empty;
+                change.Line.PrescriptionRevisionDisplay = null;
+                change.Line.PrescriptionEye = string.Empty;
+            }
         }
         return Task.CompletedTask;
     }
@@ -740,6 +939,9 @@ public partial class SalesWorkspaceHost : IDisposable
     private bool InvoiceReadOnly(UiSalesInvoiceFormModel invoice) => !ActiveTab!.IsEditMode || invoice.Status != "Draft";
     private static Guid? TryGuid(string? value) => Guid.TryParse(value, out var id) && id != Guid.Empty ? id : null;
     private static string StatusCss(string status) => SalesArabicPresenter.StatusCss(status);
+    private static bool CanCreateInvoiceFromOrder(CustomerOrderStatus status) =>
+        status is CustomerOrderStatus.Confirmed or CustomerOrderStatus.ReadyForProduction;
+
     private static string RouteFor(SalesEntityType type) => type switch { SalesEntityType.Prescriptions => "/sales/prescriptions", SalesEntityType.CustomerOrders => "/sales/customer-orders", _ => "/sales/invoices" };
     private void ClearMessages() { _error = null; _success = null; }
     public void Dispose() { Workspace.OnChange -= WorkspaceChanged; GC.SuppressFinalize(this); }

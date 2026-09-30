@@ -43,10 +43,29 @@ public sealed class SalesInvoiceAccountingPostingService(
         await EnsureAccountAsync(customer.AccountId, SalesErrorCodes.CustomerAccountInvalid, cancellationToken);
 
         var profileSpec = new Specification<PostingProfile>()
-            .Where(x => x.Module == SalesSourceReferences.Module && x.DocumentType == SalesSourceReferences.SalesInvoice && x.IsActive);
-        var profile = (await profiles.ListAsync(profileSpec, cancellationToken)).SingleOrDefault()
-            ?? throw new ConflictException("sales_posting_profile_missing", "لم يتم إعداد Posting Profile فعال لفاتورة المبيعات.");
-        var lineSpec = new Specification<PostingProfileLine>().Where(x => x.PostingProfileId == profile.Id);
+            .Where(x => x.Module == SalesSourceReferences.Module &&
+                        x.DocumentType == SalesSourceReferences.SalesInvoice &&
+                        x.IsActive);
+
+        var activeProfiles = await profiles.ListAsync(profileSpec, cancellationToken);
+
+        if (activeProfiles.Count == 0)
+        {
+            throw new ConflictException(
+                "sales_posting_profile_missing",
+                "لم يتم إعداد Posting Profile فعال لفاتورة المبيعات.");
+        }
+
+        if (activeProfiles.Count > 1)
+        {
+            throw new ConflictException(
+                "sales_posting_profile_duplicate",
+                "يوجد أكثر من Posting Profile فعال لفاتورة المبيعات. يجب إبقاء ملف ترحيل واحد فعال فقط للموديول Sales ونوع المستند SalesInvoice.");
+        }
+
+        var profile = activeProfiles[0];
+        var lineSpec = new Specification<PostingProfileLine>()
+            .Where(x => x.PostingProfileId == profile.Id);
         var configured = await profileLines.ListAsync(lineSpec, cancellationToken);
 
         var salesRevenueAccount = await RequiredRoleAsync(configured, SalesRevenueRole, cancellationToken);
@@ -116,11 +135,30 @@ public sealed class SalesInvoiceAccountingPostingService(
         return journal.Id;
     }
 
-    private async Task<Guid> RequiredRoleAsync(IReadOnlyList<PostingProfileLine> lines, string role, CancellationToken cancellationToken)
+    private async Task<Guid> RequiredRoleAsync(
+        IReadOnlyList<PostingProfileLine> lines,
+        string role,
+        CancellationToken cancellationToken)
     {
-        var line = lines.SingleOrDefault(x => string.Equals(x.AccountRole, role, StringComparison.OrdinalIgnoreCase));
-        if (line is null)
-            throw new ConflictException("sales_posting_role_missing", $"Posting Profile does not define required role '{role}'.");
+        var matchingLines = lines
+            .Where(x => string.Equals(x.AccountRole, role, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (matchingLines.Count == 0)
+        {
+            throw new ConflictException(
+                "sales_posting_role_missing",
+                $"Posting Profile does not define required role '{role}'.");
+        }
+
+        if (matchingLines.Count > 1)
+        {
+            throw new ConflictException(
+                "sales_posting_role_duplicate",
+                $"Posting Profile يحتوي أكثر من حساب للدور '{role}'. يجب تعريف حساب واحد فقط لكل دور ترحيل.");
+        }
+
+        var line = matchingLines[0];
         await EnsureAccountAsync(line.AccountId, "sales_posting_account_invalid", cancellationToken);
         return line.AccountId;
     }

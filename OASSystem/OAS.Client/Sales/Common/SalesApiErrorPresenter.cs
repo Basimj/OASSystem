@@ -37,7 +37,6 @@ public static class SalesApiErrorPresenter
         ["sales_prescription_delete_forbidden"] = "لا يمكن حذف الوصفة في حالتها الحالية.",
         ["sales_prescription_eye_duplicate"] = "يوجد قياس مكرر لنفس العين داخل Revision الوصفة.",
         ["sales_prescription_eye_required"] = "بيانات العين المطلوبة غير مكتملة.",
-        ["sales_prescription_revision_required"] = "لا يمكن حفظ الوصفة بدون الإصدار الأول.",
         ["sales_prescription_id_required"] = "معرف الوصفة مطلوب.",
         ["sales_prescription_required"] = "يجب تحديد وصفة وإصدار صالح لهذا السطر.",
         ["sales_prescription_status_invalid"] = "حالة الوصفة الحالية لا تسمح بهذه العملية.",
@@ -56,7 +55,19 @@ public static class SalesApiErrorPresenter
     };
 
     public static string GetMessage(ApiError? error, string fallback = "تعذر إتمام العملية.")
-        => error is not null && Messages.TryGetValue(error.Code ?? string.Empty, out var message)
-            ? message
-            : !string.IsNullOrWhiteSpace(error?.Message) ? error.Message : fallback;
+    {
+        if (error is null)
+            return fallback;
+
+        if (Messages.TryGetValue(error.Code ?? string.Empty, out var message))
+            return message;
+
+        if (string.Equals(error.Code, "business_rule_failed", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(error.Message, "Required date cannot be before order date.", StringComparison.OrdinalIgnoreCase))
+        {
+            return "تاريخ التسليم المطلوب لا يمكن أن يكون قبل تاريخ الطلب.";
+        }
+
+        return !string.IsNullOrWhiteSpace(error.Message) ? error.Message : fallback;
+    }
 }

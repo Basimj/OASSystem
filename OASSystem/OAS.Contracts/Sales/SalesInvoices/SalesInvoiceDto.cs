@@ -54,4 +54,6 @@ public sealed record SalesInvoiceDto(
     DateTimeOffset? LastModifiedAtUtc,
     string? LastModifiedBy,
     SalesInvoicePaymentSummaryDto PaymentSummary,
-    IReadOnlyList<SalesInvoiceLineDto> Lines);
+    IReadOnlyList<SalesInvoiceLineDto> Lines,
+    string? PrescriptionCode = null,
+    int? PrescriptionRevisionNumber = null);

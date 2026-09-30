@@ -67,6 +67,50 @@
                               MinimumSearchLength="0"
                               DebounceMilliseconds="200" />
 
+                    <UiLookup Label="حساب إيرادات المبيعات"
+                              Value="@ToLookupValue(_settingsSalesRevenueAccountId)"
+                              ValueChanged="SetSalesRevenueAccount"
+                              SelectedItem="@SalesRevenueAccountLookupItem"
+                              SearchAsync="SearchSalesRevenueAccountsAsync"
+                              Placeholder="ابحث برقم الحساب أو الاسم..."
+                              EmptyText="لا توجد حسابات إيرادات صالحة للترحيل."
+                              ClearText="إلغاء اختيار حساب إيرادات المبيعات"
+                              MinimumSearchLength="0"
+                              DebounceMilliseconds="250" />
+
+                    <UiLookup Label="حساب الضرائب المستحقة"
+                              Value="@ToLookupValue(_settingsTaxPayableAccountId)"
+                              ValueChanged="SetTaxPayableAccount"
+                              SelectedItem="@TaxPayableAccountLookupItem"
+                              SearchAsync="SearchTaxPayableAccountsAsync"
+                              Placeholder="ابحث برقم الحساب أو الاسم..."
+                              EmptyText="لا توجد حسابات التزامات صالحة للترحيل."
+                              ClearText="إلغاء اختيار حساب الضرائب المستحقة"
+                              MinimumSearchLength="0"
+                              DebounceMilliseconds="250" />
+
+                    <UiLookup Label="حساب المخزون"
+                              Value="@ToLookupValue(_settingsInventoryAccountId)"
+                              ValueChanged="SetInventoryAccount"
+                              SelectedItem="@InventoryAccountLookupItem"
+                              SearchAsync="SearchInventoryAccountsAsync"
+                              Placeholder="ابحث برقم الحساب أو الاسم..."
+                              EmptyText="لا توجد حسابات أصول صالحة للترحيل."
+                              ClearText="إلغاء اختيار حساب المخزون"
+                              MinimumSearchLength="0"
+                              DebounceMilliseconds="250" />
+
+                    <UiLookup Label="حساب تكلفة البضاعة المباعة"
+                              Value="@ToLookupValue(_settingsCogsAccountId)"
+                              ValueChanged="SetCogsAccount"
+                              SelectedItem="@CogsAccountLookupItem"
+                              SearchAsync="SearchCogsAccountsAsync"
+                              Placeholder="ابحث برقم الحساب أو الاسم..."
+                              EmptyText="لا توجد حسابات مصروفات صالحة للترحيل."
+                              ClearText="إلغاء اختيار حساب تكلفة البضاعة المباعة"
+                              MinimumSearchLength="0"
+                              DebounceMilliseconds="250" />
+
                     <UiLookup Label="حساب أرباح فروقات الصرف"
                               Value="@ToLookupValue(_settingsExchangeGainAccountId)"
                               ValueChanged="SetExchangeGainAccount"
@@ -90,7 +134,7 @@
                               DebounceMilliseconds="250" />
                 </UiAccountingFormGrid>
 
-                <UiAlert Message="البحث يعرض الحسابات المطابقة ويعطّل الحساب غير المؤهل مع توضيح السبب. الحساب الرئيسي للصناديق والبنوك وذمم الموظفين يجب أن يكون حساب تحكم نشطًا من الأصول وبطبيعة مدينة."
+                <UiAlert Message="البحث يعرض الحسابات المطابقة ويعطّل الحساب غير المؤهل مع توضيح السبب. حسابات ترحيل فاتورة المبيعات هي: إيرادات المبيعات (إيراد دائن)، الضرائب المستحقة (التزام دائن)، المخزون (أصل مدين)، وتكلفة البضاعة المباعة (مصروف مدين). جميعها يجب أن تكون نشطة وقابلة للترحيل."
                          Tone="AlertTone.Info" />
 
                 @if (_settings is null)

@@ -2,23 +2,28 @@
 @using OAS.UiLib.Core.Models.Sales
 @using OAS.UiLib.Components.Sales.Orders
 
-<UiSalesFormSection Title="بيانات الفاتورة" IconCss="fa-solid fa-file-invoice-dollar">
+<UiSalesFormSection Title="بيانات الفاتورة" Description="عند اختيار طلب عميل يتم تحميل العميل والوصفة والعملة وأسطر البيع تلقائيًا من الطلب." IconCss="fa-solid fa-file-invoice-dollar">
     <div class="ui-sales-form-grid">
         <UiInputText Label="كود الفاتورة" Value="@Model.InvoiceCode" ReadOnly="true" />
-        <UiLookup Label="العميل" Value="@Model.CustomerId" ValueChanged="CustomerChanged" SelectedItem="@CustomerItem" SearchAsync="SearchCustomersAsync" Placeholder="ابحث عن العميل..." Required="true" Disabled="@ReadOnly" />
-        <UiLookup Label="طلب العميل المصدر" Value="@Model.CustomerOrderId" ValueChanged="OrderChanged" SelectedItem="@OrderItem" SearchAsync="SearchOrdersAsync" Placeholder="اختياري - للبيع المباشر اتركه فارغًا" Disabled="@ReadOnly" />
-        <UiLookup Label="Revision الوصفة" Value="@Model.PrescriptionRevisionId" ValueChanged="PrescriptionChanged" SelectedItem="@PrescriptionItem" SearchAsync="SearchPrescriptionsAsync" Placeholder="اختياري" Disabled="@ReadOnly" />
+        <UiLookup Label="طلب العميل المصدر" Value="@Model.CustomerOrderId" ValueChanged="OrderChanged" SelectedItem="@OrderItem" SearchAsync="SearchOrdersAsync" Placeholder="اختر طلبًا أو اتركه فارغًا للبيع المباشر" Disabled="@ReadOnly" />
+
+        <UiInputText Label="كود العميل" Value="@Model.CustomerCode" ReadOnly="true" />
+        <UiLookup Label="العميل" Value="@Model.CustomerId" ValueChanged="CustomerChanged" SelectedItem="@CustomerItem" SearchAsync="SearchCustomersAsync" Placeholder="ابحث بكود العميل أو الاسم..." Required="true" Disabled="@SourceOrderFieldsReadOnly" />
+
+        <UiInputText Label="كود الوصفة" Value="@Model.PrescriptionCode" ReadOnly="true" />
+        <UiLookup Label="الوصفة / الإصدار" Value="@Model.PrescriptionRevisionId" ValueChanged="PrescriptionChanged" SelectedItem="@PrescriptionItem" SearchAsync="SearchPrescriptionsAsync" Placeholder="اختياري" Disabled="@SourceOrderFieldsReadOnly" />
+
         <UiInputDate Label="تاريخ الفاتورة" Value="@Model.InvoiceDate" ValueChanged="InvoiceDateChanged" Required="true" ReadOnly="@ReadOnly" />
         <UiInputDate Label="تاريخ الترحيل" Value="@Model.PostingDate" ValueChanged="PostingDateChanged" Required="true" ReadOnly="@ReadOnly" />
-        <UiLookup Label="العملة" Value="@Model.CurrencyId" ValueChanged="CurrencyChanged" SelectedItem="@CurrencyItem" SearchAsync="SearchCurrenciesAsync" Placeholder="اختر العملة..." Required="true" Disabled="@ReadOnly" />
-        <UiSelect Label="طريقة الضريبة" Value="@Model.TaxCalculationMode" ValueChanged="TaxModeChanged" Disabled="@ReadOnly" Options="@TaxOptions" />
-        <UiSelect Label="شروط السداد" Value="@Model.PaymentTermType" ValueChanged="PaymentTermChanged" Disabled="@ReadOnly" Options="@PaymentOptions" />
+        <UiLookup Label="العملة" Value="@Model.CurrencyId" ValueChanged="CurrencyChanged" SelectedItem="@CurrencyItem" SearchAsync="SearchCurrenciesAsync" Placeholder="اختر العملة..." Required="true" Disabled="@SourceOrderFieldsReadOnly" />
+        <UiSelect Label="طريقة الضريبة" Value="@Model.TaxCalculationMode" ValueChanged="TaxModeChanged" Disabled="@SourceOrderFieldsReadOnly" Options="@TaxOptions" />
+        <UiSelect Label="شروط السداد" Value="@Model.PaymentTermType" ValueChanged="PaymentTermChanged" Disabled="@SourceOrderFieldsReadOnly" Options="@PaymentOptions" />
         <UiInputText Label="البيان" Value="@Model.Description" ValueChanged="DescriptionChanged" ReadOnly="@ReadOnly" />
     </div>
 </UiSalesFormSection>
 
-<UiSalesFormSection Title="أسطر الفاتورة" Description="الأسعار والتكلفة النهائية تُعتمد من الـApplication/Inventory عند التأكيد والترحيل." IconCss="fa-solid fa-list-check">
-    <UiSalesLinesEditor Model="@Model.Lines" ReadOnly="@ReadOnly" SearchProductsAsync="SearchProductsAsync" SearchWarehousesAsync="SearchWarehousesAsync"
+<UiSalesFormSection Title="أسطر الفاتورة" Description="سعر المنتج يُجلب تلقائيًا ولا يُعدل مباشرة. عند الحاجة إلى سعر مختلف استخدم طلب تغيير السعر ليُطبق بعد الموافقة." IconCss="fa-solid fa-list-check">
+    <UiSalesLinesEditor Model="@Model.Lines" ReadOnly="@SourceOrderFieldsReadOnly" SearchProductsAsync="SearchProductsAsync" SearchWarehousesAsync="SearchWarehousesAsync"
                         SearchPrescriptionRevisionsAsync="SearchPrescriptionRevisionsAsync" OnProductSelected="OnProductSelected" OnWarehouseSelected="OnWarehouseSelected"
                         EnablePriceOverride="true" OnRequestPriceOverride="OnRequestPriceOverride" OnChanged="OnChanged" />
 </UiSalesFormSection>
@@ -47,10 +52,19 @@
     [Parameter] public EventCallback<UiSalesLineSelectionChange> OnWarehouseSelected { get; set; }
     [Parameter] public EventCallback<UiSalesLineModel> OnRequestPriceOverride { get; set; }
     [Parameter] public EventCallback OnChanged { get; set; }
-    private UiLookupItem? CustomerItem => string.IsNullOrWhiteSpace(Model.CustomerId) ? null : new(Model.CustomerId, Model.CustomerDisplay ?? Model.CustomerId);
-    private UiLookupItem? OrderItem => string.IsNullOrWhiteSpace(Model.CustomerOrderId) ? null : new(Model.CustomerOrderId, Model.CustomerOrderDisplay ?? Model.CustomerOrderId);
-    private UiLookupItem? PrescriptionItem => string.IsNullOrWhiteSpace(Model.PrescriptionRevisionId) ? null : new(Model.PrescriptionRevisionId, Model.PrescriptionDisplay ?? Model.PrescriptionRevisionId);
-    private UiLookupItem? CurrencyItem => string.IsNullOrWhiteSpace(Model.CurrencyId) ? null : new(Model.CurrencyId, Model.CurrencyDisplay ?? Model.CurrencyCode ?? Model.CurrencyId);
+    private bool SourceOrderFieldsReadOnly => ReadOnly || (!Model.Id.HasValue && !string.IsNullOrWhiteSpace(Model.CustomerOrderId));
+    private UiLookupItem? CustomerItem => string.IsNullOrWhiteSpace(Model.CustomerId)
+        ? null
+        : new(Model.CustomerId, Model.CustomerDisplay ?? (string.IsNullOrWhiteSpace(Model.CustomerCode) ? "العميل المحدد" : Model.CustomerCode));
+    private UiLookupItem? OrderItem => string.IsNullOrWhiteSpace(Model.CustomerOrderId)
+        ? null
+        : new(Model.CustomerOrderId, Model.CustomerOrderDisplay ?? "الطلب المحدد");
+    private UiLookupItem? PrescriptionItem => string.IsNullOrWhiteSpace(Model.PrescriptionRevisionId)
+        ? null
+        : new(Model.PrescriptionRevisionId, Model.PrescriptionDisplay ?? (string.IsNullOrWhiteSpace(Model.PrescriptionCode) ? "الوصفة المحددة" : Model.PrescriptionCode));
+    private UiLookupItem? CurrencyItem => string.IsNullOrWhiteSpace(Model.CurrencyId)
+        ? null
+        : new(Model.CurrencyId, Model.CurrencyDisplay ?? (string.IsNullOrWhiteSpace(Model.CurrencyCode) ? "العملة المحددة" : Model.CurrencyCode));
     private async Task CustomerChanged(string? v) { Model.CustomerId = v ?? string.Empty; await OnSelectionChanged.InvokeAsync(new("Customer", v)); await OnChanged.InvokeAsync(); }
     private async Task OrderChanged(string? v) { Model.CustomerOrderId = v ?? string.Empty; await OnSelectionChanged.InvokeAsync(new("CustomerOrder", v)); await OnChanged.InvokeAsync(); }
     private async Task PrescriptionChanged(string? v) { Model.PrescriptionRevisionId = v ?? string.Empty; await OnSelectionChanged.InvokeAsync(new("PrescriptionRevision", v)); await OnChanged.InvokeAsync(); }
@@ -58,6 +72,11 @@
     private async Task InvoiceDateChanged(DateOnly? v) { Model.InvoiceDate = v; await OnChanged.InvokeAsync(); }
     private async Task PostingDateChanged(DateOnly? v) { Model.PostingDate = v; await OnChanged.InvokeAsync(); }
     private async Task TaxModeChanged(string? v) { Model.TaxCalculationMode = v ?? "Exclusive"; await OnChanged.InvokeAsync(); }
-    private async Task PaymentTermChanged(string? v) { Model.PaymentTermType = v ?? "Immediate"; await OnChanged.InvokeAsync(); }
+    private async Task PaymentTermChanged(string? v)
+    {
+        Model.PaymentTermType = v ?? "Immediate";
+        await OnSelectionChanged.InvokeAsync(new("PaymentTermType", Model.PaymentTermType));
+        await OnChanged.InvokeAsync();
+    }
     private async Task DescriptionChanged(string? v) { Model.Description = v; await OnChanged.InvokeAsync(); }
 }

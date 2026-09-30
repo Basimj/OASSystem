@@ -32,8 +32,10 @@ public sealed class CreateSalesInvoiceFromOrderCommandHandler(
             ?? throw new NotFoundException(nameof(CustomerOrder), request.OrderId);
         SalesConcurrency.Ensure(request.Request.OrderRowVersion, order.RowVersion, "طلب العميل");
 
-        if (order.Status is CustomerOrderStatus.Draft or CustomerOrderStatus.Cancelled)
-            throw new ConflictException("sales_order_invalid_status", "يجب تأكيد الطلب قبل إنشاء الفاتورة منه.");
+        if (order.Status is not (CustomerOrderStatus.Confirmed or CustomerOrderStatus.ReadyForProduction))
+            throw new ConflictException(
+                "sales_order_invalid_status",
+                "يمكن إنشاء الفاتورة فقط من طلب مؤكد أو جاهز للإنتاج.");
 
         var customer = await customers.GetByIdAsync(order.CustomerId, ct)
             ?? throw new NotFoundException(nameof(Customer), order.CustomerId);

@@ -21,6 +21,7 @@
 <UiSalesFormSection Title="أسطر الطلب" Description="يتم احتساب الإجماليات النهائية داخل Domain/Application عند الحفظ والتأكيد." IconCss="fa-solid fa-list">
     <UiSalesLinesEditor Model="@Model.Lines" ReadOnly="@ReadOnly" SearchProductsAsync="SearchProductsAsync"
                         SearchWarehousesAsync="SearchWarehousesAsync" SearchPrescriptionRevisionsAsync="SearchPrescriptionRevisionsAsync"
+                        HeaderPrescriptionRevisionId="@Model.PrescriptionRevisionId" HeaderPrescriptionRevisionDisplay="@Model.PrescriptionDisplay"
                         OnProductSelected="OnProductSelected" OnWarehouseSelected="OnWarehouseSelected" OnChanged="OnChanged" />
 </UiSalesFormSection>
 
@@ -50,6 +51,11 @@
     private async Task OrderDateChanged(DateOnly? v) { Model.OrderDate = v; await OnChanged.InvokeAsync(); }
     private async Task RequiredDateChanged(DateOnly? v) { Model.RequiredDate = v; await OnChanged.InvokeAsync(); }
     private async Task TaxModeChanged(string? v) { Model.TaxCalculationMode = v ?? "Exclusive"; await OnChanged.InvokeAsync(); }
-    private async Task PaymentTermChanged(string? v) { Model.PaymentTermType = v ?? "Immediate"; await OnChanged.InvokeAsync(); }
+    private async Task PaymentTermChanged(string? v)
+    {
+        Model.PaymentTermType = v ?? "Immediate";
+        await OnSelectionChanged.InvokeAsync(new("PaymentTermType", Model.PaymentTermType));
+        await OnChanged.InvokeAsync();
+    }
     private async Task NotesChanged(string? v) { Model.Notes = v; await OnChanged.InvokeAsync(); }
 }
