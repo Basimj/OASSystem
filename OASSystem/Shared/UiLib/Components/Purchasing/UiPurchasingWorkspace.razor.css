@@ -1,1 +1,23 @@
-.ui-purchasing-workspace { display: grid; gap: var(--oas-space-3); min-width: 0; }
+.ui-purchasing-workspace {
+    min-height: 100%;
+    min-width: 0;
+    display: grid;
+    align-content: start;
+    gap: var(--oas-space-3);
+    overflow: visible;
+    padding-inline-end: 2px;
+    padding-block-end: var(--oas-space-4);
+    box-sizing: border-box;
+}
+
+.ui-purchasing-workspace > * {
+    min-width: 0;
+}
+
+@media (max-width: 1050px) {
+    .ui-purchasing-workspace {
+        min-height: 0;
+        padding-inline-end: 0;
+        padding-block-end: var(--oas-space-3);
+    }
+}

@@ -12,7 +12,7 @@
         <div class="ui-workspace__filters">@Filters</div>
     }
     <div class="@((ShowAside && Aside is not null) ? "ui-workspace__body ui-workspace__body--split" : "ui-workspace__body")">
-        <main class="ui-workspace__main">@Content</main>
+        <main class="@(ScrollableMain ? "ui-workspace__main ui-workspace__main--scrollable" : "ui-workspace__main")">@Content</main>
         @if (ShowAside && Aside is not null)
         {
             <aside class="ui-workspace__aside">@Aside</aside>
