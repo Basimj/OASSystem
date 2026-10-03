@@ -9,7 +9,7 @@ public sealed class EmployeeConfiguration
 {
     public void Configure(EntityTypeBuilder<Employee> builder)
     {
-        builder.ToTable("Employees", "hr");
+        builder.ToTable("Employees", "hr", t => t.HasCheckConstraint("CK_Employees_NotSelfManager", "[ManagerEmployeeId] IS NULL OR [ManagerEmployeeId] <> [Id]"));
 
         builder.HasKey(x => x.Id);
 
@@ -34,8 +34,17 @@ public sealed class EmployeeConfiguration
         builder.Property(x => x.JobTitleId)
             .IsRequired();
 
+        builder.Property(x => x.DepartmentId);
+        builder.Property(x => x.ManagerEmployeeId);
+
         builder.Property(x => x.HireDate)
             .HasColumnType("date");
+
+        builder.Property(x => x.IsSalesperson)
+            .IsRequired();
+
+        builder.Property(x => x.IsTechnician)
+            .IsRequired();
 
         builder.Property(x => x.IsCommissionEligible)
             .IsRequired();
@@ -57,6 +66,12 @@ public sealed class EmployeeConfiguration
 
         builder.Property(x => x.LastModifiedBy)
             .HasMaxLength(64);
+
+        builder.Property<string?>("CreatedFromDevice")
+            .HasMaxLength(256);
+
+        builder.Property<string?>("UpdatedFromDevice")
+            .HasMaxLength(256);
 
         builder.OwnsOne(x => x.ContactInfo, contact =>
         {
@@ -113,6 +128,12 @@ public sealed class EmployeeConfiguration
         builder.HasIndex(x => x.JobTitleId)
             .HasDatabaseName("IX_Employees_JobTitleId");
 
+        builder.HasIndex(x => x.DepartmentId)
+            .HasDatabaseName("IX_Employees_DepartmentId");
+
+        builder.HasIndex(x => x.ManagerEmployeeId)
+            .HasDatabaseName("IX_Employees_ManagerEmployeeId");
+
         builder.HasIndex(x => x.UserAccountId)
             .IsUnique()
             .HasDatabaseName("UX_Employees_UserAccountId")
@@ -129,6 +150,19 @@ public sealed class EmployeeConfiguration
             .HasForeignKey(x => x.JobTitleId)
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_Employees_JobTitles_JobTitleId");
+
+        builder.HasOne<Department>()
+            .WithMany()
+            .HasForeignKey(x => x.DepartmentId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_Employees_Departments_DepartmentId");
+
+        builder.HasOne<Employee>()
+            .WithMany()
+            .HasForeignKey(x => x.ManagerEmployeeId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_Employees_Employees_ManagerEmployeeId");
+
 
         builder.HasOne<OAS.Domain.Identity.Entities.UserAccount>()
             .WithMany()

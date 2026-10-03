@@ -40,7 +40,8 @@ public sealed class GetEmployeeByIdQueryHandlerTests
             new GetEmployeeByIdQueryHandler(
                 new FakeEmployeeRepository(employee),
                 new FakeJobTitleRepository(title),
-                new FakeUserRepository());
+                new FakeUserRepository(),
+                new FakeDepartmentRepository());
 
         var result =
             await handler.Handle(
@@ -82,7 +83,8 @@ public sealed class GetEmployeeByIdQueryHandlerTests
             new GetEmployeeByIdQueryHandler(
                 new FakeEmployeeRepository(),
                 new FakeJobTitleRepository(),
-                new FakeUserRepository());
+                new FakeUserRepository(),
+                new FakeDepartmentRepository());
 
         Assert.ThrowsAsync<NotFoundException>(() =>
             handler.Handle(

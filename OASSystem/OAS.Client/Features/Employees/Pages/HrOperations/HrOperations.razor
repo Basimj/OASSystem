@@ -1,0 +1,406 @@
+@page "/employees/hr"
+@attribute [Authorize(Roles = "Administrator")]
+
+<PageTitle>شؤون الموظفين</PageTitle>
+
+<UiWorkspaceLayout ShowAside="@ShowAside" ShowFilters="false">
+    <Actions>
+        <UiWorkspaceActionBar>
+            <UiButton Text="جديد" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" Disabled="@(!CanNew)" OnClick="NewAsync" />
+            <UiButton Text="تعديل" IconCssClass="fa-solid fa-pen" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(!CanEdit)" OnClick="EditAsync" />
+            <UiButton Text="حفظ" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small" Disabled="@(!CanSave)" Loading="@_saving" OnClick="SaveAsync" />
+            <UiButton Text="إلغاء" IconCssClass="fa-solid fa-xmark" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Disabled="@(!CanCancelEdit)" OnClick="CancelEditAsync" />
+            @if (CanSubmit)
+            {
+                <UiButton Text="إرسال للاعتماد" IconCssClass="fa-solid fa-paper-plane" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="SubmitAsync" />
+            }
+            @if (CanApprove)
+            {
+                <UiButton Text="اعتماد" IconCssClass="fa-solid fa-circle-check" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="ApproveAsync" />
+            }
+            @if (CanReject)
+            {
+                <UiButton Text="رفض" IconCssClass="fa-solid fa-circle-xmark" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="RejectAsync" />
+            }
+            @if (CanCancelRecord)
+            {
+                <UiButton Text="إلغاء السجل" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CancelRecordAsync" />
+            }
+            @if (CanGenerateAttendance)
+            {
+                <UiButton Text="تهيئة الفترة" IconCssClass="fa-solid fa-calendar-plus" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="GenerateAttendanceAsync" />
+            }
+            @if (CanDisburseLoan)
+            {
+                <UiButton Text="صرف السلفة" IconCssClass="fa-solid fa-money-bill-transfer" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="DisburseLoanAsync" />
+            }
+            @if (CanPayNextLoanInstallment)
+            {
+                <UiButton Text="سداد القسط التالي" IconCssClass="fa-solid fa-hand-holding-dollar" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="PayNextLoanInstallmentAsync" />
+            }
+            <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@_saving" Loading="@_loading" OnClick="RefreshAsync" />
+        </UiWorkspaceActionBar>
+    </Actions>
+
+    <Content>
+        <UiContainer CssClass="hr-operations-workspace">
+            <UiSectionTabStrip Tabs="@SectionTabs" OnSelect="ChangeSectionAsync" />
+
+            @if (_loading)
+            {
+                <UiAlert Message="جاري تحميل بيانات شؤون الموظفين..." />
+            }
+            else if (_section == "shifts")
+            {
+                <UiDataGridPanel Title="الورديات" Subtitle="@($"{_shifts.Count} وردية")" HeaderLabels="@ShiftHeaders" HeaderCssClass="hr-shift-header">
+                    <Body>
+                        @if (_shifts.Count == 0) { <UiAlert Message="لا توجد ورديات." /> }
+                        else
+                        {
+                            <UiContainer CssClass="hr-list-body">
+                                @foreach (var item in _shifts)
+                                {
+                                    <UiClickableSurface CssClass="@RowCss(item.Id == _selectedShift?.Id)" OnClick="@(() => SelectShift(item))">
+                                        <UiInline Strong="true">@item.ShiftCode</UiInline><UiInline>@item.NameAr</UiInline>
+                                        <UiInline>@($"{item.StartTime:HH:mm} - {item.EndTime:HH:mm}")</UiInline><UiInline>@($"{item.ScheduledMinutes} د")</UiInline>
+                                        <UiBadge Text="@(item.IsActive ? "نشط" : "غير نشط")" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" />
+                                    </UiClickableSurface>
+                                }
+                            </UiContainer>
+                        }
+                    </Body>
+                </UiDataGridPanel>
+            }
+            else if (_section == "assignments")
+            {
+                <UiCard Title="تعيين ورديات الموظفين" Subtitle="اختر الموظف من محرر الجانب لعرض تاريخه">
+                    @if (_assignmentEmployeeId is null) { <UiAlert Message="اختر موظفًا لعرض تعيينات الورديات." /> }
+                    else if (_assignments.Count == 0) { <UiAlert Message="لا توجد تعيينات وردية لهذا الموظف." /> }
+                    else
+                    {
+                        <UiContainer CssClass="hr-list-body hr-list-body--compact">
+                            @foreach (var item in _assignments)
+                            {
+                                <UiClickableSurface CssClass="@RowCss(item.Id == _selectedAssignment?.Id)" OnClick="@(() => SelectAssignment(item))">
+                                    <UiInline Strong="true">@item.ShiftCode</UiInline><UiInline>@item.ShiftName</UiInline>
+                                    <UiInline>@item.EffectiveFrom.ToString("yyyy-MM-dd")</UiInline><UiInline>@(item.EffectiveTo?.ToString("yyyy-MM-dd") ?? "مفتوح")</UiInline>
+                                    <UiBadge Text="@(item.IsActive ? "نشط" : "غير نشط")" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" />
+                                </UiClickableSurface>
+                            }
+                        </UiContainer>
+                    }
+                </UiCard>
+            }
+            else if (_section == "holidays")
+            {
+                <UiDataGridPanel Title="العطل الرسمية" Subtitle="@($"{_holidays.Count} عطلة")" HeaderLabels="@HolidayHeaders" HeaderCssClass="hr-holiday-header">
+                    <Body>
+                        @if (_holidays.Count == 0) { <UiAlert Message="لا توجد عطل معرفة." /> }
+                        else
+                        {
+                            <UiContainer CssClass="hr-list-body">
+                                @foreach (var item in _holidays)
+                                {
+                                    <UiClickableSurface CssClass="@RowCss(item.Id == _selectedHoliday?.Id)" OnClick="@(() => SelectHoliday(item))">
+                                        <UiInline Strong="true">@item.HolidayCode</UiInline><UiInline>@item.NameAr</UiInline><UiInline>@item.StartDate.ToString("yyyy-MM-dd")</UiInline><UiInline>@item.EndDate.ToString("yyyy-MM-dd")</UiInline>
+                                        <UiBadge Text="@(item.IsActive ? "نشط" : "غير نشط")" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" />
+                                    </UiClickableSurface>
+                                }
+                            </UiContainer>
+                        }
+                    </Body>
+                </UiDataGridPanel>
+            }
+            else if (_section == "attendance")
+            {
+                <UiContainer CssClass="hr-filter-row">
+                    <UiInputDate @bind-Value="_attendanceFrom" Label="من" Size="ControlSize.Small" />
+                    <UiInputDate @bind-Value="_attendanceTo" Label="إلى" Size="ControlSize.Small" />
+                    <UiButton Text="تطبيق" IconCssClass="fa-solid fa-filter" Size="ControlSize.Small" Variant="ButtonVariant.Secondary" OnClick="ApplyAttendanceFilterAsync" />
+                </UiContainer>
+                <UiDataGridPanel Title="الحضور" Subtitle="@($"{_attendance.Count} سجل")" HeaderLabels="@AttendanceHeaders" HeaderCssClass="hr-attendance-header">
+                    <Body>
+                        @if (_attendance.Count == 0) { <UiAlert Message="لا توجد سجلات حضور ضمن الفترة." /> }
+                        else
+                        {
+                            <UiContainer CssClass="hr-list-body">
+                                @foreach (var item in _attendance)
+                                {
+                                    <UiClickableSurface CssClass="@RowCss(item.Id == _selectedAttendance?.Id)" OnClick="@(() => SelectAttendance(item))">
+                                        <UiInline Strong="true">@item.EmployeeName</UiInline><UiInline>@item.AttendanceDate.ToString("yyyy-MM-dd")</UiInline><UiInline>@(item.ShiftName ?? "—")</UiInline>
+                                        <UiInline>@Time(item.CheckInAtUtc)</UiInline><UiInline>@Time(item.CheckOutAtUtc)</UiInline><UiInline>@($"{item.LateMinutes} / {item.OvertimeMinutes}")</UiInline>
+                                        <UiBadge Text="@AttendanceApprovalName(item.ApprovalStatus)" Tone="@ApprovalTone(item.ApprovalStatus)" />
+                                    </UiClickableSurface>
+                                }
+                            </UiContainer>
+                        }
+                    </Body>
+                </UiDataGridPanel>
+            }
+            else if (_section == "leave-types")
+            {
+                <UiDataGridPanel Title="أنواع الإجازات" Subtitle="@($"{_leaveTypes.Count} نوع")" HeaderLabels="@LeaveTypeHeaders" HeaderCssClass="hr-leave-type-header">
+                    <Body>
+                        @if (_leaveTypes.Count == 0) { <UiAlert Message="لا توجد أنواع إجازات." /> }
+                        else
+                        {
+                            <UiContainer CssClass="hr-list-body">
+                                @foreach (var item in _leaveTypes)
+                                {
+                                    <UiClickableSurface CssClass="@RowCss(item.Id == _selectedLeaveType?.Id)" OnClick="@(() => SelectLeaveType(item))">
+                                        <UiInline Strong="true">@item.LeaveTypeCode</UiInline><UiInline>@item.NameAr</UiInline><UiInline>@(item.IsPaid ? "مدفوعة" : "غير مدفوعة")</UiInline><UiInline>@item.AnnualEntitlementDays.ToString("0.##")</UiInline>
+                                        <UiBadge Text="@(item.IsActive ? "نشط" : "غير نشط")" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" />
+                                    </UiClickableSurface>
+                                }
+                            </UiContainer>
+                        }
+                    </Body>
+                </UiDataGridPanel>
+            }
+            else if (_section == "leave-requests")
+            {
+                <UiDataGridPanel Title="طلبات الإجازات" Subtitle="@($"{_leaveRequests.Count} طلب")" HeaderLabels="@LeaveRequestHeaders" HeaderCssClass="hr-leave-request-header">
+                    <Body>
+                        @if (_leaveRequests.Count == 0) { <UiAlert Message="لا توجد طلبات إجازة." /> }
+                        else
+                        {
+                            <UiContainer CssClass="hr-list-body">
+                                @foreach (var item in _leaveRequests)
+                                {
+                                    <UiClickableSurface CssClass="@RowCss(item.Id == _selectedLeaveRequest?.Id)" OnClick="@(() => SelectLeaveRequest(item))">
+                                        <UiInline Strong="true">@item.LeaveRequestCode</UiInline><UiInline>@item.EmployeeName</UiInline><UiInline>@item.LeaveTypeName</UiInline><UiInline>@($"{item.StartDate:yyyy-MM-dd} → {item.EndDate:yyyy-MM-dd}")</UiInline><UiInline>@item.RequestedDays.ToString("0.##")</UiInline>
+                                        <UiBadge Text="@WorkflowName(item.Status)" Tone="@WorkflowTone(item.Status)" />
+                                    </UiClickableSurface>
+                                }
+                            </UiContainer>
+                        }
+                    </Body>
+                </UiDataGridPanel>
+            }
+            else if (_section == "overtime")
+            {
+                <UiDataGridPanel Title="العمل الإضافي" Subtitle="@($"{_overtime.Count} سجل")" HeaderLabels="@OvertimeHeaders" HeaderCssClass="hr-overtime-header">
+                    <Body>
+                        @if (_overtime.Count == 0) { <UiAlert Message="لا توجد سجلات عمل إضافي." /> }
+                        else
+                        {
+                            <UiContainer CssClass="hr-list-body">
+                                @foreach (var item in _overtime)
+                                {
+                                    <UiClickableSurface CssClass="@RowCss(item.Id == _selectedOvertime?.Id)" OnClick="@(() => SelectOvertime(item))">
+                                        <UiInline Strong="true">@item.OvertimeCode</UiInline><UiInline>@item.EmployeeName</UiInline><UiInline>@item.WorkDate.ToString("yyyy-MM-dd")</UiInline><UiInline>@($"{item.RequestedMinutes} د")</UiInline><UiInline>@($"{item.ApprovedMinutes} د")</UiInline>
+                                        <UiBadge Text="@WorkflowName(item.Status)" Tone="@WorkflowTone(item.Status)" />
+                                    </UiClickableSurface>
+                                }
+                            </UiContainer>
+                        }
+                    </Body>
+                </UiDataGridPanel>
+            }
+            else if (_section == "loans")
+            {
+                <UiDataGridPanel Title="سلف الموظفين" Subtitle="@($"{_loans.Count} سلفة")" HeaderLabels="@LoanHeaders" HeaderCssClass="hr-loan-header">
+                    <Body>
+                        @if (_loans.Count == 0) { <UiAlert Message="لا توجد سلف موظفين." /> }
+                        else
+                        {
+                            <UiContainer CssClass="hr-list-body">
+                                @foreach (var item in _loans)
+                                {
+                                    <UiClickableSurface CssClass="@RowCss(item.Id == _selectedLoan?.Id)" OnClick="@(() => SelectLoanAsync(item))">
+                                        <UiInline Strong="true">@item.LoanCode</UiInline><UiInline>@item.EmployeeName</UiInline><UiInline>@Money(item.PrincipalAmount, item.CurrencyCode)</UiInline><UiInline>@Money(item.OutstandingAmount, item.CurrencyCode)</UiInline><UiInline>@item.InstallmentCount</UiInline>
+                                        <UiBadge Text="@LoanStatusName(item.Status)" Tone="@LoanTone(item.Status)" />
+                                    </UiClickableSurface>
+                                }
+                            </UiContainer>
+                        }
+                    </Body>
+                </UiDataGridPanel>
+                @if (_selectedLoan is not null && _selectedLoan.Installments.Count > 0)
+                {
+                    <UiCard Title="جدول الأقساط" Subtitle="@_selectedLoan.LoanCode">
+                        <UiContainer CssClass="hr-installments">
+                            @foreach (var installment in _selectedLoan.Installments)
+                            {
+                                <UiInline>@($"#{installment.InstallmentSequence} — {installment.DueDate:yyyy-MM-dd} — {Money(installment.Amount, _selectedLoan.CurrencyCode)} — {InstallmentStatusName(installment.Status)}")</UiInline>
+                            }
+                        </UiContainer>
+                    </UiCard>
+                }
+            }
+            else if (_section == "adjustments")
+            {
+                <UiDataGridPanel Title="تعديلات الموظفين" Subtitle="@($"{_adjustments.Count} تعديل")" HeaderLabels="@AdjustmentHeaders" HeaderCssClass="hr-adjustment-header">
+                    <Body>
+                        @if (_adjustments.Count == 0) { <UiAlert Message="لا توجد تعديلات موظفين." /> }
+                        else
+                        {
+                            <UiContainer CssClass="hr-list-body">
+                                @foreach (var item in _adjustments)
+                                {
+                                    <UiClickableSurface CssClass="@RowCss(item.Id == _selectedAdjustment?.Id)" OnClick="@(() => SelectAdjustment(item))">
+                                        <UiInline Strong="true">@item.AdjustmentCode</UiInline><UiInline>@item.EmployeeName</UiInline><UiInline>@item.ComponentName</UiInline><UiInline>@item.EffectiveDate.ToString("yyyy-MM-dd")</UiInline><UiInline>@Money(item.Amount, item.CurrencyCode)</UiInline>
+                                        <UiBadge Text="@WorkflowName(item.Status)" Tone="@WorkflowTone(item.Status)" />
+                                    </UiClickableSurface>
+                                }
+                            </UiContainer>
+                        }
+                    </Body>
+                </UiDataGridPanel>
+            }
+            else if (_section == "settings")
+            {
+                <UiCard Title="إعدادات الموارد البشرية" Subtitle="تستخدم في احتساب يوم العمل وسنة الإجازة">
+                    <UiContainer CssClass="hr-settings-card">
+                        <UiInputText @bind-Value="_settingsTimeZoneId" Label="المنطقة الزمنية" Placeholder="Asia/Aden" Disabled="@(!_settingsEditing)" Size="ControlSize.Small" />
+                        <UiInputText @bind-Value="_settingsLeaveYearMonthText" Label="شهر بداية سنة الإجازة" InputMode="numeric" Disabled="@(!_settingsEditing)" Size="ControlSize.Small" />
+                        <UiCheckbox @bind-Value="_settingsRequireAttendanceApproval" Label="يتطلب الحضور اعتمادًا" Disabled="@(!_settingsEditing)" />
+                    </UiContainer>
+                </UiCard>
+            }
+        </UiContainer>
+    </Content>
+
+    <Aside>
+        @if (ShowAside)
+        {
+            <UiContainer CssClass="hr-operations-aside">
+                @if (_section == "shifts")
+                {
+                    <UiCard Title="@EditorTitle" Subtitle="@(_selectedShift?.ShiftCode)">
+                        <UiContainer CssClass="hr-editor">
+                            <UiInputText Value="@(_selectedShift?.ShiftCode ?? "سيولد تلقائيًا")" Label="كود الوردية" ReadOnly="true" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_shiftNameAr" Label="اسم الوردية" Required="true" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_shiftNameEn" Label="الاسم الإنجليزي" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_shiftStartText" Label="وقت البداية HH:mm" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_shiftEndText" Label="وقت النهاية HH:mm" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_shiftBreakText" Label="دقائق الاستراحة" InputMode="numeric" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_shiftGraceLateText" Label="سماح التأخير بالدقائق" InputMode="numeric" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_shiftGraceEarlyText" Label="سماح الانصراف المبكر" InputMode="numeric" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_shiftDaysMaskText" Label="قناع أيام العمل 1-127" InputMode="numeric" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiContainer CssClass="hr-editor__checks"><UiCheckbox @bind-Value="_shiftFlexible" Label="وردية مرنة" Disabled="@(!IsEditing)" /><UiCheckbox @bind-Value="_shiftActive" Label="نشطة" Disabled="@(!IsEditing)" /></UiContainer>
+                            <UiInputText @bind-Value="_shiftNotes" Label="ملاحظات" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                        </UiContainer>
+                    </UiCard>
+                }
+                else if (_section == "assignments")
+                {
+                    <UiCard Title="@EditorTitle" Subtitle="تاريخ وردية الموظف">
+                        <UiContainer CssClass="hr-editor">
+                            <UiLookup Value="@AssignmentEmployeeValue" ValueChanged="SetAssignmentEmployeeAsync" SelectedItem="@AssignmentEmployeeItem" SearchAsync="SearchEmployeesAsync" Label="الموظف" Placeholder="ابحث بالكود أو الاسم..." Disabled="@IsEditing" MinimumSearchLength="0" />
+                            <UiSelect Value="@AssignmentShiftValue" ValueChanged="SetAssignmentShiftAsync" Label="الوردية" Options="@ShiftOptions" Disabled="@(!IsEditing)" Required="true" Size="ControlSize.Small" />
+                            <UiInputDate @bind-Value="_assignmentFrom" Label="من تاريخ" Disabled="@(!IsEditing)" Required="true" Size="ControlSize.Small" />
+                            <UiInputDate @bind-Value="_assignmentTo" Label="إلى تاريخ" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiCheckbox @bind-Value="_assignmentActive" Label="نشط" Disabled="@(!IsEditing)" />
+                        </UiContainer>
+                    </UiCard>
+                }
+                else if (_section == "holidays")
+                {
+                    <UiCard Title="@EditorTitle" Subtitle="@(_selectedHoliday?.HolidayCode)">
+                        <UiContainer CssClass="hr-editor">
+                            <UiInputText Value="@(_selectedHoliday?.HolidayCode ?? "سيولد تلقائيًا")" Label="كود العطلة" ReadOnly="true" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_holidayNameAr" Label="اسم العطلة" Required="true" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_holidayNameEn" Label="الاسم الإنجليزي" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputDate @bind-Value="_holidayFrom" Label="من تاريخ" Required="true" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputDate @bind-Value="_holidayTo" Label="إلى تاريخ" Required="true" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiCheckbox @bind-Value="_holidayPaid" Label="عطلة مدفوعة" Disabled="@(!IsEditing)" />
+                            <UiCheckbox @bind-Value="_holidayActive" Label="نشطة" Disabled="@(!IsEditing)" />
+                            <UiInputText @bind-Value="_holidayNotes" Label="ملاحظات" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                        </UiContainer>
+                    </UiCard>
+                }
+                else if (_section == "attendance")
+                {
+                    <UiCard Title="@EditorTitle" Subtitle="@(_selectedAttendance?.EmployeeName)">
+                        <UiContainer CssClass="hr-editor">
+                            <UiLookup Value="@AttendanceEmployeeValue" ValueChanged="SetAttendanceEmployeeAsync" SelectedItem="@AttendanceEmployeeItem" SearchAsync="SearchEmployeesAsync" Label="الموظف" Disabled="@(!IsEditing || _selectedAttendance is not null)" MinimumSearchLength="0" />
+                            <UiInputDate @bind-Value="_attendanceDate" Label="تاريخ الحضور" Disabled="@(!IsEditing || _selectedAttendance is not null)" Required="true" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_attendanceCheckInText" Label="الدخول UTC (yyyy-MM-dd HH:mm)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_attendanceCheckOutText" Label="الخروج UTC (yyyy-MM-dd HH:mm)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_attendanceNotes" Label="ملاحظات" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            @if (_selectedAttendance is not null) { <UiAlert Message="@($"العمل: {_selectedAttendance.WorkedMinutes} د، التأخير: {_selectedAttendance.LateMinutes} د، الإضافي الخام: {_selectedAttendance.OvertimeMinutes} د")" Tone="AlertTone.Info" /> }
+                        </UiContainer>
+                    </UiCard>
+                }
+                else if (_section == "leave-types")
+                {
+                    <UiCard Title="@EditorTitle" Subtitle="@(_selectedLeaveType?.LeaveTypeCode)">
+                        <UiContainer CssClass="hr-editor">
+                            <UiInputText Value="@(_selectedLeaveType?.LeaveTypeCode ?? "سيولد تلقائيًا")" Label="الكود" ReadOnly="true" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_leaveTypeNameAr" Label="اسم النوع" Required="true" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_leaveTypeNameEn" Label="الاسم الإنجليزي" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiSelect Value="@_leaveAccrualText" ValueChanged="SetLeaveAccrualAsync" Label="طريقة الاستحقاق" Options="@LeaveAccrualOptions" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiSelect Value="@_leaveCountingText" ValueChanged="SetLeaveCountingAsync" Label="احتساب الأيام" Options="@LeaveCountingOptions" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_leaveEntitlementText" Label="الاستحقاق السنوي" InputMode="decimal" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_leaveCarryForwardText" Label="أقصى ترحيل" InputMode="decimal" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiCheckbox @bind-Value="_leavePaid" Label="مدفوعة" Disabled="@(!IsEditing)" />
+                            <UiCheckbox @bind-Value="_leaveRequiresBalance" Label="تتطلب رصيدًا" Disabled="@(!IsEditing)" />
+                            <UiCheckbox @bind-Value="_leaveProrate" Label="توزيع نسبي عند التوظيف" Disabled="@(!IsEditing)" />
+                            <UiCheckbox @bind-Value="_leaveEncashableOnTermination" Label="قابلة للتسوية عند إنهاء الخدمة" Disabled="@(!IsEditing)" />
+                            <UiCheckbox @bind-Value="_leaveTypeActive" Label="نشط" Disabled="@(!IsEditing)" />
+                        </UiContainer>
+                    </UiCard>
+                }
+                else if (_section == "leave-requests")
+                {
+                    <UiCard Title="@EditorTitle" Subtitle="@(_selectedLeaveRequest?.LeaveRequestCode)">
+                        <UiContainer CssClass="hr-editor">
+                            <UiLookup Value="@LeaveEmployeeValue" ValueChanged="SetLeaveEmployeeAsync" SelectedItem="@LeaveEmployeeItem" SearchAsync="SearchEmployeesAsync" Label="الموظف" Disabled="@(!IsEditing || _selectedLeaveRequest is not null)" MinimumSearchLength="0" />
+                            <UiSelect Value="@LeaveTypeValue" ValueChanged="SetLeaveRequestTypeAsync" Label="نوع الإجازة" Options="@ActiveLeaveTypeOptions" Disabled="@(!IsEditing || _selectedLeaveRequest is not null)" Required="true" Size="ControlSize.Small" />
+                            <UiInputDate @bind-Value="_leaveRequestFrom" Label="من" Disabled="@(!IsEditing)" Required="true" Size="ControlSize.Small" />
+                            <UiInputDate @bind-Value="_leaveRequestTo" Label="إلى" Disabled="@(!IsEditing)" Required="true" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_leaveRequestReason" Label="السبب" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            @if (_selectedLeaveRequest is not null) { <UiAlert Message="@($"الأيام المطلوبة: {_selectedLeaveRequest.RequestedDays:0.##} — المعتمدة: {_selectedLeaveRequest.ApprovedDays?.ToString("0.##") ?? "—"}")" Tone="AlertTone.Info" /> }
+                        </UiContainer>
+                    </UiCard>
+                }
+                else if (_section == "overtime")
+                {
+                    <UiCard Title="@EditorTitle" Subtitle="@(_selectedOvertime?.OvertimeCode)">
+                        <UiContainer CssClass="hr-editor">
+                            <UiLookup Value="@OvertimeEmployeeValue" ValueChanged="SetOvertimeEmployeeAsync" SelectedItem="@OvertimeEmployeeItem" SearchAsync="SearchEmployeesAsync" Label="الموظف" Disabled="@(!IsEditing || _selectedOvertime is not null)" MinimumSearchLength="0" />
+                            <UiInputDate @bind-Value="_overtimeDate" Label="تاريخ العمل" Disabled="@(!IsEditing || _selectedOvertime is not null)" Required="true" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_overtimeMinutesText" Label="الدقائق المطلوبة" InputMode="numeric" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_overtimeMultiplierText" Label="المعامل" InputMode="decimal" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_overtimeReason" Label="السبب" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                        </UiContainer>
+                    </UiCard>
+                }
+                else if (_section == "loans")
+                {
+                    <UiCard Title="@EditorTitle" Subtitle="@(_selectedLoan?.LoanCode)">
+                        <UiContainer CssClass="hr-editor">
+                            <UiLookup Value="@LoanEmployeeValue" ValueChanged="SetLoanEmployeeAsync" SelectedItem="@LoanEmployeeItem" SearchAsync="SearchEmployeesAsync" Label="الموظف" Disabled="@(!IsEditing || _selectedLoan is not null)" MinimumSearchLength="0" />
+                            <UiInputDate @bind-Value="_loanDate" Label="تاريخ السلفة" Disabled="@(!IsEditing || _selectedLoan is not null)" Required="true" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_loanPrincipalText" Label="أصل السلفة" InputMode="decimal" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_loanCountText" Label="عدد الأقساط" InputMode="numeric" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputDate @bind-Value="_loanFirstInstallment" Label="أول قسط" Disabled="@(!IsEditing)" Required="true" Size="ControlSize.Small" />
+                            <UiSelect Value="@_loanRepaymentModeText" ValueChanged="SetLoanRepaymentModeAsync" Label="طريقة السداد" Options="@LoanRepaymentOptions" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_loanReason" Label="السبب" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            @if (_selectedLoan?.Status is 3 or 4)
+                            {
+                                <UiSelect Value="@_loanPaymentMethodText" ValueChanged="SetLoanPaymentMethodAsync" Label="طريقة صرف السلفة" Options="@PaymentMethodOptions" Size="ControlSize.Small" />
+                                @if (_loanPaymentMethodText == "1") { <UiSelect @bind-Value="_loanCashAccountValue" Label="حساب الصندوق" Options="@CashAccountOptions" Size="ControlSize.Small" /> }
+                                else { <UiSelect @bind-Value="_loanBankAccountValue" Label="الحساب البنكي" Options="@BankAccountOptions" Size="ControlSize.Small" /> }
+                            }
+                        </UiContainer>
+                    </UiCard>
+                }
+                else if (_section == "adjustments")
+                {
+                    <UiCard Title="@EditorTitle" Subtitle="@(_selectedAdjustment?.AdjustmentCode)">
+                        <UiContainer CssClass="hr-editor">
+                            <UiLookup Value="@AdjustmentEmployeeValue" ValueChanged="SetAdjustmentEmployeeAsync" SelectedItem="@AdjustmentEmployeeItem" SearchAsync="SearchEmployeesAsync" Label="الموظف" Disabled="@(!IsEditing || _selectedAdjustment is not null)" MinimumSearchLength="0" />
+                            <UiSelect Value="@AdjustmentComponentValue" ValueChanged="SetAdjustmentComponentAsync" Label="مكون الراتب" Options="@SalaryComponentOptions" Disabled="@(!IsEditing || _selectedAdjustment is not null)" Size="ControlSize.Small" />
+                            <UiInputDate @bind-Value="_adjustmentDate" Label="تاريخ الاستحقاق" Disabled="@(!IsEditing || _selectedAdjustment is not null)" Required="true" Size="ControlSize.Small" />
+                            <UiSelect Value="@_adjustmentTypeText" ValueChanged="SetAdjustmentTypeAsync" Label="النوع" Options="@AdjustmentTypeOptions" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_adjustmentAmountText" Label="المبلغ" InputMode="decimal" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_adjustmentReason" Label="السبب" Required="true" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                        </UiContainer>
+                    </UiCard>
+                }
+            </UiContainer>
+        }
+    </Aside>
+</UiWorkspaceLayout>

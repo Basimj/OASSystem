@@ -1,0 +1,11 @@
+namespace OAS.Contracts.Features.Employees.Leave;
+public sealed record LeaveTypeDto(Guid Id,string LeaveTypeCode,string NameAr,string? NameEn,bool IsPaid,bool RequiresBalance,byte AccrualMethod,byte DayCountingMethod,decimal AnnualEntitlementDays,decimal MaximumCarryForwardDays,bool ProrateOnHire,bool IsActive,string RowVersion,bool IsEncashableOnTermination=false);
+public sealed record CreateLeaveTypeRequest(string NameAr,string? NameEn,bool IsPaid,bool RequiresBalance,byte AccrualMethod,byte DayCountingMethod,decimal AnnualEntitlementDays,decimal MaximumCarryForwardDays,bool ProrateOnHire,bool IsActive=true,bool IsEncashableOnTermination=false);
+public sealed record UpdateLeaveTypeRequest(string NameAr,string? NameEn,bool IsPaid,bool RequiresBalance,byte AccrualMethod,byte DayCountingMethod,decimal AnnualEntitlementDays,decimal MaximumCarryForwardDays,bool ProrateOnHire,bool IsActive,string RowVersion,bool IsEncashableOnTermination=false);
+public sealed record SetLeaveTypeStatusRequest(bool IsActive,string RowVersion);
+public sealed record EmployeeLeaveBalanceDto(Guid Id,Guid EmployeeId,Guid LeaveTypeId,string LeaveTypeCode,string LeaveTypeName,short LeaveYear,decimal OpeningBalanceDays,decimal AccruedDays,decimal UsedDays,decimal AdjustmentDays,decimal AvailableDays,string RowVersion);
+public sealed record SetEmployeeLeaveBalanceRequest(Guid LeaveTypeId,short LeaveYear,decimal OpeningBalanceDays,decimal AccruedDays,decimal AdjustmentDays,string? RowVersion);
+public sealed record LeaveRequestDto(Guid Id,string LeaveRequestCode,Guid EmployeeId,string EmployeeCode,string EmployeeName,Guid LeaveTypeId,string LeaveTypeCode,string LeaveTypeName,DateOnly StartDate,DateOnly EndDate,decimal RequestedDays,decimal? ApprovedDays,byte Status,string? Reason,bool BalanceOverrideUsed,string? BalanceOverrideReason,string RowVersion);
+public sealed record CreateLeaveRequestRequest(Guid EmployeeId,Guid LeaveTypeId,DateOnly StartDate,DateOnly EndDate,string? Reason);
+public sealed record UpdateLeaveRequestRequest(DateOnly StartDate,DateOnly EndDate,string? Reason,string RowVersion);
+public sealed record LeaveTransitionRequest(string RowVersion,string? Reason=null,decimal? ApprovedDays=null,bool OverrideBalance=false,string? OverrideReason=null);

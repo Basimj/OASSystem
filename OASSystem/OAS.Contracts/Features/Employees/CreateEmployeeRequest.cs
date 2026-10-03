@@ -15,4 +15,8 @@ public sealed record CreateEmployeeRequest(
     bool IsCommissionEligible,
     bool IsActive = true,
     Guid? UserAccountId = null,
-    string? EmployeeCode = null);
+    string? EmployeeCode = null,
+    Guid? DepartmentId = null,
+    Guid? ManagerEmployeeId = null,
+    bool IsSalesperson = false,
+    bool IsTechnician = false);

@@ -72,6 +72,14 @@ public static class DependencyInjection
         services.AddSalesApplication();
         services.AddScoped<OAS.Application.Accounting.Spreadsheets.AccountingSpreadsheetService>();
         services.AddScoped<OAS.Application.Inventory.Spreadsheets.InventorySpreadsheetService>();
+        services.TryAddScoped<OAS.Application.Features.Employees.Services.EmployeeHierarchyValidator>();
+        services.TryAddScoped<OAS.Application.Features.Employees.Services.DepartmentHierarchyValidator>();
+        services.TryAddScoped<OAS.Application.Features.Employees.Services.AttendanceScheduleService>();
+        services.TryAddScoped<OAS.Application.Features.Employees.Services.LeaveDayCalculationService>();
+        services.TryAddScoped<OAS.Application.Features.Employees.Abstractions.IEmployeePayrollCalculationService, OAS.Application.Features.Employees.Payroll.Calculation.EmployeePayrollCalculationService>();
+        services.TryAddScoped<OAS.Application.Features.Employees.Abstractions.IEndOfServiceCalculationPolicy, OAS.Application.Features.Employees.EndOfService.ManualEndOfServiceCalculationPolicy>();
+        services.AddScoped<IPaymentAllocationTargetValidator, OAS.Application.Features.Employees.Payroll.Payments.EmployeePayrollPaymentAllocationTargetValidator>();
+        services.AddScoped<IPaymentAllocationTargetValidator, OAS.Application.Features.Employees.EndOfService.Payments.EndOfServicePaymentAllocationTargetValidator>();
         return services;
     }
 

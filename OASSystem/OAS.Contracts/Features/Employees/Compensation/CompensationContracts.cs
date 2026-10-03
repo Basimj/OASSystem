@@ -1,0 +1,11 @@
+namespace OAS.Contracts.Features.Employees.Compensation;
+
+public sealed record SalaryComponentDto(Guid Id, string ComponentCode, string NameAr, string? NameEn, byte ComponentType, byte CalculationMethod, bool IsBasicSalary, bool IsRecurring, bool IsTaxable, bool IsActive, string? DebitPostingRole, string? CreditPostingRole, int DisplayOrder, string? Notes, string RowVersion);
+public sealed record CreateSalaryComponentRequest(string NameAr, string? NameEn, byte ComponentType, byte CalculationMethod, bool IsBasicSalary, bool IsRecurring, bool IsTaxable, bool IsActive, string? DebitPostingRole, string? CreditPostingRole, int DisplayOrder, string? Notes);
+public sealed record UpdateSalaryComponentRequest(string NameAr, string? NameEn, byte ComponentType, byte CalculationMethod, bool IsBasicSalary, bool IsRecurring, bool IsTaxable, bool IsActive, string? DebitPostingRole, string? CreditPostingRole, int DisplayOrder, string? Notes, string RowVersion);
+public sealed record SalaryStructureLineRequest(Guid SalaryComponentId, decimal Amount, decimal? Percentage);
+public sealed record EmployeeSalaryStructureLineDto(Guid Id, Guid SalaryComponentId, string ComponentCodeSnapshot, string ComponentNameSnapshot, byte ComponentTypeSnapshot, byte CalculationMethodSnapshot, bool IsBasicSalarySnapshot, decimal Amount, decimal? Percentage, string? DebitPostingRoleSnapshot, string? CreditPostingRoleSnapshot);
+public sealed record EmployeeSalaryStructureDto(Guid Id, string StructureCode, Guid EmployeeId, Guid? ContractId, Guid CurrencyId, string CurrencyCode, DateOnly EffectiveFrom, DateOnly? EffectiveTo, byte Status, string? Notes, string? ApprovedBy, DateTimeOffset? ApprovedAtUtc, IReadOnlyList<EmployeeSalaryStructureLineDto> Lines, string RowVersion);
+public sealed record CreateEmployeeSalaryStructureRequest(Guid? ContractId, Guid CurrencyId, DateOnly EffectiveFrom, DateOnly? EffectiveTo, string? Notes, IReadOnlyList<SalaryStructureLineRequest> Lines);
+public sealed record UpdateEmployeeSalaryStructureRequest(Guid? ContractId, Guid CurrencyId, DateOnly EffectiveFrom, DateOnly? EffectiveTo, string? Notes, IReadOnlyList<SalaryStructureLineRequest> Lines, string RowVersion);
+public sealed record SalaryStructureLifecycleRequest(string RowVersion);

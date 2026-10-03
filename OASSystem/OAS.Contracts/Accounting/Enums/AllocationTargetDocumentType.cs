@@ -4,5 +4,7 @@ public enum AllocationTargetDocumentType : byte
     SalesInvoice = 1,
     PurchaseInvoice = 2,
     DebitAdjustment = 3,
-    CreditAdjustment = 4
+    CreditAdjustment = 4,
+    EmployeePayroll = 5,
+    EndOfServiceSettlement = 6
 }

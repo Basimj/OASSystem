@@ -1,0 +1,70 @@
+@using OAS.Contracts.Features.Employees.Contracts
+
+<UiContainer CssClass="employee-hr-panel" Direction="rtl">
+    <UiContainer CssClass="employee-hr-panel__grid">
+        <UiDataGridPanel Title="عقود الموظف"
+                         Subtitle="@($"{_items.Count} عقد")"
+                         HeaderLabels="@ContractGridHeaders"
+                         HeaderCssClass="employee-contract-grid-header">
+            <Body>
+                @if (_loading)
+                {
+                    <UiAlert Message="جاري تحميل العقود..." />
+                }
+                else if (_items.Count == 0)
+                {
+                    <UiAlert Message="لا توجد عقود لهذا الموظف." />
+                }
+                else
+                {
+                    <UiContainer CssClass="employee-contract-grid-body">
+                        @foreach (var item in _items)
+                        {
+                            <UiClickableSurface CssClass="@(item.Id == _selected?.Id ? "employee-contract-grid-row employee-contract-grid-row--selected" : "employee-contract-grid-row")"
+                                                OnClick="@(() => SelectItem(item))">
+                                <UiInline Strong="true">@item.ContractCode</UiInline>
+                                <UiInline>@TypeName(item.ContractType)</UiInline>
+                                <UiInline>@item.StartDate.ToString("yyyy/MM/dd")</UiInline>
+                                <UiInline>@item.CurrencyCode</UiInline>
+                                <UiBadge Text="@StatusName(item.Status)" Tone="@StatusTone(item.Status)" />
+                            </UiClickableSurface>
+                        }
+                    </UiContainer>
+                }
+            </Body>
+        </UiDataGridPanel>
+        <UiCard Title="@EditorTitle" Subtitle="@_selected?.ContractCode">
+            @if (_mode == EditorMode.Empty)
+            {
+                <UiAlert Message="اختر عقدًا أو استخدم زر جديد من شريط الإجراءات." />
+            }
+            else
+            {
+                <UiContainer CssClass="employee-contract-editor">
+                    <UiInputText Value="@(_selected?.ContractCode ?? "سيولد تلقائيًا")" Label="رقم العقد" ReadOnly="true" Size="ControlSize.Small" />
+                    <UiSelect Value="@_contractTypeValue" ValueChanged="SetContractTypeAsync" Label="نوع العقد" Options="@ContractTypeOptions" Disabled="@(!IsEditing)" Required="true" Size="ControlSize.Small" />
+                    <UiInputDate @bind-Value="_startDate" Label="تاريخ البداية" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                    <UiInputDate @bind-Value="_endDate" Label="تاريخ النهاية" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                    <UiInputDate @bind-Value="_probationEndDate" Label="نهاية فترة التجربة" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                    <UiSelect Value="@_currencyValue" ValueChanged="SetCurrencyAsync" Label="العملة" Placeholder="اختر العملة" Options="@CurrencyOptions" Disabled="@(!IsEditing)" Required="true" Size="ControlSize.Small" />
+                    <UiInputText @bind-Value="_workingHoursText" Label="ساعات العمل اليومية" InputMode="decimal" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                    <UiInputText @bind-Value="_workingDaysText" Label="أيام العمل الأسبوعية" InputMode="decimal" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                    <UiInputText @bind-Value="_notes" Label="ملاحظات" MaxLength="1000" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                    @if (_selected is not null && _selected.Status == 2 && !IsEditing)
+                    {
+                        <UiInputDate @bind-Value="_terminationEffectiveDate" Label="آخر يوم عمل" Size="ControlSize.Small" />
+                        <UiInputText @bind-Value="_terminationReason" Label="سبب إنهاء العقد" MaxLength="500" Size="ControlSize.Small" />
+                    }
+                    @if (_selected is not null && _selected.Status == 4)
+                    {
+                        <UiInputText Value="@(_selected.TerminationEffectiveDate?.ToString("yyyy/MM/dd") ?? "—")" Label="آخر يوم عمل" ReadOnly="true" Size="ControlSize.Small" />
+                        @if (!string.IsNullOrWhiteSpace(_selected.TerminationReason))
+                        {
+                            <UiAlert Tone="AlertTone.Warning" Message="@($"سبب الإنهاء: {_selected.TerminationReason}")" />
+                        }
+                    }
+                </UiContainer>
+            }
+        </UiCard>
+    </UiContainer>
+</UiContainer>

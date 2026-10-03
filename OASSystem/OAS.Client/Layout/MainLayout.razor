@@ -1,4 +1,4 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 
 @inject IAuthClientService AuthService
 @inject IProfileClientService ProfileService
@@ -100,10 +100,13 @@
         new("reports", "التقارير", "/reports", "fa-regular fa-chart-bar"),
         new("employees", "الموظفون", "/employees", "fa-solid fa-user-tie"),
         new("departments", "الأقسام", "/departments", "fa-solid fa-sitemap"),
+        new("hr-operations", "شؤون الموظفين", "/employees/hr", "fa-solid fa-calendar-check", AdministratorOnly: true),
+        new("payroll", "الرواتب", "/employees/payroll", "fa-solid fa-file-invoice-dollar", AdministratorOnly: true),
         new("accounting-suppliers", "الموردون", "/accounting/suppliers", "fa-solid fa-truck-field"),
         new("users", "المستخدمون", "/identity/users", "fa-solid fa-users", AdministratorOnly: true),
         new("roles", "أنواع المستخدمين", "/identity/roles", "fa-solid fa-user-shield", AdministratorOnly: true),
         new("job-titles", "المسميات الوظيفية", "/employees/job-titles", "fa-solid fa-briefcase", AdministratorOnly: true),
+        new("salary-components", "مكونات الرواتب", "/employees/salary-components", "fa-solid fa-money-check-dollar", AdministratorOnly: true),
         new("settings", "الإعدادات", "/settings", "fa-solid fa-gear")
     ];
 
@@ -142,7 +145,7 @@
             "inventory-stock-counts"
         ]),
         new("purchasing", "المشتريات", "fa-solid fa-bag-shopping", ["purchases", "purchasing-requests", "purchasing-orders", "purchasing-receipts", "purchasing-invoices", "purchasing-catalog"]),
-        new("administration", "الإدارة", "fa-solid fa-people-group", ["employees", "departments", "users", "roles", "job-titles"]),
+        new("administration", "الإدارة", "fa-solid fa-people-group", ["employees", "departments", "hr-operations", "salary-components", "payroll", "users", "roles", "job-titles"]),
         new("reports-group", "التقارير", "fa-solid fa-chart-line", ["reports"]),
         new("system", "النظام", "fa-solid fa-sliders", ["settings"], DefaultExpanded: false)
     ];

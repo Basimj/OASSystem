@@ -493,4 +493,52 @@ public sealed class OasApiClient(
         return await response.Content.ReadAsByteArrayAsync(
             cancellationToken);
     }
+    public async Task<ApiCallResult<T>> UploadMultipartResultAsync<T>(
+        string uri,
+        Stream fileStream,
+        string fileName,
+        string contentType,
+        IReadOnlyDictionary<string, string?> fields,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var request = CreateRequest(HttpMethod.Post, uri);
+            using var content = new MultipartFormDataContent();
+
+            foreach (var field in fields)
+            {
+                if (field.Value is not null)
+                    content.Add(new StringContent(field.Value), field.Key);
+            }
+
+            var fileContent = new StreamContent(fileStream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+            content.Add(fileContent, "file", fileName);
+            request.Content = content;
+
+            using var response = await httpClient.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+                return ApiCallResult<T>.Failure(await ReadErrorAsync(response, cancellationToken));
+
+            if (response.StatusCode == System.Net.HttpStatusCode.NoContent)
+                return ApiCallResult<T>.Success(default);
+
+            var value = await response.Content.ReadFromJsonAsync<T>(cancellationToken: cancellationToken);
+            return ApiCallResult<T>.Success(value);
+        }
+        catch (HttpRequestException)
+        {
+            return ApiCallResult<T>.Failure(new ApiError { Status = 0, Code = "network_error", Message = "Unable to connect to the server." });
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return ApiCallResult<T>.Failure(new ApiError { Status = 0, Code = "network_error", Message = "The request timed out before the server responded." });
+        }
+        catch (JsonException)
+        {
+            return ApiCallResult<T>.Failure(new ApiError { Status = 0, Code = "response_parse_error", Message = "The server returned an invalid response." });
+        }
+    }
+
 }

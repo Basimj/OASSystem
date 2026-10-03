@@ -65,6 +65,36 @@ public static class DocumentFieldCatalog
                 new("Signatures.Beneficiary", "توقيع المستفيد", "التواقيع"),
                 new("Signatures.Approval", "توقيع الاعتماد", "التواقيع")
             ],
+            ["Payslip"] =
+            [
+                new("PayslipNumber", "رقم القسيمة", "القسيمة"),
+                new("PeriodCode", "فترة الرواتب", "القسيمة"),
+                new("EmployeeCode", "كود الموظف", "الموظف"),
+                new("EmployeeName", "اسم الموظف", "الموظف"),
+                new("Department", "القسم", "الموظف"),
+                new("JobTitle", "المسمى الوظيفي", "الموظف"),
+                new("CoverageFrom", "بداية التغطية", "الفترة"),
+                new("CoverageTo", "نهاية التغطية", "الفترة"),
+                new("CurrencyCode", "العملة", "الإجماليات"),
+                new("ConfiguredBasicSalary", "الراتب الأساسي المهيأ", "الإجماليات"),
+                new("CalculatedBasicSalary", "الراتب الأساسي المحتسب", "الإجماليات"),
+                new("GrossEarnings", "إجمالي الاستحقاقات", "الإجماليات"),
+                new("TotalDeductions", "إجمالي الخصومات", "الإجماليات"),
+                new("TotalEmployerContributions", "مساهمات صاحب العمل", "الإجماليات"),
+                new("NetPay", "صافي الراتب", "الإجماليات"),
+                new("PaidAmount", "المدفوع", "الدفع"),
+                new("OutstandingAmount", "المتبقي", "الدفع"),
+                new("PaymentStatus", "حالة الدفع", "الدفع"),
+                new("JournalNumber", "رقم القيد", "المحاسبة"),
+                new("PaymentReferences", "مراجع الدفع", "الدفع"),
+                new("Company.Name", "اسم المنشأة", "المنشأة"),
+                new("Company.Address", "عنوان المنشأة", "المنشأة"),
+                new("Company.Phone", "هاتف المنشأة", "المنشأة"),
+                new("PrintedAt", "وقت الطباعة", "الطباعة"),
+                new("Signatures.Employee", "توقيع الموظف", "التواقيع"),
+                new("Signatures.Accountant", "توقيع المحاسب", "التواقيع"),
+                new("Signatures.Approval", "توقيع الاعتماد", "التواقيع")
+            ],
             ["Expense"] =
             [
                 new("ExpenseNumber", "رقم المصروف"), new("ExpenseDate", "التاريخ"),

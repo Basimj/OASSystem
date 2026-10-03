@@ -1,0 +1,400 @@
+@page "/employees/payroll"
+@attribute [Authorize(Roles = "Administrator")]
+@using OAS.Contracts.Features.Employees.Payroll
+@using OAS.Contracts.Features.Employees.EndOfService
+
+<PageTitle>الرواتب</PageTitle>
+
+<UiWorkspaceLayout ShowAside="true" ShowFilters="false">
+    <Actions>
+        <UiWorkspaceActionBar>
+            <UiButton Text="جديد" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" Disabled="@(!CanNew)" OnClick="NewAsync" />
+            <UiButton Text="تعديل" IconCssClass="fa-solid fa-pen" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(!CanEdit)" OnClick="EditAsync" />
+            <UiButton Text="حفظ" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small" Disabled="@(!CanSave)" Loading="@_saving" OnClick="SaveAsync" />
+            <UiButton Text="إلغاء" IconCssClass="fa-solid fa-xmark" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Disabled="@(!CanCancelEdit)" OnClick="CancelEditAsync" />
+
+            @if (_section == "runs" && _selectedRun is not null)
+            {
+                @if (_selectedRun.Status is 1 or 2)
+                {
+                    <UiButton Text="فحص قبل الاحتساب" IconCssClass="fa-solid fa-list-check" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="PrevalidateRunAsync" />
+                    <UiButton Text="احتساب" IconCssClass="fa-solid fa-calculator" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="CalculateRunAsync" />
+                }
+                @if (_selectedEmployeePayroll is not null && _selectedEmployeePayroll.Status == 1)
+                {
+                    <UiButton Text="مراجعة الموظف" IconCssClass="fa-solid fa-user-check" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="ReviewEmployeeAsync" />
+                }
+                @if (_selectedRun.Status == 2)
+                {
+                    <UiButton Text="مراجعة الكشف" IconCssClass="fa-solid fa-magnifying-glass-chart" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="ReviewRunAsync" />
+                }
+                @if (_selectedRun.Status == 3)
+                {
+                    <UiButton Text="اعتماد" IconCssClass="fa-solid fa-circle-check" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="ApproveRunAsync" />
+                }
+                @if (_selectedRun.Status is 3 or 4)
+                {
+                    <UiButton Text="إعادة فتح" IconCssClass="fa-solid fa-rotate-left" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="ReopenRunAsync" />
+                }
+                @if (_selectedRun.Status == 4)
+                {
+                    <UiButton Text="ترحيل" IconCssClass="fa-solid fa-book" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="PostRunAsync" />
+                }
+                @if (_selectedRun.Status == 5)
+                {
+                    <UiButton Text="إغلاق" IconCssClass="fa-solid fa-lock" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="CloseRunAsync" />
+                }
+                @if (_selectedRun.Status is 1 or 2 or 3)
+                {
+                    <UiButton Text="إلغاء الكشف" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CancelRunAsync" />
+                }
+                @if (_selectedEmployeePayroll is { Status: 4, OutstandingAmount: > 0 })
+                {
+                    <UiButton Text="دفع الراتب" IconCssClass="fa-solid fa-money-bill-transfer" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="PayEmployeeAsync" />
+                }
+                @if (_selectedEmployeePayroll is not null)
+                {
+                    <UiButton Text="عرض القسيمة" IconCssClass="fa-solid fa-file-invoice" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="LoadPayslipAsync" />
+                    <UiButton Text="طباعة القسيمة" IconCssClass="fa-solid fa-print" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Loading="@_printing" OnClick="PrintPayslipAsync" />
+                }
+            }
+            else if (_section == "periods" && _selectedPeriod is not null)
+            {
+                @if (_selectedPeriod.Status == 1)
+                {
+                    <UiButton Text="قفل الفترة" IconCssClass="fa-solid fa-lock" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="LockPeriodAsync" />
+                }
+                @if (_selectedPeriod.Status == 2)
+                {
+                    <UiButton Text="إعادة فتح" IconCssClass="fa-solid fa-lock-open" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="ReopenPeriodAsync" />
+                    <UiButton Text="إغلاق الفترة" IconCssClass="fa-solid fa-calendar-check" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="ClosePeriodAsync" />
+                }
+            }
+            else if (_section == "policies" && _selectedPolicy is not null)
+            {
+                @if (_selectedPolicy.Status == 1)
+                {
+                    <UiButton Text="تفعيل السياسة" IconCssClass="fa-solid fa-circle-check" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="ActivatePolicyAsync" />
+                    <UiButton Text="إلغاء السياسة" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CancelPolicyAsync" />
+                }
+            }
+            else if (_section == "eos" && _selectedEos is not null)
+            {
+                @if (_selectedEos.Status is 1 or 2)
+                {
+                    <UiButton Text="احتساب التسوية" IconCssClass="fa-solid fa-calculator" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="CalculateEosAsync" />
+                }
+                @if (_selectedEos.Status == 2)
+                {
+                    <UiButton Text="مراجعة" IconCssClass="fa-solid fa-magnifying-glass-chart" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="ReviewEosAsync" />
+                }
+                @if (_selectedEos.Status == 3)
+                {
+                    <UiButton Text="اعتماد" IconCssClass="fa-solid fa-circle-check" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="ApproveEosAsync" />
+                }
+                @if (_selectedEos.Status == 4)
+                {
+                    <UiButton Text="ترحيل" IconCssClass="fa-solid fa-book" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="PostEosAsync" />
+                }
+                @if (_selectedEos is { Status: 5, OutstandingAmount: > 0 })
+                {
+                    <UiButton Text="دفع التسوية" IconCssClass="fa-solid fa-money-bill-transfer" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="PayEosAsync" />
+                }
+                @if (_selectedEos.Status is 5 or 6)
+                {
+                    <UiButton Text="إكمال إنهاء الخدمة" IconCssClass="fa-solid fa-user-slash" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="CompleteEosAsync" />
+                }
+            }
+
+            <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Loading="@_loading" Disabled="@_saving" OnClick="RefreshAsync" />
+        </UiWorkspaceActionBar>
+    </Actions>
+
+    <Content>
+        <UiContainer CssClass="payroll-workspace">
+            <UiSectionTabStrip Tabs="@SectionTabs" OnSelect="ChangeSectionAsync" />
+
+            @if (_loading)
+            {
+                <UiAlert Message="جاري تحميل بيانات الرواتب..." />
+            }
+            else if (_section == "periods")
+            {
+                <UiDataGridPanel Title="فترات الرواتب" Subtitle="@($"{_periods.Count} فترة")" HeaderLabels="@PeriodHeaders" HeaderCssClass="payroll-period-header">
+                    <Body>
+                        @if (_periods.Count == 0) { <UiAlert Message="لا توجد فترات رواتب." /> }
+                        else
+                        {
+                            <UiContainer CssClass="payroll-list-body">
+                                @foreach (var item in _periods)
+                                {
+                                    <UiClickableSurface CssClass="@RowCss(item.Id == _selectedPeriod?.Id, "payroll-period-row")" OnClick="@(() => SelectPeriod(item))">
+                                        <UiInline Strong="true">@item.PeriodCode</UiInline><UiInline>@item.StartDate.ToString("yyyy-MM-dd")</UiInline><UiInline>@item.EndDate.ToString("yyyy-MM-dd")</UiInline><UiBadge Text="@PeriodStatusName(item.Status)" Tone="@StatusTone(item.Status)" />
+                                    </UiClickableSurface>
+                                }
+                            </UiContainer>
+                        }
+                    </Body>
+                </UiDataGridPanel>
+            }
+            else if (_section == "runs")
+            {
+                <UiDataGridPanel Title="كشوف الرواتب" Subtitle="@($"{_runs.Count} كشف")" HeaderLabels="@RunHeaders" HeaderCssClass="payroll-run-header">
+                    <Body>
+                        @if (_runs.Count == 0) { <UiAlert Message="لا توجد كشوف رواتب." /> }
+                        else
+                        {
+                            <UiContainer CssClass="payroll-list-body">
+                                @foreach (var item in _runs)
+                                {
+                                    <UiClickableSurface CssClass="@RowCss(item.Id == _selectedRun?.Id, "payroll-run-row")" OnClick="@(() => SelectRunAsync(item))">
+                                        <UiInline Strong="true">@item.PayrollRunCode</UiInline><UiInline>@item.PeriodCode</UiInline><UiInline>@RunTypeName(item.RunType)</UiInline><UiInline>@item.CurrencyCode</UiInline><UiInline>@item.TotalNetPay.ToString("N2")</UiInline><UiBadge Text="@RunStatusName(item.Status)" Tone="@StatusTone(item.Status)" />
+                                    </UiClickableSurface>
+                                }
+                            </UiContainer>
+                        }
+                    </Body>
+                </UiDataGridPanel>
+
+                @if (_prevalidation is not null)
+                {
+                    <UiCard Title="نتيجة الفحص قبل الاحتساب" Subtitle="@(_prevalidation.CanCalculate ? "جاهز للاحتساب" : "توجد أخطاء مانعة")">
+                        @if (_prevalidation.Issues.Count == 0) { <UiAlert Message="لا توجد مشاكل مانعة." Tone="AlertTone.Success" /> }
+                        else
+                        {
+                            <UiContainer CssClass="payroll-issues">
+                                @foreach (var issue in _prevalidation.Issues.Take(30))
+                                {
+                                    <UiAlert Message="@($"{issue.EmployeeCode ?? "—"} - {issue.Message}")" Tone="@IssueTone(issue.Severity)" />
+                                }
+                            </UiContainer>
+                        }
+                    </UiCard>
+                }
+
+                @if (_selectedRun is not null)
+                {
+                    <UiDataGridPanel Title="رواتب الموظفين" Subtitle="@($"{_employeePayrolls.Count} موظف")" HeaderLabels="@EmployeePayrollHeaders" HeaderCssClass="payroll-employee-header">
+                        <Body>
+                            @if (_employeePayrolls.Count == 0) { <UiAlert Message="لم يتم احتساب موظفين في هذا الكشف بعد." /> }
+                            else
+                            {
+                                <UiContainer CssClass="payroll-list-body">
+                                    @foreach (var item in _employeePayrolls)
+                                    {
+                                        <UiClickableSurface CssClass="@RowCss(item.Id == _selectedEmployeePayroll?.Id, "payroll-employee-row")" OnClick="@(() => SelectEmployeePayroll(item))">
+                                            <UiInline Strong="true">@item.EmployeeCode</UiInline><UiInline>@item.EmployeeName</UiInline><UiInline>@(item.Department ?? "—")</UiInline><UiInline>@item.GrossEarnings.ToString("N2")</UiInline><UiInline>@item.TotalDeductions.ToString("N2")</UiInline><UiInline Strong="true">@item.NetPay.ToString("N2")</UiInline><UiInline>@item.PaymentStatus</UiInline><UiBadge Text="@EmployeePayrollStatusName(item.Status)" Tone="@StatusTone(item.Status)" />
+                                        </UiClickableSurface>
+                                    }
+                                </UiContainer>
+                            }
+                        </Body>
+                    </UiDataGridPanel>
+                }
+            }
+            else if (_section == "eos")
+            {
+                <UiDataGridPanel Title="تسويات نهاية الخدمة" Subtitle="@($"{_eos.Count} تسوية")" HeaderLabels="@EosHeaders" HeaderCssClass="payroll-eos-header">
+                    <Body>
+                        @if (_eos.Count == 0) { <UiAlert Message="لا توجد تسويات نهاية خدمة." /> }
+                        else
+                        {
+                            <UiContainer CssClass="payroll-list-body">
+                                @foreach (var item in _eos)
+                                {
+                                    <UiClickableSurface CssClass="@RowCss(item.Id == _selectedEos?.Id, "payroll-eos-row")" OnClick="@(() => SelectEosAsync(item))">
+                                        <UiInline Strong="true">@item.SettlementCode</UiInline><UiInline>@item.EmployeeCode</UiInline><UiInline>@item.EmployeeName</UiInline><UiInline>@item.LastWorkingDate.ToString("yyyy-MM-dd")</UiInline><UiInline>@($"{item.NetSettlementAmount:N2} {item.CurrencyCode}")</UiInline><UiBadge Text="@EosStatusName(item.Status)" Tone="@StatusTone(item.Status)" />
+                                    </UiClickableSurface>
+                                }
+                            </UiContainer>
+                        }
+                    </Body>
+                </UiDataGridPanel>
+            }
+            else if (_section == "policies")
+            {
+                <UiDataGridPanel Title="سياسات الرواتب" Subtitle="@($"{_policies.Count} سياسة")" HeaderLabels="@PolicyHeaders" HeaderCssClass="payroll-policy-header">
+                    <Body>
+                        @if (_policies.Count == 0) { <UiAlert Message="لا توجد سياسات رواتب." /> }
+                        else
+                        {
+                            <UiContainer CssClass="payroll-list-body">
+                                @foreach (var item in _policies)
+                                {
+                                    <UiClickableSurface CssClass="@RowCss(item.Id == _selectedPolicy?.Id, "payroll-policy-row")" OnClick="@(() => SelectPolicy(item))">
+                                        <UiInline Strong="true">@item.PolicyCode</UiInline><UiInline>@item.NameAr</UiInline><UiInline>@item.EffectiveFrom.ToString("yyyy-MM-dd")</UiInline><UiInline>@(item.EffectiveTo?.ToString("yyyy-MM-dd") ?? "مفتوح")</UiInline><UiBadge Text="@PolicyStatusName(item.Status)" Tone="@StatusTone(item.Status)" />
+                                    </UiClickableSurface>
+                                }
+                            </UiContainer>
+                        }
+                    </Body>
+                </UiDataGridPanel>
+            }
+        </UiContainer>
+    </Content>
+
+    <Aside>
+        <UiContainer CssClass="payroll-aside">
+            @if (_section == "periods")
+            {
+                <UiCard Title="@(_mode == EditorMode.Create ? "فترة رواتب جديدة" : "تفاصيل الفترة")">
+                    <UiInputText @bind-Value="_periodYearText" Label="السنة" InputMode="numeric" Disabled="@(_mode != EditorMode.Create)" Size="ControlSize.Small" />
+                    <UiSelect Value="@_periodMonthText" ValueChanged="SetPeriodMonthAsync" Label="الشهر" Options="@MonthOptions" Disabled="@(_mode != EditorMode.Create)" Size="ControlSize.Small" />
+                    <UiInputDate @bind-Value="_periodStart" Label="من تاريخ" Disabled="@(_mode != EditorMode.Create)" Size="ControlSize.Small" />
+                    <UiInputDate @bind-Value="_periodEnd" Label="إلى تاريخ" Disabled="@(_mode != EditorMode.Create)" Size="ControlSize.Small" />
+                    @if (_selectedPeriod is not null) { <UiInputText Value="@PeriodStatusName(_selectedPeriod.Status)" Label="الحالة" ReadOnly="true" Size="ControlSize.Small" /> }
+                </UiCard>
+            }
+            else if (_section == "runs")
+            {
+                @if (_mode == EditorMode.Create)
+                {
+                    <UiCard Title="كشف رواتب جديد">
+                        <UiSelect Value="@_runPeriodValue" ValueChanged="SetRunPeriodAsync" Label="الفترة" Options="@PeriodOptions" Size="ControlSize.Small" />
+                        <UiSelect Value="@_runTypeText" ValueChanged="SetRunTypeAsync" Label="نوع الكشف" Options="@RunTypeOptions" Size="ControlSize.Small" />
+                        <UiSelect Value="@_runPolicyValue" ValueChanged="SetRunPolicyAsync" Label="سياسة الرواتب" Options="@PolicyOptions" Size="ControlSize.Small" />
+                        <UiSelect Value="@_runCurrencyValue" ValueChanged="SetRunCurrencyAsync" Label="العملة" Options="@CurrencyOptions" Size="ControlSize.Small" />
+                        <UiInputDate @bind-Value="_runCalculationDate" Label="تاريخ الاحتساب" Size="ControlSize.Small" />
+                        <UiInputDate @bind-Value="_runPostingDate" Label="تاريخ الترحيل" Size="ControlSize.Small" />
+                        <UiInputText @bind-Value="_runNotes" Label="ملاحظات" Size="ControlSize.Small" />
+                    </UiCard>
+                }
+                else if (_selectedEmployeePayroll is not null)
+                {
+                    <UiCard Title="@_selectedEmployeePayroll.EmployeeName" Subtitle="@_selectedEmployeePayroll.EmployeeCode">
+                        <UiInputText Value="@($"{_selectedEmployeePayroll.CoverageFrom:yyyy-MM-dd} → {_selectedEmployeePayroll.CoverageTo:yyyy-MM-dd}")" Label="فترة التغطية" ReadOnly="true" Size="ControlSize.Small" />
+                        <UiInputText Value="@($"{_selectedEmployeePayroll.GrossEarnings:N2} {_selectedEmployeePayroll.CurrencyCode}")" Label="الإجمالي" ReadOnly="true" Size="ControlSize.Small" />
+                        <UiInputText Value="@($"{_selectedEmployeePayroll.TotalDeductions:N2} {_selectedEmployeePayroll.CurrencyCode}")" Label="الخصومات" ReadOnly="true" Size="ControlSize.Small" />
+                        <UiInputText Value="@($"{_selectedEmployeePayroll.NetPay:N2} {_selectedEmployeePayroll.CurrencyCode}")" Label="صافي الراتب" ReadOnly="true" Size="ControlSize.Small" />
+                        <UiInputText Value="@($"{_selectedEmployeePayroll.PaidAmount:N2}")" Label="المدفوع" ReadOnly="true" Size="ControlSize.Small" />
+                        <UiInputText Value="@($"{_selectedEmployeePayroll.OutstandingAmount:N2}")" Label="المتبقي" ReadOnly="true" Size="ControlSize.Small" />
+                        @if (_selectedEmployeePayroll.Status == 4 && _selectedEmployeePayroll.OutstandingAmount > 0)
+                        {
+                            <UiSelect Value="@_paymentMethodText" ValueChanged="SetPaymentMethodAsync" Label="طريقة الدفع" Options="@PaymentMethodOptions" Size="ControlSize.Small" />
+                            @if (_paymentMethodText == "1")
+                            {
+                                <UiSelect Value="@_cashAccountValue" ValueChanged="SetCashAccountAsync" Label="الصندوق" Options="@CashAccountOptions" Size="ControlSize.Small" />
+                            }
+                            else
+                            {
+                                <UiSelect Value="@_bankAccountValue" ValueChanged="SetBankAccountAsync" Label="الحساب البنكي" Options="@BankAccountOptions" Size="ControlSize.Small" />
+                            }
+                            <UiInputDate @bind-Value="_paymentDate" Label="تاريخ الدفع" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_paymentAmountText" Label="المبلغ" InputMode="decimal" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_paymentExchangeRateText" Label="سعر الصرف اليدوي (اختياري)" InputMode="decimal" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_paymentReference" Label="المرجع" Size="ControlSize.Small" />
+                        }
+                    </UiCard>
+                    <UiCard Title="تفاصيل الاستحقاقات والخصومات">
+                        @if (_selectedEmployeePayroll.Lines.Count == 0) { <UiAlert Message="لا توجد تفاصيل." /> }
+                        else
+                        {
+                            <UiContainer CssClass="payroll-lines">
+                                @foreach (var line in _selectedEmployeePayroll.Lines.OrderBy(x => x.LineSequence))
+                                {
+                                    <UiInline Strong="true">@($"{line.ComponentName}: {line.Amount:N2}")</UiInline>
+                                }
+                            </UiContainer>
+                        }
+                    </UiCard>
+                    @if (_payslip is not null && _payslip.Payroll.Id == _selectedEmployeePayroll.Id)
+                    {
+                        <UiCard Title="قسيمة الراتب" Subtitle="@_payslip.PeriodCode">
+                            <UiInline Strong="true">@($"الصافي: {_payslip.Payroll.NetPay:N2} {_payslip.Payroll.CurrencyCode}")</UiInline>
+                            <UiInline>@($"حالة الدفع: {_payslip.Payroll.PaymentStatus}")</UiInline>
+                            @if (!string.IsNullOrWhiteSpace(_payslip.JournalNumber)) { <UiInline>@($"القيد: {_payslip.JournalNumber}")</UiInline> }
+                        </UiCard>
+                    }
+                }
+                else if (_selectedRun is not null)
+                {
+                    <UiCard Title="@_selectedRun.PayrollRunCode" Subtitle="@_selectedRun.PeriodCode">
+                        <UiInputText Value="@RunStatusName(_selectedRun.Status)" Label="الحالة" ReadOnly="true" Size="ControlSize.Small" />
+                        <UiInputText Value="@RunTypeName(_selectedRun.RunType)" Label="النوع" ReadOnly="true" Size="ControlSize.Small" />
+                        <UiInputText Value="@_selectedRun.CurrencyCode" Label="العملة" ReadOnly="true" Size="ControlSize.Small" />
+                        <UiInputText Value="@MoneyText(_selectedRun.TotalGrossEarnings)" Label="إجمالي الاستحقاقات" ReadOnly="true" Size="ControlSize.Small" />
+                        <UiInputText Value="@MoneyText(_selectedRun.TotalDeductions)" Label="إجمالي الخصومات" ReadOnly="true" Size="ControlSize.Small" />
+                        <UiInputText Value="@MoneyText(_selectedRun.TotalNetPay)" Label="صافي الرواتب" ReadOnly="true" Size="ControlSize.Small" />
+                    </UiCard>
+                }
+            }
+            else if (_section == "policies")
+            {
+                <UiCard Title="@(_mode == EditorMode.Create ? "سياسة جديدة" : _mode == EditorMode.Edit ? "تعديل السياسة" : "تفاصيل السياسة")">
+                    <UiInputText Value="@(_selectedPolicy?.PolicyCode ?? "سيولد تلقائيًا")" Label="الكود" ReadOnly="true" Size="ControlSize.Small" />
+                    <UiInputText @bind-Value="_policyName" Label="الاسم" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                    <UiInputDate @bind-Value="_policyFrom" Label="ساري من" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                    <UiInputDate @bind-Value="_policyTo" Label="ساري إلى" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                    <UiSelect Value="@_policyProrationText" ValueChanged="SetPolicyProrationAsync" Label="التوزيع النسبي" Options="@ProrationOptions" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                    <UiSelect Value="@_policyDailyText" ValueChanged="SetPolicyDailyAsync" Label="الأجر اليومي" Options="@DailyRateOptions" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                    <UiSelect Value="@_policyHourlyText" ValueChanged="SetPolicyHourlyAsync" Label="الأجر الساعي" Options="@HourlyRateOptions" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                    <UiCheckbox @bind-Value="_policyRequireAttendance" Label="يتطلب حضورًا معتمدًا" Disabled="@(!IsEditing)" />
+                    <UiCheckbox @bind-Value="_policyRequireFullPayment" Label="يتطلب السداد الكامل قبل إغلاق الكشف" Disabled="@(!IsEditing)" />
+                    <UiSelect Value="@_policyAbsenceComponentValue" ValueChanged="SetPolicyAbsenceComponentAsync" Label="مكون خصم الغياب" Options="@DeductionComponentOptions" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                    <UiSelect Value="@_policyLateComponentValue" ValueChanged="SetPolicyLateComponentAsync" Label="مكون خصم التأخير" Options="@DeductionComponentOptions" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                    <UiSelect Value="@_policyEarlyComponentValue" ValueChanged="SetPolicyEarlyComponentAsync" Label="مكون الانصراف المبكر" Options="@DeductionComponentOptions" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                    <UiSelect Value="@_policyUnpaidLeaveComponentValue" ValueChanged="SetPolicyUnpaidComponentAsync" Label="مكون الإجازة غير المدفوعة" Options="@DeductionComponentOptions" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                    <UiSelect Value="@_policyOvertimeComponentValue" ValueChanged="SetPolicyOvertimeComponentAsync" Label="مكون العمل الإضافي" Options="@EarningComponentOptions" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                    <UiInputText @bind-Value="_policyNotes" Label="ملاحظات" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                </UiCard>
+            }
+            else if (_section == "eos")
+            {
+                @if (_mode == EditorMode.Create)
+                {
+                    <UiCard Title="تسوية نهاية خدمة جديدة">
+                        <UiLookup Label="الموظف" Value="@_eosEmployeeValue" SelectedItem="@_eosEmployeeItem" ValueChanged="SetEosEmployeeAsync" SearchAsync="@SearchEmployeesAsync" Placeholder="ابحث عن موظف" />
+                        <UiSelect Value="@_eosFinalPayrollValue" ValueChanged="SetEosFinalPayrollAsync" Label="الراتب النهائي المرحل" Options="@FinalPayrollOptions" Size="ControlSize.Small" />
+                        <UiInputDate @bind-Value="_eosLastWorkingDate" Label="آخر يوم عمل" Size="ControlSize.Small" />
+                        <UiInputText @bind-Value="_eosReason" Label="السبب" Size="ControlSize.Small" />
+                    </UiCard>
+                }
+                else if (_selectedEos is not null)
+                {
+                    <UiCard Title="@_selectedEos.EmployeeName" Subtitle="@_selectedEos.SettlementCode">
+                        <UiInputText Value="@EosStatusName(_selectedEos.Status)" Label="الحالة" ReadOnly="true" Size="ControlSize.Small" />
+                        <UiInputText Value="@_selectedEos.LastWorkingDate.ToString("yyyy-MM-dd")" Label="آخر يوم عمل" ReadOnly="true" Size="ControlSize.Small" />
+                        <UiInputText Value="@($"{_selectedEos.NetSettlementAmount:N2} {_selectedEos.CurrencyCode}")" Label="صافي التسوية" ReadOnly="true" Size="ControlSize.Small" />
+                        <UiInputText Value="@($"{_selectedEos.PaidAmount:N2} {_selectedEos.CurrencyCode}")" Label="المدفوع" ReadOnly="true" Size="ControlSize.Small" />
+                        <UiInputText Value="@($"{_selectedEos.OutstandingAmount:N2} {_selectedEos.CurrencyCode}")" Label="المتبقي" ReadOnly="true" Size="ControlSize.Small" />
+                        @if (_selectedEos.Status is 1 or 2)
+                        {
+                            <UiInputText @bind-Value="_eosBenefitText" Label="مبلغ مكافأة نهاية الخدمة" InputMode="decimal" Size="ControlSize.Small" />
+                            @if (_eosSettleLeave)
+                            {
+                                <UiInputText @bind-Value="_eosLeaveDailyRateText" Label="سعر يوم تسوية الإجازة المعتمد" InputMode="decimal" Size="ControlSize.Small" />
+                            }
+                            <UiInputText @bind-Value="_eosOtherEarningsText" Label="استحقاقات أخرى" InputMode="decimal" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_eosOtherDeductionsText" Label="خصومات أخرى" InputMode="decimal" Size="ControlSize.Small" />
+                            <UiCheckbox @bind-Value="_eosSettleLeave" Label="تسوية الإجازات القابلة للصرف" />
+                            <UiCheckbox @bind-Value="_eosSettleLoans" Label="تسوية السلف القائمة" />
+                        }
+                        @if (_selectedEos.Status == 5 && _selectedEos.OutstandingAmount > 0)
+                        {
+                            <UiSelect Value="@_paymentMethodText" ValueChanged="SetPaymentMethodAsync" Label="طريقة الدفع" Options="@PaymentMethodOptions" Size="ControlSize.Small" />
+                            @if (_paymentMethodText == "1")
+                            {
+                                <UiSelect Value="@_cashAccountValue" ValueChanged="SetCashAccountAsync" Label="الصندوق" Options="@CashAccountOptions" Size="ControlSize.Small" />
+                            }
+                            else
+                            {
+                                <UiSelect Value="@_bankAccountValue" ValueChanged="SetBankAccountAsync" Label="الحساب البنكي" Options="@BankAccountOptions" Size="ControlSize.Small" />
+                            }
+                            <UiInputDate @bind-Value="_paymentDate" Label="تاريخ الدفع" Size="ControlSize.Small" />
+                            <UiInputText @bind-Value="_paymentAmountText" Label="المبلغ" InputMode="decimal" Size="ControlSize.Small" />
+                        }
+                    </UiCard>
+                    <UiCard Title="تفاصيل التسوية">
+                        @if (_selectedEos.Lines.Count == 0) { <UiAlert Message="لا توجد تفاصيل محتسبة بعد." /> }
+                        else
+                        {
+                            <UiContainer CssClass="payroll-lines">
+                                @foreach (var line in _selectedEos.Lines.OrderBy(x => x.LineSequence)) { <UiInline Strong="true">@($"{line.Description}: {line.Amount:N2}")</UiInline> }
+                            </UiContainer>
+                        }
+                    </UiCard>
+                }
+            }
+        </UiContainer>
+    </Aside>
+</UiWorkspaceLayout>

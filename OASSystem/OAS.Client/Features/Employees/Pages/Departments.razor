@@ -1,0 +1,74 @@
+@page "/departments"
+@attribute [Authorize(Roles = "Administrator")]
+
+<PageTitle>الأقسام</PageTitle>
+
+<UiWorkspaceLayout ShowAside="true" ShowFilters="false">
+    <Actions>
+        <UiWorkspaceActionBar>
+            <UiButton Text="جديد" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" Disabled="@IsEditing" OnClick="BeginCreateAsync" />
+            <UiButton Text="حفظ" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small" Disabled="@(!CanSave)" Loading="@_saving" OnClick="SaveAsync" />
+            <UiButton Text="تعديل" IconCssClass="fa-solid fa-pen" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(!CanEdit)" OnClick="BeginEditAsync" />
+            <UiButton Text="إلغاء" IconCssClass="fa-solid fa-xmark" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Disabled="@(!IsEditing)" OnClick="CancelEditAsync" />
+            <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@IsEditing" Loading="@_loading" OnClick="RefreshAsync" />
+            <UiSearchInput @bind-Value="_search" Placeholder="ابحث بالكود أو اسم القسم أو المدير..." AriaLabel="البحث عن قسم" ClearText="مسح البحث" DebounceMilliseconds="200" OnSearch="SearchChangedAsync" />
+        </UiWorkspaceActionBar>
+    </Actions>
+
+    <Content>
+        <UiDataGridPanel Title="الأقسام"
+                         Subtitle="@($"{FilteredItems.Count} قسم")"
+                         HeaderLabels="@DepartmentGridHeaders"
+                         HeaderCssClass="department-grid-header">
+            <Body>
+                @if (_loading)
+                {
+                    <UiAlert Message="جاري تحميل الأقسام..." />
+                }
+                else if (FilteredItems.Count == 0)
+                {
+                    <UiAlert Message="لا توجد أقسام." />
+                }
+                else
+                {
+                    <UiContainer CssClass="department-grid-body">
+                        @foreach (var item in FilteredItems)
+                        {
+                            <UiClickableSurface CssClass="@(item.Id == _selected?.Id ? "department-grid-row department-grid-row--selected" : "department-grid-row")"
+                                                OnClick="@(() => SelectItem(item))">
+                                <UiInline CssClass="department-code">@item.DepartmentCode</UiInline>
+                                <UiInline Strong="true">@item.NameAr</UiInline>
+                                <UiInline>@(item.ParentDepartmentName ?? "—")</UiInline>
+                                <UiInline>@(item.ManagerEmployeeName ?? "—")</UiInline>
+                                <UiBadge Text="@(item.IsActive ? "نشط" : "غير نشط")" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" />
+                            </UiClickableSurface>
+                        }
+                    </UiContainer>
+                }
+            </Body>
+        </UiDataGridPanel>
+    </Content>
+
+    <Aside>
+        <UiContainer CssClass="department-aside-card">
+            <UiCard Title="@EditorTitle" Subtitle="@EditorSubtitle">
+                @if (_mode == EditorMode.Empty)
+                {
+                    <UiAlert Message="اختر قسمًا من الجدول أو اضغط جديد." />
+                }
+                else
+                {
+                    <UiContainer CssClass="department-editor">
+                        <UiInputText Value="@DepartmentCodeDisplay" Label="كود القسم" ReadOnly="true" Size="ControlSize.Small" />
+                        <UiInputText @bind-Value="_formNameAr" Label="اسم القسم" Required="true" EnableNativeValidation="false" MaxLength="150" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                        <UiInputText @bind-Value="_formNameEn" Label="الاسم الإنجليزي" MaxLength="150" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                        <UiSelect Value="@ParentDepartmentValue" ValueChanged="SetParentDepartmentAsync" Label="القسم الأب" Placeholder="بدون قسم أب" Options="@ParentDepartmentOptions" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                        <UiLookup Value="@ManagerEmployeeValue" ValueChanged="SetManagerEmployeeAsync" SelectedItem="@ManagerEmployeeItem" SearchAsync="@SearchManagerEmployeesAsync" Label="مدير القسم" Placeholder="ابحث بكود الموظف أو الاسم..." EmptyText="لا توجد نتائج مطابقة." Disabled="@(!IsEditing)" MinimumSearchLength="0" DebounceMilliseconds="250" />
+                        <UiCheckbox @bind-Value="_formIsActive" Label="نشط" Disabled="@(!IsEditing)" />
+                        <UiInputText @bind-Value="_formNotes" Label="ملاحظات" MaxLength="500" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                    </UiContainer>
+                }
+            </UiCard>
+        </UiContainer>
+    </Aside>
+</UiWorkspaceLayout>

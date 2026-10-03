@@ -64,6 +64,21 @@ public sealed class SequenceNumberGenerator(
 
         var explicitSequence = sequenceName switch
         {
+            "DepartmentCodeSequence" => "[hr].[DepartmentCodeSequence]",
+            "EmployeeContractCodeSequence" => "[hr].[EmployeeContractCodeSequence]",
+            "SalaryComponentCodeSequence" => "[hr].[SalaryComponentCodeSequence]",
+            "SalaryStructureCodeSequence" => "[hr].[SalaryStructureCodeSequence]",
+            "EmployeeDocumentCodeSequence" => "[hr].[EmployeeDocumentCodeSequence]",
+            "WorkShiftCodeSequence" => "[hr].[WorkShiftCodeSequence]",
+            "HolidayCodeSequence" => "[hr].[HolidayCodeSequence]",
+            "LeaveTypeCodeSequence" => "[hr].[LeaveTypeCodeSequence]",
+            "LeaveRequestCodeSequence" => "[hr].[LeaveRequestCodeSequence]",
+            "OvertimeCodeSequence" => "[hr].[OvertimeCodeSequence]",
+            "EmployeeLoanCodeSequence" => "[hr].[EmployeeLoanCodeSequence]",
+            "EmployeeAdjustmentCodeSequence" => "[hr].[EmployeeAdjustmentCodeSequence]",
+            "PayrollPolicyCodeSequence" => "[hr].[PayrollPolicyCodeSequence]",
+            "PayrollRunCodeSequence" => "[hr].[PayrollRunCodeSequence]",
+            "EndOfServiceCodeSequence" => "[hr].[EndOfServiceCodeSequence]",
             "CustomerCodeSequence" => "[dbo].[CustomerCodeSequence]",
             "SupplierCodeSequence" => "[dbo].[SupplierCodeSequence]",
             "CustomerAccountCodeSequence" => "[dbo].[CustomerAccountCodeSequence]",

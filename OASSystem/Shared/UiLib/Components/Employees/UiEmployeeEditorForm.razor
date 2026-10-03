@@ -52,6 +52,16 @@
                           Disabled="@(!IsEditable)"
                           Size="ControlSize.Small"
                           EnableNativeValidation="false" />
+
+                <UiSelect Value="@DepartmentValue"
+                          ValueChanged="SetDepartmentAsync"
+                          ValueExpression="@(() => DepartmentValue)"
+                          Label="القسم"
+                          Placeholder="اختر القسم"
+                          Options="@DepartmentOptions"
+                          Disabled="@(!IsEditable)"
+                          Size="ControlSize.Small"
+                          EnableNativeValidation="false" />
             </div>
 
             <div class="ui-employee-editor-form__grid ui-employee-editor-form__grid--secondary">
@@ -63,10 +73,29 @@
                              Size="ControlSize.Small"
                              EnableNativeValidation="false" />
 
+                <UiLookup Value="@ManagerEmployeeValue"
+                          ValueChanged="SetManagerEmployeeAsync"
+                          SelectedItem="@ManagerEmployeeItem"
+                          SearchAsync="@ManagerEmployeeSearchAsync"
+                          Label="المدير المباشر"
+                          Placeholder="ابحث بكود الموظف أو الاسم..."
+                          EmptyText="لا توجد نتائج مطابقة."
+                          Disabled="@(!IsEditable)"
+                          MinimumSearchLength="0"
+                          DebounceMilliseconds="250" />
+
                 <div class="ui-employee-editor-form__checks">
                     <UiCheckbox Value="@Model.IsActive"
                                 ValueChanged="SetActiveAsync"
                                 Label="موظف نشط"
+                                Disabled="@(!IsEditable)" />
+                    <UiCheckbox Value="@Model.IsSalesperson"
+                                ValueChanged="SetSalespersonAsync"
+                                Label="مندوب مبيعات"
+                                Disabled="@(!IsEditable)" />
+                    <UiCheckbox Value="@Model.IsTechnician"
+                                ValueChanged="SetTechnicianAsync"
+                                Label="فني"
                                 Disabled="@(!IsEditable)" />
                     <UiCheckbox Value="@Model.IsCommissionEligible"
                                 ValueChanged="SetCommissionAsync"

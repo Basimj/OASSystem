@@ -4,6 +4,7 @@ using OAS.Application.Accounting.CashAccounts.Queries.GetCashAccountById;
 using OAS.Application.Accounting.Currencies.Queries.GetCurrencyById;
 using OAS.Application.Accounting.PaymentVouchers.Queries.GetPaymentVoucherById;
 using OAS.Application.Accounting.ReceiptVouchers.Queries.GetReceiptVoucherById;
+using OAS.Application.Features.Employees.Payroll;
 using OAS.Contracts.Accounting.BankAccounts;
 using OAS.Contracts.Accounting.CashAccounts;
 using OAS.Contracts.Accounting.Currencies;
@@ -34,6 +35,9 @@ public sealed class VoucherPrintPayloadFactory(
                 await BuildPaymentAsync(
                     await sender.Send(new GetPaymentVoucherByIdQuery(documentId), cancellationToken),
                     cancellationToken),
+
+            PrintDocumentTypes.Payslip =>
+                BuildPayslip(await sender.Send(new GetPayslipQuery(documentId), cancellationToken)),
 
             _ => throw new ArgumentOutOfRangeException(
                 nameof(documentType),
@@ -161,6 +165,58 @@ public sealed class VoucherPrintPayloadFactory(
                 Beneficiary = "المستفيد",
                 Approval = "الاعتماد"
             }
+        };
+    }
+
+
+    private object BuildPayslip(OAS.Contracts.Features.Employees.Payroll.PayslipDto payslip)
+    {
+        var payroll = payslip.Payroll;
+        var lines = payroll.Lines
+            .OrderBy(x => x.LineSequence)
+            .Select(x => new
+            {
+                x.LineSequence,
+                ComponentCode = x.ComponentCode ?? string.Empty,
+                x.ComponentName,
+                Type = x.ComponentType switch { 1 => "استحقاق", 2 => "خصم", 3 => "مساهمة صاحب العمل", _ => "أخرى" },
+                Source = x.SourceDocumentType ?? x.SourceModule ?? string.Empty,
+                x.Quantity,
+                x.Rate,
+                x.Amount,
+                Description = x.Description ?? string.Empty
+            })
+            .ToArray();
+
+        return new
+        {
+            DocumentTitleAr = "قسيمة راتب",
+            DocumentTitleEn = "PAYSLIP",
+            PayslipNumber = $"{payslip.PeriodCode}-{payroll.EmployeeCode}",
+            payslip.PeriodCode,
+            payroll.EmployeeCode,
+            payroll.EmployeeName,
+            Department = payroll.Department ?? string.Empty,
+            JobTitle = payroll.JobTitle ?? string.Empty,
+            CoverageFrom = payroll.CoverageFrom.ToString("dd/MM/yyyy"),
+            CoverageTo = payroll.CoverageTo.ToString("dd/MM/yyyy"),
+            payroll.CurrencyCode,
+            CurrencySymbol = payroll.CurrencySymbol ?? string.Empty,
+            payroll.ConfiguredBasicSalary,
+            payroll.CalculatedBasicSalary,
+            payroll.GrossEarnings,
+            payroll.TotalDeductions,
+            payroll.TotalEmployerContributions,
+            payroll.NetPay,
+            payroll.PaidAmount,
+            payroll.OutstandingAmount,
+            payroll.PaymentStatus,
+            JournalNumber = payslip.JournalNumber ?? string.Empty,
+            PaymentReferences = string.Join("، ", payslip.PaymentReferences),
+            PrintedAt = DateTimeOffset.Now.ToString("dd/MM/yyyy HH:mm"),
+            Company = Company(),
+            Lines = lines,
+            Signatures = new { Employee = "الموظف", Accountant = "المحاسب", Approval = "الاعتماد" }
         };
     }
 

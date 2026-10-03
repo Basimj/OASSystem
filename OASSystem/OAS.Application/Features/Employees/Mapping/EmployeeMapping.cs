@@ -6,10 +6,7 @@ namespace OAS.Application.Features.Employees.Mapping;
 
 public static class EmployeeMapping
 {
-    public static EmployeeDto ToDto(
-        Employee employee,
-        JobTitle jobTitle,
-        UserAccount? user = null) =>
+    public static EmployeeDto ToDto(Employee employee, JobTitle jobTitle, Department? department = null, Employee? manager = null, UserAccount? user = null) =>
         new(
             employee.Id,
             employee.EmployeeCode,
@@ -25,7 +22,15 @@ public static class EmployeeMapping
             employee.ContactInfo.Address.ResidentialAddress,
             employee.JobTitleId,
             jobTitle.Name,
+            employee.DepartmentId,
+            department?.DepartmentCode,
+            department?.NameAr,
+            employee.ManagerEmployeeId,
+            manager?.EmployeeCode,
+            manager?.DisplayName,
             employee.HireDate,
+            employee.IsSalesperson,
+            employee.IsTechnician,
             employee.IsCommissionEligible,
             employee.IsActive,
             employee.UserAccountId,

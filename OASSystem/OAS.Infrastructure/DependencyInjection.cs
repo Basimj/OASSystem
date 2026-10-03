@@ -68,6 +68,17 @@ public static class DependencyInjection
         services.AddScoped<
             ISequenceNumberGenerator,
             SequenceNumberGenerator>();
+        services.AddScoped<OAS.Application.Features.Employees.Abstractions.IHRAccountingReferencePort, OAS.Infrastructure.Features.Employees.Services.HRAccountingReferencePort>();
+        services.AddScoped<OAS.Application.Features.Employees.Abstractions.IEmployeeSalaryStructureRepository, OAS.Infrastructure.Features.Employees.Services.EmployeeSalaryStructureRepository>();
+        services.AddScoped<OAS.Application.Features.Employees.Abstractions.IHRTimeZoneService, OAS.Infrastructure.Features.Employees.Services.HRTimeZoneService>();
+        services.AddScoped<OAS.Application.Features.Employees.Abstractions.IEmployeeHrOperationLock, OAS.Infrastructure.Features.Employees.Services.EmployeeHrOperationLock>();
+        services.AddScoped<OAS.Application.Features.Employees.Abstractions.IHREmployeeLoanAccountingPort, OAS.Infrastructure.Features.Employees.Services.EmployeeLoanAccountingPort>();
+        services.AddScoped<OAS.Application.Features.Employees.Abstractions.IApprovedCommissionSource, OAS.Infrastructure.Features.Employees.Services.NullApprovedCommissionSource>();
+        services.AddScoped<OAS.Application.Features.Employees.Abstractions.IHRPayrollAccountingPort, OAS.Infrastructure.Features.Employees.Services.HRPayrollAccountingPort>();
+        services.AddScoped<OAS.Application.Features.Employees.Abstractions.IHRSalaryPaymentPort, OAS.Infrastructure.Features.Employees.Services.HRSalaryPaymentPort>();
+        services.AddScoped<OAS.Application.Features.Employees.Abstractions.IHREndOfServiceAccountingPort, OAS.Infrastructure.Features.Employees.Services.HREndOfServiceAccountingPort>();
+        services.AddScoped<OAS.Application.Features.Employees.Abstractions.IHREndOfServicePaymentPort, OAS.Infrastructure.Features.Employees.Services.HREndOfServicePaymentPort>();
+        services.AddScoped<OAS.Application.Features.Employees.Abstractions.IHREmployeeIdentityPort, OAS.Infrastructure.Features.Employees.Services.HREmployeeIdentityPort>();
 
         services.AddScoped(
             typeof(IReadRepository<,>),
@@ -102,6 +113,7 @@ public static class DependencyInjection
 
         services.AddScoped<IUserProfileImageStore, UserProfileImageStore>();
         services.AddScoped<IEmployeeImageStore, EmployeeImageStore>();
+        services.AddScoped<OAS.Application.Features.Employees.Abstractions.IEmployeeDocumentStore, OAS.Infrastructure.Features.Employees.Services.EmployeeDocumentStore>();
 
         services.AddScoped<
             IPasswordService,

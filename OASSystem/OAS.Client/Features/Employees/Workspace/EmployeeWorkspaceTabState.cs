@@ -20,9 +20,12 @@ public sealed class EmployeeWorkspaceTabState
     public bool IsLoading { get; set; }
     public bool IsSaving { get; set; }
     public bool IsEditMode { get; private set; }
+    public string ActiveSectionKey { get; set; } = "core";
     public bool HasPersistedPhoto { get; private set; }
     public string? RowVersion { get; private set; }
     public string? UserAccountDisplayName { get; private set; }
+    public string? ManagerEmployeeCode { get; private set; }
+    public string? ManagerEmployeeName { get; private set; }
     public string? UserAccountUserName { get; private set; }
     public string? UserAccountEmail { get; private set; }
     public UiEmployeeEditorModel Form { get; } = new();
@@ -63,8 +66,11 @@ public sealed class EmployeeWorkspaceTabState
         RowVersion = null;
         HasPersistedPhoto = false;
         UserAccountDisplayName = null;
+        ManagerEmployeeCode = null;
+        ManagerEmployeeName = null;
         UserAccountUserName = null;
         UserAccountEmail = null;
+        ActiveSectionKey = "core";
         IsEditMode = true;
         IsInitialized = true;
         ClearImageChanges();
@@ -83,6 +89,8 @@ public sealed class EmployeeWorkspaceTabState
         RowVersion = employee.RowVersion;
         HasPersistedPhoto = !string.IsNullOrWhiteSpace(employee.Photo);
         UserAccountDisplayName = employee.UserAccountDisplayName;
+        ManagerEmployeeCode = employee.ManagerEmployeeCode;
+        ManagerEmployeeName = employee.ManagerEmployeeName;
         UserAccountUserName = employee.UserAccountUserName;
         UserAccountEmail = employee.UserAccountEmail;
 
@@ -98,7 +106,11 @@ public sealed class EmployeeWorkspaceTabState
         Form.PostalCode = employee.PostalCode ?? string.Empty;
         Form.ResidentialAddress = employee.ResidentialAddress ?? string.Empty;
         Form.JobTitleId = employee.JobTitleId;
+        Form.DepartmentId = employee.DepartmentId;
+        Form.ManagerEmployeeId = employee.ManagerEmployeeId;
         Form.HireDate = employee.HireDate;
+        Form.IsSalesperson = employee.IsSalesperson;
+        Form.IsTechnician = employee.IsTechnician;
         Form.IsCommissionEligible = employee.IsCommissionEligible;
         Form.IsActive = employee.IsActive;
         Form.UserAccountId = employee.UserAccountId;
@@ -183,7 +195,11 @@ public sealed class EmployeeWorkspaceTabState
         Form.PostalCode ?? string.Empty,
         Form.ResidentialAddress ?? string.Empty,
         Form.JobTitleId,
+        Form.DepartmentId,
+        Form.ManagerEmployeeId,
         Form.HireDate,
+        Form.IsSalesperson,
+        Form.IsTechnician,
         Form.IsCommissionEligible,
         Form.IsActive,
         Form.UserAccountId);
@@ -200,7 +216,11 @@ public sealed class EmployeeWorkspaceTabState
         Form.PostalCode = snapshot.PostalCode;
         Form.ResidentialAddress = snapshot.ResidentialAddress;
         Form.JobTitleId = snapshot.JobTitleId;
+        Form.DepartmentId = snapshot.DepartmentId;
+        Form.ManagerEmployeeId = snapshot.ManagerEmployeeId;
         Form.HireDate = snapshot.HireDate;
+        Form.IsSalesperson = snapshot.IsSalesperson;
+        Form.IsTechnician = snapshot.IsTechnician;
         Form.IsCommissionEligible = snapshot.IsCommissionEligible;
         Form.IsActive = snapshot.IsActive;
         Form.UserAccountId = snapshot.UserAccountId;
@@ -217,7 +237,11 @@ public sealed class EmployeeWorkspaceTabState
         string PostalCode,
         string ResidentialAddress,
         Guid? JobTitleId,
+        Guid? DepartmentId,
+        Guid? ManagerEmployeeId,
         DateOnly? HireDate,
+        bool IsSalesperson,
+        bool IsTechnician,
         bool IsCommissionEligible,
         bool IsActive,
         Guid? UserAccountId);

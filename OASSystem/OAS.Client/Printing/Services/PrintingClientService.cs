@@ -17,6 +17,11 @@ public sealed class PrintingClientService(OasApiClient api) : IPrintingClientSer
         CancellationToken cancellationToken = default) =>
         QueueAsync(PrintDocumentTypes.PaymentVoucher, voucherId, cancellationToken);
 
+    public Task<PrintJobCreatedDto?> PrintPayslipAsync(
+        Guid employeePayrollId,
+        CancellationToken cancellationToken = default) =>
+        QueueAsync(PrintDocumentTypes.Payslip, employeePayrollId, cancellationToken);
+
     private Task<PrintJobCreatedDto?> QueueAsync(
         string documentType,
         Guid documentId,

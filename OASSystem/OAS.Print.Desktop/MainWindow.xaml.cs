@@ -1113,13 +1113,17 @@ public partial class MainWindow : Window
         if (!string.IsNullOrWhiteSpace(expense))
             return expense;
         var journal = JsonValueResolver.ResolveText(data, "JournalNumber");
-        return string.IsNullOrWhiteSpace(journal) ? "-" : journal;
+        if (!string.IsNullOrWhiteSpace(journal))
+            return journal;
+        var payslip = JsonValueResolver.ResolveText(data, "PayslipNumber");
+        return string.IsNullOrWhiteSpace(payslip) ? "-" : payslip;
     }
 
     private static string GetDocumentTypeArabicName(string? documentType) => documentType switch
     {
         "ReceiptVoucher" => "سند قبض",
         "PaymentVoucher" => "سند صرف",
+        "Payslip" => "قسيمة راتب",
         "Expense" => "مستند مصروف",
         "JournalEntry" => "قيد يومية",
         _ => documentType ?? "مستند"

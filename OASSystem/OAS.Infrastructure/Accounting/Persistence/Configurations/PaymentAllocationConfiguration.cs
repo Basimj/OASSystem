@@ -12,6 +12,7 @@ public sealed class PaymentAllocationConfiguration : IEntityTypeConfiguration<Pa
         {
             t.HasCheckConstraint("CK_PaymentAllocations_Amount_Positive", "[AllocatedAmount] > 0");
             t.HasCheckConstraint("CK_PaymentAllocations_BaseAmount_Positive", "[BaseAllocatedAmount] IS NULL OR [BaseAllocatedAmount] > 0");
+            t.HasCheckConstraint("CK_PaymentAllocations_TargetBaseAmount_Positive", "[TargetBaseAllocatedAmount] IS NULL OR [TargetBaseAllocatedAmount] > 0");
             t.HasCheckConstraint("CK_PaymentAllocations_ExchangeRate_Positive", "[ExchangeRate] IS NULL OR [ExchangeRate] > 0");
             t.HasCheckConstraint("CK_PaymentAllocations_TypedSource", "([ReceiptVoucherLineId] IS NULL OR [PaymentVoucherLineId] IS NULL)");
         });
@@ -26,6 +27,7 @@ public sealed class PaymentAllocationConfiguration : IEntityTypeConfiguration<Pa
         builder.Property(x => x.AllocatedAmount).IsRequired().HasPrecision(19, 4);
         builder.Property(x => x.ExchangeRate).HasPrecision(19, 8);
         builder.Property(x => x.BaseAllocatedAmount).HasPrecision(19, 4);
+        builder.Property(x => x.TargetBaseAllocatedAmount).HasPrecision(19, 4);
         builder.Property(x => x.AllocatedAtUtc).IsRequired().HasColumnType("datetime2(3)");
 
         builder.HasIndex(x => x.PaymentSourceId).HasDatabaseName("IX_PaymentAllocations_PaymentSourceId");

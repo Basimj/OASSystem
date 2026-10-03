@@ -4,6 +4,7 @@ using NUnit.Framework;
 using NUnit.Framework.Internal;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.Features.Employees.Commands.UpdateEmployee;
+using OAS.Application.Features.Employees.Services;
 using OAS.Contracts.Features.Employees;
 using OAS.Domain.Features.Employees.Entities;
 using OAS.Domain.Features.Employees.ValueObjects;
@@ -32,7 +33,9 @@ public sealed class UpdateEmployeeCommandHandlerTests
         var handler = new UpdateEmployeeCommandHandler(
             new FakeEmployeeRepository(employee),
             new FakeJobTitleRepository(oldTitle, newTitle),
-            new FakeUserRepository());
+            new FakeUserRepository(),
+            new FakeDepartmentRepository(),
+            new EmployeeHierarchyValidator(new FakeEmployeeRepository()));
 
         var request = Request(
             employee,
@@ -78,7 +81,9 @@ public sealed class UpdateEmployeeCommandHandlerTests
         var handler = new UpdateEmployeeCommandHandler(
             new FakeEmployeeRepository(employee),
             new FakeJobTitleRepository(title),
-            new FakeUserRepository());
+            new FakeUserRepository(),
+            new FakeDepartmentRepository(),
+            new EmployeeHierarchyValidator(new FakeEmployeeRepository()));
 
         await handler.Handle(
             new UpdateEmployeeCommand(
@@ -116,7 +121,9 @@ public sealed class UpdateEmployeeCommandHandlerTests
         var handler = new UpdateEmployeeCommandHandler(
             new FakeEmployeeRepository(employee),
             new FakeJobTitleRepository(title),
-            new FakeUserRepository());
+            new FakeUserRepository(),
+            new FakeDepartmentRepository(),
+            new EmployeeHierarchyValidator(new FakeEmployeeRepository()));
 
         // مهم:
         // يجب أن يكون النوع Guid? لأن القيمة قد تكون null.
@@ -161,7 +168,9 @@ public sealed class UpdateEmployeeCommandHandlerTests
         var handler = new UpdateEmployeeCommandHandler(
             new FakeEmployeeRepository(employee),
             new FakeJobTitleRepository(title),
-            new FakeUserRepository(user));
+            new FakeUserRepository(user),
+            new FakeDepartmentRepository(),
+            new EmployeeHierarchyValidator(new FakeEmployeeRepository()));
 
         await handler.Handle(
             new UpdateEmployeeCommand(
@@ -190,7 +199,9 @@ public sealed class UpdateEmployeeCommandHandlerTests
         var handler = new UpdateEmployeeCommandHandler(
             new FakeEmployeeRepository(employee),
             new FakeJobTitleRepository(title),
-            new FakeUserRepository());
+            new FakeUserRepository(),
+            new FakeDepartmentRepository(),
+            new EmployeeHierarchyValidator(new FakeEmployeeRepository()));
 
         var request = Request(employee, title.Id) with
         {

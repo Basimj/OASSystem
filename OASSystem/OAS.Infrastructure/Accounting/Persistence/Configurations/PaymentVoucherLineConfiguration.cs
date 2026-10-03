@@ -14,6 +14,7 @@ public sealed class PaymentVoucherLineConfiguration : IEntityTypeConfiguration<P
             t.HasCheckConstraint("CK_PaymentVoucherLines_Amount_Positive", "[Amount] > 0");
             t.HasCheckConstraint("CK_PaymentVoucherLines_ExchangeRate_Positive", "[ExchangeRate] IS NULL OR [ExchangeRate] > 0");
             t.HasCheckConstraint("CK_PaymentVoucherLines_BaseAmount_Positive", "[BaseAmount] IS NULL OR [BaseAmount] > 0");
+            t.HasCheckConstraint("CK_PaymentVoucherLines_CounterpartyBaseAmount_Positive", "[CounterpartyBaseAmount] IS NULL OR [CounterpartyBaseAmount] > 0");
         });
         builder.HasKey(x => x.Id);
         builder.ConfigureAccountingAudit();
@@ -29,6 +30,8 @@ public sealed class PaymentVoucherLineConfiguration : IEntityTypeConfiguration<P
         builder.Property(x => x.ExchangeRate).HasPrecision(19, 8);
         builder.Property(x => x.ExchangeRateDate).HasColumnType("date");
         builder.Property(x => x.BaseAmount).HasPrecision(19, 4);
+        builder.Property(x => x.CounterpartyBaseAmount).HasPrecision(19, 4);
+        builder.Property(x => x.RealizedExchangeDifferenceBase).HasPrecision(19, 4);
         builder.Property(x => x.ReferenceNumber).HasMaxLength(100);
         builder.Property(x => x.ReferenceDate).HasColumnType("date");
         builder.Property(x => x.ReferenceType).HasMaxLength(50);

@@ -1,0 +1,22 @@
+namespace OAS.Contracts.Features.Employees.Payroll;
+
+public sealed record PayrollPolicyDto(Guid Id,string PolicyCode,string NameAr,DateOnly EffectiveFrom,DateOnly? EffectiveTo,byte Status,byte ProrationMethod,byte DailyRateMethod,byte HourlyRateMethod,bool RequireApprovedAttendance,bool RequireFullPaymentBeforeRunClose,Guid? AbsenceDeductionComponentId,Guid? LateDeductionComponentId,Guid? EarlyLeaveDeductionComponentId,Guid? UnpaidLeaveComponentId,Guid? OvertimeComponentId,string? Notes,string RowVersion);
+public sealed record CreatePayrollPolicyRequest(string NameAr,DateOnly EffectiveFrom,DateOnly? EffectiveTo,byte ProrationMethod,byte DailyRateMethod,byte HourlyRateMethod,bool RequireApprovedAttendance,bool RequireFullPaymentBeforeRunClose,Guid? AbsenceDeductionComponentId,Guid? LateDeductionComponentId,Guid? EarlyLeaveDeductionComponentId,Guid? UnpaidLeaveComponentId,Guid? OvertimeComponentId,string? Notes);
+public sealed record UpdatePayrollPolicyRequest(string NameAr,DateOnly EffectiveFrom,DateOnly? EffectiveTo,byte ProrationMethod,byte DailyRateMethod,byte HourlyRateMethod,bool RequireApprovedAttendance,bool RequireFullPaymentBeforeRunClose,Guid? AbsenceDeductionComponentId,Guid? LateDeductionComponentId,Guid? EarlyLeaveDeductionComponentId,Guid? UnpaidLeaveComponentId,Guid? OvertimeComponentId,string? Notes,string RowVersion);
+public sealed record PayrollLifecycleRequest(string RowVersion,string? Reason=null);
+
+public sealed record PayrollPeriodDto(Guid Id,string PeriodCode,short Year,byte Month,DateOnly StartDate,DateOnly EndDate,byte Status,string RowVersion);
+public sealed record CreatePayrollPeriodRequest(short Year,byte Month,DateOnly StartDate,DateOnly EndDate);
+
+public sealed record PayrollRunDto(Guid Id,string PayrollRunCode,Guid PayrollPeriodId,string PeriodCode,byte RunType,byte Status,DateOnly CalculationDate,DateOnly? PostingDate,Guid PayrollPolicyId,Guid CurrencyId,string CurrencyCode,string? CurrencySymbol,byte CurrencyDecimalPlaces,decimal TotalGrossEarnings,decimal TotalDeductions,decimal TotalEmployerContributions,decimal TotalNetPay,decimal BaseNetPay,Guid? JournalEntryId,string? Notes,string RowVersion);
+public sealed record CreatePayrollRunRequest(Guid PayrollPeriodId,byte RunType,DateOnly CalculationDate,DateOnly? PostingDate,Guid PayrollPolicyId,Guid CurrencyId,string? Notes);
+public sealed record PayrollPrevalidationIssueDto(Guid? EmployeeId,string? EmployeeCode,string? EmployeeName,string Code,string Message,byte Severity);
+public sealed record PayrollPrevalidationDto(Guid PayrollRunId,bool CanCalculate,IReadOnlyList<PayrollPrevalidationIssueDto> Issues);
+
+public sealed record EmployeePayrollLineDto(Guid Id,int LineSequence,Guid? SalaryStructureId,Guid? SalaryComponentId,string? ComponentCode,string ComponentName,byte ComponentType,byte SourceType,string? SourceModule,string? SourceDocumentType,Guid? SourceDocumentId,DateOnly? SourceDate,decimal? Quantity,decimal? Rate,decimal Amount,string? DebitPostingRole,string? CreditPostingRole,string? Description);
+public sealed record EmployeePayrollSalarySegmentDto(Guid Id,Guid? ContractId,string? ContractCode,Guid SalaryStructureId,string SalaryStructureCode,DateOnly EffectiveFrom,DateOnly EffectiveTo,decimal BasicSalaryRate,decimal ProrationFactor);
+public sealed record EmployeePayrollDto(Guid Id,Guid PayrollRunId,Guid PayrollPeriodId,Guid EmployeeId,DateOnly CoverageFrom,DateOnly CoverageTo,string EmployeeCode,string EmployeeName,string? JobTitle,string? Department,Guid? ContractId,string? ContractCode,Guid CurrencyId,string CurrencyCode,string? CurrencySymbol,byte CurrencyDecimalPlaces,decimal ConfiguredBasicSalary,decimal CalculatedBasicSalary,decimal GrossEarnings,decimal TotalDeductions,decimal TotalEmployerContributions,decimal NetPay,decimal BaseNetPay,byte Status,decimal PaidAmount,decimal OutstandingAmount,string PaymentStatus,IReadOnlyList<EmployeePayrollSalarySegmentDto> SalarySegments,IReadOnlyList<EmployeePayrollLineDto> Lines,string RowVersion);
+
+public sealed record SalaryPaymentRequest(DateOnly PaymentDate,decimal Amount,byte PaymentMethod,Guid? CashAccountId,Guid? BankAccountId,Guid SettlementAccountId,decimal? ExchangeRate,byte ExchangeRateType,string? ReferenceNumber,string? Description);
+public sealed record SalaryPaymentResultDto(Guid PaymentVoucherId,Guid PaymentAllocationId,decimal PaidAmount,decimal OutstandingAmount,string PaymentStatus);
+public sealed record PayslipDto(EmployeePayrollDto Payroll,string PeriodCode,string? JournalNumber,IReadOnlyList<string> PaymentReferences);

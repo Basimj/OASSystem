@@ -1,0 +1,54 @@
+{
+  "Id": "c8d4cbb2-9c69-4c37-95d0-4d7781667f01",
+  "Code": "HR-PAYSLIP-A4",
+  "Name": "قسيمة راتب A4",
+  "DocumentType": "Payslip",
+  "PaperWidthMm": 210,
+  "PaperHeightMm": 297,
+  "Landscape": false,
+  "IsDefault": true,
+  "Version": 1,
+  "Elements": [
+    { "Type": "Text", "Name": "العنوان", "Xmm": 65, "Ymm": 10, "WidthMm": 80, "HeightMm": 10, "Text": "قسيمة راتب", "FontFamily": "Cairo", "FontSize": 17, "Bold": true, "Alignment": "Center", "ForegroundColor": "#102A43" },
+    { "Type": "Field", "Name": "المنشأة", "Xmm": 10, "Ymm": 10, "WidthMm": 50, "HeightMm": 8, "FieldPath": "Company.Name", "FontFamily": "Cairo", "FontSize": 11, "Bold": true, "Alignment": "Right" },
+    { "Type": "Field", "Name": "رقم القسيمة", "Xmm": 150, "Ymm": 10, "WidthMm": 50, "HeightMm": 8, "FieldPath": "PayslipNumber", "Prefix": "رقم: ", "FontFamily": "Cairo", "FontSize": 9, "Alignment": "Left" },
+
+    { "Type": "Field", "Name": "الموظف", "Xmm": 10, "Ymm": 28, "WidthMm": 90, "HeightMm": 8, "FieldPath": "EmployeeName", "Prefix": "الموظف: ", "FontFamily": "Cairo", "FontSize": 11, "Bold": true },
+    { "Type": "Field", "Name": "الكود", "Xmm": 110, "Ymm": 28, "WidthMm": 42, "HeightMm": 8, "FieldPath": "EmployeeCode", "Prefix": "الكود: ", "FontFamily": "Cairo", "FontSize": 9 },
+    { "Type": "Field", "Name": "الفترة", "Xmm": 155, "Ymm": 28, "WidthMm": 45, "HeightMm": 8, "FieldPath": "PeriodCode", "Prefix": "الفترة: ", "FontFamily": "Cairo", "FontSize": 9 },
+    { "Type": "Field", "Name": "القسم", "Xmm": 10, "Ymm": 38, "WidthMm": 90, "HeightMm": 8, "FieldPath": "Department", "Prefix": "القسم: ", "FontFamily": "Cairo", "FontSize": 9 },
+    { "Type": "Field", "Name": "المسمى", "Xmm": 110, "Ymm": 38, "WidthMm": 90, "HeightMm": 8, "FieldPath": "JobTitle", "Prefix": "المسمى: ", "FontFamily": "Cairo", "FontSize": 9 },
+    { "Type": "Field", "Name": "من", "Xmm": 10, "Ymm": 48, "WidthMm": 90, "HeightMm": 8, "FieldPath": "CoverageFrom", "Prefix": "من: ", "FontFamily": "Cairo", "FontSize": 9 },
+    { "Type": "Field", "Name": "إلى", "Xmm": 110, "Ymm": 48, "WidthMm": 90, "HeightMm": 8, "FieldPath": "CoverageTo", "Prefix": "إلى: ", "FontFamily": "Cairo", "FontSize": 9 },
+
+    {
+      "Type": "Table", "Name": "تفاصيل الراتب", "Xmm": 10, "Ymm": 62, "WidthMm": 190, "HeightMm": 120,
+      "FieldPath": "Lines", "FontFamily": "Cairo", "FontSize": 8.5, "RightToLeft": true,
+      "RowHeightMm": 8, "MaxRows": 13, "ShowHeader": true,
+      "HeaderBackgroundColor": "#E8F7FA", "HeaderForegroundColor": "#102A43", "AlternateRowBackgroundColor": "#F8FCFD",
+      "BorderThickness": 0.4, "BorderColor": "#B8C7D1",
+      "Columns": [
+        { "Header": "#", "FieldPath": "LineSequence", "WidthMm": 8, "Alignment": "Center" },
+        { "Header": "المكون", "FieldPath": "ComponentName", "WidthMm": 62, "Alignment": "Right" },
+        { "Header": "النوع", "FieldPath": "Type", "WidthMm": 25, "Alignment": "Center" },
+        { "Header": "المصدر", "FieldPath": "Source", "WidthMm": 35, "Alignment": "Right" },
+        { "Header": "المبلغ", "FieldPath": "Amount", "WidthMm": 30, "Format": "N2", "Alignment": "Left" },
+        { "Header": "البيان", "FieldPath": "Description", "WidthMm": 30, "Alignment": "Right" }
+      ]
+    },
+
+    { "Type": "Field", "Name": "الإجمالي", "Xmm": 10, "Ymm": 190, "WidthMm": 58, "HeightMm": 9, "FieldPath": "GrossEarnings", "Prefix": "الاستحقاقات: ", "Format": "N2", "FontFamily": "Cairo", "FontSize": 10, "Bold": true },
+    { "Type": "Field", "Name": "الخصومات", "Xmm": 75, "Ymm": 190, "WidthMm": 58, "HeightMm": 9, "FieldPath": "TotalDeductions", "Prefix": "الخصومات: ", "Format": "N2", "FontFamily": "Cairo", "FontSize": 10, "Bold": true },
+    { "Type": "Field", "Name": "الصافي", "Xmm": 140, "Ymm": 190, "WidthMm": 60, "HeightMm": 9, "FieldPath": "NetPay", "Prefix": "الصافي: ", "Format": "N2", "FontFamily": "Cairo", "FontSize": 11, "Bold": true },
+    { "Type": "Field", "Name": "المدفوع", "Xmm": 10, "Ymm": 202, "WidthMm": 58, "HeightMm": 8, "FieldPath": "PaidAmount", "Prefix": "المدفوع: ", "Format": "N2", "FontFamily": "Cairo", "FontSize": 9 },
+    { "Type": "Field", "Name": "المتبقي", "Xmm": 75, "Ymm": 202, "WidthMm": 58, "HeightMm": 8, "FieldPath": "OutstandingAmount", "Prefix": "المتبقي: ", "Format": "N2", "FontFamily": "Cairo", "FontSize": 9 },
+    { "Type": "Field", "Name": "العملة", "Xmm": 140, "Ymm": 202, "WidthMm": 60, "HeightMm": 8, "FieldPath": "CurrencyCode", "Prefix": "العملة: ", "FontFamily": "Cairo", "FontSize": 9 },
+    { "Type": "Field", "Name": "القيد", "Xmm": 10, "Ymm": 214, "WidthMm": 90, "HeightMm": 8, "FieldPath": "JournalNumber", "Prefix": "قيد الرواتب: ", "FontFamily": "Cairo", "FontSize": 8.5 },
+    { "Type": "Field", "Name": "مراجع الدفع", "Xmm": 105, "Ymm": 214, "WidthMm": 95, "HeightMm": 8, "FieldPath": "PaymentReferences", "Prefix": "الدفع: ", "FontFamily": "Cairo", "FontSize": 8.5 },
+
+    { "Type": "Text", "Name": "توقيع الموظف", "Xmm": 15, "Ymm": 245, "WidthMm": 50, "HeightMm": 8, "Text": "توقيع الموظف", "FontFamily": "Cairo", "FontSize": 9, "Alignment": "Center" },
+    { "Type": "Text", "Name": "توقيع المحاسب", "Xmm": 80, "Ymm": 245, "WidthMm": 50, "HeightMm": 8, "Text": "المحاسب", "FontFamily": "Cairo", "FontSize": 9, "Alignment": "Center" },
+    { "Type": "Text", "Name": "الاعتماد", "Xmm": 145, "Ymm": 245, "WidthMm": 50, "HeightMm": 8, "Text": "الاعتماد", "FontFamily": "Cairo", "FontSize": 9, "Alignment": "Center" },
+    { "Type": "Field", "Name": "وقت الطباعة", "Xmm": 10, "Ymm": 275, "WidthMm": 80, "HeightMm": 7, "FieldPath": "PrintedAt", "Prefix": "طبع في: ", "FontFamily": "Cairo", "FontSize": 7.5 }
+  ]
+}

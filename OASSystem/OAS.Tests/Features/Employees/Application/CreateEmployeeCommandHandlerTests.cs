@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.Features.Employees.Commands.CreateEmployee;
+using OAS.Application.Features.Employees.Services;
 using OAS.Contracts.Features.Employees;
 using OAS.Domain.Features.Employees.Entities;
 using OAS.Domain.Features.Employees.ValueObjects;
@@ -90,7 +91,9 @@ public sealed class CreateEmployeeCommandHandlerTests
                 employees,
                 new FakeJobTitleRepository(title),
                 new FakeUserRepository(),
-                sequence);
+                sequence,
+                new FakeDepartmentRepository(),
+                new EmployeeHierarchyValidator(new FakeEmployeeRepository()));
 
         await handler.Handle(
             new CreateEmployeeCommand(
@@ -238,7 +241,9 @@ public sealed class CreateEmployeeCommandHandlerTests
                 new FakeEmployeeRepository(existing),
                 new FakeJobTitleRepository(title),
                 new FakeUserRepository(user),
-                new FakeSequenceNumberGenerator());
+                new FakeSequenceNumberGenerator(),
+                new FakeDepartmentRepository(),
+                new EmployeeHierarchyValidator(new FakeEmployeeRepository()));
 
         var ex = Assert.ThrowsAsync<ConflictException>(() =>
             handler.Handle(
@@ -274,5 +279,7 @@ public sealed class CreateEmployeeCommandHandlerTests
             employees,
             new FakeJobTitleRepository(title),
             new FakeUserRepository(),
-            new FakeSequenceNumberGenerator(sequenceStart));
+            new FakeSequenceNumberGenerator(sequenceStart),
+            new FakeDepartmentRepository(),
+            new EmployeeHierarchyValidator(new FakeEmployeeRepository()));
 }

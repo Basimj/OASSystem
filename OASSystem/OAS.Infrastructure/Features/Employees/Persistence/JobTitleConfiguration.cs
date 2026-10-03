@@ -16,6 +16,8 @@ public sealed class JobTitleConfiguration : IEntityTypeConfiguration<JobTitle>
         builder.Property(x => x.RowVersion).IsRowVersion().IsConcurrencyToken();
         builder.Property(x => x.CreatedBy).HasMaxLength(64);
         builder.Property(x => x.LastModifiedBy).HasMaxLength(64);
+        builder.Property<string?>("CreatedFromDevice").HasMaxLength(256);
+        builder.Property<string?>("UpdatedFromDevice").HasMaxLength(256);
         builder.HasIndex(x => x.Name).IsUnique().HasDatabaseName("UX_JobTitles_Name");
         builder.HasIndex(x => x.IsActive).HasDatabaseName("IX_JobTitles_IsActive");
     }
