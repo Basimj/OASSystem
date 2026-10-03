@@ -18,7 +18,7 @@
     {
         <div class="ui-sales-lines__table-wrap">
             <table class="ui-sales-lines__table">
-                <thead><tr><th>#</th><th>النوع</th><th>المنتج / الخدمة</th><th>المخزن</th><th>الكمية</th><th>السعر</th><th>الخصم</th><th>الضريبة %</th><th>الإجمالي</th><th>العين</th><th></th></tr></thead>
+                <thead><tr><th>#</th><th>النوع</th><th>الصنف</th><th>المنتج / الخدمة</th><th>المخزن</th><th>الكمية</th><th>السعر</th><th>الخصم</th><th>الضريبة %</th><th>الإجمالي</th><th>العين</th><th></th></tr></thead>
                 <tbody>
                 @foreach (var line in Model)
                 {
@@ -30,6 +30,13 @@
                             </select>
                         </td>
                         <td class="ui-sales-lines__lookup">
+                            @if (line.LineType != "Service")
+                            {
+                                <UiLookup Value="@line.ProductCategoryId" ValueChanged="v => CategoryChanged(line, v)" SelectedItem="@CategoryItem(line)"
+                                          SearchAsync="SearchCategoriesAsync" Placeholder="اختر الصنف..." Disabled="@ReadOnly" MinimumSearchLength="0" />
+                            }
+                        </td>
+                        <td class="ui-sales-lines__lookup">
                             @if (line.LineType == "Service")
                             {
                                 <input value="@line.Description" disabled="@ReadOnly" placeholder="وصف الخدمة" @onchange="e => DescriptionChanged(line, e)" />
@@ -37,7 +44,7 @@
                             else
                             {
                                 <UiLookup Value="@line.ProductVariantId" ValueChanged="v => ProductChanged(line, v)" SelectedItem="@ProductItem(line)"
-                                          SearchAsync="SearchProductsAsync" Placeholder="ابحث عن المنتج..." Disabled="@ReadOnly" MinimumSearchLength="0" />
+                                          SearchAsync="(q, ct) => SearchProduct(line, q, ct)" Placeholder="ابحث عن المنتج..." Disabled="@(ReadOnly || string.IsNullOrWhiteSpace(line.ProductCategoryId))" MinimumSearchLength="0" />
                             }
                         </td>
                         <td class="ui-sales-lines__lookup">
@@ -90,7 +97,7 @@
                     </tr>
                     @if (!ReadOnly && line.LineType == "Lens")
                     {
-                        <tr class="ui-sales-lines__detail-row"><td colspan="11">
+                        <tr class="ui-sales-lines__detail-row"><td colspan="12">
                             <div class="ui-sales-lines__detail-fields">
                                 @if (line.PrescriptionRequired)
                                 {
@@ -118,11 +125,13 @@
 @code {
     [Parameter, EditorRequired] public List<UiSalesLineModel> Model { get; set; } = [];
     [Parameter] public bool ReadOnly { get; set; }
-    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchProductsAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchCategoriesAsync { get; set; }
+    [Parameter] public Func<UiSalesLineModel, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchProductsAsync { get; set; }
     [Parameter] public Func<UiSalesLineModel, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchWarehousesAsync { get; set; }
     [Parameter] public Func<UiSalesLineModel, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchPrescriptionRevisionsAsync { get; set; }
     [Parameter] public string? HeaderPrescriptionRevisionId { get; set; }
     [Parameter] public string? HeaderPrescriptionRevisionDisplay { get; set; }
+    [Parameter] public EventCallback<UiSalesLineSelectionChange> OnCategorySelected { get; set; }
     [Parameter] public EventCallback<UiSalesLineSelectionChange> OnProductSelected { get; set; }
     [Parameter] public EventCallback<UiSalesLineSelectionChange> OnWarehouseSelected { get; set; }
     [Parameter] public bool EnablePriceOverride { get; set; }
@@ -131,9 +140,11 @@
 
     private static bool HasStoredProductPrice(UiSalesLineModel line) => !string.IsNullOrWhiteSpace(line.ProductVariantId);
     private static string? PriceTitle(UiSalesLineModel line) => HasStoredProductPrice(line) ? "السعر يُجلب تلقائيًا من بطاقة المنتج" : null;
+    private UiLookupItem? CategoryItem(UiSalesLineModel line) => string.IsNullOrWhiteSpace(line.ProductCategoryId) ? null : new(line.ProductCategoryId, line.ProductCategoryDisplay ?? line.ProductCategoryId);
     private UiLookupItem? ProductItem(UiSalesLineModel line) => string.IsNullOrWhiteSpace(line.ProductVariantId) ? null : new(line.ProductVariantId, line.ProductDisplay ?? line.ProductNameSnapshot ?? line.ProductVariantId, line.ProductCodeSnapshot);
     private UiLookupItem? WarehouseItem(UiSalesLineModel line) => string.IsNullOrWhiteSpace(line.WarehouseId) ? null : new(line.WarehouseId, line.WarehouseDisplay ?? line.WarehouseId);
     private UiLookupItem? PrescriptionItem(UiSalesLineModel line) => string.IsNullOrWhiteSpace(line.PrescriptionRevisionId) ? null : new(line.PrescriptionRevisionId, line.PrescriptionRevisionDisplay ?? line.PrescriptionRevisionId);
+    private Task<IReadOnlyList<UiLookupItem>> SearchProduct(UiSalesLineModel line, string q, CancellationToken ct) => SearchProductsAsync?.Invoke(line, q, ct) ?? Task.FromResult<IReadOnlyList<UiLookupItem>>([]);
     private Task<IReadOnlyList<UiLookupItem>> SearchWarehouse(UiSalesLineModel line, string q, CancellationToken ct) => SearchWarehousesAsync?.Invoke(line, q, ct) ?? Task.FromResult<IReadOnlyList<UiLookupItem>>([]);
     private Task<IReadOnlyList<UiLookupItem>> SearchPrescription(UiSalesLineModel line, string q, CancellationToken ct) => SearchPrescriptionRevisionsAsync?.Invoke(line, q, ct) ?? Task.FromResult<IReadOnlyList<UiLookupItem>>([]);
 
@@ -145,6 +156,8 @@
 
         if (line.LineType == "Service")
         {
+            line.ProductCategoryId = string.Empty;
+            line.ProductCategoryDisplay = null;
             line.ProductVariantId = string.Empty;
             line.ProductDisplay = null;
             line.WarehouseId = string.Empty;
@@ -159,6 +172,26 @@
             line.PrescriptionEye = string.Empty;
         }
 
+        await OnChanged.InvokeAsync();
+    }
+    private async Task CategoryChanged(UiSalesLineModel line, string? value)
+    {
+        line.ProductCategoryId = value ?? string.Empty;
+        line.ProductCategoryDisplay = null;
+        line.ProductVariantId = string.Empty;
+        line.ProductDisplay = null;
+        line.ProductCodeSnapshot = null;
+        line.ProductNameSnapshot = null;
+        line.Description = string.Empty;
+        line.WarehouseId = string.Empty;
+        line.WarehouseDisplay = null;
+        line.BaseUnitPrice = 0m;
+        line.ActualUnitPrice = 0m;
+        line.PrescriptionRequired = false;
+        line.PrescriptionRevisionId = string.Empty;
+        line.PrescriptionRevisionDisplay = null;
+        line.PrescriptionEye = string.Empty;
+        await OnCategorySelected.InvokeAsync(new(line, value));
         await OnChanged.InvokeAsync();
     }
     private async Task ProductChanged(UiSalesLineModel line, string? value) { line.ProductVariantId = value ?? string.Empty; line.WarehouseId = string.Empty; await OnProductSelected.InvokeAsync(new(line, value)); await OnChanged.InvokeAsync(); }

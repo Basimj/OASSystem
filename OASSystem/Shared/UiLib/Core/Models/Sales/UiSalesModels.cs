@@ -63,6 +63,8 @@ public sealed class UiSalesLineModel
     public Guid? GroupId { get; set; }
     public int LineNumber { get; set; }
     public string LineType { get; set; } = "Frame";
+    public string ProductCategoryId { get; set; } = string.Empty;
+    public string? ProductCategoryDisplay { get; set; }
     public string ProductVariantId { get; set; } = string.Empty;
     public string? ProductDisplay { get; set; }
     public string WarehouseId { get; set; } = string.Empty;
@@ -156,6 +158,12 @@ public sealed class UiSalesInvoiceFormModel
     public decimal PaidAmount { get; set; }
     public decimal OutstandingAmount { get; set; }
     public Guid? JournalEntryId { get; set; }
+    public string? JournalEntryNumber { get; set; }
+    public string ImmediatePaymentMethod { get; set; } = "Cash";
+    public string ImmediateCashAccountId { get; set; } = string.Empty;
+    public string? ImmediateCashAccountDisplay { get; set; }
+    public string ImmediateBankAccountId { get; set; } = string.Empty;
+    public string? ImmediateBankAccountDisplay { get; set; }
     public string? Description { get; set; }
     public string RowVersion { get; set; } = string.Empty;
     public List<UiSalesLineModel> Lines { get; set; } = [];

@@ -19,10 +19,10 @@
 </UiSalesFormSection>
 
 <UiSalesFormSection Title="أسطر الطلب" Description="يتم احتساب الإجماليات النهائية داخل Domain/Application عند الحفظ والتأكيد." IconCss="fa-solid fa-list">
-    <UiSalesLinesEditor Model="@Model.Lines" ReadOnly="@ReadOnly" SearchProductsAsync="SearchProductsAsync"
+    <UiSalesLinesEditor Model="@Model.Lines" ReadOnly="@ReadOnly" SearchCategoriesAsync="SearchCategoriesAsync" SearchProductsAsync="SearchProductsAsync"
                         SearchWarehousesAsync="SearchWarehousesAsync" SearchPrescriptionRevisionsAsync="SearchPrescriptionRevisionsAsync"
                         HeaderPrescriptionRevisionId="@Model.PrescriptionRevisionId" HeaderPrescriptionRevisionDisplay="@Model.PrescriptionDisplay"
-                        OnProductSelected="OnProductSelected" OnWarehouseSelected="OnWarehouseSelected" OnChanged="OnChanged" />
+                        OnCategorySelected="OnCategorySelected" OnProductSelected="OnProductSelected" OnWarehouseSelected="OnWarehouseSelected" OnChanged="OnChanged" />
 </UiSalesFormSection>
 
 <UiSalesTotalsPanel CurrencyCode="@Model.CurrencyCode" Subtotal="@Model.Subtotal" DiscountAmount="@Model.DiscountAmount" TaxAmount="@Model.TaxAmount" TotalAmount="@Model.TotalAmount" />
@@ -35,10 +35,12 @@
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchCustomersAsync { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchPrescriptionsAsync { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchCurrenciesAsync { get; set; }
-    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchProductsAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchCategoriesAsync { get; set; }
+    [Parameter] public Func<UiSalesLineModel, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchProductsAsync { get; set; }
     [Parameter] public Func<UiSalesLineModel, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchWarehousesAsync { get; set; }
     [Parameter] public Func<UiSalesLineModel, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchPrescriptionRevisionsAsync { get; set; }
     [Parameter] public EventCallback<UiSalesSelectionChange> OnSelectionChanged { get; set; }
+    [Parameter] public EventCallback<UiSalesLineSelectionChange> OnCategorySelected { get; set; }
     [Parameter] public EventCallback<UiSalesLineSelectionChange> OnProductSelected { get; set; }
     [Parameter] public EventCallback<UiSalesLineSelectionChange> OnWarehouseSelected { get; set; }
     [Parameter] public EventCallback OnChanged { get; set; }

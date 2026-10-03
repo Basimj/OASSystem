@@ -39,10 +39,9 @@ public sealed class SalesStockReservationService(
             }
 
             var balance = await balances.GetByWarehouseAndVariantAsync(line.WarehouseId!.Value, line.ProductVariantId!.Value, cancellationToken);
-            if (balance is null || balance.AvailableQuantity < line.Quantity)
+            if (balance is null || !balance.TryReserve(line.Quantity))
                 continue;
 
-            balance.Reserve(line.Quantity);
             balances.Update(balance);
             await reservations.AddAsync(StockReservation.Create(
                 Guid.NewGuid(), line.ProductVariantId.Value, line.WarehouseId.Value, line.Quantity,
@@ -56,6 +55,54 @@ public sealed class SalesStockReservationService(
         return order.Lines.Any(x => x.IsActive && x.RequiresProduction)
             ? CustomerOrderStatus.ReadyForProduction
             : CustomerOrderStatus.Confirmed;
+    }
+
+    public async Task<bool> HasSufficientStockForInvoiceAsync(SalesInvoice invoice, CancellationToken cancellationToken = default)
+    {
+        var additionalRequired = new Dictionary<(Guid WarehouseId, Guid ProductVariantId), decimal>();
+
+        foreach (var line in invoice.Lines.Where(x => x.IsActive && x.RequiresInventory))
+        {
+            if (invoice.CustomerOrderId.HasValue && line.CustomerOrderLineId.HasValue)
+            {
+                var orderReservations = await FindActiveAsync(
+                    SalesSourceReferences.CustomerOrder,
+                    invoice.CustomerOrderId.Value,
+                    line.CustomerOrderLineId.Value,
+                    cancellationToken);
+
+                if (orderReservations.Sum(x => x.Quantity) < line.Quantity)
+                    return false;
+
+                continue;
+            }
+
+            var existing = await FindActiveAsync(
+                SalesSourceReferences.SalesInvoice,
+                invoice.Id,
+                line.Id,
+                cancellationToken);
+
+            var missingQuantity = line.Quantity - existing.Sum(x => x.Quantity);
+            if (missingQuantity <= 0)
+                continue;
+
+            var key = (line.WarehouseId!.Value, line.ProductVariantId!.Value);
+            additionalRequired[key] = additionalRequired.GetValueOrDefault(key) + missingQuantity;
+        }
+
+        foreach (var requirement in additionalRequired)
+        {
+            var balance = await balances.GetByWarehouseAndVariantAsync(
+                requirement.Key.WarehouseId,
+                requirement.Key.ProductVariantId,
+                cancellationToken);
+
+            if (balance is null || balance.AvailableQuantity < requirement.Value)
+                return false;
+        }
+
+        return true;
     }
 
     public async Task EnsureReservationsForInvoiceAsync(SalesInvoice invoice, CancellationToken cancellationToken = default)
@@ -75,10 +122,9 @@ public sealed class SalesStockReservationService(
                 continue;
 
             var balance = await balances.GetByWarehouseAndVariantAsync(line.WarehouseId!.Value, line.ProductVariantId!.Value, cancellationToken);
-            if (balance is null || balance.AvailableQuantity < line.Quantity)
+            if (balance is null || !balance.TryReserve(line.Quantity))
                 throw new ConflictException(SalesErrorCodes.InsufficientStock, "الكمية المتاحة غير كافية لتأكيد الفاتورة.");
 
-            balance.Reserve(line.Quantity);
             balances.Update(balance);
             await reservations.AddAsync(StockReservation.Create(
                 Guid.NewGuid(), line.ProductVariantId.Value, line.WarehouseId.Value, line.Quantity,

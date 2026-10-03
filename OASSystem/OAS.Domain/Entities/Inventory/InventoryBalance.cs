@@ -49,12 +49,19 @@ public class InventoryBalance : AuditableEntity<Guid>
 
     public void Reserve(decimal quantity)
     {
+        if (!TryReserve(quantity))
+            throw new DomainException("Insufficient available inventory quantity for reservation.");
+    }
+
+    public bool TryReserve(decimal quantity)
+    {
         EnsurePositive(quantity, "Reservation quantity");
 
         if (AvailableQuantity < quantity)
-            throw new DomainException("Insufficient available inventory quantity for reservation.");
+            return false;
 
         ReservedQuantity += quantity;
+        return true;
     }
 
     public void ReleaseReservation(decimal quantity)

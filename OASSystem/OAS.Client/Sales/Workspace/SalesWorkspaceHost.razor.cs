@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Components.Web;
 using OAS.Client.Sales.Common;
 using OAS.Client.Sales.Mapping;
 using OAS.Client.Sales.Services;
+using OAS.Client.Printing.Services;
 using OAS.Client.Sales.Workspace;
 using OAS.Client.Services.Http;
 using OAS.Contracts.Common.Pagination;
@@ -27,12 +28,16 @@ public partial class SalesWorkspaceHost : IDisposable
     [Inject] private ISalesWorkspaceState Workspace { get; set; } = default!;
     [Inject] private IUiDialogService Dialogs { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private IPrintingClientService PrintingService { get; set; } = default!;
 
     private readonly List<UiSalesDocumentListItem> _listItems = [];
     private readonly Dictionary<Guid, SalesCustomerLookupDto> _customers = [];
+    private readonly Dictionary<Guid, SalesProductCategoryLookupDto> _categories = [];
     private readonly Dictionary<Guid, SalesProductVariantLookupDto> _products = [];
     private readonly Dictionary<Guid, SalesWarehouseLookupDto> _warehouses = [];
     private readonly Dictionary<Guid, SalesCurrencyLookupDto> _currencies = [];
+    private readonly Dictionary<Guid, SalesCashAccountLookupDto> _cashAccounts = [];
+    private readonly Dictionary<Guid, SalesBankAccountLookupDto> _bankAccounts = [];
     private readonly Dictionary<Guid, CustomerOrderLookupDto> _orders = [];
     private readonly Dictionary<Guid, SalesPrescriptionRevisionLookupDto> _revisions = [];
     private string? _search;
@@ -45,6 +50,7 @@ public partial class SalesWorkspaceHost : IDisposable
     private readonly Dictionary<Guid, UiPrescriptionRevisionModel> _revisionDrafts = [];
     private readonly HashSet<Guid> _dirtyRevisionDraftTabs = [];
     private bool _isSavingRevision;
+    private bool _isPrintingInvoice;
     private SalesEntityType? _lastSection;
 
     private SalesWorkspaceTabState? ActiveTab => Workspace.ActiveTab;
@@ -303,10 +309,37 @@ public partial class SalesWorkspaceHost : IDisposable
 
     private async Task ConfirmOrderAsync(MouseEventArgs _)
     {
-        if (ActiveTab?.Model is not UiCustomerOrderFormModel m || !m.Id.HasValue) return;
-        if (!EnsureSaved(ActiveTab)) return;
-        try { var dto = await Sales.ConfirmCustomerOrderAsync(m.Id.Value, new ConfirmCustomerOrderRequest(m.RowVersion)); if (dto is not null) ActiveTab.Model = SalesUiMapper.ToUi(dto); _success = "تم تأكيد الطلب وفحص/حجز المخزون حسب المتاح."; Workspace.NotifyStateChanged(); await LoadListAsync(SalesEntityType.CustomerOrders); }
-        catch (ApiClientException ex) { _error = SalesApiErrorPresenter.GetMessage(ex.Error); }
+        if (ActiveTab?.Model is not UiCustomerOrderFormModel m || !m.Id.HasValue)
+            return;
+        if (!EnsureSaved(ActiveTab))
+            return;
+
+        ClearMessages();
+        try
+        {
+            var dto = await Sales.ConfirmCustomerOrderAsync(
+                m.Id.Value,
+                new ConfirmCustomerOrderRequest(m.RowVersion));
+
+            if (dto is not null)
+            {
+                ActiveTab.Model = SalesUiMapper.ToUi(dto);
+                _success = dto.Status switch
+                {
+                    CustomerOrderStatus.AwaitingStock => "تم تأكيد الطلب، لكن المخزون غير كافٍ حاليًا. تم تحويل الطلب إلى بانتظار المخزون.",
+                    CustomerOrderStatus.PartiallyAvailable => "تم تأكيد الطلب وحجز الكمية المتاحة. بعض البنود ما زالت بانتظار المخزون.",
+                    _ => "تم تأكيد الطلب وفحص/حجز المخزون حسب المتاح."
+                };
+            }
+
+            Workspace.NotifyStateChanged();
+            await LoadListAsync(SalesEntityType.CustomerOrders);
+        }
+        catch (ApiClientException ex)
+        {
+            _error = SalesApiErrorPresenter.GetMessage(ex.Error);
+            Workspace.NotifyStateChanged();
+        }
     }
 
     private async Task CancelOrderAsync(MouseEventArgs _)
@@ -319,9 +352,56 @@ public partial class SalesWorkspaceHost : IDisposable
 
     private async Task ConfirmInvoiceAsync(MouseEventArgs _)
     {
-        if (ActiveTab?.Model is not UiSalesInvoiceFormModel m || !m.Id.HasValue || !EnsureSaved(ActiveTab)) return;
-        try { var dto = await Sales.ConfirmSalesInvoiceAsync(m.Id.Value, new ConfirmSalesInvoiceRequest(m.RowVersion)); if (dto is not null) ActiveTab.Model = SalesUiMapper.ToUi(dto); _success = "تم تأكيد الفاتورة. أصبحت الحقول المالية الحرجة للقراءة فقط."; Workspace.NotifyStateChanged(); await LoadListAsync(SalesEntityType.SalesInvoices); }
-        catch (ApiClientException ex) { _error = SalesApiErrorPresenter.GetMessage(ex.Error); }
+        if (ActiveTab?.Model is not UiSalesInvoiceFormModel m || !m.Id.HasValue || !EnsureSaved(ActiveTab))
+            return;
+
+        ClearMessages();
+        try
+        {
+            // Expected credit-limit failures are checked without throwing a business exception.
+            // The POST confirm request is sent only when the invoice is currently eligible.
+            var validation = await Sales.PreValidateSalesInvoiceConfirmationAsync(m.Id.Value);
+            if (validation is null)
+            {
+                _error = "تعذر فحص جاهزية تأكيد الفاتورة.";
+                Workspace.NotifyStateChanged();
+                return;
+            }
+
+            if (!validation.CanConfirm)
+            {
+                var issue = validation.Issues.FirstOrDefault();
+                _error = issue is null
+                    ? "الفاتورة غير جاهزة للتأكيد."
+                    : SalesApiErrorPresenter.GetMessage(
+                        new OAS.Contracts.Common.Errors.ApiError
+                        {
+                            Code = issue.Code,
+                            Message = issue.Message,
+                            Status = 409
+                        },
+                        issue.Message);
+                Workspace.NotifyStateChanged();
+                return;
+            }
+
+            var dto = await Sales.ConfirmSalesInvoiceAsync(
+                m.Id.Value,
+                new ConfirmSalesInvoiceRequest(m.RowVersion));
+
+            if (dto is not null)
+                ActiveTab.Model = SalesUiMapper.ToUi(dto);
+
+            _success = "تم تأكيد الفاتورة. أصبحت الحقول المالية الحرجة للقراءة فقط.";
+            Workspace.NotifyStateChanged();
+            await LoadListAsync(SalesEntityType.SalesInvoices);
+        }
+        catch (ApiClientException ex)
+        {
+            // Backend validation remains the final guard for concurrency and external API callers.
+            _error = SalesApiErrorPresenter.GetMessage(ex.Error);
+            Workspace.NotifyStateChanged();
+        }
     }
 
     private async Task CancelInvoiceAsync(MouseEventArgs _)
@@ -342,11 +422,50 @@ public partial class SalesWorkspaceHost : IDisposable
             if (validation is null) { _error = "تعذر فحص جاهزية الترحيل."; return; }
             m.PostingIssues = validation.Issues.Select(x => SalesApiErrorPresenter.GetMessage(new OAS.Contracts.Common.Errors.ApiError { Code = x.Code, Message = x.Message, Status = 409 }, x.Message)).ToList();
             if (!validation.CanPost) { _error = m.PostingIssues.FirstOrDefault() ?? "الفاتورة غير جاهزة للترحيل."; Workspace.NotifyStateChanged(); return; }
-            if (!await Dialogs.ConfirmAsync("ترحيل فاتورة المبيعات", "سيتم ترحيل فاتورة المبيعات وإنشاء أثر مخزني وقيد محاسبي رسمي. بعد الترحيل لن يمكن تعديل الفاتورة مباشرة. هل تريد المتابعة؟", AlertTone.Warning, "ترحيل", "رجوع")) return;
-            await Sales.PostSalesInvoiceAsync(m.Id.Value, new PostSalesInvoiceRequest(m.RowVersion));
+            SalesImmediatePaymentMethod? immediateMethod = null;
+            Guid? cashAccountId = null;
+            Guid? bankAccountId = null;
+
+            if (string.Equals(m.PaymentTermType, "Immediate", StringComparison.OrdinalIgnoreCase))
+            {
+                immediateMethod = string.Equals(m.ImmediatePaymentMethod, "Bank", StringComparison.OrdinalIgnoreCase)
+                    ? SalesImmediatePaymentMethod.Bank
+                    : SalesImmediatePaymentMethod.Cash;
+
+                if (immediateMethod == SalesImmediatePaymentMethod.Cash)
+                {
+                    cashAccountId = TryGuid(m.ImmediateCashAccountId);
+                    if (!cashAccountId.HasValue)
+                    {
+                        _error = "يجب اختيار الصندوق قبل ترحيل الفاتورة الفورية النقدية.";
+                        Workspace.NotifyStateChanged();
+                        return;
+                    }
+                }
+                else
+                {
+                    bankAccountId = TryGuid(m.ImmediateBankAccountId);
+                    if (!bankAccountId.HasValue)
+                    {
+                        _error = "يجب اختيار الحساب البنكي قبل ترحيل الفاتورة الفورية.";
+                        Workspace.NotifyStateChanged();
+                        return;
+                    }
+                }
+            }
+
+            var confirmationText = immediateMethod.HasValue
+                ? "سيتم ترحيل فاتورة المبيعات وإنشاء الأثر المخزني والقيد المحاسبي، ثم إنشاء سند قبض تلقائي وترحيله وتخصيصه على الفاتورة. هل تريد المتابعة؟"
+                : "سيتم ترحيل فاتورة المبيعات وإنشاء أثر مخزني وقيد محاسبي رسمي. بعد الترحيل لن يمكن تعديل الفاتورة مباشرة. هل تريد المتابعة؟";
+
+            if (!await Dialogs.ConfirmAsync("ترحيل فاتورة المبيعات", confirmationText, AlertTone.Warning, "ترحيل", "رجوع")) return;
+            var postingResult = await Sales.PostSalesInvoiceAsync(m.Id.Value, new PostSalesInvoiceRequest(m.RowVersion, immediateMethod, cashAccountId, bankAccountId));
             var dto = await Sales.GetSalesInvoiceByIdAsync(m.Id.Value);
             if (dto is not null) ActiveTab.Model = SalesUiMapper.ToUi(dto);
-            _success = "تم ترحيل الفاتورة بنجاح."; Workspace.NotifyStateChanged(); await LoadListAsync(SalesEntityType.SalesInvoices);
+            _success = !string.IsNullOrWhiteSpace(postingResult?.ReceiptVoucherNumber)
+                ? $"تم ترحيل الفاتورة وإنشاء سند القبض {postingResult.ReceiptVoucherNumber} وتخصيصه بالكامل."
+                : "تم ترحيل الفاتورة بنجاح.";
+            Workspace.NotifyStateChanged(); await LoadListAsync(SalesEntityType.SalesInvoices);
         }
         catch (ApiClientException ex) { _error = SalesApiErrorPresenter.GetMessage(ex.Error); }
     }
@@ -668,10 +787,54 @@ public partial class SalesWorkspaceHost : IDisposable
                 disabled);
         }).ToArray();
     }
-    private async Task<IReadOnlyList<UiLookupItem>> SearchProductItemsAsync(string q, CancellationToken ct)
+    private async Task<IReadOnlyList<UiLookupItem>> SearchCategoryItemsAsync(string q, CancellationToken ct)
     {
-        var rows = await Sales.SearchProductVariantsAsync(q, 20, ct); foreach (var x in rows) _products[x.Id] = x;
-        return rows.Select(x => new UiLookupItem(x.Id.ToString(), $"{x.ProductCode} - {x.ProductNameAr}", string.Join(" • ", new[] { x.SKU, x.Barcode, x.VariantName }.Where(s => !string.IsNullOrWhiteSpace(s))), "fa-solid fa-box", !x.IsActive)).ToArray();
+        var rows = await Sales.SearchProductCategoriesAsync(q, 50, ct);
+        foreach (var x in rows)
+            _categories[x.Id] = x;
+
+        return rows.Select(x => new UiLookupItem(
+            x.Id.ToString(),
+            $"{x.Code} - {x.NameAr}",
+            null,
+            "fa-solid fa-layer-group",
+            !x.IsActive)).ToArray();
+    }
+
+    private async Task<IReadOnlyList<UiLookupItem>> SearchCashAccountItemsAsync(string q, CancellationToken ct)
+    {
+        if (ActiveTab?.Model is not UiSalesInvoiceFormModel invoice || !Guid.TryParse(invoice.CurrencyId, out var currencyId))
+            return [];
+        var rows = await Sales.SearchCashAccountsAsync(currencyId, q, 20, ct);
+        foreach (var x in rows) _cashAccounts[x.Id] = x;
+        return rows.Select(x => new UiLookupItem(x.Id.ToString(), $"{x.Code} - {x.Name}", x.IsDefault ? "الصندوق الافتراضي" : null, "fa-solid fa-cash-register", !x.IsActive)).ToArray();
+    }
+
+    private async Task<IReadOnlyList<UiLookupItem>> SearchBankAccountItemsAsync(string q, CancellationToken ct)
+    {
+        if (ActiveTab?.Model is not UiSalesInvoiceFormModel invoice || !Guid.TryParse(invoice.CurrencyId, out var currencyId))
+            return [];
+        var rows = await Sales.SearchBankAccountsAsync(currencyId, q, 20, ct);
+        foreach (var x in rows) _bankAccounts[x.Id] = x;
+        return rows.Select(x => new UiLookupItem(x.Id.ToString(), $"{x.Code} - {x.BankName} - {x.AccountName}", x.AccountNumber, "fa-solid fa-building-columns", !x.IsActive)).ToArray();
+    }
+
+    private async Task<IReadOnlyList<UiLookupItem>> SearchProductItemsAsync(UiSalesLineModel line, string q, CancellationToken ct)
+    {
+        var categoryId = TryGuid(line.ProductCategoryId);
+        if (!categoryId.HasValue)
+            return [];
+
+        var rows = await Sales.SearchProductVariantsAsync(categoryId, q, 20, ct);
+        foreach (var x in rows)
+            _products[x.Id] = x;
+
+        return rows.Select(x => new UiLookupItem(
+            x.Id.ToString(),
+            $"{x.ProductCode} - {x.ProductNameAr}",
+            string.Join(" • ", new[] { x.SKU, x.Barcode, x.VariantName }.Where(s => !string.IsNullOrWhiteSpace(s))),
+            "fa-solid fa-box",
+            !x.IsActive)).ToArray();
     }
     private async Task<IReadOnlyList<UiLookupItem>> SearchWarehouseItemsAsync(UiSalesLineModel line, string q, CancellationToken ct)
     {
@@ -731,6 +894,16 @@ public partial class SalesWorkspaceHost : IDisposable
 
             if (change.Field == "Currency" && Guid.TryParse(change.Value, out var curId) && _currencies.TryGetValue(curId, out var cur))
             {
+                var previousRate = order.ExchangeRate;
+                RepriceUiForCurrencyChange(
+                    order.Lines,
+                    previousRate,
+                    cur.EffectiveExchangeRate,
+                    cur.DecimalPlaces);
+                order.Subtotal = ConvertUiCurrency(order.Subtotal, previousRate, cur.EffectiveExchangeRate, cur.DecimalPlaces);
+                order.DiscountAmount = ConvertUiCurrency(order.DiscountAmount, previousRate, cur.EffectiveExchangeRate, cur.DecimalPlaces);
+                order.TaxAmount = ConvertUiCurrency(order.TaxAmount, previousRate, cur.EffectiveExchangeRate, cur.DecimalPlaces);
+                order.TotalAmount = ConvertUiCurrency(order.TotalAmount, previousRate, cur.EffectiveExchangeRate, cur.DecimalPlaces);
                 order.CurrencyDisplay = $"{cur.Code} - {cur.NameAr}";
                 order.CurrencyCode = cur.Code;
                 order.CurrencyDecimalPlaces = cur.DecimalPlaces;
@@ -775,10 +948,50 @@ public partial class SalesWorkspaceHost : IDisposable
 
             if (change.Field == "Currency" && Guid.TryParse(change.Value, out var curId) && _currencies.TryGetValue(curId, out var cur))
             {
+                var previousRate = invoice.ExchangeRate;
+                RepriceUiForCurrencyChange(
+                    invoice.Lines,
+                    previousRate,
+                    cur.EffectiveExchangeRate,
+                    cur.DecimalPlaces);
+                invoice.Subtotal = ConvertUiCurrency(invoice.Subtotal, previousRate, cur.EffectiveExchangeRate, cur.DecimalPlaces);
+                invoice.DiscountAmount = ConvertUiCurrency(invoice.DiscountAmount, previousRate, cur.EffectiveExchangeRate, cur.DecimalPlaces);
+                invoice.TaxAmount = ConvertUiCurrency(invoice.TaxAmount, previousRate, cur.EffectiveExchangeRate, cur.DecimalPlaces);
+                invoice.TotalAmount = ConvertUiCurrency(invoice.TotalAmount, previousRate, cur.EffectiveExchangeRate, cur.DecimalPlaces);
+                invoice.PaidAmount = ConvertUiCurrency(invoice.PaidAmount, previousRate, cur.EffectiveExchangeRate, cur.DecimalPlaces);
+                invoice.OutstandingAmount = ConvertUiCurrency(invoice.OutstandingAmount, previousRate, cur.EffectiveExchangeRate, cur.DecimalPlaces);
                 invoice.CurrencyDisplay = $"{cur.Code} - {cur.NameAr}";
                 invoice.CurrencyCode = cur.Code;
                 invoice.CurrencyDecimalPlaces = cur.DecimalPlaces;
                 invoice.ExchangeRate = cur.EffectiveExchangeRate;
+            }
+
+            if (change.Field == "ImmediateCashAccount")
+            {
+                if (Guid.TryParse(change.Value, out var cashId) && _cashAccounts.TryGetValue(cashId, out var cash))
+                    invoice.ImmediateCashAccountDisplay = $"{cash.Code} - {cash.Name}";
+                else
+                    invoice.ImmediateCashAccountDisplay = null;
+
+                // اختيار صندوق التحصيل بعد تأكيد الفاتورة هو مُدخل لعملية الترحيل نفسها
+                // ويُرسل ضمن PostSalesInvoiceRequest، وليس تعديلاً محفوظاً على الفاتورة.
+                // لذلك لا نعلّم التبويب Dirty وإلا سيمنع EnsureSaved عملية الترحيل
+                // مع عدم وجود زر حفظ أصلاً في حالة Confirmed.
+                Workspace.NotifyStateChanged();
+                return;
+            }
+
+            if (change.Field == "ImmediateBankAccount")
+            {
+                if (Guid.TryParse(change.Value, out var bankId) && _bankAccounts.TryGetValue(bankId, out var bank))
+                    invoice.ImmediateBankAccountDisplay = $"{bank.Code} - {bank.BankName} - {bank.AccountName}";
+                else
+                    invoice.ImmediateBankAccountDisplay = null;
+
+                // الحساب البنكي هنا أيضاً اختيار خاص بالترحيل الفوري وليس تغييراً دائماً
+                // في بيانات الفاتورة، لذلك يجب ألا يغيّر IsDirty.
+                Workspace.NotifyStateChanged();
+                return;
             }
 
             if (change.Field == "CustomerOrder")
@@ -876,18 +1089,37 @@ public partial class SalesWorkspaceHost : IDisposable
         return false;
     }
 
+    private Task CategorySelectedAsync(UiSalesLineSelectionChange change)
+    {
+        if (Guid.TryParse(change.Value, out var id) && _categories.TryGetValue(id, out var category))
+            change.Line.ProductCategoryDisplay = $"{category.Code} - {category.NameAr}";
+        else
+            change.Line.ProductCategoryDisplay = null;
+
+        return Task.CompletedTask;
+    }
+
     private Task ProductSelectedAsync(UiSalesLineSelectionChange change)
     {
         if (Guid.TryParse(change.Value, out var id) && _products.TryGetValue(id, out var product))
         {
+            change.Line.ProductCategoryId = product.CategoryId.ToString();
+            if (_categories.TryGetValue(product.CategoryId, out var category))
+                change.Line.ProductCategoryDisplay = $"{category.Code} - {category.NameAr}";
+
             change.Line.ProductDisplay = string.IsNullOrWhiteSpace(product.VariantName)
                 ? product.ProductNameAr
                 : $"{product.ProductNameAr} - {product.VariantName}";
 
             change.Line.ProductCodeSnapshot = product.ProductCode;
             change.Line.Description = change.Line.ProductDisplay;
-            change.Line.BaseUnitPrice = product.SellingPrice;
-            change.Line.ActualUnitPrice = product.SellingPrice;
+            var (exchangeRate, currencyDecimals) = ActiveCurrencyContext();
+            var transactionPrice = ConvertFromBaseForUi(
+                product.SellingPrice,
+                exchangeRate,
+                currencyDecimals);
+            change.Line.BaseUnitPrice = transactionPrice;
+            change.Line.ActualUnitPrice = transactionPrice;
             change.Line.PrescriptionRequired = product.IsPrescriptionLens;
 
             if (product.IsPrescriptionLens)
@@ -910,6 +1142,61 @@ public partial class SalesWorkspaceHost : IDisposable
         }
         return Task.CompletedTask;
     }
+    private (decimal ExchangeRate, byte DecimalPlaces) ActiveCurrencyContext() =>
+        ActiveTab?.Model switch
+        {
+            UiCustomerOrderFormModel order => (NormalizeRate(order.ExchangeRate), order.CurrencyDecimalPlaces),
+            UiSalesInvoiceFormModel invoice => (NormalizeRate(invoice.ExchangeRate), invoice.CurrencyDecimalPlaces),
+            _ => (1m, 2)
+        };
+
+    private static decimal NormalizeRate(decimal rate) => rate > 0m ? rate : 1m;
+
+    private static decimal ConvertFromBaseForUi(decimal baseAmount, decimal exchangeRate, byte decimalPlaces)
+    {
+        var rate = NormalizeRate(exchangeRate);
+        return Math.Round(baseAmount / rate, decimalPlaces, MidpointRounding.AwayFromZero);
+    }
+
+    private static decimal ConvertUiCurrency(
+        decimal amount,
+        decimal fromExchangeRate,
+        decimal toExchangeRate,
+        byte decimalPlaces)
+    {
+        var fromRate = NormalizeRate(fromExchangeRate);
+        var toRate = NormalizeRate(toExchangeRate);
+        return Math.Round(amount * fromRate / toRate, decimalPlaces, MidpointRounding.AwayFromZero);
+    }
+
+    private static void RepriceUiForCurrencyChange(
+        IEnumerable<UiSalesLineModel> lines,
+        decimal fromExchangeRate,
+        decimal toExchangeRate,
+        byte decimalPlaces)
+    {
+        foreach (var line in lines)
+        {
+            line.BaseUnitPrice = ConvertUiCurrency(line.BaseUnitPrice, fromExchangeRate, toExchangeRate, decimalPlaces);
+            line.ActualUnitPrice = ConvertUiCurrency(line.ActualUnitPrice, fromExchangeRate, toExchangeRate, decimalPlaces);
+
+            if (string.Equals(line.DiscountType, "FixedAmount", StringComparison.OrdinalIgnoreCase) &&
+                line.DiscountValue.HasValue)
+            {
+                line.DiscountValue = ConvertUiCurrency(
+                    line.DiscountValue.Value,
+                    fromExchangeRate,
+                    toExchangeRate,
+                    decimalPlaces);
+            }
+
+            line.DiscountAmount = ConvertUiCurrency(line.DiscountAmount, fromExchangeRate, toExchangeRate, decimalPlaces);
+            line.TaxAmount = ConvertUiCurrency(line.TaxAmount, fromExchangeRate, toExchangeRate, decimalPlaces);
+            line.NetAmount = ConvertUiCurrency(line.NetAmount, fromExchangeRate, toExchangeRate, decimalPlaces);
+            line.FinalAmount = ConvertUiCurrency(line.FinalAmount, fromExchangeRate, toExchangeRate, decimalPlaces);
+        }
+    }
+
     private Task WarehouseSelectedAsync(UiSalesLineSelectionChange change) { if (Guid.TryParse(change.Value, out var id) && _warehouses.TryGetValue(id, out var w)) change.Line.WarehouseDisplay = $"{w.Code} - {w.NameAr}"; return Task.CompletedTask; }
 
     private async Task RequestPriceOverrideAsync(UiSalesLineModel line)
@@ -932,6 +1219,39 @@ public partial class SalesWorkspaceHost : IDisposable
         }
         catch (ApiClientException ex) { _error = SalesApiErrorPresenter.GetMessage(ex.Error); }
         Workspace.NotifyStateChanged();
+    }
+
+    private async Task PrintInvoiceAsync(MouseEventArgs _)
+    {
+        if (_isPrintingInvoice || ActiveTab?.Model is not UiSalesInvoiceFormModel invoice || !invoice.Id.HasValue)
+            return;
+
+        if (!string.Equals(invoice.Status, "Posted", StringComparison.OrdinalIgnoreCase))
+        {
+            _error = "يمكن طباعة فاتورة المبيعات بعد الترحيل فقط.";
+            Workspace.NotifyStateChanged();
+            return;
+        }
+
+        ClearMessages();
+        _isPrintingInvoice = true;
+        Workspace.NotifyStateChanged();
+        try
+        {
+            var result = await PrintingService.PrintSalesInvoiceAsync(invoice.Id.Value);
+            _success = result is null
+                ? "تم إرسال فاتورة المبيعات إلى OAS Print."
+                : "تم إرسال فاتورة المبيعات إلى OAS Print للطباعة.";
+        }
+        catch (ApiClientException ex)
+        {
+            _error = SalesApiErrorPresenter.GetMessage(ex.Error);
+        }
+        finally
+        {
+            _isPrintingInvoice = false;
+            Workspace.NotifyStateChanged();
+        }
     }
 
     private Task ViewJournalAsync(MouseEventArgs _) { Navigation.NavigateTo("/accounting/journals"); return Task.CompletedTask; }

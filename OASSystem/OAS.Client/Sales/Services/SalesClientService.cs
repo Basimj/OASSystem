@@ -51,6 +51,7 @@ public sealed class SalesClientService(OasApiClient apiClient) : ISalesClientSer
     public Task<SalesInvoiceDto?> CreateSalesInvoiceAsync(CreateSalesInvoiceRequest r, CancellationToken ct = default) => apiClient.PostAsync<CreateSalesInvoiceRequest, SalesInvoiceDto>("api/sales/invoices", r, ct);
     public Task<SalesInvoiceDto?> CreateSalesInvoiceFromOrderAsync(Guid orderId, CreateSalesInvoiceFromOrderRequest r, CancellationToken ct = default) => apiClient.PostAsync<CreateSalesInvoiceFromOrderRequest, SalesInvoiceDto>($"api/sales/invoices/from-order/{orderId}", r, ct);
     public Task<SalesInvoiceDto?> UpdateSalesInvoiceAsync(Guid id, UpdateSalesInvoiceRequest r, CancellationToken ct = default) => apiClient.PutAsync<UpdateSalesInvoiceRequest, SalesInvoiceDto>($"api/sales/invoices/{id}", r, ct);
+    public Task<SalesConfirmationPreValidationDto?> PreValidateSalesInvoiceConfirmationAsync(Guid id, CancellationToken ct = default) => apiClient.GetAsync<SalesConfirmationPreValidationDto>($"api/sales/invoices/{id}/confirmation-prevalidation", ct);
     public Task<SalesInvoiceDto?> ConfirmSalesInvoiceAsync(Guid id, ConfirmSalesInvoiceRequest r, CancellationToken ct = default) => apiClient.PostAsync<ConfirmSalesInvoiceRequest, SalesInvoiceDto>($"api/sales/invoices/{id}/confirm", r, ct);
     public Task<SalesPostingPreValidationDto?> PreValidateSalesInvoicePostingAsync(Guid id, CancellationToken ct = default) => apiClient.GetAsync<SalesPostingPreValidationDto>($"api/sales/invoices/{id}/posting-prevalidation", ct);
     public Task<SalesInvoicePostingResultDto?> PostSalesInvoiceAsync(Guid id, PostSalesInvoiceRequest r, CancellationToken ct = default) => apiClient.PostAsync<PostSalesInvoiceRequest, SalesInvoicePostingResultDto>($"api/sales/invoices/{id}/post", r, ct);
@@ -68,12 +69,19 @@ public sealed class SalesClientService(OasApiClient apiClient) : ISalesClientSer
         => await apiClient.GetAsync<IReadOnlyList<SalesPrescriptionLookupDto>>(AddQuery("api/sales/lookups/prescriptions", ("customerId", customerId?.ToString()), ("search", search), ("take", take.ToString())), ct) ?? [];
     public async Task<IReadOnlyList<SalesPrescriptionRevisionLookupDto>> GetPrescriptionRevisionsAsync(Guid prescriptionId, CancellationToken ct = default)
         => await apiClient.GetAsync<IReadOnlyList<SalesPrescriptionRevisionLookupDto>>($"api/sales/lookups/prescriptions/{prescriptionId}/revisions", ct) ?? [];
-    public async Task<IReadOnlyList<SalesProductVariantLookupDto>> SearchProductVariantsAsync(string? search, int take = 20, CancellationToken ct = default)
-        => await apiClient.GetAsync<IReadOnlyList<SalesProductVariantLookupDto>>(AddQuery("api/sales/lookups/product-variants", ("search", search), ("take", take.ToString())), ct) ?? [];
+    public async Task<IReadOnlyList<SalesProductCategoryLookupDto>> SearchProductCategoriesAsync(string? search, int take = 20, CancellationToken ct = default)
+        => await apiClient.GetAsync<IReadOnlyList<SalesProductCategoryLookupDto>>(AddQuery("api/sales/lookups/product-categories", ("search", search), ("take", take.ToString())), ct) ?? [];
+
+    public async Task<IReadOnlyList<SalesProductVariantLookupDto>> SearchProductVariantsAsync(Guid? categoryId, string? search, int take = 20, CancellationToken ct = default)
+        => await apiClient.GetAsync<IReadOnlyList<SalesProductVariantLookupDto>>(AddQuery("api/sales/lookups/product-variants", ("categoryId", categoryId?.ToString()), ("search", search), ("take", take.ToString())), ct) ?? [];
     public async Task<IReadOnlyList<SalesWarehouseLookupDto>> SearchWarehousesAsync(Guid? productVariantId, string? search, int take = 20, CancellationToken ct = default)
         => await apiClient.GetAsync<IReadOnlyList<SalesWarehouseLookupDto>>(AddQuery("api/sales/lookups/warehouses", ("productVariantId", productVariantId?.ToString()), ("search", search), ("take", take.ToString())), ct) ?? [];
     public async Task<IReadOnlyList<SalesCurrencyLookupDto>> SearchCurrenciesAsync(DateOnly documentDate, string? search, int take = 20, CancellationToken ct = default)
         => await apiClient.GetAsync<IReadOnlyList<SalesCurrencyLookupDto>>(AddQuery("api/sales/lookups/currencies", ("documentDate", documentDate.ToString("yyyy-MM-dd")), ("search", search), ("take", take.ToString())), ct) ?? [];
+    public async Task<IReadOnlyList<SalesCashAccountLookupDto>> SearchCashAccountsAsync(Guid currencyId, string? search, int take = 20, CancellationToken ct = default)
+        => await apiClient.GetAsync<IReadOnlyList<SalesCashAccountLookupDto>>(AddQuery("api/sales/lookups/cash-accounts", ("currencyId", currencyId.ToString()), ("search", search), ("take", take.ToString())), ct) ?? [];
+    public async Task<IReadOnlyList<SalesBankAccountLookupDto>> SearchBankAccountsAsync(Guid currencyId, string? search, int take = 20, CancellationToken ct = default)
+        => await apiClient.GetAsync<IReadOnlyList<SalesBankAccountLookupDto>>(AddQuery("api/sales/lookups/bank-accounts", ("currencyId", currencyId.ToString()), ("search", search), ("take", take.ToString())), ct) ?? [];
     public async Task<IReadOnlyList<CustomerOrderLookupDto>> SearchCustomerOrdersAsync(Guid? customerId, string? search, int take = 20, CancellationToken ct = default)
         => await apiClient.GetAsync<IReadOnlyList<CustomerOrderLookupDto>>(AddQuery("api/sales/lookups/customer-orders", ("customerId", customerId?.ToString()), ("search", search), ("take", take.ToString())), ct) ?? [];
 }

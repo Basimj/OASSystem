@@ -44,6 +44,14 @@ public sealed class PostSalesInvoiceCommandValidator : AbstractValidator<PostSal
     {
         RuleFor(x => x.InvoiceId).NotEmpty().WithErrorCode("sales_invoice_id_required");
         RuleFor(x => x.Request.RowVersion).NotEmpty().WithErrorCode("row_version_required");
+        RuleFor(x => x.Request.CashAccountId)
+            .NotEmpty()
+            .When(x => x.Request.ImmediatePaymentMethod == OAS.Contracts.Sales.Enums.SalesImmediatePaymentMethod.Cash)
+            .WithErrorCode("sales_immediate_cash_account_required");
+        RuleFor(x => x.Request.BankAccountId)
+            .NotEmpty()
+            .When(x => x.Request.ImmediatePaymentMethod == OAS.Contracts.Sales.Enums.SalesImmediatePaymentMethod.Bank)
+            .WithErrorCode("sales_immediate_bank_account_required");
     }
 }
 

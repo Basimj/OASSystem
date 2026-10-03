@@ -221,6 +221,45 @@ public sealed class GetSalesPrescriptionRevisionsQueryHandler(
     }
 }
 
+public sealed class SearchSalesProductCategoriesQueryHandler(
+    IReadRepository<ProductCategory, Guid> categories)
+    : IRequestHandler<
+        SearchSalesProductCategoriesQuery,
+        IReadOnlyList<SalesProductCategoryLookupDto>>
+{
+    public async Task<IReadOnlyList<SalesProductCategoryLookupDto>> Handle(
+        SearchSalesProductCategoriesQuery request,
+        CancellationToken ct)
+    {
+        var search = request.Search?.Trim();
+        var spec = new Specification<ProductCategory>();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            spec.Where(x =>
+                x.IsActive &&
+                (x.Code.Contains(search) || x.NameAr.Contains(search)));
+        }
+        else
+        {
+            spec.Where(x => x.IsActive);
+        }
+
+        spec
+            .AddSort(
+                nameof(ProductCategory.NameAr),
+                OAS.Contracts.Common.Pagination.SortDirection.Ascending)
+            .ApplyPaging(0, SalesLookupLimit.Normalize(request.Take));
+
+        var rows = await categories.ListAsync(spec, ct);
+
+        return rows
+            .Select(x => new SalesProductCategoryLookupDto(
+                x.Id, x.Code, x.NameAr, x.ParentCategoryId, x.IsActive))
+            .ToArray();
+    }
+}
+
 public sealed class SearchSalesProductVariantsQueryHandler(
     IReadRepository<ProductVariant, Guid> variants,
     IReadRepository<Product, Guid> products,
@@ -236,45 +275,77 @@ public sealed class SearchSalesProductVariantsQueryHandler(
     {
         var search = request.Search?.Trim();
 
-        var productIds = new HashSet<Guid>();
-
-        if (!string.IsNullOrWhiteSpace(search))
+        HashSet<Guid>? categoryProductIds = null;
+        if (request.CategoryId.HasValue)
         {
-            var productSpec =
+            var categoryProducts = await products.ListAsync(
                 new Specification<Product>()
                     .Where(x =>
                         x.IsActive &&
-                        (
-                            x.ProductCode.Contains(search) ||
-                            x.NameAr.Contains(search)
-                        ))
-                    .ApplyPaging(0, 100);
+                        x.CategoryId == request.CategoryId.Value),
+                ct);
 
-            foreach (var product
-                     in await products.ListAsync(productSpec, ct))
-            {
-                productIds.Add(product.Id);
-            }
+            categoryProductIds = categoryProducts
+                .Select(x => x.Id)
+                .ToHashSet();
+
+            if (categoryProductIds.Count == 0)
+                return [];
         }
 
-        var spec =
-            new Specification<ProductVariant>();
-
+        var matchingProductIds = new HashSet<Guid>();
         if (!string.IsNullOrWhiteSpace(search))
+        {
+            var productSpec = new Specification<Product>();
+
+            if (request.CategoryId.HasValue)
+            {
+                productSpec.Where(x =>
+                    x.IsActive &&
+                    x.CategoryId == request.CategoryId.Value &&
+                    (x.ProductCode.Contains(search) || x.NameAr.Contains(search)));
+            }
+            else
+            {
+                productSpec.Where(x =>
+                    x.IsActive &&
+                    (x.ProductCode.Contains(search) || x.NameAr.Contains(search)));
+            }
+
+            productSpec.ApplyPaging(0, 100);
+            foreach (var product in await products.ListAsync(productSpec, ct))
+                matchingProductIds.Add(product.Id);
+        }
+
+        var spec = new Specification<ProductVariant>();
+
+        if (request.CategoryId.HasValue && !string.IsNullOrWhiteSpace(search))
+        {
+            spec.Where(x =>
+                x.IsActive &&
+                categoryProductIds!.Contains(x.ProductId) &&
+                (
+                    x.SKU.Contains(search) ||
+                    (x.Barcode != null && x.Barcode.Contains(search)) ||
+                    (x.VariantName != null && x.VariantName.Contains(search)) ||
+                    matchingProductIds.Contains(x.ProductId)
+                ));
+        }
+        else if (request.CategoryId.HasValue)
+        {
+            spec.Where(x =>
+                x.IsActive &&
+                categoryProductIds!.Contains(x.ProductId));
+        }
+        else if (!string.IsNullOrWhiteSpace(search))
         {
             spec.Where(x =>
                 x.IsActive &&
                 (
                     x.SKU.Contains(search) ||
-                    (
-                        x.Barcode != null &&
-                        x.Barcode.Contains(search)
-                    ) ||
-                    (
-                        x.VariantName != null &&
-                        x.VariantName.Contains(search)
-                    ) ||
-                    productIds.Contains(x.ProductId)
+                    (x.Barcode != null && x.Barcode.Contains(search)) ||
+                    (x.VariantName != null && x.VariantName.Contains(search)) ||
+                    matchingProductIds.Contains(x.ProductId)
                 ));
         }
         else
@@ -286,76 +357,102 @@ public sealed class SearchSalesProductVariantsQueryHandler(
             .AddSort(
                 nameof(ProductVariant.SKU),
                 OAS.Contracts.Common.Pagination.SortDirection.Ascending)
-            .ApplyPaging(
-                0,
-                SalesLookupLimit.Normalize(request.Take));
+            .ApplyPaging(0, SalesLookupLimit.Normalize(request.Take));
 
-        var rows =
-            await variants.ListAsync(spec, ct);
-
-        var result =
-            new List<SalesProductVariantLookupDto>(rows.Count);
+        var rows = await variants.ListAsync(spec, ct);
+        var result = new List<SalesProductVariantLookupDto>(rows.Count);
 
         foreach (var variant in rows)
         {
-            var product =
-                await products.GetByIdAsync(
-                    variant.ProductId,
-                    ct);
+            var product = await products.GetByIdAsync(variant.ProductId, ct);
 
-            if (product is null ||
-                !product.IsActive)
-            {
+            if (product is null || !product.IsActive)
                 continue;
-            }
+
+            if (request.CategoryId.HasValue &&
+                product.CategoryId != request.CategoryId.Value)
+                continue;
 
             string? unitName = null;
-
             if (variant.UnitId.HasValue)
             {
-                var unit =
-                    await units.GetByIdAsync(
-                        variant.UnitId.Value,
-                        ct);
-
+                var unit = await units.GetByIdAsync(variant.UnitId.Value, ct);
                 unitName = unit?.NameAr;
             }
 
-            var lens =
-                (
-                    await lensDetails.ListAsync(
-                        new Specification<LensDetails>()
-                            .Where(x =>
-                                x.ProductId == product.Id),
-                        ct)
-                ).FirstOrDefault();
+            var lens = (await lensDetails.ListAsync(
+                new Specification<LensDetails>()
+                    .Where(x => x.ProductId == product.Id),
+                ct)).FirstOrDefault();
 
-            result.Add(
-                new SalesProductVariantLookupDto(
-                    variant.Id,
-                    product.Id,
-                    product.ProductCode,
-                    product.NameAr,
-                    variant.SKU,
-                    variant.Barcode,
-                    variant.VariantName,
-                    variant.Color,
-                    variant.Size,
-                    variant.UnitId,
-                    unitName,
-                    variant.SellingPrice,
-                    product.IsStockItem,
-                    lens?.IsPrescriptionLens ?? false,
-                    lens?.SphereMin,
-                    lens?.SphereMax,
-                    lens?.CylinderMin,
-                    lens?.CylinderMax,
-                    lens?.AddMin,
-                    lens?.AddMax,
-                    variant.IsActive));
+            result.Add(new SalesProductVariantLookupDto(
+                variant.Id,
+                product.Id,
+                product.CategoryId,
+                product.ProductCode,
+                product.NameAr,
+                variant.SKU,
+                variant.Barcode,
+                variant.VariantName,
+                variant.Color,
+                variant.Size,
+                variant.UnitId,
+                unitName,
+                variant.SellingPrice,
+                product.IsStockItem,
+                lens?.IsPrescriptionLens ?? false,
+                lens?.SphereMin,
+                lens?.SphereMax,
+                lens?.CylinderMin,
+                lens?.CylinderMax,
+                lens?.AddMin,
+                lens?.AddMax,
+                variant.IsActive));
         }
 
         return result;
+    }
+}
+
+public sealed class SearchSalesCashAccountsQueryHandler(
+    IReadRepository<CashAccount, Guid> cashAccounts)
+    : IRequestHandler<SearchSalesCashAccountsQuery, IReadOnlyList<SalesCashAccountLookupDto>>
+{
+    public async Task<IReadOnlyList<SalesCashAccountLookupDto>> Handle(SearchSalesCashAccountsQuery request, CancellationToken ct)
+    {
+        var search = request.Search?.Trim();
+        var spec = new Specification<CashAccount>();
+        if (!string.IsNullOrWhiteSpace(search))
+            spec.Where(x => x.IsActive && x.CurrencyId == request.CurrencyId && (x.Code.Contains(search) || x.Name.Contains(search)));
+        else
+            spec.Where(x => x.IsActive && x.CurrencyId == request.CurrencyId);
+
+        spec.AddSort(nameof(CashAccount.IsDefault), OAS.Contracts.Common.Pagination.SortDirection.Descending)
+            .AddSort(nameof(CashAccount.Name), OAS.Contracts.Common.Pagination.SortDirection.Ascending)
+            .ApplyPaging(0, SalesLookupLimit.Normalize(request.Take));
+        var rows = await cashAccounts.ListAsync(spec, ct);
+        return rows.Select(x => new SalesCashAccountLookupDto(x.Id, x.Code, x.Name, x.CurrencyId!.Value, x.IsDefault, x.IsActive)).ToArray();
+    }
+}
+
+public sealed class SearchSalesBankAccountsQueryHandler(
+    IReadRepository<BankAccount, Guid> bankAccounts)
+    : IRequestHandler<SearchSalesBankAccountsQuery, IReadOnlyList<SalesBankAccountLookupDto>>
+{
+    public async Task<IReadOnlyList<SalesBankAccountLookupDto>> Handle(SearchSalesBankAccountsQuery request, CancellationToken ct)
+    {
+        var search = request.Search?.Trim();
+        var spec = new Specification<BankAccount>();
+        if (!string.IsNullOrWhiteSpace(search))
+            spec.Where(x => x.IsActive && x.CurrencyId == request.CurrencyId && (x.Code.Contains(search) || x.BankName.Contains(search) || x.AccountName.Contains(search) || x.AccountNumber.Contains(search)));
+        else
+            spec.Where(x => x.IsActive && x.CurrencyId == request.CurrencyId);
+
+        spec.AddSort(nameof(BankAccount.BankName), OAS.Contracts.Common.Pagination.SortDirection.Ascending)
+            .AddSort(nameof(BankAccount.AccountName), OAS.Contracts.Common.Pagination.SortDirection.Ascending)
+            .ApplyPaging(0, SalesLookupLimit.Normalize(request.Take));
+        var rows = await bankAccounts.ListAsync(spec, ct);
+        return rows.Select(x => new SalesBankAccountLookupDto(x.Id, x.Code, x.BankName, x.AccountName, x.AccountNumber, x.CurrencyId!.Value, x.IsActive)).ToArray();
     }
 }
 
@@ -452,11 +549,11 @@ public sealed class SearchSalesCurrenciesQueryHandler(
             new Specification<Currency>();
 
         /*
-         * äÚÑÖ ÇáÚãáÇÊ ÇáäÔØÉ ßáåÇ.
+         * Ù†Ø¹Ø±Ø¶ Ø§Ù„Ø¹Ù…Ù„Ø§Øª Ø§Ù„Ù†Ø´Ø·Ø© ÙƒÙ„Ù‡Ø§.
          *
-         * æÌæÏ ÓÚÑ ÕÑİ áíÓ ÔÑØğÇ áÅÙåÇÑ ÇáÚãáÉ İí ÇáŞÇÆãÉ.
-         * ÅĞÇ áã íæÌÏ ÇáÓÚÑ¡ ÊÑÌÚ ÇáÚãáÉ æáßä IsSelectable/HasRate
-         * íßæä False Úáì ãÓÊæì DTO.
+         * ÙˆØ¬ÙˆØ¯ Ø³Ø¹Ø± ØµØ±Ù Ù„ÙŠØ³ Ø´Ø±Ø·Ù‹Ø§ Ù„Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ø¹Ù…Ù„Ø© ÙÙŠ Ø§Ù„Ù‚Ø§Ø¦Ù…Ø©.
+         * Ø¥Ø°Ø§ Ù„Ù… ÙŠÙˆØ¬Ø¯ Ø§Ù„Ø³Ø¹Ø±ØŒ ØªØ±Ø¬Ø¹ Ø§Ù„Ø¹Ù…Ù„Ø© ÙˆÙ„ÙƒÙ† IsSelectable/HasRate
+         * ÙŠÙƒÙˆÙ† False Ø¹Ù„Ù‰ Ù…Ø³ØªÙˆÙ‰ DTO.
          */
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -491,11 +588,11 @@ public sealed class SearchSalesCurrenciesQueryHandler(
             try
             {
                 /*
-                 * ÇáÚãáÉ ÇáÃÓÇÓíÉ ÓÊÚæÏ ãä ExchangeRateResolver
-                 * ÈÓÚÑ 1 ÈÏæä ÇáÍÇÌÉ Åáì ÓÌá ExchangeRate.
+                 * Ø§Ù„Ø¹Ù…Ù„Ø© Ø§Ù„Ø£Ø³Ø§Ø³ÙŠØ© Ø³ØªØ¹ÙˆØ¯ Ù…Ù† ExchangeRateResolver
+                 * Ø¨Ø³Ø¹Ø± 1 Ø¨Ø¯ÙˆÙ† Ø§Ù„Ø­Ø§Ø¬Ø© Ø¥Ù„Ù‰ Ø³Ø¬Ù„ ExchangeRate.
                  *
-                 * ÇáÚãáÉ ÇáÃÌäÈíÉ ĞÇÊ ÇáÓÚÑ ÇáİÚÇá ÓÊÚæÏ ÈÇáÓÚÑ
-                 * ÇáãæÌæÏ İí Ãæ ŞÈá DocumentDate.
+                 * Ø§Ù„Ø¹Ù…Ù„Ø© Ø§Ù„Ø£Ø¬Ù†Ø¨ÙŠØ© Ø°Ø§Øª Ø§Ù„Ø³Ø¹Ø± Ø§Ù„ÙØ¹Ø§Ù„ Ø³ØªØ¹ÙˆØ¯ Ø¨Ø§Ù„Ø³Ø¹Ø±
+                 * Ø§Ù„Ù…ÙˆØ¬ÙˆØ¯ ÙÙŠ Ø£Ùˆ Ù‚Ø¨Ù„ DocumentDate.
                  */
                 var rate =
                     await rates.ResolveAsync(
@@ -522,15 +619,15 @@ public sealed class SearchSalesCurrenciesQueryHandler(
                 when (ex.Code == "exchange_rate_not_found")
             {
                 /*
-                 * ãåã:
+                 * Ù…Ù‡Ù…:
                  *
-                 * ÚÏã æÌæÏ ÓÚÑ ÕÑİ áíÓ ÎØÃ Lookup.
-                 * áÇ äæŞİ ÇáŞÇÆãÉ æáÇ äÑãí Conflict ááãÓÊÎÏã.
+                 * Ø¹Ø¯Ù… ÙˆØ¬ÙˆØ¯ Ø³Ø¹Ø± ØµØ±Ù Ù„ÙŠØ³ Ø®Ø·Ø£ Lookup.
+                 * Ù„Ø§ Ù†ÙˆÙ‚Ù Ø§Ù„Ù‚Ø§Ø¦Ù…Ø© ÙˆÙ„Ø§ Ù†Ø±Ù…ÙŠ Conflict Ù„Ù„Ù…Ø³ØªØ®Ø¯Ù….
                  *
-                 * äÚíÏ ÇáÚãáÉ äİÓåÇ ááÜClient æáßä ÈÍÇáÉ
+                 * Ù†Ø¹ÙŠØ¯ Ø§Ù„Ø¹Ù…Ù„Ø© Ù†ÙØ³Ù‡Ø§ Ù„Ù„Ù€Client ÙˆÙ„ÙƒÙ† Ø¨Ø­Ø§Ù„Ø©
                  * HasEffectiveExchangeRate = false.
                  *
-                 * ÇáÜClient ÓíÚÑÖåÇ Disabled.
+                 * Ø§Ù„Ù€Client Ø³ÙŠØ¹Ø±Ø¶Ù‡Ø§ Disabled.
                  */
                 result.Add(
                     new SalesCurrencyLookupDto(
@@ -540,17 +637,17 @@ public sealed class SearchSalesCurrenciesQueryHandler(
                         currency.Symbol,
                         currency.DecimalPlaces,
 
-                        // áÇ íÓÊÎÏã áÃä ÇáÚäÕÑ Óíßæä Disabled.
+                        // Ù„Ø§ ÙŠØ³ØªØ®Ø¯Ù… Ù„Ø£Ù† Ø§Ù„Ø¹Ù†ØµØ± Ø³ÙŠÙƒÙˆÙ† Disabled.
                         EffectiveExchangeRate: 0m,
 
-                        // İŞØ ŞíãÉ ãÑÌÚíÉ ááÜDTO ÚäÏ ÚÏã æÌæÏ ÓÚÑ.
+                        // ÙÙ‚Ø· Ù‚ÙŠÙ…Ø© Ù…Ø±Ø¬Ø¹ÙŠØ© Ù„Ù„Ù€DTO Ø¹Ù†Ø¯ Ø¹Ø¯Ù… ÙˆØ¬ÙˆØ¯ Ø³Ø¹Ø±.
                         EffectiveRateDate: request.DocumentDate,
 
                         IsBaseCurrency: false,
                         IsActive: currency.IsActive,
                         HasEffectiveExchangeRate: false,
                         AvailabilityMessage:
-                            $"áÇ íæÌÏ ÓÚÑ ÕÑİ İÚÇá ÍÊì {request.DocumentDate:yyyy-MM-dd}"));
+                            $"Ù„Ø§ ÙŠÙˆØ¬Ø¯ Ø³Ø¹Ø± ØµØ±Ù ÙØ¹Ø§Ù„ Ø­ØªÙ‰ {request.DocumentDate:yyyy-MM-dd}"));
             }
         }
 

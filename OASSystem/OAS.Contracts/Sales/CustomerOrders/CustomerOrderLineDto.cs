@@ -32,4 +32,7 @@ public sealed record CustomerOrderLineDto(
     string? WarehouseCode = null,
     string? WarehouseName = null,
     string? PrescriptionCode = null,
-    int? PrescriptionRevisionNumber = null);
+    int? PrescriptionRevisionNumber = null,
+    Guid? ProductCategoryId = null,
+    string? ProductCategoryCode = null,
+    string? ProductCategoryName = null);

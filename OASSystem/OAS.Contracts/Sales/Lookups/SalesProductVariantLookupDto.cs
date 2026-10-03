@@ -3,6 +3,7 @@ namespace OAS.Contracts.Sales.Lookups;
 public sealed record SalesProductVariantLookupDto(
     Guid Id,
     Guid ProductId,
+    Guid CategoryId,
     string ProductCode,
     string ProductNameAr,
     string SKU,

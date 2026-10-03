@@ -54,6 +54,7 @@ public static class DependencyInjection
         services.AddScoped<ISalesPaymentAllocationTargetValidator, SalesPaymentAllocationTargetValidator>();
         services.AddScoped<ISalesInventoryPostingService, SalesInventoryPostingService>();
         services.AddScoped<ISalesInvoiceAccountingPostingService, SalesInvoiceAccountingPostingService>();
+        services.AddScoped<ISalesImmediateSettlementService, SalesImmediateSettlementService>();
 
         return services;
     }

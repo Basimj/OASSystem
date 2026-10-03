@@ -11,6 +11,7 @@ using OAS.Domain.Accounting.Entities;
 using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Sales.Entities;
 using OAS.Domain.Sales.Enums;
+using OAS.Domain.Sales.Rules;
 
 namespace OAS.Application.Sales.SalesInvoices.Commands;
 
@@ -68,6 +69,11 @@ public sealed class UpdateSalesInvoiceCommandHandler(
                 "البيع الآجل غير مسموح لهذا العميل.");
         }
 
+        var previousExchangeRate = invoice.ExchangeRate;
+        var currencyContextChanged =
+            invoice.CurrencyId != request.Data.CurrencyId ||
+            invoice.InvoiceDate != request.Data.InvoiceDate;
+
         invoice.UpdateHeader(
             customer.Id,
             invoice.CustomerOrderId,
@@ -79,7 +85,7 @@ public sealed class UpdateSalesInvoiceCommandHandler(
             customer.PaymentTermDays,
             request.Data.Description);
 
-        if (invoice.CurrencyId != request.Data.CurrencyId)
+        if (currencyContextChanged)
         {
             var rate = await rates.ResolveAsync(
                 request.Data.CurrencyId,
@@ -107,6 +113,8 @@ public sealed class UpdateSalesInvoiceCommandHandler(
         await SynchronizeLinesAsync(
             invoice,
             request.Data.Lines,
+            previousExchangeRate,
+            currencyContextChanged,
             ct);
 
         return invoice;
@@ -115,6 +123,8 @@ public sealed class UpdateSalesInvoiceCommandHandler(
     private async Task SynchronizeLinesAsync(
         SalesInvoice invoice,
         IReadOnlyList<SalesInvoiceLineRequest> requested,
+        decimal previousExchangeRate,
+        bool currencyContextChanged,
         CancellationToken ct)
     {
         if (requested.Count == 0)
@@ -179,10 +189,24 @@ public sealed class UpdateSalesInvoiceCommandHandler(
                 //
                 // البنود بدون ProductVariant فقط
                 // يمكن تعديل السعر فيها مباشرة.
-                var existingActualUnitPrice =
-                    existing.ProductVariantId.HasValue
-                        ? existing.ActualUnitPrice
-                        : req.ActualUnitPrice;
+                var existingBaseUnitPrice = existing.BaseUnitPrice;
+                var existingActualUnitPrice = existing.ProductVariantId.HasValue
+                    ? existing.ActualUnitPrice
+                    : req.ActualUnitPrice;
+
+                if (currencyContextChanged && existing.ProductVariantId.HasValue)
+                {
+                    existingBaseUnitPrice = SalesPricingCalculator.ConvertBetweenCurrencies(
+                        existing.BaseUnitPrice,
+                        previousExchangeRate,
+                        invoice.ExchangeRate,
+                        invoice.CurrencyDecimalPlacesSnapshot);
+                    existingActualUnitPrice = SalesPricingCalculator.ConvertBetweenCurrencies(
+                        existing.ActualUnitPrice,
+                        previousExchangeRate,
+                        invoice.ExchangeRate,
+                        invoice.CurrencyDecimalPlacesSnapshot);
+                }
 
                 await InvalidatePriceOverridesWhenPriceChangesAsync(
                     existing,
@@ -192,7 +216,7 @@ public sealed class UpdateSalesInvoiceCommandHandler(
                 invoice.UpdateLinePricing(
                     existing.Id,
                     req.Quantity,
-                    existing.BaseUnitPrice,
+                    existingBaseUnitPrice,
                     existingActualUnitPrice,
                     (SalesDiscountType)(byte)req.DiscountType,
                     req.DiscountValue,
@@ -245,9 +269,16 @@ public sealed class UpdateSalesInvoiceCommandHandler(
             //
             // إذا لم يكن السطر مرتبطًا بمنتج
             // يسمح بالقيمة اليدوية مثل Service.
+            var standardUnitPrice = resolved.ProductVariantId.HasValue
+                ? SalesPricingCalculator.ConvertFromBase(
+                    resolved.BaseUnitPrice,
+                    invoice.ExchangeRate,
+                    invoice.CurrencyDecimalPlacesSnapshot)
+                : resolved.BaseUnitPrice;
+
             var resolvedActualUnitPrice =
                 resolved.ProductVariantId.HasValue
-                    ? resolved.BaseUnitPrice
+                    ? standardUnitPrice
                     : req.ActualUnitPrice;
 
             var newLine =
@@ -265,7 +296,7 @@ public sealed class UpdateSalesInvoiceCommandHandler(
                     resolved.Description,
                     resolved.UnitName,
                     req.Quantity,
-                    resolved.BaseUnitPrice,
+                    standardUnitPrice,
                     resolvedActualUnitPrice,
                     (SalesDiscountType)(byte)req.DiscountType,
                     req.DiscountValue,

@@ -34,12 +34,20 @@ public sealed class SalesLookupsController(ISender sender) : ControllerBase
         CancellationToken cancellationToken)
         => Ok(await sender.Send(new GetSalesPrescriptionRevisionsQuery(prescriptionId), cancellationToken));
 
-    [HttpGet("product-variants")]
-    public async Task<ActionResult<IReadOnlyList<SalesProductVariantLookupDto>>> ProductVariants(
+    [HttpGet("product-categories")]
+    public async Task<ActionResult<IReadOnlyList<SalesProductCategoryLookupDto>>> ProductCategories(
         [FromQuery] string? search,
         [FromQuery] int take = 20,
         CancellationToken cancellationToken = default)
-        => Ok(await sender.Send(new SearchSalesProductVariantsQuery(search, take), cancellationToken));
+        => Ok(await sender.Send(new SearchSalesProductCategoriesQuery(search, take), cancellationToken));
+
+    [HttpGet("product-variants")]
+    public async Task<ActionResult<IReadOnlyList<SalesProductVariantLookupDto>>> ProductVariants(
+        [FromQuery] Guid? categoryId,
+        [FromQuery] string? search,
+        [FromQuery] int take = 20,
+        CancellationToken cancellationToken = default)
+        => Ok(await sender.Send(new SearchSalesProductVariantsQuery(categoryId, search, take), cancellationToken));
 
     [HttpGet("warehouses")]
     public async Task<ActionResult<IReadOnlyList<SalesWarehouseLookupDto>>> Warehouses(
@@ -56,6 +64,22 @@ public sealed class SalesLookupsController(ISender sender) : ControllerBase
         [FromQuery] int take = 20,
         CancellationToken cancellationToken = default)
         => Ok(await sender.Send(new SearchSalesCurrenciesQuery(documentDate, search, take), cancellationToken));
+
+    [HttpGet("cash-accounts")]
+    public async Task<ActionResult<IReadOnlyList<SalesCashAccountLookupDto>>> CashAccounts(
+        [FromQuery] Guid currencyId,
+        [FromQuery] string? search,
+        [FromQuery] int take = 20,
+        CancellationToken cancellationToken = default)
+        => Ok(await sender.Send(new SearchSalesCashAccountsQuery(currencyId, search, take), cancellationToken));
+
+    [HttpGet("bank-accounts")]
+    public async Task<ActionResult<IReadOnlyList<SalesBankAccountLookupDto>>> BankAccounts(
+        [FromQuery] Guid currencyId,
+        [FromQuery] string? search,
+        [FromQuery] int take = 20,
+        CancellationToken cancellationToken = default)
+        => Ok(await sender.Send(new SearchSalesBankAccountsQuery(currencyId, search, take), cancellationToken));
 
     [HttpGet("customer-orders")]
     public async Task<ActionResult<IReadOnlyList<CustomerOrderLookupDto>>> CustomerOrders(
