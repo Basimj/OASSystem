@@ -13,6 +13,7 @@ using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Sales;
 using OAS.Domain.Sales.Entities;
 using OAS.Domain.Sales.Enums;
+using OAS.Domain.Sales.Rules;
 
 namespace OAS.Application.Sales.CustomerOrders.Commands;
 
@@ -73,15 +74,23 @@ public sealed class CreateCustomerOrderCommandHandler(
             resolved.OpticalPolicy,
             ct);
 
-        // إذا كان السطر مرتبطًا بمنتج، فالسعر يأتي من ProductVariant.SellingPrice عبر SalesLineResolver.
-        // لا نثق بقيمة السعر القادمة من الـClient للأسطر التي لها منتج.
+        // ProductVariant.SellingPrice is stored in the accounting base currency.
+        // Sales line prices are snapshots in the order currency, so convert base -> transaction.
+        var standardUnitPrice = resolved.ProductVariantId.HasValue
+            ? SalesPricingCalculator.ConvertFromBase(
+                resolved.BaseUnitPrice,
+                order.ExchangeRate,
+                order.CurrencyDecimalPlacesSnapshot)
+            : resolved.BaseUnitPrice;
+
+        // Product prices are server-authoritative; manual lines keep the requested price.
         var actualUnitPrice = resolved.ProductVariantId.HasValue
-            ? resolved.BaseUnitPrice
+            ? standardUnitPrice
             : req.ActualUnitPrice;
 
         return CustomerOrderLine.Create(
             Guid.NewGuid(), order.Id, lineNo, req.GroupId, lineType, resolved.ProductVariantId, resolved.WarehouseId,
-            resolved.Description, req.Quantity, resolved.BaseUnitPrice, actualUnitPrice,
+            resolved.Description, req.Quantity, standardUnitPrice, actualUnitPrice,
             (SalesDiscountType)(byte)req.DiscountType, req.DiscountValue, req.TaxRate, prescriptionRevision, eye,
             req.RequiresProduction, req.Notes, order.TaxCalculationMode, order.CurrencyDecimalPlacesSnapshot);
     }

@@ -134,6 +134,7 @@ public partial class MainWindow : Window
             SettingsPrinterCombo.ItemsSource = printers;
             SettingsReceiptPrinterCombo.ItemsSource = printers;
             SettingsPaymentPrinterCombo.ItemsSource = printers;
+            SettingsSalesInvoicePrinterCombo.ItemsSource = printers;
             PrintersList.ItemsSource = printers;
 
             var preferred = !string.IsNullOrWhiteSpace(_settings.DefaultPrinterName)
@@ -946,6 +947,7 @@ public partial class MainWindow : Window
         SettingsPrinterCombo.SelectedItem = _settings.DefaultPrinterName;
         SettingsReceiptPrinterCombo.SelectedItem = _settings.PrinterBindings.TryGetValue("ReceiptVoucher", out var receiptPrinter) ? receiptPrinter : null;
         SettingsPaymentPrinterCombo.SelectedItem = _settings.PrinterBindings.TryGetValue("PaymentVoucher", out var paymentPrinter) ? paymentPrinter : null;
+        SettingsSalesInvoicePrinterCombo.SelectedItem = _settings.PrinterBindings.TryGetValue("SalesInvoice", out var salesInvoicePrinter) ? salesInvoicePrinter : null;
     }
 
     private void SaveSettingsInline_Click(object sender, RoutedEventArgs e)
@@ -960,6 +962,7 @@ public partial class MainWindow : Window
         _settings.DefaultPrinterName = SettingsPrinterCombo.SelectedItem as string ?? _settings.DefaultPrinterName;
         SetPrinterBinding("ReceiptVoucher", SettingsReceiptPrinterCombo.SelectedItem as string);
         SetPrinterBinding("PaymentVoucher", SettingsPaymentPrinterCombo.SelectedItem as string);
+        SetPrinterBinding("SalesInvoice", SettingsSalesInvoicePrinterCombo.SelectedItem as string);
 
         _settingsStore.Save(_settings);
         _jobPolling.Start(_settings);

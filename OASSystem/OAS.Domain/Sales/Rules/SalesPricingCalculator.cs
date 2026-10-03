@@ -65,6 +65,34 @@ public static class SalesPricingCalculator
         return Round(transactionAmount * exchangeRate, baseCurrencyDecimalPlaces);
     }
 
+    public static decimal ConvertFromBase(decimal baseAmount, decimal exchangeRate, byte transactionCurrencyDecimalPlaces)
+    {
+        if (baseAmount < 0)
+            throw new DomainException("Base amount cannot be negative.");
+        if (exchangeRate <= 0)
+            throw new DomainException("Exchange rate must be greater than zero.");
+        if (transactionCurrencyDecimalPlaces > 6)
+            throw new DomainException("Transaction currency decimal places cannot exceed 6.");
+
+        return Round(baseAmount / exchangeRate, transactionCurrencyDecimalPlaces);
+    }
+
+    public static decimal ConvertBetweenCurrencies(
+        decimal amount,
+        decimal fromExchangeRate,
+        decimal toExchangeRate,
+        byte targetCurrencyDecimalPlaces)
+    {
+        if (amount < 0)
+            throw new DomainException("Amount cannot be negative.");
+        if (fromExchangeRate <= 0 || toExchangeRate <= 0)
+            throw new DomainException("Exchange rate must be greater than zero.");
+        if (targetCurrencyDecimalPlaces > 6)
+            throw new DomainException("Transaction currency decimal places cannot exceed 6.");
+
+        return Round(amount * fromExchangeRate / toExchangeRate, targetCurrencyDecimalPlaces);
+    }
+
     public static decimal Round(decimal value, byte decimalPlaces) =>
         Math.Round(value, decimalPlaces, MidpointRounding.AwayFromZero);
 

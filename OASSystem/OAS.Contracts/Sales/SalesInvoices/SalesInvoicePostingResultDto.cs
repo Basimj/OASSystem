@@ -5,4 +5,6 @@ public sealed record SalesInvoicePostingResultDto(
     string InvoiceCode,
     Guid JournalEntryId,
     IReadOnlyList<Guid> InventoryTransactionIds,
-    string RowVersion);
+    string RowVersion,
+    Guid? ReceiptVoucherId = null,
+    string? ReceiptVoucherNumber = null);

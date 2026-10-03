@@ -143,3 +143,48 @@
 .ui-sales-eye-card__wide {
     grid-column: 1 / -1;
 }
+
+/* Wide sales-line editor: mirrors the prescription revision card pattern so product
+   entry is readable on customer orders and sales invoices without a cramped row. */
+.ui-sales-line-cards { display:flex; flex-direction:column; gap:.7rem; }
+.ui-sales-line-card { border:1px solid var(--oas-sales-border); border-radius:.55rem; background:#fff; overflow:visible; }
+.ui-sales-line-card__header { display:flex; align-items:center; justify-content:space-between; gap:.8rem; padding:.6rem .75rem; background:#faf9fd; border-bottom:1px solid #efedf4; border-radius:.55rem .55rem 0 0; }
+.ui-sales-line-card__identity { display:flex; align-items:center; gap:.55rem; min-width:0; }
+.ui-sales-line-card__identity>div { display:flex; flex-direction:column; gap:.08rem; min-width:0; }
+.ui-sales-line-card__identity strong { font-size:.78rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:min(52vw,620px); }
+.ui-sales-line-card__identity span:not(.ui-sales-line-card__number) { font-size:.62rem; color:var(--oas-sales-muted); }
+.ui-sales-line-card__number { width:30px; height:30px; display:grid; place-items:center; flex:0 0 30px; border-radius:50%; background:#f0ecff; color:var(--oas-sales-primary); font-size:.7rem; font-weight:800; }
+.ui-sales-line-card__header-actions { display:flex; align-items:center; gap:.35rem; }
+.ui-sales-line-card__amount { display:flex; flex-direction:column; align-items:flex-end; line-height:1.2; margin-inline-end:.2rem; }
+.ui-sales-line-card__amount span { font-size:.58rem; color:var(--oas-sales-muted); }
+.ui-sales-line-card__amount strong { font-size:.78rem; color:var(--oas-sales-primary); direction:ltr; }
+.ui-sales-line-card__grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.6rem .7rem; padding:.75rem; align-items:end; }
+.ui-sales-line-card__field { min-width:0; }
+.ui-sales-line-card__field--wide { grid-column:span 2; }
+.ui-sales-line-card__field--full { grid-column:1/-1; }
+.ui-sales-line-card__number-field { display:flex; flex-direction:column; gap:.22rem; min-width:0; color:#5f5a6f; font-size:.68rem; }
+.ui-sales-line-card__number-field>span { font-weight:650; }
+.ui-sales-line-card__number-field input,.ui-sales-line-card__number-field select { width:100%; min-height:34px; padding:.32rem .42rem; border:1px solid var(--oas-sales-border); border-radius:.38rem; background:#fff; color:#292437; font:inherit; }
+.ui-sales-line-card__number-field input:disabled,.ui-sales-line-card__number-field select:disabled { background:#f7f7fa; color:#777284; }
+.ui-sales-line-card__optical { margin:.1rem .75rem .75rem; padding:.65rem; border:1px solid #e8e2fb; border-radius:.48rem; background:#fcfbff; }
+.ui-sales-line-card__subheader { display:flex; align-items:center; gap:.5rem; margin-bottom:.55rem; }
+.ui-sales-line-card__subheader>i { width:30px; height:30px; display:grid; place-items:center; border-radius:.4rem; background:#f0ecff; color:var(--oas-sales-primary); }
+.ui-sales-line-card__subheader>div { display:flex; flex-direction:column; gap:.05rem; }
+.ui-sales-line-card__subheader strong { font-size:.72rem; }
+.ui-sales-line-card__subheader span { font-size:.61rem; color:var(--oas-sales-muted); }
+.ui-sales-line-card__optical-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.55rem .7rem; align-items:end; }
+.ui-sales-line-card__notes { display:flex; align-items:flex-start; gap:.4rem; margin:0 .75rem .75rem; padding:.45rem .55rem; border:1px dashed #e4e0ec; border-radius:.4rem; color:var(--oas-sales-muted); font-size:.66rem; background:#fdfcff; }
+.ui-sales-line-card__notes i { margin-top:.08rem; color:var(--oas-sales-primary); }
+
+@media (max-width: 1180px) {
+    .ui-sales-line-card__grid,.ui-sales-line-card__optical-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .ui-sales-line-card__field--wide { grid-column:span 1; }
+}
+
+@media (max-width: 720px) {
+    .ui-sales-line-card__header { align-items:flex-start; flex-direction:column; }
+    .ui-sales-line-card__header-actions { width:100%; justify-content:flex-end; }
+    .ui-sales-line-card__identity strong { max-width:75vw; }
+    .ui-sales-line-card__grid,.ui-sales-line-card__optical-grid { grid-template-columns:1fr; }
+    .ui-sales-line-card__field--wide,.ui-sales-line-card__field--full { grid-column:auto; }
+}

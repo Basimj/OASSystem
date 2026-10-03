@@ -10,6 +10,7 @@ using OAS.Domain.Accounting.Entities;
 using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Sales.Entities;
 using OAS.Domain.Sales.Enums;
+using OAS.Domain.Sales.Rules;
 
 namespace OAS.Application.Sales.CustomerOrders.Commands;
 
@@ -70,6 +71,11 @@ public sealed class UpdateCustomerOrderCommandHandler(
                 "البيع الآجل غير مسموح لهذا العميل.");
         }
 
+        var previousExchangeRate = order.ExchangeRate;
+        var currencyContextChanged =
+            order.CurrencyId != request.Data.CurrencyId ||
+            order.OrderDate != request.Data.OrderDate;
+
         order.UpdateHeader(
             customer.Id,
             request.Data.PrescriptionRevisionId,
@@ -80,7 +86,7 @@ public sealed class UpdateCustomerOrderCommandHandler(
             customer.PaymentTermDays,
             request.Data.Notes);
 
-        if (order.CurrencyId != request.Data.CurrencyId)
+        if (currencyContextChanged)
         {
             var rate = await rates.ResolveAsync(
                 request.Data.CurrencyId,
@@ -103,6 +109,8 @@ public sealed class UpdateCustomerOrderCommandHandler(
             order,
             request.Data.Lines,
             lineRepository,
+            previousExchangeRate,
+            currencyContextChanged,
             ct);
 
         return order;
@@ -112,6 +120,8 @@ public sealed class UpdateCustomerOrderCommandHandler(
         CustomerOrder order,
         IReadOnlyList<CustomerOrderLineRequest> requested,
         IRepository<CustomerOrderLine, Guid> lineRepository,
+        decimal previousExchangeRate,
+        bool currencyContextChanged,
         CancellationToken ct)
     {
         var requestIds = requested
@@ -154,15 +164,29 @@ public sealed class UpdateCustomerOrderCommandHandler(
                 //
                 // البنود غير المرتبطة بمنتج مثل Service
                 // يمكن أن تستقبل سعرًا يدويًا.
-                var existingActualUnitPrice =
-                    existing.ProductVariantId.HasValue
-                        ? existing.BaseUnitPrice
-                        : req.ActualUnitPrice;
+                var existingBaseUnitPrice = existing.BaseUnitPrice;
+                var existingActualUnitPrice = existing.ProductVariantId.HasValue
+                    ? existing.ActualUnitPrice
+                    : req.ActualUnitPrice;
+
+                if (currencyContextChanged && existing.ProductVariantId.HasValue)
+                {
+                    existingBaseUnitPrice = SalesPricingCalculator.ConvertBetweenCurrencies(
+                        existing.BaseUnitPrice,
+                        previousExchangeRate,
+                        order.ExchangeRate,
+                        order.CurrencyDecimalPlacesSnapshot);
+                    existingActualUnitPrice = SalesPricingCalculator.ConvertBetweenCurrencies(
+                        existing.ActualUnitPrice,
+                        previousExchangeRate,
+                        order.ExchangeRate,
+                        order.CurrencyDecimalPlacesSnapshot);
+                }
 
                 order.UpdateLinePricing(
                     existing.Id,
                     req.Quantity,
-                    existing.BaseUnitPrice,
+                    existingBaseUnitPrice,
                     existingActualUnitPrice,
                     (SalesDiscountType)(byte)req.DiscountType,
                     req.DiscountValue,
@@ -216,9 +240,16 @@ public sealed class UpdateCustomerOrderCommandHandler(
             //
             // الخدمة/البند بدون منتج:
             // يسمح بالسعر المرسل من المستخدم.
+            var standardUnitPrice = resolved.ProductVariantId.HasValue
+                ? SalesPricingCalculator.ConvertFromBase(
+                    resolved.BaseUnitPrice,
+                    order.ExchangeRate,
+                    order.CurrencyDecimalPlacesSnapshot)
+                : resolved.BaseUnitPrice;
+
             var resolvedActualUnitPrice =
                 resolved.ProductVariantId.HasValue
-                    ? resolved.BaseUnitPrice
+                    ? standardUnitPrice
                     : req.ActualUnitPrice;
 
             var newLine = CustomerOrderLine.Create(
@@ -231,7 +262,7 @@ public sealed class UpdateCustomerOrderCommandHandler(
                 resolved.WarehouseId,
                 resolved.Description,
                 req.Quantity,
-                resolved.BaseUnitPrice,
+                standardUnitPrice,
                 resolvedActualUnitPrice,
                 (SalesDiscountType)(byte)req.DiscountType,
                 req.DiscountValue,

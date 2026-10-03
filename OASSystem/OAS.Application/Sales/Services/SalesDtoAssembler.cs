@@ -15,11 +15,14 @@ namespace OAS.Application.Sales.Services;
 public sealed class SalesDtoAssembler(
     IReadRepository<Customer, Guid> customers,
     IReadRepository<PaymentAllocation, Guid> allocations,
+    IReadRepository<JournalEntry, Guid> journals,
     IReadRepository<CustomerOrder, Guid> orders,
     IReadRepository<PrescriptionRevision, Guid> revisions,
     IReadRepository<Prescription, Guid> prescriptions,
     IReadRepository<ProductVariant, Guid> variants,
     IReadRepository<Product, Guid> products,
+    IReadRepository<ProductType, Guid> productTypes,
+    IReadRepository<ProductCategory, Guid> categories,
     IReadRepository<Warehouse, Guid> warehouses)
 {
     public async Task<PrescriptionDto> PrescriptionAsync(Prescription entity, CancellationToken ct = default)
@@ -85,6 +88,9 @@ public sealed class SalesDtoAssembler(
 
         var payment = await PaymentSummaryAsync(entity, ct);
         var prescription = await ResolvePrescriptionAsync(entity.PrescriptionRevisionId, ct);
+        var journalNumber = entity.JournalEntryId.HasValue
+            ? (await journals.GetByIdAsync(entity.JournalEntryId.Value, ct))?.JournalNumber
+            : null;
 
         var lines = new List<SalesInvoiceLineDto>(entity.Lines.Count);
         foreach (var line in entity.Lines.OrderBy(x => x.LineNumber))
@@ -99,7 +105,8 @@ public sealed class SalesDtoAssembler(
         {
             Lines = lines,
             PrescriptionCode = prescription.Code,
-            PrescriptionRevisionNumber = prescription.RevisionNumber
+            PrescriptionRevisionNumber = prescription.RevisionNumber,
+            JournalEntryNumber = journalNumber
         };
     }
 
@@ -113,6 +120,14 @@ public sealed class SalesDtoAssembler(
         {
             ProductCode = product.Code,
             ProductName = product.Name,
+            ProductCategoryId = product.CategoryId,
+            ProductCategoryCode = product.CategoryCode,
+            ProductCategoryName = product.CategoryName,
+            ProductTypeId = product.ProductTypeId,
+            ProductTypeCode = product.ProductTypeCode,
+            ProductTypeName = product.ProductTypeName,
+            ProductTypeSystemKey = product.ProductTypeSystemKey,
+            ProductIsStockItem = product.IsStockItem,
             WarehouseCode = warehouse.Code,
             WarehouseName = warehouse.Name,
             PrescriptionCode = prescription.Code,
@@ -122,11 +137,20 @@ public sealed class SalesDtoAssembler(
 
     private async Task<SalesInvoiceLineDto> InvoiceLineAsync(SalesInvoiceLine line, CancellationToken ct)
     {
+        var product = await ResolveProductAsync(line.ProductVariantId, ct);
         var warehouse = await ResolveWarehouseAsync(line.WarehouseId, ct);
         var prescription = await ResolvePrescriptionAsync(line.PrescriptionRevisionId, ct);
 
         return SalesContractMapping.InvoiceLine(line) with
         {
+            ProductCategoryId = product.CategoryId,
+            ProductCategoryCode = product.CategoryCode,
+            ProductCategoryName = product.CategoryName,
+            ProductTypeId = product.ProductTypeId,
+            ProductTypeCode = product.ProductTypeCode,
+            ProductTypeName = product.ProductTypeName,
+            ProductTypeSystemKey = product.ProductTypeSystemKey,
+            ProductIsStockItem = product.IsStockItem,
             WarehouseCode = warehouse.Code,
             WarehouseName = warehouse.Name,
             PrescriptionCode = prescription.Code,
@@ -134,24 +158,46 @@ public sealed class SalesDtoAssembler(
         };
     }
 
-    private async Task<(string? Code, string? Name)> ResolveProductAsync(Guid? variantId, CancellationToken ct)
+    private async Task<(
+        string? Code,
+        string? Name,
+        Guid? CategoryId,
+        string? CategoryCode,
+        string? CategoryName,
+        Guid? ProductTypeId,
+        string? ProductTypeCode,
+        string? ProductTypeName,
+        string? ProductTypeSystemKey,
+        bool? IsStockItem)> ResolveProductAsync(Guid? variantId, CancellationToken ct)
     {
         if (!variantId.HasValue)
-            return (null, null);
+            return (null, null, null, null, null, null, null, null, null, null);
 
         var variant = await variants.GetByIdAsync(variantId.Value, ct);
         if (variant is null)
-            return (null, null);
+            return (null, null, null, null, null, null, null, null, null, null);
 
         var product = await products.GetByIdAsync(variant.ProductId, ct);
         if (product is null)
-            return (null, variant.VariantName);
+            return (null, variant.VariantName, null, null, null, null, null, null, null, null);
 
+        var category = await categories.GetByIdAsync(product.CategoryId, ct);
+        var productType = await productTypes.GetByIdAsync(product.ProductTypeId, ct);
         var name = string.IsNullOrWhiteSpace(variant.VariantName)
             ? product.NameAr
             : $"{product.NameAr} - {variant.VariantName}";
 
-        return (product.ProductCode, name);
+        return (
+            product.ProductCode,
+            name,
+            product.CategoryId,
+            category?.Code,
+            category?.NameAr,
+            product.ProductTypeId,
+            productType?.Code,
+            productType?.NameAr,
+            productType?.SystemKey,
+            product.IsStockItem);
     }
 
     private async Task<(string? Code, string? Name)> ResolveWarehouseAsync(Guid? warehouseId, CancellationToken ct)

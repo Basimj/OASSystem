@@ -4,6 +4,8 @@ using OAS.Application.Accounting.CashAccounts.Queries.GetCashAccountById;
 using OAS.Application.Accounting.Currencies.Queries.GetCurrencyById;
 using OAS.Application.Accounting.PaymentVouchers.Queries.GetPaymentVoucherById;
 using OAS.Application.Accounting.ReceiptVouchers.Queries.GetReceiptVoucherById;
+using OAS.Application.Common.Exceptions;
+using OAS.Application.Sales.SalesInvoices.Queries;
 using OAS.Contracts.Accounting.BankAccounts;
 using OAS.Contracts.Accounting.CashAccounts;
 using OAS.Contracts.Accounting.Currencies;
@@ -11,6 +13,8 @@ using OAS.Contracts.Accounting.Enums;
 using OAS.Contracts.Accounting.PaymentVouchers;
 using OAS.Contracts.Accounting.ReceiptVouchers;
 using OAS.Contracts.Printing;
+using OAS.Contracts.Sales.Enums;
+using OAS.Contracts.Sales.SalesInvoices;
 
 namespace OAS.API.Printing;
 
@@ -33,6 +37,11 @@ public sealed class VoucherPrintPayloadFactory(
             PrintDocumentTypes.PaymentVoucher =>
                 await BuildPaymentAsync(
                     await sender.Send(new GetPaymentVoucherByIdQuery(documentId), cancellationToken),
+                    cancellationToken),
+
+            PrintDocumentTypes.SalesInvoice =>
+                await BuildSalesInvoiceAsync(
+                    await sender.Send(new GetSalesInvoiceByIdQuery(documentId), cancellationToken),
                     cancellationToken),
 
             _ => throw new ArgumentOutOfRangeException(
@@ -163,6 +172,170 @@ public sealed class VoucherPrintPayloadFactory(
             }
         };
     }
+
+    private async Task<object> BuildSalesInvoiceAsync(
+        SalesInvoiceDto invoice,
+        CancellationToken cancellationToken)
+    {
+        if (invoice.Status != SalesInvoiceStatus.Posted)
+            throw new ConflictException(
+                "SALES_INVOICE_NOT_POSTED",
+                "يمكن طباعة فاتورة المبيعات بعد الترحيل فقط.");
+
+        var currency = await TryGetCurrencyAsync(invoice.CurrencyId, cancellationToken);
+        var saleTypeText = invoice.PaymentTermType == SalesPaymentTermType.Immediate ? "فوري" : "آجل";
+        var lines = invoice.Lines
+            .OrderBy(x => x.LineNumber)
+            .Select(MapSalesInvoiceLine)
+            .ToArray();
+
+        return new
+        {
+            DocumentTitleAr = "فاتورة مبيعات",
+            DocumentTitleEn = "SALES INVOICE",
+            InvoiceNumber = invoice.InvoiceCode,
+            InvoiceDate = invoice.InvoiceDate.ToString("dd/MM/yyyy"),
+            PostingDate = invoice.PostingDate.ToString("dd/MM/yyyy"),
+            CustomerCode = invoice.CustomerCode ?? string.Empty,
+            CustomerName = invoice.CustomerName ?? string.Empty,
+            CustomerOrderNumber = invoice.CustomerOrderCode ?? string.Empty,
+            PrescriptionNumber = BuildPrescriptionNumber(invoice.PrescriptionCode, invoice.PrescriptionRevisionNumber),
+            JournalEntryNumber = invoice.JournalEntryNumber ?? string.Empty,
+            Status = invoice.Status.ToString(),
+            StatusText = DescribeSalesInvoiceStatus(invoice.Status),
+            SaleType = saleTypeText,
+            PaymentTermDays = invoice.PaymentTermDaysSnapshot,
+            DueDate = invoice.DueDate?.ToString("dd/MM/yyyy") ?? string.Empty,
+            CurrencyCode = invoice.CurrencyCodeSnapshot,
+            CurrencyName = currency?.NameAr ?? string.Empty,
+            CurrencySymbol = invoice.CurrencySymbolSnapshot ?? currency?.Symbol ?? string.Empty,
+            CurrencyDecimalPlaces = invoice.CurrencyDecimalPlacesSnapshot,
+            invoice.ExchangeRate,
+            ExchangeRateDate = invoice.ExchangeRateDate.ToString("dd/MM/yyyy"),
+            TaxCalculationMode = DescribeTaxCalculationMode(invoice.TaxCalculationMode),
+            invoice.Subtotal,
+            invoice.DiscountAmount,
+            TotalAfterDiscount = invoice.Subtotal - invoice.DiscountAmount,
+            invoice.TaxAmount,
+            invoice.TotalAmount,
+            PaidAmount = invoice.PaymentSummary.PaidAmount,
+            OutstandingAmount = invoice.PaymentSummary.OutstandingAmount,
+            TotalAmountWords = ArabicAmountTextFormatter.Format(invoice.TotalAmount, currency?.NameAr),
+            Description = invoice.Description ?? string.Empty,
+            ConfirmedAt = invoice.ConfirmedAtUtc?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? string.Empty,
+            ConfirmedBy = invoice.ConfirmedBy ?? string.Empty,
+            PostedAt = invoice.PostedAtUtc?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? string.Empty,
+            PostedBy = invoice.PostedBy ?? string.Empty,
+            CreatedBy = invoice.CreatedBy ?? string.Empty,
+            CreatedAt = invoice.CreatedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm"),
+            PrintedAt = DateTimeOffset.Now.ToString("dd/MM/yyyy HH:mm"),
+            Company = Company(),
+            Lines = lines,
+            Signatures = new
+            {
+                Cashier = "أمين الصندوق",
+                Accountant = "المحاسب",
+                SalesManager = "مدير المبيعات",
+                Customer = "استلام العميل"
+            }
+        };
+    }
+
+    private static object MapSalesInvoiceLine(SalesInvoiceLineDto line) => new
+    {
+        line.LineNumber,
+        ProductCode = line.ProductCodeSnapshot ?? string.Empty,
+        ProductName = line.ProductNameSnapshot,
+        Description = BuildSalesLineDescription(line),
+        LineType = DescribeSalesLineType(line.LineType),
+        Unit = line.UnitSnapshot ?? string.Empty,
+        Warehouse = string.IsNullOrWhiteSpace(line.WarehouseName)
+            ? line.WarehouseCode ?? string.Empty
+            : string.IsNullOrWhiteSpace(line.WarehouseCode)
+                ? line.WarehouseName
+                : $"{line.WarehouseCode} - {line.WarehouseName}",
+        line.Quantity,
+        UnitPrice = line.ActualUnitPrice,
+        Discount = line.DiscountAmount,
+        TaxRate = line.TaxRate ?? 0m,
+        Tax = line.TaxAmount,
+        Net = line.NetAmount,
+        Total = line.FinalAmount,
+        Prescription = BuildPrescriptionNumber(line.PrescriptionCode, line.PrescriptionRevisionNumber),
+        Eye = DescribeEyeSide(line.PrescriptionEye),
+        Notes = line.Notes ?? string.Empty
+    };
+
+    private static string BuildSalesLineDescription(SalesInvoiceLineDto line)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(line.DescriptionSnapshot))
+            parts.Add(line.DescriptionSnapshot.Trim());
+
+        var prescription = BuildPrescriptionNumber(line.PrescriptionCode, line.PrescriptionRevisionNumber);
+        if (!string.IsNullOrWhiteSpace(prescription))
+        {
+            var eye = DescribeEyeSide(line.PrescriptionEye);
+            parts.Add(string.IsNullOrWhiteSpace(eye) ? $"وصفة: {prescription}" : $"وصفة: {prescription} - {eye}");
+        }
+
+        if (line.PrescriptionSnapshot is not null)
+        {
+            var rx = line.PrescriptionSnapshot;
+            var measurements = new List<string>();
+            if (rx.SPH.HasValue) measurements.Add($"SPH {rx.SPH.Value:0.##}");
+            if (rx.CYL.HasValue) measurements.Add($"CYL {rx.CYL.Value:0.##}");
+            if (rx.Axis.HasValue) measurements.Add($"AX {rx.Axis.Value}");
+            if (rx.ADD.HasValue) measurements.Add($"ADD {rx.ADD.Value:0.##}");
+            if (rx.PD.HasValue) measurements.Add($"PD {rx.PD.Value:0.##}");
+            if (rx.FittingHeight.HasValue) measurements.Add($"H {rx.FittingHeight.Value:0.##}");
+            if (measurements.Count > 0) parts.Add(string.Join(" / ", measurements));
+        }
+
+        if (!string.IsNullOrWhiteSpace(line.Notes))
+            parts.Add(line.Notes.Trim());
+
+        return string.Join(" • ", parts);
+    }
+
+    private static string BuildPrescriptionNumber(string? code, int? revisionNumber)
+    {
+        if (string.IsNullOrWhiteSpace(code)) return string.Empty;
+        return revisionNumber.HasValue ? $"{code} / إصدار {revisionNumber.Value}" : code;
+    }
+
+    private static string DescribeSalesInvoiceStatus(SalesInvoiceStatus status) => status switch
+    {
+        SalesInvoiceStatus.Draft => "مسودة",
+        SalesInvoiceStatus.Confirmed => "مؤكدة",
+        SalesInvoiceStatus.Posted => "مرحّلة",
+        SalesInvoiceStatus.Cancelled => "ملغاة",
+        _ => status.ToString()
+    };
+
+    private static string DescribeTaxCalculationMode(TaxCalculationMode mode) => mode switch
+    {
+        TaxCalculationMode.Exclusive => "الضريبة غير شاملة",
+        TaxCalculationMode.Inclusive => "الضريبة شاملة",
+        _ => mode.ToString()
+    };
+
+    private static string DescribeSalesLineType(SalesLineType value) => value switch
+    {
+        SalesLineType.Frame => "إطار",
+        SalesLineType.Lens => "عدسة",
+        SalesLineType.Accessory => "ملحق",
+        SalesLineType.Service => "خدمة",
+        SalesLineType.Other => "أخرى",
+        _ => value.ToString()
+    };
+
+    private static string DescribeEyeSide(EyeSide? value) => value switch
+    {
+        EyeSide.RightOD => "يمين (OD)",
+        EyeSide.LeftOS => "يسار (OS)",
+        _ => string.Empty
+    };
 
     private static object MapReceiptLine(
         ReceiptVoucherLineDto line,
