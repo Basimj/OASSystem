@@ -107,9 +107,9 @@
                 <ChildContent>
                 <UiCustomerOrderEditor Model="@order" ReadOnly="@(!ActiveTab.IsEditMode)" SearchCustomersAsync="SearchCustomerItemsAsync"
                                        SearchPrescriptionsAsync="SearchPrescriptionRevisionItemsAsync" SearchCurrenciesAsync="SearchCurrencyItemsAsync"
-                                       SearchCategoriesAsync="SearchCategoryItemsAsync" SearchProductsAsync="SearchProductItemsAsync" SearchWarehousesAsync="SearchWarehouseItemsAsync"
+                                       SearchProductTypesAsync="SearchProductTypeItemsAsync" SearchCategoriesAsync="SearchCategoryItemsAsync" SearchProductsAsync="SearchProductItemsAsync" SearchWarehousesAsync="SearchWarehouseItemsAsync"
                                        SearchPrescriptionRevisionsAsync="SearchLinePrescriptionItemsAsync" OnSelectionChanged="SelectionChangedAsync"
-                                       OnCategorySelected="CategorySelectedAsync"
+                                       OnProductTypeSelected="ProductTypeSelectedAsync" OnCategorySelected="CategorySelectedAsync"
                                OnProductSelected="ProductSelectedAsync" OnWarehouseSelected="WarehouseSelectedAsync" OnChanged="MarkDirtyAsync" />
                 </ChildContent>
             </UiSalesEditorSurface>
@@ -146,9 +146,9 @@
                 <UiSalesInvoiceEditor Model="@invoice" ReadOnly="@InvoiceReadOnly(invoice)"
                                       SearchCustomersAsync="SearchCustomerItemsAsync" SearchOrdersAsync="SearchOrderItemsAsync" SearchPrescriptionsAsync="SearchPrescriptionRevisionItemsAsync" SearchCurrenciesAsync="SearchCurrencyItemsAsync"
                                       SearchCashAccountsAsync="SearchCashAccountItemsAsync" SearchBankAccountsAsync="SearchBankAccountItemsAsync"
-                                      SearchCategoriesAsync="SearchCategoryItemsAsync" SearchProductsAsync="SearchProductItemsAsync" SearchWarehousesAsync="SearchWarehouseItemsAsync"
+                                      SearchProductTypesAsync="SearchProductTypeItemsAsync" SearchCategoriesAsync="SearchCategoryItemsAsync" SearchProductsAsync="SearchProductItemsAsync" SearchWarehousesAsync="SearchWarehouseItemsAsync"
                                       SearchPrescriptionRevisionsAsync="SearchLinePrescriptionItemsAsync" OnSelectionChanged="SelectionChangedAsync"
-                                      OnCategorySelected="CategorySelectedAsync"
+                                      OnProductTypeSelected="ProductTypeSelectedAsync" OnCategorySelected="CategorySelectedAsync"
                                OnProductSelected="ProductSelectedAsync" OnWarehouseSelected="WarehouseSelectedAsync" OnRequestPriceOverride="RequestPriceOverrideAsync" OnChanged="MarkDirtyAsync" />
                 </ChildContent>
             </UiSalesEditorSurface>

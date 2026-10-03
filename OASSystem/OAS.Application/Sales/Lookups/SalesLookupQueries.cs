@@ -22,13 +22,19 @@ public sealed record GetSalesPrescriptionRevisionsQuery(Guid PrescriptionId)
     public IReadOnlyCollection<string> RequiredPermissions { get; } = [SalesPermissions.Prescriptions.View];
 }
 
-public sealed record SearchSalesProductCategoriesQuery(string? Search, int Take = 20)
+public sealed record SearchSalesProductTypesQuery(string? Search, int Take = 20)
+    : IQuery<IReadOnlyList<SalesProductTypeLookupDto>>, IAuthorizedRequest
+{
+    public IReadOnlyCollection<string> RequiredPermissions { get; } = [SalesPermissions.View];
+}
+
+public sealed record SearchSalesProductCategoriesQuery(Guid? ProductTypeId, string? Search, int Take = 20)
     : IQuery<IReadOnlyList<SalesProductCategoryLookupDto>>, IAuthorizedRequest
 {
     public IReadOnlyCollection<string> RequiredPermissions { get; } = [SalesPermissions.View];
 }
 
-public sealed record SearchSalesProductVariantsQuery(Guid? CategoryId, string? Search, int Take = 20)
+public sealed record SearchSalesProductVariantsQuery(Guid? ProductTypeId, Guid? CategoryId, string? Search, int Take = 20)
     : IQuery<IReadOnlyList<SalesProductVariantLookupDto>>, IAuthorizedRequest
 {
     public IReadOnlyCollection<string> RequiredPermissions { get; } = [SalesPermissions.View];

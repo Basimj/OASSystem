@@ -2,6 +2,7 @@ using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Abstractions.Persistence.Specifications;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.Sales.Abstractions;
+using OAS.Application.Sales.Common;
 using OAS.Domain.Entities.Inventory;
 using OAS.Domain.Sales.Enums;
 using OAS.Domain.Sales.ValueObjects;
@@ -11,6 +12,7 @@ namespace OAS.Application.Sales.Services;
 public sealed class SalesLineResolver(
     IReadRepository<ProductVariant, Guid> variants,
     IReadRepository<Product, Guid> products,
+    IReadRepository<ProductType, Guid> productTypes,
     IReadRepository<Unit, Guid> units,
     IReadRepository<Warehouse, Guid> warehouses,
     IReadRepository<LensDetails, Guid> lensDetails) : ISalesLineResolver
@@ -22,7 +24,7 @@ public sealed class SalesLineResolver(
         string? requestedDescription,
         CancellationToken cancellationToken = default)
     {
-        if (lineType == SalesLineType.Service)
+        if (lineType == SalesLineType.Service && !productVariantId.HasValue)
         {
             var serviceDescription = RequiredDescription(requestedDescription, "الخدمة");
             return new(null, null, null, serviceDescription, serviceDescription, null, 0m, false, null);
@@ -47,16 +49,29 @@ public sealed class SalesLineResolver(
         if (!product.IsActive)
             throw new ConflictException("sales_product_inactive", "المنتج المحدد غير فعال.");
 
-        if (lineType is SalesLineType.Frame or SalesLineType.Lens or SalesLineType.Accessory)
+        var productType = await productTypes.GetByIdAsync(product.ProductTypeId, cancellationToken)
+            ?? throw new NotFoundException(nameof(ProductType), product.ProductTypeId);
+        if (!productType.IsActive)
+            throw new ConflictException("sales_product_type_inactive", "نوع المنتج المحدد غير فعال.");
+
+        var expectedLineType = SalesProductTypeMapping.ToLineType(productType.SystemKey);
+        if (lineType != expectedLineType)
+            throw new ConflictException(
+                "sales_product_type_mismatch",
+                $"نوع سطر البيع لا يتطابق مع نوع المنتج ({productType.NameAr}). أعد اختيار المنتج من النوع الصحيح.");
+
+        if (product.IsStockItem)
         {
-            if (!product.IsStockItem)
-                throw new ConflictException("sales_product_not_stock_item", "المنتج المحدد ليس منتج مخزون.");
             if (!warehouseId.HasValue || warehouseId.Value == Guid.Empty)
-                throw new ConflictException("sales_warehouse_required", "يجب تحديد المخزن لهذا السطر.");
+                throw new ConflictException("sales_warehouse_required", "يجب تحديد المخزن لهذا المنتج.");
             var warehouse = await warehouses.GetByIdAsync(warehouseId.Value, cancellationToken)
                 ?? throw new NotFoundException(nameof(Warehouse), warehouseId.Value);
             if (!warehouse.IsActive)
                 throw new ConflictException("sales_warehouse_inactive", "المخزن المحدد غير فعال.");
+        }
+        else if (warehouseId.HasValue && warehouseId.Value != Guid.Empty)
+        {
+            throw new ConflictException("sales_warehouse_not_allowed", "لا يتم تحديد مخزن لمنتج غير مخزني.");
         }
 
         string? unitName = null;

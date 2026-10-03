@@ -1,4 +1,5 @@
 using OAS.Client.Sales.Common;
+using OAS.Contracts.Inventory.Products;
 using OAS.Contracts.Sales.CustomerOrders;
 using OAS.Contracts.Sales.Enums;
 using OAS.Contracts.Sales.Prescriptions;
@@ -200,6 +201,10 @@ public static class SalesUiMapper
         GroupId = x.GroupId,
         LineNumber = x.LineNumber,
         LineType = x.LineType.ToString(),
+        ProductTypeId = ResolveProductTypeId(x.ProductTypeId, x.LineType),
+        ProductTypeDisplay = ResolveProductTypeDisplay(x.ProductTypeCode, x.ProductTypeName, x.LineType),
+        ProductTypeSystemKey = ResolveProductTypeSystemKey(x.ProductTypeSystemKey, x.LineType),
+        ProductIsStockItem = x.ProductIsStockItem,
         ProductCategoryId = x.ProductCategoryId?.ToString() ?? string.Empty,
         ProductCategoryDisplay = Display(x.ProductCategoryCode, x.ProductCategoryName),
         ProductVariantId = x.ProductVariantId?.ToString() ?? string.Empty,
@@ -244,6 +249,10 @@ public static class SalesUiMapper
         GroupId = x.GroupId,
         LineNumber = x.LineNumber,
         LineType = x.LineType.ToString(),
+        ProductTypeId = ResolveProductTypeId(x.ProductTypeId, x.LineType),
+        ProductTypeDisplay = ResolveProductTypeDisplay(x.ProductTypeCode, x.ProductTypeName, x.LineType),
+        ProductTypeSystemKey = ResolveProductTypeSystemKey(x.ProductTypeSystemKey, x.LineType),
+        ProductIsStockItem = x.ProductIsStockItem,
         ProductCategoryId = x.ProductCategoryId?.ToString() ?? string.Empty,
         ProductCategoryDisplay = Display(x.ProductCategoryCode, x.ProductCategoryName),
         ProductVariantId = x.ProductVariantId?.ToString() ?? string.Empty,
@@ -334,6 +343,47 @@ public static class SalesUiMapper
 
     private static SalesInvoiceLineRequest ToInvoiceLineRequest(UiSalesLineModel x) =>
         new(x.Id, x.CustomerOrderLineId, x.GroupId, Parse<SalesLineType>(x.LineType, SalesLineType.Frame), ParseGuid(x.ProductVariantId), ParseGuid(x.WarehouseId), x.Description, x.Quantity, x.ActualUnitPrice, Parse<SalesDiscountType>(x.DiscountType, SalesDiscountType.None), x.DiscountValue, x.TaxRate, ParseGuid(x.PrescriptionRevisionId), ParseNullable<EyeSide>(x.PrescriptionEye), x.RequiresProduction, x.Notes, string.IsNullOrWhiteSpace(x.RowVersion) ? null : x.RowVersion);
+
+
+    private static string ResolveProductTypeId(Guid? productTypeId, SalesLineType lineType)
+    {
+        if (productTypeId.HasValue && productTypeId.Value != Guid.Empty)
+            return productTypeId.Value.ToString();
+
+        return lineType switch
+        {
+            SalesLineType.Service => ProductTypeSystemIds.Service.ToString(),
+            SalesLineType.Other => ProductTypeSystemIds.Other.ToString(),
+            _ => string.Empty
+        };
+    }
+
+    private static string? ResolveProductTypeDisplay(string? code, string? name, SalesLineType lineType)
+    {
+        var display = Display(code, name);
+        if (!string.IsNullOrWhiteSpace(display))
+            return display;
+
+        return lineType switch
+        {
+            SalesLineType.Service => $"{ProductTypeSystemKeys.Service} - خدمة",
+            SalesLineType.Other => $"{ProductTypeSystemKeys.Other} - أخرى",
+            _ => null
+        };
+    }
+
+    private static string? ResolveProductTypeSystemKey(string? systemKey, SalesLineType lineType)
+    {
+        if (!string.IsNullOrWhiteSpace(systemKey))
+            return systemKey;
+
+        return lineType switch
+        {
+            SalesLineType.Service => ProductTypeSystemKeys.Service,
+            SalesLineType.Other => ProductTypeSystemKeys.Other,
+            _ => null
+        };
+    }
 
     private static string? Display(string? code, string? name)
     {

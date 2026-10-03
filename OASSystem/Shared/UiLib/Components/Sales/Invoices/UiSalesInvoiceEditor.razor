@@ -34,9 +34,9 @@
     </div>
 </UiSalesFormSection>
 
-<UiSalesFormSection Title="أسطر الفاتورة" Description="سعر المنتج يُجلب تلقائيًا ولا يُعدل مباشرة. عند الحاجة إلى سعر مختلف استخدم طلب تغيير السعر ليُطبق بعد الموافقة." IconCss="fa-solid fa-list-check">
-    <UiSalesLinesEditor Model="@Model.Lines" ReadOnly="@SourceOrderFieldsReadOnly" SearchCategoriesAsync="SearchCategoriesAsync" SearchProductsAsync="SearchProductsAsync" SearchWarehousesAsync="SearchWarehousesAsync"
-                        SearchPrescriptionRevisionsAsync="SearchPrescriptionRevisionsAsync" OnCategorySelected="OnCategorySelected" OnProductSelected="OnProductSelected" OnWarehouseSelected="OnWarehouseSelected"
+<UiSalesFormSection Title="بنود الفاتورة" Description="محرر واسع للبند: نوع المنتج ثم التصنيف ثم المنتج/المتغير. سعر المنتج يُجلب تلقائيًا، وعند الحاجة إلى سعر مختلف استخدم طلب تغيير السعر." IconCss="fa-solid fa-list-check">
+    <UiSalesLinesEditor Model="@Model.Lines" ReadOnly="@SourceOrderFieldsReadOnly" SearchProductTypesAsync="SearchProductTypesAsync" SearchCategoriesAsync="SearchCategoriesAsync" SearchProductsAsync="SearchProductsAsync" SearchWarehousesAsync="SearchWarehousesAsync"
+                        SearchPrescriptionRevisionsAsync="SearchPrescriptionRevisionsAsync" OnProductTypeSelected="OnProductTypeSelected" OnCategorySelected="OnCategorySelected" OnProductSelected="OnProductSelected" OnWarehouseSelected="OnWarehouseSelected"
                         EnablePriceOverride="true" OnRequestPriceOverride="OnRequestPriceOverride" OnChanged="OnChanged" />
 </UiSalesFormSection>
 
@@ -57,13 +57,15 @@
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchOrdersAsync { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchPrescriptionsAsync { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchCurrenciesAsync { get; set; }
-    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchCategoriesAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchProductTypesAsync { get; set; }
+    [Parameter] public Func<UiSalesLineModel, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchCategoriesAsync { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchCashAccountsAsync { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchBankAccountsAsync { get; set; }
     [Parameter] public Func<UiSalesLineModel, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchProductsAsync { get; set; }
     [Parameter] public Func<UiSalesLineModel, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchWarehousesAsync { get; set; }
     [Parameter] public Func<UiSalesLineModel, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchPrescriptionRevisionsAsync { get; set; }
     [Parameter] public EventCallback<UiSalesSelectionChange> OnSelectionChanged { get; set; }
+    [Parameter] public EventCallback<UiSalesLineSelectionChange> OnProductTypeSelected { get; set; }
     [Parameter] public EventCallback<UiSalesLineSelectionChange> OnCategorySelected { get; set; }
     [Parameter] public EventCallback<UiSalesLineSelectionChange> OnProductSelected { get; set; }
     [Parameter] public EventCallback<UiSalesLineSelectionChange> OnWarehouseSelected { get; set; }

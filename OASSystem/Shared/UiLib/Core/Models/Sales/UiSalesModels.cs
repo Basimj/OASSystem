@@ -63,6 +63,10 @@ public sealed class UiSalesLineModel
     public Guid? GroupId { get; set; }
     public int LineNumber { get; set; }
     public string LineType { get; set; } = "Frame";
+    public string ProductTypeId { get; set; } = string.Empty;
+    public string? ProductTypeDisplay { get; set; }
+    public string? ProductTypeSystemKey { get; set; }
+    public bool? ProductIsStockItem { get; set; }
     public string ProductCategoryId { get; set; } = string.Empty;
     public string? ProductCategoryDisplay { get; set; }
     public string ProductVariantId { get; set; } = string.Empty;

@@ -34,20 +34,29 @@ public sealed class SalesLookupsController(ISender sender) : ControllerBase
         CancellationToken cancellationToken)
         => Ok(await sender.Send(new GetSalesPrescriptionRevisionsQuery(prescriptionId), cancellationToken));
 
-    [HttpGet("product-categories")]
-    public async Task<ActionResult<IReadOnlyList<SalesProductCategoryLookupDto>>> ProductCategories(
+    [HttpGet("product-types")]
+    public async Task<ActionResult<IReadOnlyList<SalesProductTypeLookupDto>>> ProductTypes(
         [FromQuery] string? search,
         [FromQuery] int take = 20,
         CancellationToken cancellationToken = default)
-        => Ok(await sender.Send(new SearchSalesProductCategoriesQuery(search, take), cancellationToken));
+        => Ok(await sender.Send(new SearchSalesProductTypesQuery(search, take), cancellationToken));
+
+    [HttpGet("product-categories")]
+    public async Task<ActionResult<IReadOnlyList<SalesProductCategoryLookupDto>>> ProductCategories(
+        [FromQuery] Guid? productTypeId,
+        [FromQuery] string? search,
+        [FromQuery] int take = 20,
+        CancellationToken cancellationToken = default)
+        => Ok(await sender.Send(new SearchSalesProductCategoriesQuery(productTypeId, search, take), cancellationToken));
 
     [HttpGet("product-variants")]
     public async Task<ActionResult<IReadOnlyList<SalesProductVariantLookupDto>>> ProductVariants(
+        [FromQuery] Guid? productTypeId,
         [FromQuery] Guid? categoryId,
         [FromQuery] string? search,
         [FromQuery] int take = 20,
         CancellationToken cancellationToken = default)
-        => Ok(await sender.Send(new SearchSalesProductVariantsQuery(categoryId, search, take), cancellationToken));
+        => Ok(await sender.Send(new SearchSalesProductVariantsQuery(productTypeId, categoryId, search, take), cancellationToken));
 
     [HttpGet("warehouses")]
     public async Task<ActionResult<IReadOnlyList<SalesWarehouseLookupDto>>> Warehouses(

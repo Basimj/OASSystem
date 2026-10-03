@@ -69,11 +69,14 @@ public sealed class SalesClientService(OasApiClient apiClient) : ISalesClientSer
         => await apiClient.GetAsync<IReadOnlyList<SalesPrescriptionLookupDto>>(AddQuery("api/sales/lookups/prescriptions", ("customerId", customerId?.ToString()), ("search", search), ("take", take.ToString())), ct) ?? [];
     public async Task<IReadOnlyList<SalesPrescriptionRevisionLookupDto>> GetPrescriptionRevisionsAsync(Guid prescriptionId, CancellationToken ct = default)
         => await apiClient.GetAsync<IReadOnlyList<SalesPrescriptionRevisionLookupDto>>($"api/sales/lookups/prescriptions/{prescriptionId}/revisions", ct) ?? [];
-    public async Task<IReadOnlyList<SalesProductCategoryLookupDto>> SearchProductCategoriesAsync(string? search, int take = 20, CancellationToken ct = default)
-        => await apiClient.GetAsync<IReadOnlyList<SalesProductCategoryLookupDto>>(AddQuery("api/sales/lookups/product-categories", ("search", search), ("take", take.ToString())), ct) ?? [];
+    public async Task<IReadOnlyList<SalesProductTypeLookupDto>> SearchProductTypesAsync(string? search, int take = 20, CancellationToken ct = default)
+        => await apiClient.GetAsync<IReadOnlyList<SalesProductTypeLookupDto>>(AddQuery("api/sales/lookups/product-types", ("search", search), ("take", take.ToString())), ct) ?? [];
 
-    public async Task<IReadOnlyList<SalesProductVariantLookupDto>> SearchProductVariantsAsync(Guid? categoryId, string? search, int take = 20, CancellationToken ct = default)
-        => await apiClient.GetAsync<IReadOnlyList<SalesProductVariantLookupDto>>(AddQuery("api/sales/lookups/product-variants", ("categoryId", categoryId?.ToString()), ("search", search), ("take", take.ToString())), ct) ?? [];
+    public async Task<IReadOnlyList<SalesProductCategoryLookupDto>> SearchProductCategoriesAsync(Guid? productTypeId, string? search, int take = 20, CancellationToken ct = default)
+        => await apiClient.GetAsync<IReadOnlyList<SalesProductCategoryLookupDto>>(AddQuery("api/sales/lookups/product-categories", ("productTypeId", productTypeId?.ToString()), ("search", search), ("take", take.ToString())), ct) ?? [];
+
+    public async Task<IReadOnlyList<SalesProductVariantLookupDto>> SearchProductVariantsAsync(Guid? productTypeId, Guid? categoryId, string? search, int take = 20, CancellationToken ct = default)
+        => await apiClient.GetAsync<IReadOnlyList<SalesProductVariantLookupDto>>(AddQuery("api/sales/lookups/product-variants", ("productTypeId", productTypeId?.ToString()), ("categoryId", categoryId?.ToString()), ("search", search), ("take", take.ToString())), ct) ?? [];
     public async Task<IReadOnlyList<SalesWarehouseLookupDto>> SearchWarehousesAsync(Guid? productVariantId, string? search, int take = 20, CancellationToken ct = default)
         => await apiClient.GetAsync<IReadOnlyList<SalesWarehouseLookupDto>>(AddQuery("api/sales/lookups/warehouses", ("productVariantId", productVariantId?.ToString()), ("search", search), ("take", take.ToString())), ct) ?? [];
     public async Task<IReadOnlyList<SalesCurrencyLookupDto>> SearchCurrenciesAsync(DateOnly documentDate, string? search, int take = 20, CancellationToken ct = default)

@@ -32,6 +32,7 @@ public partial class SalesWorkspaceHost : IDisposable
 
     private readonly List<UiSalesDocumentListItem> _listItems = [];
     private readonly Dictionary<Guid, SalesCustomerLookupDto> _customers = [];
+    private readonly Dictionary<Guid, SalesProductTypeLookupDto> _productTypes = [];
     private readonly Dictionary<Guid, SalesProductCategoryLookupDto> _categories = [];
     private readonly Dictionary<Guid, SalesProductVariantLookupDto> _products = [];
     private readonly Dictionary<Guid, SalesWarehouseLookupDto> _warehouses = [];
@@ -787,9 +788,27 @@ public partial class SalesWorkspaceHost : IDisposable
                 disabled);
         }).ToArray();
     }
-    private async Task<IReadOnlyList<UiLookupItem>> SearchCategoryItemsAsync(string q, CancellationToken ct)
+    private async Task<IReadOnlyList<UiLookupItem>> SearchProductTypeItemsAsync(string q, CancellationToken ct)
     {
-        var rows = await Sales.SearchProductCategoriesAsync(q, 50, ct);
+        var rows = await Sales.SearchProductTypesAsync(q, 30, ct);
+        foreach (var x in rows)
+            _productTypes[x.Id] = x;
+
+        return rows.Select(x => new UiLookupItem(
+            x.Id.ToString(),
+            $"{x.Code} - {x.NameAr}",
+            ProductTypeHint(x),
+            ProductTypeIcon(x.SalesLineType),
+            !x.IsActive)).ToArray();
+    }
+
+    private async Task<IReadOnlyList<UiLookupItem>> SearchCategoryItemsAsync(UiSalesLineModel line, string q, CancellationToken ct)
+    {
+        var productTypeId = TryGuid(line.ProductTypeId);
+        if (!productTypeId.HasValue)
+            return [];
+
+        var rows = await Sales.SearchProductCategoriesAsync(productTypeId, q, 50, ct);
         foreach (var x in rows)
             _categories[x.Id] = x;
 
@@ -821,19 +840,20 @@ public partial class SalesWorkspaceHost : IDisposable
 
     private async Task<IReadOnlyList<UiLookupItem>> SearchProductItemsAsync(UiSalesLineModel line, string q, CancellationToken ct)
     {
+        var productTypeId = TryGuid(line.ProductTypeId);
         var categoryId = TryGuid(line.ProductCategoryId);
-        if (!categoryId.HasValue)
+        if (!productTypeId.HasValue || !categoryId.HasValue)
             return [];
 
-        var rows = await Sales.SearchProductVariantsAsync(categoryId, q, 20, ct);
+        var rows = await Sales.SearchProductVariantsAsync(productTypeId, categoryId, q, 20, ct);
         foreach (var x in rows)
             _products[x.Id] = x;
 
         return rows.Select(x => new UiLookupItem(
             x.Id.ToString(),
             $"{x.ProductCode} - {x.ProductNameAr}",
-            string.Join(" • ", new[] { x.SKU, x.Barcode, x.VariantName }.Where(s => !string.IsNullOrWhiteSpace(s))),
-            "fa-solid fa-box",
+            string.Join(" • ", new[] { x.SKU, x.Barcode, x.VariantName }.Where(value => !string.IsNullOrWhiteSpace(value))),
+            ProductTypeIcon(x.SalesLineType),
             !x.IsActive)).ToArray();
     }
     private async Task<IReadOnlyList<UiLookupItem>> SearchWarehouseItemsAsync(UiSalesLineModel line, string q, CancellationToken ct)
@@ -1089,6 +1109,24 @@ public partial class SalesWorkspaceHost : IDisposable
         return false;
     }
 
+    private Task ProductTypeSelectedAsync(UiSalesLineSelectionChange change)
+    {
+        if (Guid.TryParse(change.Value, out var id) && _productTypes.TryGetValue(id, out var productType))
+        {
+            change.Line.ProductTypeDisplay = $"{productType.Code} - {productType.NameAr}";
+            change.Line.ProductTypeSystemKey = productType.SystemKey;
+            change.Line.LineType = productType.SalesLineType.ToString();
+        }
+        else
+        {
+            change.Line.ProductTypeDisplay = null;
+            change.Line.ProductTypeSystemKey = null;
+            change.Line.LineType = SalesLineType.Other.ToString();
+        }
+
+        return Task.CompletedTask;
+    }
+
     private Task CategorySelectedAsync(UiSalesLineSelectionChange change)
     {
         if (Guid.TryParse(change.Value, out var id) && _categories.TryGetValue(id, out var category))
@@ -1103,6 +1141,12 @@ public partial class SalesWorkspaceHost : IDisposable
     {
         if (Guid.TryParse(change.Value, out var id) && _products.TryGetValue(id, out var product))
         {
+            change.Line.ProductTypeId = product.ProductTypeId.ToString();
+            change.Line.ProductTypeDisplay = $"{product.ProductTypeCode} - {product.ProductTypeNameAr}";
+            change.Line.ProductTypeSystemKey = product.ProductTypeSystemKey;
+            change.Line.LineType = product.SalesLineType.ToString();
+            change.Line.ProductIsStockItem = product.IsStockItem;
+
             change.Line.ProductCategoryId = product.CategoryId.ToString();
             if (_categories.TryGetValue(product.CategoryId, out var category))
                 change.Line.ProductCategoryDisplay = $"{category.Code} - {category.NameAr}";
@@ -1112,6 +1156,8 @@ public partial class SalesWorkspaceHost : IDisposable
                 : $"{product.ProductNameAr} - {product.VariantName}";
 
             change.Line.ProductCodeSnapshot = product.ProductCode;
+            change.Line.ProductNameSnapshot = change.Line.ProductDisplay;
+            change.Line.UnitSnapshot = product.UnitName;
             change.Line.Description = change.Line.ProductDisplay;
             var (exchangeRate, currencyDecimals) = ActiveCurrencyContext();
             var transactionPrice = ConvertFromBaseForUi(
@@ -1122,26 +1168,61 @@ public partial class SalesWorkspaceHost : IDisposable
             change.Line.ActualUnitPrice = transactionPrice;
             change.Line.PrescriptionRequired = product.IsPrescriptionLens;
 
-            if (product.IsPrescriptionLens)
+            if (change.Line.LineType == SalesLineType.Lens.ToString())
             {
-                // العدسة الطبية يجب أن تعامل كسطر Lens ويحدد المستخدم العين فقط
-                // عندما توجد Revision في رأس طلب العميل.
-                change.Line.LineType = "Lens";
-                if (ActiveTab?.Model is UiCustomerOrderFormModel)
+                if (product.IsPrescriptionLens && ActiveTab?.Model is UiCustomerOrderFormModel)
+                {
+                    // في طلب العميل نستخدم وصفة الرأس، ويحدد المستخدم العين على مستوى البند.
+                    change.Line.PrescriptionRevisionId = string.Empty;
+                    change.Line.PrescriptionRevisionDisplay = null;
+                }
+                else if (!product.IsPrescriptionLens)
                 {
                     change.Line.PrescriptionRevisionId = string.Empty;
                     change.Line.PrescriptionRevisionDisplay = null;
+                    change.Line.PrescriptionEye = string.Empty;
                 }
             }
             else
             {
+                change.Line.PrescriptionRequired = false;
                 change.Line.PrescriptionRevisionId = string.Empty;
                 change.Line.PrescriptionRevisionDisplay = null;
                 change.Line.PrescriptionEye = string.Empty;
             }
         }
+        else
+        {
+            change.Line.ProductDisplay = null;
+            change.Line.ProductCodeSnapshot = null;
+            change.Line.ProductNameSnapshot = null;
+            change.Line.UnitSnapshot = null;
+            change.Line.ProductIsStockItem = null;
+            change.Line.PrescriptionRequired = false;
+        }
+
         return Task.CompletedTask;
     }
+
+    private static string ProductTypeHint(SalesProductTypeLookupDto productType) => productType.SalesLineType switch
+    {
+        SalesLineType.Frame when string.Equals(productType.SystemKey, "SUNGLASSES", StringComparison.OrdinalIgnoreCase) => "نظارة شمسية • تعامل كسطر إطار",
+        SalesLineType.Frame => "إطار",
+        SalesLineType.Lens => "عدسة",
+        SalesLineType.Accessory => "إكسسوار",
+        SalesLineType.Service => "خدمة / غير مخزني عادةً",
+        _ => "نوع آخر"
+    };
+
+    private static string ProductTypeIcon(SalesLineType lineType) => lineType switch
+    {
+        SalesLineType.Frame => "fa-solid fa-glasses",
+        SalesLineType.Lens => "fa-solid fa-circle-dot",
+        SalesLineType.Accessory => "fa-solid fa-box-open",
+        SalesLineType.Service => "fa-solid fa-screwdriver-wrench",
+        _ => "fa-solid fa-box"
+    };
+
     private (decimal ExchangeRate, byte DecimalPlaces) ActiveCurrencyContext() =>
         ActiveTab?.Model switch
         {

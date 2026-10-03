@@ -5,6 +5,7 @@ using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.Inventory.Repositories;
 using OAS.Application.Sales.Abstractions;
+using OAS.Application.Sales.Common;
 using OAS.Contracts.Sales.Lookups;
 using OAS.Domain.Accounting.Entities;
 using OAS.Domain.Accounting.Enums;
@@ -221,8 +222,53 @@ public sealed class GetSalesPrescriptionRevisionsQueryHandler(
     }
 }
 
+public sealed class SearchSalesProductTypesQueryHandler(
+    IReadRepository<ProductType, Guid> productTypes)
+    : IRequestHandler<
+        SearchSalesProductTypesQuery,
+        IReadOnlyList<SalesProductTypeLookupDto>>
+{
+    public async Task<IReadOnlyList<SalesProductTypeLookupDto>> Handle(
+        SearchSalesProductTypesQuery request,
+        CancellationToken ct)
+    {
+        var search = request.Search?.Trim();
+        var spec = new Specification<ProductType>();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            spec.Where(x =>
+                x.IsActive &&
+                (x.Code.Contains(search) || x.NameAr.Contains(search)));
+        }
+        else
+        {
+            spec.Where(x => x.IsActive);
+        }
+
+        spec
+            .AddSort(
+                nameof(ProductType.NameAr),
+                OAS.Contracts.Common.Pagination.SortDirection.Ascending)
+            .ApplyPaging(0, SalesLookupLimit.Normalize(request.Take));
+
+        var rows = await productTypes.ListAsync(spec, ct);
+
+        return rows
+            .Select(x => new SalesProductTypeLookupDto(
+                x.Id,
+                x.Code,
+                x.NameAr,
+                x.SystemKey,
+                (OAS.Contracts.Sales.Enums.SalesLineType)(byte)SalesProductTypeMapping.ToLineType(x.SystemKey),
+                x.IsActive))
+            .ToArray();
+    }
+}
+
 public sealed class SearchSalesProductCategoriesQueryHandler(
-    IReadRepository<ProductCategory, Guid> categories)
+    IReadRepository<ProductCategory, Guid> categories,
+    IReadRepository<Product, Guid> products)
     : IRequestHandler<
         SearchSalesProductCategoriesQuery,
         IReadOnlyList<SalesProductCategoryLookupDto>>
@@ -231,10 +277,37 @@ public sealed class SearchSalesProductCategoriesQueryHandler(
         SearchSalesProductCategoriesQuery request,
         CancellationToken ct)
     {
+        HashSet<Guid>? allowedCategoryIds = null;
+        if (request.ProductTypeId.HasValue)
+        {
+            var matchingProducts = await products.ListAsync(
+                new Specification<Product>()
+                    .Where(x => x.IsActive && x.ProductTypeId == request.ProductTypeId.Value),
+                ct);
+
+            allowedCategoryIds = matchingProducts
+                .Select(x => x.CategoryId)
+                .ToHashSet();
+
+            if (allowedCategoryIds.Count == 0)
+                return [];
+        }
+
         var search = request.Search?.Trim();
         var spec = new Specification<ProductCategory>();
 
-        if (!string.IsNullOrWhiteSpace(search))
+        if (allowedCategoryIds is not null && !string.IsNullOrWhiteSpace(search))
+        {
+            spec.Where(x =>
+                x.IsActive &&
+                allowedCategoryIds.Contains(x.Id) &&
+                (x.Code.Contains(search) || x.NameAr.Contains(search)));
+        }
+        else if (allowedCategoryIds is not null)
+        {
+            spec.Where(x => x.IsActive && allowedCategoryIds.Contains(x.Id));
+        }
+        else if (!string.IsNullOrWhiteSpace(search))
         {
             spec.Where(x =>
                 x.IsActive &&
@@ -263,6 +336,7 @@ public sealed class SearchSalesProductCategoriesQueryHandler(
 public sealed class SearchSalesProductVariantsQueryHandler(
     IReadRepository<ProductVariant, Guid> variants,
     IReadRepository<Product, Guid> products,
+    IReadRepository<ProductType, Guid> productTypes,
     IReadRepository<InventoryUnit, Guid> units,
     IReadRepository<LensDetails, Guid> lensDetails)
     : IRequestHandler<
@@ -275,21 +349,35 @@ public sealed class SearchSalesProductVariantsQueryHandler(
     {
         var search = request.Search?.Trim();
 
-        HashSet<Guid>? categoryProductIds = null;
-        if (request.CategoryId.HasValue)
+        HashSet<Guid>? filteredProductIds = null;
+        if (request.ProductTypeId.HasValue || request.CategoryId.HasValue)
         {
-            var categoryProducts = await products.ListAsync(
-                new Specification<Product>()
-                    .Where(x =>
-                        x.IsActive &&
-                        x.CategoryId == request.CategoryId.Value),
-                ct);
+            var productFilter = new Specification<Product>();
 
-            categoryProductIds = categoryProducts
-                .Select(x => x.Id)
-                .ToHashSet();
+            if (request.ProductTypeId.HasValue && request.CategoryId.HasValue)
+            {
+                productFilter.Where(x =>
+                    x.IsActive &&
+                    x.ProductTypeId == request.ProductTypeId.Value &&
+                    x.CategoryId == request.CategoryId.Value);
+            }
+            else if (request.ProductTypeId.HasValue)
+            {
+                productFilter.Where(x =>
+                    x.IsActive &&
+                    x.ProductTypeId == request.ProductTypeId.Value);
+            }
+            else
+            {
+                productFilter.Where(x =>
+                    x.IsActive &&
+                    x.CategoryId == request.CategoryId!.Value);
+            }
 
-            if (categoryProductIds.Count == 0)
+            var filteredProducts = await products.ListAsync(productFilter, ct);
+            filteredProductIds = filteredProducts.Select(x => x.Id).ToHashSet();
+
+            if (filteredProductIds.Count == 0)
                 return [];
         }
 
@@ -298,7 +386,22 @@ public sealed class SearchSalesProductVariantsQueryHandler(
         {
             var productSpec = new Specification<Product>();
 
-            if (request.CategoryId.HasValue)
+            if (request.ProductTypeId.HasValue && request.CategoryId.HasValue)
+            {
+                productSpec.Where(x =>
+                    x.IsActive &&
+                    x.ProductTypeId == request.ProductTypeId.Value &&
+                    x.CategoryId == request.CategoryId.Value &&
+                    (x.ProductCode.Contains(search) || x.NameAr.Contains(search)));
+            }
+            else if (request.ProductTypeId.HasValue)
+            {
+                productSpec.Where(x =>
+                    x.IsActive &&
+                    x.ProductTypeId == request.ProductTypeId.Value &&
+                    (x.ProductCode.Contains(search) || x.NameAr.Contains(search)));
+            }
+            else if (request.CategoryId.HasValue)
             {
                 productSpec.Where(x =>
                     x.IsActive &&
@@ -319,11 +422,11 @@ public sealed class SearchSalesProductVariantsQueryHandler(
 
         var spec = new Specification<ProductVariant>();
 
-        if (request.CategoryId.HasValue && !string.IsNullOrWhiteSpace(search))
+        if (filteredProductIds is not null && !string.IsNullOrWhiteSpace(search))
         {
             spec.Where(x =>
                 x.IsActive &&
-                categoryProductIds!.Contains(x.ProductId) &&
+                filteredProductIds.Contains(x.ProductId) &&
                 (
                     x.SKU.Contains(search) ||
                     (x.Barcode != null && x.Barcode.Contains(search)) ||
@@ -331,11 +434,9 @@ public sealed class SearchSalesProductVariantsQueryHandler(
                     matchingProductIds.Contains(x.ProductId)
                 ));
         }
-        else if (request.CategoryId.HasValue)
+        else if (filteredProductIds is not null)
         {
-            spec.Where(x =>
-                x.IsActive &&
-                categoryProductIds!.Contains(x.ProductId));
+            spec.Where(x => x.IsActive && filteredProductIds.Contains(x.ProductId));
         }
         else if (!string.IsNullOrWhiteSpace(search))
         {
@@ -369,8 +470,14 @@ public sealed class SearchSalesProductVariantsQueryHandler(
             if (product is null || !product.IsActive)
                 continue;
 
-            if (request.CategoryId.HasValue &&
-                product.CategoryId != request.CategoryId.Value)
+            if (request.ProductTypeId.HasValue && product.ProductTypeId != request.ProductTypeId.Value)
+                continue;
+
+            if (request.CategoryId.HasValue && product.CategoryId != request.CategoryId.Value)
+                continue;
+
+            var productType = await productTypes.GetByIdAsync(product.ProductTypeId, ct);
+            if (productType is null || !productType.IsActive)
                 continue;
 
             string? unitName = null;
@@ -388,6 +495,11 @@ public sealed class SearchSalesProductVariantsQueryHandler(
             result.Add(new SalesProductVariantLookupDto(
                 variant.Id,
                 product.Id,
+                productType.Id,
+                productType.Code,
+                productType.NameAr,
+                productType.SystemKey,
+                (OAS.Contracts.Sales.Enums.SalesLineType)(byte)SalesProductTypeMapping.ToLineType(productType.SystemKey),
                 product.CategoryId,
                 product.ProductCode,
                 product.NameAr,

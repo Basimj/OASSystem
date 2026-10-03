@@ -21,6 +21,7 @@ public sealed class SalesDtoAssembler(
     IReadRepository<Prescription, Guid> prescriptions,
     IReadRepository<ProductVariant, Guid> variants,
     IReadRepository<Product, Guid> products,
+    IReadRepository<ProductType, Guid> productTypes,
     IReadRepository<ProductCategory, Guid> categories,
     IReadRepository<Warehouse, Guid> warehouses)
 {
@@ -122,6 +123,11 @@ public sealed class SalesDtoAssembler(
             ProductCategoryId = product.CategoryId,
             ProductCategoryCode = product.CategoryCode,
             ProductCategoryName = product.CategoryName,
+            ProductTypeId = product.ProductTypeId,
+            ProductTypeCode = product.ProductTypeCode,
+            ProductTypeName = product.ProductTypeName,
+            ProductTypeSystemKey = product.ProductTypeSystemKey,
+            ProductIsStockItem = product.IsStockItem,
             WarehouseCode = warehouse.Code,
             WarehouseName = warehouse.Name,
             PrescriptionCode = prescription.Code,
@@ -140,6 +146,11 @@ public sealed class SalesDtoAssembler(
             ProductCategoryId = product.CategoryId,
             ProductCategoryCode = product.CategoryCode,
             ProductCategoryName = product.CategoryName,
+            ProductTypeId = product.ProductTypeId,
+            ProductTypeCode = product.ProductTypeCode,
+            ProductTypeName = product.ProductTypeName,
+            ProductTypeSystemKey = product.ProductTypeSystemKey,
+            ProductIsStockItem = product.IsStockItem,
             WarehouseCode = warehouse.Code,
             WarehouseName = warehouse.Name,
             PrescriptionCode = prescription.Code,
@@ -152,20 +163,26 @@ public sealed class SalesDtoAssembler(
         string? Name,
         Guid? CategoryId,
         string? CategoryCode,
-        string? CategoryName)> ResolveProductAsync(Guid? variantId, CancellationToken ct)
+        string? CategoryName,
+        Guid? ProductTypeId,
+        string? ProductTypeCode,
+        string? ProductTypeName,
+        string? ProductTypeSystemKey,
+        bool? IsStockItem)> ResolveProductAsync(Guid? variantId, CancellationToken ct)
     {
         if (!variantId.HasValue)
-            return (null, null, null, null, null);
+            return (null, null, null, null, null, null, null, null, null, null);
 
         var variant = await variants.GetByIdAsync(variantId.Value, ct);
         if (variant is null)
-            return (null, null, null, null, null);
+            return (null, null, null, null, null, null, null, null, null, null);
 
         var product = await products.GetByIdAsync(variant.ProductId, ct);
         if (product is null)
-            return (null, variant.VariantName, null, null, null);
+            return (null, variant.VariantName, null, null, null, null, null, null, null, null);
 
         var category = await categories.GetByIdAsync(product.CategoryId, ct);
+        var productType = await productTypes.GetByIdAsync(product.ProductTypeId, ct);
         var name = string.IsNullOrWhiteSpace(variant.VariantName)
             ? product.NameAr
             : $"{product.NameAr} - {variant.VariantName}";
@@ -175,7 +192,12 @@ public sealed class SalesDtoAssembler(
             name,
             product.CategoryId,
             category?.Code,
-            category?.NameAr);
+            category?.NameAr,
+            product.ProductTypeId,
+            productType?.Code,
+            productType?.NameAr,
+            productType?.SystemKey,
+            product.IsStockItem);
     }
 
     private async Task<(string? Code, string? Name)> ResolveWarehouseAsync(Guid? warehouseId, CancellationToken ct)

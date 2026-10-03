@@ -3,59 +3,115 @@
 
 <div class="ui-sales-lines" dir="rtl">
     <div class="ui-sales-lines__toolbar">
-        <div><strong>أسطر البيع</strong><span>@Model.Count سطر</span></div>
+        <div>
+            <strong>بنود البيع</strong>
+            <span>@Model.Count بند</span>
+        </div>
         @if (!ReadOnly)
         {
-            <UiButton Text="إضافة سطر" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" Variant="ButtonVariant.Secondary" OnClick="AddLineAsync" />
+            <UiButton Text="إضافة بند" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" Variant="ButtonVariant.Secondary" OnClick="AddLineAsync" />
         }
     </div>
 
     @if (Model.Count == 0)
     {
-        <div class="ui-sales-empty ui-sales-empty--compact"><i class="fa-solid fa-basket-shopping"></i><span>لا توجد أسطر بيع حتى الآن.</span></div>
+        <div class="ui-sales-empty ui-sales-empty--compact">
+            <i class="fa-solid fa-basket-shopping"></i>
+            <span>لا توجد بنود بيع حتى الآن.</span>
+        </div>
     }
     else
     {
-        <div class="ui-sales-lines__table-wrap">
-            <table class="ui-sales-lines__table">
-                <thead><tr><th>#</th><th>النوع</th><th>الصنف</th><th>المنتج / الخدمة</th><th>المخزن</th><th>الكمية</th><th>السعر</th><th>الخصم</th><th>الضريبة %</th><th>الإجمالي</th><th>العين</th><th></th></tr></thead>
-                <tbody>
-                @foreach (var line in Model)
-                {
-                    <tr @key="line">
-                        <td>@line.LineNumber</td>
-                        <td>
-                            <select disabled="@ReadOnly" value="@line.LineType" @onchange="e => LineTypeChanged(line, e)">
-                                <option value="Frame">إطار</option><option value="Lens">عدسة</option><option value="Accessory">إكسسوار</option><option value="Service">خدمة</option><option value="Other">أخرى</option>
-                            </select>
-                        </td>
-                        <td class="ui-sales-lines__lookup">
-                            @if (line.LineType != "Service")
+        <div class="ui-sales-line-cards">
+            @foreach (var line in Model)
+            {
+                <div class="ui-sales-line-card" @key="line">
+                    <div class="ui-sales-line-card__header">
+                        <div class="ui-sales-line-card__identity">
+                            <span class="ui-sales-line-card__number">@line.LineNumber</span>
+                            <div>
+                                <strong>@LineHeading(line)</strong>
+                                <span>@LineTypeText(line.LineType)</span>
+                            </div>
+                        </div>
+
+                        <div class="ui-sales-line-card__header-actions">
+                            <div class="ui-sales-line-card__amount">
+                                <span>إجمالي البند</span>
+                                <strong>@line.FinalAmount.ToString("N2")</strong>
+                            </div>
+                            @if (EnablePriceOverride && !ReadOnly && line.Id.HasValue && HasStoredProductPrice(line))
                             {
-                                <UiLookup Value="@line.ProductCategoryId" ValueChanged="v => CategoryChanged(line, v)" SelectedItem="@CategoryItem(line)"
-                                          SearchAsync="SearchCategoriesAsync" Placeholder="اختر الصنف..." Disabled="@ReadOnly" MinimumSearchLength="0" />
+                                <button type="button" class="ui-sales-icon-button" title="طلب تغيير السعر" @onclick="() => OnRequestPriceOverride.InvokeAsync(line)">
+                                    <i class="fa-solid fa-tag"></i>
+                                </button>
                             }
-                        </td>
-                        <td class="ui-sales-lines__lookup">
-                            @if (line.LineType == "Service")
+                            @if (!ReadOnly)
                             {
-                                <input value="@line.Description" disabled="@ReadOnly" placeholder="وصف الخدمة" @onchange="e => DescriptionChanged(line, e)" />
+                                <button type="button" class="ui-sales-icon-button ui-sales-icon-button--danger" title="حذف البند" @onclick="() => RemoveLineAsync(line)">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
                             }
-                            else
-                            {
-                                <UiLookup Value="@line.ProductVariantId" ValueChanged="v => ProductChanged(line, v)" SelectedItem="@ProductItem(line)"
-                                          SearchAsync="(q, ct) => SearchProduct(line, q, ct)" Placeholder="ابحث عن المنتج..." Disabled="@(ReadOnly || string.IsNullOrWhiteSpace(line.ProductCategoryId))" MinimumSearchLength="0" />
-                            }
-                        </td>
-                        <td class="ui-sales-lines__lookup">
-                            @if (line.LineType != "Service")
-                            {
-                                <UiLookup Value="@line.WarehouseId" ValueChanged="v => WarehouseChanged(line, v)" SelectedItem="@WarehouseItem(line)"
-                                          SearchAsync="(q, ct) => SearchWarehouse(line, q, ct)" Placeholder="المخزن" Disabled="@ReadOnly" MinimumSearchLength="0" />
-                            }
-                        </td>
-                        <td><input type="number" min="0.0001" step="0.01" value="@line.Quantity" disabled="@ReadOnly" @onchange="e => DecimalChanged(line, nameof(line.Quantity), e)" /></td>
-                        <td>
+                        </div>
+                    </div>
+
+                    <div class="ui-sales-line-card__grid">
+                        <div class="ui-sales-line-card__field">
+                            <UiLookup Label="نوع المنتج"
+                                      Value="@line.ProductTypeId"
+                                      ValueChanged="v => ProductTypeChanged(line, v)"
+                                      SelectedItem="@ProductTypeItem(line)"
+                                      SearchAsync="SearchProductTypesAsync"
+                                      Placeholder="اختر نوع المنتج..."
+                                      Required="true"
+                                      Disabled="@ReadOnly"
+                                      MinimumSearchLength="0" />
+                        </div>
+
+                        <div class="ui-sales-line-card__field">
+                            <UiLookup Label="التصنيف"
+                                      Value="@line.ProductCategoryId"
+                                      ValueChanged="v => CategoryChanged(line, v)"
+                                      SelectedItem="@CategoryItem(line)"
+                                      SearchAsync="(q, ct) => SearchCategory(line, q, ct)"
+                                      Placeholder="اختر التصنيف..."
+                                      Disabled="@(ReadOnly || string.IsNullOrWhiteSpace(line.ProductTypeId))"
+                                      MinimumSearchLength="0" />
+                        </div>
+
+                        <div class="ui-sales-line-card__field ui-sales-line-card__field--wide">
+                            <UiLookup Label="المنتج / المتغير"
+                                      Value="@line.ProductVariantId"
+                                      ValueChanged="v => ProductChanged(line, v)"
+                                      SelectedItem="@ProductItem(line)"
+                                      SearchAsync="(q, ct) => SearchProduct(line, q, ct)"
+                                      Placeholder="ابحث بالاسم أو الكود أو SKU أو الباركود..."
+                                      Disabled="@(ReadOnly || string.IsNullOrWhiteSpace(line.ProductTypeId) || string.IsNullOrWhiteSpace(line.ProductCategoryId))"
+                                      MinimumSearchLength="0" />
+                        </div>
+
+                        @if (ShouldShowWarehouse(line))
+                        {
+                            <div class="ui-sales-line-card__field">
+                                <UiLookup Label="المخزن"
+                                          Value="@line.WarehouseId"
+                                          ValueChanged="v => WarehouseChanged(line, v)"
+                                          SelectedItem="@WarehouseItem(line)"
+                                          SearchAsync="(q, ct) => SearchWarehouse(line, q, ct)"
+                                          Placeholder="اختر المخزن..."
+                                          Required="@(line.ProductIsStockItem == true)"
+                                          Disabled="@(ReadOnly || string.IsNullOrWhiteSpace(line.ProductVariantId))"
+                                          MinimumSearchLength="0" />
+                            </div>
+                        }
+
+                        <label class="ui-sales-line-card__number-field">
+                            <span>الكمية</span>
+                            <input type="number" min="0.0001" step="0.01" value="@line.Quantity" disabled="@ReadOnly" @onchange="e => DecimalChanged(line, nameof(line.Quantity), e)" />
+                        </label>
+
+                        <label class="ui-sales-line-card__number-field">
+                            <span>السعر</span>
                             <input type="number"
                                    min="0"
                                    step="0.01"
@@ -63,42 +119,51 @@
                                    disabled="@(ReadOnly || HasStoredProductPrice(line))"
                                    title="@PriceTitle(line)"
                                    @onchange="e => DecimalChanged(line, nameof(line.ActualUnitPrice), e)" />
-                        </td>
-                        <td>
-                            <div class="ui-sales-lines__discount">
-                                <select disabled="@ReadOnly" value="@line.DiscountType" @onchange="e => DiscountTypeChanged(line, e)"><option value="None">بدون</option><option value="Percentage">%</option><option value="FixedAmount">مبلغ</option></select>
-                                @if (line.DiscountType != "None") { <input type="number" min="0" step="0.01" value="@line.DiscountValue" disabled="@ReadOnly" @onchange="e => NullableDecimalChanged(line, nameof(line.DiscountValue), e)" /> }
-                            </div>
-                        </td>
-                        <td><input type="number" min="0" step="0.01" value="@line.TaxRate" disabled="@ReadOnly" @onchange="e => NullableDecimalChanged(line, nameof(line.TaxRate), e)" /></td>
-                        <td class="ui-sales-lines__amount">@line.FinalAmount.ToString("N2")</td>
-                        <td>
-                            @if (line.PrescriptionRequired)
-                            {
-                                <select disabled="@ReadOnly" value="@line.PrescriptionEye" @onchange="e => EyeChanged(line, e)">
-                                    <option value="">اختر العين</option>
-                                    <option value="RightOD">OD</option>
-                                    <option value="LeftOS">OS</option>
-                                </select>
-                            }
-                        </td>
-                        <td>
-                            <div class="ui-sales-lines__row-actions">
-                                @if (EnablePriceOverride && !ReadOnly && line.Id.HasValue && HasStoredProductPrice(line))
-                                {
-                                    <button type="button" class="ui-sales-icon-button" title="طلب تغيير السعر" @onclick="() => OnRequestPriceOverride.InvokeAsync(line)"><i class="fa-solid fa-tag"></i></button>
-                                }
-                                @if (!ReadOnly)
-                                {
-                                    <button type="button" class="ui-sales-icon-button ui-sales-icon-button--danger" title="حذف السطر" @onclick="() => RemoveLineAsync(line)"><i class="fa-solid fa-trash"></i></button>
-                                }
-                            </div>
-                        </td>
-                    </tr>
-                    @if (!ReadOnly && line.LineType == "Lens")
+                        </label>
+
+                        <label class="ui-sales-line-card__number-field">
+                            <span>نوع الخصم</span>
+                            <select disabled="@ReadOnly" value="@line.DiscountType" @onchange="e => DiscountTypeChanged(line, e)">
+                                <option value="None">بدون خصم</option>
+                                <option value="Percentage">نسبة %</option>
+                                <option value="FixedAmount">مبلغ ثابت</option>
+                            </select>
+                        </label>
+
+                        @if (line.DiscountType != "None")
+                        {
+                            <label class="ui-sales-line-card__number-field">
+                                <span>قيمة الخصم</span>
+                                <input type="number" min="0" step="0.01" value="@line.DiscountValue" disabled="@ReadOnly" @onchange="e => NullableDecimalChanged(line, nameof(line.DiscountValue), e)" />
+                            </label>
+                        }
+
+                        <label class="ui-sales-line-card__number-field">
+                            <span>الضريبة %</span>
+                            <input type="number" min="0" step="0.01" value="@line.TaxRate" disabled="@ReadOnly" @onchange="e => NullableDecimalChanged(line, nameof(line.TaxRate), e)" />
+                        </label>
+
+                        <div class="ui-sales-line-card__field ui-sales-line-card__field--full">
+                            <UiInputText Label="الوصف"
+                                         Value="@line.Description"
+                                         ValueChanged="v => DescriptionChanged(line, v)"
+                                         ReadOnly="@ReadOnly"
+                                         Placeholder="وصف المنتج أو الخدمة كما سيظهر في المستند" />
+                        </div>
+                    </div>
+
+                    @if (line.LineType == "Lens")
                     {
-                        <tr class="ui-sales-lines__detail-row"><td colspan="12">
-                            <div class="ui-sales-lines__detail-fields">
+                        <div class="ui-sales-line-card__optical">
+                            <div class="ui-sales-line-card__subheader">
+                                <i class="fa-solid fa-glasses"></i>
+                                <div>
+                                    <strong>بيانات العدسة والوصفة</strong>
+                                    <span>تظهر بيانات الوصفة بشكل واسع مثل إصدار الوصفة.</span>
+                                </div>
+                            </div>
+
+                            <div class="ui-sales-line-card__optical-grid">
                                 @if (line.PrescriptionRequired)
                                 {
                                     @if (!string.IsNullOrWhiteSpace(HeaderPrescriptionRevisionId))
@@ -107,17 +172,44 @@
                                     }
                                     else
                                     {
-                                        <UiLookup Label="إصدار الوصفة" Value="@line.PrescriptionRevisionId" ValueChanged="v => PrescriptionRevisionChanged(line, v)" SelectedItem="@PrescriptionItem(line)" SearchAsync="(q, ct) => SearchPrescription(line, q, ct)" Placeholder="اختر Revision..." />
+                                        <UiLookup Label="إصدار الوصفة"
+                                                  Value="@line.PrescriptionRevisionId"
+                                                  ValueChanged="v => PrescriptionRevisionChanged(line, v)"
+                                                  SelectedItem="@PrescriptionItem(line)"
+                                                  SearchAsync="(q, ct) => SearchPrescription(line, q, ct)"
+                                                  Placeholder="اختر إصدار الوصفة..."
+                                                  Disabled="@ReadOnly" />
                                     }
+
+                                    <label class="ui-sales-line-card__number-field">
+                                        <span>العين</span>
+                                        <select disabled="@ReadOnly" value="@line.PrescriptionEye" @onchange="e => EyeChanged(line, e)">
+                                            <option value="">اختر العين</option>
+                                            <option value="RightOD">العين اليمنى OD</option>
+                                            <option value="LeftOS">العين اليسرى OS</option>
+                                        </select>
+                                    </label>
                                 }
-                                <UiCheckbox Label="يتطلب تجهيز/إنتاج" Value="@line.RequiresProduction" ValueChanged="v => ProductionChanged(line, v)" />
-                                <UiInputText Label="ملاحظات السطر" Value="@line.Notes" ValueChanged="v => NotesChanged(line, v)" />
+
+                                <div class="ui-sales-line-card__field">
+                                    <UiCheckbox Label="يتطلب تجهيز / إنتاج" Value="@line.RequiresProduction" ValueChanged="v => ProductionChanged(line, v)" Disabled="@ReadOnly" />
+                                </div>
+
+                                <div class="ui-sales-line-card__field ui-sales-line-card__field--wide">
+                                    <UiInputText Label="ملاحظات البند" Value="@line.Notes" ValueChanged="v => NotesChanged(line, v)" ReadOnly="@ReadOnly" />
+                                </div>
                             </div>
-                        </td></tr>
+                        </div>
                     }
-                }
-                </tbody>
-            </table>
+                    else if (!string.IsNullOrWhiteSpace(line.Notes))
+                    {
+                        <div class="ui-sales-line-card__notes">
+                            <i class="fa-regular fa-note-sticky"></i>
+                            <span>@line.Notes</span>
+                        </div>
+                    }
+                </div>
+            }
         </div>
     }
 </div>
@@ -125,12 +217,14 @@
 @code {
     [Parameter, EditorRequired] public List<UiSalesLineModel> Model { get; set; } = [];
     [Parameter] public bool ReadOnly { get; set; }
-    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchCategoriesAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchProductTypesAsync { get; set; }
+    [Parameter] public Func<UiSalesLineModel, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchCategoriesAsync { get; set; }
     [Parameter] public Func<UiSalesLineModel, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchProductsAsync { get; set; }
     [Parameter] public Func<UiSalesLineModel, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchWarehousesAsync { get; set; }
     [Parameter] public Func<UiSalesLineModel, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchPrescriptionRevisionsAsync { get; set; }
     [Parameter] public string? HeaderPrescriptionRevisionId { get; set; }
     [Parameter] public string? HeaderPrescriptionRevisionDisplay { get; set; }
+    [Parameter] public EventCallback<UiSalesLineSelectionChange> OnProductTypeSelected { get; set; }
     [Parameter] public EventCallback<UiSalesLineSelectionChange> OnCategorySelected { get; set; }
     [Parameter] public EventCallback<UiSalesLineSelectionChange> OnProductSelected { get; set; }
     [Parameter] public EventCallback<UiSalesLineSelectionChange> OnWarehouseSelected { get; set; }
@@ -140,49 +234,121 @@
 
     private static bool HasStoredProductPrice(UiSalesLineModel line) => !string.IsNullOrWhiteSpace(line.ProductVariantId);
     private static string? PriceTitle(UiSalesLineModel line) => HasStoredProductPrice(line) ? "السعر يُجلب تلقائيًا من بطاقة المنتج" : null;
+    private static bool LineNormallyUsesStock(string lineType) => lineType is "Frame" or "Lens" or "Accessory";
+    private static bool ShouldShowWarehouse(UiSalesLineModel line) =>
+        line.ProductIsStockItem == true ||
+        (string.IsNullOrWhiteSpace(line.ProductVariantId) && LineNormallyUsesStock(line.LineType));
+
+    private static string LineTypeText(string lineType) => lineType switch
+    {
+        "Frame" => "إطار / نظارة شمسية",
+        "Lens" => "عدسة",
+        "Accessory" => "إكسسوار",
+        "Service" => "خدمة",
+        _ => "أخرى"
+    };
+
+    private static string LineHeading(UiSalesLineModel line)
+    {
+        if (!string.IsNullOrWhiteSpace(line.ProductDisplay))
+            return line.ProductDisplay;
+        if (!string.IsNullOrWhiteSpace(line.Description))
+            return line.Description;
+        if (!string.IsNullOrWhiteSpace(line.ProductTypeDisplay))
+            return line.ProductTypeDisplay;
+        return $"بند بيع رقم {line.LineNumber}";
+    }
+
+    private UiLookupItem? ProductTypeItem(UiSalesLineModel line) => string.IsNullOrWhiteSpace(line.ProductTypeId) ? null : new(line.ProductTypeId, line.ProductTypeDisplay ?? line.ProductTypeId);
     private UiLookupItem? CategoryItem(UiSalesLineModel line) => string.IsNullOrWhiteSpace(line.ProductCategoryId) ? null : new(line.ProductCategoryId, line.ProductCategoryDisplay ?? line.ProductCategoryId);
     private UiLookupItem? ProductItem(UiSalesLineModel line) => string.IsNullOrWhiteSpace(line.ProductVariantId) ? null : new(line.ProductVariantId, line.ProductDisplay ?? line.ProductNameSnapshot ?? line.ProductVariantId, line.ProductCodeSnapshot);
     private UiLookupItem? WarehouseItem(UiSalesLineModel line) => string.IsNullOrWhiteSpace(line.WarehouseId) ? null : new(line.WarehouseId, line.WarehouseDisplay ?? line.WarehouseId);
     private UiLookupItem? PrescriptionItem(UiSalesLineModel line) => string.IsNullOrWhiteSpace(line.PrescriptionRevisionId) ? null : new(line.PrescriptionRevisionId, line.PrescriptionRevisionDisplay ?? line.PrescriptionRevisionId);
+    private Task<IReadOnlyList<UiLookupItem>> SearchCategory(UiSalesLineModel line, string q, CancellationToken ct) => SearchCategoriesAsync?.Invoke(line, q, ct) ?? Task.FromResult<IReadOnlyList<UiLookupItem>>([]);
     private Task<IReadOnlyList<UiLookupItem>> SearchProduct(UiSalesLineModel line, string q, CancellationToken ct) => SearchProductsAsync?.Invoke(line, q, ct) ?? Task.FromResult<IReadOnlyList<UiLookupItem>>([]);
     private Task<IReadOnlyList<UiLookupItem>> SearchWarehouse(UiSalesLineModel line, string q, CancellationToken ct) => SearchWarehousesAsync?.Invoke(line, q, ct) ?? Task.FromResult<IReadOnlyList<UiLookupItem>>([]);
     private Task<IReadOnlyList<UiLookupItem>> SearchPrescription(UiSalesLineModel line, string q, CancellationToken ct) => SearchPrescriptionRevisionsAsync?.Invoke(line, q, ct) ?? Task.FromResult<IReadOnlyList<UiLookupItem>>([]);
 
-    private async Task AddLineAsync(MouseEventArgs _) { Model.Add(new UiSalesLineModel { LineNumber = Model.Count + 1 }); await OnChanged.InvokeAsync(); }
-    private async Task RemoveLineAsync(UiSalesLineModel line) { Model.Remove(line); for (var i = 0; i < Model.Count; i++) Model[i].LineNumber = i + 1; await OnChanged.InvokeAsync(); }
-    private async Task LineTypeChanged(UiSalesLineModel line, ChangeEventArgs e)
+    private async Task AddLineAsync(MouseEventArgs _)
     {
-        line.LineType = e.Value?.ToString() ?? "Frame";
+        Model.Add(new UiSalesLineModel { LineNumber = Model.Count + 1 });
+        await OnChanged.InvokeAsync();
+    }
 
-        if (line.LineType == "Service")
+    private async Task RemoveLineAsync(UiSalesLineModel line)
+    {
+        Model.Remove(line);
+        for (var i = 0; i < Model.Count; i++)
+            Model[i].LineNumber = i + 1;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task ProductTypeChanged(UiSalesLineModel line, string? value)
+    {
+        line.ProductTypeId = value ?? string.Empty;
+        line.ProductTypeDisplay = null;
+        line.ProductTypeSystemKey = null;
+        line.LineType = "Other";
+        ClearProductSelection(line, clearDescription: true);
+        await OnProductTypeSelected.InvokeAsync(new(line, value));
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task CategoryChanged(UiSalesLineModel line, string? value)
+    {
+        line.ProductCategoryId = value ?? string.Empty;
+        line.ProductCategoryDisplay = null;
+        ClearProductSelection(line, clearCategory: false, clearDescription: true);
+        await OnCategorySelected.InvokeAsync(new(line, value));
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task ProductChanged(UiSalesLineModel line, string? value)
+    {
+        line.ProductVariantId = value ?? string.Empty;
+        line.WarehouseId = string.Empty;
+        line.WarehouseDisplay = null;
+        line.ProductIsStockItem = null;
+
+        if (string.IsNullOrWhiteSpace(value))
         {
-            line.ProductCategoryId = string.Empty;
-            line.ProductCategoryDisplay = null;
-            line.ProductVariantId = string.Empty;
             line.ProductDisplay = null;
-            line.WarehouseId = string.Empty;
-            line.WarehouseDisplay = null;
-        }
-
-        if (line.LineType != "Lens")
-        {
+            line.ProductCodeSnapshot = null;
+            line.ProductNameSnapshot = null;
+            line.UnitSnapshot = null;
+            line.BaseUnitPrice = 0m;
+            line.ActualUnitPrice = 0m;
             line.PrescriptionRequired = false;
             line.PrescriptionRevisionId = string.Empty;
             line.PrescriptionRevisionDisplay = null;
             line.PrescriptionEye = string.Empty;
         }
 
+        await OnProductSelected.InvokeAsync(new(line, value));
         await OnChanged.InvokeAsync();
     }
-    private async Task CategoryChanged(UiSalesLineModel line, string? value)
+
+    private async Task WarehouseChanged(UiSalesLineModel line, string? value)
     {
-        line.ProductCategoryId = value ?? string.Empty;
-        line.ProductCategoryDisplay = null;
+        line.WarehouseId = value ?? string.Empty;
+        await OnWarehouseSelected.InvokeAsync(new(line, value));
+        await OnChanged.InvokeAsync();
+    }
+
+    private static void ClearProductSelection(UiSalesLineModel line, bool clearCategory = true, bool clearDescription = false)
+    {
+        if (clearCategory)
+        {
+            line.ProductCategoryId = string.Empty;
+            line.ProductCategoryDisplay = null;
+        }
+
         line.ProductVariantId = string.Empty;
         line.ProductDisplay = null;
         line.ProductCodeSnapshot = null;
         line.ProductNameSnapshot = null;
-        line.Description = string.Empty;
+        line.UnitSnapshot = null;
+        line.ProductIsStockItem = null;
         line.WarehouseId = string.Empty;
         line.WarehouseDisplay = null;
         line.BaseUnitPrice = 0m;
@@ -191,13 +357,12 @@
         line.PrescriptionRevisionId = string.Empty;
         line.PrescriptionRevisionDisplay = null;
         line.PrescriptionEye = string.Empty;
-        await OnCategorySelected.InvokeAsync(new(line, value));
-        await OnChanged.InvokeAsync();
+        if (clearDescription)
+            line.Description = string.Empty;
     }
-    private async Task ProductChanged(UiSalesLineModel line, string? value) { line.ProductVariantId = value ?? string.Empty; line.WarehouseId = string.Empty; await OnProductSelected.InvokeAsync(new(line, value)); await OnChanged.InvokeAsync(); }
-    private async Task WarehouseChanged(UiSalesLineModel line, string? value) { line.WarehouseId = value ?? string.Empty; await OnWarehouseSelected.InvokeAsync(new(line, value)); await OnChanged.InvokeAsync(); }
+
     private async Task PrescriptionRevisionChanged(UiSalesLineModel line, string? value) { line.PrescriptionRevisionId = value ?? string.Empty; await OnChanged.InvokeAsync(); }
-    private async Task DescriptionChanged(UiSalesLineModel line, ChangeEventArgs e) { line.Description = e.Value?.ToString() ?? string.Empty; await OnChanged.InvokeAsync(); }
+    private async Task DescriptionChanged(UiSalesLineModel line, string? value) { line.Description = value ?? string.Empty; await OnChanged.InvokeAsync(); }
     private async Task DiscountTypeChanged(UiSalesLineModel line, ChangeEventArgs e) { line.DiscountType = e.Value?.ToString() ?? "None"; if (line.DiscountType == "None") line.DiscountValue = null; await OnChanged.InvokeAsync(); }
     private async Task EyeChanged(UiSalesLineModel line, ChangeEventArgs e) { line.PrescriptionEye = e.Value?.ToString() ?? string.Empty; await OnChanged.InvokeAsync(); }
     private async Task ProductionChanged(UiSalesLineModel line, bool value) { line.RequiresProduction = value; await OnChanged.InvokeAsync(); }

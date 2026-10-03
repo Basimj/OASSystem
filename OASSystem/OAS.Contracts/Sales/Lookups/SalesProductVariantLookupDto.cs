@@ -1,8 +1,15 @@
+using OAS.Contracts.Sales.Enums;
+
 namespace OAS.Contracts.Sales.Lookups;
 
 public sealed record SalesProductVariantLookupDto(
     Guid Id,
     Guid ProductId,
+    Guid ProductTypeId,
+    string ProductTypeCode,
+    string ProductTypeNameAr,
+    string? ProductTypeSystemKey,
+    SalesLineType SalesLineType,
     Guid CategoryId,
     string ProductCode,
     string ProductNameAr,

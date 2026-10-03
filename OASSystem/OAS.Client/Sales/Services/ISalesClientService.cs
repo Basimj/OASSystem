@@ -47,8 +47,9 @@ public interface ISalesClientService
     Task<IReadOnlyList<SalesCustomerLookupDto>> SearchCustomersAsync(string? search, int take = 20, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SalesPrescriptionLookupDto>> SearchPrescriptionsAsync(Guid? customerId, string? search, int take = 20, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SalesPrescriptionRevisionLookupDto>> GetPrescriptionRevisionsAsync(Guid prescriptionId, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<SalesProductCategoryLookupDto>> SearchProductCategoriesAsync(string? search, int take = 20, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<SalesProductVariantLookupDto>> SearchProductVariantsAsync(Guid? categoryId, string? search, int take = 20, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SalesProductTypeLookupDto>> SearchProductTypesAsync(string? search, int take = 20, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SalesProductCategoryLookupDto>> SearchProductCategoriesAsync(Guid? productTypeId, string? search, int take = 20, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SalesProductVariantLookupDto>> SearchProductVariantsAsync(Guid? productTypeId, Guid? categoryId, string? search, int take = 20, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SalesWarehouseLookupDto>> SearchWarehousesAsync(Guid? productVariantId, string? search, int take = 20, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SalesCurrencyLookupDto>> SearchCurrenciesAsync(DateOnly documentDate, string? search, int take = 20, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SalesCashAccountLookupDto>> SearchCashAccountsAsync(Guid currencyId, string? search, int take = 20, CancellationToken cancellationToken = default);

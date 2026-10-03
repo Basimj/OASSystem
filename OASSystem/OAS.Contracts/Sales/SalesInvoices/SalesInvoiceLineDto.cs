@@ -43,4 +43,9 @@ public sealed record SalesInvoiceLineDto(
     int? PrescriptionRevisionNumber = null,
     Guid? ProductCategoryId = null,
     string? ProductCategoryCode = null,
-    string? ProductCategoryName = null);
+    string? ProductCategoryName = null,
+    Guid? ProductTypeId = null,
+    string? ProductTypeCode = null,
+    string? ProductTypeName = null,
+    string? ProductTypeSystemKey = null,
+    bool? ProductIsStockItem = null);
