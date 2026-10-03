@@ -65,6 +65,7 @@ public static class DocumentFieldCatalog
                 new("Signatures.Beneficiary", "توقيع المستفيد", "التواقيع"),
                 new("Signatures.Approval", "توقيع الاعتماد", "التواقيع")
             ],
+
             ["Payslip"] =
             [
                 new("PayslipNumber", "رقم القسيمة", "القسيمة"),
@@ -94,6 +95,52 @@ public static class DocumentFieldCatalog
                 new("Signatures.Employee", "توقيع الموظف", "التواقيع"),
                 new("Signatures.Accountant", "توقيع المحاسب", "التواقيع"),
                 new("Signatures.Approval", "توقيع الاعتماد", "التواقيع")
+            ],
+
+            ["SalesInvoice"] =
+            [
+                new("InvoiceNumber", "رقم الفاتورة", "الفاتورة"),
+                new("InvoiceDate", "تاريخ الفاتورة", "الفاتورة"),
+                new("PostingDate", "تاريخ الترحيل", "الفاتورة"),
+                new("StatusText", "الحالة", "الفاتورة"),
+                new("SaleType", "نوع البيع فوري/آجل", "السداد"),
+                new("PaymentTermDays", "أيام الأجل", "السداد"),
+                new("DueDate", "تاريخ الاستحقاق", "السداد"),
+                new("CustomerCode", "كود العميل", "العميل"),
+                new("CustomerName", "اسم العميل", "العميل"),
+                new("CustomerOrderNumber", "رقم طلب العميل", "المراجع"),
+                new("PrescriptionNumber", "رقم الوصفة", "المراجع"),
+                new("JournalEntryNumber", "رقم القيد", "المراجع"),
+                new("CurrencyCode", "العملة", "العملة"),
+                new("CurrencyName", "اسم العملة", "العملة"),
+                new("CurrencySymbol", "رمز العملة", "العملة"),
+                new("ExchangeRate", "سعر الصرف", "العملة"),
+                new("ExchangeRateDate", "تاريخ سعر الصرف", "العملة"),
+                new("TaxCalculationMode", "طريقة احتساب الضريبة", "الضريبة"),
+                new("Subtotal", "الإجمالي قبل الخصم", "الإجماليات"),
+                new("DiscountAmount", "الخصم", "الإجماليات"),
+                new("TotalAfterDiscount", "الإجمالي بعد الخصم", "الإجماليات"),
+                new("TaxAmount", "الضريبة", "الإجماليات"),
+                new("TotalAmount", "المبلغ النهائي", "الإجماليات"),
+                new("PaidAmount", "المبلغ المدفوع", "الإجماليات"),
+                new("OutstandingAmount", "المبلغ المتبقي", "الإجماليات"),
+                new("TotalAmountWords", "المبلغ كتابة", "الإجماليات"),
+                new("Description", "الوصف/الملاحظات", "الفاتورة"),
+                new("Company.Name", "اسم المنشأة", "المنشأة"),
+                new("Company.Address", "عنوان المنشأة", "المنشأة"),
+                new("Company.Phone", "هاتف المنشأة", "المنشأة"),
+                new("Company.CommercialRegistration", "السجل التجاري", "المنشأة"),
+                new("Company.TaxNumber", "الرقم الضريبي", "المنشأة"),
+                new("CreatedBy", "أنشئت بواسطة", "التدقيق"),
+                new("CreatedAt", "وقت الإنشاء", "التدقيق"),
+                new("PostedBy", "رُحلت بواسطة", "التدقيق"),
+                new("PostedAt", "وقت الترحيل", "التدقيق"),
+                new("PrintedAt", "وقت الطباعة", "الطباعة"),
+                new("Signatures.Cashier", "توقيع أمين الصندوق", "التواقيع"),
+                new("Signatures.Accountant", "توقيع المحاسب", "التواقيع"),
+                new("Signatures.SalesManager", "توقيع مدير المبيعات", "التواقيع"),
+                new("Signatures.Customer", "استلام العميل", "التواقيع")
+
             ],
             ["Expense"] =
             [

@@ -40,4 +40,12 @@ public sealed record SalesInvoiceLineDto(
     string? WarehouseCode = null,
     string? WarehouseName = null,
     string? PrescriptionCode = null,
-    int? PrescriptionRevisionNumber = null);
+    int? PrescriptionRevisionNumber = null,
+    Guid? ProductCategoryId = null,
+    string? ProductCategoryCode = null,
+    string? ProductCategoryName = null,
+    Guid? ProductTypeId = null,
+    string? ProductTypeCode = null,
+    string? ProductTypeName = null,
+    string? ProductTypeSystemKey = null,
+    bool? ProductIsStockItem = null);

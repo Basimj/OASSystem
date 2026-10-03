@@ -19,6 +19,7 @@ public sealed class PostSalesInvoiceCommandHandler(
     ISalesCreditExposureService credit,
     ISalesInventoryPostingService inventory,
     ISalesInvoiceAccountingPostingService accounting,
+    ISalesImmediateSettlementService immediateSettlement,
     IUnitOfWork unitOfWork,
     ICurrentUser currentUser,
     TimeProvider timeProvider)
@@ -59,13 +60,37 @@ public sealed class PostSalesInvoiceCommandHandler(
         var journalId = await accounting.PostAsync(invoice, userId, now.UtcDateTime, ct);
         invoice.SetJournalEntry(journalId);
         invoice.Post(now, currentUser.UserId);
+
+        // Persist the Posted state inside the still-open outer transaction so the
+        // allocation validator observes the authoritative invoice status. A later
+        // failure in automatic settlement still rolls the whole transaction back.
         await unitOfWork.SaveChangesAsync(ct);
+
+        SalesImmediateSettlementResult? settlementResult = null;
+        if (invoice.PaymentTermType == SalesPaymentTermType.Immediate)
+        {
+            var method = request.Request.ImmediatePaymentMethod
+                ?? throw new ConflictException("sales_immediate_payment_method_required", "يجب تحديد طريقة التحصيل قبل ترحيل الفاتورة الفورية.");
+
+            settlementResult = await immediateSettlement.SettleAsync(
+                invoice,
+                method,
+                request.Request.CashAccountId,
+                request.Request.BankAccountId,
+                userId,
+                now.UtcDateTime,
+                ct);
+
+            await unitOfWork.SaveChangesAsync(ct);
+        }
 
         return new SalesInvoicePostingResultDto(
             invoice.Id,
             invoice.InvoiceCode,
             journalId,
             inventoryResult.InventoryTransactionIds,
-            Convert.ToBase64String(invoice.RowVersion));
+            Convert.ToBase64String(invoice.RowVersion),
+            settlementResult?.ReceiptVoucherId,
+            settlementResult?.ReceiptVoucherNumber);
     }
 }

@@ -42,12 +42,26 @@
     overflow: hidden;
     direction: rtl;
 }
+.ui-workspace__main--scrollable {
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: #d8d3e2 transparent;
+    scrollbar-gutter: stable;
+}
+.ui-workspace__main--scrollable::-webkit-scrollbar { width: 6px; }
+.ui-workspace__main--scrollable::-webkit-scrollbar-track { background: transparent; }
+.ui-workspace__main--scrollable::-webkit-scrollbar-thumb { border-radius: 999px; background: #d8d3e2; }
+.ui-workspace__main--scrollable::-webkit-scrollbar-thumb:hover { background: #bbb5c8; }
 .ui-workspace__aside { overflow-y: auto; scrollbar-width: thin; scrollbar-color: #d8d3e2 transparent; }
 .ui-workspace__aside::-webkit-scrollbar { width: 5px; }
 .ui-workspace__aside::-webkit-scrollbar-thumb { border-radius: 999px; background: #d8d3e2; }
 @media (max-width: 1050px) {
     .ui-workspace { height: auto; min-height: 100%; overflow: visible; }
+    .ui-workspace__body,
     .ui-workspace__body--split { grid-template-columns: 1fr; direction: rtl; overflow: visible; }
     .ui-workspace__main,
     .ui-workspace__aside { height: auto; overflow: visible; }
+    .ui-workspace__main--scrollable { overflow: visible; scrollbar-gutter: auto; }
 }

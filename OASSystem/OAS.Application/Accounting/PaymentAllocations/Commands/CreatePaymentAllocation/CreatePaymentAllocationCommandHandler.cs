@@ -11,6 +11,7 @@ namespace OAS.Application.Accounting.PaymentAllocations.Commands.CreatePaymentAl
 public sealed class CreatePaymentAllocationCommandHandler(
     IRepository<PaymentAllocation, Guid> repository,
     IReadRepository<ReceiptVoucherLine, Guid> receiptLines,
+    IReadRepository<ReceiptVoucher, Guid> receiptVouchers,
     IReadRepository<PaymentVoucherLine, Guid> paymentLines,
     IEnumerable<IPaymentAllocationTargetValidator> targetValidators,
     TimeProvider timeProvider) : IRequestHandler<CreatePaymentAllocationCommand, Guid>
@@ -66,6 +67,9 @@ public sealed class CreatePaymentAllocationCommandHandler(
         if (receiptLineId is Guid rid)
         {
             var line = await receiptLines.GetByIdAsync(rid, ct) ?? throw new NotFoundException(nameof(ReceiptVoucherLine), rid);
+            var voucher = await receiptVouchers.GetByIdAsync(line.ReceiptVoucherId, ct) ?? throw new NotFoundException(nameof(ReceiptVoucher), line.ReceiptVoucherId);
+            if (voucher.Status != OAS.Domain.Accounting.Enums.ReceiptVoucherStatus.Posted)
+                throw new ConflictException("payment_allocation_receipt_not_posted", "لا يمكن تخصيص دفعة من سند قبض غير مرحل.");
             return ToSource(line.CurrencyId, line.CurrencyCodeSnapshot, line.Amount, line.ExchangeRate, "receipt");
         }
         if (paymentLineId is Guid pid)

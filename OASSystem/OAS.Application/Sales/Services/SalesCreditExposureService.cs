@@ -14,20 +14,67 @@ public sealed class SalesCreditExposureService(
     IReadRepository<SalesInvoice, Guid> invoices,
     IReadRepository<PaymentAllocation, Guid> allocations) : ISalesCreditExposureService
 {
-    public async Task ValidateAsync(Customer customer, SalesInvoice invoice, CancellationToken cancellationToken = default)
+    public async Task<SalesCreditAssessment> EvaluateAsync(
+        Customer customer,
+        SalesInvoice invoice,
+        CancellationToken cancellationToken = default)
     {
         if (invoice.PaymentTermType != SalesPaymentTermType.Credit)
-            return;
+        {
+            return new SalesCreditAssessment(
+                true,
+                null,
+                null,
+                0m,
+                invoice.BaseTotalAmount,
+                customer.CreditLimit,
+                invoice.BaseTotalAmount);
+        }
 
         if (!customer.IsCreditAllowed)
-            throw new ConflictException(SalesErrorCodes.CreditNotAllowed, "البيع الآجل غير مسموح لهذا العميل.");
+        {
+            return new SalesCreditAssessment(
+                false,
+                SalesErrorCodes.CreditNotAllowed,
+                "البيع الآجل غير مسموح لهذا العميل.",
+                0m,
+                invoice.BaseTotalAmount,
+                customer.CreditLimit,
+                invoice.BaseTotalAmount);
+        }
 
         // Customer.CreditLimit has no currency field in the current OAS model, so Sales treats
         // it as a base-currency limit. Exposure is therefore calculated from base snapshots.
         var before = await CalculateExposureBeforeCurrentAsync(customer.Id, invoice.Id, cancellationToken);
         var newExposure = before + invoice.BaseTotalAmount;
+
         if (newExposure > customer.CreditLimit)
-            throw new ConflictException(SalesErrorCodes.CreditLimitExceeded, "تتجاوز الفاتورة الحد الائتماني المسموح للعميل.");
+        {
+            return new SalesCreditAssessment(
+                false,
+                SalesErrorCodes.CreditLimitExceeded,
+                "تتجاوز الفاتورة الحد الائتماني المسموح للعميل.",
+                before,
+                invoice.BaseTotalAmount,
+                customer.CreditLimit,
+                newExposure);
+        }
+
+        return new SalesCreditAssessment(
+            true,
+            null,
+            null,
+            before,
+            invoice.BaseTotalAmount,
+            customer.CreditLimit,
+            newExposure);
+    }
+
+    public async Task ValidateAsync(Customer customer, SalesInvoice invoice, CancellationToken cancellationToken = default)
+    {
+        var assessment = await EvaluateAsync(customer, invoice, cancellationToken);
+        if (!assessment.IsAllowed)
+            throw new ConflictException(assessment.ErrorCode!, assessment.Message!);
     }
 
     public async Task<decimal> CalculateExposureBeforeCurrentAsync(

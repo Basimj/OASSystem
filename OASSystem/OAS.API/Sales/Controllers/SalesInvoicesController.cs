@@ -66,6 +66,12 @@ public sealed class SalesInvoicesController(ISender sender) : ControllerBase
         return Ok(await sender.Send(new GetSalesInvoiceByIdQuery(id), cancellationToken));
     }
 
+    [HttpGet("{id:guid}/confirmation-prevalidation")]
+    public async Task<ActionResult<SalesConfirmationPreValidationDto>> PreValidateConfirmation(
+        Guid id,
+        CancellationToken cancellationToken)
+        => Ok(await sender.Send(new PreValidateSalesInvoiceConfirmationQuery(id), cancellationToken));
+
     [HttpPost("{id:guid}/confirm")]
     public async Task<ActionResult<SalesInvoiceDto>> Confirm(
         Guid id,

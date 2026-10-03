@@ -1,21 +1,24 @@
 @namespace OAS.UiLib.Components.Sales.Invoices
 
-<div class="ui-sales-posting-summary" dir="rtl">
-    @if (JournalEntryId.HasValue)
-    {
-        <div><i class="fa-solid fa-book-journal-whills"></i><span>تم إنشاء القيد المحاسبي</span><strong>@JournalEntryId</strong></div>
-    }
-    else
-    {
-        <div class="ui-sales-posting-summary__pending"><i class="fa-regular fa-clock"></i><span>لم يتم الترحيل المحاسبي بعد</span></div>
-    }
-    @if (Issues.Count > 0)
-    {
-        <div class="ui-sales-posting-summary__issues"><strong>ملاحظات تمنع الترحيل:</strong>@foreach (var issue in Issues){<span>@issue</span>}</div>
-    }
-</div>
+@if (JournalEntryId.HasValue)
+{
+    <div class="ui-sales-posting-summary">
+        <div><i class="fa-solid fa-book-journal-whills"></i><span>تم إنشاء القيد المحاسبي</span><strong>@JournalDisplay</strong></div>
+    </div>
+}
+@if (Issues.Count > 0)
+{
+    <div class="ui-sales-posting-issues">
+        @foreach (var issue in Issues)
+        {
+            <div><i class="fa-solid fa-triangle-exclamation"></i><span>@issue</span></div>
+        }
+    </div>
+}
 
 @code {
     [Parameter] public Guid? JournalEntryId { get; set; }
+    [Parameter] public string? JournalEntryNumber { get; set; }
     [Parameter] public IReadOnlyList<string> Issues { get; set; } = [];
+    private string JournalDisplay => string.IsNullOrWhiteSpace(JournalEntryNumber) ? JournalEntryId?.ToString() ?? string.Empty : JournalEntryNumber;
 }

@@ -18,13 +18,25 @@
         <UiLookup Label="العملة" Value="@Model.CurrencyId" ValueChanged="CurrencyChanged" SelectedItem="@CurrencyItem" SearchAsync="SearchCurrenciesAsync" Placeholder="اختر العملة..." Required="true" Disabled="@SourceOrderFieldsReadOnly" />
         <UiSelect Label="طريقة الضريبة" Value="@Model.TaxCalculationMode" ValueChanged="TaxModeChanged" Disabled="@SourceOrderFieldsReadOnly" Options="@TaxOptions" />
         <UiSelect Label="شروط السداد" Value="@Model.PaymentTermType" ValueChanged="PaymentTermChanged" Disabled="@SourceOrderFieldsReadOnly" Options="@PaymentOptions" />
+        @if (ShowImmediateSettlement)
+        {
+            <UiSelect Label="طريقة التحصيل" Value="@Model.ImmediatePaymentMethod" ValueChanged="ImmediatePaymentMethodChanged" Disabled="@ImmediateSettlementReadOnly" Options="@ImmediatePaymentOptions" />
+            @if (Model.ImmediatePaymentMethod == "Bank")
+            {
+                <UiLookup Label="الحساب البنكي" Value="@Model.ImmediateBankAccountId" ValueChanged="ImmediateBankAccountChanged" SelectedItem="@BankAccountItem" SearchAsync="SearchBankAccountsAsync" Placeholder="اختر الحساب البنكي..." Required="true" Disabled="@ImmediateSettlementReadOnly" />
+            }
+            else
+            {
+                <UiLookup Label="الصندوق" Value="@Model.ImmediateCashAccountId" ValueChanged="ImmediateCashAccountChanged" SelectedItem="@CashAccountItem" SearchAsync="SearchCashAccountsAsync" Placeholder="اختر الصندوق..." Required="true" Disabled="@ImmediateSettlementReadOnly" />
+            }
+        }
         <UiInputText Label="البيان" Value="@Model.Description" ValueChanged="DescriptionChanged" ReadOnly="@ReadOnly" />
     </div>
 </UiSalesFormSection>
 
-<UiSalesFormSection Title="أسطر الفاتورة" Description="سعر المنتج يُجلب تلقائيًا ولا يُعدل مباشرة. عند الحاجة إلى سعر مختلف استخدم طلب تغيير السعر ليُطبق بعد الموافقة." IconCss="fa-solid fa-list-check">
-    <UiSalesLinesEditor Model="@Model.Lines" ReadOnly="@SourceOrderFieldsReadOnly" SearchProductsAsync="SearchProductsAsync" SearchWarehousesAsync="SearchWarehousesAsync"
-                        SearchPrescriptionRevisionsAsync="SearchPrescriptionRevisionsAsync" OnProductSelected="OnProductSelected" OnWarehouseSelected="OnWarehouseSelected"
+<UiSalesFormSection Title="بنود الفاتورة" Description="محرر واسع للبند: نوع المنتج ثم التصنيف ثم المنتج/المتغير. سعر المنتج يُجلب تلقائيًا، وعند الحاجة إلى سعر مختلف استخدم طلب تغيير السعر." IconCss="fa-solid fa-list-check">
+    <UiSalesLinesEditor Model="@Model.Lines" ReadOnly="@SourceOrderFieldsReadOnly" SearchProductTypesAsync="SearchProductTypesAsync" SearchCategoriesAsync="SearchCategoriesAsync" SearchProductsAsync="SearchProductsAsync" SearchWarehousesAsync="SearchWarehousesAsync"
+                        SearchPrescriptionRevisionsAsync="SearchPrescriptionRevisionsAsync" OnProductTypeSelected="OnProductTypeSelected" OnCategorySelected="OnCategorySelected" OnProductSelected="OnProductSelected" OnWarehouseSelected="OnWarehouseSelected"
                         EnablePriceOverride="true" OnRequestPriceOverride="OnRequestPriceOverride" OnChanged="OnChanged" />
 </UiSalesFormSection>
 
@@ -33,21 +45,28 @@
     <UiSalesPaymentSummary CurrencyCode="@Model.CurrencyCode" InvoiceTotal="@Model.TotalAmount" PaidAmount="@Model.PaidAmount" OutstandingAmount="@Model.OutstandingAmount" />
 </div>
 
-<UiSalesPostingSummary JournalEntryId="@Model.JournalEntryId" Issues="@Model.PostingIssues" />
+<UiSalesPostingSummary JournalEntryId="@Model.JournalEntryId" JournalEntryNumber="@Model.JournalEntryNumber" Issues="@Model.PostingIssues" />
 
 @code {
     private static readonly IReadOnlyList<UiSelectOption> TaxOptions = [new("Exclusive", "غير شامل الضريبة"), new("Inclusive", "شامل الضريبة")];
     private static readonly IReadOnlyList<UiSelectOption> PaymentOptions = [new("Immediate", "فوري"), new("Credit", "آجل")];
+    private static readonly IReadOnlyList<UiSelectOption> ImmediatePaymentOptions = [new("Cash", "نقدي"), new("Bank", "بنك")];
     [Parameter, EditorRequired] public UiSalesInvoiceFormModel Model { get; set; } = new();
     [Parameter] public bool ReadOnly { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchCustomersAsync { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchOrdersAsync { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchPrescriptionsAsync { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchCurrenciesAsync { get; set; }
-    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchProductsAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchProductTypesAsync { get; set; }
+    [Parameter] public Func<UiSalesLineModel, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchCategoriesAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchCashAccountsAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchBankAccountsAsync { get; set; }
+    [Parameter] public Func<UiSalesLineModel, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchProductsAsync { get; set; }
     [Parameter] public Func<UiSalesLineModel, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchWarehousesAsync { get; set; }
     [Parameter] public Func<UiSalesLineModel, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchPrescriptionRevisionsAsync { get; set; }
     [Parameter] public EventCallback<UiSalesSelectionChange> OnSelectionChanged { get; set; }
+    [Parameter] public EventCallback<UiSalesLineSelectionChange> OnProductTypeSelected { get; set; }
+    [Parameter] public EventCallback<UiSalesLineSelectionChange> OnCategorySelected { get; set; }
     [Parameter] public EventCallback<UiSalesLineSelectionChange> OnProductSelected { get; set; }
     [Parameter] public EventCallback<UiSalesLineSelectionChange> OnWarehouseSelected { get; set; }
     [Parameter] public EventCallback<UiSalesLineModel> OnRequestPriceOverride { get; set; }
@@ -65,6 +84,11 @@
     private UiLookupItem? CurrencyItem => string.IsNullOrWhiteSpace(Model.CurrencyId)
         ? null
         : new(Model.CurrencyId, Model.CurrencyDisplay ?? (string.IsNullOrWhiteSpace(Model.CurrencyCode) ? "العملة المحددة" : Model.CurrencyCode));
+    private UiLookupItem? CashAccountItem => string.IsNullOrWhiteSpace(Model.ImmediateCashAccountId) ? null : new(Model.ImmediateCashAccountId, Model.ImmediateCashAccountDisplay ?? "الصندوق المحدد");
+    private UiLookupItem? BankAccountItem => string.IsNullOrWhiteSpace(Model.ImmediateBankAccountId) ? null : new(Model.ImmediateBankAccountId, Model.ImmediateBankAccountDisplay ?? "الحساب البنكي المحدد");
+    private bool IsImmediatePayment => string.Equals(Model.PaymentTermType, "Immediate", StringComparison.OrdinalIgnoreCase);
+    private bool ShowImmediateSettlement => IsImmediatePayment && string.Equals(Model.Status, "Confirmed", StringComparison.OrdinalIgnoreCase);
+    private bool ImmediateSettlementReadOnly => string.Equals(Model.Status, "Posted", StringComparison.OrdinalIgnoreCase) || string.Equals(Model.Status, "Cancelled", StringComparison.OrdinalIgnoreCase);
     private async Task CustomerChanged(string? v) { Model.CustomerId = v ?? string.Empty; await OnSelectionChanged.InvokeAsync(new("Customer", v)); await OnChanged.InvokeAsync(); }
     private async Task OrderChanged(string? v) { Model.CustomerOrderId = v ?? string.Empty; await OnSelectionChanged.InvokeAsync(new("CustomerOrder", v)); await OnChanged.InvokeAsync(); }
     private async Task PrescriptionChanged(string? v) { Model.PrescriptionRevisionId = v ?? string.Empty; await OnSelectionChanged.InvokeAsync(new("PrescriptionRevision", v)); await OnChanged.InvokeAsync(); }
@@ -78,5 +102,21 @@
         await OnSelectionChanged.InvokeAsync(new("PaymentTermType", Model.PaymentTermType));
         await OnChanged.InvokeAsync();
     }
+    private async Task ImmediatePaymentMethodChanged(string? v)
+    {
+        Model.ImmediatePaymentMethod = v ?? "Cash";
+        if (Model.ImmediatePaymentMethod == "Bank")
+        {
+            Model.ImmediateCashAccountId = string.Empty;
+            Model.ImmediateCashAccountDisplay = null;
+        }
+        else
+        {
+            Model.ImmediateBankAccountId = string.Empty;
+            Model.ImmediateBankAccountDisplay = null;
+        }
+    }
+    private async Task ImmediateCashAccountChanged(string? v) { Model.ImmediateCashAccountId = v ?? string.Empty; await OnSelectionChanged.InvokeAsync(new("ImmediateCashAccount", v)); }
+    private async Task ImmediateBankAccountChanged(string? v) { Model.ImmediateBankAccountId = v ?? string.Empty; await OnSelectionChanged.InvokeAsync(new("ImmediateBankAccount", v)); }
     private async Task DescriptionChanged(string? v) { Model.Description = v; await OnChanged.InvokeAsync(); }
 }
