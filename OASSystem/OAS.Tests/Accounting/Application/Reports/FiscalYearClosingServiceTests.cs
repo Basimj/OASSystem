@@ -24,21 +24,21 @@ public sealed class FiscalYearClosingServiceTests
         var currency = Currency.Create(Guid.NewGuid(), "YER", "ريال يمني", "Yemeni Rial", "ر.ي", 2);
         var retained = Account.Create(
             Guid.NewGuid(), "3100", "الأرباح المحتجزة", "Retained Earnings", null, 1,
-            AccountClass.Equity, AccountType.Detail, NormalBalance.Credit,
+            AccountClass.Equity, AccountType.Posting, NormalBalance.Credit,
             isPostingAccount: true, isControlAccount: false, allowManualPosting: false,
             isSystemAccount: true, isActive: true, effectiveDate: new DateOnly(2026, 1, 1));
         var asset = Account.Create(
             Guid.NewGuid(), "1100", "النقدية", "Cash", null, 1,
-            AccountClass.Asset, AccountType.Detail, NormalBalance.Debit,
+            AccountClass.Asset, AccountType.Posting, NormalBalance.Debit,
             isPostingAccount: true, isControlAccount: false, allowManualPosting: false,
             isSystemAccount: true, isActive: true, effectiveDate: new DateOnly(2026, 1, 1));
         var revenue = Account.Create(
             Guid.NewGuid(), "4100", "إيرادات المبيعات", "Sales Revenue", null, 1,
-            AccountClass.Revenue, AccountType.Detail, NormalBalance.Credit,
+            AccountClass.Revenue, AccountType.Posting, NormalBalance.Credit,
             true, false, false, true, true, new DateOnly(2026, 1, 1));
         var expense = Account.Create(
             Guid.NewGuid(), "5100", "تكلفة ومصروف", "Expense", null, 1,
-            AccountClass.Expense, AccountType.Detail, NormalBalance.Debit,
+            AccountClass.Expense, AccountType.Posting, NormalBalance.Debit,
             true, false, false, true, true, new DateOnly(2026, 1, 1));
 
         var settings = AccountingSettings.Create(currency.Id, retainedEarningsAccountId: retained.Id);

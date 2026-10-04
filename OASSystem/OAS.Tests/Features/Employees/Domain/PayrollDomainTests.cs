@@ -23,6 +23,7 @@ public sealed class PayrollDomainTests
         Assert.That(period.Status, Is.EqualTo(PayrollPeriodStatus.Locked));
         period.Reopen();
         Assert.That(period.Status, Is.EqualTo(PayrollPeriodStatus.Open));
+        period.Lock("admin", DateTimeOffset.UtcNow);
         period.Close("admin", DateTimeOffset.UtcNow);
         Assert.That(period.Status, Is.EqualTo(PayrollPeriodStatus.Closed));
     }

@@ -196,6 +196,14 @@ public sealed class ProductOpeningSqlServerTests
             throw new InvalidOperationException("Injected failure after writing opening inventory.");
         }
 
+        public Task<decimal> GetAvailableOutboundUnitCostAsync(
+            Guid warehouseId,
+            Guid productVariantId,
+            decimal quantity,
+            CancellationToken cancellationToken = default)
+            => inner.GetAvailableOutboundUnitCostAsync(
+                warehouseId, productVariantId, quantity, cancellationToken);
+
         public Task<decimal> GetOutboundUnitCostAsync(
             Guid warehouseId,
             Guid productVariantId,

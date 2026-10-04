@@ -85,6 +85,13 @@ public static class AccountingPermissions
         public const string Post = "accounting.payment_vouchers.post";
     }
 
+    public static class CustomerAdvances
+    {
+        public const string View = "accounting.customer_advances.view";
+        public const string Create = "accounting.customer_advances.create";
+        public const string Apply = "accounting.customer_advances.apply";
+    }
+
     public static class PaymentAllocations
     {
         public const string View = "accounting.payment_allocations.view";

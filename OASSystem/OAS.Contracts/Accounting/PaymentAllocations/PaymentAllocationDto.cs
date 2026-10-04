@@ -14,4 +14,6 @@ public sealed record PaymentAllocationDto(
     decimal? ExchangeRate,
     decimal? BaseAllocatedAmount,
     DateTimeOffset AllocatedAtUtc,
-    string? CreatedBy);
+    string? CreatedBy,
+    Guid? CustomerAdvanceApplicationId = null,
+    decimal? TargetBaseAllocatedAmount = null);

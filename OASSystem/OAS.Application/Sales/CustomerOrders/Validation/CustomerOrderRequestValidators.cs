@@ -53,5 +53,35 @@ public sealed class CustomerOrderLineRequestValidator : AbstractValidator<Custom
         RuleFor(x => x.WarehouseId).NotEmpty().When(x => x.LineType is SalesLineType.Frame or SalesLineType.Lens or SalesLineType.Accessory);
         RuleFor(x => x.Description).MaximumLength(500);
         RuleFor(x => x.Notes).MaximumLength(1000);
+        When(x => x.OpticalSnapshot is not null, () =>
+        {
+            RuleFor(x => x.OpticalSnapshot!.MeasurementSource).IsInEnum();
+            RuleFor(x => x.OpticalSnapshot!.Eye).IsInEnum();
+            RuleFor(x => x.OpticalSnapshot!.PrescriptionRevisionId)
+                .NotEmpty()
+                .When(x => x.OpticalSnapshot!.MeasurementSource == OpticalMeasurementSource.StoredPrescription);
+            RuleFor(x => x.OpticalSnapshot!.Axis)
+                .InclusiveBetween((short)0, (short)180)
+                .When(x => x.OpticalSnapshot!.Axis.HasValue);
+            RuleFor(x => x.OpticalSnapshot!.ADD)
+                .GreaterThanOrEqualTo(0m)
+                .When(x => x.OpticalSnapshot!.ADD.HasValue);
+            RuleFor(x => x.OpticalSnapshot!.Prism)
+                .GreaterThanOrEqualTo(0m)
+                .When(x => x.OpticalSnapshot!.Prism.HasValue);
+            RuleFor(x => x.OpticalSnapshot!.PD)
+                .GreaterThan(0m)
+                .When(x => x.OpticalSnapshot!.PD.HasValue);
+            RuleFor(x => x.OpticalSnapshot!.MonocularPD)
+                .GreaterThan(0m)
+                .When(x => x.OpticalSnapshot!.MonocularPD.HasValue);
+            RuleFor(x => x.OpticalSnapshot!.FittingHeight)
+                .GreaterThan(0m)
+                .When(x => x.OpticalSnapshot!.FittingHeight.HasValue);
+            RuleFor(x => x.OpticalSnapshot!.VA).MaximumLength(20);
+            RuleFor(x => x.OpticalSnapshot!.LensTypeSnapshot).MaximumLength(100);
+            RuleFor(x => x.OpticalSnapshot!.MaterialSnapshot).MaximumLength(100);
+            RuleFor(x => x.OpticalSnapshot!.CoatingSnapshot).MaximumLength(100);
+        });
     }
 }

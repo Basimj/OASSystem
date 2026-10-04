@@ -19,10 +19,10 @@ namespace OAS.Application.Sales.CustomerOrders.Commands;
 
 public sealed class CreateCustomerOrderCommandHandler(
     ICustomerOrderAggregateRepository repository,
+    IRepository<CustomerOrderLineOpticalSnapshot, Guid> snapshots,
     IReadRepository<Customer, Guid> customers,
     IExchangeRateResolver rates,
-    ISalesLineResolver lineResolver,
-    ISalesPrescriptionValidator prescriptionValidator,
+    ICustomerOrderOpticalService optical,
     ISequenceNumberGenerator sequences) : IRequestHandler<CreateCustomerOrderCommand, CustomerOrder>
 {
     public async Task<CustomerOrder> Handle(CreateCustomerOrderCommand request, CancellationToken ct)
@@ -58,41 +58,38 @@ public sealed class CreateCustomerOrderCommandHandler(
     private async Task<CustomerOrderLine> BuildLineAsync(CustomerOrder order, int lineNo, CustomerOrderLineRequest req, CancellationToken ct)
     {
         var lineType = (SalesLineType)(byte)req.LineType;
-        var resolved = await lineResolver.ResolveAsync(lineType, req.ProductVariantId, req.WarehouseId, req.Description, ct);
-        var eye = req.PrescriptionEye.HasValue ? (EyeSide?)(byte)req.PrescriptionEye.Value : null;
-
-        // لا نورّث وصفة رأس الطلب لكل سطر بشكل أعمى.
-        // تستخدم Revision الرأس فقط عندما يقرر الـApplication أن المنتج نفسه يحتاج وصفة.
-        var prescriptionRevision = req.PrescriptionRevisionId;
-        if (resolved.PrescriptionRequired && !prescriptionRevision.HasValue)
-            prescriptionRevision = order.PrescriptionRevisionId;
-
-        await prescriptionValidator.ValidateLineAsync(
-            prescriptionRevision,
-            eye,
-            resolved.PrescriptionRequired,
-            resolved.OpticalPolicy,
+        var requestEye = req.PrescriptionEye.HasValue ? (EyeSide?)(byte)req.PrescriptionEye.Value : null;
+        var prepared = await optical.PrepareAsync(
+            lineType,
+            req.ProductVariantId,
+            req.WarehouseId,
+            req.Description,
+            req.PrescriptionRevisionId,
+            requestEye,
+            order.PrescriptionRevisionId,
+            req.OpticalSnapshot,
             ct);
+        var resolved = prepared.Resolution;
 
-        // ProductVariant.SellingPrice is stored in the accounting base currency.
-        // Sales line prices are snapshots in the order currency, so convert base -> transaction.
         var standardUnitPrice = resolved.ProductVariantId.HasValue
             ? SalesPricingCalculator.ConvertFromBase(
                 resolved.BaseUnitPrice,
                 order.ExchangeRate,
                 order.CurrencyDecimalPlacesSnapshot)
             : resolved.BaseUnitPrice;
-
-        // Product prices are server-authoritative; manual lines keep the requested price.
-        var actualUnitPrice = resolved.ProductVariantId.HasValue
-            ? standardUnitPrice
-            : req.ActualUnitPrice;
-
-        return CustomerOrderLine.Create(
-            Guid.NewGuid(), order.Id, lineNo, req.GroupId, lineType, resolved.ProductVariantId, resolved.WarehouseId,
+        var actualUnitPrice = resolved.ProductVariantId.HasValue ? standardUnitPrice : req.ActualUnitPrice;
+        var lineId = Guid.NewGuid();
+        var line = CustomerOrderLine.Create(
+            lineId, order.Id, lineNo, req.GroupId, lineType, resolved.ProductVariantId, resolved.WarehouseId,
             resolved.Description, req.Quantity, standardUnitPrice, actualUnitPrice,
-            (SalesDiscountType)(byte)req.DiscountType, req.DiscountValue, req.TaxRate, prescriptionRevision, eye,
+            (SalesDiscountType)(byte)req.DiscountType, req.DiscountValue, req.TaxRate,
+            prepared.PrescriptionRevisionId, prepared.PrescriptionEye,
             req.RequiresProduction, req.Notes, order.TaxCalculationMode, order.CurrencyDecimalPlacesSnapshot);
+
+        if (prepared.OpticalSnapshot is not null)
+            await snapshots.AddAsync(CustomerOrderOpticalSnapshotFactory.Create(lineId, prepared.OpticalSnapshot), ct);
+
+        return line;
     }
 
     private static void EnsureCustomer(Customer customer, SalesPaymentTermType paymentTerm)

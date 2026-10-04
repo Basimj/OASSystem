@@ -13,6 +13,17 @@ public static class SalesPermissions
     public const string PriceOverrideRequest = "sales.price.override.request";
     public const string PriceOverrideApprove = "sales.price.override.approve";
 
+    public const string ViewCustomerPrescriptionContext = "sales.customer_prescription_context.view";
+    public const string ViewStockAvailability = "sales.stock_availability.view";
+
+    public static class OpticalJobs
+    {
+        public const string View = "optical_jobs.view";
+        public const string Start = "optical_jobs.start";
+        public const string Assign = "optical_jobs.assign";
+        public const string Complete = "optical_jobs.complete";
+    }
+
     public static class Prescriptions
     {
         public const string View = "sales.prescriptions.view";

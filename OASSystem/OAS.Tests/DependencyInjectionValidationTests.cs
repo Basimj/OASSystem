@@ -3,6 +3,8 @@ using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
 using OAS.Application;
 using OAS.Infrastructure;
+using OAS.Application.Abstractions.Security;
+using OAS.Application.Database.Abstractions;
 
 namespace OAS.Tests;
 
@@ -28,6 +30,8 @@ public sealed class DependencyInjectionValidationTests
 
         services.AddLogging();
         services.AddSingleton<IConfiguration>(configuration);
+        services.AddSingleton<ICurrentRequestInfo>(new TestCurrentRequestInfo());
+        services.AddSingleton<IDatabaseProfileSelection>(new TestDatabaseProfileSelection());
         services.AddApplication();
         services.AddInfrastructure(configuration);
 
@@ -62,6 +66,16 @@ public sealed class DependencyInjectionValidationTests
 
         Assert.That(services.Any(descriptor => descriptor.ImplementationType?.FullName == "OAS.Application.Purchasing.Mapping.PurchasingMapper"), Is.False);
         Assert.That(services.Any(descriptor => descriptor.ImplementationType?.FullName == "OAS.Application.Purchasing.Matching.PurchaseMatchingService"), Is.False);
+    }
+
+    private sealed class TestCurrentRequestInfo : ICurrentRequestInfo
+    {
+        public string? Device => "tests";
+    }
+
+    private sealed class TestDatabaseProfileSelection : IDatabaseProfileSelection
+    {
+        public string? ProfileKey => "Default";
     }
 
 }

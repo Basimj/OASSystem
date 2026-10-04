@@ -5,6 +5,7 @@ using OAS.Application.Common.Exceptions;
 using OAS.Application.Purchasing.Abstractions;
 using OAS.Application.Purchasing.Authorization;
 using OAS.Application.Purchasing.Common;
+using OAS.Application.Sales.Abstractions;
 using OAS.Contracts.Purchasing.PurchaseReceipts;
 using OAS.Domain.Purchasing.Entities;
 using DomainOrderStatus = OAS.Domain.Purchasing.Enums.PurchaseOrderStatus;
@@ -125,6 +126,8 @@ public sealed class PostPurchaseReceiptCommandHandler(
     IPurchasingReferenceDataPort references,
     IPurchasingInventoryPort inventory,
     IPurchasingAccountingPort accounting,
+    IPurchaseRequestRepository requestRepository,
+    ICustomerOrderFulfillmentService fulfillment,
     ICurrentUser currentUser,
     TimeProvider timeProvider) : IRequestHandler<PostPurchaseReceiptCommand, PurchaseReceiptPostResultDto>
 {
@@ -176,6 +179,19 @@ public sealed class PostPurchaseReceiptCommandHandler(
         var fullyReceived=order.Lines.All(x=>receivedBaseAfter.TryGetValue(x.Id,out var qty) ? qty>=x.BaseQuantity : false);
         order.MarkReceived(fullyReceived);
         orderRepository.Update(order);
+
+        var receiptPoLineIds = receipt.Lines.Where(x => x.AcceptedQuantity > 0m).Select(x => x.PurchaseOrderLineId).ToHashSet();
+        var sources = await orderRepository.GetSourcesAsync(order.Id, ct);
+        var customerOrderIds = new HashSet<Guid>();
+        foreach (var source in sources.Where(x => receiptPoLineIds.Contains(x.PurchaseOrderLineId)))
+        {
+            var purchaseRequest = await requestRepository.GetByLineIdAsync(source.PurchaseRequestLineId, ct);
+            if (purchaseRequest?.CustomerOrderId is Guid customerOrderId && customerOrderId != Guid.Empty)
+                customerOrderIds.Add(customerOrderId);
+        }
+        if (customerOrderIds.Count > 0)
+            await fulfillment.ReconcileOrdersAsync(customerOrderIds.ToArray(), ct);
+
         return new(receipt.Id,inventoryResult.InventoryTransactionId,accountingResult.JournalEntryId,order.Id,receipt.ReceiptCode);
     }
 }

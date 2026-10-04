@@ -15,4 +15,5 @@ public sealed record PurchaseRequestLineDto(
     Guid? PreferredSupplierId,
     string? PreferredSupplierName,
     string? Notes,
-    string RowVersion);
+    string RowVersion,
+    DateTimeOffset? ScheduledOrderAtUtc = null);

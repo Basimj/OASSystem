@@ -6,6 +6,7 @@ using OAS.Application.Sales.CustomerOrders;
 using OAS.Application.Sales.CustomerOrders.Mapping;
 using OAS.Application.Sales.CustomerOrders.Specifications;
 using OAS.Application.Sales.Posting;
+using OAS.Application.Sales.OpticalJobs.Services;
 using OAS.Application.Sales.Returns.Services;
 using OAS.Application.Sales.Production.Services;
 using OAS.Application.Sales.Prescriptions;
@@ -49,6 +50,11 @@ public static class DependencyInjection
 
         services.AddScoped<SalesDtoAssembler>();
         services.AddScoped<ISalesLineResolver, SalesLineResolver>();
+        services.AddScoped<ILensVariantResolver, LensVariantResolver>();
+        services.AddScoped<ICustomerOrderOpticalService, CustomerOrderOpticalService>();
+        services.AddScoped<ICustomerOrderAvailabilityService, CustomerOrderAvailabilityService>();
+        services.AddScoped<ICustomerOrderFulfillmentService, CustomerOrderFulfillmentService>();
+        services.AddScoped<IOpticalJobService, OpticalJobService>();
         services.AddScoped<ISalesPrescriptionValidator, SalesPrescriptionValidator>();
         services.AddScoped<ISalesPostingPeriodService, SalesPostingPeriodService>();
         services.AddScoped<ISalesStockReservationService, SalesStockReservationService>();

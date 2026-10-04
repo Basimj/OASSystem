@@ -9,4 +9,5 @@ public sealed record UpdatePurchaseRequestLineRequest(
     Guid? CustomerOrderLineId,
     Guid? PreferredSupplierId,
     string? Notes,
-    string? RowVersion);
+    string? RowVersion,
+    DateTimeOffset? ScheduledOrderAtUtc = null);

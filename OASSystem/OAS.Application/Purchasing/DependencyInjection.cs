@@ -6,6 +6,7 @@ using OAS.Application.Purchasing.Mapping;
 using OAS.Application.Purchasing.Matching;
 using OAS.Application.Purchasing.PurchaseReturns.Services;
 using OAS.Application.Purchasing.Services;
+using OAS.Application.Sales.Abstractions;
 
 namespace OAS.Application.Purchasing;
 
@@ -31,6 +32,7 @@ public static class DependencyInjection
         services.TryAddScoped<IPurchasingCodeService, PurchasingCodeService>();
         services.TryAddScoped<IPurchaseMatchingService, PurchaseMatchingService>();
         services.TryAddScoped<IPurchaseReturnInventoryPostingService, PurchaseReturnInventoryPostingService>();
+        services.TryAddScoped<ICustomerDemandProcurementPort, CustomerDemandProcurementService>();
 
         return services;
     }

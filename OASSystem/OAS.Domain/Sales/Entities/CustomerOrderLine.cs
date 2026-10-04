@@ -95,6 +95,16 @@ public sealed class CustomerOrderLine : AuditableEntity<Guid>
             throw new DomainException("A prescription revision and eye are required for this sales line.");
     }
 
+    public void EnsureOpticalMeasurementReference(bool opticalMeasurementRequired, bool hasOpticalSnapshot)
+    {
+        if (!opticalMeasurementRequired)
+            return;
+
+        var hasLegacyStoredPrescription = PrescriptionRevisionId.HasValue && PrescriptionEye.HasValue;
+        if (!hasLegacyStoredPrescription && !hasOpticalSnapshot)
+            throw new DomainException("An optical snapshot or stored prescription reference is required for this sales line.");
+    }
+
     internal void SetActive(bool isActive) => IsActive = isActive;
 
     internal void SetLineNumber(int lineNumber)

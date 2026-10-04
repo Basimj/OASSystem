@@ -40,4 +40,5 @@ public sealed record CustomerOrderLineDto(
     string? ProductTypeCode = null,
     string? ProductTypeName = null,
     string? ProductTypeSystemKey = null,
-    bool? ProductIsStockItem = null);
+    bool? ProductIsStockItem = null,
+    CustomerOrderLineOpticalSnapshotDto? OpticalSnapshot = null);

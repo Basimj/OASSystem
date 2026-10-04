@@ -6,11 +6,15 @@ using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Abstractions.Security;
 using OAS.Application.Abstractions.Numbering;
 using OAS.Application.Accounting.Spreadsheets;
+using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Spreadsheets;
 using OAS.Contracts.Common.Pagination;
+using OAS.Contracts.Accounting.Customers;
+using OAS.Contracts.Accounting.Suppliers;
 using OAS.Domain.Accounting.Entities;
 using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Common.Entities;
+using OAS.Domain.Features.Employees.Entities;
 using OAS.Infrastructure.Spreadsheets;
 using OAS.Tests.Accounting.Application.Common;
 namespace OAS.Tests.Accounting.Spreadsheets;
@@ -31,9 +35,10 @@ public sealed class AccountingSpreadsheetTests
         services.AddSingleton<ICurrentUser>(new FakeCurrentUser());
         services.AddSingleton<ISequenceNumberGenerator>(new FakeSequenceNumberGenerator());
         services.AddSingleton<IUnitOfWork>(new FakeUnitOfWork());
+        services.AddSingleton<IAccountingPartyQueryService>(new EmptyAccountingPartyQueryService());
         Register<Account>(services);Register<CostCenter>(services);Register<CashAccount>(services);Register<BankAccount>(services);
         Register<ExpenseType>(services);Register<PostingProfile>(services);Register<PostingProfileLine>(services);Register<JournalEntry>(services);Register<JournalEntryLine>(services);
-        Register<CashShift>(services);Register<Expense>(services);Register<PaymentAllocation>(services);Register<ReceiptVoucherLine>(services);Register<PaymentVoucherLine>(services);Register<FiscalPeriod>(services);Register<FiscalYear>(services);Register<ReceiptVoucher>(services);Register<PaymentVoucher>(services);Register<Customer>(services);Register<Supplier>(services);Register<Currency>(services);Register<AccountingSettings>(services);
+        Register<CashShift>(services);Register<Expense>(services);Register<PaymentAllocation>(services);Register<ReceiptVoucherLine>(services);Register<PaymentVoucherLine>(services);Register<FiscalPeriod>(services);Register<FiscalYear>(services);Register<ReceiptVoucher>(services);Register<PaymentVoucher>(services);Register<Customer>(services);Register<Supplier>(services);Register<Currency>(services);Register<ExchangeRate>(services);Register<AccountingSettings>(services);Register<Employee>(services);
         _provider=services.BuildServiceProvider();
         await Repo<Account>().AddAsync(Account.Create(Guid.NewGuid(),"1110","صندوق",null,null,1,AccountClass.Asset,AccountType.Posting,NormalBalance.Debit,true,false,true,false,true,null));
         await Repo<Account>().AddAsync(Account.Create(Guid.NewGuid(),"3000","رأس المال",null,null,1,AccountClass.Equity,AccountType.Posting,NormalBalance.Credit,true,false,true,false,true,null));
@@ -62,7 +67,7 @@ public sealed class AccountingSpreadsheetTests
         using var book=new XLWorkbook(new MemoryStream(await Service.TemplateAsync(section,default)));
         foreach(var definition in AccountingSpreadsheetDefinitions.Get(section))
             Assert.That(book.Worksheet(definition.DisplayName ?? definition.Name).Row(1).CellsUsed().Select(x=>x.GetString()),Is.EqualTo(definition.Columns.Select(x=>x.Header ?? x.Key)));
-        Assert.That(AccountingSpreadsheetDefinitions.Get(section).SelectMany(x=>x.Columns).Any(x=>x.Key.EndsWith("Id")),Is.False);
+        Assert.That(AccountingSpreadsheetDefinitions.Get(section).SelectMany(x=>x.Columns).Any(x=>IsTechnicalIdentifierColumn(x.Key)),Is.False);
     }
     [Test] public async Task CustomerAndSupplierImportsGenerateOperationalAndAccountCodes()
     {
@@ -251,6 +256,37 @@ public sealed class AccountingSpreadsheetTests
         Assert.That(sheet.Cell(1,2).GetString(),Is.EqualTo("الاسم العربي"));
         Assert.That(sheet.Cell(1,8).GetString(),Is.EqualTo("حساب ترحيل"));
         Assert.That(book.Worksheets.Any(x=>x.Name=="التعليمات"),Is.True);
+    }
+
+    private static bool IsTechnicalIdentifierColumn(string key)
+        => key.Equals("Id", StringComparison.OrdinalIgnoreCase)
+           || (key.EndsWith("Id", StringComparison.Ordinal) && !key.Equals("NationalId", StringComparison.Ordinal));
+
+    private sealed class EmptyAccountingPartyQueryService : IAccountingPartyQueryService
+    {
+        public Task<PagedResult<CustomerDto>> GetCustomersAsync(PageRequest request, string? filter = null, CancellationToken cancellationToken = default)
+            => Task.FromResult(new PagedResult<CustomerDto> { Items = [], PageNumber = request.PageNumber, PageSize = request.PageSize, TotalCount = 0 });
+
+        public Task<CustomerDto?> GetCustomerAsync(Guid id, CancellationToken cancellationToken = default)
+            => Task.FromResult<CustomerDto?>(null);
+
+        public Task<IReadOnlyList<CustomerLookupDto>> LookupCustomersAsync(string? search, int take, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<CustomerLookupDto>>(Array.Empty<CustomerLookupDto>());
+
+        public Task<IReadOnlyList<CustomerAccountParentDto>> GetCustomerParentsAsync(string? search, int take, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<CustomerAccountParentDto>>(Array.Empty<CustomerAccountParentDto>());
+
+        public Task<PagedResult<SupplierDto>> GetSuppliersAsync(PageRequest request, string? filter = null, CancellationToken cancellationToken = default)
+            => Task.FromResult(new PagedResult<SupplierDto> { Items = [], PageNumber = request.PageNumber, PageSize = request.PageSize, TotalCount = 0 });
+
+        public Task<SupplierDto?> GetSupplierAsync(Guid id, CancellationToken cancellationToken = default)
+            => Task.FromResult<SupplierDto?>(null);
+
+        public Task<IReadOnlyList<SupplierLookupDto>> LookupSuppliersAsync(string? search, int take, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<SupplierLookupDto>>(Array.Empty<SupplierLookupDto>());
+
+        public Task<IReadOnlyList<SupplierAccountParentDto>> GetSupplierParentsAsync(string? search, int take, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<SupplierAccountParentDto>>(Array.Empty<SupplierAccountParentDto>());
     }
 
 }

@@ -1,0 +1,35 @@
+using OAS.Contracts.Accounting.Enums;
+
+namespace OAS.Contracts.Accounting.CustomerAdvances;
+
+public sealed record CustomerAdvanceDto(
+    Guid Id,
+    string AdvanceNumber,
+    Guid CustomerId,
+    Guid CustomerOrderId,
+    Guid ReceiptVoucherLineId,
+    Guid CurrencyId,
+    string CurrencyCodeSnapshot,
+    string? CurrencySymbolSnapshot,
+    byte CurrencyDecimalPlacesSnapshot,
+    Guid BaseCurrencyId,
+    string BaseCurrencyCodeSnapshot,
+    byte BaseCurrencyDecimalPlacesSnapshot,
+    decimal Amount,
+    decimal ExchangeRate,
+    DateOnly ExchangeRateDate,
+    ExchangeRateType ExchangeRateType,
+    ExchangeRateSource ExchangeRateSource,
+    decimal BaseAmount,
+    decimal AppliedAmount,
+    decimal BaseAppliedAmount,
+    decimal AvailableAmount,
+    decimal BaseAvailableAmount,
+    CustomerAdvanceStatus Status,
+    DateTime ReceivedAtUtc,
+    bool IsActive,
+    string RowVersion,
+    DateTimeOffset CreatedAtUtc,
+    string? CreatedBy,
+    DateTimeOffset? LastModifiedAtUtc,
+    string? LastModifiedBy);

@@ -57,7 +57,7 @@ public sealed class PurchasingMapper(
             lines.Add(new PurchaseRequestLineDto(line.Id, line.PurchaseRequestId, line.LineSequence, line.ProductVariantId,
                 product?.ProductCode, product?.ProductName, line.RequestedQuantity, allocatedQty,
                 Math.Max(0m, line.RequestedQuantity - allocatedQty), line.RequiredDate, line.CustomerOrderLineId,
-                line.PreferredSupplierId, preferredSupplier?.Name, line.Notes, PurchasingRowVersion.Encode(line.RowVersion)));
+                line.PreferredSupplierId, preferredSupplier?.Name, line.Notes, PurchasingRowVersion.Encode(line.RowVersion), line.ScheduledOrderAtUtc));
         }
 
         return new PurchaseRequestDto(request.Id, request.RequestCode, (ContractRequestType)(byte)request.RequestType,

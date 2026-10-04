@@ -7,4 +7,5 @@ public sealed record CreatePurchaseRequestLineRequest(
     DateOnly? RequiredDate,
     Guid? CustomerOrderLineId,
     Guid? PreferredSupplierId,
-    string? Notes);
+    string? Notes,
+    DateTimeOffset? ScheduledOrderAtUtc = null);

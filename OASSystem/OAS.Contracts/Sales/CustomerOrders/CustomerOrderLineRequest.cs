@@ -18,4 +18,5 @@ public sealed record CustomerOrderLineRequest(
     EyeSide? PrescriptionEye,
     bool RequiresProduction,
     string? Notes,
-    string? RowVersion = null);
+    string? RowVersion = null,
+    CustomerOrderLineOpticalSnapshotRequest? OpticalSnapshot = null);

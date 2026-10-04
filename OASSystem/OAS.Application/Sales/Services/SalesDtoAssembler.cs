@@ -25,6 +25,7 @@ public sealed class SalesDtoAssembler(
     IReadRepository<ProductType, Guid> productTypes,
     IReadRepository<ProductCategory, Guid> categories,
     IReadRepository<Warehouse, Guid> warehouses,
+    IReadRepository<CustomerOrderLineOpticalSnapshot, Guid> orderOpticalSnapshots,
     IReadRepository<Employee, Guid> employees)
 {
     public async Task<PrescriptionDto> PrescriptionAsync(Prescription entity, CancellationToken ct = default)
@@ -121,6 +122,9 @@ public sealed class SalesDtoAssembler(
         var product = await ResolveProductAsync(line.ProductVariantId, ct);
         var warehouse = await ResolveWarehouseAsync(line.WarehouseId, ct);
         var prescription = await ResolvePrescriptionAsync(line.PrescriptionRevisionId, ct);
+        var snapshot = (await orderOpticalSnapshots.ListAsync(
+            new Specification<CustomerOrderLineOpticalSnapshot>().Where(x => x.CustomerOrderLineId == line.Id && x.IsActive), ct))
+            .SingleOrDefault();
 
         return SalesContractMapping.OrderLine(line) with
         {
@@ -137,7 +141,19 @@ public sealed class SalesDtoAssembler(
             WarehouseCode = warehouse.Code,
             WarehouseName = warehouse.Name,
             PrescriptionCode = prescription.Code,
-            PrescriptionRevisionNumber = prescription.RevisionNumber
+            PrescriptionRevisionNumber = prescription.RevisionNumber,
+            OpticalSnapshot = snapshot is null ? null : new CustomerOrderLineOpticalSnapshotDto(
+                snapshot.Id,
+                snapshot.CustomerOrderLineId,
+                (OAS.Contracts.Sales.Enums.OpticalMeasurementSource)(byte)snapshot.MeasurementSource,
+                snapshot.PrescriptionRevisionId,
+                (OAS.Contracts.Sales.Enums.EyeSide)(byte)snapshot.Eye,
+                snapshot.SPH, snapshot.CYL, snapshot.Axis, snapshot.ADD, snapshot.Prism,
+                snapshot.PrismBase.HasValue ? (OAS.Contracts.Sales.Enums.PrismBaseDirection?)(byte)snapshot.PrismBase.Value : null,
+                snapshot.PD, snapshot.MonocularPD, snapshot.VA, snapshot.FittingHeight,
+                snapshot.LensTypeSnapshot, snapshot.MaterialSnapshot, snapshot.CoatingSnapshot, snapshot.RefractiveIndexSnapshot,
+                snapshot.IsActive, Convert.ToBase64String(snapshot.RowVersion),
+                snapshot.CreatedAtUtc, snapshot.CreatedBy, snapshot.LastModifiedAtUtc, snapshot.LastModifiedBy)
         };
     }
 

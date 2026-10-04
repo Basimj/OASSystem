@@ -1411,6 +1411,7 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<Guid>("PaymentSourceId").IsRequired().HasColumnType("uniqueidentifier");
             b.Property<Guid?>("ReceiptVoucherLineId").HasColumnType("uniqueidentifier");
             b.Property<Guid?>("PaymentVoucherLineId").HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("CustomerAdvanceApplicationId").HasColumnType("uniqueidentifier");
             b.Property<byte>("TargetDocumentType").IsRequired().HasColumnType("tinyint");
             b.Property<Guid>("TargetDocumentId").IsRequired().HasColumnType("uniqueidentifier");
             b.Property<Guid?>("CurrencyId").HasColumnType("uniqueidentifier");
@@ -1426,6 +1427,7 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.HasIndex("PaymentSourceId").HasDatabaseName("IX_PaymentAllocations_PaymentSourceId");
             b.HasIndex("ReceiptVoucherLineId").HasDatabaseName("IX_PaymentAllocations_ReceiptVoucherLineId");
             b.HasIndex("PaymentVoucherLineId").HasDatabaseName("IX_PaymentAllocations_PaymentVoucherLineId");
+            b.HasIndex("CustomerAdvanceApplicationId").HasDatabaseName("IX_PaymentAllocations_CustomerAdvanceApplicationId");
             b.HasIndex("TargetDocumentId").HasDatabaseName("IX_PaymentAllocations_TargetDocumentId");
             b.HasIndex("TargetDocumentType", "TargetDocumentId").HasDatabaseName("IX_PaymentAllocations_TargetDocument");
             b.HasIndex("CurrencyId").HasDatabaseName("IX_PaymentAllocations_CurrencyId");
@@ -1435,7 +1437,7 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
                 t.HasCheckConstraint("CK_PaymentAllocations_BaseAmount_Positive", "[BaseAllocatedAmount] IS NULL OR [BaseAllocatedAmount] > 0");
                 t.HasCheckConstraint("CK_PaymentAllocations_TargetBaseAmount_Positive", "[TargetBaseAllocatedAmount] IS NULL OR [TargetBaseAllocatedAmount] > 0");
                 t.HasCheckConstraint("CK_PaymentAllocations_ExchangeRate_Positive", "[ExchangeRate] IS NULL OR [ExchangeRate] > 0");
-                t.HasCheckConstraint("CK_PaymentAllocations_TypedSource", "([ReceiptVoucherLineId] IS NULL OR [PaymentVoucherLineId] IS NULL)");
+                t.HasCheckConstraint("CK_PaymentAllocations_TypedSource", "(CASE WHEN [ReceiptVoucherLineId] IS NULL THEN 0 ELSE 1 END + CASE WHEN [PaymentVoucherLineId] IS NULL THEN 0 ELSE 1 END + CASE WHEN [CustomerAdvanceApplicationId] IS NULL THEN 0 ELSE 1 END) <= 1");
             });
         });
 
@@ -2711,6 +2713,7 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<DateOnly?>("RequiredDate").HasColumnType("date");
             b.Property<Guid?>("CustomerOrderLineId").HasColumnType("uniqueidentifier");
             b.Property<Guid?>("PreferredSupplierId").HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset?>("ScheduledOrderAtUtc").HasColumnType("datetimeoffset");
             b.Property<string>("Notes").HasMaxLength(500).HasColumnType("nvarchar(500)");
             b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
             b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
@@ -2718,6 +2721,8 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.HasKey("Id");
             b.HasIndex("PurchaseRequestId", "LineSequence").IsUnique().HasDatabaseName("UX_PurchaseRequestLines_Request_LineSequence");
             b.HasIndex("ProductVariantId").HasDatabaseName("IX_PurchaseRequestLines_ProductVariantId");
+            b.HasIndex("ScheduledOrderAtUtc").HasDatabaseName("IX_PurchaseRequestLines_ScheduledOrderAtUtc");
+            b.HasIndex("CustomerOrderLineId", "ProductVariantId").HasDatabaseName("IX_PurchaseRequestLines_CustomerOrderLine_ProductVariant");
             b.HasIndex("CustomerOrderLineId").HasDatabaseName("IX_PurchaseRequestLines_CustomerOrderLineId");
             b.HasIndex("PreferredSupplierId").HasDatabaseName("IX_PurchaseRequestLines_PreferredSupplierId");
             b.ToTable("tbl_PurchaseRequestLines", "dbo", t =>
@@ -4711,6 +4716,277 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.HasKey("Id");
             b.HasIndex("OpticalProductionJobId", "ProductVariantId").IsUnique().HasDatabaseName("UX_OpticalProductionMaterials_Job_Variant");
             b.ToTable("tbl_OpticalProductionMaterials", "dbo", t => t.HasCheckConstraint("CK_OpticalProductionMaterials_Qty", "[Quantity] > 0"));
+        });
+
+
+        modelBuilder.Entity("OAS.Domain.Entities.Inventory.LensVariantDetail", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset").HasColumnName("CreatedAt");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset").HasColumnName("UpdatedAt");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)").HasColumnName("UpdatedBy");
+            b.Property<Guid>("ProductVariantId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<decimal?>("SPH").HasColumnType("decimal(6,2)");
+            b.Property<decimal?>("CYL").HasColumnType("decimal(6,2)");
+            b.Property<decimal?>("ADD").HasColumnType("decimal(6,2)");
+            b.Property<decimal?>("BaseCurve").HasColumnType("decimal(6,2)");
+            b.Property<decimal?>("Diameter").HasColumnType("decimal(6,2)");
+            b.Property<bool>("IsActive").IsRequired().HasColumnType("bit");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("UpdatedFromDevice");
+            b.HasKey("Id").HasName("PK_tbl_LensVariantDetails");
+            b.HasIndex("ProductVariantId").IsUnique().HasDatabaseName("UX_LensVariantDetails_ProductVariantId");
+            b.HasIndex("SPH", "CYL", "ADD").HasDatabaseName("IX_LensVariantDetails_SPH_CYL_ADD");
+            b.ToTable("tbl_LensVariantDetails", "dbo", t =>
+            {
+                t.HasCheckConstraint("CK_LensVariantDetails_ADD", "[ADD] IS NULL OR [ADD] >= 0");
+                t.HasCheckConstraint("CK_LensVariantDetails_BaseCurve", "[BaseCurve] IS NULL OR [BaseCurve] > 0");
+                t.HasCheckConstraint("CK_LensVariantDetails_Diameter", "[Diameter] IS NULL OR [Diameter] > 0");
+            });
+        });
+
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.CustomerOrderLineOpticalSnapshot", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset").HasColumnName("CreatedAt");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset").HasColumnName("UpdatedAt");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)").HasColumnName("UpdatedBy");
+            b.Property<Guid>("CustomerOrderLineId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<byte>("MeasurementSource").IsRequired().HasColumnType("tinyint");
+            b.Property<Guid?>("PrescriptionRevisionId").HasColumnType("uniqueidentifier");
+            b.Property<byte>("Eye").IsRequired().HasColumnType("tinyint");
+            b.Property<decimal?>("SPH").HasColumnType("decimal(6,2)");
+            b.Property<decimal?>("CYL").HasColumnType("decimal(6,2)");
+            b.Property<short?>("Axis").HasColumnType("smallint");
+            b.Property<decimal?>("ADD").HasColumnType("decimal(6,2)");
+            b.Property<decimal?>("Prism").HasColumnType("decimal(6,2)");
+            b.Property<byte?>("PrismBase").HasColumnType("tinyint");
+            b.Property<decimal?>("PD").HasColumnType("decimal(6,2)");
+            b.Property<decimal?>("MonocularPD").HasColumnType("decimal(6,2)");
+            b.Property<string>("VA").HasMaxLength(20).HasColumnType("nvarchar(20)");
+            b.Property<decimal?>("FittingHeight").HasColumnType("decimal(6,2)");
+            b.Property<string>("LensTypeSnapshot").HasMaxLength(100).HasColumnType("nvarchar(100)");
+            b.Property<string>("MaterialSnapshot").HasMaxLength(100).HasColumnType("nvarchar(100)");
+            b.Property<string>("CoatingSnapshot").HasMaxLength(100).HasColumnType("nvarchar(100)");
+            b.Property<decimal?>("RefractiveIndexSnapshot").HasColumnType("decimal(5,3)");
+            b.Property<bool>("IsActive").IsRequired().HasColumnType("bit");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("UpdatedFromDevice");
+            b.HasKey("Id").HasName("PK_tbl_CustomerOrderLineOpticalSnapshots");
+            b.HasIndex("CustomerOrderLineId").IsUnique().HasDatabaseName("UX_CustomerOrderLineOpticalSnapshots_CustomerOrderLineId");
+            b.HasIndex("PrescriptionRevisionId").HasDatabaseName("IX_CustomerOrderLineOpticalSnapshots_PrescriptionRevisionId");
+            b.HasIndex("Eye").HasDatabaseName("IX_CustomerOrderLineOpticalSnapshots_Eye");
+            b.ToTable("tbl_CustomerOrderLineOpticalSnapshots", "dbo", t =>
+            {
+                t.HasCheckConstraint("CK_CustomerOrderLineOpticalSnapshots_Source", "([MeasurementSource] = 1 AND [PrescriptionRevisionId] IS NOT NULL) OR ([MeasurementSource] = 2)");
+                t.HasCheckConstraint("CK_CustomerOrderLineOpticalSnapshots_Axis", "[Axis] IS NULL OR ([Axis] >= 0 AND [Axis] <= 180)");
+                t.HasCheckConstraint("CK_CustomerOrderLineOpticalSnapshots_ADD", "[ADD] IS NULL OR [ADD] >= 0");
+                t.HasCheckConstraint("CK_CustomerOrderLineOpticalSnapshots_Prism", "[Prism] IS NULL OR [Prism] >= 0");
+                t.HasCheckConstraint("CK_CustomerOrderLineOpticalSnapshots_PD", "[PD] IS NULL OR [PD] > 0");
+                t.HasCheckConstraint("CK_CustomerOrderLineOpticalSnapshots_MonocularPD", "[MonocularPD] IS NULL OR [MonocularPD] > 0");
+                t.HasCheckConstraint("CK_CustomerOrderLineOpticalSnapshots_FittingHeight", "[FittingHeight] IS NULL OR [FittingHeight] > 0");
+                t.HasCheckConstraint("CK_CustomerOrderLineOpticalSnapshots_RefractiveIndex", "[RefractiveIndexSnapshot] IS NULL OR [RefractiveIndexSnapshot] > 0");
+            });
+        });
+
+        modelBuilder.Entity("OAS.Domain.Accounting.Entities.CustomerAdvance", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset").HasColumnName("CreatedAt");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset").HasColumnName("UpdatedAt");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)").HasColumnName("UpdatedBy");
+            b.Property<string>("AdvanceNumber").IsRequired().HasMaxLength(40).HasColumnType("nvarchar(40)");
+            b.Property<Guid>("CustomerId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<Guid>("CustomerOrderId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<Guid>("ReceiptVoucherLineId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<Guid>("CurrencyId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<string>("CurrencyCodeSnapshot").IsRequired().HasMaxLength(8).HasColumnType("nvarchar(8)");
+            b.Property<string>("CurrencySymbolSnapshot").HasMaxLength(12).HasColumnType("nvarchar(12)");
+            b.Property<byte>("CurrencyDecimalPlacesSnapshot").IsRequired().HasColumnType("tinyint");
+            b.Property<Guid>("BaseCurrencyId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<string>("BaseCurrencyCodeSnapshot").IsRequired().HasMaxLength(8).HasColumnType("nvarchar(8)");
+            b.Property<byte>("BaseCurrencyDecimalPlacesSnapshot").IsRequired().HasColumnType("tinyint");
+            b.Property<decimal>("Amount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("ExchangeRate").IsRequired().HasColumnType("decimal(19,8)");
+            b.Property<DateOnly>("ExchangeRateDate").IsRequired().HasColumnType("date");
+            b.Property<byte>("ExchangeRateType").IsRequired().HasColumnType("tinyint");
+            b.Property<byte>("ExchangeRateSource").IsRequired().HasColumnType("tinyint");
+            b.Property<decimal>("BaseAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("AppliedAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("BaseAppliedAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<byte>("Status").IsRequired().HasColumnType("tinyint");
+            b.Property<DateTime>("ReceivedAtUtc").IsRequired().HasColumnType("datetime2(3)");
+            b.Property<bool>("IsActive").IsRequired().HasColumnType("bit");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("UpdatedFromDevice");
+            b.HasKey("Id").HasName("PK_tbl_CustomerAdvances");
+            b.HasIndex("AdvanceNumber").IsUnique().HasDatabaseName("UX_CustomerAdvances_AdvanceNumber");
+            b.HasIndex("ReceiptVoucherLineId").IsUnique().HasDatabaseName("UX_CustomerAdvances_ReceiptVoucherLineId");
+            b.HasIndex("CustomerId").HasDatabaseName("IX_CustomerAdvances_CustomerId");
+            b.HasIndex("CustomerOrderId").HasDatabaseName("IX_CustomerAdvances_CustomerOrderId");
+            b.HasIndex("Status").HasDatabaseName("IX_CustomerAdvances_Status");
+            b.HasIndex("CurrencyId").HasDatabaseName("IX_CustomerAdvances_CurrencyId");
+            b.HasIndex("BaseCurrencyId").HasDatabaseName("IX_CustomerAdvances_BaseCurrencyId");
+            b.ToTable("tbl_CustomerAdvances", "dbo", t =>
+            {
+                t.HasCheckConstraint("CK_CustomerAdvances_Amount", "[Amount] > 0");
+                t.HasCheckConstraint("CK_CustomerAdvances_BaseAmount", "[BaseAmount] > 0");
+                t.HasCheckConstraint("CK_CustomerAdvances_ExchangeRate", "[ExchangeRate] > 0");
+                t.HasCheckConstraint("CK_CustomerAdvances_AppliedAmount", "[AppliedAmount] >= 0 AND [AppliedAmount] <= [Amount]");
+                t.HasCheckConstraint("CK_CustomerAdvances_BaseAppliedAmount", "[BaseAppliedAmount] >= 0 AND [BaseAppliedAmount] <= [BaseAmount]");
+            });
+        });
+
+        modelBuilder.Entity("OAS.Domain.Accounting.Entities.CustomerAdvanceApplication", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset").HasColumnName("CreatedAt");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset").HasColumnName("UpdatedAt");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)").HasColumnName("UpdatedBy");
+            b.Property<Guid>("CustomerAdvanceId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<Guid>("SalesInvoiceId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<decimal>("Amount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("BaseAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("TargetBaseAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<Guid>("JournalEntryId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<DateTime>("AppliedAtUtc").IsRequired().HasColumnType("datetime2(3)");
+            b.Property<string>("AppliedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("UpdatedFromDevice");
+            b.HasKey("Id").HasName("PK_tbl_CustomerAdvanceApplications");
+            b.HasIndex("CustomerAdvanceId").HasDatabaseName("IX_CustomerAdvanceApplications_AdvanceId");
+            b.HasIndex("SalesInvoiceId").HasDatabaseName("IX_CustomerAdvanceApplications_SalesInvoiceId");
+            b.HasIndex("JournalEntryId").HasDatabaseName("IX_CustomerAdvanceApplications_JournalEntryId");
+            b.ToTable("tbl_CustomerAdvanceApplications", "dbo", t =>
+            {
+                t.HasCheckConstraint("CK_CustomerAdvanceApplications_Amount", "[Amount] > 0");
+                t.HasCheckConstraint("CK_CustomerAdvanceApplications_BaseAmount", "[BaseAmount] > 0");
+                t.HasCheckConstraint("CK_CustomerAdvanceApplications_TargetBaseAmount", "[TargetBaseAmount] > 0");
+            });
+        });
+
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.OpticalJob", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset").HasColumnName("CreatedAt");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset").HasColumnName("UpdatedAt");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)").HasColumnName("UpdatedBy");
+            b.Property<string>("JobCode").IsRequired().HasMaxLength(40).HasColumnType("nvarchar(40)");
+            b.Property<Guid>("CustomerOrderId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("SalesInvoiceId").HasColumnType("uniqueidentifier");
+            b.Property<Guid>("CustomerId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<DateOnly?>("RequiredDate").HasColumnType("date");
+            b.Property<byte>("Status").IsRequired().HasColumnType("tinyint");
+            b.Property<Guid?>("AssignedTechnicianId").HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset?>("StartedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<DateTimeOffset?>("CompletedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("Notes").HasMaxLength(1000).HasColumnType("nvarchar(1000)");
+            b.Property<bool>("IsActive").IsRequired().HasColumnType("bit");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("UpdatedFromDevice");
+            b.HasKey("Id").HasName("PK_tbl_OpticalJobs");
+            b.HasIndex("JobCode").IsUnique().HasDatabaseName("UX_OpticalJobs_JobCode");
+            b.HasIndex("CustomerOrderId").IsUnique().HasFilter("[IsActive] = 1").HasDatabaseName("UX_OpticalJobs_CustomerOrderId");
+            b.HasIndex("Status").HasDatabaseName("IX_OpticalJobs_Status");
+            b.HasIndex("AssignedTechnicianId").HasDatabaseName("IX_OpticalJobs_AssignedTechnicianId");
+            b.HasIndex("RequiredDate").HasDatabaseName("IX_OpticalJobs_RequiredDate");
+            b.HasIndex("SalesInvoiceId").HasDatabaseName("IX_OpticalJobs_SalesInvoiceId");
+            b.ToTable("tbl_OpticalJobs", "dbo");
+        });
+
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.OpticalJobLine", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset").HasColumnName("CreatedAt");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset").HasColumnName("UpdatedAt");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)").HasColumnName("UpdatedBy");
+            b.Property<Guid>("OpticalJobId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<Guid>("CustomerOrderLineId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("ProductVariantId").HasColumnType("uniqueidentifier");
+            b.Property<int>("LineNumber").IsRequired().HasColumnType("int");
+            b.Property<byte>("LineType").IsRequired().HasColumnType("tinyint");
+            b.Property<byte?>("Eye").HasColumnType("tinyint");
+            b.Property<string>("DescriptionSnapshot").IsRequired().HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<decimal>("Quantity").IsRequired().HasColumnType("decimal(18,3)");
+            b.Property<string>("Notes").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("UpdatedFromDevice");
+            b.HasKey("Id").HasName("PK_tbl_OpticalJobLines");
+            b.HasIndex("OpticalJobId", "LineNumber").IsUnique().HasDatabaseName("UX_OpticalJobLines_Job_LineNumber");
+            b.HasIndex("OpticalJobId", "CustomerOrderLineId").IsUnique().HasDatabaseName("UX_OpticalJobLines_Job_CustomerOrderLine");
+            b.HasIndex("CustomerOrderLineId").HasDatabaseName("IX_OpticalJobLines_CustomerOrderLineId");
+            b.HasIndex("ProductVariantId").HasDatabaseName("IX_OpticalJobLines_ProductVariantId");
+            b.ToTable("tbl_OpticalJobLines", "dbo", t =>
+            {
+                t.HasCheckConstraint("CK_OpticalJobLines_LineNumber", "[LineNumber] > 0");
+                t.HasCheckConstraint("CK_OpticalJobLines_Quantity", "[Quantity] > 0");
+            });
+        });
+
+
+        // Relationships for foundation gap completion
+        modelBuilder.Entity("OAS.Domain.Entities.Inventory.LensVariantDetail", b =>
+        {
+            b.HasOne("OAS.Domain.Entities.Inventory.ProductVariant", null).WithOne()
+                .HasForeignKey("OAS.Domain.Entities.Inventory.LensVariantDetail", "ProductVariantId")
+                .OnDelete(DeleteBehavior.Restrict).IsRequired()
+                .HasConstraintName("FK_LensVariantDetails_ProductVariants_ProductVariantId");
+        });
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.CustomerOrderLineOpticalSnapshot", b =>
+        {
+            b.HasOne("OAS.Domain.Sales.Entities.CustomerOrderLine", null).WithOne()
+                .HasForeignKey("OAS.Domain.Sales.Entities.CustomerOrderLineOpticalSnapshot", "CustomerOrderLineId")
+                .OnDelete(DeleteBehavior.Restrict).IsRequired()
+                .HasConstraintName("FK_CustomerOrderLineOpticalSnapshots_CustomerOrderLines_CustomerOrderLineId");
+            b.HasOne("OAS.Domain.Sales.Entities.PrescriptionRevision", null).WithMany()
+                .HasForeignKey("PrescriptionRevisionId").OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("FK_CustomerOrderLineOpticalSnapshots_PrescriptionRevisions_PrescriptionRevisionId");
+        });
+        modelBuilder.Entity("OAS.Domain.Accounting.Entities.CustomerAdvance", b =>
+        {
+            b.HasOne("OAS.Domain.Accounting.Entities.Customer", null).WithMany().HasForeignKey("CustomerId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_CustomerAdvances_Customers_CustomerId");
+            b.HasOne("OAS.Domain.Sales.Entities.CustomerOrder", null).WithMany().HasForeignKey("CustomerOrderId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_CustomerAdvances_CustomerOrders_CustomerOrderId");
+            b.HasOne("OAS.Domain.Accounting.Entities.ReceiptVoucherLine", null).WithMany().HasForeignKey("ReceiptVoucherLineId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_CustomerAdvances_ReceiptVoucherLines_ReceiptVoucherLineId");
+            b.HasOne("OAS.Domain.Accounting.Entities.Currency", null).WithMany().HasForeignKey("CurrencyId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_CustomerAdvances_Currencies_CurrencyId");
+            b.HasOne("OAS.Domain.Accounting.Entities.Currency", null).WithMany().HasForeignKey("BaseCurrencyId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_CustomerAdvances_BaseCurrencies_BaseCurrencyId");
+        });
+        modelBuilder.Entity("OAS.Domain.Accounting.Entities.CustomerAdvanceApplication", b =>
+        {
+            b.HasOne("OAS.Domain.Accounting.Entities.CustomerAdvance", null).WithMany().HasForeignKey("CustomerAdvanceId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_CustomerAdvanceApplications_CustomerAdvances_CustomerAdvanceId");
+            b.HasOne("OAS.Domain.Sales.Entities.SalesInvoice", null).WithMany().HasForeignKey("SalesInvoiceId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_CustomerAdvanceApplications_SalesInvoices_SalesInvoiceId");
+            b.HasOne("OAS.Domain.Accounting.Entities.JournalEntry", null).WithMany().HasForeignKey("JournalEntryId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_CustomerAdvanceApplications_JournalEntries_JournalEntryId");
+        });
+        modelBuilder.Entity("OAS.Domain.Accounting.Entities.PaymentAllocation", b =>
+        {
+            b.HasOne("OAS.Domain.Accounting.Entities.CustomerAdvanceApplication", null).WithMany()
+                .HasForeignKey("CustomerAdvanceApplicationId").OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("FK_PaymentAllocations_CustomerAdvanceApplication");
+        });
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.OpticalJob", b =>
+        {
+            b.HasOne("OAS.Domain.Sales.Entities.CustomerOrder", null).WithMany().HasForeignKey("CustomerOrderId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_OpticalJobs_CustomerOrders_CustomerOrderId");
+            b.HasOne("OAS.Domain.Sales.Entities.SalesInvoice", null).WithMany().HasForeignKey("SalesInvoiceId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_OpticalJobs_SalesInvoices_SalesInvoiceId");
+            b.HasOne("OAS.Domain.Accounting.Entities.Customer", null).WithMany().HasForeignKey("CustomerId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_OpticalJobs_Customers_CustomerId");
+            b.HasOne("OAS.Domain.Features.Employees.Entities.Employee", null).WithMany().HasForeignKey("AssignedTechnicianId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_OpticalJobs_Employees_AssignedTechnicianId");
+            b.HasMany("OAS.Domain.Sales.Entities.OpticalJobLine", "Lines").WithOne().HasForeignKey("OpticalJobId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_OpticalJobLines_OpticalJobs_OpticalJobId");
+            b.Navigation("Lines").UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.OpticalJobLine", b =>
+        {
+            b.HasOne("OAS.Domain.Sales.Entities.CustomerOrderLine", null).WithMany().HasForeignKey("CustomerOrderLineId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_OpticalJobLines_CustomerOrderLines_CustomerOrderLineId");
+            b.HasOne("OAS.Domain.Entities.Inventory.ProductVariant", null).WithMany().HasForeignKey("ProductVariantId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_OpticalJobLines_ProductVariants_ProductVariantId");
         });
 
         // Relationships for returns / commissions / optical production

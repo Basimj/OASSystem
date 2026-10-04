@@ -9,6 +9,7 @@ using OAS.Application.Accounting.BankAccounts.Mapping;
 using OAS.Application.Accounting.CashAccounts.Mapping;
 using OAS.Application.Accounting.CashShifts.Mapping;
 using OAS.Application.Accounting.CostCenters.Mapping;
+using OAS.Application.Accounting.CustomerAdvances.Services;
 using OAS.Application.Accounting.Expenses.ExpenseTypes.Mapping;
 using OAS.Application.Accounting.Expenses.Mapping;
 using OAS.Application.Accounting.FiscalPeriods.Mapping;
@@ -69,6 +70,8 @@ public static class DependencyInjection
         services.TryAddScoped<ICounterpartyAccountResolver, CounterpartyAccountResolver>();
         services.TryAddScoped<ISettlementAccountResolver, SettlementAccountResolver>();
         services.TryAddScoped<IVoucherSettlementResolver, VoucherSettlementResolver>();
+        services.TryAddScoped<ICustomerAdvanceService, CustomerAdvanceService>();
+        services.TryAddScoped<ICustomerAdvanceAccountingPostingService, CustomerAdvanceAccountingPostingService>();
         services.TryAddScoped<ILinkedAccountingAccountProvisioningService, LinkedAccountingAccountProvisioningService>();
         services.AddInventoryApplication();
         services.AddSalesApplication();

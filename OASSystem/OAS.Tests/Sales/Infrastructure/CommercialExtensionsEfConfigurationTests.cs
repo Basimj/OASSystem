@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using NUnit.Framework;
 using OAS.Domain.Purchasing.Entities;
 using OAS.Domain.Sales.Entities;
@@ -24,12 +26,13 @@ public sealed class CommercialExtensionsEfConfigurationTests
     {
         using var context = new OasDbContext(_options);
 
-        var salesLine = context.Model.FindEntityType(typeof(SalesInvoiceLine));
+        var model = context.GetService<IDesignTimeModel>().Model;
+        var salesLine = model.FindEntityType(typeof(SalesInvoiceLine));
         Assert.That(salesLine, Is.Not.Null);
         Assert.That(salesLine!.FindProperty(nameof(SalesInvoiceLine.ReturnedQuantity)), Is.Not.Null);
         Assert.That(salesLine.GetCheckConstraints().Any(x => x.Name == "CK_SalesInvoiceLines_ReturnedQuantity_Valid"), Is.True);
 
-        var receiptLine = context.Model.FindEntityType(typeof(PurchaseReceiptLine));
+        var receiptLine = model.FindEntityType(typeof(PurchaseReceiptLine));
         Assert.That(receiptLine, Is.Not.Null);
         Assert.That(receiptLine!.FindProperty(nameof(PurchaseReceiptLine.ReturnedQuantity)), Is.Not.Null);
         Assert.That(receiptLine.GetCheckConstraints().Any(x => x.Name == "CK_PurchaseReceiptLines_ReturnedQuantity_Valid"), Is.True);

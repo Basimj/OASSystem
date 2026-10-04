@@ -1,5 +1,6 @@
 using MediatR;
 using OAS.Application.Abstractions.Persistence;
+using OAS.Application.Abstractions.Persistence.Specifications;
 using OAS.Application.Abstractions.Security;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.Sales.Abstractions;
@@ -15,9 +16,12 @@ namespace OAS.Application.Sales.CustomerOrders.Commands;
 public sealed class ConfirmCustomerOrderCommandHandler(
     ICustomerOrderAggregateRepository repository,
     IReadRepository<Customer, Guid> customers,
+    IReadRepository<CustomerOrderLineOpticalSnapshot, Guid> snapshots,
     ISalesLineResolver lineResolver,
     ISalesPrescriptionValidator prescriptionValidator,
     ISalesStockReservationService stock,
+    ICustomerOrderAvailabilityService availability,
+    ICustomerDemandProcurementPort procurement,
     ICurrentUser currentUser,
     TimeProvider timeProvider,
     IUnitOfWork unitOfWork,
@@ -41,26 +45,54 @@ public sealed class ConfirmCustomerOrderCommandHandler(
         if (order.PaymentTermType == SalesPaymentTermType.Credit && !customer.IsCreditAllowed)
             throw new ConflictException(SalesErrorCodes.CreditNotAllowed, "البيع الآجل غير مسموح لهذا العميل.");
 
-        // Revalidate mutable external references at confirmation time. A product, warehouse,
-        // or prescription may have become inactive after the draft was saved.
         foreach (var line in order.Lines.Where(x => x.IsActive))
         {
             var resolved = await lineResolver.ResolveAsync(
-                line.LineType,
-                line.ProductVariantId,
-                line.WarehouseId,
-                line.DescriptionSnapshot,
-                ct);
-            await prescriptionValidator.ValidateLineAsync(
-                line.PrescriptionRevisionId,
-                line.PrescriptionEye,
-                resolved.PrescriptionRequired,
-                resolved.OpticalPolicy,
+                line.LineType, line.ProductVariantId, line.WarehouseId, line.DescriptionSnapshot, ct);
+            var snapshot = (await snapshots.ListAsync(
+                new Specification<CustomerOrderLineOpticalSnapshot>().Where(x => x.CustomerOrderLineId == line.Id && x.IsActive), ct))
+                .SingleOrDefault();
+
+            line.EnsureOpticalMeasurementReference(resolved.PrescriptionRequired, snapshot is not null);
+            if (snapshot is not null)
+            {
+                if (resolved.OpticalPolicy is not null)
+                    snapshot.ValidateAgainst(resolved.OpticalPolicy);
+            }
+            else
+            {
+                await prescriptionValidator.ValidateLineAsync(
+                    line.PrescriptionRevisionId,
+                    line.PrescriptionEye,
+                    resolved.PrescriptionRequired,
+                    resolved.OpticalPolicy,
+                    ct);
+            }
+        }
+
+        // Assess shortage before creating new reservations. InventoryBalance.AvailableQuantity
+        // excludes reservations, while newly-added reservation rows are not guaranteed to be
+        // visible to a database query until SaveChanges. Assessing first keeps shortage demand
+        // deterministic and prevents creating a PurchaseRequest for stock that was just reserved.
+        var assessment = await availability.AssessAsync(order, ct);
+        var status = await stock.ReserveForOrderAsync(order, ct);
+        order.Confirm(status, timeProvider.GetUtcNow(), currentUser.UserId);
+
+        foreach (var shortage in assessment.Lines.Where(x => x.ShortageQuantity > 0m))
+        {
+            await procurement.CreateOrUpdateShortageAsync(
+                new CustomerDemandShortage(
+                    order.Id,
+                    shortage.CustomerOrderLineId,
+                    shortage.WarehouseId,
+                    shortage.ProductVariantId,
+                    shortage.ShortageQuantity,
+                    order.OrderDate,
+                    order.RequiredDate,
+                    Notes: $"Customer order {order.OrderCode}"),
                 ct);
         }
 
-        var status = await stock.ReserveForOrderAsync(order, ct);
-        order.Confirm(status, timeProvider.GetUtcNow(), currentUser.UserId);
         await unitOfWork.SaveChangesAsync(ct);
         return await assembler.OrderAsync(order, ct);
     }

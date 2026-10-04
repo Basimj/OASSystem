@@ -46,8 +46,10 @@ public sealed class CreatePurchaseRequestCommandHandler(
             PurchasingApplicationGuard.Product(await references.GetProductVariantAsync(line.ProductVariantId, ct));
             if (line.PreferredSupplierId.HasValue)
                 PurchasingApplicationGuard.Supplier(await references.GetSupplierAsync(line.PreferredSupplierId.Value, ct));
-            entity.AddLine(PurchaseRequestLine.Create(Guid.NewGuid(), id, line.LineSequence, line.ProductVariantId,
-                line.RequestedQuantity, line.RequiredDate, line.CustomerOrderLineId, line.PreferredSupplierId, line.Notes));
+            var requestLine = PurchaseRequestLine.Create(Guid.NewGuid(), id, line.LineSequence, line.ProductVariantId,
+                line.RequestedQuantity, line.RequiredDate, line.CustomerOrderLineId, line.PreferredSupplierId, line.Notes);
+            requestLine.ScheduleOrder(line.ScheduledOrderAtUtc);
+            entity.AddLine(requestLine);
         }
         await repository.AddAsync(entity, ct);
         return id;
@@ -88,11 +90,14 @@ public sealed class UpdatePurchaseRequestCommandHandler(
                 PurchasingRowVersion.EnsureMatches(existing.RowVersion, line.RowVersion, "Purchase request line");
                 existing.Update(line.LineSequence, line.ProductVariantId, line.RequestedQuantity, line.RequiredDate,
                     line.CustomerOrderLineId, line.PreferredSupplierId, line.Notes);
+                existing.ScheduleOrder(line.ScheduledOrderAtUtc);
             }
             else
             {
-                entity.AddLine(PurchaseRequestLine.Create(Guid.NewGuid(), entity.Id, line.LineSequence, line.ProductVariantId,
-                    line.RequestedQuantity, line.RequiredDate, line.CustomerOrderLineId, line.PreferredSupplierId, line.Notes));
+                var newLine = PurchaseRequestLine.Create(Guid.NewGuid(), entity.Id, line.LineSequence, line.ProductVariantId,
+                    line.RequestedQuantity, line.RequiredDate, line.CustomerOrderLineId, line.PreferredSupplierId, line.Notes);
+                newLine.ScheduleOrder(line.ScheduledOrderAtUtc);
+                entity.AddLine(newLine);
             }
         }
         await repository.ReplaceLinesAsync(entity, ct);

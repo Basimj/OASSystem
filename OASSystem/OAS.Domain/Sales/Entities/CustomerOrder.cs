@@ -165,6 +165,28 @@ public sealed class CustomerOrder : AuditableEntity<Guid>
         Status = status;
     }
 
+    public void StartProduction()
+    {
+        if (Status != CustomerOrderStatus.ReadyForProduction)
+            throw new DomainException("Customer order can only enter production after all required materials are available.");
+        Status = CustomerOrderStatus.InProduction;
+    }
+
+    public void MarkReadyForDelivery()
+    {
+        if (Status != CustomerOrderStatus.InProduction)
+            throw new DomainException("Customer order can only become ready for delivery after production has started.");
+        Status = CustomerOrderStatus.ReadyForDelivery;
+    }
+
+    public void Complete()
+    {
+        if (Status != CustomerOrderStatus.ReadyForDelivery)
+            throw new DomainException("Customer order can only be completed when it is ready for delivery.");
+        Status = CustomerOrderStatus.Completed;
+        IsActive = false;
+    }
+
     public void Cancel(DateTimeOffset cancelledAtUtc, string? cancelledBy)
     {
         if (Status is CustomerOrderStatus.Cancelled or CustomerOrderStatus.Completed or CustomerOrderStatus.InProduction or CustomerOrderStatus.ReadyForDelivery)

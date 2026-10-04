@@ -21,12 +21,18 @@ public sealed class PurchaseRequestLine : AuditableEntity<Guid>
     public DateOnly? RequiredDate { get; private set; }
     public Guid? CustomerOrderLineId { get; private set; }
     public Guid? PreferredSupplierId { get; private set; }
+    public DateTimeOffset? ScheduledOrderAtUtc { get; private set; }
     public string? Notes { get; private set; }
     public byte[] RowVersion { get; private set; } = [];
 
     public static PurchaseRequestLine Create(Guid id, Guid purchaseRequestId, int lineSequence, Guid productVariantId, decimal requestedQuantity,
         DateOnly? requiredDate = null, Guid? customerOrderLineId = null, Guid? preferredSupplierId = null, string? notes = null) =>
         new(id, purchaseRequestId, lineSequence, productVariantId, requestedQuantity, requiredDate, customerOrderLineId, preferredSupplierId, notes);
+
+    public void ScheduleOrder(DateTimeOffset? scheduledOrderAtUtc)
+    {
+        ScheduledOrderAtUtc = scheduledOrderAtUtc;
+    }
 
     public void Update(int lineSequence, Guid productVariantId, decimal requestedQuantity, DateOnly? requiredDate,
         Guid? customerOrderLineId, Guid? preferredSupplierId, string? notes)

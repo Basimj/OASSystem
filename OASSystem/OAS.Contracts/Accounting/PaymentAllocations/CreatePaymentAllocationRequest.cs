@@ -5,4 +5,5 @@ public sealed record CreatePaymentAllocationRequest(
     Guid? PaymentVoucherLineId,
     AllocationTargetDocumentType TargetDocumentType,
     Guid TargetDocumentId,
-    decimal AllocatedAmount);
+    decimal AllocatedAmount,
+    Guid? CustomerAdvanceApplicationId = null);

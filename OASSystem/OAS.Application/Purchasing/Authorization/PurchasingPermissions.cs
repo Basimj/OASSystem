@@ -10,6 +10,13 @@ public static class PurchasingPermissions
         public const string Manage = "purchasing.catalog.manage";
     }
 
+
+    public static class CustomerDemand
+    {
+        public const string View = "purchasing.customer_demand.view";
+        public const string EditSupplier = "purchasing.customer_demand.supplier.edit";
+    }
+
     public static class Requests
     {
         public const string View = "purchasing.requests.view";

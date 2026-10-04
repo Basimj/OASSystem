@@ -166,35 +166,38 @@ public sealed class EmployeeWorkspaceStateTests
     private static EmployeeDto CreateEmployee(
         Guid? userAccountId = null) =>
         new(
-            Guid.NewGuid(),
-            "EMP-00501",
-            "Ahmed",
-            "Ali",
-            "Ahmed Ali",
-            "777000000",
-            "employee@example.com",
-            "Yemen",
-            "Sana'a",
-            "Sana'a",
-            "10001",
-            "Main Street",
-            JobTitleId,
-            "فني",
-            new DateOnly(2026, 1, 1),
-            true,
-            true,
-            userAccountId,
-            userAccountId.HasValue
-                ? "Linked User"
-                : null,
-            userAccountId.HasValue
-                ? "linked"
-                : null,
-            userAccountId.HasValue
-                ? "linked@example.com"
-                : null,
-            null,
-            Convert.ToBase64String([1, 2, 3]),
-            DateTimeOffset.UtcNow,
-            null);
+            Id: Guid.NewGuid(),
+            EmployeeCode: "EMP-00501",
+            FirstName: "Ahmed",
+            LastName: "Ali",
+            DisplayName: "Ahmed Ali",
+            Phone: "777000000",
+            Email: "employee@example.com",
+            Country: "Yemen",
+            Governorate: "Sana'a",
+            City: "Sana'a",
+            PostalCode: "10001",
+            ResidentialAddress: "Main Street",
+            JobTitleId: JobTitleId,
+            JobTitleName: "فني",
+            DepartmentId: null,
+            DepartmentCode: null,
+            DepartmentName: null,
+            ManagerEmployeeId: null,
+            ManagerEmployeeCode: null,
+            ManagerEmployeeName: null,
+            HireDate: new DateOnly(2026, 1, 1),
+            IsSalesperson: true,
+            IsTechnician: true,
+            IsCommissionEligible: false,
+            IsActive: true,
+            UserAccountId: userAccountId,
+            UserAccountDisplayName: userAccountId.HasValue ? "Linked User" : null,
+            UserAccountUserName: userAccountId.HasValue ? "linked" : null,
+            UserAccountEmail: userAccountId.HasValue ? "linked@example.com" : null,
+            Photo: null,
+            RowVersion: Convert.ToBase64String([1, 2, 3]),
+            CreatedAtUtc: DateTimeOffset.UtcNow,
+            LastModifiedAtUtc: null);
+
 }
