@@ -33,6 +33,8 @@ public sealed class PaymentVoucherLine : AuditableEntity<Guid>
     public ExchangeRateType? ExchangeRateType { get; private set; }
     public ExchangeRateSource? ExchangeRateSource { get; private set; }
     public decimal? BaseAmount { get; private set; }
+    public decimal? CounterpartyBaseAmount { get; private set; }
+    public decimal? RealizedExchangeDifferenceBase { get; private set; }
 
     public string? ReferenceNumber { get; private set; }
     public DateOnly? ReferenceDate { get; private set; }
@@ -68,7 +70,9 @@ public sealed class PaymentVoucherLine : AuditableEntity<Guid>
         DateOnly? referenceDate,
         string? referenceType,
         Guid? referenceId,
-        string? description)
+        string? description,
+        decimal? counterpartyBaseAmount = null,
+        decimal? realizedExchangeDifferenceBase = null)
     {
         ValidateIdentity(id, paymentVoucherId, lineNumber);
         ValidateSettlement(
@@ -103,6 +107,8 @@ public sealed class PaymentVoucherLine : AuditableEntity<Guid>
             ExchangeRateType = exchangeRateType,
             ExchangeRateSource = exchangeRateSource,
             BaseAmount = baseAmount,
+            CounterpartyBaseAmount = counterpartyBaseAmount ?? baseAmount,
+            RealizedExchangeDifferenceBase = realizedExchangeDifferenceBase ?? 0m,
             ReferenceNumber = Optional(referenceNumber),
             ReferenceDate = referenceDate,
             ReferenceType = Optional(referenceType),

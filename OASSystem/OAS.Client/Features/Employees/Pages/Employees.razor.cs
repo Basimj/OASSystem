@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
 using OAS.Client.Common.Feedback.Services;
+using OAS.Client.Features.Employees.Components;
 using OAS.Client.Features.Employees.Services;
 using OAS.Client.Features.Employees.Workspace;
 using OAS.Client.Identity.Services;
@@ -10,6 +11,7 @@ using OAS.Client.Services.Http;
 using OAS.Contracts.Common.Pagination;
 using OAS.Contracts.Features.Employees;
 using OAS.Contracts.Features.Employees.JobTitles;
+using OAS.Contracts.Features.Employees.Departments;
 using OAS.UiLib.Core.Enums;
 using OAS.UiLib.Core.Models;
 using OAS.UiLib.Services.Dialogs;
@@ -23,6 +25,7 @@ public partial class Employees
     private const long MaximumEmployeeImageBytes = 2_500_000;
 
     [Inject] private IEmployeeClientService EmployeeService { get; set; } = default!;
+    [Inject] private IDepartmentClientService DepartmentService { get; set; } = default!;
     [Inject] private IUserClientService UserService { get; set; } = default!;
     [Inject] private IEmployeesWorkspaceState Workspace { get; set; } = default!;
     [Inject] private IUiDialogService Dialog { get; set; } = default!;
@@ -36,6 +39,10 @@ public partial class Employees
     private bool _employeeEntryOpen;
     private bool _exportDialogOpen;
     private IReadOnlyList<JobTitleDto> _jobTitles = [];
+    private IReadOnlyList<DepartmentDto> _departments = [];
+    private EmployeeContractsPanel? _contractsPanel;
+    private EmployeeSalaryPanel? _salaryPanel;
+    private EmployeeDocumentsPanel? _documentsPanel;
 
     private PagedResult<EmployeeDto> _page
     {
@@ -69,11 +76,55 @@ public partial class Employees
         return tab.IsDirty ? $"{baseCss} ui-employee-tab-icon--dirty" : baseCss;
     }
 
-    private bool CanEditActive => ActiveEditorTab is { IsNew: false, IsEditMode: false, IsLoading: false, IsSaving: false };
-    private bool CanSaveActive => ActiveEditorTab is { IsInitialized: true, IsSaving: false } tab && (tab.IsNew || tab.IsEditMode);
+    private bool IsCoreSection => ActiveEditorTab?.ActiveSectionKey is null or "core";
+    private bool IsContractsSection => ActiveEditorTab?.ActiveSectionKey == "contracts";
+    private bool IsSalarySection => ActiveEditorTab?.ActiveSectionKey == "salary";
+    private bool IsDocumentsSection => ActiveEditorTab?.ActiveSectionKey == "documents";
+
+    private bool CanNewAction => ActiveEditorTab is null || IsCoreSection || (IsContractsSection && _contractsPanel?.CanNew == true) || (IsSalarySection && _salaryPanel?.CanNew == true) || (IsDocumentsSection && _documentsPanel?.CanNew == true);
+    private bool CanEditAction => IsCoreSection
+        ? ActiveEditorTab is { IsNew: false, IsEditMode: false, IsLoading: false, IsSaving: false }
+        : IsContractsSection ? _contractsPanel?.CanEdit == true
+        : IsSalarySection ? _salaryPanel?.CanEdit == true
+        : IsDocumentsSection && _documentsPanel?.CanEdit == true;
+    private bool CanSaveAction => IsCoreSection
+        ? ActiveEditorTab is { IsInitialized: true, IsSaving: false } tab && (tab.IsNew || tab.IsEditMode)
+        : IsContractsSection ? _contractsPanel?.CanSave == true
+        : IsSalarySection ? _salaryPanel?.CanSave == true
+        : IsDocumentsSection && _documentsPanel?.CanSave == true;
     private bool CanCloseActive => ActiveEditorTab is { IsSaving: false };
-    private bool CanCancelActive => ActiveEditorTab is { IsSaving: false } tab && (tab.IsNew || tab.IsEditMode);
-    private bool CanRefreshActive => ActiveEditorTab is null ? !_isLoading : ActiveEditorTab is { IsNew: false, IsSaving: false, IsLoading: false, IsDirty: false };
+    private bool CanCancelAction => IsCoreSection
+        ? ActiveEditorTab is { IsSaving: false } tab && (tab.IsNew || tab.IsEditMode)
+        : IsContractsSection ? _contractsPanel?.CanCancelEdit == true
+        : IsSalarySection ? _salaryPanel?.CanCancelEdit == true
+        : IsDocumentsSection && _documentsPanel?.CanCancelEdit == true;
+    private bool CanRefreshAction => ActiveEditorTab is null ? !_isLoading
+        : IsCoreSection ? ActiveEditorTab is { IsNew: false, IsSaving: false, IsLoading: false, IsDirty: false }
+        : IsContractsSection ? _contractsPanel?.CanRefresh == true
+        : IsSalarySection ? _salaryPanel?.CanRefresh == true
+        : IsDocumentsSection && _documentsPanel?.CanRefresh == true;
+
+    private IReadOnlyList<UiSectionTabItem> EmployeeSectionTabs
+    {
+        get
+        {
+            var tab = ActiveEditorTab;
+            if (tab is null) return [];
+            if (tab.IsNew) return [new UiSectionTabItem("core", "بيانات الموظف", true)];
+            return
+            [
+                new UiSectionTabItem("core", "بيانات الموظف", tab.ActiveSectionKey == "core"),
+                new UiSectionTabItem("contracts", "العقد", tab.ActiveSectionKey == "contracts"),
+                new UiSectionTabItem("salary", "الراتب", tab.ActiveSectionKey == "salary"),
+                new UiSectionTabItem("time", "الدوام", tab.ActiveSectionKey == "time"),
+                new UiSectionTabItem("leave", "الإجازات", tab.ActiveSectionKey == "leave"),
+                new UiSectionTabItem("loans", "السلف", tab.ActiveSectionKey == "loans"),
+                new UiSectionTabItem("adjustments", "التعديلات", tab.ActiveSectionKey == "adjustments"),
+                new UiSectionTabItem("payroll", "الرواتب", tab.ActiveSectionKey == "payroll"),
+                new UiSectionTabItem("documents", "المستندات", tab.ActiveSectionKey == "documents")
+            ];
+        }
+    }
 
     private static readonly IReadOnlyList<UiSelectOption> FilterOptions =
     [
@@ -96,6 +147,31 @@ public partial class Employees
         }
     }
 
+    private IReadOnlyList<UiSelectOption> ActiveDepartmentOptions
+    {
+        get
+        {
+            var currentId = ActiveEditorTab?.Form.DepartmentId;
+            return _departments
+                .Where(x => x.IsActive || x.Id == currentId)
+                .OrderBy(x => x.NameAr)
+                .Select(x => new UiSelectOption(x.Id.ToString("D"), string.IsNullOrWhiteSpace(x.DepartmentCode) ? x.NameAr : $"{x.DepartmentCode} - {x.NameAr}"))
+                .ToArray();
+        }
+    }
+
+    private UiLookupItem? ManagerEmployeeItem
+    {
+        get
+        {
+            var tab = ActiveEditorTab;
+            if (tab?.Form.ManagerEmployeeId is not Guid id || string.IsNullOrWhiteSpace(tab.ManagerEmployeeName))
+                return null;
+
+            return new UiLookupItem(id.ToString("D"), tab.ManagerEmployeeName!, tab.ManagerEmployeeCode, "fa-solid fa-user-tie");
+        }
+    }
+
     private UiLookupItem? LinkedUserItem
     {
         get
@@ -111,7 +187,7 @@ public partial class Employees
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadJobTitlesAsync();
+        await Task.WhenAll(LoadJobTitlesAsync(), LoadDepartmentsAsync());
 
         if (!Workspace.HasLoadedPage)
             await LoadEmployeesAsync();
@@ -130,6 +206,19 @@ public partial class Employees
         {
             ApiFeedback.Show(ex.Error);
             _jobTitles = [];
+        }
+    }
+
+    private async Task LoadDepartmentsAsync()
+    {
+        try
+        {
+            _departments = await DepartmentService.GetAsync();
+        }
+        catch (ApiClientException ex)
+        {
+            ApiFeedback.Show(ex.Error);
+            _departments = [];
         }
     }
 
@@ -159,7 +248,7 @@ public partial class Employees
 
     private async Task RefreshAsync(MouseEventArgs _)
     {
-        await LoadJobTitlesAsync();
+        await Task.WhenAll(LoadJobTitlesAsync(), LoadDepartmentsAsync());
         await LoadEmployeesAsync();
     }
 
@@ -275,8 +364,32 @@ public partial class Employees
             .ToArray();
     }
 
+    private async Task<IReadOnlyList<UiLookupItem>> SearchManagerEmployeesAsync(string search, CancellationToken cancellationToken)
+    {
+        var page = await EmployeeService.GetPageAsync(new PageRequest
+        {
+            PageNumber = 1,
+            PageSize = 12,
+            Search = string.IsNullOrWhiteSpace(search) ? null : search.Trim(),
+            SortBy = "EmployeeCode",
+            SortDirection = SortDirection.Ascending
+        }, cancellationToken);
+
+        var currentEmployeeId = ActiveEditorTab?.EmployeeId;
+        return page.Items
+            .Where(x => x.IsActive && x.Id != currentEmployeeId)
+            .Select(x => new UiLookupItem(
+                x.Id.ToString("D"),
+                x.DisplayName,
+                string.Join(" • ", new[] { x.EmployeeCode, x.JobTitleName }.Where(v => !string.IsNullOrWhiteSpace(v))),
+                "fa-solid fa-user-tie"))
+            .ToArray();
+    }
+
     private async Task SelectWorkspaceTabAsync(Guid tabId)
     {
+        if (Workspace.ActiveTabId != tabId && !await ConfirmAndDiscardActiveHrDraftAsync()) return;
+
         Workspace.ActiveTabId = tabId;
         if (Workspace.FindEditorTab(tabId) is { } tab)
             await EnsureTabInitializedAsync(tab);
@@ -286,7 +399,9 @@ public partial class Employees
     {
         if (tabId == Workspace.AllEmployeesTabId) return;
         var tab = Workspace.FindEditorTab(tabId);
-        if (tab is null || !await ConfirmDiscardAsync([tab])) return;
+        if (tab is null) return;
+        if (Workspace.ActiveTabId == tabId && !await ConfirmAndDiscardActiveHrDraftAsync()) return;
+        if (!await ConfirmDiscardAsync([tab])) return;
         Workspace.RemoveEditorTab(tabId);
         await InvokeAsync(StateHasChanged);
     }
@@ -295,6 +410,7 @@ public partial class Employees
     {
         var keepEditor = Workspace.FindEditorTab(tabId);
         var toClose = Workspace.EditorTabs.Where(x => keepEditor is null || x.TabId != keepEditor.TabId).ToArray();
+        if (toClose.Any(x => x.TabId == Workspace.ActiveTabId) && !await ConfirmAndDiscardActiveHrDraftAsync()) return;
         if (!await ConfirmDiscardAsync(toClose)) return;
         foreach (var tab in toClose) Workspace.RemoveEditorTab(tab.TabId);
         Workspace.ActiveTabId = keepEditor?.TabId ?? Workspace.AllEmployeesTabId;
@@ -304,10 +420,39 @@ public partial class Employees
     private async Task CloseAllWorkspaceTabsAsync()
     {
         var toClose = Workspace.EditorTabs.ToArray();
+        if (!await ConfirmAndDiscardActiveHrDraftAsync()) return;
         if (!await ConfirmDiscardAsync(toClose)) return;
         foreach (var tab in toClose) Workspace.RemoveEditorTab(tab.TabId);
         Workspace.ActiveTabId = Workspace.AllEmployeesTabId;
         await InvokeAsync(StateHasChanged);
+    }
+
+    private bool HasActiveHrDraft =>
+        (IsContractsSection && _contractsPanel?.CanCancelEdit == true) ||
+        (IsSalarySection && _salaryPanel?.CanCancelEdit == true) ||
+        (IsDocumentsSection && _documentsPanel?.CanCancelEdit == true);
+
+    private async Task<bool> ConfirmAndDiscardActiveHrDraftAsync()
+    {
+        if (!HasActiveHrDraft) return true;
+
+        var confirmed = await Dialog.ConfirmAsync(
+            "تغييرات غير محفوظة",
+            "توجد تغييرات غير محفوظة في القسم الحالي. هل تريد تجاهلها والمتابعة؟",
+            AlertTone.Warning,
+            "تجاهل والمتابعة",
+            "إلغاء");
+
+        if (!confirmed) return false;
+
+        if (IsContractsSection && _contractsPanel is not null)
+            await _contractsPanel.CancelEditAsync();
+        else if (IsSalarySection && _salaryPanel is not null)
+            await _salaryPanel.CancelEditAsync();
+        else if (IsDocumentsSection && _documentsPanel is not null)
+            await _documentsPanel.CancelEditAsync();
+
+        return true;
     }
 
     private async Task<bool> ConfirmDiscardAsync(IEnumerable<EmployeeWorkspaceTabState> tabs)
@@ -375,11 +520,22 @@ public partial class Employees
         return Task.CompletedTask;
     }
 
-    private Task BeginEditActiveAsync(MouseEventArgs _)
+    private async Task NewActionAsync(MouseEventArgs args)
     {
-        ActiveEditorTab?.BeginEdit();
-        StateHasChanged();
-        return Task.CompletedTask;
+        if (ActiveEditorTab is null || IsCoreSection) { await OpenNewAsync(args); return; }
+        if (IsContractsSection && _contractsPanel is not null) await _contractsPanel.NewAsync();
+        else if (IsSalarySection && _salaryPanel is not null) await _salaryPanel.NewAsync();
+        else if (IsDocumentsSection && _documentsPanel is not null) await _documentsPanel.NewAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task BeginEditActionAsync(MouseEventArgs _)
+    {
+        if (IsCoreSection) ActiveEditorTab?.BeginEdit();
+        else if (IsContractsSection && _contractsPanel is not null) await _contractsPanel.EditAsync();
+        else if (IsSalarySection && _salaryPanel is not null) await _salaryPanel.EditAsync();
+        else if (IsDocumentsSection && _documentsPanel is not null) await _documentsPanel.EditAsync();
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task CloseActiveAsync(MouseEventArgs _)
@@ -390,16 +546,26 @@ public partial class Employees
 
     private async Task RefreshActionAsync(MouseEventArgs args)
     {
-        if (ActiveEditorTab is { } tab)
-            await ReloadTabAsync(tab);
-        else
-            await RefreshAsync(args);
+        if (ActiveEditorTab is null) { await RefreshAsync(args); return; }
+        if (IsCoreSection) await ReloadTabAsync(ActiveEditorTab);
+        else if (IsContractsSection && _contractsPanel is not null) await _contractsPanel.RefreshAsync();
+        else if (IsSalarySection && _salaryPanel is not null) await _salaryPanel.RefreshAsync();
+        else if (IsDocumentsSection && _documentsPanel is not null) await _documentsPanel.RefreshAsync();
+        await InvokeAsync(StateHasChanged);
     }
 
-    private async Task CancelActiveEditAsync(MouseEventArgs _)
+    private async Task CancelActionAsync(MouseEventArgs _)
     {
         var tab = ActiveEditorTab;
         if (tab is null) return;
+        if (!IsCoreSection)
+        {
+            if (IsContractsSection && _contractsPanel is not null) await _contractsPanel.CancelEditAsync();
+            else if (IsSalarySection && _salaryPanel is not null) await _salaryPanel.CancelEditAsync();
+            else if (IsDocumentsSection && _documentsPanel is not null) await _documentsPanel.CancelEditAsync();
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
 
         if (tab.IsNew)
         {
@@ -425,7 +591,43 @@ public partial class Employees
         await InvokeAsync(StateHasChanged);
     }
 
-    private Task SaveActiveAsync(MouseEventArgs _) => SaveActiveCoreAsync(false);
+    private async Task ChangeEmployeeSectionAsync(string key)
+    {
+        var tab = ActiveEditorTab;
+        if (tab is null || tab.IsNew || tab.ActiveSectionKey == key) return;
+        if ((IsCoreSection && (tab.IsEditMode || tab.IsDirty)) ||
+            (IsContractsSection && _contractsPanel?.CanCancelEdit == true) ||
+            (IsSalarySection && _salaryPanel?.CanCancelEdit == true) ||
+            (IsDocumentsSection && _documentsPanel?.CanCancelEdit == true))
+        {
+            Snackbar.Info("احفظ أو ألغِ التعديلات الحالية قبل الانتقال إلى قسم آخر.");
+            return;
+        }
+        tab.ActiveSectionKey = key;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private Task HrPanelStateChangedAsync()
+    {
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private async Task ActivateContractAsync(MouseEventArgs _){ if(_contractsPanel is not null) await _contractsPanel.ActivateAsync(); await InvokeAsync(StateHasChanged); }
+    private async Task TerminateContractAsync(MouseEventArgs _){ if(_contractsPanel is not null) await _contractsPanel.TerminateAsync(); await InvokeAsync(StateHasChanged); }
+    private async Task CancelContractAsync(MouseEventArgs _){ if(_contractsPanel is not null) await _contractsPanel.CancelContractAsync(); await InvokeAsync(StateHasChanged); }
+    private async Task ActivateSalaryStructureAsync(MouseEventArgs _){ if(_salaryPanel is not null) await _salaryPanel.ActivateAsync(); await InvokeAsync(StateHasChanged); }
+    private async Task CancelSalaryStructureAsync(MouseEventArgs _){ if(_salaryPanel is not null) await _salaryPanel.CancelStructureAsync(); await InvokeAsync(StateHasChanged); }
+    private async Task ToggleDocumentStatusAsync(MouseEventArgs _){ if(_documentsPanel is not null) await _documentsPanel.ToggleStatusAsync(); await InvokeAsync(StateHasChanged); }
+
+    private async Task SaveActionAsync(MouseEventArgs _)
+    {
+        if (IsCoreSection) { await SaveActiveCoreAsync(false); return; }
+        if (IsContractsSection && _contractsPanel is not null) await _contractsPanel.SaveAsync();
+        else if (IsSalarySection && _salaryPanel is not null) await _salaryPanel.SaveAsync();
+        else if (IsDocumentsSection && _documentsPanel is not null) await _documentsPanel.SaveAsync();
+        await InvokeAsync(StateHasChanged);
+    }
     private Task SaveAndCloseActiveAsync(MouseEventArgs _) => SaveActiveCoreAsync(true);
 
     private async Task SaveActiveCoreAsync(bool closeAfterSave)
@@ -527,7 +729,11 @@ public partial class Employees
         tab.Form.IsCommissionEligible,
         tab.Form.IsActive,
         tab.Form.UserAccountId,
-        tab.Form.EmployeeCode);
+        tab.Form.EmployeeCode,
+        tab.Form.DepartmentId,
+        tab.Form.ManagerEmployeeId,
+        tab.Form.IsSalesperson,
+        tab.Form.IsTechnician);
 
     private static UpdateEmployeeRequest BuildUpdateRequest(EmployeeWorkspaceTabState tab, string rowVersion) => new(
         tab.Form.FirstName.Trim(),
@@ -544,7 +750,11 @@ public partial class Employees
         tab.Form.IsCommissionEligible,
         tab.Form.IsActive,
         tab.Form.UserAccountId,
-        rowVersion);
+        rowVersion,
+        tab.Form.DepartmentId,
+        tab.Form.ManagerEmployeeId,
+        tab.Form.IsSalesperson,
+        tab.Form.IsTechnician);
 
     private async Task<bool> SavePendingImageAsync(EmployeeWorkspaceTabState tab)
     {

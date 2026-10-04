@@ -1,12 +1,8 @@
+using OAS.Application.Accounting.Abstractions;
+
 namespace OAS.Application.Sales.Abstractions;
 
-public interface ISalesPaymentAllocationTargetValidator
+[Obsolete("Use IPaymentAllocationTargetValidator. This compatibility interface is retained for source compatibility.")]
+public interface ISalesPaymentAllocationTargetValidator : IPaymentAllocationTargetValidator
 {
-    Task ValidateAsync(
-        Guid salesInvoiceId,
-        Guid sourceCurrencyId,
-        decimal allocatedAmount,
-        decimal baseAllocatedAmount,
-        Guid? excludingAllocationId = null,
-        CancellationToken cancellationToken = default);
 }

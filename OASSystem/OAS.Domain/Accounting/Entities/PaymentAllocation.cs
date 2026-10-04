@@ -23,6 +23,7 @@ public sealed class PaymentAllocation : AuditableEntity<Guid>
     public decimal AllocatedAmount { get; private set; }
     public decimal? ExchangeRate { get; private set; }
     public decimal? BaseAllocatedAmount { get; private set; }
+    public decimal? TargetBaseAllocatedAmount { get; private set; }
     public DateTime AllocatedAtUtc { get; private set; }
 
     public static PaymentAllocation CreateLineAllocation(
@@ -36,7 +37,8 @@ public sealed class PaymentAllocation : AuditableEntity<Guid>
         decimal allocatedAmount,
         decimal exchangeRate,
         decimal baseAllocatedAmount,
-        DateTime allocatedAtUtc)
+        DateTime allocatedAtUtc,
+        decimal? targetBaseAllocatedAmount = null)
     {
         ValidateCommon(id, targetDocumentId, allocatedAmount);
         var sourceCount = (receiptVoucherLineId.HasValue ? 1 : 0) + (paymentVoucherLineId.HasValue ? 1 : 0);
@@ -63,6 +65,7 @@ public sealed class PaymentAllocation : AuditableEntity<Guid>
             AllocatedAmount = allocatedAmount,
             ExchangeRate = exchangeRate,
             BaseAllocatedAmount = baseAllocatedAmount,
+            TargetBaseAllocatedAmount = targetBaseAllocatedAmount ?? baseAllocatedAmount,
             AllocatedAtUtc = allocatedAtUtc
         };
     }
@@ -90,12 +93,14 @@ public sealed class PaymentAllocation : AuditableEntity<Guid>
         };
     }
 
-    public void UpdateAllocatedAmount(decimal allocatedAmount, decimal? baseAllocatedAmount = null)
+    public void UpdateAllocatedAmount(decimal allocatedAmount, decimal? baseAllocatedAmount = null, decimal? targetBaseAllocatedAmount = null)
     {
         if (allocatedAmount <= 0) throw new ArgumentOutOfRangeException(nameof(allocatedAmount), "Allocated amount must be greater than zero.");
         if (baseAllocatedAmount.HasValue && baseAllocatedAmount.Value <= 0) throw new ArgumentOutOfRangeException(nameof(baseAllocatedAmount));
+        if (targetBaseAllocatedAmount.HasValue && targetBaseAllocatedAmount.Value <= 0) throw new ArgumentOutOfRangeException(nameof(targetBaseAllocatedAmount));
         AllocatedAmount = allocatedAmount;
         if (baseAllocatedAmount.HasValue) BaseAllocatedAmount = baseAllocatedAmount.Value;
+        if (targetBaseAllocatedAmount.HasValue) TargetBaseAllocatedAmount = targetBaseAllocatedAmount.Value;
     }
 
     private static void ValidateCommon(Guid id, Guid targetDocumentId, decimal allocatedAmount)

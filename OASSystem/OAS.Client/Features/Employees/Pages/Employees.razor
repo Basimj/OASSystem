@@ -11,19 +11,20 @@
             <UiButton Text="جديد"
                       IconCssClass="fa-solid fa-user-plus"
                       Size="ControlSize.Small"
-                      OnClick="OpenNewAsync" />
+                      Disabled="@(!CanNewAction)"
+                      OnClick="NewActionAsync" />
             <UiButton Text="تعديل"
                       IconCssClass="fa-solid fa-pen"
                       Variant="ButtonVariant.Secondary"
                       Size="ControlSize.Small"
-                      Disabled="@(!CanEditActive)"
-                      OnClick="BeginEditActiveAsync" />
+                      Disabled="@(!CanEditAction)"
+                      OnClick="BeginEditActionAsync" />
             <UiButton Text="حفظ"
                       IconCssClass="fa-solid fa-floppy-disk"
                       Size="ControlSize.Small"
-                      Disabled="@(!CanSaveActive)"
+                      Disabled="@(!CanSaveAction)"
                       Loading="@(activeEditorTab?.IsSaving == true)"
-                      OnClick="SaveActiveAsync" />
+                      OnClick="SaveActionAsync" />
             <UiButton Text="إغلاق"
                       IconCssClass="fa-solid fa-xmark"
                       Variant="ButtonVariant.Secondary"
@@ -34,8 +35,24 @@
                       IconCssClass="fa-solid fa-ban"
                       Variant="ButtonVariant.Ghost"
                       Size="ControlSize.Small"
-                      Disabled="@(!CanCancelActive)"
-                      OnClick="CancelActiveEditAsync" />
+                      Disabled="@(!CanCancelAction)"
+                      OnClick="CancelActionAsync" />
+            @if (IsContractsSection)
+            {
+                <UiButton Text="تفعيل العقد" IconCssClass="fa-solid fa-circle-check" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(_contractsPanel?.CanActivate != true)" OnClick="ActivateContractAsync" />
+                <UiButton Text="إنهاء العقد" IconCssClass="fa-solid fa-user-slash" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(_contractsPanel?.CanTerminate != true)" OnClick="TerminateContractAsync" />
+                <UiButton Text="إلغاء العقد" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Disabled="@(_contractsPanel?.CanCancelContract != true)" OnClick="CancelContractAsync" />
+            }
+            else if (IsSalarySection)
+            {
+                <UiButton Text="تفعيل الهيكل" IconCssClass="fa-solid fa-circle-check" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(_salaryPanel?.CanActivate != true)" OnClick="ActivateSalaryStructureAsync" />
+                <UiButton Text="إلغاء الهيكل" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Disabled="@(_salaryPanel?.CanCancelStructure != true)" OnClick="CancelSalaryStructureAsync" />
+            }
+            else if (IsDocumentsSection)
+            {
+                <UiButton Text="@(_documentsPanel?.ToggleStatusText ?? "تغيير الحالة")" IconCssClass="fa-solid fa-toggle-on" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(_documentsPanel?.CanToggleStatus != true)" OnClick="ToggleDocumentStatusAsync" />
+            }
+
             <UiButton Text="حذف"
                       IconCssClass="fa-regular fa-trash-can"
                       Variant="ButtonVariant.Secondary"
@@ -45,7 +62,7 @@
                       IconCssClass="fa-solid fa-rotate"
                       Variant="ButtonVariant.Secondary"
                       Size="ControlSize.Small"
-                      Disabled="@(!CanRefreshActive)"
+                      Disabled="@(!CanRefreshAction)"
                       Loading="@(isListTab ? _isLoading : activeEditorTab?.IsLoading == true)"
                       OnClick="RefreshActionAsync" />
             <UiButton Text="استيراد"
@@ -118,18 +135,59 @@
         }
         else
         {
-            <UiEmployeeEditorForm Model="@activeEditorTab.Form"
-                                  IsNew="@activeEditorTab.IsNew"
-                                  IsEditable="@(activeEditorTab.IsNew || activeEditorTab.IsEditMode)"
-                                  UserAccountLinkLocked="@activeEditorTab.IsUserAccountLinkLocked"
-                                  ImageUrl="@activeEditorTab.EffectiveImageUrl"
-                                  ShowRemoveImage="@activeEditorTab.ShowRemoveImage"
-                                  JobTitleOptions="@ActiveJobTitleOptions"
-                                  LinkedUserItem="@LinkedUserItem"
-                                  UserSearchAsync="@SearchUsersAsync"
-                                  OnChanged="EditorChangedAsync"
-                                  OnImageSelected="EmployeeImageSelectedAsync"
-                                  OnImageRemoved="EmployeeImageRemovedAsync" />
+            <UiContainer CssClass="employee-editor-sections">
+                <UiSectionTabStrip Tabs="@EmployeeSectionTabs" OnSelect="ChangeEmployeeSectionAsync" />
+                @if (activeEditorTab.ActiveSectionKey == "core" || activeEditorTab.IsNew)
+                {
+                    <UiEmployeeEditorForm Model="@activeEditorTab.Form"
+                                          IsNew="@activeEditorTab.IsNew"
+                                          IsEditable="@(activeEditorTab.IsNew || activeEditorTab.IsEditMode)"
+                                          UserAccountLinkLocked="@activeEditorTab.IsUserAccountLinkLocked"
+                                          ImageUrl="@activeEditorTab.EffectiveImageUrl"
+                                          ShowRemoveImage="@activeEditorTab.ShowRemoveImage"
+                                          JobTitleOptions="@ActiveJobTitleOptions"
+                                          DepartmentOptions="@ActiveDepartmentOptions"
+                                          ManagerEmployeeItem="@ManagerEmployeeItem"
+                                          ManagerEmployeeSearchAsync="@SearchManagerEmployeesAsync"
+                                          LinkedUserItem="@LinkedUserItem"
+                                          UserSearchAsync="@SearchUsersAsync"
+                                          OnChanged="EditorChangedAsync"
+                                          OnImageSelected="EmployeeImageSelectedAsync"
+                                          OnImageRemoved="EmployeeImageRemovedAsync" />
+                }
+                else if (activeEditorTab.EmployeeId is Guid employeeId && activeEditorTab.ActiveSectionKey == "contracts")
+                {
+                    <EmployeeContractsPanel @ref="_contractsPanel" EmployeeId="@employeeId" OnStateChanged="HrPanelStateChangedAsync" />
+                }
+                else if (activeEditorTab.EmployeeId is Guid salaryEmployeeId && activeEditorTab.ActiveSectionKey == "salary")
+                {
+                    <EmployeeSalaryPanel @ref="_salaryPanel" EmployeeId="@salaryEmployeeId" OnStateChanged="HrPanelStateChangedAsync" />
+                }
+                else if (activeEditorTab.EmployeeId is Guid timeEmployeeId && activeEditorTab.ActiveSectionKey == "time")
+                {
+                    <EmployeeHrSummaryPanel EmployeeId="@timeEmployeeId" Section="time" />
+                }
+                else if (activeEditorTab.EmployeeId is Guid leaveEmployeeId && activeEditorTab.ActiveSectionKey == "leave")
+                {
+                    <EmployeeHrSummaryPanel EmployeeId="@leaveEmployeeId" Section="leave" />
+                }
+                else if (activeEditorTab.EmployeeId is Guid loansEmployeeId && activeEditorTab.ActiveSectionKey == "loans")
+                {
+                    <EmployeeHrSummaryPanel EmployeeId="@loansEmployeeId" Section="loans" />
+                }
+                else if (activeEditorTab.EmployeeId is Guid adjustmentsEmployeeId && activeEditorTab.ActiveSectionKey == "adjustments")
+                {
+                    <EmployeeHrSummaryPanel EmployeeId="@adjustmentsEmployeeId" Section="adjustments" />
+                }
+                else if (activeEditorTab.EmployeeId is Guid payrollEmployeeId && activeEditorTab.ActiveSectionKey == "payroll")
+                {
+                    <EmployeeHrSummaryPanel EmployeeId="@payrollEmployeeId" Section="payroll" />
+                }
+                else if (activeEditorTab.EmployeeId is Guid documentsEmployeeId && activeEditorTab.ActiveSectionKey == "documents")
+                {
+                    <EmployeeDocumentsPanel @ref="_documentsPanel" EmployeeId="@documentsEmployeeId" OnStateChanged="HrPanelStateChangedAsync" />
+                }
+            </UiContainer>
         }
     </Content>
 </UiEmployeeWorkspace>

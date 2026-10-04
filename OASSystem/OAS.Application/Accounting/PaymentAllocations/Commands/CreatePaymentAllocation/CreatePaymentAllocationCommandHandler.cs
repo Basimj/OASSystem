@@ -1,17 +1,19 @@
 using MediatR;
 using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Abstractions.Persistence.Specifications;
+using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Common.Exceptions;
-using OAS.Application.Sales.Abstractions;
 using OAS.Domain.Accounting.Entities;
 using DomainAllocationTargetDocumentType = OAS.Domain.Accounting.Enums.AllocationTargetDocumentType;
+
 namespace OAS.Application.Accounting.PaymentAllocations.Commands.CreatePaymentAllocation;
+
 public sealed class CreatePaymentAllocationCommandHandler(
     IRepository<PaymentAllocation, Guid> repository,
     IReadRepository<ReceiptVoucherLine, Guid> receiptLines,
     IReadRepository<ReceiptVoucher, Guid> receiptVouchers,
     IReadRepository<PaymentVoucherLine, Guid> paymentLines,
-    ISalesPaymentAllocationTargetValidator salesInvoiceValidator,
+    IEnumerable<IPaymentAllocationTargetValidator> targetValidators,
     TimeProvider timeProvider) : IRequestHandler<CreatePaymentAllocationCommand, Guid>
 {
     public async Task<Guid> Handle(CreatePaymentAllocationCommand request, CancellationToken ct)
@@ -25,16 +27,37 @@ public sealed class CreatePaymentAllocationCommandHandler(
         var available = source.Amount - existing.Sum(x => x.AllocatedAmount);
         if (d.AllocatedAmount > available)
             throw new ConflictException("payment_allocation_exceeds_available_amount", $"The requested allocation ({d.AllocatedAmount}) exceeds the available source-line amount ({available}).");
-        var baseAmount = Math.Round(d.AllocatedAmount * source.ExchangeRate, 4, MidpointRounding.AwayFromZero);
-        if ((DomainAllocationTargetDocumentType)(byte)d.TargetDocumentType == DomainAllocationTargetDocumentType.SalesInvoice)
+
+        var sourceBaseAmount = Math.Round(d.AllocatedAmount * source.ExchangeRate, 4, MidpointRounding.AwayFromZero);
+        var targetType = (DomainAllocationTargetDocumentType)(byte)d.TargetDocumentType;
+        if (targetType is DomainAllocationTargetDocumentType.EmployeePayroll or DomainAllocationTargetDocumentType.EndOfServiceSettlement)
+            throw new ConflictException("managed_payment_allocation_required", "Payroll and end-of-service allocations can only be created by their dedicated payment workflows.");
+        var validator = targetValidators.SingleOrDefault(x => x.TargetDocumentType == targetType);
+        var targetBaseAmount = sourceBaseAmount;
+        if (validator is not null)
         {
-            await salesInvoiceValidator.ValidateAsync(
-                d.TargetDocumentId, source.CurrencyId, d.AllocatedAmount, baseAmount, null, ct);
+            targetBaseAmount = (await validator.ValidateAsync(
+                d.TargetDocumentId,
+                source.CurrencyId,
+                d.AllocatedAmount,
+                sourceBaseAmount,
+                null,
+                ct)).TargetBaseAllocatedAmount;
         }
-        var entity = PaymentAllocation.CreateLineAllocation(Guid.NewGuid(), d.ReceiptVoucherLineId, d.PaymentVoucherLineId,
-            (DomainAllocationTargetDocumentType)(byte)d.TargetDocumentType, d.TargetDocumentId,
-            source.CurrencyId, source.CurrencyCode, d.AllocatedAmount, source.ExchangeRate, baseAmount,
-            timeProvider.GetUtcNow().UtcDateTime);
+
+        var entity = PaymentAllocation.CreateLineAllocation(
+            Guid.NewGuid(),
+            d.ReceiptVoucherLineId,
+            d.PaymentVoucherLineId,
+            targetType,
+            d.TargetDocumentId,
+            source.CurrencyId,
+            source.CurrencyCode,
+            d.AllocatedAmount,
+            source.ExchangeRate,
+            sourceBaseAmount,
+            timeProvider.GetUtcNow().UtcDateTime,
+            targetBaseAmount);
         await repository.AddAsync(entity, ct);
         return entity.Id;
     }
@@ -56,11 +79,13 @@ public sealed class CreatePaymentAllocationCommandHandler(
         }
         throw new ConflictException("payment_source_line_required", "Exactly one receipt or payment voucher line must be selected.");
     }
+
     private static SourceInfo ToSource(Guid? id, string? code, decimal amount, decimal? rate, string type)
     {
         if (id is not Guid currencyId || string.IsNullOrWhiteSpace(code) || rate is null or <= 0)
             throw new ConflictException("payment_source_line_not_migrated", $"The selected {type} voucher line does not contain multi-currency settlement data.");
         return new SourceInfo(currencyId, code, amount, rate.Value);
     }
+
     private sealed record SourceInfo(Guid CurrencyId, string CurrencyCode, decimal Amount, decimal ExchangeRate);
 }

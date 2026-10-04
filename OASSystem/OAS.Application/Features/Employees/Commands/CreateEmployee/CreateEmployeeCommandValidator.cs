@@ -51,6 +51,14 @@ public sealed class CreateEmployeeCommandValidator
             .MaximumLength(300)
             .When(x => !string.IsNullOrWhiteSpace(x.Request.ResidentialAddress));
 
+        RuleFor(x => x.Request.DepartmentId)
+            .Must(id => id is null || id.Value != Guid.Empty)
+            .WithErrorCode("department_id_invalid");
+
+        RuleFor(x => x.Request.ManagerEmployeeId)
+            .Must(id => id is null || id.Value != Guid.Empty)
+            .WithErrorCode("manager_employee_id_invalid");
+
         RuleFor(x => x.Request.JobTitleId)
             .NotEmpty()
             .WithErrorCode("job_title_required");

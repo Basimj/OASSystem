@@ -1,0 +1,87 @@
+@using OAS.Contracts.Features.Employees.Compensation
+
+<UiContainer CssClass="employee-salary-panel" Direction="rtl">
+    <UiContainer CssClass="employee-salary-panel__layout">
+        <UiDataGridPanel Title="هياكل الراتب"
+                         Subtitle="@($"{_items.Count} هيكل")"
+                         HeaderLabels="@SalaryGridHeaders"
+                         HeaderCssClass="employee-salary-grid-header">
+            <Body>
+                @if (_loading)
+                {
+                    <UiAlert Message="جاري تحميل هياكل الراتب..." />
+                }
+                else if (_items.Count == 0)
+                {
+                    <UiAlert Message="لا توجد هياكل راتب لهذا الموظف." />
+                }
+                else
+                {
+                    <UiContainer CssClass="employee-salary-grid-body">
+                        @foreach (var item in _items)
+                        {
+                            <UiClickableSurface CssClass="@(item.Id == _selected?.Id ? "employee-salary-grid-row employee-salary-grid-row--selected" : "employee-salary-grid-row")"
+                                                OnClick="@(() => SelectItem(item))">
+                                <UiInline Strong="true">@item.StructureCode</UiInline>
+                                <UiInline>@item.EffectiveFrom.ToString("yyyy/MM/dd")</UiInline>
+                                <UiInline>@(item.EffectiveTo?.ToString("yyyy/MM/dd") ?? "—")</UiInline>
+                                <UiInline>@item.CurrencyCode</UiInline>
+                                <UiBadge Text="@StatusName(item.Status)" Tone="@StatusTone(item.Status)" />
+                            </UiClickableSurface>
+                        }
+                    </UiContainer>
+                }
+            </Body>
+        </UiDataGridPanel>
+
+        <UiCard Title="@EditorTitle" Subtitle="@_selected?.StructureCode">
+            @if (_mode == EditorMode.Empty)
+            {
+                <UiAlert Message="اختر هيكل راتب أو استخدم زر جديد من شريط الإجراءات." />
+            }
+            else
+            {
+                <UiContainer CssClass="employee-salary-editor">
+                    <UiContainer CssClass="employee-salary-editor__header">
+                        <UiInputText Value="@(_selected?.StructureCode ?? "سيولد تلقائيًا")" Label="رقم الهيكل" ReadOnly="true" Size="ControlSize.Small" />
+                        <UiSelect Value="@_contractValue" ValueChanged="SetContractAsync" Label="العقد" Placeholder="بدون عقد" Options="@ContractOptions" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                        <UiSelect Value="@_currencyValue" ValueChanged="SetCurrencyAsync" Label="العملة" Placeholder="اختر العملة" Options="@CurrencyOptions" Disabled="@(!IsEditing)" Required="true" Size="ControlSize.Small" />
+                        <UiInputDate @bind-Value="_effectiveFrom" Label="ساري من" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                        <UiInputDate @bind-Value="_effectiveTo" Label="ساري إلى" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                        <UiInputText @bind-Value="_notes" Label="ملاحظات" MaxLength="500" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                    </UiContainer>
+
+                    <UiContainer CssClass="employee-salary-lines-title">
+                        <UiInline Strong="true">مكونات الهيكل</UiInline>
+                        @if (IsEditing)
+                        {
+                            <UiButton Text="إضافة مكون" IconCssClass="fa-solid fa-plus" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="AddLineAsync" />
+                        }
+                    </UiContainer>
+                    @if (_lines.Count == 0)
+                    {
+                        <UiAlert Message="أضف مكون راتب واحدًا على الأقل، ويجب أن يحتوي الهيكل على راتب أساسي واحد فقط." />
+                    }
+                    else
+                    {
+                        <UiContainer CssClass="employee-salary-lines">
+                            @foreach (var line in _lines)
+                            {
+                                <UiContainer CssClass="employee-salary-line" @key="line.Key">
+                                    <UiSelect Value="@line.ComponentValue" ValueChanged="@(value => SetLineComponentAsync(line, value))" Label="المكون" Options="@ComponentOptions" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                    <UiInputText @bind-Value="line.AmountText" Label="المبلغ/المعدل" InputMode="decimal" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                                    <UiInputText @bind-Value="line.PercentageText" Label="النسبة %" InputMode="decimal" Disabled="@(!IsEditing || !line.IsPercentage)" Size="ControlSize.Small" />
+                                    <UiInline CssClass="employee-salary-line__kind">@line.ComponentHint</UiInline>
+                                    @if (IsEditing)
+                                    {
+                                        <UiButton Text="إزالة" IconCssClass="fa-regular fa-trash-can" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="@(() => RemoveLineAsync(line))" />
+                                    }
+                                </UiContainer>
+                            }
+                        </UiContainer>
+                    }
+                </UiContainer>
+            }
+        </UiCard>
+    </UiContainer>
+</UiContainer>

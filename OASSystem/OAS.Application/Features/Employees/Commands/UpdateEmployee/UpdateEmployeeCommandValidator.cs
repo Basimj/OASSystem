@@ -25,6 +25,14 @@ public sealed class UpdateEmployeeCommandValidator : AbstractValidator<UpdateEmp
         RuleFor(x => x.Request.City).MaximumLength(100).When(x => !string.IsNullOrWhiteSpace(x.Request.City));
         RuleFor(x => x.Request.PostalCode).MaximumLength(24).When(x => !string.IsNullOrWhiteSpace(x.Request.PostalCode));
         RuleFor(x => x.Request.ResidentialAddress).MaximumLength(300).When(x => !string.IsNullOrWhiteSpace(x.Request.ResidentialAddress));
+        RuleFor(x => x.Request.DepartmentId)
+            .Must(id => id is null || id.Value != Guid.Empty)
+            .WithErrorCode("department_id_invalid");
+
+        RuleFor(x => x.Request.ManagerEmployeeId)
+            .Must(id => id is null || id.Value != Guid.Empty)
+            .WithErrorCode("manager_employee_id_invalid");
+
         RuleFor(x => x.Request.JobTitleId)
             .NotEmpty().WithErrorCode("job_title_required");
         RuleFor(x => x.Request.RowVersion)

@@ -4,6 +4,8 @@ namespace OAS.UiLib.Components.Workspace;
 
 public partial class UiDataGridPanel
 {
+    [Parameter] public IReadOnlyList<string> HeaderLabels { get; set; } = [];
+    [Parameter] public string? HeaderCssClass { get; set; }
     [Parameter] public string Title { get; set; } = string.Empty;
     [Parameter] public string? Subtitle { get; set; }
     [Parameter] public RenderFragment? Toolbar { get; set; }

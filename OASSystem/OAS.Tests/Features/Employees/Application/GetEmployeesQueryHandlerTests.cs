@@ -36,7 +36,8 @@ public sealed class GetEmployeesQueryHandlerTests
                 new FakeEmployeeRepository(
                     first,
                     second),
-                new FakeJobTitleRepository(title));
+                new FakeJobTitleRepository(title),
+                new FakeDepartmentRepository());
 
         var result =
             await handler.Handle(
@@ -92,7 +93,8 @@ public sealed class GetEmployeesQueryHandlerTests
                 new FakeEmployeeRepository(
                     first,
                     second),
-                new FakeJobTitleRepository(title));
+                new FakeJobTitleRepository(title),
+                new FakeDepartmentRepository());
 
         var result =
             await handler.Handle(
@@ -148,7 +150,8 @@ public sealed class GetEmployeesQueryHandlerTests
                 new FakeEmployeeRepository(
                     first,
                     second),
-                new FakeJobTitleRepository(title));
+                new FakeJobTitleRepository(title),
+                new FakeDepartmentRepository());
 
         var result =
             await handler.Handle(
@@ -204,7 +207,8 @@ public sealed class GetEmployeesQueryHandlerTests
                         stock.Id)),
                 new FakeJobTitleRepository(
                     tech,
-                    stock));
+                    stock),
+                new FakeDepartmentRepository());
 
         var result =
             await handler.Handle(
@@ -255,7 +259,8 @@ public sealed class GetEmployeesQueryHandlerTests
         var handler =
             new GetEmployeesQueryHandler(
                 new FakeEmployeeRepository(employees),
-                new FakeJobTitleRepository(title));
+                new FakeJobTitleRepository(title),
+                new FakeDepartmentRepository());
 
         var result =
             await handler.Handle(

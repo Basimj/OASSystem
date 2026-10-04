@@ -28,6 +28,15 @@ public partial class UiEmployeeEditorForm
     public IReadOnlyList<UiSelectOption> JobTitleOptions { get; set; } = [];
 
     [Parameter]
+    public IReadOnlyList<UiSelectOption> DepartmentOptions { get; set; } = [];
+
+    [Parameter]
+    public UiLookupItem? ManagerEmployeeItem { get; set; }
+
+    [Parameter]
+    public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? ManagerEmployeeSearchAsync { get; set; }
+
+    [Parameter]
     public UiLookupItem? LinkedUserItem { get; set; }
 
     [Parameter]
@@ -49,6 +58,12 @@ public partial class UiEmployeeEditorForm
 
     private string? JobTitleValue =>
         Model.JobTitleId?.ToString("D");
+
+    private string? DepartmentValue =>
+        Model.DepartmentId?.ToString("D");
+
+    private string? ManagerEmployeeValue =>
+        Model.ManagerEmployeeId?.ToString("D");
 
     private string? UserAccountValue =>
         Model.UserAccountId?.ToString("D");
@@ -141,9 +156,33 @@ public partial class UiEmployeeEditorForm
         await OnChanged.InvokeAsync();
     }
 
+    private async Task SetDepartmentAsync(string? value)
+    {
+        Model.DepartmentId = Guid.TryParse(value, out var id) ? id : null;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task SetManagerEmployeeAsync(string? value)
+    {
+        Model.ManagerEmployeeId = Guid.TryParse(value, out var id) ? id : null;
+        await OnChanged.InvokeAsync();
+    }
+
     private async Task SetHireDateAsync(DateOnly? value)
     {
         Model.HireDate = value;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task SetSalespersonAsync(bool value)
+    {
+        Model.IsSalesperson = value;
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task SetTechnicianAsync(bool value)
+    {
+        Model.IsTechnician = value;
         await OnChanged.InvokeAsync();
     }
 

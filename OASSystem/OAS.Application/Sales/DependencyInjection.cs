@@ -54,6 +54,7 @@ public static class DependencyInjection
         services.AddScoped<ISalesStockReservationService, SalesStockReservationService>();
         services.AddScoped<ISalesCreditExposureService, SalesCreditExposureService>();
         services.AddScoped<ISalesPaymentAllocationTargetValidator, SalesPaymentAllocationTargetValidator>();
+        services.AddScoped<OAS.Application.Accounting.Abstractions.IPaymentAllocationTargetValidator>(sp => sp.GetRequiredService<ISalesPaymentAllocationTargetValidator>());
         services.AddScoped<ISalesInventoryPostingService, SalesInventoryPostingService>();
         services.AddScoped<ISalesInvoiceAccountingPostingService, SalesInvoiceAccountingPostingService>();
         services.AddScoped<ISalesReturnInventoryPostingService, SalesReturnInventoryPostingService>();

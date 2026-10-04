@@ -12,6 +12,10 @@ public interface IPrintingClientService
         Guid voucherId,
         CancellationToken cancellationToken = default);
 
+    Task<PrintJobCreatedDto?> PrintPayslipAsync(
+        Guid employeePayrollId,
+        CancellationToken cancellationToken = default);
+
     Task<PrintJobCreatedDto?> PrintSalesInvoiceAsync(
         Guid invoiceId,
         CancellationToken cancellationToken = default);

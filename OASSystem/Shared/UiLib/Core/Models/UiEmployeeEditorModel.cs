@@ -24,7 +24,15 @@ public sealed class UiEmployeeEditorModel
 
     public Guid? JobTitleId { get; set; }
 
+    public Guid? DepartmentId { get; set; }
+
+    public Guid? ManagerEmployeeId { get; set; }
+
     public DateOnly? HireDate { get; set; }
+
+    public bool IsSalesperson { get; set; }
+
+    public bool IsTechnician { get; set; }
 
     public bool IsCommissionEligible { get; set; }
 
@@ -49,8 +57,12 @@ public sealed class UiEmployeeEditorModel
         ResidentialAddress = string.Empty;
 
         JobTitleId = null;
+        DepartmentId = null;
+        ManagerEmployeeId = null;
         HireDate = null;
 
+        IsSalesperson = false;
+        IsTechnician = false;
         IsCommissionEligible = false;
         IsActive = true;
 

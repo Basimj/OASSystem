@@ -1,0 +1,8 @@
+@if (Strong)
+{
+    <strong class="@CssClass" @attributes="AdditionalAttributes">@ChildContent</strong>
+}
+else
+{
+    <span class="@CssClass" @attributes="AdditionalAttributes">@ChildContent</span>
+}

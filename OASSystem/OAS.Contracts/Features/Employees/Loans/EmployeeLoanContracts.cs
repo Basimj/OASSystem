@@ -1,0 +1,9 @@
+using OAS.Contracts.Accounting.Enums;
+namespace OAS.Contracts.Features.Employees.Loans;
+public sealed record EmployeeLoanInstallmentDto(Guid Id,int InstallmentSequence,DateOnly DueDate,decimal Amount,byte Status,Guid? EmployeePayrollId,Guid? ReceiptVoucherId,string RowVersion);
+public sealed record EmployeeLoanDto(Guid Id,string LoanCode,Guid EmployeeId,string EmployeeCode,string EmployeeName,Guid? ContractId,Guid? SalaryStructureId,DateOnly LoanDate,Guid CurrencyId,string CurrencyCode,string? CurrencySymbol,byte CurrencyDecimalPlaces,decimal PrincipalAmount,int InstallmentCount,DateOnly FirstInstallmentDate,byte RepaymentMode,byte Status,string? Reason,Guid? PaymentVoucherId,decimal PaidAmount,decimal OutstandingAmount,IReadOnlyList<EmployeeLoanInstallmentDto> Installments,string RowVersion);
+public sealed record CreateEmployeeLoanRequest(Guid EmployeeId,DateOnly LoanDate,decimal PrincipalAmount,int InstallmentCount,DateOnly FirstInstallmentDate,byte RepaymentMode,string? Reason);
+public sealed record UpdateEmployeeLoanRequest(decimal PrincipalAmount,int InstallmentCount,DateOnly FirstInstallmentDate,byte RepaymentMode,string? Reason,string RowVersion);
+public sealed record EmployeeLoanTransitionRequest(string RowVersion,string? Reason=null);
+public sealed record DisburseEmployeeLoanRequest(DateOnly VoucherDate,PaymentMethod PaymentMethod,Guid? CashAccountId,Guid? BankAccountId,Guid? SettlementAccountId,decimal? ExchangeRate,ExchangeRateType ExchangeRateType=ExchangeRateType.Accounting,string? ReferenceNumber=null,string? Description=null,string? RowVersion=null);
+public sealed record PayLoanInstallmentExternallyRequest(DateOnly PaymentDate,PaymentMethod PaymentMethod,Guid? CashAccountId,Guid? BankAccountId,Guid? SettlementAccountId,decimal? ExchangeRate,ExchangeRateType ExchangeRateType=ExchangeRateType.Accounting,string? ReferenceNumber=null,string? Description=null,string? RowVersion=null);

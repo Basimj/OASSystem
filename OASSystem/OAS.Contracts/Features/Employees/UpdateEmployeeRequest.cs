@@ -15,4 +15,8 @@ public sealed record UpdateEmployeeRequest(
     bool IsCommissionEligible,
     bool IsActive,
     Guid? UserAccountId,
-    string RowVersion);
+    string RowVersion,
+    Guid? DepartmentId = null,
+    Guid? ManagerEmployeeId = null,
+    bool IsSalesperson = false,
+    bool IsTechnician = false);

@@ -235,6 +235,74 @@ public sealed class EfUnitOfWork(OasDbContext dbContext) : IUnitOfWork
         }
 
 
+
+        if (message.Contains("UX_Departments_DepartmentCode", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("hr_department_code_exists", "Department code already exists.");
+            return true;
+        }
+
+        if (message.Contains("UX_EmployeeContracts_ContractCode", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("hr_contract_code_exists", "Contract code already exists.");
+            return true;
+        }
+
+        if (message.Contains("UX_EmployeeContracts_Employee_Active", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("contract_active_exists", "The employee already has an active contract.");
+            return true;
+        }
+
+        if (message.Contains("UX_SalaryComponents_ComponentCode", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("hr_salary_component_code_exists", "Salary component code already exists.");
+            return true;
+        }
+
+        if (message.Contains("UX_SalaryComponents_ActiveBasicSalary", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("salary_component_basic_exists", "An active basic salary component already exists.");
+            return true;
+        }
+
+        if (message.Contains("UX_EmployeeSalaryStructures_StructureCode", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("hr_salary_structure_code_exists", "Salary structure code already exists.");
+            return true;
+        }
+
+        if (message.Contains("UX_EmployeeSalaryStructures_Employee_Active", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("salary_structure_active_exists", "The employee already has an active salary structure.");
+            return true;
+        }
+
+        if (message.Contains("UX_EmployeeSalaryStructureLines_Structure_Component", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("salary_structure_component_duplicate", "The salary structure contains the same component more than once.");
+            return true;
+        }
+
+        if (message.Contains("UX_EmployeeDocuments_DocumentCode", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("hr_employee_document_code_exists", "Employee document code already exists.");
+            return true;
+        }
+
+        if (message.Contains("UX_WorkShifts_ShiftCode", StringComparison.OrdinalIgnoreCase)) { conflict = new ConflictException("hr_shift_code_exists", "Shift code already exists."); return true; }
+        if (message.Contains("UX_Holidays_HolidayCode", StringComparison.OrdinalIgnoreCase)) { conflict = new ConflictException("hr_holiday_code_exists", "Holiday code already exists."); return true; }
+        if (message.Contains("UX_Attendance_Employee_Date", StringComparison.OrdinalIgnoreCase)) { conflict = new ConflictException("attendance_exists", "Attendance already exists for this employee and date."); return true; }
+        if (message.Contains("UX_LeaveTypes_Code", StringComparison.OrdinalIgnoreCase)) { conflict = new ConflictException("hr_leave_type_code_exists", "Leave type code already exists."); return true; }
+        if (message.Contains("UX_LeaveBalances_Employee_Type_Year", StringComparison.OrdinalIgnoreCase)) { conflict = new ConflictException("leave_balance_exists", "Leave balance already exists for this employee, leave type and leave year."); return true; }
+        if (message.Contains("UX_LeaveRequests_Code", StringComparison.OrdinalIgnoreCase)) { conflict = new ConflictException("hr_leave_request_code_exists", "Leave request code already exists."); return true; }
+        if (message.Contains("UX_Overtime_Code", StringComparison.OrdinalIgnoreCase)) { conflict = new ConflictException("hr_overtime_code_exists", "Overtime code already exists."); return true; }
+        if (message.Contains("UX_Overtime_AttendanceRecord", StringComparison.OrdinalIgnoreCase)) { conflict = new ConflictException("overtime_attendance_exists", "Overtime already exists for this attendance record."); return true; }
+        if (message.Contains("UX_EmployeeLoans_LoanCode", StringComparison.OrdinalIgnoreCase)) { conflict = new ConflictException("hr_employee_loan_code_exists", "Employee loan code already exists."); return true; }
+        if (message.Contains("UX_EmployeeLoans_PaymentVoucher", StringComparison.OrdinalIgnoreCase)) { conflict = new ConflictException("employee_loan_voucher_duplicate", "Payment voucher is already linked to an employee loan."); return true; }
+        if (message.Contains("UX_LoanInstallments_Loan_Sequence", StringComparison.OrdinalIgnoreCase)) { conflict = new ConflictException("loan_installment_sequence_duplicate", "Loan installment sequence already exists."); return true; }
+        if (message.Contains("UX_EmployeeAdjustments_Code", StringComparison.OrdinalIgnoreCase)) { conflict = new ConflictException("hr_employee_adjustment_code_exists", "Employee adjustment code already exists."); return true; }
+
         if (message.Contains("UX_Prescriptions_PrescriptionCode", StringComparison.OrdinalIgnoreCase))
         {
             conflict = new ConflictException("sales_duplicate_prescription_code", "كود الوصفة مستخدم مسبقًا.");

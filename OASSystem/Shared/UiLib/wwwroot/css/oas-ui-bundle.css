@@ -20,6 +20,7 @@
 /* Blazor CSS isolation output for all OAS.UiLib components */
 @import "../OAS.UiLib.bundle.scp.css";
 @import "./features/employee-import-bulk.css";
+@import "./features/hr-foundation.css";
 @import "./features/accounting.css";
 @import "./features/sales.css";
 @import "./oas-main-shell.css";

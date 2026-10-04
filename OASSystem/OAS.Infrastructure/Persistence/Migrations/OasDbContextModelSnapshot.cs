@@ -16,6 +16,21 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
         modelBuilder.HasAnnotation("ProductVersion", "9.0.8").HasAnnotation("Relational:MaxIdentifierLength", 128);
         SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+        modelBuilder.HasSequence<long>("DepartmentCodeSequence", "hr");
+        modelBuilder.HasSequence<long>("EmployeeContractCodeSequence", "hr");
+        modelBuilder.HasSequence<long>("SalaryComponentCodeSequence", "hr");
+        modelBuilder.HasSequence<long>("SalaryStructureCodeSequence", "hr");
+        modelBuilder.HasSequence<long>("EmployeeDocumentCodeSequence", "hr");
+        modelBuilder.HasSequence<long>("WorkShiftCodeSequence", "hr");
+        modelBuilder.HasSequence<long>("HolidayCodeSequence", "hr");
+        modelBuilder.HasSequence<long>("LeaveTypeCodeSequence", "hr");
+        modelBuilder.HasSequence<long>("LeaveRequestCodeSequence", "hr");
+        modelBuilder.HasSequence<long>("OvertimeCodeSequence", "hr");
+        modelBuilder.HasSequence<long>("EmployeeLoanCodeSequence", "hr");
+        modelBuilder.HasSequence<long>("EmployeeAdjustmentCodeSequence", "hr");
+        modelBuilder.HasSequence<long>("PayrollPolicyCodeSequence", "hr");
+        modelBuilder.HasSequence<long>("PayrollRunCodeSequence", "hr");
+        modelBuilder.HasSequence<long>("EndOfServiceCodeSequence", "hr");
         modelBuilder.HasSequence<long>("PurchaseRequestCodeSequence", "dbo");
         modelBuilder.HasSequence<long>("PurchaseOrderCodeSequence", "dbo");
         modelBuilder.HasSequence<long>("PurchaseReceiptCodeSequence", "dbo");
@@ -34,6 +49,8 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<bool>("IsSystem").HasColumnType("bit");
             b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
             b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
             b.Property<string>("Name").IsRequired().HasMaxLength(64).HasColumnType("nvarchar(64)");
             b.Property<string>("NormalizedName").IsRequired().HasMaxLength(64).HasColumnType("nvarchar(64)");
             b.HasKey("Id");
@@ -74,9 +91,11 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
             b.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("datetimeoffset");
             b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
             b.Property<bool>("IsActive").HasColumnType("bit");
             b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
             b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
             b.Property<string>("Name").IsRequired().HasMaxLength(100).HasColumnType("nvarchar(100)");
             b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
             b.HasKey("Id");
@@ -90,12 +109,13 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
             b.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("datetimeoffset");
             b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
-            b.Property<string>("EmployeeCode")
-      .IsRequired()
-      .HasMaxLength(32)
-      .HasColumnType("nvarchar(32)");
+            b.Property<string>("EmployeeCode").IsRequired().HasMaxLength(32).HasColumnType("nvarchar(32)");
             b.Property<string>("FirstName").IsRequired().HasMaxLength(100).HasColumnType("nvarchar(100)");
+            b.Property<Guid?>("DepartmentId").HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("ManagerEmployeeId").HasColumnType("uniqueidentifier");
             b.Property<DateOnly?>("HireDate").HasColumnType("date");
+            b.Property<bool>("IsSalesperson").HasColumnType("bit");
+            b.Property<bool>("IsTechnician").HasColumnType("bit");
             b.Property<bool>("IsActive").HasColumnType("bit");
             b.Property<bool>("IsCommissionEligible").HasColumnType("bit");
             b.Property<Guid>("JobTitleId").HasColumnType("uniqueidentifier");
@@ -105,15 +125,809 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<string>("Photo").HasMaxLength(512).HasColumnType("nvarchar(512)");
             b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
             b.Property<Guid?>("UserAccountId").HasColumnType("uniqueidentifier");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
             b.HasKey("Id");
-            b.HasIndex("EmployeeCode")
-                .IsUnique()
-                .HasDatabaseName("UX_Employees_EmployeeCode");
+            b.HasIndex("DepartmentId").HasDatabaseName("IX_Employees_DepartmentId");
+            b.HasIndex("EmployeeCode").IsUnique().HasDatabaseName("UX_Employees_EmployeeCode");
             b.HasIndex("IsActive").HasDatabaseName("IX_Employees_IsActive");
             b.HasIndex("JobTitleId").HasDatabaseName("IX_Employees_JobTitleId");
             b.HasIndex("LastName", "FirstName").HasDatabaseName("IX_Employees_LastName_FirstName");
+            b.HasIndex("ManagerEmployeeId").HasDatabaseName("IX_Employees_ManagerEmployeeId");
             b.HasIndex("UserAccountId").IsUnique().HasDatabaseName("UX_Employees_UserAccountId").HasFilter("[UserAccountId] IS NOT NULL");
-            b.ToTable("Employees", "hr");
+            b.ToTable("Employees", "hr", t => t.HasCheckConstraint("CK_Employees_NotSelfManager", "[ManagerEmployeeId] IS NULL OR [ManagerEmployeeId] <> [Id]"));
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Entities.Department", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("DepartmentCode").IsRequired().HasMaxLength(32).HasColumnType("nvarchar(32)");
+            b.Property<bool>("IsActive").HasColumnType("bit");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<Guid?>("ManagerEmployeeId").HasColumnType("uniqueidentifier");
+            b.Property<string>("NameAr").IsRequired().HasMaxLength(150).HasColumnType("nvarchar(150)");
+            b.Property<string>("NameEn").HasMaxLength(150).HasColumnType("nvarchar(150)");
+            b.Property<string>("Notes").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<Guid?>("ParentDepartmentId").HasColumnType("uniqueidentifier");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.HasKey("Id");
+            b.HasIndex("DepartmentCode").IsUnique().HasDatabaseName("UX_Departments_DepartmentCode");
+            b.HasIndex("IsActive").HasDatabaseName("IX_Departments_IsActive");
+            b.HasIndex("ManagerEmployeeId").HasDatabaseName("IX_Departments_ManagerEmployeeId");
+            b.HasIndex("NameAr").HasDatabaseName("IX_Departments_NameAr");
+            b.HasIndex("ParentDepartmentId").HasDatabaseName("IX_Departments_ParentDepartmentId");
+            b.ToTable("Departments", "hr", t => t.HasCheckConstraint("CK_Departments_NotSelfParent", "[ParentDepartmentId] IS NULL OR [ParentDepartmentId] <> [Id]"));
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Entities.EmployeeContract", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<string>("ActivatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("ActivatedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("ContractCode").IsRequired().HasMaxLength(40).HasColumnType("nvarchar(40)");
+            b.Property<byte>("ContractType").HasColumnType("tinyint");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<Guid>("CurrencyId").HasColumnType("uniqueidentifier");
+            b.Property<Guid>("EmployeeId").HasColumnType("uniqueidentifier");
+            b.Property<DateOnly?>("EndDate").HasColumnType("date");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("Notes").HasMaxLength(1000).HasColumnType("nvarchar(1000)");
+            b.Property<DateOnly?>("ProbationEndDate").HasColumnType("date");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<DateOnly>("StartDate").HasColumnType("date");
+            b.Property<byte>("Status").HasColumnType("tinyint");
+            b.Property<DateTimeOffset?>("TerminatedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<DateOnly?>("TerminationEffectiveDate").HasColumnType("date");
+            b.Property<string>("TerminatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("TerminationReason").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<decimal?>("WorkingDaysPerWeek").HasColumnType("decimal(4,2)");
+            b.Property<decimal?>("WorkingHoursPerDay").HasColumnType("decimal(6,2)");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.HasKey("Id");
+            b.HasIndex("ContractCode").IsUnique().HasDatabaseName("UX_EmployeeContracts_ContractCode");
+            b.HasIndex("EmployeeId").HasDatabaseName("IX_EmployeeContracts_EmployeeId");
+            b.HasIndex("EmployeeId", "Status").IsUnique().HasFilter("[Status] = 2").HasDatabaseName("UX_EmployeeContracts_Employee_Active");
+            b.HasIndex("StartDate", "EndDate").HasDatabaseName("IX_EmployeeContracts_StartDate_EndDate");
+            b.HasIndex("Status").HasDatabaseName("IX_EmployeeContracts_Status");
+            b.ToTable("EmployeeContracts", "hr", t =>
+            {
+                t.HasCheckConstraint("CK_EmployeeContracts_Dates", "[EndDate] IS NULL OR [EndDate] >= [StartDate]");
+                t.HasCheckConstraint("CK_EmployeeContracts_Probation", "[ProbationEndDate] IS NULL OR ([ProbationEndDate] >= [StartDate] AND ([EndDate] IS NULL OR [ProbationEndDate] <= [EndDate]))");
+                t.HasCheckConstraint("CK_EmployeeContracts_WorkingHours", "[WorkingHoursPerDay] IS NULL OR ([WorkingHoursPerDay] > 0 AND [WorkingHoursPerDay] <= 24)");
+                t.HasCheckConstraint("CK_EmployeeContracts_WorkingDays", "[WorkingDaysPerWeek] IS NULL OR ([WorkingDaysPerWeek] > 0 AND [WorkingDaysPerWeek] <= 7)");
+            });
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Entities.SalaryComponent", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<byte>("CalculationMethod").HasColumnType("tinyint");
+            b.Property<string>("ComponentCode").IsRequired().HasMaxLength(32).HasColumnType("nvarchar(32)");
+            b.Property<byte>("ComponentType").HasColumnType("tinyint");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CreditPostingRole").HasMaxLength(50).HasColumnType("nvarchar(50)");
+            b.Property<string>("DebitPostingRole").HasMaxLength(50).HasColumnType("nvarchar(50)");
+            b.Property<int>("DisplayOrder").HasColumnType("int");
+            b.Property<bool>("IsActive").HasColumnType("bit");
+            b.Property<bool>("IsBasicSalary").HasColumnType("bit");
+            b.Property<bool>("IsRecurring").HasColumnType("bit");
+            b.Property<bool>("IsTaxable").HasColumnType("bit");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("NameAr").IsRequired().HasMaxLength(150).HasColumnType("nvarchar(150)");
+            b.Property<string>("NameEn").HasMaxLength(150).HasColumnType("nvarchar(150)");
+            b.Property<string>("Notes").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.HasKey("Id");
+            b.HasIndex("ComponentCode").IsUnique().HasDatabaseName("UX_SalaryComponents_ComponentCode");
+            b.HasIndex("IsActive").HasDatabaseName("IX_SalaryComponents_IsActive");
+            b.HasIndex("IsBasicSalary").IsUnique().HasFilter("[IsBasicSalary] = 1 AND [IsActive] = 1").HasDatabaseName("UX_SalaryComponents_ActiveBasicSalary");
+            b.ToTable("SalaryComponents", "hr", t => t.HasCheckConstraint("CK_SalaryComponents_DisplayOrder", "[DisplayOrder] >= 0"));
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Entities.EmployeeSalaryStructure", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<string>("ApprovedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("ApprovedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<Guid?>("ContractId").HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<Guid>("CurrencyId").HasColumnType("uniqueidentifier");
+            b.Property<DateOnly>("EffectiveFrom").HasColumnType("date");
+            b.Property<DateOnly?>("EffectiveTo").HasColumnType("date");
+            b.Property<Guid>("EmployeeId").HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("Notes").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<byte>("Status").HasColumnType("tinyint");
+            b.Property<string>("StructureCode").IsRequired().HasMaxLength(40).HasColumnType("nvarchar(40)");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.HasKey("Id");
+            b.HasIndex("EmployeeId").HasDatabaseName("IX_EmployeeSalaryStructures_EmployeeId");
+            b.HasIndex("EmployeeId", "EffectiveFrom", "EffectiveTo").HasDatabaseName("IX_EmployeeSalaryStructures_EffectiveDates");
+            b.HasIndex("EmployeeId", "Status").IsUnique().HasFilter("[Status] = 2").HasDatabaseName("UX_EmployeeSalaryStructures_Employee_Active");
+            b.HasIndex("StructureCode").IsUnique().HasDatabaseName("UX_EmployeeSalaryStructures_StructureCode");
+            b.ToTable("EmployeeSalaryStructures", "hr", t => t.HasCheckConstraint("CK_EmployeeSalaryStructures_Dates", "[EffectiveTo] IS NULL OR [EffectiveTo] >= [EffectiveFrom]"));
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Entities.EmployeeSalaryStructureLine", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<decimal>("Amount").HasColumnType("decimal(19,4)");
+            b.Property<byte>("CalculationMethodSnapshot").HasColumnType("tinyint");
+            b.Property<string>("ComponentCodeSnapshot").IsRequired().HasMaxLength(32).HasColumnType("nvarchar(32)");
+            b.Property<string>("ComponentNameSnapshot").IsRequired().HasMaxLength(150).HasColumnType("nvarchar(150)");
+            b.Property<byte>("ComponentTypeSnapshot").HasColumnType("tinyint");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CreditPostingRoleSnapshot").HasMaxLength(50).HasColumnType("nvarchar(50)");
+            b.Property<string>("DebitPostingRoleSnapshot").HasMaxLength(50).HasColumnType("nvarchar(50)");
+            b.Property<Guid>("EmployeeSalaryStructureId").HasColumnType("uniqueidentifier");
+            b.Property<bool>("IsBasicSalarySnapshot").HasColumnType("bit");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<decimal?>("Percentage").HasColumnType("decimal(9,6)");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<Guid>("SalaryComponentId").HasColumnType("uniqueidentifier");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.HasKey("Id");
+            b.HasIndex("EmployeeSalaryStructureId").HasDatabaseName("IX_EmployeeSalaryStructureLines_StructureId");
+            b.HasIndex("EmployeeSalaryStructureId", "SalaryComponentId").IsUnique().HasDatabaseName("UX_EmployeeSalaryStructureLines_Structure_Component");
+            b.ToTable("EmployeeSalaryStructureLines", "hr", t =>
+            {
+                t.HasCheckConstraint("CK_EmployeeSalaryStructureLines_Amount", "[Amount] >= 0");
+                t.HasCheckConstraint("CK_EmployeeSalaryStructureLines_Percentage", "[Percentage] IS NULL OR [Percentage] > 0");
+            });
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Entities.EmployeeDocument", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<string>("ContentType").IsRequired().HasMaxLength(100).HasColumnType("nvarchar(100)");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("DocumentCode").IsRequired().HasMaxLength(40).HasColumnType("nvarchar(40)");
+            b.Property<byte>("DocumentType").HasColumnType("tinyint");
+            b.Property<Guid>("EmployeeId").HasColumnType("uniqueidentifier");
+            b.Property<DateOnly?>("ExpiryDate").HasColumnType("date");
+            b.Property<long>("FileSize").HasColumnType("bigint");
+            b.Property<bool>("IsActive").HasColumnType("bit");
+            b.Property<DateOnly?>("IssueDate").HasColumnType("date");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("Notes").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<string>("OriginalFileName").IsRequired().HasMaxLength(260).HasColumnType("nvarchar(260)");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<string>("Sha256Hash").IsRequired().HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("StorageKey").IsRequired().HasMaxLength(512).HasColumnType("nvarchar(512)");
+            b.Property<string>("Title").IsRequired().HasMaxLength(200).HasColumnType("nvarchar(200)");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.HasKey("Id");
+            b.HasIndex("DocumentCode").IsUnique().HasDatabaseName("UX_EmployeeDocuments_DocumentCode");
+            b.HasIndex("EmployeeId").HasDatabaseName("IX_EmployeeDocuments_EmployeeId");
+            b.HasIndex("EmployeeId", "IsActive").HasDatabaseName("IX_EmployeeDocuments_Employee_Status");
+            b.HasIndex("ExpiryDate").HasDatabaseName("IX_EmployeeDocuments_ExpiryDate");
+            b.ToTable("EmployeeDocuments", "hr", t => t.HasCheckConstraint("CK_EmployeeDocuments_FileSize", "[FileSize] > 0"));
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Settings.HrSettings", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<byte>("LeaveYearStartMonth").HasColumnType("tinyint");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<bool>("RequireAttendanceApproval").HasColumnType("bit");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<string>("TimeZoneId").HasMaxLength(128).HasColumnType("nvarchar(128)");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.HasKey("Id");
+            b.ToTable("HrSettings", "hr", t => t.HasCheckConstraint("CK_HrSettings_LeaveYearStartMonth", "[LeaveYearStartMonth] BETWEEN 1 AND 12"));
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Time.WorkShift", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<int>("BreakMinutes").HasColumnType("int");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<TimeOnly>("EndTime").HasColumnType("time");
+            b.Property<int>("GraceEarlyLeaveMinutes").HasColumnType("int");
+            b.Property<int>("GraceLateMinutes").HasColumnType("int");
+            b.Property<bool>("IsActive").HasColumnType("bit");
+            b.Property<bool>("IsFlexible").HasColumnType("bit");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("NameAr").IsRequired().HasMaxLength(150).HasColumnType("nvarchar(150)");
+            b.Property<string>("NameEn").HasMaxLength(150).HasColumnType("nvarchar(150)");
+            b.Property<string>("Notes").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<string>("ShiftCode").IsRequired().HasMaxLength(32).HasColumnType("nvarchar(32)");
+            b.Property<TimeOnly>("StartTime").HasColumnType("time");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<byte>("WorkingDaysMask").HasColumnType("tinyint");
+            b.HasKey("Id");
+            b.HasIndex("IsActive").HasDatabaseName("IX_WorkShifts_IsActive");
+            b.HasIndex("ShiftCode").IsUnique().HasDatabaseName("UX_WorkShifts_ShiftCode");
+            b.ToTable("WorkShifts", "hr", t =>
+            {
+                t.HasCheckConstraint("CK_WorkShifts_Minutes", "[BreakMinutes] >= 0 AND [GraceLateMinutes] >= 0 AND [GraceEarlyLeaveMinutes] >= 0");
+                t.HasCheckConstraint("CK_WorkShifts_Times", "[StartTime] <> [EndTime]");
+                t.HasCheckConstraint("CK_WorkShifts_WorkingDaysMask", "[WorkingDaysMask] BETWEEN 1 AND 127");
+            });
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Time.EmployeeShiftAssignment", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<DateOnly>("EffectiveFrom").HasColumnType("date");
+            b.Property<DateOnly?>("EffectiveTo").HasColumnType("date");
+            b.Property<Guid>("EmployeeId").HasColumnType("uniqueidentifier");
+            b.Property<bool>("IsActive").HasColumnType("bit");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<Guid>("WorkShiftId").HasColumnType("uniqueidentifier");
+            b.HasKey("Id");
+            b.HasIndex("EmployeeId", "EffectiveFrom", "EffectiveTo").HasDatabaseName("IX_ShiftAssignments_Employee_Dates");
+            b.HasIndex("WorkShiftId").HasDatabaseName("IX_ShiftAssignments_ShiftId");
+            b.ToTable("EmployeeShiftAssignments", "hr", t => t.HasCheckConstraint("CK_EmployeeShiftAssignments_Dates", "[EffectiveTo] IS NULL OR [EffectiveTo] >= [EffectiveFrom]"));
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Time.Holiday", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<DateOnly>("EndDate").HasColumnType("date");
+            b.Property<string>("HolidayCode").IsRequired().HasMaxLength(32).HasColumnType("nvarchar(32)");
+            b.Property<bool>("IsActive").HasColumnType("bit");
+            b.Property<bool>("IsPaid").HasColumnType("bit");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("NameAr").IsRequired().HasMaxLength(150).HasColumnType("nvarchar(150)");
+            b.Property<string>("NameEn").HasMaxLength(150).HasColumnType("nvarchar(150)");
+            b.Property<string>("Notes").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<DateOnly>("StartDate").HasColumnType("date");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.HasKey("Id");
+            b.HasIndex("HolidayCode").IsUnique().HasDatabaseName("UX_Holidays_HolidayCode");
+            b.HasIndex("StartDate", "EndDate", "IsActive").HasDatabaseName("IX_Holidays_Dates");
+            b.ToTable("Holidays", "hr", t => t.HasCheckConstraint("CK_Holidays_Dates", "[EndDate] >= [StartDate]"));
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Leave.LeaveType", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<byte>("AccrualMethod").HasColumnType("tinyint");
+            b.Property<decimal>("AnnualEntitlementDays").HasColumnType("decimal(8,2)");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<byte>("DayCountingMethod").HasColumnType("tinyint");
+            b.Property<bool>("IsActive").HasColumnType("bit");
+            b.Property<bool>("IsPaid").HasColumnType("bit");
+            b.Property<bool>("IsEncashableOnTermination").HasColumnType("bit");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("LeaveTypeCode").IsRequired().HasMaxLength(32).HasColumnType("nvarchar(32)");
+            b.Property<decimal>("MaximumCarryForwardDays").HasColumnType("decimal(8,2)");
+            b.Property<string>("NameAr").IsRequired().HasMaxLength(150).HasColumnType("nvarchar(150)");
+            b.Property<string>("NameEn").HasMaxLength(150).HasColumnType("nvarchar(150)");
+            b.Property<bool>("ProrateOnHire").HasColumnType("bit");
+            b.Property<bool>("RequiresBalance").HasColumnType("bit");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.HasKey("Id");
+            b.HasIndex("IsActive").HasDatabaseName("IX_LeaveTypes_IsActive");
+            b.HasIndex("LeaveTypeCode").IsUnique().HasDatabaseName("UX_LeaveTypes_Code");
+            b.ToTable("LeaveTypes", "hr", t => t.HasCheckConstraint("CK_LeaveTypes_Amounts", "[AnnualEntitlementDays]>=0 AND [MaximumCarryForwardDays]>=0"));
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Leave.EmployeeLeaveBalance", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<decimal>("AccruedDays").HasColumnType("decimal(8,2)");
+            b.Property<decimal>("AdjustmentDays").HasColumnType("decimal(8,2)");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<Guid>("EmployeeId").HasColumnType("uniqueidentifier");
+            b.Property<Guid>("LeaveTypeId").HasColumnType("uniqueidentifier");
+            b.Property<short>("LeaveYear").HasColumnType("smallint");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<decimal>("OpeningBalanceDays").HasColumnType("decimal(8,2)");
+            b.Property<decimal>("SettledDays").HasColumnType("decimal(8,2)");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<decimal>("UsedDays").HasColumnType("decimal(8,2)");
+            b.HasKey("Id");
+            b.HasIndex("EmployeeId", "LeaveTypeId", "LeaveYear").IsUnique().HasDatabaseName("UX_LeaveBalances_Employee_Type_Year");
+            b.HasIndex("LeaveTypeId").HasDatabaseName("IX_LeaveBalances_LeaveTypeId");
+            b.ToTable("EmployeeLeaveBalances", "hr", t => t.HasCheckConstraint("CK_LeaveBalances_NonNegative", "[OpeningBalanceDays]>=0 AND [AccruedDays]>=0 AND [UsedDays]>=0 AND [SettledDays]>=0"));
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Leave.LeaveRequest", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<decimal?>("ApprovedDays").HasColumnType("decimal(8,2)");
+            b.Property<DateTimeOffset?>("ApprovedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("ApprovedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("BalanceOverrideReason").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<bool>("BalanceOverrideUsed").HasColumnType("bit");
+            b.Property<DateTimeOffset?>("CancelledAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("CancelledBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CancellationReason").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<byte>("DayCountingMethodSnapshot").HasColumnType("tinyint");
+            b.Property<Guid>("EmployeeId").HasColumnType("uniqueidentifier");
+            b.Property<DateOnly>("EndDate").HasColumnType("date");
+            b.Property<bool>("IsPaidSnapshot").HasColumnType("bit");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("LeaveRequestCode").IsRequired().HasMaxLength(40).HasColumnType("nvarchar(40)");
+            b.Property<string>("LeaveTypeCodeSnapshot").IsRequired().HasMaxLength(32).HasColumnType("nvarchar(32)");
+            b.Property<Guid>("LeaveTypeId").HasColumnType("uniqueidentifier");
+            b.Property<string>("LeaveTypeNameSnapshot").IsRequired().HasMaxLength(150).HasColumnType("nvarchar(150)");
+            b.Property<string>("Reason").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<DateTimeOffset?>("RejectedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("RejectedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("RejectionReason").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<bool>("RequiresBalanceSnapshot").HasColumnType("bit");
+            b.Property<decimal>("RequestedDays").HasColumnType("decimal(8,2)");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<DateOnly>("StartDate").HasColumnType("date");
+            b.Property<byte>("Status").HasColumnType("tinyint");
+            b.Property<DateTimeOffset?>("SubmittedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("SubmittedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.HasKey("Id");
+            b.HasIndex("EmployeeId").HasDatabaseName("IX_LeaveRequests_Employee");
+            b.HasIndex("LeaveRequestCode").IsUnique().HasDatabaseName("UX_LeaveRequests_Code");
+            b.HasIndex("StartDate", "EndDate").HasDatabaseName("IX_LeaveRequests_Dates");
+            b.HasIndex("Status").HasDatabaseName("IX_LeaveRequests_Status");
+            b.HasIndex("LeaveTypeId").HasDatabaseName("IX_LeaveRequests_LeaveTypeId");
+            b.ToTable("LeaveRequests", "hr", t =>
+            {
+                t.HasCheckConstraint("CK_LeaveRequests_Dates", "[EndDate] >= [StartDate]");
+                t.HasCheckConstraint("CK_LeaveRequests_Days", "[RequestedDays]>0 AND ([ApprovedDays] IS NULL OR [ApprovedDays]>=0)");
+            });
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Time.AttendanceRecord", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset?>("ApprovedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("ApprovedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<byte>("ApprovalStatus").HasColumnType("tinyint");
+            b.Property<DateOnly>("AttendanceDate").HasColumnType("date");
+            b.Property<byte>("AttendanceStatus").HasColumnType("tinyint");
+            b.Property<int>("BreakMinutesSnapshot").HasColumnType("int");
+            b.Property<DateTimeOffset?>("CheckInAtUtc").HasColumnType("datetimeoffset");
+            b.Property<DateTimeOffset?>("CheckOutAtUtc").HasColumnType("datetimeoffset");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<int>("EarlyLeaveMinutes").HasColumnType("int");
+            b.Property<Guid>("EmployeeId").HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("EmployeePayrollId").HasColumnType("uniqueidentifier");
+            b.Property<int>("GraceEarlyLeaveMinutesSnapshot").HasColumnType("int");
+            b.Property<int>("GraceLateMinutesSnapshot").HasColumnType("int");
+            b.Property<bool>("IsFlexibleSnapshot").HasColumnType("bit");
+            b.Property<DateTimeOffset?>("LastCorrectedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("LastCorrectedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("LastCorrectionReason").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<int>("LateMinutes").HasColumnType("int");
+            b.Property<string>("Notes").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<int>("OvertimeMinutes").HasColumnType("int");
+            b.Property<DateTimeOffset?>("RejectedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("RejectedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("RejectionReason").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<DateTimeOffset?>("ScheduledEndAtUtc").HasColumnType("datetimeoffset");
+            b.Property<int>("ScheduledMinutes").HasColumnType("int");
+            b.Property<DateTimeOffset?>("ScheduledStartAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("ShiftCodeSnapshot").HasMaxLength(32).HasColumnType("nvarchar(32)");
+            b.Property<string>("ShiftNameSnapshot").HasMaxLength(150).HasColumnType("nvarchar(150)");
+            b.Property<byte>("Source").HasColumnType("tinyint");
+            b.Property<Guid?>("SourceHolidayId").HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("SourceLeaveRequestId").HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset?>("SubmittedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("SubmittedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("TimeZoneIdSnapshot").HasMaxLength(128).HasColumnType("nvarchar(128)");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<Guid?>("WorkShiftId").HasColumnType("uniqueidentifier");
+            b.Property<int>("WorkedMinutes").HasColumnType("int");
+            b.HasKey("Id");
+            b.HasIndex("ApprovalStatus").HasDatabaseName("IX_Attendance_ApprovalStatus");
+            b.HasIndex("AttendanceDate").HasDatabaseName("IX_Attendance_Date");
+            b.HasIndex("AttendanceStatus").HasDatabaseName("IX_Attendance_Status");
+            b.HasIndex("WorkShiftId").HasDatabaseName("IX_Attendance_WorkShiftId");
+            b.HasIndex("SourceLeaveRequestId").HasDatabaseName("IX_Attendance_SourceLeaveRequestId");
+            b.HasIndex("SourceHolidayId").HasDatabaseName("IX_Attendance_SourceHolidayId");
+            b.HasIndex("EmployeeId", "AttendanceDate").IsUnique().HasDatabaseName("UX_Attendance_Employee_Date");
+            b.HasIndex("EmployeePayrollId").HasDatabaseName("IX_Attendance_EmployeePayrollId");
+            b.ToTable("AttendanceRecords", "hr", t =>
+            {
+                t.HasCheckConstraint("CK_Attendance_CheckTimes", "[CheckOutAtUtc] IS NULL OR [CheckInAtUtc] IS NULL OR [CheckOutAtUtc] >= [CheckInAtUtc]");
+                t.HasCheckConstraint("CK_Attendance_Minutes", "[ScheduledMinutes]>=0 AND [WorkedMinutes]>=0 AND [LateMinutes]>=0 AND [EarlyLeaveMinutes]>=0 AND [OvertimeMinutes]>=0 AND [BreakMinutesSnapshot]>=0 AND [GraceLateMinutesSnapshot]>=0 AND [GraceEarlyLeaveMinutesSnapshot]>=0");
+            });
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Overtime.OvertimeRecord", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<int>("ApprovedMinutes").HasColumnType("int");
+            b.Property<DateTimeOffset?>("ApprovedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("ApprovedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<Guid?>("AttendanceRecordId").HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset?>("CancelledAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("CancelledBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CancellationReason").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<Guid>("EmployeeId").HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("EmployeePayrollId").HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("OvertimeCode").IsRequired().HasMaxLength(40).HasColumnType("nvarchar(40)");
+            b.Property<decimal>("RateMultiplier").HasColumnType("decimal(9,4)");
+            b.Property<string>("Reason").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<DateTimeOffset?>("RejectedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("RejectedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("RejectionReason").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<int>("RequestedMinutes").HasColumnType("int");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<byte>("Status").HasColumnType("tinyint");
+            b.Property<DateTimeOffset?>("SubmittedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("SubmittedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<DateOnly>("WorkDate").HasColumnType("date");
+            b.HasKey("Id");
+            b.HasIndex("AttendanceRecordId").IsUnique().HasFilter("[AttendanceRecordId] IS NOT NULL").HasDatabaseName("UX_Overtime_AttendanceRecord");
+            b.HasIndex("EmployeePayrollId").HasDatabaseName("IX_Overtime_EmployeePayrollId");
+            b.HasIndex("EmployeeId", "WorkDate").HasDatabaseName("IX_Overtime_Employee_Date");
+            b.HasIndex("OvertimeCode").IsUnique().HasDatabaseName("UX_Overtime_Code");
+            b.HasIndex("Status").HasDatabaseName("IX_Overtime_Status");
+            b.ToTable("OvertimeRecords", "hr", t =>
+            {
+                t.HasCheckConstraint("CK_Overtime_Minutes", "[RequestedMinutes]>0 AND [ApprovedMinutes]>=0 AND [ApprovedMinutes]<=[RequestedMinutes]");
+                t.HasCheckConstraint("CK_Overtime_Multiplier", "[RateMultiplier]>0");
+            });
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Loans.EmployeeLoan", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset?>("ApprovedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("ApprovedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("CancelledAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("CancelledBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CancellationReason").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<Guid?>("ContractId").HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<string>("CurrencyCodeSnapshot").IsRequired().HasMaxLength(8).HasColumnType("nvarchar(8)");
+            b.Property<byte>("CurrencyDecimalPlacesSnapshot").HasColumnType("tinyint");
+            b.Property<Guid>("CurrencyId").HasColumnType("uniqueidentifier");
+            b.Property<string>("CurrencySymbolSnapshot").HasMaxLength(8).HasColumnType("nvarchar(8)");
+            b.Property<DateTimeOffset?>("DisbursedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("DisbursedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<Guid>("EmployeeId").HasColumnType("uniqueidentifier");
+            b.Property<DateOnly>("FirstInstallmentDate").HasColumnType("date");
+            b.Property<int>("InstallmentCount").HasColumnType("int");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("LoanCode").IsRequired().HasMaxLength(40).HasColumnType("nvarchar(40)");
+            b.Property<DateOnly>("LoanDate").HasColumnType("date");
+            b.Property<Guid?>("PaymentVoucherId").HasColumnType("uniqueidentifier");
+            b.Property<decimal>("PrincipalAmount").HasColumnType("decimal(19,4)");
+            b.Property<string>("Reason").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<DateTimeOffset?>("RejectedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("RejectedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("RejectionReason").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<byte>("RepaymentMode").HasColumnType("tinyint");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<Guid?>("SalaryStructureId").HasColumnType("uniqueidentifier");
+            b.Property<byte>("Status").HasColumnType("tinyint");
+            b.Property<DateTimeOffset?>("SubmittedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("SubmittedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.HasKey("Id");
+            b.HasIndex("EmployeeId", "Status").HasDatabaseName("IX_EmployeeLoans_Employee_Status");
+            b.HasIndex("LoanCode").IsUnique().HasDatabaseName("UX_EmployeeLoans_LoanCode");
+            b.HasIndex("PaymentVoucherId").IsUnique().HasFilter("[PaymentVoucherId] IS NOT NULL").HasDatabaseName("UX_EmployeeLoans_PaymentVoucher");
+            b.HasIndex("ContractId").HasDatabaseName("IX_EmployeeLoans_ContractId");
+            b.HasIndex("SalaryStructureId").HasDatabaseName("IX_EmployeeLoans_SalaryStructureId");
+            b.HasIndex("CurrencyId").HasDatabaseName("IX_EmployeeLoans_CurrencyId");
+            b.ToTable("EmployeeLoans", "hr", t =>
+            {
+                t.HasCheckConstraint("CK_EmployeeLoans_Count", "[InstallmentCount]>0");
+                t.HasCheckConstraint("CK_EmployeeLoans_Principal", "[PrincipalAmount]>0");
+            });
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Loans.EmployeeLoanInstallment", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<decimal>("Amount").HasColumnType("decimal(19,4)");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<DateTimeOffset?>("DeductedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<DateOnly>("DueDate").HasColumnType("date");
+            b.Property<Guid>("EmployeeLoanId").HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("EmployeePayrollId").HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("EndOfServiceSettlementId").HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset?>("ExternallyPaidAtUtc").HasColumnType("datetimeoffset");
+            b.Property<int>("InstallmentSequence").HasColumnType("int");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<Guid?>("ReceiptVoucherId").HasColumnType("uniqueidentifier");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<byte>("Status").HasColumnType("tinyint");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.HasKey("Id");
+            b.HasIndex("DueDate", "Status").HasDatabaseName("IX_LoanInstallments_DueDate_Status");
+            b.HasIndex("EmployeeLoanId", "InstallmentSequence").IsUnique().HasDatabaseName("UX_LoanInstallments_Loan_Sequence");
+            b.HasIndex("ReceiptVoucherId").HasDatabaseName("IX_LoanInstallments_ReceiptVoucherId");
+            b.HasIndex("EmployeePayrollId").HasDatabaseName("IX_LoanInstallments_EmployeePayrollId");
+            b.HasIndex("EndOfServiceSettlementId").HasDatabaseName("IX_LoanInstallments_EndOfServiceSettlementId");
+            b.ToTable("EmployeeLoanInstallments", "hr", t => t.HasCheckConstraint("CK_LoanInstallments_Amount", "[Amount]>0"));
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Adjustments.EmployeeAdjustment", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<string>("AdjustmentCode").IsRequired().HasMaxLength(40).HasColumnType("nvarchar(40)");
+            b.Property<byte>("AdjustmentType").HasColumnType("tinyint");
+            b.Property<decimal>("Amount").HasColumnType("decimal(19,4)");
+            b.Property<DateTimeOffset?>("ApprovedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("ApprovedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("CancelledAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("CancelledBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CancellationReason").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<string>("ComponentCodeSnapshot").IsRequired().HasMaxLength(32).HasColumnType("nvarchar(32)");
+            b.Property<string>("ComponentNameSnapshot").IsRequired().HasMaxLength(150).HasColumnType("nvarchar(150)");
+            b.Property<byte>("ComponentTypeSnapshot").HasColumnType("tinyint");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<string>("CreditPostingRoleSnapshot").HasMaxLength(50).HasColumnType("nvarchar(50)");
+            b.Property<string>("CurrencyCodeSnapshot").IsRequired().HasMaxLength(8).HasColumnType("nvarchar(8)");
+            b.Property<byte>("CurrencyDecimalPlacesSnapshot").HasColumnType("tinyint");
+            b.Property<Guid>("CurrencyId").HasColumnType("uniqueidentifier");
+            b.Property<string>("CurrencySymbolSnapshot").HasMaxLength(8).HasColumnType("nvarchar(8)");
+            b.Property<string>("DebitPostingRoleSnapshot").HasMaxLength(50).HasColumnType("nvarchar(50)");
+            b.Property<DateOnly>("EffectiveDate").HasColumnType("date");
+            b.Property<Guid>("EmployeeId").HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("EmployeePayrollId").HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("Reason").IsRequired().HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<DateTimeOffset?>("RejectedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("RejectedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("RejectionReason").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<Guid>("SalaryComponentId").HasColumnType("uniqueidentifier");
+            b.Property<byte>("Status").HasColumnType("tinyint");
+            b.Property<DateTimeOffset?>("SubmittedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("SubmittedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.HasKey("Id");
+            b.HasIndex("AdjustmentCode").IsUnique().HasDatabaseName("UX_EmployeeAdjustments_Code");
+            b.HasIndex("EmployeeId", "EffectiveDate").HasDatabaseName("IX_Adjustments_Employee_EffectiveDate");
+            b.HasIndex("Status").HasDatabaseName("IX_Adjustments_Status");
+            b.HasIndex("SalaryComponentId").HasDatabaseName("IX_Adjustments_SalaryComponentId");
+            b.HasIndex("CurrencyId").HasDatabaseName("IX_Adjustments_CurrencyId");
+            b.HasIndex("EmployeePayrollId").HasDatabaseName("IX_Adjustments_EmployeePayrollId");
+            b.ToTable("EmployeeAdjustments", "hr", t => t.HasCheckConstraint("CK_EmployeeAdjustments_Amount", "[Amount]>0"));
+        });
+
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Payroll.PayrollPolicy", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<string>("PolicyCode").IsRequired().HasMaxLength(32).HasColumnType("nvarchar(32)");
+            b.Property<string>("NameAr").IsRequired().HasMaxLength(150).HasColumnType("nvarchar(150)");
+            b.Property<DateOnly>("EffectiveFrom").HasColumnType("date");
+            b.Property<DateOnly?>("EffectiveTo").HasColumnType("date");
+            b.Property<byte>("Status").HasColumnType("tinyint");
+            b.Property<byte>("ProrationMethod").HasColumnType("tinyint");
+            b.Property<byte>("DailyRateMethod").HasColumnType("tinyint");
+            b.Property<byte>("HourlyRateMethod").HasColumnType("tinyint");
+            b.Property<bool>("RequireApprovedAttendance").HasColumnType("bit");
+            b.Property<bool>("RequireFullPaymentBeforeRunClose").HasColumnType("bit");
+            b.Property<Guid?>("AbsenceDeductionComponentId").HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("LateDeductionComponentId").HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("EarlyLeaveDeductionComponentId").HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("UnpaidLeaveComponentId").HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("OvertimeComponentId").HasColumnType("uniqueidentifier");
+            b.Property<string>("Notes").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<string>("ActivatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("ActivatedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.HasKey("Id");
+            b.HasIndex("PolicyCode").IsUnique().HasDatabaseName("UX_PayrollPolicies_Code"); b.HasIndex("Status").IsUnique().HasFilter("[Status] = 2").HasDatabaseName("UX_PayrollPolicies_OneActive");
+            b.HasIndex("Status", "EffectiveFrom", "EffectiveTo").HasDatabaseName("IX_PayrollPolicies_Status_Dates");
+            b.HasIndex("AbsenceDeductionComponentId"); b.HasIndex("LateDeductionComponentId"); b.HasIndex("EarlyLeaveDeductionComponentId"); b.HasIndex("UnpaidLeaveComponentId"); b.HasIndex("OvertimeComponentId");
+            b.ToTable("PayrollPolicies", "hr", t => t.HasCheckConstraint("CK_PayrollPolicies_EffectiveDates", "[EffectiveTo] IS NULL OR [EffectiveTo] >= [EffectiveFrom]"));
+            b.HasOne("OAS.Domain.Features.Employees.Entities.SalaryComponent", null).WithMany().HasForeignKey("AbsenceDeductionComponentId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_PayrollPolicies_AbsenceComponent");
+            b.HasOne("OAS.Domain.Features.Employees.Entities.SalaryComponent", null).WithMany().HasForeignKey("LateDeductionComponentId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_PayrollPolicies_LateComponent");
+            b.HasOne("OAS.Domain.Features.Employees.Entities.SalaryComponent", null).WithMany().HasForeignKey("EarlyLeaveDeductionComponentId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_PayrollPolicies_EarlyLeaveComponent");
+            b.HasOne("OAS.Domain.Features.Employees.Entities.SalaryComponent", null).WithMany().HasForeignKey("UnpaidLeaveComponentId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_PayrollPolicies_UnpaidLeaveComponent");
+            b.HasOne("OAS.Domain.Features.Employees.Entities.SalaryComponent", null).WithMany().HasForeignKey("OvertimeComponentId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_PayrollPolicies_OvertimeComponent");
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Payroll.PayrollPeriod", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<string>("PeriodCode").IsRequired().HasMaxLength(20).HasColumnType("nvarchar(20)");
+            b.Property<short>("Year").HasColumnType("smallint");
+            b.Property<byte>("Month").HasColumnType("tinyint");
+            b.Property<DateOnly>("StartDate").HasColumnType("date");
+            b.Property<DateOnly>("EndDate").HasColumnType("date");
+            b.Property<byte>("Status").HasColumnType("tinyint");
+            b.Property<string>("LockedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("LockedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("ClosedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("ClosedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.HasKey("Id");
+            b.HasIndex("PeriodCode").IsUnique().HasDatabaseName("UX_PayrollPeriods_Code");
+            b.HasIndex("Year", "Month").IsUnique().HasDatabaseName("UX_PayrollPeriods_Year_Month");
+            b.ToTable("PayrollPeriods", "hr", t => t.HasCheckConstraint("CK_PayrollPeriods_Dates", "[EndDate] >= [StartDate] AND [Month] BETWEEN 1 AND 12"));
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Payroll.PayrollRun", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<string>("PayrollRunCode").IsRequired().HasMaxLength(40).HasColumnType("nvarchar(40)");
+            b.Property<Guid>("PayrollPeriodId").HasColumnType("uniqueidentifier");
+            b.Property<byte>("RunType").HasColumnType("tinyint"); b.Property<byte>("Status").HasColumnType("tinyint");
+            b.Property<DateOnly>("CalculationDate").HasColumnType("date"); b.Property<DateOnly?>("PostingDate").HasColumnType("date"); b.Property<Guid>("PayrollPolicyId").HasColumnType("uniqueidentifier");
+            b.Property<Guid>("CurrencyId").HasColumnType("uniqueidentifier"); b.Property<string>("CurrencyCodeSnapshot").IsRequired().HasMaxLength(8).HasColumnType("nvarchar(8)"); b.Property<string>("CurrencySymbolSnapshot").HasMaxLength(12).HasColumnType("nvarchar(12)"); b.Property<byte>("CurrencyDecimalPlacesSnapshot").HasColumnType("tinyint");
+            b.Property<Guid?>("BaseCurrencyId").HasColumnType("uniqueidentifier"); b.Property<string>("BaseCurrencyCodeSnapshot").HasMaxLength(8).HasColumnType("nvarchar(8)"); b.Property<byte?>("BaseCurrencyDecimalPlacesSnapshot").HasColumnType("tinyint");
+            b.Property<decimal?>("PostingExchangeRate").HasColumnType("decimal(19,8)"); b.Property<DateOnly?>("PostingExchangeRateDate").HasColumnType("date"); b.Property<byte?>("PostingExchangeRateType").HasColumnType("tinyint"); b.Property<byte?>("PostingExchangeRateSource").HasColumnType("tinyint");
+            b.Property<decimal>("TotalGrossEarnings").HasColumnType("decimal(19,4)"); b.Property<decimal>("TotalDeductions").HasColumnType("decimal(19,4)"); b.Property<decimal>("TotalEmployerContributions").HasColumnType("decimal(19,4)"); b.Property<decimal>("TotalNetPay").HasColumnType("decimal(19,4)");
+            b.Property<decimal>("BaseGrossEarnings").HasColumnType("decimal(19,4)"); b.Property<decimal>("BaseDeductions").HasColumnType("decimal(19,4)"); b.Property<decimal>("BaseEmployerContributions").HasColumnType("decimal(19,4)"); b.Property<decimal>("BaseNetPay").HasColumnType("decimal(19,4)");
+            b.Property<Guid?>("JournalEntryId").HasColumnType("uniqueidentifier");
+            b.Property<string>("CalculatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)"); b.Property<DateTimeOffset?>("CalculatedAtUtc").HasColumnType("datetimeoffset"); b.Property<string>("ReviewedBy").HasMaxLength(64).HasColumnType("nvarchar(64)"); b.Property<DateTimeOffset?>("ReviewedAtUtc").HasColumnType("datetimeoffset"); b.Property<string>("ApprovedBy").HasMaxLength(64).HasColumnType("nvarchar(64)"); b.Property<DateTimeOffset?>("ApprovedAtUtc").HasColumnType("datetimeoffset"); b.Property<string>("PostedBy").HasMaxLength(64).HasColumnType("nvarchar(64)"); b.Property<DateTimeOffset?>("PostedAtUtc").HasColumnType("datetimeoffset"); b.Property<string>("ClosedBy").HasMaxLength(64).HasColumnType("nvarchar(64)"); b.Property<DateTimeOffset?>("ClosedAtUtc").HasColumnType("datetimeoffset"); b.Property<string>("Notes").HasMaxLength(1000).HasColumnType("nvarchar(1000)");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.HasKey("Id"); b.HasIndex("PayrollRunCode").IsUnique().HasDatabaseName("UX_PayrollRuns_Code"); b.HasIndex("PayrollPeriodId", "CurrencyId", "RunType").IsUnique().HasFilter("[Status] <> 7").HasDatabaseName("UX_PayrollRuns_Period_Currency_Type_Active"); b.HasIndex("PayrollPeriodId", "Status").HasDatabaseName("IX_PayrollRuns_Period_Status"); b.HasIndex("CurrencyId").HasDatabaseName("IX_PayrollRuns_Currency"); b.HasIndex("PayrollPolicyId"); b.HasIndex("BaseCurrencyId"); b.HasIndex("JournalEntryId");
+            b.ToTable("PayrollRuns", "hr", t => { t.HasCheckConstraint("CK_PayrollRuns_Totals", "[TotalGrossEarnings]>=0 AND [TotalDeductions]>=0 AND [TotalEmployerContributions]>=0 AND [TotalNetPay]>=0 AND [BaseGrossEarnings]>=0 AND [BaseDeductions]>=0 AND [BaseEmployerContributions]>=0 AND [BaseNetPay]>=0"); t.HasCheckConstraint("CK_PayrollRuns_PostingRate", "[PostingExchangeRate] IS NULL OR [PostingExchangeRate] > 0"); });
+            b.HasOne("OAS.Domain.Features.Employees.Payroll.PayrollPeriod", null).WithMany().HasForeignKey("PayrollPeriodId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_PayrollRuns_Period");
+            b.HasOne("OAS.Domain.Features.Employees.Payroll.PayrollPolicy", null).WithMany().HasForeignKey("PayrollPolicyId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_PayrollRuns_Policy");
+            b.HasOne("OAS.Domain.Accounting.Entities.Currency", null).WithMany().HasForeignKey("CurrencyId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_PayrollRuns_Currency");
+            b.HasOne("OAS.Domain.Accounting.Entities.Currency", null).WithMany().HasForeignKey("BaseCurrencyId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_PayrollRuns_BaseCurrency");
+            b.HasOne("OAS.Domain.Accounting.Entities.JournalEntry", null).WithMany().HasForeignKey("JournalEntryId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_PayrollRuns_Journal");
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Payroll.EmployeePayroll", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<Guid>("PayrollRunId").HasColumnType("uniqueidentifier"); b.Property<Guid>("PayrollPeriodId").HasColumnType("uniqueidentifier"); b.Property<Guid>("EmployeeId").HasColumnType("uniqueidentifier"); b.Property<DateOnly>("CoverageFrom").HasColumnType("date"); b.Property<DateOnly>("CoverageTo").HasColumnType("date");
+            b.Property<string>("EmployeeCodeSnapshot").IsRequired().HasMaxLength(32).HasColumnType("nvarchar(32)"); b.Property<string>("EmployeeNameSnapshot").IsRequired().HasMaxLength(220).HasColumnType("nvarchar(220)"); b.Property<string>("JobTitleSnapshot").HasMaxLength(150).HasColumnType("nvarchar(150)"); b.Property<string>("DepartmentSnapshot").HasMaxLength(150).HasColumnType("nvarchar(150)"); b.Property<Guid?>("ContractId").HasColumnType("uniqueidentifier"); b.Property<string>("ContractCodeSnapshot").HasMaxLength(40).HasColumnType("nvarchar(40)");
+            b.Property<Guid>("CurrencyId").HasColumnType("uniqueidentifier"); b.Property<string>("CurrencyCodeSnapshot").IsRequired().HasMaxLength(8).HasColumnType("nvarchar(8)"); b.Property<string>("CurrencySymbolSnapshot").HasMaxLength(12).HasColumnType("nvarchar(12)"); b.Property<byte>("CurrencyDecimalPlacesSnapshot").HasColumnType("tinyint");
+            b.Property<decimal>("ConfiguredBasicSalarySnapshot").HasColumnType("decimal(19,4)"); b.Property<decimal>("CalculatedBasicSalary").HasColumnType("decimal(19,4)"); b.Property<decimal>("GrossEarnings").HasColumnType("decimal(19,4)"); b.Property<decimal>("TotalDeductions").HasColumnType("decimal(19,4)"); b.Property<decimal>("TotalEmployerContributions").HasColumnType("decimal(19,4)"); b.Property<decimal>("NetPay").HasColumnType("decimal(19,4)"); b.Property<decimal>("BaseGrossEarnings").HasColumnType("decimal(19,4)"); b.Property<decimal>("BaseDeductions").HasColumnType("decimal(19,4)"); b.Property<decimal>("BaseEmployerContributions").HasColumnType("decimal(19,4)"); b.Property<decimal>("BaseNetPay").HasColumnType("decimal(19,4)"); b.Property<byte>("Status").HasColumnType("tinyint");
+            b.Property<string>("ReviewedBy").HasMaxLength(64).HasColumnType("nvarchar(64)"); b.Property<DateTimeOffset?>("ReviewedAtUtc").HasColumnType("datetimeoffset"); b.Property<string>("ApprovedBy").HasMaxLength(64).HasColumnType("nvarchar(64)"); b.Property<DateTimeOffset?>("ApprovedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.HasKey("Id"); b.HasIndex("PayrollRunId", "EmployeeId").IsUnique().HasDatabaseName("UX_EmployeePayroll_Run_Employee"); b.HasIndex("PayrollPeriodId", "EmployeeId").IsUnique().HasFilter("[Status] <> 5").HasDatabaseName("UX_EmployeePayroll_Period_Employee"); b.HasIndex("EmployeeId").HasDatabaseName("IX_EmployeePayroll_Employee"); b.HasIndex("Status").HasDatabaseName("IX_EmployeePayroll_Status"); b.HasIndex("ContractId"); b.HasIndex("CurrencyId");
+            b.ToTable("EmployeePayrolls", "hr", t => { t.HasCheckConstraint("CK_EmployeePayrolls_Coverage", "[CoverageTo] >= [CoverageFrom]"); t.HasCheckConstraint("CK_EmployeePayrolls_Totals", "[ConfiguredBasicSalarySnapshot]>=0 AND [CalculatedBasicSalary]>=0 AND [GrossEarnings]>=0 AND [TotalDeductions]>=0 AND [TotalEmployerContributions]>=0 AND [NetPay]>=0 AND [BaseGrossEarnings]>=0 AND [BaseDeductions]>=0 AND [BaseEmployerContributions]>=0 AND [BaseNetPay]>=0"); });
+            b.HasOne("OAS.Domain.Features.Employees.Payroll.PayrollRun", null).WithMany().HasForeignKey("PayrollRunId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_EmployeePayrolls_Run"); b.HasOne("OAS.Domain.Features.Employees.Payroll.PayrollPeriod", null).WithMany().HasForeignKey("PayrollPeriodId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_EmployeePayrolls_Period"); b.HasOne("OAS.Domain.Features.Employees.Entities.Employee", null).WithMany().HasForeignKey("EmployeeId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_EmployeePayrolls_Employee"); b.HasOne("OAS.Domain.Features.Employees.Entities.EmployeeContract", null).WithMany().HasForeignKey("ContractId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_EmployeePayrolls_Contract"); b.HasOne("OAS.Domain.Accounting.Entities.Currency", null).WithMany().HasForeignKey("CurrencyId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_EmployeePayrolls_Currency");
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Payroll.EmployeePayrollSalarySegment", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<Guid>("EmployeePayrollId").HasColumnType("uniqueidentifier"); b.Property<Guid?>("ContractId").HasColumnType("uniqueidentifier"); b.Property<string>("ContractCodeSnapshot").HasMaxLength(40).HasColumnType("nvarchar(40)"); b.Property<Guid>("SalaryStructureId").HasColumnType("uniqueidentifier"); b.Property<string>("SalaryStructureCodeSnapshot").IsRequired().HasMaxLength(40).HasColumnType("nvarchar(40)"); b.Property<DateOnly>("EffectiveFrom").HasColumnType("date"); b.Property<DateOnly>("EffectiveTo").HasColumnType("date"); b.Property<decimal>("BasicSalaryRateSnapshot").HasColumnType("decimal(19,4)"); b.Property<decimal>("ProrationFactor").HasColumnType("decimal(18,8)");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.HasKey("Id"); b.HasIndex("EmployeePayrollId").HasDatabaseName("IX_PayrollSalarySegments_Payroll"); b.HasIndex("ContractId"); b.HasIndex("SalaryStructureId"); b.ToTable("EmployeePayrollSalarySegments", "hr", t => { t.HasCheckConstraint("CK_PayrollSalarySegments_Dates", "[EffectiveTo] >= [EffectiveFrom]"); t.HasCheckConstraint("CK_PayrollSalarySegments_Amounts", "[BasicSalaryRateSnapshot]>=0 AND [ProrationFactor]>=0 AND [ProrationFactor]<=1"); }); b.HasOne("OAS.Domain.Features.Employees.Payroll.EmployeePayroll", null).WithMany().HasForeignKey("EmployeePayrollId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_PayrollSalarySegments_Payroll"); b.HasOne("OAS.Domain.Features.Employees.Entities.EmployeeContract", null).WithMany().HasForeignKey("ContractId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_PayrollSalarySegments_Contract"); b.HasOne("OAS.Domain.Features.Employees.Entities.EmployeeSalaryStructure", null).WithMany().HasForeignKey("SalaryStructureId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_PayrollSalarySegments_Structure");
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Payroll.EmployeePayrollLine", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<Guid>("EmployeePayrollId").HasColumnType("uniqueidentifier"); b.Property<int>("LineSequence").HasColumnType("int"); b.Property<Guid?>("SalaryStructureId").HasColumnType("uniqueidentifier"); b.Property<Guid?>("SalaryComponentId").HasColumnType("uniqueidentifier"); b.Property<string>("ComponentCodeSnapshot").HasMaxLength(32).HasColumnType("nvarchar(32)"); b.Property<string>("ComponentNameSnapshot").IsRequired().HasMaxLength(150).HasColumnType("nvarchar(150)"); b.Property<byte>("ComponentType").HasColumnType("tinyint"); b.Property<byte>("SourceType").HasColumnType("tinyint"); b.Property<string>("SourceModule").HasMaxLength(50).HasColumnType("nvarchar(50)"); b.Property<string>("SourceDocumentType").HasMaxLength(80).HasColumnType("nvarchar(80)"); b.Property<Guid?>("SourceDocumentId").HasColumnType("uniqueidentifier"); b.Property<DateOnly?>("SourceDate").HasColumnType("date"); b.Property<decimal?>("Quantity").HasColumnType("decimal(18,4)"); b.Property<decimal?>("Rate").HasColumnType("decimal(19,6)"); b.Property<decimal>("Amount").HasColumnType("decimal(19,4)"); b.Property<string>("DebitPostingRole").HasMaxLength(50).HasColumnType("nvarchar(50)"); b.Property<string>("CreditPostingRole").HasMaxLength(50).HasColumnType("nvarchar(50)"); b.Property<string>("Description").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.HasKey("Id"); b.HasIndex("EmployeePayrollId", "LineSequence").IsUnique().HasDatabaseName("UX_EmployeePayrollLines_Payroll_Sequence"); b.HasIndex("SourceType", "SourceDocumentId").HasDatabaseName("IX_EmployeePayrollLines_Source"); b.HasIndex("SalaryStructureId"); b.HasIndex("SalaryComponentId"); b.ToTable("EmployeePayrollLines", "hr", t => t.HasCheckConstraint("CK_EmployeePayrollLines_Amount", "[Amount]>=0")); b.HasOne("OAS.Domain.Features.Employees.Payroll.EmployeePayroll", null).WithMany().HasForeignKey("EmployeePayrollId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_EmployeePayrollLines_Payroll"); b.HasOne("OAS.Domain.Features.Employees.Entities.EmployeeSalaryStructure", null).WithMany().HasForeignKey("SalaryStructureId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_EmployeePayrollLines_Structure"); b.HasOne("OAS.Domain.Features.Employees.Entities.SalaryComponent", null).WithMany().HasForeignKey("SalaryComponentId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_EmployeePayrollLines_Component");
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.EndOfService.EndOfServiceSettlement", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<string>("SettlementCode").IsRequired().HasMaxLength(40).HasColumnType("nvarchar(40)"); b.Property<Guid>("EmployeeId").HasColumnType("uniqueidentifier"); b.Property<Guid?>("ContractId").HasColumnType("uniqueidentifier"); b.Property<Guid?>("FinalEmployeePayrollId").HasColumnType("uniqueidentifier"); b.Property<DateOnly>("LastWorkingDate").HasColumnType("date"); b.Property<byte>("Status").HasColumnType("tinyint"); b.Property<Guid>("CurrencyId").HasColumnType("uniqueidentifier"); b.Property<string>("CurrencyCodeSnapshot").IsRequired().HasMaxLength(8).HasColumnType("nvarchar(8)"); b.Property<string>("CurrencySymbolSnapshot").HasMaxLength(12).HasColumnType("nvarchar(12)"); b.Property<byte>("CurrencyDecimalPlacesSnapshot").HasColumnType("tinyint");
+            b.Property<decimal>("OutstandingPayrollAmountSnapshot").HasColumnType("decimal(19,4)"); b.Property<decimal>("LeaveSettlementAmount").HasColumnType("decimal(19,4)"); b.Property<decimal>("EndOfServiceBenefitAmount").HasColumnType("decimal(19,4)"); b.Property<decimal>("OtherEarningsAmount").HasColumnType("decimal(19,4)"); b.Property<decimal>("LoanDeductionAmount").HasColumnType("decimal(19,4)"); b.Property<decimal>("OtherDeductionsAmount").HasColumnType("decimal(19,4)"); b.Property<decimal>("GrossSettlementAmount").HasColumnType("decimal(19,4)"); b.Property<decimal>("NetSettlementAmount").HasColumnType("decimal(19,4)"); b.Property<decimal>("BaseGrossSettlementAmount").HasColumnType("decimal(19,4)"); b.Property<decimal>("BaseNetSettlementAmount").HasColumnType("decimal(19,4)"); b.Property<decimal?>("PostingExchangeRate").HasColumnType("decimal(19,8)"); b.Property<DateOnly?>("PostingExchangeRateDate").HasColumnType("date"); b.Property<byte?>("PostingExchangeRateType").HasColumnType("tinyint"); b.Property<byte?>("PostingExchangeRateSource").HasColumnType("tinyint"); b.Property<Guid?>("JournalEntryId").HasColumnType("uniqueidentifier"); b.Property<string>("Reason").HasMaxLength(500).HasColumnType("nvarchar(500)"); b.Property<string>("CalculatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)"); b.Property<DateTimeOffset?>("CalculatedAtUtc").HasColumnType("datetimeoffset"); b.Property<string>("ReviewedBy").HasMaxLength(64).HasColumnType("nvarchar(64)"); b.Property<DateTimeOffset?>("ReviewedAtUtc").HasColumnType("datetimeoffset"); b.Property<string>("ApprovedBy").HasMaxLength(64).HasColumnType("nvarchar(64)"); b.Property<DateTimeOffset?>("ApprovedAtUtc").HasColumnType("datetimeoffset"); b.Property<string>("PostedBy").HasMaxLength(64).HasColumnType("nvarchar(64)"); b.Property<DateTimeOffset?>("PostedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.HasKey("Id"); b.HasIndex("SettlementCode").IsUnique().HasDatabaseName("UX_EndOfService_SettlementCode"); b.HasIndex("EmployeeId").IsUnique().HasFilter("[Status] <> 7").HasDatabaseName("UX_EndOfService_Employee_Active"); b.HasIndex("ContractId"); b.HasIndex("FinalEmployeePayrollId"); b.HasIndex("CurrencyId"); b.HasIndex("JournalEntryId"); b.ToTable("EndOfServiceSettlements", "hr", t => { t.HasCheckConstraint("CK_EndOfService_Amounts", "[OutstandingPayrollAmountSnapshot]>=0 AND [LeaveSettlementAmount]>=0 AND [EndOfServiceBenefitAmount]>=0 AND [OtherEarningsAmount]>=0 AND [LoanDeductionAmount]>=0 AND [OtherDeductionsAmount]>=0 AND [GrossSettlementAmount]>=0 AND [NetSettlementAmount]>=0 AND [BaseGrossSettlementAmount]>=0 AND [BaseNetSettlementAmount]>=0"); t.HasCheckConstraint("CK_EndOfService_Rate", "[PostingExchangeRate] IS NULL OR [PostingExchangeRate]>0"); }); b.HasOne("OAS.Domain.Features.Employees.Entities.Employee", null).WithMany().HasForeignKey("EmployeeId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_EndOfService_Employee"); b.HasOne("OAS.Domain.Features.Employees.Entities.EmployeeContract", null).WithMany().HasForeignKey("ContractId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_EndOfService_Contract"); b.HasOne("OAS.Domain.Features.Employees.Payroll.EmployeePayroll", null).WithMany().HasForeignKey("FinalEmployeePayrollId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_EndOfService_FinalPayroll"); b.HasOne("OAS.Domain.Accounting.Entities.Currency", null).WithMany().HasForeignKey("CurrencyId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_EndOfService_Currency"); b.HasOne("OAS.Domain.Accounting.Entities.JournalEntry", null).WithMany().HasForeignKey("JournalEntryId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_EndOfService_Journal");
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.EndOfService.EndOfServiceSettlementLine", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
+            b.Property<Guid>("EndOfServiceSettlementId").HasColumnType("uniqueidentifier"); b.Property<int>("LineSequence").HasColumnType("int"); b.Property<byte>("LineType").HasColumnType("tinyint"); b.Property<string>("SourceDocumentType").HasMaxLength(80).HasColumnType("nvarchar(80)"); b.Property<Guid?>("SourceDocumentId").HasColumnType("uniqueidentifier"); b.Property<string>("Description").IsRequired().HasMaxLength(500).HasColumnType("nvarchar(500)"); b.Property<decimal?>("Quantity").HasColumnType("decimal(18,4)"); b.Property<decimal?>("Rate").HasColumnType("decimal(19,6)"); b.Property<decimal>("Amount").HasColumnType("decimal(19,4)"); b.Property<string>("DebitPostingRole").HasMaxLength(50).HasColumnType("nvarchar(50)"); b.Property<string>("CreditPostingRole").HasMaxLength(50).HasColumnType("nvarchar(50)");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.HasKey("Id"); b.HasIndex("EndOfServiceSettlementId", "LineSequence").IsUnique().HasDatabaseName("UX_EndOfServiceLines_Settlement_Sequence"); b.ToTable("EndOfServiceSettlementLines", "hr", t => t.HasCheckConstraint("CK_EndOfServiceLines_Amount", "[Amount]>=0")); b.HasOne("OAS.Domain.Features.Employees.EndOfService.EndOfServiceSettlement", null).WithMany().HasForeignKey("EndOfServiceSettlementId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_EndOfServiceLines_Settlement");
         });
 
         modelBuilder.Entity("OAS.Domain.Identity.Entities.UserPasswordHistory", b =>
@@ -604,6 +1418,7 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<decimal>("AllocatedAmount").IsRequired().HasColumnType("decimal(19,4)");
             b.Property<decimal?>("ExchangeRate").HasColumnType("decimal(19,8)");
             b.Property<decimal?>("BaseAllocatedAmount").HasColumnType("decimal(19,4)");
+            b.Property<decimal?>("TargetBaseAllocatedAmount").HasColumnType("decimal(19,4)");
             b.Property<DateTime>("AllocatedAtUtc").IsRequired().HasColumnType("datetime2(3)");
             b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
             b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("UpdatedFromDevice");
@@ -618,6 +1433,7 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             {
                 t.HasCheckConstraint("CK_PaymentAllocations_Amount_Positive", "[AllocatedAmount] > 0");
                 t.HasCheckConstraint("CK_PaymentAllocations_BaseAmount_Positive", "[BaseAllocatedAmount] IS NULL OR [BaseAllocatedAmount] > 0");
+                t.HasCheckConstraint("CK_PaymentAllocations_TargetBaseAmount_Positive", "[TargetBaseAllocatedAmount] IS NULL OR [TargetBaseAllocatedAmount] > 0");
                 t.HasCheckConstraint("CK_PaymentAllocations_ExchangeRate_Positive", "[ExchangeRate] IS NULL OR [ExchangeRate] > 0");
                 t.HasCheckConstraint("CK_PaymentAllocations_TypedSource", "([ReceiptVoucherLineId] IS NULL OR [PaymentVoucherLineId] IS NULL)");
             });
@@ -693,6 +1509,8 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<byte?>("ExchangeRateType").HasColumnType("tinyint");
             b.Property<byte?>("ExchangeRateSource").HasColumnType("tinyint");
             b.Property<decimal?>("BaseAmount").HasColumnType("decimal(19,4)");
+            b.Property<decimal?>("CounterpartyBaseAmount").HasColumnType("decimal(19,4)");
+            b.Property<decimal?>("RealizedExchangeDifferenceBase").HasColumnType("decimal(19,4)");
             b.Property<string>("ReferenceNumber").HasMaxLength(100).HasColumnType("nvarchar(100)");
             b.Property<DateOnly?>("ReferenceDate").HasColumnType("date");
             b.Property<string>("ReferenceType").HasMaxLength(50).HasColumnType("nvarchar(50)");
@@ -714,6 +1532,7 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
                 t.HasCheckConstraint("CK_PaymentVoucherLines_Amount_Positive", "[Amount] > 0");
                 t.HasCheckConstraint("CK_PaymentVoucherLines_ExchangeRate_Positive", "[ExchangeRate] IS NULL OR [ExchangeRate] > 0");
                 t.HasCheckConstraint("CK_PaymentVoucherLines_BaseAmount_Positive", "[BaseAmount] IS NULL OR [BaseAmount] > 0");
+                t.HasCheckConstraint("CK_PaymentVoucherLines_CounterpartyBaseAmount_Positive", "[CounterpartyBaseAmount] IS NULL OR [CounterpartyBaseAmount] > 0");
             });
         });
 
@@ -1642,10 +2461,102 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             });
         });
 
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Entities.Department", b =>
+        {
+            b.HasOne("OAS.Domain.Features.Employees.Entities.Department", null).WithMany().HasForeignKey("ParentDepartmentId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_Departments_Departments_ParentDepartmentId");
+            b.HasOne("OAS.Domain.Features.Employees.Entities.Employee", null).WithMany().HasForeignKey("ManagerEmployeeId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_Departments_Employees_ManagerEmployeeId");
+        });
+
         modelBuilder.Entity("OAS.Domain.Features.Employees.Entities.Employee", b =>
         {
             b.HasOne("OAS.Domain.Features.Employees.Entities.JobTitle", null).WithMany().HasForeignKey("JobTitleId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_Employees_JobTitles_JobTitleId");
+            b.HasOne("OAS.Domain.Features.Employees.Entities.Department", null).WithMany().HasForeignKey("DepartmentId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_Employees_Departments_DepartmentId");
+            b.HasOne("OAS.Domain.Features.Employees.Entities.Employee", null).WithMany().HasForeignKey("ManagerEmployeeId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_Employees_Employees_ManagerEmployeeId");
             b.HasOne("OAS.Domain.Identity.Entities.UserAccount", null).WithMany().HasForeignKey("UserAccountId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_Employees_Users_UserAccountId");
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Entities.EmployeeContract", b =>
+        {
+            b.HasOne("OAS.Domain.Features.Employees.Entities.Employee", null).WithMany().HasForeignKey("EmployeeId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_EmployeeContracts_Employees_EmployeeId");
+            b.HasOne("OAS.Domain.Accounting.Entities.Currency", null).WithMany().HasForeignKey("CurrencyId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_EmployeeContracts_Currencies_CurrencyId");
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Entities.EmployeeSalaryStructure", b =>
+        {
+            b.HasOne("OAS.Domain.Features.Employees.Entities.Employee", null).WithMany().HasForeignKey("EmployeeId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_EmployeeSalaryStructures_Employees_EmployeeId");
+            b.HasOne("OAS.Domain.Features.Employees.Entities.EmployeeContract", null).WithMany().HasForeignKey("ContractId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_EmployeeSalaryStructures_Contracts_ContractId");
+            b.HasOne("OAS.Domain.Accounting.Entities.Currency", null).WithMany().HasForeignKey("CurrencyId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_EmployeeSalaryStructures_Currencies_CurrencyId");
+            b.Navigation("Lines").UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Entities.EmployeeSalaryStructureLine", b =>
+        {
+            b.HasOne("OAS.Domain.Features.Employees.Entities.EmployeeSalaryStructure", null).WithMany("Lines").HasForeignKey("EmployeeSalaryStructureId").OnDelete(DeleteBehavior.Cascade).IsRequired().HasConstraintName("FK_EmployeeSalaryStructureLines_Structures_StructureId");
+            b.HasOne("OAS.Domain.Features.Employees.Entities.SalaryComponent", null).WithMany().HasForeignKey("SalaryComponentId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_EmployeeSalaryStructureLines_Components_ComponentId");
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Entities.EmployeeDocument", b =>
+        {
+            b.HasOne("OAS.Domain.Features.Employees.Entities.Employee", null).WithMany().HasForeignKey("EmployeeId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_EmployeeDocuments_Employees_EmployeeId");
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Time.EmployeeShiftAssignment", b =>
+        {
+            b.HasOne("OAS.Domain.Features.Employees.Entities.Employee", null).WithMany().HasForeignKey("EmployeeId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_EmployeeShiftAssignments_Employees");
+            b.HasOne("OAS.Domain.Features.Employees.Time.WorkShift", null).WithMany().HasForeignKey("WorkShiftId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_EmployeeShiftAssignments_WorkShifts");
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Leave.EmployeeLeaveBalance", b =>
+        {
+            b.HasOne("OAS.Domain.Features.Employees.Entities.Employee", null).WithMany().HasForeignKey("EmployeeId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_LeaveBalances_Employees");
+            b.HasOne("OAS.Domain.Features.Employees.Leave.LeaveType", null).WithMany().HasForeignKey("LeaveTypeId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_LeaveBalances_Types");
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Leave.LeaveRequest", b =>
+        {
+            b.HasOne("OAS.Domain.Features.Employees.Entities.Employee", null).WithMany().HasForeignKey("EmployeeId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_LeaveRequests_Employees");
+            b.HasOne("OAS.Domain.Features.Employees.Leave.LeaveType", null).WithMany().HasForeignKey("LeaveTypeId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_LeaveRequests_Types");
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Time.AttendanceRecord", b =>
+        {
+            b.HasOne("OAS.Domain.Features.Employees.Entities.Employee", null).WithMany().HasForeignKey("EmployeeId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_Attendance_Employees");
+            b.HasOne("OAS.Domain.Features.Employees.Time.Holiday", null).WithMany().HasForeignKey("SourceHolidayId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_Attendance_Holidays");
+            b.HasOne("OAS.Domain.Features.Employees.Leave.LeaveRequest", null).WithMany().HasForeignKey("SourceLeaveRequestId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_Attendance_LeaveRequests");
+            b.HasOne("OAS.Domain.Features.Employees.Time.WorkShift", null).WithMany().HasForeignKey("WorkShiftId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_Attendance_WorkShifts");
+            b.HasOne("OAS.Domain.Features.Employees.Payroll.EmployeePayroll", null).WithMany().HasForeignKey("EmployeePayrollId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_Attendance_EmployeePayrolls");
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Overtime.OvertimeRecord", b =>
+        {
+            b.HasOne("OAS.Domain.Features.Employees.Time.AttendanceRecord", null).WithMany().HasForeignKey("AttendanceRecordId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_Overtime_Attendance");
+            b.HasOne("OAS.Domain.Features.Employees.Entities.Employee", null).WithMany().HasForeignKey("EmployeeId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_Overtime_Employees");
+            b.HasOne("OAS.Domain.Features.Employees.Payroll.EmployeePayroll", null).WithMany().HasForeignKey("EmployeePayrollId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_Overtime_EmployeePayrolls");
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Loans.EmployeeLoan", b =>
+        {
+            b.HasOne("OAS.Domain.Features.Employees.Entities.EmployeeContract", null).WithMany().HasForeignKey("ContractId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_EmployeeLoans_Contracts");
+            b.HasOne("OAS.Domain.Accounting.Entities.Currency", null).WithMany().HasForeignKey("CurrencyId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_EmployeeLoans_Currencies");
+            b.HasOne("OAS.Domain.Features.Employees.Entities.Employee", null).WithMany().HasForeignKey("EmployeeId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_EmployeeLoans_Employees");
+            b.HasOne("OAS.Domain.Accounting.Entities.PaymentVoucher", null).WithMany().HasForeignKey("PaymentVoucherId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_EmployeeLoans_PaymentVouchers");
+            b.HasOne("OAS.Domain.Features.Employees.Entities.EmployeeSalaryStructure", null).WithMany().HasForeignKey("SalaryStructureId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_EmployeeLoans_SalaryStructures");
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Loans.EmployeeLoanInstallment", b =>
+        {
+            b.HasOne("OAS.Domain.Features.Employees.Loans.EmployeeLoan", null).WithMany().HasForeignKey("EmployeeLoanId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_LoanInstallments_Loans");
+            b.HasOne("OAS.Domain.Features.Employees.Payroll.EmployeePayroll", null).WithMany().HasForeignKey("EmployeePayrollId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_LoanInstallments_EmployeePayroll");
+            b.HasOne("OAS.Domain.Features.Employees.EndOfService.EndOfServiceSettlement", null).WithMany().HasForeignKey("EndOfServiceSettlementId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_LoanInstallments_EndOfServiceSettlement");
+            b.HasOne("OAS.Domain.Accounting.Entities.ReceiptVoucher", null).WithMany().HasForeignKey("ReceiptVoucherId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_LoanInstallments_ReceiptVouchers");
+        });
+
+        modelBuilder.Entity("OAS.Domain.Features.Employees.Adjustments.EmployeeAdjustment", b =>
+        {
+            b.HasOne("OAS.Domain.Accounting.Entities.Currency", null).WithMany().HasForeignKey("CurrencyId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_EmployeeAdjustments_Currencies");
+            b.HasOne("OAS.Domain.Features.Employees.Entities.Employee", null).WithMany().HasForeignKey("EmployeeId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_EmployeeAdjustments_Employees");
+            b.HasOne("OAS.Domain.Features.Employees.Entities.SalaryComponent", null).WithMany().HasForeignKey("SalaryComponentId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_EmployeeAdjustments_Components");
+            b.HasOne("OAS.Domain.Features.Employees.Payroll.EmployeePayroll", null).WithMany().HasForeignKey("EmployeePayrollId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_EmployeeAdjustments_EmployeePayroll");
         });
 
         modelBuilder.Entity("OAS.Domain.Features.Employees.Entities.Employee", b =>

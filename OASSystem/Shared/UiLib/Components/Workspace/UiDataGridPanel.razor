@@ -10,6 +10,15 @@
     {
         <div class="ui-data-grid-panel__header">@Header</div>
     }
+    else if (HeaderLabels.Count > 0)
+    {
+        <div class="ui-data-grid-panel__header @HeaderCssClass">
+            @foreach (var label in HeaderLabels)
+            {
+                <span>@label</span>
+            }
+        </div>
+    }
     <div class="ui-data-grid-panel__body">@Body</div>
     @if (Footer is not null)
     {

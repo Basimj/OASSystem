@@ -1,0 +1,74 @@
+@using OAS.Contracts.Features.Employees.Documents
+@using Microsoft.AspNetCore.Components.Forms
+
+<UiContainer CssClass="employee-documents-panel" Direction="rtl">
+    <UiContainer CssClass="employee-documents-panel__layout">
+        <UiDataGridPanel Title="مستندات الموظف"
+                         Subtitle="@($"{_items.Count} مستند")"
+                         HeaderLabels="@DocumentGridHeaders"
+                         HeaderCssClass="employee-document-grid-header">
+            <Body>
+                @if (_loading)
+                {
+                    <UiAlert Message="جاري تحميل المستندات..." />
+                }
+                else if (_items.Count == 0)
+                {
+                    <UiAlert Message="لا توجد مستندات لهذا الموظف." />
+                }
+                else
+                {
+                    <UiContainer CssClass="employee-document-grid-body">
+                        @foreach (var item in _items)
+                        {
+                            <UiContainer CssClass="@(item.Id == _selected?.Id ? "employee-document-grid-row employee-document-grid-row--selected" : "employee-document-grid-row")">
+                                <UiClickableSurface CssClass="employee-document-grid-row__select" OnClick="@(() => SelectItem(item))">
+                                    <UiInline Strong="true">@item.DocumentCode</UiInline>
+                                    <UiInline>@TypeName(item.DocumentType)</UiInline>
+                                    <UiInline>@item.Title</UiInline>
+                                    <UiInline>@item.OriginalFileName</UiInline>
+                                    <UiBadge Text="@(item.IsActive ? "نشط" : "غير نشط")" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" />
+                                </UiClickableSurface>
+                                <UiButton Text="تنزيل" IconCssClass="fa-solid fa-download" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="@(() => DownloadAsync(item))" />
+                            </UiContainer>
+                        }
+                    </UiContainer>
+                }
+            </Body>
+        </UiDataGridPanel>
+
+        <UiCard Title="@EditorTitle" Subtitle="@_selected?.DocumentCode">
+            @if (_mode == EditorMode.Empty)
+            {
+                <UiAlert Message="اختر مستندًا أو استخدم زر جديد من شريط الإجراءات." />
+            }
+            else
+            {
+                <UiContainer CssClass="employee-document-editor">
+                    <UiInputText Value="@(_selected?.DocumentCode ?? "سيولد تلقائيًا")" Label="كود المستند" ReadOnly="true" Size="ControlSize.Small" />
+                    <UiSelect Value="@_documentTypeValue" ValueChanged="SetDocumentTypeAsync" Label="نوع المستند" Options="@DocumentTypeOptions" Disabled="@(!IsEditing)" Required="true" Size="ControlSize.Small" />
+                    <UiInputText @bind-Value="_title" Label="عنوان المستند" MaxLength="200" Disabled="@(!IsEditing)" Required="true" Size="ControlSize.Small" />
+                    <UiInputDate @bind-Value="_issueDate" Label="تاريخ الإصدار" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                    <UiInputDate @bind-Value="_expiryDate" Label="تاريخ الانتهاء" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                    <UiInputText @bind-Value="_notes" Label="ملاحظات" MaxLength="500" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                    @if (_mode == EditorMode.Create)
+                    {
+                        <UiLabelContainer CssClass="employee-document-upload" For="employee-document-file-input">
+                            <UiInline>ملف المستند (PDF / JPG / PNG - حتى 10 MB)</UiInline>
+                            <InputFile id="employee-document-file-input" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" OnChange="FileSelectedAsync" />
+                            <UiInline>@(_pendingFileName ?? "لم يتم اختيار ملف")</UiInline>
+                        </UiLabelContainer>
+                    }
+                    else if (_selected is not null)
+                    {
+                        <UiContainer CssClass="employee-document-file-summary">
+                            <UiInline Strong="true">@_selected.OriginalFileName</UiInline>
+                            <UiInline>@FormatFileSize(_selected.FileSize)</UiInline>
+                            <UiInline CssClass="employee-document-file-hash">@_selected.Sha256Hash[..Math.Min(16, _selected.Sha256Hash.Length)]…</UiInline>
+                        </UiContainer>
+                    }
+                </UiContainer>
+            }
+        </UiCard>
+    </UiContainer>
+</UiContainer>

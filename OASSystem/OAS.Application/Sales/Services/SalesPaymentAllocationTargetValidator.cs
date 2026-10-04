@@ -2,6 +2,7 @@ using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Abstractions.Persistence.Specifications;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.Sales.Abstractions;
+using OAS.Application.Accounting.Abstractions;
 using OAS.Domain.Accounting.Entities;
 using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Sales.Entities;
@@ -13,7 +14,9 @@ public sealed class SalesPaymentAllocationTargetValidator(
     IReadRepository<SalesInvoice, Guid> invoices,
     IReadRepository<PaymentAllocation, Guid> allocations) : ISalesPaymentAllocationTargetValidator
 {
-    public async Task ValidateAsync(
+    public AllocationTargetDocumentType TargetDocumentType => AllocationTargetDocumentType.SalesInvoice;
+
+    public async Task<PaymentAllocationTargetValidation> ValidateAsync(
         Guid salesInvoiceId,
         Guid sourceCurrencyId,
         decimal allocatedAmount,
@@ -52,6 +55,8 @@ public sealed class SalesPaymentAllocationTargetValidator(
             if (allocatedAmount > transactionOutstanding)
                 throw new ConflictException("sales_payment_allocation_exceeds_outstanding", "المبلغ المخصص يتجاوز الرصيد المتبقي على فاتورة المبيعات.");
         }
+
+        return new PaymentAllocationTargetValidation(baseAllocatedAmount);
     }
 
     private static decimal GetBaseAllocatedAmount(PaymentAllocation allocation)

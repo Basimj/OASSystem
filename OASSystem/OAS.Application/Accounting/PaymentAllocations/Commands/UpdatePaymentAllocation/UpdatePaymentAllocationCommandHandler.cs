@@ -1,38 +1,52 @@
 using MediatR;
 using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Abstractions.Persistence.Specifications;
+using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Common.Exceptions;
-using OAS.Application.Sales.Abstractions;
 using OAS.Domain.Accounting.Entities;
-using OAS.Domain.Accounting.Enums;
+
 namespace OAS.Application.Accounting.PaymentAllocations.Commands.UpdatePaymentAllocation;
+
 public sealed class UpdatePaymentAllocationCommandHandler(
     IRepository<PaymentAllocation, Guid> repository,
     IReadRepository<ReceiptVoucherLine, Guid> receiptLines,
     IReadRepository<PaymentVoucherLine, Guid> paymentLines,
-    ISalesPaymentAllocationTargetValidator salesInvoiceValidator) : IRequestHandler<UpdatePaymentAllocationCommand>
+    IEnumerable<IPaymentAllocationTargetValidator> targetValidators) : IRequestHandler<UpdatePaymentAllocationCommand>
 {
     public async Task Handle(UpdatePaymentAllocationCommand request, CancellationToken ct)
     {
         var allocation = await repository.GetForUpdateAsync(request.Id, ct) ?? throw new NotFoundException(nameof(PaymentAllocation), request.Id);
+        if (allocation.TargetDocumentType is OAS.Domain.Accounting.Enums.AllocationTargetDocumentType.EmployeePayroll or OAS.Domain.Accounting.Enums.AllocationTargetDocumentType.EndOfServiceSettlement)
+            throw new ConflictException("managed_payment_allocation_immutable", "Payroll and end-of-service allocations are managed by their dedicated payment workflows and cannot be edited directly.");
         if (!allocation.ReceiptVoucherLineId.HasValue && !allocation.PaymentVoucherLineId.HasValue)
             throw new ConflictException("legacy_allocation_readonly", "Legacy payment allocations must be migrated before they can be edited.");
+
         var sourceAmount = await GetSourceAmountAsync(allocation, ct);
         var existing = await repository.ListAsync(new Specification<PaymentAllocation>().Where(x =>
             allocation.ReceiptVoucherLineId.HasValue ? x.ReceiptVoucherLineId == allocation.ReceiptVoucherLineId : x.PaymentVoucherLineId == allocation.PaymentVoucherLineId), ct);
         var available = sourceAmount - existing.Where(x => x.Id != allocation.Id).Sum(x => x.AllocatedAmount);
         if (request.Data.AllocatedAmount > available)
             throw new ConflictException("payment_allocation_exceeds_available_amount", $"The requested allocation ({request.Data.AllocatedAmount}) exceeds the available source-line amount ({available}).");
+
         var rate = allocation.ExchangeRate ?? 1m;
-        var baseAmount = Math.Round(request.Data.AllocatedAmount * rate, 4, MidpointRounding.AwayFromZero);
-        if (allocation.TargetDocumentType == AllocationTargetDocumentType.SalesInvoice && allocation.CurrencyId.HasValue)
+        var sourceBaseAmount = Math.Round(request.Data.AllocatedAmount * rate, 4, MidpointRounding.AwayFromZero);
+        var targetBaseAmount = sourceBaseAmount;
+        var validator = targetValidators.SingleOrDefault(x => x.TargetDocumentType == allocation.TargetDocumentType);
+        if (validator is not null && allocation.CurrencyId.HasValue)
         {
-            await salesInvoiceValidator.ValidateAsync(
-                allocation.TargetDocumentId, allocation.CurrencyId.Value, request.Data.AllocatedAmount, baseAmount, allocation.Id, ct);
+            targetBaseAmount = (await validator.ValidateAsync(
+                allocation.TargetDocumentId,
+                allocation.CurrencyId.Value,
+                request.Data.AllocatedAmount,
+                sourceBaseAmount,
+                allocation.Id,
+                ct)).TargetBaseAllocatedAmount;
         }
-        allocation.UpdateAllocatedAmount(request.Data.AllocatedAmount, baseAmount);
+
+        allocation.UpdateAllocatedAmount(request.Data.AllocatedAmount, sourceBaseAmount, targetBaseAmount);
         repository.Update(allocation);
     }
+
     private async Task<decimal> GetSourceAmountAsync(PaymentAllocation a, CancellationToken ct)
     {
         if (a.ReceiptVoucherLineId is Guid rid) return (await receiptLines.GetByIdAsync(rid, ct) ?? throw new NotFoundException(nameof(ReceiptVoucherLine), rid)).Amount;

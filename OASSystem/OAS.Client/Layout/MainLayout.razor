@@ -57,69 +57,103 @@
         : null;
     private string ShellStateStorageKey => $"oas.ui.shell.v2:{AuthState.CurrentUser?.Id:D}:{SelectedDatabaseName}";
 
-    private static readonly IReadOnlyList<UiShellModuleItem> ShellModules =
-    [
-        new("dashboard", "لوحة التحكم", "/", "fa-solid fa-house"),
-        new("sales", "المبيعات", "/sales", "fa-solid fa-cart-shopping"),
-        new("sales-prescriptions", "الوصفات", "/sales/prescriptions", "fa-solid fa-glasses"),
-        new("sales-orders", "طلبات العملاء", "/sales/customer-orders", "fa-solid fa-clipboard-list"),
-        new("sales-invoices", "فواتير المبيعات", "/sales/invoices", "fa-solid fa-file-invoice-dollar"),
-        new("sales-returns", "مرتجعات المبيعات", "/sales/returns", "fa-solid fa-rotate-left"),
-        new("sales-production", "الإنتاج البصري", "/sales/production", "fa-solid fa-industry"),
-        new("sales-commissions", "العمولات", "/sales/commissions", "fa-solid fa-percent"),
-        new("accounting-customers", "العملاء", "/accounting/customers", "fa-regular fa-user"),
-        new("products", "المنتجات", "/products", "fa-solid fa-glasses"),
-        new("inventory-product-categories", "تصنيفات المنتجات", "/inventory/product-categories", "fa-solid fa-layer-group"),
-        new("inventory-brands", "العلامات التجارية", "/inventory/brands", "fa-solid fa-tags"),
-        new("inventory-product-types", "أنواع المنتجات", "/inventory/product-types", "fa-solid fa-list"),
-        new("inventory-warehouses", "المخازن", "/inventory/warehouses", "fa-solid fa-warehouse"),
-        new("inventory-balances", "أرصدة المخزون", "/inventory/balances", "fa-solid fa-boxes-stacked"),
-        new("inventory-transactions", "عمليات المخزون", "/inventory/transactions", "fa-solid fa-arrow-right-arrow-left"),
-        new("inventory-ledger", "حركات المخزون", "/inventory/ledger", "fa-solid fa-list-ol"),
-        new("inventory-stock-counts", "الجرد المخزني", "/inventory/stock-counts", "fa-solid fa-clipboard-check"),
-        new("daily-orders", "الطلبات اليومية", "/daily-orders", "fa-regular fa-calendar-check"),
-        new("purchases", "المشتريات", "/purchases", "fa-solid fa-bag-shopping"),
-        new("purchasing-requests", "طلبات الشراء", "/purchases/requests", "fa-solid fa-clipboard-list"),
-        new("purchasing-orders", "أوامر الشراء", "/purchases/orders", "fa-solid fa-file-signature"),
-        new("purchasing-receipts", "استلام المشتريات", "/purchases/receipts", "fa-solid fa-truck-ramp-box"),
-        new("purchasing-invoices", "فواتير المشتريات", "/purchases/invoices", "fa-solid fa-file-invoice-dollar"),
-        new("purchasing-returns", "مرتجعات المشتريات", "/purchases/returns", "fa-solid fa-rotate-left"),
-        new("purchasing-catalog", "كتالوج المورد", "/purchases/supplier-catalog", "fa-solid fa-box-open"),
-        new("finance", "المحاسبة العامة", "/accounting", "fa-solid fa-calculator"),
-        new("accounting-accounts", "شجرة الحسابات", "/accounting/accounts", "fa-solid fa-folder-tree"),
-        new("accounting-journals", "القيود اليومية", "/accounting/journals", "fa-solid fa-book-journal-whills"),
-        new("accounting-reports", "التقارير المالية", "/accounting/reports", "fa-solid fa-chart-line"),
-        new("accounting-receipts", "سندات القبض", "/accounting/receipt-vouchers", "fa-solid fa-file-invoice-dollar"),
-        new("accounting-payments", "سندات الصرف", "/accounting/payment-vouchers", "fa-solid fa-money-bill-transfer"),
-        new("accounting-cash-accounts", "الصناديق", "/accounting/cash-accounts", "fa-solid fa-vault"),
-        new("accounting-bank-accounts", "الحسابات البنكية", "/accounting/bank-accounts", "fa-solid fa-building-columns"),
-        new("accounting-cash-shifts", "ورديات الصندوق", "/accounting/cash-shifts", "fa-solid fa-cash-register"),
-        new("accounting-expenses", "المصروفات", "/accounting/expenses", "fa-solid fa-receipt"),
-        new("accounting-fiscal", "السنوات المالية", "/accounting/fiscal-years", "fa-solid fa-calendar-days"),
-        new("accounting-cost-centers", "مراكز التكلفة", "/accounting/cost-centers", "fa-solid fa-network-wired"),
-        new("accounting-currencies", "العملات", "/accounting/currencies", "fa-solid fa-coins"),
-        new("accounting-exchange-rates", "أسعار الصرف", "/accounting/exchange-rates", "fa-solid fa-arrow-right-arrow-left"),
-        new("accounting-employee-accounts", "حسابات الموظفين", "/accounting/employee-accounts", "fa-solid fa-user-tie"),
-        new("accounting-settings", "إعدادات المحاسبة", "/accounting/settings", "fa-solid fa-sliders"),
-        new("accounting-posting-profiles", "ملفات الترحيل", "/accounting/posting-profiles", "fa-solid fa-sliders"),
-        new("reports", "التقارير", "/reports", "fa-regular fa-chart-bar"),
-        new("employees", "الموظفون", "/employees", "fa-solid fa-user-tie"),
-        new("departments", "الأقسام", "/departments", "fa-solid fa-sitemap"),
-        new("accounting-suppliers", "الموردون", "/accounting/suppliers", "fa-solid fa-truck-field"),
-        new("users", "المستخدمون", "/identity/users", "fa-solid fa-users", AdministratorOnly: true),
-        new("roles", "أنواع المستخدمين", "/identity/roles", "fa-solid fa-user-shield", AdministratorOnly: true),
-        new("job-titles", "المسميات الوظيفية", "/employees/job-titles", "fa-solid fa-briefcase", AdministratorOnly: true),
-        new("settings", "الإعدادات", "/settings", "fa-solid fa-gear")
-    ];
+private static readonly IReadOnlyList<UiShellModuleItem> ShellModules =
+[
+    new("dashboard", "لوحة التحكم", "/", "fa-solid fa-house"),
 
-    private static readonly IReadOnlyList<UiShellNavigationGroup> ShellGroups =
-    [
-        new("operations", "المبيعات والتشغيل", "fa-solid fa-store", ["sales", "sales-prescriptions", "sales-orders", "sales-invoices", "sales-returns", "sales-production", "sales-commissions", "daily-orders"]),
-        new("accounting", "المحاسبة والمالية", "fa-solid fa-scale-balanced", [
+    // Sales
+    new("sales", "المبيعات", "/sales", "fa-solid fa-cart-shopping"),
+    new("sales-prescriptions", "الوصفات", "/sales/prescriptions", "fa-solid fa-glasses"),
+    new("sales-orders", "طلبات العملاء", "/sales/customer-orders", "fa-solid fa-clipboard-list"),
+    new("sales-invoices", "فواتير المبيعات", "/sales/invoices", "fa-solid fa-file-invoice-dollar"),
+    new("sales-returns", "مرتجعات المبيعات", "/sales/returns", "fa-solid fa-rotate-left"),
+    new("sales-production", "الإنتاج البصري", "/sales/production", "fa-solid fa-industry"),
+    new("sales-commissions", "العمولات", "/sales/commissions", "fa-solid fa-percent"),
+
+    new("accounting-customers", "العملاء", "/accounting/customers", "fa-regular fa-user"),
+
+    // Inventory
+    new("products", "المنتجات", "/products", "fa-solid fa-glasses"),
+    new("inventory-product-categories", "تصنيفات المنتجات", "/inventory/product-categories", "fa-solid fa-layer-group"),
+    new("inventory-brands", "العلامات التجارية", "/inventory/brands", "fa-solid fa-tags"),
+    new("inventory-product-types", "أنواع المنتجات", "/inventory/product-types", "fa-solid fa-list"),
+    new("inventory-warehouses", "المخازن", "/inventory/warehouses", "fa-solid fa-warehouse"),
+    new("inventory-balances", "أرصدة المخزون", "/inventory/balances", "fa-solid fa-boxes-stacked"),
+    new("inventory-transactions", "عمليات المخزون", "/inventory/transactions", "fa-solid fa-arrow-right-arrow-left"),
+    new("inventory-ledger", "حركات المخزون", "/inventory/ledger", "fa-solid fa-list-ol"),
+    new("inventory-stock-counts", "الجرد المخزني", "/inventory/stock-counts", "fa-solid fa-clipboard-check"),
+
+    new("daily-orders", "الطلبات اليومية", "/daily-orders", "fa-regular fa-calendar-check"),
+
+    // Purchasing
+    new("purchases", "المشتريات", "/purchases", "fa-solid fa-bag-shopping"),
+    new("purchasing-requests", "طلبات الشراء", "/purchases/requests", "fa-solid fa-clipboard-list"),
+    new("purchasing-orders", "أوامر الشراء", "/purchases/orders", "fa-solid fa-file-signature"),
+    new("purchasing-receipts", "استلام المشتريات", "/purchases/receipts", "fa-solid fa-truck-ramp-box"),
+    new("purchasing-invoices", "فواتير المشتريات", "/purchases/invoices", "fa-solid fa-file-invoice-dollar"),
+    new("purchasing-returns", "مرتجعات المشتريات", "/purchases/returns", "fa-solid fa-rotate-left"),
+    new("purchasing-catalog", "كتالوج المورد", "/purchases/supplier-catalog", "fa-solid fa-box-open"),
+
+    // Accounting
+    new("finance", "المحاسبة العامة", "/accounting", "fa-solid fa-calculator"),
+    new("accounting-accounts", "شجرة الحسابات", "/accounting/accounts", "fa-solid fa-folder-tree"),
+    new("accounting-journals", "القيود اليومية", "/accounting/journals", "fa-solid fa-book-journal-whills"),
+    new("accounting-receipts", "سندات القبض", "/accounting/receipt-vouchers", "fa-solid fa-file-invoice-dollar"),
+    new("accounting-payments", "سندات الصرف", "/accounting/payment-vouchers", "fa-solid fa-money-bill-transfer"),
+    new("accounting-cash-accounts", "الصناديق", "/accounting/cash-accounts", "fa-solid fa-vault"),
+    new("accounting-bank-accounts", "الحسابات البنكية", "/accounting/bank-accounts", "fa-solid fa-building-columns"),
+    new("accounting-cash-shifts", "ورديات الصندوق", "/accounting/cash-shifts", "fa-solid fa-cash-register"),
+    new("accounting-expenses", "المصروفات", "/accounting/expenses", "fa-solid fa-receipt"),
+    new("accounting-fiscal", "السنوات المالية", "/accounting/fiscal-years", "fa-solid fa-calendar-days"),
+    new("accounting-cost-centers", "مراكز التكلفة", "/accounting/cost-centers", "fa-solid fa-network-wired"),
+    new("accounting-currencies", "العملات", "/accounting/currencies", "fa-solid fa-coins"),
+    new("accounting-exchange-rates", "أسعار الصرف", "/accounting/exchange-rates", "fa-solid fa-arrow-right-arrow-left"),
+    new("accounting-employee-accounts", "حسابات الموظفين", "/accounting/employee-accounts", "fa-solid fa-user-tie"),
+    new("accounting-settings", "إعدادات المحاسبة", "/accounting/settings", "fa-solid fa-sliders"),
+    new("accounting-posting-profiles", "ملفات الترحيل", "/accounting/posting-profiles", "fa-solid fa-sliders"),
+
+    // Reports
+    new("reports", "التقارير", "/reports", "fa-regular fa-chart-bar"),
+
+    // Administration
+    new("employees", "الموظفون", "/employees", "fa-solid fa-user-tie"),
+    new("departments", "الأقسام", "/departments", "fa-solid fa-sitemap"),
+    new("hr-operations", "شؤون الموظفين", "/employees/hr", "fa-solid fa-calendar-check", AdministratorOnly: true),
+    new("payroll", "الرواتب", "/employees/payroll", "fa-solid fa-file-invoice-dollar", AdministratorOnly: true),
+    new("accounting-suppliers", "الموردون", "/accounting/suppliers", "fa-solid fa-truck-field"),
+    new("users", "المستخدمون", "/identity/users", "fa-solid fa-users", AdministratorOnly: true),
+    new("roles", "أنواع المستخدمين", "/identity/roles", "fa-solid fa-user-shield", AdministratorOnly: true),
+    new("job-titles", "المسميات الوظيفية", "/employees/job-titles", "fa-solid fa-briefcase", AdministratorOnly: true),
+    new("salary-components", "مكونات الرواتب", "/employees/salary-components", "fa-solid fa-money-check-dollar", AdministratorOnly: true),
+
+    new("settings", "الإعدادات", "/settings", "fa-solid fa-gear")
+];
+
+private static readonly IReadOnlyList<UiShellNavigationGroup> ShellGroups =
+[
+    new(
+        "operations",
+        "المبيعات والتشغيل",
+        "fa-solid fa-store",
+        [
+            "sales",
+            "sales-prescriptions",
+            "sales-orders",
+            "sales-invoices",
+            "sales-returns",
+            "sales-production",
+            "sales-commissions",
+            "daily-orders"
+        ]),
+
+    new(
+        "accounting",
+        "المحاسبة والمالية",
+        "fa-solid fa-scale-balanced",
+        [
             "finance",
             "accounting-accounts",
             "accounting-journals",
-            "accounting-reports",
             "accounting-receipts",
             "accounting-payments",
             "accounting-cash-accounts",
@@ -136,7 +170,12 @@
             "accounting-settings",
             "accounting-posting-profiles"
         ]),
-        new("stock", "المخزون", "fa-solid fa-boxes-stacked", [
+
+    new(
+        "stock",
+        "المخزون",
+        "fa-solid fa-boxes-stacked",
+        [
             "products",
             "inventory-product-categories",
             "inventory-brands",
@@ -147,12 +186,45 @@
             "inventory-ledger",
             "inventory-stock-counts"
         ]),
-        new("purchasing", "المشتريات", "fa-solid fa-bag-shopping", ["purchases", "purchasing-requests", "purchasing-orders", "purchasing-receipts", "purchasing-invoices", "purchasing-returns", "purchasing-catalog"]),
-        new("administration", "الإدارة", "fa-solid fa-people-group", ["employees", "departments", "users", "roles", "job-titles"]),
-        new("reports-group", "التقارير", "fa-solid fa-chart-line", ["reports"]),
-        new("system", "النظام", "fa-solid fa-sliders", ["settings"], DefaultExpanded: false)
-    ];
 
+    new(
+        "purchasing",
+        "المشتريات",
+        "fa-solid fa-bag-shopping",
+        [
+            "purchases",
+            "purchasing-requests",
+            "purchasing-orders",
+            "purchasing-receipts",
+            "purchasing-invoices",
+            "purchasing-returns",
+            "purchasing-catalog"
+        ]),
+
+    new(
+        "administration",
+        "الإدارة",
+        "fa-solid fa-people-group",
+        [
+            "employees",
+            "departments",
+            "hr-operations",
+            "salary-components",
+            "payroll",
+            "users",
+            "roles",
+            "job-titles"
+        ]),
+
+    new("reports-group", "التقارير", "fa-solid fa-chart-line", ["reports"]),
+
+    new(
+        "system",
+        "النظام",
+        "fa-solid fa-sliders",
+        ["settings"],
+        DefaultExpanded: false)
+];
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;

@@ -59,6 +59,12 @@ public static class ClientServices
 
         // Employees
         services.AddScoped<IEmployeeClientService, EmployeeClientService>();
+        services.AddScoped<IDepartmentClientService, DepartmentClientService>();
+        services.AddScoped<IEmployeeContractClientService, EmployeeContractClientService>();
+        services.AddScoped<IEmployeeCompensationClientService, EmployeeCompensationClientService>();
+        services.AddScoped<IEmployeeDocumentClientService, EmployeeDocumentClientService>();
+        services.AddScoped<IHrOperationsClientService, HrOperationsClientService>();
+        services.AddScoped<IPayrollClientService, PayrollClientService>();
         services.AddScoped<IEmployeesWorkspaceState, EmployeesWorkspaceState>();
 
         // Inventory
