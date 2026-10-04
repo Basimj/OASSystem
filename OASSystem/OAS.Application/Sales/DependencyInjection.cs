@@ -6,6 +6,8 @@ using OAS.Application.Sales.CustomerOrders;
 using OAS.Application.Sales.CustomerOrders.Mapping;
 using OAS.Application.Sales.CustomerOrders.Specifications;
 using OAS.Application.Sales.Posting;
+using OAS.Application.Sales.Returns.Services;
+using OAS.Application.Sales.Production.Services;
 using OAS.Application.Sales.Prescriptions;
 using OAS.Application.Sales.Prescriptions.Mapping;
 using OAS.Application.Sales.Prescriptions.Specifications;
@@ -54,6 +56,9 @@ public static class DependencyInjection
         services.AddScoped<ISalesPaymentAllocationTargetValidator, SalesPaymentAllocationTargetValidator>();
         services.AddScoped<ISalesInventoryPostingService, SalesInventoryPostingService>();
         services.AddScoped<ISalesInvoiceAccountingPostingService, SalesInvoiceAccountingPostingService>();
+        services.AddScoped<ISalesReturnInventoryPostingService, SalesReturnInventoryPostingService>();
+        services.AddScoped<ISalesReturnAccountingPostingService, SalesReturnAccountingPostingService>();
+        services.AddScoped<IOpticalProductionInventoryService, OpticalProductionInventoryService>();
         services.AddScoped<ISalesImmediateSettlementService, SalesImmediateSettlementService>();
 
         return services;

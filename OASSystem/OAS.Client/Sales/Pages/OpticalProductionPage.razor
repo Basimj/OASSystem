@@ -1,0 +1,555 @@
+@page "/sales/production"
+@attribute [Authorize]
+@using OAS.Contracts.Sales.Enums
+@using OAS.Contracts.Sales.Lookups
+@using OAS.Contracts.Sales.Production
+@using OAS.Contracts.Sales.SalesInvoices
+@inject ISalesClientService Sales
+
+<PageTitle>الإنتاج البصري | OAS</PageTitle>
+
+<UiWorkspaceLayout ShowAside="@(_creating || _selected is not null)" ShowFilters="false">
+    <Actions>
+        <UiWorkspaceActionBar>
+            <UiButton Text="أمر إنتاج جديد" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" OnClick="BeginCreateAsync" />
+            <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Loading="@_busy" OnClick="RefreshAsync" />
+
+            @if (_selected is { Status: OpticalProductionStatus.Draft })
+            {
+                <UiButton Text="إطلاق للإنتاج" IconCssClass="fa-solid fa-paper-plane" Size="ControlSize.Small" Loading="@_busy" OnClick="ReleaseAsync" />
+                <UiButton Text="إلغاء" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" Loading="@_busy" OnClick="CancelAsync" />
+            }
+            else if (_selected is { Status: OpticalProductionStatus.Released })
+            {
+                <UiButton Text="بدء الإنتاج" IconCssClass="fa-solid fa-play" Size="ControlSize.Small" Loading="@_busy" OnClick="StartAsync" />
+                <UiButton Text="إلغاء" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" Loading="@_busy" OnClick="CancelAsync" />
+            }
+            else if (_selected is { Status: OpticalProductionStatus.InProgress, InventoryTransactionId: null })
+            {
+                <UiButton Text="صرف المواد" IconCssClass="fa-solid fa-boxes-stacked" Size="ControlSize.Small" Loading="@_busy" OnClick="IssueMaterialsAsync" />
+            }
+            else if (_selected is { Status: OpticalProductionStatus.QualityControl })
+            {
+                <UiButton Text="إكمال الأمر" IconCssClass="fa-solid fa-circle-check" Size="ControlSize.Small" Loading="@_busy" OnClick="CompleteAsync" />
+            }
+            else if (_selected is { Status: OpticalProductionStatus.QualityControlFailed })
+            {
+                <UiButton Text="إنشاء إعادة تصنيع" IconCssClass="fa-solid fa-rotate-left" Size="ControlSize.Small" Loading="@_busy" OnClick="CreateRemakeAsync" />
+            }
+        </UiWorkspaceActionBar>
+    </Actions>
+
+    <Content>
+        <UiDataGridPanel Title="أوامر الإنتاج البصري" Subtitle="@($"{_jobs.Count:N0} أمر")">
+            <Toolbar>
+                <UiSelect Label="الحالة"
+                          Placeholder="كل الحالات"
+                          Value="@_statusFilter"
+                          ValueChanged="StatusChangedAsync"
+                          Options="@StatusOptions"
+                          Size="ControlSize.Small" />
+            </Toolbar>
+            <Body>
+                <UiStackLayout Gap="StackGap.Small">
+                    @if (!string.IsNullOrWhiteSpace(_error))
+                    {
+                        <UiAlert Message="@_error" Tone="AlertTone.Danger" />
+                    }
+                    @if (_busy && _jobs.Count == 0)
+                    {
+                        <UiAlert Message="جارٍ تحميل أوامر الإنتاج..." Tone="AlertTone.Info" />
+                    }
+                    else if (_jobs.Count == 0)
+                    {
+                        <UiAlert Message="لا توجد أوامر إنتاج مطابقة." Tone="AlertTone.Info" />
+                    }
+                    else
+                    {
+                        @foreach (var item in _jobs)
+                        {
+                            <UiRecordRow Title="@item.JobCode"
+                                         Subtitle="@($"{item.JobDate:yyyy-MM-dd} • تكلفة المواد {item.MaterialCostBase:N2}")"
+                                         Selected="@(_selected?.Id == item.Id)"
+                                         OnClick="@(() => SelectAsync(item.Id))">
+                                <Content>
+                                    <UiKeyValue Label="الهدف" Value="@(item.TargetDate?.ToString("yyyy-MM-dd") ?? "-")" />
+                                    @if (item.RemakeNumber > 0)
+                                    {
+                                        <UiKeyValue Label="إعادة تصنيع" Value="@($"#{item.RemakeNumber}")" />
+                                    }
+                                </Content>
+                                <Trailing>
+                                    <UiBadge Text="@StatusText(item.Status)" Tone="@StatusTone(item.Status)" />
+                                </Trailing>
+                            </UiRecordRow>
+                        }
+                    }
+                </UiStackLayout>
+            </Body>
+        </UiDataGridPanel>
+    </Content>
+
+    <Aside>
+        @if (_creating)
+        {
+            <UiCard Title="أمر إنتاج بصري جديد" Subtitle="أنشئ الأمر من سطر فاتورة مؤكدة أو مرحلة يحتاج إلى إنتاج.">
+                <UiStackLayout Gap="StackGap.Small">
+                    @if (!string.IsNullOrWhiteSpace(_editorError))
+                    {
+                        <UiAlert Message="@_editorError" Tone="AlertTone.Danger" />
+                    }
+
+                    <UiSelect Label="فاتورة المبيعات"
+                              Placeholder="اختر فاتورة"
+                              Value="@_invoiceIdText"
+                              ValueChanged="InvoiceChangedAsync"
+                              Options="@InvoiceOptions"
+                              Size="ControlSize.Small" />
+
+                    @if (_sourceInvoice is not null)
+                    {
+                        <UiSelect Label="سطر الإنتاج"
+                                  Placeholder="اختر السطر"
+                                  Value="@_invoiceLineIdText"
+                                  ValueChanged="InvoiceLineChangedAsync"
+                                  Options="@InvoiceLineOptions"
+                                  Size="ControlSize.Small" />
+                    }
+
+                    <UiSelect Label="مخزن صرف مواد الإنتاج"
+                              Placeholder="اختر المخزن"
+                              Value="@_warehouseIdText"
+                              ValueChanged="@(value => _warehouseIdText = value)"
+                              Options="@WarehouseOptions"
+                              Size="ControlSize.Small" />
+
+                    <UiGrid Columns="2">
+                        <UiInputDate Label="تاريخ الأمر" Value="@_jobDate" ValueChanged="@(value => _jobDate = value)" Size="ControlSize.Small" />
+                        <UiInputDate Label="التاريخ المستهدف" Value="@_targetDate" ValueChanged="@(value => _targetDate = value)" Size="ControlSize.Small" />
+                    </UiGrid>
+                    <UiInputText Label="ملاحظات" Value="@_notes" ValueChanged="@(value => _notes = value)" Size="ControlSize.Small" MaxLength="1000" />
+
+                    <UiCard Title="مواد الإنتاج" Subtitle="المواد ستُصرف من المخزون عند مرحلة صرف المواد.">
+                        <UiStackLayout Gap="StackGap.Small">
+                            @foreach (var material in _materialForms)
+                            {
+                                <UiCard Title="مادة إنتاج">
+                                    <UiGrid Columns="2">
+                                        <UiSelect Label="الصنف"
+                                                  Placeholder="اختر الصنف"
+                                                  Value="@material.ProductVariantIdText"
+                                                  ValueChanged="@(value => material.ProductVariantIdText = value)"
+                                                  Options="@MaterialOptions"
+                                                  Size="ControlSize.Small" />
+                                        <UiInputText Label="الكمية"
+                                                     Value="@material.QuantityText"
+                                                     ValueChanged="@(value => material.QuantityText = value ?? string.Empty)"
+                                                     InputMode="decimal"
+                                                     Size="ControlSize.Small" />
+                                    </UiGrid>
+                                    <UiInputText Label="ملاحظة المادة" Value="@material.Notes" ValueChanged="@(value => material.Notes = value)" Size="ControlSize.Small" MaxLength="500" />
+                                    @if (_materialForms.Count > 1)
+                                    {
+                                        <UiButton Text="حذف المادة" IconCssClass="fa-solid fa-trash" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="@(() => RemoveMaterial(material))" />
+                                    }
+                                </UiCard>
+                            }
+                            <UiButton Text="إضافة مادة" IconCssClass="fa-solid fa-plus" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="AddMaterial" />
+                        </UiStackLayout>
+                    </UiCard>
+
+                    <UiWorkspaceActionBar>
+                        <UiButton Text="حفظ المسودة" IconCssClass="fa-solid fa-floppy-disk" Loading="@_busy" Size="ControlSize.Small" OnClick="CreateAsync" />
+                        <UiButton Text="إلغاء" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CloseEditorAsync" />
+                    </UiWorkspaceActionBar>
+                </UiStackLayout>
+            </UiCard>
+        }
+        else if (_selected is not null)
+        {
+            <UiCard Title="@_selected.JobCode" Subtitle="@StatusText(_selected.Status)">
+                <UiStackLayout Gap="StackGap.Small">
+                    <UiGrid Columns="2">
+                        <UiKeyValue Label="تاريخ الأمر" Value="@_selected.JobDate.ToString("yyyy-MM-dd")" />
+                        <UiKeyValue Label="التاريخ المستهدف" Value="@(_selected.TargetDate?.ToString("yyyy-MM-dd") ?? "-")" />
+                        <UiKeyValue Label="تكلفة المواد" Value="@_selected.MaterialCostBase.ToString("N2")" />
+                        <UiKeyValue Label="حركة المخزون" Value="@(_selected.InventoryTransactionId?.ToString("D") ?? "لم تُصرف المواد")" />
+                        <UiKeyValue Label="محاولات الجودة" Value="@_selected.QcAttemptCount.ToString()" />
+                        <UiKeyValue Label="مرات الفشل" Value="@_selected.FailedQcCount.ToString()" />
+                    </UiGrid>
+
+                    @if (_selected.RemakeNumber > 0)
+                    {
+                        <UiAlert Message="@($"إعادة تصنيع رقم {_selected.RemakeNumber} مرتبطة بالأمر {_selected.RemakeOfJobId}")" Tone="AlertTone.Warning" />
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_selected.Notes))
+                    {
+                        <UiAlert Message="@_selected.Notes" Tone="AlertTone.Info" />
+                    }
+
+                    <UiCard Title="مواد الإنتاج" Subtitle="@($"{_selected.Materials.Count} مادة")">
+                        <UiStackLayout Gap="StackGap.Small">
+                            @foreach (var material in _selected.Materials)
+                            {
+                                <UiRecordRow Title="@MaterialName(material.ProductVariantId)"
+                                             Subtitle="@($"الكمية {material.Quantity:N3}")">
+                                    <Content>
+                                        <UiKeyValue Label="تكلفة الوحدة" Value="@(material.UnitCostSnapshot?.ToString("N4") ?? "-")" />
+                                        <UiKeyValue Label="إجمالي التكلفة" Value="@(material.TotalCostSnapshot?.ToString("N2") ?? "-")" />
+                                    </Content>
+                                </UiRecordRow>
+                            }
+                        </UiStackLayout>
+                    </UiCard>
+
+                    @if (_selected.Status == OpticalProductionStatus.InProgress && _selected.InventoryTransactionId.HasValue)
+                    {
+                        <UiCard Title="فحص الجودة" Subtitle="سجّل النتيجة بعد الانتهاء من التصنيع.">
+                            <UiStackLayout Gap="StackGap.Small">
+                                <UiInputText Label="ملاحظات الفحص" Value="@_qcNotes" ValueChanged="@(value => _qcNotes = value)" Size="ControlSize.Small" MaxLength="1000" />
+                                <UiCheckbox Label="الفشل بسبب كسر" Value="@_qcBreakage" ValueChanged="@(value => _qcBreakage = value)" />
+                                <UiWorkspaceActionBar>
+                                    <UiButton Text="اجتاز الفحص" IconCssClass="fa-solid fa-check" Size="ControlSize.Small" Loading="@_busy" OnClick="PassQcAsync" />
+                                    <UiButton Text="فشل الفحص" IconCssClass="fa-solid fa-xmark" Variant="ButtonVariant.Danger" Size="ControlSize.Small" Loading="@_busy" OnClick="FailQcAsync" />
+                                </UiWorkspaceActionBar>
+                            </UiStackLayout>
+                        </UiCard>
+                    }
+
+                    @if (_selected.Status == OpticalProductionStatus.QualityControlFailed)
+                    {
+                        <UiCard Title="إعادة التصنيع" Subtitle="سيُنشأ أمر جديد ويرتبط بالأمر الفاشل ويعيد نسخ تعريف مواد الإنتاج.">
+                            <UiStackLayout Gap="StackGap.Small">
+                                <UiInputDate Label="التاريخ المستهدف" Value="@_remakeTargetDate" ValueChanged="@(value => _remakeTargetDate = value)" Size="ControlSize.Small" />
+                                <UiInputText Label="ملاحظات إعادة التصنيع" Value="@_remakeNotes" ValueChanged="@(value => _remakeNotes = value)" Size="ControlSize.Small" MaxLength="1000" />
+                            </UiStackLayout>
+                        </UiCard>
+                    }
+
+                    @if (_selected.LastQcResult.HasValue)
+                    {
+                        <UiAlert Message="@QcSummary(_selected)" Tone="@(_selected.LastQcResult == OpticalProductionQcResult.Passed ? AlertTone.Success : AlertTone.Danger)" />
+                    }
+                </UiStackLayout>
+            </UiCard>
+        }
+    </Aside>
+</UiWorkspaceLayout>
+
+@code {
+    private IReadOnlyList<OpticalProductionJobDto> _jobs = [];
+    private OpticalProductionJobDto? _selected;
+    private IReadOnlyList<SalesInvoiceDto> _eligibleInvoices = [];
+    private SalesInvoiceDto? _sourceInvoice;
+    private IReadOnlyList<SalesProductVariantLookupDto> _materialProducts = [];
+    private IReadOnlyList<SalesWarehouseLookupDto> _warehouses = [];
+    private readonly List<MaterialForm> _materialForms = [new()];
+
+    private bool _creating;
+    private bool _busy;
+    private string? _error;
+    private string? _editorError;
+    private string? _statusFilter;
+    private string? _invoiceIdText;
+    private string? _invoiceLineIdText;
+    private string? _warehouseIdText;
+    private DateOnly? _jobDate = DateOnly.FromDateTime(DateTime.Today);
+    private DateOnly? _targetDate;
+    private string? _notes;
+    private string? _qcNotes;
+    private bool _qcBreakage;
+    private DateOnly? _remakeTargetDate;
+    private string? _remakeNotes;
+
+    private IReadOnlyList<UiSelectOption> StatusOptions =>
+    [
+        new(nameof(OpticalProductionStatus.Draft), "مسودة"),
+        new(nameof(OpticalProductionStatus.Released), "مطلق للإنتاج"),
+        new(nameof(OpticalProductionStatus.InProgress), "قيد الإنتاج"),
+        new(nameof(OpticalProductionStatus.QualityControl), "اجتاز الجودة"),
+        new(nameof(OpticalProductionStatus.QualityControlFailed), "فشل الجودة"),
+        new(nameof(OpticalProductionStatus.Completed), "مكتمل"),
+        new(nameof(OpticalProductionStatus.Cancelled), "ملغي")
+    ];
+
+    private IReadOnlyList<UiSelectOption> InvoiceOptions => _eligibleInvoices
+        .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.InvoiceCode} - {x.CustomerName ?? x.CustomerCode ?? "عميل"}"))
+        .ToArray();
+
+    private IReadOnlyList<UiSelectOption> InvoiceLineOptions => (_sourceInvoice?.Lines ?? [])
+        .Where(x => x.IsActive && x.RequiresProduction)
+        .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.LineNumber} - {x.ProductNameSnapshot}"))
+        .ToArray();
+
+    private IReadOnlyList<UiSelectOption> WarehouseOptions => _warehouses
+        .Where(x => x.IsActive)
+        .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.NameAr}"))
+        .ToArray();
+
+    private IReadOnlyList<UiSelectOption> MaterialOptions => _materialProducts
+        .Where(x => x.IsActive && x.IsStockItem)
+        .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.ProductCode} - {x.ProductNameAr}{(string.IsNullOrWhiteSpace(x.VariantName) ? string.Empty : $" / {x.VariantName}")}"))
+        .ToArray();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLookupsAsync();
+        await RefreshAsync();
+    }
+
+    private async Task LoadLookupsAsync()
+    {
+        try
+        {
+            _materialProducts = await Sales.SearchProductVariantsAsync(null, null, null, 100);
+            _warehouses = await Sales.SearchWarehousesAsync(null, null, 100);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task RefreshAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            OpticalProductionStatus? status = Enum.TryParse<OpticalProductionStatus>(_statusFilter, out var parsed) ? parsed : null;
+            _jobs = await Sales.GetOpticalProductionJobsAsync(status);
+            if (_selected is not null)
+                _selected = await Sales.GetOpticalProductionJobAsync(_selected.Id);
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private async Task StatusChangedAsync(string? value)
+    {
+        _statusFilter = value;
+        await RefreshAsync();
+    }
+
+    private async Task SelectAsync(Guid id)
+    {
+        _creating = false;
+        _editorError = null;
+        _busy = true;
+        try
+        {
+            _selected = await Sales.GetOpticalProductionJobAsync(id);
+            _qcNotes = _selected?.LastQcNotes;
+            _qcBreakage = false;
+            _remakeTargetDate = _selected?.TargetDate;
+            _remakeNotes = null;
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private async Task BeginCreateAsync()
+    {
+        _creating = true;
+        _selected = null;
+        _editorError = null;
+        _sourceInvoice = null;
+        _invoiceIdText = null;
+        _invoiceLineIdText = null;
+        _warehouseIdText = null;
+        _jobDate = DateOnly.FromDateTime(DateTime.Today);
+        _targetDate = null;
+        _notes = null;
+        _materialForms.Clear();
+        _materialForms.Add(new MaterialForm());
+        _busy = true;
+        try
+        {
+            var page = await Sales.GetSalesInvoicesPageAsync(new PageRequest { PageNumber = 1, PageSize = 200, SortBy = "invoiceDate", SortDirection = SortDirection.Descending });
+            _eligibleInvoices = page.Items
+                .Where(x => (x.Status is SalesInvoiceStatus.Confirmed or SalesInvoiceStatus.Posted) && x.Lines.Any(line => line.IsActive && line.RequiresProduction))
+                .ToArray();
+        }
+        catch (Exception ex) { _editorError = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private async Task InvoiceChangedAsync(string? value)
+    {
+        _invoiceIdText = value;
+        _invoiceLineIdText = null;
+        _sourceInvoice = null;
+        if (!Guid.TryParse(value, out var id)) return;
+        _busy = true;
+        try { _sourceInvoice = await Sales.GetSalesInvoiceByIdAsync(id); }
+        catch (Exception ex) { _editorError = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private Task InvoiceLineChangedAsync(string? value)
+    {
+        _invoiceLineIdText = value;
+        if (_sourceInvoice is not null && Guid.TryParse(value, out var lineId))
+        {
+            var line = _sourceInvoice.Lines.FirstOrDefault(x => x.Id == lineId);
+            if (line?.WarehouseId is Guid warehouseId)
+                _warehouseIdText = warehouseId.ToString("D");
+        }
+        return Task.CompletedTask;
+    }
+
+    private void AddMaterial() => _materialForms.Add(new MaterialForm());
+    private void RemoveMaterial(MaterialForm material) => _materialForms.Remove(material);
+
+    private async Task CreateAsync()
+    {
+        _editorError = null;
+        if (!Guid.TryParse(_invoiceLineIdText, out var lineId))
+        {
+            _editorError = "اختر سطر فاتورة يحتاج إلى إنتاج.";
+            return;
+        }
+        if (!Guid.TryParse(_warehouseIdText, out var warehouseId))
+        {
+            _editorError = "اختر مخزن صرف مواد الإنتاج.";
+            return;
+        }
+        if (!_jobDate.HasValue)
+        {
+            _editorError = "تاريخ أمر الإنتاج مطلوب.";
+            return;
+        }
+
+        var materials = new List<CreateOpticalProductionMaterialRequest>();
+        foreach (var material in _materialForms)
+        {
+            if (!Guid.TryParse(material.ProductVariantIdText, out var productVariantId) ||
+                !decimal.TryParse(material.QuantityText, out var quantity) || quantity <= 0m)
+            {
+                _editorError = "حدد صنفًا وكمية أكبر من صفر لكل مادة إنتاج.";
+                return;
+            }
+            if (materials.Any(x => x.ProductVariantId == productVariantId))
+            {
+                _editorError = "لا يمكن تكرار نفس مادة الإنتاج.";
+                return;
+            }
+            materials.Add(new CreateOpticalProductionMaterialRequest(productVariantId, quantity, material.Notes));
+        }
+
+        _busy = true;
+        try
+        {
+            var created = await Sales.CreateOpticalProductionJobAsync(new CreateOpticalProductionJobRequest(
+                lineId, warehouseId, _jobDate.Value, _targetDate, _notes, materials));
+            if (created is not null)
+            {
+                _creating = false;
+                _selected = created;
+                await RefreshAsync();
+            }
+        }
+        catch (Exception ex) { _editorError = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private Task CloseEditorAsync()
+    {
+        _creating = false;
+        _editorError = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task RunActionAsync(Func<OpticalProductionJobDto, Task<OpticalProductionJobDto?>> action)
+    {
+        if (_selected is null) return;
+        _busy = true;
+        _error = null;
+        try
+        {
+            var updated = await action(_selected);
+            if (updated is not null) _selected = updated;
+            await RefreshAsync();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private Task ReleaseAsync() => RunActionAsync(x => Sales.ReleaseOpticalProductionJobAsync(x.Id, new OpticalProductionActionRequest(x.RowVersion)));
+    private Task StartAsync() => RunActionAsync(x => Sales.StartOpticalProductionJobAsync(x.Id, new OpticalProductionActionRequest(x.RowVersion)));
+    private Task IssueMaterialsAsync() => RunActionAsync(x => Sales.IssueOpticalProductionMaterialsAsync(x.Id, new OpticalProductionActionRequest(x.RowVersion)));
+    private Task CompleteAsync() => RunActionAsync(x => Sales.CompleteOpticalProductionJobAsync(x.Id, new OpticalProductionActionRequest(x.RowVersion)));
+    private Task CancelAsync() => RunActionAsync(x => Sales.CancelOpticalProductionJobAsync(x.Id, new OpticalProductionActionRequest(x.RowVersion)));
+
+    private async Task PassQcAsync()
+    {
+        _qcBreakage = false;
+        await RunActionAsync(x => Sales.SubmitOpticalProductionQcAsync(x.Id, new SubmitOpticalProductionQcRequest(x.RowVersion, true, _qcNotes, false)));
+    }
+
+    private Task FailQcAsync() => RunActionAsync(x => Sales.SubmitOpticalProductionQcAsync(x.Id, new SubmitOpticalProductionQcRequest(x.RowVersion, false, _qcNotes, _qcBreakage)));
+
+    private async Task CreateRemakeAsync()
+    {
+        if (_selected is null) return;
+        _busy = true;
+        _error = null;
+        try
+        {
+            var remake = await Sales.CreateOpticalProductionRemakeAsync(_selected.Id,
+                new CreateOpticalProductionRemakeRequest(_selected.RowVersion, _remakeTargetDate, _remakeNotes));
+            if (remake is not null)
+            {
+                _selected = remake;
+                _statusFilter = null;
+                await RefreshAsync();
+            }
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private string MaterialName(Guid id)
+    {
+        var product = _materialProducts.FirstOrDefault(x => x.Id == id);
+        return product is null ? id.ToString("D") : $"{product.ProductCode} - {product.ProductNameAr}";
+    }
+
+    private static string StatusText(OpticalProductionStatus status) => status switch
+    {
+        OpticalProductionStatus.Draft => "مسودة",
+        OpticalProductionStatus.Released => "مطلق للإنتاج",
+        OpticalProductionStatus.InProgress => "قيد الإنتاج",
+        OpticalProductionStatus.QualityControl => "اجتاز الجودة",
+        OpticalProductionStatus.QualityControlFailed => "فشل الجودة",
+        OpticalProductionStatus.Completed => "مكتمل",
+        OpticalProductionStatus.Cancelled => "ملغي",
+        _ => status.ToString()
+    };
+
+    private static AlertTone StatusTone(OpticalProductionStatus status) => status switch
+    {
+        OpticalProductionStatus.Completed => AlertTone.Success,
+        OpticalProductionStatus.QualityControl => AlertTone.Success,
+        OpticalProductionStatus.QualityControlFailed => AlertTone.Danger,
+        OpticalProductionStatus.Cancelled => AlertTone.Danger,
+        OpticalProductionStatus.InProgress => AlertTone.Info,
+        OpticalProductionStatus.Released => AlertTone.Warning,
+        _ => AlertTone.Info
+    };
+
+    private static string QcSummary(OpticalProductionJobDto job)
+    {
+        var result = job.LastQcResult == OpticalProductionQcResult.Passed ? "اجتاز فحص الجودة" : "فشل فحص الجودة";
+        var breakage = job.LastQcWasBreakage ? " • كسر" : string.Empty;
+        var notes = string.IsNullOrWhiteSpace(job.LastQcNotes) ? string.Empty : $" • {job.LastQcNotes}";
+        return $"{result}{breakage}{notes}";
+    }
+
+    private sealed class MaterialForm
+    {
+        public string? ProductVariantIdText { get; set; }
+        public string QuantityText { get; set; } = "1";
+        public string? Notes { get; set; }
+    }
+}

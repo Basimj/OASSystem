@@ -75,6 +75,10 @@ public sealed class SequenceNumberGenerator(
             "PurchaseOrderCodeSequence" => "[dbo].[PurchaseOrderCodeSequence]",
             "PurchaseReceiptCodeSequence" => "[dbo].[PurchaseReceiptCodeSequence]",
             "PurchaseInvoiceCodeSequence" => "[dbo].[PurchaseInvoiceCodeSequence]",
+            "PurchaseReturnCodeSequence" => "[dbo].[PurchaseReturnCodeSequence]",
+            "SalesReturnCodeSequence" => "[dbo].[SalesReturnCodeSequence]",
+            "CommissionStatementCodeSequence" => "[dbo].[CommissionStatementCodeSequence]",
+            "OpticalProductionJobCodeSequence" => "[dbo].[OpticalProductionJobCodeSequence]",
             _ => null
         };
 

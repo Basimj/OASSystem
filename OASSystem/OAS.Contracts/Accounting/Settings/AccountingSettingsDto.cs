@@ -16,4 +16,5 @@ public sealed record AccountingSettingsDto(
     Guid? InventoryAccountId,
     Guid? CogsAccountId,
     ExchangeRateType DefaultExchangeRateType,
-    string RowVersion);
+    string RowVersion,
+    Guid? RetainedEarningsAccountId);

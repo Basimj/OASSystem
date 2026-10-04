@@ -112,7 +112,7 @@ public sealed class PurchasingMapper(
                 line.ProductVariantId, product?.ProductCode, product?.ProductName, line.OrderedQuantitySnapshot,
                 line.PreviouslyReceivedQty, line.RemainingReceivableQuantity, line.ReceivedQuantity, line.AcceptedQuantity,
                 line.RejectedQuantity, line.BaseAcceptedQuantity, line.ActualUnitCost, line.TotalAcceptedCost, line.ExpiryDate,
-                line.BatchCode, line.Notes, PurchasingRowVersion.Encode(line.RowVersion)));
+                line.BatchCode, line.Notes, PurchasingRowVersion.Encode(line.RowVersion), line.ReturnedQuantity));
         }
 
         return new PurchaseReceiptDto(receipt.Id, receipt.ReceiptCode, receipt.PurchaseOrderId, order?.PurchaseOrderCode,

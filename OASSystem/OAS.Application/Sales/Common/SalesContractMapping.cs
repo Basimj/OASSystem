@@ -85,7 +85,8 @@ internal static class SalesContractMapping
         x.BaseTaxAmount, x.BaseTotalAmount, x.Description, x.JournalEntryId, x.ConfirmedAtUtc, x.ConfirmedBy,
         x.PostedAtUtc, x.PostedBy, x.CancelledAtUtc, x.CancelledBy, x.IsActive, Convert.ToBase64String(x.RowVersion),
         x.CreatedAtUtc, x.CreatedBy, x.LastModifiedAtUtc, x.LastModifiedBy, payment,
-        x.Lines.OrderBy(l => l.LineNumber).Select(InvoiceLine).ToArray());
+        x.Lines.OrderBy(l => l.LineNumber).Select(InvoiceLine).ToArray(),
+        SalesEmployeeId: x.SalesEmployeeId);
 
     public static SalesPriceOverrideDto PriceOverride(SalesPriceOverride x) => new(
         x.Id, x.SalesInvoiceId, x.SalesInvoiceLineId, x.OriginalPrice, x.OverridePrice, x.Reason,

@@ -1,5 +1,8 @@
 using OAS.Contracts.Common.Pagination;
 using OAS.Contracts.Sales.Common;
+using OAS.Contracts.Sales.Returns;
+using OAS.Contracts.Sales.Production;
+using OAS.Contracts.Sales.Commissions;
 using OAS.Contracts.Sales.CustomerOrders;
 using OAS.Contracts.Sales.Lookups;
 using OAS.Contracts.Sales.Prescriptions;
@@ -38,6 +41,31 @@ public interface ISalesClientService
     Task<SalesInvoicePostingResultDto?> PostSalesInvoiceAsync(Guid id, PostSalesInvoiceRequest request, CancellationToken cancellationToken = default);
     Task<SalesInvoiceDto?> CancelSalesInvoiceAsync(Guid id, CancelSalesInvoiceRequest request, CancellationToken cancellationToken = default);
     Task<SalesInvoicePaymentSummaryDto?> GetSalesInvoicePaymentSummaryAsync(Guid id, CancellationToken cancellationToken = default);
+
+    Task<PagedResult<SalesReturnDto>> GetSalesReturnsPageAsync(PageRequest request, Guid? salesInvoiceId = null, Guid? customerId = null, SalesReturnStatus? status = null, CancellationToken cancellationToken = default);
+    Task<SalesReturnDto?> GetSalesReturnByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<SalesReturnDto?> CreateSalesReturnAsync(CreateSalesReturnRequest request, CancellationToken cancellationToken = default);
+    Task<SalesReturnDto?> ConfirmSalesReturnAsync(Guid id, SalesReturnActionRequest request, CancellationToken cancellationToken = default);
+    Task<SalesReturnPostingResultDto?> PostSalesReturnAsync(Guid id, SalesReturnActionRequest request, CancellationToken cancellationToken = default);
+    Task<SalesReturnDto?> CancelSalesReturnAsync(Guid id, CancelSalesReturnRequest request, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<CommissionRuleDto>> GetCommissionRulesAsync(Guid? employeeId = null, CancellationToken cancellationToken = default);
+    Task<CommissionRuleDto?> CreateCommissionRuleAsync(CreateCommissionRuleRequest request, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<CommissionStatementDto>> GetCommissionStatementsAsync(Guid? employeeId = null, DateOnly? fromDate = null, DateOnly? toDate = null, CancellationToken cancellationToken = default);
+    Task<CommissionStatementDto?> GetCommissionStatementAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<CommissionStatementDto?> CalculateCommissionStatementAsync(CalculateCommissionStatementRequest request, CancellationToken cancellationToken = default);
+    Task<CommissionStatementDto?> FinalizeCommissionStatementAsync(Guid id, CommissionStatementActionRequest request, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<OpticalProductionJobDto>> GetOpticalProductionJobsAsync(OpticalProductionStatus? status = null, Guid? salesInvoiceId = null, CancellationToken cancellationToken = default);
+    Task<OpticalProductionJobDto?> GetOpticalProductionJobAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<OpticalProductionJobDto?> CreateOpticalProductionJobAsync(CreateOpticalProductionJobRequest request, CancellationToken cancellationToken = default);
+    Task<OpticalProductionJobDto?> ReleaseOpticalProductionJobAsync(Guid id, OpticalProductionActionRequest request, CancellationToken cancellationToken = default);
+    Task<OpticalProductionJobDto?> StartOpticalProductionJobAsync(Guid id, OpticalProductionActionRequest request, CancellationToken cancellationToken = default);
+    Task<OpticalProductionJobDto?> IssueOpticalProductionMaterialsAsync(Guid id, OpticalProductionActionRequest request, CancellationToken cancellationToken = default);
+    Task<OpticalProductionJobDto?> SubmitOpticalProductionQcAsync(Guid id, SubmitOpticalProductionQcRequest request, CancellationToken cancellationToken = default);
+    Task<OpticalProductionJobDto?> CreateOpticalProductionRemakeAsync(Guid id, CreateOpticalProductionRemakeRequest request, CancellationToken cancellationToken = default);
+    Task<OpticalProductionJobDto?> CompleteOpticalProductionJobAsync(Guid id, OpticalProductionActionRequest request, CancellationToken cancellationToken = default);
+    Task<OpticalProductionJobDto?> CancelOpticalProductionJobAsync(Guid id, OpticalProductionActionRequest request, CancellationToken cancellationToken = default);
 
     Task<SalesPriceOverrideDto?> RequestPriceOverrideAsync(Guid invoiceId, RequestSalesPriceOverrideRequest request, CancellationToken cancellationToken = default);
     Task<SalesPriceOverrideDto?> ApprovePriceOverrideAsync(Guid overrideId, ApproveSalesPriceOverrideRequest request, CancellationToken cancellationToken = default);

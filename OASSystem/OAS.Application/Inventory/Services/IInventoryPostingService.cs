@@ -17,6 +17,12 @@ public interface IInventoryPostingService
         string createdBy,
         CancellationToken cancellationToken = default);
 
+    Task<decimal> GetAvailableOutboundUnitCostAsync(
+        Guid warehouseId,
+        Guid productVariantId,
+        decimal quantity,
+        CancellationToken cancellationToken = default);
+
     Task<decimal> GetOutboundUnitCostAsync(
         Guid warehouseId,
         Guid productVariantId,

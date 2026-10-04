@@ -14,4 +14,5 @@ public sealed record UpdateAccountingSettingsRequest(
     Guid? InventoryAccountId,
     Guid? CogsAccountId,
     ExchangeRateType DefaultExchangeRateType = ExchangeRateType.Accounting,
-    string? RowVersion = null);
+    string? RowVersion = null,
+    Guid? RetainedEarningsAccountId = null);

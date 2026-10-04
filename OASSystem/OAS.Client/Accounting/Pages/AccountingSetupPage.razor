@@ -132,9 +132,20 @@
                               ClearText="إلغاء اختيار حساب خسائر فروق العملة"
                               MinimumSearchLength="0"
                               DebounceMilliseconds="250" />
+
+                    <UiLookup Label="حساب الأرباح المحتجزة"
+                              Value="@ToLookupValue(_settingsRetainedEarningsAccountId)"
+                              ValueChanged="SetRetainedEarningsAccount"
+                              SelectedItem="@RetainedEarningsAccountLookupItem"
+                              SearchAsync="SearchRetainedEarningsAccountsAsync"
+                              Placeholder="ابحث برقم الحساب أو الاسم..."
+                              EmptyText="لا توجد حسابات حقوق ملكية صالحة للترحيل."
+                              ClearText="إلغاء اختيار حساب الأرباح المحتجزة"
+                              MinimumSearchLength="0"
+                              DebounceMilliseconds="250" />
                 </UiAccountingFormGrid>
 
-                <UiAlert Message="البحث يعرض الحسابات المطابقة ويعطّل الحساب غير المؤهل مع توضيح السبب. حسابات ترحيل فاتورة المبيعات هي: إيرادات المبيعات (إيراد دائن)، الضرائب المستحقة (التزام دائن)، المخزون (أصل مدين)، وتكلفة البضاعة المباعة (مصروف مدين). جميعها يجب أن تكون نشطة وقابلة للترحيل."
+                <UiAlert Message="البحث يعرض الحسابات المطابقة ويعطّل الحساب غير المؤهل مع توضيح السبب. حسابات ترحيل فاتورة المبيعات هي: إيرادات المبيعات (إيراد دائن)، الضرائب المستحقة (التزام دائن)، المخزون (أصل مدين)، وتكلفة البضاعة المباعة (مصروف مدين). جميعها يجب أن تكون نشطة وقابلة للترحيل. كما يجب تحديد حساب الأرباح المحتجزة (حقوق ملكية دائن) قبل الإقفال السنوي."
                          Tone="AlertTone.Info" />
 
                 @if (_settings is null)

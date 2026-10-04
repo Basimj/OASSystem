@@ -12,6 +12,7 @@ public sealed class SalesInvoiceLineConfiguration : IEntityTypeConfiguration<Sal
         builder.ToTable("tbl_SalesInvoiceLines", "dbo", t =>
         {
             t.HasCheckConstraint("CK_SalesInvoiceLines_Quantity_Positive", "[Quantity] > 0");
+            t.HasCheckConstraint("CK_SalesInvoiceLines_ReturnedQuantity_Valid", "[ReturnedQuantity] >= 0 AND [ReturnedQuantity] <= [Quantity]");
             t.HasCheckConstraint("CK_SalesInvoiceLines_BaseUnitPrice_NonNegative", "[BaseUnitPrice] >= 0");
             t.HasCheckConstraint("CK_SalesInvoiceLines_ActualUnitPrice_NonNegative", "[ActualUnitPrice] >= 0");
             t.HasCheckConstraint("CK_SalesInvoiceLines_DiscountAmount_NonNegative", "[DiscountAmount] >= 0");
@@ -38,6 +39,7 @@ public sealed class SalesInvoiceLineConfiguration : IEntityTypeConfiguration<Sal
         builder.Property(x => x.DescriptionSnapshot).IsRequired().HasMaxLength(500);
         builder.Property(x => x.UnitSnapshot).HasMaxLength(100);
         builder.Property(x => x.Quantity).IsRequired().HasPrecision(18, 3);
+        builder.Property(x => x.ReturnedQuantity).IsRequired().HasPrecision(18, 3).HasDefaultValue(0m);
         builder.Property(x => x.BaseUnitPrice).IsRequired().HasPrecision(19, 4);
         builder.Property(x => x.ActualUnitPrice).IsRequired().HasPrecision(19, 4);
         builder.Property(x => x.DiscountType).IsRequired().HasConversion<byte>();

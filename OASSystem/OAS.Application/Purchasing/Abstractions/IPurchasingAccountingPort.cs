@@ -6,4 +6,5 @@ public interface IPurchasingAccountingPort
     Task ValidateSupplierAccountAsync(Guid supplierId, CancellationToken cancellationToken = default);
     Task<PurchasingAccountingPostingResult> PostPurchaseReceiptJournalAsync(PurchasingReceiptAccountingContext context, CancellationToken cancellationToken = default);
     Task<PurchasingAccountingPostingResult> PostPurchaseInvoiceJournalAsync(PurchasingInvoiceAccountingContext context, CancellationToken cancellationToken = default);
+    Task<PurchasingAccountingPostingResult> PostPurchaseReturnJournalAsync(PurchasingReturnAccountingContext context, CancellationToken cancellationToken = default);
 }

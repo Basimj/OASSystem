@@ -16,4 +16,6 @@ public sealed record SalesInvoiceSummaryDto(
     decimal PaidAmount,
     decimal OutstandingAmount,
     Guid? JournalEntryId,
-    string RowVersion);
+    string RowVersion,
+    Guid? SalesEmployeeId = null,
+    string? SalesEmployeeName = null);

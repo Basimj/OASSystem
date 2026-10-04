@@ -53,7 +53,8 @@ public sealed class GetAccountingSettingsQueryHandler(
             roles.InventoryAccountId,
             roles.CogsAccountId,
             (ContractRateType)(byte)entity.DefaultExchangeRateType,
-            Convert.ToBase64String(entity.RowVersion));
+            Convert.ToBase64String(entity.RowVersion),
+            entity.RetainedEarningsAccountId);
     }
 
     private async Task<SalesInvoiceRoleAccounts> ResolveSalesInvoiceRoleAccountsAsync(

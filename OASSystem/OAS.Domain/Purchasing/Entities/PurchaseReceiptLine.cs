@@ -32,6 +32,7 @@ public sealed class PurchaseReceiptLine : AuditableEntity<Guid>
     public decimal ReceivedQuantity { get; private set; }
     public decimal AcceptedQuantity { get; private set; }
     public decimal RejectedQuantity { get; private set; }
+    public decimal ReturnedQuantity { get; private set; }
     public decimal BaseAcceptedQuantity { get; private set; }
     public decimal ActualUnitCost { get; private set; }
     public decimal TotalAcceptedCost { get; private set; }
@@ -40,12 +41,27 @@ public sealed class PurchaseReceiptLine : AuditableEntity<Guid>
     public string? Notes { get; private set; }
     public byte[] RowVersion { get; private set; } = [];
     public decimal RemainingReceivableQuantity => OrderedQuantitySnapshot - PreviouslyReceivedQty;
+    public decimal RemainingReturnableQuantity => AcceptedQuantity - ReturnedQuantity;
 
     public static PurchaseReceiptLine Create(Guid id,Guid purchaseReceiptId,Guid purchaseOrderLineId,int lineSequence,Guid productVariantId,
         decimal orderedQuantitySnapshot,decimal previouslyReceivedQty,decimal receivedQuantity,decimal acceptedQuantity,decimal rejectedQuantity,
         decimal unitConversionFactor,decimal actualUnitCost,DateOnly? expiryDate,string? batchCode,string? notes)=>
         new(id,purchaseReceiptId,purchaseOrderLineId,lineSequence,productVariantId,orderedQuantitySnapshot,previouslyReceivedQty,receivedQuantity,
             acceptedQuantity,rejectedQuantity,unitConversionFactor,actualUnitCost,expiryDate,batchCode,notes);
+
+    public void ReserveReturnQuantity(decimal quantity)
+    {
+        PurchasingDomainGuard.Positive(quantity,"Return quantity");
+        if(ReturnedQuantity+quantity>AcceptedQuantity)throw new DomainException("Return quantity cannot exceed the remaining accepted quantity.");
+        ReturnedQuantity+=quantity;
+    }
+
+    public void ReleaseReturnQuantity(decimal quantity)
+    {
+        PurchasingDomainGuard.Positive(quantity,"Return quantity");
+        if(quantity>ReturnedQuantity)throw new DomainException("Cannot release more return quantity than currently reserved.");
+        ReturnedQuantity-=quantity;
+    }
 
     public void Update(decimal receivedQuantity,decimal acceptedQuantity,decimal rejectedQuantity,decimal unitConversionFactor,decimal actualUnitCost,
         DateOnly? expiryDate,string? batchCode,string? notes){SetReceiptQuantities(receivedQuantity,acceptedQuantity,rejectedQuantity,unitConversionFactor,actualUnitCost);ExpiryDate=expiryDate;BatchCode=PurchasingDomainGuard.Optional(batchCode,100,"Batch code");Notes=PurchasingDomainGuard.Optional(notes,500,"Notes");}

@@ -10,6 +10,7 @@ public sealed class PurchasingCodeService(ISequenceNumberGenerator sequenceNumbe
     public const string PurchaseOrderCodeSequence = "PurchaseOrderCodeSequence";
     public const string PurchaseReceiptCodeSequence = "PurchaseReceiptCodeSequence";
     public const string PurchaseInvoiceCodeSequence = "PurchaseInvoiceCodeSequence";
+    public const string PurchaseReturnCodeSequence = "PurchaseReturnCodeSequence";
 
     public async Task<string> NextPurchaseRequestCodeAsync(DateOnly documentDate, CancellationToken cancellationToken = default) =>
         PurchaseRequestCodeFormatter.Format(await sequenceNumberGenerator.NextAsync(PurchaseRequestCodeSequence, cancellationToken), documentDate.Year);
@@ -22,4 +23,7 @@ public sealed class PurchasingCodeService(ISequenceNumberGenerator sequenceNumbe
 
     public async Task<string> NextPurchaseInvoiceCodeAsync(DateOnly documentDate, CancellationToken cancellationToken = default) =>
         PurchaseInvoiceCodeFormatter.Format(await sequenceNumberGenerator.NextAsync(PurchaseInvoiceCodeSequence, cancellationToken), documentDate.Year);
+
+    public async Task<string> NextPurchaseReturnCodeAsync(DateOnly documentDate, CancellationToken cancellationToken = default) =>
+        $"PRT-{documentDate.Year:0000}-{await sequenceNumberGenerator.NextAsync(PurchaseReturnCodeSequence, cancellationToken):000000}";
 }

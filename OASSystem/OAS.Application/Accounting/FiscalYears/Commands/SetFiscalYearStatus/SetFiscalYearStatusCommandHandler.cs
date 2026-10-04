@@ -1,6 +1,7 @@
 using MediatR;
 using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Abstractions.Security;
+using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Common.Exceptions;
 using OAS.Domain.Accounting.Entities;
 
@@ -8,6 +9,8 @@ namespace OAS.Application.Accounting.FiscalYears.Commands.SetFiscalYearStatus;
 
 public sealed class SetFiscalYearStatusCommandHandler(
     IRepository<FiscalYear, Guid> repository,
+    IAccountingReportingQueryService reports,
+    IFiscalYearClosingService closingService,
     ICurrentUser currentUser,
     TimeProvider timeProvider)
     : IRequestHandler<SetFiscalYearStatusCommand>
@@ -27,7 +30,16 @@ public sealed class SetFiscalYearStatusCommandHandler(
                 request.Id);
         }
 
-        var requestedRowVersion = Convert.FromBase64String(request.Data.RowVersion);
+        byte[] requestedRowVersion;
+        try
+        {
+            requestedRowVersion = Convert.FromBase64String(request.Data.RowVersion);
+        }
+        catch (FormatException ex)
+        {
+            throw new ConcurrencyException("بيانات التزامن الخاصة بالسنة المالية غير صالحة.", ex);
+        }
+
         if (!fiscalYear.RowVersion.SequenceEqual(requestedRowVersion))
         {
             throw new ConcurrencyException("The fiscal year has been modified by another user.");
@@ -44,7 +56,7 @@ public sealed class SetFiscalYearStatusCommandHandler(
                 break;
 
             case OAS.Contracts.Accounting.Enums.FiscalYearStatus.Closed:
-                CloseFiscalYear(fiscalYear);
+                await CloseFiscalYearAsync(fiscalYear, cancellationToken);
                 break;
 
             case OAS.Contracts.Accounting.Enums.FiscalYearStatus.Future:
@@ -61,7 +73,9 @@ public sealed class SetFiscalYearStatusCommandHandler(
         repository.Update(fiscalYear);
     }
 
-    private void CloseFiscalYear(FiscalYear fiscalYear)
+    private async Task CloseFiscalYearAsync(
+        FiscalYear fiscalYear,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(currentUser.UserId) ||
             !Guid.TryParse(currentUser.UserId, out var userId) ||
@@ -72,8 +86,25 @@ public sealed class SetFiscalYearStatusCommandHandler(
                 "A valid current user is required to close a fiscal year.");
         }
 
-        fiscalYear.Close(
+        var readiness = await reports.GetFiscalYearCloseReadinessAsync(
+            fiscalYear.Id,
+            cancellationToken);
+
+        if (!readiness.CanClose)
+        {
+            var failed = string.Join(
+                "، ",
+                readiness.Checks.Where(x => !x.Passed).Select(x => x.Description));
+
+            throw new ConflictException(
+                "fiscal_year_close_not_ready",
+                $"لا يمكن إقفال السنة المالية قبل معالجة متطلبات الإقفال: {failed}");
+        }
+
+        await closingService.CloseAsync(
+            fiscalYear,
             userId,
-            timeProvider.GetUtcNow().UtcDateTime);
+            timeProvider.GetUtcNow().UtcDateTime,
+            cancellationToken);
     }
 }

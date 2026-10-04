@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using OAS.Infrastructure.Persistence;
@@ -20,6 +20,10 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
         modelBuilder.HasSequence<long>("PurchaseOrderCodeSequence", "dbo");
         modelBuilder.HasSequence<long>("PurchaseReceiptCodeSequence", "dbo");
         modelBuilder.HasSequence<long>("PurchaseInvoiceCodeSequence", "dbo");
+        modelBuilder.HasSequence<long>("PurchaseReturnCodeSequence", "dbo");
+        modelBuilder.HasSequence<long>("SalesReturnCodeSequence", "dbo");
+        modelBuilder.HasSequence<long>("CommissionStatementCodeSequence", "dbo");
+        modelBuilder.HasSequence<long>("OpticalProductionJobCodeSequence", "dbo");
 
         modelBuilder.Entity("OAS.Domain.Identity.Entities.Role", b =>
         {
@@ -177,11 +181,13 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<Guid?>("BankParentAccountId").HasColumnType("uniqueidentifier");
             b.Property<Guid?>("ExchangeGainAccountId").HasColumnType("uniqueidentifier");
             b.Property<Guid?>("ExchangeLossAccountId").HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("RetainedEarningsAccountId").HasColumnType("uniqueidentifier");
             b.Property<byte>("DefaultExchangeRateType").IsRequired().HasColumnType("tinyint");
             b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
             b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
             b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("UpdatedFromDevice");
             b.HasKey("Id");
+            b.HasIndex("RetainedEarningsAccountId");
             b.ToTable("tbl_AccountingSettings", "dbo");
         });
 
@@ -1440,6 +1446,7 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<Guid>("CustomerId").IsRequired().HasColumnType("uniqueidentifier");
             b.Property<Guid?>("CustomerOrderId").HasColumnType("uniqueidentifier");
             b.Property<Guid?>("PrescriptionRevisionId").HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("SalesEmployeeId").HasColumnType("uniqueidentifier");
             b.Property<DateOnly>("InvoiceDate").IsRequired().HasColumnType("date");
             b.Property<DateOnly>("PostingDate").IsRequired().HasColumnType("date");
             b.Property<byte>("Status").IsRequired().HasColumnType("tinyint");
@@ -1489,6 +1496,7 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.HasIndex("PrescriptionRevisionId").HasDatabaseName("IX_SalesInvoices_PrescriptionRevisionId");
             b.HasIndex("CurrencyId").HasDatabaseName("IX_SalesInvoices_CurrencyId");
             b.HasIndex("BaseCurrencyId").HasDatabaseName("IX_SalesInvoices_BaseCurrencyId");
+            b.HasIndex("SalesEmployeeId").HasDatabaseName("IX_SalesInvoices_SalesEmployeeId");
             b.ToTable("tbl_SalesInvoices", "dbo", t =>
             {
                 t.HasCheckConstraint("CK_SalesInvoices_ExchangeRate_Positive", "[ExchangeRate] > 0");
@@ -1517,6 +1525,7 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<string>("DescriptionSnapshot").IsRequired().HasMaxLength(500).HasColumnType("nvarchar(500)");
             b.Property<string>("UnitSnapshot").HasMaxLength(100).HasColumnType("nvarchar(100)");
             b.Property<decimal>("Quantity").IsRequired().HasColumnType("decimal(18,3)");
+            b.Property<decimal>("ReturnedQuantity").IsRequired().HasDefaultValue(0m).HasColumnType("decimal(18,3)");
             b.Property<decimal>("BaseUnitPrice").IsRequired().HasColumnType("decimal(19,4)");
             b.Property<decimal>("ActualUnitPrice").IsRequired().HasColumnType("decimal(19,4)");
             b.Property<byte>("DiscountType").IsRequired().HasColumnType("tinyint");
@@ -1559,6 +1568,7 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
                 t.HasCheckConstraint("CK_SalesInvoiceLines_FinalAmount_NonNegative", "[FinalAmount] >= 0");
                 t.HasCheckConstraint("CK_SalesInvoiceLines_BaseAmounts_NonNegative", "[BaseNetAmount] >= 0 AND [BaseTaxAmount] >= 0 AND [BaseFinalAmount] >= 0");
                 t.HasCheckConstraint("CK_SalesInvoiceLines_CostSnapshots_NonNegative", "([UnitCostSnapshot] IS NULL OR [UnitCostSnapshot] >= 0) AND ([TotalCostSnapshot] IS NULL OR [TotalCostSnapshot] >= 0)");
+                t.HasCheckConstraint("CK_SalesInvoiceLines_ReturnedQuantity_Valid", "[ReturnedQuantity] >= 0 AND [ReturnedQuantity] <= [Quantity]");
             });
         });
 
@@ -1980,6 +1990,7 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<decimal>("ReceivedQuantity").IsRequired().HasColumnType("decimal(18,3)");
             b.Property<decimal>("AcceptedQuantity").IsRequired().HasColumnType("decimal(18,3)");
             b.Property<decimal>("RejectedQuantity").IsRequired().HasColumnType("decimal(18,3)");
+            b.Property<decimal>("ReturnedQuantity").IsRequired().HasDefaultValue(0m).HasColumnType("decimal(18,3)");
             b.Property<decimal>("BaseAcceptedQuantity").IsRequired().HasColumnType("decimal(18,3)");
             b.Property<decimal>("ActualUnitCost").IsRequired().HasColumnType("decimal(19,4)");
             b.Property<decimal>("TotalAcceptedCost").IsRequired().HasColumnType("decimal(19,4)");
@@ -1998,6 +2009,7 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
                 t.HasCheckConstraint("CK_PurchaseReceiptLines_ReceivedQuantity_Positive", "[ReceivedQuantity] > 0");
                 t.HasCheckConstraint("CK_PurchaseReceiptLines_Quantities_NonNegative", "[AcceptedQuantity] >= 0 AND [RejectedQuantity] >= 0 AND [BaseAcceptedQuantity] >= 0");
                 t.HasCheckConstraint("CK_PurchaseReceiptLines_ActualUnitCost_NonNegative", "[ActualUnitCost] >= 0");
+                t.HasCheckConstraint("CK_PurchaseReceiptLines_ReturnedQuantity_Valid", "[ReturnedQuantity] >= 0 AND [ReturnedQuantity] <= [AcceptedQuantity]");
             });
         });
 
@@ -2520,6 +2532,14 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
                 .HasForeignKey("ExchangeLossAccountId")
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("FK_AccountingSettings_ExchangeLossAccount");
+        });
+
+        modelBuilder.Entity("OAS.Domain.Accounting.Entities.AccountingSettings", b =>
+        {
+            b.HasOne("OAS.Domain.Accounting.Entities.Account", null).WithMany()
+                .HasForeignKey("RetainedEarningsAccountId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("FK_AccountingSettings_RetainedEarningsAccount");
         });
 
         modelBuilder.Entity("OAS.Domain.Accounting.Entities.BankAccount", b =>
@@ -3462,6 +3482,396 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
                     b2.WithOwner().HasForeignKey("SupplierId");
                 });
             });
+        });
+
+        // Added with 20261003113000_AddReturnsCommissionsOpticalProduction
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.SalesReturn", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset").HasColumnName("CreatedAt");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset").HasColumnName("UpdatedAt");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)").HasColumnName("UpdatedBy");
+            b.Property<string>("ReturnCode").IsRequired().HasMaxLength(40).HasColumnType("nvarchar(40)");
+            b.Property<Guid>("SalesInvoiceId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<Guid>("CustomerId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<DateOnly>("ReturnDate").IsRequired().HasColumnType("date");
+            b.Property<DateOnly>("PostingDate").IsRequired().HasColumnType("date");
+            b.Property<byte>("Status").IsRequired().HasColumnType("tinyint");
+            b.Property<Guid>("CurrencyId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<string>("CurrencyCodeSnapshot").IsRequired().HasMaxLength(10).HasColumnType("nvarchar(10)");
+            b.Property<byte>("CurrencyDecimalPlacesSnapshot").IsRequired().HasColumnType("tinyint");
+            b.Property<decimal>("ExchangeRate").IsRequired().HasColumnType("decimal(19,8)");
+            b.Property<DateOnly>("ExchangeRateDate").IsRequired().HasColumnType("date");
+            b.Property<byte>("ExchangeRateType").IsRequired().HasColumnType("tinyint");
+            b.Property<byte>("ExchangeRateSource").IsRequired().HasColumnType("tinyint");
+            b.Property<Guid>("BaseCurrencyId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<string>("BaseCurrencyCodeSnapshot").IsRequired().HasMaxLength(10).HasColumnType("nvarchar(10)");
+            b.Property<byte>("BaseCurrencyDecimalPlacesSnapshot").IsRequired().HasColumnType("tinyint");
+            b.Property<decimal>("NetAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("TaxAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("TotalAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("BaseNetAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("BaseTaxAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("BaseTotalAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<string>("Reason").HasMaxLength(1000).HasColumnType("nvarchar(1000)");
+            b.Property<Guid?>("JournalEntryId").HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset?>("ConfirmedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("ConfirmedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("PostedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("PostedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("CancelledAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("CancelledBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CancellationReason").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("UpdatedFromDevice");
+            b.HasKey("Id");
+            b.HasIndex("ReturnCode").IsUnique().HasDatabaseName("UX_SalesReturns_ReturnCode");
+            b.HasIndex("SalesInvoiceId").HasDatabaseName("IX_SalesReturns_SalesInvoiceId");
+            b.HasIndex("CustomerId").HasDatabaseName("IX_SalesReturns_CustomerId");
+            b.HasIndex("PostingDate").HasDatabaseName("IX_SalesReturns_PostingDate");
+            b.HasIndex("Status").HasDatabaseName("IX_SalesReturns_Status");
+            b.HasIndex("JournalEntryId").HasDatabaseName("IX_SalesReturns_JournalEntryId");
+            b.ToTable("tbl_SalesReturns", "dbo", t =>
+            {
+                t.HasCheckConstraint("CK_SalesReturns_ExchangeRate_Positive", "[ExchangeRate] > 0");
+                t.HasCheckConstraint("CK_SalesReturns_Amounts_NonNegative", "[NetAmount] >= 0 AND [TaxAmount] >= 0 AND [TotalAmount] >= 0 AND [BaseNetAmount] >= 0 AND [BaseTaxAmount] >= 0 AND [BaseTotalAmount] >= 0");
+            });
+        });
+
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.SalesReturnLine", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset").HasColumnName("CreatedAt");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset").HasColumnName("UpdatedAt");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)").HasColumnName("UpdatedBy");
+            b.Property<Guid>("SalesReturnId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<int>("LineNumber").IsRequired().HasColumnType("int");
+            b.Property<Guid>("SalesInvoiceLineId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<byte>("LineType").IsRequired().HasColumnType("tinyint");
+            b.Property<Guid?>("ProductVariantId").HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("WarehouseId").HasColumnType("uniqueidentifier");
+            b.Property<string>("ProductCodeSnapshot").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("ProductNameSnapshot").IsRequired().HasMaxLength(250).HasColumnType("nvarchar(250)");
+            b.Property<decimal>("Quantity").IsRequired().HasColumnType("decimal(19,3)");
+            b.Property<decimal>("NetAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("TaxAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("FinalAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("BaseNetAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("BaseTaxAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("BaseFinalAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal?>("UnitCostSnapshot").HasColumnType("decimal(19,4)");
+            b.Property<decimal?>("TotalCostSnapshot").HasColumnType("decimal(19,4)");
+            b.Property<bool>("IsActive").IsRequired().HasColumnType("bit");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("UpdatedFromDevice");
+            b.HasKey("Id");
+            b.HasIndex("SalesReturnId", "LineNumber").IsUnique().HasDatabaseName("UX_SalesReturnLines_Return_LineNumber");
+            b.HasIndex("SalesInvoiceLineId").HasDatabaseName("IX_SalesReturnLines_SalesInvoiceLineId");
+            b.ToTable("tbl_SalesReturnLines", "dbo", t =>
+            {
+                t.HasCheckConstraint("CK_SalesReturnLines_Quantity_Positive", "[Quantity] > 0");
+                t.HasCheckConstraint("CK_SalesReturnLines_Amounts_NonNegative", "[NetAmount] >= 0 AND [TaxAmount] >= 0 AND [FinalAmount] >= 0 AND [BaseNetAmount] >= 0 AND [BaseTaxAmount] >= 0 AND [BaseFinalAmount] >= 0");
+            });
+        });
+
+        modelBuilder.Entity("OAS.Domain.Purchasing.Entities.PurchaseReturn", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset").HasColumnName("CreatedAt");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset").HasColumnName("UpdatedAt");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)").HasColumnName("UpdatedBy");
+            b.Property<string>("ReturnCode").IsRequired().HasMaxLength(40).HasColumnType("nvarchar(40)");
+            b.Property<Guid>("PurchaseReceiptId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("PurchaseInvoiceId").HasColumnType("uniqueidentifier");
+            b.Property<Guid>("SupplierId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<Guid>("WarehouseId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<DateOnly>("ReturnDate").IsRequired().HasColumnType("date");
+            b.Property<DateOnly>("PostingDate").IsRequired().HasColumnType("date");
+            b.Property<byte>("Status").IsRequired().HasColumnType("tinyint");
+            b.Property<decimal>("ReceiptCostBaseAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("SupplierNetBaseAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("SupplierTaxBaseAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("SupplierGrossBaseAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("InventoryCostBaseAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("PurchasePriceVarianceBaseAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<string>("Reason").HasMaxLength(1000).HasColumnType("nvarchar(1000)");
+            b.Property<Guid?>("JournalEntryId").HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset?>("ConfirmedAt").HasColumnType("datetimeoffset");
+            b.Property<string>("ConfirmedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("PostedAt").HasColumnType("datetimeoffset");
+            b.Property<string>("PostedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("CancelledAt").HasColumnType("datetimeoffset");
+            b.Property<string>("CancelledBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<string>("CancellationReason").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("UpdatedFromDevice");
+            b.HasKey("Id");
+            b.HasIndex("ReturnCode").IsUnique().HasDatabaseName("UX_PurchaseReturns_ReturnCode");
+            b.HasIndex("PurchaseReceiptId").HasDatabaseName("IX_PurchaseReturns_PurchaseReceiptId");
+            b.HasIndex("PurchaseInvoiceId").HasDatabaseName("IX_PurchaseReturns_PurchaseInvoiceId");
+            b.HasIndex("SupplierId").HasDatabaseName("IX_PurchaseReturns_SupplierId");
+            b.HasIndex("Status").HasDatabaseName("IX_PurchaseReturns_Status");
+            b.HasIndex("PostingDate").HasDatabaseName("IX_PurchaseReturns_PostingDate");
+            b.ToTable("tbl_PurchaseReturns", "dbo", t => t.HasCheckConstraint("CK_PurchaseReturns_Amounts_NonNegative", "[ReceiptCostBaseAmount] >= 0 AND [SupplierNetBaseAmount] >= 0 AND [SupplierTaxBaseAmount] >= 0 AND [SupplierGrossBaseAmount] >= 0 AND [InventoryCostBaseAmount] >= 0"));
+        });
+
+        modelBuilder.Entity("OAS.Domain.Purchasing.Entities.PurchaseReturnLine", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset").HasColumnName("CreatedAt");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset").HasColumnName("UpdatedAt");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)").HasColumnName("UpdatedBy");
+            b.Property<Guid>("PurchaseReturnId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<int>("LineNumber").IsRequired().HasColumnType("int");
+            b.Property<Guid>("PurchaseReceiptLineId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("PurchaseInvoiceLineId").HasColumnType("uniqueidentifier");
+            b.Property<Guid>("ProductVariantId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<decimal>("Quantity").IsRequired().HasColumnType("decimal(18,3)");
+            b.Property<decimal>("BaseQuantity").IsRequired().HasColumnType("decimal(18,3)");
+            b.Property<decimal>("ReceiptUnitCostBase").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("ReceiptCostBaseAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("SupplierNetBaseAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("SupplierTaxBaseAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("SupplierGrossBaseAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal?>("InventoryUnitCostBase").HasColumnType("decimal(19,4)");
+            b.Property<decimal?>("InventoryCostBaseAmount").HasColumnType("decimal(19,4)");
+            b.Property<bool>("IsActive").IsRequired().HasColumnType("bit");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("UpdatedFromDevice");
+            b.HasKey("Id");
+            b.HasIndex("PurchaseReturnId", "LineNumber").IsUnique().HasDatabaseName("UX_PurchaseReturnLines_Return_LineNumber");
+            b.HasIndex("PurchaseReceiptLineId").HasDatabaseName("IX_PurchaseReturnLines_ReceiptLineId");
+            b.HasIndex("PurchaseInvoiceLineId").HasDatabaseName("IX_PurchaseReturnLines_InvoiceLineId");
+            b.ToTable("tbl_PurchaseReturnLines", "dbo", t =>
+            {
+                t.HasCheckConstraint("CK_PurchaseReturnLines_Quantity_Positive", "[Quantity] > 0 AND [BaseQuantity] > 0");
+                t.HasCheckConstraint("CK_PurchaseReturnLines_Amounts_NonNegative", "[ReceiptUnitCostBase] >= 0 AND [ReceiptCostBaseAmount] >= 0 AND [SupplierNetBaseAmount] >= 0 AND [SupplierTaxBaseAmount] >= 0 AND [SupplierGrossBaseAmount] >= 0 AND ([InventoryUnitCostBase] IS NULL OR [InventoryUnitCostBase] >= 0) AND ([InventoryCostBaseAmount] IS NULL OR [InventoryCostBaseAmount] >= 0)");
+            });
+        });
+
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.CommissionRule", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset").HasColumnName("CreatedAt");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset").HasColumnName("UpdatedAt");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)").HasColumnName("UpdatedBy");
+            b.Property<string>("Code").IsRequired().HasMaxLength(40).HasColumnType("nvarchar(40)");
+            b.Property<string>("Name").IsRequired().HasMaxLength(160).HasColumnType("nvarchar(160)");
+            b.Property<Guid?>("EmployeeId").HasColumnType("uniqueidentifier");
+            b.Property<decimal>("RatePercent").IsRequired().HasColumnType("decimal(9,4)");
+            b.Property<DateOnly>("EffectiveFrom").IsRequired().HasColumnType("date");
+            b.Property<DateOnly?>("EffectiveTo").HasColumnType("date");
+            b.Property<bool>("IsActive").IsRequired().HasColumnType("bit");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("UpdatedFromDevice");
+            b.HasKey("Id");
+            b.HasIndex("Code").IsUnique().HasDatabaseName("UX_CommissionRules_Code");
+            b.HasIndex("EmployeeId", "EffectiveFrom", "EffectiveTo", "IsActive").HasDatabaseName("IX_CommissionRules_Resolution");
+            b.ToTable("tbl_CommissionRules", "dbo", t => t.HasCheckConstraint("CK_CommissionRules_Rate", "[RatePercent] >= 0 AND [RatePercent] <= 100"));
+        });
+
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.CommissionStatement", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset").HasColumnName("CreatedAt");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset").HasColumnName("UpdatedAt");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)").HasColumnName("UpdatedBy");
+            b.Property<string>("StatementCode").IsRequired().HasMaxLength(40).HasColumnType("nvarchar(40)");
+            b.Property<Guid>("EmployeeId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<DateOnly>("FromDate").IsRequired().HasColumnType("date");
+            b.Property<DateOnly>("ToDate").IsRequired().HasColumnType("date");
+            b.Property<byte>("Status").IsRequired().HasColumnType("tinyint");
+            b.Property<decimal>("SalesBaseAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("ReturnsBaseAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("CommissionBaseAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<DateTimeOffset?>("CalculatedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("CalculatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("FinalizedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("FinalizedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<bool>("IsActive").IsRequired().HasColumnType("bit");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("UpdatedFromDevice");
+            b.HasKey("Id");
+            b.HasIndex("StatementCode").IsUnique().HasDatabaseName("UX_CommissionStatements_StatementCode");
+            b.HasIndex("EmployeeId", "FromDate", "ToDate").HasDatabaseName("IX_CommissionStatements_Employee_Period");
+            b.ToTable("tbl_CommissionStatements", "dbo", t => t.HasCheckConstraint("CK_CommissionStatements_Period", "[ToDate] >= [FromDate]"));
+        });
+
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.CommissionEntry", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset").HasColumnName("CreatedAt");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset").HasColumnName("UpdatedAt");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)").HasColumnName("UpdatedBy");
+            b.Property<Guid>("CommissionStatementId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<Guid>("EmployeeId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<string>("SourceDocumentType").IsRequired().HasMaxLength(40).HasColumnType("nvarchar(40)");
+            b.Property<Guid>("SourceDocumentId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<Guid>("SourceLineId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<Guid>("SalesInvoiceId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<Guid>("OriginalSalesInvoiceLineId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("SalesReturnId").HasColumnType("uniqueidentifier");
+            b.Property<DateOnly>("SourceDate").IsRequired().HasColumnType("date");
+            b.Property<decimal>("BaseSalesAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("RatePercent").IsRequired().HasColumnType("decimal(9,4)");
+            b.Property<decimal>("CommissionBaseAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<Guid>("CommissionRuleId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<string>("RuleCodeSnapshot").IsRequired().HasMaxLength(40).HasColumnType("nvarchar(40)");
+            b.Property<string>("RuleNameSnapshot").IsRequired().HasMaxLength(160).HasColumnType("nvarchar(160)");
+            b.Property<bool>("IsReversal").IsRequired().HasColumnType("bit");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("UpdatedFromDevice");
+            b.HasKey("Id");
+            b.HasIndex("SourceDocumentType", "SourceLineId").IsUnique().HasDatabaseName("UX_CommissionEntries_SourceLine");
+            b.HasIndex("OriginalSalesInvoiceLineId").HasDatabaseName("IX_CommissionEntries_OriginalSalesInvoiceLineId");
+            b.HasIndex("EmployeeId").HasDatabaseName("IX_CommissionEntries_EmployeeId");
+            b.ToTable("tbl_CommissionEntries", "dbo");
+        });
+
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.OpticalProductionJob", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset").HasColumnName("CreatedAt");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset").HasColumnName("UpdatedAt");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)").HasColumnName("UpdatedBy");
+            b.Property<string>("JobCode").IsRequired().HasMaxLength(40).HasColumnType("nvarchar(40)");
+            b.Property<Guid>("SalesInvoiceId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<Guid>("SalesInvoiceLineId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<Guid>("CustomerId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<Guid>("WarehouseId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<DateOnly>("JobDate").IsRequired().HasColumnType("date");
+            b.Property<DateOnly?>("TargetDate").HasColumnType("date");
+            b.Property<byte>("Status").IsRequired().HasColumnType("tinyint");
+            b.Property<Guid?>("InventoryTransactionId").HasColumnType("uniqueidentifier");
+            b.Property<decimal>("MaterialCostBase").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<string>("Notes").HasMaxLength(1000).HasColumnType("nvarchar(1000)");
+            b.Property<Guid?>("RemakeOfJobId").HasColumnType("uniqueidentifier");
+            b.Property<int>("RemakeNumber").IsRequired().HasColumnType("int");
+            b.Property<byte?>("LastQcResult").HasColumnType("tinyint");
+            b.Property<int>("QcAttemptCount").IsRequired().HasColumnType("int");
+            b.Property<int>("FailedQcCount").IsRequired().HasColumnType("int");
+            b.Property<string>("LastQcNotes").HasMaxLength(1000).HasColumnType("nvarchar(1000)");
+            b.Property<bool>("LastQcWasBreakage").IsRequired().HasColumnType("bit");
+            b.Property<DateTimeOffset?>("ReleasedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<DateTimeOffset?>("StartedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<DateTimeOffset?>("QcAtUtc").HasColumnType("datetimeoffset");
+            b.Property<DateTimeOffset?>("FailedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<DateTimeOffset?>("CompletedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<bool>("IsActive").IsRequired().HasColumnType("bit");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("UpdatedFromDevice");
+            b.HasKey("Id");
+            b.HasIndex("JobCode").IsUnique().HasDatabaseName("UX_OpticalProductionJobs_JobCode");
+            b.HasIndex("SalesInvoiceLineId").IsUnique().HasFilter("[IsActive] = 1").HasDatabaseName("UX_OpticalProductionJobs_ActiveInvoiceLine");
+            b.HasIndex("Status").HasDatabaseName("IX_OpticalProductionJobs_Status");
+            b.HasIndex("RemakeOfJobId").HasDatabaseName("IX_OpticalProductionJobs_RemakeOfJobId");
+            b.ToTable("tbl_OpticalProductionJobs", "dbo", t =>
+            {
+                t.HasCheckConstraint("CK_OpticalProductionJobs_RemakeNumber", "[RemakeNumber] >= 0");
+                t.HasCheckConstraint("CK_OpticalProductionJobs_QcCounters", "[QcAttemptCount] >= 0 AND [FailedQcCount] >= 0 AND [FailedQcCount] <= [QcAttemptCount]");
+                t.HasCheckConstraint("CK_OpticalProductionJobs_MaterialCost", "[MaterialCostBase] >= 0");
+            });
+        });
+
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.OpticalProductionMaterial", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<Guid>("OpticalProductionJobId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<Guid>("ProductVariantId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<decimal>("Quantity").IsRequired().HasColumnType("decimal(18,3)");
+            b.Property<decimal?>("UnitCostSnapshot").HasColumnType("decimal(19,4)");
+            b.Property<decimal?>("TotalCostSnapshot").HasColumnType("decimal(19,4)");
+            b.Property<string>("Notes").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.HasKey("Id");
+            b.HasIndex("OpticalProductionJobId", "ProductVariantId").IsUnique().HasDatabaseName("UX_OpticalProductionMaterials_Job_Variant");
+            b.ToTable("tbl_OpticalProductionMaterials", "dbo", t => t.HasCheckConstraint("CK_OpticalProductionMaterials_Qty", "[Quantity] > 0"));
+        });
+
+        // Relationships for returns / commissions / optical production
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.SalesInvoice", b =>
+        {
+            b.HasOne("OAS.Domain.Features.Employees.Entities.Employee", null).WithMany()
+                .HasForeignKey("SalesEmployeeId").OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("FK_SalesInvoices_Employees_SalesEmployeeId");
+        });
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.SalesReturn", b =>
+        {
+            b.HasOne("OAS.Domain.Sales.Entities.SalesInvoice", null).WithMany().HasForeignKey("SalesInvoiceId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_SalesReturns_SalesInvoices_SalesInvoiceId");
+            b.HasOne("OAS.Domain.Accounting.Entities.Customer", null).WithMany().HasForeignKey("CustomerId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_SalesReturns_Customers_CustomerId");
+            b.HasOne("OAS.Domain.Accounting.Entities.Currency", null).WithMany().HasForeignKey("CurrencyId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_SalesReturns_Currencies_CurrencyId");
+            b.HasOne("OAS.Domain.Accounting.Entities.Currency", null).WithMany().HasForeignKey("BaseCurrencyId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_SalesReturns_BaseCurrencies_BaseCurrencyId");
+            b.HasOne("OAS.Domain.Accounting.Entities.JournalEntry", null).WithMany().HasForeignKey("JournalEntryId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_SalesReturns_JournalEntries_JournalEntryId");
+            b.HasMany("OAS.Domain.Sales.Entities.SalesReturnLine", "Lines").WithOne().HasForeignKey("SalesReturnId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_SalesReturnLines_SalesReturns_SalesReturnId");
+            b.Navigation("Lines").UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.SalesReturnLine", b =>
+        {
+            b.HasOne("OAS.Domain.Sales.Entities.SalesInvoiceLine", null).WithMany().HasForeignKey("SalesInvoiceLineId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_SalesReturnLines_SalesInvoiceLines_SalesInvoiceLineId");
+            b.HasOne("OAS.Domain.Entities.Inventory.ProductVariant", null).WithMany().HasForeignKey("ProductVariantId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_SalesReturnLines_ProductVariants_ProductVariantId");
+            b.HasOne("OAS.Domain.Entities.Inventory.Warehouse", null).WithMany().HasForeignKey("WarehouseId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_SalesReturnLines_Warehouses_WarehouseId");
+        });
+        modelBuilder.Entity("OAS.Domain.Purchasing.Entities.PurchaseReturn", b =>
+        {
+            b.HasOne("OAS.Domain.Purchasing.Entities.PurchaseReceipt", null).WithMany().HasForeignKey("PurchaseReceiptId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_PurchaseReturns_Receipts_PurchaseReceiptId");
+            b.HasOne("OAS.Domain.Purchasing.Entities.PurchaseInvoice", null).WithMany().HasForeignKey("PurchaseInvoiceId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_PurchaseReturns_Invoices_PurchaseInvoiceId");
+            b.HasOne("OAS.Domain.Accounting.Entities.Supplier", null).WithMany().HasForeignKey("SupplierId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_PurchaseReturns_Suppliers_SupplierId");
+            b.HasOne("OAS.Domain.Entities.Inventory.Warehouse", null).WithMany().HasForeignKey("WarehouseId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_PurchaseReturns_Warehouses_WarehouseId");
+            b.HasOne("OAS.Domain.Accounting.Entities.JournalEntry", null).WithMany().HasForeignKey("JournalEntryId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_PurchaseReturns_Journals_JournalEntryId");
+            b.HasMany("OAS.Domain.Purchasing.Entities.PurchaseReturnLine", "Lines").WithOne().HasForeignKey("PurchaseReturnId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_PurchaseReturnLines_Returns_PurchaseReturnId");
+            b.Navigation("Lines").UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+        modelBuilder.Entity("OAS.Domain.Purchasing.Entities.PurchaseReturnLine", b =>
+        {
+            b.HasOne("OAS.Domain.Purchasing.Entities.PurchaseReceiptLine", null).WithMany().HasForeignKey("PurchaseReceiptLineId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_PurchaseReturnLines_ReceiptLines_PurchaseReceiptLineId");
+            b.HasOne("OAS.Domain.Purchasing.Entities.PurchaseInvoiceLine", null).WithMany().HasForeignKey("PurchaseInvoiceLineId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_PurchaseReturnLines_InvoiceLines_PurchaseInvoiceLineId");
+            b.HasOne("OAS.Domain.Entities.Inventory.ProductVariant", null).WithMany().HasForeignKey("ProductVariantId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_PurchaseReturnLines_ProductVariants_ProductVariantId");
+        });
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.CommissionRule", b =>
+        {
+            b.HasOne("OAS.Domain.Features.Employees.Entities.Employee", null).WithMany().HasForeignKey("EmployeeId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_CommissionRules_Employees_EmployeeId");
+        });
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.CommissionStatement", b =>
+        {
+            b.HasOne("OAS.Domain.Features.Employees.Entities.Employee", null).WithMany().HasForeignKey("EmployeeId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_CommissionStatements_Employees_EmployeeId");
+            b.HasMany("OAS.Domain.Sales.Entities.CommissionEntry", "Entries").WithOne().HasForeignKey("CommissionStatementId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_CommissionEntries_Statements_CommissionStatementId");
+            b.Navigation("Entries").UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.CommissionEntry", b =>
+        {
+            b.HasOne("OAS.Domain.Features.Employees.Entities.Employee", null).WithMany().HasForeignKey("EmployeeId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_CommissionEntries_Employees_EmployeeId");
+            b.HasOne("OAS.Domain.Sales.Entities.CommissionRule", null).WithMany().HasForeignKey("CommissionRuleId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_CommissionEntries_CommissionRules_CommissionRuleId");
+            b.HasOne("OAS.Domain.Sales.Entities.SalesInvoice", null).WithMany().HasForeignKey("SalesInvoiceId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_CommissionEntries_SalesInvoices_SalesInvoiceId");
+            b.HasOne("OAS.Domain.Sales.Entities.SalesReturn", null).WithMany().HasForeignKey("SalesReturnId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_CommissionEntries_SalesReturns_SalesReturnId");
+        });
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.OpticalProductionJob", b =>
+        {
+            b.HasOne("OAS.Domain.Sales.Entities.SalesInvoice", null).WithMany().HasForeignKey("SalesInvoiceId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_OpticalProductionJobs_SalesInvoices_SalesInvoiceId");
+            b.HasOne("OAS.Domain.Sales.Entities.SalesInvoiceLine", null).WithMany().HasForeignKey("SalesInvoiceLineId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_OpticalProductionJobs_SalesInvoiceLines_SalesInvoiceLineId");
+            b.HasOne("OAS.Domain.Accounting.Entities.Customer", null).WithMany().HasForeignKey("CustomerId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_OpticalProductionJobs_Customers_CustomerId");
+            b.HasOne("OAS.Domain.Entities.Inventory.Warehouse", null).WithMany().HasForeignKey("WarehouseId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_OpticalProductionJobs_Warehouses_WarehouseId");
+            b.HasOne("OAS.Domain.Entities.Inventory.InventoryTransaction", null).WithMany().HasForeignKey("InventoryTransactionId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_OpticalProductionJobs_InventoryTransactions_InventoryTransactionId");
+            b.HasOne("OAS.Domain.Sales.Entities.OpticalProductionJob", null).WithMany().HasForeignKey("RemakeOfJobId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_OpticalProductionJobs_RemakeOfJobId");
+            b.HasMany("OAS.Domain.Sales.Entities.OpticalProductionMaterial", "Materials").WithOne().HasForeignKey("OpticalProductionJobId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_OpticalProductionMaterials_Jobs_OpticalProductionJobId");
+            b.Navigation("Materials").UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.OpticalProductionMaterial", b =>
+        {
+            b.HasOne("OAS.Domain.Entities.Inventory.ProductVariant", null).WithMany().HasForeignKey("ProductVariantId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_OpticalProductionMaterials_ProductVariants_ProductVariantId");
         });
 
 #pragma warning restore 612, 618

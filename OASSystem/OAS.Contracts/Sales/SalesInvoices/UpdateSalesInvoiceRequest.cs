@@ -12,4 +12,5 @@ public sealed record UpdateSalesInvoiceRequest(
     SalesPaymentTermType PaymentTermType,
     string? Description,
     IReadOnlyList<SalesInvoiceLineRequest> Lines,
-    string RowVersion);
+    string RowVersion,
+    Guid? SalesEmployeeId = null);

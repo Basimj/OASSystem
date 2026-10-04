@@ -17,6 +17,19 @@ public sealed record PurchasingInventoryPostingResult(Guid InventoryTransactionI
 public sealed record PurchasingReceiptJournalLine(Guid PurchaseReceiptLineId, Guid ProductVariantId, decimal BaseAmount);
 public sealed record PurchasingReceiptAccountingContext(Guid PurchaseReceiptId, string ReceiptCode, Guid SupplierId, DateOnly PostingDate, IReadOnlyList<PurchasingReceiptJournalLine> Lines);
 public sealed record PurchasingInvoiceAccountingContext(Guid PurchaseInvoiceId, string PurchaseInvoiceCode, Guid SupplierId, DateOnly PostingDate, Guid CurrencyId, decimal ExchangeRate, decimal GrniBaseAmount, decimal PurchaseTaxBaseAmount, decimal PurchasePriceVarianceBaseAmount, decimal SupplierPayableBaseAmount);
+public sealed record PurchasingReturnAccountingContext(
+    Guid PurchaseReturnId,
+    string ReturnCode,
+    Guid PurchaseReceiptId,
+    Guid? PurchaseInvoiceId,
+    Guid SupplierId,
+    DateOnly PostingDate,
+    decimal ReceiptCostBaseAmount,
+    decimal SupplierNetBaseAmount,
+    decimal SupplierTaxBaseAmount,
+    decimal SupplierGrossBaseAmount,
+    decimal InventoryCostBaseAmount,
+    decimal PurchasePriceVarianceBaseAmount);
 public sealed record PurchasingAccountingPostingResult(Guid JournalEntryId);
 
 public sealed record PurchaseMatchingTolerances(decimal QuantityTolerance, decimal PriceTolerance, decimal TaxTolerance);

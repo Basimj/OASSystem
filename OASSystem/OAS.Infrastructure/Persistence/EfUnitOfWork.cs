@@ -386,6 +386,48 @@ public sealed class EfUnitOfWork(OasDbContext dbContext) : IUnitOfWork
             return true;
         }
 
+        if (message.Contains("UX_SalesReturns_ReturnCode", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("sales_return_code_exists", "كود مرتجع المبيعات مستخدم مسبقًا.");
+            return true;
+        }
+
+        if (message.Contains("UX_PurchaseReturns_ReturnCode", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("purchase_return_code_exists", "كود مرتجع المشتريات مستخدم مسبقًا.");
+            return true;
+        }
+
+        if (message.Contains("UX_CommissionRules_Code", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("commission_rule_code_duplicate", "كود قاعدة العمولة مستخدم مسبقًا.");
+            return true;
+        }
+
+        if (message.Contains("UX_CommissionStatements_StatementCode", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("commission_statement_code_exists", "كود دورة العمولة مستخدم مسبقًا.");
+            return true;
+        }
+
+        if (message.Contains("UX_CommissionEntries_SourceLine", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("commission_source_already_processed", "تم احتساب عمولة هذا السطر مسبقًا.");
+            return true;
+        }
+
+        if (message.Contains("UX_OpticalProductionJobs_JobCode", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("production_job_code_exists", "كود أمر الإنتاج مستخدم مسبقًا.");
+            return true;
+        }
+
+        if (message.Contains("UX_OpticalProductionJobs_ActiveInvoiceLine", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("production_active_job_exists", "يوجد أمر إنتاج نشط لسطر الفاتورة بالفعل.");
+            return true;
+        }
+
         conflict = new ConflictException("unique_constraint_conflict", "A unique value already exists.");
         return true;
     }

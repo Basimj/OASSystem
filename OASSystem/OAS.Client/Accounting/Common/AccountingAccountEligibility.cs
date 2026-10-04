@@ -19,7 +19,8 @@ public enum AccountingAccountEligibilityContext
     TaxPayable = 11,
     SalesRevenue = 12,
     Inventory = 13,
-    CostOfGoodsSold = 14
+    CostOfGoodsSold = 14,
+    RetainedEarnings = 15
 }
 
 public sealed record AccountingAccountEligibilityResult(
@@ -61,6 +62,7 @@ public static class AccountingAccountEligibility
             AccountingAccountEligibilityContext.SalesRevenue => EvaluateSalesRevenue(account),
             AccountingAccountEligibilityContext.Inventory => EvaluateInventory(account),
             AccountingAccountEligibilityContext.CostOfGoodsSold => EvaluateCostOfGoodsSold(account),
+            AccountingAccountEligibilityContext.RetainedEarnings => EvaluateRetainedEarnings(account),
             _ => AccountingAccountEligibilityResult.Eligible
         };
     }
@@ -107,6 +109,21 @@ public static class AccountingAccountEligibility
 
         if (account.NormalBalance != NormalBalance.Debit)
             return Invalid("cogs_wrong_balance", "يجب أن تكون طبيعة حساب تكلفة البضاعة المباعة مدينة.");
+
+        return AccountingAccountEligibilityResult.Eligible;
+    }
+
+    private static AccountingAccountEligibilityResult EvaluateRetainedEarnings(AccountDto account)
+    {
+        var posting = EvaluateAutomaticPosting(account);
+        if (!posting.IsEligible)
+            return posting;
+
+        if (account.AccountClass != AccountClass.Equity)
+            return Invalid("retained_earnings_wrong_class", "يجب أن يكون حساب الأرباح المحتجزة من حسابات حقوق الملكية.");
+
+        if (account.NormalBalance != NormalBalance.Credit)
+            return Invalid("retained_earnings_wrong_balance", "يجب أن تكون طبيعة حساب الأرباح المحتجزة دائنة.");
 
         return AccountingAccountEligibilityResult.Eligible;
     }

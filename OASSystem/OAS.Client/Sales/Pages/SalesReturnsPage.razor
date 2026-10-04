@@ -1,0 +1,367 @@
+@page "/sales/returns"
+@attribute [Authorize]
+@using OAS.Contracts.Sales.Returns
+@using OAS.Contracts.Sales.SalesInvoices
+@using OAS.Contracts.Sales.Enums
+@inject ISalesClientService Sales
+
+<PageTitle>مرتجعات المبيعات | OAS</PageTitle>
+
+<UiWorkspaceLayout ShowAside="@(_creating || _selected is not null)" ShowFilters="false">
+    <Actions>
+        <UiWorkspaceActionBar>
+            <UiButton Text="مرتجع جديد" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" OnClick="BeginCreateAsync" />
+            <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Loading="@_busy" OnClick="RefreshAsync" />
+            @if (_selected is { Status: SalesReturnStatus.Draft })
+            {
+                <UiButton Text="تأكيد" IconCssClass="fa-solid fa-check" Size="ControlSize.Small" Loading="@_busy" OnClick="ConfirmAsync" />
+                <UiButton Text="إلغاء" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" Loading="@_busy" OnClick="CancelAsync" />
+            }
+            else if (_selected is { Status: SalesReturnStatus.Confirmed })
+            {
+                <UiButton Text="ترحيل" IconCssClass="fa-solid fa-arrow-up-right-dots" Size="ControlSize.Small" Loading="@_busy" OnClick="PostAsync" />
+                <UiButton Text="إلغاء" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" Loading="@_busy" OnClick="CancelAsync" />
+            }
+        </UiWorkspaceActionBar>
+    </Actions>
+
+    <Content>
+        <UiDataGridPanel Title="مرتجعات المبيعات" Subtitle="@($"{_page.TotalCount:N0} مستند")">
+            <Toolbar>
+                <UiSearchInput Value="@_search" ValueChanged="@(value => _search = value)" OnSearch="SearchAsync" Placeholder="بحث برقم المرتجع أو السبب..." />
+            </Toolbar>
+            <Body>
+                <UiStackLayout Gap="StackGap.Small">
+                    @if (!string.IsNullOrWhiteSpace(_error))
+                    {
+                        <UiAlert Message="@_error" Tone="AlertTone.Danger" />
+                    }
+                    @if (_busy && _page.Items.Count == 0)
+                    {
+                        <UiAlert Message="جارٍ تحميل مرتجعات المبيعات..." Tone="AlertTone.Info" />
+                    }
+                    else if (_page.Items.Count == 0)
+                    {
+                        <UiAlert Message="لا توجد مرتجعات مبيعات مطابقة." Tone="AlertTone.Info" />
+                    }
+                    else
+                    {
+                        @foreach (var item in _page.Items)
+                        {
+                            <UiRecordRow Title="@item.ReturnCode"
+                                         Subtitle="@($"{item.ReturnDate:yyyy-MM-dd} • {item.TotalAmount:N2} {item.CurrencyCode}")"
+                                         Selected="@(_selected?.Id == item.Id)"
+                                         OnClick="@(() => SelectAsync(item.Id))">
+                                <Content>
+                                    <UiKeyValue Label="تاريخ الترحيل" Value="@item.PostingDate.ToString("yyyy-MM-dd")" />
+                                </Content>
+                                <Trailing>
+                                    <UiBadge Text="@StatusText(item.Status)" Tone="@StatusTone(item.Status)" />
+                                </Trailing>
+                            </UiRecordRow>
+                        }
+                    }
+                </UiStackLayout>
+            </Body>
+            <Footer>
+                <UiPagination PageNumber="@_page.PageNumber" TotalPages="@_page.TotalPages" TotalCount="@_page.TotalCount" OnPrevious="PreviousAsync" OnNext="NextAsync" />
+            </Footer>
+        </UiDataGridPanel>
+    </Content>
+
+    <Aside>
+        @if (_creating)
+        {
+            <UiCard Title="مرتجع مبيعات جديد" Subtitle="اختر فاتورة مرحلة ثم حدد الأسطر والكميات المراد إرجاعها.">
+                <UiStackLayout Gap="StackGap.Small">
+                    @if (!string.IsNullOrWhiteSpace(_editorError))
+                    {
+                        <UiAlert Message="@_editorError" Tone="AlertTone.Danger" />
+                    }
+                    <UiSelect Label="فاتورة المبيعات"
+                              Placeholder="اختر فاتورة مرحلة"
+                              Value="@_invoiceIdText"
+                              ValueChanged="InvoiceChangedAsync"
+                              Options="@InvoiceOptions"
+                              Size="ControlSize.Small" />
+                    <UiGrid Columns="2">
+                        <UiInputDate Label="تاريخ المرتجع" Value="@_returnDate" ValueChanged="@(value => _returnDate = value)" Size="ControlSize.Small" />
+                        <UiInputDate Label="تاريخ الترحيل" Value="@_postingDate" ValueChanged="@(value => _postingDate = value)" Size="ControlSize.Small" />
+                    </UiGrid>
+                    <UiInputText Label="السبب" Value="@_reason" ValueChanged="@(value => _reason = value)" Size="ControlSize.Small" MaxLength="1000" />
+
+                    @if (_sourceInvoice is not null)
+                    {
+                        <UiCard Title="أسطر الفاتورة" Subtitle="الكمية المتاحة محسوبة بعد خصم المرتجعات السابقة والمحجوزة.">
+                            <UiStackLayout Gap="StackGap.Small">
+                                @foreach (var line in _returnLines)
+                                {
+                                    <UiCard Title="@($"{line.Line.LineNumber} - {line.Line.ProductNameSnapshot}")"
+                                            Subtitle="@($"الكمية الأصلية {line.Line.Quantity:N3} • المتاح {line.Remaining:N3}")">
+                                        <UiGrid Columns="2">
+                                            <UiCheckbox Value="@line.Selected" ValueChanged="@(value => line.Selected = value)" Label="إرجاع هذا السطر" Disabled="@(line.Remaining <= 0m)" />
+                                            <UiInputText Label="الكمية المرتجعة"
+                                                         Value="@line.QuantityText"
+                                                         ValueChanged="@(value => line.QuantityText = value ?? string.Empty)"
+                                                         InputMode="decimal"
+                                                         Size="ControlSize.Small"
+                                                         Disabled="@(!line.Selected || line.Remaining <= 0m)" />
+                                        </UiGrid>
+                                    </UiCard>
+                                }
+                            </UiStackLayout>
+                        </UiCard>
+                    }
+
+                    <UiWorkspaceActionBar>
+                        <UiButton Text="حفظ المسودة" IconCssClass="fa-solid fa-floppy-disk" Loading="@_busy" Size="ControlSize.Small" OnClick="CreateAsync" />
+                        <UiButton Text="إلغاء" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CloseEditorAsync" />
+                    </UiWorkspaceActionBar>
+                </UiStackLayout>
+            </UiCard>
+        }
+        else if (_selected is not null)
+        {
+            <UiCard Title="@_selected.ReturnCode" Subtitle="@StatusText(_selected.Status)">
+                <UiStackLayout Gap="StackGap.Small">
+                    <UiGrid Columns="2">
+                        <UiKeyValue Label="تاريخ المرتجع" Value="@_selected.ReturnDate.ToString("yyyy-MM-dd")" />
+                        <UiKeyValue Label="تاريخ الترحيل" Value="@_selected.PostingDate.ToString("yyyy-MM-dd")" />
+                        <UiKeyValue Label="صافي المرتجع" Value="@($"{_selected.NetAmount:N2} {_selected.CurrencyCode}")" />
+                        <UiKeyValue Label="الضريبة" Value="@($"{_selected.TaxAmount:N2} {_selected.CurrencyCode}")" />
+                        <UiKeyValue Label="الإجمالي" Value="@($"{_selected.TotalAmount:N2} {_selected.CurrencyCode}")" />
+                        <UiKeyValue Label="القيد" Value="@(_selected.JournalEntryId?.ToString("D") ?? "غير مرحل")" />
+                    </UiGrid>
+                    @if (!string.IsNullOrWhiteSpace(_selected.Reason))
+                    {
+                        <UiAlert Message="@_selected.Reason" Tone="AlertTone.Info" />
+                    }
+                    <UiCard Title="الأسطر" Subtitle="@($"{_selected.Lines.Count} سطر")">
+                        <UiStackLayout Gap="StackGap.Small">
+                            @foreach (var line in _selected.Lines)
+                            {
+                                <UiRecordRow Title="@($"{line.LineNumber} - {line.ProductName}")"
+                                             Subtitle="@($"كمية {line.Quantity:N3} • إجمالي {line.FinalAmount:N2}")">
+                                    <Content>
+                                        <UiKeyValue Label="تكلفة المخزون" Value="@(line.TotalCostSnapshot?.ToString("N2") ?? "-")" />
+                                    </Content>
+                                </UiRecordRow>
+                            }
+                        </UiStackLayout>
+                    </UiCard>
+                </UiStackLayout>
+            </UiCard>
+        }
+    </Aside>
+</UiWorkspaceLayout>
+
+@code {
+    private PagedResult<SalesReturnDto> _page = new();
+    private SalesReturnDto? _selected;
+    private SalesInvoiceDto? _sourceInvoice;
+    private IReadOnlyList<SalesInvoiceDto> _postedInvoices = [];
+    private readonly List<ReturnLineForm> _returnLines = [];
+    private bool _creating;
+    private bool _busy;
+    private int _pageNumber = 1;
+    private string? _search;
+    private string? _error;
+    private string? _editorError;
+    private string? _invoiceIdText;
+    private DateOnly? _returnDate = DateOnly.FromDateTime(DateTime.Today);
+    private DateOnly? _postingDate = DateOnly.FromDateTime(DateTime.Today);
+    private string? _reason;
+
+    private IReadOnlyList<UiSelectOption> InvoiceOptions => _postedInvoices
+        .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.InvoiceCode} - {x.CustomerName ?? x.CustomerCode ?? "عميل"}"))
+        .ToArray();
+
+    protected override async Task OnInitializedAsync() => await RefreshAsync();
+
+    private async Task RefreshAsync()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            _page = await Sales.GetSalesReturnsPageAsync(new PageRequest { PageNumber = _pageNumber, PageSize = 20, Search = _search });
+            if (_selected is not null)
+                _selected = await Sales.GetSalesReturnByIdAsync(_selected.Id);
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private async Task SearchAsync(string? value)
+    {
+        _search = value;
+        _pageNumber = 1;
+        await RefreshAsync();
+    }
+
+    private async Task PreviousAsync() { if (_pageNumber > 1) { _pageNumber--; await RefreshAsync(); } }
+    private async Task NextAsync() { if (_page.HasNextPage) { _pageNumber++; await RefreshAsync(); } }
+
+    private async Task SelectAsync(Guid id)
+    {
+        _creating = false;
+        _editorError = null;
+        _busy = true;
+        try { _selected = await Sales.GetSalesReturnByIdAsync(id); }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private async Task BeginCreateAsync()
+    {
+        _creating = true;
+        _selected = null;
+        _editorError = null;
+        _sourceInvoice = null;
+        _returnLines.Clear();
+        _invoiceIdText = null;
+        _reason = null;
+        _returnDate = DateOnly.FromDateTime(DateTime.Today);
+        _postingDate = _returnDate;
+        _busy = true;
+        try
+        {
+            var invoices = await Sales.GetSalesInvoicesPageAsync(new PageRequest { PageNumber = 1, PageSize = 200, SortBy = "invoiceDate", SortDirection = SortDirection.Descending });
+            _postedInvoices = invoices.Items.Where(x => x.Status == SalesInvoiceStatus.Posted).ToArray();
+        }
+        catch (Exception ex) { _editorError = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private async Task InvoiceChangedAsync(string? value)
+    {
+        _invoiceIdText = value;
+        _sourceInvoice = null;
+        _returnLines.Clear();
+        if (!Guid.TryParse(value, out var id)) return;
+        _busy = true;
+        try
+        {
+            _sourceInvoice = await Sales.GetSalesInvoiceByIdAsync(id);
+            if (_sourceInvoice is null) return;
+            foreach (var line in _sourceInvoice.Lines.Where(x => x.IsActive))
+            {
+                var remaining = Math.Max(0m, line.Quantity - line.ReturnedQuantity);
+                _returnLines.Add(new ReturnLineForm(line, remaining));
+            }
+        }
+        catch (Exception ex) { _editorError = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private async Task CreateAsync()
+    {
+        _editorError = null;
+        if (_sourceInvoice is null || !_returnDate.HasValue || !_postingDate.HasValue)
+        {
+            _editorError = "اختر فاتورة وحدد تاريخ المرتجع والترحيل.";
+            return;
+        }
+        var lines = new List<CreateSalesReturnLineRequest>();
+        foreach (var form in _returnLines.Where(x => x.Selected))
+        {
+            if (!decimal.TryParse(form.QuantityText, out var quantity) || quantity <= 0m || quantity > form.Remaining)
+            {
+                _editorError = $"تحقق من كمية السطر {form.Line.LineNumber}. الحد الأقصى {form.Remaining:N3}.";
+                return;
+            }
+            lines.Add(new CreateSalesReturnLineRequest(form.Line.Id, quantity));
+        }
+        if (lines.Count == 0)
+        {
+            _editorError = "حدد سطرًا واحدًا على الأقل وكمية مرتجعة صحيحة.";
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var created = await Sales.CreateSalesReturnAsync(new CreateSalesReturnRequest(_sourceInvoice.Id, _returnDate.Value, _postingDate.Value, _reason, lines));
+            if (created is not null)
+            {
+                _creating = false;
+                _selected = created;
+                _pageNumber = 1;
+                await RefreshAsync();
+            }
+        }
+        catch (Exception ex) { _editorError = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private async Task ConfirmAsync()
+    {
+        if (_selected is null) return;
+        await RunSelectedActionAsync(async () => await Sales.ConfirmSalesReturnAsync(_selected.Id, new SalesReturnActionRequest(_selected.RowVersion)));
+    }
+
+    private async Task PostAsync()
+    {
+        if (_selected is null) return;
+        _busy = true; _error = null;
+        try
+        {
+            await Sales.PostSalesReturnAsync(_selected.Id, new SalesReturnActionRequest(_selected.RowVersion));
+            _selected = await Sales.GetSalesReturnByIdAsync(_selected.Id);
+            await RefreshAsync();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private async Task CancelAsync()
+    {
+        if (_selected is null) return;
+        await RunSelectedActionAsync(async () => await Sales.CancelSalesReturnAsync(_selected.Id, new CancelSalesReturnRequest(_selected.RowVersion, "إلغاء من واجهة مرتجعات المبيعات")));
+    }
+
+    private async Task RunSelectedActionAsync(Func<Task<SalesReturnDto?>> action)
+    {
+        _busy = true; _error = null;
+        try
+        {
+            var result = await action();
+            if (result is not null) _selected = result;
+            await RefreshAsync();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private Task CloseEditorAsync()
+    {
+        _creating = false;
+        _editorError = null;
+        return Task.CompletedTask;
+    }
+
+    private static string StatusText(SalesReturnStatus status) => status switch
+    {
+        SalesReturnStatus.Draft => "مسودة",
+        SalesReturnStatus.Confirmed => "مؤكد",
+        SalesReturnStatus.Posted => "مرحل",
+        SalesReturnStatus.Cancelled => "ملغي",
+        _ => status.ToString()
+    };
+
+    private static AlertTone StatusTone(SalesReturnStatus status) => status switch
+    {
+        SalesReturnStatus.Posted => AlertTone.Success,
+        SalesReturnStatus.Cancelled => AlertTone.Danger,
+        SalesReturnStatus.Confirmed => AlertTone.Warning,
+        _ => AlertTone.Info
+    };
+
+    private sealed class ReturnLineForm(SalesInvoiceLineDto line, decimal remaining)
+    {
+        public SalesInvoiceLineDto Line { get; } = line;
+        public decimal Remaining { get; } = remaining;
+        public bool Selected { get; set; }
+        public string QuantityText { get; set; } = remaining > 0m ? Math.Min(remaining, line.Quantity).ToString("0.###") : "0";
+    }
+}

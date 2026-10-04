@@ -8,6 +8,7 @@ using OAS.Contracts.Sales.SalesInvoices;
 using OAS.Domain.Accounting.Entities;
 using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Entities.Inventory;
+using OAS.Domain.Features.Employees.Entities;
 using OAS.Domain.Sales.Entities;
 
 namespace OAS.Application.Sales.Services;
@@ -23,7 +24,8 @@ public sealed class SalesDtoAssembler(
     IReadRepository<Product, Guid> products,
     IReadRepository<ProductType, Guid> productTypes,
     IReadRepository<ProductCategory, Guid> categories,
-    IReadRepository<Warehouse, Guid> warehouses)
+    IReadRepository<Warehouse, Guid> warehouses,
+    IReadRepository<Employee, Guid> employees)
 {
     public async Task<PrescriptionDto> PrescriptionAsync(Prescription entity, CancellationToken ct = default)
     {
@@ -88,6 +90,9 @@ public sealed class SalesDtoAssembler(
 
         var payment = await PaymentSummaryAsync(entity, ct);
         var prescription = await ResolvePrescriptionAsync(entity.PrescriptionRevisionId, ct);
+        var salesEmployeeName = entity.SalesEmployeeId.HasValue
+            ? (await employees.GetByIdAsync(entity.SalesEmployeeId.Value, ct))?.DisplayName
+            : null;
         var journalNumber = entity.JournalEntryId.HasValue
             ? (await journals.GetByIdAsync(entity.JournalEntryId.Value, ct))?.JournalNumber
             : null;
@@ -106,7 +111,8 @@ public sealed class SalesDtoAssembler(
             Lines = lines,
             PrescriptionCode = prescription.Code,
             PrescriptionRevisionNumber = prescription.RevisionNumber,
-            JournalEntryNumber = journalNumber
+            JournalEntryNumber = journalNumber,
+            SalesEmployeeName = salesEmployeeName
         };
     }
 
@@ -151,6 +157,7 @@ public sealed class SalesDtoAssembler(
             ProductTypeName = product.ProductTypeName,
             ProductTypeSystemKey = product.ProductTypeSystemKey,
             ProductIsStockItem = product.IsStockItem,
+            ReturnedQuantity = line.ReturnedQuantity,
             WarehouseCode = warehouse.Code,
             WarehouseName = warehouse.Name,
             PrescriptionCode = prescription.Code,

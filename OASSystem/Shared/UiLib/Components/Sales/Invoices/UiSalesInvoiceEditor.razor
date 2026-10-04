@@ -10,6 +10,7 @@
         <UiInputText Label="كود العميل" Value="@Model.CustomerCode" ReadOnly="true" />
         <UiLookup Label="العميل" Value="@Model.CustomerId" ValueChanged="CustomerChanged" SelectedItem="@CustomerItem" SearchAsync="SearchCustomersAsync" Placeholder="ابحث بكود العميل أو الاسم..." Required="true" Disabled="@SourceOrderFieldsReadOnly" />
 
+        <UiLookup Label="موظف المبيعات" Value="@Model.SalesEmployeeId" ValueChanged="SalesEmployeeChanged" SelectedItem="@SalesEmployeeItem" SearchAsync="SearchEmployeesAsync" Placeholder="اختياري - اختر موظف المبيعات" Disabled="@ReadOnly" />
         <UiInputText Label="كود الوصفة" Value="@Model.PrescriptionCode" ReadOnly="true" />
         <UiLookup Label="الوصفة / الإصدار" Value="@Model.PrescriptionRevisionId" ValueChanged="PrescriptionChanged" SelectedItem="@PrescriptionItem" SearchAsync="SearchPrescriptionsAsync" Placeholder="اختياري" Disabled="@SourceOrderFieldsReadOnly" />
 
@@ -54,6 +55,7 @@
     [Parameter, EditorRequired] public UiSalesInvoiceFormModel Model { get; set; } = new();
     [Parameter] public bool ReadOnly { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchCustomersAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchEmployeesAsync { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchOrdersAsync { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchPrescriptionsAsync { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchCurrenciesAsync { get; set; }
@@ -75,6 +77,9 @@
     private UiLookupItem? CustomerItem => string.IsNullOrWhiteSpace(Model.CustomerId)
         ? null
         : new(Model.CustomerId, Model.CustomerDisplay ?? (string.IsNullOrWhiteSpace(Model.CustomerCode) ? "العميل المحدد" : Model.CustomerCode));
+    private UiLookupItem? SalesEmployeeItem => string.IsNullOrWhiteSpace(Model.SalesEmployeeId)
+        ? null
+        : new(Model.SalesEmployeeId, Model.SalesEmployeeDisplay ?? "موظف المبيعات المحدد");
     private UiLookupItem? OrderItem => string.IsNullOrWhiteSpace(Model.CustomerOrderId)
         ? null
         : new(Model.CustomerOrderId, Model.CustomerOrderDisplay ?? "الطلب المحدد");
@@ -90,6 +95,7 @@
     private bool ShowImmediateSettlement => IsImmediatePayment && string.Equals(Model.Status, "Confirmed", StringComparison.OrdinalIgnoreCase);
     private bool ImmediateSettlementReadOnly => string.Equals(Model.Status, "Posted", StringComparison.OrdinalIgnoreCase) || string.Equals(Model.Status, "Cancelled", StringComparison.OrdinalIgnoreCase);
     private async Task CustomerChanged(string? v) { Model.CustomerId = v ?? string.Empty; await OnSelectionChanged.InvokeAsync(new("Customer", v)); await OnChanged.InvokeAsync(); }
+    private async Task SalesEmployeeChanged(string? v) { Model.SalesEmployeeId = v ?? string.Empty; await OnSelectionChanged.InvokeAsync(new("SalesEmployee", v)); await OnChanged.InvokeAsync(); }
     private async Task OrderChanged(string? v) { Model.CustomerOrderId = v ?? string.Empty; await OnSelectionChanged.InvokeAsync(new("CustomerOrder", v)); await OnChanged.InvokeAsync(); }
     private async Task PrescriptionChanged(string? v) { Model.PrescriptionRevisionId = v ?? string.Empty; await OnSelectionChanged.InvokeAsync(new("PrescriptionRevision", v)); await OnChanged.InvokeAsync(); }
     private async Task CurrencyChanged(string? v) { Model.CurrencyId = v ?? string.Empty; await OnSelectionChanged.InvokeAsync(new("Currency", v)); await OnChanged.InvokeAsync(); }

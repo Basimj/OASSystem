@@ -1,6 +1,7 @@
 using MediatR;
 using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Abstractions.Security;
+using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Common.Exceptions;
 using OAS.Contracts.Accounting.Enums;
 using OAS.Domain.Accounting.Entities;
@@ -11,6 +12,7 @@ namespace OAS.Application.Accounting.FiscalPeriods.Commands.SetFiscalPeriodStatu
 public sealed class SetFiscalPeriodStatusCommandHandler(
     IRepository<FiscalPeriod, Guid> repository,
     IUnitOfWork unitOfWork,
+    IAccountingReportingQueryService reports,
     ICurrentUser currentUser,
     TimeProvider timeProvider)
     : IRequestHandler<SetFiscalPeriodStatusCommand, Guid>
@@ -31,7 +33,16 @@ public sealed class SetFiscalPeriodStatusCommandHandler(
                 "The specified fiscal period was not found.");
         }
 
-        var requestedRowVersion = Convert.FromBase64String(request.Request.RowVersion);
+        byte[] requestedRowVersion;
+        try
+        {
+            requestedRowVersion = Convert.FromBase64String(request.Request.RowVersion);
+        }
+        catch (FormatException ex)
+        {
+            throw new ConcurrencyException("بيانات التزامن الخاصة بالفترة المالية غير صالحة.", ex);
+        }
+
         if (!period.RowVersion.SequenceEqual(requestedRowVersion))
         {
             throw new ConcurrencyException("The fiscal period has been modified by another user.");
@@ -56,6 +67,21 @@ public sealed class SetFiscalPeriodStatusCommandHandler(
                     throw new ConflictException(
                         "current_user_required",
                         "A valid current user is required to close a fiscal period.");
+                }
+
+                var readiness = await reports.GetFiscalPeriodCloseReadinessAsync(
+                    period.Id,
+                    cancellationToken);
+
+                if (!readiness.CanClose)
+                {
+                    var failed = string.Join(
+                        "، ",
+                        readiness.Checks.Where(x => !x.Passed).Select(x => x.Description));
+
+                    throw new ConflictException(
+                        "fiscal_period_close_not_ready",
+                        $"لا يمكن إقفال الفترة المالية قبل معالجة متطلبات الإقفال: {failed}");
                 }
 
                 period.Close(

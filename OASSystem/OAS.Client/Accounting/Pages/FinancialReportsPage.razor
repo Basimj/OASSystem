@@ -1,0 +1,256 @@
+@page "/accounting/reports"
+@attribute [Authorize]
+@using OAS.Contracts.Accounting.Reports
+@using System.Globalization
+@inject IAccountingClientService Accounting
+@inject NavigationManager Navigation
+
+<PageTitle>التقارير المالية | OAS</PageTitle>
+
+<UiAccountingWorkspace ShowTabs="false">
+    <Actions>
+        <UiWorkspaceActionBar>
+            <UiInputDate Label="من تاريخ"
+                         Value="@_fromDate"
+                         ValueChanged="@(value => _fromDate = value)"
+                         ValueExpression="@(() => _fromDate)"
+                         Size="ControlSize.Small" />
+            <UiInputDate Label="إلى تاريخ"
+                         Value="@_toDate"
+                         ValueChanged="@(value => _toDate = value)"
+                         ValueExpression="@(() => _toDate)"
+                         Size="ControlSize.Small" />
+            <UiSelect Label="التقرير"
+                      Value="@_reportMode"
+                      ValueChanged="SetReportMode"
+                      Options="@ReportOptions"
+                      Size="ControlSize.Small" />
+            <UiButton Text="عرض التقرير"
+                      IconCssClass="fa-solid fa-chart-line"
+                      Variant="ButtonVariant.Primary"
+                      Size="ControlSize.Small"
+                      Loading="@_busy"
+                      OnClick="LoadAsync" />
+        </UiWorkspaceActionBar>
+    </Actions>
+
+    <Metrics>
+        @if (_trialBalance is not null)
+        {
+            <UiAccountingMetricTile Label="إجمالي مدين الفترة"
+                                    Value="@Money(_trialBalance.PeriodDebitTotal)"
+                                    IconCssClass="fa-solid fa-arrow-trend-up"
+                                    Variant="@UiAccountingMetricTile.MetricVariant.Debit" />
+            <UiAccountingMetricTile Label="إجمالي دائن الفترة"
+                                    Value="@Money(_trialBalance.PeriodCreditTotal)"
+                                    IconCssClass="fa-solid fa-arrow-trend-down"
+                                    Variant="@UiAccountingMetricTile.MetricVariant.Credit" />
+            <UiAccountingMetricTile Label="رصيد ختامي مدين"
+                                    Value="@Money(_trialBalance.ClosingDebitTotal)"
+                                    IconCssClass="fa-solid fa-scale-balanced"
+                                    Variant="@UiAccountingMetricTile.MetricVariant.Balance" />
+            <UiAccountingMetricTile Label="الرصيد"
+                                    Value="@(_trialBalance.IsBalanced ? "متوازن" : "غير متوازن")"
+                                    IconCssClass="fa-solid fa-check-double"
+                                    Variant="@UiAccountingMetricTile.MetricVariant.Default" />
+        }
+        else if (_generalLedger is not null)
+        {
+            <UiAccountingMetricTile Label="إجمالي المدين"
+                                    Value="@Money(_generalLedger.TotalDebit)"
+                                    IconCssClass="fa-solid fa-arrow-trend-up"
+                                    Variant="@UiAccountingMetricTile.MetricVariant.Debit" />
+            <UiAccountingMetricTile Label="إجمالي الدائن"
+                                    Value="@Money(_generalLedger.TotalCredit)"
+                                    IconCssClass="fa-solid fa-arrow-trend-down"
+                                    Variant="@UiAccountingMetricTile.MetricVariant.Credit" />
+            <UiAccountingMetricTile Label="الحسابات ذات الحركة"
+                                    Value="@_generalLedger.Accounts.Count.ToString(CultureInfo.InvariantCulture)"
+                                    IconCssClass="fa-solid fa-book-open"
+                                    Variant="@UiAccountingMetricTile.MetricVariant.Default" />
+        }
+    </Metrics>
+
+    <Body>
+        <UiAccountingEditorSurface>
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <UiAlert Message="@_error" Tone="AlertTone.Danger" />
+            }
+
+            @if (_reportMode == TrialBalanceMode)
+            {
+                <UiAccountingFormSection Title="ميزان المراجعة"
+                                         Subtitle="يعرض الأرصدة الافتتاحية وحركة الفترة والأرصدة الختامية من القيود المرحلة فقط."
+                                         IconCssClass="fa-solid fa-scale-balanced">
+                    <UiAccountingRecordList Items="@TrialBalanceItems"
+                                            EmptyTitle="لا توجد حركات محاسبية"
+                                            EmptyDescription="لا توجد قيود مرحلة ضمن نطاق التاريخ المحدد."
+                                            EmptyIconCssClass="fa-solid fa-scale-balanced"
+                                            OnOpen="OpenAccountLedgerAsync" />
+                </UiAccountingFormSection>
+            }
+            else
+            {
+                <UiAccountingFormSection Title="دفتر الأستاذ العام"
+                                         Subtitle="الرصيد الجاري محسوب من القيود المرحلة والعكسية مع الاحتفاظ بأثر القيد الأصلي وقيد العكس."
+                                         IconCssClass="fa-solid fa-book-open">
+                    @if (_generalLedger is null || _generalLedger.Accounts.Count == 0)
+                    {
+                        <UiAccountingEmptyState IconCssClass="fa-solid fa-book-open"
+                                                Title="لا توجد حركات"
+                                                Description="لا توجد حركات دفتر أستاذ ضمن نطاق التاريخ المحدد." />
+                    }
+                    else
+                    {
+                        @foreach (var account in _generalLedger.Accounts)
+                        {
+                            <UiAccountingFormSection Title="@($"{account.AccountCode} - {account.AccountNameAr}")"
+                                                     Subtitle="@($"افتتاحي {Money(account.OpeningBalance)} | ختامي {Money(account.ClosingBalance)}")"
+                                                     IconCssClass="fa-regular fa-folder-open"
+                                                     Collapsible="true"
+                                                     DefaultCollapsed="@(_generalLedger.Accounts.Count > 4)">
+                                <UiAccountingFormGrid Columns="4">
+                                    <UiAccountingReadOnlyValue Label="الرصيد الافتتاحي" Value="@Money(account.OpeningBalance)" />
+                                    <UiAccountingReadOnlyValue Label="مدين الفترة" Value="@Money(account.PeriodDebit)" Tone="@UiAccountingReadOnlyValue.ValueTone.Primary" />
+                                    <UiAccountingReadOnlyValue Label="دائن الفترة" Value="@Money(account.PeriodCredit)" />
+                                    <UiAccountingReadOnlyValue Label="الرصيد الختامي" Value="@Money(account.ClosingBalance)" Tone="@UiAccountingReadOnlyValue.ValueTone.Success" />
+                                </UiAccountingFormGrid>
+
+                                <UiAccountingRecordList Items="@LedgerLineItems(account)"
+                                                        EmptyTitle="لا توجد حركة خلال الفترة"
+                                                        EmptyDescription="يوجد رصيد افتتاحي للحساب دون حركات داخل النطاق المحدد."
+                                                        EmptyIconCssClass="fa-regular fa-folder-open"
+                                                        OnOpen="OpenJournalAsync" />
+                            </UiAccountingFormSection>
+                        }
+                    }
+                </UiAccountingFormSection>
+            }
+        </UiAccountingEditorSurface>
+    </Body>
+</UiAccountingWorkspace>
+
+@code {
+    private const string TrialBalanceMode = "trial-balance";
+    private const string GeneralLedgerMode = "general-ledger";
+
+    private DateOnly? _fromDate = new(DateTime.Today.Year, 1, 1);
+    private DateOnly? _toDate = DateOnly.FromDateTime(DateTime.Today);
+    private string _reportMode = TrialBalanceMode;
+    private bool _busy;
+    private string? _error;
+    private TrialBalanceReportDto? _trialBalance;
+    private GeneralLedgerReportDto? _generalLedger;
+
+    private static IReadOnlyList<UiSelectOption> ReportOptions { get; } =
+    [
+        new(TrialBalanceMode, "ميزان المراجعة"),
+        new(GeneralLedgerMode, "دفتر الأستاذ العام")
+    ];
+
+    private IReadOnlyList<UiAccountingRecordList.RecordItem> TrialBalanceItems =>
+        _trialBalance?.Rows.Select(row => new UiAccountingRecordList.RecordItem(
+            row.AccountId,
+            $"{row.AccountCode} - {row.AccountNameAr}",
+            row.AccountNameEn,
+            "fa-solid fa-book",
+            [
+                new UiAccountingRecordList.DetailItem("افتتاحي مدين", Money(row.OpeningDebit)),
+                new UiAccountingRecordList.DetailItem("افتتاحي دائن", Money(row.OpeningCredit)),
+                new UiAccountingRecordList.DetailItem("حركة مدين", Money(row.PeriodDebit)),
+                new UiAccountingRecordList.DetailItem("حركة دائن", Money(row.PeriodCredit)),
+                new UiAccountingRecordList.DetailItem("ختامي مدين", Money(row.ClosingDebit)),
+                new UiAccountingRecordList.DetailItem("ختامي دائن", Money(row.ClosingCredit))
+            ],
+            row.ClosingDebit > 0m ? "مدين" : row.ClosingCredit > 0m ? "دائن" : "صفر",
+            row.ClosingDebit > 0m ? "approved" : row.ClosingCredit > 0m ? "posted" : "draft"))
+        .ToArray() ?? [];
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private Task SetReportMode(string? value)
+    {
+        _reportMode = string.IsNullOrWhiteSpace(value) ? TrialBalanceMode : value;
+        return Task.CompletedTask;
+    }
+
+    private async Task LoadAsync()
+    {
+        if (!_fromDate.HasValue || !_toDate.HasValue || _toDate.Value < _fromDate.Value)
+        {
+            _error = "تحقق من نطاق التاريخ: تاريخ النهاية يجب ألا يسبق تاريخ البداية.";
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+        try
+        {
+            if (_reportMode == TrialBalanceMode)
+            {
+                _trialBalance = await Accounting.GetTrialBalanceAsync(_fromDate.Value, _toDate.Value);
+                _generalLedger = null;
+            }
+            else
+            {
+                _generalLedger = await Accounting.GetGeneralLedgerAsync(_fromDate.Value, _toDate.Value);
+                _trialBalance = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task OpenAccountLedgerAsync(Guid accountId)
+    {
+        if (!_fromDate.HasValue || !_toDate.HasValue)
+            return;
+
+        _reportMode = GeneralLedgerMode;
+        _busy = true;
+        _error = null;
+        try
+        {
+            _generalLedger = await Accounting.GetGeneralLedgerAsync(_fromDate.Value, _toDate.Value, accountId);
+            _trialBalance = null;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private IReadOnlyList<UiAccountingRecordList.RecordItem> LedgerLineItems(GeneralLedgerAccountDto account) =>
+        account.Lines.Select(line => new UiAccountingRecordList.RecordItem(
+            line.JournalEntryId,
+            $"{line.JournalNumber} - {line.PostingDate:yyyy-MM-dd}",
+            line.Description,
+            "fa-solid fa-book-journal-whills",
+            [
+                new UiAccountingRecordList.DetailItem("مدين", Money(line.Debit)),
+                new UiAccountingRecordList.DetailItem("دائن", Money(line.Credit)),
+                new UiAccountingRecordList.DetailItem("الرصيد الجاري", Money(line.RunningBalance))
+            ],
+            line.SourceModule,
+            "posted"))
+        .ToArray();
+
+    private Task OpenJournalAsync(Guid journalId)
+    {
+        Navigation.NavigateTo($"/accounting/journals?journalId={journalId:D}");
+        return Task.CompletedTask;
+    }
+
+    private static string Money(decimal value) => value.ToString("N2", CultureInfo.CurrentCulture);
+}

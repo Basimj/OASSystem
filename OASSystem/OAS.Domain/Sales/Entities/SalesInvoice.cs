@@ -42,6 +42,7 @@ public sealed class SalesInvoice : AuditableEntity<Guid>
     public Guid CustomerId { get; private set; }
     public Guid? CustomerOrderId { get; private set; }
     public Guid? PrescriptionRevisionId { get; private set; }
+    public Guid? SalesEmployeeId { get; private set; }
     public DateOnly InvoiceDate { get; private set; }
     public DateOnly PostingDate { get; private set; }
     public SalesInvoiceStatus Status { get; private set; }
@@ -109,6 +110,13 @@ public sealed class SalesInvoice : AuditableEntity<Guid>
         SetCommercialPolicy(taxCalculationMode, paymentTermType, paymentTermDaysSnapshot);
         Description = SalesDomainGuard.Optional(description, 1000, "Invoice description");
         RepriceLines();
+    }
+
+    public void SetSalesEmployee(Guid? employeeId)
+    {
+        EnsureDraft();
+        ValidateOptionalId(employeeId, "Sales employee id");
+        SalesEmployeeId = employeeId;
     }
 
     public void ChangeCurrency(

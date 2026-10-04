@@ -1,0 +1,378 @@
+@page "/sales/commissions"
+@attribute [Authorize]
+@using OAS.Client.Features.Employees.Services
+@using OAS.Contracts.Features.Employees
+@using OAS.Contracts.Sales.Commissions
+@inject ISalesClientService Sales
+@inject IEmployeeClientService Employees
+
+<PageTitle>العمولات | OAS</PageTitle>
+
+<UiWorkspaceLayout ShowAside="@(_showRuleEditor || _showStatementEditor || _selectedStatement is not null)" ShowFilters="false">
+    <Actions>
+        <UiWorkspaceActionBar>
+            @if (_mode == StatementsMode)
+            {
+                <UiButton Text="احتساب دورة" IconCssClass="fa-solid fa-calculator" Size="ControlSize.Small" OnClick="BeginStatementAsync" />
+                @if (_selectedStatement is { Status: CommissionStatementStatus.Calculated })
+                {
+                    <UiButton Text="اعتماد الدورة" IconCssClass="fa-solid fa-check-double" Size="ControlSize.Small" Loading="@_busy" OnClick="FinalizeAsync" />
+                }
+            }
+            else
+            {
+                <UiButton Text="قاعدة عمولة جديدة" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" OnClick="BeginRuleAsync" />
+            }
+            <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Loading="@_busy" OnClick="RefreshAsync" />
+        </UiWorkspaceActionBar>
+    </Actions>
+    <Tabs>
+        <UiSectionTabStrip Tabs="@Tabs" OnSelect="SetModeAsync" />
+    </Tabs>
+
+    <Content>
+        @if (_mode == StatementsMode)
+        {
+            <UiDataGridPanel Title="دورات العمولات" Subtitle="@($"{_statements.Count} دورة")">
+                <Body>
+                    <UiStackLayout Gap="StackGap.Small">
+                        @if (!string.IsNullOrWhiteSpace(_error))
+                        {
+                            <UiAlert Message="@_error" Tone="AlertTone.Danger" />
+                        }
+                        @if (_statements.Count == 0)
+                        {
+                            <UiAlert Message="لا توجد دورات عمولات حتى الآن." Tone="AlertTone.Info" />
+                        }
+                        else
+                        {
+                            @foreach (var item in _statements.OrderByDescending(x => x.ToDate).ThenByDescending(x => x.StatementCode))
+                            {
+                                <UiRecordRow Title="@item.StatementCode"
+                                             Subtitle="@($"{item.EmployeeName ?? item.EmployeeId.ToString("D")} • {item.FromDate:yyyy-MM-dd} إلى {item.ToDate:yyyy-MM-dd}")"
+                                             Selected="@(_selectedStatement?.Id == item.Id)"
+                                             OnClick="@(() => SelectStatementAsync(item.Id))">
+                                    <Content>
+                                        <UiKeyValue Label="صافي أساس العمولة" Value="@item.CommissionBaseAmount.ToString("N2")" />
+                                    </Content>
+                                    <Trailing><UiBadge Text="@StatementStatusText(item.Status)" Tone="@StatementTone(item.Status)" /></Trailing>
+                                </UiRecordRow>
+                            }
+                        }
+                    </UiStackLayout>
+                </Body>
+            </UiDataGridPanel>
+        }
+        else
+        {
+            <UiDataGridPanel Title="قواعد العمولات" Subtitle="@($"{_rules.Count} قاعدة")">
+                <Body>
+                    <UiStackLayout Gap="StackGap.Small">
+                        @if (!string.IsNullOrWhiteSpace(_error))
+                        {
+                            <UiAlert Message="@_error" Tone="AlertTone.Danger" />
+                        }
+                        @if (_rules.Count == 0)
+                        {
+                            <UiAlert Message="لا توجد قواعد عمولات." Tone="AlertTone.Info" />
+                        }
+                        else
+                        {
+                            @foreach (var rule in _rules.OrderByDescending(x => x.EffectiveFrom).ThenBy(x => x.Code))
+                            {
+                                <UiRecordRow Title="@($"{rule.Code} - {rule.Name}")"
+                                             Subtitle="@(rule.EmployeeName ?? "قاعدة عامة لجميع الموظفين المؤهلين")">
+                                    <Content>
+                                        <UiGrid Columns="3">
+                                            <UiKeyValue Label="النسبة" Value="@($"{rule.RatePercent:N2}%")" />
+                                            <UiKeyValue Label="من" Value="@rule.EffectiveFrom.ToString("yyyy-MM-dd")" />
+                                            <UiKeyValue Label="إلى" Value="@(rule.EffectiveTo?.ToString("yyyy-MM-dd") ?? "مفتوحة")" />
+                                        </UiGrid>
+                                    </Content>
+                                    <Trailing><UiBadge Text="@(rule.IsActive ? "نشطة" : "غير نشطة")" Tone="@(rule.IsActive ? AlertTone.Success : AlertTone.Warning)" /></Trailing>
+                                </UiRecordRow>
+                            }
+                        }
+                    </UiStackLayout>
+                </Body>
+            </UiDataGridPanel>
+        }
+    </Content>
+
+    <Aside>
+        @if (_showRuleEditor)
+        {
+            <UiCard Title="قاعدة عمولة جديدة" Subtitle="يمكن ترك الموظف فارغًا لإنشاء قاعدة عامة.">
+                <UiStackLayout Gap="StackGap.Small">
+                    @if (!string.IsNullOrWhiteSpace(_editorError))
+                    {
+                        <UiAlert Message="@_editorError" Tone="AlertTone.Danger" />
+                    }
+                    <UiInputText Label="الكود" Value="@_ruleCode" ValueChanged="@(value => _ruleCode = value)" Size="ControlSize.Small" MaxLength="50" />
+                    <UiInputText Label="الاسم" Value="@_ruleName" ValueChanged="@(value => _ruleName = value)" Size="ControlSize.Small" MaxLength="200" />
+                    <UiSelect Label="الموظف" Placeholder="قاعدة عامة" Value="@_ruleEmployeeId" ValueChanged="@(value => _ruleEmployeeId = value)" Options="@EmployeeOptions" Size="ControlSize.Small" />
+                    <UiInputText Label="نسبة العمولة %" Value="@_rateText" ValueChanged="@(value => _rateText = value ?? string.Empty)" InputMode="decimal" Size="ControlSize.Small" />
+                    <UiGrid Columns="2">
+                        <UiInputDate Label="سارية من" Value="@_ruleFrom" ValueChanged="@(value => _ruleFrom = value)" Size="ControlSize.Small" />
+                        <UiInputDate Label="سارية إلى" Value="@_ruleTo" ValueChanged="@(value => _ruleTo = value)" Size="ControlSize.Small" />
+                    </UiGrid>
+                    <UiWorkspaceActionBar>
+                        <UiButton Text="حفظ القاعدة" IconCssClass="fa-solid fa-floppy-disk" Loading="@_busy" Size="ControlSize.Small" OnClick="CreateRuleAsync" />
+                        <UiButton Text="إلغاء" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CloseEditorsAsync" />
+                    </UiWorkspaceActionBar>
+                </UiStackLayout>
+            </UiCard>
+        }
+        else if (_showStatementEditor)
+        {
+            <UiCard Title="احتساب دورة عمولات" Subtitle="تُحفظ نسبة وقاعدة العمولة كـ Snapshot، وتُخصم المرتجعات تلقائيًا.">
+                <UiStackLayout Gap="StackGap.Small">
+                    @if (!string.IsNullOrWhiteSpace(_editorError))
+                    {
+                        <UiAlert Message="@_editorError" Tone="AlertTone.Danger" />
+                    }
+                    <UiSelect Label="الموظف" Placeholder="اختر موظفًا مؤهلًا للعمولة" Value="@_statementEmployeeId" ValueChanged="@(value => _statementEmployeeId = value)" Options="@EmployeeOptions" Size="ControlSize.Small" />
+                    <UiGrid Columns="2">
+                        <UiInputDate Label="من تاريخ" Value="@_statementFrom" ValueChanged="@(value => _statementFrom = value)" Size="ControlSize.Small" />
+                        <UiInputDate Label="إلى تاريخ" Value="@_statementTo" ValueChanged="@(value => _statementTo = value)" Size="ControlSize.Small" />
+                    </UiGrid>
+                    <UiWorkspaceActionBar>
+                        <UiButton Text="احتساب" IconCssClass="fa-solid fa-calculator" Loading="@_busy" Size="ControlSize.Small" OnClick="CalculateAsync" />
+                        <UiButton Text="إلغاء" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CloseEditorsAsync" />
+                    </UiWorkspaceActionBar>
+                </UiStackLayout>
+            </UiCard>
+        }
+        else if (_selectedStatement is not null)
+        {
+            <UiCard Title="@_selectedStatement.StatementCode" Subtitle="@StatementStatusText(_selectedStatement.Status)">
+                <UiStackLayout Gap="StackGap.Small">
+                    <UiGrid Columns="2">
+                        <UiKeyValue Label="الموظف" Value="@(_selectedStatement.EmployeeName ?? _selectedStatement.EmployeeId.ToString("D"))" />
+                        <UiKeyValue Label="الفترة" Value="@($"{_selectedStatement.FromDate:yyyy-MM-dd} — {_selectedStatement.ToDate:yyyy-MM-dd}")" />
+                        <UiKeyValue Label="مبيعات أساس" Value="@_selectedStatement.SalesBaseAmount.ToString("N2")" />
+                        <UiKeyValue Label="مرتجعات أساس" Value="@_selectedStatement.ReturnsBaseAmount.ToString("N2")" />
+                        <UiKeyValue Label="صافي العمولة" Value="@_selectedStatement.CommissionBaseAmount.ToString("N2")" />
+                        <UiKeyValue Label="عدد المصادر" Value="@_selectedStatement.Entries.Count.ToString()" />
+                    </UiGrid>
+                    <UiCard Title="تفاصيل العمولة" Subtitle="كل سطر يحتفظ بقاعدة ونسبة تاريخية مستقلة.">
+                        <UiStackLayout Gap="StackGap.Small">
+                            @foreach (var entry in _selectedStatement.Entries.OrderBy(x => x.SourceDate).ThenBy(x => x.SourceDocumentType))
+                            {
+                                <UiRecordRow Title="@($"{entry.SourceDocumentType} • {entry.SourceDate:yyyy-MM-dd}")"
+                                             Subtitle="@($"{entry.RuleCodeSnapshot} - {entry.RuleNameSnapshot}")">
+                                    <Content>
+                                        <UiGrid Columns="3">
+                                            <UiKeyValue Label="أساس البيع" Value="@entry.BaseSalesAmount.ToString("N2")" />
+                                            <UiKeyValue Label="النسبة" Value="@($"{entry.RatePercent:N2}%")" />
+                                            <UiKeyValue Label="العمولة" Value="@entry.CommissionBaseAmount.ToString("N2")" />
+                                        </UiGrid>
+                                    </Content>
+                                    <Trailing>
+                                        @if (entry.IsReversal)
+                                        {
+                                            <UiBadge Text="عكس مرتجع" Tone="AlertTone.Warning" />
+                                        }
+                                    </Trailing>
+                                </UiRecordRow>
+                            }
+                        </UiStackLayout>
+                    </UiCard>
+                </UiStackLayout>
+            </UiCard>
+        }
+    </Aside>
+</UiWorkspaceLayout>
+
+@code {
+    private const string StatementsMode = "statements";
+    private const string RulesMode = "rules";
+    private string _mode = StatementsMode;
+    private IReadOnlyList<CommissionStatementDto> _statements = [];
+    private IReadOnlyList<CommissionRuleDto> _rules = [];
+    private IReadOnlyList<EmployeeDto> _employees = [];
+    private CommissionStatementDto? _selectedStatement;
+    private bool _showRuleEditor;
+    private bool _showStatementEditor;
+    private bool _busy;
+    private string? _error;
+    private string? _editorError;
+
+    private string? _ruleCode;
+    private string? _ruleName;
+    private string? _ruleEmployeeId;
+    private string _rateText = "1";
+    private DateOnly? _ruleFrom = DateOnly.FromDateTime(DateTime.Today);
+    private DateOnly? _ruleTo;
+
+    private string? _statementEmployeeId;
+    private DateOnly? _statementFrom = new DateOnly(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private DateOnly? _statementTo = DateOnly.FromDateTime(DateTime.Today);
+
+    private IReadOnlyList<UiSectionTabItem> Tabs =>
+    [
+        new(StatementsMode, "دورات العمولات", _mode == StatementsMode),
+        new(RulesMode, "قواعد العمولات", _mode == RulesMode)
+    ];
+
+    private IReadOnlyList<UiSelectOption> EmployeeOptions => _employees
+        .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.EmployeeCode} - {x.DisplayName}"))
+        .ToArray();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _busy = true;
+        try
+        {
+            var page = await Employees.GetPageAsync(new PageRequest { PageNumber = 1, PageSize = 200, SortBy = "EmployeeCode" });
+            _employees = page.Items.Where(x => x.IsActive && x.IsCommissionEligible).ToArray();
+            await LoadDataAsync();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private async Task RefreshAsync()
+    {
+        _busy = true; _error = null;
+        try
+        {
+            await LoadDataAsync();
+            if (_selectedStatement is not null)
+                _selectedStatement = await Sales.GetCommissionStatementAsync(_selectedStatement.Id);
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _rules = await Sales.GetCommissionRulesAsync();
+        _statements = await Sales.GetCommissionStatementsAsync();
+    }
+
+    private async Task SetModeAsync(string mode)
+    {
+        _mode = mode;
+        _selectedStatement = null;
+        _showRuleEditor = false;
+        _showStatementEditor = false;
+        await Task.CompletedTask;
+    }
+
+    private Task BeginRuleAsync()
+    {
+        _showRuleEditor = true; _showStatementEditor = false; _selectedStatement = null; _editorError = null;
+        _ruleCode = null; _ruleName = null; _ruleEmployeeId = null; _rateText = "1";
+        _ruleFrom = DateOnly.FromDateTime(DateTime.Today); _ruleTo = null;
+        return Task.CompletedTask;
+    }
+
+    private Task BeginStatementAsync()
+    {
+        _showStatementEditor = true; _showRuleEditor = false; _selectedStatement = null; _editorError = null;
+        _statementEmployeeId = null;
+        _statementFrom = new DateOnly(DateTime.Today.Year, DateTime.Today.Month, 1);
+        _statementTo = DateOnly.FromDateTime(DateTime.Today);
+        return Task.CompletedTask;
+    }
+
+    private async Task CreateRuleAsync()
+    {
+        _editorError = null;
+        if (string.IsNullOrWhiteSpace(_ruleCode) || string.IsNullOrWhiteSpace(_ruleName) || !_ruleFrom.HasValue)
+        {
+            _editorError = "أدخل كود القاعدة واسمها وتاريخ بداية السريان.";
+            return;
+        }
+        if (!decimal.TryParse(_rateText, out var rate) || rate < 0m || rate > 100m)
+        {
+            _editorError = "نسبة العمولة يجب أن تكون رقمًا بين 0 و100.";
+            return;
+        }
+        if (_ruleTo.HasValue && _ruleTo.Value < _ruleFrom.Value)
+        {
+            _editorError = "تاريخ نهاية القاعدة لا يمكن أن يسبق تاريخ البداية.";
+            return;
+        }
+        Guid? employeeId = Guid.TryParse(_ruleEmployeeId, out var parsed) ? parsed : null;
+        _busy = true;
+        try
+        {
+            await Sales.CreateCommissionRuleAsync(new CreateCommissionRuleRequest(_ruleCode.Trim(), _ruleName.Trim(), employeeId, rate, _ruleFrom.Value, _ruleTo));
+            _showRuleEditor = false;
+            await RefreshAsync();
+        }
+        catch (Exception ex) { _editorError = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private async Task CalculateAsync()
+    {
+        _editorError = null;
+        if (!Guid.TryParse(_statementEmployeeId, out var employeeId) || !_statementFrom.HasValue || !_statementTo.HasValue)
+        {
+            _editorError = "اختر الموظف وحدد فترة الاحتساب.";
+            return;
+        }
+        if (_statementTo.Value < _statementFrom.Value)
+        {
+            _editorError = "تاريخ نهاية الفترة لا يمكن أن يسبق بدايتها.";
+            return;
+        }
+        _busy = true;
+        try
+        {
+            var result = await Sales.CalculateCommissionStatementAsync(new CalculateCommissionStatementRequest(employeeId, _statementFrom.Value, _statementTo.Value));
+            _showStatementEditor = false;
+            _selectedStatement = result;
+            await RefreshAsync();
+        }
+        catch (Exception ex) { _editorError = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private async Task SelectStatementAsync(Guid id)
+    {
+        _showStatementEditor = false; _showRuleEditor = false; _error = null; _busy = true;
+        try { _selectedStatement = await Sales.GetCommissionStatementAsync(id); }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private async Task FinalizeAsync()
+    {
+        if (_selectedStatement is null) return;
+        _busy = true; _error = null;
+        try
+        {
+            _selectedStatement = await Sales.FinalizeCommissionStatementAsync(_selectedStatement.Id, new CommissionStatementActionRequest(_selectedStatement.RowVersion));
+            await RefreshAsync();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private Task CloseEditorsAsync()
+    {
+        _showRuleEditor = false; _showStatementEditor = false; _editorError = null;
+        return Task.CompletedTask;
+    }
+
+    private static string StatementStatusText(CommissionStatementStatus status) => status switch
+    {
+        CommissionStatementStatus.Draft => "مسودة",
+        CommissionStatementStatus.Calculated => "محسوبة",
+        CommissionStatementStatus.Finalized => "معتمدة",
+        CommissionStatementStatus.Cancelled => "ملغاة",
+        _ => status.ToString()
+    };
+
+    private static AlertTone StatementTone(CommissionStatementStatus status) => status switch
+    {
+        CommissionStatementStatus.Finalized => AlertTone.Success,
+        CommissionStatementStatus.Cancelled => AlertTone.Danger,
+        CommissionStatementStatus.Calculated => AlertTone.Warning,
+        _ => AlertTone.Info
+    };
+}

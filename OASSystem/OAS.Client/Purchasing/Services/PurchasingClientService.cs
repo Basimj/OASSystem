@@ -5,6 +5,7 @@ using OAS.Contracts.Purchasing.PurchaseInvoices;
 using OAS.Contracts.Purchasing.PurchaseOrders;
 using OAS.Contracts.Purchasing.PurchaseReceipts;
 using OAS.Contracts.Purchasing.PurchaseRequests;
+using OAS.Contracts.Purchasing.PurchaseReturns;
 using OAS.Contracts.Purchasing.SupplierCatalog;
 
 namespace OAS.Client.Purchasing.Services;
@@ -73,6 +74,17 @@ public sealed class PurchasingClientService(OasApiClient api) : IPurchasingClien
     public Task<PurchaseInvoiceDto?> RejectPurchaseVarianceAsync(Guid id,RejectPurchaseVarianceRequest r,CancellationToken ct=default)=>Post<RejectPurchaseVarianceRequest,PurchaseInvoiceDto>($"api/purchasing/invoices/{id}/variances/reject",r,ct);
     public Task<PurchaseInvoicePostResultDto?> PostPurchaseInvoiceAsync(Guid id,PostPurchaseInvoiceRequest r,CancellationToken ct=default)=>Post<PostPurchaseInvoiceRequest,PurchaseInvoicePostResultDto>($"api/purchasing/invoices/{id}/post",r,ct);
     public Task<PurchaseInvoiceDto?> CancelPurchaseInvoiceAsync(Guid id,CancelPurchaseInvoiceRequest r,CancellationToken ct=default)=>Post<CancelPurchaseInvoiceRequest,PurchaseInvoiceDto>($"api/purchasing/invoices/{id}/cancel",r,ct);
+
+    public Task<PagedResult<PurchaseReturnDto>> GetPurchaseReturnsAsync(PageRequest r, PurchaseReturnStatus? status=null, Guid? purchaseReceiptId=null, Guid? purchaseInvoiceId=null, Guid? supplierId=null, CancellationToken ct=default)
+    {
+        var q=Add(Add(Add(Add("api/purchasing/returns"+PageQuery(r),"status",status),"purchaseReceiptId",purchaseReceiptId),"purchaseInvoiceId",purchaseInvoiceId),"supplierId",supplierId);
+        return GetPage<PurchaseReturnDto>(q,ct);
+    }
+    public Task<PurchaseReturnDto?> GetPurchaseReturnAsync(Guid id,CancellationToken ct=default)=>api.GetAsync<PurchaseReturnDto>($"api/purchasing/returns/{id:D}",ct);
+    public Task<PurchaseReturnDto?> CreatePurchaseReturnAsync(CreatePurchaseReturnRequest r,CancellationToken ct=default)=>Post<CreatePurchaseReturnRequest,PurchaseReturnDto>("api/purchasing/returns",r,ct);
+    public Task<PurchaseReturnDto?> ConfirmPurchaseReturnAsync(Guid id,PurchaseReturnActionRequest r,CancellationToken ct=default)=>Post<PurchaseReturnActionRequest,PurchaseReturnDto>($"api/purchasing/returns/{id:D}/confirm",r,ct);
+    public Task<PurchaseReturnPostingResultDto?> PostPurchaseReturnAsync(Guid id,PurchaseReturnActionRequest r,CancellationToken ct=default)=>Post<PurchaseReturnActionRequest,PurchaseReturnPostingResultDto>($"api/purchasing/returns/{id:D}/post",r,ct);
+    public Task<PurchaseReturnDto?> CancelPurchaseReturnAsync(Guid id,CancelPurchaseReturnRequest r,CancellationToken ct=default)=>Post<CancelPurchaseReturnRequest,PurchaseReturnDto>($"api/purchasing/returns/{id:D}/cancel",r,ct);
 
     private async Task<PagedResult<T>> GetPage<T>(string uri,CancellationToken ct)=>await api.GetAsync<PagedResult<T>>(uri,ct)??new();
     private Task<T?> Post<TRequest,T>(string uri,TRequest payload,CancellationToken ct)=>api.PostAsync<TRequest,T>(uri,payload,ct);

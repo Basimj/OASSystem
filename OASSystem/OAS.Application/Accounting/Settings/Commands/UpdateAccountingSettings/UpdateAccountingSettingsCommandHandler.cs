@@ -46,6 +46,8 @@ public sealed class UpdateAccountingSettingsCommandHandler(
         await ValidatePostingAsync(data.ExchangeGainAccountId, "exchange_gain_account_invalid", cancellationToken);
         await ValidatePostingAsync(data.ExchangeLossAccountId, "exchange_loss_account_invalid", cancellationToken);
 
+        await ValidateRetainedEarningsAsync(data.RetainedEarningsAccountId, cancellationToken);
+
         ValidateSalesInvoiceSettingsCompleteness(data);
         await ValidateSalesRevenueAsync(data.SalesRevenueAccountId, cancellationToken);
         await ValidateTaxPayableAsync(data.TaxPayableAccountId, cancellationToken);
@@ -65,7 +67,8 @@ public sealed class UpdateAccountingSettingsCommandHandler(
                 data.BankParentAccountId,
                 data.ExchangeGainAccountId,
                 data.ExchangeLossAccountId,
-                (DomainRateType)(byte)data.DefaultExchangeRateType);
+                (DomainRateType)(byte)data.DefaultExchangeRateType,
+                data.RetainedEarningsAccountId);
 
             await repository.AddAsync(entity, cancellationToken);
         }
@@ -107,7 +110,8 @@ public sealed class UpdateAccountingSettingsCommandHandler(
                 data.BankParentAccountId,
                 data.ExchangeGainAccountId,
                 data.ExchangeLossAccountId,
-                (DomainRateType)(byte)data.DefaultExchangeRateType);
+                (DomainRateType)(byte)data.DefaultExchangeRateType,
+                data.RetainedEarningsAccountId);
 
             repository.Update(entity);
         }
@@ -258,6 +262,26 @@ public sealed class UpdateAccountingSettingsCommandHandler(
             throw new ConflictException(
                 "cogs_account_invalid",
                 "حساب تكلفة البضاعة المباعة يجب أن يكون حساب مصروف نشطًا، مدينًا، وقابلًا للترحيل.");
+        }
+    }
+
+    private async Task ValidateRetainedEarningsAsync(
+        Guid? id,
+        CancellationToken cancellationToken)
+    {
+        if (!id.HasValue)
+            return;
+
+        var account = await accounts.GetByIdAsync(id.Value, cancellationToken)
+            ?? throw new NotFoundException(nameof(Account), id.Value);
+
+        if (!account.CanReceivePosting() ||
+            account.AccountClass != AccountClass.Equity ||
+            account.NormalBalance != NormalBalance.Credit)
+        {
+            throw new ConflictException(
+                "retained_earnings_account_invalid",
+                "حساب الأرباح المحتجزة يجب أن يكون حساب حقوق ملكية نشطًا، دائنًا، وقابلًا للترحيل.");
         }
     }
 

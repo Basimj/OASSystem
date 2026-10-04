@@ -18,6 +18,7 @@ public sealed class PurchasingAccountingPort(
     private const string PurchasingModule = "Purchasing";
     private const string ReceiptDocumentType = "PurchaseReceipt";
     private const string InvoiceDocumentType = "PurchaseInvoice";
+    private const string ReturnDocumentType = "PurchaseReturn";
     private const string InventoryRole = "Inventory";
     private const string GrniRole = "GoodsReceivedNotInvoiced";
     private const string PurchaseTaxRole = "PurchaseTax";
@@ -111,6 +112,109 @@ public sealed class PurchasingAccountingPort(
         CompleteJournal(journal, userGuid, now);
         await dbContext.Set<JournalEntry>().AddAsync(journal, cancellationToken);
         return new PurchasingAccountingPostingResult(journal.Id);
+    }
+
+    public async Task<PurchasingAccountingPostingResult> PostPurchaseReturnJournalAsync(
+        PurchasingReturnAccountingContext context,
+        CancellationToken cancellationToken = default)
+    {
+        var existing = await FindExistingJournalAsync(ReturnDocumentType, context.PurchaseReturnId, cancellationToken);
+        if (existing is not null) return new PurchasingAccountingPostingResult(existing.Id);
+        if (context.InventoryCostBaseAmount < 0 || context.ReceiptCostBaseAmount < 0 ||
+            context.SupplierNetBaseAmount < 0 || context.SupplierTaxBaseAmount < 0 || context.SupplierGrossBaseAmount < 0)
+            throw new ConflictException("purchase_return_amount_invalid", "قيم مرتجع المشتريات المحاسبية غير صالحة.");
+
+        var period = await ResolveFiscalPeriodAsync(context.PostingDate, cancellationToken);
+        var receiptProfile = await ResolveProfileAsync(ReceiptDocumentType, cancellationToken);
+        var inventoryAccount = await ResolveProfileAccountAsync(receiptProfile, InventoryRole, cancellationToken);
+        var (_, baseCurrency) = await ResolveBaseCurrencyAsync(cancellationToken);
+        var (supplier, supplierAccount) = await ResolveSupplierAccountAsync(context.SupplierId, cancellationToken);
+        var userGuid = ResolveUserGuid();
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var journal = await CreateJournalAsync(context.PostingDate, period.Id, $"Purchase return {context.ReturnCode}", ReturnDocumentType,
+            context.PurchaseReturnId, baseCurrency, cancellationToken);
+        var lineNo = 1;
+
+        if (context.PurchaseInvoiceId.HasValue)
+        {
+            var invoice = await dbContext.Set<OAS.Domain.Purchasing.Entities.PurchaseInvoice>().AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == context.PurchaseInvoiceId.Value, cancellationToken)
+                ?? throw new NotFoundException("PurchaseInvoice", context.PurchaseInvoiceId.Value);
+            if (invoice.SupplierId != context.SupplierId || invoice.Status != OAS.Domain.Purchasing.Enums.PurchaseInvoiceStatus.Posted)
+                throw new ConflictException("purchase_return_invoice_invalid", "فاتورة المورد المرتبطة بالمرتجع غير صالحة للترحيل العكسي.");
+            var invoiceProfile = await ResolveProfileAsync(InvoiceDocumentType, cancellationToken);
+            Account? taxAccount = context.SupplierTaxBaseAmount > 0m
+                ? await ResolveProfileAccountAsync(invoiceProfile, PurchaseTaxRole, cancellationToken)
+                : null;
+            Account? varianceAccount = context.PurchasePriceVarianceBaseAmount != 0m
+                ? await ResolveProfileAccountAsync(invoiceProfile, PriceVarianceRole, cancellationToken)
+                : null;
+            var txCurrency = await dbContext.Set<Currency>().AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == invoice.CurrencyId, cancellationToken)
+                ?? throw new NotFoundException(nameof(Currency), invoice.CurrencyId);
+
+            if (context.SupplierGrossBaseAmount <= 0m)
+                throw new ConflictException("purchase_return_supplier_amount_invalid", "قيمة عكس مديونية المورد يجب أن تكون أكبر من صفر.");
+            journal.AddLine(CreateInvoiceCurrencyLine(journal.Id, lineNo++, supplierAccount.Id,
+                context.SupplierGrossBaseAmount, 0m, txCurrency, invoice.ExchangeRate, context.PostingDate,
+                $"Supplier return {context.ReturnCode}", supplier.Id));
+            if (context.SupplierTaxBaseAmount > 0m && taxAccount is not null)
+                journal.AddLine(CreateInvoiceCurrencyLine(journal.Id, lineNo++, taxAccount.Id,
+                    0m, context.SupplierTaxBaseAmount, txCurrency, invoice.ExchangeRate, context.PostingDate,
+                    $"Purchase tax reversal {context.ReturnCode}", supplier.Id));
+            if (context.InventoryCostBaseAmount > 0m)
+                journal.AddLine(CreateBaseCurrencyLine(journal.Id, lineNo++, inventoryAccount.Id,
+                    0m, context.InventoryCostBaseAmount, baseCurrency, context.PostingDate,
+                    $"Inventory purchase return {context.ReturnCode}", supplier.Id, null, null));
+
+            AddVarianceLine(journal, ref lineNo, varianceAccount, context.PurchasePriceVarianceBaseAmount,
+                baseCurrency, context.PostingDate, context.ReturnCode, supplier.Id);
+        }
+        else
+        {
+            var grniAccount = await ResolveProfileAccountAsync(receiptProfile, GrniRole, cancellationToken);
+            Account? varianceAccount = null;
+            if (context.PurchasePriceVarianceBaseAmount != 0m)
+            {
+                var invoiceProfile = await ResolveProfileAsync(InvoiceDocumentType, cancellationToken);
+                varianceAccount = await ResolveProfileAccountAsync(invoiceProfile, PriceVarianceRole, cancellationToken);
+            }
+            if (context.ReceiptCostBaseAmount <= 0m)
+                throw new ConflictException("purchase_return_receipt_amount_invalid", "قيمة تكلفة الاستلام للمرتجع يجب أن تكون أكبر من صفر.");
+            journal.AddLine(CreateBaseCurrencyLine(journal.Id, lineNo++, grniAccount.Id,
+                context.ReceiptCostBaseAmount, 0m, baseCurrency, context.PostingDate,
+                $"GRNI reversal {context.ReturnCode}", supplier.Id, null, null));
+            journal.AddLine(CreateBaseCurrencyLine(journal.Id, lineNo++, inventoryAccount.Id,
+                0m, context.InventoryCostBaseAmount, baseCurrency, context.PostingDate,
+                $"Inventory purchase return {context.ReturnCode}", supplier.Id, null, null));
+            AddVarianceLine(journal, ref lineNo, varianceAccount, context.PurchasePriceVarianceBaseAmount,
+                baseCurrency, context.PostingDate, context.ReturnCode, supplier.Id);
+        }
+
+        if (!journal.IsBalanced())
+            throw new ConflictException("purchase_return_journal_unbalanced", "تعذر ترحيل مرتجع المشتريات لأن القيد المحاسبي غير متوازن.");
+        CompleteJournal(journal, userGuid, now);
+        await dbContext.Set<JournalEntry>().AddAsync(journal, cancellationToken);
+        return new PurchasingAccountingPostingResult(journal.Id);
+    }
+
+    private static void AddVarianceLine(
+        JournalEntry journal,
+        ref int lineNo,
+        Account? varianceAccount,
+        decimal variance,
+        Currency baseCurrency,
+        DateOnly postingDate,
+        string returnCode,
+        Guid supplierId)
+    {
+        if (variance == 0m) return;
+        if (varianceAccount is null)
+            throw new ConflictException("purchase_return_variance_account_missing", "حساب فرق سعر المشتريات مطلوب لترحيل المرتجع.");
+        journal.AddLine(CreateBaseCurrencyLine(journal.Id, lineNo++, varianceAccount.Id,
+            variance < 0m ? Math.Abs(variance) : 0m,
+            variance > 0m ? variance : 0m,
+            baseCurrency, postingDate, $"Purchase return variance {returnCode}", supplierId, null, null));
     }
 
     private async Task<JournalEntry?> FindExistingJournalAsync(string documentType, Guid sourceId, CancellationToken ct) =>

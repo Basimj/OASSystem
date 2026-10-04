@@ -13,10 +13,39 @@ public sealed class EnforceSingleActiveSalesInvoicePostingProfileDbo : Migration
     protected override void Up(MigrationBuilder migrationBuilder)
     {
         migrationBuilder.Sql("""
+SET XACT_ABORT ON;
+
+-- Repair known historical locations/names before enforcing the filtered index.
+-- Some development databases have migration history from the rename/move phase while
+-- the physical table still exists under the old schema/name.
 IF OBJECT_ID(N'[dbo].[tbl_PostingProfiles]', N'U') IS NULL
 BEGIN
-    THROW 50001, 'Table [dbo].[tbl_PostingProfiles] was not found.', 1;
+    IF OBJECT_ID(N'[accounting].[tbl_PostingProfiles]', N'U') IS NOT NULL
+        ALTER SCHEMA [dbo] TRANSFER [accounting].[tbl_PostingProfiles];
+    ELSE IF OBJECT_ID(N'[accounting].[PostingProfiles]', N'U') IS NOT NULL
+    BEGIN
+        EXEC sys.sp_rename N'[accounting].[PostingProfiles]', N'tbl_PostingProfiles', N'OBJECT';
+        ALTER SCHEMA [dbo] TRANSFER [accounting].[tbl_PostingProfiles];
+    END
+    ELSE IF OBJECT_ID(N'[dbo].[PostingProfiles]', N'U') IS NOT NULL
+        EXEC sys.sp_rename N'[dbo].[PostingProfiles]', N'tbl_PostingProfiles', N'OBJECT';
 END;
+
+IF OBJECT_ID(N'[dbo].[tbl_PostingProfileLines]', N'U') IS NULL
+BEGIN
+    IF OBJECT_ID(N'[accounting].[tbl_PostingProfileLines]', N'U') IS NOT NULL
+        ALTER SCHEMA [dbo] TRANSFER [accounting].[tbl_PostingProfileLines];
+    ELSE IF OBJECT_ID(N'[accounting].[PostingProfileLines]', N'U') IS NOT NULL
+    BEGIN
+        EXEC sys.sp_rename N'[accounting].[PostingProfileLines]', N'tbl_PostingProfileLines', N'OBJECT';
+        ALTER SCHEMA [dbo] TRANSFER [accounting].[tbl_PostingProfileLines];
+    END
+    ELSE IF OBJECT_ID(N'[dbo].[PostingProfileLines]', N'U') IS NOT NULL
+        EXEC sys.sp_rename N'[dbo].[PostingProfileLines]', N'tbl_PostingProfileLines', N'OBJECT';
+END;
+
+IF OBJECT_ID(N'[dbo].[tbl_PostingProfiles]', N'U') IS NULL
+    THROW 51110, 'Required table dbo.tbl_PostingProfiles was not found after schema repair.', 1;
 
 -- Repair only Sales / SalesInvoice legacy duplicates.
 ;WITH RankedSalesInvoiceProfiles AS

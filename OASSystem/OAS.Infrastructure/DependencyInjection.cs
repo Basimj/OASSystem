@@ -25,6 +25,7 @@ using OAS.Infrastructure.Persistence;
 using OAS.Infrastructure.Persistence.Interceptors;
 using OAS.Infrastructure.Persistence.Repositories.Generic;
 using OAS.Infrastructure.Sales.Persistence.Repositories;
+using OAS.Infrastructure.Sales.Persistence.Queries;
 
 namespace OAS.Infrastructure;
 
@@ -80,9 +81,17 @@ public static class DependencyInjection
         services.AddScoped<IPrescriptionAggregateRepository, PrescriptionAggregateRepository>();
         services.AddScoped<ICustomerOrderAggregateRepository, CustomerOrderAggregateRepository>();
         services.AddScoped<ISalesInvoiceAggregateRepository, SalesInvoiceAggregateRepository>();
+        services.AddScoped<ISalesReturnAggregateRepository, SalesReturnAggregateRepository>();
+        services.AddScoped<ISalesReturnQueryService, SalesReturnQueryService>();
+        services.AddScoped<ICommissionStatementRepository, CommissionStatementRepository>();
+        services.AddScoped<ICommissionSourceQueryService, CommissionSourceQueryService>();
+        services.AddScoped<ICommissionQueryService, CommissionQueryService>();
+        services.AddScoped<IOpticalProductionJobRepository, OpticalProductionJobRepository>();
+        services.AddScoped<IOpticalProductionQueryService, OpticalProductionQueryService>();
 
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IAccountingPartyQueryService, AccountingPartyQueryService>();
+        services.AddScoped<IAccountingReportingQueryService, AccountingReportingQueryService>();
 
         services.AddScoped<
             IIdentityRepository,
@@ -124,6 +133,8 @@ public static class DependencyInjection
         services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>();
         services.AddScoped<IPurchaseReceiptRepository, PurchaseReceiptRepository>();
         services.AddScoped<IPurchaseInvoiceRepository, PurchaseInvoiceRepository>();
+        services.AddScoped<IPurchaseReturnRepository, PurchaseReturnRepository>();
+        services.AddScoped<IPurchaseReturnDataPort, PurchaseReturnDataPort>();
         services.AddScoped<IPurchasingReferenceDataPort, PurchasingReferenceDataPort>();
         services.AddScoped<IPurchaseMatchingDataPort, PurchaseMatchingDataPort>();
         services.AddScoped<IPurchasingSettingsPort, PurchasingSettingsPort>();

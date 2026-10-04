@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using OAS.Application.Purchasing.Abstractions;
 using OAS.Application.Purchasing.Mapping;
 using OAS.Application.Purchasing.Matching;
+using OAS.Application.Purchasing.PurchaseReturns.Services;
 using OAS.Application.Purchasing.Services;
 
 namespace OAS.Application.Purchasing;
@@ -29,6 +30,7 @@ public static class DependencyInjection
         services.TryAddScoped<PurchasingMapper>();
         services.TryAddScoped<IPurchasingCodeService, PurchasingCodeService>();
         services.TryAddScoped<IPurchaseMatchingService, PurchaseMatchingService>();
+        services.TryAddScoped<IPurchaseReturnInventoryPostingService, PurchaseReturnInventoryPostingService>();
 
         return services;
     }

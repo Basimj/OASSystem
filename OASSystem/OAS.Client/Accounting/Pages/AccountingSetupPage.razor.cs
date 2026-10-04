@@ -68,6 +68,8 @@ public partial class AccountingSetupPage
 
     private Guid? _settingsExchangeLossAccountId;
 
+    private Guid? _settingsRetainedEarningsAccountId;
+
     private Guid? _settingsSalesRevenueAccountId;
 
     private Guid? _settingsTaxPayableAccountId;
@@ -212,6 +214,9 @@ public partial class AccountingSetupPage
     private UiLookupItem? ExchangeLossAccountLookupItem =>
         GetAccountLookupItem(_settingsExchangeLossAccountId, AccountingAccountEligibilityContext.ExchangeLoss);
 
+    private UiLookupItem? RetainedEarningsAccountLookupItem =>
+        GetAccountLookupItem(_settingsRetainedEarningsAccountId, AccountingAccountEligibilityContext.RetainedEarnings);
+
 
     // ================================================================
     // البحث في الحسابات - Server-side + سياق الأهلية
@@ -251,6 +256,11 @@ public partial class AccountingSetupPage
         string search,
         CancellationToken cancellationToken) =>
         SearchAccountsAsync(search, AccountingAccountEligibilityContext.ExchangeLoss, cancellationToken);
+
+    private Task<IReadOnlyList<UiLookupItem>> SearchRetainedEarningsAccountsAsync(
+        string search,
+        CancellationToken cancellationToken) =>
+        SearchAccountsAsync(search, AccountingAccountEligibilityContext.RetainedEarnings, cancellationToken);
 
     private async Task<IReadOnlyList<UiLookupItem>> SearchAccountsAsync(
         string search,
@@ -477,6 +487,12 @@ public partial class AccountingSetupPage
     private Task SetExchangeLossAccount(string? value)
     {
         _settingsExchangeLossAccountId = ParseNullableGuid(value);
+        return Task.CompletedTask;
+    }
+
+    private Task SetRetainedEarningsAccount(string? value)
+    {
+        _settingsRetainedEarningsAccountId = ParseNullableGuid(value);
         return Task.CompletedTask;
     }
 
@@ -745,6 +761,10 @@ public partial class AccountingSetupPage
             settings?
                 .ExchangeLossAccountId;
 
+        _settingsRetainedEarningsAccountId =
+            settings?
+                .RetainedEarningsAccountId;
+
 
         _settingsSalesRevenueAccountId =
             settings?
@@ -875,6 +895,14 @@ public partial class AccountingSetupPage
                     return;
                 }
 
+                if (!await ValidateSettingsAccountAsync(
+                        _settingsRetainedEarningsAccountId,
+                        AccountingAccountEligibilityContext.RetainedEarnings,
+                        "حساب الأرباح المحتجزة"))
+                {
+                    return;
+                }
+
                 var updated =
                     await Accounting
                         .UpdateAccountingSettingsAsync(
@@ -902,7 +930,9 @@ public partial class AccountingSetupPage
                                 ExchangeRateType.Accounting,
 
                                 _settings?
-                                    .RowVersion));
+                                    .RowVersion,
+
+                                _settingsRetainedEarningsAccountId));
 
 
                 if (updated is null)

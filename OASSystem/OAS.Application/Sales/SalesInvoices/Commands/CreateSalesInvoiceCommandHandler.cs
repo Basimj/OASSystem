@@ -10,6 +10,7 @@ using OAS.Application.Sales.Services;
 using OAS.Contracts.Sales.SalesInvoices;
 using OAS.Domain.Accounting.Entities;
 using OAS.Domain.Accounting.Enums;
+using OAS.Domain.Features.Employees.Entities;
 using OAS.Domain.Sales;
 using OAS.Domain.Sales.Entities;
 using OAS.Domain.Sales.Enums;
@@ -22,6 +23,7 @@ public sealed class CreateSalesInvoiceCommandHandler(
     IReadRepository<Customer, Guid> customers,
     IReadRepository<AccountingSettings, Guid> settings,
     IReadRepository<Currency, Guid> currencies,
+    IReadRepository<Employee, Guid> employees,
     IExchangeRateResolver rates,
     ISalesLineResolver lineResolver,
     ISalesPrescriptionValidator prescriptionValidator,
@@ -80,6 +82,15 @@ public sealed class CreateSalesInvoiceCommandHandler(
             baseCurrency.Code,
             baseCurrency.DecimalPlaces,
             d.Description);
+
+        if (d.SalesEmployeeId.HasValue)
+        {
+            var employee = await employees.GetByIdAsync(d.SalesEmployeeId.Value, ct)
+                ?? throw new NotFoundException(nameof(Employee), d.SalesEmployeeId.Value);
+            if (!employee.IsActive)
+                throw new ConflictException("sales_employee_inactive", "موظف المبيعات غير فعال.");
+            invoice.SetSalesEmployee(employee.Id);
+        }
 
         var lineNumber = 1;
         foreach (var req in d.Lines)

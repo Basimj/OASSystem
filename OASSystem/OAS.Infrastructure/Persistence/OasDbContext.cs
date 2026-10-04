@@ -61,6 +61,10 @@ public sealed class OasDbContext(DbContextOptions<OasDbContext> options) : DbCon
         modelBuilder.HasSequence<long>("PurchaseOrderCodeSequence", "dbo");
         modelBuilder.HasSequence<long>("PurchaseReceiptCodeSequence", "dbo");
         modelBuilder.HasSequence<long>("PurchaseInvoiceCodeSequence", "dbo");
+        modelBuilder.HasSequence<long>("PurchaseReturnCodeSequence", "dbo");
+        modelBuilder.HasSequence<long>("SalesReturnCodeSequence", "dbo");
+        modelBuilder.HasSequence<long>("CommissionStatementCodeSequence", "dbo");
+        modelBuilder.HasSequence<long>("OpticalProductionJobCodeSequence", "dbo");
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(OasDbContext).Assembly);
     }
 }

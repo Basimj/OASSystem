@@ -5,4 +5,5 @@ public static class SalesSourceReferences
     public const string Module = "Sales";
     public const string CustomerOrder = "CustomerOrder";
     public const string SalesInvoice = "SalesInvoice";
+    public const string SalesReturn = "SalesReturn";
 }

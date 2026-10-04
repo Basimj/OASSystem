@@ -17,6 +17,7 @@ using OAS.Contracts.Accounting.PaymentAllocations;
 using OAS.Contracts.Accounting.PaymentVouchers;
 using OAS.Contracts.Accounting.PostingProfiles;
 using OAS.Contracts.Accounting.ReceiptVouchers;
+using OAS.Contracts.Accounting.Reports;
 using OAS.Contracts.Accounting.Suppliers;
 using OAS.Contracts.Common.Pagination;
 
@@ -148,6 +149,11 @@ public interface IAccountingClientService
 
     Task<AccountingSettingsDto?> GetAccountingSettingsAsync(CancellationToken cancellationToken = default);
     Task<AccountingSettingsDto?> UpdateAccountingSettingsAsync(UpdateAccountingSettingsRequest request, CancellationToken cancellationToken = default);
+
+    Task<GeneralLedgerReportDto?> GetGeneralLedgerAsync(DateOnly fromDate, DateOnly toDate, Guid? accountId = null, CancellationToken cancellationToken = default);
+    Task<TrialBalanceReportDto?> GetTrialBalanceAsync(DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken = default);
+    Task<FiscalCloseReadinessDto?> GetFiscalPeriodCloseReadinessAsync(Guid fiscalPeriodId, CancellationToken cancellationToken = default);
+    Task<FiscalCloseReadinessDto?> GetFiscalYearCloseReadinessAsync(Guid fiscalYearId, CancellationToken cancellationToken = default);
 
     Task<PagedResult<EmployeeAccountDto>> GetEmployeeAccountsPageAsync(PageRequest request, CancellationToken cancellationToken = default);
     Task<EmployeeAccountDto?> GetEmployeeAccountByIdAsync(Guid id, CancellationToken cancellationToken = default);

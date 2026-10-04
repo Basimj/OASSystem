@@ -13,6 +13,7 @@ using OAS.Application.Accounting.Expenses.ExpenseTypes.Mapping;
 using OAS.Application.Accounting.Expenses.Mapping;
 using OAS.Application.Accounting.FiscalPeriods.Mapping;
 using OAS.Application.Accounting.FiscalYears.Mapping;
+using OAS.Application.Accounting.FiscalYears.Services;
 using OAS.Application.Accounting.PaymentAllocations.Mapping;
 using OAS.Application.Accounting.PaymentVouchers.Mapping;
 using OAS.Application.Accounting.Posting;
@@ -60,6 +61,7 @@ public static class DependencyInjection
         services.TryAddScoped<ICurrentUser, AnonymousCurrentUser>();
         services.TryAddScoped<IPermissionChecker, DenyAllPermissionChecker>();
         services.TryAddScoped<IAccountingDocumentPostingService, AccountingDocumentPostingService>();
+        services.TryAddScoped<IFiscalYearClosingService, FiscalYearClosingService>();
         services.TryAddScoped<IPartyAccountProvisioningService, PartyAccountProvisioningService>();
         services.TryAddScoped<IManagedAccountGuard, ManagedAccountGuard>();
         services.TryAddScoped<ICurrencyRoundingService, CurrencyRoundingService>();

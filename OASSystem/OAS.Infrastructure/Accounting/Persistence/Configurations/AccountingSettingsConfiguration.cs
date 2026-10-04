@@ -21,5 +21,6 @@ public sealed class AccountingSettingsConfiguration : IEntityTypeConfiguration<A
         builder.HasOne<Account>().WithMany().HasForeignKey(x => x.BankParentAccountId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_AccountingSettings_BankParentAccount");
         builder.HasOne<Account>().WithMany().HasForeignKey(x => x.ExchangeGainAccountId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_AccountingSettings_ExchangeGainAccount");
         builder.HasOne<Account>().WithMany().HasForeignKey(x => x.ExchangeLossAccountId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_AccountingSettings_ExchangeLossAccount");
+        builder.HasOne<Account>().WithMany().HasForeignKey(x => x.RetainedEarningsAccountId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_AccountingSettings_RetainedEarningsAccount");
     }
 }

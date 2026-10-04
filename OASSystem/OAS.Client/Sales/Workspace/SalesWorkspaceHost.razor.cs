@@ -1,12 +1,14 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using OAS.Client.Sales.Common;
+using OAS.Client.Features.Employees.Services;
 using OAS.Client.Sales.Mapping;
 using OAS.Client.Sales.Services;
 using OAS.Client.Printing.Services;
 using OAS.Client.Sales.Workspace;
 using OAS.Client.Services.Http;
 using OAS.Contracts.Common.Pagination;
+using OAS.Contracts.Features.Employees;
 using OAS.Contracts.Sales.CustomerOrders;
 using OAS.Contracts.Sales.Enums;
 using OAS.Contracts.Sales.Lookups;
@@ -25,6 +27,7 @@ public partial class SalesWorkspaceHost : IDisposable
 {
     [Parameter] public SalesEntityType Section { get; set; }
     [Inject] private ISalesClientService Sales { get; set; } = default!;
+    [Inject] private IEmployeeClientService Employees { get; set; } = default!;
     [Inject] private ISalesWorkspaceState Workspace { get; set; } = default!;
     [Inject] private IUiDialogService Dialogs { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
@@ -32,6 +35,7 @@ public partial class SalesWorkspaceHost : IDisposable
 
     private readonly List<UiSalesDocumentListItem> _listItems = [];
     private readonly Dictionary<Guid, SalesCustomerLookupDto> _customers = [];
+    private readonly Dictionary<Guid, EmployeeDto> _employees = [];
     private readonly Dictionary<Guid, SalesProductTypeLookupDto> _productTypes = [];
     private readonly Dictionary<Guid, SalesProductCategoryLookupDto> _categories = [];
     private readonly Dictionary<Guid, SalesProductVariantLookupDto> _products = [];
@@ -711,6 +715,17 @@ public partial class SalesWorkspaceHost : IDisposable
         var rows = await Sales.SearchCustomersAsync(q, 20, ct); foreach (var x in rows) _customers[x.Id] = x;
         return rows.Select(x => new UiLookupItem(x.Id.ToString(), $"{x.CustomerCode} - {x.NameAr}", string.Join(" • ", new[] { x.AccountCode, x.Mobile }.Where(s => !string.IsNullOrWhiteSpace(s))), "fa-regular fa-user", !x.IsActive)).ToArray();
     }
+    private async Task<IReadOnlyList<UiLookupItem>> SearchEmployeeItemsAsync(string q, CancellationToken ct)
+    {
+        var page = await Employees.GetPageAsync(new PageRequest { PageNumber = 1, PageSize = 50, Search = q }, ct);
+        foreach (var employee in page.Items) _employees[employee.Id] = employee;
+        return page.Items.Select(employee => new UiLookupItem(
+            employee.Id.ToString(),
+            $"{employee.EmployeeCode} - {employee.DisplayName}",
+            string.Join(" • ", new[] { employee.JobTitleName, employee.IsCommissionEligible ? "مؤهل للعمولة" : null }.Where(value => !string.IsNullOrWhiteSpace(value))),
+            "fa-solid fa-user-tie",
+            !employee.IsActive)).ToArray();
+    }
     private async Task<IReadOnlyList<UiLookupItem>> SearchPrescriptionRevisionItemsAsync(string q, CancellationToken ct)
     {
         Guid? customerId = ActiveTab?.Model switch
@@ -960,6 +975,14 @@ public partial class SalesWorkspaceHost : IDisposable
                 invoice.CustomerDisplay = $"{c.CustomerCode} - {c.NameAr}";
                 if (!ValidateCreditSale(invoice.CustomerId, invoice.PaymentTermType))
                     invoice.PaymentTermType = "Immediate";
+            }
+
+            if (change.Field == "SalesEmployee")
+            {
+                if (Guid.TryParse(change.Value, out var employeeId) && _employees.TryGetValue(employeeId, out var employee))
+                    invoice.SalesEmployeeDisplay = $"{employee.EmployeeCode} - {employee.DisplayName}";
+                else
+                    invoice.SalesEmployeeDisplay = null;
             }
 
             if (change.Field == "PaymentTermType")

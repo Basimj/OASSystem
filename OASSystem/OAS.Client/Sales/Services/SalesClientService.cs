@@ -1,6 +1,9 @@
 using OAS.Client.Services.Http;
 using OAS.Contracts.Common.Pagination;
 using OAS.Contracts.Sales.Common;
+using OAS.Contracts.Sales.Returns;
+using OAS.Contracts.Sales.Production;
+using OAS.Contracts.Sales.Commissions;
 using OAS.Contracts.Sales.CustomerOrders;
 using OAS.Contracts.Sales.Lookups;
 using OAS.Contracts.Sales.Prescriptions;
@@ -23,10 +26,21 @@ public sealed class SalesClientService(OasApiClient apiClient) : ISalesClientSer
     private async Task<PagedResult<T>> GetPageAsync<T>(string route, PageRequest request, CancellationToken ct)
         => await apiClient.GetAsync<PagedResult<T>>($"{route}{PageQuery(request)}", ct) ?? new PagedResult<T>();
 
+    private static string AppendQuery(string route, params (string Key, string? Value)[] values)
+    {
+        var parts = values.Where(x => !string.IsNullOrWhiteSpace(x.Value))
+            .Select(x => $"{x.Key}={Uri.EscapeDataString(x.Value!)}").ToArray();
+        if (parts.Length == 0) return route;
+        var separator = route.Contains('?') ? "&" : "?";
+        return $"{route}{separator}{string.Join("&", parts)}";
+    }
+
     private static string AddQuery(string route, params (string Key, string? Value)[] values)
     {
         var parts = values.Where(x => !string.IsNullOrWhiteSpace(x.Value)).Select(x => $"{x.Key}={Uri.EscapeDataString(x.Value!)}").ToArray();
-        return parts.Length == 0 ? route : $"{route}?{string.Join("&", parts)}";
+        if (parts.Length == 0) return route;
+        var separator = route.Contains('?') ? "&" : "?";
+        return $"{route}{separator}{string.Join("&", parts)}";
     }
 
     public Task<PagedResult<PrescriptionDto>> GetPrescriptionsPageAsync(PageRequest r, CancellationToken ct = default) => GetPageAsync<PrescriptionDto>("api/sales/prescriptions", r, ct);
@@ -58,6 +72,61 @@ public sealed class SalesClientService(OasApiClient apiClient) : ISalesClientSer
     public Task<SalesInvoiceDto?> CancelSalesInvoiceAsync(Guid id, CancelSalesInvoiceRequest r, CancellationToken ct = default) => apiClient.PostAsync<CancelSalesInvoiceRequest, SalesInvoiceDto>($"api/sales/invoices/{id}/cancel", r, ct);
     public Task<SalesInvoicePaymentSummaryDto?> GetSalesInvoicePaymentSummaryAsync(Guid id, CancellationToken ct = default) => apiClient.GetAsync<SalesInvoicePaymentSummaryDto>($"api/sales/invoices/{id}/payment-summary", ct);
 
+    public async Task<PagedResult<SalesReturnDto>> GetSalesReturnsPageAsync(PageRequest r, Guid? salesInvoiceId = null, Guid? customerId = null, SalesReturnStatus? status = null, CancellationToken ct = default)
+    {
+        var route = AppendQuery("api/sales/returns" + PageQuery(r),
+            ("salesInvoiceId", salesInvoiceId?.ToString()),
+            ("customerId", customerId?.ToString()),
+            ("status", status?.ToString()));
+        return await apiClient.GetAsync<PagedResult<SalesReturnDto>>(route, ct) ?? new PagedResult<SalesReturnDto>();
+    }
+
+    public Task<SalesReturnDto?> GetSalesReturnByIdAsync(Guid id, CancellationToken ct = default)
+        => apiClient.GetAsync<SalesReturnDto>($"api/sales/returns/{id:D}", ct);
+    public Task<SalesReturnDto?> CreateSalesReturnAsync(CreateSalesReturnRequest r, CancellationToken ct = default)
+        => apiClient.PostAsync<CreateSalesReturnRequest, SalesReturnDto>("api/sales/returns", r, ct);
+    public Task<SalesReturnDto?> ConfirmSalesReturnAsync(Guid id, SalesReturnActionRequest r, CancellationToken ct = default)
+        => apiClient.PostAsync<SalesReturnActionRequest, SalesReturnDto>($"api/sales/returns/{id:D}/confirm", r, ct);
+    public Task<SalesReturnPostingResultDto?> PostSalesReturnAsync(Guid id, SalesReturnActionRequest r, CancellationToken ct = default)
+        => apiClient.PostAsync<SalesReturnActionRequest, SalesReturnPostingResultDto>($"api/sales/returns/{id:D}/post", r, ct);
+    public Task<SalesReturnDto?> CancelSalesReturnAsync(Guid id, CancelSalesReturnRequest r, CancellationToken ct = default)
+        => apiClient.PostAsync<CancelSalesReturnRequest, SalesReturnDto>($"api/sales/returns/{id:D}/cancel", r, ct);
+
+    public async Task<IReadOnlyList<CommissionRuleDto>> GetCommissionRulesAsync(Guid? employeeId = null, CancellationToken ct = default)
+        => await apiClient.GetAsync<IReadOnlyList<CommissionRuleDto>>(AppendQuery("api/sales/commissions/rules", ("employeeId", employeeId?.ToString())), ct) ?? [];
+    public Task<CommissionRuleDto?> CreateCommissionRuleAsync(CreateCommissionRuleRequest r, CancellationToken ct = default)
+        => apiClient.PostAsync<CreateCommissionRuleRequest, CommissionRuleDto>("api/sales/commissions/rules", r, ct);
+    public async Task<IReadOnlyList<CommissionStatementDto>> GetCommissionStatementsAsync(Guid? employeeId = null, DateOnly? fromDate = null, DateOnly? toDate = null, CancellationToken ct = default)
+        => await apiClient.GetAsync<IReadOnlyList<CommissionStatementDto>>(AppendQuery("api/sales/commissions/statements",
+            ("employeeId", employeeId?.ToString()), ("fromDate", fromDate?.ToString("yyyy-MM-dd")), ("toDate", toDate?.ToString("yyyy-MM-dd"))), ct) ?? [];
+    public Task<CommissionStatementDto?> GetCommissionStatementAsync(Guid id, CancellationToken ct = default)
+        => apiClient.GetAsync<CommissionStatementDto>($"api/sales/commissions/statements/{id:D}", ct);
+    public Task<CommissionStatementDto?> CalculateCommissionStatementAsync(CalculateCommissionStatementRequest r, CancellationToken ct = default)
+        => apiClient.PostAsync<CalculateCommissionStatementRequest, CommissionStatementDto>("api/sales/commissions/statements/calculate", r, ct);
+    public Task<CommissionStatementDto?> FinalizeCommissionStatementAsync(Guid id, CommissionStatementActionRequest r, CancellationToken ct = default)
+        => apiClient.PostAsync<CommissionStatementActionRequest, CommissionStatementDto>($"api/sales/commissions/statements/{id:D}/finalize", r, ct);
+
+    public async Task<IReadOnlyList<OpticalProductionJobDto>> GetOpticalProductionJobsAsync(OpticalProductionStatus? status = null, Guid? salesInvoiceId = null, CancellationToken ct = default)
+        => await apiClient.GetAsync<IReadOnlyList<OpticalProductionJobDto>>(AppendQuery("api/sales/production", ("status", status?.ToString()), ("salesInvoiceId", salesInvoiceId?.ToString())), ct) ?? [];
+    public Task<OpticalProductionJobDto?> GetOpticalProductionJobAsync(Guid id, CancellationToken ct = default)
+        => apiClient.GetAsync<OpticalProductionJobDto>($"api/sales/production/{id:D}", ct);
+    public Task<OpticalProductionJobDto?> CreateOpticalProductionJobAsync(CreateOpticalProductionJobRequest r, CancellationToken ct = default)
+        => apiClient.PostAsync<CreateOpticalProductionJobRequest, OpticalProductionJobDto>("api/sales/production", r, ct);
+    public Task<OpticalProductionJobDto?> ReleaseOpticalProductionJobAsync(Guid id, OpticalProductionActionRequest r, CancellationToken ct = default)
+        => apiClient.PostAsync<OpticalProductionActionRequest, OpticalProductionJobDto>($"api/sales/production/{id:D}/release", r, ct);
+    public Task<OpticalProductionJobDto?> StartOpticalProductionJobAsync(Guid id, OpticalProductionActionRequest r, CancellationToken ct = default)
+        => apiClient.PostAsync<OpticalProductionActionRequest, OpticalProductionJobDto>($"api/sales/production/{id:D}/start", r, ct);
+    public Task<OpticalProductionJobDto?> IssueOpticalProductionMaterialsAsync(Guid id, OpticalProductionActionRequest r, CancellationToken ct = default)
+        => apiClient.PostAsync<OpticalProductionActionRequest, OpticalProductionJobDto>($"api/sales/production/{id:D}/issue-materials", r, ct);
+    public Task<OpticalProductionJobDto?> SubmitOpticalProductionQcAsync(Guid id, SubmitOpticalProductionQcRequest r, CancellationToken ct = default)
+        => apiClient.PostAsync<SubmitOpticalProductionQcRequest, OpticalProductionJobDto>($"api/sales/production/{id:D}/quality-control", r, ct);
+    public Task<OpticalProductionJobDto?> CreateOpticalProductionRemakeAsync(Guid id, CreateOpticalProductionRemakeRequest r, CancellationToken ct = default)
+        => apiClient.PostAsync<CreateOpticalProductionRemakeRequest, OpticalProductionJobDto>($"api/sales/production/{id:D}/remake", r, ct);
+    public Task<OpticalProductionJobDto?> CompleteOpticalProductionJobAsync(Guid id, OpticalProductionActionRequest r, CancellationToken ct = default)
+        => apiClient.PostAsync<OpticalProductionActionRequest, OpticalProductionJobDto>($"api/sales/production/{id:D}/complete", r, ct);
+    public Task<OpticalProductionJobDto?> CancelOpticalProductionJobAsync(Guid id, OpticalProductionActionRequest r, CancellationToken ct = default)
+        => apiClient.PostAsync<OpticalProductionActionRequest, OpticalProductionJobDto>($"api/sales/production/{id:D}/cancel", r, ct);
+
     public Task<SalesPriceOverrideDto?> RequestPriceOverrideAsync(Guid invoiceId, RequestSalesPriceOverrideRequest r, CancellationToken ct = default) => apiClient.PostAsync<RequestSalesPriceOverrideRequest, SalesPriceOverrideDto>($"api/sales/invoices/{invoiceId}/price-overrides", r, ct);
     public Task<SalesPriceOverrideDto?> ApprovePriceOverrideAsync(Guid id, ApproveSalesPriceOverrideRequest r, CancellationToken ct = default) => apiClient.PostAsync<ApproveSalesPriceOverrideRequest, SalesPriceOverrideDto>($"api/sales/invoices/price-overrides/{id}/approve", r, ct);
     public Task<SalesPriceOverrideDto?> RejectPriceOverrideAsync(Guid id, RejectSalesPriceOverrideRequest r, CancellationToken ct = default) => apiClient.PostAsync<RejectSalesPriceOverrideRequest, SalesPriceOverrideDto>($"api/sales/invoices/price-overrides/{id}/reject", r, ct);
@@ -85,6 +154,7 @@ public sealed class SalesClientService(OasApiClient apiClient) : ISalesClientSer
         => await apiClient.GetAsync<IReadOnlyList<SalesCashAccountLookupDto>>(AddQuery("api/sales/lookups/cash-accounts", ("currencyId", currencyId.ToString()), ("search", search), ("take", take.ToString())), ct) ?? [];
     public async Task<IReadOnlyList<SalesBankAccountLookupDto>> SearchBankAccountsAsync(Guid currencyId, string? search, int take = 20, CancellationToken ct = default)
         => await apiClient.GetAsync<IReadOnlyList<SalesBankAccountLookupDto>>(AddQuery("api/sales/lookups/bank-accounts", ("currencyId", currencyId.ToString()), ("search", search), ("take", take.ToString())), ct) ?? [];
+
     public async Task<IReadOnlyList<CustomerOrderLookupDto>> SearchCustomerOrdersAsync(Guid? customerId, string? search, int take = 20, CancellationToken ct = default)
         => await apiClient.GetAsync<IReadOnlyList<CustomerOrderLookupDto>>(AddQuery("api/sales/lookups/customer-orders", ("customerId", customerId?.ToString()), ("search", search), ("take", take.ToString())), ct) ?? [];
 }

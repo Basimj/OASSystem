@@ -20,4 +20,5 @@ public sealed record PurchaseReceiptLineDto(
     DateOnly? ExpiryDate,
     string? BatchCode,
     string? Notes,
-    string RowVersion);
+    string RowVersion,
+    decimal ReturnedQuantity = 0m);

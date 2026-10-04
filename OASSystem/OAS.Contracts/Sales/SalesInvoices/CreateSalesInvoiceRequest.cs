@@ -12,4 +12,5 @@ public sealed record CreateSalesInvoiceRequest(
     TaxCalculationMode TaxCalculationMode,
     SalesPaymentTermType PaymentTermType,
     string? Description,
-    IReadOnlyList<SalesInvoiceLineRequest> Lines);
+    IReadOnlyList<SalesInvoiceLineRequest> Lines,
+    Guid? SalesEmployeeId = null);

@@ -57,4 +57,6 @@ public sealed record SalesInvoiceDto(
     IReadOnlyList<SalesInvoiceLineDto> Lines,
     string? PrescriptionCode = null,
     int? PrescriptionRevisionNumber = null,
-    string? JournalEntryNumber = null);
+    string? JournalEntryNumber = null,
+    Guid? SalesEmployeeId = null,
+    string? SalesEmployeeName = null);

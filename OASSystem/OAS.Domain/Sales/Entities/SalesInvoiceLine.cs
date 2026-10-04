@@ -53,6 +53,8 @@ public sealed class SalesInvoiceLine : AuditableEntity<Guid>
     public string DescriptionSnapshot { get; private set; } = string.Empty;
     public string? UnitSnapshot { get; private set; }
     public decimal Quantity { get; private set; }
+    public decimal ReturnedQuantity { get; private set; }
+    public decimal RemainingReturnableQuantity => Quantity - ReturnedQuantity;
     public decimal BaseUnitPrice { get; private set; }
     public decimal ActualUnitPrice { get; private set; }
     public SalesDiscountType DiscountType { get; private set; }
@@ -139,6 +141,22 @@ public sealed class SalesInvoiceLine : AuditableEntity<Guid>
             throw new DomainException("Prescription snapshot does not match the sales invoice line.");
 
         PrescriptionSnapshot = snapshot;
+    }
+
+    public void ReserveReturnQuantity(decimal quantity)
+    {
+        if (quantity <= 0m) throw new DomainException("Return quantity must be greater than zero.");
+        if (ReturnedQuantity + quantity > Quantity)
+            throw new DomainException("Return quantity exceeds the remaining returnable quantity.");
+        ReturnedQuantity += quantity;
+    }
+
+    public void ReleaseReturnQuantity(decimal quantity)
+    {
+        if (quantity <= 0m) throw new DomainException("Return quantity must be greater than zero.");
+        if (quantity > ReturnedQuantity)
+            throw new DomainException("Cannot release more returned quantity than currently reserved.");
+        ReturnedQuantity -= quantity;
     }
 
     public void EnsurePrescriptionReference(bool prescriptionRequired)

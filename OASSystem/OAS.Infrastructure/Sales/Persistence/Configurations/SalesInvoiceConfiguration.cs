@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using OAS.Domain.Accounting.Entities;
 using OAS.Domain.Sales.Entities;
+using OAS.Domain.Features.Employees.Entities;
 
 namespace OAS.Infrastructure.Sales.Persistence.Configurations;
 
@@ -24,6 +25,7 @@ public sealed class SalesInvoiceConfiguration : IEntityTypeConfiguration<SalesIn
         builder.Property(x => x.CustomerId).IsRequired();
         builder.Property(x => x.CustomerOrderId);
         builder.Property(x => x.PrescriptionRevisionId);
+        builder.Property(x => x.SalesEmployeeId);
         builder.Property(x => x.InvoiceDate).IsRequired().HasColumnType("date");
         builder.Property(x => x.PostingDate).IsRequired().HasColumnType("date");
         builder.Property(x => x.Status).IsRequired().HasConversion<byte>();
@@ -69,6 +71,7 @@ public sealed class SalesInvoiceConfiguration : IEntityTypeConfiguration<SalesIn
         builder.HasIndex(x => x.CustomerOrderId).HasDatabaseName("IX_SalesInvoices_CustomerOrderId");
         builder.HasIndex(x => x.JournalEntryId).HasDatabaseName("IX_SalesInvoices_JournalEntryId");
         builder.HasIndex(x => x.PrescriptionRevisionId).HasDatabaseName("IX_SalesInvoices_PrescriptionRevisionId");
+        builder.HasIndex(x => x.SalesEmployeeId).HasDatabaseName("IX_SalesInvoices_SalesEmployeeId");
         builder.HasIndex(x => x.CurrencyId).HasDatabaseName("IX_SalesInvoices_CurrencyId");
         builder.HasIndex(x => x.BaseCurrencyId).HasDatabaseName("IX_SalesInvoices_BaseCurrencyId");
 
@@ -78,6 +81,8 @@ public sealed class SalesInvoiceConfiguration : IEntityTypeConfiguration<SalesIn
             .OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_SalesInvoices_CustomerOrders_CustomerOrderId");
         builder.HasOne<PrescriptionRevision>().WithMany().HasForeignKey(x => x.PrescriptionRevisionId)
             .OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_SalesInvoices_PrescriptionRevisions_PrescriptionRevisionId");
+        builder.HasOne<Employee>().WithMany().HasForeignKey(x => x.SalesEmployeeId)
+            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_SalesInvoices_Employees_SalesEmployeeId");
         builder.HasOne<Currency>().WithMany().HasForeignKey(x => x.CurrencyId)
             .OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_SalesInvoices_Currencies_CurrencyId");
         builder.HasOne<Currency>().WithMany().HasForeignKey(x => x.BaseCurrencyId)

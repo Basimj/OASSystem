@@ -79,9 +79,25 @@ public sealed class DatabaseMaintenanceService(DatabaseProfileCatalog catalog, I
         try
         {
             await using var db = CreateContext(connectionString);
-            logger.LogInformation("Applying OAS migrations to database profile {ProfileKey}.", resolvedProfileKey);
+            var pendingBeforeUpdate = (await db.Database.GetPendingMigrationsAsync(cancellationToken)).ToArray();
+
+            logger.LogInformation(
+                "Applying {PendingCount} OAS migration(s) to database profile {ProfileKey}. PendingMigrations={PendingMigrations}",
+                pendingBeforeUpdate.Length,
+                resolvedProfileKey,
+                pendingBeforeUpdate.Length == 0 ? "<none>" : string.Join(", ", pendingBeforeUpdate));
+
             await db.Database.MigrateAsync(cancellationToken);
+
             var pending = (await db.Database.GetPendingMigrationsAsync(cancellationToken)).ToArray();
+            if (pending.Length > 0)
+            {
+                logger.LogWarning(
+                    "Database profile {ProfileKey} still has pending migrations after update. PendingMigrations={PendingMigrations}",
+                    resolvedProfileKey,
+                    string.Join(", ", pending));
+            }
+
             return new DatabaseUpdateStatusDto(resolvedProfileKey, true, pending.Length == 0, pending.Length);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

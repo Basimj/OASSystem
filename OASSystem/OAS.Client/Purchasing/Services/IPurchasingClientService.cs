@@ -4,6 +4,7 @@ using OAS.Contracts.Purchasing.PurchaseInvoices;
 using OAS.Contracts.Purchasing.PurchaseOrders;
 using OAS.Contracts.Purchasing.PurchaseReceipts;
 using OAS.Contracts.Purchasing.PurchaseRequests;
+using OAS.Contracts.Purchasing.PurchaseReturns;
 using OAS.Contracts.Purchasing.SupplierCatalog;
 
 namespace OAS.Client.Purchasing.Services;
@@ -55,4 +56,12 @@ public interface IPurchasingClientService
     Task<PurchaseInvoiceDto?> RejectPurchaseVarianceAsync(Guid id, RejectPurchaseVarianceRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseInvoicePostResultDto?> PostPurchaseInvoiceAsync(Guid id, PostPurchaseInvoiceRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseInvoiceDto?> CancelPurchaseInvoiceAsync(Guid id, CancelPurchaseInvoiceRequest request, CancellationToken cancellationToken = default);
+
+    Task<PagedResult<PurchaseReturnDto>> GetPurchaseReturnsAsync(PageRequest request, PurchaseReturnStatus? status = null, Guid? purchaseReceiptId = null, Guid? purchaseInvoiceId = null, Guid? supplierId = null, CancellationToken cancellationToken = default);
+    Task<PurchaseReturnDto?> GetPurchaseReturnAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<PurchaseReturnDto?> CreatePurchaseReturnAsync(CreatePurchaseReturnRequest request, CancellationToken cancellationToken = default);
+    Task<PurchaseReturnDto?> ConfirmPurchaseReturnAsync(Guid id, PurchaseReturnActionRequest request, CancellationToken cancellationToken = default);
+    Task<PurchaseReturnPostingResultDto?> PostPurchaseReturnAsync(Guid id, PurchaseReturnActionRequest request, CancellationToken cancellationToken = default);
+    Task<PurchaseReturnDto?> CancelPurchaseReturnAsync(Guid id, CancelPurchaseReturnRequest request, CancellationToken cancellationToken = default);
+
 }

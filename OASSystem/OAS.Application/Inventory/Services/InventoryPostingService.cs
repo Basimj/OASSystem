@@ -71,6 +71,20 @@ public sealed class InventoryPostingService(
         return (balance, ledger);
     }
 
+    public async Task<decimal> GetAvailableOutboundUnitCostAsync(
+        Guid warehouseId,
+        Guid productVariantId,
+        decimal quantity,
+        CancellationToken cancellationToken = default)
+    {
+        if (quantity <= 0)
+            throw new ArgumentOutOfRangeException(nameof(quantity));
+        var balance = await balanceRepository.GetByWarehouseAndVariantAsync(warehouseId, productVariantId, cancellationToken);
+        if (balance is null || balance.AvailableQuantity < quantity || balance.OnHandQuantity < quantity)
+            throw new ConflictException("insufficient_stock", $"Insufficient available stock. Available: {balance?.AvailableQuantity ?? 0m}, Required: {quantity}");
+        return balance.AverageUnitCost;
+    }
+
     public async Task<decimal> GetOutboundUnitCostAsync(
         Guid warehouseId,
         Guid productVariantId,

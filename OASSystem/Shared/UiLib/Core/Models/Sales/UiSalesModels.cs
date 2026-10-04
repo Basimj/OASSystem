@@ -137,6 +137,8 @@ public sealed class UiSalesInvoiceFormModel
     public string CustomerId { get; set; } = string.Empty;
     public string CustomerCode { get; set; } = string.Empty;
     public string? CustomerDisplay { get; set; }
+    public string SalesEmployeeId { get; set; } = string.Empty;
+    public string? SalesEmployeeDisplay { get; set; }
     public string CustomerOrderId { get; set; } = string.Empty;
     public string? CustomerOrderDisplay { get; set; }
     public string PrescriptionRevisionId { get; set; } = string.Empty;

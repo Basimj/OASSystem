@@ -1,4 +1,4 @@
-using OAS.Client.Services.Http;
+ï»¿using OAS.Client.Services.Http;
 using OAS.Contracts.Accounting.Accounts;
 using OAS.Contracts.Accounting.BankAccounts;
 using OAS.Contracts.Accounting.CashAccounts;
@@ -18,6 +18,7 @@ using OAS.Contracts.Accounting.PaymentAllocations;
 using OAS.Contracts.Accounting.PaymentVouchers;
 using OAS.Contracts.Accounting.PostingProfiles;
 using OAS.Contracts.Accounting.ReceiptVouchers;
+using OAS.Contracts.Accounting.Reports;
 using OAS.Contracts.Accounting.Settings;
 using OAS.Contracts.Accounting.Suppliers;
 using OAS.Contracts.Common.Errors;
@@ -87,10 +88,10 @@ public sealed class AccountingClientService(
 
 
     // ============================================================
-    // ÇáÊÍŞŞ ÇáãÓÈŞ ãä ÇáÍÓÇÈ ÇáÑÆíÓí
+    // Ø§Ù„ØªØ­Ù‚Ù‚ Ø§Ù„Ù…Ø³Ø¨Ù‚ Ù…Ù† Ø§Ù„Ø­Ø³Ø§Ø¨ Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠ
     //
-    // åĞÇ ÇáÊÍŞŞ UX İŞØ.
-    // ÇáÊÍŞŞ ÇáãæÌæÏ İí Application íÌÈ Ãä íÈŞì ßãÇ åæ.
+    // Ù‡Ø°Ø§ Ø§Ù„ØªØ­Ù‚Ù‚ UX ÙÙ‚Ø·.
+    // Ø§Ù„ØªØ­Ù‚Ù‚ Ø§Ù„Ù…ÙˆØ¬ÙˆØ¯ ÙÙŠ Application ÙŠØ¬Ø¨ Ø£Ù† ÙŠØ¨Ù‚Ù‰ ÙƒÙ…Ø§ Ù‡Ùˆ.
     // ============================================================
 
     private async Task EnsureParentAccountConfiguredAsync(
@@ -131,7 +132,7 @@ public sealed class AccountingClientService(
             settings =>
                 settings.CashParentAccountId,
             "accounting.cash_parent_account_required",
-            "íÌÈ ÊÍÏíÏ ÇáÍÓÇÈ ÇáÑÆíÓí ááÕäÇÏíŞ İí ÅÚÏÇÏÇÊ ÇáãÍÇÓÈÉ ÃæáÇğ.",
+            "ÙŠØ¬Ø¨ ØªØ­Ø¯ÙŠØ¯ Ø§Ù„Ø­Ø³Ø§Ø¨ Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠ Ù„Ù„ØµÙ†Ø§Ø¯ÙŠÙ‚ ÙÙŠ Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ù…Ø­Ø§Ø³Ø¨Ø© Ø£ÙˆÙ„Ø§Ù‹.",
             cancellationToken);
     }
 
@@ -143,7 +144,7 @@ public sealed class AccountingClientService(
             settings =>
                 settings.BankParentAccountId,
             "accounting.bank_parent_account_required",
-            "íÌÈ ÊÍÏíÏ ÇáÍÓÇÈ ÇáÑÆíÓí ááÈäæß İí ÅÚÏÇÏÇÊ ÇáãÍÇÓÈÉ ÃæáÇğ.",
+            "ÙŠØ¬Ø¨ ØªØ­Ø¯ÙŠØ¯ Ø§Ù„Ø­Ø³Ø§Ø¨ Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠ Ù„Ù„Ø¨Ù†ÙˆÙƒ ÙÙŠ Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ù…Ø­Ø§Ø³Ø¨Ø© Ø£ÙˆÙ„Ø§Ù‹.",
             cancellationToken);
     }
 
@@ -155,7 +156,7 @@ public sealed class AccountingClientService(
             settings =>
                 settings.EmployeeParentAccountId,
             "accounting.employee_parent_account_required",
-            "íÌÈ ÊÍÏíÏ ÇáÍÓÇÈ ÇáÑÆíÓí áĞãã ÇáãæÙİíä İí ÅÚÏÇÏÇÊ ÇáãÍÇÓÈÉ ÃæáÇğ.",
+            "ÙŠØ¬Ø¨ ØªØ­Ø¯ÙŠØ¯ Ø§Ù„Ø­Ø³Ø§Ø¨ Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠ Ù„Ø°Ù…Ù… Ø§Ù„Ù…ÙˆØ¸ÙÙŠÙ† ÙÙŠ Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ù…Ø­Ø§Ø³Ø¨Ø© Ø£ÙˆÙ„Ø§Ù‹.",
             cancellationToken);
     }
 
@@ -1557,6 +1558,44 @@ public sealed class AccountingClientService(
 
 
     // ============================================================
+    // Financial Reports and Closing Readiness
+    // ============================================================
+
+    public Task<GeneralLedgerReportDto?> GetGeneralLedgerAsync(
+        DateOnly fromDate,
+        DateOnly toDate,
+        Guid? accountId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var accountQuery = accountId.HasValue ? $"&accountId={accountId.Value:D}" : string.Empty;
+        return apiClient.GetAsync<GeneralLedgerReportDto>(
+            $"api/accounting/reports/general-ledger?fromDate={fromDate:yyyy-MM-dd}&toDate={toDate:yyyy-MM-dd}{accountQuery}",
+            cancellationToken);
+    }
+
+    public Task<TrialBalanceReportDto?> GetTrialBalanceAsync(
+        DateOnly fromDate,
+        DateOnly toDate,
+        CancellationToken cancellationToken = default) =>
+        apiClient.GetAsync<TrialBalanceReportDto>(
+            $"api/accounting/reports/trial-balance?fromDate={fromDate:yyyy-MM-dd}&toDate={toDate:yyyy-MM-dd}",
+            cancellationToken);
+
+    public Task<FiscalCloseReadinessDto?> GetFiscalPeriodCloseReadinessAsync(
+        Guid fiscalPeriodId,
+        CancellationToken cancellationToken = default) =>
+        apiClient.GetAsync<FiscalCloseReadinessDto>(
+            $"api/accounting/reports/fiscal-periods/{fiscalPeriodId:D}/close-readiness",
+            cancellationToken);
+
+    public Task<FiscalCloseReadinessDto?> GetFiscalYearCloseReadinessAsync(
+        Guid fiscalYearId,
+        CancellationToken cancellationToken = default) =>
+        apiClient.GetAsync<FiscalCloseReadinessDto>(
+            $"api/accounting/reports/fiscal-years/{fiscalYearId:D}/close-readiness",
+            cancellationToken);
+
+    // ============================================================
     // Employee Accounts
     // ============================================================
 
@@ -1587,8 +1626,8 @@ public sealed class AccountingClientService(
             CancellationToken cancellationToken = default)
     {
         /*
-         * ÅäÔÇÁ ÇáÑÈØ ÇáãÍÇÓÈí ááãæÙİ íÍÊÇÌ ÇáÍÓÇÈ ÇáÑÆíÓí.
-         * ÅĞÇ ßÇä ÇáØáÈ áÊÚØíá ÇáÑÈØ İáÇ äÍÊÇÌ åĞÇ ÇáİÍÕ.
+         * Ø¥Ù†Ø´Ø§Ø¡ Ø§Ù„Ø±Ø¨Ø· Ø§Ù„Ù…Ø­Ø§Ø³Ø¨ÙŠ Ù„Ù„Ù…ÙˆØ¸Ù ÙŠØ­ØªØ§Ø¬ Ø§Ù„Ø­Ø³Ø§Ø¨ Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠ.
+         * Ø¥Ø°Ø§ ÙƒØ§Ù† Ø§Ù„Ø·Ù„Ø¨ Ù„ØªØ¹Ø·ÙŠÙ„ Ø§Ù„Ø±Ø¨Ø· ÙÙ„Ø§ Ù†Ø­ØªØ§Ø¬ Ù‡Ø°Ø§ Ø§Ù„ÙØ­Øµ.
          */
         if (request.IsActive)
         {
