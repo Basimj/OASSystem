@@ -40,6 +40,21 @@ public sealed class CustomerOrderLineOpticalSnapshotDomainTests
     }
 
     [Test]
+    public void ManualMeasurements_CannotReferencePrescriptionRevision()
+    {
+        var snapshot = CustomerOrderLineOpticalSnapshot.CreateManual(
+            Guid.NewGuid(), Guid.NewGuid(), EyeSide.RightOD, -1m, -0.5m, 90);
+
+        Assert.Throws<DomainException>(() => snapshot.UpdateWhileDraft(
+            CustomerOrderStatus.Draft,
+            OpticalMeasurementSource.Manual,
+            Guid.NewGuid(),
+            EyeSide.RightOD,
+            -1m, -0.5m, 90, null, null, null, null, null, null, null,
+            null, null, null, null));
+    }
+
+    [Test]
     public void Snapshot_CannotBeChangedAfterOrderLeavesDraft()
     {
         var snapshot = CustomerOrderLineOpticalSnapshot.CreateManual(

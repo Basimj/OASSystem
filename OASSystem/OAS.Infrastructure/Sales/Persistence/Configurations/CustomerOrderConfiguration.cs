@@ -34,6 +34,7 @@ public sealed class CustomerOrderConfiguration : IEntityTypeConfiguration<Custom
         builder.Property(x => x.ExchangeRateType).IsRequired().HasConversion<byte>();
         builder.Property(x => x.ExchangeRateSource).IsRequired().HasConversion<byte>();
         builder.Property(x => x.TaxCalculationMode).IsRequired().HasConversion<byte>();
+        builder.Property(x => x.PaymentPlan).IsRequired().HasConversion<byte>();
         builder.Property(x => x.PaymentTermType).IsRequired().HasConversion<byte>();
         builder.Property(x => x.PaymentTermDaysSnapshot).IsRequired();
         builder.Property(x => x.Subtotal).IsRequired().HasPrecision(19, 4);
@@ -54,6 +55,7 @@ public sealed class CustomerOrderConfiguration : IEntityTypeConfiguration<Custom
         builder.HasIndex(x => x.Status).HasDatabaseName("IX_CustomerOrders_Status");
         builder.HasIndex(x => x.PrescriptionRevisionId).HasDatabaseName("IX_CustomerOrders_PrescriptionRevisionId");
         builder.HasIndex(x => x.CurrencyId).HasDatabaseName("IX_CustomerOrders_CurrencyId");
+        builder.HasIndex(x => x.PaymentPlan).HasDatabaseName("IX_CustomerOrders_PaymentPlan");
 
         builder.HasOne<Customer>().WithMany().HasForeignKey(x => x.CustomerId)
             .OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_CustomerOrders_Customers_CustomerId");

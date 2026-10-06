@@ -38,8 +38,8 @@ public sealed class UpdateCustomerOrderCommandHandler(
         if (!customer.IsActive)
             throw new ConflictException(SalesErrorCodes.CustomerInactive, "العميل غير فعال.");
 
-        var term = (SalesPaymentTermType)(byte)request.Data.PaymentTermType;
-        if (term == SalesPaymentTermType.Credit && !customer.IsCreditAllowed)
+        var paymentPlan = (SalesPaymentPlan)(byte)request.Data.PaymentPlan;
+        if (paymentPlan == SalesPaymentPlan.AccountCredit && (string.IsNullOrWhiteSpace(customer.CustomerCode) || !customer.IsCreditAllowed))
             throw new ConflictException(SalesErrorCodes.CreditNotAllowed, "البيع الآجل غير مسموح لهذا العميل.");
 
         var previousExchangeRate = order.ExchangeRate;
@@ -51,8 +51,8 @@ public sealed class UpdateCustomerOrderCommandHandler(
             request.Data.OrderDate,
             request.Data.RequiredDate,
             (TaxCalculationMode)(byte)request.Data.TaxCalculationMode,
-            term,
-            customer.PaymentTermDays,
+            paymentPlan,
+            paymentPlan == SalesPaymentPlan.AccountCredit ? customer.PaymentTermDays : 0,
             request.Data.Notes);
 
         if (currencyContextChanged)

@@ -37,6 +37,28 @@ public sealed class PartyDomainTests
     }
 
     [Test]
+    public void Customer_AccountCreditEligibility_UsesOperationalCreditPolicy()
+    {
+        var customer = Customer.Create(Guid.NewGuid(), "CUS-000010", Guid.NewGuid(), PartyEntityType.Individual,
+            "عميل آجل", null, null, null, null, null, null, Gender.Unspecified, Contact(), true, 500000m, 30, null, true, null);
+
+        Assert.DoesNotThrow(() => customer.EnsureCanUseAccountCredit(100000m, 200000m));
+        Assert.Throws<DomainException>(() => customer.EnsureCanUseAccountCredit(400000m, 200000m));
+    }
+
+    [Test]
+    public void Customer_AccountCreditEligibility_RejectsInactiveOrCashOnlyCustomer()
+    {
+        var cashOnly = Customer.Create(Guid.NewGuid(), "CUS-000011", Guid.NewGuid(), PartyEntityType.Individual,
+            "عميل نقدي", null, null, null, null, null, null, Gender.Unspecified, Contact(), false, 0m, 0, null, true, null);
+        Assert.Throws<DomainException>(() => cashOnly.EnsureCanUseAccountCredit(0m, 100m));
+
+        var inactive = Customer.Create(Guid.NewGuid(), "CUS-000012", Guid.NewGuid(), PartyEntityType.Individual,
+            "عميل غير فعال", null, null, null, null, null, null, Gender.Unspecified, Contact(), true, 1000m, 30, null, false, null);
+        Assert.Throws<DomainException>(() => inactive.EnsureCanUseAccountCredit(0m, 100m));
+    }
+
+    [Test]
     public void Supplier_InvalidScope_IsRejected()
     {
         Assert.Throws<DomainException>(() => Supplier.Create(Guid.NewGuid(), "SUP-000001", Guid.NewGuid(),

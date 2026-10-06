@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using OAS.Application.Sales.OpticalJobs.Commands;
 using OAS.Application.Sales.OpticalJobs.Queries;
+using OAS.Contracts.Common.Pagination;
 using OAS.Contracts.Sales.OpticalJobs;
 
 namespace OAS.API.Optical.Controllers;
@@ -15,7 +16,14 @@ namespace OAS.API.Optical.Controllers;
 public sealed class OpticalJobsController(ISender sender) : ControllerBase
 {
     [HttpGet("work-queue")]
-    public async Task<ActionResult<IReadOnlyList<OpticalJobWorkQueueDto>>> GetWorkQueue(
+    public async Task<ActionResult<PagedResult<OpticalJobWorkQueueDto>>> GetWorkQueue(
+        [FromQuery] OpticalJobWorkQueueRequest request,
+        CancellationToken cancellationToken)
+        => Ok(await sender.Send(new GetOpticalJobWorkQueuePageQuery(request), cancellationToken));
+
+    // Compatibility endpoint for callers that still need the pre-pagination list contract.
+    [HttpGet("work-queue/all")]
+    public async Task<ActionResult<IReadOnlyList<OpticalJobWorkQueueDto>>> GetAllWorkQueue(
         CancellationToken cancellationToken)
         => Ok(await sender.Send(new GetOpticalJobWorkQueueQuery(), cancellationToken));
 
@@ -35,6 +43,16 @@ public sealed class OpticalJobsController(ISender sender) : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id }, dto);
     }
 
+    [HttpPost("{id:guid}/assign")]
+    public async Task<ActionResult<OpticalJobDetailsDto>> Assign(
+        Guid id,
+        [FromBody] AssignOpticalJobRequest request,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new AssignOpticalJobCommand(id, request), cancellationToken);
+        return Ok(await sender.Send(new GetOpticalJobQuery(id), cancellationToken));
+    }
+
     [HttpPost("{id:guid}/start")]
     public async Task<ActionResult<OpticalJobDetailsDto>> Start(
         Guid id,
@@ -45,8 +63,9 @@ public sealed class OpticalJobsController(ISender sender) : ControllerBase
         return Ok(await sender.Send(new GetOpticalJobQuery(id), cancellationToken));
     }
 
+    [HttpPost("{id:guid}/ready-for-delivery")]
     [HttpPost("{id:guid}/ready")]
-    public async Task<ActionResult<OpticalJobDetailsDto>> MarkReady(
+    public async Task<ActionResult<OpticalJobDetailsDto>> MarkReadyForDelivery(
         Guid id,
         [FromBody] OpticalJobActionRequest request,
         CancellationToken cancellationToken)

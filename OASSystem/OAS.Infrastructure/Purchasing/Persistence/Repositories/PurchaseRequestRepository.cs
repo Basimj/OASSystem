@@ -6,6 +6,7 @@ using OAS.Contracts.Purchasing.Enums;
 using OAS.Domain.Purchasing.Entities;
 using OAS.Infrastructure.Persistence;
 using DomainStatus = OAS.Domain.Purchasing.Enums.PurchaseRequestStatus;
+using DomainOrderStatus = OAS.Domain.Purchasing.Enums.PurchaseOrderStatus;
 
 namespace OAS.Infrastructure.Purchasing.Persistence.Repositories;
 
@@ -15,6 +16,7 @@ public sealed class PurchaseRequestRepository(OasDbContext dbContext) : IPurchas
     private DbSet<PurchaseRequestLine> Lines => dbContext.Set<PurchaseRequestLine>();
     private DbSet<PurchaseOrderLineSource> Sources => dbContext.Set<PurchaseOrderLineSource>();
     private DbSet<PurchaseOrderLine> OrderLines => dbContext.Set<PurchaseOrderLine>();
+    private DbSet<PurchaseOrder> Orders => dbContext.Set<PurchaseOrder>();
 
     public Task<PurchaseRequest?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         Requests.AsNoTracking().Include(x => x.Lines).FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -34,9 +36,18 @@ public sealed class PurchaseRequestRepository(OasDbContext dbContext) : IPurchas
     public async Task<IReadOnlyDictionary<Guid, decimal>> GetAllocatedQuantitiesAsync(IReadOnlyCollection<Guid> purchaseRequestLineIds, CancellationToken cancellationToken = default)
     {
         if (purchaseRequestLineIds.Count == 0) return new Dictionary<Guid, decimal>();
-        return await Sources.AsNoTracking().Where(x => purchaseRequestLineIds.Contains(x.PurchaseRequestLineId))
-            .GroupBy(x => x.PurchaseRequestLineId).Select(g => new { Id = g.Key, Quantity = g.Sum(x => x.AllocatedQuantity) })
-            .ToDictionaryAsync(x => x.Id, x => x.Quantity, cancellationToken);
+
+        var query =
+            from source in Sources.AsNoTracking()
+            join line in OrderLines.AsNoTracking() on source.PurchaseOrderLineId equals line.Id
+            join order in Orders.AsNoTracking() on line.PurchaseOrderId equals order.Id
+            where purchaseRequestLineIds.Contains(source.PurchaseRequestLineId)
+                  && order.Status != DomainOrderStatus.Cancelled
+                  && order.Status != DomainOrderStatus.Rejected
+            group source by source.PurchaseRequestLineId into g
+            select new { Id = g.Key, Quantity = g.Sum(x => x.AllocatedQuantity) };
+
+        return await query.ToDictionaryAsync(x => x.Id, x => x.Quantity, cancellationToken);
     }
 
     public Task<PurchaseRequest?> GetByLineIdAsync(Guid purchaseRequestLineId, CancellationToken cancellationToken = default) =>
@@ -47,7 +58,11 @@ public sealed class PurchaseRequestRepository(OasDbContext dbContext) : IPurchas
         if (purchaseRequestLineIds.Count == 0) return new Dictionary<Guid, decimal>();
         var query = from source in Sources.AsNoTracking()
                     join line in OrderLines.AsNoTracking() on source.PurchaseOrderLineId equals line.Id
-                    where purchaseRequestLineIds.Contains(source.PurchaseRequestLineId) && line.PurchaseOrderId != purchaseOrderId
+                    join order in Orders.AsNoTracking() on line.PurchaseOrderId equals order.Id
+                    where purchaseRequestLineIds.Contains(source.PurchaseRequestLineId)
+                          && line.PurchaseOrderId != purchaseOrderId
+                          && order.Status != DomainOrderStatus.Cancelled
+                          && order.Status != DomainOrderStatus.Rejected
                     group source by source.PurchaseRequestLineId into g
                     select new { Id = g.Key, Quantity = g.Sum(x => x.AllocatedQuantity) };
         return await query.ToDictionaryAsync(x => x.Id, x => x.Quantity, cancellationToken);

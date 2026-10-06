@@ -1,28 +1,20 @@
 using MediatR;
-using OAS.Application.Abstractions.Persistence;
-using OAS.Application.Abstractions.Security;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.Sales.Abstractions;
 using OAS.Application.Sales.Common;
+using OAS.Contracts.Accounting.Enums;
+using OAS.Contracts.Sales.Checkout;
+using OAS.Contracts.Sales.Enums;
 using OAS.Contracts.Sales.SalesInvoices;
-using OAS.Domain.Accounting.Entities;
 using OAS.Domain.Sales.Entities;
-using OAS.Domain.Sales.Enums;
+using DomainPlan = OAS.Domain.Sales.Enums.SalesPaymentPlan;
 
 namespace OAS.Application.Sales.SalesInvoices.Commands;
 
 public sealed class PostSalesInvoiceCommandHandler(
     ISalesInvoiceAggregateRepository invoices,
-    IReadRepository<Customer, Guid> customers,
-    ISalesPostingPeriodService periods,
-    ISalesStockReservationService stock,
-    ISalesCreditExposureService credit,
-    ISalesInventoryPostingService inventory,
-    ISalesInvoiceAccountingPostingService accounting,
-    ISalesImmediateSettlementService immediateSettlement,
-    IUnitOfWork unitOfWork,
-    ICurrentUser currentUser,
-    TimeProvider timeProvider)
+    ISalesInvoicePostingWorkflow posting,
+    ISalesSettlementService settlement)
     : IRequestHandler<PostSalesInvoiceCommand, SalesInvoicePostingResultDto>
 {
     public async Task<SalesInvoicePostingResultDto> Handle(PostSalesInvoiceCommand request, CancellationToken ct)
@@ -31,66 +23,39 @@ public sealed class PostSalesInvoiceCommandHandler(
             ?? throw new NotFoundException(nameof(SalesInvoice), request.InvoiceId);
         SalesConcurrency.Ensure(request.Request.RowVersion, invoice.RowVersion, "فاتورة المبيعات");
 
-        if (invoice.Status == SalesInvoiceStatus.Posted)
-            throw new ConflictException(SalesErrorCodes.InvoiceAlreadyPosted, "الفاتورة مرحلة مسبقًا.");
-        if (invoice.Status != SalesInvoiceStatus.Confirmed)
-            throw new ConflictException(SalesErrorCodes.InvoiceInvalidStatus, "يجب أن تكون الفاتورة مؤكدة قبل الترحيل.");
+        var result = await posting.PostAsync(invoice, ct);
 
-        if (!Guid.TryParse(currentUser.UserId, out var userId))
-            throw new ForbiddenException();
-
-        var requiresInventory = invoice.Lines.Any(x => x.IsActive && x.RequiresInventory);
-        await periods.GetOpenPostingPeriodAsync(invoice.PostingDate, requiresInventory, ct);
-
-        var customer = await customers.GetByIdAsync(invoice.CustomerId, ct)
-            ?? throw new NotFoundException(nameof(Customer), invoice.CustomerId);
-        if (!customer.IsActive)
-            throw new ConflictException(SalesErrorCodes.CustomerInactive, "العميل غير فعال.");
-
-        // Credit and reservation checks are intentionally repeated at Posting inside the same
-        // transaction; Confirm-time validation is not sufficient under concurrency.
-        await credit.ValidateAsync(customer, invoice, ct);
-        await stock.ValidateInvoiceReservationsAsync(invoice, ct);
-
-        var now = timeProvider.GetUtcNow();
-        var inventoryResult = await inventory.PostAsync(invoice, currentUser.UserId!, now, ct);
-        foreach (var cost in inventoryResult.LineCosts)
-            invoice.SetLineCostSnapshot(cost.SalesInvoiceLineId, cost.UnitCost, cost.TotalCost);
-
-        var journalId = await accounting.PostAsync(invoice, userId, now.UtcDateTime, ct);
-        invoice.SetJournalEntry(journalId);
-        invoice.Post(now, currentUser.UserId);
-
-        // Persist the Posted state inside the still-open outer transaction so the
-        // allocation validator observes the authoritative invoice status. A later
-        // failure in automatic settlement still rolls the whole transaction back.
-        await unitOfWork.SaveChangesAsync(ct);
-
-        SalesImmediateSettlementResult? settlementResult = null;
-        if (invoice.PaymentTermType == SalesPaymentTermType.Immediate)
+        SalesPaymentCollectionResult? collection = null;
+        // Compatibility for the old standalone Post Invoice flow. The new Checkout flow calls the
+        // posting workflow directly and controls payment according to PaymentPlan.
+        if (invoice.PaymentPlan == DomainPlan.FullNow)
         {
-            var method = request.Request.ImmediatePaymentMethod
-                ?? throw new ConflictException("sales_immediate_payment_method_required", "يجب تحديد طريقة التحصيل قبل ترحيل الفاتورة الفورية.");
-
-            settlementResult = await immediateSettlement.SettleAsync(
+            var legacyMethod = request.Request.ImmediatePaymentMethod
+                ?? throw new ConflictException("sales_immediate_payment_method_required", "يجب تحديد طريقة التحصيل للفواتير ذات خطة الدفع الكامل الآن.");
+            var method = legacyMethod == SalesImmediatePaymentMethod.Cash
+                ? PaymentMethod.Cash
+                : PaymentMethod.BankTransfer;
+            collection = await settlement.CreateReceiptForInvoiceAsync(
                 invoice,
-                method,
-                request.Request.CashAccountId,
-                request.Request.BankAccountId,
-                userId,
-                now.UtcDateTime,
+                [new CheckoutPaymentLineRequest(
+                    method,
+                    invoice.CurrencyId,
+                    invoice.TotalAmount,
+                    request.Request.CashAccountId,
+                    request.Request.BankAccountId,
+                    null,
+                    invoice.InvoiceDate,
+                    $"تحصيل كامل للفاتورة {invoice.InvoiceCode}")],
                 ct);
-
-            await unitOfWork.SaveChangesAsync(ct);
         }
 
         return new SalesInvoicePostingResultDto(
             invoice.Id,
             invoice.InvoiceCode,
-            journalId,
-            inventoryResult.InventoryTransactionIds,
+            result.JournalEntryId,
+            result.InventoryTransactionIds,
             Convert.ToBase64String(invoice.RowVersion),
-            settlementResult?.ReceiptVoucherId,
-            settlementResult?.ReceiptVoucherNumber);
+            collection?.ReceiptVoucherId,
+            collection?.ReceiptVoucherNumber);
     }
 }

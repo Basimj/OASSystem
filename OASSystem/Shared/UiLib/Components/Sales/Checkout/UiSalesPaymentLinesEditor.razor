@@ -1,0 +1,80 @@
+@namespace OAS.UiLib.Components.Sales.Checkout
+@using OAS.UiLib.Components.Accounting.Inputs
+@using OAS.UiLib.Core.Models.Sales
+
+<div class="ui-sales-payment-lines" dir="rtl">
+    <div class="ui-sales-payment-lines__header">
+        <div><strong>دفعات العملية</strong><span>يمكن توزيع التحصيل على أكثر من طريقة دفع.</span></div>
+        <UiButton Text="إضافة دفعة" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" Variant="ButtonVariant.Secondary" Disabled="@Disabled" OnClick="AddAsync" />
+    </div>
+    @if (Lines.Count == 0)
+    {
+        <div class="ui-sales-empty ui-sales-empty--compact"><span>لا توجد دفعات مدخلة.</span></div>
+    }
+    else
+    {
+        <div class="ui-sales-payment-lines__list">
+            @for (var i = 0; i < Lines.Count; i++)
+            {
+                var line = Lines[i];
+                <div class="ui-sales-payment-line">
+                    <UiSelect Label="الطريقة" Value="@line.PaymentMethod" ValueChanged="v => MethodChangedAsync(line, v)" Options="@PaymentMethodOptions" Disabled="@Disabled" />
+                    <UiLookup Label="العملة" Value="@line.CurrencyId" SelectedItem="@SelectedCurrency(line)" SearchAsync="SearchCurrenciesAsync" ValueChanged="v => CurrencyChangedAsync(line, v)" Disabled="@Disabled" />
+                    <div class="ui-sales-payment-line__amount"><span>المبلغ</span><UiAccountingMoneyInput Value="@line.Amount" ValueChanged="v => AmountChangedAsync(line, v)" Currency="@CurrencyLabel(line)" Disabled="@Disabled" /></div>
+                    @if (line.PaymentMethod == "Cash")
+                    {
+                        <UiLookup Label="الصندوق" Value="@line.CashAccountId" SelectedItem="@SelectedCash(line)" SearchAsync="(q,ct) => SearchCashAsync(line,q,ct)" ValueChanged="v => CashChangedAsync(line, v)" Disabled="@Disabled" />
+                    }
+                    else if (line.PaymentMethod is "Card" or "BankTransfer" or "Cheque")
+                    {
+                        <UiLookup Label="الحساب البنكي" Value="@line.BankAccountId" SelectedItem="@SelectedBank(line)" SearchAsync="(q,ct) => SearchBankAsync(line,q,ct)" ValueChanged="v => BankChangedAsync(line, v)" Disabled="@Disabled" />
+                    }
+                    else if (line.PaymentMethod == "Other")
+                    {
+                        <UiLookup Label="حساب التسوية" Value="@line.SettlementAccountId" SelectedItem="@SelectedSettlement(line)" SearchAsync="SearchSettlementAccountsAsync" ValueChanged="v => SettlementChangedAsync(line, v)" Disabled="@Disabled" />
+                    }
+                    <UiInputText Label="المرجع" Value="@line.ReferenceNumber" ValueChanged="v => TextChangedAsync(line, v)" Placeholder="رقم التحويل/الشيك" Disabled="@Disabled" />
+                    <UiButton Text="حذف" IconCssClass="fa-solid fa-trash" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Disabled="@Disabled" OnClick="_ => RemoveAsync(line)" />
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public List<UiCheckoutPaymentLineModel> Lines { get; set; } = [];
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchCurrenciesAsync { get; set; }
+    [Parameter] public Func<UiCheckoutPaymentLineModel,string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchCashAccountsAsync { get; set; }
+    [Parameter] public Func<UiCheckoutPaymentLineModel,string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchBankAccountsAsync { get; set; }
+    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchSettlementAccountsAsync { get; set; }
+    [Parameter] public EventCallback OnAdd { get; set; }
+    [Parameter] public EventCallback<UiCheckoutPaymentLineModel> OnRemove { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private static readonly IReadOnlyList<UiSelectOption> PaymentMethodOptions =
+    [
+        new("Cash","نقد"), new("Card","بطاقة"), new("BankTransfer","تحويل بنكي"), new("Cheque","شيك"), new("Other","أخرى")
+    ];
+
+
+    private Task<IReadOnlyList<UiLookupItem>> SearchCashAsync(UiCheckoutPaymentLineModel line,string query,CancellationToken ct)
+        => SearchCashAccountsAsync is null ? Task.FromResult<IReadOnlyList<UiLookupItem>>([]) : SearchCashAccountsAsync(line,query,ct);
+    private Task<IReadOnlyList<UiLookupItem>> SearchBankAsync(UiCheckoutPaymentLineModel line,string query,CancellationToken ct)
+        => SearchBankAccountsAsync is null ? Task.FromResult<IReadOnlyList<UiLookupItem>>([]) : SearchBankAccountsAsync(line,query,ct);
+    private static UiLookupItem? ToSelected(string? value,string? display,string icon) => string.IsNullOrWhiteSpace(value) || string.IsNullOrWhiteSpace(display) ? null : new(value,display,null,icon);
+    private static UiLookupItem? SelectedCurrency(UiCheckoutPaymentLineModel line) => ToSelected(line.CurrencyId,line.CurrencyDisplay,"fa-solid fa-coins");
+    private static UiLookupItem? SelectedCash(UiCheckoutPaymentLineModel line) => ToSelected(line.CashAccountId,line.CashAccountDisplay,"fa-solid fa-vault");
+    private static UiLookupItem? SelectedBank(UiCheckoutPaymentLineModel line) => ToSelected(line.BankAccountId,line.BankAccountDisplay,"fa-solid fa-building-columns");
+    private static UiLookupItem? SelectedSettlement(UiCheckoutPaymentLineModel line) => ToSelected(line.SettlementAccountId,line.SettlementAccountDisplay,"fa-solid fa-scale-balanced");
+    private static string CurrencyLabel(UiCheckoutPaymentLineModel line) => string.IsNullOrWhiteSpace(line.CurrencyDisplay) ? "" : line.CurrencyDisplay;
+    private Task AddAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _) => OnAdd.InvokeAsync();
+    private Task RemoveAsync(UiCheckoutPaymentLineModel line) => OnRemove.InvokeAsync(line);
+    private async Task MethodChangedAsync(UiCheckoutPaymentLineModel line,string? value){ line.PaymentMethod=value??"Cash"; line.CashAccountId=string.Empty; line.CashAccountDisplay=null; line.BankAccountId=string.Empty; line.BankAccountDisplay=null; line.SettlementAccountId=string.Empty; line.SettlementAccountDisplay=null; await OnChanged.InvokeAsync(); }
+    private async Task AmountChangedAsync(UiCheckoutPaymentLineModel line,decimal value){ line.Amount=value; await OnChanged.InvokeAsync(); }
+    private async Task TextChangedAsync(UiCheckoutPaymentLineModel line,string? value){ line.ReferenceNumber=value; await OnChanged.InvokeAsync(); }
+    private async Task CurrencyChangedAsync(UiCheckoutPaymentLineModel line,string? value){line.CurrencyId=value??string.Empty;line.CurrencyDisplay=null;line.CashAccountId=string.Empty;line.CashAccountDisplay=null;line.BankAccountId=string.Empty;line.BankAccountDisplay=null;await OnChanged.InvokeAsync();}
+    private async Task CashChangedAsync(UiCheckoutPaymentLineModel line,string? value){line.CashAccountId=value??string.Empty;line.CashAccountDisplay=null;await OnChanged.InvokeAsync();}
+    private async Task BankChangedAsync(UiCheckoutPaymentLineModel line,string? value){line.BankAccountId=value??string.Empty;line.BankAccountDisplay=null;await OnChanged.InvokeAsync();}
+    private async Task SettlementChangedAsync(UiCheckoutPaymentLineModel line,string? value){line.SettlementAccountId=value??string.Empty;line.SettlementAccountDisplay=null;await OnChanged.InvokeAsync();}
+}

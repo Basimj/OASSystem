@@ -233,6 +233,8 @@ public sealed class CustomerOrderLineOpticalSnapshot : AuditableEntity<Guid>
         if (measurementSource == OpticalMeasurementSource.StoredPrescription &&
             (!prescriptionRevisionId.HasValue || prescriptionRevisionId.Value == Guid.Empty))
             throw new DomainException("Stored prescription measurements require a prescription revision.");
+        if (measurementSource == OpticalMeasurementSource.Manual && prescriptionRevisionId.HasValue)
+            throw new DomainException("Manual optical measurements cannot reference a prescription revision.");
         if (prescriptionRevisionId == Guid.Empty)
             throw new DomainException("Prescription revision id cannot be empty.");
         if (refractiveIndexSnapshot.HasValue && refractiveIndexSnapshot.Value <= 0)

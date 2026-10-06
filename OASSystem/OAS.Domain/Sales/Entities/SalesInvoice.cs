@@ -17,7 +17,7 @@ public sealed class SalesInvoice : AuditableEntity<Guid>
         DateOnly invoiceDate, DateOnly postingDate, Guid currencyId, string currencyCodeSnapshot,
         string? currencySymbolSnapshot, byte currencyDecimalPlacesSnapshot, decimal exchangeRate,
         DateOnly exchangeRateDate, ExchangeRateType exchangeRateType, ExchangeRateSource exchangeRateSource,
-        TaxCalculationMode taxCalculationMode, SalesPaymentTermType paymentTermType, int paymentTermDaysSnapshot,
+        TaxCalculationMode taxCalculationMode, SalesPaymentPlan paymentPlan, int paymentTermDaysSnapshot,
         Guid baseCurrencyId, string baseCurrencyCodeSnapshot, byte baseCurrencyDecimalPlacesSnapshot, string? description)
     {
         Id = SalesDomainGuard.Required(id, "Sales invoice id");
@@ -32,7 +32,7 @@ public sealed class SalesInvoice : AuditableEntity<Guid>
         SetCurrencySnapshots(currencyId, currencyCodeSnapshot, currencySymbolSnapshot, currencyDecimalPlacesSnapshot,
             exchangeRate, exchangeRateDate, exchangeRateType, exchangeRateSource, baseCurrencyId,
             baseCurrencyCodeSnapshot, baseCurrencyDecimalPlacesSnapshot);
-        SetCommercialPolicy(taxCalculationMode, paymentTermType, paymentTermDaysSnapshot);
+        SetCommercialPolicy(taxCalculationMode, paymentPlan, paymentTermDaysSnapshot);
         Description = SalesDomainGuard.Optional(description, 1000, "Invoice description");
         Status = SalesInvoiceStatus.Draft;
         IsActive = true;
@@ -55,6 +55,7 @@ public sealed class SalesInvoice : AuditableEntity<Guid>
     public ExchangeRateType ExchangeRateType { get; private set; }
     public ExchangeRateSource ExchangeRateSource { get; private set; }
     public TaxCalculationMode TaxCalculationMode { get; private set; }
+    public SalesPaymentPlan PaymentPlan { get; private set; } = SalesPaymentPlan.FullNow;
     public SalesPaymentTermType PaymentTermType { get; private set; }
     public int PaymentTermDaysSnapshot { get; private set; }
     public DateOnly? DueDate { get; private set; }
@@ -86,17 +87,33 @@ public sealed class SalesInvoice : AuditableEntity<Guid>
         DateOnly invoiceDate, DateOnly postingDate, Guid currencyId, string currencyCodeSnapshot,
         string? currencySymbolSnapshot, byte currencyDecimalPlacesSnapshot, decimal exchangeRate,
         DateOnly exchangeRateDate, ExchangeRateType exchangeRateType, ExchangeRateSource exchangeRateSource,
-        TaxCalculationMode taxCalculationMode, SalesPaymentTermType paymentTermType, int paymentTermDaysSnapshot,
+        TaxCalculationMode taxCalculationMode, SalesPaymentPlan paymentPlan, int paymentTermDaysSnapshot,
         Guid baseCurrencyId, string baseCurrencyCodeSnapshot, byte baseCurrencyDecimalPlacesSnapshot,
         string? description = null) =>
         new(id, invoiceCode, customerId, customerOrderId, prescriptionRevisionId, invoiceDate, postingDate, currencyId,
             currencyCodeSnapshot, currencySymbolSnapshot, currencyDecimalPlacesSnapshot, exchangeRate, exchangeRateDate,
-            exchangeRateType, exchangeRateSource, taxCalculationMode, paymentTermType, paymentTermDaysSnapshot,
+            exchangeRateType, exchangeRateSource, taxCalculationMode, paymentPlan, paymentTermDaysSnapshot,
+            baseCurrencyId, baseCurrencyCodeSnapshot, baseCurrencyDecimalPlacesSnapshot, description);
+
+    // Transitional overload for the current Application layer. Credit maps to AccountCredit and
+    // Immediate maps to FullNow, matching the required data backfill rule.
+    public static SalesInvoice Create(
+        Guid id, string invoiceCode, Guid customerId, Guid? customerOrderId, Guid? prescriptionRevisionId,
+        DateOnly invoiceDate, DateOnly postingDate, Guid currencyId, string currencyCodeSnapshot,
+        string? currencySymbolSnapshot, byte currencyDecimalPlacesSnapshot, decimal exchangeRate,
+        DateOnly exchangeRateDate, ExchangeRateType exchangeRateType, ExchangeRateSource exchangeRateSource,
+        TaxCalculationMode taxCalculationMode, SalesPaymentTermType paymentTermType, int paymentTermDaysSnapshot,
+        Guid baseCurrencyId, string baseCurrencyCodeSnapshot, byte baseCurrencyDecimalPlacesSnapshot,
+        string? description = null) =>
+        Create(id, invoiceCode, customerId, customerOrderId, prescriptionRevisionId, invoiceDate, postingDate,
+            currencyId, currencyCodeSnapshot, currencySymbolSnapshot, currencyDecimalPlacesSnapshot, exchangeRate,
+            exchangeRateDate, exchangeRateType, exchangeRateSource, taxCalculationMode,
+            SalesPaymentPlanPolicy.FromLegacyPaymentTerm(paymentTermType), paymentTermDaysSnapshot,
             baseCurrencyId, baseCurrencyCodeSnapshot, baseCurrencyDecimalPlacesSnapshot, description);
 
     public void UpdateHeader(
         Guid customerId, Guid? customerOrderId, Guid? prescriptionRevisionId, DateOnly invoiceDate, DateOnly postingDate,
-        TaxCalculationMode taxCalculationMode, SalesPaymentTermType paymentTermType, int paymentTermDaysSnapshot,
+        TaxCalculationMode taxCalculationMode, SalesPaymentPlan paymentPlan, int paymentTermDaysSnapshot,
         string? description)
     {
         EnsureDraft();
@@ -107,9 +124,24 @@ public sealed class SalesInvoice : AuditableEntity<Guid>
         PrescriptionRevisionId = prescriptionRevisionId;
         InvoiceDate = invoiceDate;
         PostingDate = postingDate;
-        SetCommercialPolicy(taxCalculationMode, paymentTermType, paymentTermDaysSnapshot);
+        SetCommercialPolicy(taxCalculationMode, paymentPlan, paymentTermDaysSnapshot);
         Description = SalesDomainGuard.Optional(description, 1000, "Invoice description");
         RepriceLines();
+    }
+
+    // Transitional overload for callers still using SalesPaymentTermType.
+    public void UpdateHeader(
+        Guid customerId, Guid? customerOrderId, Guid? prescriptionRevisionId, DateOnly invoiceDate, DateOnly postingDate,
+        TaxCalculationMode taxCalculationMode, SalesPaymentTermType paymentTermType, int paymentTermDaysSnapshot,
+        string? description) =>
+        UpdateHeader(customerId, customerOrderId, prescriptionRevisionId, invoiceDate, postingDate,
+            taxCalculationMode, SalesPaymentPlanPolicy.FromLegacyPaymentTerm(paymentTermType),
+            paymentTermDaysSnapshot, description);
+
+    public void ChangePaymentPlanSnapshot(SalesPaymentPlan paymentPlan, int paymentTermDaysSnapshot = 0)
+    {
+        EnsureDraft();
+        SetCommercialPolicy(TaxCalculationMode, paymentPlan, paymentTermDaysSnapshot);
     }
 
     public void SetSalesEmployee(Guid? employeeId)
@@ -173,8 +205,8 @@ public sealed class SalesInvoice : AuditableEntity<Guid>
     public void Confirm(DateTimeOffset confirmedAtUtc, string? confirmedBy)
     {
         EnsureDraft();
-        if (_lines.Count == 0)
-            throw new DomainException("Sales invoice must contain at least one line before confirmation.");
+        if (_lines.Count == 0 || _lines.All(x => !x.IsActive))
+            throw new DomainException("Sales invoice must contain at least one active line before confirmation.");
 
         RecalculateTotals();
         Status = SalesInvoiceStatus.Confirmed;
@@ -259,17 +291,16 @@ public sealed class SalesInvoice : AuditableEntity<Guid>
         BaseCurrencyDecimalPlacesSnapshot = baseCurrencyDecimals;
     }
 
-    private void SetCommercialPolicy(TaxCalculationMode taxMode, SalesPaymentTermType paymentTermType, int paymentTermDays)
+    private void SetCommercialPolicy(TaxCalculationMode taxMode, SalesPaymentPlan paymentPlan, int paymentTermDays)
     {
         SalesDomainGuard.Defined(taxMode, "Tax calculation mode");
-        SalesDomainGuard.Defined(paymentTermType, "Payment term type");
-        if (paymentTermDays < 0)
-            throw new DomainException("Payment term days cannot be negative.");
+        SalesDomainGuard.Defined(paymentPlan, "Sales payment plan");
 
         TaxCalculationMode = taxMode;
-        PaymentTermType = paymentTermType;
-        PaymentTermDaysSnapshot = paymentTermType == SalesPaymentTermType.Immediate ? 0 : paymentTermDays;
-        DueDate = paymentTermType == SalesPaymentTermType.Credit
+        PaymentPlan = paymentPlan;
+        PaymentTermType = SalesPaymentPlanPolicy.ToPaymentTermType(paymentPlan);
+        PaymentTermDaysSnapshot = SalesPaymentPlanPolicy.NormalizePaymentTermDays(paymentPlan, paymentTermDays);
+        DueDate = PaymentTermType == SalesPaymentTermType.Credit
             ? InvoiceDate.AddDays(PaymentTermDaysSnapshot)
             : null;
     }

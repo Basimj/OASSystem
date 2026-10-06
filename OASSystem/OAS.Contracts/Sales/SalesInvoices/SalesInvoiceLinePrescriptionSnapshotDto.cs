@@ -5,7 +5,7 @@ namespace OAS.Contracts.Sales.SalesInvoices;
 public sealed record SalesInvoiceLinePrescriptionSnapshotDto(
     Guid Id,
     Guid SalesInvoiceLineId,
-    Guid PrescriptionRevisionId,
+    Guid? PrescriptionRevisionId,
     EyeSide Eye,
     decimal? SPH,
     decimal? CYL,

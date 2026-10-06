@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using OAS.Contracts.Sales.Lookups;
 using OAS.Contracts.Sales.OpticalJobs;
 using OAS.Domain.Accounting.Entities;
 using OAS.Domain.Common.Entities;
@@ -32,7 +33,29 @@ public sealed class FoundationGapArchitectureTests
     {
         AssertEnumParity<OAS.Domain.Sales.Enums.OpticalMeasurementSource, OAS.Contracts.Sales.Enums.OpticalMeasurementSource>();
         AssertEnumParity<OAS.Domain.Sales.Enums.OpticalJobStatus, OAS.Contracts.Sales.Enums.OpticalJobStatus>();
+        AssertEnumParity<OAS.Domain.Sales.Enums.SalesPaymentPlan, OAS.Contracts.Sales.Enums.SalesPaymentPlan>();
         AssertEnumParity<OAS.Domain.Accounting.Enums.CustomerAdvanceStatus, OAS.Contracts.Accounting.Enums.CustomerAdvanceStatus>();
+    }
+
+    [Test]
+    public void SalesCustomerLookup_DoesNotSerializeAccountingIdentifiers()
+    {
+        var dto = new SalesCustomerLookupDto(
+            Guid.NewGuid(),
+            "CUST-0001",
+            "عميل",
+            null,
+            "777000000",
+            null,
+            false,
+            0m,
+            0,
+            true);
+
+        var json = System.Text.Json.JsonSerializer.Serialize(dto);
+
+        Assert.That(json, Does.Not.Contain("AccountId"));
+        Assert.That(json, Does.Not.Contain("AccountCode"));
     }
 
     [Test]

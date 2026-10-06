@@ -14,4 +14,7 @@ public sealed record CustomerOrderSummaryDto(
     string CurrencyCodeSnapshot,
     decimal TotalAmount,
     bool IsActive,
-    string RowVersion);
+    string RowVersion)
+{
+    public SalesPaymentPlan? PaymentPlan { get; init; }
+}

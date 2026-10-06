@@ -53,6 +53,14 @@ public static class DependencyInjection
         services.AddScoped<ILensVariantResolver, LensVariantResolver>();
         services.AddScoped<ICustomerOrderOpticalService, CustomerOrderOpticalService>();
         services.AddScoped<ICustomerOrderAvailabilityService, CustomerOrderAvailabilityService>();
+        services.AddScoped<ICustomerOrderConfirmationService, CustomerOrderConfirmationService>();
+        services.AddScoped<ISalesInvoiceFromOrderService, SalesInvoiceFromOrderService>();
+        services.AddScoped<ISalesInvoiceConfirmationService, SalesInvoiceConfirmationService>();
+        services.AddScoped<ISalesInvoicePostingWorkflow, SalesInvoicePostingWorkflow>();
+        services.AddScoped<ISalesSettlementService, SalesSettlementService>();
+        services.AddScoped<IOpticalProductionPort, OpticalProductionPort>();
+        services.AddScoped<ISalesCheckoutOrchestrator, OAS.Application.Sales.Checkout.Services.SalesCheckoutOrchestrator>();
+        services.AddScoped<ISalesCheckoutContextService, OAS.Application.Sales.Checkout.Services.SalesCheckoutContextService>();
         services.AddScoped<ICustomerOrderFulfillmentService, CustomerOrderFulfillmentService>();
         services.AddScoped<IOpticalJobService, OpticalJobService>();
         services.AddScoped<ISalesPrescriptionValidator, SalesPrescriptionValidator>();

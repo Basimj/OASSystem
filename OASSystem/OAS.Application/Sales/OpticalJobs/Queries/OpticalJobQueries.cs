@@ -31,3 +31,18 @@ public sealed class GetOpticalJobWorkQueueQueryHandler(IOpticalJobService servic
     public Task<IReadOnlyList<OpticalJobWorkQueueDto>> Handle(GetOpticalJobWorkQueueQuery request, CancellationToken cancellationToken) =>
         service.GetWorkQueueAsync(cancellationToken);
 }
+
+public sealed record GetOpticalJobWorkQueuePageQuery(OpticalJobWorkQueueRequest Request)
+    : IQuery<OAS.Contracts.Common.Pagination.PagedResult<OpticalJobWorkQueueDto>>, IAuthorizedRequest
+{
+    public IReadOnlyCollection<string> RequiredPermissions { get; } = [SalesPermissions.OpticalJobs.View];
+}
+
+public sealed class GetOpticalJobWorkQueuePageQueryHandler(IOpticalJobQueryService queries)
+    : IRequestHandler<GetOpticalJobWorkQueuePageQuery, OAS.Contracts.Common.Pagination.PagedResult<OpticalJobWorkQueueDto>>
+{
+    public Task<OAS.Contracts.Common.Pagination.PagedResult<OpticalJobWorkQueueDto>> Handle(
+        GetOpticalJobWorkQueuePageQuery request,
+        CancellationToken cancellationToken) =>
+        queries.GetWorkQueueAsync(request.Request, cancellationToken);
+}

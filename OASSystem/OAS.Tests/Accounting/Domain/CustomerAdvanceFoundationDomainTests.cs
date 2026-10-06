@@ -37,6 +37,15 @@ public sealed class CustomerAdvanceFoundationDomainTests
     }
 
     [Test]
+    public void ApplyingMoreThanAvailableBaseAmount_IsRejected()
+    {
+        var advance = CreateAdvance(100m, 25000m);
+        advance.Apply(50m, 20000m);
+
+        Assert.Throws<InvalidOperationException>(() => advance.Apply(10m, 6000m));
+    }
+
+    [Test]
     public void ReverseApplication_RestoresAvailableBalance()
     {
         var advance = CreateAdvance(100m, 25000m);

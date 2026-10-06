@@ -1,0 +1,14 @@
+@namespace OAS.UiLib.Components.Sales.Checkout
+@using OAS.UiLib.Core.Models.Sales
+
+<div class="ui-sales-checkout__summary" dir="rtl">
+    <div><span>الإجمالي قبل الخصم</span><strong>@Model.Subtotal.ToString("N2") @Model.CurrencyCode</strong></div>
+    <div><span>الخصم</span><strong>@Model.DiscountAmount.ToString("N2")</strong></div>
+    <div><span>الضريبة</span><strong>@Model.TaxAmount.ToString("N2")</strong></div>
+    <div class="is-total"><span>الإجمالي</span><strong>@Model.TotalAmount.ToString("N2") @Model.CurrencyCode</strong></div>
+    <div><span>المدفوع</span><strong>@Model.PaidAmount.ToString("N2")</strong></div>
+    <div><span>عربون متاح</span><strong>@Model.ExistingAdvance.ToString("N2")</strong></div>
+    <div class="is-outstanding"><span>المتبقي</span><strong>@Model.OutstandingAmount.ToString("N2") @Model.CurrencyCode</strong></div>
+</div>
+
+@code { [Parameter, EditorRequired] public UiSalesCheckoutModel Model { get; set; } = new(); }

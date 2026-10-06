@@ -33,6 +33,8 @@ public static class DependencyInjection
         services.TryAddScoped<IPurchaseMatchingService, PurchaseMatchingService>();
         services.TryAddScoped<IPurchaseReturnInventoryPostingService, PurchaseReturnInventoryPostingService>();
         services.TryAddScoped<ICustomerDemandProcurementPort, CustomerDemandProcurementService>();
+        services.TryAddScoped<ICustomerDemandSourcingService, CustomerDemandSourcingService>();
+        services.TryAddScoped<IPurchasingCommercialTermsPort, DefaultPurchasingCommercialTermsService>();
 
         return services;
     }

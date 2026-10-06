@@ -15,6 +15,9 @@ public static class PurchasingPermissions
     {
         public const string View = "purchasing.customer_demand.view";
         public const string EditSupplier = "purchasing.customer_demand.supplier.edit";
+        public const string CreatePO = "purchasing.customer_demand.po.create";
+        public const string Resupply = "purchasing.customer_demand.resupply";
+        public const string ViewCosts = "purchasing.customer_demand.costs.view";
     }
 
     public static class Requests

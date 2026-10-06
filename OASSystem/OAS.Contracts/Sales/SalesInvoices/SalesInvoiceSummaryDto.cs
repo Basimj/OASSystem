@@ -18,4 +18,7 @@ public sealed record SalesInvoiceSummaryDto(
     Guid? JournalEntryId,
     string RowVersion,
     Guid? SalesEmployeeId = null,
-    string? SalesEmployeeName = null);
+    string? SalesEmployeeName = null)
+{
+    public SalesPaymentPlan? PaymentPlan { get; init; }
+}

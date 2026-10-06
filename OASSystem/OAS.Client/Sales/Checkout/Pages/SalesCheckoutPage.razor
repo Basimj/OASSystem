@@ -1,0 +1,24 @@
+@page "/sales/checkout"
+@attribute [Authorize]
+@namespace OAS.Client.Sales.Checkout.Pages
+@using OAS.UiLib.Components.Sales.Checkout
+
+<UiSalesCheckoutSurface Selection="@_selection"
+                        Model="@_model"
+                        IsBusy="@State.IsBusy"
+                        ErrorText="@State.Error"
+                        SuccessText="@State.Success"
+                        SearchOrdersAsync="SearchOrdersAsync"
+                        SearchSuppliersAsync="SearchSuppliersAsync"
+                        SearchCurrenciesAsync="SearchCurrenciesAsync"
+                        SearchCashAccountsAsync="SearchCashAccountsAsync"
+                        SearchBankAccountsAsync="SearchBankAccountsAsync"
+                        SearchSettlementAccountsAsync="SearchSettlementAccountsAsync"
+                        OnOpenOrderEditor="OpenOrderEditorAsync"
+                        OnOrderChanged="OrderChangedAsync"
+                        OnPaymentPlanChanged="PaymentPlanChangedAsync"
+                        OnRefresh="RefreshAsync"
+                        OnCheckout="CheckoutAsync"
+                        OnAddPaymentLine="AddPaymentLineAsync"
+                        OnRemovePaymentLine="RemovePaymentLineAsync"
+                        OnChanged="ModelChangedAsync" />

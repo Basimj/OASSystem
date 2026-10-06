@@ -60,11 +60,11 @@ public sealed class UpdateSalesInvoiceCommandHandler(
                 "العميل غير فعال.");
         }
 
-        var term =
-            (SalesPaymentTermType)(byte)request.Data.PaymentTermType;
+        var paymentPlan =
+            (SalesPaymentPlan)(byte)request.Data.PaymentPlan;
 
-        if (term == SalesPaymentTermType.Credit &&
-            !customer.IsCreditAllowed)
+        if (paymentPlan == SalesPaymentPlan.AccountCredit &&
+            (string.IsNullOrWhiteSpace(customer.CustomerCode) || !customer.IsCreditAllowed))
         {
             throw new ConflictException(
                 SalesErrorCodes.CreditNotAllowed,
@@ -83,8 +83,8 @@ public sealed class UpdateSalesInvoiceCommandHandler(
             request.Data.InvoiceDate,
             request.Data.PostingDate,
             (TaxCalculationMode)(byte)request.Data.TaxCalculationMode,
-            term,
-            customer.PaymentTermDays,
+            paymentPlan,
+            paymentPlan == SalesPaymentPlan.AccountCredit ? customer.PaymentTermDays : 0,
             request.Data.Description);
 
         if (request.Data.SalesEmployeeId.HasValue)

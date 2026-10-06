@@ -13,4 +13,10 @@ public sealed record CreateSalesInvoiceRequest(
     SalesPaymentTermType PaymentTermType,
     string? Description,
     IReadOnlyList<SalesInvoiceLineRequest> Lines,
-    Guid? SalesEmployeeId = null);
+    Guid? SalesEmployeeId = null)
+{
+    public SalesPaymentPlan PaymentPlan { get; init; } =
+        PaymentTermType == SalesPaymentTermType.Credit
+            ? SalesPaymentPlan.AccountCredit
+            : SalesPaymentPlan.FullNow;
+}

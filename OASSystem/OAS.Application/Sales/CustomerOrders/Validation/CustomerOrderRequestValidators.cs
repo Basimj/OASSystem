@@ -10,6 +10,7 @@ public sealed class CreateCustomerOrderRequestValidator : AbstractValidator<Crea
     {
         RuleFor(x => x.CustomerId).NotEmpty();
         RuleFor(x => x.CurrencyId).NotEmpty();
+        RuleFor(x => x.PaymentPlan).IsInEnum();
         RuleFor(x => x.OrderDate)
             .NotEmpty()
             .WithMessage("يجب تحديد تاريخ الطلب.");
@@ -29,6 +30,7 @@ public sealed class UpdateCustomerOrderRequestValidator : AbstractValidator<Upda
     {
         RuleFor(x => x.CustomerId).NotEmpty();
         RuleFor(x => x.CurrencyId).NotEmpty();
+        RuleFor(x => x.PaymentPlan).IsInEnum();
         RuleFor(x => x.OrderDate)
             .NotEmpty()
             .WithMessage("يجب تحديد تاريخ الطلب.");

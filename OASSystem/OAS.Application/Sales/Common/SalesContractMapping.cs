@@ -46,7 +46,10 @@ internal static class SalesContractMapping
         SalesEnumMap.To<OAS.Contracts.Sales.Enums.SalesPaymentTermType>(x.PaymentTermType), x.PaymentTermDaysSnapshot,
         x.Subtotal, x.DiscountAmount, x.TaxAmount, x.TotalAmount, x.Notes, x.IsActive, x.ConfirmedAtUtc, x.ConfirmedBy,
         x.CancelledAtUtc, x.CancelledBy, Convert.ToBase64String(x.RowVersion), x.CreatedAtUtc, x.CreatedBy,
-        x.LastModifiedAtUtc, x.LastModifiedBy, x.Lines.OrderBy(l => l.LineNumber).Select(OrderLine).ToArray());
+        x.LastModifiedAtUtc, x.LastModifiedBy, x.Lines.OrderBy(l => l.LineNumber).Select(OrderLine).ToArray())
+    {
+        PaymentPlan = SalesEnumMap.To<OAS.Contracts.Sales.Enums.SalesPaymentPlan>(x.PaymentPlan)
+    };
 
     public static SalesInvoiceLinePrescriptionSnapshotDto PrescriptionSnapshot(SalesInvoiceLinePrescriptionSnapshot x) => new(
         x.Id, x.SalesInvoiceLineId, x.PrescriptionRevisionId,
@@ -86,7 +89,10 @@ internal static class SalesContractMapping
         x.PostedAtUtc, x.PostedBy, x.CancelledAtUtc, x.CancelledBy, x.IsActive, Convert.ToBase64String(x.RowVersion),
         x.CreatedAtUtc, x.CreatedBy, x.LastModifiedAtUtc, x.LastModifiedBy, payment,
         x.Lines.OrderBy(l => l.LineNumber).Select(InvoiceLine).ToArray(),
-        SalesEmployeeId: x.SalesEmployeeId);
+        SalesEmployeeId: x.SalesEmployeeId)
+    {
+        PaymentPlan = SalesEnumMap.To<OAS.Contracts.Sales.Enums.SalesPaymentPlan>(x.PaymentPlan)
+    };
 
     public static SalesPriceOverrideDto PriceOverride(SalesPriceOverride x) => new(
         x.Id, x.SalesInvoiceId, x.SalesInvoiceLineId, x.OriginalPrice, x.OverridePrice, x.Reason,

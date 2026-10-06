@@ -140,10 +140,10 @@ public sealed class CustomerAdvance : AuditableEntity<Guid>
         EnsureApplicable();
         if (amount <= 0) throw new ArgumentOutOfRangeException(nameof(amount), "Applied amount must be greater than zero.");
         if (baseAmount <= 0) throw new ArgumentOutOfRangeException(nameof(baseAmount), "Applied base amount must be greater than zero.");
-        if (AppliedAmount + amount > Amount)
-            throw new InvalidOperationException("Applied amount cannot exceed the customer advance amount.");
-        if (BaseAppliedAmount + baseAmount > BaseAmount)
-            throw new InvalidOperationException("Applied base amount cannot exceed the customer advance base amount.");
+        if (amount > AvailableAmount)
+            throw new InvalidOperationException("Applied amount cannot exceed the available customer advance amount.");
+        if (baseAmount > BaseAvailableAmount)
+            throw new InvalidOperationException("Applied base amount cannot exceed the available customer advance base amount.");
 
         AppliedAmount += amount;
         BaseAppliedAmount += baseAmount;
@@ -193,12 +193,15 @@ public sealed class CustomerAdvance : AuditableEntity<Guid>
 
     private void RefreshStatus()
     {
-        Status = AppliedAmount switch
+        if (AppliedAmount == 0m && BaseAppliedAmount == 0m)
         {
-            0m => CustomerAdvanceStatus.Available,
-            _ when AppliedAmount == Amount => CustomerAdvanceStatus.Applied,
-            _ => CustomerAdvanceStatus.PartiallyApplied
-        };
+            Status = CustomerAdvanceStatus.Available;
+            return;
+        }
+
+        Status = AppliedAmount == Amount && BaseAppliedAmount == BaseAmount
+            ? CustomerAdvanceStatus.Applied
+            : CustomerAdvanceStatus.PartiallyApplied;
     }
 
     private static string Required(string? value, int maxLength, string name)

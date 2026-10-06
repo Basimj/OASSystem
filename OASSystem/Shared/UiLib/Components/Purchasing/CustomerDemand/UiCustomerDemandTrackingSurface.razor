@@ -1,0 +1,102 @@
+@namespace OAS.UiLib.Components.Purchasing.CustomerDemand
+@using OAS.UiLib.Components.Sales.Workflow
+@using OAS.UiLib.Core.Models.Sales
+
+<div class="ui-sales-workspace" dir="rtl">
+    <UiWorkflowSummaryCards Metrics="@Metrics" OnSelect="OnMetricSelected" />
+    <UiSectionTabStrip Tabs="@Tabs" OnSelect="TabSelectedAsync" />
+    <UiWorkspaceFilterBar Compact="true">
+        <UiSearchInput Value="@Filter.Search" ValueChanged="v => Filter.Search=v" OnSearch="_ => OnApplyFilters.InvokeAsync()" Placeholder="Request / Order / Customer / SKU" />
+        <UiInputDate Label="من تاريخ الطلب" Value="@Filter.RequestDateFrom" ValueChanged="RequestDateFromChangedAsync" />
+        <UiInputDate Label="إلى تاريخ الطلب" Value="@Filter.RequestDateTo" ValueChanged="RequestDateToChangedAsync" />
+        <UiLookup Value="@Filter.CustomerId" SelectedItem="@CustomerFilterItem" SearchAsync="SearchCustomersAsync" ValueChanged="CustomerFilterChangedAsync" Placeholder="العميل" />
+        <UiLookup Value="@Filter.CustomerOrderId" SelectedItem="@OrderFilterItem" SearchAsync="SearchOrdersAsync" ValueChanged="OrderFilterChangedAsync" Placeholder="طلب العميل" />
+        <UiLookup Value="@Filter.SupplierId" SelectedItem="@FilterSupplier" SearchAsync="SearchSuppliersAsync" ValueChanged="SupplierFilterChangedAsync" Placeholder="المورد" />
+        <UiSelect Value="@Filter.ProductType" ValueChanged="ProductTypeChangedAsync" Options="@ProductTypeOptions" Placeholder="نوع المنتج: الكل" />
+        <UiLookup Value="@Filter.WarehouseId" SelectedItem="@WarehouseFilterItem" SearchAsync="SearchWarehousesAsync" ValueChanged="WarehouseFilterChangedAsync" Placeholder="المخزن" />
+        <UiInputDate Label="الوصول المتوقع" Value="@Filter.ExpectedDeliveryDate" ValueChanged="ExpectedChangedAsync" />
+        <label class="ui-workflow-check"><input type="checkbox" checked="@Filter.OverdueOnly" @onchange="OverdueChangedAsync" /><span>متأخر فقط</span></label>
+        <UiButton Text="مسح الفلاتر" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" IconCssClass="fa-solid fa-filter-circle-xmark" OnClick="_ => OnClearFilters.InvokeAsync()" />
+        <UiButton Text="تحديث" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" IconCssClass="fa-solid fa-rotate" Loading="@IsBusy" OnClick="_ => OnApplyFilters.InvokeAsync()" />
+    </UiWorkspaceFilterBar>
+
+    @if(!string.IsNullOrWhiteSpace(ErrorText)){<UiAlert Tone="AlertTone.Danger">@ErrorText</UiAlert>}
+    @if(!string.IsNullOrWhiteSpace(SuccessText)){<UiAlert Tone="AlertTone.Success">@SuccessText</UiAlert>}
+
+    <UiDataGridPanel Title="متابعة النواقص والتوريد" Subtitle="الحالة المشتقة من طلب الشراء وأمر الشراء والاستلام، بدون جدول Tracking مستقل.">
+        <Body>
+            <UiDataTable TItem="UiDemandTrackingRowModel" Items="@Rows" Headers="@Headers" Compact="true" OnRowClick="@((UiDemandTrackingRowModel row) => OpenAsync(row))" EmptyText="لا توجد نواقص مطابقة للفلاتر.">
+                <RowTemplate Context="row">
+                    <td><strong>@row.RequestCode</strong><small class="ui-workflow-cell-muted">@row.RequestDate</small></td>
+                    <td>@row.OrderCode<br/><small>@row.CustomerCode - @row.CustomerName</small></td>
+                    <td>@row.ProductText<br/><small>@(row.OpticalSummary ?? row.EyeText ?? "")</small></td>
+                    <td>@row.Requested.ToString("N3")</td><td>@row.Received.ToString("N3")</td><td><strong>@row.Remaining.ToString("N3")</strong></td>
+                    <td>@(row.ActualSupplier ?? row.PreferredSupplier ?? "—")</td><td>@(row.PurchaseOrderCode ?? "—")</td><td>@(row.ExpectedDate ?? "—")</td>
+                    <td><span class="ui-sales-status @row.TrackingCss">@row.TrackingText</span>@if(row.DelayDays.HasValue){<small class="ui-workflow-delay">@row.DelayDays يوم</small>}</td>
+                </RowTemplate>
+            </UiDataTable>
+        </Body>
+        <Footer><UiPagination PageNumber="@PageNumber" TotalPages="@TotalPages" TotalCount="@TotalCount" OnPrevious="OnPrevious" OnNext="OnNext" /></Footer>
+    </UiDataGridPanel>
+</div>
+
+@if(Selected is not null)
+{
+    <div class="ui-workflow-drawer-backdrop" @onclick="CloseAsync"></div>
+    <aside class="ui-workflow-drawer ui-workflow-drawer--wide" dir="rtl">
+        <header class="ui-workflow-drawer__header"><div><strong>@Selected.RequestCode</strong><span>@Selected.CustomerText • @Selected.OrderCode</span></div><button type="button" @onclick="CloseAsync">×</button></header>
+        <div class="ui-workflow-drawer__body">
+            <div class="ui-workflow-detail-grid"><span>الصنف<strong>@Selected.ProductText</strong></span><span>الحالة<strong>@Selected.TrackingText</strong></span><span>المتبقي<strong>@Selected.Remaining.ToString("N3")</strong></span><span>الوصول<strong>@(Selected.ExpectedDate ?? "—")</strong></span></div>
+            @if(!string.IsNullOrWhiteSpace(Selected.OpticalSummary)){<div class="ui-workflow-optical"><i class="fa-solid fa-glasses"></i><span>@Selected.OpticalSummary</span></div>}
+            <section><h4>المورد والجدولة</h4><div class="ui-workflow-form-grid">
+                <UiLookup Label="المورد المفضل" Value="@Selected.PreferredSupplierId" SelectedItem="@SelectedSupplier" SearchAsync="SearchSuppliersAsync" ValueChanged="PreferredSupplierChangedAsync" />
+                <label class="ui-sales-checkout__datetime"><span>موعد الطلب/المتابعة</span><input type="datetime-local" value="@FormatDateTime(Selected.ScheduledAt)" @onchange="ScheduleValueChanged" /></label>
+                <UiInputDate Label="الوصول المتوقع" Value="@Selected.ExpectedDeliveryDateInput" ValueChanged="v => Selected.ExpectedDeliveryDateInput=v" />
+            </div></section>
+            <section><h4>إعادة توجيه المتبقي</h4><div class="ui-workflow-form-grid"><UiLookup Label="المورد الجديد" Value="@Selected.ResupplySupplierId" SelectedItem="@ResupplySupplier" SearchAsync="SearchSuppliersAsync" ValueChanged="ResupplySupplierChangedAsync" /><label class="ui-sales-checkout__datetime"><span>موعد الطلب الجديد</span><input type="datetime-local" value="@FormatDateTime(Selected.ResupplyScheduledAt)" @onchange="ResupplyScheduleChanged" /></label></div></section>
+            @if(History.Count>0){<section><h4>سجل المورد</h4><UiDataTable Items="@History" Headers="@HistoryHeaders" Compact="true"><RowTemplate Context="h"><td>@h.OrderCode</td><td>@h.OrderDate</td><td>@h.ProductText</td><td>@h.Ordered.ToString("N3")</td><td>@h.Received.ToString("N3")</td><td>@(h.UnitPrice?.ToString("N2")??"—")</td><td>@(h.ActualUnitCost?.ToString("N2")??"—")</td></RowTemplate></UiDataTable></section>}
+        </div>
+        <footer class="ui-workflow-drawer__footer">
+            @if(Selected.TrackingKey is "New" or "AwaitingSupplier" or "Scheduled")
+            {
+                <UiButton Text="حفظ المورد" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Loading="@IsBusy" OnClick="_ => OnAssignSupplier.InvokeAsync()" />
+                <UiButton Text="حفظ الموعد" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Loading="@IsBusy" OnClick="_ => OnSchedule.InvokeAsync()" />
+                <UiButton Text="إنشاء أمر شراء" Size="ControlSize.Small" Disabled="@string.IsNullOrWhiteSpace(Selected.PreferredSupplierId)" Loading="@IsBusy" OnClick="_ => OnCreatePurchaseOrder.InvokeAsync()" />
+            }
+            @if(Selected.TrackingKey is "Ordered" or "DueToday" or "Overdue" or "PartiallyReceived")
+            {
+                <UiButton Text="إعادة توجيه المتبقي" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(Selected.Remaining <= 0m || string.IsNullOrWhiteSpace(Selected.ResupplySupplierId))" Loading="@IsBusy" OnClick="_ => OnResourceRemaining.InvokeAsync()" />
+            }
+            <UiButton Text="فتح طلب العميل" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="_ => OnOpenOrder.InvokeAsync(Selected.OrderId)" />
+            @if(Selected.PurchaseOrderId.HasValue){<UiButton Text="فتح أمر الشراء" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="_ => OnOpenPurchaseOrder.InvokeAsync(Selected.PurchaseOrderId.Value)" />}
+            <UiButton Text="سجل المورد" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Disabled="@string.IsNullOrWhiteSpace(Selected.PreferredSupplierId)" OnClick="_ => OnLoadHistory.InvokeAsync()" />
+        </footer>
+    </aside>
+}
+
+@code{
+    [Parameter,EditorRequired] public UiDemandTrackingFilterModel Filter{get;set;}=new();
+    [Parameter] public IReadOnlyList<UiWorkflowMetric> Metrics{get;set;}=[]; [Parameter] public IReadOnlyList<UiDemandTrackingRowModel> Rows{get;set;}=[]; [Parameter] public UiDemandTrackingDetailsModel? Selected{get;set;}
+    [Parameter] public IReadOnlyList<UiSupplierHistoryRowModel> History{get;set;}=[]; [Parameter] public bool IsBusy{get;set;} [Parameter] public string? ErrorText{get;set;} [Parameter] public string? SuccessText{get;set;}
+    [Parameter] public int PageNumber{get;set;}=1;[Parameter] public int TotalPages{get;set;}[Parameter] public long TotalCount{get;set;}
+    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchSuppliersAsync{get;set;}
+    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchWarehousesAsync{get;set;}
+    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchCustomersAsync{get;set;}
+    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchOrdersAsync{get;set;}
+    [Parameter] public EventCallback OnApplyFilters{get;set;}[Parameter] public EventCallback OnClearFilters{get;set;}[Parameter] public EventCallback<string> OnTabSelected{get;set;}[Parameter] public EventCallback<string> OnMetricSelected{get;set;}
+    [Parameter] public EventCallback<UiDemandTrackingRowModel> OnOpen{get;set;}[Parameter] public EventCallback OnCloseDetails{get;set;}[Parameter] public EventCallback OnAssignSupplier{get;set;}[Parameter] public EventCallback OnSchedule{get;set;}[Parameter] public EventCallback OnCreatePurchaseOrder{get;set;}[Parameter] public EventCallback OnResourceRemaining{get;set;}[Parameter] public EventCallback OnLoadHistory{get;set;}
+    [Parameter] public EventCallback<Guid> OnOpenOrder{get;set;}[Parameter] public EventCallback<Guid> OnOpenPurchaseOrder{get;set;}[Parameter] public EventCallback OnPrevious{get;set;}[Parameter] public EventCallback OnNext{get;set;}
+    private static readonly IReadOnlyList<string> Headers=["النقص","الطلب/العميل","الصنف","المطلوب","المستلم","المتبقي","المورد","PO","الوصول","الحالة"];
+    private static readonly IReadOnlyList<UiSelectOption> ProductTypeOptions=[new("Frame","إطار"),new("Lens","عدسة"),new("Accessory","إكسسوار"),new("Service","خدمة"),new("Other","أخرى")];
+    private static readonly IReadOnlyList<string> HistoryHeaders=["PO","التاريخ","الصنف","المطلوب","المستلم","سعر PO","التكلفة"];
+    private IReadOnlyList<UiSectionTabItem> Tabs=>new[]{("","الكل"),("New","جديدة"),("AwaitingSupplier","بانتظار المورد"),("Scheduled","مجدولة"),("Ordered","تم طلبها"),("DueToday","تصل اليوم"),("Overdue","متأخرة"),("PartiallyReceived","مستلمة جزئيًا"),("Received","مستلمة")}.Select(x=>new UiSectionTabItem(x.Item1,x.Item2,string.Equals(Filter.Status,x.Item1,StringComparison.OrdinalIgnoreCase))).ToArray();
+    private UiLookupItem? FilterSupplier=>SelectedItem(Filter.SupplierId,Filter.SupplierDisplay);private UiLookupItem? WarehouseFilterItem=>SelectedItem(Filter.WarehouseId,Filter.WarehouseDisplay,"fa-solid fa-warehouse");private UiLookupItem? CustomerFilterItem=>SelectedItem(Filter.CustomerId,Filter.CustomerDisplay,"fa-solid fa-user");private UiLookupItem? OrderFilterItem=>SelectedItem(Filter.CustomerOrderId,Filter.CustomerOrderDisplay,"fa-solid fa-clipboard-list");private UiLookupItem? SelectedSupplier=>SelectedItem(Selected?.PreferredSupplierId,Selected?.PreferredSupplierDisplay);private UiLookupItem? ResupplySupplier=>SelectedItem(Selected?.ResupplySupplierId,Selected?.ResupplySupplierDisplay);
+    private static UiLookupItem? SelectedItem(string? id,string? text,string icon="fa-solid fa-truck-field")=>string.IsNullOrWhiteSpace(id)||string.IsNullOrWhiteSpace(text)?null:new(id,text,null,icon); private static string FormatDateTime(DateTimeOffset? v)=>v?.ToLocalTime().ToString("yyyy-MM-ddTHH:mm")??"";
+    private Task OpenAsync(UiDemandTrackingRowModel r)=>OnOpen.InvokeAsync(r);private Task CloseAsync()=>OnCloseDetails.InvokeAsync();private Task TabSelectedAsync(string key){Filter.Status=key;return OnTabSelected.InvokeAsync(key);}
+    private async Task RequestDateFromChangedAsync(DateOnly? v){Filter.RequestDateFrom=v;await OnApplyFilters.InvokeAsync();}private async Task RequestDateToChangedAsync(DateOnly? v){Filter.RequestDateTo=v;await OnApplyFilters.InvokeAsync();}
+    private async Task CustomerFilterChangedAsync(string? v){Filter.CustomerId=v??"";Filter.CustomerDisplay=null;Filter.CustomerOrderId="";Filter.CustomerOrderDisplay=null;await OnApplyFilters.InvokeAsync();}private async Task OrderFilterChangedAsync(string? v){Filter.CustomerOrderId=v??"";Filter.CustomerOrderDisplay=null;await OnApplyFilters.InvokeAsync();}
+    private async Task SupplierFilterChangedAsync(string? v){Filter.SupplierId=v??"";Filter.SupplierDisplay=null;await OnApplyFilters.InvokeAsync();}private async Task ProductTypeChangedAsync(string? v){Filter.ProductType=v??"";await OnApplyFilters.InvokeAsync();}
+    private async Task WarehouseFilterChangedAsync(string? v){Filter.WarehouseId=v??"";Filter.WarehouseDisplay=null;await OnApplyFilters.InvokeAsync();}private async Task ExpectedChangedAsync(DateOnly? v){Filter.ExpectedDeliveryDate=v;await OnApplyFilters.InvokeAsync();}private async Task OverdueChangedAsync(ChangeEventArgs e){Filter.OverdueOnly=e.Value is bool b&&b;await OnApplyFilters.InvokeAsync();}
+    private Task PreferredSupplierChangedAsync(string? v){if(Selected is not null){Selected.PreferredSupplierId=v??"";Selected.PreferredSupplierDisplay=null;}return Task.CompletedTask;} private Task ResupplySupplierChangedAsync(string? v){if(Selected is not null){Selected.ResupplySupplierId=v??"";Selected.ResupplySupplierDisplay=null;}return Task.CompletedTask;}
+    private void ScheduleValueChanged(ChangeEventArgs e){if(Selected is null)return;Selected.ScheduledAt=DateTime.TryParse(e.Value?.ToString(),out var dt)?new DateTimeOffset(dt):null;}private void ResupplyScheduleChanged(ChangeEventArgs e){if(Selected is null)return;Selected.ResupplyScheduledAt=DateTime.TryParse(e.Value?.ToString(),out var dt)?new DateTimeOffset(dt):null;}
+}

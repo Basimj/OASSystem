@@ -36,7 +36,8 @@ public sealed class CreateSalesInvoiceCommandHandler(
         var customer = await customers.GetByIdAsync(d.CustomerId, ct)
             ?? throw new NotFoundException(nameof(Customer), d.CustomerId);
 
-        EnsureCustomer(customer, (SalesPaymentTermType)(byte)d.PaymentTermType);
+        var paymentPlan = (SalesPaymentPlan)(byte)d.PaymentPlan;
+        EnsureCustomer(customer, paymentPlan);
 
         if (d.Lines.Count == 0)
             throw new ConflictException("sales_invoice_lines_required", "يجب أن تحتوي الفاتورة على سطر واحد على الأقل.");
@@ -76,8 +77,8 @@ public sealed class CreateSalesInvoiceCommandHandler(
             rate.RateType,
             rate.Source,
             (TaxCalculationMode)(byte)d.TaxCalculationMode,
-            (SalesPaymentTermType)(byte)d.PaymentTermType,
-            customer.PaymentTermDays,
+            paymentPlan,
+            paymentPlan == SalesPaymentPlan.AccountCredit ? customer.PaymentTermDays : 0,
             baseCurrency.Id,
             baseCurrency.Code,
             baseCurrency.DecimalPlaces,
@@ -177,12 +178,12 @@ public sealed class CreateSalesInvoiceCommandHandler(
             invoice.BaseCurrencyDecimalPlacesSnapshot);
     }
 
-    private static void EnsureCustomer(Customer customer, SalesPaymentTermType paymentTerm)
+    private static void EnsureCustomer(Customer customer, SalesPaymentPlan paymentPlan)
     {
         if (!customer.IsActive)
             throw new ConflictException(SalesErrorCodes.CustomerInactive, "العميل غير فعال.");
 
-        if (paymentTerm == SalesPaymentTermType.Credit && !customer.IsCreditAllowed)
+        if (paymentPlan == SalesPaymentPlan.AccountCredit && (string.IsNullOrWhiteSpace(customer.CustomerCode) || !customer.IsCreditAllowed))
             throw new ConflictException(SalesErrorCodes.CreditNotAllowed, "البيع الآجل غير مسموح لهذا العميل.");
     }
 }

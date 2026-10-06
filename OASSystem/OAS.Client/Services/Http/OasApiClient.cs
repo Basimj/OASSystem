@@ -204,6 +204,17 @@ public sealed class OasApiClient(
         }
     }
 
+    public async Task<T?> PatchAsync<TRequest, T>(
+        string uri,
+        TRequest payload,
+        CancellationToken cancellationToken = default)
+    {
+        using var request = CreateRequest(HttpMethod.Patch, uri);
+        request.Content = JsonContent.Create(payload);
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        return await ReadAsync<T>(response, cancellationToken);
+    }
+
     public async Task DeleteAsync(
         string uri,
         CancellationToken cancellationToken = default)

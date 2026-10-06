@@ -17,7 +17,7 @@ public sealed class CustomerOrder : AuditableEntity<Guid>
         DateOnly? requiredDate, Guid currencyId, string currencyCodeSnapshot, string? currencySymbolSnapshot,
         byte currencyDecimalPlacesSnapshot, decimal exchangeRate, DateOnly exchangeRateDate,
         ExchangeRateType exchangeRateType, ExchangeRateSource exchangeRateSource, TaxCalculationMode taxCalculationMode,
-        SalesPaymentTermType paymentTermType, int paymentTermDaysSnapshot, string? notes)
+        SalesPaymentPlan paymentPlan, int paymentTermDaysSnapshot, string? notes)
     {
         Id = SalesDomainGuard.Required(id, "Customer order id");
         OrderCode = SalesDomainGuard.Required(orderCode, 40, "Order code");
@@ -30,8 +30,9 @@ public sealed class CustomerOrder : AuditableEntity<Guid>
         PrescriptionRevisionId = prescriptionRevisionId;
         OrderDate = orderDate;
         RequiredDate = requiredDate;
-        SetCurrencySnapshot(currencyId, currencyCodeSnapshot, currencySymbolSnapshot, currencyDecimalPlacesSnapshot, exchangeRate, exchangeRateDate, exchangeRateType, exchangeRateSource);
-        SetCommercialPolicy(taxCalculationMode, paymentTermType, paymentTermDaysSnapshot);
+        SetCurrencySnapshot(currencyId, currencyCodeSnapshot, currencySymbolSnapshot, currencyDecimalPlacesSnapshot,
+            exchangeRate, exchangeRateDate, exchangeRateType, exchangeRateSource);
+        SetCommercialPolicy(taxCalculationMode, paymentPlan, paymentTermDaysSnapshot);
         Notes = SalesDomainGuard.Optional(notes, 1000, "Order notes");
         Status = CustomerOrderStatus.Draft;
         IsActive = true;
@@ -52,6 +53,7 @@ public sealed class CustomerOrder : AuditableEntity<Guid>
     public ExchangeRateType ExchangeRateType { get; private set; }
     public ExchangeRateSource ExchangeRateSource { get; private set; }
     public TaxCalculationMode TaxCalculationMode { get; private set; }
+    public SalesPaymentPlan PaymentPlan { get; private set; } = SalesPaymentPlan.FullNow;
     public SalesPaymentTermType PaymentTermType { get; private set; }
     public int PaymentTermDaysSnapshot { get; private set; }
     public decimal Subtotal { get; private set; }
@@ -67,19 +69,34 @@ public sealed class CustomerOrder : AuditableEntity<Guid>
     public byte[] RowVersion { get; private set; } = [];
     public IReadOnlyCollection<CustomerOrderLine> Lines => _lines.AsReadOnly();
 
+    public bool RequiresProduction => _lines.Any(x => x.IsActive && x.RequiresProduction);
+
+    public static CustomerOrder Create(
+        Guid id, string orderCode, Guid customerId, Guid? prescriptionRevisionId, DateOnly orderDate,
+        DateOnly? requiredDate, Guid currencyId, string currencyCodeSnapshot, string? currencySymbolSnapshot,
+        byte currencyDecimalPlacesSnapshot, decimal exchangeRate, DateOnly exchangeRateDate,
+        ExchangeRateType exchangeRateType, ExchangeRateSource exchangeRateSource, TaxCalculationMode taxCalculationMode,
+        SalesPaymentPlan paymentPlan, int paymentTermDaysSnapshot, string? notes = null) =>
+        new(id, orderCode, customerId, prescriptionRevisionId, orderDate, requiredDate, currencyId, currencyCodeSnapshot,
+            currencySymbolSnapshot, currencyDecimalPlacesSnapshot, exchangeRate, exchangeRateDate, exchangeRateType,
+            exchangeRateSource, taxCalculationMode, paymentPlan, paymentTermDaysSnapshot, notes);
+
+    // Transitional overload for the current Application layer. It preserves the pre-checkout behavior
+    // until Contracts/Application are migrated to SalesPaymentPlan in their dedicated phases.
     public static CustomerOrder Create(
         Guid id, string orderCode, Guid customerId, Guid? prescriptionRevisionId, DateOnly orderDate,
         DateOnly? requiredDate, Guid currencyId, string currencyCodeSnapshot, string? currencySymbolSnapshot,
         byte currencyDecimalPlacesSnapshot, decimal exchangeRate, DateOnly exchangeRateDate,
         ExchangeRateType exchangeRateType, ExchangeRateSource exchangeRateSource, TaxCalculationMode taxCalculationMode,
         SalesPaymentTermType paymentTermType, int paymentTermDaysSnapshot, string? notes = null) =>
-        new(id, orderCode, customerId, prescriptionRevisionId, orderDate, requiredDate, currencyId, currencyCodeSnapshot,
-            currencySymbolSnapshot, currencyDecimalPlacesSnapshot, exchangeRate, exchangeRateDate, exchangeRateType,
-            exchangeRateSource, taxCalculationMode, paymentTermType, paymentTermDaysSnapshot, notes);
+        Create(id, orderCode, customerId, prescriptionRevisionId, orderDate, requiredDate, currencyId,
+            currencyCodeSnapshot, currencySymbolSnapshot, currencyDecimalPlacesSnapshot, exchangeRate,
+            exchangeRateDate, exchangeRateType, exchangeRateSource, taxCalculationMode,
+            SalesPaymentPlanPolicy.FromLegacyPaymentTerm(paymentTermType), paymentTermDaysSnapshot, notes);
 
     public void UpdateHeader(
         Guid customerId, Guid? prescriptionRevisionId, DateOnly orderDate, DateOnly? requiredDate,
-        TaxCalculationMode taxCalculationMode, SalesPaymentTermType paymentTermType, int paymentTermDaysSnapshot,
+        TaxCalculationMode taxCalculationMode, SalesPaymentPlan paymentPlan, int paymentTermDaysSnapshot,
         string? notes)
     {
         EnsureDraft();
@@ -92,9 +109,23 @@ public sealed class CustomerOrder : AuditableEntity<Guid>
         PrescriptionRevisionId = prescriptionRevisionId;
         OrderDate = orderDate;
         RequiredDate = requiredDate;
-        SetCommercialPolicy(taxCalculationMode, paymentTermType, paymentTermDaysSnapshot);
+        SetCommercialPolicy(taxCalculationMode, paymentPlan, paymentTermDaysSnapshot);
         Notes = SalesDomainGuard.Optional(notes, 1000, "Order notes");
         RepriceLines();
+    }
+
+    // Transitional overload for callers still sending the legacy term type.
+    public void UpdateHeader(
+        Guid customerId, Guid? prescriptionRevisionId, DateOnly orderDate, DateOnly? requiredDate,
+        TaxCalculationMode taxCalculationMode, SalesPaymentTermType paymentTermType, int paymentTermDaysSnapshot,
+        string? notes) =>
+        UpdateHeader(customerId, prescriptionRevisionId, orderDate, requiredDate, taxCalculationMode,
+            SalesPaymentPlanPolicy.FromLegacyPaymentTerm(paymentTermType), paymentTermDaysSnapshot, notes);
+
+    public void ChangePaymentPlan(SalesPaymentPlan paymentPlan, int paymentTermDaysSnapshot = 0)
+    {
+        EnsureDraft();
+        SetCommercialPolicy(TaxCalculationMode, paymentPlan, paymentTermDaysSnapshot);
     }
 
     public void ChangeCurrency(
@@ -145,10 +176,12 @@ public sealed class CustomerOrder : AuditableEntity<Guid>
     public void Confirm(CustomerOrderStatus resultingStatus, DateTimeOffset confirmedAtUtc, string? confirmedBy)
     {
         EnsureDraft();
-        if (_lines.Count == 0)
-            throw new DomainException("Customer order must contain at least one line before confirmation.");
+        if (_lines.Count == 0 || _lines.All(x => !x.IsActive))
+            throw new DomainException("Customer order must contain at least one active line before confirmation.");
         if (resultingStatus is not (CustomerOrderStatus.Confirmed or CustomerOrderStatus.AwaitingStock or CustomerOrderStatus.PartiallyAvailable or CustomerOrderStatus.ReadyForProduction))
             throw new DomainException("Invalid customer order confirmation status.");
+        if (resultingStatus == CustomerOrderStatus.ReadyForProduction && !RequiresProduction)
+            throw new DomainException("An order without production-required lines cannot enter ready-for-production status.");
 
         RecalculateTotals();
         Status = resultingStatus;
@@ -158,25 +191,42 @@ public sealed class CustomerOrder : AuditableEntity<Guid>
 
     public void SetAvailabilityStatus(CustomerOrderStatus status)
     {
-        if (Status is CustomerOrderStatus.Draft or CustomerOrderStatus.Cancelled or CustomerOrderStatus.Completed)
+        if (Status is CustomerOrderStatus.Draft or CustomerOrderStatus.Cancelled or CustomerOrderStatus.Completed or CustomerOrderStatus.InProduction or CustomerOrderStatus.ReadyForDelivery)
             throw new DomainException("Customer order availability status cannot be changed in the current state.");
         if (status is not (CustomerOrderStatus.Confirmed or CustomerOrderStatus.AwaitingStock or CustomerOrderStatus.PartiallyAvailable or CustomerOrderStatus.ReadyForProduction))
             throw new DomainException("Invalid stock availability status.");
+        if (status == CustomerOrderStatus.ReadyForProduction && !RequiresProduction)
+            throw new DomainException("An order without production-required lines cannot enter ready-for-production status.");
         Status = status;
     }
 
-    public void StartProduction()
+    public void MarkInProduction()
     {
         if (Status != CustomerOrderStatus.ReadyForProduction)
             throw new DomainException("Customer order can only enter production after all required materials are available.");
+        if (!RequiresProduction)
+            throw new DomainException("Customer order does not contain production-required lines.");
         Status = CustomerOrderStatus.InProduction;
     }
 
+    // Kept as a compatibility alias until the Application layer is migrated.
+    public void StartProduction() => MarkInProduction();
+
     public void MarkReadyForDelivery()
     {
-        if (Status != CustomerOrderStatus.InProduction)
-            throw new DomainException("Customer order can only become ready for delivery after production has started.");
-        Status = CustomerOrderStatus.ReadyForDelivery;
+        if (Status == CustomerOrderStatus.InProduction)
+        {
+            Status = CustomerOrderStatus.ReadyForDelivery;
+            return;
+        }
+
+        if (!RequiresProduction && Status == CustomerOrderStatus.Confirmed)
+        {
+            Status = CustomerOrderStatus.ReadyForDelivery;
+            return;
+        }
+
+        throw new DomainException("Customer order can only become ready for delivery after production, or directly when no production is required.");
     }
 
     public void Complete()
@@ -224,20 +274,22 @@ public sealed class CustomerOrder : AuditableEntity<Guid>
         ExchangeRateSource = rateSource;
     }
 
-    private void SetCommercialPolicy(TaxCalculationMode taxMode, SalesPaymentTermType paymentTermType, int paymentTermDays)
+    private void SetCommercialPolicy(TaxCalculationMode taxMode, SalesPaymentPlan paymentPlan, int paymentTermDays)
     {
         SalesDomainGuard.Defined(taxMode, "Tax calculation mode");
-        SalesDomainGuard.Defined(paymentTermType, "Payment term type");
-        if (paymentTermDays < 0) throw new DomainException("Payment term days cannot be negative.");
+        SalesDomainGuard.Defined(paymentPlan, "Sales payment plan");
+
         TaxCalculationMode = taxMode;
-        PaymentTermType = paymentTermType;
-        PaymentTermDaysSnapshot = paymentTermType == SalesPaymentTermType.Immediate ? 0 : paymentTermDays;
+        PaymentPlan = paymentPlan;
+        PaymentTermType = SalesPaymentPlanPolicy.ToPaymentTermType(paymentPlan);
+        PaymentTermDaysSnapshot = SalesPaymentPlanPolicy.NormalizePaymentTermDays(paymentPlan, paymentTermDays);
     }
 
     private void RepriceLines()
     {
         foreach (var line in _lines)
-            line.UpdatePricing(line.Quantity, line.BaseUnitPrice, line.ActualUnitPrice, line.DiscountType, line.DiscountValue, line.TaxRate, TaxCalculationMode, CurrencyDecimalPlacesSnapshot);
+            line.UpdatePricing(line.Quantity, line.BaseUnitPrice, line.ActualUnitPrice, line.DiscountType, line.DiscountValue,
+                line.TaxRate, TaxCalculationMode, CurrencyDecimalPlacesSnapshot);
         RecalculateTotals();
     }
 

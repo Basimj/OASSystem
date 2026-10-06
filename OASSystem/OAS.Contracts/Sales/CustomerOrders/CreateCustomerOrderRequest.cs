@@ -12,4 +12,12 @@ public sealed record CreateCustomerOrderRequest(
     TaxCalculationMode TaxCalculationMode,
     SalesPaymentTermType PaymentTermType,
     string? Notes,
-    IReadOnlyList<CustomerOrderLineRequest> Lines);
+    IReadOnlyList<CustomerOrderLineRequest> Lines)
+{
+    // Transitional default keeps legacy callers valid until the Checkout/Application stage is wired.
+    // New callers should send PaymentPlan explicitly.
+    public SalesPaymentPlan PaymentPlan { get; init; } =
+        PaymentTermType == SalesPaymentTermType.Credit
+            ? SalesPaymentPlan.AccountCredit
+            : SalesPaymentPlan.FullNow;
+}

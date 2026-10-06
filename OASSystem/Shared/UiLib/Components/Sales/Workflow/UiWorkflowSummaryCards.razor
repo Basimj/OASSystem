@@ -1,0 +1,19 @@
+@namespace OAS.UiLib.Components.Sales.Workflow
+@using OAS.UiLib.Core.Models.Sales
+
+<div class="ui-workflow-metrics" dir="rtl">
+    @foreach (var metric in Metrics)
+    {
+        <button type="button" class="ui-workflow-metric @metric.CssClass" @onclick="() => SelectAsync(metric.Key)">
+            <i class="@metric.IconCss" aria-hidden="true"></i>
+            <span>@metric.Label</span>
+            <strong>@metric.Value</strong>
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<UiWorkflowMetric> Metrics { get; set; } = [];
+    [Parameter] public EventCallback<string> OnSelect { get; set; }
+    private Task SelectAsync(string key) => OnSelect.HasDelegate ? OnSelect.InvokeAsync(key) : Task.CompletedTask;
+}

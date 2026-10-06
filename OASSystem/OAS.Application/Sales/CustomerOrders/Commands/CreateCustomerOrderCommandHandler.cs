@@ -29,7 +29,8 @@ public sealed class CreateCustomerOrderCommandHandler(
     {
         var d = request.Data;
         var customer = await customers.GetByIdAsync(d.CustomerId, ct) ?? throw new NotFoundException(nameof(Customer), d.CustomerId);
-        EnsureCustomer(customer, (SalesPaymentTermType)(byte)d.PaymentTermType);
+        var paymentPlan = (SalesPaymentPlan)(byte)d.PaymentPlan;
+        EnsureCustomer(customer, paymentPlan);
         if (d.Lines.Count == 0) throw new ConflictException("sales_order_lines_required", "يجب أن يحتوي الطلب على سطر واحد على الأقل.");
 
         var code = d.OrderCode?.Trim();
@@ -43,7 +44,7 @@ public sealed class CreateCustomerOrderCommandHandler(
             Guid.NewGuid(), code, customer.Id, d.PrescriptionRevisionId, d.OrderDate, d.RequiredDate,
             rate.CurrencyId, rate.CurrencyCode, rate.CurrencySymbol, rate.CurrencyDecimalPlaces, rate.Rate,
             rate.RateDate, rate.RateType, rate.Source, (TaxCalculationMode)(byte)d.TaxCalculationMode,
-            (SalesPaymentTermType)(byte)d.PaymentTermType, customer.PaymentTermDays, d.Notes);
+            paymentPlan, paymentPlan == SalesPaymentPlan.AccountCredit ? customer.PaymentTermDays : 0, d.Notes);
 
         var lineNo = 1;
         foreach (var req in d.Lines)
@@ -92,10 +93,10 @@ public sealed class CreateCustomerOrderCommandHandler(
         return line;
     }
 
-    private static void EnsureCustomer(Customer customer, SalesPaymentTermType paymentTerm)
+    private static void EnsureCustomer(Customer customer, SalesPaymentPlan paymentPlan)
     {
         if (!customer.IsActive) throw new ConflictException(SalesErrorCodes.CustomerInactive, "العميل غير فعال.");
-        if (paymentTerm == SalesPaymentTermType.Credit && !customer.IsCreditAllowed)
+        if (paymentPlan == SalesPaymentPlan.AccountCredit && (string.IsNullOrWhiteSpace(customer.CustomerCode) || !customer.IsCreditAllowed))
             throw new ConflictException(SalesErrorCodes.CreditNotAllowed, "البيع الآجل غير مسموح لهذا العميل.");
     }
 }

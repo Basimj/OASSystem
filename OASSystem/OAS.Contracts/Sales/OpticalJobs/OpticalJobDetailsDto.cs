@@ -20,4 +20,9 @@ public sealed record OpticalJobDetailsDto(
     string? CreatedBy,
     DateTimeOffset? LastModifiedAtUtc,
     string? LastModifiedBy,
-    IReadOnlyList<OpticalJobLineDto> Lines);
+    IReadOnlyList<OpticalJobLineDto> Lines,
+    string? CustomerOrderCode = null,
+    string? CustomerCode = null,
+    string? CustomerName = null,
+    string? Mobile = null,
+    string? AssignedTechnicianName = null);

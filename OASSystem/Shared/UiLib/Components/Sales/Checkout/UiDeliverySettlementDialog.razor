@@ -1,0 +1,41 @@
+@namespace OAS.UiLib.Components.Sales.Checkout
+@using OAS.UiLib.Core.Models.Sales
+
+<div class="ui-workflow-dialog-backdrop"><UiDialog Title="تسليم للعميل" Size="UiDialogSize.Large" OnClose="OnClose">
+    <div class="ui-delivery-settlement" dir="rtl">
+        <div class="ui-delivery-settlement__header">
+            <div><span>الطلب</span><strong>@Model.OrderCode</strong></div>
+            <div><span>العميل</span><strong>@Model.CustomerText</strong></div>
+            <div><span>الفاتورة</span><strong>@(Model.InvoiceCode ?? "—")</strong></div>
+            <div><span>الخطة</span><strong>@Model.PaymentPlan</strong></div>
+        </div>
+        <div class="ui-delivery-settlement__totals">
+            <span>الإجمالي <strong>@Model.Total.ToString("N2") @Model.CurrencyCode</strong></span>
+            <span>المدفوع/المطبق <strong>@((Model.Paid + Model.AppliedAdvances).ToString("N2"))</strong></span>
+            <span class="is-outstanding">المتبقي <strong>@Model.Outstanding.ToString("N2") @Model.CurrencyCode</strong></span>
+        </div>
+        @if (Model.Outstanding > 0 && Model.PaymentPlan != "AccountCredit")
+        {
+            <UiSalesPaymentLinesEditor Lines="@Model.PaymentLines" SearchCurrenciesAsync="SearchCurrenciesAsync" SearchCashAccountsAsync="SearchCashAccountsAsync" SearchBankAccountsAsync="SearchBankAccountsAsync" SearchSettlementAccountsAsync="SearchSettlementAccountsAsync" OnAdd="OnAddPaymentLine" OnRemove="OnRemovePaymentLine" Disabled="@IsBusy" />
+        }
+        @if (!string.IsNullOrWhiteSpace(ErrorText)){<UiAlert Tone="AlertTone.Danger">@ErrorText</UiAlert>}
+        <div class="ui-delivery-settlement__actions">
+            <UiButton Text="إغلاق" Variant="ButtonVariant.Ghost" OnClick="_ => OnClose.InvokeAsync()" />
+            <UiButton Text="تحصيل وتسليم" IconCssClass="fa-solid fa-box-open" Loading="@IsBusy" OnClick="_ => OnSubmit.InvokeAsync()" />
+        </div>
+    </div>
+</UiDialog></div>
+
+@code {
+    [Parameter,EditorRequired] public UiDeliverySettlementModel Model { get; set; } = new();
+    [Parameter] public bool IsBusy { get; set; }
+    [Parameter] public string? ErrorText { get; set; }
+    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchCurrenciesAsync { get; set; }
+    [Parameter] public Func<UiCheckoutPaymentLineModel,string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchCashAccountsAsync { get; set; }
+    [Parameter] public Func<UiCheckoutPaymentLineModel,string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchBankAccountsAsync { get; set; }
+    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchSettlementAccountsAsync { get; set; }
+    [Parameter] public EventCallback OnAddPaymentLine { get; set; }
+    [Parameter] public EventCallback<UiCheckoutPaymentLineModel> OnRemovePaymentLine { get; set; }
+    [Parameter] public EventCallback OnSubmit { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+}

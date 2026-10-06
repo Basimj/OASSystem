@@ -87,6 +87,15 @@ public sealed class OpticalJobService(
         return job.Id;
     }
 
+    public async Task AssignAsync(Guid id, AssignOpticalJobRequest request, CancellationToken cancellationToken = default)
+    {
+        var job = await jobs.GetForUpdateAsync(id, cancellationToken)
+            ?? throw new NotFoundException(nameof(OpticalJob), id);
+        SalesConcurrency.Ensure(request.RowVersion, job.RowVersion, "أمر المعمل");
+        job.AssignTechnician(request.TechnicianId);
+        jobs.Update(job);
+    }
+
     public async Task StartAsync(Guid id, OpticalJobActionRequest request, CancellationToken cancellationToken = default)
     {
         var job = await jobs.GetForUpdateAsync(id, cancellationToken)
@@ -126,6 +135,19 @@ public sealed class OpticalJobService(
         if (order.Status == CustomerOrderStatus.InProduction)
             order.MarkReadyForDelivery();
         orders.Update(order);
+    }
+
+    public async Task DeliverAsync(Guid id, OpticalJobActionRequest request, CancellationToken cancellationToken = default)
+    {
+        var job = await jobs.GetForUpdateAsync(id, cancellationToken)
+            ?? throw new NotFoundException(nameof(OpticalJob), id);
+        SalesConcurrency.Ensure(request.RowVersion, job.RowVersion, "أمر المعمل");
+        if (job.Status == OpticalJobStatus.Delivered)
+            return;
+        if (job.Status != OpticalJobStatus.ReadyForDelivery)
+            throw new ConflictException("optical_job_not_ready_for_delivery", "أمر المعمل ليس جاهزًا للتسليم.");
+        job.MarkDelivered();
+        jobs.Update(job);
     }
 
     public async Task<OpticalJobDetailsDto> GetAsync(Guid id, CancellationToken cancellationToken = default)

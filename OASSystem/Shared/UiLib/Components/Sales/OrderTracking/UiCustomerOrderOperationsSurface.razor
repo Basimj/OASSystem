@@ -1,0 +1,116 @@
+@namespace OAS.UiLib.Components.Sales.OrderTracking
+@using OAS.UiLib.Components.Sales.Workflow
+@using OAS.UiLib.Core.Models.Sales
+
+<UiSalesWorkspace>
+    <Actions>
+        <UiWorkflowSummaryCards Metrics="@Metrics" OnSelect="OnMetricSelected" />
+    </Actions>
+    <Tabs>
+        <UiSectionTabStrip Tabs="@Tabs" OnSelect="TabSelectedAsync" />
+    </Tabs>
+    <Body>
+        <div class="ui-workflow-page" dir="rtl">
+            <UiWorkspaceFilterBar Compact="true">
+                <UiSearchInput Value="@Filter.Search" ValueChanged="SearchChangedAsync" OnSearch="_ => ApplyFiltersAsync()" Placeholder="الطلب / العميل / الجوال / الصنف" />
+                <UiInputDate Label="من تاريخ الطلب" Value="@Filter.OrderDateFrom" ValueChanged="OrderDateFromChangedAsync" />
+                <UiInputDate Label="إلى تاريخ الطلب" Value="@Filter.OrderDateTo" ValueChanged="OrderDateToChangedAsync" />
+                <UiSelect Value="@Filter.ProductType" ValueChanged="ProductTypeChangedAsync" Options="@ProductTypeOptions" Placeholder="نوع المنتج: الكل" />
+                <UiLookup Value="@Filter.WarehouseId" SelectedItem="@WarehouseItem" SearchAsync="SearchWarehousesAsync" ValueChanged="WarehouseChangedAsync" Placeholder="المخزن" />
+                <UiSelect Value="@Filter.RequiresProduction" ValueChanged="RequiresProductionChangedAsync" Options="@ProductionOptions" Placeholder="يحتاج معمل: الكل" />
+                <UiSelect Value="@Filter.Availability" ValueChanged="AvailabilityChangedAsync" Options="@AvailabilityOptions" Placeholder="التوفر: الكل" />
+                <UiInputDate Label="موعد التسليم" Value="@Filter.RequiredDate" ValueChanged="RequiredDateChangedAsync" />
+                <UiLookup Value="@Filter.TechnicianId" SelectedItem="@TechnicianItem" SearchAsync="SearchTechniciansAsync" ValueChanged="TechnicianChangedAsync" Placeholder="الفني" />
+                <label class="ui-workflow-check"><input type="checkbox" checked="@Filter.OverdueOnly" @onchange="OverdueChangedAsync" /><span>متأخر فقط</span></label>
+                <UiButton Text="مسح الفلاتر" IconCssClass="fa-solid fa-filter-circle-xmark" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="ClearAsync" />
+                <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Loading="@IsBusy" OnClick="RefreshAsync" />
+            </UiWorkspaceFilterBar>
+
+            @if (!string.IsNullOrWhiteSpace(ErrorText)){<UiAlert Tone="AlertTone.Danger">@ErrorText</UiAlert>}
+
+            <UiDataGridPanel Title="متابعة طلبات العملاء" Subtitle="التوفر والتوريد والمعمل والتسليم من شاشة تشغيلية واحدة.">
+                <Body>
+                    <UiDataTable TItem="UiOrderOperationsRowModel" Items="@Rows" Headers="@Headers" Compact="true" OnRowClick="@((UiOrderOperationsRowModel row) => OpenAsync(row))" EmptyText="لا توجد طلبات مطابقة للفلاتر.">
+                        <RowTemplate Context="row">
+                            <td><strong>@row.OrderCode</strong><small class="ui-workflow-cell-muted">@row.OrderDate</small></td>
+                            <td>@row.CustomerCode<br/><small>@row.CustomerName</small></td>
+                            <td>@(row.Mobile ?? "—")</td><td>@row.ItemsSummary</td>
+                            <td>@row.AvailableLines / @row.TotalLines</td><td>@row.ShortageLines</td><td>@row.SupplyText</td>
+                            <td><span class="ui-sales-status @row.StatusCss">@row.StatusText</span></td><td>@(row.RequiredDate ?? "—")</td><td>@(row.JobCode ?? "—")</td>
+                        </RowTemplate>
+                    </UiDataTable>
+                </Body>
+                <Footer><UiPagination PageNumber="@PageNumber" TotalPages="@TotalPages" TotalCount="@TotalCount" OnPrevious="OnPrevious" OnNext="OnNext" /></Footer>
+            </UiDataGridPanel>
+        </div>
+    </Body>
+</UiSalesWorkspace>
+
+@if (Selected is not null)
+{
+    <div class="ui-workflow-drawer-backdrop" @onclick="CloseDetailsAsync"></div>
+    <aside class="ui-workflow-drawer" dir="rtl">
+        <header class="ui-workflow-drawer__header"><div><strong>@Selected.OrderCode</strong><span>@Selected.CustomerText • @(Selected.Mobile ?? "—")</span></div><button type="button" @onclick="CloseDetailsAsync">×</button></header>
+        <div class="ui-workflow-drawer__body">
+            <div class="ui-workflow-detail-grid"><span>الحالة<strong>@Selected.StatusText</strong></span><span>موعد التسليم<strong>@(Selected.RequiredDate ?? "—")</strong></span><span>التوريد<strong>@Selected.SupplyText</strong></span><span>Job<strong>@(Selected.JobCode ?? "—")</strong></span></div>
+            <section><h4>البنود</h4><UiDataTable Items="@Selected.Lines" Headers="@DetailHeaders" Compact="true"><RowTemplate Context="line"><td>@line.LineNumber</td><td>@line.TypeText</td><td>@line.ProductText</td><td>@(line.EyeText ?? "—")</td><td>@line.Quantity.ToString("N3")</td><td><span class="ui-sales-status @line.AvailabilityCss">@line.AvailabilityText</span></td><td>@line.ProcurementText</td><td>@(line.ExpectedDelivery ?? "—")</td></RowTemplate></UiDataTable></section>
+            <section><h4>المسار التشغيلي</h4><div class="ui-workflow-timeline">@foreach(var item in Selected.Timeline){<div><i class="fa-solid fa-circle"></i><span><strong>@item.Title</strong><small>@item.OccurredAt @(string.IsNullOrWhiteSpace(item.Meta)?"":$"• {item.Meta}")</small></span></div>}</div></section>
+        </div>
+        <footer class="ui-workflow-drawer__footer">
+            @if (Selected.Lines.Any(x => x.ShortageQuantity > 0m)){<UiButton Text="فتح النقص" IconCssClass="fa-solid fa-truck-fast" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="_ => OnOpenSupply.InvokeAsync(Selected.OrderId)" />}
+            @if (Selected.JobId.HasValue){<UiButton Text="فتح Job" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="_ => OnOpenJob.InvokeAsync(Selected.JobId.Value)" />}
+            @if (Selected.StatusKey == "ReadyForDelivery"){<UiButton Text="تسليم للعميل" IconCssClass="fa-solid fa-box-open" Size="ControlSize.Small" OnClick="_ => OnDeliver.InvokeAsync(Selected.OrderId)" />}
+        </footer>
+    </aside>
+}
+
+@code {
+    [Parameter,EditorRequired] public UiOrderOperationsFilterModel Filter { get; set; } = new();
+    [Parameter] public IReadOnlyList<UiWorkflowMetric> Metrics { get; set; }=[];
+    [Parameter] public IReadOnlyList<UiOrderOperationsRowModel> Rows { get; set; }=[];
+    [Parameter] public UiOrderOperationsDetailsModel? Selected { get; set; }
+    [Parameter] public bool IsBusy { get; set; }
+    [Parameter] public string? ErrorText { get; set; }
+    [Parameter] public int PageNumber { get; set; }=1;
+    [Parameter] public int TotalPages { get; set; }
+    [Parameter] public long TotalCount { get; set; }
+    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchWarehousesAsync { get; set; }
+    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchTechniciansAsync { get; set; }
+    [Parameter] public EventCallback OnApplyFilters { get; set; }
+    [Parameter] public EventCallback OnClearFilters { get; set; }
+    [Parameter] public EventCallback<string> OnTabSelected { get; set; }
+    [Parameter] public EventCallback<string> OnMetricSelected { get; set; }
+    [Parameter] public EventCallback<UiOrderOperationsRowModel> OnOpen { get; set; }
+    [Parameter] public EventCallback OnCloseDetails { get; set; }
+    [Parameter] public EventCallback<Guid> OnDeliver { get; set; }
+    [Parameter] public EventCallback<Guid> OnOpenSupply { get; set; }
+    [Parameter] public EventCallback<Guid> OnOpenJob { get; set; }
+    [Parameter] public EventCallback OnPrevious { get; set; }
+    [Parameter] public EventCallback OnNext { get; set; }
+
+    private static readonly IReadOnlyList<string> Headers=["الطلب","العميل","الجوال","المطلوب","المتاح","الناقص","التوريد","الحالة","الموعد","Job"];
+    private static readonly IReadOnlyList<string> DetailHeaders=["#","النوع","الصنف","العين","الكمية","التوفر","التوريد","الوصول"];
+    private static readonly IReadOnlyList<UiSelectOption> ProductTypeOptions=[new("Frame","إطار"),new("Lens","عدسة"),new("Accessory","إكسسوار"),new("Service","خدمة"),new("Other","أخرى")];
+    private static readonly IReadOnlyList<UiSelectOption> ProductionOptions=[new("true","نعم"),new("false","لا")];
+    private static readonly IReadOnlyList<UiSelectOption> AvailabilityOptions=[new("Available","كامل"),new("Reserved","محجوز"),new("Shortage","ناقص")];
+    private IReadOnlyList<UiSectionTabItem> Tabs => new[]{("","الكل"),("Confirmed","جديدة"),("AwaitingStock","بانتظار مخزون"),("PartiallyAvailable","متاحة جزئيًا"),("ReadyForProduction","جاهزة للمعمل"),("InProduction","قيد التجهيز"),("ReadyForDelivery","جاهزة للتسليم"),("Completed","مكتملة"),("Cancelled","ملغاة")}.Select(x=>new UiSectionTabItem(x.Item1,x.Item2,string.Equals(Filter.Status,x.Item1,StringComparison.OrdinalIgnoreCase))).ToArray();
+    private UiLookupItem? WarehouseItem=>Lookup(Filter.WarehouseId,Filter.WarehouseDisplay,"fa-solid fa-warehouse");
+    private UiLookupItem? TechnicianItem=>Lookup(Filter.TechnicianId,Filter.TechnicianDisplay,"fa-solid fa-user-gear");
+    private static UiLookupItem? Lookup(string? id,string? text,string icon)=>string.IsNullOrWhiteSpace(id)||string.IsNullOrWhiteSpace(text)?null:new(id,text,null,icon);
+    private Task SearchChangedAsync(string? v){Filter.Search=v;return Task.CompletedTask;}
+    private async Task OrderDateFromChangedAsync(DateOnly? v){Filter.OrderDateFrom=v;await ApplyFiltersAsync();}
+    private async Task OrderDateToChangedAsync(DateOnly? v){Filter.OrderDateTo=v;await ApplyFiltersAsync();}
+    private async Task ProductTypeChangedAsync(string? v){Filter.ProductType=v??"";await ApplyFiltersAsync();}
+    private async Task WarehouseChangedAsync(string? v){Filter.WarehouseId=v??"";Filter.WarehouseDisplay=null;await ApplyFiltersAsync();}
+    private async Task RequiresProductionChangedAsync(string? v){Filter.RequiresProduction=v??"";await ApplyFiltersAsync();}
+    private async Task AvailabilityChangedAsync(string? v){Filter.Availability=v??"";await ApplyFiltersAsync();}
+    private async Task RequiredDateChangedAsync(DateOnly? v){Filter.RequiredDate=v;await ApplyFiltersAsync();}
+    private async Task TechnicianChangedAsync(string? v){Filter.TechnicianId=v??"";Filter.TechnicianDisplay=null;await ApplyFiltersAsync();}
+    private async Task OverdueChangedAsync(ChangeEventArgs e){Filter.OverdueOnly=e.Value is bool b&&b;await ApplyFiltersAsync();}
+    private Task ApplyFiltersAsync()=>OnApplyFilters.InvokeAsync();
+    private Task TabSelectedAsync(string key){Filter.Status=key;return OnTabSelected.InvokeAsync(key);}
+    private Task OpenAsync(UiOrderOperationsRowModel row)=>OnOpen.InvokeAsync(row);
+    private Task CloseDetailsAsync()=>OnCloseDetails.InvokeAsync();
+    private Task ClearAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _)=>OnClearFilters.InvokeAsync();
+    private Task RefreshAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _)=>OnApplyFilters.InvokeAsync();
+}

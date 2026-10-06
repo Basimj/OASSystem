@@ -11,6 +11,14 @@ using OAS.Client.Inventory.Services;
 using OAS.Client.Printing.Services;
 using OAS.Client.Sales.Services;
 using OAS.Client.Sales.Workspace;
+using OAS.Client.Sales.Checkout.Services;
+using OAS.Client.Sales.Checkout.State;
+using OAS.Client.Sales.OrderTracking.Services;
+using OAS.Client.Sales.OrderTracking.State;
+using OAS.Client.Purchasing.CustomerDemand.Services;
+using OAS.Client.Purchasing.CustomerDemand.State;
+using OAS.Client.Optical.Services;
+using OAS.Client.Optical.State;
 using OAS.Client.Services.Browser;
 using OAS.Client.Services.Http;
 using OAS.UiLib.Extensions;
@@ -92,6 +100,10 @@ public static class ClientServices
         // Sales
         services.AddScoped<ISalesClientService, SalesClientService>();
         services.AddScoped<ISalesWorkspaceState, SalesWorkspaceState>();
+        services.AddScoped<ISalesCheckoutClientService, SalesCheckoutClientService>();
+        services.AddScoped<SalesCheckoutState>();
+        services.AddScoped<ICustomerOrderOperationsClientService, CustomerOrderOperationsClientService>();
+        services.AddScoped<CustomerOrderOperationsState>();
 
         // Purchasing
         services.AddScoped<
@@ -101,6 +113,13 @@ public static class ClientServices
         services.AddScoped<
             OAS.Client.Purchasing.Workspace.IPurchasingWorkspaceState,
             OAS.Client.Purchasing.Workspace.PurchasingWorkspaceState>();
+
+        services.AddScoped<ICustomerDemandTrackingClientService, CustomerDemandTrackingClientService>();
+        services.AddScoped<CustomerDemandTrackingState>();
+
+        // Optical / Lab
+        services.AddScoped<IOpticalJobsClientService, OpticalJobsClientService>();
+        services.AddScoped<OpticalJobsState>();
 
         return services;
     }

@@ -41,4 +41,10 @@ public sealed record CustomerOrderDto(
     string? LastModifiedBy,
     IReadOnlyList<CustomerOrderLineDto> Lines,
     string? PrescriptionCode = null,
-    int? PrescriptionRevisionNumber = null);
+    int? PrescriptionRevisionNumber = null)
+{
+    public SalesPaymentPlan PaymentPlan { get; init; } =
+        PaymentTermType == SalesPaymentTermType.Credit
+            ? SalesPaymentPlan.AccountCredit
+            : SalesPaymentPlan.FullNow;
+}

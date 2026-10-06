@@ -23,7 +23,23 @@ public sealed class OpticalJobFoundationDomainTests
     }
 
     [Test]
-    public void JobCannotStartBeforeMaterialsIssued()
+    public void V1Lifecycle_CanStartWhenMaterialsAreAvailable_AndFinishWithoutMandatoryQc()
+    {
+        var job = CreateJobWithLine();
+        job.MarkMaterialsAvailable();
+        job.Start(new DateTimeOffset(2026, 10, 4, 12, 0, 0, TimeSpan.Zero));
+        job.MarkReadyForDelivery(new DateTimeOffset(2026, 10, 4, 13, 0, 0, TimeSpan.Zero));
+        job.MarkDelivered();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(job.Status, Is.EqualTo(OpticalJobStatus.Delivered));
+            Assert.That(job.IsActive, Is.False);
+        });
+    }
+
+    [Test]
+    public void JobCannotStartBeforeMaterialsAreAvailable()
     {
         var job = CreateJobWithLine();
         Assert.Throws<DomainException>(() => job.Start(DateTimeOffset.UtcNow));

@@ -12,6 +12,12 @@ public sealed record CreateOpticalJobCommand(CreateOpticalJobRequest Request)
     public IReadOnlyCollection<string> RequiredPermissions { get; } = [SalesPermissions.OpticalJobs.Start];
 }
 
+public sealed record AssignOpticalJobCommand(Guid Id, AssignOpticalJobRequest Request)
+    : ICommand, IAuthorizedRequest
+{
+    public IReadOnlyCollection<string> RequiredPermissions { get; } = [SalesPermissions.OpticalJobs.Assign];
+}
+
 public sealed record StartOpticalJobCommand(Guid Id, OpticalJobActionRequest Request)
     : ICommand, IAuthorizedRequest
 {
@@ -29,6 +35,13 @@ public sealed class CreateOpticalJobCommandHandler(IOpticalJobService service)
 {
     public Task<Guid> Handle(CreateOpticalJobCommand request, CancellationToken cancellationToken) =>
         service.CreateAsync(request.Request, cancellationToken);
+}
+
+public sealed class AssignOpticalJobCommandHandler(IOpticalJobService service)
+    : IRequestHandler<AssignOpticalJobCommand>
+{
+    public Task Handle(AssignOpticalJobCommand request, CancellationToken cancellationToken) =>
+        service.AssignAsync(request.Id, request.Request, cancellationToken);
 }
 
 public sealed class StartOpticalJobCommandHandler(IOpticalJobService service)

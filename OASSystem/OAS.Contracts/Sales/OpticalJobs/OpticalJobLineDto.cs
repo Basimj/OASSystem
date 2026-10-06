@@ -1,3 +1,4 @@
+using OAS.Contracts.Sales.CustomerOrders;
 using OAS.Contracts.Sales.Enums;
 
 namespace OAS.Contracts.Sales.OpticalJobs;
@@ -13,4 +14,7 @@ public sealed record OpticalJobLineDto(
     string DescriptionSnapshot,
     decimal Quantity,
     string? Notes,
-    string RowVersion);
+    string RowVersion,
+    string? ProductCode = null,
+    string? ProductName = null,
+    CustomerOrderLineOpticalSnapshotDto? OpticalSnapshot = null);

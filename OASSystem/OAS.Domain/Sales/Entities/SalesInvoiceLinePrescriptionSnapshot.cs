@@ -10,14 +10,16 @@ public sealed class SalesInvoiceLinePrescriptionSnapshot : AuditableEntity<Guid>
     private SalesInvoiceLinePrescriptionSnapshot() { }
 
     private SalesInvoiceLinePrescriptionSnapshot(
-        Guid id, Guid salesInvoiceLineId, Guid prescriptionRevisionId, EyeSide eye,
+        Guid id, Guid salesInvoiceLineId, Guid? prescriptionRevisionId, EyeSide eye,
         decimal? sph, decimal? cyl, short? axis, decimal? add, decimal? prism,
         PrismBaseDirection? prismBase, decimal? pd, decimal? monocularPd, string? va,
         decimal? fittingHeight)
     {
         Id = SalesDomainGuard.Required(id, "Prescription snapshot id");
         SalesInvoiceLineId = SalesDomainGuard.Required(salesInvoiceLineId, "Sales invoice line id");
-        PrescriptionRevisionId = SalesDomainGuard.Required(prescriptionRevisionId, "Prescription revision id");
+        if (prescriptionRevisionId == Guid.Empty)
+            throw new OAS.Domain.Exceptions.DomainException("Prescription revision id cannot be empty.");
+        PrescriptionRevisionId = prescriptionRevisionId;
         SalesDomainGuard.Defined(eye, "Eye side");
         if (prismBase.HasValue)
             SalesDomainGuard.Defined(prismBase.Value, "Prism base direction");
@@ -39,7 +41,7 @@ public sealed class SalesInvoiceLinePrescriptionSnapshot : AuditableEntity<Guid>
     }
 
     public Guid SalesInvoiceLineId { get; private set; }
-    public Guid PrescriptionRevisionId { get; private set; }
+    public Guid? PrescriptionRevisionId { get; private set; }
     public EyeSide Eye { get; private set; }
     public decimal? SPH { get; private set; }
     public decimal? CYL { get; private set; }
@@ -55,7 +57,7 @@ public sealed class SalesInvoiceLinePrescriptionSnapshot : AuditableEntity<Guid>
     public byte[] RowVersion { get; private set; } = [];
 
     public static SalesInvoiceLinePrescriptionSnapshot Create(
-        Guid id, Guid salesInvoiceLineId, Guid prescriptionRevisionId, EyeSide eye,
+        Guid id, Guid salesInvoiceLineId, Guid? prescriptionRevisionId, EyeSide eye,
         decimal? sph = null, decimal? cyl = null, short? axis = null, decimal? add = null,
         decimal? prism = null, PrismBaseDirection? prismBase = null, decimal? pd = null,
         decimal? monocularPd = null, string? va = null, decimal? fittingHeight = null) =>

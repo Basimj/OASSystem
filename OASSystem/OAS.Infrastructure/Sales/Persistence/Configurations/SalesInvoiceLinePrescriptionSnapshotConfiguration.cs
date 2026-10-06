@@ -22,7 +22,7 @@ public sealed class SalesInvoiceLinePrescriptionSnapshotConfiguration : IEntityT
 
         builder.Property(x => x.Id).ValueGeneratedNever();
         builder.Property(x => x.SalesInvoiceLineId).IsRequired();
-        builder.Property(x => x.PrescriptionRevisionId).IsRequired();
+        builder.Property(x => x.PrescriptionRevisionId);
         builder.Property(x => x.Eye).IsRequired().HasConversion<byte>();
         builder.Property(x => x.SPH).HasPrecision(6, 2);
         builder.Property(x => x.CYL).HasPrecision(6, 2);

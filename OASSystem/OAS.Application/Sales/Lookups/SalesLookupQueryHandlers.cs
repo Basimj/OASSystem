@@ -24,8 +24,7 @@ internal static class SalesLookupLimit
 }
 
 public sealed class SearchSalesCustomersQueryHandler(
-    IReadRepository<Customer, Guid> customers,
-    IReadRepository<Account, Guid> accounts)
+    IReadRepository<Customer, Guid> customers)
     : IRequestHandler<
         SearchSalesCustomersQuery,
         IReadOnlyList<SalesCustomerLookupDto>>
@@ -44,10 +43,9 @@ public sealed class SearchSalesCustomersQueryHandler(
                 (
                     x.CustomerCode.Contains(search) ||
                     x.NameAr.Contains(search) ||
-                    (
-                        x.ContactInfo.Mobile != null &&
-                        x.ContactInfo.Mobile.Contains(search)
-                    )
+                    (x.NameEn != null && x.NameEn.Contains(search)) ||
+                    (x.ContactInfo.Mobile != null && x.ContactInfo.Mobile.Contains(search)) ||
+                    (x.ContactInfo.Phone != null && x.ContactInfo.Phone.Contains(search))
                 ));
         }
         else
@@ -65,31 +63,19 @@ public sealed class SearchSalesCustomersQueryHandler(
 
         var rows = await customers.ListAsync(spec, ct);
 
-        var result =
-            new List<SalesCustomerLookupDto>(rows.Count);
-
-        foreach (var customer in rows)
-        {
-            var account =
-                await accounts.GetByIdAsync(
-                    customer.AccountId,
-                    ct);
-
-            result.Add(
-                new SalesCustomerLookupDto(
-                    customer.Id,
-                    customer.CustomerCode,
-                    customer.AccountId,
-                    account?.Code ?? string.Empty,
-                    customer.NameAr,
-                    customer.ContactInfo.Mobile,
-                    customer.IsCreditAllowed,
-                    customer.CreditLimit,
-                    customer.PaymentTermDays,
-                    customer.IsActive));
-        }
-
-        return result;
+        return rows
+            .Select(customer => new SalesCustomerLookupDto(
+                customer.Id,
+                customer.CustomerCode,
+                customer.NameAr,
+                customer.NameEn,
+                customer.ContactInfo.Mobile,
+                customer.ContactInfo.Phone,
+                customer.IsCreditAllowed,
+                customer.CreditLimit,
+                customer.PaymentTermDays,
+                customer.IsActive))
+            .ToArray();
     }
 }
 

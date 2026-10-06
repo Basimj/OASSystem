@@ -1,0 +1,129 @@
+@namespace OAS.UiLib.Components.Sales.Checkout
+@using OAS.UiLib.Core.Models.Sales
+@using OAS.UiLib.Components.Sales.Workflow
+
+<UiSalesWorkspace>
+    <Actions>
+        <UiWorkspaceActionBar>
+            <UiButton Text="طلب عميل جديد" IconCssClass="fa-solid fa-file-circle-plus" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="OpenOrderEditorAsync" />
+            <UiLookup Label="طلب العميل" Value="@Selection.OrderId" SelectedItem="@SelectedOrderItem" SearchAsync="SearchOrdersAsync" ValueChanged="OrderChangedAsync" Placeholder="ابحث برقم الطلب..." />
+            <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Loading="@IsBusy" Disabled="@(Model is null)" OnClick="RefreshAsync" />
+            <UiButton Text="تأكيد/إتمام البيع" IconCssClass="fa-solid fa-check" Size="ControlSize.Small" Loading="@IsBusy" Disabled="@(Model is null)" OnClick="CheckoutAsync" />
+        </UiWorkspaceActionBar>
+    </Actions>
+    <Body>
+        @if (!string.IsNullOrWhiteSpace(ErrorText))
+        {
+            <UiAlert Tone="AlertTone.Danger">@ErrorText</UiAlert>
+        }
+        @if (!string.IsNullOrWhiteSpace(SuccessText))
+        {
+            <UiAlert Tone="AlertTone.Success">@SuccessText</UiAlert>
+        }
+        @if (Model is null)
+        {
+            <div class="ui-sales-empty">
+                <i class="fa-solid fa-cart-plus"></i>
+                <strong>اختر طلب عميل لبدء Checkout</strong>
+                <span>يمكنك إنشاء الطلب وتعديل بنوده من شاشة طلبات العملاء ثم إتمام البيع من هنا.</span>
+            </div>
+        }
+        else
+        {
+            <div class="ui-sales-checkout" dir="rtl">
+                <section class="ui-sales-section">
+                    <header class="ui-sales-section__header"><i class="fa-solid fa-user"></i><div><h3>العميل والطلب</h3><p>البيانات التشغيلية الأساسية قبل الإتمام.</p></div></header>
+                    <div class="ui-sales-section__body ui-sales-checkout__header-grid">
+                        <div><span>رقم الطلب</span><strong>@Model.OrderCode</strong></div>
+                        <div><span>رقم العميل</span><strong>@Model.CustomerCode</strong></div>
+                        <div><span>العميل</span><strong>@Model.CustomerName</strong></div>
+                        <div><span>الجوال</span><strong>@(Model.Mobile ?? "—")</strong></div>
+                        <div><span>الحالة</span><strong>@Model.StatusText</strong></div>
+                        <div><span>الفحص</span><strong>@(Model.PrescriptionText ?? "لا يوجد فحص مرتبط")</strong></div>
+                    </div>
+                </section>
+
+                <section class="ui-sales-section">
+                    <header class="ui-sales-section__header"><i class="fa-solid fa-boxes-stacked"></i><div><h3>البنود والتوفر</h3><p>فحص المخزون الحالي لكل بند من الطلب.</p></div></header>
+                    <div class="ui-sales-section__body">
+                        <UiDataTable Items="@Model.Lines" Headers="@LineHeaders" Compact="true" EmptyText="لا توجد بنود في الطلب.">
+                            <RowTemplate Context="line">
+                                <td>@line.TypeText</td><td>@line.ProductText</td><td>@(line.EyeText ?? "—")</td><td>@(line.OpticalSummary ?? "—")</td><td>@(line.WarehouseText ?? "—")</td>
+                                <td><span class="ui-sales-status @line.AvailabilityCss">@line.AvailabilityText</span></td><td>@line.Quantity.ToString("N3")</td><td>@line.UnitPrice.ToString("N2")</td><td>@line.FinalAmount.ToString("N2")</td>
+                            </RowTemplate>
+                        </UiDataTable>
+                    </div>
+                </section>
+
+                @if (Model.Shortages.Count > 0)
+                {
+                    <section class="ui-sales-section">
+                        <header class="ui-sales-section__header"><i class="fa-solid fa-triangle-exclamation"></i><div><h3>النواقص والتوريد</h3><p>حدد المورد والموعد عند الحاجة قبل تأكيد Checkout.</p></div></header>
+                        <div class="ui-sales-section__body ui-sales-checkout__shortages">
+                            @foreach (var shortage in Model.Shortages)
+                            {
+                                <div class="ui-sales-checkout__shortage">
+                                    <div class="ui-sales-checkout__shortage-title"><strong>@shortage.ProductText</strong><span>@(shortage.EyeText ?? "") @(shortage.OpticalSummary ?? "")</span><b>الناقص @shortage.ShortageQuantity.ToString("N3")</b></div>
+                                    <UiLookup Label="المورد المفضل" Value="@shortage.PreferredSupplierId" SelectedItem="@SupplierItem(shortage)" SearchAsync="SearchSuppliersAsync" ValueChanged="v => SupplierChangedAsync(shortage, v)" Placeholder="اختيار المورد" />
+                                    <label class="ui-sales-checkout__datetime"><span>موعد الطلب/المتابعة</span><input type="datetime-local" value="@FormatDateTime(shortage.ScheduledOrderAtUtc)" @onchange="e => ScheduleChangedAsync(shortage,e)" /></label>
+                                    <div class="ui-sales-checkout__readonly"><span>تاريخ الاحتياج</span><strong>@(shortage.RequiredDate?.ToString("yyyy-MM-dd") ?? "—")</strong></div>
+                                </div>
+                            }
+                        </div>
+                    </section>
+                }
+
+                <section class="ui-sales-section">
+                    <header class="ui-sales-section__header"><i class="fa-solid fa-credit-card"></i><div><h3>طريقة السداد</h3><p>اختر خطة الدفع ثم أدخل الدفعات المطلوبة.</p></div></header>
+                    <div class="ui-sales-section__body">
+                        <UiSalesPaymentPlanPanel Value="@Model.PaymentPlan" ValueChanged="PaymentPlanChangedAsync" CreditAllowed="@Model.CreditAllowed" CreditLimit="@Model.CreditLimit" CurrentExposure="@Model.CurrentCreditExposure" AvailableCredit="@Model.AvailableCredit" PaymentTermDays="@Model.PaymentTermDays" Disabled="@(IsBusy || Model.PaymentPlanLocked)" />
+                        @if (ShowPaymentLines)
+                        {
+                            <UiSalesPaymentLinesEditor Lines="@Model.PaymentLines" SearchCurrenciesAsync="SearchCurrenciesAsync" SearchCashAccountsAsync="SearchCashAccountsAsync" SearchBankAccountsAsync="SearchBankAccountsAsync" SearchSettlementAccountsAsync="SearchSettlementAccountsAsync" OnAdd="OnAddPaymentLine" OnRemove="OnRemovePaymentLine" OnChanged="OnChanged" Disabled="@IsBusy" />
+                        }
+                    </div>
+                </section>
+
+                <section class="ui-sales-section">
+                    <header class="ui-sales-section__header"><i class="fa-solid fa-calculator"></i><div><h3>ملخص العملية</h3><p>المبالغ محسوبة من المستندات والتخصيصات الحالية.</p></div></header>
+                    <div class="ui-sales-section__body"><UiCheckoutSummaryPanel Model="@Model" /></div>
+                </section>
+            </div>
+        }
+    </Body>
+</UiSalesWorkspace>
+
+@code {
+    [Parameter, EditorRequired] public UiSalesCheckoutSelectionModel Selection { get; set; } = new();
+    [Parameter] public UiSalesCheckoutModel? Model { get; set; }
+    [Parameter] public bool IsBusy { get; set; }
+    [Parameter] public string? ErrorText { get; set; }
+    [Parameter] public string? SuccessText { get; set; }
+    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchOrdersAsync { get; set; }
+    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchSuppliersAsync { get; set; }
+    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchCurrenciesAsync { get; set; }
+    [Parameter] public Func<UiCheckoutPaymentLineModel,string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchCashAccountsAsync { get; set; }
+    [Parameter] public Func<UiCheckoutPaymentLineModel,string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchBankAccountsAsync { get; set; }
+    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchSettlementAccountsAsync { get; set; }
+    [Parameter] public EventCallback OnOpenOrderEditor { get; set; }
+    [Parameter] public EventCallback<string?> OnOrderChanged { get; set; }
+    [Parameter] public EventCallback<string> OnPaymentPlanChanged { get; set; }
+    [Parameter] public EventCallback OnRefresh { get; set; }
+    [Parameter] public EventCallback OnCheckout { get; set; }
+    [Parameter] public EventCallback OnAddPaymentLine { get; set; }
+    [Parameter] public EventCallback<UiCheckoutPaymentLineModel> OnRemovePaymentLine { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private static readonly IReadOnlyList<string> LineHeaders = ["النوع","الصنف","العين","المواصفات","المخزن","التوفر","الكمية","السعر","الإجمالي"];
+    private UiLookupItem? SelectedOrderItem => string.IsNullOrWhiteSpace(Selection.OrderId) || string.IsNullOrWhiteSpace(Selection.OrderDisplay) ? null : new(Selection.OrderId,Selection.OrderDisplay,null,"fa-solid fa-clipboard-list");
+    private bool ShowPaymentLines => Model is not null && Model.PaymentPlan is "FullNow" or "PartialNow";
+    private static UiLookupItem? SupplierItem(UiCheckoutShortageModel x) => string.IsNullOrWhiteSpace(x.PreferredSupplierId)||string.IsNullOrWhiteSpace(x.PreferredSupplierDisplay)?null:new(x.PreferredSupplierId,x.PreferredSupplierDisplay,null,"fa-solid fa-truck-field");
+    private static string FormatDateTime(DateTimeOffset? value) => value?.ToLocalTime().ToString("yyyy-MM-ddTHH:mm") ?? string.Empty;
+    private Task OpenOrderEditorAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _)=>OnOpenOrderEditor.InvokeAsync();
+    private Task OrderChangedAsync(string? value)=>OnOrderChanged.InvokeAsync(value);
+    private Task PaymentPlanChangedAsync(string value)=>OnPaymentPlanChanged.InvokeAsync(value);
+    private Task RefreshAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _)=>OnRefresh.InvokeAsync();
+    private Task CheckoutAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _)=>OnCheckout.InvokeAsync();
+    private async Task SupplierChangedAsync(UiCheckoutShortageModel shortage,string? value){shortage.PreferredSupplierId=value??string.Empty;shortage.PreferredSupplierDisplay=null;await OnChanged.InvokeAsync();}
+    private async Task ScheduleChangedAsync(UiCheckoutShortageModel shortage,ChangeEventArgs e){if(DateTime.TryParse(e.Value?.ToString(),out var dt))shortage.ScheduledOrderAtUtc=new DateTimeOffset(dt);else shortage.ScheduledOrderAtUtc=null;await OnChanged.InvokeAsync();}
+}

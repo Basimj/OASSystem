@@ -12,4 +12,12 @@ public sealed record UpdateCustomerOrderRequest(
     SalesPaymentTermType PaymentTermType,
     string? Notes,
     IReadOnlyList<CustomerOrderLineRequest> Lines,
-    string RowVersion);
+    string RowVersion)
+{
+    // Transitional default keeps legacy callers valid until the Checkout/Application stage is wired.
+    // New callers should send PaymentPlan explicitly.
+    public SalesPaymentPlan PaymentPlan { get; init; } =
+        PaymentTermType == SalesPaymentTermType.Credit
+            ? SalesPaymentPlan.AccountCredit
+            : SalesPaymentPlan.FullNow;
+}

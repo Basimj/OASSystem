@@ -7,7 +7,10 @@
     </div>
     <div class="ui-sales-home__grid">
         <button type="button" @onclick="() => NavigateAsync(PrescriptionsRoute)"><i class="fa-solid fa-glasses"></i><strong>الوصفات</strong><span>الوصفات الطبية وإصدارات قياسات العين</span></button>
-        <button type="button" @onclick="() => NavigateAsync(OrdersRoute)"><i class="fa-solid fa-clipboard-list"></i><strong>طلبات العملاء</strong><span>الطلبات وحجز الكميات ومتابعة الجاهزية</span></button>
+        <button type="button" @onclick="() => NavigateAsync(OrdersRoute)"><i class="fa-solid fa-clipboard-list"></i><strong>طلبات العملاء</strong><span>إنشاء الطلب وبنوده وقياساته</span></button>
+        <button type="button" @onclick="() => NavigateAsync(CheckoutRoute)"><i class="fa-solid fa-cart-plus"></i><strong>بيع جديد / Checkout</strong><span>التوفر وخطة الدفع والنواقص وإتمام البيع</span></button>
+        <button type="button" @onclick="() => NavigateAsync(OrderTrackingRoute)"><i class="fa-solid fa-route"></i><strong>متابعة طلبات العملاء</strong><span>المخزون والتوريد والمعمل والتسليم</span></button>
+        <button type="button" @onclick="() => NavigateAsync(OpticalJobsRoute)"><i class="fa-solid fa-flask"></i><strong>المعمل</strong><span>طابور العمل الفني والمواصفات التشغيلية</span></button>
         <button type="button" @onclick="() => NavigateAsync(InvoicesRoute)"><i class="fa-solid fa-file-invoice-dollar"></i><strong>فواتير المبيعات</strong><span>التأكيد والترحيل المحاسبي والمخزني</span></button>
     </div>
 </div>
@@ -16,6 +19,9 @@
     [Parameter] public string PrescriptionsRoute { get; set; } = "/sales/prescriptions";
     [Parameter] public string OrdersRoute { get; set; } = "/sales/customer-orders";
     [Parameter] public string InvoicesRoute { get; set; } = "/sales/invoices";
+    [Parameter] public string CheckoutRoute { get; set; } = "/sales/checkout";
+    [Parameter] public string OrderTrackingRoute { get; set; } = "/sales/order-tracking";
+    [Parameter] public string OpticalJobsRoute { get; set; } = "/optical/jobs";
     [Parameter] public EventCallback<string> OnNavigate { get; set; }
     private Task NavigateAsync(string route) => OnNavigate.InvokeAsync(route);
 }

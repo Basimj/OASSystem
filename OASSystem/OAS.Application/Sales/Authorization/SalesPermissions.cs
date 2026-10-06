@@ -16,6 +16,28 @@ public static class SalesPermissions
     public const string ViewCustomerPrescriptionContext = "sales.customer_prescription_context.view";
     public const string ViewStockAvailability = "sales.stock_availability.view";
 
+
+    public static class Checkout
+    {
+        public const string Create = "sales.checkout.create";
+        public const string Confirm = "sales.checkout.confirm";
+        public const string Deliver = "sales.checkout.deliver";
+    }
+
+    public static class OrderOperations
+    {
+        public const string View = "sales.order_operations.view";
+        public const string ViewAll = "sales.order_operations.view_all";
+    }
+
+    public static class Credit
+    {
+        public const string Use = "sales.credit.use";
+    }
+
+    public const string ViewPrescription = "sales.prescription.view";
+    public const string UseManualOpticalMeasurements = "sales.optical_measurements.manual.use";
+
     public static class OpticalJobs
     {
         public const string View = "optical_jobs.view";

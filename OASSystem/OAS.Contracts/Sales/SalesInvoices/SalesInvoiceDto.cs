@@ -59,4 +59,10 @@ public sealed record SalesInvoiceDto(
     int? PrescriptionRevisionNumber = null,
     string? JournalEntryNumber = null,
     Guid? SalesEmployeeId = null,
-    string? SalesEmployeeName = null);
+    string? SalesEmployeeName = null)
+{
+    public SalesPaymentPlan PaymentPlan { get; init; } =
+        PaymentTermType == SalesPaymentTermType.Credit
+            ? SalesPaymentPlan.AccountCredit
+            : SalesPaymentPlan.FullNow;
+}

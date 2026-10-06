@@ -80,6 +80,22 @@ public sealed class Customer : AuditableEntity<Guid>
 
     public void SetActive(bool isActive) => IsActive = isActive;
 
+    public void EnsureCanUseAccountCredit(decimal currentCreditExposure, decimal newInvoiceAmount)
+    {
+        if (string.IsNullOrWhiteSpace(CustomerCode))
+            throw new DomainException("A registered customer code is required for account credit.");
+        if (!IsActive)
+            throw new DomainException("Inactive customers cannot use account credit.");
+        if (!IsCreditAllowed)
+            throw new DomainException("Account credit is not allowed for this customer.");
+        if (currentCreditExposure < 0)
+            throw new DomainException("Current credit exposure cannot be negative.");
+        if (newInvoiceAmount <= 0)
+            throw new DomainException("New invoice amount must be greater than zero for credit validation.");
+        if (currentCreditExposure + newInvoiceAmount > CreditLimit)
+            throw new DomainException("The transaction exceeds the customer's available credit limit.");
+    }
+
     private static string NormalizeRequired(string value, int max, string name)
     {
         if (string.IsNullOrWhiteSpace(value)) throw new DomainException($"{name} is required.");

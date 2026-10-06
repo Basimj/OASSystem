@@ -1,0 +1,49 @@
+@namespace OAS.UiLib.Components.Sales.Checkout
+
+<div class="ui-sales-checkout__payment-plans" dir="rtl">
+    @foreach (var option in Options)
+    {
+        <button type="button"
+                class="@(string.Equals(Value, option.Key, StringComparison.OrdinalIgnoreCase) ? "ui-sales-checkout__payment-plan is-active" : "ui-sales-checkout__payment-plan")"
+                disabled="@(Disabled || (option.Key == "AccountCredit" && !CreditAllowed))"
+                @onclick="() => SelectAsync(option.Key)">
+            <i class="@option.Icon" aria-hidden="true"></i>
+            <span>@option.Label</span>
+            <small>@option.Description</small>
+        </button>
+    }
+</div>
+@if (!CreditAllowed)
+{
+    <div class="ui-sales-flow__message is-info"><i class="fa-solid fa-circle-info"></i><span>البيع الآجل غير متاح لهذا العميل حاليًا؛ تحقق من تفعيل العميل، السماح الائتماني، والحد المتاح.</span></div>
+}
+@if (string.Equals(Value, "AccountCredit", StringComparison.OrdinalIgnoreCase))
+{
+    <div class="ui-sales-checkout__credit-panel">
+        <span>الحد الائتماني <strong>@CreditLimit.ToString("N2")</strong></span>
+        <span>التعرض الحالي <strong>@CurrentExposure.ToString("N2")</strong></span>
+        <span>المتاح <strong>@AvailableCredit.ToString("N2")</strong></span>
+        <span>مدة السداد <strong>@PaymentTermDays يوم</strong></span>
+    </div>
+}
+
+@code {
+    [Parameter] public string Value { get; set; } = "FullNow";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool CreditAllowed { get; set; }
+    [Parameter] public decimal CreditLimit { get; set; }
+    [Parameter] public decimal CurrentExposure { get; set; }
+    [Parameter] public decimal AvailableCredit { get; set; }
+    [Parameter] public int PaymentTermDays { get; set; }
+
+    private static readonly IReadOnlyList<(string Key,string Label,string Description,string Icon)> Options =
+    [
+        ("FullNow","دفع كامل الآن","تحصيل كامل قيمة الطلب الآن","fa-solid fa-circle-check"),
+        ("PartialNow","دفع جزئي الآن","تحصيل جزء والباقي عند التسليم","fa-solid fa-chart-pie"),
+        ("PayOnPickup","الدفع عند الاستلام","بدون تحصيل أولي","fa-solid fa-box-open"),
+        ("AccountCredit","بيع آجل","وفق الحد والسياسة الائتمانية للعميل","fa-solid fa-file-invoice")
+    ];
+
+    private Task SelectAsync(string key) => ValueChanged.InvokeAsync(key);
+}

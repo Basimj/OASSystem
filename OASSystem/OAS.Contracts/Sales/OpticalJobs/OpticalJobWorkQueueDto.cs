@@ -14,4 +14,12 @@ public sealed record OpticalJobWorkQueueDto(
     DateTimeOffset? StartedAtUtc,
     DateTimeOffset? CompletedAtUtc,
     string? Notes,
-    string RowVersion);
+    string RowVersion,
+    string? CustomerOrderCode = null,
+    string? CustomerCode = null,
+    string? CustomerName = null,
+    string? Mobile = null,
+    string? FrameSummary = null,
+    string? ODSummary = null,
+    string? OSSummary = null,
+    string? AssignedTechnicianName = null);

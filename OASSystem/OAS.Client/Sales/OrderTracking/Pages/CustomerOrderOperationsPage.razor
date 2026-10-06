@@ -1,0 +1,43 @@
+@page "/sales/order-tracking"
+@attribute [Authorize]
+@namespace OAS.Client.Sales.OrderTracking.Pages
+@using OAS.UiLib.Components.Sales.OrderTracking
+@using OAS.UiLib.Components.Sales.Checkout
+
+<UiCustomerOrderOperationsSurface Filter="@_filter"
+                                  Metrics="@_metrics"
+                                  Rows="@_rows"
+                                  Selected="@_selected"
+                                  IsBusy="@State.IsBusy"
+                                  ErrorText="@State.Error"
+                                  SearchWarehousesAsync="SearchWarehousesAsync"
+                                  SearchTechniciansAsync="SearchTechniciansAsync"
+                                  PageNumber="@State.Page.PageNumber"
+                                  TotalPages="@State.Page.TotalPages"
+                                  TotalCount="@State.Page.TotalCount"
+                                  OnApplyFilters="ApplyFiltersAsync"
+                                  OnClearFilters="ClearFiltersAsync"
+                                  OnTabSelected="TabSelectedAsync"
+                                  OnMetricSelected="MetricSelectedAsync"
+                                  OnOpen="OpenAsync"
+                                  OnCloseDetails="CloseDetailsAsync"
+                                  OnDeliver="OpenDeliveryAsync"
+                                  OnOpenSupply="OpenSupplyAsync"
+                                  OnOpenJob="OpenJobAsync"
+                                  OnPrevious="PreviousAsync"
+                                  OnNext="NextAsync" />
+
+@if (_delivery is not null)
+{
+    <UiDeliverySettlementDialog Model="@_delivery"
+                                IsBusy="@_deliveryBusy"
+                                ErrorText="@_deliveryError"
+                                SearchCurrenciesAsync="SearchCurrenciesAsync"
+                                SearchCashAccountsAsync="SearchCashAccountsAsync"
+                                SearchBankAccountsAsync="SearchBankAccountsAsync"
+                                SearchSettlementAccountsAsync="SearchSettlementAccountsAsync"
+                                OnAddPaymentLine="AddDeliveryPaymentAsync"
+                                OnRemovePaymentLine="RemoveDeliveryPaymentAsync"
+                                OnSubmit="DeliverAsync"
+                                OnClose="CloseDeliveryAsync" />
+}

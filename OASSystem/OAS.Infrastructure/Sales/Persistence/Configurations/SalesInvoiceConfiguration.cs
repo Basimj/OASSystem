@@ -38,6 +38,7 @@ public sealed class SalesInvoiceConfiguration : IEntityTypeConfiguration<SalesIn
         builder.Property(x => x.ExchangeRateType).IsRequired().HasConversion<byte>();
         builder.Property(x => x.ExchangeRateSource).IsRequired().HasConversion<byte>();
         builder.Property(x => x.TaxCalculationMode).IsRequired().HasConversion<byte>();
+        builder.Property(x => x.PaymentPlan).IsRequired().HasConversion<byte>();
         builder.Property(x => x.PaymentTermType).IsRequired().HasConversion<byte>();
         builder.Property(x => x.PaymentTermDaysSnapshot).IsRequired();
         builder.Property(x => x.DueDate).HasColumnType("date");
@@ -74,6 +75,7 @@ public sealed class SalesInvoiceConfiguration : IEntityTypeConfiguration<SalesIn
         builder.HasIndex(x => x.SalesEmployeeId).HasDatabaseName("IX_SalesInvoices_SalesEmployeeId");
         builder.HasIndex(x => x.CurrencyId).HasDatabaseName("IX_SalesInvoices_CurrencyId");
         builder.HasIndex(x => x.BaseCurrencyId).HasDatabaseName("IX_SalesInvoices_BaseCurrencyId");
+        builder.HasIndex(x => x.PaymentPlan).HasDatabaseName("IX_SalesInvoices_PaymentPlan");
 
         builder.HasOne<Customer>().WithMany().HasForeignKey(x => x.CustomerId)
             .OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_SalesInvoices_Customers_CustomerId");

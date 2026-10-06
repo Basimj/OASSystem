@@ -116,7 +116,8 @@ public sealed class OpticalJob : AuditableEntity<Guid>
 
     public void Start(DateTimeOffset atUtc)
     {
-        EnsureStatus(OpticalJobStatus.MaterialsIssued);
+        if (Status is not (OpticalJobStatus.MaterialsAvailable or OpticalJobStatus.MaterialsIssued))
+            throw new DomainException("Optical job can only start after all required materials are available.");
         Status = OpticalJobStatus.InProduction;
         StartedAtUtc = atUtc;
     }
@@ -135,7 +136,8 @@ public sealed class OpticalJob : AuditableEntity<Guid>
 
     public void MarkReadyForDelivery(DateTimeOffset completedAtUtc)
     {
-        EnsureStatus(OpticalJobStatus.QCPassed);
+        if (Status is not (OpticalJobStatus.InProduction or OpticalJobStatus.QCPassed))
+            throw new DomainException("Optical job can only become ready for delivery from production or after quality control passes.");
         Status = OpticalJobStatus.ReadyForDelivery;
         CompletedAtUtc = completedAtUtc;
     }

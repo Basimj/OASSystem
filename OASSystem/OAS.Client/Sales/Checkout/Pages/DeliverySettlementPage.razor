@@ -1,0 +1,15 @@
+@page "/sales/delivery/{OrderId:guid}"
+@attribute [Authorize]
+@namespace OAS.Client.Sales.Checkout.Pages
+@using OAS.UiLib.Components.Sales.Checkout
+
+<UiDeliverySettlementSurface Model="@_model"
+                             IsBusy="@_busy"
+                             ErrorText="@_error"
+                             SuccessText="@_success"
+                             SearchCurrenciesAsync="SearchCurrenciesAsync"
+                             SearchCashAccountsAsync="SearchCashAccountsAsync"
+                             SearchBankAccountsAsync="SearchBankAccountsAsync"
+                             SearchSettlementAccountsAsync="SearchSettlementAccountsAsync"
+                             OnDeliver="DeliverAsync"
+                             OnChanged="ModelChangedAsync" />

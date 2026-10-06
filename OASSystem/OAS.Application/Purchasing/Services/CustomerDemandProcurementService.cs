@@ -27,12 +27,24 @@ public sealed class CustomerDemandProcurementService(
         PurchaseRequestStatus.Converted
     ];
 
-    private static readonly PurchaseRequestStatus[] OpenStatuses =
+    private static readonly PurchaseRequestStatus[] EditableStatuses =
     [
         PurchaseRequestStatus.Draft,
         PurchaseRequestStatus.PendingApproval,
         PurchaseRequestStatus.Approved,
         PurchaseRequestStatus.PartiallyConverted
+    ];
+
+    // A fully converted CustomerDemand is still operationally open until the supplier
+    // receipts satisfy the customer shortage. Keep it visible to Checkout/operations
+    // results even though supplier reassignment must no longer overwrite its history.
+    private static readonly PurchaseRequestStatus[] TrackingStatuses =
+    [
+        PurchaseRequestStatus.Draft,
+        PurchaseRequestStatus.PendingApproval,
+        PurchaseRequestStatus.Approved,
+        PurchaseRequestStatus.PartiallyConverted,
+        PurchaseRequestStatus.Converted
     ];
 
     public async Task CreateOrUpdateShortageAsync(
@@ -168,7 +180,7 @@ public sealed class CustomerDemandProcurementService(
             new Specification<PurchaseRequest>().Where(x =>
                 x.RequestType == PurchaseRequestType.CustomerDemand &&
                 x.CustomerOrderId == customerOrderId &&
-                OpenStatuses.Contains(x.Status)),
+                TrackingStatuses.Contains(x.Status)),
             cancellationToken);
 
         if (headers.Count == 0)
@@ -210,7 +222,7 @@ public sealed class CustomerDemandProcurementService(
         foreach (var line in matching)
         {
             var parent = await requests.GetByLineIdAsync(line.Id, cancellationToken);
-            if (parent is not null && parent.RequestType == PurchaseRequestType.CustomerDemand && OpenStatuses.Contains(parent.Status))
+            if (parent is not null && parent.RequestType == PurchaseRequestType.CustomerDemand && EditableStatuses.Contains(parent.Status))
                 open.Add(parent.Lines.SingleOrDefault(x => x.Id == line.Id) ?? line);
         }
 
