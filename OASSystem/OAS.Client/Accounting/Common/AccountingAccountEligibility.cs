@@ -20,7 +20,10 @@ public enum AccountingAccountEligibilityContext
     SalesRevenue = 12,
     Inventory = 13,
     CostOfGoodsSold = 14,
-    RetainedEarnings = 15
+    RetainedEarnings = 15,
+    GoodsReceivedNotInvoiced = 16,
+    PurchaseTax = 17,
+    PurchasePriceVariance = 18
 }
 
 public sealed record AccountingAccountEligibilityResult(
@@ -63,6 +66,9 @@ public static class AccountingAccountEligibility
             AccountingAccountEligibilityContext.Inventory => EvaluateInventory(account),
             AccountingAccountEligibilityContext.CostOfGoodsSold => EvaluateCostOfGoodsSold(account),
             AccountingAccountEligibilityContext.RetainedEarnings => EvaluateRetainedEarnings(account),
+            AccountingAccountEligibilityContext.GoodsReceivedNotInvoiced => EvaluateGrni(account),
+            AccountingAccountEligibilityContext.PurchaseTax => EvaluatePurchaseTax(account),
+            AccountingAccountEligibilityContext.PurchasePriceVariance => EvaluatePurchasePriceVariance(account),
             _ => AccountingAccountEligibilityResult.Eligible
         };
     }
@@ -110,6 +116,39 @@ public static class AccountingAccountEligibility
         if (account.NormalBalance != NormalBalance.Debit)
             return Invalid("cogs_wrong_balance", "يجب أن تكون طبيعة حساب تكلفة البضاعة المباعة مدينة.");
 
+        return AccountingAccountEligibilityResult.Eligible;
+    }
+
+    private static AccountingAccountEligibilityResult EvaluateGrni(AccountDto account)
+    {
+        var posting = EvaluateAutomaticPosting(account);
+        if (!posting.IsEligible) return posting;
+        if (account.AccountClass != AccountClass.Liability)
+            return Invalid("grni_wrong_class", "يجب أن يكون حساب بضاعة مستلمة غير مفوترة من حسابات الالتزامات.");
+        if (account.NormalBalance != NormalBalance.Credit)
+            return Invalid("grni_wrong_balance", "يجب أن تكون طبيعة حساب بضاعة مستلمة غير مفوترة دائنة.");
+        return AccountingAccountEligibilityResult.Eligible;
+    }
+
+    private static AccountingAccountEligibilityResult EvaluatePurchaseTax(AccountDto account)
+    {
+        var posting = EvaluateAutomaticPosting(account);
+        if (!posting.IsEligible) return posting;
+        if (account.AccountClass != AccountClass.Asset)
+            return Invalid("purchase_tax_wrong_class", "يجب أن يكون حساب ضريبة المشتريات من حسابات الأصول.");
+        if (account.NormalBalance != NormalBalance.Debit)
+            return Invalid("purchase_tax_wrong_balance", "يجب أن تكون طبيعة حساب ضريبة المشتريات مدينة.");
+        return AccountingAccountEligibilityResult.Eligible;
+    }
+
+    private static AccountingAccountEligibilityResult EvaluatePurchasePriceVariance(AccountDto account)
+    {
+        var posting = EvaluateAutomaticPosting(account);
+        if (!posting.IsEligible) return posting;
+        if (account.AccountClass != AccountClass.Expense)
+            return Invalid("purchase_price_variance_wrong_class", "يجب أن يكون حساب فرق سعر المشتريات من حسابات المصروفات.");
+        if (account.NormalBalance != NormalBalance.Debit)
+            return Invalid("purchase_price_variance_wrong_balance", "يجب أن تكون طبيعة حساب فرق سعر المشتريات مدينة.");
         return AccountingAccountEligibilityResult.Eligible;
     }
 

@@ -23,6 +23,12 @@ public sealed class UpdateAccountingSettingsCommandHandler(
     private const string TaxPayableRole = "TaxPayable";
     private const string InventoryRole = "Inventory";
     private const string CogsRole = "COGS";
+    private const string PurchasingModule = "Purchasing";
+    private const string PurchaseReceiptDocumentType = "PurchaseReceipt";
+    private const string PurchaseInvoiceDocumentType = "PurchaseInvoice";
+    private const string GrniRole = "GoodsReceivedNotInvoiced";
+    private const string PurchaseTaxRole = "PurchaseTax";
+    private const string PurchasePriceVarianceRole = "PurchasePriceVariance";
 
     public async Task Handle(
         UpdateAccountingSettingsCommand request,
@@ -53,6 +59,10 @@ public sealed class UpdateAccountingSettingsCommandHandler(
         await ValidateTaxPayableAsync(data.TaxPayableAccountId, cancellationToken);
         await ValidateInventoryAsync(data.InventoryAccountId, cancellationToken);
         await ValidateCogsAsync(data.CogsAccountId, cancellationToken);
+        ValidatePurchasingSettingsCompleteness(data);
+        await ValidateGrniAsync(data.GrniAccountId, cancellationToken);
+        await ValidatePurchaseTaxAsync(data.PurchaseTaxAccountId, cancellationToken);
+        await ValidatePurchasePriceVarianceAsync(data.PurchasePriceVarianceAccountId, cancellationToken);
 
         var entity = await repository.GetForUpdateAsync(
             AccountingSettings.SingletonId,
@@ -68,7 +78,11 @@ public sealed class UpdateAccountingSettingsCommandHandler(
                 data.ExchangeGainAccountId,
                 data.ExchangeLossAccountId,
                 (DomainRateType)(byte)data.DefaultExchangeRateType,
-                data.RetainedEarningsAccountId);
+                data.RetainedEarningsAccountId,
+                data.GrniAccountId,
+                data.PurchaseTaxAccountId,
+                data.PurchasePriceVarianceAccountId,
+                data.InventoryAccountId);
 
             await repository.AddAsync(entity, cancellationToken);
         }
@@ -111,7 +125,11 @@ public sealed class UpdateAccountingSettingsCommandHandler(
                 data.ExchangeGainAccountId,
                 data.ExchangeLossAccountId,
                 (DomainRateType)(byte)data.DefaultExchangeRateType,
-                data.RetainedEarningsAccountId);
+                data.RetainedEarningsAccountId,
+                data.GrniAccountId,
+                data.PurchaseTaxAccountId,
+                data.PurchasePriceVarianceAccountId,
+                data.InventoryAccountId);
 
             repository.Update(entity);
         }
@@ -122,11 +140,23 @@ public sealed class UpdateAccountingSettingsCommandHandler(
             data.InventoryAccountId,
             data.CogsAccountId,
             cancellationToken);
+
+        await UpsertPurchasingProfilesAsync(
+            data.InventoryAccountId,
+            data.GrniAccountId,
+            data.PurchaseTaxAccountId,
+            data.PurchasePriceVarianceAccountId,
+            cancellationToken);
     }
 
     private static void ValidateSalesInvoiceSettingsCompleteness(
         OAS.Contracts.Accounting.Settings.UpdateAccountingSettingsRequest data)
     {
+        var hasSalesSpecificAccount =
+            data.SalesRevenueAccountId.HasValue ||
+            data.TaxPayableAccountId.HasValue ||
+            data.CogsAccountId.HasValue;
+
         var configured = new[]
         {
             data.SalesRevenueAccountId,
@@ -135,7 +165,7 @@ public sealed class UpdateAccountingSettingsCommandHandler(
             data.CogsAccountId
         };
 
-        if (configured.Any(x => x.HasValue) && configured.Any(x => !x.HasValue))
+        if (hasSalesSpecificAccount && configured.Any(x => !x.HasValue))
         {
             throw new ConflictException(
                 "sales_invoice_posting_accounts_incomplete",
@@ -265,6 +295,53 @@ public sealed class UpdateAccountingSettingsCommandHandler(
         }
     }
 
+    private static void ValidatePurchasingSettingsCompleteness(
+        OAS.Contracts.Accounting.Settings.UpdateAccountingSettingsRequest data)
+    {
+        // Purchase receipt posting only requires Inventory + GRNI.
+        // Purchase Tax and Purchase Price Variance are conditional invoice roles and
+        // should not block receipt posting when they are not used yet.
+        var hasReceiptAccount = data.InventoryAccountId.HasValue || data.GrniAccountId.HasValue;
+        if (hasReceiptAccount && (!data.InventoryAccountId.HasValue || !data.GrniAccountId.HasValue))
+        {
+            throw new ConflictException(
+                "purchasing_receipt_posting_accounts_incomplete",
+                "لترحيل استلامات المشتريات يجب تحديد حساب المخزون وحساب بضاعة مستلمة غير مفوترة (GRNI).");
+        }
+
+        if ((data.PurchaseTaxAccountId.HasValue || data.PurchasePriceVarianceAccountId.HasValue) &&
+            !data.GrniAccountId.HasValue)
+        {
+            throw new ConflictException(
+                "purchasing_invoice_posting_accounts_incomplete",
+                "قبل إعداد ضريبة المشتريات أو فرق سعر المشتريات يجب تحديد حساب بضاعة مستلمة غير مفوترة (GRNI).");
+        }
+    }
+
+    private async Task ValidateGrniAsync(Guid? id, CancellationToken cancellationToken)
+    {
+        if (!id.HasValue) return;
+        var account = await accounts.GetByIdAsync(id.Value, cancellationToken) ?? throw new NotFoundException(nameof(Account), id.Value);
+        if (!account.CanReceivePosting() || account.AccountClass != AccountClass.Liability || account.NormalBalance != NormalBalance.Credit)
+            throw new ConflictException("grni_account_invalid", "حساب بضاعة مستلمة غير مفوترة يجب أن يكون التزامًا نشطًا، دائنًا، وقابلًا للترحيل.");
+    }
+
+    private async Task ValidatePurchaseTaxAsync(Guid? id, CancellationToken cancellationToken)
+    {
+        if (!id.HasValue) return;
+        var account = await accounts.GetByIdAsync(id.Value, cancellationToken) ?? throw new NotFoundException(nameof(Account), id.Value);
+        if (!account.CanReceivePosting() || account.AccountClass != AccountClass.Asset || account.NormalBalance != NormalBalance.Debit)
+            throw new ConflictException("purchase_tax_account_invalid", "حساب ضريبة المشتريات يجب أن يكون أصلًا نشطًا، مدينًا، وقابلًا للترحيل.");
+    }
+
+    private async Task ValidatePurchasePriceVarianceAsync(Guid? id, CancellationToken cancellationToken)
+    {
+        if (!id.HasValue) return;
+        var account = await accounts.GetByIdAsync(id.Value, cancellationToken) ?? throw new NotFoundException(nameof(Account), id.Value);
+        if (!account.CanReceivePosting() || account.AccountClass != AccountClass.Expense || account.NormalBalance != NormalBalance.Debit)
+            throw new ConflictException("purchase_price_variance_account_invalid", "حساب فرق سعر المشتريات يجب أن يكون مصروفًا نشطًا، مدينًا، وقابلًا للترحيل.");
+    }
+
     private async Task ValidateRetainedEarningsAsync(
         Guid? id,
         CancellationToken cancellationToken)
@@ -312,7 +389,6 @@ public sealed class UpdateAccountingSettingsCommandHandler(
         var hasAnyConfiguredAccount =
             salesRevenueAccountId.HasValue ||
             taxPayableAccountId.HasValue ||
-            inventoryAccountId.HasValue ||
             cogsAccountId.HasValue;
 
         if (profile is null)
@@ -331,6 +407,68 @@ public sealed class UpdateAccountingSettingsCommandHandler(
         await UpsertRoleAsync(profile.Id, TaxPayableRole, taxPayableAccountId, cancellationToken);
         await UpsertRoleAsync(profile.Id, InventoryRole, inventoryAccountId, cancellationToken);
         await UpsertRoleAsync(profile.Id, CogsRole, cogsAccountId, cancellationToken);
+    }
+
+    private async Task UpsertPurchasingProfilesAsync(
+        Guid? inventoryAccountId,
+        Guid? grniAccountId,
+        Guid? purchaseTaxAccountId,
+        Guid? purchasePriceVarianceAccountId,
+        CancellationToken cancellationToken)
+    {
+        // Receipt posting is independent from invoice-only roles.
+        if (inventoryAccountId.HasValue && grniAccountId.HasValue)
+        {
+            var receipt = await EnsurePurchasingProfileAsync(
+                "PURCHASE-RECEIPT",
+                "ترحيل استلام المشتريات",
+                PurchaseReceiptDocumentType,
+                cancellationToken);
+
+            await UpsertRoleAsync(receipt.Id, InventoryRole, inventoryAccountId, cancellationToken);
+            await UpsertRoleAsync(receipt.Id, GrniRole, grniAccountId, cancellationToken);
+        }
+
+        // Invoice posting always needs GRNI. Tax/PPV roles are conditional and are
+        // only required by the posting service when the corresponding amount is non-zero.
+        if (grniAccountId.HasValue)
+        {
+            var invoice = await EnsurePurchasingProfileAsync(
+                "PURCHASE-INVOICE",
+                "ترحيل فاتورة المورد",
+                PurchaseInvoiceDocumentType,
+                cancellationToken);
+
+            await UpsertRoleAsync(invoice.Id, GrniRole, grniAccountId, cancellationToken);
+            await UpsertRoleAsync(invoice.Id, PurchaseTaxRole, purchaseTaxAccountId, cancellationToken);
+            await UpsertRoleAsync(invoice.Id, PurchasePriceVarianceRole, purchasePriceVarianceAccountId, cancellationToken);
+        }
+    }
+
+    private async Task<PostingProfile> EnsurePurchasingProfileAsync(
+        string code, string name, string documentType, CancellationToken cancellationToken)
+    {
+        var profiles = await postingProfiles.ListAsync(
+            new Specification<PostingProfile>().Where(x => x.Module == PurchasingModule && x.DocumentType == documentType).Tracking(),
+            cancellationToken);
+
+        var active = profiles.Where(x => x.IsActive).ToList();
+        if (active.Count > 1)
+            throw new ConflictException("purchasing_posting_profile_duplicate", $"يوجد أكثر من ملف ترحيل فعال للمستند {documentType}.");
+
+        var profile = active.SingleOrDefault() ?? profiles.FirstOrDefault();
+        if (profile is null)
+        {
+            profile = PostingProfile.Create(Guid.NewGuid(), code, name, PurchasingModule, documentType, true);
+            await postingProfiles.AddAsync(profile, cancellationToken);
+        }
+        else if (!profile.IsActive)
+        {
+            profile.SetActive(true);
+            postingProfiles.Update(profile);
+        }
+
+        return profile;
     }
 
     private async Task UpsertRoleAsync(

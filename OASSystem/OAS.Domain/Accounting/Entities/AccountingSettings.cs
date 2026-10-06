@@ -8,10 +8,35 @@ public sealed class AccountingSettings : AuditableEntity<Guid>
     public static readonly Guid SingletonId = Guid.Parse("9d171de8-4a54-49f8-8f0d-01b942b7795d");
 
     private AccountingSettings() { }
-    private AccountingSettings(Guid baseCurrencyId, Guid? employeeParentAccountId, Guid? cashParentAccountId, Guid? bankParentAccountId, Guid? exchangeGainAccountId, Guid? exchangeLossAccountId, ExchangeRateType defaultExchangeRateType, Guid? retainedEarningsAccountId)
+
+    private AccountingSettings(
+        Guid baseCurrencyId,
+        Guid? employeeParentAccountId,
+        Guid? cashParentAccountId,
+        Guid? bankParentAccountId,
+        Guid? exchangeGainAccountId,
+        Guid? exchangeLossAccountId,
+        ExchangeRateType defaultExchangeRateType,
+        Guid? retainedEarningsAccountId,
+        Guid? grniAccountId,
+        Guid? purchaseTaxAccountId,
+        Guid? purchasePriceVarianceAccountId,
+        Guid? inventoryAccountId)
     {
         Id = SingletonId;
-        Apply(baseCurrencyId, employeeParentAccountId, cashParentAccountId, bankParentAccountId, exchangeGainAccountId, exchangeLossAccountId, defaultExchangeRateType, retainedEarningsAccountId);
+        Apply(
+            baseCurrencyId,
+            employeeParentAccountId,
+            cashParentAccountId,
+            bankParentAccountId,
+            exchangeGainAccountId,
+            exchangeLossAccountId,
+            defaultExchangeRateType,
+            retainedEarningsAccountId,
+            grniAccountId,
+            purchaseTaxAccountId,
+            purchasePriceVarianceAccountId,
+            inventoryAccountId);
     }
 
     public Guid BaseCurrencyId { get; private set; }
@@ -21,18 +46,84 @@ public sealed class AccountingSettings : AuditableEntity<Guid>
     public Guid? ExchangeGainAccountId { get; private set; }
     public Guid? ExchangeLossAccountId { get; private set; }
     public Guid? RetainedEarningsAccountId { get; private set; }
+    public Guid? InventoryAccountId { get; private set; }
+    public Guid? GrniAccountId { get; private set; }
+    public Guid? PurchaseTaxAccountId { get; private set; }
+    public Guid? PurchasePriceVarianceAccountId { get; private set; }
     public ExchangeRateType DefaultExchangeRateType { get; private set; } = ExchangeRateType.Accounting;
     public byte[] RowVersion { get; private set; } = [];
 
-    public static AccountingSettings Create(Guid baseCurrencyId, Guid? employeeParentAccountId = null, Guid? cashParentAccountId = null, Guid? bankParentAccountId = null, Guid? exchangeGainAccountId = null, Guid? exchangeLossAccountId = null, ExchangeRateType defaultExchangeRateType = ExchangeRateType.Accounting, Guid? retainedEarningsAccountId = null)
-        => new(baseCurrencyId, employeeParentAccountId, cashParentAccountId, bankParentAccountId, exchangeGainAccountId, exchangeLossAccountId, defaultExchangeRateType, retainedEarningsAccountId);
+    public static AccountingSettings Create(
+        Guid baseCurrencyId,
+        Guid? employeeParentAccountId = null,
+        Guid? cashParentAccountId = null,
+        Guid? bankParentAccountId = null,
+        Guid? exchangeGainAccountId = null,
+        Guid? exchangeLossAccountId = null,
+        ExchangeRateType defaultExchangeRateType = ExchangeRateType.Accounting,
+        Guid? retainedEarningsAccountId = null,
+        Guid? grniAccountId = null,
+        Guid? purchaseTaxAccountId = null,
+        Guid? purchasePriceVarianceAccountId = null,
+        Guid? inventoryAccountId = null)
+        => new(
+            baseCurrencyId,
+            employeeParentAccountId,
+            cashParentAccountId,
+            bankParentAccountId,
+            exchangeGainAccountId,
+            exchangeLossAccountId,
+            defaultExchangeRateType,
+            retainedEarningsAccountId,
+            grniAccountId,
+            purchaseTaxAccountId,
+            purchasePriceVarianceAccountId,
+            inventoryAccountId);
 
-    public void Update(Guid baseCurrencyId, Guid? employeeParentAccountId, Guid? cashParentAccountId, Guid? bankParentAccountId, Guid? exchangeGainAccountId, Guid? exchangeLossAccountId, ExchangeRateType defaultExchangeRateType, Guid? retainedEarningsAccountId = null)
-        => Apply(baseCurrencyId, employeeParentAccountId, cashParentAccountId, bankParentAccountId, exchangeGainAccountId, exchangeLossAccountId, defaultExchangeRateType, retainedEarningsAccountId);
+    public void Update(
+        Guid baseCurrencyId,
+        Guid? employeeParentAccountId,
+        Guid? cashParentAccountId,
+        Guid? bankParentAccountId,
+        Guid? exchangeGainAccountId,
+        Guid? exchangeLossAccountId,
+        ExchangeRateType defaultExchangeRateType,
+        Guid? retainedEarningsAccountId = null,
+        Guid? grniAccountId = null,
+        Guid? purchaseTaxAccountId = null,
+        Guid? purchasePriceVarianceAccountId = null,
+        Guid? inventoryAccountId = null)
+        => Apply(
+            baseCurrencyId,
+            employeeParentAccountId,
+            cashParentAccountId,
+            bankParentAccountId,
+            exchangeGainAccountId,
+            exchangeLossAccountId,
+            defaultExchangeRateType,
+            retainedEarningsAccountId,
+            grniAccountId,
+            purchaseTaxAccountId,
+            purchasePriceVarianceAccountId,
+            inventoryAccountId);
 
-    private void Apply(Guid baseCurrencyId, Guid? employeeParentAccountId, Guid? cashParentAccountId, Guid? bankParentAccountId, Guid? exchangeGainAccountId, Guid? exchangeLossAccountId, ExchangeRateType defaultExchangeRateType, Guid? retainedEarningsAccountId)
+    private void Apply(
+        Guid baseCurrencyId,
+        Guid? employeeParentAccountId,
+        Guid? cashParentAccountId,
+        Guid? bankParentAccountId,
+        Guid? exchangeGainAccountId,
+        Guid? exchangeLossAccountId,
+        ExchangeRateType defaultExchangeRateType,
+        Guid? retainedEarningsAccountId,
+        Guid? grniAccountId,
+        Guid? purchaseTaxAccountId,
+        Guid? purchasePriceVarianceAccountId,
+        Guid? inventoryAccountId)
     {
-        if (baseCurrencyId == Guid.Empty) throw new ArgumentException("Base currency is required.", nameof(baseCurrencyId));
+        if (baseCurrencyId == Guid.Empty)
+            throw new ArgumentException("Base currency is required.", nameof(baseCurrencyId));
+
         BaseCurrencyId = baseCurrencyId;
         EmployeeParentAccountId = Normalize(employeeParentAccountId);
         CashParentAccountId = Normalize(cashParentAccountId);
@@ -40,6 +131,10 @@ public sealed class AccountingSettings : AuditableEntity<Guid>
         ExchangeGainAccountId = Normalize(exchangeGainAccountId);
         ExchangeLossAccountId = Normalize(exchangeLossAccountId);
         RetainedEarningsAccountId = Normalize(retainedEarningsAccountId);
+        InventoryAccountId = Normalize(inventoryAccountId);
+        GrniAccountId = Normalize(grniAccountId);
+        PurchaseTaxAccountId = Normalize(purchaseTaxAccountId);
+        PurchasePriceVarianceAccountId = Normalize(purchasePriceVarianceAccountId);
         DefaultExchangeRateType = defaultExchangeRateType;
     }
 

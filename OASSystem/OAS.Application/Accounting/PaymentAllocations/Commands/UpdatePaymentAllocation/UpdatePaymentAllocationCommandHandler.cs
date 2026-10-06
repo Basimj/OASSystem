@@ -10,8 +10,11 @@ namespace OAS.Application.Accounting.PaymentAllocations.Commands.UpdatePaymentAl
 public sealed class UpdatePaymentAllocationCommandHandler(
     IRepository<PaymentAllocation, Guid> repository,
     IReadRepository<ReceiptVoucherLine, Guid> receiptLines,
+    IReadRepository<ReceiptVoucher, Guid> receiptVouchers,
     IReadRepository<PaymentVoucherLine, Guid> paymentLines,
-    IEnumerable<IPaymentAllocationTargetValidator> targetValidators) : IRequestHandler<UpdatePaymentAllocationCommand>
+    IReadRepository<PaymentVoucher, Guid> paymentVouchers,
+    IEnumerable<IPaymentAllocationTargetValidator> targetValidators,
+    IEnumerable<IPaymentAllocationSourceTargetValidator> sourceTargetValidators) : IRequestHandler<UpdatePaymentAllocationCommand>
 {
     public async Task Handle(UpdatePaymentAllocationCommand request, CancellationToken ct)
     {
@@ -21,7 +24,8 @@ public sealed class UpdatePaymentAllocationCommandHandler(
         if (!allocation.ReceiptVoucherLineId.HasValue && !allocation.PaymentVoucherLineId.HasValue)
             throw new ConflictException("legacy_allocation_readonly", "Legacy payment allocations must be migrated before they can be edited.");
 
-        var sourceAmount = await GetSourceAmountAsync(allocation, ct);
+        var source = await GetSourceAsync(allocation, ct);
+        var sourceAmount = source.Amount;
         var existing = await repository.ListAsync(new Specification<PaymentAllocation>().Where(x =>
             allocation.ReceiptVoucherLineId.HasValue ? x.ReceiptVoucherLineId == allocation.ReceiptVoucherLineId : x.PaymentVoucherLineId == allocation.PaymentVoucherLineId), ct);
         var available = sourceAmount - existing.Where(x => x.Id != allocation.Id).Sum(x => x.AllocatedAmount);
@@ -30,6 +34,10 @@ public sealed class UpdatePaymentAllocationCommandHandler(
 
         var rate = allocation.ExchangeRate ?? 1m;
         var sourceBaseAmount = Math.Round(request.Data.AllocatedAmount * rate, 4, MidpointRounding.AwayFromZero);
+        var sourceTargetValidator = sourceTargetValidators.SingleOrDefault(x => x.TargetDocumentType == allocation.TargetDocumentType);
+        if (sourceTargetValidator is not null)
+            await sourceTargetValidator.ValidateSourceAsync(allocation.TargetDocumentId, source.Context, ct);
+
         var targetBaseAmount = sourceBaseAmount;
         var validator = targetValidators.SingleOrDefault(x => x.TargetDocumentType == allocation.TargetDocumentType);
         if (validator is not null && allocation.CurrencyId.HasValue)
@@ -47,10 +55,42 @@ public sealed class UpdatePaymentAllocationCommandHandler(
         repository.Update(allocation);
     }
 
-    private async Task<decimal> GetSourceAmountAsync(PaymentAllocation a, CancellationToken ct)
+    private async Task<SourceInfo> GetSourceAsync(PaymentAllocation allocation, CancellationToken ct)
     {
-        if (a.ReceiptVoucherLineId is Guid rid) return (await receiptLines.GetByIdAsync(rid, ct) ?? throw new NotFoundException(nameof(ReceiptVoucherLine), rid)).Amount;
-        if (a.PaymentVoucherLineId is Guid pid) return (await paymentLines.GetByIdAsync(pid, ct) ?? throw new NotFoundException(nameof(PaymentVoucherLine), pid)).Amount;
+        if (allocation.ReceiptVoucherLineId is Guid rid)
+        {
+            var line = await receiptLines.GetByIdAsync(rid, ct) ?? throw new NotFoundException(nameof(ReceiptVoucherLine), rid);
+            var voucher = await receiptVouchers.GetByIdAsync(line.ReceiptVoucherId, ct) ?? throw new NotFoundException(nameof(ReceiptVoucher), line.ReceiptVoucherId);
+            if (voucher.Status != OAS.Domain.Accounting.Enums.ReceiptVoucherStatus.Posted)
+                throw new ConflictException("payment_allocation_receipt_not_posted", "لا يمكن تعديل تخصيص مرتبط بسند قبض غير مرحل.");
+            return new SourceInfo(
+                line.Amount,
+                new PaymentAllocationSourceContext(
+                    OAS.Domain.Accounting.Enums.PaymentSourceType.ReceiptVoucher,
+                    line.PartyType,
+                    line.CustomerId,
+                    line.SupplierId,
+                    line.EmployeeId));
+        }
+
+        if (allocation.PaymentVoucherLineId is Guid pid)
+        {
+            var line = await paymentLines.GetByIdAsync(pid, ct) ?? throw new NotFoundException(nameof(PaymentVoucherLine), pid);
+            var voucher = await paymentVouchers.GetByIdAsync(line.PaymentVoucherId, ct) ?? throw new NotFoundException(nameof(PaymentVoucher), line.PaymentVoucherId);
+            if (voucher.Status != OAS.Domain.Accounting.Enums.PaymentVoucherStatus.Posted)
+                throw new ConflictException("payment_allocation_payment_not_posted", "لا يمكن تعديل تخصيص مرتبط بسند صرف غير مرحل.");
+            return new SourceInfo(
+                line.Amount,
+                new PaymentAllocationSourceContext(
+                    OAS.Domain.Accounting.Enums.PaymentSourceType.PaymentVoucher,
+                    line.PartyType,
+                    line.CustomerId,
+                    line.SupplierId,
+                    line.EmployeeId));
+        }
+
         throw new ConflictException("payment_source_line_required", "Payment source line is missing.");
     }
+
+    private sealed record SourceInfo(decimal Amount, PaymentAllocationSourceContext Context);
 }

@@ -62,6 +62,7 @@ public static class DependencyInjection
         services.TryAddScoped<ICurrentUser, AnonymousCurrentUser>();
         services.TryAddScoped<IPermissionChecker, DenyAllPermissionChecker>();
         services.TryAddScoped<IAccountingDocumentPostingService, AccountingDocumentPostingService>();
+        services.TryAddScoped<IProfileAccountingPostingService, ProfileAccountingPostingService>();
         services.TryAddScoped<IFiscalYearClosingService, FiscalYearClosingService>();
         services.TryAddScoped<IPartyAccountProvisioningService, PartyAccountProvisioningService>();
         services.TryAddScoped<IManagedAccountGuard, ManagedAccountGuard>();

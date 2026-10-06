@@ -147,4 +147,46 @@ public sealed class PurchasingDomainWorkflowTests
         Assert.That(invoice.JournalEntryId, Is.EqualTo(journalId));
         Assert.That(invoice.TotalAmount, Is.EqualTo(100m));
     }
+
+    [Test]
+    public void PurchaseRequest_PartiallyConverted_Cancel_CancelsOnlyRemainingWorkflow()
+    {
+        var request = PurchaseRequest.Create(
+            Guid.NewGuid(), "PR-TEST-PARTIAL", PurchaseRequestType.Replenishment, Guid.NewGuid(), null,
+            new DateOnly(2026, 10, 5), null, null, null, "requester");
+        request.AddLine(PurchaseRequestLine.Create(Guid.NewGuid(), request.Id, 1, Guid.NewGuid(), 10m));
+        request.Submit(DateTimeOffset.UtcNow, "requester");
+        request.Approve(DateTimeOffset.UtcNow, "approver");
+        request.MarkConversion(4m, 10m);
+
+        Assert.That(request.Status, Is.EqualTo(PurchaseRequestStatus.PartiallyConverted));
+
+        request.Cancel(DateTimeOffset.UtcNow, "requester", "Cancel remaining quantity");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(request.Status, Is.EqualTo(PurchaseRequestStatus.Cancelled));
+            Assert.That(request.CancellationReason, Is.EqualTo("Cancel remaining quantity"));
+        });
+    }
+
+    [Test]
+    public void PurchaseOrder_FullyReceived_RemainsSeparateFromClosed()
+    {
+        var order = PurchaseOrder.Create(Guid.NewGuid(), "PO-TEST-FULL", Guid.NewGuid(), Guid.NewGuid(),
+            new DateOnly(2026, 10, 5), null, Guid.NewGuid(), 1m, new DateOnly(2026, 10, 5),
+            TaxCalculationMode.Exclusive, 0, null);
+        order.AddLine(PurchaseOrderLine.Create(Guid.NewGuid(), order.Id, 1, Guid.NewGuid(), null, Guid.NewGuid(), 1m,
+            "P-1", "Product", "Each", 1m, 10m, 0m, 0m, TaxCalculationMode.Exclusive, null, null));
+        order.Submit(DateTimeOffset.UtcNow, "user");
+        order.Approve(DateTimeOffset.UtcNow, "approver");
+        order.Send(DateTimeOffset.UtcNow, "sender");
+        order.MarkReceived(true);
+
+        Assert.That(order.Status, Is.EqualTo(PurchaseOrderStatus.FullyReceived));
+        Assert.That(order.Status, Is.Not.EqualTo(PurchaseOrderStatus.Closed));
+
+        order.Close(DateTimeOffset.UtcNow, "closer");
+        Assert.That(order.Status, Is.EqualTo(PurchaseOrderStatus.Closed));
+    }
 }

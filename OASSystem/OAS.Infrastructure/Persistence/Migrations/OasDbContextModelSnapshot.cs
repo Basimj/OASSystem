@@ -996,12 +996,20 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<Guid?>("ExchangeGainAccountId").HasColumnType("uniqueidentifier");
             b.Property<Guid?>("ExchangeLossAccountId").HasColumnType("uniqueidentifier");
             b.Property<Guid?>("RetainedEarningsAccountId").HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("InventoryAccountId").HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("GrniAccountId").HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("PurchaseTaxAccountId").HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("PurchasePriceVarianceAccountId").HasColumnType("uniqueidentifier");
             b.Property<byte>("DefaultExchangeRateType").IsRequired().HasColumnType("tinyint");
             b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
             b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
             b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("UpdatedFromDevice");
             b.HasKey("Id");
             b.HasIndex("RetainedEarningsAccountId");
+            b.HasIndex("InventoryAccountId");
+            b.HasIndex("GrniAccountId");
+            b.HasIndex("PurchaseTaxAccountId");
+            b.HasIndex("PurchasePriceVarianceAccountId");
             b.ToTable("tbl_AccountingSettings", "dbo");
         });
 
@@ -1437,7 +1445,7 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
                 t.HasCheckConstraint("CK_PaymentAllocations_BaseAmount_Positive", "[BaseAllocatedAmount] IS NULL OR [BaseAllocatedAmount] > 0");
                 t.HasCheckConstraint("CK_PaymentAllocations_TargetBaseAmount_Positive", "[TargetBaseAllocatedAmount] IS NULL OR [TargetBaseAllocatedAmount] > 0");
                 t.HasCheckConstraint("CK_PaymentAllocations_ExchangeRate_Positive", "[ExchangeRate] IS NULL OR [ExchangeRate] > 0");
-                t.HasCheckConstraint("CK_PaymentAllocations_TypedSource", "(CASE WHEN [ReceiptVoucherLineId] IS NULL THEN 0 ELSE 1 END + CASE WHEN [PaymentVoucherLineId] IS NULL THEN 0 ELSE 1 END + CASE WHEN [CustomerAdvanceApplicationId] IS NULL THEN 0 ELSE 1 END) = 1");
+                t.HasCheckConstraint("CK_PaymentAllocations_TypedSource", "(CASE WHEN [ReceiptVoucherLineId] IS NULL THEN 0 ELSE 1 END + CASE WHEN [PaymentVoucherLineId] IS NULL THEN 0 ELSE 1 END + CASE WHEN [CustomerAdvanceApplicationId] IS NULL THEN 0 ELSE 1 END) <= 1");
             });
         });
 
@@ -1555,6 +1563,8 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("UpdatedFromDevice");
             b.HasKey("Id");
             b.HasIndex("Code").IsUnique().HasDatabaseName("UX_PostingProfiles_Code");
+            b.HasIndex("Module", "DocumentType").IsUnique().HasDatabaseName("UX_PostingProfiles_Active_PurchaseReceipt").HasFilter("[IsActive] = 1 AND [Module] = N'Purchasing' AND [DocumentType] = N'PurchaseReceipt'");
+            b.HasIndex("Module", "DocumentType").IsUnique().HasDatabaseName("UX_PostingProfiles_Active_PurchaseInvoice").HasFilter("[IsActive] = 1 AND [Module] = N'Purchasing' AND [DocumentType] = N'PurchaseInvoice'");
             b.ToTable("tbl_PostingProfiles", "dbo");
         });
 
@@ -2087,7 +2097,6 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<byte>("ExchangeRateType").IsRequired().HasColumnType("tinyint");
             b.Property<byte>("ExchangeRateSource").IsRequired().HasColumnType("tinyint");
             b.Property<byte>("TaxCalculationMode").IsRequired().HasColumnType("tinyint");
-            b.Property<byte>("PaymentPlan").IsRequired().HasColumnType("tinyint");
             b.Property<byte>("PaymentTermType").IsRequired().HasColumnType("tinyint");
             b.Property<int>("PaymentTermDaysSnapshot").IsRequired().HasColumnType("int");
             b.Property<decimal>("Subtotal").IsRequired().HasColumnType("decimal(19,4)");
@@ -2110,7 +2119,6 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.HasIndex("Status").HasDatabaseName("IX_CustomerOrders_Status");
             b.HasIndex("PrescriptionRevisionId").HasDatabaseName("IX_CustomerOrders_PrescriptionRevisionId");
             b.HasIndex("CurrencyId").HasDatabaseName("IX_CustomerOrders_CurrencyId");
-            b.HasIndex("PaymentPlan").HasDatabaseName("IX_CustomerOrders_PaymentPlan");
             b.ToTable("tbl_CustomerOrders", "dbo", t =>
             {
                 t.HasCheckConstraint("CK_CustomerOrders_ExchangeRate_Positive", "[ExchangeRate] > 0");
@@ -2203,7 +2211,7 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
             b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset").HasColumnName("UpdatedAt");
             b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)").HasColumnName("UpdatedBy");
-            b.Property<Guid?>("PrescriptionRevisionId").HasColumnType("uniqueidentifier");
+            b.Property<Guid>("PrescriptionRevisionId").IsRequired().HasColumnType("uniqueidentifier");
             b.Property<byte>("Eye").IsRequired().HasColumnType("tinyint");
             b.Property<decimal?>("SPH").HasColumnType("decimal(6,2)");
             b.Property<decimal?>("CYL").HasColumnType("decimal(6,2)");
@@ -2282,7 +2290,6 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<byte>("ExchangeRateType").IsRequired().HasColumnType("tinyint");
             b.Property<byte>("ExchangeRateSource").IsRequired().HasColumnType("tinyint");
             b.Property<byte>("TaxCalculationMode").IsRequired().HasColumnType("tinyint");
-            b.Property<byte>("PaymentPlan").IsRequired().HasColumnType("tinyint");
             b.Property<byte>("PaymentTermType").IsRequired().HasColumnType("tinyint");
             b.Property<int>("PaymentTermDaysSnapshot").IsRequired().HasColumnType("int");
             b.Property<DateOnly?>("DueDate").HasColumnType("date");
@@ -2320,7 +2327,6 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.HasIndex("PrescriptionRevisionId").HasDatabaseName("IX_SalesInvoices_PrescriptionRevisionId");
             b.HasIndex("CurrencyId").HasDatabaseName("IX_SalesInvoices_CurrencyId");
             b.HasIndex("BaseCurrencyId").HasDatabaseName("IX_SalesInvoices_BaseCurrencyId");
-            b.HasIndex("PaymentPlan").HasDatabaseName("IX_SalesInvoices_PaymentPlan");
             b.HasIndex("SalesEmployeeId").HasDatabaseName("IX_SalesInvoices_SalesEmployeeId");
             b.ToTable("tbl_SalesInvoices", "dbo", t =>
             {
@@ -2405,7 +2411,7 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset").HasColumnName("UpdatedAt");
             b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)").HasColumnName("UpdatedBy");
             b.Property<Guid>("SalesInvoiceLineId").IsRequired().HasColumnType("uniqueidentifier");
-            b.Property<Guid?>("PrescriptionRevisionId").HasColumnType("uniqueidentifier");
+            b.Property<Guid>("PrescriptionRevisionId").IsRequired().HasColumnType("uniqueidentifier");
             b.Property<byte>("Eye").IsRequired().HasColumnType("tinyint");
             b.Property<decimal?>("SPH").HasColumnType("decimal(6,2)");
             b.Property<decimal?>("CYL").HasColumnType("decimal(6,2)");
@@ -3462,6 +3468,38 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
                 .HasConstraintName("FK_AccountingSettings_RetainedEarningsAccount");
         });
 
+        modelBuilder.Entity("OAS.Domain.Accounting.Entities.AccountingSettings", b =>
+        {
+            b.HasOne("OAS.Domain.Accounting.Entities.Account", null).WithMany()
+                .HasForeignKey("InventoryAccountId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("FK_AccountingSettings_InventoryAccount");
+        });
+
+        modelBuilder.Entity("OAS.Domain.Accounting.Entities.AccountingSettings", b =>
+        {
+            b.HasOne("OAS.Domain.Accounting.Entities.Account", null).WithMany()
+                .HasForeignKey("GrniAccountId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("FK_AccountingSettings_GrniAccount");
+        });
+
+        modelBuilder.Entity("OAS.Domain.Accounting.Entities.AccountingSettings", b =>
+        {
+            b.HasOne("OAS.Domain.Accounting.Entities.Account", null).WithMany()
+                .HasForeignKey("PurchaseTaxAccountId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("FK_AccountingSettings_PurchaseTaxAccount");
+        });
+
+        modelBuilder.Entity("OAS.Domain.Accounting.Entities.AccountingSettings", b =>
+        {
+            b.HasOne("OAS.Domain.Accounting.Entities.Account", null).WithMany()
+                .HasForeignKey("PurchasePriceVarianceAccountId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("FK_AccountingSettings_PurchasePriceVarianceAccount");
+        });
+
         modelBuilder.Entity("OAS.Domain.Accounting.Entities.BankAccount", b =>
         {
             b.HasOne("OAS.Domain.Accounting.Entities.Account", null).WithMany()
@@ -4308,6 +4346,7 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.HasOne("OAS.Domain.Sales.Entities.PrescriptionRevision", null).WithMany()
                 .HasForeignKey("PrescriptionRevisionId")
                 .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired()
                 .HasConstraintName("FK_SalesInvoicePrescriptionSnapshots_Revisions_PrescriptionRevisionId");
         });
 

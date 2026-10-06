@@ -125,6 +125,7 @@ public sealed class UiPurchaseOrderLineModel
     public decimal RemainingBaseQuantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal DiscountAmount { get; set; }
+    public decimal NetAmount { get; set; }
     public decimal TaxRate { get; set; }
     public decimal TaxAmount { get; set; }
     public decimal FinalAmount { get; set; }

@@ -111,6 +111,39 @@
                               MinimumSearchLength="0"
                               DebounceMilliseconds="250" />
 
+                    <UiLookup Label="حساب بضاعة مستلمة غير مفوترة (GRNI)"
+                              Value="@ToLookupValue(_settingsGrniAccountId)"
+                              ValueChanged="SetGrniAccount"
+                              SelectedItem="@GrniAccountLookupItem"
+                              SearchAsync="SearchGrniAccountsAsync"
+                              Placeholder="ابحث عن حساب التزام دائن..."
+                              EmptyText="لا توجد حسابات التزامات صالحة لـ GRNI."
+                              ClearText="إلغاء اختيار حساب GRNI"
+                              MinimumSearchLength="0"
+                              DebounceMilliseconds="250" />
+
+                    <UiLookup Label="حساب ضريبة المشتريات"
+                              Value="@ToLookupValue(_settingsPurchaseTaxAccountId)"
+                              ValueChanged="SetPurchaseTaxAccount"
+                              SelectedItem="@PurchaseTaxAccountLookupItem"
+                              SearchAsync="SearchPurchaseTaxAccountsAsync"
+                              Placeholder="ابحث عن حساب أصل مدين..."
+                              EmptyText="لا توجد حسابات أصول صالحة لضريبة المشتريات."
+                              ClearText="إلغاء اختيار حساب ضريبة المشتريات"
+                              MinimumSearchLength="0"
+                              DebounceMilliseconds="250" />
+
+                    <UiLookup Label="حساب فرق سعر المشتريات"
+                              Value="@ToLookupValue(_settingsPurchasePriceVarianceAccountId)"
+                              ValueChanged="SetPurchasePriceVarianceAccount"
+                              SelectedItem="@PurchasePriceVarianceAccountLookupItem"
+                              SearchAsync="SearchPurchasePriceVarianceAccountsAsync"
+                              Placeholder="ابحث عن حساب مصروف مدين..."
+                              EmptyText="لا توجد حسابات مصروفات صالحة لفروقات سعر المشتريات."
+                              ClearText="إلغاء اختيار حساب فرق سعر المشتريات"
+                              MinimumSearchLength="0"
+                              DebounceMilliseconds="250" />
+
                     <UiLookup Label="حساب أرباح فروقات الصرف"
                               Value="@ToLookupValue(_settingsExchangeGainAccountId)"
                               ValueChanged="SetExchangeGainAccount"
@@ -145,7 +178,7 @@
                               DebounceMilliseconds="250" />
                 </UiAccountingFormGrid>
 
-                <UiAlert Message="البحث يعرض الحسابات المطابقة ويعطّل الحساب غير المؤهل مع توضيح السبب. حسابات ترحيل فاتورة المبيعات هي: إيرادات المبيعات (إيراد دائن)، الضرائب المستحقة (التزام دائن)، المخزون (أصل مدين)، وتكلفة البضاعة المباعة (مصروف مدين). جميعها يجب أن تكون نشطة وقابلة للترحيل. كما يجب تحديد حساب الأرباح المحتجزة (حقوق ملكية دائن) قبل الإقفال السنوي."
+                <UiAlert Message="البحث يعرض الحسابات المطابقة ويعطّل الحساب غير المؤهل مع توضيح السبب. للمشتريات: المخزون أصل مدين، GRNI التزام دائن، ضريبة المشتريات أصل مدين، وفرق سعر المشتريات مصروف مدين. عند حفظ المجموعة كاملة ينشئ النظام أو يحدّث ملفات ترحيل PurchaseReceipt وPurchaseInvoice تلقائيًا. جميع الحسابات يجب أن تكون نشطة وقابلة للترحيل."
                          Tone="AlertTone.Info" />
 
                 @if (_settings is null)

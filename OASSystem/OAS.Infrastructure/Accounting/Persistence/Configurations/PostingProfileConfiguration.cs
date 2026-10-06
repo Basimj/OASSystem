@@ -45,6 +45,16 @@ public sealed class PostingProfileConfiguration : IEntityTypeConfiguration<Posti
             .IsUnique()
             .HasDatabaseName("UX_PostingProfiles_Code");
 
+        builder.HasIndex(x => new { x.Module, x.DocumentType })
+            .IsUnique()
+            .HasDatabaseName("UX_PostingProfiles_Active_PurchaseReceipt")
+            .HasFilter("[IsActive] = 1 AND [Module] = N'Purchasing' AND [DocumentType] = N'PurchaseReceipt'");
+
+        builder.HasIndex(x => new { x.Module, x.DocumentType })
+            .IsUnique()
+            .HasDatabaseName("UX_PostingProfiles_Active_PurchaseInvoice")
+            .HasFilter("[IsActive] = 1 AND [Module] = N'Purchasing' AND [DocumentType] = N'PurchaseInvoice'");
+
         builder.HasMany(x => x.Lines)
             .WithOne()
             .HasForeignKey(x => x.PostingProfileId)

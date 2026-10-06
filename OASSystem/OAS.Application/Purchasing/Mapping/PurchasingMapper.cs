@@ -162,13 +162,17 @@ public sealed class PurchasingMapper(
 
     private static IEnumerable<PurchaseVarianceDto> BuildVariances(PurchaseMatchAllocationEvaluation item)
     {
+        if (item.QuantityVariance != 0m)
+            yield return new PurchaseVarianceDto(OAS.Contracts.Purchasing.Enums.PurchaseVarianceType.Quantity, item.PurchaseInvoiceLineId,
+                item.PurchaseReceiptLineId, item.MatchedQuantity, item.MatchedQuantity + item.QuantityVariance, item.QuantityVariance, item.QuantityTolerance,
+                item.Status, "فرق كمية بين فاتورة المورد والكمية المخصصة من الاستلامات.");
         if (item.PriceVarianceAmount != 0m)
             yield return new PurchaseVarianceDto(OAS.Contracts.Purchasing.Enums.PurchaseVarianceType.Price, item.PurchaseInvoiceLineId,
-                item.PurchaseReceiptLineId, item.ReceiptCostBaseAmount, item.InvoiceNetBaseAmount, item.PriceVarianceAmount, item.PriceTolerance,
-                item.Status, "فرق بين تكلفة الاستلام وصافي الفاتورة.");
+                item.PurchaseReceiptLineId, item.PurchaseOrderNetBaseAmount, item.InvoiceNetBaseAmount, item.PriceVarianceAmount, item.PriceTolerance,
+                item.Status, "فرق سعر بين صافي أمر الشراء وصافي فاتورة المورد.");
         if (item.TaxVarianceAmount != 0m)
             yield return new PurchaseVarianceDto(OAS.Contracts.Purchasing.Enums.PurchaseVarianceType.Tax, item.PurchaseInvoiceLineId,
-                item.PurchaseReceiptLineId, item.InvoiceTaxBaseAmount - item.TaxVarianceAmount, item.InvoiceTaxBaseAmount,
-                item.TaxVarianceAmount, item.TaxTolerance, item.Status, "فرق ضريبة بين المستندات المطابقة.");
+                item.PurchaseReceiptLineId, item.ExpectedTaxBaseAmount, item.InvoiceTaxBaseAmount,
+                item.TaxVarianceAmount, item.TaxTolerance, item.Status, "فرق ضريبة بين أمر الشراء وفاتورة المورد وفق سياسة الضريبة المركزية.");
     }
 }

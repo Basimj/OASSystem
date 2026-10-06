@@ -70,7 +70,7 @@ public sealed class CreatePurchaseOrderCommandHandler(
 
             foreach (var source in line.Sources)
             {
-                await ValidateSourceAllocationAsync(requestRepository, source.PurchaseRequestLineId, source.AllocatedQuantity, null, ct);
+                await ValidateSourceAllocationAsync(requestRepository, source.PurchaseRequestLineId, source.AllocatedQuantity, line.ProductVariantId, null, ct);
                 sources.Add(PurchaseOrderLineSource.Create(Guid.NewGuid(), lineId, source.PurchaseRequestLineId, source.AllocatedQuantity));
             }
         }
@@ -81,12 +81,14 @@ public sealed class CreatePurchaseOrderCommandHandler(
         return id;
     }
 
-    internal static async Task ValidateSourceAllocationAsync(IPurchaseRequestRepository repository, Guid lineId, decimal quantity, Guid? excludingOrderId, CancellationToken ct)
+    internal static async Task ValidateSourceAllocationAsync(IPurchaseRequestRepository repository, Guid lineId, decimal quantity, Guid expectedProductVariantId, Guid? excludingOrderId, CancellationToken ct)
     {
         var request = await repository.GetByLineIdAsync(lineId, ct) ?? throw new NotFoundException("PurchaseRequestLine", lineId);
         if (request.Status is not (DomainRequestStatus.Approved or DomainRequestStatus.PartiallyConverted))
             throw new ConflictException("purchasing_request_line_not_approved", "لا يمكن ربط أمر شراء بسطر طلب غير معتمد.");
         var line = request.Lines.Single(x => x.Id == lineId);
+        if (line.ProductVariantId != expectedProductVariantId)
+            throw new ConflictException("purchasing_request_source_product_mismatch", "منتج سطر أمر الشراء لا يطابق المنتج في سطر طلب الشراء المصدر.");
         var ids = new[] { lineId };
         var allocated = excludingOrderId.HasValue
             ? await repository.GetAllocatedQuantitiesExcludingPurchaseOrderAsync(ids, excludingOrderId.Value, ct)
@@ -216,7 +218,7 @@ public sealed class UpdatePurchaseOrderCommandHandler(
             foreach (var source in line.Sources)
             {
                 await CreatePurchaseOrderCommandHandler.ValidateSourceAllocationAsync(requestRepository, source.PurchaseRequestLineId,
-                    source.AllocatedQuantity, order.Id, ct);
+                    source.AllocatedQuantity, line.ProductVariantId, order.Id, ct);
                 var sourceId = source.Id ?? Guid.NewGuid();
                 if (source.Id.HasValue)
                 {
@@ -308,7 +310,11 @@ public sealed class CancelPurchaseOrderCommandHandler(
     }
 }
 
-public sealed class ClosePurchaseOrderCommandHandler(IPurchaseOrderRepository repository, ICurrentUser currentUser, TimeProvider timeProvider)
+public sealed class ClosePurchaseOrderCommandHandler(
+    IPurchaseOrderRepository repository,
+    IPurchasingInventoryPort inventory,
+    ICurrentUser currentUser,
+    TimeProvider timeProvider)
     : PurchaseOrderStatusHandlerBase(repository, currentUser, timeProvider), IRequestHandler<ClosePurchaseOrderCommand>
 {
     public async Task Handle(ClosePurchaseOrderCommand c, CancellationToken ct)
@@ -316,6 +322,20 @@ public sealed class ClosePurchaseOrderCommandHandler(IPurchaseOrderRepository re
         var order = await LoadAsync(c.Id, c.Request.RowVersion, ct);
         if (!await repository.CanCloseAsync(order.Id, ct))
             throw new ConflictException("purchasing_order_close_requirements_not_met", "لا يمكن إغلاق أمر الشراء لوجود استلامات أو فواتير أو فروقات معلقة.");
+
+        if (order.Status == DomainOrderStatus.PartiallyReceived)
+        {
+            var received = await repository.GetPostedReceivedBaseQuantitiesAsync(order.Id, ct);
+            var open = order.Lines.Select(x =>
+            {
+                received.TryGetValue(x.Id, out var receivedBase);
+                return new PurchasingOnOrderLine(x.ProductVariantId, Math.Max(0m, x.BaseQuantity - receivedBase));
+            }).Where(x => x.BaseQuantity > 0).ToArray();
+
+            if (open.Length > 0)
+                await inventory.DecreaseOnOrderAsync(order.DestinationWarehouseId, open, order.Id, order.OrderDate, ct);
+        }
+
         order.Close(Now, UserId);
         Save(order);
     }

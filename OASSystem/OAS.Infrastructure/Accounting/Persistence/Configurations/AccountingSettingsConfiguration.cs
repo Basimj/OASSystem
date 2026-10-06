@@ -22,5 +22,9 @@ public sealed class AccountingSettingsConfiguration : IEntityTypeConfiguration<A
         builder.HasOne<Account>().WithMany().HasForeignKey(x => x.ExchangeGainAccountId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_AccountingSettings_ExchangeGainAccount");
         builder.HasOne<Account>().WithMany().HasForeignKey(x => x.ExchangeLossAccountId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_AccountingSettings_ExchangeLossAccount");
         builder.HasOne<Account>().WithMany().HasForeignKey(x => x.RetainedEarningsAccountId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_AccountingSettings_RetainedEarningsAccount");
+        builder.HasOne<Account>().WithMany().HasForeignKey(x => x.InventoryAccountId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_AccountingSettings_InventoryAccount");
+        builder.HasOne<Account>().WithMany().HasForeignKey(x => x.GrniAccountId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_AccountingSettings_GrniAccount");
+        builder.HasOne<Account>().WithMany().HasForeignKey(x => x.PurchaseTaxAccountId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_AccountingSettings_PurchaseTaxAccount");
+        builder.HasOne<Account>().WithMany().HasForeignKey(x => x.PurchasePriceVarianceAccountId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_AccountingSettings_PurchasePriceVarianceAccount");
     }
 }

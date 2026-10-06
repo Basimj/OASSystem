@@ -6,7 +6,7 @@ public sealed record PurchasingSupplierSnapshot(Guid Id, string Code, string Nam
 public sealed record PurchasingWarehouseSnapshot(Guid Id, string Code, string Name, bool IsActive);
 public sealed record PurchasingUnitSnapshot(Guid Id, string Code, string Name, bool IsActive);
 public sealed record PurchasingCurrencySnapshot(Guid Id, string Code, bool IsActive);
-public sealed record PurchasingCatalogDefaults(Guid CatalogItemId, Guid PurchaseUnitId, decimal UnitConversionFactor, decimal UnitPrice);
+public sealed record PurchasingCatalogDefaults(Guid CatalogItemId, Guid PurchaseUnitId, decimal UnitConversionFactor, decimal? UnitPrice);
 public sealed record PurchasingProductSnapshot(Guid VariantId, string? ProductCode, string ProductName, bool VariantIsActive, bool ProductIsActive, bool IsStockItem, Guid? DefaultUnitId);
 
 public sealed record PurchasingOnOrderLine(Guid ProductVariantId, decimal BaseQuantity);
@@ -40,10 +40,15 @@ public sealed record PurchaseReceiptMatchCandidate(
     Guid ProductVariantId,
     Guid SupplierId,
     Guid CurrencyId,
+    Guid PurchaseUnitId,
+    decimal UnitConversionFactor,
     decimal AcceptedQuantity,
+    decimal ReturnedQuantity,
     decimal AvailableQuantity,
     decimal ReceiptUnitCostBase,
     decimal PurchaseOrderUnitPrice,
+    decimal PurchaseOrderNetUnitPriceBase,
+    decimal PurchaseOrderTaxUnitAmountBase,
     decimal PurchaseOrderTaxRate,
     PurchaseReceiptStatus ReceiptStatus);
 
@@ -57,9 +62,12 @@ public sealed record PurchaseMatchAllocationEvaluation(
     decimal PriceVarianceAmount,
     decimal TaxVarianceAmount,
     PurchaseMatchStatus Status,
+    decimal QuantityTolerance,
     decimal PriceTolerance,
     decimal TaxTolerance,
     decimal ReceiptCostBaseAmount,
+    decimal PurchaseOrderNetBaseAmount,
+    decimal ExpectedTaxBaseAmount,
     decimal InvoiceNetBaseAmount,
     decimal InvoiceTaxBaseAmount);
 
@@ -71,3 +79,4 @@ public sealed record PurchaseMatchEvaluation(
     decimal InvoiceNetBaseAmount,
     decimal InvoiceTaxBaseAmount,
     decimal PriceVarianceBaseAmount);
+

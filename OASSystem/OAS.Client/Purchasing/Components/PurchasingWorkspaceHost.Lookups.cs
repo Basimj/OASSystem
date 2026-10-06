@@ -55,7 +55,7 @@ public partial class PurchasingWorkspaceHost
             foreach(var line in po.Lines.Where(x=>x.RemainingBaseQuantity>0))
             {
                 var factor=line.UnitConversionFactor<=0?1m:line.UnitConversionFactor;var remaining=Math.Round(line.RemainingBaseQuantity/factor,3);
-                m.Lines.Add(new(){PurchaseOrderLineId=line.Id,LineSequence=m.Lines.Count+1,ProductVariantId=line.ProductVariantId,ProductName=line.ProductNameSnapshot,OrderedQuantitySnapshot=line.OrderedQuantity,PreviouslyReceivedQty=Math.Max(0,line.OrderedQuantity-remaining),RemainingReceivableQuantity=remaining,ActualUnitCost=Math.Round(line.UnitPrice/factor,4)});
+                m.Lines.Add(new(){PurchaseOrderLineId=line.Id,LineSequence=m.Lines.Count+1,ProductVariantId=line.ProductVariantId,ProductName=line.ProductNameSnapshot,OrderedQuantitySnapshot=line.OrderedQuantity,PreviouslyReceivedQty=Math.Max(0,line.OrderedQuantity-remaining),RemainingReceivableQuantity=remaining,ActualUnitCost=CalculateBaseReceiptUnitCost(line, po.ExchangeRate)});
             }
             if(ActiveTab is { } tab)tab.IsDirty=true;StateHasChanged();
         }

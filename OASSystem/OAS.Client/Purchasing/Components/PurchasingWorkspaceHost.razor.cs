@@ -191,7 +191,10 @@ public partial class PurchasingWorkspaceHost
     }
     private async Task<object?> SaveOrderAsync(UiPurchaseOrderEditorModel m)
     {
-        if(m.SupplierId is not Guid supplier||m.DestinationWarehouseId is not Guid warehouse||m.CurrencyId is not Guid currency||m.Lines.Count==0||m.Lines.Any(x=>!x.ProductVariantId.HasValue||!x.PurchaseUnitId.HasValue)){Snackbar.Warning("أكمل المورد والمخزن والعملة وبيانات البنود.");return null;}
+        if(m.SupplierId is not Guid supplier||m.DestinationWarehouseId is not Guid warehouse||m.CurrencyId is not Guid currency||m.Lines.Count==0||m.Lines.Any(x=>!x.ProductVariantId.HasValue||!x.PurchaseUnitId.HasValue)){Snackbar.Warning("أكمل المورد والمخزن والعملة ووحدة الشراء لكل بند قبل الحفظ.");return null;}
+        if(m.ExchangeRate<=0m){Snackbar.Warning("سعر الصرف يجب أن يكون أكبر من صفر.");return null;}
+        if(m.Lines.Any(x=>x.UnitConversionFactor<=0m||x.OrderedQuantity<=0m)){Snackbar.Warning("تحقق من معامل التحويل والكمية في جميع بنود أمر الشراء.");return null;}
+        if(m.Lines.Any(x=>x.Sources.Any(s=>s.AllocatedQuantity<=0m))){Snackbar.Warning("الكمية المخصصة من طلب الشراء يجب أن تكون أكبر من صفر.");return null;}
         if(!m.Id.HasValue)
         {
             var lines=m.Lines.Select(x=>new CreatePurchaseOrderLineRequest(x.LineSequence,x.ProductVariantId!.Value,x.SupplierCatalogItemId,x.PurchaseUnitId!.Value,x.UnitConversionFactor,x.OrderedQuantity,x.UnitPrice,x.DiscountAmount,x.TaxRate,x.ExpectedDeliveryDate,x.Notes,x.Sources.Select(s=>new CreatePurchaseOrderLineSourceRequest(s.PurchaseRequestLineId,s.AllocatedQuantity)).ToArray())).ToArray();

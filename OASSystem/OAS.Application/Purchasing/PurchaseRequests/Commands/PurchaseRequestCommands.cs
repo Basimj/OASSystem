@@ -170,18 +170,49 @@ public sealed class CreatePurchaseOrderFromRequestCommandHandler(
             if (allocation.AllocatedQuantity <= 0 || alreadyAllocated + allocation.AllocatedQuantity > requestLine.RequestedQuantity)
                 throw new ConflictException("purchasing_request_overallocated", "لا يمكن تخصيص كمية لأمر الشراء أكبر من الكمية المتبقية في طلب الشراء.");
 
-            var defaults = await catalogRepository.GetPurchaseDefaultsAsync(command.Request.SupplierId, requestLine.ProductVariantId, command.Request.CurrencyId, ct)
-                ?? throw new ConflictException("purchasing_supplier_catalog_missing", "لا يوجد كتالوج/سعر صالح للمورد والمنتج والعملة المحددة.");
             var product = await references.GetProductVariantAsync(requestLine.ProductVariantId, ct);
             PurchasingApplicationGuard.Product(product);
-            var unit = await references.GetUnitAsync(defaults.PurchaseUnitId, ct);
+
+            var defaults = await catalogRepository.GetPurchaseDefaultsAsync(
+                command.Request.SupplierId, requestLine.ProductVariantId, command.Request.CurrencyId, ct);
+
+            Guid? supplierCatalogItemId;
+            Guid purchaseUnitId;
+            decimal unitConversionFactor;
+            decimal unitPrice;
+
+            if (defaults is not null)
+            {
+                // Use supplier-specific purchasing defaults whenever a catalog entry exists.
+                // Missing price is allowed for a Draft PO; the user can enter it before approval/send.
+                supplierCatalogItemId = defaults.CatalogItemId;
+                purchaseUnitId = defaults.PurchaseUnitId;
+                unitConversionFactor = defaults.UnitConversionFactor;
+                unitPrice = defaults.UnitPrice ?? 0m;
+            }
+            else
+            {
+                // Do not block PR -> PO conversion just because the supplier catalog has not been prepared yet.
+                // Fall back to the product's default/base unit and create the PO line with price = 0.
+                if (!product!.DefaultUnitId.HasValue || product.DefaultUnitId.Value == Guid.Empty)
+                    throw new ConflictException(
+                        "purchasing_product_default_unit_missing",
+                        "لا يوجد كتالوج مورد لهذا الصنف، كما أن الصنف لا يحتوي على وحدة افتراضية يمكن استخدامها لإنشاء مسودة أمر الشراء.");
+
+                supplierCatalogItemId = null;
+                purchaseUnitId = product.DefaultUnitId.Value;
+                unitConversionFactor = 1m;
+                unitPrice = 0m;
+            }
+
+            var unit = await references.GetUnitAsync(purchaseUnitId, ct);
             PurchasingApplicationGuard.Unit(unit);
 
-            var orderedQty = Math.Round(allocation.AllocatedQuantity / defaults.UnitConversionFactor, 3);
+            var orderedQty = Math.Round(allocation.AllocatedQuantity / unitConversionFactor, 3);
             var lineId = Guid.NewGuid();
             order.AddLine(PurchaseOrderLine.Create(lineId, orderId, sequence++, requestLine.ProductVariantId,
-                defaults.CatalogItemId, defaults.PurchaseUnitId, defaults.UnitConversionFactor, product!.ProductCode,
-                product.ProductName, unit!.Name, orderedQty, defaults.UnitPrice, 0m, 0m, order.TaxCalculationMode,
+                supplierCatalogItemId, purchaseUnitId, unitConversionFactor, product!.ProductCode,
+                product.ProductName, unit!.Name, orderedQty, unitPrice, 0m, 0m, order.TaxCalculationMode,
                 requestLine.RequiredDate ?? command.Request.ExpectedDeliveryDate, requestLine.Notes));
             sources.Add(PurchaseOrderLineSource.Create(Guid.NewGuid(), lineId, requestLine.Id, allocation.AllocatedQuantity));
         }

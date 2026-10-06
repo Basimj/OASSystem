@@ -5,8 +5,10 @@ using OAS.Application.Purchasing.Abstractions;
 using OAS.Application.Purchasing.Mapping;
 using OAS.Application.Purchasing.Matching;
 using OAS.Application.Purchasing.PurchaseReturns.Services;
+using OAS.Application.Purchasing.Payments;
 using OAS.Application.Purchasing.Services;
 using OAS.Application.Sales.Abstractions;
+using OAS.Application.Accounting.Abstractions;
 
 namespace OAS.Application.Purchasing;
 
@@ -33,8 +35,8 @@ public static class DependencyInjection
         services.TryAddScoped<IPurchaseMatchingService, PurchaseMatchingService>();
         services.TryAddScoped<IPurchaseReturnInventoryPostingService, PurchaseReturnInventoryPostingService>();
         services.TryAddScoped<ICustomerDemandProcurementPort, CustomerDemandProcurementService>();
-        services.TryAddScoped<ICustomerDemandSourcingService, CustomerDemandSourcingService>();
-        services.TryAddScoped<IPurchasingCommercialTermsPort, DefaultPurchasingCommercialTermsService>();
+        services.AddScoped<IPaymentAllocationTargetValidator, PurchaseInvoicePaymentAllocationTargetValidator>();
+        services.AddScoped<IPaymentAllocationSourceTargetValidator, PurchaseInvoicePaymentAllocationTargetValidator>();
 
         return services;
     }
