@@ -96,7 +96,7 @@
                     else if (order.Status == "Draft")
                     {
                         <UiButton Text="تعديل" IconCssClass="fa-solid fa-pen" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="BeginEditAsync" />
-                        <UiButton Text="تأكيد الطلب" IconCssClass="fa-solid fa-check" Size="ControlSize.Small" OnClick="ConfirmOrderAsync" />
+                        <UiButton Text="إتمام البيع" IconCssClass="fa-solid fa-cart-check" Size="ControlSize.Small" OnClick="OpenCheckoutAsync" />
                         <UiButton Text="إلغاء الطلب" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" OnClick="CancelOrderAsync" />
                     }
                     else if (order.Status != "Cancelled" && order.Status != "Completed")
@@ -144,8 +144,8 @@
                 </Actions>
                 <ChildContent>
                 <UiSalesInvoiceEditor Model="@invoice" ReadOnly="@InvoiceReadOnly(invoice)"
-                                      SearchCustomersAsync="SearchCustomerItemsAsync" SearchEmployeesAsync="SearchEmployeeItemsAsync" SearchOrdersAsync="SearchOrderItemsAsync" SearchPrescriptionsAsync="SearchPrescriptionRevisionItemsAsync" SearchCurrenciesAsync="SearchCurrencyItemsAsync"
-                                      SearchCashAccountsAsync="SearchCashAccountItemsAsync" SearchBankAccountsAsync="SearchBankAccountItemsAsync"
+                                      SearchCustomersAsync="SearchCustomerItemsAsync" SearchEmployeesAsync="SearchEmployeeItemsAsync" SearchPrescriptionsAsync="SearchPrescriptionRevisionItemsAsync" SearchCurrenciesAsync="SearchCurrencyItemsAsync"
+                                      SearchPaymentCashAccountsAsync="SearchPaymentCashAccountItemsAsync" SearchPaymentBankAccountsAsync="SearchPaymentBankAccountItemsAsync" SearchSettlementAccountsAsync="SearchSettlementAccountItemsAsync"
                                       SearchProductTypesAsync="SearchProductTypeItemsAsync" SearchCategoriesAsync="SearchCategoryItemsAsync" SearchProductsAsync="SearchProductItemsAsync" SearchWarehousesAsync="SearchWarehouseItemsAsync"
                                       SearchPrescriptionRevisionsAsync="SearchLinePrescriptionItemsAsync" OnSelectionChanged="SelectionChangedAsync"
                                       OnProductTypeSelected="ProductTypeSelectedAsync" OnCategorySelected="CategorySelectedAsync"

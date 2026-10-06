@@ -1,6 +1,6 @@
 @if (Visible)
 {
-    <div class="ui-account-menu" @onclick:stopPropagation="true">
+    <div class="ui-account-menu" @onclick:stopPropagation="true" @onwheel:stopPropagation="true" @ontouchmove:stopPropagation="true">
         <div class="ui-account-menu__profile">
             <div class="ui-account-menu__photo-column">
                 <button type="button" class="ui-account-menu__avatar-button" title="@EditProfileText" aria-label="@EditProfileText" @onclick="EditProfileAsync">

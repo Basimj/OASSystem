@@ -36,7 +36,9 @@
         <div class="ui-tab-context-menu"
              style="@ContextMenuStyle"
              role="menu"
-             @onclick:stopPropagation="true">
+             @onclick:stopPropagation="true"
+             @onwheel:stopPropagation="true"
+             @ontouchmove:stopPropagation="true">
             <button type="button" role="menuitem" @onclick="CloseCurrentFromMenuAsync">
                 <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                 <span>غلق التبويبة الحالية</span>

@@ -49,13 +49,34 @@ public sealed class SalesCheckoutOrchestrator(
         ArgumentNullException.ThrowIfNull(order);
 
         var requestedPlan = (SalesPaymentPlan)(byte)request.PaymentPlan;
-        if (order.Status != CustomerOrderStatus.Draft)
+        var wasDraft = order.Status == CustomerOrderStatus.Draft;
+
+        if (!wasDraft)
         {
             if (order.PaymentPlan != requestedPlan)
                 throw new ConflictException("sales_checkout_payment_plan_locked", "لا يمكن تغيير خطة السداد بعد تأكيد طلب العميل.");
             if (order.Status == CustomerOrderStatus.Cancelled)
                 throw new ConflictException("sales_checkout_order_cancelled", "طلب العميل ملغى ولا يمكن إتمام البيع عليه.");
-            return await BuildExistingResultAsync(order, cancellationToken);
+
+            // A confirmed order created through the legacy Orders screen may not have passed
+            // through Checkout yet. If it already has an invoice, the operation is an
+            // idempotent read. Otherwise, fully-available confirmed orders are allowed to
+            // continue from the invoice/posting step instead of silently returning with no invoice.
+            var existingInvoice = await FindInvoiceAsync(order.Id, cancellationToken);
+            if (existingInvoice is not null || order.Status == CustomerOrderStatus.Completed)
+                return await BuildExistingResultAsync(order, cancellationToken);
+
+            // Shortage/production-in-progress states are completed by the fulfillment/lab
+            // workflows. Re-running Checkout must not collect a second advance or duplicate work.
+            if (order.Status is CustomerOrderStatus.AwaitingStock
+                or CustomerOrderStatus.PartiallyAvailable
+                or CustomerOrderStatus.InProduction)
+                return await BuildExistingResultAsync(order, cancellationToken);
+
+            if (order.Status is not (CustomerOrderStatus.Confirmed
+                or CustomerOrderStatus.ReadyForProduction
+                or CustomerOrderStatus.ReadyForDelivery))
+                return await BuildExistingResultAsync(order, cancellationToken);
         }
 
         var customer = await customers.GetByIdAsync(order.CustomerId, cancellationToken)
@@ -63,8 +84,11 @@ public sealed class SalesCheckoutOrchestrator(
         if (!customer.IsActive)
             throw new ConflictException("sales_checkout_customer_inactive", "العميل غير مفعل.");
 
-        var paymentTermDays = requestedPlan == SalesPaymentPlan.AccountCredit ? customer.PaymentTermDays : 0;
-        order.ChangePaymentPlan(requestedPlan, paymentTermDays);
+        if (wasDraft)
+        {
+            var paymentTermDays = requestedPlan == SalesPaymentPlan.AccountCredit ? customer.PaymentTermDays : 0;
+            order.ChangePaymentPlan(requestedPlan, paymentTermDays);
+        }
 
         if (requestedPlan == SalesPaymentPlan.AccountCredit)
             await ValidateAccountCreditAsync(customer, order, cancellationToken);
@@ -76,13 +100,25 @@ public sealed class SalesCheckoutOrchestrator(
         var requiredBaseAmount = Math.Round(remainingBeforeCheckout * order.ExchangeRate, 4, MidpointRounding.AwayFromZero);
         ValidateCheckoutPaymentPlan(order, request.PaymentLines.Count, paymentBaseAmount, requiredBaseAmount);
 
-        var confirmation = await orderConfirmation.ConfirmAsync(
-            order, request.SupplierSchedulingDecisions, cancellationToken);
-        orders.Update(order);
+        CustomerOrderConfirmationResult confirmation;
+        if (wasDraft)
+        {
+            confirmation = await orderConfirmation.ConfirmAsync(
+                order, request.SupplierSchedulingDecisions, cancellationToken);
+            orders.Update(order);
 
-        // Reservation and CustomerDemand entities must be visible to the invoice/credit/posting
-        // queries that run later in the same outer transaction.
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+            // Reservation and CustomerDemand entities must be visible to the invoice/credit/posting
+            // queries that run later in the same outer transaction.
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        else
+        {
+            // The legacy Confirm action already created the order reservations. We only need
+            // the current availability/demand context so Checkout can continue with invoicing.
+            var currentAvailability = await availability.AssessAsync(order, cancellationToken);
+            var demandLines = await customerDemand.GetOpenDemandForOrderAsync(order.Id, cancellationToken);
+            confirmation = new CustomerOrderConfirmationResult(currentAvailability, order.Status, demandLines);
+        }
 
         var hasShortage = confirmation.Availability.Lines.Any(x => x.ShortageQuantity > 0m);
         if (hasShortage)
@@ -110,14 +146,17 @@ public sealed class SalesCheckoutOrchestrator(
         var invoice = await invoiceFromOrder.CreateAsync(order, today, today, null, $"فاتورة طلب العميل {order.OrderCode}", cancellationToken);
         if (invoice.Status == SalesInvoiceStatus.Draft)
         {
+            // CreateAsync always returns an aggregate tracked by the current DbContext:
+            // either a newly Added invoice or an existing aggregate loaded with tracking.
+            // Calling Update here is unsafe for a newly Added invoice with application-generated
+            // Guid keys because it can flip the header to Modified while its lines remain Added,
+            // causing FK_SalesInvoiceLines_Invoices_SalesInvoiceId on SaveChanges.
             await invoiceConfirmation.ConfirmAsync(invoice, cancellationToken);
-            invoices.Update(invoice);
             await unitOfWork.SaveChangesAsync(cancellationToken);
         }
         if (invoice.Status == SalesInvoiceStatus.Confirmed)
         {
             await invoicePosting.PostAsync(invoice, cancellationToken);
-            invoices.Update(invoice);
         }
         if (invoice.Status != SalesInvoiceStatus.Posted)
             throw new ConflictException("sales_checkout_invoice_not_posted", "تعذر ترحيل فاتورة المبيعات لإكمال عملية البيع.");

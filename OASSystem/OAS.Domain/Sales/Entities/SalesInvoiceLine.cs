@@ -135,10 +135,24 @@ public sealed class SalesInvoiceLine : AuditableEntity<Guid>
         ArgumentNullException.ThrowIfNull(snapshot);
         if (LineType != SalesLineType.Lens)
             throw new DomainException("Prescription snapshots can only be attached to lens lines.");
-        if (!PrescriptionRevisionId.HasValue || !PrescriptionEye.HasValue)
-            throw new DomainException("The invoice line must reference a prescription revision and eye first.");
-        if (snapshot.SalesInvoiceLineId != Id || snapshot.PrescriptionRevisionId != PrescriptionRevisionId.Value || snapshot.Eye != PrescriptionEye.Value)
+        if (snapshot.SalesInvoiceLineId != Id)
             throw new DomainException("Prescription snapshot does not match the sales invoice line.");
+
+        // Stored-prescription lines keep the revision/eye pair on the line and the snapshot
+        // must match it. Manual optical measurements intentionally have no prescription
+        // revision on the line; in that case the snapshot itself carries the eye and must
+        // also have a null PrescriptionRevisionId.
+        if (PrescriptionRevisionId.HasValue)
+        {
+            if (!PrescriptionEye.HasValue ||
+                snapshot.PrescriptionRevisionId != PrescriptionRevisionId.Value ||
+                snapshot.Eye != PrescriptionEye.Value)
+                throw new DomainException("Prescription snapshot does not match the sales invoice line.");
+        }
+        else if (snapshot.PrescriptionRevisionId.HasValue)
+        {
+            throw new DomainException("Manual optical snapshots cannot reference a prescription revision.");
+        }
 
         PrescriptionSnapshot = snapshot;
     }

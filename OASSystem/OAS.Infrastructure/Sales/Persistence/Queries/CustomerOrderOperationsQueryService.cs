@@ -176,17 +176,18 @@ public sealed class CustomerOrderOperationsQueryService(
             from job in jobJoin.DefaultIfEmpty()
             join technician in employees on job.AssignedTechnicianId equals (Guid?)technician.Id into technicianJoin
             from technician in technicianJoin.DefaultIfEmpty()
-            let activeLines = lines.Where(x => x.CustomerOrderId == order.Id && x.IsActive)
-            let totalLines = activeLines.Count()
-            let availableLines = activeLines.Count(line =>
-                line.ProductVariantId == null || line.WarehouseId == null ||
-                reservations.Where(r =>
-                    r.SourceModule == SalesSourceReferences.Module &&
-                    r.SourceDocumentType == SalesSourceReferences.CustomerOrder &&
-                    r.SourceDocumentId == order.Id &&
-                    r.SourceLineId == line.Id &&
-                    (r.Status == StockReservationStatus.Active || r.Status == StockReservationStatus.Consumed))
-                    .Sum(r => (decimal?)r.Quantity) >= line.Quantity)
+            let totalLines = lines.Count(x => x.CustomerOrderId == order.Id && x.IsActive)
+            let availableLines = lines.Count(line =>
+                line.CustomerOrderId == order.Id &&
+                line.IsActive &&
+                (line.ProductVariantId == null || line.WarehouseId == null ||
+                 reservations.Where(r =>
+                     r.SourceModule == SalesSourceReferences.Module &&
+                     r.SourceDocumentType == SalesSourceReferences.CustomerOrder &&
+                     r.SourceDocumentId == order.Id &&
+                     r.SourceLineId == line.Id &&
+                     (r.Status == StockReservationStatus.Active || r.Status == StockReservationStatus.Consumed))
+                     .Sum(r => (decimal?)r.Quantity) >= line.Quantity))
             let shortageLines = totalLines - availableLines
             select new OrderRow
             {
@@ -202,7 +203,7 @@ public sealed class CustomerOrderOperationsQueryService(
                 TotalLines = totalLines,
                 AvailableLines = availableLines,
                 ShortageLines = shortageLines,
-                RequiresProduction = activeLines.Any(x => x.RequiresProduction),
+                RequiresProduction = lines.Any(x => x.CustomerOrderId == order.Id && x.IsActive && x.RequiresProduction),
                 OpticalJobId = job == null ? null : (Guid?)job.Id,
                 OpticalJobCode = job == null ? null : job.JobCode,
                 TechnicianId = job == null ? null : job.AssignedTechnicianId,

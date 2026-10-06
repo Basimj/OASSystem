@@ -30,7 +30,7 @@
 
     @if (_open && !Disabled)
     {
-        <div class="ui-lookup__results">
+        <div class="ui-lookup__results" tabindex="0" @onwheel:stopPropagation="true" @ontouchmove:stopPropagation="true">
             @if (_loading)
             {
                 <div class="ui-lookup__empty">جاري البحث...</div>

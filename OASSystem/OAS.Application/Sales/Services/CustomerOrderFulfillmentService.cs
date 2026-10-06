@@ -1,5 +1,4 @@
 using OAS.Application.Abstractions.Persistence;
-using OAS.Application.Abstractions.Persistence.Specifications;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.Sales.Abstractions;
 using OAS.Domain.Sales.Entities;
@@ -9,7 +8,6 @@ namespace OAS.Application.Sales.Services;
 
 public sealed class CustomerOrderFulfillmentService(
     ICustomerOrderAggregateRepository orders,
-    IRepository<SalesInvoice, Guid> invoices,
     ISalesStockReservationService stock,
     ISalesInvoiceFromOrderService invoiceFromOrder,
     ISalesInvoiceConfirmationService invoiceConfirmation,
@@ -24,7 +22,7 @@ public sealed class CustomerOrderFulfillmentService(
     public CustomerOrderFulfillmentService(
         ICustomerOrderAggregateRepository orders,
         ISalesStockReservationService stock)
-        : this(orders, null!, stock, null!, null!, null!, null!, null!, null!, TimeProvider.System)
+        : this(orders, stock, null!, null!, null!, null!, null!, null!, TimeProvider.System)
     {
         _completeCommercialWorkflow = false;
     }
@@ -58,26 +56,26 @@ public sealed class CustomerOrderFulfillmentService(
                 continue;
 
             // Once all materials are available, finalize the commercial document exactly once.
-            var invoice = await FindInvoiceAsync(order.Id, cancellationToken)
-                ?? await invoiceFromOrder.CreateAsync(
-                    order,
-                    DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime),
-                    DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime),
-                    null,
-                    $"فاتورة طلب العميل {order.OrderCode}",
-                    cancellationToken);
+            // SalesInvoiceFromOrderService is the single idempotent entry point: it creates a new
+            // tracked aggregate or loads the existing invoice aggregate with tracking. Avoid a
+            // detached header query followed by Update, which can break graph state/order.
+            var invoice = await invoiceFromOrder.CreateAsync(
+                order,
+                DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime),
+                DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime),
+                null,
+                $"فاتورة طلب العميل {order.OrderCode}",
+                cancellationToken);
 
             if (invoice.Status == SalesInvoiceStatus.Draft)
             {
                 await invoiceConfirmation.ConfirmAsync(invoice, cancellationToken);
-                invoices.Update(invoice);
                 await unitOfWork.SaveChangesAsync(cancellationToken);
             }
 
             if (invoice.Status == SalesInvoiceStatus.Confirmed)
             {
                 await invoicePosting.PostAsync(invoice, cancellationToken);
-                invoices.Update(invoice);
             }
 
             if (invoice.Status != SalesInvoiceStatus.Posted)
@@ -99,11 +97,4 @@ public sealed class CustomerOrderFulfillmentService(
         }
     }
 
-    private async Task<SalesInvoice?> FindInvoiceAsync(Guid orderId, CancellationToken cancellationToken)
-    {
-        var rows = await invoices.ListAsync(
-            new Specification<SalesInvoice>().Where(x => x.CustomerOrderId == orderId && x.Status != SalesInvoiceStatus.Cancelled),
-            cancellationToken);
-        return rows.OrderByDescending(x => x.CreatedAtUtc).FirstOrDefault();
-    }
 }

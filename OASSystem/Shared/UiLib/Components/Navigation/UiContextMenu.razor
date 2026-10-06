@@ -1,6 +1,6 @@
 @if (Visible)
 {
-    <div class="ui-context-menu" role="menu" @onclick:stopPropagation="true">
+    <div class="ui-context-menu" role="menu" @onclick:stopPropagation="true" @onwheel:stopPropagation="true" @ontouchmove:stopPropagation="true">
         @if (!string.IsNullOrWhiteSpace(Title))
         {
             <div class="ui-context-menu__title">@Title</div>

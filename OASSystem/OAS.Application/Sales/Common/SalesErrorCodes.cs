@@ -20,6 +20,7 @@ public static class SalesErrorCodes
     public const string PrescriptionEyeRequired = "sales_prescription_eye_required";
     public const string PrescriptionEyeDuplicate = "sales_prescription_eye_duplicate";
     public const string InvalidPrescriptionRevision = "sales_invalid_prescription_revision";
+    public const string PrescriptionOutsideLensRange = "sales_prescription_outside_lens_range";
     public const string DuplicateInvoiceCode = "sales_duplicate_invoice_code";
     public const string DuplicateOrderCode = "sales_duplicate_order_code";
     public const string DuplicatePrescriptionCode = "sales_duplicate_prescription_code";

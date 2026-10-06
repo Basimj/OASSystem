@@ -13,7 +13,7 @@
         <UiLookup Label="العملة" Value="@Model.CurrencyId" ValueChanged="CurrencyChanged" SelectedItem="@CurrencyItem"
                   SearchAsync="SearchCurrenciesAsync" Placeholder="اختر العملة..." Required="true" Disabled="@ReadOnly" />
         <UiSelect Label="طريقة الضريبة" Value="@Model.TaxCalculationMode" ValueChanged="TaxModeChanged" Disabled="@ReadOnly" Options="@TaxOptions" />
-        <UiSelect Label="شروط السداد" Value="@Model.PaymentTermType" ValueChanged="PaymentTermChanged" Disabled="@ReadOnly" Options="@PaymentOptions" />
+        <UiInputText Label="خطة السداد" Value="تُحدد عند إتمام البيع" ReadOnly="true" />
         <UiInputText Label="ملاحظات" Value="@Model.Notes" ValueChanged="NotesChanged" ReadOnly="@ReadOnly" />
     </div>
 </UiSalesFormSection>
@@ -29,7 +29,6 @@
 
 @code {
     private static readonly IReadOnlyList<UiSelectOption> TaxOptions = [new("Exclusive", "غير شامل الضريبة"), new("Inclusive", "شامل الضريبة")];
-    private static readonly IReadOnlyList<UiSelectOption> PaymentOptions = [new("Immediate", "فوري"), new("Credit", "آجل")];
     [Parameter, EditorRequired] public UiCustomerOrderFormModel Model { get; set; } = new();
     [Parameter] public bool ReadOnly { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchCustomersAsync { get; set; }
@@ -55,11 +54,5 @@
     private async Task OrderDateChanged(DateOnly? v) { Model.OrderDate = v; await OnChanged.InvokeAsync(); }
     private async Task RequiredDateChanged(DateOnly? v) { Model.RequiredDate = v; await OnChanged.InvokeAsync(); }
     private async Task TaxModeChanged(string? v) { Model.TaxCalculationMode = v ?? "Exclusive"; await OnChanged.InvokeAsync(); }
-    private async Task PaymentTermChanged(string? v)
-    {
-        Model.PaymentTermType = v ?? "Immediate";
-        await OnSelectionChanged.InvokeAsync(new("PaymentTermType", Model.PaymentTermType));
-        await OnChanged.InvokeAsync();
-    }
     private async Task NotesChanged(string? v) { Model.Notes = v; await OnChanged.InvokeAsync(); }
 }

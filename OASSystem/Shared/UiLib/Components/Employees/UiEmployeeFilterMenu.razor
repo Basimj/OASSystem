@@ -10,7 +10,7 @@
     </button>
     @if (_open && !Disabled)
     {
-        <div class="ui-employee-filter__menu">
+        <div class="ui-employee-filter__menu" @onwheel:stopPropagation="true" @ontouchmove:stopPropagation="true">
             @foreach (var option in Options)
             {
                 <button type="button"

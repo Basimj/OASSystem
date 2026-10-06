@@ -27,6 +27,7 @@ public sealed class CreateSalesInvoiceCommandHandler(
     IExchangeRateResolver rates,
     ISalesLineResolver lineResolver,
     ISalesPrescriptionValidator prescriptionValidator,
+    ILensVariantResolver lensVariantResolver,
     ISequenceNumberGenerator sequences)
     : IRequestHandler<CreateSalesInvoiceCommand, SalesInvoice>
 {
@@ -37,6 +38,10 @@ public sealed class CreateSalesInvoiceCommandHandler(
             ?? throw new NotFoundException(nameof(Customer), d.CustomerId);
 
         var paymentPlan = (SalesPaymentPlan)(byte)d.PaymentPlan;
+        if (paymentPlan == SalesPaymentPlan.PayOnPickup)
+            throw new ConflictException(
+                "direct_sale_pay_on_pickup_not_supported",
+                "الدفع عند الاستلام يتطلب طلب عميل ومسار Checkout. البيع المباشر يدعم الدفع الكامل أو الجزئي أو البيع الآجل فقط.");
         EnsureCustomer(customer, paymentPlan);
 
         if (d.Lines.Count == 0)
@@ -95,7 +100,12 @@ public sealed class CreateSalesInvoiceCommandHandler(
 
         var lineNumber = 1;
         foreach (var req in d.Lines)
-            invoice.AddLine(await BuildLineAsync(invoice, lineNumber++, req, ct));
+        {
+            var prepared = await BuildLineAsync(invoice, lineNumber++, req, ct);
+            invoice.AddLine(prepared.Line);
+            if (prepared.Snapshot is not null)
+                invoice.SetLinePrescriptionSnapshot(prepared.Line.Id, prepared.Snapshot);
+        }
 
         await repository.AddAsync(invoice, ct);
         return invoice;
@@ -112,7 +122,7 @@ public sealed class CreateSalesInvoiceCommandHandler(
             ?? throw new ConflictException("base_currency_missing", "العملة الأساسية غير موجودة.");
     }
 
-    private async Task<SalesInvoiceLine> BuildLineAsync(
+    private async Task<PreparedInvoiceLine> BuildLineAsync(
         SalesInvoice invoice,
         int number,
         SalesInvoiceLineRequest req,
@@ -131,12 +141,48 @@ public sealed class CreateSalesInvoiceCommandHandler(
             ? (EyeSide?)(byte)req.PrescriptionEye.Value
             : null;
 
-        await prescriptionValidator.ValidateLineAsync(
+        // Direct sale used to validate the selected seed variant directly.
+        // Use the same exact-lens resolution path as CustomerOrder so the stored SKU
+        // matches SPH/CYL/ADD before range validation and invoice snapshot creation.
+        var prescription = await prescriptionValidator.ValidateLineAsync(
             revision,
             eye,
             resolved.PrescriptionRequired,
-            resolved.OpticalPolicy,
-            ct);
+            opticalPolicy: null,
+            cancellationToken: ct);
+
+        if (type == SalesLineType.Lens && prescription is not null && resolved.ProductVariantId.HasValue)
+        {
+            var exact = await lensVariantResolver.ResolveAsync(
+                new LensVariantMatchRequest(
+                    resolved.ProductVariantId.Value,
+                    prescription.SPH,
+                    prescription.CYL,
+                    prescription.ADD),
+                ct);
+
+            if (exact.ProductVariantId != resolved.ProductVariantId.Value)
+            {
+                resolved = await lineResolver.ResolveAsync(
+                    type,
+                    exact.ProductVariantId,
+                    req.WarehouseId,
+                    req.Description,
+                    ct);
+            }
+        }
+
+        if (prescription is not null && resolved.OpticalPolicy is not null)
+        {
+            // Re-use the central validator so range violations become a stable
+            // application conflict with an Arabic, actionable message.
+            prescription = await prescriptionValidator.ValidateLineAsync(
+                revision,
+                eye,
+                resolved.PrescriptionRequired,
+                resolved.OpticalPolicy,
+                ct);
+        }
 
         var standardUnitPrice = resolved.ProductVariantId.HasValue
             ? SalesPricingCalculator.ConvertFromBase(
@@ -149,7 +195,7 @@ public sealed class CreateSalesInvoiceCommandHandler(
             ? standardUnitPrice
             : req.ActualUnitPrice;
 
-        return SalesInvoiceLine.Create(
+        var line = SalesInvoiceLine.Create(
             Guid.NewGuid(),
             invoice.Id,
             number,
@@ -176,7 +222,33 @@ public sealed class CreateSalesInvoiceCommandHandler(
             invoice.CurrencyDecimalPlacesSnapshot,
             invoice.ExchangeRate,
             invoice.BaseCurrencyDecimalPlacesSnapshot);
+
+        SalesInvoiceLinePrescriptionSnapshot? snapshot = null;
+        if (type == SalesLineType.Lens && prescription is not null)
+        {
+            snapshot = SalesInvoiceLinePrescriptionSnapshot.Create(
+                Guid.NewGuid(),
+                line.Id,
+                prescription.PrescriptionRevisionId,
+                prescription.Eye,
+                prescription.SPH,
+                prescription.CYL,
+                prescription.Axis,
+                prescription.ADD,
+                prescription.Prism,
+                prescription.PrismBase,
+                prescription.PD,
+                prescription.MonocularPD,
+                prescription.VA,
+                prescription.FittingHeight);
+        }
+
+        return new PreparedInvoiceLine(line, snapshot);
     }
+
+    private sealed record PreparedInvoiceLine(
+        SalesInvoiceLine Line,
+        SalesInvoiceLinePrescriptionSnapshot? Snapshot);
 
     private static void EnsureCustomer(Customer customer, SalesPaymentPlan paymentPlan)
     {

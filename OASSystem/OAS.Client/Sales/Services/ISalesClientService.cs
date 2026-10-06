@@ -33,7 +33,6 @@ public interface ISalesClientService
     Task<SalesInvoiceDto?> GetSalesInvoiceByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<SalesCodeReservationDto?> ReserveSalesInvoiceCodeAsync(DateOnly invoiceDate, CancellationToken cancellationToken = default);
     Task<SalesInvoiceDto?> CreateSalesInvoiceAsync(CreateSalesInvoiceRequest request, CancellationToken cancellationToken = default);
-    Task<SalesInvoiceDto?> CreateSalesInvoiceFromOrderAsync(Guid orderId, CreateSalesInvoiceFromOrderRequest request, CancellationToken cancellationToken = default);
     Task<SalesInvoiceDto?> UpdateSalesInvoiceAsync(Guid id, UpdateSalesInvoiceRequest request, CancellationToken cancellationToken = default);
     Task<SalesConfirmationPreValidationDto?> PreValidateSalesInvoiceConfirmationAsync(Guid id, CancellationToken cancellationToken = default);
     Task<SalesInvoiceDto?> ConfirmSalesInvoiceAsync(Guid id, ConfirmSalesInvoiceRequest request, CancellationToken cancellationToken = default);

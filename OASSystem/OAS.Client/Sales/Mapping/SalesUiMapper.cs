@@ -110,6 +110,7 @@ public static class SalesUiMapper
         ExchangeRate = dto.ExchangeRate,
         TaxCalculationMode = dto.TaxCalculationMode.ToString(),
         PaymentTermType = dto.PaymentTermType.ToString(),
+        PaymentPlan = dto.PaymentPlan.ToString(),
         PaymentTermDays = dto.PaymentTermDaysSnapshot,
         Subtotal = dto.Subtotal,
         DiscountAmount = dto.DiscountAmount,
@@ -123,79 +124,6 @@ public static class SalesUiMapper
         RowVersion = dto.RowVersion,
         Lines = dto.Lines.OrderBy(x => x.LineNumber).Select(ToUi).ToList()
     };
-
-    /// <summary>
-    /// Applies the selected customer order to a new invoice preview.
-    /// Invoice code/date/posting date/description are intentionally preserved because
-    /// they belong to the invoice itself, while all source-order business data is copied.
-    /// </summary>
-    public static void ApplyOrderToInvoice(UiSalesInvoiceFormModel invoice, CustomerOrderDto order)
-    {
-        invoice.CustomerOrderId = order.Id.ToString();
-        invoice.CustomerOrderDisplay = order.OrderCode;
-
-        invoice.CustomerId = order.CustomerId.ToString();
-        invoice.CustomerCode = order.CustomerCode ?? string.Empty;
-        invoice.CustomerDisplay = Display(order.CustomerCode, order.CustomerName);
-
-        invoice.PrescriptionRevisionId = order.PrescriptionRevisionId?.ToString() ?? string.Empty;
-        invoice.PrescriptionCode = order.PrescriptionCode ?? string.Empty;
-        invoice.PrescriptionDisplay = PrescriptionDisplay(order.PrescriptionCode, order.PrescriptionRevisionNumber);
-
-        invoice.CurrencyId = order.CurrencyId.ToString();
-        invoice.CurrencyCode = order.CurrencyCodeSnapshot;
-        invoice.CurrencyDisplay = order.CurrencyCodeSnapshot;
-        invoice.CurrencyDecimalPlaces = order.CurrencyDecimalPlacesSnapshot;
-        invoice.ExchangeRate = order.ExchangeRate;
-
-        invoice.TaxCalculationMode = order.TaxCalculationMode.ToString();
-        invoice.PaymentTermType = order.PaymentTermType.ToString();
-        invoice.PaymentTermDays = order.PaymentTermDaysSnapshot;
-        invoice.DueDate = invoice.PaymentTermType == SalesPaymentTermType.Credit.ToString() && invoice.InvoiceDate.HasValue
-            ? invoice.InvoiceDate.Value.AddDays(order.PaymentTermDaysSnapshot)
-            : null;
-
-        invoice.Subtotal = order.Subtotal;
-        invoice.DiscountAmount = order.DiscountAmount;
-        invoice.TaxAmount = order.TaxAmount;
-        invoice.TotalAmount = order.TotalAmount;
-        invoice.PaidAmount = 0m;
-        invoice.OutstandingAmount = order.TotalAmount;
-
-        invoice.Lines = order.Lines
-            .Where(x => x.IsActive)
-            .OrderBy(x => x.LineNumber)
-            .Select(ToInvoiceDraftLineFromOrder)
-            .ToList();
-    }
-
-    public static void ClearOrderFromNewInvoice(UiSalesInvoiceFormModel invoice)
-    {
-        invoice.CustomerOrderId = string.Empty;
-        invoice.CustomerOrderDisplay = null;
-        invoice.CustomerId = string.Empty;
-        invoice.CustomerCode = string.Empty;
-        invoice.CustomerDisplay = null;
-        invoice.PrescriptionRevisionId = string.Empty;
-        invoice.PrescriptionCode = string.Empty;
-        invoice.PrescriptionDisplay = null;
-        invoice.CurrencyId = string.Empty;
-        invoice.CurrencyDisplay = null;
-        invoice.CurrencyCode = string.Empty;
-        invoice.CurrencyDecimalPlaces = 2;
-        invoice.ExchangeRate = 1m;
-        invoice.TaxCalculationMode = TaxCalculationMode.Exclusive.ToString();
-        invoice.PaymentTermType = SalesPaymentTermType.Immediate.ToString();
-        invoice.PaymentTermDays = 0;
-        invoice.DueDate = null;
-        invoice.Subtotal = 0m;
-        invoice.DiscountAmount = 0m;
-        invoice.TaxAmount = 0m;
-        invoice.TotalAmount = 0m;
-        invoice.PaidAmount = 0m;
-        invoice.OutstandingAmount = 0m;
-        invoice.Lines.Clear();
-    }
 
     private static UiSalesLineModel ToUi(CustomerOrderLineDto x) => new()
     {
@@ -335,10 +263,17 @@ public static class SalesUiMapper
         new(Guid.Parse(m.CustomerId), ParseGuid(m.PrescriptionRevisionId), m.OrderDate ?? DateOnly.FromDateTime(DateTime.Today), m.RequiredDate, Guid.Parse(m.CurrencyId), Parse<TaxCalculationMode>(m.TaxCalculationMode, TaxCalculationMode.Exclusive), Parse<SalesPaymentTermType>(m.PaymentTermType, SalesPaymentTermType.Immediate), m.Notes, m.Lines.Select(ToOrderLineRequest).ToArray(), m.RowVersion);
 
     public static CreateSalesInvoiceRequest ToCreate(UiSalesInvoiceFormModel m) =>
-        new(m.InvoiceCode, Guid.Parse(m.CustomerId), ParseGuid(m.PrescriptionRevisionId), m.InvoiceDate ?? DateOnly.FromDateTime(DateTime.Today), m.PostingDate ?? DateOnly.FromDateTime(DateTime.Today), Guid.Parse(m.CurrencyId), Parse<TaxCalculationMode>(m.TaxCalculationMode, TaxCalculationMode.Exclusive), Parse<SalesPaymentTermType>(m.PaymentTermType, SalesPaymentTermType.Immediate), m.Description, m.Lines.Select(ToInvoiceLineRequest).ToArray(), ParseGuid(m.SalesEmployeeId));
+        new(m.InvoiceCode, Guid.Parse(m.CustomerId), ParseGuid(m.PrescriptionRevisionId), m.InvoiceDate ?? DateOnly.FromDateTime(DateTime.Today), m.PostingDate ?? DateOnly.FromDateTime(DateTime.Today), Guid.Parse(m.CurrencyId), Parse<TaxCalculationMode>(m.TaxCalculationMode, TaxCalculationMode.Exclusive), PaymentTermForPlan(m.PaymentPlan), m.Description, m.Lines.Select(ToInvoiceLineRequest).ToArray(), ParseGuid(m.SalesEmployeeId))
+        { PaymentPlan = Parse<SalesPaymentPlan>(m.PaymentPlan, SalesPaymentPlan.FullNow) };
 
     public static UpdateSalesInvoiceRequest ToUpdate(UiSalesInvoiceFormModel m) =>
-        new(Guid.Parse(m.CustomerId), ParseGuid(m.PrescriptionRevisionId), m.InvoiceDate ?? DateOnly.FromDateTime(DateTime.Today), m.PostingDate ?? DateOnly.FromDateTime(DateTime.Today), Guid.Parse(m.CurrencyId), Parse<TaxCalculationMode>(m.TaxCalculationMode, TaxCalculationMode.Exclusive), Parse<SalesPaymentTermType>(m.PaymentTermType, SalesPaymentTermType.Immediate), m.Description, m.Lines.Select(ToInvoiceLineRequest).ToArray(), m.RowVersion, ParseGuid(m.SalesEmployeeId));
+        new(Guid.Parse(m.CustomerId), ParseGuid(m.PrescriptionRevisionId), m.InvoiceDate ?? DateOnly.FromDateTime(DateTime.Today), m.PostingDate ?? DateOnly.FromDateTime(DateTime.Today), Guid.Parse(m.CurrencyId), Parse<TaxCalculationMode>(m.TaxCalculationMode, TaxCalculationMode.Exclusive), PaymentTermForPlan(m.PaymentPlan), m.Description, m.Lines.Select(ToInvoiceLineRequest).ToArray(), m.RowVersion, ParseGuid(m.SalesEmployeeId))
+        { PaymentPlan = Parse<SalesPaymentPlan>(m.PaymentPlan, SalesPaymentPlan.FullNow) };
+
+    private static SalesPaymentTermType PaymentTermForPlan(string? paymentPlan) =>
+        Parse<SalesPaymentPlan>(paymentPlan, SalesPaymentPlan.FullNow) == SalesPaymentPlan.AccountCredit
+            ? SalesPaymentTermType.Credit
+            : SalesPaymentTermType.Immediate;
 
     private static CustomerOrderLineRequest ToOrderLineRequest(UiSalesLineModel x) =>
         new(x.Id, x.GroupId, Parse<SalesLineType>(x.LineType, SalesLineType.Frame), ParseGuid(x.ProductVariantId), ParseGuid(x.WarehouseId), x.Description, x.Quantity, x.ActualUnitPrice, Parse<SalesDiscountType>(x.DiscountType, SalesDiscountType.None), x.DiscountValue, x.TaxRate, ParseGuid(x.PrescriptionRevisionId), ParseNullable<EyeSide>(x.PrescriptionEye), x.RequiresProduction, x.Notes, string.IsNullOrWhiteSpace(x.RowVersion) ? null : x.RowVersion);

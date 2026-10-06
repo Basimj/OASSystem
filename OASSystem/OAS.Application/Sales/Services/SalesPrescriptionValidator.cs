@@ -4,6 +4,7 @@ using OAS.Application.Common.Exceptions;
 using OAS.Application.Sales.Abstractions;
 using OAS.Application.Sales.Common;
 using OAS.Domain.Sales.Entities;
+using OAS.Domain.Exceptions;
 using OAS.Domain.Sales.Enums;
 using OAS.Domain.Sales.ValueObjects;
 
@@ -37,8 +38,38 @@ public sealed class SalesPrescriptionValidator(
             ?? throw new ConflictException(SalesErrorCodes.InvalidPrescriptionRevision, "لا توجد قياسات فعالة للعين المحددة في إصدار الوصفة.");
 
         if (opticalPolicy is not null)
-            detail.ValidateAgainst(opticalPolicy);
+        {
+            try
+            {
+                detail.ValidateAgainst(opticalPolicy);
+            }
+            catch (DomainException)
+            {
+                throw new ConflictException(
+                    SalesErrorCodes.PrescriptionOutsideLensRange,
+                    BuildRangeMessage(detail, opticalPolicy));
+            }
+        }
 
         return detail;
     }
+
+    private static string BuildRangeMessage(
+        PrescriptionEyeDetail detail,
+        OpticalPrescriptionRangePolicy policy)
+    {
+        var issues = new List<string>();
+
+        if (detail.SPH.HasValue && !policy.Sphere.Contains(detail.SPH.Value))
+            issues.Add($"SPH {detail.SPH.Value:0.##} (المسموح {policy.Sphere.Minimum:0.##} إلى {policy.Sphere.Maximum:0.##})");
+        if (detail.CYL.HasValue && !policy.Cylinder.Contains(detail.CYL.Value))
+            issues.Add($"CYL {detail.CYL.Value:0.##} (المسموح {policy.Cylinder.Minimum:0.##} إلى {policy.Cylinder.Maximum:0.##})");
+        if (detail.ADD.HasValue && !policy.Add.Contains(detail.ADD.Value))
+            issues.Add($"ADD {detail.ADD.Value:0.##} (المسموح {policy.Add.Minimum:0.##} إلى {policy.Add.Maximum:0.##})");
+
+        var eye = detail.Eye == EyeSide.RightOD ? "العين اليمنى OD" : "العين اليسرى OS";
+        var detailText = issues.Count == 0 ? "القياسات خارج نطاق العدسة." : string.Join("، ", issues);
+        return $"قياسات {eye} لا تتوافق مع نطاق العدسة المحددة: {detailText} اختر عدسة/SKU يدعم القياسات أو صحح نطاق العدسة في بيانات المنتج.";
+    }
+
 }

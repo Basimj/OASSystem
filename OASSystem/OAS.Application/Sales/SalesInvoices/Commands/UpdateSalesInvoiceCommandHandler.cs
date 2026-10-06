@@ -63,6 +63,11 @@ public sealed class UpdateSalesInvoiceCommandHandler(
         var paymentPlan =
             (SalesPaymentPlan)(byte)request.Data.PaymentPlan;
 
+        if (!invoice.CustomerOrderId.HasValue && paymentPlan == SalesPaymentPlan.PayOnPickup)
+            throw new ConflictException(
+                "direct_sale_pay_on_pickup_not_supported",
+                "الدفع عند الاستلام يتطلب طلب عميل ومسار Checkout. البيع المباشر يدعم الدفع الكامل أو الجزئي أو البيع الآجل فقط.");
+
         if (paymentPlan == SalesPaymentPlan.AccountCredit &&
             (string.IsNullOrWhiteSpace(customer.CustomerCode) || !customer.IsCreditAllowed))
         {

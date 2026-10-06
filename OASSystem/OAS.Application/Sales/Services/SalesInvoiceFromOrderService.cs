@@ -16,7 +16,6 @@ public sealed class SalesInvoiceFromOrderService(
     IReadRepository<AccountingSettings, Guid> settings,
     IReadRepository<Currency, Guid> currencies,
     IReadRepository<CustomerOrderLineOpticalSnapshot, Guid> orderSnapshots,
-    IRepository<SalesInvoiceLinePrescriptionSnapshot, Guid> invoiceSnapshots,
     ISalesLineResolver lineResolver,
     ISequenceNumberGenerator sequences) : ISalesInvoiceFromOrderService
 {
@@ -105,7 +104,6 @@ public sealed class SalesInvoiceFromOrderService(
                 optical.VA,
                 optical.FittingHeight);
             invoice.SetLinePrescriptionSnapshot(invoiceLine.Id, snapshot);
-            await invoiceSnapshots.AddAsync(snapshot, cancellationToken);
         }
 
         await invoices.AddAsync(invoice, cancellationToken);

@@ -156,6 +156,7 @@ public sealed class UiSalesInvoiceFormModel
     public decimal ExchangeRate { get; set; } = 1m;
     public string TaxCalculationMode { get; set; } = "Exclusive";
     public string PaymentTermType { get; set; } = "Immediate";
+    public string PaymentPlan { get; set; } = "FullNow";
     public int PaymentTermDays { get; set; }
     public decimal Subtotal { get; set; }
     public decimal DiscountAmount { get; set; }
@@ -165,14 +166,11 @@ public sealed class UiSalesInvoiceFormModel
     public decimal OutstandingAmount { get; set; }
     public Guid? JournalEntryId { get; set; }
     public string? JournalEntryNumber { get; set; }
-    public string ImmediatePaymentMethod { get; set; } = "Cash";
-    public string ImmediateCashAccountId { get; set; } = string.Empty;
-    public string? ImmediateCashAccountDisplay { get; set; }
-    public string ImmediateBankAccountId { get; set; } = string.Empty;
-    public string? ImmediateBankAccountDisplay { get; set; }
     public string? Description { get; set; }
     public string RowVersion { get; set; } = string.Empty;
     public List<UiSalesLineModel> Lines { get; set; } = [];
+    // Transient settlement input used only while posting a confirmed direct invoice.
+    public List<UiCheckoutPaymentLineModel> PaymentLines { get; set; } = [];
     public List<string> PostingIssues { get; set; } = [];
 }
 

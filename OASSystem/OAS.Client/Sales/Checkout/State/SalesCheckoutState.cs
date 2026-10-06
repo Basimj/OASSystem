@@ -26,7 +26,13 @@ public sealed class SalesCheckoutState
     public void SetResult(CheckoutCustomerOrderResultDto? result)
     {
         Result = result;
-        if (result is not null) { Success = $"تم تنفيذ العملية للطلب {result.OrderCode}."; IdempotencyKey = Guid.NewGuid().ToString("N"); }
+        if (result is not null)
+        {
+            Success = string.IsNullOrWhiteSpace(result.InvoiceCode)
+                ? $"تم تنفيذ العملية للطلب {result.OrderCode}."
+                : $"تم تنفيذ العملية للطلب {result.OrderCode} وإنشاء الفاتورة {result.InvoiceCode}.";
+            IdempotencyKey = Guid.NewGuid().ToString("N");
+        }
     }
 
     public void ClearMessages(){ Error=null; Success=null; }

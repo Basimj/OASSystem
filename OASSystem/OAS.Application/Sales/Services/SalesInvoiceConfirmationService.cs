@@ -6,6 +6,7 @@ using OAS.Application.Sales.Abstractions;
 using OAS.Application.Sales.Authorization;
 using OAS.Application.Sales.Common;
 using OAS.Domain.Accounting.Entities;
+using OAS.Domain.Exceptions;
 using OAS.Domain.Sales.Entities;
 using OAS.Domain.Sales.Enums;
 
@@ -33,6 +34,10 @@ public sealed class SalesInvoiceConfirmationService(
             ?? throw new NotFoundException(nameof(Customer), invoice.CustomerId);
         if (!customer.IsActive)
             throw new ConflictException(SalesErrorCodes.CustomerInactive, "العميل غير فعال.");
+
+        if (invoice.PaymentPlan == SalesPaymentPlan.AccountCredit &&
+            !await permissions.HasPermissionAsync(SalesPermissions.Credit.Use, cancellationToken))
+            throw new ForbiddenException("ليس لديك صلاحية استخدام البيع الآجل.", SalesPermissions.Credit.Use);
 
         var hasDiscount = invoice.Lines.Any(x => x.IsActive && x.DiscountAmount > 0);
         if (hasDiscount && !await permissions.HasPermissionAsync(SalesPermissions.Discount, cancellationToken))
@@ -66,7 +71,16 @@ public sealed class SalesInvoiceConfirmationService(
             }
             else if (resolved.OpticalPolicy is not null)
             {
-                line.PrescriptionSnapshot.ValidateAgainst(resolved.OpticalPolicy);
+                try
+                {
+                    line.PrescriptionSnapshot.ValidateAgainst(resolved.OpticalPolicy);
+                }
+                catch (DomainException)
+                {
+                    throw new ConflictException(
+                        SalesErrorCodes.PrescriptionOutsideLensRange,
+                        "قياسات الوصفة المحفوظة في الفاتورة لم تعد ضمن نطاق العدسة المحددة. راجع نطاق العدسة أو اختر SKU متوافقًا قبل التأكيد.");
+                }
             }
 
             if (line.ActualUnitPrice != line.BaseUnitPrice)
