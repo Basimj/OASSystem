@@ -5,6 +5,7 @@ using OAS.Application;
 using OAS.Infrastructure;
 using OAS.Application.Abstractions.Security;
 using OAS.Application.Database.Abstractions;
+using OAS.Application.Purchasing.Abstractions;
 
 namespace OAS.Tests;
 
@@ -34,6 +35,11 @@ public sealed class DependencyInjectionValidationTests
         services.AddSingleton<IDatabaseProfileSelection>(new TestDatabaseProfileSelection());
         services.AddApplication();
         services.AddInfrastructure(configuration);
+
+        Assert.That(services.Any(descriptor => descriptor.ServiceType == typeof(ICustomerDemandSourcingService)), Is.True,
+            "Customer-demand sourcing service must be registered before Purchasing MediatR handlers are activated.");
+        Assert.That(services.Any(descriptor => descriptor.ServiceType == typeof(IPurchasingCommercialTermsPort)), Is.True,
+            "Purchasing commercial-terms resolver must be registered for customer-demand PO sourcing.");
 
         // This enforces validation of all registered services and their constructor dependencies
         var options = new ServiceProviderOptions

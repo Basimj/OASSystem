@@ -35,6 +35,8 @@ public static class DependencyInjection
         services.TryAddScoped<IPurchaseMatchingService, PurchaseMatchingService>();
         services.TryAddScoped<IPurchaseReturnInventoryPostingService, PurchaseReturnInventoryPostingService>();
         services.TryAddScoped<ICustomerDemandProcurementPort, CustomerDemandProcurementService>();
+        services.TryAddScoped<IPurchasingCommercialTermsPort, DefaultPurchasingCommercialTermsService>();
+        services.TryAddScoped<ICustomerDemandSourcingService, CustomerDemandSourcingService>();
         services.AddScoped<IPaymentAllocationTargetValidator, PurchaseInvoicePaymentAllocationTargetValidator>();
         services.AddScoped<IPaymentAllocationSourceTargetValidator, PurchaseInvoicePaymentAllocationTargetValidator>();
 
