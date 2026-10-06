@@ -15,6 +15,9 @@ public sealed record AccountingSettingsDto(
     Guid? TaxPayableAccountId,
     Guid? InventoryAccountId,
     Guid? CogsAccountId,
+    Guid? GrniAccountId,
+    Guid? PurchaseTaxAccountId,
+    Guid? PurchasePriceVarianceAccountId,
     ExchangeRateType DefaultExchangeRateType,
     string RowVersion,
     Guid? RetainedEarningsAccountId);

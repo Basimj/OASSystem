@@ -15,4 +15,7 @@ public sealed record UpdateAccountingSettingsRequest(
     Guid? CogsAccountId,
     ExchangeRateType DefaultExchangeRateType = ExchangeRateType.Accounting,
     string? RowVersion = null,
-    Guid? RetainedEarningsAccountId = null);
+    Guid? RetainedEarningsAccountId = null,
+    Guid? GrniAccountId = null,
+    Guid? PurchaseTaxAccountId = null,
+    Guid? PurchasePriceVarianceAccountId = null);

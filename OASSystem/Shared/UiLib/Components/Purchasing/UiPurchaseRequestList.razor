@@ -1,6 +1,6 @@
 @namespace OAS.UiLib.Components.Purchasing
 @using OAS.UiLib.Core.Models.Purchasing
-<UiPurchasingList Items="Items" Loading="Loading" EmptyText="EmptyText" OnOpen="OnOpen" />
+<UiPurchasingList Items="@Items" Loading="@Loading" EmptyText="@EmptyText" OnOpen="@OnOpen" />
 @code {
     [Parameter] public IReadOnlyList<UiPurchasingListItem> Items { get; set; } = [];
     [Parameter] public bool Loading { get; set; }

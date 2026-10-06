@@ -77,6 +77,9 @@ public partial class AccountingSetupPage
     private Guid? _settingsInventoryAccountId;
 
     private Guid? _settingsCogsAccountId;
+    private Guid? _settingsGrniAccountId;
+    private Guid? _settingsPurchaseTaxAccountId;
+    private Guid? _settingsPurchasePriceVarianceAccountId;
 
 
     // ================================================================
@@ -208,6 +211,15 @@ public partial class AccountingSetupPage
     private UiLookupItem? CogsAccountLookupItem =>
         GetAccountLookupItem(_settingsCogsAccountId, AccountingAccountEligibilityContext.CostOfGoodsSold);
 
+    private UiLookupItem? GrniAccountLookupItem =>
+        GetAccountLookupItem(_settingsGrniAccountId, AccountingAccountEligibilityContext.GoodsReceivedNotInvoiced);
+
+    private UiLookupItem? PurchaseTaxAccountLookupItem =>
+        GetAccountLookupItem(_settingsPurchaseTaxAccountId, AccountingAccountEligibilityContext.PurchaseTax);
+
+    private UiLookupItem? PurchasePriceVarianceAccountLookupItem =>
+        GetAccountLookupItem(_settingsPurchasePriceVarianceAccountId, AccountingAccountEligibilityContext.PurchasePriceVariance);
+
     private UiLookupItem? ExchangeGainAccountLookupItem =>
         GetAccountLookupItem(_settingsExchangeGainAccountId, AccountingAccountEligibilityContext.ExchangeGain);
 
@@ -246,6 +258,15 @@ public partial class AccountingSetupPage
         string search,
         CancellationToken cancellationToken) =>
         SearchAccountsAsync(search, AccountingAccountEligibilityContext.CostOfGoodsSold, cancellationToken);
+
+    private Task<IReadOnlyList<UiLookupItem>> SearchGrniAccountsAsync(string search, CancellationToken cancellationToken) =>
+        SearchAccountsAsync(search, AccountingAccountEligibilityContext.GoodsReceivedNotInvoiced, cancellationToken);
+
+    private Task<IReadOnlyList<UiLookupItem>> SearchPurchaseTaxAccountsAsync(string search, CancellationToken cancellationToken) =>
+        SearchAccountsAsync(search, AccountingAccountEligibilityContext.PurchaseTax, cancellationToken);
+
+    private Task<IReadOnlyList<UiLookupItem>> SearchPurchasePriceVarianceAccountsAsync(string search, CancellationToken cancellationToken) =>
+        SearchAccountsAsync(search, AccountingAccountEligibilityContext.PurchasePriceVariance, cancellationToken);
 
     private Task<IReadOnlyList<UiLookupItem>> SearchExchangeGainAccountsAsync(
         string search,
@@ -477,6 +498,10 @@ public partial class AccountingSetupPage
         _settingsCogsAccountId = ParseNullableGuid(value);
         return Task.CompletedTask;
     }
+
+    private Task SetGrniAccount(string? value) { _settingsGrniAccountId = ParseNullableGuid(value); return Task.CompletedTask; }
+    private Task SetPurchaseTaxAccount(string? value) { _settingsPurchaseTaxAccountId = ParseNullableGuid(value); return Task.CompletedTask; }
+    private Task SetPurchasePriceVarianceAccount(string? value) { _settingsPurchasePriceVarianceAccountId = ParseNullableGuid(value); return Task.CompletedTask; }
 
     private Task SetExchangeGainAccount(string? value)
     {
@@ -781,9 +806,10 @@ public partial class AccountingSetupPage
                 .InventoryAccountId;
 
 
-        _settingsCogsAccountId =
-            settings?
-                .CogsAccountId;
+        _settingsCogsAccountId = settings?.CogsAccountId;
+        _settingsGrniAccountId = settings?.GrniAccountId;
+        _settingsPurchaseTaxAccountId = settings?.PurchaseTaxAccountId;
+        _settingsPurchasePriceVarianceAccountId = settings?.PurchasePriceVarianceAccountId;
     }
 
 
@@ -863,6 +889,23 @@ public partial class AccountingSetupPage
                     return;
                 }
 
+                if (!await ValidateSettingsAccountAsync(_settingsGrniAccountId, AccountingAccountEligibilityContext.GoodsReceivedNotInvoiced, "حساب بضاعة مستلمة غير مفوترة")) return;
+                if (!await ValidateSettingsAccountAsync(_settingsPurchaseTaxAccountId, AccountingAccountEligibilityContext.PurchaseTax, "حساب ضريبة المشتريات")) return;
+                if (!await ValidateSettingsAccountAsync(_settingsPurchasePriceVarianceAccountId, AccountingAccountEligibilityContext.PurchasePriceVariance, "حساب فرق سعر المشتريات")) return;
+
+                var hasPurchasingReceiptAccount = _settingsInventoryAccountId.HasValue || _settingsGrniAccountId.HasValue;
+                if (hasPurchasingReceiptAccount && (!_settingsInventoryAccountId.HasValue || !_settingsGrniAccountId.HasValue))
+                {
+                    Snackbar.Warning("لترحيل استلامات المشتريات حدد حساب المخزون وحساب بضاعة مستلمة غير مفوترة (GRNI).");
+                    return;
+                }
+
+                if ((_settingsPurchaseTaxAccountId.HasValue || _settingsPurchasePriceVarianceAccountId.HasValue) && !_settingsGrniAccountId.HasValue)
+                {
+                    Snackbar.Warning("حدد حساب GRNI قبل إعداد حساب ضريبة المشتريات أو فرق سعر المشتريات.");
+                    return;
+                }
+
                 var salesPostingAccounts = new[]
                 {
                     _settingsSalesRevenueAccountId,
@@ -871,8 +914,8 @@ public partial class AccountingSetupPage
                     _settingsCogsAccountId
                 };
 
-                if (salesPostingAccounts.Any(x => x.HasValue) &&
-                    salesPostingAccounts.Any(x => !x.HasValue))
+                var hasSalesSpecificAccount = _settingsSalesRevenueAccountId.HasValue || _settingsTaxPayableAccountId.HasValue || _settingsCogsAccountId.HasValue;
+                if (hasSalesSpecificAccount && salesPostingAccounts.Any(x => !x.HasValue))
                 {
                     Snackbar.Warning(
                         "حدد حسابات ترحيل المبيعات الأربعة: الإيرادات، الضرائب، المخزون، وتكلفة البضاعة المباعة.");
@@ -932,7 +975,10 @@ public partial class AccountingSetupPage
                                 _settings?
                                     .RowVersion,
 
-                                _settingsRetainedEarningsAccountId));
+                                _settingsRetainedEarningsAccountId,
+                                _settingsGrniAccountId,
+                                _settingsPurchaseTaxAccountId,
+                                _settingsPurchasePriceVarianceAccountId));
 
 
                 if (updated is null)

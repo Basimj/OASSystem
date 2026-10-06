@@ -182,8 +182,8 @@ public sealed class PurchaseOrder : AuditableEntity<Guid>
 
     public void Close(DateTimeOffset at, string? by)
     {
-        if (Status != PurchaseOrderStatus.FullyReceived)
-            throw new DomainException("Only fully received purchase orders can be closed after all closing checks pass.");
+        if (Status is not (PurchaseOrderStatus.FullyReceived or PurchaseOrderStatus.PartiallyReceived))
+            throw new DomainException("Only fully or partially received purchase orders can be closed after all closing checks pass.");
         Status = PurchaseOrderStatus.Closed;
         ClosedAt = at;
         ClosedBy = PurchasingDomainGuard.User(by);

@@ -50,8 +50,11 @@ public sealed class GetAccountingSettingsQueryHandler(
             entity.ExchangeLossAccountId,
             roles.SalesRevenueAccountId,
             roles.TaxPayableAccountId,
-            roles.InventoryAccountId,
+            entity.InventoryAccountId ?? roles.InventoryAccountId,
             roles.CogsAccountId,
+            entity.GrniAccountId,
+            entity.PurchaseTaxAccountId,
+            entity.PurchasePriceVarianceAccountId,
             (ContractRateType)(byte)entity.DefaultExchangeRateType,
             Convert.ToBase64String(entity.RowVersion),
             entity.RetainedEarningsAccountId);

@@ -36,14 +36,30 @@ public sealed class SupplierCatalogRepository(OasDbContext dbContext) : ISupplie
 
     public async Task<PurchasingCatalogDefaults?> GetPurchaseDefaultsAsync(Guid supplierId, Guid productVariantId, Guid currencyId, CancellationToken cancellationToken = default)
     {
-        var row = await (from item in Items.AsNoTracking()
-                         join price in Prices.AsNoTracking() on item.Id equals price.SupplierCatalogItemId
-                         where item.SupplierId == supplierId && item.ProductVariantId == productVariantId && item.IsActive
-                               && price.CurrencyId == currencyId && price.IsCurrent
-                         orderby item.IsPreferred descending, price.EffectiveFrom descending
-                         select new { item.Id, item.PurchaseUnitId, item.UnitConversionFactor, price.UnitPrice })
+        // Prefer an active supplier-catalog row that has a current price in the requested currency.
+        var priced = await (from item in Items.AsNoTracking()
+                            join price in Prices.AsNoTracking() on item.Id equals price.SupplierCatalogItemId
+                            where item.SupplierId == supplierId && item.ProductVariantId == productVariantId && item.IsActive
+                                  && price.CurrencyId == currencyId && price.IsCurrent
+                            orderby item.IsPreferred descending, price.EffectiveFrom descending
+                            select new { item.Id, item.PurchaseUnitId, item.UnitConversionFactor, price.UnitPrice })
             .FirstOrDefaultAsync(cancellationToken);
-        return row is null ? null : new PurchasingCatalogDefaults(row.Id, row.PurchaseUnitId, row.UnitConversionFactor, row.UnitPrice);
+
+        if (priced is not null)
+            return new PurchasingCatalogDefaults(priced.Id, priced.PurchaseUnitId, priced.UnitConversionFactor, priced.UnitPrice);
+
+        // A catalog entry without a current price must not block creation of a PO draft.
+        // Keep the supplier's purchase unit/conversion and let the user enter the commercial price on the draft.
+        var catalog = await Items.AsNoTracking()
+            .Where(x => x.SupplierId == supplierId && x.ProductVariantId == productVariantId && x.IsActive)
+            .OrderByDescending(x => x.IsPreferred)
+            .ThenBy(x => x.SupplierProductName)
+            .Select(x => new { x.Id, x.PurchaseUnitId, x.UnitConversionFactor })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return catalog is null
+            ? null
+            : new PurchasingCatalogDefaults(catalog.Id, catalog.PurchaseUnitId, catalog.UnitConversionFactor, null);
     }
 
     public Task<SupplierPriceHistory?> GetPriceForUpdateAsync(Guid priceId, CancellationToken cancellationToken = default) =>

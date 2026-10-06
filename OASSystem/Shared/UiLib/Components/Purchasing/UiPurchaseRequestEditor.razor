@@ -7,14 +7,14 @@
         <UiPurchasingFormGrid>
             <UiSelect Label="نوع الطلب" Value="@Model.RequestType.ToString()" Options="RequestTypeOptions" Disabled="@(!IsEditable)" OnValueChanged="RequestTypeChanged" />
             <UiLookup Label="المخزن" Required="true" Value="@GuidText(Model.WarehouseId)" SelectedItem="@Selected(Model.WarehouseId,Model.WarehouseName,"fa-solid fa-warehouse")" SearchAsync="WarehouseSearchAsync" ValueChanged="WarehouseChanged" Disabled="@(!IsEditable)" />
-            <UiInputDate Label="تاريخ الطلب" Value="Model.RequestDate" ValueChanged="RequestDateChanged" Disabled="@(!IsEditable)" Required="true" />
-            <UiInputDate Label="التاريخ المطلوب" Value="Model.RequiredDate" ValueChanged="RequiredDateChanged" Disabled="@(!IsEditable)" />
+            <UiInputDate Label="تاريخ الطلب" Value="@Model.RequestDate" ValueChanged="RequestDateChanged" Disabled="@(!IsEditable)" Required="true" />
+            <UiInputDate Label="التاريخ المطلوب" Value="@Model.RequiredDate" ValueChanged="RequiredDateChanged" Disabled="@(!IsEditable)" />
             @if (Model.RequestType == 1)
             {
                 <UiInputText Label="مرجع طلب العميل" Value="@(Model.CustomerOrderId?.ToString("D"))" ValueChanged="CustomerOrderChanged" Disabled="@(!IsEditable)" />
             }
-            <UiInputText Label="سبب الطلب" Value="Model.Reason" ValueChanged="ReasonChanged" Disabled="@(!IsEditable)" MaxLength="500" />
-            <UiInputText Label="ملاحظات" Value="Model.Notes" ValueChanged="NotesChanged" Disabled="@(!IsEditable)" MaxLength="1000" />
+            <UiInputText Label="سبب الطلب" Value="@Model.Reason" ValueChanged="ReasonChanged" Disabled="@(!IsEditable)" MaxLength="500" />
+            <UiInputText Label="ملاحظات" Value="@Model.Notes" ValueChanged="NotesChanged" Disabled="@(!IsEditable)" MaxLength="1000" />
         </UiPurchasingFormGrid>
     </UiPurchasingSection>
     <UiPurchasingSection Title="بنود الطلب" Subtitle="المنتجات والكميات المطلوبة">
@@ -29,10 +29,10 @@
                     <div class="ui-purchasing-line-card__head"><strong>البند @line.LineSequence</strong>@if(IsEditable){<UiButton Text="حذف" IconCssClass="fa-regular fa-trash-can" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="@(_=>RemoveLineAsync(line))" />}</div>
                     <UiPurchasingFormGrid>
                         <UiLookup Label="المنتج" Required="true" Value="@GuidText(line.ProductVariantId)" SelectedItem="@Selected(line.ProductVariantId,line.ProductName,"fa-solid fa-box")" SearchAsync="ProductSearchAsync" ValueChanged="@(v=>ProductChanged(line,v))" Disabled="@(!IsEditable)" />
-                        <UiPurchasingNumberField Label="الكمية المطلوبة" Value="line.RequestedQuantity" ValueChanged="@(v=>LineQuantityChanged(line,v))" Disabled="@(!IsEditable)" />
-                        <UiInputDate Label="التاريخ المطلوب" Value="line.RequiredDate" ValueChanged="@(v=>LineDateChanged(line,v))" Disabled="@(!IsEditable)" />
+                        <UiPurchasingNumberField Label="الكمية المطلوبة" Value="@line.RequestedQuantity" ValueChanged="@(v=>LineQuantityChanged(line,v))" Disabled="@(!IsEditable)" />
+                        <UiInputDate Label="التاريخ المطلوب" Value="@line.RequiredDate" ValueChanged="@(v=>LineDateChanged(line,v))" Disabled="@(!IsEditable)" />
                         <UiLookup Label="المورد المفضل" Value="@GuidText(line.PreferredSupplierId)" SelectedItem="@Selected(line.PreferredSupplierId,line.PreferredSupplierName,"fa-solid fa-truck-field")" SearchAsync="SupplierSearchAsync" ValueChanged="@(v=>LineSupplierChanged(line,v))" Disabled="@(!IsEditable)" />
-                        <UiInputText Label="ملاحظات البند" Value="line.Notes" ValueChanged="@(v=>LineNotesChanged(line,v))" Disabled="@(!IsEditable)" />
+                        <UiInputText Label="ملاحظات البند" Value="@line.Notes" ValueChanged="@(v=>LineNotesChanged(line,v))" Disabled="@(!IsEditable)" />
                     </UiPurchasingFormGrid>
                     @if (line.Id.HasValue)
                     {

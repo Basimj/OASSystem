@@ -59,7 +59,7 @@ public sealed class PurchaseOrderRepository(OasDbContext dbContext) : IPurchaseO
     public async Task<bool> CanCloseAsync(Guid purchaseOrderId, CancellationToken cancellationToken = default)
     {
         var order = await Orders.AsNoTracking().Include(x => x.Lines).FirstOrDefaultAsync(x => x.Id == purchaseOrderId, cancellationToken);
-        if (order is null || order.Status != DomainOrderStatus.FullyReceived) return false;
+        if (order is null || order.Status is not (DomainOrderStatus.FullyReceived or DomainOrderStatus.PartiallyReceived)) return false;
         if (await Receipts.AsNoTracking().AnyAsync(x => x.PurchaseOrderId == purchaseOrderId && x.Status != DomainReceiptStatus.Posted && x.Status != DomainReceiptStatus.Cancelled, cancellationToken)) return false;
         var poLineIds = order.Lines.Select(x => x.Id).ToArray();
         var invoiceIds = await InvoiceLines.AsNoTracking().Where(x => x.PurchaseOrderLineId.HasValue && poLineIds.Contains(x.PurchaseOrderLineId.Value)).Select(x => x.PurchaseInvoiceId).Distinct().ToListAsync(cancellationToken);

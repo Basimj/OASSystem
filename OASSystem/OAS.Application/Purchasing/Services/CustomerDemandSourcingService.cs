@@ -139,7 +139,7 @@ public sealed class CustomerDemandSourcingService(
             lineId, order.Id, lineSequence, requestLine.ProductVariantId,
             defaults.CatalogItemId, defaults.PurchaseUnitId, defaults.UnitConversionFactor,
             product!.ProductCode, product.ProductName, unit!.Name,
-            orderedQty, defaults.UnitPrice, 0m, 0m, order.TaxCalculationMode,
+            orderedQty, defaults.UnitPrice ?? 0m, 0m, 0m, order.TaxCalculationMode,
             expectedDeliveryDate ?? requestLine.RequiredDate, requestLine.Notes);
         order.AddLine(poLine);
         sources.Add(PurchaseOrderLineSource.Create(Guid.NewGuid(), lineId, requestLine.Id, remaining));

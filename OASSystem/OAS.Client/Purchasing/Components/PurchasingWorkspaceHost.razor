@@ -20,14 +20,14 @@
                 <UiButton Text="إغلاق" IconCssClass="fa-solid fa-xmark" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CloseActiveAsync" />
                 @if (ShowSubmitRequest) { <UiButton Text="إرسال للاعتماد" IconCssClass="fa-solid fa-paper-plane" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="SubmitRequestAsync" /> }
                 @if (ShowApproveRequest) { <UiButton Text="اعتماد" IconCssClass="fa-solid fa-circle-check" Size="ControlSize.Small" OnClick="ApproveRequestAsync" /><UiButton Text="رفض" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" OnClick="RejectRequestAsync" /> }
-                @if (ShowCancelRequest) { <UiButton Text="إلغاء الطلب" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" OnClick="CancelRequestAsync" /> }
+                @if (ShowCancelRequest) { <UiButton Text="@CancelRequestText" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" OnClick="CancelRequestAsync" /> }
                 @if (ShowCreateOrderFromRequest) { <UiButton Text="إنشاء أمر شراء" IconCssClass="fa-solid fa-file-circle-plus" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="CreateOrderFromRequestAsync" /> }
 
                 @if (ShowSubmitOrder) { <UiButton Text="إرسال للاعتماد" IconCssClass="fa-solid fa-paper-plane" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="SubmitOrderAsync" /> }
                 @if (ShowApproveOrder) { <UiButton Text="اعتماد" IconCssClass="fa-solid fa-circle-check" Size="ControlSize.Small" OnClick="ApproveOrderAsync" /><UiButton Text="رفض" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" OnClick="RejectOrderAsync" /> }
                 @if (ShowSendOrder) { <UiButton Text="إرسال للمورد" IconCssClass="fa-solid fa-paper-plane" Size="ControlSize.Small" OnClick="SendOrderAsync" /> }
                 @if (ShowCreateReceipt) { <UiButton Text="إنشاء استلام" IconCssClass="fa-solid fa-truck-ramp-box" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="CreateReceiptFromOrderAsync" /> }
-                @if (ShowCloseOrder) { <UiButton Text="إغلاق الأمر" IconCssClass="fa-solid fa-lock" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="CloseOrderAsync" /> }
+                @if (ShowCloseOrder) { <UiButton Text="@CloseOrderText" IconCssClass="fa-solid fa-lock" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="CloseOrderAsync" /> }
                 @if (ShowCancelOrder) { <UiButton Text="إلغاء الأمر" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" OnClick="CancelOrderAsync" /> }
 
                 @if (ShowConfirmReceipt) { <UiButton Text="تأكيد" IconCssClass="fa-solid fa-circle-check" Size="ControlSize.Small" OnClick="ConfirmReceiptAsync" /> }
@@ -87,7 +87,7 @@
         }
         else if (ActiveTab?.Model is UiPurchaseOrderEditorModel order)
         {
-            <UiPurchaseOrderEditor Model="order" IsEditable="@IsEditable" SupplierSearchAsync="SearchSuppliersAsync" WarehouseSearchAsync="SearchWarehousesAsync" ProductSearchAsync="SearchProductsAsync" UnitSearchAsync="SearchUnitsAsync" CurrencySearchAsync="SearchCurrenciesAsync" OnChanged="EditorChangedAsync" />
+            <UiPurchaseOrderEditor Model="order" IsEditable="@IsEditable" SupplierSearchAsync="SearchSuppliersAsync" WarehouseSearchAsync="SearchWarehousesAsync" ProductSearchAsync="SearchProductsAsync" UnitSearchAsync="SearchUnitsAsync" CurrencySearchAsync="SearchCurrenciesAsync" OnSupplierChanged="PurchaseOrderSupplierChangedAsync" OnCurrencyChanged="PurchaseOrderCurrencyChangedAsync" OnOrderDateChanged="PurchaseOrderDateChangedAsync" OnLineUnitChanged="PurchaseOrderLineUnitChangedAsync" OnChanged="EditorChangedAsync" />
         }
         else if (ActiveTab?.Model is UiPurchaseReceiptEditorModel receipt)
         {

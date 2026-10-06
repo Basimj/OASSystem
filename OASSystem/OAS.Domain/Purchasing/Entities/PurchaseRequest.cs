@@ -73,6 +73,14 @@ public sealed class PurchaseRequest : AuditableEntity<Guid>
     public void Approve(DateTimeOffset at,string? by){if(Status!=PurchaseRequestStatus.PendingApproval)throw new DomainException("Only pending purchase requests can be approved.");Status=PurchaseRequestStatus.Approved;ApprovedAt=at;ApprovedBy=PurchasingDomainGuard.User(by);}
     public void Reject(DateTimeOffset at,string? by,string reason){if(Status!=PurchaseRequestStatus.PendingApproval)throw new DomainException("Only pending purchase requests can be rejected.");Status=PurchaseRequestStatus.Rejected;RejectedAt=at;RejectedBy=PurchasingDomainGuard.User(by);RejectionReason=PurchasingDomainGuard.Required(reason,500,"Rejection reason");}
     public void MarkConversion(decimal allocatedQuantity, decimal requestedQuantityTotal){if(Status is not (PurchaseRequestStatus.Approved or PurchaseRequestStatus.PartiallyConverted or PurchaseRequestStatus.Converted))throw new DomainException("Only approved purchase requests can be converted.");PurchasingDomainGuard.NonNegative(allocatedQuantity,"Allocated quantity");PurchasingDomainGuard.Positive(requestedQuantityTotal,"Requested quantity total");if(allocatedQuantity>requestedQuantityTotal)throw new DomainException("Allocated quantity cannot exceed requested quantity.");Status=allocatedQuantity==requestedQuantityTotal?PurchaseRequestStatus.Converted:allocatedQuantity>0?PurchaseRequestStatus.PartiallyConverted:PurchaseRequestStatus.Approved;}
-    public void Cancel(DateTimeOffset at,string? by,string? reason){if(Status is not (PurchaseRequestStatus.Draft or PurchaseRequestStatus.Approved))throw new DomainException("Purchase request cannot be cancelled in the current state.");Status=PurchaseRequestStatus.Cancelled;CancelledAt=at;CancelledBy=PurchasingDomainGuard.User(by);CancellationReason=PurchasingDomainGuard.Optional(reason,500,"Cancellation reason");}
+    public void Cancel(DateTimeOffset at,string? by,string? reason)
+    {
+        if(Status is not (PurchaseRequestStatus.Draft or PurchaseRequestStatus.Approved or PurchaseRequestStatus.PartiallyConverted))
+            throw new DomainException("Purchase request cannot be cancelled in the current state.");
+        Status=PurchaseRequestStatus.Cancelled;
+        CancelledAt=at;
+        CancelledBy=PurchasingDomainGuard.User(by);
+        CancellationReason=PurchasingDomainGuard.Optional(reason,500,"Cancellation reason");
+    }
     private void EnsureDraft(){if(Status!=PurchaseRequestStatus.Draft)throw new DomainException("Only draft purchase requests can be modified.");}
 }
