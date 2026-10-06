@@ -194,7 +194,7 @@ public sealed class PurchaseMatchingServiceTests
             TaxCalculationMode.Exclusive,
             null);
 
-        var effectivePoLineId = linkToPurchaseOrder ? poLineId : null;
+        Guid? effectivePoLineId = linkToPurchaseOrder ? poLineId : null;
         var invoiceLine = PurchaseInvoiceLine.Create(
             Guid.NewGuid(),
             invoice.Id,

@@ -250,6 +250,8 @@ public partial class SalesWorkspaceHost : IDisposable
                     if (model.Lines.Count == 0)
                         throw new InvalidOperationException("يجب إضافة سطر واحد على الأقل.");
 
+                    ValidatePrescriptionLines(model.Lines, model.PrescriptionRevisionId);
+
                     var o = model.Id.HasValue
                         ? await Sales.UpdateCustomerOrderAsync(model.Id.Value, SalesUiMapper.ToUpdate(model))
                         : await Sales.CreateCustomerOrderAsync(SalesUiMapper.ToCreate(model));
@@ -267,6 +269,9 @@ public partial class SalesWorkspaceHost : IDisposable
                     if (!ValidateCreditSale(model.CustomerId, model.PaymentTermType))
                         return;
                     if (model.Lines.Count == 0) throw new InvalidOperationException("يجب إضافة سطر واحد على الأقل.");
+
+                    ValidatePrescriptionLines(model.Lines, model.PrescriptionRevisionId);
+
                     var i = model.Id.HasValue
                         ? await Sales.UpdateSalesInvoiceAsync(model.Id.Value, SalesUiMapper.ToUpdate(model))
                         : await Sales.CreateSalesInvoiceAsync(SalesUiMapper.ToCreate(model));
@@ -283,6 +288,34 @@ public partial class SalesWorkspaceHost : IDisposable
     }
 
     private static void CompleteSave(SalesWorkspaceTabState tab, Guid id, string title, object model) => tab.CompleteSave(id, title, model);
+
+    private static void ValidatePrescriptionLines(
+        IReadOnlyList<UiSalesLineModel> lines,
+        string? headerPrescriptionRevisionId)
+    {
+        foreach (var line in lines.Where(x => x.PrescriptionRequired))
+        {
+            var hasRevision = Guid.TryParse(line.PrescriptionRevisionId, out var lineRevisionId) && lineRevisionId != Guid.Empty
+                || Guid.TryParse(headerPrescriptionRevisionId, out var headerRevisionId) && headerRevisionId != Guid.Empty;
+
+            if (!hasRevision)
+            {
+                var item = string.IsNullOrWhiteSpace(line.ProductDisplay)
+                    ? $"السطر {line.LineNumber}"
+                    : $"السطر {line.LineNumber} - {line.ProductDisplay}";
+                throw new InvalidOperationException($"يجب اختيار الوصفة في أعلى المستند أو على {item}.");
+            }
+
+            if (!Enum.TryParse<EyeSide>(line.PrescriptionEye, true, out _))
+            {
+                var item = string.IsNullOrWhiteSpace(line.ProductDisplay)
+                    ? $"السطر {line.LineNumber}"
+                    : $"السطر {line.LineNumber} - {line.ProductDisplay}";
+                throw new InvalidOperationException($"يجب تحديد العين (OD أو OS) لـ{item}.");
+            }
+        }
+    }
+
     private static void RequireGuid(string value, string message) { if (!Guid.TryParse(value, out var id) || id == Guid.Empty) throw new InvalidOperationException(message); }
     private Task MarkDirtyAsync() { if (ActiveTab is not null) { ActiveTab.IsDirty = true; Workspace.NotifyStateChanged(); } return Task.CompletedTask; }
     private Task BeginEditAsync(MouseEventArgs _) { ActiveTab?.BeginEdit(); ClearMessages(); Workspace.NotifyStateChanged(); return Task.CompletedTask; }
@@ -816,6 +849,63 @@ public partial class SalesWorkspaceHost : IDisposable
         var rows = await Sales.SearchBankAccountsAsync(currencyId, q, 20, ct);
         foreach (var x in rows) _bankAccounts[x.Id] = x;
         return rows.Select(x => new UiLookupItem(x.Id.ToString(), $"{x.Code} - {x.BankName} - {x.AccountName}", x.AccountNumber, "fa-solid fa-building-columns", !x.IsActive)).ToArray();
+    }
+
+    private async Task<IReadOnlyList<UiLookupItem>> SearchPaymentCashAccountItemsAsync(UiCheckoutPaymentLineModel line, string q, CancellationToken ct)
+    {
+        if (!Guid.TryParse(line.CurrencyId, out var currencyId))
+            return [];
+
+        var rows = await Sales.SearchCashAccountsAsync(currencyId, q, 20, ct);
+        foreach (var x in rows)
+            _cashAccounts[x.Id] = x;
+
+        return rows
+            .Where(x => x.IsActive)
+            .Select(x => new UiLookupItem(
+                x.Id.ToString("D"),
+                x.Name,
+                x.Code,
+                "fa-solid fa-vault"))
+            .ToArray();
+    }
+
+    private async Task<IReadOnlyList<UiLookupItem>> SearchPaymentBankAccountItemsAsync(UiCheckoutPaymentLineModel line, string q, CancellationToken ct)
+    {
+        if (!Guid.TryParse(line.CurrencyId, out var currencyId))
+            return [];
+
+        var rows = await Sales.SearchBankAccountsAsync(currencyId, q, 20, ct);
+        foreach (var x in rows)
+            _bankAccounts[x.Id] = x;
+
+        return rows
+            .Where(x => x.IsActive)
+            .Select(x => new UiLookupItem(
+                x.Id.ToString("D"),
+                $"{x.BankName} - {x.AccountName}",
+                x.AccountNumber,
+                "fa-solid fa-building-columns"))
+            .ToArray();
+    }
+
+    private async Task<IReadOnlyList<UiLookupItem>> SearchSettlementAccountItemsAsync(string q, CancellationToken ct)
+    {
+        var page = await Accounting.GetAccountsPageAsync(new PageRequest
+        {
+            PageNumber = 1,
+            PageSize = 20,
+            Search = string.IsNullOrWhiteSpace(q) ? null : q
+        }, ct);
+
+        return page.Items
+            .Where(x => x.IsActive && x.IsPostingAccount)
+            .Select(x => new UiLookupItem(
+                x.Id.ToString("D"),
+                $"{x.Code} - {x.NameAr}",
+                null,
+                "fa-solid fa-book"))
+            .ToArray();
     }
 
     private async Task<IReadOnlyList<UiLookupItem>> SearchProductItemsAsync(UiSalesLineModel line, string q, CancellationToken ct)

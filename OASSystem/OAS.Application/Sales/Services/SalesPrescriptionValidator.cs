@@ -24,8 +24,15 @@ public sealed class SalesPrescriptionValidator(
         if (!prescriptionRequired && !prescriptionRevisionId.HasValue && !eye.HasValue)
             return null;
 
-        if (!prescriptionRevisionId.HasValue || !eye.HasValue)
-            throw new ConflictException(SalesErrorCodes.PrescriptionRequired, "يجب تحديد إصدار الوصفة والعين لهذا السطر.");
+        if (!prescriptionRevisionId.HasValue)
+            throw new ConflictException(
+                SalesErrorCodes.PrescriptionRequired,
+                "يجب تحديد إصدار الوصفة لهذا السطر. إذا اخترت وصفة في رأس المستند فسيتم استخدامها تلقائيًا لأسطر العدسات.");
+
+        if (!eye.HasValue)
+            throw new ConflictException(
+                SalesErrorCodes.PrescriptionEyeRequired,
+                "يجب تحديد العين (OD أو OS) لسطر العدسة.");
 
         var revision = await revisions.GetByIdAsync(prescriptionRevisionId.Value, cancellationToken)
             ?? throw new ConflictException(SalesErrorCodes.InvalidPrescriptionRevision, "إصدار الوصفة المحدد غير موجود.");

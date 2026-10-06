@@ -159,7 +159,7 @@
                                 <i class="fa-solid fa-glasses"></i>
                                 <div>
                                     <strong>بيانات العدسة والوصفة</strong>
-                                    <span>تظهر بيانات الوصفة بشكل واسع مثل إصدار الوصفة.</span>
+                                    <span>الوصفة المختارة أعلى المستند تُستخدم تلقائيًا، لكن يجب تحديد العين OD أو OS لكل سطر عدسة.</span>
                                 </div>
                             </div>
 
@@ -182,8 +182,8 @@
                                     }
 
                                     <label class="ui-sales-line-card__number-field">
-                                        <span>العين</span>
-                                        <select disabled="@ReadOnly" value="@line.PrescriptionEye" @onchange="e => EyeChanged(line, e)">
+                                        <span>العين <strong aria-hidden="true">*</strong></span>
+                                        <select aria-label="العين المطلوبة لسطر العدسة" disabled="@ReadOnly" value="@line.PrescriptionEye" @onchange="e => EyeChanged(line, e)">
                                             <option value="">اختر العين</option>
                                             <option value="RightOD">العين اليمنى OD</option>
                                             <option value="LeftOS">العين اليسرى OS</option>

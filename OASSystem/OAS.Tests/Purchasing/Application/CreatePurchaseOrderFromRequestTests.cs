@@ -1,5 +1,6 @@
 using System.Reflection;
 using NUnit.Framework;
+using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Purchasing.Abstractions;
 using OAS.Application.Purchasing.PurchaseRequests.Commands;
 using OAS.Contracts.Common.Pagination;

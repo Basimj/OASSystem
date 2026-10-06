@@ -81,21 +81,64 @@ public sealed class AddPurchasingPostingAccountsToAccountingSettings : Migration
             principalColumn: "Id",
             onDelete: ReferentialAction.Restrict);
 
-        migrationBuilder.CreateIndex(
-            name: "UX_PostingProfiles_Active_PurchaseReceipt",
-            schema: "dbo",
-            table: "tbl_PostingProfiles",
-            columns: new[] { "Module", "DocumentType" },
-            unique: true,
-            filter: "[IsActive] = 1 AND [Module] = N'Purchasing' AND [DocumentType] = N'PurchaseReceipt'");
+        // Existing installations may already contain more than one active purchasing
+        // posting profile for the same document type. Repair that legacy state before
+        // enforcing the filtered unique indexes. Keep the most recently changed row
+        // (highest rowversion) active and preserve older profiles as inactive history.
+        migrationBuilder.Sql("""
+IF OBJECT_ID(N'[dbo].[tbl_PostingProfiles]', N'U') IS NULL
+    THROW 51120, 'Required table dbo.tbl_PostingProfiles was not found.', 1;
 
-        migrationBuilder.CreateIndex(
-            name: "UX_PostingProfiles_Active_PurchaseInvoice",
-            schema: "dbo",
-            table: "tbl_PostingProfiles",
-            columns: new[] { "Module", "DocumentType" },
-            unique: true,
-            filter: "[IsActive] = 1 AND [Module] = N'Purchasing' AND [DocumentType] = N'PurchaseInvoice'");
+;WITH RankedPurchasingProfiles AS
+(
+    SELECT
+        [Id],
+        ROW_NUMBER() OVER
+        (
+            PARTITION BY [Module], [DocumentType]
+            ORDER BY CONVERT(bigint, [RowVersion]) DESC, [Id] DESC
+        ) AS [rn]
+    FROM [dbo].[tbl_PostingProfiles]
+    WHERE [IsActive] = 1
+      AND [Module] = N'Purchasing'
+      AND [DocumentType] IN (N'PurchaseReceipt', N'PurchaseInvoice')
+)
+UPDATE p
+   SET [IsActive] = 0
+FROM [dbo].[tbl_PostingProfiles] p
+INNER JOIN RankedPurchasingProfiles r ON r.[Id] = p.[Id]
+WHERE r.[rn] > 1;
+
+IF NOT EXISTS
+(
+    SELECT 1
+    FROM sys.indexes
+    WHERE [name] = N'UX_PostingProfiles_Active_PurchaseReceipt'
+      AND [object_id] = OBJECT_ID(N'[dbo].[tbl_PostingProfiles]')
+)
+BEGIN
+    CREATE UNIQUE INDEX [UX_PostingProfiles_Active_PurchaseReceipt]
+        ON [dbo].[tbl_PostingProfiles]([Module], [DocumentType])
+        WHERE [IsActive] = 1
+          AND [Module] = N'Purchasing'
+          AND [DocumentType] = N'PurchaseReceipt';
+END;
+
+IF NOT EXISTS
+(
+    SELECT 1
+    FROM sys.indexes
+    WHERE [name] = N'UX_PostingProfiles_Active_PurchaseInvoice'
+      AND [object_id] = OBJECT_ID(N'[dbo].[tbl_PostingProfiles]')
+)
+BEGIN
+    CREATE UNIQUE INDEX [UX_PostingProfiles_Active_PurchaseInvoice]
+        ON [dbo].[tbl_PostingProfiles]([Module], [DocumentType])
+        WHERE [IsActive] = 1
+          AND [Module] = N'Purchasing'
+          AND [DocumentType] = N'PurchaseInvoice';
+END;
+""");
 
         // Profiles and lines are intentionally not seeded with account IDs here.
         // They are provisioned atomically by UpdateAccountingSettings using the

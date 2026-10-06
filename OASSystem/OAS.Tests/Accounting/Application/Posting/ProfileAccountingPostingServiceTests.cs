@@ -1,17 +1,17 @@
-using FluentAssertions;
 using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Accounting.Posting;
 using OAS.Domain.Accounting.Entities;
 using OAS.Domain.Accounting.Enums;
 using OAS.Tests.Accounting.Application.Common;
 using OAS.Tests.Inventory.Fakes;
-using Xunit;
+using NUnit.Framework;
 
 namespace OAS.Tests.Accounting.Application.Posting;
 
+[TestFixture]
 public sealed class ProfileAccountingPostingServiceTests
 {
-    [Fact]
+    [Test]
     public async Task PostAsync_UsesPostingProfileAndCreatesBalancedAutomaticJournal()
     {
         var currency = Currency.Create(Guid.NewGuid(), "YER", "ريال", null, "﷼", 2);
@@ -48,17 +48,17 @@ public sealed class ProfileAccountingPostingServiceTests
 
         var journalId = await service.PostAsync(request, Guid.NewGuid(), DateTime.UtcNow);
 
-        journalRepo.Items.Should().ContainSingle();
+        Assert.That(journalRepo.Items, Has.Count.EqualTo(1));
         var journal = journalRepo.Items.Single();
-        journal.Id.Should().Be(journalId);
-        journal.SourceModule.Should().Be("Purchasing");
-        journal.SourceDocumentType.Should().Be("PurchaseReceipt");
-        journal.SourceDocumentId.Should().Be(documentId);
-        journal.IsBalanced().Should().BeTrue();
-        journal.Lines.Should().HaveCount(2);
+        Assert.That(journal.Id, Is.EqualTo(journalId));
+        Assert.That(journal.SourceModule, Is.EqualTo("Purchasing"));
+        Assert.That(journal.SourceDocumentType, Is.EqualTo("PurchaseReceipt"));
+        Assert.That(journal.SourceDocumentId, Is.EqualTo(documentId));
+        Assert.That(journal.IsBalanced(), Is.True);
+        Assert.That(journal.Lines, Has.Count.EqualTo(2));
     }
 
-    [Fact]
+    [Test]
     public async Task PostAsync_ProvisionMissingPurchaseReceiptProfile_FromPersistedAccountingSettings()
     {
         var currency = Currency.Create(Guid.NewGuid(), "YER", "ريال", null, "﷼", 2);
@@ -113,19 +113,19 @@ public sealed class ProfileAccountingPostingServiceTests
 
         _ = await service.PostAsync(request, Guid.NewGuid(), DateTime.UtcNow);
 
-        profileRepo.Items.Should().ContainSingle(x =>
+        Assert.That(profileRepo.Items.Count(x =>
             x.Module == "Purchasing" &&
             x.DocumentType == "PurchaseReceipt" &&
-            x.IsActive);
+            x.IsActive), Is.EqualTo(1));
 
         var receiptProfile = profileRepo.Items.Single(x => x.Module == "Purchasing" && x.DocumentType == "PurchaseReceipt");
-        profileLineRepo.Items.Should().Contain(x => x.PostingProfileId == receiptProfile.Id && x.AccountRole == "Inventory" && x.AccountId == inventory.Id);
-        profileLineRepo.Items.Should().Contain(x => x.PostingProfileId == receiptProfile.Id && x.AccountRole == "GoodsReceivedNotInvoiced" && x.AccountId == grni.Id);
-        journalRepo.Items.Should().ContainSingle();
-        journalRepo.Items.Single().IsBalanced().Should().BeTrue();
+        Assert.That(profileLineRepo.Items.Any(x => x.PostingProfileId == receiptProfile.Id && x.AccountRole == "Inventory" && x.AccountId == inventory.Id), Is.True);
+        Assert.That(profileLineRepo.Items.Any(x => x.PostingProfileId == receiptProfile.Id && x.AccountRole == "GoodsReceivedNotInvoiced" && x.AccountId == grni.Id), Is.True);
+        Assert.That(journalRepo.Items, Has.Count.EqualTo(1));
+        Assert.That(journalRepo.Items.Single().IsBalanced(), Is.True);
     }
 
-    [Fact]
+    [Test]
     public async Task PostAsync_IsIdempotentBySourceDocument()
     {
         var currency = Currency.Create(Guid.NewGuid(), "YER", "ريال", null, null, 2);
@@ -159,8 +159,8 @@ public sealed class ProfileAccountingPostingServiceTests
         var first = await service.PostAsync(request, Guid.NewGuid(), DateTime.UtcNow);
         var second = await service.PostAsync(request, Guid.NewGuid(), DateTime.UtcNow);
 
-        second.Should().Be(first);
-        journals.Items.Should().ContainSingle();
+        Assert.That(second, Is.EqualTo(first));
+        Assert.That(journals.Items, Has.Count.EqualTo(1));
     }
 
     private static Account CreateAccount(string code, AccountClass accountClass, NormalBalance normalBalance) =>
