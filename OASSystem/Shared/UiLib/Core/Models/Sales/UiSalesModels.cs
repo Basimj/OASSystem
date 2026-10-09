@@ -163,6 +163,7 @@ public sealed class UiSalesInvoiceFormModel
     public decimal TaxAmount { get; set; }
     public decimal TotalAmount { get; set; }
     public decimal PaidAmount { get; set; }
+    public decimal ReturnedAmount { get; set; }
     public decimal OutstandingAmount { get; set; }
     public Guid? JournalEntryId { get; set; }
     public string? JournalEntryNumber { get; set; }

@@ -23,6 +23,21 @@ public interface ISalesSettlementService
         DateOnly documentDate,
         CancellationToken cancellationToken = default);
 
+    Task<decimal> CalculateOrderBaseAmountAsync(
+        CustomerOrder order,
+        decimal amount,
+        CancellationToken cancellationToken = default);
+
+    Task<decimal> CalculateOrderPaymentTargetBaseAmountAsync(
+        CustomerOrder order,
+        IReadOnlyList<CheckoutPaymentLineRequest> paymentLines,
+        CancellationToken cancellationToken = default);
+
+    Task<decimal> CalculateInvoicePaymentTargetBaseAmountAsync(
+        SalesInvoice invoice,
+        IReadOnlyList<CheckoutPaymentLineRequest> paymentLines,
+        CancellationToken cancellationToken = default);
+
     Task<SalesPaymentCollectionResult> CreateReceiptForInvoiceAsync(
         SalesInvoice invoice,
         IReadOnlyList<CheckoutPaymentLineRequest> paymentLines,

@@ -23,7 +23,8 @@ public enum AccountingAccountEligibilityContext
     RetainedEarnings = 15,
     GoodsReceivedNotInvoiced = 16,
     PurchaseTax = 17,
-    PurchasePriceVariance = 18
+    PurchasePriceVariance = 18,
+    CustomerAdvances = 19
 }
 
 public sealed record AccountingAccountEligibilityResult(
@@ -62,6 +63,7 @@ public static class AccountingAccountEligibility
             AccountingAccountEligibilityContext.ExchangeGain or
             AccountingAccountEligibilityContext.ExchangeLoss => EvaluateAutomaticPosting(account),
             AccountingAccountEligibilityContext.TaxPayable => EvaluateTaxPayable(account),
+            AccountingAccountEligibilityContext.CustomerAdvances => EvaluateCustomerAdvances(account),
             AccountingAccountEligibilityContext.SalesRevenue => EvaluateSalesRevenue(account),
             AccountingAccountEligibilityContext.Inventory => EvaluateInventory(account),
             AccountingAccountEligibilityContext.CostOfGoodsSold => EvaluateCostOfGoodsSold(account),
@@ -163,6 +165,22 @@ public static class AccountingAccountEligibility
 
         if (account.NormalBalance != NormalBalance.Credit)
             return Invalid("retained_earnings_wrong_balance", "يجب أن تكون طبيعة حساب الأرباح المحتجزة دائنة.");
+
+        return AccountingAccountEligibilityResult.Eligible;
+    }
+
+
+    private static AccountingAccountEligibilityResult EvaluateCustomerAdvances(AccountDto account)
+    {
+        var posting = EvaluateAutomaticPosting(account);
+        if (!posting.IsEligible)
+            return posting;
+
+        if (account.AccountClass != AccountClass.Liability)
+            return Invalid("customer_advances_wrong_class", "يجب أن يكون حساب دفعات مقدمة من العملاء من حسابات الالتزامات.");
+
+        if (account.NormalBalance != NormalBalance.Credit)
+            return Invalid("customer_advances_wrong_balance", "يجب أن تكون طبيعة حساب دفعات مقدمة من العملاء دائنة.");
 
         return AccountingAccountEligibilityResult.Eligible;
     }

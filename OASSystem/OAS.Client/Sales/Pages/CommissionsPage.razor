@@ -3,7 +3,12 @@
 @using OAS.Client.Features.Employees.Services
 @using OAS.Contracts.Features.Employees
 @using OAS.Contracts.Sales.Commissions
+@using OAS.Client.Common.Feedback.Services
+@using OAS.Client.Services.Http
+@using OAS.UiLib.Services.Feedback
 @inject ISalesClientService Sales
+@inject IUiSnackbarService Snackbar
+@inject IApiFeedbackService ApiFeedback
 @inject IEmployeeClientService Employees
 
 <PageTitle>العمولات | OAS</PageTitle>
@@ -36,10 +41,6 @@
             <UiDataGridPanel Title="دورات العمولات" Subtitle="@($"{_statements.Count} دورة")">
                 <Body>
                     <UiStackLayout Gap="StackGap.Small">
-                        @if (!string.IsNullOrWhiteSpace(_error))
-                        {
-                            <UiAlert Message="@_error" Tone="AlertTone.Danger" />
-                        }
                         @if (_statements.Count == 0)
                         {
                             <UiAlert Message="لا توجد دورات عمولات حتى الآن." Tone="AlertTone.Info" />
@@ -68,10 +69,6 @@
             <UiDataGridPanel Title="قواعد العمولات" Subtitle="@($"{_rules.Count} قاعدة")">
                 <Body>
                     <UiStackLayout Gap="StackGap.Small">
-                        @if (!string.IsNullOrWhiteSpace(_error))
-                        {
-                            <UiAlert Message="@_error" Tone="AlertTone.Danger" />
-                        }
                         @if (_rules.Count == 0)
                         {
                             <UiAlert Message="لا توجد قواعد عمولات." Tone="AlertTone.Info" />
@@ -104,10 +101,6 @@
         {
             <UiCard Title="قاعدة عمولة جديدة" Subtitle="يمكن ترك الموظف فارغًا لإنشاء قاعدة عامة.">
                 <UiStackLayout Gap="StackGap.Small">
-                    @if (!string.IsNullOrWhiteSpace(_editorError))
-                    {
-                        <UiAlert Message="@_editorError" Tone="AlertTone.Danger" />
-                    }
                     <UiInputText Label="الكود" Value="@_ruleCode" ValueChanged="@(value => _ruleCode = value)" Size="ControlSize.Small" MaxLength="50" />
                     <UiInputText Label="الاسم" Value="@_ruleName" ValueChanged="@(value => _ruleName = value)" Size="ControlSize.Small" MaxLength="200" />
                     <UiSelect Label="الموظف" Placeholder="قاعدة عامة" Value="@_ruleEmployeeId" ValueChanged="@(value => _ruleEmployeeId = value)" Options="@EmployeeOptions" Size="ControlSize.Small" />
@@ -127,10 +120,6 @@
         {
             <UiCard Title="احتساب دورة عمولات" Subtitle="تُحفظ نسبة وقاعدة العمولة كـ Snapshot، وتُخصم المرتجعات تلقائيًا.">
                 <UiStackLayout Gap="StackGap.Small">
-                    @if (!string.IsNullOrWhiteSpace(_editorError))
-                    {
-                        <UiAlert Message="@_editorError" Tone="AlertTone.Danger" />
-                    }
                     <UiSelect Label="الموظف" Placeholder="اختر موظفًا مؤهلًا للعمولة" Value="@_statementEmployeeId" ValueChanged="@(value => _statementEmployeeId = value)" Options="@EmployeeOptions" Size="ControlSize.Small" />
                     <UiGrid Columns="2">
                         <UiInputDate Label="من تاريخ" Value="@_statementFrom" ValueChanged="@(value => _statementFrom = value)" Size="ControlSize.Small" />
@@ -195,8 +184,6 @@
     private bool _showRuleEditor;
     private bool _showStatementEditor;
     private bool _busy;
-    private string? _error;
-    private string? _editorError;
 
     private string? _ruleCode;
     private string? _ruleName;
@@ -228,20 +215,22 @@
             _employees = page.Items.Where(x => x.IsActive && x.IsCommissionEligible).ToArray();
             await LoadDataAsync();
         }
-        catch (Exception ex) { _error = ex.Message; }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
     }
 
     private async Task RefreshAsync()
     {
-        _busy = true; _error = null;
+        _busy = true;
         try
         {
             await LoadDataAsync();
             if (_selectedStatement is not null)
                 _selectedStatement = await Sales.GetCommissionStatementAsync(_selectedStatement.Id);
         }
-        catch (Exception ex) { _error = ex.Message; }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
     }
 
@@ -262,7 +251,7 @@
 
     private Task BeginRuleAsync()
     {
-        _showRuleEditor = true; _showStatementEditor = false; _selectedStatement = null; _editorError = null;
+        _showRuleEditor = true; _showStatementEditor = false; _selectedStatement = null;
         _ruleCode = null; _ruleName = null; _ruleEmployeeId = null; _rateText = "1";
         _ruleFrom = DateOnly.FromDateTime(DateTime.Today); _ruleTo = null;
         return Task.CompletedTask;
@@ -270,7 +259,7 @@
 
     private Task BeginStatementAsync()
     {
-        _showStatementEditor = true; _showRuleEditor = false; _selectedStatement = null; _editorError = null;
+        _showStatementEditor = true; _showRuleEditor = false; _selectedStatement = null;
         _statementEmployeeId = null;
         _statementFrom = new DateOnly(DateTime.Today.Year, DateTime.Today.Month, 1);
         _statementTo = DateOnly.FromDateTime(DateTime.Today);
@@ -279,83 +268,100 @@
 
     private async Task CreateRuleAsync()
     {
-        _editorError = null;
         if (string.IsNullOrWhiteSpace(_ruleCode) || string.IsNullOrWhiteSpace(_ruleName) || !_ruleFrom.HasValue)
         {
-            _editorError = "أدخل كود القاعدة واسمها وتاريخ بداية السريان.";
+            Snackbar.Error("أدخل كود القاعدة واسمها وتاريخ بداية السريان.");
             return;
         }
         if (!decimal.TryParse(_rateText, out var rate) || rate < 0m || rate > 100m)
         {
-            _editorError = "نسبة العمولة يجب أن تكون رقمًا بين 0 و100.";
+            Snackbar.Error("نسبة العمولة يجب أن تكون رقمًا بين 0 و100.");
             return;
         }
         if (_ruleTo.HasValue && _ruleTo.Value < _ruleFrom.Value)
         {
-            _editorError = "تاريخ نهاية القاعدة لا يمكن أن يسبق تاريخ البداية.";
+            Snackbar.Error("تاريخ نهاية القاعدة لا يمكن أن يسبق تاريخ البداية.");
             return;
         }
         Guid? employeeId = Guid.TryParse(_ruleEmployeeId, out var parsed) ? parsed : null;
         _busy = true;
         try
         {
-            await Sales.CreateCommissionRuleAsync(new CreateCommissionRuleRequest(_ruleCode.Trim(), _ruleName.Trim(), employeeId, rate, _ruleFrom.Value, _ruleTo));
+            var call = await Sales.CreateCommissionRuleResultAsync(new CreateCommissionRuleRequest(_ruleCode.Trim(), _ruleName.Trim(), employeeId, rate, _ruleFrom.Value, _ruleTo));
+            if (!TryGetApiResult(call, out _)) return;
             _showRuleEditor = false;
+            Snackbar.Success("تم حفظ قاعدة العمولة بنجاح.");
             await RefreshAsync();
         }
-        catch (Exception ex) { _editorError = ex.Message; }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
     }
 
     private async Task CalculateAsync()
     {
-        _editorError = null;
         if (!Guid.TryParse(_statementEmployeeId, out var employeeId) || !_statementFrom.HasValue || !_statementTo.HasValue)
         {
-            _editorError = "اختر الموظف وحدد فترة الاحتساب.";
+            Snackbar.Error("اختر الموظف وحدد فترة الاحتساب.");
             return;
         }
         if (_statementTo.Value < _statementFrom.Value)
         {
-            _editorError = "تاريخ نهاية الفترة لا يمكن أن يسبق بدايتها.";
+            Snackbar.Error("تاريخ نهاية الفترة لا يمكن أن يسبق بدايتها.");
             return;
         }
         _busy = true;
         try
         {
-            var result = await Sales.CalculateCommissionStatementAsync(new CalculateCommissionStatementRequest(employeeId, _statementFrom.Value, _statementTo.Value));
+            var call = await Sales.CalculateCommissionStatementResultAsync(new CalculateCommissionStatementRequest(employeeId, _statementFrom.Value, _statementTo.Value));
+            if (!TryGetApiResult(call, out var result)) return;
             _showStatementEditor = false;
             _selectedStatement = result;
+            Snackbar.Success("تم احتساب دورة العمولة بنجاح.");
             await RefreshAsync();
         }
-        catch (Exception ex) { _editorError = ex.Message; }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
     }
 
     private async Task SelectStatementAsync(Guid id)
     {
-        _showStatementEditor = false; _showRuleEditor = false; _error = null; _busy = true;
+        _showStatementEditor = false; _showRuleEditor = false; _busy = true;
         try { _selectedStatement = await Sales.GetCommissionStatementAsync(id); }
-        catch (Exception ex) { _error = ex.Message; }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
     }
 
     private async Task FinalizeAsync()
     {
         if (_selectedStatement is null) return;
-        _busy = true; _error = null;
+        _busy = true;
         try
         {
-            _selectedStatement = await Sales.FinalizeCommissionStatementAsync(_selectedStatement.Id, new CommissionStatementActionRequest(_selectedStatement.RowVersion));
+            var call = await Sales.FinalizeCommissionStatementResultAsync(_selectedStatement.Id, new CommissionStatementActionRequest(_selectedStatement.RowVersion));
+            if (!TryGetApiResult(call, out var result)) return;
+            _selectedStatement = result;
+            Snackbar.Success("تم اعتماد دورة العمولة بنجاح.");
             await RefreshAsync();
         }
-        catch (Exception ex) { _error = ex.Message; }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
+    }
+
+    private bool TryGetApiResult<T>(ApiCallResult<T> result, out T? value)
+    {
+        value = result.Value;
+        if (result.Succeeded) return true;
+        if (result.Error is not null) ApiFeedback.Show(result.Error); else ApiFeedback.ShowUnexpected();
+        return false;
     }
 
     private Task CloseEditorsAsync()
     {
-        _showRuleEditor = false; _showStatementEditor = false; _editorError = null;
+        _showRuleEditor = false; _showStatementEditor = false;
         return Task.CompletedTask;
     }
 

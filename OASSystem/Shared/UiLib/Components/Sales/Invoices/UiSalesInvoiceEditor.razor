@@ -49,7 +49,7 @@
 
 <div class="ui-sales-summary-grid">
     <UiSalesTotalsPanel CurrencyCode="@Model.CurrencyCode" Subtotal="@Model.Subtotal" DiscountAmount="@Model.DiscountAmount" TaxAmount="@Model.TaxAmount" TotalAmount="@Model.TotalAmount" />
-    <UiSalesPaymentSummary CurrencyCode="@Model.CurrencyCode" InvoiceTotal="@Model.TotalAmount" PaidAmount="@Model.PaidAmount" OutstandingAmount="@Model.OutstandingAmount" />
+    <UiSalesPaymentSummary CurrencyCode="@Model.CurrencyCode" InvoiceTotal="@Model.TotalAmount" PaidAmount="@Model.PaidAmount" ReturnedAmount="@Model.ReturnedAmount" OutstandingAmount="@Model.OutstandingAmount" />
 </div>
 
 <UiSalesPostingSummary JournalEntryId="@Model.JournalEntryId" JournalEntryNumber="@Model.JournalEntryNumber" Issues="@Model.PostingIssues" />

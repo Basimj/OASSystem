@@ -136,8 +136,8 @@ public sealed class OpticalJob : AuditableEntity<Guid>
 
     public void MarkReadyForDelivery(DateTimeOffset completedAtUtc)
     {
-        if (Status is not (OpticalJobStatus.InProduction or OpticalJobStatus.QCPassed))
-            throw new DomainException("Optical job can only become ready for delivery from production or after quality control passes.");
+        if (Status != OpticalJobStatus.QCPassed)
+            throw new DomainException("Optical job can only become ready for delivery after quality control passes.");
         Status = OpticalJobStatus.ReadyForDelivery;
         CompletedAtUtc = completedAtUtc;
     }

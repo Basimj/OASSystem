@@ -38,4 +38,9 @@ public interface ICustomerDemandProcurementPort
         Guid? preferredSupplierId,
         DateTimeOffset? scheduledOrderAtUtc,
         CancellationToken cancellationToken = default);
+
+    Task CancelUncommittedDemandForOrderAsync(
+        Guid customerOrderId,
+        string? reason,
+        CancellationToken cancellationToken = default);
 }

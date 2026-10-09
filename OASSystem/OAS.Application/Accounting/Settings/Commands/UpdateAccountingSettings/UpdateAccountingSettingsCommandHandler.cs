@@ -29,6 +29,9 @@ public sealed class UpdateAccountingSettingsCommandHandler(
     private const string GrniRole = "GoodsReceivedNotInvoiced";
     private const string PurchaseTaxRole = "PurchaseTax";
     private const string PurchasePriceVarianceRole = "PurchasePriceVariance";
+    private const string AccountingModule = "Accounting";
+    private const string CustomerAdvanceApplicationDocumentType = "CustomerAdvanceApplication";
+    private const string CustomerAdvancesRole = "CustomerAdvances";
 
     public async Task Handle(
         UpdateAccountingSettingsCommand request,
@@ -57,6 +60,7 @@ public sealed class UpdateAccountingSettingsCommandHandler(
         ValidateSalesInvoiceSettingsCompleteness(data);
         await ValidateSalesRevenueAsync(data.SalesRevenueAccountId, cancellationToken);
         await ValidateTaxPayableAsync(data.TaxPayableAccountId, cancellationToken);
+        await ValidateCustomerAdvancesAsync(data.CustomerAdvancesAccountId, cancellationToken);
         await ValidateInventoryAsync(data.InventoryAccountId, cancellationToken);
         await ValidateCogsAsync(data.CogsAccountId, cancellationToken);
         ValidatePurchasingSettingsCompleteness(data);
@@ -139,6 +143,10 @@ public sealed class UpdateAccountingSettingsCommandHandler(
             data.TaxPayableAccountId,
             data.InventoryAccountId,
             data.CogsAccountId,
+            cancellationToken);
+
+        await UpsertCustomerAdvanceProfileAsync(
+            data.CustomerAdvancesAccountId,
             cancellationToken);
 
         await UpsertPurchasingProfilesAsync(
@@ -252,6 +260,26 @@ public sealed class UpdateAccountingSettingsCommandHandler(
             throw new ConflictException(
                 "tax_payable_account_invalid",
                 "حساب الضرائب المستحقة يجب أن يكون حساب التزام نشطًا، دائنًا، وقابلًا للترحيل.");
+        }
+    }
+
+    private async Task ValidateCustomerAdvancesAsync(
+        Guid? id,
+        CancellationToken cancellationToken)
+    {
+        if (!id.HasValue)
+            return;
+
+        var account = await accounts.GetByIdAsync(id.Value, cancellationToken)
+            ?? throw new NotFoundException(nameof(Account), id.Value);
+
+        if (!account.CanReceivePosting() ||
+            account.AccountClass != AccountClass.Liability ||
+            account.NormalBalance != NormalBalance.Credit)
+        {
+            throw new ConflictException(
+                "customer_advances_account_invalid",
+                "حساب دفعات مقدمة من العملاء يجب أن يكون حساب التزام نشطًا، دائنًا، وقابلًا للترحيل.");
         }
     }
 
@@ -407,6 +435,66 @@ public sealed class UpdateAccountingSettingsCommandHandler(
         await UpsertRoleAsync(profile.Id, TaxPayableRole, taxPayableAccountId, cancellationToken);
         await UpsertRoleAsync(profile.Id, InventoryRole, inventoryAccountId, cancellationToken);
         await UpsertRoleAsync(profile.Id, CogsRole, cogsAccountId, cancellationToken);
+    }
+
+    private async Task UpsertCustomerAdvanceProfileAsync(
+        Guid? customerAdvancesAccountId,
+        CancellationToken cancellationToken)
+    {
+        var allProfiles = await postingProfiles.ListAsync(
+            new Specification<PostingProfile>()
+                .Where(x =>
+                    x.Module == AccountingModule &&
+                    x.DocumentType == CustomerAdvanceApplicationDocumentType)
+                .Tracking(),
+            cancellationToken);
+
+        var activeProfiles = allProfiles.Where(x => x.IsActive).ToList();
+        if (activeProfiles.Count > 1)
+        {
+            throw new ConflictException(
+                "customer_advance_posting_profile_duplicate",
+                "يوجد أكثر من ملف ترحيل فعال لعربون العميل. يجب إبقاء ملف واحد فقط.");
+        }
+
+        var profile = activeProfiles.SingleOrDefault() ?? allProfiles.FirstOrDefault();
+
+        if (!customerAdvancesAccountId.HasValue)
+        {
+            if (profile is null)
+                return;
+
+            await UpsertRoleAsync(profile.Id, CustomerAdvancesRole, null, cancellationToken);
+            if (profile.IsActive)
+            {
+                profile.SetActive(false);
+                postingProfiles.Update(profile);
+            }
+            return;
+        }
+
+        if (profile is null)
+        {
+            profile = PostingProfile.Create(
+                Guid.NewGuid(),
+                "ACCOUNTING-CUSTOMER-ADVANCE",
+                "ترحيل دفعات مقدمة من العملاء",
+                AccountingModule,
+                CustomerAdvanceApplicationDocumentType,
+                true);
+            await postingProfiles.AddAsync(profile, cancellationToken);
+        }
+        else if (!profile.IsActive)
+        {
+            profile.SetActive(true);
+            postingProfiles.Update(profile);
+        }
+
+        await UpsertRoleAsync(
+            profile.Id,
+            CustomerAdvancesRole,
+            customerAdvancesAccountId,
+            cancellationToken);
     }
 
     private async Task UpsertPurchasingProfilesAsync(

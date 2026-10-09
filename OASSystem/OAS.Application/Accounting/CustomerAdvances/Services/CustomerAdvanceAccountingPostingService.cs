@@ -119,18 +119,18 @@ public sealed class CustomerAdvanceAccountingPostingService(
         var activeProfiles = await profiles.ListAsync(profileSpec, cancellationToken);
 
         if (activeProfiles.Count == 0)
-            throw new ConflictException("customer_advance_posting_profile_missing", "لم يتم إعداد Posting Profile فعال لتطبيق عربون العميل.");
+            throw new ConflictException("customer_advance_posting_profile_missing", "لم يتم إعداد حساب دفعات مقدمة من العملاء. افتح إعدادات المحاسبة وحدد «حساب دفعات مقدمة من العملاء» ثم احفظ الإعدادات.");
         if (activeProfiles.Count > 1)
-            throw new ConflictException("customer_advance_posting_profile_duplicate", "يوجد أكثر من Posting Profile فعال لتطبيق عربون العميل.");
+            throw new ConflictException("customer_advance_posting_profile_duplicate", "يوجد أكثر من إعداد ترحيل فعال لعربون العميل. راجع Posting Profiles وأبقِ إعدادًا واحدًا فعالًا فقط.");
 
         var profileId = activeProfiles[0].Id;
         var lineSpec = new Specification<PostingProfileLine>()
             .Where(x => x.PostingProfileId == profileId && x.AccountRole == CustomerAdvancesRole);
         var roleLines = await profileLines.ListAsync(lineSpec, cancellationToken);
         if (roleLines.Count == 0)
-            throw new ConflictException("customer_advance_posting_role_missing", "Posting Profile لا يحتوي دور الحساب CustomerAdvances.");
+            throw new ConflictException("customer_advance_posting_role_missing", "إعداد عربون العميل لا يحتوي حساب دفعات مقدمة من العملاء. احفظ الحساب من إعدادات المحاسبة.");
         if (roleLines.Count > 1)
-            throw new ConflictException("customer_advance_posting_role_duplicate", "يجب تعريف حساب واحد فقط لدور CustomerAdvances.");
+            throw new ConflictException("customer_advance_posting_role_duplicate", "يوجد أكثر من حساب معرف لدفعات مقدمة من العملاء. يجب إبقاء حساب واحد فقط.");
 
         await EnsurePostingAccountAsync(roleLines[0].AccountId, cancellationToken);
         return roleLines[0].AccountId;

@@ -106,6 +106,10 @@ public sealed class CompleteSalesWorkflowControllersTests
             Is.EqualTo("{id:guid}/assign"));
         Assert.That(GetHttpTemplate<OpticalJobsController>(nameof(OpticalJobsController.Start), typeof(HttpPostAttribute)),
             Is.EqualTo("{id:guid}/start"));
+        Assert.That(GetHttpTemplate<OpticalJobsController>(nameof(OpticalJobsController.SendToQualityControl), typeof(HttpPostAttribute)),
+            Is.EqualTo("{id:guid}/send-to-quality-control"));
+        Assert.That(GetHttpTemplate<OpticalJobsController>(nameof(OpticalJobsController.PassQualityControl), typeof(HttpPostAttribute)),
+            Is.EqualTo("{id:guid}/pass-quality-control"));
 
         var readyRoutes = typeof(OpticalJobsController)
             .GetMethod(nameof(OpticalJobsController.MarkReadyForDelivery))!

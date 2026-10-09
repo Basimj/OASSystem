@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using OAS.Client.Sales.Common;
+using OAS.Client.Common.Feedback.Services;
 using OAS.Client.Accounting.Services;
 using OAS.Client.Features.Employees.Services;
 using OAS.Client.Sales.Mapping;
@@ -23,6 +24,7 @@ using OAS.UiLib.Core.Models;
 using OAS.UiLib.Core.Models.Sales;
 using OAS.UiLib.Components.Sales.Invoices;
 using OAS.UiLib.Services.Dialogs;
+using OAS.UiLib.Services.Feedback;
 
 namespace OAS.Client.Sales.Workspace;
 
@@ -36,6 +38,8 @@ public partial class SalesWorkspaceHost : IDisposable
     [Inject] private IUiDialogService Dialogs { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private IPrintingClientService PrintingService { get; set; } = default!;
+    [Inject] private IUiSnackbarService Snackbar { get; set; } = default!;
+    [Inject] private IApiFeedbackService ApiFeedback { get; set; } = default!;
 
     private readonly List<UiSalesDocumentListItem> _listItems = [];
     private readonly Dictionary<Guid, SalesCustomerLookupDto> _customers = [];
@@ -53,8 +57,6 @@ public partial class SalesWorkspaceHost : IDisposable
     private int _pageNumber = 1;
     private int _totalPages;
     private long _totalCount;
-    private string? _error;
-    private string? _success;
     private readonly Dictionary<Guid, UiPrescriptionRevisionModel> _revisionDrafts = [];
     private readonly HashSet<Guid> _dirtyRevisionDraftTabs = [];
     private bool _isSavingRevision;
@@ -92,7 +94,7 @@ public partial class SalesWorkspaceHost : IDisposable
 
     private async Task LoadListAsync(SalesEntityType type)
     {
-        _isLoading = true; _error = null; _listItems.Clear();
+        _isLoading = true; _listItems.Clear();
         try
         {
             var request = new PageRequest { PageNumber = _pageNumber, PageSize = 20, Search = _search };
@@ -121,7 +123,7 @@ public partial class SalesWorkspaceHost : IDisposable
                 }
             }
         }
-        catch (ApiClientException ex) { _error = SalesApiErrorPresenter.GetMessage(ex.Error); }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
         finally { _isLoading = false; await InvokeAsync(StateHasChanged); }
     }
 
@@ -136,27 +138,30 @@ public partial class SalesWorkspaceHost : IDisposable
             switch (type)
             {
                 case SalesEntityType.Prescriptions:
-                    var rx = await Sales.ReservePrescriptionCodeAsync();
+                    var rxCall = await Sales.ReservePrescriptionCodeResultAsync();
+                    if (!TryGetApiResult(rxCall, out var rx) || rx is null) { Workspace.RemoveTab(tab.TabId); return; }
                     tab.Model = new UiPrescriptionFormModel
                     {
-                        PrescriptionCode = rx?.Code ?? string.Empty,
+                        PrescriptionCode = rx.Code,
                         Status = PrescriptionStatus.Draft.ToString(),
                         StatusText = "جديدة - ستصبح مفعلة بعد الحفظ"
                     };
                     _revisionDrafts[tab.TabId] = CreateRevisionDraft(1);
                     break;
                 case SalesEntityType.CustomerOrders:
-                    var orderCode = await Sales.ReserveCustomerOrderCodeAsync(DateOnly.FromDateTime(DateTime.Today));
-                    tab.Model = new UiCustomerOrderFormModel { OrderCode = orderCode?.Code ?? string.Empty };
+                    var orderCodeCall = await Sales.ReserveCustomerOrderCodeResultAsync(DateOnly.FromDateTime(DateTime.Today));
+                    if (!TryGetApiResult(orderCodeCall, out var orderCode) || orderCode is null) { Workspace.RemoveTab(tab.TabId); return; }
+                    tab.Model = new UiCustomerOrderFormModel { OrderCode = orderCode.Code };
                     break;
                 default:
-                    var invoiceCode = await Sales.ReserveSalesInvoiceCodeAsync(DateOnly.FromDateTime(DateTime.Today));
-                    tab.Model = new UiSalesInvoiceFormModel { InvoiceCode = invoiceCode?.Code ?? string.Empty };
+                    var invoiceCodeCall = await Sales.ReserveSalesInvoiceCodeResultAsync(DateOnly.FromDateTime(DateTime.Today));
+                    if (!TryGetApiResult(invoiceCodeCall, out var invoiceCode) || invoiceCode is null) { Workspace.RemoveTab(tab.TabId); return; }
+                    tab.Model = new UiSalesInvoiceFormModel { InvoiceCode = invoiceCode.Code };
                     break;
             }
             tab.IsInitialized = true;
         }
-        catch (ApiClientException ex) { _error = SalesApiErrorPresenter.GetMessage(ex.Error); Workspace.RemoveTab(tab.TabId); }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); Workspace.RemoveTab(tab.TabId); }
         finally { tab.IsLoading = false; Workspace.NotifyStateChanged(); }
     }
 
@@ -189,39 +194,44 @@ public partial class SalesWorkspaceHost : IDisposable
             }
             Workspace.NotifyStateChanged();
         }
-        catch (ApiClientException ex) { _error = SalesApiErrorPresenter.GetMessage(ex.Error); }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
     }
 
     private async Task SaveAsync(MouseEventArgs _)
     {
         if (ActiveTab is null || ActiveTab.Model is null) return;
-        ClearMessages(); ActiveTab.IsSaving = true;
+        ClearMessages();
+        ActiveTab.IsSaving = true;
         try
         {
             switch (ActiveTab.Model)
             {
                 case UiPrescriptionFormModel model:
                 {
-                    RequireGuid(model.CustomerId, "يجب تحديد العميل.");
+                    if (!RequireGuid(model.CustomerId, "يجب تحديد العميل.")) return;
 
                     PrescriptionDto? prescription;
-
                     if (model.Id.HasValue)
                     {
-                        prescription = await Sales.UpdatePrescriptionAsync(
+                        var call = await Sales.UpdatePrescriptionResultAsync(
                             model.Id.Value,
                             SalesUiMapper.ToUpdate(model));
+                        if (!TryGetApiResult(call, out prescription)) return;
                     }
                     else
                     {
-                        var initialRevision = ActiveRevisionDraft
-                            ?? throw new InvalidOperationException(
-                                "لا يمكن حفظ الوصفة بدون الإصدار الأول.");
+                        var initialRevision = ActiveRevisionDraft;
+                        if (initialRevision is null)
+                        {
+                            Snackbar.Error("لا يمكن حفظ الوصفة بدون الإصدار الأول.");
+                            return;
+                        }
 
-                        ValidateRevisionDraft(initialRevision);
+                        if (!ValidateRevisionDraft(initialRevision)) return;
 
-                        prescription = await Sales.CreatePrescriptionAsync(
+                        var call = await Sales.CreatePrescriptionResultAsync(
                             SalesUiMapper.ToCreate(model, initialRevision));
+                        if (!TryGetApiResult(call, out prescription)) return;
                     }
 
                     if (prescription is not null)
@@ -238,58 +248,100 @@ public partial class SalesWorkspaceHost : IDisposable
                     break;
                 }
                 case UiCustomerOrderFormModel model:
-                    RequireGuid(model.CustomerId, "يجب تحديد العميل.");
-                    RequireGuid(model.CurrencyId, "يجب تحديد العملة.");
+                {
+                    if (!RequireGuid(model.CustomerId, "يجب تحديد العميل.")) return;
+                    if (!RequireGuid(model.CurrencyId, "يجب تحديد العملة.")) return;
 
                     if (!model.OrderDate.HasValue)
-                        throw new InvalidOperationException("يجب تحديد تاريخ الطلب.");
+                    {
+                        Snackbar.Error("يجب تحديد تاريخ الطلب.");
+                        return;
+                    }
 
                     if (model.RequiredDate.HasValue && model.RequiredDate.Value < model.OrderDate.Value)
-                        throw new InvalidOperationException("تاريخ التسليم المطلوب لا يمكن أن يكون قبل تاريخ الطلب.");
+                    {
+                        Snackbar.Error("تاريخ التسليم المطلوب لا يمكن أن يكون قبل تاريخ الطلب.");
+                        return;
+                    }
 
                     if (model.Lines.Count == 0)
-                        throw new InvalidOperationException("يجب إضافة سطر واحد على الأقل.");
-
-                    ValidatePrescriptionLines(model.Lines, model.PrescriptionRevisionId);
-
-                    var o = model.Id.HasValue
-                        ? await Sales.UpdateCustomerOrderAsync(model.Id.Value, SalesUiMapper.ToUpdate(model))
-                        : await Sales.CreateCustomerOrderAsync(SalesUiMapper.ToCreate(model));
-
-                    if (o is not null)
-                        CompleteSave(ActiveTab, o.Id, o.OrderCode, SalesUiMapper.ToUi(o));
-                    break;
-                case UiSalesInvoiceFormModel model:
-                    if (!model.Id.HasValue && !string.IsNullOrWhiteSpace(model.CustomerOrderId))
-                        throw new InvalidOperationException("طلبات العملاء تُفوتر من شاشة بيع جديد / Checkout. الفاتورة اليدوية مخصصة للبيع المباشر فقط.");
-
-                    RequireGuid(model.CustomerId, "يجب تحديد العميل.");
-                    RequireGuid(model.CurrencyId, "يجب تحديد العملة.");
-                    model.PaymentTermType = string.Equals(model.PaymentPlan, "AccountCredit", StringComparison.OrdinalIgnoreCase) ? "Credit" : "Immediate";
-                    if (!ValidateCreditSale(model.CustomerId, model.PaymentTermType))
+                    {
+                        Snackbar.Error("يجب إضافة سطر واحد على الأقل.");
                         return;
-                    if (model.Lines.Count == 0) throw new InvalidOperationException("يجب إضافة سطر واحد على الأقل.");
+                    }
 
-                    ValidatePrescriptionLines(model.Lines, model.PrescriptionRevisionId);
+                    if (!ValidatePrescriptionLines(model.Lines, model.PrescriptionRevisionId)) return;
 
-                    var i = model.Id.HasValue
-                        ? await Sales.UpdateSalesInvoiceAsync(model.Id.Value, SalesUiMapper.ToUpdate(model))
-                        : await Sales.CreateSalesInvoiceAsync(SalesUiMapper.ToCreate(model));
-                    if (i is not null) CompleteSave(ActiveTab, i.Id, i.InvoiceCode, SalesUiMapper.ToUi(i));
+                    var orderCall = model.Id.HasValue
+                        ? await Sales.UpdateCustomerOrderResultAsync(model.Id.Value, SalesUiMapper.ToUpdate(model))
+                        : await Sales.CreateCustomerOrderResultAsync(SalesUiMapper.ToCreate(model));
+                    if (!TryGetApiResult(orderCall, out var order)) return;
+
+                    if (order is not null)
+                        CompleteSave(ActiveTab, order.Id, order.OrderCode, SalesUiMapper.ToUi(order));
                     break;
+                }
+                case UiSalesInvoiceFormModel model:
+                {
+                    if (!model.Id.HasValue && !string.IsNullOrWhiteSpace(model.CustomerOrderId))
+                    {
+                        Snackbar.Error("طلبات العملاء تُفوتر من شاشة بيع جديد / Checkout. الفاتورة اليدوية مخصصة للبيع المباشر فقط.");
+                        return;
+                    }
+
+                    if (!RequireGuid(model.CustomerId, "يجب تحديد العميل.")) return;
+                    if (!RequireGuid(model.CurrencyId, "يجب تحديد العملة.")) return;
+
+                    model.PaymentTermType = string.Equals(model.PaymentPlan, "AccountCredit", StringComparison.OrdinalIgnoreCase)
+                        ? "Credit"
+                        : "Immediate";
+
+                    if (!ValidateCreditSale(model.CustomerId, model.PaymentTermType)) return;
+
+                    if (model.Lines.Count == 0)
+                    {
+                        Snackbar.Error("يجب إضافة سطر واحد على الأقل.");
+                        return;
+                    }
+
+                    if (!ValidatePrescriptionLines(model.Lines, model.PrescriptionRevisionId)) return;
+
+                    var invoiceCall = model.Id.HasValue
+                        ? await Sales.UpdateSalesInvoiceResultAsync(model.Id.Value, SalesUiMapper.ToUpdate(model))
+                        : await Sales.CreateSalesInvoiceResultAsync(SalesUiMapper.ToCreate(model));
+                    if (!TryGetApiResult(invoiceCall, out var invoice)) return;
+
+                    if (invoice is not null)
+                        CompleteSave(ActiveTab, invoice.Id, invoice.InvoiceCode, SalesUiMapper.ToUi(invoice));
+                    break;
+                }
             }
-            _success = "تم حفظ البيانات بنجاح.";
+
+            Snackbar.Success("تم حفظ البيانات بنجاح.");
             await LoadListAsync(ActiveTab.EntityType);
         }
-        catch (InvalidOperationException ex) { _error = ex.Message; }
-        catch (FormatException) { _error = "توجد قيمة مرجعية غير صالحة. أعد اختيار العميل/العملة/المخزن من قائمة البحث."; }
-        catch (ApiClientException ex) { _error = SalesApiErrorPresenter.GetMessage(ex.Error); }
-        finally { ActiveTab.IsSaving = false; Workspace.NotifyStateChanged(); }
+        catch (FormatException)
+        {
+            Snackbar.Error("توجد قيمة مرجعية غير صالحة. أعد اختيار العميل/العملة/المخزن من قائمة البحث.");
+        }
+        catch (ApiClientException ex)
+        {
+            ApiFeedback.Show(ex.Error);
+        }
+        catch
+        {
+            ApiFeedback.ShowUnexpected();
+        }
+        finally
+        {
+            ActiveTab.IsSaving = false;
+            Workspace.NotifyStateChanged();
+        }
     }
 
     private static void CompleteSave(SalesWorkspaceTabState tab, Guid id, string title, object model) => tab.CompleteSave(id, title, model);
 
-    private static void ValidatePrescriptionLines(
+    private bool ValidatePrescriptionLines(
         IReadOnlyList<UiSalesLineModel> lines,
         string? headerPrescriptionRevisionId)
     {
@@ -303,7 +355,8 @@ public partial class SalesWorkspaceHost : IDisposable
                 var item = string.IsNullOrWhiteSpace(line.ProductDisplay)
                     ? $"السطر {line.LineNumber}"
                     : $"السطر {line.LineNumber} - {line.ProductDisplay}";
-                throw new InvalidOperationException($"يجب اختيار الوصفة في أعلى المستند أو على {item}.");
+                Snackbar.Error($"يجب اختيار الوصفة في أعلى المستند أو على {item}.");
+                return false;
             }
 
             if (!Enum.TryParse<EyeSide>(line.PrescriptionEye, true, out _))
@@ -311,12 +364,21 @@ public partial class SalesWorkspaceHost : IDisposable
                 var item = string.IsNullOrWhiteSpace(line.ProductDisplay)
                     ? $"السطر {line.LineNumber}"
                     : $"السطر {line.LineNumber} - {line.ProductDisplay}";
-                throw new InvalidOperationException($"يجب تحديد العين (OD أو OS) لـ{item}.");
+                Snackbar.Error($"يجب تحديد العين (OD أو OS) لـ{item}.");
+                return false;
             }
         }
+
+        return true;
     }
 
-    private static void RequireGuid(string value, string message) { if (!Guid.TryParse(value, out var id) || id == Guid.Empty) throw new InvalidOperationException(message); }
+    private bool RequireGuid(string value, string message)
+    {
+        if (Guid.TryParse(value, out var id) && id != Guid.Empty) return true;
+        Snackbar.Error(message);
+        return false;
+    }
+
     private Task MarkDirtyAsync() { if (ActiveTab is not null) { ActiveTab.IsDirty = true; Workspace.NotifyStateChanged(); } return Task.CompletedTask; }
     private Task BeginEditAsync(MouseEventArgs _) { ActiveTab?.BeginEdit(); ClearMessages(); Workspace.NotifyStateChanged(); return Task.CompletedTask; }
 
@@ -341,7 +403,7 @@ public partial class SalesWorkspaceHost : IDisposable
             }
             ActiveTab.CancelEdit(); ActiveTab.IsInitialized = true; ClearMessages(); Workspace.NotifyStateChanged();
         }
-        catch (ApiClientException ex) { _error = SalesApiErrorPresenter.GetMessage(ex.Error); }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
     }
 
     private Task OpenCheckoutAsync(MouseEventArgs _)
@@ -359,8 +421,12 @@ public partial class SalesWorkspaceHost : IDisposable
     {
         if (ActiveTab?.Model is not UiCustomerOrderFormModel m || !m.Id.HasValue) return;
         if (!await Dialogs.ConfirmAsync("إلغاء الطلب", "سيتم تحرير الحجوزات النشطة المرتبطة بالطلب. هل تريد المتابعة؟", AlertTone.Warning, "إلغاء الطلب", "رجوع")) return;
-        try { var dto = await Sales.CancelCustomerOrderAsync(m.Id.Value, new CancelCustomerOrderRequest(m.RowVersion)); if (dto is not null) ActiveTab.Model = SalesUiMapper.ToUi(dto); _success = "تم إلغاء الطلب."; Workspace.NotifyStateChanged(); await LoadListAsync(SalesEntityType.CustomerOrders); }
-        catch (ApiClientException ex) { _error = SalesApiErrorPresenter.GetMessage(ex.Error); }
+        var call = await Sales.CancelCustomerOrderResultAsync(m.Id.Value, new CancelCustomerOrderRequest(m.RowVersion));
+        if (!TryGetApiResult(call, out var dto)) return;
+        if (dto is not null) ActiveTab.Model = SalesUiMapper.ToUi(dto);
+        Snackbar.Success("تم إلغاء الطلب.");
+        Workspace.NotifyStateChanged();
+        await LoadListAsync(SalesEntityType.CustomerOrders);
     }
 
     private async Task ConfirmInvoiceAsync(MouseEventArgs _)
@@ -376,7 +442,7 @@ public partial class SalesWorkspaceHost : IDisposable
             var validation = await Sales.PreValidateSalesInvoiceConfirmationAsync(m.Id.Value);
             if (validation is null)
             {
-                _error = "تعذر فحص جاهزية تأكيد الفاتورة.";
+                Snackbar.Error("تعذر فحص جاهزية تأكيد الفاتورة.");
                 Workspace.NotifyStateChanged();
                 return;
             }
@@ -384,7 +450,7 @@ public partial class SalesWorkspaceHost : IDisposable
             if (!validation.CanConfirm)
             {
                 var issue = validation.Issues.FirstOrDefault();
-                _error = issue is null
+                var message = issue is null
                     ? "الفاتورة غير جاهزة للتأكيد."
                     : SalesApiErrorPresenter.GetMessage(
                         new OAS.Contracts.Common.Errors.ApiError
@@ -394,25 +460,27 @@ public partial class SalesWorkspaceHost : IDisposable
                             Status = 409
                         },
                         issue.Message);
+                Snackbar.Error(message);
                 Workspace.NotifyStateChanged();
                 return;
             }
 
-            var dto = await Sales.ConfirmSalesInvoiceAsync(
+            var confirmCall = await Sales.ConfirmSalesInvoiceResultAsync(
                 m.Id.Value,
                 new ConfirmSalesInvoiceRequest(m.RowVersion));
+            if (!TryGetApiResult(confirmCall, out var dto)) return;
 
             if (dto is not null)
                 ActiveTab.Model = SalesUiMapper.ToUi(dto);
 
-            _success = "تم تأكيد الفاتورة. أصبحت الحقول المالية الحرجة للقراءة فقط.";
+            Snackbar.Success("تم تأكيد الفاتورة. أصبحت الحقول المالية الحرجة للقراءة فقط.");
             Workspace.NotifyStateChanged();
             await LoadListAsync(SalesEntityType.SalesInvoices);
         }
         catch (ApiClientException ex)
         {
             // Backend validation remains the final guard for concurrency and external API callers.
-            _error = SalesApiErrorPresenter.GetMessage(ex.Error);
+            ApiFeedback.Show(ex.Error);
             Workspace.NotifyStateChanged();
         }
     }
@@ -421,8 +489,12 @@ public partial class SalesWorkspaceHost : IDisposable
     {
         if (ActiveTab?.Model is not UiSalesInvoiceFormModel m || !m.Id.HasValue) return;
         if (!await Dialogs.ConfirmAsync("إلغاء الفاتورة", "سيتم إلغاء الفاتورة قبل الترحيل وتحرير الحجوزات النشطة. هل تريد المتابعة؟", AlertTone.Warning, "إلغاء الفاتورة", "رجوع")) return;
-        try { var dto = await Sales.CancelSalesInvoiceAsync(m.Id.Value, new CancelSalesInvoiceRequest(m.RowVersion)); if (dto is not null) ActiveTab.Model = SalesUiMapper.ToUi(dto); _success = "تم إلغاء الفاتورة."; Workspace.NotifyStateChanged(); await LoadListAsync(SalesEntityType.SalesInvoices); }
-        catch (ApiClientException ex) { _error = SalesApiErrorPresenter.GetMessage(ex.Error); }
+        var call = await Sales.CancelSalesInvoiceResultAsync(m.Id.Value, new CancelSalesInvoiceRequest(m.RowVersion));
+        if (!TryGetApiResult(call, out var dto)) return;
+        if (dto is not null) ActiveTab.Model = SalesUiMapper.ToUi(dto);
+        Snackbar.Success("تم إلغاء الفاتورة.");
+        Workspace.NotifyStateChanged();
+        await LoadListAsync(SalesEntityType.SalesInvoices);
     }
 
     private async Task PostInvoiceAsync(MouseEventArgs _)
@@ -432,45 +504,181 @@ public partial class SalesWorkspaceHost : IDisposable
         try
         {
             var validation = await Sales.PreValidateSalesInvoicePostingAsync(m.Id.Value);
-            if (validation is null) { _error = "تعذر فحص جاهزية الترحيل."; return; }
-            m.PostingIssues = validation.Issues.Select(x => SalesApiErrorPresenter.GetMessage(new OAS.Contracts.Common.Errors.ApiError { Code = x.Code, Message = x.Message, Status = 409 }, x.Message)).ToList();
-            if (!validation.CanPost) { _error = m.PostingIssues.FirstOrDefault() ?? "الفاتورة غير جاهزة للترحيل."; Workspace.NotifyStateChanged(); return; }
+            if (validation is null)
+            {
+                Snackbar.Error("تعذر فحص جاهزية الترحيل.");
+                return;
+            }
 
-            var paymentLines = BuildDirectInvoicePayments(m);
+            m.PostingIssues = validation.Issues.Select(x => SalesApiErrorPresenter.GetMessage(new OAS.Contracts.Common.Errors.ApiError { Code = x.Code, Message = x.Message, Status = 409 }, x.Message)).ToList();
+            if (!validation.CanPost)
+            {
+                Snackbar.Error(m.PostingIssues.FirstOrDefault() ?? "الفاتورة غير جاهزة للترحيل.");
+                Workspace.NotifyStateChanged();
+                return;
+            }
+
+            if (!TryBuildDirectInvoicePayments(m, out var paymentLines, out var paymentError))
+            {
+                Snackbar.Error(paymentError!);
+                return;
+            }
+
+            if (!ValidateDirectInvoicePaymentPlan(m, paymentLines, out var planError))
+            {
+                Snackbar.Error(planError!);
+                return;
+            }
             var confirmationText = paymentLines.Count > 0
                 ? "سيتم ترحيل فاتورة البيع المباشر وإنشاء الأثر المخزني والقيد المحاسبي، ثم إنشاء سند قبض واحد بخطوط الدفع المدخلة وتخصيصه على الفاتورة. هل تريد المتابعة؟"
                 : "سيتم ترحيل فاتورة البيع المباشر وإنشاء أثر مخزني وقيد محاسبي رسمي بدون تحصيل الآن. هل تريد المتابعة؟";
 
             if (!await Dialogs.ConfirmAsync("ترحيل فاتورة المبيعات", confirmationText, AlertTone.Warning, "ترحيل", "رجوع")) return;
-            var postingResult = await Sales.PostSalesInvoiceAsync(
+            var postCall = await Sales.PostSalesInvoiceResultAsync(
                 m.Id.Value,
                 new PostSalesInvoiceRequest(m.RowVersion) { PaymentLines = paymentLines });
+            if (!TryGetApiResult(postCall, out var postingResult)) return;
             var dto = await Sales.GetSalesInvoiceByIdAsync(m.Id.Value);
             if (dto is not null) ActiveTab.Model = SalesUiMapper.ToUi(dto);
-            _success = !string.IsNullOrWhiteSpace(postingResult?.ReceiptVoucherNumber)
+            Snackbar.Success(!string.IsNullOrWhiteSpace(postingResult?.ReceiptVoucherNumber)
                 ? $"تم ترحيل الفاتورة وإنشاء سند القبض {postingResult.ReceiptVoucherNumber} وتخصيص الدفعات."
-                : "تم ترحيل الفاتورة بنجاح.";
-            Workspace.NotifyStateChanged(); await LoadListAsync(SalesEntityType.SalesInvoices);
+                : "تم ترحيل الفاتورة بنجاح.");
+            Workspace.NotifyStateChanged();
+            await LoadListAsync(SalesEntityType.SalesInvoices);
         }
-        catch (InvalidOperationException ex) { _error = ex.Message; Workspace.NotifyStateChanged(); }
-        catch (ApiClientException ex) { _error = SalesApiErrorPresenter.GetMessage(ex.Error); }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
     }
 
-    private static IReadOnlyList<CheckoutPaymentLineRequest> BuildDirectInvoicePayments(UiSalesInvoiceFormModel invoice)
+    private static bool TryBuildDirectInvoicePayments(
+        UiSalesInvoiceFormModel invoice,
+        out IReadOnlyList<CheckoutPaymentLineRequest> payments,
+        out string? error)
     {
         var result = new List<CheckoutPaymentLineRequest>();
         foreach (var line in invoice.PaymentLines.Where(x => x.Amount > 0m))
         {
             if (!Enum.TryParse<PaymentMethod>(line.PaymentMethod, true, out var method))
-                throw new InvalidOperationException("طريقة دفع غير صحيحة.");
+            {
+                payments = [];
+                error = "طريقة دفع غير صحيحة.";
+                return false;
+            }
+
             if (!Guid.TryParse(line.CurrencyId, out var currencyId))
-                throw new InvalidOperationException("يجب تحديد عملة كل دفعة.");
+            {
+                payments = [];
+                error = "يجب تحديد عملة كل دفعة.";
+                return false;
+            }
+
+            if (method == PaymentMethod.Cash && !TryGuid(line.CashAccountId).HasValue)
+            {
+                payments = [];
+                error = "يجب اختيار الصندوق للدفع النقدي.";
+                return false;
+            }
+
+            if ((method is PaymentMethod.Card or PaymentMethod.BankTransfer or PaymentMethod.Cheque) && !TryGuid(line.BankAccountId).HasValue)
+            {
+                payments = [];
+                error = "يجب اختيار الحساب البنكي لطريقة الدفع المحددة.";
+                return false;
+            }
+
+            if (method == PaymentMethod.Cheque && string.IsNullOrWhiteSpace(line.ReferenceNumber))
+            {
+                payments = [];
+                error = "رقم الشيك مطلوب.";
+                return false;
+            }
+
+            if (method == PaymentMethod.Other && !TryGuid(line.SettlementAccountId).HasValue)
+            {
+                payments = [];
+                error = "يجب تحديد حساب التسوية لطريقة الدفع الأخرى.";
+                return false;
+            }
+
             result.Add(new CheckoutPaymentLineRequest(
                 method, currencyId, line.Amount, TryGuid(line.CashAccountId), TryGuid(line.BankAccountId),
                 line.ReferenceNumber, line.ReferenceDate, line.Description)
             { SettlementAccountId = TryGuid(line.SettlementAccountId) });
         }
-        return result;
+
+        payments = result;
+        error = null;
+        return true;
+    }
+
+    private static bool ValidateDirectInvoicePaymentPlan(
+        UiSalesInvoiceFormModel invoice,
+        IReadOnlyList<CheckoutPaymentLineRequest> payments,
+        out string? error)
+    {
+        const decimal tolerance = 0.0001m;
+        if (!Enum.TryParse<SalesPaymentPlan>(invoice.PaymentPlan, true, out var plan))
+        {
+            error = "خطة السداد غير صحيحة.";
+            return false;
+        }
+
+        var invoiceCurrencyId = TryGuid(invoice.CurrencyId);
+        var comparable = invoiceCurrencyId.HasValue && payments.All(x => x.CurrencyId == invoiceCurrencyId.Value);
+        var paid = payments.Sum(x => x.Amount);
+        var required = invoice.TotalAmount;
+
+        switch (plan)
+        {
+            case SalesPaymentPlan.FullNow:
+                if (payments.Count == 0)
+                {
+                    error = "خطة الدفع الكامل تتطلب إدخال دفعة تغطي كامل قيمة الفاتورة.";
+                    return false;
+                }
+                if (comparable && Math.Abs(paid - required) > tolerance)
+                {
+                    error = paid > required + tolerance
+                        ? "مبلغ الدفعة يتجاوز كامل قيمة الفاتورة."
+                        : "خطة الدفع الكامل تتطلب دفعات تغطي كامل قيمة الفاتورة.";
+                    return false;
+                }
+                break;
+            case SalesPaymentPlan.PartialNow:
+                if (payments.Count == 0 || paid <= tolerance)
+                {
+                    error = "أدخل مبلغ الدفع الجزئي أولًا.";
+                    return false;
+                }
+                if (comparable && paid >= required - tolerance)
+                {
+                    error = paid > required + tolerance
+                        ? "مبلغ الدفعة يتجاوز كامل قيمة الفاتورة."
+                        : "المبلغ المدخل يغطي كامل قيمة الفاتورة. اختر الدفع الكامل.";
+                    return false;
+                }
+                break;
+            case SalesPaymentPlan.PayOnPickup:
+                if (payments.Count != 0)
+                {
+                    error = "الدفع عند الاستلام لا يقبل دفعات عند ترحيل البيع الأولي.";
+                    return false;
+                }
+                break;
+            case SalesPaymentPlan.AccountCredit:
+                if (payments.Count != 0)
+                {
+                    error = "البيع الآجل لا يقبل دفعات عند الترحيل الأولي.";
+                    return false;
+                }
+                break;
+            default:
+                error = "خطة السداد غير صحيحة.";
+                return false;
+        }
+
+        error = null;
+        return true;
     }
 
     private async Task CancelPrescriptionAsync(MouseEventArgs _)
@@ -499,9 +707,10 @@ public partial class SalesWorkspaceHost : IDisposable
 
         try
         {
-            var dto = await Sales.SetPrescriptionStatusAsync(
+            var call = await Sales.SetPrescriptionStatusResultAsync(
                 model.Id.Value,
                 new SetPrescriptionStatusRequest(status, model.RowVersion));
+            if (!TryGetApiResult(call, out var dto)) return;
 
             if (dto is not null)
                 ActiveTab.Model = SalesUiMapper.ToUi(dto);
@@ -511,7 +720,7 @@ public partial class SalesWorkspaceHost : IDisposable
         }
         catch (ApiClientException ex)
         {
-            _error = SalesApiErrorPresenter.GetMessage(ex.Error);
+            ApiFeedback.Show(ex.Error);
         }
     }
 
@@ -590,30 +799,31 @@ public partial class SalesWorkspaceHost : IDisposable
 
         try
         {
-            ValidateRevisionDraft(revisionDraft);
+            if (!ValidateRevisionDraft(revisionDraft)) return;
 
-            var dto = await Sales.CreatePrescriptionRevisionAsync(
+            var call = await Sales.CreatePrescriptionRevisionResultAsync(
                 prescription.Id.Value,
                 SalesUiMapper.ToRevisionRequest(
                     revisionDraft,
                     prescription.RowVersion));
+            if (!TryGetApiResult(call, out var dto)) return;
 
             if (dto is not null)
                 ActiveTab.Model = SalesUiMapper.ToUi(dto);
 
             _revisionDrafts.Remove(ActiveTab.TabId);
             _dirtyRevisionDraftTabs.Remove(ActiveTab.TabId);
-            _success = "تم حفظ الإصدار الجديد وأصبح هو الإصدار الحالي للوصفة.";
+            Snackbar.Success("تم حفظ الإصدار الجديد وأصبح هو الإصدار الحالي للوصفة.");
             Workspace.NotifyStateChanged();
             await LoadListAsync(SalesEntityType.Prescriptions);
         }
-        catch (InvalidOperationException ex)
-        {
-            _error = ex.Message;
-        }
         catch (ApiClientException ex)
         {
-            _error = SalesApiErrorPresenter.GetMessage(ex.Error);
+            ApiFeedback.Show(ex.Error);
+        }
+        catch
+        {
+            ApiFeedback.ShowUnexpected();
         }
         finally
         {
@@ -641,35 +851,53 @@ public partial class SalesWorkspaceHost : IDisposable
         ]
     };
 
-    private static void ValidateRevisionDraft(UiPrescriptionRevisionModel revision)
+    private bool ValidateRevisionDraft(UiPrescriptionRevisionModel revision)
     {
         if (!revision.EffectiveDate.HasValue)
-            throw new InvalidOperationException("يجب تحديد تاريخ سريان الإصدار.");
+        {
+            Snackbar.Error("يجب تحديد تاريخ سريان الإصدار.");
+            return false;
+        }
 
         if (revision.Eyes.Count == 0)
-            throw new InvalidOperationException("يجب إضافة بيانات عين واحدة على الأقل.");
+        {
+            Snackbar.Error("يجب إضافة بيانات عين واحدة على الأقل.");
+            return false;
+        }
 
         if (revision.Eyes
             .GroupBy(x => x.Eye, StringComparer.OrdinalIgnoreCase)
             .Any(group => group.Count() > 1))
         {
-            throw new InvalidOperationException("لا يمكن تكرار نفس العين داخل الإصدار.");
+            Snackbar.Error("لا يمكن تكرار نفس العين داخل الإصدار.");
+            return false;
         }
 
         if (revision.Eyes.Any(x => x.Axis is < 0 or > 180))
-            throw new InvalidOperationException("قيمة Axis يجب أن تكون بين 0 و180.");
+        {
+            Snackbar.Error("قيمة Axis يجب أن تكون بين 0 و180.");
+            return false;
+        }
 
         if (revision.Eyes.Any(x => x.ADD < 0 || x.Prism < 0))
-            throw new InvalidOperationException("قيم ADD وPrism لا يمكن أن تكون سالبة.");
+        {
+            Snackbar.Error("قيم ADD وPrism لا يمكن أن تكون سالبة.");
+            return false;
+        }
 
         if (revision.Eyes.Any(x => x.PD is <= 0 || x.MonocularPD is <= 0 || x.FittingHeight is <= 0))
-            throw new InvalidOperationException("قيم PD وMono PD وFitting Height يجب أن تكون أكبر من صفر عند إدخالها.");
+        {
+            Snackbar.Error("قيم PD وMono PD وFitting Height يجب أن تكون أكبر من صفر عند إدخالها.");
+            return false;
+        }
+
+        return true;
     }
 
     private bool EnsureSaved(SalesWorkspaceTabState tab)
     {
         if (!tab.IsDirty) return true;
-        _error = "توجد تعديلات غير محفوظة. احفظ المستند قبل تنفيذ الإجراء.";
+        Snackbar.Info("توجد تعديلات غير محفوظة. احفظ المستند قبل تنفيذ الإجراء.");
         return false;
     }
 
@@ -1077,8 +1305,7 @@ public partial class SalesWorkspaceHost : IDisposable
         if (customer.IsCreditAllowed)
             return true;
 
-        _error = "البيع الآجل غير مسموح لهذا العميل. اختر السداد الفوري.";
-        _success = null;
+        Snackbar.Error("البيع الآجل غير مسموح لهذا العميل. اختر السداد الفوري.");
         Workspace.NotifyStateChanged();
         return false;
     }
@@ -1289,12 +1516,13 @@ public partial class SalesWorkspaceHost : IDisposable
         if (result.Cancelled || result.Value is not UiSalesPriceOverrideRequestModel request) return;
         try
         {
-            var created = await Sales.RequestPriceOverrideAsync(
+            var call = await Sales.RequestPriceOverrideResultAsync(
                 invoice.Id.Value,
                 new RequestSalesPriceOverrideRequest(line.Id.Value, request.OverridePrice, request.Reason, invoice.RowVersion));
-            if (created is not null) _success = "تم إرسال طلب اعتماد السعر بنجاح.";
+            if (!TryGetApiResult(call, out var created)) return;
+            if (created is not null) Snackbar.Success("تم إرسال طلب اعتماد السعر بنجاح.");
         }
-        catch (ApiClientException ex) { _error = SalesApiErrorPresenter.GetMessage(ex.Error); }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
         Workspace.NotifyStateChanged();
     }
 
@@ -1305,7 +1533,7 @@ public partial class SalesWorkspaceHost : IDisposable
 
         if (!string.Equals(invoice.Status, "Posted", StringComparison.OrdinalIgnoreCase))
         {
-            _error = "يمكن طباعة فاتورة المبيعات بعد الترحيل فقط.";
+            Snackbar.Info("يمكن طباعة فاتورة المبيعات بعد الترحيل فقط.");
             Workspace.NotifyStateChanged();
             return;
         }
@@ -1316,13 +1544,13 @@ public partial class SalesWorkspaceHost : IDisposable
         try
         {
             var result = await PrintingService.PrintSalesInvoiceAsync(invoice.Id.Value);
-            _success = result is null
+            Snackbar.Success(result is null
                 ? "تم إرسال فاتورة المبيعات إلى OAS Print."
-                : "تم إرسال فاتورة المبيعات إلى OAS Print للطباعة.";
+                : "تم إرسال فاتورة المبيعات إلى OAS Print للطباعة.");
         }
         catch (ApiClientException ex)
         {
-            _error = SalesApiErrorPresenter.GetMessage(ex.Error);
+            ApiFeedback.Show(ex.Error);
         }
         finally
         {
@@ -1337,6 +1565,14 @@ public partial class SalesWorkspaceHost : IDisposable
     private static Guid? TryGuid(string? value) => Guid.TryParse(value, out var id) && id != Guid.Empty ? id : null;
     private static string StatusCss(string status) => SalesArabicPresenter.StatusCss(status);
     private static string RouteFor(SalesEntityType type) => type switch { SalesEntityType.Prescriptions => "/sales/prescriptions", SalesEntityType.CustomerOrders => "/sales/customer-orders", _ => "/sales/invoices" };
-    private void ClearMessages() { _error = null; _success = null; }
+    private bool TryGetApiResult<T>(ApiCallResult<T> result, out T? value)
+    {
+        value = result.Value;
+        if (result.Succeeded) return true;
+        if (result.Error is not null) ApiFeedback.Show(result.Error); else ApiFeedback.ShowUnexpected();
+        return false;
+    }
+
+    private static void ClearMessages() { }
     public void Dispose() { Workspace.OnChange -= WorkspaceChanged; GC.SuppressFinalize(this); }
 }

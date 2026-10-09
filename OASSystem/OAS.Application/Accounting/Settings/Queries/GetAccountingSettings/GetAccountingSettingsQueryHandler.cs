@@ -21,6 +21,9 @@ public sealed class GetAccountingSettingsQueryHandler(
     private const string TaxPayableRole = "TaxPayable";
     private const string InventoryRole = "Inventory";
     private const string CogsRole = "COGS";
+    private const string AccountingModule = "Accounting";
+    private const string CustomerAdvanceApplicationDocumentType = "CustomerAdvanceApplication";
+    private const string CustomerAdvancesRole = "CustomerAdvances";
 
     public async Task<AccountingSettingsDto?> Handle(
         GetAccountingSettingsQuery request,
@@ -38,6 +41,7 @@ public sealed class GetAccountingSettingsQueryHandler(
             cancellationToken);
 
         var roles = await ResolveSalesInvoiceRoleAccountsAsync(cancellationToken);
+        var customerAdvancesAccountId = await ResolveCustomerAdvancesAccountAsync(cancellationToken);
 
         return new AccountingSettingsDto(
             entity.Id,
@@ -50,6 +54,7 @@ public sealed class GetAccountingSettingsQueryHandler(
             entity.ExchangeLossAccountId,
             roles.SalesRevenueAccountId,
             roles.TaxPayableAccountId,
+            customerAdvancesAccountId,
             entity.InventoryAccountId ?? roles.InventoryAccountId,
             roles.CogsAccountId,
             entity.GrniAccountId,
@@ -110,6 +115,44 @@ public sealed class GetAccountingSettingsQueryHandler(
             Find(TaxPayableRole),
             Find(InventoryRole),
             Find(CogsRole));
+    }
+
+    private async Task<Guid?> ResolveCustomerAdvancesAccountAsync(CancellationToken cancellationToken)
+    {
+        var profiles = await postingProfiles.ListAsync(
+            new Specification<PostingProfile>()
+                .Where(x =>
+                    x.Module == AccountingModule &&
+                    x.DocumentType == CustomerAdvanceApplicationDocumentType &&
+                    x.IsActive),
+            cancellationToken);
+
+        if (profiles.Count > 1)
+        {
+            throw new ConflictException(
+                "customer_advance_posting_profile_duplicate",
+                "يوجد أكثر من ملف ترحيل فعال لعربون العميل.");
+        }
+
+        var profile = profiles.SingleOrDefault();
+        if (profile is null)
+            return null;
+
+        var lines = await postingProfileLines.ListAsync(
+            new Specification<PostingProfileLine>()
+                .Where(x =>
+                    x.PostingProfileId == profile.Id &&
+                    x.AccountRole == CustomerAdvancesRole),
+            cancellationToken);
+
+        if (lines.Count > 1)
+        {
+            throw new ConflictException(
+                "customer_advance_posting_role_duplicate",
+                "يوجد أكثر من حساب معرف لدور دفعات مقدمة من العملاء.");
+        }
+
+        return lines.SingleOrDefault()?.AccountId;
     }
 
     private sealed record SalesInvoiceRoleAccounts(

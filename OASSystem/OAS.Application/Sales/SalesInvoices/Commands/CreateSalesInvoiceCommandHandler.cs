@@ -191,7 +191,7 @@ public sealed class CreateSalesInvoiceCommandHandler(
                 invoice.CurrencyDecimalPlacesSnapshot)
             : resolved.BaseUnitPrice;
 
-        var actualUnitPrice = resolved.ProductVariantId.HasValue
+        var actualUnitPrice = resolved.ProductVariantId.HasValue && standardUnitPrice > 0m
             ? standardUnitPrice
             : req.ActualUnitPrice;
 

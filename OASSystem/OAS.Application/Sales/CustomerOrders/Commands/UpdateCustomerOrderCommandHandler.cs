@@ -109,13 +109,11 @@ public sealed class UpdateCustomerOrderCommandHandler(
             if (existing is not null && IsSameStructure(existing, req, prepared))
             {
                 var existingBaseUnitPrice = existing.BaseUnitPrice;
-                var existingActualUnitPrice = existing.ProductVariantId.HasValue ? existing.ActualUnitPrice : req.ActualUnitPrice;
+                var existingActualUnitPrice = req.ActualUnitPrice;
                 if (currencyContextChanged && existing.ProductVariantId.HasValue)
                 {
                     existingBaseUnitPrice = SalesPricingCalculator.ConvertBetweenCurrencies(
                         existing.BaseUnitPrice, previousExchangeRate, order.ExchangeRate, order.CurrencyDecimalPlacesSnapshot);
-                    existingActualUnitPrice = SalesPricingCalculator.ConvertBetweenCurrencies(
-                        existing.ActualUnitPrice, previousExchangeRate, order.ExchangeRate, order.CurrencyDecimalPlacesSnapshot);
                 }
 
                 order.UpdateLinePricing(
@@ -141,7 +139,7 @@ public sealed class UpdateCustomerOrderCommandHandler(
             var standardUnitPrice = resolved.ProductVariantId.HasValue
                 ? SalesPricingCalculator.ConvertFromBase(resolved.BaseUnitPrice, order.ExchangeRate, order.CurrencyDecimalPlacesSnapshot)
                 : resolved.BaseUnitPrice;
-            var resolvedActualUnitPrice = resolved.ProductVariantId.HasValue ? standardUnitPrice : req.ActualUnitPrice;
+            var resolvedActualUnitPrice = req.ActualUnitPrice;
             var newLineId = Guid.NewGuid();
             var newLine = CustomerOrderLine.Create(
                 newLineId,

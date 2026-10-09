@@ -3,6 +3,10 @@
 <div class="ui-sales-payment-summary" dir="rtl">
     <div><span>قيمة الفاتورة</span><strong>@InvoiceTotal.ToString("N2") @CurrencyCode</strong></div>
     <div><span>المبلغ المسدد</span><strong>@PaidAmount.ToString("N2") @CurrencyCode</strong></div>
+    @if (ReturnedAmount > 0m)
+    {
+        <div><span>المرتجعات المرحلة</span><strong>@ReturnedAmount.ToString("N2") @CurrencyCode</strong></div>
+    }
     <div class="@(OutstandingAmount > 0 ? "ui-sales-payment-summary__outstanding" : "ui-sales-payment-summary__settled")"><span>المتبقي</span><strong>@OutstandingAmount.ToString("N2") @CurrencyCode</strong></div>
 </div>
 
@@ -10,5 +14,6 @@
     [Parameter] public string CurrencyCode { get; set; } = string.Empty;
     [Parameter] public decimal InvoiceTotal { get; set; }
     [Parameter] public decimal PaidAmount { get; set; }
+    [Parameter] public decimal ReturnedAmount { get; set; }
     [Parameter] public decimal OutstandingAmount { get; set; }
 }

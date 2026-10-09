@@ -207,10 +207,11 @@ public sealed class UpdateSalesInvoiceCommandHandler(
                 // ActualUnitPrice المحفوظة هي السعر
                 // الذي نعتمد عليه ونبقيه كما هو.
                 //
-                // البنود بدون ProductVariant فقط
-                // يمكن تعديل السعر فيها مباشرة.
+                // البنود بدون ProductVariant أو المنتجات التي لا تملك سعرًا محفوظًا
+                // يمكن إدخال سعرها يدويًا مباشرة. المنتج ذو السعر المحفوظ
+                // يبقى خاضعًا لمسار Price Override.
                 var existingBaseUnitPrice = existing.BaseUnitPrice;
-                var existingActualUnitPrice = existing.ProductVariantId.HasValue
+                var existingActualUnitPrice = existing.ProductVariantId.HasValue && existing.BaseUnitPrice > 0m
                     ? existing.ActualUnitPrice
                     : req.ActualUnitPrice;
 
@@ -285,10 +286,9 @@ public sealed class UpdateSalesInvoiceCommandHandler(
                 resolved.OpticalPolicy,
                 ct);
 
-            // المنتج يأخذ السعر المخزن مسبقًا.
-            //
-            // إذا لم يكن السطر مرتبطًا بمنتج
-            // يسمح بالقيمة اليدوية مثل Service.
+            // المنتج ذو السعر المخزن يأخذ سعره القياسي عند إنشاء السطر.
+            // إذا لم يكن للمنتج سعر مخزن (السعر القياسي = صفر)،
+            // أو لم يكن السطر مرتبطًا بمنتج، يسمح بالقيمة اليدوية.
             var standardUnitPrice = resolved.ProductVariantId.HasValue
                 ? SalesPricingCalculator.ConvertFromBase(
                     resolved.BaseUnitPrice,
@@ -297,7 +297,7 @@ public sealed class UpdateSalesInvoiceCommandHandler(
                 : resolved.BaseUnitPrice;
 
             var resolvedActualUnitPrice =
-                resolved.ProductVariantId.HasValue
+                resolved.ProductVariantId.HasValue && standardUnitPrice > 0m
                     ? standardUnitPrice
                     : req.ActualUnitPrice;
 

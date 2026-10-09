@@ -111,14 +111,18 @@
                         </label>
 
                         <label class="ui-sales-line-card__number-field">
-                            <span>السعر</span>
+                            <span>سعر البيع</span>
                             <input type="number"
                                    min="0"
                                    step="0.01"
                                    value="@line.ActualUnitPrice"
-                                   disabled="@(ReadOnly || HasStoredProductPrice(line))"
+                                   disabled="@(ReadOnly || (EnablePriceOverride && HasStoredProductPrice(line)))"
                                    title="@PriceTitle(line)"
                                    @onchange="e => DecimalChanged(line, nameof(line.ActualUnitPrice), e)" />
+                            @if (!string.IsNullOrWhiteSpace(line.ProductVariantId))
+                            {
+                                <small class="ui-sales-line-card__price-hint">@OriginalPriceText(line)</small>
+                            }
                         </label>
 
                         <label class="ui-sales-line-card__number-field">
@@ -232,8 +236,20 @@
     [Parameter] public EventCallback<UiSalesLineModel> OnRequestPriceOverride { get; set; }
     [Parameter] public EventCallback OnChanged { get; set; }
 
-    private static bool HasStoredProductPrice(UiSalesLineModel line) => !string.IsNullOrWhiteSpace(line.ProductVariantId);
-    private static string? PriceTitle(UiSalesLineModel line) => HasStoredProductPrice(line) ? "السعر يُجلب تلقائيًا من بطاقة المنتج" : null;
+    private static bool HasStoredProductPrice(UiSalesLineModel line) =>
+        !string.IsNullOrWhiteSpace(line.ProductVariantId) && line.BaseUnitPrice > 0m;
+
+    private static string? PriceTitle(UiSalesLineModel line) =>
+        string.IsNullOrWhiteSpace(line.ProductVariantId)
+            ? null
+            : HasStoredProductPrice(line)
+                ? "سعر البيع الافتراضي محمّل من بطاقة المنتج. في طلب العميل يمكنك تعديله، وفي الفاتورة المباشرة يخضع تغيير السعر لمسار الموافقة."
+                : "لا يوجد سعر بيع محفوظ للمنتج. أدخل سعر البيع يدويًا.";
+
+    private static string OriginalPriceText(UiSalesLineModel line) =>
+        HasStoredProductPrice(line)
+            ? $"السعر الأصلي: {line.BaseUnitPrice:N2}"
+            : "لا يوجد سعر أصلي محفوظ - أدخل سعر البيع";
     private static bool LineNormallyUsesStock(string lineType) => lineType is "Frame" or "Lens" or "Accessory";
     private static bool ShouldShowWarehouse(UiSalesLineModel line) =>
         line.ProductIsStockItem == true ||

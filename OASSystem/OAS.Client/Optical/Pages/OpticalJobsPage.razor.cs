@@ -142,6 +142,26 @@ public partial class OpticalJobsPage : ComponentBase
         });
     }
 
+    private async Task SendToQualityControlAsync()
+    {
+        if (_selected is null) return;
+        await MutateAsync(async () =>
+        {
+            var dto = await Jobs.SendToQualityControlAsync(_selected.Id, new OpticalJobActionRequest(_selected.RowVersion));
+            ApplyDetails(dto, "تم إرسال أمر المعمل لفحص الجودة.");
+        });
+    }
+
+    private async Task PassQualityControlAsync()
+    {
+        if (_selected is null) return;
+        await MutateAsync(async () =>
+        {
+            var dto = await Jobs.PassQualityControlAsync(_selected.Id, new OpticalJobActionRequest(_selected.RowVersion));
+            ApplyDetails(dto, "تم تسجيل اجتياز فحص الجودة.");
+        });
+    }
+
     private async Task ReadyAsync()
     {
         if (_selected is null) return;

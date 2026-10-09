@@ -34,7 +34,7 @@
             <UiSalesEditorSurface Title="@(prescription.Id.HasValue ? prescription.PrescriptionCode : "وصفة جديدة")"
                                   Subtitle="الوصفة الطبية وإصدارات قياسات العين" IconCss="fa-solid fa-glasses"
                                   StatusText="@prescription.StatusText" StatusCssClass="@StatusCss(prescription.Status)"
-                                  ErrorText="@_error" SuccessText="@_success">
+>
                 <Actions>
                     @if (ActiveTab.IsNew)
                     {
@@ -86,7 +86,7 @@
         else if (ActiveTab.Model is UiCustomerOrderFormModel order)
         {
             <UiSalesEditorSurface Title="@(order.Id.HasValue ? order.OrderCode : "طلب عميل جديد")" Subtitle="طلب العميل وحجز المخزون" IconCss="fa-solid fa-clipboard-list"
-                                  StatusText="@order.StatusText" StatusCssClass="@StatusCss(order.Status)" ErrorText="@_error" SuccessText="@_success">
+                                  StatusText="@order.StatusText" StatusCssClass="@StatusCss(order.Status)">
                 <Actions>
                     @if (ActiveTab.IsEditMode)
                     {
@@ -117,7 +117,7 @@
         else if (ActiveTab.Model is UiSalesInvoiceFormModel invoice)
         {
             <UiSalesEditorSurface Title="@(invoice.Id.HasValue ? invoice.InvoiceCode : "فاتورة مبيعات جديدة")" Subtitle="فاتورة المبيعات والترحيل المخزني والمحاسبي" IconCss="fa-solid fa-file-invoice-dollar"
-                                  StatusText="@invoice.StatusText" StatusCssClass="@StatusCss(invoice.Status)" ErrorText="@_error" SuccessText="@_success">
+                                  StatusText="@invoice.StatusText" StatusCssClass="@StatusCss(invoice.Status)">
                 <Actions>
                     @if (ActiveTab.IsEditMode)
                     {

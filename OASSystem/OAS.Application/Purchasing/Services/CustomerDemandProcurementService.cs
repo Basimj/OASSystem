@@ -16,7 +16,8 @@ public sealed class CustomerDemandProcurementService(
     IRepository<PurchaseRequestLine, Guid> lines,
     IPurchasingReferenceDataPort references,
     IPurchasingCodeService codes,
-    ICurrentUser currentUser) : ICustomerDemandProcurementPort
+    ICurrentUser currentUser,
+    TimeProvider timeProvider) : ICustomerDemandProcurementPort
 {
     private static readonly PurchaseRequestStatus[] CoverageStatuses =
     [
@@ -247,4 +248,45 @@ public sealed class CustomerDemandProcurementService(
         target.ScheduleOrder(scheduledOrderAtUtc);
         lines.Update(target);
     }
+    public async Task CancelUncommittedDemandForOrderAsync(
+        Guid customerOrderId,
+        string? reason,
+        CancellationToken cancellationToken = default)
+    {
+        var headers = await requestHeaders.ListAsync(
+            new Specification<PurchaseRequest>().Where(x =>
+                x.RequestType == PurchaseRequestType.CustomerDemand &&
+                x.CustomerOrderId == customerOrderId &&
+                x.Status != PurchaseRequestStatus.Cancelled &&
+                x.Status != PurchaseRequestStatus.Rejected),
+            cancellationToken);
+
+        foreach (var header in headers)
+        {
+            var aggregate = await requests.GetForUpdateAsync(header.Id, cancellationToken) ?? header;
+            var lineIds = aggregate.Lines.Select(x => x.Id).ToArray();
+            var allocated = lineIds.Length == 0
+                ? new Dictionary<Guid, decimal>()
+                : await requests.GetAllocatedQuantitiesAsync(lineIds, cancellationToken);
+            if (allocated.Values.Any(x => x > 0m) || aggregate.Status == PurchaseRequestStatus.Converted)
+                throw new ConflictException(
+                    "sales_order_customer_demand_committed",
+                    "لا يمكن إلغاء طلب العميل لأن أحد طلبات النقص مرتبط بالفعل بأمر شراء. عالج التزام الشراء أولًا.");
+
+            if (aggregate.Status == PurchaseRequestStatus.PendingApproval)
+                throw new ConflictException(
+                    "sales_order_customer_demand_pending_approval",
+                    "لا يمكن إلغاء طلب العميل بينما يوجد طلب نقص بانتظار الاعتماد. ألغِ أو ارفض طلب النقص أولًا.");
+
+            if (aggregate.Status is PurchaseRequestStatus.Draft or PurchaseRequestStatus.Approved or PurchaseRequestStatus.PartiallyConverted)
+            {
+                aggregate.Cancel(
+                    timeProvider.GetUtcNow(),
+                    currentUser.UserId,
+                    string.IsNullOrWhiteSpace(reason) ? "Customer order cancelled" : reason);
+                requests.Update(aggregate);
+            }
+        }
+    }
+
 }

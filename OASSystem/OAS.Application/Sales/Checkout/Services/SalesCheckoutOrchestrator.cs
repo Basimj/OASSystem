@@ -26,6 +26,7 @@ public sealed class SalesCheckoutOrchestrator(
     IRepository<OpticalJob, Guid> opticalJobs,
     IReadRepository<Customer, Guid> customers,
     ICustomerOrderConfirmationService orderConfirmation,
+    ICustomerOrderFulfillmentService fulfillment,
     ICustomerOrderAvailabilityService availability,
     ICustomerDemandProcurementPort customerDemand,
     ISalesInvoiceFromOrderService invoiceFromOrder,
@@ -68,9 +69,16 @@ public sealed class SalesCheckoutOrchestrator(
 
             // Shortage/production-in-progress states are completed by the fulfillment/lab
             // workflows. Re-running Checkout must not collect a second advance or duplicate work.
-            if (order.Status is CustomerOrderStatus.AwaitingStock
-                or CustomerOrderStatus.PartiallyAvailable
-                or CustomerOrderStatus.InProduction)
+            if (order.Status is CustomerOrderStatus.AwaitingStock or CustomerOrderStatus.PartiallyAvailable)
+            {
+                // Re-check reservations on an explicit Checkout retry as well. Stock may have
+                // arrived through a transfer, adjustment, or unrelated receipt rather than the
+                // purchasing receipt that originally created this customer demand.
+                await fulfillment.ReconcileOrdersAsync([order.Id], cancellationToken);
+                return await BuildExistingResultAsync(order, cancellationToken);
+            }
+
+            if (order.Status == CustomerOrderStatus.InProduction)
                 return await BuildExistingResultAsync(order, cancellationToken);
 
             if (order.Status is not (CustomerOrderStatus.Confirmed
@@ -84,6 +92,15 @@ public sealed class SalesCheckoutOrchestrator(
         if (!customer.IsActive)
             throw new ConflictException("sales_checkout_customer_inactive", "العميل غير مفعل.");
 
+        var lineWithoutPrice = order.Lines
+            .Where(x => x.IsActive && x.ProductVariantId.HasValue && x.ActualUnitPrice <= 0m)
+            .OrderBy(x => x.LineNumber)
+            .FirstOrDefault();
+        if (lineWithoutPrice is not null)
+            throw new ConflictException(
+                "sales_product_price_required",
+                $"لم يتم تحديد سعر بيع للبند رقم {lineWithoutPrice.LineNumber}. أدخل سعر البيع قبل اختيار الدفع الكامل أو الجزئي.");
+
         if (wasDraft)
         {
             var paymentTermDays = requestedPlan == SalesPaymentPlan.AccountCredit ? customer.PaymentTermDays : 0;
@@ -93,11 +110,12 @@ public sealed class SalesCheckoutOrchestrator(
         if (requestedPlan == SalesPaymentPlan.AccountCredit)
             await ValidateAccountCreditAsync(customer, order, cancellationToken);
 
-        var paymentBaseAmount = await settlement.CalculatePaymentBaseAmountAsync(
-            request.PaymentLines, order.OrderDate, cancellationToken);
+        var paymentBaseAmount = await settlement.CalculateOrderPaymentTargetBaseAmountAsync(
+            order, request.PaymentLines, cancellationToken);
         var preCheckoutPayment = await settlement.GetPaymentSummaryAsync(order, null, 0m, cancellationToken);
         var remainingBeforeCheckout = Math.Max(0m, order.TotalAmount - preCheckoutPayment.ExistingAdvanceBalance);
-        var requiredBaseAmount = Math.Round(remainingBeforeCheckout * order.ExchangeRate, 4, MidpointRounding.AwayFromZero);
+        var requiredBaseAmount = await settlement.CalculateOrderBaseAmountAsync(
+            order, remainingBeforeCheckout, cancellationToken);
         ValidateCheckoutPaymentPlan(order, request.PaymentLines.Count, paymentBaseAmount, requiredBaseAmount);
 
         CustomerOrderConfirmationResult confirmation;
@@ -179,7 +197,7 @@ public sealed class SalesCheckoutOrchestrator(
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        var paidNowAmount = ToOrderCurrency(receiptCollection?.BaseAmount ?? 0m, order);
+        var paidNowAmount = ToOrderCurrency(receiptCollection is null ? 0m : paymentBaseAmount, order);
         var finalPayment = await settlement.GetPaymentSummaryAsync(order, invoice, paidNowAmount, cancellationToken);
         if (order.PaymentPlan == SalesPaymentPlan.FullNow && finalPayment.OutstandingAmount > MoneyTolerance)
             throw new ConflictException("sales_checkout_full_payment_incomplete", "الدفع الكامل لم يغطِ كامل المبلغ المستحق.");
@@ -214,11 +232,14 @@ public sealed class SalesCheckoutOrchestrator(
 
         SalesPaymentCollectionResult? collection = null;
         var before = await settlement.GetPaymentSummaryAsync(order, invoice, 0m, cancellationToken);
+        var deliveryPaymentTargetBase = request.PaymentLines.Count == 0
+            ? 0m
+            : await settlement.CalculateOrderPaymentTargetBaseAmountAsync(order, request.PaymentLines, cancellationToken);
         if (request.PaymentLines.Count > 0)
             collection = await settlement.CreateReceiptForInvoiceAsync(invoice, request.PaymentLines, cancellationToken);
 
         var after = await settlement.GetPaymentSummaryAsync(
-            order, invoice, ToOrderCurrency(collection?.BaseAmount ?? 0m, order), cancellationToken);
+            order, invoice, ToOrderCurrency(collection is null ? 0m : deliveryPaymentTargetBase, order), cancellationToken);
         if (order.PaymentPlan != SalesPaymentPlan.AccountCredit && after.OutstandingAmount > MoneyTolerance)
         {
             var code = request.PaymentLines.Count == 0 && before.OutstandingAmount > MoneyTolerance
@@ -263,7 +284,8 @@ public sealed class SalesCheckoutOrchestrator(
             throw new ForbiddenException("ليس لديك صلاحية استخدام البيع الآجل.");
 
         var exposure = await creditExposure.CalculateExposureBeforeCurrentAsync(customer.Id, null, cancellationToken);
-        var newBaseAmount = Math.Round(order.TotalAmount * order.ExchangeRate, 4, MidpointRounding.AwayFromZero);
+        var newBaseAmount = await settlement.CalculateOrderBaseAmountAsync(
+            order, order.TotalAmount, cancellationToken);
         try
         {
             customer.EnsureCanUseAccountCredit(exposure, newBaseAmount);

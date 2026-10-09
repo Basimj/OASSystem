@@ -43,6 +43,11 @@ public sealed class CustomerOrderConfirmationService(
 
         foreach (var line in order.Lines.Where(x => x.IsActive))
         {
+            if (line.ProductVariantId.HasValue && line.ActualUnitPrice <= 0m)
+                throw new ConflictException(
+                    "sales_product_price_required",
+                    $"لم يتم تحديد سعر بيع للبند رقم {line.LineNumber}. أدخل سعر البيع قبل إتمام العملية.");
+
             var resolved = await lineResolver.ResolveAsync(
                 line.LineType, line.ProductVariantId, line.WarehouseId, line.DescriptionSnapshot, cancellationToken);
             var snapshot = (await snapshots.ListAsync(

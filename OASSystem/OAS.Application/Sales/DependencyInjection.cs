@@ -57,6 +57,7 @@ public static class DependencyInjection
         services.AddScoped<ISalesInvoiceFromOrderService, SalesInvoiceFromOrderService>();
         services.AddScoped<ISalesInvoiceConfirmationService, SalesInvoiceConfirmationService>();
         services.AddScoped<ISalesInvoicePostingWorkflow, SalesInvoicePostingWorkflow>();
+        services.AddScoped<ISalesInvoiceBalanceService, SalesInvoiceBalanceService>();
         services.AddScoped<ISalesSettlementService, SalesSettlementService>();
         services.AddScoped<IOpticalProductionPort, OpticalProductionPort>();
         services.AddScoped<ISalesCheckoutOrchestrator, OAS.Application.Sales.Checkout.Services.SalesCheckoutOrchestrator>();

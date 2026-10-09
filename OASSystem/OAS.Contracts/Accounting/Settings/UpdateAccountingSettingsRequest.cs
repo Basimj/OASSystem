@@ -11,6 +11,7 @@ public sealed record UpdateAccountingSettingsRequest(
     Guid? ExchangeLossAccountId,
     Guid? SalesRevenueAccountId,
     Guid? TaxPayableAccountId,
+    Guid? CustomerAdvancesAccountId,
     Guid? InventoryAccountId,
     Guid? CogsAccountId,
     ExchangeRateType DefaultExchangeRateType = ExchangeRateType.Accounting,

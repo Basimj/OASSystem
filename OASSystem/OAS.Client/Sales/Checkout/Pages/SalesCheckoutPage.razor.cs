@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using OAS.Client.Accounting.Services;
+using OAS.Client.Common.Feedback.Services;
 using OAS.Client.Sales.Checkout.Services;
 using OAS.Client.Sales.Checkout.State;
 using OAS.Client.Sales.Mapping;
@@ -11,6 +12,7 @@ using OAS.Contracts.Sales.Checkout;
 using OAS.Contracts.Sales.Enums;
 using OAS.UiLib.Core.Models;
 using OAS.UiLib.Core.Models.Sales;
+using OAS.UiLib.Services.Feedback;
 
 namespace OAS.Client.Sales.Checkout.Pages;
 
@@ -21,6 +23,8 @@ public partial class SalesCheckoutPage : ComponentBase
     [Inject] private IAccountingClientService Accounting { get; set; } = default!;
     [Inject] private SalesCheckoutState State { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private IUiSnackbarService Snackbar { get; set; } = default!;
+    [Inject] private IApiFeedbackService ApiFeedback { get; set; } = default!;
 
     [Parameter, SupplyParameterFromQuery(Name = "orderId")] public Guid? OrderId { get; set; }
 
@@ -69,8 +73,8 @@ public partial class SalesCheckoutPage : ComponentBase
                 EnsureInitialPaymentLine();
             }
         }
-        catch (ApiClientException ex) { State.Error = ex.Error.Message; }
-        catch { State.Error = "تعذر تحميل بيانات Checkout."; }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { Snackbar.Error("تعذر تحميل بيانات Checkout."); }
         finally { State.IsBusy = false; }
     }
 
@@ -109,12 +113,27 @@ public partial class SalesCheckoutPage : ComponentBase
         try
         {
             if (!Enum.TryParse<SalesPaymentPlan>(_model.PaymentPlan, out var paymentPlan))
-                throw new InvalidOperationException("خطة السداد غير صحيحة.");
+            {
+                Snackbar.Error("خطة السداد غير صحيحة.");
+                return;
+            }
+
+            if (!TryBuildPayments(_model.PaymentLines, out var payments, out var paymentError))
+            {
+                Snackbar.Error(paymentError!);
+                return;
+            }
+
+            if (!ValidatePaymentPlan(paymentPlan, payments, _model.CurrencyId, _model.OutstandingAmount, out var planError))
+            {
+                Snackbar.Error(planError!);
+                return;
+            }
 
             var request = new CheckoutCustomerOrderRequest(
                 _model.OrderId,
                 paymentPlan,
-                BuildPayments(_model.PaymentLines),
+                payments,
                 _model.Shortages.Select(x => new CheckoutSupplierScheduleRequest(
                     x.CustomerOrderLineId,
                     ParseGuid(x.PreferredSupplierId),
@@ -123,25 +142,76 @@ public partial class SalesCheckoutPage : ComponentBase
                 _model.RowVersion,
                 State.IdempotencyKey);
 
-            var result = await Checkout.CheckoutAsync(_model.OrderId, request);
+            var call = await Checkout.CheckoutResultAsync(_model.OrderId, request);
+            if (!call.Succeeded)
+            {
+                if (call.Error is not null) ApiFeedback.Show(call.Error); else ApiFeedback.ShowUnexpected();
+                return;
+            }
+
+            var result = call.Value;
             var orderId = _model.OrderId;
             await LoadAsync(orderId);
             State.SetResult(result);
+            if (result is not null)
+                Snackbar.Success(string.IsNullOrWhiteSpace(result.InvoiceCode)
+                    ? $"تم تنفيذ العملية للطلب {result.OrderCode}."
+                    : $"تم تنفيذ العملية للطلب {result.OrderCode} وإنشاء الفاتورة {result.InvoiceCode}.");
         }
-        catch (ApiClientException ex) { State.Error = ex.Error.Message; }
-        catch (Exception ex) { State.Error = ex.Message; }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
         finally { State.IsBusy = false; }
     }
 
-    private IReadOnlyList<CheckoutPaymentLineRequest> BuildPayments(IEnumerable<UiCheckoutPaymentLineModel> lines)
+    private static bool TryBuildPayments(
+        IEnumerable<UiCheckoutPaymentLineModel> lines,
+        out IReadOnlyList<CheckoutPaymentLineRequest> payments,
+        out string? error)
     {
         var result = new List<CheckoutPaymentLineRequest>();
         foreach (var line in lines.Where(x => x.Amount > 0m))
         {
             if (!Enum.TryParse<PaymentMethod>(line.PaymentMethod, out var method))
-                throw new InvalidOperationException("طريقة دفع غير صحيحة.");
+            {
+                payments = [];
+                error = "طريقة دفع غير صحيحة.";
+                return false;
+            }
+
             if (!Guid.TryParse(line.CurrencyId, out var currencyId))
-                throw new InvalidOperationException("يجب تحديد عملة الدفعة.");
+            {
+                payments = [];
+                error = "يجب تحديد عملة الدفعة.";
+                return false;
+            }
+
+            if (method == PaymentMethod.Cash && !ParseGuid(line.CashAccountId).HasValue)
+            {
+                payments = [];
+                error = "يجب اختيار الصندوق للدفع النقدي.";
+                return false;
+            }
+
+            if ((method is PaymentMethod.Card or PaymentMethod.BankTransfer or PaymentMethod.Cheque) && !ParseGuid(line.BankAccountId).HasValue)
+            {
+                payments = [];
+                error = "يجب اختيار الحساب البنكي لطريقة الدفع المحددة.";
+                return false;
+            }
+
+            if (method == PaymentMethod.Cheque && string.IsNullOrWhiteSpace(line.ReferenceNumber))
+            {
+                payments = [];
+                error = "رقم الشيك مطلوب.";
+                return false;
+            }
+
+            if (method == PaymentMethod.Other && !ParseGuid(line.SettlementAccountId).HasValue)
+            {
+                payments = [];
+                error = "يجب تحديد حساب التسوية لطريقة الدفع الأخرى.";
+                return false;
+            }
 
             result.Add(new CheckoutPaymentLineRequest(
                 method,
@@ -154,7 +224,70 @@ public partial class SalesCheckoutPage : ComponentBase
                 line.Description)
             { SettlementAccountId = ParseGuid(line.SettlementAccountId) });
         }
-        return result;
+
+        payments = result;
+        error = null;
+        return true;
+    }
+
+    private static bool ValidatePaymentPlan(
+        SalesPaymentPlan plan,
+        IReadOnlyList<CheckoutPaymentLineRequest> payments,
+        string orderCurrencyIdText,
+        decimal outstandingAmount,
+        out string? error)
+    {
+        const decimal tolerance = 0.0001m;
+        var paid = payments.Sum(x => x.Amount);
+        var orderCurrencyId = ParseGuid(orderCurrencyIdText);
+        var comparable = orderCurrencyId.HasValue && payments.All(x => x.CurrencyId == orderCurrencyId.Value);
+        switch (plan)
+        {
+            case SalesPaymentPlan.FullNow:
+                if (payments.Count == 0)
+                {
+                    error = "الدفع الكامل يتطلب دفعات تغطي كامل المبلغ المستحق.";
+                    return false;
+                }
+                if (comparable && Math.Abs(paid - outstandingAmount) > tolerance)
+                {
+                    error = paid > outstandingAmount + tolerance
+                        ? "مبلغ الدفعة يتجاوز كامل المبلغ المستحق."
+                        : "الدفع الكامل يتطلب دفعات تغطي كامل المبلغ المستحق.";
+                    return false;
+                }
+                break;
+            case SalesPaymentPlan.PartialNow:
+                if (payments.Count == 0 || paid <= tolerance)
+                {
+                    error = "أدخل مبلغ الدفع الجزئي أولًا.";
+                    return false;
+                }
+                if (comparable && paid >= outstandingAmount - tolerance)
+                {
+                    error = paid > outstandingAmount + tolerance
+                        ? "مبلغ الدفعة يتجاوز كامل المبلغ المستحق."
+                        : "المبلغ المدخل يغطي كامل المستحق. اختر الدفع الكامل.";
+                    return false;
+                }
+                break;
+            case SalesPaymentPlan.PayOnPickup:
+            case SalesPaymentPlan.AccountCredit:
+                if (payments.Count != 0)
+                {
+                    error = plan == SalesPaymentPlan.PayOnPickup
+                        ? "الدفع عند الاستلام لا يقبل دفعات الآن."
+                        : "البيع الآجل لا يقبل دفعات عند تنفيذ Checkout.";
+                    return false;
+                }
+                break;
+            default:
+                error = "خطة السداد غير صحيحة.";
+                return false;
+        }
+
+        error = null;
+        return true;
     }
 
     private void EnsureInitialPaymentLine()

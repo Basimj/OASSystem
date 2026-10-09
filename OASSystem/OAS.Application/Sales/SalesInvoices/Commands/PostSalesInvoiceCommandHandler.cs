@@ -26,7 +26,7 @@ public sealed class PostSalesInvoiceCommandHandler(
         SalesConcurrency.Ensure(request.Request.RowVersion, invoice.RowVersion, "فاتورة المبيعات");
 
         var paymentLines = BuildEffectivePaymentLines(invoice, request.Request);
-        var paymentBaseAmount = await settlement.CalculatePaymentBaseAmountAsync(paymentLines, invoice.InvoiceDate, ct);
+        var paymentBaseAmount = await settlement.CalculateInvoicePaymentTargetBaseAmountAsync(invoice, paymentLines, ct);
         ValidatePaymentPlan(invoice.PaymentPlan, paymentLines.Count, paymentBaseAmount, invoice.BaseTotalAmount);
 
         var result = await posting.PostAsync(invoice, ct);

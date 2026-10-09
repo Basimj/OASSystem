@@ -1,3 +1,4 @@
+using OAS.Client.Services.Http;
 using OAS.Contracts.Common.Pagination;
 using OAS.Contracts.Sales.Common;
 using OAS.Contracts.Sales.Returns;
@@ -70,6 +71,50 @@ public interface ISalesClientService
     Task<SalesPriceOverrideDto?> ApprovePriceOverrideAsync(Guid overrideId, ApproveSalesPriceOverrideRequest request, CancellationToken cancellationToken = default);
     Task<SalesPriceOverrideDto?> RejectPriceOverrideAsync(Guid overrideId, RejectSalesPriceOverrideRequest request, CancellationToken cancellationToken = default);
     Task<SalesPriceOverrideDto?> CancelPriceOverrideAsync(Guid overrideId, CancelSalesPriceOverrideRequest request, CancellationToken cancellationToken = default);
+
+    // Result-based mutation methods mirror the Employees module so expected API errors do not become client-side exceptions.
+    Task<ApiCallResult<SalesCodeReservationDto>> ReservePrescriptionCodeResultAsync(CancellationToken cancellationToken = default);
+    Task<ApiCallResult<SalesCodeReservationDto>> ReserveCustomerOrderCodeResultAsync(DateOnly orderDate, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<SalesCodeReservationDto>> ReserveSalesInvoiceCodeResultAsync(DateOnly invoiceDate, CancellationToken cancellationToken = default);
+
+    Task<ApiCallResult<PrescriptionDto>> CreatePrescriptionResultAsync(CreatePrescriptionRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<PrescriptionDto>> UpdatePrescriptionResultAsync(Guid id, UpdatePrescriptionRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<PrescriptionDto>> CreatePrescriptionRevisionResultAsync(Guid id, CreatePrescriptionRevisionRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<PrescriptionDto>> SetPrescriptionStatusResultAsync(Guid id, SetPrescriptionStatusRequest request, CancellationToken cancellationToken = default);
+
+    Task<ApiCallResult<CustomerOrderDto>> CreateCustomerOrderResultAsync(CreateCustomerOrderRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<CustomerOrderDto>> UpdateCustomerOrderResultAsync(Guid id, UpdateCustomerOrderRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<CustomerOrderDto>> ConfirmCustomerOrderResultAsync(Guid id, ConfirmCustomerOrderRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<CustomerOrderDto>> CancelCustomerOrderResultAsync(Guid id, CancelCustomerOrderRequest request, CancellationToken cancellationToken = default);
+
+    Task<ApiCallResult<SalesInvoiceDto>> CreateSalesInvoiceResultAsync(CreateSalesInvoiceRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<SalesInvoiceDto>> UpdateSalesInvoiceResultAsync(Guid id, UpdateSalesInvoiceRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<SalesInvoiceDto>> ConfirmSalesInvoiceResultAsync(Guid id, ConfirmSalesInvoiceRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<SalesInvoicePostingResultDto>> PostSalesInvoiceResultAsync(Guid id, PostSalesInvoiceRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<SalesInvoiceDto>> CancelSalesInvoiceResultAsync(Guid id, CancelSalesInvoiceRequest request, CancellationToken cancellationToken = default);
+
+    Task<ApiCallResult<SalesReturnDto>> CreateSalesReturnResultAsync(CreateSalesReturnRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<SalesReturnDto>> ConfirmSalesReturnResultAsync(Guid id, SalesReturnActionRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<SalesReturnPostingResultDto>> PostSalesReturnResultAsync(Guid id, SalesReturnActionRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<SalesReturnDto>> CancelSalesReturnResultAsync(Guid id, CancelSalesReturnRequest request, CancellationToken cancellationToken = default);
+
+    Task<ApiCallResult<CommissionRuleDto>> CreateCommissionRuleResultAsync(CreateCommissionRuleRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<CommissionStatementDto>> CalculateCommissionStatementResultAsync(CalculateCommissionStatementRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<CommissionStatementDto>> FinalizeCommissionStatementResultAsync(Guid id, CommissionStatementActionRequest request, CancellationToken cancellationToken = default);
+
+    Task<ApiCallResult<OpticalProductionJobDto>> CreateOpticalProductionJobResultAsync(CreateOpticalProductionJobRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<OpticalProductionJobDto>> ReleaseOpticalProductionJobResultAsync(Guid id, OpticalProductionActionRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<OpticalProductionJobDto>> StartOpticalProductionJobResultAsync(Guid id, OpticalProductionActionRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<OpticalProductionJobDto>> IssueOpticalProductionMaterialsResultAsync(Guid id, OpticalProductionActionRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<OpticalProductionJobDto>> SubmitOpticalProductionQcResultAsync(Guid id, SubmitOpticalProductionQcRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<OpticalProductionJobDto>> CreateOpticalProductionRemakeResultAsync(Guid id, CreateOpticalProductionRemakeRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<OpticalProductionJobDto>> CompleteOpticalProductionJobResultAsync(Guid id, OpticalProductionActionRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<OpticalProductionJobDto>> CancelOpticalProductionJobResultAsync(Guid id, OpticalProductionActionRequest request, CancellationToken cancellationToken = default);
+
+    Task<ApiCallResult<SalesPriceOverrideDto>> RequestPriceOverrideResultAsync(Guid invoiceId, RequestSalesPriceOverrideRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<SalesPriceOverrideDto>> ApprovePriceOverrideResultAsync(Guid overrideId, ApproveSalesPriceOverrideRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<SalesPriceOverrideDto>> RejectPriceOverrideResultAsync(Guid overrideId, RejectSalesPriceOverrideRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<SalesPriceOverrideDto>> CancelPriceOverrideResultAsync(Guid overrideId, CancelSalesPriceOverrideRequest request, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<SalesCustomerLookupDto>> SearchCustomersAsync(string? search, int take = 20, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SalesPrescriptionLookupDto>> SearchPrescriptionsAsync(Guid? customerId, string? search, int take = 20, CancellationToken cancellationToken = default);

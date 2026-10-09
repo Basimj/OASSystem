@@ -83,7 +83,14 @@ public sealed class SalesInvoiceConfirmationService(
                 }
             }
 
-            if (line.ActualUnitPrice != line.BaseUnitPrice)
+            if (line.ProductVariantId.HasValue && line.ActualUnitPrice <= 0m)
+                throw new ConflictException(
+                    "sales_product_price_required",
+                    $"لم يتم تحديد سعر بيع للبند رقم {line.LineNumber}. أدخل سعر البيع قبل تأكيد الفاتورة.");
+
+            if (!line.CustomerOrderLineId.HasValue &&
+                line.BaseUnitPrice > 0m &&
+                line.ActualUnitPrice != line.BaseUnitPrice)
             {
                 var spec = new Specification<SalesPriceOverride>()
                     .Where(x => x.SalesInvoiceLineId == line.Id &&

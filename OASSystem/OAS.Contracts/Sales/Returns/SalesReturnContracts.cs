@@ -11,7 +11,10 @@ public enum SalesReturnStatus : byte
     Cancelled = 4
 }
 
-public sealed record CreateSalesReturnLineRequest(Guid SalesInvoiceLineId, decimal Quantity);
+public sealed record CreateSalesReturnLineRequest(
+    Guid SalesInvoiceLineId,
+    decimal Quantity,
+    Guid? ReturnWarehouseId = null);
 
 public sealed record CreateSalesReturnRequest(
     Guid SalesInvoiceId,

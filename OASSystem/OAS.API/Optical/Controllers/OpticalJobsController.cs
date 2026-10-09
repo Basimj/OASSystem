@@ -63,6 +63,26 @@ public sealed class OpticalJobsController(ISender sender) : ControllerBase
         return Ok(await sender.Send(new GetOpticalJobQuery(id), cancellationToken));
     }
 
+    [HttpPost("{id:guid}/send-to-quality-control")]
+    public async Task<ActionResult<OpticalJobDetailsDto>> SendToQualityControl(
+        Guid id,
+        [FromBody] OpticalJobActionRequest request,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new SendOpticalJobToQualityControlCommand(id, request), cancellationToken);
+        return Ok(await sender.Send(new GetOpticalJobQuery(id), cancellationToken));
+    }
+
+    [HttpPost("{id:guid}/pass-quality-control")]
+    public async Task<ActionResult<OpticalJobDetailsDto>> PassQualityControl(
+        Guid id,
+        [FromBody] OpticalJobActionRequest request,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new PassOpticalJobQualityControlCommand(id, request), cancellationToken);
+        return Ok(await sender.Send(new GetOpticalJobQuery(id), cancellationToken));
+    }
+
     [HttpPost("{id:guid}/ready-for-delivery")]
     [HttpPost("{id:guid}/ready")]
     public async Task<ActionResult<OpticalJobDetailsDto>> MarkReadyForDelivery(

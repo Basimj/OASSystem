@@ -23,11 +23,19 @@ public sealed class OpticalJobFoundationDomainTests
     }
 
     [Test]
-    public void V1Lifecycle_CanStartWhenMaterialsAreAvailable_AndFinishWithoutMandatoryQc()
+    public void ReadyForDelivery_RequiresIndependentQualityControlPass()
     {
         var job = CreateJobWithLine();
         job.MarkMaterialsAvailable();
         job.Start(new DateTimeOffset(2026, 10, 4, 12, 0, 0, TimeSpan.Zero));
+
+        Assert.Throws<DomainException>(() =>
+            job.MarkReadyForDelivery(new DateTimeOffset(2026, 10, 4, 13, 0, 0, TimeSpan.Zero)));
+
+        job.SendToQualityControl();
+        Assert.That(job.Status, Is.EqualTo(OpticalJobStatus.AwaitingQC));
+        job.PassQualityControl();
+        Assert.That(job.Status, Is.EqualTo(OpticalJobStatus.QCPassed));
         job.MarkReadyForDelivery(new DateTimeOffset(2026, 10, 4, 13, 0, 0, TimeSpan.Zero));
         job.MarkDelivered();
 

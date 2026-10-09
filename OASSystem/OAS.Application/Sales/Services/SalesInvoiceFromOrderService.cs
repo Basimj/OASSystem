@@ -2,10 +2,12 @@ using OAS.Application.Abstractions.Numbering;
 using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Abstractions.Persistence.Specifications;
 using OAS.Application.Common.Exceptions;
+using OAS.Application.Abstractions.Security;
 using OAS.Application.Sales.Abstractions;
 using OAS.Application.Sales.Common;
 using OAS.Domain.Accounting.Entities;
 using OAS.Domain.Sales;
+using OAS.Domain.Features.Employees.Entities;
 using OAS.Domain.Sales.Entities;
 using OAS.Domain.Sales.Enums;
 
@@ -16,6 +18,8 @@ public sealed class SalesInvoiceFromOrderService(
     IReadRepository<AccountingSettings, Guid> settings,
     IReadRepository<Currency, Guid> currencies,
     IReadRepository<CustomerOrderLineOpticalSnapshot, Guid> orderSnapshots,
+    IReadRepository<Employee, Guid> employees,
+    ICurrentUser currentUser,
     ISalesLineResolver lineResolver,
     ISequenceNumberGenerator sequences) : ISalesInvoiceFromOrderService
 {
@@ -60,6 +64,25 @@ public sealed class SalesInvoiceFromOrderService(
             order.ExchangeRateType, order.ExchangeRateSource, order.TaxCalculationMode,
             order.PaymentPlan, order.PaymentTermDaysSnapshot,
             baseCurrency.Id, baseCurrency.Code, baseCurrency.DecimalPlaces, description);
+
+        // CustomerOrder currently has no dedicated SalesEmployeeId. Preserve the salesperson
+        // deterministically by resolving the employee linked to the user who created the order;
+        // fall back to the current checkout user only for legacy orders without CreatedBy audit.
+        // This prevents Checkout invoices from being omitted from employee commissions.
+        var salespersonUser = Guid.TryParse(order.CreatedBy, out var createdByUser) && createdByUser != Guid.Empty
+            ? createdByUser
+            : Guid.TryParse(currentUser.UserId, out var checkoutUser) && checkoutUser != Guid.Empty
+                ? checkoutUser
+                : (Guid?)null;
+        if (salespersonUser.HasValue)
+        {
+            var linkedEmployees = await employees.ListAsync(
+                new Specification<Employee>().Where(x =>
+                    x.UserAccountId == salespersonUser.Value && x.IsActive && x.IsSalesperson),
+                cancellationToken);
+            if (linkedEmployees.Count == 1)
+                invoice.SetSalesEmployee(linkedEmployees[0].Id);
+        }
 
         var lineNumber = 1;
         foreach (var orderLine in order.Lines.Where(x => x.IsActive).OrderBy(x => x.LineNumber))

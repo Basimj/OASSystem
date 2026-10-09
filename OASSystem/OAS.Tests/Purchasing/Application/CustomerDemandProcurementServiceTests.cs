@@ -100,7 +100,8 @@ public sealed class CustomerDemandProcurementServiceTests
                 lineRepository,
                 new ReferencePort(WarehouseId, ProductVariantId, SupplierId),
                 new CodeService(),
-                new FakeCurrentUser("purchasing-test"));
+                new FakeCurrentUser("purchasing-test"),
+                TimeProvider.System);
         }
 
         public CustomerDemandShortage Shortage(decimal quantity) => new(

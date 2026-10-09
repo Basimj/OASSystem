@@ -15,6 +15,8 @@ public sealed class OpticalJobsClientService(OasApiClient api) : IOpticalJobsCli
     public Task<OpticalJobDetailsDto?> GetDetailsAsync(Guid id,CancellationToken ct=default)=>api.GetAsync<OpticalJobDetailsDto>($"api/optical/jobs/{id:D}",ct);
     public Task<OpticalJobDetailsDto?> AssignAsync(Guid id,AssignOpticalJobRequest r,CancellationToken ct=default)=>api.PostAsync<AssignOpticalJobRequest,OpticalJobDetailsDto>($"api/optical/jobs/{id:D}/assign",r,ct);
     public Task<OpticalJobDetailsDto?> StartAsync(Guid id,OpticalJobActionRequest r,CancellationToken ct=default)=>api.PostAsync<OpticalJobActionRequest,OpticalJobDetailsDto>($"api/optical/jobs/{id:D}/start",r,ct);
+    public Task<OpticalJobDetailsDto?> SendToQualityControlAsync(Guid id,OpticalJobActionRequest r,CancellationToken ct=default)=>api.PostAsync<OpticalJobActionRequest,OpticalJobDetailsDto>($"api/optical/jobs/{id:D}/send-to-quality-control",r,ct);
+    public Task<OpticalJobDetailsDto?> PassQualityControlAsync(Guid id,OpticalJobActionRequest r,CancellationToken ct=default)=>api.PostAsync<OpticalJobActionRequest,OpticalJobDetailsDto>($"api/optical/jobs/{id:D}/pass-quality-control",r,ct);
     public Task<OpticalJobDetailsDto?> ReadyAsync(Guid id,OpticalJobActionRequest r,CancellationToken ct=default)=>api.PostAsync<OpticalJobActionRequest,OpticalJobDetailsDto>($"api/optical/jobs/{id:D}/ready-for-delivery",r,ct);
     private static void Add(List<string> q,string key,string? value){if(!string.IsNullOrWhiteSpace(value))q.Add($"{key}={Uri.EscapeDataString(value)}");}
 }

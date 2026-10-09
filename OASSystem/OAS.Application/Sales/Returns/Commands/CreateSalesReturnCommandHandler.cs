@@ -6,6 +6,7 @@ using OAS.Application.Common.Exceptions;
 using OAS.Application.Sales.Abstractions;
 using OAS.Contracts.Sales.Returns;
 using OAS.Domain.Exceptions;
+using OAS.Domain.Entities.Inventory;
 using OAS.Domain.Sales.Entities;
 using OAS.Domain.Sales.Enums;
 
@@ -15,6 +16,7 @@ public sealed class CreateSalesReturnCommandHandler(
     ISalesInvoiceAggregateRepository invoices,
     IRepository<SalesReturn, Guid> returns,
     IReadRepository<SalesReturnLine, Guid> existingReturnLines,
+    IReadRepository<Warehouse, Guid> warehouses,
     ISequenceNumberGenerator sequences)
     : IRequestHandler<CreateSalesReturnCommand, Guid>
 {
@@ -78,6 +80,23 @@ public sealed class CreateSalesReturnCommandHandler(
             var tax = Allocate(source.TaxAmount, existing.Sum(x => x.TaxAmount), source.Quantity, requested.Quantity, invoice.CurrencyDecimalPlacesSnapshot, isFinal);
             var baseNet = Allocate(source.BaseNetAmount, existing.Sum(x => x.BaseNetAmount), source.Quantity, requested.Quantity, invoice.BaseCurrencyDecimalPlacesSnapshot, isFinal);
             var baseTax = Allocate(source.BaseTaxAmount, existing.Sum(x => x.BaseTaxAmount), source.Quantity, requested.Quantity, invoice.BaseCurrencyDecimalPlacesSnapshot, isFinal);
+            Guid? returnWarehouseId = null;
+            if (source.RequiresInventory)
+            {
+                returnWarehouseId = requested.ReturnWarehouseId ?? source.WarehouseId;
+                if (!returnWarehouseId.HasValue || returnWarehouseId == Guid.Empty)
+                    throw new ConflictException("sales_return_warehouse_required", "حدد مخزن إرجاع لسطر المخزون.");
+
+                var returnWarehouse = await warehouses.GetByIdAsync(returnWarehouseId.Value, ct)
+                    ?? throw new ConflictException("sales_return_warehouse_missing", "مخزن الإرجاع المحدد غير موجود.");
+                if (!returnWarehouse.IsActive)
+                    throw new ConflictException("sales_return_warehouse_inactive", "مخزن الإرجاع المحدد غير مفعل.");
+            }
+            else if (requested.ReturnWarehouseId.HasValue)
+            {
+                throw new ConflictException("sales_return_warehouse_not_applicable", "مخزن الإرجاع يحدد فقط لأسطر المخزون.");
+            }
+
             var unitCost = source.RequiresInventory
                 ? source.UnitCostSnapshot ?? throw new ConflictException("sales_return_cost_snapshot_missing", "تكلفة سطر الفاتورة الأصلية غير محفوظة ولا يمكن إنشاء المرتجع.")
                 : (decimal?)null;
@@ -85,7 +104,7 @@ public sealed class CreateSalesReturnCommandHandler(
 
             entity.AddLine(SalesReturnLine.Create(
                 Guid.NewGuid(), entity.Id, lineNo++, source.Id, source.LineType,
-                source.ProductVariantId, source.WarehouseId, source.ProductCodeSnapshot, source.ProductNameSnapshot,
+                source.ProductVariantId, returnWarehouseId, source.ProductCodeSnapshot, source.ProductNameSnapshot,
                 requested.Quantity, net, tax, Math.Round(net + tax, invoice.CurrencyDecimalPlacesSnapshot),
                 baseNet, baseTax, Math.Round(baseNet + baseTax, invoice.BaseCurrencyDecimalPlacesSnapshot),
                 unitCost, totalCost));

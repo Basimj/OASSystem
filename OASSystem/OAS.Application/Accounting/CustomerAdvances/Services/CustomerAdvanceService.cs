@@ -186,9 +186,9 @@ public sealed class CustomerAdvanceService(
             .Where(x => x.Module == "Accounting" && x.DocumentType == "CustomerAdvanceApplication" && x.IsActive);
         var activeProfiles = await postingProfiles.ListAsync(profileSpec, cancellationToken);
         if (activeProfiles.Count == 0)
-            throw new ConflictException("customer_advance_posting_profile_missing", "لم يتم إعداد Posting Profile فعال لعربون العميل.");
+            throw new ConflictException("customer_advance_posting_profile_missing", "لم يتم إعداد حساب دفعات مقدمة من العملاء. افتح إعدادات المحاسبة وحدد «حساب دفعات مقدمة من العملاء» ثم احفظ الإعدادات.");
         if (activeProfiles.Count > 1)
-            throw new ConflictException("customer_advance_posting_profile_duplicate", "يوجد أكثر من Posting Profile فعال لعربون العميل.");
+            throw new ConflictException("customer_advance_posting_profile_duplicate", "يوجد أكثر من إعداد ترحيل فعال لعربون العميل. راجع Posting Profiles وأبقِ إعدادًا واحدًا فعالًا فقط.");
 
         var profileId = activeProfiles[0].Id;
         var linesSpec = new Specification<PostingProfileLine>()
@@ -197,7 +197,7 @@ public sealed class CustomerAdvanceService(
         if (roleLines.Count != 1)
             throw new ConflictException(
                 roleLines.Count == 0 ? "customer_advance_posting_role_missing" : "customer_advance_posting_role_duplicate",
-                "يجب تعريف حساب واحد فقط للدور CustomerAdvances في Posting Profile.");
+                "إعداد حساب دفعات مقدمة من العملاء غير مكتمل أو مكرر. افتح إعدادات المحاسبة وحدد حسابًا واحدًا صالحًا ثم احفظ الإعدادات.");
         return roleLines[0].AccountId;
     }
 

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using OAS.Client.Accounting.Services;
+using OAS.Client.Common.Feedback.Services;
 using OAS.Client.Sales.Checkout.Services;
 using OAS.Client.Sales.Services;
 using OAS.Client.Services.Http;
@@ -8,6 +9,7 @@ using OAS.Contracts.Common.Pagination;
 using OAS.Contracts.Sales.Checkout;
 using OAS.UiLib.Core.Models;
 using OAS.UiLib.Core.Models.Sales;
+using OAS.UiLib.Services.Feedback;
 
 namespace OAS.Client.Sales.Checkout.Pages;
 
@@ -16,13 +18,13 @@ public partial class DeliverySettlementPage : ComponentBase
     [Inject] private ISalesCheckoutClientService Checkout { get; set; } = default!;
     [Inject] private ISalesClientService Sales { get; set; } = default!;
     [Inject] private IAccountingClientService Accounting { get; set; } = default!;
+    [Inject] private IUiSnackbarService Snackbar { get; set; } = default!;
+    [Inject] private IApiFeedbackService ApiFeedback { get; set; } = default!;
 
     [Parameter] public Guid OrderId { get; set; }
 
     private UiDeliverySettlementModel _model = new();
     private bool _busy;
-    private string? _error;
-    private string? _success;
     private string _idempotencyKey = Guid.NewGuid().ToString("N");
     private Guid _orderCurrencyId;
     private Guid? _loadedOrderId;
@@ -36,11 +38,14 @@ public partial class DeliverySettlementPage : ComponentBase
     private async Task LoadAsync()
     {
         _busy = true;
-        _error = null;
         try
         {
             var context = await Checkout.GetCheckoutContextAsync(OrderId);
-            if (context is null) throw new InvalidOperationException("تعذر تحميل بيانات التسليم.");
+            if (context is null)
+            {
+                Snackbar.Error("تعذر تحميل بيانات التسليم.");
+                return;
+            }
             _orderCurrencyId = context.Order.CurrencyId;
             _model = new UiDeliverySettlementModel
             {
@@ -62,8 +67,8 @@ public partial class DeliverySettlementPage : ComponentBase
             _loadedOrderId = OrderId;
             _idempotencyKey = Guid.NewGuid().ToString("N");
         }
-        catch (ApiClientException ex) { _error = ex.Error.Message; }
-        catch (Exception ex) { _error = ex.Message; }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
     }
 
@@ -71,33 +76,93 @@ public partial class DeliverySettlementPage : ComponentBase
     {
         if (_busy) return;
         _busy = true;
-        _error = null;
-        _success = null;
         try
         {
-            var result = await Checkout.DeliverAsync(OrderId,
-                new DeliverCustomerOrderRequest(BuildPayments(), _model.RowVersion, _idempotencyKey));
-            _success = result is null ? "تم التسليم بنجاح." : $"تم تسليم الطلب {result.OrderCode} بنجاح.";
+            if (!TryBuildPayments(out var payments, out var paymentError))
+            {
+                Snackbar.Error(paymentError!);
+                return;
+            }
+
+            var call = await Checkout.DeliverResultAsync(OrderId,
+                new DeliverCustomerOrderRequest(payments, _model.RowVersion, _idempotencyKey));
+            if (!call.Succeeded)
+            {
+                if (call.Error is not null) ApiFeedback.Show(call.Error); else ApiFeedback.ShowUnexpected();
+                return;
+            }
+
+            var result = call.Value;
+            var successMessage = result is null ? "تم التسليم بنجاح." : $"تم تسليم الطلب {result.OrderCode} بنجاح.";
+            Snackbar.Success(successMessage);
             _idempotencyKey = Guid.NewGuid().ToString("N");
             await LoadAsync();
         }
-        catch (ApiClientException ex) { _error = ex.Error.Message; }
-        catch (Exception ex) { _error = ex.Message; }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
     }
 
-    private IReadOnlyList<CheckoutPaymentLineRequest> BuildPayments()
-        => _model.PaymentLines.Where(x => x.Amount > 0m).Select(x =>
+    private bool TryBuildPayments(
+        out IReadOnlyList<CheckoutPaymentLineRequest> payments,
+        out string? error)
+    {
+        var result = new List<CheckoutPaymentLineRequest>();
+        foreach (var line in _model.PaymentLines.Where(x => x.Amount > 0m))
         {
-            if (!Enum.TryParse<PaymentMethod>(x.PaymentMethod, out var method))
-                throw new InvalidOperationException("طريقة دفع غير صحيحة.");
-            if (!Guid.TryParse(x.CurrencyId, out var currencyId))
-                throw new InvalidOperationException("يجب تحديد عملة الدفعة.");
-            return new CheckoutPaymentLineRequest(method, currencyId, x.Amount,
-                ParseGuid(x.CashAccountId), ParseGuid(x.BankAccountId), x.ReferenceNumber,
-                x.ReferenceDate, x.Description)
-            { SettlementAccountId = ParseGuid(x.SettlementAccountId) };
-        }).ToArray();
+            if (!Enum.TryParse<PaymentMethod>(line.PaymentMethod, out var method))
+            {
+                payments = [];
+                error = "طريقة دفع غير صحيحة.";
+                return false;
+            }
+
+            if (!Guid.TryParse(line.CurrencyId, out var currencyId))
+            {
+                payments = [];
+                error = "يجب تحديد عملة الدفعة.";
+                return false;
+            }
+
+            if (method == PaymentMethod.Cash && !ParseGuid(line.CashAccountId).HasValue)
+            {
+                payments = [];
+                error = "يجب اختيار الصندوق للدفع النقدي.";
+                return false;
+            }
+
+            if ((method is PaymentMethod.Card or PaymentMethod.BankTransfer or PaymentMethod.Cheque) && !ParseGuid(line.BankAccountId).HasValue)
+            {
+                payments = [];
+                error = "يجب اختيار الحساب البنكي لطريقة الدفع المحددة.";
+                return false;
+            }
+
+            if (method == PaymentMethod.Cheque && string.IsNullOrWhiteSpace(line.ReferenceNumber))
+            {
+                payments = [];
+                error = "رقم الشيك مطلوب.";
+                return false;
+            }
+
+            if (method == PaymentMethod.Other && !ParseGuid(line.SettlementAccountId).HasValue)
+            {
+                payments = [];
+                error = "يجب تحديد حساب التسوية لطريقة الدفع الأخرى.";
+                return false;
+            }
+
+            result.Add(new CheckoutPaymentLineRequest(
+                method, currencyId, line.Amount,
+                ParseGuid(line.CashAccountId), ParseGuid(line.BankAccountId), line.ReferenceNumber,
+                line.ReferenceDate, line.Description)
+            { SettlementAccountId = ParseGuid(line.SettlementAccountId) });
+        }
+
+        payments = result;
+        error = null;
+        return true;
+    }
 
     private UiCheckoutPaymentLineModel NewPayment(decimal amount) => new()
     {

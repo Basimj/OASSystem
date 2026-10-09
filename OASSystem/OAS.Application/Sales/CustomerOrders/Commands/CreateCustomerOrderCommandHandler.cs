@@ -78,7 +78,7 @@ public sealed class CreateCustomerOrderCommandHandler(
                 order.ExchangeRate,
                 order.CurrencyDecimalPlacesSnapshot)
             : resolved.BaseUnitPrice;
-        var actualUnitPrice = resolved.ProductVariantId.HasValue ? standardUnitPrice : req.ActualUnitPrice;
+        var actualUnitPrice = req.ActualUnitPrice;
         var lineId = Guid.NewGuid();
         var line = CustomerOrderLine.Create(
             lineId, order.Id, lineNo, req.GroupId, lineType, resolved.ProductVariantId, resolved.WarehouseId,

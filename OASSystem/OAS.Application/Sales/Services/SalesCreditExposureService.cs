@@ -12,7 +12,7 @@ namespace OAS.Application.Sales.Services;
 
 public sealed class SalesCreditExposureService(
     IReadRepository<SalesInvoice, Guid> invoices,
-    IReadRepository<PaymentAllocation, Guid> allocations) : ISalesCreditExposureService
+    ISalesInvoiceBalanceService invoiceBalances) : ISalesCreditExposureService
 {
     public async Task<SalesCreditAssessment> EvaluateAsync(
         Customer customer,
@@ -96,22 +96,10 @@ public sealed class SalesCreditExposureService(
         decimal postedOutstanding = 0m;
         foreach (var invoice in posted)
         {
-            var allocationSpec = new Specification<PaymentAllocation>()
-                .Where(x => x.TargetDocumentType == AllocationTargetDocumentType.SalesInvoice && x.TargetDocumentId == invoice.Id);
-            var invoiceAllocations = await allocations.ListAsync(allocationSpec, cancellationToken);
-            var paidBase = invoiceAllocations.Sum(GetBaseAllocatedAmount);
-            postedOutstanding += Math.Max(0m, invoice.BaseTotalAmount - paidBase);
+            var balance = await invoiceBalances.GetAsync(invoice, cancellationToken: cancellationToken);
+            postedOutstanding += balance.OutstandingBaseAmount;
         }
 
         return postedOutstanding + confirmedCredit;
-    }
-
-    private static decimal GetBaseAllocatedAmount(PaymentAllocation allocation)
-    {
-        if (allocation.BaseAllocatedAmount.HasValue)
-            return allocation.BaseAllocatedAmount.Value;
-        if (allocation.ExchangeRate.HasValue)
-            return Math.Round(allocation.AllocatedAmount * allocation.ExchangeRate.Value, 4, MidpointRounding.AwayFromZero);
-        return allocation.AllocatedAmount;
     }
 }

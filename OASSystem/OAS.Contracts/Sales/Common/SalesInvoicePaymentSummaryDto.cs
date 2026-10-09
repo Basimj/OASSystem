@@ -4,4 +4,5 @@ public sealed record SalesInvoicePaymentSummaryDto(
     Guid InvoiceId,
     decimal InvoiceTotal,
     decimal PaidAmount,
-    decimal OutstandingAmount);
+    decimal OutstandingAmount,
+    decimal ReturnedAmount = 0m);

@@ -32,6 +32,7 @@ public sealed class SalesSettlementService(
     IAccountingDocumentPostingService postingService,
     ICustomerAdvanceService customerAdvanceService,
     ISalesPaymentAllocationTargetValidator allocationValidator,
+    ISalesInvoiceBalanceService invoiceBalances,
     ISequenceNumberGenerator sequenceNumberGenerator,
     ICurrentUser currentUser,
     IUnitOfWork unitOfWork,
@@ -57,6 +58,86 @@ public sealed class SalesSettlementService(
         return rounding.Round(total, baseCurrency.DecimalPlaces);
     }
 
+    public async Task<decimal> CalculateOrderBaseAmountAsync(
+        CustomerOrder order,
+        decimal amount,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(order);
+        if (amount <= 0m)
+            return 0m;
+        var baseCurrency = await GetBaseCurrencyAsync(cancellationToken);
+        return rounding.CalculateBaseAmount(
+            amount,
+            order.ExchangeRate,
+            order.CurrencyDecimalPlacesSnapshot,
+            baseCurrency.DecimalPlaces);
+    }
+
+    public Task<decimal> CalculateOrderPaymentTargetBaseAmountAsync(
+        CustomerOrder order,
+        IReadOnlyList<CheckoutPaymentLineRequest> paymentLines,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(order);
+        return CalculatePaymentTargetBaseAmountAsync(
+            order.CurrencyId,
+            order.ExchangeRate,
+            order.CurrencyDecimalPlacesSnapshot,
+            paymentLines,
+            cancellationToken);
+    }
+
+    public Task<decimal> CalculateInvoicePaymentTargetBaseAmountAsync(
+        SalesInvoice invoice,
+        IReadOnlyList<CheckoutPaymentLineRequest> paymentLines,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(invoice);
+        return CalculatePaymentTargetBaseAmountAsync(
+            invoice.CurrencyId,
+            invoice.ExchangeRate,
+            invoice.CurrencyDecimalPlacesSnapshot,
+            paymentLines,
+            cancellationToken);
+    }
+
+    private async Task<decimal> CalculatePaymentTargetBaseAmountAsync(
+        Guid targetCurrencyId,
+        decimal targetExchangeRate,
+        byte targetCurrencyDecimalPlaces,
+        IReadOnlyList<CheckoutPaymentLineRequest> paymentLines,
+        CancellationToken cancellationToken)
+    {
+        if (paymentLines.Count == 0)
+            return 0m;
+
+        var baseCurrency = await GetBaseCurrencyAsync(cancellationToken);
+        var collectionDate = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        decimal total = 0m;
+
+        foreach (var line in paymentLines)
+        {
+            ValidatePaymentLine(line);
+            if (line.CurrencyId == targetCurrencyId)
+            {
+                // A payment in the document currency settles the document at its immutable
+                // exchange-rate snapshot. The cash receipt itself is still posted using the
+                // collection-date rate; PaymentAllocation stores both source base and target base.
+                total += rounding.CalculateBaseAmount(
+                    line.Amount, targetExchangeRate, targetCurrencyDecimalPlaces, baseCurrency.DecimalPlaces);
+                continue;
+            }
+
+            var rate = await exchangeRates.ResolveAsync(
+                line.CurrencyId, collectionDate, ExchangeRateType.Accounting, cancellationToken: cancellationToken);
+            total += rounding.CalculateBaseAmount(
+                line.Amount, rate.Rate, rate.CurrencyDecimalPlaces, baseCurrency.DecimalPlaces);
+        }
+
+        return rounding.Round(total, baseCurrency.DecimalPlaces);
+    }
+
     public async Task<SalesPaymentCollectionResult> CreateReceiptForInvoiceAsync(
         SalesInvoice invoice,
         IReadOnlyList<CheckoutPaymentLineRequest> paymentLines,
@@ -70,14 +151,15 @@ public sealed class SalesSettlementService(
         var userId = GetCurrentUserId();
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
+        var collectionDate = DateOnly.FromDateTime(now);
         var party = await counterparties.ResolveAsync(
             SettlementPartyType.Customer, invoice.CustomerId, null, null, null, null, cancellationToken);
         var resolved = new List<ResolvedPaymentLine>(paymentLines.Count);
         foreach (var line in paymentLines)
-            resolved.Add(await ResolvePaymentLineAsync(line, invoice.InvoiceDate, invoice.CustomerId, party.AccountId, party.PartyNameSnapshot, cancellationToken));
+            resolved.Add(await ResolvePaymentLineAsync(line, collectionDate, invoice.CustomerId, party.AccountId, party.PartyNameSnapshot, cancellationToken));
 
         var voucher = await CreateAndPostVoucherAsync(
-            invoice.PostingDate,
+            collectionDate,
             invoice.BaseCurrencyId,
             invoice.BaseCurrencyCodeSnapshot,
             invoice.BaseCurrencyDecimalPlacesSnapshot,
@@ -141,6 +223,7 @@ public sealed class SalesSettlementService(
             throw new ConflictException("sales_payment_lines_required", "يجب إدخال طريقة دفع واحدة على الأقل.");
         var userId = GetCurrentUserId();
         var now = timeProvider.GetUtcNow().UtcDateTime;
+        var collectionDate = DateOnly.FromDateTime(now);
         var baseCurrency = await GetBaseCurrencyAsync(cancellationToken);
         var advanceLiabilityAccountId = await ResolveAdvanceLiabilityAccountAsync(cancellationToken);
         var party = await counterparties.ResolveAsync(
@@ -148,10 +231,10 @@ public sealed class SalesSettlementService(
 
         var resolved = new List<ResolvedPaymentLine>(paymentLines.Count);
         foreach (var line in paymentLines)
-            resolved.Add(await ResolvePaymentLineAsync(line, order.OrderDate, order.CustomerId, advanceLiabilityAccountId, party.PartyNameSnapshot, cancellationToken));
+            resolved.Add(await ResolvePaymentLineAsync(line, collectionDate, order.CustomerId, advanceLiabilityAccountId, party.PartyNameSnapshot, cancellationToken));
 
         var voucher = await CreateAndPostVoucherAsync(
-            order.OrderDate,
+            collectionDate,
             baseCurrency.Id,
             baseCurrency.Code,
             baseCurrency.DecimalPlaces,
@@ -264,7 +347,8 @@ public sealed class SalesSettlementService(
             new Specification<PaymentAllocation>().Where(x =>
                 x.TargetDocumentType == AllocationTargetDocumentType.SalesInvoice && x.TargetDocumentId == invoice.Id),
             cancellationToken);
-        var totalAllocatedBase = allocationRows.Sum(GetBaseAllocatedAmount);
+        var balance = await invoiceBalances.GetAsync(invoice, cancellationToken: cancellationToken);
+        var totalAllocatedBase = balance.AllocatedBaseAmount;
         var appliedFromAdvanceBase = allocationRows
             .Where(x => x.CustomerAdvanceApplicationId.HasValue)
             .Sum(GetBaseAllocatedAmount);
@@ -272,9 +356,6 @@ public sealed class SalesSettlementService(
         var directPaid = invoice.ExchangeRate <= 0m
             ? 0m
             : rounding.Round(directPaidBase / invoice.ExchangeRate, invoice.CurrencyDecimalPlacesSnapshot);
-        var totalSettled = invoice.ExchangeRate <= 0m
-            ? 0m
-            : rounding.Round(totalAllocatedBase / invoice.ExchangeRate, invoice.CurrencyDecimalPlacesSnapshot);
         var appliedAdvance = invoice.ExchangeRate <= 0m
             ? 0m
             : rounding.Round(appliedFromAdvanceBase / invoice.ExchangeRate, invoice.CurrencyDecimalPlacesSnapshot);
@@ -287,8 +368,8 @@ public sealed class SalesSettlementService(
             paidNowAmount,
             availableAdvance,
             appliedAdvance,
-            Math.Min(invoice.TotalAmount, Math.Max(0m, directPaid)),
-            Math.Max(0m, invoice.TotalAmount - totalSettled));
+            Math.Min(balance.NetInvoiceAmount, Math.Max(0m, directPaid)),
+            balance.OutstandingAmount);
     }
 
 
@@ -451,15 +532,14 @@ public sealed class SalesSettlementService(
 
     private async Task<decimal> GetInvoiceOutstandingBaseAsync(SalesInvoice invoice, CancellationToken cancellationToken)
     {
-        var rows = await allocations.ListAsync(
-            new Specification<PaymentAllocation>().Where(x =>
-                x.TargetDocumentType == AllocationTargetDocumentType.SalesInvoice && x.TargetDocumentId == invoice.Id),
-            cancellationToken);
-        return Math.Max(0m, invoice.BaseTotalAmount - rows.Sum(GetBaseAllocatedAmount));
+        var balance = await invoiceBalances.GetAsync(invoice, cancellationToken: cancellationToken);
+        return balance.OutstandingBaseAmount;
     }
 
     private static decimal GetBaseAllocatedAmount(PaymentAllocation allocation)
     {
+        if (allocation.TargetBaseAllocatedAmount.HasValue)
+            return allocation.TargetBaseAllocatedAmount.Value;
         if (allocation.BaseAllocatedAmount.HasValue)
             return allocation.BaseAllocatedAmount.Value;
         if (allocation.ExchangeRate.HasValue)
@@ -494,7 +574,7 @@ public sealed class SalesSettlementService(
         if (profiles.Count != 1)
             throw new ConflictException(
                 profiles.Count == 0 ? "customer_advance_posting_profile_missing" : "customer_advance_posting_profile_duplicate",
-                "يجب إعداد Posting Profile واحد فعال لعربون العميل.");
+                "لم يتم إعداد حساب دفعات مقدمة من العملاء. افتح إعدادات المحاسبة وحدد «حساب دفعات مقدمة من العملاء» ثم احفظ الإعدادات.");
         var roleLines = await postingProfileLines.ListAsync(
             new Specification<PostingProfileLine>().Where(x =>
                 x.PostingProfileId == profiles[0].Id && x.AccountRole == "CustomerAdvances"),
@@ -502,7 +582,7 @@ public sealed class SalesSettlementService(
         if (roleLines.Count != 1)
             throw new ConflictException(
                 roleLines.Count == 0 ? "customer_advance_posting_role_missing" : "customer_advance_posting_role_duplicate",
-                "يجب تعريف حساب واحد فقط للدور CustomerAdvances في Posting Profile.");
+                "إعداد حساب دفعات مقدمة من العملاء غير مكتمل أو مكرر. افتح إعدادات المحاسبة وحدد حسابًا واحدًا صالحًا ثم احفظ الإعدادات.");
         return roleLines[0].AccountId;
     }
 

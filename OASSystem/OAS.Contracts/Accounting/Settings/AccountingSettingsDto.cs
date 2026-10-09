@@ -13,6 +13,7 @@ public sealed record AccountingSettingsDto(
     Guid? ExchangeLossAccountId,
     Guid? SalesRevenueAccountId,
     Guid? TaxPayableAccountId,
+    Guid? CustomerAdvancesAccountId,
     Guid? InventoryAccountId,
     Guid? CogsAccountId,
     Guid? GrniAccountId,

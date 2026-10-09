@@ -117,6 +117,7 @@ public static class SalesUiMapper
         TaxAmount = dto.TaxAmount,
         TotalAmount = dto.TotalAmount,
         PaidAmount = dto.PaymentSummary.PaidAmount,
+        ReturnedAmount = dto.PaymentSummary.ReturnedAmount,
         OutstandingAmount = dto.PaymentSummary.OutstandingAmount,
         JournalEntryId = dto.JournalEntryId,
         JournalEntryNumber = dto.JournalEntryNumber,

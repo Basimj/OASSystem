@@ -114,6 +114,35 @@ public sealed class AccountingAccountEligibilityTests
 
 
     [Test]
+    public void CustomerAdvances_RequiresActivePostingLiabilityCreditAccount()
+    {
+        var valid = CreateAccount(
+            accountClass: AccountClass.Liability,
+            accountType: AccountType.Posting,
+            normalBalance: NormalBalance.Credit,
+            isPostingAccount: true);
+
+        var wrongClass = CreateAccount(
+            accountClass: AccountClass.Asset,
+            accountType: AccountType.Posting,
+            normalBalance: NormalBalance.Debit,
+            isPostingAccount: true);
+
+        var invalid = AccountingAccountEligibility.Evaluate(
+            wrongClass,
+            AccountingAccountEligibilityContext.CustomerAdvances);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(AccountingAccountEligibility.Evaluate(
+                valid,
+                AccountingAccountEligibilityContext.CustomerAdvances).IsEligible, Is.True);
+            Assert.That(invalid.IsEligible, Is.False);
+            Assert.That(invalid.ReasonCode, Is.EqualTo("customer_advances_wrong_class"));
+        });
+    }
+
+    [Test]
     public void LiabilityControlParent_RequiresActiveLiabilityCreditControlAccount()
     {
         var valid = CreateAccount(

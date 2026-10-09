@@ -9,7 +9,6 @@
                                   Rows="@_rows"
                                   Selected="@_selected"
                                   IsBusy="@State.IsBusy"
-                                  ErrorText="@State.Error"
                                   SearchWarehousesAsync="SearchWarehousesAsync"
                                   SearchTechniciansAsync="SearchTechniciansAsync"
                                   PageNumber="@State.Page.PageNumber"
@@ -31,7 +30,6 @@
 {
     <UiDeliverySettlementDialog Model="@_delivery"
                                 IsBusy="@_deliveryBusy"
-                                ErrorText="@_deliveryError"
                                 SearchCurrenciesAsync="SearchCurrenciesAsync"
                                 SearchCashAccountsAsync="SearchCashAccountsAsync"
                                 SearchBankAccountsAsync="SearchBankAccountsAsync"

@@ -3,7 +3,13 @@
 @using OAS.Contracts.Sales.Returns
 @using OAS.Contracts.Sales.SalesInvoices
 @using OAS.Contracts.Sales.Enums
+@using OAS.Contracts.Sales.Lookups
+@using OAS.Client.Common.Feedback.Services
+@using OAS.Client.Services.Http
+@using OAS.UiLib.Services.Feedback
 @inject ISalesClientService Sales
+@inject IUiSnackbarService Snackbar
+@inject IApiFeedbackService ApiFeedback
 
 <PageTitle>مرتجعات المبيعات | OAS</PageTitle>
 
@@ -32,10 +38,6 @@
             </Toolbar>
             <Body>
                 <UiStackLayout Gap="StackGap.Small">
-                    @if (!string.IsNullOrWhiteSpace(_error))
-                    {
-                        <UiAlert Message="@_error" Tone="AlertTone.Danger" />
-                    }
                     @if (_busy && _page.Items.Count == 0)
                     {
                         <UiAlert Message="جارٍ تحميل مرتجعات المبيعات..." Tone="AlertTone.Info" />
@@ -74,10 +76,6 @@
         {
             <UiCard Title="مرتجع مبيعات جديد" Subtitle="اختر فاتورة مرحلة ثم حدد الأسطر والكميات المراد إرجاعها.">
                 <UiStackLayout Gap="StackGap.Small">
-                    @if (!string.IsNullOrWhiteSpace(_editorError))
-                    {
-                        <UiAlert Message="@_editorError" Tone="AlertTone.Danger" />
-                    }
                     <UiSelect Label="فاتورة المبيعات"
                               Placeholder="اختر فاتورة مرحلة"
                               Value="@_invoiceIdText"
@@ -106,6 +104,16 @@
                                                          InputMode="decimal"
                                                          Size="ControlSize.Small"
                                                          Disabled="@(!line.Selected || line.Remaining <= 0m)" />
+                                            @if (line.RequiresInventory)
+                                            {
+                                                <UiSelect Label="مخزن الإرجاع / الفحص"
+                                                          Placeholder="اختر مخزن الإرجاع"
+                                                          Value="@line.ReturnWarehouseIdText"
+                                                          ValueChanged="@(value => line.ReturnWarehouseIdText = value)"
+                                                          Options="@WarehouseOptions"
+                                                          Size="ControlSize.Small"
+                                                          Disabled="@(!line.Selected || line.Remaining <= 0m)" />
+                                            }
                                         </UiGrid>
                                     </UiCard>
                                 }
@@ -160,13 +168,12 @@
     private SalesReturnDto? _selected;
     private SalesInvoiceDto? _sourceInvoice;
     private IReadOnlyList<SalesInvoiceDto> _postedInvoices = [];
+    private IReadOnlyList<SalesWarehouseLookupDto> _returnWarehouses = [];
     private readonly List<ReturnLineForm> _returnLines = [];
     private bool _creating;
     private bool _busy;
     private int _pageNumber = 1;
     private string? _search;
-    private string? _error;
-    private string? _editorError;
     private string? _invoiceIdText;
     private DateOnly? _returnDate = DateOnly.FromDateTime(DateTime.Today);
     private DateOnly? _postingDate = DateOnly.FromDateTime(DateTime.Today);
@@ -176,19 +183,24 @@
         .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.InvoiceCode} - {x.CustomerName ?? x.CustomerCode ?? "عميل"}"))
         .ToArray();
 
+    private IReadOnlyList<UiSelectOption> WarehouseOptions => _returnWarehouses
+        .Where(x => x.IsActive)
+        .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.NameAr}"))
+        .ToArray();
+
     protected override async Task OnInitializedAsync() => await RefreshAsync();
 
     private async Task RefreshAsync()
     {
         _busy = true;
-        _error = null;
         try
         {
             _page = await Sales.GetSalesReturnsPageAsync(new PageRequest { PageNumber = _pageNumber, PageSize = 20, Search = _search });
             if (_selected is not null)
                 _selected = await Sales.GetSalesReturnByIdAsync(_selected.Id);
         }
-        catch (Exception ex) { _error = ex.Message; }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
     }
 
@@ -205,10 +217,10 @@
     private async Task SelectAsync(Guid id)
     {
         _creating = false;
-        _editorError = null;
         _busy = true;
         try { _selected = await Sales.GetSalesReturnByIdAsync(id); }
-        catch (Exception ex) { _error = ex.Message; }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
     }
 
@@ -216,7 +228,6 @@
     {
         _creating = true;
         _selected = null;
-        _editorError = null;
         _sourceInvoice = null;
         _returnLines.Clear();
         _invoiceIdText = null;
@@ -226,10 +237,14 @@
         _busy = true;
         try
         {
-            var invoices = await Sales.GetSalesInvoicesPageAsync(new PageRequest { PageNumber = 1, PageSize = 200, SortBy = "invoiceDate", SortDirection = SortDirection.Descending });
-            _postedInvoices = invoices.Items.Where(x => x.Status == SalesInvoiceStatus.Posted).ToArray();
+            var invoicesTask = Sales.GetSalesInvoicesPageAsync(new PageRequest { PageNumber = 1, PageSize = 200, SortBy = "invoiceDate", SortDirection = SortDirection.Descending });
+            var warehousesTask = Sales.SearchWarehousesAsync(null, null, 100);
+            await Task.WhenAll(invoicesTask, warehousesTask);
+            _postedInvoices = invoicesTask.Result.Items.Where(x => x.Status == SalesInvoiceStatus.Posted).ToArray();
+            _returnWarehouses = warehousesTask.Result.Where(x => x.IsActive).ToArray();
         }
-        catch (Exception ex) { _editorError = ex.Message; }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
     }
 
@@ -250,16 +265,16 @@
                 _returnLines.Add(new ReturnLineForm(line, remaining));
             }
         }
-        catch (Exception ex) { _editorError = ex.Message; }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
     }
 
     private async Task CreateAsync()
     {
-        _editorError = null;
         if (_sourceInvoice is null || !_returnDate.HasValue || !_postingDate.HasValue)
         {
-            _editorError = "اختر فاتورة وحدد تاريخ المرتجع والترحيل.";
+            Snackbar.Error("اختر فاتورة وحدد تاريخ المرتجع والترحيل.");
             return;
         }
         var lines = new List<CreateSalesReturnLineRequest>();
@@ -267,76 +282,106 @@
         {
             if (!decimal.TryParse(form.QuantityText, out var quantity) || quantity <= 0m || quantity > form.Remaining)
             {
-                _editorError = $"تحقق من كمية السطر {form.Line.LineNumber}. الحد الأقصى {form.Remaining:N3}.";
+                Snackbar.Error($"تحقق من كمية السطر {form.Line.LineNumber}. الحد الأقصى {form.Remaining:N3}.");
                 return;
             }
-            lines.Add(new CreateSalesReturnLineRequest(form.Line.Id, quantity));
+            Guid? returnWarehouseId = null;
+            if (form.RequiresInventory)
+            {
+                if (!Guid.TryParse(form.ReturnWarehouseIdText, out var parsedWarehouseId))
+                {
+                    Snackbar.Error($"حدد مخزن الإرجاع للسطر {form.Line.LineNumber}.");
+                    return;
+                }
+                returnWarehouseId = parsedWarehouseId;
+            }
+            lines.Add(new CreateSalesReturnLineRequest(form.Line.Id, quantity, returnWarehouseId));
         }
         if (lines.Count == 0)
         {
-            _editorError = "حدد سطرًا واحدًا على الأقل وكمية مرتجعة صحيحة.";
+            Snackbar.Error("حدد سطرًا واحدًا على الأقل وكمية مرتجعة صحيحة.");
             return;
         }
 
         _busy = true;
         try
         {
-            var created = await Sales.CreateSalesReturnAsync(new CreateSalesReturnRequest(_sourceInvoice.Id, _returnDate.Value, _postingDate.Value, _reason, lines));
+            var call = await Sales.CreateSalesReturnResultAsync(new CreateSalesReturnRequest(_sourceInvoice.Id, _returnDate.Value, _postingDate.Value, _reason, lines));
+            if (!TryGetApiResult(call, out var created)) return;
             if (created is not null)
             {
                 _creating = false;
                 _selected = created;
                 _pageNumber = 1;
+                Snackbar.Success("تم إنشاء مرتجع المبيعات بنجاح.");
                 await RefreshAsync();
             }
         }
-        catch (Exception ex) { _editorError = ex.Message; }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
     }
 
     private async Task ConfirmAsync()
     {
         if (_selected is null) return;
-        await RunSelectedActionAsync(async () => await Sales.ConfirmSalesReturnAsync(_selected.Id, new SalesReturnActionRequest(_selected.RowVersion)));
+        await RunSelectedActionAsync(
+            async () => await Sales.ConfirmSalesReturnResultAsync(_selected.Id, new SalesReturnActionRequest(_selected.RowVersion)),
+            "تم تأكيد مرتجع المبيعات بنجاح.");
     }
 
     private async Task PostAsync()
     {
         if (_selected is null) return;
-        _busy = true; _error = null;
+        _busy = true;
         try
         {
-            await Sales.PostSalesReturnAsync(_selected.Id, new SalesReturnActionRequest(_selected.RowVersion));
+            var call = await Sales.PostSalesReturnResultAsync(_selected.Id, new SalesReturnActionRequest(_selected.RowVersion));
+            if (!TryGetApiResult(call, out _)) return;
             _selected = await Sales.GetSalesReturnByIdAsync(_selected.Id);
+            Snackbar.Success("تم ترحيل مرتجع المبيعات بنجاح.");
             await RefreshAsync();
         }
-        catch (Exception ex) { _error = ex.Message; }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
     }
 
     private async Task CancelAsync()
     {
         if (_selected is null) return;
-        await RunSelectedActionAsync(async () => await Sales.CancelSalesReturnAsync(_selected.Id, new CancelSalesReturnRequest(_selected.RowVersion, "إلغاء من واجهة مرتجعات المبيعات")));
+        await RunSelectedActionAsync(
+            async () => await Sales.CancelSalesReturnResultAsync(_selected.Id, new CancelSalesReturnRequest(_selected.RowVersion, "إلغاء من واجهة مرتجعات المبيعات")),
+            "تم إلغاء مرتجع المبيعات.");
     }
 
-    private async Task RunSelectedActionAsync(Func<Task<SalesReturnDto?>> action)
+    private async Task RunSelectedActionAsync(Func<Task<ApiCallResult<SalesReturnDto>>> action, string successMessage)
     {
-        _busy = true; _error = null;
+        _busy = true;
         try
         {
-            var result = await action();
+            var call = await action();
+            if (!TryGetApiResult(call, out var result)) return;
             if (result is not null) _selected = result;
+            Snackbar.Success(successMessage);
             await RefreshAsync();
         }
-        catch (Exception ex) { _error = ex.Message; }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
+    }
+
+    private bool TryGetApiResult<T>(ApiCallResult<T> result, out T? value)
+    {
+        value = result.Value;
+        if (result.Succeeded) return true;
+        if (result.Error is not null) ApiFeedback.Show(result.Error); else ApiFeedback.ShowUnexpected();
+        return false;
     }
 
     private Task CloseEditorAsync()
     {
         _creating = false;
-        _editorError = null;
         return Task.CompletedTask;
     }
 
@@ -361,7 +406,9 @@
     {
         public SalesInvoiceLineDto Line { get; } = line;
         public decimal Remaining { get; } = remaining;
+        public bool RequiresInventory { get; } = line.LineType != SalesLineType.Service && line.ProductVariantId.HasValue && line.WarehouseId.HasValue;
         public bool Selected { get; set; }
         public string QuantityText { get; set; } = remaining > 0m ? Math.Min(remaining, line.Quantity).ToString("0.###") : "0";
+        public string? ReturnWarehouseIdText { get; set; } = line.WarehouseId?.ToString("D");
     }
 }

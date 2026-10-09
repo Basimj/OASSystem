@@ -74,6 +74,8 @@ public partial class AccountingSetupPage
 
     private Guid? _settingsTaxPayableAccountId;
 
+    private Guid? _settingsCustomerAdvancesAccountId;
+
     private Guid? _settingsInventoryAccountId;
 
     private Guid? _settingsCogsAccountId;
@@ -205,6 +207,9 @@ public partial class AccountingSetupPage
     private UiLookupItem? TaxPayableAccountLookupItem =>
         GetAccountLookupItem(_settingsTaxPayableAccountId, AccountingAccountEligibilityContext.TaxPayable);
 
+    private UiLookupItem? CustomerAdvancesAccountLookupItem =>
+        GetAccountLookupItem(_settingsCustomerAdvancesAccountId, AccountingAccountEligibilityContext.CustomerAdvances);
+
     private UiLookupItem? InventoryAccountLookupItem =>
         GetAccountLookupItem(_settingsInventoryAccountId, AccountingAccountEligibilityContext.Inventory);
 
@@ -248,6 +253,11 @@ public partial class AccountingSetupPage
         string search,
         CancellationToken cancellationToken) =>
         SearchAccountsAsync(search, AccountingAccountEligibilityContext.TaxPayable, cancellationToken);
+
+    private Task<IReadOnlyList<UiLookupItem>> SearchCustomerAdvancesAccountsAsync(
+        string search,
+        CancellationToken cancellationToken) =>
+        SearchAccountsAsync(search, AccountingAccountEligibilityContext.CustomerAdvances, cancellationToken);
 
     private Task<IReadOnlyList<UiLookupItem>> SearchInventoryAccountsAsync(
         string search,
@@ -484,6 +494,12 @@ public partial class AccountingSetupPage
     private Task SetTaxPayableAccount(string? value)
     {
         _settingsTaxPayableAccountId = ParseNullableGuid(value);
+        return Task.CompletedTask;
+    }
+
+    private Task SetCustomerAdvancesAccount(string? value)
+    {
+        _settingsCustomerAdvancesAccountId = ParseNullableGuid(value);
         return Task.CompletedTask;
     }
 
@@ -800,6 +816,8 @@ public partial class AccountingSetupPage
             settings?
                 .TaxPayableAccountId;
 
+        _settingsCustomerAdvancesAccountId = settings?.CustomerAdvancesAccountId;
+
 
         _settingsInventoryAccountId =
             settings?
@@ -869,6 +887,14 @@ public partial class AccountingSetupPage
                         _settingsTaxPayableAccountId,
                         AccountingAccountEligibilityContext.TaxPayable,
                         "حساب الضرائب المستحقة"))
+                {
+                    return;
+                }
+
+                if (!await ValidateSettingsAccountAsync(
+                        _settingsCustomerAdvancesAccountId,
+                        AccountingAccountEligibilityContext.CustomerAdvances,
+                        "حساب دفعات مقدمة من العملاء"))
                 {
                     return;
                 }
@@ -965,6 +991,8 @@ public partial class AccountingSetupPage
                                 _settingsSalesRevenueAccountId,
 
                                 _settingsTaxPayableAccountId,
+
+                                _settingsCustomerAdvancesAccountId,
 
                                 _settingsInventoryAccountId,
 

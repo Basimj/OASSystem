@@ -115,17 +115,35 @@ public sealed class OpticalJobService(
         orders.Update(order);
     }
 
+    public async Task SendToQualityControlAsync(Guid id, OpticalJobActionRequest request, CancellationToken cancellationToken = default)
+    {
+        var job = await jobs.GetForUpdateAsync(id, cancellationToken)
+            ?? throw new NotFoundException(nameof(OpticalJob), id);
+        SalesConcurrency.Ensure(request.RowVersion, job.RowVersion, "أمر المعمل");
+        if (job.Status != OpticalJobStatus.InProduction)
+            throw new ConflictException("optical_job_not_in_production", "يمكن إرسال أمر المعمل لفحص الجودة من حالة قيد الإنتاج فقط.");
+        job.SendToQualityControl();
+        jobs.Update(job);
+    }
+
+    public async Task PassQualityControlAsync(Guid id, OpticalJobActionRequest request, CancellationToken cancellationToken = default)
+    {
+        var job = await jobs.GetForUpdateAsync(id, cancellationToken)
+            ?? throw new NotFoundException(nameof(OpticalJob), id);
+        SalesConcurrency.Ensure(request.RowVersion, job.RowVersion, "أمر المعمل");
+        if (job.Status != OpticalJobStatus.AwaitingQC)
+            throw new ConflictException("optical_job_not_awaiting_qc", "أمر المعمل ليس بانتظار فحص الجودة.");
+        job.PassQualityControl();
+        jobs.Update(job);
+    }
+
     public async Task MarkReadyAsync(Guid id, OpticalJobActionRequest request, CancellationToken cancellationToken = default)
     {
         var job = await jobs.GetForUpdateAsync(id, cancellationToken)
             ?? throw new NotFoundException(nameof(OpticalJob), id);
         SalesConcurrency.Ensure(request.RowVersion, job.RowVersion, "أمر المعمل");
-        if (job.Status == OpticalJobStatus.InProduction)
-            job.SendToQualityControl();
-        if (job.Status == OpticalJobStatus.AwaitingQC)
-            job.PassQualityControl();
         if (job.Status != OpticalJobStatus.QCPassed)
-            throw new ConflictException("optical_job_not_ready_for_delivery", "أمر المعمل ليس في حالة تسمح بجعله جاهزًا للتسليم.");
+            throw new ConflictException("optical_job_qc_required", "يجب تسجيل اجتياز فحص الجودة أولًا قبل جعل أمر المعمل جاهزًا للتسليم.");
 
         job.MarkReadyForDelivery(timeProvider.GetUtcNow());
         jobs.Update(job);

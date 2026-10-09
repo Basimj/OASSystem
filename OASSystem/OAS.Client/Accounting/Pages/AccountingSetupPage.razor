@@ -24,7 +24,7 @@
     <Body>
         <UiAccountingEditorSurface>
             <UiAccountingFormSection Title="إعدادات المحاسبة الأساسية"
-                                     Subtitle="حدد العملة الأساسية والحسابات الرئيسية التي يستخدمها النظام عند إنشاء حسابات الموظفين والصناديق والبنوك تلقائيًا."
+                                     Subtitle="حدد العملة الأساسية والحسابات الرئيسية وحسابات الترحيل، بما فيها دفعات العملاء المقدمة، التي يستخدمها النظام تلقائيًا."
                                      IconCssClass="fa-solid fa-sliders">
                 <UiAccountingFormGrid Columns="3">
                     <UiSelect Label="العملة الأساسية"
@@ -86,6 +86,17 @@
                               Placeholder="ابحث برقم الحساب أو الاسم..."
                               EmptyText="لا توجد حسابات التزامات صالحة للترحيل."
                               ClearText="إلغاء اختيار حساب الضرائب المستحقة"
+                              MinimumSearchLength="0"
+                              DebounceMilliseconds="250" />
+
+                    <UiLookup Label="حساب دفعات مقدمة من العملاء"
+                              Value="@ToLookupValue(_settingsCustomerAdvancesAccountId)"
+                              ValueChanged="SetCustomerAdvancesAccount"
+                              SelectedItem="@CustomerAdvancesAccountLookupItem"
+                              SearchAsync="SearchCustomerAdvancesAccountsAsync"
+                              Placeholder="ابحث عن حساب التزام دائن..."
+                              EmptyText="لا توجد حسابات التزامات صالحة لعربون العميل."
+                              ClearText="إلغاء اختيار حساب دفعات مقدمة من العملاء"
                               MinimumSearchLength="0"
                               DebounceMilliseconds="250" />
 

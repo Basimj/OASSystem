@@ -21,4 +21,10 @@ public sealed class SalesCheckoutClientService(OasApiClient api) : ISalesCheckou
 
     public Task<CheckoutCustomerOrderResultDto?> DeliverAsync(Guid orderId, DeliverCustomerOrderRequest request, CancellationToken ct = default)
         => api.PostAsync<DeliverCustomerOrderRequest, CheckoutCustomerOrderResultDto>($"api/sales/orders/{orderId:D}/delivery", request, ct);
+
+    public Task<ApiCallResult<CheckoutCustomerOrderResultDto>> CheckoutResultAsync(Guid orderId, CheckoutCustomerOrderRequest request, CancellationToken ct = default)
+        => api.PostResultAsync<CheckoutCustomerOrderRequest, CheckoutCustomerOrderResultDto>($"api/sales/orders/{orderId:D}/checkout", request, ct);
+
+    public Task<ApiCallResult<CheckoutCustomerOrderResultDto>> DeliverResultAsync(Guid orderId, DeliverCustomerOrderRequest request, CancellationToken ct = default)
+        => api.PostResultAsync<DeliverCustomerOrderRequest, CheckoutCustomerOrderResultDto>($"api/sales/orders/{orderId:D}/delivery", request, ct);
 }

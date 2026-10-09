@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using OAS.Client.Accounting.Services;
+using OAS.Client.Common.Feedback.Services;
 using OAS.Client.Features.Employees.Services;
 using OAS.Client.Sales.Checkout.Services;
 using OAS.Client.Sales.Mapping;
@@ -14,6 +15,7 @@ using OAS.Contracts.Sales.Enums;
 using OAS.Contracts.Sales.OrderOperations;
 using OAS.UiLib.Core.Models;
 using OAS.UiLib.Core.Models.Sales;
+using OAS.UiLib.Services.Feedback;
 
 namespace OAS.Client.Sales.OrderTracking.Pages;
 
@@ -26,6 +28,8 @@ public partial class CustomerOrderOperationsPage : ComponentBase
     [Inject] private IEmployeeClientService Employees { get; set; } = default!;
     [Inject] private CustomerOrderOperationsState State { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private IUiSnackbarService Snackbar { get; set; } = default!;
+    [Inject] private IApiFeedbackService ApiFeedback { get; set; } = default!;
 
     [Parameter, SupplyParameterFromQuery(Name = "orderId")] public Guid? OrderId { get; set; }
 
@@ -35,7 +39,6 @@ public partial class CustomerOrderOperationsPage : ComponentBase
     private UiOrderOperationsDetailsModel? _selected;
     private UiDeliverySettlementModel? _delivery;
     private bool _deliveryBusy;
-    private string? _deliveryError;
     private string _deliveryKey = Guid.NewGuid().ToString("N");
     private bool _initialLoaded;
 
@@ -64,8 +67,8 @@ public partial class CustomerOrderOperationsPage : ComponentBase
             _rows = State.Page.Items.Select(SalesWorkflowUiMapper.ToUi).ToArray();
             _metrics = BuildMetrics(State.Summary);
         }
-        catch (ApiClientException ex) { State.Error = ex.Error.Message; }
-        catch { State.Error = "تعذر تحميل متابعة طلبات العملاء."; }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { Snackbar.Error("تعذر تحميل متابعة طلبات العملاء."); }
         finally { State.IsBusy = false; }
     }
 
@@ -116,7 +119,7 @@ public partial class CustomerOrderOperationsPage : ComponentBase
     {
         State.IsBusy=true;
         try{State.Selected=await Operations.GetDetailsAsync(id);_selected=State.Selected is null?null:SalesWorkflowUiMapper.ToUi(State.Selected);}
-        catch(ApiClientException ex){State.Error=ex.Error.Message;}
+        catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}
         finally{State.IsBusy=false;}
     }
     private Task CloseDetailsAsync(){State.Selected=null;_selected=null;return Task.CompletedTask;}
@@ -125,11 +128,15 @@ public partial class CustomerOrderOperationsPage : ComponentBase
 
     private async Task OpenDeliveryAsync(Guid orderId)
     {
-        _deliveryError=null;_deliveryBusy=true;
+        _deliveryBusy=true;
         try
         {
             var context=await Checkout.GetCheckoutContextAsync(orderId);
-            if(context is null) throw new InvalidOperationException("تعذر تحميل بيانات التسليم.");
+            if(context is null)
+            {
+                Snackbar.Error("تعذر تحميل بيانات التسليم.");
+                return;
+            }
             var customerText=$"{context.Customer.CustomerCode} - {context.Customer.NameAr}";
             _delivery=new UiDeliverySettlementModel
             {
@@ -140,31 +147,62 @@ public partial class CustomerOrderOperationsPage : ComponentBase
             _deliveryKey=Guid.NewGuid().ToString("N");
             if(_delivery.Outstanding>0 && _delivery.PaymentPlan!="AccountCredit") _delivery.PaymentLines.Add(NewDeliveryPayment(context.Order.CurrencyId,context.Order.CurrencyCodeSnapshot,_delivery.Outstanding));
         }
-        catch(ApiClientException ex){State.Error=ex.Error.Message;}
-        catch(Exception ex){State.Error=ex.Message;}
+        catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}
+        catch{ApiFeedback.ShowUnexpected();}
         finally{_deliveryBusy=false;}
     }
 
     private Task AddDeliveryPaymentAsync(){if(_delivery is not null)_delivery.PaymentLines.Add(NewDeliveryPayment(ParseGuid(_delivery.CurrencyId)??Guid.Empty,_delivery.CurrencyCode,0m));return Task.CompletedTask;}
     private Task RemoveDeliveryPaymentAsync(UiCheckoutPaymentLineModel line){_delivery?.PaymentLines.Remove(line);return Task.CompletedTask;}
-    private Task CloseDeliveryAsync(){_delivery=null;_deliveryError=null;return Task.CompletedTask;}
+    private Task CloseDeliveryAsync(){_delivery=null;return Task.CompletedTask;}
     private async Task DeliverAsync()
     {
-        if(_delivery is null)return;_deliveryBusy=true;_deliveryError=null;
+        if(_delivery is null)return;_deliveryBusy=true;
         try
         {
-            var payments=BuildPayments(_delivery.PaymentLines);
-            await Checkout.DeliverAsync(_delivery.OrderId,new DeliverCustomerOrderRequest(payments,_delivery.RowVersion,_deliveryKey));
+            if(!TryBuildPayments(_delivery.PaymentLines,out var payments,out var paymentError))
+            {
+                Snackbar.Error(paymentError!);
+                return;
+            }
+            var call=await Checkout.DeliverResultAsync(_delivery.OrderId,new DeliverCustomerOrderRequest(payments,_delivery.RowVersion,_deliveryKey));
+            if(!call.Succeeded)
+            {
+                if(call.Error is not null)ApiFeedback.Show(call.Error);else ApiFeedback.ShowUnexpected();
+                return;
+            }
+            var result=call.Value;
+            Snackbar.Success(result is null?"تم التسليم بنجاح.":$"تم تسليم الطلب {result.OrderCode} بنجاح.");
             _delivery=null;_selected=null;State.Selected=null;await LoadAsync();
         }
-        catch(ApiClientException ex){_deliveryError=ex.Error.Message;}
-        catch(Exception ex){_deliveryError=ex.Message;}
+        catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}
+        catch{ApiFeedback.ShowUnexpected();}
         finally{_deliveryBusy=false;}
     }
 
     private static UiCheckoutPaymentLineModel NewDeliveryPayment(Guid currencyId,string currencyCode,decimal amount)=>new(){PaymentMethod="Cash",CurrencyId=currencyId==Guid.Empty?"":currencyId.ToString("D"),CurrencyDisplay=currencyCode,Amount=amount};
     private static Guid? ParseGuid(string? v)=>Guid.TryParse(v,out var id)?id:null;
-    private static IReadOnlyList<CheckoutPaymentLineRequest> BuildPayments(IEnumerable<UiCheckoutPaymentLineModel> lines)=>lines.Where(x=>x.Amount>0).Select(x=>new CheckoutPaymentLineRequest(Enum.Parse<PaymentMethod>(x.PaymentMethod),Guid.Parse(x.CurrencyId),x.Amount,ParseGuid(x.CashAccountId),ParseGuid(x.BankAccountId),x.ReferenceNumber,x.ReferenceDate,x.Description){SettlementAccountId=ParseGuid(x.SettlementAccountId)}).ToArray();
+    private static bool TryBuildPayments(IEnumerable<UiCheckoutPaymentLineModel> lines,out IReadOnlyList<CheckoutPaymentLineRequest> payments,out string? error)
+    {
+        var result=new List<CheckoutPaymentLineRequest>();
+        foreach(var line in lines.Where(x=>x.Amount>0))
+        {
+            if(!Enum.TryParse<PaymentMethod>(line.PaymentMethod,out var method))
+            {
+                payments=[];error="طريقة دفع غير صحيحة.";return false;
+            }
+            if(!Guid.TryParse(line.CurrencyId,out var currencyId))
+            {
+                payments=[];error="يجب تحديد عملة الدفعة.";return false;
+            }
+            if(method==PaymentMethod.Cash&&!ParseGuid(line.CashAccountId).HasValue){payments=[];error="يجب اختيار الصندوق للدفع النقدي.";return false;}
+            if((method is PaymentMethod.Card or PaymentMethod.BankTransfer or PaymentMethod.Cheque)&&!ParseGuid(line.BankAccountId).HasValue){payments=[];error="يجب اختيار الحساب البنكي لطريقة الدفع المحددة.";return false;}
+            if(method==PaymentMethod.Cheque&&string.IsNullOrWhiteSpace(line.ReferenceNumber)){payments=[];error="رقم الشيك مطلوب.";return false;}
+            if(method==PaymentMethod.Other&&!ParseGuid(line.SettlementAccountId).HasValue){payments=[];error="يجب تحديد حساب التسوية لطريقة الدفع الأخرى.";return false;}
+            result.Add(new CheckoutPaymentLineRequest(method,currencyId,line.Amount,ParseGuid(line.CashAccountId),ParseGuid(line.BankAccountId),line.ReferenceNumber,line.ReferenceDate,line.Description){SettlementAccountId=ParseGuid(line.SettlementAccountId)});
+        }
+        payments=result;error=null;return true;
+    }
 
     private async Task<IReadOnlyList<UiLookupItem>> SearchWarehousesAsync(string search,CancellationToken ct)
     {

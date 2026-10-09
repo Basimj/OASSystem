@@ -166,6 +166,7 @@
 .ui-sales-line-card__number-field>span { font-weight:650; }
 .ui-sales-line-card__number-field input,.ui-sales-line-card__number-field select { width:100%; min-height:34px; padding:.32rem .42rem; border:1px solid var(--oas-sales-border); border-radius:.38rem; background:#fff; color:#292437; font:inherit; }
 .ui-sales-line-card__number-field input:disabled,.ui-sales-line-card__number-field select:disabled { background:#f7f7fa; color:#777284; }
+.ui-sales-line-card__price-hint { color:var(--oas-sales-muted); font-size:.58rem; line-height:1.35; }
 .ui-sales-line-card__optical { margin:.1rem .75rem .75rem; padding:.65rem; border:1px solid #e8e2fb; border-radius:.48rem; background:#fcfbff; }
 .ui-sales-line-card__subheader { display:flex; align-items:center; gap:.5rem; margin-bottom:.55rem; }
 .ui-sales-line-card__subheader>i { width:30px; height:30px; display:grid; place-items:center; border-radius:.4rem; background:#f0ecff; color:var(--oas-sales-primary); }

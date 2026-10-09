@@ -12,7 +12,7 @@ namespace OAS.Application.Sales.Services;
 
 public sealed class SalesPaymentAllocationTargetValidator(
     IReadRepository<SalesInvoice, Guid> invoices,
-    IReadRepository<PaymentAllocation, Guid> allocations) : ISalesPaymentAllocationTargetValidator
+    ISalesInvoiceBalanceService invoiceBalances) : ISalesPaymentAllocationTargetValidator
 {
     public AllocationTargetDocumentType TargetDocumentType => AllocationTargetDocumentType.SalesInvoice;
 
@@ -30,41 +30,26 @@ public sealed class SalesPaymentAllocationTargetValidator(
         if (invoice.Status != SalesInvoiceStatus.Posted)
             throw new ConflictException("sales_payment_allocation_invoice_not_posted", "لا يمكن تخصيص دفعة إلا لفاتورة مبيعات مرحلة.");
 
-        var spec = new Specification<PaymentAllocation>()
-            .Where(x => x.TargetDocumentType == AllocationTargetDocumentType.SalesInvoice &&
-                        x.TargetDocumentId == salesInvoiceId);
-        var existing = await allocations.ListAsync(spec, cancellationToken);
-        if (excludingAllocationId.HasValue)
-            existing = existing.Where(x => x.Id != excludingAllocationId.Value).ToArray();
+        var balance = await invoiceBalances.GetAsync(invoice, excludingAllocationId, cancellationToken);
 
-        // Base currency is the authoritative cross-currency ceiling. This prevents an invoice
-        // being over-allocated by mixing receipts in different currencies.
-        var alreadyAllocatedBase = existing.Sum(GetBaseAllocatedAmount);
-        var baseOutstanding = Math.Max(0m, invoice.BaseTotalAmount - alreadyAllocatedBase);
-        if (baseAllocatedAmount > baseOutstanding)
-            throw new ConflictException("sales_payment_allocation_exceeds_outstanding", "القيمة الأساسية للمبلغ المخصص تتجاوز الرصيد المتبقي على فاتورة المبيعات.");
+        // TargetBaseAllocatedAmount represents how much of the invoice's historical base
+        // balance is settled. When collecting in the invoice currency, use the invoice's
+        // immutable exchange-rate snapshot rather than today's collection rate. This keeps
+        // a 300-unit payment equal to exactly 300 invoice-currency units even if FX changed.
+        var targetBaseAllocatedAmount = sourceCurrencyId == invoice.CurrencyId
+            ? Math.Round(
+                allocatedAmount * invoice.ExchangeRate,
+                invoice.BaseCurrencyDecimalPlacesSnapshot,
+                MidpointRounding.AwayFromZero)
+            : baseAllocatedAmount;
 
-        // For allocations in the same currency as the invoice, also preserve the exact
-        // transaction-currency ceiling shown to the user.
-        if (sourceCurrencyId == invoice.CurrencyId)
-        {
-            var alreadyAllocatedInInvoiceCurrency = existing
-                .Where(x => x.CurrencyId == invoice.CurrencyId)
-                .Sum(x => x.AllocatedAmount);
-            var transactionOutstanding = Math.Max(0m, invoice.TotalAmount - alreadyAllocatedInInvoiceCurrency);
-            if (allocatedAmount > transactionOutstanding)
-                throw new ConflictException("sales_payment_allocation_exceeds_outstanding", "المبلغ المخصص يتجاوز الرصيد المتبقي على فاتورة المبيعات.");
-        }
+        if (targetBaseAllocatedAmount > balance.OutstandingBaseAmount)
+            throw new ConflictException("sales_payment_allocation_exceeds_outstanding", "القيمة الأساسية للمبلغ المخصص تتجاوز الرصيد المتبقي على فاتورة المبيعات بعد المرتجعات المرحلة.");
 
-        return new PaymentAllocationTargetValidation(baseAllocatedAmount);
+        if (sourceCurrencyId == invoice.CurrencyId && allocatedAmount > balance.OutstandingAmount)
+            throw new ConflictException("sales_payment_allocation_exceeds_outstanding", "المبلغ المخصص يتجاوز الرصيد المتبقي على فاتورة المبيعات بعد المرتجعات المرحلة.");
+
+        return new PaymentAllocationTargetValidation(targetBaseAllocatedAmount);
     }
 
-    private static decimal GetBaseAllocatedAmount(PaymentAllocation allocation)
-    {
-        if (allocation.BaseAllocatedAmount.HasValue)
-            return allocation.BaseAllocatedAmount.Value;
-        if (allocation.ExchangeRate.HasValue)
-            return Math.Round(allocation.AllocatedAmount * allocation.ExchangeRate.Value, 4, MidpointRounding.AwayFromZero);
-        return allocation.AllocatedAmount;
-    }
 }

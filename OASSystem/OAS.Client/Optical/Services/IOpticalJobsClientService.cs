@@ -9,5 +9,7 @@ public interface IOpticalJobsClientService
     Task<OpticalJobDetailsDto?> GetDetailsAsync(Guid id, CancellationToken ct = default);
     Task<OpticalJobDetailsDto?> AssignAsync(Guid id, AssignOpticalJobRequest request, CancellationToken ct = default);
     Task<OpticalJobDetailsDto?> StartAsync(Guid id, OpticalJobActionRequest request, CancellationToken ct = default);
+    Task<OpticalJobDetailsDto?> SendToQualityControlAsync(Guid id, OpticalJobActionRequest request, CancellationToken ct = default);
+    Task<OpticalJobDetailsDto?> PassQualityControlAsync(Guid id, OpticalJobActionRequest request, CancellationToken ct = default);
     Task<OpticalJobDetailsDto?> ReadyAsync(Guid id, OpticalJobActionRequest request, CancellationToken ct = default);
 }

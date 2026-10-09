@@ -1,3 +1,4 @@
+using OAS.Client.Services.Http;
 using OAS.Contracts.Sales.Checkout;
 using OAS.Contracts.Sales.CustomerOrders;
 using OAS.Contracts.Sales.Prescriptions;
@@ -11,4 +12,6 @@ public interface ISalesCheckoutClientService
     Task<CustomerOrderAvailabilityDto?> AssessAvailabilityAsync(Guid orderId, CancellationToken ct = default);
     Task<CheckoutCustomerOrderResultDto?> CheckoutAsync(Guid orderId, CheckoutCustomerOrderRequest request, CancellationToken ct = default);
     Task<CheckoutCustomerOrderResultDto?> DeliverAsync(Guid orderId, DeliverCustomerOrderRequest request, CancellationToken ct = default);
+    Task<ApiCallResult<CheckoutCustomerOrderResultDto>> CheckoutResultAsync(Guid orderId, CheckoutCustomerOrderRequest request, CancellationToken ct = default);
+    Task<ApiCallResult<CheckoutCustomerOrderResultDto>> DeliverResultAsync(Guid orderId, DeliverCustomerOrderRequest request, CancellationToken ct = default);
 }

@@ -1,5 +1,7 @@
 using MediatR;
+using Microsoft.Extensions.Logging;
 using OAS.Application.Abstractions.Messaging;
+using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Abstractions.Security;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.Purchasing.Abstractions;
@@ -19,7 +21,7 @@ public sealed record UpdatePurchaseReceiptCommand(Guid Id, UpdatePurchaseReceipt
 { public IReadOnlyCollection<string> RequiredPermissions { get; }=[PurchasingPermissions.Receipts.Edit]; }
 public sealed record ConfirmPurchaseReceiptCommand(Guid Id, ConfirmPurchaseReceiptRequest Request) : ICommand, IAuthorizedRequest
 { public IReadOnlyCollection<string> RequiredPermissions { get; }=[PurchasingPermissions.Receipts.Confirm]; }
-public sealed record PostPurchaseReceiptCommand(Guid Id, PostPurchaseReceiptRequest Request) : ICommand<PurchaseReceiptPostResultDto>, IAuthorizedRequest
+public sealed record PostPurchaseReceiptCommand(Guid Id, PostPurchaseReceiptRequest Request) : INonTransactionalCommand<PurchaseReceiptPostResultDto>, IAuthorizedRequest
 { public IReadOnlyCollection<string> RequiredPermissions { get; }=[PurchasingPermissions.Receipts.Post]; }
 public sealed record CancelPurchaseReceiptCommand(Guid Id, CancelPurchaseReceiptRequest Request) : ICommand, IAuthorizedRequest
 { public IReadOnlyCollection<string> RequiredPermissions { get; }=[PurchasingPermissions.Receipts.Cancel]; }
@@ -129,59 +131,129 @@ public sealed class PostPurchaseReceiptCommandHandler(
     IPurchaseRequestRepository requestRepository,
     ICustomerOrderFulfillmentService fulfillment,
     ICurrentUser currentUser,
-    TimeProvider timeProvider) : IRequestHandler<PostPurchaseReceiptCommand, PurchaseReceiptPostResultDto>
+    TimeProvider timeProvider,
+    IUnitOfWork unitOfWork,
+    ILogger<PostPurchaseReceiptCommandHandler> logger) : IRequestHandler<PostPurchaseReceiptCommand, PurchaseReceiptPostResultDto>
 {
-    public async Task<PurchaseReceiptPostResultDto> Handle(PostPurchaseReceiptCommand command,CancellationToken ct)
+    public async Task<PurchaseReceiptPostResultDto> Handle(PostPurchaseReceiptCommand command, CancellationToken ct)
     {
-        var receipt=await receiptRepository.GetForUpdateAsync(command.Id,ct)??throw new NotFoundException("PurchaseReceipt",command.Id);
-        if(receipt.Status==DomainReceiptStatus.Posted && receipt.InventoryTransactionId.HasValue && receipt.JournalEntryId.HasValue)
-            return new(receipt.Id,receipt.InventoryTransactionId.Value,receipt.JournalEntryId.Value,receipt.PurchaseOrderId,receipt.ReceiptCode);
-        PurchasingRowVersion.EnsureMatches(receipt.RowVersion,command.Request.RowVersion,"Purchase receipt");
-        if(receipt.Status!=DomainReceiptStatus.Confirmed)throw new ConflictException("purchasing_receipt_not_confirmed","يجب تأكيد سند الاستلام قبل الترحيل.");
+        // Purchase receipt posting is its own committed transaction. Customer-order fulfillment
+        // runs only after that commit, so a sales-side validation failure can never roll back
+        // inventory/accounting effects of a valid purchasing receipt.
+        var posted = await unitOfWork.ExecuteInTransactionAsync(
+            tx => PostReceiptAsync(command, tx),
+            ct);
 
-        var order=await orderRepository.GetForUpdateAsync(receipt.PurchaseOrderId,ct)??throw new NotFoundException("PurchaseOrder",receipt.PurchaseOrderId);
-        if(order.Status is not (DomainOrderStatus.Sent or DomainOrderStatus.PartiallyReceived))throw new ConflictException("purchasing_order_not_receivable","أمر الشراء غير متاح للاستلام.");
-        PurchasingApplicationGuard.Supplier(await references.GetSupplierAsync(receipt.SupplierId,ct));
-        PurchasingApplicationGuard.Warehouse(await references.GetWarehouseAsync(receipt.WarehouseId,ct));
-        await inventory.ValidatePostingDateAsync(receipt.WarehouseId,receipt.PostingDate,ct);
-        await accounting.ValidatePostingPeriodAsync(receipt.PostingDate,ct);
-
-        var orderLines=order.Lines.ToDictionary(x=>x.Id);
-        var inventoryLines=new List<PurchasingReceiptInventoryLine>();
-        var journalLines=new List<PurchasingReceiptJournalLine>();
-        var decreaseLines=new List<PurchasingOnOrderLine>();
-        var receivedBaseAfter=new Dictionary<Guid,decimal>();
-        foreach(var poLine in order.Lines)
+        if (posted.CustomerOrderIds.Count > 0)
         {
-            var previous=await receiptRepository.GetPostedAcceptedQuantityAsync(poLine.Id,ct);
-            receivedBaseAfter[poLine.Id]=Math.Round(previous*poLine.UnitConversionFactor,3);
+            try
+            {
+                await unitOfWork.ExecuteInTransactionAsync(async tx =>
+                {
+                    await fulfillment.ReconcileOrdersAsync(posted.CustomerOrderIds, tx);
+                    return true;
+                }, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // The receipt is already committed. Keep purchasing successful and leave the
+                // customer order resumable through Checkout/reconciliation instead of returning
+                // an error that misleadingly suggests the receipt was rolled back.
+                logger.LogWarning(
+                    ex,
+                    "Purchase receipt {ReceiptId} posted successfully, but follow-up sales fulfillment failed for customer orders {CustomerOrderIds}.",
+                    posted.Result.PurchaseReceiptId,
+                    string.Join(",", posted.CustomerOrderIds));
+            }
         }
-        foreach(var line in receipt.Lines)
+
+        return posted.Result;
+    }
+
+    private async Task<PostedReceiptWork> PostReceiptAsync(PostPurchaseReceiptCommand command, CancellationToken ct)
+    {
+        var receipt = await receiptRepository.GetForUpdateAsync(command.Id, ct)
+            ?? throw new NotFoundException("PurchaseReceipt", command.Id);
+
+        if (receipt.Status == DomainReceiptStatus.Posted && receipt.InventoryTransactionId.HasValue && receipt.JournalEntryId.HasValue)
         {
-            if(!orderLines.TryGetValue(line.PurchaseOrderLineId,out var poLine))throw new ConflictException("purchasing_receipt_line_not_in_po","سطر الاستلام لم يعد مرتبطًا بسطر صالح في أمر الشراء.");
-            var previousBase=receivedBaseAfter[poLine.Id];
-            var previous=poLine.UnitConversionFactor == 0 ? 0 : previousBase/poLine.UnitConversionFactor;
-            if(previous+line.AcceptedQuantity>poLine.OrderedQuantity)throw new ConflictException("purchasing_receipt_over_receipt","لا يمكن استلام كمية أكبر من الكمية المتبقية في أمر الشراء.");
-            receivedBaseAfter[poLine.Id]=previousBase+line.BaseAcceptedQuantity;
-            if(line.AcceptedQuantity<=0)continue;
-            inventoryLines.Add(new(line.Id,line.ProductVariantId,line.BaseAcceptedQuantity,line.ActualUnitCost,line.ExpiryDate,line.BatchCode));
-            journalLines.Add(new(line.Id,line.ProductVariantId,line.TotalAcceptedCost));
-            decreaseLines.Add(new(line.ProductVariantId,line.BaseAcceptedQuantity));
+            var linked = await ResolveCustomerOrderIdsAsync(receipt, ct);
+            return new PostedReceiptWork(
+                new PurchaseReceiptPostResultDto(receipt.Id, receipt.InventoryTransactionId.Value, receipt.JournalEntryId.Value, receipt.PurchaseOrderId, receipt.ReceiptCode),
+                linked);
         }
-        if(inventoryLines.Count==0)throw new ConflictException("purchasing_receipt_no_accepted_quantity","لا توجد كمية مقبولة لترحيلها إلى المخزون.");
 
-        var inventoryResult=await inventory.PostPurchaseReceiptAsync(new(receipt.Id,receipt.ReceiptCode,receipt.WarehouseId,receipt.PostingDate,inventoryLines),ct);
-        await inventory.DecreaseOnOrderAsync(receipt.WarehouseId,decreaseLines,order.Id,receipt.PostingDate,ct);
-        var accountingResult=await accounting.PostPurchaseReceiptJournalAsync(new(receipt.Id,receipt.ReceiptCode,receipt.SupplierId,receipt.PostingDate,journalLines),ct);
+        PurchasingRowVersion.EnsureMatches(receipt.RowVersion, command.Request.RowVersion, "Purchase receipt");
+        if (receipt.Status != DomainReceiptStatus.Confirmed)
+            throw new ConflictException("purchasing_receipt_not_confirmed", "يجب تأكيد سند الاستلام قبل الترحيل.");
 
-        receipt.MarkPosted(inventoryResult.InventoryTransactionId,accountingResult.JournalEntryId,timeProvider.GetUtcNow(),currentUser.UserId);
+        var order = await orderRepository.GetForUpdateAsync(receipt.PurchaseOrderId, ct)
+            ?? throw new NotFoundException("PurchaseOrder", receipt.PurchaseOrderId);
+        if (order.Status is not (DomainOrderStatus.Sent or DomainOrderStatus.PartiallyReceived))
+            throw new ConflictException("purchasing_order_not_receivable", "أمر الشراء غير متاح للاستلام.");
+
+        PurchasingApplicationGuard.Supplier(await references.GetSupplierAsync(receipt.SupplierId, ct));
+        PurchasingApplicationGuard.Warehouse(await references.GetWarehouseAsync(receipt.WarehouseId, ct));
+        await inventory.ValidatePostingDateAsync(receipt.WarehouseId, receipt.PostingDate, ct);
+        await accounting.ValidatePostingPeriodAsync(receipt.PostingDate, ct);
+
+        var orderLines = order.Lines.ToDictionary(x => x.Id);
+        var inventoryLines = new List<PurchasingReceiptInventoryLine>();
+        var journalLines = new List<PurchasingReceiptJournalLine>();
+        var decreaseLines = new List<PurchasingOnOrderLine>();
+        var receivedBaseAfter = new Dictionary<Guid, decimal>();
+        foreach (var poLine in order.Lines)
+        {
+            var previous = await receiptRepository.GetPostedAcceptedQuantityAsync(poLine.Id, ct);
+            receivedBaseAfter[poLine.Id] = Math.Round(previous * poLine.UnitConversionFactor, 3);
+        }
+
+        foreach (var line in receipt.Lines)
+        {
+            if (!orderLines.TryGetValue(line.PurchaseOrderLineId, out var poLine))
+                throw new ConflictException("purchasing_receipt_line_not_in_po", "سطر الاستلام لم يعد مرتبطًا بسطر صالح في أمر الشراء.");
+            var previousBase = receivedBaseAfter[poLine.Id];
+            var previous = poLine.UnitConversionFactor == 0 ? 0 : previousBase / poLine.UnitConversionFactor;
+            if (previous + line.AcceptedQuantity > poLine.OrderedQuantity)
+                throw new ConflictException("purchasing_receipt_over_receipt", "لا يمكن استلام كمية أكبر من الكمية المتبقية في أمر الشراء.");
+            receivedBaseAfter[poLine.Id] = previousBase + line.BaseAcceptedQuantity;
+            if (line.AcceptedQuantity <= 0) continue;
+            inventoryLines.Add(new(line.Id, line.ProductVariantId, line.BaseAcceptedQuantity, line.ActualUnitCost, line.ExpiryDate, line.BatchCode));
+            journalLines.Add(new(line.Id, line.ProductVariantId, line.TotalAcceptedCost));
+            decreaseLines.Add(new(line.ProductVariantId, line.BaseAcceptedQuantity));
+        }
+
+        if (inventoryLines.Count == 0)
+            throw new ConflictException("purchasing_receipt_no_accepted_quantity", "لا توجد كمية مقبولة لترحيلها إلى المخزون.");
+
+        var inventoryResult = await inventory.PostPurchaseReceiptAsync(
+            new(receipt.Id, receipt.ReceiptCode, receipt.WarehouseId, receipt.PostingDate, inventoryLines), ct);
+        await inventory.DecreaseOnOrderAsync(receipt.WarehouseId, decreaseLines, order.Id, receipt.PostingDate, ct);
+        var accountingResult = await accounting.PostPurchaseReceiptJournalAsync(
+            new(receipt.Id, receipt.ReceiptCode, receipt.SupplierId, receipt.PostingDate, journalLines), ct);
+
+        receipt.MarkPosted(inventoryResult.InventoryTransactionId, accountingResult.JournalEntryId, timeProvider.GetUtcNow(), currentUser.UserId);
         receiptRepository.Update(receipt);
-        var fullyReceived=order.Lines.All(x=>receivedBaseAfter.TryGetValue(x.Id,out var qty) ? qty>=x.BaseQuantity : false);
+        var fullyReceived = order.Lines.All(x => receivedBaseAfter.TryGetValue(x.Id, out var qty) && qty >= x.BaseQuantity);
         order.MarkReceived(fullyReceived);
         orderRepository.Update(order);
 
-        var receiptPoLineIds = receipt.Lines.Where(x => x.AcceptedQuantity > 0m).Select(x => x.PurchaseOrderLineId).ToHashSet();
-        var sources = await orderRepository.GetSourcesAsync(order.Id, ct);
+        var customerOrderIds = await ResolveCustomerOrderIdsAsync(receipt, ct);
+        return new PostedReceiptWork(
+            new PurchaseReceiptPostResultDto(receipt.Id, inventoryResult.InventoryTransactionId, accountingResult.JournalEntryId, order.Id, receipt.ReceiptCode),
+            customerOrderIds);
+    }
+
+    private async Task<IReadOnlyList<Guid>> ResolveCustomerOrderIdsAsync(PurchaseReceipt receipt, CancellationToken ct)
+    {
+        var receiptPoLineIds = receipt.Lines
+            .Where(x => x.AcceptedQuantity > 0m)
+            .Select(x => x.PurchaseOrderLineId)
+            .ToHashSet();
+        if (receiptPoLineIds.Count == 0)
+            return [];
+
+        var sources = await orderRepository.GetSourcesAsync(receipt.PurchaseOrderId, ct);
         var customerOrderIds = new HashSet<Guid>();
         foreach (var source in sources.Where(x => receiptPoLineIds.Contains(x.PurchaseOrderLineId)))
         {
@@ -189,9 +261,10 @@ public sealed class PostPurchaseReceiptCommandHandler(
             if (purchaseRequest?.CustomerOrderId is Guid customerOrderId && customerOrderId != Guid.Empty)
                 customerOrderIds.Add(customerOrderId);
         }
-        if (customerOrderIds.Count > 0)
-            await fulfillment.ReconcileOrdersAsync(customerOrderIds.ToArray(), ct);
-
-        return new(receipt.Id,inventoryResult.InventoryTransactionId,accountingResult.JournalEntryId,order.Id,receipt.ReceiptCode);
+        return customerOrderIds.ToArray();
     }
+
+    private sealed record PostedReceiptWork(
+        PurchaseReceiptPostResultDto Result,
+        IReadOnlyList<Guid> CustomerOrderIds);
 }
