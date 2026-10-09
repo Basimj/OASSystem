@@ -92,6 +92,19 @@ public sealed class PurchaseInvoicesController(ISender sender) : ControllerBase
         CancellationToken cancellationToken)
         => Ok(await sender.Send(new PostPurchaseInvoiceCommand(id, request), cancellationToken));
 
+    [HttpGet("{id:guid}/payment-summary")]
+    public async Task<ActionResult<PurchaseInvoicePaymentSummaryDto>> GetPaymentSummary(
+        Guid id,
+        CancellationToken cancellationToken)
+        => Ok(await sender.Send(new GetPurchaseInvoicePaymentSummaryQuery(id), cancellationToken));
+
+    [HttpPost("{id:guid}/pay")]
+    public async Task<ActionResult<PayPurchaseInvoiceResultDto>> Pay(
+        Guid id,
+        [FromBody] PayPurchaseInvoiceRequest request,
+        CancellationToken cancellationToken)
+        => Ok(await sender.Send(new PayPurchaseInvoiceCommand(id, request), cancellationToken));
+
     [HttpPost("{id:guid}/cancel")]
     public async Task<ActionResult<PurchaseInvoiceDto>> Cancel(
         Guid id,

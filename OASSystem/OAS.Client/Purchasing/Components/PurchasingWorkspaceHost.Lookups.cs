@@ -42,6 +42,26 @@ public partial class PurchasingWorkspaceHost
     }
     private static PageRequest LookupRequest(string search)=>new(){PageNumber=1,PageSize=12,Search=string.IsNullOrWhiteSpace(search)?null:search.Trim(),SortDirection=SortDirection.Ascending};
 
+    private async Task<IReadOnlyList<UiLookupItem>> SearchInvoiceCashAccountsAsync(Guid currencyId,string search,CancellationToken ct)
+    {
+        var page=await Accounting.GetCashAccountsPageAsync(LookupRequest(search),ct);
+        return page.Items
+            .Where(x=>x.IsActive&&x.CurrencyId==currencyId)
+            .Take(12)
+            .Select(x=>new UiLookupItem(x.Id.ToString("D"),x.Name,x.Code,"fa-solid fa-cash-register"))
+            .ToArray();
+    }
+
+    private async Task<IReadOnlyList<UiLookupItem>> SearchInvoiceBankAccountsAsync(Guid currencyId,string search,CancellationToken ct)
+    {
+        var page=await Accounting.GetBankAccountsPageAsync(LookupRequest(search),ct);
+        return page.Items
+            .Where(x=>x.IsActive&&x.CurrencyId==currencyId)
+            .Take(12)
+            .Select(x=>new UiLookupItem(x.Id.ToString("D"),x.AccountName,$"{x.BankName} • {x.AccountNumber}","fa-solid fa-building-columns"))
+            .ToArray();
+    }
+
     private async Task ReceiptPurchaseOrderChangedAsync(Guid? purchaseOrderId)
     {
         if(ActiveTab?.Model is not UiPurchaseReceiptEditorModel m)return;

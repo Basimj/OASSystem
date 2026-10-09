@@ -1,0 +1,202 @@
+@namespace OAS.UiLib.Components.Purchasing
+@using OAS.UiLib.Components.Accounting.Workspace
+@using OAS.UiLib.Components.Inputs
+@using OAS.UiLib.Core.Models
+@using OAS.UiLib.Services.Dialogs
+@inject IUiDialogService Dialog
+
+<div dir="rtl">
+    <UiAccountingFormSection Title="الفاتورة المراد سدادها"
+                             Subtitle="بيانات المورد والفاتورة والعملة محددة تلقائياً ولا تحتاج إدخالاً يدوياً."
+                             IconCssClass="fa-solid fa-file-invoice-dollar">
+        <UiAccountingFormGrid Columns="3">
+            <UiAccountingReadOnlyValue Label="رقم الفاتورة" Value="@InvoiceCode" Tone="@UiAccountingReadOnlyValue.ValueTone.Primary" />
+            <UiAccountingReadOnlyValue Label="المورد" Value="@SupplierName" Tone="@UiAccountingReadOnlyValue.ValueTone.Default" />
+            <UiAccountingReadOnlyValue Label="العملة" Value="@CurrencyCode" Tone="@UiAccountingReadOnlyValue.ValueTone.Default" />
+            <UiAccountingReadOnlyValue Label="إجمالي الفاتورة" Value="@FormatAmount(TotalAmount)" Tone="@UiAccountingReadOnlyValue.ValueTone.Default" />
+            <UiAccountingReadOnlyValue Label="المدفوع سابقاً" Value="@FormatAmount(PaidAmount)" Tone="@UiAccountingReadOnlyValue.ValueTone.Default" />
+            <UiAccountingReadOnlyValue Label="الرصيد المتبقي" Value="@FormatAmount(OutstandingAmount)" Tone="@UiAccountingReadOnlyValue.ValueTone.Primary" />
+        </UiAccountingFormGrid>
+    </UiAccountingFormSection>
+
+    <UiAccountingFormSection Title="طريقة السداد"
+                             Subtitle="اختر مصدر السداد فقط؛ حساب المورد والتخصيص والقيد يتم إنشاؤها تلقائياً."
+                             IconCssClass="fa-solid fa-money-bill-transfer">
+        <UiAccountingFormGrid Columns="2">
+            <UiInputDate Label="تاريخ السداد"
+                         Value="@PaymentDate"
+                         ValueChanged="OnPaymentDateChanged"
+                         Required="true"
+                         Size="ControlSize.Small" />
+
+            <UiSelect Label="طريقة الدفع"
+                      Value="@SelectedPaymentMethod.ToString()"
+                      ValueChanged="OnPaymentMethodChanged"
+                      Options="@PaymentMethodOptions"
+                      Size="ControlSize.Small" />
+
+            @if (SelectedPaymentMethod == PaymentMethodKind.Cash)
+            {
+                <UiLookup Label="الصندوق"
+                          Value='@CashAccountId?.ToString("D")'
+                          ValueChanged="OnCashAccountChanged"
+                          SearchAsync="CashAccountSearchAsync"
+                          Placeholder="اختر صندوقاً بنفس عملة الفاتورة..."
+                          Required="true"
+                          MinimumSearchLength="0"
+                          DebounceMilliseconds="250" />
+            }
+            else
+            {
+                <UiLookup Label="الحساب البنكي"
+                          Value='@BankAccountId?.ToString("D")'
+                          ValueChanged="OnBankAccountChanged"
+                          SearchAsync="BankAccountSearchAsync"
+                          Placeholder="اختر حساباً بنكياً بنفس عملة الفاتورة..."
+                          Required="true"
+                          MinimumSearchLength="0"
+                          DebounceMilliseconds="250" />
+            }
+
+            <UiAccountingNumberField Label="مبلغ السداد"
+                                     Value="@Amount"
+                                     ValueChanged="OnAmountChanged"
+                                     Min="0.0001"
+                                     Tone="@UiAccountingNumberField.NumberTone.Primary" />
+
+            @if (SelectedPaymentMethod == PaymentMethodKind.BankTransfer)
+            {
+                <UiInputText Label="رقم التحويل / المرجع (اختياري)"
+                             Value="@ReferenceNumber"
+                             ValueExpression="@(() => ReferenceNumber)"
+                             ValueChanged="OnReferenceChanged"
+                             Placeholder="رقم التحويل البنكي إن وجد..." />
+            }
+        </UiAccountingFormGrid>
+    </UiAccountingFormSection>
+
+    @if (!string.IsNullOrWhiteSpace(_validationMessage))
+    {
+        <div class="alert alert-warning mt-3 mb-0" role="alert">@_validationMessage</div>
+    }
+
+    <div class="d-flex gap-2 justify-content-end mt-3">
+        <UiButton Text="إلغاء" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CancelAsync" />
+        <UiButton Text="سداد وترحيل" IconCssClass="fa-solid fa-check-double" Size="ControlSize.Small" OnClick="SubmitAsync" />
+    </div>
+</div>
+
+@code {
+    public enum PaymentMethodKind : byte
+    {
+        Cash = 1,
+        BankTransfer = 3
+    }
+
+    public sealed record PaymentRequestModel(
+        DateOnly PaymentDate,
+        decimal Amount,
+        PaymentMethodKind PaymentMethod,
+        Guid? CashAccountId,
+        Guid? BankAccountId,
+        string? ReferenceNumber);
+
+    [Parameter] public string InvoiceCode { get; set; } = string.Empty;
+    [Parameter] public string SupplierName { get; set; } = string.Empty;
+    [Parameter] public string CurrencyCode { get; set; } = string.Empty;
+    [Parameter] public decimal TotalAmount { get; set; }
+    [Parameter] public decimal PaidAmount { get; set; }
+    [Parameter] public decimal OutstandingAmount { get; set; }
+    [Parameter] public DateOnly PaymentDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CashAccountSearchAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? BankAccountSearchAsync { get; set; }
+
+    private PaymentMethodKind SelectedPaymentMethod { get; set; } = PaymentMethodKind.Cash;
+    private Guid? CashAccountId { get; set; }
+    private Guid? BankAccountId { get; set; }
+    private decimal Amount { get; set; }
+    private string? ReferenceNumber { get; set; }
+    private string? _validationMessage;
+
+    private static readonly IReadOnlyList<UiSelectOption> PaymentMethodOptions =
+    [
+        new(PaymentMethodKind.Cash.ToString(), "نقدي"),
+        new(PaymentMethodKind.BankTransfer.ToString(), "تحويل بنكي")
+    ];
+
+    protected override void OnParametersSet()
+    {
+        if (Amount <= 0m && OutstandingAmount > 0m)
+            Amount = OutstandingAmount;
+    }
+
+    private static string FormatAmount(decimal value) => value.ToString("N2");
+
+    private Task OnPaymentDateChanged(DateOnly? value)
+    {
+        if (value.HasValue) PaymentDate = value.Value;
+        return Task.CompletedTask;
+    }
+
+    private Task OnPaymentMethodChanged(string value)
+    {
+        if (Enum.TryParse<PaymentMethodKind>(value, out var method))
+        {
+            SelectedPaymentMethod = method;
+            CashAccountId = null;
+            BankAccountId = null;
+            _validationMessage = null;
+        }
+        return Task.CompletedTask;
+    }
+
+    private Task OnCashAccountChanged(string? value)
+    {
+        CashAccountId = Guid.TryParse(value, out var id) ? id : null;
+        return Task.CompletedTask;
+    }
+
+    private Task OnBankAccountChanged(string? value)
+    {
+        BankAccountId = Guid.TryParse(value, out var id) ? id : null;
+        return Task.CompletedTask;
+    }
+
+    private Task OnAmountChanged(decimal value) { Amount = value; return Task.CompletedTask; }
+    private Task OnReferenceChanged(string? value) { ReferenceNumber = value; return Task.CompletedTask; }
+    private Task CancelAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _) { Dialog.Cancel(); return Task.CompletedTask; }
+
+    private Task SubmitAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _)
+    {
+        _validationMessage = null;
+        if (Amount <= 0m)
+        {
+            _validationMessage = "أدخل مبلغ سداد أكبر من صفر.";
+            return Task.CompletedTask;
+        }
+        if (Amount > OutstandingAmount)
+        {
+            _validationMessage = "مبلغ السداد لا يمكن أن يتجاوز الرصيد المتبقي على الفاتورة.";
+            return Task.CompletedTask;
+        }
+        if (SelectedPaymentMethod == PaymentMethodKind.Cash && !CashAccountId.HasValue)
+        {
+            _validationMessage = "اختر الصندوق الذي سيتم السداد منه.";
+            return Task.CompletedTask;
+        }
+        if (SelectedPaymentMethod == PaymentMethodKind.BankTransfer && !BankAccountId.HasValue)
+        {
+            _validationMessage = "اختر الحساب البنكي الذي سيتم السداد منه.";
+            return Task.CompletedTask;
+        }
+
+        Dialog.Close(new PaymentRequestModel(
+            PaymentDate,
+            Amount,
+            SelectedPaymentMethod,
+            CashAccountId,
+            BankAccountId,
+            string.IsNullOrWhiteSpace(ReferenceNumber) ? null : ReferenceNumber.Trim()));
+        return Task.CompletedTask;
+    }
+}

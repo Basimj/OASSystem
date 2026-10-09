@@ -9,6 +9,8 @@ using OAS.Contracts.Purchasing.PurchaseReceipts;
 using OAS.Contracts.Purchasing.PurchaseRequests;
 using OAS.Contracts.Sales.Enums;
 using OAS.UiLib.Core.Enums;
+using OAS.UiLib.Core.Models;
+using OAS.UiLib.Components.Purchasing;
 using OAS.UiLib.Core.Models.Purchasing;
 
 namespace OAS.Client.Purchasing.Components;
@@ -77,6 +79,7 @@ public partial class PurchasingWorkspaceHost
     private bool ShowPostInvoice=>ActiveTab?.Model is UiPurchaseInvoiceEditorModel m&&m.Status==(byte)PurchaseInvoiceStatus.Confirmed;
     private bool ShowCancelInvoice=>ActiveTab?.Model is UiPurchaseInvoiceEditorModel m&&(m.Status is (byte)PurchaseInvoiceStatus.Draft or (byte)PurchaseInvoiceStatus.Confirmed or (byte)PurchaseInvoiceStatus.PendingMatchApproval);
     private bool ShowInvoiceJournal=>ActiveTab?.Model is UiPurchaseInvoiceEditorModel m&&m.Status==(byte)PurchaseInvoiceStatus.Posted&&m.JournalEntryId.HasValue;
+    private bool ShowPayInvoice=>ActiveTab?.Model is UiPurchaseInvoiceEditorModel m&&m.Status==(byte)PurchaseInvoiceStatus.Posted&&m.Id.HasValue;
 
     private async Task SubmitRequestAsync(MouseEventArgs _)=>await ChangeRequestAsync((id,rv)=>Purchasing.SubmitPurchaseRequestAsync(id,new(rv)));
     private async Task ApproveRequestAsync(MouseEventArgs _)=>await ChangeRequestAsync((id,rv)=>Purchasing.ApprovePurchaseRequestAsync(id,new(rv)));
@@ -556,6 +559,54 @@ public partial class PurchasingWorkspaceHost
         if(ActiveTab?.Model is not UiPurchaseInvoiceEditorModel m||m.Id is not Guid id)return;
         if(!await Dialog.ConfirmAsync("ترحيل فاتورة المورد","سيتم إنشاء قيد GRNI / الضريبة / فروقات السعر / حساب المورد.",AlertTone.Warning,"ترحيل","رجوع"))return;
         try{await Purchasing.PostPurchaseInvoiceAsync(id,new(m.RowVersion??string.Empty));var dto=await Purchasing.GetPurchaseInvoiceAsync(id);if(dto is not null)SetActive(Map(dto));Snackbar.Success("تم ترحيل فاتورة المورد.");}
+        catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}catch{ApiFeedback.ShowUnexpected();}
+    }
+
+    private async Task PayInvoiceAsync(MouseEventArgs _)
+    {
+        if(ActiveTab?.Model is not UiPurchaseInvoiceEditorModel m||m.Id is not Guid id||m.CurrencyId is not Guid currencyId)return;
+        try
+        {
+            var summary=await Purchasing.GetPurchaseInvoicePaymentSummaryAsync(id);
+            if(summary is null)return;
+            if(summary.OutstandingAmount<=0m)
+            {
+                Snackbar.Info("فاتورة المورد مسددة بالكامل بالفعل.");
+                return;
+            }
+
+            var result=await Dialog.ShowAsync<UiPurchaseInvoicePaymentDialog>(
+                "سداد فاتورة المورد",
+                new Dictionary<string,object>
+                {
+                    [nameof(UiPurchaseInvoicePaymentDialog.InvoiceCode)]=m.PurchaseInvoiceCode,
+                    [nameof(UiPurchaseInvoicePaymentDialog.SupplierName)]=m.SupplierName??"المورد",
+                    [nameof(UiPurchaseInvoicePaymentDialog.CurrencyCode)]=m.CurrencyCode??string.Empty,
+                    [nameof(UiPurchaseInvoicePaymentDialog.TotalAmount)]=summary.TotalAmount,
+                    [nameof(UiPurchaseInvoicePaymentDialog.PaidAmount)]=summary.PaidAmount,
+                    [nameof(UiPurchaseInvoicePaymentDialog.OutstandingAmount)]=summary.OutstandingAmount,
+                    [nameof(UiPurchaseInvoicePaymentDialog.PaymentDate)]=DateOnly.FromDateTime(DateTime.Today),
+                    [nameof(UiPurchaseInvoicePaymentDialog.CashAccountSearchAsync)]=new Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>((text,ct)=>SearchInvoiceCashAccountsAsync(currencyId,text,ct)),
+                    [nameof(UiPurchaseInvoicePaymentDialog.BankAccountSearchAsync)]=new Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>((text,ct)=>SearchInvoiceBankAccountsAsync(currencyId,text,ct))
+                },
+                new UiDialogOptions{Size=UiDialogSize.Large,CloseOnBackdrop=false});
+
+            if(result.Cancelled||result.Value is not UiPurchaseInvoicePaymentDialog.PaymentRequestModel payment)return;
+
+            var response=await Purchasing.PayPurchaseInvoiceAsync(id,new PayPurchaseInvoiceRequest(
+                payment.PaymentDate,
+                payment.Amount,
+                (OAS.Contracts.Accounting.Enums.PaymentMethod)(byte)payment.PaymentMethod,
+                payment.CashAccountId,
+                payment.BankAccountId,
+                payment.ReferenceNumber,
+                $"سداد فاتورة المورد {m.PurchaseInvoiceCode}"));
+            if(response is null)return;
+
+            Snackbar.Success(response.OutstandingAmount<=0m
+                ? $"تم سداد الفاتورة بالكامل وإنشاء سند الصرف {response.PaymentVoucherNumber}."
+                : $"تم تسجيل السداد وإنشاء سند الصرف {response.PaymentVoucherNumber}. المتبقي {response.OutstandingAmount:N2} {m.CurrencyCode}.");
+        }
         catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}catch{ApiFeedback.ShowUnexpected();}
     }
 

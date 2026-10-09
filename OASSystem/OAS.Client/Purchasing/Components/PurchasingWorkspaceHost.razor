@@ -43,6 +43,7 @@
                 @if (ShowPostInvoice) { <UiButton Text="ترحيل الفاتورة" IconCssClass="fa-solid fa-check-double" Size="ControlSize.Small" OnClick="PostInvoiceAsync" /> }
                 @if (ShowCancelInvoice) { <UiButton Text="إلغاء الفاتورة" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" OnClick="CancelInvoiceAsync" /> }
                 @if (ShowInvoiceJournal) { <UiButton Text="عرض القيد" IconCssClass="fa-solid fa-book-journal-whills" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="OpenInvoiceJournalAsync" /> }
+                @if (ShowPayInvoice) { <UiButton Text="سداد المورد" IconCssClass="fa-solid fa-money-check-dollar" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="PayInvoiceAsync" /> }
             }
         </UiWorkspaceActionBar>
     </Actions>
