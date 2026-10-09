@@ -26,7 +26,7 @@ public sealed class PrintJobsController(
         if (request.Copies is < 1 or > 20)
             return BadRequest("عدد النسخ يجب أن يكون بين 1 و20.");
 
-        if (request.DocumentType is not (PrintDocumentTypes.ReceiptVoucher or PrintDocumentTypes.PaymentVoucher or PrintDocumentTypes.SalesInvoice))
+        if (request.DocumentType is not (PrintDocumentTypes.ReceiptVoucher or PrintDocumentTypes.PaymentVoucher or PrintDocumentTypes.SalesInvoice or PrintDocumentTypes.PurchaseInvoice))
             return BadRequest("نوع المستند غير مدعوم للطباعة.");
 
         var data = await payloadFactory.BuildAsync(

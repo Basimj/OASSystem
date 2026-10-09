@@ -135,6 +135,7 @@ public partial class MainWindow : Window
             SettingsReceiptPrinterCombo.ItemsSource = printers;
             SettingsPaymentPrinterCombo.ItemsSource = printers;
             SettingsSalesInvoicePrinterCombo.ItemsSource = printers;
+        SettingsPurchaseInvoicePrinterCombo.ItemsSource = printers;
             PrintersList.ItemsSource = printers;
 
             var preferred = !string.IsNullOrWhiteSpace(_settings.DefaultPrinterName)
@@ -948,6 +949,7 @@ public partial class MainWindow : Window
         SettingsReceiptPrinterCombo.SelectedItem = _settings.PrinterBindings.TryGetValue("ReceiptVoucher", out var receiptPrinter) ? receiptPrinter : null;
         SettingsPaymentPrinterCombo.SelectedItem = _settings.PrinterBindings.TryGetValue("PaymentVoucher", out var paymentPrinter) ? paymentPrinter : null;
         SettingsSalesInvoicePrinterCombo.SelectedItem = _settings.PrinterBindings.TryGetValue("SalesInvoice", out var salesInvoicePrinter) ? salesInvoicePrinter : null;
+        SettingsPurchaseInvoicePrinterCombo.SelectedItem = _settings.PrinterBindings.TryGetValue("PurchaseInvoice", out var purchaseInvoicePrinter) ? purchaseInvoicePrinter : null;
     }
 
     private void SaveSettingsInline_Click(object sender, RoutedEventArgs e)
@@ -963,6 +965,7 @@ public partial class MainWindow : Window
         SetPrinterBinding("ReceiptVoucher", SettingsReceiptPrinterCombo.SelectedItem as string);
         SetPrinterBinding("PaymentVoucher", SettingsPaymentPrinterCombo.SelectedItem as string);
         SetPrinterBinding("SalesInvoice", SettingsSalesInvoicePrinterCombo.SelectedItem as string);
+        SetPrinterBinding("PurchaseInvoice", SettingsPurchaseInvoicePrinterCombo.SelectedItem as string);
 
         _settingsStore.Save(_settings);
         _jobPolling.Start(_settings);
@@ -1112,6 +1115,9 @@ public partial class MainWindow : Window
         var voucher = JsonValueResolver.ResolveText(data, "VoucherNumber");
         if (!string.IsNullOrWhiteSpace(voucher))
             return voucher;
+        var invoice = JsonValueResolver.ResolveText(data, "InvoiceNumber");
+        if (!string.IsNullOrWhiteSpace(invoice))
+            return invoice;
         var expense = JsonValueResolver.ResolveText(data, "ExpenseNumber");
         if (!string.IsNullOrWhiteSpace(expense))
             return expense;
@@ -1127,6 +1133,8 @@ public partial class MainWindow : Window
         "ReceiptVoucher" => "سند قبض",
         "PaymentVoucher" => "سند صرف",
         "Payslip" => "قسيمة راتب",
+        "SalesInvoice" => "فاتورة مبيعات",
+        "PurchaseInvoice" => "فاتورة مشتريات",
         "Expense" => "مستند مصروف",
         "JournalEntry" => "قيد يومية",
         _ => documentType ?? "مستند"

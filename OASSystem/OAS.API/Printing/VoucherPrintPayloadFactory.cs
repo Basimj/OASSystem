@@ -7,6 +7,7 @@ using OAS.Application.Accounting.ReceiptVouchers.Queries.GetReceiptVoucherById;
 using OAS.Application.Features.Employees.Payroll;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.Sales.SalesInvoices.Queries;
+using OAS.Application.Purchasing.PurchaseInvoices.Queries;
 using OAS.Contracts.Accounting.BankAccounts;
 using OAS.Contracts.Accounting.CashAccounts;
 using OAS.Contracts.Accounting.Currencies;
@@ -14,6 +15,8 @@ using OAS.Contracts.Accounting.Enums;
 using OAS.Contracts.Accounting.PaymentVouchers;
 using OAS.Contracts.Accounting.ReceiptVouchers;
 using OAS.Contracts.Printing;
+using OAS.Contracts.Purchasing.PurchaseInvoices;
+using OAS.Contracts.Purchasing.Enums;
 using OAS.Contracts.Sales.Enums;
 using OAS.Contracts.Sales.SalesInvoices;
 
@@ -46,6 +49,11 @@ public sealed class VoucherPrintPayloadFactory(
             PrintDocumentTypes.SalesInvoice =>
                 await BuildSalesInvoiceAsync(
                     await sender.Send(new GetSalesInvoiceByIdQuery(documentId), cancellationToken),
+                    cancellationToken),
+
+            PrintDocumentTypes.PurchaseInvoice =>
+                await BuildPurchaseInvoiceAsync(
+                    await sender.Send(new GetPurchaseInvoiceByIdQuery(documentId), cancellationToken),
                     cancellationToken),
 
             _ => throw new ArgumentOutOfRangeException(
@@ -298,6 +306,87 @@ public sealed class VoucherPrintPayloadFactory(
         };
     }
 
+    private async Task<object> BuildPurchaseInvoiceAsync(
+        PurchaseInvoiceDto invoice,
+        CancellationToken cancellationToken)
+    {
+        if (invoice.Status != PurchaseInvoiceStatus.Posted)
+            throw new ConflictException(
+                "PURCHASE_INVOICE_NOT_POSTED",
+                "يمكن طباعة فاتورة المشتريات بعد الترحيل فقط.");
+
+        var currency = await TryGetCurrencyAsync(invoice.CurrencyId, cancellationToken);
+        var payment = await sender.Send(new GetPurchaseInvoicePaymentSummaryQuery(invoice.Id), cancellationToken);
+        var lines = invoice.Lines
+            .OrderBy(x => x.LineSequence)
+            .Select(MapPurchaseInvoiceLine)
+            .ToArray();
+
+        return new
+        {
+            DocumentTitleAr = "فاتورة مشتريات",
+            DocumentTitleEn = "PURCHASE INVOICE",
+            InvoiceNumber = invoice.PurchaseInvoiceCode,
+            SupplierInvoiceNumber = invoice.SupplierInvoiceCode ?? string.Empty,
+            InvoiceDate = invoice.InvoiceDate.ToString("dd/MM/yyyy"),
+            PostingDate = invoice.PostingDate.ToString("dd/MM/yyyy"),
+            SupplierCode = invoice.SupplierCode ?? string.Empty,
+            SupplierName = invoice.SupplierName ?? string.Empty,
+            Status = invoice.Status.ToString(),
+            StatusText = DescribePurchaseInvoiceStatus(invoice.Status),
+            PaymentStatus = payment.PaymentStatus,
+            PaymentStatusText = DescribePurchasePaymentStatus(payment.PaymentStatus),
+            CurrencyCode = invoice.CurrencyCode ?? currency?.Code ?? string.Empty,
+            CurrencyName = currency?.NameAr ?? string.Empty,
+            CurrencySymbol = currency?.Symbol ?? string.Empty,
+            CurrencyDecimalPlaces = currency?.DecimalPlaces ?? (byte)2,
+            invoice.ExchangeRate,
+            ExchangeRateDate = invoice.ExchangeRateDate.ToString("dd/MM/yyyy"),
+            TaxCalculationMode = DescribeTaxCalculationMode(invoice.TaxCalculationMode),
+            invoice.Subtotal,
+            invoice.DiscountAmount,
+            TotalAfterDiscount = invoice.Subtotal - invoice.DiscountAmount,
+            invoice.TaxAmount,
+            invoice.TotalAmount,
+            payment.PaidAmount,
+            payment.OutstandingAmount,
+            TotalAmountWords = ArabicAmountTextFormatter.Format(invoice.TotalAmount, currency?.NameAr),
+            Description = invoice.Notes ?? string.Empty,
+            ConfirmedAt = invoice.ConfirmedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? string.Empty,
+            ConfirmedBy = invoice.ConfirmedBy ?? string.Empty,
+            PostedAt = invoice.PostedAt?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? string.Empty,
+            PostedBy = invoice.PostedBy ?? string.Empty,
+            CreatedBy = invoice.CreatedBy ?? string.Empty,
+            CreatedAt = invoice.CreatedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm"),
+            PrintedAt = DateTimeOffset.Now.ToString("dd/MM/yyyy HH:mm"),
+            Company = Company(),
+            Lines = lines,
+            Signatures = new
+            {
+                Supplier = "المورد",
+                PurchasingManager = "مسؤول المشتريات",
+                Accountant = "المحاسب",
+                Approval = "الاعتماد"
+            }
+        };
+    }
+
+    private static object MapPurchaseInvoiceLine(PurchaseInvoiceLineDto line) => new
+    {
+        LineNumber = line.LineSequence,
+        ProductCode = line.ProductCodeSnapshot ?? string.Empty,
+        ProductName = line.DescriptionSnapshot ?? string.Empty,
+        Description = line.DescriptionSnapshot ?? string.Empty,
+        line.Quantity,
+        line.UnitPrice,
+        Gross = line.GrossAmount,
+        Discount = line.DiscountAmount,
+        Net = line.NetAmount,
+        line.TaxRate,
+        Tax = line.TaxAmount,
+        Total = line.FinalAmount
+    };
+
     private static object MapSalesInvoiceLine(SalesInvoiceLineDto line) => new
     {
         line.LineNumber,
@@ -368,6 +457,25 @@ public sealed class VoucherPrintPayloadFactory(
         SalesInvoiceStatus.Posted => "مرحّلة",
         SalesInvoiceStatus.Cancelled => "ملغاة",
         _ => status.ToString()
+    };
+
+    private static string DescribePurchaseInvoiceStatus(PurchaseInvoiceStatus status) => status switch
+    {
+        PurchaseInvoiceStatus.Draft => "مسودة",
+        PurchaseInvoiceStatus.Confirmed => "مؤكدة",
+        PurchaseInvoiceStatus.PendingMatchApproval => "بانتظار اعتماد المطابقة",
+        PurchaseInvoiceStatus.Posted => "مرحّلة",
+        PurchaseInvoiceStatus.Cancelled => "ملغاة",
+        _ => status.ToString()
+    };
+
+    private static string DescribePurchasePaymentStatus(string? status) => status switch
+    {
+        "Paid" => "مسددة بالكامل",
+        "PartiallyPaid" => "مسددة جزئيًا",
+        "Unpaid" => "غير مسددة",
+        "NotPosted" => "غير مرحلة",
+        _ => status ?? string.Empty
     };
 
     private static string DescribeTaxCalculationMode(TaxCalculationMode mode) => mode switch

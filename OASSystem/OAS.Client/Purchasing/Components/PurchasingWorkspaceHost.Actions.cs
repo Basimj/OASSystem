@@ -79,6 +79,7 @@ public partial class PurchasingWorkspaceHost
     private bool ShowPostInvoice=>ActiveTab?.Model is UiPurchaseInvoiceEditorModel m&&m.Status==(byte)PurchaseInvoiceStatus.Confirmed;
     private bool ShowCancelInvoice=>ActiveTab?.Model is UiPurchaseInvoiceEditorModel m&&(m.Status is (byte)PurchaseInvoiceStatus.Draft or (byte)PurchaseInvoiceStatus.Confirmed or (byte)PurchaseInvoiceStatus.PendingMatchApproval);
     private bool ShowInvoiceJournal=>ActiveTab?.Model is UiPurchaseInvoiceEditorModel m&&m.Status==(byte)PurchaseInvoiceStatus.Posted&&m.JournalEntryId.HasValue;
+    private bool ShowPrintInvoice=>ActiveTab?.Model is UiPurchaseInvoiceEditorModel m&&m.Status==(byte)PurchaseInvoiceStatus.Posted&&m.Id.HasValue&&!ActiveTab.IsDirty;
     private bool ShowPayInvoice=>ActiveTab?.Model is UiPurchaseInvoiceEditorModel m&&m.Status==(byte)PurchaseInvoiceStatus.Posted&&m.Id.HasValue;
 
     private async Task SubmitRequestAsync(MouseEventArgs _)=>await ChangeRequestAsync((id,rv)=>Purchasing.SubmitPurchaseRequestAsync(id,new(rv)));
@@ -558,7 +559,18 @@ public partial class PurchasingWorkspaceHost
     {
         if(ActiveTab?.Model is not UiPurchaseInvoiceEditorModel m||m.Id is not Guid id)return;
         if(!await Dialog.ConfirmAsync("ترحيل فاتورة المورد","سيتم إنشاء قيد GRNI / الضريبة / فروقات السعر / حساب المورد.",AlertTone.Warning,"ترحيل","رجوع"))return;
-        try{await Purchasing.PostPurchaseInvoiceAsync(id,new(m.RowVersion??string.Empty));var dto=await Purchasing.GetPurchaseInvoiceAsync(id);if(dto is not null)SetActive(Map(dto));Snackbar.Success("تم ترحيل فاتورة المورد.");}
+        try
+        {
+            await Purchasing.PostPurchaseInvoiceAsync(id,new(m.RowVersion??string.Empty));
+            var dto=await Purchasing.GetPurchaseInvoiceAsync(id);
+            if(dto is not null)
+            {
+                var mapped=Map(dto);
+                SetActive(mapped);
+                await LoadInvoicePaymentSummaryAsync(mapped,true);
+            }
+            Snackbar.Success("تم ترحيل فاتورة المورد.");
+        }
         catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}catch{ApiFeedback.ShowUnexpected();}
     }
 
@@ -569,6 +581,8 @@ public partial class PurchasingWorkspaceHost
         {
             var summary=await Purchasing.GetPurchaseInvoicePaymentSummaryAsync(id);
             if(summary is null)return;
+            _invoicePaymentSummaries[id]=summary;
+            StateHasChanged();
             if(summary.OutstandingAmount<=0m)
             {
                 Snackbar.Info("فاتورة المورد مسددة بالكامل بالفعل.");
@@ -602,6 +616,7 @@ public partial class PurchasingWorkspaceHost
                 payment.ReferenceNumber,
                 $"سداد فاتورة المورد {m.PurchaseInvoiceCode}"));
             if(response is null)return;
+            await LoadInvoicePaymentSummaryAsync(m,true);
 
             Snackbar.Success(response.OutstandingAmount<=0m
                 ? $"تم سداد الفاتورة بالكامل وإنشاء سند الصرف {response.PaymentVoucherNumber}."
@@ -622,6 +637,36 @@ public partial class PurchasingWorkspaceHost
         if(ActiveTab?.Model is UiPurchaseReceiptEditorModel { JournalEntryId: Guid id })
             Navigation.NavigateTo($"/accounting/journals?journalId={id:D}");
         return Task.CompletedTask;
+    }
+
+    private async Task PrintPurchaseInvoiceAsync(MouseEventArgs _)
+    {
+        if(_isPrintingPurchaseInvoice||ActiveTab?.Model is not UiPurchaseInvoiceEditorModel invoice||invoice.Id is not Guid id)return;
+        if(invoice.Status!=(byte)PurchaseInvoiceStatus.Posted)
+        {
+            Snackbar.Info("يمكن طباعة فاتورة المشتريات بعد الترحيل فقط.");
+            return;
+        }
+        if(ActiveTab.IsDirty)
+        {
+            Snackbar.Warning("احفظ التعديلات قبل إرسال الفاتورة للطباعة.");
+            return;
+        }
+
+        _isPrintingPurchaseInvoice=true;
+        try
+        {
+            var result=await Printing.PrintPurchaseInvoiceAsync(id);
+            if(result is null)Snackbar.Error("تعذر إرسال فاتورة المشتريات إلى OAS Print.");
+            else Snackbar.Success("تم إرسال فاتورة المشتريات إلى OAS Print للطباعة.");
+        }
+        catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}
+        catch{ApiFeedback.ShowUnexpected();}
+        finally
+        {
+            _isPrintingPurchaseInvoice=false;
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     private Task OpenInvoiceJournalAsync(MouseEventArgs _)
