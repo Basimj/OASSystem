@@ -22,4 +22,7 @@ public sealed record OpticalJobWorkQueueDto(
     string? FrameSummary = null,
     string? ODSummary = null,
     string? OSSummary = null,
-    string? AssignedTechnicianName = null);
+    string? AssignedTechnicianName = null,
+    bool HasOpenBreakage = false,
+    bool HasOpenRemake = false,
+    DateTimeOffset? CreatedAtUtc = null);

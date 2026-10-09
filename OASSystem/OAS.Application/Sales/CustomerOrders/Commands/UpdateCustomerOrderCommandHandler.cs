@@ -106,21 +106,39 @@ public sealed class UpdateCustomerOrderCommandHandler(
                 req.OpticalSnapshot,
                 ct);
 
-            if (existing is not null && IsSameStructure(existing, req, prepared))
-            {
-                var existingBaseUnitPrice = existing.BaseUnitPrice;
-                var existingActualUnitPrice = req.ActualUnitPrice;
-                if (currencyContextChanged && existing.ProductVariantId.HasValue)
-                {
-                    existingBaseUnitPrice = SalesPricingCalculator.ConvertBetweenCurrencies(
-                        existing.BaseUnitPrice, previousExchangeRate, order.ExchangeRate, order.CurrencyDecimalPlacesSnapshot);
-                }
+            var resolved = prepared.Resolution;
+            var requiresProduction = SalesLensLinePolicy.ResolveRequiresProduction(
+                lineType,
+                resolved,
+                req.GroupId,
+                req.RequiresProduction);
+            var standardUnitPrice = resolved.ProductVariantId.HasValue
+                ? SalesPricingCalculator.ConvertFromBase(
+                    resolved.BaseUnitPrice,
+                    order.ExchangeRate,
+                    order.CurrencyDecimalPlacesSnapshot)
+                : resolved.BaseUnitPrice;
+            var seedStandardUnitPrice = prepared.SeedResolution.ProductVariantId.HasValue
+                ? SalesPricingCalculator.ConvertFromBase(
+                    prepared.SeedResolution.BaseUnitPrice,
+                    order.ExchangeRate,
+                    order.CurrencyDecimalPlacesSnapshot)
+                : prepared.SeedResolution.BaseUnitPrice;
+            var requestedActualUnitPrice = lineType == SalesLineType.Lens
+                ? SalesLensLinePolicy.ResolveCustomerOrderActualPrice(
+                    req.ActualUnitPrice,
+                    seedStandardUnitPrice,
+                    standardUnitPrice,
+                    order.CurrencyDecimalPlacesSnapshot)
+                : req.ActualUnitPrice;
 
+            if (existing is not null && IsSameStructure(existing, req, prepared, requiresProduction))
+            {
                 order.UpdateLinePricing(
                     existing.Id,
                     req.Quantity,
-                    existingBaseUnitPrice,
-                    existingActualUnitPrice,
+                    standardUnitPrice,
+                    requestedActualUnitPrice,
                     (SalesDiscountType)(byte)req.DiscountType,
                     req.DiscountValue,
                     req.TaxRate);
@@ -135,11 +153,6 @@ public sealed class UpdateCustomerOrderCommandHandler(
                 lineRepository.Delete(existing);
             }
 
-            var resolved = prepared.Resolution;
-            var standardUnitPrice = resolved.ProductVariantId.HasValue
-                ? SalesPricingCalculator.ConvertFromBase(resolved.BaseUnitPrice, order.ExchangeRate, order.CurrencyDecimalPlacesSnapshot)
-                : resolved.BaseUnitPrice;
-            var resolvedActualUnitPrice = req.ActualUnitPrice;
             var newLineId = Guid.NewGuid();
             var newLine = CustomerOrderLine.Create(
                 newLineId,
@@ -152,13 +165,13 @@ public sealed class UpdateCustomerOrderCommandHandler(
                 resolved.Description,
                 req.Quantity,
                 standardUnitPrice,
-                resolvedActualUnitPrice,
+                requestedActualUnitPrice,
                 (SalesDiscountType)(byte)req.DiscountType,
                 req.DiscountValue,
                 req.TaxRate,
                 prepared.PrescriptionRevisionId,
                 prepared.PrescriptionEye,
-                req.RequiresProduction,
+                requiresProduction,
                 req.Notes,
                 order.TaxCalculationMode,
                 order.CurrencyDecimalPlacesSnapshot);
@@ -225,7 +238,8 @@ public sealed class UpdateCustomerOrderCommandHandler(
     private static bool IsSameStructure(
         CustomerOrderLine line,
         CustomerOrderLineRequest req,
-        PreparedCustomerOrderLine prepared)
+        PreparedCustomerOrderLine prepared,
+        bool requiresProduction)
     {
         var resolved = prepared.Resolution;
         return line.GroupId == req.GroupId &&
@@ -234,7 +248,7 @@ public sealed class UpdateCustomerOrderCommandHandler(
                line.WarehouseId == resolved.WarehouseId &&
                line.PrescriptionRevisionId == prepared.PrescriptionRevisionId &&
                line.PrescriptionEye == prepared.PrescriptionEye &&
-               line.RequiresProduction == req.RequiresProduction &&
+               line.RequiresProduction == requiresProduction &&
                line.DescriptionSnapshot == resolved.Description &&
                line.Notes == (string.IsNullOrWhiteSpace(req.Notes) ? null : req.Notes.Trim());
     }

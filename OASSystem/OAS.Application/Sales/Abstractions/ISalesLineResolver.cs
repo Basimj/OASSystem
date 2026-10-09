@@ -12,7 +12,8 @@ public sealed record SalesLineResolution(
     string? UnitName,
     decimal BaseUnitPrice,
     bool PrescriptionRequired,
-    OpticalPrescriptionRangePolicy? OpticalPolicy);
+    OpticalPrescriptionRangePolicy? OpticalPolicy,
+    bool IsStockItem = false);
 
 public interface ISalesLineResolver
 {

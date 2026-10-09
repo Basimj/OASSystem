@@ -2,11 +2,13 @@ using NUnit.Framework;
 using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Abstractions.Persistence.Specifications;
 using OAS.Application.Common.Exceptions;
+using OAS.Application.Abstractions.Security;
 using OAS.Application.Sales.Abstractions;
 using OAS.Application.Sales.OpticalJobs.Services;
 using OAS.Contracts.Sales.OpticalJobs;
 using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Common.Entities;
+using OAS.Domain.Features.Employees.Entities;
 using OAS.Domain.Sales.Entities;
 using OAS.Domain.Sales.Enums;
 using OAS.Tests.Inventory.Fakes;
@@ -59,10 +61,22 @@ public sealed class OpticalJobServiceTests
     private static OpticalJobService CreateService(CustomerOrder order, FakeGenericRepository<OpticalJob, Guid> jobs) => new(
         jobs,
         new FakeGenericRepository<OpticalJobLine, Guid>(),
+        new FakeGenericRepository<OpticalJobStatusHistory, Guid>(),
+        new FakeGenericRepository<OpticalQualityCheck, Guid>(),
+        new FakeGenericRepository<OpticalQualityCheckItem, Guid>(),
+        new FakeGenericRepository<OpticalJobBreakage, Guid>(),
+        new FakeGenericRepository<OpticalJobRemake, Guid>(),
         new ReadRepository<CustomerOrderLineOpticalSnapshot>([]),
         new OrderRepository(order),
         new ReadRepository<SalesInvoice>([]),
+        new ReadRepository<Employee>([]),
         new FakeInventorySequenceNumberGenerator(),
+        new NoopInventoryPort(),
+        new NoopAccountingPort(),
+        new NoopPurchasingPort(),
+        new NoopSalesPort(),
+        new NoopQueryService(),
+        new TestCurrentUser(),
         TimeProvider.System);
 
     private static CustomerOrder CreateOrder(CustomerOrderStatus status)
@@ -114,4 +128,49 @@ public sealed class OpticalJobServiceTests
         public void Delete(CustomerOrder entity) { }
         public void DeleteRange(IEnumerable<CustomerOrder> entities) { }
     }
+    private sealed class NoopInventoryPort : IOpticalJobInventoryPort
+    {
+        public Task<decimal> GetAvailableQuantityAsync(Guid warehouseId, Guid productVariantId, CancellationToken cancellationToken = default) => Task.FromResult(100m);
+        public Task<OpticalJobInventoryPostingResult> IssueMaterialsAsync(Guid opticalJobId, Guid requestId, string jobCode, Guid warehouseId, IReadOnlyCollection<OpticalJobMaterialIssueLine> lines, string createdBy, DateTimeOffset atUtc, CancellationToken cancellationToken = default) => Task.FromResult(new OpticalJobInventoryPostingResult(Guid.NewGuid(), 1m));
+        public Task<OpticalJobInventoryPostingResult> ScrapAsync(Guid breakageId, string jobCode, Guid warehouseId, Guid productVariantId, decimal quantity, string createdBy, DateTimeOffset atUtc, CancellationToken cancellationToken = default) => Task.FromResult(new OpticalJobInventoryPostingResult(Guid.NewGuid(), quantity));
+    }
+
+    private sealed class NoopAccountingPort : IOpticalJobAccountingPort
+    {
+        public Task<Guid> PostBreakageAsync(OpticalJobBreakage breakage, Guid warehouseId, decimal totalCostBase, Guid postedBy, DateTimeOffset postedAtUtc, CancellationToken cancellationToken = default) => Task.FromResult(Guid.NewGuid());
+    }
+
+    private sealed class NoopPurchasingPort : IOpticalJobPurchasingPort
+    {
+        public Task<Guid?> CreateReplacementDemandAsync(OpticalJob job, OpticalJobLine line, Guid warehouseId, Guid productVariantId, decimal quantity, DateOnly requestDate, string reason, CancellationToken cancellationToken = default) => Task.FromResult<Guid?>(Guid.NewGuid());
+    }
+
+    private sealed class NoopSalesPort : IOpticalJobSalesPort
+    {
+        public Task MarkReadyForDeliveryAsync(OpticalJob job, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task EnsureDeliveryEligibleAsync(OpticalJob job, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task MarkDeliveredAsync(OpticalJob job, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private sealed class NoopQueryService : IOpticalJobQueryService
+    {
+        public Task<OAS.Contracts.Common.Pagination.PagedResult<OpticalJobWorkQueueDto>> GetWorkQueueAsync(OpticalJobWorkQueueRequest request, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new OAS.Contracts.Common.Pagination.PagedResult<OpticalJobWorkQueueDto>
+            {
+                Items = [],
+                PageNumber = request.PageNumber,
+                PageSize = request.PageSize,
+                TotalCount = 0
+            });
+
+        public Task<OpticalJobDetailsDto> GetDetailsAsync(Guid id, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class TestCurrentUser : ICurrentUser
+    {
+        public string? UserId => "00000000-0000-0000-0000-000000000123";
+        public bool IsAuthenticated => true;
+    }
+
 }

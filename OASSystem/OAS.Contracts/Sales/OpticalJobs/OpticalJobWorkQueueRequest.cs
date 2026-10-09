@@ -11,6 +11,10 @@ public sealed record OpticalJobWorkQueueRequest
     public OpticalJobStatus? Status { get; init; }
     public Guid? TechnicianId { get; init; }
     public DateOnly? RequiredDate { get; init; }
+    public DateOnly? RequiredDateFrom { get; init; }
+    public DateOnly? RequiredDateTo { get; init; }
+    public bool? HasBreakage { get; init; }
+    public bool? HasRemake { get; init; }
     public string? SortBy { get; init; }
     public SortDirection SortDirection { get; init; } = SortDirection.Ascending;
 

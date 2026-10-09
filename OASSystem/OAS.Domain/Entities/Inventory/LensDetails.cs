@@ -48,12 +48,9 @@ public class LensDetails : Entity<Guid>
         Material = material;
         Coating = coating;
         RefractiveIndex = refractiveIndex;
-        SphereMin = sphereMin;
-        SphereMax = sphereMax;
-        CylinderMin = cylinderMin;
-        CylinderMax = cylinderMax;
-        AddMin = addMin;
-        AddMax = addMax;
+        (SphereMin, SphereMax) = NormalizeRange(sphereMin, sphereMax);
+        (CylinderMin, CylinderMax) = NormalizeRange(cylinderMin, cylinderMax);
+        (AddMin, AddMax) = NormalizeRange(addMin, addMax);
         IsPrescriptionLens = isPrescriptionLens;
     }
 
@@ -74,12 +71,19 @@ public class LensDetails : Entity<Guid>
         Material = material;
         Coating = coating;
         RefractiveIndex = refractiveIndex;
-        SphereMin = sphereMin;
-        SphereMax = sphereMax;
-        CylinderMin = cylinderMin;
-        CylinderMax = cylinderMax;
-        AddMin = addMin;
-        AddMax = addMax;
+        (SphereMin, SphereMax) = NormalizeRange(sphereMin, sphereMax);
+        (CylinderMin, CylinderMax) = NormalizeRange(cylinderMin, cylinderMax);
+        (AddMin, AddMax) = NormalizeRange(addMin, addMax);
         IsPrescriptionLens = isPrescriptionLens;
+    }
+
+    private static (decimal? Minimum, decimal? Maximum) NormalizeRange(decimal? first, decimal? second)
+    {
+        if (!first.HasValue || !second.HasValue)
+            return (first, second);
+
+        return first.Value <= second.Value
+            ? (first, second)
+            : (second, first);
     }
 }

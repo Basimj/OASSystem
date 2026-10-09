@@ -4932,8 +4932,10 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<DateOnly?>("RequiredDate").HasColumnType("date");
             b.Property<byte>("Status").IsRequired().HasColumnType("tinyint");
             b.Property<Guid?>("AssignedTechnicianId").HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset?>("AssignedAtUtc").HasColumnType("datetimeoffset");
             b.Property<DateTimeOffset?>("StartedAtUtc").HasColumnType("datetimeoffset");
             b.Property<DateTimeOffset?>("CompletedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<DateTimeOffset?>("DeliveredAtUtc").HasColumnType("datetimeoffset");
             b.Property<string>("Notes").HasMaxLength(1000).HasColumnType("nvarchar(1000)");
             b.Property<bool>("IsActive").IsRequired().HasColumnType("bit");
             b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
@@ -4946,6 +4948,7 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.HasIndex("AssignedTechnicianId").HasDatabaseName("IX_OpticalJobs_AssignedTechnicianId");
             b.HasIndex("RequiredDate").HasDatabaseName("IX_OpticalJobs_RequiredDate");
             b.HasIndex("SalesInvoiceId").HasDatabaseName("IX_OpticalJobs_SalesInvoiceId");
+            b.HasIndex("CustomerId").HasDatabaseName("IX_OpticalJobs_CustomerId");
             b.ToTable("tbl_OpticalJobs", "dbo");
         });
 
@@ -4962,8 +4965,10 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<int>("LineNumber").IsRequired().HasColumnType("int");
             b.Property<byte>("LineType").IsRequired().HasColumnType("tinyint");
             b.Property<byte?>("Eye").HasColumnType("tinyint");
+            b.Property<Guid?>("GroupId").HasColumnType("uniqueidentifier");
             b.Property<string>("DescriptionSnapshot").IsRequired().HasMaxLength(500).HasColumnType("nvarchar(500)");
             b.Property<decimal>("Quantity").IsRequired().HasColumnType("decimal(18,3)");
+            b.Property<bool>("RequiresProduction").IsRequired().HasColumnType("bit");
             b.Property<string>("Notes").HasMaxLength(500).HasColumnType("nvarchar(500)");
             b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
             b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
@@ -4973,6 +4978,7 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.HasIndex("OpticalJobId", "CustomerOrderLineId").IsUnique().HasDatabaseName("UX_OpticalJobLines_Job_CustomerOrderLine");
             b.HasIndex("CustomerOrderLineId").HasDatabaseName("IX_OpticalJobLines_CustomerOrderLineId");
             b.HasIndex("ProductVariantId").HasDatabaseName("IX_OpticalJobLines_ProductVariantId");
+            b.HasIndex("OpticalJobId", "GroupId").HasDatabaseName("IX_OpticalJobLines_OpticalJobId_GroupId");
             b.ToTable("tbl_OpticalJobLines", "dbo", t =>
             {
                 t.HasCheckConstraint("CK_OpticalJobLines_LineNumber", "[LineNumber] > 0");
@@ -4980,6 +4986,144 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             });
         });
 
+
+
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.OpticalJobStatusHistory", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset").HasColumnName("CreatedAt");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset").HasColumnName("UpdatedAt");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)").HasColumnName("UpdatedBy");
+            b.Property<Guid>("OpticalJobId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<byte?>("FromStatus").HasColumnType("tinyint");
+            b.Property<byte>("ToStatus").IsRequired().HasColumnType("tinyint");
+            b.Property<string>("Reason").HasMaxLength(1000).HasColumnType("nvarchar(1000)");
+            b.Property<Guid>("ChangedBy").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("ChangedAtUtc").IsRequired().HasColumnType("datetimeoffset");
+            b.Property<string>("CorrelationId").HasMaxLength(100).HasColumnType("nvarchar(100)");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("UpdatedFromDevice");
+            b.HasKey("Id").HasName("PK_tbl_OpticalJobStatusHistory");
+            b.HasIndex("OpticalJobId", "ChangedAtUtc").HasDatabaseName("IX_OpticalJobStatusHistory_OpticalJobId_ChangedAtUtc");
+            b.ToTable("tbl_OpticalJobStatusHistory", "dbo");
+        });
+
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.OpticalQualityCheck", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset").HasColumnName("CreatedAt");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset").HasColumnName("UpdatedAt");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)").HasColumnName("UpdatedBy");
+            b.Property<Guid>("OpticalJobId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<int>("AttemptNumber").IsRequired().HasColumnType("int");
+            b.Property<byte>("Result").IsRequired().HasColumnType("tinyint");
+            b.Property<byte?>("FailureAction").HasColumnType("tinyint");
+            b.Property<string>("GeneralNotes").HasMaxLength(2000).HasColumnType("nvarchar(2000)");
+            b.Property<Guid?>("CheckedBy").HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset?>("CheckedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("UpdatedFromDevice");
+            b.HasKey("Id").HasName("PK_tbl_OpticalQualityChecks");
+            b.HasIndex("OpticalJobId", "AttemptNumber").IsUnique().HasDatabaseName("UQ_tbl_OpticalQualityChecks_OpticalJobId_AttemptNumber");
+            b.ToTable("tbl_OpticalQualityChecks", "dbo", t =>
+            {
+                t.HasCheckConstraint("CK_OpticalQualityChecks_AttemptNumber", "[AttemptNumber] > 0");
+            });
+        });
+
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.OpticalQualityCheckItem", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset").HasColumnName("CreatedAt");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset").HasColumnName("UpdatedAt");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)").HasColumnName("UpdatedBy");
+            b.Property<Guid>("QualityCheckId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<string>("CheckCode").IsRequired().HasMaxLength(50).HasColumnType("nvarchar(50)");
+            b.Property<string>("CheckName").IsRequired().HasMaxLength(200).HasColumnType("nvarchar(200)");
+            b.Property<byte>("Result").IsRequired().HasColumnType("tinyint");
+            b.Property<string>("Notes").HasMaxLength(1000).HasColumnType("nvarchar(1000)");
+            b.Property<int>("Sequence").IsRequired().HasColumnType("int");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("UpdatedFromDevice");
+            b.HasKey("Id").HasName("PK_tbl_OpticalQualityCheckItems");
+            b.HasIndex("QualityCheckId", "CheckCode").IsUnique().HasDatabaseName("UQ_tbl_OpticalQualityCheckItems_QualityCheckId_CheckCode");
+            b.ToTable("tbl_OpticalQualityCheckItems", "dbo", t =>
+            {
+                t.HasCheckConstraint("CK_OpticalQualityCheckItems_Sequence", "[Sequence] > 0");
+            });
+        });
+
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.OpticalJobBreakage", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset").HasColumnName("CreatedAt");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset").HasColumnName("UpdatedAt");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)").HasColumnName("UpdatedBy");
+            b.Property<Guid>("OpticalJobId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<Guid>("OpticalJobLineId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<Guid>("ProductVariantId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<byte?>("Eye").HasColumnType("tinyint");
+            b.Property<decimal>("Quantity").IsRequired().HasColumnType("decimal(18,3)");
+            b.Property<string>("ReasonCode").IsRequired().HasMaxLength(50).HasColumnType("nvarchar(50)");
+            b.Property<string>("ReasonText").HasMaxLength(1000).HasColumnType("nvarchar(1000)");
+            b.Property<Guid?>("TechnicianId").HasColumnType("uniqueidentifier");
+            b.Property<byte>("Status").IsRequired().HasColumnType("tinyint");
+            b.Property<bool>("RequiresReplacement").IsRequired().HasColumnType("bit");
+            b.Property<Guid?>("InventoryTransactionId").HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("JournalEntryId").HasColumnType("uniqueidentifier");
+            b.Property<Guid>("RecordedBy").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("RecordedAtUtc").IsRequired().HasColumnType("datetimeoffset");
+            b.Property<string>("IdempotencyKey").HasMaxLength(100).HasColumnType("nvarchar(100)");
+            b.Property<DateTimeOffset?>("ClosedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("UpdatedFromDevice");
+            b.HasKey("Id").HasName("PK_tbl_OpticalJobBreakages");
+            b.HasIndex("OpticalJobId").HasDatabaseName("IX_tbl_OpticalJobBreakages_OpticalJobId");
+            b.HasIndex("Status").HasDatabaseName("IX_tbl_OpticalJobBreakages_Status");
+            b.HasIndex("OpticalJobId", "IdempotencyKey").IsUnique().HasFilter("[IdempotencyKey] IS NOT NULL").HasDatabaseName("UX_tbl_OpticalJobBreakages_Job_IdempotencyKey");
+            b.ToTable("tbl_OpticalJobBreakages", "dbo", t =>
+            {
+                t.HasCheckConstraint("CK_tbl_OpticalJobBreakages_Quantity_GT_0", "[Quantity] > 0");
+            });
+        });
+
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.OpticalJobRemake", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset").HasColumnName("CreatedAt");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset").HasColumnName("UpdatedAt");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)").HasColumnName("UpdatedBy");
+            b.Property<Guid>("OpticalJobId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("SourceQualityCheckId").HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("SourceBreakageId").HasColumnType("uniqueidentifier");
+            b.Property<Guid>("OpticalJobLineId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("ProductVariantId").HasColumnType("uniqueidentifier");
+            b.Property<decimal>("Quantity").IsRequired().HasColumnType("decimal(18,3)");
+            b.Property<byte>("Status").IsRequired().HasColumnType("tinyint");
+            b.Property<string>("Reason").IsRequired().HasMaxLength(1000).HasColumnType("nvarchar(1000)");
+            b.Property<Guid?>("ReplacementPurchaseRequestLineId").HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset?>("StartedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<DateTimeOffset?>("CompletedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<Guid>("CreatedByUserId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("UpdatedFromDevice");
+            b.HasKey("Id").HasName("PK_tbl_OpticalJobRemakes");
+            b.HasIndex("OpticalJobId").HasDatabaseName("IX_tbl_OpticalJobRemakes_OpticalJobId");
+            b.HasIndex("Status").HasDatabaseName("IX_tbl_OpticalJobRemakes_Status");
+            b.ToTable("tbl_OpticalJobRemakes", "dbo", t =>
+            {
+                t.HasCheckConstraint("CK_tbl_OpticalJobRemakes_Quantity_GT_0", "[Quantity] > 0");
+            });
+        });
 
         // Relationships for foundation gap completion
         modelBuilder.Entity("OAS.Domain.Entities.Inventory.LensVariantDetail", b =>
@@ -5032,6 +5176,36 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
         {
             b.HasOne("OAS.Domain.Sales.Entities.CustomerOrderLine", null).WithMany().HasForeignKey("CustomerOrderLineId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_OpticalJobLines_CustomerOrderLines_CustomerOrderLineId");
             b.HasOne("OAS.Domain.Entities.Inventory.ProductVariant", null).WithMany().HasForeignKey("ProductVariantId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_OpticalJobLines_ProductVariants_ProductVariantId");
+        });
+
+
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.OpticalJobStatusHistory", b =>
+        {
+            b.HasOne("OAS.Domain.Sales.Entities.OpticalJob", null).WithMany().HasForeignKey("OpticalJobId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_OpticalJobStatusHistory_OpticalJobs");
+        });
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.OpticalQualityCheck", b =>
+        {
+            b.HasOne("OAS.Domain.Sales.Entities.OpticalJob", null).WithMany().HasForeignKey("OpticalJobId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_OpticalQualityChecks_OpticalJobs");
+            b.HasMany("OAS.Domain.Sales.Entities.OpticalQualityCheckItem", "Items").WithOne().HasForeignKey("QualityCheckId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_OpticalQualityCheckItems_QualityChecks");
+            b.Navigation("Items").UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.OpticalJobBreakage", b =>
+        {
+            b.HasOne("OAS.Domain.Sales.Entities.OpticalJob", null).WithMany().HasForeignKey("OpticalJobId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_tbl_OpticalJobBreakages_OpticalJobs");
+            b.HasOne("OAS.Domain.Sales.Entities.OpticalJobLine", null).WithMany().HasForeignKey("OpticalJobLineId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_tbl_OpticalJobBreakages_OpticalJobLines");
+            b.HasOne("OAS.Domain.Entities.Inventory.ProductVariant", null).WithMany().HasForeignKey("ProductVariantId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_tbl_OpticalJobBreakages_ProductVariants");
+            b.HasOne("OAS.Domain.Features.Employees.Entities.Employee", null).WithMany().HasForeignKey("TechnicianId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_tbl_OpticalJobBreakages_Employees");
+            b.HasOne("OAS.Domain.Entities.Inventory.InventoryTransaction", null).WithMany().HasForeignKey("InventoryTransactionId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_tbl_OpticalJobBreakages_InventoryTransactions");
+            b.HasOne("OAS.Domain.Accounting.Entities.JournalEntry", null).WithMany().HasForeignKey("JournalEntryId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_tbl_OpticalJobBreakages_JournalEntries");
+        });
+        modelBuilder.Entity("OAS.Domain.Sales.Entities.OpticalJobRemake", b =>
+        {
+            b.HasOne("OAS.Domain.Sales.Entities.OpticalJob", null).WithMany().HasForeignKey("OpticalJobId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_tbl_OpticalJobRemakes_OpticalJobs");
+            b.HasOne("OAS.Domain.Sales.Entities.OpticalQualityCheck", null).WithMany().HasForeignKey("SourceQualityCheckId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_tbl_OpticalJobRemakes_QualityChecks");
+            b.HasOne("OAS.Domain.Sales.Entities.OpticalJobBreakage", null).WithMany().HasForeignKey("SourceBreakageId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_tbl_OpticalJobRemakes_Breakages");
+            b.HasOne("OAS.Domain.Sales.Entities.OpticalJobLine", null).WithMany().HasForeignKey("OpticalJobLineId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_tbl_OpticalJobRemakes_OpticalJobLines");
+            b.HasOne("OAS.Domain.Entities.Inventory.ProductVariant", null).WithMany().HasForeignKey("ProductVariantId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_tbl_OpticalJobRemakes_ProductVariants");
+            b.HasOne("OAS.Domain.Purchasing.Entities.PurchaseRequestLine", null).WithMany().HasForeignKey("ReplacementPurchaseRequestLineId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_tbl_OpticalJobRemakes_PurchaseRequestLines");
         });
 
         // Relationships for returns / commissions / optical production

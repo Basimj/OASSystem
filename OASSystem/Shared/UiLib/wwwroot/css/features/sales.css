@@ -166,6 +166,7 @@
 .ui-sales-line-card__number-field>span { font-weight:650; }
 .ui-sales-line-card__number-field input,.ui-sales-line-card__number-field select { width:100%; min-height:34px; padding:.32rem .42rem; border:1px solid var(--oas-sales-border); border-radius:.38rem; background:#fff; color:#292437; font:inherit; }
 .ui-sales-line-card__number-field input:disabled,.ui-sales-line-card__number-field select:disabled { background:#f7f7fa; color:#777284; }
+.ui-sales-line-card__range-hint { display:block; color:#5f5874; font-size:.62rem; line-height:1.3; font-weight:500; }
 .ui-sales-line-card__price-hint { color:var(--oas-sales-muted); font-size:.58rem; line-height:1.35; }
 .ui-sales-line-card__optical { margin:.1rem .75rem .75rem; padding:.65rem; border:1px solid #e8e2fb; border-radius:.48rem; background:#fcfbff; }
 .ui-sales-line-card__subheader { display:flex; align-items:center; gap:.5rem; margin-bottom:.55rem; }
@@ -236,3 +237,9 @@
 .ui-sales-status.is-warning{background:color-mix(in srgb,var(--ui-warning,#d97706) 12%,transparent);color:#92400e;border-color:color-mix(in srgb,var(--ui-warning,#d97706) 30%,transparent)}
 .ui-sales-status.is-info{background:color-mix(in srgb,var(--ui-primary,#2563eb) 10%,transparent);color:var(--ui-primary,#1d4ed8);border-color:color-mix(in srgb,var(--ui-primary,#2563eb) 28%,transparent)}
 .ui-sales-status.is-neutral{background:var(--ui-surface-muted,#f3f4f6);color:var(--ui-text-muted,#4b5563);border-color:var(--ui-border,#d1d5db)}
+
+.ui-sales-optical-range-note { display:flex; align-items:flex-start; gap:.45rem; margin:.55rem 0 .7rem; padding:.5rem .6rem; border:1px solid #ddd5fb; border-radius:.42rem; background:#f8f6ff; color:#4f4767; font-size:.68rem; line-height:1.45; }
+.ui-sales-optical-range-note i { color:var(--oas-sales-primary); margin-top:.12rem; }
+.ui-sales-eye-card__range-hint { display:block; margin-top:.16rem; color:#5f5874; font-size:.62rem; line-height:1.3; font-weight:500; }
+.ui-sales-line-card__range-banner { display:flex; align-items:flex-start; gap:.42rem; margin:0 .75rem .6rem; padding:.45rem .55rem; border:1px solid #ddd5fb; border-radius:.4rem; background:#f8f6ff; color:#4f4767; font-size:.65rem; line-height:1.4; }
+.ui-sales-line-card__range-banner i { color:var(--oas-sales-primary); margin-top:.1rem; }

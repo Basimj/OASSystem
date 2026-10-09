@@ -52,7 +52,9 @@ public sealed class CustomerOrderLineRequestValidator : AbstractValidator<Custom
         RuleFor(x => x.DiscountValue).GreaterThanOrEqualTo(0).When(x => x.DiscountValue.HasValue);
         RuleFor(x => x.TaxRate).GreaterThanOrEqualTo(0).When(x => x.TaxRate.HasValue);
         RuleFor(x => x.ProductVariantId).NotEmpty().When(x => x.LineType is SalesLineType.Frame or SalesLineType.Lens or SalesLineType.Accessory);
-        RuleFor(x => x.WarehouseId).NotEmpty().When(x => x.LineType is SalesLineType.Frame or SalesLineType.Lens or SalesLineType.Accessory);
+        // Warehouse depends on the selected product's IsStockItem flag and is therefore
+        // validated authoritatively by ISalesLineResolver. Non-stock optical products must
+        // remain valid without a warehouse.
         RuleFor(x => x.Description).MaximumLength(500);
         RuleFor(x => x.Notes).MaximumLength(1000);
         When(x => x.OpticalSnapshot is not null, () =>

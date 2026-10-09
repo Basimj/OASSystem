@@ -6,8 +6,10 @@ public sealed record CreateOpticalJobLineRequest(
     Guid CustomerOrderLineId,
     Guid? ProductVariantId,
     int LineNumber,
-    SalesLineType LineType,
+    OpticalJobLineType LineType,
     EyeSide? Eye,
+    Guid? GroupId,
     string DescriptionSnapshot,
     decimal Quantity,
+    bool RequiresProduction = true,
     string? Notes = null);

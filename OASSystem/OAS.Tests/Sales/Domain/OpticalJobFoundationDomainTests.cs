@@ -37,7 +37,7 @@ public sealed class OpticalJobFoundationDomainTests
         job.PassQualityControl();
         Assert.That(job.Status, Is.EqualTo(OpticalJobStatus.QCPassed));
         job.MarkReadyForDelivery(new DateTimeOffset(2026, 10, 4, 13, 0, 0, TimeSpan.Zero));
-        job.MarkDelivered();
+        job.MarkDelivered(new DateTimeOffset(2026, 10, 4, 14, 0, 0, TimeSpan.Zero));
 
         Assert.Multiple(() =>
         {
@@ -54,23 +54,89 @@ public sealed class OpticalJobFoundationDomainTests
     }
 
     [Test]
+    public void DeliverBeforeReady_IsRejected()
+    {
+        var job = CreateJobWithLine();
+        job.MarkMaterialsAvailable();
+        Assert.Throws<DomainException>(() => job.MarkDelivered(DateTimeOffset.UtcNow));
+    }
+
+    [Test]
+    public void FailedQualityControl_ReturnsJobToProduction()
+    {
+        var job = CreateJobWithLine();
+        job.MarkMaterialsAvailable();
+        job.Start(DateTimeOffset.UtcNow);
+        job.SendToQualityControl();
+
+        job.FailQualityControl(OpticalQcFailureAction.Rework);
+
+        Assert.That(job.Status, Is.EqualTo(OpticalJobStatus.InProduction));
+    }
+
+    [Test]
+    public void QualityControl_CannotPassWhenAnyRequiredItemFailed()
+    {
+        var qc = OpticalQualityCheck.Create(Guid.NewGuid(), Guid.NewGuid(), 1);
+        var item = OpticalQualityCheckItem.Create(Guid.NewGuid(), qc.Id, "POWER", "Power", 1);
+        item.SetResult(OpticalQualityCheckItemResult.Fail, "Power mismatch");
+        qc.AddItem(item);
+
+        Assert.Throws<DomainException>(() => qc.CompletePassed(
+            Guid.NewGuid(), DateTimeOffset.UtcNow, allItemsPassed: false));
+    }
+
+    [Test]
+    public void Remake_FollowsReadyProductionQcCompletedLifecycle()
+    {
+        var remake = OpticalJobRemake.Create(
+            Guid.NewGuid(), Guid.NewGuid(), null, null, Guid.NewGuid(), Guid.NewGuid(),
+            1m, "QC remake", Guid.NewGuid(), DateTimeOffset.UtcNow);
+
+        remake.MarkReady();
+        remake.Start(DateTimeOffset.UtcNow);
+        remake.SendToQc();
+        remake.Complete(DateTimeOffset.UtcNow);
+
+        Assert.That(remake.Status, Is.EqualTo(OpticalRemakeStatus.Completed));
+    }
+
+    [Test]
+    public void DeliveredJob_CannotBeCancelledOrReassigned()
+    {
+        var job = CreateJobWithLine();
+        job.MarkMaterialsAvailable();
+        job.Start(DateTimeOffset.UtcNow);
+        job.SendToQualityControl();
+        job.PassQualityControl();
+        job.MarkReadyForDelivery(DateTimeOffset.UtcNow);
+        job.MarkDelivered(DateTimeOffset.UtcNow);
+
+        Assert.Multiple(() =>
+        {
+            Assert.Throws<DomainException>(() => job.Cancel());
+            Assert.Throws<DomainException>(() => job.AssignTechnician(Guid.NewGuid(), DateTimeOffset.UtcNow));
+        });
+    }
+
+    [Test]
     public void SameCustomerOrderLine_CannotBeAddedTwice()
     {
         var job = OpticalJob.Create(Guid.NewGuid(), "OJ-1", Guid.NewGuid(), null, Guid.NewGuid());
         var orderLineId = Guid.NewGuid();
         job.AddLine(OpticalJobLine.Create(Guid.NewGuid(), job.Id, orderLineId, Guid.NewGuid(), 1,
-            SalesLineType.Lens, EyeSide.RightOD, "OD lens", 1m));
+            OpticalJobLineType.Lens, EyeSide.RightOD, null, "OD lens", 1m, true));
 
         Assert.Throws<DomainException>(() => job.AddLine(OpticalJobLine.Create(
             Guid.NewGuid(), job.Id, orderLineId, Guid.NewGuid(), 2,
-            SalesLineType.Lens, EyeSide.RightOD, "duplicate", 1m)));
+            OpticalJobLineType.Lens, EyeSide.RightOD, null, "duplicate", 1m, true)));
     }
 
     private static OpticalJob CreateJobWithLine()
     {
         var job = OpticalJob.Create(Guid.NewGuid(), "OJ-TEST", Guid.NewGuid(), null, Guid.NewGuid());
         job.AddLine(OpticalJobLine.Create(Guid.NewGuid(), job.Id, Guid.NewGuid(), Guid.NewGuid(), 1,
-            SalesLineType.Lens, EyeSide.LeftOS, "OS lens", 1m));
+            OpticalJobLineType.Lens, EyeSide.LeftOS, null, "OS lens", 1m, true));
         return job;
     }
 }

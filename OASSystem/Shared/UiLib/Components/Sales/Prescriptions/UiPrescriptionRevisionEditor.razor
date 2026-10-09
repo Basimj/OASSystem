@@ -6,25 +6,63 @@
         <UiInputDate Label="تاريخ السريان" Value="@Model.EffectiveDate" ValueChanged="EffectiveDateChanged" Required="true" />
         <UiInputText Label="سبب الإصدار" Value="@Model.Reason" ValueChanged="ReasonChanged" />
     </div>
+
+    <div class="ui-sales-optical-range-note" role="note">
+        <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+        @if (HasConfiguredRanges)
+        {
+            <span>النطاق الإرشادي مأخوذ من العدسات الطبية الفعالة المعرفة في النظام: @GlobalRangeSummary</span>
+        }
+        else
+        {
+            <span>لم يتم تعريف نطاقات عدسات طبية فعالة بعد. سيتم التحقق من توافق القياسات مع العدسة عند البيع.</span>
+        }
+    </div>
+
     <div class="ui-sales-eye-grid ui-sales-eye-grid--editor">
         @foreach (var eye in Model.Eyes)
         {
             <div class="ui-sales-eye-card ui-sales-eye-card--editor">
                 <strong>@eye.EyeText</strong>
-                <label>SPH<input type="number" step="0.25" value="@eye.SPH" @onchange="e => DecimalChanged(eye, nameof(eye.SPH), e)" /></label>
-                <label>CYL<input type="number" step="0.25" value="@eye.CYL" @onchange="e => DecimalChanged(eye, nameof(eye.CYL), e)" /></label>
-                <label>Axis<input type="number" min="0" max="180" value="@eye.Axis" @onchange="e => AxisChanged(eye, e)" /></label>
-                <label>ADD<input type="number" step="0.25" min="0" value="@eye.ADD" @onchange="e => DecimalChanged(eye, nameof(eye.ADD), e)" /></label>
-                <label>Prism<input type="number" step="0.25" min="0" value="@eye.Prism" @onchange="e => DecimalChanged(eye, nameof(eye.Prism), e)" /></label>
+                <label>
+                    SPH
+                    <input type="number" step="0.25" min="@SphereMin" max="@SphereMax"
+                           placeholder="@RangePlaceholder(SphereMin, SphereMax)"
+                           title="@RangeTitle(nameof(UiPrescriptionEyeModel.SPH), SphereMin, SphereMax)"
+                           value="@eye.SPH" @onchange="e => DecimalChanged(eye, nameof(eye.SPH), e)" />
+                    <small class="ui-sales-eye-card__range-hint">@RangeHint("SPH", SphereMin, SphereMax)</small>
+                </label>
+                <label>
+                    CYL
+                    <input type="number" step="0.25" min="@CylinderMin" max="@CylinderMax"
+                           placeholder="@RangePlaceholder(CylinderMin, CylinderMax)"
+                           title="@RangeTitle(nameof(UiPrescriptionEyeModel.CYL), CylinderMin, CylinderMax)"
+                           value="@eye.CYL" @onchange="e => DecimalChanged(eye, nameof(eye.CYL), e)" />
+                    <small class="ui-sales-eye-card__range-hint">@RangeHint("CYL", CylinderMin, CylinderMax)</small>
+                </label>
+                <label>
+                    Axis
+                    <input type="number" min="0" max="180" step="1" placeholder="من 0 إلى 180" title="Axis: أدخل قيمة بين 0 و 180" value="@eye.Axis" @onchange="e => AxisChanged(eye, e)" />
+                    <small class="ui-sales-eye-card__range-hint">أدخل قيمة بين 0 و 180.</small>
+                </label>
+                <label>
+                    ADD
+                    <input type="number" step="0.25" min="@(AddMin ?? 0m)" max="@AddMax"
+                           placeholder="@RangePlaceholder(AddMin ?? 0m, AddMax)"
+                           title="@RangeTitle(nameof(UiPrescriptionEyeModel.ADD), AddMin ?? 0m, AddMax)"
+                           value="@eye.ADD" @onchange="e => DecimalChanged(eye, nameof(eye.ADD), e)" />
+                    <small class="ui-sales-eye-card__range-hint">@RangeHint("ADD", AddMin ?? 0m, AddMax)</small>
+                </label>
+                <label>Prism<input type="number" step="0.25" min="0" placeholder="0 أو أكثر" value="@eye.Prism" @onchange="e => DecimalChanged(eye, nameof(eye.Prism), e)" /></label>
                 <label>Prism Base
                     <select value="@eye.PrismBase" @onchange="e => PrismBaseChanged(eye, e)">
                         <option value="None">بدون</option><option value="Up">أعلى</option><option value="Down">أسفل</option><option value="In">للداخل</option><option value="Out">للخارج</option>
                     </select>
                 </label>
-                <label>PD<input type="number" step="0.5" min="0" value="@eye.PD" @onchange="e => DecimalChanged(eye, nameof(eye.PD), e)" /></label>
-                <label>Mono PD<input type="number" step="0.5" min="0" value="@eye.MonocularPD" @onchange="e => DecimalChanged(eye, nameof(eye.MonocularPD), e)" /></label>
+                <label>PD<input type="number" step="0.5" min="0" placeholder="أكبر من 0" value="@eye.PD" @onchange="e => DecimalChanged(eye, nameof(eye.PD), e)" /></label>
+                <label>Mono PD<input type="number" step="0.5" min="0" placeholder="أكبر من 0" value="@eye.MonocularPD" @onchange="e => DecimalChanged(eye, nameof(eye.MonocularPD), e)" /></label>
                 <label>VA<input value="@eye.VA" @onchange="e => TextChanged(eye, nameof(eye.VA), e)" /></label>
-                <label>Fitting Height<input type="number" step="0.5" min="0" value="@eye.FittingHeight" @onchange="e => DecimalChanged(eye, nameof(eye.FittingHeight), e)" /></label>
+                <label>Fitting Height<input type="number" step="0.5" min="0" placeholder="أكبر من 0" value="@eye.FittingHeight" @onchange="e => DecimalChanged(eye, nameof(eye.FittingHeight), e)" /></label>
                 <label class="ui-sales-eye-card__wide">ملاحظات<input value="@eye.Notes" @onchange="e => NotesChanged(eye, e)" /></label>
             </div>
         }
@@ -33,7 +71,39 @@
 
 @code {
     [Parameter, EditorRequired] public UiPrescriptionRevisionModel Model { get; set; } = new();
+    [Parameter] public decimal? SphereMin { get; set; }
+    [Parameter] public decimal? SphereMax { get; set; }
+    [Parameter] public decimal? CylinderMin { get; set; }
+    [Parameter] public decimal? CylinderMax { get; set; }
+    [Parameter] public decimal? AddMin { get; set; }
+    [Parameter] public decimal? AddMax { get; set; }
     [Parameter] public EventCallback OnChanged { get; set; }
+
+    private bool HasConfiguredRanges =>
+        HasRange(SphereMin, SphereMax) || HasRange(CylinderMin, CylinderMax) || HasRange(AddMin ?? 0m, AddMax);
+
+    private string GlobalRangeSummary => string.Join(" • ", new[]
+    {
+        RangeSummary("SPH", SphereMin, SphereMax),
+        RangeSummary("CYL", CylinderMin, CylinderMax),
+        RangeSummary("ADD", AddMin ?? 0m, AddMax)
+    }.Where(x => !string.IsNullOrWhiteSpace(x)));
+
+    private static bool HasRange(decimal? minimum, decimal? maximum) => minimum.HasValue && maximum.HasValue;
+    private static string Format(decimal value) => value > 0 ? $"+{value:0.##}" : $"{value:0.##}";
+    private static string? RangePlaceholder(decimal? minimum, decimal? maximum) =>
+        HasRange(minimum, maximum) ? $"{Format(minimum!.Value)} إلى {Format(maximum!.Value)}" : null;
+    private static string RangeTitle(string field, decimal? minimum, decimal? maximum) =>
+        HasRange(minimum, maximum)
+            ? $"{field}: أدخل قيمة بين {Format(minimum!.Value)} و {Format(maximum!.Value)}"
+            : $"{field}: سيتم التحقق من نطاق العدسة عند البيع";
+    private static string RangeHint(string field, decimal? minimum, decimal? maximum) =>
+        HasRange(minimum, maximum)
+            ? $"أدخل قيمة بين {Format(minimum!.Value)} و {Format(maximum!.Value)}."
+            : "سيتم التحقق من النطاق حسب العدسة المختارة عند البيع.";
+    private static string RangeSummary(string field, decimal? minimum, decimal? maximum) =>
+        HasRange(minimum, maximum) ? $"{field} {Format(minimum!.Value)} إلى {Format(maximum!.Value)}" : string.Empty;
+
     private async Task EffectiveDateChanged(DateOnly? value) { Model.EffectiveDate = value; await OnChanged.InvokeAsync(); }
     private async Task ReasonChanged(string? value) { Model.Reason = value; await OnChanged.InvokeAsync(); }
     private async Task DecimalChanged(UiPrescriptionEyeModel eye, string field, ChangeEventArgs args)

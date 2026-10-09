@@ -319,6 +319,55 @@ public sealed class SearchSalesProductCategoriesQueryHandler(
     }
 }
 
+public sealed class GetSalesPrescriptionOpticalRangesQueryHandler(
+    IReadRepository<LensDetails, Guid> lensDetails,
+    IReadRepository<Product, Guid> products)
+    : IRequestHandler<GetSalesPrescriptionOpticalRangesQuery, SalesOpticalRangeLookupDto>
+{
+    public async Task<SalesOpticalRangeLookupDto> Handle(
+        GetSalesPrescriptionOpticalRangesQuery request,
+        CancellationToken ct)
+    {
+        var lenses = await lensDetails.ListAsync(
+            new Specification<LensDetails>().Where(x => x.IsPrescriptionLens),
+            ct);
+
+        var active = new List<LensDetails>();
+        foreach (var lens in lenses)
+        {
+            var product = await products.GetByIdAsync(lens.ProductId, ct);
+            if (product?.IsActive == true)
+                active.Add(lens);
+        }
+
+        static (decimal? Min, decimal? Max) Aggregate(
+            IEnumerable<LensDetails> source,
+            Func<LensDetails, decimal?> minSelector,
+            Func<LensDetails, decimal?> maxSelector)
+        {
+            // نأخذ القيمتين معًا حتى تبقى النتيجة صحيحة حتى قبل تشغيل migration
+            // على قواعد بيانات قديمة تحتوي Min/Max معكوسين.
+            var values = source
+                .SelectMany(x => new[] { minSelector(x), maxSelector(x) })
+                .Where(x => x.HasValue)
+                .Select(x => x!.Value)
+                .ToArray();
+
+            return values.Length == 0 ? ((decimal?)null, (decimal?)null) : (values.Min(), values.Max());
+        }
+
+        var sphere = Aggregate(active, x => x.SphereMin, x => x.SphereMax);
+        var cylinder = Aggregate(active, x => x.CylinderMin, x => x.CylinderMax);
+        var add = Aggregate(active, x => x.AddMin, x => x.AddMax);
+
+        return new SalesOpticalRangeLookupDto(
+            sphere.Min, sphere.Max,
+            cylinder.Min, cylinder.Max,
+            add.Min, add.Max,
+            active.Count);
+    }
+}
+
 public sealed class SearchSalesProductVariantsQueryHandler(
     IReadRepository<ProductVariant, Guid> variants,
     IReadRepository<Product, Guid> products,
@@ -478,6 +527,10 @@ public sealed class SearchSalesProductVariantsQueryHandler(
                     .Where(x => x.ProductId == product.Id),
                 ct)).FirstOrDefault();
 
+            var (sphereMin, sphereMax) = NormalizeRange(lens?.SphereMin, lens?.SphereMax);
+            var (cylinderMin, cylinderMax) = NormalizeRange(lens?.CylinderMin, lens?.CylinderMax);
+            var (addMin, addMax) = NormalizeRange(lens?.AddMin, lens?.AddMax);
+
             result.Add(new SalesProductVariantLookupDto(
                 variant.Id,
                 product.Id,
@@ -499,16 +552,30 @@ public sealed class SearchSalesProductVariantsQueryHandler(
                 variant.SellingPrice,
                 product.IsStockItem,
                 lens?.IsPrescriptionLens ?? false,
-                lens?.SphereMin,
-                lens?.SphereMax,
-                lens?.CylinderMin,
-                lens?.CylinderMax,
-                lens?.AddMin,
-                lens?.AddMax,
-                variant.IsActive));
+                sphereMin,
+                sphereMax,
+                cylinderMin,
+                cylinderMax,
+                addMin,
+                addMax,
+                variant.IsActive,
+                lens?.LensType,
+                lens?.Material,
+                lens?.Coating,
+                lens?.RefractiveIndex));
         }
 
         return result;
+    }
+
+    private static (decimal? Minimum, decimal? Maximum) NormalizeRange(decimal? first, decimal? second)
+    {
+        if (!first.HasValue || !second.HasValue)
+            return (first, second);
+
+        return first.Value <= second.Value
+            ? (first, second)
+            : (second, first);
     }
 }
 

@@ -77,6 +77,10 @@ public sealed class UiCheckoutShortageModel
     public string? PreferredSupplierDisplay { get; set; }
     public DateTimeOffset? ScheduledOrderAtUtc { get; set; }
     public DateOnly? RequiredDate { get; set; }
+    public DateOnly? RequiredDateFrom { get; set; }
+    public DateOnly? RequiredDateTo { get; set; }
+    public bool? HasBreakage { get; set; }
+    public bool? HasRemake { get; set; }
 }
 
 public sealed record UiOrderOperationsRowModel(Guid Id,string OrderCode,string OrderDate,string? RequiredDate,string CustomerCode,string CustomerName,string? Mobile,string ItemsSummary,int TotalLines,int AvailableLines,int ShortageLines,string SupplyText,string StatusText,string StatusCss,bool RequiresProduction,string? JobCode,string? Technician,string LastUpdated);
@@ -137,8 +141,36 @@ public sealed class UiDemandTrackingDetailsModel
     public DateTimeOffset? ResupplyScheduledAt { get; set; }
 }
 
-public sealed record UiOpticalJobRowModel(Guid Id,string JobCode,string? OrderCode,string CustomerText,string? Mobile,string? RequiredDate,string? Frame,string? OD,string? OS,string? Technician,string StatusText,string StatusCss);
-public sealed record UiOpticalJobLineModel(int LineNumber,string TypeText,string ProductText,string? EyeText,decimal Quantity,string? OpticalSummary,string? Notes);
+public sealed record UiOpticalJobRowModel(Guid Id,string JobCode,string? OrderCode,string CustomerText,string? Mobile,string? RequiredDate,string? Frame,string? OD,string? OS,string? Technician,string StatusText,string StatusCss,bool HasOpenBreakage=false,bool HasOpenRemake=false);
+
+public sealed record UiOpticalJobLineModel(
+    Guid Id, Guid? ProductVariantId, Guid? GroupId, int LineNumber, string TypeText, string ProductText,
+    string? EyeText, decimal Quantity, string? OpticalSummary, string? Notes);
+
+public sealed class UiOpticalQualityCheckItemModel
+{
+    public Guid Id { get; set; }
+    public string CheckCode { get; set; } = string.Empty;
+    public string CheckName { get; set; } = string.Empty;
+    public string Result { get; set; } = "NotChecked";
+    public string? Notes { get; set; }
+    public int Sequence { get; set; }
+}
+
+public sealed class UiOpticalQualityCheckModel
+{
+    public Guid Id { get; set; }
+    public int AttemptNumber { get; set; }
+    public string Result { get; set; } = string.Empty;
+    public string? GeneralNotes { get; set; }
+    public string RowVersion { get; set; } = string.Empty;
+    public List<UiOpticalQualityCheckItemModel> Items { get; set; } = [];
+}
+
+public sealed record UiOpticalBreakageModel(Guid Id, Guid OpticalJobLineId, string Status, decimal Quantity, string Reason, string? Eye, DateTimeOffset RecordedAtUtc);
+public sealed record UiOpticalRemakeModel(Guid Id, Guid OpticalJobLineId, string Status, decimal Quantity, string Reason, Guid? ReplacementPurchaseRequestLineId, string RowVersion);
+public sealed record UiOpticalTimelineModel(string FromStatus, string ToStatus, string? Reason, DateTimeOffset ChangedAtUtc);
+
 public sealed class UiOpticalJobDetailsModel
 {
     public Guid Id { get; set; }
@@ -154,6 +186,34 @@ public sealed class UiOpticalJobDetailsModel
     public string RowVersion { get; set; } = string.Empty;
     public string? Notes { get; set; }
     public List<UiOpticalJobLineModel> Lines { get; set; } = [];
+    public UiOpticalQualityCheckModel? LatestQualityCheck { get; set; }
+    public List<UiOpticalBreakageModel> Breakages { get; set; } = [];
+    public List<UiOpticalRemakeModel> Remakes { get; set; } = [];
+    public List<UiOpticalTimelineModel> Timeline { get; set; } = [];
+
+    public string BreakageLineId { get; set; } = string.Empty;
+    public decimal BreakageQuantity { get; set; } = 1m;
+    public string BreakageReasonCode { get; set; } = "LAB_BREAKAGE";
+    public string? BreakageReasonText { get; set; }
+    public bool BreakageRequiresReplacement { get; set; } = true;
+    public string BreakageWarehouseId { get; set; } = string.Empty;
+    public string? BreakageWarehouseDisplay { get; set; }
+
+    public string MaterialLineId { get; set; } = string.Empty;
+    public decimal MaterialQuantity { get; set; } = 1m;
+    public string MaterialWarehouseId { get; set; } = string.Empty;
+    public string? MaterialWarehouseDisplay { get; set; }
+
+    public string RemakeLineId { get; set; } = string.Empty;
+    public decimal RemakeQuantity { get; set; } = 1m;
+    public string? RemakeReason { get; set; }
+    public string RemakeWarehouseId { get; set; } = string.Empty;
+    public string? RemakeWarehouseDisplay { get; set; }
+
+    public string QcFailureAction { get; set; } = "Rework";
+    public string? QcFailureReason { get; set; }
+    public string QcRemakeLineId { get; set; } = string.Empty;
+    public decimal QcRemakeQuantity { get; set; } = 1m;
 }
 
 public sealed class UiDeliverySettlementModel
@@ -222,6 +282,10 @@ public sealed class UiOpticalJobFilterModel
     public string TechnicianId { get; set; } = string.Empty;
     public string? TechnicianDisplay { get; set; }
     public DateOnly? RequiredDate { get; set; }
+    public DateOnly? RequiredDateFrom { get; set; }
+    public DateOnly? RequiredDateTo { get; set; }
+    public bool? HasBreakage { get; set; }
+    public bool? HasRemake { get; set; }
 }
 
 public sealed record UiDemandActionModel(string Action, Guid LineId, string SupplierId, DateTimeOffset? ScheduledAt, DateOnly? ExpectedDate, string RowVersion);

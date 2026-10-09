@@ -1,82 +1,56 @@
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using OAS.Application.Sales.Production.Commands;
-using OAS.Application.Sales.Production.Queries;
 using OAS.Contracts.Sales.Production;
 
 namespace OAS.API.Sales.Controllers;
 
+/// <summary>
+/// Legacy compatibility endpoint. The active laboratory workflow is OpticalJob under /api/optical/jobs.
+/// Keeping this controller avoids a hard 404 for older clients while preventing creation of a second,
+/// parallel production workflow.
+/// </summary>
 [ApiController]
 [Authorize]
 [EnableRateLimiting("api")]
 [Route("api/sales/production")]
-public sealed class OpticalProductionController(ISender sender) : ControllerBase
+[Obsolete("Use api/optical/jobs. OpticalJob is the single laboratory workflow.")]
+public sealed class OpticalProductionController : ControllerBase
 {
+    private ObjectResult Gone() => Problem(
+        statusCode: StatusCodes.Status410Gone,
+        title: "Legacy optical production workflow is disabled.",
+        detail: "استخدم مسار المعمل الموحد api/optical/jobs. تم إيقاف مسار sales/production لمنع إنشاء دورتين متوازيتين للإنتاج البصري.");
+
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<OpticalProductionJobDto>>> Get(
+    public ActionResult<IReadOnlyList<OpticalProductionJobDto>> Get(
         [FromQuery] OpticalProductionStatus? status,
-        [FromQuery] Guid? salesInvoiceId,
-        CancellationToken ct) =>
-        Ok(await sender.Send(new GetOpticalProductionJobsQuery(status, salesInvoiceId), ct));
+        [FromQuery] Guid? salesInvoiceId) => Gone();
 
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<OpticalProductionJobDto>> GetById(Guid id, CancellationToken ct) =>
-        Ok(await sender.Send(new GetOpticalProductionJobQuery(id), ct));
+    public ActionResult<OpticalProductionJobDto> GetById(Guid id) => Gone();
 
     [HttpPost]
-    public async Task<ActionResult<OpticalProductionJobDto>> Create(
-        [FromBody] CreateOpticalProductionJobRequest request,
-        CancellationToken ct) =>
-        Ok(await sender.Send(new CreateOpticalProductionJobCommand(request), ct));
+    public ActionResult<OpticalProductionJobDto> Create([FromBody] CreateOpticalProductionJobRequest request) => Gone();
 
     [HttpPost("{id:guid}/release")]
-    public async Task<ActionResult<OpticalProductionJobDto>> Release(
-        Guid id,
-        [FromBody] OpticalProductionActionRequest request,
-        CancellationToken ct) =>
-        Ok(await sender.Send(new ReleaseOpticalProductionJobCommand(id, request), ct));
+    public ActionResult<OpticalProductionJobDto> Release(Guid id, [FromBody] OpticalProductionActionRequest request) => Gone();
 
     [HttpPost("{id:guid}/start")]
-    public async Task<ActionResult<OpticalProductionJobDto>> Start(
-        Guid id,
-        [FromBody] OpticalProductionActionRequest request,
-        CancellationToken ct) =>
-        Ok(await sender.Send(new StartOpticalProductionJobCommand(id, request), ct));
+    public ActionResult<OpticalProductionJobDto> Start(Guid id, [FromBody] OpticalProductionActionRequest request) => Gone();
 
     [HttpPost("{id:guid}/issue-materials")]
-    public async Task<ActionResult<OpticalProductionJobDto>> Issue(
-        Guid id,
-        [FromBody] OpticalProductionActionRequest request,
-        CancellationToken ct) =>
-        Ok(await sender.Send(new IssueOpticalProductionMaterialsCommand(id, request), ct));
+    public ActionResult<OpticalProductionJobDto> Issue(Guid id, [FromBody] OpticalProductionActionRequest request) => Gone();
 
     [HttpPost("{id:guid}/quality-control")]
-    public async Task<ActionResult<OpticalProductionJobDto>> QualityControl(
-        Guid id,
-        [FromBody] SubmitOpticalProductionQcRequest request,
-        CancellationToken ct) =>
-        Ok(await sender.Send(new SubmitOpticalProductionQcCommand(id, request), ct));
+    public ActionResult<OpticalProductionJobDto> QualityControl(Guid id, [FromBody] SubmitOpticalProductionQcRequest request) => Gone();
 
     [HttpPost("{id:guid}/remake")]
-    public async Task<ActionResult<OpticalProductionJobDto>> Remake(
-        Guid id,
-        [FromBody] CreateOpticalProductionRemakeRequest request,
-        CancellationToken ct) =>
-        Ok(await sender.Send(new CreateOpticalProductionRemakeCommand(id, request), ct));
+    public ActionResult<OpticalProductionJobDto> Remake(Guid id, [FromBody] CreateOpticalProductionRemakeRequest request) => Gone();
 
     [HttpPost("{id:guid}/complete")]
-    public async Task<ActionResult<OpticalProductionJobDto>> Complete(
-        Guid id,
-        [FromBody] OpticalProductionActionRequest request,
-        CancellationToken ct) =>
-        Ok(await sender.Send(new CompleteOpticalProductionJobCommand(id, request), ct));
+    public ActionResult<OpticalProductionJobDto> Complete(Guid id, [FromBody] OpticalProductionActionRequest request) => Gone();
 
     [HttpPost("{id:guid}/cancel")]
-    public async Task<ActionResult<OpticalProductionJobDto>> Cancel(
-        Guid id,
-        [FromBody] OpticalProductionActionRequest request,
-        CancellationToken ct) =>
-        Ok(await sender.Send(new CancelOpticalProductionJobCommand(id, request), ct));
+    public ActionResult<OpticalProductionJobDto> Cancel(Guid id, [FromBody] OpticalProductionActionRequest request) => Gone();
 }

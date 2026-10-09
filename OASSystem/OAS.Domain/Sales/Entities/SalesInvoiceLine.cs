@@ -130,6 +130,11 @@ public sealed class SalesInvoiceLine : AuditableEntity<Guid>
         TotalCostSnapshot = totalCost;
     }
 
+    internal void ClearPrescriptionSnapshot()
+    {
+        PrescriptionSnapshot = null;
+    }
+
     internal void SetPrescriptionSnapshot(SalesInvoiceLinePrescriptionSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
@@ -193,9 +198,12 @@ public sealed class SalesInvoiceLine : AuditableEntity<Guid>
         if (LineType is SalesLineType.Frame or SalesLineType.Lens or SalesLineType.Accessory)
         {
             if (!productVariantId.HasValue || productVariantId.Value == Guid.Empty)
-                throw new DomainException("Product variant is required for inventory sales lines.");
-            if (!warehouseId.HasValue || warehouseId.Value == Guid.Empty)
-                throw new DomainException("Warehouse is required for inventory sales lines.");
+                throw new DomainException("Product variant is required for product sales lines.");
+            // Warehouse is intentionally optional at the domain level because a Lens/Frame/Accessory
+            // product can be configured as non-stock (for example a made-to-order lab lens).
+            // ISalesLineResolver remains authoritative and requires a warehouse for stock items.
+            if (warehouseId == Guid.Empty)
+                throw new DomainException("Warehouse id cannot be empty when provided.");
         }
 
         if (LineType == SalesLineType.Service && (productVariantId.HasValue || warehouseId.HasValue))

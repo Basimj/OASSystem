@@ -25,8 +25,8 @@ public sealed class UpdateSalesInvoiceCommandHandler(
     IReadRepository<Currency, Guid> currencies,
     IReadRepository<Employee, Guid> employees,
     IExchangeRateResolver rates,
-    ISalesLineResolver lineResolver,
-    ISalesPrescriptionValidator prescriptionValidator)
+    ICustomerOrderOpticalService optical,
+    IRepository<SalesInvoiceLinePrescriptionSnapshot, Guid> snapshotRepository)
     : IRequestHandler<UpdateSalesInvoiceCommand, SalesInvoice>
 {
     public async Task<SalesInvoice> Handle(
@@ -163,132 +163,45 @@ public sealed class UpdateSalesInvoiceCommandHandler(
                      .Where(x => !requestedIds.Contains(x.Id))
                      .ToList())
         {
-            await EnsureLineCanBeRemovedAsync(
-                old.Id,
-                ct);
-
+            await EnsureLineCanBeRemovedAsync(old.Id, ct);
+            await DeleteInvoiceSnapshotAsync(invoice, old.Id, ct);
             invoice.RemoveLine(old.Id);
-
             lineRepository.Delete(old);
         }
 
-        var nextLineNumber =
-            invoice.Lines.Count == 0
-                ? 1
-                : invoice.Lines.Max(
-                    x => x.LineNumber) + 1;
+        var nextLineNumber = invoice.Lines.Count == 0
+            ? 1
+            : invoice.Lines.Max(x => x.LineNumber) + 1;
 
         foreach (var req in requested)
         {
             var existing = req.Id.HasValue
-                ? invoice.Lines.SingleOrDefault(
-                    x => x.Id == req.Id.Value)
+                ? invoice.Lines.SingleOrDefault(x => x.Id == req.Id.Value)
                 : null;
 
-            if (existing is not null &&
-                HasSameStructure(
-                    existing,
-                    req,
-                    invoice))
-            {
-                if (!string.IsNullOrWhiteSpace(
-                        req.RowVersion))
-                {
-                    SalesConcurrency.Ensure(
-                        req.RowVersion,
-                        existing.RowVersion,
-                        "سطر الفاتورة");
-                }
+            if (existing is not null && !string.IsNullOrWhiteSpace(req.RowVersion))
+                SalesConcurrency.Ensure(req.RowVersion, existing.RowVersion, "سطر الفاتورة");
 
-                // للأسطر المرتبطة بمنتج:
-                // لا نأخذ السعر من Client.
-                //
-                // إذا كان هناك Price Override معتمد،
-                // ActualUnitPrice المحفوظة هي السعر
-                // الذي نعتمد عليه ونبقيه كما هو.
-                //
-                // البنود بدون ProductVariant أو المنتجات التي لا تملك سعرًا محفوظًا
-                // يمكن إدخال سعرها يدويًا مباشرة. المنتج ذو السعر المحفوظ
-                // يبقى خاضعًا لمسار Price Override.
-                var existingBaseUnitPrice = existing.BaseUnitPrice;
-                var existingActualUnitPrice = existing.ProductVariantId.HasValue && existing.BaseUnitPrice > 0m
-                    ? existing.ActualUnitPrice
-                    : req.ActualUnitPrice;
-
-                if (currencyContextChanged && existing.ProductVariantId.HasValue)
-                {
-                    existingBaseUnitPrice = SalesPricingCalculator.ConvertBetweenCurrencies(
-                        existing.BaseUnitPrice,
-                        previousExchangeRate,
-                        invoice.ExchangeRate,
-                        invoice.CurrencyDecimalPlacesSnapshot);
-                    existingActualUnitPrice = SalesPricingCalculator.ConvertBetweenCurrencies(
-                        existing.ActualUnitPrice,
-                        previousExchangeRate,
-                        invoice.ExchangeRate,
-                        invoice.CurrencyDecimalPlacesSnapshot);
-                }
-
-                await InvalidatePriceOverridesWhenPriceChangesAsync(
-                    existing,
-                    existingActualUnitPrice,
-                    ct);
-
-                invoice.UpdateLinePricing(
-                    existing.Id,
-                    req.Quantity,
-                    existingBaseUnitPrice,
-                    existingActualUnitPrice,
-                    (SalesDiscountType)(byte)req.DiscountType,
-                    req.DiscountValue,
-                    req.TaxRate);
-
-                continue;
-            }
-
-            if (existing is not null)
-            {
-                await EnsureLineCanBeRemovedAsync(
-                    existing.Id,
-                    ct);
-
-                invoice.RemoveLine(
-                    existing.Id);
-
-                lineRepository.Delete(
-                    existing);
-            }
-
-            var type =
-                (SalesLineType)(byte)req.LineType;
-
-            var resolved =
-                await lineResolver.ResolveAsync(
-                    type,
-                    req.ProductVariantId,
-                    req.WarehouseId,
-                    req.Description,
-                    ct);
-
-            var revision =
-                req.PrescriptionRevisionId ??
-                invoice.PrescriptionRevisionId;
-
-            var eye =
-                req.PrescriptionEye.HasValue
-                    ? (EyeSide?)(byte)req.PrescriptionEye.Value
-                    : null;
-
-            await prescriptionValidator.ValidateLineAsync(
-                revision,
-                eye,
-                resolved.PrescriptionRequired,
-                resolved.OpticalPolicy,
+            var type = (SalesLineType)(byte)req.LineType;
+            var requestEye = req.PrescriptionEye.HasValue
+                ? (EyeSide?)(byte)req.PrescriptionEye.Value
+                : null;
+            var prepared = await optical.PrepareAsync(
+                type,
+                req.ProductVariantId,
+                req.WarehouseId,
+                req.Description,
+                req.PrescriptionRevisionId,
+                requestEye,
+                invoice.PrescriptionRevisionId,
+                req.OpticalSnapshot,
                 ct);
-
-            // المنتج ذو السعر المخزن يأخذ سعره القياسي عند إنشاء السطر.
-            // إذا لم يكن للمنتج سعر مخزن (السعر القياسي = صفر)،
-            // أو لم يكن السطر مرتبطًا بمنتج، يسمح بالقيمة اليدوية.
+            var resolved = prepared.Resolution;
+            var requiresProduction = SalesLensLinePolicy.ResolveRequiresProduction(
+                type,
+                resolved,
+                req.GroupId,
+                req.RequiresProduction);
             var standardUnitPrice = resolved.ProductVariantId.HasValue
                 ? SalesPricingCalculator.ConvertFromBase(
                     resolved.BaseUnitPrice,
@@ -296,46 +209,130 @@ public sealed class UpdateSalesInvoiceCommandHandler(
                     invoice.CurrencyDecimalPlacesSnapshot)
                 : resolved.BaseUnitPrice;
 
-            var resolvedActualUnitPrice =
-                resolved.ProductVariantId.HasValue && standardUnitPrice > 0m
-                    ? standardUnitPrice
+            if (existing is not null && HasSameStructure(existing, req, prepared, requiresProduction))
+            {
+                // Product-priced direct invoice lines retain their approved actual price. A zero-priced
+                // product (or non-product line) accepts the current manual value from the user.
+                var actualUnitPrice = existing.ProductVariantId.HasValue && standardUnitPrice > 0m
+                    ? existing.ActualUnitPrice
                     : req.ActualUnitPrice;
 
-            var newLine =
-                SalesInvoiceLine.Create(
-                    Guid.NewGuid(),
-                    invoice.Id,
-                    nextLineNumber++,
-                    req.CustomerOrderLineId,
-                    req.GroupId,
-                    type,
-                    resolved.ProductVariantId,
-                    resolved.WarehouseId,
-                    resolved.ProductCode,
-                    resolved.ProductName,
-                    resolved.Description,
-                    resolved.UnitName,
+                if (currencyContextChanged && existing.ProductVariantId.HasValue && existing.ActualUnitPrice != existing.BaseUnitPrice)
+                {
+                    // Preserve an approved price override across a currency change.
+                    actualUnitPrice = SalesPricingCalculator.ConvertBetweenCurrencies(
+                        existing.ActualUnitPrice,
+                        previousExchangeRate,
+                        invoice.ExchangeRate,
+                        invoice.CurrencyDecimalPlacesSnapshot);
+                }
+                else if (currencyContextChanged && existing.ProductVariantId.HasValue)
+                {
+                    actualUnitPrice = standardUnitPrice;
+                }
+
+                await InvalidatePriceOverridesWhenPriceChangesAsync(existing, actualUnitPrice, ct);
+                invoice.UpdateLinePricing(
+                    existing.Id,
                     req.Quantity,
                     standardUnitPrice,
-                    resolvedActualUnitPrice,
+                    actualUnitPrice,
                     (SalesDiscountType)(byte)req.DiscountType,
                     req.DiscountValue,
-                    req.TaxRate,
-                    revision,
-                    eye,
-                    req.RequiresProduction,
-                    req.Notes,
-                    invoice.TaxCalculationMode,
-                    invoice.CurrencyDecimalPlacesSnapshot,
-                    invoice.ExchangeRate,
-                    invoice.BaseCurrencyDecimalPlacesSnapshot);
+                    req.TaxRate);
+                await SynchronizeInvoiceSnapshotAsync(invoice, existing.Id, prepared.OpticalSnapshot, ct);
+                continue;
+            }
+
+            if (existing is not null)
+            {
+                await EnsureLineCanBeRemovedAsync(existing.Id, ct);
+                await DeleteInvoiceSnapshotAsync(invoice, existing.Id, ct);
+                invoice.RemoveLine(existing.Id);
+                lineRepository.Delete(existing);
+            }
+
+            var resolvedActualUnitPrice = resolved.ProductVariantId.HasValue && standardUnitPrice > 0m
+                ? standardUnitPrice
+                : req.ActualUnitPrice;
+
+            var newLine = SalesInvoiceLine.Create(
+                Guid.NewGuid(),
+                invoice.Id,
+                nextLineNumber++,
+                req.CustomerOrderLineId,
+                req.GroupId,
+                type,
+                resolved.ProductVariantId,
+                resolved.WarehouseId,
+                resolved.ProductCode,
+                resolved.ProductName,
+                resolved.Description,
+                resolved.UnitName,
+                req.Quantity,
+                standardUnitPrice,
+                resolvedActualUnitPrice,
+                (SalesDiscountType)(byte)req.DiscountType,
+                req.DiscountValue,
+                req.TaxRate,
+                prepared.PrescriptionRevisionId,
+                prepared.PrescriptionEye,
+                requiresProduction,
+                req.Notes,
+                invoice.TaxCalculationMode,
+                invoice.CurrencyDecimalPlacesSnapshot,
+                invoice.ExchangeRate,
+                invoice.BaseCurrencyDecimalPlacesSnapshot);
 
             invoice.AddLine(newLine);
+            await lineRepository.AddAsync(newLine, ct);
 
-            await lineRepository.AddAsync(
-                newLine,
-                ct);
+            if (prepared.OpticalSnapshot is not null)
+            {
+                var snapshot = SalesInvoiceOpticalSnapshotFactory.Create(newLine.Id, prepared.OpticalSnapshot);
+                invoice.SetLinePrescriptionSnapshot(newLine.Id, snapshot);
+                await snapshotRepository.AddAsync(snapshot, ct);
+            }
         }
+    }
+
+    private async Task SynchronizeInvoiceSnapshotAsync(
+        SalesInvoice invoice,
+        Guid lineId,
+        OpticalSnapshotDraft? draft,
+        CancellationToken ct)
+    {
+        var existing = (await snapshotRepository.ListAsync(
+            new Specification<SalesInvoiceLinePrescriptionSnapshot>()
+                .Where(x => x.SalesInvoiceLineId == lineId && x.IsActive)
+                .Tracking(),
+            ct)).SingleOrDefault();
+
+        if (existing is not null)
+            snapshotRepository.Delete(existing);
+
+        invoice.ClearLinePrescriptionSnapshot(lineId);
+        if (draft is null)
+            return;
+
+        var replacement = SalesInvoiceOpticalSnapshotFactory.Create(lineId, draft);
+        invoice.SetLinePrescriptionSnapshot(lineId, replacement);
+        await snapshotRepository.AddAsync(replacement, ct);
+    }
+
+    private async Task DeleteInvoiceSnapshotAsync(
+        SalesInvoice invoice,
+        Guid lineId,
+        CancellationToken ct)
+    {
+        var existing = (await snapshotRepository.ListAsync(
+            new Specification<SalesInvoiceLinePrescriptionSnapshot>()
+                .Where(x => x.SalesInvoiceLineId == lineId)
+                .Tracking(),
+            ct)).ToArray();
+        foreach (var snapshot in existing)
+            snapshotRepository.Delete(snapshot);
+        invoice.ClearLinePrescriptionSnapshot(lineId);
     }
 
     private async Task InvalidatePriceOverridesWhenPriceChangesAsync(
@@ -408,39 +405,18 @@ public sealed class UpdateSalesInvoiceCommandHandler(
     private static bool HasSameStructure(
         SalesInvoiceLine line,
         SalesInvoiceLineRequest request,
-        SalesInvoice invoice)
+        PreparedCustomerOrderLine prepared,
+        bool requiresProduction)
     {
-        var revision =
-            request.PrescriptionRevisionId ??
-            invoice.PrescriptionRevisionId;
-
-        var eye =
-            request.PrescriptionEye.HasValue
-                ? (EyeSide?)(byte)request.PrescriptionEye.Value
-                : null;
-
-        return
-            line.CustomerOrderLineId ==
-                request.CustomerOrderLineId &&
-            line.GroupId ==
-                request.GroupId &&
-            line.LineType ==
-                (SalesLineType)(byte)request.LineType &&
-            line.ProductVariantId ==
-                request.ProductVariantId &&
-            line.WarehouseId ==
-                request.WarehouseId &&
-            line.PrescriptionRevisionId ==
-                revision &&
-            line.PrescriptionEye ==
-                eye &&
-            line.RequiresProduction ==
-                request.RequiresProduction &&
-            line.Notes ==
-                (string.IsNullOrWhiteSpace(
-                    request.Notes)
-                    ? null
-                    : request.Notes.Trim());
+        return line.CustomerOrderLineId == request.CustomerOrderLineId &&
+               line.GroupId == request.GroupId &&
+               line.LineType == (SalesLineType)(byte)request.LineType &&
+               line.ProductVariantId == prepared.Resolution.ProductVariantId &&
+               line.WarehouseId == prepared.Resolution.WarehouseId &&
+               line.PrescriptionRevisionId == prepared.PrescriptionRevisionId &&
+               line.PrescriptionEye == prepared.PrescriptionEye &&
+               line.RequiresProduction == requiresProduction &&
+               line.Notes == (string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim());
     }
 
     private async Task<Currency> GetBaseAsync(

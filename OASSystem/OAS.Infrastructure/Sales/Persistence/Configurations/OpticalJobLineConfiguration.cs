@@ -25,8 +25,10 @@ public sealed class OpticalJobLineConfiguration : IEntityTypeConfiguration<Optic
         builder.Property(x => x.LineNumber).IsRequired();
         builder.Property(x => x.LineType).HasConversion<byte>().IsRequired();
         builder.Property(x => x.Eye).HasConversion<byte>();
+        builder.Property(x => x.GroupId);
         builder.Property(x => x.DescriptionSnapshot).HasMaxLength(500).IsRequired();
         builder.Property(x => x.Quantity).HasPrecision(18, 3).IsRequired();
+        builder.Property(x => x.RequiresProduction).IsRequired();
         builder.Property(x => x.Notes).HasMaxLength(500);
         builder.Property(x => x.RowVersion).IsRowVersion().IsConcurrencyToken();
 
@@ -36,6 +38,7 @@ public sealed class OpticalJobLineConfiguration : IEntityTypeConfiguration<Optic
             .IsUnique().HasDatabaseName("UX_OpticalJobLines_Job_CustomerOrderLine");
         builder.HasIndex(x => x.CustomerOrderLineId).HasDatabaseName("IX_OpticalJobLines_CustomerOrderLineId");
         builder.HasIndex(x => x.ProductVariantId).HasDatabaseName("IX_OpticalJobLines_ProductVariantId");
+        builder.HasIndex(x => new { x.OpticalJobId, x.GroupId }).HasDatabaseName("IX_OpticalJobLines_OpticalJobId_GroupId");
 
         builder.HasOne<CustomerOrderLine>().WithMany().HasForeignKey(x => x.CustomerOrderLineId)
             .OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_OpticalJobLines_CustomerOrderLines_CustomerOrderLineId");

@@ -78,14 +78,32 @@ public sealed class CreateCustomerOrderCommandHandler(
                 order.ExchangeRate,
                 order.CurrencyDecimalPlacesSnapshot)
             : resolved.BaseUnitPrice;
-        var actualUnitPrice = req.ActualUnitPrice;
+        var seedStandardUnitPrice = prepared.SeedResolution.ProductVariantId.HasValue
+            ? SalesPricingCalculator.ConvertFromBase(
+                prepared.SeedResolution.BaseUnitPrice,
+                order.ExchangeRate,
+                order.CurrencyDecimalPlacesSnapshot)
+            : prepared.SeedResolution.BaseUnitPrice;
+        var actualUnitPrice = lineType == SalesLineType.Lens
+            ? SalesLensLinePolicy.ResolveCustomerOrderActualPrice(
+                req.ActualUnitPrice,
+                seedStandardUnitPrice,
+                standardUnitPrice,
+                order.CurrencyDecimalPlacesSnapshot)
+            : req.ActualUnitPrice;
+        var requiresProduction = SalesLensLinePolicy.ResolveRequiresProduction(
+            lineType,
+            resolved,
+            req.GroupId,
+            req.RequiresProduction);
+
         var lineId = Guid.NewGuid();
         var line = CustomerOrderLine.Create(
             lineId, order.Id, lineNo, req.GroupId, lineType, resolved.ProductVariantId, resolved.WarehouseId,
             resolved.Description, req.Quantity, standardUnitPrice, actualUnitPrice,
             (SalesDiscountType)(byte)req.DiscountType, req.DiscountValue, req.TaxRate,
             prepared.PrescriptionRevisionId, prepared.PrescriptionEye,
-            req.RequiresProduction, req.Notes, order.TaxCalculationMode, order.CurrencyDecimalPlacesSnapshot);
+            requiresProduction, req.Notes, order.TaxCalculationMode, order.CurrencyDecimalPlacesSnapshot);
 
         if (prepared.OpticalSnapshot is not null)
             await snapshots.AddAsync(CustomerOrderOpticalSnapshotFactory.Create(lineId, prepared.OpticalSnapshot), ct);

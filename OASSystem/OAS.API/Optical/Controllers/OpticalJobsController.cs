@@ -53,6 +53,16 @@ public sealed class OpticalJobsController(ISender sender) : ControllerBase
         return Ok(await sender.Send(new GetOpticalJobQuery(id), cancellationToken));
     }
 
+    [HttpPost("{id:guid}/materials/issue")]
+    public async Task<ActionResult<OpticalJobDetailsDto>> IssueMaterials(
+        Guid id,
+        [FromBody] IssueOpticalJobMaterialsRequest request,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new IssueOpticalJobMaterialsCommand(id, request), cancellationToken);
+        return Ok(await sender.Send(new GetOpticalJobQuery(id), cancellationToken));
+    }
+
     [HttpPost("{id:guid}/start")]
     public async Task<ActionResult<OpticalJobDetailsDto>> Start(
         Guid id,
@@ -64,12 +74,24 @@ public sealed class OpticalJobsController(ISender sender) : ControllerBase
     }
 
     [HttpPost("{id:guid}/send-to-quality-control")]
+    [HttpPost("{id:guid}/qc")]
     public async Task<ActionResult<OpticalJobDetailsDto>> SendToQualityControl(
         Guid id,
         [FromBody] OpticalJobActionRequest request,
         CancellationToken cancellationToken)
     {
         await sender.Send(new SendOpticalJobToQualityControlCommand(id, request), cancellationToken);
+        return Ok(await sender.Send(new GetOpticalJobQuery(id), cancellationToken));
+    }
+
+    [HttpPost("{id:guid}/qc/{qcId:guid}/complete")]
+    public async Task<ActionResult<OpticalJobDetailsDto>> CompleteQualityControl(
+        Guid id,
+        Guid qcId,
+        [FromBody] CompleteOpticalQualityCheckRequest request,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new CompleteOpticalQualityControlCommand(id, qcId, request), cancellationToken);
         return Ok(await sender.Send(new GetOpticalJobQuery(id), cancellationToken));
     }
 
@@ -83,6 +105,48 @@ public sealed class OpticalJobsController(ISender sender) : ControllerBase
         return Ok(await sender.Send(new GetOpticalJobQuery(id), cancellationToken));
     }
 
+    [HttpPost("{id:guid}/breakages")]
+    public async Task<ActionResult<OpticalJobDetailsDto>> RecordBreakage(
+        Guid id,
+        [FromBody] RecordOpticalJobBreakageRequest request,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new RecordOpticalJobBreakageCommand(id, request), cancellationToken);
+        return Ok(await sender.Send(new GetOpticalJobQuery(id), cancellationToken));
+    }
+
+    [HttpPost("{id:guid}/remakes")]
+    public async Task<ActionResult<OpticalJobDetailsDto>> CreateRemake(
+        Guid id,
+        [FromBody] CreateOpticalJobRemakeRequest request,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new CreateOpticalJobRemakeCommand(id, request), cancellationToken);
+        return Ok(await sender.Send(new GetOpticalJobQuery(id), cancellationToken));
+    }
+
+    [HttpPost("{id:guid}/remakes/{remakeId:guid}/start")]
+    public async Task<ActionResult<OpticalJobDetailsDto>> StartRemake(
+        Guid id,
+        Guid remakeId,
+        [FromBody] OpticalJobRemakeActionRequest request,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new StartOpticalJobRemakeCommand(id, remakeId, request), cancellationToken);
+        return Ok(await sender.Send(new GetOpticalJobQuery(id), cancellationToken));
+    }
+
+    [HttpPost("{id:guid}/remakes/{remakeId:guid}/qc")]
+    public async Task<ActionResult<OpticalJobDetailsDto>> SendRemakeToQc(
+        Guid id,
+        Guid remakeId,
+        [FromBody] OpticalJobRemakeActionRequest request,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new SendOpticalJobRemakeToQcCommand(id, remakeId, request), cancellationToken);
+        return Ok(await sender.Send(new GetOpticalJobQuery(id), cancellationToken));
+    }
+
     [HttpPost("{id:guid}/ready-for-delivery")]
     [HttpPost("{id:guid}/ready")]
     public async Task<ActionResult<OpticalJobDetailsDto>> MarkReadyForDelivery(
@@ -91,6 +155,27 @@ public sealed class OpticalJobsController(ISender sender) : ControllerBase
         CancellationToken cancellationToken)
     {
         await sender.Send(new MarkOpticalJobReadyCommand(id, request), cancellationToken);
+        return Ok(await sender.Send(new GetOpticalJobQuery(id), cancellationToken));
+    }
+
+
+    [HttpPost("{id:guid}/deliver")]
+    public async Task<ActionResult<OpticalJobDetailsDto>> Deliver(
+        Guid id,
+        [FromBody] OpticalJobActionRequest request,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new DeliverOpticalJobCommand(id, request), cancellationToken);
+        return Ok(await sender.Send(new GetOpticalJobQuery(id), cancellationToken));
+    }
+
+    [HttpPost("{id:guid}/cancel")]
+    public async Task<ActionResult<OpticalJobDetailsDto>> Cancel(
+        Guid id,
+        [FromBody] OpticalJobActionRequest request,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new CancelOpticalJobCommand(id, request), cancellationToken);
         return Ok(await sender.Send(new GetOpticalJobQuery(id), cancellationToken));
     }
 }

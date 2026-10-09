@@ -11,10 +11,15 @@ using OAS.Domain.Features.Employees.Entities;
 using OAS.Domain.Sales.Entities;
 using OAS.Infrastructure.Persistence;
 using ContractEyeSide = OAS.Contracts.Sales.Enums.EyeSide;
-using ContractLineType = OAS.Contracts.Sales.Enums.SalesLineType;
+using ContractLineType = OAS.Contracts.Sales.Enums.OpticalJobLineType;
 using ContractJobStatus = OAS.Contracts.Sales.Enums.OpticalJobStatus;
 using ContractMeasurementSource = OAS.Contracts.Sales.Enums.OpticalMeasurementSource;
 using ContractPrismBase = OAS.Contracts.Sales.Enums.PrismBaseDirection;
+using ContractQcResult = OAS.Contracts.Sales.Enums.OpticalQualityCheckResult;
+using ContractQcItemResult = OAS.Contracts.Sales.Enums.OpticalQualityCheckItemResult;
+using ContractQcAction = OAS.Contracts.Sales.Enums.OpticalQcFailureAction;
+using ContractBreakageStatus = OAS.Contracts.Sales.Enums.OpticalBreakageStatus;
+using ContractRemakeStatus = OAS.Contracts.Sales.Enums.OpticalRemakeStatus;
 
 namespace OAS.Infrastructure.Sales.Persistence.Queries;
 
@@ -49,6 +54,9 @@ public sealed class OpticalJobQueryService(OasDbContext db) : IOpticalJobQuerySe
                 AssignedTechnicianId = job.AssignedTechnicianId,
                 StartedAtUtc = job.StartedAtUtc,
                 CompletedAtUtc = job.CompletedAtUtc,
+                AssignedAtUtc = job.AssignedAtUtc,
+                DeliveredAtUtc = job.DeliveredAtUtc,
+                CreatedAtUtc = job.CreatedAtUtc,
                 Notes = job.Notes,
                 RowVersion = job.RowVersion,
                 CustomerOrderCode = order.OrderCode,
@@ -64,6 +72,10 @@ public sealed class OpticalJobQueryService(OasDbContext db) : IOpticalJobQuerySe
             query = query.Where(x => x.AssignedTechnicianId == request.TechnicianId.Value);
         if (request.RequiredDate.HasValue)
             query = query.Where(x => x.RequiredDate == request.RequiredDate.Value);
+        if (request.RequiredDateFrom.HasValue)
+            query = query.Where(x => x.RequiredDate.HasValue && x.RequiredDate.Value >= request.RequiredDateFrom.Value);
+        if (request.RequiredDateTo.HasValue)
+            query = query.Where(x => x.RequiredDate.HasValue && x.RequiredDate.Value <= request.RequiredDateTo.Value);
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var term = request.Search.Trim();
@@ -72,10 +84,32 @@ public sealed class OpticalJobQueryService(OasDbContext db) : IOpticalJobQuerySe
                                      (x.Mobile != null && x.Mobile.Contains(term)));
         }
 
+        if (request.HasBreakage.HasValue)
+        {
+            var openBreakageJobIds = db.Set<OpticalJobBreakage>().AsNoTracking()
+                .Where(x => x.Status != OAS.Domain.Sales.Enums.OpticalBreakageStatus.Closed && x.Status != OAS.Domain.Sales.Enums.OpticalBreakageStatus.Cancelled)
+                .Select(x => x.OpticalJobId);
+            query = request.HasBreakage.Value ? query.Where(x => openBreakageJobIds.Contains(x.Id)) : query.Where(x => !openBreakageJobIds.Contains(x.Id));
+        }
+        if (request.HasRemake.HasValue)
+        {
+            var openRemakeJobIds = db.Set<OpticalJobRemake>().AsNoTracking()
+                .Where(x => x.Status != OAS.Domain.Sales.Enums.OpticalRemakeStatus.Completed && x.Status != OAS.Domain.Sales.Enums.OpticalRemakeStatus.Cancelled)
+                .Select(x => x.OpticalJobId);
+            query = request.HasRemake.Value ? query.Where(x => openRemakeJobIds.Contains(x.Id)) : query.Where(x => !openRemakeJobIds.Contains(x.Id));
+        }
+
         query = ApplySort(query, request.SortBy, request.SortDirection);
         var total = await query.LongCountAsync(cancellationToken);
         var rows = await query.Skip((page.PageNumber - 1) * page.PageSize).Take(page.PageSize).ToListAsync(cancellationToken);
-        var summaries = await BuildLineSummariesAsync(rows.Select(x => x.Id).ToArray(), cancellationToken);
+        var jobIds = rows.Select(x => x.Id).ToArray();
+        var summaries = await BuildLineSummariesAsync(jobIds, cancellationToken);
+        var breakageJobs = (await db.Set<OpticalJobBreakage>().AsNoTracking()
+            .Where(x => jobIds.Contains(x.OpticalJobId) && x.Status != OAS.Domain.Sales.Enums.OpticalBreakageStatus.Closed && x.Status != OAS.Domain.Sales.Enums.OpticalBreakageStatus.Cancelled)
+            .Select(x => x.OpticalJobId).Distinct().ToListAsync(cancellationToken)).ToHashSet();
+        var remakeJobs = (await db.Set<OpticalJobRemake>().AsNoTracking()
+            .Where(x => jobIds.Contains(x.OpticalJobId) && x.Status != OAS.Domain.Sales.Enums.OpticalRemakeStatus.Completed && x.Status != OAS.Domain.Sales.Enums.OpticalRemakeStatus.Cancelled)
+            .Select(x => x.OpticalJobId).Distinct().ToListAsync(cancellationToken)).ToHashSet();
 
         return new PagedResult<OpticalJobWorkQueueDto>
         {
@@ -102,7 +136,10 @@ public sealed class OpticalJobQueryService(OasDbContext db) : IOpticalJobQuerySe
                     summary?.Frame,
                     summary?.OD,
                     summary?.OS,
-                    x.AssignedTechnicianName);
+                    x.AssignedTechnicianName,
+                    breakageJobs.Contains(x.Id),
+                    remakeJobs.Contains(x.Id),
+                    x.CreatedAtUtc);
             }).ToArray(),
             PageNumber = page.PageNumber,
             PageSize = page.PageSize,
@@ -131,6 +168,10 @@ public sealed class OpticalJobQueryService(OasDbContext db) : IOpticalJobQuerySe
             ?? throw new NotFoundException(nameof(OpticalJob), id);
 
         var lines = await BuildDetailsLinesAsync(id, cancellationToken);
+        var timeline = await BuildTimelineAsync(id, cancellationToken);
+        var openBreakages = await BuildBreakagesAsync(id, cancellationToken);
+        var openRemakes = await BuildRemakesAsync(id, cancellationToken);
+        var latestQc = await BuildLatestQualityCheckAsync(id, cancellationToken);
         var jobEntity = row.Job;
         return new OpticalJobDetailsDto(
             jobEntity.Id,
@@ -155,7 +196,13 @@ public sealed class OpticalJobQueryService(OasDbContext db) : IOpticalJobQuerySe
             row.CustomerCode,
             row.CustomerName,
             row.Mobile,
-            row.TechnicianName);
+            row.TechnicianName,
+            jobEntity.AssignedAtUtc,
+            jobEntity.DeliveredAtUtc,
+            timeline,
+            openBreakages,
+            openRemakes,
+            latestQc);
     }
 
     private async Task<IReadOnlyList<OpticalJobLineDto>> BuildDetailsLinesAsync(Guid jobId, CancellationToken ct)
@@ -184,8 +231,10 @@ public sealed class OpticalJobQueryService(OasDbContext db) : IOpticalJobQuerySe
                 line.LineNumber,
                 (ContractLineType)(byte)line.LineType,
                 line.Eye.HasValue ? (ContractEyeSide?)(byte)line.Eye.Value : null,
+                line.GroupId,
                 line.DescriptionSnapshot,
                 line.Quantity,
+                line.RequiresProduction,
                 line.Notes,
                 Convert.ToBase64String(line.RowVersion),
                 variant?.SKU,
@@ -209,10 +258,10 @@ public sealed class OpticalJobQueryService(OasDbContext db) : IOpticalJobQuerySe
         var result = new Dictionary<Guid, JobSummary>();
         foreach (var group in lines.GroupBy(x => x.OpticalJobId))
         {
-            string? frame = group.FirstOrDefault(x => x.LineType == OAS.Domain.Sales.Enums.SalesLineType.Frame)?.DescriptionSnapshot;
+            string? frame = group.FirstOrDefault(x => x.LineType == OAS.Domain.Sales.Enums.OpticalJobLineType.Frame)?.DescriptionSnapshot;
             string? od = null;
             string? os = null;
-            foreach (var line in group.Where(x => x.LineType == OAS.Domain.Sales.Enums.SalesLineType.Lens))
+            foreach (var line in group.Where(x => x.LineType == OAS.Domain.Sales.Enums.OpticalJobLineType.Lens))
             {
                 snapshots.TryGetValue(line.CustomerOrderLineId, out var snapshot);
                 var text = FormatOptical(line.DescriptionSnapshot, snapshot);
@@ -223,6 +272,50 @@ public sealed class OpticalJobQueryService(OasDbContext db) : IOpticalJobQuerySe
             result[group.Key] = new JobSummary(frame, od, os);
         }
         return result;
+    }
+
+    private async Task<IReadOnlyList<OpticalJobTimelineItemDto>> BuildTimelineAsync(Guid jobId, CancellationToken ct)
+    {
+        var rows = await db.Set<OpticalJobStatusHistory>().AsNoTracking()
+            .Where(x => x.OpticalJobId == jobId).OrderByDescending(x => x.ChangedAtUtc).ToListAsync(ct);
+        return rows.Select(x => new OpticalJobTimelineItemDto(
+            x.FromStatus.HasValue ? (ContractJobStatus?)(byte)x.FromStatus.Value : null,
+            (ContractJobStatus)(byte)x.ToStatus, x.Reason, x.ChangedBy, x.ChangedAtUtc, x.CorrelationId)).ToArray();
+    }
+
+    private async Task<IReadOnlyList<OpticalJobBreakageDto>> BuildBreakagesAsync(Guid jobId, CancellationToken ct)
+    {
+        var rows = await db.Set<OpticalJobBreakage>().AsNoTracking()
+            .Where(x => x.OpticalJobId == jobId && x.Status != OAS.Domain.Sales.Enums.OpticalBreakageStatus.Closed && x.Status != OAS.Domain.Sales.Enums.OpticalBreakageStatus.Cancelled)
+            .OrderByDescending(x => x.RecordedAtUtc).ToListAsync(ct);
+        return rows.Select(x => new OpticalJobBreakageDto(x.Id, x.OpticalJobId, x.OpticalJobLineId, x.ProductVariantId,
+            x.Eye.HasValue ? (ContractEyeSide?)(byte)x.Eye.Value : null, x.Quantity, x.ReasonCode, x.ReasonText,
+            x.TechnicianId, (ContractBreakageStatus)(byte)x.Status, x.RequiresReplacement, x.RecordedAtUtc,
+            x.ClosedAtUtc, Convert.ToBase64String(x.RowVersion))).ToArray();
+    }
+
+    private async Task<IReadOnlyList<OpticalJobRemakeDto>> BuildRemakesAsync(Guid jobId, CancellationToken ct)
+    {
+        var rows = await db.Set<OpticalJobRemake>().AsNoTracking()
+            .Where(x => x.OpticalJobId == jobId && x.Status != OAS.Domain.Sales.Enums.OpticalRemakeStatus.Completed && x.Status != OAS.Domain.Sales.Enums.OpticalRemakeStatus.Cancelled)
+            .OrderByDescending(x => x.CreatedAtUtc).ToListAsync(ct);
+        return rows.Select(x => new OpticalJobRemakeDto(x.Id, x.OpticalJobId, x.SourceQualityCheckId, x.SourceBreakageId,
+            x.OpticalJobLineId, x.ProductVariantId, x.Quantity, (ContractRemakeStatus)(byte)x.Status, x.Reason,
+            x.ReplacementPurchaseRequestLineId, x.StartedAtUtc, x.CompletedAtUtc, Convert.ToBase64String(x.RowVersion))).ToArray();
+    }
+
+    private async Task<OpticalQualityCheckDto?> BuildLatestQualityCheckAsync(Guid jobId, CancellationToken ct)
+    {
+        var check = await db.Set<OpticalQualityCheck>().AsNoTracking().Where(x => x.OpticalJobId == jobId)
+            .OrderByDescending(x => x.AttemptNumber).FirstOrDefaultAsync(ct);
+        if (check is null) return null;
+        var items = await db.Set<OpticalQualityCheckItem>().AsNoTracking().Where(x => x.QualityCheckId == check.Id)
+            .OrderBy(x => x.Sequence).ToListAsync(ct);
+        return new OpticalQualityCheckDto(check.Id, check.OpticalJobId, check.AttemptNumber, (ContractQcResult)(byte)check.Result,
+            check.FailureAction.HasValue ? (ContractQcAction?)(byte)check.FailureAction.Value : null, check.GeneralNotes,
+            check.CheckedBy, check.CheckedAtUtc, Convert.ToBase64String(check.RowVersion),
+            items.Select(x => new OpticalQualityCheckItemDto(x.Id, x.CheckCode, x.CheckName, (ContractQcItemResult)(byte)x.Result,
+                x.Notes, x.Sequence, Convert.ToBase64String(x.RowVersion))).ToArray());
     }
 
     private static IQueryable<JobRow> ApplySort(IQueryable<JobRow> query, string? sortBy, SortDirection direction)
@@ -291,6 +384,9 @@ public sealed class OpticalJobQueryService(OasDbContext db) : IOpticalJobQuerySe
         public Guid? AssignedTechnicianId { get; init; }
         public DateTimeOffset? StartedAtUtc { get; init; }
         public DateTimeOffset? CompletedAtUtc { get; init; }
+        public DateTimeOffset? AssignedAtUtc { get; init; }
+        public DateTimeOffset? DeliveredAtUtc { get; init; }
+        public DateTimeOffset CreatedAtUtc { get; init; }
         public string? Notes { get; init; }
         public byte[] RowVersion { get; init; } = [];
         public string CustomerOrderCode { get; init; } = string.Empty;

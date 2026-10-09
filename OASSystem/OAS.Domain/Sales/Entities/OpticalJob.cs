@@ -41,8 +41,10 @@ public sealed class OpticalJob : AuditableEntity<Guid>
     public DateOnly? RequiredDate { get; private set; }
     public OpticalJobStatus Status { get; private set; }
     public Guid? AssignedTechnicianId { get; private set; }
+    public DateTimeOffset? AssignedAtUtc { get; private set; }
     public DateTimeOffset? StartedAtUtc { get; private set; }
     public DateTimeOffset? CompletedAtUtc { get; private set; }
+    public DateTimeOffset? DeliveredAtUtc { get; private set; }
     public string? Notes { get; private set; }
     public bool IsActive { get; private set; }
     public byte[] RowVersion { get; private set; } = [];
@@ -72,12 +74,13 @@ public sealed class OpticalJob : AuditableEntity<Guid>
         _lines.Add(line);
     }
 
-    public void AssignTechnician(Guid? technicianId)
+    public void AssignTechnician(Guid? technicianId, DateTimeOffset atUtc)
     {
         EnsureOpen();
         if (technicianId == Guid.Empty)
             throw new DomainException("Assigned technician id cannot be empty.");
         AssignedTechnicianId = technicianId;
+        AssignedAtUtc = technicianId.HasValue ? atUtc : null;
     }
 
     public void UpdatePlanning(DateOnly? requiredDate, string? notes)
@@ -134,6 +137,22 @@ public sealed class OpticalJob : AuditableEntity<Guid>
         Status = OpticalJobStatus.QCPassed;
     }
 
+    public void FailQualityControl(OpticalQcFailureAction action)
+    {
+        EnsureStatus(OpticalJobStatus.AwaitingQC);
+        SalesDomainGuard.Defined(action, "QC failure action");
+        // Rework/remake both return the same job to production. The detailed reason/action
+        // is retained by OpticalQualityCheck / OpticalJobRemake.
+        Status = OpticalJobStatus.InProduction;
+    }
+
+    public void ResumeAfterReplacement()
+    {
+        if (Status is not (OpticalJobStatus.AwaitingMaterials or OpticalJobStatus.InProduction))
+            throw new DomainException("Optical job cannot resume replacement from the current state.");
+        Status = OpticalJobStatus.MaterialsAvailable;
+    }
+
     public void MarkReadyForDelivery(DateTimeOffset completedAtUtc)
     {
         if (Status != OpticalJobStatus.QCPassed)
@@ -142,10 +161,11 @@ public sealed class OpticalJob : AuditableEntity<Guid>
         CompletedAtUtc = completedAtUtc;
     }
 
-    public void MarkDelivered()
+    public void MarkDelivered(DateTimeOffset deliveredAtUtc)
     {
         EnsureStatus(OpticalJobStatus.ReadyForDelivery);
         Status = OpticalJobStatus.Delivered;
+        DeliveredAtUtc = deliveredAtUtc;
         IsActive = false;
     }
 

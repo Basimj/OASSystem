@@ -10,6 +10,7 @@
         @if (!ReadOnly)
         {
             <UiButton Text="إضافة بند" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" Variant="ButtonVariant.Secondary" OnClick="AddLineAsync" />
+            <UiButton Text="إضافة نظارة" IconCssClass="fa-solid fa-glasses" Size="ControlSize.Small" Variant="ButtonVariant.Secondary" OnClick="AddOpticalSetAsync" />
         }
     </div>
 
@@ -31,7 +32,7 @@
                             <span class="ui-sales-line-card__number">@line.LineNumber</span>
                             <div>
                                 <strong>@LineHeading(line)</strong>
-                                <span>@LineTypeText(line.LineType)</span>
+                                <span>@LineTypeText(line.LineType)@GroupText(line)</span>
                             </div>
                         </div>
 
@@ -167,22 +168,44 @@
                                 </div>
                             </div>
 
+                            @if (line.PrescriptionRequired)
+                            {
+                                <div class="ui-sales-line-card__range-banner" role="note">
+                                    <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                                    <span>@LensRangeSummary(line)</span>
+                                </div>
+                            }
+
                             <div class="ui-sales-line-card__optical-grid">
                                 @if (line.PrescriptionRequired)
                                 {
-                                    @if (!string.IsNullOrWhiteSpace(HeaderPrescriptionRevisionId))
+                                    <label class="ui-sales-line-card__number-field">
+                                        <span>مصدر القياسات</span>
+                                        <select aria-label="مصدر قياسات العدسة" disabled="@ReadOnly" value="@line.OpticalMeasurementSource" @onchange="e => OpticalSourceChanged(line, e)">
+                                            <option value="StoredPrescription">وصفة محفوظة</option>
+                                            <option value="Manual">إدخال يدوي</option>
+                                        </select>
+                                    </label>
+
+                                    @if (line.OpticalMeasurementSource == "StoredPrescription")
                                     {
-                                        <UiInputText Label="إصدار الوصفة" Value="@(HeaderPrescriptionRevisionDisplay ?? HeaderPrescriptionRevisionId)" ReadOnly="true" />
-                                    }
-                                    else
-                                    {
-                                        <UiLookup Label="إصدار الوصفة"
-                                                  Value="@line.PrescriptionRevisionId"
-                                                  ValueChanged="v => PrescriptionRevisionChanged(line, v)"
-                                                  SelectedItem="@PrescriptionItem(line)"
-                                                  SearchAsync="(q, ct) => SearchPrescription(line, q, ct)"
-                                                  Placeholder="اختر إصدار الوصفة..."
-                                                  Disabled="@ReadOnly" />
+                                        <div class="ui-sales-line-card__field ui-sales-line-card__field--wide">
+                                            <small class="ui-sales-line-card__range-hint">سيتم التحقق من قياسات الوصفة المختارة مقابل نطاق العدسة الموضح أعلاه.</small>
+                                        </div>
+                                        @if (!string.IsNullOrWhiteSpace(HeaderPrescriptionRevisionId))
+                                        {
+                                            <UiInputText Label="إصدار الوصفة" Value="@(HeaderPrescriptionRevisionDisplay ?? HeaderPrescriptionRevisionId)" ReadOnly="true" />
+                                        }
+                                        else
+                                        {
+                                            <UiLookup Label="إصدار الوصفة"
+                                                      Value="@line.PrescriptionRevisionId"
+                                                      ValueChanged="v => PrescriptionRevisionChanged(line, v)"
+                                                      SelectedItem="@PrescriptionItem(line)"
+                                                      SearchAsync="(q, ct) => SearchPrescription(line, q, ct)"
+                                                      Placeholder="اختر إصدار الوصفة..."
+                                                      Disabled="@ReadOnly" />
+                                        }
                                     }
 
                                     <label class="ui-sales-line-card__number-field">
@@ -193,10 +216,49 @@
                                             <option value="LeftOS">العين اليسرى OS</option>
                                         </select>
                                     </label>
+
+                                    @if (line.OpticalMeasurementSource == "Manual")
+                                    {
+                                        <label class="ui-sales-line-card__number-field">
+                                            <span>SPH</span>
+                                            <input type="number" step="0.25" min="@line.LensSphereMin" max="@line.LensSphereMax" placeholder="@RangePlaceholder(line.LensSphereMin, line.LensSphereMax)" title="@RangeTitle(nameof(line.SPH), line.LensSphereMin, line.LensSphereMax)" value="@line.SPH" disabled="@ReadOnly" @onchange="e => OpticalDecimalChanged(line, nameof(line.SPH), e)" />
+                                            <small class="ui-sales-line-card__range-hint">@RangeHint(nameof(line.SPH), line.LensSphereMin, line.LensSphereMax)</small>
+                                        </label>
+                                        <label class="ui-sales-line-card__number-field">
+                                            <span>CYL</span>
+                                            <input type="number" step="0.25" min="@line.LensCylinderMin" max="@line.LensCylinderMax" placeholder="@RangePlaceholder(line.LensCylinderMin, line.LensCylinderMax)" title="@RangeTitle(nameof(line.CYL), line.LensCylinderMin, line.LensCylinderMax)" value="@line.CYL" disabled="@ReadOnly" @onchange="e => OpticalDecimalChanged(line, nameof(line.CYL), e)" />
+                                            <small class="ui-sales-line-card__range-hint">@RangeHint(nameof(line.CYL), line.LensCylinderMin, line.LensCylinderMax)</small>
+                                        </label>
+                                        <label class="ui-sales-line-card__number-field">
+                                            <span>Axis</span>
+                                            <input type="number" min="0" max="180" step="1" placeholder="0 إلى 180" title="Axis: أدخل قيمة بين 0 و 180" value="@line.Axis" disabled="@ReadOnly" @onchange="e => OpticalAxisChanged(line, e)" />
+                                            <small class="ui-sales-line-card__range-hint">أدخل قيمة بين 0 و 180.</small>
+                                        </label>
+                                        <label class="ui-sales-line-card__number-field">
+                                            <span>ADD</span>
+                                            <input type="number" step="0.25" min="@line.LensAddMin" max="@line.LensAddMax" placeholder="@RangePlaceholder(line.LensAddMin, line.LensAddMax)" title="@RangeTitle(nameof(line.ADD), line.LensAddMin, line.LensAddMax)" value="@line.ADD" disabled="@ReadOnly" @onchange="e => OpticalDecimalChanged(line, nameof(line.ADD), e)" />
+                                            <small class="ui-sales-line-card__range-hint">@RangeHint(nameof(line.ADD), line.LensAddMin, line.LensAddMax)</small>
+                                        </label>
+                                        <label class="ui-sales-line-card__number-field"><span>Prism</span><input type="number" min="0" step="0.25" value="@line.Prism" disabled="@ReadOnly" @onchange="e => OpticalDecimalChanged(line, nameof(line.Prism), e)" /></label>
+                                        <label class="ui-sales-line-card__number-field">
+                                            <span>Prism Base</span>
+                                            <select disabled="@ReadOnly" value="@line.PrismBase" @onchange="e => PrismBaseChanged(line, e)">
+                                                <option value="None">بدون</option>
+                                                <option value="BaseIn">Base In</option>
+                                                <option value="BaseOut">Base Out</option>
+                                                <option value="BaseUp">Base Up</option>
+                                                <option value="BaseDown">Base Down</option>
+                                            </select>
+                                        </label>
+                                        <label class="ui-sales-line-card__number-field"><span>PD</span><input type="number" min="0" step="0.5" value="@line.PD" disabled="@ReadOnly" @onchange="e => OpticalDecimalChanged(line, nameof(line.PD), e)" /></label>
+                                        <label class="ui-sales-line-card__number-field"><span>Mono PD</span><input type="number" min="0" step="0.5" value="@line.MonocularPD" disabled="@ReadOnly" @onchange="e => OpticalDecimalChanged(line, nameof(line.MonocularPD), e)" /></label>
+                                        <label class="ui-sales-line-card__number-field"><span>Fitting Height</span><input type="number" min="0" step="0.5" value="@line.FittingHeight" disabled="@ReadOnly" @onchange="e => OpticalDecimalChanged(line, nameof(line.FittingHeight), e)" /></label>
+                                        <div class="ui-sales-line-card__field"><UiInputText Label="VA" Value="@line.VA" ValueChanged="v => VaChanged(line, v)" ReadOnly="@ReadOnly" /></div>
+                                    }
                                 }
 
-                                <div class="ui-sales-line-card__field">
-                                    <UiCheckbox Label="يتطلب تجهيز / إنتاج" Value="@line.RequiresProduction" ValueChanged="v => ProductionChanged(line, v)" Disabled="@ReadOnly" />
+                                <div class="ui-sales-line-card__field ui-sales-line-card__field--wide">
+                                    <UiInputText Label="مسار التجهيز" Value="@ProductionStatusText(line)" ReadOnly="true" />
                                 </div>
 
                                 <div class="ui-sales-line-card__field ui-sales-line-card__field--wide">
@@ -264,6 +326,49 @@
         _ => "أخرى"
     };
 
+    private static string GroupText(UiSalesLineModel line) =>
+        line.GroupId.HasValue ? " • مجموعة نظارة" : string.Empty;
+
+    private static string ProductionStatusText(UiSalesLineModel line) =>
+        line.RequiresProduction
+            ? "يدخل مسار المعمل تلقائيًا"
+            : "جاهز للبيع دون مسار معمل";
+
+    private static bool HasRange(decimal? minimum, decimal? maximum) => minimum.HasValue && maximum.HasValue;
+
+    private static string FormatRangeValue(decimal value) => value > 0 ? $"+{value:0.##}" : $"{value:0.##}";
+
+    private static string? RangePlaceholder(decimal? minimum, decimal? maximum) =>
+        HasRange(minimum, maximum) ? $"{FormatRangeValue(minimum!.Value)} إلى {FormatRangeValue(maximum!.Value)}" : "النطاق غير محدد";
+
+    private static string RangeTitle(string field, decimal? minimum, decimal? maximum) =>
+        HasRange(minimum, maximum)
+            ? $"{field}: أدخل قيمة بين {FormatRangeValue(minimum!.Value)} و {FormatRangeValue(maximum!.Value)}"
+            : $"{field}: نطاق العدسة غير محدد في بطاقة المنتج";
+
+    private static string RangeHint(string field, decimal? minimum, decimal? maximum) =>
+        HasRange(minimum, maximum)
+            ? $"أدخل قيمة بين {FormatRangeValue(minimum!.Value)} و {FormatRangeValue(maximum!.Value)}."
+            : "النطاق غير محدد في بطاقة العدسة.";
+
+    private static string LensRangeSummary(UiSalesLineModel line)
+    {
+        if (!HasRange(line.LensSphereMin, line.LensSphereMax) &&
+            !HasRange(line.LensCylinderMin, line.LensCylinderMax) &&
+            !HasRange(line.LensAddMin, line.LensAddMax))
+            return "لا توجد نطاقات قياس معرفة لهذه العدسة. راجع بطاقة العدسة قبل إكمال البيع.";
+
+        var parts = new List<string>();
+        if (HasRange(line.LensSphereMin, line.LensSphereMax))
+            parts.Add($"SPH {FormatRangeValue(line.LensSphereMin!.Value)} إلى {FormatRangeValue(line.LensSphereMax!.Value)}");
+        if (HasRange(line.LensCylinderMin, line.LensCylinderMax))
+            parts.Add($"CYL {FormatRangeValue(line.LensCylinderMin!.Value)} إلى {FormatRangeValue(line.LensCylinderMax!.Value)}");
+        if (HasRange(line.LensAddMin, line.LensAddMax))
+            parts.Add($"ADD {FormatRangeValue(line.LensAddMin!.Value)} إلى {FormatRangeValue(line.LensAddMax!.Value)}");
+
+        return "نطاق العدسة المختارة: " + string.Join(" • ", parts);
+    }
+
     private static string LineHeading(UiSalesLineModel line)
     {
         if (!string.IsNullOrWhiteSpace(line.ProductDisplay))
@@ -288,6 +393,40 @@
     private async Task AddLineAsync(MouseEventArgs _)
     {
         Model.Add(new UiSalesLineModel { LineNumber = Model.Count + 1 });
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task AddOpticalSetAsync(MouseEventArgs _)
+    {
+        var groupId = Guid.NewGuid();
+        Model.Add(new UiSalesLineModel
+        {
+            GroupId = groupId,
+            LineNumber = Model.Count + 1,
+            LineType = "Frame",
+            RequiresProduction = true,
+            Description = "إطار النظارة"
+        });
+        Model.Add(new UiSalesLineModel
+        {
+            GroupId = groupId,
+            LineNumber = Model.Count + 1,
+            LineType = "Lens",
+            PrescriptionEye = "RightOD",
+            RequiresProduction = true,
+            OpticalMeasurementSource = "StoredPrescription",
+            Description = "عدسة العين اليمنى OD"
+        });
+        Model.Add(new UiSalesLineModel
+        {
+            GroupId = groupId,
+            LineNumber = Model.Count + 1,
+            LineType = "Lens",
+            PrescriptionEye = "LeftOS",
+            RequiresProduction = true,
+            OpticalMeasurementSource = "StoredPrescription",
+            Description = "عدسة العين اليسرى OS"
+        });
         await OnChanged.InvokeAsync();
     }
 
@@ -334,10 +473,12 @@
             line.UnitSnapshot = null;
             line.BaseUnitPrice = 0m;
             line.ActualUnitPrice = 0m;
+            line.ProductIsPrescriptionLens = null;
             line.PrescriptionRequired = false;
             line.PrescriptionRevisionId = string.Empty;
             line.PrescriptionRevisionDisplay = null;
             line.PrescriptionEye = string.Empty;
+            ClearOpticalMeasurements(line);
         }
 
         await OnProductSelected.InvokeAsync(new(line, value));
@@ -365,6 +506,7 @@
         line.ProductNameSnapshot = null;
         line.UnitSnapshot = null;
         line.ProductIsStockItem = null;
+        line.ProductIsPrescriptionLens = null;
         line.WarehouseId = string.Empty;
         line.WarehouseDisplay = null;
         line.BaseUnitPrice = 0m;
@@ -373,6 +515,13 @@
         line.PrescriptionRevisionId = string.Empty;
         line.PrescriptionRevisionDisplay = null;
         line.PrescriptionEye = string.Empty;
+        line.LensSphereMin = null;
+        line.LensSphereMax = null;
+        line.LensCylinderMin = null;
+        line.LensCylinderMax = null;
+        line.LensAddMin = null;
+        line.LensAddMax = null;
+        ClearOpticalMeasurements(line);
         if (clearDescription)
             line.Description = string.Empty;
     }
@@ -381,8 +530,67 @@
     private async Task DescriptionChanged(UiSalesLineModel line, string? value) { line.Description = value ?? string.Empty; await OnChanged.InvokeAsync(); }
     private async Task DiscountTypeChanged(UiSalesLineModel line, ChangeEventArgs e) { line.DiscountType = e.Value?.ToString() ?? "None"; if (line.DiscountType == "None") line.DiscountValue = null; await OnChanged.InvokeAsync(); }
     private async Task EyeChanged(UiSalesLineModel line, ChangeEventArgs e) { line.PrescriptionEye = e.Value?.ToString() ?? string.Empty; await OnChanged.InvokeAsync(); }
-    private async Task ProductionChanged(UiSalesLineModel line, bool value) { line.RequiresProduction = value; await OnChanged.InvokeAsync(); }
+    private async Task OpticalSourceChanged(UiSalesLineModel line, ChangeEventArgs e)
+    {
+        line.OpticalMeasurementSource = e.Value?.ToString() == "Manual" ? "Manual" : "StoredPrescription";
+        if (line.OpticalMeasurementSource == "Manual")
+        {
+            line.PrescriptionRevisionId = string.Empty;
+            line.PrescriptionRevisionDisplay = null;
+        }
+        else
+        {
+            ClearManualMeasurementValues(line);
+        }
+        await OnChanged.InvokeAsync();
+    }
+    private async Task OpticalDecimalChanged(UiSalesLineModel line, string field, ChangeEventArgs e)
+    {
+        decimal? value = decimal.TryParse(e.Value?.ToString(), out var parsed) ? parsed : null;
+        switch (field)
+        {
+            case nameof(line.SPH): line.SPH = value; break;
+            case nameof(line.CYL): line.CYL = value; break;
+            case nameof(line.ADD): line.ADD = value; break;
+            case nameof(line.Prism): line.Prism = value; break;
+            case nameof(line.PD): line.PD = value; break;
+            case nameof(line.MonocularPD): line.MonocularPD = value; break;
+            case nameof(line.FittingHeight): line.FittingHeight = value; break;
+        }
+        await OnChanged.InvokeAsync();
+    }
+    private async Task OpticalAxisChanged(UiSalesLineModel line, ChangeEventArgs e)
+    {
+        line.Axis = short.TryParse(e.Value?.ToString(), out var parsed) ? parsed : null;
+        await OnChanged.InvokeAsync();
+    }
+    private async Task PrismBaseChanged(UiSalesLineModel line, ChangeEventArgs e) { line.PrismBase = e.Value?.ToString() ?? "None"; await OnChanged.InvokeAsync(); }
+    private async Task VaChanged(UiSalesLineModel line, string? value) { line.VA = value; await OnChanged.InvokeAsync(); }
     private async Task NotesChanged(UiSalesLineModel line, string? value) { line.Notes = value; await OnChanged.InvokeAsync(); }
     private async Task DecimalChanged(UiSalesLineModel line, string field, ChangeEventArgs e) { var value = decimal.TryParse(e.Value?.ToString(), out var parsed) ? parsed : 0m; if (field == nameof(line.Quantity)) line.Quantity = value; else if (field == nameof(line.ActualUnitPrice)) line.ActualUnitPrice = value; await OnChanged.InvokeAsync(); }
     private async Task NullableDecimalChanged(UiSalesLineModel line, string field, ChangeEventArgs e) { decimal? value = decimal.TryParse(e.Value?.ToString(), out var parsed) ? parsed : null; if (field == nameof(line.DiscountValue)) line.DiscountValue = value; else if (field == nameof(line.TaxRate)) line.TaxRate = value; await OnChanged.InvokeAsync(); }
+
+    private static void ClearManualMeasurementValues(UiSalesLineModel line)
+    {
+        line.SPH = null;
+        line.CYL = null;
+        line.Axis = null;
+        line.ADD = null;
+        line.Prism = null;
+        line.PrismBase = "None";
+        line.PD = null;
+        line.MonocularPD = null;
+        line.VA = null;
+        line.FittingHeight = null;
+    }
+
+    private static void ClearOpticalMeasurements(UiSalesLineModel line)
+    {
+        line.OpticalMeasurementSource = "StoredPrescription";
+        ClearManualMeasurementValues(line);
+        line.LensTypeSnapshot = null;
+        line.LensMaterialSnapshot = null;
+        line.LensCoatingSnapshot = null;
+        line.LensRefractiveIndexSnapshot = null;
+    }
 }

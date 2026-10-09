@@ -1,4 +1,4 @@
-using MediatR;
+﻿using MediatR;
 using Microsoft.Extensions.Logging;
 using OAS.Application.Abstractions.Messaging;
 using OAS.Application.Abstractions.Persistence;
@@ -130,6 +130,7 @@ public sealed class PostPurchaseReceiptCommandHandler(
     IPurchasingAccountingPort accounting,
     IPurchaseRequestRepository requestRepository,
     ICustomerOrderFulfillmentService fulfillment,
+    IOpticalReplacementReceiptService opticalReplacementReceipts,
     ICurrentUser currentUser,
     TimeProvider timeProvider,
     IUnitOfWork unitOfWork,
@@ -167,6 +168,24 @@ public sealed class PostPurchaseReceiptCommandHandler(
             }
         }
 
+        if (posted.PurchaseRequestLineIds.Count > 0)
+        {
+            try
+            {
+                await unitOfWork.ExecuteInTransactionAsync(async tx =>
+                {
+                    await opticalReplacementReceipts.ReconcileAsync(posted.WarehouseId, posted.PurchaseRequestLineIds, tx);
+                    return true;
+                }, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex,
+                    "Purchase receipt {ReceiptId} posted successfully, but optical replacement reconciliation failed.",
+                    posted.Result.PurchaseReceiptId);
+            }
+        }
+
         return posted.Result;
     }
 
@@ -177,10 +196,10 @@ public sealed class PostPurchaseReceiptCommandHandler(
 
         if (receipt.Status == DomainReceiptStatus.Posted && receipt.InventoryTransactionId.HasValue && receipt.JournalEntryId.HasValue)
         {
-            var linked = await ResolveCustomerOrderIdsAsync(receipt, ct);
+            var existingSources = await ResolveReceiptSourcesAsync(receipt, ct);
             return new PostedReceiptWork(
                 new PurchaseReceiptPostResultDto(receipt.Id, receipt.InventoryTransactionId.Value, receipt.JournalEntryId.Value, receipt.PurchaseOrderId, receipt.ReceiptCode),
-                linked);
+                existingSources.CustomerOrderIds, existingSources.PurchaseRequestLineIds, receipt.WarehouseId);
         }
 
         PurchasingRowVersion.EnsureMatches(receipt.RowVersion, command.Request.RowVersion, "Purchase receipt");
@@ -238,33 +257,41 @@ public sealed class PostPurchaseReceiptCommandHandler(
         order.MarkReceived(fullyReceived);
         orderRepository.Update(order);
 
-        var customerOrderIds = await ResolveCustomerOrderIdsAsync(receipt, ct);
+        var linked = await ResolveReceiptSourcesAsync(receipt, ct);
         return new PostedReceiptWork(
             new PurchaseReceiptPostResultDto(receipt.Id, inventoryResult.InventoryTransactionId, accountingResult.JournalEntryId, order.Id, receipt.ReceiptCode),
-            customerOrderIds);
+            linked.CustomerOrderIds, linked.PurchaseRequestLineIds, receipt.WarehouseId);
     }
 
-    private async Task<IReadOnlyList<Guid>> ResolveCustomerOrderIdsAsync(PurchaseReceipt receipt, CancellationToken ct)
+    private async Task<ReceiptSources> ResolveReceiptSourcesAsync(PurchaseReceipt receipt, CancellationToken ct)
     {
         var receiptPoLineIds = receipt.Lines
             .Where(x => x.AcceptedQuantity > 0m)
             .Select(x => x.PurchaseOrderLineId)
             .ToHashSet();
         if (receiptPoLineIds.Count == 0)
-            return [];
+            return new ReceiptSources([], []);
 
         var sources = await orderRepository.GetSourcesAsync(receipt.PurchaseOrderId, ct);
         var customerOrderIds = new HashSet<Guid>();
+        var purchaseRequestLineIds = new HashSet<Guid>();
         foreach (var source in sources.Where(x => receiptPoLineIds.Contains(x.PurchaseOrderLineId)))
         {
+            purchaseRequestLineIds.Add(source.PurchaseRequestLineId);
             var purchaseRequest = await requestRepository.GetByLineIdAsync(source.PurchaseRequestLineId, ct);
             if (purchaseRequest?.CustomerOrderId is Guid customerOrderId && customerOrderId != Guid.Empty)
                 customerOrderIds.Add(customerOrderId);
         }
-        return customerOrderIds.ToArray();
+        return new ReceiptSources(customerOrderIds.ToArray(), purchaseRequestLineIds.ToArray());
     }
+
+    private sealed record ReceiptSources(
+        IReadOnlyList<Guid> CustomerOrderIds,
+        IReadOnlyList<Guid> PurchaseRequestLineIds);
 
     private sealed record PostedReceiptWork(
         PurchaseReceiptPostResultDto Result,
-        IReadOnlyList<Guid> CustomerOrderIds);
+        IReadOnlyList<Guid> CustomerOrderIds,
+        IReadOnlyList<Guid> PurchaseRequestLineIds,
+        Guid WarehouseId);
 }

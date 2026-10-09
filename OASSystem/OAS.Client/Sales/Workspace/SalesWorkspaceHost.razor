@@ -68,7 +68,11 @@
                         <UiSalesFormSection Title="الإصدار الأول"
                                                 Description="الإصدار الأول إلزامي. يتم حفظ الوصفة والإصدار والقياسات معًا، وبعد نجاح الحفظ تصبح الوصفة مفعلة تلقائيًا."
                                                 IconCss="fa-solid fa-code-branch">
-                            <UiPrescriptionRevisionEditor Model="@ActiveRevisionDraft" OnChanged="MarkDirtyAsync" />
+                            <UiPrescriptionRevisionEditor Model="@ActiveRevisionDraft"
+                                                          SphereMin="@_prescriptionOpticalRanges?.SphereMin" SphereMax="@_prescriptionOpticalRanges?.SphereMax"
+                                                          CylinderMin="@_prescriptionOpticalRanges?.CylinderMin" CylinderMax="@_prescriptionOpticalRanges?.CylinderMax"
+                                                          AddMin="@_prescriptionOpticalRanges?.AddMin" AddMax="@_prescriptionOpticalRanges?.AddMax"
+                                                          OnChanged="MarkDirtyAsync" />
                         </UiSalesFormSection>
                     }
                     else
@@ -76,7 +80,11 @@
                         <UiSalesFormSection Title="@($"الإصدار {ActiveRevisionDraft.RevisionNumber} - إصدار جديد")"
                                                 Description="أدخل القياسات ثم اضغط «حفظ الإصدار» من شريط الإجراءات أعلى الصفحة. لا تحتاج إلى الدخول في تعديل الوصفة لحفظ الإصدار."
                                                 IconCss="fa-solid fa-code-branch">
-                            <UiPrescriptionRevisionEditor Model="@ActiveRevisionDraft" OnChanged="RevisionDraftChangedAsync" />
+                            <UiPrescriptionRevisionEditor Model="@ActiveRevisionDraft"
+                                                          SphereMin="@_prescriptionOpticalRanges?.SphereMin" SphereMax="@_prescriptionOpticalRanges?.SphereMax"
+                                                          CylinderMin="@_prescriptionOpticalRanges?.CylinderMin" CylinderMax="@_prescriptionOpticalRanges?.CylinderMax"
+                                                          AddMin="@_prescriptionOpticalRanges?.AddMin" AddMax="@_prescriptionOpticalRanges?.AddMax"
+                                                          OnChanged="RevisionDraftChangedAsync" />
                         </UiSalesFormSection>
                     }
                 }
