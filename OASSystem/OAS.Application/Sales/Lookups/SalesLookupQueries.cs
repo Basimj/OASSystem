@@ -40,6 +40,12 @@ public sealed record SearchSalesProductVariantsQuery(Guid? ProductTypeId, Guid? 
     public IReadOnlyCollection<string> RequiredPermissions { get; } = [SalesPermissions.View];
 }
 
+public sealed record GetSalesPrescriptionOpticalRangesQuery
+    : IQuery<SalesOpticalRangeLookupDto>, IAuthorizedRequest
+{
+    public IReadOnlyCollection<string> RequiredPermissions { get; } = [SalesPermissions.Prescriptions.View];
+}
+
 public sealed record SearchSalesWarehousesQuery(Guid? ProductVariantId, string? Search, int Take = 20)
     : IQuery<IReadOnlyList<SalesWarehouseLookupDto>>, IAuthorizedRequest
 {

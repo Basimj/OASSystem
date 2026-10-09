@@ -136,6 +136,7 @@ public static class SalesUiMapper
         ProductTypeDisplay = ResolveProductTypeDisplay(x.ProductTypeCode, x.ProductTypeName, x.LineType),
         ProductTypeSystemKey = ResolveProductTypeSystemKey(x.ProductTypeSystemKey, x.LineType),
         ProductIsStockItem = x.ProductIsStockItem,
+        ProductIsPrescriptionLens = x.ProductIsPrescriptionLens,
         ProductCategoryId = x.ProductCategoryId?.ToString() ?? string.Empty,
         ProductCategoryDisplay = Display(x.ProductCategoryCode, x.ProductCategoryName),
         ProductVariantId = x.ProductVariantId?.ToString() ?? string.Empty,
@@ -157,8 +158,29 @@ public static class SalesUiMapper
         FinalAmount = x.FinalAmount,
         PrescriptionRevisionId = x.PrescriptionRevisionId?.ToString() ?? string.Empty,
         PrescriptionRevisionDisplay = PrescriptionDisplay(x.PrescriptionCode, x.PrescriptionRevisionNumber),
-        PrescriptionEye = x.PrescriptionEye?.ToString() ?? string.Empty,
-        PrescriptionRequired = x.PrescriptionRevisionId.HasValue || x.PrescriptionEye.HasValue,
+        PrescriptionEye = x.OpticalSnapshot?.Eye.ToString() ?? x.PrescriptionEye?.ToString() ?? string.Empty,
+        PrescriptionRequired = x.ProductIsPrescriptionLens ?? (x.PrescriptionRevisionId.HasValue || x.PrescriptionEye.HasValue || x.OpticalSnapshot is not null),
+        OpticalMeasurementSource = x.OpticalSnapshot?.MeasurementSource.ToString() ?? "StoredPrescription",
+        SPH = x.OpticalSnapshot?.SPH,
+        CYL = x.OpticalSnapshot?.CYL,
+        Axis = x.OpticalSnapshot?.Axis,
+        ADD = x.OpticalSnapshot?.ADD,
+        Prism = x.OpticalSnapshot?.Prism,
+        PrismBase = x.OpticalSnapshot?.PrismBase?.ToString() ?? "None",
+        PD = x.OpticalSnapshot?.PD,
+        MonocularPD = x.OpticalSnapshot?.MonocularPD,
+        VA = x.OpticalSnapshot?.VA,
+        FittingHeight = x.OpticalSnapshot?.FittingHeight,
+        LensSphereMin = x.LensSphereMin,
+        LensSphereMax = x.LensSphereMax,
+        LensCylinderMin = x.LensCylinderMin,
+        LensCylinderMax = x.LensCylinderMax,
+        LensAddMin = x.LensAddMin,
+        LensAddMax = x.LensAddMax,
+        LensTypeSnapshot = x.OpticalSnapshot?.LensTypeSnapshot,
+        LensMaterialSnapshot = x.OpticalSnapshot?.MaterialSnapshot,
+        LensCoatingSnapshot = x.OpticalSnapshot?.CoatingSnapshot,
+        LensRefractiveIndexSnapshot = x.OpticalSnapshot?.RefractiveIndexSnapshot,
         RequiresProduction = x.RequiresProduction,
         Notes = x.Notes,
         RowVersion = x.RowVersion
@@ -184,6 +206,7 @@ public static class SalesUiMapper
         ProductTypeDisplay = ResolveProductTypeDisplay(x.ProductTypeCode, x.ProductTypeName, x.LineType),
         ProductTypeSystemKey = ResolveProductTypeSystemKey(x.ProductTypeSystemKey, x.LineType),
         ProductIsStockItem = x.ProductIsStockItem,
+        ProductIsPrescriptionLens = x.ProductIsPrescriptionLens,
         ProductCategoryId = x.ProductCategoryId?.ToString() ?? string.Empty,
         ProductCategoryDisplay = Display(x.ProductCategoryCode, x.ProductCategoryName),
         ProductVariantId = x.ProductVariantId?.ToString() ?? string.Empty,
@@ -208,8 +231,25 @@ public static class SalesUiMapper
         TotalCostSnapshot = x.TotalCostSnapshot,
         PrescriptionRevisionId = x.PrescriptionRevisionId?.ToString() ?? string.Empty,
         PrescriptionRevisionDisplay = PrescriptionDisplay(x.PrescriptionCode, x.PrescriptionRevisionNumber),
-        PrescriptionEye = x.PrescriptionEye?.ToString() ?? string.Empty,
-        PrescriptionRequired = x.PrescriptionRevisionId.HasValue || x.PrescriptionEye.HasValue,
+        PrescriptionEye = x.PrescriptionSnapshot?.Eye.ToString() ?? x.PrescriptionEye?.ToString() ?? string.Empty,
+        PrescriptionRequired = x.ProductIsPrescriptionLens ?? (x.PrescriptionRevisionId.HasValue || x.PrescriptionEye.HasValue || x.PrescriptionSnapshot is not null),
+        OpticalMeasurementSource = x.PrescriptionSnapshot is { PrescriptionRevisionId: null } ? "Manual" : "StoredPrescription",
+        SPH = x.PrescriptionSnapshot?.SPH,
+        CYL = x.PrescriptionSnapshot?.CYL,
+        Axis = x.PrescriptionSnapshot?.Axis,
+        ADD = x.PrescriptionSnapshot?.ADD,
+        Prism = x.PrescriptionSnapshot?.Prism,
+        PrismBase = x.PrescriptionSnapshot?.PrismBase?.ToString() ?? "None",
+        PD = x.PrescriptionSnapshot?.PD,
+        MonocularPD = x.PrescriptionSnapshot?.MonocularPD,
+        VA = x.PrescriptionSnapshot?.VA,
+        FittingHeight = x.PrescriptionSnapshot?.FittingHeight,
+        LensSphereMin = x.LensSphereMin,
+        LensSphereMax = x.LensSphereMax,
+        LensCylinderMin = x.LensCylinderMin,
+        LensCylinderMax = x.LensCylinderMax,
+        LensAddMin = x.LensAddMin,
+        LensAddMax = x.LensAddMax,
         RequiresProduction = x.RequiresProduction,
         Notes = x.Notes,
         RowVersion = x.RowVersion
@@ -277,10 +317,40 @@ public static class SalesUiMapper
             : SalesPaymentTermType.Immediate;
 
     private static CustomerOrderLineRequest ToOrderLineRequest(UiSalesLineModel x) =>
-        new(x.Id, x.GroupId, Parse<SalesLineType>(x.LineType, SalesLineType.Frame), ParseGuid(x.ProductVariantId), ParseGuid(x.WarehouseId), x.Description, x.Quantity, x.ActualUnitPrice, Parse<SalesDiscountType>(x.DiscountType, SalesDiscountType.None), x.DiscountValue, x.TaxRate, ParseGuid(x.PrescriptionRevisionId), ParseNullable<EyeSide>(x.PrescriptionEye), x.RequiresProduction, x.Notes, string.IsNullOrWhiteSpace(x.RowVersion) ? null : x.RowVersion);
+        new(x.Id, x.GroupId, Parse<SalesLineType>(x.LineType, SalesLineType.Frame), ParseGuid(x.ProductVariantId), ParseGuid(x.WarehouseId), x.Description, x.Quantity, x.ActualUnitPrice, Parse<SalesDiscountType>(x.DiscountType, SalesDiscountType.None), x.DiscountValue, x.TaxRate, ParseGuid(x.PrescriptionRevisionId), ParseNullable<EyeSide>(x.PrescriptionEye), x.RequiresProduction, x.Notes, string.IsNullOrWhiteSpace(x.RowVersion) ? null : x.RowVersion, BuildOpticalSnapshotRequest(x));
 
     private static SalesInvoiceLineRequest ToInvoiceLineRequest(UiSalesLineModel x) =>
-        new(x.Id, x.CustomerOrderLineId, x.GroupId, Parse<SalesLineType>(x.LineType, SalesLineType.Frame), ParseGuid(x.ProductVariantId), ParseGuid(x.WarehouseId), x.Description, x.Quantity, x.ActualUnitPrice, Parse<SalesDiscountType>(x.DiscountType, SalesDiscountType.None), x.DiscountValue, x.TaxRate, ParseGuid(x.PrescriptionRevisionId), ParseNullable<EyeSide>(x.PrescriptionEye), x.RequiresProduction, x.Notes, string.IsNullOrWhiteSpace(x.RowVersion) ? null : x.RowVersion);
+        new(x.Id, x.CustomerOrderLineId, x.GroupId, Parse<SalesLineType>(x.LineType, SalesLineType.Frame), ParseGuid(x.ProductVariantId), ParseGuid(x.WarehouseId), x.Description, x.Quantity, x.ActualUnitPrice, Parse<SalesDiscountType>(x.DiscountType, SalesDiscountType.None), x.DiscountValue, x.TaxRate, ParseGuid(x.PrescriptionRevisionId), ParseNullable<EyeSide>(x.PrescriptionEye), x.RequiresProduction, x.Notes, string.IsNullOrWhiteSpace(x.RowVersion) ? null : x.RowVersion, BuildOpticalSnapshotRequest(x));
+
+    private static CustomerOrderLineOpticalSnapshotRequest? BuildOpticalSnapshotRequest(UiSalesLineModel x)
+    {
+        if (!string.Equals(x.LineType, SalesLineType.Lens.ToString(), StringComparison.OrdinalIgnoreCase) || !x.PrescriptionRequired)
+            return null;
+
+        var eye = ParseNullable<EyeSide>(x.PrescriptionEye);
+        if (!eye.HasValue)
+            return null;
+
+        var source = Parse<OpticalMeasurementSource>(x.OpticalMeasurementSource, OpticalMeasurementSource.StoredPrescription);
+        return new CustomerOrderLineOpticalSnapshotRequest(
+            source,
+            source == OpticalMeasurementSource.StoredPrescription ? ParseGuid(x.PrescriptionRevisionId) : null,
+            eye.Value,
+            x.SPH,
+            x.CYL,
+            x.Axis,
+            x.ADD,
+            x.Prism,
+            ParseNullable<PrismBaseDirection>(x.PrismBase),
+            x.PD,
+            x.MonocularPD,
+            x.VA,
+            x.FittingHeight,
+            x.LensTypeSnapshot,
+            x.LensMaterialSnapshot,
+            x.LensCoatingSnapshot,
+            x.LensRefractiveIndexSnapshot);
+    }
 
 
     private static string ResolveProductTypeId(Guid? productTypeId, SalesLineType lineType)

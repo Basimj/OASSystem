@@ -257,7 +257,7 @@ public sealed class SalesCheckoutOrchestrator(
             {
                 if (job.Status != OpticalJobStatus.ReadyForDelivery)
                     throw new ConflictException("sales_delivery_optical_job_not_ready", "أمر المعمل ليس جاهزًا للتسليم.");
-                job.MarkDelivered();
+                job.MarkDelivered(timeProvider.GetUtcNow());
                 opticalJobs.Update(job);
             }
         }

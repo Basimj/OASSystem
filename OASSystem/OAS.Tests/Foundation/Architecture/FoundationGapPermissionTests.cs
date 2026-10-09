@@ -34,7 +34,7 @@ public sealed class FoundationGapPermissionTests
         Assert.That(new StartOpticalJobCommand(Guid.NewGuid(), new("AA==")).RequiredPermissions,
             Is.EquivalentTo(new[] { SalesPermissions.OpticalJobs.Start }));
         Assert.That(new MarkOpticalJobReadyCommand(Guid.NewGuid(), new("AA==")).RequiredPermissions,
-            Is.EquivalentTo(new[] { SalesPermissions.OpticalJobs.Complete }));
+            Is.EquivalentTo(new[] { SalesPermissions.OpticalJobs.MarkReady }));
     }
 
     [Test]

@@ -49,4 +49,11 @@ public sealed record SalesInvoiceLineDto(
     string? ProductTypeName = null,
     string? ProductTypeSystemKey = null,
     bool? ProductIsStockItem = null,
-    decimal ReturnedQuantity = 0m);
+    decimal ReturnedQuantity = 0m,
+    bool? ProductIsPrescriptionLens = null,
+    decimal? LensSphereMin = null,
+    decimal? LensSphereMax = null,
+    decimal? LensCylinderMin = null,
+    decimal? LensCylinderMax = null,
+    decimal? LensAddMin = null,
+    decimal? LensAddMax = null);

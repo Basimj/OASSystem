@@ -67,6 +67,7 @@ public sealed class UiSalesLineModel
     public string? ProductTypeDisplay { get; set; }
     public string? ProductTypeSystemKey { get; set; }
     public bool? ProductIsStockItem { get; set; }
+    public bool? ProductIsPrescriptionLens { get; set; }
     public string ProductCategoryId { get; set; } = string.Empty;
     public string? ProductCategoryDisplay { get; set; }
     public string ProductVariantId { get; set; } = string.Empty;
@@ -92,8 +93,31 @@ public sealed class UiSalesLineModel
     public string PrescriptionRevisionId { get; set; } = string.Empty;
     public string? PrescriptionRevisionDisplay { get; set; }
     public string PrescriptionEye { get; set; } = string.Empty;
-    // UI metadata فقط: تحدد إن كان المنتج المختار عدسة طبية تحتاج وصفة.
+    // UI metadata فقط: تحدد إن كان المنتج المختار عدسة طبية تحتاج قياسات بصرية.
     public bool PrescriptionRequired { get; set; }
+    // StoredPrescription أو Manual. القياسات اليدوية تحفظ Snapshot على سطر البيع.
+    public string OpticalMeasurementSource { get; set; } = "StoredPrescription";
+    public decimal? SPH { get; set; }
+    public decimal? CYL { get; set; }
+    public short? Axis { get; set; }
+    public decimal? ADD { get; set; }
+    public decimal? Prism { get; set; }
+    public string PrismBase { get; set; } = "None";
+    public decimal? PD { get; set; }
+    public decimal? MonocularPD { get; set; }
+    public string? VA { get; set; }
+    public decimal? FittingHeight { get; set; }
+    // نطاقات العدسة المختارة لعرض إرشاد فوري والتحقق من الإدخال اليدوي.
+    public decimal? LensSphereMin { get; set; }
+    public decimal? LensSphereMax { get; set; }
+    public decimal? LensCylinderMin { get; set; }
+    public decimal? LensCylinderMax { get; set; }
+    public decimal? LensAddMin { get; set; }
+    public decimal? LensAddMax { get; set; }
+    public string? LensTypeSnapshot { get; set; }
+    public string? LensMaterialSnapshot { get; set; }
+    public string? LensCoatingSnapshot { get; set; }
+    public decimal? LensRefractiveIndexSnapshot { get; set; }
     public bool RequiresProduction { get; set; }
     public string? Notes { get; set; }
     public string RowVersion { get; set; } = string.Empty;

@@ -64,6 +64,11 @@ public static class DependencyInjection
         services.AddScoped<ISalesCheckoutContextService, OAS.Application.Sales.Checkout.Services.SalesCheckoutContextService>();
         services.AddScoped<ICustomerOrderFulfillmentService, CustomerOrderFulfillmentService>();
         services.AddScoped<IOpticalJobService, OpticalJobService>();
+        services.AddScoped<IOpticalJobInventoryPort, OpticalJobInventoryPort>();
+        services.AddScoped<IOpticalJobAccountingPort, OpticalJobAccountingPort>();
+        services.AddScoped<IOpticalJobPurchasingPort, OpticalJobPurchasingPort>();
+        services.AddScoped<IOpticalJobSalesPort, OpticalJobSalesPort>();
+        services.AddScoped<IOpticalReplacementReceiptService, OpticalReplacementReceiptService>();
         services.AddScoped<ISalesPrescriptionValidator, SalesPrescriptionValidator>();
         services.AddScoped<ISalesPostingPeriodService, SalesPostingPeriodService>();
         services.AddScoped<ISalesStockReservationService, SalesStockReservationService>();

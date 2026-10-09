@@ -22,8 +22,10 @@ public sealed class OpticalJobConfiguration : IEntityTypeConfiguration<OpticalJo
         builder.Property(x => x.RequiredDate).HasColumnType("date");
         builder.Property(x => x.Status).HasConversion<byte>().IsRequired();
         builder.Property(x => x.AssignedTechnicianId);
+        builder.Property(x => x.AssignedAtUtc).HasColumnType("datetimeoffset");
         builder.Property(x => x.StartedAtUtc).HasColumnType("datetimeoffset");
         builder.Property(x => x.CompletedAtUtc).HasColumnType("datetimeoffset");
+        builder.Property(x => x.DeliveredAtUtc).HasColumnType("datetimeoffset");
         builder.Property(x => x.Notes).HasMaxLength(1000);
         builder.Property(x => x.IsActive).IsRequired();
         builder.Property(x => x.RowVersion).IsRowVersion().IsConcurrencyToken();
@@ -34,6 +36,7 @@ public sealed class OpticalJobConfiguration : IEntityTypeConfiguration<OpticalJo
         builder.HasIndex(x => x.AssignedTechnicianId).HasDatabaseName("IX_OpticalJobs_AssignedTechnicianId");
         builder.HasIndex(x => x.RequiredDate).HasDatabaseName("IX_OpticalJobs_RequiredDate");
         builder.HasIndex(x => x.SalesInvoiceId).HasDatabaseName("IX_OpticalJobs_SalesInvoiceId");
+        builder.HasIndex(x => x.CustomerId).HasDatabaseName("IX_OpticalJobs_CustomerId");
 
         builder.HasOne<CustomerOrder>().WithMany().HasForeignKey(x => x.CustomerOrderId)
             .OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_OpticalJobs_CustomerOrders_CustomerOrderId");

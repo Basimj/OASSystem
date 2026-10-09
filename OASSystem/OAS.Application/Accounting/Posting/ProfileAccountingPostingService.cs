@@ -125,12 +125,19 @@ public sealed class ProfileAccountingPostingService(
                 await TryProvisionPurchasingProfileAsync(documentType, ct);
                 matches = await profiles.ListAsync(profileSpec, ct);
             }
+            else if (matches.Count == 0 && string.Equals(module, "Optical", StringComparison.OrdinalIgnoreCase))
+            {
+                await TryProvisionOpticalProfileAsync(documentType, ct);
+                matches = await profiles.ListAsync(profileSpec, ct);
+            }
 
             if (matches.Count != 1)
             {
                 var message = matches.Count == 0 && string.Equals(module, "Purchasing", StringComparison.OrdinalIgnoreCase)
                     ? $"إعدادات ترحيل المشتريات غير مكتملة للمستند '{documentType}'. افتح إعدادات المحاسبة وحدد حسابات ترحيل المشتريات المطلوبة ثم احفظ الإعدادات."
-                    : $"يجب وجود Posting Profile فعال واحد للموديول '{module}' والمستند '{documentType}'.";
+                    : matches.Count == 0 && string.Equals(module, "Optical", StringComparison.OrdinalIgnoreCase)
+                        ? "إعداد ترحيل تلف/كسر المعمل غير مكتمل. يجب إعداد حساب المخزون وتكلفة المبيعات في إعدادات المحاسبة."
+                        : $"يجب وجود Posting Profile فعال واحد للموديول '{module}' والمستند '{documentType}'.";
 
                 throw new ConflictException("accounting_posting_profile_invalid", message);
             }
@@ -147,6 +154,57 @@ public sealed class ProfileAccountingPostingService(
         return account.Id;
     }
 
+
+    private async Task TryProvisionOpticalProfileAsync(string documentType, CancellationToken ct)
+    {
+        if (!string.Equals(documentType, "OpticalBreakage", StringComparison.OrdinalIgnoreCase)) return;
+
+        var accountingSettings = await settings.GetByIdAsync(AccountingSettings.SingletonId, ct);
+        if (accountingSettings?.InventoryAccountId is not Guid inventoryAccountId) return;
+
+        // The current settings model has no dedicated production-damage account. Reuse the
+        // configured COGS posting account as the default damage expense account, but store it
+        // under a distinct PostingProfile role so it can be replaced later without code changes.
+        var damageAccountId = await ResolveSalesRoleAccountIdAsync("COGS", ct);
+        if (!damageAccountId.HasValue) return;
+
+        var all = await profiles.ListAsync(
+            new Specification<PostingProfile>()
+                .Where(x => x.Module == "Optical" && x.DocumentType == "OpticalBreakage")
+                .Tracking(), ct);
+        var active = all.Where(x => x.IsActive).ToList();
+        if (active.Count > 1)
+            throw new ConflictException("optical_posting_profile_duplicate", "يوجد أكثر من ملف ترحيل فعال لكسر المعمل.");
+
+        var profile = active.SingleOrDefault() ?? all.FirstOrDefault();
+        if (profile is null)
+        {
+            profile = PostingProfile.Create(Guid.NewGuid(), "OPTICAL-BREAKAGE", "ترحيل كسر وتلف المعمل", "Optical", "OpticalBreakage", true);
+            await profiles.AddAsync(profile, ct);
+        }
+        else if (!profile.IsActive)
+        {
+            profile.SetActive(true);
+            profiles.Update(profile);
+        }
+
+        await UpsertProfileRoleAsync(profile.Id, "ProductionDamageExpense", damageAccountId.Value, ct);
+        await UpsertProfileRoleAsync(profile.Id, "Inventory", inventoryAccountId, ct);
+    }
+
+    private async Task<Guid?> ResolveSalesRoleAccountIdAsync(string role, CancellationToken ct)
+    {
+        var salesProfiles = await profiles.ListAsync(
+            new Specification<PostingProfile>()
+                .Where(x => x.IsActive && x.Module == "Sales" && x.DocumentType == "SalesInvoice")
+                .ApplyPaging(0, 2), ct);
+        if (salesProfiles.Count != 1) return null;
+        var rows = await profileLines.ListAsync(
+            new Specification<PostingProfileLine>()
+                .Where(x => x.PostingProfileId == salesProfiles[0].Id && x.AccountRole == role)
+                .ApplyPaging(0, 2), ct);
+        return rows.Count == 1 ? rows[0].AccountId : null;
+    }
 
     private async Task TryProvisionPurchasingProfileAsync(string documentType, CancellationToken ct)
     {

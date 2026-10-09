@@ -1,4 +1,5 @@
 using OAS.Contracts.Sales.Enums;
+using OAS.Contracts.Sales.CustomerOrders;
 
 namespace OAS.Contracts.Sales.SalesInvoices;
 
@@ -19,4 +20,5 @@ public sealed record SalesInvoiceLineRequest(
     EyeSide? PrescriptionEye,
     bool RequiresProduction,
     string? Notes,
-    string? RowVersion = null);
+    string? RowVersion = null,
+    CustomerOrderLineOpticalSnapshotRequest? OpticalSnapshot = null);

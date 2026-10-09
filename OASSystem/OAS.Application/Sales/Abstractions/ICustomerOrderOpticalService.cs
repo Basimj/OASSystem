@@ -24,6 +24,7 @@ public sealed record OpticalSnapshotDraft(
     decimal? RefractiveIndexSnapshot);
 
 public sealed record PreparedCustomerOrderLine(
+    SalesLineResolution SeedResolution,
     SalesLineResolution Resolution,
     Guid? PrescriptionRevisionId,
     EyeSide? PrescriptionEye,

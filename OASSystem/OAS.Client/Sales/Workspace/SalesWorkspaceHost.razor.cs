@@ -62,6 +62,8 @@ public partial class SalesWorkspaceHost : IDisposable
     private bool _isSavingRevision;
     private bool _isPrintingInvoice;
     private SalesEntityType? _lastSection;
+    private SalesOpticalRangeLookupDto? _prescriptionOpticalRanges;
+    private bool _isLoadingPrescriptionOpticalRanges;
 
     private SalesWorkspaceTabState? ActiveTab => Workspace.ActiveTab;
     private UiPrescriptionRevisionModel? ActiveRevisionDraft =>
@@ -87,10 +89,37 @@ public partial class SalesWorkspaceHost : IDisposable
             Workspace.OpenOrActivateListTab(Section);
         _pageNumber = 1;
         _search = null;
+        if (Section == SalesEntityType.Prescriptions)
+            await EnsurePrescriptionOpticalRangesLoadedAsync();
         await LoadListAsync(Section);
     }
 
-    private void WorkspaceChanged() => _ = InvokeAsync(StateHasChanged);
+    private void WorkspaceChanged() => _ = InvokeAsync(async () =>
+    {
+        if (Workspace.ActiveTab?.EntityType == SalesEntityType.Prescriptions)
+            await EnsurePrescriptionOpticalRangesLoadedAsync();
+        StateHasChanged();
+    });
+
+    private async Task EnsurePrescriptionOpticalRangesLoadedAsync()
+    {
+        if (_prescriptionOpticalRanges is not null || _isLoadingPrescriptionOpticalRanges)
+            return;
+
+        _isLoadingPrescriptionOpticalRanges = true;
+        try
+        {
+            _prescriptionOpticalRanges = await Sales.GetPrescriptionOpticalRangesAsync();
+        }
+        catch (ApiClientException ex)
+        {
+            ApiFeedback.Show(ex.Error);
+        }
+        finally
+        {
+            _isLoadingPrescriptionOpticalRanges = false;
+        }
+    }
 
     private async Task LoadListAsync(SalesEntityType type)
     {
@@ -138,6 +167,7 @@ public partial class SalesWorkspaceHost : IDisposable
             switch (type)
             {
                 case SalesEntityType.Prescriptions:
+                    await EnsurePrescriptionOpticalRangesLoadedAsync();
                     var rxCall = await Sales.ReservePrescriptionCodeResultAsync();
                     if (!TryGetApiResult(rxCall, out var rx) || rx is null) { Workspace.RemoveTab(tab.TabId); return; }
                     tab.Model = new UiPrescriptionFormModel
@@ -180,6 +210,7 @@ public partial class SalesWorkspaceHost : IDisposable
             switch (type)
             {
                 case SalesEntityType.Prescriptions:
+                    await EnsurePrescriptionOpticalRangesLoadedAsync();
                     var prescription = await Sales.GetPrescriptionByIdAsync(id); if (prescription is null) return;
                     var rxTab = Workspace.OpenOrActivateEntityTab(type, id, prescription.PrescriptionCode); rxTab.CompleteSave(prescription.Id, prescription.PrescriptionCode, SalesUiMapper.ToUi(prescription));
                     break;
@@ -347,29 +378,60 @@ public partial class SalesWorkspaceHost : IDisposable
     {
         foreach (var line in lines.Where(x => x.PrescriptionRequired))
         {
-            var hasRevision = Guid.TryParse(line.PrescriptionRevisionId, out var lineRevisionId) && lineRevisionId != Guid.Empty
-                || Guid.TryParse(headerPrescriptionRevisionId, out var headerRevisionId) && headerRevisionId != Guid.Empty;
-
-            if (!hasRevision)
-            {
-                var item = string.IsNullOrWhiteSpace(line.ProductDisplay)
-                    ? $"السطر {line.LineNumber}"
-                    : $"السطر {line.LineNumber} - {line.ProductDisplay}";
-                Snackbar.Error($"يجب اختيار الوصفة في أعلى المستند أو على {item}.");
-                return false;
-            }
+            var item = string.IsNullOrWhiteSpace(line.ProductDisplay)
+                ? $"السطر {line.LineNumber}"
+                : $"السطر {line.LineNumber} - {line.ProductDisplay}";
 
             if (!Enum.TryParse<EyeSide>(line.PrescriptionEye, true, out _))
             {
-                var item = string.IsNullOrWhiteSpace(line.ProductDisplay)
-                    ? $"السطر {line.LineNumber}"
-                    : $"السطر {line.LineNumber} - {line.ProductDisplay}";
                 Snackbar.Error($"يجب تحديد العين (OD أو OS) لـ{item}.");
                 return false;
+            }
+
+            var usesManualMeasurements = string.Equals(
+                line.OpticalMeasurementSource,
+                "Manual",
+                StringComparison.OrdinalIgnoreCase);
+
+            if (usesManualMeasurements)
+            {
+                if (!ValidateOpticalRange(item, "SPH", line.SPH, line.LensSphereMin, line.LensSphereMax) ||
+                    !ValidateOpticalRange(item, "CYL", line.CYL, line.LensCylinderMin, line.LensCylinderMax) ||
+                    !ValidateOpticalRange(item, "ADD", line.ADD, line.LensAddMin, line.LensAddMax))
+                    return false;
+            }
+
+            if (!usesManualMeasurements)
+            {
+                var hasRevision = Guid.TryParse(line.PrescriptionRevisionId, out var lineRevisionId) && lineRevisionId != Guid.Empty
+                    || Guid.TryParse(headerPrescriptionRevisionId, out var headerRevisionId) && headerRevisionId != Guid.Empty;
+
+                if (!hasRevision)
+                {
+                    Snackbar.Error($"اختر وصفة محفوظة لـ{item} أو غيّر مصدر القياسات إلى إدخال يدوي.");
+                    return false;
+                }
             }
         }
 
         return true;
+    }
+
+    private bool ValidateOpticalRange(
+        string item,
+        string field,
+        decimal? value,
+        decimal? minimum,
+        decimal? maximum)
+    {
+        if (!value.HasValue || !minimum.HasValue || !maximum.HasValue)
+            return true;
+
+        if (value.Value >= minimum.Value && value.Value <= maximum.Value)
+            return true;
+
+        Snackbar.Error($"{field} في {item}: أدخل قيمة بين {minimum.Value:0.##} و {maximum.Value:0.##}.");
+        return false;
     }
 
     private bool RequireGuid(string value, string message)
@@ -1214,7 +1276,8 @@ public partial class SalesWorkspaceHost : IDisposable
 
                 // عند تغيير وصفة رأس الطلب لا نحتفظ بمرجع Revision قديم داخل أسطر العدسات.
                 // الـApplication سيربط Revision الرأس فقط بالأسطر التي تحتاج وصفة فعليًا.
-                foreach (var line in order.Lines.Where(x => x.PrescriptionRequired))
+                foreach (var line in order.Lines.Where(x => x.PrescriptionRequired &&
+                    !string.Equals(x.OpticalMeasurementSource, "Manual", StringComparison.OrdinalIgnoreCase)))
                 {
                     line.PrescriptionRevisionId = string.Empty;
                     line.PrescriptionRevisionDisplay = null;
@@ -1284,6 +1347,13 @@ public partial class SalesWorkspaceHost : IDisposable
                     invoice.PrescriptionCode = string.Empty;
                     invoice.PrescriptionDisplay = null;
                 }
+
+                foreach (var line in invoice.Lines.Where(x => x.PrescriptionRequired &&
+                    !string.Equals(x.OpticalMeasurementSource, "Manual", StringComparison.OrdinalIgnoreCase)))
+                {
+                    line.PrescriptionRevisionId = string.Empty;
+                    line.PrescriptionRevisionDisplay = null;
+                }
             }
         }
 
@@ -1347,6 +1417,7 @@ public partial class SalesWorkspaceHost : IDisposable
             change.Line.ProductTypeSystemKey = product.ProductTypeSystemKey;
             change.Line.LineType = product.SalesLineType.ToString();
             change.Line.ProductIsStockItem = product.IsStockItem;
+            change.Line.ProductIsPrescriptionLens = product.IsPrescriptionLens;
 
             change.Line.ProductCategoryId = product.CategoryId.ToString();
             if (_categories.TryGetValue(product.CategoryId, out var category))
@@ -1368,9 +1439,22 @@ public partial class SalesWorkspaceHost : IDisposable
             change.Line.BaseUnitPrice = transactionPrice;
             change.Line.ActualUnitPrice = transactionPrice;
             change.Line.PrescriptionRequired = product.IsPrescriptionLens;
+            change.Line.LensTypeSnapshot = product.LensType;
+            change.Line.LensMaterialSnapshot = product.LensMaterial;
+            change.Line.LensCoatingSnapshot = product.LensCoating;
+            change.Line.LensRefractiveIndexSnapshot = product.LensRefractiveIndex;
+            change.Line.LensSphereMin = product.SphereMin;
+            change.Line.LensSphereMax = product.SphereMax;
+            change.Line.LensCylinderMin = product.CylinderMin;
+            change.Line.LensCylinderMax = product.CylinderMax;
+            change.Line.LensAddMin = product.AddMin;
+            change.Line.LensAddMax = product.AddMax;
 
             if (change.Line.LineType == SalesLineType.Lens.ToString())
             {
+                change.Line.RequiresProduction = product.IsPrescriptionLens || !product.IsStockItem || change.Line.GroupId.HasValue;
+                if (string.IsNullOrWhiteSpace(change.Line.OpticalMeasurementSource))
+                    change.Line.OpticalMeasurementSource = "StoredPrescription";
                 if (product.IsPrescriptionLens && ActiveTab?.Model is UiCustomerOrderFormModel)
                 {
                     // في طلب العميل نستخدم وصفة الرأس، ويحدد المستخدم العين على مستوى البند.
@@ -1387,9 +1471,33 @@ public partial class SalesWorkspaceHost : IDisposable
             else
             {
                 change.Line.PrescriptionRequired = false;
+                change.Line.ProductIsPrescriptionLens = false;
                 change.Line.PrescriptionRevisionId = string.Empty;
                 change.Line.PrescriptionRevisionDisplay = null;
                 change.Line.PrescriptionEye = string.Empty;
+                change.Line.OpticalMeasurementSource = "StoredPrescription";
+                change.Line.SPH = null;
+                change.Line.CYL = null;
+                change.Line.Axis = null;
+                change.Line.ADD = null;
+                change.Line.Prism = null;
+                change.Line.PrismBase = "None";
+                change.Line.PD = null;
+                change.Line.MonocularPD = null;
+                change.Line.VA = null;
+                change.Line.FittingHeight = null;
+                change.Line.LensTypeSnapshot = null;
+                change.Line.LensMaterialSnapshot = null;
+                change.Line.LensCoatingSnapshot = null;
+                change.Line.LensRefractiveIndexSnapshot = null;
+                change.Line.LensSphereMin = null;
+                change.Line.LensSphereMax = null;
+                change.Line.LensCylinderMin = null;
+                change.Line.LensCylinderMax = null;
+                change.Line.LensAddMin = null;
+                change.Line.LensAddMax = null;
+                if (change.Line.LineType == SalesLineType.Frame.ToString() && change.Line.GroupId.HasValue)
+                    change.Line.RequiresProduction = true;
             }
         }
         else
@@ -1399,7 +1507,14 @@ public partial class SalesWorkspaceHost : IDisposable
             change.Line.ProductNameSnapshot = null;
             change.Line.UnitSnapshot = null;
             change.Line.ProductIsStockItem = null;
+            change.Line.ProductIsPrescriptionLens = null;
             change.Line.PrescriptionRequired = false;
+            change.Line.LensSphereMin = null;
+            change.Line.LensSphereMax = null;
+            change.Line.LensCylinderMin = null;
+            change.Line.LensCylinderMax = null;
+            change.Line.LensAddMin = null;
+            change.Line.LensAddMax = null;
         }
 
         return Task.CompletedTask;
@@ -1417,11 +1532,11 @@ public partial class SalesWorkspaceHost : IDisposable
         if (product.IsPrescriptionLens)
         {
             if (product.SphereMin.HasValue && product.SphereMax.HasValue)
-                parts.Add($"SPH {product.SphereMin.Value:0.##}..{product.SphereMax.Value:0.##}");
+                parts.Add($"SPH من {product.SphereMin.Value:0.##} إلى {product.SphereMax.Value:0.##}");
             if (product.CylinderMin.HasValue && product.CylinderMax.HasValue)
-                parts.Add($"CYL {product.CylinderMin.Value:0.##}..{product.CylinderMax.Value:0.##}");
+                parts.Add($"CYL من {product.CylinderMin.Value:0.##} إلى {product.CylinderMax.Value:0.##}");
             if (product.AddMin.HasValue && product.AddMax.HasValue)
-                parts.Add($"ADD {product.AddMin.Value:0.##}..{product.AddMax.Value:0.##}");
+                parts.Add($"ADD من {product.AddMin.Value:0.##} إلى {product.AddMax.Value:0.##}");
         }
 
         return string.Join(" • ", parts);

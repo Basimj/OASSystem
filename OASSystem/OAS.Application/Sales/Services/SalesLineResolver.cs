@@ -27,13 +27,13 @@ public sealed class SalesLineResolver(
         if (lineType == SalesLineType.Service && !productVariantId.HasValue)
         {
             var serviceDescription = RequiredDescription(requestedDescription, "الخدمة");
-            return new(null, null, null, serviceDescription, serviceDescription, null, 0m, false, null);
+            return new(null, null, null, serviceDescription, serviceDescription, null, 0m, false, null, false);
         }
 
         if (lineType == SalesLineType.Other && !productVariantId.HasValue)
         {
             var otherDescription = RequiredDescription(requestedDescription, "بند مبيعات");
-            return new(null, null, null, otherDescription, otherDescription, null, 0m, false, null);
+            return new(null, null, null, otherDescription, otherDescription, null, 0m, false, null, false);
         }
 
         if (!productVariantId.HasValue || productVariantId.Value == Guid.Empty)
@@ -94,10 +94,19 @@ public sealed class SalesLineResolver(
                     lens.CylinderMin.HasValue && lens.CylinderMax.HasValue &&
                     lens.AddMin.HasValue && lens.AddMax.HasValue)
                 {
+                    var sphere = NormalizeRange(lens.SphereMin.Value, lens.SphereMax.Value);
+                    var cylinder = NormalizeRange(lens.CylinderMin.Value, lens.CylinderMax.Value);
+                    var add = NormalizeRange(lens.AddMin.Value, lens.AddMax.Value);
+
+                    if (add.Minimum < 0m)
+                        throw new ConflictException(
+                            "sales_lens_add_range_invalid",
+                            $"نطاق ADD في بطاقة العدسة غير صالح ({add.Minimum:0.##} إلى {add.Maximum:0.##}). صحح بيانات العدسة قبل استخدامها في البيع.");
+
                     policy = new OpticalPrescriptionRangePolicy(
-                        new OpticalPowerRange(lens.SphereMin.Value, lens.SphereMax.Value),
-                        new OpticalPowerRange(lens.CylinderMin.Value, lens.CylinderMax.Value),
-                        new OpticalPowerRange(lens.AddMin.Value, lens.AddMax.Value));
+                        new OpticalPowerRange(sphere.Minimum, sphere.Maximum),
+                        new OpticalPowerRange(cylinder.Minimum, cylinder.Maximum),
+                        new OpticalPowerRange(add.Minimum, add.Maximum));
                 }
             }
         }
@@ -116,9 +125,13 @@ public sealed class SalesLineResolver(
             unitName,
             variant.SellingPrice,
             prescriptionRequired,
-            policy);
+            policy,
+            product.IsStockItem);
     }
 
     private static string RequiredDescription(string? value, string fallback) =>
         string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+
+    private static (decimal Minimum, decimal Maximum) NormalizeRange(decimal first, decimal second) =>
+        first <= second ? (first, second) : (second, first);
 }

@@ -25,4 +25,10 @@ public sealed record OpticalJobDetailsDto(
     string? CustomerCode = null,
     string? CustomerName = null,
     string? Mobile = null,
-    string? AssignedTechnicianName = null);
+    string? AssignedTechnicianName = null,
+    DateTimeOffset? AssignedAtUtc = null,
+    DateTimeOffset? DeliveredAtUtc = null,
+    IReadOnlyList<OpticalJobTimelineItemDto>? Timeline = null,
+    IReadOnlyList<OpticalJobBreakageDto>? OpenBreakages = null,
+    IReadOnlyList<OpticalJobRemakeDto>? OpenRemakes = null,
+    OpticalQualityCheckDto? LatestQualityCheck = null);

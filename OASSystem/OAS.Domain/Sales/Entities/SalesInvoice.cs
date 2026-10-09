@@ -202,6 +202,12 @@ public sealed class SalesInvoice : AuditableEntity<Guid>
         FindLine(lineId).SetPrescriptionSnapshot(snapshot);
     }
 
+    public void ClearLinePrescriptionSnapshot(Guid lineId)
+    {
+        EnsureDraft();
+        FindLine(lineId).ClearPrescriptionSnapshot();
+    }
+
     public void Confirm(DateTimeOffset confirmedAtUtc, string? confirmedBy)
     {
         EnsureDraft();

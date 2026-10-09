@@ -41,9 +41,20 @@ public static class SalesPermissions
     public static class OpticalJobs
     {
         public const string View = "optical_jobs.view";
-        public const string Start = "optical_jobs.start";
+        public const string ViewAll = "optical_jobs.view_all";
         public const string Assign = "optical_jobs.assign";
-        public const string Complete = "optical_jobs.complete";
+        public const string Reassign = "optical_jobs.reassign";
+        public const string Start = "optical_jobs.start";
+        public const string IssueMaterials = "optical_jobs.issue_materials";
+        public const string QC = "optical_jobs.qc";
+        public const string RecordBreakage = "optical_jobs.record_breakage";
+        public const string Remake = "optical_jobs.remake";
+        public const string MarkReady = "optical_jobs.mark_ready";
+        public const string Deliver = "optical_jobs.deliver";
+        public const string Cancel = "optical_jobs.cancel";
+        public const string Override = "optical_jobs.override";
+        // Backward-compatible alias used by older policies/tests.
+        public const string Complete = QC;
     }
 
     public static class Prescriptions

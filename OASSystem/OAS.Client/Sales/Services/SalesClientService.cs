@@ -216,6 +216,9 @@ public sealed class SalesClientService(OasApiClient apiClient) : ISalesClientSer
         => await apiClient.GetAsync<IReadOnlyList<SalesPrescriptionLookupDto>>(AddQuery("api/sales/lookups/prescriptions", ("customerId", customerId?.ToString()), ("search", search), ("take", take.ToString())), ct) ?? [];
     public async Task<IReadOnlyList<SalesPrescriptionRevisionLookupDto>> GetPrescriptionRevisionsAsync(Guid prescriptionId, CancellationToken ct = default)
         => await apiClient.GetAsync<IReadOnlyList<SalesPrescriptionRevisionLookupDto>>($"api/sales/lookups/prescriptions/{prescriptionId}/revisions", ct) ?? [];
+    public Task<SalesOpticalRangeLookupDto?> GetPrescriptionOpticalRangesAsync(CancellationToken ct = default)
+        => apiClient.GetAsync<SalesOpticalRangeLookupDto>("api/sales/lookups/prescription-optical-ranges", ct);
+
     public async Task<IReadOnlyList<SalesProductTypeLookupDto>> SearchProductTypesAsync(string? search, int take = 20, CancellationToken ct = default)
         => await apiClient.GetAsync<IReadOnlyList<SalesProductTypeLookupDto>>(AddQuery("api/sales/lookups/product-types", ("search", search), ("take", take.ToString())), ct) ?? [];
 

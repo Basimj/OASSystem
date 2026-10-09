@@ -29,4 +29,8 @@ public sealed record SalesProductVariantLookupDto(
     decimal? CylinderMax,
     decimal? AddMin,
     decimal? AddMax,
-    bool IsActive);
+    bool IsActive,
+    string? LensType = null,
+    string? LensMaterial = null,
+    string? LensCoating = null,
+    decimal? LensRefractiveIndex = null);

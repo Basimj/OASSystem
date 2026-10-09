@@ -49,6 +49,11 @@ public sealed class SalesLookupsController(ISender sender) : ControllerBase
         CancellationToken cancellationToken = default)
         => Ok(await sender.Send(new SearchSalesProductCategoriesQuery(productTypeId, search, take), cancellationToken));
 
+    [HttpGet("prescription-optical-ranges")]
+    public async Task<ActionResult<SalesOpticalRangeLookupDto>> PrescriptionOpticalRanges(
+        CancellationToken cancellationToken = default)
+        => Ok(await sender.Send(new GetSalesPrescriptionOpticalRangesQuery(), cancellationToken));
+
     [HttpGet("product-variants")]
     public async Task<ActionResult<IReadOnlyList<SalesProductVariantLookupDto>>> ProductVariants(
         [FromQuery] Guid? productTypeId,

@@ -46,7 +46,7 @@ public sealed class CustomerOrderOpticalService(
                 seed.OpticalPolicy,
                 cancellationToken);
 
-            return new PreparedCustomerOrderLine(seed, revision, eye, null);
+            return new PreparedCustomerOrderLine(seed, seed, revision, eye, null);
         }
 
         var draft = await ResolveSnapshotAsync(
@@ -58,7 +58,7 @@ public sealed class CustomerOrderOpticalService(
             cancellationToken);
 
         if (draft is null)
-            return new PreparedCustomerOrderLine(seed, null, null, null);
+            return new PreparedCustomerOrderLine(seed, seed, null, null, null);
 
         var exactVariant = seed.ProductVariantId;
         if (seed.ProductVariantId.HasValue)
@@ -77,6 +77,7 @@ public sealed class CustomerOrderOpticalService(
             PrescriptionOpticalRules.ValidateConfiguredRanges(draft.SPH, draft.CYL, draft.ADD, resolved.OpticalPolicy);
 
         return new PreparedCustomerOrderLine(
+            seed,
             resolved,
             draft.MeasurementSource == OpticalMeasurementSource.StoredPrescription ? draft.PrescriptionRevisionId : null,
             draft.MeasurementSource == OpticalMeasurementSource.StoredPrescription ? draft.Eye : null,

@@ -25,9 +25,7 @@ public sealed class CreateSalesInvoiceCommandHandler(
     IReadRepository<Currency, Guid> currencies,
     IReadRepository<Employee, Guid> employees,
     IExchangeRateResolver rates,
-    ISalesLineResolver lineResolver,
-    ISalesPrescriptionValidator prescriptionValidator,
-    ILensVariantResolver lensVariantResolver,
+    ICustomerOrderOpticalService optical,
     ISequenceNumberGenerator sequences)
     : IRequestHandler<CreateSalesInvoiceCommand, SalesInvoice>
 {
@@ -129,60 +127,20 @@ public sealed class CreateSalesInvoiceCommandHandler(
         CancellationToken ct)
     {
         var type = (SalesLineType)(byte)req.LineType;
-        var resolved = await lineResolver.ResolveAsync(
+        var requestEye = req.PrescriptionEye.HasValue
+            ? (EyeSide?)(byte)req.PrescriptionEye.Value
+            : null;
+        var prepared = await optical.PrepareAsync(
             type,
             req.ProductVariantId,
             req.WarehouseId,
             req.Description,
+            req.PrescriptionRevisionId,
+            requestEye,
+            invoice.PrescriptionRevisionId,
+            req.OpticalSnapshot,
             ct);
-
-        var revision = req.PrescriptionRevisionId ?? invoice.PrescriptionRevisionId;
-        var eye = req.PrescriptionEye.HasValue
-            ? (EyeSide?)(byte)req.PrescriptionEye.Value
-            : null;
-
-        // Direct sale used to validate the selected seed variant directly.
-        // Use the same exact-lens resolution path as CustomerOrder so the stored SKU
-        // matches SPH/CYL/ADD before range validation and invoice snapshot creation.
-        var prescription = await prescriptionValidator.ValidateLineAsync(
-            revision,
-            eye,
-            resolved.PrescriptionRequired,
-            opticalPolicy: null,
-            cancellationToken: ct);
-
-        if (type == SalesLineType.Lens && prescription is not null && resolved.ProductVariantId.HasValue)
-        {
-            var exact = await lensVariantResolver.ResolveAsync(
-                new LensVariantMatchRequest(
-                    resolved.ProductVariantId.Value,
-                    prescription.SPH,
-                    prescription.CYL,
-                    prescription.ADD),
-                ct);
-
-            if (exact.ProductVariantId != resolved.ProductVariantId.Value)
-            {
-                resolved = await lineResolver.ResolveAsync(
-                    type,
-                    exact.ProductVariantId,
-                    req.WarehouseId,
-                    req.Description,
-                    ct);
-            }
-        }
-
-        if (prescription is not null && resolved.OpticalPolicy is not null)
-        {
-            // Re-use the central validator so range violations become a stable
-            // application conflict with an Arabic, actionable message.
-            prescription = await prescriptionValidator.ValidateLineAsync(
-                revision,
-                eye,
-                resolved.PrescriptionRequired,
-                resolved.OpticalPolicy,
-                ct);
-        }
+        var resolved = prepared.Resolution;
 
         var standardUnitPrice = resolved.ProductVariantId.HasValue
             ? SalesPricingCalculator.ConvertFromBase(
@@ -191,9 +149,16 @@ public sealed class CreateSalesInvoiceCommandHandler(
                 invoice.CurrencyDecimalPlacesSnapshot)
             : resolved.BaseUnitPrice;
 
+        // Direct invoices preserve the approval model: a product with a configured price
+        // starts from that configured price. Products without a price can be priced manually.
         var actualUnitPrice = resolved.ProductVariantId.HasValue && standardUnitPrice > 0m
             ? standardUnitPrice
             : req.ActualUnitPrice;
+        var requiresProduction = SalesLensLinePolicy.ResolveRequiresProduction(
+            type,
+            resolved,
+            req.GroupId,
+            req.RequiresProduction);
 
         var line = SalesInvoiceLine.Create(
             Guid.NewGuid(),
@@ -214,34 +179,18 @@ public sealed class CreateSalesInvoiceCommandHandler(
             (SalesDiscountType)(byte)req.DiscountType,
             req.DiscountValue,
             req.TaxRate,
-            revision,
-            eye,
-            req.RequiresProduction,
+            prepared.PrescriptionRevisionId,
+            prepared.PrescriptionEye,
+            requiresProduction,
             req.Notes,
             invoice.TaxCalculationMode,
             invoice.CurrencyDecimalPlacesSnapshot,
             invoice.ExchangeRate,
             invoice.BaseCurrencyDecimalPlacesSnapshot);
 
-        SalesInvoiceLinePrescriptionSnapshot? snapshot = null;
-        if (type == SalesLineType.Lens && prescription is not null)
-        {
-            snapshot = SalesInvoiceLinePrescriptionSnapshot.Create(
-                Guid.NewGuid(),
-                line.Id,
-                prescription.PrescriptionRevisionId,
-                prescription.Eye,
-                prescription.SPH,
-                prescription.CYL,
-                prescription.Axis,
-                prescription.ADD,
-                prescription.Prism,
-                prescription.PrismBase,
-                prescription.PD,
-                prescription.MonocularPD,
-                prescription.VA,
-                prescription.FittingHeight);
-        }
+        var snapshot = prepared.OpticalSnapshot is null
+            ? null
+            : SalesInvoiceOpticalSnapshotFactory.Create(line.Id, prepared.OpticalSnapshot);
 
         return new PreparedInvoiceLine(line, snapshot);
     }
