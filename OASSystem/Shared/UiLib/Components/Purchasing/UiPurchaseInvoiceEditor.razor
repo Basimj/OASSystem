@@ -25,7 +25,8 @@
                 <div class="ui-purchasing-invoice-line">
                     <div class="ui-purchasing-invoice-line__head"><strong>البند @line.LineSequence</strong>@if(IsEditable){<UiButton Text="حذف" IconCssClass="fa-regular fa-trash-can" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="@(_=>RemoveLineAsync(line))" />}</div>
                     <UiPurchasingFormGrid>
-                        <UiLookup Label="المنتج" Required="true" Value="@GuidText(line.ProductVariantId)" SelectedItem="@Selected(line.ProductVariantId,line.ProductName,"fa-solid fa-box")" SearchAsync="ProductSearchAsync" ValueChanged="@(v=>ProductChanged(line,v))" Disabled="@(!IsEditable)" />
+                        <UiLookup Label="المنتج" Required="true" Value="@GuidText(line.ProductVariantId)" SelectedItem="@Selected(line.ProductVariantId,line.ProductName,"fa-solid fa-box")" SearchAsync="ProductSearchAsync" ValueChanged="@(v=>ProductChanged(line,v))" Disabled="@(line.PurchaseOrderLineId.HasValue || !IsEditable)" />
+                        <UiInputText Label="ربط أمر الشراء" Value="@PurchaseOrderLinkText(line)" Disabled="true" />
                         <UiPurchasingNumberField Label="الكمية" Value="@line.Quantity" ValueChanged="@(v=>QuantityChanged(line,v))" Disabled="@(!IsEditable)" />
                         <UiPurchasingNumberField Label="سعر الوحدة" Value="@line.UnitPrice" ValueChanged="@(v=>PriceChanged(line,v))" Disabled="@(!IsEditable)" Step="0.0001" />
                         <UiPurchasingNumberField Label="الخصم" Value="@line.DiscountAmount" ValueChanged="@(v=>DiscountChanged(line,v))" Disabled="@(!IsEditable)" Step="0.0001" />
@@ -63,6 +64,7 @@
     private static readonly IReadOnlyList<UiSelectOption> TaxModeOptions=[new("1","غير شامل"),new("2","شامل")];
     private static string? GuidText(Guid? id)=>id?.ToString("D"); private static Guid? Parse(string? v)=>Guid.TryParse(v,out var x)?x:null;
     private static UiLookupItem? Selected(Guid? id,string? text,string icon)=>id.HasValue?new(id.Value.ToString("D"),text??id.Value.ToString("D"),null,icon):null;
+    private static string PurchaseOrderLinkText(UiPurchaseInvoiceLineModel line)=>line.PurchaseOrderLineId.HasValue?"مرتبط بسطر أمر شراء":"غير مرتبط";
     private Task Changed()=>OnChanged.InvokeAsync();
     private async Task SupplierInvoiceCodeChanged(string? v){Model.SupplierInvoiceCode=v;await Changed();}
     private async Task SupplierChanged(string? v){Model.SupplierId=Parse(v);await Changed();}

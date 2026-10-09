@@ -35,6 +35,7 @@
                 @if (ShowCancelReceipt) { <UiButton Text="إلغاء الاستلام" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" OnClick="CancelReceiptAsync" /> }
                 @if (ShowReceiptInventory) { <UiButton Text="عرض حركة المخزون" IconCssClass="fa-solid fa-arrow-right-arrow-left" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="OpenReceiptInventoryAsync" /> }
                 @if (ShowReceiptJournal) { <UiButton Text="عرض القيد" IconCssClass="fa-solid fa-book-journal-whills" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="OpenReceiptJournalAsync" /> }
+                @if (ShowCreateInvoiceFromReceipt) { <UiButton Text="إنشاء فاتورة مورد" IconCssClass="fa-solid fa-file-invoice-dollar" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="CreateInvoiceFromReceiptAsync" /> }
 
                 @if (ShowMatchInvoice) { <UiButton Text="تشغيل المطابقة" IconCssClass="fa-solid fa-code-compare" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="MatchInvoiceAsync" /> }
                 @if (ShowConfirmInvoice) { <UiButton Text="تأكيد" IconCssClass="fa-solid fa-circle-check" Size="ControlSize.Small" OnClick="ConfirmInvoiceAsync" /> }

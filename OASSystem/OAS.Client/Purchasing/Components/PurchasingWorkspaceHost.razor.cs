@@ -217,6 +217,9 @@ public partial class PurchasingWorkspaceHost
     private async Task<object?> SaveInvoiceAsync(UiPurchaseInvoiceEditorModel m)
     {
         if(m.SupplierId is not Guid supplier||m.CurrencyId is not Guid currency||m.Lines.Count==0||m.Lines.Any(x=>!x.ProductVariantId.HasValue)){Snackbar.Warning("أكمل المورد والعملة ومنتجات الفاتورة.");return null;}
+        if(m.Lines.Any(x=>!x.PurchaseOrderLineId.HasValue)){Snackbar.Warning("يجب إنشاء فاتورة المورد من استلام مرحّل حتى ترتبط جميع البنود بأمر الشراء قبل المطابقة الثلاثية.");return null;}
+        if(m.ExchangeRate<=0m){Snackbar.Warning("سعر الصرف يجب أن يكون أكبر من صفر.");return null;}
+        if(m.Lines.Any(x=>x.Quantity<=0m)){Snackbar.Warning("كمية كل بند في فاتورة المورد يجب أن تكون أكبر من صفر.");return null;}
         if(!m.Id.HasValue)
         {
             var lines=m.Lines.Select(x=>new CreatePurchaseInvoiceLineRequest(x.LineSequence,x.PurchaseOrderLineId,x.ProductVariantId!.Value,x.Quantity,x.UnitPrice,x.DiscountAmount,x.TaxRate)).ToArray();
