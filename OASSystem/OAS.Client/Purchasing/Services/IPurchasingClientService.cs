@@ -55,6 +55,8 @@ public interface IPurchasingClientService
     Task<PurchaseInvoiceDto?> ApprovePurchaseVarianceAsync(Guid id, ApprovePurchaseVarianceRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseInvoiceDto?> RejectPurchaseVarianceAsync(Guid id, RejectPurchaseVarianceRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseInvoicePostResultDto?> PostPurchaseInvoiceAsync(Guid id, PostPurchaseInvoiceRequest request, CancellationToken cancellationToken = default);
+    Task<PurchaseInvoicePaymentSummaryDto?> GetPurchaseInvoicePaymentSummaryAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<PayPurchaseInvoiceResultDto?> PayPurchaseInvoiceAsync(Guid id, PayPurchaseInvoiceRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseInvoiceDto?> CancelPurchaseInvoiceAsync(Guid id, CancelPurchaseInvoiceRequest request, CancellationToken cancellationToken = default);
 
     Task<PagedResult<PurchaseReturnDto>> GetPurchaseReturnsAsync(PageRequest request, PurchaseReturnStatus? status = null, Guid? purchaseReceiptId = null, Guid? purchaseInvoiceId = null, Guid? supplierId = null, CancellationToken cancellationToken = default);

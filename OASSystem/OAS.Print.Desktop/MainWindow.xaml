@@ -720,6 +720,8 @@
                                 <ComboBox x:Name="SettingsPaymentPrinterCombo"/>
                                 <TextBlock Text="فواتير المبيعات" Style="{StaticResource FieldLabelStyle}"/>
                                 <ComboBox x:Name="SettingsSalesInvoicePrinterCombo"/>
+                                <TextBlock Text="فواتير المشتريات" Style="{StaticResource FieldLabelStyle}"/>
+                                <ComboBox x:Name="SettingsPurchaseInvoicePrinterCombo"/>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
                                     <Button Content="حفظ الإعدادات" Style="{StaticResource PrimaryButtonStyle}" Click="SaveSettingsInline_Click"/>
                                     <Button Content="إعادة تحميل" Style="{StaticResource ToolbarButtonStyle}" Click="ReloadSettings_Click"/>

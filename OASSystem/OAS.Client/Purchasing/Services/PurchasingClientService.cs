@@ -73,6 +73,8 @@ public sealed class PurchasingClientService(OasApiClient api) : IPurchasingClien
     public Task<PurchaseInvoiceDto?> ApprovePurchaseVarianceAsync(Guid id,ApprovePurchaseVarianceRequest r,CancellationToken ct=default)=>Post<ApprovePurchaseVarianceRequest,PurchaseInvoiceDto>($"api/purchasing/invoices/{id}/variances/approve",r,ct);
     public Task<PurchaseInvoiceDto?> RejectPurchaseVarianceAsync(Guid id,RejectPurchaseVarianceRequest r,CancellationToken ct=default)=>Post<RejectPurchaseVarianceRequest,PurchaseInvoiceDto>($"api/purchasing/invoices/{id}/variances/reject",r,ct);
     public Task<PurchaseInvoicePostResultDto?> PostPurchaseInvoiceAsync(Guid id,PostPurchaseInvoiceRequest r,CancellationToken ct=default)=>Post<PostPurchaseInvoiceRequest,PurchaseInvoicePostResultDto>($"api/purchasing/invoices/{id}/post",r,ct);
+    public Task<PurchaseInvoicePaymentSummaryDto?> GetPurchaseInvoicePaymentSummaryAsync(Guid id,CancellationToken ct=default)=>api.GetAsync<PurchaseInvoicePaymentSummaryDto>($"api/purchasing/invoices/{id}/payment-summary",ct);
+    public Task<PayPurchaseInvoiceResultDto?> PayPurchaseInvoiceAsync(Guid id,PayPurchaseInvoiceRequest r,CancellationToken ct=default)=>Post<PayPurchaseInvoiceRequest,PayPurchaseInvoiceResultDto>($"api/purchasing/invoices/{id}/pay",r,ct);
     public Task<PurchaseInvoiceDto?> CancelPurchaseInvoiceAsync(Guid id,CancelPurchaseInvoiceRequest r,CancellationToken ct=default)=>Post<CancelPurchaseInvoiceRequest,PurchaseInvoiceDto>($"api/purchasing/invoices/{id}/cancel",r,ct);
 
     public Task<PagedResult<PurchaseReturnDto>> GetPurchaseReturnsAsync(PageRequest r, PurchaseReturnStatus? status=null, Guid? purchaseReceiptId=null, Guid? purchaseInvoiceId=null, Guid? supplierId=null, CancellationToken ct=default)

@@ -9,6 +9,8 @@ using OAS.Contracts.Purchasing.PurchaseReceipts;
 using OAS.Contracts.Purchasing.PurchaseRequests;
 using OAS.Contracts.Sales.Enums;
 using OAS.UiLib.Core.Enums;
+using OAS.UiLib.Core.Models;
+using OAS.UiLib.Components.Purchasing;
 using OAS.UiLib.Core.Models.Purchasing;
 
 namespace OAS.Client.Purchasing.Components;
@@ -70,12 +72,15 @@ public partial class PurchasingWorkspaceHost
     private bool ShowCancelReceipt=>ActiveTab?.Model is UiPurchaseReceiptEditorModel m&&(m.Status is (byte)PurchaseReceiptStatus.Draft or (byte)PurchaseReceiptStatus.Confirmed);
     private bool ShowReceiptInventory=>ActiveTab?.Model is UiPurchaseReceiptEditorModel m&&m.Status==(byte)PurchaseReceiptStatus.Posted&&m.InventoryTransactionId.HasValue;
     private bool ShowReceiptJournal=>ActiveTab?.Model is UiPurchaseReceiptEditorModel m&&m.Status==(byte)PurchaseReceiptStatus.Posted&&m.JournalEntryId.HasValue;
+    private bool ShowCreateInvoiceFromReceipt=>ActiveTab?.Model is UiPurchaseReceiptEditorModel m&&m.Status==(byte)PurchaseReceiptStatus.Posted;
     private bool ShowMatchInvoice=>ActiveTab?.Model is UiPurchaseInvoiceEditorModel m&&((m.Status is (byte)PurchaseInvoiceStatus.Draft or (byte)PurchaseInvoiceStatus.Confirmed or (byte)PurchaseInvoiceStatus.PendingMatchApproval))&&!ActiveTab.IsDirty;
     private bool ShowConfirmInvoice=>ActiveTab?.Model is UiPurchaseInvoiceEditorModel m&&m.Status==(byte)PurchaseInvoiceStatus.Draft&&!ActiveTab.IsDirty;
     private bool ShowApproveVariance=>ActiveTab?.Model is UiPurchaseInvoiceEditorModel m&&m.Status==(byte)PurchaseInvoiceStatus.PendingMatchApproval&&m.Match?.Allocations.Any(x=>x.Status=="يحتاج اعتماد")==true;
     private bool ShowPostInvoice=>ActiveTab?.Model is UiPurchaseInvoiceEditorModel m&&m.Status==(byte)PurchaseInvoiceStatus.Confirmed;
     private bool ShowCancelInvoice=>ActiveTab?.Model is UiPurchaseInvoiceEditorModel m&&(m.Status is (byte)PurchaseInvoiceStatus.Draft or (byte)PurchaseInvoiceStatus.Confirmed or (byte)PurchaseInvoiceStatus.PendingMatchApproval);
     private bool ShowInvoiceJournal=>ActiveTab?.Model is UiPurchaseInvoiceEditorModel m&&m.Status==(byte)PurchaseInvoiceStatus.Posted&&m.JournalEntryId.HasValue;
+    private bool ShowPrintInvoice=>ActiveTab?.Model is UiPurchaseInvoiceEditorModel m&&m.Status==(byte)PurchaseInvoiceStatus.Posted&&m.Id.HasValue&&!ActiveTab.IsDirty;
+    private bool ShowPayInvoice=>ActiveTab?.Model is UiPurchaseInvoiceEditorModel m&&m.Status==(byte)PurchaseInvoiceStatus.Posted&&m.Id.HasValue;
 
     private async Task SubmitRequestAsync(MouseEventArgs _)=>await ChangeRequestAsync((id,rv)=>Purchasing.SubmitPurchaseRequestAsync(id,new(rv)));
     private async Task ApproveRequestAsync(MouseEventArgs _)=>await ChangeRequestAsync((id,rv)=>Purchasing.ApprovePurchaseRequestAsync(id,new(rv)));
@@ -400,6 +405,100 @@ public partial class PurchasingWorkspaceHost
         catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}catch{ApiFeedback.ShowUnexpected();}
     }
 
+    private async Task CreateInvoiceFromReceiptAsync(MouseEventArgs _)
+    {
+        if(ActiveTab?.Model is not UiPurchaseReceiptEditorModel receipt||receipt.Id is not Guid||receipt.Status!=(byte)PurchaseReceiptStatus.Posted)return;
+        if(receipt.PurchaseOrderId is not Guid purchaseOrderId)
+        {
+            Snackbar.Warning("سند الاستلام غير مرتبط بأمر شراء صالح.");
+            return;
+        }
+
+        try
+        {
+            var order=await Purchasing.GetPurchaseOrderAsync(purchaseOrderId);
+            if(order is null)
+            {
+                Snackbar.Warning("تعذر تحميل أمر الشراء المرتبط بسند الاستلام.");
+                return;
+            }
+            if(order.SupplierId!=receipt.SupplierId)
+            {
+                Snackbar.Warning("مورد سند الاستلام لا يطابق مورد أمر الشراء.");
+                return;
+            }
+
+            var orderLines=order.Lines.ToDictionary(x=>x.Id);
+            var model=new UiPurchaseInvoiceEditorModel
+            {
+                SupplierId=order.SupplierId,
+                SupplierName=order.SupplierName,
+                InvoiceDate=DateOnly.FromDateTime(DateTime.Today),
+                PostingDate=DateOnly.FromDateTime(DateTime.Today),
+                CurrencyId=order.CurrencyId,
+                CurrencyCode=order.CurrencyCode,
+                ExchangeRate=order.ExchangeRate,
+                ExchangeRateDate=order.ExchangeRateDate,
+                TaxCalculationMode=(byte)order.TaxCalculationMode,
+                Notes=$"فاتورة مورد من الاستلام {receipt.ReceiptCode} / أمر الشراء {order.PurchaseOrderCode}"
+            };
+
+            foreach(var receiptLine in receipt.Lines.Where(x=>x.AcceptedQuantity>0m).OrderBy(x=>x.LineSequence))
+            {
+                if(!orderLines.TryGetValue(receiptLine.PurchaseOrderLineId,out var poLine))
+                {
+                    Snackbar.Warning($"تعذر العثور على سطر أمر الشراء المرتبط ببند الاستلام {receiptLine.LineSequence}.");
+                    return;
+                }
+
+                var quantity=Math.Round(Math.Max(0m,receiptLine.AcceptedQuantity),3);
+                if(quantity<=0m)continue;
+                var ratio=poLine.OrderedQuantity<=0m?0m:quantity/poLine.OrderedQuantity;
+                var discount=Math.Round(poLine.DiscountAmount*ratio,4);
+                var gross=Math.Round(quantity*poLine.UnitPrice,4);
+                var net=Math.Round(poLine.NetAmount*ratio,4);
+                var tax=Math.Round(poLine.TaxAmount*ratio,4);
+                var final=Math.Round(poLine.FinalAmount*ratio,4);
+
+                model.Lines.Add(new UiPurchaseInvoiceLineModel
+                {
+                    LineSequence=model.Lines.Count+1,
+                    PurchaseOrderLineId=poLine.Id,
+                    ProductVariantId=poLine.ProductVariantId,
+                    ProductName=poLine.ProductNameSnapshot,
+                    Quantity=quantity,
+                    UnitPrice=poLine.UnitPrice,
+                    GrossAmount=gross,
+                    DiscountAmount=discount,
+                    NetAmount=net,
+                    TaxRate=poLine.TaxRate,
+                    TaxAmount=tax,
+                    FinalAmount=final
+                });
+            }
+
+            if(model.Lines.Count==0)
+            {
+                Snackbar.Warning("لا توجد كميات مقبولة متاحة لإنشاء فاتورة من هذا الاستلام.");
+                return;
+            }
+
+            model.Subtotal=Math.Round(model.Lines.Sum(x=>x.GrossAmount),4);
+            model.DiscountAmount=Math.Round(model.Lines.Sum(x=>x.DiscountAmount),4);
+            model.TaxAmount=Math.Round(model.Lines.Sum(x=>x.TaxAmount),4);
+            model.TotalAmount=Math.Round(model.Lines.Sum(x=>x.FinalAmount),4);
+
+            var tab=Workspace.OpenNew(PurchasingEntityType.PurchaseInvoices,$"فاتورة من {receipt.ReceiptCode}");
+            tab.Model=model;
+            tab.IsDirty=true;
+            tab.IsEditMode=true;
+            Navigation.NavigateTo("/purchases/invoices");
+            Snackbar.Success("تم تجهيز فاتورة المورد وربط البنود بأمر الشراء. أدخل رقم فاتورة المورد ثم احفظ وشغّل المطابقة.");
+            await InvokeAsync(StateHasChanged);
+        }
+        catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}catch{ApiFeedback.ShowUnexpected();}
+    }
+
     private async Task ConfirmInvoiceAsync(MouseEventArgs _)=>await ChangeInvoiceAsync((id,rv)=>Purchasing.ConfirmPurchaseInvoiceAsync(id,new(rv)));
     private async Task CancelInvoiceAsync(MouseEventArgs _)
     {
@@ -460,7 +559,69 @@ public partial class PurchasingWorkspaceHost
     {
         if(ActiveTab?.Model is not UiPurchaseInvoiceEditorModel m||m.Id is not Guid id)return;
         if(!await Dialog.ConfirmAsync("ترحيل فاتورة المورد","سيتم إنشاء قيد GRNI / الضريبة / فروقات السعر / حساب المورد.",AlertTone.Warning,"ترحيل","رجوع"))return;
-        try{await Purchasing.PostPurchaseInvoiceAsync(id,new(m.RowVersion??string.Empty));var dto=await Purchasing.GetPurchaseInvoiceAsync(id);if(dto is not null)SetActive(Map(dto));Snackbar.Success("تم ترحيل فاتورة المورد.");}
+        try
+        {
+            await Purchasing.PostPurchaseInvoiceAsync(id,new(m.RowVersion??string.Empty));
+            var dto=await Purchasing.GetPurchaseInvoiceAsync(id);
+            if(dto is not null)
+            {
+                var mapped=Map(dto);
+                SetActive(mapped);
+                await LoadInvoicePaymentSummaryAsync(mapped,true);
+            }
+            Snackbar.Success("تم ترحيل فاتورة المورد.");
+        }
+        catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}catch{ApiFeedback.ShowUnexpected();}
+    }
+
+    private async Task PayInvoiceAsync(MouseEventArgs _)
+    {
+        if(ActiveTab?.Model is not UiPurchaseInvoiceEditorModel m||m.Id is not Guid id||m.CurrencyId is not Guid currencyId)return;
+        try
+        {
+            var summary=await Purchasing.GetPurchaseInvoicePaymentSummaryAsync(id);
+            if(summary is null)return;
+            _invoicePaymentSummaries[id]=summary;
+            StateHasChanged();
+            if(summary.OutstandingAmount<=0m)
+            {
+                Snackbar.Info("فاتورة المورد مسددة بالكامل بالفعل.");
+                return;
+            }
+
+            var result=await Dialog.ShowAsync<UiPurchaseInvoicePaymentDialog>(
+                "سداد فاتورة المورد",
+                new Dictionary<string,object>
+                {
+                    [nameof(UiPurchaseInvoicePaymentDialog.InvoiceCode)]=m.PurchaseInvoiceCode,
+                    [nameof(UiPurchaseInvoicePaymentDialog.SupplierName)]=m.SupplierName??"المورد",
+                    [nameof(UiPurchaseInvoicePaymentDialog.CurrencyCode)]=m.CurrencyCode??string.Empty,
+                    [nameof(UiPurchaseInvoicePaymentDialog.TotalAmount)]=summary.TotalAmount,
+                    [nameof(UiPurchaseInvoicePaymentDialog.PaidAmount)]=summary.PaidAmount,
+                    [nameof(UiPurchaseInvoicePaymentDialog.OutstandingAmount)]=summary.OutstandingAmount,
+                    [nameof(UiPurchaseInvoicePaymentDialog.PaymentDate)]=DateOnly.FromDateTime(DateTime.Today),
+                    [nameof(UiPurchaseInvoicePaymentDialog.CashAccountSearchAsync)]=new Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>((text,ct)=>SearchInvoiceCashAccountsAsync(currencyId,text,ct)),
+                    [nameof(UiPurchaseInvoicePaymentDialog.BankAccountSearchAsync)]=new Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>((text,ct)=>SearchInvoiceBankAccountsAsync(currencyId,text,ct))
+                },
+                new UiDialogOptions{Size=UiDialogSize.Large,CloseOnBackdrop=false});
+
+            if(result.Cancelled||result.Value is not UiPurchaseInvoicePaymentDialog.PaymentRequestModel payment)return;
+
+            var response=await Purchasing.PayPurchaseInvoiceAsync(id,new PayPurchaseInvoiceRequest(
+                payment.PaymentDate,
+                payment.Amount,
+                (OAS.Contracts.Accounting.Enums.PaymentMethod)(byte)payment.PaymentMethod,
+                payment.CashAccountId,
+                payment.BankAccountId,
+                payment.ReferenceNumber,
+                $"سداد فاتورة المورد {m.PurchaseInvoiceCode}"));
+            if(response is null)return;
+            await LoadInvoicePaymentSummaryAsync(m,true);
+
+            Snackbar.Success(response.OutstandingAmount<=0m
+                ? $"تم سداد الفاتورة بالكامل وإنشاء سند الصرف {response.PaymentVoucherNumber}."
+                : $"تم تسجيل السداد وإنشاء سند الصرف {response.PaymentVoucherNumber}. المتبقي {response.OutstandingAmount:N2} {m.CurrencyCode}.");
+        }
         catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}catch{ApiFeedback.ShowUnexpected();}
     }
 
@@ -476,6 +637,36 @@ public partial class PurchasingWorkspaceHost
         if(ActiveTab?.Model is UiPurchaseReceiptEditorModel { JournalEntryId: Guid id })
             Navigation.NavigateTo($"/accounting/journals?journalId={id:D}");
         return Task.CompletedTask;
+    }
+
+    private async Task PrintPurchaseInvoiceAsync(MouseEventArgs _)
+    {
+        if(_isPrintingPurchaseInvoice||ActiveTab?.Model is not UiPurchaseInvoiceEditorModel invoice||invoice.Id is not Guid id)return;
+        if(invoice.Status!=(byte)PurchaseInvoiceStatus.Posted)
+        {
+            Snackbar.Info("يمكن طباعة فاتورة المشتريات بعد الترحيل فقط.");
+            return;
+        }
+        if(ActiveTab.IsDirty)
+        {
+            Snackbar.Warning("احفظ التعديلات قبل إرسال الفاتورة للطباعة.");
+            return;
+        }
+
+        _isPrintingPurchaseInvoice=true;
+        try
+        {
+            var result=await Printing.PrintPurchaseInvoiceAsync(id);
+            if(result is null)Snackbar.Error("تعذر إرسال فاتورة المشتريات إلى OAS Print.");
+            else Snackbar.Success("تم إرسال فاتورة المشتريات إلى OAS Print للطباعة.");
+        }
+        catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}
+        catch{ApiFeedback.ShowUnexpected();}
+        finally
+        {
+            _isPrintingPurchaseInvoice=false;
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     private Task OpenInvoiceJournalAsync(MouseEventArgs _)

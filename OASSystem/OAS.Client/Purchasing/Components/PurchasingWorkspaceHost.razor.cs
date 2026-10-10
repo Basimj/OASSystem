@@ -4,6 +4,7 @@ using OAS.Client.Accounting.Services;
 using OAS.Client.Common.Feedback.Services;
 using OAS.Client.Inventory.Services;
 using OAS.Client.Purchasing.Common;
+using OAS.Client.Printing.Services;
 using OAS.Client.Purchasing.Services;
 using OAS.Client.Purchasing.Workspace;
 using OAS.Client.Services.Http;
@@ -30,6 +31,7 @@ public partial class PurchasingWorkspaceHost
     [Inject] private IPurchasingClientService Purchasing {get;set;}=default!;
     [Inject] private IInventoryClientService Inventory {get;set;}=default!;
     [Inject] private IAccountingClientService Accounting {get;set;}=default!;
+    [Inject] private IPrintingClientService Printing {get;set;}=default!;
     [Inject] private IPurchasingWorkspaceState Workspace {get;set;}=default!;
     [Inject] private IApiFeedbackService ApiFeedback {get;set;}=default!;
     [Inject] private IUiSnackbarService Snackbar {get;set;}=default!;
@@ -42,9 +44,24 @@ public partial class PurchasingWorkspaceHost
     private int _pageNumber=1;
     private int _totalPages;
     private long _totalCount;
+    private bool _isPrintingPurchaseInvoice;
     private IReadOnlyList<UiPurchasingListItem> CurrentListItems=[];
+    private readonly Dictionary<Guid,PurchaseInvoicePaymentSummaryDto> _invoicePaymentSummaries=[];
+    private readonly HashSet<Guid> _loadingInvoicePaymentSummaries=[];
 
     private PurchasingTabState? ActiveTab=>Workspace.Find(Workspace.ActiveTabId);
+    private PurchaseInvoicePaymentSummaryDto? ActiveInvoicePaymentSummary
+        => ActiveTab?.Model is UiPurchaseInvoiceEditorModel { Id: Guid id } && _invoicePaymentSummaries.TryGetValue(id,out var summary) ? summary : null;
+    private bool IsActiveInvoicePaymentSummaryLoading
+        => ActiveTab?.Model is UiPurchaseInvoiceEditorModel { Id: Guid id } && _loadingInvoicePaymentSummaries.Contains(id);
+    private bool ShowInvoicePaymentSummary
+        => ActiveTab?.Model is UiPurchaseInvoiceEditorModel m && m.Status==(byte)PurchaseInvoiceStatus.Posted && m.Id.HasValue;
+    private string ActiveInvoicePaymentStatusText=>PaymentStatusText(ActiveInvoicePaymentSummary?.PaymentStatus);
+    private string PayInvoiceButtonText
+        => ActiveInvoicePaymentSummary is { OutstandingAmount: <= 0m } ? "مسددة بالكامل"
+            : ActiveInvoicePaymentSummary is { PaidAmount: > 0m } ? "سداد المتبقي"
+            : "سداد المورد";
+    private bool PayInvoiceDisabled=>IsActiveInvoicePaymentSummaryLoading || ActiveInvoicePaymentSummary is { OutstandingAmount: <= 0m };
     private bool IsListTab=>ActiveTab is null || ActiveTab.IsListTab;
     private bool IsEditable=>ActiveTab is { } t && !t.IsListTab && (t.IsNew||t.IsEditMode) && IsDomainEditable(t.Model);
     private bool CanBeginEdit=>ActiveTab is {IsListTab:false,IsNew:false,IsEditMode:false} t && IsDomainEditable(t.Model);
@@ -129,6 +146,7 @@ public partial class PurchasingWorkspaceHost
             };
             if(tab.Model is null)throw new InvalidOperationException();
             tab.Title=ModelTitle(tab.Model);tab.IsDirty=false;tab.IsEditMode=false;
+            if(tab.Model is UiPurchaseInvoiceEditorModel invoice)await LoadInvoicePaymentSummaryAsync(invoice,force);
         }
         catch(ApiClientException ex){ApiFeedback.Show(ex.Error);Workspace.Close(tab.TabId);}catch{ApiFeedback.ShowUnexpected();Workspace.Close(tab.TabId);}
         finally{tab.IsLoading=false;}
@@ -145,7 +163,7 @@ public partial class PurchasingWorkspaceHost
     }
     private async Task RefreshActiveAsync(MouseEventArgs _){if(ActiveTab is not {IsNew:false} tab)return;if(tab.IsDirty&&!await ConfirmDiscardAsync(tab))return;tab.Model=null;await EnsureLoadedAsync(tab,true);await InvokeAsync(StateHasChanged);}
     private async Task CloseActiveAsync(MouseEventArgs _){if(ActiveTab is { } tab)await CloseTabAsync(tab.TabId);}
-    private async Task SelectTabAsync(Guid id){Workspace.ActiveTabId=id;if(Workspace.Find(id) is { } t)await EnsureLoadedAsync(t);if(IsListTab)await LoadListAsync();}
+    private async Task SelectTabAsync(Guid id){Workspace.ActiveTabId=id;if(Workspace.Find(id) is { } t){await EnsureLoadedAsync(t);if(t.Model is UiPurchaseInvoiceEditorModel invoice)await LoadInvoicePaymentSummaryAsync(invoice);}if(IsListTab)await LoadListAsync();}
     private async Task CloseTabAsync(Guid id){var tab=Workspace.Find(id);if(tab is null||!tab.CanClose)return;if(!await ConfirmDiscardAsync(tab))return;Workspace.Close(id);await InvokeAsync(StateHasChanged);}
     private async Task CloseOtherTabsAsync(Guid id){var keep=Workspace.Find(id);foreach(var tab in Workspace.VisibleTabs(Section).Where(x=>x.CanClose&&x.TabId!=id).ToArray()){if(!await ConfirmDiscardAsync(tab))return;}foreach(var tab in Workspace.VisibleTabs(Section).Where(x=>x.CanClose&&x.TabId!=id).ToArray())Workspace.Close(tab.TabId);Workspace.ActiveTabId=keep?.TabId??Workspace.OpenList(Section).TabId;}
     private async Task CloseAllTabsAsync(){var tabs=Workspace.VisibleTabs(Section).Where(x=>x.CanClose).ToArray();foreach(var t in tabs)if(!await ConfirmDiscardAsync(t))return;foreach(var t in tabs)Workspace.Close(t.TabId);Workspace.OpenList(Section);}
@@ -217,6 +235,9 @@ public partial class PurchasingWorkspaceHost
     private async Task<object?> SaveInvoiceAsync(UiPurchaseInvoiceEditorModel m)
     {
         if(m.SupplierId is not Guid supplier||m.CurrencyId is not Guid currency||m.Lines.Count==0||m.Lines.Any(x=>!x.ProductVariantId.HasValue)){Snackbar.Warning("أكمل المورد والعملة ومنتجات الفاتورة.");return null;}
+        if(m.Lines.Any(x=>!x.PurchaseOrderLineId.HasValue)){Snackbar.Warning("يجب إنشاء فاتورة المورد من استلام مرحّل حتى ترتبط جميع البنود بأمر الشراء قبل المطابقة الثلاثية.");return null;}
+        if(m.ExchangeRate<=0m){Snackbar.Warning("سعر الصرف يجب أن يكون أكبر من صفر.");return null;}
+        if(m.Lines.Any(x=>x.Quantity<=0m)){Snackbar.Warning("كمية كل بند في فاتورة المورد يجب أن تكون أكبر من صفر.");return null;}
         if(!m.Id.HasValue)
         {
             var lines=m.Lines.Select(x=>new CreatePurchaseInvoiceLineRequest(x.LineSequence,x.PurchaseOrderLineId,x.ProductVariantId!.Value,x.Quantity,x.UnitPrice,x.DiscountAmount,x.TaxRate)).ToArray();
@@ -225,6 +246,39 @@ public partial class PurchasingWorkspaceHost
         var updates=m.Lines.Select(x=>new UpdatePurchaseInvoiceLineRequest(x.Id,x.LineSequence,x.PurchaseOrderLineId,x.ProductVariantId!.Value,x.Quantity,x.UnitPrice,x.DiscountAmount,x.TaxRate,x.RowVersion)).ToArray();
         return Map((await Purchasing.UpdatePurchaseInvoiceAsync(m.Id.Value,new(m.SupplierInvoiceCode,supplier,m.InvoiceDate,m.PostingDate,currency,m.ExchangeRate,m.ExchangeRateDate,(TaxCalculationMode)m.TaxCalculationMode,m.Notes,updates,m.RowVersion??string.Empty)))!);
     }
+
+    private async Task LoadInvoicePaymentSummaryAsync(UiPurchaseInvoiceEditorModel invoice,bool force=false)
+    {
+        if(invoice.Id is not Guid id)return;
+        if(invoice.Status!=(byte)PurchaseInvoiceStatus.Posted)
+        {
+            _invoicePaymentSummaries.Remove(id);
+            return;
+        }
+        if(!force&&_invoicePaymentSummaries.ContainsKey(id))return;
+        if(!_loadingInvoicePaymentSummaries.Add(id))return;
+        try
+        {
+            var summary=await Purchasing.GetPurchaseInvoicePaymentSummaryAsync(id);
+            if(summary is not null)_invoicePaymentSummaries[id]=summary;
+        }
+        catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}
+        catch{ApiFeedback.ShowUnexpected();}
+        finally
+        {
+            _loadingInvoicePaymentSummaries.Remove(id);
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private static string PaymentStatusText(string? status)=>status switch
+    {
+        "Paid"=>"مسددة بالكامل",
+        "PartiallyPaid"=>"مسددة جزئياً",
+        "Unpaid"=>"غير مسددة",
+        "NotPosted"=>"غير مرحلة",
+        _=>"غير محددة"
+    };
 
     private async Task SearchTextChanged(string? value){_search=value;await Task.CompletedTask;}
     private async Task SearchAsync(string? value){_search=value;_pageNumber=1;await LoadListAsync();}

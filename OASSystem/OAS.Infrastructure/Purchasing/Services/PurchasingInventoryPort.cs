@@ -88,7 +88,7 @@ public sealed class PurchasingInventoryPort(
                 source.BaseQuantity, source.UnitCost, transaction.Id, line.Id, movementAt, userId, cancellationToken);
         }
         transaction.Post(timeProvider.GetUtcNow(), userId);
-        transactionRepository.Update(transaction);
+        //transactionRepository.Update(transaction);
         return new PurchasingInventoryPostingResult(transaction.Id);
     }
 

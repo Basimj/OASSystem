@@ -25,7 +25,8 @@
                 <div class="ui-purchasing-invoice-line">
                     <div class="ui-purchasing-invoice-line__head"><strong>البند @line.LineSequence</strong>@if(IsEditable){<UiButton Text="حذف" IconCssClass="fa-regular fa-trash-can" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="@(_=>RemoveLineAsync(line))" />}</div>
                     <UiPurchasingFormGrid>
-                        <UiLookup Label="المنتج" Required="true" Value="@GuidText(line.ProductVariantId)" SelectedItem="@Selected(line.ProductVariantId,line.ProductName,"fa-solid fa-box")" SearchAsync="ProductSearchAsync" ValueChanged="@(v=>ProductChanged(line,v))" Disabled="@(!IsEditable)" />
+                        <UiLookup Label="المنتج" Required="true" Value="@GuidText(line.ProductVariantId)" SelectedItem="@Selected(line.ProductVariantId,line.ProductName,"fa-solid fa-box")" SearchAsync="ProductSearchAsync" ValueChanged="@(v=>ProductChanged(line,v))" Disabled="@(line.PurchaseOrderLineId.HasValue || !IsEditable)" />
+                        <UiInputText Label="ربط أمر الشراء" Value="@PurchaseOrderLinkText(line)" Disabled="true" />
                         <UiPurchasingNumberField Label="الكمية" Value="@line.Quantity" ValueChanged="@(v=>QuantityChanged(line,v))" Disabled="@(!IsEditable)" />
                         <UiPurchasingNumberField Label="سعر الوحدة" Value="@line.UnitPrice" ValueChanged="@(v=>PriceChanged(line,v))" Disabled="@(!IsEditable)" Step="0.0001" />
                         <UiPurchasingNumberField Label="الخصم" Value="@line.DiscountAmount" ValueChanged="@(v=>DiscountChanged(line,v))" Disabled="@(!IsEditable)" Step="0.0001" />
@@ -46,6 +47,29 @@
         </div>
     </UiPurchasingSection>
 
+    @if(ShowPaymentSummary)
+    {
+        <UiPurchasingSection Title="حالة سداد الفاتورة">
+            @if(PaymentSummaryLoading)
+            {
+                <div class="ui-purchasing-empty">جاري تحميل حالة السداد...</div>
+            }
+            else if(PaymentTotalAmount.HasValue && PaymentPaidAmount.HasValue && PaymentOutstandingAmount.HasValue)
+            {
+                <div class="ui-purchasing-invoice-totals">
+                    <span><small>إجمالي الفاتورة</small><strong>@FormatPaymentAmount(PaymentTotalAmount.Value)</strong></span>
+                    <span><small>المدفوع</small><strong>@FormatPaymentAmount(PaymentPaidAmount.Value)</strong></span>
+                    <span><small>المتبقي</small><strong>@FormatPaymentAmount(PaymentOutstandingAmount.Value)</strong></span>
+                    <span><small>حالة السداد</small><strong>@(string.IsNullOrWhiteSpace(PaymentStatusText) ? "غير محددة" : PaymentStatusText)</strong></span>
+                </div>
+            }
+            else
+            {
+                <div class="ui-purchasing-empty">تعذر تحميل ملخص السداد. استخدم زر التحديث لإعادة المحاولة.</div>
+            }
+        </UiPurchasingSection>
+    }
+
     @if(Model.Match is not null)
     {
         <UiPurchaseMatchPanel Model="@Model.Match" />
@@ -59,10 +83,18 @@
     [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SupplierSearchAsync {get;set;}
     [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? CurrencySearchAsync {get;set;}
     [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? ProductSearchAsync {get;set;}
+    [Parameter] public bool ShowPaymentSummary {get;set;}
+    [Parameter] public bool PaymentSummaryLoading {get;set;}
+    [Parameter] public decimal? PaymentTotalAmount {get;set;}
+    [Parameter] public decimal? PaymentPaidAmount {get;set;}
+    [Parameter] public decimal? PaymentOutstandingAmount {get;set;}
+    [Parameter] public string? PaymentStatusText {get;set;}
     [Parameter] public EventCallback OnChanged {get;set;}
     private static readonly IReadOnlyList<UiSelectOption> TaxModeOptions=[new("1","غير شامل"),new("2","شامل")];
     private static string? GuidText(Guid? id)=>id?.ToString("D"); private static Guid? Parse(string? v)=>Guid.TryParse(v,out var x)?x:null;
     private static UiLookupItem? Selected(Guid? id,string? text,string icon)=>id.HasValue?new(id.Value.ToString("D"),text??id.Value.ToString("D"),null,icon):null;
+    private static string PurchaseOrderLinkText(UiPurchaseInvoiceLineModel line)=>line.PurchaseOrderLineId.HasValue?"مرتبط بسطر أمر شراء":"غير مرتبط";
+    private string FormatPaymentAmount(decimal value)=>$"{value:N2} {Model.CurrencyCode}".Trim();
     private Task Changed()=>OnChanged.InvokeAsync();
     private async Task SupplierInvoiceCodeChanged(string? v){Model.SupplierInvoiceCode=v;await Changed();}
     private async Task SupplierChanged(string? v){Model.SupplierId=Parse(v);await Changed();}
