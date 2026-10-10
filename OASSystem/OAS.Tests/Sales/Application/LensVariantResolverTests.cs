@@ -62,4 +62,22 @@ public sealed class LensVariantResolverTests
         Assert.ThrowsAsync<ConflictException>(async () =>
             await resolver.ResolveAsync(new LensVariantMatchRequest(seed.Id, -2m, -0.75m, null)));
     }
+    [Test]
+    public async Task TryResolveExactAsync_NoExactIdentity_ReturnsNullForLabFallback()
+    {
+        var productId = Guid.NewGuid();
+        var seed = new ProductVariant(productId, "SEED", 10m, 20m);
+        var candidate = new ProductVariant(productId, "CANDIDATE", 10m, 20m);
+        var resolver = new LensVariantResolver(
+            new FakeGenericRepository<ProductVariant, Guid>([seed, candidate]),
+            new FakeGenericRepository<LensVariantDetail, Guid>([
+                LensVariantDetail.Create(Guid.NewGuid(), candidate.Id, -2.25m, -0.75m, 1.50m)
+            ]));
+
+        var result = await resolver.TryResolveExactAsync(
+            new LensVariantMatchRequest(seed.Id, -2.00m, -0.75m, 1.50m));
+
+        Assert.That(result, Is.Null);
+    }
+
 }

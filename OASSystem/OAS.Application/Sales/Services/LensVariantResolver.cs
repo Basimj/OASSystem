@@ -14,6 +14,19 @@ public sealed class LensVariantResolver(
         LensVariantMatchRequest request,
         CancellationToken cancellationToken = default)
     {
+        var exact = await TryResolveExactAsync(request, cancellationToken);
+        if (exact is null)
+            throw new ConflictException(
+                "sales_lens_variant_not_found",
+                "لا يوجد SKU عدسة مخزني مطابق تمامًا لقيم SPH/CYL/ADD المطلوبة.");
+
+        return exact;
+    }
+
+    public async Task<LensVariantResolution?> TryResolveExactAsync(
+        LensVariantMatchRequest request,
+        CancellationToken cancellationToken = default)
+    {
         if (request.SeedProductVariantId == Guid.Empty)
             throw new ConflictException("sales_lens_variant_seed_required", "يجب تحديد عدسة/متغير منتج مرجعي لتحديد المقاس المخزني الصحيح.");
 
@@ -26,7 +39,7 @@ public sealed class LensVariantResolver(
 
         var candidateIds = candidateVariants.Select(x => x.Id).ToArray();
         if (candidateIds.Length == 0)
-            throw new ConflictException("sales_lens_variant_not_found", "لا يوجد متغير عدسة فعال للمنتج المحدد.");
+            return null;
 
         var matchingDetails = await details.ListAsync(
             new Specification<LensVariantDetail>().Where(x =>
@@ -38,9 +51,7 @@ public sealed class LensVariantResolver(
             cancellationToken);
 
         if (matchingDetails.Count == 0)
-            throw new ConflictException(
-                "sales_lens_variant_not_found",
-                "لا يوجد SKU عدسة مخزني مطابق تمامًا لقيم SPH/CYL/ADD المطلوبة.");
+            return null;
 
         if (matchingDetails.Count > 1)
             throw new ConflictException(

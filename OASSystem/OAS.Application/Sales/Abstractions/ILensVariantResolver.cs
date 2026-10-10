@@ -17,4 +17,13 @@ public interface ILensVariantResolver
     Task<LensVariantResolution> ResolveAsync(
         LensVariantMatchRequest request,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Attempts to resolve an exact stocked lens SKU for the requested optical identity.
+    /// Returns null when no exact SPH/CYL/ADD identity exists for the product. Ambiguous
+    /// identities remain a data-integrity error and are still rejected.
+    /// </summary>
+    Task<LensVariantResolution?> TryResolveExactAsync(
+        LensVariantMatchRequest request,
+        CancellationToken cancellationToken = default);
 }

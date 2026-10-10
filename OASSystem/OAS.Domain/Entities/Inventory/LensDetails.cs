@@ -1,4 +1,5 @@
 using OAS.Domain.Common.Entities;
+using OAS.Domain.Exceptions;
 
 namespace OAS.Domain.Entities.Inventory;
 
@@ -47,7 +48,7 @@ public class LensDetails : Entity<Guid>
         LensType = lensType;
         Material = material;
         Coating = coating;
-        RefractiveIndex = refractiveIndex;
+        RefractiveIndex = ValidateRefractiveIndex(refractiveIndex);
         (SphereMin, SphereMax) = NormalizeRange(sphereMin, sphereMax);
         (CylinderMin, CylinderMax) = NormalizeRange(cylinderMin, cylinderMax);
         (AddMin, AddMax) = NormalizeRange(addMin, addMax);
@@ -70,11 +71,19 @@ public class LensDetails : Entity<Guid>
         LensType = lensType;
         Material = material;
         Coating = coating;
-        RefractiveIndex = refractiveIndex;
+        RefractiveIndex = ValidateRefractiveIndex(refractiveIndex);
         (SphereMin, SphereMax) = NormalizeRange(sphereMin, sphereMax);
         (CylinderMin, CylinderMax) = NormalizeRange(cylinderMin, cylinderMax);
         (AddMin, AddMax) = NormalizeRange(addMin, addMax);
         IsPrescriptionLens = isPrescriptionLens;
+    }
+
+    private static decimal? ValidateRefractiveIndex(decimal? value)
+    {
+        if (value.HasValue && value.Value <= 0m)
+            throw new DomainException("Refractive index must be greater than zero when provided.");
+
+        return value;
     }
 
     private static (decimal? Minimum, decimal? Maximum) NormalizeRange(decimal? first, decimal? second)

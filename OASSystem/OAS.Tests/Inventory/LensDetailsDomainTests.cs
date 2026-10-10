@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using OAS.Domain.Entities.Inventory;
+using OAS.Domain.Exceptions;
 
 namespace OAS.Tests.Inventory;
 
@@ -29,6 +30,22 @@ public sealed class LensDetailsDomainTests
             Assert.That(lens.AddMin, Is.EqualTo(0m));
             Assert.That(lens.AddMax, Is.EqualTo(3.50m));
         });
+    }
+
+    [Test]
+    public void Constructor_RejectsZeroRefractiveIndex()
+    {
+        Assert.Throws<DomainException>(() =>
+            new LensDetails(Guid.NewGuid(), "Single Vision", refractiveIndex: 0m));
+    }
+
+    [Test]
+    public void UpdateDetails_RejectsNegativeRefractiveIndex()
+    {
+        var lens = new LensDetails(Guid.NewGuid(), "Single Vision", refractiveIndex: 1.56m);
+
+        Assert.Throws<DomainException>(() =>
+            lens.UpdateDetails("Single Vision", refractiveIndex: -1m));
     }
 
     [Test]

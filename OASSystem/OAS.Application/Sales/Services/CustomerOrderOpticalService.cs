@@ -60,18 +60,41 @@ public sealed class CustomerOrderOpticalService(
         if (draft is null)
             return new PreparedCustomerOrderLine(seed, seed, null, null, null);
 
-        var exactVariant = seed.ProductVariantId;
+        // For prescription lenses, an exact LensVariantDetail is an optional stocked fulfillment
+        // optimization, not the identity of the prescription itself. If an exact SKU exists, use it
+        // and keep the inventory path. If it does not exist, preserve the commercial seed variant
+        // and route the line as a non-inventory production/lab line instead of rejecting the order.
+        // The prescription range has already been validated above, so the fallback is allowed only
+        // for a structurally/configurationally valid prescription.
+        SalesLineResolution resolved = seed;
         if (seed.ProductVariantId.HasValue)
         {
-            var exact = await lensVariantResolver.ResolveAsync(
+            var exact = await lensVariantResolver.TryResolveExactAsync(
                 new LensVariantMatchRequest(seed.ProductVariantId.Value, draft.SPH, draft.CYL, draft.ADD),
                 cancellationToken);
-            exactVariant = exact.ProductVariantId;
-        }
 
-        var resolved = exactVariant == seed.ProductVariantId
-            ? seed
-            : await lineResolver.ResolveAsync(lineType, exactVariant, warehouseId, description, cancellationToken);
+            if (exact is not null && exact.ProductVariantId != seed.ProductVariantId)
+            {
+                resolved = await lineResolver.ResolveAsync(
+                    lineType,
+                    exact.ProductVariantId,
+                    warehouseId,
+                    description,
+                    cancellationToken);
+            }
+            else if (exact is null)
+            {
+                // Do not keep the seed warehouse in the fallback. A warehouse reference makes the
+                // sales line inventory-bearing, which would reserve/post the seed SKU even though it
+                // does not match the customer's prescription. Keeping the variant only preserves the
+                // selected commercial lens/product and its price for the lab job and invoice.
+                resolved = seed with
+                {
+                    WarehouseId = null,
+                    IsStockItem = false
+                };
+            }
+        }
 
         if (resolved.OpticalPolicy is not null)
             PrescriptionOpticalRules.ValidateConfiguredRanges(draft.SPH, draft.CYL, draft.ADD, resolved.OpticalPolicy);
@@ -133,7 +156,7 @@ public sealed class CustomerOrderOpticalService(
                 LensTypeSnapshot = snapshotRequest.LensTypeSnapshot,
                 MaterialSnapshot = snapshotRequest.MaterialSnapshot,
                 CoatingSnapshot = snapshotRequest.CoatingSnapshot,
-                RefractiveIndexSnapshot = snapshotRequest.RefractiveIndexSnapshot
+                RefractiveIndexSnapshot = NormalizeLegacyRefractiveIndex(snapshotRequest.RefractiveIndexSnapshot)
             };
         }
 
@@ -172,8 +195,11 @@ public sealed class CustomerOrderOpticalService(
             snapshotRequest.LensTypeSnapshot,
             snapshotRequest.MaterialSnapshot,
             snapshotRequest.CoatingSnapshot,
-            snapshotRequest.RefractiveIndexSnapshot);
+            NormalizeLegacyRefractiveIndex(snapshotRequest.RefractiveIndexSnapshot));
     }
+
+    private static decimal? NormalizeLegacyRefractiveIndex(decimal? value)
+        => value.HasValue && value.Value <= 0m ? null : value;
 
     private static OpticalSnapshotDraft FromStoredPrescription(
         Guid revisionId,

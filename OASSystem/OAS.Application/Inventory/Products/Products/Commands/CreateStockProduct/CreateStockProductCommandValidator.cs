@@ -75,7 +75,9 @@ public sealed class CreateStockProductCommandValidator : AbstractValidator<Creat
                 .MaximumLength(50).WithErrorCode("lens_type_max_length");
             RuleFor(x => x.Request.LensDetails!.Material).MaximumLength(50).WithErrorCode("lens_material_max_length");
             RuleFor(x => x.Request.LensDetails!.Coating).MaximumLength(50).WithErrorCode("lens_coating_max_length");
-            RuleFor(x => x.Request.LensDetails!.RefractiveIndex).Must(x => FitsNullableDecimal(x, 5, 3)).WithErrorCode("lens_refractive_index_invalid");
+            RuleFor(x => x.Request.LensDetails!.RefractiveIndex)
+                .Must(x => !x.HasValue || x.Value > 0m).WithErrorCode("lens_refractive_index_must_be_positive")
+                .Must(x => FitsNullableDecimal(x, 5, 3)).WithErrorCode("lens_refractive_index_invalid");
             RuleFor(x => x.Request.LensDetails!.SphereMin).Must(FitsNullableDecimal6x2).WithErrorCode("lens_sphere_min_invalid");
             RuleFor(x => x.Request.LensDetails!.SphereMax).Must(FitsNullableDecimal6x2).WithErrorCode("lens_sphere_max_invalid");
             RuleFor(x => x.Request.LensDetails!.CylinderMin).Must(FitsNullableDecimal6x2).WithErrorCode("lens_cylinder_min_invalid");

@@ -16,5 +16,9 @@ public sealed class UpdateLensDetailsRequestValidator : AbstractValidator<Update
 
         RuleFor(x => x.Coating)
             .MaximumLength(50).WithErrorCode("lens_coating_max_length");
+
+        RuleFor(x => x.RefractiveIndex)
+            .Must(x => !x.HasValue || x.Value > 0m)
+            .WithErrorCode("lens_refractive_index_must_be_positive");
     }
 }

@@ -401,6 +401,9 @@ public sealed partial class InventorySpreadsheetService
                 if (row.Optional("LensType") is null)
                     row.Errors.Add("نوع العدسة: مطلوب عند إدخال تفاصيل العدسة.");
                 ValidateDecimalPrecision(row, "LensRefractiveIndex", "معامل الانكسار", 5, 3, allowNegative: false);
+                var refractiveIndex = row.NullableDecimal("LensRefractiveIndex");
+                if (refractiveIndex.HasValue && refractiveIndex.Value <= 0m)
+                    row.Errors.Add("معامل الانكسار: يجب أن يكون أكبر من صفر عند إدخاله.");
                 ValidateDecimalPrecision(row, "LensSphereMin", "Sphere Min", 6, 2, allowNegative: true);
                 ValidateDecimalPrecision(row, "LensSphereMax", "Sphere Max", 6, 2, allowNegative: true);
                 ValidateDecimalPrecision(row, "LensCylinderMin", "Cylinder Min", 6, 2, allowNegative: true);
