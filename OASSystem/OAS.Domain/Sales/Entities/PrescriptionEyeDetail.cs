@@ -1,7 +1,6 @@
 using OAS.Domain.Common.Entities;
 using OAS.Domain.Sales.Enums;
 using OAS.Domain.Sales.Rules;
-using OAS.Domain.Sales.ValueObjects;
 
 namespace OAS.Domain.Sales.Entities;
 
@@ -78,8 +77,5 @@ public sealed class PrescriptionEyeDetail : AuditableEntity<Guid>
         FittingHeight = fittingHeight;
         Notes = SalesDomainGuard.Optional(notes, 500, "Eye notes");
     }
-
-    public void ValidateAgainst(OpticalPrescriptionRangePolicy policy) =>
-        PrescriptionOpticalRules.ValidateConfiguredRanges(SPH, CYL, ADD, policy);
 
 }

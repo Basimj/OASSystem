@@ -14,17 +14,13 @@ public sealed class CreateStockProductCommandValidator : AbstractValidator<Creat
             RuleFor(x => x.Request.Product.ProductCode)
                 .NotEmpty().WithErrorCode("product_code_required")
                 .MaximumLength(32).WithErrorCode("product_code_max_length");
-            RuleFor(x => x.Request.Product.NameAr)
-                .NotEmpty().WithErrorCode("product_name_ar_required")
-                .MaximumLength(150).WithErrorCode("product_name_ar_max_length");
-            RuleFor(x => x.Request.Product.NameEn)
-                .MaximumLength(150).WithErrorCode("product_name_en_max_length");
+            RuleFor(x => x.Request.Product.Name)
+                .NotEmpty().WithErrorCode("product_name_required")
+                .MaximumLength(200).WithErrorCode("product_name_max_length");
             RuleFor(x => x.Request.Product.CategoryId)
                 .NotEmpty().WithErrorCode("category_id_required");
-            RuleFor(x => x.Request.Product.ProductTypeId)
-                .NotEmpty().WithErrorCode("product_type_id_required");
             RuleFor(x => x.Request.Product.Description)
-                .MaximumLength(500).WithErrorCode("product_description_max_length");
+                .MaximumLength(1000).WithErrorCode("product_description_max_length");
 
             When(x => x.Request.Product.IsStockItem, () =>
             {
@@ -72,18 +68,21 @@ public sealed class CreateStockProductCommandValidator : AbstractValidator<Creat
         {
             RuleFor(x => x.Request.LensDetails!.LensType)
                 .NotEmpty().WithErrorCode("lens_type_required")
-                .MaximumLength(50).WithErrorCode("lens_type_max_length");
-            RuleFor(x => x.Request.LensDetails!.Material).MaximumLength(50).WithErrorCode("lens_material_max_length");
-            RuleFor(x => x.Request.LensDetails!.Coating).MaximumLength(50).WithErrorCode("lens_coating_max_length");
+                .MaximumLength(100).WithErrorCode("lens_type_max_length");
+            RuleFor(x => x.Request.LensDetails!.Material).MaximumLength(100).WithErrorCode("lens_material_max_length");
+            RuleFor(x => x.Request.LensDetails!.Coating).MaximumLength(100).WithErrorCode("lens_coating_max_length");
             RuleFor(x => x.Request.LensDetails!.RefractiveIndex)
                 .Must(x => !x.HasValue || x.Value > 0m).WithErrorCode("lens_refractive_index_must_be_positive")
                 .Must(x => FitsNullableDecimal(x, 5, 3)).WithErrorCode("lens_refractive_index_invalid");
-            RuleFor(x => x.Request.LensDetails!.SphereMin).Must(FitsNullableDecimal6x2).WithErrorCode("lens_sphere_min_invalid");
-            RuleFor(x => x.Request.LensDetails!.SphereMax).Must(FitsNullableDecimal6x2).WithErrorCode("lens_sphere_max_invalid");
-            RuleFor(x => x.Request.LensDetails!.CylinderMin).Must(FitsNullableDecimal6x2).WithErrorCode("lens_cylinder_min_invalid");
-            RuleFor(x => x.Request.LensDetails!.CylinderMax).Must(FitsNullableDecimal6x2).WithErrorCode("lens_cylinder_max_invalid");
-            RuleFor(x => x.Request.LensDetails!.AddMin).Must(FitsNullableDecimal6x2).WithErrorCode("lens_add_min_invalid");
-            RuleFor(x => x.Request.LensDetails!.AddMax).Must(FitsNullableDecimal6x2).WithErrorCode("lens_add_max_invalid");
+            RuleFor(x => x.Request.LensDetails!.SPH).Must(FitsNullableDecimal6x2).WithErrorCode("lens_sph_invalid");
+            RuleFor(x => x.Request.LensDetails!.CYL).Must(FitsNullableDecimal6x2).WithErrorCode("lens_cyl_invalid");
+            RuleFor(x => x.Request.LensDetails!.ADD).Must(FitsNullableDecimal6x2).WithErrorCode("lens_add_invalid")
+                .Must(x => !x.HasValue || x.Value >= 0m).WithErrorCode("lens_add_must_be_non_negative");
+            RuleFor(x => x.Request.LensDetails!.BaseCurve).Must(FitsNullableDecimal6x2).WithErrorCode("lens_base_curve_invalid")
+                .Must(x => !x.HasValue || x.Value > 0m).WithErrorCode("lens_base_curve_must_be_positive");
+            RuleFor(x => x.Request.LensDetails!.Diameter).Must(FitsNullableDecimal6x2).WithErrorCode("lens_diameter_invalid")
+                .Must(x => !x.HasValue || x.Value > 0m).WithErrorCode("lens_diameter_must_be_positive");
+            RuleFor(x => x.Request.Variant).NotNull().WithErrorCode("lens_details_variant_required");
         });
 
         When(x => x.Request.OpeningInventory is not null && x.Request.Product is not null, () =>

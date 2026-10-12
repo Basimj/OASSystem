@@ -18,15 +18,15 @@ public sealed class PurchasingReferenceDataPort(OasDbContext dbContext) : IPurch
     public async Task<PurchasingWarehouseSnapshot?> GetWarehouseAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var value = await dbContext.Set<Warehouse>().AsNoTracking().Where(x => x.Id == id)
-            .Select(x => new { x.Id, x.Code, x.NameAr, x.IsActive }).FirstOrDefaultAsync(cancellationToken);
-        return value is null ? null : new PurchasingWarehouseSnapshot(value.Id, value.Code, value.NameAr, value.IsActive);
+            .Select(x => new { x.Id, x.Code, x.Name, x.IsActive }).FirstOrDefaultAsync(cancellationToken);
+        return value is null ? null : new PurchasingWarehouseSnapshot(value.Id, value.Code, value.Name, value.IsActive);
     }
 
     public async Task<PurchasingUnitSnapshot?> GetUnitAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var value = await dbContext.Set<Unit>().AsNoTracking().Where(x => x.Id == id)
-            .Select(x => new { x.Id, x.Code, x.NameAr, x.IsActive }).FirstOrDefaultAsync(cancellationToken);
-        return value is null ? null : new PurchasingUnitSnapshot(value.Id, value.Code, value.NameAr, value.IsActive);
+            .Select(x => new { x.Id, x.Code, x.Name, x.IsActive }).FirstOrDefaultAsync(cancellationToken);
+        return value is null ? null : new PurchasingUnitSnapshot(value.Id, value.Code, value.Name, value.IsActive);
     }
 
     public async Task<PurchasingCurrencySnapshot?> GetCurrencyAsync(Guid id, CancellationToken cancellationToken = default)
@@ -45,7 +45,7 @@ public sealed class PurchasingReferenceDataPort(OasDbContext dbContext) : IPurch
                            {
                                VariantId = variant.Id,
                                ProductCode = product.ProductCode,
-                               ProductName = product.NameAr,
+                               ProductName = product.Name,
                                VariantIsActive = variant.IsActive,
                                ProductIsActive = product.IsActive,
                                product.IsStockItem,

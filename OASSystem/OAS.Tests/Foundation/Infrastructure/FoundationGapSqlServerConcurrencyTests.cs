@@ -40,14 +40,14 @@ public sealed class FoundationGapSqlServerConcurrencyTests
     }
 
     [Test]
-    public async Task ConcurrentLensVariantDetails_AllowOnlyOneDetailPerProductVariant()
+    public async Task ConcurrentLensDetails_AllowOnlyOneDetailPerProductVariant()
     {
         var variantId = await CreateVariantAsync();
 
         async Task<bool> InsertAsync(decimal sph)
         {
             await using var context = Context();
-            context.Add(LensVariantDetail.Create(Guid.NewGuid(), variantId, sph, -0.75m, null));
+            context.Add(new LensDetails(variantId, "Single Vision", true, sph: sph, cyl: -0.75m));
             try
             {
                 await context.SaveChangesAsync();
@@ -63,28 +63,28 @@ public sealed class FoundationGapSqlServerConcurrencyTests
 
         Assert.That(outcomes.Count(x => x), Is.EqualTo(1));
         await using var verify = Context();
-        Assert.That(await verify.Set<LensVariantDetail>().CountAsync(x => x.ProductVariantId == variantId), Is.EqualTo(1));
+        Assert.That(await verify.Set<LensDetails>().CountAsync(x => x.ProductVariantId == variantId), Is.EqualTo(1));
     }
 
     [Test]
-    public async Task LensVariantDetail_RowVersionRejectsStaleWriter()
+    public async Task LensDetails_RowVersionRejectsStaleWriter()
     {
         var variantId = await CreateVariantAsync();
         await using (var seed = Context())
         {
-            seed.Add(LensVariantDetail.Create(Guid.NewGuid(), variantId, -2m, -0.75m, null));
+            seed.Add(new LensDetails(variantId, "Single Vision", true, sph: -2m, cyl: -0.75m));
             await seed.SaveChangesAsync();
         }
 
         await using var first = Context();
         await using var second = Context();
-        var a = await first.Set<LensVariantDetail>().SingleAsync(x => x.ProductVariantId == variantId);
-        var b = await second.Set<LensVariantDetail>().SingleAsync(x => x.ProductVariantId == variantId);
+        var a = await first.Set<LensDetails>().SingleAsync(x => x.ProductVariantId == variantId);
+        var b = await second.Set<LensDetails>().SingleAsync(x => x.ProductVariantId == variantId);
 
-        a.Update(a.SPH, a.CYL, a.ADD, 8.60m, 14.20m, true);
+        a.UpdateDetails(a.LensType, a.IsPrescriptionLens, a.Material, a.Coating, a.RefractiveIndex, a.SPH, a.CYL, a.ADD, 8.60m, 14.20m, a.IsActive);
         await first.SaveChangesAsync();
 
-        b.Update(b.SPH, b.CYL, b.ADD, 8.70m, 14.20m, true);
+        b.UpdateDetails(b.LensType, b.IsPrescriptionLens, b.Material, b.Coating, b.RefractiveIndex, b.SPH, b.CYL, b.ADD, 8.70m, 14.20m, b.IsActive);
         Assert.ThrowsAsync<DbUpdateConcurrencyException>(async () => await second.SaveChangesAsync());
     }
 
@@ -92,9 +92,9 @@ public sealed class FoundationGapSqlServerConcurrencyTests
     {
         await using var context = Context();
         var suffix = Guid.NewGuid().ToString("N")[..10];
-        var category = new ProductCategory($"CAT-{suffix}", "تصنيف اختبار");
         var productType = new ProductType($"TYPE-{suffix}", "نوع اختبار");
-        var product = new Product($"P-{suffix}", "عدسة اختبار", category.Id, productType.Id);
+        var category = new ProductCategory($"CAT-{suffix}", "تصنيف اختبار", productType.Id);
+        var product = new Product($"P-{suffix}", "عدسة اختبار", category.Id);
         var variant = new ProductVariant(product.Id, $"SKU-{suffix}", 10m, 20m);
         context.AddRange(category, productType, product, variant);
         await context.SaveChangesAsync();

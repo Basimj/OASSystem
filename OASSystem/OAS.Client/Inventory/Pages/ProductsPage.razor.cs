@@ -37,12 +37,11 @@ public partial class ProductsPage
     private const string LensMaterialField = "خامة العدسة";
     private const string LensCoatingField = "الطلاء / Coating";
     private const string RefractiveIndexField = "معامل الانكسار";
-    private const string SphereMinField = "Sphere Min";
-    private const string SphereMaxField = "Sphere Max";
-    private const string CylinderMinField = "Cylinder Min";
-    private const string CylinderMaxField = "Cylinder Max";
-    private const string AddMinField = "Add Min";
-    private const string AddMaxField = "Add Max";
+    private const string SphField = "SPH";
+    private const string BaseCurveField = "Base Curve";
+    private const string CylField = "CYL";
+    private const string DiameterField = "Diameter";
+    private const string AddField = "ADD";
     private const string InitialSkuField = "SKU الأول";
     private const string InitialBarcodeField = "باركود الصنف الأول";
     private const string InitialPurchasePriceField = "سعر شراء الصنف الأول";
@@ -96,12 +95,10 @@ public partial class ProductsPage
 
     // Shared/edit fields
     private string _code = string.Empty;
-    private string _nameAr = string.Empty;
-    private string? _nameEn;
+    private string _name = string.Empty;
     private bool _isActive = true;
 
     // Category
-    private string? _parentCategoryId;
 
     // Brand
     private string _brandName = string.Empty;
@@ -128,12 +125,11 @@ public partial class ProductsPage
     private string? _lensMaterial;
     private string? _lensCoating;
     private string? _refractiveIndex;
-    private string? _sphereMin;
-    private string? _sphereMax;
-    private string? _cylinderMin;
-    private string? _cylinderMax;
-    private string? _addMin;
-    private string? _addMax;
+    private string? _sph;
+    private string? _baseCurve;
+    private string? _cyl;
+    private string? _diameter;
+    private string? _add;
     private bool _isPrescriptionLens;
 
     // Variant
@@ -170,7 +166,8 @@ public partial class ProductsPage
         _section == ProductSection.Products &&
         CurrentProductType?.SystemKey is ProductTypeSystemKeys.Frame or ProductTypeSystemKeys.Sunglasses;
     private bool ShowsLensDetails =>
-        _section == ProductSection.Products && CurrentProductType?.SystemKey == ProductTypeSystemKeys.Lens;
+        CurrentProductType?.SystemKey == ProductTypeSystemKeys.Lens &&
+        ((_section == ProductSection.Products && _mode == EditorMode.Create) || _section == ProductSection.Variants);
 
     private string SectionTitle => _section switch
     {
@@ -234,7 +231,14 @@ public partial class ProductsPage
     private string? EditorSubtitle => _selectedId.HasValue ? _code : null;
 
     private IReadOnlyList<UiSelectOption> CategoryOptions =>
-        [new UiSelectOption(string.Empty, "— بدون —"), .. _categories.Where(x => x.IsActive).Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.NameAr}"))];
+        [
+            new UiSelectOption(string.Empty, "— بدون —"),
+            .. _categories
+                .Where(x => (string.IsNullOrWhiteSpace(_productTypeId) || x.ProductTypeId.ToString("D") == _productTypeId) &&
+                            (x.IsActive || string.Equals(x.Id.ToString("D"), _categoryId, StringComparison.OrdinalIgnoreCase)))
+                .OrderBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase)
+                .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.Name}"))
+        ];
 
     private IReadOnlyList<UiSelectOption> BrandOptions =>
         [new UiSelectOption(string.Empty, "— بدون —"), .. _brands.Where(x => x.IsActive).Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.Name}"))];
@@ -242,20 +246,33 @@ public partial class ProductsPage
     private IReadOnlyList<UiSelectOption> ProductTypeOptions =>
         _productTypes
             .Where(x => x.IsActive || string.Equals(x.Id.ToString("D"), _productTypeId, StringComparison.OrdinalIgnoreCase))
-            .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.NameAr}"))
+            .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.Name}"))
             .ToArray();
 
     private IReadOnlyList<UiSelectOption> UnitOptions =>
-        [new UiSelectOption(string.Empty, "— بدون —"), .. _units.Where(x => x.IsActive).Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.NameAr}"))];
+        [new UiSelectOption(string.Empty, "— بدون —"), .. _units.Where(x => x.IsActive).Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.Name}"))];
 
-    private IReadOnlyList<UiSelectOption> ProductOptions =>
-        _products.Where(x => x.IsActive).Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.ProductCode} - {x.NameAr}")).ToArray();
+    private IReadOnlyList<UiSelectOption> ProductOptions
+    {
+        get
+        {
+            if (!Guid.TryParse(_categoryId, out var categoryId))
+                return [];
+
+            return _products
+                .Where(x => x.CategoryId == categoryId &&
+                            (x.IsActive || string.Equals(x.Id.ToString("D"), _productId, StringComparison.OrdinalIgnoreCase)))
+                .OrderBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase)
+                .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.ProductCode} - {x.Name}"))
+                .ToArray();
+        }
+    }
 
     private IReadOnlyList<UiSelectOption> OpeningWarehouseOptions =>
         _warehouses.Where(x => x.IsActive)
             .OrderByDescending(x => x.IsDefault)
-            .ThenBy(x => x.NameAr)
-            .Select(x => new UiSelectOption(x.Id.ToString("D"), x.IsDefault ? $"{x.Code} - {x.NameAr} (افتراضي)" : $"{x.Code} - {x.NameAr}"))
+            .ThenBy(x => x.Name)
+            .Select(x => new UiSelectOption(x.Id.ToString("D"), x.IsDefault ? $"{x.Code} - {x.Name} (افتراضي)" : $"{x.Code} - {x.Name}"))
             .ToArray();
 
     private bool IsServiceProductType => CurrentProductType?.SystemKey == ProductTypeSystemKeys.Service;
@@ -479,12 +496,12 @@ public partial class ProductsPage
 
     private async Task<Guid?> SaveCategoryAsync()
     {
+        if (!Guid.TryParse(_productTypeId, out var productTypeId)) return null;
         ProductCategoryDto? result;
-        var parentId = ParseGuid(_parentCategoryId);
-        if (_mode == EditorMode.Create)
-            result = await Inventory.CreateProductCategoryAsync(new(_code.Trim(), _nameAr.Trim(), NullIfBlank(_nameEn), parentId));
+                if (_mode == EditorMode.Create)
+            result = await Inventory.CreateProductCategoryAsync(new(_code.Trim(), _name.Trim(), productTypeId));
         else
-            result = await Inventory.UpdateProductCategoryAsync(_selectedId!.Value, new(_code.Trim(), _nameAr.Trim(), NullIfBlank(_nameEn), parentId, _isActive));
+            result = await Inventory.UpdateProductCategoryAsync(_selectedId!.Value, new(_code.Trim(), _name.Trim(), productTypeId, _isActive));
         return result?.Id;
     }
 
@@ -502,9 +519,9 @@ public partial class ProductsPage
     {
         ProductTypeDto? result;
         if (_mode == EditorMode.Create)
-            result = await Inventory.CreateProductTypeAsync(new(_code.Trim(), _nameAr.Trim(), NullIfBlank(_nameEn)));
+            result = await Inventory.CreateProductTypeAsync(new(_code.Trim(), _name.Trim()));
         else
-            result = await Inventory.UpdateProductTypeAsync(_selectedId!.Value, new(_code.Trim(), _nameAr.Trim(), NullIfBlank(_nameEn), _isActive));
+            result = await Inventory.UpdateProductTypeAsync(_selectedId!.Value, new(_code.Trim(), _name.Trim(), _isActive));
         return result?.Id;
     }
 
@@ -512,16 +529,15 @@ public partial class ProductsPage
     {
         UnitDto? result;
         if (_mode == EditorMode.Create)
-            result = await Inventory.CreateUnitAsync(new(_code.Trim(), _nameAr.Trim(), NullIfBlank(_nameEn)));
+            result = await Inventory.CreateUnitAsync(new(_code.Trim(), _name.Trim()));
         else
-            result = await Inventory.UpdateUnitAsync(_selectedId!.Value, new(_code.Trim(), _nameAr.Trim(), NullIfBlank(_nameEn), _isActive));
+            result = await Inventory.UpdateUnitAsync(_selectedId!.Value, new(_code.Trim(), _name.Trim(), _isActive));
         return result?.Id;
     }
 
     private async Task<Guid?> SaveProductAsync()
     {
         if (!Guid.TryParse(_categoryId, out var categoryId)) return null;
-        if (!Guid.TryParse(_productTypeId, out var productTypeId)) return null;
         var brandId = ParseGuid(_brandId);
 
         if (_mode == EditorMode.Create)
@@ -574,17 +590,16 @@ public partial class ProductsPage
                     NullIfBlank(_lensMaterial),
                     NullIfBlank(_lensCoating),
                     ParseNullableDecimal(_refractiveIndex),
-                    ParseNullableDecimal(_sphereMin),
-                    ParseNullableDecimal(_sphereMax),
-                    ParseNullableDecimal(_cylinderMin),
-                    ParseNullableDecimal(_cylinderMax),
-                    ParseNullableDecimal(_addMin),
-                    ParseNullableDecimal(_addMax),
+                    ParseNullableDecimal(_sph),
+                    ParseNullableDecimal(_cyl),
+                    ParseNullableDecimal(_add),
+                    ParseNullableDecimal(_baseCurve),
+                    ParseNullableDecimal(_diameter),
                     _isPrescriptionLens);
             }
 
             var request = new CreateStockProductRequest(
-                new CreateProductRequest(_code.Trim(), _nameAr.Trim(), NullIfBlank(_nameEn), categoryId, brandId, productTypeId, NullIfBlank(_description), _isStockItem),
+                new CreateProductRequest(_code.Trim(), _name.Trim(), categoryId, brandId, NullIfBlank(_description), _isStockItem),
                 variantRequest,
                 openingRequest,
                 frameDetailsRequest,
@@ -603,7 +618,7 @@ public partial class ProductsPage
 
         var updated = await Inventory.UpdateProductAsync(
             _selectedId!.Value,
-            new UpdateProductRequest(_code.Trim(), _nameAr.Trim(), NullIfBlank(_nameEn), categoryId, brandId, productTypeId, NullIfBlank(_description), _isStockItem, _isActive));
+            new UpdateProductRequest(_code.Trim(), _name.Trim(), categoryId, brandId, NullIfBlank(_description), _isStockItem, _isActive));
 
         if (updated is not null)
             await SaveSpecializedDetailsAsync(updated.Id);
@@ -624,18 +639,6 @@ public partial class ProductsPage
                     await Inventory.UpdateFrameDetailsAsync(existingFrame.Id, new UpdateFrameDetailsRequest(_frameModel.Trim(), NullIfBlank(_frameMaterial), NullIfBlank(_frameRimType), NullIfBlank(_frameGender), NullIfBlank(_frameShape), ParseNullableDecimal(_templeLength), ParseNullableDecimal(_bridgeSize), ParseNullableDecimal(_lensWidth)));
             }
         }
-        else if (ShowsLensDetails)
-        {
-            var existingLens = _lensDetails.FirstOrDefault(x => x.ProductId == productId);
-            var hasLensValues = existingLens is not null || HasLensDetailsInput();
-            if (hasLensValues && !string.IsNullOrWhiteSpace(_lensType))
-            {
-                if (existingLens is null)
-                    await Inventory.CreateLensDetailsAsync(new CreateLensDetailsRequest(productId, _lensType.Trim(), NullIfBlank(_lensMaterial), NullIfBlank(_lensCoating), ParseNullableDecimal(_refractiveIndex), ParseNullableDecimal(_sphereMin), ParseNullableDecimal(_sphereMax), ParseNullableDecimal(_cylinderMin), ParseNullableDecimal(_cylinderMax), ParseNullableDecimal(_addMin), ParseNullableDecimal(_addMax), _isPrescriptionLens));
-                else
-                    await Inventory.UpdateLensDetailsAsync(existingLens.Id, new UpdateLensDetailsRequest(_lensType.Trim(), NullIfBlank(_lensMaterial), NullIfBlank(_lensCoating), ParseNullableDecimal(_refractiveIndex), ParseNullableDecimal(_sphereMin), ParseNullableDecimal(_sphereMax), ParseNullableDecimal(_cylinderMin), ParseNullableDecimal(_cylinderMax), ParseNullableDecimal(_addMin), ParseNullableDecimal(_addMax), _isPrescriptionLens));
-            }
-        }
     }
 
     private async Task<Guid?> SaveVariantAsync()
@@ -648,6 +651,15 @@ public partial class ProductsPage
             result = await Inventory.CreateProductVariantAsync(new(productId, _code.Trim(), NullIfBlank(_barcode), NullIfBlank(_variantName), NullIfBlank(_color), NullIfBlank(_size), unitId, purchasePrice, sellingPrice));
         else
             result = await Inventory.UpdateProductVariantAsync(_selectedId!.Value, new(_code.Trim(), NullIfBlank(_barcode), NullIfBlank(_variantName), NullIfBlank(_color), NullIfBlank(_size), unitId, purchasePrice, sellingPrice, _isActive));
+
+        if (result is not null && ShowsLensDetails && HasLensDetailsInput() && !string.IsNullOrWhiteSpace(_lensType))
+        {
+            var existingLens = _lensDetails.FirstOrDefault(x => x.ProductVariantId == result.Id);
+            if (existingLens is null)
+                await Inventory.CreateLensDetailsAsync(new CreateLensDetailsRequest(result.Id, _lensType.Trim(), NullIfBlank(_lensMaterial), NullIfBlank(_lensCoating), ParseNullableDecimal(_refractiveIndex), ParseNullableDecimal(_sph), ParseNullableDecimal(_cyl), ParseNullableDecimal(_add), ParseNullableDecimal(_baseCurve), ParseNullableDecimal(_diameter), _isPrescriptionLens));
+            else
+                await Inventory.UpdateLensDetailsAsync(existingLens.Id, new UpdateLensDetailsRequest(_lensType.Trim(), NullIfBlank(_lensMaterial), NullIfBlank(_lensCoating), ParseNullableDecimal(_refractiveIndex), ParseNullableDecimal(_sph), ParseNullableDecimal(_cyl), ParseNullableDecimal(_add), ParseNullableDecimal(_baseCurve), ParseNullableDecimal(_diameter), _isPrescriptionLens, existingLens.IsActive));
+        }
         return result?.Id;
     }
 
@@ -673,12 +685,15 @@ public partial class ProductsPage
         {
             case ProductSection.Categories:
                 Required("الكود", _code);
-                Required("الاسم بالعربية", _nameAr);
+                Required("الاسم", _name);
+                Required("نوع المنتج", _productTypeId);
                 MaxLength("الكود", _code, 32);
-                MaxLength("الاسم بالعربية", _nameAr, 100);
-                MaxLength("الاسم بالإنجليزية", _nameEn, 100);
+                MaxLength("الاسم", _name, 100);
                 if (_categories.Any(x => x.Id != _selectedId && string.Equals(x.Code, _code.Trim(), StringComparison.OrdinalIgnoreCase)))
                     SetError("الكود", "هذا الكود مستخدم مسبقًا.");
+                if (!string.IsNullOrWhiteSpace(_productTypeId) &&
+                    (!Guid.TryParse(_productTypeId, out var categoryTypeId) || !_productTypes.Any(x => x.Id == categoryTypeId)))
+                    SetError("نوع المنتج", "قيمة نوع المنتج غير صحيحة.");
                 break;
 
             case ProductSection.Brands:
@@ -694,33 +709,30 @@ public partial class ProductsPage
 
             case ProductSection.ProductTypes:
                 Required("الكود", _code);
-                Required("الاسم بالعربية", _nameAr);
+                Required("الاسم", _name);
                 MaxLength("الكود", _code, 32);
-                MaxLength("الاسم بالعربية", _nameAr, 100);
-                MaxLength("الاسم بالإنجليزية", _nameEn, 100);
+                MaxLength("الاسم", _name, 100);
                 if (_productTypes.Any(x => x.Id != _selectedId && string.Equals(x.Code, _code.Trim(), StringComparison.OrdinalIgnoreCase)))
                     SetError("الكود", "هذا الكود مستخدم مسبقًا.");
                 break;
 
             case ProductSection.Units:
                 Required("الكود", _code);
-                Required("الاسم بالعربية", _nameAr);
+                Required("الاسم", _name);
                 MaxLength("الكود", _code, 32);
-                MaxLength("الاسم بالعربية", _nameAr, 100);
-                MaxLength("الاسم بالإنجليزية", _nameEn, 100);
+                MaxLength("الاسم", _name, 100);
                 if (_units.Any(x => x.Id != _selectedId && string.Equals(x.Code, _code.Trim(), StringComparison.OrdinalIgnoreCase)))
                     SetError("الكود", "هذا الكود مستخدم مسبقًا.");
                 break;
 
             case ProductSection.Products:
                 Required("كود المنتج", _code);
-                Required("الاسم بالعربية", _nameAr);
+                Required("الاسم", _name);
                 Required("التصنيف", _categoryId);
                 Required("نوع المنتج", _productTypeId);
                 MaxLength("كود المنتج", _code, 32);
-                MaxLength("الاسم بالعربية", _nameAr, 150);
-                MaxLength("الاسم بالإنجليزية", _nameEn, 150);
-                MaxLength("الوصف", _description, 500);
+                MaxLength("الاسم", _name, 200);
+                MaxLength("الوصف", _description, 1000);
 
                 if (_products.Any(x => x.Id != _selectedId && string.Equals(x.ProductCode, _code.Trim(), StringComparison.OrdinalIgnoreCase)))
                     SetError("كود المنتج", "كود المنتج مستخدم مسبقًا.");
@@ -729,6 +741,12 @@ public partial class ProductsPage
                 if (!string.IsNullOrWhiteSpace(_productTypeId) &&
                     (!Guid.TryParse(_productTypeId, out var productTypeId) || !_productTypes.Any(x => x.Id == productTypeId)))
                     SetError("نوع المنتج", "قيمة نوع المنتج غير صحيحة.");
+                if (Guid.TryParse(_categoryId, out var selectedProductCategoryId) && Guid.TryParse(_productTypeId, out var selectedProductTypeId))
+                {
+                    var selectedCategory = _categories.FirstOrDefault(x => x.Id == selectedProductCategoryId);
+                    if (selectedCategory is not null && selectedCategory.ProductTypeId != selectedProductTypeId)
+                        SetError("التصنيف", "التصنيف المحدد لا يتبع نوع المنتج المختار.");
+                }
 
                 if (IsServiceProductType && _isStockItem)
                     SetError("صنف مخزني", "الخدمة لا يمكن أن تكون صنفًا مخزنيًا.");
@@ -740,6 +758,8 @@ public partial class ProductsPage
                 break;
 
             case ProductSection.Variants:
+                Required("نوع المنتج", _productTypeId);
+                Required("التصنيف", _categoryId);
                 Required("المنتج", _productId);
                 Required("SKU", _code);
                 Required("سعر الشراء", _purchasePrice);
@@ -752,6 +772,18 @@ public partial class ProductsPage
 
                 if (!string.IsNullOrWhiteSpace(_productId) && !Guid.TryParse(_productId, out _))
                     SetError("المنتج", "قيمة المنتج غير صحيحة.");
+                if (Guid.TryParse(_categoryId, out var variantCategoryId) && Guid.TryParse(_productTypeId, out var variantTypeId))
+                {
+                    var category = _categories.FirstOrDefault(x => x.Id == variantCategoryId);
+                    if (category is null || category.ProductTypeId != variantTypeId)
+                        SetError("التصنيف", "التصنيف المحدد لا يتبع نوع المنتج المختار.");
+                }
+                if (Guid.TryParse(_productId, out var variantProductId) && Guid.TryParse(_categoryId, out var selectedVariantCategoryId))
+                {
+                    var product = _products.FirstOrDefault(x => x.Id == variantProductId);
+                    if (product is null || product.CategoryId != selectedVariantCategoryId)
+                        SetError("المنتج", "المنتج المحدد لا يتبع التصنيف المختار.");
+                }
                 if (_variants.Any(x => x.Id != _selectedId && string.Equals(x.SKU, _code.Trim(), StringComparison.OrdinalIgnoreCase)))
                     SetError("SKU", "SKU مستخدم مسبقًا.");
                 if (!string.IsNullOrWhiteSpace(_barcode) && _variants.Any(x => x.Id != _selectedId && string.Equals(x.Barcode, _barcode.Trim(), StringComparison.OrdinalIgnoreCase)))
@@ -797,16 +829,15 @@ public partial class ProductsPage
                 SetError("نوع العدسة", "هذا الحقل إجباري عند إدخال تفاصيل العدسة.");
                 missingRequired = true;
             }
-            ValidateMaxLength("نوع العدسة", _lensType, 50);
-            ValidateMaxLength("خامة العدسة", _lensMaterial, 50);
-            ValidateMaxLength("الطلاء / Coating", _lensCoating, 50);
+            ValidateMaxLength("نوع العدسة", _lensType, 100);
+            ValidateMaxLength("خامة العدسة", _lensMaterial, 100);
+            ValidateMaxLength("الطلاء / Coating", _lensCoating, 100);
             ValidateDecimalField("معامل الانكسار", _refractiveIndex, false, 5, 3, false, ref missingRequired);
-            ValidateDecimalField("Sphere Min", _sphereMin, false, 6, 2, false, ref missingRequired);
-            ValidateDecimalField("Sphere Max", _sphereMax, false, 6, 2, false, ref missingRequired);
-            ValidateDecimalField("Cylinder Min", _cylinderMin, false, 6, 2, false, ref missingRequired);
-            ValidateDecimalField("Cylinder Max", _cylinderMax, false, 6, 2, false, ref missingRequired);
-            ValidateDecimalField("Add Min", _addMin, false, 6, 2, false, ref missingRequired);
-            ValidateDecimalField("Add Max", _addMax, false, 6, 2, false, ref missingRequired);
+            ValidateDecimalField("SPH", _sph, false, 6, 2, false, ref missingRequired);
+            ValidateDecimalField("Base Curve", _baseCurve, false, 6, 2, true, ref missingRequired);
+            ValidateDecimalField("CYL", _cyl, false, 6, 2, false, ref missingRequired);
+            ValidateDecimalField("Diameter", _diameter, false, 6, 2, true, ref missingRequired);
+            ValidateDecimalField("ADD", _add, false, 6, 2, true, ref missingRequired);
         }
     }
 
@@ -867,12 +898,11 @@ public partial class ProductsPage
         !string.IsNullOrWhiteSpace(_bridgeSize) || !string.IsNullOrWhiteSpace(_lensWidth);
 
     private bool HasLensDetailsInput() =>
-        _lensDetails.Any(x => x.ProductId == _selectedId) ||
+        (_selectedId.HasValue && _section == ProductSection.Variants && _lensDetails.Any(x => x.ProductVariantId == _selectedId.Value)) ||
         !string.IsNullOrWhiteSpace(_lensType) || !string.IsNullOrWhiteSpace(_lensMaterial) ||
         !string.IsNullOrWhiteSpace(_lensCoating) || !string.IsNullOrWhiteSpace(_refractiveIndex) ||
-        !string.IsNullOrWhiteSpace(_sphereMin) || !string.IsNullOrWhiteSpace(_sphereMax) ||
-        !string.IsNullOrWhiteSpace(_cylinderMin) || !string.IsNullOrWhiteSpace(_cylinderMax) ||
-        !string.IsNullOrWhiteSpace(_addMin) || !string.IsNullOrWhiteSpace(_addMax);
+        !string.IsNullOrWhiteSpace(_sph) || !string.IsNullOrWhiteSpace(_cyl) || !string.IsNullOrWhiteSpace(_add) ||
+        !string.IsNullOrWhiteSpace(_baseCurve) || !string.IsNullOrWhiteSpace(_diameter);
 
     private string? ErrorFor(string key) => _fieldErrors.TryGetValue(key, out var error) ? error : null;
     private static string? OptionalPlaceholder(bool required) => required ? null : "(اختياري)";
@@ -903,8 +933,8 @@ public partial class ProductsPage
             case ProductSection.Categories:
                 if (_categories.FirstOrDefault(x => x.Id == id) is { } category)
                 {
-                    _code = category.Code; _nameAr = category.NameAr; _nameEn = category.NameEn;
-                    _parentCategoryId = category.ParentCategoryId?.ToString("D"); _isActive = category.IsActive;
+                    _code = category.Code; _name = category.Name;
+                    _productTypeId = category.ProductTypeId.ToString("D"); _isActive = category.IsActive;
                 }
                 break;
             case ProductSection.Brands:
@@ -916,21 +946,21 @@ public partial class ProductsPage
             case ProductSection.ProductTypes:
                 if (_productTypes.FirstOrDefault(x => x.Id == id) is { } productType)
                 {
-                    _code = productType.Code; _nameAr = productType.NameAr; _nameEn = productType.NameEn; _isActive = productType.IsActive;
+                    _code = productType.Code; _name = productType.Name; _isActive = productType.IsActive;
                 }
                 break;
             case ProductSection.Units:
                 if (_units.FirstOrDefault(x => x.Id == id) is { } unit)
                 {
-                    _code = unit.Code; _nameAr = unit.NameAr; _nameEn = unit.NameEn; _isActive = unit.IsActive;
+                    _code = unit.Code; _name = unit.Name; _isActive = unit.IsActive;
                 }
                 break;
             case ProductSection.Products:
                 if (_products.FirstOrDefault(x => x.Id == id) is { } product)
                 {
-                    _code = product.ProductCode; _nameAr = product.NameAr; _nameEn = product.NameEn;
+                    _code = product.ProductCode; _name = product.Name;
                     _categoryId = product.CategoryId.ToString("D"); _brandId = product.BrandId?.ToString("D");
-                    _productTypeId = product.ProductTypeId.ToString("D");
+                    _productTypeId = _categories.FirstOrDefault(x => x.Id == product.CategoryId)?.ProductTypeId.ToString("D");
                     _description = product.Description;
                     _isStockItem = product.IsStockItem; _isActive = product.IsActive;
                     LoadSpecializedDetails(product.Id);
@@ -940,11 +970,17 @@ public partial class ProductsPage
                 if (_variants.FirstOrDefault(x => x.Id == id) is { } variant)
                 {
                     _code = variant.SKU; _productId = variant.ProductId.ToString("D"); _barcode = variant.Barcode;
+                    if (_products.FirstOrDefault(x => x.Id == variant.ProductId) is { } variantProduct)
+                    {
+                        _categoryId = variantProduct.CategoryId.ToString("D");
+                        _productTypeId = _categories.FirstOrDefault(x => x.Id == variantProduct.CategoryId)?.ProductTypeId.ToString("D");
+                    }
                     _variantName = variant.VariantName; _color = variant.Color; _size = variant.Size;
                     _unitId = variant.UnitId?.ToString("D");
                     _purchasePrice = variant.PurchasePrice.ToString(System.Globalization.CultureInfo.InvariantCulture);
                     _sellingPrice = variant.SellingPrice.ToString(System.Globalization.CultureInfo.InvariantCulture);
                     _isActive = variant.IsActive;
+                    LoadLensDetailsForVariant(variant.Id);
                 }
                 break;
         }
@@ -953,8 +989,8 @@ public partial class ProductsPage
     private void ClearForm()
     {
         ClearValidation();
-        _code = string.Empty; _nameAr = string.Empty; _nameEn = null; _isActive = true;
-        _parentCategoryId = null; _brandName = string.Empty;
+        _code = string.Empty; _name = string.Empty; _isActive = true;
+        _brandName = string.Empty;
         _categoryId = null; _brandId = null;
         _productTypeId = _productTypes.FirstOrDefault(x => x.IsActive && x.SystemKey == ProductTypeSystemKeys.Frame)?.Id.ToString("D")
             ?? _productTypes.FirstOrDefault(x => x.IsActive)?.Id.ToString("D");
@@ -962,7 +998,7 @@ public partial class ProductsPage
         _frameModel = string.Empty; _frameMaterial = null; _frameRimType = null; _frameGender = null; _frameShape = null;
         _templeLength = null; _bridgeSize = null; _lensWidth = null;
         _lensType = string.Empty; _lensMaterial = null; _lensCoating = null; _refractiveIndex = null;
-        _sphereMin = null; _sphereMax = null; _cylinderMin = null; _cylinderMax = null; _addMin = null; _addMax = null; _isPrescriptionLens = false;
+        _sph = null; _cyl = null; _add = null; _baseCurve = null; _diameter = null; _isPrescriptionLens = false;
         _productId = null; _barcode = null; _variantName = null; _color = null; _size = null; _unitId = null;
         _purchasePrice = "0"; _sellingPrice = "0";
         _initialSku = string.Empty; _initialBarcode = null; _initialVariantName = null; _initialColor = null; _initialSize = null; _initialUnitId = null;
@@ -985,20 +1021,21 @@ public partial class ProductsPage
             _lensWidth = FormatNullableDecimal(frame.LensWidth);
         }
 
-        if (_lensDetails.FirstOrDefault(x => x.ProductId == productId) is { } lens)
-        {
-            _lensType = lens.LensType;
-            _lensMaterial = lens.Material;
-            _lensCoating = lens.Coating;
-            _refractiveIndex = FormatNullableDecimal(lens.RefractiveIndex);
-            _sphereMin = FormatNullableDecimal(lens.SphereMin);
-            _sphereMax = FormatNullableDecimal(lens.SphereMax);
-            _cylinderMin = FormatNullableDecimal(lens.CylinderMin);
-            _cylinderMax = FormatNullableDecimal(lens.CylinderMax);
-            _addMin = FormatNullableDecimal(lens.AddMin);
-            _addMax = FormatNullableDecimal(lens.AddMax);
-            _isPrescriptionLens = lens.IsPrescriptionLens;
-        }
+    }
+
+    private void LoadLensDetailsForVariant(Guid productVariantId)
+    {
+        if (_lensDetails.FirstOrDefault(x => x.ProductVariantId == productVariantId) is not { } lens) return;
+        _lensType = lens.LensType;
+        _lensMaterial = lens.Material;
+        _lensCoating = lens.Coating;
+        _refractiveIndex = FormatNullableDecimal(lens.RefractiveIndex);
+        _sph = FormatNullableDecimal(lens.SPH);
+        _cyl = FormatNullableDecimal(lens.CYL);
+        _add = FormatNullableDecimal(lens.ADD);
+        _baseCurve = FormatNullableDecimal(lens.BaseCurve);
+        _diameter = FormatNullableDecimal(lens.Diameter);
+        _isPrescriptionLens = lens.IsPrescriptionLens;
     }
 
     private bool SelectionExists(Guid id) => _section switch
@@ -1118,11 +1155,11 @@ public partial class ProductsPage
         }
     }
 
-    private IReadOnlyList<ProductCategoryDto> FilterCategories() => _categories.Where(x => Match(_search, x.Code, x.NameAr, x.NameEn)).ToArray();
+    private IReadOnlyList<ProductCategoryDto> FilterCategories() => _categories.Where(x => Match(_search, x.Code, x.Name)).ToArray();
     private IReadOnlyList<BrandDto> FilterBrands() => _brands.Where(x => Match(_search, x.Code, x.Name)).ToArray();
-    private IReadOnlyList<ProductTypeDto> FilterProductTypes() => _productTypes.Where(x => Match(_search, x.Code, x.NameAr, x.NameEn)).ToArray();
-    private IReadOnlyList<UnitDto> FilterUnits() => _units.Where(x => Match(_search, x.Code, x.NameAr, x.NameEn)).ToArray();
-    private IReadOnlyList<ProductDto> FilterProducts() => _products.Where(x => Match(_search, x.ProductCode, x.NameAr, x.NameEn, x.Description, ProductTypeName(x.ProductTypeId))).ToArray();
+    private IReadOnlyList<ProductTypeDto> FilterProductTypes() => _productTypes.Where(x => Match(_search, x.Code, x.Name)).ToArray();
+    private IReadOnlyList<UnitDto> FilterUnits() => _units.Where(x => Match(_search, x.Code, x.Name)).ToArray();
+    private IReadOnlyList<ProductDto> FilterProducts() => _products.Where(x => Match(_search, x.ProductCode, x.Name, x.Description, ProductTypeNameForCategory(x.CategoryId))).ToArray();
     private IReadOnlyList<ProductVariantDto> FilterVariants() => _variants.Where(x => Match(_search, x.SKU, x.Barcode, x.VariantName, x.Color, x.Size)).ToArray();
 
     private static bool Match(string? search, params string?[] values)
@@ -1151,9 +1188,8 @@ public partial class ProductsPage
     private void RenderCategoryEditor(RenderTreeBuilder b, ref int s)
     {
         AddText(b, ref s, "الكود", _code, v => _code = v, () => _code, (!IsEditing || _saving), true, 32);
-        AddText(b, ref s, "الاسم بالعربية", _nameAr, v => _nameAr = v, () => _nameAr, (!IsEditing || _saving), true, 100);
-        AddText(b, ref s, "الاسم بالإنجليزية", _nameEn, v => _nameEn = v, () => _nameEn, (!IsEditing || _saving), false, 100);
-        AddSelect(b, ref s, "التصنيف الأب", _parentCategoryId, v => _parentCategoryId = v, () => _parentCategoryId, CategoryOptions.Where(x => x.Value != _selectedId?.ToString("D")).ToArray());
+        AddText(b, ref s, "الاسم", _name, v => _name = v, () => _name, (!IsEditing || _saving), true, 100);
+        AddSelect(b, ref s, "نوع المنتج", _productTypeId, SetProductType, () => _productTypeId, ProductTypeOptions, true);
         AddActive(b, ref s);
     }
 
@@ -1167,35 +1203,35 @@ public partial class ProductsPage
     private void RenderProductTypeEditor(RenderTreeBuilder b, ref int s)
     {
         AddText(b, ref s, "الكود", _code, v => _code = v.ToUpperInvariant(), () => _code, (!IsEditing || _saving), true, 32);
-        AddText(b, ref s, "الاسم بالعربية", _nameAr, v => _nameAr = v, () => _nameAr, (!IsEditing || _saving), true, 100);
-        AddText(b, ref s, "الاسم بالإنجليزية", _nameEn, v => _nameEn = v, () => _nameEn, (!IsEditing || _saving), false, 100);
+        AddText(b, ref s, "الاسم", _name, v => _name = v, () => _name, (!IsEditing || _saving), true, 100);
         AddActive(b, ref s);
     }
 
     private void RenderUnitEditor(RenderTreeBuilder b, ref int s)
     {
         AddText(b, ref s, "الكود", _code, v => _code = v, () => _code, (!IsEditing || _saving), true, 32);
-        AddText(b, ref s, "الاسم بالعربية", _nameAr, v => _nameAr = v, () => _nameAr, (!IsEditing || _saving), true, 100);
-        AddText(b, ref s, "الاسم بالإنجليزية", _nameEn, v => _nameEn = v, () => _nameEn, (!IsEditing || _saving), false, 100);
+        AddText(b, ref s, "الاسم", _name, v => _name = v, () => _name, (!IsEditing || _saving), true, 100);
         AddActive(b, ref s);
     }
 
     private void RenderProductEditor(RenderTreeBuilder b, ref int s)
     {
         AddText(b, ref s, "كود المنتج", _code, v => _code = v, () => _code, (!IsEditing || _saving), true, 32);
-        AddText(b, ref s, "الاسم بالعربية", _nameAr, v => _nameAr = v, () => _nameAr, (!IsEditing || _saving), true, 150);
-        AddText(b, ref s, "الاسم بالإنجليزية", _nameEn, v => _nameEn = v, () => _nameEn, (!IsEditing || _saving), false, 150);
-        AddSelect(b, ref s, "التصنيف", _categoryId, v => _categoryId = v, () => _categoryId, CategoryOptions.Where(x => !string.IsNullOrEmpty(x.Value)).ToArray(), true);
-        AddSelect(b, ref s, "العلامة التجارية", _brandId, v => _brandId = v, () => _brandId, BrandOptions);
+        AddText(b, ref s, "الاسم", _name, v => _name = v, () => _name, (!IsEditing || _saving), true, 200);
         AddSelect(b, ref s, "نوع المنتج", _productTypeId, SetProductType, () => _productTypeId, ProductTypeOptions, true);
-        AddText(b, ref s, "الوصف", _description, v => _description = v, () => _description, (!IsEditing || _saving), false, 500);
+        AddSelect(b, ref s, "التصنيف", _categoryId, SetProductCategory, () => _categoryId, CategoryOptions.Where(x => !string.IsNullOrEmpty(x.Value)).ToArray(), true);
+        AddSelect(b, ref s, "العلامة التجارية", _brandId, v => _brandId = v, () => _brandId, BrandOptions);
+        AddText(b, ref s, "الوصف", _description, v => _description = v, () => _description, (!IsEditing || _saving), false, 1000);
         AddCheckbox(b, ref s, "صنف مخزني", _isStockItem, SetStockItem, forceDisabled: IsServiceProductType);
         AddActive(b, ref s);
     }
 
     private void RenderVariantEditor(RenderTreeBuilder b, ref int s)
     {
-        AddSelect(b, ref s, "المنتج", _productId, v => _productId = v, () => _productId, ProductOptions, true, _mode != EditorMode.Create);
+        var lockHierarchy = _mode != EditorMode.Create;
+        AddSelect(b, ref s, "نوع المنتج", _productTypeId, SetProductType, () => _productTypeId, ProductTypeOptions, true, lockHierarchy);
+        AddSelect(b, ref s, "التصنيف", _categoryId, SetProductCategory, () => _categoryId, CategoryOptions.Where(x => !string.IsNullOrEmpty(x.Value)).ToArray(), true, lockHierarchy);
+        AddSelect(b, ref s, "المنتج", _productId, SetVariantProduct, () => _productId, ProductOptions, true, lockHierarchy);
         AddText(b, ref s, "SKU", _code, v => _code = v, () => _code, (!IsEditing || _saving), true, 64);
         AddText(b, ref s, "الباركود", _barcode, v => _barcode = v, () => _barcode, (!IsEditing || _saving), false, 64);
         AddText(b, ref s, "اسم المتغير", _variantName, v => _variantName = v, () => _variantName, (!IsEditing || _saving), false, 100);
@@ -1209,12 +1245,41 @@ public partial class ProductsPage
 
     private void SetProductType(string? value)
     {
+        if (!string.Equals(_productTypeId, value, StringComparison.OrdinalIgnoreCase))
+        {
+            _categoryId = null;
+            _productId = null;
+        }
         _productTypeId = value;
         if (IsServiceProductType)
         {
             _isStockItem = false;
             _addOpeningInventory = false;
         }
+    }
+
+    private void SetProductCategory(string? value)
+    {
+        if (!string.Equals(_categoryId, value, StringComparison.OrdinalIgnoreCase))
+            _productId = null;
+
+        _categoryId = value;
+        if (Guid.TryParse(value, out var categoryId))
+            _productTypeId = _categories.FirstOrDefault(x => x.Id == categoryId)?.ProductTypeId.ToString("D") ?? _productTypeId;
+    }
+
+    private void SetVariantProduct(string? value)
+    {
+        _productId = value;
+        if (!Guid.TryParse(value, out var productId))
+            return;
+
+        var product = _products.FirstOrDefault(x => x.Id == productId);
+        if (product is null)
+            return;
+
+        _categoryId = product.CategoryId.ToString("D");
+        _productTypeId = _categories.FirstOrDefault(x => x.Id == product.CategoryId)?.ProductTypeId.ToString("D") ?? _productTypeId;
     }
 
     private void ToggleOpeningInventory(bool value)
@@ -1321,8 +1386,13 @@ public partial class ProductsPage
         b.AddAttribute(s++, "Disabled", (!IsEditing || _saving) || forceDisabled); b.CloseComponent();
     }
 
-    private string ProductName(Guid id) => _products.FirstOrDefault(x => x.Id == id)?.NameAr ?? "—";
-    private string ProductTypeName(Guid id) => _productTypes.FirstOrDefault(x => x.Id == id)?.NameAr ?? "—";
+    private string ProductName(Guid id) => _products.FirstOrDefault(x => x.Id == id)?.Name ?? "—";
+    private string ProductTypeName(Guid id) => _productTypes.FirstOrDefault(x => x.Id == id)?.Name ?? "—";
+    private string ProductTypeNameForCategory(Guid categoryId)
+    {
+        var category = _categories.FirstOrDefault(x => x.Id == categoryId);
+        return category is null ? "—" : ProductTypeName(category.ProductTypeId);
+    }
     private static string StatusText(bool active) => active ? "نشط" : "غير نشط";
     private static Guid? ParseGuid(string? value) => Guid.TryParse(value, out var id) ? id : null;
     private static decimal? ParseNullableDecimal(string? value)

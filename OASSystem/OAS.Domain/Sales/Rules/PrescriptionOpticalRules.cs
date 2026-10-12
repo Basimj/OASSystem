@@ -1,5 +1,4 @@
 using OAS.Domain.Exceptions;
-using OAS.Domain.Sales.ValueObjects;
 
 namespace OAS.Domain.Sales.Rules;
 
@@ -27,21 +26,5 @@ public static class PrescriptionOpticalRules
             throw new DomainException("Monocular PD must be greater than zero.");
         if (fittingHeight.HasValue && fittingHeight.Value <= 0)
             throw new DomainException("Fitting height must be greater than zero.");
-    }
-
-    public static void ValidateConfiguredRanges(
-        decimal? sphere,
-        decimal? cylinder,
-        decimal? add,
-        OpticalPrescriptionRangePolicy policy)
-    {
-        ArgumentNullException.ThrowIfNull(policy);
-
-        if (sphere.HasValue && !policy.Sphere.Contains(sphere.Value))
-            throw new DomainException("SPH is outside the configured optical range.");
-        if (cylinder.HasValue && !policy.Cylinder.Contains(cylinder.Value))
-            throw new DomainException("CYL is outside the configured optical range.");
-        if (add.HasValue && !policy.Add.Contains(add.Value))
-            throw new DomainException("ADD is outside the configured optical range.");
     }
 }

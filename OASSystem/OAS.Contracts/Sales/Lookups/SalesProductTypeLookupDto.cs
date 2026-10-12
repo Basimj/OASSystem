@@ -5,7 +5,7 @@ namespace OAS.Contracts.Sales.Lookups;
 public sealed record SalesProductTypeLookupDto(
     Guid Id,
     string Code,
-    string NameAr,
+    string Name,
     string? SystemKey,
     SalesLineType SalesLineType,
     bool IsActive);

@@ -11,18 +11,16 @@ public sealed class ProductCategoryMapper
     {
         return new ProductCategory(
             source.Code,
-            source.NameAr,
-            source.NameEn,
-            source.ParentCategoryId);
+            source.Name,
+            source.ProductTypeId);
     }
 
     public void Update(UpdateProductCategoryRequest source, ProductCategory destination)
     {
         destination.UpdateDetails(
             source.Code.Trim(),
-            source.NameAr,
-            source.NameEn,
-            source.ParentCategoryId,
+            source.Name,
+            source.ProductTypeId,
             source.IsActive);
     }
 
@@ -31,9 +29,8 @@ public sealed class ProductCategoryMapper
         return new ProductCategoryDto(
             source.Id,
             source.Code,
-            source.NameAr,
-            source.NameEn,
-            source.ParentCategoryId,
+            source.Name,
+            source.ProductTypeId,
             source.IsActive);
     }
 }

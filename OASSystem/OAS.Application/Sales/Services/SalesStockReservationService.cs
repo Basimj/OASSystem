@@ -118,16 +118,17 @@ public sealed class SalesStockReservationService(
             }
 
             var existing = await FindActiveAsync(SalesSourceReferences.SalesInvoice, invoice.Id, line.Id, cancellationToken);
-            if (existing.Sum(x => x.Quantity) >= line.Quantity)
+            var missingQuantity = line.Quantity - existing.Sum(x => x.Quantity);
+            if (missingQuantity <= 0m)
                 continue;
 
             var balance = await balances.GetByWarehouseAndVariantAsync(line.WarehouseId!.Value, line.ProductVariantId!.Value, cancellationToken);
-            if (balance is null || !balance.TryReserve(line.Quantity))
+            if (balance is null || !balance.TryReserve(missingQuantity))
                 throw new ConflictException(SalesErrorCodes.InsufficientStock, "الكمية المتاحة غير كافية لتأكيد الفاتورة.");
 
             balances.Update(balance);
             await reservations.AddAsync(StockReservation.Create(
-                Guid.NewGuid(), line.ProductVariantId.Value, line.WarehouseId.Value, line.Quantity,
+                Guid.NewGuid(), line.ProductVariantId.Value, line.WarehouseId.Value, missingQuantity,
                 SalesSourceReferences.Module, SalesSourceReferences.SalesInvoice, invoice.Id, line.Id,
                 timeProvider.GetUtcNow()), cancellationToken);
         }

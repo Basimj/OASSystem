@@ -51,7 +51,7 @@ SELECT
     sc.CountNumber,
     sc.WarehouseId,
     w.Code AS WarehouseCode,
-    w.NameAr AS WarehouseName,
+    w.Name AS WarehouseName,
     w.IsActive AS WarehouseIsActive,
     sc.Status,
     CASE sc.Status
@@ -84,7 +84,7 @@ SELECT
     scl.Id AS StockCountLineId,
     scl.ProductVariantId,
     p.ProductCode,
-    p.NameAr AS ProductName,
+    p.Name AS ProductName,
     pv.SKU,
     pv.Barcode,
     pv.VariantName,

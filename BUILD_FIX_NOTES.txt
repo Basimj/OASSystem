@@ -1,0 +1,9 @@
+Build correction FIX1 - 2026-10-11
+
+Fixed OAS.Application/Sales/Lookups/SalesLookupQueryHandlers.cs:
+- Customer search uses Customer.NameAr / Customer.NameEn (Accounting entity was not renamed).
+- Currency search uses Currency.NameAr (Accounting entity was not renamed).
+
+The CS0006 errors for OAS.Application/OAS.Infrastructure/OAS.API/OAS.Tests are downstream metadata errors caused by OAS.Application failing to compile; they should disappear after the source error is fixed and the solution is rebuilt.
+
+Environment note: .NET SDK is not installed in the artifact execution environment, so dotnet build/test could not be executed here.

@@ -43,9 +43,6 @@ public sealed record CustomerOrderLineDto(
     bool? ProductIsStockItem = null,
     CustomerOrderLineOpticalSnapshotDto? OpticalSnapshot = null,
     bool? ProductIsPrescriptionLens = null,
-    decimal? LensSphereMin = null,
-    decimal? LensSphereMax = null,
-    decimal? LensCylinderMin = null,
-    decimal? LensCylinderMax = null,
-    decimal? LensAddMin = null,
-    decimal? LensAddMax = null);
+    decimal? LensSPH = null,
+    decimal? LensCYL = null,
+    decimal? LensADD = null);

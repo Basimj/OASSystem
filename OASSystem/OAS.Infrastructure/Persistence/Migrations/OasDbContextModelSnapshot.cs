@@ -1851,21 +1851,32 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
         modelBuilder.Entity("OAS.Domain.Entities.Inventory.LensDetails", b =>
         {
             b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
-            b.Property<Guid>("ProductId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<Guid>("ProductVariantId").IsRequired().HasColumnType("uniqueidentifier");
             b.Property<string>("LensType").IsRequired().HasMaxLength(100).HasColumnType("nvarchar(100)");
             b.Property<string>("Material").HasMaxLength(100).HasColumnType("nvarchar(100)");
             b.Property<string>("Coating").HasMaxLength(100).HasColumnType("nvarchar(100)");
             b.Property<decimal?>("RefractiveIndex").HasColumnType("decimal(5,3)");
-            b.Property<decimal?>("SphereMin").HasColumnType("decimal(6,2)");
-            b.Property<decimal?>("SphereMax").HasColumnType("decimal(6,2)");
-            b.Property<decimal?>("CylinderMin").HasColumnType("decimal(6,2)");
-            b.Property<decimal?>("CylinderMax").HasColumnType("decimal(6,2)");
-            b.Property<decimal?>("AddMin").HasColumnType("decimal(6,2)");
-            b.Property<decimal?>("AddMax").HasColumnType("decimal(6,2)");
+            b.Property<decimal?>("SPH").HasColumnType("decimal(6,2)");
+            b.Property<decimal?>("CYL").HasColumnType("decimal(6,2)");
+            b.Property<decimal?>("ADD").HasColumnType("decimal(6,2)");
+            b.Property<decimal?>("BaseCurve").HasColumnType("decimal(6,2)");
+            b.Property<decimal?>("Diameter").HasColumnType("decimal(6,2)");
             b.Property<bool>("IsPrescriptionLens").IsRequired().HasColumnType("bit");
-            b.HasKey("Id");
-            b.HasIndex("ProductId").IsUnique().HasDatabaseName("UX_LensDetails_ProductId");
-            b.ToTable("tbl_LensDetails");
+            b.Property<bool>("IsActive").IsRequired().HasColumnType("bit");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.HasKey("Id").HasName("PK_tbl_LensDetails");
+            b.HasIndex("ProductVariantId").IsUnique().HasDatabaseName("UX_LensDetails_ProductVariantId");
+            b.HasIndex("SPH", "CYL", "ADD").HasDatabaseName("IX_LensDetails_SPH_CYL_ADD");
+            b.ToTable("tbl_LensDetails", "dbo", t =>
+            {
+                t.HasCheckConstraint("CK_LensDetails_ADD", "[ADD] IS NULL OR [ADD] >= 0");
+                t.HasCheckConstraint("CK_LensDetails_BaseCurve", "[BaseCurve] IS NULL OR [BaseCurve] > 0");
+                t.HasCheckConstraint("CK_LensDetails_Diameter", "[Diameter] IS NULL OR [Diameter] > 0");
+            });
         });
 
         modelBuilder.Entity("OAS.Domain.Entities.Inventory.ProductCategory", b =>
@@ -1876,13 +1887,12 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
             b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
             b.Property<string>("Code").IsRequired().HasMaxLength(32).HasColumnType("nvarchar(32)");
-            b.Property<string>("NameAr").IsRequired().HasMaxLength(100).HasColumnType("nvarchar(100)");
-            b.Property<string>("NameEn").HasMaxLength(100).HasColumnType("nvarchar(100)");
-            b.Property<Guid?>("ParentCategoryId").HasColumnType("uniqueidentifier");
+            b.Property<string>("Name").IsRequired().HasMaxLength(100).HasColumnType("nvarchar(100)");
+            b.Property<Guid>("ProductTypeId").IsRequired().HasColumnType("uniqueidentifier");
             b.Property<bool>("IsActive").IsRequired().HasColumnType("bit");
             b.HasKey("Id");
             b.HasIndex("Code").IsUnique().HasDatabaseName("UX_ProductCategories_Code");
-            b.HasIndex("ParentCategoryId").HasDatabaseName("IX_ProductCategories_ParentCategoryId");
+            b.HasIndex("ProductTypeId").HasDatabaseName("IX_ProductCategories_ProductTypeId");
             b.HasIndex("IsActive").HasDatabaseName("IX_ProductCategories_IsActive");
             b.ToTable("tbl_ProductCategories");
         });
@@ -1895,11 +1905,9 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
             b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
             b.Property<string>("ProductCode").IsRequired().HasMaxLength(32).HasColumnType("nvarchar(32)");
-            b.Property<string>("NameAr").IsRequired().HasMaxLength(200).HasColumnType("nvarchar(200)");
-            b.Property<string>("NameEn").HasMaxLength(200).HasColumnType("nvarchar(200)");
+            b.Property<string>("Name").IsRequired().HasMaxLength(200).HasColumnType("nvarchar(200)");
             b.Property<Guid>("CategoryId").IsRequired().HasColumnType("uniqueidentifier");
             b.Property<Guid?>("BrandId").HasColumnType("uniqueidentifier");
-            b.Property<Guid>("ProductTypeId").IsRequired().HasColumnType("uniqueidentifier");
             b.Property<string>("Description").HasMaxLength(1000).HasColumnType("nvarchar(1000)");
             b.Property<bool>("IsStockItem").IsRequired().HasColumnType("bit");
             b.Property<bool>("IsActive").IsRequired().HasColumnType("bit");
@@ -1908,7 +1916,6 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.HasIndex("ProductCode").IsUnique().HasDatabaseName("UX_Products_ProductCode");
             b.HasIndex("CategoryId").HasDatabaseName("IX_Products_CategoryId");
             b.HasIndex("BrandId").HasDatabaseName("IX_Products_BrandId");
-            b.HasIndex("ProductTypeId").HasDatabaseName("IX_Products_ProductTypeId");
             b.HasIndex("IsActive").HasDatabaseName("IX_Products_IsActive");
             b.ToTable("tbl_Products");
         });
@@ -1921,8 +1928,7 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
             b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
             b.Property<string>("Code").IsRequired().HasMaxLength(32).HasColumnType("nvarchar(32)");
-            b.Property<string>("NameAr").IsRequired().HasMaxLength(100).HasColumnType("nvarchar(100)");
-            b.Property<string>("NameEn").HasMaxLength(100).HasColumnType("nvarchar(100)");
+            b.Property<string>("Name").IsRequired().HasMaxLength(100).HasColumnType("nvarchar(100)");
             b.Property<string>("SystemKey").HasMaxLength(32).HasColumnType("nvarchar(32)");
             b.Property<bool>("IsActive").IsRequired().HasColumnType("bit");
             b.HasKey("Id");
@@ -2045,8 +2051,7 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
             b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
             b.Property<string>("Code").IsRequired().HasMaxLength(32).HasColumnType("nvarchar(32)");
-            b.Property<string>("NameAr").IsRequired().HasMaxLength(100).HasColumnType("nvarchar(100)");
-            b.Property<string>("NameEn").HasMaxLength(100).HasColumnType("nvarchar(100)");
+            b.Property<string>("Name").IsRequired().HasMaxLength(100).HasColumnType("nvarchar(100)");
             b.Property<bool>("IsActive").IsRequired().HasColumnType("bit");
             b.HasKey("Id");
             b.HasIndex("Code").IsUnique().HasDatabaseName("UX_Units_Code");
@@ -2062,8 +2067,7 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset");
             b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
             b.Property<string>("Code").IsRequired().HasMaxLength(32).HasColumnType("nvarchar(32)");
-            b.Property<string>("NameAr").IsRequired().HasMaxLength(100).HasColumnType("nvarchar(100)");
-            b.Property<string>("NameEn").HasMaxLength(100).HasColumnType("nvarchar(100)");
+            b.Property<string>("Name").IsRequired().HasMaxLength(100).HasColumnType("nvarchar(100)");
             b.Property<string>("Description").HasMaxLength(500).HasColumnType("nvarchar(500)");
             b.Property<bool>("IsDefault").IsRequired().HasColumnType("bit");
             b.Property<bool>("IsActive").IsRequired().HasColumnType("bit");
@@ -4091,20 +4095,22 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
 
         modelBuilder.Entity("OAS.Domain.Entities.Inventory.LensDetails", b =>
         {
-            b.HasOne("OAS.Domain.Entities.Inventory.Product", null).WithMany()
-                .HasForeignKey("ProductId")
+            b.HasOne("OAS.Domain.Entities.Inventory.ProductVariant", null).WithOne()
+                .HasForeignKey("OAS.Domain.Entities.Inventory.LensDetails", "ProductVariantId")
                 .OnDelete(DeleteBehavior.Cascade)
                 .IsRequired()
-                .HasConstraintName("FK_LensDetails_Products_ProductId");
+                .HasConstraintName("FK_LensDetails_ProductVariants_ProductVariantId");
         });
 
         modelBuilder.Entity("OAS.Domain.Entities.Inventory.ProductCategory", b =>
         {
-            b.HasOne("OAS.Domain.Entities.Inventory.ProductCategory", null).WithMany()
-                .HasForeignKey("ParentCategoryId")
+            b.HasOne("OAS.Domain.Entities.Inventory.ProductType", null).WithMany()
+                .HasForeignKey("ProductTypeId")
                 .OnDelete(DeleteBehavior.Restrict)
-                .HasConstraintName("FK_ProductCategories_ParentCategory");
+                .IsRequired()
+                .HasConstraintName("FK_ProductCategories_ProductTypes_ProductTypeId");
         });
+
 
         modelBuilder.Entity("OAS.Domain.Entities.Inventory.Product", b =>
         {
@@ -4123,14 +4129,6 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
                 .HasConstraintName("FK_Products_Brands_BrandId");
         });
 
-        modelBuilder.Entity("OAS.Domain.Entities.Inventory.Product", b =>
-        {
-            b.HasOne("OAS.Domain.Entities.Inventory.ProductType", null).WithMany()
-                .HasForeignKey("ProductTypeId")
-                .OnDelete(DeleteBehavior.Restrict)
-                .IsRequired()
-                .HasConstraintName("FK_Products_ProductTypes_ProductTypeId");
-        });
 
         modelBuilder.Entity("OAS.Domain.Entities.Inventory.ProductVariant", b =>
         {
@@ -4764,33 +4762,6 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
         });
 
 
-        modelBuilder.Entity("OAS.Domain.Entities.Inventory.LensVariantDetail", b =>
-        {
-            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
-            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset").HasColumnName("CreatedAt");
-            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
-            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset").HasColumnName("UpdatedAt");
-            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)").HasColumnName("UpdatedBy");
-            b.Property<Guid>("ProductVariantId").IsRequired().HasColumnType("uniqueidentifier");
-            b.Property<decimal?>("SPH").HasColumnType("decimal(6,2)");
-            b.Property<decimal?>("CYL").HasColumnType("decimal(6,2)");
-            b.Property<decimal?>("ADD").HasColumnType("decimal(6,2)");
-            b.Property<decimal?>("BaseCurve").HasColumnType("decimal(6,2)");
-            b.Property<decimal?>("Diameter").HasColumnType("decimal(6,2)");
-            b.Property<bool>("IsActive").IsRequired().HasColumnType("bit");
-            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
-            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
-            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("UpdatedFromDevice");
-            b.HasKey("Id").HasName("PK_tbl_LensVariantDetails");
-            b.HasIndex("ProductVariantId").IsUnique().HasDatabaseName("UX_LensVariantDetails_ProductVariantId");
-            b.HasIndex("SPH", "CYL", "ADD").HasDatabaseName("IX_LensVariantDetails_SPH_CYL_ADD");
-            b.ToTable("tbl_LensVariantDetails", "dbo", t =>
-            {
-                t.HasCheckConstraint("CK_LensVariantDetails_ADD", "[ADD] IS NULL OR [ADD] >= 0");
-                t.HasCheckConstraint("CK_LensVariantDetails_BaseCurve", "[BaseCurve] IS NULL OR [BaseCurve] > 0");
-                t.HasCheckConstraint("CK_LensVariantDetails_Diameter", "[Diameter] IS NULL OR [Diameter] > 0");
-            });
-        });
 
         modelBuilder.Entity("OAS.Domain.Sales.Entities.CustomerOrderLineOpticalSnapshot", b =>
         {
@@ -5126,13 +5097,6 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
         });
 
         // Relationships for foundation gap completion
-        modelBuilder.Entity("OAS.Domain.Entities.Inventory.LensVariantDetail", b =>
-        {
-            b.HasOne("OAS.Domain.Entities.Inventory.ProductVariant", null).WithOne()
-                .HasForeignKey("OAS.Domain.Entities.Inventory.LensVariantDetail", "ProductVariantId")
-                .OnDelete(DeleteBehavior.Restrict).IsRequired()
-                .HasConstraintName("FK_LensVariantDetails_ProductVariants_ProductVariantId");
-        });
         modelBuilder.Entity("OAS.Domain.Sales.Entities.CustomerOrderLineOpticalSnapshot", b =>
         {
             b.HasOne("OAS.Domain.Sales.Entities.CustomerOrderLine", null).WithOne()

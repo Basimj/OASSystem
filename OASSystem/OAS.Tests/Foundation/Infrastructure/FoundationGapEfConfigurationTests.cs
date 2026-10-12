@@ -23,7 +23,7 @@ public sealed class FoundationGapEfConfigurationTests
         using var context = Context();
         var expected = new (Type Type, string Table)[]
         {
-            (typeof(LensVariantDetail), "tbl_LensVariantDetails"),
+            (typeof(LensDetails), "tbl_LensDetails"),
             (typeof(CustomerOrderLineOpticalSnapshot), "tbl_CustomerOrderLineOpticalSnapshots"),
             (typeof(CustomerAdvance), "tbl_CustomerAdvances"),
             (typeof(CustomerAdvanceApplication), "tbl_CustomerAdvanceApplications"),
@@ -44,14 +44,14 @@ public sealed class FoundationGapEfConfigurationTests
     }
 
     [Test]
-    public void LensVariant_AndOpticalSnapshot_HaveRequiredUniqueIndexesAndChecks()
+    public void LensDetails_AndOpticalSnapshot_HaveRequiredUniqueIndexesAndChecks()
     {
         using var context = Context();
         var model = context.GetService<IDesignTimeModel>().Model;
-        var lens = model.FindEntityType(typeof(LensVariantDetail))!;
-        var lensIndex = lens.GetIndexes().Single(x => x.GetDatabaseName() == "UX_LensVariantDetails_ProductVariantId");
+        var lens = model.FindEntityType(typeof(LensDetails))!;
+        var lensIndex = lens.GetIndexes().Single(x => x.GetDatabaseName() == "UX_LensDetails_ProductVariantId");
         Assert.That(lensIndex.IsUnique, Is.True);
-        Assert.That(lens.GetCheckConstraints().Select(x => x.Name), Does.Contain("CK_LensVariantDetails_BaseCurve"));
+        Assert.That(lens.GetCheckConstraints().Select(x => x.Name), Does.Contain("CK_LensDetails_BaseCurve"));
 
         var snapshot = model.FindEntityType(typeof(CustomerOrderLineOpticalSnapshot))!;
         var snapshotIndex = snapshot.GetIndexes().Single(x => x.GetDatabaseName() == "UX_CustomerOrderLineOpticalSnapshots_CustomerOrderLineId");

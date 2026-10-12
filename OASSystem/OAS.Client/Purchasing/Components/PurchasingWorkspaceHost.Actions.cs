@@ -322,7 +322,7 @@ public partial class PurchasingWorkspaceHost
         try
         {
             var unit=await Inventory.GetUnitAsync(line.PurchaseUnitId.Value);
-            line.PurchaseUnitName=unit?.NameAr;
+            line.PurchaseUnitName=unit?.Name;
             if(ActiveTab is { } tab)tab.IsDirty=true;
             StateHasChanged();
         }

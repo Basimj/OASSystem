@@ -31,6 +31,29 @@ public sealed class FoundationGapMigrationTests
         });
     }
 
+    [Test]
+    public void InventoryLensRefinementMigration_UsesRawSqlAndCreatesMergedLensDetailsModel()
+    {
+        var root = FindSolutionRoot();
+        var path = Path.Combine(root, "OAS.Infrastructure", "Persistence", "Migrations", "20261011180000_RefineInventoryLensModel.cs");
+        Assert.That(File.Exists(path), Is.True, path);
+        var text = File.ReadAllText(path);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(text, Does.Contain("migrationBuilder.Sql"));
+            Assert.That(text, Does.Not.Contain("migrationBuilder.CreateTable("));
+            Assert.That(text, Does.Not.Contain("migrationBuilder.AddColumn("));
+            Assert.That(text, Does.Not.Contain("migrationBuilder.CreateIndex("));
+            Assert.That(text, Does.Contain("tbl_LensDetails"));
+            Assert.That(text, Does.Contain("ProductVariantId"));
+            Assert.That(text, Does.Contain("[SPH]"));
+            Assert.That(text, Does.Contain("[CYL]"));
+            Assert.That(text, Does.Contain("[ADD]"));
+            Assert.That(text, Does.Contain("DROP TABLE [dbo].[tbl_LensVariantDetails]"));
+        });
+    }
+
     private static string FindSolutionRoot()
     {
         var current = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);

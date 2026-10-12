@@ -1,7 +1,2 @@
 namespace OAS.Contracts.Inventory.Products;
-
-public sealed record UpdateProductTypeRequest(
-    string Code,
-    string NameAr,
-    string? NameEn,
-    bool IsActive);
+public sealed record UpdateProductTypeRequest(string Code, string Name, bool IsActive);

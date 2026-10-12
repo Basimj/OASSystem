@@ -1,7 +1,6 @@
 using OAS.Domain.Common.Entities;
 using OAS.Domain.Sales.Enums;
 using OAS.Domain.Sales.Rules;
-using OAS.Domain.Sales.ValueObjects;
 
 namespace OAS.Domain.Sales.Entities;
 
@@ -62,7 +61,4 @@ public sealed class SalesInvoiceLinePrescriptionSnapshot : AuditableEntity<Guid>
         decimal? prism = null, PrismBaseDirection? prismBase = null, decimal? pd = null,
         decimal? monocularPd = null, string? va = null, decimal? fittingHeight = null) =>
         new(id, salesInvoiceLineId, prescriptionRevisionId, eye, sph, cyl, axis, add, prism, prismBase, pd, monocularPd, va, fittingHeight);
-
-    public void ValidateAgainst(OpticalPrescriptionRangePolicy policy) =>
-        PrescriptionOpticalRules.ValidateConfiguredRanges(SPH, CYL, ADD, policy);
 }

@@ -2,7 +2,6 @@ using OAS.Domain.Common.Entities;
 using OAS.Domain.Exceptions;
 using OAS.Domain.Sales.Enums;
 using OAS.Domain.Sales.Rules;
-using OAS.Domain.Sales.ValueObjects;
 
 namespace OAS.Domain.Sales.Entities;
 
@@ -203,9 +202,6 @@ public sealed class CustomerOrderLineOpticalSnapshot : AuditableEntity<Guid>
             throw new DomainException("Optical snapshot can only be deactivated while the customer order is draft.");
         IsActive = false;
     }
-
-    public void ValidateAgainst(OpticalPrescriptionRangePolicy policy) =>
-        PrescriptionOpticalRules.ValidateConfiguredRanges(SPH, CYL, ADD, policy);
 
     private void SetMeasurements(
         OpticalMeasurementSource measurementSource,

@@ -311,10 +311,10 @@
         [new UiSelectOption(string.Empty, "كل الأنواع"), .. InventoryArabicPresenter.TransactionTypeOptions];
 
     private IReadOnlyList<UiSelectOption> WarehouseFilterOptions =>
-        [new UiSelectOption(string.Empty, "كل المخازن"), .. _warehouses.Select(x => new UiSelectOption(x.Id.ToString("D"), x.NameAr))];
+        [new UiSelectOption(string.Empty, "كل المخازن"), .. _warehouses.Select(x => new UiSelectOption(x.Id.ToString("D"), x.Name))];
 
     private IReadOnlyList<UiSelectOption> WarehouseOptions =>
-        [new UiSelectOption(string.Empty, "اختر المخزن"), .. _warehouses.Where(x => x.IsActive).Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.NameAr}"))];
+        [new UiSelectOption(string.Empty, "اختر المخزن"), .. _warehouses.Where(x => x.IsActive).Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.Name}"))];
 
     private IReadOnlyList<UiSelectOption> VariantOptions => _variants.Where(IsUsableVariant)
         .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{ProductName(x.ProductId)} - {x.SKU}{(string.IsNullOrWhiteSpace(x.VariantName) ? string.Empty : $" - {x.VariantName}")}"))
@@ -878,8 +878,8 @@
     private bool IsUsableVariant(ProductVariantDto variant) =>
         variant.IsActive && _products.Any(x => x.Id == variant.ProductId && x.IsActive && x.IsStockItem);
 
-    private string WarehouseName(Guid? id) => id.HasValue ? _warehouses.FirstOrDefault(x => x.Id == id.Value)?.NameAr ?? "—" : "—";
-    private string ProductName(Guid id) => _products.FirstOrDefault(x => x.Id == id)?.NameAr ?? "—";
+    private string WarehouseName(Guid? id) => id.HasValue ? _warehouses.FirstOrDefault(x => x.Id == id.Value)?.Name ?? "—" : "—";
+    private string ProductName(Guid id) => _products.FirstOrDefault(x => x.Id == id)?.Name ?? "—";
     private ProductVariantDto? Variant(Guid id) => _variants.FirstOrDefault(x => x.Id == id);
     private string VariantLabel(Guid id) { var v = Variant(id); return v is null ? "—" : $"{ProductName(v.ProductId)}{(string.IsNullOrWhiteSpace(v.VariantName) ? string.Empty : $" - {v.VariantName}")}"; }
     private string VariantSku(Guid id) => Variant(id)?.SKU ?? "—";

@@ -253,7 +253,7 @@ public sealed class CustomerOrderOperationsQueryService(
                 (x.Mobile != null && x.Mobile.Contains(term)) ||
                 lines.Any(l => l.CustomerOrderId == x.CustomerOrderId && l.IsActive && l.ProductVariantId != null &&
                     variants.Any(v => v.Id == l.ProductVariantId &&
-                        (v.SKU.Contains(term) || products.Any(p => p.Id == v.ProductId && p.NameAr.Contains(term))))));
+                        (v.SKU.Contains(term) || products.Any(p => p.Id == v.ProductId && p.Name.Contains(term))))));
         }
 
         return query;
@@ -320,7 +320,7 @@ public sealed class CustomerOrderOperationsQueryService(
                 {
                     if (line.ProductVariantId.HasValue && variants.TryGetValue(line.ProductVariantId.Value, out var variant) &&
                         products.TryGetValue(variant.ProductId, out var product))
-                        return product.NameAr;
+                        return product.Name;
 
                     return string.IsNullOrWhiteSpace(line.DescriptionSnapshot)
                         ? line.LineType.ToString()
@@ -375,11 +375,11 @@ public sealed class CustomerOrderOperationsQueryService(
                 (ContractLineType)(byte)line.LineType,
                 line.ProductVariantId,
                 variant?.SKU,
-                product?.NameAr ?? line.DescriptionSnapshot,
+                product?.Name ?? line.DescriptionSnapshot,
                 snapshot is not null ? (ContractEyeSide?)(byte)snapshot.Eye : line.PrescriptionEye.HasValue ? (ContractEyeSide?)(byte)line.PrescriptionEye.Value : null,
                 line.Quantity,
                 line.WarehouseId,
-                line.WarehouseId.HasValue ? warehouses.GetValueOrDefault(line.WarehouseId.Value)?.NameAr : null,
+                line.WarehouseId.HasValue ? warehouses.GetValueOrDefault(line.WarehouseId.Value)?.Name : null,
                 availability,
                 activeReserved,
                 shortage,

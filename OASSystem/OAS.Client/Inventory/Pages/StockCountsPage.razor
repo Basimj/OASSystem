@@ -247,10 +247,10 @@
     private string? AsideSubtitle => _selectedCount?.CountNumber ?? (_mode == ViewMode.Create ? "سيتم توليد الرقم تلقائيًا" : null);
 
     private IReadOnlyList<UiSelectOption> WarehouseFilterOptions =>
-        [new UiSelectOption(string.Empty, "كل المخازن"), .. _warehouses.Select(x => new UiSelectOption(x.Id.ToString("D"), x.IsActive ? x.NameAr : $"{x.NameAr} (غير نشط)"))];
+        [new UiSelectOption(string.Empty, "كل المخازن"), .. _warehouses.Select(x => new UiSelectOption(x.Id.ToString("D"), x.IsActive ? x.Name : $"{x.Name} (غير نشط)"))];
 
     private IReadOnlyList<UiSelectOption> WarehouseOptions =>
-        [new UiSelectOption(string.Empty, "اختر المخزن"), .. _warehouses.Where(x => x.IsActive).Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.NameAr}"))];
+        [new UiSelectOption(string.Empty, "اختر المخزن"), .. _warehouses.Where(x => x.IsActive).Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.Name}"))];
 
     private IReadOnlyList<StockCountDto> FilteredCounts => _counts.Where(x =>
     {
@@ -668,11 +668,11 @@
     private string WarehouseName(Guid id)
     {
         var warehouse = _warehouses.FirstOrDefault(x => x.Id == id);
-        return warehouse is null ? "—" : warehouse.IsActive ? warehouse.NameAr : $"{warehouse.NameAr} (غير نشط)";
+        return warehouse is null ? "—" : warehouse.IsActive ? warehouse.Name : $"{warehouse.Name} (غير نشط)";
     }
 
     private ProductVariantDto? Variant(Guid id) => _variants.FirstOrDefault(x => x.Id == id);
-    private string ProductName(Guid id) => _products.FirstOrDefault(x => x.Id == id)?.NameAr ?? "—";
+    private string ProductName(Guid id) => _products.FirstOrDefault(x => x.Id == id)?.Name ?? "—";
     private string VariantLabel(Guid id)
     {
         var variant = Variant(id);

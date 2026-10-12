@@ -17,8 +17,7 @@ public sealed class ProductSpecificationFactory : ICrudSpecificationFactory<Prod
             var search = normalized.Search.Trim();
             specification.Where(x =>
                 x.ProductCode.Contains(search) ||
-                x.NameAr.Contains(search) ||
-                (x.NameEn != null && x.NameEn.Contains(search)) ||
+                x.Name.Contains(search) ||
                 (x.Description != null && x.Description.Contains(search)));
         }
 
@@ -41,10 +40,8 @@ public sealed class ProductSpecificationFactory : ICrudSpecificationFactory<Prod
         {
             "productcode" => nameof(Product.ProductCode),
             "code" => nameof(Product.ProductCode),
-            "name" => nameof(Product.NameAr),
-            "namear" => nameof(Product.NameAr),
-            "nameen" => nameof(Product.NameEn),
-            "producttypeid" => nameof(Product.ProductTypeId),
+            "name" => nameof(Product.Name),
+            "namear" => nameof(Product.Name),
             "isstockitem" => nameof(Product.IsStockItem),
             "isactive" => nameof(Product.IsActive),
             _ => nameof(Product.ProductCode)

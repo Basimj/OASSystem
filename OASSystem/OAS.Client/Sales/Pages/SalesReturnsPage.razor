@@ -185,7 +185,7 @@
 
     private IReadOnlyList<UiSelectOption> WarehouseOptions => _returnWarehouses
         .Where(x => x.IsActive)
-        .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.NameAr}"))
+        .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.Name}"))
         .ToArray();
 
     protected override async Task OnInitializedAsync() => await RefreshAsync();

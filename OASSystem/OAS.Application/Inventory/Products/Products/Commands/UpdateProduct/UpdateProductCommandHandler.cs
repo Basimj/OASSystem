@@ -35,8 +35,8 @@ public sealed class UpdateProductCommandHandler(
             Ensure(brand.IsActive, "product_brand_inactive", "Selected brand is inactive.");
         }
 
-        var productType = await productTypeRepository.GetByIdAsync(request.ProductTypeId, cancellationToken)
-            ?? throw new NotFoundException(nameof(ProductType), request.ProductTypeId);
+        var productType = await productTypeRepository.GetByIdAsync(category.ProductTypeId, cancellationToken)
+            ?? throw new NotFoundException(nameof(ProductType), category.ProductTypeId);
         Ensure(productType.IsActive, "product_type_inactive", "Selected product type is inactive.");
 
         var isService = string.Equals(productType.SystemKey, ProductTypeSystemKeys.Service, StringComparison.OrdinalIgnoreCase);
@@ -76,11 +76,9 @@ public sealed class UpdateProductCommandHandler(
 
         product.UpdateDetails(
             request.ProductCode.Trim(),
-            request.NameAr.Trim(),
-            NullIfBlank(request.NameEn),
+            request.Name.Trim(),
             request.CategoryId,
             request.BrandId,
-            request.ProductTypeId,
             NullIfBlank(request.Description),
             request.IsStockItem,
             request.IsActive);

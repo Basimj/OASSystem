@@ -1,6 +1,2 @@
 namespace OAS.Contracts.Inventory.Products;
-
-public sealed record CreateProductTypeRequest(
-    string Code,
-    string NameAr,
-    string? NameEn);
+public sealed record CreateProductTypeRequest(string Code, string Name);

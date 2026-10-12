@@ -1,5 +1,4 @@
 using OAS.Domain.Sales.Enums;
-using OAS.Domain.Sales.ValueObjects;
 
 namespace OAS.Application.Sales.Abstractions;
 
@@ -12,7 +11,6 @@ public sealed record SalesLineResolution(
     string? UnitName,
     decimal BaseUnitPrice,
     bool PrescriptionRequired,
-    OpticalPrescriptionRangePolicy? OpticalPolicy,
     bool IsStockItem = false);
 
 public interface ISalesLineResolver

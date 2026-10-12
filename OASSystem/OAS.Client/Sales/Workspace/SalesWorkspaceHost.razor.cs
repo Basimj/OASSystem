@@ -62,8 +62,6 @@ public partial class SalesWorkspaceHost : IDisposable
     private bool _isSavingRevision;
     private bool _isPrintingInvoice;
     private SalesEntityType? _lastSection;
-    private SalesOpticalRangeLookupDto? _prescriptionOpticalRanges;
-    private bool _isLoadingPrescriptionOpticalRanges;
 
     private SalesWorkspaceTabState? ActiveTab => Workspace.ActiveTab;
     private UiPrescriptionRevisionModel? ActiveRevisionDraft =>
@@ -89,37 +87,10 @@ public partial class SalesWorkspaceHost : IDisposable
             Workspace.OpenOrActivateListTab(Section);
         _pageNumber = 1;
         _search = null;
-        if (Section == SalesEntityType.Prescriptions)
-            await EnsurePrescriptionOpticalRangesLoadedAsync();
         await LoadListAsync(Section);
     }
 
-    private void WorkspaceChanged() => _ = InvokeAsync(async () =>
-    {
-        if (Workspace.ActiveTab?.EntityType == SalesEntityType.Prescriptions)
-            await EnsurePrescriptionOpticalRangesLoadedAsync();
-        StateHasChanged();
-    });
-
-    private async Task EnsurePrescriptionOpticalRangesLoadedAsync()
-    {
-        if (_prescriptionOpticalRanges is not null || _isLoadingPrescriptionOpticalRanges)
-            return;
-
-        _isLoadingPrescriptionOpticalRanges = true;
-        try
-        {
-            _prescriptionOpticalRanges = await Sales.GetPrescriptionOpticalRangesAsync();
-        }
-        catch (ApiClientException ex)
-        {
-            ApiFeedback.Show(ex.Error);
-        }
-        finally
-        {
-            _isLoadingPrescriptionOpticalRanges = false;
-        }
-    }
+    private void WorkspaceChanged() => _ = InvokeAsync(StateHasChanged);
 
     private async Task LoadListAsync(SalesEntityType type)
     {
@@ -167,8 +138,7 @@ public partial class SalesWorkspaceHost : IDisposable
             switch (type)
             {
                 case SalesEntityType.Prescriptions:
-                    await EnsurePrescriptionOpticalRangesLoadedAsync();
-                    var rxCall = await Sales.ReservePrescriptionCodeResultAsync();
+                            var rxCall = await Sales.ReservePrescriptionCodeResultAsync();
                     if (!TryGetApiResult(rxCall, out var rx) || rx is null) { Workspace.RemoveTab(tab.TabId); return; }
                     tab.Model = new UiPrescriptionFormModel
                     {
@@ -210,8 +180,7 @@ public partial class SalesWorkspaceHost : IDisposable
             switch (type)
             {
                 case SalesEntityType.Prescriptions:
-                    await EnsurePrescriptionOpticalRangesLoadedAsync();
-                    var prescription = await Sales.GetPrescriptionByIdAsync(id); if (prescription is null) return;
+                            var prescription = await Sales.GetPrescriptionByIdAsync(id); if (prescription is null) return;
                     var rxTab = Workspace.OpenOrActivateEntityTab(type, id, prescription.PrescriptionCode); rxTab.CompleteSave(prescription.Id, prescription.PrescriptionCode, SalesUiMapper.ToUi(prescription));
                     break;
                 case SalesEntityType.CustomerOrders:
@@ -393,14 +362,6 @@ public partial class SalesWorkspaceHost : IDisposable
                 "Manual",
                 StringComparison.OrdinalIgnoreCase);
 
-            if (usesManualMeasurements)
-            {
-                if (!ValidateOpticalRange(item, "SPH", line.SPH, line.LensSphereMin, line.LensSphereMax) ||
-                    !ValidateOpticalRange(item, "CYL", line.CYL, line.LensCylinderMin, line.LensCylinderMax) ||
-                    !ValidateOpticalRange(item, "ADD", line.ADD, line.LensAddMin, line.LensAddMax))
-                    return false;
-            }
-
             if (!usesManualMeasurements)
             {
                 var hasRevision = Guid.TryParse(line.PrescriptionRevisionId, out var lineRevisionId) && lineRevisionId != Guid.Empty
@@ -415,23 +376,6 @@ public partial class SalesWorkspaceHost : IDisposable
         }
 
         return true;
-    }
-
-    private bool ValidateOpticalRange(
-        string item,
-        string field,
-        decimal? value,
-        decimal? minimum,
-        decimal? maximum)
-    {
-        if (!value.HasValue || !minimum.HasValue || !maximum.HasValue)
-            return true;
-
-        if (value.Value >= minimum.Value && value.Value <= maximum.Value)
-            return true;
-
-        Snackbar.Error($"{field} في {item}: أدخل قيمة بين {minimum.Value:0.##} و {maximum.Value:0.##}.");
-        return false;
     }
 
     private bool RequireGuid(string value, string message)
@@ -1099,7 +1043,7 @@ public partial class SalesWorkspaceHost : IDisposable
 
         return rows.Select(x => new UiLookupItem(
             x.Id.ToString(),
-            $"{x.Code} - {x.NameAr}",
+            $"{x.Code} - {x.Name}",
             ProductTypeHint(x),
             ProductTypeIcon(x.SalesLineType),
             !x.IsActive)).ToArray();
@@ -1117,7 +1061,7 @@ public partial class SalesWorkspaceHost : IDisposable
 
         return rows.Select(x => new UiLookupItem(
             x.Id.ToString(),
-            $"{x.Code} - {x.NameAr}",
+            $"{x.Code} - {x.Name}",
             null,
             "fa-solid fa-layer-group",
             !x.IsActive)).ToArray();
@@ -1211,7 +1155,7 @@ public partial class SalesWorkspaceHost : IDisposable
 
         return rows.Select(x => new UiLookupItem(
             x.Id.ToString(),
-            $"{x.ProductCode} - {x.ProductNameAr}",
+            $"{x.ProductCode} - {x.ProductName}",
             BuildProductLookupHint(x),
             ProductTypeIcon(x.SalesLineType),
             !x.IsActive)).ToArray();
@@ -1220,7 +1164,7 @@ public partial class SalesWorkspaceHost : IDisposable
     {
         Guid? variant = Guid.TryParse(line.ProductVariantId, out var id) ? id : null;
         var rows = await Sales.SearchWarehousesAsync(variant, q, 20, ct); foreach (var x in rows) _warehouses[x.Id] = x;
-        return rows.Select(x => new UiLookupItem(x.Id.ToString(), $"{x.Code} - {x.NameAr}", x.AvailableQuantity.HasValue ? $"المتاح: {x.AvailableQuantity:N2}" : null, "fa-solid fa-warehouse", !x.IsActive)).ToArray();
+        return rows.Select(x => new UiLookupItem(x.Id.ToString(), $"{x.Code} - {x.Name}", x.AvailableQuantity.HasValue ? $"المتاح: {x.AvailableQuantity:N2}" : null, "fa-solid fa-warehouse", !x.IsActive)).ToArray();
     }
     private Task PrescriptionCustomerChangedAsync(string? value)
     {
@@ -1384,7 +1328,7 @@ public partial class SalesWorkspaceHost : IDisposable
     {
         if (Guid.TryParse(change.Value, out var id) && _productTypes.TryGetValue(id, out var productType))
         {
-            change.Line.ProductTypeDisplay = $"{productType.Code} - {productType.NameAr}";
+            change.Line.ProductTypeDisplay = $"{productType.Code} - {productType.Name}";
             change.Line.ProductTypeSystemKey = productType.SystemKey;
             change.Line.LineType = productType.SalesLineType.ToString();
         }
@@ -1401,7 +1345,7 @@ public partial class SalesWorkspaceHost : IDisposable
     private Task CategorySelectedAsync(UiSalesLineSelectionChange change)
     {
         if (Guid.TryParse(change.Value, out var id) && _categories.TryGetValue(id, out var category))
-            change.Line.ProductCategoryDisplay = $"{category.Code} - {category.NameAr}";
+            change.Line.ProductCategoryDisplay = $"{category.Code} - {category.Name}";
         else
             change.Line.ProductCategoryDisplay = null;
 
@@ -1413,7 +1357,7 @@ public partial class SalesWorkspaceHost : IDisposable
         if (Guid.TryParse(change.Value, out var id) && _products.TryGetValue(id, out var product))
         {
             change.Line.ProductTypeId = product.ProductTypeId.ToString();
-            change.Line.ProductTypeDisplay = $"{product.ProductTypeCode} - {product.ProductTypeNameAr}";
+            change.Line.ProductTypeDisplay = $"{product.ProductTypeCode} - {product.ProductTypeName}";
             change.Line.ProductTypeSystemKey = product.ProductTypeSystemKey;
             change.Line.LineType = product.SalesLineType.ToString();
             change.Line.ProductIsStockItem = product.IsStockItem;
@@ -1421,11 +1365,11 @@ public partial class SalesWorkspaceHost : IDisposable
 
             change.Line.ProductCategoryId = product.CategoryId.ToString();
             if (_categories.TryGetValue(product.CategoryId, out var category))
-                change.Line.ProductCategoryDisplay = $"{category.Code} - {category.NameAr}";
+                change.Line.ProductCategoryDisplay = $"{category.Code} - {category.Name}";
 
             change.Line.ProductDisplay = string.IsNullOrWhiteSpace(product.VariantName)
-                ? product.ProductNameAr
-                : $"{product.ProductNameAr} - {product.VariantName}";
+                ? product.ProductName
+                : $"{product.ProductName} - {product.VariantName}";
 
             change.Line.ProductCodeSnapshot = product.ProductCode;
             change.Line.ProductNameSnapshot = change.Line.ProductDisplay;
@@ -1443,12 +1387,9 @@ public partial class SalesWorkspaceHost : IDisposable
             change.Line.LensMaterialSnapshot = product.LensMaterial;
             change.Line.LensCoatingSnapshot = product.LensCoating;
             change.Line.LensRefractiveIndexSnapshot = product.LensRefractiveIndex;
-            change.Line.LensSphereMin = product.SphereMin;
-            change.Line.LensSphereMax = product.SphereMax;
-            change.Line.LensCylinderMin = product.CylinderMin;
-            change.Line.LensCylinderMax = product.CylinderMax;
-            change.Line.LensAddMin = product.AddMin;
-            change.Line.LensAddMax = product.AddMax;
+            change.Line.LensSPH = product.SPH;
+            change.Line.LensCYL = product.CYL;
+            change.Line.LensADD = product.ADD;
 
             if (change.Line.LineType == SalesLineType.Lens.ToString())
             {
@@ -1490,12 +1431,9 @@ public partial class SalesWorkspaceHost : IDisposable
                 change.Line.LensMaterialSnapshot = null;
                 change.Line.LensCoatingSnapshot = null;
                 change.Line.LensRefractiveIndexSnapshot = null;
-                change.Line.LensSphereMin = null;
-                change.Line.LensSphereMax = null;
-                change.Line.LensCylinderMin = null;
-                change.Line.LensCylinderMax = null;
-                change.Line.LensAddMin = null;
-                change.Line.LensAddMax = null;
+                change.Line.LensSPH = null;
+                change.Line.LensCYL = null;
+                change.Line.LensADD = null;
                 if (change.Line.LineType == SalesLineType.Frame.ToString() && change.Line.GroupId.HasValue)
                     change.Line.RequiresProduction = true;
             }
@@ -1509,12 +1447,9 @@ public partial class SalesWorkspaceHost : IDisposable
             change.Line.ProductIsStockItem = null;
             change.Line.ProductIsPrescriptionLens = null;
             change.Line.PrescriptionRequired = false;
-            change.Line.LensSphereMin = null;
-            change.Line.LensSphereMax = null;
-            change.Line.LensCylinderMin = null;
-            change.Line.LensCylinderMax = null;
-            change.Line.LensAddMin = null;
-            change.Line.LensAddMax = null;
+            change.Line.LensSPH = null;
+            change.Line.LensCYL = null;
+            change.Line.LensADD = null;
         }
 
         return Task.CompletedTask;
@@ -1531,12 +1466,9 @@ public partial class SalesWorkspaceHost : IDisposable
 
         if (product.IsPrescriptionLens)
         {
-            if (product.SphereMin.HasValue && product.SphereMax.HasValue)
-                parts.Add($"SPH من {product.SphereMin.Value:0.##} إلى {product.SphereMax.Value:0.##}");
-            if (product.CylinderMin.HasValue && product.CylinderMax.HasValue)
-                parts.Add($"CYL من {product.CylinderMin.Value:0.##} إلى {product.CylinderMax.Value:0.##}");
-            if (product.AddMin.HasValue && product.AddMax.HasValue)
-                parts.Add($"ADD من {product.AddMin.Value:0.##} إلى {product.AddMax.Value:0.##}");
+            if (product.SPH.HasValue) parts.Add($"SPH {product.SPH.Value:+0.##;-0.##;0}");
+            if (product.CYL.HasValue) parts.Add($"CYL {product.CYL.Value:+0.##;-0.##;0}");
+            if (product.ADD.HasValue) parts.Add($"ADD {product.ADD.Value:+0.##;-0.##;0}");
         }
 
         return string.Join(" • ", parts);
@@ -1616,7 +1548,7 @@ public partial class SalesWorkspaceHost : IDisposable
         }
     }
 
-    private Task WarehouseSelectedAsync(UiSalesLineSelectionChange change) { if (Guid.TryParse(change.Value, out var id) && _warehouses.TryGetValue(id, out var w)) change.Line.WarehouseDisplay = $"{w.Code} - {w.NameAr}"; return Task.CompletedTask; }
+    private Task WarehouseSelectedAsync(UiSalesLineSelectionChange change) { if (Guid.TryParse(change.Value, out var id) && _warehouses.TryGetValue(id, out var w)) change.Line.WarehouseDisplay = $"{w.Code} - {w.Name}"; return Task.CompletedTask; }
 
     private async Task RequestPriceOverrideAsync(UiSalesLineModel line)
     {

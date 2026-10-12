@@ -334,7 +334,7 @@ public partial class CustomerDemandTrackingPage : ComponentBase
     {
         var page = await Inventory.GetWarehousesAsync(new PageRequest { PageNumber = 1, PageSize = 30, Search = string.IsNullOrWhiteSpace(search) ? null : search, SortBy = "Code" }, ct);
         return page.Items.Where(x => x.IsActive)
-            .Select(x => new UiLookupItem(x.Id.ToString("D"), $"{x.Code} - {x.NameAr}", null, "fa-solid fa-warehouse"))
+            .Select(x => new UiLookupItem(x.Id.ToString("D"), $"{x.Code} - {x.Name}", null, "fa-solid fa-warehouse"))
             .ToArray();
     }
 

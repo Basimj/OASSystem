@@ -154,15 +154,13 @@ public sealed partial class InventorySpreadsheetService(
     private async Task<IReadOnlyList<SpreadsheetTable>> ExportCategoriesAsync(PageRequest request, CancellationToken ct)
     {
         var categories = await CategoriesAsync(request, ct);
-        var all = await CategoriesAsync(new PageRequest(), ct);
-        var lookup = all.ToDictionary(x => x.Id, x => $"{x.Code} - {x.NameAr}");
+        var productTypes = (await ProductTypesAsync(new PageRequest(), ct)).ToDictionary(x => x.Id, x => $"{x.Code} - {x.Name}");
         return [Table("التصنيفات",
-            [Text("الكود"), Text("الاسم العربي"), Text("الاسم الإنجليزي"), Text("التصنيف الأب"), Text("الحالة")],
+            [Text("الكود"), Text("الاسم"), Text("نوع المنتج"), Text("الحالة")],
             categories.Select(x => Row(
                 ("الكود", x.Code),
-                ("الاسم العربي", x.NameAr),
-                ("الاسم الإنجليزي", x.NameEn),
-                ("التصنيف الأب", x.ParentCategoryId is Guid id ? lookup.GetValueOrDefault(id) : null),
+                ("الاسم", x.Name),
+                ("نوع المنتج", productTypes.GetValueOrDefault(x.ProductTypeId)),
                 ("الحالة", Active(x.IsActive)))))];
     }
 
@@ -178,11 +176,10 @@ public sealed partial class InventorySpreadsheetService(
     {
         var items = await ProductTypesAsync(request, ct);
         return [Table("أنواع المنتجات",
-            [Text("الكود"), Text("الاسم العربي"), Text("الاسم الإنجليزي"), Text("الحالة")],
+            [Text("الكود"), Text("الاسم"), Text("الحالة")],
             items.Select(x => Row(
                 ("الكود", x.Code),
-                ("الاسم العربي", x.NameAr),
-                ("الاسم الإنجليزي", x.NameEn),
+                ("الاسم", x.Name),
                 ("الحالة", Active(x.IsActive)))))];
     }
 
@@ -190,42 +187,37 @@ public sealed partial class InventorySpreadsheetService(
     {
         var items = await UnitsAsync(request, ct);
         return [Table("الوحدات",
-            [Text("الكود"), Text("الاسم العربي"), Text("الاسم الإنجليزي"), Text("الحالة")],
-            items.Select(x => Row(("الكود", x.Code), ("الاسم العربي", x.NameAr), ("الاسم الإنجليزي", x.NameEn), ("الحالة", Active(x.IsActive)))))];
+            [Text("الكود"), Text("الاسم"), Text("الحالة")],
+            items.Select(x => Row(("الكود", x.Code), ("الاسم", x.Name), ("الحالة", Active(x.IsActive)))))];
     }
 
     private async Task<IReadOnlyList<SpreadsheetTable>> ExportProductsAsync(PageRequest request, CancellationToken ct)
     {
         var items = await ProductsAsync(request, ct);
-        var categories = (await CategoriesAsync(new PageRequest(), ct)).ToDictionary(x => x.Id, x => $"{x.Code} - {x.NameAr}");
+        var categoryRows = await CategoriesAsync(new PageRequest(), ct);
+        var categories = categoryRows.ToDictionary(x => x.Id, x => $"{x.Code} - {x.Name}");
+        var categoryTypeIds = categoryRows.ToDictionary(x => x.Id, x => x.ProductTypeId);
         var brands = (await BrandsAsync(new PageRequest(), ct)).ToDictionary(x => x.Id, x => $"{x.Code} - {x.Name}");
-        var productTypes = (await ProductTypesAsync(new PageRequest(), ct)).ToDictionary(x => x.Id, x => $"{x.Code} - {x.NameAr}");
+        var productTypes = (await ProductTypesAsync(new PageRequest(), ct)).ToDictionary(x => x.Id, x => $"{x.Code} - {x.Name}");
         var canViewFrameDetails = await permissions.HasPermissionAsync(InventoryPermissions.FrameDetails.View, ct);
-        var canViewLensDetails = await permissions.HasPermissionAsync(InventoryPermissions.LensDetails.View, ct);
         var frameDetails = canViewFrameDetails
             ? (await FrameDetailsAsync(new PageRequest(), ct)).ToDictionary(x => x.ProductId)
             : new Dictionary<Guid, FrameDetailsDto>();
-        var lensDetails = canViewLensDetails
-            ? (await LensDetailsAsync(new PageRequest(), ct)).ToDictionary(x => x.ProductId)
-            : new Dictionary<Guid, LensDetailsDto>();
 
         return [Table("المنتجات",
             [
-                Text("كود المنتج"), Text("الاسم العربي"), Text("الاسم الإنجليزي"), Text("التصنيف"), Text("الماركة"), Text("نوع المنتج"), Text("الوصف"), Text("صنف مخزني"), Text("الحالة"),
-                Text("موديل الإطار"), Text("خامة الإطار"), Text("نوع الإطار / Rim"), Text("جنس الإطار"), Text("شكل الإطار"), Number("طول ذراع الإطار"), Number("مقاس جسر الإطار"), Number("عرض عدسة الإطار"),
-                Text("نوع العدسة"), Text("خامة العدسة"), Text("طلاء العدسة"), Number("معامل الانكسار"), Number("Sphere Min"), Number("Sphere Max"), Number("Cylinder Min"), Number("Cylinder Max"), Number("Add Min"), Number("Add Max"), Text("عدسة طبية")
+                Text("كود المنتج"), Text("الاسم"), Text("التصنيف"), Text("الماركة"), Text("نوع المنتج"), Text("الوصف"), Text("صنف مخزني"), Text("الحالة"),
+                Text("موديل الإطار"), Text("خامة الإطار"), Text("نوع الإطار / Rim"), Text("جنس الإطار"), Text("شكل الإطار"), Number("طول ذراع الإطار"), Number("مقاس جسر الإطار"), Number("عرض عدسة الإطار")
             ],
             items.Select(x =>
             {
                 frameDetails.TryGetValue(x.Id, out var frame);
-                lensDetails.TryGetValue(x.Id, out var lens);
                 return Row(
                     ("كود المنتج", x.ProductCode),
-                    ("الاسم العربي", x.NameAr),
-                    ("الاسم الإنجليزي", x.NameEn),
+                    ("الاسم", x.Name),
                     ("التصنيف", categories.GetValueOrDefault(x.CategoryId)),
                     ("الماركة", x.BrandId is Guid brandId ? brands.GetValueOrDefault(brandId) : null),
-                    ("نوع المنتج", productTypes.GetValueOrDefault(x.ProductTypeId)),
+                    ("نوع المنتج", categoryTypeIds.TryGetValue(x.CategoryId, out var typeId) ? productTypes.GetValueOrDefault(typeId) : null),
                     ("الوصف", x.Description),
                     ("صنف مخزني", YesNo(x.IsStockItem)),
                     ("الحالة", Active(x.IsActive)),
@@ -236,48 +228,57 @@ public sealed partial class InventorySpreadsheetService(
                     ("شكل الإطار", frame?.Shape),
                     ("طول ذراع الإطار", frame?.TempleLength is decimal temple ? F(temple) : null),
                     ("مقاس جسر الإطار", frame?.BridgeSize is decimal bridge ? F(bridge) : null),
-                    ("عرض عدسة الإطار", frame?.LensWidth is decimal width ? F(width) : null),
-                    ("نوع العدسة", lens?.LensType),
-                    ("خامة العدسة", lens?.Material),
-                    ("طلاء العدسة", lens?.Coating),
-                    ("معامل الانكسار", lens?.RefractiveIndex is decimal refractive ? F(refractive) : null),
-                    ("Sphere Min", lens?.SphereMin is decimal sphereMin ? F(sphereMin) : null),
-                    ("Sphere Max", lens?.SphereMax is decimal sphereMax ? F(sphereMax) : null),
-                    ("Cylinder Min", lens?.CylinderMin is decimal cylinderMin ? F(cylinderMin) : null),
-                    ("Cylinder Max", lens?.CylinderMax is decimal cylinderMax ? F(cylinderMax) : null),
-                    ("Add Min", lens?.AddMin is decimal addMin ? F(addMin) : null),
-                    ("Add Max", lens?.AddMax is decimal addMax ? F(addMax) : null),
-                    ("عدسة طبية", lens is null ? null : YesNo(lens.IsPrescriptionLens)));
+                    ("عرض عدسة الإطار", frame?.LensWidth is decimal width ? F(width) : null));
             }))];
     }
 
     private async Task<IReadOnlyList<SpreadsheetTable>> ExportVariantsAsync(PageRequest request, CancellationToken ct)
     {
         var items = await VariantsAsync(request, ct);
-        var products = (await ProductsAsync(new PageRequest(), ct)).ToDictionary(x => x.Id, x => $"{x.ProductCode} - {x.NameAr}");
-        var units = (await UnitsAsync(new PageRequest(), ct)).ToDictionary(x => x.Id, x => $"{x.Code} - {x.NameAr}");
+        var products = (await ProductsAsync(new PageRequest(), ct)).ToDictionary(x => x.Id, x => $"{x.ProductCode} - {x.Name}");
+        var units = (await UnitsAsync(new PageRequest(), ct)).ToDictionary(x => x.Id, x => $"{x.Code} - {x.Name}");
+        var canViewLensDetails = await permissions.HasPermissionAsync(InventoryPermissions.LensDetails.View, ct);
+        var lensDetails = canViewLensDetails
+            ? (await LensDetailsAsync(new PageRequest(), ct)).ToDictionary(x => x.ProductVariantId)
+            : new Dictionary<Guid, LensDetailsDto>();
+
         return [Table("متغيرات المنتجات",
-            [Text("رمز SKU"), Text("الباركود"), Text("المنتج"), Text("اسم المتغير"), Text("اللون"), Text("المقاس"), Text("الوحدة"), Number("سعر الشراء"), Number("سعر البيع"), Text("الحالة")],
-            items.Select(x => Row(
-                ("رمز SKU", x.SKU),
-                ("الباركود", x.Barcode),
-                ("المنتج", products.GetValueOrDefault(x.ProductId)),
-                ("اسم المتغير", x.VariantName),
-                ("اللون", x.Color),
-                ("المقاس", x.Size),
-                ("الوحدة", x.UnitId is Guid unitId ? units.GetValueOrDefault(unitId) : null),
-                ("سعر الشراء", F(x.PurchasePrice)),
-                ("سعر البيع", F(x.SellingPrice)),
-                ("الحالة", Active(x.IsActive)))))];
+            [Text("رمز SKU"), Text("الباركود"), Text("المنتج"), Text("اسم المتغير"), Text("اللون"), Text("المقاس"), Text("الوحدة"), Number("سعر الشراء"), Number("سعر البيع"),
+             Text("نوع العدسة"), Text("خامة العدسة"), Text("طلاء العدسة"), Number("معامل الانكسار"), Number("SPH"), Number("CYL"), Number("ADD"), Number("Base Curve"), Number("Diameter"), Text("عدسة طبية"), Text("الحالة")],
+            items.Select(x =>
+            {
+                lensDetails.TryGetValue(x.Id, out var lens);
+                return Row(
+                    ("رمز SKU", x.SKU),
+                    ("الباركود", x.Barcode),
+                    ("المنتج", products.GetValueOrDefault(x.ProductId)),
+                    ("اسم المتغير", x.VariantName),
+                    ("اللون", x.Color),
+                    ("المقاس", x.Size),
+                    ("الوحدة", x.UnitId is Guid unitId ? units.GetValueOrDefault(unitId) : null),
+                    ("سعر الشراء", F(x.PurchasePrice)),
+                    ("سعر البيع", F(x.SellingPrice)),
+                    ("نوع العدسة", lens?.LensType),
+                    ("خامة العدسة", lens?.Material),
+                    ("طلاء العدسة", lens?.Coating),
+                    ("معامل الانكسار", lens?.RefractiveIndex is decimal ri ? F(ri) : null),
+                    ("SPH", lens?.SPH is decimal sph ? F(sph) : null),
+                    ("CYL", lens?.CYL is decimal cyl ? F(cyl) : null),
+                    ("ADD", lens?.ADD is decimal add ? F(add) : null),
+                    ("Base Curve", lens?.BaseCurve is decimal bc ? F(bc) : null),
+                    ("Diameter", lens?.Diameter is decimal dia ? F(dia) : null),
+                    ("عدسة طبية", lens is null ? null : YesNo(lens.IsPrescriptionLens)),
+                    ("الحالة", Active(x.IsActive)));
+            }))];
     }
 
     private async Task<IReadOnlyList<SpreadsheetTable>> ExportWarehousesAsync(PageRequest request, CancellationToken ct)
     {
         var items = await WarehousesAsync(request, ct);
         return [Table("المخازن",
-            [Text("الكود"), Text("الاسم العربي"), Text("الاسم الإنجليزي"), Text("الوصف"), Text("المخزن الافتراضي"), Text("الحالة")],
+            [Text("الكود"), Text("الاسم"), Text("الوصف"), Text("المخزن الافتراضي"), Text("الحالة")],
             items.Select(x => Row(
-                ("الكود", x.Code), ("الاسم العربي", x.NameAr), ("الاسم الإنجليزي", x.NameEn), ("الوصف", x.Description),
+                ("الكود", x.Code), ("الاسم", x.Name), ("الوصف", x.Description),
                 ("المخزن الافتراضي", YesNo(x.IsDefault)), ("الحالة", Active(x.IsActive)))))];
     }
 
@@ -315,7 +316,7 @@ public sealed partial class InventorySpreadsheetService(
                 variantMap.TryGetValue(x.ProductVariantId, out var variant);
                 ProductDto? product = variant is null ? null : productMap.GetValueOrDefault(variant.ProductId);
                 var warehouse = warehouseMap.GetValueOrDefault(x.WarehouseId);
-                return Match(term, variant?.SKU, variant?.Barcode, variant?.VariantName, product?.ProductCode, product?.NameAr, product?.NameEn, warehouse?.NameAr);
+                return Match(term, variant?.SKU, variant?.Barcode, variant?.VariantName, product?.ProductCode, product?.Name, warehouse?.Name);
             }).ToArray();
         }
 
@@ -326,11 +327,11 @@ public sealed partial class InventorySpreadsheetService(
                 variantMap.TryGetValue(x.ProductVariantId, out var variant);
                 var product = variant is null ? null : productMap.GetValueOrDefault(variant.ProductId);
                 return Row(
-                    ("المنتج", product is null ? null : $"{product.ProductCode} - {product.NameAr}"),
+                    ("المنتج", product is null ? null : $"{product.ProductCode} - {product.Name}"),
                     ("متغير المنتج", variant?.VariantName),
                     ("رمز SKU", variant?.SKU),
                     ("الباركود", variant?.Barcode),
-                    ("المخزن", warehouseMap.GetValueOrDefault(x.WarehouseId)?.NameAr),
+                    ("المخزن", warehouseMap.GetValueOrDefault(x.WarehouseId)?.Name),
                     ("المتوفر فعليًا", F(x.OnHandQuantity)),
                     ("المحجوز", F(x.ReservedQuantity)),
                     ("المتاح", F(x.AvailableQuantity)),
@@ -359,8 +360,8 @@ public sealed partial class InventorySpreadsheetService(
             var term = request.Search.Trim();
             items = items.Where(x => Match(term,
                 x.TransactionNumber, x.ReferenceType, x.Reason, x.Notes,
-                x.SourceWarehouseId is Guid source ? warehouses.GetValueOrDefault(source)?.NameAr : null,
-                x.DestinationWarehouseId is Guid destination ? warehouses.GetValueOrDefault(destination)?.NameAr : null)).ToArray();
+                x.SourceWarehouseId is Guid source ? warehouses.GetValueOrDefault(source)?.Name : null,
+                x.DestinationWarehouseId is Guid destination ? warehouses.GetValueOrDefault(destination)?.Name : null)).ToArray();
         }
 
         var lineRows = new List<IReadOnlyDictionary<string, string>>();
@@ -373,7 +374,7 @@ public sealed partial class InventorySpreadsheetService(
                 var product = variant is null ? null : products.GetValueOrDefault(variant.ProductId);
                 lineRows.Add(Row(
                     ("رقم العملية", transaction.TransactionNumber),
-                    ("المنتج", product is null ? null : $"{product.ProductCode} - {product.NameAr}"),
+                    ("المنتج", product is null ? null : $"{product.ProductCode} - {product.Name}"),
                     ("متغير المنتج", variant?.VariantName),
                     ("رمز SKU", variant?.SKU),
                     ("الباركود", variant?.Barcode),
@@ -392,8 +393,8 @@ public sealed partial class InventorySpreadsheetService(
                     ("رقم العملية", x.TransactionNumber),
                     ("نوع العملية", TransactionTypeText(x.TransactionType)),
                     ("التاريخ", DateTimeText(x.TransactionDate)),
-                    ("من مخزن", x.SourceWarehouseId is Guid source ? warehouses.GetValueOrDefault(source)?.NameAr : null),
-                    ("إلى مخزن", x.DestinationWarehouseId is Guid destination ? warehouses.GetValueOrDefault(destination)?.NameAr : null),
+                    ("من مخزن", x.SourceWarehouseId is Guid source ? warehouses.GetValueOrDefault(source)?.Name : null),
+                    ("إلى مخزن", x.DestinationWarehouseId is Guid destination ? warehouses.GetValueOrDefault(destination)?.Name : null),
                     ("الحالة", TransactionStatusText(x.Status)),
                     ("نوع المرجع", x.ReferenceType),
                     ("معرف المرجع", x.ReferenceId?.ToString("D")),
@@ -433,7 +434,7 @@ public sealed partial class InventorySpreadsheetService(
                 var warehouse = warehouses.GetValueOrDefault(x.WarehouseId);
                 return Match(term,
                     transaction?.TransactionNumber, variant?.VariantName, variant?.SKU, variant?.Barcode,
-                    product?.ProductCode, product?.NameAr, warehouse?.NameAr,
+                    product?.ProductCode, product?.Name, warehouse?.Name,
                     transaction is null ? null : TransactionTypeText(transaction.TransactionType),
                     transaction?.ReferenceType, transaction?.Reason, transaction?.Notes);
             }).ToArray();
@@ -454,11 +455,11 @@ public sealed partial class InventorySpreadsheetService(
                     ("التاريخ", DateTimeText(x.MovementDate)),
                     ("رقم العملية", transaction?.TransactionNumber),
                     ("نوع الحركة", MovementTypeText(x.MovementType)),
-                    ("المنتج", product is null ? null : $"{product.ProductCode} - {product.NameAr}"),
+                    ("المنتج", product is null ? null : $"{product.ProductCode} - {product.Name}"),
                     ("متغير المنتج", variant?.VariantName),
                     ("رمز SKU", variant?.SKU),
                     ("الباركود", variant?.Barcode),
-                    ("المخزن", warehouses.GetValueOrDefault(x.WarehouseId)?.NameAr),
+                    ("المخزن", warehouses.GetValueOrDefault(x.WarehouseId)?.Name),
                     ("الكمية الداخلة", F(x.QuantityIn)),
                     ("الكمية الخارجة", F(x.QuantityOut)),
                     ("الرصيد بعد الحركة", F(x.BalanceAfter)),
@@ -484,7 +485,7 @@ public sealed partial class InventorySpreadsheetService(
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var term = request.Search.Trim();
-            items = items.Where(x => Match(term, x.CountNumber, x.Notes, warehouses.GetValueOrDefault(x.WarehouseId)?.NameAr)).ToArray();
+            items = items.Where(x => Match(term, x.CountNumber, x.Notes, warehouses.GetValueOrDefault(x.WarehouseId)?.Name)).ToArray();
         }
 
         var lineRows = new List<IReadOnlyDictionary<string, string>>();
@@ -497,7 +498,7 @@ public sealed partial class InventorySpreadsheetService(
                 var product = variant is null ? null : products.GetValueOrDefault(variant.ProductId);
                 lineRows.Add(Row(
                     ("رقم الجرد", count.CountNumber),
-                    ("المنتج", product is null ? null : $"{product.ProductCode} - {product.NameAr}"),
+                    ("المنتج", product is null ? null : $"{product.ProductCode} - {product.Name}"),
                     ("متغير المنتج", variant?.VariantName),
                     ("رمز SKU", variant?.SKU),
                     ("الباركود", variant?.Barcode),
@@ -518,7 +519,7 @@ public sealed partial class InventorySpreadsheetService(
                 [Text("رقم الجرد"), Text("المخزن"), Text("الحالة"), Text("تاريخ الجرد"), Text("بدء العد"), Text("إكمال العد"), Text("الاعتماد"), Text("اعتمد بواسطة"), Text("الترحيل"), Text("رحّل بواسطة"), Text("ملاحظات")],
                 items.Select(x => Row(
                     ("رقم الجرد", x.CountNumber),
-                    ("المخزن", warehouses.GetValueOrDefault(x.WarehouseId)?.NameAr),
+                    ("المخزن", warehouses.GetValueOrDefault(x.WarehouseId)?.Name),
                     ("الحالة", StockCountStatusText(x.Status)),
                     ("تاريخ الجرد", x.CountDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
                     ("بدء العد", DateTimeText(x.StartedAtUtc)),

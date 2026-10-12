@@ -9,12 +9,12 @@ public sealed class ProductTypeMapper
 {
     public ProductType Create(CreateProductTypeRequest source)
     {
-        return new ProductType(source.Code.Trim().ToUpperInvariant(), source.NameAr.Trim(), source.NameEn?.Trim());
+        return new ProductType(source.Code.Trim().ToUpperInvariant(), source.Name.Trim());
     }
 
     public void Update(UpdateProductTypeRequest source, ProductType destination)
     {
-        destination.UpdateDetails(source.Code.Trim().ToUpperInvariant(), source.NameAr.Trim(), source.NameEn?.Trim(), source.IsActive);
+        destination.UpdateDetails(source.Code.Trim().ToUpperInvariant(), source.Name.Trim(), source.IsActive);
     }
 
     public ProductTypeDto ToRead(ProductType source)
@@ -22,8 +22,7 @@ public sealed class ProductTypeMapper
         return new ProductTypeDto(
             source.Id,
             source.Code,
-            source.NameAr,
-            source.NameEn,
+            source.Name,
             source.SystemKey,
             source.IsActive);
     }

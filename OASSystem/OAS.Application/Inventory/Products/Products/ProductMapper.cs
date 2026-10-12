@@ -11,11 +11,9 @@ public sealed class ProductMapper
     {
         return new Product(
             source.ProductCode,
-            source.NameAr,
+            source.Name,
             source.CategoryId,
-            source.ProductTypeId,
             source.IsStockItem,
-            source.NameEn,
             source.BrandId,
             source.Description);
     }
@@ -24,11 +22,9 @@ public sealed class ProductMapper
     {
         destination.UpdateDetails(
             source.ProductCode,
-            source.NameAr,
-            source.NameEn,
+            source.Name,
             source.CategoryId,
             source.BrandId,
-            source.ProductTypeId,
             source.Description,
             source.IsStockItem,
             source.IsActive);
@@ -39,11 +35,9 @@ public sealed class ProductMapper
         return new ProductDto(
             source.Id,
             source.ProductCode,
-            source.NameAr,
-            source.NameEn,
+            source.Name,
             source.CategoryId,
             source.BrandId,
-            source.ProductTypeId,
             source.Description,
             source.IsStockItem,
             source.IsActive);

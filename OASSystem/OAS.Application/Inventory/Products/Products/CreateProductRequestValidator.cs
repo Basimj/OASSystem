@@ -11,20 +11,15 @@ public sealed class CreateProductRequestValidator : AbstractValidator<CreateProd
             .NotEmpty().WithErrorCode("product_code_required")
             .MaximumLength(32).WithErrorCode("product_code_max_length");
 
-        RuleFor(x => x.NameAr)
-            .NotEmpty().WithErrorCode("product_name_ar_required")
-            .MaximumLength(150).WithErrorCode("product_name_ar_max_length");
+        RuleFor(x => x.Name)
+            .NotEmpty().WithErrorCode("product_name_required")
+            .MaximumLength(200).WithErrorCode("product_name_max_length");
 
-        RuleFor(x => x.NameEn)
-            .MaximumLength(150).WithErrorCode("product_name_en_max_length");
 
         RuleFor(x => x.CategoryId)
             .NotEmpty().WithErrorCode("category_id_required");
 
-        RuleFor(x => x.ProductTypeId)
-            .NotEmpty().WithErrorCode("product_type_id_required");
-
         RuleFor(x => x.Description)
-            .MaximumLength(500).WithErrorCode("product_description_max_length");
+            .MaximumLength(1000).WithErrorCode("product_description_max_length");
     }
 }

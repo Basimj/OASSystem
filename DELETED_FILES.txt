@@ -1,0 +1,6 @@
+OAS.Contracts/Sales/Lookups/SalesOpticalRangeLookupDto.cs
+OAS.Domain/Entities/Inventory/LensVariantDetail.cs
+OAS.Domain/Sales/ValueObjects/OpticalPowerRange.cs
+OAS.Domain/Sales/ValueObjects/OpticalPrescriptionRangePolicy.cs
+OAS.Infrastructure/Persistence/Configurations/Inventory/LensVariantDetailConfiguration.cs
+OAS.Tests/Inventory/LensVariantDetailDomainTests.cs

@@ -23,7 +23,7 @@ public sealed class InventoryProductApiContractTests
     public void CreateWithOpeningInventory_RequiresCatalogAndInventoryPermissions()
     {
         var command = new CreateStockProductCommand(new CreateStockProductRequest(
-            new CreateProductRequest("P-API", "منتج", null, Guid.NewGuid(), null, Guid.NewGuid(), null, true),
+            new CreateProductRequest("P-API", "منتج", Guid.NewGuid(), null, null, true),
             new InitialProductVariantRequest("SKU-API", null, null, null, null, null, 10m, 20m),
             new OpeningInventoryRequest(Guid.NewGuid(), 1m, 10m)));
 

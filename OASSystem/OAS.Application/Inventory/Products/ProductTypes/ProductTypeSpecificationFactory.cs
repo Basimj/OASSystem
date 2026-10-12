@@ -17,8 +17,7 @@ public sealed class ProductTypeSpecificationFactory : ICrudSpecificationFactory<
             var search = normalized.Search.Trim();
             specification.Where(x =>
                 x.Code.Contains(search) ||
-                x.NameAr.Contains(search) ||
-                (x.NameEn != null && x.NameEn.Contains(search)));
+                x.Name.Contains(search));
         }
 
         var sortBy = ResolveSortProperty(normalized.SortBy);
@@ -38,9 +37,8 @@ public sealed class ProductTypeSpecificationFactory : ICrudSpecificationFactory<
         return requested.Trim().ToLowerInvariant() switch
         {
             "code" => nameof(ProductType.Code),
-            "name" => nameof(ProductType.NameAr),
-            "namear" => nameof(ProductType.NameAr),
-            "nameen" => nameof(ProductType.NameEn),
+            "name" => nameof(ProductType.Name),
+            "namear" => nameof(ProductType.Name),
             "isactive" => nameof(ProductType.IsActive),
             _ => nameof(ProductType.Code)
         };

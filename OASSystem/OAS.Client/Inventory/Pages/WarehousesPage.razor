@@ -43,7 +43,7 @@
                                  OnRowClick="@(x => Select(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
                         <RowTemplate Context="warehouse">
                             <td>@warehouse.Code</td>
-                            <td>@warehouse.NameAr</td>
+                            <td>@warehouse.Name</td>
                             <td>
                                 @if (warehouse.IsDefault)
                                 {
@@ -81,22 +81,12 @@
                                  Disabled="@(!IsEditing)"
                                  Size="ControlSize.Small" />
 
-                    <UiInputText Label="اسم المخزن بالعربية"
-                                 Value="@_nameAr"
-                                 ValueExpression="@(() => _nameAr)"
-                                 ValueChanged="@(v => SetField(NameArField, () => _nameAr = v ?? string.Empty))"
+                    <UiInputText Label="اسم المخزن"
+                                 Value="@_name"
+                                 ValueExpression="@(() => _name)"
+                                 ValueChanged="@(v => SetField(NameField, () => _name = v ?? string.Empty))"
                                  Required="true"
-                                 ErrorText="@ErrorFor(NameArField)"
-                                 MaxLength="100"
-                                 Disabled="@(!IsEditing)"
-                                 Size="ControlSize.Small" />
-
-                    <UiInputText Label="اسم المخزن بالإنجليزية"
-                                 Value="@_nameEn"
-                                 ValueExpression="@(() => _nameEn)"
-                                 ValueChanged="@(v => SetField(NameEnField, () => _nameEn = v))"
-                                 Placeholder="(اختياري)"
-                                 ErrorText="@ErrorFor(NameEnField)"
+                                 ErrorText="@ErrorFor(NameField)"
                                  MaxLength="100"
                                  Disabled="@(!IsEditing)"
                                  Size="ControlSize.Small" />
@@ -140,8 +130,7 @@
     private enum EditorMode { Empty, View, Create, Edit }
 
     private const string CodeField = "كود المخزن";
-    private const string NameArField = "اسم المخزن بالعربية";
-    private const string NameEnField = "اسم المخزن بالإنجليزية";
+    private const string NameField = "اسم المخزن";
     private const string DescriptionField = "الوصف";
     private const string DefaultField = "المخزن الافتراضي";
     private const string ActiveField = "المخزن نشط";
@@ -165,8 +154,7 @@
     private string? _search;
 
     private string _code = string.Empty;
-    private string _nameAr = string.Empty;
-    private string? _nameEn;
+    private string _name = string.Empty;
     private string? _description;
     private bool _isDefault;
     private bool _isActive = true;
@@ -183,7 +171,7 @@
 
     private IReadOnlyList<WarehouseDto> FilteredWarehouses => _warehouses
         .Where(x => string.IsNullOrWhiteSpace(_search) ||
-                    Match(_search, x.Code, x.NameAr, x.NameEn, x.Description))
+                    Match(_search, x.Code, x.Name, x.Description))
         .ToArray();
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
@@ -267,12 +255,12 @@
             if (_mode == EditorMode.Create)
             {
                 saved = await Inventory.CreateWarehouseAsync(new CreateWarehouseRequest(
-                    _code.Trim(), _nameAr.Trim(), NullIfBlank(_nameEn), NullIfBlank(_description), _isDefault));
+                    _code.Trim(), _name.Trim(), NullIfBlank(_description), _isDefault));
             }
             else
             {
                 saved = await Inventory.UpdateWarehouseAsync(_selectedId!.Value, new UpdateWarehouseRequest(
-                    _code.Trim(), _nameAr.Trim(), NullIfBlank(_nameEn), NullIfBlank(_description), _isDefault, _isActive));
+                    _code.Trim(), _name.Trim(), NullIfBlank(_description), _isDefault, _isActive));
             }
 
             if (saved is null) return;
@@ -322,15 +310,14 @@
             SetError(CodeField, "هذا الحقل إجباري.");
             missingRequired = true;
         }
-        if (string.IsNullOrWhiteSpace(_nameAr))
+        if (string.IsNullOrWhiteSpace(_name))
         {
-            SetError(NameArField, "هذا الحقل إجباري.");
+            SetError(NameField, "هذا الحقل إجباري.");
             missingRequired = true;
         }
 
         ValidateMaxLength(CodeField, _code, 32);
-        ValidateMaxLength(NameArField, _nameAr, 100);
-        ValidateMaxLength(NameEnField, _nameEn, 100);
+        ValidateMaxLength(NameField, _name, 100);
         ValidateMaxLength(DescriptionField, _description, 500);
 
         if (!string.IsNullOrWhiteSpace(_code) &&
@@ -409,8 +396,7 @@
         var item = _warehouses.FirstOrDefault(x => x.Id == id);
         if (item is null) return;
         _code = item.Code;
-        _nameAr = item.NameAr;
-        _nameEn = item.NameEn;
+        _name = item.Name;
         _description = item.Description;
         _isDefault = item.IsDefault;
         _isActive = item.IsActive;
@@ -420,8 +406,7 @@
     {
         ClearValidation();
         _code = string.Empty;
-        _nameAr = string.Empty;
-        _nameEn = null;
+        _name = string.Empty;
         _description = null;
         _isDefault = false;
         _isActive = true;

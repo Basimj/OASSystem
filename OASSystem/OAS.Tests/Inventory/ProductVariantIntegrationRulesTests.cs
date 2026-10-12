@@ -14,7 +14,7 @@ public sealed class ProductVariantIntegrationRulesTests
     [Test]
     public void LastActiveVariantOfStockProductCannotBeDeactivated()
     {
-        var product = new Product("P-1", "منتج", Guid.NewGuid(), Guid.NewGuid(), isStockItem: true);
+        var product = new Product("P-1", "منتج", Guid.NewGuid(), isStockItem: true);
         var variant = new ProductVariant(product.Id, "SKU-1", 10m, 20m);
         var variants = new FakeGenericRepository<ProductVariant, Guid>([variant]);
         var products = new FakeGenericRepository<Product, Guid>([product]);
@@ -29,7 +29,7 @@ public sealed class ProductVariantIntegrationRulesTests
     [Test]
     public async Task OneVariantCanBeDeactivatedWhenAnotherActiveVariantExists()
     {
-        var product = new Product("P-2", "منتج", Guid.NewGuid(), Guid.NewGuid(), isStockItem: true);
+        var product = new Product("P-2", "منتج", Guid.NewGuid(), isStockItem: true);
         var first = new ProductVariant(product.Id, "SKU-2-A", 10m, 20m);
         var second = new ProductVariant(product.Id, "SKU-2-B", 10m, 20m);
         var variants = new FakeGenericRepository<ProductVariant, Guid>([first, second]);

@@ -59,7 +59,7 @@ public sealed class InventoryTransactionTests
         _warehouseBId = warehouseB.Id;
         _warehouseRepository.Items.Add(warehouseB);
 
-        var product = new Product("PRD-01", "Test Product", Guid.NewGuid(), Guid.NewGuid(), isStockItem: true);
+        var product = new Product("PRD-01", "Test Product", Guid.NewGuid(), isStockItem: true);
         _productRepository.Items.Add(product);
         var variant = new ProductVariant(product.Id, "VAR-01", 20m, 50m, variantName: "Variant 01");
         _variantId = variant.Id;
@@ -114,7 +114,7 @@ public sealed class InventoryTransactionTests
     public void CreateTransaction_InactiveWarehouse_IsRejectedServerSide()
     {
         var warehouse = _warehouseRepository.Items.Single(x => x.Id == _warehouseAId);
-        warehouse.UpdateDetails(warehouse.Code, warehouse.NameAr, warehouse.NameEn, warehouse.Description, warehouse.IsDefault, isActive: false);
+        warehouse.UpdateDetails(warehouse.Code, warehouse.Name, warehouse.Description, warehouse.IsDefault, isActive: false);
 
         var handler = CreateTransactionHandler();
         var request = CreateReceiptRequest();
@@ -152,11 +152,9 @@ public sealed class InventoryTransactionTests
         var product = _productRepository.Items.Single(x => x.Id == variant.ProductId);
         product.UpdateDetails(
             product.ProductCode,
-            product.NameAr,
-            product.NameEn,
+            product.Name,
             product.CategoryId,
             product.BrandId,
-            product.ProductTypeId,
             product.Description,
             product.IsStockItem,
             isActive: false);
@@ -175,11 +173,9 @@ public sealed class InventoryTransactionTests
         var product = _productRepository.Items.Single(x => x.Id == variant.ProductId);
         product.UpdateDetails(
             product.ProductCode,
-            product.NameAr,
-            product.NameEn,
+            product.Name,
             product.CategoryId,
             product.BrandId,
-            product.ProductTypeId,
             product.Description,
             isStockItem: false,
             isActive: product.IsActive);

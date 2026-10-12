@@ -238,7 +238,7 @@ public sealed class OpticalJobQueryService(OasDbContext db) : IOpticalJobQuerySe
                 line.Notes,
                 Convert.ToBase64String(line.RowVersion),
                 variant?.SKU,
-                product?.NameAr ?? line.DescriptionSnapshot,
+                product?.Name ?? line.DescriptionSnapshot,
                 snapshot is null ? null : MapSnapshot(snapshot));
         }).ToArray();
     }

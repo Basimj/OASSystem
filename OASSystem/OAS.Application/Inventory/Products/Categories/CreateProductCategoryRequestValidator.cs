@@ -11,11 +11,12 @@ public sealed class CreateProductCategoryRequestValidator : AbstractValidator<Cr
             .NotEmpty().WithErrorCode("category_code_required")
             .MaximumLength(32).WithErrorCode("category_code_max_length");
 
-        RuleFor(x => x.NameAr)
-            .NotEmpty().WithErrorCode("category_name_ar_required")
-            .MaximumLength(100).WithErrorCode("category_name_ar_max_length");
+        RuleFor(x => x.Name)
+            .NotEmpty().WithErrorCode("category_name_required")
+            .MaximumLength(100).WithErrorCode("category_name_max_length");
 
-        RuleFor(x => x.NameEn)
-            .MaximumLength(100).WithErrorCode("category_name_en_max_length");
+
+        RuleFor(x => x.ProductTypeId)
+            .NotEmpty().WithErrorCode("product_type_id_required");
     }
 }

@@ -5,46 +5,28 @@ namespace OAS.Domain.Entities.Inventory;
 public class Warehouse : AuditableEntity<Guid>
 {
     public string Code { get; private set; } = null!;
-    public string NameAr { get; private set; } = null!;
-    public string? NameEn { get; private set; }
+    public string Name { get; private set; } = null!;
     public string? Description { get; private set; }
-
     public bool IsDefault { get; private set; }
     public bool IsActive { get; private set; }
     public byte[] RowVersion { get; private set; } = [];
 
-    private Warehouse()
-    {
-    }
+    private Warehouse() { }
 
-    public Warehouse(
-        string code,
-        string nameAr,
-        string? nameEn = null,
-        string? description = null,
-        bool isDefault = false)
+    public Warehouse(string code, string name, string? description = null, bool isDefault = false)
     {
         Id = Guid.NewGuid();
-
         Code = code;
-        NameAr = nameAr;
-        NameEn = nameEn;
+        Name = name;
         Description = description;
         IsDefault = isDefault;
         IsActive = true;
     }
 
-    public void UpdateDetails(
-        string code,
-        string nameAr,
-        string? nameEn,
-        string? description,
-        bool isDefault,
-        bool isActive)
+    public void UpdateDetails(string code, string name, string? description, bool isDefault, bool isActive)
     {
         Code = code;
-        NameAr = nameAr;
-        NameEn = nameEn;
+        Name = name;
         Description = description;
         IsDefault = isDefault;
         IsActive = isActive;

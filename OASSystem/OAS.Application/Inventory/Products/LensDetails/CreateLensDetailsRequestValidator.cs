@@ -7,21 +7,13 @@ public sealed class CreateLensDetailsRequestValidator : AbstractValidator<Create
 {
     public CreateLensDetailsRequestValidator()
     {
-        RuleFor(x => x.ProductId)
-            .NotEmpty().WithErrorCode("product_id_required");
-
-        RuleFor(x => x.LensType)
-            .NotEmpty().WithErrorCode("lens_type_required")
-            .MaximumLength(50).WithErrorCode("lens_type_max_length");
-
-        RuleFor(x => x.Material)
-            .MaximumLength(50).WithErrorCode("lens_material_max_length");
-
-        RuleFor(x => x.Coating)
-            .MaximumLength(50).WithErrorCode("lens_coating_max_length");
-
-        RuleFor(x => x.RefractiveIndex)
-            .Must(x => !x.HasValue || x.Value > 0m)
-            .WithErrorCode("lens_refractive_index_must_be_positive");
+        RuleFor(x => x.ProductVariantId).NotEmpty().WithErrorCode("product_variant_id_required");
+        RuleFor(x => x.LensType).NotEmpty().WithErrorCode("lens_type_required").MaximumLength(100).WithErrorCode("lens_type_max_length");
+        RuleFor(x => x.Material).MaximumLength(100).WithErrorCode("lens_material_max_length");
+        RuleFor(x => x.Coating).MaximumLength(100).WithErrorCode("lens_coating_max_length");
+        RuleFor(x => x.RefractiveIndex).Must(x => !x.HasValue || x.Value > 0m).WithErrorCode("lens_refractive_index_must_be_positive");
+        RuleFor(x => x.ADD).Must(x => !x.HasValue || x.Value >= 0m).WithErrorCode("lens_add_must_be_non_negative");
+        RuleFor(x => x.BaseCurve).Must(x => !x.HasValue || x.Value > 0m).WithErrorCode("lens_base_curve_must_be_positive");
+        RuleFor(x => x.Diameter).Must(x => !x.HasValue || x.Value > 0m).WithErrorCode("lens_diameter_must_be_positive");
     }
 }

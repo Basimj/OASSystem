@@ -16,14 +16,9 @@ public static class InventorySpreadsheetDefinitions
         "warehouses"
     ];
 
-    private static SpreadsheetColumn Text(string key, string header, bool required = false) =>
-        new(key, required, "text", Header: header);
-
-    private static SpreadsheetColumn Bool(string key, string header, bool required = false, string? defaultValue = null) =>
-        new(key, required, "bool", defaultValue, ["نعم", "لا"], Header: header);
-
-    private static SpreadsheetColumn Decimal(string key, string header, bool required = false, string? defaultValue = null) =>
-        new(key, required, "decimal", defaultValue, Header: header);
+    private static SpreadsheetColumn Text(string key, string header, bool required = false) => new(key, required, "text", Header: header);
+    private static SpreadsheetColumn Bool(string key, string header, bool required = false, string? defaultValue = null) => new(key, required, "bool", defaultValue, ["نعم", "لا"], Header: header);
+    private static SpreadsheetColumn Decimal(string key, string header, bool required = false, string? defaultValue = null) => new(key, required, "decimal", defaultValue, Header: header);
 
     public static IReadOnlyList<SpreadsheetSheet> Get(string section) => section.Trim().ToLowerInvariant() switch
     {
@@ -32,12 +27,10 @@ public static class InventorySpreadsheetDefinitions
             new SpreadsheetSheet("ProductCategories",
             [
                 Text("Code", "كود التصنيف", true),
-                Text("NameAr", "الاسم العربي", true),
-                Text("NameEn", "الاسم الإنجليزي"),
-                Text("ParentCode", "كود التصنيف الأب")
+                Text("Name", "الاسم", true),
+                Text("ProductTypeCode", "كود نوع المنتج", true)
             ], "تصنيفات المنتجات")
         ],
-
         "brands" =>
         [
             new SpreadsheetSheet("Brands",
@@ -46,37 +39,30 @@ public static class InventorySpreadsheetDefinitions
                 Text("Name", "اسم العلامة التجارية", true)
             ], "العلامات التجارية")
         ],
-
         "product-types" =>
         [
             new SpreadsheetSheet("ProductTypes",
             [
                 Text("Code", "كود نوع المنتج", true),
-                Text("NameAr", "الاسم العربي", true),
-                Text("NameEn", "الاسم الإنجليزي")
+                Text("Name", "الاسم", true)
             ], "أنواع المنتجات")
         ],
-
         "units" =>
         [
             new SpreadsheetSheet("Units",
             [
                 Text("Code", "كود الوحدة", true),
-                Text("NameAr", "الاسم العربي", true),
-                Text("NameEn", "الاسم الإنجليزي")
+                Text("Name", "الاسم", true)
             ], "الوحدات")
         ],
-
         "products" =>
         [
             new SpreadsheetSheet("Products",
             [
                 Text("ProductCode", "كود المنتج", true),
-                Text("NameAr", "الاسم العربي", true),
-                Text("NameEn", "الاسم الإنجليزي"),
+                Text("Name", "الاسم", true),
                 Text("CategoryCode", "كود التصنيف", true),
                 Text("BrandCode", "كود العلامة التجارية"),
-                Text("ProductTypeCode", "كود نوع المنتج", true),
                 Text("Description", "الوصف"),
                 Bool("IsStockItem", "صنف مخزني", false, "نعم"),
                 Text("InitialSKU", "SKU الأول"),
@@ -99,16 +85,14 @@ public static class InventorySpreadsheetDefinitions
                 Text("LensMaterial", "خامة العدسة"),
                 Text("LensCoating", "طلاء العدسة"),
                 Decimal("LensRefractiveIndex", "معامل الانكسار"),
-                Decimal("LensSphereMin", "Sphere Min"),
-                Decimal("LensSphereMax", "Sphere Max"),
-                Decimal("LensCylinderMin", "Cylinder Min"),
-                Decimal("LensCylinderMax", "Cylinder Max"),
-                Decimal("LensAddMin", "Add Min"),
-                Decimal("LensAddMax", "Add Max"),
+                Decimal("LensSPH", "SPH"),
+                Decimal("LensCYL", "CYL"),
+                Decimal("LensADD", "ADD"),
+                Decimal("LensBaseCurve", "Base Curve"),
+                Decimal("LensDiameter", "Diameter"),
                 Bool("LensIsPrescription", "عدسة طبية", false, "لا")
             ], "المنتجات")
         ],
-
         "product-variants" =>
         [
             new SpreadsheetSheet("ProductVariants",
@@ -121,22 +105,29 @@ public static class InventorySpreadsheetDefinitions
                 Text("Size", "المقاس"),
                 Text("UnitCode", "كود الوحدة"),
                 Decimal("PurchasePrice", "سعر الشراء", true),
-                Decimal("SellingPrice", "سعر البيع", true)
+                Decimal("SellingPrice", "سعر البيع", true),
+                Text("LensType", "نوع العدسة"),
+                Text("LensMaterial", "خامة العدسة"),
+                Text("LensCoating", "طلاء العدسة"),
+                Decimal("LensRefractiveIndex", "معامل الانكسار"),
+                Decimal("LensSPH", "SPH"),
+                Decimal("LensCYL", "CYL"),
+                Decimal("LensADD", "ADD"),
+                Decimal("LensBaseCurve", "Base Curve"),
+                Decimal("LensDiameter", "Diameter"),
+                Bool("LensIsPrescription", "عدسة طبية", false, "لا")
             ], "متغيرات المنتجات")
         ],
-
         "warehouses" =>
         [
             new SpreadsheetSheet("Warehouses",
             [
                 Text("Code", "كود المخزن", true),
-                Text("NameAr", "الاسم العربي", true),
-                Text("NameEn", "الاسم الإنجليزي"),
+                Text("Name", "الاسم", true),
                 Text("Description", "الوصف"),
                 Bool("IsDefault", "المخزن الافتراضي", false, "لا")
             ], "المخازن")
         ],
-
         _ => throw new NotFoundException("inventory spreadsheet template", section)
     };
 }

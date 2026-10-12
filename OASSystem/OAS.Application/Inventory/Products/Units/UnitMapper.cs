@@ -9,12 +9,12 @@ public sealed class UnitMapper
 {
     public Unit Create(CreateUnitRequest source)
     {
-        return new Unit(source.Code, source.NameAr, source.NameEn);
+        return new Unit(source.Code, source.Name);
     }
 
     public void Update(UpdateUnitRequest source, Unit destination)
     {
-        destination.UpdateDetails(source.Code.Trim(), source.NameAr, source.NameEn, source.IsActive);
+        destination.UpdateDetails(source.Code.Trim(), source.Name, source.IsActive);
     }
 
     public UnitDto ToRead(Unit source)
@@ -22,8 +22,7 @@ public sealed class UnitMapper
         return new UnitDto(
             source.Id,
             source.Code,
-            source.NameAr,
-            source.NameEn,
+            source.Name,
             source.IsActive);
     }
 }

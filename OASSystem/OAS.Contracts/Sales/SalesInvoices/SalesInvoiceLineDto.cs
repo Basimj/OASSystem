@@ -51,9 +51,6 @@ public sealed record SalesInvoiceLineDto(
     bool? ProductIsStockItem = null,
     decimal ReturnedQuantity = 0m,
     bool? ProductIsPrescriptionLens = null,
-    decimal? LensSphereMin = null,
-    decimal? LensSphereMax = null,
-    decimal? LensCylinderMin = null,
-    decimal? LensCylinderMax = null,
-    decimal? LensAddMin = null,
-    decimal? LensAddMax = null);
+    decimal? LensSPH = null,
+    decimal? LensCYL = null,
+    decimal? LensADD = null);

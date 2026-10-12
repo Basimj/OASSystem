@@ -1,38 +1,27 @@
-using OAS.Domain.Common;
 using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Entities.Inventory;
 
 public sealed class Unit : AuditableEntity<Guid>
 {
-    public string Code { get; private set; }
-    public string NameAr { get; private set; }
-    public string? NameEn { get; private set; }
+    public string Code { get; private set; } = null!;
+    public string Name { get; private set; } = null!;
     public bool IsActive { get; private set; }
 
-    private Unit()
-    {
-        Code = null!;
-        NameAr = null!;
-    }
+    private Unit() { }
 
-    public Unit(
-        string code,
-        string nameAr,
-        string? nameEn = null)
+    public Unit(string code, string name)
     {
         Id = Guid.NewGuid();
         Code = code;
-        NameAr = nameAr;
-        NameEn = nameEn;
+        Name = name;
         IsActive = true;
     }
 
-    public void UpdateDetails(string code, string nameAr, string? nameEn, bool isActive)
+    public void UpdateDetails(string code, string name, bool isActive)
     {
         Code = code;
-        NameAr = nameAr;
-        NameEn = nameEn;
+        Name = name;
         IsActive = isActive;
     }
 }

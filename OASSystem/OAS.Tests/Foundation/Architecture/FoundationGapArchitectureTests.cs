@@ -16,7 +16,7 @@ public sealed class FoundationGapArchitectureTests
     {
         var types = new[]
         {
-            typeof(LensVariantDetail),
+            typeof(LensDetails),
             typeof(CustomerOrderLineOpticalSnapshot),
             typeof(CustomerAdvance),
             typeof(CustomerAdvanceApplication),

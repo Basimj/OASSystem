@@ -12,9 +12,11 @@ SELECT * FROM dbo.tbl_ProductCategories WHERE Code = @CategoryCode;
 SELECT * FROM dbo.tbl_Brands            WHERE Code = @BrandCode;
 SELECT * FROM dbo.tbl_Units             WHERE Code = @UnitCode;
 
-SELECT p.*, pt.Code AS ProductTypeCode, pt.NameAr AS ProductTypeNameAr
+SELECT p.*, c.Code AS CategoryCode, c.Name AS CategoryName,
+       pt.Code AS ProductTypeCode, pt.Name AS ProductTypeName
 FROM dbo.tbl_Products p
-INNER JOIN dbo.tbl_productTypes pt ON pt.Id = p.ProductTypeId
+INNER JOIN dbo.tbl_ProductCategories c ON c.Id = p.CategoryId
+INNER JOIN dbo.tbl_productTypes pt ON pt.Id = c.ProductTypeId
 WHERE p.ProductCode = @ProductCode;
 
 SELECT fd.*

@@ -4,7 +4,7 @@
     Scope: Inventory tables only
 
     IMPORTANT:
-    - Run EF migrations first, including 20260923070000_AddProductTypesLookup.
+    - Run EF migrations first, including 20261010210000_ProductTypeCategoryHierarchy.
     - This script expects the Inventory tables to be empty.
     - Inventory enum columns are inserted as INT, matching Domain/Contracts/EF configuration.
 
@@ -54,9 +54,10 @@ BEGIN TRY
     END;
 
     IF COL_LENGTH(N'dbo.tbl_Products', N'ProductType') IS NOT NULL
-       OR COL_LENGTH(N'dbo.tbl_Products', N'ProductTypeId') IS NULL
+       OR COL_LENGTH(N'dbo.tbl_Products', N'ProductTypeId') IS NOT NULL
+       OR COL_LENGTH(N'dbo.tbl_ProductCategories', N'ProductTypeId') IS NULL
     BEGIN
-        THROW 52004, 'Product type schema is not aligned. Apply RemoveProductTypeFromProducts and AddProductTypesLookup first.', 1;
+        THROW 52004, 'Product hierarchy schema is not aligned. Apply ProductTypeCategoryHierarchy first.', 1;
     END;
 
     IF (SELECT COUNT(*) FROM dbo.tbl_productTypes WHERE Code IN (N'FRAME', N'LENS', N'SUNGLASSES', N'ACCESSORY', N'OTHER', N'SERVICE')) < 6
@@ -114,24 +115,34 @@ BEGIN TRY
     DECLARE @D2  datetimeoffset(7) = DATEADD(day, -2,  @Now);
 
     ---------------------------------------------------------------------------
-    -- Stable IDs: Categories
+    -- Product types (seeded by AddProductTypesLookup migration)
     ---------------------------------------------------------------------------
-    DECLARE @CatEyewear     uniqueidentifier = '10000000-0000-0000-0000-000000000001';
+    DECLARE @TypeFrame      uniqueidentifier = (SELECT Id FROM dbo.tbl_productTypes WHERE Code = N'FRAME');
+    DECLARE @TypeLens       uniqueidentifier = (SELECT Id FROM dbo.tbl_productTypes WHERE Code = N'LENS');
+    DECLARE @TypeSunglasses uniqueidentifier = (SELECT Id FROM dbo.tbl_productTypes WHERE Code = N'SUNGLASSES');
+    DECLARE @TypeAccessory  uniqueidentifier = (SELECT Id FROM dbo.tbl_productTypes WHERE Code = N'ACCESSORY');
+    DECLARE @TypeOther      uniqueidentifier = (SELECT Id FROM dbo.tbl_productTypes WHERE Code = N'OTHER');
+    DECLARE @TypeService    uniqueidentifier = (SELECT Id FROM dbo.tbl_productTypes WHERE Code = N'SERVICE');
+
+    ---------------------------------------------------------------------------
+    -- Stable IDs: Categories. Each category belongs to exactly one product type.
+    ---------------------------------------------------------------------------
     DECLARE @CatFrames      uniqueidentifier = '10000000-0000-0000-0000-000000000002';
     DECLARE @CatLenses      uniqueidentifier = '10000000-0000-0000-0000-000000000003';
     DECLARE @CatSunglasses  uniqueidentifier = '10000000-0000-0000-0000-000000000004';
     DECLARE @CatAccessories uniqueidentifier = '10000000-0000-0000-0000-000000000005';
     DECLARE @CatServices    uniqueidentifier = '10000000-0000-0000-0000-000000000006';
+    DECLARE @CatOther       uniqueidentifier = '10000000-0000-0000-0000-000000000007';
 
     INSERT dbo.tbl_ProductCategories
-        (Id, Code, NameAr, NameEn, ParentCategoryId, IsActive, CreatedAtUtc, CreatedBy, LastModifiedAtUtc, LastModifiedBy)
+        (Id, Code, Name, ProductTypeId, IsActive, CreatedAtUtc, CreatedBy, LastModifiedAtUtc, LastModifiedBy)
     VALUES
-        (@CatEyewear,     N'EYEWEAR',     N'النظارات والعدسات', N'Eyewear',     NULL,        1, @D14, @SeedUser, NULL, NULL),
-        (@CatFrames,      N'FRAMES',      N'الإطارات',          N'Frames',      @CatEyewear, 1, @D14, @SeedUser, NULL, NULL),
-        (@CatLenses,      N'LENSES',      N'العدسات',           N'Lenses',      @CatEyewear, 1, @D14, @SeedUser, NULL, NULL),
-        (@CatSunglasses,  N'SUNGLASSES',  N'النظارات الشمسية', N'Sunglasses',  @CatEyewear, 1, @D14, @SeedUser, NULL, NULL),
-        (@CatAccessories, N'ACCESSORIES', N'الإكسسوارات',       N'Accessories', NULL,        1, @D14, @SeedUser, NULL, NULL),
-        (@CatServices,    N'SERVICES',    N'الخدمات',           N'Services',    NULL,        1, @D14, @SeedUser, NULL, NULL);
+        (@CatFrames,      N'FRAMES',      N'الإطارات',          @TypeFrame,      1, @D14, @SeedUser, NULL, NULL),
+        (@CatLenses,      N'LENSES',      N'العدسات',           @TypeLens,       1, @D14, @SeedUser, NULL, NULL),
+        (@CatSunglasses,  N'SUNGLASSES',  N'النظارات الشمسية', @TypeSunglasses, 1, @D14, @SeedUser, NULL, NULL),
+        (@CatAccessories, N'ACCESSORIES', N'الإكسسوارات',       @TypeAccessory,  1, @D14, @SeedUser, NULL, NULL),
+        (@CatOther,       N'OTHER',       N'أخرى',              @TypeOther,      1, @D14, @SeedUser, NULL, NULL),
+        (@CatServices,    N'SERVICES',    N'الخدمات',           @TypeService,    1, @D14, @SeedUser, NULL, NULL);
 
     ---------------------------------------------------------------------------
     -- Brands
@@ -159,21 +170,11 @@ BEGIN TRY
     DECLARE @UnitBox   uniqueidentifier = '30000000-0000-0000-0000-000000000003';
 
     INSERT dbo.tbl_Units
-        (Id, Code, NameAr, NameEn, IsActive, CreatedAtUtc, CreatedBy, LastModifiedAtUtc, LastModifiedBy)
+        (Id, Code, Name, IsActive, CreatedAtUtc, CreatedBy, LastModifiedAtUtc, LastModifiedBy)
     VALUES
-        (@UnitPiece, N'PCS',  N'قطعة', N'Piece', 1, @D14, @SeedUser, NULL, NULL),
-        (@UnitPair,  N'PAIR', N'زوج',  N'Pair',  1, @D14, @SeedUser, NULL, NULL),
-        (@UnitBox,   N'BOX',  N'علبة', N'Box',   1, @D14, @SeedUser, NULL, NULL);
-
-    ---------------------------------------------------------------------------
-    -- Product types (seeded by AddProductTypesLookup migration)
-    ---------------------------------------------------------------------------
-    DECLARE @TypeFrame      uniqueidentifier = (SELECT Id FROM dbo.tbl_productTypes WHERE Code = N'FRAME');
-    DECLARE @TypeLens       uniqueidentifier = (SELECT Id FROM dbo.tbl_productTypes WHERE Code = N'LENS');
-    DECLARE @TypeSunglasses uniqueidentifier = (SELECT Id FROM dbo.tbl_productTypes WHERE Code = N'SUNGLASSES');
-    DECLARE @TypeAccessory  uniqueidentifier = (SELECT Id FROM dbo.tbl_productTypes WHERE Code = N'ACCESSORY');
-    DECLARE @TypeOther      uniqueidentifier = (SELECT Id FROM dbo.tbl_productTypes WHERE Code = N'OTHER');
-    DECLARE @TypeService    uniqueidentifier = (SELECT Id FROM dbo.tbl_productTypes WHERE Code = N'SERVICE');
+        (@UnitPiece, N'PCS',  N'قطعة', 1, @D14, @SeedUser, NULL, NULL),
+        (@UnitPair,  N'PAIR', N'زوج',  1, @D14, @SeedUser, NULL, NULL),
+        (@UnitBox,   N'BOX',  N'علبة', 1, @D14, @SeedUser, NULL, NULL);
 
     ---------------------------------------------------------------------------
     -- Products across the seeded categories
@@ -186,15 +187,15 @@ BEGIN TRY
     DECLARE @ProdService    uniqueidentifier = '40000000-0000-0000-0000-000000000006';
 
     INSERT dbo.tbl_Products
-        (Id, ProductCode, NameAr, NameEn, CategoryId, BrandId, ProductTypeId, Description,
+        (Id, ProductCode, Name, CategoryId, BrandId, Description,
          IsStockItem, IsActive, CreatedAtUtc, CreatedBy, LastModifiedAtUtc, LastModifiedBy)
     VALUES
-        (@ProdFrame,      N'PRD-FRM-RB001', N'إطار راي بان كلاسيك',       N'Ray-Ban Classic Frame', @CatFrames,       @BrandRayBan,  @TypeFrame,      N'إطار طبي للاختبار متعدد المتغيرات.', 1, 1, @D14, @SeedUser, NULL, NULL),
-        (@ProdLens,       N'PRD-LNS-ES001', N'عدسة إسيلور أحادية الرؤية', N'Essilor Single Vision', @CatLenses,       @BrandEssilor, @TypeLens,       N'عدسة طبية بدرجات انكسار متعددة.',      1, 1, @D14, @SeedUser, NULL, NULL),
-        (@ProdSunglasses, N'PRD-SUN-OK001', N'نظارة أوكلي شمسية',         N'Oakley Sunglasses',     @CatSunglasses,  @BrandOakley,  @TypeSunglasses,N'نظارة شمسية مع تفاصيل إطار.',           1, 1, @D14, @SeedUser, NULL, NULL),
-        (@ProdAccessory,  N'PRD-ACC-CL001', N'بخاخ تنظيف العدسات',        N'Lens Cleaning Spray',   @CatAccessories, @BrandGeneric, @TypeAccessory, N'عبوة تنظيف 60 مل.',                      1, 1, @D14, @SeedUser, NULL, NULL),
-        (@ProdOther,      N'PRD-OTH-CS001', N'حافظة نظارات',              N'Glasses Case',          @CatAccessories, @BrandGeneric, @TypeOther,     N'حافظة صلبة للنظارات.',                  1, 1, @D14, @SeedUser, NULL, NULL),
-        (@ProdService,    N'PRD-SRV-EX001', N'فحص نظر',                   N'Eye Examination',       @CatServices,    NULL,          @TypeService,   N'خدمة غير مخزنية للاختبار.',            0, 1, @D14, @SeedUser, NULL, NULL);
+        (@ProdFrame,      N'PRD-FRM-RB001', N'إطار راي بان كلاسيك', @CatFrames,       @BrandRayBan,   N'إطار طبي للاختبار متعدد المتغيرات.', 1, 1, @D14, @SeedUser, NULL, NULL),
+        (@ProdLens,       N'PRD-LNS-ES001', N'عدسة إسيلور أحادية الرؤية', @CatLenses,       @BrandEssilor,   N'عدسة طبية بدرجات انكسار متعددة.',      1, 1, @D14, @SeedUser, NULL, NULL),
+        (@ProdSunglasses, N'PRD-SUN-OK001', N'نظارة أوكلي شمسية',     @CatSunglasses,  @BrandOakley,  N'نظارة شمسية مع تفاصيل إطار.',           1, 1, @D14, @SeedUser, NULL, NULL),
+        (@ProdAccessory,  N'PRD-ACC-CL001', N'بخاخ تنظيف العدسات',   @CatAccessories, @BrandGeneric, N'عبوة تنظيف 60 مل.',                      1, 1, @D14, @SeedUser, NULL, NULL),
+        (@ProdOther,      N'PRD-OTH-CS001', N'حافظة نظارات',          @CatOther, @BrandGeneric, N'حافظة صلبة للنظارات.',                  1, 1, @D14, @SeedUser, NULL, NULL),
+        (@ProdService,    N'PRD-SRV-EX001', N'فحص نظر',       @CatServices,    NULL,          N'خدمة غير مخزنية للاختبار.',            0, 1, @D14, @SeedUser, NULL, NULL);
 
     ---------------------------------------------------------------------------
     -- Product Variants / SKU / Barcode / Prices
@@ -231,11 +232,14 @@ BEGIN TRY
         ('60000000-0000-0000-0000-000000000002', @ProdSunglasses, N'OK-Sun-01',     N'O-Matter',N'Full Rim', N'Unisex', N'Sport',     138.00, 17.00, 55.00);
 
     INSERT dbo.tbl_LensDetails
-        (Id, ProductId, LensType, Material, Coating, RefractiveIndex, SphereMin, SphereMax,
-         CylinderMin, CylinderMax, AddMin, AddMax, IsPrescriptionLens)
+        (Id, ProductVariantId, LensType, Material, Coating, RefractiveIndex,
+         SPH, CYL, [ADD], BaseCurve, Diameter, IsPrescriptionLens, IsActive,
+         CreatedAtUtc, CreatedBy, LastModifiedAtUtc, LastModifiedBy)
     VALUES
-        ('61000000-0000-0000-0000-000000000001', @ProdLens, N'Single Vision', N'CR-39 / Resin', N'Anti-Reflective', 1.560,
-         -10.00, 6.00, -4.00, 4.00, 0.00, 3.50, 1);
+        ('61000000-0000-0000-0000-000000000001', @VLens156, N'Single Vision', N'CR-39 / Resin', N'Anti-Reflective', 1.560,
+         -2.00, -0.75, NULL, 6.00, 70.00, 1, 1, @D14, @SeedUser, NULL, NULL),
+        ('61000000-0000-0000-0000-000000000002', @VLens167, N'Single Vision', N'High Index', N'Anti-Reflective', 1.670,
+         -1.75, -0.50, NULL, 6.00, 70.00, 1, 1, @D14, @SeedUser, NULL, NULL);
 
     ---------------------------------------------------------------------------
     -- Warehouses
@@ -245,12 +249,12 @@ BEGIN TRY
     DECLARE @WhLab    uniqueidentifier = '70000000-0000-0000-0000-000000000003';
 
     INSERT dbo.tbl_Warehouses
-        (Id, Code, NameAr, NameEn, Description, IsDefault, IsActive,
+        (Id, Code, Name, Description, IsDefault, IsActive,
          CreatedAtUtc, CreatedBy, LastModifiedAtUtc, LastModifiedBy)
     VALUES
-        (@WhMain,   N'WH-MAIN',   N'المخزن الرئيسي', N'Main Warehouse',   N'المخزن الافتراضي للفرع الرئيسي.', 1, 1, @D14, @SeedUser, NULL, NULL),
-        (@WhBranch, N'WH-BRANCH', N'مخزن الفرع',     N'Branch Warehouse', N'مخزن اختبار للتحويل بين المخازن.', 0, 1, @D14, @SeedUser, NULL, NULL),
-        (@WhLab,    N'WH-LAB',    N'مخزن المختبر',   N'Lab Warehouse',    N'مخزن غير فعال لاختبار حالة التفعيل.', 0, 0, @D14, @SeedUser, NULL, NULL);
+        (@WhMain,   N'WH-MAIN',   N'المخزن الرئيسي', N'المخزن الافتراضي للفرع الرئيسي.', 1, 1, @D14, @SeedUser, NULL, NULL),
+        (@WhBranch, N'WH-BRANCH', N'مخزن الفرع',     N'مخزن اختبار للتحويل بين المخازن.', 0, 1, @D14, @SeedUser, NULL, NULL),
+        (@WhLab,    N'WH-LAB',    N'مخزن المختبر',   N'مخزن غير فعال لاختبار حالة التفعيل.', 0, 0, @D14, @SeedUser, NULL, NULL);
 
     ---------------------------------------------------------------------------
     -- Inventory transactions (all 10 transaction types)

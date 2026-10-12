@@ -43,7 +43,6 @@ public sealed class CustomerOrderOpticalService(
                 revision,
                 eye,
                 seed.PrescriptionRequired,
-                seed.OpticalPolicy,
                 cancellationToken);
 
             return new PreparedCustomerOrderLine(seed, seed, revision, eye, null);
@@ -60,20 +59,18 @@ public sealed class CustomerOrderOpticalService(
         if (draft is null)
             return new PreparedCustomerOrderLine(seed, seed, null, null, null);
 
-        // For prescription lenses, an exact LensVariantDetail is an optional stocked fulfillment
-        // optimization, not the identity of the prescription itself. If an exact SKU exists, use it
-        // and keep the inventory path. If it does not exist, preserve the commercial seed variant
-        // and route the line as a non-inventory production/lab line instead of rejecting the order.
-        // The prescription range has already been validated above, so the fallback is allowed only
-        // for a structurally/configurationally valid prescription.
+        // Prescription lens fulfillment is based on an exact LensDetails optical identity.
+        // The exact ProductVariant always remains inventory-bearing. Availability then decides
+        // whether it is reserved immediately for the lab or converted into CustomerDemand
+        // for purchasing. Missing catalog identity is a master-data error, not a lab fallback.
         SalesLineResolution resolved = seed;
         if (seed.ProductVariantId.HasValue)
         {
-            var exact = await lensVariantResolver.TryResolveExactAsync(
+            var exact = await lensVariantResolver.ResolveAsync(
                 new LensVariantMatchRequest(seed.ProductVariantId.Value, draft.SPH, draft.CYL, draft.ADD),
                 cancellationToken);
 
-            if (exact is not null && exact.ProductVariantId != seed.ProductVariantId)
+            if (exact.ProductVariantId != seed.ProductVariantId)
             {
                 resolved = await lineResolver.ResolveAsync(
                     lineType,
@@ -82,22 +79,7 @@ public sealed class CustomerOrderOpticalService(
                     description,
                     cancellationToken);
             }
-            else if (exact is null)
-            {
-                // Do not keep the seed warehouse in the fallback. A warehouse reference makes the
-                // sales line inventory-bearing, which would reserve/post the seed SKU even though it
-                // does not match the customer's prescription. Keeping the variant only preserves the
-                // selected commercial lens/product and its price for the lab job and invoice.
-                resolved = seed with
-                {
-                    WarehouseId = null,
-                    IsStockItem = false
-                };
-            }
         }
-
-        if (resolved.OpticalPolicy is not null)
-            PrescriptionOpticalRules.ValidateConfiguredRanges(draft.SPH, draft.CYL, draft.ADD, resolved.OpticalPolicy);
 
         return new PreparedCustomerOrderLine(
             seed,
@@ -125,7 +107,6 @@ public sealed class CustomerOrderOpticalService(
                 revisionId,
                 requestPrescriptionEye,
                 true,
-                seed.OpticalPolicy,
                 cancellationToken)
                 ?? throw new ConflictException("sales_prescription_required", "يجب تحديد قياسات الوصفة للعدسة الطبية.");
 
@@ -146,7 +127,6 @@ public sealed class CustomerOrderOpticalService(
                 revisionId,
                 eye,
                 true,
-                seed.OpticalPolicy,
                 cancellationToken)
                 ?? throw new ConflictException("sales_prescription_required", "تعذر تحميل قياسات الوصفة المخزنة.");
 
@@ -174,9 +154,6 @@ public sealed class CustomerOrderOpticalService(
             snapshotRequest.PD,
             snapshotRequest.MonocularPD,
             snapshotRequest.FittingHeight);
-
-        if (seed.OpticalPolicy is not null)
-            PrescriptionOpticalRules.ValidateConfiguredRanges(snapshotRequest.SPH, snapshotRequest.CYL, snapshotRequest.ADD, seed.OpticalPolicy);
 
         return new OpticalSnapshotDraft(
             OpticalMeasurementSource.Manual,

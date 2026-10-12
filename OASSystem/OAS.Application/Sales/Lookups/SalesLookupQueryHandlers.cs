@@ -225,7 +225,7 @@ public sealed class SearchSalesProductTypesQueryHandler(
         {
             spec.Where(x =>
                 x.IsActive &&
-                (x.Code.Contains(search) || x.NameAr.Contains(search)));
+                (x.Code.Contains(search) || x.Name.Contains(search)));
         }
         else
         {
@@ -234,7 +234,7 @@ public sealed class SearchSalesProductTypesQueryHandler(
 
         spec
             .AddSort(
-                nameof(ProductType.NameAr),
+                nameof(ProductType.Name),
                 OAS.Contracts.Common.Pagination.SortDirection.Ascending)
             .ApplyPaging(0, SalesLookupLimit.Normalize(request.Take));
 
@@ -244,7 +244,7 @@ public sealed class SearchSalesProductTypesQueryHandler(
             .Select(x => new SalesProductTypeLookupDto(
                 x.Id,
                 x.Code,
-                x.NameAr,
+                x.Name,
                 x.SystemKey,
                 (OAS.Contracts.Sales.Enums.SalesLineType)(byte)SalesProductTypeMapping.ToLineType(x.SystemKey),
                 x.IsActive))
@@ -253,8 +253,7 @@ public sealed class SearchSalesProductTypesQueryHandler(
 }
 
 public sealed class SearchSalesProductCategoriesQueryHandler(
-    IReadRepository<ProductCategory, Guid> categories,
-    IReadRepository<Product, Guid> products)
+    IReadRepository<ProductCategory, Guid> categories)
     : IRequestHandler<
         SearchSalesProductCategoriesQuery,
         IReadOnlyList<SalesProductCategoryLookupDto>>
@@ -263,41 +262,25 @@ public sealed class SearchSalesProductCategoriesQueryHandler(
         SearchSalesProductCategoriesQuery request,
         CancellationToken ct)
     {
-        HashSet<Guid>? allowedCategoryIds = null;
-        if (request.ProductTypeId.HasValue)
-        {
-            var matchingProducts = await products.ListAsync(
-                new Specification<Product>()
-                    .Where(x => x.IsActive && x.ProductTypeId == request.ProductTypeId.Value),
-                ct);
-
-            allowedCategoryIds = matchingProducts
-                .Select(x => x.CategoryId)
-                .ToHashSet();
-
-            if (allowedCategoryIds.Count == 0)
-                return [];
-        }
-
         var search = request.Search?.Trim();
         var spec = new Specification<ProductCategory>();
 
-        if (allowedCategoryIds is not null && !string.IsNullOrWhiteSpace(search))
+        if (request.ProductTypeId.HasValue && !string.IsNullOrWhiteSpace(search))
         {
             spec.Where(x =>
                 x.IsActive &&
-                allowedCategoryIds.Contains(x.Id) &&
-                (x.Code.Contains(search) || x.NameAr.Contains(search)));
+                x.ProductTypeId == request.ProductTypeId.Value &&
+                (x.Code.Contains(search) || x.Name.Contains(search)));
         }
-        else if (allowedCategoryIds is not null)
+        else if (request.ProductTypeId.HasValue)
         {
-            spec.Where(x => x.IsActive && allowedCategoryIds.Contains(x.Id));
+            spec.Where(x => x.IsActive && x.ProductTypeId == request.ProductTypeId.Value);
         }
         else if (!string.IsNullOrWhiteSpace(search))
         {
             spec.Where(x =>
                 x.IsActive &&
-                (x.Code.Contains(search) || x.NameAr.Contains(search)));
+                (x.Code.Contains(search) || x.Name.Contains(search)));
         }
         else
         {
@@ -306,7 +289,7 @@ public sealed class SearchSalesProductCategoriesQueryHandler(
 
         spec
             .AddSort(
-                nameof(ProductCategory.NameAr),
+                nameof(ProductCategory.Name),
                 OAS.Contracts.Common.Pagination.SortDirection.Ascending)
             .ApplyPaging(0, SalesLookupLimit.Normalize(request.Take));
 
@@ -314,63 +297,15 @@ public sealed class SearchSalesProductCategoriesQueryHandler(
 
         return rows
             .Select(x => new SalesProductCategoryLookupDto(
-                x.Id, x.Code, x.NameAr, x.ParentCategoryId, x.IsActive))
+                x.Id, x.Code, x.Name, x.IsActive))
             .ToArray();
-    }
-}
-
-public sealed class GetSalesPrescriptionOpticalRangesQueryHandler(
-    IReadRepository<LensDetails, Guid> lensDetails,
-    IReadRepository<Product, Guid> products)
-    : IRequestHandler<GetSalesPrescriptionOpticalRangesQuery, SalesOpticalRangeLookupDto>
-{
-    public async Task<SalesOpticalRangeLookupDto> Handle(
-        GetSalesPrescriptionOpticalRangesQuery request,
-        CancellationToken ct)
-    {
-        var lenses = await lensDetails.ListAsync(
-            new Specification<LensDetails>().Where(x => x.IsPrescriptionLens),
-            ct);
-
-        var active = new List<LensDetails>();
-        foreach (var lens in lenses)
-        {
-            var product = await products.GetByIdAsync(lens.ProductId, ct);
-            if (product?.IsActive == true)
-                active.Add(lens);
-        }
-
-        static (decimal? Min, decimal? Max) Aggregate(
-            IEnumerable<LensDetails> source,
-            Func<LensDetails, decimal?> minSelector,
-            Func<LensDetails, decimal?> maxSelector)
-        {
-            // نأخذ القيمتين معًا حتى تبقى النتيجة صحيحة حتى قبل تشغيل migration
-            // على قواعد بيانات قديمة تحتوي Min/Max معكوسين.
-            var values = source
-                .SelectMany(x => new[] { minSelector(x), maxSelector(x) })
-                .Where(x => x.HasValue)
-                .Select(x => x!.Value)
-                .ToArray();
-
-            return values.Length == 0 ? ((decimal?)null, (decimal?)null) : (values.Min(), values.Max());
-        }
-
-        var sphere = Aggregate(active, x => x.SphereMin, x => x.SphereMax);
-        var cylinder = Aggregate(active, x => x.CylinderMin, x => x.CylinderMax);
-        var add = Aggregate(active, x => x.AddMin, x => x.AddMax);
-
-        return new SalesOpticalRangeLookupDto(
-            sphere.Min, sphere.Max,
-            cylinder.Min, cylinder.Max,
-            add.Min, add.Max,
-            active.Count);
     }
 }
 
 public sealed class SearchSalesProductVariantsQueryHandler(
     IReadRepository<ProductVariant, Guid> variants,
     IReadRepository<Product, Guid> products,
+    IReadRepository<ProductCategory, Guid> categories,
     IReadRepository<ProductType, Guid> productTypes,
     IReadRepository<InventoryUnit, Guid> units,
     IReadRepository<LensDetails, Guid> lensDetails)
@@ -384,34 +319,36 @@ public sealed class SearchSalesProductVariantsQueryHandler(
     {
         var search = request.Search?.Trim();
 
-        HashSet<Guid>? filteredProductIds = null;
-        if (request.ProductTypeId.HasValue || request.CategoryId.HasValue)
+        HashSet<Guid>? allowedCategoryIds = null;
+        if (request.ProductTypeId.HasValue)
         {
-            var productFilter = new Specification<Product>();
+            var categoryRows = await categories.ListAsync(
+                new Specification<ProductCategory>()
+                    .Where(x => x.IsActive && x.ProductTypeId == request.ProductTypeId.Value),
+                ct);
+            allowedCategoryIds = categoryRows.Select(x => x.Id).ToHashSet();
+            if (allowedCategoryIds.Count == 0)
+                return [];
+        }
 
-            if (request.ProductTypeId.HasValue && request.CategoryId.HasValue)
-            {
-                productFilter.Where(x =>
-                    x.IsActive &&
-                    x.ProductTypeId == request.ProductTypeId.Value &&
-                    x.CategoryId == request.CategoryId.Value);
-            }
-            else if (request.ProductTypeId.HasValue)
-            {
-                productFilter.Where(x =>
-                    x.IsActive &&
-                    x.ProductTypeId == request.ProductTypeId.Value);
-            }
-            else
-            {
-                productFilter.Where(x =>
-                    x.IsActive &&
-                    x.CategoryId == request.CategoryId!.Value);
-            }
+        if (request.CategoryId.HasValue)
+        {
+            var category = await categories.GetByIdAsync(request.CategoryId.Value, ct);
+            if (category is null || !category.IsActive)
+                return [];
+            if (request.ProductTypeId.HasValue && category.ProductTypeId != request.ProductTypeId.Value)
+                return [];
+            allowedCategoryIds = [category.Id];
+        }
 
-            var filteredProducts = await products.ListAsync(productFilter, ct);
+        HashSet<Guid>? filteredProductIds = null;
+        if (allowedCategoryIds is not null)
+        {
+            var filteredProducts = await products.ListAsync(
+                new Specification<Product>()
+                    .Where(x => x.IsActive && allowedCategoryIds.Contains(x.CategoryId)),
+                ct);
             filteredProductIds = filteredProducts.Select(x => x.Id).ToHashSet();
-
             if (filteredProductIds.Count == 0)
                 return [];
         }
@@ -420,34 +357,18 @@ public sealed class SearchSalesProductVariantsQueryHandler(
         if (!string.IsNullOrWhiteSpace(search))
         {
             var productSpec = new Specification<Product>();
-
-            if (request.ProductTypeId.HasValue && request.CategoryId.HasValue)
+            if (allowedCategoryIds is not null)
             {
                 productSpec.Where(x =>
                     x.IsActive &&
-                    x.ProductTypeId == request.ProductTypeId.Value &&
-                    x.CategoryId == request.CategoryId.Value &&
-                    (x.ProductCode.Contains(search) || x.NameAr.Contains(search)));
-            }
-            else if (request.ProductTypeId.HasValue)
-            {
-                productSpec.Where(x =>
-                    x.IsActive &&
-                    x.ProductTypeId == request.ProductTypeId.Value &&
-                    (x.ProductCode.Contains(search) || x.NameAr.Contains(search)));
-            }
-            else if (request.CategoryId.HasValue)
-            {
-                productSpec.Where(x =>
-                    x.IsActive &&
-                    x.CategoryId == request.CategoryId.Value &&
-                    (x.ProductCode.Contains(search) || x.NameAr.Contains(search)));
+                    allowedCategoryIds.Contains(x.CategoryId) &&
+                    (x.ProductCode.Contains(search) || x.Name.Contains(search)));
             }
             else
             {
                 productSpec.Where(x =>
                     x.IsActive &&
-                    (x.ProductCode.Contains(search) || x.NameAr.Contains(search)));
+                    (x.ProductCode.Contains(search) || x.Name.Contains(search)));
             }
 
             productSpec.ApplyPaging(0, 100);
@@ -501,17 +422,18 @@ public sealed class SearchSalesProductVariantsQueryHandler(
         foreach (var variant in rows)
         {
             var product = await products.GetByIdAsync(variant.ProductId, ct);
-
             if (product is null || !product.IsActive)
                 continue;
 
-            if (request.ProductTypeId.HasValue && product.ProductTypeId != request.ProductTypeId.Value)
+            var category = await categories.GetByIdAsync(product.CategoryId, ct);
+            if (category is null || !category.IsActive)
+                continue;
+            if (request.ProductTypeId.HasValue && category.ProductTypeId != request.ProductTypeId.Value)
+                continue;
+            if (request.CategoryId.HasValue && category.Id != request.CategoryId.Value)
                 continue;
 
-            if (request.CategoryId.HasValue && product.CategoryId != request.CategoryId.Value)
-                continue;
-
-            var productType = await productTypes.GetByIdAsync(product.ProductTypeId, ct);
+            var productType = await productTypes.GetByIdAsync(category.ProductTypeId, ct);
             if (productType is null || !productType.IsActive)
                 continue;
 
@@ -519,29 +441,25 @@ public sealed class SearchSalesProductVariantsQueryHandler(
             if (variant.UnitId.HasValue)
             {
                 var unit = await units.GetByIdAsync(variant.UnitId.Value, ct);
-                unitName = unit?.NameAr;
+                unitName = unit?.Name;
             }
 
             var lens = (await lensDetails.ListAsync(
                 new Specification<LensDetails>()
-                    .Where(x => x.ProductId == product.Id),
-                ct)).FirstOrDefault();
-
-            var (sphereMin, sphereMax) = NormalizeRange(lens?.SphereMin, lens?.SphereMax);
-            var (cylinderMin, cylinderMax) = NormalizeRange(lens?.CylinderMin, lens?.CylinderMax);
-            var (addMin, addMax) = NormalizeRange(lens?.AddMin, lens?.AddMax);
+                    .Where(x => x.ProductVariantId == variant.Id && x.IsActive),
+                ct)).SingleOrDefault();
 
             result.Add(new SalesProductVariantLookupDto(
                 variant.Id,
                 product.Id,
                 productType.Id,
                 productType.Code,
-                productType.NameAr,
+                productType.Name,
                 productType.SystemKey,
                 (OAS.Contracts.Sales.Enums.SalesLineType)(byte)SalesProductTypeMapping.ToLineType(productType.SystemKey),
                 product.CategoryId,
                 product.ProductCode,
-                product.NameAr,
+                product.Name,
                 variant.SKU,
                 variant.Barcode,
                 variant.VariantName,
@@ -552,12 +470,9 @@ public sealed class SearchSalesProductVariantsQueryHandler(
                 variant.SellingPrice,
                 product.IsStockItem,
                 lens?.IsPrescriptionLens ?? false,
-                sphereMin,
-                sphereMax,
-                cylinderMin,
-                cylinderMax,
-                addMin,
-                addMax,
+                lens?.SPH,
+                lens?.CYL,
+                lens?.ADD,
                 variant.IsActive,
                 lens?.LensType,
                 lens?.Material,
@@ -566,16 +481,6 @@ public sealed class SearchSalesProductVariantsQueryHandler(
         }
 
         return result;
-    }
-
-    private static (decimal? Minimum, decimal? Maximum) NormalizeRange(decimal? first, decimal? second)
-    {
-        if (!first.HasValue || !second.HasValue)
-            return (first, second);
-
-        return first.Value <= second.Value
-            ? (first, second)
-            : (second, first);
     }
 }
 
@@ -643,7 +548,7 @@ public sealed class SearchSalesWarehousesQueryHandler(
                 x.IsActive &&
                 (
                     x.Code.Contains(search) ||
-                    x.NameAr.Contains(search)
+                    x.Name.Contains(search)
                 ));
         }
         else
@@ -656,7 +561,7 @@ public sealed class SearchSalesWarehousesQueryHandler(
                 nameof(Warehouse.IsDefault),
                 OAS.Contracts.Common.Pagination.SortDirection.Descending)
             .AddSort(
-                nameof(Warehouse.NameAr),
+                nameof(Warehouse.Name),
                 OAS.Contracts.Common.Pagination.SortDirection.Ascending)
             .ApplyPaging(
                 0,
@@ -685,7 +590,7 @@ public sealed class SearchSalesWarehousesQueryHandler(
                 new SalesWarehouseLookupDto(
                     warehouse.Id,
                     warehouse.Code,
-                    warehouse.NameAr,
+                    warehouse.Name,
                     warehouse.IsDefault,
                     warehouse.IsActive,
                     balance?.OnHandQuantity,

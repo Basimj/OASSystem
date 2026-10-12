@@ -8,69 +8,53 @@ namespace OAS.Tests.Inventory;
 public sealed class LensDetailsDomainTests
 {
     [Test]
-    public void Constructor_NormalizesReversedOpticalRanges()
+    public void Constructor_StoresExactOpticalMeasurementsForVariant()
     {
+        var variantId = Guid.NewGuid();
         var lens = new LensDetails(
-            Guid.NewGuid(),
+            variantId,
             "Single Vision",
             isPrescriptionLens: true,
-            sphereMin: -0.25m,
-            sphereMax: -6.00m,
-            cylinderMin: 0m,
-            cylinderMax: -4.00m,
-            addMin: 3.50m,
-            addMax: 0m);
+            refractiveIndex: 1.56m,
+            sph: -2.00m,
+            cyl: -0.75m,
+            add: 1.50m,
+            baseCurve: 8.60m,
+            diameter: 70m);
 
         Assert.Multiple(() =>
         {
-            Assert.That(lens.SphereMin, Is.EqualTo(-6.00m));
-            Assert.That(lens.SphereMax, Is.EqualTo(-0.25m));
-            Assert.That(lens.CylinderMin, Is.EqualTo(-4.00m));
-            Assert.That(lens.CylinderMax, Is.EqualTo(0m));
-            Assert.That(lens.AddMin, Is.EqualTo(0m));
-            Assert.That(lens.AddMax, Is.EqualTo(3.50m));
+            Assert.That(lens.ProductVariantId, Is.EqualTo(variantId));
+            Assert.That(lens.SPH, Is.EqualTo(-2.00m));
+            Assert.That(lens.CYL, Is.EqualTo(-0.75m));
+            Assert.That(lens.ADD, Is.EqualTo(1.50m));
+            Assert.That(lens.BaseCurve, Is.EqualTo(8.60m));
+            Assert.That(lens.Diameter, Is.EqualTo(70m));
+            Assert.That(lens.Matches(-2.00m, -0.75m, 1.50m), Is.True);
         });
     }
 
     [Test]
-    public void Constructor_RejectsZeroRefractiveIndex()
+    public void Constructor_RejectsZeroRefractiveIndex() =>
+        Assert.Throws<DomainException>(() => new LensDetails(Guid.NewGuid(), "Single Vision", refractiveIndex: 0m));
+
+    [Test]
+    public void UpdateDetails_RejectsNegativeAdd()
     {
-        Assert.Throws<DomainException>(() =>
-            new LensDetails(Guid.NewGuid(), "Single Vision", refractiveIndex: 0m));
+        var lens = new LensDetails(Guid.NewGuid(), "Progressive", isPrescriptionLens: true);
+        Assert.Throws<DomainException>(() => lens.UpdateDetails("Progressive", isPrescriptionLens: true, add: -0.25m));
     }
 
     [Test]
-    public void UpdateDetails_RejectsNegativeRefractiveIndex()
+    public void UpdateDetails_ReplacesExactMeasurementsWithoutRangeNormalization()
     {
-        var lens = new LensDetails(Guid.NewGuid(), "Single Vision", refractiveIndex: 1.56m);
-
-        Assert.Throws<DomainException>(() =>
-            lens.UpdateDetails("Single Vision", refractiveIndex: -1m));
-    }
-
-    [Test]
-    public void UpdateDetails_NormalizesReversedOpticalRanges()
-    {
-        var lens = new LensDetails(Guid.NewGuid(), "Single Vision", isPrescriptionLens: true);
-
-        lens.UpdateDetails(
-            "Single Vision",
-            isPrescriptionLens: true,
-            sphereMin: 4.00m,
-            sphereMax: -8.00m,
-            cylinderMin: 0m,
-            cylinderMax: -6.00m,
-            addMin: 4.00m,
-            addMax: 0m);
-
+        var lens = new LensDetails(Guid.NewGuid(), "Single Vision", isPrescriptionLens: true, sph: -1m, cyl: 0m);
+        lens.UpdateDetails("Single Vision", isPrescriptionLens: true, sph: -6.25m, cyl: -1.50m, add: null);
         Assert.Multiple(() =>
         {
-            Assert.That(lens.SphereMin, Is.EqualTo(-8.00m));
-            Assert.That(lens.SphereMax, Is.EqualTo(4.00m));
-            Assert.That(lens.CylinderMin, Is.EqualTo(-6.00m));
-            Assert.That(lens.CylinderMax, Is.EqualTo(0m));
-            Assert.That(lens.AddMin, Is.EqualTo(0m));
-            Assert.That(lens.AddMax, Is.EqualTo(4.00m));
+            Assert.That(lens.SPH, Is.EqualTo(-6.25m));
+            Assert.That(lens.CYL, Is.EqualTo(-1.50m));
+            Assert.That(lens.ADD, Is.Null);
         });
     }
 }

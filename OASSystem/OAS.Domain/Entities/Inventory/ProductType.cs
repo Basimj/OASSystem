@@ -5,30 +5,25 @@ namespace OAS.Domain.Entities.Inventory;
 public class ProductType : AuditableEntity<Guid>
 {
     public string Code { get; private set; } = null!;
-    public string NameAr { get; private set; } = null!;
-    public string? NameEn { get; private set; }
+    public string Name { get; private set; } = null!;
     public string? SystemKey { get; private set; }
     public bool IsActive { get; private set; }
 
-    private ProductType()
-    {
-    }
+    private ProductType() { }
 
-    public ProductType(string code, string nameAr, string? nameEn = null, string? systemKey = null)
+    public ProductType(string code, string name, string? systemKey = null)
     {
         Id = Guid.NewGuid();
         Code = code;
-        NameAr = nameAr;
-        NameEn = nameEn;
+        Name = name;
         SystemKey = systemKey;
         IsActive = true;
     }
 
-    public void UpdateDetails(string code, string nameAr, string? nameEn, bool isActive)
+    public void UpdateDetails(string code, string name, bool isActive)
     {
         Code = code;
-        NameAr = nameAr;
-        NameEn = nameEn;
+        Name = name;
         IsActive = isActive;
     }
 }

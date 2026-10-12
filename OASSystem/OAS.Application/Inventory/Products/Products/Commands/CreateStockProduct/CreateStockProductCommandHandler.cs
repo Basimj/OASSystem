@@ -48,8 +48,8 @@ public sealed class CreateStockProductCommandHandler(
             Ensure(brand.IsActive, "product_brand_inactive", "Selected brand is inactive.");
         }
 
-        var productType = await productTypeRepository.GetByIdAsync(productRequest.ProductTypeId, cancellationToken)
-            ?? throw new NotFoundException(nameof(ProductType), productRequest.ProductTypeId);
+        var productType = await productTypeRepository.GetByIdAsync(category.ProductTypeId, cancellationToken)
+            ?? throw new NotFoundException(nameof(ProductType), category.ProductTypeId);
         Ensure(productType.IsActive, "product_type_inactive", "Selected product type is inactive.");
 
         var isService = string.Equals(productType.SystemKey, ProductTypeSystemKeys.Service, StringComparison.OrdinalIgnoreCase);
@@ -63,11 +63,9 @@ public sealed class CreateStockProductCommandHandler(
 
         var product = new Product(
             productRequest.ProductCode.Trim(),
-            productRequest.NameAr.Trim(),
+            productRequest.Name.Trim(),
             productRequest.CategoryId,
-            productRequest.ProductTypeId,
             productRequest.IsStockItem,
-            NullIfBlank(productRequest.NameEn),
             productRequest.BrandId,
             NullIfBlank(productRequest.Description));
         await productRepository.AddAsync(product, cancellationToken);
@@ -88,27 +86,6 @@ public sealed class CreateStockProductCommandHandler(
                 frame.TempleLength,
                 frame.BridgeSize,
                 frame.LensWidth), cancellationToken);
-        }
-
-        if (request.LensDetails is not null)
-        {
-            if (!string.Equals(productType.SystemKey, ProductTypeSystemKeys.Lens, StringComparison.OrdinalIgnoreCase))
-                throw Validation("lens_details", "lens_details_product_type_invalid", "Lens details are only valid for lens products.");
-
-            var lens = request.LensDetails;
-            await lensDetailsRepository.AddAsync(new DomainLensDetails(
-                product.Id,
-                lens.LensType.Trim(),
-                lens.IsPrescriptionLens,
-                NullIfBlank(lens.Material),
-                NullIfBlank(lens.Coating),
-                lens.RefractiveIndex,
-                lens.SphereMin,
-                lens.SphereMax,
-                lens.CylinderMin,
-                lens.CylinderMax,
-                lens.AddMin,
-                lens.AddMax), cancellationToken);
         }
 
         ProductVariant? variant = null;
@@ -133,6 +110,28 @@ public sealed class CreateStockProductCommandHandler(
                 NullIfBlank(variantRequest.Size),
                 variantRequest.UnitId);
             await variantRepository.AddAsync(variant, cancellationToken);
+        }
+
+        if (request.LensDetails is not null)
+        {
+            if (!string.Equals(productType.SystemKey, ProductTypeSystemKeys.Lens, StringComparison.OrdinalIgnoreCase))
+                throw Validation("lens_details", "lens_details_product_type_invalid", "Lens details are only valid for lens products.");
+            if (variant is null)
+                throw Validation("variant", "lens_details_variant_required", "Lens details require a product variant because optical measurements identify the SKU.");
+
+            var lens = request.LensDetails;
+            await lensDetailsRepository.AddAsync(new DomainLensDetails(
+                variant.Id,
+                lens.LensType.Trim(),
+                lens.IsPrescriptionLens,
+                NullIfBlank(lens.Material),
+                NullIfBlank(lens.Coating),
+                lens.RefractiveIndex,
+                lens.SPH,
+                lens.CYL,
+                lens.ADD,
+                lens.BaseCurve,
+                lens.Diameter), cancellationToken);
         }
 
         Guid? transactionId = null;

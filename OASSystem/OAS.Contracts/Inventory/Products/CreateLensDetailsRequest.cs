@@ -1,15 +1,14 @@
-﻿namespace OAS.Contracts.Inventory.Products;
-
+namespace OAS.Contracts.Inventory.Products;
 public sealed record CreateLensDetailsRequest(
-    Guid ProductId,
+    Guid ProductVariantId,
     string LensType,
     string? Material,
     string? Coating,
     decimal? RefractiveIndex,
-    decimal? SphereMin,
-    decimal? SphereMax,
-    decimal? CylinderMin,
-    decimal? CylinderMax,
-    decimal? AddMin,
-    decimal? AddMax,
-    bool IsPrescriptionLens);
+    decimal? SPH,
+    decimal? CYL,
+    decimal? ADD,
+    decimal? BaseCurve,
+    decimal? Diameter,
+    bool IsPrescriptionLens,
+    bool IsActive = true);

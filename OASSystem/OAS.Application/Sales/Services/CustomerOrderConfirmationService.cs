@@ -56,18 +56,12 @@ public sealed class CustomerOrderConfirmationService(
                 .SingleOrDefault();
 
             line.EnsureOpticalMeasurementReference(resolved.PrescriptionRequired, snapshot is not null);
-            if (snapshot is not null)
-            {
-                if (resolved.OpticalPolicy is not null)
-                    snapshot.ValidateAgainst(resolved.OpticalPolicy);
-            }
-            else
+            if (snapshot is null)
             {
                 await prescriptionValidator.ValidateLineAsync(
                     line.PrescriptionRevisionId,
                     line.PrescriptionEye,
                     resolved.PrescriptionRequired,
-                    resolved.OpticalPolicy,
                     cancellationToken);
             }
         }

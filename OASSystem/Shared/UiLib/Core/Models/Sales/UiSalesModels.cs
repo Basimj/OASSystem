@@ -107,13 +107,10 @@ public sealed class UiSalesLineModel
     public decimal? MonocularPD { get; set; }
     public string? VA { get; set; }
     public decimal? FittingHeight { get; set; }
-    // نطاقات العدسة المختارة لعرض إرشاد فوري والتحقق من الإدخال اليدوي.
-    public decimal? LensSphereMin { get; set; }
-    public decimal? LensSphereMax { get; set; }
-    public decimal? LensCylinderMin { get; set; }
-    public decimal? LensCylinderMax { get; set; }
-    public decimal? LensAddMin { get; set; }
-    public decimal? LensAddMax { get; set; }
+    // القياسات الفعلية للـSKU المختار. لا تستخدم كمدى للتحقق من الوصفة.
+    public decimal? LensSPH { get; set; }
+    public decimal? LensCYL { get; set; }
+    public decimal? LensADD { get; set; }
     public string? LensTypeSnapshot { get; set; }
     public string? LensMaterialSnapshot { get; set; }
     public string? LensCoatingSnapshot { get; set; }

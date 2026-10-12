@@ -12,10 +12,8 @@ public sealed class CreateStockProductValidationTests
         var product = new CreateProductRequest(
             "P-VALID",
             "منتج",
-            null,
             Guid.NewGuid(),
             null,
-            Guid.NewGuid(),
             null,
             true);
 

@@ -171,7 +171,7 @@ public sealed partial class InventorySpreadsheetService
         switch (section)
         {
             case "product-categories":
-                ValidateCategories(rows, categories);
+                ValidateCategories(rows, categories, productTypes);
                 break;
             case "brands":
                 ValidateBrands(rows, brands);
@@ -186,7 +186,7 @@ public sealed partial class InventorySpreadsheetService
                 ValidateProducts(rows, products, variants, categories, brands, productTypes, units);
                 break;
             case "product-variants":
-                ValidateVariants(rows, variants, products, units);
+                ValidateVariants(rows, variants, products, categories, productTypes, units);
                 break;
             case "warehouses":
                 ValidateWarehouses(rows, warehouses);
@@ -228,9 +228,7 @@ public sealed partial class InventorySpreadsheetService
                     }
                     else
                     {
-                        var allowsNegative = column.Key is
-                            "LensSphereMin" or "LensSphereMax" or
-                            "LensCylinderMin" or "LensCylinderMax";
+                        var allowsNegative = column.Key is "LensSPH" or "LensCYL";
 
                         if ((!allowsNegative && number < 0) || decimal.Round(number, 4) != number)
                         {
@@ -244,41 +242,21 @@ public sealed partial class InventorySpreadsheetService
         }
     }
 
-    private static void ValidateCategories(IReadOnlyList<ImportRow> rows, IReadOnlyList<ProductCategoryDto> existing)
+    private static void ValidateCategories(
+        IReadOnlyList<ImportRow> rows,
+        IReadOnlyList<ProductCategoryDto> existing,
+        IReadOnlyList<ProductTypeDto> productTypes)
     {
         ValidateCodeRows(rows, "Code", "كود التصنيف", existing.Select(x => x.Code), 32);
         foreach (var row in rows)
         {
-            ValidateRequiredText(row, "NameAr", "الاسم العربي", 100);
-            ValidateOptionalText(row, "NameEn", "الاسم الإنجليزي", 100);
-            var parentCode = row.Optional("ParentCode");
-            if (parentCode is null) continue;
-            if (string.Equals(parentCode, row.Get("Code"), StringComparison.OrdinalIgnoreCase))
-                row.Errors.Add("كود التصنيف الأب: لا يمكن أن يكون التصنيف أبًا لنفسه.");
-            else if (!existing.Any(x => Eq(x.Code, parentCode)) && !rows.Any(x => Eq(x.Get("Code"), parentCode)))
-                row.Errors.Add("كود التصنيف الأب: الكود غير موجود في النظام أو الملف.");
-        }
-
-        var parentByCode = rows
-            .Where(x => x.Get("Code").Length > 0)
-            .GroupBy(x => x.Get("Code"), StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.First().Optional("ParentCode"), StringComparer.OrdinalIgnoreCase);
-
-        foreach (var row in rows)
-        {
-            var start = row.Get("Code");
-            if (start.Length == 0) continue;
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { start };
-            var current = row.Optional("ParentCode");
-            while (current is not null && parentByCode.TryGetValue(current, out var next))
-            {
-                if (!seen.Add(current))
-                {
-                    row.Errors.Add("كود التصنيف الأب: توجد دورة غير صالحة في شجرة التصنيفات.");
-                    break;
-                }
-                current = next;
-            }
+            ValidateRequiredText(row, "Name", "الاسم", 100);
+            var productTypeCode = row.Get("ProductTypeCode");
+            var productType = productTypes.FirstOrDefault(x => Eq(x.Code, productTypeCode));
+            if (productTypeCode.Length > 0 && productType is null)
+                row.Errors.Add("كود نوع المنتج: الكود غير موجود.");
+            else if (productType is { IsActive: false })
+                row.Errors.Add("كود نوع المنتج: نوع المنتج غير نشط.");
         }
     }
 
@@ -294,8 +272,7 @@ public sealed partial class InventorySpreadsheetService
         ValidateCodeRows(rows, "Code", "كود نوع المنتج", existing.Select(x => x.Code), 32);
         foreach (var row in rows)
         {
-            ValidateRequiredText(row, "NameAr", "الاسم العربي", 100);
-            ValidateOptionalText(row, "NameEn", "الاسم الإنجليزي", 100);
+            ValidateRequiredText(row, "Name", "الاسم", 100);
         }
     }
 
@@ -304,8 +281,7 @@ public sealed partial class InventorySpreadsheetService
         ValidateCodeRows(rows, "Code", "كود الوحدة", existing.Select(x => x.Code), 32);
         foreach (var row in rows)
         {
-            ValidateRequiredText(row, "NameAr", "الاسم العربي", 100);
-            ValidateOptionalText(row, "NameEn", "الاسم الإنجليزي", 100);
+            ValidateRequiredText(row, "Name", "الاسم", 100);
         }
     }
 
@@ -326,9 +302,8 @@ public sealed partial class InventorySpreadsheetService
 
         foreach (var row in rows)
         {
-            ValidateRequiredText(row, "NameAr", "الاسم العربي", 150);
-            ValidateOptionalText(row, "NameEn", "الاسم الإنجليزي", 150);
-            ValidateOptionalText(row, "Description", "الوصف", 500);
+            ValidateRequiredText(row, "Name", "الاسم", 200);
+            ValidateOptionalText(row, "Description", "الوصف", 1000);
             ValidateOptionalText(row, "InitialSKU", "SKU الأول", 64);
             ValidateOptionalText(row, "InitialBarcode", "باركود المتغير الأول", 64);
             ValidateOptionalText(row, "InitialVariantName", "اسم المتغير الأول", 100);
@@ -339,9 +314,9 @@ public sealed partial class InventorySpreadsheetService
             ValidateOptionalText(row, "FrameRimType", "نوع الإطار / Rim", 50);
             ValidateOptionalText(row, "FrameGender", "جنس الإطار", 20);
             ValidateOptionalText(row, "FrameShape", "شكل الإطار", 50);
-            ValidateOptionalText(row, "LensType", "نوع العدسة", 50);
-            ValidateOptionalText(row, "LensMaterial", "خامة العدسة", 50);
-            ValidateOptionalText(row, "LensCoating", "طلاء العدسة", 50);
+            ValidateOptionalText(row, "LensType", "نوع العدسة", 100);
+            ValidateOptionalText(row, "LensMaterial", "خامة العدسة", 100);
+            ValidateOptionalText(row, "LensCoating", "طلاء العدسة", 100);
 
             var categoryCode = row.Get("CategoryCode");
             var category = categories.FirstOrDefault(x => Eq(x.Code, categoryCode));
@@ -357,12 +332,13 @@ public sealed partial class InventorySpreadsheetService
             else if (brand is { IsActive: false })
                 row.Errors.Add("كود العلامة التجارية: العلامة التجارية غير نشطة.");
 
-            var productTypeCode = row.Get("ProductTypeCode");
-            var productType = productTypes.FirstOrDefault(x => Eq(x.Code, productTypeCode));
-            if (productTypeCode.Length > 0 && productType is null)
-                row.Errors.Add("كود نوع المنتج: الكود غير موجود.");
+            var productType = category is null
+                ? null
+                : productTypes.FirstOrDefault(x => x.Id == category.ProductTypeId);
+            if (category is not null && productType is null)
+                row.Errors.Add("كود التصنيف: نوع المنتج المرتبط بالتصنيف غير موجود.");
             else if (productType is { IsActive: false })
-                row.Errors.Add("كود نوع المنتج: نوع المنتج غير نشط.");
+                row.Errors.Add("كود التصنيف: نوع المنتج المرتبط بالتصنيف غير نشط.");
 
             var isStock = TryBool(row.Get("IsStockItem"), true);
             if (productType is not null &&
@@ -377,8 +353,7 @@ public sealed partial class InventorySpreadsheetService
                 "FrameTempleLength", "FrameBridgeSize", "FrameLensWidth");
             var hasLensDetails = HasAny(row,
                 "LensType", "LensMaterial", "LensCoating", "LensRefractiveIndex",
-                "LensSphereMin", "LensSphereMax", "LensCylinderMin", "LensCylinderMax",
-                "LensAddMin", "LensAddMax") || TryBool(row.Get("LensIsPrescription"), false);
+                "LensSPH", "LensCYL", "LensADD", "LensBaseCurve", "LensDiameter") || TryBool(row.Get("LensIsPrescription"), false);
 
             if (hasFrameDetails)
             {
@@ -404,12 +379,11 @@ public sealed partial class InventorySpreadsheetService
                 var refractiveIndex = row.NullableDecimal("LensRefractiveIndex");
                 if (refractiveIndex.HasValue && refractiveIndex.Value <= 0m)
                     row.Errors.Add("معامل الانكسار: يجب أن يكون أكبر من صفر عند إدخاله.");
-                ValidateDecimalPrecision(row, "LensSphereMin", "Sphere Min", 6, 2, allowNegative: true);
-                ValidateDecimalPrecision(row, "LensSphereMax", "Sphere Max", 6, 2, allowNegative: true);
-                ValidateDecimalPrecision(row, "LensCylinderMin", "Cylinder Min", 6, 2, allowNegative: true);
-                ValidateDecimalPrecision(row, "LensCylinderMax", "Cylinder Max", 6, 2, allowNegative: true);
-                ValidateDecimalPrecision(row, "LensAddMin", "Add Min", 6, 2, allowNegative: false);
-                ValidateDecimalPrecision(row, "LensAddMax", "Add Max", 6, 2, allowNegative: false);
+                ValidateDecimalPrecision(row, "LensSPH", "SPH", 6, 2, allowNegative: true);
+                ValidateDecimalPrecision(row, "LensCYL", "CYL", 6, 2, allowNegative: true);
+                ValidateDecimalPrecision(row, "LensADD", "ADD", 6, 2, allowNegative: false);
+                ValidateDecimalPrecision(row, "LensBaseCurve", "Base Curve", 6, 2, allowNegative: false);
+                ValidateDecimalPrecision(row, "LensDiameter", "Diameter", 6, 2, allowNegative: false);
             }
 
             var sku = row.Optional("InitialSKU");
@@ -459,6 +433,8 @@ public sealed partial class InventorySpreadsheetService
         IReadOnlyList<ImportRow> rows,
         IReadOnlyList<ProductVariantDto> existing,
         IReadOnlyList<ProductDto> products,
+        IReadOnlyList<ProductCategoryDto> categories,
+        IReadOnlyList<ProductTypeDto> productTypes,
         IReadOnlyList<UnitDto> units)
     {
         ValidateCodeRows(rows, "SKU", "SKU", existing.Select(x => x.SKU), 64);
@@ -478,6 +454,24 @@ public sealed partial class InventorySpreadsheetService
             ValidateOptionalText(row, "VariantName", "اسم المتغير", 100);
             ValidateOptionalText(row, "Color", "اللون", 50);
             ValidateOptionalText(row, "Size", "المقاس", 50);
+            ValidateOptionalText(row, "LensType", "نوع العدسة", 100);
+            ValidateOptionalText(row, "LensMaterial", "خامة العدسة", 100);
+            ValidateOptionalText(row, "LensCoating", "طلاء العدسة", 100);
+            var hasLensDetails = HasAny(row, "LensType", "LensMaterial", "LensCoating", "LensRefractiveIndex", "LensSPH", "LensCYL", "LensADD", "LensBaseCurve", "LensDiameter") || TryBool(row.Get("LensIsPrescription"), false);
+            if (hasLensDetails)
+            {
+                var category = product is null ? null : categories.FirstOrDefault(x => x.Id == product.CategoryId);
+                var productType = category is null ? null : productTypes.FirstOrDefault(x => x.Id == category.ProductTypeId);
+                if (!string.Equals(productType?.SystemKey, ProductTypeSystemKeys.Lens, StringComparison.OrdinalIgnoreCase))
+                    row.Errors.Add("نوع العدسة: بيانات قياس العدسة مسموحة فقط لمتغير تابع لمنتج من نوع عدسة.");
+                if (row.Optional("LensType") is null) row.Errors.Add("نوع العدسة: مطلوب عند إدخال بيانات العدسة.");
+                ValidateDecimalPrecision(row, "LensRefractiveIndex", "معامل الانكسار", 5, 3, allowNegative: false);
+                ValidateDecimalPrecision(row, "LensSPH", "SPH", 6, 2, allowNegative: true);
+                ValidateDecimalPrecision(row, "LensCYL", "CYL", 6, 2, allowNegative: true);
+                ValidateDecimalPrecision(row, "LensADD", "ADD", 6, 2, allowNegative: false);
+                ValidateDecimalPrecision(row, "LensBaseCurve", "Base Curve", 6, 2, allowNegative: false);
+                ValidateDecimalPrecision(row, "LensDiameter", "Diameter", 6, 2, allowNegative: false);
+            }
 
             var unitCode = row.Optional("UnitCode");
             var unit = unitCode is null ? null : units.FirstOrDefault(x => Eq(x.Code, unitCode));
@@ -507,9 +501,8 @@ public sealed partial class InventorySpreadsheetService
         ValidateCodeRows(rows, "Code", "كود المخزن", existing.Select(x => x.Code), 32);
         foreach (var row in rows)
         {
-            ValidateRequiredText(row, "NameAr", "الاسم العربي", 100);
-            ValidateOptionalText(row, "NameEn", "الاسم الإنجليزي", 100);
-            ValidateOptionalText(row, "Description", "الوصف", 500);
+            ValidateRequiredText(row, "Name", "الاسم", 100);
+            ValidateOptionalText(row, "Description", "الوصف", 1000);
         }
 
         var requestedDefaults = rows.Count(x => TryBool(x.Get("IsDefault"), false));
@@ -551,37 +544,10 @@ public sealed partial class InventorySpreadsheetService
     private async Task<int> ImportCategoriesAsync(IReadOnlyList<ImportRow> rows, CancellationToken ct)
     {
         var service = Crud<ProductCategoryDto, CreateProductCategoryRequest, UpdateProductCategoryRequest>();
-        var existing = await CategoriesAsync(new PageRequest(), ct);
-        var ids = existing.ToDictionary(x => x.Code, x => x.Id, StringComparer.OrdinalIgnoreCase);
-        var pending = rows.ToList();
-        var imported = 0;
-
-        while (pending.Count > 0)
-        {
-            var progress = false;
-            foreach (var row in pending.ToArray())
-            {
-                var parentCode = row.Optional("ParentCode");
-                if (parentCode is not null && !ids.ContainsKey(parentCode))
-                    continue;
-
-                var created = await service.CreateAsync(new CreateProductCategoryRequest(
-                    row.Get("Code"),
-                    row.Get("NameAr"),
-                    row.Optional("NameEn"),
-                    parentCode is null ? null : ids[parentCode]), ct);
-
-                ids[created.Code] = created.Id;
-                pending.Remove(row);
-                imported++;
-                progress = true;
-            }
-
-            if (!progress)
-                throw new RequestValidationException(new Dictionary<string, string[]> { ["ParentCode"] = ["تعذر ترتيب التصنيفات حسب العلاقات الأب/الابن."] });
-        }
-
-        return imported;
+        var productTypes = (await ProductTypesAsync(new PageRequest(), ct)).ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
+        foreach (var row in rows)
+            await service.CreateAsync(new CreateProductCategoryRequest(row.Get("Code"), row.Get("Name"), productTypes[row.Get("ProductTypeCode")].Id), ct);
+        return rows.Count;
     }
 
     private async Task<int> ImportBrandsAsync(IReadOnlyList<ImportRow> rows, CancellationToken ct)
@@ -596,7 +562,7 @@ public sealed partial class InventorySpreadsheetService
     {
         var service = Crud<ProductTypeDto, CreateProductTypeRequest, UpdateProductTypeRequest>();
         foreach (var row in rows)
-            await service.CreateAsync(new CreateProductTypeRequest(row.Get("Code"), row.Get("NameAr"), row.Optional("NameEn")), ct);
+            await service.CreateAsync(new CreateProductTypeRequest(row.Get("Code"), row.Get("Name")), ct);
         return rows.Count;
     }
 
@@ -604,7 +570,7 @@ public sealed partial class InventorySpreadsheetService
     {
         var service = Crud<UnitDto, CreateUnitRequest, UpdateUnitRequest>();
         foreach (var row in rows)
-            await service.CreateAsync(new CreateUnitRequest(row.Get("Code"), row.Get("NameAr"), row.Optional("NameEn")), ct);
+            await service.CreateAsync(new CreateUnitRequest(row.Get("Code"), row.Get("Name")), ct);
         return rows.Count;
     }
 
@@ -613,7 +579,6 @@ public sealed partial class InventorySpreadsheetService
         var sender = Services.GetRequiredService<ISender>();
         var categories = (await CategoriesAsync(new PageRequest(), ct)).ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
         var brands = (await BrandsAsync(new PageRequest(), ct)).ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
-        var productTypes = (await ProductTypesAsync(new PageRequest(), ct)).ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
         var units = (await UnitsAsync(new PageRequest(), ct)).ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
 
         foreach (var row in rows)
@@ -652,30 +617,27 @@ public sealed partial class InventorySpreadsheetService
             }
 
             InitialLensDetailsRequest? lensDetails = null;
-            if (HasAny(row, "LensType", "LensMaterial", "LensCoating", "LensRefractiveIndex", "LensSphereMin", "LensSphereMax", "LensCylinderMin", "LensCylinderMax", "LensAddMin", "LensAddMax") || row.Bool("LensIsPrescription", false))
+            if (HasAny(row, "LensType", "LensMaterial", "LensCoating", "LensRefractiveIndex", "LensSPH", "LensCYL", "LensADD", "LensBaseCurve", "LensDiameter") || row.Bool("LensIsPrescription", false))
             {
                 lensDetails = new InitialLensDetailsRequest(
                     row.Get("LensType"),
                     row.Optional("LensMaterial"),
                     row.Optional("LensCoating"),
                     row.NullableDecimal("LensRefractiveIndex"),
-                    row.NullableDecimal("LensSphereMin"),
-                    row.NullableDecimal("LensSphereMax"),
-                    row.NullableDecimal("LensCylinderMin"),
-                    row.NullableDecimal("LensCylinderMax"),
-                    row.NullableDecimal("LensAddMin"),
-                    row.NullableDecimal("LensAddMax"),
+                    row.NullableDecimal("LensSPH"),
+                    row.NullableDecimal("LensCYL"),
+                    row.NullableDecimal("LensADD"),
+                    row.NullableDecimal("LensBaseCurve"),
+                    row.NullableDecimal("LensDiameter"),
                     row.Bool("LensIsPrescription", false));
             }
 
             var request = new CreateStockProductRequest(
                 new CreateProductRequest(
                     row.Get("ProductCode"),
-                    row.Get("NameAr"),
-                    row.Optional("NameEn"),
+                    row.Get("Name"),
                     categories[row.Get("CategoryCode")].Id,
                     brandCode is null ? null : brands[brandCode].Id,
-                    productTypes[row.Get("ProductTypeCode")].Id,
                     row.Optional("Description"),
                     isStock),
                 variant,
@@ -692,24 +654,28 @@ public sealed partial class InventorySpreadsheetService
     private async Task<int> ImportVariantsAsync(IReadOnlyList<ImportRow> rows, CancellationToken ct)
     {
         var service = Crud<ProductVariantDto, CreateProductVariantRequest, UpdateProductVariantRequest>();
+        var lensService = Crud<LensDetailsDto, CreateLensDetailsRequest, UpdateLensDetailsRequest>();
         var products = (await ProductsAsync(new PageRequest(), ct)).ToDictionary(x => x.ProductCode, StringComparer.OrdinalIgnoreCase);
         var units = (await UnitsAsync(new PageRequest(), ct)).ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
 
         foreach (var row in rows)
         {
             var unitCode = row.Optional("UnitCode");
-            await service.CreateAsync(new CreateProductVariantRequest(
-                products[row.Get("ProductCode")].Id,
-                row.Get("SKU"),
-                row.Optional("Barcode"),
-                row.Optional("VariantName"),
-                row.Optional("Color"),
-                row.Optional("Size"),
-                unitCode is null ? null : units[unitCode].Id,
-                row.Decimal("PurchasePrice"),
-                row.Decimal("SellingPrice")), ct);
-        }
+            var created = await service.CreateAsync(new CreateProductVariantRequest(
+                products[row.Get("ProductCode")].Id, row.Get("SKU"), row.Optional("Barcode"), row.Optional("VariantName"),
+                row.Optional("Color"), row.Optional("Size"), unitCode is null ? null : units[unitCode].Id,
+                row.Decimal("PurchasePrice"), row.Decimal("SellingPrice")), ct);
 
+            var hasLens = HasAny(row, "LensType", "LensMaterial", "LensCoating", "LensRefractiveIndex", "LensSPH", "LensCYL", "LensADD", "LensBaseCurve", "LensDiameter") || row.Bool("LensIsPrescription", false);
+            if (hasLens)
+            {
+                await lensService.CreateAsync(new CreateLensDetailsRequest(
+                    created.Id, row.Get("LensType"), row.Optional("LensMaterial"), row.Optional("LensCoating"),
+                    row.NullableDecimal("LensRefractiveIndex"), row.NullableDecimal("LensSPH"), row.NullableDecimal("LensCYL"),
+                    row.NullableDecimal("LensADD"), row.NullableDecimal("LensBaseCurve"), row.NullableDecimal("LensDiameter"),
+                    row.Bool("LensIsPrescription", false)), ct);
+            }
+        }
         return rows.Count;
     }
 
@@ -719,8 +685,7 @@ public sealed partial class InventorySpreadsheetService
         foreach (var row in rows)
             await service.CreateAsync(new CreateWarehouseRequest(
                 row.Get("Code"),
-                row.Get("NameAr"),
-                row.Optional("NameEn"),
+                row.Get("Name"),
                 row.Optional("Description"),
                 row.Bool("IsDefault", false)), ct);
         return rows.Count;

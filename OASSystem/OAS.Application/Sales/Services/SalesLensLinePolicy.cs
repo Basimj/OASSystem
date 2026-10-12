@@ -17,10 +17,10 @@ public static class SalesLensLinePolicy
     {
         if (lineType == SalesLineType.Lens)
         {
-            // Prescription lenses always require optical preparation. Non-stock lenses represent
-            // made-to-order/lab supply and also require production. A grouped lens belongs to a
-            // Frame + OD + OS optical set and therefore requires fitting even when plano/non-prescription.
-            return resolution.PrescriptionRequired || !resolution.IsStockItem || groupId.HasValue;
+            // Every sold lens goes through the optical lab/production workflow. Stock availability
+            // only decides whether the exact SKU can be reserved now or must first be procured via
+            // CustomerDemand; it never bypasses laboratory preparation.
+            return true;
         }
 
         // A frame that belongs to an optical set is carried into the job as fitting context.

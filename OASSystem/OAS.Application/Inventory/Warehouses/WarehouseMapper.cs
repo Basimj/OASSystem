@@ -11,8 +11,7 @@ public sealed class WarehouseMapper
     {
         return new Warehouse(
             source.Code,
-            source.NameAr,
-            source.NameEn,
+            source.Name,
             source.Description,
             source.IsDefault);
     }
@@ -21,8 +20,7 @@ public sealed class WarehouseMapper
     {
         destination.UpdateDetails(
             source.Code.Trim(),
-            source.NameAr,
-            source.NameEn,
+            source.Name,
             source.Description,
             source.IsDefault,
             source.IsActive);
@@ -33,8 +31,7 @@ public sealed class WarehouseMapper
         return new WarehouseDto(
             source.Id,
             source.Code,
-            source.NameAr,
-            source.NameEn,
+            source.Name,
             source.Description,
             source.IsDefault,
             source.IsActive);

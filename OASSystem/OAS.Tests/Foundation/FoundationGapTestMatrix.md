@@ -4,8 +4,8 @@ This folder contains the regression/acceptance coverage added for the foundation
 
 | Requirement | Automated coverage |
 |---|---|
-| Exact lens SKU identity | LensVariantDetailDomainTests, LensVariantResolverTests |
-| One LensVariantDetail per ProductVariant | FoundationGapEfConfigurationTests, FoundationGapSqlServerConcurrencyTests |
+| Exact lens SKU identity | LensDetailsDomainTests, LensVariantResolverTests |
+| One LensDetails per ProductVariant | FoundationGapEfConfigurationTests, FoundationGapSqlServerConcurrencyTests |
 | Manual/stored optical snapshot | CustomerOrderLineOpticalSnapshotDomainTests |
 | Snapshot immutable outside Draft | CustomerOrderLineOpticalSnapshotDomainTests |
 | Availability query is read-only | CustomerOrderAvailabilityServiceTests |

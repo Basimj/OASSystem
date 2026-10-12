@@ -121,12 +121,9 @@ public sealed class SalesDtoAssembler(
             ProductTypeSystemKey = product.ProductTypeSystemKey,
             ProductIsStockItem = product.IsStockItem,
             ProductIsPrescriptionLens = product.IsPrescriptionLens,
-            LensSphereMin = product.SphereMin,
-            LensSphereMax = product.SphereMax,
-            LensCylinderMin = product.CylinderMin,
-            LensCylinderMax = product.CylinderMax,
-            LensAddMin = product.AddMin,
-            LensAddMax = product.AddMax,
+            LensSPH = product.SPH,
+            LensCYL = product.CYL,
+            LensADD = product.ADD,
             WarehouseCode = warehouse.Code,
             WarehouseName = warehouse.Name,
             PrescriptionCode = prescription.Code,
@@ -163,12 +160,9 @@ public sealed class SalesDtoAssembler(
             ProductTypeSystemKey = product.ProductTypeSystemKey,
             ProductIsStockItem = product.IsStockItem,
             ProductIsPrescriptionLens = product.IsPrescriptionLens,
-            LensSphereMin = product.SphereMin,
-            LensSphereMax = product.SphereMax,
-            LensCylinderMin = product.CylinderMin,
-            LensCylinderMax = product.CylinderMax,
-            LensAddMin = product.AddMin,
-            LensAddMax = product.AddMax,
+            LensSPH = product.SPH,
+            LensCYL = product.CYL,
+            LensADD = product.ADD,
             ReturnedQuantity = line.ReturnedQuantity,
             WarehouseCode = warehouse.Code,
             WarehouseName = warehouse.Name,
@@ -189,65 +183,45 @@ public sealed class SalesDtoAssembler(
         string? ProductTypeSystemKey,
         bool? IsStockItem,
         bool? IsPrescriptionLens,
-        decimal? SphereMin,
-        decimal? SphereMax,
-        decimal? CylinderMin,
-        decimal? CylinderMax,
-        decimal? AddMin,
-        decimal? AddMax)> ResolveProductAsync(Guid? variantId, CancellationToken ct)
+        decimal? SPH,
+        decimal? CYL,
+        decimal? ADD)> ResolveProductAsync(Guid? variantId, CancellationToken ct)
     {
         if (!variantId.HasValue)
-            return (null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+            return (null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
         var variant = await variants.GetByIdAsync(variantId.Value, ct);
         if (variant is null)
-            return (null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+            return (null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
         var product = await products.GetByIdAsync(variant.ProductId, ct);
         if (product is null)
-            return (null, variant.VariantName, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+            return (null, variant.VariantName, null, null, null, null, null, null, null, null, null, null, null, null);
 
         var category = await categories.GetByIdAsync(product.CategoryId, ct);
-        var productType = await productTypes.GetByIdAsync(product.ProductTypeId, ct);
+        var productType = category is null ? null : await productTypes.GetByIdAsync(category.ProductTypeId, ct);
         var name = string.IsNullOrWhiteSpace(variant.VariantName)
-            ? product.NameAr
-            : $"{product.NameAr} - {variant.VariantName}";
+            ? product.Name
+            : $"{product.Name} - {variant.VariantName}";
 
         var lens = (await lensDetails.ListAsync(
-            new Specification<LensDetails>().Where(x => x.ProductId == product.Id), ct)).FirstOrDefault();
-
-        var (sphereMin, sphereMax) = NormalizeRange(lens?.SphereMin, lens?.SphereMax);
-        var (cylinderMin, cylinderMax) = NormalizeRange(lens?.CylinderMin, lens?.CylinderMax);
-        var (addMin, addMax) = NormalizeRange(lens?.AddMin, lens?.AddMax);
+            new Specification<LensDetails>().Where(x => x.ProductVariantId == variant.Id && x.IsActive), ct)).SingleOrDefault();
 
         return (
             product.ProductCode,
             name,
             product.CategoryId,
             category?.Code,
-            category?.NameAr,
-            product.ProductTypeId,
+            category?.Name,
+            category?.ProductTypeId,
             productType?.Code,
-            productType?.NameAr,
+            productType?.Name,
             productType?.SystemKey,
             product.IsStockItem,
             lens?.IsPrescriptionLens,
-            sphereMin,
-            sphereMax,
-            cylinderMin,
-            cylinderMax,
-            addMin,
-            addMax);
-    }
-
-    private static (decimal? Minimum, decimal? Maximum) NormalizeRange(decimal? first, decimal? second)
-    {
-        if (!first.HasValue || !second.HasValue)
-            return (first, second);
-
-        return first.Value <= second.Value
-            ? (first, second)
-            : (second, first);
+            lens?.SPH,
+            lens?.CYL,
+            lens?.ADD);
     }
 
     private async Task<(string? Code, string? Name)> ResolveWarehouseAsync(Guid? warehouseId, CancellationToken ct)
@@ -258,7 +232,7 @@ public sealed class SalesDtoAssembler(
         var warehouse = await warehouses.GetByIdAsync(warehouseId.Value, ct);
         return warehouse is null
             ? (null, null)
-            : (warehouse.Code, warehouse.NameAr);
+            : (warehouse.Code, warehouse.Name);
     }
 
     private async Task<(string? Code, int? RevisionNumber)> ResolvePrescriptionAsync(Guid? revisionId, CancellationToken ct)

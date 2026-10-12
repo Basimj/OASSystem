@@ -17,8 +17,7 @@ public sealed class WarehouseSpecificationFactory : ICrudSpecificationFactory<Wa
             var search = normalized.Search.Trim();
             specification.Where(x =>
                 x.Code.Contains(search) ||
-                x.NameAr.Contains(search) ||
-                (x.NameEn != null && x.NameEn.Contains(search)) ||
+                x.Name.Contains(search) ||
                 (x.Description != null && x.Description.Contains(search)));
         }
 
@@ -40,9 +39,8 @@ public sealed class WarehouseSpecificationFactory : ICrudSpecificationFactory<Wa
         return requested.Trim().ToLowerInvariant() switch
         {
             "code" => nameof(Warehouse.Code),
-            "name" => nameof(Warehouse.NameAr),
-            "namear" => nameof(Warehouse.NameAr),
-            "nameen" => nameof(Warehouse.NameEn),
+            "name" => nameof(Warehouse.Name),
+            "namear" => nameof(Warehouse.Name),
             "isdefault" => nameof(Warehouse.IsDefault),
             "isactive" => nameof(Warehouse.IsActive),
             _ => nameof(Warehouse.Code)

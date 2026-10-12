@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using NUnit.Framework;
 using OAS.Application.Common.Exceptions;
@@ -55,13 +55,13 @@ public sealed class ProductOpeningSqlServerTests
     {
         await using var context = Context();
         var key = Guid.NewGuid().ToString("N")[..12];
-        var category = new ProductCategory($"C-{key}", "تصنيف اختبار");
         var type = new ProductType($"T-{key}", "منتج اختبار");
+        var category = new ProductCategory($"C-{key}", "تصنيف اختبار", type.Id);
         var warehouse = new Warehouse($"W-{key}", "مخزن اختبار");
         context.AddRange(category, type, warehouse);
         await context.SaveChangesAsync();
         return new CreateStockProductRequest(
-            new CreateProductRequest($"P-{key}", "منتج اختبار", null, category.Id, null, type.Id, null, true),
+            new CreateProductRequest($"P-{key}", "منتج اختبار", category.Id, null, null, true),
             new InitialProductVariantRequest($"V-{key}", null, null, null, null, null, 100m, 150m),
             opening ? new OpeningInventoryRequest(warehouse.Id, 10m, 100m) : null);
     }

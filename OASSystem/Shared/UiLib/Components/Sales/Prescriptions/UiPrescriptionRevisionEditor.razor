@@ -9,14 +9,7 @@
 
     <div class="ui-sales-optical-range-note" role="note">
         <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
-        @if (HasConfiguredRanges)
-        {
-            <span>النطاق الإرشادي مأخوذ من العدسات الطبية الفعالة المعرفة في النظام: @GlobalRangeSummary</span>
-        }
-        else
-        {
-            <span>لم يتم تعريف نطاقات عدسات طبية فعالة بعد. سيتم التحقق من توافق القياسات مع العدسة عند البيع.</span>
-        }
+        <span>أدخل قياسات الوصفة مباشرة. توفر العدسة في المخزون يتم التحقق منه لاحقًا بمطابقة SPH/CYL/ADD مع SKU العدسة.</span>
     </div>
 
     <div class="ui-sales-eye-grid ui-sales-eye-grid--editor">
@@ -26,19 +19,13 @@
                 <strong>@eye.EyeText</strong>
                 <label>
                     SPH
-                    <input type="number" step="0.25" min="@SphereMin" max="@SphereMax"
-                           placeholder="@RangePlaceholder(SphereMin, SphereMax)"
-                           title="@RangeTitle(nameof(UiPrescriptionEyeModel.SPH), SphereMin, SphereMax)"
-                           value="@eye.SPH" @onchange="e => DecimalChanged(eye, nameof(eye.SPH), e)" />
-                    <small class="ui-sales-eye-card__range-hint">@RangeHint("SPH", SphereMin, SphereMax)</small>
+                    <input type="number" step="0.25" placeholder="SPH" value="@eye.SPH" @onchange="e => DecimalChanged(eye, nameof(eye.SPH), e)" />
+                    <small class="ui-sales-eye-card__range-hint">قيمة الوصفة مباشرة.</small>
                 </label>
                 <label>
                     CYL
-                    <input type="number" step="0.25" min="@CylinderMin" max="@CylinderMax"
-                           placeholder="@RangePlaceholder(CylinderMin, CylinderMax)"
-                           title="@RangeTitle(nameof(UiPrescriptionEyeModel.CYL), CylinderMin, CylinderMax)"
-                           value="@eye.CYL" @onchange="e => DecimalChanged(eye, nameof(eye.CYL), e)" />
-                    <small class="ui-sales-eye-card__range-hint">@RangeHint("CYL", CylinderMin, CylinderMax)</small>
+                    <input type="number" step="0.25" placeholder="CYL" value="@eye.CYL" @onchange="e => DecimalChanged(eye, nameof(eye.CYL), e)" />
+                    <small class="ui-sales-eye-card__range-hint">قيمة الوصفة مباشرة.</small>
                 </label>
                 <label>
                     Axis
@@ -47,11 +34,8 @@
                 </label>
                 <label>
                     ADD
-                    <input type="number" step="0.25" min="@(AddMin ?? 0m)" max="@AddMax"
-                           placeholder="@RangePlaceholder(AddMin ?? 0m, AddMax)"
-                           title="@RangeTitle(nameof(UiPrescriptionEyeModel.ADD), AddMin ?? 0m, AddMax)"
-                           value="@eye.ADD" @onchange="e => DecimalChanged(eye, nameof(eye.ADD), e)" />
-                    <small class="ui-sales-eye-card__range-hint">@RangeHint("ADD", AddMin ?? 0m, AddMax)</small>
+                    <input type="number" step="0.25" min="0" placeholder="ADD" value="@eye.ADD" @onchange="e => DecimalChanged(eye, nameof(eye.ADD), e)" />
+                    <small class="ui-sales-eye-card__range-hint">قيمة الوصفة مباشرة عند الحاجة.</small>
                 </label>
                 <label>Prism<input type="number" step="0.25" min="0" placeholder="0 أو أكثر" value="@eye.Prism" @onchange="e => DecimalChanged(eye, nameof(eye.Prism), e)" /></label>
                 <label>Prism Base
@@ -71,38 +55,7 @@
 
 @code {
     [Parameter, EditorRequired] public UiPrescriptionRevisionModel Model { get; set; } = new();
-    [Parameter] public decimal? SphereMin { get; set; }
-    [Parameter] public decimal? SphereMax { get; set; }
-    [Parameter] public decimal? CylinderMin { get; set; }
-    [Parameter] public decimal? CylinderMax { get; set; }
-    [Parameter] public decimal? AddMin { get; set; }
-    [Parameter] public decimal? AddMax { get; set; }
     [Parameter] public EventCallback OnChanged { get; set; }
-
-    private bool HasConfiguredRanges =>
-        HasRange(SphereMin, SphereMax) || HasRange(CylinderMin, CylinderMax) || HasRange(AddMin ?? 0m, AddMax);
-
-    private string GlobalRangeSummary => string.Join(" • ", new[]
-    {
-        RangeSummary("SPH", SphereMin, SphereMax),
-        RangeSummary("CYL", CylinderMin, CylinderMax),
-        RangeSummary("ADD", AddMin ?? 0m, AddMax)
-    }.Where(x => !string.IsNullOrWhiteSpace(x)));
-
-    private static bool HasRange(decimal? minimum, decimal? maximum) => minimum.HasValue && maximum.HasValue;
-    private static string Format(decimal value) => value > 0 ? $"+{value:0.##}" : $"{value:0.##}";
-    private static string? RangePlaceholder(decimal? minimum, decimal? maximum) =>
-        HasRange(minimum, maximum) ? $"{Format(minimum!.Value)} إلى {Format(maximum!.Value)}" : null;
-    private static string RangeTitle(string field, decimal? minimum, decimal? maximum) =>
-        HasRange(minimum, maximum)
-            ? $"{field}: أدخل قيمة بين {Format(minimum!.Value)} و {Format(maximum!.Value)}"
-            : $"{field}: سيتم التحقق من نطاق العدسة عند البيع";
-    private static string RangeHint(string field, decimal? minimum, decimal? maximum) =>
-        HasRange(minimum, maximum)
-            ? $"أدخل قيمة بين {Format(minimum!.Value)} و {Format(maximum!.Value)}."
-            : "سيتم التحقق من النطاق حسب العدسة المختارة عند البيع.";
-    private static string RangeSummary(string field, decimal? minimum, decimal? maximum) =>
-        HasRange(minimum, maximum) ? $"{field} {Format(minimum!.Value)} إلى {Format(maximum!.Value)}" : string.Empty;
 
     private async Task EffectiveDateChanged(DateOnly? value) { Model.EffectiveDate = value; await OnChanged.InvokeAsync(); }
     private async Task ReasonChanged(string? value) { Model.Reason = value; await OnChanged.InvokeAsync(); }

@@ -16,7 +16,7 @@ public partial class PurchasingWorkspaceHost
     private async Task<IReadOnlyList<UiLookupItem>> SearchWarehousesAsync(string search,CancellationToken ct)
     {
         var page=await Inventory.GetWarehousesAsync(LookupRequest(search),ct);
-        return page.Items.Where(x=>x.IsActive).Select(x=>new UiLookupItem(x.Id.ToString("D"),x.NameAr,x.Code,"fa-solid fa-warehouse")).ToArray();
+        return page.Items.Where(x=>x.IsActive).Select(x=>new UiLookupItem(x.Id.ToString("D"),x.Name,x.Code,"fa-solid fa-warehouse")).ToArray();
     }
     private async Task<IReadOnlyList<UiLookupItem>> SearchProductsAsync(string search,CancellationToken ct)
     {
@@ -26,7 +26,7 @@ public partial class PurchasingWorkspaceHost
     private async Task<IReadOnlyList<UiLookupItem>> SearchUnitsAsync(string search,CancellationToken ct)
     {
         var page=await Inventory.GetUnitsAsync(LookupRequest(search),ct);
-        return page.Items.Where(x=>x.IsActive).Select(x=>new UiLookupItem(x.Id.ToString("D"),x.NameAr,x.Code,"fa-solid fa-ruler")).ToArray();
+        return page.Items.Where(x=>x.IsActive).Select(x=>new UiLookupItem(x.Id.ToString("D"),x.Name,x.Code,"fa-solid fa-ruler")).ToArray();
     }
     private async Task<IReadOnlyList<UiLookupItem>> SearchCurrenciesAsync(string search,CancellationToken ct)
     {

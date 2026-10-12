@@ -55,7 +55,7 @@
                                  SidebarTypography="true"
                                  UniformCellTypography="true" Compact="true" FitToContainer="true">
                         <RowTemplate Context="row">
-                            <td>@row.Product.NameAr<br /><UiTextLabel Text="@row.Product.ProductCode" Size="ControlSize.Small" Tone="TextTone.Muted" /></td>
+                            <td>@row.Product.Name<br /><UiTextLabel Text="@row.Product.ProductCode" Size="ControlSize.Small" Tone="TextTone.Muted" /></td>
                             <td>@(row.Variant.VariantName ?? "—")<br /><UiTextLabel Text="@VariantIdentity(row.Variant)" Size="ControlSize.Small" Tone="TextTone.Muted" /></td>
                             <td>@WarehouseName(row.WarehouseId)</td>
                             <td>@row.OnHandQuantity.ToString("N3")</td>
@@ -105,8 +105,8 @@
     private IReadOnlyList<UiSelectOption> WarehouseFilterOptions =>
         _warehouses.Where(x => x.IsActive)
             .OrderByDescending(x => x.IsDefault)
-            .ThenBy(x => x.NameAr)
-            .Select(x => new UiSelectOption(x.Id.ToString("D"), x.IsDefault ? $"{x.NameAr} (افتراضي)" : x.NameAr))
+            .ThenBy(x => x.Name)
+            .Select(x => new UiSelectOption(x.Id.ToString("D"), x.IsDefault ? $"{x.Name} (افتراضي)" : x.Name))
             .ToArray();
 
     private sealed record InventoryDisplayRow(Guid WarehouseId, ProductDto Product, ProductVariantDto Variant, InventoryBalanceDto? Balance)
@@ -144,10 +144,10 @@
                 {
                     if (string.IsNullOrWhiteSpace(_search)) return true;
                     var term = _search.Trim();
-                    return new[] { row.Variant.SKU, row.Variant.Barcode, row.Variant.VariantName, row.Product.ProductCode, row.Product.NameAr, row.Product.NameEn }
+                    return new[] { row.Variant.SKU, row.Variant.Barcode, row.Variant.VariantName, row.Product.ProductCode, row.Product.Name }
                         .Any(x => x?.Contains(term, StringComparison.CurrentCultureIgnoreCase) == true);
                 })
-                .OrderBy(x => x.Product.NameAr)
+                .OrderBy(x => x.Product.Name)
                 .ThenBy(x => x.Variant.SKU)
                 .ToArray();
         }
@@ -266,7 +266,7 @@
     private Task SearchChangedAsync(string? _) => Task.CompletedTask;
     private ProductVariantDto? FindVariant(Guid id) => _variants.FirstOrDefault(x => x.Id == id);
     private string VariantIdentity(ProductVariantDto variant) => $"{variant.SKU} · {variant.Barcode ?? "—"}";
-    private string WarehouseName(Guid id) => _warehouses.FirstOrDefault(x => x.Id == id)?.NameAr ?? "—";
+    private string WarehouseName(Guid id) => _warehouses.FirstOrDefault(x => x.Id == id)?.Name ?? "—";
 
     private void OpenProduct(Guid variantId)
     {

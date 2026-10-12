@@ -132,7 +132,7 @@
     private string? _dateFilterError;
 
     private IReadOnlyList<UiSelectOption> WarehouseFilterOptions =>
-        [new UiSelectOption(string.Empty, "كل المخازن"), .. _warehouses.Select(x => new UiSelectOption(x.Id.ToString("D"), x.IsActive ? x.NameAr : $"{x.NameAr} (غير نشط)"))];
+        [new UiSelectOption(string.Empty, "كل المخازن"), .. _warehouses.Select(x => new UiSelectOption(x.Id.ToString("D"), x.IsActive ? x.Name : $"{x.Name} (غير نشط)"))];
 
     private IReadOnlyList<InventoryLedgerDto> FilteredEntries => string.IsNullOrWhiteSpace(_dateFilterError)
         ? _entries.Where(x =>
@@ -257,10 +257,10 @@
     private string WarehouseName(Guid id)
     {
         var warehouse = _warehouses.FirstOrDefault(x => x.Id == id);
-        return warehouse is null ? "—" : warehouse.IsActive ? warehouse.NameAr : $"{warehouse.NameAr} (غير نشط)";
+        return warehouse is null ? "—" : warehouse.IsActive ? warehouse.Name : $"{warehouse.Name} (غير نشط)";
     }
 
-    private string ProductName(Guid id) => _products.FirstOrDefault(x => x.Id == id)?.NameAr ?? "—";
+    private string ProductName(Guid id) => _products.FirstOrDefault(x => x.Id == id)?.Name ?? "—";
     private string ProductCode(Guid variantId) => ProductForVariant(variantId)?.ProductCode ?? "—";
     private string VariantLabel(Guid id)
     {

@@ -9,8 +9,7 @@ DECLARE @WarehouseCode nvarchar(32) = N'QA-WH-001';
 SELECT
     w.Id,
     w.Code,
-    w.NameAr,
-    w.NameEn,
+    w.Name,
     w.Description,
     w.IsDefault,
     w.IsActive,
@@ -28,12 +27,12 @@ GROUP BY Code
 HAVING COUNT(*) > 1;
 
 -- للمراجعة اليدوية: يفترض أن يوجد مخزن افتراضي واحد كحد أقصى.
-SELECT Id, Code, NameAr, IsDefault, IsActive
+SELECT Id, Code, Name, IsDefault, IsActive
 FROM dbo.tbl_Warehouses
 WHERE IsDefault = 1
 ORDER BY Code;
 
 -- يجب أن تكون النتيجة صفر صفوف.
-SELECT Id, Code, NameAr, IsDefault, IsActive
+SELECT Id, Code, Name, IsDefault, IsActive
 FROM dbo.tbl_Warehouses
 WHERE IsDefault = 1 AND IsActive = 0;

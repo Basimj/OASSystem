@@ -6,7 +6,6 @@ using OAS.Application.Sales.Abstractions;
 using OAS.Application.Sales.Authorization;
 using OAS.Application.Sales.Common;
 using OAS.Domain.Accounting.Entities;
-using OAS.Domain.Exceptions;
 using OAS.Domain.Sales.Entities;
 using OAS.Domain.Sales.Enums;
 
@@ -56,7 +55,6 @@ public sealed class SalesInvoiceConfirmationService(
                     line.PrescriptionRevisionId,
                     line.PrescriptionEye,
                     resolved.PrescriptionRequired,
-                    resolved.OpticalPolicy,
                     cancellationToken);
 
                 if (line.LineType == SalesLineType.Lens && detail is not null)
@@ -69,20 +67,6 @@ public sealed class SalesInvoiceConfirmationService(
                     await snapshots.AddAsync(snapshot, cancellationToken);
                 }
             }
-            else if (resolved.OpticalPolicy is not null)
-            {
-                try
-                {
-                    line.PrescriptionSnapshot.ValidateAgainst(resolved.OpticalPolicy);
-                }
-                catch (DomainException)
-                {
-                    throw new ConflictException(
-                        SalesErrorCodes.PrescriptionOutsideLensRange,
-                        "قياسات الوصفة المحفوظة في الفاتورة لم تعد ضمن نطاق العدسة المحددة. راجع نطاق العدسة أو اختر SKU متوافقًا قبل التأكيد.");
-                }
-            }
-
             if (line.ProductVariantId.HasValue && line.ActualUnitPrice <= 0m)
                 throw new ConflictException(
                     "sales_product_price_required",

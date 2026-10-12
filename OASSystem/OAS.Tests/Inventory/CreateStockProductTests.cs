@@ -31,7 +31,8 @@ public sealed class CreateStockProductTests
     private FakeGenericRepository<InventoryLedger, Guid> _ledger = null!;
     private FakeInventorySequenceNumberGenerator _sequence = null!;
     private InventoryPostingService _posting = null!;
-    private ProductCategory _category = null!;
+    private ProductCategory _frameCategory = null!;
+    private ProductCategory _serviceCategory = null!;
     private ProductType _frameType = null!;
     private ProductType _serviceType = null!;
     private Warehouse _warehouse = null!;
@@ -55,11 +56,12 @@ public sealed class CreateStockProductTests
         _sequence = new();
         _posting = new InventoryPostingService(_balances, _ledger, _sequence, TimeProvider.System);
 
-        _category = new ProductCategory("CAT", "تصنيف");
         _frameType = new ProductType("FRAME", "إطار", systemKey: ProductTypeSystemKeys.Frame);
         _serviceType = new ProductType("SERVICE", "خدمة", systemKey: ProductTypeSystemKeys.Service);
+        _frameCategory = new ProductCategory("CAT-FRAME", "تصنيف الإطارات", _frameType.Id);
+        _serviceCategory = new ProductCategory("CAT-SERVICE", "تصنيف الخدمات", _serviceType.Id);
         _warehouse = new Warehouse("MAIN", "المخزن الرئيسي", isDefault: true);
-        _categories.Items.Add(_category);
+        _categories.Items.AddRange([_frameCategory, _serviceCategory]);
         _types.Items.AddRange([_frameType, _serviceType]);
         _warehouses.Items.Add(_warehouse);
     }
@@ -69,7 +71,7 @@ public sealed class CreateStockProductTests
     {
         var handler = CreateHandler();
         var request = new CreateStockProductRequest(
-            new CreateProductRequest("P-001", "إطار تجريبي", null, _category.Id, null, _frameType.Id, null, true),
+            new CreateProductRequest("P-001", "إطار تجريبي", _frameCategory.Id, null, null, true),
             new InitialProductVariantRequest("SKU-001", "111", "أسود", "Black", "52", null, 100m, 180m),
             new OpeningInventoryRequest(_warehouse.Id, 10m, 100m),
             new InitialFrameDetailsRequest("RB-001", "Acetate", "Full Rim", null, "Square", 140m, 18m, 52m));
@@ -97,7 +99,7 @@ public sealed class CreateStockProductTests
     {
         var handler = CreateHandler();
         var request = new CreateStockProductRequest(
-            new CreateProductRequest("P-002", "منتج بدون رصيد", null, _category.Id, null, _frameType.Id, null, true),
+            new CreateProductRequest("P-002", "منتج بدون رصيد", _frameCategory.Id, null, null, true),
             new InitialProductVariantRequest("SKU-002", null, null, null, null, null, 10m, 20m),
             null);
 
@@ -115,7 +117,7 @@ public sealed class CreateStockProductTests
     {
         var handler = CreateHandler();
         var request = new CreateStockProductRequest(
-            new CreateProductRequest("S-001", "خدمة", null, _category.Id, null, _serviceType.Id, null, true),
+            new CreateProductRequest("S-001", "خدمة", _serviceCategory.Id, null, null, true),
             new InitialProductVariantRequest("SERVICE-SKU", null, null, null, null, null, 0m, 0m),
             null);
 
@@ -126,10 +128,10 @@ public sealed class CreateStockProductTests
     [Test]
     public void InactiveWarehouseRejectsOpeningInventory()
     {
-        _warehouse.UpdateDetails(_warehouse.Code, _warehouse.NameAr, _warehouse.NameEn, _warehouse.Description, _warehouse.IsDefault, false);
+        _warehouse.UpdateDetails(_warehouse.Code, _warehouse.Name, _warehouse.Description, _warehouse.IsDefault, false);
         var handler = CreateHandler();
         var request = new CreateStockProductRequest(
-            new CreateProductRequest("P-003", "منتج", null, _category.Id, null, _frameType.Id, null, true),
+            new CreateProductRequest("P-003", "منتج", _frameCategory.Id, null, null, true),
             new InitialProductVariantRequest("SKU-003", null, null, null, null, null, 10m, 20m),
             new OpeningInventoryRequest(_warehouse.Id, 1m, 10m));
 
@@ -143,7 +145,7 @@ public sealed class CreateStockProductTests
         using var context = new OasDbContext(new DbContextOptionsBuilder<OasDbContext>()
             .UseSqlServer("Server=(localdb)\\mssqllocaldb;Database=tracking_only;Trusted_Connection=True;").Options);
         var request = new CreateStockProductRequest(
-            new CreateProductRequest("P-TRACK", "منتج", null, _category.Id, null, _frameType.Id, null, true),
+            new CreateProductRequest("P-TRACK", "منتج", _frameCategory.Id, null, null, true),
             new InitialProductVariantRequest("SKU-TRACK", null, null, null, null, null, 100m, 150m),
             new OpeningInventoryRequest(_warehouse.Id, 10m, 100m));
         await CreateHandler(new InventoryTransactionRepository(context))

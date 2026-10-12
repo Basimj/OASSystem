@@ -29,7 +29,7 @@ public sealed class InventoryCodeGeneratorTests
     public async Task GeneratorSkipsAnExistingCode()
     {
         var products = new FakeGenericRepository<Product, Guid>(
-            [new Product("P-000001", "منتج موجود", Guid.NewGuid(), Guid.NewGuid())]);
+            [new Product("P-000001", "منتج موجود", Guid.NewGuid())]);
         var generator = CreateGenerator(products: products);
 
         var code = await generator.NextAsync(InventoryCodeKinds.Product);
@@ -42,7 +42,7 @@ public sealed class InventoryCodeGeneratorTests
     {
         var type = new ProductType("SERVICE", "خدمة", systemKey: ProductTypeSystemKeys.Service);
 
-        type.UpdateDetails("T-000123", "خدمة", "Service", true);
+        type.UpdateDetails("T-000123", "خدمة", true);
 
         Assert.That(type.Code, Is.EqualTo("T-000123"));
         Assert.That(type.SystemKey, Is.EqualTo(ProductTypeSystemKeys.Service));

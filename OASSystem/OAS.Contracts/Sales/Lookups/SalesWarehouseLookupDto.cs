@@ -3,7 +3,7 @@ namespace OAS.Contracts.Sales.Lookups;
 public sealed record SalesWarehouseLookupDto(
     Guid Id,
     string Code,
-    string NameAr,
+    string Name,
     bool IsDefault,
     bool IsActive,
     decimal? OnHandQuantity = null,
