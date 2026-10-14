@@ -44,6 +44,10 @@ public class AccountingEfConfigurationTests
             (typeof(PaymentAllocation), "tbl_PaymentAllocations"),
             (typeof(CashAccount), "tbl_CashAccounts"),
             (typeof(BankAccount), "tbl_BankAccounts"),
+            (typeof(BankStatement), "tbl_BankStatements"),
+            (typeof(BankStatementLine), "tbl_BankStatementLines"),
+            (typeof(BankReconciliation), "tbl_BankReconciliations"),
+            (typeof(BankReconciliationMatch), "tbl_BankReconciliationMatches"),
             (typeof(CashShift), "tbl_CashShifts"),
             (typeof(ExpenseType), "tbl_ExpenseTypes"),
             (typeof(Expense), "tbl_Expenses")
@@ -74,6 +78,9 @@ public class AccountingEfConfigurationTests
     [TestCase(typeof(PaymentVoucher))]
     [TestCase(typeof(CashAccount))]
     [TestCase(typeof(BankAccount))]
+    [TestCase(typeof(BankStatement))]
+    [TestCase(typeof(BankStatementLine))]
+    [TestCase(typeof(BankReconciliation))]
     [TestCase(typeof(CashShift))]
     [TestCase(typeof(ExpenseType))]
     [TestCase(typeof(Expense))]
@@ -113,6 +120,10 @@ public class AccountingEfConfigurationTests
             typeof(PaymentAllocation),
             typeof(CashAccount),
             typeof(BankAccount),
+            typeof(BankStatement),
+            typeof(BankStatementLine),
+            typeof(BankReconciliation),
+            typeof(BankReconciliationMatch),
             typeof(CashShift),
             typeof(ExpenseType),
             typeof(Expense)

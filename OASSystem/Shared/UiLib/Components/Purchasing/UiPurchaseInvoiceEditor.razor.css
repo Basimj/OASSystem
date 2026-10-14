@@ -1,8 +1,0 @@
-.ui-purchasing-invoice-line { min-width:0; display:grid; gap:7px; border:1px solid var(--oas-color-border); border-radius:var(--oas-radius-md); padding:8px 9px; background:color-mix(in srgb,var(--oas-color-surface) 98%,var(--oas-color-primary) 2%); }
-.ui-purchasing-invoice-line__head { display:flex; align-items:center; justify-content:space-between; gap:6px; }
-.ui-purchasing-invoice-line__head strong { font-size:var(--oas-font-sm); }
-.ui-purchasing-invoice-totals { display:grid; grid-template-columns:repeat(4,minmax(105px,1fr)); gap:6px; }
-.ui-purchasing-invoice-totals span { display:grid; gap:1px; border:1px solid var(--oas-color-border); border-radius:var(--oas-radius-md); padding:7px 8px; }
-.ui-purchasing-invoice-totals small { color:var(--oas-color-text-muted); font-size:var(--oas-font-xs); }
-.ui-purchasing-invoice-totals strong { font-size:var(--oas-font-sm); }
-@media(max-width:800px){.ui-purchasing-invoice-totals{grid-template-columns:1fr 1fr;}}

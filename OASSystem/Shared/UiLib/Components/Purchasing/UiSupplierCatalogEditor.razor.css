@@ -1,6 +1,0 @@
-.ui-purchasing-editor-note { padding:8px 9px; border:1px dashed var(--oas-color-border); border-radius:var(--oas-radius-md); color:var(--oas-color-text-muted); font-size:var(--oas-font-xs); }
-.ui-purchasing-price-list { display:grid; gap:6px; }
-.ui-purchasing-price-row { min-width:0; display:grid; grid-template-columns:minmax(95px,.8fr) minmax(150px,1.2fr) auto; gap:7px; padding:7px 8px; border:1px solid var(--oas-color-border); border-radius:var(--oas-radius-md); align-items:center; }
-.ui-purchasing-price-row strong { font-size:var(--oas-font-sm); }
-.ui-purchasing-price-row span { color:var(--oas-color-text-muted); font-size:var(--oas-font-xs); }
-@media(max-width:700px){.ui-purchasing-price-row{grid-template-columns:1fr}.ui-purchasing-price-row span{white-space:normal}}
