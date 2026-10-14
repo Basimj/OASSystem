@@ -59,7 +59,7 @@
         <footer class="ui-workflow-drawer__footer">
             @if (Selected.Lines.Any(x => x.ShortageQuantity > 0m)){<UiButton Text="فتح النقص" IconCssClass="fa-solid fa-truck-fast" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="_ => OnOpenSupply.InvokeAsync(Selected.OrderId)" />}
             @if (Selected.JobId.HasValue){<UiButton Text="فتح Job" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="_ => OnOpenJob.InvokeAsync(Selected.JobId.Value)" />}
-            @if (Selected.StatusKey == "ReadyForDelivery"){<UiButton Text="تسليم للعميل" IconCssClass="fa-solid fa-box-open" Size="ControlSize.Small" OnClick="_ => OnDeliver.InvokeAsync(Selected.OrderId)" />}
+            @if (Selected.StatusKey == "ReadyForDelivery"){<UiButton Text="التسوية والتسليم" IconCssClass="fa-solid fa-cash-register" Size="ControlSize.Small" OnClick="_ => OnDeliver.InvokeAsync(Selected.OrderId)" />}
         </footer>
     </aside>
 }

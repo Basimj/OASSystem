@@ -12,7 +12,10 @@ public sealed class ReverseJournalEntryCommandHandler(IRepository<JournalEntry, 
     public async Task<Guid> Handle(ReverseJournalEntryCommand request, CancellationToken ct)
     {
         var original = await repository.GetForUpdateAsync(request.JournalEntryId, ct) ?? throw new NotFoundException(nameof(JournalEntry), request.JournalEntryId);
-        if (original.Status != DomainJournalEntryStatus.Posted) throw new ConflictException("journal_not_posted", "Only posted journal entries can be reversed.");
+        if (original.Status != DomainJournalEntryStatus.Posted)
+            throw new ConflictException("journal_not_posted", "Only posted journal entries can be reversed.");
+        if (original.ReversedJournalId.HasValue)
+            throw new ConflictException("journal_already_reversed", "This journal entry has already been reversed.");
         var originalLines = await lineRepository.ListAsync(new Specification<JournalEntryLine>().Where(x => x.JournalEntryId == original.Id).AddSort(nameof(JournalEntryLine.LineNumber), OAS.Contracts.Common.Pagination.SortDirection.Ascending), ct);
         if (originalLines.Count == 0) throw new ConflictException("journal_lines_missing", "The posted journal has no lines and cannot be reversed safely.");
         var sequence = await sequenceNumberGenerator.NextAsync($"JournalEntry-{original.PostingDate.Year}", ct);

@@ -1,5 +1,6 @@
 
 using OAS.Domain.Accounting.Enums;
+using OAS.Domain.Accounting.Rules;
 using OAS.Domain.Common.Entities;
 
 namespace OAS.Domain.Accounting.Entities;
@@ -337,6 +338,8 @@ public sealed class JournalEntry : AuditableEntity<Guid>
                 "Journal entry debit and credit totals must be equal.");
         }
 
+        JournalPostingRules.EnsureCurrencySnapshots(this, _lines);
+
         Status = JournalEntryStatus.Posted;
         PostedBy = postedBy;
         PostedAtUtc = postedAtUtc;
@@ -355,8 +358,17 @@ public sealed class JournalEntry : AuditableEntity<Guid>
                 "Only posted journals can be reversed.");
         }
 
+        if (ReversedJournalId.HasValue)
+        {
+            throw new InvalidOperationException(
+                "The journal entry has already been reversed.");
+        }
+
+        // Preserve the original posted journal in the ledger. Reversal is represented
+        // by a separate opposite journal linked through ReversedJournalId. Changing the
+        // original status to Reversed would make posted-only reports drop the original
+        // movement and report only the opposite entry.
         ReversedJournalId = reversedJournalId;
-        Status = JournalEntryStatus.Reversed;
     }
 
     public void EnsureEditable()

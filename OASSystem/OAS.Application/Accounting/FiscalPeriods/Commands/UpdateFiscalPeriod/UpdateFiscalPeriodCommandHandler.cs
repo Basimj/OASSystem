@@ -1,5 +1,6 @@
 using MediatR;
 using OAS.Application.Abstractions.Persistence;
+using OAS.Application.Accounting.CoreHardening.Services;
 using OAS.Application.Accounting.FiscalPeriods.Mapping;
 using OAS.Application.Common.Exceptions;
 using OAS.Domain.Accounting.Entities;
@@ -8,7 +9,8 @@ namespace OAS.Application.Accounting.FiscalPeriods.Commands.UpdateFiscalPeriod;
 
 public sealed class UpdateFiscalPeriodCommandHandler(
     IRepository<FiscalPeriod, Guid> repository,
-    FiscalPeriodMapper mapper)
+    FiscalPeriodMapper mapper,
+    IFiscalPeriodIntegrityService integrity)
     : IRequestHandler<UpdateFiscalPeriodCommand, FiscalPeriod>
 {
     public async Task<FiscalPeriod> Handle(
@@ -17,15 +19,25 @@ public sealed class UpdateFiscalPeriodCommandHandler(
     {
         var entity = await repository.GetForUpdateAsync(request.Id, cancellationToken);
         if (entity is null)
-        {
             throw new NotFoundException(nameof(FiscalPeriod), request.Id);
-        }
 
         var requestedRowVersion = Convert.FromBase64String(request.Data.RowVersion);
         if (!entity.RowVersion.SequenceEqual(requestedRowVersion))
-        {
             throw new ConcurrencyException("The fiscal period has been modified by another user.");
-        }
+
+        await integrity.ValidateAsync(
+            entity.FiscalYearId,
+            entity.PeriodNumber,
+            request.Data.StartDate,
+            request.Data.EndDate,
+            entity.Id,
+            cancellationToken);
+
+        await integrity.ValidateDateChangeAgainstJournalHistoryAsync(
+            entity.Id,
+            request.Data.StartDate,
+            request.Data.EndDate,
+            cancellationToken);
 
         mapper.Update(request.Data, entity);
         repository.Update(entity);

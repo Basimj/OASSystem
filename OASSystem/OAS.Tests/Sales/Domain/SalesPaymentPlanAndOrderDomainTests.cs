@@ -12,7 +12,6 @@ public sealed class SalesPaymentPlanAndOrderDomainTests
 {
     [TestCase(SalesPaymentPlan.FullNow, SalesPaymentTermType.Immediate)]
     [TestCase(SalesPaymentPlan.PartialNow, SalesPaymentTermType.Immediate)]
-    [TestCase(SalesPaymentPlan.PayOnPickup, SalesPaymentTermType.Immediate)]
     [TestCase(SalesPaymentPlan.AccountCredit, SalesPaymentTermType.Credit)]
     public void PaymentPlan_MapsToExpectedPaymentTerm(
         SalesPaymentPlan paymentPlan,
@@ -34,7 +33,6 @@ public sealed class SalesPaymentPlanAndOrderDomainTests
 
     [TestCase(SalesPaymentPlan.FullNow)]
     [TestCase(SalesPaymentPlan.PartialNow)]
-    [TestCase(SalesPaymentPlan.PayOnPickup)]
     public void NonCreditPaymentPlans_DoNotCreateCreditTerms(SalesPaymentPlan paymentPlan)
     {
         var order = CreateOrder(paymentPlan, paymentTermDays: 30);
@@ -54,7 +52,7 @@ public sealed class SalesPaymentPlanAndOrderDomainTests
         order.Confirm(CustomerOrderStatus.Confirmed, DateTimeOffset.UtcNow, "tester");
 
         Assert.Throws<DomainException>(() =>
-            order.ChangePaymentPlan(SalesPaymentPlan.PayOnPickup));
+            order.ChangePaymentPlan(SalesPaymentPlan.PartialNow));
     }
 
     [Test]
@@ -78,7 +76,7 @@ public sealed class SalesPaymentPlanAndOrderDomainTests
     [Test]
     public void NonProductionOrder_CanMoveDirectlyFromConfirmedToReadyForDelivery()
     {
-        var order = CreateOrder(SalesPaymentPlan.PayOnPickup);
+        var order = CreateOrder(SalesPaymentPlan.PartialNow);
         order.AddLine(CreateServiceLine(order.Id, requiresProduction: false));
         order.Confirm(CustomerOrderStatus.Confirmed, DateTimeOffset.UtcNow, "tester");
 

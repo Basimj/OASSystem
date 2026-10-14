@@ -1,11 +1,24 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Media;
 
 namespace OAS.Print.Desktop;
 
 public sealed class PreviewWindow : Window
 {
+    public PreviewWindow(FixedDocument document)
+        : this(new DocumentViewer
+        {
+            Document = document,
+            FlowDirection = FlowDirection.LeftToRight,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch,
+            Margin = new Thickness(0)
+        })
+    {
+    }
+
     public PreviewWindow(UIElement content)
     {
         Title = "معاينة الطباعة — OAS Print";
@@ -76,29 +89,46 @@ public sealed class PreviewWindow : Window
         Grid.SetRow(header, 0);
         root.Children.Add(header);
 
-        var pageHost = new Border
+        UIElement body;
+        if (content is DocumentViewer)
         {
-            Background = Brushes.White,
-            BorderBrush = Brush("#D9CCFF"),
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(4),
-            Child = content,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Top,
-            Margin = new Thickness(24)
-        };
+            body = new Border
+            {
+                Background = Brush("#EEF0F5"),
+                BorderBrush = Brush("#D9CCFF"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(4),
+                Child = content,
+                Margin = new Thickness(18)
+            };
+        }
+        else
+        {
+            var pageHost = new Border
+            {
+                Background = Brushes.White,
+                BorderBrush = Brush("#D9CCFF"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(4),
+                Child = content,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(24)
+            };
 
-        var scroll = new ScrollViewer
-        {
-            Background = Brush("#EEF0F5"),
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            HorizontalContentAlignment = HorizontalAlignment.Center,
-            VerticalContentAlignment = VerticalAlignment.Top,
-            Content = pageHost
-        };
-        Grid.SetRow(scroll, 1);
-        root.Children.Add(scroll);
+            body = new ScrollViewer
+            {
+                Background = Brush("#EEF0F5"),
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Top,
+                Content = pageHost
+            };
+        }
+
+        Grid.SetRow(body, 1);
+        root.Children.Add(body);
 
         Content = root;
     }

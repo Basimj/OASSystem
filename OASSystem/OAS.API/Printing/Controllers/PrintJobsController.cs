@@ -12,6 +12,7 @@ namespace OAS.API.Printing.Controllers;
 public sealed class PrintJobsController(
     IPrintJobQueue queue,
     VoucherPrintPayloadFactory payloadFactory,
+    AccountingReportPrintPayloadFactory accountingReportPayloadFactory,
     DesktopPrintApiKeyValidator apiKeyValidator) : ControllerBase
 {
     [Authorize]
@@ -53,6 +54,73 @@ public sealed class PrintJobsController(
 
         return Ok(queue.Enqueue(request.WorkstationCode, job));
     }
+
+    [Authorize]
+    [HttpPost("jobs/general-ledger")]
+    public async Task<ActionResult<PrintJobCreatedDto>> CreateGeneralLedgerReport(
+        [FromBody] CreateGeneralLedgerPrintJobRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request.Filter is null)
+            return BadRequest("فلتر التقرير مطلوب.");
+
+        if (request.Filter.ToDate < request.Filter.FromDate)
+            return BadRequest("تاريخ النهاية يجب ألا يسبق تاريخ البداية.");
+
+        if (request.Copies is < 1 or > 20)
+            return BadRequest("عدد النسخ يجب أن يكون بين 1 و20.");
+
+        var requestedBy = RequestedBy();
+        var data = await accountingReportPayloadFactory.BuildGeneralLedgerAsync(request.Filter, requestedBy, cancellationToken);
+        var job = new DesktopPrintJobDto(
+            Guid.NewGuid(),
+            PrintDocumentTypes.GeneralLedgerReport,
+            request.TemplateCode,
+            request.PrinterName,
+            request.Copies,
+            request.ShowPreview,
+            requestedBy,
+            JsonSerializer.SerializeToElement(data));
+
+        return Ok(queue.Enqueue(request.WorkstationCode, job));
+    }
+
+    [Authorize]
+    [HttpPost("jobs/trial-balance")]
+    public async Task<ActionResult<PrintJobCreatedDto>> CreateTrialBalanceReport(
+        [FromBody] CreateTrialBalancePrintJobRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request.Filter is null)
+            return BadRequest("فلتر التقرير مطلوب.");
+
+        if (request.Filter.ToDate < request.Filter.FromDate)
+            return BadRequest("تاريخ النهاية يجب ألا يسبق تاريخ البداية.");
+
+        if (request.Copies is < 1 or > 20)
+            return BadRequest("عدد النسخ يجب أن يكون بين 1 و20.");
+
+        var requestedBy = RequestedBy();
+        var data = await accountingReportPayloadFactory.BuildTrialBalanceAsync(request.Filter, requestedBy, cancellationToken);
+        var job = new DesktopPrintJobDto(
+            Guid.NewGuid(),
+            PrintDocumentTypes.TrialBalanceReport,
+            request.TemplateCode,
+            request.PrinterName,
+            request.Copies,
+            request.ShowPreview,
+            requestedBy,
+            JsonSerializer.SerializeToElement(data));
+
+        return Ok(queue.Enqueue(request.WorkstationCode, job));
+    }
+
+    private string? RequestedBy() =>
+        User.Identity?.Name
+        ?? User.FindFirst("name")?.Value
+        ?? User.FindFirst("preferred_username")?.Value
+        ?? User.FindFirst("email")?.Value
+        ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
 
     [AllowAnonymous]
     [HttpGet("desktop/jobs/next")]

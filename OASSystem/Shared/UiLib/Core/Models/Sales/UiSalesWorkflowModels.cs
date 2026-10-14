@@ -174,6 +174,7 @@ public sealed record UiOpticalTimelineModel(string FromStatus, string ToStatus, 
 public sealed class UiOpticalJobDetailsModel
 {
     public Guid Id { get; set; }
+    public Guid CustomerOrderId { get; set; }
     public string JobCode { get; set; } = string.Empty;
     public string? OrderCode { get; set; }
     public string CustomerText { get; set; } = string.Empty;

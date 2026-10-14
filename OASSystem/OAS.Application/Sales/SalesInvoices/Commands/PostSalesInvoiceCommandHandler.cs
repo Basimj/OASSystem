@@ -83,10 +83,6 @@ public sealed class PostSalesInvoiceCommandHandler(
                 if (paymentLineCount == 0 || paymentBaseAmount <= MoneyTolerance || paymentBaseAmount >= requiredBaseAmount - MoneyTolerance)
                     throw new ConflictException("sales_direct_partial_payment_invalid", "الدفع الجزئي يجب أن يكون أكبر من صفر وأقل من كامل قيمة الفاتورة.");
                 break;
-            case DomainPlan.PayOnPickup:
-                if (paymentLineCount != 0)
-                    throw new ConflictException("sales_direct_pickup_payment_not_allowed", "الدفع عند الاستلام لا يقبل دفعات عند ترحيل البيع الأولي.");
-                break;
             case DomainPlan.AccountCredit:
                 if (paymentLineCount != 0)
                     throw new ConflictException("sales_direct_credit_payment_not_allowed", "البيع الآجل لا يقبل دفعات عند الترحيل الأولي في الإصدار الحالي.");

@@ -23,6 +23,7 @@ public partial class OpticalJobsPage : ComponentBase
     [Inject] private OpticalJobsState State { get; set; } = default!;
     [Inject] private IUiSnackbarService Snackbar { get; set; } = default!;
     [Inject] private IApiFeedbackService ApiFeedback { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
 
     [Parameter, SupplyParameterFromQuery(Name = "jobId")] public Guid? JobId { get; set; }
 
@@ -130,8 +131,17 @@ public partial class OpticalJobsPage : ComponentBase
 
     private Task ReadyAsync() => MutateAsync(
         () => Jobs.ReadyAsync(_selected!.Id, new OpticalJobActionRequest(_selected.RowVersion)), "تم تحويل الطلب إلى جاهز للتسليم.");
-    private Task DeliverAsync() => MutateAsync(
-        () => Jobs.DeliverAsync(_selected!.Id, new OpticalJobActionRequest(_selected.RowVersion)), "تم تسليم أمر المعمل وإكمال الطلب.");
+    private Task DeliverAsync()
+    {
+        if (_selected is null || _selected.CustomerOrderId == Guid.Empty)
+        {
+            Snackbar.Error("لا يوجد طلب عميل صالح لإكمال التسوية والتسليم.");
+            return Task.CompletedTask;
+        }
+
+        Navigation.NavigateTo($"/sales/delivery/{_selected.CustomerOrderId:D}");
+        return Task.CompletedTask;
+    }
     private Task CancelAsync() => MutateAsync(
         () => Jobs.CancelAsync(_selected!.Id, new OpticalJobActionRequest(_selected.RowVersion)), "تم إلغاء أمر المعمل.");
 

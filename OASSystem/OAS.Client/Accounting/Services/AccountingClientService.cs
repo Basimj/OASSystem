@@ -1565,11 +1565,33 @@ public sealed class AccountingClientService(
         DateOnly fromDate,
         DateOnly toDate,
         Guid? accountId = null,
+        CancellationToken cancellationToken = default) =>
+        GetGeneralLedgerAsync(
+            new GeneralLedgerFilterDto(fromDate, toDate, AccountId: accountId),
+            cancellationToken);
+
+    public Task<GeneralLedgerReportDto?> GetGeneralLedgerAsync(
+        GeneralLedgerFilterDto filter,
         CancellationToken cancellationToken = default)
     {
-        var accountQuery = accountId.HasValue ? $"&accountId={accountId.Value:D}" : string.Empty;
+        var query = new List<string>
+        {
+            $"fromDate={filter.FromDate:yyyy-MM-dd}",
+            $"toDate={filter.ToDate:yyyy-MM-dd}",
+            $"includeAccountSubtree={filter.IncludeAccountSubtree.ToString().ToLowerInvariant()}",
+            $"includeOpeningBalance={filter.IncludeOpeningBalance.ToString().ToLowerInvariant()}"
+        };
+        AddGuid(query, "fiscalYearId", filter.FiscalYearId);
+        AddGuid(query, "fiscalPeriodId", filter.FiscalPeriodId);
+        AddGuid(query, "accountId", filter.AccountId);
+        AddGuid(query, "customerId", filter.CustomerId);
+        AddGuid(query, "supplierId", filter.SupplierId);
+        if (filter.JournalType.HasValue) query.Add($"journalType={(byte)filter.JournalType.Value}");
+        AddText(query, "sourceModule", filter.SourceModule);
+        AddText(query, "reference", filter.Reference);
+
         return apiClient.GetAsync<GeneralLedgerReportDto>(
-            $"api/accounting/reports/general-ledger?fromDate={fromDate:yyyy-MM-dd}&toDate={toDate:yyyy-MM-dd}{accountQuery}",
+            $"api/accounting/reports/general-ledger?{string.Join("&", query)}",
             cancellationToken);
     }
 
@@ -1577,9 +1599,66 @@ public sealed class AccountingClientService(
         DateOnly fromDate,
         DateOnly toDate,
         CancellationToken cancellationToken = default) =>
-        apiClient.GetAsync<TrialBalanceReportDto>(
-            $"api/accounting/reports/trial-balance?fromDate={fromDate:yyyy-MM-dd}&toDate={toDate:yyyy-MM-dd}",
+        GetTrialBalanceAsync(new TrialBalanceFilterDto(fromDate, toDate), cancellationToken);
+
+    public Task<TrialBalanceReportDto?> GetTrialBalanceAsync(
+        TrialBalanceFilterDto filter,
+        CancellationToken cancellationToken = default)
+    {
+        var query = new List<string>
+        {
+            $"fromDate={filter.FromDate:yyyy-MM-dd}",
+            $"toDate={filter.ToDate:yyyy-MM-dd}",
+            $"postingAccountsOnly={filter.PostingAccountsOnly.ToString().ToLowerInvariant()}",
+            $"includeZeroBalance={filter.IncludeZeroBalance.ToString().ToLowerInvariant()}",
+            $"groupedTree={filter.GroupedTree.ToString().ToLowerInvariant()}"
+        };
+        if (filter.AsOfDate.HasValue) query.Add($"asOfDate={filter.AsOfDate.Value:yyyy-MM-dd}");
+        AddGuid(query, "fiscalYearId", filter.FiscalYearId);
+        AddGuid(query, "fiscalPeriodId", filter.FiscalPeriodId);
+        if (filter.AccountLevel.HasValue) query.Add($"accountLevel={filter.AccountLevel.Value}");
+
+        return apiClient.GetAsync<TrialBalanceReportDto>(
+            $"api/accounting/reports/trial-balance?{string.Join("&", query)}",
             cancellationToken);
+    }
+
+    public Task<JournalReportDto?> GetJournalReportAsync(
+        JournalReportFilterDto filter,
+        CancellationToken cancellationToken = default)
+    {
+        var query = new List<string>
+        {
+            $"fromDate={filter.FromDate:yyyy-MM-dd}",
+            $"toDate={filter.ToDate:yyyy-MM-dd}",
+            $"pageNumber={filter.PageNumber}",
+            $"pageSize={filter.PageSize}"
+        };
+        AddGuid(query, "fiscalYearId", filter.FiscalYearId);
+        AddGuid(query, "fiscalPeriodId", filter.FiscalPeriodId);
+        AddGuid(query, "accountId", filter.AccountId);
+        AddGuid(query, "userId", filter.UserId);
+        if (filter.JournalType.HasValue) query.Add($"journalType={(byte)filter.JournalType.Value}");
+        if (filter.Status.HasValue) query.Add($"status={(byte)filter.Status.Value}");
+        AddText(query, "sourceModule", filter.SourceModule);
+        AddText(query, "journalNumber", filter.JournalNumber);
+        AddText(query, "reference", filter.Reference);
+
+        return apiClient.GetAsync<JournalReportDto>(
+            $"api/accounting/reports/journal-report?{string.Join("&", query)}",
+            cancellationToken);
+    }
+
+    private static void AddGuid(List<string> query, string name, Guid? value)
+    {
+        if (value.HasValue) query.Add($"{name}={value.Value:D}");
+    }
+
+    private static void AddText(List<string> query, string name, string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+            query.Add($"{name}={Uri.EscapeDataString(value.Trim())}");
+    }
 
     public Task<FiscalCloseReadinessDto?> GetFiscalPeriodCloseReadinessAsync(
         Guid fiscalPeriodId,

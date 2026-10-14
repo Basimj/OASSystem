@@ -2,6 +2,7 @@ using MediatR;
 using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Abstractions.Persistence.Specifications;
 using OAS.Application.Abstractions.Security;
+using OAS.Application.Accounting.CoreHardening.Services;
 using OAS.Application.Common.Exceptions;
 using OAS.Domain.Accounting.Entities;
 using DomainJournalEntryStatus = OAS.Domain.Accounting.Enums.JournalEntryStatus;
@@ -13,6 +14,8 @@ public sealed class SetJournalEntryStatusCommandHandler(
     IReadRepository<JournalEntryLine, Guid> lineRepository,
     IReadRepository<FiscalPeriod, Guid> periodRepository,
     IReadRepository<Account, Guid> accountRepository,
+    IJournalSubledgerIntegrityService subledgerIntegrity,
+    IJournalSourceIntegrityService sourceIntegrity,
     ICurrentUser currentUser,
     TimeProvider timeProvider)
     : IRequestHandler<SetJournalEntryStatusCommand, Guid>
@@ -32,12 +35,14 @@ public sealed class SetJournalEntryStatusCommandHandler(
         if (!Guid.TryParse(currentUser.UserId, out var userId))
             throw new ForbiddenException();
 
-        // The generic aggregate repository does not eager-load child rows. Hydrate the
-        // domain aggregate explicitly so balance/state rules operate on the real journal.
+        // Aggregate repositories do not eager-load journal lines. Hydrate explicitly so
+        // domain balance rules and posting integrity checks see the persisted lines.
         var lines = await lineRepository.ListAsync(
             new Specification<JournalEntryLine>()
                 .Where(x => x.JournalEntryId == journal.Id)
-                .AddSort(nameof(JournalEntryLine.LineNumber), OAS.Contracts.Common.Pagination.SortDirection.Ascending)
+                .AddSort(
+                    nameof(JournalEntryLine.LineNumber),
+                    OAS.Contracts.Common.Pagination.SortDirection.Ascending)
                 .Tracking(),
             cancellationToken);
 
@@ -58,6 +63,13 @@ public sealed class SetJournalEntryStatusCommandHandler(
                 break;
 
             case DomainJournalEntryStatus.Posted:
+                await sourceIntegrity.ValidateUniqueSourceAsync(
+                    journal.SourceModule,
+                    journal.SourceDocumentType,
+                    journal.SourceDocumentId,
+                    journal.Id,
+                    cancellationToken);
+
                 var period = await periodRepository.GetByIdAsync(journal.FiscalPeriodId, cancellationToken);
                 if (period is null)
                     throw new NotFoundException(nameof(FiscalPeriod), journal.FiscalPeriodId);
@@ -96,6 +108,13 @@ public sealed class SetJournalEntryStatusCommandHandler(
                             "manual_posting_not_allowed",
                             $"Manual posting is not allowed for account '{account.Code}'.");
                     }
+
+                    await subledgerIntegrity.ValidateAndResolvePartyNameAsync(
+                        account,
+                        line.CustomerId,
+                        line.SupplierId,
+                        line.EmployeeId,
+                        cancellationToken);
                 }
 
                 journal.Post(userId, nowUtc);

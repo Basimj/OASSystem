@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using OAS.Application.Accounting.Abstractions;
+using OAS.Application.Accounting.Reports.Services;
 using OAS.Application.Common.Exceptions;
 using OAS.Contracts.Accounting.Reports;
 using OAS.Domain.Accounting.Entities;
@@ -14,64 +15,111 @@ namespace OAS.Infrastructure.Accounting.Persistence.Queries;
 
 public sealed class AccountingReportingQueryService(OasDbContext db) : IAccountingReportingQueryService
 {
-    public async Task<GeneralLedgerReportDto> GetGeneralLedgerAsync(
+    public Task<GeneralLedgerReportDto> GetGeneralLedgerAsync(
         DateOnly fromDate,
         DateOnly toDate,
         Guid? accountId = null,
+        CancellationToken cancellationToken = default) =>
+        GetGeneralLedgerAsync(
+            new GeneralLedgerFilterDto(fromDate, toDate, AccountId: accountId),
+            cancellationToken);
+
+    public async Task<GeneralLedgerReportDto> GetGeneralLedgerAsync(
+        GeneralLedgerFilterDto filter,
         CancellationToken cancellationToken = default)
     {
-        EnsureDateRange(fromDate, toDate);
+        var (fromDate, toDate) = await ResolveRangeAsync(
+            filter.FromDate, filter.ToDate, null, filter.FiscalYearId, filter.FiscalPeriodId, cancellationToken);
 
-        var accountQuery = db.Set<Account>().AsNoTracking().AsQueryable();
-        if (accountId.HasValue)
-            accountQuery = accountQuery.Where(x => x.Id == accountId.Value);
-
-        var accounts = await accountQuery
+        var allAccounts = await db.Set<Account>()
+            .AsNoTracking()
             .OrderBy(x => x.Code)
-            .Select(x => new
-            {
-                x.Id,
-                x.Code,
-                x.NameAr,
-                x.NameEn,
-                x.AccountClass,
-                x.NormalBalance
-            })
+            .Select(x => new AccountReportMeta(
+                x.Id, x.Code, x.NameAr, x.NameEn, x.ParentAccountId, x.Level,
+                x.AccountClass, x.AccountType, x.NormalBalance, x.IsPostingAccount))
             .ToListAsync(cancellationToken);
 
-        if (accountId.HasValue && accounts.Count == 0)
-            throw new NotFoundException(nameof(Account), accountId.Value);
-
-        var selectedAccountIds = accounts.Select(x => x.Id).ToArray();
-        if (selectedAccountIds.Length == 0)
+        IReadOnlySet<Guid>? selectedIds = null;
+        if (filter.AccountId.HasValue)
         {
-            return new GeneralLedgerReportDto(fromDate, toDate, accountId, [], 0m, 0m);
+            if (allAccounts.All(x => x.Id != filter.AccountId.Value))
+                throw new NotFoundException(nameof(Account), filter.AccountId.Value);
+
+            selectedIds = filter.IncludeAccountSubtree
+                ? ResolveAccountSubtree(filter.AccountId.Value, allAccounts)
+                : new HashSet<Guid> { filter.AccountId.Value };
         }
 
-        var movements = await (
+        var movementFrom = filter.IncludeOpeningBalance ? (DateOnly?)null : fromDate;
+        var query =
             from line in db.Set<JournalEntryLine>().AsNoTracking()
             join journal in db.Set<JournalEntry>().AsNoTracking()
                 on line.JournalEntryId equals journal.Id
-            where selectedAccountIds.Contains(line.AccountId)
+            where journal.Status == JournalEntryStatus.Posted
                   && journal.PostingDate <= toDate
-                  && (journal.Status == JournalEntryStatus.Posted || journal.Status == JournalEntryStatus.Reversed)
+                  && (!movementFrom.HasValue || journal.PostingDate >= movementFrom.Value)
             select new
             {
                 line.AccountId,
                 line.LineNumber,
                 line.DebitAmount,
                 line.CreditAmount,
-                LineDescription = line.Description,
+                line.Description,
+                line.CustomerId,
+                line.SupplierId,
+                line.TransactionCurrencyCodeSnapshot,
+                line.TransactionDebitAmount,
+                line.TransactionCreditAmount,
+                line.ExchangeRate,
                 JournalId = journal.Id,
                 journal.JournalNumber,
+                journal.JournalType,
                 journal.PostingDate,
                 journal.DocumentDate,
                 JournalDescription = journal.Description,
                 journal.SourceModule,
                 journal.SourceDocumentType,
                 journal.SourceDocumentId
-            })
-            .ToListAsync(cancellationToken);
+            };
+
+        if (selectedIds is not null)
+        {
+            var ids = selectedIds.ToArray();
+            query = query.Where(x => ids.Contains(x.AccountId));
+        }
+
+        if (filter.JournalType.HasValue)
+        {
+            var journalType = (JournalType)(byte)filter.JournalType.Value;
+            query = query.Where(x => x.JournalType == journalType);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.SourceModule))
+        {
+            var source = filter.SourceModule.Trim();
+            query = query.Where(x => x.SourceModule == source);
+        }
+
+        if (filter.CustomerId.HasValue)
+            query = query.Where(x => x.CustomerId == filter.CustomerId.Value);
+        if (filter.SupplierId.HasValue)
+            query = query.Where(x => x.SupplierId == filter.SupplierId.Value);
+
+        if (!string.IsNullOrWhiteSpace(filter.Reference))
+        {
+            var reference = filter.Reference.Trim();
+            query = query.Where(x =>
+                x.JournalNumber.Contains(reference) ||
+                x.JournalDescription.Contains(reference) ||
+                (x.Description != null && x.Description.Contains(reference)) ||
+                (x.SourceModule != null && x.SourceModule.Contains(reference)) ||
+                (x.SourceDocumentType != null && x.SourceDocumentType.Contains(reference)));
+        }
+
+        var movements = await query.ToListAsync(cancellationToken);
+        var accounts = allAccounts
+            .Where(x => selectedIds is null || selectedIds.Contains(x.Id))
+            .ToList();
 
         var accountReports = new List<GeneralLedgerAccountDto>(accounts.Count);
         decimal totalDebit = 0m;
@@ -86,9 +134,11 @@ public sealed class AccountingReportingQueryService(OasDbContext db) : IAccounti
                 .ThenBy(x => x.LineNumber)
                 .ToList();
 
-            var opening = accountMovements
-                .Where(x => x.PostingDate < fromDate)
-                .Sum(x => x.DebitAmount - x.CreditAmount);
+            var opening = filter.IncludeOpeningBalance
+                ? accountMovements
+                    .Where(x => x.PostingDate < fromDate)
+                    .Sum(x => AccountingReportMath.NaturalDelta(account.NormalBalance, x.DebitAmount, x.CreditAmount))
+                : 0m;
 
             var period = accountMovements
                 .Where(x => x.PostingDate >= fromDate && x.PostingDate <= toDate)
@@ -98,22 +148,30 @@ public sealed class AccountingReportingQueryService(OasDbContext db) : IAccounti
             var lines = new List<GeneralLedgerLineDto>(period.Count);
             foreach (var movement in period)
             {
-                running += movement.DebitAmount - movement.CreditAmount;
+                running += AccountingReportMath.NaturalDelta(account.NormalBalance, movement.DebitAmount, movement.CreditAmount);
                 lines.Add(new GeneralLedgerLineDto(
                     movement.JournalId,
                     movement.JournalNumber,
                     movement.PostingDate,
                     movement.DocumentDate,
-                    string.IsNullOrWhiteSpace(movement.LineDescription)
+                    string.IsNullOrWhiteSpace(movement.Description)
                         ? movement.JournalDescription
-                        : movement.LineDescription!,
+                        : movement.Description!,
                     movement.SourceModule,
                     movement.SourceDocumentType,
                     movement.SourceDocumentId,
                     movement.LineNumber,
                     movement.DebitAmount,
                     movement.CreditAmount,
-                    running));
+                    running,
+                    (OAS.Contracts.Accounting.Enums.JournalType)(byte)movement.JournalType,
+                    movement.CustomerId,
+                    movement.SupplierId,
+                    movement.TransactionCurrencyCodeSnapshot,
+                    movement.TransactionDebitAmount,
+                    movement.TransactionCreditAmount,
+                    movement.ExchangeRate,
+                    FormatReference(movement.SourceDocumentType, movement.SourceDocumentId)));
             }
 
             var debit = period.Sum(x => x.DebitAmount);
@@ -121,7 +179,7 @@ public sealed class AccountingReportingQueryService(OasDbContext db) : IAccounti
             totalDebit += debit;
             totalCredit += credit;
 
-            if (!accountId.HasValue && opening == 0m && debit == 0m && credit == 0m)
+            if (!filter.AccountId.HasValue && opening == 0m && debit == 0m && credit == 0m)
                 continue;
 
             accountReports.Add(new GeneralLedgerAccountDto(
@@ -134,72 +192,85 @@ public sealed class AccountingReportingQueryService(OasDbContext db) : IAccounti
                 opening,
                 debit,
                 credit,
-                opening + debit - credit,
-                lines));
+                running,
+                lines,
+                account.Level,
+                account.ParentAccountId,
+                (OAS.Contracts.Accounting.Enums.AccountType)(byte)account.AccountType));
         }
 
         return new GeneralLedgerReportDto(
-            fromDate,
-            toDate,
-            accountId,
-            accountReports,
-            totalDebit,
-            totalCredit);
+            fromDate, toDate, filter.AccountId, accountReports, totalDebit, totalCredit);
     }
 
-    public async Task<TrialBalanceReportDto> GetTrialBalanceAsync(
+    public Task<TrialBalanceReportDto> GetTrialBalanceAsync(
         DateOnly fromDate,
         DateOnly toDate,
+        CancellationToken cancellationToken = default) =>
+        GetTrialBalanceAsync(new TrialBalanceFilterDto(fromDate, toDate), cancellationToken);
+
+    public async Task<TrialBalanceReportDto> GetTrialBalanceAsync(
+        TrialBalanceFilterDto filter,
         CancellationToken cancellationToken = default)
     {
-        EnsureDateRange(fromDate, toDate);
+        var (fromDate, toDate) = await ResolveRangeAsync(
+            filter.FromDate, filter.ToDate, filter.AsOfDate, filter.FiscalYearId, filter.FiscalPeriodId, cancellationToken);
 
         var accounts = await db.Set<Account>()
             .AsNoTracking()
             .OrderBy(x => x.Code)
-            .Select(x => new
-            {
-                x.Id,
-                x.Code,
-                x.NameAr,
-                x.NameEn,
-                x.AccountClass,
-                x.NormalBalance
-            })
+            .Select(x => new AccountReportMeta(
+                x.Id, x.Code, x.NameAr, x.NameEn, x.ParentAccountId, x.Level,
+                x.AccountClass, x.AccountType, x.NormalBalance, x.IsPostingAccount))
             .ToListAsync(cancellationToken);
 
         var movements = await (
             from line in db.Set<JournalEntryLine>().AsNoTracking()
             join journal in db.Set<JournalEntry>().AsNoTracking()
                 on line.JournalEntryId equals journal.Id
-            where journal.PostingDate <= toDate
-                  && (journal.Status == JournalEntryStatus.Posted || journal.Status == JournalEntryStatus.Reversed)
+            where journal.PostingDate <= toDate && journal.Status == JournalEntryStatus.Posted
             group new { line, journal } by line.AccountId
             into g
-            select new
-            {
-                AccountId = g.Key,
-                OpeningDebit = g.Where(x => x.journal.PostingDate < fromDate).Sum(x => x.line.DebitAmount),
-                OpeningCredit = g.Where(x => x.journal.PostingDate < fromDate).Sum(x => x.line.CreditAmount),
-                PeriodDebit = g.Where(x => x.journal.PostingDate >= fromDate && x.journal.PostingDate <= toDate)
-                    .Sum(x => x.line.DebitAmount),
-                PeriodCredit = g.Where(x => x.journal.PostingDate >= fromDate && x.journal.PostingDate <= toDate)
-                    .Sum(x => x.line.CreditAmount)
-            })
+            select new AccountMovement(
+                g.Key,
+                g.Where(x => x.journal.PostingDate < fromDate).Sum(x => x.line.DebitAmount),
+                g.Where(x => x.journal.PostingDate < fromDate).Sum(x => x.line.CreditAmount),
+                g.Where(x => x.journal.PostingDate >= fromDate && x.journal.PostingDate <= toDate).Sum(x => x.line.DebitAmount),
+                g.Where(x => x.journal.PostingDate >= fromDate && x.journal.PostingDate <= toDate).Sum(x => x.line.CreditAmount)))
             .ToListAsync(cancellationToken);
 
-        var movementMap = movements.ToDictionary(x => x.AccountId);
-        var rows = new List<TrialBalanceRowDto>();
+        var direct = movements.ToDictionary(x => x.AccountId);
+        var children = accounts
+            .Where(x => x.ParentAccountId.HasValue)
+            .GroupBy(x => x.ParentAccountId!.Value)
+            .ToDictionary(x => x.Key, x => x.Select(a => a.Id).ToArray());
 
+        var rows = new List<TrialBalanceRowDto>();
         foreach (var account in accounts)
         {
-            movementMap.TryGetValue(account.Id, out var movement);
-            var openingSigned = (movement?.OpeningDebit ?? 0m) - (movement?.OpeningCredit ?? 0m);
-            var periodDebit = movement?.PeriodDebit ?? 0m;
-            var periodCredit = movement?.PeriodCredit ?? 0m;
-            var closingSigned = openingSigned + periodDebit - periodCredit;
+            if (filter.PostingAccountsOnly && !account.IsPostingAccount)
+                continue;
+            if (filter.AccountLevel.HasValue && account.Level > filter.AccountLevel.Value)
+                continue;
 
-            if (openingSigned == 0m && periodDebit == 0m && periodCredit == 0m)
+            AccountMovement movement;
+            var aggregate = filter.GroupedTree && children.ContainsKey(account.Id);
+            if (aggregate)
+            {
+                var ids = ResolveAccountSubtree(account.Id, accounts);
+                movement = SumMovements(ids, direct);
+            }
+            else
+            {
+                movement = direct.TryGetValue(account.Id, out var value)
+                    ? value
+                    : new AccountMovement(account.Id, 0m, 0m, 0m, 0m);
+            }
+
+            var openingSigned = movement.OpeningDebit - movement.OpeningCredit;
+            var closingSigned = openingSigned + movement.PeriodDebit - movement.PeriodCredit;
+
+            if (!filter.IncludeZeroBalance && openingSigned == 0m && movement.PeriodDebit == 0m && movement.PeriodCredit == 0m)
                 continue;
 
             rows.Add(new TrialBalanceRowDto(
@@ -211,18 +282,32 @@ public sealed class AccountingReportingQueryService(OasDbContext db) : IAccounti
                 (OAS.Contracts.Accounting.Enums.NormalBalance)(byte)account.NormalBalance,
                 openingSigned >= 0m ? openingSigned : 0m,
                 openingSigned < 0m ? -openingSigned : 0m,
-                periodDebit,
-                periodCredit,
+                movement.PeriodDebit,
+                movement.PeriodCredit,
                 closingSigned >= 0m ? closingSigned : 0m,
-                closingSigned < 0m ? -closingSigned : 0m));
+                closingSigned < 0m ? -closingSigned : 0m,
+                account.Level,
+                account.ParentAccountId,
+                (OAS.Contracts.Accounting.Enums.AccountType)(byte)account.AccountType,
+                aggregate));
         }
 
-        var openingDebitTotal = rows.Sum(x => x.OpeningDebit);
-        var openingCreditTotal = rows.Sum(x => x.OpeningCredit);
-        var periodDebitTotal = rows.Sum(x => x.PeriodDebit);
-        var periodCreditTotal = rows.Sum(x => x.PeriodCredit);
-        var closingDebitTotal = rows.Sum(x => x.ClosingDebit);
-        var closingCreditTotal = rows.Sum(x => x.ClosingCredit);
+        // Totals are calculated from direct account movements, never from header rollups,
+        // so grouped-tree display cannot double-count the trial balance.
+        var directMovements = accounts.Select(account => direct.TryGetValue(account.Id, out var m)
+            ? m
+            : new AccountMovement(account.Id, 0m, 0m, 0m, 0m)).ToList();
+        var openingNets = directMovements
+            .Select(x => x.OpeningDebit - x.OpeningCredit)
+            .ToArray();
+        var openingDebitTotal = openingNets.Where(x => x >= 0m).Sum();
+        var openingCreditTotal = -openingNets.Where(x => x < 0m).Sum();
+        var periodDebitTotal = directMovements.Sum(x => x.PeriodDebit);
+        var periodCreditTotal = directMovements.Sum(x => x.PeriodCredit);
+        var closingNets = directMovements.Select(x =>
+            (x.OpeningDebit - x.OpeningCredit) + x.PeriodDebit - x.PeriodCredit).ToArray();
+        var closingDebitTotal = closingNets.Where(x => x >= 0m).Sum();
+        var closingCreditTotal = -closingNets.Where(x => x < 0m).Sum();
 
         return new TrialBalanceReportDto(
             fromDate,
@@ -234,10 +319,201 @@ public sealed class AccountingReportingQueryService(OasDbContext db) : IAccounti
             periodCreditTotal,
             closingDebitTotal,
             closingCreditTotal,
-            openingDebitTotal == openingCreditTotal &&
-            periodDebitTotal == periodCreditTotal &&
-            closingDebitTotal == closingCreditTotal);
+            AccountingReportMath.IsBalanced(openingDebitTotal, openingCreditTotal) &&
+            AccountingReportMath.IsBalanced(periodDebitTotal, periodCreditTotal) &&
+            AccountingReportMath.IsBalanced(closingDebitTotal, closingCreditTotal));
     }
+
+    public async Task<JournalReportDto> GetJournalReportAsync(
+        JournalReportFilterDto filter,
+        CancellationToken cancellationToken = default)
+    {
+        if (filter.PageNumber < 1)
+            throw new ArgumentOutOfRangeException(nameof(filter.PageNumber));
+        if (filter.PageSize is < 1 or > 500)
+            throw new ArgumentOutOfRangeException(nameof(filter.PageSize));
+
+        var (fromDate, toDate) = await ResolveRangeAsync(
+            filter.FromDate, filter.ToDate, null, filter.FiscalYearId, filter.FiscalPeriodId, cancellationToken);
+
+        var query =
+            from line in db.Set<JournalEntryLine>().AsNoTracking()
+            join journal in db.Set<JournalEntry>().AsNoTracking() on line.JournalEntryId equals journal.Id
+            join account in db.Set<Account>().AsNoTracking() on line.AccountId equals account.Id
+            where journal.PostingDate >= fromDate && journal.PostingDate <= toDate
+            select new
+            {
+                Journal = journal,
+                Line = line,
+                AccountCode = account.Code,
+                AccountNameAr = account.NameAr
+            };
+
+        if (filter.JournalType.HasValue)
+        {
+            var value = (JournalType)(byte)filter.JournalType.Value;
+            query = query.Where(x => x.Journal.JournalType == value);
+        }
+        if (filter.Status.HasValue)
+        {
+            var value = (JournalEntryStatus)(byte)filter.Status.Value;
+            query = query.Where(x => x.Journal.Status == value);
+        }
+        if (!string.IsNullOrWhiteSpace(filter.SourceModule))
+        {
+            var value = filter.SourceModule.Trim();
+            query = query.Where(x => x.Journal.SourceModule == value);
+        }
+        if (filter.AccountId.HasValue)
+            query = query.Where(x => x.Line.AccountId == filter.AccountId.Value);
+        if (filter.UserId.HasValue)
+        {
+            var userText = filter.UserId.Value.ToString();
+            query = query.Where(x => x.Journal.PostedBy == filter.UserId.Value || x.Journal.CreatedBy == userText);
+        }
+        if (!string.IsNullOrWhiteSpace(filter.JournalNumber))
+        {
+            var value = filter.JournalNumber.Trim();
+            query = query.Where(x => x.Journal.JournalNumber.Contains(value));
+        }
+        if (!string.IsNullOrWhiteSpace(filter.Reference))
+        {
+            var value = filter.Reference.Trim();
+            query = query.Where(x =>
+                x.Journal.JournalNumber.Contains(value) ||
+                x.Journal.Description.Contains(value) ||
+                (x.Line.Description != null && x.Line.Description.Contains(value)) ||
+                (x.Journal.SourceModule != null && x.Journal.SourceModule.Contains(value)) ||
+                (x.Journal.SourceDocumentType != null && x.Journal.SourceDocumentType.Contains(value)));
+        }
+
+        var totalCount = await query.LongCountAsync(cancellationToken);
+        var totalDebit = await query.SumAsync(x => (decimal?)x.Line.DebitAmount, cancellationToken) ?? 0m;
+        var totalCredit = await query.SumAsync(x => (decimal?)x.Line.CreditAmount, cancellationToken) ?? 0m;
+
+        var page = await query
+            .OrderBy(x => x.Journal.PostingDate)
+            .ThenBy(x => x.Journal.JournalNumber)
+            .ThenBy(x => x.Line.LineNumber)
+            .Skip((filter.PageNumber - 1) * filter.PageSize)
+            .Take(filter.PageSize)
+            .Select(x => new JournalReportLineDto(
+                x.Journal.Id,
+                x.Journal.JournalNumber,
+                x.Journal.PostingDate,
+                x.Journal.DocumentDate,
+                (OAS.Contracts.Accounting.Enums.JournalType)(byte)x.Journal.JournalType,
+                (OAS.Contracts.Accounting.Enums.JournalEntryStatus)(byte)x.Journal.Status,
+                x.Line.AccountId,
+                x.AccountCode,
+                x.AccountNameAr,
+                x.Line.LineNumber,
+                x.Line.Description ?? x.Journal.Description,
+                x.Line.DebitAmount,
+                x.Line.CreditAmount,
+                x.Journal.SourceModule,
+                x.Journal.SourceDocumentType,
+                x.Journal.SourceDocumentId,
+                x.Journal.CreatedBy,
+                x.Journal.PostedBy,
+                x.Line.CustomerId,
+                x.Line.SupplierId,
+                null))
+            .ToListAsync(cancellationToken);
+
+        var lines = page.Select(x => x with
+        {
+            Reference = FormatReference(x.SourceDocumentType, x.SourceDocumentId)
+        }).ToArray();
+
+        return new JournalReportDto(
+            fromDate, toDate, lines, totalDebit, totalCredit, totalDebit - totalCredit,
+            totalCount, filter.PageNumber, filter.PageSize);
+    }
+
+    private async Task<(DateOnly FromDate, DateOnly ToDate)> ResolveRangeAsync(
+        DateOnly fromDate,
+        DateOnly toDate,
+        DateOnly? asOfDate,
+        Guid? fiscalYearId,
+        Guid? fiscalPeriodId,
+        CancellationToken cancellationToken)
+    {
+        if (asOfDate.HasValue)
+            toDate = asOfDate.Value;
+        EnsureDateRange(fromDate, toDate);
+
+        if (fiscalPeriodId.HasValue)
+        {
+            var period = await db.Set<FiscalPeriod>().AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == fiscalPeriodId.Value, cancellationToken)
+                ?? throw new NotFoundException(nameof(FiscalPeriod), fiscalPeriodId.Value);
+            if (fiscalYearId.HasValue && period.FiscalYearId != fiscalYearId.Value)
+                throw new ConflictException("report_period_year_mismatch", "The selected fiscal period does not belong to the selected fiscal year.");
+            fromDate = Max(fromDate, period.StartDate);
+            toDate = Min(toDate, period.EndDate);
+        }
+        else if (fiscalYearId.HasValue)
+        {
+            var year = await db.Set<FiscalYear>().AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == fiscalYearId.Value, cancellationToken)
+                ?? throw new NotFoundException(nameof(FiscalYear), fiscalYearId.Value);
+            fromDate = Max(fromDate, year.StartDate);
+            toDate = Min(toDate, year.EndDate);
+        }
+
+        EnsureDateRange(fromDate, toDate);
+        return (fromDate, toDate);
+    }
+
+    private static HashSet<Guid> ResolveAccountSubtree(Guid rootId, IReadOnlyCollection<AccountReportMeta> accounts)
+    {
+        var result = new HashSet<Guid> { rootId };
+        var queue = new Queue<Guid>();
+        queue.Enqueue(rootId);
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            foreach (var child in accounts.Where(x => x.ParentAccountId == current))
+            {
+                if (result.Add(child.Id))
+                    queue.Enqueue(child.Id);
+            }
+        }
+        return result;
+    }
+
+    private static AccountMovement SumMovements(
+        IEnumerable<Guid> accountIds,
+        IReadOnlyDictionary<Guid, AccountMovement> direct)
+    {
+        decimal openingDebit = 0m, openingCredit = 0m, periodDebit = 0m, periodCredit = 0m;
+        foreach (var id in accountIds)
+        {
+            if (!direct.TryGetValue(id, out var movement))
+                continue;
+            openingDebit += movement.OpeningDebit;
+            openingCredit += movement.OpeningCredit;
+            periodDebit += movement.PeriodDebit;
+            periodCredit += movement.PeriodCredit;
+        }
+        return new AccountMovement(Guid.Empty, openingDebit, openingCredit, periodDebit, periodCredit);
+    }
+
+    private static string? FormatReference(string? sourceDocumentType, Guid? sourceDocumentId) =>
+        string.IsNullOrWhiteSpace(sourceDocumentType) && !sourceDocumentId.HasValue
+            ? null
+            : $"{sourceDocumentType}{(sourceDocumentId.HasValue ? $" / {sourceDocumentId:D}" : string.Empty)}";
+
+    private static DateOnly Max(DateOnly left, DateOnly right) => left >= right ? left : right;
+    private static DateOnly Min(DateOnly left, DateOnly right) => left <= right ? left : right;
+
+    private sealed record AccountReportMeta(
+        Guid Id, string Code, string NameAr, string? NameEn, Guid? ParentAccountId, byte Level,
+        AccountClass AccountClass, AccountType AccountType, NormalBalance NormalBalance, bool IsPostingAccount);
+
+    private sealed record AccountMovement(
+        Guid AccountId, decimal OpeningDebit, decimal OpeningCredit, decimal PeriodDebit, decimal PeriodCredit);
 
     public async Task<FiscalCloseReadinessDto> GetFiscalPeriodCloseReadinessAsync(
         Guid fiscalPeriodId,

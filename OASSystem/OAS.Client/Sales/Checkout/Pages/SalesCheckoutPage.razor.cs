@@ -84,7 +84,7 @@ public partial class SalesCheckoutPage : ComponentBase
     {
         if (_model is null) return Task.CompletedTask;
         _model.PaymentPlan = value;
-        if (value is "PayOnPickup" or "AccountCredit") _model.PaymentLines.Clear();
+        if (value == "AccountCredit") _model.PaymentLines.Clear();
         else EnsureInitialPaymentLine();
         return Task.CompletedTask;
     }
@@ -271,13 +271,10 @@ public partial class SalesCheckoutPage : ComponentBase
                     return false;
                 }
                 break;
-            case SalesPaymentPlan.PayOnPickup:
             case SalesPaymentPlan.AccountCredit:
                 if (payments.Count != 0)
                 {
-                    error = plan == SalesPaymentPlan.PayOnPickup
-                        ? "الدفع عند الاستلام لا يقبل دفعات الآن."
-                        : "البيع الآجل لا يقبل دفعات عند تنفيذ Checkout.";
+                    error = "البيع الآجل لا يقبل دفعات عند تنفيذ Checkout.";
                     return false;
                 }
                 break;
@@ -292,7 +289,7 @@ public partial class SalesCheckoutPage : ComponentBase
 
     private void EnsureInitialPaymentLine()
     {
-        if (_model is null || _model.PaymentPlan is "PayOnPickup" or "AccountCredit" || _model.PaymentLines.Count > 0) return;
+        if (_model is null || _model.PaymentPlan == "AccountCredit" || _model.PaymentLines.Count > 0) return;
         _model.PaymentLines.Add(NewPaymentLine());
     }
 

@@ -120,6 +120,14 @@ public sealed class EfUnitOfWork(OasDbContext dbContext) : IUnitOfWork
             return true;
         }
 
+        if (message.Contains("UX_JournalEntries_SourceDocument", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException(
+                "accounting_source_already_posted",
+                "An accounting journal already exists for this source document. Reload the source document before retrying.");
+            return true;
+        }
+
         if (message.Contains("UX_PostingProfiles_Code", StringComparison.OrdinalIgnoreCase))
         {
             conflict = new ConflictException("accounting_posting_profile_code_exists", "A posting profile with this code already exists.");

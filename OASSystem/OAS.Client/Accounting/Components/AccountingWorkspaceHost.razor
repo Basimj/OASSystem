@@ -184,7 +184,7 @@
                                       Size="ControlSize.Small"
                                       OnClick="@(() => ChangeJournalStatusAsync(JournalEntryStatus.Posted))" />
                         }
-                        else if (journal.Status == JournalEntryStatus.Posted)
+                        else if (journal.Status == JournalEntryStatus.Posted && !journal.ReversedJournalId.HasValue)
                         {
                             <UiButton Text="عكس القيد"
                                       IconCssClass="fa-solid fa-arrow-rotate-left"

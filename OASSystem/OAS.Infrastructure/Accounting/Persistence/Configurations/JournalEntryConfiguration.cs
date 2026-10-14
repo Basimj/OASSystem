@@ -87,6 +87,11 @@ public sealed class JournalEntryConfiguration : IEntityTypeConfiguration<Journal
         builder.HasIndex(x => x.Status)
             .HasDatabaseName("IX_JournalEntries_Status");
 
+        builder.HasIndex(x => new { x.SourceModule, x.SourceDocumentType, x.SourceDocumentId })
+            .IsUnique()
+            .HasFilter("[SourceModule] IS NOT NULL AND [SourceDocumentType] IS NOT NULL AND [SourceDocumentId] IS NOT NULL")
+            .HasDatabaseName("UX_JournalEntries_SourceDocument");
+
         builder.HasIndex(x => x.ReversedJournalId)
             .HasDatabaseName("IX_JournalEntries_ReversedJournalId");
 

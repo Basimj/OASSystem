@@ -108,6 +108,15 @@ public sealed class FiscalYearClosingServiceTests
         public Task<GeneralLedgerReportDto> GetGeneralLedgerAsync(DateOnly fromDate, DateOnly toDate, Guid? accountId = null, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
 
+        public Task<GeneralLedgerReportDto> GetGeneralLedgerAsync(GeneralLedgerFilterDto filter, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<TrialBalanceReportDto> GetTrialBalanceAsync(TrialBalanceFilterDto filter, CancellationToken cancellationToken = default)
+            => Task.FromResult(trialBalance);
+
+        public Task<JournalReportDto> GetJournalReportAsync(JournalReportFilterDto filter, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
         public Task<FiscalCloseReadinessDto> GetFiscalPeriodCloseReadinessAsync(Guid fiscalPeriodId, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
 

@@ -10,9 +10,21 @@ public interface IAccountingReportingQueryService
         Guid? accountId = null,
         CancellationToken cancellationToken = default);
 
+    Task<GeneralLedgerReportDto> GetGeneralLedgerAsync(
+        GeneralLedgerFilterDto filter,
+        CancellationToken cancellationToken = default);
+
     Task<TrialBalanceReportDto> GetTrialBalanceAsync(
         DateOnly fromDate,
         DateOnly toDate,
+        CancellationToken cancellationToken = default);
+
+    Task<TrialBalanceReportDto> GetTrialBalanceAsync(
+        TrialBalanceFilterDto filter,
+        CancellationToken cancellationToken = default);
+
+    Task<JournalReportDto> GetJournalReportAsync(
+        JournalReportFilterDto filter,
         CancellationToken cancellationToken = default);
 
     Task<FiscalCloseReadinessDto> GetFiscalPeriodCloseReadinessAsync(

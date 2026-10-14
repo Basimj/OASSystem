@@ -150,6 +150,31 @@ public class AccountingEfConfigurationTests
         });
     }
 
+
+    [Test]
+    public void JournalEntries_SourceDocumentIndex_IsUniqueAndFilteredForIdempotency()
+    {
+        using var context = new OasDbContext(_options);
+        var entity = context.Model.FindEntityType(typeof(JournalEntry));
+        Assert.That(entity, Is.Not.Null);
+
+        var index = entity!.GetIndexes().SingleOrDefault(x =>
+            x.GetDatabaseName() == "UX_JournalEntries_SourceDocument");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(index, Is.Not.Null);
+            Assert.That(index!.IsUnique, Is.True);
+            Assert.That(index.Properties.Select(x => x.Name), Is.EqualTo(new[]
+            {
+                nameof(JournalEntry.SourceModule),
+                nameof(JournalEntry.SourceDocumentType),
+                nameof(JournalEntry.SourceDocumentId)
+            }));
+            Assert.That(index.GetFilter(), Does.Contain("SourceDocumentId"));
+        });
+    }
+
     private static void AssertAuditColumn(
         Microsoft.EntityFrameworkCore.Metadata.IEntityType entity,
         StoreObjectIdentifier table,

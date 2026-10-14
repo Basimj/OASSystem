@@ -6,6 +6,7 @@ using OAS.Application.Accounting.Accounts.Mapping;
 using OAS.Application.Accounting.Accounts.Queries.GetAccountById;
 using OAS.Application.Accounting.Accounts.Queries.GetAccounts;
 using OAS.Application.Accounting.Abstractions;
+using OAS.Application.Accounting.CoreHardening.Services;
 using OAS.Application.Common.Exceptions;
 using OAS.Contracts.Accounting.Accounts;
 using OAS.Contracts.Accounting.Enums;
@@ -34,7 +35,7 @@ public class AccountCommandAndQueryTests
     [Test]
     public async Task CreateAccountCommandHandler_AddsAccountToRepository()
     {
-        var handler = new CreateAccountCommandHandler(_repository, _mapper);
+        var handler = new CreateAccountCommandHandler(_repository, _mapper, new AllowAllAccountIntegrityService());
         var request = new CreateAccountRequest(
             Code: "1101",
             NameAr: "الصندوق الرئيسي",
@@ -70,7 +71,7 @@ public class AccountCommandAndQueryTests
         var existing = CreateAccountEntity("1101", "الصندوق");
         await _repository.AddAsync(existing);
 
-        var handler = new UpdateAccountCommandHandler(_repository, _mapper, new UnmanagedAccountGuard());
+        var handler = new UpdateAccountCommandHandler(_repository, _mapper, new UnmanagedAccountGuard(), new AllowAllAccountIntegrityService());
         var request = new UpdateAccountRequest(
             Code: "1101",
             NameAr: "الصندوق الرئيسي المعدل",
@@ -108,7 +109,7 @@ public class AccountCommandAndQueryTests
         var existing = CreateAccountEntity("1101", "الصندوق");
         _repository.AddAsync(existing).GetAwaiter().GetResult();
 
-        var handler = new UpdateAccountCommandHandler(_repository, _mapper, new UnmanagedAccountGuard());
+        var handler = new UpdateAccountCommandHandler(_repository, _mapper, new UnmanagedAccountGuard(), new AllowAllAccountIntegrityService());
         var request = new UpdateAccountRequest(
             Code: "9999",
             NameAr: "الصندوق",
@@ -141,7 +142,7 @@ public class AccountCommandAndQueryTests
         var existing = CreateAccountEntity("1101", "الصندوق");
         await _repository.AddAsync(existing);
 
-        var handler = new SetAccountStatusCommandHandler(_repository, new UnmanagedAccountGuard());
+        var handler = new SetAccountStatusCommandHandler(_repository, new UnmanagedAccountGuard(), new AllowAllAccountIntegrityService());
         var request = new SetAccountStatusRequest(
             IsActive: false,
             RowVersion: Convert.ToBase64String(existing.RowVersion));
@@ -226,6 +227,18 @@ public class AccountCommandAndQueryTests
     private sealed class UnmanagedAccountGuard : IManagedAccountGuard
     {
         public Task<bool> IsManagedAsync(Guid accountId, CancellationToken cancellationToken = default) => Task.FromResult(false);
+    }
+
+    private sealed class AllowAllAccountIntegrityService : IAccountIntegrityService
+    {
+        public Task ValidateHierarchyAsync(Guid accountId, Guid? parentAccountId, byte level, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task ValidateUpdateAsync(
+            Account current, Guid? parentAccountId, byte level, DomainAccountClass accountClass, DomainAccountType accountType,
+            DomainNormalBalance normalBalance, bool isPostingAccount, bool isControlAccount, bool isSystemAccount, bool isActive,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task ValidateDeactivationAsync(Account account, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
 }

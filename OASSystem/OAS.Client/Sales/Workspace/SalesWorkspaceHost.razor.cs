@@ -664,13 +664,6 @@ public partial class SalesWorkspaceHost : IDisposable
                     return false;
                 }
                 break;
-            case SalesPaymentPlan.PayOnPickup:
-                if (payments.Count != 0)
-                {
-                    error = "الدفع عند الاستلام لا يقبل دفعات عند ترحيل البيع الأولي.";
-                    return false;
-                }
-                break;
             case SalesPaymentPlan.AccountCredit:
                 if (payments.Count != 0)
                 {

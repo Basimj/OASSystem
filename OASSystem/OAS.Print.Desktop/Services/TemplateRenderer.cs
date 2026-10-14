@@ -16,14 +16,16 @@ public sealed class TemplateRenderer
     public const double DipPerMm = 96d / 25.4d;
 
     public Canvas BuildCanvas(TemplateDefinition template, JsonElement data, bool designMode = false) =>
-        BuildCanvasCore(template, data, designMode, null, null);
+        BuildCanvasCore(template, data, designMode, null, null, 1, 1);
 
     private Canvas BuildCanvasCore(
         TemplateDefinition template,
         JsonElement data,
         bool designMode,
         TablePageSlice? tableSlice,
-        Func<TemplateElement, bool>? includeElement)
+        Func<TemplateElement, bool>? includeElement,
+        int pageNumber,
+        int pageCount)
     {
         var canvas = new Canvas
         {
@@ -39,7 +41,7 @@ public sealed class TemplateRenderer
             if (includeElement is not null && !includeElement(element))
                 continue;
 
-            var visual = BuildElement(element, data, designMode, tableSlice);
+            var visual = BuildElement(element, data, designMode, tableSlice, pageNumber, pageCount);
             visual.Tag = element;
             Canvas.SetLeft(visual, Mm(element.Xmm));
             Canvas.SetTop(visual, Mm(element.Ymm));
@@ -56,10 +58,10 @@ public sealed class TemplateRenderer
         var document = new FixedDocument();
         document.DocumentPaginator.PageSize = new Size(pageWidth, pageHeight);
 
-        // Voucher line tables can exceed the visual capacity of one page. Instead of silently
+        // Document line tables can exceed the visual capacity of one page. Instead of silently
         // dropping rows after MaxRows, split the main Lines table across pages and keep the
-        // totals/signatures on the final page only. This preserves every voucher line while
-        // keeping the compact template layout intact.
+        // totals/signatures on the final page only. This preserves every report/document line
+        // while keeping the compact template layout intact.
         var pagedTable = template.Elements
             .FirstOrDefault(x =>
                 x.Type == TemplateElementType.Table &&
@@ -71,7 +73,7 @@ public sealed class TemplateRenderer
 
         if (pagedTable is null || items is not { ValueKind: JsonValueKind.Array })
         {
-            AddPage(document, pageWidth, pageHeight, BuildCanvasCore(template, data, false, null, null));
+            AddPage(document, pageWidth, pageHeight, BuildCanvasCore(template, data, false, null, null, 1, 1));
             return document;
         }
 
@@ -79,7 +81,7 @@ public sealed class TemplateRenderer
         var rowsPerPage = Math.Max(1, pagedTable.MaxRows);
         if (totalRows <= rowsPerPage)
         {
-            AddPage(document, pageWidth, pageHeight, BuildCanvasCore(template, data, false, null, null));
+            AddPage(document, pageWidth, pageHeight, BuildCanvasCore(template, data, false, null, null, 1, 1));
             return document;
         }
 
@@ -92,9 +94,11 @@ public sealed class TemplateRenderer
             var slice = new TablePageSlice(pagedTable.Id, pageIndex * rowsPerPage, rowsPerPage);
 
             bool IncludeElement(TemplateElement element) =>
-                isLastPage || element.Ymm <= tableBottom + 0.01;
+                isLastPage
+                || element.Ymm <= tableBottom + 0.01
+                || string.Equals(element.FieldPath, "__PageLabel", StringComparison.OrdinalIgnoreCase);
 
-            var canvas = BuildCanvasCore(template, data, false, slice, IncludeElement);
+            var canvas = BuildCanvasCore(template, data, false, slice, IncludeElement, pageIndex + 1, pageCount);
             AddPage(document, pageWidth, pageHeight, canvas);
         }
 
@@ -124,13 +128,15 @@ public sealed class TemplateRenderer
         TemplateElement element,
         JsonElement data,
         bool designMode,
-        TablePageSlice? tableSlice) =>
+        TablePageSlice? tableSlice,
+        int pageNumber,
+        int pageCount) =>
         element.Type switch
         {
             TemplateElementType.Text => BuildText(element, element.Text, designMode),
             TemplateElementType.Field => BuildText(
                 element,
-                element.Prefix + JsonValueResolver.ResolveText(data, element.FieldPath, element.Format) + element.Suffix,
+                element.Prefix + ResolveFieldText(data, element.FieldPath, element.Format, pageNumber, pageCount) + element.Suffix,
                 designMode),
             TemplateElementType.Rectangle => BuildRectangle(element, designMode),
             TemplateElementType.Line => BuildLine(element, designMode),
@@ -138,6 +144,23 @@ public sealed class TemplateRenderer
             TemplateElementType.Table => BuildTable(element, data, designMode, tableSlice),
             _ => BuildText(element, element.Text, designMode)
         };
+
+    private static string ResolveFieldText(
+        JsonElement data,
+        string fieldPath,
+        string? format,
+        int pageNumber,
+        int pageCount)
+    {
+        if (string.Equals(fieldPath, "__PageNumber", StringComparison.OrdinalIgnoreCase))
+            return pageNumber.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        if (string.Equals(fieldPath, "__PageCount", StringComparison.OrdinalIgnoreCase))
+            return pageCount.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        if (string.Equals(fieldPath, "__PageLabel", StringComparison.OrdinalIgnoreCase))
+            return $"صفحة {pageNumber} من {pageCount}";
+
+        return JsonValueResolver.ResolveText(data, fieldPath, format);
+    }
 
     private FrameworkElement BuildText(TemplateElement element, string text, bool designMode)
     {
