@@ -36,10 +36,6 @@ public sealed class CreateSalesInvoiceCommandHandler(
             ?? throw new NotFoundException(nameof(Customer), d.CustomerId);
 
         var paymentPlan = (SalesPaymentPlan)(byte)d.PaymentPlan;
-        if (paymentPlan == SalesPaymentPlan.PayOnPickup)
-            throw new ConflictException(
-                "direct_sale_pay_on_pickup_not_supported",
-                "الدفع عند الاستلام يتطلب طلب عميل ومسار Checkout. البيع المباشر يدعم الدفع الكامل أو الجزئي أو البيع الآجل فقط.");
         EnsureCustomer(customer, paymentPlan);
 
         if (d.Lines.Count == 0)

@@ -1,5 +1,6 @@
 using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Common.Entities;
+using OAS.Domain.Accounting.Rules;
 
 namespace OAS.Domain.Accounting.Entities;
 
@@ -102,6 +103,11 @@ public sealed class Account : AuditableEntity<Guid>
         if (level == 0)
             throw new ArgumentOutOfRangeException(nameof(level));
 
+        ChartOfAccountsRules.EnsureParentIsNotSelf(id, parentAccountId);
+        ChartOfAccountsRules.EnsureClassificationIsValid(accountClass, normalBalance);
+        ChartOfAccountsRules.EnsureDefinitionIsConsistent(
+            accountType, isPostingAccount, isControlAccount, allowManualPosting);
+
         return new Account(
             id,
             code.Trim(),
@@ -142,6 +148,11 @@ public sealed class Account : AuditableEntity<Guid>
 
         if (level == 0)
             throw new ArgumentOutOfRangeException(nameof(level));
+
+        ChartOfAccountsRules.EnsureParentIsNotSelf(Id, parentAccountId);
+        ChartOfAccountsRules.EnsureClassificationIsValid(accountClass, normalBalance);
+        ChartOfAccountsRules.EnsureDefinitionIsConsistent(
+            accountType, isPostingAccount, isControlAccount, allowManualPosting);
 
         Code = code.Trim();
         NameAr = nameAr.Trim();

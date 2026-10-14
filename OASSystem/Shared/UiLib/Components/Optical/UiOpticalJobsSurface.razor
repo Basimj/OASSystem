@@ -120,7 +120,7 @@
             @if(Selected.StatusKey is "MaterialsAvailable" or "MaterialsIssued") {<UiButton Text="بدء العمل" IconCssClass="fa-solid fa-play" Size="ControlSize.Small" Loading="@IsBusy" OnClick="_ => OnStart.InvokeAsync()" />}
             @if(Selected.StatusKey == "InProduction") {<UiButton Text="إرسال لفحص الجودة" IconCssClass="fa-solid fa-microscope" Size="ControlSize.Small" Loading="@IsBusy" OnClick="_ => OnSendToQualityControl.InvokeAsync()" />}
             @if(Selected.StatusKey == "QCPassed") {<UiButton Text="جاهز للتسليم" IconCssClass="fa-solid fa-circle-check" Size="ControlSize.Small" Loading="@IsBusy" OnClick="_ => OnReady.InvokeAsync()" />}
-            @if(Selected.StatusKey == "ReadyForDelivery") {<UiButton Text="تسليم" IconCssClass="fa-solid fa-box-open" Size="ControlSize.Small" Loading="@IsBusy" OnClick="_ => OnDeliver.InvokeAsync()" />}
+            @if(Selected.StatusKey == "ReadyForDelivery") {<UiButton Text="التسوية والتسليم" IconCssClass="fa-solid fa-cash-register" Size="ControlSize.Small" Loading="@IsBusy" OnClick="_ => OnDeliver.InvokeAsync()" />}
             @if(Selected.StatusKey is not "Delivered" and not "Cancelled") {<UiButton Text="إلغاء" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Loading="@IsBusy" OnClick="_ => OnCancel.InvokeAsync()" />}
         </footer>
     </aside>

@@ -1,16 +1,12 @@
 using Microsoft.AspNetCore.Components;
-using OAS.Client.Accounting.Services;
 using OAS.Client.Common.Feedback.Services;
 using OAS.Client.Features.Employees.Services;
-using OAS.Client.Sales.Checkout.Services;
 using OAS.Client.Sales.Mapping;
 using OAS.Client.Sales.OrderTracking.Services;
 using OAS.Client.Sales.OrderTracking.State;
 using OAS.Client.Sales.Services;
 using OAS.Client.Services.Http;
-using OAS.Contracts.Accounting.Enums;
 using OAS.Contracts.Common.Pagination;
-using OAS.Contracts.Sales.Checkout;
 using OAS.Contracts.Sales.Enums;
 using OAS.Contracts.Sales.OrderOperations;
 using OAS.UiLib.Core.Models;
@@ -22,9 +18,7 @@ namespace OAS.Client.Sales.OrderTracking.Pages;
 public partial class CustomerOrderOperationsPage : ComponentBase
 {
     [Inject] private ICustomerOrderOperationsClientService Operations { get; set; } = default!;
-    [Inject] private ISalesCheckoutClientService Checkout { get; set; } = default!;
     [Inject] private ISalesClientService Sales { get; set; } = default!;
-    [Inject] private IAccountingClientService Accounting { get; set; } = default!;
     [Inject] private IEmployeeClientService Employees { get; set; } = default!;
     [Inject] private CustomerOrderOperationsState State { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
@@ -37,9 +31,6 @@ public partial class CustomerOrderOperationsPage : ComponentBase
     private IReadOnlyList<UiWorkflowMetric> _metrics = [];
     private IReadOnlyList<UiOrderOperationsRowModel> _rows = [];
     private UiOrderOperationsDetailsModel? _selected;
-    private UiDeliverySettlementModel? _delivery;
-    private bool _deliveryBusy;
-    private string _deliveryKey = Guid.NewGuid().ToString("N");
     private bool _initialLoaded;
 
     protected override async Task OnParametersSetAsync()
@@ -126,83 +117,15 @@ public partial class CustomerOrderOperationsPage : ComponentBase
     private Task OpenSupplyAsync(Guid id){Navigation.NavigateTo($"/purchasing/customer-demand?orderId={id:D}");return Task.CompletedTask;}
     private Task OpenJobAsync(Guid id){Navigation.NavigateTo($"/optical/jobs?jobId={id:D}");return Task.CompletedTask;}
 
-    private async Task OpenDeliveryAsync(Guid orderId)
+    private Task OpenDeliveryAsync(Guid orderId)
     {
-        _deliveryBusy=true;
-        try
-        {
-            var context=await Checkout.GetCheckoutContextAsync(orderId);
-            if(context is null)
-            {
-                Snackbar.Error("تعذر تحميل بيانات التسليم.");
-                return;
-            }
-            var customerText=$"{context.Customer.CustomerCode} - {context.Customer.NameAr}";
-            _delivery=new UiDeliverySettlementModel
-            {
-                OrderId=orderId,OrderCode=context.Order.OrderCode,CustomerText=customerText,InvoiceCode=context.InvoiceCode,CurrencyId=context.Order.CurrencyId.ToString("D"),CurrencyCode=context.Order.CurrencyCodeSnapshot,
-                Total=context.PaymentSummary.TotalAmount,Paid=context.PaymentSummary.PaidAmount,AppliedAdvances=context.PaymentSummary.AppliedAdvanceAmount,
-                Outstanding=context.PaymentSummary.OutstandingAmount,PaymentPlan=context.Order.PaymentPlan.ToString(),RowVersion=context.Order.RowVersion
-            };
-            _deliveryKey=Guid.NewGuid().ToString("N");
-            if(_delivery.Outstanding>0 && _delivery.PaymentPlan!="AccountCredit") _delivery.PaymentLines.Add(NewDeliveryPayment(context.Order.CurrencyId,context.Order.CurrencyCodeSnapshot,_delivery.Outstanding));
-        }
-        catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}
-        catch{ApiFeedback.ShowUnexpected();}
-        finally{_deliveryBusy=false;}
+        State.Selected = null;
+        _selected = null;
+        Navigation.NavigateTo($"/sales/delivery/{orderId:D}");
+        return Task.CompletedTask;
     }
 
-    private Task AddDeliveryPaymentAsync(){if(_delivery is not null)_delivery.PaymentLines.Add(NewDeliveryPayment(ParseGuid(_delivery.CurrencyId)??Guid.Empty,_delivery.CurrencyCode,0m));return Task.CompletedTask;}
-    private Task RemoveDeliveryPaymentAsync(UiCheckoutPaymentLineModel line){_delivery?.PaymentLines.Remove(line);return Task.CompletedTask;}
-    private Task CloseDeliveryAsync(){_delivery=null;return Task.CompletedTask;}
-    private async Task DeliverAsync()
-    {
-        if(_delivery is null)return;_deliveryBusy=true;
-        try
-        {
-            if(!TryBuildPayments(_delivery.PaymentLines,out var payments,out var paymentError))
-            {
-                Snackbar.Error(paymentError!);
-                return;
-            }
-            var call=await Checkout.DeliverResultAsync(_delivery.OrderId,new DeliverCustomerOrderRequest(payments,_delivery.RowVersion,_deliveryKey));
-            if(!call.Succeeded)
-            {
-                if(call.Error is not null)ApiFeedback.Show(call.Error);else ApiFeedback.ShowUnexpected();
-                return;
-            }
-            var result=call.Value;
-            Snackbar.Success(result is null?"تم التسليم بنجاح.":$"تم تسليم الطلب {result.OrderCode} بنجاح.");
-            _delivery=null;_selected=null;State.Selected=null;await LoadAsync();
-        }
-        catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}
-        catch{ApiFeedback.ShowUnexpected();}
-        finally{_deliveryBusy=false;}
-    }
-
-    private static UiCheckoutPaymentLineModel NewDeliveryPayment(Guid currencyId,string currencyCode,decimal amount)=>new(){PaymentMethod="Cash",CurrencyId=currencyId==Guid.Empty?"":currencyId.ToString("D"),CurrencyDisplay=currencyCode,Amount=amount};
-    private static Guid? ParseGuid(string? v)=>Guid.TryParse(v,out var id)?id:null;
-    private static bool TryBuildPayments(IEnumerable<UiCheckoutPaymentLineModel> lines,out IReadOnlyList<CheckoutPaymentLineRequest> payments,out string? error)
-    {
-        var result=new List<CheckoutPaymentLineRequest>();
-        foreach(var line in lines.Where(x=>x.Amount>0))
-        {
-            if(!Enum.TryParse<PaymentMethod>(line.PaymentMethod,out var method))
-            {
-                payments=[];error="طريقة دفع غير صحيحة.";return false;
-            }
-            if(!Guid.TryParse(line.CurrencyId,out var currencyId))
-            {
-                payments=[];error="يجب تحديد عملة الدفعة.";return false;
-            }
-            if(method==PaymentMethod.Cash&&!ParseGuid(line.CashAccountId).HasValue){payments=[];error="يجب اختيار الصندوق للدفع النقدي.";return false;}
-            if((method is PaymentMethod.Card or PaymentMethod.BankTransfer or PaymentMethod.Cheque)&&!ParseGuid(line.BankAccountId).HasValue){payments=[];error="يجب اختيار الحساب البنكي لطريقة الدفع المحددة.";return false;}
-            if(method==PaymentMethod.Cheque&&string.IsNullOrWhiteSpace(line.ReferenceNumber)){payments=[];error="رقم الشيك مطلوب.";return false;}
-            if(method==PaymentMethod.Other&&!ParseGuid(line.SettlementAccountId).HasValue){payments=[];error="يجب تحديد حساب التسوية لطريقة الدفع الأخرى.";return false;}
-            result.Add(new CheckoutPaymentLineRequest(method,currencyId,line.Amount,ParseGuid(line.CashAccountId),ParseGuid(line.BankAccountId),line.ReferenceNumber,line.ReferenceDate,line.Description){SettlementAccountId=ParseGuid(line.SettlementAccountId)});
-        }
-        payments=result;error=null;return true;
-    }
+    private static Guid? ParseGuid(string? v) => Guid.TryParse(v, out var id) ? id : null;
 
     private async Task<IReadOnlyList<UiLookupItem>> SearchWarehousesAsync(string search,CancellationToken ct)
     {
@@ -216,8 +139,4 @@ public partial class CustomerOrderOperationsPage : ComponentBase
         return page.Items.Where(x=>x.IsActive&&x.IsTechnician).Select(x=>new UiLookupItem(x.Id.ToString("D"),$"{x.EmployeeCode} - {x.DisplayName}",x.JobTitleName,"fa-solid fa-user-gear")).ToArray();
     }
 
-    private async Task<IReadOnlyList<UiLookupItem>> SearchCurrenciesAsync(string search,CancellationToken ct){var rows=await Sales.SearchCurrenciesAsync(DateOnly.FromDateTime(DateTime.Today),search,20,ct);return rows.Where(x=>x.IsActive).Select(x=>new UiLookupItem(x.Id.ToString("D"),$"{x.Code} - {x.NameAr}",x.Symbol,"fa-solid fa-coins")).ToArray();}
-    private async Task<IReadOnlyList<UiLookupItem>> SearchCashAccountsAsync(UiCheckoutPaymentLineModel line,string search,CancellationToken ct){var c=ParseGuid(line.CurrencyId);if(!c.HasValue)return[];var rows=await Sales.SearchCashAccountsAsync(c.Value,search,20,ct);return rows.Where(x=>x.IsActive).Select(x=>new UiLookupItem(x.Id.ToString("D"),x.Name,x.Code,"fa-solid fa-vault")).ToArray();}
-    private async Task<IReadOnlyList<UiLookupItem>> SearchBankAccountsAsync(UiCheckoutPaymentLineModel line,string search,CancellationToken ct){var c=ParseGuid(line.CurrencyId);if(!c.HasValue)return[];var rows=await Sales.SearchBankAccountsAsync(c.Value,search,20,ct);return rows.Where(x=>x.IsActive).Select(x=>new UiLookupItem(x.Id.ToString("D"),$"{x.BankName} - {x.AccountName}",x.AccountNumber,"fa-solid fa-building-columns")).ToArray();}
-    private async Task<IReadOnlyList<UiLookupItem>> SearchSettlementAccountsAsync(string search,CancellationToken ct){var page=await Accounting.GetAccountsPageAsync(new PageRequest{PageNumber=1,PageSize=20,Search=string.IsNullOrWhiteSpace(search)?null:search},ct);return page.Items.Where(x=>x.IsActive&&x.IsPostingAccount).Select(x=>new UiLookupItem(x.Id.ToString("D"),$"{x.Code} - {x.NameAr}",null,"fa-solid fa-book")).ToArray();}
 }

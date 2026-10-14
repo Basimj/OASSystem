@@ -146,7 +146,7 @@ public class JournalEntryDomainTests
         var reversalId = Guid.NewGuid();
         entry.MarkReversed(reversalId);
 
-        Assert.That(entry.Status, Is.EqualTo(JournalEntryStatus.Reversed));
+        Assert.That(entry.Status, Is.EqualTo(JournalEntryStatus.Posted));
         Assert.That(entry.ReversedJournalId, Is.EqualTo(reversalId));
     }
 

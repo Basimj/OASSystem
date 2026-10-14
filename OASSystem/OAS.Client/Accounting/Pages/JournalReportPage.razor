@@ -1,0 +1,184 @@
+@page "/accounting/journal-report"
+@attribute [Authorize]
+@using OAS.Client.Accounting.Common
+@using OAS.Contracts.Accounting.Enums
+@using OAS.Contracts.Accounting.Reports
+@using System.Globalization
+@inject IAccountingClientService Accounting
+@inject NavigationManager Navigation
+
+<PageTitle>تقرير دفتر اليومية | OAS</PageTitle>
+
+<UiAccountingWorkspace ShowTabs="false">
+    <Actions>
+        <UiWorkspaceActionBar>
+            <UiInputDate Label="من تاريخ"
+                         Value="@_fromDate"
+                         ValueChanged="@(value => _fromDate = value)"
+                         ValueExpression="@(() => _fromDate)"
+                         Size="ControlSize.Small" />
+            <UiInputDate Label="إلى تاريخ"
+                         Value="@_toDate"
+                         ValueChanged="@(value => _toDate = value)"
+                         ValueExpression="@(() => _toDate)"
+                         Size="ControlSize.Small" />
+            <UiSelect Label="الحالة"
+                      Value="@_status"
+                      ValueChanged="@(value => _status = value ?? string.Empty)"
+                      Options="@StatusOptions"
+                      Size="ControlSize.Small" />
+            <UiInputText Label="رقم القيد / المرجع"
+                         Value="@_reference"
+                         ValueChanged="@(value => _reference = value)"
+                         ValueExpression="@(() => _reference)"
+                         Size="ControlSize.Small" />
+            <UiButton Text="عرض التقرير"
+                      IconCssClass="fa-solid fa-book-journal-whills"
+                      Variant="ButtonVariant.Primary"
+                      Size="ControlSize.Small"
+                      Loading="@_busy"
+                      OnClick="LoadAsync" />
+        </UiWorkspaceActionBar>
+    </Actions>
+
+    <Metrics>
+        @if (_report is not null)
+        {
+            <UiAccountingMetricTile Label="إجمالي المدين"
+                                    Value="@Money(_report.TotalDebit)"
+                                    IconCssClass="fa-solid fa-arrow-trend-up"
+                                    Variant="@UiAccountingMetricTile.MetricVariant.Debit" />
+            <UiAccountingMetricTile Label="إجمالي الدائن"
+                                    Value="@Money(_report.TotalCredit)"
+                                    IconCssClass="fa-solid fa-arrow-trend-down"
+                                    Variant="@UiAccountingMetricTile.MetricVariant.Credit" />
+            <UiAccountingMetricTile Label="الفرق"
+                                    Value="@Money(_report.Difference)"
+                                    IconCssClass="fa-solid fa-scale-balanced"
+                                    Variant="@UiAccountingMetricTile.MetricVariant.Balance" />
+            <UiAccountingMetricTile Label="عدد السطور"
+                                    Value="@_report.TotalCount.ToString(CultureInfo.InvariantCulture)"
+                                    IconCssClass="fa-solid fa-list-ol"
+                                    Variant="@UiAccountingMetricTile.MetricVariant.Default" />
+        }
+    </Metrics>
+
+    <Body>
+        <UiAccountingEditorSurface>
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <UiAlert Message="@_error" Tone="AlertTone.Danger" />
+            }
+
+            <UiAccountingFormSection Title="تقرير دفتر اليومية"
+                                     Subtitle="تقرير مستقل عن شاشة إدارة القيود، ويعرض رأس القيد وسطور الحسابات والمصدر ضمن النطاق المحدد."
+                                     IconCssClass="fa-solid fa-book-journal-whills">
+                <UiAccountingRecordList Items="@JournalItems"
+                                        EmptyTitle="لا توجد قيود مطابقة"
+                                        EmptyDescription="غيّر نطاق التاريخ أو مرشحات التقرير ثم أعد المحاولة."
+                                        EmptyIconCssClass="fa-solid fa-book-journal-whills"
+                                        OnOpen="OpenJournalAsync" />
+            </UiAccountingFormSection>
+        </UiAccountingEditorSurface>
+    </Body>
+</UiAccountingWorkspace>
+
+@code {
+    private DateOnly? _fromDate = new(DateTime.Today.Year, 1, 1);
+    private DateOnly? _toDate = DateOnly.FromDateTime(DateTime.Today);
+    private string _status = string.Empty;
+    private string? _reference;
+    private bool _busy;
+    private string? _error;
+    private JournalReportDto? _report;
+
+    private static IReadOnlyList<UiSelectOption> StatusOptions { get; } =
+    [
+        new(string.Empty, "كل الحالات"),
+        new(((byte)JournalEntryStatus.Draft).ToString(CultureInfo.InvariantCulture), "مسودة"),
+        new(((byte)JournalEntryStatus.PendingApproval).ToString(CultureInfo.InvariantCulture), "بانتظار الاعتماد"),
+        new(((byte)JournalEntryStatus.Approved).ToString(CultureInfo.InvariantCulture), "معتمد"),
+        new(((byte)JournalEntryStatus.Posted).ToString(CultureInfo.InvariantCulture), "مرحّل"),
+        new(((byte)JournalEntryStatus.Reversed).ToString(CultureInfo.InvariantCulture), "معكوس (قديم)")
+    ];
+
+    private IReadOnlyList<UiAccountingRecordList.RecordItem> JournalItems =>
+        _report?.Lines.Select(line => new UiAccountingRecordList.RecordItem(
+            line.JournalEntryId,
+            $"{line.JournalNumber} - {line.AccountCode}",
+            $"{line.PostingDate:yyyy-MM-dd} | {line.AccountNameAr}",
+            "fa-solid fa-book-journal-whills",
+            [
+                new UiAccountingRecordList.DetailItem("البيان", line.Description),
+                new UiAccountingRecordList.DetailItem("مدين", Money(line.Debit)),
+                new UiAccountingRecordList.DetailItem("دائن", Money(line.Credit)),
+                new UiAccountingRecordList.DetailItem("المصدر", SourceText(line))
+            ],
+            AccountingArabicPresenter.GetJournalStatusText(line.Status),
+            JournalState(line.Status)))
+        .ToArray() ?? [];
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        if (!_fromDate.HasValue || !_toDate.HasValue || _toDate.Value < _fromDate.Value)
+        {
+            _error = "تحقق من نطاق التاريخ: تاريخ النهاية يجب ألا يسبق تاريخ البداية.";
+            return;
+        }
+
+        _busy = true;
+        _error = null;
+        try
+        {
+            JournalEntryStatus? status = null;
+            if (byte.TryParse(_status, NumberStyles.None, CultureInfo.InvariantCulture, out var statusValue) &&
+                Enum.IsDefined(typeof(JournalEntryStatus), statusValue))
+            {
+                status = (JournalEntryStatus)statusValue;
+            }
+
+            _report = await Accounting.GetJournalReportAsync(new JournalReportFilterDto(
+                _fromDate.Value,
+                _toDate.Value,
+                Status: status,
+                Reference: string.IsNullOrWhiteSpace(_reference) ? null : _reference.Trim(),
+                PageNumber: 1,
+                PageSize: 250));
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private Task OpenJournalAsync(Guid journalId)
+    {
+        Navigation.NavigateTo($"/accounting/journals?journalId={journalId:D}");
+        return Task.CompletedTask;
+    }
+
+    private static string SourceText(JournalReportLineDto line) =>
+        string.IsNullOrWhiteSpace(line.SourceModule)
+            ? "يدوي"
+            : string.IsNullOrWhiteSpace(line.SourceDocumentType)
+                ? line.SourceModule!
+                : $"{line.SourceModule} / {line.SourceDocumentType}";
+
+    private static string JournalState(JournalEntryStatus value) => value switch
+    {
+        JournalEntryStatus.Draft => "draft",
+        JournalEntryStatus.PendingApproval => "pending",
+        JournalEntryStatus.Approved => "approved",
+        JournalEntryStatus.Posted => "posted",
+        JournalEntryStatus.Reversed => "cancelled",
+        _ => "draft"
+    };
+
+    private static string Money(decimal value) => value.ToString("N2", CultureInfo.CurrentCulture);
+}

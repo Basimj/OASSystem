@@ -8,5 +8,19 @@ public sealed class GetGeneralLedgerQueryHandler(IAccountingReportingQueryServic
     : IRequestHandler<GetGeneralLedgerQuery, GeneralLedgerReportDto>
 {
     public Task<GeneralLedgerReportDto> Handle(GetGeneralLedgerQuery request, CancellationToken cancellationToken) =>
-        reports.GetGeneralLedgerAsync(request.FromDate, request.ToDate, request.AccountId, cancellationToken);
+        reports.GetGeneralLedgerAsync(
+            new GeneralLedgerFilterDto(
+                request.FromDate,
+                request.ToDate,
+                request.FiscalYearId,
+                request.FiscalPeriodId,
+                request.AccountId,
+                request.IncludeAccountSubtree,
+                request.JournalType,
+                request.SourceModule,
+                request.CustomerId,
+                request.SupplierId,
+                request.Reference,
+                request.IncludeOpeningBalance),
+            cancellationToken);
 }

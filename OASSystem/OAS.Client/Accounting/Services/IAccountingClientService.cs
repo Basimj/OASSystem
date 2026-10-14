@@ -151,7 +151,10 @@ public interface IAccountingClientService
     Task<AccountingSettingsDto?> UpdateAccountingSettingsAsync(UpdateAccountingSettingsRequest request, CancellationToken cancellationToken = default);
 
     Task<GeneralLedgerReportDto?> GetGeneralLedgerAsync(DateOnly fromDate, DateOnly toDate, Guid? accountId = null, CancellationToken cancellationToken = default);
+    Task<GeneralLedgerReportDto?> GetGeneralLedgerAsync(GeneralLedgerFilterDto filter, CancellationToken cancellationToken = default);
     Task<TrialBalanceReportDto?> GetTrialBalanceAsync(DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken = default);
+    Task<TrialBalanceReportDto?> GetTrialBalanceAsync(TrialBalanceFilterDto filter, CancellationToken cancellationToken = default);
+    Task<JournalReportDto?> GetJournalReportAsync(JournalReportFilterDto filter, CancellationToken cancellationToken = default);
     Task<FiscalCloseReadinessDto?> GetFiscalPeriodCloseReadinessAsync(Guid fiscalPeriodId, CancellationToken cancellationToken = default);
     Task<FiscalCloseReadinessDto?> GetFiscalYearCloseReadinessAsync(Guid fiscalYearId, CancellationToken cancellationToken = default);
 

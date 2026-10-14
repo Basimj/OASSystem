@@ -1355,6 +1355,7 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.HasIndex("FiscalPeriodId").HasDatabaseName("IX_JournalEntries_FiscalPeriodId");
             b.HasIndex("PostingDate").HasDatabaseName("IX_JournalEntries_PostingDate");
             b.HasIndex("Status").HasDatabaseName("IX_JournalEntries_Status");
+            b.HasIndex("SourceModule", "SourceDocumentType", "SourceDocumentId").IsUnique().HasFilter("[SourceModule] IS NOT NULL AND [SourceDocumentType] IS NOT NULL AND [SourceDocumentId] IS NOT NULL").HasDatabaseName("UX_JournalEntries_SourceDocument");
             b.HasIndex("ReversedJournalId").HasDatabaseName("IX_JournalEntries_ReversedJournalId");
             b.HasIndex("BaseCurrencyId").HasDatabaseName("IX_JournalEntries_BaseCurrencyId");
             b.ToTable("tbl_JournalEntries", "dbo");

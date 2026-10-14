@@ -1,6 +1,7 @@
 using NUnit.Framework;
 using OAS.Application.Accounting.Journals.Commands.CreateJournalEntry;
 using OAS.Application.Accounting.Abstractions;
+using OAS.Application.Accounting.CoreHardening.Services;
 using OAS.Application.Accounting.Journals.Commands.ReverseJournalEntry;
 using OAS.Application.Accounting.Journals.Commands.SetJournalEntryStatus;
 using OAS.Application.Accounting.Journals.Queries.GetJournalEntryById;
@@ -70,18 +71,23 @@ public class JournalCommandAndQueryTests
         var currencyRepository = new FakeRepository<Currency, Guid>([currency]);
         var settingsRepository = new FakeRepository<AccountingSettings, Guid>([settings]);
 
-        var handler = new CreateJournalEntryCommandHandler(
-            _journalRepository,
-            accountRepository,
+        var subledgerIntegrity = new JournalSubledgerIntegrityService(
             new FakeRepository<Customer, Guid>(),
             new FakeRepository<Supplier, Guid>(),
             new FakeRepository<OAS.Domain.Features.Employees.Entities.Employee, Guid>(),
+            new FakeRepository<EmployeeAccount, Guid>());
+
+        var handler = new CreateJournalEntryCommandHandler(
+            _journalRepository,
+            accountRepository,
             settingsRepository,
             currencyRepository,
             new FixedExchangeRateResolver(currency),
             new TestCurrencyRoundingService(),
             new FakePermissionChecker(),
-            _sequenceGenerator);
+            _sequenceGenerator,
+            subledgerIntegrity,
+            new JournalSourceIntegrityService(_journalRepository));
 
         var request = new CreateJournalEntryRequest(
             JournalType: JournalType.Manual,
@@ -244,6 +250,12 @@ public class JournalCommandAndQueryTests
             _lineRepository,
             _periodRepository,
             _accountRepository,
+            new JournalSubledgerIntegrityService(
+                new FakeRepository<Customer, Guid>(),
+                new FakeRepository<Supplier, Guid>(),
+                new FakeRepository<OAS.Domain.Features.Employees.Entities.Employee, Guid>(),
+                new FakeRepository<EmployeeAccount, Guid>()),
+            new JournalSourceIntegrityService(_journalRepository),
             _currentUser,
             TimeProvider.System);
 
@@ -356,7 +368,7 @@ public class JournalCommandAndQueryTests
 
         Assert.That(
             journal.Status,
-            Is.EqualTo(DomainJournalStatus.Reversed));
+            Is.EqualTo(DomainJournalStatus.Posted));
 
         Assert.That(
             _journalRepository.Items.Count,

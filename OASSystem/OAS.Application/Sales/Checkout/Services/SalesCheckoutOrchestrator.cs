@@ -318,10 +318,6 @@ public sealed class SalesCheckoutOrchestrator(
                 if (paymentLineCount == 0 || paymentBaseAmount <= MoneyTolerance || paymentBaseAmount >= requiredBaseAmount - MoneyTolerance)
                     throw new ConflictException("sales_checkout_partial_payment_invalid", "الدفع الجزئي يجب أن يكون أكبر من صفر وأقل من كامل قيمة الطلب.");
                 break;
-            case SalesPaymentPlan.PayOnPickup:
-                if (paymentLineCount != 0)
-                    throw new ConflictException("sales_checkout_pickup_payment_not_allowed", "الدفع عند الاستلام لا يقبل دفعات أثناء إتمام البيع الأولي.");
-                break;
             case SalesPaymentPlan.AccountCredit:
                 if (paymentLineCount != 0)
                     throw new ConflictException("sales_checkout_credit_payment_not_allowed", "البيع الآجل لا يقبل دفعات أثناء الإتمام الأولي في الإصدار الحالي.");

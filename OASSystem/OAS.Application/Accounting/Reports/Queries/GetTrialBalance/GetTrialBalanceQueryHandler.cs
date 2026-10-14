@@ -8,5 +8,16 @@ public sealed class GetTrialBalanceQueryHandler(IAccountingReportingQueryService
     : IRequestHandler<GetTrialBalanceQuery, TrialBalanceReportDto>
 {
     public Task<TrialBalanceReportDto> Handle(GetTrialBalanceQuery request, CancellationToken cancellationToken) =>
-        reports.GetTrialBalanceAsync(request.FromDate, request.ToDate, cancellationToken);
+        reports.GetTrialBalanceAsync(
+            new TrialBalanceFilterDto(
+                request.FromDate,
+                request.ToDate,
+                request.AsOfDate,
+                request.FiscalYearId,
+                request.FiscalPeriodId,
+                request.AccountLevel,
+                request.PostingAccountsOnly,
+                request.IncludeZeroBalance,
+                request.GroupedTree),
+            cancellationToken);
 }

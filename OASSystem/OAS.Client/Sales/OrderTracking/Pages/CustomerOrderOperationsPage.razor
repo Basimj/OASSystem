@@ -2,7 +2,6 @@
 @attribute [Authorize]
 @namespace OAS.Client.Sales.OrderTracking.Pages
 @using OAS.UiLib.Components.Sales.OrderTracking
-@using OAS.UiLib.Components.Sales.Checkout
 
 <UiCustomerOrderOperationsSurface Filter="@_filter"
                                   Metrics="@_metrics"
@@ -26,16 +25,3 @@
                                   OnPrevious="PreviousAsync"
                                   OnNext="NextAsync" />
 
-@if (_delivery is not null)
-{
-    <UiDeliverySettlementDialog Model="@_delivery"
-                                IsBusy="@_deliveryBusy"
-                                SearchCurrenciesAsync="SearchCurrenciesAsync"
-                                SearchCashAccountsAsync="SearchCashAccountsAsync"
-                                SearchBankAccountsAsync="SearchBankAccountsAsync"
-                                SearchSettlementAccountsAsync="SearchSettlementAccountsAsync"
-                                OnAddPaymentLine="AddDeliveryPaymentAsync"
-                                OnRemovePaymentLine="RemoveDeliveryPaymentAsync"
-                                OnSubmit="DeliverAsync"
-                                OnClose="CloseDeliveryAsync" />
-}

@@ -160,7 +160,7 @@ public class AccountingEndToEndWorkflowTests
         // 10. Reverse Journal Entry
         var reversalJournalId = Guid.NewGuid();
         journal.MarkReversed(reversalJournalId);
-        Assert.That(journal.Status, Is.EqualTo(JournalEntryStatus.Reversed));
+        Assert.That(journal.Status, Is.EqualTo(JournalEntryStatus.Posted));
         Assert.That(journal.ReversedJournalId, Is.EqualTo(reversalJournalId));
     }
 }

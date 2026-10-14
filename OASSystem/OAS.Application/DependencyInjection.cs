@@ -9,6 +9,7 @@ using OAS.Application.Accounting.BankAccounts.Mapping;
 using OAS.Application.Accounting.CashAccounts.Mapping;
 using OAS.Application.Accounting.CashShifts.Mapping;
 using OAS.Application.Accounting.CostCenters.Mapping;
+using OAS.Application.Accounting.CoreHardening.Services;
 using OAS.Application.Accounting.CustomerAdvances.Services;
 using OAS.Application.Accounting.Expenses.ExpenseTypes.Mapping;
 using OAS.Application.Accounting.Expenses.Mapping;
@@ -66,6 +67,10 @@ public static class DependencyInjection
         services.TryAddScoped<IFiscalYearClosingService, FiscalYearClosingService>();
         services.TryAddScoped<IPartyAccountProvisioningService, PartyAccountProvisioningService>();
         services.TryAddScoped<IManagedAccountGuard, ManagedAccountGuard>();
+        services.TryAddScoped<IAccountIntegrityService, AccountIntegrityService>();
+        services.TryAddScoped<IJournalSubledgerIntegrityService, JournalSubledgerIntegrityService>();
+        services.TryAddScoped<IJournalSourceIntegrityService, JournalSourceIntegrityService>();
+        services.TryAddScoped<IFiscalPeriodIntegrityService, FiscalPeriodIntegrityService>();
         services.TryAddScoped<ICurrencyRoundingService, CurrencyRoundingService>();
         services.TryAddScoped<IExchangeRateResolver, ExchangeRateResolver>();
         services.TryAddScoped<ICounterpartyAccountResolver, CounterpartyAccountResolver>();
