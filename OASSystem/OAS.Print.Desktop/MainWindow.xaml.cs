@@ -1064,7 +1064,7 @@ public partial class MainWindow : Window
 
             if (job.ShowPreview)
             {
-                var preview = new PreviewWindow(_renderer.BuildCanvas(template, job.Data, false)) { Owner = this };
+                var preview = new PreviewWindow(_renderer.BuildDocument(template, job.Data)) { Owner = this };
                 preview.ShowDialog();
             }
             else
@@ -1125,7 +1125,10 @@ public partial class MainWindow : Window
         if (!string.IsNullOrWhiteSpace(journal))
             return journal;
         var payslip = JsonValueResolver.ResolveText(data, "PayslipNumber");
-        return string.IsNullOrWhiteSpace(payslip) ? "-" : payslip;
+        if (!string.IsNullOrWhiteSpace(payslip))
+            return payslip;
+        var report = JsonValueResolver.ResolveText(data, "ReportNumber");
+        return string.IsNullOrWhiteSpace(report) ? "-" : report;
     }
 
     private static string GetDocumentTypeArabicName(string? documentType) => documentType switch
@@ -1137,6 +1140,8 @@ public partial class MainWindow : Window
         "PurchaseInvoice" => "فاتورة مشتريات",
         "Expense" => "مستند مصروف",
         "JournalEntry" => "قيد يومية",
+        "GeneralLedgerReport" => "دفتر الأستاذ العام",
+        "TrialBalanceReport" => "ميزان المراجعة",
         _ => documentType ?? "مستند"
     };
 

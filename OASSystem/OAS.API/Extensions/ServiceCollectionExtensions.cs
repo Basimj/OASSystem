@@ -23,6 +23,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IPrintJobQueue, PrintJobQueue>();
         services.AddSingleton<DesktopPrintApiKeyValidator>();
         services.AddScoped<VoucherPrintPayloadFactory>();
+        services.AddScoped<AccountingReportPrintPayloadFactory>();
 
         services.AddScoped<ICurrentUser, HttpCurrentUser>();
         services.AddScoped<ICurrentRequestInfo, HttpCurrentRequestInfo>();

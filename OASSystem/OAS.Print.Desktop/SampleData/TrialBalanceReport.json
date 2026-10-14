@@ -1,0 +1,41 @@
+{
+  "ReportNumber": "TB-20261001-20261031",
+  "FromDate": "01/10/2026",
+  "ToDate": "31/10/2026",
+  "BalanceStatus": "متوازن",
+  "OpeningDebitTotal": 10000,
+  "OpeningCreditTotal": 10000,
+  "PeriodDebitTotal": 5000,
+  "PeriodCreditTotal": 5000,
+  "ClosingDebitTotal": 13000,
+  "ClosingCreditTotal": 13000,
+  "PrintedAt": "14/10/2026 07:30",
+  "Company": {
+    "Name": "OAS",
+    "Address": "",
+    "Phone": ""
+  },
+  "Lines": [
+    {
+      "AccountCode": "1101",
+      "AccountName": "الصندوق الرئيسي",
+      "OpeningDebit": 10000,
+      "OpeningCredit": 0,
+      "PeriodDebit": 5000,
+      "PeriodCredit": 2000,
+      "ClosingDebit": 13000,
+      "ClosingCredit": 0
+    },
+    {
+      "AccountCode": "2101",
+      "AccountName": "الموردون",
+      "OpeningDebit": 0,
+      "OpeningCredit": 10000,
+      "PeriodDebit": 2000,
+      "PeriodCredit": 5000,
+      "ClosingDebit": 0,
+      "ClosingCredit": 13000
+    }
+  ],
+  "RequestedBy": "admin"
+}

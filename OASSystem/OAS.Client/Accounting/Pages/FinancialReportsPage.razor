@@ -1,8 +1,10 @@
 @page "/accounting/reports"
 @attribute [Authorize]
 @using OAS.Contracts.Accounting.Reports
+@using OAS.Client.Printing.Services
 @using System.Globalization
 @inject IAccountingClientService Accounting
+@inject IPrintingClientService Printing
 @inject NavigationManager Navigation
 
 <PageTitle>التقارير المالية | OAS</PageTitle>
@@ -31,6 +33,20 @@
                       Size="ControlSize.Small"
                       Loading="@_busy"
                       OnClick="LoadAsync" />
+            <UiButton Text="معاينة الطباعة"
+                      IconCssClass="fa-regular fa-file-lines"
+                      Variant="ButtonVariant.Secondary"
+                      Size="ControlSize.Small"
+                      Loading="@_printing"
+                      Disabled="@(_busy || _printing)"
+                      OnClick="PreviewPrintAsync" />
+            <UiButton Text="طباعة"
+                      IconCssClass="fa-solid fa-print"
+                      Variant="ButtonVariant.Secondary"
+                      Size="ControlSize.Small"
+                      Loading="@_printing"
+                      Disabled="@(_busy || _printing)"
+                      OnClick="PrintAsync" />
         </UiWorkspaceActionBar>
     </Actions>
 
@@ -76,6 +92,10 @@
             @if (!string.IsNullOrWhiteSpace(_error))
             {
                 <UiAlert Message="@_error" Tone="AlertTone.Danger" />
+            }
+            @if (!string.IsNullOrWhiteSpace(_notice))
+            {
+                <UiAlert Message="@_notice" Tone="AlertTone.Success" />
             }
 
             @if (_reportMode == TrialBalanceMode)
@@ -139,7 +159,11 @@
     private DateOnly? _toDate = DateOnly.FromDateTime(DateTime.Today);
     private string _reportMode = TrialBalanceMode;
     private bool _busy;
+    private bool _printing;
     private string? _error;
+    private string? _notice;
+    private GeneralLedgerFilterDto? _loadedGeneralLedgerFilter;
+    private TrialBalanceFilterDto? _loadedTrialBalanceFilter;
     private TrialBalanceReportDto? _trialBalance;
     private GeneralLedgerReportDto? _generalLedger;
 
@@ -185,17 +209,22 @@
 
         _busy = true;
         _error = null;
+        _notice = null;
         try
         {
             if (_reportMode == TrialBalanceMode)
             {
-                _trialBalance = await Accounting.GetTrialBalanceAsync(_fromDate.Value, _toDate.Value);
+                _loadedTrialBalanceFilter = new TrialBalanceFilterDto(_fromDate.Value, _toDate.Value);
+                _trialBalance = await Accounting.GetTrialBalanceAsync(_loadedTrialBalanceFilter);
                 _generalLedger = null;
+                _loadedGeneralLedgerFilter = null;
             }
             else
             {
-                _generalLedger = await Accounting.GetGeneralLedgerAsync(_fromDate.Value, _toDate.Value);
+                _loadedGeneralLedgerFilter = new GeneralLedgerFilterDto(_fromDate.Value, _toDate.Value);
+                _generalLedger = await Accounting.GetGeneralLedgerAsync(_loadedGeneralLedgerFilter);
                 _trialBalance = null;
+                _loadedTrialBalanceFilter = null;
             }
         }
         catch (Exception ex)
@@ -216,10 +245,13 @@
         _reportMode = GeneralLedgerMode;
         _busy = true;
         _error = null;
+        _notice = null;
         try
         {
-            _generalLedger = await Accounting.GetGeneralLedgerAsync(_fromDate.Value, _toDate.Value, accountId);
+            _loadedGeneralLedgerFilter = new GeneralLedgerFilterDto(_fromDate.Value, _toDate.Value, AccountId: accountId);
+            _generalLedger = await Accounting.GetGeneralLedgerAsync(_loadedGeneralLedgerFilter);
             _trialBalance = null;
+            _loadedTrialBalanceFilter = null;
         }
         catch (Exception ex)
         {
@@ -228,6 +260,61 @@
         finally
         {
             _busy = false;
+        }
+    }
+
+    private Task PreviewPrintAsync() => QueuePrintAsync(showPreview: true);
+
+    private Task PrintAsync() => QueuePrintAsync(showPreview: false);
+
+    private async Task QueuePrintAsync(bool showPreview)
+    {
+        if (!_fromDate.HasValue || !_toDate.HasValue || _toDate.Value < _fromDate.Value)
+        {
+            _error = "تحقق من نطاق التاريخ قبل الطباعة.";
+            _notice = null;
+            return;
+        }
+
+        _printing = true;
+        _error = null;
+        _notice = null;
+        try
+        {
+            if (_reportMode == TrialBalanceMode)
+            {
+                if (_trialBalance is null || _loadedTrialBalanceFilter is null)
+                {
+                    _error = "اعرض ميزان المراجعة أولًا قبل المعاينة أو الطباعة.";
+                    return;
+                }
+
+                await Printing.PrintTrialBalanceAsync(_loadedTrialBalanceFilter, showPreview);
+                _notice = showPreview
+                    ? "تم إرسال ميزان المراجعة إلى OAS Print للمعاينة."
+                    : "تم إرسال ميزان المراجعة إلى OAS Print للطباعة.";
+            }
+            else
+            {
+                if (_generalLedger is null || _loadedGeneralLedgerFilter is null)
+                {
+                    _error = "اعرض دفتر الأستاذ أولًا قبل المعاينة أو الطباعة.";
+                    return;
+                }
+
+                await Printing.PrintGeneralLedgerAsync(_loadedGeneralLedgerFilter, showPreview);
+                _notice = showPreview
+                    ? "تم إرسال دفتر الأستاذ إلى OAS Print للمعاينة."
+                    : "تم إرسال دفتر الأستاذ إلى OAS Print للطباعة.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _printing = false;
         }
     }
 

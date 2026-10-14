@@ -1,4 +1,5 @@
 using OAS.Client.Services.Http;
+using OAS.Contracts.Accounting.Reports;
 using OAS.Contracts.Printing;
 
 namespace OAS.Client.Printing.Services;
@@ -31,6 +32,40 @@ public sealed class PrintingClientService(OasApiClient api) : IPrintingClientSer
         Guid invoiceId,
         CancellationToken cancellationToken = default) =>
         QueueAsync(PrintDocumentTypes.PurchaseInvoice, invoiceId, cancellationToken);
+
+    public Task<PrintJobCreatedDto?> PrintGeneralLedgerAsync(
+        GeneralLedgerFilterDto filter,
+        bool showPreview = false,
+        CancellationToken cancellationToken = default)
+    {
+        var request = new CreateGeneralLedgerPrintJobRequest(
+            filter,
+            DefaultWorkstationCode,
+            Copies: 1,
+            ShowPreview: showPreview);
+
+        return api.PostAsync<CreateGeneralLedgerPrintJobRequest, PrintJobCreatedDto>(
+            "api/printing/jobs/general-ledger",
+            request,
+            cancellationToken);
+    }
+
+    public Task<PrintJobCreatedDto?> PrintTrialBalanceAsync(
+        TrialBalanceFilterDto filter,
+        bool showPreview = false,
+        CancellationToken cancellationToken = default)
+    {
+        var request = new CreateTrialBalancePrintJobRequest(
+            filter,
+            DefaultWorkstationCode,
+            Copies: 1,
+            ShowPreview: showPreview);
+
+        return api.PostAsync<CreateTrialBalancePrintJobRequest, PrintJobCreatedDto>(
+            "api/printing/jobs/trial-balance",
+            request,
+            cancellationToken);
+    }
 
     private Task<PrintJobCreatedDto?> QueueAsync(
         string documentType,

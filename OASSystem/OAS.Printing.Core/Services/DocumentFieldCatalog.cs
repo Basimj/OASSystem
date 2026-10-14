@@ -182,6 +182,46 @@ public static class DocumentFieldCatalog
                 new("Signatures.Accountant", "توقيع المحاسب", "التواقيع"),
                 new("Signatures.Approval", "توقيع الاعتماد", "التواقيع")
             ],
+            ["GeneralLedgerReport"] =
+            [
+                new("ReportNumber", "رقم التقرير", "التقرير"),
+                new("FromDate", "من تاريخ", "الفترة"),
+                new("ToDate", "إلى تاريخ", "الفترة"),
+                new("ScopeText", "نطاق الحسابات", "التقرير"),
+                new("AccountCode", "كود الحساب", "الحساب"),
+                new("AccountName", "اسم الحساب", "الحساب"),
+                new("AccountCount", "عدد الحسابات", "التقرير"),
+                new("OpeningBalanceDisplay", "الرصيد الافتتاحي", "الإجماليات"),
+                new("TotalDebit", "إجمالي المدين", "الإجماليات"),
+                new("TotalCredit", "إجمالي الدائن", "الإجماليات"),
+                new("ClosingBalanceDisplay", "الرصيد الختامي", "الإجماليات"),
+                new("Company.Name", "اسم المنشأة", "المنشأة"),
+                new("Company.Address", "عنوان المنشأة", "المنشأة"),
+                new("Company.Phone", "هاتف المنشأة", "المنشأة"),
+                new("RequestedBy", "طلب الطباعة بواسطة", "الطباعة"),
+                new("PrintedAt", "وقت الطباعة", "الطباعة"),
+                new("__PageLabel", "رقم الصفحة", "الطباعة")
+            ],
+            ["TrialBalanceReport"] =
+            [
+                new("ReportNumber", "رقم التقرير", "التقرير"),
+                new("FromDate", "من تاريخ", "الفترة"),
+                new("ToDate", "إلى تاريخ", "الفترة"),
+                new("AsOfDate", "حتى تاريخ", "الفترة"),
+                new("OpeningDebitTotal", "إجمالي افتتاحي مدين", "الإجماليات"),
+                new("OpeningCreditTotal", "إجمالي افتتاحي دائن", "الإجماليات"),
+                new("PeriodDebitTotal", "إجمالي حركة مدين", "الإجماليات"),
+                new("PeriodCreditTotal", "إجمالي حركة دائن", "الإجماليات"),
+                new("ClosingDebitTotal", "إجمالي ختامي مدين", "الإجماليات"),
+                new("ClosingCreditTotal", "إجمالي ختامي دائن", "الإجماليات"),
+                new("BalanceStatus", "حالة التوازن", "التقرير"),
+                new("Company.Name", "اسم المنشأة", "المنشأة"),
+                new("Company.Address", "عنوان المنشأة", "المنشأة"),
+                new("Company.Phone", "هاتف المنشأة", "المنشأة"),
+                new("RequestedBy", "طلب الطباعة بواسطة", "الطباعة"),
+                new("PrintedAt", "وقت الطباعة", "الطباعة"),
+                new("__PageLabel", "رقم الصفحة", "الطباعة")
+            ],
             ["Expense"] =
             [
                 new("ExpenseNumber", "رقم المصروف"), new("ExpenseDate", "التاريخ"),

@@ -1,0 +1,42 @@
+{
+  "ReportNumber": "GL-20261001-20261031",
+  "FromDate": "01/10/2026",
+  "ToDate": "31/10/2026",
+  "ScopeText": "1101 - الصندوق الرئيسي",
+  "AccountCount": 1,
+  "TotalDebit": 5000,
+  "TotalCredit": 2000,
+  "PrintedAt": "14/10/2026 07:30",
+  "Company": {
+    "Name": "OAS",
+    "Address": "",
+    "Phone": ""
+  },
+  "Lines": [
+    {
+      "AccountCode": "1101",
+      "AccountName": "الصندوق الرئيسي",
+      "PostingDate": "01/10/2026",
+      "JournalNumber": "JV-001",
+      "Description": "تحصيل نقدي",
+      "Reference": "Sales/Receipt",
+      "Debit": 5000,
+      "Credit": 0,
+      "RunningBalance": 15000
+    },
+    {
+      "AccountCode": "1101",
+      "AccountName": "الصندوق الرئيسي",
+      "PostingDate": "02/10/2026",
+      "JournalNumber": "JV-002",
+      "Description": "مصروف نقدي",
+      "Reference": "Accounting/Expense",
+      "Debit": 0,
+      "Credit": 2000,
+      "RunningBalance": 13000
+    }
+  ],
+  "OpeningBalanceDisplay": "10,000.00",
+  "ClosingBalanceDisplay": "13,000.00",
+  "RequestedBy": "admin"
+}
