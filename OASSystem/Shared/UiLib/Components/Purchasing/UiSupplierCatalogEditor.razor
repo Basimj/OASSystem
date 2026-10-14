@@ -2,7 +2,7 @@
 @using OAS.UiLib.Core.Models.Purchasing
 @using OAS.UiLib.Core.Models
 
-<UiPurchasingEditorShell Title="@(Model.Id.HasValue ? "بيانات كتالوج المورد" : "إضافة صنف إلى كتالوج المورد")" Subtitle="ربط المورد بالصنف ووحدة الشراء وشروط التوريد" StatusText="@(Model.IsActive ? "فعال" : "غير فعال")">
+<UiPurchasingEditorShell Eyebrow="كتالوج المورد" Title="@(Model.Id.HasValue ? "بيانات كتالوج المورد" : "إضافة صنف إلى كتالوج المورد")" Subtitle="ربط المورد بالصنف ووحدة الشراء وشروط التوريد" StatusText="@(Model.IsActive ? "فعال" : "غير فعال")">
     <UiPurchasingSection Title="البيانات الأساسية">
         <UiPurchasingFormGrid>
             <UiLookup Label="المورد" Required="true" Disabled="@(!IsEditable || Model.Id.HasValue)"

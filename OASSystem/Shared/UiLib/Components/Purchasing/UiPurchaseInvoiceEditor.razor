@@ -2,7 +2,7 @@
 @using OAS.UiLib.Core.Models.Purchasing
 @using OAS.UiLib.Core.Models
 
-<UiPurchasingEditorShell Title="@Model.PurchaseInvoiceCode" Subtitle="فاتورة المورد والمطابقة الثلاثية" StatusText="@Model.StatusText">
+<UiPurchasingEditorShell Eyebrow="فواتير المشتريات" Title="@Model.PurchaseInvoiceCode" Subtitle="فاتورة المورد والمطابقة الثلاثية" StatusText="@Model.StatusText">
     <UiPurchasingSection Title="بيانات الفاتورة">
         <UiPurchasingFormGrid>
             <UiInputText Label="رقم فاتورة المورد" Value="@Model.SupplierInvoiceCode" ValueChanged="SupplierInvoiceCodeChanged" Disabled="@(!IsEditable)" MaxLength="100" />

@@ -1,3 +1,4 @@
-.ui-purchasing-line-card { display:grid; gap:var(--oas-space-3); border:1px solid var(--oas-color-border); border-radius:var(--oas-radius-md); padding:var(--oas-space-3); min-width:720px; }
-.ui-purchasing-line-card__head { display:flex; align-items:center; justify-content:space-between; gap:var(--oas-space-2); }
-.ui-purchasing-line-card__summary { font-size:var(--oas-font-sm); color:var(--oas-color-text-muted); }
+.ui-purchasing-line-card { min-width:0; display:grid; gap:7px; border:1px solid var(--oas-color-border); border-radius:var(--oas-radius-md); padding:8px 9px; background:color-mix(in srgb,var(--oas-color-surface) 98%,var(--oas-color-primary) 2%); }
+.ui-purchasing-line-card__head { display:flex; align-items:center; justify-content:space-between; gap:6px; }
+.ui-purchasing-line-card__head strong { font-size:var(--oas-font-sm); }
+.ui-purchasing-line-card__summary { padding-top:4px; border-top:1px dashed var(--oas-color-border); font-size:var(--oas-font-xs); color:var(--oas-color-text-muted); }

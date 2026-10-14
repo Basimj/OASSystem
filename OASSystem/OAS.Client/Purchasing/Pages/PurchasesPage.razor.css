@@ -1,0 +1,193 @@
+.purchasing-home {
+    height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    display: grid;
+    align-content: start;
+    gap: 10px;
+    padding: 2px 4px 14px;
+    scrollbar-width: thin;
+}
+
+.purchasing-home__hero,
+.purchasing-home__tools {
+    border: 1px solid var(--oas-color-border);
+    border-radius: var(--oas-radius-lg);
+    background: var(--oas-color-surface);
+}
+
+.purchasing-home__hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 16px;
+}
+
+.purchasing-home__hero-copy {
+    min-width: 0;
+    max-width: 780px;
+}
+
+.purchasing-home__eyebrow {
+    display: inline-block;
+    margin-bottom: 3px;
+    color: var(--oas-color-primary);
+    font-size: var(--oas-font-xs);
+    font-weight: 700;
+}
+
+.purchasing-home__hero h1 {
+    margin: 0 0 4px;
+    font-size: 1.12rem;
+    line-height: 1.5;
+}
+
+.purchasing-home__hero p,
+.purchasing-home__tools p {
+    margin: 0;
+    color: var(--oas-color-text-muted);
+    font-size: var(--oas-font-sm);
+    line-height: 1.65;
+}
+
+.purchasing-home__hero-actions {
+    flex: none;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.purchasing-home__flow {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.purchasing-flow-card,
+.purchasing-tool-card {
+    color: inherit;
+    text-decoration: none;
+}
+
+.purchasing-flow-card {
+    position: relative;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) 14px;
+    align-items: center;
+    gap: 9px;
+    padding: 11px;
+    border: 1px solid var(--oas-color-border);
+    border-radius: var(--oas-radius-lg);
+    background: var(--oas-color-surface);
+    transition: border-color .15s ease, background .15s ease, transform .15s ease;
+}
+
+.purchasing-flow-card:hover,
+.purchasing-tool-card:hover {
+    border-color: var(--oas-color-primary);
+    background: var(--oas-color-hover);
+}
+
+.purchasing-flow-card:hover {
+    transform: translateY(-1px);
+}
+
+.purchasing-flow-card__step {
+    position: absolute;
+    inset-block-start: 7px;
+    inset-inline-end: 7px;
+    min-width: 18px;
+    height: 18px;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--oas-color-primary) 10%, transparent);
+    color: var(--oas-color-primary);
+    font-size: 9px;
+    font-weight: 800;
+}
+
+.purchasing-flow-card__icon,
+.purchasing-tool-card > i {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--oas-color-primary) 9%, transparent);
+    color: var(--oas-color-primary);
+    font-size: 13px;
+}
+
+.purchasing-flow-card__body,
+.purchasing-tool-card span {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+}
+
+.purchasing-flow-card strong,
+.purchasing-tool-card strong {
+    font-size: var(--oas-font-sm);
+}
+
+.purchasing-flow-card small,
+.purchasing-tool-card small {
+    color: var(--oas-color-text-muted);
+    font-size: var(--oas-font-xs);
+    line-height: 1.55;
+}
+
+.purchasing-flow-card__arrow {
+    color: var(--oas-color-text-muted);
+    font-size: 9px;
+}
+
+.purchasing-home__tools {
+    padding: 11px 12px 12px;
+}
+
+.purchasing-home__tools header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.purchasing-home__tools h2 {
+    margin: 0 0 2px;
+    font-size: .98rem;
+}
+
+.purchasing-home__tools-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
+}
+
+.purchasing-tool-card {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    padding: 9px 10px;
+    border: 1px solid var(--oas-color-border);
+    border-radius: var(--oas-radius-md);
+    background: var(--oas-color-surface);
+    transition: border-color .15s ease, background .15s ease;
+}
+
+@media (max-width: 1100px) {
+    .purchasing-home__flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 760px) {
+    .purchasing-home { overflow: visible; }
+    .purchasing-home__hero { align-items: flex-start; flex-direction: column; }
+    .purchasing-home__flow,
+    .purchasing-home__tools-grid { grid-template-columns: 1fr; }
+}

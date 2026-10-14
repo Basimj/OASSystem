@@ -2,7 +2,7 @@
 @using OAS.UiLib.Core.Models.Purchasing
 @using OAS.UiLib.Core.Models
 
-<UiPurchasingEditorShell Title="@Model.RequestCode" Subtitle="طلب شراء واحتياج تشغيلي" StatusText="@Model.StatusText">
+<UiPurchasingEditorShell Eyebrow="طلبات الشراء" Title="@Model.RequestCode" Subtitle="طلب شراء واحتياج تشغيلي" StatusText="@Model.StatusText">
     <UiPurchasingSection Title="البيانات الأساسية">
         <UiPurchasingFormGrid>
             <UiSelect Label="نوع الطلب" Value="@Model.RequestType.ToString()" Options="RequestTypeOptions" Disabled="@(!IsEditable)" OnValueChanged="RequestTypeChanged" />

@@ -2,7 +2,7 @@
 @using OAS.UiLib.Core.Models.Purchasing
 @using OAS.UiLib.Core.Models
 
-<UiPurchasingEditorShell Title="@Model.PurchaseOrderCode" Subtitle="أمر شراء للمورد" StatusText="@Model.StatusText">
+<UiPurchasingEditorShell Eyebrow="أوامر الشراء" Title="@Model.PurchaseOrderCode" Subtitle="أمر شراء للمورد" StatusText="@Model.StatusText">
     <UiPurchasingSection Title="البيانات الأساسية">
         <UiPurchasingFormGrid>
             <UiLookup Label="المورد" Required="true" Value="@GuidText(Model.SupplierId)" SelectedItem="@Selected(Model.SupplierId,Model.SupplierName,"fa-solid fa-truck-field")" SearchAsync="SupplierSearchAsync" ValueChanged="SupplierChanged" Disabled="@(!IsEditable)" />

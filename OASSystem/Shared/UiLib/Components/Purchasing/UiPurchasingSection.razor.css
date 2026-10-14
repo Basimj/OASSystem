@@ -1,5 +1,5 @@
-.ui-purchasing-section { display:grid; gap:var(--oas-space-3); }
-.ui-purchasing-section > header { display:flex; align-items:end; justify-content:space-between; gap:var(--oas-space-2); border-bottom:1px solid var(--oas-color-border); padding-bottom:var(--oas-space-2); }
-.ui-purchasing-section h3 { margin:0; font-size:1rem; }
-.ui-purchasing-section small { color:var(--oas-color-text-muted); }
-.ui-purchasing-section__body { display:grid; gap:var(--oas-space-3); }
+.ui-purchasing-section { min-width: 0; display: grid; gap: 7px; }
+.ui-purchasing-section > header { display:flex; align-items:end; justify-content:space-between; gap:7px; border-bottom:1px solid var(--oas-color-border); padding-bottom:5px; }
+.ui-purchasing-section h3 { margin:0; font-size:.91rem; }
+.ui-purchasing-section small { color:var(--oas-color-text-muted); font-size:var(--oas-font-xs); }
+.ui-purchasing-section__body { min-width:0; display:grid; gap:7px; }

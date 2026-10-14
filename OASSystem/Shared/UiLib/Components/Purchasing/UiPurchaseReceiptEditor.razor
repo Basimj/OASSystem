@@ -2,7 +2,7 @@
 @using OAS.UiLib.Core.Models.Purchasing
 @using OAS.UiLib.Core.Models
 
-<UiPurchasingEditorShell Title="@Model.ReceiptCode" Subtitle="استلام مشتريات مرتبط بأمر شراء" StatusText="@Model.StatusText">
+<UiPurchasingEditorShell Eyebrow="استلام المشتريات" Title="@Model.ReceiptCode" Subtitle="استلام مشتريات مرتبط بأمر شراء" StatusText="@Model.StatusText">
     <UiPurchasingSection Title="بيانات الاستلام">
         <UiPurchasingFormGrid>
             <UiLookup Label="أمر الشراء" Required="true" Value="@GuidText(Model.PurchaseOrderId)" SelectedItem="@Selected(Model.PurchaseOrderId,Model.PurchaseOrderCode,"fa-solid fa-file-signature")" SearchAsync="PurchaseOrderSearchAsync" ValueChanged="PurchaseOrderChangedAsync" Disabled="@(!IsEditable || Model.Id.HasValue)" />
