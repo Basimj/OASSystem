@@ -55,6 +55,22 @@ public sealed class PostSalesInvoiceCommandValidator : AbstractValidator<PostSal
     }
 }
 
+public sealed class CollectSalesInvoicePaymentCommandValidator : AbstractValidator<CollectSalesInvoicePaymentCommand>
+{
+    public CollectSalesInvoicePaymentCommandValidator()
+    {
+        RuleFor(x => x.InvoiceId).NotEmpty().WithErrorCode("sales_invoice_id_required");
+        RuleFor(x => x.Request.PaymentLines)
+            .NotEmpty()
+            .WithErrorCode("sales_invoice_collection_payment_required");
+        RuleForEach(x => x.Request.PaymentLines).ChildRules(line =>
+        {
+            line.RuleFor(x => x.CurrencyId).NotEmpty().WithErrorCode("sales_payment_currency_required");
+            line.RuleFor(x => x.Amount).GreaterThan(0m).WithErrorCode("sales_payment_amount_invalid");
+        });
+    }
+}
+
 public sealed class CancelSalesInvoiceCommandValidator : AbstractValidator<CancelSalesInvoiceCommand>
 {
     public CancelSalesInvoiceCommandValidator()

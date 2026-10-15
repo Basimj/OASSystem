@@ -1,0 +1,149 @@
+@namespace OAS.UiLib.Components.Sales.Invoices
+@using OAS.UiLib.Components.Sales.Checkout
+@using OAS.UiLib.Components.Sales.Workspace
+@using OAS.UiLib.Core.Models
+@using OAS.UiLib.Core.Models.Sales
+@using OAS.UiLib.Services.Dialogs
+@inject IUiDialogService Dialog
+
+<div dir="rtl">
+    <UiSalesFormSection Title="الفاتورة المراد تحصيلها"
+                        Description="الفاتورة ثابتة ولا يتم تعديلها عند السداد. سيتم إنشاء سند قبض مستقل وتخصيصه على هذه الفاتورة."
+                        IconCss="fa-solid fa-file-invoice-dollar">
+        <UiSalesPaymentSummary CurrencyCode="@CurrencyCode"
+                               InvoiceTotal="@InvoiceTotal"
+                               PaidAmount="@PaidAmount"
+                               ReturnedAmount="@ReturnedAmount"
+                               OutstandingAmount="@OutstandingAmount" />
+    </UiSalesFormSection>
+
+    <UiSalesFormSection Title="بيانات التحصيل"
+                        Description="يمكن تحصيل كامل المتبقي أو جزء منه، كما يمكن توزيع التحصيل على أكثر من طريقة دفع."
+                        IconCss="fa-solid fa-hand-holding-dollar">
+        <UiSalesPaymentLinesEditor Lines="@PaymentLines"
+                                   SearchCurrenciesAsync="SearchCurrenciesAsync"
+                                   SearchCashAccountsAsync="SearchCashAccountsAsync"
+                                   SearchBankAccountsAsync="SearchBankAccountsAsync"
+                                   SearchSettlementAccountsAsync="SearchSettlementAccountsAsync"
+                                   OnAdd="AddPaymentLineAsync"
+                                   OnRemove="RemovePaymentLineAsync"
+                                   OnChanged="PaymentLinesChangedAsync" />
+    </UiSalesFormSection>
+
+    @if (!string.IsNullOrWhiteSpace(_validationMessage))
+    {
+        <div class="alert alert-warning mt-3 mb-0" role="alert">@_validationMessage</div>
+    }
+
+    <div class="d-flex gap-2 justify-content-end mt-3">
+        <UiButton Text="إلغاء" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CancelAsync" />
+        <UiButton Text="إنشاء سند قبض وترحيله"
+                  IconCssClass="fa-solid fa-receipt"
+                  Size="ControlSize.Small"
+                  OnClick="SubmitAsync" />
+    </div>
+</div>
+
+@code {
+    public sealed record CollectionRequestModel(IReadOnlyList<UiCheckoutPaymentLineModel> PaymentLines);
+
+    [Parameter] public string InvoiceCode { get; set; } = string.Empty;
+    [Parameter] public string CurrencyId { get; set; } = string.Empty;
+    [Parameter] public string CurrencyCode { get; set; } = string.Empty;
+    [Parameter] public decimal InvoiceTotal { get; set; }
+    [Parameter] public decimal PaidAmount { get; set; }
+    [Parameter] public decimal ReturnedAmount { get; set; }
+    [Parameter] public decimal OutstandingAmount { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchCurrenciesAsync { get; set; }
+    [Parameter] public Func<UiCheckoutPaymentLineModel, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchCashAccountsAsync { get; set; }
+    [Parameter] public Func<UiCheckoutPaymentLineModel, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchBankAccountsAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchSettlementAccountsAsync { get; set; }
+
+    private List<UiCheckoutPaymentLineModel> PaymentLines { get; } = [];
+    private string? _validationMessage;
+    private bool _initialized;
+
+    protected override void OnParametersSet()
+    {
+        if (_initialized) return;
+        _initialized = true;
+        if (OutstandingAmount > 0m)
+            PaymentLines.Add(NewPaymentLine(OutstandingAmount));
+    }
+
+    private UiCheckoutPaymentLineModel NewPaymentLine(decimal amount = 0m) => new()
+    {
+        PaymentMethod = "Cash",
+        CurrencyId = CurrencyId,
+        CurrencyDisplay = CurrencyCode,
+        Amount = amount,
+        ReferenceDate = DateOnly.FromDateTime(DateTime.Today),
+        Description = $"تحصيل فاتورة المبيعات {InvoiceCode}"
+    };
+
+    private Task AddPaymentLineAsync()
+    {
+        PaymentLines.Add(NewPaymentLine());
+        _validationMessage = null;
+        return Task.CompletedTask;
+    }
+
+    private Task RemovePaymentLineAsync(UiCheckoutPaymentLineModel line)
+    {
+        PaymentLines.Remove(line);
+        return Task.CompletedTask;
+    }
+
+    private Task PaymentLinesChangedAsync()
+    {
+        _validationMessage = null;
+        return Task.CompletedTask;
+    }
+
+    private Task CancelAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _)
+    {
+        Dialog.Cancel();
+        return Task.CompletedTask;
+    }
+
+    private Task SubmitAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _)
+    {
+        _validationMessage = Validate();
+        if (_validationMessage is not null)
+            return Task.CompletedTask;
+
+        Dialog.Close(new CollectionRequestModel(PaymentLines.Where(x => x.Amount > 0m).ToArray()));
+        return Task.CompletedTask;
+    }
+
+    private string? Validate()
+    {
+        var positive = PaymentLines.Where(x => x.Amount > 0m).ToArray();
+        if (positive.Length == 0)
+            return "أدخل مبلغ تحصيل أكبر من صفر.";
+
+        foreach (var line in positive)
+        {
+            if (!Guid.TryParse(line.CurrencyId, out var currencyId) || currencyId == Guid.Empty)
+                return "يجب تحديد عملة كل دفعة.";
+
+            if (line.PaymentMethod == "Cash" && !Guid.TryParse(line.CashAccountId, out _))
+                return "اختر الصندوق للدفع النقدي.";
+
+            if (line.PaymentMethod is "Card" or "BankTransfer" or "Cheque" && !Guid.TryParse(line.BankAccountId, out _))
+                return "اختر الحساب البنكي لطريقة الدفع المحددة.";
+
+            if (line.PaymentMethod == "Cheque" && string.IsNullOrWhiteSpace(line.ReferenceNumber))
+                return "رقم الشيك مطلوب.";
+
+            if (line.PaymentMethod == "Other" && !Guid.TryParse(line.SettlementAccountId, out _))
+                return "حدد حساب التسوية لطريقة الدفع الأخرى.";
+        }
+
+        if (positive.All(x => string.Equals(x.CurrencyId, CurrencyId, StringComparison.OrdinalIgnoreCase)) &&
+            positive.Sum(x => x.Amount) > OutstandingAmount + 0.0001m)
+            return "مبلغ التحصيل لا يمكن أن يتجاوز الرصيد المتبقي على الفاتورة.";
+
+        return null;
+    }
+}

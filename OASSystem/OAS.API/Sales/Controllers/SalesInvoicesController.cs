@@ -92,6 +92,13 @@ public sealed class SalesInvoicesController(ISender sender) : ControllerBase
         CancellationToken cancellationToken)
         => Ok(await sender.Send(new PostSalesInvoiceCommand(id, request), cancellationToken));
 
+    [HttpPost("{id:guid}/collect-payment")]
+    public async Task<ActionResult<CollectSalesInvoicePaymentResultDto>> CollectPayment(
+        Guid id,
+        [FromBody] CollectSalesInvoicePaymentRequest request,
+        CancellationToken cancellationToken)
+        => Ok(await sender.Send(new CollectSalesInvoicePaymentCommand(id, request), cancellationToken));
+
     [HttpPost("{id:guid}/cancel")]
     public async Task<ActionResult<SalesInvoiceDto>> Cancel(
         Guid id,

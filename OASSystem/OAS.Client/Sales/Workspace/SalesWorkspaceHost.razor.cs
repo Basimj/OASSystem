@@ -61,6 +61,7 @@ public partial class SalesWorkspaceHost : IDisposable
     private readonly HashSet<Guid> _dirtyRevisionDraftTabs = [];
     private bool _isSavingRevision;
     private bool _isPrintingInvoice;
+    private bool _isCollectingInvoicePayment;
     private SalesEntityType? _lastSection;
 
     private SalesWorkspaceTabState? ActiveTab => Workspace.ActiveTab;
@@ -560,9 +561,15 @@ public partial class SalesWorkspaceHost : IDisposable
         UiSalesInvoiceFormModel invoice,
         out IReadOnlyList<CheckoutPaymentLineRequest> payments,
         out string? error)
+        => TryBuildPaymentLines(invoice.PaymentLines, out payments, out error);
+
+    private static bool TryBuildPaymentLines(
+        IEnumerable<UiCheckoutPaymentLineModel> paymentLines,
+        out IReadOnlyList<CheckoutPaymentLineRequest> payments,
+        out string? error)
     {
         var result = new List<CheckoutPaymentLineRequest>();
-        foreach (var line in invoice.PaymentLines.Where(x => x.Amount > 0m))
+        foreach (var line in paymentLines.Where(x => x.Amount > 0m))
         {
             if (!Enum.TryParse<PaymentMethod>(line.PaymentMethod, true, out var method))
             {
@@ -615,6 +622,94 @@ public partial class SalesWorkspaceHost : IDisposable
         payments = result;
         error = null;
         return true;
+    }
+
+    private async Task CollectInvoicePaymentAsync(MouseEventArgs _)
+    {
+        if (_isCollectingInvoicePayment || ActiveTab?.Model is not UiSalesInvoiceFormModel invoice || !invoice.Id.HasValue)
+            return;
+
+        if (!string.Equals(invoice.Status, "Posted", StringComparison.OrdinalIgnoreCase))
+        {
+            Snackbar.Info("يجب ترحيل الفاتورة قبل تحصيل دفعات لاحقة.");
+            return;
+        }
+
+        if (invoice.OutstandingAmount <= 0.0001m)
+        {
+            Snackbar.Info("فاتورة المبيعات مسددة بالكامل.");
+            return;
+        }
+
+        var dialogResult = await Dialogs.ShowAsync<UiSalesInvoiceCollectionDialog>(
+            $"تحصيل دفعة - {invoice.InvoiceCode}",
+            new Dictionary<string, object>
+            {
+                [nameof(UiSalesInvoiceCollectionDialog.InvoiceCode)] = invoice.InvoiceCode,
+                [nameof(UiSalesInvoiceCollectionDialog.CurrencyId)] = invoice.CurrencyId,
+                [nameof(UiSalesInvoiceCollectionDialog.CurrencyCode)] = invoice.CurrencyCode,
+                [nameof(UiSalesInvoiceCollectionDialog.InvoiceTotal)] = invoice.TotalAmount,
+                [nameof(UiSalesInvoiceCollectionDialog.PaidAmount)] = invoice.PaidAmount,
+                [nameof(UiSalesInvoiceCollectionDialog.ReturnedAmount)] = invoice.ReturnedAmount,
+                [nameof(UiSalesInvoiceCollectionDialog.OutstandingAmount)] = invoice.OutstandingAmount,
+                [nameof(UiSalesInvoiceCollectionDialog.SearchCurrenciesAsync)] = new Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>(SearchCollectionCurrencyItemsAsync),
+                [nameof(UiSalesInvoiceCollectionDialog.SearchCashAccountsAsync)] = new Func<UiCheckoutPaymentLineModel, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>(SearchPaymentCashAccountItemsAsync),
+                [nameof(UiSalesInvoiceCollectionDialog.SearchBankAccountsAsync)] = new Func<UiCheckoutPaymentLineModel, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>(SearchPaymentBankAccountItemsAsync),
+                [nameof(UiSalesInvoiceCollectionDialog.SearchSettlementAccountsAsync)] = new Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>(SearchSettlementAccountItemsAsync)
+            });
+
+        if (dialogResult.Cancelled || dialogResult.Value is not UiSalesInvoiceCollectionDialog.CollectionRequestModel collection)
+            return;
+
+        if (!TryBuildPaymentLines(collection.PaymentLines, out var paymentLines, out var error))
+        {
+            Snackbar.Error(error ?? "بيانات التحصيل غير مكتملة.");
+            return;
+        }
+
+        if (paymentLines.Count == 0)
+        {
+            Snackbar.Error("أدخل مبلغ تحصيل أكبر من صفر.");
+            return;
+        }
+
+        ClearMessages();
+        _isCollectingInvoicePayment = true;
+        Workspace.NotifyStateChanged();
+        try
+        {
+            var call = await Sales.CollectSalesInvoicePaymentResultAsync(
+                invoice.Id.Value,
+                new CollectSalesInvoicePaymentRequest(paymentLines));
+            if (!TryGetApiResult(call, out var result) || result is null)
+                return;
+
+            var dto = await Sales.GetSalesInvoiceByIdAsync(invoice.Id.Value);
+            if (dto is not null)
+                ActiveTab.Model = SalesUiMapper.ToUi(dto);
+            else
+            {
+                invoice.PaidAmount = result.PaymentSummary.PaidAmount;
+                invoice.ReturnedAmount = result.PaymentSummary.ReturnedAmount;
+                invoice.OutstandingAmount = result.PaymentSummary.OutstandingAmount;
+            }
+
+            Snackbar.Success($"تم إنشاء وترحيل سند القبض {result.ReceiptVoucherNumber} وتخصيصه على الفاتورة.");
+            await LoadListAsync(SalesEntityType.SalesInvoices);
+        }
+        catch (ApiClientException ex)
+        {
+            ApiFeedback.Show(ex.Error);
+        }
+        catch
+        {
+            ApiFeedback.ShowUnexpected();
+        }
+        finally
+        {
+            _isCollectingInvoicePayment = false;
+            Workspace.NotifyStateChanged();
+        }
     }
 
     private static bool ValidateDirectInvoicePaymentPlan(
@@ -1028,6 +1123,25 @@ public partial class SalesWorkspaceHost : IDisposable
                 disabled);
         }).ToArray();
     }
+    private async Task<IReadOnlyList<UiLookupItem>> SearchCollectionCurrencyItemsAsync(string q, CancellationToken ct)
+    {
+        var date = DateOnly.FromDateTime(DateTime.Today);
+        var rows = await Sales.SearchCurrenciesAsync(date, q, 20, ct);
+        foreach (var currency in rows)
+            _currencies[currency.Id] = currency;
+
+        return rows.Select(currency => new UiLookupItem(
+            currency.Id.ToString("D"),
+            $"{currency.Code} - {currency.NameAr}",
+            currency.IsBaseCurrency
+                ? "العملة الأساسية"
+                : currency.HasEffectiveExchangeRate
+                    ? $"سعر التحصيل الحالي: {currency.EffectiveExchangeRate:N4}"
+                    : currency.AvailabilityMessage,
+            currency.HasEffectiveExchangeRate ? "fa-solid fa-coins" : "fa-solid fa-triangle-exclamation",
+            !currency.IsActive || !currency.HasEffectiveExchangeRate)).ToArray();
+    }
+
     private async Task<IReadOnlyList<UiLookupItem>> SearchProductTypeItemsAsync(string q, CancellationToken ct)
     {
         var rows = await Sales.SearchProductTypesAsync(q, 30, ct);

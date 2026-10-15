@@ -33,6 +33,21 @@ public sealed class CompleteSalesWorkflowClientUiTests
     }
 
     [Test]
+    public void PostedInvoice_CollectsThroughReceiptVoucherFlow()
+    {
+        var host = File.ReadAllText(Find("OAS.Client/Sales/Workspace/SalesWorkspaceHost.razor"));
+        var code = File.ReadAllText(Find("OAS.Client/Sales/Workspace/SalesWorkspaceHost.razor.cs"));
+        var dialog = File.ReadAllText(Find("Shared/UiLib/Components/Sales/Invoices/UiSalesInvoiceCollectionDialog.razor"));
+
+        Assert.That(host, Does.Contain("تحصيل دفعة"));
+        Assert.That(host, Does.Contain("invoice.OutstandingAmount > 0.0001m"));
+        Assert.That(code, Does.Contain("CollectSalesInvoicePaymentResultAsync"));
+        Assert.That(code, Does.Not.Contain("UpdateSalesInvoiceResultAsync(invoice.Id.Value"));
+        Assert.That(dialog, Does.Contain("سند قبض مستقل"));
+        Assert.That(dialog, Does.Contain("إنشاء سند قبض وترحيله"));
+    }
+
+    [Test]
     public void CheckoutPaymentEditor_SupportsOtherSettlementAccount()
     {
         var text = File.ReadAllText(Find("Shared/UiLib/Components/Sales/Checkout/UiSalesPaymentLinesEditor.razor"));

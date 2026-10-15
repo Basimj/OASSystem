@@ -44,6 +44,25 @@ public sealed class SalesInvoiceDomainTests
     }
 
     [Test]
+    public void ConfirmedInvoice_CannotChangeFinancialHeader()
+    {
+        var invoice = CreateInvoice();
+        invoice.AddLine(CreateServiceLine(invoice.Id, 1, 1m, 100m));
+        invoice.Confirm(DateTimeOffset.UtcNow, "tester");
+
+        Assert.Throws<DomainException>(() => invoice.UpdateHeader(
+            Guid.NewGuid(),
+            null,
+            null,
+            new DateOnly(2026, 10, 2),
+            new DateOnly(2026, 10, 2),
+            TaxCalculationMode.Exclusive,
+            SalesPaymentTermType.Immediate,
+            0,
+            "attempted change"));
+    }
+
+    [Test]
     public void ConfirmedInvoice_CannotBeRepriced()
     {
         var invoice = CreateInvoice();

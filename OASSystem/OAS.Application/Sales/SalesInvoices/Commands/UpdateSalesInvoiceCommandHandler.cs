@@ -46,6 +46,13 @@ public sealed class UpdateSalesInvoiceCommandHandler(
             invoice.RowVersion,
             "فاتورة المبيعات");
 
+        if (invoice.Status != SalesInvoiceStatus.Draft)
+        {
+            throw new ConflictException(
+                "sales_invoice_locked_after_confirmation",
+                "لا يمكن تعديل فاتورة المبيعات بعد تأكيدها. استخدم سند قبض للتحصيل أو مستند تصحيح/مرتجع للتعديل المالي.");
+        }
+
         var customer = await customers.GetByIdAsync(
                            request.Data.CustomerId,
                            ct)
