@@ -1,4 +1,4 @@
-﻿using OAS.Client.Services.Http;
+using OAS.Client.Services.Http;
 using OAS.Contracts.Accounting.Accounts;
 using OAS.Contracts.Accounting.BankAccounts;
 using OAS.Contracts.Accounting.CashAccounts;
@@ -1560,6 +1560,12 @@ public sealed class AccountingClientService(
     // ============================================================
     // Financial Reports and Closing Readiness
     // ============================================================
+
+    public Task<AccountingDashboardDto?> GetAccountingDashboardAsync(
+        CancellationToken cancellationToken = default) =>
+        apiClient.GetAsync<AccountingDashboardDto>(
+            "api/accounting/reports/dashboard",
+            cancellationToken);
 
     public Task<GeneralLedgerReportDto?> GetGeneralLedgerAsync(
         DateOnly fromDate,

@@ -1,7 +1,211 @@
 @page "/accounting"
 @attribute [Authorize]
-@using OAS.Client.Accounting.Components
+@using OAS.Client.Accounting.Services
+@using OAS.Contracts.Accounting.Enums
+@using OAS.Contracts.Accounting.Reports
+@using OAS.UiLib.Components.Accounting.Workspace
+@using OAS.UiLib.Core.Models.Accounting
+@inject IAccountingClientService Accounting
 
-<PageTitle>المحاسبة المالية | OAS</PageTitle>
+<PageTitle>المحاسبة | OAS</PageTitle>
 
-<AccountingWorkspaceHost />
+<UiAccountingHomeDashboard Metrics="@Metrics"
+                           Sections="@Sections"
+                           AttentionItems="@AttentionItems"
+                           RecentActivities="@RecentActivities"
+                           IsLoading="@_loading"
+                           ErrorText="@_error"
+                           OnRefresh="LoadDashboardAsync" />
+
+@code {
+    private AccountingDashboardDto? _dashboard;
+    private bool _loading;
+    private string? _error;
+
+    private IReadOnlyList<UiAccountingHomeMetric> Metrics =>
+    [
+        new(
+            "قيود غير مرحلة",
+            _dashboard is null ? "—" : _dashboard.UnpostedJournalCount.ToString("N0"),
+            "fa-regular fa-rectangle-list",
+            _dashboard?.UnpostedJournalCount > 0 ? "danger" : "success",
+            _dashboard?.UnpostedJournalCount > 0 ? "تحتاج مراجعة أو ترحيل" : "لا توجد قيود معلقة"),
+        new(
+            "الفترة الحالية",
+            _dashboard?.CurrentFiscalPeriodName ?? "—",
+            "fa-regular fa-calendar",
+            "info",
+            _dashboard?.CurrentFiscalPeriodEndDate is DateOnly endDate ? $"تنتهي {endDate:yyyy/MM/dd}" : null),
+        new(
+            "ورديات صندوق مفتوحة",
+            _dashboard is null ? "—" : _dashboard.OpenCashShiftCount.ToString("N0"),
+            "fa-solid fa-cash-register",
+            _dashboard?.OpenCashShiftCount > 0 ? "warning" : "success",
+            _dashboard?.OpenCashShiftCount > 0 ? "تابع الورديات قبل الإقفال" : "لا توجد ورديات مفتوحة"),
+        new(
+            "البنوك النشطة",
+            _dashboard is null ? "—" : _dashboard.ActiveBankAccountCount.ToString("N0"),
+            "fa-solid fa-building-columns",
+            "success",
+            "حسابات بنكية مفعلة")
+    ];
+
+    private static IReadOnlyList<UiAccountingHomeSection> Sections { get; } =
+    [
+        new(
+            "الإعداد المحاسبي",
+            "fa-solid fa-sliders",
+            [
+                new("شجرة الحسابات", "إدارة الحسابات والتصنيفات", "/accounting/accounts", "fa-solid fa-folder-tree", "primary"),
+                new("السنوات والفترات المالية", "فتح وإقفال الفترات", "/accounting/fiscal-years", "fa-regular fa-calendar-days", "blue"),
+                new("ملفات الترحيل", "ربط المستندات بالحسابات", "/accounting/posting-profiles", "fa-solid fa-layer-group", "green"),
+                new("مراكز التكلفة", "تعريف وربط المراكز", "/accounting/cost-centers", "fa-solid fa-network-wired", "orange"),
+                new("إعدادات المحاسبة", "الحسابات النظامية وإعدادات الترحيل", "/accounting/settings", "fa-solid fa-gear", "primary", true),
+                new("العملات", "إدارة العملات ودقة الكسور", "/accounting/currencies", "fa-solid fa-coins", "green", true),
+                new("أسعار الصرف", "إدارة أسعار الصرف المحاسبية", "/accounting/exchange-rates", "fa-solid fa-arrow-right-arrow-left", "blue", true)
+            ]),
+        new(
+            "العمليات اليومية",
+            "fa-solid fa-gears",
+            [
+                new("القيود اليومية", "تسجيل ومراجعة القيود", "/accounting/journals", "fa-solid fa-book-journal-whills", "primary"),
+                new("سندات القبض", "إدارة التحصيلات", "/accounting/receipt-vouchers", "fa-solid fa-arrow-down-long", "green"),
+                new("سندات الصرف", "إدارة المدفوعات", "/accounting/payment-vouchers", "fa-solid fa-arrow-up-long", "red"),
+                new("المصروفات", "إدخال واعتماد المصروفات", "/accounting/expenses", "fa-solid fa-wallet", "orange")
+            ]),
+        new(
+            "التقارير",
+            "fa-solid fa-chart-column",
+            [
+                new("دفتر الأستاذ", "حركة الحسابات والأرصدة", "/accounting/reports?mode=general-ledger", "fa-solid fa-book-open", "primary"),
+                new("تقرير القيود", "استعراض القيود المحاسبية", "/accounting/journal-report", "fa-solid fa-list-ul", "blue"),
+                new("ميزان المراجعة", "الأرصدة والحركات", "/accounting/reports?mode=trial-balance", "fa-solid fa-scale-balanced", "green"),
+                new("تقارير إضافية", "تقارير مالية أخرى", "/accounting/reports", "fa-solid fa-chart-pie", "orange")
+            ]),
+        new(
+            "النقد والبنوك",
+            "fa-solid fa-building-columns",
+            [
+                new("الصناديق", "إدارة الصناديق النقدية", "/accounting/cash-accounts", "fa-solid fa-vault", "primary"),
+                new("البنوك", "إدارة الحسابات البنكية", "/accounting/bank-accounts", "fa-solid fa-building-columns", "blue"),
+                new("ورديات الصندوق", "فتح وإغلاق الورديات", "/accounting/cash-shifts", "fa-regular fa-clock", "green"),
+                new("الحسابات المساعدة", "حسابات العملاء والموردين", "/accounting/customers", "fa-solid fa-users", "orange"),
+                new("العملاء", "الحسابات المحاسبية للعملاء", "/accounting/customers", "fa-solid fa-user-group", "orange", true),
+                new("الموردون", "الحسابات المحاسبية للموردين", "/accounting/suppliers", "fa-solid fa-truck-field", "red", true),
+                new("حسابات الموظفين", "ربط الموظفين بحساباتهم", "/accounting/employee-accounts", "fa-solid fa-user-tie", "primary", true)
+            ])
+    ];
+
+    private IReadOnlyList<UiAccountingHomeAttentionItem> AttentionItems =>
+        _dashboard?.AttentionItems
+            .Select(item => new UiAccountingHomeAttentionItem(
+                item.Title,
+                item.Meta ?? string.Empty,
+                NormalizeSeverity(item.Severity),
+                AttentionHref(item.Code)))
+            .ToArray() ?? [];
+
+    private IReadOnlyList<UiAccountingHomeActivityItem> RecentActivities =>
+        _dashboard?.RecentActivities
+            .Select(ToUiActivity)
+            .ToArray() ?? [];
+
+    protected override Task OnInitializedAsync() => LoadDashboardAsync();
+
+    private async Task LoadDashboardAsync()
+    {
+        if (_loading)
+            return;
+
+        _loading = true;
+        _error = null;
+        try
+        {
+            _dashboard = await Accounting.GetAccountingDashboardAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static UiAccountingHomeActivityItem ToUiActivity(AccountingDashboardActivityDto activity)
+    {
+        var (title, tone, icon, href) = activity.ActivityType switch
+        {
+            "journal" => JournalActivity(activity),
+            "receipt" => VoucherActivity(activity, isReceipt: true),
+            "payment" => VoucherActivity(activity, isReceipt: false),
+            _ => ("تم تحديث المستند", "info", "fa-regular fa-file-lines", "/accounting")
+        };
+
+        return new UiAccountingHomeActivityItem(
+            activity.Reference,
+            title,
+            RelativeTime(activity.OccurredAtUtc),
+            tone,
+            icon,
+            href);
+    }
+
+    private static (string Title, string Tone, string Icon, string Href) JournalActivity(AccountingDashboardActivityDto activity)
+    {
+        var status = (JournalEntryStatus)activity.Status;
+        return status switch
+        {
+            JournalEntryStatus.Posted => ("تم ترحيل القيد", "success", "fa-solid fa-book-journal-whills", $"/accounting/journals?journalId={activity.EntityId:D}"),
+            JournalEntryStatus.Approved => ("تم اعتماد القيد", "info", "fa-solid fa-book-journal-whills", $"/accounting/journals?journalId={activity.EntityId:D}"),
+            JournalEntryStatus.PendingApproval => ("القيد بانتظار الاعتماد", "warning", "fa-solid fa-book-journal-whills", $"/accounting/journals?journalId={activity.EntityId:D}"),
+            JournalEntryStatus.Reversed => ("تم عكس القيد", "danger", "fa-solid fa-arrow-rotate-left", $"/accounting/journals?journalId={activity.EntityId:D}"),
+            _ => ("تم تحديث مسودة القيد", "info", "fa-solid fa-book-journal-whills", $"/accounting/journals?journalId={activity.EntityId:D}")
+        };
+    }
+
+    private static (string Title, string Tone, string Icon, string Href) VoucherActivity(
+        AccountingDashboardActivityDto activity,
+        bool isReceipt)
+    {
+        var href = isReceipt ? "/accounting/receipt-vouchers" : "/accounting/payment-vouchers";
+        var icon = isReceipt ? "fa-solid fa-money-bill-trend-up" : "fa-solid fa-money-bill-transfer";
+        var label = isReceipt ? "سند القبض" : "سند الصرف";
+
+        return activity.Status switch
+        {
+            3 => ($"تم ترحيل {label}", "success", icon, href),
+            2 => ($"تم اعتماد {label}", "info", icon, href),
+            4 => ($"تم إلغاء {label}", "danger", icon, href),
+            _ => ($"تم تحديث {label}", "warning", icon, href)
+        };
+    }
+
+    private static string AttentionHref(string code) => code switch
+    {
+        "unposted-journals" => "/accounting/journals",
+        "missing-current-period" => "/accounting/fiscal-years",
+        "period-closing-soon" => "/accounting/fiscal-years",
+        "open-cash-shifts" => "/accounting/cash-shifts",
+        _ => "/accounting"
+    };
+
+    private static string NormalizeSeverity(string severity) => severity switch
+    {
+        "danger" => "danger",
+        "warning" => "warning",
+        "success" => "success",
+        _ => "info"
+    };
+
+    private static string RelativeTime(DateTimeOffset occurredAtUtc)
+    {
+        var age = DateTimeOffset.UtcNow - occurredAtUtc.ToUniversalTime();
+        if (age.TotalMinutes < 1) return "الآن";
+        if (age.TotalMinutes < 60) return $"منذ {(int)age.TotalMinutes} دقيقة";
+        if (age.TotalHours < 24) return $"منذ {(int)age.TotalHours} ساعة";
+        if (age.TotalDays < 7) return $"منذ {(int)age.TotalDays} يوم";
+        return occurredAtUtc.ToLocalTime().ToString("yyyy/MM/dd");
+    }
+}

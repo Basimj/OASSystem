@@ -102,6 +102,17 @@ public sealed class FiscalYearClosingServiceTests
 
     private sealed class StubAccountingReports(TrialBalanceReportDto trialBalance) : IAccountingReportingQueryService
     {
+        public Task<AccountingDashboardDto> GetAccountingDashboardAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult(new AccountingDashboardDto(
+                0,
+                null,
+                string.Empty,
+                null,
+                0,
+                0,
+                Array.Empty<AccountingDashboardAttentionDto>(),
+                Array.Empty<AccountingDashboardActivityDto>()));
+
         public Task<TrialBalanceReportDto> GetTrialBalanceAsync(DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken = default)
             => Task.FromResult(trialBalance);
 

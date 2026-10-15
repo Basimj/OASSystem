@@ -155,6 +155,9 @@
     private const string TrialBalanceMode = "trial-balance";
     private const string GeneralLedgerMode = "general-ledger";
 
+    [Parameter, SupplyParameterFromQuery(Name = "mode")]
+    public string? ModeFromQuery { get; set; }
+
     private DateOnly? _fromDate = new(DateTime.Today.Year, 1, 1);
     private DateOnly? _toDate = DateOnly.FromDateTime(DateTime.Today);
     private string _reportMode = TrialBalanceMode;
@@ -191,7 +194,15 @@
             row.ClosingDebit > 0m ? "approved" : row.ClosingCredit > 0m ? "posted" : "draft"))
         .ToArray() ?? [];
 
-    protected override Task OnInitializedAsync() => LoadAsync();
+    protected override async Task OnParametersSetAsync()
+    {
+        if (string.Equals(ModeFromQuery, GeneralLedgerMode, StringComparison.OrdinalIgnoreCase))
+            _reportMode = GeneralLedgerMode;
+        else if (string.Equals(ModeFromQuery, TrialBalanceMode, StringComparison.OrdinalIgnoreCase))
+            _reportMode = TrialBalanceMode;
+
+        await LoadAsync();
+    }
 
     private Task SetReportMode(string? value)
     {

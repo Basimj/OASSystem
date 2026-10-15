@@ -1,0 +1,184 @@
+@namespace OAS.UiLib.Components.Accounting.Workspace
+@using OAS.UiLib.Core.Models.Accounting
+@using System.Linq
+
+<section class="ui-acc-home" dir="rtl" aria-busy="@IsLoading">
+    <header class="ui-acc-home__header">
+        <div class="ui-acc-home__identity">
+            <span class="ui-acc-home__identity-icon" aria-hidden="true">
+                <i class="fa-solid fa-chart-column"></i>
+            </span>
+            <div>
+                <h1 class="ui-acc-home__title">@Title</h1>
+                <p class="ui-acc-home__subtitle">@Subtitle</p>
+            </div>
+        </div>
+
+        <div class="ui-acc-home__actions">
+            <a class="ui-acc-home__action ui-acc-home__action--primary" href="@PrimaryHref">
+                <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                <span>@PrimaryActionText</span>
+            </a>
+            <button class="ui-acc-home__action" type="button" disabled="@IsLoading" @onclick="InvokeRefreshAsync">
+                <i class="fa-solid fa-rotate @(IsLoading ? "fa-spin" : null)" aria-hidden="true"></i>
+                <span>تحديث</span>
+            </button>
+        </div>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(ErrorText))
+    {
+        <div class="ui-acc-home__error" role="alert">
+            <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+            <span>@ErrorText</span>
+        </div>
+    }
+
+    <div class="ui-acc-home__metrics">
+        @foreach (var metric in Metrics)
+        {
+            <article class="ui-acc-home-metric ui-acc-home-metric--@metric.Accent">
+                <span class="ui-acc-home-metric__icon" aria-hidden="true">
+                    <i class="@metric.IconCssClass"></i>
+                </span>
+                <div class="ui-acc-home-metric__content">
+                    <span class="ui-acc-home-metric__label">@metric.Label</span>
+                    <strong class="ui-acc-home-metric__value">@metric.Value</strong>
+                    @if (!string.IsNullOrWhiteSpace(metric.Meta))
+                    {
+                        <span class="ui-acc-home-metric__meta">@metric.Meta</span>
+                    }
+                </div>
+            </article>
+        }
+    </div>
+
+    <div class="ui-acc-home__section-grid">
+        @foreach (var group in Sections)
+        {
+            <section class="ui-acc-home-group ui-acc-home-group--@group.Accent">
+                <header class="ui-acc-home-group__header">
+                    <div class="ui-acc-home-group__heading">
+                        <span class="ui-acc-home-group__icon" aria-hidden="true">
+                            <i class="@group.IconCssClass"></i>
+                        </span>
+                        <h2>@group.Title</h2>
+                    </div>
+
+                    <details class="ui-acc-home-group__more">
+                        <summary>
+                            <span>عرض الكل</span>
+                            <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                        </summary>
+                        <div class="ui-acc-home-group__menu">
+                            @foreach (var menuTile in group.Tiles)
+                            {
+                                <a href="@menuTile.Href">
+                                    <span class="ui-acc-home-group__menu-icon ui-acc-home-nav--@menuTile.Accent">
+                                        <i class="@menuTile.IconCssClass" aria-hidden="true"></i>
+                                    </span>
+                                    <span>@menuTile.Title</span>
+                                </a>
+                            }
+                        </div>
+                    </details>
+                </header>
+
+                <div class="ui-acc-home-group__tiles">
+                    @foreach (var tile in group.Tiles.Where(x => !x.IsSecondary).Take(4))
+                    {
+                        <a href="@tile.Href" class="ui-acc-home-nav ui-acc-home-nav--@tile.Accent">
+                            <span class="ui-acc-home-nav__icon" aria-hidden="true">
+                                <i class="@tile.IconCssClass"></i>
+                            </span>
+                            <span class="ui-acc-home-nav__content">
+                                <strong>@tile.Title</strong>
+                                <small>@tile.Description</small>
+                            </span>
+                            <i class="fa-solid fa-chevron-left ui-acc-home-nav__arrow" aria-hidden="true"></i>
+                        </a>
+                    }
+                </div>
+            </section>
+        }
+    </div>
+
+    <div class="ui-acc-home__lower-grid">
+        <section class="ui-acc-home-panel ui-acc-home-panel--attention">
+            <header class="ui-acc-home-panel__header">
+                <div>
+                    <i class="fa-regular fa-bell" aria-hidden="true"></i>
+                    <h2>مهام تحتاج انتباه</h2>
+                </div>
+            </header>
+            <div class="ui-acc-home-panel__rows">
+                @if (AttentionItems.Count == 0)
+                {
+                    <div class="ui-acc-home-panel__empty">
+                        <i class="fa-regular fa-circle-check" aria-hidden="true"></i>
+                        <span>لا توجد مهام محاسبية حرجة حاليًا.</span>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var item in AttentionItems.Take(3))
+                    {
+                        <a class="ui-acc-home-row" href="@item.Href">
+                            <span class="ui-acc-home-row__dot ui-acc-home-row__dot--@item.Severity"></span>
+                            <span class="ui-acc-home-row__text">@item.Title</span>
+                            <span class="ui-acc-home-row__meta">@item.Meta</span>
+                        </a>
+                    }
+                }
+            </div>
+        </section>
+
+        <section class="ui-acc-home-panel">
+            <header class="ui-acc-home-panel__header">
+                <div>
+                    <i class="fa-regular fa-clock" aria-hidden="true"></i>
+                    <h2>آخر الأنشطة</h2>
+                </div>
+            </header>
+            <div class="ui-acc-home-panel__rows">
+                @if (RecentActivities.Count == 0)
+                {
+                    <div class="ui-acc-home-panel__empty">
+                        <i class="fa-regular fa-folder-open" aria-hidden="true"></i>
+                        <span>لا توجد أنشطة محاسبية حديثة.</span>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var item in RecentActivities.Take(3))
+                    {
+                        <a class="ui-acc-home-row" href="@item.Href">
+                            <span class="ui-acc-home-row__activity-icon ui-acc-home-row__activity-icon--@item.Tone">
+                                <i class="@item.IconCssClass" aria-hidden="true"></i>
+                            </span>
+                            <span class="ui-acc-home-row__reference">@item.Reference</span>
+                            <span class="ui-acc-home-row__text">@item.Title</span>
+                            <span class="ui-acc-home-row__meta">@item.Meta</span>
+                        </a>
+                    }
+                }
+            </div>
+        </section>
+    </div>
+</section>
+
+@code {
+    [Parameter] public string Title { get; set; } = "المحاسبة";
+    [Parameter] public string Subtitle { get; set; } = "إدارة العمليات والإعدادات والتقارير المالية";
+    [Parameter] public string PrimaryActionText { get; set; } = "شجرة الحسابات";
+    [Parameter] public string PrimaryHref { get; set; } = "/accounting/accounts";
+    [Parameter] public IReadOnlyList<UiAccountingHomeMetric> Metrics { get; set; } = [];
+    [Parameter] public IReadOnlyList<UiAccountingHomeSection> Sections { get; set; } = [];
+    [Parameter] public IReadOnlyList<UiAccountingHomeAttentionItem> AttentionItems { get; set; } = [];
+    [Parameter] public IReadOnlyList<UiAccountingHomeActivityItem> RecentActivities { get; set; } = [];
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public string? ErrorText { get; set; }
+    [Parameter] public EventCallback OnRefresh { get; set; }
+
+    private Task InvokeRefreshAsync() => OnRefresh.InvokeAsync();
+}

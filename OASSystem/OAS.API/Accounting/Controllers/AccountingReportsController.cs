@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using OAS.Application.Accounting.Reports.Queries.GetAccountingDashboard;
 using OAS.Application.Accounting.Reports.Queries.GetFiscalPeriodCloseReadiness;
 using OAS.Application.Accounting.Reports.Queries.GetFiscalYearCloseReadiness;
 using OAS.Application.Accounting.Reports.Queries.GetGeneralLedger;
@@ -18,6 +19,14 @@ namespace OAS.API.Accounting.Controllers;
 [Route("api/accounting/reports")]
 public sealed class AccountingReportsController(ISender sender) : ControllerBase
 {
+    [HttpGet("dashboard")]
+    public async Task<ActionResult<AccountingDashboardDto>> Dashboard(
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetAccountingDashboardQuery(), cancellationToken);
+        return Ok(result);
+    }
+
     [HttpGet("general-ledger")]
     public async Task<ActionResult<GeneralLedgerReportDto>> GeneralLedger(
         [FromQuery] DateOnly fromDate,

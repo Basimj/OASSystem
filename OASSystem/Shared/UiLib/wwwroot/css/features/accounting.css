@@ -2202,3 +2202,1090 @@
 .ui-acc-account-editor__section--status .ui-checkbox input[type="checkbox"]:disabled {
     cursor: not-allowed;
 }
+
+/* ========================================================================== 
+   Account Management — strict single-screen detail layout
+   2026-10-15
+   The account detail surface must never require page-level vertical scrolling.
+   Only the chart-of-accounts tree is allowed to scroll internally.
+   ========================================================================== */
+
+@media (min-width: 980px) {
+    .ui-acc-workspace--account-management {
+        box-sizing: border-box;
+        height: 100%;
+        max-height: 100%;
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-workspace__actions {
+        flex: 0 0 auto;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-workspace__body {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-accounts-split {
+        height: 100%;
+        min-height: 0;
+        max-height: 100%;
+        overflow: hidden;
+        align-items: stretch;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-accounts-split__tree,
+    .ui-acc-workspace--account-management .ui-acc-accounts-split__detail {
+        height: 100%;
+        min-height: 0;
+        max-height: 100%;
+        overflow: hidden;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-accounts-split__detail {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-overview {
+        flex: 0 0 auto;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor {
+        flex: 1 1 auto;
+        min-height: 0;
+        align-content: start;
+        overflow: hidden;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-tree-panel {
+        height: 100%;
+        min-height: 0;
+        max-height: 100%;
+        overflow: hidden;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-tree-panel > .ui-acc-section__body {
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-tree-panel .ui-acc-tree {
+        flex: 1 1 auto;
+        min-height: 0;
+        max-height: none;
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-gutter: stable;
+    }
+}
+
+/* Compact-height desktop mode: preserve every account field on-screen rather
+   than allowing the outer application content area to scroll. */
+@media (min-width: 980px) and (max-height: 760px) {
+    .ui-acc-workspace--account-management {
+        --ui-acc-account-tree-width: clamp(250px, 23vw, 310px);
+        padding: 0.24rem;
+        gap: 0.22rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-workspace__actions {
+        padding: 0.13rem 0.3rem;
+        border-radius: 0.48rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-workspace__actions .ui-workspace-actionbar {
+        min-height: 1.58rem;
+        gap: 0.2rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-workspace__body,
+    .ui-acc-workspace--account-management .ui-acc-accounts-split,
+    .ui-acc-workspace--account-management .ui-acc-accounts-split__detail {
+        gap: 0.22rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-overview {
+        gap: 0.2rem;
+        padding: 0.28rem 0.4rem;
+        border-radius: 0.52rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-overview__breadcrumb {
+        margin-bottom: 0.06rem;
+        font-size: 0.56rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-overview__title-row {
+        gap: 0.38rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-overview__icon {
+        width: 1.8rem;
+        min-width: 1.8rem;
+        height: 1.8rem;
+        border-radius: 0.48rem;
+        font-size: 0.78rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-overview__title-line h2 {
+        font-size: 0.9rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-overview__status {
+        padding: 0.08rem 0.3rem;
+        font-size: 0.5rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-overview__meta {
+        margin-top: 0.03rem;
+        gap: 0.1rem 0.55rem;
+        font-size: 0.52rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-overview__metrics {
+        gap: 0.26rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-kpi {
+        min-height: 2.72rem;
+        gap: 0.26rem;
+        padding: 0.2rem 0.3rem;
+        border-radius: 0.44rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-kpi__icon {
+        width: 1.42rem;
+        min-width: 1.42rem;
+        height: 1.42rem;
+        font-size: 0.62rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-kpi__label {
+        font-size: 0.49rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-kpi__value {
+        margin-top: 0.02rem;
+        font-size: 0.72rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-kpi small {
+        margin-top: 0;
+        font-size: 0.43rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor {
+        gap: 0.18rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-section {
+        border-radius: 0.48rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-section__header {
+        min-height: 1.35rem;
+        padding: 0.1rem 0.34rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-section__title,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-section__icon {
+        font-size: 0.58rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-section__body {
+        padding: 0.18rem 0.34rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-form-grid,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-form-grid--2col,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-form-grid--3col,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-form-grid--4col {
+        gap: 0.12rem 0.28rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor__section--settings .ui-acc-checks-group {
+        gap: 0.1rem 0.3rem;
+        padding-block: 0;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor__section--settings .ui-checkbox,
+    .ui-acc-workspace--account-management .ui-acc-account-editor__section--status .ui-checkbox {
+        gap: 0.28rem;
+        font-size: 0.6rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor__section--settings .ui-checkbox input[type="checkbox"],
+    .ui-acc-workspace--account-management .ui-acc-account-editor__section--status .ui-checkbox input[type="checkbox"] {
+        width: 1.82rem;
+        height: 0.98rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor__section--settings .ui-checkbox input[type="checkbox"]::after,
+    .ui-acc-workspace--account-management .ui-acc-account-editor__section--status .ui-checkbox input[type="checkbox"]::after {
+        width: 0.68rem;
+        height: 0.68rem;
+        left: 0.13rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor__section--settings .ui-checkbox input[type="checkbox"]:checked::after,
+    .ui-acc-workspace--account-management .ui-acc-account-editor__section--status .ui-checkbox input[type="checkbox"]:checked::after {
+        left: 0.94rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-input-text,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-select,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-input-date,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-lookup,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-readonly-field {
+        gap: 2px;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-input-text__label,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-select__label,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-input-date__label,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-lookup__label,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-readonly-field__label {
+        font-size: 0.56rem;
+        line-height: 1.05;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-input-text__control--small,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-select__control--small,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-input-date__control--small,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-lookup__control,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-readonly-field__value {
+        min-height: 1.58rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-tree-panel > .ui-acc-section__header {
+        min-height: 1.85rem;
+        padding: 0.27rem 0.45rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-tree-panel > .ui-acc-section__body {
+        gap: 0.28rem;
+        padding: 0.34rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-tree-panel .ui-acc-tree__row {
+        min-height: 1.62rem;
+        padding-block: 0.03rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-tree-panel .ui-acc-tree__link {
+        min-height: 1.34rem;
+        padding-block: 0.06rem;
+    }
+}
+
+/* Extremely short desktop windows still keep all account details visible.
+   This is deliberately denser, but leaves the tree as the only scroll surface. */
+@media (min-width: 980px) and (max-height: 600px) {
+    .ui-acc-workspace--account-management .ui-acc-account-overview__breadcrumb {
+        display: none;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-overview {
+        gap: 0.14rem;
+        padding-block: 0.2rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-kpi {
+        min-height: 2.4rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-section__header {
+        min-height: 1.18rem;
+        padding-block: 0.05rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-section__body {
+        padding-block: 0.12rem;
+    }
+}
+
+/* UiTextLabel is a shared component, so account-editor label density is scoped
+   here instead of changing the global input library. */
+@media (min-width: 980px) and (max-height: 760px) {
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-text-label,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-lookup__label,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-readonly-field__label {
+        font-size: 0.56rem;
+        line-height: 1.05;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-lookup__control {
+        grid-template-columns: 18px minmax(0, 1fr) 20px;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-lookup__input {
+        height: 1.48rem;
+        font-size: 0.62rem;
+    }
+}
+
+/* ========================================================================== 
+   Account Management — comfort density correction
+   2026-10-15
+   Keep the single-screen behavior, but preserve readable desktop sizing.
+   The previous short-viewport rules were too aggressive at ~560px height.
+   ========================================================================== */
+@media (min-width: 980px) and (max-height: 760px) {
+    .ui-acc-workspace--account-management {
+        padding: 0.36rem;
+        gap: 0.32rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-workspace__actions {
+        padding: 0.2rem 0.4rem;
+        border-radius: 0.55rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-workspace__actions .ui-workspace-actionbar {
+        min-height: 1.9rem;
+        gap: 0.3rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-workspace__body,
+    .ui-acc-workspace--account-management .ui-acc-accounts-split,
+    .ui-acc-workspace--account-management .ui-acc-accounts-split__detail {
+        gap: 0.32rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-overview {
+        gap: 0.32rem;
+        padding: 0.42rem 0.54rem;
+        border-radius: 0.6rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-overview__breadcrumb {
+        display: flex;
+        margin-bottom: 0.12rem;
+        font-size: 0.62rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-overview__title-row {
+        gap: 0.48rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-overview__icon {
+        width: 2.2rem;
+        min-width: 2.2rem;
+        height: 2.2rem;
+        border-radius: 0.54rem;
+        font-size: 0.94rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-overview__title-line h2 {
+        font-size: 1.05rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-overview__status {
+        padding: 0.11rem 0.38rem;
+        font-size: 0.56rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-overview__meta {
+        margin-top: 0.08rem;
+        gap: 0.12rem 0.64rem;
+        font-size: 0.59rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-overview__metrics {
+        gap: 0.34rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-kpi {
+        min-height: 3.25rem;
+        gap: 0.36rem;
+        padding: 0.34rem 0.42rem;
+        border-radius: 0.5rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-kpi__icon {
+        width: 1.7rem;
+        min-width: 1.7rem;
+        height: 1.7rem;
+        font-size: 0.72rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-kpi__label {
+        font-size: 0.57rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-kpi__value {
+        margin-top: 0.05rem;
+        font-size: 0.84rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-kpi small {
+        margin-top: 0.02rem;
+        font-size: 0.48rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor {
+        gap: 0.3rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-section {
+        border-radius: 0.52rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-section__header {
+        min-height: 1.65rem;
+        padding: 0.18rem 0.42rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-section__title,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-section__icon {
+        font-size: 0.68rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-section__body {
+        padding: 0.28rem 0.42rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-form-grid,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-form-grid--2col,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-form-grid--3col,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-form-grid--4col {
+        gap: 0.24rem 0.4rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-text-label,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-input-text__label,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-select__label,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-input-date__label,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-lookup__label,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-readonly-field__label,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-number-field__label {
+        font-size: 0.66rem;
+        line-height: 1.15;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-input-text__control--small,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-select__control--small,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-input-date__control--small,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-lookup__control,
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-readonly-field__value {
+        min-height: 1.9rem;
+        font-size: 0.7rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-lookup__control {
+        grid-template-columns: 22px minmax(0, 1fr) 24px;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-lookup__input {
+        height: 1.78rem;
+        font-size: 0.7rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor__section--settings .ui-acc-checks-group {
+        gap: 0.22rem 0.42rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor__section--settings .ui-checkbox,
+    .ui-acc-workspace--account-management .ui-acc-account-editor__section--status .ui-checkbox {
+        gap: 0.34rem;
+        font-size: 0.66rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor__section--settings .ui-checkbox input[type="checkbox"],
+    .ui-acc-workspace--account-management .ui-acc-account-editor__section--status .ui-checkbox input[type="checkbox"] {
+        width: 1.98rem;
+        height: 1.06rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor__section--settings .ui-checkbox input[type="checkbox"]::after,
+    .ui-acc-workspace--account-management .ui-acc-account-editor__section--status .ui-checkbox input[type="checkbox"]::after {
+        width: 0.74rem;
+        height: 0.74rem;
+        left: 0.14rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor__section--settings .ui-checkbox input[type="checkbox"]:checked::after,
+    .ui-acc-workspace--account-management .ui-acc-account-editor__section--status .ui-checkbox input[type="checkbox"]:checked::after {
+        left: 1.0rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-tree-panel > .ui-acc-section__header {
+        min-height: 2.05rem;
+        padding: 0.34rem 0.5rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-tree-panel > .ui-acc-section__body {
+        gap: 0.34rem;
+        padding: 0.4rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-tree-panel .ui-acc-tree__row {
+        min-height: 1.78rem;
+        padding-block: 0.05rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-tree-panel .ui-acc-tree__link {
+        min-height: 1.5rem;
+        padding-block: 0.08rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-tree-panel .ui-acc-tree__name {
+        font-size: 0.7rem;
+        font-weight: 650;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-tree-panel .ui-acc-tree__code {
+        font-size: 0.65rem;
+        font-weight: 700;
+    }
+}
+
+@media (min-width: 980px) and (max-height: 600px) {
+    .ui-acc-workspace--account-management .ui-acc-account-overview__breadcrumb {
+        display: flex;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-overview {
+        gap: 0.28rem;
+        padding-block: 0.36rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-kpi {
+        min-height: 3.05rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-section__header {
+        min-height: 1.55rem;
+        padding-block: 0.15rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-section__body {
+        padding-block: 0.24rem;
+    }
+}
+
+/* ========================================================================== 
+   Accounting Home Command Center
+   ========================================================================== */
+
+.ui-acc-home {
+    --ui-acc-home-gap: .62rem;
+    height: 100%;
+    max-height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    gap: var(--ui-acc-home-gap);
+    padding: .55rem .7rem .65rem;
+    box-sizing: border-box;
+    color: #172033;
+    background: linear-gradient(180deg, #fbfcff 0%, #f8fafc 100%);
+}
+
+.ui-acc-home__header {
+    min-height: 3.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: .05rem .2rem;
+}
+
+.ui-acc-home__identity {
+    display: flex;
+    align-items: center;
+    gap: .72rem;
+    min-width: 0;
+}
+
+.ui-acc-home__identity-icon {
+    width: 2.8rem;
+    height: 2.8rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    border-radius: .85rem;
+    background: linear-gradient(145deg, #eee9ff, #f8f6ff);
+    color: var(--oas-acc-primary, #6338e8);
+    font-size: 1.15rem;
+}
+
+.ui-acc-home__title {
+    margin: 0;
+    font-size: 1.45rem;
+    line-height: 1.12;
+    font-weight: 900;
+    color: #12182b;
+}
+
+.ui-acc-home__subtitle {
+    margin: .2rem 0 0;
+    font-size: .74rem;
+    line-height: 1.25;
+    color: #7b8498;
+    font-weight: 600;
+}
+
+.ui-acc-home__actions {
+    display: flex;
+    align-items: center;
+    gap: .58rem;
+    flex: 0 0 auto;
+}
+
+.ui-acc-home__action {
+    min-height: 2.45rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .48rem;
+    padding: .48rem .9rem;
+    border: 1px solid #dfe3ec;
+    border-radius: .72rem;
+    background: #fff;
+    color: #596276;
+    font: inherit;
+    font-size: .77rem;
+    font-weight: 800;
+    text-decoration: none;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(34, 45, 72, .035);
+    transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+
+.ui-acc-home__action:hover:not(:disabled) {
+    border-color: rgba(var(--oas-acc-primary-rgb), .4);
+    box-shadow: 0 5px 14px rgba(42, 31, 86, .08);
+    transform: translateY(-1px);
+}
+
+.ui-acc-home__action--primary {
+    color: var(--oas-acc-primary, #6338e8);
+    border-color: rgba(var(--oas-acc-primary-rgb), .48);
+    background: #fff;
+}
+
+.ui-acc-home__action:disabled { opacity: .62; cursor: wait; }
+
+.ui-acc-home__error {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    padding: .45rem .7rem;
+    border: 1px solid #fecaca;
+    border-radius: .62rem;
+    background: #fff7f7;
+    color: #991b1b;
+    font-size: .72rem;
+    font-weight: 700;
+}
+
+.ui-acc-home__metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .72rem;
+}
+
+.ui-acc-home-metric {
+    min-width: 0;
+    min-height: 5.35rem;
+    display: flex;
+    align-items: center;
+    gap: .78rem;
+    padding: .7rem .95rem;
+    border: 1px solid #e7eaf1;
+    border-radius: .85rem;
+    background: #fff;
+    box-shadow: 0 3px 10px rgba(30, 41, 59, .045);
+}
+
+.ui-acc-home-metric__icon {
+    width: 2.65rem;
+    height: 2.65rem;
+    border-radius: .78rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    font-size: 1.03rem;
+    background: #f2efff;
+    color: #6842dc;
+}
+
+.ui-acc-home-metric__content {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: .1rem;
+}
+
+.ui-acc-home-metric__label {
+    font-size: .74rem;
+    color: #596175;
+    font-weight: 750;
+    white-space: nowrap;
+}
+
+.ui-acc-home-metric__value {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 1.22rem;
+    line-height: 1.15;
+    color: #12182b;
+    font-weight: 900;
+}
+
+.ui-acc-home-metric__meta { font-size: .62rem; color: #9299aa; }
+
+.ui-acc-home-metric--danger { background: linear-gradient(180deg,#fff 0%,#fff6f7 100%); border-color:#f5dfe3; }
+.ui-acc-home-metric--danger .ui-acc-home-metric__icon { background:#fff0f2; color:#e12d4c; }
+.ui-acc-home-metric--danger .ui-acc-home-metric__value { color:#a81731; }
+.ui-acc-home-metric--info { background: linear-gradient(180deg,#fff 0%,#f6f9ff 100%); border-color:#dfe8fa; }
+.ui-acc-home-metric--info .ui-acc-home-metric__icon { background:#eef4ff; color:#2868d8; }
+.ui-acc-home-metric--warning { background: linear-gradient(180deg,#fff 0%,#fff9f0 100%); border-color:#f1e2ca; }
+.ui-acc-home-metric--warning .ui-acc-home-metric__icon { background:#fff3df; color:#e1760a; }
+.ui-acc-home-metric--success { background: linear-gradient(180deg,#fff 0%,#f3fbf7 100%); border-color:#d7ecdf; }
+.ui-acc-home-metric--success .ui-acc-home-metric__icon { background:#e9f9f0; color:#118653; }
+
+.ui-acc-home__section-grid {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    gap: var(--ui-acc-home-gap);
+}
+
+.ui-acc-home-group {
+    position: relative;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: .68rem .75rem .72rem;
+    border: 1px solid #e5e8ef;
+    border-radius: .86rem;
+    background: rgba(255,255,255,.98);
+    box-shadow: 0 3px 11px rgba(30,41,59,.045);
+    overflow: visible;
+}
+
+.ui-acc-home-group__header {
+    position: relative;
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 2rem;
+    margin-bottom: .55rem;
+}
+
+.ui-acc-home-group__heading { display:flex; align-items:center; gap:.5rem; }
+.ui-acc-home-group__heading h2 { margin:0; font-size:.92rem; font-weight:900; color:#172033; }
+
+.ui-acc-home-group__icon {
+    width: 1.95rem;
+    height: 1.95rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: .58rem;
+    background:#f1edff;
+    color:#6842dc;
+    font-size:.8rem;
+}
+
+.ui-acc-home-group__more { position:relative; color:#6842dc; }
+.ui-acc-home-group__more > summary {
+    list-style:none;
+    cursor:pointer;
+    display:inline-flex;
+    align-items:center;
+    gap:.35rem;
+    color:#6842dc;
+    font-size:.72rem;
+    font-weight:800;
+    user-select:none;
+}
+.ui-acc-home-group__more > summary::-webkit-details-marker { display:none; }
+.ui-acc-home-group__more[open] > summary i { transform:rotate(-90deg); }
+.ui-acc-home-group__more > summary i { font-size:.5rem; transition:transform .15s ease; }
+.ui-acc-home-group__menu {
+    position:absolute;
+    top:calc(100% + .45rem);
+    left:0;
+    z-index:30;
+    width:14rem;
+    max-height:16rem;
+    overflow:auto;
+    padding:.35rem;
+    border:1px solid #e2e4ec;
+    border-radius:.7rem;
+    background:#fff;
+    box-shadow:0 12px 30px rgba(30,41,59,.15);
+}
+.ui-acc-home-group__menu a {
+    min-height:2.25rem;
+    display:flex;
+    align-items:center;
+    gap:.5rem;
+    padding:.35rem .42rem;
+    border-radius:.48rem;
+    color:#30394d;
+    text-decoration:none;
+    font-size:.69rem;
+    font-weight:750;
+}
+.ui-acc-home-group__menu a:hover { background:#f7f5ff; color:#5c36cf; }
+.ui-acc-home-group__menu-icon {
+    width:1.65rem;
+    height:1.65rem;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:.45rem;
+    background:#f2efff;
+    color:#6842dc;
+    flex:0 0 auto;
+}
+.ui-acc-home-group__menu-icon.ui-acc-home-nav--green { background:#eaf9f1; color:#13935b; }
+.ui-acc-home-group__menu-icon.ui-acc-home-nav--blue { background:#eef5ff; color:#246ad9; }
+.ui-acc-home-group__menu-icon.ui-acc-home-nav--orange { background:#fff3e4; color:#e7790d; }
+.ui-acc-home-group__menu-icon.ui-acc-home-nav--red { background:#fff0f2; color:#d93651; }
+
+.ui-acc-home-group__tiles {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .6rem;
+}
+
+.ui-acc-home-nav {
+    position:relative;
+    min-width:0;
+    min-height:0;
+    height:100%;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:.42rem;
+    padding:.62rem .45rem 1.3rem;
+    border:1px solid #e6e8ef;
+    border-radius:.72rem;
+    background:#fff;
+    color:inherit;
+    text-decoration:none;
+    text-align:center;
+    transition:border-color .15s ease, transform .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.ui-acc-home-nav:hover {
+    transform: translateY(-2px);
+    border-color: rgba(var(--oas-acc-primary-rgb), .32);
+    box-shadow:0 7px 18px rgba(43,32,83,.08);
+    background:#fff;
+}
+
+.ui-acc-home-nav__icon {
+    width:2.55rem;
+    height:2.55rem;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:.72rem;
+    flex:0 0 auto;
+    background:#f2efff;
+    color:#6842dc;
+    font-size:1rem;
+}
+.ui-acc-home-nav--green .ui-acc-home-nav__icon { background:#eaf9f1; color:#13935b; }
+.ui-acc-home-nav--blue .ui-acc-home-nav__icon { background:#eef5ff; color:#246ad9; }
+.ui-acc-home-nav--orange .ui-acc-home-nav__icon { background:#fff3e4; color:#e7790d; }
+.ui-acc-home-nav--red .ui-acc-home-nav__icon { background:#fff0f2; color:#d93651; }
+
+.ui-acc-home-nav__content {
+    min-width:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:.18rem;
+}
+.ui-acc-home-nav__content strong {
+    max-width:100%;
+    font-size:.78rem;
+    line-height:1.25;
+    color:#20283a;
+    font-weight:850;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+.ui-acc-home-nav__content small {
+    max-width:100%;
+    min-height:1.8em;
+    font-size:.61rem;
+    line-height:1.35;
+    color:#858d9e;
+    display:-webkit-box;
+    -webkit-line-clamp:2;
+    -webkit-box-orient:vertical;
+    overflow:hidden;
+}
+.ui-acc-home-nav__arrow {
+    position:absolute;
+    left:.55rem;
+    bottom:.55rem;
+    color:#9ca5b6;
+    font-size:.58rem;
+}
+
+.ui-acc-home__lower-grid {
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:var(--ui-acc-home-gap);
+    min-height:6.8rem;
+}
+
+.ui-acc-home-panel {
+    min-width:0;
+    padding:.55rem .75rem;
+    border:1px solid #e5e8ef;
+    border-radius:.78rem;
+    background:#fff;
+    box-shadow:0 3px 10px rgba(30,41,59,.04);
+}
+.ui-acc-home-panel--attention { border-color:#f3d8dc; background:linear-gradient(180deg,#fff 0%,#fffafa 100%); }
+.ui-acc-home-panel__header { min-height:1.5rem; margin-bottom:.2rem; display:flex; align-items:center; justify-content:space-between; }
+.ui-acc-home-panel__header > div { display:flex; align-items:center; gap:.42rem; }
+.ui-acc-home-panel__header h2 { margin:0; font-size:.82rem; font-weight:900; }
+.ui-acc-home-panel__header i { color:var(--oas-acc-primary,#6338e8); }
+.ui-acc-home-panel--attention .ui-acc-home-panel__header i { color:#d93651; }
+.ui-acc-home-panel__rows { display:grid; gap:.05rem; }
+
+.ui-acc-home-row {
+    min-width:0;
+    min-height:1.38rem;
+    display:grid;
+    grid-template-columns:auto auto minmax(0,1fr) auto;
+    align-items:center;
+    gap:.38rem;
+    padding:.16rem .12rem;
+    border-top:1px solid #eef0f4;
+    color:inherit;
+    text-decoration:none;
+}
+.ui-acc-home-row:first-child { border-top:0; }
+.ui-acc-home-row:hover .ui-acc-home-row__text { color:var(--oas-acc-primary,#6338e8); }
+.ui-acc-home-row__dot { width:.45rem; height:.45rem; border-radius:50%; background:#94a3b8; }
+.ui-acc-home-row__dot--danger { background:#e23b55; }
+.ui-acc-home-row__dot--warning { background:#e88a12; }
+.ui-acc-home-row__dot--info { background:#3d7be4; }
+.ui-acc-home-row__dot--success { background:#14935d; }
+.ui-acc-home-row__activity-icon {
+    width:1.35rem; height:1.35rem; display:inline-flex; align-items:center; justify-content:center;
+    border-radius:.38rem; background:#f1edff; color:#6842dc; font-size:.58rem;
+}
+.ui-acc-home-row__activity-icon--success { background:#eaf9f1; color:#13935b; }
+.ui-acc-home-row__activity-icon--warning { background:#fff3e4; color:#d97813; }
+.ui-acc-home-row__activity-icon--danger { background:#fff0f2; color:#d93651; }
+.ui-acc-home-row__activity-icon--info { background:#eef5ff; color:#246ad9; }
+.ui-acc-home-row__reference { font-size:.65rem; font-weight:850; color:#323a4d; direction:ltr; }
+.ui-acc-home-row__text { min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:.67rem; font-weight:750; color:#3c4558; }
+.ui-acc-home-row__meta {
+    max-width:9.5rem;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    padding:.12rem .38rem;
+    border-radius:999px;
+    background:#f3f1fb;
+    font-size:.54rem;
+    color:#858c9d;
+}
+.ui-acc-home-panel__empty { min-height:3.4rem; display:flex; align-items:center; justify-content:center; gap:.4rem; color:#8a91a1; font-size:.66rem; }
+
+@media (max-width: 1180px) {
+    .ui-acc-home { --ui-acc-home-gap:.48rem; padding:.35rem .45rem .45rem; }
+    .ui-acc-home__header { min-height:2.7rem; }
+    .ui-acc-home__identity-icon { width:2.35rem; height:2.35rem; font-size:.95rem; }
+    .ui-acc-home__title { font-size:1.15rem; }
+    .ui-acc-home__subtitle { font-size:.64rem; }
+    .ui-acc-home__action { min-height:2rem; padding:.35rem .65rem; font-size:.66rem; }
+    .ui-acc-home-metric { min-height:4.2rem; padding:.48rem .62rem; gap:.5rem; }
+    .ui-acc-home-metric__icon { width:2.05rem; height:2.05rem; font-size:.82rem; }
+    .ui-acc-home-metric__label { font-size:.64rem; }
+    .ui-acc-home-metric__value { font-size:.94rem; }
+    .ui-acc-home-metric__meta { font-size:.54rem; }
+    .ui-acc-home-group { padding:.45rem .5rem .5rem; }
+    .ui-acc-home-group__header { min-height:1.65rem; margin-bottom:.34rem; }
+    .ui-acc-home-group__heading h2 { font-size:.72rem; }
+    .ui-acc-home-group__icon { width:1.55rem; height:1.55rem; font-size:.65rem; }
+    .ui-acc-home-group__more > summary { font-size:.61rem; }
+    .ui-acc-home-group__tiles { gap:.36rem; }
+    .ui-acc-home-nav { padding:.4rem .25rem 1rem; gap:.26rem; }
+    .ui-acc-home-nav__icon { width:1.9rem; height:1.9rem; font-size:.74rem; }
+    .ui-acc-home-nav__content strong { font-size:.64rem; }
+    .ui-acc-home-nav__content small { font-size:.52rem; }
+    .ui-acc-home-nav__arrow { left:.35rem; bottom:.35rem; }
+    .ui-acc-home__lower-grid { min-height:5.4rem; }
+    .ui-acc-home-panel { padding:.36rem .55rem; }
+    .ui-acc-home-panel__header h2 { font-size:.68rem; }
+    .ui-acc-home-row { min-height:1.02rem; padding:.08rem .08rem; }
+    .ui-acc-home-row__text { font-size:.58rem; }
+    .ui-acc-home-row__reference { font-size:.56rem; }
+    .ui-acc-home-row__meta { font-size:.48rem; }
+}
+
+/* Keep the image-like card hierarchy on short desktop screens instead of hiding descriptions. */
+@media (max-height: 650px) and (min-width: 901px) {
+    .ui-acc-home { --ui-acc-home-gap:.38rem; padding:.22rem .36rem .32rem; }
+    .ui-acc-home__header { min-height:2.35rem; }
+    .ui-acc-home__identity-icon { width:2.1rem; height:2.1rem; }
+    .ui-acc-home__title { font-size:1.12rem; }
+    .ui-acc-home__subtitle { font-size:.63rem; margin-top:.08rem; }
+    .ui-acc-home__action { min-height:1.95rem; padding:.3rem .62rem; font-size:.66rem; }
+    .ui-acc-home-metric { min-height:3.9rem; padding:.38rem .58rem; }
+    .ui-acc-home-metric__icon { width:1.95rem; height:1.95rem; font-size:.78rem; }
+    .ui-acc-home-metric__label { font-size:.63rem; }
+    .ui-acc-home-metric__value { font-size:.92rem; }
+    .ui-acc-home-metric__meta { font-size:.51rem; }
+    .ui-acc-home-group { padding:.34rem .42rem .38rem; }
+    .ui-acc-home-group__header { min-height:1.35rem; margin-bottom:.2rem; }
+    .ui-acc-home-group__heading h2 { font-size:.72rem; }
+    .ui-acc-home-group__icon { width:1.5rem; height:1.5rem; font-size:.64rem; }
+    .ui-acc-home-group__more > summary { font-size:.59rem; }
+    .ui-acc-home-group__tiles { gap:.28rem; }
+    .ui-acc-home-nav { padding:.28rem .2rem .82rem; gap:.18rem; border-radius:.52rem; }
+    .ui-acc-home-nav__icon { width:1.72rem; height:1.72rem; font-size:.68rem; border-radius:.5rem; }
+    .ui-acc-home-nav__content strong { font-size:.63rem; }
+    .ui-acc-home-nav__content small { font-size:.5rem; line-height:1.22; min-height:1.5em; -webkit-line-clamp:1; }
+    .ui-acc-home-nav__arrow { left:.28rem; bottom:.26rem; font-size:.45rem; }
+    .ui-acc-home__lower-grid { min-height:4.8rem; }
+    .ui-acc-home-panel { padding:.27rem .45rem; }
+    .ui-acc-home-panel__header { min-height:1rem; margin-bottom:.04rem; }
+    .ui-acc-home-panel__header h2 { font-size:.66rem; }
+    .ui-acc-home-row { min-height:.82rem; padding:.03rem .05rem; gap:.25rem; }
+    .ui-acc-home-row__text { font-size:.55rem; }
+    .ui-acc-home-row__reference { font-size:.53rem; }
+    .ui-acc-home-row__meta { font-size:.43rem; max-width:6.8rem; padding:.07rem .24rem; }
+    .ui-acc-home-row__activity-icon { width:1rem; height:1rem; font-size:.43rem; }
+}
+
+@media (max-width: 900px) {
+    .ui-acc-home { height:auto; max-height:none; overflow:visible; grid-template-rows:auto; }
+    .ui-acc-home__metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .ui-acc-home__section-grid { grid-template-columns:1fr; grid-template-rows:auto; }
+    .ui-acc-home__lower-grid { grid-template-columns:1fr; }
+    .ui-acc-home-group__tiles { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .ui-acc-home-nav { min-height:6.5rem; }
+}

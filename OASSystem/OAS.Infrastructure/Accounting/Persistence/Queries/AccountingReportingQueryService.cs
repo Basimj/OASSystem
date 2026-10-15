@@ -13,8 +13,179 @@ using OAS.Infrastructure.Persistence;
 
 namespace OAS.Infrastructure.Accounting.Persistence.Queries;
 
-public sealed class AccountingReportingQueryService(OasDbContext db) : IAccountingReportingQueryService
+public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvider timeProvider) : IAccountingReportingQueryService
 {
+    public async Task<AccountingDashboardDto> GetAccountingDashboardAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var nowUtc = timeProvider.GetUtcNow();
+        var localNow = TimeZoneInfo.ConvertTime(nowUtc, timeProvider.LocalTimeZone);
+        var today = DateOnly.FromDateTime(localNow.DateTime);
+
+        var unpostedJournalCount = await db.Set<JournalEntry>()
+            .AsNoTracking()
+            .LongCountAsync(x =>
+                x.Status != JournalEntryStatus.Posted &&
+                x.Status != JournalEntryStatus.Reversed,
+                cancellationToken);
+
+        var currentPeriod = await (
+            from period in db.Set<FiscalPeriod>().AsNoTracking()
+            join year in db.Set<FiscalYear>().AsNoTracking()
+                on period.FiscalYearId equals year.Id
+            where period.StartDate <= today && period.EndDate >= today
+            orderby period.Status, period.PeriodNumber
+            select new
+            {
+                period.Id,
+                period.Name,
+                period.PeriodNumber,
+                period.EndDate,
+                period.Status,
+                FiscalYearCode = year.Code
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var openCashShiftCount = await db.Set<CashShift>()
+            .AsNoTracking()
+            .LongCountAsync(x =>
+                x.Status == CashShiftStatus.Open || x.Status == CashShiftStatus.Closing,
+                cancellationToken);
+
+        var oldestOpenShift = await db.Set<CashShift>()
+            .AsNoTracking()
+            .Where(x => x.Status == CashShiftStatus.Open || x.Status == CashShiftStatus.Closing)
+            .OrderBy(x => x.OpenedAtUtc)
+            .Select(x => (DateTime?)x.OpenedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var activeBankAccountCount = await db.Set<BankAccount>()
+            .AsNoTracking()
+            .LongCountAsync(x => x.IsActive, cancellationToken);
+
+        var attention = new List<AccountingDashboardAttentionDto>(3);
+        if (unpostedJournalCount > 0)
+        {
+            attention.Add(new AccountingDashboardAttentionDto(
+                "unposted-journals",
+                $"{unpostedJournalCount:N0} قيود تنتظر الترحيل",
+                "danger",
+                "القيود اليومية"));
+        }
+
+        if (currentPeriod is null)
+        {
+            attention.Add(new AccountingDashboardAttentionDto(
+                "missing-current-period",
+                "لا توجد فترة مالية تغطي تاريخ اليوم",
+                "danger",
+                "السنوات والفترات المالية"));
+        }
+        else
+        {
+            var daysRemaining = currentPeriod.EndDate.DayNumber - today.DayNumber;
+            if (currentPeriod.Status != FiscalPeriodStatus.Closed && daysRemaining <= 7)
+            {
+                var periodCaption = string.IsNullOrWhiteSpace(currentPeriod.FiscalYearCode)
+                    ? currentPeriod.Name
+                    : $"{currentPeriod.Name} {currentPeriod.FiscalYearCode}";
+                var dayText = daysRemaining <= 0 ? "اليوم" : $"خلال {daysRemaining} يوم";
+                attention.Add(new AccountingDashboardAttentionDto(
+                    "period-closing-soon",
+                    $"الفترة المالية {periodCaption} تنتهي {dayText}",
+                    "warning",
+                    "مراجعة جاهزية الإقفال"));
+            }
+        }
+
+        if (openCashShiftCount > 0)
+        {
+            var meta = "ورديات الصندوق";
+            if (oldestOpenShift.HasValue)
+            {
+                var opened = DateTime.SpecifyKind(oldestOpenShift.Value, DateTimeKind.Utc);
+                var age = nowUtc - new DateTimeOffset(opened);
+                if (age.TotalHours >= 24)
+                    meta = $"أقدم وردية مفتوحة منذ {Math.Max(1, (int)Math.Floor(age.TotalDays))} يوم";
+            }
+
+            attention.Add(new AccountingDashboardAttentionDto(
+                "open-cash-shifts",
+                $"{openCashShiftCount:N0} ورديات صندوق مفتوحة",
+                openCashShiftCount > 1 ? "warning" : "info",
+                meta));
+        }
+
+        var journalActivities = await db.Set<JournalEntry>()
+            .AsNoTracking()
+            .OrderByDescending(x => x.LastModifiedAtUtc ?? x.CreatedAtUtc)
+            .Take(4)
+            .Select(x => new ActivityCandidate(
+                x.Id,
+                "journal",
+                x.JournalNumber,
+                (byte)x.Status,
+                x.Description,
+                x.LastModifiedAtUtc ?? x.CreatedAtUtc))
+            .ToListAsync(cancellationToken);
+
+        var receiptActivities = await db.Set<ReceiptVoucher>()
+            .AsNoTracking()
+            .OrderByDescending(x => x.LastModifiedAtUtc ?? x.CreatedAtUtc)
+            .Take(4)
+            .Select(x => new ActivityCandidate(
+                x.Id,
+                "receipt",
+                x.VoucherNumber,
+                (byte)x.Status,
+                x.Description,
+                x.LastModifiedAtUtc ?? x.CreatedAtUtc))
+            .ToListAsync(cancellationToken);
+
+        var paymentActivities = await db.Set<PaymentVoucher>()
+            .AsNoTracking()
+            .OrderByDescending(x => x.LastModifiedAtUtc ?? x.CreatedAtUtc)
+            .Take(4)
+            .Select(x => new ActivityCandidate(
+                x.Id,
+                "payment",
+                x.VoucherNumber,
+                (byte)x.Status,
+                x.Description,
+                x.LastModifiedAtUtc ?? x.CreatedAtUtc))
+            .ToListAsync(cancellationToken);
+
+        var activities = journalActivities
+            .Concat(receiptActivities)
+            .Concat(paymentActivities)
+            .OrderByDescending(x => x.OccurredAtUtc)
+            .Take(5)
+            .Select(x => new AccountingDashboardActivityDto(
+                x.EntityId,
+                x.ActivityType,
+                x.Reference,
+                x.Status,
+                x.Description,
+                x.OccurredAtUtc))
+            .ToArray();
+
+        var currentPeriodName = currentPeriod is null
+            ? "لا توجد فترة حالية"
+            : string.IsNullOrWhiteSpace(currentPeriod.FiscalYearCode)
+                ? currentPeriod.Name
+                : $"{currentPeriod.Name} {currentPeriod.FiscalYearCode}";
+
+        return new AccountingDashboardDto(
+            unpostedJournalCount,
+            currentPeriod?.Id,
+            currentPeriodName,
+            currentPeriod?.EndDate,
+            openCashShiftCount,
+            activeBankAccountCount,
+            attention,
+            activities);
+    }
+
     public Task<GeneralLedgerReportDto> GetGeneralLedgerAsync(
         DateOnly fromDate,
         DateOnly toDate,
@@ -762,4 +933,13 @@ public sealed class AccountingReportingQueryService(OasDbContext db) : IAccounti
         if (toDate < fromDate)
             throw new ArgumentException("To date cannot be before from date.");
     }
+
+    private sealed record ActivityCandidate(
+        Guid EntityId,
+        string ActivityType,
+        string Reference,
+        byte Status,
+        string? Description,
+        DateTimeOffset OccurredAtUtc);
+
 }

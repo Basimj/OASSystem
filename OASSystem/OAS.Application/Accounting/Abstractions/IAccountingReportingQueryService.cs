@@ -4,6 +4,9 @@ namespace OAS.Application.Accounting.Abstractions;
 
 public interface IAccountingReportingQueryService
 {
+    Task<AccountingDashboardDto> GetAccountingDashboardAsync(
+        CancellationToken cancellationToken = default);
+
     Task<GeneralLedgerReportDto> GetGeneralLedgerAsync(
         DateOnly fromDate,
         DateOnly toDate,
