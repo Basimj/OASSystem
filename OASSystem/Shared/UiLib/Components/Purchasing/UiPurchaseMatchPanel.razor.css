@@ -1,4 +1,4 @@
-.ui-purchase-match-summary { display:flex; justify-content:space-between; gap:1rem; padding:var(--oas-space-3); border:1px solid var(--oas-color-border); border-radius:var(--oas-radius-md); }
+.ui-purchase-match-summary { display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px 12px; padding:7px 9px; border:1px solid var(--oas-color-border); border-radius:var(--oas-radius-md); font-size:var(--oas-font-xs); }
 .ui-purchase-match-summary span { color:var(--oas-color-text-muted); }
-.ui-purchase-match-grid { display:grid; gap:var(--oas-space-2); }
-.ui-purchase-match-row { display:grid; grid-template-columns:repeat(4,1fr); gap:var(--oas-space-2); border-bottom:1px solid var(--oas-color-border); padding:var(--oas-space-2) 0; font-size:var(--oas-font-sm); }
+.ui-purchase-match-grid { min-width:0; display:grid; gap:4px; overflow-x:auto; }
+.ui-purchase-match-row { min-width:560px; display:grid; grid-template-columns:repeat(4,minmax(110px,1fr)); gap:6px; border-bottom:1px solid var(--oas-color-border); padding:6px 2px; font-size:var(--oas-font-xs); }

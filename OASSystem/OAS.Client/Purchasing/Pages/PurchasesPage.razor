@@ -1,5 +1,89 @@
 @page "/purchases"
 @attribute [Authorize]
 @inject NavigationManager Navigation
+
 <PageTitle>المشتريات | OAS</PageTitle>
-@code { protected override void OnInitialized()=>Navigation.NavigateTo("/purchases/requests",replace:true); }
+
+<div class="purchasing-home">
+    <section class="purchasing-home__hero">
+        <div class="purchasing-home__hero-copy">
+            <span class="purchasing-home__eyebrow">مركز المشتريات</span>
+            <h1>إدارة دورة الشراء من الاحتياج حتى السداد</h1>
+            <p>ابدأ من طلب الشراء، ثم حوّله إلى أمر شراء، استلم الأصناف، وسجّل فاتورة المورد. كل مرحلة لها شاشة مستقلة حتى لا تختلط المهام على المستخدم.</p>
+        </div>
+        <div class="purchasing-home__hero-actions">
+            <UiButton Text="طلبات الشراء" IconCssClass="fa-solid fa-clipboard-list" Size="ControlSize.Small" OnClick="GoRequests" />
+            <UiButton Text="أوامر الشراء" IconCssClass="fa-solid fa-file-signature" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="GoOrders" />
+        </div>
+    </section>
+
+    <section class="purchasing-home__flow" aria-label="دورة المشتريات">
+        <a class="purchasing-flow-card" href="/purchases/requests">
+            <span class="purchasing-flow-card__step">1</span>
+            <span class="purchasing-flow-card__icon"><i class="fa-solid fa-clipboard-list"></i></span>
+            <span class="purchasing-flow-card__body">
+                <strong>طلبات الشراء</strong>
+                <small>تسجيل الاحتياج الداخلي والكميات المطلوبة قبل الالتزام مع المورد.</small>
+            </span>
+            <i class="fa-solid fa-chevron-left purchasing-flow-card__arrow"></i>
+        </a>
+
+        <a class="purchasing-flow-card" href="/purchases/orders">
+            <span class="purchasing-flow-card__step">2</span>
+            <span class="purchasing-flow-card__icon"><i class="fa-solid fa-file-signature"></i></span>
+            <span class="purchasing-flow-card__body">
+                <strong>أوامر الشراء</strong>
+                <small>اختيار المورد والأسعار والوحدات واعتماد الطلب التجاري.</small>
+            </span>
+            <i class="fa-solid fa-chevron-left purchasing-flow-card__arrow"></i>
+        </a>
+
+        <a class="purchasing-flow-card" href="/purchases/receipts">
+            <span class="purchasing-flow-card__step">3</span>
+            <span class="purchasing-flow-card__icon"><i class="fa-solid fa-truck-ramp-box"></i></span>
+            <span class="purchasing-flow-card__body">
+                <strong>استلام المشتريات</strong>
+                <small>تسجيل المقبول والمرفوض وتحديث المخزون وربط الاستلام بأمر الشراء.</small>
+            </span>
+            <i class="fa-solid fa-chevron-left purchasing-flow-card__arrow"></i>
+        </a>
+
+        <a class="purchasing-flow-card" href="/purchases/invoices">
+            <span class="purchasing-flow-card__step">4</span>
+            <span class="purchasing-flow-card__icon"><i class="fa-solid fa-file-invoice-dollar"></i></span>
+            <span class="purchasing-flow-card__body">
+                <strong>فواتير المشتريات</strong>
+                <small>مطابقة الفاتورة مع أمر الشراء والاستلام ثم الترحيل والسداد.</small>
+            </span>
+            <i class="fa-solid fa-chevron-left purchasing-flow-card__arrow"></i>
+        </a>
+    </section>
+
+    <section class="purchasing-home__tools">
+        <header>
+            <div>
+                <h2>أدوات المشتريات</h2>
+                <p>شاشات مساندة للدورة الرئيسية.</p>
+            </div>
+        </header>
+        <div class="purchasing-home__tools-grid">
+            <a class="purchasing-tool-card" href="/purchasing/customer-demand">
+                <i class="fa-solid fa-truck-fast"></i>
+                <span><strong>متابعة النواقص والتوريد</strong><small>متابعة الطلبات التي تحتاج توريدًا وربطها بالمشتريات.</small></span>
+            </a>
+            <a class="purchasing-tool-card" href="/purchases/returns">
+                <i class="fa-solid fa-rotate-left"></i>
+                <span><strong>مرتجعات المشتريات</strong><small>إرجاع الأصناف المستلمة وعكس الأثر المخزني والمحاسبي.</small></span>
+            </a>
+            <a class="purchasing-tool-card" href="/purchases/supplier-catalog">
+                <i class="fa-solid fa-box-open"></i>
+                <span><strong>كتالوج المورد</strong><small>إدارة وحدات وأسعار الموردين المستخدمة في أوامر الشراء.</small></span>
+            </a>
+        </div>
+    </section>
+</div>
+
+@code {
+    private void GoRequests(MouseEventArgs _) => Navigation.NavigateTo("/purchases/requests");
+    private void GoOrders(MouseEventArgs _) => Navigation.NavigateTo("/purchases/orders");
+}

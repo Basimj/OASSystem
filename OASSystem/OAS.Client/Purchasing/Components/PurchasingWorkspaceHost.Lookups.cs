@@ -20,8 +20,34 @@ public partial class PurchasingWorkspaceHost
     }
     private async Task<IReadOnlyList<UiLookupItem>> SearchProductsAsync(string search,CancellationToken ct)
     {
-        var page=await Inventory.GetProductVariantsAsync(LookupRequest(search),ct);
-        return page.Items.Where(x=>x.IsActive).Select(x=>new UiLookupItem(x.Id.ToString("D"),string.IsNullOrWhiteSpace(x.VariantName)?x.SKU:x.VariantName,x.SKU,"fa-solid fa-box")).ToArray();
+        var items=await Inventory.SearchProductVariantsAsync(
+            string.IsNullOrWhiteSpace(search)?null:search.Trim(),
+            20,
+            ct);
+
+        return items
+            .Where(x=>x.IsActive)
+            .Select(x=>new UiLookupItem(
+                x.Id.ToString("D"),
+                ProductLookupTitle(x.ProductName,x.VariantName),
+                ProductLookupHint(x.ProductCode,x.SKU,x.Barcode),
+                "fa-solid fa-box"))
+            .ToArray();
+    }
+
+    private static string ProductLookupTitle(string productName,string? variantName)=>
+        string.IsNullOrWhiteSpace(variantName) ||
+        string.Equals(productName,variantName,StringComparison.OrdinalIgnoreCase)
+            ? productName
+            : $"{productName} — {variantName}";
+
+    private static string ProductLookupHint(string productCode,string sku,string? barcode)
+    {
+        var parts=new List<string>(3);
+        if(!string.IsNullOrWhiteSpace(productCode))parts.Add($"كود المنتج: {productCode}");
+        if(!string.IsNullOrWhiteSpace(sku))parts.Add($"SKU: {sku}");
+        if(!string.IsNullOrWhiteSpace(barcode))parts.Add($"باركود: {barcode}");
+        return string.Join(" • ",parts);
     }
     private async Task<IReadOnlyList<UiLookupItem>> SearchUnitsAsync(string search,CancellationToken ct)
     {

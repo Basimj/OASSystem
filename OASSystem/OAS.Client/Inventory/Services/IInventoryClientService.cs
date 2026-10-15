@@ -8,6 +8,9 @@ using OAS.Contracts.Inventory.Warehouses;
 
 namespace OAS.Client.Inventory.Services;
 
+/// <summary>
+/// Inventory client contract used by Inventory and Purchasing UI orchestration.
+/// </summary>
 public interface IInventoryClientService
 {
     Task<InventoryCodeSuggestionDto?> GetNextCodeAsync(string kind, CancellationToken cancellationToken = default);
@@ -45,6 +48,7 @@ public interface IInventoryClientService
 
     // Product variants
     Task<PagedResult<ProductVariantDto>> GetProductVariantsAsync(PageRequest request, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ProductVariantLookupDto>> SearchProductVariantsAsync(string? search, int take = 20, CancellationToken cancellationToken = default);
     Task<ProductVariantDto?> GetProductVariantAsync(Guid id, CancellationToken cancellationToken = default);
     Task<ProductVariantDto?> CreateProductVariantAsync(CreateProductVariantRequest request, CancellationToken cancellationToken = default);
     Task<ProductVariantDto?> UpdateProductVariantAsync(Guid id, UpdateProductVariantRequest request, CancellationToken cancellationToken = default);

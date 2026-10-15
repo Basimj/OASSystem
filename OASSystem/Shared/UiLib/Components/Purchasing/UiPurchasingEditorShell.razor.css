@@ -1,7 +1,29 @@
-.ui-purchasing-editor { border:1px solid var(--oas-color-border); border-radius:var(--oas-radius-lg); background:var(--oas-color-surface); overflow:hidden; }
-.ui-purchasing-editor__header { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--oas-space-3); padding:var(--oas-space-4); border-bottom:1px solid var(--oas-color-border); }
-.ui-purchasing-editor__header small { color:var(--oas-color-primary); font-weight:600; }
-.ui-purchasing-editor__header h2 { margin:.2rem 0; font-size:1.15rem; }
-.ui-purchasing-editor__header p { margin:0; color:var(--oas-color-text-muted); font-size:var(--oas-font-sm); }
-.ui-purchasing-editor__status { border:1px solid var(--oas-color-border); border-radius:999px; padding:.3rem .65rem; color:var(--oas-color-text-muted); white-space:nowrap; }
-.ui-purchasing-editor__content { padding:var(--oas-space-4); display:grid; gap:var(--oas-space-4); }
+.ui-purchasing-editor {
+    min-width: 0;
+    border: 1px solid var(--oas-color-border);
+    border-radius: var(--oas-radius-lg);
+    background: var(--oas-color-surface);
+    overflow: hidden;
+}
+
+.ui-purchasing-editor__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--oas-color-border);
+    background: color-mix(in srgb, var(--oas-color-surface) 96%, var(--oas-color-primary) 4%);
+}
+
+.ui-purchasing-editor__header > div { min-width: 0; }
+.ui-purchasing-editor__header small { color: var(--oas-color-primary); font-size: var(--oas-font-xs); font-weight: 700; }
+.ui-purchasing-editor__header h2 { margin: 1px 0 0; font-size: 1rem; line-height: 1.35; }
+.ui-purchasing-editor__header p { margin: 2px 0 0; color: var(--oas-color-text-muted); font-size: var(--oas-font-xs); }
+.ui-purchasing-editor__status { flex: none; border: 1px solid var(--oas-color-border); border-radius: 999px; padding: 3px 7px; color: var(--oas-color-text-muted); font-size: var(--oas-font-xs); white-space: nowrap; }
+.ui-purchasing-editor__content { min-width: 0; padding: 10px 12px 12px; display: grid; gap: 10px; }
+
+@media (max-width: 680px) {
+    .ui-purchasing-editor__header { align-items: flex-start; }
+    .ui-purchasing-editor__content { padding-inline: 9px; }
+}

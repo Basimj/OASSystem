@@ -1,4 +1,5 @@
-.ui-purchasing-number { display:grid; gap:var(--oas-space-1); }
-.ui-purchasing-number label { font-size:var(--oas-font-sm); color:var(--oas-color-text-muted); }
-.ui-purchasing-number input { width:100%; box-sizing:border-box; min-height:var(--oas-control-sm); border:1px solid var(--oas-color-border); border-radius:var(--oas-radius-md); background:var(--oas-color-surface); color:var(--oas-color-text); padding-inline:var(--oas-space-2); }
-.ui-purchasing-number input:focus { outline:none; border-color:var(--oas-color-primary); box-shadow:0 0 0 2px color-mix(in srgb,var(--oas-color-primary) 18%,transparent); }
+.ui-purchasing-number { min-width:0; display:grid; gap:4px; }
+.ui-purchasing-number label { font-size:10px; font-weight:700; color:#3a3a4f; }
+.ui-purchasing-number input { width:100%; box-sizing:border-box; min-height:34px; border:1px solid #dedbe6; border-radius:6px; background:var(--oas-color-surface); color:var(--oas-color-text); padding-inline:7px; font-family:inherit; font-size:10.5px; }
+.ui-purchasing-number input:focus { outline:none; border-color:var(--oas-color-primary); box-shadow:0 0 0 2px color-mix(in srgb,var(--oas-color-primary) 14%,transparent); }
+.ui-purchasing-number input:disabled { background:#f7f6f9; color:#777382; }

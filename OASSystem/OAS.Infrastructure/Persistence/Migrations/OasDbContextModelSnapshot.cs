@@ -1013,6 +1013,145 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.ToTable("tbl_AccountingSettings", "dbo");
         });
 
+        modelBuilder.Entity("OAS.Domain.Accounting.Entities.BankStatement", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset").HasColumnName("CreatedAt");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset").HasColumnName("UpdatedAt");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)").HasColumnName("UpdatedBy");
+            b.Property<Guid>("BankAccountId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<string>("StatementNumber").HasMaxLength(50).HasColumnType("nvarchar(50)");
+            b.Property<DateOnly>("FromDate").IsRequired().HasColumnType("date");
+            b.Property<DateOnly>("ToDate").IsRequired().HasColumnType("date");
+            b.Property<decimal>("OpeningBalance").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("ClosingBalance").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<Guid>("CurrencyId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<byte>("Status").IsRequired().HasColumnType("tinyint");
+            b.Property<byte>("SourceType").IsRequired().HasColumnType("tinyint");
+            b.Property<string>("ImportedFileName").HasMaxLength(260).HasColumnType("nvarchar(260)");
+            b.Property<string>("ImportedFileHash").HasMaxLength(128).HasColumnType("nvarchar(128)");
+            b.Property<DateTimeOffset?>("ImportedAtUtc").HasColumnType("datetimeoffset(0)");
+            b.Property<Guid?>("ImportedBy").HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset?>("ReviewedAtUtc").HasColumnType("datetimeoffset(0)");
+            b.Property<Guid?>("ReviewedBy").HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset?>("ReconciledAtUtc").HasColumnType("datetimeoffset(0)");
+            b.Property<Guid?>("ReconciledBy").HasColumnType("uniqueidentifier");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("UpdatedFromDevice");
+            b.HasKey("Id");
+            b.HasIndex("BankAccountId", "FromDate", "ToDate").HasDatabaseName("IX_BankStatements_BankAccountId_FromDate_ToDate");
+            b.HasIndex("Status").HasDatabaseName("IX_BankStatements_Status");
+            b.HasIndex("BankAccountId", "StatementNumber").HasDatabaseName("IX_BankStatements_BankAccountId_StatementNumber");
+            b.HasIndex("ImportedFileHash").IsUnique().HasDatabaseName("UX_BankStatements_ImportedFileHash_Active").HasFilter("[ImportedFileHash] IS NOT NULL AND [Status] <> 5");
+            b.ToTable("tbl_BankStatements", "dbo", t => t.HasCheckConstraint("CK_BankStatements_Period", "[FromDate] <= [ToDate]"));
+        });
+
+        modelBuilder.Entity("OAS.Domain.Accounting.Entities.BankStatementLine", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset").HasColumnName("CreatedAt");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset").HasColumnName("UpdatedAt");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)").HasColumnName("UpdatedBy");
+            b.Property<Guid>("BankStatementId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<DateOnly>("TransactionDate").IsRequired().HasColumnType("date");
+            b.Property<DateOnly?>("ValueDate").HasColumnType("date");
+            b.Property<string>("Reference").HasMaxLength(100).HasColumnType("nvarchar(100)");
+            b.Property<string>("Description").HasMaxLength(1000).HasColumnType("nvarchar(1000)");
+            b.Property<decimal>("DebitAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("CreditAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal?>("RunningBalance").HasColumnType("decimal(19,4)");
+            b.Property<string>("ExternalTransactionId").HasMaxLength(100).HasColumnType("nvarchar(100)");
+            b.Property<byte>("MatchStatus").IsRequired().HasColumnType("tinyint");
+            b.Property<bool>("IsIgnored").IsRequired().HasColumnType("bit");
+            b.Property<string>("IgnoreReason").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<DateTimeOffset?>("IgnoredAtUtc").HasColumnType("datetimeoffset(0)");
+            b.Property<Guid?>("IgnoredBy").HasColumnType("uniqueidentifier");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("UpdatedFromDevice");
+            b.HasKey("Id");
+            b.HasIndex("BankStatementId", "TransactionDate").HasDatabaseName("IX_BankStatementLines_Statement_TransactionDate");
+            b.HasIndex("BankStatementId", "MatchStatus").HasDatabaseName("IX_BankStatementLines_Statement_MatchStatus");
+            b.HasIndex("BankStatementId", "ExternalTransactionId").HasDatabaseName("IX_BankStatementLines_Statement_ExternalTransactionId").HasFilter("[ExternalTransactionId] IS NOT NULL");
+            b.ToTable("tbl_BankStatementLines", "dbo", t =>
+            {
+                t.HasCheckConstraint("CK_BankStatementLines_Debit_NonNegative", "[DebitAmount] >= 0");
+                t.HasCheckConstraint("CK_BankStatementLines_Credit_NonNegative", "[CreditAmount] >= 0");
+                t.HasCheckConstraint("CK_BankStatementLines_OneSidedAmount", "NOT ([DebitAmount] > 0 AND [CreditAmount] > 0)");
+                t.HasCheckConstraint("CK_BankStatementLines_NonZeroAmount", "[DebitAmount] > 0 OR [CreditAmount] > 0");
+            });
+        });
+
+        modelBuilder.Entity("OAS.Domain.Accounting.Entities.BankReconciliation", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset").HasColumnName("CreatedAt");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset").HasColumnName("UpdatedAt");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)").HasColumnName("UpdatedBy");
+            b.Property<Guid>("BankAccountId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<Guid>("BankStatementId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<DateOnly>("ReconciliationDate").IsRequired().HasColumnType("date");
+            b.Property<decimal>("BookClosingBalance").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("StatementClosingBalance").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<decimal>("Difference").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<byte>("Status").IsRequired().HasColumnType("tinyint");
+            b.Property<Guid?>("SubmittedBy").HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset?>("SubmittedAtUtc").HasColumnType("datetimeoffset(0)");
+            b.Property<Guid?>("ApprovedBy").HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset?>("ApprovedAtUtc").HasColumnType("datetimeoffset(0)");
+            b.Property<Guid?>("ClosedBy").HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset?>("ClosedAtUtc").HasColumnType("datetimeoffset(0)");
+            b.Property<Guid?>("ReopenedBy").HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset?>("ReopenedAtUtc").HasColumnType("datetimeoffset(0)");
+            b.Property<string>("ReopenReason").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("UpdatedFromDevice");
+            b.HasKey("Id");
+            b.HasIndex("BankAccountId").HasDatabaseName("IX_BankReconciliations_BankAccountId");
+            b.HasIndex("BankStatementId").IsUnique().HasDatabaseName("UX_BankReconciliations_BankStatementId_Active").HasFilter("[Status] <> 5");
+            b.HasIndex("Status").HasDatabaseName("IX_BankReconciliations_Status");
+            b.HasIndex("ReconciliationDate").HasDatabaseName("IX_BankReconciliations_ReconciliationDate");
+            b.ToTable("tbl_BankReconciliations", "dbo");
+        });
+
+        modelBuilder.Entity("OAS.Domain.Accounting.Entities.BankReconciliationMatch", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
+            b.Property<DateTimeOffset>("CreatedAtUtc").IsRequired().HasColumnType("datetimeoffset").HasColumnName("CreatedAt");
+            b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
+            b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnType("datetimeoffset").HasColumnName("UpdatedAt");
+            b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)").HasColumnName("UpdatedBy");
+            b.Property<Guid>("BankReconciliationId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<Guid>("BankStatementLineId").IsRequired().HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("JournalEntryLineId").HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("ReceiptVoucherLineId").HasColumnType("uniqueidentifier");
+            b.Property<Guid?>("PaymentVoucherLineId").HasColumnType("uniqueidentifier");
+            b.Property<decimal>("MatchedAmount").IsRequired().HasColumnType("decimal(19,4)");
+            b.Property<byte>("MatchType").IsRequired().HasColumnType("tinyint");
+            b.Property<byte>("MatchMethod").IsRequired().HasColumnType("tinyint");
+            b.Property<bool>("IsVoided").IsRequired().HasColumnType("bit");
+            b.Property<DateTimeOffset?>("VoidedAtUtc").HasColumnType("datetimeoffset(0)");
+            b.Property<Guid?>("VoidedBy").HasColumnType("uniqueidentifier");
+            b.Property<string>("VoidReason").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
+            b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("UpdatedFromDevice");
+            b.HasKey("Id");
+            b.HasIndex("BankReconciliationId", "BankStatementLineId").HasDatabaseName("IX_BankReconciliationMatches_Reconciliation_StatementLine");
+            b.HasIndex("JournalEntryLineId").HasDatabaseName("IX_BankReconciliationMatches_JournalEntryLine_Active").HasFilter("[JournalEntryLineId] IS NOT NULL AND [IsVoided] = 0");
+            b.HasIndex("ReceiptVoucherLineId").HasDatabaseName("IX_BankReconciliationMatches_ReceiptVoucherLine_Active").HasFilter("[ReceiptVoucherLineId] IS NOT NULL AND [IsVoided] = 0");
+            b.HasIndex("PaymentVoucherLineId").HasDatabaseName("IX_BankReconciliationMatches_PaymentVoucherLine_Active").HasFilter("[PaymentVoucherLineId] IS NOT NULL AND [IsVoided] = 0");
+            b.ToTable("tbl_BankReconciliationMatches", "dbo", t =>
+            {
+                t.HasCheckConstraint("CK_BankReconciliationMatches_MatchedAmount_Positive", "[MatchedAmount] > 0");
+                t.HasCheckConstraint("CK_BankReconciliationMatches_ExactlyOneSource", "(([MatchType] = 1 AND [JournalEntryLineId] IS NOT NULL AND [ReceiptVoucherLineId] IS NULL AND [PaymentVoucherLineId] IS NULL) OR ([MatchType] = 2 AND [JournalEntryLineId] IS NULL AND [ReceiptVoucherLineId] IS NOT NULL AND [PaymentVoucherLineId] IS NULL) OR ([MatchType] = 3 AND [JournalEntryLineId] IS NULL AND [ReceiptVoucherLineId] IS NULL AND [PaymentVoucherLineId] IS NOT NULL))");
+            });
+        });
+
         modelBuilder.Entity("OAS.Domain.Accounting.Entities.BankAccount", b =>
         {
             b.Property<Guid>("Id").ValueGeneratedNever().HasColumnType("uniqueidentifier");
@@ -3507,6 +3646,76 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
                 .HasForeignKey("PurchasePriceVarianceAccountId")
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("FK_AccountingSettings_PurchasePriceVarianceAccount");
+        });
+
+        modelBuilder.Entity("OAS.Domain.Accounting.Entities.BankStatement", b =>
+        {
+            b.HasOne("OAS.Domain.Accounting.Entities.BankAccount", null).WithMany()
+                .HasForeignKey("BankAccountId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired()
+                .HasConstraintName("FK_BankStatements_BankAccount");
+
+            b.HasOne("OAS.Domain.Accounting.Entities.Currency", null).WithMany()
+                .HasForeignKey("CurrencyId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired()
+                .HasConstraintName("FK_BankStatements_Currency");
+
+            b.HasMany("OAS.Domain.Accounting.Entities.BankStatementLine", "Lines").WithOne()
+                .HasForeignKey("BankStatementId")
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired()
+                .HasConstraintName("FK_BankStatementLines_BankStatement");
+
+            b.Navigation("Lines").UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        modelBuilder.Entity("OAS.Domain.Accounting.Entities.BankReconciliation", b =>
+        {
+            b.HasOne("OAS.Domain.Accounting.Entities.BankAccount", null).WithMany()
+                .HasForeignKey("BankAccountId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired()
+                .HasConstraintName("FK_BankReconciliations_BankAccount");
+
+            b.HasOne("OAS.Domain.Accounting.Entities.BankStatement", null).WithMany()
+                .HasForeignKey("BankStatementId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired()
+                .HasConstraintName("FK_BankReconciliations_BankStatement");
+
+            b.HasMany("OAS.Domain.Accounting.Entities.BankReconciliationMatch", "Matches").WithOne()
+                .HasForeignKey("BankReconciliationId")
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired()
+                .HasConstraintName("FK_BankReconciliationMatches_BankReconciliation");
+
+            b.Navigation("Matches").UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        modelBuilder.Entity("OAS.Domain.Accounting.Entities.BankReconciliationMatch", b =>
+        {
+            b.HasOne("OAS.Domain.Accounting.Entities.BankStatementLine", null).WithMany()
+                .HasForeignKey("BankStatementLineId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired()
+                .HasConstraintName("FK_BankReconciliationMatches_BankStatementLine");
+
+            b.HasOne("OAS.Domain.Accounting.Entities.JournalEntryLine", null).WithMany()
+                .HasForeignKey("JournalEntryLineId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("FK_BankReconciliationMatches_JournalEntryLine");
+
+            b.HasOne("OAS.Domain.Accounting.Entities.ReceiptVoucherLine", null).WithMany()
+                .HasForeignKey("ReceiptVoucherLineId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("FK_BankReconciliationMatches_ReceiptVoucherLine");
+
+            b.HasOne("OAS.Domain.Accounting.Entities.PaymentVoucherLine", null).WithMany()
+                .HasForeignKey("PaymentVoucherLineId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("FK_BankReconciliationMatches_PaymentVoucherLine");
         });
 
         modelBuilder.Entity("OAS.Domain.Accounting.Entities.BankAccount", b =>

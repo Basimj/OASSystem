@@ -2,7 +2,7 @@
 @using OAS.UiLib.Core.Models.Purchasing
 @using OAS.UiLib.Core.Models
 
-<UiPurchasingEditorShell Title="@Model.PurchaseInvoiceCode" Subtitle="فاتورة المورد والمطابقة الثلاثية" StatusText="@Model.StatusText">
+<UiPurchasingEditorShell Eyebrow="فواتير المشتريات" Title="@Model.PurchaseInvoiceCode" Subtitle="فاتورة المورد والمطابقة الثلاثية" StatusText="@Model.StatusText">
     <UiPurchasingSection Title="بيانات الفاتورة">
         <UiPurchasingFormGrid>
             <UiInputText Label="رقم فاتورة المورد" Value="@Model.SupplierInvoiceCode" ValueChanged="SupplierInvoiceCodeChanged" Disabled="@(!IsEditable)" MaxLength="100" />
@@ -25,7 +25,7 @@
                 <div class="ui-purchasing-invoice-line">
                     <div class="ui-purchasing-invoice-line__head"><strong>البند @line.LineSequence</strong>@if(IsEditable){<UiButton Text="حذف" IconCssClass="fa-regular fa-trash-can" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="@(_=>RemoveLineAsync(line))" />}</div>
                     <UiPurchasingFormGrid>
-                        <UiLookup Label="المنتج" Required="true" Value="@GuidText(line.ProductVariantId)" SelectedItem="@Selected(line.ProductVariantId,line.ProductName,"fa-solid fa-box")" SearchAsync="ProductSearchAsync" ValueChanged="@(v=>ProductChanged(line,v))" Disabled="@(line.PurchaseOrderLineId.HasValue || !IsEditable)" />
+                        <UiLookup Label="المنتج" Required="true" Value="@GuidText(line.ProductVariantId)" SelectedItem="@Selected(line.ProductVariantId,line.ProductName,"fa-solid fa-box")" SearchAsync="ProductSearchAsync" SelectedItemChanged="@(item=>ProductSelectionChanged(line,item))" ValueChanged="@(v=>ProductChanged(line,v))" Disabled="@(line.PurchaseOrderLineId.HasValue || !IsEditable)" />
                         <UiInputText Label="ربط أمر الشراء" Value="@PurchaseOrderLinkText(line)" Disabled="true" />
                         <UiPurchasingNumberField Label="الكمية" Value="@line.Quantity" ValueChanged="@(v=>QuantityChanged(line,v))" Disabled="@(!IsEditable)" />
                         <UiPurchasingNumberField Label="سعر الوحدة" Value="@line.UnitPrice" ValueChanged="@(v=>PriceChanged(line,v))" Disabled="@(!IsEditable)" Step="0.0001" />
@@ -107,6 +107,7 @@
     private async Task NotesChanged(string? v){Model.Notes=v;await Changed();}
     private async Task AddLineAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _){Model.Lines.Add(new(){LineSequence=Model.Lines.Count+1});await Changed();}
     private async Task RemoveLineAsync(UiPurchaseInvoiceLineModel l){Model.Lines.Remove(l);for(var i=0;i<Model.Lines.Count;i++)Model.Lines[i].LineSequence=i+1;await Changed();}
+    private static void ProductSelectionChanged(UiPurchaseInvoiceLineModel l,UiLookupItem? item)=>l.ProductName=item?.PrimaryText;
     private async Task ProductChanged(UiPurchaseInvoiceLineModel l,string? v){l.ProductVariantId=Parse(v);await Changed();}
     private async Task QuantityChanged(UiPurchaseInvoiceLineModel l,decimal v){l.Quantity=v;await Changed();}
     private async Task PriceChanged(UiPurchaseInvoiceLineModel l,decimal v){l.UnitPrice=v;await Changed();}

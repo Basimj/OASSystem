@@ -7,9 +7,9 @@
         <UiWorkspaceActionBar>
             @if (IsListTab)
             {
-                <UiButton Text="جديد" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" OnClick="OpenNewAsync" />
+                <UiButton Text="@NewButtonText" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" OnClick="OpenNewAsync" />
                 <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Loading="_isLoadingList" OnClick="RefreshListAsync" />
-                <UiSearchInput Value="_search" ValueChanged="SearchTextChanged" OnSearch="SearchAsync" Placeholder="بحث في السجلات..." DebounceMilliseconds="300" />
+                <UiSearchInput Value="_search" ValueChanged="SearchTextChanged" OnSearch="SearchAsync" Placeholder="@SearchPlaceholder" DebounceMilliseconds="300" />
             }
             else
             {

@@ -1,1 +1,17 @@
-.ui-purchasing-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:var(--oas-space-3); align-items:end; }
+.ui-purchasing-grid {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+    gap: 6px 8px;
+    align-items: end;
+}
+
+.ui-purchasing-grid > * { min-width: 0; }
+
+@media (min-width: 1500px) {
+    .ui-purchasing-grid { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+}
+
+@media (max-width: 620px) {
+    .ui-purchasing-grid { grid-template-columns: 1fr; }
+}

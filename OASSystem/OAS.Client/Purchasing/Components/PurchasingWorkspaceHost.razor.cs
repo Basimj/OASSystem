@@ -68,6 +68,24 @@ public partial class PurchasingWorkspaceHost
     private bool CanSave=>ActiveTab is {IsListTab:false} t && (t.IsNew||t.IsEditMode) && IsDomainEditable(t.Model);
     private bool CanCancelEdit=>ActiveTab is {IsListTab:false} t && (t.IsNew||t.IsEditMode);
     private string TabsAriaLabel=>$"تبويبات {ListTitle(Section)}";
+    private string NewButtonText=>Section switch
+    {
+        PurchasingEntityType.SupplierCatalog=>"صنف مورد جديد",
+        PurchasingEntityType.PurchaseRequests=>"طلب شراء جديد",
+        PurchasingEntityType.PurchaseOrders=>"أمر شراء جديد",
+        PurchasingEntityType.PurchaseReceipts=>"استلام جديد",
+        PurchasingEntityType.PurchaseInvoices=>"فاتورة مورد جديدة",
+        _=>"جديد"
+    };
+    private string SearchPlaceholder=>Section switch
+    {
+        PurchasingEntityType.SupplierCatalog=>"ابحث بالمورد أو المنتج أو كود المورد...",
+        PurchasingEntityType.PurchaseRequests=>"ابحث برقم الطلب أو المخزن أو السبب...",
+        PurchasingEntityType.PurchaseOrders=>"ابحث برقم الأمر أو المورد أو المخزن...",
+        PurchasingEntityType.PurchaseReceipts=>"ابحث برقم الاستلام أو المورد أو أمر الشراء...",
+        PurchasingEntityType.PurchaseInvoices=>"ابحث برقم الفاتورة أو المورد أو رقم فاتورة المورد...",
+        _=>"بحث..."
+    };
 
     private IReadOnlyList<UiApplicationTabItem> WorkspaceTabs=>Workspace.VisibleTabs(Section)
         .Select(t=>new UiApplicationTabItem(t.TabId,t.Title,Route(Section),Icon(Section),Workspace.ActiveTabId==t.TabId,t.CanClose)).ToArray();

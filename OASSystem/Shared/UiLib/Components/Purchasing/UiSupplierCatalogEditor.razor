@@ -2,7 +2,7 @@
 @using OAS.UiLib.Core.Models.Purchasing
 @using OAS.UiLib.Core.Models
 
-<UiPurchasingEditorShell Title="@(Model.Id.HasValue ? "بيانات كتالوج المورد" : "إضافة صنف إلى كتالوج المورد")" Subtitle="ربط المورد بالصنف ووحدة الشراء وشروط التوريد" StatusText="@(Model.IsActive ? "فعال" : "غير فعال")">
+<UiPurchasingEditorShell Eyebrow="كتالوج المورد" Title="@(Model.Id.HasValue ? "بيانات كتالوج المورد" : "إضافة صنف إلى كتالوج المورد")" Subtitle="ربط المورد بالصنف ووحدة الشراء وشروط التوريد" StatusText="@(Model.IsActive ? "فعال" : "غير فعال")">
     <UiPurchasingSection Title="البيانات الأساسية">
         <UiPurchasingFormGrid>
             <UiLookup Label="المورد" Required="true" Disabled="@(!IsEditable || Model.Id.HasValue)"
@@ -10,7 +10,7 @@
                       SearchAsync="SupplierSearchAsync" ValueChanged="SupplierChangedAsync" Placeholder="ابحث عن المورد..." />
             <UiLookup Label="المنتج" Required="true" Disabled="@(!IsEditable || Model.Id.HasValue)"
                       Value="@GuidText(Model.ProductVariantId)" SelectedItem="@Selected(Model.ProductVariantId, Model.ProductName, "fa-solid fa-box")"
-                      SearchAsync="ProductSearchAsync" ValueChanged="ProductChangedAsync" Placeholder="ابحث عن المنتج..." />
+                      SearchAsync="ProductSearchAsync" SelectedItemChanged="ProductSelectionChanged" ValueChanged="ProductChangedAsync" Placeholder="ابحث باسم المنتج أو الكود أو SKU..." />
             <UiLookup Label="وحدة الشراء" Required="true" Disabled="@(!IsEditable)"
                       Value="@GuidText(Model.PurchaseUnitId)" SelectedItem="@Selected(Model.PurchaseUnitId, Model.PurchaseUnitName, "fa-solid fa-ruler")"
                       SearchAsync="UnitSearchAsync" ValueChanged="UnitChangedAsync" Placeholder="اختر الوحدة..." />
@@ -72,6 +72,7 @@
     private static string? GuidText(Guid? id) => id?.ToString("D");
     private static UiLookupItem? Selected(Guid? id, string? text, string icon) => id.HasValue ? new(id.Value.ToString("D"), text ?? id.Value.ToString("D"), null, icon) : null;
     private async Task SupplierChangedAsync(string? value){Model.SupplierId=Parse(value); await OnChanged.InvokeAsync();}
+    private void ProductSelectionChanged(UiLookupItem? item)=>Model.ProductName=item?.PrimaryText;
     private async Task ProductChangedAsync(string? value){Model.ProductVariantId=Parse(value); await OnChanged.InvokeAsync();}
     private async Task UnitChangedAsync(string? value){Model.PurchaseUnitId=Parse(value); await OnChanged.InvokeAsync();}
     private async Task SetSupplierCode(string? v){Model.SupplierProductCode=v; await OnChanged.InvokeAsync();}

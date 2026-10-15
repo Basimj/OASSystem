@@ -1,1 +1,6 @@
-.ui-purchasing-lines { display:grid; gap:var(--oas-space-2); overflow-x:auto; }
+.ui-purchasing-lines {
+    min-width: 0;
+    display: grid;
+    gap: 6px;
+    overflow: visible;
+}

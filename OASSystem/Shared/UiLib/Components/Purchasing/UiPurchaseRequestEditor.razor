@@ -2,7 +2,7 @@
 @using OAS.UiLib.Core.Models.Purchasing
 @using OAS.UiLib.Core.Models
 
-<UiPurchasingEditorShell Title="@Model.RequestCode" Subtitle="طلب شراء واحتياج تشغيلي" StatusText="@Model.StatusText">
+<UiPurchasingEditorShell Eyebrow="طلبات الشراء" Title="@Model.RequestCode" Subtitle="طلب شراء واحتياج تشغيلي" StatusText="@Model.StatusText">
     <UiPurchasingSection Title="البيانات الأساسية">
         <UiPurchasingFormGrid>
             <UiSelect Label="نوع الطلب" Value="@Model.RequestType.ToString()" Options="RequestTypeOptions" Disabled="@(!IsEditable)" OnValueChanged="RequestTypeChanged" />
@@ -28,7 +28,7 @@
                 <div class="ui-purchasing-line-card">
                     <div class="ui-purchasing-line-card__head"><strong>البند @line.LineSequence</strong>@if(IsEditable){<UiButton Text="حذف" IconCssClass="fa-regular fa-trash-can" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="@(_=>RemoveLineAsync(line))" />}</div>
                     <UiPurchasingFormGrid>
-                        <UiLookup Label="المنتج" Required="true" Value="@GuidText(line.ProductVariantId)" SelectedItem="@Selected(line.ProductVariantId,line.ProductName,"fa-solid fa-box")" SearchAsync="ProductSearchAsync" ValueChanged="@(v=>ProductChanged(line,v))" Disabled="@(!IsEditable)" />
+                        <UiLookup Label="المنتج" Required="true" Value="@GuidText(line.ProductVariantId)" SelectedItem="@Selected(line.ProductVariantId,line.ProductName,"fa-solid fa-box")" SearchAsync="ProductSearchAsync" SelectedItemChanged="@(item=>ProductSelectionChanged(line,item))" ValueChanged="@(v=>ProductChanged(line,v))" Disabled="@(!IsEditable)" />
                         <UiPurchasingNumberField Label="الكمية المطلوبة" Value="@line.RequestedQuantity" ValueChanged="@(v=>LineQuantityChanged(line,v))" Disabled="@(!IsEditable)" />
                         <UiInputDate Label="التاريخ المطلوب" Value="@line.RequiredDate" ValueChanged="@(v=>LineDateChanged(line,v))" Disabled="@(!IsEditable)" />
                         <UiLookup Label="المورد المفضل" Value="@GuidText(line.PreferredSupplierId)" SelectedItem="@Selected(line.PreferredSupplierId,line.PreferredSupplierName,"fa-solid fa-truck-field")" SearchAsync="SupplierSearchAsync" ValueChanged="@(v=>LineSupplierChanged(line,v))" Disabled="@(!IsEditable)" />
@@ -65,6 +65,7 @@
     private async Task NotesChanged(string? v){Model.Notes=v;await Changed();}
     private async Task AddLineAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _){Model.Lines.Add(new(){LineSequence=Model.Lines.Count+1,RequiredDate=Model.RequiredDate});await Changed();}
     private async Task RemoveLineAsync(UiPurchaseRequestLineModel line){Model.Lines.Remove(line);for(var i=0;i<Model.Lines.Count;i++)Model.Lines[i].LineSequence=i+1;await Changed();}
+    private static void ProductSelectionChanged(UiPurchaseRequestLineModel l,UiLookupItem? item)=>l.ProductName=item?.PrimaryText;
     private async Task ProductChanged(UiPurchaseRequestLineModel l,string? v){l.ProductVariantId=Parse(v);await Changed();}
     private async Task LineQuantityChanged(UiPurchaseRequestLineModel l,decimal v){l.RequestedQuantity=v;await Changed();}
     private async Task LineDateChanged(UiPurchaseRequestLineModel l,DateOnly? v){l.RequiredDate=v;await Changed();}

@@ -89,6 +89,14 @@ public sealed class InventoryClientService(OasApiClient apiClient) : IInventoryC
     public async Task<PagedResult<ProductVariantDto>> GetProductVariantsAsync(PageRequest request, CancellationToken cancellationToken = default) =>
         await GetPageAsync<ProductVariantDto>($"{BaseEndpoint}/product-variants", request, cancellationToken);
 
+    public async Task<IReadOnlyList<ProductVariantLookupDto>> SearchProductVariantsAsync(
+        string? search,
+        int take = 20,
+        CancellationToken cancellationToken = default) =>
+        await apiClient.GetAsync<IReadOnlyList<ProductVariantLookupDto>>(
+            $"{BaseEndpoint}/product-variants/lookup?search={Uri.EscapeDataString(search ?? string.Empty)}&take={Math.Clamp(take, 1, 50)}",
+            cancellationToken) ?? [];
+
     public Task<ProductVariantDto?> GetProductVariantAsync(Guid id, CancellationToken cancellationToken = default) =>
         apiClient.GetAsync<ProductVariantDto>($"{BaseEndpoint}/product-variants/{id:D}", cancellationToken);
 

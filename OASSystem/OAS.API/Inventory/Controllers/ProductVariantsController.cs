@@ -7,6 +7,7 @@ using OAS.Application.Common.Exceptions;
 using OAS.Application.CRUD.Abstractions;
 using OAS.Application.Inventory.Authorization;
 using OAS.Application.Inventory.Products.Variants.Commands.UpdateProductVariant;
+using OAS.Application.Inventory.Products.Variants.Queries.SearchProductVariants;
 using OAS.Contracts.Common.Pagination;
 using OAS.Contracts.Inventory.Products;
 
@@ -28,6 +29,15 @@ public sealed class ProductVariantsController(
     {
         await EnsurePermissionAsync(InventoryPermissions.ProductVariants.View, cancellationToken);
         return Ok(await service.GetPageAsync(request, cancellationToken));
+    }
+
+    [HttpGet("lookup")]
+    public async Task<ActionResult<IReadOnlyList<ProductVariantLookupDto>>> Lookup(
+        [FromQuery] string? search,
+        [FromQuery] int take = 20,
+        CancellationToken cancellationToken = default)
+    {
+        return Ok(await sender.Send(new SearchProductVariantsQuery(search, take), cancellationToken));
     }
 
     [HttpGet("{id:guid}")]
