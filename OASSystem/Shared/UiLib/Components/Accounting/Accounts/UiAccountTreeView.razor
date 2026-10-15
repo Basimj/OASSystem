@@ -23,40 +23,10 @@ else
     [Parameter] public IReadOnlyList<AccountTreeNode> Nodes { get; set; } = [];
     [Parameter] public Guid? SelectedAccountId { get; set; }
     [Parameter] public EventCallback<Guid> OnSelect { get; set; }
-
     private readonly HashSet<Guid> _expanded = [];
 
-    protected override void OnParametersSet()
-    {
-        EnsureExpandedState(Nodes, 0);
-    }
-
-    private void EnsureExpandedState(IEnumerable<AccountTreeNode> nodes, int level)
-    {
-        foreach (var node in nodes)
-        {
-            if (node.Children.Count > 0 && (level == 0 || ContainsSelected(node)))
-            {
-                _expanded.Add(node.Id);
-            }
-
-            EnsureExpandedState(node.Children, level + 1);
-        }
-    }
-
-    private bool ContainsSelected(AccountTreeNode node)
-    {
-        if (!SelectedAccountId.HasValue)
-            return false;
-
-        if (node.Id == SelectedAccountId.Value)
-            return true;
-
-        return node.Children.Any(ContainsSelected);
-    }
-
     private bool IsExpanded(AccountTreeNode node) =>
-        node.Children.Count == 0 || _expanded.Contains(node.Id);
+        node.Children.Count > 0 && _expanded.Contains(node.Id);
 
     private void Toggle(Guid id)
     {
@@ -69,9 +39,21 @@ else
             ? OnSelect.InvokeAsync(id)
             : Task.CompletedTask;
 
+    private static string GetLevelColor(int level) =>
+        (level % 7) switch
+        {
+            0 => "#F59E0B",
+            1 => "#2563EB",
+            2 => "#8B5CF6",
+            3 => "#10B981",
+            4 => "#EC4899",
+            5 => "#0EA5E9",
+            _ => "#EF4444"
+        };
+
     private RenderFragment RenderNode(AccountTreeNode node, int level) => @<div class="ui-acc-tree__node">
-        <div class="ui-acc-tree__row @(SelectedAccountId == node.Id ? "is-selected" : null)"
-             style="--ui-acc-tree-level:@level"
+        <div class="ui-acc-tree__row @(SelectedAccountId == node.Id ? "is-selected" : null) @(node.Children.Count > 0 ? "is-branch" : "is-leaf") @(level == 0 ? "is-root" : null)"
+             style="--ui-acc-tree-level:@level; --ui-acc-tree-level-color:@GetLevelColor(level)"
              role="treeitem"
              aria-expanded="@(node.Children.Count > 0 ? IsExpanded(node) : null)">
             @if (node.Children.Count > 0)
@@ -90,14 +72,13 @@ else
 
             <button type="button"
                     class="ui-acc-tree__link"
+                    title="@($"{node.Code} - {node.NameAr}")"
                     @onclick="() => SelectNodeAsync(node.Id)">
                 <span class="ui-acc-tree__icon" aria-hidden="true">
-                    <i class="fa-solid @(node.Children.Count > 0 ? "fa-folder-tree" : "fa-file-lines")"></i>
+                    <i class="fa-solid fa-folder"></i>
                 </span>
-                <span class="ui-acc-tree__text">
-                    <span class="ui-acc-tree__code">@node.Code</span>
-                    <span class="ui-acc-tree__name">@node.NameAr</span>
-                </span>
+                <span class="ui-acc-tree__name">@node.NameAr</span>
+                <span class="ui-acc-tree__code">@node.Code</span>
                 @if (!node.IsActive)
                 {
                     <span class="ui-acc-tree__badge">معطل</span>

@@ -1,6 +1,6 @@
 @namespace OAS.UiLib.Components.Accounting.Workspace
 
-<div class="ui-acc-section" dir="rtl">
+<div class="@CssClass" dir="rtl">
     <div class="ui-acc-section__header" @onclick="ToggleCollapsed">
         <div class="ui-acc-section__title-group">
             @if (!string.IsNullOrWhiteSpace(IconCssClass))
@@ -38,8 +38,13 @@
     [Parameter] public bool Collapsible { get; set; }
     [Parameter] public bool DefaultCollapsed { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public string? AdditionalCssClass { get; set; }
 
     private bool _isCollapsed;
+
+    private string CssClass => string.IsNullOrWhiteSpace(AdditionalCssClass)
+        ? "ui-acc-section"
+        : $"ui-acc-section {AdditionalCssClass}";
 
     protected override void OnInitialized()
     {

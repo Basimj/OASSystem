@@ -1,6 +1,6 @@
 @namespace OAS.UiLib.Components.Accounting.Workspace
 
-<section class="ui-acc-workspace" dir="rtl">
+<section class="@CssClass" dir="rtl">
     @if (Actions is not null)
     {
         <div class="ui-acc-workspace__actions">
@@ -33,4 +33,9 @@
     [Parameter] public RenderFragment? Tabs { get; set; }
     [Parameter] public bool ShowTabs { get; set; } = true;
     [Parameter] public RenderFragment? Body { get; set; }
+    [Parameter] public string? AdditionalCssClass { get; set; }
+
+    private string CssClass => string.IsNullOrWhiteSpace(AdditionalCssClass)
+        ? "ui-acc-workspace"
+        : $"ui-acc-workspace {AdditionalCssClass}";
 }

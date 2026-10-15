@@ -7,15 +7,15 @@
 @using OAS.UiLib.Components.Inputs
 @using OAS.UiLib.Core.Models
 
-<UiAccountingEditorSurface>
+<UiAccountingEditorSurface AdditionalCssClass="ui-acc-account-editor">
 
     <UiAccountingFormSection Title="المعلومات الأساسية"
-                             Subtitle="كود الحساب، المسميات، وربط التبعية الشجرية"
-                             IconCssClass="fa-solid fa-circle-info">
+                             IconCssClass="fa-solid fa-file-lines"
+                             AdditionalCssClass="ui-acc-account-editor__section ui-acc-account-editor__section--basic">
 
-        <UiAccountingFormGrid Columns="2">
+        <UiAccountingFormGrid Columns="3" AdditionalCssClass="ui-acc-account-editor__basic-grid">
 
-            <UiInputText Label="كود الحساب"
+            <UiInputText Label="رمز الحساب"
                          Value="@Model.Code"
                          ValueExpression="@(() => Model.Code)"
                          ValueChanged="OnCodeChanged"
@@ -53,16 +53,18 @@
                       MinimumSearchLength="0"
                       DebounceMilliseconds="250" />
 
+            <UiAccountingReadOnlyValue Label="المستوى في الشجرة"
+                                       Value="@Model.Level.ToString()" />
+
         </UiAccountingFormGrid>
 
     </UiAccountingFormSection>
 
-
     <UiAccountingFormSection Title="التصنيف المحاسبي"
-                             Subtitle="نوع الحساب، طبيعة الرصيد والمستوى الشجري"
-                             IconCssClass="fa-solid fa-sitemap">
+                             IconCssClass="fa-solid fa-chart-pie"
+                             AdditionalCssClass="ui-acc-account-editor__section ui-acc-account-editor__section--classification">
 
-        <UiAccountingFormGrid Columns="4">
+        <UiAccountingFormGrid Columns="3">
 
             <UiSelect Label="تصنيف الحساب"
                       Value="@Model.AccountClassValue"
@@ -88,72 +90,65 @@
                       Disabled="@(!IsEditable)"
                       Size="ControlSize.Small" />
 
-            <UiAccountingNumberField Label="المستوى الشجري"
-                                     Value="@Model.Level"
-                                     ValueChanged="OnLevelChanged"
-                                     Min="1"
-                                     Step="1"
-                                     Disabled="@(!IsEditable)"
-                                     Hint="من 1 إلى 255 حسب مستوى الحساب في الشجرة" />
-
         </UiAccountingFormGrid>
 
     </UiAccountingFormSection>
 
+    <UiAccountingFormGrid Columns="2" AdditionalCssClass="ui-acc-account-editor__lower-grid">
 
-    <UiAccountingFormSection Title="خصائص وتشغيل الحساب"
-                             Subtitle="صلاحيات الترحيل والتحكم وحالة النشاط"
-                             IconCssClass="fa-solid fa-sliders">
+        <UiAccountingFormSection Title="الإعدادات والتشغيل"
+                                 IconCssClass="fa-solid fa-gear"
+                                 AdditionalCssClass="ui-acc-account-editor__section ui-acc-account-editor__section--settings">
 
-        <UiAccountingCheckGroup>
+            <UiAccountingCheckGroup>
 
-            <UiCheckbox Label="حساب ترحيل (يقبل القيود)"
-                        Value="@Model.IsPostingAccount"
-                        ValueChanged="OnIsPostingAccountChanged"
-                        Disabled="@(!IsEditable)" />
+                <UiCheckbox Label="حساب ترحيل (يقبل القيود)"
+                            Value="@Model.IsPostingAccount"
+                            ValueChanged="OnIsPostingAccountChanged"
+                            Disabled="@(!IsEditable)" />
 
-            <UiCheckbox Label="حساب تحكمي (أستاذ مساعد)"
-                        Value="@Model.IsControlAccount"
-                        ValueChanged="OnIsControlAccountChanged"
-                        Disabled="@(!IsEditable)" />
+                <UiCheckbox Label="السماح بالترحيل اليدوي"
+                            Value="@Model.AllowManualPosting"
+                            ValueChanged="OnAllowManualPostingChanged"
+                            Disabled="@(!IsEditable)" />
 
-            <UiCheckbox Label="السماح بالترحيل اليدوي"
-                        Value="@Model.AllowManualPosting"
-                        ValueChanged="OnAllowManualPostingChanged"
-                        Disabled="@(!IsEditable)" />
+                <UiCheckbox Label="حساب تحكمي (أستاذ مساعد)"
+                            Value="@Model.IsControlAccount"
+                            ValueChanged="OnIsControlAccountChanged"
+                            Disabled="@(!IsEditable)" />
 
-            <UiCheckbox Label="حساب نظامي (أساسي)"
-                        Value="@Model.IsSystemAccount"
-                        ValueChanged="OnIsSystemAccountChanged"
-                        Disabled="@(!IsEditable || !IsNew)" />
+                <UiCheckbox Label="حساب نظامي (أساسي)"
+                            Value="@Model.IsSystemAccount"
+                            ValueChanged="OnIsSystemAccountChanged"
+                            Disabled="@(!IsEditable || !IsNew)" />
 
-            <UiCheckbox Label="الحساب نشط"
-                        Value="@Model.IsActive"
-                        ValueChanged="OnIsActiveChanged"
-                        Disabled="@(!IsEditable)" />
+            </UiAccountingCheckGroup>
 
-        </UiAccountingCheckGroup>
+        </UiAccountingFormSection>
 
-    </UiAccountingFormSection>
+        <UiAccountingFormSection Title="الربط والحالة"
+                                 IconCssClass="fa-solid fa-link"
+                                 AdditionalCssClass="ui-acc-account-editor__section ui-acc-account-editor__section--status">
 
+            <UiAccountingFormGrid Columns="2">
 
-    <UiAccountingFormSection Title="الإعدادات الزمنية والنظامية"
-                             Subtitle="تاريخ السريان والبيانات التدقيقية"
-                             IconCssClass="fa-regular fa-clock"
-                             Collapsible="true">
+                <UiInputDate Label="تاريخ السريان"
+                             Value="@Model.EffectiveDate"
+                             ValueExpression="@(() => Model.EffectiveDate)"
+                             ValueChanged="OnEffectiveDateChanged"
+                             Disabled="@(!IsEditable)"
+                             Size="ControlSize.Small" />
 
-        <UiAccountingFormGrid Columns="2">
+                <UiCheckbox Label="الحساب نشط"
+                            Value="@Model.IsActive"
+                            ValueChanged="OnIsActiveChanged"
+                            Disabled="@(!IsEditable)" />
 
-            <UiInputDate Label="تاريخ السريان"
-                         Value="@Model.EffectiveDate"
-                         ValueExpression="@(() => Model.EffectiveDate)"
-                         ValueChanged="OnEffectiveDateChanged"
-                         Disabled="@(!IsEditable)"
-                         Size="ControlSize.Small" />
+            </UiAccountingFormGrid>
 
-        </UiAccountingFormGrid>
+        </UiAccountingFormSection>
 
-    </UiAccountingFormSection>
+    </UiAccountingFormGrid>
 
 </UiAccountingEditorSurface>
 
@@ -272,6 +267,10 @@
         Task<IReadOnlyList<UiLookupItem>>>?
         AccountSearchAsync
     { get; set; }
+
+
+    [Parameter]
+    public Func<Guid?, int>? AccountLevelResolver { get; set; }
 
 
     [Parameter]
@@ -429,6 +428,18 @@
                 out var id)
                 ? id
                 : null;
+
+        if (AccountLevelResolver is not null)
+        {
+            Model.Level = Math.Clamp(
+                AccountLevelResolver(Model.ParentAccountId),
+                1,
+                255);
+        }
+        else
+        {
+            Model.Level = Model.ParentAccountId.HasValue ? Math.Max(2, Model.Level) : 1;
+        }
 
         await OnChanged();
     }

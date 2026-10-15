@@ -13,7 +13,8 @@
     var isList = activeTab is null || activeTab.IsListTab;
 }
 
-<UiAccountingWorkspace ShowTabs="@Section.HasValue">
+<UiAccountingWorkspace ShowTabs="@(Section.HasValue && Section != AccountingEntityType.Accounts)"
+                       AdditionalCssClass='@(Section == AccountingEntityType.Accounts ? "ui-acc-workspace--account-management" : null)'>
 
     <Actions>
 
@@ -26,6 +27,71 @@
                           Variant="ButtonVariant.Secondary"
                           Size="ControlSize.Small"
                           OnClick="RefreshActiveAsync" />
+            }
+            else if (Section == AccountingEntityType.Accounts)
+            {
+                @if (isList)
+                {
+                    <UiButton Text="جديد"
+                              IconCssClass="fa-solid fa-plus"
+                              Size="ControlSize.Small"
+                              OnClick="OpenNewRecord" />
+
+                    <UiButton Text="تحديث"
+                              IconCssClass="fa-solid fa-rotate"
+                              Variant="ButtonVariant.Ghost"
+                              Size="ControlSize.Small"
+                              Loading="@_isLoading"
+                              OnClick="RefreshActiveAsync" />
+                }
+                else
+                {
+                    @if (activeTab is not null && (activeTab.IsNew || activeTab.IsEditMode))
+                    {
+                        <UiButton Text="حفظ"
+                                  IconCssClass="fa-solid fa-floppy-disk"
+                                  Size="ControlSize.Small"
+                                  Disabled="@(!CanSaveActive)"
+                                  Loading="@(activeTab?.IsSaving == true)"
+                                  OnClick="SaveActiveAsync" />
+
+                        <UiButton Text="إلغاء"
+                                  IconCssClass="fa-solid fa-arrow-rotate-left"
+                                  Variant="ButtonVariant.Ghost"
+                                  Size="ControlSize.Small"
+                                  Disabled="@(!CanCancelActive)"
+                                  OnClick="CancelActiveEdit" />
+                    }
+                    else
+                    {
+                        <UiButton Text="جديد"
+                                  IconCssClass="fa-solid fa-plus"
+                                  Variant="ButtonVariant.Secondary"
+                                  Size="ControlSize.Small"
+                                  OnClick="@(() => OpenNewRecord(AccountingEntityType.Accounts))" />
+
+                        <UiButton Text="تعديل"
+                                  IconCssClass="fa-solid fa-pen-to-square"
+                                  Variant="ButtonVariant.Secondary"
+                                  Size="ControlSize.Small"
+                                  Disabled="@(!CanEditActive)"
+                                  OnClick="BeginEditActive" />
+                    }
+
+                    <UiButton Text="تحديث"
+                              IconCssClass="fa-solid fa-rotate"
+                              Variant="ButtonVariant.Ghost"
+                              Size="ControlSize.Small"
+                              Disabled="@(activeTab?.IsNew == true)"
+                              OnClick="RefreshActiveAsync" />
+
+                    <UiButton Text="إغلاق"
+                              IconCssClass="fa-solid fa-xmark"
+                              Variant="ButtonVariant.Ghost"
+                              Size="ControlSize.Small"
+                              Disabled="@(!CanCloseActive)"
+                              OnClick="CloseActiveTabAsync" />
+                }
             }
             else if (isList)
             {
@@ -415,10 +481,16 @@
                 <Tree>
 
                     <UiAccountingFormSection Title="شجرة الحسابات"
-                                             Subtitle="عرض هرمي لكل الحسابات مع التبعية بين الحسابات الأب والفرعية"
-                                             IconCssClass="fa-solid fa-folder-tree">
+                                             IconCssClass="fa-solid fa-folder-tree"
+                                             AdditionalCssClass="ui-acc-account-tree-panel">
 
-                        <UiAccountTreeView Nodes="@AccountTreeNodes"
+                        <UiSearchInput Value="@_accountTreeSearch"
+                                       ValueChanged="SetAccountTreeSearch"
+                                       Placeholder="البحث في الحسابات..."
+                                       AriaLabel="البحث في شجرة الحسابات"
+                                       DebounceMilliseconds="0" />
+
+                        <UiAccountTreeView Nodes="@FilteredAccountTreeNodes"
                                            SelectedAccountId="@SelectedAccountId"
                                            OnSelect="OpenAccountFromTreeAsync" />
 
@@ -431,18 +503,27 @@
                     @if (activeTab is { IsListTab: false } &&
                                     activeTab.Model is AccountEditor.FormModel accountModel)
                     {
-                        <UiAccountingFormSection Title="بيانات الحساب"
-                                                 Subtitle="تفاصيل الحساب المحدد أو الحساب الجديد"
-                                                 IconCssClass="fa-solid fa-file-pen">
+                        <UiAccountOverviewHeader Title="@(activeTab.IsNew ? "حساب جديد" : accountModel.NameAr)"
+                                                 Code="@(string.IsNullOrWhiteSpace(accountModel.Code) ? "—" : accountModel.Code)"
+                                                 EnglishName="@accountModel.NameEn"
+                                                 IsActive="@accountModel.IsActive"
+                                                 IsNew="@activeTab.IsNew"
+                                                 Breadcrumb="@GetAccountBreadcrumb(accountModel)"
+                                                 BalanceText="@AccountBalanceText"
+                                                 PeriodDebitText="@AccountPeriodDebitText"
+                                                 PeriodCreditText="@AccountPeriodCreditText"
+                                                 LastMovementText="@AccountLastMovementText"
+                                                 CurrencyText="@_accountOverview.CurrencyText"
+                                                 PeriodCaption="@_accountOverview.PeriodCaption"
+                                                 MetricsLoading="@_accountOverviewLoading" />
 
-                            <AccountEditor Model="@accountModel"
-                                           IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
-                                           IsNew="@activeTab.IsNew"
-                                           ParentAccountLookupItem="@GetAccountLookup(accountModel.ParentAccountId)"
-                                           AccountSearchAsync="SearchAccountsAsync"
-                                           OnModelChanged="MarkActiveDirty" />
-
-                        </UiAccountingFormSection>
+                        <AccountEditor Model="@accountModel"
+                                       IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
+                                       IsNew="@activeTab.IsNew"
+                                       ParentAccountLookupItem="@GetAccountLookup(accountModel.ParentAccountId)"
+                                       AccountSearchAsync="SearchAccountsAsync"
+                                       AccountLevelResolver="ResolveAccountLevel"
+                                       OnModelChanged="MarkActiveDirty" />
                     }
                     else if (_isLoading)
                     {
@@ -453,7 +534,7 @@
                     else
                     {
                         <UiAccountingEmptyState Title="اختر حساباً من الشجرة"
-                                                Description="من القسم الأيسر افتح أي حساب لعرض بياناته هنا، أو اضغط &quot;جديد&quot; لإنشاء حساب جديد في هذا القسم."
+                                                Description="اختر حساباً لعرض بياناته في اللوحة، أو استخدم زر جديد لإنشاء حساب."
                                                 IconCssClass="fa-solid fa-hand-pointer" />
                     }
 
@@ -875,12 +956,18 @@
                     <Tree>
 
                         <UiAccountingFormSection Title="شجرة الحسابات"
-                                                 Subtitle="عرض هرمي لكل الحسابات مع إمكانية التوسيع والطي"
-                                                 IconCssClass="fa-solid fa-folder-tree">
+                                                 IconCssClass="fa-solid fa-folder-tree"
+                                                 AdditionalCssClass="ui-acc-account-tree-panel">
 
-                            <UiAccountTreeView Nodes="@AccountTreeNodes"
+                            <UiSearchInput Value="@_accountTreeSearch"
+                                           ValueChanged="SetAccountTreeSearch"
+                                           Placeholder="البحث في الحسابات..."
+                                           AriaLabel="البحث في شجرة الحسابات"
+                                           DebounceMilliseconds="0" />
+
+                            <UiAccountTreeView Nodes="@FilteredAccountTreeNodes"
                                                SelectedAccountId="@SelectedAccountId"
-                                               OnSelect="OpenAccountFromTreeAsync" />
+                                                   OnSelect="OpenAccountFromTreeAsync" />
 
                         </UiAccountingFormSection>
 
@@ -889,7 +976,7 @@
                     <Detail>
 
                         <UiAccountingEmptyState Title="اختر حساباً أو أنشئ حساباً جديداً"
-                                                Description="اضغط على أي حساب في الشجرة لعرض بياناته هنا، أو استخدم زر جديد لفتح تبويب حساب جديد في القسم الثاني."
+                                                Description="اختر حساباً من الشجرة لعرض بياناته أو استخدم زر جديد."
                                                 IconCssClass="fa-solid fa-file-circle-plus" />
 
                     </Detail>

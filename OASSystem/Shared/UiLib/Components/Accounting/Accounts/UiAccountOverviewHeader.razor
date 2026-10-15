@@ -1,0 +1,114 @@
+@namespace OAS.UiLib.Components.Accounting.Accounts
+
+<div class="ui-acc-account-overview" dir="rtl">
+    <div class="ui-acc-account-overview__identity-row">
+        <div class="ui-acc-account-overview__identity">
+            @if (Breadcrumb.Count > 0)
+            {
+                <nav class="ui-acc-account-overview__breadcrumb" aria-label="مسار الحساب">
+                    <i class="fa-solid fa-house" aria-hidden="true"></i>
+                    @for (var i = 0; i < Breadcrumb.Count; i++)
+                    {
+                        if (i > 0)
+                        {
+                            <i class="fa-solid fa-chevron-left ui-acc-account-overview__crumb-separator" aria-hidden="true"></i>
+                        }
+                        <span>@Breadcrumb[i]</span>
+                    }
+                </nav>
+            }
+
+            <div class="ui-acc-account-overview__title-row">
+                <span class="ui-acc-account-overview__icon" aria-hidden="true">
+                    <i class="fa-solid fa-coins"></i>
+                </span>
+                <div class="ui-acc-account-overview__title-block">
+                    <div class="ui-acc-account-overview__title-line">
+                        <h2>@Title</h2>
+                        @if (!IsNew)
+                        {
+                            <span class="ui-acc-account-overview__status @(IsActive ? "is-active" : "is-inactive")">
+                                <span class="ui-acc-account-overview__status-dot"></span>
+                                @(IsActive ? "نشط" : "معطل")
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="ui-acc-account-overview__status is-new">جديد</span>
+                        }
+                    </div>
+                    <div class="ui-acc-account-overview__meta">
+                        <span>رمز الحساب: <strong>@Code</strong></span>
+                        @if (!string.IsNullOrWhiteSpace(EnglishName))
+                        {
+                            <span>الاسم بالإنجليزية: <strong dir="ltr">@EnglishName</strong></span>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="ui-acc-account-overview__metrics" aria-label="ملخص حركة الحساب">
+        <div class="ui-acc-account-kpi ui-acc-account-kpi--balance">
+            <span class="ui-acc-account-kpi__icon"><i class="fa-solid fa-coins" aria-hidden="true"></i></span>
+            <span class="ui-acc-account-kpi__body">
+                <span class="ui-acc-account-kpi__label">الرصيد الحالي</span>
+                <strong class="ui-acc-account-kpi__value">@(MetricsLoading ? "..." : BalanceText)</strong>
+                @if (!string.IsNullOrWhiteSpace(CurrencyText))
+                {
+                    <small>@CurrencyText</small>
+                }
+            </span>
+        </div>
+
+        <div class="ui-acc-account-kpi ui-acc-account-kpi--debit">
+            <span class="ui-acc-account-kpi__icon"><i class="fa-solid fa-arrow-up" aria-hidden="true"></i></span>
+            <span class="ui-acc-account-kpi__body">
+                <span class="ui-acc-account-kpi__label">مدين الفترة</span>
+                <strong class="ui-acc-account-kpi__value">@(MetricsLoading ? "..." : PeriodDebitText)</strong>
+                @if (!string.IsNullOrWhiteSpace(CurrencyText))
+                {
+                    <small>@CurrencyText</small>
+                }
+            </span>
+        </div>
+
+        <div class="ui-acc-account-kpi ui-acc-account-kpi--credit">
+            <span class="ui-acc-account-kpi__icon"><i class="fa-solid fa-arrow-down" aria-hidden="true"></i></span>
+            <span class="ui-acc-account-kpi__body">
+                <span class="ui-acc-account-kpi__label">دائن الفترة</span>
+                <strong class="ui-acc-account-kpi__value">@(MetricsLoading ? "..." : PeriodCreditText)</strong>
+                @if (!string.IsNullOrWhiteSpace(CurrencyText))
+                {
+                    <small>@CurrencyText</small>
+                }
+            </span>
+        </div>
+
+        <div class="ui-acc-account-kpi ui-acc-account-kpi--last">
+            <span class="ui-acc-account-kpi__icon"><i class="fa-regular fa-calendar" aria-hidden="true"></i></span>
+            <span class="ui-acc-account-kpi__body">
+                <span class="ui-acc-account-kpi__label">آخر حركة</span>
+                <strong class="ui-acc-account-kpi__value">@(MetricsLoading ? "..." : LastMovementText)</strong>
+                <small>@PeriodCaption</small>
+            </span>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "الحساب";
+    [Parameter] public string Code { get; set; } = "—";
+    [Parameter] public string? EnglishName { get; set; }
+    [Parameter] public bool IsActive { get; set; } = true;
+    [Parameter] public bool IsNew { get; set; }
+    [Parameter] public IReadOnlyList<string> Breadcrumb { get; set; } = [];
+    [Parameter] public string BalanceText { get; set; } = "0.00";
+    [Parameter] public string PeriodDebitText { get; set; } = "0.00";
+    [Parameter] public string PeriodCreditText { get; set; } = "0.00";
+    [Parameter] public string LastMovementText { get; set; } = "لا توجد حركة";
+    [Parameter] public string CurrencyText { get; set; } = string.Empty;
+    [Parameter] public string PeriodCaption { get; set; } = "الفترة الحالية";
+    [Parameter] public bool MetricsLoading { get; set; }
+}

@@ -23,6 +23,7 @@ using OAS.Contracts.Accounting.PaymentAllocations;
 using OAS.Contracts.Accounting.PaymentVouchers;
 using OAS.Contracts.Accounting.PostingProfiles;
 using OAS.Contracts.Accounting.ReceiptVouchers;
+using OAS.Contracts.Accounting.Reports;
 using OAS.Contracts.Accounting.Suppliers;
 using OAS.Contracts.Common.Pagination;
 using OAS.UiLib.Components.Accounting.Accounts;
@@ -60,6 +61,13 @@ public partial class AccountingWorkspaceHost : IDisposable
     private bool _initialized;
     private AccountingEntityType? _loadedSection;
     private Guid? _loadedInitialRecordId;
+
+    private string _accountTreeSearch = string.Empty;
+    private bool _accountOverviewLoading;
+    private Guid? _accountOverviewAccountId;
+    private AccountOverviewMetrics _accountOverview = AccountOverviewMetrics.Empty;
+    private (DateOnly From, DateOnly To, string Caption)? _currentAccountingPeriod;
+    private string? _baseCurrencyText;
 
     private readonly Dictionary<AccountingEntityType, string> _searchByEntity = [];
     private readonly Dictionary<AccountingEntityType, int> _pageByEntity = [];
@@ -152,6 +160,16 @@ public partial class AccountingWorkspaceHost : IDisposable
             : null;
 
     private IReadOnlyList<AccountTreeNode> AccountTreeNodes => BuildAccountTreeNodes();
+
+    private IReadOnlyList<AccountTreeNode> FilteredAccountTreeNodes =>
+        string.IsNullOrWhiteSpace(_accountTreeSearch)
+            ? AccountTreeNodes
+            : FilterAccountTree(AccountTreeNodes, _accountTreeSearch);
+
+    private string AccountBalanceText => FormatAccountAmount(_accountOverview.Balance);
+    private string AccountPeriodDebitText => FormatAccountAmount(_accountOverview.PeriodDebit);
+    private string AccountPeriodCreditText => FormatAccountAmount(_accountOverview.PeriodCredit);
+    private string AccountLastMovementText => _accountOverview.LastMovementDate?.ToString("yyyy/MM/dd") ?? "لا توجد حركة";
 
     private bool CanEditActive =>
         Workspace.ActiveTab is { IsListTab: false, IsNew: false, IsEditMode: false, IsLoading: false, IsSaving: false } tab &&
@@ -441,8 +459,28 @@ public partial class AccountingWorkspaceHost : IDisposable
     {
         try
         {
+            if (entityType == AccountingEntityType.Accounts &&
+                Workspace.ActiveTab is { IsListTab: false, EntityType: AccountingEntityType.Accounts, IsDirty: true })
+            {
+                Snackbar.Warning("احفظ تغييرات الحساب الحالي أو ألغها قبل إنشاء حساب جديد.");
+                return;
+            }
+
             var tab = Workspace.OpenNewEntityTab(entityType);
+            if (entityType == AccountingEntityType.Accounts)
+                RemoveInactiveCleanAccountTabs();
+
             InitializeNewModel(tab);
+            if (entityType == AccountingEntityType.Accounts)
+            {
+                _accountOverviewAccountId = null;
+                _accountOverviewLoading = false;
+                _accountOverview = AccountOverviewMetrics.Empty with
+                {
+                    CurrencyText = _baseCurrencyText ?? string.Empty,
+                    PeriodCaption = "لا توجد حركة بعد"
+                };
+            }
             await ReserveAutomaticNumberAsync(tab);
             tab.CaptureBaseline(SerializeModel(tab.Model));
             Workspace.NotifyStateChanged();
@@ -521,6 +559,9 @@ public partial class AccountingWorkspaceHost : IDisposable
 
     private async Task RefreshActiveAsync()
     {
+        if (Section == AccountingEntityType.Accounts)
+            _currentAccountingPeriod = null;
+
         if (Workspace.ActiveTab is { IsListTab: false, EntityId: Guid id } tab)
             await LoadExistingRecordAsync(tab, id);
         else if (Section.HasValue)
@@ -725,14 +766,47 @@ public partial class AccountingWorkspaceHost : IDisposable
     private Task OpenCurrentRecordAsync(Guid id) =>
         OpenRecordInTab(CurrentListEntity, id, GetEntityDisplayName(CurrentListEntity));
 
-    private Task OpenAccountFromTreeAsync(Guid id) =>
-        OpenRecordInTab(AccountingEntityType.Accounts, id, "حساب");
+    private async Task OpenAccountFromTreeAsync(Guid id)
+    {
+        if (Workspace.ActiveTab is
+            { IsListTab: false, EntityType: AccountingEntityType.Accounts, IsDirty: true } active &&
+            active.EntityId != id)
+        {
+            Snackbar.Warning("لديك تغييرات غير محفوظة في الحساب الحالي. احفظ التغييرات أو ألغها قبل الانتقال إلى حساب آخر.");
+            return;
+        }
+
+        await OpenRecordInTab(AccountingEntityType.Accounts, id, "حساب");
+        RemoveInactiveCleanAccountTabs();
+    }
+
+    private void RemoveInactiveCleanAccountTabs()
+    {
+        var activeTabId = Workspace.ActiveTabId;
+        var removable = Workspace.Tabs
+            .Where(x =>
+                !x.IsListTab &&
+                x.EntityType == AccountingEntityType.Accounts &&
+                x.TabId != activeTabId &&
+                !x.IsDirty)
+            .Select(x => x.TabId)
+            .ToArray();
+
+        foreach (var tabId in removable)
+            Workspace.RemoveTab(tabId);
+    }
 
     private async Task OpenRecordInTab(AccountingEntityType entityType, Guid id, string title)
     {
         var tab = Workspace.OpenOrActivateEntityTab(entityType, id, title);
         if (!tab.IsInitialized)
+        {
             await LoadExistingRecordAsync(tab, id);
+        }
+        else if (entityType == AccountingEntityType.Accounts)
+        {
+            await LoadAccountOverviewAsync(id);
+        }
     }
 
     private async Task LoadExistingRecordAsync(AccountingTabState tab, Guid id)
@@ -766,7 +840,9 @@ public partial class AccountingWorkspaceHost : IDisposable
                             EffectiveDate = dto.EffectiveDate,
                             RowVersion = dto.RowVersion
                         };
+                        RememberAccountLookups([dto]);
                         CompleteLoadedTab(tab, dto.Id, $"{dto.Code} - {dto.NameAr}", model);
+                        await LoadAccountOverviewAsync(dto.Id);
                         break;
                     }
                 case AccountingEntityType.FiscalYears:
@@ -3255,6 +3331,238 @@ public partial class AccountingWorkspaceHost : IDisposable
         AccountingEntityType.ExpenseTypes => (_expenseTypesPage.PageNumber, _expenseTypesPage.TotalPages, _expenseTypesPage.TotalCount),
         _ => (1, 0, 0)
     };
+
+    private Task SetAccountTreeSearch(string? value)
+    {
+        _accountTreeSearch = value?.Trim() ?? string.Empty;
+        return Task.CompletedTask;
+    }
+
+    private int ResolveAccountLevel(Guid? parentAccountId)
+    {
+        if (!parentAccountId.HasValue)
+            return 1;
+
+        return _accountDtos.TryGetValue(parentAccountId.Value, out var parent)
+            ? Math.Clamp(parent.Level + 1, 1, 255)
+            : 2;
+    }
+
+    private IReadOnlyList<string> GetAccountBreadcrumb(AccountEditor.FormModel model)
+    {
+        var result = new List<string>();
+
+        if (model.ParentAccountId.HasValue)
+        {
+            var visited = new HashSet<Guid>();
+            var currentId = model.ParentAccountId;
+
+            while (currentId.HasValue && visited.Add(currentId.Value) && _accountDtos.TryGetValue(currentId.Value, out var account))
+            {
+                result.Add(account.NameAr);
+                currentId = account.ParentAccountId;
+            }
+
+            result.Reverse();
+        }
+
+        if (!string.IsNullOrWhiteSpace(model.NameAr))
+            result.Add(model.NameAr.Trim());
+        else if (result.Count == 0)
+            result.Add("حساب جديد");
+
+        return result;
+    }
+
+    private static IReadOnlyList<AccountTreeNode> FilterAccountTree(
+        IReadOnlyList<AccountTreeNode> nodes,
+        string search)
+    {
+        if (string.IsNullOrWhiteSpace(search))
+            return nodes;
+
+        var term = search.Trim();
+        var result = new List<AccountTreeNode>();
+
+        foreach (var node in nodes)
+        {
+            var selfMatch =
+                node.Code.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                node.NameAr.Contains(term, StringComparison.OrdinalIgnoreCase);
+
+            if (selfMatch)
+            {
+                result.Add(node);
+                continue;
+            }
+
+            var children = FilterAccountTree(node.Children, term);
+            if (children.Count > 0)
+                result.Add(node with { Children = children });
+        }
+
+        return result;
+    }
+
+    private static string FormatAccountAmount(decimal value) =>
+        value.ToString("N2");
+
+    private async Task LoadAccountOverviewAsync(Guid accountId)
+    {
+        _accountOverviewAccountId = accountId;
+        _accountOverviewLoading = true;
+        _accountOverview = _accountOverview with
+        {
+            CurrencyText = await GetBaseCurrencyTextAsync()
+        };
+        Workspace.NotifyStateChanged();
+
+        try
+        {
+            var period = await GetCurrentAccountingPeriodAsync();
+            var report = await AccountingService.GetGeneralLedgerAsync(
+                new GeneralLedgerFilterDto(
+                    period.From,
+                    period.To,
+                    AccountId: accountId,
+                    IncludeAccountSubtree: true,
+                    IncludeOpeningBalance: true));
+
+            if (_accountOverviewAccountId != accountId)
+                return;
+
+            var accounts = report?.Accounts ?? [];
+            var selectedNormalBalance = _accountDtos.TryGetValue(accountId, out var selectedAccount)
+                ? selectedAccount.NormalBalance
+                : NormalBalance.Debit;
+
+            var signedClosingBalance = accounts.Sum(x =>
+                x.NormalBalance == NormalBalance.Debit
+                    ? x.ClosingBalance
+                    : -x.ClosingBalance);
+
+            var naturalClosingBalance = selectedNormalBalance == NormalBalance.Debit
+                ? signedClosingBalance
+                : -signedClosingBalance;
+
+            var lastMovement = accounts
+                .SelectMany(x => x.Lines)
+                .OrderByDescending(x => x.PostingDate)
+                .ThenByDescending(x => x.LineNumber)
+                .FirstOrDefault()?.PostingDate;
+
+            _accountOverview = new AccountOverviewMetrics(
+                naturalClosingBalance,
+                accounts.Sum(x => x.PeriodDebit),
+                accounts.Sum(x => x.PeriodCredit),
+                lastMovement,
+                _baseCurrencyText ?? string.Empty,
+                period.Caption);
+        }
+        catch (ApiClientException)
+        {
+            if (_accountOverviewAccountId == accountId)
+            {
+                _accountOverview = AccountOverviewMetrics.Empty with
+                {
+                    CurrencyText = _baseCurrencyText ?? string.Empty,
+                    PeriodCaption = "تعذر تحميل ملخص الحركة"
+                };
+            }
+        }
+        catch (Exception)
+        {
+            if (_accountOverviewAccountId == accountId)
+            {
+                _accountOverview = AccountOverviewMetrics.Empty with
+                {
+                    CurrencyText = _baseCurrencyText ?? string.Empty,
+                    PeriodCaption = "تعذر تحميل ملخص الحركة"
+                };
+            }
+        }
+        finally
+        {
+            if (_accountOverviewAccountId == accountId)
+            {
+                _accountOverviewLoading = false;
+                Workspace.NotifyStateChanged();
+            }
+        }
+    }
+
+    private async Task<(DateOnly From, DateOnly To, string Caption)> GetCurrentAccountingPeriodAsync()
+    {
+        if (_currentAccountingPeriod.HasValue)
+            return _currentAccountingPeriod.Value;
+
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        FiscalPeriodDto? current = null;
+
+        for (var pageNumber = 1; current is null; pageNumber++)
+        {
+            var page = await AccountingService.GetFiscalPeriodsPageAsync(new PageRequest
+            {
+                PageNumber = pageNumber,
+                PageSize = PageRequest.MaximumPageSize
+            });
+
+            current = page.Items
+                .Where(x => x.StartDate <= today && x.EndDate >= today)
+                .OrderBy(x => x.StartDate)
+                .FirstOrDefault();
+
+            if (current is not null || page.Items.Count < PageRequest.MaximumPageSize)
+                break;
+        }
+
+        if (current is not null)
+        {
+            _currentAccountingPeriod = (
+                current.StartDate,
+                today <= current.EndDate ? today : current.EndDate,
+                current.Name);
+        }
+        else
+        {
+            _currentAccountingPeriod = (
+                new DateOnly(today.Year, 1, 1),
+                today,
+                $"من بداية {today.Year}");
+        }
+
+        return _currentAccountingPeriod.Value;
+    }
+
+    private async Task<string> GetBaseCurrencyTextAsync()
+    {
+        if (_baseCurrencyText is not null)
+            return _baseCurrencyText;
+
+        try
+        {
+            var settings = await AccountingService.GetAccountingSettingsAsync();
+            _baseCurrencyText = settings?.BaseCurrencyCode ?? string.Empty;
+        }
+        catch
+        {
+            _baseCurrencyText = string.Empty;
+        }
+
+        return _baseCurrencyText;
+    }
+
+    private sealed record AccountOverviewMetrics(
+        decimal Balance,
+        decimal PeriodDebit,
+        decimal PeriodCredit,
+        DateOnly? LastMovementDate,
+        string CurrencyText,
+        string PeriodCaption)
+    {
+        public static AccountOverviewMetrics Empty { get; } =
+            new(0m, 0m, 0m, null, string.Empty, "الفترة الحالية");
+    }
 
     private IReadOnlyList<AccountTreeNode> BuildAccountTreeNodes()
     {

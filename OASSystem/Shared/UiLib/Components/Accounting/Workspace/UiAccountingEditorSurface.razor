@@ -1,9 +1,14 @@
 @namespace OAS.UiLib.Components.Accounting.Workspace
 
-<div class="ui-acc-editor" dir="rtl">
+<div class="@CssClass" dir="rtl">
     @ChildContent
 </div>
 
 @code {
     [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public string? AdditionalCssClass { get; set; }
+
+    private string CssClass => string.IsNullOrWhiteSpace(AdditionalCssClass)
+        ? "ui-acc-editor"
+        : $"ui-acc-editor {AdditionalCssClass}";
 }
