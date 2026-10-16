@@ -1,0 +1,417 @@
+@namespace OAS.UiLib.Components.Accounting.Parties
+@using Microsoft.AspNetCore.Components.Web
+@using OAS.UiLib.Components.Accounting.Workspace
+@using OAS.UiLib.Core.Models
+@using OAS.UiLib.Core.Models.Accounting
+
+<div class="cust-page" dir="rtl">
+            <header class="cust-topbar">
+                <div class="cust-title-wrap">
+                    <div class="cust-title-icon"><i class="fa-solid fa-users"></i></div>
+                    <div>
+                        <h1>العملاء</h1>
+                        <p>إدارة بيانات العملاء والحسابات والائتمان</p>
+                    </div>
+                </div>
+
+                <div class="cust-search-wrap">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input value="@Search" @oninput="HandleSearchInput" @onkeydown="HandleSearchKeyDown" placeholder="البحث في العملاء..." />
+                </div>
+
+                <div class="cust-toolbar-filter">
+                    <i class="fa-solid fa-filter"></i>
+                    <select value="@Filter" @onchange="HandleFilterChanged" disabled="@Busy">
+                        @foreach (var option in FilterOptions)
+                        {
+                            <option value="@option.Value">@option.Text</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="cust-excel-wrap">
+                    <button type="button" class="cust-tool-btn" @onclick="ToggleExcelMenu" disabled="@Busy">
+                        <i class="fa-solid fa-file-excel"></i>
+                        <span>Excel</span>
+                        <i class="fa-solid fa-chevron-down cust-tool-btn__chevron"></i>
+                    </button>
+                    @if (_excelMenuOpen)
+                    {
+                        <div class="cust-excel-menu">
+                            <button type="button" @onclick="ImportAsync"><i class="fa-solid fa-file-import"></i> استيراد</button>
+                            <button type="button" @onclick="TemplateAsync"><i class="fa-solid fa-download"></i> تنزيل القالب</button>
+                            <button type="button" @onclick="ExportAsync"><i class="fa-solid fa-file-export"></i> تصدير</button>
+                        </div>
+                    }
+                </div>
+
+                <button type="button" class="cust-tool-btn" @onclick="RefreshAsync" disabled="@Busy">
+                    <i class="fa-solid fa-rotate"></i>
+                    <span>تحديث</span>
+                </button>
+
+                <button type="button" class="cust-tool-btn cust-tool-btn--primary" @onclick="NewAsync" disabled="@Busy">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>عميل جديد</span>
+                </button>
+            </header>
+
+            <div class="cust-layout">
+                <aside class="cust-list-panel">
+                    <div class="cust-list-head">
+                        <div>
+                            <h2>قائمة العملاء</h2>
+                            <span>@TotalCount عميل</span>
+                        </div>
+                        <div class="cust-list-head__icon"><i class="fa-solid fa-users"></i></div>
+                    </div>
+
+                    <div class="cust-list-scroll">
+                        @if (Items.Count == 0)
+                        {
+                            <div class="cust-list-empty">
+                                <i class="fa-solid fa-users"></i>
+                                <strong>لا يوجد عملاء</strong>
+                                <span>غيّر البحث أو الفلتر، أو أضف عميلًا جديدًا.</span>
+                            </div>
+                        }
+                        else
+                        {
+                            @foreach (var item in Items)
+                            {
+                                <button type="button"
+                                        class="@(item.Id == ActiveId ? "cust-list-card is-selected" : "cust-list-card")"
+                                        @onclick="() => SelectCustomerAsync(item.Id)">
+                                    <div class="cust-list-card__avatar"><i class="@(item.EntityLabel == "منشأة" ? "fa-solid fa-building" : "fa-solid fa-user")"></i></div>
+                                    <div class="cust-list-card__body">
+                                        <div class="cust-list-card__top">
+                                            <span class="cust-list-card__code">@item.Code</span>
+                                            <span class="@(item.IsActive ? "cust-status cust-status--active" : "cust-status cust-status--inactive")">
+                                                <span class="cust-status__dot"></span>@(item.IsActive ? "نشط" : "غير نشط")
+                                            </span>
+                                        </div>
+                                        <div class="cust-list-card__name">@item.Name</div>
+                                        <div class="cust-list-card__meta">
+                                            <span class="cust-type-pill">@item.EntityLabel</span>
+                                            <span><i class="fa-solid fa-phone"></i>@TextOrDash(item.Mobile)</span>
+                                            <span><i class="fa-solid fa-location-dot"></i>@TextOrDash(item.Location)</span>
+                                        </div>
+                                        <div class="cust-list-card__credit"><i class="fa-regular fa-credit-card"></i>@item.CreditOrTerms</div>
+                                    </div>
+                                </button>
+                            }
+                        }
+                    </div>
+
+                    <div class="cust-pager">
+                        <button type="button" @onclick="PreviousAsync" disabled="@(Busy || PageNumber <= 1)"><i class="fa-solid fa-chevron-right"></i></button>
+                        <span>@PageNumber / @Math.Max(1, TotalPages)</span>
+                        <button type="button" @onclick="NextAsync" disabled="@(Busy || PageNumber >= TotalPages)"><i class="fa-solid fa-chevron-left"></i></button>
+                    </div>
+                </aside>
+
+                <main class="cust-main-panel">
+                    @if (!EditorOpen)
+                    {
+                        <div class="cust-empty-main">
+                            <div class="cust-empty-main__icon"><i class="fa-solid fa-user-group"></i></div>
+                            <h2>اختر عميلًا</h2>
+                            <p>اختر عميلًا من القائمة لعرض ملفه، أو أنشئ عميلًا جديدًا.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <section class="cust-profile-card">
+                            <div class="cust-profile-grid">
+                                <div class="cust-profile-avatar"><i class="@(EntityTypeLabel == "منشأة" ? "fa-solid fa-building" : "fa-solid fa-user")"></i></div>
+
+                                <div class="cust-profile-info">
+                                    <div class="cust-profile-name-row">
+                                        <h2>@DisplayName</h2>
+                                        <span class="@(Form.IsActive ? "cust-status cust-status--active" : "cust-status cust-status--inactive")"><span class="cust-status__dot"></span>@(Form.IsActive ? "نشط" : "غير نشط")</span>
+                                    </div>
+                                    <div class="cust-profile-sub">@TextOrDash(Form.Code) · @EntityTypeLabel</div>
+                                    <div class="cust-profile-sub">الحساب المحاسبي: @TextOrDash(Form.AccountCode) · @ParentDisplayText</div>
+                                    <div class="cust-profile-sub cust-profile-sub--split">
+                                        <span>الجوال: @TextOrDash(Form.Mobile)</span>
+                                        <span>بداية التعامل: @DateText(Form.Since)</span>
+                                    </div>
+                                </div>
+
+                                <div class="cust-profile-actions">
+                                    @if (IsEditing)
+                                    {
+                                        <button type="button" class="cust-profile-action cust-profile-action--primary" @onclick="SaveAsync" disabled="@Busy"><i class="fa-solid fa-floppy-disk"></i>حفظ</button>
+                                        <button type="button" class="cust-profile-action" @onclick="CancelAsync" disabled="@Busy"><i class="fa-solid fa-xmark"></i>إلغاء</button>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="cust-profile-action cust-profile-action--primary" @onclick="EditAsync" disabled="@Busy"><i class="fa-solid fa-pen"></i>تعديل</button>
+                                        <button type="button" class="cust-profile-action cust-profile-action--danger" @onclick="ToggleStatusAsync" disabled="@Busy"><i class="fa-solid fa-ban"></i>@(Form.IsActive ? "تعطيل العميل" : "تفعيل العميل")</button>
+                                        <button type="button" class="cust-profile-action" @onclick="StatementAsync" disabled="@Busy"><i class="fa-regular fa-file-lines"></i>كشف حساب</button>
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="cust-kpis">
+                                <div class="cust-kpi cust-kpi--purple"><div class="cust-kpi-icon"><i class="fa-solid fa-coins"></i></div><div><span>الرصيد الحالي</span><strong>—</strong></div></div>
+                                <div class="cust-kpi cust-kpi--blue"><div class="cust-kpi-icon"><i class="fa-regular fa-file-lines"></i></div><div><span>الفواتير المفتوحة</span><strong>—</strong></div></div>
+                                <div class="cust-kpi cust-kpi--red"><div class="cust-kpi-icon"><i class="fa-regular fa-clock"></i></div><div><span>المتأخر</span><strong>—</strong></div></div>
+                                <div class="cust-kpi cust-kpi--green"><div class="cust-kpi-icon"><i class="fa-solid fa-chart-pie"></i></div><div><span>الحد الائتماني</span><strong>@CreditLimitText</strong></div></div>
+                            </div>
+
+                            <div class="cust-tabs">
+                                <button type="button" class="@TabCss(CustomerSection.General)" @onclick="() => SetSection(CustomerSection.General)">عام</button>
+                                <button type="button" class="@TabCss(CustomerSection.Contact)" @onclick="() => SetSection(CustomerSection.Contact)"><i class="fa-solid fa-location-dot"></i>التواصل والعنوان</button>
+                                <button type="button" class="@TabCss(CustomerSection.Credit)" @onclick="() => SetSection(CustomerSection.Credit)"><i class="fa-solid fa-coins"></i>الائتمان والحساب</button>
+                                <button type="button" class="@TabCss(CustomerSection.Activity)" @onclick="() => SetSection(CustomerSection.Activity)"><i class="fa-solid fa-chart-column"></i>النشاط</button>
+                            </div>
+
+                            @if (IsEditing)
+                            {
+                                @if (_section == CustomerSection.General)
+                                {
+                                    <UiAccountingFormSection Title="المعلومات الأساسية" IconCssClass="fa-solid fa-address-card">
+                                        <UiAccountingFormGrid Columns="3">
+                                            <UiInputText Label="كود العميل" Value="@Form.Code" ReadOnly="true" Disabled="true" />
+                                            <UiInputText Label="كود الحساب" Value="@Form.AccountCode" ReadOnly="true" Disabled="true" />
+                                            <UiLookup Label="الحساب الرئيسي"
+                                                      Value="@Form.ParentAccountId"
+                                                      ValueChanged="SetParent"
+                                                      SelectedItem="@ParentLookupItem"
+                                                      SearchAsync="@ParentSearchAsync"
+                                                      Placeholder="ابحث بالكود أو الاسم عن حساب المراقبة"
+                                                      MinimumSearchLength="0"
+                                                      DebounceMilliseconds="250"
+                                                      Disabled="@(!IsNew || Busy)" />
+                                            <UiSelect Label="نوع الكيان" Value="@Form.EntityType" ValueChanged="SetEntityType" Options="@EntityTypeOptions" Disabled="Busy" />
+                                            <UiInputText Label="الاسم العربي" Value="@Form.NameAr" ValueChanged="SetNameAr" Disabled="Busy" />
+                                            <UiInputText Label="الاسم الإنجليزي" Value="@Form.NameEn" ValueChanged="SetNameEn" Disabled="Busy" />
+                                            <UiInputText Label="الاسم التجاري" Value="@Form.TradeName" ValueChanged="SetTradeName" Disabled="Busy" />
+                                            @if (ShowPersonalIdentity)
+                                            {
+                                                <UiInputText Label="رقم الهوية" Value="@Form.NationalId" ValueChanged="SetNationalId" Disabled="Busy" />
+                                                <UiInputDate Label="تاريخ الميلاد" Value="@Form.DateOfBirth" ValueChanged="SetDateOfBirth" Disabled="Busy" />
+                                                <UiSelect Label="الجنس" Value="@Form.Gender" ValueChanged="SetGender" Options="@GenderOptions" Disabled="Busy" />
+                                            }
+                                            else
+                                            {
+                                                <UiInputText Label="السجل التجاري" Value="@Form.CommercialRegistrationNo" ValueChanged="SetCommercialRegistration" Disabled="Busy" />
+                                                <UiInputText Label="الرقم الضريبي" Value="@Form.TaxNumber" ValueChanged="SetTaxNumber" Disabled="Busy" />
+                                            }
+                                            <UiInputDate Label="بداية التعامل مع العميل" Value="@Form.Since" ValueChanged="SetSince" Disabled="Busy" />
+                                        </UiAccountingFormGrid>
+                                    </UiAccountingFormSection>
+                                }
+                                else if (_section == CustomerSection.Contact)
+                                {
+                                    <UiAccountingFormSection Title="التواصل والعنوان" IconCssClass="fa-solid fa-location-dot">
+                                        <UiAccountingFormGrid Columns="3">
+                                            <UiInputText Label="الجوال" Value="@Form.Mobile" ValueChanged="SetMobile" Disabled="Busy" />
+                                            <UiInputText Label="الهاتف" Value="@Form.Phone" ValueChanged="SetPhone" Disabled="Busy" />
+                                            <UiInputText Label="واتساب" Value="@Form.WhatsAppNumber" ValueChanged="SetWhatsApp" Disabled="Busy" />
+                                            <UiInputText Label="البريد الإلكتروني" Value="@Form.Email" ValueChanged="SetEmail" Disabled="Busy" />
+                                            <UiInputText Label="الدولة" Value="@Form.Country" ValueChanged="SetCountry" Disabled="Busy" />
+                                            <UiInputText Label="المحافظة" Value="@Form.Governorate" ValueChanged="SetGovernorate" Disabled="Busy" />
+                                            <UiInputText Label="المدينة" Value="@Form.City" ValueChanged="SetCity" Disabled="Busy" />
+                                            <UiInputText Label="الحي / المنطقة" Value="@Form.District" ValueChanged="SetDistrict" Disabled="Busy" />
+                                            <UiInputText Label="الشارع" Value="@Form.Street" ValueChanged="SetStreet" Disabled="Busy" />
+                                        </UiAccountingFormGrid>
+                                    </UiAccountingFormSection>
+                                }
+                                else if (_section == CustomerSection.Credit)
+                                {
+                                    <UiAccountingFormSection Title="الائتمان والحساب" IconCssClass="fa-solid fa-coins">
+                                        <UiAccountingFormGrid Columns="3">
+                                            <UiCheckbox Label="السماح بالبيع الآجل" Value="@Form.IsCreditAllowed" ValueChanged="SetCreditAllowed" Disabled="Busy" />
+                                            <UiAccountingNumberField Label="الحد الائتماني" Value="@Form.CreditLimit" ValueChanged="SetCreditLimit" Disabled="@(Busy || !Form.IsCreditAllowed)" />
+                                            <UiAccountingNumberField Label="أيام السداد" Value="@Form.PaymentTermDays" ValueChanged="SetPaymentTermDays" Disabled="@(Busy || !Form.IsCreditAllowed)" />
+                                            <UiInputText Label="ملاحظات" Value="@Form.Notes" ValueChanged="SetNotes" Disabled="Busy" />
+                                        </UiAccountingFormGrid>
+                                    </UiAccountingFormSection>
+                                }
+                                else
+                                {
+                                    <div class="cust-activity-empty">
+                                        <div class="cust-activity-empty__icon"><i class="fa-solid fa-chart-column"></i></div>
+                                        <div><strong>النشاط</strong><p>لا توجد حقول قابلة للتعديل في هذا القسم.</p></div>
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                @if (_section == CustomerSection.General)
+                                {
+                                    <div class="cust-section-card">
+                                        <div class="cust-section-title"><i class="fa-solid fa-address-card"></i><strong>المعلومات الأساسية</strong></div>
+                                        <div class="cust-info-grid">
+                                            <div class="cust-info-item"><span class="cust-info-item__label">كود العميل</span><div class="cust-info-item__value"><i class="fa-solid fa-barcode"></i>@TextOrDash(Form.Code)</div></div>
+                                            <div class="cust-info-item"><span class="cust-info-item__label">نوع العميل</span><div class="cust-info-item__value"><i class="fa-solid fa-user"></i>@EntityTypeLabel</div></div>
+                                            <div class="cust-info-item"><span class="cust-info-item__label">كود الحساب</span><div class="cust-info-item__value"><i class="fa-solid fa-building-columns"></i>@TextOrDash(Form.AccountCode)</div></div>
+                                            <div class="cust-info-item"><span class="cust-info-item__label">الاسم (بالعربية)</span><div class="cust-info-item__value"><i class="fa-solid fa-user"></i>@TextOrDash(Form.NameAr)</div></div>
+                                            <div class="cust-info-item"><span class="cust-info-item__label">الاسم (بالإنجليزية)</span><div class="cust-info-item__value"><i class="fa-regular fa-envelope"></i>@TextOrDash(Form.NameEn)</div></div>
+                                            <div class="cust-info-item"><span class="cust-info-item__label">الحساب الرئيسي</span><div class="cust-info-item__value"><i class="fa-solid fa-database"></i>@ParentDisplayText</div></div>
+                                            <div class="cust-info-item"><span class="cust-info-item__label">الاسم التجاري</span><div class="cust-info-item__value"><i class="fa-solid fa-store"></i>@TextOrDash(Form.TradeName)</div></div>
+                                            @if (ShowPersonalIdentity)
+                                            {
+                                                <div class="cust-info-item"><span class="cust-info-item__label">رقم الهوية</span><div class="cust-info-item__value"><i class="fa-regular fa-id-card"></i>@TextOrDash(Form.NationalId)</div></div>
+                                                <div class="cust-info-item"><span class="cust-info-item__label">تاريخ الميلاد</span><div class="cust-info-item__value"><i class="fa-regular fa-calendar"></i>@DateText(Form.DateOfBirth)</div></div>
+                                                <div class="cust-info-item"><span class="cust-info-item__label">الجنس</span><div class="cust-info-item__value"><i class="fa-solid fa-user"></i>@GenderLabel</div></div>
+                                            }
+                                            else
+                                            {
+                                                <div class="cust-info-item"><span class="cust-info-item__label">السجل التجاري</span><div class="cust-info-item__value"><i class="fa-regular fa-file-lines"></i>@TextOrDash(Form.CommercialRegistrationNo)</div></div>
+                                                <div class="cust-info-item"><span class="cust-info-item__label">الرقم الضريبي</span><div class="cust-info-item__value"><i class="fa-solid fa-receipt"></i>@TextOrDash(Form.TaxNumber)</div></div>
+                                            }
+                                            <div class="cust-info-item"><span class="cust-info-item__label">بداية التعامل</span><div class="cust-info-item__value"><i class="fa-regular fa-calendar"></i>@DateText(Form.Since)</div></div>
+                                        </div>
+                                    </div>
+                                    <div class="cust-preview-row">
+                                        <button type="button" class="cust-preview-card" @onclick="() => SetSection(CustomerSection.Contact)"><i class="fa-solid fa-location-dot cust-preview-card__icon"></i><div><strong>التواصل والعنوان</strong><p>الجوال، الهاتف، واتساب، البريد الإلكتروني، الدولة، المحافظة، المدينة، الحي، الشارع.</p></div><i class="fa-solid fa-chevron-left cust-preview-card__arrow"></i></button>
+                                        <button type="button" class="cust-preview-card" @onclick="() => SetSection(CustomerSection.Credit)"><i class="fa-solid fa-coins cust-preview-card__icon"></i><div><strong>الائتمان والحساب</strong><p>السماح بالبيع الآجل، الحد الائتماني، أيام السداد، الحساب المحاسبي.</p></div><i class="fa-solid fa-chevron-left cust-preview-card__arrow"></i></button>
+                                        <button type="button" class="cust-preview-card" @onclick="() => SetSection(CustomerSection.Activity)"><i class="fa-solid fa-chart-column cust-preview-card__icon"></i><div><strong>النشاط</strong><p>فواتير المبيعات، سندات القبض، آخر تعديل والحركات المرتبطة.</p></div><i class="fa-solid fa-chevron-left cust-preview-card__arrow"></i></button>
+                                    </div>
+                                }
+                                else if (_section == CustomerSection.Contact)
+                                {
+                                    <div class="cust-section-card">
+                                        <div class="cust-section-title"><i class="fa-solid fa-location-dot"></i><strong>التواصل والعنوان</strong></div>
+                                        <div class="cust-info-grid">
+                                            <div class="cust-info-item"><span class="cust-info-item__label">الجوال</span><div class="cust-info-item__value"><i class="fa-solid fa-mobile-screen"></i>@TextOrDash(Form.Mobile)</div></div>
+                                            <div class="cust-info-item"><span class="cust-info-item__label">الهاتف</span><div class="cust-info-item__value"><i class="fa-solid fa-phone"></i>@TextOrDash(Form.Phone)</div></div>
+                                            <div class="cust-info-item"><span class="cust-info-item__label">واتساب</span><div class="cust-info-item__value"><i class="fa-brands fa-whatsapp"></i>@TextOrDash(Form.WhatsAppNumber)</div></div>
+                                            <div class="cust-info-item"><span class="cust-info-item__label">البريد الإلكتروني</span><div class="cust-info-item__value"><i class="fa-regular fa-envelope"></i>@TextOrDash(Form.Email)</div></div>
+                                            <div class="cust-info-item"><span class="cust-info-item__label">الدولة</span><div class="cust-info-item__value"><i class="fa-solid fa-earth-americas"></i>@TextOrDash(Form.Country)</div></div>
+                                            <div class="cust-info-item"><span class="cust-info-item__label">المحافظة</span><div class="cust-info-item__value"><i class="fa-solid fa-location-dot"></i>@TextOrDash(Form.Governorate)</div></div>
+                                            <div class="cust-info-item"><span class="cust-info-item__label">المدينة</span><div class="cust-info-item__value"><i class="fa-solid fa-city"></i>@TextOrDash(Form.City)</div></div>
+                                            <div class="cust-info-item"><span class="cust-info-item__label">الحي / المنطقة</span><div class="cust-info-item__value"><i class="fa-solid fa-map-pin"></i>@TextOrDash(Form.District)</div></div>
+                                            <div class="cust-info-item"><span class="cust-info-item__label">الشارع</span><div class="cust-info-item__value"><i class="fa-solid fa-road"></i>@TextOrDash(Form.Street)</div></div>
+                                        </div>
+                                    </div>
+                                }
+                                else if (_section == CustomerSection.Credit)
+                                {
+                                    <div class="cust-section-card">
+                                        <div class="cust-section-title"><i class="fa-solid fa-coins"></i><strong>الائتمان والحساب</strong></div>
+                                        <div class="cust-info-grid">
+                                            <div class="cust-info-item"><span class="cust-info-item__label">طريقة التعامل</span><div class="cust-info-item__value"><i class="fa-solid fa-wallet"></i>@CreditModeLabel</div></div>
+                                            <div class="cust-info-item"><span class="cust-info-item__label">الحد الائتماني</span><div class="cust-info-item__value"><i class="fa-solid fa-coins"></i>@(Form.IsCreditAllowed ? Form.CreditLimit.ToString("N2") : "—")</div></div>
+                                            <div class="cust-info-item"><span class="cust-info-item__label">أيام السداد</span><div class="cust-info-item__value"><i class="fa-regular fa-clock"></i>@(Form.IsCreditAllowed ? $"{Form.PaymentTermDays} يوم" : "—")</div></div>
+                                            <div class="cust-info-item"><span class="cust-info-item__label">الحساب المحاسبي</span><div class="cust-info-item__value"><i class="fa-solid fa-building-columns"></i>@TextOrDash(Form.AccountCode)</div></div>
+                                            <div class="cust-info-item"><span class="cust-info-item__label">الحساب الرئيسي</span><div class="cust-info-item__value"><i class="fa-solid fa-database"></i>@ParentDisplayText</div></div>
+                                        </div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="cust-activity-empty">
+                                        <div class="cust-activity-empty__icon"><i class="fa-solid fa-chart-column"></i></div>
+                                        <div><strong>النشاط</strong><p>ستظهر هنا فواتير المبيعات، سندات القبض، وآخر الحركات المرتبطة بالعميل عند توفر ملخص مالي مباشر لهذه الصفحة.</p></div>
+                                    </div>
+                                }
+                            }
+                        </section>
+                    }
+                </main>
+            </div>
+</div>
+
+@code {
+    private enum CustomerSection { General, Contact, Credit, Activity }
+
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public bool EditorOpen { get; set; }
+    [Parameter] public bool IsNew { get; set; }
+    [Parameter] public bool IsEditing { get; set; }
+    [Parameter] public UiAccountingPartyFormModel Form { get; set; } = new();
+    [Parameter] public IReadOnlyList<UiAccountingPartyListItem> Items { get; set; } = [];
+    [Parameter] public UiLookupItem? ParentLookupItem { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? ParentSearchAsync { get; set; }
+    [Parameter] public string Search { get; set; } = string.Empty;
+    [Parameter] public string Filter { get; set; } = "all";
+    [Parameter] public int PageNumber { get; set; } = 1;
+    [Parameter] public int TotalPages { get; set; } = 1;
+    [Parameter] public long TotalCount { get; set; }
+    [Parameter] public EventCallback<string?> SearchChanged { get; set; }
+    [Parameter] public EventCallback<string?> FilterChanged { get; set; }
+    [Parameter] public EventCallback<string?> OnSearch { get; set; }
+    [Parameter] public EventCallback OnNew { get; set; }
+    [Parameter] public EventCallback OnRefresh { get; set; }
+    [Parameter] public EventCallback<Guid> OnOpen { get; set; }
+    [Parameter] public EventCallback OnEdit { get; set; }
+    [Parameter] public EventCallback OnSave { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public EventCallback OnToggleStatus { get; set; }
+    [Parameter] public EventCallback OnStatement { get; set; }
+    [Parameter] public EventCallback OnPreviousPage { get; set; }
+    [Parameter] public EventCallback OnNextPage { get; set; }
+    [Parameter] public EventCallback OnImport { get; set; }
+    [Parameter] public EventCallback OnTemplate { get; set; }
+    [Parameter] public EventCallback OnExport { get; set; }
+    [Parameter] public EventCallback OnFormChanged { get; set; }
+
+    private CustomerSection _section = CustomerSection.General;
+    private bool _excelMenuOpen;
+
+    private Guid ActiveId => Form.Id ?? Guid.Empty;
+    private string DisplayName => string.IsNullOrWhiteSpace(Form.NameAr) ? "عميل جديد" : Form.NameAr;
+    private string EntityTypeLabel => Form.EntityType == "2" ? "منشأة" : "فرد";
+    private string ParentDisplayText => ParentLookupItem is null ? "—" : string.IsNullOrWhiteSpace(ParentLookupItem.SecondaryText) ? ParentLookupItem.PrimaryText : $"{ParentLookupItem.PrimaryText} · {ParentLookupItem.SecondaryText}";
+    private string CreditLimitText => Form.IsCreditAllowed && Form.CreditLimit > 0 ? Form.CreditLimit.ToString("N0") : "—";
+    private bool ShowPersonalIdentity => Form.EntityType != "2";
+    private string GenderLabel => Form.Gender switch { "1" => "ذكر", "2" => "أنثى", _ => "غير محدد" };
+    private string CreditModeLabel => Form.IsCreditAllowed ? "آجل" : "نقدي فقط";
+
+    private static readonly IReadOnlyList<UiSelectOption> EntityTypeOptions = [new("1", "فرد"), new("2", "منشأة")];
+    private static readonly IReadOnlyList<UiSelectOption> GenderOptions = [new("0", "غير محدد"), new("1", "ذكر"), new("2", "أنثى")];
+    private static readonly IReadOnlyList<UiSelectOption> FilterOptions = [new("all", "الكل"), new("active", "نشط"), new("inactive", "غير نشط"), new("individual", "أفراد"), new("organization", "منشآت"), new("credit", "بيع آجل"), new("cash", "نقدي فقط")];
+
+    private string TabCss(CustomerSection section) => _section == section ? "cust-tab is-active" : "cust-tab";
+    private void SetSection(CustomerSection section) => _section = section;
+    private static string TextOrDash(string? value) => string.IsNullOrWhiteSpace(value) ? "—" : value;
+    private static string DateText(DateOnly? value) => value?.ToString("yyyy/MM/dd") ?? "—";
+
+    private async Task HandleSearchInput(ChangeEventArgs e) { await SearchChanged.InvokeAsync(e.Value?.ToString()); }
+    private async Task HandleSearchKeyDown(KeyboardEventArgs e) { if (e.Key == "Enter") await OnSearch.InvokeAsync(Search); }
+    private async Task HandleFilterChanged(ChangeEventArgs e) { await FilterChanged.InvokeAsync(e.Value?.ToString()); }
+    private void ToggleExcelMenu() => _excelMenuOpen = !_excelMenuOpen;
+    private async Task ImportAsync() { _excelMenuOpen = false; await OnImport.InvokeAsync(); }
+    private async Task TemplateAsync() { _excelMenuOpen = false; await OnTemplate.InvokeAsync(); }
+    private async Task ExportAsync() { _excelMenuOpen = false; await OnExport.InvokeAsync(); }
+    private Task RefreshAsync() => OnRefresh.InvokeAsync();
+    private Task NewAsync() => OnNew.InvokeAsync();
+    private Task SelectCustomerAsync(Guid id) => OnOpen.InvokeAsync(id);
+    private Task EditAsync() => OnEdit.InvokeAsync();
+    private Task SaveAsync() => OnSave.InvokeAsync();
+    private Task CancelAsync() => OnCancel.InvokeAsync();
+    private Task ToggleStatusAsync() => OnToggleStatus.InvokeAsync();
+    private Task StatementAsync() => OnStatement.InvokeAsync();
+    private Task PreviousAsync() => OnPreviousPage.InvokeAsync();
+    private Task NextAsync() => OnNextPage.InvokeAsync();
+
+    private async Task Changed() { await OnFormChanged.InvokeAsync(); await InvokeAsync(StateHasChanged); }
+    private Task SetParent(string? v) { Form.ParentAccountId = v ?? ""; return Changed(); }
+    private Task SetEntityType(string? v) { Form.EntityType = v ?? "1"; return Changed(); }
+    private Task SetGender(string? v) { Form.Gender = v ?? "0"; return Changed(); }
+    private Task SetNameAr(string? v) { Form.NameAr = v ?? ""; return Changed(); }
+    private Task SetNameEn(string? v) { Form.NameEn = v; return Changed(); }
+    private Task SetTradeName(string? v) { Form.TradeName = v; return Changed(); }
+    private Task SetNationalId(string? v) { Form.NationalId = v; return Changed(); }
+    private Task SetCommercialRegistration(string? v) { Form.CommercialRegistrationNo = v; return Changed(); }
+    private Task SetTaxNumber(string? v) { Form.TaxNumber = v; return Changed(); }
+    private Task SetDateOfBirth(DateOnly? v) { Form.DateOfBirth = v; return Changed(); }
+    private Task SetSince(DateOnly? v) { Form.Since = v; return Changed(); }
+    private Task SetPhone(string? v) { Form.Phone = v; return Changed(); }
+    private Task SetMobile(string? v) { Form.Mobile = v; return Changed(); }
+    private Task SetWhatsApp(string? v) { Form.WhatsAppNumber = v; return Changed(); }
+    private Task SetEmail(string? v) { Form.Email = v; return Changed(); }
+    private Task SetCountry(string? v) { Form.Country = v; return Changed(); }
+    private Task SetGovernorate(string? v) { Form.Governorate = v; return Changed(); }
+    private Task SetCity(string? v) { Form.City = v; return Changed(); }
+    private Task SetDistrict(string? v) { Form.District = v; return Changed(); }
+    private Task SetStreet(string? v) { Form.Street = v; return Changed(); }
+    private Task SetCreditAllowed(bool v) { Form.IsCreditAllowed = v; if (!v) { Form.CreditLimit = 0; Form.PaymentTermDays = 0; } return Changed(); }
+    private Task SetCreditLimit(decimal v) { Form.CreditLimit = v; return Changed(); }
+    private Task SetPaymentTermDays(decimal v) { Form.PaymentTermDays = (int)v; return Changed(); }
+    private Task SetNotes(string? v) { Form.Notes = v; return Changed(); }
+}
