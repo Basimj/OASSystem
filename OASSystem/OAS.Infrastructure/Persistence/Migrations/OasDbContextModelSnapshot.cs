@@ -1522,6 +1522,7 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<byte?>("ExchangeRateType").HasColumnType("tinyint");
             b.Property<byte?>("ExchangeRateSource").HasColumnType("tinyint");
             b.Property<Guid?>("SourceDocumentLineId").HasColumnType("uniqueidentifier");
+            b.Property<string>("PostingRole").HasMaxLength(40).HasColumnType("nvarchar(40)");
             b.Property<string>("Description").HasMaxLength(300).HasColumnType("nvarchar(300)");
             b.Property<Guid?>("CustomerId").HasColumnType("uniqueidentifier");
             b.Property<Guid?>("SupplierId").HasColumnType("uniqueidentifier");
@@ -1541,6 +1542,7 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.HasIndex("SupplierId").HasDatabaseName("IX_JournalEntryLines_SupplierId");
             b.HasIndex("EmployeeId").HasDatabaseName("IX_JournalEntryLines_EmployeeId");
             b.HasIndex("SourceDocumentLineId").HasDatabaseName("IX_JournalEntryLines_SourceDocumentLineId");
+            b.HasIndex("JournalEntryId", "PostingRole").HasDatabaseName("IX_JournalEntryLines_Journal_Role");
             b.ToTable("tbl_JournalEntryLines", "dbo", t =>
             {
                 t.HasCheckConstraint("CK_JournalEntryLines_BaseDirection", "([DebitAmount] > 0 AND [CreditAmount] = 0) OR ([CreditAmount] > 0 AND [DebitAmount] = 0)");
@@ -2211,10 +2213,12 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<string>("Description").HasMaxLength(500).HasColumnType("nvarchar(500)");
             b.Property<bool>("IsDefault").IsRequired().HasColumnType("bit");
             b.Property<bool>("IsActive").IsRequired().HasColumnType("bit");
+            b.Property<bool>("AllowsSalesAllocation").IsRequired().ValueGeneratedOnAdd().HasColumnType("bit").HasDefaultValue(true);
             b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
             b.HasKey("Id");
             b.HasIndex("Code").IsUnique().HasDatabaseName("UX_Warehouses_Code");
             b.HasIndex("IsActive").HasDatabaseName("IX_Warehouses_IsActive");
+            b.HasIndex("IsActive", "AllowsSalesAllocation").HasDatabaseName("IX_Warehouses_SalesAllocation");
             b.HasIndex("IsDefault").IsUnique().HasDatabaseName("UX_Warehouses_ActiveDefault").HasFilter("[IsDefault] = 1 AND [IsActive] = 1");
             b.ToTable("tbl_Warehouses");
         });
@@ -4684,6 +4688,11 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<decimal>("BaseTaxAmount").IsRequired().HasColumnType("decimal(19,4)");
             b.Property<decimal>("BaseTotalAmount").IsRequired().HasColumnType("decimal(19,4)");
             b.Property<string>("Reason").HasMaxLength(1000).HasColumnType("nvarchar(1000)");
+            b.Property<DateOnly?>("ReturnPolicyReferenceDate").HasColumnType("date");
+            b.Property<int?>("ReturnWindowDaysSnapshot").HasColumnType("int");
+            b.Property<bool>("ReturnWindowOverridden").IsRequired().ValueGeneratedOnAdd().HasColumnType("bit").HasDefaultValue(false);
+            b.Property<string>("ReturnWindowOverrideReason").HasMaxLength(500).HasColumnType("nvarchar(500)");
+            b.Property<string>("ReturnWindowOverriddenBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
             b.Property<Guid?>("JournalEntryId").HasColumnType("uniqueidentifier");
             b.Property<DateTimeOffset?>("ConfirmedAtUtc").HasColumnType("datetimeoffset");
             b.Property<string>("ConfirmedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
@@ -4733,6 +4742,10 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             b.Property<decimal>("BaseFinalAmount").IsRequired().HasColumnType("decimal(19,4)");
             b.Property<decimal?>("UnitCostSnapshot").HasColumnType("decimal(19,4)");
             b.Property<decimal?>("TotalCostSnapshot").HasColumnType("decimal(19,4)");
+            b.Property<byte?>("ReturnCondition").HasColumnType("tinyint");
+            b.Property<byte?>("StockDisposition").HasColumnType("tinyint");
+            b.Property<DateTimeOffset?>("InspectedAtUtc").HasColumnType("datetimeoffset(3)");
+            b.Property<string>("InspectedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
             b.Property<bool>("IsActive").IsRequired().HasColumnType("bit");
             b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
             b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)").HasColumnName("CreatedFromDevice");
@@ -4744,6 +4757,8 @@ sealed partial class OasDbContextModelSnapshot : ModelSnapshot
             {
                 t.HasCheckConstraint("CK_SalesReturnLines_Quantity_Positive", "[Quantity] > 0");
                 t.HasCheckConstraint("CK_SalesReturnLines_Amounts_NonNegative", "[NetAmount] >= 0 AND [TaxAmount] >= 0 AND [FinalAmount] >= 0 AND [BaseNetAmount] >= 0 AND [BaseTaxAmount] >= 0 AND [BaseFinalAmount] >= 0");
+                t.HasCheckConstraint("CK_SalesReturnLines_ReturnCondition", "[ReturnCondition] IS NULL OR [ReturnCondition] IN (0,1,2,3)");
+                t.HasCheckConstraint("CK_SalesReturnLines_StockDisposition", "[StockDisposition] IS NULL OR [StockDisposition] IN (0,1,2,3,4)");
             });
         });
 

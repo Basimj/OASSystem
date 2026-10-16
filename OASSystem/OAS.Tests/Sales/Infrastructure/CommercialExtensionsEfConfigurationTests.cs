@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using NUnit.Framework;
+using OAS.Domain.Accounting.Entities;
+using OAS.Domain.Entities.Inventory;
 using OAS.Domain.Purchasing.Entities;
 using OAS.Domain.Sales.Entities;
 using OAS.Infrastructure.Persistence;
@@ -63,6 +65,37 @@ public sealed class CommercialExtensionsEfConfigurationTests
         Assert.That(index, Is.Not.Null);
         Assert.That(index!.IsUnique, Is.True);
         Assert.That(index.GetFilter(), Is.EqualTo("[IsActive] = 1"));
+    }
+
+    [Test]
+    public void SalesReturnHardening_HasPostingRoleQualityAndNonSellableWarehouseMetadata()
+    {
+        using var context = new OasDbContext(_options);
+        var model = context.GetService<IDesignTimeModel>().Model;
+
+        var journalLine = model.FindEntityType(typeof(JournalEntryLine));
+        Assert.That(journalLine, Is.Not.Null);
+        Assert.That(journalLine!.FindProperty(nameof(JournalEntryLine.PostingRole)), Is.Not.Null);
+        Assert.That(journalLine.GetIndexes().Any(x => x.GetDatabaseName() == "IX_JournalEntryLines_Journal_Role"), Is.True);
+
+        var returnLine = model.FindEntityType(typeof(SalesReturnLine));
+        Assert.That(returnLine, Is.Not.Null);
+        Assert.That(returnLine!.FindProperty(nameof(SalesReturnLine.ReturnCondition)), Is.Not.Null);
+        Assert.That(returnLine.FindProperty(nameof(SalesReturnLine.StockDisposition)), Is.Not.Null);
+        Assert.That(returnLine.FindProperty(nameof(SalesReturnLine.InspectedAtUtc)), Is.Not.Null);
+        Assert.That(returnLine.GetCheckConstraints().Any(x => x.Name == "CK_SalesReturnLines_ReturnCondition"), Is.True);
+        Assert.That(returnLine.GetCheckConstraints().Any(x => x.Name == "CK_SalesReturnLines_StockDisposition"), Is.True);
+
+        var salesReturn = model.FindEntityType(typeof(SalesReturn));
+        Assert.That(salesReturn, Is.Not.Null);
+        Assert.That(salesReturn!.FindProperty(nameof(SalesReturn.ReturnPolicyReferenceDate)), Is.Not.Null);
+        Assert.That(salesReturn.FindProperty(nameof(SalesReturn.ReturnWindowDaysSnapshot)), Is.Not.Null);
+        Assert.That(salesReturn.FindProperty(nameof(SalesReturn.ReturnWindowOverridden)), Is.Not.Null);
+
+        var warehouse = model.FindEntityType(typeof(Warehouse));
+        Assert.That(warehouse, Is.Not.Null);
+        Assert.That(warehouse!.FindProperty(nameof(Warehouse.AllowsSalesAllocation)), Is.Not.Null);
+        Assert.That(warehouse.GetIndexes().Any(x => x.GetDatabaseName() == "IX_Warehouses_SalesAllocation"), Is.True);
     }
 
     private static void AssertUniqueIndex(DbContext context, Type entityType, string databaseName)

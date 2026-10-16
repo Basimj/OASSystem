@@ -1270,7 +1270,7 @@ public partial class SalesWorkspaceHost : IDisposable
     private async Task<IReadOnlyList<UiLookupItem>> SearchWarehouseItemsAsync(UiSalesLineModel line, string q, CancellationToken ct)
     {
         Guid? variant = Guid.TryParse(line.ProductVariantId, out var id) ? id : null;
-        var rows = await Sales.SearchWarehousesAsync(variant, q, 20, ct); foreach (var x in rows) _warehouses[x.Id] = x;
+        var rows = await Sales.SearchWarehousesAsync(variant, q, 20, false, ct); foreach (var x in rows) _warehouses[x.Id] = x;
         return rows.Select(x => new UiLookupItem(x.Id.ToString(), $"{x.Code} - {x.Name}", x.AvailableQuantity.HasValue ? $"المتاح: {x.AvailableQuantity:N2}" : null, "fa-solid fa-warehouse", !x.IsActive)).ToArray();
     }
     private Task PrescriptionCustomerChangedAsync(string? value)

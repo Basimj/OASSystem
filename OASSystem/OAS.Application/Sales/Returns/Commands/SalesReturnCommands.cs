@@ -24,3 +24,7 @@ public sealed record CancelSalesReturnCommand(Guid Id, CancelSalesReturnRequest 
 {
     public IReadOnlyCollection<string> RequiredPermissions { get; } = [SalesPermissions.Invoices.Cancel];
 }
+public sealed record InspectSalesReturnLineCommand(Guid ReturnId, Guid LineId, InspectSalesReturnLineRequest Request) : ICommand<SalesReturnDto>, IAuthorizedRequest
+{
+    public IReadOnlyCollection<string> RequiredPermissions { get; } = [SalesPermissions.Returns.Inspect];
+}

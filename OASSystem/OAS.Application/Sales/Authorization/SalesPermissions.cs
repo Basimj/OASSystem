@@ -30,6 +30,14 @@ public static class SalesPermissions
         public const string ViewAll = "sales.order_operations.view_all";
     }
 
+
+    public static class Returns
+    {
+        public const string Inspect = "sales.returns.inspect";
+        public const string OverrideWindow = "sales.returns.window_override";
+        public const string QualityOverride = "sales.returns.quality_override";
+    }
+
     public static class Credit
     {
         public const string Use = "sales.credit.use";

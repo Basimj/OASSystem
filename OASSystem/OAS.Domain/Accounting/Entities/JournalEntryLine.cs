@@ -25,6 +25,7 @@ public sealed class JournalEntryLine : AuditableEntity<Guid>
     public ExchangeRateType? ExchangeRateType { get; private set; }
     public ExchangeRateSource? ExchangeRateSource { get; private set; }
     public Guid? SourceDocumentLineId { get; private set; }
+    public string? PostingRole { get; private set; }
 
     public string? Description { get; private set; }
     public Guid? CustomerId { get; private set; }
@@ -59,7 +60,8 @@ public sealed class JournalEntryLine : AuditableEntity<Guid>
         Guid? costCenterId,
         Guid? productVariantId,
         Guid? warehouseId,
-        Guid? sourceDocumentLineId)
+        Guid? sourceDocumentLineId,
+        string? postingRole = null)
     {
         ValidateIdentity(id, journalEntryId, lineNumber, accountId);
         ValidateAmounts(debitAmount, creditAmount);
@@ -94,6 +96,7 @@ public sealed class JournalEntryLine : AuditableEntity<Guid>
             ExchangeRateType = exchangeRateType,
             ExchangeRateSource = exchangeRateSource,
             SourceDocumentLineId = Normalize(sourceDocumentLineId),
+            PostingRole = NormalizePostingRole(postingRole),
             Description = Normalize(description),
             CustomerId = Normalize(customerId),
             SupplierId = Normalize(supplierId),
@@ -160,7 +163,8 @@ public sealed class JournalEntryLine : AuditableEntity<Guid>
         Guid? costCenterId,
         Guid? productVariantId,
         Guid? warehouseId,
-        Guid? sourceDocumentLineId)
+        Guid? sourceDocumentLineId,
+        string? postingRole = null)
     {
         ValidateIdentity(Id == Guid.Empty ? Guid.NewGuid() : Id, JournalEntryId, Math.Max(LineNumber, 1), accountId);
         ValidateAmounts(debitAmount, creditAmount);
@@ -185,6 +189,7 @@ public sealed class JournalEntryLine : AuditableEntity<Guid>
         ExchangeRateType = exchangeRateType;
         ExchangeRateSource = exchangeRateSource;
         SourceDocumentLineId = Normalize(sourceDocumentLineId);
+        PostingRole = NormalizePostingRole(postingRole);
         Description = Normalize(description);
         CustomerId = Normalize(customerId);
         SupplierId = Normalize(supplierId);
@@ -243,4 +248,11 @@ public sealed class JournalEntryLine : AuditableEntity<Guid>
 
     private static Guid? Normalize(Guid? value) => value is { } id && id != Guid.Empty ? id : null;
     private static string? Normalize(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static string? NormalizePostingRole(string? value)
+    {
+        var normalized = Normalize(value);
+        if (normalized is { Length: > 40 })
+            throw new ArgumentException("Posting role cannot exceed 40 characters.", nameof(value));
+        return normalized;
+    }
 }

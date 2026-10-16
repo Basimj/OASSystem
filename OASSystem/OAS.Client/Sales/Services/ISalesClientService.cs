@@ -49,6 +49,7 @@ public interface ISalesClientService
     Task<SalesReturnDto?> ConfirmSalesReturnAsync(Guid id, SalesReturnActionRequest request, CancellationToken cancellationToken = default);
     Task<SalesReturnPostingResultDto?> PostSalesReturnAsync(Guid id, SalesReturnActionRequest request, CancellationToken cancellationToken = default);
     Task<SalesReturnDto?> CancelSalesReturnAsync(Guid id, CancelSalesReturnRequest request, CancellationToken cancellationToken = default);
+    Task<SalesReturnDto?> InspectSalesReturnLineAsync(Guid id, Guid lineId, InspectSalesReturnLineRequest request, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<CommissionRuleDto>> GetCommissionRulesAsync(Guid? employeeId = null, CancellationToken cancellationToken = default);
     Task<CommissionRuleDto?> CreateCommissionRuleAsync(CreateCommissionRuleRequest request, CancellationToken cancellationToken = default);
@@ -99,6 +100,7 @@ public interface ISalesClientService
     Task<ApiCallResult<SalesReturnDto>> ConfirmSalesReturnResultAsync(Guid id, SalesReturnActionRequest request, CancellationToken cancellationToken = default);
     Task<ApiCallResult<SalesReturnPostingResultDto>> PostSalesReturnResultAsync(Guid id, SalesReturnActionRequest request, CancellationToken cancellationToken = default);
     Task<ApiCallResult<SalesReturnDto>> CancelSalesReturnResultAsync(Guid id, CancelSalesReturnRequest request, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<SalesReturnDto>> InspectSalesReturnLineResultAsync(Guid id, Guid lineId, InspectSalesReturnLineRequest request, CancellationToken cancellationToken = default);
 
     Task<ApiCallResult<CommissionRuleDto>> CreateCommissionRuleResultAsync(CreateCommissionRuleRequest request, CancellationToken cancellationToken = default);
     Task<ApiCallResult<CommissionStatementDto>> CalculateCommissionStatementResultAsync(CalculateCommissionStatementRequest request, CancellationToken cancellationToken = default);
@@ -123,7 +125,7 @@ public interface ISalesClientService
     Task<IReadOnlyList<SalesPrescriptionRevisionLookupDto>> GetPrescriptionRevisionsAsync(Guid prescriptionId, CancellationToken cancellationToken = default);    Task<IReadOnlyList<SalesProductTypeLookupDto>> SearchProductTypesAsync(string? search, int take = 20, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SalesProductCategoryLookupDto>> SearchProductCategoriesAsync(Guid? productTypeId, string? search, int take = 20, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SalesProductVariantLookupDto>> SearchProductVariantsAsync(Guid? productTypeId, Guid? categoryId, string? search, int take = 20, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<SalesWarehouseLookupDto>> SearchWarehousesAsync(Guid? productVariantId, string? search, int take = 20, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<SalesWarehouseLookupDto>> SearchWarehousesAsync(Guid? productVariantId, string? search, int take = 20, bool includeNonSellable = false, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SalesCurrencyLookupDto>> SearchCurrenciesAsync(DateOnly documentDate, string? search, int take = 20, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SalesCashAccountLookupDto>> SearchCashAccountsAsync(Guid currencyId, string? search, int take = 20, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SalesBankAccountLookupDto>> SearchBankAccountsAsync(Guid currencyId, string? search, int take = 20, CancellationToken cancellationToken = default);

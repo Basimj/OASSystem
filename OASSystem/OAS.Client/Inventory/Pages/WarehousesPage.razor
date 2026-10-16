@@ -54,6 +54,7 @@
                                     <span>—</span>
                                 }
                             </td>
+                            <td><UiBadge Text="@(warehouse.AllowsSalesAllocation ? "متاح للبيع" : "حجر / غير مخصص للبيع")" Tone="@(warehouse.AllowsSalesAllocation ? AlertTone.Success : AlertTone.Warning)" /></td>
                             <td><UiBadge Text="@(warehouse.IsActive ? "نشط" : "غير نشط")" Tone="@(warehouse.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
                         </RowTemplate>
                     </UiDataTable>
@@ -107,6 +108,11 @@
                                 ErrorText="@ErrorFor(DefaultField)"
                                 Disabled="@(!IsEditing)" />
 
+                    <UiCheckbox Label="يسمح بالحجز والبيع من هذا المخزن"
+                                Value="@_allowsSalesAllocation"
+                                ValueChanged="@(value => _allowsSalesAllocation = value)"
+                                Disabled="@(!IsEditing)" />
+
                     <UiCheckbox Label="المخزن نشط"
                                 Value="@_isActive"
                                 ValueChanged="SetActiveAsync"
@@ -142,7 +148,7 @@
     [Inject] private IUiSnackbarService Snackbar { get; set; } = default!;
 
     private IReadOnlyList<WarehouseDto> _warehouses = [];
-    private static readonly IReadOnlyList<string> WarehouseHeaders = ["الكود", "اسم المخزن", "الافتراضي", "الحالة"];
+    private static readonly IReadOnlyList<string> WarehouseHeaders = ["الكود", "اسم المخزن", "الافتراضي", "سياسة البيع", "الحالة"];
     private readonly Dictionary<string, string> _fieldErrors = new(StringComparer.Ordinal);
     private EditorMode _mode = EditorMode.Empty;
     private Guid? _selectedId;
@@ -158,6 +164,7 @@
     private string? _description;
     private bool _isDefault;
     private bool _isActive = true;
+    private bool _allowsSalesAllocation = true;
 
     private bool IsEditing => _mode is EditorMode.Create or EditorMode.Edit;
     private bool CanEdit => _mode == EditorMode.View && _selectedId.HasValue;
@@ -255,12 +262,12 @@
             if (_mode == EditorMode.Create)
             {
                 saved = await Inventory.CreateWarehouseAsync(new CreateWarehouseRequest(
-                    _code.Trim(), _name.Trim(), NullIfBlank(_description), _isDefault));
+                    _code.Trim(), _name.Trim(), NullIfBlank(_description), _isDefault, _allowsSalesAllocation));
             }
             else
             {
                 saved = await Inventory.UpdateWarehouseAsync(_selectedId!.Value, new UpdateWarehouseRequest(
-                    _code.Trim(), _name.Trim(), NullIfBlank(_description), _isDefault, _isActive));
+                    _code.Trim(), _name.Trim(), NullIfBlank(_description), _isDefault, _isActive, _allowsSalesAllocation));
             }
 
             if (saved is null) return;
@@ -400,6 +407,7 @@
         _description = item.Description;
         _isDefault = item.IsDefault;
         _isActive = item.IsActive;
+        _allowsSalesAllocation = item.AllowsSalesAllocation;
     }
 
     private void ClearForm()
@@ -410,6 +418,7 @@
         _description = null;
         _isDefault = false;
         _isActive = true;
+        _allowsSalesAllocation = true;
     }
 
     private string? ErrorFor(string key) => _fieldErrors.TryGetValue(key, out var error) ? error : null;

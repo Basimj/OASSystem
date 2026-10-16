@@ -41,7 +41,7 @@ public sealed record SearchSalesProductVariantsQuery(Guid? ProductTypeId, Guid? 
 }
 
 
-public sealed record SearchSalesWarehousesQuery(Guid? ProductVariantId, string? Search, int Take = 20)
+public sealed record SearchSalesWarehousesQuery(Guid? ProductVariantId, string? Search, int Take = 20, bool IncludeNonSellable = false)
     : IQuery<IReadOnlyList<SalesWarehouseLookupDto>>, IAuthorizedRequest
 {
     public IReadOnlyCollection<string> RequiredPermissions { get; } = [SalesPermissions.View];

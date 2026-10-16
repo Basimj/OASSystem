@@ -63,8 +63,9 @@ public sealed class SalesLookupsController(ISender sender) : ControllerBase
         [FromQuery] Guid? productVariantId,
         [FromQuery] string? search,
         [FromQuery] int take = 20,
+        [FromQuery] bool includeNonSellable = false,
         CancellationToken cancellationToken = default)
-        => Ok(await sender.Send(new SearchSalesWarehousesQuery(productVariantId, search, take), cancellationToken));
+        => Ok(await sender.Send(new SearchSalesWarehousesQuery(productVariantId, search, take, includeNonSellable), cancellationToken));
 
     [HttpGet("currencies")]
     public async Task<ActionResult<IReadOnlyList<SalesCurrencyLookupDto>>> Currencies(

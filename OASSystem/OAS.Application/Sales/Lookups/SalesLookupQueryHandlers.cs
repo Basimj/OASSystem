@@ -546,6 +546,7 @@ public sealed class SearchSalesWarehousesQueryHandler(
         {
             spec.Where(x =>
                 x.IsActive &&
+                (request.IncludeNonSellable || x.AllowsSalesAllocation) &&
                 (
                     x.Code.Contains(search) ||
                     x.Name.Contains(search)
@@ -553,7 +554,7 @@ public sealed class SearchSalesWarehousesQueryHandler(
         }
         else
         {
-            spec.Where(x => x.IsActive);
+            spec.Where(x => x.IsActive && (request.IncludeNonSellable || x.AllowsSalesAllocation));
         }
 
         spec
@@ -595,7 +596,8 @@ public sealed class SearchSalesWarehousesQueryHandler(
                     warehouse.IsActive,
                     balance?.OnHandQuantity,
                     balance?.ReservedQuantity,
-                    balance?.AvailableQuantity));
+                    balance?.AvailableQuantity,
+                    warehouse.AllowsSalesAllocation));
         }
 
         return result;

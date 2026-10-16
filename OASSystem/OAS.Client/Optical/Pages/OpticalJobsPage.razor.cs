@@ -221,7 +221,7 @@ public partial class OpticalJobsPage : ComponentBase
     private async Task<IReadOnlyList<UiLookupItem>> SearchWarehousesAsync(Guid? lineId, string search, CancellationToken ct)
     {
         var variantId = lineId.HasValue ? _selected?.Lines.FirstOrDefault(x => x.Id == lineId.Value)?.ProductVariantId : null;
-        var rows = await Sales.SearchWarehousesAsync(variantId, search, 30, ct);
+        var rows = await Sales.SearchWarehousesAsync(variantId, search, 30, false, ct);
         return rows.Where(x => x.IsActive).Select(x => new UiLookupItem(x.Id.ToString("D"), $"{x.Code} - {x.Name}", x.AvailableQuantity.HasValue ? $"المتاح {x.AvailableQuantity:N3}" : null, "fa-solid fa-warehouse")).ToArray();
     }
 

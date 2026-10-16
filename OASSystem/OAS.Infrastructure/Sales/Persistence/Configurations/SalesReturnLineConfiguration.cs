@@ -13,6 +13,8 @@ public sealed class SalesReturnLineConfiguration : IEntityTypeConfiguration<Sale
         {
             t.HasCheckConstraint("CK_SalesReturnLines_Quantity_Positive", "[Quantity] > 0");
             t.HasCheckConstraint("CK_SalesReturnLines_Amounts_NonNegative", "[NetAmount] >= 0 AND [TaxAmount] >= 0 AND [FinalAmount] >= 0 AND [BaseNetAmount] >= 0 AND [BaseTaxAmount] >= 0 AND [BaseFinalAmount] >= 0");
+            t.HasCheckConstraint("CK_SalesReturnLines_ReturnCondition", "[ReturnCondition] IS NULL OR [ReturnCondition] IN (0,1,2,3)");
+            t.HasCheckConstraint("CK_SalesReturnLines_StockDisposition", "[StockDisposition] IS NULL OR [StockDisposition] IN (0,1,2,3,4)");
         });
         builder.HasKey(x => x.Id);
         builder.ConfigureSalesAudit();
@@ -34,6 +36,10 @@ public sealed class SalesReturnLineConfiguration : IEntityTypeConfiguration<Sale
         builder.Property(x => x.BaseFinalAmount).HasPrecision(19, 4).IsRequired();
         builder.Property(x => x.UnitCostSnapshot).HasPrecision(19, 4);
         builder.Property(x => x.TotalCostSnapshot).HasPrecision(19, 4);
+        builder.Property(x => x.ReturnCondition).HasConversion<byte?>();
+        builder.Property(x => x.StockDisposition).HasConversion<byte?>();
+        builder.Property(x => x.InspectedAtUtc).HasColumnType("datetimeoffset(3)");
+        builder.Property(x => x.InspectedBy).HasMaxLength(64);
         builder.Property(x => x.IsActive).IsRequired();
         builder.Property(x => x.RowVersion).IsRowVersion().IsConcurrencyToken();
         builder.HasIndex(x => new { x.SalesReturnId, x.LineNumber }).IsUnique().HasDatabaseName("UX_SalesReturnLines_Return_LineNumber");

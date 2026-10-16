@@ -28,7 +28,8 @@ public sealed class CustomerOrderAvailabilityServiceTests
 
         var service = new CustomerOrderAvailabilityService(
             new BalanceRepository(balance),
-            new ReadRepository<StockReservation>([reservation]));
+            new ReadRepository<StockReservation>([reservation]),
+            new AnyWarehouseRepository());
 
         var result = await service.AssessAsync(order);
         var availability = result.Lines.Single();
@@ -51,11 +52,39 @@ public sealed class CustomerOrderAvailabilityServiceTests
         var order = CreateOrder(2m);
         var service = new CustomerOrderAvailabilityService(
             new BalanceRepository(),
-            new ReadRepository<StockReservation>([]));
+            new ReadRepository<StockReservation>([]),
+            new AnyWarehouseRepository());
 
         var availability = (await service.AssessAsync(order)).Lines.Single();
         Assert.Multiple(() =>
         {
+            Assert.That(availability.ShortageQuantity, Is.EqualTo(2m));
+            Assert.That(availability.AvailabilityStatus, Is.EqualTo("Unavailable"));
+        });
+    }
+
+    [Test]
+    public async Task Assess_QuarantineWarehouse_IsUnavailableEvenWhenBalanceOrOldReservationExists()
+    {
+        var order = CreateOrder(2m);
+        var line = order.Lines.Single();
+        var balance = new InventoryBalance(line.WarehouseId!.Value, line.ProductVariantId!.Value, onHandQuantity: 10m, reservedQuantity: 2m);
+        var oldReservation = StockReservation.Create(
+            Guid.NewGuid(), line.ProductVariantId.Value, line.WarehouseId.Value, 2m,
+            SalesSourceReferences.Module, SalesSourceReferences.CustomerOrder,
+            order.Id, line.Id, DateTimeOffset.UtcNow);
+
+        var service = new CustomerOrderAvailabilityService(
+            new BalanceRepository(balance),
+            new ReadRepository<StockReservation>([oldReservation]),
+            new AnyWarehouseRepository(allowsSalesAllocation: false));
+
+        var availability = (await service.AssessAsync(order)).Lines.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(availability.AvailableQuantity, Is.Zero);
+            Assert.That(availability.AlreadyReservedForThisOrder, Is.Zero);
             Assert.That(availability.ShortageQuantity, Is.EqualTo(2m));
             Assert.That(availability.AvailabilityStatus, Is.EqualTo("Unavailable"));
         });
@@ -73,6 +102,16 @@ public sealed class CustomerOrderAvailabilityServiceTests
             "Lens", quantity, 10m, 10m, SalesDiscountType.None, null, null,
             null, null, true, null, TaxCalculationMode.Exclusive, 2));
         return order;
+    }
+
+    private sealed class AnyWarehouseRepository(bool allowsSalesAllocation = true) : IReadRepository<Warehouse, Guid>
+    {
+        private readonly Warehouse _warehouse = new("TEST", "Test Warehouse", allowsSalesAllocation: allowsSalesAllocation);
+        public Task<Warehouse?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) => Task.FromResult<Warehouse?>(_warehouse);
+        public Task<IReadOnlyList<Warehouse>> ListAsync(ISpecification<Warehouse>? specification = null, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<Warehouse>>([_warehouse]);
+        public Task<PagedData<Warehouse>> GetPageAsync(ISpecification<Warehouse> specification, CancellationToken cancellationToken = default) => Task.FromResult(new PagedData<Warehouse>([_warehouse], 1));
+        public Task<long> CountAsync(ISpecification<Warehouse>? specification = null, CancellationToken cancellationToken = default) => Task.FromResult(1L);
+        public Task<bool> ExistsAsync(Guid id, CancellationToken cancellationToken = default) => Task.FromResult(true);
     }
 
     private sealed class BalanceRepository(params InventoryBalance[] initial) : IInventoryBalanceRepository

@@ -77,6 +77,11 @@ public sealed class SalesReturn : AuditableEntity<Guid>
     public decimal BaseTaxAmount { get; private set; }
     public decimal BaseTotalAmount { get; private set; }
     public string? Reason { get; private set; }
+    public DateOnly? ReturnPolicyReferenceDate { get; private set; }
+    public int? ReturnWindowDaysSnapshot { get; private set; }
+    public bool ReturnWindowOverridden { get; private set; }
+    public string? ReturnWindowOverrideReason { get; private set; }
+    public string? ReturnWindowOverriddenBy { get; private set; }
     public Guid? JournalEntryId { get; private set; }
     public DateTimeOffset? ConfirmedAtUtc { get; private set; }
     public string? ConfirmedBy { get; private set; }
@@ -97,6 +102,28 @@ public sealed class SalesReturn : AuditableEntity<Guid>
             currencyDecimalPlacesSnapshot, exchangeRate, exchangeRateDate, exchangeRateType, exchangeRateSource,
             baseCurrencyId, baseCurrencyCodeSnapshot, baseCurrencyDecimalPlacesSnapshot, reason);
 
+    public void SetReturnPolicySnapshot(
+        DateOnly referenceDate,
+        int windowDays,
+        bool overridden,
+        string? overrideReason,
+        string? overriddenBy)
+    {
+        EnsureDraft();
+        if (windowDays <= 0) throw new DomainException("Return window days must be greater than zero.");
+        if (ReturnDate < referenceDate) throw new DomainException("Return date cannot be before the delivery/reference date.");
+        if (overridden && string.IsNullOrWhiteSpace(overrideReason))
+            throw new DomainException("Return window override reason is required.");
+
+        ReturnPolicyReferenceDate = referenceDate;
+        ReturnWindowDaysSnapshot = windowDays;
+        ReturnWindowOverridden = overridden;
+        ReturnWindowOverrideReason = overridden
+            ? SalesDomainGuard.Required(overrideReason!, 500, "Return window override reason")
+            : null;
+        ReturnWindowOverriddenBy = overridden ? NormalizeUser(overriddenBy) : null;
+    }
+
     public void AddLine(SalesReturnLine line)
     {
         EnsureDraft();
@@ -113,6 +140,8 @@ public sealed class SalesReturn : AuditableEntity<Guid>
         EnsureDraft();
         if (_lines.Count == 0 || _lines.All(x => !x.IsActive))
             throw new DomainException("Sales return must contain at least one active line before confirmation.");
+        if (_lines.Any(x => x.IsActive && x.RequiresInventory && (!x.ReturnCondition.HasValue || !x.StockDisposition.HasValue)))
+            throw new DomainException("All inventory return lines require a documented condition and stock disposition before confirmation.");
         Status = SalesReturnStatus.Confirmed;
         ConfirmedAtUtc = atUtc;
         ConfirmedBy = NormalizeUser(by);

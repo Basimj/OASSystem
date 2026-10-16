@@ -7,6 +7,9 @@ using OAS.Application.Sales.OpticalJobs.Commands;
 using OAS.Application.Sales.OpticalJobs.Queries;
 using OAS.Application.Sales.Prescriptions.Queries.CustomerPrescriptionContext;
 using OAS.Application.Sales.Prescriptions.Queries.CustomerPrescriptionHistory;
+using OAS.Application.Sales.Returns.Commands;
+using OAS.Contracts.Sales.Enums;
+using OAS.Contracts.Sales.Returns;
 
 namespace OAS.Tests.Foundation.Architecture;
 
@@ -35,6 +38,17 @@ public sealed class FoundationGapPermissionTests
             Is.EquivalentTo(new[] { SalesPermissions.OpticalJobs.Start }));
         Assert.That(new MarkOpticalJobReadyCommand(Guid.NewGuid(), new("AA==")).RequiredPermissions,
             Is.EquivalentTo(new[] { SalesPermissions.OpticalJobs.MarkReady }));
+    }
+
+    [Test]
+    public void SalesReturnInspection_RequiresDedicatedQualityPermission()
+    {
+        var command = new InspectSalesReturnLineCommand(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            new InspectSalesReturnLineRequest("AA==", SalesReturnCondition.Resellable, SalesReturnStockDisposition.Restock, Guid.NewGuid()));
+
+        Assert.That(command.RequiredPermissions, Is.EquivalentTo(new[] { SalesPermissions.Returns.Inspect }));
     }
 
     [Test]

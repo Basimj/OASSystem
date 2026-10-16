@@ -4,6 +4,7 @@ using OAS.Application.Abstractions.Persistence.Specifications;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.Sales.Abstractions;
 using OAS.Application.Sales.Common;
+using OAS.Domain.Accounting;
 using OAS.Domain.Accounting.Entities;
 using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Sales;
@@ -98,7 +99,8 @@ public sealed class SalesInvoiceAccountingPostingService(
         var number = 1;
         journal.AddLine(CreateInvoiceCurrencyLine(
             journal.Id, number++, customer.AccountId, invoice.BaseTotalAmount, 0m,
-            invoice.TotalAmount, 0m, invoice, $"Customer / {invoice.InvoiceCode}", customer.Id, null, null, null));
+            invoice.TotalAmount, 0m, invoice, $"Customer / {invoice.InvoiceCode}", customer.Id, null, null, null,
+            AccountingPostingRoles.SalesCustomerReceivable));
 
         // Use the confirmed invoice header snapshots so base-currency rounding remains
         // internally balanced even when line-level conversions have rounding differences.
@@ -106,13 +108,15 @@ public sealed class SalesInvoiceAccountingPostingService(
         var baseNet = invoice.BaseTotalAmount - invoice.BaseTaxAmount;
         journal.AddLine(CreateInvoiceCurrencyLine(
             journal.Id, number++, salesRevenueAccount, 0m, baseNet,
-            0m, transactionNet, invoice, $"Sales revenue / {invoice.InvoiceCode}", null, null, null, null));
+            0m, transactionNet, invoice, $"Sales revenue / {invoice.InvoiceCode}", null, null, null, null,
+            AccountingPostingRoles.SalesRevenue));
 
         if (invoice.TaxAmount > 0m && taxAccount.HasValue)
         {
             journal.AddLine(CreateInvoiceCurrencyLine(
                 journal.Id, number++, taxAccount.Value, 0m, invoice.BaseTaxAmount,
-                0m, invoice.TaxAmount, invoice, $"Sales tax / {invoice.InvoiceCode}", null, null, null, null));
+                0m, invoice.TaxAmount, invoice, $"Sales tax / {invoice.InvoiceCode}", null, null, null, null,
+                AccountingPostingRoles.SalesTax));
         }
 
         foreach (var salesLine in inventoryLines.OrderBy(x => x.LineNumber))
@@ -122,10 +126,12 @@ public sealed class SalesInvoiceAccountingPostingService(
             var cost = salesLine.TotalCostSnapshot.Value;
             journal.AddLine(CreateBaseCurrencyLine(
                 journal.Id, number++, cogsAccount!.Value, cost, 0m, invoice,
-                $"COGS / {invoice.InvoiceCode} / line {salesLine.LineNumber}", salesLine.ProductVariantId, salesLine.WarehouseId, salesLine.Id));
+                $"COGS / {invoice.InvoiceCode} / line {salesLine.LineNumber}", salesLine.ProductVariantId, salesLine.WarehouseId, salesLine.Id,
+                AccountingPostingRoles.SalesCOGS));
             journal.AddLine(CreateBaseCurrencyLine(
                 journal.Id, number++, inventoryAccount!.Value, 0m, cost, invoice,
-                $"Inventory / {invoice.InvoiceCode} / line {salesLine.LineNumber}", salesLine.ProductVariantId, salesLine.WarehouseId, salesLine.Id));
+                $"Inventory / {invoice.InvoiceCode} / line {salesLine.LineNumber}", salesLine.ProductVariantId, salesLine.WarehouseId, salesLine.Id,
+                AccountingPostingRoles.SalesInventory));
         }
 
         journal.SetPendingApproval();
@@ -174,23 +180,23 @@ public sealed class SalesInvoiceAccountingPostingService(
     private static JournalEntryLine CreateInvoiceCurrencyLine(
         Guid journalId, int lineNumber, Guid accountId, decimal debitBase, decimal creditBase,
         decimal debitTransaction, decimal creditTransaction, SalesInvoice invoice, string description,
-        Guid? customerId, Guid? productVariantId, Guid? warehouseId, Guid? sourceLineId) =>
+        Guid? customerId, Guid? productVariantId, Guid? warehouseId, Guid? sourceLineId, string postingRole) =>
         JournalEntryLine.CreateMultiCurrency(
             Guid.NewGuid(), journalId, lineNumber, accountId,
             debitBase, creditBase,
             invoice.CurrencyId, invoice.CurrencyCodeSnapshot, invoice.CurrencyDecimalPlacesSnapshot,
             debitTransaction, creditTransaction,
             invoice.ExchangeRate, invoice.ExchangeRateDate, invoice.ExchangeRateType, invoice.ExchangeRateSource,
-            description, customerId, null, null, null, null, productVariantId, warehouseId, sourceLineId);
+            description, customerId, null, null, null, null, productVariantId, warehouseId, sourceLineId, postingRole);
 
     private static JournalEntryLine CreateBaseCurrencyLine(
         Guid journalId, int lineNumber, Guid accountId, decimal debit, decimal credit,
-        SalesInvoice invoice, string description, Guid? productVariantId, Guid? warehouseId, Guid? sourceLineId) =>
+        SalesInvoice invoice, string description, Guid? productVariantId, Guid? warehouseId, Guid? sourceLineId, string postingRole) =>
         JournalEntryLine.CreateMultiCurrency(
             Guid.NewGuid(), journalId, lineNumber, accountId,
             debit, credit,
             invoice.BaseCurrencyId, invoice.BaseCurrencyCodeSnapshot, invoice.BaseCurrencyDecimalPlacesSnapshot,
             debit, credit,
             1m, invoice.PostingDate, ExchangeRateType.Accounting, ExchangeRateSource.System,
-            description, null, null, null, null, null, productVariantId, warehouseId, sourceLineId);
+            description, null, null, null, null, null, productVariantId, warehouseId, sourceLineId, postingRole);
 }

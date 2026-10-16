@@ -40,6 +40,11 @@ public sealed class SalesReturnConfiguration : IEntityTypeConfiguration<SalesRet
         builder.Property(x => x.BaseTaxAmount).HasPrecision(19, 4).IsRequired();
         builder.Property(x => x.BaseTotalAmount).HasPrecision(19, 4).IsRequired();
         builder.Property(x => x.Reason).HasMaxLength(1000);
+        builder.Property(x => x.ReturnPolicyReferenceDate).HasColumnType("date");
+        builder.Property(x => x.ReturnWindowDaysSnapshot);
+        builder.Property(x => x.ReturnWindowOverridden).IsRequired().HasDefaultValue(false);
+        builder.Property(x => x.ReturnWindowOverrideReason).HasMaxLength(500);
+        builder.Property(x => x.ReturnWindowOverriddenBy).HasMaxLength(64);
         builder.Property(x => x.JournalEntryId);
         builder.Property(x => x.ConfirmedAtUtc).HasColumnType("datetimeoffset");
         builder.Property(x => x.ConfirmedBy).HasMaxLength(64);

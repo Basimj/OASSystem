@@ -13,7 +13,8 @@ public sealed class WarehouseMapper
             source.Code,
             source.Name,
             source.Description,
-            source.IsDefault);
+            source.IsDefault,
+            source.AllowsSalesAllocation);
     }
 
     public void Update(UpdateWarehouseRequest source, Warehouse destination)
@@ -23,7 +24,8 @@ public sealed class WarehouseMapper
             source.Name,
             source.Description,
             source.IsDefault,
-            source.IsActive);
+            source.IsActive,
+            source.AllowsSalesAllocation);
     }
 
     public WarehouseDto ToRead(Warehouse source)
@@ -34,6 +36,7 @@ public sealed class WarehouseMapper
             source.Name,
             source.Description,
             source.IsDefault,
-            source.IsActive);
+            source.IsActive,
+            source.AllowsSalesAllocation);
     }
 }

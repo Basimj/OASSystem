@@ -15,11 +15,13 @@ public sealed class WarehouseConfiguration : IEntityTypeConfiguration<Warehouse>
         builder.Property(x => x.Description).HasMaxLength(500);
         builder.Property(x => x.IsDefault).IsRequired();
         builder.Property(x => x.IsActive).IsRequired();
+        builder.Property(x => x.AllowsSalesAllocation).IsRequired().HasDefaultValue(true);
         builder.Property(x => x.CreatedBy).HasMaxLength(64);
         builder.Property(x => x.LastModifiedBy).HasMaxLength(64);
         builder.Property(x => x.RowVersion).IsRowVersion().IsConcurrencyToken();
         builder.HasIndex(x => x.Code).IsUnique().HasDatabaseName("UX_Warehouses_Code");
         builder.HasIndex(x => x.IsActive).HasDatabaseName("IX_Warehouses_IsActive");
+        builder.HasIndex(x => new { x.IsActive, x.AllowsSalesAllocation }).HasDatabaseName("IX_Warehouses_SalesAllocation");
         builder.HasIndex(x => x.IsDefault).IsUnique().HasFilter("[IsDefault] = 1 AND [IsActive] = 1").HasDatabaseName("UX_Warehouses_ActiveDefault");
     }
 }

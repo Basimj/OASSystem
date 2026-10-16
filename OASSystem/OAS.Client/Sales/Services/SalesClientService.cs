@@ -91,6 +91,8 @@ public sealed class SalesClientService(OasApiClient apiClient) : ISalesClientSer
         => apiClient.PostAsync<SalesReturnActionRequest, SalesReturnPostingResultDto>($"api/sales/returns/{id:D}/post", r, ct);
     public Task<SalesReturnDto?> CancelSalesReturnAsync(Guid id, CancelSalesReturnRequest r, CancellationToken ct = default)
         => apiClient.PostAsync<CancelSalesReturnRequest, SalesReturnDto>($"api/sales/returns/{id:D}/cancel", r, ct);
+    public Task<SalesReturnDto?> InspectSalesReturnLineAsync(Guid id, Guid lineId, InspectSalesReturnLineRequest r, CancellationToken ct = default)
+        => apiClient.PostAsync<InspectSalesReturnLineRequest, SalesReturnDto>($"api/sales/returns/{id:D}/lines/{lineId:D}/inspect", r, ct);
 
     public async Task<IReadOnlyList<CommissionRuleDto>> GetCommissionRulesAsync(Guid? employeeId = null, CancellationToken ct = default)
         => await apiClient.GetAsync<IReadOnlyList<CommissionRuleDto>>(AppendQuery("api/sales/commissions/rules", ("employeeId", employeeId?.ToString())), ct) ?? [];
@@ -179,6 +181,8 @@ public sealed class SalesClientService(OasApiClient apiClient) : ISalesClientSer
         => apiClient.PostResultAsync<SalesReturnActionRequest, SalesReturnPostingResultDto>($"api/sales/returns/{id:D}/post", r, ct);
     public Task<ApiCallResult<SalesReturnDto>> CancelSalesReturnResultAsync(Guid id, CancelSalesReturnRequest r, CancellationToken ct = default)
         => apiClient.PostResultAsync<CancelSalesReturnRequest, SalesReturnDto>($"api/sales/returns/{id:D}/cancel", r, ct);
+    public Task<ApiCallResult<SalesReturnDto>> InspectSalesReturnLineResultAsync(Guid id, Guid lineId, InspectSalesReturnLineRequest r, CancellationToken ct = default)
+        => apiClient.PostResultAsync<InspectSalesReturnLineRequest, SalesReturnDto>($"api/sales/returns/{id:D}/lines/{lineId:D}/inspect", r, ct);
 
     public Task<ApiCallResult<CommissionRuleDto>> CreateCommissionRuleResultAsync(CreateCommissionRuleRequest r, CancellationToken ct = default)
         => apiClient.PostResultAsync<CreateCommissionRuleRequest, CommissionRuleDto>("api/sales/commissions/rules", r, ct);
@@ -228,8 +232,8 @@ public sealed class SalesClientService(OasApiClient apiClient) : ISalesClientSer
 
     public async Task<IReadOnlyList<SalesProductVariantLookupDto>> SearchProductVariantsAsync(Guid? productTypeId, Guid? categoryId, string? search, int take = 20, CancellationToken ct = default)
         => await apiClient.GetAsync<IReadOnlyList<SalesProductVariantLookupDto>>(AddQuery("api/sales/lookups/product-variants", ("productTypeId", productTypeId?.ToString()), ("categoryId", categoryId?.ToString()), ("search", search), ("take", take.ToString())), ct) ?? [];
-    public async Task<IReadOnlyList<SalesWarehouseLookupDto>> SearchWarehousesAsync(Guid? productVariantId, string? search, int take = 20, CancellationToken ct = default)
-        => await apiClient.GetAsync<IReadOnlyList<SalesWarehouseLookupDto>>(AddQuery("api/sales/lookups/warehouses", ("productVariantId", productVariantId?.ToString()), ("search", search), ("take", take.ToString())), ct) ?? [];
+    public async Task<IReadOnlyList<SalesWarehouseLookupDto>> SearchWarehousesAsync(Guid? productVariantId, string? search, int take = 20, bool includeNonSellable = false, CancellationToken ct = default)
+        => await apiClient.GetAsync<IReadOnlyList<SalesWarehouseLookupDto>>(AddQuery("api/sales/lookups/warehouses", ("productVariantId", productVariantId?.ToString()), ("search", search), ("take", take.ToString()), ("includeNonSellable", includeNonSellable.ToString())), ct) ?? [];
     public async Task<IReadOnlyList<SalesCurrencyLookupDto>> SearchCurrenciesAsync(DateOnly documentDate, string? search, int take = 20, CancellationToken ct = default)
         => await apiClient.GetAsync<IReadOnlyList<SalesCurrencyLookupDto>>(AddQuery("api/sales/lookups/currencies", ("documentDate", documentDate.ToString("yyyy-MM-dd")), ("search", search), ("take", take.ToString())), ct) ?? [];
     public async Task<IReadOnlyList<SalesCashAccountLookupDto>> SearchCashAccountsAsync(Guid currencyId, string? search, int take = 20, CancellationToken ct = default)

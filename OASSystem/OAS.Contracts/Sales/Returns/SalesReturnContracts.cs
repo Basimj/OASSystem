@@ -14,17 +14,26 @@ public enum SalesReturnStatus : byte
 public sealed record CreateSalesReturnLineRequest(
     Guid SalesInvoiceLineId,
     decimal Quantity,
-    Guid? ReturnWarehouseId = null);
+    Guid? ReturnWarehouseId = null,
+    SalesReturnCondition? ReturnCondition = null,
+    SalesReturnStockDisposition? StockDisposition = null);
 
 public sealed record CreateSalesReturnRequest(
     Guid SalesInvoiceId,
     DateOnly ReturnDate,
     DateOnly PostingDate,
     string? Reason,
-    IReadOnlyList<CreateSalesReturnLineRequest> Lines);
+    IReadOnlyList<CreateSalesReturnLineRequest> Lines,
+    bool OverrideReturnWindow = false,
+    string? ReturnWindowOverrideReason = null);
 
 public sealed record SalesReturnActionRequest(string RowVersion);
 public sealed record CancelSalesReturnRequest(string RowVersion, string? Reason);
+public sealed record InspectSalesReturnLineRequest(
+    string RowVersion,
+    SalesReturnCondition Condition,
+    SalesReturnStockDisposition Disposition,
+    Guid? DestinationWarehouseId = null);
 
 public sealed record SalesReturnLineDto(
     Guid Id,
@@ -43,7 +52,12 @@ public sealed record SalesReturnLineDto(
     decimal BaseTaxAmount,
     decimal BaseFinalAmount,
     decimal? UnitCostSnapshot,
-    decimal? TotalCostSnapshot);
+    decimal? TotalCostSnapshot,
+    SalesReturnCondition? ReturnCondition,
+    SalesReturnStockDisposition? StockDisposition,
+    DateTimeOffset? InspectedAtUtc,
+    string? InspectedBy,
+    string RowVersion);
 
 public sealed record SalesReturnDto(
     Guid Id,
@@ -67,6 +81,11 @@ public sealed record SalesReturnDto(
     decimal BaseTaxAmount,
     decimal BaseTotalAmount,
     string? Reason,
+    DateOnly? ReturnPolicyReferenceDate,
+    int? ReturnWindowDaysSnapshot,
+    bool ReturnWindowOverridden,
+    string? ReturnWindowOverrideReason,
+    string? ReturnWindowOverriddenBy,
     Guid? JournalEntryId,
     DateTimeOffset? ConfirmedAtUtc,
     DateTimeOffset? PostedAtUtc,

@@ -8,4 +8,5 @@ public sealed record SalesWarehouseLookupDto(
     bool IsActive,
     decimal? OnHandQuantity = null,
     decimal? ReservedQuantity = null,
-    decimal? AvailableQuantity = null);
+    decimal? AvailableQuantity = null,
+    bool AllowsSalesAllocation = true);

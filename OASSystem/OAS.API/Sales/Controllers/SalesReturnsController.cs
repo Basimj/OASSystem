@@ -52,6 +52,14 @@ public sealed class SalesReturnsController(ISender sender) : ControllerBase
         CancellationToken cancellationToken) =>
         Ok(await sender.Send(new PostSalesReturnCommand(id, request), cancellationToken));
 
+    [HttpPost("{id:guid}/lines/{lineId:guid}/inspect")]
+    public async Task<ActionResult<SalesReturnDto>> InspectLine(
+        Guid id,
+        Guid lineId,
+        [FromBody] InspectSalesReturnLineRequest request,
+        CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new InspectSalesReturnLineCommand(id, lineId, request), cancellationToken));
+
     [HttpPost("{id:guid}/cancel")]
     public async Task<ActionResult<SalesReturnDto>> Cancel(
         Guid id,

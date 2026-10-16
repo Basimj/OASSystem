@@ -30,6 +30,7 @@ public sealed class JournalEntryLineConfiguration : IEntityTypeConfiguration<Jou
         builder.Property(x => x.ExchangeRate).HasPrecision(19, 8);
         builder.Property(x => x.ExchangeRateDate).HasColumnType("date");
         builder.Property(x => x.PartyNameSnapshot).HasMaxLength(200);
+        builder.Property(x => x.PostingRole).HasMaxLength(40);
         builder.Property(x => x.Description).HasMaxLength(300);
 
         builder.HasIndex(x => new { x.JournalEntryId, x.LineNumber }).IsUnique().HasDatabaseName("UX_JournalEntryLines_Journal_LineNumber");
@@ -40,6 +41,7 @@ public sealed class JournalEntryLineConfiguration : IEntityTypeConfiguration<Jou
         builder.HasIndex(x => x.SupplierId).HasDatabaseName("IX_JournalEntryLines_SupplierId");
         builder.HasIndex(x => x.EmployeeId).HasDatabaseName("IX_JournalEntryLines_EmployeeId");
         builder.HasIndex(x => x.SourceDocumentLineId).HasDatabaseName("IX_JournalEntryLines_SourceDocumentLineId");
+        builder.HasIndex(x => new { x.JournalEntryId, x.PostingRole }).HasDatabaseName("IX_JournalEntryLines_Journal_Role");
 
         builder.HasOne<Account>().WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_JournalEntryLines_Account");
         builder.HasOne<Currency>().WithMany().HasForeignKey(x => x.TransactionCurrencyId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_JournalEntryLines_TransactionCurrency");

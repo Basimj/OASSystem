@@ -129,7 +129,7 @@ public partial class CustomerOrderOperationsPage : ComponentBase
 
     private async Task<IReadOnlyList<UiLookupItem>> SearchWarehousesAsync(string search,CancellationToken ct)
     {
-        var rows=await Sales.SearchWarehousesAsync(null,string.IsNullOrWhiteSpace(search)?null:search,20,ct);
+        var rows=await Sales.SearchWarehousesAsync(null,string.IsNullOrWhiteSpace(search)?null:search,20,false,ct);
         return rows.Where(x=>x.IsActive).Select(x=>new UiLookupItem(x.Id.ToString("D"),$"{x.Code} - {x.Name}",null,"fa-solid fa-warehouse")).ToArray();
     }
 

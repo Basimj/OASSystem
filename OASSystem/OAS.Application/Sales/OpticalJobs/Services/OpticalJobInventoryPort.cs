@@ -15,16 +15,22 @@ public sealed class OpticalJobInventoryPort(
     IInventoryTransactionRepository transactions,
     IRepository<InventoryTransactionLine, Guid> transactionLines,
     IInventoryPostingService posting,
+    IReadRepository<Warehouse, Guid> warehouses,
     ISequenceNumberGenerator sequences) : IOpticalJobInventoryPort
 {
     public async Task<decimal> GetAvailableQuantityAsync(Guid warehouseId, Guid productVariantId, CancellationToken cancellationToken = default)
-        => (await balances.GetByWarehouseAndVariantAsync(warehouseId, productVariantId, cancellationToken))?.AvailableQuantity ?? 0m;
+    {
+        var warehouse = await warehouses.GetByIdAsync(warehouseId, cancellationToken);
+        if (warehouse is null || !warehouse.IsActive || !warehouse.AllowsSalesAllocation) return 0m;
+        return (await balances.GetByWarehouseAndVariantAsync(warehouseId, productVariantId, cancellationToken))?.AvailableQuantity ?? 0m;
+    }
 
     public async Task<OpticalJobInventoryPostingResult> IssueMaterialsAsync(Guid opticalJobId, Guid requestId, string jobCode, Guid warehouseId,
         IReadOnlyCollection<OpticalJobMaterialIssueLine> lines, string createdBy, DateTimeOffset atUtc, CancellationToken cancellationToken = default)
     {
         if (requestId == Guid.Empty) throw new ConflictException("optical_job_material_request_id_required", "معرف طلب صرف المواد مطلوب.");
         if (lines.Count == 0) throw new ConflictException("optical_job_materials_required", "يجب تحديد مواد إضافية واحدة على الأقل للصرف.");
+        await EnsureSalesAllocatableWarehouseAsync(warehouseId, cancellationToken);
         var existing = (await transactions.ListAsync(new Specification<InventoryTransaction>().Where(x =>
             x.TransactionType == InventoryTransactionType.ProductionIssue && x.ReferenceType == "OpticalJobMaterialIssue" && x.ReferenceId == requestId), cancellationToken)).FirstOrDefault();
         if (existing is not null)
@@ -79,5 +85,14 @@ public sealed class OpticalJobInventoryPort(
             tx.Id, line.Id, atUtc, createdBy, cancellationToken);
         tx.Post(atUtc, createdBy);
         return new(tx.Id, line.TotalCost);
+    }
+    private async Task EnsureSalesAllocatableWarehouseAsync(Guid warehouseId, CancellationToken cancellationToken)
+    {
+        var warehouse = await warehouses.GetByIdAsync(warehouseId, cancellationToken)
+            ?? throw new ConflictException("optical_job_warehouse_missing", "مخزن مواد المعمل غير موجود.");
+        if (!warehouse.IsActive)
+            throw new ConflictException("optical_job_warehouse_inactive", "مخزن مواد المعمل غير فعال.");
+        if (!warehouse.AllowsSalesAllocation)
+            throw new ConflictException("optical_job_warehouse_quarantined", "لا يمكن صرف مواد إنتاج من مخزن حجر/غير مخصص للبيع.");
     }
 }

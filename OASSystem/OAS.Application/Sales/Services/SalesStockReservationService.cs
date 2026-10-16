@@ -15,6 +15,7 @@ namespace OAS.Application.Sales.Services;
 public sealed class SalesStockReservationService(
     IInventoryBalanceRepository balances,
     IRepository<StockReservation, Guid> reservations,
+    IReadRepository<Warehouse, Guid> warehouses,
     TimeProvider timeProvider) : ISalesStockReservationService
 {
     // V1 policy: reservation is all-or-none per inventory line. We never create a partial
@@ -38,7 +39,10 @@ public sealed class SalesStockReservationService(
                 continue;
             }
 
-            var balance = await balances.GetByWarehouseAndVariantAsync(line.WarehouseId!.Value, line.ProductVariantId!.Value, cancellationToken);
+            if (!await AllowsSalesAllocationAsync(line.WarehouseId!.Value, cancellationToken))
+                continue;
+
+            var balance = await balances.GetByWarehouseAndVariantAsync(line.WarehouseId.Value, line.ProductVariantId!.Value, cancellationToken);
             if (balance is null || !balance.TryReserve(line.Quantity))
                 continue;
 
@@ -93,6 +97,9 @@ public sealed class SalesStockReservationService(
 
         foreach (var requirement in additionalRequired)
         {
+            if (!await AllowsSalesAllocationAsync(requirement.Key.WarehouseId, cancellationToken))
+                return false;
+
             var balance = await balances.GetByWarehouseAndVariantAsync(
                 requirement.Key.WarehouseId,
                 requirement.Key.ProductVariantId,
@@ -122,7 +129,10 @@ public sealed class SalesStockReservationService(
             if (missingQuantity <= 0m)
                 continue;
 
-            var balance = await balances.GetByWarehouseAndVariantAsync(line.WarehouseId!.Value, line.ProductVariantId!.Value, cancellationToken);
+            if (!await AllowsSalesAllocationAsync(line.WarehouseId!.Value, cancellationToken))
+                throw new ConflictException("sales_warehouse_not_sellable", "المخزن المحدد حجر/غير متاح للتخصيص البيعي.");
+
+            var balance = await balances.GetByWarehouseAndVariantAsync(line.WarehouseId.Value, line.ProductVariantId!.Value, cancellationToken);
             if (balance is null || !balance.TryReserve(missingQuantity))
                 throw new ConflictException(SalesErrorCodes.InsufficientStock, "الكمية المتاحة غير كافية لتأكيد الفاتورة.");
 
@@ -144,6 +154,9 @@ public sealed class SalesStockReservationService(
     {
         foreach (var line in invoice.Lines.Where(x => x.IsActive && x.RequiresInventory))
         {
+            if (!await AllowsSalesAllocationAsync(line.WarehouseId!.Value, cancellationToken))
+                throw new ConflictException("sales_warehouse_not_sellable", "المخزن المرتبط بالسطر حجر/غير متاح للبيع.");
+
             IReadOnlyList<StockReservation> active;
             if (invoice.CustomerOrderId.HasValue && line.CustomerOrderLineId.HasValue)
                 active = await FindActiveAsync(SalesSourceReferences.CustomerOrder, invoice.CustomerOrderId.Value, line.CustomerOrderLineId.Value, cancellationToken);
@@ -171,6 +184,12 @@ public sealed class SalesStockReservationService(
             // Reservation was loaded with Tracking(); changing it is enough for the current UnitOfWork.
             reservation.Release(releasedAtUtc);
         }
+    }
+
+    private async Task<bool> AllowsSalesAllocationAsync(Guid warehouseId, CancellationToken cancellationToken)
+    {
+        var warehouse = await warehouses.GetByIdAsync(warehouseId, cancellationToken);
+        return warehouse is { IsActive: true, AllowsSalesAllocation: true };
     }
 
     private async Task<IReadOnlyList<StockReservation>> FindActiveAsync(string documentType, Guid documentId, Guid lineId, CancellationToken cancellationToken)

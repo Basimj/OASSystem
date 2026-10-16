@@ -1,5 +1,7 @@
 using OAS.Application.Abstractions.Numbering;
 using OAS.Application.Abstractions.Persistence;
+using OAS.Application.Abstractions.Persistence.Specifications;
+using OAS.Application.Common.Exceptions;
 using OAS.Application.Inventory.Repositories;
 using OAS.Application.Inventory.Services;
 using OAS.Application.Sales.Abstractions;
@@ -23,8 +25,33 @@ public sealed class SalesReturnInventoryPostingService(
         CancellationToken cancellationToken = default)
     {
         var transactionIds = new List<Guid>();
-        var inventoryLines = salesReturn.Lines.Where(x => x.IsActive && x.RequiresInventory).ToArray();
-        foreach (var warehouseGroup in inventoryLines.GroupBy(x => x.WarehouseId!.Value))
+        var inventoryLines = salesReturn.Lines.Where(x => x.IsActive && x.RestoresInventoryAsset).ToArray();
+        var warehouseGroups = inventoryLines.GroupBy(x => x.WarehouseId!.Value).ToArray();
+
+        var existing = await transactions.ListAsync(
+            new Specification<InventoryTransaction>().Where(x =>
+                x.TransactionType == InventoryTransactionType.SalesReturn &&
+                x.ReferenceType == SalesSourceReferences.SalesReturn &&
+                x.ReferenceId == salesReturn.Id),
+            cancellationToken);
+        if (existing.Count > 0)
+        {
+            var expectedWarehouses = warehouseGroups.Select(x => x.Key).OrderBy(x => x).ToArray();
+            var postedWarehouses = existing
+                .Where(x => x.Status == InventoryTransactionStatus.Posted && x.DestinationWarehouseId.HasValue)
+                .Select(x => x.DestinationWarehouseId!.Value)
+                .Distinct()
+                .OrderBy(x => x)
+                .ToArray();
+            if (existing.Count == warehouseGroups.Length && expectedWarehouses.SequenceEqual(postedWarehouses))
+                return new SalesReturnInventoryPostingResult(existing.Select(x => x.Id).ToArray());
+
+            throw new ConflictException(
+                "sales_return_inventory_partial_posting",
+                "تم العثور على ترحيل مخزني جزئي/غير متسق لهذا المرتجع. أوقف إعادة المحاولة وراجع الحركة قبل أي ترحيل إضافي.");
+        }
+
+        foreach (var warehouseGroup in warehouseGroups)
         {
             var sequence = await sequences.NextAsync("InventoryTransaction", cancellationToken);
             var transaction = new InventoryTransaction(

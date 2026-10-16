@@ -4,6 +4,7 @@ using OAS.Application.Inventory.Repositories;
 using OAS.Application.Sales.Abstractions;
 using OAS.Application.Sales.Common;
 using OAS.Contracts.Sales.CustomerOrders;
+using OAS.Domain.Entities.Inventory;
 using OAS.Domain.Enums.Inventory;
 using OAS.Domain.Sales;
 using OAS.Domain.Sales.Entities;
@@ -12,7 +13,8 @@ namespace OAS.Application.Sales.Services;
 
 public sealed class CustomerOrderAvailabilityService(
     IInventoryBalanceRepository balances,
-    IReadRepository<OAS.Domain.Entities.Inventory.StockReservation, Guid> reservations)
+    IReadRepository<OAS.Domain.Entities.Inventory.StockReservation, Guid> reservations,
+    IReadRepository<Warehouse, Guid> warehouses)
     : ICustomerOrderAvailabilityService
 {
     public async Task<CustomerOrderAvailabilityDto> AssessAsync(
@@ -25,7 +27,11 @@ public sealed class CustomerOrderAvailabilityService(
         {
             var warehouseId = line.WarehouseId!.Value;
             var productVariantId = line.ProductVariantId!.Value;
-            var balance = await balances.GetByWarehouseAndVariantAsync(warehouseId, productVariantId, cancellationToken);
+            var warehouse = await warehouses.GetByIdAsync(warehouseId, cancellationToken);
+            var canAllocate = warehouse is { IsActive: true, AllowsSalesAllocation: true };
+            var balance = canAllocate
+                ? await balances.GetByWarehouseAndVariantAsync(warehouseId, productVariantId, cancellationToken)
+                : null;
 
             var reservationSpec = new Specification<OAS.Domain.Entities.Inventory.StockReservation>().Where(x =>
                 x.SourceModule == SalesSourceReferences.Module &&
@@ -35,7 +41,7 @@ public sealed class CustomerOrderAvailabilityService(
                 x.Status == StockReservationStatus.Active &&
                 x.IsActive);
             var orderReservations = await reservations.ListAsync(reservationSpec, cancellationToken);
-            var alreadyReserved = orderReservations.Sum(x => x.Quantity);
+            var alreadyReserved = canAllocate ? orderReservations.Sum(x => x.Quantity) : 0m;
 
             var onHand = balance?.OnHandQuantity ?? 0m;
             var reserved = balance?.ReservedQuantity ?? 0m;

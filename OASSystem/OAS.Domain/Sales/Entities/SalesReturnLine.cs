@@ -28,7 +28,9 @@ public sealed class SalesReturnLine : AuditableEntity<Guid>
         decimal baseTaxAmount,
         decimal baseFinalAmount,
         decimal? unitCostSnapshot,
-        decimal? totalCostSnapshot)
+        decimal? totalCostSnapshot,
+        SalesReturnCondition? returnCondition,
+        SalesReturnStockDisposition? stockDisposition)
     {
         Id = SalesDomainGuard.Required(id, "Sales return line id");
         SalesReturnId = SalesDomainGuard.Required(salesReturnId, "Sales return id");
@@ -66,6 +68,9 @@ public sealed class SalesReturnLine : AuditableEntity<Guid>
         BaseFinalAmount = baseFinalAmount;
         UnitCostSnapshot = unitCostSnapshot;
         TotalCostSnapshot = totalCostSnapshot;
+        ReturnCondition = returnCondition;
+        StockDisposition = stockDisposition;
+        ValidateQualityPolicy();
         IsActive = true;
     }
 
@@ -86,9 +91,14 @@ public sealed class SalesReturnLine : AuditableEntity<Guid>
     public decimal BaseFinalAmount { get; private set; }
     public decimal? UnitCostSnapshot { get; private set; }
     public decimal? TotalCostSnapshot { get; private set; }
+    public SalesReturnCondition? ReturnCondition { get; private set; }
+    public SalesReturnStockDisposition? StockDisposition { get; private set; }
+    public DateTimeOffset? InspectedAtUtc { get; private set; }
+    public string? InspectedBy { get; private set; }
     public bool IsActive { get; private set; }
     public byte[] RowVersion { get; private set; } = [];
     public bool RequiresInventory => ProductVariantId.HasValue && WarehouseId.HasValue;
+    public bool RestoresInventoryAsset => RequiresInventory && StockDisposition is SalesReturnStockDisposition.Restock or SalesReturnStockDisposition.Quarantine;
 
     public static SalesReturnLine Create(
         Guid id,
@@ -108,10 +118,67 @@ public sealed class SalesReturnLine : AuditableEntity<Guid>
         decimal baseTaxAmount,
         decimal baseFinalAmount,
         decimal? unitCostSnapshot,
-        decimal? totalCostSnapshot) =>
+        decimal? totalCostSnapshot,
+        SalesReturnCondition? returnCondition = null,
+        SalesReturnStockDisposition? stockDisposition = null) =>
         new(id, salesReturnId, lineNumber, salesInvoiceLineId, lineType, productVariantId, warehouseId,
             productCodeSnapshot, productNameSnapshot, quantity, netAmount, taxAmount, finalAmount,
-            baseNetAmount, baseTaxAmount, baseFinalAmount, unitCostSnapshot, totalCostSnapshot);
+            baseNetAmount, baseTaxAmount, baseFinalAmount, unitCostSnapshot, totalCostSnapshot,
+            returnCondition, stockDisposition);
+
+    public void RecordInspection(
+        SalesReturnCondition condition,
+        SalesReturnStockDisposition disposition,
+        DateTimeOffset inspectedAtUtc,
+        string inspectedBy,
+        Guid? destinationWarehouseId = null)
+    {
+        if (!RequiresInventory)
+            throw new DomainException("Only inventory return lines can be inspected.");
+        if (StockDisposition != SalesReturnStockDisposition.Quarantine)
+            throw new DomainException("Only quarantined return lines can be inspected or released.");
+        if (disposition is not (SalesReturnStockDisposition.Quarantine or SalesReturnStockDisposition.Restock))
+            throw new DomainException("Inspection can keep stock quarantined or release it back to sellable stock only.");
+        if (disposition == SalesReturnStockDisposition.Restock)
+        {
+            if (condition != SalesReturnCondition.Resellable)
+                throw new DomainException("Only a resellable inspected item can be released from quarantine.");
+            if (!destinationWarehouseId.HasValue || destinationWarehouseId == Guid.Empty)
+                throw new DomainException("A destination warehouse is required when releasing quarantined stock.");
+        }
+        else if (destinationWarehouseId.HasValue)
+        {
+            throw new DomainException("A destination warehouse is only allowed when releasing stock from quarantine.");
+        }
+
+        ReturnCondition = condition;
+        StockDisposition = disposition;
+        if (disposition == SalesReturnStockDisposition.Restock)
+            WarehouseId = destinationWarehouseId;
+        InspectedAtUtc = inspectedAtUtc;
+        InspectedBy = SalesDomainGuard.Required(inspectedBy, 64, "Inspector");
+        ValidateQualityPolicy();
+    }
+
+    private void ValidateQualityPolicy()
+    {
+        if (!RequiresInventory)
+        {
+            if (StockDisposition.HasValue && StockDisposition != SalesReturnStockDisposition.NoStock)
+                throw new DomainException("Non-inventory return lines must use NoStock disposition when a disposition is supplied.");
+            return;
+        }
+
+        if (ReturnCondition.HasValue && ReturnCondition == SalesReturnCondition.Unknown)
+            throw new DomainException("Inventory return condition cannot be Unknown.");
+        if (StockDisposition.HasValue && StockDisposition == SalesReturnStockDisposition.Unknown)
+            throw new DomainException("Inventory return stock disposition cannot be Unknown.");
+        if (ReturnCondition is SalesReturnCondition.NeedsInspection or SalesReturnCondition.Damaged &&
+            StockDisposition is not null and not SalesReturnStockDisposition.Quarantine)
+            throw new DomainException("Items requiring inspection or marked damaged must be quarantined first.");
+        if (StockDisposition == SalesReturnStockDisposition.Restock && ReturnCondition != SalesReturnCondition.Resellable)
+            throw new DomainException("Only resellable returned stock can be restocked directly.");
+    }
 
     internal void Deactivate() => IsActive = false;
 }

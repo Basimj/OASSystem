@@ -3,6 +3,7 @@ using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Abstractions.Persistence.Specifications;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.Sales.Abstractions;
+using OAS.Domain.Accounting;
 using OAS.Domain.Accounting.Entities;
 using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Sales;
@@ -30,8 +31,8 @@ public sealed class SalesReturnAccountingPostingService(
             throw new ConflictException("sales_return_journal_duplicate", "يوجد أكثر من قيد محاسبي لمرتجع المبيعات.");
         if (existing.Count == 1) return existing[0].Id;
 
-        var requiresInventory = salesReturn.Lines.Any(x => x.IsActive && x.RequiresInventory);
-        var period = await postingPeriods.GetOpenPostingPeriodAsync(salesReturn.PostingDate, requiresInventory, cancellationToken);
+        var restoresInventory = salesReturn.Lines.Any(x => x.IsActive && x.RestoresInventoryAsset);
+        var period = await postingPeriods.GetOpenPostingPeriodAsync(salesReturn.PostingDate, restoresInventory, cancellationToken);
         var customer = await customers.GetByIdAsync(salesReturn.CustomerId, cancellationToken)
             ?? throw new NotFoundException(nameof(Customer), salesReturn.CustomerId);
         if (!customer.IsActive)
@@ -48,26 +49,19 @@ public sealed class SalesReturnAccountingPostingService(
         if (sourceJournalLines.Count == 0)
             throw new ConflictException("sales_return_source_journal_lines_missing", "لا توجد أسطر قيد محفوظة للفاتورة الأصلية.");
 
-        // A return must reverse the exact accounts used by the original posted invoice. Posting
-        // profile or customer-account configuration may have changed since the sale.
-        var customerAccount = ResolveSingleAccount(
-            sourceJournalLines.Where(x => x.CustomerId == salesReturn.CustomerId && x.DebitAmount > 0m),
-            "sales_return_source_customer_account_missing",
-            "تعذر تحديد حساب العميل من قيد الفاتورة الأصلية.");
-        var revenueAccount = ResolveSingleAccount(
-            sourceJournalLines.Where(x => x.Description?.StartsWith("Sales revenue /", StringComparison.OrdinalIgnoreCase) == true),
-            "sales_return_source_revenue_account_missing",
-            "تعذر تحديد حساب إيراد المبيعات من قيد الفاتورة الأصلية.");
+        // Historical reversal is driven by immutable lineage/roles, never by Description text
+        // and never by the currently active posting profile.
+        var customerAccount = SalesReturnHistoricalAccountResolver.ResolveCustomerAccount(sourceJournalLines, salesReturn.CustomerId);
+        var revenueAccount = SalesReturnHistoricalAccountResolver.ResolveRevenueAccount(sourceJournalLines, customerAccount, salesReturn.TaxAmount > 0m);
         Guid? taxAccount = salesReturn.TaxAmount > 0m
-            ? ResolveSingleAccount(
-                sourceJournalLines.Where(x => x.Description?.StartsWith("Sales tax /", StringComparison.OrdinalIgnoreCase) == true),
-                "sales_return_source_tax_account_missing",
-                "تعذر تحديد حساب ضريبة المبيعات من قيد الفاتورة الأصلية.")
+            ? SalesReturnHistoricalAccountResolver.ResolveRequiredRoleAccount(sourceJournalLines, AccountingPostingRoles.SalesTax,
+                "sales_return_legacy_tax_role_review_required",
+                "تعذر إثبات حساب ضريبة الفاتورة التاريخي بنيويًا. يلزم مراجعة/تسوية بيانات القيد القديم قبل ترحيل المرتجع.")
             : null;
 
-        await EnsureAccountAsync(customerAccount, cancellationToken);
-        await EnsureAccountAsync(revenueAccount, cancellationToken);
-        if (taxAccount.HasValue) await EnsureAccountAsync(taxAccount.Value, cancellationToken);
+        await EnsureHistoricalAccountAsync(customerAccount, cancellationToken);
+        await EnsureHistoricalAccountAsync(revenueAccount, cancellationToken);
+        if (taxAccount.HasValue) await EnsureHistoricalAccountAsync(taxAccount.Value, cancellationToken);
 
         var sequence = await sequences.NextAsync($"JournalEntry-{salesReturn.PostingDate.Year}", cancellationToken);
         var journal = JournalEntry.Create(
@@ -86,39 +80,40 @@ public sealed class SalesReturnAccountingPostingService(
 
         var lineNo = 1;
         journal.AddLine(CreateInvoiceCurrencyLine(journal.Id, lineNo++, customerAccount, 0m, salesReturn.BaseTotalAmount,
-            0m, salesReturn.TotalAmount, salesReturn, $"Customer refund / {salesReturn.ReturnCode}", customer.Id));
+            0m, salesReturn.TotalAmount, salesReturn, $"Customer return / {salesReturn.ReturnCode}", customer.Id,
+            AccountingPostingRoles.SalesCustomerReceivable));
         journal.AddLine(CreateInvoiceCurrencyLine(journal.Id, lineNo++, revenueAccount, salesReturn.BaseNetAmount, 0m,
-            salesReturn.NetAmount, 0m, salesReturn, $"Sales revenue reversal / {salesReturn.ReturnCode}", null));
+            salesReturn.NetAmount, 0m, salesReturn, $"Sales revenue reversal / {salesReturn.ReturnCode}", null,
+            AccountingPostingRoles.SalesRevenue));
         if (salesReturn.TaxAmount > 0m && taxAccount.HasValue)
         {
             journal.AddLine(CreateInvoiceCurrencyLine(journal.Id, lineNo++, taxAccount.Value, salesReturn.BaseTaxAmount, 0m,
-                salesReturn.TaxAmount, 0m, salesReturn, $"Sales tax reversal / {salesReturn.ReturnCode}", null));
+                salesReturn.TaxAmount, 0m, salesReturn, $"Sales tax reversal / {salesReturn.ReturnCode}", null,
+                AccountingPostingRoles.SalesTax));
         }
 
-        foreach (var returnLine in salesReturn.Lines.Where(x => x.IsActive && x.RequiresInventory).OrderBy(x => x.LineNumber))
+        foreach (var returnLine in salesReturn.Lines.Where(x => x.IsActive && x.RestoresInventoryAsset).OrderBy(x => x.LineNumber))
         {
             var cost = returnLine.TotalCostSnapshot ?? 0m;
             if (cost <= 0m) continue;
 
-            var inventoryAccount = ResolveSingleAccount(
-                sourceJournalLines.Where(x =>
-                    x.SourceDocumentLineId == returnLine.SalesInvoiceLineId &&
-                    x.Description?.StartsWith("Inventory /", StringComparison.OrdinalIgnoreCase) == true),
+            var inventoryAccount = SalesReturnHistoricalAccountResolver.ResolveSourceLineAccount(
+                sourceJournalLines, returnLine.SalesInvoiceLineId, AccountingPostingRoles.SalesInventory, creditDirection: true,
                 "sales_return_source_inventory_account_missing",
-                $"تعذر تحديد حساب المخزون من قيد الفاتورة الأصلية للسطر {returnLine.LineNumber}.");
-            var cogsAccount = ResolveSingleAccount(
-                sourceJournalLines.Where(x =>
-                    x.SourceDocumentLineId == returnLine.SalesInvoiceLineId &&
-                    x.Description?.StartsWith("COGS /", StringComparison.OrdinalIgnoreCase) == true),
+                $"تعذر تحديد حساب المخزون التاريخي من قيد الفاتورة الأصلية للسطر {returnLine.LineNumber}.");
+            var cogsAccount = SalesReturnHistoricalAccountResolver.ResolveSourceLineAccount(
+                sourceJournalLines, returnLine.SalesInvoiceLineId, AccountingPostingRoles.SalesCOGS, creditDirection: false,
                 "sales_return_source_cogs_account_missing",
-                $"تعذر تحديد حساب تكلفة المبيعات من قيد الفاتورة الأصلية للسطر {returnLine.LineNumber}.");
-            await EnsureAccountAsync(inventoryAccount, cancellationToken);
-            await EnsureAccountAsync(cogsAccount, cancellationToken);
+                $"تعذر تحديد حساب تكلفة المبيعات التاريخي من قيد الفاتورة الأصلية للسطر {returnLine.LineNumber}.");
+            await EnsureHistoricalAccountAsync(inventoryAccount, cancellationToken);
+            await EnsureHistoricalAccountAsync(cogsAccount, cancellationToken);
 
             journal.AddLine(CreateBaseCurrencyLine(journal.Id, lineNo++, inventoryAccount, cost, 0m, salesReturn,
-                $"Inventory return / {salesReturn.ReturnCode} / line {returnLine.LineNumber}", returnLine.ProductVariantId, returnLine.WarehouseId, returnLine.Id));
+                $"Inventory return / {salesReturn.ReturnCode} / line {returnLine.LineNumber}", returnLine.ProductVariantId, returnLine.WarehouseId, returnLine.Id,
+                AccountingPostingRoles.SalesInventory));
             journal.AddLine(CreateBaseCurrencyLine(journal.Id, lineNo++, cogsAccount, 0m, cost, salesReturn,
-                $"COGS reversal / {salesReturn.ReturnCode} / line {returnLine.LineNumber}", returnLine.ProductVariantId, returnLine.WarehouseId, returnLine.Id));
+                $"COGS reversal / {salesReturn.ReturnCode} / line {returnLine.LineNumber}", returnLine.ProductVariantId, returnLine.WarehouseId, returnLine.Id,
+                AccountingPostingRoles.SalesCOGS));
         }
 
         if (!journal.IsBalanced())
@@ -130,38 +125,34 @@ public sealed class SalesReturnAccountingPostingService(
         return journal.Id;
     }
 
-    private static Guid ResolveSingleAccount(IEnumerable<JournalEntryLine> candidates, string code, string message)
-    {
-        var accounts = candidates.Select(x => x.AccountId).Distinct().ToArray();
-        if (accounts.Length != 1)
-            throw new ConflictException(code, message);
-        return accounts[0];
-    }
-
-    private async Task EnsureAccountAsync(Guid accountId, CancellationToken ct)
+    private async Task EnsureHistoricalAccountAsync(Guid accountId, CancellationToken ct)
     {
         var account = await accounts.GetByIdAsync(accountId, ct)
             ?? throw new ConflictException("sales_return_account_missing", "الحساب المحاسبي المستخدم في الفاتورة الأصلية لم يعد موجودًا.");
-        if (!account.CanReceivePosting())
-            throw new ConflictException("sales_return_account_invalid", $"الحساب '{account.Code}' المستخدم في الفاتورة الأصلية غير صالح حاليًا للترحيل.");
+        // A historical automated reversal must keep the exact account used by the posted
+        // invoice even if that account was later deactivated or the posting profile changed.
+        // We only reject structural non-posting/header accounts; inactivity must not redirect
+        // the reversal to a different current account.
+        if (!account.IsPostingAccount || account.AccountType == AccountType.Header)
+            throw new ConflictException("sales_return_account_invalid", $"الحساب التاريخي '{account.Code}' ليس حساب ترحيل صالحًا بنيويًا.");
     }
 
     private static JournalEntryLine CreateInvoiceCurrencyLine(
         Guid journalId, int lineNo, Guid accountId, decimal debitBase, decimal creditBase,
-        decimal debitTx, decimal creditTx, SalesReturn salesReturn, string description, Guid? customerId) =>
+        decimal debitTx, decimal creditTx, SalesReturn salesReturn, string description, Guid? customerId, string postingRole) =>
         JournalEntryLine.CreateMultiCurrency(
             Guid.NewGuid(), journalId, lineNo, accountId, debitBase, creditBase,
             salesReturn.CurrencyId, salesReturn.CurrencyCodeSnapshot, salesReturn.CurrencyDecimalPlacesSnapshot,
             debitTx, creditTx, salesReturn.ExchangeRate, salesReturn.ExchangeRateDate,
             salesReturn.ExchangeRateType, salesReturn.ExchangeRateSource, description,
-            customerId, null, null, null, null, null, null, null);
+            customerId, null, null, null, null, null, null, null, postingRole);
 
     private static JournalEntryLine CreateBaseCurrencyLine(
         Guid journalId, int lineNo, Guid accountId, decimal debit, decimal credit, SalesReturn salesReturn,
-        string description, Guid? productVariantId, Guid? warehouseId, Guid? sourceLineId) =>
+        string description, Guid? productVariantId, Guid? warehouseId, Guid? sourceLineId, string postingRole) =>
         JournalEntryLine.CreateMultiCurrency(
             Guid.NewGuid(), journalId, lineNo, accountId, debit, credit,
             salesReturn.BaseCurrencyId, salesReturn.BaseCurrencyCodeSnapshot, salesReturn.BaseCurrencyDecimalPlacesSnapshot,
             debit, credit, 1m, salesReturn.PostingDate, ExchangeRateType.Accounting, ExchangeRateSource.System,
-            description, null, null, null, null, null, productVariantId, warehouseId, sourceLineId);
+            description, null, null, null, null, null, productVariantId, warehouseId, sourceLineId, postingRole);
 }

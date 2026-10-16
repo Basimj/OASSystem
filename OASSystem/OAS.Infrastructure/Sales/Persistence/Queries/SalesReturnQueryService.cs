@@ -78,6 +78,11 @@ public sealed class SalesReturnQueryService(OAS.Infrastructure.Persistence.OasDb
         entity.BaseTaxAmount,
         entity.BaseTotalAmount,
         entity.Reason,
+        entity.ReturnPolicyReferenceDate,
+        entity.ReturnWindowDaysSnapshot,
+        entity.ReturnWindowOverridden,
+        entity.ReturnWindowOverrideReason,
+        entity.ReturnWindowOverriddenBy,
         entity.JournalEntryId,
         entity.ConfirmedAtUtc,
         entity.PostedAtUtc,
@@ -100,5 +105,10 @@ public sealed class SalesReturnQueryService(OAS.Infrastructure.Persistence.OasDb
             x.BaseTaxAmount,
             x.BaseFinalAmount,
             x.UnitCostSnapshot,
-            x.TotalCostSnapshot)).ToList());
+            x.TotalCostSnapshot,
+            x.ReturnCondition.HasValue ? (OAS.Contracts.Sales.Enums.SalesReturnCondition?)(byte)x.ReturnCondition.Value : null,
+            x.StockDisposition.HasValue ? (OAS.Contracts.Sales.Enums.SalesReturnStockDisposition?)(byte)x.StockDisposition.Value : null,
+            x.InspectedAtUtc,
+            x.InspectedBy,
+            Convert.ToBase64String(x.RowVersion))).ToList());
 }
