@@ -53,4 +53,8 @@ public sealed record SalesInvoiceLineDto(
     bool? ProductIsPrescriptionLens = null,
     decimal? LensSPH = null,
     decimal? LensCYL = null,
-    decimal? LensADD = null);
+    decimal? LensADD = null)
+{
+    public decimal HeaderDiscountAllocated { get; init; }
+    public decimal BaseHeaderDiscountAllocated { get; init; }
+}
