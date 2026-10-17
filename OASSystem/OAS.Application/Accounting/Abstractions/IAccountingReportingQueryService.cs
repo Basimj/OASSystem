@@ -30,19 +30,6 @@ public interface IAccountingReportingQueryService
         JournalReportFilterDto filter,
         CancellationToken cancellationToken = default);
 
-    Task<SupplierStatementDto> GetSupplierStatementAsync(
-        SupplierStatementFilterDto filter,
-        CancellationToken cancellationToken = default);
-
-    Task<SupplierBalancesDto> GetSupplierBalancesAsync(
-        SupplierBalancesFilterDto filter,
-        CancellationToken cancellationToken = default);
-
-    Task<ApReconciliationDto> GetApReconciliationAsync(
-        DateOnly asOfDate,
-        Guid? controlAccountId = null,
-        CancellationToken cancellationToken = default);
-
     Task<FiscalCloseReadinessDto> GetFiscalPeriodCloseReadinessAsync(
         Guid fiscalPeriodId,
         CancellationToken cancellationToken = default);
