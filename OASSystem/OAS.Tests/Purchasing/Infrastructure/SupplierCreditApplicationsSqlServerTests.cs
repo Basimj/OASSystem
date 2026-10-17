@@ -9,6 +9,7 @@ namespace OAS.Tests.Purchasing.Infrastructure;
 [TestFixture, Category("PurchasingSqlServer"), NonParallelizable]
 public sealed class SupplierCreditApplicationsSqlServerTests
 {
+    private const string Ap01MigrationId = "20261017040000_AddSupplierCreditApplications";
     private string _connection = null!;
 
     [OneTimeSetUp]
@@ -27,7 +28,11 @@ public sealed class SupplierCreditApplicationsSqlServerTests
         };
         _connection = builder.ConnectionString;
         await using var context = Context();
-        await context.Database.MigrateAsync();
+
+        // This test validates the AP-01 migration chain itself. Targeting AP-01 explicitly
+        // prevents unrelated pending-model drift elsewhere in the solution from blocking
+        // this migration/schema acceptance test before AP-01 can be exercised.
+        await context.Database.MigrateAsync(Ap01MigrationId);
     }
 
     [OneTimeTearDown]
@@ -50,7 +55,7 @@ public sealed class SupplierCreditApplicationsSqlServerTests
         Assert.That(await ColumnExists(connection, "tbl_SupplierCreditApplications", "AppliedInvoiceCurrencyAmount"), Is.True);
         Assert.That(await ColumnExists(connection, "tbl_SupplierCreditApplications", "RowVersion"), Is.True);
         Assert.That(await IndexExists(connection, "tbl_SupplierCreditApplications", "UX_SupplierCreditApplications_IdempotencyKey"), Is.True);
-        Assert.That(await MigrationApplied(connection, "20261017040000_AddSupplierCreditApplications"), Is.True);
+        Assert.That(await MigrationApplied(connection, Ap01MigrationId), Is.True);
     }
 
     private OasDbContext Context() => new(new DbContextOptionsBuilder<OasDbContext>()
