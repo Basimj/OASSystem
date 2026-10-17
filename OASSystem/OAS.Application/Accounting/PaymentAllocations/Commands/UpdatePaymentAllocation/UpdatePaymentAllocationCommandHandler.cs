@@ -20,6 +20,8 @@ public sealed class UpdatePaymentAllocationCommandHandler(
     public async Task Handle(UpdatePaymentAllocationCommand request, CancellationToken ct)
     {
         var allocation = await repository.GetForUpdateAsync(request.Id, ct) ?? throw new NotFoundException(nameof(PaymentAllocation), request.Id);
+        if (allocation.IsReversed)
+            throw new ConflictException("payment_allocation_reversed_readonly", "لا يمكن تعديل تخصيص تم عكسه.");
         if (allocation.TargetDocumentType is AllocationTargetDocumentType.EmployeePayroll or AllocationTargetDocumentType.EndOfServiceSettlement)
             throw new ConflictException("managed_payment_allocation_immutable", "Payroll and end-of-service allocations are managed by their dedicated payment workflows and cannot be edited directly.");
         if (allocation.TargetDocumentType == AllocationTargetDocumentType.PurchaseInvoice)
@@ -32,7 +34,8 @@ public sealed class UpdatePaymentAllocationCommandHandler(
         var source = await GetSourceAsync(allocation, ct);
         var sourceAmount = source.Amount;
         var existing = await repository.ListAsync(new Specification<PaymentAllocation>().Where(x =>
-            allocation.ReceiptVoucherLineId.HasValue ? x.ReceiptVoucherLineId == allocation.ReceiptVoucherLineId : x.PaymentVoucherLineId == allocation.PaymentVoucherLineId), ct);
+            x.ReversedAtUtc == null &&
+            (allocation.ReceiptVoucherLineId.HasValue ? x.ReceiptVoucherLineId == allocation.ReceiptVoucherLineId : x.PaymentVoucherLineId == allocation.PaymentVoucherLineId)), ct);
         var available = sourceAmount - existing.Where(x => x.Id != allocation.Id).Sum(x => x.AllocatedAmount);
         if (request.Data.AllocatedAmount > available)
             throw new ConflictException("payment_allocation_exceeds_available_amount", $"The requested allocation ({request.Data.AllocatedAmount}) exceeds the available source-line amount ({available}).");
