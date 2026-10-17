@@ -55,7 +55,8 @@ public sealed class GetPurchaseInvoicePaymentSummaryQueryHandler(
                 0m,
                 invoice.BaseTotalAmount,
                 0m,
-                Array.Empty<PurchaseInvoicePaymentSettlementDto>());
+                Array.Empty<PurchaseInvoicePaymentSettlementDto>(),
+                invoice.BaseCurrencyCodeSnapshot);
         }
 
         var balance = await balances.GetAsync(invoice, null, ct);
@@ -124,7 +125,8 @@ public sealed class GetPurchaseInvoicePaymentSummaryQueryHandler(
             balance.AppliedCreditBaseAmount,
             balance.OutstandingBaseAmount,
             balance.RealizedExchangeDifferenceBase,
-            settlements);
+            settlements,
+            invoice.BaseCurrencyCodeSnapshot);
     }
 
     private static decimal GetSourceBaseAmount(PaymentAllocation allocation, decimal? sourceRate)
