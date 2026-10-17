@@ -13,11 +13,10 @@ public sealed class CustomerOrderConfiguration : IEntityTypeConfiguration<Custom
         {
             t.HasCheckConstraint("CK_CustomerOrders_ExchangeRate_Positive", "[ExchangeRate] > 0");
             t.HasCheckConstraint("CK_CustomerOrders_PaymentTermDays_NonNegative", "[PaymentTermDaysSnapshot] >= 0");
-            t.HasCheckConstraint("CK_CustomerOrders_Totals_NonNegative", "[Subtotal] >= 0 AND [DiscountAmount] >= 0 AND [TaxAmount] >= 0 AND [TotalAmount] >= 0");
+            t.HasCheckConstraint("CK_CustomerOrders_Totals_NonNegative", "[Subtotal] >= 0 AND [DiscountAmount] >= 0 AND [HeaderDiscountAmount] >= 0 AND [TaxAmount] >= 0 AND [TotalAmount] >= 0");
         });
         builder.HasKey(x => x.Id);
         builder.ConfigureSalesAudit();
-
         builder.Property(x => x.Id).ValueGeneratedNever();
         builder.Property(x => x.OrderCode).IsRequired().HasMaxLength(40);
         builder.Property(x => x.CustomerId).IsRequired();
@@ -39,6 +38,12 @@ public sealed class CustomerOrderConfiguration : IEntityTypeConfiguration<Custom
         builder.Property(x => x.PaymentTermDaysSnapshot).IsRequired();
         builder.Property(x => x.Subtotal).IsRequired().HasPrecision(19, 4);
         builder.Property(x => x.DiscountAmount).IsRequired().HasPrecision(19, 4);
+        builder.Property(x => x.HeaderDiscountType).IsRequired().HasConversion<byte>().HasDefaultValue(OAS.Domain.Sales.Enums.SalesDiscountType.None);
+        builder.Property(x => x.HeaderDiscountValue).HasPrecision(19, 4);
+        builder.Property(x => x.HeaderDiscountAmount).IsRequired().HasPrecision(19, 4).HasDefaultValue(0m);
+        builder.Property(x => x.HeaderDiscountReason).HasMaxLength(500);
+        builder.Property(x => x.HeaderDiscountApprovedAtUtc).HasColumnType("datetimeoffset");
+        builder.Property(x => x.HeaderDiscountApprovedBy).HasMaxLength(64);
         builder.Property(x => x.TaxAmount).IsRequired().HasPrecision(19, 4);
         builder.Property(x => x.TotalAmount).IsRequired().HasPrecision(19, 4);
         builder.Property(x => x.Notes).HasMaxLength(1000);
@@ -48,7 +53,6 @@ public sealed class CustomerOrderConfiguration : IEntityTypeConfiguration<Custom
         builder.Property(x => x.CancelledAtUtc).HasColumnType("datetimeoffset");
         builder.Property(x => x.CancelledBy).HasMaxLength(64);
         builder.Property(x => x.RowVersion).IsRowVersion().IsConcurrencyToken();
-
         builder.HasIndex(x => x.OrderCode).IsUnique().HasDatabaseName("UX_CustomerOrders_OrderCode");
         builder.HasIndex(x => x.CustomerId).HasDatabaseName("IX_CustomerOrders_CustomerId");
         builder.HasIndex(x => x.OrderDate).HasDatabaseName("IX_CustomerOrders_OrderDate");
@@ -56,16 +60,10 @@ public sealed class CustomerOrderConfiguration : IEntityTypeConfiguration<Custom
         builder.HasIndex(x => x.PrescriptionRevisionId).HasDatabaseName("IX_CustomerOrders_PrescriptionRevisionId");
         builder.HasIndex(x => x.CurrencyId).HasDatabaseName("IX_CustomerOrders_CurrencyId");
         builder.HasIndex(x => x.PaymentPlan).HasDatabaseName("IX_CustomerOrders_PaymentPlan");
-
-        builder.HasOne<Customer>().WithMany().HasForeignKey(x => x.CustomerId)
-            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_CustomerOrders_Customers_CustomerId");
-        builder.HasOne<PrescriptionRevision>().WithMany().HasForeignKey(x => x.PrescriptionRevisionId)
-            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_CustomerOrders_PrescriptionRevisions_PrescriptionRevisionId");
-        builder.HasOne<Currency>().WithMany().HasForeignKey(x => x.CurrencyId)
-            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_CustomerOrders_Currencies_CurrencyId");
-
-        builder.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.CustomerOrderId)
-            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_CustomerOrderLines_Orders_CustomerOrderId");
+        builder.HasOne<Customer>().WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_CustomerOrders_Customers_CustomerId");
+        builder.HasOne<PrescriptionRevision>().WithMany().HasForeignKey(x => x.PrescriptionRevisionId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_CustomerOrders_PrescriptionRevisions_PrescriptionRevisionId");
+        builder.HasOne<Currency>().WithMany().HasForeignKey(x => x.CurrencyId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_CustomerOrders_Currencies_CurrencyId");
+        builder.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.CustomerOrderId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_CustomerOrderLines_Orders_CustomerOrderId");
         builder.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

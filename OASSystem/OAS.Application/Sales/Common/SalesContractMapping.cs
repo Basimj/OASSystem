@@ -34,7 +34,10 @@ internal static class SalesContractMapping
         SalesEnumMap.To<OAS.Contracts.Sales.Enums.SalesDiscountType>(x.DiscountType), x.DiscountValue, x.DiscountAmount,
         x.TaxRate, x.TaxAmount, x.NetAmount, x.FinalAmount, x.PrescriptionRevisionId,
         x.PrescriptionEye.HasValue ? SalesEnumMap.To<OAS.Contracts.Sales.Enums.EyeSide>(x.PrescriptionEye.Value) : null,
-        x.RequiresProduction, x.Notes, x.IsActive, Convert.ToBase64String(x.RowVersion));
+        x.RequiresProduction, x.Notes, x.IsActive, Convert.ToBase64String(x.RowVersion))
+    {
+        HeaderDiscountAllocated = x.HeaderDiscountAllocated
+    };
 
     public static CustomerOrderDto Order(CustomerOrder x, string? customerCode = null, string? customerName = null) => new(
         x.Id, x.OrderCode, x.CustomerId, customerCode, customerName, x.PrescriptionRevisionId, x.OrderDate, x.RequiredDate,
@@ -48,7 +51,14 @@ internal static class SalesContractMapping
         x.CancelledAtUtc, x.CancelledBy, Convert.ToBase64String(x.RowVersion), x.CreatedAtUtc, x.CreatedBy,
         x.LastModifiedAtUtc, x.LastModifiedBy, x.Lines.OrderBy(l => l.LineNumber).Select(OrderLine).ToArray())
     {
-        PaymentPlan = SalesEnumMap.To<OAS.Contracts.Sales.Enums.SalesPaymentPlan>(x.PaymentPlan)
+        PaymentPlan = SalesEnumMap.To<OAS.Contracts.Sales.Enums.SalesPaymentPlan>(x.PaymentPlan),
+        HeaderDiscountType = SalesEnumMap.To<OAS.Contracts.Sales.Enums.SalesDiscountType>(x.HeaderDiscountType),
+        HeaderDiscountValue = x.HeaderDiscountValue,
+        HeaderDiscountAmount = x.HeaderDiscountAmount,
+        HeaderDiscountReason = x.HeaderDiscountReason,
+        HeaderDiscountApprovedAtUtc = x.HeaderDiscountApprovedAtUtc,
+        HeaderDiscountApprovedBy = x.HeaderDiscountApprovedBy,
+        HeaderDiscountRequiresApproval = x.HeaderDiscountRequiresApproval
     };
 
     public static SalesInvoiceLinePrescriptionSnapshotDto PrescriptionSnapshot(SalesInvoiceLinePrescriptionSnapshot x) => new(
@@ -67,7 +77,11 @@ internal static class SalesContractMapping
         x.PrescriptionRevisionId,
         x.PrescriptionEye.HasValue ? SalesEnumMap.To<OAS.Contracts.Sales.Enums.EyeSide>(x.PrescriptionEye.Value) : null,
         x.RequiresProduction, x.Notes, x.IsActive, Convert.ToBase64String(x.RowVersion),
-        x.PrescriptionSnapshot is null ? null : PrescriptionSnapshot(x.PrescriptionSnapshot));
+        x.PrescriptionSnapshot is null ? null : PrescriptionSnapshot(x.PrescriptionSnapshot))
+    {
+        HeaderDiscountAllocated = x.HeaderDiscountAllocated,
+        BaseHeaderDiscountAllocated = x.BaseHeaderDiscountAllocated
+    };
 
     public static SalesInvoiceDto Invoice(
         SalesInvoice x,
@@ -88,10 +102,17 @@ internal static class SalesContractMapping
         x.BaseTaxAmount, x.BaseTotalAmount, x.Description, x.JournalEntryId, x.ConfirmedAtUtc, x.ConfirmedBy,
         x.PostedAtUtc, x.PostedBy, x.CancelledAtUtc, x.CancelledBy, x.IsActive, Convert.ToBase64String(x.RowVersion),
         x.CreatedAtUtc, x.CreatedBy, x.LastModifiedAtUtc, x.LastModifiedBy, payment,
-        x.Lines.OrderBy(l => l.LineNumber).Select(InvoiceLine).ToArray(),
-        SalesEmployeeId: x.SalesEmployeeId)
+        x.Lines.OrderBy(l => l.LineNumber).Select(InvoiceLine).ToArray(), SalesEmployeeId: x.SalesEmployeeId)
     {
-        PaymentPlan = SalesEnumMap.To<OAS.Contracts.Sales.Enums.SalesPaymentPlan>(x.PaymentPlan)
+        PaymentPlan = SalesEnumMap.To<OAS.Contracts.Sales.Enums.SalesPaymentPlan>(x.PaymentPlan),
+        HeaderDiscountType = SalesEnumMap.To<OAS.Contracts.Sales.Enums.SalesDiscountType>(x.HeaderDiscountType),
+        HeaderDiscountValue = x.HeaderDiscountValue,
+        HeaderDiscountAmount = x.HeaderDiscountAmount,
+        BaseHeaderDiscountAmount = x.BaseHeaderDiscountAmount,
+        HeaderDiscountReason = x.HeaderDiscountReason,
+        HeaderDiscountApprovedAtUtc = x.HeaderDiscountApprovedAtUtc,
+        HeaderDiscountApprovedBy = x.HeaderDiscountApprovedBy,
+        HeaderDiscountRequiresApproval = x.HeaderDiscountRequiresApproval
     };
 
     public static SalesPriceOverrideDto PriceOverride(SalesPriceOverride x) => new(

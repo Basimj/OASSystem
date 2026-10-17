@@ -1,5 +1,6 @@
 @namespace OAS.Client.Sales.Workspace
 @using OAS.Client.Sales.Workspace
+@using OAS.Client.Sales.Components
 @using OAS.UiLib.Core.Models.Sales
 @using OAS.UiLib.Components.Sales.Workspace
 @using OAS.UiLib.Components.Sales.Prescriptions
@@ -33,8 +34,7 @@
         {
             <UiSalesEditorSurface Title="@(prescription.Id.HasValue ? prescription.PrescriptionCode : "وصفة جديدة")"
                                   Subtitle="الوصفة الطبية وإصدارات قياسات العين" IconCss="fa-solid fa-glasses"
-                                  StatusText="@prescription.StatusText" StatusCssClass="@StatusCss(prescription.Status)"
->
+                                  StatusText="@prescription.StatusText" StatusCssClass="@StatusCss(prescription.Status)">
                 <Actions>
                     @if (ActiveTab.IsNew)
                     {
@@ -58,30 +58,24 @@
                     }
                 </Actions>
                 <ChildContent>
-                <UiSalesFormSection Title="بيانات الوصفة" IconCss="fa-solid fa-file-medical">
-                    <UiPrescriptionEditor Model="@prescription" ReadOnly="@(!ActiveTab.IsEditMode)" SearchCustomersAsync="SearchCustomerItemsAsync" OnCustomerSelected="PrescriptionCustomerChangedAsync" OnChanged="MarkDirtyAsync" />
-                </UiSalesFormSection>
-                @if (ActiveRevisionDraft is not null)
-                {
-                    @if (ActiveTab.IsNew)
+                    <UiSalesFormSection Title="بيانات الوصفة" IconCss="fa-solid fa-file-medical">
+                        <UiPrescriptionEditor Model="@prescription" ReadOnly="@(!ActiveTab.IsEditMode)" SearchCustomersAsync="SearchCustomerItemsAsync" OnCustomerSelected="PrescriptionCustomerChangedAsync" OnChanged="MarkDirtyAsync" />
+                    </UiSalesFormSection>
+                    @if (ActiveRevisionDraft is not null)
                     {
-                        <UiSalesFormSection Title="الإصدار الأول"
-                                                Description="الإصدار الأول إلزامي. يتم حفظ الوصفة والإصدار والقياسات معًا، وبعد نجاح الحفظ تصبح الوصفة مفعلة تلقائيًا."
-                                                IconCss="fa-solid fa-code-branch">
-                            <UiPrescriptionRevisionEditor Model="@ActiveRevisionDraft"
-                                                          OnChanged="MarkDirtyAsync" />
-                        </UiSalesFormSection>
+                        @if (ActiveTab.IsNew)
+                        {
+                            <UiSalesFormSection Title="الإصدار الأول" Description="الإصدار الأول إلزامي. يتم حفظ الوصفة والإصدار والقياسات معًا، وبعد نجاح الحفظ تصبح الوصفة مفعلة تلقائيًا." IconCss="fa-solid fa-code-branch">
+                                <UiPrescriptionRevisionEditor Model="@ActiveRevisionDraft" OnChanged="MarkDirtyAsync" />
+                            </UiSalesFormSection>
+                        }
+                        else
+                        {
+                            <UiSalesFormSection Title="@($"الإصدار {ActiveRevisionDraft.RevisionNumber} - إصدار جديد")" Description="أدخل القياسات ثم اضغط «حفظ الإصدار» من شريط الإجراءات أعلى الصفحة. لا تحتاج إلى الدخول في تعديل الوصفة لحفظ الإصدار." IconCss="fa-solid fa-code-branch">
+                                <UiPrescriptionRevisionEditor Model="@ActiveRevisionDraft" OnChanged="RevisionDraftChangedAsync" />
+                            </UiSalesFormSection>
+                        }
                     }
-                    else
-                    {
-                        <UiSalesFormSection Title="@($"الإصدار {ActiveRevisionDraft.RevisionNumber} - إصدار جديد")"
-                                                Description="أدخل القياسات ثم اضغط «حفظ الإصدار» من شريط الإجراءات أعلى الصفحة. لا تحتاج إلى الدخول في تعديل الوصفة لحفظ الإصدار."
-                                                IconCss="fa-solid fa-code-branch">
-                            <UiPrescriptionRevisionEditor Model="@ActiveRevisionDraft"
-                                                          OnChanged="RevisionDraftChangedAsync" />
-                        </UiSalesFormSection>
-                    }
-                }
                 </ChildContent>
             </UiSalesEditorSurface>
         }
@@ -107,12 +101,16 @@
                     }
                 </Actions>
                 <ChildContent>
-                <UiCustomerOrderEditor Model="@order" ReadOnly="@(!ActiveTab.IsEditMode)" SearchCustomersAsync="SearchCustomerItemsAsync"
-                                       SearchPrescriptionsAsync="SearchPrescriptionRevisionItemsAsync" SearchCurrenciesAsync="SearchCurrencyItemsAsync"
-                                       SearchProductTypesAsync="SearchProductTypeItemsAsync" SearchCategoriesAsync="SearchCategoryItemsAsync" SearchProductsAsync="SearchProductItemsAsync" SearchWarehousesAsync="SearchWarehouseItemsAsync"
-                                       SearchPrescriptionRevisionsAsync="SearchLinePrescriptionItemsAsync" OnSelectionChanged="SelectionChangedAsync"
-                                       OnProductTypeSelected="ProductTypeSelectedAsync" OnCategorySelected="CategorySelectedAsync"
-                               OnProductSelected="ProductSelectedAsync" OnWarehouseSelected="WarehouseSelectedAsync" OnChanged="MarkDirtyAsync" />
+                    <UiCustomerOrderEditor Model="@order" ReadOnly="@(!ActiveTab.IsEditMode)" SearchCustomersAsync="SearchCustomerItemsAsync"
+                                           SearchPrescriptionsAsync="SearchPrescriptionRevisionItemsAsync" SearchCurrenciesAsync="SearchCurrencyItemsAsync"
+                                           SearchProductTypesAsync="SearchProductTypeItemsAsync" SearchCategoriesAsync="SearchCategoryItemsAsync" SearchProductsAsync="SearchProductItemsAsync" SearchWarehousesAsync="SearchWarehouseItemsAsync"
+                                           SearchPrescriptionRevisionsAsync="SearchLinePrescriptionItemsAsync" OnSelectionChanged="SelectionChangedAsync"
+                                           OnProductTypeSelected="ProductTypeSelectedAsync" OnCategorySelected="CategorySelectedAsync"
+                                           OnProductSelected="ProductSelectedAsync" OnWarehouseSelected="WarehouseSelectedAsync" OnChanged="MarkDirtyAsync" />
+                    @if (order.Id.HasValue)
+                    {
+                        <SalesHeaderDiscountPanel DocumentKind="order" DocumentId="@order.Id.Value" />
+                    }
                 </ChildContent>
             </UiSalesEditorSurface>
         }
@@ -153,13 +151,17 @@
                     }
                 </Actions>
                 <ChildContent>
-                <UiSalesInvoiceEditor Model="@invoice" ReadOnly="@InvoiceReadOnly(invoice)"
-                                      SearchCustomersAsync="SearchCustomerItemsAsync" SearchEmployeesAsync="SearchEmployeeItemsAsync" SearchPrescriptionsAsync="SearchPrescriptionRevisionItemsAsync" SearchCurrenciesAsync="SearchCurrencyItemsAsync"
-                                      SearchPaymentCashAccountsAsync="SearchPaymentCashAccountItemsAsync" SearchPaymentBankAccountsAsync="SearchPaymentBankAccountItemsAsync" SearchSettlementAccountsAsync="SearchSettlementAccountItemsAsync"
-                                      SearchProductTypesAsync="SearchProductTypeItemsAsync" SearchCategoriesAsync="SearchCategoryItemsAsync" SearchProductsAsync="SearchProductItemsAsync" SearchWarehousesAsync="SearchWarehouseItemsAsync"
-                                      SearchPrescriptionRevisionsAsync="SearchLinePrescriptionItemsAsync" OnSelectionChanged="SelectionChangedAsync"
-                                      OnProductTypeSelected="ProductTypeSelectedAsync" OnCategorySelected="CategorySelectedAsync"
-                               OnProductSelected="ProductSelectedAsync" OnWarehouseSelected="WarehouseSelectedAsync" OnRequestPriceOverride="RequestPriceOverrideAsync" OnChanged="MarkDirtyAsync" />
+                    <UiSalesInvoiceEditor Model="@invoice" ReadOnly="@InvoiceReadOnly(invoice)"
+                                          SearchCustomersAsync="SearchCustomerItemsAsync" SearchEmployeesAsync="SearchEmployeeItemsAsync" SearchPrescriptionsAsync="SearchPrescriptionRevisionItemsAsync" SearchCurrenciesAsync="SearchCurrencyItemsAsync"
+                                          SearchPaymentCashAccountsAsync="SearchPaymentCashAccountItemsAsync" SearchPaymentBankAccountsAsync="SearchPaymentBankAccountItemsAsync" SearchSettlementAccountsAsync="SearchSettlementAccountItemsAsync"
+                                          SearchProductTypesAsync="SearchProductTypeItemsAsync" SearchCategoriesAsync="SearchCategoryItemsAsync" SearchProductsAsync="SearchProductItemsAsync" SearchWarehousesAsync="SearchWarehouseItemsAsync"
+                                          SearchPrescriptionRevisionsAsync="SearchLinePrescriptionItemsAsync" OnSelectionChanged="SelectionChangedAsync"
+                                          OnProductTypeSelected="ProductTypeSelectedAsync" OnCategorySelected="CategorySelectedAsync"
+                                          OnProductSelected="ProductSelectedAsync" OnWarehouseSelected="WarehouseSelectedAsync" OnRequestPriceOverride="RequestPriceOverrideAsync" OnChanged="MarkDirtyAsync" />
+                    @if (invoice.Id.HasValue)
+                    {
+                        <SalesHeaderDiscountPanel DocumentKind="invoice" DocumentId="@invoice.Id.Value" />
+                    }
                 </ChildContent>
             </UiSalesEditorSurface>
         }

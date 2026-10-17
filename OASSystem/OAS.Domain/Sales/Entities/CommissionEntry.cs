@@ -1,5 +1,6 @@
 using OAS.Domain.Common.Entities;
 using OAS.Domain.Exceptions;
+using OAS.Domain.Sales.Commissions;
 
 namespace OAS.Domain.Sales.Entities;
 
@@ -10,13 +11,15 @@ public sealed class CommissionEntry : AuditableEntity<Guid>
     private CommissionEntry(Guid id, Guid statementId, Guid employeeId, string sourceDocumentType,
         Guid sourceDocumentId, Guid sourceLineId, Guid salesInvoiceId, Guid originalSalesInvoiceLineId,
         Guid? salesReturnId, DateOnly sourceDate, decimal baseSalesAmount, decimal ratePercent,
-        Guid commissionRuleId, string ruleCodeSnapshot, string ruleNameSnapshot, bool isReversal)
+        Guid commissionRuleId, string ruleCodeSnapshot, string ruleNameSnapshot, CommissionBasisKind basisKindSnapshot,
+        bool isReversal)
     {
         if (id == Guid.Empty || statementId == Guid.Empty || employeeId == Guid.Empty || sourceDocumentId == Guid.Empty ||
             sourceLineId == Guid.Empty || salesInvoiceId == Guid.Empty || originalSalesInvoiceLineId == Guid.Empty || commissionRuleId == Guid.Empty)
             throw new DomainException("Commission entry identifiers are required.");
         if (string.IsNullOrWhiteSpace(sourceDocumentType)) throw new DomainException("Commission source document type is required.");
         if (ratePercent < 0m || ratePercent > 100m) throw new DomainException("Commission rate must be between 0 and 100.");
+        if (!Enum.IsDefined(basisKindSnapshot)) throw new DomainException("Commission basis snapshot is invalid.");
         if ((!isReversal && baseSalesAmount < 0m) || (isReversal && baseSalesAmount > 0m))
             throw new DomainException("Commission sales amount sign does not match reversal state.");
 
@@ -36,6 +39,7 @@ public sealed class CommissionEntry : AuditableEntity<Guid>
         CommissionRuleId = commissionRuleId;
         RuleCodeSnapshot = Required(ruleCodeSnapshot, 40);
         RuleNameSnapshot = Required(ruleNameSnapshot, 160);
+        BasisKindSnapshot = basisKindSnapshot;
         IsReversal = isReversal;
     }
 
@@ -54,6 +58,7 @@ public sealed class CommissionEntry : AuditableEntity<Guid>
     public Guid CommissionRuleId { get; private set; }
     public string RuleCodeSnapshot { get; private set; } = string.Empty;
     public string RuleNameSnapshot { get; private set; } = string.Empty;
+    public CommissionBasisKind BasisKindSnapshot { get; private set; } = CommissionBasisKind.NetAfterDiscountExcludingTax;
     public bool IsReversal { get; private set; }
 
     public static CommissionEntry Create(Guid id, Guid statementId, Guid employeeId, string sourceDocumentType,
@@ -61,7 +66,16 @@ public sealed class CommissionEntry : AuditableEntity<Guid>
         Guid? salesReturnId, DateOnly sourceDate, decimal baseSalesAmount, decimal ratePercent,
         Guid ruleId, string ruleCode, string ruleName, bool isReversal) =>
         new(id, statementId, employeeId, sourceDocumentType, sourceDocumentId, sourceLineId, salesInvoiceId,
-            originalSalesInvoiceLineId, salesReturnId, sourceDate, baseSalesAmount, ratePercent, ruleId, ruleCode, ruleName, isReversal);
+            originalSalesInvoiceLineId, salesReturnId, sourceDate, baseSalesAmount, ratePercent, ruleId, ruleCode, ruleName,
+            CommissionBasisKind.NetAfterDiscountExcludingTax, isReversal);
+
+    public static CommissionEntry Create(Guid id, Guid statementId, Guid employeeId, string sourceDocumentType,
+        Guid sourceDocumentId, Guid sourceLineId, Guid salesInvoiceId, Guid originalSalesInvoiceLineId,
+        Guid? salesReturnId, DateOnly sourceDate, decimal baseSalesAmount, decimal ratePercent,
+        Guid ruleId, string ruleCode, string ruleName, CommissionBasisKind basisKind, bool isReversal) =>
+        new(id, statementId, employeeId, sourceDocumentType, sourceDocumentId, sourceLineId, salesInvoiceId,
+            originalSalesInvoiceLineId, salesReturnId, sourceDate, baseSalesAmount, ratePercent, ruleId, ruleCode, ruleName,
+            basisKind, isReversal);
 
     private static string Required(string value, int max)
     {

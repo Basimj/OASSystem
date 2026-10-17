@@ -1,0 +1,178 @@
+@using OAS.Client.Services.Http
+@using OAS.Contracts.Sales.CustomerOrders
+@using OAS.Contracts.Sales.SalesInvoices
+@using OAS.Contracts.Sales.Enums
+@using OAS.Client.Common.Feedback.Services
+@using OAS.UiLib.Services.Feedback
+@inject OasApiClient Api
+@inject IUiSnackbarService Snackbar
+@inject IApiFeedbackService ApiFeedback
+
+<UiSalesFormSection Title="خصم رأس المستند" Description="خصم مستقل عن خصومات السطور، ويوزع تلقائيًا على السطور قبل احتساب الضريبة." IconCss="fa-solid fa-percent">
+    @if (_loading)
+    {
+        <UiAlert Message="جاري تحميل بيانات الخصم..." Tone="AlertTone.Info" />
+    }
+    else
+    {
+        <UiGrid Columns="3">
+            <UiKeyValue Label="خصم الرأس الحالي" Value="@_amount.ToString("N2")" />
+            <UiKeyValue Label="الحالة" Value="@(_amount <= 0m ? "لا يوجد" : _approved ? "معتمد" : "بانتظار الاعتماد")" />
+            <UiKeyValue Label="المعتمد بواسطة" Value="@(_approvedBy ?? "-")" />
+        </UiGrid>
+
+        @if (_isDraft)
+        {
+            <UiStackLayout Gap="StackGap.Small">
+                <UiSelect Label="نوع الخصم" Value="@_type" ValueChanged="@(v => _type = v)" Options="@DiscountTypeOptions" Size="ControlSize.Small" />
+                <UiInputText Label="قيمة الخصم" Value="@_value" ValueChanged="@(v => _value = v ?? string.Empty)" InputMode="decimal" Size="ControlSize.Small" />
+                <UiInputText Label="سبب الخصم" Value="@_reason" ValueChanged="@(v => _reason = v)" Size="ControlSize.Small" MaxLength="500" />
+                <UiWorkspaceActionBar>
+                    <UiButton Text="تطبيق الخصم" IconCssClass="fa-solid fa-percent" Loading="@_busy" Size="ControlSize.Small" OnClick="SetDiscountAsync" />
+                    @if (_amount > 0m && !_approved)
+                    {
+                        <UiButton Text="اعتماد الخصم" IconCssClass="fa-solid fa-user-check" Variant="ButtonVariant.Secondary" Loading="@_busy" Size="ControlSize.Small" OnClick="ApproveAsync" />
+                    }
+                </UiWorkspaceActionBar>
+            </UiStackLayout>
+        }
+        else if (_amount > 0m)
+        {
+            <UiAlert Message="تم تثبيت خصم رأس المستند؛ لا يعاد تسعيره بعد مغادرة حالة المسودة." Tone="AlertTone.Success" />
+        }
+    }
+</UiSalesFormSection>
+
+@code {
+    [Parameter, EditorRequired] public string DocumentKind { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public Guid DocumentId { get; set; }
+
+    private bool _loading = true;
+    private bool _busy;
+    private bool _isDraft;
+    private bool _approved;
+    private decimal _amount;
+    private string? _approvedBy;
+    private string? _rowVersion;
+    private string? _type = ((byte)SalesDiscountType.None).ToString();
+    private string _value = "0";
+    private string? _reason;
+
+    private static IReadOnlyList<UiSelectOption> DiscountTypeOptions =>
+    [
+        new(((byte)SalesDiscountType.None).ToString(), "بدون خصم"),
+        new(((byte)SalesDiscountType.Percentage).ToString(), "نسبة مئوية"),
+        new(((byte)SalesDiscountType.FixedAmount).ToString(), "مبلغ ثابت")
+    ];
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            if (DocumentKind == "invoice")
+            {
+                var dto = await Api.GetAsync<SalesInvoiceDto>($"api/sales/invoices/{DocumentId:D}");
+                if (dto is not null)
+                {
+                    _isDraft = dto.Status == SalesInvoiceStatus.Draft;
+                    _amount = dto.HeaderDiscountAmount;
+                    _approved = dto.HeaderDiscountApprovedAtUtc.HasValue;
+                    _approvedBy = dto.HeaderDiscountApprovedBy;
+                    _rowVersion = dto.RowVersion;
+                    _type = ((byte)dto.HeaderDiscountType).ToString();
+                    _value = dto.HeaderDiscountValue?.ToString() ?? "0";
+                    _reason = dto.HeaderDiscountReason;
+                }
+            }
+            else
+            {
+                var dto = await Api.GetAsync<CustomerOrderDto>($"api/sales/customer-orders/{DocumentId:D}");
+                if (dto is not null)
+                {
+                    _isDraft = dto.Status == CustomerOrderStatus.Draft;
+                    _amount = dto.HeaderDiscountAmount;
+                    _approved = dto.HeaderDiscountApprovedAtUtc.HasValue;
+                    _approvedBy = dto.HeaderDiscountApprovedBy;
+                    _rowVersion = dto.RowVersion;
+                    _type = ((byte)dto.HeaderDiscountType).ToString();
+                    _value = dto.HeaderDiscountValue?.ToString() ?? "0";
+                    _reason = dto.HeaderDiscountReason;
+                }
+            }
+        }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
+        finally { _loading = false; }
+    }
+
+    private async Task SetDiscountAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_rowVersion)) return;
+        if (!byte.TryParse(_type, out var typeByte)) return;
+        var type = (SalesDiscountType)typeByte;
+        decimal? value = null;
+        if (type != SalesDiscountType.None)
+        {
+            if (!decimal.TryParse(_value, out var parsed) || parsed < 0m)
+            { Snackbar.Error("قيمة الخصم غير صحيحة."); return; }
+            if (string.IsNullOrWhiteSpace(_reason))
+            { Snackbar.Error("سبب الخصم إلزامي."); return; }
+            value = parsed;
+        }
+
+        _busy = true;
+        try
+        {
+            if (DocumentKind == "invoice")
+            {
+                var call = await Api.PostResultAsync<SetSalesInvoiceHeaderDiscountRequest, SalesInvoiceDto>(
+                    $"api/sales/invoices/{DocumentId:D}/header-discount",
+                    new SetSalesInvoiceHeaderDiscountRequest(type, value, _reason, _rowVersion));
+                if (!call.Succeeded) { if (call.Error is not null) ApiFeedback.Show(call.Error); return; }
+            }
+            else
+            {
+                var call = await Api.PostResultAsync<SetCustomerOrderHeaderDiscountRequest, CustomerOrderDto>(
+                    $"api/sales/customer-orders/{DocumentId:D}/header-discount",
+                    new SetCustomerOrderHeaderDiscountRequest(type, value, _reason, _rowVersion));
+                if (!call.Succeeded) { if (call.Error is not null) ApiFeedback.Show(call.Error); return; }
+            }
+            Snackbar.Success("تم تطبيق خصم رأس المستند وتوزيعه على السطور.");
+            await LoadAsync();
+        }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
+        finally { _busy = false; }
+    }
+
+    private async Task ApproveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_rowVersion)) return;
+        _busy = true;
+        try
+        {
+            if (DocumentKind == "invoice")
+            {
+                var call = await Api.PostResultAsync<ApproveSalesInvoiceHeaderDiscountRequest, SalesInvoiceDto>(
+                    $"api/sales/invoices/{DocumentId:D}/header-discount/approve",
+                    new ApproveSalesInvoiceHeaderDiscountRequest(_rowVersion));
+                if (!call.Succeeded) { if (call.Error is not null) ApiFeedback.Show(call.Error); return; }
+            }
+            else
+            {
+                var call = await Api.PostResultAsync<ApproveCustomerOrderHeaderDiscountRequest, CustomerOrderDto>(
+                    $"api/sales/customer-orders/{DocumentId:D}/header-discount/approve",
+                    new ApproveCustomerOrderHeaderDiscountRequest(_rowVersion));
+                if (!call.Succeeded) { if (call.Error is not null) ApiFeedback.Show(call.Error); return; }
+            }
+            Snackbar.Success("تم اعتماد خصم رأس المستند.");
+            await LoadAsync();
+        }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
+        finally { _busy = false; }
+    }
+}
