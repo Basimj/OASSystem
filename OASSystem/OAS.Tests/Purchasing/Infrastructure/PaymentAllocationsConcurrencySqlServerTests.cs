@@ -47,17 +47,14 @@ public sealed class PaymentAllocationsConcurrencySqlServerTests
         await using var connection = new SqlConnection(_connection);
         await connection.OpenAsync();
 
-        Assert.Multiple(async () =>
-        {
-            Assert.That(await ColumnExists(connection, "tbl_PaymentAllocations", "IdempotencyKey"), Is.True);
-            Assert.That(await ColumnExists(connection, "tbl_PaymentAllocations", "ReversedAtUtc"), Is.True);
-            Assert.That(await ColumnExists(connection, "tbl_PaymentAllocations", "ReversedBy"), Is.True);
-            Assert.That(await ColumnExists(connection, "tbl_PaymentAllocations", "ReversalReason"), Is.True);
-            Assert.That(await ColumnExists(connection, "tbl_PaymentAllocations", "RowVersion"), Is.True);
-            Assert.That(await IndexExists(connection, "tbl_PaymentAllocations", "UX_PaymentAllocations_IdempotencyKey"), Is.True);
-            Assert.That(await IndexExists(connection, "tbl_PaymentAllocations", "IX_PaymentAllocations_PaymentVoucherLine_Date"), Is.True);
-            Assert.That(await MigrationApplied(connection, Ap03MigrationId), Is.True);
-        });
+        Assert.That(await ColumnExists(connection, "tbl_PaymentAllocations", "IdempotencyKey"), Is.True);
+        Assert.That(await ColumnExists(connection, "tbl_PaymentAllocations", "ReversedAtUtc"), Is.True);
+        Assert.That(await ColumnExists(connection, "tbl_PaymentAllocations", "ReversedBy"), Is.True);
+        Assert.That(await ColumnExists(connection, "tbl_PaymentAllocations", "ReversalReason"), Is.True);
+        Assert.That(await ColumnExists(connection, "tbl_PaymentAllocations", "RowVersion"), Is.True);
+        Assert.That(await IndexExists(connection, "tbl_PaymentAllocations", "UX_PaymentAllocations_IdempotencyKey"), Is.True);
+        Assert.That(await IndexExists(connection, "tbl_PaymentAllocations", "IX_PaymentAllocations_PaymentVoucherLine_Date"), Is.True);
+        Assert.That(await MigrationApplied(connection, Ap03MigrationId), Is.True);
     }
 
     [Test]
