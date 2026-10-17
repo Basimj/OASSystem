@@ -13,6 +13,7 @@ public sealed class PaymentAllocationConfiguration : IEntityTypeConfiguration<Pa
             t.HasCheckConstraint("CK_PaymentAllocations_Amount_Positive", "[AllocatedAmount] > 0");
             t.HasCheckConstraint("CK_PaymentAllocations_BaseAmount_Positive", "[BaseAllocatedAmount] IS NULL OR [BaseAllocatedAmount] > 0");
             t.HasCheckConstraint("CK_PaymentAllocations_TargetBaseAmount_Positive", "[TargetBaseAllocatedAmount] IS NULL OR [TargetBaseAllocatedAmount] > 0");
+            t.HasCheckConstraint("CK_PaymentAllocations_TargetDocumentAmount_Positive", "[TargetDocumentAmount] IS NULL OR [TargetDocumentAmount] > 0");
             t.HasCheckConstraint("CK_PaymentAllocations_ExchangeRate_Positive", "[ExchangeRate] IS NULL OR [ExchangeRate] > 0");
             t.HasCheckConstraint("CK_PaymentAllocations_TypedSource", "(CASE WHEN [ReceiptVoucherLineId] IS NULL THEN 0 ELSE 1 END + CASE WHEN [PaymentVoucherLineId] IS NULL THEN 0 ELSE 1 END + CASE WHEN [CustomerAdvanceApplicationId] IS NULL THEN 0 ELSE 1 END) = 1");
         });
@@ -29,6 +30,7 @@ public sealed class PaymentAllocationConfiguration : IEntityTypeConfiguration<Pa
         builder.Property(x => x.ExchangeRate).HasPrecision(19, 8);
         builder.Property(x => x.BaseAllocatedAmount).HasPrecision(19, 4);
         builder.Property(x => x.TargetBaseAllocatedAmount).HasPrecision(19, 4);
+        builder.Property(x => x.TargetDocumentAmount).HasPrecision(19, 4);
         builder.Property(x => x.AllocatedAtUtc).IsRequired().HasColumnType("datetime2(3)");
 
         builder.HasIndex(x => x.PaymentSourceId).HasDatabaseName("IX_PaymentAllocations_PaymentSourceId");
@@ -37,6 +39,7 @@ public sealed class PaymentAllocationConfiguration : IEntityTypeConfiguration<Pa
         builder.HasIndex(x => x.CustomerAdvanceApplicationId).HasDatabaseName("IX_PaymentAllocations_CustomerAdvanceApplicationId");
         builder.HasIndex(x => x.TargetDocumentId).HasDatabaseName("IX_PaymentAllocations_TargetDocumentId");
         builder.HasIndex(x => new { x.TargetDocumentType, x.TargetDocumentId }).HasDatabaseName("IX_PaymentAllocations_TargetDocument");
+        builder.HasIndex(x => new { x.TargetDocumentType, x.TargetDocumentId, x.AllocatedAtUtc }).HasDatabaseName("IX_PaymentAllocations_TargetDocument_Date");
         builder.HasIndex(x => x.CurrencyId).HasDatabaseName("IX_PaymentAllocations_CurrencyId");
 
         builder.HasOne<ReceiptVoucherLine>().WithMany().HasForeignKey(x => x.ReceiptVoucherLineId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_PaymentAllocations_ReceiptVoucherLine");
