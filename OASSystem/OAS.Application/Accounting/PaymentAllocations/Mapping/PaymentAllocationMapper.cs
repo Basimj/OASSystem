@@ -11,5 +11,7 @@ public sealed class PaymentAllocationMapper
         (ContractAllocationTargetDocumentType)(int)source.TargetDocumentType, source.TargetDocumentId,
         source.CurrencyId, source.CurrencyCodeSnapshot, source.AllocatedAmount, source.ExchangeRate, source.BaseAllocatedAmount,
         source.AllocatedAtUtc, source.CreatedBy, source.CustomerAdvanceApplicationId,
-        source.TargetBaseAllocatedAmount, source.TargetDocumentAmount);
+        source.TargetBaseAllocatedAmount, source.TargetDocumentAmount,
+        source.IdempotencyKey, source.IsReversed, source.ReversedAtUtc, source.ReversedBy, source.ReversalReason,
+        source.RowVersion.Length == 0 ? string.Empty : Convert.ToBase64String(source.RowVersion));
 }
