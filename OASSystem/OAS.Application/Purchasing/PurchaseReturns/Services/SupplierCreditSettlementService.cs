@@ -13,7 +13,8 @@ public sealed class SupplierCreditSettlementService(
     IReadRepository<PurchaseInvoice, Guid> purchaseInvoices,
     IRepository<SupplierCreditApplication, Guid> creditApplications,
     IPurchaseInvoiceBalanceService invoiceBalances,
-    ISupplierCreditConcurrencyPort concurrencyPort)
+    ISupplierCreditConcurrencyPort concurrencyPort,
+    ISupplierCreditSourcePort creditSourcePort)
     : ISupplierCreditSettlementService
 {
     public async Task<SupplierCreditApplication?> AutoApplyLinkedReturnAsync(
@@ -26,14 +27,17 @@ public sealed class SupplierCreditSettlementService(
 
         if (purchaseReturn.Status != PurchaseReturnStatus.Posted ||
             !purchaseReturn.PurchaseInvoiceId.HasValue ||
-            purchaseReturn.SupplierGrossBaseAmount <= 0m ||
             !purchaseReturn.JournalEntryId.HasValue)
             return null;
+
+        var sourceCreditBase = await GetPostedSourceCreditBaseAmountAsync(purchaseReturn, cancellationToken);
+        if (sourceCreditBase <= 0m) return null;
 
         var targetInvoiceId = purchaseReturn.PurchaseInvoiceId.Value;
         var key = AutoIdempotencyKey(purchaseReturn.Id, targetInvoiceId);
         return await ApplyCoreAsync(
             purchaseReturn,
+            sourceCreditBase,
             targetInvoiceId,
             null,
             key,
@@ -65,9 +69,11 @@ public sealed class SupplierCreditSettlementService(
 
         var purchaseReturn = await purchaseReturns.GetForUpdateAsync(purchaseReturnId, cancellationToken)
             ?? throw new NotFoundException(nameof(PurchaseReturn), purchaseReturnId);
+        var sourceCreditBase = await GetPostedSourceCreditBaseAmountAsync(purchaseReturn, cancellationToken);
 
         return await ApplyCoreAsync(
             purchaseReturn,
+            sourceCreditBase,
             purchaseInvoiceId,
             appliedBaseAmount,
             idempotencyKey.Trim(),
@@ -115,7 +121,7 @@ public sealed class SupplierCreditSettlementService(
 
         var rows = await GetApplicationsAsync(purchaseReturn.Id, cancellationToken);
         var active = rows.Where(x => x.Status == SupplierCreditApplicationStatus.Active).ToArray();
-        var totalCredit = IsApCreditSource(purchaseReturn) ? purchaseReturn.SupplierGrossBaseAmount : 0m;
+        var totalCredit = await GetPostedSourceCreditBaseAmountAsync(purchaseReturn, cancellationToken);
         var applied = Round(active.Sum(x => x.AppliedSourceBaseAmount));
         var available = Math.Max(0m, Round(totalCredit - applied));
 
@@ -130,6 +136,7 @@ public sealed class SupplierCreditSettlementService(
 
     private async Task<SupplierCreditApplication?> ApplyCoreAsync(
         PurchaseReturn purchaseReturn,
+        decimal sourceCreditBaseAmount,
         Guid targetInvoiceId,
         decimal? requestedBaseAmount,
         string idempotencyKey,
@@ -139,10 +146,10 @@ public sealed class SupplierCreditSettlementService(
         CancellationToken cancellationToken,
         bool lockAlreadyAcquired = false)
     {
-        if (!IsApCreditSource(purchaseReturn))
+        if (sourceCreditBaseAmount <= 0m)
             throw new ConflictException(
                 "supplier_credit_return_not_ap_credit",
-                "المرتجع المحدد لا يمثل ائتمانًا على حساب المورد؛ المرتجع قبل الفوترة يعكس GRNI فقط.");
+                "المرتجع المحدد لا يحتوي حركة مدينة مرحلة على حساب المورد؛ المرتجع قبل الفوترة يعكس GRNI فقط.");
 
         if (!lockAlreadyAcquired)
             await concurrencyPort.LockAsync(purchaseReturn.Id, targetInvoiceId, cancellationToken);
@@ -173,7 +180,7 @@ public sealed class SupplierCreditSettlementService(
         var activeSourceApplied = Round(sourceApplications
             .Where(x => x.Status == SupplierCreditApplicationStatus.Active)
             .Sum(x => x.AppliedSourceBaseAmount));
-        var availableSourceBase = Math.Max(0m, Round(purchaseReturn.SupplierGrossBaseAmount - activeSourceApplied));
+        var availableSourceBase = Math.Max(0m, Round(sourceCreditBaseAmount - activeSourceApplied));
 
         var balance = await invoiceBalances.GetAsync(targetInvoice, null, cancellationToken);
         var maximumBase = Math.Min(availableSourceBase, balance.OutstandingBaseAmount);
@@ -218,11 +225,21 @@ public sealed class SupplierCreditSettlementService(
             new Specification<SupplierCreditApplication>().Where(x => x.PurchaseReturnId == purchaseReturnId),
             cancellationToken);
 
-    private static bool IsApCreditSource(PurchaseReturn purchaseReturn) =>
-        purchaseReturn.Status == PurchaseReturnStatus.Posted &&
-        purchaseReturn.PurchaseInvoiceId.HasValue &&
-        purchaseReturn.JournalEntryId.HasValue &&
-        purchaseReturn.SupplierGrossBaseAmount > 0m;
+    private async Task<decimal> GetPostedSourceCreditBaseAmountAsync(
+        PurchaseReturn purchaseReturn,
+        CancellationToken cancellationToken)
+    {
+        if (purchaseReturn.Status != PurchaseReturnStatus.Posted || !purchaseReturn.JournalEntryId.HasValue)
+            return 0m;
+
+        var amount = await creditSourcePort.GetPostedApCreditBaseAmountAsync(
+            purchaseReturn.Id,
+            purchaseReturn.JournalEntryId.Value,
+            purchaseReturn.SupplierId,
+            cancellationToken);
+
+        return Round(Math.Max(0m, amount));
+    }
 
     private static string AutoIdempotencyKey(Guid returnId, Guid invoiceId) =>
         $"PRC:{returnId:N}:{invoiceId:N}";
