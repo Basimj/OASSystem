@@ -63,16 +63,14 @@ public sealed class PurchaseInvoiceBalanceService(
             cancellationToken);
 
         var paymentBase = Round(payments.Sum(GetPaymentTargetBaseAmount));
+        var paymentDocumentAmount = Round(payments.Sum(x => GetPaymentTargetDocumentAmount(x, invoice.ExchangeRate)));
         var creditBase = Round(credits.Sum(x => x.AppliedTargetBaseAmount));
         var creditDocumentAmount = Round(credits.Sum(x => x.AppliedInvoiceCurrencyAmount));
+
         var outstandingBase = Math.Max(0m, Round(invoice.BaseTotalAmount - paymentBase - creditBase));
-
-        var outstanding = invoice.ExchangeRate > 0m
-            ? Math.Min(invoice.TotalAmount, Round(outstandingBase / invoice.ExchangeRate))
-            : Math.Max(0m, Round(invoice.TotalAmount - creditDocumentAmount));
-
+        var outstanding = Math.Max(0m, Round(invoice.TotalAmount - paymentDocumentAmount - creditDocumentAmount));
         var settled = Math.Max(0m, Round(invoice.TotalAmount - outstanding));
-        var paid = Math.Max(0m, Round(settled - Math.Min(settled, creditDocumentAmount)));
+        var paid = Math.Max(0m, Round(paymentDocumentAmount));
 
         return new PurchaseInvoiceBalanceSnapshot(
             invoice.Id,
@@ -96,6 +94,14 @@ public sealed class PurchaseInvoiceBalanceService(
         if (allocation.ExchangeRate.HasValue)
             return Round(allocation.AllocatedAmount * allocation.ExchangeRate.Value);
         return allocation.AllocatedAmount;
+    }
+
+    private static decimal GetPaymentTargetDocumentAmount(PaymentAllocation allocation, decimal invoiceExchangeRate)
+    {
+        if (allocation.TargetDocumentAmount.HasValue)
+            return allocation.TargetDocumentAmount.Value;
+        var targetBase = GetPaymentTargetBaseAmount(allocation);
+        return invoiceExchangeRate > 0m ? Round(targetBase / invoiceExchangeRate) : allocation.AllocatedAmount;
     }
 
     private static decimal Round(decimal value) =>
