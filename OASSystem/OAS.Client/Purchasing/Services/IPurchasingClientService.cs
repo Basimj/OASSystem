@@ -1,3 +1,4 @@
+using OAS.Contracts.Accounting.PaymentAllocations;
 using OAS.Contracts.Common.Pagination;
 using OAS.Contracts.Purchasing.Enums;
 using OAS.Contracts.Purchasing.PurchaseInvoices;
@@ -61,6 +62,8 @@ public interface IPurchasingClientService
     Task<PurchaseInvoiceDto?> CancelPurchaseInvoiceAsync(Guid id, CancelPurchaseInvoiceRequest request, CancellationToken cancellationToken = default);
 
     Task<SupplierAllocationCenterDto?> GetSupplierAllocationCenterAsync(Guid supplierId, CancellationToken cancellationToken = default);
+    Task<PaymentAllocationDto?> CreateSupplierPaymentAllocationAsync(CreatePaymentAllocationRequest request, CancellationToken cancellationToken = default);
+    Task<ReversePaymentAllocationResultDto?> ReverseSupplierPaymentAllocationAsync(Guid allocationId, ReversePaymentAllocationRequest request, CancellationToken cancellationToken = default);
 
     Task<PagedResult<PurchaseReturnDto>> GetPurchaseReturnsAsync(PageRequest request, PurchaseReturnStatus? status = null, Guid? purchaseReceiptId = null, Guid? purchaseInvoiceId = null, Guid? supplierId = null, CancellationToken cancellationToken = default);
     Task<PurchaseReturnDto?> GetPurchaseReturnAsync(Guid id, CancellationToken cancellationToken = default);
