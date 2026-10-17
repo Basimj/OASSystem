@@ -1,3 +1,4 @@
+using OAS.Contracts.Accounting.PaymentAllocations;
 using OAS.Contracts.Purchasing.SupplierAllocations;
 
 namespace OAS.Client.Purchasing.Services;
@@ -9,5 +10,22 @@ public sealed partial class PurchasingClientService
         CancellationToken cancellationToken = default)
         => api.GetAsync<SupplierAllocationCenterDto>(
             $"api/purchasing/supplier-allocations/{supplierId:D}",
+            cancellationToken);
+
+    public Task<PaymentAllocationDto?> CreateSupplierPaymentAllocationAsync(
+        CreatePaymentAllocationRequest request,
+        CancellationToken cancellationToken = default)
+        => api.PostAsync<CreatePaymentAllocationRequest, PaymentAllocationDto>(
+            "api/accounting/payment-allocations",
+            request,
+            cancellationToken);
+
+    public Task<ReversePaymentAllocationResultDto?> ReverseSupplierPaymentAllocationAsync(
+        Guid allocationId,
+        ReversePaymentAllocationRequest request,
+        CancellationToken cancellationToken = default)
+        => api.PostAsync<ReversePaymentAllocationRequest, ReversePaymentAllocationResultDto>(
+            $"api/accounting/payment-allocations/{allocationId:D}/reverse",
+            request,
             cancellationToken);
 }
