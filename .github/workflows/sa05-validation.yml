@@ -29,6 +29,8 @@ jobs:
 
   generate-snapshot:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -75,6 +77,17 @@ jobs:
           path.write_text(text[:start] + segment + text[end:], encoding='utf-8')
       - name: Generate temporary EF migration to refresh snapshot
         run: dotnet ef migrations add SA05SnapshotSyncTemp --project OASSystem/OAS.Infrastructure/OAS.Infrastructure.csproj --startup-project OASSystem/OAS.API/OAS.API.csproj --output-dir Persistence/Migrations
+      - name: Commit generated snapshot only
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add OASSystem/OAS.Infrastructure/Persistence/Migrations/OasDbContextModelSnapshot.cs
+          if git diff --cached --quiet; then
+            echo "Snapshot already synchronized."
+          else
+            git commit -m "SA-05 synchronize EF model snapshot [skip ci]"
+            git push origin HEAD:feature/sa-05-header-discount-commissions
+          fi
       - name: Upload generated snapshot only
         uses: actions/upload-artifact@v4
         with:
