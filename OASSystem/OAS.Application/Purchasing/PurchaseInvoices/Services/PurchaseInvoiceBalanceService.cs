@@ -44,6 +44,8 @@ public sealed class PurchaseInvoiceBalanceService(
                 invoice.BaseTotalAmount,
                 invoice.TotalAmount,
                 0m,
+                0m,
+                0m,
                 0m);
         }
 
@@ -62,8 +64,13 @@ public sealed class PurchaseInvoiceBalanceService(
                 x.Status == SupplierCreditApplicationStatus.Active),
             cancellationToken);
 
+        // AP-02 deliberately keeps three settlement dimensions independent:
+        // source/cash base, invoice-document quantity, and historical AP carrying base.
         var paymentBase = Round(payments.Sum(GetPaymentTargetBaseAmount));
-        var paymentDocumentAmount = Round(payments.Sum(x => GetPaymentTargetDocumentAmount(x, invoice.ExchangeRate)));
+        var paymentDocumentAmount = Round(payments.Sum(x => GetPaymentTargetDocumentAmount(x, invoice)));
+        var paymentSourceBase = Round(payments.Sum(GetPaymentSourceBaseAmount));
+        var realizedExchangeDifferenceBase = Round(paymentSourceBase - paymentBase);
+
         var creditBase = Round(credits.Sum(x => x.AppliedTargetBaseAmount));
         var creditDocumentAmount = Round(credits.Sum(x => x.AppliedInvoiceCurrencyAmount));
 
@@ -82,7 +89,9 @@ public sealed class PurchaseInvoiceBalanceService(
             outstandingBase,
             outstanding,
             paid,
-            settled);
+            settled,
+            paymentDocumentAmount,
+            realizedExchangeDifferenceBase);
     }
 
     private static decimal GetPaymentTargetBaseAmount(PaymentAllocation allocation)
@@ -96,12 +105,28 @@ public sealed class PurchaseInvoiceBalanceService(
         return allocation.AllocatedAmount;
     }
 
-    private static decimal GetPaymentTargetDocumentAmount(PaymentAllocation allocation, decimal invoiceExchangeRate)
+    private static decimal GetPaymentTargetDocumentAmount(PaymentAllocation allocation, PurchaseInvoice invoice)
     {
-        if (allocation.TargetDocumentAmount.HasValue)
+        if (allocation.TargetDocumentAmount is > 0m)
             return allocation.TargetDocumentAmount.Value;
+
+        // Same-currency legacy allocations used AllocatedAmount as the document quantity.
+        if (allocation.CurrencyId == invoice.CurrencyId)
+            return allocation.AllocatedAmount;
+
         var targetBase = GetPaymentTargetBaseAmount(allocation);
-        return invoiceExchangeRate > 0m ? Round(targetBase / invoiceExchangeRate) : allocation.AllocatedAmount;
+        return invoice.ExchangeRate > 0m
+            ? Round(targetBase / invoice.ExchangeRate)
+            : 0m;
+    }
+
+    private static decimal GetPaymentSourceBaseAmount(PaymentAllocation allocation)
+    {
+        if (allocation.BaseAllocatedAmount.HasValue)
+            return allocation.BaseAllocatedAmount.Value;
+        if (allocation.ExchangeRate.HasValue)
+            return Round(allocation.AllocatedAmount * allocation.ExchangeRate.Value);
+        return allocation.AllocatedAmount;
     }
 
     private static decimal Round(decimal value) =>
