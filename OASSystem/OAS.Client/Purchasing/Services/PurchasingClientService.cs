@@ -12,6 +12,8 @@ namespace OAS.Client.Purchasing.Services;
 
 public sealed partial class PurchasingClientService(OasApiClient api) : IPurchasingClientService
 {
+    private readonly OasApiClient _api = api;
+
     private static string PageQuery(PageRequest request)
     {
         var x=request.Normalize();
