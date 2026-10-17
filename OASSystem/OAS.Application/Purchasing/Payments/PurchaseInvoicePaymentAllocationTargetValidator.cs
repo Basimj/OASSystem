@@ -12,12 +12,12 @@ namespace OAS.Application.Purchasing.Payments;
 /// Protects supplier-invoice allocations from overpayment and from being funded by
 /// a payment source that belongs to another party (or by a receipt voucher).
 ///
-/// AP-02 separates the cash-flow base amount from the historical base carrying
-/// amount of the supplier liability. When the payment is made in the invoice
-/// currency, the document amount is settled in that currency and the target base
-/// amount is calculated using the invoice's historical exchange rate. Any
-/// difference between source base and target base is a realized FX difference and
-/// is posted separately by the settlement posting flow.
+/// AP-02 separates three values:
+/// 1) the source cash amount/base value at the settlement-date rate,
+/// 2) the amount settled in the invoice document currency, and
+/// 3) the historical AP carrying amount released at the invoice rate.
+/// The difference between source base and target base is realized FX and is posted
+/// separately by the supplier-settlement posting flow.
 /// </summary>
 public sealed class PurchaseInvoicePaymentAllocationTargetValidator(
     IReadRepository<PurchaseInvoice, Guid> invoices,
@@ -41,44 +41,41 @@ public sealed class PurchaseInvoicePaymentAllocationTargetValidator(
             throw new ConflictException(
                 "purchase_invoice_payment_amount_invalid",
                 "يجب أن تكون قيمة التخصيص لفاتورة المورد أكبر من صفر.");
+        if (invoice.ExchangeRate <= 0m)
+            throw new ConflictException(
+                "purchase_invoice_exchange_rate_invalid",
+                "سعر الصرف التاريخي لفاتورة المورد غير صالح.");
 
         var balance = await balances.GetAsync(invoice, excludingAllocationId, cancellationToken);
 
-        // If the voucher line uses the same currency as the invoice, the original
-        // document amount is the settlement quantity. The AP carrying amount must
-        // therefore be released at the invoice historical rate, not at the payment
-        // day's rate. Example: Invoice USD 100 @ 1500 and payment USD 100 @ 1600:
-        // source cash base = 160,000, target AP base = 150,000, realized FX = 10,000.
+        decimal targetDocumentAmount;
         if (sourceCurrencyId == invoice.CurrencyId)
         {
-            if (invoice.ExchangeRate <= 0m)
-                throw new ConflictException(
-                    "purchase_invoice_exchange_rate_invalid",
-                    "سعر الصرف التاريخي لفاتورة المورد غير صالح.");
-
-            if (allocatedAmount > balance.OutstandingAmount)
-                throw new ConflictException(
-                    "purchase_invoice_payment_allocation_exceeds_outstanding",
-                    "المبلغ المخصص يتجاوز الرصيد المتبقي على فاتورة المورد بعد المرتجعات والائتمانات.");
-
-            var targetBaseAmount = Round(allocatedAmount * invoice.ExchangeRate);
-            if (targetBaseAmount > balance.OutstandingBaseAmount)
-                throw new ConflictException(
-                    "purchase_invoice_payment_allocation_exceeds_outstanding_base",
-                    "القيمة الدفترية التاريخية للمبلغ المخصص تتجاوز الرصيد الأساسي المتبقي على فاتورة المورد.");
-
-            return new PaymentAllocationTargetValidation(targetBaseAmount);
+            // Same document currency: the paid foreign-currency quantity is the
+            // invoice quantity being extinguished, regardless of today's base rate.
+            targetDocumentAmount = Round(allocatedAmount);
+        }
+        else
+        {
+            // Third-currency policy: the source cash base value determines the AP
+            // carrying value released. Translate that carrying value to invoice
+            // currency at the invoice historical rate. This is deterministic and
+            // prevents an unexplained residual in either currency.
+            targetDocumentAmount = Round(sourceBaseAllocatedAmount / invoice.ExchangeRate);
         }
 
-        // Third-currency settlement is intentionally kept on the existing base-value
-        // rule in this step. The next AP-02 slice adds explicit target-document amount
-        // capture and FX posting for cross-currency allocations.
-        if (sourceBaseAllocatedAmount > balance.OutstandingBaseAmount)
+        if (targetDocumentAmount <= 0m || targetDocumentAmount > balance.OutstandingAmount)
             throw new ConflictException(
                 "purchase_invoice_payment_allocation_exceeds_outstanding",
-                "القيمة الأساسية للمبلغ المخصص تتجاوز الرصيد المتبقي على فاتورة المورد بعد المرتجعات والائتمانات.");
+                "المبلغ المسوى بعملة فاتورة المورد يتجاوز الرصيد المتبقي.");
 
-        return new PaymentAllocationTargetValidation(sourceBaseAllocatedAmount);
+        var targetBaseAmount = Round(targetDocumentAmount * invoice.ExchangeRate);
+        if (targetBaseAmount > balance.OutstandingBaseAmount)
+            throw new ConflictException(
+                "purchase_invoice_payment_allocation_exceeds_outstanding_base",
+                "القيمة الدفترية التاريخية للمبلغ المسوى تتجاوز الرصيد الأساسي المتبقي على فاتورة المورد.");
+
+        return new PaymentAllocationTargetValidation(targetBaseAmount, targetDocumentAmount);
     }
 
     public async Task ValidateSourceAsync(
