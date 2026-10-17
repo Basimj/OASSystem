@@ -16,4 +16,5 @@ public sealed record PaymentAllocationDto(
     DateTimeOffset AllocatedAtUtc,
     string? CreatedBy,
     Guid? CustomerAdvanceApplicationId = null,
-    decimal? TargetBaseAllocatedAmount = null);
+    decimal? TargetBaseAllocatedAmount = null,
+    decimal? TargetDocumentAmount = null);
