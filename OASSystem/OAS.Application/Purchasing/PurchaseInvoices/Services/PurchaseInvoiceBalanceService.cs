@@ -52,7 +52,8 @@ public sealed class PurchaseInvoiceBalanceService(
         var payments = await paymentAllocations.ListAsync(
             new Specification<PaymentAllocation>().Where(x =>
                 x.TargetDocumentType == AllocationTargetDocumentType.PurchaseInvoice &&
-                x.TargetDocumentId == invoice.Id),
+                x.TargetDocumentId == invoice.Id &&
+                x.ReversedAtUtc == null),
             cancellationToken);
 
         if (excludingPaymentAllocationId.HasValue)
