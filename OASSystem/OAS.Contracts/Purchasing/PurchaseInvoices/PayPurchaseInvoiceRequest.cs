@@ -26,4 +26,6 @@ public sealed record PurchaseInvoicePaymentSummaryDto(
     decimal TotalAmount,
     decimal PaidAmount,
     decimal OutstandingAmount,
-    string PaymentStatus);
+    string PaymentStatus,
+    decimal AppliedCreditAmount = 0m,
+    decimal SettledAmount = 0m);

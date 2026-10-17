@@ -1,8 +1,7 @@
 using OAS.Application.Abstractions.Persistence;
-using OAS.Application.Abstractions.Persistence.Specifications;
 using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Common.Exceptions;
-using OAS.Domain.Accounting.Entities;
+using OAS.Application.Purchasing.Abstractions;
 using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Purchasing.Entities;
 using OAS.Domain.Purchasing.Enums;
@@ -12,10 +11,12 @@ namespace OAS.Application.Purchasing.Payments;
 /// <summary>
 /// Protects supplier-invoice allocations from overpayment and from being funded by
 /// a payment source that belongs to another party (or by a receipt voucher).
+/// The invoice ceiling includes active supplier-credit applications so a posted
+/// purchase return cannot be paid a second time.
 /// </summary>
 public sealed class PurchaseInvoicePaymentAllocationTargetValidator(
     IReadRepository<PurchaseInvoice, Guid> invoices,
-    IReadRepository<PaymentAllocation, Guid> allocations) :
+    IPurchaseInvoiceBalanceService balances) :
     IPaymentAllocationTargetValidator,
     IPaymentAllocationSourceTargetValidator
 {
@@ -36,38 +37,20 @@ public sealed class PurchaseInvoicePaymentAllocationTargetValidator(
                 "purchase_invoice_payment_amount_invalid",
                 "يجب أن تكون قيمة التخصيص لفاتورة المورد أكبر من صفر.");
 
-        var existing = await allocations.ListAsync(
-            new Specification<PaymentAllocation>().Where(x =>
-                x.TargetDocumentType == AllocationTargetDocumentType.PurchaseInvoice &&
-                x.TargetDocumentId == targetDocumentId),
-            cancellationToken);
+        var balance = await balances.GetAsync(invoice, excludingAllocationId, cancellationToken);
 
-        if (excludingAllocationId.HasValue)
-            existing = existing.Where(x => x.Id != excludingAllocationId.Value).ToArray();
-
-        // Base currency is the authoritative ceiling when allocations use different
-        // settlement currencies.  This mirrors the accounting allocation convention
-        // already used for sales invoices.
-        var alreadyAllocatedBase = existing.Sum(GetTargetBaseAllocatedAmount);
-        var baseOutstanding = Math.Max(0m, invoice.BaseTotalAmount - alreadyAllocatedBase);
-        if (sourceBaseAllocatedAmount > baseOutstanding)
+        // AP-02 will separate settlement-base from historical target-base when exchange
+        // rates differ. Until then the existing convention remains unchanged, but the
+        // ceiling now includes supplier credits from posted purchase returns.
+        if (sourceBaseAllocatedAmount > balance.OutstandingBaseAmount)
             throw new ConflictException(
                 "purchase_invoice_payment_allocation_exceeds_outstanding",
-                "القيمة الأساسية للمبلغ المخصص تتجاوز الرصيد المتبقي على فاتورة المورد.");
+                "القيمة الأساسية للمبلغ المخصص تتجاوز الرصيد المتبقي على فاتورة المورد بعد المرتجعات والائتمانات.");
 
-        // When payment and invoice use the same currency, also preserve the exact
-        // document-currency ceiling shown to the user.
-        if (sourceCurrencyId == invoice.CurrencyId)
-        {
-            var alreadyAllocatedInInvoiceCurrency = existing
-                .Where(x => x.CurrencyId == invoice.CurrencyId)
-                .Sum(x => x.AllocatedAmount);
-            var transactionOutstanding = Math.Max(0m, invoice.TotalAmount - alreadyAllocatedInInvoiceCurrency);
-            if (allocatedAmount > transactionOutstanding)
-                throw new ConflictException(
-                    "purchase_invoice_payment_allocation_exceeds_outstanding",
-                    "المبلغ المخصص يتجاوز الرصيد المتبقي على فاتورة المورد.");
-        }
+        if (sourceCurrencyId == invoice.CurrencyId && allocatedAmount > balance.OutstandingAmount)
+            throw new ConflictException(
+                "purchase_invoice_payment_allocation_exceeds_outstanding",
+                "المبلغ المخصص يتجاوز الرصيد المتبقي على فاتورة المورد بعد المرتجعات والائتمانات.");
 
         return new PaymentAllocationTargetValidation(sourceBaseAllocatedAmount);
     }
@@ -106,16 +89,5 @@ public sealed class PurchaseInvoicePaymentAllocationTargetValidator(
                 "لا يمكن تخصيص دفعة إلا لفاتورة مورد مرحلة.");
 
         return invoice;
-    }
-
-    private static decimal GetTargetBaseAllocatedAmount(PaymentAllocation allocation)
-    {
-        if (allocation.TargetBaseAllocatedAmount.HasValue)
-            return allocation.TargetBaseAllocatedAmount.Value;
-        if (allocation.BaseAllocatedAmount.HasValue)
-            return allocation.BaseAllocatedAmount.Value;
-        if (allocation.ExchangeRate.HasValue)
-            return Math.Round(allocation.AllocatedAmount * allocation.ExchangeRate.Value, 4, MidpointRounding.AwayFromZero);
-        return allocation.AllocatedAmount;
     }
 }

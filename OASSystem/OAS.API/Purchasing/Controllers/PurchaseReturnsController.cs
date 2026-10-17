@@ -47,4 +47,23 @@ public sealed class PurchaseReturnsController(ISender sender) : ControllerBase
     [HttpPost("{id:guid}/cancel")]
     public async Task<ActionResult<PurchaseReturnDto>> Cancel(Guid id, [FromBody] CancelPurchaseReturnRequest request, CancellationToken cancellationToken) =>
         Ok(await sender.Send(new CancelPurchaseReturnCommand(id, request), cancellationToken));
+
+    [HttpGet("{id:guid}/credit-summary")]
+    public async Task<ActionResult<SupplierCreditSummaryDto>> GetCreditSummary(Guid id, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new GetPurchaseReturnCreditSummaryQuery(id), cancellationToken));
+
+    [HttpPost("{id:guid}/credits/apply")]
+    public async Task<ActionResult<SupplierCreditApplicationDto>> ApplyCredit(
+        Guid id,
+        [FromBody] ApplySupplierCreditRequest request,
+        CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ApplySupplierCreditCommand(id, request), cancellationToken));
+
+    [HttpPost("{id:guid}/credits/{applicationId:guid}/reverse")]
+    public async Task<ActionResult<SupplierCreditApplicationDto>> ReverseCredit(
+        Guid id,
+        Guid applicationId,
+        [FromBody] ReverseSupplierCreditApplicationRequest request,
+        CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new ReverseSupplierCreditApplicationCommand(id, applicationId, request), cancellationToken));
 }

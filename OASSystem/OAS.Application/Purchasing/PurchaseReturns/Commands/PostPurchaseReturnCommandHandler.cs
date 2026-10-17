@@ -13,6 +13,7 @@ public sealed class PostPurchaseReturnCommandHandler(
     IPurchaseReturnInventoryPostingService inventory,
     IPurchasingInventoryPort inventoryPort,
     IPurchasingAccountingPort accounting,
+    ISupplierCreditSettlementService supplierCredits,
     ICurrentUser currentUser,
     TimeProvider timeProvider) : IRequestHandler<PostPurchaseReturnCommand, PurchaseReturnPostingResultDto>
 {
@@ -47,6 +48,17 @@ public sealed class PostPurchaseReturnCommandHandler(
             entity.PurchasePriceVarianceBaseAmount), ct);
         entity.MarkPosted(accountingResult.JournalEntryId, now, currentUser.UserId);
         returns.Update(entity);
+
+        // A return linked to a posted supplier invoice has already debited Supplier AP in the
+        // journal above. The following open-item application only settles that existing credit
+        // against the original invoice; it must never create another journal entry. Any excess
+        // remains visible as unapplied supplier credit.
+        await supplierCredits.AutoApplyLinkedReturnAsync(
+            entity,
+            now.UtcDateTime,
+            currentUser.UserId,
+            ct);
+
         return new PurchaseReturnPostingResultDto(entity.Id, accountingResult.JournalEntryId, inventoryResult.InventoryTransactionIds);
     }
 }

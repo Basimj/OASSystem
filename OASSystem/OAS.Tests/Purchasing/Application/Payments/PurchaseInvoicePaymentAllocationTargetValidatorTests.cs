@@ -2,6 +2,7 @@ using NUnit.Framework;
 using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.Purchasing.Payments;
+using OAS.Application.Purchasing.PurchaseInvoices.Services;
 using OAS.Domain.Accounting.Entities;
 using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Purchasing.Entities;
@@ -16,6 +17,7 @@ public sealed class PurchaseInvoicePaymentAllocationTargetValidatorTests
 {
     private FakeRepository<PurchaseInvoice, Guid> _invoiceRepository = null!;
     private FakeRepository<PaymentAllocation, Guid> _allocationRepository = null!;
+    private FakeRepository<SupplierCreditApplication, Guid> _creditRepository = null!;
     private PurchaseInvoicePaymentAllocationTargetValidator _validator = null!;
     private Guid _supplierId;
     private Guid _currencyId;
@@ -25,7 +27,9 @@ public sealed class PurchaseInvoicePaymentAllocationTargetValidatorTests
     {
         _invoiceRepository = new();
         _allocationRepository = new();
-        _validator = new PurchaseInvoicePaymentAllocationTargetValidator(_invoiceRepository, _allocationRepository);
+        _creditRepository = new();
+        var balances = new PurchaseInvoiceBalanceService(_invoiceRepository, _allocationRepository, _creditRepository);
+        _validator = new PurchaseInvoicePaymentAllocationTargetValidator(_invoiceRepository, balances);
         _supplierId = Guid.NewGuid();
         _currencyId = Guid.NewGuid();
     }
@@ -37,12 +41,7 @@ public sealed class PurchaseInvoicePaymentAllocationTargetValidatorTests
         await _invoiceRepository.AddAsync(invoice);
 
         var result = await _validator.ValidateAsync(
-            invoice.Id,
-            _currencyId,
-            40m,
-            80m,
-            null,
-            CancellationToken.None);
+            invoice.Id, _currencyId, 40m, 80m, null, CancellationToken.None);
 
         Assert.That(result.TargetBaseAllocatedAmount, Is.EqualTo(80m));
     }
@@ -53,21 +52,26 @@ public sealed class PurchaseInvoicePaymentAllocationTargetValidatorTests
         var invoice = CreatePostedInvoice(100m, 2m);
         await _invoiceRepository.AddAsync(invoice);
         await _allocationRepository.AddAsync(PaymentAllocation.CreateLineAllocation(
-            Guid.NewGuid(),
-            null,
-            Guid.NewGuid(),
-            AllocationTargetDocumentType.PurchaseInvoice,
-            invoice.Id,
-            _currencyId,
-            "USD",
-            80m,
-            2m,
-            160m,
-            DateTime.UtcNow,
-            160m));
+            Guid.NewGuid(), null, Guid.NewGuid(), AllocationTargetDocumentType.PurchaseInvoice,
+            invoice.Id, _currencyId, "USD", 80m, 2m, 160m, DateTime.UtcNow, 160m));
 
         var ex = Assert.ThrowsAsync<ConflictException>(async () =>
             await _validator.ValidateAsync(invoice.Id, _currencyId, 30m, 60m, null, CancellationToken.None));
+
+        Assert.That(ex!.Code, Is.EqualTo("purchase_invoice_payment_allocation_exceeds_outstanding"));
+    }
+
+    [Test]
+    public async Task ValidateAsync_WhenSupplierCreditConsumesOutstanding_ThrowsConflict()
+    {
+        var invoice = CreatePostedInvoice(100m, 2m);
+        await _invoiceRepository.AddAsync(invoice);
+        await _creditRepository.AddAsync(SupplierCreditApplication.Create(
+            Guid.NewGuid(), Guid.NewGuid(), invoice.Id, _supplierId,
+            80m, 80m, 40m, DateTime.UtcNow, "tester", "credit-validator-test"));
+
+        var ex = Assert.ThrowsAsync<ConflictException>(async () =>
+            await _validator.ValidateAsync(invoice.Id, _currencyId, 70m, 140m, null, CancellationToken.None));
 
         Assert.That(ex!.Code, Is.EqualTo("purchase_invoice_payment_allocation_exceeds_outstanding"));
     }
@@ -90,11 +94,7 @@ public sealed class PurchaseInvoicePaymentAllocationTargetValidatorTests
         var invoice = CreatePostedInvoice(100m, 2m);
         await _invoiceRepository.AddAsync(invoice);
         var source = new PaymentAllocationSourceContext(
-            PaymentSourceType.PaymentVoucher,
-            SettlementPartyType.Supplier,
-            null,
-            _supplierId,
-            null);
+            PaymentSourceType.PaymentVoucher, SettlementPartyType.Supplier, null, _supplierId, null);
 
         Assert.DoesNotThrowAsync(async () =>
             await _validator.ValidateSourceAsync(invoice.Id, source, CancellationToken.None));
@@ -106,11 +106,7 @@ public sealed class PurchaseInvoicePaymentAllocationTargetValidatorTests
         var invoice = CreatePostedInvoice(100m, 2m);
         await _invoiceRepository.AddAsync(invoice);
         var source = new PaymentAllocationSourceContext(
-            PaymentSourceType.PaymentVoucher,
-            SettlementPartyType.Supplier,
-            null,
-            Guid.NewGuid(),
-            null);
+            PaymentSourceType.PaymentVoucher, SettlementPartyType.Supplier, null, Guid.NewGuid(), null);
 
         var ex = Assert.ThrowsAsync<ConflictException>(async () =>
             await _validator.ValidateSourceAsync(invoice.Id, source, CancellationToken.None));
@@ -124,11 +120,7 @@ public sealed class PurchaseInvoicePaymentAllocationTargetValidatorTests
         var invoice = CreatePostedInvoice(100m, 2m);
         await _invoiceRepository.AddAsync(invoice);
         var source = new PaymentAllocationSourceContext(
-            PaymentSourceType.ReceiptVoucher,
-            SettlementPartyType.Supplier,
-            null,
-            _supplierId,
-            null);
+            PaymentSourceType.ReceiptVoucher, SettlementPartyType.Supplier, null, _supplierId, null);
 
         var ex = Assert.ThrowsAsync<ConflictException>(async () =>
             await _validator.ValidateSourceAsync(invoice.Id, source, CancellationToken.None));
@@ -146,32 +138,13 @@ public sealed class PurchaseInvoicePaymentAllocationTargetValidatorTests
     private PurchaseInvoice CreateConfirmedInvoice(decimal unitPrice, decimal exchangeRate)
     {
         var invoice = PurchaseInvoice.Create(
-            Guid.NewGuid(),
-            "PI-TEST-001",
-            "SUP-INV-001",
-            _supplierId,
-            new DateOnly(2026, 10, 5),
-            new DateOnly(2026, 10, 5),
-            _currencyId,
-            exchangeRate,
-            new DateOnly(2026, 10, 5),
-            TaxCalculationMode.Exclusive,
-            null);
+            Guid.NewGuid(), "PI-TEST-001", "SUP-INV-001", _supplierId,
+            new DateOnly(2026, 10, 5), new DateOnly(2026, 10, 5), _currencyId, exchangeRate,
+            new DateOnly(2026, 10, 5), TaxCalculationMode.Exclusive, null);
 
         invoice.AddLine(PurchaseInvoiceLine.Create(
-            Guid.NewGuid(),
-            invoice.Id,
-            1,
-            Guid.NewGuid(),
-            Guid.NewGuid(),
-            "VAR-001",
-            "Test variant",
-            1m,
-            unitPrice,
-            0m,
-            0m,
-            TaxCalculationMode.Exclusive,
-            exchangeRate));
+            Guid.NewGuid(), invoice.Id, 1, Guid.NewGuid(), Guid.NewGuid(), "VAR-001", "Test variant",
+            1m, unitPrice, 0m, 0m, TaxCalculationMode.Exclusive, exchangeRate));
         invoice.Confirm(DateTimeOffset.UtcNow, "tester");
         return invoice;
     }
