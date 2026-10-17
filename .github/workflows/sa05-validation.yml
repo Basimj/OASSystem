@@ -36,6 +36,8 @@ jobs:
           dotnet-version: '9.0.x'
       - name: Install EF tool
         run: dotnet tool install --global dotnet-ef --version 9.0.*
+      - name: Add EF Design package to startup project on runner only
+        run: dotnet add OASSystem/OAS.API/OAS.API.csproj package Microsoft.EntityFrameworkCore.Design --version 9.0.21
       - name: Generate temporary EF migration to refresh snapshot
         run: dotnet ef migrations add SA05SnapshotSyncTemp --project OASSystem/OAS.Infrastructure/OAS.Infrastructure.csproj --startup-project OASSystem/OAS.API/OAS.API.csproj --output-dir Persistence/Migrations
       - name: Upload generated snapshot only
