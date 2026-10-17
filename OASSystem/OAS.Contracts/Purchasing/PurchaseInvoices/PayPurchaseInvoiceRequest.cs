@@ -23,6 +23,23 @@ public sealed record PayPurchaseInvoiceResultDto(
     decimal RealizedExchangeDifferenceBase = 0m,
     Guid? RealizedExchangeJournalEntryId = null);
 
+public sealed record PurchaseInvoicePaymentSettlementDto(
+    Guid PaymentAllocationId,
+    Guid? PaymentVoucherId,
+    Guid? PaymentVoucherLineId,
+    string? SourceCurrencyCode,
+    decimal SourceAmount,
+    decimal? SourceExchangeRate,
+    DateOnly? SourceExchangeRateDate,
+    ExchangeRateType? SourceExchangeRateType,
+    ExchangeRateSource? SourceExchangeRateSource,
+    decimal SourceBaseAmount,
+    decimal TargetDocumentAmount,
+    decimal TargetBaseAmount,
+    decimal RealizedExchangeDifferenceBase,
+    Guid? RealizedExchangeJournalEntryId,
+    DateTimeOffset AllocatedAtUtc);
+
 public sealed record PurchaseInvoicePaymentSummaryDto(
     Guid PurchaseInvoiceId,
     decimal TotalAmount,
@@ -30,4 +47,10 @@ public sealed record PurchaseInvoicePaymentSummaryDto(
     decimal OutstandingAmount,
     string PaymentStatus,
     decimal AppliedCreditAmount = 0m,
-    decimal SettledAmount = 0m);
+    decimal SettledAmount = 0m,
+    decimal BaseTotalAmount = 0m,
+    decimal AppliedPaymentBaseAmount = 0m,
+    decimal AppliedCreditBaseAmount = 0m,
+    decimal OutstandingBaseAmount = 0m,
+    decimal RealizedExchangeDifferenceBase = 0m,
+    IReadOnlyList<PurchaseInvoicePaymentSettlementDto>? Settlements = null);
