@@ -49,12 +49,28 @@ jobs:
           next_marker = 'modelBuilder.Entity("OAS.Domain.Features.Employees.Entities.EmployeeSalaryStructureLine", b =>'
           needle = 'b.Navigation("Lines").UsePropertyAccessMode(PropertyAccessMode.Field);'
 
-          start = text.index(marker)
-          end = text.index(next_marker, start)
-          segment = text[start:end]
-          if segment.count(needle) != 1:
-              raise SystemExit(f'Expected exactly one legacy Lines navigation in EmployeeSalaryStructure block, found {segment.count(needle)}.')
+          starts = []
+          pos = 0
+          while True:
+              pos = text.find(marker, pos)
+              if pos < 0:
+                  break
+              starts.append(pos)
+              pos += len(marker)
 
+          matches = []
+          for start in starts:
+              end = text.find(next_marker, start)
+              if end < 0:
+                  continue
+              segment = text[start:end]
+              if needle in segment:
+                  matches.append((start, end, segment))
+
+          if len(matches) != 1:
+              raise SystemExit(f'Expected exactly one EmployeeSalaryStructure relationship block with Lines navigation, found {len(matches)}.')
+
+          start, end, segment = matches[0]
           segment = segment.replace(needle, '', 1)
           path.write_text(text[:start] + segment + text[end:], encoding='utf-8')
       - name: Generate temporary EF migration to refresh snapshot
