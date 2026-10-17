@@ -28,6 +28,10 @@ public sealed class SupplierOpeningRepository(OasDbContext db) : ISupplierOpenin
         return query.SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
     }
 
+    public Task<SupplierOpeningApplication?> GetApplicationByIdempotencyKeyAsync(string idempotencyKey, CancellationToken cancellationToken = default) =>
+        db.Set<SupplierOpeningApplication>().AsNoTracking()
+            .SingleOrDefaultAsync(x => x.IdempotencyKey == idempotencyKey, cancellationToken);
+
     public async Task<IReadOnlyList<SupplierOpeningApplication>> GetApplicationsForItemAsync(Guid itemId, CancellationToken cancellationToken = default) =>
         await db.Set<SupplierOpeningApplication>().AsNoTracking()
             .Where(x => x.SupplierOpeningItemId == itemId)
