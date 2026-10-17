@@ -1,6 +1,7 @@
 using MediatR;
 using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Abstractions.Persistence.Specifications;
+using OAS.Application.Abstractions.Security;
 using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Common.Exceptions;
 using OAS.Domain.Accounting.Entities;
@@ -16,6 +17,8 @@ public sealed class CreatePaymentAllocationCommandHandler(
     IReadRepository<PaymentVoucher, Guid> paymentVouchers,
     IEnumerable<IPaymentAllocationTargetValidator> targetValidators,
     IEnumerable<IPaymentAllocationSourceTargetValidator> sourceTargetValidators,
+    ISupplierSettlementFxPostingService supplierSettlementFxPosting,
+    ICurrentUser currentUser,
     TimeProvider timeProvider) : IRequestHandler<CreatePaymentAllocationCommand, Guid>
 {
     public async Task<Guid> Handle(CreatePaymentAllocationCommand request, CancellationToken ct)
@@ -38,19 +41,20 @@ public sealed class CreatePaymentAllocationCommandHandler(
         if (sourceTargetValidator is not null)
             await sourceTargetValidator.ValidateSourceAsync(d.TargetDocumentId, source.Context, ct);
 
+        var validation = new PaymentAllocationTargetValidation(sourceBaseAmount);
         var validator = targetValidators.SingleOrDefault(x => x.TargetDocumentType == targetType);
-        var targetBaseAmount = sourceBaseAmount;
         if (validator is not null)
         {
-            targetBaseAmount = (await validator.ValidateAsync(
+            validation = await validator.ValidateAsync(
                 d.TargetDocumentId,
                 source.CurrencyId,
                 d.AllocatedAmount,
                 sourceBaseAmount,
                 null,
-                ct)).TargetBaseAllocatedAmount;
+                ct);
         }
 
+        var now = timeProvider.GetUtcNow().UtcDateTime;
         var entity = PaymentAllocation.CreateLineAllocation(
             Guid.NewGuid(),
             d.ReceiptVoucherLineId,
@@ -62,9 +66,39 @@ public sealed class CreatePaymentAllocationCommandHandler(
             d.AllocatedAmount,
             source.ExchangeRate,
             sourceBaseAmount,
-            timeProvider.GetUtcNow().UtcDateTime,
-            targetBaseAmount);
+            now,
+            validation.TargetBaseAllocatedAmount,
+            targetDocumentAmount: validation.TargetDocumentAmount);
         await repository.AddAsync(entity, ct);
+
+        if (targetType == DomainAllocationTargetDocumentType.PurchaseInvoice)
+        {
+            if (source.Context.SupplierId is not Guid supplierId || supplierId == Guid.Empty ||
+                source.CounterpartyAccountId is not Guid supplierAccountId || supplierAccountId == Guid.Empty ||
+                !source.PostingDate.HasValue)
+            {
+                throw new ConflictException(
+                    "purchase_invoice_fx_source_incomplete",
+                    "بيانات المورد أو حساب الذمم أو تاريخ السداد غير مكتملة لإنشاء قيد فرق الصرف.");
+            }
+
+            if (!Guid.TryParse(currentUser.UserId, out var userId))
+                throw new ForbiddenException();
+
+            await supplierSettlementFxPosting.PostAsync(
+                new SupplierSettlementFxPostingRequest(
+                    entity.Id,
+                    supplierId,
+                    supplierAccountId,
+                    source.PostingDate.Value,
+                    sourceBaseAmount,
+                    validation.TargetBaseAllocatedAmount,
+                    $"فرق صرف محقق لتخصيص دفعة على فاتورة مورد {d.TargetDocumentId}"),
+                userId,
+                now,
+                ct);
+        }
+
         return entity.Id;
     }
 
@@ -87,7 +121,9 @@ public sealed class CreatePaymentAllocationCommandHandler(
                     line.PartyType,
                     line.CustomerId,
                     line.SupplierId,
-                    line.EmployeeId));
+                    line.EmployeeId),
+                line.CounterpartyAccountId,
+                voucher.VoucherDate);
         }
         if (paymentLineId is Guid pid)
         {
@@ -106,7 +142,9 @@ public sealed class CreatePaymentAllocationCommandHandler(
                     line.PartyType,
                     line.CustomerId,
                     line.SupplierId,
-                    line.EmployeeId));
+                    line.EmployeeId),
+                line.CounterpartyAccountId,
+                voucher.VoucherDate);
         }
         throw new ConflictException("payment_source_line_required", "Exactly one receipt or payment voucher line must be selected.");
     }
@@ -117,11 +155,13 @@ public sealed class CreatePaymentAllocationCommandHandler(
         decimal amount,
         decimal? rate,
         string type,
-        PaymentAllocationSourceContext context)
+        PaymentAllocationSourceContext context,
+        Guid? counterpartyAccountId,
+        DateOnly postingDate)
     {
         if (id is not Guid currencyId || string.IsNullOrWhiteSpace(code) || rate is null or <= 0)
             throw new ConflictException("payment_source_line_not_migrated", $"The selected {type} voucher line does not contain multi-currency settlement data.");
-        return new SourceInfo(currencyId, code, amount, rate.Value, context);
+        return new SourceInfo(currencyId, code, amount, rate.Value, context, counterpartyAccountId, postingDate);
     }
 
     private sealed record SourceInfo(
@@ -129,5 +169,7 @@ public sealed class CreatePaymentAllocationCommandHandler(
         string CurrencyCode,
         decimal Amount,
         decimal ExchangeRate,
-        PaymentAllocationSourceContext Context);
+        PaymentAllocationSourceContext Context,
+        Guid? CounterpartyAccountId,
+        DateOnly? PostingDate);
 }
