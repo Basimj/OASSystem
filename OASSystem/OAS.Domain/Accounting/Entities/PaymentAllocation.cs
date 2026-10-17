@@ -28,6 +28,16 @@ public sealed class PaymentAllocation : AuditableEntity<Guid>
     public decimal? TargetDocumentAmount { get; private set; }
     public DateTime AllocatedAtUtc { get; private set; }
 
+    // AP-03 shared settlement safety metadata. These fields are intentionally generic
+    // because the same allocation table is also used by Sales/AR.
+    public string? IdempotencyKey { get; private set; }
+    public DateTime? ReversedAtUtc { get; private set; }
+    public string? ReversedBy { get; private set; }
+    public string? ReversalReason { get; private set; }
+    public byte[] RowVersion { get; private set; } = [];
+
+    public bool IsReversed => ReversedAtUtc.HasValue;
+
     public static PaymentAllocation CreateLineAllocation(
         Guid id,
         Guid? receiptVoucherLineId,
@@ -42,7 +52,8 @@ public sealed class PaymentAllocation : AuditableEntity<Guid>
         DateTime allocatedAtUtc,
         decimal? targetBaseAllocatedAmount = null,
         Guid? customerAdvanceApplicationId = null,
-        decimal? targetDocumentAmount = null)
+        decimal? targetDocumentAmount = null,
+        string? idempotencyKey = null)
     {
         ValidateCommon(id, targetDocumentId, allocatedAmount);
         if (receiptVoucherLineId == Guid.Empty) throw new ArgumentException("Receipt voucher line id cannot be empty.", nameof(receiptVoucherLineId));
@@ -84,7 +95,8 @@ public sealed class PaymentAllocation : AuditableEntity<Guid>
             BaseAllocatedAmount = baseAllocatedAmount,
             TargetBaseAllocatedAmount = targetBaseAllocatedAmount ?? baseAllocatedAmount,
             TargetDocumentAmount = targetDocumentAmount,
-            AllocatedAtUtc = allocatedAtUtc
+            AllocatedAtUtc = allocatedAtUtc,
+            IdempotencyKey = NormalizeIdempotencyKey(idempotencyKey)
         };
     }
 
@@ -144,6 +156,8 @@ public sealed class PaymentAllocation : AuditableEntity<Guid>
         decimal? targetBaseAllocatedAmount = null,
         decimal? targetDocumentAmount = null)
     {
+        if (IsReversed)
+            throw new InvalidOperationException("A reversed payment allocation cannot be edited.");
         if (allocatedAmount <= 0) throw new ArgumentOutOfRangeException(nameof(allocatedAmount), "Allocated amount must be greater than zero.");
         if (baseAllocatedAmount.HasValue && baseAllocatedAmount.Value <= 0) throw new ArgumentOutOfRangeException(nameof(baseAllocatedAmount));
         if (targetBaseAllocatedAmount.HasValue && targetBaseAllocatedAmount.Value <= 0) throw new ArgumentOutOfRangeException(nameof(targetBaseAllocatedAmount));
@@ -154,6 +168,24 @@ public sealed class PaymentAllocation : AuditableEntity<Guid>
         if (targetDocumentAmount.HasValue) TargetDocumentAmount = targetDocumentAmount.Value;
     }
 
+    public void Reverse(DateTime reversedAtUtc, string reversedBy, string reason)
+    {
+        if (IsReversed)
+            throw new InvalidOperationException("Payment allocation has already been reversed.");
+        if (string.IsNullOrWhiteSpace(reversedBy))
+            throw new ArgumentException("Reversed by is required.", nameof(reversedBy));
+        if (reversedBy.Trim().Length > 64)
+            throw new ArgumentOutOfRangeException(nameof(reversedBy));
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new ArgumentException("Reversal reason is required.", nameof(reason));
+        if (reason.Trim().Length > 300)
+            throw new ArgumentOutOfRangeException(nameof(reason));
+
+        ReversedAtUtc = reversedAtUtc;
+        ReversedBy = reversedBy.Trim();
+        ReversalReason = reason.Trim();
+    }
+
     private static void ValidateCommon(Guid id, Guid targetDocumentId, decimal allocatedAmount)
     {
         if (id == Guid.Empty) throw new ArgumentException("Id is required.", nameof(id));
@@ -162,4 +194,12 @@ public sealed class PaymentAllocation : AuditableEntity<Guid>
     }
 
     private static Guid? Normalize(Guid? value) => value is { } id && id != Guid.Empty ? id : null;
+
+    private static string? NormalizeIdempotencyKey(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var normalized = value.Trim();
+        if (normalized.Length > 80) throw new ArgumentOutOfRangeException(nameof(value), "Idempotency key cannot exceed 80 characters.");
+        return normalized;
+    }
 }
