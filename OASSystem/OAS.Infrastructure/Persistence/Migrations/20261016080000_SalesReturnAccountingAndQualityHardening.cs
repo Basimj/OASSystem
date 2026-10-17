@@ -12,12 +12,23 @@ public sealed class SalesReturnAccountingAndQualityHardening : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
     {
+        // SQL Server compiles a batch before executing it. Adding a column and then
+        // referencing that new column later in the same batch can therefore fail with
+        // "Invalid column name". Keep schema changes and dependent data/index work
+        // in separate commands so each command is compiled against the updated schema.
         migrationBuilder.Sql("""
 IF OBJECT_ID(N'[dbo].[tbl_JournalEntryLines]', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.tbl_JournalEntryLines', N'PostingRole') IS NULL
 BEGIN
-    IF COL_LENGTH(N'dbo.tbl_JournalEntryLines', N'PostingRole') IS NULL
-        ALTER TABLE [dbo].[tbl_JournalEntryLines] ADD [PostingRole] nvarchar(40) NULL;
+    ALTER TABLE [dbo].[tbl_JournalEntryLines]
+        ADD [PostingRole] nvarchar(40) NULL;
+END;
+""");
 
+        migrationBuilder.Sql("""
+IF OBJECT_ID(N'[dbo].[tbl_JournalEntryLines]', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.tbl_JournalEntryLines', N'PostingRole') IS NOT NULL
+BEGIN
     -- Safe historical reconstruction only. Description is deliberately not used.
     UPDATE jel
        SET [PostingRole] = N'SalesCustomerReceivable'
@@ -84,7 +95,9 @@ BEGIN
         CREATE INDEX [IX_JournalEntryLines_Journal_Role]
             ON [dbo].[tbl_JournalEntryLines]([JournalEntryId], [PostingRole]);
 END;
+""");
 
+        migrationBuilder.Sql("""
 IF OBJECT_ID(N'[dbo].[tbl_SalesReturnLines]', N'U') IS NOT NULL
 BEGIN
     IF COL_LENGTH(N'dbo.tbl_SalesReturnLines', N'ReturnCondition') IS NULL
@@ -95,15 +108,25 @@ BEGIN
         ALTER TABLE [dbo].[tbl_SalesReturnLines] ADD [InspectedAtUtc] datetimeoffset(3) NULL;
     IF COL_LENGTH(N'dbo.tbl_SalesReturnLines', N'InspectedBy') IS NULL
         ALTER TABLE [dbo].[tbl_SalesReturnLines] ADD [InspectedBy] nvarchar(64) NULL;
+END;
+""");
 
-    IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE [name] = N'CK_SalesReturnLines_ReturnCondition')
+        migrationBuilder.Sql("""
+IF OBJECT_ID(N'[dbo].[tbl_SalesReturnLines]', N'U') IS NOT NULL
+BEGIN
+    IF COL_LENGTH(N'dbo.tbl_SalesReturnLines', N'ReturnCondition') IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE [name] = N'CK_SalesReturnLines_ReturnCondition')
         ALTER TABLE [dbo].[tbl_SalesReturnLines] ADD CONSTRAINT [CK_SalesReturnLines_ReturnCondition]
             CHECK ([ReturnCondition] IS NULL OR [ReturnCondition] IN (0,1,2,3));
-    IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE [name] = N'CK_SalesReturnLines_StockDisposition')
+
+    IF COL_LENGTH(N'dbo.tbl_SalesReturnLines', N'StockDisposition') IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE [name] = N'CK_SalesReturnLines_StockDisposition')
         ALTER TABLE [dbo].[tbl_SalesReturnLines] ADD CONSTRAINT [CK_SalesReturnLines_StockDisposition]
             CHECK ([StockDisposition] IS NULL OR [StockDisposition] IN (0,1,2,3,4));
 END;
+""");
 
+        migrationBuilder.Sql("""
 IF OBJECT_ID(N'[dbo].[tbl_SalesReturns]', N'U') IS NOT NULL
 BEGIN
     IF COL_LENGTH(N'dbo.tbl_SalesReturns', N'ReturnPolicyReferenceDate') IS NULL
@@ -117,21 +140,29 @@ BEGIN
     IF COL_LENGTH(N'dbo.tbl_SalesReturns', N'ReturnWindowOverriddenBy') IS NULL
         ALTER TABLE [dbo].[tbl_SalesReturns] ADD [ReturnWindowOverriddenBy] nvarchar(64) NULL;
 END;
+""");
 
+        migrationBuilder.Sql("""
 IF OBJECT_ID(N'[dbo].[tbl_Warehouses]', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.tbl_Warehouses', N'AllowsSalesAllocation') IS NULL
 BEGIN
-    IF COL_LENGTH(N'dbo.tbl_Warehouses', N'AllowsSalesAllocation') IS NULL
-        ALTER TABLE [dbo].[tbl_Warehouses] ADD [AllowsSalesAllocation] bit NOT NULL
-            CONSTRAINT [DF_Warehouses_AllowsSalesAllocation] DEFAULT(1);
+    ALTER TABLE [dbo].[tbl_Warehouses] ADD [AllowsSalesAllocation] bit NOT NULL
+        CONSTRAINT [DF_Warehouses_AllowsSalesAllocation] DEFAULT(1);
+END;
+""");
 
-    IF NOT EXISTS
-    (
-        SELECT 1 FROM sys.indexes
-        WHERE [name] = N'IX_Warehouses_SalesAllocation'
-          AND [object_id] = OBJECT_ID(N'[dbo].[tbl_Warehouses]')
-    )
-        CREATE INDEX [IX_Warehouses_SalesAllocation]
-            ON [dbo].[tbl_Warehouses]([IsActive], [AllowsSalesAllocation]);
+        migrationBuilder.Sql("""
+IF OBJECT_ID(N'[dbo].[tbl_Warehouses]', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.tbl_Warehouses', N'AllowsSalesAllocation') IS NOT NULL
+   AND NOT EXISTS
+   (
+       SELECT 1 FROM sys.indexes
+       WHERE [name] = N'IX_Warehouses_SalesAllocation'
+         AND [object_id] = OBJECT_ID(N'[dbo].[tbl_Warehouses]')
+   )
+BEGIN
+    CREATE INDEX [IX_Warehouses_SalesAllocation]
+        ON [dbo].[tbl_Warehouses]([IsActive], [AllowsSalesAllocation]);
 END;
 """);
     }
