@@ -4,6 +4,7 @@ using OAS.Application.Abstractions.Persistence.Specifications;
 using OAS.Application.Abstractions.Security;
 using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Common.Exceptions;
+using OAS.Application.Purchasing.Abstractions;
 using OAS.Domain.Accounting.Entities;
 using DomainAllocationTargetDocumentType = OAS.Domain.Accounting.Enums.AllocationTargetDocumentType;
 
@@ -18,25 +19,57 @@ public sealed class CreatePaymentAllocationCommandHandler(
     IEnumerable<IPaymentAllocationTargetValidator> targetValidators,
     IEnumerable<IPaymentAllocationSourceTargetValidator> sourceTargetValidators,
     ISupplierSettlementFxPostingService supplierSettlementFxPosting,
+    IPurchasePaymentAllocationConcurrencyPort purchaseAllocationConcurrency,
     ICurrentUser currentUser,
     TimeProvider timeProvider) : IRequestHandler<CreatePaymentAllocationCommand, Guid>
 {
     public async Task<Guid> Handle(CreatePaymentAllocationCommand request, CancellationToken ct)
     {
         var d = request.Data;
+        var targetType = (DomainAllocationTargetDocumentType)(byte)d.TargetDocumentType;
+        if (targetType is DomainAllocationTargetDocumentType.EmployeePayroll or DomainAllocationTargetDocumentType.EndOfServiceSettlement)
+            throw new ConflictException("managed_payment_allocation_required", "Payroll and end-of-service allocations can only be created by their dedicated payment workflows.");
+
+        // AP allocations are line-owned. Lock source + target before any SUM/outstanding
+        // read so concurrent HTTP requests cannot both consume the same remaining amount.
+        if (targetType == DomainAllocationTargetDocumentType.PurchaseInvoice)
+        {
+            if (d.PaymentVoucherLineId is not Guid paymentLineId || paymentLineId == Guid.Empty ||
+                d.ReceiptVoucherLineId.HasValue || d.CustomerAdvanceApplicationId.HasValue)
+            {
+                throw new ConflictException(
+                    "purchase_invoice_payment_source_invalid",
+                    "يمكن تخصيص فاتورة المورد من سطر سند صرف مرحل فقط.");
+            }
+
+            await purchaseAllocationConcurrency.LockPaymentLineAndInvoiceAsync(
+                paymentLineId,
+                d.TargetDocumentId,
+                ct);
+        }
+
+        var idempotencyKey = NormalizeIdempotencyKey(d.IdempotencyKey);
+        if (idempotencyKey is not null)
+        {
+            var replay = await FindByIdempotencyKeyAsync(idempotencyKey, ct);
+            if (replay is not null)
+            {
+                EnsureReplayMatches(replay, d, targetType);
+                return replay.Id;
+            }
+        }
+
         var source = await ResolveSourceAsync(d.ReceiptVoucherLineId, d.PaymentVoucherLineId, ct);
         var existing = await repository.ListAsync(new Specification<PaymentAllocation>().Where(x =>
-            d.ReceiptVoucherLineId.HasValue
+            x.ReversedAtUtc == null &&
+            (d.ReceiptVoucherLineId.HasValue
                 ? x.ReceiptVoucherLineId == d.ReceiptVoucherLineId
-                : x.PaymentVoucherLineId == d.PaymentVoucherLineId), ct);
+                : x.PaymentVoucherLineId == d.PaymentVoucherLineId)), ct);
         var available = source.Amount - existing.Sum(x => x.AllocatedAmount);
         if (d.AllocatedAmount > available)
             throw new ConflictException("payment_allocation_exceeds_available_amount", $"The requested allocation ({d.AllocatedAmount}) exceeds the available source-line amount ({available}).");
 
         var sourceBaseAmount = Math.Round(d.AllocatedAmount * source.ExchangeRate, 4, MidpointRounding.AwayFromZero);
-        var targetType = (DomainAllocationTargetDocumentType)(byte)d.TargetDocumentType;
-        if (targetType is DomainAllocationTargetDocumentType.EmployeePayroll or DomainAllocationTargetDocumentType.EndOfServiceSettlement)
-            throw new ConflictException("managed_payment_allocation_required", "Payroll and end-of-service allocations can only be created by their dedicated payment workflows.");
         var sourceTargetValidator = sourceTargetValidators.SingleOrDefault(x => x.TargetDocumentType == targetType);
         if (sourceTargetValidator is not null)
             await sourceTargetValidator.ValidateSourceAsync(d.TargetDocumentId, source.Context, ct);
@@ -68,7 +101,8 @@ public sealed class CreatePaymentAllocationCommandHandler(
             sourceBaseAmount,
             now,
             validation.TargetBaseAllocatedAmount,
-            targetDocumentAmount: validation.TargetDocumentAmount);
+            targetDocumentAmount: validation.TargetDocumentAmount,
+            idempotencyKey: idempotencyKey);
         await repository.AddAsync(entity, ct);
 
         if (targetType == DomainAllocationTargetDocumentType.PurchaseInvoice)
@@ -100,6 +134,46 @@ public sealed class CreatePaymentAllocationCommandHandler(
         }
 
         return entity.Id;
+    }
+
+    private async Task<PaymentAllocation?> FindByIdempotencyKeyAsync(string key, CancellationToken ct)
+    {
+        var matches = await repository.ListAsync(
+            new Specification<PaymentAllocation>()
+                .Where(x => x.IdempotencyKey == key)
+                .ApplyPaging(0, 2),
+            ct);
+        return matches.FirstOrDefault();
+    }
+
+    private static void EnsureReplayMatches(
+        PaymentAllocation existing,
+        OAS.Contracts.Accounting.PaymentAllocations.CreatePaymentAllocationRequest request,
+        DomainAllocationTargetDocumentType targetType)
+    {
+        var sourceMatches =
+            existing.ReceiptVoucherLineId == request.ReceiptVoucherLineId &&
+            existing.PaymentVoucherLineId == request.PaymentVoucherLineId &&
+            existing.CustomerAdvanceApplicationId == request.CustomerAdvanceApplicationId;
+
+        if (!sourceMatches ||
+            existing.TargetDocumentType != targetType ||
+            existing.TargetDocumentId != request.TargetDocumentId ||
+            existing.AllocatedAmount != request.AllocatedAmount)
+        {
+            throw new ConflictException(
+                "payment_allocation_idempotency_conflict",
+                "مفتاح منع التكرار مستخدم لعملية تخصيص مختلفة.");
+        }
+    }
+
+    private static string? NormalizeIdempotencyKey(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        var normalized = value.Trim();
+        if (normalized.Length > 80)
+            throw new ConflictException("payment_allocation_idempotency_key_invalid", "مفتاح منع التكرار يجب ألا يتجاوز 80 حرفًا.");
+        return normalized;
     }
 
     private async Task<SourceInfo> ResolveSourceAsync(Guid? receiptLineId, Guid? paymentLineId, CancellationToken ct)
