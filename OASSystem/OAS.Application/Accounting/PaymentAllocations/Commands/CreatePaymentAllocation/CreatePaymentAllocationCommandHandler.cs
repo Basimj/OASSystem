@@ -165,6 +165,11 @@ public sealed class CreatePaymentAllocationCommandHandler(
                 "payment_allocation_idempotency_conflict",
                 "مفتاح منع التكرار مستخدم لعملية تخصيص مختلفة.");
         }
+
+        if (existing.IsReversed)
+            throw new ConflictException(
+                "payment_allocation_idempotency_reversed",
+                "عملية التخصيص بهذا المفتاح سبق عكسها ولا يمكن إنشاؤها مرة أخرى بالمفتاح نفسه.");
     }
 
     private static string? NormalizeIdempotencyKey(string? value)
