@@ -10,6 +10,7 @@ namespace OAS.Application.Accounting.Posting;
 
 public sealed class SupplierSettlementFxPostingService(
     IRepository<JournalEntry, Guid> journals,
+    IReadRepository<JournalEntryLine, Guid> journalLines,
     IReadRepository<FiscalPeriod, Guid> fiscalPeriods,
     IReadRepository<Account, Guid> accounts,
     IReadRepository<AccountingSettings, Guid> settings,
@@ -19,6 +20,7 @@ public sealed class SupplierSettlementFxPostingService(
 {
     private const string SourceModule = "Accounting";
     private const string SourceDocumentType = "SupplierSettlementFx";
+    private const string ReversalSourceDocumentType = "SupplierSettlementFxReversal";
 
     public async Task<SupplierSettlementFxPostingResult> PostAsync(
         SupplierSettlementFxPostingRequest request,
@@ -90,8 +92,6 @@ public sealed class SupplierSettlementFxPostingService(
         var amount = Math.Abs(difference);
         if (difference > 0m)
         {
-            // Cash paid at the settlement rate is greater than the historical AP carrying
-            // amount: Dr FX Loss / Cr Supplier AP to bring the supplier balance to zero.
             journal.AddLine(CreateBaseLine(
                 journal.Id, 1, fxAccountId.Value, amount, 0m, baseCurrency,
                 request.PostingDate, request.PaymentAllocationId, null,
@@ -103,8 +103,6 @@ public sealed class SupplierSettlementFxPostingService(
         }
         else
         {
-            // Cash paid at the settlement rate is lower than the historical AP carrying
-            // amount: Dr Supplier AP / Cr FX Gain to bring the supplier balance to zero.
             journal.AddLine(CreateBaseLine(
                 journal.Id, 1, request.SupplierAccountId, amount, 0m, baseCurrency,
                 request.PostingDate, request.PaymentAllocationId, request.SupplierId,
@@ -124,6 +122,138 @@ public sealed class SupplierSettlementFxPostingService(
         await journals.AddAsync(journal, cancellationToken);
 
         return new SupplierSettlementFxPostingResult(journal.Id, difference);
+    }
+
+    public async Task<SupplierSettlementFxReversalResult> ReverseAsync(
+        SupplierSettlementFxReversalRequest request,
+        Guid reversedBy,
+        DateTime reversedAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (request.PaymentAllocationId == Guid.Empty)
+            throw new ArgumentException("Payment allocation id is required.", nameof(request));
+        if (reversedBy == Guid.Empty)
+            throw new ArgumentException("Reversed by is required.", nameof(reversedBy));
+
+        var originals = await journals.ListAsync(
+            new Specification<JournalEntry>()
+                .Where(x =>
+                    x.SourceModule == SourceModule &&
+                    x.SourceDocumentType == SourceDocumentType &&
+                    x.SourceDocumentId == request.PaymentAllocationId)
+                .ApplyPaging(0, 2),
+            cancellationToken);
+
+        // No realized FX was posted for this allocation, so reversing the allocation
+        // has no accounting adjustment to reverse.
+        if (originals.Count == 0)
+            return new SupplierSettlementFxReversalResult(null, null);
+
+        var original = await journals.GetForUpdateAsync(originals[0].Id, cancellationToken)
+            ?? throw new NotFoundException(nameof(JournalEntry), originals[0].Id);
+        if (original.Status != JournalEntryStatus.Posted)
+            throw new ConflictException("supplier_settlement_fx_not_posted", "قيد فرق الصرف الأصلي غير مرحل ولا يمكن عكسه.");
+        if (original.ReversedJournalId.HasValue)
+            return new SupplierSettlementFxReversalResult(original.Id, original.ReversedJournalId.Value);
+
+        var existingReversal = await journals.ListAsync(
+            new Specification<JournalEntry>()
+                .Where(x =>
+                    x.SourceModule == SourceModule &&
+                    x.SourceDocumentType == ReversalSourceDocumentType &&
+                    x.SourceDocumentId == request.PaymentAllocationId)
+                .ApplyPaging(0, 2),
+            cancellationToken);
+        if (existingReversal.Count > 0)
+        {
+            original.MarkReversed(existingReversal[0].Id);
+            journals.Update(original);
+            return new SupplierSettlementFxReversalResult(original.Id, existingReversal[0].Id);
+        }
+
+        if (!original.BaseCurrencyId.HasValue ||
+            string.IsNullOrWhiteSpace(original.BaseCurrencyCodeSnapshot) ||
+            !original.BaseCurrencyDecimalPlacesSnapshot.HasValue)
+        {
+            throw new ConflictException(
+                "supplier_settlement_fx_base_currency_missing",
+                "قيد فرق الصرف الأصلي لا يحتوي Snapshot صالحًا للعملة الأساسية.");
+        }
+
+        var originalLines = await journalLines.ListAsync(
+            new Specification<JournalEntryLine>().Where(x => x.JournalEntryId == original.Id),
+            cancellationToken);
+        if (originalLines.Count == 0)
+            throw new ConflictException("supplier_settlement_fx_lines_missing", "قيد فرق الصرف الأصلي لا يحتوي بنودًا قابلة للعكس.");
+
+        var period = await ResolveFiscalPeriodAsync(request.PostingDate, cancellationToken);
+        var sequence = await sequences.NextAsync($"JournalEntry-{request.PostingDate.Year}", cancellationToken);
+        var reversal = JournalEntry.Create(
+            Guid.NewGuid(),
+            $"JV-{request.PostingDate.Year:0000}-{sequence:000000}",
+            JournalType.Automatic,
+            request.PostingDate,
+            request.PostingDate,
+            period.Id,
+            string.IsNullOrWhiteSpace(request.Description) ? "Reverse supplier realized FX settlement" : request.Description.Trim(),
+            SourceModule,
+            ReversalSourceDocumentType,
+            request.PaymentAllocationId,
+            JournalEntryStatus.Draft);
+        reversal.SetBaseCurrencySnapshot(
+            original.BaseCurrencyId.Value,
+            original.BaseCurrencyCodeSnapshot,
+            original.BaseCurrencyDecimalPlacesSnapshot.Value);
+
+        var lineNumber = 1;
+        foreach (var source in originalLines.OrderBy(x => x.LineNumber))
+        {
+            var currencyId = source.TransactionCurrencyId ?? original.BaseCurrencyId.Value;
+            var currencyCode = source.TransactionCurrencyCodeSnapshot ?? original.BaseCurrencyCodeSnapshot;
+            var currencyDecimals = source.TransactionCurrencyDecimalPlacesSnapshot ?? original.BaseCurrencyDecimalPlacesSnapshot.Value;
+            var transactionDebit = source.TransactionCreditAmount ?? source.CreditAmount;
+            var transactionCredit = source.TransactionDebitAmount ?? source.DebitAmount;
+
+            reversal.AddLine(JournalEntryLine.CreateMultiCurrency(
+                Guid.NewGuid(),
+                reversal.Id,
+                lineNumber++,
+                source.AccountId,
+                source.CreditAmount,
+                source.DebitAmount,
+                currencyId,
+                currencyCode,
+                currencyDecimals,
+                transactionDebit,
+                transactionCredit,
+                source.ExchangeRate ?? 1m,
+                source.ExchangeRateDate ?? original.PostingDate,
+                source.ExchangeRateType ?? ExchangeRateType.Accounting,
+                source.ExchangeRateSource ?? ExchangeRateSource.System,
+                $"Reversal: {source.Description ?? original.Description}",
+                source.CustomerId,
+                source.SupplierId,
+                source.EmployeeId,
+                source.PartyNameSnapshot,
+                source.CostCenterId,
+                source.ProductVariantId,
+                source.WarehouseId,
+                request.PaymentAllocationId));
+        }
+
+        if (!reversal.IsBalanced())
+            throw new ConflictException("supplier_settlement_fx_reversal_unbalanced", "قيد عكس فرق الصرف غير متوازن.");
+
+        reversal.SetPendingApproval();
+        reversal.Approve(reversedBy, reversedAtUtc);
+        reversal.Post(reversedBy, reversedAtUtc);
+        await journals.AddAsync(reversal, cancellationToken);
+
+        original.MarkReversed(reversal.Id);
+        journals.Update(original);
+
+        return new SupplierSettlementFxReversalResult(original.Id, reversal.Id);
     }
 
     private async Task<FiscalPeriod> ResolveFiscalPeriodAsync(DateOnly postingDate, CancellationToken ct)
