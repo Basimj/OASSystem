@@ -11,8 +11,13 @@ namespace OAS.Application.Purchasing.Payments;
 /// <summary>
 /// Protects supplier-invoice allocations from overpayment and from being funded by
 /// a payment source that belongs to another party (or by a receipt voucher).
-/// The invoice ceiling includes active supplier-credit applications so a posted
-/// purchase return cannot be paid a second time.
+///
+/// AP-02 separates the cash-flow base amount from the historical base carrying
+/// amount of the supplier liability. When the payment is made in the invoice
+/// currency, the document amount is settled in that currency and the target base
+/// amount is calculated using the invoice's historical exchange rate. Any
+/// difference between source base and target base is a realized FX difference and
+/// is posted separately by the settlement posting flow.
 /// </summary>
 public sealed class PurchaseInvoicePaymentAllocationTargetValidator(
     IReadRepository<PurchaseInvoice, Guid> invoices,
@@ -39,18 +44,39 @@ public sealed class PurchaseInvoicePaymentAllocationTargetValidator(
 
         var balance = await balances.GetAsync(invoice, excludingAllocationId, cancellationToken);
 
-        // AP-02 will separate settlement-base from historical target-base when exchange
-        // rates differ. Until then the existing convention remains unchanged, but the
-        // ceiling now includes supplier credits from posted purchase returns.
+        // If the voucher line uses the same currency as the invoice, the original
+        // document amount is the settlement quantity. The AP carrying amount must
+        // therefore be released at the invoice historical rate, not at the payment
+        // day's rate. Example: Invoice USD 100 @ 1500 and payment USD 100 @ 1600:
+        // source cash base = 160,000, target AP base = 150,000, realized FX = 10,000.
+        if (sourceCurrencyId == invoice.CurrencyId)
+        {
+            if (invoice.ExchangeRate <= 0m)
+                throw new ConflictException(
+                    "purchase_invoice_exchange_rate_invalid",
+                    "سعر الصرف التاريخي لفاتورة المورد غير صالح.");
+
+            if (allocatedAmount > balance.OutstandingAmount)
+                throw new ConflictException(
+                    "purchase_invoice_payment_allocation_exceeds_outstanding",
+                    "المبلغ المخصص يتجاوز الرصيد المتبقي على فاتورة المورد بعد المرتجعات والائتمانات.");
+
+            var targetBaseAmount = Round(allocatedAmount * invoice.ExchangeRate);
+            if (targetBaseAmount > balance.OutstandingBaseAmount)
+                throw new ConflictException(
+                    "purchase_invoice_payment_allocation_exceeds_outstanding_base",
+                    "القيمة الدفترية التاريخية للمبلغ المخصص تتجاوز الرصيد الأساسي المتبقي على فاتورة المورد.");
+
+            return new PaymentAllocationTargetValidation(targetBaseAmount);
+        }
+
+        // Third-currency settlement is intentionally kept on the existing base-value
+        // rule in this step. The next AP-02 slice adds explicit target-document amount
+        // capture and FX posting for cross-currency allocations.
         if (sourceBaseAllocatedAmount > balance.OutstandingBaseAmount)
             throw new ConflictException(
                 "purchase_invoice_payment_allocation_exceeds_outstanding",
                 "القيمة الأساسية للمبلغ المخصص تتجاوز الرصيد المتبقي على فاتورة المورد بعد المرتجعات والائتمانات.");
-
-        if (sourceCurrencyId == invoice.CurrencyId && allocatedAmount > balance.OutstandingAmount)
-            throw new ConflictException(
-                "purchase_invoice_payment_allocation_exceeds_outstanding",
-                "المبلغ المخصص يتجاوز الرصيد المتبقي على فاتورة المورد بعد المرتجعات والائتمانات.");
 
         return new PaymentAllocationTargetValidation(sourceBaseAllocatedAmount);
     }
@@ -90,4 +116,7 @@ public sealed class PurchaseInvoicePaymentAllocationTargetValidator(
 
         return invoice;
     }
+
+    private static decimal Round(decimal value) =>
+        Math.Round(value, 4, MidpointRounding.AwayFromZero);
 }
