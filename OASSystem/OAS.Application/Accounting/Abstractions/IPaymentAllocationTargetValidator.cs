@@ -2,7 +2,9 @@ using OAS.Domain.Accounting.Enums;
 
 namespace OAS.Application.Accounting.Abstractions;
 
-public sealed record PaymentAllocationTargetValidation(decimal TargetBaseAllocatedAmount);
+public sealed record PaymentAllocationTargetValidation(
+    decimal TargetBaseAllocatedAmount,
+    decimal TargetDocumentAmount);
 
 public interface IPaymentAllocationTargetValidator
 {
@@ -14,5 +16,6 @@ public interface IPaymentAllocationTargetValidator
         decimal allocatedAmount,
         decimal sourceBaseAllocatedAmount,
         Guid? excludingAllocationId = null,
+        decimal? requestedTargetDocumentAmount = null,
         CancellationToken cancellationToken = default);
 }
