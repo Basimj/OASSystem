@@ -43,7 +43,83 @@ public sealed class PurchaseInvoicePaymentAllocationTargetValidatorTests
         var result = await _validator.ValidateAsync(
             invoice.Id, _currencyId, 40m, 80m, null, CancellationToken.None);
 
-        Assert.That(result.TargetBaseAllocatedAmount, Is.EqualTo(80m));
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.TargetBaseAllocatedAmount, Is.EqualTo(80m));
+            Assert.That(result.TargetDocumentAmount, Is.EqualTo(40m));
+        });
+    }
+
+    [Test]
+    public async Task ValidateAsync_Invoice100UsdAt1500_Payment100UsdAt1600_ClosesDocumentAtHistoricalCarryingValue()
+    {
+        var invoice = CreatePostedInvoice(100m, 1500m);
+        await _invoiceRepository.AddAsync(invoice);
+
+        var result = await _validator.ValidateAsync(
+            invoice.Id, _currencyId, 100m, 160000m, null, CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.TargetDocumentAmount, Is.EqualTo(100m));
+            Assert.That(result.TargetBaseAllocatedAmount, Is.EqualTo(150000m));
+            Assert.That(160000m - result.TargetBaseAllocatedAmount, Is.EqualTo(10000m));
+        });
+    }
+
+    [Test]
+    public async Task ValidateAsync_Invoice100UsdAt1500_Payment100UsdAt1400_ClosesDocumentAndProducesGainDirection()
+    {
+        var invoice = CreatePostedInvoice(100m, 1500m);
+        await _invoiceRepository.AddAsync(invoice);
+
+        var result = await _validator.ValidateAsync(
+            invoice.Id, _currencyId, 100m, 140000m, null, CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.TargetDocumentAmount, Is.EqualTo(100m));
+            Assert.That(result.TargetBaseAllocatedAmount, Is.EqualTo(150000m));
+            Assert.That(140000m - result.TargetBaseAllocatedAmount, Is.EqualTo(-10000m));
+        });
+    }
+
+    [Test]
+    public async Task ValidateAsync_MultiplePartialPayments_UsesRemainingDocumentAndHistoricalBaseAmounts()
+    {
+        var invoice = CreatePostedInvoice(100m, 1500m);
+        await _invoiceRepository.AddAsync(invoice);
+        await _allocationRepository.AddAsync(PaymentAllocation.CreateLineAllocation(
+            Guid.NewGuid(), null, Guid.NewGuid(), AllocationTargetDocumentType.PurchaseInvoice,
+            invoice.Id, _currencyId, "USD", 40m, 1600m, 64000m, DateTime.UtcNow,
+            targetBaseAllocatedAmount: 60000m,
+            targetDocumentAmount: 40m));
+
+        var result = await _validator.ValidateAsync(
+            invoice.Id, _currencyId, 60m, 84000m, null, CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.TargetDocumentAmount, Is.EqualTo(60m));
+            Assert.That(result.TargetBaseAllocatedAmount, Is.EqualTo(90000m));
+        });
+    }
+
+    [Test]
+    public async Task ValidateAsync_ThirdCurrency_UsesSourceBaseToDetermineInvoiceCurrencyQuantity()
+    {
+        var invoice = CreatePostedInvoice(100m, 1500m);
+        await _invoiceRepository.AddAsync(invoice);
+        var thirdCurrencyId = Guid.NewGuid();
+
+        var result = await _validator.ValidateAsync(
+            invoice.Id, thirdCurrencyId, 250m, 75000m, null, CancellationToken.None);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.TargetDocumentAmount, Is.EqualTo(50m));
+            Assert.That(result.TargetBaseAllocatedAmount, Is.EqualTo(75000m));
+        });
     }
 
     [Test]
@@ -53,7 +129,8 @@ public sealed class PurchaseInvoicePaymentAllocationTargetValidatorTests
         await _invoiceRepository.AddAsync(invoice);
         await _allocationRepository.AddAsync(PaymentAllocation.CreateLineAllocation(
             Guid.NewGuid(), null, Guid.NewGuid(), AllocationTargetDocumentType.PurchaseInvoice,
-            invoice.Id, _currencyId, "USD", 80m, 2m, 160m, DateTime.UtcNow, 160m));
+            invoice.Id, _currencyId, "USD", 80m, 2m, 160m, DateTime.UtcNow, 160m,
+            targetDocumentAmount: 80m));
 
         var ex = Assert.ThrowsAsync<ConflictException>(async () =>
             await _validator.ValidateAsync(invoice.Id, _currencyId, 30m, 60m, null, CancellationToken.None));
