@@ -44,7 +44,12 @@ public sealed record CustomerOrderDto(
     int? PrescriptionRevisionNumber = null)
 {
     public SalesPaymentPlan PaymentPlan { get; init; } =
-        PaymentTermType == SalesPaymentTermType.Credit
-            ? SalesPaymentPlan.AccountCredit
-            : SalesPaymentPlan.FullNow;
+        PaymentTermType == SalesPaymentTermType.Credit ? SalesPaymentPlan.AccountCredit : SalesPaymentPlan.FullNow;
+    public SalesDiscountType HeaderDiscountType { get; init; } = SalesDiscountType.None;
+    public decimal? HeaderDiscountValue { get; init; }
+    public decimal HeaderDiscountAmount { get; init; }
+    public string? HeaderDiscountReason { get; init; }
+    public DateTimeOffset? HeaderDiscountApprovedAtUtc { get; init; }
+    public string? HeaderDiscountApprovedBy { get; init; }
+    public bool HeaderDiscountRequiresApproval { get; init; }
 }
