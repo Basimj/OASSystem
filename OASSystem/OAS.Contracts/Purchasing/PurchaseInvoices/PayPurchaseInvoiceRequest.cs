@@ -9,7 +9,8 @@ public sealed record PayPurchaseInvoiceRequest(
     Guid? CashAccountId,
     Guid? BankAccountId,
     string? ReferenceNumber = null,
-    string? Description = null);
+    string? Description = null,
+    string? IdempotencyKey = null);
 
 public sealed record PayPurchaseInvoiceResultDto(
     Guid PaymentVoucherId,
