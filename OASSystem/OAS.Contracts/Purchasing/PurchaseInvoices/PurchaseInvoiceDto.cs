@@ -39,4 +39,11 @@ public sealed record PurchaseInvoiceDto(
     DateTimeOffset CreatedAtUtc,
     string? CreatedBy,
     DateTimeOffset? LastModifiedAtUtc,
-    string? LastModifiedBy);
+    string? LastModifiedBy,
+    string? CurrencyCodeSnapshot = null,
+    byte? CurrencyDecimalPlacesSnapshot = null,
+    Guid? BaseCurrencyId = null,
+    string? BaseCurrencyCodeSnapshot = null,
+    byte? BaseCurrencyDecimalPlacesSnapshot = null,
+    byte? ExchangeRateType = null,
+    byte? ExchangeRateSource = null);
