@@ -10,7 +10,7 @@ using OAS.Contracts.Purchasing.SupplierCatalog;
 
 namespace OAS.Client.Purchasing.Services;
 
-public sealed class PurchasingClientService(OasApiClient api) : IPurchasingClientService
+public sealed partial class PurchasingClientService(OasApiClient api) : IPurchasingClientService
 {
     private static string PageQuery(PageRequest request)
     {
