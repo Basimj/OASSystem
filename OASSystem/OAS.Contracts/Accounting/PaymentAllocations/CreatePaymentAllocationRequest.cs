@@ -6,4 +6,5 @@ public sealed record CreatePaymentAllocationRequest(
     AllocationTargetDocumentType TargetDocumentType,
     Guid TargetDocumentId,
     decimal AllocatedAmount,
-    Guid? CustomerAdvanceApplicationId = null);
+    Guid? CustomerAdvanceApplicationId = null,
+    string? IdempotencyKey = null);
