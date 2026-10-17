@@ -192,7 +192,8 @@ public sealed class PayPurchaseInvoiceCommandHandler(
             resolved.ExchangeRate,
             resolved.BaseAmount,
             now,
-            validation.TargetBaseAllocatedAmount);
+            validation.TargetBaseAllocatedAmount,
+            targetDocumentAmount: validation.TargetDocumentAmount);
         await paymentAllocations.AddAsync(allocation, ct);
 
         var fxPosting = await supplierSettlementFxPosting.PostAsync(
@@ -208,16 +209,13 @@ public sealed class PayPurchaseInvoiceCommandHandler(
             now,
             ct);
 
-        var baseOutstanding = Math.Max(0m, Math.Round(
-            balanceBeforePayment.OutstandingBaseAmount - validation.TargetBaseAllocatedAmount,
+        var settledDocumentAmount = validation.TargetDocumentAmount ?? resolved.Amount;
+        var outstanding = Math.Max(0m, Math.Round(
+            balanceBeforePayment.OutstandingAmount - settledDocumentAmount,
             4,
             MidpointRounding.AwayFromZero));
-        var outstanding = invoice.ExchangeRate > 0m
-            ? Math.Min(invoice.TotalAmount, Math.Round(baseOutstanding / invoice.ExchangeRate, 4, MidpointRounding.AwayFromZero))
-            : Math.Max(0m, Math.Round(balanceBeforePayment.OutstandingAmount - resolved.Amount, 4, MidpointRounding.AwayFromZero));
-        var settled = Math.Max(0m, Math.Round(invoice.TotalAmount - outstanding, 4, MidpointRounding.AwayFromZero));
         var paid = Math.Max(0m, Math.Round(
-            settled - Math.Min(settled, balanceBeforePayment.AppliedCreditInvoiceCurrencyAmount),
+            balanceBeforePayment.PaidAmount + settledDocumentAmount,
             4,
             MidpointRounding.AwayFromZero));
 
