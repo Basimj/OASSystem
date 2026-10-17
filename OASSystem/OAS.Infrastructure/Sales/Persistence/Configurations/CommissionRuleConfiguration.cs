@@ -23,7 +23,7 @@ public sealed class CommissionRuleConfiguration : IEntityTypeConfiguration<Commi
         b.Property(x => x.EmployeeId);
         b.Property(x => x.ProductVariantId);
         b.Property(x => x.ProductCategoryId);
-        b.Property(x => x.SaleType).HasConversion<byte?>();
+        b.Property(x => x.SaleType).HasConversion<byte>();
         b.Property(x => x.Priority).IsRequired().HasDefaultValue(0);
         b.Property(x => x.BasisKind).IsRequired().HasConversion<byte>().HasDefaultValue(OAS.Domain.Sales.Commissions.CommissionBasisKind.NetAfterDiscountExcludingTax);
         b.Property(x => x.RatePercent).HasPrecision(9, 4).IsRequired();
