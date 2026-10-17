@@ -23,7 +23,8 @@ public sealed class PurchaseInvoiceBalanceServiceTests
 
         await allocations.AddAsync(PaymentAllocation.CreateLineAllocation(
             Guid.NewGuid(), null, Guid.NewGuid(), AllocationTargetDocumentType.PurchaseInvoice,
-            invoice.Id, currencyId, "YER", 60m, 1m, 60m, DateTime.UtcNow, 60m));
+            invoice.Id, currencyId, "YER", 60m, 1m, 60m, DateTime.UtcNow, 60m,
+            targetDocumentAmount: 60m));
         await credits.AddAsync(SupplierCreditApplication.Create(
             Guid.NewGuid(), Guid.NewGuid(), invoice.Id, supplierId,
             23m, 23m, 23m, DateTime.UtcNow, "tester", "balance-test"));
@@ -38,6 +39,69 @@ public sealed class PurchaseInvoiceBalanceServiceTests
             Assert.That(result.OutstandingAmount, Is.EqualTo(32m));
             Assert.That(result.OutstandingBaseAmount, Is.EqualTo(32m));
             Assert.That(result.SettledAmount, Is.EqualTo(83m));
+        });
+    }
+
+    [Test]
+    public async Task GetAsync_Invoice100UsdAt1500_Payment100UsdAt1600_HasZeroDocumentAndBaseOutstanding()
+    {
+        var supplierId = Guid.NewGuid();
+        var currencyId = Guid.NewGuid();
+        var invoice = CreatePostedInvoice(supplierId, currencyId, 100m, 1500m);
+        var allocations = new FakeRepository<PaymentAllocation, Guid>();
+        await allocations.AddAsync(PaymentAllocation.CreateLineAllocation(
+            Guid.NewGuid(), null, Guid.NewGuid(), AllocationTargetDocumentType.PurchaseInvoice,
+            invoice.Id, currencyId, "USD", 100m, 1600m, 160000m, DateTime.UtcNow,
+            targetBaseAllocatedAmount: 150000m,
+            targetDocumentAmount: 100m));
+
+        var service = new PurchaseInvoiceBalanceService(
+            new FakeRepository<PurchaseInvoice, Guid>([invoice]),
+            allocations,
+            new FakeRepository<SupplierCreditApplication, Guid>());
+
+        var result = await service.GetAsync(invoice);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.PaidAmount, Is.EqualTo(100m));
+            Assert.That(result.OutstandingAmount, Is.Zero);
+            Assert.That(result.OutstandingBaseAmount, Is.Zero);
+            Assert.That(result.SettledAmount, Is.EqualTo(100m));
+        });
+    }
+
+    [Test]
+    public async Task GetAsync_MultiplePaymentsAtDifferentRates_PreservesExplainableDocumentAndHistoricalBaseRemaining()
+    {
+        var supplierId = Guid.NewGuid();
+        var currencyId = Guid.NewGuid();
+        var invoice = CreatePostedInvoice(supplierId, currencyId, 100m, 1500m);
+        var allocations = new FakeRepository<PaymentAllocation, Guid>();
+
+        await allocations.AddAsync(PaymentAllocation.CreateLineAllocation(
+            Guid.NewGuid(), null, Guid.NewGuid(), AllocationTargetDocumentType.PurchaseInvoice,
+            invoice.Id, currencyId, "USD", 25m, 1600m, 40000m, DateTime.UtcNow,
+            targetBaseAllocatedAmount: 37500m,
+            targetDocumentAmount: 25m));
+        await allocations.AddAsync(PaymentAllocation.CreateLineAllocation(
+            Guid.NewGuid(), null, Guid.NewGuid(), AllocationTargetDocumentType.PurchaseInvoice,
+            invoice.Id, currencyId, "USD", 35m, 1400m, 49000m, DateTime.UtcNow,
+            targetBaseAllocatedAmount: 52500m,
+            targetDocumentAmount: 35m));
+
+        var service = new PurchaseInvoiceBalanceService(
+            new FakeRepository<PurchaseInvoice, Guid>([invoice]),
+            allocations,
+            new FakeRepository<SupplierCreditApplication, Guid>());
+
+        var result = await service.GetAsync(invoice);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.PaidAmount, Is.EqualTo(60m));
+            Assert.That(result.OutstandingAmount, Is.EqualTo(40m));
+            Assert.That(result.OutstandingBaseAmount, Is.EqualTo(60000m));
         });
     }
 
