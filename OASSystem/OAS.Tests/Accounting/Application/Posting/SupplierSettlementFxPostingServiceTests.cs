@@ -137,9 +137,11 @@ public sealed class SupplierSettlementFxPostingServiceTests
             new DateOnly(2026, 1, 1), new DateOnly(2026, 12, 31),
             FiscalPeriodStatus.Open, false, false, false);
         var journals = new FakeGenericRepository<JournalEntry, Guid>();
+        var journalLines = new FakeGenericRepository<JournalEntryLine, Guid>();
 
         var service = new SupplierSettlementFxPostingService(
             journals,
+            journalLines,
             new FakeGenericRepository<FiscalPeriod, Guid>([period]),
             new FakeGenericRepository<Account, Guid>([supplierAccount, gainAccount, lossAccount]),
             new FakeGenericRepository<AccountingSettings, Guid>([settings]),

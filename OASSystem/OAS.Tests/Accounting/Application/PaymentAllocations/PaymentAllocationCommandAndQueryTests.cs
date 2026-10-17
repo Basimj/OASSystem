@@ -51,7 +51,19 @@ public sealed class PaymentAllocationCommandAndQueryTests
         await _allocationRepository.AddAsync(PaymentAllocation.CreateLineAllocation(
             Guid.NewGuid(), source.Id, null, DomainAllocationTargetDocumentType.SalesInvoice, Guid.NewGuid(), _currencyId, "USD", 600m, 550m, 330000m, DateTime.UtcNow));
 
-        var handler = new CreatePaymentAllocationCommandHandler(_allocationRepository, _receiptLineRepository, _receiptVoucherRepository, _paymentLineRepository, _paymentVoucherRepository, [new NoOpSalesPaymentAllocationTargetValidator()], [], TimeProvider.System);
+        var handler = new CreatePaymentAllocationCommandHandler(
+            _allocationRepository,
+            _receiptLineRepository,
+            _receiptVoucherRepository,
+            _paymentLineRepository,
+            _paymentVoucherRepository,
+            [new NoOpSalesPaymentAllocationTargetValidator()],
+            [],
+            null!, // ISupplierSettlementFxPostingService - not used for SalesInvoice tests
+            null!, // IPurchasePaymentAllocationConcurrencyPort - not used for SalesInvoice tests
+            null!, // ICurrentUser - not used for SalesInvoice tests
+            TimeProvider.System);
+
         var request = new CreatePaymentAllocationRequest(source.Id, null, AllocationTargetDocumentType.SalesInvoice, Guid.NewGuid(), 300m);
 
         var id = await handler.Handle(new CreatePaymentAllocationCommand(request), CancellationToken.None);
@@ -76,7 +88,19 @@ public sealed class PaymentAllocationCommandAndQueryTests
         _allocationRepository.AddAsync(PaymentAllocation.CreateLineAllocation(
             Guid.NewGuid(), source.Id, null, DomainAllocationTargetDocumentType.SalesInvoice, Guid.NewGuid(), _currencyId, "USD", 900m, 550m, 495000m, DateTime.UtcNow)).GetAwaiter().GetResult();
 
-        var handler = new CreatePaymentAllocationCommandHandler(_allocationRepository, _receiptLineRepository, _receiptVoucherRepository, _paymentLineRepository, _paymentVoucherRepository, [new NoOpSalesPaymentAllocationTargetValidator()], [], TimeProvider.System);
+        var handler = new CreatePaymentAllocationCommandHandler(
+            _allocationRepository,
+            _receiptLineRepository,
+            _receiptVoucherRepository,
+            _paymentLineRepository,
+            _paymentVoucherRepository,
+            [new NoOpSalesPaymentAllocationTargetValidator()],
+            [],
+            null!,
+            null!,
+            null!,
+            TimeProvider.System);
+
         var request = new CreatePaymentAllocationRequest(source.Id, null, AllocationTargetDocumentType.SalesInvoice, Guid.NewGuid(), 200m);
 
         var ex = Assert.ThrowsAsync<ConflictException>(async () =>
@@ -111,7 +135,11 @@ public sealed class PaymentAllocationCommandAndQueryTests
             _paymentVoucherRepository,
             [new NoOpSalesPaymentAllocationTargetValidator()],
             [],
+            null!,
+            null!,
+            null!,
             TimeProvider.System);
+
         var request = new CreatePaymentAllocationRequest(source.Id, null, AllocationTargetDocumentType.SalesInvoice, Guid.NewGuid(), 100m);
 
         var ex = Assert.ThrowsAsync<ConflictException>(async () =>
@@ -119,7 +147,6 @@ public sealed class PaymentAllocationCommandAndQueryTests
 
         Assert.That(ex!.Code, Is.EqualTo("payment_allocation_receipt_not_posted"));
     }
-
 
     [Test]
     public void CreatePaymentAllocationCommandHandler_WhenPaymentVoucherIsNotPosted_ThrowsConflictException()
@@ -153,7 +180,11 @@ public sealed class PaymentAllocationCommandAndQueryTests
             _paymentVoucherRepository,
             [new NoOpSalesPaymentAllocationTargetValidator()],
             [],
+            null!,
+            null!,
+            null!,
             TimeProvider.System);
+
         var request = new CreatePaymentAllocationRequest(null, line.Id, AllocationTargetDocumentType.SalesInvoice, Guid.NewGuid(), 50m);
 
         var ex = Assert.ThrowsAsync<ConflictException>(async () =>
@@ -227,6 +258,7 @@ public sealed class PaymentAllocationCommandAndQueryTests
             _currencyId, "USD", "$", 2, amount, 550m, new DateOnly(2026, 1, 15), DomainExchangeRateType.Accounting,
             DomainExchangeRateSource.System, amount * 550m, null, null, null, null, null);
     }
+
     private sealed class NoOpSalesPaymentAllocationTargetValidator : ISalesPaymentAllocationTargetValidator
     {
         public DomainAllocationTargetDocumentType TargetDocumentType
@@ -242,5 +274,4 @@ public sealed class PaymentAllocationCommandAndQueryTests
             => Task.FromResult(
                 new OAS.Application.Accounting.Abstractions.PaymentAllocationTargetValidation(baseAllocatedAmount));
     }
-
 }
