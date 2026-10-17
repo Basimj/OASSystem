@@ -53,6 +53,6 @@ public sealed class SupplierOpeningRepository(OasDbContext db) : ISupplierOpenin
     public Task AddApplicationAsync(SupplierOpeningApplication application, CancellationToken cancellationToken = default) =>
         db.Set<SupplierOpeningApplication>().AddAsync(application, cancellationToken).AsTask();
 
-    public void UpdateBatch(SupplierOpeningBatch batch) => db.Set<SupplierOpeningBatch>().Update(batch);
-    public void UpdateApplication(SupplierOpeningApplication application) => db.Set<SupplierOpeningApplication>().Update(application);
+    public void UpdateBatch(SupplierOpeningBatch batch) => db.Entry(batch).State = EntityState.Modified;
+    public void UpdateApplication(SupplierOpeningApplication application) => db.Entry(application).State = EntityState.Modified;
 }
