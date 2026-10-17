@@ -151,6 +151,7 @@ public static class DependencyInjection
         services.AddScoped<IPurchaseReturnRepository, PurchaseReturnRepository>();
         services.AddScoped<IPurchaseReturnDataPort, PurchaseReturnDataPort>();
         services.AddScoped<ISupplierCreditConcurrencyPort, SupplierCreditConcurrencyPort>();
+        services.AddScoped<ISupplierCreditSourcePort, SupplierCreditSourcePort>();
         services.AddScoped<IPurchasingReferenceDataPort, PurchasingReferenceDataPort>();
         services.AddScoped<IPurchaseMatchingDataPort, PurchaseMatchingDataPort>();
         services.AddScoped<IPurchasingSettingsPort, PurchasingSettingsPort>();
