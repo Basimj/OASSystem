@@ -231,8 +231,8 @@ public sealed class ApplySupplierOpeningCommandHandler(
         var sourceApps = await openings.GetApplicationsForPaymentLineAsync(line.Id, cancellationToken);
         var sourceOpeningApplied = sourceApps.Where(x => x.Status == SupplierOpeningApplicationStatus.Active).Sum(x => x.AppliedSourceBaseAmount);
         var otherAllocations = await paymentAllocations.ListAsync(new Specification<PaymentAllocation>()
-            .Where(x => x.PaymentVoucherLineId == line.Id && !x.IsReversed), cancellationToken);
-        var otherApplied = otherAllocations.Sum(x => x.BaseAllocatedAmount ?? x.Amount * x.ExchangeRateSnapshot);
+            .Where(x => x.PaymentVoucherLineId == line.Id && !x.ReversedAtUtc.HasValue), cancellationToken);
+        var otherApplied = otherAllocations.Sum(x => x.BaseAllocatedAmount ?? x.AllocatedAmount * (x.ExchangeRate ?? 1m));
         var sourceBase = line.CounterpartyBaseAmount ?? line.BaseAmount ?? Math.Round(line.Amount * (line.ExchangeRate ?? 1m), 4);
         var sourceAvailable = Math.Max(0m, sourceBase - sourceOpeningApplied - otherApplied);
         var amount = Math.Round(command.Request.AmountBase, 4, MidpointRounding.AwayFromZero);
