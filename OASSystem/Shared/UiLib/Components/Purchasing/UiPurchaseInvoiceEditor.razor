@@ -58,8 +58,12 @@
             {
                 <div class="ui-purchasing-invoice-totals">
                     <span><small>إجمالي الفاتورة</small><strong>@FormatPaymentAmount(PaymentTotalAmount.Value)</strong></span>
-                    <span><small>المدفوع</small><strong>@FormatPaymentAmount(PaymentPaidAmount.Value)</strong></span>
-                    <span><small>المتبقي</small><strong>@FormatPaymentAmount(PaymentOutstandingAmount.Value)</strong></span>
+                    <span><small>المدفوع نقدًا/بنك</small><strong>@FormatPaymentAmount(PaymentPaidAmount.Value)</strong></span>
+                    @if(PaymentCreditAmount.HasValue && PaymentCreditAmount.Value > 0m)
+                    {
+                        <span><small>مرتجعات / ائتمان مطبق</small><strong>@FormatPaymentAmount(PaymentCreditAmount.Value)</strong></span>
+                    }
+                    <span><small>المتبقي الحقيقي</small><strong>@FormatPaymentAmount(PaymentOutstandingAmount.Value)</strong></span>
                     <span><small>حالة السداد</small><strong>@(string.IsNullOrWhiteSpace(PaymentStatusText) ? "غير محددة" : PaymentStatusText)</strong></span>
                 </div>
             }
@@ -87,6 +91,7 @@
     [Parameter] public bool PaymentSummaryLoading {get;set;}
     [Parameter] public decimal? PaymentTotalAmount {get;set;}
     [Parameter] public decimal? PaymentPaidAmount {get;set;}
+    [Parameter] public decimal? PaymentCreditAmount {get;set;}
     [Parameter] public decimal? PaymentOutstandingAmount {get;set;}
     [Parameter] public string? PaymentStatusText {get;set;}
     [Parameter] public EventCallback OnChanged {get;set;}
