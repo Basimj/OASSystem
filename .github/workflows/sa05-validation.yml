@@ -1,3 +1,4 @@
+# Final verification workflow for SA-05; removed after checks pass.
 name: SA05 Validation
 
 on:
