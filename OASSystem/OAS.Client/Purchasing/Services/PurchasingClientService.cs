@@ -87,6 +87,9 @@ public sealed class PurchasingClientService(OasApiClient api) : IPurchasingClien
     public Task<PurchaseReturnDto?> ConfirmPurchaseReturnAsync(Guid id,PurchaseReturnActionRequest r,CancellationToken ct=default)=>Post<PurchaseReturnActionRequest,PurchaseReturnDto>($"api/purchasing/returns/{id:D}/confirm",r,ct);
     public Task<PurchaseReturnPostingResultDto?> PostPurchaseReturnAsync(Guid id,PurchaseReturnActionRequest r,CancellationToken ct=default)=>Post<PurchaseReturnActionRequest,PurchaseReturnPostingResultDto>($"api/purchasing/returns/{id:D}/post",r,ct);
     public Task<PurchaseReturnDto?> CancelPurchaseReturnAsync(Guid id,CancelPurchaseReturnRequest r,CancellationToken ct=default)=>Post<CancelPurchaseReturnRequest,PurchaseReturnDto>($"api/purchasing/returns/{id:D}/cancel",r,ct);
+    public Task<SupplierCreditSummaryDto?> GetPurchaseReturnCreditSummaryAsync(Guid id,CancellationToken ct=default)=>api.GetAsync<SupplierCreditSummaryDto>($"api/purchasing/returns/{id:D}/credit-summary",ct);
+    public Task<SupplierCreditApplicationDto?> ApplySupplierCreditAsync(Guid id,ApplySupplierCreditRequest r,CancellationToken ct=default)=>Post<ApplySupplierCreditRequest,SupplierCreditApplicationDto>($"api/purchasing/returns/{id:D}/credits/apply",r,ct);
+    public Task<SupplierCreditApplicationDto?> ReverseSupplierCreditAsync(Guid id,Guid applicationId,ReverseSupplierCreditApplicationRequest r,CancellationToken ct=default)=>Post<ReverseSupplierCreditApplicationRequest,SupplierCreditApplicationDto>($"api/purchasing/returns/{id:D}/credits/{applicationId:D}/reverse",r,ct);
 
     private async Task<PagedResult<T>> GetPage<T>(string uri,CancellationToken ct)=>await api.GetAsync<PagedResult<T>>(uri,ct)??new();
     private Task<T?> Post<TRequest,T>(string uri,TRequest payload,CancellationToken ct)=>api.PostAsync<TRequest,T>(uri,payload,ct);
