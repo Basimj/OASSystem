@@ -10,6 +10,7 @@ using OAS.Application.Purchasing.Payments;
 using OAS.Application.Purchasing.Services;
 using OAS.Application.Sales.Abstractions;
 using OAS.Application.Accounting.Abstractions;
+using OAS.Application.Accounting.Posting;
 
 namespace OAS.Application.Purchasing;
 
@@ -37,6 +38,7 @@ public static class DependencyInjection
         services.TryAddScoped<IPurchaseReturnInventoryPostingService, PurchaseReturnInventoryPostingService>();
         services.TryAddScoped<IPurchaseInvoiceBalanceService, PurchaseInvoiceBalanceService>();
         services.TryAddScoped<ISupplierCreditSettlementService, SupplierCreditSettlementService>();
+        services.TryAddScoped<ISupplierSettlementFxPostingService, SupplierSettlementFxPostingService>();
         services.TryAddScoped<ICustomerDemandProcurementPort, CustomerDemandProcurementService>();
         services.TryAddScoped<IPurchasingCommercialTermsPort, DefaultPurchasingCommercialTermsService>();
         services.TryAddScoped<ICustomerDemandSourcingService, CustomerDemandSourcingService>();
