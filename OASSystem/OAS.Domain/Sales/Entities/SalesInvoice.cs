@@ -9,7 +9,6 @@ namespace OAS.Domain.Sales.Entities;
 public sealed class SalesInvoice : AuditableEntity<Guid>
 {
     private readonly List<SalesInvoiceLine> _lines = [];
-
     private SalesInvoice() { }
 
     private SalesInvoice(
@@ -30,10 +29,10 @@ public sealed class SalesInvoice : AuditableEntity<Guid>
         InvoiceDate = invoiceDate;
         PostingDate = postingDate;
         SetCurrencySnapshots(currencyId, currencyCodeSnapshot, currencySymbolSnapshot, currencyDecimalPlacesSnapshot,
-            exchangeRate, exchangeRateDate, exchangeRateType, exchangeRateSource, baseCurrencyId,
-            baseCurrencyCodeSnapshot, baseCurrencyDecimalPlacesSnapshot);
+            exchangeRate, exchangeRateDate, exchangeRateType, exchangeRateSource, baseCurrencyId, baseCurrencyCodeSnapshot, baseCurrencyDecimalPlacesSnapshot);
         SetCommercialPolicy(taxCalculationMode, paymentPlan, paymentTermDaysSnapshot);
         Description = SalesDomainGuard.Optional(description, 1000, "Invoice description");
+        HeaderDiscountType = SalesDiscountType.None;
         Status = SalesInvoiceStatus.Draft;
         IsActive = true;
     }
@@ -63,7 +62,15 @@ public sealed class SalesInvoice : AuditableEntity<Guid>
     public string BaseCurrencyCodeSnapshot { get; private set; } = string.Empty;
     public byte BaseCurrencyDecimalPlacesSnapshot { get; private set; }
     public decimal Subtotal { get; private set; }
+    /// <summary>Sum of line-level discounts only.</summary>
     public decimal DiscountAmount { get; private set; }
+    public SalesDiscountType HeaderDiscountType { get; private set; }
+    public decimal? HeaderDiscountValue { get; private set; }
+    public decimal HeaderDiscountAmount { get; private set; }
+    public decimal BaseHeaderDiscountAmount { get; private set; }
+    public string? HeaderDiscountReason { get; private set; }
+    public DateTimeOffset? HeaderDiscountApprovedAtUtc { get; private set; }
+    public string? HeaderDiscountApprovedBy { get; private set; }
     public decimal TaxAmount { get; private set; }
     public decimal TotalAmount { get; private set; }
     public decimal BaseSubtotal { get; private set; }
@@ -81,6 +88,7 @@ public sealed class SalesInvoice : AuditableEntity<Guid>
     public bool IsActive { get; private set; }
     public byte[] RowVersion { get; private set; } = [];
     public IReadOnlyCollection<SalesInvoiceLine> Lines => _lines.AsReadOnly();
+    public bool HeaderDiscountRequiresApproval => HeaderDiscountAmount > 0m && !HeaderDiscountApprovedAtUtc.HasValue;
 
     public static SalesInvoice Create(
         Guid id, string invoiceCode, Guid customerId, Guid? customerOrderId, Guid? prescriptionRevisionId,
@@ -95,8 +103,6 @@ public sealed class SalesInvoice : AuditableEntity<Guid>
             exchangeRateType, exchangeRateSource, taxCalculationMode, paymentPlan, paymentTermDaysSnapshot,
             baseCurrencyId, baseCurrencyCodeSnapshot, baseCurrencyDecimalPlacesSnapshot, description);
 
-    // Transitional overload for the current Application layer. Credit maps to AccountCredit and
-    // Immediate maps to FullNow, matching the required data backfill rule.
     public static SalesInvoice Create(
         Guid id, string invoiceCode, Guid customerId, Guid? customerOrderId, Guid? prescriptionRevisionId,
         DateOnly invoiceDate, DateOnly postingDate, Guid currencyId, string currencyCodeSnapshot,
@@ -113,10 +119,10 @@ public sealed class SalesInvoice : AuditableEntity<Guid>
 
     public void UpdateHeader(
         Guid customerId, Guid? customerOrderId, Guid? prescriptionRevisionId, DateOnly invoiceDate, DateOnly postingDate,
-        TaxCalculationMode taxCalculationMode, SalesPaymentPlan paymentPlan, int paymentTermDaysSnapshot,
-        string? description)
+        TaxCalculationMode taxCalculationMode, SalesPaymentPlan paymentPlan, int paymentTermDaysSnapshot, string? description)
     {
         EnsureDraft();
+        InvalidateHeaderDiscountApproval();
         CustomerId = SalesDomainGuard.Required(customerId, "Customer id");
         ValidateOptionalId(customerOrderId, "Customer order id");
         ValidateOptionalId(prescriptionRevisionId, "Prescription revision id");
@@ -129,14 +135,11 @@ public sealed class SalesInvoice : AuditableEntity<Guid>
         RepriceLines();
     }
 
-    // Transitional overload for callers still using SalesPaymentTermType.
     public void UpdateHeader(
         Guid customerId, Guid? customerOrderId, Guid? prescriptionRevisionId, DateOnly invoiceDate, DateOnly postingDate,
-        TaxCalculationMode taxCalculationMode, SalesPaymentTermType paymentTermType, int paymentTermDaysSnapshot,
-        string? description) =>
-        UpdateHeader(customerId, customerOrderId, prescriptionRevisionId, invoiceDate, postingDate,
-            taxCalculationMode, SalesPaymentPlanPolicy.FromLegacyPaymentTerm(paymentTermType),
-            paymentTermDaysSnapshot, description);
+        TaxCalculationMode taxCalculationMode, SalesPaymentTermType paymentTermType, int paymentTermDaysSnapshot, string? description) =>
+        UpdateHeader(customerId, customerOrderId, prescriptionRevisionId, invoiceDate, postingDate, taxCalculationMode,
+            SalesPaymentPlanPolicy.FromLegacyPaymentTerm(paymentTermType), paymentTermDaysSnapshot, description);
 
     public void ChangePaymentPlanSnapshot(SalesPaymentPlan paymentPlan, int paymentTermDaysSnapshot = 0)
     {
@@ -151,12 +154,42 @@ public sealed class SalesInvoice : AuditableEntity<Guid>
         SalesEmployeeId = employeeId;
     }
 
+    public void SetHeaderDiscount(SalesDiscountType type, decimal? value, string? reason)
+    {
+        EnsureDraft();
+        SalesDomainGuard.Defined(type, "Header discount type");
+        if (type == SalesDiscountType.None)
+        {
+            HeaderDiscountType = SalesDiscountType.None;
+            HeaderDiscountValue = null;
+            HeaderDiscountReason = null;
+            InvalidateHeaderDiscountApproval();
+            RecalculateTotals();
+            return;
+        }
+        HeaderDiscountReason = SalesDomainGuard.Required(reason ?? string.Empty, 500, "Header discount reason");
+        HeaderDiscountType = type;
+        HeaderDiscountValue = value;
+        InvalidateHeaderDiscountApproval();
+        RecalculateTotals();
+    }
+
+    public void ApproveHeaderDiscount(DateTimeOffset approvedAtUtc, string approvedBy)
+    {
+        EnsureDraft();
+        RecalculateTotals();
+        if (HeaderDiscountAmount <= 0m) throw new DomainException("There is no header discount to approve.");
+        HeaderDiscountApprovedAtUtc = approvedAtUtc;
+        HeaderDiscountApprovedBy = SalesDomainGuard.Required(approvedBy, 64, "Header discount approver");
+    }
+
     public void ChangeCurrency(
         Guid currencyId, string currencyCodeSnapshot, string? currencySymbolSnapshot, byte currencyDecimalPlacesSnapshot,
         decimal exchangeRate, DateOnly exchangeRateDate, ExchangeRateType exchangeRateType, ExchangeRateSource exchangeRateSource,
         Guid baseCurrencyId, string baseCurrencyCodeSnapshot, byte baseCurrencyDecimalPlacesSnapshot)
     {
         EnsureDraft();
+        InvalidateHeaderDiscountApproval();
         SetCurrencySnapshots(currencyId, currencyCodeSnapshot, currencySymbolSnapshot, currencyDecimalPlacesSnapshot,
             exchangeRate, exchangeRateDate, exchangeRateType, exchangeRateSource, baseCurrencyId, baseCurrencyCodeSnapshot,
             baseCurrencyDecimalPlacesSnapshot);
@@ -167,11 +200,9 @@ public sealed class SalesInvoice : AuditableEntity<Guid>
     {
         EnsureDraft();
         ArgumentNullException.ThrowIfNull(line);
-        if (line.SalesInvoiceId != Id)
-            throw new DomainException("Sales invoice line does not belong to this invoice.");
-        if (_lines.Any(x => x.Id == line.Id || x.LineNumber == line.LineNumber))
-            throw new DomainException("Duplicate sales invoice line is not allowed.");
-
+        if (line.SalesInvoiceId != Id) throw new DomainException("Sales invoice line does not belong to this invoice.");
+        if (_lines.Any(x => x.Id == line.Id || x.LineNumber == line.LineNumber)) throw new DomainException("Duplicate sales invoice line is not allowed.");
+        InvalidateHeaderDiscountApproval();
         _lines.Add(line);
         RecalculateTotals();
     }
@@ -179,17 +210,17 @@ public sealed class SalesInvoice : AuditableEntity<Guid>
     public void RemoveLine(Guid lineId)
     {
         EnsureDraft();
-        var line = FindLine(lineId);
-        _lines.Remove(line);
+        InvalidateHeaderDiscountApproval();
+        _lines.Remove(FindLine(lineId));
         ReNumberLines();
         RecalculateTotals();
     }
 
-    public void UpdateLinePricing(
-        Guid lineId, decimal quantity, decimal baseUnitPrice, decimal actualUnitPrice, SalesDiscountType discountType,
-        decimal? discountValue, decimal? taxRate)
+    public void UpdateLinePricing(Guid lineId, decimal quantity, decimal baseUnitPrice, decimal actualUnitPrice,
+        SalesDiscountType discountType, decimal? discountValue, decimal? taxRate)
     {
         EnsureDraft();
+        InvalidateHeaderDiscountApproval();
         var line = FindLine(lineId);
         line.UpdatePricing(quantity, baseUnitPrice, actualUnitPrice, discountType, discountValue, taxRate,
             TaxCalculationMode, CurrencyDecimalPlacesSnapshot, ExchangeRate, BaseCurrencyDecimalPlacesSnapshot);
@@ -201,7 +232,6 @@ public sealed class SalesInvoice : AuditableEntity<Guid>
         EnsureDraft();
         FindLine(lineId).SetPrescriptionSnapshot(snapshot);
     }
-
     public void ClearLinePrescriptionSnapshot(Guid lineId)
     {
         EnsureDraft();
@@ -211,10 +241,9 @@ public sealed class SalesInvoice : AuditableEntity<Guid>
     public void Confirm(DateTimeOffset confirmedAtUtc, string? confirmedBy)
     {
         EnsureDraft();
-        if (_lines.Count == 0 || _lines.All(x => !x.IsActive))
-            throw new DomainException("Sales invoice must contain at least one active line before confirmation.");
-
+        if (_lines.Count == 0 || _lines.All(x => !x.IsActive)) throw new DomainException("Sales invoice must contain at least one active line before confirmation.");
         RecalculateTotals();
+        if (HeaderDiscountRequiresApproval) throw new DomainException("Header discount must be approved before confirming the sales invoice.");
         Status = SalesInvoiceStatus.Confirmed;
         ConfirmedAtUtc = confirmedAtUtc;
         ConfirmedBy = NormalizeUser(confirmedBy);
@@ -225,31 +254,24 @@ public sealed class SalesInvoice : AuditableEntity<Guid>
         EnsureConfirmed();
         FindLine(lineId).SetCostSnapshot(unitCost, totalCost);
     }
-
     public void SetJournalEntry(Guid journalEntryId)
     {
         EnsureConfirmed();
         JournalEntryId = SalesDomainGuard.Required(journalEntryId, "Journal entry id");
     }
-
     public void Post(DateTimeOffset postedAtUtc, string? postedBy)
     {
         EnsureConfirmed();
-        if (!JournalEntryId.HasValue)
-            throw new DomainException("Journal entry must be assigned before posting the sales invoice.");
+        if (!JournalEntryId.HasValue) throw new DomainException("Journal entry must be assigned before posting the sales invoice.");
         if (_lines.Where(x => x.IsActive && x.RequiresInventory).Any(x => !x.UnitCostSnapshot.HasValue || !x.TotalCostSnapshot.HasValue))
             throw new DomainException("All inventory sales lines must have cost snapshots before posting.");
-
         Status = SalesInvoiceStatus.Posted;
         PostedAtUtc = postedAtUtc;
         PostedBy = NormalizeUser(postedBy);
     }
-
     public void Cancel(DateTimeOffset cancelledAtUtc, string? cancelledBy)
     {
-        if (Status is SalesInvoiceStatus.Posted or SalesInvoiceStatus.Cancelled)
-            throw new DomainException("Posted or already cancelled sales invoices cannot be cancelled directly.");
-
+        if (Status is SalesInvoiceStatus.Posted or SalesInvoiceStatus.Cancelled) throw new DomainException("Posted or already cancelled sales invoices cannot be cancelled directly.");
         Status = SalesInvoiceStatus.Cancelled;
         IsActive = false;
         CancelledAtUtc = cancelledAtUtc;
@@ -258,37 +280,45 @@ public sealed class SalesInvoice : AuditableEntity<Guid>
 
     public void RecalculateTotals()
     {
-        var activeLines = _lines.Where(x => x.IsActive).ToList();
-        Subtotal = SalesPricingCalculator.Round(activeLines.Sum(x => x.GrossAmount), CurrencyDecimalPlacesSnapshot);
-        DiscountAmount = SalesPricingCalculator.Round(activeLines.Sum(x => x.DiscountAmount), CurrencyDecimalPlacesSnapshot);
-        TaxAmount = SalesPricingCalculator.Round(activeLines.Sum(x => x.TaxAmount), CurrencyDecimalPlacesSnapshot);
-        TotalAmount = SalesPricingCalculator.Round(activeLines.Sum(x => x.FinalAmount), CurrencyDecimalPlacesSnapshot);
+        var active = _lines.Where(x => x.IsActive).OrderBy(x => x.LineNumber).ToList();
+        var allocations = SalesPricingCalculator.AllocateHeaderDiscount(
+            active.Select(x => SalesPricingCalculator.Round(x.NetBeforeHeaderDiscount, CurrencyDecimalPlacesSnapshot)).ToArray(),
+            HeaderDiscountType, HeaderDiscountValue, CurrencyDecimalPlacesSnapshot);
+        for (var i = 0; i < active.Count; i++)
+            active[i].ApplyHeaderDiscountAllocation(allocations[i], TaxCalculationMode, CurrencyDecimalPlacesSnapshot, ExchangeRate, BaseCurrencyDecimalPlacesSnapshot);
 
+        Subtotal = SalesPricingCalculator.Round(active.Sum(x => x.GrossAmount), CurrencyDecimalPlacesSnapshot);
+        DiscountAmount = SalesPricingCalculator.Round(active.Sum(x => x.DiscountAmount), CurrencyDecimalPlacesSnapshot);
+        HeaderDiscountAmount = SalesPricingCalculator.Round(active.Sum(x => x.HeaderDiscountAllocated), CurrencyDecimalPlacesSnapshot);
+        TaxAmount = SalesPricingCalculator.Round(active.Sum(x => x.TaxAmount), CurrencyDecimalPlacesSnapshot);
+        TotalAmount = SalesPricingCalculator.Round(active.Sum(x => x.FinalAmount), CurrencyDecimalPlacesSnapshot);
         BaseSubtotal = SalesPricingCalculator.ConvertToBase(Subtotal, ExchangeRate, BaseCurrencyDecimalPlacesSnapshot);
         BaseDiscountAmount = SalesPricingCalculator.ConvertToBase(DiscountAmount, ExchangeRate, BaseCurrencyDecimalPlacesSnapshot);
+        BaseHeaderDiscountAmount = SalesPricingCalculator.ConvertToBase(HeaderDiscountAmount, ExchangeRate, BaseCurrencyDecimalPlacesSnapshot);
         BaseTaxAmount = SalesPricingCalculator.ConvertToBase(TaxAmount, ExchangeRate, BaseCurrencyDecimalPlacesSnapshot);
         BaseTotalAmount = SalesPricingCalculator.ConvertToBase(TotalAmount, ExchangeRate, BaseCurrencyDecimalPlacesSnapshot);
     }
 
-    private void SetCurrencySnapshots(
-        Guid currencyId, string code, string? symbol, byte decimals, decimal exchangeRate, DateOnly exchangeRateDate,
-        ExchangeRateType exchangeRateType, ExchangeRateSource exchangeRateSource, Guid baseCurrencyId,
-        string baseCurrencyCode, byte baseCurrencyDecimals)
+    private void InvalidateHeaderDiscountApproval()
+    {
+        HeaderDiscountApprovedAtUtc = null;
+        HeaderDiscountApprovedBy = null;
+    }
+
+    private void SetCurrencySnapshots(Guid currencyId, string code, string? symbol, byte decimals, decimal exchangeRate,
+        DateOnly exchangeRateDate, ExchangeRateType exchangeRateType, ExchangeRateSource exchangeRateSource,
+        Guid baseCurrencyId, string baseCurrencyCode, byte baseCurrencyDecimals)
     {
         CurrencyId = SalesDomainGuard.Required(currencyId, "Currency id");
         BaseCurrencyId = SalesDomainGuard.Required(baseCurrencyId, "Base currency id");
         CurrencyCodeSnapshot = SalesDomainGuard.Required(code, 10, "Currency code").ToUpperInvariant();
         CurrencySymbolSnapshot = SalesDomainGuard.Optional(symbol, 10, "Currency symbol");
         BaseCurrencyCodeSnapshot = SalesDomainGuard.Required(baseCurrencyCode, 10, "Base currency code").ToUpperInvariant();
-        if (decimals > 6 || baseCurrencyDecimals > 6)
-            throw new DomainException("Currency decimal places cannot exceed 6.");
-        if (exchangeRate <= 0)
-            throw new DomainException("Exchange rate must be greater than zero.");
-        if (currencyId == baseCurrencyId && exchangeRate != 1m)
-            throw new DomainException("Exchange rate must be 1 when invoice currency is the base currency.");
+        if (decimals > 6 || baseCurrencyDecimals > 6) throw new DomainException("Currency decimal places cannot exceed 6.");
+        if (exchangeRate <= 0) throw new DomainException("Exchange rate must be greater than zero.");
+        if (currencyId == baseCurrencyId && exchangeRate != 1m) throw new DomainException("Exchange rate must be 1 when invoice currency is the base currency.");
         SalesDomainGuard.Defined(exchangeRateType, "Exchange rate type");
         SalesDomainGuard.Defined(exchangeRateSource, "Exchange rate source");
-
         CurrencyDecimalPlacesSnapshot = decimals;
         ExchangeRate = exchangeRate;
         ExchangeRateDate = exchangeRateDate;
@@ -301,14 +331,11 @@ public sealed class SalesInvoice : AuditableEntity<Guid>
     {
         SalesDomainGuard.Defined(taxMode, "Tax calculation mode");
         SalesDomainGuard.Defined(paymentPlan, "Sales payment plan");
-
         TaxCalculationMode = taxMode;
         PaymentPlan = paymentPlan;
         PaymentTermType = SalesPaymentPlanPolicy.ToPaymentTermType(paymentPlan);
         PaymentTermDaysSnapshot = SalesPaymentPlanPolicy.NormalizePaymentTermDays(paymentPlan, paymentTermDays);
-        DueDate = PaymentTermType == SalesPaymentTermType.Credit
-            ? InvoiceDate.AddDays(PaymentTermDaysSnapshot)
-            : null;
+        DueDate = PaymentTermType == SalesPaymentTermType.Credit ? InvoiceDate.AddDays(PaymentTermDaysSnapshot) : null;
     }
 
     private void RepriceLines()
@@ -318,34 +345,10 @@ public sealed class SalesInvoice : AuditableEntity<Guid>
                 line.TaxRate, TaxCalculationMode, CurrencyDecimalPlacesSnapshot, ExchangeRate, BaseCurrencyDecimalPlacesSnapshot);
         RecalculateTotals();
     }
-
-    private SalesInvoiceLine FindLine(Guid lineId) =>
-        _lines.SingleOrDefault(x => x.Id == lineId) ?? throw new DomainException("Sales invoice line was not found.");
-
-    private void ReNumberLines()
-    {
-        var number = 1;
-        foreach (var line in _lines.OrderBy(x => x.LineNumber))
-            line.SetLineNumber(number++);
-    }
-
-    private void EnsureDraft()
-    {
-        if (Status != SalesInvoiceStatus.Draft)
-            throw new DomainException("Only draft sales invoices can be modified.");
-    }
-
-    private void EnsureConfirmed()
-    {
-        if (Status != SalesInvoiceStatus.Confirmed)
-            throw new DomainException("Only confirmed sales invoices can be posted.");
-    }
-
-    private static void ValidateOptionalId(Guid? id, string name)
-    {
-        if (id.HasValue && id.Value == Guid.Empty)
-            throw new DomainException($"{name} cannot be empty.");
-    }
-
+    private SalesInvoiceLine FindLine(Guid lineId) => _lines.SingleOrDefault(x => x.Id == lineId) ?? throw new DomainException("Sales invoice line was not found.");
+    private void ReNumberLines() { var n = 1; foreach (var line in _lines.OrderBy(x => x.LineNumber)) line.SetLineNumber(n++); }
+    private void EnsureDraft() { if (Status != SalesInvoiceStatus.Draft) throw new DomainException("Only draft sales invoices can be modified."); }
+    private void EnsureConfirmed() { if (Status != SalesInvoiceStatus.Confirmed) throw new DomainException("Only confirmed sales invoices can be posted."); }
+    private static void ValidateOptionalId(Guid? id, string name) { if (id.HasValue && id.Value == Guid.Empty) throw new DomainException($"{name} cannot be empty."); }
     private static string? NormalizeUser(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
