@@ -66,6 +66,51 @@
                     <span><small>المتبقي الحقيقي</small><strong>@FormatPaymentAmount(PaymentOutstandingAmount.Value)</strong></span>
                     <span><small>حالة السداد</small><strong>@(string.IsNullOrWhiteSpace(PaymentStatusText) ? "غير محددة" : PaymentStatusText)</strong></span>
                 </div>
+
+                @if(PaymentBaseTotalAmount.HasValue)
+                {
+                    <div class="ui-purchasing-invoice-totals">
+                        <span><small>القيمة التاريخية الأساسية</small><strong>@FormatBaseAmount(PaymentBaseTotalAmount.Value)</strong></span>
+                        <span><small>المسدد من حساب المورد</small><strong>@FormatBaseAmount(PaymentAppliedBaseAmount ?? 0m)</strong></span>
+                        @if(PaymentCreditBaseAmount is > 0m)
+                        {
+                            <span><small>ائتمان المورد - أساسي</small><strong>@FormatBaseAmount(PaymentCreditBaseAmount.Value)</strong></span>
+                        }
+                        <span><small>المتبقي الأساسي</small><strong>@FormatBaseAmount(PaymentOutstandingBaseAmount ?? 0m)</strong></span>
+                        @if(PaymentRealizedExchangeDifferenceBase is { } fx && fx != 0m)
+                        {
+                            <span><small>@(fx > 0m ? "خسارة صرف محققة" : "ربح صرف محقق")</small><strong>@FormatBaseAmount(Math.Abs(fx))</strong></span>
+                        }
+                    </div>
+                }
+
+                @if(PaymentSettlements.Count > 0)
+                {
+                    <h4>تفاصيل التسويات وفروق الصرف</h4>
+                    <UiPurchasingLineTable>
+                        @foreach(var settlement in PaymentSettlements.OrderBy(x=>x.AllocatedAtUtc))
+                        {
+                            <div class="ui-purchasing-invoice-line">
+                                <div class="ui-purchasing-invoice-line__head">
+                                    <strong>@FormatSettlementTitle(settlement)</strong>
+                                    @if(settlement.RealizedExchangeJournalEntryId is Guid fxJournalId)
+                                    {
+                                        <UiButton Text="عرض قيد فرق الصرف" IconCssClass="fa-solid fa-book-journal-whills" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="@(_=>OpenFxJournalAsync(fxJournalId))" />
+                                    }
+                                </div>
+                                <div class="ui-purchasing-invoice-totals">
+                                    <span><small>مبلغ السداد</small><strong>@FormatSettlementSource(settlement)</strong></span>
+                                    <span><small>سعر السداد</small><strong>@FormatSettlementRate(settlement)</strong></span>
+                                    <span><small>القيمة الأساسية للسداد</small><strong>@FormatBaseAmount(settlement.SourceBaseAmount)</strong></span>
+                                    <span><small>المسوى من الفاتورة</small><strong>@FormatPaymentAmount(settlement.TargetDocumentAmount)</strong></span>
+                                    <span><small>القيمة التاريخية المسواة</small><strong>@FormatBaseAmount(settlement.TargetBaseAmount)</strong></span>
+                                    <span><small>فرق الصرف</small><strong>@FormatFx(settlement.RealizedExchangeDifferenceBase)</strong></span>
+                                </div>
+                                <small>@FormatSettlementSourceInfo(settlement)</small>
+                            </div>
+                        }
+                    </UiPurchasingLineTable>
+                }
             }
             else
             {
@@ -94,12 +139,33 @@
     [Parameter] public decimal? PaymentCreditAmount {get;set;}
     [Parameter] public decimal? PaymentOutstandingAmount {get;set;}
     [Parameter] public string? PaymentStatusText {get;set;}
+    [Parameter] public decimal? PaymentBaseTotalAmount {get;set;}
+    [Parameter] public decimal? PaymentAppliedBaseAmount {get;set;}
+    [Parameter] public decimal? PaymentCreditBaseAmount {get;set;}
+    [Parameter] public decimal? PaymentOutstandingBaseAmount {get;set;}
+    [Parameter] public decimal? PaymentRealizedExchangeDifferenceBase {get;set;}
+    [Parameter] public string? PaymentBaseCurrencyCode {get;set;}
+    [Parameter] public IReadOnlyList<UiPurchaseInvoicePaymentSettlementModel> PaymentSettlements {get;set;}=Array.Empty<UiPurchaseInvoicePaymentSettlementModel>();
+    [Parameter] public EventCallback<Guid> OnOpenFxJournal {get;set;}
     [Parameter] public EventCallback OnChanged {get;set;}
     private static readonly IReadOnlyList<UiSelectOption> TaxModeOptions=[new("1","غير شامل"),new("2","شامل")];
     private static string? GuidText(Guid? id)=>id?.ToString("D"); private static Guid? Parse(string? v)=>Guid.TryParse(v,out var x)?x:null;
     private static UiLookupItem? Selected(Guid? id,string? text,string icon)=>id.HasValue?new(id.Value.ToString("D"),text??id.Value.ToString("D"),null,icon):null;
     private static string PurchaseOrderLinkText(UiPurchaseInvoiceLineModel line)=>line.PurchaseOrderLineId.HasValue?"مرتبط بسطر أمر شراء":"غير مرتبط";
     private string FormatPaymentAmount(decimal value)=>$"{value:N2} {Model.CurrencyCode}".Trim();
+    private string FormatBaseAmount(decimal value)=>$"{value:N2} {PaymentBaseCurrencyCode}".Trim();
+    private static string FormatSettlementSource(UiPurchaseInvoicePaymentSettlementModel x)=>$"{x.SourceAmount:N2} {x.SourceCurrencyCode}".Trim();
+    private static string FormatSettlementRate(UiPurchaseInvoicePaymentSettlementModel x)=>x.SourceExchangeRate.HasValue?x.SourceExchangeRate.Value.ToString("N8"):"—";
+    private string FormatFx(decimal value)=>value==0m?"لا يوجد":$"{(value>0m?"خسارة":"ربح")} {Math.Abs(value):N2} {PaymentBaseCurrencyCode}".Trim();
+    private static string FormatSettlementTitle(UiPurchaseInvoicePaymentSettlementModel x)=>$"تسوية {x.AllocatedAtUtc.ToLocalTime():yyyy-MM-dd HH:mm}";
+    private static string FormatSettlementSourceInfo(UiPurchaseInvoicePaymentSettlementModel x)
+    {
+        var date=x.SourceExchangeRateDate?.ToString("yyyy-MM-dd")??"—";
+        var type=string.IsNullOrWhiteSpace(x.SourceExchangeRateTypeText)?"—":x.SourceExchangeRateTypeText;
+        var source=string.IsNullOrWhiteSpace(x.SourceExchangeRateSourceText)?"—":x.SourceExchangeRateSourceText;
+        return $"تاريخ السعر: {date} · النوع: {type} · المصدر: {source}";
+    }
+    private Task OpenFxJournalAsync(Guid id)=>OnOpenFxJournal.InvokeAsync(id);
     private Task Changed()=>OnChanged.InvokeAsync();
     private async Task SupplierInvoiceCodeChanged(string? v){Model.SupplierInvoiceCode=v;await Changed();}
     private async Task SupplierChanged(string? v){Model.SupplierId=Parse(v);await Changed();}
