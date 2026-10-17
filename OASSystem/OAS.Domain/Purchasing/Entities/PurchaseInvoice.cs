@@ -108,6 +108,37 @@ public sealed class PurchaseInvoice : AuditableEntity<Guid>
         Notes = PurchasingDomainGuard.Optional(notes, 1000, "Notes");
     }
 
+    public void CaptureCurrencySnapshot(
+        string currencyCode,
+        byte currencyDecimalPlaces,
+        Guid baseCurrencyId,
+        string baseCurrencyCode,
+        byte baseCurrencyDecimalPlaces,
+        ExchangeRateType exchangeRateType,
+        ExchangeRateSource exchangeRateSource)
+    {
+        if (Status == PurchaseInvoiceStatus.Posted)
+            throw new DomainException("Currency snapshot of a posted purchase invoice cannot be changed.");
+        if (baseCurrencyId == Guid.Empty)
+            throw new DomainException("Base currency id is required for the purchase invoice snapshot.");
+        if (string.IsNullOrWhiteSpace(currencyCode) || currencyCode.Trim().Length > 8)
+            throw new DomainException("Purchase invoice currency code snapshot is invalid.");
+        if (string.IsNullOrWhiteSpace(baseCurrencyCode) || baseCurrencyCode.Trim().Length > 8)
+            throw new DomainException("Purchase invoice base currency code snapshot is invalid.");
+        if (currencyDecimalPlaces > 6 || baseCurrencyDecimalPlaces > 6)
+            throw new DomainException("Purchase invoice currency precision snapshot is invalid.");
+        if (!Enum.IsDefined(exchangeRateType) || !Enum.IsDefined(exchangeRateSource))
+            throw new DomainException("Purchase invoice exchange-rate snapshot is invalid.");
+
+        CurrencyCodeSnapshot = currencyCode.Trim().ToUpperInvariant();
+        CurrencyDecimalPlacesSnapshot = currencyDecimalPlaces;
+        BaseCurrencyId = baseCurrencyId;
+        BaseCurrencyCodeSnapshot = baseCurrencyCode.Trim().ToUpperInvariant();
+        BaseCurrencyDecimalPlacesSnapshot = baseCurrencyDecimalPlaces;
+        ExchangeRateType = exchangeRateType;
+        ExchangeRateSource = exchangeRateSource;
+    }
+
     public void AddLine(PurchaseInvoiceLine line)
     {
         EnsureDraft();
@@ -167,6 +198,10 @@ public sealed class PurchaseInvoice : AuditableEntity<Guid>
         if (Status != PurchaseInvoiceStatus.Confirmed)
             throw new DomainException("Only confirmed and matched purchase invoices can be posted.");
         if (JournalEntryId.HasValue) throw new DomainException("Purchase invoice is already linked to a journal entry.");
+        if (string.IsNullOrWhiteSpace(CurrencyCodeSnapshot) || !CurrencyDecimalPlacesSnapshot.HasValue ||
+            !BaseCurrencyId.HasValue || string.IsNullOrWhiteSpace(BaseCurrencyCodeSnapshot) ||
+            !BaseCurrencyDecimalPlacesSnapshot.HasValue || !ExchangeRateType.HasValue || !ExchangeRateSource.HasValue)
+            throw new DomainException("Purchase invoice currency snapshot must be captured before posting.");
         JournalEntryId = PurchasingDomainGuard.Required(journalEntryId, "Journal entry id");
         Status = PurchaseInvoiceStatus.Posted;
         PostedAt = at;
