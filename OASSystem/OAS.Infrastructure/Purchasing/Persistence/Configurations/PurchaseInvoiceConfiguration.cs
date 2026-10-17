@@ -35,8 +35,8 @@ public sealed class PurchaseInvoiceConfiguration : IEntityTypeConfiguration<Purc
         builder.Property(x => x.BaseCurrencyDecimalPlacesSnapshot);
         builder.Property(x => x.ExchangeRate).HasPrecision(19,8).IsRequired();
         builder.Property(x => x.ExchangeRateDate).HasColumnType("date").IsRequired();
-        builder.Property(x => x.ExchangeRateType).HasConversion<byte?>();
-        builder.Property(x => x.ExchangeRateSource).HasConversion<byte?>();
+        builder.Property(x => x.ExchangeRateType).HasConversion<byte>();
+        builder.Property(x => x.ExchangeRateSource).HasConversion<byte>();
         builder.Property(x => x.TaxCalculationMode).HasConversion<byte>().IsRequired();
         builder.Property(x => x.Status).HasConversion<byte>().IsRequired();
         builder.Property(x => x.Subtotal).HasPrecision(19,4).IsRequired();
