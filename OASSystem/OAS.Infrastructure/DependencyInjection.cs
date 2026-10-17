@@ -124,7 +124,7 @@ public static class DependencyInjection
             OAS.Application.Inventory.Repositories.IStockCountRepository,
             OAS.Infrastructure.Persistence.Repositories.Inventory.StockCountRepository>();
 
-        services.AddScoped<IUserProfileImageStore, ProfileImagesControllerStorePlaceholder>();
+        services.AddScoped<IUserProfileImageStore, UserProfileImageStore>();
         services.AddScoped<IEmployeeImageStore, EmployeeImageStore>();
         services.AddScoped<OAS.Application.Features.Employees.Abstractions.IEmployeeDocumentStore, OAS.Infrastructure.Features.Employees.Services.EmployeeDocumentStore>();
 
