@@ -8,7 +8,8 @@ public sealed record SupplierAllocationCenterDto(
     decimal TotalAvailableCreditBaseAmount,
     IReadOnlyList<SupplierUnappliedPaymentDto> UnappliedPayments,
     IReadOnlyList<SupplierOpenInvoiceDto> OpenInvoices,
-    IReadOnlyList<SupplierAvailableCreditDto> AvailableCredits);
+    IReadOnlyList<SupplierAvailableCreditDto> AvailableCredits,
+    IReadOnlyList<SupplierActivePaymentAllocationDto> ActiveAllocations);
 
 public sealed record SupplierUnappliedPaymentDto(
     Guid PaymentVoucherLineId,
@@ -47,3 +48,19 @@ public sealed record SupplierAvailableCreditDto(
     decimal TotalCreditBaseAmount,
     decimal AppliedCreditBaseAmount,
     decimal AvailableCreditBaseAmount);
+
+public sealed record SupplierActivePaymentAllocationDto(
+    Guid PaymentAllocationId,
+    Guid PaymentVoucherLineId,
+    Guid PaymentVoucherId,
+    string VoucherNumber,
+    Guid PurchaseInvoiceId,
+    string PurchaseInvoiceCode,
+    string SourceCurrencyCode,
+    decimal SourceAmount,
+    decimal TargetDocumentAmount,
+    decimal SourceBaseAmount,
+    decimal TargetBaseAmount,
+    decimal RealizedExchangeDifferenceBase,
+    DateTimeOffset AllocatedAtUtc,
+    string RowVersion);
