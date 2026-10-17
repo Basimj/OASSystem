@@ -63,7 +63,8 @@ public sealed class GetPurchaseInvoicePaymentSummaryQueryHandler(
         var allocations = await paymentAllocations.ListAsync(
             new Specification<PaymentAllocation>().Where(x =>
                 x.TargetDocumentType == AllocationTargetDocumentType.PurchaseInvoice &&
-                x.TargetDocumentId == invoice.Id),
+                x.TargetDocumentId == invoice.Id &&
+                x.ReversedAtUtc == null),
             ct);
 
         var settlements = new List<PurchaseInvoicePaymentSettlementDto>(allocations.Count);
