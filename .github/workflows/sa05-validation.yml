@@ -1,0 +1,22 @@
+name: SA05 Validation
+
+on:
+  push:
+    branches:
+      - feature/sa-05-header-discount-commissions
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - name: Restore tests
+        run: dotnet restore OASSystem/OAS.Tests/OAS.Tests.csproj
+      - name: Build tests and dependencies
+        run: dotnet build OASSystem/OAS.Tests/OAS.Tests.csproj --no-restore -c Release
+      - name: Run SA-05 domain tests
+        run: dotnet test OASSystem/OAS.Tests/OAS.Tests.csproj --no-build -c Release --filter FullyQualifiedName~SA05HeaderDiscountAndCommissionTests
