@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using OAS.Application.Accounting.PaymentAllocations.Commands.CreatePaymentAllocation;
+using OAS.Application.Accounting.PaymentAllocations.Commands.ReversePaymentAllocation;
 using OAS.Application.Accounting.PaymentAllocations.Commands.UpdatePaymentAllocation;
 using OAS.Application.Accounting.PaymentAllocations.Queries.GetPaymentAllocationById;
 using OAS.Application.Accounting.PaymentAllocations.Queries.GetPaymentAllocations;
@@ -46,6 +47,7 @@ public sealed class PaymentAllocationsController(ISender sender) : ControllerBas
         var dto = await sender.Send(new GetPaymentAllocationByIdQuery(id), cancellationToken);
         return CreatedAtAction(nameof(GetById), new { id }, dto);
     }
+
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<PaymentAllocationDto>> Update(
         Guid id,
@@ -57,4 +59,10 @@ public sealed class PaymentAllocationsController(ISender sender) : ControllerBas
         return Ok(dto);
     }
 
+    [HttpPost("{id:guid}/reverse")]
+    public async Task<ActionResult<ReversePaymentAllocationResultDto>> Reverse(
+        Guid id,
+        [FromBody] ReversePaymentAllocationRequest request,
+        CancellationToken cancellationToken)
+        => Ok(await sender.Send(new ReversePaymentAllocationCommand(id, request), cancellationToken));
 }
