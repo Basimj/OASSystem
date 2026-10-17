@@ -12,7 +12,9 @@ public sealed record PurchaseInvoiceBalanceSnapshot(
     decimal OutstandingBaseAmount,
     decimal OutstandingAmount,
     decimal PaidAmount,
-    decimal SettledAmount);
+    decimal SettledAmount,
+    decimal AppliedPaymentInvoiceCurrencyAmount = 0m,
+    decimal RealizedExchangeDifferenceBase = 0m);
 
 public interface IPurchaseInvoiceBalanceService
 {
