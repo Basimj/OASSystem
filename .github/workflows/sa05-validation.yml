@@ -18,6 +18,8 @@ jobs:
         run: dotnet restore OASSystem/OAS.Tests/OAS.Tests.csproj
       - name: Build tests and dependencies
         run: dotnet build OASSystem/OAS.Tests/OAS.Tests.csproj --no-restore -c Release
+      - name: Build client and Razor UI
+        run: dotnet build OASSystem/OAS.Client/OAS.Client.csproj -c Release
       - name: Run SA-05 domain tests
         run: dotnet test OASSystem/OAS.Tests/OAS.Tests.csproj --no-build -c Release --filter FullyQualifiedName~SA05HeaderDiscountAndCommissionTests
       - name: Install EF tool
