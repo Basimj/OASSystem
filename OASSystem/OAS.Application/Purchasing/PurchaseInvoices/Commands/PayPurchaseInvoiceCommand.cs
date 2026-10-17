@@ -37,6 +37,7 @@ public sealed class PayPurchaseInvoiceCommandHandler(
     IReadRepository<Currency, Guid> currencies,
     IVoucherSettlementResolver settlementResolver,
     IAccountingDocumentPostingService postingService,
+    ISupplierSettlementFxPostingService supplierSettlementFxPosting,
     IEnumerable<IPaymentAllocationTargetValidator> targetValidators,
     IEnumerable<IPaymentAllocationSourceTargetValidator> sourceTargetValidators,
     IPurchaseInvoiceBalanceService invoiceBalances,
@@ -120,6 +121,10 @@ public sealed class PayPurchaseInvoiceCommandHandler(
         var description = string.IsNullOrWhiteSpace(request.Description)
             ? $"سداد فاتورة المورد {invoice.PurchaseInvoiceCode}"
             : request.Description.Trim();
+        var realizedExchangeDifferenceBase = Math.Round(
+            resolved.BaseAmount - validation.TargetBaseAllocatedAmount,
+            4,
+            MidpointRounding.AwayFromZero);
 
         var voucher = PaymentVoucher.CreateSettlementDocument(
             voucherId,
@@ -159,7 +164,9 @@ public sealed class PayPurchaseInvoiceCommandHandler(
             request.PaymentDate,
             "PurchaseInvoice",
             invoice.Id,
-            description);
+            description,
+            validation.TargetBaseAllocatedAmount,
+            realizedExchangeDifferenceBase);
 
         voucher.AddLine(line);
         await paymentVouchers.AddAsync(voucher, ct);
@@ -188,6 +195,19 @@ public sealed class PayPurchaseInvoiceCommandHandler(
             validation.TargetBaseAllocatedAmount);
         await paymentAllocations.AddAsync(allocation, ct);
 
+        var fxPosting = await supplierSettlementFxPosting.PostAsync(
+            new SupplierSettlementFxPostingRequest(
+                allocation.Id,
+                invoice.SupplierId,
+                resolved.CounterpartyAccountId,
+                request.PaymentDate,
+                resolved.BaseAmount,
+                validation.TargetBaseAllocatedAmount,
+                $"فرق صرف محقق لسداد فاتورة المورد {invoice.PurchaseInvoiceCode}"),
+            userId,
+            now,
+            ct);
+
         var baseOutstanding = Math.Max(0m, Math.Round(
             balanceBeforePayment.OutstandingBaseAmount - validation.TargetBaseAllocatedAmount,
             4,
@@ -209,7 +229,9 @@ public sealed class PayPurchaseInvoiceCommandHandler(
             journalId,
             paid,
             outstanding,
-            outstanding <= 0m ? "Paid" : "PartiallyPaid");
+            outstanding <= 0m ? "Paid" : "PartiallyPaid",
+            fxPosting.RealizedExchangeDifferenceBase,
+            fxPosting.JournalEntryId);
     }
 
     private static void ValidateSettlementSelection(PaymentMethod method, Guid? cashAccountId, Guid? bankAccountId)
