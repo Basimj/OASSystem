@@ -9,6 +9,7 @@ using OAS.Application.Purchasing.Common;
 using OAS.Application.Purchasing.Mapping;
 using OAS.Contracts.Purchasing.PurchaseInvoices;
 using OAS.Domain.Purchasing.Entities;
+using DomainDueDateProvenance = OAS.Domain.Purchasing.Enums.PurchaseInvoiceDueDateProvenance;
 using DomainInvoiceStatus = OAS.Domain.Purchasing.Enums.PurchaseInvoiceStatus;
 using DomainMatchStatus = OAS.Domain.Purchasing.Enums.PurchaseMatchStatus;
 
@@ -40,7 +41,8 @@ public sealed class CreatePurchaseInvoiceCommandHandler(
     public async Task<Guid> Handle(CreatePurchaseInvoiceCommand command,CancellationToken ct)
     {
         var r=command.Request;
-        PurchasingApplicationGuard.Supplier(await references.GetSupplierAsync(r.SupplierId,ct));
+        var supplier=await references.GetSupplierAsync(r.SupplierId,ct);
+        PurchasingApplicationGuard.Supplier(supplier);
         PurchasingApplicationGuard.Currency(await references.GetCurrencyAsync(r.CurrencyId,ct));
         await EnsureSupplierInvoiceCodeUniqueAsync(invoiceRepository,r.SupplierId,r.SupplierInvoiceCode,null,ct);
         var id=Guid.NewGuid();
@@ -48,6 +50,8 @@ public sealed class CreatePurchaseInvoiceCommandHandler(
             r.InvoiceDate,r.PostingDate,r.CurrencyId,r.ExchangeRate,r.ExchangeRateDate,(OAS.Domain.Sales.Enums.TaxCalculationMode)(byte)r.TaxCalculationMode,r.Notes);
         foreach(var line in r.Lines.OrderBy(x=>x.LineSequence))
             invoice.AddLine(await BuildLineAsync(id,line.LineSequence,line.PurchaseOrderLineId,line.ProductVariantId,line.Quantity,line.UnitPrice,line.DiscountAmount,line.TaxRate,r.SupplierId,r.CurrencyId,r.ExchangeRate,(OAS.Domain.Sales.Enums.TaxCalculationMode)(byte)r.TaxCalculationMode,orderRepository,references,ct));
+        var terms=await ResolvePaymentTermsAsync(r.InvoiceDate,r.DueDate,r.PaymentTermDays,r.Lines.Select(x=>x.PurchaseOrderLineId),supplier!,orderRepository,ct);
+        invoice.SetPaymentTerms(terms.PaymentTermDays,terms.DueDate,terms.Provenance);
         await invoiceRepository.AddAsync(invoice,ct);
         return id;
     }
@@ -69,12 +73,50 @@ public sealed class CreatePurchaseInvoiceCommandHandler(
             quantity,unitPrice,discountAmount,taxRate,taxCalculationMode,exchangeRate);
     }
 
+    internal static async Task<ResolvedPaymentTerms> ResolvePaymentTermsAsync(
+        DateOnly invoiceDate,
+        DateOnly? explicitDueDate,
+        int? explicitPaymentTermDays,
+        IEnumerable<Guid?> purchaseOrderLineIds,
+        PurchasingSupplierSnapshot supplier,
+        IPurchaseOrderRepository orderRepository,
+        CancellationToken ct)
+    {
+        if(explicitPaymentTermDays<0)
+            throw new ConflictException("purchasing_payment_terms_invalid","عدد أيام السداد لا يمكن أن يكون سالبًا.");
+
+        if(explicitDueDate.HasValue||explicitPaymentTermDays.HasValue)
+        {
+            var days=explicitPaymentTermDays??(explicitDueDate!.Value.DayNumber-invoiceDate.DayNumber);
+            if(days<0)throw new ConflictException("purchasing_due_date_invalid","تاريخ الاستحقاق لا يمكن أن يسبق تاريخ الفاتورة.");
+            var due=explicitDueDate??invoiceDate.AddDays(days);
+            if(due<invoiceDate)throw new ConflictException("purchasing_due_date_invalid","تاريخ الاستحقاق لا يمكن أن يسبق تاريخ الفاتورة.");
+            return new(days,due,DomainDueDateProvenance.Explicit);
+        }
+
+        var poTerms=new HashSet<int>();
+        foreach(var poLineId in purchaseOrderLineIds.Where(x=>x.HasValue).Select(x=>x!.Value).Distinct())
+        {
+            var order=await orderRepository.GetByLineIdAsync(poLineId,ct)
+                ??throw new NotFoundException("PurchaseOrderLine",poLineId);
+            poTerms.Add(order.PaymentTermDays);
+        }
+
+        if(poTerms.Count>1)
+            throw new ConflictException("purchasing_invoice_mixed_payment_terms","الفاتورة مرتبطة بأوامر شراء ذات شروط سداد مختلفة. حدد تاريخ الاستحقاق صراحةً.");
+
+        var snapshotDays=poTerms.Count==1?poTerms.Single():supplier.PaymentTermDays;
+        return new(snapshotDays,invoiceDate.AddDays(snapshotDays),DomainDueDateProvenance.DerivedAtInvoice);
+    }
+
     internal static async Task EnsureSupplierInvoiceCodeUniqueAsync(IPurchaseInvoiceRepository repository,Guid supplierId,string? code,Guid? exceptId,CancellationToken ct)
     {
         if(string.IsNullOrWhiteSpace(code))return;
         if(await repository.SupplierInvoiceCodeExistsAsync(supplierId,code.Trim(),exceptId,ct))
             throw new ConflictException("purchasing_supplier_invoice_duplicate","فاتورة المورد مسجلة مسبقًا.");
     }
+
+    internal sealed record ResolvedPaymentTerms(int PaymentTermDays,DateOnly DueDate,DomainDueDateProvenance Provenance);
 }
 
 public sealed class UpdatePurchaseInvoiceCommandHandler(
@@ -87,7 +129,8 @@ public sealed class UpdatePurchaseInvoiceCommandHandler(
         var invoice=await invoiceRepository.GetForUpdateAsync(command.Id,ct)??throw new NotFoundException("PurchaseInvoice",command.Id);
         PurchasingRowVersion.EnsureMatches(invoice.RowVersion,command.Request.RowVersion,"Purchase invoice");
         if(invoice.Status!=DomainInvoiceStatus.Draft)throw new ConflictException("purchasing_invoice_not_draft","يمكن تعديل فاتورة المورد عندما تكون مسودة فقط.");
-        PurchasingApplicationGuard.Supplier(await references.GetSupplierAsync(command.Request.SupplierId,ct));
+        var supplier=await references.GetSupplierAsync(command.Request.SupplierId,ct);
+        PurchasingApplicationGuard.Supplier(supplier);
         PurchasingApplicationGuard.Currency(await references.GetCurrencyAsync(command.Request.CurrencyId,ct));
         await CreatePurchaseInvoiceCommandHandler.EnsureSupplierInvoiceCodeUniqueAsync(invoiceRepository,command.Request.SupplierId,command.Request.SupplierInvoiceCode,invoice.Id,ct);
         invoice.UpdateHeader(command.Request.SupplierInvoiceCode,command.Request.SupplierId,command.Request.InvoiceDate,command.Request.PostingDate,
@@ -114,6 +157,9 @@ public sealed class UpdatePurchaseInvoiceCommandHandler(
             else invoice.AddLine(await CreatePurchaseInvoiceCommandHandler.BuildLineAsync(invoice.Id,line.LineSequence,line.PurchaseOrderLineId,line.ProductVariantId,
                 line.Quantity,line.UnitPrice,line.DiscountAmount,line.TaxRate,command.Request.SupplierId,command.Request.CurrencyId,command.Request.ExchangeRate,(OAS.Domain.Sales.Enums.TaxCalculationMode)(byte)command.Request.TaxCalculationMode,orderRepository,references,ct));
         }
+        var terms=await CreatePurchaseInvoiceCommandHandler.ResolvePaymentTermsAsync(command.Request.InvoiceDate,command.Request.DueDate,command.Request.PaymentTermDays,
+            command.Request.Lines.Select(x=>x.PurchaseOrderLineId),supplier!,orderRepository,ct);
+        invoice.SetPaymentTerms(terms.PaymentTermDays,terms.DueDate,terms.Provenance);
         invoice.RecalculateTotals();
         await invoiceRepository.ReplaceLinesAsync(invoice,ct);
         invoiceRepository.Update(invoice);
@@ -137,9 +183,6 @@ public sealed class MatchPurchaseInvoiceCommandHandler(
         if(invoice.Status==DomainInvoiceStatus.Confirmed && evaluation.RequiresApproval)invoice.MarkMatchApprovalRequired();
         else if(invoice.Status==DomainInvoiceStatus.PendingMatchApproval && !evaluation.RequiresApproval)invoice.MarkMatchApproved();
         invoiceRepository.Update(invoice);
-        // Persist the new allocations inside the current command transaction before mapping.
-        // SQL Server generates RowVersion values on SaveChanges; variance approval needs those
-        // values immediately in the match response. TransactionBehavior still owns commit/rollback.
         await unitOfWork.SaveChangesAsync(ct);
         return await mapper.ToMatchDtoAsync(invoice,evaluation,ct);
     }
