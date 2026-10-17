@@ -54,15 +54,46 @@ public sealed class SupplierOpeningConcurrencyPort(OasDbContext db) : ISupplierO
     {
         if (db.Database.CurrentTransaction is null)
             throw new InvalidOperationException("Supplier opening allocation requires an active database transaction.");
+        if (paymentVoucherLineId == Guid.Empty || supplierOpeningItemId == Guid.Empty)
+            throw new ArgumentException("Payment voucher line and supplier opening item IDs are required.");
+
         await db.Database.OpenConnectionAsync(cancellationToken);
+
+        // The same payment-line lock coordinates with payment-allocation operations,
+        // and the opening-item lock serializes competing AP-05 applications.
         await LockAsync("tbl_PaymentVoucherLines", paymentVoucherLineId, cancellationToken);
         await LockAsync("tbl_SupplierOpeningItems", supplierOpeningItemId, cancellationToken);
+
+        var batchId = await db.Set<SupplierOpeningItem>().AsNoTracking()
+            .Where(x => x.Id == supplierOpeningItemId)
+            .Select(x => x.BatchId)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (batchId == Guid.Empty)
+            throw new NotFoundException(nameof(SupplierOpeningItem), supplierOpeningItemId);
+
+        // Lock the parent batch so an opening cannot be allocated while it is
+        // still a draft or while its accounting journal is being established.
+        await LockAsync("tbl_SupplierOpeningBatches", batchId, cancellationToken);
+        var batch = await db.Set<SupplierOpeningBatch>().AsNoTracking()
+            .Where(x => x.Id == batchId)
+            .Select(x => new { x.Status, x.JournalEntryId })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (batch is null ||
+            batch.JournalEntryId is null ||
+            batch.Status is not (SupplierOpeningBatchStatus.Posted or SupplierOpeningBatchStatus.LinkedExistingJournal))
+        {
+            throw new ConflictException(
+                "supplier_opening_batch_not_posted",
+                "لا يمكن تسوية رصيد افتتاحي قبل ترحيل الدفعة أو ربطها بقيد افتتاحي مرحّل.");
+        }
     }
 
     private async Task LockAsync(string tableName, Guid id, CancellationToken ct)
     {
         await using var command = db.Database.GetDbConnection().CreateCommand();
         command.Transaction = db.Database.CurrentTransaction!.GetDbTransaction();
+        // tableName is intentionally restricted to constant, internal call sites.
         command.CommandText = $"SELECT [Id] FROM [dbo].[{tableName}] WITH (UPDLOCK,HOLDLOCK) WHERE [Id] = @id";
         var parameter = command.CreateParameter();
         parameter.ParameterName = "@id";

@@ -1,0 +1,206 @@
+@page "/accounting/suppliers/openings"
+@attribute [Authorize]
+@using OAS.Client.Accounting.Services
+@using OAS.Contracts.Accounting.Currencies
+@using OAS.Contracts.Accounting.Suppliers
+@using OAS.Contracts.Accounting.SupplierOpenings
+@inject OasApiClient Api
+@inject IAccountingClientService Accounting
+
+<PageTitle>الأرصدة الافتتاحية للموردين | OAS</PageTitle>
+
+<div class="container-fluid py-3" dir="rtl">
+    <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+        <div><h1 class="h5 mb-1">الأرصدة الافتتاحية للموردين</h1>
+            <small class="text-muted">أنشئ تفاصيل الرصيد أولًا، ثم رحّل قيدًا واحدًا متوازنًا أو اربط دفعتك بقيد موجود بعد التحقق منه.</small></div>
+        <div class="d-flex gap-2">
+            <a class="btn btn-outline-secondary btn-sm" href="/accounting/suppliers">الموردون</a>
+            <a class="btn btn-outline-primary btn-sm" href="/accounting/suppliers/aging">أعمار الديون</a>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_error)) { <div class="alert alert-danger" role="alert">@_error</div> }
+    @if (!string.IsNullOrWhiteSpace(_success)) { <div class="alert alert-success" role="status">@_success</div> }
+    <div class="alert alert-warning small">
+        لا تستخدم هذا النموذج إذا كانت ذمم الموردين الافتتاحية قد رُحّلت سابقًا؛ استخدم ربط القيد الموجود بدل ترحيل قيد جديد. لا تخمّن تواريخ استحقاق الفواتير القديمة.
+        يتطلب الترحيل فترة مالية مفتوحة وملف ترحيل مهيّأ لمستند <code>SupplierOpeningBatch</code> وحساب موازنة افتتاحي.
+    </div>
+
+    @if (_batch is null)
+    {
+        <div class="card mb-3"><div class="card-body">
+            <h2 class="h6">إنشاء دفعة افتتاحية</h2>
+            <div class="row g-2 mb-3">
+                <div class="col-md-3"><label class="form-label" for="opening-date">تاريخ القيد الافتتاحي</label>
+                    <input id="opening-date" class="form-control form-control-sm" type="date" @bind="_asOfDate" /></div>
+                <div class="col-md-3"><label class="form-label" for="opening-currency">العملة الأساسية</label>
+                    <select id="opening-currency" class="form-select form-select-sm" @bind="_baseCurrencyId">
+                        <option value="">اختر العملة الأساسية</option>
+                        @foreach (var c in _currencies) { <option value="@c.Id">@c.Code — @c.NameAr</option> }
+                    </select></div>
+                <div class="col-md-6"><label class="form-label" for="opening-notes">ملاحظات</label>
+                    <input id="opening-notes" class="form-control form-control-sm" @bind="_notes" placeholder="مصدر الأرصدة الافتتاحية" /></div>
+            </div>
+            <div class="row g-2 mb-3 align-items-end">
+                <div class="col-md-7"><label class="form-label" for="opening-supplier-search">إضافة مورد إلى الدفعة</label>
+                    <input id="opening-supplier-search" class="form-control form-control-sm" @bind="_supplierSearch" @bind:event="oninput" placeholder="ابحث بالاسم أو الكود" /></div>
+                <div class="col-md-3"><button class="btn btn-outline-primary btn-sm w-100" disabled="@_busy" @onclick="SearchSuppliersAsync">بحث عن مورد</button></div>
+            </div>
+            @foreach (var supplier in _supplierChoices)
+            {
+                <button class="btn btn-outline-secondary btn-sm me-2 mb-2" @onclick="() => AddSupplier(supplier)">@supplier.SupplierCode — @supplier.NameAr</button>
+            }
+            <div class="table-responsive"><table class="table table-sm align-middle">
+                <thead><tr><th>المورد</th><th>مرجع المستند القديم</th><th>تاريخ المستند</th><th>تاريخ الاستحقاق إن كان موثقًا</th><th>العملة</th><th>المبلغ الأصلي</th><th>سعر الصرف</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var item in _items)
+                    {
+                        <tr>
+                            <td>@item.SupplierName</td>
+                            <td><input class="form-control form-control-sm" @bind="item.LegacyReference" placeholder="اختياري" /></td>
+                            <td><input class="form-control form-control-sm" type="date" @bind="item.DocumentDate" /></td>
+                            <td><input class="form-control form-control-sm" type="date" @bind="item.DueDate" /></td>
+                            <td><select class="form-select form-select-sm" @bind="item.CurrencyId">
+                                @foreach (var c in _currencies) { <option value="@c.Id">@c.Code</option> }
+                            </select></td>
+                            <td><input class="form-control form-control-sm" type="number" min="0.0001" step="0.0001" @bind="item.Amount" /></td>
+                            <td><input class="form-control form-control-sm" type="number" min="0.00000001" step="0.00000001" @bind="item.ExchangeRate" /></td>
+                            <td><button class="btn btn-outline-danger btn-sm" @onclick="() => _items.Remove(item)">حذف</button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table></div>
+            @if (_items.Count == 0) { <p class="text-muted small">ابحث عن مورد وأضفه، ثم أدخل تفاصيل الرصيد القديم.</p> }
+            <button class="btn btn-primary btn-sm" disabled="@(_busy || _items.Count == 0)" @onclick="CreateAsync">حفظ الدفعة كمسودة</button>
+        </div></div>
+    }
+    else
+    {
+        <div class="card mb-3"><div class="card-body">
+            <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap mb-2">
+                <div><h2 class="h6 mb-1">@_batch.BatchCode</h2><small>حالة الدفعة: @Status(_batch.Status) | تاريخ: @_batch.AsOfDate | إجمالي أساسي: @_batch.TotalBaseOpenAmount.ToString("N2")</small></div>
+                <button class="btn btn-outline-secondary btn-sm" disabled="@_busy" @onclick="StartNew">دفعة جديدة</button>
+            </div>
+            <div class="table-responsive"><table class="table table-sm">
+                <thead><tr><th>المورد</th><th>المرجع القديم</th><th>الاستحقاق</th><th>العملة</th><th>الرصيد الأساسي</th><th>المخصص</th><th>المتبقي</th></tr></thead>
+                <tbody>@foreach (var item in _batch.Items)
+                {
+                    <tr><td>@item.SupplierCode — @item.SupplierName</td><td>@item.LegacyReference</td>
+                        <td>@(item.DueDate?.ToString("yyyy-MM-dd") ?? "بحاجة مراجعة")</td><td>@item.CurrencyCode</td>
+                        <td>@item.BaseOpenAmount.ToString("N2")</td><td>@item.AppliedBaseAmount.ToString("N2")</td><td>@item.OutstandingBaseAmount.ToString("N2")</td></tr>
+                }</tbody>
+            </table></div>
+            @if (_batch.Status == 1)
+            {
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <button class="btn btn-primary btn-sm" disabled="@_busy" @onclick="PostAsync">ترحيل القيد الافتتاحي</button>
+                    <details class="border rounded px-2 py-1"><summary>بدل الترحيل: ربط قيد افتتاحي موجود</summary>
+                        <label class="form-label small mt-2">معرف القيد المرحّل الموجود (بعد التحقق من تاريخه ومبالغه)</label>
+                        <input class="form-control form-control-sm mb-2" @bind="_existingJournalId" placeholder="Journal ID" />
+                        <button class="btn btn-outline-primary btn-sm mb-2" disabled="@_busy" @onclick="LinkAsync">التحقق والربط</button>
+                    </details>
+                </div>
+            }
+            else
+            {
+                <p class="small text-success">الدفعة مرتبطة بالقيد: @_batch.JournalEntryId. تخصيص المدفوعات على سطور الافتتاح يتم من واجهة التسوية أو API وفق صلاحيات المستخدم.</p>
+            }
+        </div></div>
+    }
+</div>
+
+@code {
+    private readonly List<DraftOpeningItem> _items = [];
+    private IReadOnlyList<CurrencyDto> _currencies = [];
+    private IReadOnlyList<SupplierLookupDto> _supplierChoices = [];
+    private string? _supplierSearch, _notes, _error, _success, _existingJournalId;
+    private DateOnly _asOfDate = DateOnly.FromDateTime(DateTime.Today);
+    private Guid? _baseCurrencyId;
+    private SupplierOpeningBatchDto? _batch;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _currencies = (await Accounting.GetCurrenciesPageAsync(new PageRequest { PageSize = 100 })).Items;
+        }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+    private async Task SearchSuppliersAsync()
+    {
+        try { _supplierChoices = await Accounting.LookupSuppliersAsync(_supplierSearch) ?? []; }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+    private void AddSupplier(SupplierLookupDto supplier)
+    {
+        _items.Add(new DraftOpeningItem
+        {
+            SupplierId = supplier.Id, SupplierName = supplier.DisplayText,
+            DocumentDate = _asOfDate, CurrencyId = _baseCurrencyId ?? (_currencies.FirstOrDefault()?.Id ?? Guid.Empty)
+        });
+        _supplierChoices = [];
+    }
+    private async Task CreateAsync()
+    {
+        if (!_baseCurrencyId.HasValue || _baseCurrencyId == Guid.Empty) { _error = "اختر العملة الأساسية."; return; }
+        if (_items.Any(x => x.CurrencyId == Guid.Empty || x.Amount <= 0m || x.ExchangeRate <= 0m ||
+                            (x.DueDate.HasValue && x.DueDate < x.DocumentDate)))
+        { _error = "راجع العملات والمبالغ والأسعار وتواريخ استحقاق البنود."; return; }
+        await RunAsync(async () =>
+        {
+            var request = new CreateSupplierOpeningBatchRequest(_asOfDate, _baseCurrencyId.Value, _notes,
+                _items.Select(x => new CreateSupplierOpeningItemRequest(x.SupplierId, x.LegacyReference,
+                    x.DocumentDate, x.DueDate, x.CurrencyId, x.Amount, x.ExchangeRate)).ToArray());
+            _batch = await Api.PostAsync<CreateSupplierOpeningBatchRequest, SupplierOpeningBatchDto>("api/accounting/supplier-openings", request);
+            _success = "تم حفظ الدفعة كمسودة. راجع الأرصدة ثم قرر الترحيل أو ربط قيد افتتاحي موجود.";
+        });
+    }
+    private async Task PostAsync()
+    {
+        if (_batch is null) return;
+        await RunAsync(async () =>
+        {
+            var id = _batch.Id;
+            await Api.PostAsync<PostSupplierOpeningBatchRequest, Guid>($"api/accounting/supplier-openings/{id:D}/post", new(_batch.RowVersion));
+            await ReloadAsync(id);
+            _success = "تم ترحيل الدفعة الافتتاحية بنجاح.";
+        });
+    }
+    private async Task LinkAsync()
+    {
+        if (_batch is null || !Guid.TryParse(_existingJournalId, out var journalId))
+        { _error = "معرف القيد غير صالح."; return; }
+        await RunAsync(async () =>
+        {
+            var id = _batch.Id;
+            await Api.PostAsync<LinkSupplierOpeningJournalRequest, Guid>($"api/accounting/supplier-openings/{id:D}/link-existing-journal",
+                new(journalId, _batch.RowVersion));
+            await ReloadAsync(id);
+            _success = "تم ربط الدفعة بالقيد الموجود بعد التحقق من توازنه وحسابات الموردين.";
+        });
+    }
+    private Task ReloadAsync(Guid id) => ReloadCoreAsync(id);
+    private async Task ReloadCoreAsync(Guid id) => _batch = await Api.GetAsync<SupplierOpeningBatchDto>($"api/accounting/supplier-openings/{id:D}");
+    private async Task RunAsync(Func<Task> action)
+    {
+        if (_busy) return;
+        _busy = true; _error = null; _success = null;
+        try { await action(); }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+    private void StartNew() { _batch = null; _items.Clear(); _existingJournalId = null; _error = _success = null; }
+    private static string Status(byte value) => value switch { 1 => "مسودة", 2 => "مرحلة", 3 => "مرتبطة بقيد سابق", _ => value.ToString() };
+    private sealed class DraftOpeningItem
+    {
+        public Guid SupplierId { get; set; }
+        public string SupplierName { get; set; } = string.Empty;
+        public string? LegacyReference { get; set; }
+        public DateOnly DocumentDate { get; set; }
+        public DateOnly? DueDate { get; set; }
+        public Guid CurrencyId { get; set; }
+        public decimal Amount { get; set; }
+        public decimal ExchangeRate { get; set; } = 1m;
+    }
+}
