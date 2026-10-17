@@ -144,7 +144,7 @@ public sealed class SupplierSettlementFxPostingServiceTests
             new FakeGenericRepository<Account, Guid>([supplierAccount, gainAccount, lossAccount]),
             new FakeGenericRepository<AccountingSettings, Guid>([settings]),
             new FakeGenericRepository<Currency, Guid>([baseCurrency]),
-            new FakeSequenceNumberGenerator());
+            new FakeInventorySequenceNumberGenerator());
 
         return new Fixture(service, journals, supplierAccount, gainAccount, lossAccount);
     }
