@@ -52,6 +52,7 @@ public sealed class GetSupplierAllocationCenterQueryHandler(
         var unappliedPayments = await BuildUnappliedPaymentsAsync(request.SupplierId, ct);
         var openInvoices = await BuildOpenInvoicesAsync(request.SupplierId, ct);
         var availableCredits = await BuildAvailableCreditsAsync(request.SupplierId, ct);
+        var activeAllocations = await BuildActiveAllocationsAsync(request.SupplierId, ct);
 
         return new SupplierAllocationCenterDto(
             supplier.Id,
@@ -61,21 +62,15 @@ public sealed class GetSupplierAllocationCenterQueryHandler(
             Round(availableCredits.Sum(x => x.AvailableCreditBaseAmount)),
             unappliedPayments,
             openInvoices,
-            availableCredits);
+            availableCredits,
+            activeAllocations);
     }
 
     private async Task<IReadOnlyList<SupplierUnappliedPaymentDto>> BuildUnappliedPaymentsAsync(
         Guid supplierId,
         CancellationToken ct)
     {
-        var lines = await paymentLines.ListAsync(
-            new Specification<PaymentVoucherLine>()
-                .Where(x =>
-                    x.PartyType == SettlementPartyType.Supplier &&
-                    x.SupplierId == supplierId)
-                .AddSort(nameof(PaymentVoucherLine.PaymentVoucherId), OAS.Contracts.Common.Pagination.SortDirection.Descending),
-            ct);
-
+        var lines = await GetSupplierPaymentLinesAsync(supplierId, ct);
         var result = new List<SupplierUnappliedPaymentDto>();
         foreach (var line in lines)
         {
@@ -90,12 +85,7 @@ public sealed class GetSupplierAllocationCenterQueryHandler(
             if (voucher is null || voucher.Status != PaymentVoucherStatus.Posted)
                 continue;
 
-            var active = await allocations.ListAsync(
-                new Specification<PaymentAllocation>().Where(x =>
-                    x.PaymentVoucherLineId == line.Id &&
-                    x.ReversedAtUtc == null),
-                ct);
-
+            var active = await GetActiveLineAllocationsAsync(line.Id, ct);
             var applied = Round(active.Sum(x => x.AllocatedAmount));
             var unapplied = Math.Max(0m, Round(line.Amount - applied));
             if (unapplied <= 0m)
@@ -203,6 +193,79 @@ public sealed class GetSupplierAllocationCenterQueryHandler(
 
         return result;
     }
+
+    private async Task<IReadOnlyList<SupplierActivePaymentAllocationDto>> BuildActiveAllocationsAsync(
+        Guid supplierId,
+        CancellationToken ct)
+    {
+        var lines = await GetSupplierPaymentLinesAsync(supplierId, ct);
+        var result = new List<SupplierActivePaymentAllocationDto>();
+
+        foreach (var line in lines)
+        {
+            var voucher = await paymentVouchers.GetByIdAsync(line.PaymentVoucherId, ct);
+            if (voucher is null || voucher.Status != PaymentVoucherStatus.Posted)
+                continue;
+
+            var active = await GetActiveLineAllocationsAsync(line.Id, ct);
+            foreach (var allocation in active.Where(x => x.TargetDocumentType == AllocationTargetDocumentType.PurchaseInvoice))
+            {
+                var invoice = await invoices.GetByIdAsync(allocation.TargetDocumentId, ct);
+                if (invoice is null || invoice.SupplierId != supplierId)
+                    continue;
+
+                var sourceBase = allocation.BaseAllocatedAmount is > 0m
+                    ? allocation.BaseAllocatedAmount.Value
+                    : allocation.ExchangeRate is > 0m
+                        ? Round(allocation.AllocatedAmount * allocation.ExchangeRate.Value)
+                        : allocation.AllocatedAmount;
+                var targetBase = allocation.TargetBaseAllocatedAmount is > 0m
+                    ? allocation.TargetBaseAllocatedAmount.Value
+                    : sourceBase;
+                var targetDocument = allocation.TargetDocumentAmount is > 0m
+                    ? allocation.TargetDocumentAmount.Value
+                    : allocation.CurrencyId == invoice.CurrencyId
+                        ? allocation.AllocatedAmount
+                        : invoice.ExchangeRate > 0m
+                            ? Round(targetBase / invoice.ExchangeRate)
+                            : 0m;
+
+                result.Add(new SupplierActivePaymentAllocationDto(
+                    allocation.Id,
+                    line.Id,
+                    voucher.Id,
+                    voucher.VoucherNumber,
+                    invoice.Id,
+                    invoice.PurchaseInvoiceCode,
+                    allocation.CurrencyCodeSnapshot ?? line.CurrencyCodeSnapshot ?? string.Empty,
+                    allocation.AllocatedAmount,
+                    targetDocument,
+                    sourceBase,
+                    targetBase,
+                    Round(sourceBase - targetBase),
+                    allocation.AllocatedAtUtc,
+                    allocation.RowVersion.Length == 0 ? string.Empty : Convert.ToBase64String(allocation.RowVersion)));
+            }
+        }
+
+        return result
+            .OrderByDescending(x => x.AllocatedAtUtc)
+            .ToArray();
+    }
+
+    private Task<IReadOnlyList<PaymentVoucherLine>> GetSupplierPaymentLinesAsync(Guid supplierId, CancellationToken ct)
+        => paymentLines.ListAsync(
+            new Specification<PaymentVoucherLine>().Where(x =>
+                x.PartyType == SettlementPartyType.Supplier &&
+                x.SupplierId == supplierId),
+            ct);
+
+    private Task<IReadOnlyList<PaymentAllocation>> GetActiveLineAllocationsAsync(Guid paymentLineId, CancellationToken ct)
+        => allocations.ListAsync(
+            new Specification<PaymentAllocation>().Where(x =>
+                x.PaymentVoucherLineId == paymentLineId &&
+                x.ReversedAtUtc == null),
+            ct);
 
     private static decimal Round(decimal value) =>
         Math.Round(value, 4, MidpointRounding.AwayFromZero);
