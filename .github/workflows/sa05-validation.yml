@@ -38,6 +38,28 @@ jobs:
         run: dotnet tool install --global dotnet-ef --version 9.0.*
       - name: Add EF Design package to startup project on runner only
         run: dotnet add OASSystem/OAS.API/OAS.API.csproj package Microsoft.EntityFrameworkCore.Design --version 9.0.21
+      - name: Repair legacy salary navigation ordering on runner only
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path('OASSystem/OAS.Infrastructure/Persistence/Migrations/OasDbContextModelSnapshot.cs')
+          text = path.read_text(encoding='utf-8-sig')
+          block = '''        modelBuilder.Entity("OAS.Domain.Features.Employees.Entities.EmployeeSalaryStructure", b =>
+          {
+              b.HasOne("OAS.Domain.Features.Employees.Entities.Employee", null).WithMany().HasForeignKey("EmployeeId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_EmployeeSalaryStructures_Employees_EmployeeId");
+              b.HasOne("OAS.Domain.Features.Employees.Entities.EmployeeContract", null).WithMany().HasForeignKey("ContractId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_EmployeeSalaryStructures_Contracts_ContractId");
+              b.HasOne("OAS.Domain.Accounting.Entities.Currency", null).WithMany().HasForeignKey("CurrencyId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_EmployeeSalaryStructures_Currencies_CurrencyId");
+              b.Navigation("Lines").UsePropertyAccessMode(PropertyAccessMode.Field);
+          });'''
+          replacement = '''        modelBuilder.Entity("OAS.Domain.Features.Employees.Entities.EmployeeSalaryStructure", b =>
+          {
+              b.HasOne("OAS.Domain.Features.Employees.Entities.Employee", null).WithMany().HasForeignKey("EmployeeId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_EmployeeSalaryStructures_Employees_EmployeeId");
+              b.HasOne("OAS.Domain.Features.Employees.Entities.EmployeeContract", null).WithMany().HasForeignKey("ContractId").OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_EmployeeSalaryStructures_Contracts_ContractId");
+              b.HasOne("OAS.Domain.Accounting.Entities.Currency", null).WithMany().HasForeignKey("CurrencyId").OnDelete(DeleteBehavior.Restrict).IsRequired().HasConstraintName("FK_EmployeeSalaryStructures_Currencies_CurrencyId");
+          });'''
+          if block not in text:
+              raise SystemExit('Expected legacy EmployeeSalaryStructure snapshot block was not found.')
+          path.write_text(text.replace(block, replacement, 1), encoding='utf-8')
       - name: Generate temporary EF migration to refresh snapshot
         run: dotnet ef migrations add SA05SnapshotSyncTemp --project OASSystem/OAS.Infrastructure/OAS.Infrastructure.csproj --startup-project OASSystem/OAS.API/OAS.API.csproj --output-dir Persistence/Migrations
       - name: Upload generated snapshot only
