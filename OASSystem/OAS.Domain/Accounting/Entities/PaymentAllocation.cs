@@ -25,6 +25,7 @@ public sealed class PaymentAllocation : AuditableEntity<Guid>
     public decimal? ExchangeRate { get; private set; }
     public decimal? BaseAllocatedAmount { get; private set; }
     public decimal? TargetBaseAllocatedAmount { get; private set; }
+    public decimal? TargetDocumentAmount { get; private set; }
     public DateTime AllocatedAtUtc { get; private set; }
 
     public static PaymentAllocation CreateLineAllocation(
@@ -40,7 +41,8 @@ public sealed class PaymentAllocation : AuditableEntity<Guid>
         decimal baseAllocatedAmount,
         DateTime allocatedAtUtc,
         decimal? targetBaseAllocatedAmount = null,
-        Guid? customerAdvanceApplicationId = null)
+        Guid? customerAdvanceApplicationId = null,
+        decimal? targetDocumentAmount = null)
     {
         ValidateCommon(id, targetDocumentId, allocatedAmount);
         if (receiptVoucherLineId == Guid.Empty) throw new ArgumentException("Receipt voucher line id cannot be empty.", nameof(receiptVoucherLineId));
@@ -55,6 +57,8 @@ public sealed class PaymentAllocation : AuditableEntity<Guid>
         if (string.IsNullOrWhiteSpace(currencyCodeSnapshot)) throw new ArgumentException("Currency code snapshot is required.", nameof(currencyCodeSnapshot));
         if (exchangeRate <= 0) throw new ArgumentOutOfRangeException(nameof(exchangeRate));
         if (baseAllocatedAmount <= 0) throw new ArgumentOutOfRangeException(nameof(baseAllocatedAmount));
+        if (targetBaseAllocatedAmount.HasValue && targetBaseAllocatedAmount.Value <= 0) throw new ArgumentOutOfRangeException(nameof(targetBaseAllocatedAmount));
+        if (targetDocumentAmount.HasValue && targetDocumentAmount.Value <= 0) throw new ArgumentOutOfRangeException(nameof(targetDocumentAmount));
 
         var legacySourceType = receiptVoucherLineId.HasValue
             ? PaymentSourceType.ReceiptVoucher
@@ -79,10 +83,10 @@ public sealed class PaymentAllocation : AuditableEntity<Guid>
             ExchangeRate = exchangeRate,
             BaseAllocatedAmount = baseAllocatedAmount,
             TargetBaseAllocatedAmount = targetBaseAllocatedAmount ?? baseAllocatedAmount,
+            TargetDocumentAmount = targetDocumentAmount,
             AllocatedAtUtc = allocatedAtUtc
         };
     }
-
 
     public static PaymentAllocation CreateCustomerAdvanceAllocation(
         Guid id,
@@ -134,14 +138,20 @@ public sealed class PaymentAllocation : AuditableEntity<Guid>
         };
     }
 
-    public void UpdateAllocatedAmount(decimal allocatedAmount, decimal? baseAllocatedAmount = null, decimal? targetBaseAllocatedAmount = null)
+    public void UpdateAllocatedAmount(
+        decimal allocatedAmount,
+        decimal? baseAllocatedAmount = null,
+        decimal? targetBaseAllocatedAmount = null,
+        decimal? targetDocumentAmount = null)
     {
         if (allocatedAmount <= 0) throw new ArgumentOutOfRangeException(nameof(allocatedAmount), "Allocated amount must be greater than zero.");
         if (baseAllocatedAmount.HasValue && baseAllocatedAmount.Value <= 0) throw new ArgumentOutOfRangeException(nameof(baseAllocatedAmount));
         if (targetBaseAllocatedAmount.HasValue && targetBaseAllocatedAmount.Value <= 0) throw new ArgumentOutOfRangeException(nameof(targetBaseAllocatedAmount));
+        if (targetDocumentAmount.HasValue && targetDocumentAmount.Value <= 0) throw new ArgumentOutOfRangeException(nameof(targetDocumentAmount));
         AllocatedAmount = allocatedAmount;
         if (baseAllocatedAmount.HasValue) BaseAllocatedAmount = baseAllocatedAmount.Value;
         if (targetBaseAllocatedAmount.HasValue) TargetBaseAllocatedAmount = targetBaseAllocatedAmount.Value;
+        if (targetDocumentAmount.HasValue) TargetDocumentAmount = targetDocumentAmount.Value;
     }
 
     private static void ValidateCommon(Guid id, Guid targetDocumentId, decimal allocatedAmount)
