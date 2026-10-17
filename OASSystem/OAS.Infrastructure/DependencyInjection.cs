@@ -160,6 +160,7 @@ public static class DependencyInjection
         services.AddScoped<IPurchasingInventoryPort, PurchasingInventoryPort>();
         services.AddScoped<IPurchasingAccountingPort, PurchasingAccountingPort>();
         services.AddScoped<ICustomerDemandTrackingQueryService, CustomerDemandTrackingQueryService>();
+        services.AddScoped<ISupplierPerformanceReportingQueryService, SupplierPerformanceReportingQueryService>();
 
         // Purchasing handlers are activated only after every repository/port above
         // has a concrete Infrastructure implementation. This keeps ValidateOnBuild safe.
