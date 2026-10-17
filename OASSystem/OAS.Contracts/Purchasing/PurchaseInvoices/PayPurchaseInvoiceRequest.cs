@@ -19,7 +19,9 @@ public sealed record PayPurchaseInvoiceResultDto(
     Guid JournalEntryId,
     decimal PaidAmount,
     decimal OutstandingAmount,
-    string PaymentStatus);
+    string PaymentStatus,
+    decimal RealizedExchangeDifferenceBase = 0m,
+    Guid? RealizedExchangeJournalEntryId = null);
 
 public sealed record PurchaseInvoicePaymentSummaryDto(
     Guid PurchaseInvoiceId,
