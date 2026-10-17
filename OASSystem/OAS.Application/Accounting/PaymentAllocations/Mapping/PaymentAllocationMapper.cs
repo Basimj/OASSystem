@@ -10,5 +10,6 @@ public sealed class PaymentAllocationMapper
         (ContractPaymentSourceType)(int)source.PaymentSourceType, source.PaymentSourceId,
         (ContractAllocationTargetDocumentType)(int)source.TargetDocumentType, source.TargetDocumentId,
         source.CurrencyId, source.CurrencyCodeSnapshot, source.AllocatedAmount, source.ExchangeRate, source.BaseAllocatedAmount,
-        source.AllocatedAtUtc, source.CreatedBy);
+        source.AllocatedAtUtc, source.CreatedBy, source.CustomerAdvanceApplicationId,
+        source.TargetBaseAllocatedAmount, source.TargetDocumentAmount);
 }
