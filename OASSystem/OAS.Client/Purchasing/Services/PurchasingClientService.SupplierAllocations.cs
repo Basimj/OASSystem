@@ -8,14 +8,14 @@ public sealed partial class PurchasingClientService
     public Task<SupplierAllocationCenterDto?> GetSupplierAllocationCenterAsync(
         Guid supplierId,
         CancellationToken cancellationToken = default)
-        => api.GetAsync<SupplierAllocationCenterDto>(
+        => _api.GetAsync<SupplierAllocationCenterDto>(
             $"api/purchasing/supplier-allocations/{supplierId:D}",
             cancellationToken);
 
     public Task<PaymentAllocationDto?> CreateSupplierPaymentAllocationAsync(
         CreatePaymentAllocationRequest request,
         CancellationToken cancellationToken = default)
-        => api.PostAsync<CreatePaymentAllocationRequest, PaymentAllocationDto>(
+        => _api.PostAsync<CreatePaymentAllocationRequest, PaymentAllocationDto>(
             "api/accounting/payment-allocations",
             request,
             cancellationToken);
@@ -24,7 +24,7 @@ public sealed partial class PurchasingClientService
         Guid allocationId,
         ReversePaymentAllocationRequest request,
         CancellationToken cancellationToken = default)
-        => api.PostAsync<ReversePaymentAllocationRequest, ReversePaymentAllocationResultDto>(
+        => _api.PostAsync<ReversePaymentAllocationRequest, ReversePaymentAllocationResultDto>(
             $"api/accounting/payment-allocations/{allocationId:D}/reverse",
             request,
             cancellationToken);
