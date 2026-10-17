@@ -34,6 +34,19 @@ public sealed class CommissionsController(ISender sender) : ControllerBase
     public async Task<ActionResult<CommissionStatementDto>> Calculate([FromBody] CalculateCommissionStatementRequest request, CancellationToken ct) =>
         Ok(await sender.Send(new CalculateCommissionStatementCommand(request), ct));
 
+    [HttpPost("statements/{id:guid}/review")]
+    public async Task<ActionResult<CommissionStatementDto>> Review(Guid id, [FromBody] CommissionStatementActionRequest request, CancellationToken ct) =>
+        Ok(await sender.Send(new ReviewCommissionStatementCommand(id, request), ct));
+
+    [HttpPost("statements/{id:guid}/approve")]
+    public async Task<ActionResult<CommissionStatementDto>> Approve(Guid id, [FromBody] CommissionStatementActionRequest request, CancellationToken ct) =>
+        Ok(await sender.Send(new ApproveCommissionStatementCommand(id, request), ct));
+
+    [HttpPost("statements/{id:guid}/settle")]
+    public async Task<ActionResult<CommissionStatementDto>> Settle(Guid id, [FromBody] CommissionStatementActionRequest request, CancellationToken ct) =>
+        Ok(await sender.Send(new SettleCommissionStatementCommand(id, request), ct));
+
+    // Legacy endpoint retained for old clients/data flows.
     [HttpPost("statements/{id:guid}/finalize")]
     public async Task<ActionResult<CommissionStatementDto>> Finalize(Guid id, [FromBody] CommissionStatementActionRequest request, CancellationToken ct) =>
         Ok(await sender.Send(new FinalizeCommissionStatementCommand(id, request), ct));
