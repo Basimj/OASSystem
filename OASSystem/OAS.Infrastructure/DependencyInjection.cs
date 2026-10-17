@@ -106,6 +106,7 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IAccountingPartyQueryService, AccountingPartyQueryService>();
         services.AddScoped<IAccountingReportingQueryService, AccountingReportingQueryService>();
+        services.AddScoped<ISupplierApReportingQueryService, SupplierApReportingQueryService>();
 
         services.AddScoped<
             IIdentityRepository,
@@ -150,6 +151,9 @@ public static class DependencyInjection
         services.AddScoped<IPurchaseInvoiceRepository, PurchaseInvoiceRepository>();
         services.AddScoped<IPurchaseReturnRepository, PurchaseReturnRepository>();
         services.AddScoped<IPurchaseReturnDataPort, PurchaseReturnDataPort>();
+        services.AddScoped<ISupplierCreditConcurrencyPort, SupplierCreditConcurrencyPort>();
+        services.AddScoped<IPurchasePaymentAllocationConcurrencyPort, PurchasePaymentAllocationConcurrencyPort>();
+        services.AddScoped<ISupplierCreditSourcePort, SupplierCreditSourcePort>();
         services.AddScoped<IPurchasingReferenceDataPort, PurchasingReferenceDataPort>();
         services.AddScoped<IPurchaseMatchingDataPort, PurchaseMatchingDataPort>();
         services.AddScoped<IPurchasingSettingsPort, PurchasingSettingsPort>();

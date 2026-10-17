@@ -3,19 +3,23 @@ using OAS.Application.Abstractions.Security;
 using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.Purchasing.Abstractions;
+using OAS.Domain.Accounting.Entities;
+using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Purchasing.Entities;
 using OAS.Domain.Purchasing.Enums;
 
 namespace OAS.Infrastructure.Purchasing.Services;
 
 /// <summary>
-/// Purchasing-to-Accounting adapter. This class only translates purchasing contexts into
+/// Purchasing-to-Accounting adapter. This class translates purchasing contexts into
 /// accounting posting contexts. Posting-profile resolution, account validation, journal
 /// construction, balancing and idempotency are owned by Accounting.
 /// </summary>
 public sealed class PurchasingAccountingPort(
     IProfileAccountingPostingService postingService,
-    IReadRepository<PurchaseInvoice, Guid> purchaseInvoices,
+    IRepository<PurchaseInvoice, Guid> purchaseInvoices,
+    IReadRepository<AccountingSettings, Guid> accountingSettings,
+    IReadRepository<Currency, Guid> currencies,
     ICurrentUser currentUser,
     TimeProvider timeProvider) : IPurchasingAccountingPort
 {
@@ -83,6 +87,8 @@ public sealed class PurchasingAccountingPort(
             throw new ConflictException("purchasing_exchange_rate_invalid", "سعر الصرف يجب أن يكون أكبر من صفر.");
         if (context.SupplierPayableBaseAmount <= 0m)
             throw new ConflictException("purchasing_supplier_payable_invalid", "قيمة مديونية المورد يجب أن تكون أكبر من صفر.");
+
+        await CaptureInvoiceCurrencySnapshotAsync(context.PurchaseInvoiceId, context.CurrencyId, cancellationToken);
 
         var lines = new List<ProfileAccountingPostingLine>();
         if (context.GrniBaseAmount > 0m)
@@ -170,6 +176,31 @@ public sealed class PurchasingAccountingPort(
             ResolveUserGuid(), timeProvider.GetUtcNow().UtcDateTime, cancellationToken);
 
         return new PurchasingAccountingPostingResult(journalId);
+    }
+
+    private async Task CaptureInvoiceCurrencySnapshotAsync(Guid invoiceId, Guid invoiceCurrencyId, CancellationToken ct)
+    {
+        var invoice = await purchaseInvoices.GetForUpdateAsync(invoiceId, ct)
+            ?? throw new NotFoundException(nameof(PurchaseInvoice), invoiceId);
+        if (invoice.CurrencyId != invoiceCurrencyId)
+            throw new ConflictException("purchasing_invoice_currency_changed", "عملة فاتورة المورد تغيرت أثناء الترحيل.");
+
+        var settings = await accountingSettings.GetByIdAsync(AccountingSettings.SingletonId, ct)
+            ?? throw new ConflictException("accounting_settings_required", "يجب إعداد المحاسبة قبل ترحيل فاتورة المورد.");
+        var invoiceCurrency = await currencies.GetByIdAsync(invoice.CurrencyId, ct)
+            ?? throw new NotFoundException(nameof(Currency), invoice.CurrencyId);
+        var baseCurrency = await currencies.GetByIdAsync(settings.BaseCurrencyId, ct)
+            ?? throw new NotFoundException(nameof(Currency), settings.BaseCurrencyId);
+
+        invoice.CaptureCurrencySnapshot(
+            invoiceCurrency.Code,
+            invoiceCurrency.DecimalPlaces,
+            baseCurrency.Id,
+            baseCurrency.Code,
+            baseCurrency.DecimalPlaces,
+            settings.DefaultExchangeRateType,
+            ExchangeRateSource.Manual);
+        purchaseInvoices.Update(invoice);
     }
 
     private static ProfileAccountingPostingLine RoleDebit(string profileType, string role, decimal amount, bool tx, string description, Guid supplierId)

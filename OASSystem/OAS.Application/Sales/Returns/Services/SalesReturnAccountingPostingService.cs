@@ -22,14 +22,35 @@ public sealed class SalesReturnAccountingPostingService(
 {
     public async Task<Guid> PostAsync(SalesReturn salesReturn, Guid postedBy, DateTime postedAtUtc, CancellationToken cancellationToken = default)
     {
+        // Read every journal for this source, not only Posted/Reversed ones. A Draft,
+        // PendingApproval, or Approved journal means a previous posting attempt reached
+        // accounting persistence but did not complete. Continuing on top of that state
+        // risks a partial/duplicate posting, so the retry must stop for review.
+        //
+        // UX_JournalEntries_SourceDocument is also the database-level concurrency guard:
+        // even if two requests race past this read, SQL Server allows only one journal
+        // for the same (SourceModule, SourceDocumentType, SourceDocumentId).
         var existing = await journals.ListAsync(new Specification<JournalEntry>().Where(x =>
             x.SourceModule == SalesSourceReferences.Module &&
             x.SourceDocumentType == SalesSourceReferences.SalesReturn &&
-            x.SourceDocumentId == salesReturn.Id &&
-            (x.Status == JournalEntryStatus.Posted || x.Status == JournalEntryStatus.Reversed)), cancellationToken);
+            x.SourceDocumentId == salesReturn.Id), cancellationToken);
+
         if (existing.Count > 1)
-            throw new ConflictException("sales_return_journal_duplicate", "يوجد أكثر من قيد محاسبي لمرتجع المبيعات.");
-        if (existing.Count == 1) return existing[0].Id;
+            throw new ConflictException(
+                "sales_return_journal_duplicate",
+                "يوجد أكثر من قيد محاسبي لمرتجع المبيعات. أوقف الترحيل وراجع القيود قبل أي إعادة محاولة.");
+
+        if (existing.Count == 1)
+        {
+            var existingJournal = existing[0];
+            if (existingJournal.Status is JournalEntryStatus.Posted or JournalEntryStatus.Reversed)
+                return existingJournal.Id;
+
+            throw new ConflictException(
+                "sales_return_journal_partial_posting",
+                $"تم العثور على قيد محاسبي غير مكتمل لمرتجع المبيعات بالحالة '{existingJournal.Status}'. " +
+                "أوقف إعادة المحاولة وراجع القيد قبل أي ترحيل إضافي.");
+        }
 
         var restoresInventory = salesReturn.Lines.Any(x => x.IsActive && x.RestoresInventoryAsset);
         var period = await postingPeriods.GetOpenPostingPeriodAsync(salesReturn.PostingDate, restoresInventory, cancellationToken);

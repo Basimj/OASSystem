@@ -98,6 +98,30 @@ public sealed class CommercialExtensionsEfConfigurationTests
         Assert.That(warehouse.GetIndexes().Any(x => x.GetDatabaseName() == "IX_Warehouses_SalesAllocation"), Is.True);
     }
 
+    [Test]
+    public void SalesReturnHardening_HasDatabaseConcurrencyAndIdempotencyGuards()
+    {
+        using var context = new OasDbContext(_options);
+        var model = context.GetService<IDesignTimeModel>().Model;
+
+        var journal = model.FindEntityType(typeof(JournalEntry));
+        Assert.That(journal, Is.Not.Null);
+        var sourceIndex = journal!.GetIndexes()
+            .SingleOrDefault(x => x.GetDatabaseName() == "UX_JournalEntries_SourceDocument");
+        Assert.That(sourceIndex, Is.Not.Null);
+        Assert.That(sourceIndex!.IsUnique, Is.True);
+        Assert.That(sourceIndex.GetFilter(), Does.Contain("[SourceDocumentId] IS NOT NULL"));
+        AssertRowVersion(journal, nameof(JournalEntry.RowVersion));
+
+        var salesReturn = model.FindEntityType(typeof(SalesReturn));
+        Assert.That(salesReturn, Is.Not.Null);
+        AssertRowVersion(salesReturn!, nameof(SalesReturn.RowVersion));
+
+        var returnLine = model.FindEntityType(typeof(SalesReturnLine));
+        Assert.That(returnLine, Is.Not.Null);
+        AssertRowVersion(returnLine!, nameof(SalesReturnLine.RowVersion));
+    }
+
     private static void AssertUniqueIndex(DbContext context, Type entityType, string databaseName)
     {
         var entity = context.Model.FindEntityType(entityType);
@@ -106,5 +130,13 @@ public sealed class CommercialExtensionsEfConfigurationTests
         var index = entity!.GetIndexes().SingleOrDefault(x => x.GetDatabaseName() == databaseName);
         Assert.That(index, Is.Not.Null, $"Index {databaseName} is missing.");
         Assert.That(index!.IsUnique, Is.True, $"Index {databaseName} must be unique.");
+    }
+
+    private static void AssertRowVersion(IReadOnlyEntityType entity, string propertyName)
+    {
+        var property = entity.FindProperty(propertyName);
+        Assert.That(property, Is.Not.Null, $"{entity.ClrType.Name}.{propertyName} is missing.");
+        Assert.That(property!.IsConcurrencyToken, Is.True, $"{entity.ClrType.Name}.{propertyName} must be a concurrency token.");
+        Assert.That(property.ValueGenerated, Is.EqualTo(ValueGenerated.OnAddOrUpdate));
     }
 }

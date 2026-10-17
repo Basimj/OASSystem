@@ -1,8 +1,7 @@
 using OAS.Application.Abstractions.Persistence;
-using OAS.Application.Abstractions.Persistence.Specifications;
 using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Common.Exceptions;
-using OAS.Domain.Accounting.Entities;
+using OAS.Application.Purchasing.Abstractions;
 using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Purchasing.Entities;
 using OAS.Domain.Purchasing.Enums;
@@ -12,10 +11,17 @@ namespace OAS.Application.Purchasing.Payments;
 /// <summary>
 /// Protects supplier-invoice allocations from overpayment and from being funded by
 /// a payment source that belongs to another party (or by a receipt voucher).
+///
+/// AP-02 separates three values:
+/// 1) the source cash amount/base value at the settlement-date rate,
+/// 2) the amount settled in the invoice document currency, and
+/// 3) the historical AP carrying amount released at the invoice rate.
+/// The difference between source base and target base is realized FX and is posted
+/// separately by the supplier-settlement posting flow.
 /// </summary>
 public sealed class PurchaseInvoicePaymentAllocationTargetValidator(
     IReadRepository<PurchaseInvoice, Guid> invoices,
-    IReadRepository<PaymentAllocation, Guid> allocations) :
+    IPurchaseInvoiceBalanceService balances) :
     IPaymentAllocationTargetValidator,
     IPaymentAllocationSourceTargetValidator
 {
@@ -35,41 +41,41 @@ public sealed class PurchaseInvoicePaymentAllocationTargetValidator(
             throw new ConflictException(
                 "purchase_invoice_payment_amount_invalid",
                 "يجب أن تكون قيمة التخصيص لفاتورة المورد أكبر من صفر.");
-
-        var existing = await allocations.ListAsync(
-            new Specification<PaymentAllocation>().Where(x =>
-                x.TargetDocumentType == AllocationTargetDocumentType.PurchaseInvoice &&
-                x.TargetDocumentId == targetDocumentId),
-            cancellationToken);
-
-        if (excludingAllocationId.HasValue)
-            existing = existing.Where(x => x.Id != excludingAllocationId.Value).ToArray();
-
-        // Base currency is the authoritative ceiling when allocations use different
-        // settlement currencies.  This mirrors the accounting allocation convention
-        // already used for sales invoices.
-        var alreadyAllocatedBase = existing.Sum(GetTargetBaseAllocatedAmount);
-        var baseOutstanding = Math.Max(0m, invoice.BaseTotalAmount - alreadyAllocatedBase);
-        if (sourceBaseAllocatedAmount > baseOutstanding)
+        if (invoice.ExchangeRate <= 0m)
             throw new ConflictException(
-                "purchase_invoice_payment_allocation_exceeds_outstanding",
-                "القيمة الأساسية للمبلغ المخصص تتجاوز الرصيد المتبقي على فاتورة المورد.");
+                "purchase_invoice_exchange_rate_invalid",
+                "سعر الصرف التاريخي لفاتورة المورد غير صالح.");
 
-        // When payment and invoice use the same currency, also preserve the exact
-        // document-currency ceiling shown to the user.
+        var balance = await balances.GetAsync(invoice, excludingAllocationId, cancellationToken);
+
+        decimal targetDocumentAmount;
         if (sourceCurrencyId == invoice.CurrencyId)
         {
-            var alreadyAllocatedInInvoiceCurrency = existing
-                .Where(x => x.CurrencyId == invoice.CurrencyId)
-                .Sum(x => x.AllocatedAmount);
-            var transactionOutstanding = Math.Max(0m, invoice.TotalAmount - alreadyAllocatedInInvoiceCurrency);
-            if (allocatedAmount > transactionOutstanding)
-                throw new ConflictException(
-                    "purchase_invoice_payment_allocation_exceeds_outstanding",
-                    "المبلغ المخصص يتجاوز الرصيد المتبقي على فاتورة المورد.");
+            // Same document currency: the paid foreign-currency quantity is the
+            // invoice quantity being extinguished, regardless of today's base rate.
+            targetDocumentAmount = Round(allocatedAmount);
+        }
+        else
+        {
+            // Third-currency policy: the source cash base value determines the AP
+            // carrying value released. Translate that carrying value to invoice
+            // currency at the invoice historical rate. This is deterministic and
+            // prevents an unexplained residual in either currency.
+            targetDocumentAmount = Round(sourceBaseAllocatedAmount / invoice.ExchangeRate);
         }
 
-        return new PaymentAllocationTargetValidation(sourceBaseAllocatedAmount);
+        if (targetDocumentAmount <= 0m || targetDocumentAmount > balance.OutstandingAmount)
+            throw new ConflictException(
+                "purchase_invoice_payment_allocation_exceeds_outstanding",
+                "المبلغ المسوى بعملة فاتورة المورد يتجاوز الرصيد المتبقي.");
+
+        var targetBaseAmount = Round(targetDocumentAmount * invoice.ExchangeRate);
+        if (targetBaseAmount > balance.OutstandingBaseAmount)
+            throw new ConflictException(
+                "purchase_invoice_payment_allocation_exceeds_outstanding_base",
+                "القيمة الدفترية التاريخية للمبلغ المسوى تتجاوز الرصيد الأساسي المتبقي على فاتورة المورد.");
+
+        return new PaymentAllocationTargetValidation(targetBaseAmount, targetDocumentAmount);
     }
 
     public async Task ValidateSourceAsync(
@@ -108,14 +114,6 @@ public sealed class PurchaseInvoicePaymentAllocationTargetValidator(
         return invoice;
     }
 
-    private static decimal GetTargetBaseAllocatedAmount(PaymentAllocation allocation)
-    {
-        if (allocation.TargetBaseAllocatedAmount.HasValue)
-            return allocation.TargetBaseAllocatedAmount.Value;
-        if (allocation.BaseAllocatedAmount.HasValue)
-            return allocation.BaseAllocatedAmount.Value;
-        if (allocation.ExchangeRate.HasValue)
-            return Math.Round(allocation.AllocatedAmount * allocation.ExchangeRate.Value, 4, MidpointRounding.AwayFromZero);
-        return allocation.AllocatedAmount;
-    }
+    private static decimal Round(decimal value) =>
+        Math.Round(value, 4, MidpointRounding.AwayFromZero);
 }

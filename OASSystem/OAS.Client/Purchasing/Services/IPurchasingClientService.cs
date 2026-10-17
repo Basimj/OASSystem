@@ -1,3 +1,4 @@
+using OAS.Contracts.Accounting.PaymentAllocations;
 using OAS.Contracts.Common.Pagination;
 using OAS.Contracts.Purchasing.Enums;
 using OAS.Contracts.Purchasing.PurchaseInvoices;
@@ -5,6 +6,7 @@ using OAS.Contracts.Purchasing.PurchaseOrders;
 using OAS.Contracts.Purchasing.PurchaseReceipts;
 using OAS.Contracts.Purchasing.PurchaseRequests;
 using OAS.Contracts.Purchasing.PurchaseReturns;
+using OAS.Contracts.Purchasing.SupplierAllocations;
 using OAS.Contracts.Purchasing.SupplierCatalog;
 
 namespace OAS.Client.Purchasing.Services;
@@ -59,11 +61,17 @@ public interface IPurchasingClientService
     Task<PayPurchaseInvoiceResultDto?> PayPurchaseInvoiceAsync(Guid id, PayPurchaseInvoiceRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseInvoiceDto?> CancelPurchaseInvoiceAsync(Guid id, CancelPurchaseInvoiceRequest request, CancellationToken cancellationToken = default);
 
+    Task<SupplierAllocationCenterDto?> GetSupplierAllocationCenterAsync(Guid supplierId, CancellationToken cancellationToken = default);
+    Task<PaymentAllocationDto?> CreateSupplierPaymentAllocationAsync(CreatePaymentAllocationRequest request, CancellationToken cancellationToken = default);
+    Task<ReversePaymentAllocationResultDto?> ReverseSupplierPaymentAllocationAsync(Guid allocationId, ReversePaymentAllocationRequest request, CancellationToken cancellationToken = default);
+
     Task<PagedResult<PurchaseReturnDto>> GetPurchaseReturnsAsync(PageRequest request, PurchaseReturnStatus? status = null, Guid? purchaseReceiptId = null, Guid? purchaseInvoiceId = null, Guid? supplierId = null, CancellationToken cancellationToken = default);
     Task<PurchaseReturnDto?> GetPurchaseReturnAsync(Guid id, CancellationToken cancellationToken = default);
     Task<PurchaseReturnDto?> CreatePurchaseReturnAsync(CreatePurchaseReturnRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseReturnDto?> ConfirmPurchaseReturnAsync(Guid id, PurchaseReturnActionRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseReturnPostingResultDto?> PostPurchaseReturnAsync(Guid id, PurchaseReturnActionRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseReturnDto?> CancelPurchaseReturnAsync(Guid id, CancelPurchaseReturnRequest request, CancellationToken cancellationToken = default);
-
+    Task<SupplierCreditSummaryDto?> GetPurchaseReturnCreditSummaryAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<SupplierCreditApplicationDto?> ApplySupplierCreditAsync(Guid id, ApplySupplierCreditRequest request, CancellationToken cancellationToken = default);
+    Task<SupplierCreditApplicationDto?> ReverseSupplierCreditAsync(Guid id, Guid applicationId, ReverseSupplierCreditApplicationRequest request, CancellationToken cancellationToken = default);
 }
