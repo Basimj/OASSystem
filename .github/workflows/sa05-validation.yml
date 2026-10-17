@@ -23,7 +23,7 @@ jobs:
       - name: Run SA-05 domain tests
         run: dotnet test OASSystem/OAS.Tests/OAS.Tests.csproj --no-build -c Release --filter FullyQualifiedName~SA05HeaderDiscountAndCommissionTests
       - name: Install EF tool
-        run: dotnet tool install --global dotnet-ef --version 9.0.*
+        run: dotnet tool install --global dotnet-ef --version 9.0.8
       - name: Check EF model snapshot
         run: dotnet ef migrations has-pending-model-changes --project OASSystem/OAS.Infrastructure/OAS.Infrastructure.csproj --startup-project OASSystem/OAS.API/OAS.API.csproj
 
@@ -37,9 +37,9 @@ jobs:
         with:
           dotnet-version: '9.0.x'
       - name: Install EF tool
-        run: dotnet tool install --global dotnet-ef --version 9.0.*
+        run: dotnet tool install --global dotnet-ef --version 9.0.8
       - name: Add EF Design package to startup project on runner only
-        run: dotnet add OASSystem/OAS.API/OAS.API.csproj package Microsoft.EntityFrameworkCore.Design --version 9.0.21
+        run: dotnet add OASSystem/OAS.API/OAS.API.csproj package Microsoft.EntityFrameworkCore.Design --version 9.0.8
       - name: Repair legacy salary navigation ordering on runner only
         shell: python
         run: |
@@ -69,12 +69,15 @@ jobs:
               if needle in segment:
                   matches.append((start, end, segment))
 
-          if len(matches) != 1:
-              raise SystemExit(f'Expected exactly one EmployeeSalaryStructure relationship block with Lines navigation, found {len(matches)}.')
-
-          start, end, segment = matches[0]
-          segment = segment.replace(needle, '', 1)
-          path.write_text(text[:start] + segment + text[end:], encoding='utf-8')
+          if len(matches) > 1:
+              raise SystemExit(f'Expected at most one EmployeeSalaryStructure relationship block with legacy Lines navigation, found {len(matches)}.')
+          if len(matches) == 1:
+              start, end, segment = matches[0]
+              segment = segment.replace(needle, '', 1)
+              path.write_text(text[:start] + segment + text[end:], encoding='utf-8')
+              print('Legacy salary snapshot navigation repaired.')
+          else:
+              print('Legacy salary snapshot navigation already synchronized.')
       - name: Generate temporary EF migration to refresh snapshot
         run: dotnet ef migrations add SA05SnapshotSyncTemp --project OASSystem/OAS.Infrastructure/OAS.Infrastructure.csproj --startup-project OASSystem/OAS.API/OAS.API.csproj --output-dir Persistence/Migrations
       - name: Commit generated snapshot only
@@ -85,7 +88,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "Snapshot already synchronized."
           else
-            git commit -m "SA-05 synchronize EF model snapshot [skip ci]"
+            git commit -m "SA-05 synchronize EF model snapshot"
             git push origin HEAD:feature/sa-05-header-discount-commissions
           fi
       - name: Upload generated snapshot only
