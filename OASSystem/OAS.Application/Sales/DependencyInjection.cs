@@ -1,4 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
+using OAS.Application.Accounting.Abstractions;
+using OAS.Application.Accounting.Posting;
 using OAS.Application.CRUD.Abstractions;
 using OAS.Application.CRUD.Mapping;
 using OAS.Application.Sales.Abstractions;
@@ -58,7 +60,11 @@ public static class DependencyInjection
         services.AddScoped<ISalesInvoiceConfirmationService, SalesInvoiceConfirmationService>();
         services.AddScoped<ISalesInvoicePostingWorkflow, SalesInvoicePostingWorkflow>();
         services.AddScoped<ISalesInvoiceBalanceService, SalesInvoiceBalanceService>();
-        services.AddScoped<ISalesSettlementService, SalesSettlementService>();
+
+        services.AddScoped<SalesSettlementService>();
+        services.AddScoped<ISalesSettlementService, SalesSettlementFxDecorator>();
+        services.AddScoped<ICustomerSettlementFxPostingService, CustomerSettlementFxPostingService>();
+
         services.AddScoped<IOpticalProductionPort, OpticalProductionPort>();
         services.AddScoped<ISalesCheckoutOrchestrator, OAS.Application.Sales.Checkout.Services.SalesCheckoutOrchestrator>();
         services.AddScoped<ISalesCheckoutContextService, OAS.Application.Sales.Checkout.Services.SalesCheckoutContextService>();
@@ -74,7 +80,8 @@ public static class DependencyInjection
         services.AddScoped<ISalesStockReservationService, SalesStockReservationService>();
         services.AddScoped<ISalesCreditExposureService, SalesCreditExposureService>();
         services.AddScoped<ISalesPaymentAllocationTargetValidator, SalesPaymentAllocationTargetValidator>();
-        services.AddScoped<OAS.Application.Accounting.Abstractions.IPaymentAllocationTargetValidator>(sp => sp.GetRequiredService<ISalesPaymentAllocationTargetValidator>());
+        services.AddScoped<IPaymentAllocationTargetValidator>(sp => sp.GetRequiredService<ISalesPaymentAllocationTargetValidator>());
+        services.AddScoped<IPaymentAllocationSourceTargetValidator, SalesPaymentAllocationSourceTargetValidator>();
         services.AddScoped<ISalesInventoryPostingService, SalesInventoryPostingService>();
         services.AddScoped<ISalesInvoiceAccountingPostingService, SalesInvoiceAccountingPostingService>();
         services.AddScoped<ISalesReturnInventoryPostingService, SalesReturnInventoryPostingService>();

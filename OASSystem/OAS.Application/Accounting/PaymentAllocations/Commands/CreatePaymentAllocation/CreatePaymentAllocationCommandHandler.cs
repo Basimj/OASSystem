@@ -5,6 +5,7 @@ using OAS.Application.Abstractions.Security;
 using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.Purchasing.Abstractions;
+using OAS.Application.Sales.Abstractions;
 using OAS.Domain.Accounting.Entities;
 using DomainAllocationTargetDocumentType = OAS.Domain.Accounting.Enums.AllocationTargetDocumentType;
 
@@ -21,7 +22,10 @@ public sealed class CreatePaymentAllocationCommandHandler(
     ISupplierSettlementFxPostingService supplierSettlementFxPosting,
     IPurchasePaymentAllocationConcurrencyPort purchaseAllocationConcurrency,
     ICurrentUser currentUser,
-    TimeProvider timeProvider) : IRequestHandler<CreatePaymentAllocationCommand, Guid>
+    TimeProvider timeProvider,
+    ICustomerSettlementFxPostingService? customerSettlementFxPosting = null,
+    ISalesPaymentAllocationConcurrencyPort? salesAllocationConcurrency = null)
+    : IRequestHandler<CreatePaymentAllocationCommand, Guid>
 {
     public async Task<Guid> Handle(CreatePaymentAllocationCommand request, CancellationToken ct)
     {
@@ -30,8 +34,6 @@ public sealed class CreatePaymentAllocationCommandHandler(
         if (targetType is DomainAllocationTargetDocumentType.EmployeePayroll or DomainAllocationTargetDocumentType.EndOfServiceSettlement)
             throw new ConflictException("managed_payment_allocation_required", "Payroll and end-of-service allocations can only be created by their dedicated payment workflows.");
 
-        // AP allocations are line-owned. Lock source + target before any SUM/outstanding
-        // read so concurrent HTTP requests cannot both consume the same remaining amount.
         if (targetType == DomainAllocationTargetDocumentType.PurchaseInvoice)
         {
             if (d.PaymentVoucherLineId is not Guid paymentLineId || paymentLineId == Guid.Empty ||
@@ -44,6 +46,26 @@ public sealed class CreatePaymentAllocationCommandHandler(
 
             await purchaseAllocationConcurrency.LockPaymentLineAndInvoiceAsync(
                 paymentLineId,
+                d.TargetDocumentId,
+                ct);
+        }
+        else if (targetType == DomainAllocationTargetDocumentType.SalesInvoice &&
+                 d.CustomerAdvanceApplicationId is null)
+        {
+            if (salesAllocationConcurrency is null)
+                throw new ConflictException(
+                    "sales_payment_allocation_concurrency_missing",
+                    "خدمة حماية تزامن تخصيصات المبيعات غير متاحة.");
+            if (d.ReceiptVoucherLineId is not Guid receiptLineId || receiptLineId == Guid.Empty ||
+                d.PaymentVoucherLineId.HasValue)
+            {
+                throw new ConflictException(
+                    "sales_invoice_receipt_source_invalid",
+                    "يمكن تخصيص فاتورة المبيعات من سطر سند قبض مرحل فقط.");
+            }
+
+            await salesAllocationConcurrency.LockReceiptLineAndInvoiceAsync(
+                receiptLineId,
                 d.TargetDocumentId,
                 ct);
         }
@@ -116,9 +138,7 @@ public sealed class CreatePaymentAllocationCommandHandler(
                     "بيانات المورد أو حساب الذمم أو تاريخ السداد غير مكتملة لإنشاء قيد فرق الصرف.");
             }
 
-            if (!Guid.TryParse(currentUser.UserId, out var userId))
-                throw new ForbiddenException();
-
+            var userId = GetCurrentUserId();
             await supplierSettlementFxPosting.PostAsync(
                 new SupplierSettlementFxPostingRequest(
                     entity.Id,
@@ -132,8 +152,44 @@ public sealed class CreatePaymentAllocationCommandHandler(
                 now,
                 ct);
         }
+        else if (targetType == DomainAllocationTargetDocumentType.SalesInvoice)
+        {
+            if (customerSettlementFxPosting is null)
+                throw new ConflictException(
+                    "customer_settlement_fx_service_missing",
+                    "خدمة فروق الصرف لتحصيلات العملاء غير متاحة.");
+            if (source.Context.CustomerId is not Guid customerId || customerId == Guid.Empty ||
+                source.CounterpartyAccountId is not Guid customerAccountId || customerAccountId == Guid.Empty ||
+                !source.PostingDate.HasValue)
+            {
+                throw new ConflictException(
+                    "sales_invoice_fx_source_incomplete",
+                    "بيانات العميل أو حساب الذمم أو تاريخ التحصيل غير مكتملة لإنشاء قيد فرق الصرف.");
+            }
+
+            var userId = GetCurrentUserId();
+            await customerSettlementFxPosting.PostAsync(
+                new CustomerSettlementFxPostingRequest(
+                    entity.Id,
+                    customerId,
+                    customerAccountId,
+                    source.PostingDate.Value,
+                    sourceBaseAmount,
+                    validation.TargetBaseAllocatedAmount,
+                    $"فرق صرف محقق لتخصيص تحصيل على فاتورة مبيعات {d.TargetDocumentId}"),
+                userId,
+                now,
+                ct);
+        }
 
         return entity.Id;
+    }
+
+    private Guid GetCurrentUserId()
+    {
+        if (!Guid.TryParse(currentUser.UserId, out var userId) || userId == Guid.Empty)
+            throw new ForbiddenException();
+        return userId;
     }
 
     private async Task<PaymentAllocation?> FindByIdempotencyKeyAsync(string key, CancellationToken ct)

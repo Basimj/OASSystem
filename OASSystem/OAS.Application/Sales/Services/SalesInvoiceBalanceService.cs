@@ -21,17 +21,21 @@ public sealed class SalesInvoiceBalanceService(
 
         var postedReturns = await returns.ListAsync(
             new Specification<SalesReturn>().Where(x =>
-                x.SalesInvoiceId == invoice.Id && x.Status == SalesReturnStatus.Posted),
+                x.SalesInvoiceId == invoice.Id &&
+                x.Status == SalesReturnStatus.Posted),
             cancellationToken);
 
         var allocationRows = await allocations.ListAsync(
             new Specification<PaymentAllocation>().Where(x =>
                 x.TargetDocumentType == AllocationTargetDocumentType.SalesInvoice &&
-                x.TargetDocumentId == invoice.Id),
+                x.TargetDocumentId == invoice.Id &&
+                x.ReversedAtUtc == null),
             cancellationToken);
 
         if (excludingAllocationId.HasValue)
-            allocationRows = allocationRows.Where(x => x.Id != excludingAllocationId.Value).ToArray();
+            allocationRows = allocationRows
+                .Where(x => x.Id != excludingAllocationId.Value)
+                .ToArray();
 
         var returnedBase = Math.Min(
             invoice.BaseTotalAmount,
@@ -42,25 +46,18 @@ public sealed class SalesInvoiceBalanceService(
 
         var netBase = Math.Max(0m, invoice.BaseTotalAmount - returnedBase);
         var net = Math.Max(0m, invoice.TotalAmount - returned);
-        var allocatedBase = Math.Max(0m, allocationRows.Sum(x =>
-            GetTargetBaseAllocatedAmount(x, invoice.BaseCurrencyDecimalPlacesSnapshot)));
 
-        // Preserve exact transaction-currency allocations when payment and invoice use the
-        // same currency. Only cross-currency allocations need to be translated back using
-        // the invoice's immutable exchange-rate snapshot. Otherwise a later collection rate
-        // could make a 300 USD payment appear as (for example) 312 USD against the invoice.
-        var sameCurrencyRows = allocationRows.Where(x => x.CurrencyId == invoice.CurrencyId).ToArray();
-        var sameCurrencyAllocated = Math.Max(0m, sameCurrencyRows.Sum(x => x.AllocatedAmount));
-        var sameCurrencyTargetBase = Math.Max(0m, sameCurrencyRows.Sum(x =>
-            GetTargetBaseAllocatedAmount(x, invoice.BaseCurrencyDecimalPlacesSnapshot)));
-        var crossCurrencyTargetBase = Math.Max(0m, allocatedBase - sameCurrencyTargetBase);
-        var crossCurrencyInInvoiceCurrency = invoice.ExchangeRate <= 0m
-            ? 0m
-            : Math.Round(
-                crossCurrencyTargetBase / invoice.ExchangeRate,
-                invoice.CurrencyDecimalPlacesSnapshot,
-                MidpointRounding.AwayFromZero);
-        var allocated = Math.Min(net, Math.Max(0m, sameCurrencyAllocated + crossCurrencyInInvoiceCurrency));
+        var allocatedBase = Math.Min(
+            netBase,
+            Math.Max(0m, allocationRows.Sum(x =>
+                GetTargetBaseAllocatedAmount(
+                    x,
+                    invoice.BaseCurrencyDecimalPlacesSnapshot))));
+
+        var allocated = Math.Min(
+            net,
+            Math.Max(0m, allocationRows.Sum(x =>
+                GetTargetDocumentAmount(x, invoice))));
 
         return new SalesInvoiceBalance(
             invoice.TotalAmount,
@@ -75,7 +72,32 @@ public sealed class SalesInvoiceBalanceService(
             Math.Max(0m, netBase - allocatedBase));
     }
 
-    private static decimal GetTargetBaseAllocatedAmount(PaymentAllocation allocation, byte baseCurrencyDecimalPlaces)
+    private static decimal GetTargetDocumentAmount(
+        PaymentAllocation allocation,
+        SalesInvoice invoice)
+    {
+        if (allocation.TargetDocumentAmount is > 0m)
+            return allocation.TargetDocumentAmount.Value;
+
+        // Backward compatibility for legacy same-currency allocations.
+        if (allocation.CurrencyId == invoice.CurrencyId)
+            return allocation.AllocatedAmount;
+
+        var targetBase = GetTargetBaseAllocatedAmount(
+            allocation,
+            invoice.BaseCurrencyDecimalPlacesSnapshot);
+
+        return invoice.ExchangeRate <= 0m
+            ? 0m
+            : Math.Round(
+                targetBase / invoice.ExchangeRate,
+                invoice.CurrencyDecimalPlacesSnapshot,
+                MidpointRounding.AwayFromZero);
+    }
+
+    private static decimal GetTargetBaseAllocatedAmount(
+        PaymentAllocation allocation,
+        byte baseCurrencyDecimalPlaces)
     {
         if (allocation.TargetBaseAllocatedAmount.HasValue)
             return allocation.TargetBaseAllocatedAmount.Value;

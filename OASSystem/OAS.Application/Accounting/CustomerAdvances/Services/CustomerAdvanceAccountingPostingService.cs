@@ -9,10 +9,6 @@ using OAS.Domain.Sales.Entities;
 
 namespace OAS.Application.Accounting.CustomerAdvances.Services;
 
-/// <summary>
-/// Posts the accounting settlement produced when a customer advance is applied to a posted sales invoice.
-/// The advance liability account is resolved from Posting Profiles; no GL account is hard-coded here.
-/// </summary>
 public sealed class CustomerAdvanceAccountingPostingService(
     IRepository<JournalEntry, Guid> journals,
     IReadRepository<Customer, Guid> customers,
@@ -20,7 +16,9 @@ public sealed class CustomerAdvanceAccountingPostingService(
     IReadRepository<FiscalPeriod, Guid> fiscalPeriods,
     IReadRepository<PostingProfile, Guid> profiles,
     IReadRepository<PostingProfileLine, Guid> profileLines,
-    ISequenceNumberGenerator sequences) : ICustomerAdvanceAccountingPostingService
+    ISequenceNumberGenerator sequences,
+    IReadRepository<AccountingSettings, Guid>? accountingSettings = null)
+    : ICustomerAdvanceAccountingPostingService
 {
     private const string Module = "Accounting";
     private const string DocumentType = "CustomerAdvanceApplication";
@@ -46,16 +44,6 @@ public sealed class CustomerAdvanceAccountingPostingService(
         if (!Guid.TryParse(appliedBy, out var actorId) || actorId == Guid.Empty)
             throw new ForbiddenException();
 
-        // The current allocation validator evaluates a cross-currency target using the
-        // authoritative base amount. Until a dedicated realised FX settlement role is
-        // introduced, the application journal must remain exactly balanced in base currency.
-        if (sourceBaseAmount != targetBaseAmount)
-        {
-            throw new ConflictException(
-                "customer_advance_fx_difference_not_configured",
-                "لا يمكن تطبيق العربون لأن القيمة الأساسية للمصدر والمستند المستهدف مختلفة ولا يوجد حساب فروقات عملة مخصص لهذه التسوية.");
-        }
-
         var customer = await customers.GetByIdAsync(advance.CustomerId, cancellationToken)
             ?? throw new NotFoundException(nameof(Customer), advance.CustomerId);
         if (!customer.IsActive)
@@ -65,6 +53,33 @@ public sealed class CustomerAdvanceAccountingPostingService(
         var advanceAccountId = await ResolveAdvanceLiabilityAccountAsync(cancellationToken);
         var postingDate = DateOnly.FromDateTime(appliedAtUtc);
         var period = await ResolveAccountingPeriodAsync(postingDate, cancellationToken);
+
+        Guid? gainAccountId = null;
+        Guid? lossAccountId = null;
+        var difference = Math.Round(sourceBaseAmount - targetBaseAmount, 4, MidpointRounding.AwayFromZero);
+        if (difference != 0m)
+        {
+            if (accountingSettings is null)
+                throw new ConflictException(
+                    "customer_advance_fx_settings_missing",
+                    "إعدادات فروقات العملة غير متاحة لتطبيق العربون متعدد العملات.");
+
+            var settings = await accountingSettings.GetByIdAsync(AccountingSettings.SingletonId, cancellationToken)
+                ?? throw new ConflictException("accounting_settings_required", "يجب إعداد المحاسبة قبل تطبيق العربون متعدد العملات.");
+
+            if (difference > 0m)
+            {
+                gainAccountId = settings.ExchangeGainAccountId
+                    ?? throw new ConflictException("exchange_gain_account_required", "يجب تحديد حساب أرباح فروق العملة في إعدادات المحاسبة.");
+                await EnsurePostingAccountAsync(gainAccountId.Value, cancellationToken);
+            }
+            else
+            {
+                lossAccountId = settings.ExchangeLossAccountId
+                    ?? throw new ConflictException("exchange_loss_account_required", "يجب تحديد حساب خسائر فروق العملة في إعدادات المحاسبة.");
+                await EnsurePostingAccountAsync(lossAccountId.Value, cancellationToken);
+            }
+        }
 
         var sequence = await sequences.NextAsync($"JournalEntry-{postingDate.Year}", cancellationToken);
         var journal = JournalEntry.Create(
@@ -84,7 +99,7 @@ public sealed class CustomerAdvanceAccountingPostingService(
             advance.BaseCurrencyCodeSnapshot,
             advance.BaseCurrencyDecimalPlacesSnapshot);
 
-        // Dr Customer Advances Liability
+        // Dr customer-advance liability at the source carrying amount.
         journal.AddLine(JournalEntryLine.CreateMultiCurrency(
             Guid.NewGuid(), journal.Id, 1, advanceAccountId,
             sourceBaseAmount, 0m,
@@ -94,15 +109,43 @@ public sealed class CustomerAdvanceAccountingPostingService(
             $"Customer advance / {advance.AdvanceNumber}",
             advance.CustomerId, null, null, null, null, null, null, applicationId));
 
-        // Cr Customer Receivable (the customer's sub-ledger GL account).
+        // Cr AR at the historical carrying amount being extinguished.
         journal.AddLine(JournalEntryLine.CreateMultiCurrency(
             Guid.NewGuid(), journal.Id, 2, customer.AccountId,
             0m, targetBaseAmount,
-            advance.CurrencyId, advance.CurrencyCodeSnapshot, advance.CurrencyDecimalPlacesSnapshot,
-            0m, amount,
-            advance.ExchangeRate, advance.ExchangeRateDate, advance.ExchangeRateType, advance.ExchangeRateSource,
+            invoice.CurrencyId, invoice.CurrencyCodeSnapshot, invoice.CurrencyDecimalPlacesSnapshot,
+            0m, Math.Round(targetBaseAmount / invoice.ExchangeRate, invoice.CurrencyDecimalPlacesSnapshot, MidpointRounding.AwayFromZero),
+            invoice.ExchangeRate, invoice.ExchangeRateDate, invoice.ExchangeRateType, invoice.ExchangeRateSource,
             $"Customer receivable / {invoice.InvoiceCode}",
             advance.CustomerId, null, null, null, null, null, null, applicationId));
+
+        if (difference > 0m)
+        {
+            // Source liability carrying value exceeds historical AR extinguished.
+            journal.AddLine(JournalEntryLine.CreateMultiCurrency(
+                Guid.NewGuid(), journal.Id, 3, gainAccountId!.Value,
+                0m, difference,
+                advance.BaseCurrencyId, advance.BaseCurrencyCodeSnapshot, advance.BaseCurrencyDecimalPlacesSnapshot,
+                0m, difference,
+                1m, postingDate, ExchangeRateType.Accounting, ExchangeRateSource.System,
+                "Realized FX gain on customer advance application",
+                advance.CustomerId, null, null, null, null, null, null, applicationId));
+        }
+        else if (difference < 0m)
+        {
+            var loss = Math.Abs(difference);
+            journal.AddLine(JournalEntryLine.CreateMultiCurrency(
+                Guid.NewGuid(), journal.Id, 3, lossAccountId!.Value,
+                loss, 0m,
+                advance.BaseCurrencyId, advance.BaseCurrencyCodeSnapshot, advance.BaseCurrencyDecimalPlacesSnapshot,
+                loss, 0m,
+                1m, postingDate, ExchangeRateType.Accounting, ExchangeRateSource.System,
+                "Realized FX loss on customer advance application",
+                advance.CustomerId, null, null, null, null, null, null, applicationId));
+        }
+
+        if (!journal.IsBalanced())
+            throw new ConflictException("customer_advance_application_unbalanced", "قيد تطبيق عربون العميل غير متوازن.");
 
         journal.SetPendingApproval();
         journal.Approve(actorId, appliedAtUtc);

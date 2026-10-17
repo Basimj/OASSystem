@@ -28,6 +28,10 @@ public sealed class UpdatePaymentAllocationCommandHandler(
             throw new ConflictException(
                 "purchase_invoice_allocation_reversal_required",
                 "لا يمكن تعديل تخصيص فاتورة مورد بعد إنشائه لأن له أثراً محاسبياً تاريخياً. استخدم عكس التخصيص ثم أنشئ تخصيصاً جديداً.");
+        if (allocation.TargetDocumentType == AllocationTargetDocumentType.SalesInvoice)
+            throw new ConflictException(
+                "sales_invoice_allocation_reversal_required",
+                "لا يمكن تعديل تخصيص فاتورة مبيعات بعد إنشائه لأن له أثراً محاسبياً تاريخياً. استخدم عكس التخصيص ثم أنشئ تخصيصاً جديداً.");
         if (!allocation.ReceiptVoucherLineId.HasValue && !allocation.PaymentVoucherLineId.HasValue)
             throw new ConflictException("legacy_allocation_readonly", "Legacy payment allocations must be migrated before they can be edited.");
 

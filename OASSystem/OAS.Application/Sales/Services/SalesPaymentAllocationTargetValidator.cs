@@ -1,9 +1,7 @@
 using OAS.Application.Abstractions.Persistence;
-using OAS.Application.Abstractions.Persistence.Specifications;
+using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.Sales.Abstractions;
-using OAS.Application.Accounting.Abstractions;
-using OAS.Domain.Accounting.Entities;
 using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Sales.Entities;
 using OAS.Domain.Sales.Enums;
@@ -12,9 +10,14 @@ namespace OAS.Application.Sales.Services;
 
 public sealed class SalesPaymentAllocationTargetValidator(
     IReadRepository<SalesInvoice, Guid> invoices,
-    ISalesInvoiceBalanceService invoiceBalances) : ISalesPaymentAllocationTargetValidator
+    ISalesInvoiceBalanceService invoiceBalances,
+    IExchangeRateResolver? exchangeRates = null,
+    TimeProvider? timeProvider = null) : ISalesPaymentAllocationTargetValidator
 {
-    public AllocationTargetDocumentType TargetDocumentType => AllocationTargetDocumentType.SalesInvoice;
+    private const decimal MoneyTolerance = 0.0001m;
+
+    public AllocationTargetDocumentType TargetDocumentType =>
+        AllocationTargetDocumentType.SalesInvoice;
 
     public async Task<PaymentAllocationTargetValidation> ValidateAsync(
         Guid salesInvoiceId,
@@ -28,28 +31,74 @@ public sealed class SalesPaymentAllocationTargetValidator(
             ?? throw new NotFoundException(nameof(SalesInvoice), salesInvoiceId);
 
         if (invoice.Status != SalesInvoiceStatus.Posted)
-            throw new ConflictException("sales_payment_allocation_invoice_not_posted", "لا يمكن تخصيص دفعة إلا لفاتورة مبيعات مرحلة.");
+            throw new ConflictException(
+                "sales_payment_allocation_invoice_not_posted",
+                "لا يمكن تخصيص دفعة إلا لفاتورة مبيعات مرحلة.");
 
-        var balance = await invoiceBalances.GetAsync(invoice, excludingAllocationId, cancellationToken);
+        var balance = await invoiceBalances.GetAsync(
+            invoice,
+            excludingAllocationId,
+            cancellationToken);
 
-        // TargetBaseAllocatedAmount represents how much of the invoice's historical base
-        // balance is settled. When collecting in the invoice currency, use the invoice's
-        // immutable exchange-rate snapshot rather than today's collection rate. This keeps
-        // a 300-unit payment equal to exactly 300 invoice-currency units even if FX changed.
-        var targetBaseAllocatedAmount = sourceCurrencyId == invoice.CurrencyId
-            ? Math.Round(
-                allocatedAmount * invoice.ExchangeRate,
-                invoice.BaseCurrencyDecimalPlacesSnapshot,
-                MidpointRounding.AwayFromZero)
-            : baseAllocatedAmount;
+        decimal targetDocumentAmount;
 
-        if (targetBaseAllocatedAmount > balance.OutstandingBaseAmount)
-            throw new ConflictException("sales_payment_allocation_exceeds_outstanding", "القيمة الأساسية للمبلغ المخصص تتجاوز الرصيد المتبقي على فاتورة المبيعات بعد المرتجعات المرحلة.");
+        if (sourceCurrencyId == invoice.CurrencyId)
+        {
+            // Same-currency collection extinguishes the exact invoice-currency amount.
+            targetDocumentAmount = Math.Round(
+                allocatedAmount,
+                invoice.CurrencyDecimalPlacesSnapshot,
+                MidpointRounding.AwayFromZero);
+        }
+        else
+        {
+            if (exchangeRates is null)
+                throw new ConflictException(
+                    "sales_cross_currency_rate_resolver_missing",
+                    "خدمة أسعار الصرف مطلوبة لتخصيص دفعة بعملة مختلفة عن عملة الفاتورة.");
 
-        if (sourceCurrencyId == invoice.CurrencyId && allocatedAmount > balance.OutstandingAmount)
-            throw new ConflictException("sales_payment_allocation_exceeds_outstanding", "المبلغ المخصص يتجاوز الرصيد المتبقي على فاتورة المبيعات بعد المرتجعات المرحلة.");
+            var clock = timeProvider ?? TimeProvider.System;
+            var allocationDate = DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
+            var targetCurrentRate = await exchangeRates.ResolveAsync(
+                invoice.CurrencyId,
+                allocationDate,
+                ExchangeRateType.Accounting,
+                cancellationToken: cancellationToken);
 
-        return new PaymentAllocationTargetValidation(targetBaseAllocatedAmount);
+            if (targetCurrentRate.Rate <= 0m)
+                throw new ConflictException(
+                    "sales_target_currency_rate_invalid",
+                    "تعذر تحديد سعر صرف صالح لعملة فاتورة المبيعات.");
+
+            // Third-currency policy: value source cash in base currency, translate that
+            // base value to invoice currency at the allocation-date rate, then extinguish
+            // historical AR using the invoice's immutable posting rate.
+            targetDocumentAmount = Math.Round(
+                baseAllocatedAmount / targetCurrentRate.Rate,
+                invoice.CurrencyDecimalPlacesSnapshot,
+                MidpointRounding.AwayFromZero);
+        }
+
+        if (targetDocumentAmount <= 0m)
+            throw new ConflictException(
+                "sales_payment_allocation_target_amount_invalid",
+                "قيمة التسوية بعملة الفاتورة يجب أن تكون أكبر من صفر.");
+
+        var targetBaseAllocatedAmount = Math.Round(
+            targetDocumentAmount * invoice.ExchangeRate,
+            invoice.BaseCurrencyDecimalPlacesSnapshot,
+            MidpointRounding.AwayFromZero);
+
+        if (targetDocumentAmount > balance.OutstandingAmount + MoneyTolerance ||
+            targetBaseAllocatedAmount > balance.OutstandingBaseAmount + MoneyTolerance)
+        {
+            throw new ConflictException(
+                "sales_payment_allocation_exceeds_outstanding",
+                "المبلغ المخصص يتجاوز الرصيد المتبقي على فاتورة المبيعات بعد المرتجعات المرحلة.");
+        }
+
+        return new PaymentAllocationTargetValidation(
+            targetBaseAllocatedAmount,
+            targetDocumentAmount);
     }
-
 }

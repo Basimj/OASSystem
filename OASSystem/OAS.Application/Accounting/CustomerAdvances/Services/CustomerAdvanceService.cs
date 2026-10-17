@@ -29,9 +29,12 @@ public sealed class CustomerAdvanceService(
     IEnumerable<IPaymentAllocationTargetValidator> targetValidators,
     ICustomerAdvanceAccountingPostingService posting,
     ICurrentUser currentUser,
-    TimeProvider timeProvider) : ICustomerAdvanceService
+    TimeProvider timeProvider,
+    ISalesPaymentAllocationConcurrencyPort? salesAllocationConcurrency = null) : ICustomerAdvanceService
 {
-    public async Task<CustomerAdvanceDto> CreateAsync(CreateCustomerAdvanceRequest request, CancellationToken cancellationToken = default)
+    public async Task<CustomerAdvanceDto> CreateAsync(
+        CreateCustomerAdvanceRequest request,
+        CancellationToken cancellationToken = default)
     {
         var customer = await customers.GetByIdAsync(request.CustomerId, cancellationToken)
             ?? throw new NotFoundException(nameof(Customer), request.CustomerId);
@@ -104,6 +107,9 @@ public sealed class CustomerAdvanceService(
             ?? throw new NotFoundException(nameof(CustomerAdvance), customerAdvanceId);
         SalesConcurrency.Ensure(request.RowVersion, advance.RowVersion, "عربون العميل");
 
+        if (salesAllocationConcurrency is not null)
+            await salesAllocationConcurrency.LockInvoiceAsync(request.SalesInvoiceId, cancellationToken);
+
         var invoice = await invoices.GetByIdAsync(request.SalesInvoiceId, cancellationToken)
             ?? throw new NotFoundException(nameof(SalesInvoice), request.SalesInvoiceId);
         if (invoice.CustomerId != advance.CustomerId)
@@ -166,19 +172,22 @@ public sealed class CustomerAdvanceService(
             advance.ExchangeRate,
             sourceBaseAmount,
             postingResult.TargetBaseAmount,
-            appliedAt);
+            appliedAt,
+            target.TargetDocumentAmount,
+            $"CAA:{application.Id:N}");
         await allocations.AddAsync(allocation, cancellationToken);
 
         return Map(application);
     }
 
-    public async Task<CustomerAdvanceDto> GetAsync(Guid customerAdvanceId, CancellationToken cancellationToken = default)
+    public async Task<CustomerAdvanceDto> GetAsync(
+        Guid customerAdvanceId,
+        CancellationToken cancellationToken = default)
     {
         var advance = await advances.GetByIdAsync(customerAdvanceId, cancellationToken)
             ?? throw new NotFoundException(nameof(CustomerAdvance), customerAdvanceId);
         return Map(advance);
     }
-
 
     private async Task<Guid> ResolveAdvanceLiabilityAccountAsync(CancellationToken cancellationToken)
     {

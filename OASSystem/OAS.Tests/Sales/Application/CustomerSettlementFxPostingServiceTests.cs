@@ -1,0 +1,157 @@
+using NUnit.Framework;
+using OAS.Application.Accounting.Posting;
+using OAS.Domain.Accounting.Entities;
+using OAS.Domain.Accounting.Enums;
+using OAS.Tests.Accounting.Application.Common;
+using OAS.Tests.Inventory.Fakes;
+
+namespace OAS.Tests.Sales.Application;
+
+[TestFixture]
+public sealed class CustomerSettlementFxPostingServiceTests
+{
+    [Test]
+    public async Task ReceiptAt1600_AgainstInvoiceAt1500_PostsTenThousandGain()
+    {
+        var fixture = CreateFixture();
+        var allocationId = Guid.NewGuid();
+
+        var result = await fixture.Service.PostAsync(
+            new(
+                allocationId,
+                Guid.NewGuid(),
+                fixture.CustomerAccount.Id,
+                new DateOnly(2026, 10, 17),
+                160000m,
+                150000m,
+                "FX gain"),
+            Guid.NewGuid(),
+            DateTime.UtcNow);
+
+        var journal = fixture.Journals.Items.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.RealizedExchangeDifferenceBase, Is.EqualTo(10000m));
+            Assert.That(journal.IsBalanced(), Is.True);
+            Assert.That(journal.SourceDocumentType, Is.EqualTo("CustomerSettlementFx"));
+            Assert.That(journal.SourceDocumentId, Is.EqualTo(allocationId));
+            Assert.That(journal.Lines.Single(x => x.AccountId == fixture.CustomerAccount.Id).DebitAmount, Is.EqualTo(10000m));
+            Assert.That(journal.Lines.Single(x => x.AccountId == fixture.GainAccount.Id).CreditAmount, Is.EqualTo(10000m));
+        });
+    }
+
+    [Test]
+    public async Task ReceiptAt1400_AgainstInvoiceAt1500_PostsTenThousandLoss()
+    {
+        var fixture = CreateFixture();
+
+        var result = await fixture.Service.PostAsync(
+            new(
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                fixture.CustomerAccount.Id,
+                new DateOnly(2026, 10, 17),
+                140000m,
+                150000m,
+                "FX loss"),
+            Guid.NewGuid(),
+            DateTime.UtcNow);
+
+        var journal = fixture.Journals.Items.Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.RealizedExchangeDifferenceBase, Is.EqualTo(-10000m));
+            Assert.That(journal.IsBalanced(), Is.True);
+            Assert.That(journal.Lines.Single(x => x.AccountId == fixture.LossAccount.Id).DebitAmount, Is.EqualTo(10000m));
+            Assert.That(journal.Lines.Single(x => x.AccountId == fixture.CustomerAccount.Id).CreditAmount, Is.EqualTo(10000m));
+        });
+    }
+
+    [Test]
+    public async Task SameAllocation_Replay_DoesNotCreateSecondFxJournal()
+    {
+        var fixture = CreateFixture();
+        var allocationId = Guid.NewGuid();
+        var request = new OAS.Application.Accounting.Abstractions.CustomerSettlementFxPostingRequest(
+            allocationId,
+            Guid.NewGuid(),
+            fixture.CustomerAccount.Id,
+            new DateOnly(2026, 10, 17),
+            160000m,
+            150000m,
+            "Idempotent FX");
+
+        var first = await fixture.Service.PostAsync(request, Guid.NewGuid(), DateTime.UtcNow);
+        var second = await fixture.Service.PostAsync(request, Guid.NewGuid(), DateTime.UtcNow);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(second.JournalEntryId, Is.EqualTo(first.JournalEntryId));
+            Assert.That(fixture.Journals.Items, Has.Count.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public async Task NoDifference_DoesNotCreateFxJournal()
+    {
+        var fixture = CreateFixture();
+        var result = await fixture.Service.PostAsync(
+            new(
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                fixture.CustomerAccount.Id,
+                new DateOnly(2026, 10, 17),
+                150000m,
+                150000m,
+                "No FX"),
+            Guid.NewGuid(),
+            DateTime.UtcNow);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.JournalEntryId, Is.Null);
+            Assert.That(result.RealizedExchangeDifferenceBase, Is.Zero);
+            Assert.That(fixture.Journals.Items, Is.Empty);
+        });
+    }
+
+    private static Fixture CreateFixture()
+    {
+        var baseCurrency = Currency.Create(Guid.NewGuid(), "YER", "ريال", null, null, 2);
+        var customerAccount = CreateAccount("110100", AccountClass.Asset, NormalBalance.Debit);
+        var gainAccount = CreateAccount("470100", AccountClass.Revenue, NormalBalance.Credit);
+        var lossAccount = CreateAccount("570100", AccountClass.Expense, NormalBalance.Debit);
+        var settings = AccountingSettings.Create(
+            baseCurrency.Id,
+            exchangeGainAccountId: gainAccount.Id,
+            exchangeLossAccountId: lossAccount.Id);
+        var period = FiscalPeriod.Create(
+            Guid.NewGuid(), Guid.NewGuid(), 1, "2026",
+            new DateOnly(2026, 1, 1), new DateOnly(2026, 12, 31),
+            FiscalPeriodStatus.Open, false, false, false);
+        var journals = new FakeGenericRepository<JournalEntry, Guid>();
+        var journalLines = new FakeGenericRepository<JournalEntryLine, Guid>();
+
+        var service = new CustomerSettlementFxPostingService(
+            journals,
+            journalLines,
+            new FakeGenericRepository<FiscalPeriod, Guid>([period]),
+            new FakeGenericRepository<Account, Guid>([customerAccount, gainAccount, lossAccount]),
+            new FakeGenericRepository<AccountingSettings, Guid>([settings]),
+            new FakeGenericRepository<Currency, Guid>([baseCurrency]),
+            new FakeInventorySequenceNumberGenerator());
+
+        return new Fixture(service, journals, customerAccount, gainAccount, lossAccount);
+    }
+
+    private static Account CreateAccount(string code, AccountClass accountClass, NormalBalance normalBalance) =>
+        Account.Create(Guid.NewGuid(), code, code, null, null, 1, accountClass, AccountType.Posting,
+            normalBalance, true, false, false, true, true, null);
+
+    private sealed record Fixture(
+        CustomerSettlementFxPostingService Service,
+        FakeGenericRepository<JournalEntry, Guid> Journals,
+        Account CustomerAccount,
+        Account GainAccount,
+        Account LossAccount);
+}

@@ -27,6 +27,7 @@ using OAS.Infrastructure.Persistence.Interceptors;
 using OAS.Infrastructure.Persistence.Repositories.Generic;
 using OAS.Infrastructure.Sales.Persistence.Repositories;
 using OAS.Infrastructure.Sales.Persistence.Queries;
+using OAS.Infrastructure.Sales.Services;
 
 namespace OAS.Infrastructure;
 
@@ -102,6 +103,7 @@ public static class DependencyInjection
         services.AddScoped<IOpticalProductionQueryService, OpticalProductionQueryService>();
         services.AddScoped<ICustomerOrderOperationsQueryService, CustomerOrderOperationsQueryService>();
         services.AddScoped<IOpticalJobQueryService, OpticalJobQueryService>();
+        services.AddScoped<ISalesPaymentAllocationConcurrencyPort, SalesPaymentAllocationConcurrencyPort>();
 
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IAccountingPartyQueryService, AccountingPartyQueryService>();
@@ -161,8 +163,6 @@ public static class DependencyInjection
         services.AddScoped<IPurchasingAccountingPort, PurchasingAccountingPort>();
         services.AddScoped<ICustomerDemandTrackingQueryService, CustomerDemandTrackingQueryService>();
 
-        // Purchasing handlers are activated only after every repository/port above
-        // has a concrete Infrastructure implementation. This keeps ValidateOnBuild safe.
         services.AddPurchasingApplication();
 
         return services;

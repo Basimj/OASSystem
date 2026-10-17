@@ -7,11 +7,9 @@ public sealed class PaymentAllocation : AuditableEntity<Guid>
 {
     private PaymentAllocation() { }
 
-    // Legacy source pointer retained during Expand.
     public PaymentSourceType PaymentSourceType { get; private set; }
     public Guid PaymentSourceId { get; private set; }
 
-    // Typed source-line foreign keys for new allocations. Exactly one must be set.
     public Guid? ReceiptVoucherLineId { get; private set; }
     public Guid? PaymentVoucherLineId { get; private set; }
     public Guid? CustomerAdvanceApplicationId { get; private set; }
@@ -28,8 +26,6 @@ public sealed class PaymentAllocation : AuditableEntity<Guid>
     public decimal? TargetDocumentAmount { get; private set; }
     public DateTime AllocatedAtUtc { get; private set; }
 
-    // AP-03 shared settlement safety metadata. These fields are intentionally generic
-    // because the same allocation table is also used by Sales/AR.
     public string? IdempotencyKey { get; private set; }
     public DateTime? ReversedAtUtc { get; private set; }
     public string? ReversedBy { get; private set; }
@@ -56,27 +52,45 @@ public sealed class PaymentAllocation : AuditableEntity<Guid>
         string? idempotencyKey = null)
     {
         ValidateCommon(id, targetDocumentId, allocatedAmount);
-        if (receiptVoucherLineId == Guid.Empty) throw new ArgumentException("Receipt voucher line id cannot be empty.", nameof(receiptVoucherLineId));
-        if (paymentVoucherLineId == Guid.Empty) throw new ArgumentException("Payment voucher line id cannot be empty.", nameof(paymentVoucherLineId));
-        if (customerAdvanceApplicationId == Guid.Empty) throw new ArgumentException("Customer advance application id cannot be empty.", nameof(customerAdvanceApplicationId));
+
+        if (receiptVoucherLineId == Guid.Empty)
+            throw new ArgumentException("Receipt voucher line id cannot be empty.", nameof(receiptVoucherLineId));
+        if (paymentVoucherLineId == Guid.Empty)
+            throw new ArgumentException("Payment voucher line id cannot be empty.", nameof(paymentVoucherLineId));
+        if (customerAdvanceApplicationId == Guid.Empty)
+            throw new ArgumentException("Customer advance application id cannot be empty.", nameof(customerAdvanceApplicationId));
+
         var sourceCount =
             (receiptVoucherLineId.HasValue ? 1 : 0) +
             (paymentVoucherLineId.HasValue ? 1 : 0) +
             (customerAdvanceApplicationId.HasValue ? 1 : 0);
-        if (sourceCount != 1) throw new InvalidOperationException("Exactly one payment source line/application must be selected.");
-        if (currencyId == Guid.Empty) throw new ArgumentException("Currency is required.", nameof(currencyId));
-        if (string.IsNullOrWhiteSpace(currencyCodeSnapshot)) throw new ArgumentException("Currency code snapshot is required.", nameof(currencyCodeSnapshot));
-        if (exchangeRate <= 0) throw new ArgumentOutOfRangeException(nameof(exchangeRate));
-        if (baseAllocatedAmount <= 0) throw new ArgumentOutOfRangeException(nameof(baseAllocatedAmount));
-        if (targetBaseAllocatedAmount.HasValue && targetBaseAllocatedAmount.Value <= 0) throw new ArgumentOutOfRangeException(nameof(targetBaseAllocatedAmount));
-        if (targetDocumentAmount.HasValue && targetDocumentAmount.Value <= 0) throw new ArgumentOutOfRangeException(nameof(targetDocumentAmount));
+
+        if (sourceCount != 1)
+            throw new InvalidOperationException("Exactly one payment source line/application must be selected.");
+
+        if (currencyId == Guid.Empty)
+            throw new ArgumentException("Currency is required.", nameof(currencyId));
+        if (string.IsNullOrWhiteSpace(currencyCodeSnapshot))
+            throw new ArgumentException("Currency code snapshot is required.", nameof(currencyCodeSnapshot));
+        if (exchangeRate <= 0)
+            throw new ArgumentOutOfRangeException(nameof(exchangeRate));
+        if (baseAllocatedAmount <= 0)
+            throw new ArgumentOutOfRangeException(nameof(baseAllocatedAmount));
+        if (targetBaseAllocatedAmount.HasValue && targetBaseAllocatedAmount.Value <= 0)
+            throw new ArgumentOutOfRangeException(nameof(targetBaseAllocatedAmount));
+        if (targetDocumentAmount.HasValue && targetDocumentAmount.Value <= 0)
+            throw new ArgumentOutOfRangeException(nameof(targetDocumentAmount));
 
         var legacySourceType = receiptVoucherLineId.HasValue
             ? PaymentSourceType.ReceiptVoucher
             : paymentVoucherLineId.HasValue
                 ? PaymentSourceType.PaymentVoucher
                 : PaymentSourceType.CustomerAdvance;
-        var legacySourceId = receiptVoucherLineId ?? paymentVoucherLineId ?? customerAdvanceApplicationId!.Value;
+
+        var legacySourceId =
+            receiptVoucherLineId ??
+            paymentVoucherLineId ??
+            customerAdvanceApplicationId!.Value;
 
         return new PaymentAllocation
         {
@@ -93,13 +107,17 @@ public sealed class PaymentAllocation : AuditableEntity<Guid>
             AllocatedAmount = allocatedAmount,
             ExchangeRate = exchangeRate,
             BaseAllocatedAmount = baseAllocatedAmount,
-            TargetBaseAllocatedAmount = targetBaseAllocatedAmount ?? baseAllocatedAmount,
+            TargetBaseAllocatedAmount =
+                targetBaseAllocatedAmount ?? baseAllocatedAmount,
             TargetDocumentAmount = targetDocumentAmount,
             AllocatedAtUtc = allocatedAtUtc,
             IdempotencyKey = NormalizeIdempotencyKey(idempotencyKey)
         };
     }
 
+    // Backward-compatible extension for SA-02:
+    // existing callers can keep using 11 args; new callers may additionally persist
+    // invoice-currency target amount and idempotency metadata.
     public static PaymentAllocation CreateCustomerAdvanceAllocation(
         Guid id,
         Guid customerAdvanceApplicationId,
@@ -111,7 +129,9 @@ public sealed class PaymentAllocation : AuditableEntity<Guid>
         decimal exchangeRate,
         decimal baseAllocatedAmount,
         decimal targetBaseAllocatedAmount,
-        DateTime allocatedAtUtc) =>
+        DateTime allocatedAtUtc,
+        decimal? targetDocumentAmount = null,
+        string? idempotencyKey = null) =>
         CreateLineAllocation(
             id,
             null,
@@ -125,7 +145,9 @@ public sealed class PaymentAllocation : AuditableEntity<Guid>
             baseAllocatedAmount,
             allocatedAtUtc,
             targetBaseAllocatedAmount,
-            customerAdvanceApplicationId);
+            customerAdvanceApplicationId,
+            targetDocumentAmount,
+            idempotencyKey);
 
     public static PaymentAllocation Create(
         Guid id,
@@ -137,7 +159,10 @@ public sealed class PaymentAllocation : AuditableEntity<Guid>
         DateTime allocatedAtUtc)
     {
         ValidateCommon(id, targetDocumentId, allocatedAmount);
-        if (paymentSourceId == Guid.Empty) throw new ArgumentException("Payment source id is required.", nameof(paymentSourceId));
+
+        if (paymentSourceId == Guid.Empty)
+            throw new ArgumentException("Payment source id is required.", nameof(paymentSourceId));
+
         return new PaymentAllocation
         {
             Id = id,
@@ -158,17 +183,28 @@ public sealed class PaymentAllocation : AuditableEntity<Guid>
     {
         if (IsReversed)
             throw new InvalidOperationException("A reversed payment allocation cannot be edited.");
-        if (allocatedAmount <= 0) throw new ArgumentOutOfRangeException(nameof(allocatedAmount), "Allocated amount must be greater than zero.");
-        if (baseAllocatedAmount.HasValue && baseAllocatedAmount.Value <= 0) throw new ArgumentOutOfRangeException(nameof(baseAllocatedAmount));
-        if (targetBaseAllocatedAmount.HasValue && targetBaseAllocatedAmount.Value <= 0) throw new ArgumentOutOfRangeException(nameof(targetBaseAllocatedAmount));
-        if (targetDocumentAmount.HasValue && targetDocumentAmount.Value <= 0) throw new ArgumentOutOfRangeException(nameof(targetDocumentAmount));
+        if (allocatedAmount <= 0)
+            throw new ArgumentOutOfRangeException(nameof(allocatedAmount), "Allocated amount must be greater than zero.");
+        if (baseAllocatedAmount.HasValue && baseAllocatedAmount.Value <= 0)
+            throw new ArgumentOutOfRangeException(nameof(baseAllocatedAmount));
+        if (targetBaseAllocatedAmount.HasValue && targetBaseAllocatedAmount.Value <= 0)
+            throw new ArgumentOutOfRangeException(nameof(targetBaseAllocatedAmount));
+        if (targetDocumentAmount.HasValue && targetDocumentAmount.Value <= 0)
+            throw new ArgumentOutOfRangeException(nameof(targetDocumentAmount));
+
         AllocatedAmount = allocatedAmount;
-        if (baseAllocatedAmount.HasValue) BaseAllocatedAmount = baseAllocatedAmount.Value;
-        if (targetBaseAllocatedAmount.HasValue) TargetBaseAllocatedAmount = targetBaseAllocatedAmount.Value;
-        if (targetDocumentAmount.HasValue) TargetDocumentAmount = targetDocumentAmount.Value;
+        if (baseAllocatedAmount.HasValue)
+            BaseAllocatedAmount = baseAllocatedAmount.Value;
+        if (targetBaseAllocatedAmount.HasValue)
+            TargetBaseAllocatedAmount = targetBaseAllocatedAmount.Value;
+        if (targetDocumentAmount.HasValue)
+            TargetDocumentAmount = targetDocumentAmount.Value;
     }
 
-    public void Reverse(DateTime reversedAtUtc, string reversedBy, string reason)
+    public void Reverse(
+        DateTime reversedAtUtc,
+        string reversedBy,
+        string reason)
     {
         if (IsReversed)
             throw new InvalidOperationException("Payment allocation has already been reversed.");
@@ -186,20 +222,37 @@ public sealed class PaymentAllocation : AuditableEntity<Guid>
         ReversalReason = reason.Trim();
     }
 
-    private static void ValidateCommon(Guid id, Guid targetDocumentId, decimal allocatedAmount)
+    private static void ValidateCommon(
+        Guid id,
+        Guid targetDocumentId,
+        decimal allocatedAmount)
     {
-        if (id == Guid.Empty) throw new ArgumentException("Id is required.", nameof(id));
-        if (targetDocumentId == Guid.Empty) throw new ArgumentException("Target document id is required.", nameof(targetDocumentId));
-        if (allocatedAmount <= 0) throw new ArgumentOutOfRangeException(nameof(allocatedAmount), "Allocated amount must be greater than zero.");
+        if (id == Guid.Empty)
+            throw new ArgumentException("Id is required.", nameof(id));
+        if (targetDocumentId == Guid.Empty)
+            throw new ArgumentException("Target document id is required.", nameof(targetDocumentId));
+        if (allocatedAmount <= 0)
+            throw new ArgumentOutOfRangeException(
+                nameof(allocatedAmount),
+                "Allocated amount must be greater than zero.");
     }
 
-    private static Guid? Normalize(Guid? value) => value is { } id && id != Guid.Empty ? id : null;
+    private static Guid? Normalize(Guid? value) =>
+        value is { } id && id != Guid.Empty
+            ? id
+            : null;
 
     private static string? NormalizeIdempotencyKey(string? value)
     {
-        if (string.IsNullOrWhiteSpace(value)) return null;
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
         var normalized = value.Trim();
-        if (normalized.Length > 80) throw new ArgumentOutOfRangeException(nameof(value), "Idempotency key cannot exceed 80 characters.");
+        if (normalized.Length > 80)
+            throw new ArgumentOutOfRangeException(
+                nameof(value),
+                "Idempotency key cannot exceed 80 characters.");
+
         return normalized;
     }
 }
