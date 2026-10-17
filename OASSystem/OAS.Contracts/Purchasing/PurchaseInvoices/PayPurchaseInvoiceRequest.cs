@@ -53,4 +53,5 @@ public sealed record PurchaseInvoicePaymentSummaryDto(
     decimal AppliedCreditBaseAmount = 0m,
     decimal OutstandingBaseAmount = 0m,
     decimal RealizedExchangeDifferenceBase = 0m,
-    IReadOnlyList<PurchaseInvoicePaymentSettlementDto>? Settlements = null);
+    IReadOnlyList<PurchaseInvoicePaymentSettlementDto>? Settlements = null,
+    string? BaseCurrencyCode = null);
