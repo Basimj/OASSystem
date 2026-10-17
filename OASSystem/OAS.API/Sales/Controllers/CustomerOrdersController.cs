@@ -17,27 +17,19 @@ namespace OAS.API.Sales.Controllers;
 public sealed class CustomerOrdersController(ISender sender) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<PagedResult<CustomerOrderDto>>> Get(
-        [FromQuery] PageRequest request,
-        CancellationToken cancellationToken)
+    public async Task<ActionResult<PagedResult<CustomerOrderDto>>> Get([FromQuery] PageRequest request, CancellationToken cancellationToken)
         => Ok(await sender.Send(new GetCustomerOrdersQuery(request), cancellationToken));
 
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<CustomerOrderDto>> GetById(
-        Guid id,
-        CancellationToken cancellationToken)
+    public async Task<ActionResult<CustomerOrderDto>> GetById(Guid id, CancellationToken cancellationToken)
         => Ok(await sender.Send(new GetCustomerOrderByIdQuery(id), cancellationToken));
 
     [HttpPost("code/reserve")]
-    public async Task<ActionResult<SalesCodeReservationDto>> ReserveCode(
-        [FromQuery] DateOnly orderDate,
-        CancellationToken cancellationToken)
+    public async Task<ActionResult<SalesCodeReservationDto>> ReserveCode([FromQuery] DateOnly orderDate, CancellationToken cancellationToken)
         => Ok(await sender.Send(new ReserveCustomerOrderCodeCommand(orderDate), cancellationToken));
 
     [HttpPost]
-    public async Task<ActionResult<CustomerOrderDto>> Create(
-        [FromBody] CreateCustomerOrderRequest request,
-        CancellationToken cancellationToken)
+    public async Task<ActionResult<CustomerOrderDto>> Create([FromBody] CreateCustomerOrderRequest request, CancellationToken cancellationToken)
     {
         var entity = await sender.Send(new CreateCustomerOrderCommand(request), cancellationToken);
         var dto = await sender.Send(new GetCustomerOrderByIdQuery(entity.Id), cancellationToken);
@@ -45,26 +37,31 @@ public sealed class CustomerOrdersController(ISender sender) : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    public async Task<ActionResult<CustomerOrderDto>> Update(
-        Guid id,
-        [FromBody] UpdateCustomerOrderRequest request,
-        CancellationToken cancellationToken)
+    public async Task<ActionResult<CustomerOrderDto>> Update(Guid id, [FromBody] UpdateCustomerOrderRequest request, CancellationToken cancellationToken)
     {
         await sender.Send(new UpdateCustomerOrderCommand(id, request), cancellationToken);
         return Ok(await sender.Send(new GetCustomerOrderByIdQuery(id), cancellationToken));
     }
 
+    [HttpPost("{id:guid}/header-discount")]
+    public async Task<ActionResult<CustomerOrderDto>> SetHeaderDiscount(Guid id, [FromBody] SetCustomerOrderHeaderDiscountRequest request, CancellationToken cancellationToken)
+    {
+        await sender.Send(new SetCustomerOrderHeaderDiscountCommand(id, request), cancellationToken);
+        return Ok(await sender.Send(new GetCustomerOrderByIdQuery(id), cancellationToken));
+    }
+
+    [HttpPost("{id:guid}/header-discount/approve")]
+    public async Task<ActionResult<CustomerOrderDto>> ApproveHeaderDiscount(Guid id, [FromBody] ApproveCustomerOrderHeaderDiscountRequest request, CancellationToken cancellationToken)
+    {
+        await sender.Send(new ApproveCustomerOrderHeaderDiscountCommand(id, request), cancellationToken);
+        return Ok(await sender.Send(new GetCustomerOrderByIdQuery(id), cancellationToken));
+    }
+
     [HttpPost("{id:guid}/confirm")]
-    public async Task<ActionResult<CustomerOrderDto>> Confirm(
-        Guid id,
-        [FromBody] ConfirmCustomerOrderRequest request,
-        CancellationToken cancellationToken)
+    public async Task<ActionResult<CustomerOrderDto>> Confirm(Guid id, [FromBody] ConfirmCustomerOrderRequest request, CancellationToken cancellationToken)
         => Ok(await sender.Send(new ConfirmCustomerOrderCommand(id, request), cancellationToken));
 
     [HttpPost("{id:guid}/cancel")]
-    public async Task<ActionResult<CustomerOrderDto>> Cancel(
-        Guid id,
-        [FromBody] CancelCustomerOrderRequest request,
-        CancellationToken cancellationToken)
+    public async Task<ActionResult<CustomerOrderDto>> Cancel(Guid id, [FromBody] CancelCustomerOrderRequest request, CancellationToken cancellationToken)
         => Ok(await sender.Send(new CancelCustomerOrderCommand(id, request), cancellationToken));
 }
