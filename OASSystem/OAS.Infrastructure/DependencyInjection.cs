@@ -74,7 +74,7 @@ public static class DependencyInjection
         services.AddScoped<OAS.Application.Features.Employees.Abstractions.IEmployeeSalaryStructureRepository, OAS.Infrastructure.Features.Employees.Services.EmployeeSalaryStructureRepository>();
         services.AddScoped<OAS.Application.Features.Employees.Abstractions.IHRTimeZoneService, OAS.Infrastructure.Features.Employees.Services.HRTimeZoneService>();
         services.AddScoped<OAS.Application.Features.Employees.Abstractions.IEmployeeHrOperationLock, OAS.Infrastructure.Features.Employees.Services.EmployeeHrOperationLock>();
-        services.AddScoped<OAS.Application.Features.Employees.Abstractions.IHREmployeeLoanAccountingPort, OAS.Infrastructure.Features.Employees.Services.EmployeeLoanAccountingPort>();
+        services.AddScoped<OAS.Application.Features.Employees.Abstractions.IHREmployeeLoanAccountingPort, OAS.Infrastructure.Features.Employees.Services.HREmployeeLoanAccountingPort>();
         services.AddScoped<OAS.Application.Features.Employees.Abstractions.IApprovedCommissionSource, OAS.Infrastructure.Features.Employees.Services.NullApprovedCommissionSource>();
         services.AddScoped<OAS.Application.Features.Employees.Abstractions.IHRPayrollAccountingPort, OAS.Infrastructure.Features.Employees.Services.HRPayrollAccountingPort>();
         services.AddScoped<OAS.Application.Features.Employees.Abstractions.IHRSalaryPaymentPort, OAS.Infrastructure.Features.Employees.Services.HRSalaryPaymentPort>();
@@ -150,6 +150,7 @@ public static class DependencyInjection
         services.AddScoped<IPurchaseInvoiceRepository, PurchaseInvoiceRepository>();
         services.AddScoped<IPurchaseReturnRepository, PurchaseReturnRepository>();
         services.AddScoped<IPurchaseReturnDataPort, PurchaseReturnDataPort>();
+        services.AddScoped<ISupplierCreditConcurrencyPort, SupplierCreditConcurrencyPort>();
         services.AddScoped<IPurchasingReferenceDataPort, PurchasingReferenceDataPort>();
         services.AddScoped<IPurchaseMatchingDataPort, PurchaseMatchingDataPort>();
         services.AddScoped<IPurchasingSettingsPort, PurchasingSettingsPort>();

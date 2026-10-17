@@ -65,3 +65,43 @@ public sealed record PurchaseReturnPostingResultDto(
     Guid PurchaseReturnId,
     Guid JournalEntryId,
     IReadOnlyList<Guid> InventoryTransactionIds);
+
+public enum SupplierCreditApplicationStatus : byte
+{
+    Active = 1,
+    Reversed = 2
+}
+
+public sealed record ApplySupplierCreditRequest(
+    Guid PurchaseInvoiceId,
+    decimal? AppliedBaseAmount,
+    string IdempotencyKey);
+
+public sealed record ReverseSupplierCreditApplicationRequest(
+    string RowVersion,
+    string Reason);
+
+public sealed record SupplierCreditApplicationDto(
+    Guid Id,
+    Guid PurchaseReturnId,
+    Guid PurchaseInvoiceId,
+    Guid SupplierId,
+    decimal AppliedSourceBaseAmount,
+    decimal AppliedTargetBaseAmount,
+    decimal AppliedInvoiceCurrencyAmount,
+    DateTime AppliedAtUtc,
+    string AppliedBy,
+    SupplierCreditApplicationStatus Status,
+    string? IdempotencyKey,
+    DateTime? ReversedAtUtc,
+    string? ReversedBy,
+    string? ReversalReason,
+    string RowVersion);
+
+public sealed record SupplierCreditSummaryDto(
+    Guid PurchaseReturnId,
+    Guid SupplierId,
+    decimal TotalCreditBaseAmount,
+    decimal AppliedCreditBaseAmount,
+    decimal AvailableCreditBaseAmount,
+    IReadOnlyList<SupplierCreditApplicationDto> Applications);

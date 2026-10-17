@@ -39,6 +39,7 @@ public sealed class PayPurchaseInvoiceCommandHandler(
     IAccountingDocumentPostingService postingService,
     IEnumerable<IPaymentAllocationTargetValidator> targetValidators,
     IEnumerable<IPaymentAllocationSourceTargetValidator> sourceTargetValidators,
+    IPurchaseInvoiceBalanceService invoiceBalances,
     ISequenceNumberGenerator sequences,
     ICurrentUser currentUser,
     TimeProvider timeProvider)
@@ -97,6 +98,8 @@ public sealed class PayPurchaseInvoiceCommandHandler(
             resolved.BaseAmount,
             null,
             ct);
+
+        var balanceBeforePayment = await invoiceBalances.GetAsync(invoice, null, ct);
 
         if (sourceTargetValidator is not null)
         {
@@ -185,21 +188,18 @@ public sealed class PayPurchaseInvoiceCommandHandler(
             validation.TargetBaseAllocatedAmount);
         await paymentAllocations.AddAsync(allocation, ct);
 
-        var existing = await paymentAllocations.ListAsync(
-            new Specification<PaymentAllocation>().Where(x =>
-                x.TargetDocumentType == AllocationTargetDocumentType.PurchaseInvoice &&
-                x.TargetDocumentId == invoice.Id),
-            ct);
-        var allocatedTargetBase = existing.Sum(x =>
-            x.TargetBaseAllocatedAmount ??
-            x.BaseAllocatedAmount ??
-            (x.ExchangeRate.HasValue ? Math.Round(x.AllocatedAmount * x.ExchangeRate.Value, 4, MidpointRounding.AwayFromZero) : x.AllocatedAmount));
-        allocatedTargetBase += validation.TargetBaseAllocatedAmount;
-        var baseOutstanding = Math.Max(0m, invoice.BaseTotalAmount - allocatedTargetBase);
+        var baseOutstanding = Math.Max(0m, Math.Round(
+            balanceBeforePayment.OutstandingBaseAmount - validation.TargetBaseAllocatedAmount,
+            4,
+            MidpointRounding.AwayFromZero));
         var outstanding = invoice.ExchangeRate > 0m
             ? Math.Min(invoice.TotalAmount, Math.Round(baseOutstanding / invoice.ExchangeRate, 4, MidpointRounding.AwayFromZero))
-            : Math.Max(0m, invoice.TotalAmount - resolved.Amount);
-        var paid = Math.Max(0m, invoice.TotalAmount - outstanding);
+            : Math.Max(0m, Math.Round(balanceBeforePayment.OutstandingAmount - resolved.Amount, 4, MidpointRounding.AwayFromZero));
+        var settled = Math.Max(0m, Math.Round(invoice.TotalAmount - outstanding, 4, MidpointRounding.AwayFromZero));
+        var paid = Math.Max(0m, Math.Round(
+            settled - Math.Min(settled, balanceBeforePayment.AppliedCreditInvoiceCurrencyAmount),
+            4,
+            MidpointRounding.AwayFromZero));
 
         return new PayPurchaseInvoiceResultDto(
             voucher.Id,
