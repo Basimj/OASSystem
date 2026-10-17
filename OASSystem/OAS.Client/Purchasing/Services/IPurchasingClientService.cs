@@ -65,5 +65,8 @@ public interface IPurchasingClientService
     Task<PurchaseReturnDto?> ConfirmPurchaseReturnAsync(Guid id, PurchaseReturnActionRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseReturnPostingResultDto?> PostPurchaseReturnAsync(Guid id, PurchaseReturnActionRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseReturnDto?> CancelPurchaseReturnAsync(Guid id, CancelPurchaseReturnRequest request, CancellationToken cancellationToken = default);
+    Task<SupplierCreditSummaryDto?> GetPurchaseReturnCreditSummaryAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<SupplierCreditApplicationDto?> ApplySupplierCreditAsync(Guid id, ApplySupplierCreditRequest request, CancellationToken cancellationToken = default);
+    Task<SupplierCreditApplicationDto?> ReverseSupplierCreditAsync(Guid id, Guid applicationId, ReverseSupplierCreditApplicationRequest request, CancellationToken cancellationToken = default);
 
 }
