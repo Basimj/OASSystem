@@ -1,3 +1,4 @@
+using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Common.Entities;
 using OAS.Domain.Exceptions;
 using OAS.Domain.Purchasing.Enums;
@@ -37,8 +38,15 @@ public sealed class PurchaseInvoice : AuditableEntity<Guid>
     public DateOnly InvoiceDate { get; private set; }
     public DateOnly PostingDate { get; private set; }
     public Guid CurrencyId { get; private set; }
+    public string? CurrencyCodeSnapshot { get; private set; }
+    public byte? CurrencyDecimalPlacesSnapshot { get; private set; }
+    public Guid? BaseCurrencyId { get; private set; }
+    public string? BaseCurrencyCodeSnapshot { get; private set; }
+    public byte? BaseCurrencyDecimalPlacesSnapshot { get; private set; }
     public decimal ExchangeRate { get; private set; }
     public DateOnly ExchangeRateDate { get; private set; }
+    public ExchangeRateType? ExchangeRateType { get; private set; }
+    public ExchangeRateSource? ExchangeRateSource { get; private set; }
     public TaxCalculationMode TaxCalculationMode { get; private set; }
     public PurchaseInvoiceStatus Status { get; private set; }
     public decimal Subtotal { get; private set; }
