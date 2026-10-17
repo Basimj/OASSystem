@@ -198,10 +198,6 @@ public sealed class PurchaseInvoice : AuditableEntity<Guid>
         if (Status != PurchaseInvoiceStatus.Confirmed)
             throw new DomainException("Only confirmed and matched purchase invoices can be posted.");
         if (JournalEntryId.HasValue) throw new DomainException("Purchase invoice is already linked to a journal entry.");
-        if (string.IsNullOrWhiteSpace(CurrencyCodeSnapshot) || !CurrencyDecimalPlacesSnapshot.HasValue ||
-            !BaseCurrencyId.HasValue || string.IsNullOrWhiteSpace(BaseCurrencyCodeSnapshot) ||
-            !BaseCurrencyDecimalPlacesSnapshot.HasValue || !ExchangeRateType.HasValue || !ExchangeRateSource.HasValue)
-            throw new DomainException("Purchase invoice currency snapshot must be captured before posting.");
         JournalEntryId = PurchasingDomainGuard.Required(journalEntryId, "Journal entry id");
         Status = PurchaseInvoiceStatus.Posted;
         PostedAt = at;
