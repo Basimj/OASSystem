@@ -45,4 +45,7 @@ public sealed record CustomerOrderLineDto(
     bool? ProductIsPrescriptionLens = null,
     decimal? LensSPH = null,
     decimal? LensCYL = null,
-    decimal? LensADD = null);
+    decimal? LensADD = null)
+{
+    public decimal HeaderDiscountAllocated { get; init; }
+}

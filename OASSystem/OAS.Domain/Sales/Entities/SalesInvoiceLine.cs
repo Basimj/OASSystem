@@ -20,10 +20,8 @@ public sealed class SalesInvoiceLine : AuditableEntity<Guid>
     {
         Id = SalesDomainGuard.Required(id, "Sales invoice line id");
         SalesInvoiceId = SalesDomainGuard.Required(salesInvoiceId, "Sales invoice id");
-        if (lineNumber <= 0)
-            throw new DomainException("Line number must be greater than zero.");
-        if (customerOrderLineId == Guid.Empty)
-            throw new DomainException("Customer order line id cannot be empty.");
+        if (lineNumber <= 0) throw new DomainException("Line number must be greater than zero.");
+        if (customerOrderLineId == Guid.Empty) throw new DomainException("Customer order line id cannot be empty.");
 
         LineNumber = lineNumber;
         CustomerOrderLineId = customerOrderLineId;
@@ -59,7 +57,10 @@ public sealed class SalesInvoiceLine : AuditableEntity<Guid>
     public decimal ActualUnitPrice { get; private set; }
     public SalesDiscountType DiscountType { get; private set; }
     public decimal? DiscountValue { get; private set; }
+    /// <summary>Line-level discount only. Header discounts are stored separately.</summary>
     public decimal DiscountAmount { get; private set; }
+    public decimal HeaderDiscountAllocated { get; private set; }
+    public decimal BaseHeaderDiscountAllocated { get; private set; }
     public decimal? TaxRate { get; private set; }
     public decimal TaxAmount { get; private set; }
     public decimal NetAmount { get; private set; }
@@ -78,6 +79,7 @@ public sealed class SalesInvoiceLine : AuditableEntity<Guid>
     public SalesInvoiceLinePrescriptionSnapshot? PrescriptionSnapshot { get; private set; }
 
     public decimal GrossAmount => Quantity * ActualUnitPrice;
+    public decimal NetBeforeHeaderDiscount => Math.Max(0m, GrossAmount - DiscountAmount);
     public bool RequiresInventory => LineType != SalesLineType.Service && ProductVariantId.HasValue && WarehouseId.HasValue;
 
     public static SalesInvoiceLine Create(
@@ -98,9 +100,7 @@ public sealed class SalesInvoiceLine : AuditableEntity<Guid>
         decimal? discountValue, decimal? taxRate, TaxCalculationMode taxCalculationMode, byte currencyDecimalPlaces,
         decimal exchangeRate, byte baseCurrencyDecimalPlaces)
     {
-        if (baseUnitPrice < 0)
-            throw new DomainException("Base unit price cannot be negative.");
-
+        if (baseUnitPrice < 0) throw new DomainException("Base unit price cannot be negative.");
         var amounts = SalesPricingCalculator.Calculate(quantity, actualUnitPrice, discountType, discountValue, taxRate,
             taxCalculationMode, currencyDecimalPlaces);
 
@@ -110,10 +110,50 @@ public sealed class SalesInvoiceLine : AuditableEntity<Guid>
         DiscountType = discountType;
         DiscountValue = discountType == SalesDiscountType.None ? null : discountValue;
         DiscountAmount = amounts.DiscountAmount;
+        HeaderDiscountAllocated = 0m;
+        BaseHeaderDiscountAllocated = 0m;
         TaxRate = taxRate;
         TaxAmount = amounts.TaxAmount;
         NetAmount = amounts.NetAmount;
         FinalAmount = amounts.FinalAmount;
+        RefreshBaseAmounts(exchangeRate, baseCurrencyDecimalPlaces);
+    }
+
+    internal void ApplyHeaderDiscountAllocation(
+        decimal allocation,
+        TaxCalculationMode taxCalculationMode,
+        byte currencyDecimalPlaces,
+        decimal exchangeRate,
+        byte baseCurrencyDecimalPlaces)
+    {
+        if (allocation < 0m || allocation > NetBeforeHeaderDiscount)
+            throw new DomainException("Header discount allocation must be between zero and the line amount after line discount.");
+
+        HeaderDiscountAllocated = SalesPricingCalculator.Round(allocation, currencyDecimalPlaces);
+        BaseHeaderDiscountAllocated = SalesPricingCalculator.ConvertToBase(HeaderDiscountAllocated, exchangeRate, baseCurrencyDecimalPlaces);
+
+        var amountAfterDiscounts = SalesPricingCalculator.Round(NetBeforeHeaderDiscount - HeaderDiscountAllocated, currencyDecimalPlaces);
+        var rate = TaxRate ?? 0m;
+        if (taxCalculationMode == TaxCalculationMode.Exclusive)
+        {
+            NetAmount = amountAfterDiscounts;
+            TaxAmount = SalesPricingCalculator.Round(NetAmount * rate / 100m, currencyDecimalPlaces);
+            FinalAmount = SalesPricingCalculator.Round(NetAmount + TaxAmount, currencyDecimalPlaces);
+        }
+        else
+        {
+            FinalAmount = amountAfterDiscounts;
+            TaxAmount = rate == 0m
+                ? 0m
+                : SalesPricingCalculator.Round(FinalAmount - FinalAmount / (1m + rate / 100m), currencyDecimalPlaces);
+            NetAmount = SalesPricingCalculator.Round(FinalAmount - TaxAmount, currencyDecimalPlaces);
+        }
+
+        RefreshBaseAmounts(exchangeRate, baseCurrencyDecimalPlaces);
+    }
+
+    private void RefreshBaseAmounts(decimal exchangeRate, byte baseCurrencyDecimalPlaces)
+    {
         BaseNetAmount = SalesPricingCalculator.ConvertToBase(NetAmount, exchangeRate, baseCurrencyDecimalPlaces);
         BaseTaxAmount = SalesPricingCalculator.ConvertToBase(TaxAmount, exchangeRate, baseCurrencyDecimalPlaces);
         BaseFinalAmount = SalesPricingCalculator.ConvertToBase(FinalAmount, exchangeRate, baseCurrencyDecimalPlaces);
@@ -121,60 +161,40 @@ public sealed class SalesInvoiceLine : AuditableEntity<Guid>
 
     internal void SetCostSnapshot(decimal unitCost, decimal totalCost)
     {
-        if (!RequiresInventory)
-            throw new DomainException("Service or non-inventory lines cannot receive inventory cost snapshots.");
-        if (unitCost < 0 || totalCost < 0)
-            throw new DomainException("Inventory cost snapshot cannot be negative.");
-
+        if (!RequiresInventory) throw new DomainException("Service or non-inventory lines cannot receive inventory cost snapshots.");
+        if (unitCost < 0 || totalCost < 0) throw new DomainException("Inventory cost snapshot cannot be negative.");
         UnitCostSnapshot = unitCost;
         TotalCostSnapshot = totalCost;
     }
 
-    internal void ClearPrescriptionSnapshot()
-    {
-        PrescriptionSnapshot = null;
-    }
+    internal void ClearPrescriptionSnapshot() => PrescriptionSnapshot = null;
 
     internal void SetPrescriptionSnapshot(SalesInvoiceLinePrescriptionSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
-        if (LineType != SalesLineType.Lens)
-            throw new DomainException("Prescription snapshots can only be attached to lens lines.");
-        if (snapshot.SalesInvoiceLineId != Id)
-            throw new DomainException("Prescription snapshot does not match the sales invoice line.");
-
-        // Stored-prescription lines keep the revision/eye pair on the line and the snapshot
-        // must match it. Manual optical measurements intentionally have no prescription
-        // revision on the line; in that case the snapshot itself carries the eye and must
-        // also have a null PrescriptionRevisionId.
+        if (LineType != SalesLineType.Lens) throw new DomainException("Prescription snapshots can only be attached to lens lines.");
+        if (snapshot.SalesInvoiceLineId != Id) throw new DomainException("Prescription snapshot does not match the sales invoice line.");
         if (PrescriptionRevisionId.HasValue)
         {
-            if (!PrescriptionEye.HasValue ||
-                snapshot.PrescriptionRevisionId != PrescriptionRevisionId.Value ||
-                snapshot.Eye != PrescriptionEye.Value)
+            if (!PrescriptionEye.HasValue || snapshot.PrescriptionRevisionId != PrescriptionRevisionId.Value || snapshot.Eye != PrescriptionEye.Value)
                 throw new DomainException("Prescription snapshot does not match the sales invoice line.");
         }
         else if (snapshot.PrescriptionRevisionId.HasValue)
-        {
             throw new DomainException("Manual optical snapshots cannot reference a prescription revision.");
-        }
-
         PrescriptionSnapshot = snapshot;
     }
 
     public void ReserveReturnQuantity(decimal quantity)
     {
         if (quantity <= 0m) throw new DomainException("Return quantity must be greater than zero.");
-        if (ReturnedQuantity + quantity > Quantity)
-            throw new DomainException("Return quantity exceeds the remaining returnable quantity.");
+        if (ReturnedQuantity + quantity > Quantity) throw new DomainException("Return quantity exceeds the remaining returnable quantity.");
         ReturnedQuantity += quantity;
     }
 
     public void ReleaseReturnQuantity(decimal quantity)
     {
         if (quantity <= 0m) throw new DomainException("Return quantity must be greater than zero.");
-        if (quantity > ReturnedQuantity)
-            throw new DomainException("Cannot release more returned quantity than currently reserved.");
+        if (quantity > ReturnedQuantity) throw new DomainException("Cannot release more returned quantity than currently reserved.");
         ReturnedQuantity -= quantity;
     }
 
@@ -186,36 +206,25 @@ public sealed class SalesInvoiceLine : AuditableEntity<Guid>
 
     internal void SetLineNumber(int lineNumber)
     {
-        if (lineNumber <= 0)
-            throw new DomainException("Line number must be greater than zero.");
+        if (lineNumber <= 0) throw new DomainException("Line number must be greater than zero.");
         LineNumber = lineNumber;
     }
 
     private void SetItemReferences(Guid? productVariantId, Guid? warehouseId, Guid? prescriptionRevisionId, EyeSide? prescriptionEye)
     {
         SalesDomainGuard.Defined(LineType, "Sales line type");
-
         if (LineType is SalesLineType.Frame or SalesLineType.Lens or SalesLineType.Accessory)
         {
             if (!productVariantId.HasValue || productVariantId.Value == Guid.Empty)
                 throw new DomainException("Product variant is required for product sales lines.");
-            // Warehouse is intentionally optional at the domain level because a Lens/Frame/Accessory
-            // product can be configured as non-stock (for example a made-to-order lab lens).
-            // ISalesLineResolver remains authoritative and requires a warehouse for stock items.
-            if (warehouseId == Guid.Empty)
-                throw new DomainException("Warehouse id cannot be empty when provided.");
+            if (warehouseId == Guid.Empty) throw new DomainException("Warehouse id cannot be empty when provided.");
         }
-
         if (LineType == SalesLineType.Service && (productVariantId.HasValue || warehouseId.HasValue))
             throw new DomainException("Service lines cannot reference a product variant or warehouse.");
-
         if (prescriptionRevisionId.HasValue != prescriptionEye.HasValue)
             throw new DomainException("Prescription revision and prescription eye must be provided together.");
-        if (prescriptionRevisionId == Guid.Empty)
-            throw new DomainException("Prescription revision id cannot be empty.");
-        if (prescriptionEye.HasValue)
-            SalesDomainGuard.Defined(prescriptionEye.Value, "Prescription eye");
-
+        if (prescriptionRevisionId == Guid.Empty) throw new DomainException("Prescription revision id cannot be empty.");
+        if (prescriptionEye.HasValue) SalesDomainGuard.Defined(prescriptionEye.Value, "Prescription eye");
         ProductVariantId = productVariantId;
         WarehouseId = warehouseId;
         PrescriptionRevisionId = prescriptionRevisionId;

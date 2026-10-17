@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using OAS.Domain.Accounting.Entities;
-using OAS.Domain.Sales.Entities;
 using OAS.Domain.Features.Employees.Entities;
+using OAS.Domain.Sales.Entities;
 
 namespace OAS.Infrastructure.Sales.Persistence.Configurations;
 
@@ -14,12 +14,11 @@ public sealed class SalesInvoiceConfiguration : IEntityTypeConfiguration<SalesIn
         {
             t.HasCheckConstraint("CK_SalesInvoices_ExchangeRate_Positive", "[ExchangeRate] > 0");
             t.HasCheckConstraint("CK_SalesInvoices_PaymentTermDays_NonNegative", "[PaymentTermDaysSnapshot] >= 0");
-            t.HasCheckConstraint("CK_SalesInvoices_Totals_NonNegative", "[Subtotal] >= 0 AND [DiscountAmount] >= 0 AND [TaxAmount] >= 0 AND [TotalAmount] >= 0");
-            t.HasCheckConstraint("CK_SalesInvoices_BaseTotals_NonNegative", "[BaseSubtotal] >= 0 AND [BaseDiscountAmount] >= 0 AND [BaseTaxAmount] >= 0 AND [BaseTotalAmount] >= 0");
+            t.HasCheckConstraint("CK_SalesInvoices_Totals_NonNegative", "[Subtotal] >= 0 AND [DiscountAmount] >= 0 AND [HeaderDiscountAmount] >= 0 AND [TaxAmount] >= 0 AND [TotalAmount] >= 0");
+            t.HasCheckConstraint("CK_SalesInvoices_BaseTotals_NonNegative", "[BaseSubtotal] >= 0 AND [BaseDiscountAmount] >= 0 AND [BaseHeaderDiscountAmount] >= 0 AND [BaseTaxAmount] >= 0 AND [BaseTotalAmount] >= 0");
         });
         builder.HasKey(x => x.Id);
         builder.ConfigureSalesAudit();
-
         builder.Property(x => x.Id).ValueGeneratedNever();
         builder.Property(x => x.InvoiceCode).IsRequired().HasMaxLength(40);
         builder.Property(x => x.CustomerId).IsRequired();
@@ -47,6 +46,13 @@ public sealed class SalesInvoiceConfiguration : IEntityTypeConfiguration<SalesIn
         builder.Property(x => x.BaseCurrencyDecimalPlacesSnapshot).IsRequired();
         builder.Property(x => x.Subtotal).IsRequired().HasPrecision(19, 4);
         builder.Property(x => x.DiscountAmount).IsRequired().HasPrecision(19, 4);
+        builder.Property(x => x.HeaderDiscountType).IsRequired().HasConversion<byte>().HasDefaultValue(OAS.Domain.Sales.Enums.SalesDiscountType.None);
+        builder.Property(x => x.HeaderDiscountValue).HasPrecision(19, 4);
+        builder.Property(x => x.HeaderDiscountAmount).IsRequired().HasPrecision(19, 4).HasDefaultValue(0m);
+        builder.Property(x => x.BaseHeaderDiscountAmount).IsRequired().HasPrecision(19, 4).HasDefaultValue(0m);
+        builder.Property(x => x.HeaderDiscountReason).HasMaxLength(500);
+        builder.Property(x => x.HeaderDiscountApprovedAtUtc).HasColumnType("datetimeoffset");
+        builder.Property(x => x.HeaderDiscountApprovedBy).HasMaxLength(64);
         builder.Property(x => x.TaxAmount).IsRequired().HasPrecision(19, 4);
         builder.Property(x => x.TotalAmount).IsRequired().HasPrecision(19, 4);
         builder.Property(x => x.BaseSubtotal).IsRequired().HasPrecision(19, 4);
@@ -63,7 +69,6 @@ public sealed class SalesInvoiceConfiguration : IEntityTypeConfiguration<SalesIn
         builder.Property(x => x.CancelledBy).HasMaxLength(64);
         builder.Property(x => x.IsActive).IsRequired();
         builder.Property(x => x.RowVersion).IsRowVersion().IsConcurrencyToken();
-
         builder.HasIndex(x => x.InvoiceCode).IsUnique().HasDatabaseName("UX_SalesInvoices_InvoiceCode");
         builder.HasIndex(x => x.CustomerId).HasDatabaseName("IX_SalesInvoices_CustomerId");
         builder.HasIndex(x => x.InvoiceDate).HasDatabaseName("IX_SalesInvoices_InvoiceDate");
@@ -76,24 +81,14 @@ public sealed class SalesInvoiceConfiguration : IEntityTypeConfiguration<SalesIn
         builder.HasIndex(x => x.CurrencyId).HasDatabaseName("IX_SalesInvoices_CurrencyId");
         builder.HasIndex(x => x.BaseCurrencyId).HasDatabaseName("IX_SalesInvoices_BaseCurrencyId");
         builder.HasIndex(x => x.PaymentPlan).HasDatabaseName("IX_SalesInvoices_PaymentPlan");
-
-        builder.HasOne<Customer>().WithMany().HasForeignKey(x => x.CustomerId)
-            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_SalesInvoices_Customers_CustomerId");
-        builder.HasOne<CustomerOrder>().WithMany().HasForeignKey(x => x.CustomerOrderId)
-            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_SalesInvoices_CustomerOrders_CustomerOrderId");
-        builder.HasOne<PrescriptionRevision>().WithMany().HasForeignKey(x => x.PrescriptionRevisionId)
-            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_SalesInvoices_PrescriptionRevisions_PrescriptionRevisionId");
-        builder.HasOne<Employee>().WithMany().HasForeignKey(x => x.SalesEmployeeId)
-            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_SalesInvoices_Employees_SalesEmployeeId");
-        builder.HasOne<Currency>().WithMany().HasForeignKey(x => x.CurrencyId)
-            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_SalesInvoices_Currencies_CurrencyId");
-        builder.HasOne<Currency>().WithMany().HasForeignKey(x => x.BaseCurrencyId)
-            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_SalesInvoices_BaseCurrencies_BaseCurrencyId");
-        builder.HasOne<JournalEntry>().WithMany().HasForeignKey(x => x.JournalEntryId)
-            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_SalesInvoices_JournalEntries_JournalEntryId");
-
-        builder.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.SalesInvoiceId)
-            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_SalesInvoiceLines_Invoices_SalesInvoiceId");
+        builder.HasOne<Customer>().WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_SalesInvoices_Customers_CustomerId");
+        builder.HasOne<CustomerOrder>().WithMany().HasForeignKey(x => x.CustomerOrderId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_SalesInvoices_CustomerOrders_CustomerOrderId");
+        builder.HasOne<PrescriptionRevision>().WithMany().HasForeignKey(x => x.PrescriptionRevisionId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_SalesInvoices_PrescriptionRevisions_PrescriptionRevisionId");
+        builder.HasOne<Employee>().WithMany().HasForeignKey(x => x.SalesEmployeeId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_SalesInvoices_Employees_SalesEmployeeId");
+        builder.HasOne<Currency>().WithMany().HasForeignKey(x => x.CurrencyId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_SalesInvoices_Currencies_CurrencyId");
+        builder.HasOne<Currency>().WithMany().HasForeignKey(x => x.BaseCurrencyId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_SalesInvoices_BaseCurrencies_BaseCurrencyId");
+        builder.HasOne<JournalEntry>().WithMany().HasForeignKey(x => x.JournalEntryId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_SalesInvoices_JournalEntries_JournalEntryId");
+        builder.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.SalesInvoiceId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_SalesInvoiceLines_Invoices_SalesInvoiceId");
         builder.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

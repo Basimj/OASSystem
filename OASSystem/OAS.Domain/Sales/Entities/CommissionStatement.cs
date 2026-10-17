@@ -33,6 +33,12 @@ public sealed class CommissionStatement : AuditableEntity<Guid>
     public decimal CommissionBaseAmount { get; private set; }
     public DateTimeOffset? CalculatedAtUtc { get; private set; }
     public string? CalculatedBy { get; private set; }
+    public DateTimeOffset? ReviewedAtUtc { get; private set; }
+    public string? ReviewedBy { get; private set; }
+    public DateTimeOffset? ApprovedAtUtc { get; private set; }
+    public string? ApprovedBy { get; private set; }
+    public DateTimeOffset? SettledAtUtc { get; private set; }
+    public string? SettledBy { get; private set; }
     public DateTimeOffset? FinalizedAtUtc { get; private set; }
     public string? FinalizedBy { get; private set; }
     public bool IsActive { get; private set; }
@@ -62,6 +68,33 @@ public sealed class CommissionStatement : AuditableEntity<Guid>
         CalculatedBy = NormalizeUser(user);
     }
 
+    public void Review(DateTimeOffset atUtc, string? user)
+    {
+        if (Status != CommissionStatementStatus.Calculated) throw new DomainException("Only calculated commission statements can be reviewed.");
+        Status = CommissionStatementStatus.Reviewed;
+        ReviewedAtUtc = atUtc;
+        ReviewedBy = NormalizeUser(user);
+    }
+
+    public void Approve(DateTimeOffset atUtc, string? user)
+    {
+        if (Status != CommissionStatementStatus.Reviewed) throw new DomainException("Only reviewed commission statements can be approved.");
+        Status = CommissionStatementStatus.Approved;
+        ApprovedAtUtc = atUtc;
+        ApprovedBy = NormalizeUser(user);
+    }
+
+    public void Settle(DateTimeOffset atUtc, string? user)
+    {
+        if (Status != CommissionStatementStatus.Approved) throw new DomainException("Only approved commission statements can be settled.");
+        Status = CommissionStatementStatus.Settled;
+        SettledAtUtc = atUtc;
+        SettledBy = NormalizeUser(user);
+        FinalizedAtUtc = atUtc;
+        FinalizedBy = NormalizeUser(user);
+    }
+
+    /// <summary>Legacy transition retained for old API callers.</summary>
     public void Finalize(DateTimeOffset atUtc, string? user)
     {
         if (Status != CommissionStatementStatus.Calculated) throw new DomainException("Only calculated commission statements can be finalized.");
@@ -72,7 +105,8 @@ public sealed class CommissionStatement : AuditableEntity<Guid>
 
     public void Cancel()
     {
-        if (Status == CommissionStatementStatus.Finalized) throw new DomainException("Finalized commission statements cannot be cancelled.");
+        if (Status is CommissionStatementStatus.Finalized or CommissionStatementStatus.Settled)
+            throw new DomainException("Closed commission statements cannot be cancelled.");
         Status = CommissionStatementStatus.Cancelled;
         IsActive = false;
     }
