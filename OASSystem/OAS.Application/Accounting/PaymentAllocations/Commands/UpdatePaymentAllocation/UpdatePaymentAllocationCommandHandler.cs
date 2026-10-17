@@ -4,6 +4,7 @@ using OAS.Application.Abstractions.Persistence.Specifications;
 using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Common.Exceptions;
 using OAS.Domain.Accounting.Entities;
+using OAS.Domain.Accounting.Enums;
 
 namespace OAS.Application.Accounting.PaymentAllocations.Commands.UpdatePaymentAllocation;
 
@@ -19,8 +20,12 @@ public sealed class UpdatePaymentAllocationCommandHandler(
     public async Task Handle(UpdatePaymentAllocationCommand request, CancellationToken ct)
     {
         var allocation = await repository.GetForUpdateAsync(request.Id, ct) ?? throw new NotFoundException(nameof(PaymentAllocation), request.Id);
-        if (allocation.TargetDocumentType is OAS.Domain.Accounting.Enums.AllocationTargetDocumentType.EmployeePayroll or OAS.Domain.Accounting.Enums.AllocationTargetDocumentType.EndOfServiceSettlement)
+        if (allocation.TargetDocumentType is AllocationTargetDocumentType.EmployeePayroll or AllocationTargetDocumentType.EndOfServiceSettlement)
             throw new ConflictException("managed_payment_allocation_immutable", "Payroll and end-of-service allocations are managed by their dedicated payment workflows and cannot be edited directly.");
+        if (allocation.TargetDocumentType == AllocationTargetDocumentType.PurchaseInvoice)
+            throw new ConflictException(
+                "purchase_invoice_allocation_reversal_required",
+                "لا يمكن تعديل تخصيص فاتورة مورد بعد إنشائه لأن له أثراً محاسبياً تاريخياً. استخدم عكس التخصيص ثم أنشئ تخصيصاً جديداً.");
         if (!allocation.ReceiptVoucherLineId.HasValue && !allocation.PaymentVoucherLineId.HasValue)
             throw new ConflictException("legacy_allocation_readonly", "Legacy payment allocations must be migrated before they can be edited.");
 
@@ -38,20 +43,24 @@ public sealed class UpdatePaymentAllocationCommandHandler(
         if (sourceTargetValidator is not null)
             await sourceTargetValidator.ValidateSourceAsync(allocation.TargetDocumentId, source.Context, ct);
 
-        var targetBaseAmount = sourceBaseAmount;
+        var validation = new PaymentAllocationTargetValidation(sourceBaseAmount);
         var validator = targetValidators.SingleOrDefault(x => x.TargetDocumentType == allocation.TargetDocumentType);
         if (validator is not null && allocation.CurrencyId.HasValue)
         {
-            targetBaseAmount = (await validator.ValidateAsync(
+            validation = await validator.ValidateAsync(
                 allocation.TargetDocumentId,
                 allocation.CurrencyId.Value,
                 request.Data.AllocatedAmount,
                 sourceBaseAmount,
                 allocation.Id,
-                ct)).TargetBaseAllocatedAmount;
+                ct);
         }
 
-        allocation.UpdateAllocatedAmount(request.Data.AllocatedAmount, sourceBaseAmount, targetBaseAmount);
+        allocation.UpdateAllocatedAmount(
+            request.Data.AllocatedAmount,
+            sourceBaseAmount,
+            validation.TargetBaseAllocatedAmount,
+            validation.TargetDocumentAmount);
         repository.Update(allocation);
     }
 
@@ -61,12 +70,12 @@ public sealed class UpdatePaymentAllocationCommandHandler(
         {
             var line = await receiptLines.GetByIdAsync(rid, ct) ?? throw new NotFoundException(nameof(ReceiptVoucherLine), rid);
             var voucher = await receiptVouchers.GetByIdAsync(line.ReceiptVoucherId, ct) ?? throw new NotFoundException(nameof(ReceiptVoucher), line.ReceiptVoucherId);
-            if (voucher.Status != OAS.Domain.Accounting.Enums.ReceiptVoucherStatus.Posted)
+            if (voucher.Status != ReceiptVoucherStatus.Posted)
                 throw new ConflictException("payment_allocation_receipt_not_posted", "لا يمكن تعديل تخصيص مرتبط بسند قبض غير مرحل.");
             return new SourceInfo(
                 line.Amount,
                 new PaymentAllocationSourceContext(
-                    OAS.Domain.Accounting.Enums.PaymentSourceType.ReceiptVoucher,
+                    PaymentSourceType.ReceiptVoucher,
                     line.PartyType,
                     line.CustomerId,
                     line.SupplierId,
@@ -77,12 +86,12 @@ public sealed class UpdatePaymentAllocationCommandHandler(
         {
             var line = await paymentLines.GetByIdAsync(pid, ct) ?? throw new NotFoundException(nameof(PaymentVoucherLine), pid);
             var voucher = await paymentVouchers.GetByIdAsync(line.PaymentVoucherId, ct) ?? throw new NotFoundException(nameof(PaymentVoucher), line.PaymentVoucherId);
-            if (voucher.Status != OAS.Domain.Accounting.Enums.PaymentVoucherStatus.Posted)
+            if (voucher.Status != PaymentVoucherStatus.Posted)
                 throw new ConflictException("payment_allocation_payment_not_posted", "لا يمكن تعديل تخصيص مرتبط بسند صرف غير مرحل.");
             return new SourceInfo(
                 line.Amount,
                 new PaymentAllocationSourceContext(
-                    OAS.Domain.Accounting.Enums.PaymentSourceType.PaymentVoucher,
+                    PaymentSourceType.PaymentVoucher,
                     line.PartyType,
                     line.CustomerId,
                     line.SupplierId,
