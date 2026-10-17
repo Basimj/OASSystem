@@ -16,4 +16,11 @@ public sealed record PaymentAllocationDto(
     DateTimeOffset AllocatedAtUtc,
     string? CreatedBy,
     Guid? CustomerAdvanceApplicationId = null,
-    decimal? TargetBaseAllocatedAmount = null);
+    decimal? TargetBaseAllocatedAmount = null,
+    decimal? TargetDocumentAmount = null,
+    string? IdempotencyKey = null,
+    bool IsReversed = false,
+    DateTimeOffset? ReversedAtUtc = null,
+    string? ReversedBy = null,
+    string? ReversalReason = null,
+    string? RowVersion = null);

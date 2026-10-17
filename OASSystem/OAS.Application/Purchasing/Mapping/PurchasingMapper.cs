@@ -141,7 +141,14 @@ public sealed class PurchasingMapper(
             invoice.BaseTotalAmount, invoice.JournalEntryId, invoice.Notes, invoice.ConfirmedBy, invoice.ConfirmedAt,
             invoice.PostedBy, invoice.PostedAt, invoice.CancelledBy, invoice.CancelledAt, invoice.CancellationReason, lines,
             PurchasingRowVersion.Encode(invoice.RowVersion), invoice.CreatedAtUtc, invoice.CreatedBy, invoice.LastModifiedAtUtc,
-            invoice.LastModifiedBy);
+            invoice.LastModifiedBy,
+            invoice.CurrencyCodeSnapshot,
+            invoice.CurrencyDecimalPlacesSnapshot,
+            invoice.BaseCurrencyId,
+            invoice.BaseCurrencyCodeSnapshot,
+            invoice.BaseCurrencyDecimalPlacesSnapshot,
+            invoice.ExchangeRateType.HasValue ? (byte)invoice.ExchangeRateType.Value : null,
+            invoice.ExchangeRateSource.HasValue ? (byte)invoice.ExchangeRateSource.Value : null);
     }
 
     public async Task<PurchaseMatchResultDto> ToMatchDtoAsync(PurchaseInvoice invoice, PurchaseMatchEvaluation evaluation, CancellationToken cancellationToken)

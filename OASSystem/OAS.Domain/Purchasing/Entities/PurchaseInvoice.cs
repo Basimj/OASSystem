@@ -1,3 +1,4 @@
+using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Common.Entities;
 using OAS.Domain.Exceptions;
 using OAS.Domain.Purchasing.Enums;
@@ -37,8 +38,15 @@ public sealed class PurchaseInvoice : AuditableEntity<Guid>
     public DateOnly InvoiceDate { get; private set; }
     public DateOnly PostingDate { get; private set; }
     public Guid CurrencyId { get; private set; }
+    public string? CurrencyCodeSnapshot { get; private set; }
+    public byte? CurrencyDecimalPlacesSnapshot { get; private set; }
+    public Guid? BaseCurrencyId { get; private set; }
+    public string? BaseCurrencyCodeSnapshot { get; private set; }
+    public byte? BaseCurrencyDecimalPlacesSnapshot { get; private set; }
     public decimal ExchangeRate { get; private set; }
     public DateOnly ExchangeRateDate { get; private set; }
+    public ExchangeRateType? ExchangeRateType { get; private set; }
+    public ExchangeRateSource? ExchangeRateSource { get; private set; }
     public TaxCalculationMode TaxCalculationMode { get; private set; }
     public PurchaseInvoiceStatus Status { get; private set; }
     public decimal Subtotal { get; private set; }
@@ -98,6 +106,37 @@ public sealed class PurchaseInvoice : AuditableEntity<Guid>
         ExchangeRateDate = exchangeRateDate;
         TaxCalculationMode = taxCalculationMode;
         Notes = PurchasingDomainGuard.Optional(notes, 1000, "Notes");
+    }
+
+    public void CaptureCurrencySnapshot(
+        string currencyCode,
+        byte currencyDecimalPlaces,
+        Guid baseCurrencyId,
+        string baseCurrencyCode,
+        byte baseCurrencyDecimalPlaces,
+        ExchangeRateType exchangeRateType,
+        ExchangeRateSource exchangeRateSource)
+    {
+        if (Status == PurchaseInvoiceStatus.Posted)
+            throw new DomainException("Currency snapshot of a posted purchase invoice cannot be changed.");
+        if (baseCurrencyId == Guid.Empty)
+            throw new DomainException("Base currency id is required for the purchase invoice snapshot.");
+        if (string.IsNullOrWhiteSpace(currencyCode) || currencyCode.Trim().Length > 8)
+            throw new DomainException("Purchase invoice currency code snapshot is invalid.");
+        if (string.IsNullOrWhiteSpace(baseCurrencyCode) || baseCurrencyCode.Trim().Length > 8)
+            throw new DomainException("Purchase invoice base currency code snapshot is invalid.");
+        if (currencyDecimalPlaces > 6 || baseCurrencyDecimalPlaces > 6)
+            throw new DomainException("Purchase invoice currency precision snapshot is invalid.");
+        if (!Enum.IsDefined(exchangeRateType) || !Enum.IsDefined(exchangeRateSource))
+            throw new DomainException("Purchase invoice exchange-rate snapshot is invalid.");
+
+        CurrencyCodeSnapshot = currencyCode.Trim().ToUpperInvariant();
+        CurrencyDecimalPlacesSnapshot = currencyDecimalPlaces;
+        BaseCurrencyId = baseCurrencyId;
+        BaseCurrencyCodeSnapshot = baseCurrencyCode.Trim().ToUpperInvariant();
+        BaseCurrencyDecimalPlacesSnapshot = baseCurrencyDecimalPlaces;
+        ExchangeRateType = exchangeRateType;
+        ExchangeRateSource = exchangeRateSource;
     }
 
     public void AddLine(PurchaseInvoiceLine line)

@@ -13,8 +13,10 @@ public sealed class PaymentAllocationConfiguration : IEntityTypeConfiguration<Pa
             t.HasCheckConstraint("CK_PaymentAllocations_Amount_Positive", "[AllocatedAmount] > 0");
             t.HasCheckConstraint("CK_PaymentAllocations_BaseAmount_Positive", "[BaseAllocatedAmount] IS NULL OR [BaseAllocatedAmount] > 0");
             t.HasCheckConstraint("CK_PaymentAllocations_TargetBaseAmount_Positive", "[TargetBaseAllocatedAmount] IS NULL OR [TargetBaseAllocatedAmount] > 0");
+            t.HasCheckConstraint("CK_PaymentAllocations_TargetDocumentAmount_Positive", "[TargetDocumentAmount] IS NULL OR [TargetDocumentAmount] > 0");
             t.HasCheckConstraint("CK_PaymentAllocations_ExchangeRate_Positive", "[ExchangeRate] IS NULL OR [ExchangeRate] > 0");
             t.HasCheckConstraint("CK_PaymentAllocations_TypedSource", "(CASE WHEN [ReceiptVoucherLineId] IS NULL THEN 0 ELSE 1 END + CASE WHEN [PaymentVoucherLineId] IS NULL THEN 0 ELSE 1 END + CASE WHEN [CustomerAdvanceApplicationId] IS NULL THEN 0 ELSE 1 END) = 1");
+            t.HasCheckConstraint("CK_PaymentAllocations_ReversalAudit", "([ReversedAtUtc] IS NULL AND [ReversedBy] IS NULL AND [ReversalReason] IS NULL) OR ([ReversedAtUtc] IS NOT NULL AND [ReversedBy] IS NOT NULL AND [ReversalReason] IS NOT NULL)");
         });
         builder.HasKey(x => x.Id);
         builder.ConfigureAccountingAudit();
@@ -29,15 +31,28 @@ public sealed class PaymentAllocationConfiguration : IEntityTypeConfiguration<Pa
         builder.Property(x => x.ExchangeRate).HasPrecision(19, 8);
         builder.Property(x => x.BaseAllocatedAmount).HasPrecision(19, 4);
         builder.Property(x => x.TargetBaseAllocatedAmount).HasPrecision(19, 4);
+        builder.Property(x => x.TargetDocumentAmount).HasPrecision(19, 4);
         builder.Property(x => x.AllocatedAtUtc).IsRequired().HasColumnType("datetime2(3)");
+        builder.Property(x => x.IdempotencyKey).HasMaxLength(80);
+        builder.Property(x => x.ReversedAtUtc).HasColumnType("datetime2(3)");
+        builder.Property(x => x.ReversedBy).HasMaxLength(64);
+        builder.Property(x => x.ReversalReason).HasMaxLength(300);
+        builder.Property(x => x.RowVersion).IsRowVersion();
+        builder.Ignore(x => x.IsReversed);
 
         builder.HasIndex(x => x.PaymentSourceId).HasDatabaseName("IX_PaymentAllocations_PaymentSourceId");
         builder.HasIndex(x => x.ReceiptVoucherLineId).HasDatabaseName("IX_PaymentAllocations_ReceiptVoucherLineId");
         builder.HasIndex(x => x.PaymentVoucherLineId).HasDatabaseName("IX_PaymentAllocations_PaymentVoucherLineId");
+        builder.HasIndex(x => new { x.PaymentVoucherLineId, x.AllocatedAtUtc }).HasDatabaseName("IX_PaymentAllocations_PaymentVoucherLine_Date");
         builder.HasIndex(x => x.CustomerAdvanceApplicationId).HasDatabaseName("IX_PaymentAllocations_CustomerAdvanceApplicationId");
         builder.HasIndex(x => x.TargetDocumentId).HasDatabaseName("IX_PaymentAllocations_TargetDocumentId");
         builder.HasIndex(x => new { x.TargetDocumentType, x.TargetDocumentId }).HasDatabaseName("IX_PaymentAllocations_TargetDocument");
+        builder.HasIndex(x => new { x.TargetDocumentType, x.TargetDocumentId, x.AllocatedAtUtc }).HasDatabaseName("IX_PaymentAllocations_TargetDocument_Date");
         builder.HasIndex(x => x.CurrencyId).HasDatabaseName("IX_PaymentAllocations_CurrencyId");
+        builder.HasIndex(x => x.IdempotencyKey)
+            .IsUnique()
+            .HasFilter("[IdempotencyKey] IS NOT NULL")
+            .HasDatabaseName("UX_PaymentAllocations_IdempotencyKey");
 
         builder.HasOne<ReceiptVoucherLine>().WithMany().HasForeignKey(x => x.ReceiptVoucherLineId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_PaymentAllocations_ReceiptVoucherLine");
         builder.HasOne<PaymentVoucherLine>().WithMany().HasForeignKey(x => x.PaymentVoucherLineId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_PaymentAllocations_PaymentVoucherLine");

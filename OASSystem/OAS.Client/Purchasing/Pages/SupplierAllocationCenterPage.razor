@@ -1,0 +1,499 @@
+@page "/purchases/supplier-allocations"
+@attribute [Authorize]
+@using OAS.Client.Accounting.Services
+@using OAS.Client.Purchasing.Services
+@using OAS.Contracts.Accounting.Enums
+@using OAS.Contracts.Accounting.PaymentAllocations
+@using OAS.Contracts.Accounting.Suppliers
+@using OAS.Contracts.Purchasing.PurchaseReturns
+@using OAS.Contracts.Purchasing.SupplierAllocations
+@inject IPurchasingClientService Purchasing
+@inject IAccountingClientService Accounting
+
+<PageTitle>مركز تخصيص دفعات المورد | OAS</PageTitle>
+
+<div class="supplier-allocation-page" dir="rtl">
+    <header class="supplier-allocation-page__header">
+        <div>
+            <h1>مركز تخصيص دفعات المورد</h1>
+            <p>اعرض الدفعات المرحلة غير المطبقة، الفواتير المفتوحة، وائتمانات المرتجعات حسب المورد.</p>
+        </div>
+        @if (_center is not null)
+        {
+            <button class="btn btn-outline-secondary" disabled="@_busy" @onclick="ReloadAsync">تحديث</button>
+        }
+    </header>
+
+    <section class="supplier-allocation-card supplier-allocation-search">
+        <label for="supplier-search">المورد</label>
+        <div class="supplier-allocation-search__row">
+            <input id="supplier-search" class="form-control" placeholder="ابحث بكود أو اسم المورد..." @bind="_supplierSearch" @bind:event="oninput" />
+            <button class="btn btn-primary" disabled="@_busy" @onclick="SearchSuppliersAsync">بحث</button>
+        </div>
+        @if (_supplierResults.Count > 0)
+        {
+            <div class="supplier-allocation-search__results">
+                @foreach (var supplier in _supplierResults)
+                {
+                    <button class="supplier-result" disabled="@_busy" @onclick="() => SelectSupplierAsync(supplier)">
+                        <strong>@supplier.SupplierCode</strong>
+                        <span>@supplier.NameAr</span>
+                        <small>@supplier.AccountCode</small>
+                    </button>
+                }
+            </div>
+        }
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(_message))
+    {
+        <div class="supplier-allocation-message @(_isError ? "supplier-allocation-message--error" : "supplier-allocation-message--success")">@_message</div>
+    }
+
+    @if (_busy && _center is null)
+    {
+        <div class="supplier-allocation-card">جاري تحميل بيانات المورد...</div>
+    }
+    else if (_center is not null)
+    {
+        <section class="supplier-allocation-summary">
+            <div class="supplier-allocation-card">
+                <small>المورد</small>
+                <strong>@_center.SupplierCode — @_center.SupplierName</strong>
+            </div>
+            <div class="supplier-allocation-card">
+                <small>دفعات غير مطبقة — بالأساسي</small>
+                <strong>@_center.TotalUnappliedPaymentBaseAmount.ToString("N2")</strong>
+            </div>
+            <div class="supplier-allocation-card">
+                <small>ائتمانات مرتجعات متاحة — بالأساسي</small>
+                <strong>@_center.TotalAvailableCreditBaseAmount.ToString("N2")</strong>
+            </div>
+            <div class="supplier-allocation-card">
+                <small>فواتير مفتوحة</small>
+                <strong>@_center.OpenInvoices.Count</strong>
+            </div>
+        </section>
+
+        <section class="supplier-allocation-card">
+            <div class="supplier-allocation-section-title">
+                <div>
+                    <h2>1. الدفعات المرحلة غير المطبقة</h2>
+                    <p>الرصيد هنا هو ما خرج فعليًا من الصندوق/البنك ولم يُربط بعد بفواتير المورد.</p>
+                </div>
+            </div>
+            @if (_center.UnappliedPayments.Count == 0)
+            {
+                <div class="supplier-allocation-empty">لا توجد دفعات غير مطبقة لهذا المورد.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table supplier-allocation-table">
+                        <thead><tr><th>السند</th><th>التاريخ</th><th>العملة</th><th>قيمة السطر</th><th>المطبق</th><th>غير المطبق</th><th></th></tr></thead>
+                        <tbody>
+                        @foreach (var payment in _center.UnappliedPayments)
+                        {
+                            <tr class="@(SelectedPaymentId == payment.PaymentVoucherLineId ? "is-selected" : null)">
+                                <td>@payment.VoucherNumber</td>
+                                <td>@payment.VoucherDate.ToString("yyyy-MM-dd")</td>
+                                <td>@payment.CurrencyCode</td>
+                                <td>@payment.SourceAmount.ToString("N2")</td>
+                                <td>@payment.AppliedAmount.ToString("N2")</td>
+                                <td><strong>@payment.UnappliedAmount.ToString("N2")</strong></td>
+                                <td><button class="btn btn-sm btn-outline-primary" disabled="@_busy" @onclick="() => SelectPayment(payment)">اختيار</button></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+
+        <section class="supplier-allocation-card">
+            <div class="supplier-allocation-section-title">
+                <div>
+                    <h2>2. الفواتير المفتوحة</h2>
+                    <p>المتبقي محسوب من الفاتورة ناقص الدفعات النشطة وائتمانات المورد، وليس من قيمة سند الصرف.</p>
+                </div>
+            </div>
+            @if (_center.OpenInvoices.Count == 0)
+            {
+                <div class="supplier-allocation-empty">لا توجد فواتير مورد مفتوحة.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table supplier-allocation-table">
+                        <thead><tr><th>الفاتورة</th><th>تاريخها</th><th>العملة</th><th>الإجمالي</th><th>مدفوع</th><th>ائتمان</th><th>المتبقي</th><th></th></tr></thead>
+                        <tbody>
+                        @foreach (var invoice in _center.OpenInvoices)
+                        {
+                            <tr class="@(SelectedInvoiceId == invoice.PurchaseInvoiceId ? "is-selected" : null)">
+                                <td>@invoice.PurchaseInvoiceCode<br /><small>@invoice.SupplierInvoiceCode</small></td>
+                                <td>@invoice.InvoiceDate.ToString("yyyy-MM-dd")</td>
+                                <td>@invoice.CurrencyCode</td>
+                                <td>@invoice.TotalAmount.ToString("N2")</td>
+                                <td>@invoice.AppliedPaymentAmount.ToString("N2")</td>
+                                <td>@invoice.AppliedCreditAmount.ToString("N2")</td>
+                                <td><strong>@invoice.OutstandingAmount.ToString("N2")</strong></td>
+                                <td><button class="btn btn-sm btn-outline-primary" disabled="@_busy" @onclick="() => SelectInvoice(invoice)">اختيار</button></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+
+        <section class="supplier-allocation-card supplier-allocation-action">
+            <h2>تخصيص الدفعة على الفاتورة</h2>
+            @if (_selectedPayment is null || _selectedInvoice is null)
+            {
+                <p>اختر دفعة غير مطبقة وفاتورة مفتوحة أولًا.</p>
+            }
+            else
+            {
+                <div class="supplier-allocation-action__selection">
+                    <span>السند: <strong>@_selectedPayment.VoucherNumber</strong> — المتاح @_selectedPayment.UnappliedAmount.ToString("N2") @_selectedPayment.CurrencyCode</span>
+                    <span>الفاتورة: <strong>@_selectedInvoice.PurchaseInvoiceCode</strong> — المتبقي @_selectedInvoice.OutstandingAmount.ToString("N2") @_selectedInvoice.CurrencyCode</span>
+                </div>
+                <label>المبلغ من عملة سطر سند الصرف</label>
+                <input class="form-control" type="number" min="0.0001" step="0.0001" @bind="_allocationAmount" />
+                @if (_selectedPayment.CurrencyId != _selectedInvoice.CurrencyId)
+                {
+                    <small>العملتان مختلفتان؛ سيحدد الخادم مقدار الفاتورة المسوّى والقيمة الدفترية وفرق الصرف وفق AP-02.</small>
+                }
+                <button class="btn btn-primary" disabled="@(_busy || _allocationAmount <= 0m)" @onclick="AllocatePaymentAsync">تخصيص الدفعة</button>
+            }
+        </section>
+
+        <section class="supplier-allocation-card">
+            <h2>ائتمانات مرتجعات المورد المتاحة</h2>
+            @if (_center.AvailableCredits.Count == 0)
+            {
+                <div class="supplier-allocation-empty">لا توجد ائتمانات مرتجعات غير مطبقة.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table supplier-allocation-table">
+                        <thead><tr><th>المرتجع</th><th>تاريخ الترحيل</th><th>إجمالي الائتمان</th><th>المطبق</th><th>المتاح</th><th></th></tr></thead>
+                        <tbody>
+                        @foreach (var credit in _center.AvailableCredits)
+                        {
+                            <tr class="@(SelectedCreditId == credit.PurchaseReturnId ? "is-selected" : null)">
+                                <td>@credit.ReturnCode</td>
+                                <td>@credit.PostingDate.ToString("yyyy-MM-dd")</td>
+                                <td>@credit.TotalCreditBaseAmount.ToString("N2")</td>
+                                <td>@credit.AppliedCreditBaseAmount.ToString("N2")</td>
+                                <td><strong>@credit.AvailableCreditBaseAmount.ToString("N2")</strong></td>
+                                <td><button class="btn btn-sm btn-outline-primary" disabled="@_busy" @onclick="() => SelectCredit(credit)">اختيار</button></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+                @if (_selectedCredit is not null && _selectedInvoice is not null)
+                {
+                    <div class="supplier-allocation-action__selection">
+                        <span>المرتجع: <strong>@_selectedCredit.ReturnCode</strong></span>
+                        <span>الفاتورة: <strong>@_selectedInvoice.PurchaseInvoiceCode</strong></span>
+                        <label>المبلغ الأساسي المراد تطبيقه</label>
+                        <input class="form-control" type="number" min="0.0001" step="0.0001" @bind="_creditBaseAmount" />
+                        <button class="btn btn-primary" disabled="@(_busy || _creditBaseAmount <= 0m)" @onclick="ApplyCreditAsync">تطبيق الائتمان</button>
+                    </div>
+                }
+            }
+        </section>
+
+        <section class="supplier-allocation-card">
+            <h2>التخصيصات النشطة</h2>
+            @if (_center.ActiveAllocations.Count == 0)
+            {
+                <div class="supplier-allocation-empty">لا توجد تخصيصات دفعات نشطة.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table supplier-allocation-table">
+                        <thead><tr><th>السند</th><th>الفاتورة</th><th>المصدر</th><th>المسوّى</th><th>فرق الصرف</th><th>وقت التخصيص</th><th>العكس</th></tr></thead>
+                        <tbody>
+                        @foreach (var allocation in _center.ActiveAllocations)
+                        {
+                            <tr>
+                                <td>@allocation.VoucherNumber</td>
+                                <td>@allocation.PurchaseInvoiceCode</td>
+                                <td>@allocation.SourceAmount.ToString("N2") @allocation.SourceCurrencyCode</td>
+                                <td>@allocation.TargetDocumentAmount.ToString("N2")</td>
+                                <td>@allocation.RealizedExchangeDifferenceBase.ToString("N2")</td>
+                                <td>@allocation.AllocatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                                <td><button class="btn btn-sm btn-outline-danger" disabled="@_busy" @onclick="() => BeginReverse(allocation)">عكس</button></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+
+            @if (_reverseAllocation is not null)
+            {
+                <div class="supplier-allocation-reverse">
+                    <strong>عكس تخصيص @_reverseAllocation.VoucherNumber → @_reverseAllocation.PurchaseInvoiceCode</strong>
+                    <input class="form-control" placeholder="سبب العكس (إلزامي)" @bind="_reverseReason" />
+                    <div>
+                        <button class="btn btn-danger" disabled="@(_busy || string.IsNullOrWhiteSpace(_reverseReason))" @onclick="ReverseAllocationAsync">تأكيد العكس</button>
+                        <button class="btn btn-outline-secondary" disabled="@_busy" @onclick="CancelReverse">إلغاء</button>
+                    </div>
+                </div>
+            }
+        </section>
+    }
+</div>
+
+@code {
+    private string? _supplierSearch;
+    private IReadOnlyList<SupplierLookupDto> _supplierResults = Array.Empty<SupplierLookupDto>();
+    private SupplierLookupDto? _selectedSupplier;
+    private SupplierAllocationCenterDto? _center;
+    private SupplierUnappliedPaymentDto? _selectedPayment;
+    private SupplierOpenInvoiceDto? _selectedInvoice;
+    private SupplierAvailableCreditDto? _selectedCredit;
+    private SupplierActivePaymentAllocationDto? _reverseAllocation;
+    private decimal _allocationAmount;
+    private decimal _creditBaseAmount;
+    private string? _reverseReason;
+    private string? _pendingAllocationKey;
+    private string? _pendingCreditKey;
+    private bool _busy;
+    private string? _message;
+    private bool _isError;
+
+    private Guid? SelectedPaymentId => _selectedPayment?.PaymentVoucherLineId;
+    private Guid? SelectedInvoiceId => _selectedInvoice?.PurchaseInvoiceId;
+    private Guid? SelectedCreditId => _selectedCredit?.PurchaseReturnId;
+
+    private async Task SearchSuppliersAsync()
+    {
+        _message = null;
+        _supplierResults = await Accounting.LookupSuppliersAsync(_supplierSearch) ?? Array.Empty<SupplierLookupDto>();
+        _supplierResults = _supplierResults.Where(x => x.IsActive).Take(20).ToArray();
+    }
+
+    private async Task SelectSupplierAsync(SupplierLookupDto supplier)
+    {
+        _selectedSupplier = supplier;
+        _supplierSearch = supplier.DisplayText;
+        _supplierResults = Array.Empty<SupplierLookupDto>();
+        ResetSelections();
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        if (_selectedSupplier is null) return;
+        _busy = true;
+        _message = null;
+        try
+        {
+            _center = await Purchasing.GetSupplierAllocationCenterAsync(_selectedSupplier.Id);
+            if (_center is null)
+                SetError("تعذر تحميل مركز تخصيص المورد.");
+        }
+        catch (Exception ex)
+        {
+            SetError($"تعذر تحميل البيانات: {ex.Message}");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void SelectPayment(SupplierUnappliedPaymentDto payment)
+    {
+        _selectedPayment = payment;
+        _pendingAllocationKey = null;
+        RecalculateAllocationDefault();
+    }
+
+    private void SelectInvoice(SupplierOpenInvoiceDto invoice)
+    {
+        _selectedInvoice = invoice;
+        _pendingAllocationKey = null;
+        _pendingCreditKey = null;
+        RecalculateAllocationDefault();
+        if (_selectedCredit is not null)
+            _creditBaseAmount = Math.Min(_selectedCredit.AvailableCreditBaseAmount, invoice.OutstandingBaseAmount);
+    }
+
+    private void SelectCredit(SupplierAvailableCreditDto credit)
+    {
+        _selectedCredit = credit;
+        _pendingCreditKey = null;
+        _creditBaseAmount = _selectedInvoice is null
+            ? credit.AvailableCreditBaseAmount
+            : Math.Min(credit.AvailableCreditBaseAmount, _selectedInvoice.OutstandingBaseAmount);
+    }
+
+    private void RecalculateAllocationDefault()
+    {
+        if (_selectedPayment is null || _selectedInvoice is null)
+        {
+            _allocationAmount = 0m;
+            return;
+        }
+
+        _allocationAmount = _selectedPayment.CurrencyId == _selectedInvoice.CurrencyId
+            ? Math.Min(_selectedPayment.UnappliedAmount, _selectedInvoice.OutstandingAmount)
+            : Math.Min(
+                _selectedPayment.UnappliedAmount,
+                _selectedPayment.ExchangeRate > 0m
+                    ? Math.Round(_selectedInvoice.OutstandingBaseAmount / _selectedPayment.ExchangeRate, 4, MidpointRounding.AwayFromZero)
+                    : 0m);
+    }
+
+    private async Task AllocatePaymentAsync()
+    {
+        if (_selectedPayment is null || _selectedInvoice is null || _allocationAmount <= 0m) return;
+        _busy = true;
+        _message = null;
+        try
+        {
+            _pendingAllocationKey ??= $"APC:{Guid.NewGuid():N}";
+            var created = await Purchasing.CreateSupplierPaymentAllocationAsync(new CreatePaymentAllocationRequest(
+                null,
+                _selectedPayment.PaymentVoucherLineId,
+                AllocationTargetDocumentType.PurchaseInvoice,
+                _selectedInvoice.PurchaseInvoiceId,
+                _allocationAmount,
+                null,
+                _pendingAllocationKey));
+
+            if (created is null)
+            {
+                SetError("تعذر إنشاء تخصيص الدفعة.");
+                return;
+            }
+
+            SetSuccess("تم تخصيص الدفعة على فاتورة المورد دون إنشاء قيد جديد، باستثناء فرق الصرف عند الحاجة.");
+            ResetSelections();
+            await ReloadAsync();
+        }
+        catch (Exception ex)
+        {
+            SetError($"فشل التخصيص: {ex.Message}");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task ApplyCreditAsync()
+    {
+        if (_selectedCredit is null || _selectedInvoice is null || _creditBaseAmount <= 0m) return;
+        _busy = true;
+        _message = null;
+        try
+        {
+            _pendingCreditKey ??= $"APC-CREDIT:{Guid.NewGuid():N}";
+            var applied = await Purchasing.ApplySupplierCreditAsync(
+                _selectedCredit.PurchaseReturnId,
+                new ApplySupplierCreditRequest(
+                    _selectedInvoice.PurchaseInvoiceId,
+                    _creditBaseAmount,
+                    _pendingCreditKey));
+
+            if (applied is null)
+            {
+                SetError("تعذر تطبيق ائتمان المرتجع.");
+                return;
+            }
+
+            SetSuccess("تم تطبيق ائتمان المرتجع على الفاتورة.");
+            ResetSelections();
+            await ReloadAsync();
+        }
+        catch (Exception ex)
+        {
+            SetError($"فشل تطبيق الائتمان: {ex.Message}");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void BeginReverse(SupplierActivePaymentAllocationDto allocation)
+    {
+        _reverseAllocation = allocation;
+        _reverseReason = null;
+    }
+
+    private void CancelReverse()
+    {
+        _reverseAllocation = null;
+        _reverseReason = null;
+    }
+
+    private async Task ReverseAllocationAsync()
+    {
+        if (_reverseAllocation is null || string.IsNullOrWhiteSpace(_reverseReason)) return;
+        _busy = true;
+        _message = null;
+        try
+        {
+            var result = await Purchasing.ReverseSupplierPaymentAllocationAsync(
+                _reverseAllocation.PaymentAllocationId,
+                new ReversePaymentAllocationRequest(
+                    DateOnly.FromDateTime(DateTime.Today),
+                    _reverseReason.Trim(),
+                    _reverseAllocation.RowVersion));
+
+            if (result is null)
+            {
+                SetError("تعذر عكس التخصيص.");
+                return;
+            }
+
+            SetSuccess(result.AlreadyReversed
+                ? "كان التخصيص معكوسًا بالفعل؛ لم يُنشأ عكس مكرر."
+                : "تم عكس التخصيص وإعادة فتح الرصيد، وعكس قيد فرق الصرف إن وُجد.");
+            CancelReverse();
+            ResetSelections();
+            await ReloadAsync();
+        }
+        catch (Exception ex)
+        {
+            SetError($"فشل عكس التخصيص: {ex.Message}");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void ResetSelections()
+    {
+        _selectedPayment = null;
+        _selectedInvoice = null;
+        _selectedCredit = null;
+        _allocationAmount = 0m;
+        _creditBaseAmount = 0m;
+        _pendingAllocationKey = null;
+        _pendingCreditKey = null;
+    }
+
+    private void SetSuccess(string message)
+    {
+        _message = message;
+        _isError = false;
+    }
+
+    private void SetError(string message)
+    {
+        _message = message;
+        _isError = true;
+    }
+}
