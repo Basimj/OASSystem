@@ -10,7 +10,8 @@ public sealed record SupplierWorkspaceDocumentsFilter(
     string? Search = null,
     string? CurrencyCode = null,
     int PageNumber = 1,
-    int PageSize = 50);
+    int PageSize = 50,
+    byte? Status = null);
 
 public sealed record SupplierWorkspaceDocumentRowDto(
     Guid Id,
