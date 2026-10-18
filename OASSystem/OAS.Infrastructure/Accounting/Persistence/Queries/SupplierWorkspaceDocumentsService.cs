@@ -32,7 +32,7 @@ public sealed class SupplierWorkspaceDocumentsService(OasDbContext db) : ISuppli
         var search = filter.Search?.Trim();
         var currency = filter.CurrencyCode?.Trim().ToUpperInvariant();
         var id = filter.SupplierId;
-        var from = filter.FromDate;
+        var startDate = filter.FromDate;
         var to = filter.ToDate;
 
         IQueryable<SupplierWorkspaceDocumentRowDto> query;
@@ -41,7 +41,7 @@ public sealed class SupplierWorkspaceDocumentsService(OasDbContext db) : ISuppli
             case "PurchaseOrder":
             {
                 var orders = db.Set<PurchaseOrder>().AsNoTracking()
-                    .Where(x => x.SupplierId == id && x.OrderDate >= from && x.OrderDate <= to);
+                    .Where(x => x.SupplierId == id && x.OrderDate >= startDate && x.OrderDate <= to);
                 if (!string.IsNullOrWhiteSpace(search))
                     orders = orders.Where(x => x.PurchaseOrderCode.Contains(search));
                 query = from o in orders
@@ -54,7 +54,7 @@ public sealed class SupplierWorkspaceDocumentsService(OasDbContext db) : ISuppli
             case "PurchaseReceipt":
             {
                 var receipts = db.Set<PurchaseReceipt>().AsNoTracking()
-                    .Where(x => x.SupplierId == id && x.ReceiptDate >= from && x.ReceiptDate <= to);
+                    .Where(x => x.SupplierId == id && x.ReceiptDate >= startDate && x.ReceiptDate <= to);
                 if (!string.IsNullOrWhiteSpace(search))
                     receipts = receipts.Where(x => x.ReceiptCode.Contains(search));
                 // Receipt values use the purchase-order currency and are not an AP/GL balance.
@@ -70,7 +70,7 @@ public sealed class SupplierWorkspaceDocumentsService(OasDbContext db) : ISuppli
             case "PurchaseInvoice":
             {
                 var invoices = db.Set<PurchaseInvoice>().AsNoTracking()
-                    .Where(x => x.SupplierId == id && x.InvoiceDate >= from && x.InvoiceDate <= to);
+                    .Where(x => x.SupplierId == id && x.InvoiceDate >= startDate && x.InvoiceDate <= to);
                 if (!string.IsNullOrWhiteSpace(search))
                     invoices = invoices.Where(x => x.PurchaseInvoiceCode.Contains(search) ||
                         (x.SupplierInvoiceCode != null && x.SupplierInvoiceCode.Contains(search)));
@@ -84,7 +84,7 @@ public sealed class SupplierWorkspaceDocumentsService(OasDbContext db) : ISuppli
             case "PurchaseReturn":
             {
                 var returns = db.Set<PurchaseReturn>().AsNoTracking()
-                    .Where(x => x.SupplierId == id && x.ReturnDate >= from && x.ReturnDate <= to);
+                    .Where(x => x.SupplierId == id && x.ReturnDate >= startDate && x.ReturnDate <= to);
                 if (!string.IsNullOrWhiteSpace(search))
                     returns = returns.Where(x => x.ReturnCode.Contains(search));
                 // Return has verified base totals, but those are not outstanding AP.
@@ -100,7 +100,7 @@ public sealed class SupplierWorkspaceDocumentsService(OasDbContext db) : ISuppli
                 var lines =
                     from l in db.Set<PaymentVoucherLine>().AsNoTracking()
                     join v in db.Set<PaymentVoucher>().AsNoTracking() on l.PaymentVoucherId equals v.Id
-                    where l.SupplierId == id && v.VoucherDate >= from && v.VoucherDate <= to
+                    where l.SupplierId == id && v.VoucherDate >= startDate && v.VoucherDate <= to
                     select new { Line = l, Voucher = v };
                 if (!string.IsNullOrWhiteSpace(search))
                     lines = lines.Where(x => x.Voucher.VoucherNumber.Contains(search) ||
