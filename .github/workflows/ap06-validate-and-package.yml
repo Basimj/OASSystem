@@ -1,0 +1,59 @@
+name: AP-06 build and downloadable ZIPs
+
+on:
+  push:
+    branches:
+      - feature/ap-06-supplier-workspace
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Prepare exact-branch archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          mkdir -p dist/changed
+          git diff --name-only --diff-filter=ACMR -z origin/main...HEAD | while IFS= read -r -d '' file; do
+            if [[ -f "$file" ]]; then
+              mkdir -p "dist/changed/$(dirname "$file")"
+              cp "$file" "dist/changed/$file"
+            fi
+          done
+          cd dist/changed
+          zip -qr ../OASSystem_AP06_Modified_Files_Only.zip .
+          cd ../..
+          git archive --format=zip --output=dist/OASSystem_AP06_Full_Project.zip HEAD
+      - name: Upload exact modified files
+        uses: actions/upload-artifact@v4
+        with:
+          name: OASSystem-AP06-Modified-Files-Only
+          path: dist/OASSystem_AP06_Modified_Files_Only.zip
+          if-no-files-found: error
+      - name: Upload complete project
+        uses: actions/upload-artifact@v4
+        with:
+          name: OASSystem-AP06-Full-Project
+          path: dist/OASSystem_AP06_Full_Project.zip
+          if-no-files-found: error
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - name: Restore
+        run: dotnet restore OASSystem/OASSystem.sln
+      - name: Build
+        run: dotnet build OASSystem/OASSystem.sln --no-restore
+      - name: AP-06 tests
+        run: dotnet test OASSystem/OAS.Tests/OAS.Tests.csproj --no-restore --filter "FullyQualifiedName~Ap06"

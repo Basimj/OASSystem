@@ -1,0 +1,527 @@
+@page "/accounting/suppliers/{SupplierId:guid}/center"
+@attribute [Authorize]
+@using System.Globalization
+@using System.Text
+@using OAS.Contracts.Accounting.Reports
+@using OAS.Contracts.Accounting.Suppliers
+@using OAS.Client.Services.Browser
+@inject IAccountingClientService Accounting
+@inject OasApiClient Api
+@inject BrowserFileDownloadService Download
+@inject IJSRuntime JS
+
+<PageTitle>مركز المورد | OAS</PageTitle>
+
+<div class="container-fluid py-3" dir="rtl">
+    <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap mb-3">
+        <div>
+            <h1 class="h5 mb-1">مركز المورد: @(_supplier?.NameAr ?? "جارٍ التحميل")</h1>
+            <small class="text-muted">@_supplier?.SupplierCode — حساب المورد: @_supplier?.AccountCode</small>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a class="btn btn-outline-secondary btn-sm" href="/accounting/suppliers">الموردون</a>
+            <button class="btn btn-outline-primary btn-sm" disabled="@_busy" @onclick="LoadAsync">تحديث</button>
+            <button class="btn btn-outline-secondary btn-sm" disabled="@(_busy || (_statement is null && _documents is null))" @onclick="PrintAsync">طباعة</button>
+            <button class="btn btn-outline-secondary btn-sm" disabled="@(_busy || ((_statement?.Movements.Count ?? 0) == 0 && (_documents?.Rows.Count ?? 0) == 0))" @onclick="ExportCurrentPageAsync">تصدير صفحة الكشف CSV</button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="alert alert-danger" role="alert">@_error</div>
+    }
+    @if (_busy) { <div class="small text-muted mb-2" role="status">جارٍ تحميل بيانات المورد...</div> }
+
+    @if (_supplier is not null)
+    {
+        <div class="card mb-3"><div class="card-body py-2">
+            <div class="row g-2 align-items-end">
+                <div class="col-6 col-md-2">
+                    <label class="form-label small">من تاريخ</label>
+                    <input class="form-control form-control-sm" type="date" @bind="_fromDate" />
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label small">إلى تاريخ / تاريخ أعمار الديون</label>
+                    <input class="form-control form-control-sm" type="date" @bind="_toDate" />
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label small">العملة (الكود)</label>
+                    <input class="form-control form-control-sm" @bind="_currency" placeholder="كل العملات" />
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label small">بحث في المرجع أو الوصف</label>
+                    <input class="form-control form-control-sm" @bind="_reference" placeholder="رقم القيد / المستند" />
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label small">نوع مستند الكشف</label>
+                    <select class="form-select form-select-sm" @bind="_documentType">
+                        <option value="">الكل</option>
+                        <option value="PurchaseInvoice">فاتورة مورد</option>
+                        <option value="PaymentVoucher">سند صرف</option>
+                        <option value="PurchaseReturn">مرتجع مشتريات</option>
+                        <option value="SupplierOpeningBatch">رصيد افتتاحي</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-1">
+                    <button class="btn btn-primary btn-sm w-100" disabled="@_busy" @onclick="SearchAsync">عرض</button>
+                </div>
+            </div>
+        </div></div>
+
+        @if (_tab == "orders")
+        {
+            <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+                <label class="small" for="supplier-doc-type">مستندات المشتريات</label>
+                <select id="supplier-doc-type" class="form-select form-select-sm w-auto" @bind="_operationalType">
+                    <option value="PurchaseOrder">أوامر الشراء</option>
+                    <option value="PurchaseReceipt">سندات الاستلام</option>
+                </select>
+                <button class="btn btn-outline-primary btn-sm" disabled="@_busy" @onclick="SearchAsync">عرض المستندات</button>
+            </div>
+        }
+        @if (_tab is "invoices" or "payments" or "returns" or "orders")
+        {
+            <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+                <label class="small" for="supplier-doc-status">حالة المستند</label>
+                <select id="supplier-doc-status" class="form-select form-select-sm w-auto" @bind="_statusFilter">
+                    <option value="">جميع الحالات</option>
+                    <option value="1">الحالة 1</option>
+                    <option value="2">الحالة 2</option>
+                    <option value="3">الحالة 3</option>
+                    <option value="4">الحالة 4</option>
+                    <option value="5">الحالة 5</option>
+                    <option value="6">الحالة 6</option>
+                    <option value="7">الحالة 7</option>
+                    <option value="8">الحالة 8</option>
+                    <option value="9">الحالة 9</option>
+                </select>
+                <button class="btn btn-outline-primary btn-sm" disabled="@_busy" @onclick="SearchAsync">تطبيق الحالة</button>
+            </div>
+        }
+        <div class="d-flex flex-wrap gap-2 mb-3" role="tablist" aria-label="تبويبات مركز المورد">
+            @foreach (var tab in Tabs)
+            {
+                <button type="button" role="tab" aria-selected="@(tab.Key == _tab)"
+                    class="btn btn-sm @(tab.Key == _tab ? "btn-primary" : "btn-outline-secondary")"
+                    disabled="@_busy" @onclick="() => SelectTabAsync(tab.Key)">@tab.Label</button>
+            }
+        </div>
+
+        @if (_statement is not null)
+        {
+            <div class="row g-2 mb-3">
+                @foreach (var tile in SummaryTiles())
+                {
+                    <div class="col-6 col-lg-3"><div class="card h-100"><div class="card-body py-2">
+                        <small class="text-muted">@tile.Label</small>
+                        <div class="fw-bold" style="font-variant-numeric:tabular-nums">@Amount(tile.Value)</div>
+                    </div></div></div>
+                }
+            </div>
+        }
+
+        @if (_documents is not null)
+        {
+            <div class="card mb-3"><div class="card-body">
+                <h2 class="h6">سجل مستندات المورد — @DocumentLabel(_documents.DocumentType)</h2>
+                <p class="small text-muted">السندات المشتركة تظهر بسطر المورد فقط. مبالغ المستندات التشغيلية لا تُجمع ضمن رصيد الذمم.</p>
+                <div class="table-responsive"><table class="table table-sm table-hover align-middle">
+                    <thead><tr><th>رقم المستند</th><th>تاريخ</th><th>حالة</th><th>المبلغ الأصلي</th><th>المبلغ الأساسي</th><th>غير مخصص</th><th>فتح المستند</th><th>القيد</th></tr></thead>
+                    <tbody>
+                    @foreach (var item in _documents.Rows)
+                    {
+                        <tr>
+                            <td>@item.Reference</td>
+                            <td>@item.DocumentDate.ToString("yyyy-MM-dd")</td>
+                            <td>@StatusText(item.DocumentType, item.Status)</td>
+                            <td>@(item.DocumentAmount.HasValue ? Amount(item.DocumentAmount.Value) : "—") @item.CurrencyCode</td>
+                            <td>@(item.BaseAmount.HasValue ? Amount(item.BaseAmount.Value) : "—")</td>
+                            <td>@(item.UnappliedPaymentBaseAmount.HasValue ? Amount(item.UnappliedPaymentBaseAmount.Value) : "—")</td>
+                            <td><a href="@DocumentUrl(item)">عرض</a></td>
+                            <td>@if (item.JournalEntryId.HasValue)
+                            {
+                                <a href="@("/accounting/journals?journalId=" + item.JournalEntryId.Value.ToString("D"))">القيد</a>
+                            }</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table></div>
+                @if (_documents.TotalCount == 0) { <p class="small text-muted">لا توجد مستندات في نطاق البحث.</p> }
+                <div class="d-flex align-items-center justify-content-center gap-3">
+                    <button class="btn btn-outline-secondary btn-sm" disabled="@(_page <= 1 || _busy)" @onclick="PreviousAsync">السابق</button>
+                    <span class="small">صفحة @_page — عدد السطور @_documents.TotalCount</span>
+                    <button class="btn btn-outline-secondary btn-sm" disabled="@(_page * PageSize >= _documents.TotalCount || _busy)" @onclick="NextAsync">التالي</button>
+                </div>
+            </div></div>
+        }
+
+        @if (_tab == "summary" || _tab == "orders")
+        {
+            @if (_statement is not null)
+            {
+                <p class="small text-muted">أرقام أوامر الشراء والاستلام وGRNI تشغيلية، وليست إضافات إلى رصيد ذمم الموردين.</p>
+                <div class="row g-2 mb-3">
+                    @foreach (var tile in OperationalTiles())
+                    {
+                        <div class="col-6 col-md-3"><div class="card h-100"><div class="card-body py-2">
+                            <small class="text-muted">@tile.Label</small>
+                            <div class="fw-semibold">@Amount(tile.Value)</div>
+                        </div></div></div>
+                    }
+                </div>
+                <div class="d-flex gap-2 flex-wrap mb-3">
+                    <a class="btn btn-outline-primary btn-sm" href="/purchases/orders">أوامر الشراء</a>
+                    <a class="btn btn-outline-primary btn-sm" href="/purchases/receipts">الاستلامات</a>
+                    <a class="btn btn-outline-primary btn-sm" href="/purchases/invoices">فواتير المشتريات</a>
+                    <a class="btn btn-outline-primary btn-sm" href="/purchases/returns">المرتجعات</a>
+                </div>
+            }
+            @if (_aging is not null)
+            {
+                <div class="alert alert-info small">
+                    الذمم المفتوحة حتى @_toDate: <strong>@Amount(_aging.TotalOutstanding)</strong> —
+                    مدفوعات غير مخصصة: <strong>@Amount(_aging.UnappliedPayments)</strong> —
+                    ائتمانات غير مطبقة: <strong>@Amount(_aging.UnappliedCredits)</strong>.
+                    تظهر المبالغ غير المخصصة منفصلة ولا تُخصم تلقائيًا من الفواتير.
+                </div>
+                <a href="@("/accounting/suppliers/aging?supplierId=" + SupplierId.ToString("D"))">فتح تقرير أعمار الديون الكامل</a>
+            }
+        }
+        else if (_tab == "invoices")
+        {
+            @if (_aging is not null)
+            {
+                <div class="alert alert-info small">
+                    إجمالي الفواتير والأرصدة الافتتاحية المفتوحة بتاريخ @_toDate:
+                    <strong>@Amount(_aging.TotalOutstanding)</strong>.
+                    المدفوعات غير المخصصة: @Amount(_aging.UnappliedPayments)،
+                    الائتمانات غير المطبقة: @Amount(_aging.UnappliedCredits).
+                </div>
+                <div class="card"><div class="card-body">
+                    <h2 class="h6">الديون والفواتير المفتوحة (بحسب تاريخ التقرير)</h2>
+                    <div class="table-responsive"><table class="table table-sm table-hover align-middle">
+                        <thead><tr><th>المستند</th><th>نوع المستند</th><th>التاريخ</th><th>الاستحقاق</th><th>فئة التأخر</th><th>الأساسي</th><th>المتبقي</th><th></th></tr></thead>
+                        <tbody>
+                        @foreach (var line in _aging.Lines)
+                        {
+                            <tr>
+                                <td>@line.Reference</td><td>@(line.SourceType == "SupplierOpening" ? "رصيد افتتاحي" : "فاتورة")</td>
+                                <td>@line.PostingDate</td><td>@(line.DueDate?.ToString("yyyy-MM-dd") ?? "يحتاج مراجعة")</td>
+                                <td>@line.Bucket</td><td>@Amount(line.OriginalBaseAmount)</td><td>@Amount(line.OutstandingBaseAmount)</td>
+                                <td>@if (line.SourceType == "PurchaseInvoice")
+                                    { <a href="@("/purchases/invoices?openId=" + line.SourceId.ToString("D"))">فتح</a> }
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table></div>
+                    @if (_aging.TotalCount == 0) { <p class="small text-muted">لا توجد فواتير أو أرصدة افتتاحية مفتوحة.</p> }
+                    <div class="d-flex align-items-center gap-3 justify-content-center">
+                        <button class="btn btn-sm btn-outline-secondary" disabled="@(_page <= 1 || _busy)" @onclick="PreviousAsync">السابق</button>
+                        <span class="small">صفحة @_page — عدد المستندات @_aging.TotalCount</span>
+                        <button class="btn btn-sm btn-outline-secondary" disabled="@(_page * PageSize >= _aging.TotalCount || _busy)" @onclick="NextAsync">التالي</button>
+                    </div>
+                </div></div>
+            }
+        }
+        else if (_statement is not null)
+        {
+            <div class="card"><div class="card-body">
+                <div class="d-flex justify-content-between gap-2 flex-wrap mb-2">
+                    <h2 class="h6">حركات كشف الحساب — @TabLabel(_tab)</h2>
+                    <small class="text-muted">الملخص المالي أعلى الصفحة لجميع حركات الفترة، حتى عند تصفية الجدول بنوع المستند.</small>
+                </div>
+                <div class="table-responsive"><table class="table table-sm table-hover align-middle">
+                    <thead><tr><th>تاريخ الترحيل</th><th>رقم القيد</th><th>المستند</th><th>البيان</th><th>مدين</th><th>دائن</th><th>الرصيد الدفتري</th><th>روابط</th></tr></thead>
+                    <tbody>
+                    @foreach (var movement in _statement.Movements)
+                    {
+                        <tr>
+                            <td>@movement.PostingDate</td><td>@movement.JournalNumber</td>
+                            <td>@movement.Reference <small class="text-muted">(@movement.SourceDocumentType)</small></td>
+                            <td>@movement.Description</td><td>@Amount(movement.DebitBaseAmount)</td>
+                            <td>@Amount(movement.CreditBaseAmount)</td><td>@Amount(movement.RunningLiabilityBaseAmount)</td>
+                            <td>
+                                <a href="@("/accounting/journals?journalId=" + movement.JournalEntryId.ToString("D"))">القيد</a>
+                                @if (DocumentUrl(movement) is string documentUrl)
+                                { <span> | </span><a href="@documentUrl">المستند</a> }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table></div>
+                @if (_statement.TotalCount == 0) { <p class="text-muted small">لا توجد حركات مطابقة في هذه الفترة.</p> }
+                <div class="d-flex align-items-center gap-3 justify-content-center">
+                    <button class="btn btn-sm btn-outline-secondary" disabled="@(_page <= 1 || _busy)" @onclick="PreviousAsync">السابق</button>
+                    <span class="small">صفحة @_page — الحركات المطابقة @_statement.TotalCount</span>
+                    <button class="btn btn-sm btn-outline-secondary" disabled="@(_page * PageSize >= _statement.TotalCount || _busy)" @onclick="NextAsync">التالي</button>
+                </div>
+            </div></div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public Guid SupplierId { get; set; }
+
+    private const int PageSize = 50;
+    private readonly (string Key, string Label)[] Tabs =
+    [
+        ("summary", "ملخص المورد"), ("statement", "كشف الحساب"),
+        ("invoices", "الفواتير والديون"), ("payments", "سندات الصرف"),
+        ("returns", "المرتجعات"), ("orders", "المشتريات وGRNI")
+    ];
+
+    private Guid _loadedSupplierId;
+    private SupplierDto? _supplier;
+    private SupplierStatementDto? _statement;
+    private SupplierAgingReportDto? _aging;
+    private SupplierWorkspaceDocumentsDto? _documents;
+    private string _operationalType = "PurchaseOrder";
+    private string? _statusFilter;
+    private string _tab = "summary";
+    private DateOnly _fromDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(-1));
+    private DateOnly _toDate = DateOnly.FromDateTime(DateTime.Today);
+    private string? _currency, _reference, _documentType, _error;
+    private int _page = 1;
+    private bool _busy;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedSupplierId == SupplierId) return;
+        _loadedSupplierId = SupplierId;
+        _supplier = null;
+        await LoadAsync();
+    }
+
+    private async Task SelectTabAsync(string tab)
+    {
+        _tab = tab;
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private async Task PreviousAsync()
+    {
+        if (_page > 1) { _page--; await LoadAsync(); }
+    }
+
+    private async Task NextAsync() { _page++; await LoadAsync(); }
+
+    private async Task LoadAsync()
+    {
+        if (_busy) return;
+        _error = null;
+        if (_fromDate > _toDate) { _error = "تاريخ البداية يجب ألا يتجاوز تاريخ النهاية."; return; }
+
+        _busy = true;
+        try
+        {
+            _supplier ??= await Accounting.GetSupplierByIdAsync(SupplierId);
+            if (_supplier is null) { _error = "لم يتم العثور على المورد."; return; }
+
+            _statement = null;
+            _aging = null;
+            _documents = null;
+            if (_tab is "summary" or "statement" or "orders")
+            {
+                var url = "api/accounting/reports/suppliers/" + SupplierId.ToString("D") +
+                    "/statement?fromDate=" + _fromDate.ToString("yyyy-MM-dd") +
+                    "&toDate=" + _toDate.ToString("yyyy-MM-dd") +
+                    "&pageNumber=" + _page + "&pageSize=" + PageSize;
+                var sourceType = _tab switch
+                {
+                    "payments" => "PaymentVoucher",
+                    "returns" => "PurchaseReturn",
+                    "statement" => _documentType,
+                    _ => null
+                };
+                if (!string.IsNullOrWhiteSpace(sourceType))
+                    url += "&sourceDocumentType=" + Uri.EscapeDataString(sourceType);
+                if (!string.IsNullOrWhiteSpace(_reference))
+                    url += "&reference=" + Uri.EscapeDataString(_reference.Trim());
+                if (!string.IsNullOrWhiteSpace(_currency))
+                    url += "&currencyCode=" + Uri.EscapeDataString(_currency.Trim());
+                _statement = await Api.GetAsync<SupplierStatementDto>(url);
+            }
+            if (_tab is "summary" or "invoices" or "orders" or "payments" or "returns")
+            {
+                var url = "api/accounting/reports/supplier-aging?asOfDate=" +
+                    _toDate.ToString("yyyy-MM-dd") + "&supplierId=" + SupplierId.ToString("D") +
+                    "&pageNumber=" + _page + "&pageSize=" + PageSize;
+                _aging = await Api.GetAsync<SupplierAgingReportDto>(url);
+            }
+            if (_tab is "invoices" or "payments" or "returns" or "orders")
+            {
+                var type = _tab switch
+                {
+                    "invoices" => "PurchaseInvoice",
+                    "payments" => "PaymentVoucher",
+                    "returns" => "PurchaseReturn",
+                    _ => _operationalType
+                };
+                var url = "api/accounting/suppliers/" + SupplierId.ToString("D") +
+                    "/workspace-documents?documentType=" + type +
+                    "&fromDate=" + _fromDate.ToString("yyyy-MM-dd") +
+                    "&toDate=" + _toDate.ToString("yyyy-MM-dd") +
+                    "&pageNumber=" + _page + "&pageSize=" + PageSize;
+                if (!string.IsNullOrWhiteSpace(_reference))
+                    url += "&search=" + Uri.EscapeDataString(_reference.Trim());
+                if (!string.IsNullOrWhiteSpace(_currency))
+                    url += "&currencyCode=" + Uri.EscapeDataString(_currency.Trim());
+                if (byte.TryParse(_statusFilter, out var parsedStatus))
+                    url += "&status=" + parsedStatus;
+                _documents = await Api.GetAsync<SupplierWorkspaceDocumentsDto>(url);
+            }
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private IEnumerable<(string Label, decimal Value)> SummaryTiles()
+    {
+        if (_statement is null) yield break;
+        yield return ("رصيد أول الفترة (دائن موجب)", _statement.OpeningLiabilityBaseAmount);
+        yield return ("مدين الفترة", _statement.PeriodDebitBaseAmount);
+        yield return ("دائن الفترة", _statement.PeriodCreditBaseAmount);
+        yield return ("رصيد آخر الفترة (دائن موجب)", _statement.ClosingLiabilityBaseAmount);
+    }
+
+    private IEnumerable<(string Label, decimal Value)> OperationalTiles()
+    {
+        if (_statement is null) yield break;
+        var x = _statement.OperationalExposure;
+        yield return ("قيمة أوامر الشراء", x.PurchaseOrdersBaseAmount);
+        yield return ("GRNI نشأ بالاستلام", x.ReceiptGrniCreatedBaseAmount);
+        yield return ("GRNI تمت تسويته", x.GrniClearedBaseAmount);
+        yield return ("GRNI مفتوح", x.OpenGrniBaseAmount);
+    }
+
+    private static string TabLabel(string tab) => tab switch
+    {
+        "payments" => "سندات الصرف", "returns" => "مرتجعات المشتريات",
+        _ => "جميع الحركات"
+    };
+
+    private static string StatusText(string documentType, byte status)
+    {
+        if (status == 1) return "مسودة";
+        return documentType switch
+        {
+            "PurchaseOrder" => status switch
+            {
+                2 => "بانتظار الاعتماد", 3 => "معتمد", 4 => "مرسل",
+                5 => "مستلم جزئيًا", 6 => "مستلم كاملًا",
+                7 => "مغلق", 8 => "مرفوض", 9 => "ملغى", _ => status.ToString()
+            },
+            "PurchaseInvoice" => status switch
+            {
+                2 => "مؤكدة", 3 => "بانتظار اعتماد المطابقة",
+                4 => "مرحّلة", 5 => "ملغاة", _ => status.ToString()
+            },
+            "PaymentVoucher" => status switch
+            {
+                2 => "معتمد", 3 => "مرحّل", 4 => "ملغى", _ => status.ToString()
+            },
+            _ => status switch
+            {
+                2 => "مؤكد", 3 => "مرحّل", 4 => "ملغى", _ => status.ToString()
+            }
+        };
+    }
+
+    private static string DocumentLabel(string type) => type switch
+    {
+        "PurchaseOrder" => "أوامر الشراء",
+        "PurchaseReceipt" => "سندات الاستلام",
+        "PurchaseInvoice" => "فواتير المورد",
+        "PurchaseReturn" => "المرتجعات",
+        "PaymentVoucher" => "سندات الصرف",
+        _ => type
+    };
+
+    private static string DocumentUrl(SupplierWorkspaceDocumentRowDto x)
+    {
+        var id = x.Id.ToString("D");
+        return x.DocumentType switch
+        {
+            "PurchaseInvoice" => "/purchases/invoices?openId=" + id,
+            "PurchaseOrder" => "/purchases/orders?openId=" + id,
+            "PurchaseReceipt" => "/purchases/receipts?openId=" + id,
+            "PurchaseReturn" => "/purchases/returns",
+            "PaymentVoucher" => "/accounting/payment-vouchers",
+            _ => "/accounting/suppliers"
+        };
+    }
+
+    private static string? DocumentUrl(SupplierStatementMovementDto movement)
+    {
+        if (!movement.SourceDocumentId.HasValue) return null;
+        var id = movement.SourceDocumentId.Value.ToString("D");
+        return movement.SourceDocumentType switch
+        {
+            "PurchaseInvoice" => "/purchases/invoices?openId=" + id,
+            "PurchaseOrder" => "/purchases/orders?openId=" + id,
+            "PurchaseReceipt" => "/purchases/receipts?openId=" + id,
+            "PurchaseReturn" => "/purchases/returns",
+            "PaymentVoucher" => "/accounting/payment-vouchers",
+            _ => null
+        };
+    }
+
+    private Task PrintAsync() => JS.InvokeVoidAsync("print").AsTask();
+
+    private async Task ExportCurrentPageAsync()
+    {
+        if (_statement is null && _documents is null) return;
+        if (_documents is not null)
+        {
+            var source = new StringBuilder("المستند,التاريخ,الحالة,المبلغ الأصلي,المبلغ الأساسي,غير مخصص\r\n");
+            foreach (var doc in _documents.Rows)
+            {
+                var values = new[]
+                {
+                    doc.Reference, doc.DocumentDate.ToString("yyyy-MM-dd"), doc.Status.ToString(CultureInfo.InvariantCulture),
+                    doc.DocumentAmount?.ToString(CultureInfo.InvariantCulture) ?? "",
+                    doc.BaseAmount?.ToString(CultureInfo.InvariantCulture) ?? "",
+                    doc.UnappliedPaymentBaseAmount?.ToString(CultureInfo.InvariantCulture) ?? ""
+                };
+                source.AppendLine(string.Join(",", values.Select(EscapeCsv)));
+            }
+            await Download.DownloadAsync(Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(source.ToString())).ToArray(),
+                "SupplierDocuments-" + SupplierId.ToString("N") + "-page-" + _page + ".csv", "text/csv;charset=utf-8");
+            return;
+        }
+        var csv = new StringBuilder("تاريخ الترحيل,رقم القيد,نوع المستند,المرجع,الوصف,مدين,دائن,الرصيد\r\n");
+        foreach (var line in _statement.Movements)
+        {
+            var columns = new[]
+            {
+                line.PostingDate.ToString("yyyy-MM-dd"), line.JournalNumber,
+                line.SourceDocumentType ?? "", line.Reference, line.Description,
+                line.DebitBaseAmount.ToString(CultureInfo.InvariantCulture),
+                line.CreditBaseAmount.ToString(CultureInfo.InvariantCulture),
+                line.RunningLiabilityBaseAmount.ToString(CultureInfo.InvariantCulture)
+            };
+            csv.AppendLine(string.Join(",", columns.Select(EscapeCsv)));
+        }
+        await Download.DownloadAsync(Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(csv.ToString())).ToArray(),
+            "SupplierStatement-" + SupplierId.ToString("N") + "-page-" + _page + ".csv", "text/csv;charset=utf-8");
+    }
+
+    private static string EscapeCsv(string value)
+    {
+        // Protect users opening exports in Excel from CSV formula evaluation.
+        if (!string.IsNullOrWhiteSpace(value) && "=+-@".Contains(value.TrimStart()[0]))
+            value = "'" + value;
+        return "\"" + value.Replace("\"", "\"\"") + "\"";
+    }
+
+    private static string Amount(decimal value) => value.ToString("N2", CultureInfo.CurrentCulture);
+}
