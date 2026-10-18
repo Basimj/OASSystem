@@ -60,6 +60,18 @@
 
     </UiAccountingFormSection>
 
+    @{ var linkedSupplierInvoice = Model.Lines.FirstOrDefault(x =>
+        x.PartyType == UiVoucherSettlementLinesEditor.SettlementPartyKind.Supplier &&
+        x.ReferenceType == "PurchaseInvoice" && x.SupplierId.HasValue && x.ReferenceId.HasValue); }
+    @if (linkedSupplierInvoice is not null)
+    {
+        <div class="alert alert-info mb-2" role="status">
+            سند الصرف العام يدعم أسطرًا وطرقًا وعملات متعددة. مرجع الفاتورة للتتبع فقط؛
+            <strong>لن يُخصص المبلغ للفاتورة تلقائيًا.</strong>
+            بعد ترحيل السند افتح
+            <a href="@($"/purchases/supplier-allocations?supplierId={linkedSupplierInvoice.SupplierId!.Value:D}&invoiceId={linkedSupplierInvoice.ReferenceId!.Value:D}")">مركز تخصيص دفعات المورد</a>.
+        </div>
+    }
     <UiAccountingFormSection Title="أسطر الصرف"
                              Subtitle="يمكن للسند الواحد أن يحتوي عدة أطراف وطرق دفع وصناديق/بنوك وعملات."
                              IconCssClass="fa-solid fa-list-check">

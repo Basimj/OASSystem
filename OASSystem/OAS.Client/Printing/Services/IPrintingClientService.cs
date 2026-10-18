@@ -30,6 +30,10 @@ public interface IPrintingClientService
         bool showPreview = false,
         CancellationToken cancellationToken = default);
 
+    Task<PrintJobCreatedDto?> PrintSupplierStatementAsync(
+        Guid supplierId, DateOnly fromDate, DateOnly toDate,
+        bool showPreview = true, CancellationToken cancellationToken = default);
+
     Task<PrintJobCreatedDto?> PrintTrialBalanceAsync(
         TrialBalanceFilterDto filter,
         bool showPreview = false,

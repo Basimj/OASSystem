@@ -17,3 +17,9 @@ public sealed record CreateTrialBalancePrintJobRequest(
     string? PrinterName = null,
     int Copies = 1,
     bool ShowPreview = false);
+
+
+public sealed record CreateSupplierStatementPrintJobRequest(
+    Guid SupplierId, DateOnly FromDate, DateOnly ToDate,
+    string WorkstationCode = "DEFAULT", string? TemplateCode = null,
+    string? PrinterName = null, int Copies = 1, bool ShowPreview = true);

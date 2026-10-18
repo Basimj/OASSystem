@@ -3,4 +3,9 @@
 @using OAS.Client.Purchasing.Components
 @using OAS.Client.Purchasing.Workspace
 <PageTitle>طلبات الشراء | OAS</PageTitle>
-<PurchasingWorkspaceHost Section="PurchasingEntityType.PurchaseRequests" />
+<PurchasingWorkspaceHost Section="PurchasingEntityType.PurchaseRequests" InitialRecordId="@OpenId" />
+
+@code {
+    [Microsoft.AspNetCore.Components.SupplyParameterFromQuery(Name = "openId")]
+    public Guid? OpenId { get; set; }
+}

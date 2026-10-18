@@ -9,4 +9,5 @@ public static class PrintDocumentTypes
     public const string PurchaseInvoice = "PurchaseInvoice";
     public const string GeneralLedgerReport = "GeneralLedgerReport";
     public const string TrialBalanceReport = "TrialBalanceReport";
+    public const string SupplierStatementReport = "SupplierStatementReport";
 }

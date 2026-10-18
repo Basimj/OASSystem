@@ -24,6 +24,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<DesktopPrintApiKeyValidator>();
         services.AddScoped<VoucherPrintPayloadFactory>();
         services.AddScoped<AccountingReportPrintPayloadFactory>();
+        services.AddScoped<SupplierReportSnapshotService>();
 
         services.AddScoped<ICurrentUser, HttpCurrentUser>();
         services.AddScoped<ICurrentRequestInfo, HttpCurrentRequestInfo>();

@@ -182,6 +182,28 @@ public static class DocumentFieldCatalog
                 new("Signatures.Accountant", "توقيع المحاسب", "التواقيع"),
                 new("Signatures.Approval", "توقيع الاعتماد", "التواقيع")
             ],
+            ["SupplierStatementReport"] =
+            [
+                new("ReportNumber", "رقم كشف المورد", "التقرير"),
+                new("SupplierCode", "كود المورد", "المورد"),
+                new("SupplierName", "اسم المورد", "المورد"),
+                new("AccountCode", "كود الحساب", "المورد"),
+                new("AccountName", "اسم الحساب", "المورد"),
+                new("FromDate", "من تاريخ", "الفترة"),
+                new("ToDate", "إلى تاريخ", "الفترة"),
+                new("BaseCurrencyCode", "العملة الأساسية", "الفترة"),
+                new("OpeningBalance", "الرصيد الافتتاحي", "الإجماليات"),
+                new("TotalDebit", "إجمالي مدين", "الإجماليات"),
+                new("TotalCredit", "إجمالي دائن", "الإجماليات"),
+                new("ClosingBalance", "الرصيد الختامي", "الإجماليات"),
+                new("LineCount", "عدد الحركات", "التقرير"),
+                new("Company.Name", "اسم المنشأة", "المنشأة"),
+                new("Company.Address", "عنوان المنشأة", "المنشأة"),
+                new("RequestedBy", "طلب الطباعة بواسطة", "الطباعة"),
+                new("PrintedAt", "وقت إنشاء التقرير", "الطباعة"),
+                new("SchemaVersion", "إصدار التقرير", "التدقيق"),
+                new("__PageLabel", "رقم الصفحة", "الطباعة")
+            ],
             ["GeneralLedgerReport"] =
             [
                 new("ReportNumber", "رقم التقرير", "التقرير"),
