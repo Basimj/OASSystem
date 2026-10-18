@@ -1,0 +1,68 @@
+{
+  "DocumentTitleAr": "كشف حساب المورد",
+  "DocumentTitleEn": "SUPPLIER STATEMENT",
+  "ReportNumber": "SUP-S001-20261101-20261130",
+  "SupplierCode": "S001",
+  "SupplierName": "أحمد للتوريدات",
+  "AccountCode": "2101001",
+  "AccountName": "موردون محليون",
+  "FromDate": "01/11/2026",
+  "ToDate": "30/11/2026",
+  "BaseCurrencyCode": "YER",
+  "OpeningBalance": 30000.0,
+  "TotalDebit": 140000.0,
+  "TotalCredit": 200000.0,
+  "ClosingBalance": 90000.0,
+  "LineCount": 3,
+  "PrintedAt": "2026-11-30 18:00 UTC",
+  "RequestedBy": "accountant",
+  "SchemaVersion": "AP-08/v1",
+  "Company": {
+    "Name": "OAS",
+    "Address": ""
+  },
+  "Lines": [
+    {
+      "PostingDate": "04/11/2026",
+      "DocumentDate": "04/11/2026",
+      "JournalNumber": "JV-001",
+      "DocumentType": "PurchaseInvoice",
+      "DocumentReference": "PIN-001",
+      "Description": "فاتورة المورد",
+      "Debit": 0,
+      "Credit": 200000,
+      "RunningBalance": 230000,
+      "TransactionCurrencyCode": "YER",
+      "TransactionDebit": 0,
+      "TransactionCredit": 200000
+    },
+    {
+      "PostingDate": "09/11/2026",
+      "DocumentDate": "09/11/2026",
+      "JournalNumber": "JV-002",
+      "DocumentType": "PaymentVoucher",
+      "DocumentReference": "PV-001",
+      "Description": "سداد المورد",
+      "Debit": 120000,
+      "Credit": 0,
+      "RunningBalance": 110000,
+      "TransactionCurrencyCode": "YER",
+      "TransactionDebit": 120000,
+      "TransactionCredit": 0
+    },
+    {
+      "PostingDate": "21/11/2026",
+      "DocumentDate": "21/11/2026",
+      "JournalNumber": "JV-003",
+      "DocumentType": "PurchaseReturn",
+      "DocumentReference": "PR-001",
+      "Description": "مرتجع",
+      "Debit": 20000,
+      "Credit": 0,
+      "RunningBalance": 90000,
+      "TransactionCurrencyCode": "YER",
+      "TransactionDebit": 20000,
+      "TransactionCredit": 0
+    }
+  ]
+}

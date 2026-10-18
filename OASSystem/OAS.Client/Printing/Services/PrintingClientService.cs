@@ -50,6 +50,17 @@ public sealed class PrintingClientService(OasApiClient api) : IPrintingClientSer
             cancellationToken);
     }
 
+    public Task<PrintJobCreatedDto?> PrintSupplierStatementAsync(
+        Guid supplierId, DateOnly fromDate, DateOnly toDate,
+        bool showPreview = true, CancellationToken cancellationToken = default)
+    {
+        var request = new CreateSupplierStatementPrintJobRequest(
+            supplierId, fromDate, toDate, DefaultWorkstationCode,
+            Copies: 1, ShowPreview: showPreview);
+        return api.PostAsync<CreateSupplierStatementPrintJobRequest, PrintJobCreatedDto>(
+            "api/printing/jobs/supplier-statement", request, cancellationToken);
+    }
+
     public Task<PrintJobCreatedDto?> PrintTrialBalanceAsync(
         TrialBalanceFilterDto filter,
         bool showPreview = false,

@@ -115,6 +115,31 @@ public sealed class PrintJobsController(
         return Ok(queue.Enqueue(request.WorkstationCode, job));
     }
 
+    [Authorize]
+    [HttpPost("jobs/supplier-statement")]
+    public async Task<ActionResult<PrintJobCreatedDto>> CreateSupplierStatement(
+        [FromBody] CreateSupplierStatementPrintJobRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request.SupplierId == Guid.Empty) return BadRequest("معرف المورد مطلوب.");
+        if (request.ToDate < request.FromDate) return BadRequest("تاريخ النهاية يجب ألا يسبق تاريخ البداية.");
+        if (request.Copies is < 1 or > 20) return BadRequest("عدد النسخ يجب أن يكون بين 1 و20.");
+
+        // MediatR enforces the exact same supplier & journal view permissions as report UI.
+        object data;
+        try
+        {
+            data = await accountingReportPayloadFactory.BuildSupplierStatementAsync(
+                request.SupplierId, request.FromDate, request.ToDate, RequestedBy(), cancellationToken);
+        }
+        catch (ArgumentOutOfRangeException ex) { return BadRequest(ex.Message); }
+        var job = new DesktopPrintJobDto(
+            Guid.NewGuid(), PrintDocumentTypes.SupplierStatementReport,
+            request.TemplateCode, request.PrinterName, request.Copies,
+            request.ShowPreview, RequestedBy(), JsonSerializer.SerializeToElement(data));
+        return Ok(queue.Enqueue(request.WorkstationCode, job));
+    }
+
     private string? RequestedBy() =>
         User.Identity?.Name
         ?? User.FindFirst("name")?.Value

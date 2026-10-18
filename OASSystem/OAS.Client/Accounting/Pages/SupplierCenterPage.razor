@@ -1,14 +1,12 @@
 @page "/accounting/suppliers/{SupplierId:guid}/center"
 @attribute [Authorize]
-@using System.Globalization
-@using System.Text
 @using OAS.Contracts.Accounting.Reports
 @using OAS.Contracts.Accounting.Suppliers
 @using OAS.Client.Services.Browser
 @inject IAccountingClientService Accounting
 @inject OasApiClient Api
 @inject BrowserFileDownloadService Download
-@inject IJSRuntime JS
+@inject OAS.Client.Printing.Services.IPrintingClientService Printing
 
 <PageTitle>مركز المورد | OAS</PageTitle>
 
@@ -21,11 +19,17 @@
         <div class="d-flex gap-2 flex-wrap">
             <a class="btn btn-outline-secondary btn-sm" href="/accounting/suppliers">الموردون</a>
             <button class="btn btn-outline-primary btn-sm" disabled="@_busy" @onclick="LoadAsync">تحديث</button>
-            <button class="btn btn-outline-secondary btn-sm" disabled="@(_busy || (_statement is null && _documents is null))" @onclick="PrintAsync">طباعة</button>
-            <button class="btn btn-outline-secondary btn-sm" disabled="@(_busy || ((_statement?.Movements.Count ?? 0) == 0 && (_documents?.Rows.Count ?? 0) == 0))" @onclick="ExportCurrentPageAsync">تصدير صفحة الكشف CSV</button>
+            <button class="btn btn-outline-secondary btn-sm" disabled="@(_busy || _statement is null)" @onclick="PreviewPrintAsync">معاينة كشف المورد</button>
+            <button class="btn btn-outline-secondary btn-sm" disabled="@(_busy || _statement is null)" @onclick="PrintAsync">طباعة OAS</button>
+            <button class="btn btn-outline-secondary btn-sm" disabled="@(_busy || _statement is null)" @onclick="ExportCsvAsync">CSV كامل</button>
+            <button class="btn btn-outline-secondary btn-sm" disabled="@(_busy || _statement is null)" @onclick="ExportExcelAsync">Excel كامل</button>
         </div>
     </div>
 
+    @if (!string.IsNullOrWhiteSpace(_notice))
+    {
+        <div class="alert alert-success" role="status">@_notice</div>
+    }
     @if (!string.IsNullOrWhiteSpace(_error))
     {
         <div class="alert alert-danger" role="alert">@_error</div>
@@ -282,7 +286,7 @@
     private string _tab = "summary";
     private DateOnly _fromDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(-1));
     private DateOnly _toDate = DateOnly.FromDateTime(DateTime.Today);
-    private string? _currency, _reference, _documentType, _error;
+    private string? _currency, _reference, _documentType, _error, _notice;
     private int _page = 1;
     private bool _busy;
 
@@ -318,6 +322,7 @@
     {
         if (_busy) return;
         _error = null;
+        _notice = null;
         if (_fromDate > _toDate) { _error = "تاريخ البداية يجب ألا يتجاوز تاريخ النهاية."; return; }
 
         _busy = true;
@@ -475,52 +480,42 @@
         };
     }
 
-    private Task PrintAsync() => JS.InvokeVoidAsync("print").AsTask();
+    private Task PreviewPrintAsync() => QueuePrintAsync(true);
+    private Task PrintAsync() => QueuePrintAsync(false);
 
-    private async Task ExportCurrentPageAsync()
+    private async Task QueuePrintAsync(bool preview)
     {
-        if (_statement is null && _documents is null) return;
-        if (_documents is not null)
+        _error = null;
+        try
         {
-            var source = new StringBuilder("المستند,التاريخ,الحالة,المبلغ الأصلي,المبلغ الأساسي,غير مخصص\r\n");
-            foreach (var doc in _documents.Rows)
-            {
-                var values = new[]
-                {
-                    doc.Reference, doc.DocumentDate.ToString("yyyy-MM-dd"), doc.Status.ToString(CultureInfo.InvariantCulture),
-                    doc.DocumentAmount?.ToString(CultureInfo.InvariantCulture) ?? "",
-                    doc.BaseAmount?.ToString(CultureInfo.InvariantCulture) ?? "",
-                    doc.UnappliedPaymentBaseAmount?.ToString(CultureInfo.InvariantCulture) ?? ""
-                };
-                source.AppendLine(string.Join(",", values.Select(EscapeCsv)));
-            }
-            await Download.DownloadAsync(Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(source.ToString())).ToArray(),
-                "SupplierDocuments-" + SupplierId.ToString("N") + "-page-" + _page + ".csv", "text/csv;charset=utf-8");
-            return;
+            if (_fromDate > _toDate) throw new InvalidOperationException("راجع الفترة المحددة.");
+            var job = await Printing.PrintSupplierStatementAsync(SupplierId, _fromDate, _toDate, preview);
+            if (job is null) throw new InvalidOperationException("تعذر إرسال تقرير المورد للطباعة.");
+            _notice = preview
+                ? "تم إرسال كشف حساب المورد إلى OAS Print للمعاينة."
+                : "تم إرسال كشف حساب المورد إلى OAS Print للطباعة.";
         }
-        var csv = new StringBuilder("تاريخ الترحيل,رقم القيد,نوع المستند,المرجع,الوصف,مدين,دائن,الرصيد\r\n");
-        foreach (var line in _statement.Movements)
-        {
-            var columns = new[]
-            {
-                line.PostingDate.ToString("yyyy-MM-dd"), line.JournalNumber,
-                line.SourceDocumentType ?? "", line.Reference, line.Description,
-                line.DebitBaseAmount.ToString(CultureInfo.InvariantCulture),
-                line.CreditBaseAmount.ToString(CultureInfo.InvariantCulture),
-                line.RunningLiabilityBaseAmount.ToString(CultureInfo.InvariantCulture)
-            };
-            csv.AppendLine(string.Join(",", columns.Select(EscapeCsv)));
-        }
-        await Download.DownloadAsync(Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(csv.ToString())).ToArray(),
-            "SupplierStatement-" + SupplierId.ToString("N") + "-page-" + _page + ".csv", "text/csv;charset=utf-8");
+        catch (Exception ex) { _error = ex.Message; }
     }
 
-    private static string EscapeCsv(string value)
+    private Task ExportCsvAsync() => ExportReportAsync("csv");
+    private Task ExportExcelAsync() => ExportReportAsync("xlsx");
+
+    private async Task ExportReportAsync(string format)
     {
-        // Protect users opening exports in Excel from CSV formula evaluation.
-        if (!string.IsNullOrWhiteSpace(value) && "=+-@".Contains(value.TrimStart()[0]))
-            value = "'" + value;
-        return "\"" + value.Replace("\"", "\"\"") + "\"";
+        _error = null;
+        try
+        {
+            if (_fromDate > _toDate) throw new InvalidOperationException("راجع الفترة المحددة.");
+            var url = $"api/accounting/reports/suppliers/{SupplierId:D}/statement/export" +
+                $"?fromDate={_fromDate:yyyy-MM-dd}&toDate={_toDate:yyyy-MM-dd}&format={format}";
+            var bytes = await Api.GetFileAsync(url);
+            var name = $"SupplierStatement-{SupplierId:N}-{_fromDate:yyyyMMdd}-{_toDate:yyyyMMdd}.{format}";
+            await Download.DownloadAsync(bytes, name,
+                format == "csv" ? "text/csv;charset=utf-8"
+                    : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        }
+        catch (Exception ex) { _error = ex.Message; }
     }
 
     private static string Amount(decimal value) => value.ToString("N2", CultureInfo.CurrentCulture);

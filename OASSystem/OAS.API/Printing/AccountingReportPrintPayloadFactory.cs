@@ -7,8 +7,19 @@ namespace OAS.API.Printing;
 
 public sealed class AccountingReportPrintPayloadFactory(
     ISender sender,
-    IConfiguration configuration)
+    IConfiguration configuration,
+    SupplierReportSnapshotService supplierReports)
 {
+    public async Task<object> BuildSupplierStatementAsync(
+        Guid supplierId, DateOnly fromDate, DateOnly toDate,
+        string? requestedBy, CancellationToken cancellationToken)
+    {
+        var report = await supplierReports.StatementAsync(supplierId, fromDate, toDate, cancellationToken);
+        return SupplierStatementPrintPayload.Create(report, Company(),
+            configuration["Accounting:BaseCurrencyCode"] ?? "العملة الأساسية",
+            requestedBy, DateTimeOffset.UtcNow);
+    }
+
     public async Task<object> BuildGeneralLedgerAsync(
         GeneralLedgerFilterDto filter,
         string? requestedBy,

@@ -50,7 +50,7 @@ public sealed class SupplierWorkspaceDocumentsService(OasDbContext db) : ISuppli
                         join c in db.Set<Currency>().AsNoTracking() on o.CurrencyId equals c.Id
                         where currency == null || currency == "" || c.Code == currency
                         select new SupplierWorkspaceDocumentRowDto(o.Id, type, o.PurchaseOrderCode,
-                            o.OrderDate, (byte)o.Status, o.TotalAmount, null, c.Code, null);
+                            o.OrderDate, (byte)o.Status, o.TotalAmount, null, c.Code, null, null, null);
                 break;
             }
             case "PurchaseReceipt":
@@ -67,7 +67,7 @@ public sealed class SupplierWorkspaceDocumentsService(OasDbContext db) : ISuppli
                         join c in db.Set<Currency>().AsNoTracking() on o.CurrencyId equals c.Id
                         where currency == null || currency == "" || c.Code == currency
                         select new SupplierWorkspaceDocumentRowDto(r.Id, type, r.ReceiptCode,
-                            r.ReceiptDate, (byte)r.Status, null, null, c.Code, r.JournalEntryId);
+                            r.ReceiptDate, (byte)r.Status, null, null, c.Code, r.JournalEntryId, null, null);
                 break;
             }
             case "PurchaseInvoice":
@@ -82,7 +82,7 @@ public sealed class SupplierWorkspaceDocumentsService(OasDbContext db) : ISuppli
                     invoices = invoices.Where(x => x.CurrencyCodeSnapshot == currency);
                 query = invoices.Select(x => new SupplierWorkspaceDocumentRowDto(
                     x.Id, type, x.PurchaseInvoiceCode, x.InvoiceDate, (byte)x.Status,
-                    x.TotalAmount, x.BaseTotalAmount, x.CurrencyCodeSnapshot, x.JournalEntryId));
+                    x.TotalAmount, x.BaseTotalAmount, x.CurrencyCodeSnapshot, x.JournalEntryId, null, null));
                 break;
             }
             case "PurchaseReturn":
@@ -95,7 +95,7 @@ public sealed class SupplierWorkspaceDocumentsService(OasDbContext db) : ISuppli
                 // Return has verified base totals, but those are not outstanding AP.
                 query = returns.Select(x => new SupplierWorkspaceDocumentRowDto(
                     x.Id, type, x.ReturnCode, x.ReturnDate, (byte)x.Status, null,
-                    x.SupplierGrossBaseAmount, null, x.JournalEntryId));
+                    x.SupplierGrossBaseAmount, null, x.JournalEntryId, null, null));
                 if (!string.IsNullOrWhiteSpace(currency))
                     query = query.Where(_ => false); // No original-currency snapshot in return.
                 break;
@@ -119,7 +119,7 @@ public sealed class SupplierWorkspaceDocumentsService(OasDbContext db) : ISuppli
                     (byte)x.Voucher.Status, x.Line.Amount,
                     x.Line.CounterpartyBaseAmount ?? x.Line.BaseAmount ?? x.Line.Amount * (x.Line.ExchangeRate ?? 1m),
                     x.Line.CurrencyCodeSnapshot,
-                    x.Voucher.JournalEntryId, x.Line.Id));
+                    x.Voucher.JournalEntryId, x.Line.Id, null));
                 break;
             }
             default:
