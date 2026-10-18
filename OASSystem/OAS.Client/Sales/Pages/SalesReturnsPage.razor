@@ -8,6 +8,7 @@
 @using OAS.Client.Services.Http
 @using OAS.UiLib.Services.Feedback
 @inject ISalesClientService Sales
+@inject OasApiClient ApiClient
 @inject IUiSnackbarService Snackbar
 @inject IApiFeedbackService ApiFeedback
 
@@ -30,12 +31,9 @@
             }
         </UiWorkspaceActionBar>
     </Actions>
-
     <Content>
         <UiDataGridPanel Title="مرتجعات المبيعات" Subtitle="@($"{_page.TotalCount:N0} مستند")">
-            <Toolbar>
-                <UiSearchInput Value="@_search" ValueChanged="@(value => _search = value)" OnSearch="SearchAsync" Placeholder="بحث برقم المرتجع أو السبب..." />
-            </Toolbar>
+            <Toolbar><UiSearchInput Value="@_search" ValueChanged="@(value => _search = value)" OnSearch="SearchAsync" Placeholder="بحث برقم المرتجع أو السبب..." /></Toolbar>
             <Body>
                 <UiStackLayout Gap="StackGap.Small">
                     @if (_busy && _page.Items.Count == 0)
@@ -52,90 +50,66 @@
                         {
                             <UiRecordRow Title="@item.ReturnCode"
                                          Subtitle="@($"{item.ReturnDate:yyyy-MM-dd} • {item.TotalAmount:N2} {item.CurrencyCode}")"
-                                         Selected="@(_selected?.Id == item.Id)"
-                                         OnClick="@(() => SelectAsync(item.Id))">
-                                <Content>
-                                    <UiKeyValue Label="تاريخ الترحيل" Value="@item.PostingDate.ToString("yyyy-MM-dd")" />
-                                </Content>
-                                <Trailing>
-                                    <UiBadge Text="@StatusText(item.Status)" Tone="@StatusTone(item.Status)" />
-                                </Trailing>
+                                         Selected="@(_selected?.Id == item.Id)" OnClick="@(() => SelectAsync(item.Id))">
+                                <Content><UiKeyValue Label="تاريخ الترحيل" Value="@item.PostingDate.ToString("yyyy-MM-dd")" /></Content>
+                                <Trailing><UiBadge Text="@StatusText(item.Status)" Tone="@StatusTone(item.Status)" /></Trailing>
                             </UiRecordRow>
                         }
                     }
                 </UiStackLayout>
             </Body>
-            <Footer>
-                <UiPagination PageNumber="@_page.PageNumber" TotalPages="@_page.TotalPages" TotalCount="@_page.TotalCount" OnPrevious="PreviousAsync" OnNext="NextAsync" />
-            </Footer>
+            <Footer><UiPagination PageNumber="@_page.PageNumber" TotalPages="@_page.TotalPages" TotalCount="@_page.TotalCount" OnPrevious="PreviousAsync" OnNext="NextAsync" /></Footer>
         </UiDataGridPanel>
     </Content>
-
     <Aside>
         @if (_creating)
         {
-            <UiCard Title="مرتجع مبيعات جديد" Subtitle="اختر فاتورة مرحلة ثم حدد الأسطر والكميات المراد إرجاعها.">
+            <UiCard Title="مرتجع مبيعات جديد" Subtitle="اختر فاتورة مرحلة، وسيضبط النظام التواريخ والمخازن وفق شروطها.">
                 <UiStackLayout Gap="StackGap.Small">
-                    <UiSelect Label="فاتورة المبيعات"
-                              Placeholder="اختر فاتورة مرحلة"
-                              Value="@_invoiceIdText"
-                              ValueChanged="InvoiceChangedAsync"
-                              Options="@InvoiceOptions"
-                              Size="ControlSize.Small" />
+                    <UiSelect Label="فاتورة المبيعات" Placeholder="اختر فاتورة مرحلة" Value="@_invoiceIdText"
+                              ValueChanged="InvoiceChangedAsync" Options="@InvoiceOptions" Size="ControlSize.Small" />
                     <UiGrid Columns="2">
-                        <UiInputDate Label="تاريخ المرتجع" Value="@_returnDate" ValueChanged="@(value => _returnDate = value)" Size="ControlSize.Small" />
-                        <UiInputDate Label="تاريخ الترحيل" Value="@_postingDate" ValueChanged="@(value => _postingDate = value)" Size="ControlSize.Small" />
+                        <UiInputDate Label="تاريخ المرتجع" Value="@_returnDate" ValueChanged="OnReturnDateChanged" Size="ControlSize.Small" />
+                        <UiInputDate Label="تاريخ الترحيل" Value="@_postingDate" ValueChanged="OnPostingDateChanged" Size="ControlSize.Small" />
                     </UiGrid>
                     <UiInputText Label="السبب" Value="@_reason" ValueChanged="@(value => _reason = value)" Size="ControlSize.Small" MaxLength="1000" />
-                    <UiCheckbox Label="تجاوز مدة الإرجاع النظامية عند الحاجة"
-                                Value="@_overrideReturnWindow"
-                                ValueChanged="@(value => _overrideReturnWindow = value)" />
+                    @if (_returnPolicy?.CanOverrideReturnWindow == true)
+                    {
+                        <UiCheckbox Label="تجاوز مدة الإرجاع النظامية عند الحاجة" Value="@_overrideReturnWindow"
+                                    ValueChanged="@(value => _overrideReturnWindow = value)" />
+                    }
                     @if (_overrideReturnWindow)
                     {
-                        <UiInputText Label="سبب تجاوز مدة الإرجاع"
-                                     Value="@_returnWindowOverrideReason"
-                                     ValueChanged="@(value => _returnWindowOverrideReason = value)"
-                                     Required="true"
-                                     Size="ControlSize.Small"
-                                     MaxLength="500" />
+                        <UiInputText Label="سبب تجاوز مدة الإرجاع" Value="@_returnWindowOverrideReason"
+                                     ValueChanged="@(value => _returnWindowOverrideReason = value)" Size="ControlSize.Small" MaxLength="500" />
                     }
-
                     @if (_sourceInvoice is not null)
                     {
-                        <UiCard Title="أسطر الفاتورة" Subtitle="الكمية المتاحة محسوبة بعد خصم المرتجعات السابقة والمحجوزة.">
+                        <UiCard Title="أسطر الفاتورة" Subtitle="يحدد النظام مخزنًا صالحًا تلقائيًا بحسب قرار المخزون.">
                             <UiStackLayout Gap="StackGap.Small">
                                 @foreach (var line in _returnLines)
                                 {
                                     <UiCard Title="@($"{line.Line.LineNumber} - {line.Line.ProductNameSnapshot}")"
                                             Subtitle="@($"الكمية الأصلية {line.Line.Quantity:N3} • المتاح {line.Remaining:N3}")">
                                         <UiGrid Columns="2">
-                                            <UiCheckbox Value="@line.Selected" ValueChanged="@(value => line.Selected = value)" Label="إرجاع هذا السطر" Disabled="@(line.Remaining <= 0m)" />
-                                            <UiInputText Label="الكمية المرتجعة"
-                                                         Value="@line.QuantityText"
+                                            <UiCheckbox Value="@line.Selected" ValueChanged="@(value => OnLineSelected(line, value))" Label="إرجاع هذا السطر" Disabled="@(line.Remaining <= 0m)" />
+                                            <UiInputText Label="الكمية المرتجعة" Value="@line.QuantityText"
                                                          ValueChanged="@(value => line.QuantityText = value ?? string.Empty)"
-                                                         InputMode="decimal"
-                                                         Size="ControlSize.Small"
-                                                         Disabled="@(!line.Selected || line.Remaining <= 0m)" />
+                                                         InputMode="decimal" Size="ControlSize.Small" Disabled="@(!line.Selected || line.Remaining <= 0m)" />
                                             @if (line.RequiresInventory)
                                             {
-                                                <UiSelect Label="حالة الصنف المرتجع"
-                                                          Value="@line.ReturnConditionText"
-                                                          ValueChanged="@(value => line.ReturnConditionText = value)"
-                                                          Options="@ConditionOptions"
-                                                          Size="ControlSize.Small"
+                                                <UiSelect Label="حالة الصنف المرتجع" Value="@line.ReturnConditionText"
+                                                          ValueChanged="@(value => OnConditionChanged(line, value))"
+                                                          Options="@ConditionOptionsFor(line)" Size="ControlSize.Small"
                                                           Disabled="@(!line.Selected || line.Remaining <= 0m)" />
-                                                <UiSelect Label="قرار المخزون"
-                                                          Value="@line.StockDispositionText"
-                                                          ValueChanged="@(value => line.StockDispositionText = value)"
-                                                          Options="@DispositionOptions"
-                                                          Size="ControlSize.Small"
+                                                <UiSelect Label="قرار المخزون" Value="@line.StockDispositionText"
+                                                          ValueChanged="@(value => OnDispositionChanged(line, value))"
+                                                          Options="@DispositionOptionsFor(line)" Size="ControlSize.Small"
                                                           Disabled="@(!line.Selected || line.Remaining <= 0m)" />
-                                                <UiSelect Label="مخزن الإرجاع / الفحص"
-                                                          Placeholder="اختر مخزن الإرجاع"
+                                                <UiSelect Label="مخزن الإرجاع / الفحص" Placeholder="لا يوجد مخزن صالح"
                                                           Value="@line.ReturnWarehouseIdText"
-                                                          ValueChanged="@(value => line.ReturnWarehouseIdText = value)"
-                                                          Options="@WarehouseOptions"
-                                                          Size="ControlSize.Small"
+                                                          ValueChanged="@(value => OnReturnWarehouseChanged(line, value))"
+                                                          Options="@WarehouseOptionsFor(line)" Size="ControlSize.Small"
                                                           Disabled="@(!line.Selected || line.Remaining <= 0m)" />
                                             }
                                         </UiGrid>
@@ -144,7 +118,6 @@
                             </UiStackLayout>
                         </UiCard>
                     }
-
                     <UiWorkspaceActionBar>
                         <UiButton Text="حفظ المسودة" IconCssClass="fa-solid fa-floppy-disk" Loading="@_busy" Size="ControlSize.Small" OnClick="CreateAsync" />
                         <UiButton Text="إلغاء" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CloseEditorAsync" />
@@ -196,29 +169,22 @@
                                 @if (_selected.Status == SalesReturnStatus.Posted && line.StockDisposition == SalesReturnStockDisposition.Quarantine)
                                 {
                                     var inspection = GetInspectionForm(line.Id);
-                                    <UiCard Title="فحص / تسريح من الحجر" Subtitle="لن يعود الصنف للبيع إلا بعد نتيجة فحص صريحة ومخزن بيع صالح.">
+                                    <UiCard Title="فحص / تسريح من الحجر" Subtitle="تُعرض مخازن البيع النشطة فقط عند التسريح.">
                                         <UiGrid Columns="2">
-                                            <UiSelect Label="نتيجة الفحص"
-                                                      Value="@inspection.ConditionText"
-                                                      ValueChanged="@(value => inspection.ConditionText = value ?? nameof(SalesReturnCondition.NeedsInspection))"
-                                                      Options="@InspectionConditionOptions"
-                                                      Size="ControlSize.Small" />
+                                            <UiSelect Label="نتيجة الفحص" Value="@inspection.ConditionText"
+                                                      ValueChanged="@(value => OnInspectionConditionChanged(inspection, value))"
+                                                      Options="@InspectionConditionOptions" Size="ControlSize.Small" />
                                             @if (inspection.ConditionText == nameof(SalesReturnCondition.Resellable))
                                             {
-                                                <UiSelect Label="مخزن التسريح القابل للبيع"
-                                                          Placeholder="اختر مخزن الوجهة"
+                                                <UiSelect Label="مخزن التسريح القابل للبيع" Placeholder="لا يوجد مخزن صالح"
                                                           Value="@inspection.DestinationWarehouseIdText"
                                                           ValueChanged="@(value => inspection.DestinationWarehouseIdText = value)"
-                                                          Options="@SellableWarehouseOptions"
-                                                          Size="ControlSize.Small" />
+                                                          Options="@SellableWarehouseOptions" Size="ControlSize.Small" />
                                             }
                                         </UiGrid>
                                         <UiWorkspaceActionBar>
-                                            <UiButton Text="حفظ نتيجة الفحص"
-                                                      IconCssClass="fa-solid fa-shield-check"
-                                                      Size="ControlSize.Small"
-                                                      Loading="@_busy"
-                                                      OnClick="@(() => InspectLineAsync(line))" />
+                                            <UiButton Text="حفظ نتيجة الفحص" IconCssClass="fa-solid fa-shield-check"
+                                                      Size="ControlSize.Small" Loading="@_busy" OnClick="@(() => InspectLineAsync(line))" />
                                         </UiWorkspaceActionBar>
                                     </UiCard>
                                 }
@@ -238,6 +204,7 @@
     private IReadOnlyList<SalesInvoiceDto> _postedInvoices = [];
     private IReadOnlyList<SalesWarehouseLookupDto> _returnWarehouses = [];
     private readonly List<ReturnLineForm> _returnLines = [];
+    private readonly Dictionary<Guid, InspectionLineForm> _inspectionForms = [];
     private bool _creating;
     private bool _busy;
     private int _pageNumber = 1;
@@ -248,25 +215,30 @@
     private string? _reason;
     private bool _overrideReturnWindow;
     private string? _returnWindowOverrideReason;
-    private readonly Dictionary<Guid, InspectionLineForm> _inspectionForms = [];
+    private SalesReturnCreationPolicyDto? _returnPolicy;
 
     private IReadOnlyList<UiSelectOption> InvoiceOptions => _postedInvoices
         .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.InvoiceCode} - {x.CustomerName ?? x.CustomerCode ?? "عميل"}"))
         .ToArray();
 
-    private static readonly IReadOnlyList<UiSelectOption> ConditionOptions =
+    private static readonly IReadOnlyList<UiSelectOption> StandardConditions =
     [
         new(nameof(SalesReturnCondition.Resellable), "قابل لإعادة البيع"),
         new(nameof(SalesReturnCondition.NeedsInspection), "يحتاج فحص"),
         new(nameof(SalesReturnCondition.Damaged), "تالف / متضرر")
     ];
-
-    private static readonly IReadOnlyList<UiSelectOption> DispositionOptions =
+    private static readonly IReadOnlyList<UiSelectOption> QuarantineConditions =
+    [
+        new(nameof(SalesReturnCondition.NeedsInspection), "يحتاج فحص"),
+        new(nameof(SalesReturnCondition.Damaged), "تالف / متضرر")
+    ];
+    private static readonly IReadOnlyList<UiSelectOption> StandardDispositions =
     [
         new(nameof(SalesReturnStockDisposition.Restock), "إعادة للمخزون القابل للبيع"),
         new(nameof(SalesReturnStockDisposition.Quarantine), "حجر وفحص")
     ];
-
+    private static readonly IReadOnlyList<UiSelectOption> MandatoryQuarantine =
+    [new(nameof(SalesReturnStockDisposition.Quarantine), "حجر وفحص")];
     private static readonly IReadOnlyList<UiSelectOption> InspectionConditionOptions =
     [
         new(nameof(SalesReturnCondition.Resellable), "قابل لإعادة البيع — تسريح"),
@@ -274,18 +246,99 @@
         new(nameof(SalesReturnCondition.Damaged), "تالف / يبقى في الحجر")
     ];
 
-    private IReadOnlyList<UiSelectOption> WarehouseOptions => _returnWarehouses
-        .Where(x => x.IsActive)
-        .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.Name}{(x.AllowsSalesAllocation ? string.Empty : " (حجر / غير متاح للبيع)")}"))
-        .ToArray();
+    private IReadOnlyList<UiSelectOption> ConditionOptionsFor(ReturnLineForm line) =>
+        line.RequiresQualityInspection ? QuarantineConditions : StandardConditions;
+    private IReadOnlyList<UiSelectOption> DispositionOptionsFor(ReturnLineForm line) =>
+        line.RequiresQualityInspection || line.ReturnConditionText != nameof(SalesReturnCondition.Resellable)
+            ? MandatoryQuarantine : StandardDispositions;
 
+    private IReadOnlyList<SalesWarehouseLookupDto> EligibleWarehouses(ReturnLineForm line) =>
+        _returnWarehouses.Where(x => x.IsActive &&
+            (line.StockDispositionText == nameof(SalesReturnStockDisposition.Quarantine)
+                ? !x.AllowsSalesAllocation : x.AllowsSalesAllocation)).ToArray();
+
+    private IReadOnlyList<UiSelectOption> WarehouseOptionsFor(ReturnLineForm line) => EligibleWarehouses(line)
+        .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.Name}"))
+        .ToArray();
     private IReadOnlyList<UiSelectOption> SellableWarehouseOptions => _returnWarehouses
         .Where(x => x.IsActive && x.AllowsSalesAllocation)
         .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.Name}"))
         .ToArray();
 
-    protected override async Task OnInitializedAsync() => await RefreshAsync();
+    // Invalid historical dates are never sent to the API. No under-field error rendering.
+    private DateOnly EarliestDate => _returnPolicy?.EarliestReturnDate ?? _sourceInvoice?.PostingDate ?? DateOnly.FromDateTime(DateTime.Today);
+    private void OnReturnDateChanged(DateOnly? date)
+    {
+        _returnDate = Later(date ?? EarliestDate, EarliestDate);
+        SynchronizePostingDate();
+    }
+    private void OnPostingDateChanged(DateOnly? date)
+    {
+        _postingDate = Later(date ?? _returnDate ?? EarliestDate,
+            Later(EarliestDate, _returnDate ?? EarliestDate));
+    }
+    private static DateOnly Later(DateOnly a, DateOnly b) => a > b ? a : b;
+    private void SynchronizePostingDate()
+    {
+        if (_returnDate.HasValue)
+            _postingDate = Later(_postingDate ?? _returnDate.Value,
+                Later(_returnDate.Value, EarliestDate));
+    }
+    private void NormalizeDates()
+    {
+        if (_sourceInvoice is null) return;
+        _returnDate = Later(_returnDate ?? EarliestDate, EarliestDate);
+        SynchronizePostingDate();
+    }
 
+    private void EnsureWarehouse(ReturnLineForm line)
+    {
+        if (!line.RequiresInventory) return;
+        var eligible = EligibleWarehouses(line);
+        if (Guid.TryParse(line.ReturnWarehouseIdText, out var selected) && eligible.Any(x => x.Id == selected)) return;
+        // Prefer the source warehouse when it is suitable; otherwise pick the first valid one.
+        var warehouse = eligible.FirstOrDefault(x => x.Id == line.Line.WarehouseId) ?? eligible.FirstOrDefault();
+        line.ReturnWarehouseIdText = warehouse?.Id.ToString("D");
+    }
+    private void OnLineSelected(ReturnLineForm line, bool selected)
+    {
+        line.Selected = selected;
+        if (selected) EnsureWarehouse(line);
+    }
+    private void OnReturnWarehouseChanged(ReturnLineForm line, string? value)
+    {
+        line.ReturnWarehouseIdText = value;
+        EnsureWarehouse(line);
+    }
+    private void OnConditionChanged(ReturnLineForm line, string? value)
+    {
+        line.ReturnConditionText = line.RequiresQualityInspection
+            ? (value == nameof(SalesReturnCondition.Damaged) ? nameof(SalesReturnCondition.Damaged) : nameof(SalesReturnCondition.NeedsInspection))
+            : (value ?? nameof(SalesReturnCondition.NeedsInspection));
+        if (line.ReturnConditionText != nameof(SalesReturnCondition.Resellable))
+            line.StockDispositionText = nameof(SalesReturnStockDisposition.Quarantine);
+        EnsureWarehouse(line);
+    }
+    private void OnDispositionChanged(ReturnLineForm line, string? value)
+    {
+        line.StockDispositionText = line.RequiresQualityInspection ||
+            line.ReturnConditionText != nameof(SalesReturnCondition.Resellable)
+            ? nameof(SalesReturnStockDisposition.Quarantine)
+            : value == nameof(SalesReturnStockDisposition.Quarantine)
+                ? nameof(SalesReturnStockDisposition.Quarantine)
+                : nameof(SalesReturnStockDisposition.Restock);
+        EnsureWarehouse(line);
+    }
+    private void OnInspectionConditionChanged(InspectionLineForm form, string? value)
+    {
+        form.ConditionText = value ?? nameof(SalesReturnCondition.NeedsInspection);
+        if (form.ConditionText != nameof(SalesReturnCondition.Resellable)) form.DestinationWarehouseIdText = null;
+        else if (!Guid.TryParse(form.DestinationWarehouseIdText, out var id) ||
+                 !_returnWarehouses.Any(x => x.Id == id && x.IsActive && x.AllowsSalesAllocation))
+            form.DestinationWarehouseIdText = _returnWarehouses.FirstOrDefault(x => x.IsActive && x.AllowsSalesAllocation)?.Id.ToString("D");
+    }
+
+    protected override async Task OnInitializedAsync() => await RefreshAsync();
     private async Task RefreshAsync()
     {
         _busy = true;
@@ -302,40 +355,32 @@
         catch { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
     }
-
-    private async Task SearchAsync(string? value)
-    {
-        _search = value;
-        _pageNumber = 1;
-        await RefreshAsync();
-    }
-
+    private async Task SearchAsync(string? text) { _search = text; _pageNumber = 1; await RefreshAsync(); }
     private async Task PreviousAsync() { if (_pageNumber > 1) { _pageNumber--; await RefreshAsync(); } }
     private async Task NextAsync() { if (_page.HasNextPage) { _pageNumber++; await RefreshAsync(); } }
-
     private async Task SelectAsync(Guid id)
     {
         _creating = false;
         _busy = true;
         try
         {
-            var selectedTask = Sales.GetSalesReturnByIdAsync(id);
-            var warehousesTask = Sales.SearchWarehousesAsync(null, null, 100, true);
-            await Task.WhenAll(selectedTask, warehousesTask);
-            _selected = selectedTask.Result;
-            _returnWarehouses = warehousesTask.Result.Where(x => x.IsActive).ToArray();
+            var selection = Sales.GetSalesReturnByIdAsync(id);
+            var warehouses = Sales.SearchWarehousesAsync(null, null, 100, true);
+            await Task.WhenAll(selection, warehouses);
+            _selected = selection.Result;
+            _returnWarehouses = warehouses.Result.Where(x => x.IsActive).ToArray();
             SyncInspectionForms();
         }
         catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
         catch { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
     }
-
     private async Task BeginCreateAsync()
     {
         _creating = true;
         _selected = null;
         _sourceInvoice = null;
+        _returnPolicy = null;
         _returnLines.Clear();
         _invoiceIdText = null;
         _reason = null;
@@ -346,32 +391,46 @@
         _busy = true;
         try
         {
-            var invoicesTask = Sales.GetSalesInvoicesPageAsync(new PageRequest { PageNumber = 1, PageSize = 200, SortBy = "invoiceDate", SortDirection = SortDirection.Descending });
-            var warehousesTask = Sales.SearchWarehousesAsync(null, null, 100, true);
-            await Task.WhenAll(invoicesTask, warehousesTask);
-            _postedInvoices = invoicesTask.Result.Items.Where(x => x.Status == SalesInvoiceStatus.Posted).ToArray();
-            _returnWarehouses = warehousesTask.Result.Where(x => x.IsActive).ToArray();
+            var invoices = Sales.GetSalesInvoicesPageAsync(new PageRequest { PageNumber = 1, PageSize = 200, SortBy = "invoiceDate", SortDirection = SortDirection.Descending });
+            var warehouses = Sales.SearchWarehousesAsync(null, null, 100, true);
+            await Task.WhenAll(invoices, warehouses);
+            _postedInvoices = invoices.Result.Items.Where(x => x.Status == SalesInvoiceStatus.Posted).ToArray();
+            _returnWarehouses = warehouses.Result.Where(x => x.IsActive).ToArray();
         }
         catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
         catch { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
     }
-
     private async Task InvoiceChangedAsync(string? value)
     {
         _invoiceIdText = value;
         _sourceInvoice = null;
+        _returnPolicy = null;
         _returnLines.Clear();
         if (!Guid.TryParse(value, out var id)) return;
         _busy = true;
         try
         {
-            _sourceInvoice = await Sales.GetSalesInvoiceByIdAsync(id);
-            if (_sourceInvoice is null) return;
+            var invoiceTask = Sales.GetSalesInvoiceByIdAsync(id);
+            var policyTask = ApiClient.GetAsync<SalesReturnCreationPolicyDto>(
+                $"api/sales/returns/invoices/{id:D}/return-policy");
+            await Task.WhenAll(invoiceTask, policyTask);
+            _sourceInvoice = invoiceTask.Result;
+            _returnPolicy = policyTask.Result;
+            if (_sourceInvoice is null || _returnPolicy is null) return;
+            if (!_returnPolicy.CanCreate)
+            {
+                Snackbar.Error(_returnPolicy.Reason ?? "الفاتورة غير متاحة للإرجاع.");
+                _sourceInvoice = null;
+                return;
+            }
+            NormalizeDates();
             foreach (var line in _sourceInvoice.Lines.Where(x => x.IsActive))
             {
                 var remaining = Math.Max(0m, line.Quantity - line.ReturnedQuantity);
-                _returnLines.Add(new ReturnLineForm(line, remaining));
+                var form = new ReturnLineForm(line, remaining);
+                EnsureWarehouse(form);
+                _returnLines.Add(form);
             }
         }
         catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
@@ -383,59 +442,74 @@
     {
         if (_sourceInvoice is null || !_returnDate.HasValue || !_postingDate.HasValue)
         {
-            Snackbar.Error("اختر فاتورة وحدد تاريخ المرتجع والترحيل.");
+            Snackbar.Error("اختر فاتورة وحدد التاريخ.");
             return;
+        }
+        NormalizeDates();
+        if (_returnPolicy is not null && !_returnPolicy.CanCreate)
+        {
+            Snackbar.Error(_returnPolicy.Reason ?? "الفاتورة غير قابلة للإرجاع.");
+            return;
+        }
+        if (_returnPolicy?.LastReturnDateWithoutOverride is { } until && _returnDate.Value > until)
+        {
+            if (!_overrideReturnWindow)
+            {
+                Snackbar.Error("انتهت مدة الإرجاع النظامية. يلزم تجاوز مصرح به.");
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(_returnWindowOverrideReason))
+            {
+                Snackbar.Error("سجّل سبب تجاوز مدة الإرجاع.");
+                return;
+            }
         }
         var lines = new List<CreateSalesReturnLineRequest>();
         foreach (var form in _returnLines.Where(x => x.Selected))
         {
             if (!decimal.TryParse(form.QuantityText, out var quantity) || quantity <= 0m || quantity > form.Remaining)
             {
-                Snackbar.Error($"تحقق من كمية السطر {form.Line.LineNumber}. الحد الأقصى {form.Remaining:N3}.");
+                Snackbar.Error($"تحقق من كمية السطر {form.Line.LineNumber}؛ الحد الأقصى {form.Remaining:N3}.");
                 return;
             }
-            Guid? returnWarehouseId = null;
-            if (form.RequiresInventory)
-            {
-                if (!Guid.TryParse(form.ReturnWarehouseIdText, out var parsedWarehouseId))
-                {
-                    Snackbar.Error($"حدد مخزن الإرجاع للسطر {form.Line.LineNumber}.");
-                    return;
-                }
-                returnWarehouseId = parsedWarehouseId;
-            }
+            Guid? warehouseId = null;
             SalesReturnCondition? condition = null;
             SalesReturnStockDisposition? disposition = null;
             if (form.RequiresInventory)
             {
-                if (!Enum.TryParse<SalesReturnCondition>(form.ReturnConditionText, out var parsedCondition) ||
-                    !Enum.TryParse<SalesReturnStockDisposition>(form.StockDispositionText, out var parsedDisposition))
+                EnsureWarehouse(form);
+                if (!Guid.TryParse(form.ReturnWarehouseIdText, out var parsedWarehouseId) ||
+                    !EligibleWarehouses(form).Any(x => x.Id == parsedWarehouseId))
                 {
-                    Snackbar.Error($"حدد حالة المرتجع وقرار المخزون للسطر {form.Line.LineNumber}.");
+                    Snackbar.Error($"لا يوجد مخزن مناسب لقرار السطر {form.Line.LineNumber}؛ جهّز مخزنًا نشطًا ملائمًا أولًا.");
+                    return;
+                }
+                warehouseId = parsedWarehouseId;
+                if (!Enum.TryParse(form.ReturnConditionText, out SalesReturnCondition parsedCondition) ||
+                    !Enum.TryParse(form.StockDispositionText, out SalesReturnStockDisposition parsedDisposition))
+                {
+                    Snackbar.Error($"راجع حالة المخزون للسطر {form.Line.LineNumber}.");
                     return;
                 }
                 condition = parsedCondition;
                 disposition = parsedDisposition;
             }
-            lines.Add(new CreateSalesReturnLineRequest(form.Line.Id, quantity, returnWarehouseId, condition, disposition));
+            lines.Add(new CreateSalesReturnLineRequest(form.Line.Id, quantity, warehouseId, condition, disposition));
         }
-        if (lines.Count == 0)
-        {
-            Snackbar.Error("حدد سطرًا واحدًا على الأقل وكمية مرتجعة صحيحة.");
-            return;
-        }
-
+        if (lines.Count == 0) { Snackbar.Error("حدد سطرًا واحدًا على الأقل."); return; }
         _busy = true;
         try
         {
-            var call = await Sales.CreateSalesReturnResultAsync(new CreateSalesReturnRequest(_sourceInvoice.Id, _returnDate.Value, _postingDate.Value, _reason, lines, _overrideReturnWindow, _returnWindowOverrideReason));
-            if (!TryGetApiResult(call, out var created)) return;
+            var request = new CreateSalesReturnRequest(_sourceInvoice.Id, _returnDate.Value, _postingDate.Value,
+                _reason, lines, _overrideReturnWindow, _returnWindowOverrideReason);
+            var result = await Sales.CreateSalesReturnResultAsync(request);
+            if (!TryGetApiResult(result, out var created)) return;
             if (created is not null)
             {
                 _creating = false;
                 _selected = created;
                 _pageNumber = 1;
-                Snackbar.Success("تم إنشاء مرتجع المبيعات بنجاح.");
+                Snackbar.Success("تم إنشاء مرتجع المبيعات.");
                 await RefreshAsync();
             }
         }
@@ -443,175 +517,141 @@
         catch { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
     }
-
     private async Task ConfirmAsync()
     {
         if (_selected is null) return;
-        await RunSelectedActionAsync(
-            async () => await Sales.ConfirmSalesReturnResultAsync(_selected.Id, new SalesReturnActionRequest(_selected.RowVersion)),
-            "تم تأكيد مرتجع المبيعات بنجاح.");
+        await RunSelectedActionAsync(async () => await Sales.ConfirmSalesReturnResultAsync(
+            _selected.Id, new SalesReturnActionRequest(_selected.RowVersion)), "تم تأكيد المرتجع.");
     }
-
     private async Task PostAsync()
     {
         if (_selected is null) return;
         _busy = true;
         try
         {
+            // Non-mutating preflight: invalid historical accounts/periods produce a single snackbar,
+            // instead of triggering an expected ConflictException in the posting command debugger.
+            var readiness = await ApiClient.GetAsync<SalesReturnPostingReadinessDto>(
+                $"api/sales/returns/{_selected.Id:D}/posting-readiness");
+            if (readiness is null) { Snackbar.Error("تعذر التحقق من جاهزية المرتجع."); return; }
+            if (!readiness.CanPost)
+            {
+                Snackbar.Error(string.Join(" | ", readiness.Issues.Select(x => x.Message).Distinct()));
+                return;
+            }
             var call = await Sales.PostSalesReturnResultAsync(_selected.Id, new SalesReturnActionRequest(_selected.RowVersion));
             if (!TryGetApiResult(call, out _)) return;
             _selected = await Sales.GetSalesReturnByIdAsync(_selected.Id);
-            Snackbar.Success("تم ترحيل مرتجع المبيعات بنجاح.");
+            Snackbar.Success("تم ترحيل المرتجع.");
             await RefreshAsync();
         }
         catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
         catch { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
     }
-
     private async Task CancelAsync()
     {
         if (_selected is null) return;
-        await RunSelectedActionAsync(
-            async () => await Sales.CancelSalesReturnResultAsync(_selected.Id, new CancelSalesReturnRequest(_selected.RowVersion, "إلغاء من واجهة مرتجعات المبيعات")),
-            "تم إلغاء مرتجع المبيعات.");
+        await RunSelectedActionAsync(async () => await Sales.CancelSalesReturnResultAsync(
+            _selected.Id, new CancelSalesReturnRequest(_selected.RowVersion, "إلغاء من واجهة مرتجعات المبيعات")),
+            "تم إلغاء المرتجع.");
     }
-
-    private InspectionLineForm GetInspectionForm(Guid lineId)
+    private InspectionLineForm GetInspectionForm(Guid id)
     {
-        if (_inspectionForms.TryGetValue(lineId, out var form)) return form;
+        if (_inspectionForms.TryGetValue(id, out var form)) return form;
         form = new InspectionLineForm();
-        _inspectionForms[lineId] = form;
+        _inspectionForms[id] = form;
         return form;
     }
-
     private void SyncInspectionForms()
     {
         if (_selected is null) return;
-        var quarantined = _selected.Lines
-            .Where(x => x.StockDisposition == SalesReturnStockDisposition.Quarantine)
-            .Select(x => x.Id)
-            .ToHashSet();
-        foreach (var key in _inspectionForms.Keys.Where(x => !quarantined.Contains(x)).ToArray())
-            _inspectionForms.Remove(key);
-        foreach (var id in quarantined)
-            _ = GetInspectionForm(id);
+        var quarantined = _selected.Lines.Where(x => x.StockDisposition == SalesReturnStockDisposition.Quarantine)
+            .Select(x => x.Id).ToHashSet();
+        foreach (var id in _inspectionForms.Keys.Where(x => !quarantined.Contains(x)).ToArray()) _inspectionForms.Remove(id);
+        foreach (var id in quarantined) _ = GetInspectionForm(id);
     }
-
     private async Task InspectLineAsync(SalesReturnLineDto line)
     {
         if (_selected is null) return;
         var form = GetInspectionForm(line.Id);
-        if (!Enum.TryParse<SalesReturnCondition>(form.ConditionText, out var condition) || condition == SalesReturnCondition.Unknown)
-        {
-            Snackbar.Error("حدد نتيجة الفحص.");
-            return;
-        }
-
+        if (!Enum.TryParse(form.ConditionText, out SalesReturnCondition condition) || condition == SalesReturnCondition.Unknown)
+        { Snackbar.Error("حدد نتيجة الفحص."); return; }
         var disposition = condition == SalesReturnCondition.Resellable
-            ? SalesReturnStockDisposition.Restock
-            : SalesReturnStockDisposition.Quarantine;
-        Guid? destinationWarehouseId = null;
+            ? SalesReturnStockDisposition.Restock : SalesReturnStockDisposition.Quarantine;
+        Guid? destinationId = null;
         if (disposition == SalesReturnStockDisposition.Restock)
         {
-            if (!Guid.TryParse(form.DestinationWarehouseIdText, out var parsedWarehouseId))
-            {
-                Snackbar.Error("حدد مخزنًا قابلًا للبيع لتسريح الصنف.");
-                return;
-            }
-            destinationWarehouseId = parsedWarehouseId;
+            if (!Guid.TryParse(form.DestinationWarehouseIdText, out var parsedWarehouseId) ||
+                !_returnWarehouses.Any(x => x.Id == parsedWarehouseId && x.IsActive && x.AllowsSalesAllocation))
+            { Snackbar.Error("جهّز مخزن بيع نشطًا قبل تسريح البضاعة."); return; }
+            destinationId = parsedWarehouseId;
         }
-
         _busy = true;
         try
         {
-            var call = await Sales.InspectSalesReturnLineResultAsync(
-                _selected.Id,
-                line.Id,
-                new InspectSalesReturnLineRequest(line.RowVersion, condition, disposition, destinationWarehouseId));
+            var call = await Sales.InspectSalesReturnLineResultAsync(_selected.Id, line.Id,
+                new InspectSalesReturnLineRequest(line.RowVersion, condition, disposition, destinationId));
             if (!TryGetApiResult(call, out var result)) return;
             if (result is not null) _selected = result;
             SyncInspectionForms();
             Snackbar.Success(disposition == SalesReturnStockDisposition.Restock
-                ? "تم فحص الصنف وتسريحه إلى المخزون القابل للبيع."
-                : "تم حفظ نتيجة الفحص وبقي الصنف في الحجر.");
+                ? "تم الفحص والتسريح للمخزون القابل للبيع." : "تم تسجيل الفحص وبقي الصنف في الحجر.");
             await RefreshAsync();
         }
         catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
         catch { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
     }
-
-    private async Task RunSelectedActionAsync(Func<Task<ApiCallResult<SalesReturnDto>>> action, string successMessage)
+    private async Task RunSelectedActionAsync(Func<Task<ApiCallResult<SalesReturnDto>>> action, string message)
     {
         _busy = true;
         try
         {
-            var call = await action();
-            if (!TryGetApiResult(call, out var result)) return;
-            if (result is not null) _selected = result;
-            Snackbar.Success(successMessage);
+            var result = await action();
+            if (!TryGetApiResult(result, out var value)) return;
+            if (value is not null) _selected = value;
+            Snackbar.Success(message);
             await RefreshAsync();
         }
         catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
         catch { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
     }
-
     private bool TryGetApiResult<T>(ApiCallResult<T> result, out T? value)
     {
         value = result.Value;
         if (result.Succeeded) return true;
-        if (result.Error is not null) ApiFeedback.Show(result.Error); else ApiFeedback.ShowUnexpected();
+        if (result.Error is not null) ApiFeedback.Show(result.Error);
+        else ApiFeedback.ShowUnexpected();
         return false;
     }
-
-    private Task CloseEditorAsync()
-    {
-        _creating = false;
-        return Task.CompletedTask;
-    }
-
+    private Task CloseEditorAsync() { _creating = false; return Task.CompletedTask; }
     private static string StatusText(SalesReturnStatus status) => status switch
     {
-        SalesReturnStatus.Draft => "مسودة",
-        SalesReturnStatus.Confirmed => "مؤكد",
-        SalesReturnStatus.Posted => "مرحل",
-        SalesReturnStatus.Cancelled => "ملغي",
-        _ => status.ToString()
+        SalesReturnStatus.Draft => "مسودة", SalesReturnStatus.Confirmed => "مؤكد",
+        SalesReturnStatus.Posted => "مرحل", SalesReturnStatus.Cancelled => "ملغي", _ => status.ToString()
     };
-
     private static AlertTone StatusTone(SalesReturnStatus status) => status switch
     {
-        SalesReturnStatus.Posted => AlertTone.Success,
-        SalesReturnStatus.Cancelled => AlertTone.Danger,
-        SalesReturnStatus.Confirmed => AlertTone.Warning,
-        _ => AlertTone.Info
+        SalesReturnStatus.Posted => AlertTone.Success, SalesReturnStatus.Cancelled => AlertTone.Danger,
+        SalesReturnStatus.Confirmed => AlertTone.Warning, _ => AlertTone.Info
     };
-
     private static string ReturnConditionText(SalesReturnCondition? condition) => condition switch
     {
-        SalesReturnCondition.Resellable => "قابل لإعادة البيع",
-        SalesReturnCondition.NeedsInspection => "يحتاج فحص",
-        SalesReturnCondition.Damaged => "تالف / متضرر",
-        _ => "غير محدد"
+        SalesReturnCondition.Resellable => "قابل لإعادة البيع", SalesReturnCondition.NeedsInspection => "يحتاج فحص",
+        SalesReturnCondition.Damaged => "تالف / متضرر", _ => "غير محدد"
     };
-
     private static string StockDispositionText(SalesReturnStockDisposition? disposition) => disposition switch
     {
-        SalesReturnStockDisposition.Restock => "إعادة للمخزون",
-        SalesReturnStockDisposition.Quarantine => "حجر وفحص",
-        SalesReturnStockDisposition.Dispose => "إتلاف",
-        SalesReturnStockDisposition.NoStock => "بدون حركة مخزون",
-        _ => "غير محدد"
+        SalesReturnStockDisposition.Restock => "إعادة للمخزون", SalesReturnStockDisposition.Quarantine => "حجر وفحص",
+        SalesReturnStockDisposition.Dispose => "إتلاف", SalesReturnStockDisposition.NoStock => "بدون حركة مخزون", _ => "غير محدد"
     };
-
     private sealed class InspectionLineForm
     {
         public string ConditionText { get; set; } = nameof(SalesReturnCondition.NeedsInspection);
         public string? DestinationWarehouseIdText { get; set; }
     }
-
     private sealed class ReturnLineForm(SalesInvoiceLineDto line, decimal remaining)
     {
         public SalesInvoiceLineDto Line { get; } = line;
@@ -621,13 +661,10 @@
         public string QuantityText { get; set; } = remaining > 0m ? Math.Min(remaining, line.Quantity).ToString("0.###") : "0";
         public bool RequiresQualityInspection { get; } = line.LineType == SalesLineType.Lens && (line.RequiresProduction || line.PrescriptionSnapshot is not null);
         public string ReturnConditionText { get; set; } = line.LineType == SalesLineType.Lens && (line.RequiresProduction || line.PrescriptionSnapshot is not null)
-            ? nameof(SalesReturnCondition.NeedsInspection)
-            : nameof(SalesReturnCondition.Resellable);
+            ? nameof(SalesReturnCondition.NeedsInspection) : nameof(SalesReturnCondition.Resellable);
         public string StockDispositionText { get; set; } = line.LineType == SalesLineType.Lens && (line.RequiresProduction || line.PrescriptionSnapshot is not null)
-            ? nameof(SalesReturnStockDisposition.Quarantine)
-            : nameof(SalesReturnStockDisposition.Restock);
+            ? nameof(SalesReturnStockDisposition.Quarantine) : nameof(SalesReturnStockDisposition.Restock);
         public string? ReturnWarehouseIdText { get; set; } = line.LineType == SalesLineType.Lens && (line.RequiresProduction || line.PrescriptionSnapshot is not null)
-            ? null
-            : line.WarehouseId?.ToString("D");
+            ? null : line.WarehouseId?.ToString("D");
     }
 }
