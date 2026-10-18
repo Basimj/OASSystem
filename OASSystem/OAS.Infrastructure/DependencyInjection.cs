@@ -162,6 +162,7 @@ public static class DependencyInjection
         services.AddScoped<IPurchasingInventoryPort, PurchasingInventoryPort>();
         services.AddScoped<IPurchasingAccountingPort, PurchasingAccountingPort>();
         services.AddScoped<ICustomerDemandTrackingQueryService, CustomerDemandTrackingQueryService>();
+        services.AddScoped<ISupplierPerformanceReportingQueryService, SupplierPerformanceReportingQueryService>();
 
         services.AddPurchasingApplication();
 

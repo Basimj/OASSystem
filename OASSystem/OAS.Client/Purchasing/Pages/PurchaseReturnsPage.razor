@@ -195,7 +195,16 @@
         .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.PurchaseInvoiceCode} - {x.SupplierInvoiceCode ?? "بدون رقم مورد"}"))
         .ToArray();
 
+    [Parameter, SupplyParameterFromQuery(Name = "openId")]
+    public Guid? OpenId { get; set; }
+
     protected override async Task OnInitializedAsync() => await RefreshAsync();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (OpenId is Guid id && id != Guid.Empty && _selected?.Id != id)
+            await SelectAsync(id);
+    }
 
     private async Task RefreshAsync()
     {

@@ -8,6 +8,7 @@ using OAS.Contracts.Purchasing.PurchaseRequests;
 using OAS.Contracts.Purchasing.PurchaseReturns;
 using OAS.Contracts.Purchasing.SupplierAllocations;
 using OAS.Contracts.Purchasing.SupplierCatalog;
+using OAS.Contracts.Purchasing.Reports;
 
 namespace OAS.Client.Purchasing.Services;
 
@@ -74,4 +75,10 @@ public interface IPurchasingClientService
     Task<SupplierCreditSummaryDto?> GetPurchaseReturnCreditSummaryAsync(Guid id, CancellationToken cancellationToken = default);
     Task<SupplierCreditApplicationDto?> ApplySupplierCreditAsync(Guid id, ApplySupplierCreditRequest request, CancellationToken cancellationToken = default);
     Task<SupplierCreditApplicationDto?> ReverseSupplierCreditAsync(Guid id, Guid applicationId, ReverseSupplierCreditApplicationRequest request, CancellationToken cancellationToken = default);
+    Task<SupplierPerformanceSummaryDto?> GetSupplierPerformanceSummaryAsync(SupplierPerformanceQueryRequest request, CancellationToken ct = default);
+    Task<PagedResult<SupplierPerformanceLineDto>> GetSupplierPerformanceLinesAsync(SupplierPerformanceQueryRequest request, CancellationToken ct = default);
+    Task<SupplierPerformanceDrillDownDto?> GetSupplierPerformanceDrillDownAsync(Guid id, SupplierPerformanceQueryRequest request, CancellationToken ct = default);
+    Task<PagedResult<SupplierPriceHistoryItemDto>> GetSupplierPriceHistoryReportAsync(SupplierPerformanceQueryRequest request, CancellationToken ct = default);
+    Task<SupplierPerformancePrintDto?> GetSupplierPerformancePrintAsync(SupplierPerformanceQueryRequest request, CancellationToken ct = default);
+    Task<byte[]> ExportSupplierPerformanceAsync(SupplierPerformanceQueryRequest request, SupplierPerformanceExportFormat format, CancellationToken ct = default);
 }

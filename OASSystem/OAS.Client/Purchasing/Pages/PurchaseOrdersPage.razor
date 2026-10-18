@@ -3,4 +3,9 @@
 @using OAS.Client.Purchasing.Components
 @using OAS.Client.Purchasing.Workspace
 <PageTitle>أوامر الشراء | OAS</PageTitle>
-<PurchasingWorkspaceHost Section="PurchasingEntityType.PurchaseOrders" />
+<PurchasingWorkspaceHost Section="PurchasingEntityType.PurchaseOrders" OpenId="@OpenId" />
+
+@code {
+    [Parameter, SupplyParameterFromQuery(Name = "openId")]
+    public Guid? OpenId { get; set; }
+}

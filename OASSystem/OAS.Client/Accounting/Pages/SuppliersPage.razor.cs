@@ -29,6 +29,9 @@ public partial class SuppliersPage
     [Inject] private IUiDialogService Dialog { get; set; } = default!;
 
     private const int PageSize = 25;
+    private string SupplierPerformanceUrl => EditorOpen && ActiveForm.Id is Guid id
+        ? $"/purchases/supplier-performance?supplierId={id:D}"
+        : "/purchases/supplier-performance";
 
     private readonly Guid _listTabId = Guid.NewGuid();
     private readonly List<PartyEditorTab> _editorTabs = [];

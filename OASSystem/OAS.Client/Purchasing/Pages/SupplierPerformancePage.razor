@@ -1,0 +1,222 @@
+@page "/purchases/supplier-performance"
+@attribute [Authorize]
+@using OAS.Client.Purchasing.Services
+@using OAS.Client.Inventory.Services
+@using OAS.Contracts.Purchasing.Reports
+@using OAS.Contracts.Accounting.Suppliers
+@using OAS.Contracts.Accounting.Currencies
+@using OAS.Contracts.Inventory.Warehouses
+@using OAS.Contracts.Inventory.Products
+@inject IPurchasingClientService Purchasing
+@inject IAccountingClientService Accounting
+@inject IInventoryClientService Inventory
+@inject IJSRuntime JS
+<PageTitle>تقارير أداء المشتريات والموردين | OAS</PageTitle>
+<div class="sp-report" dir="rtl">
+  <header class="sp-report__header">
+    <div><h1>تقارير أداء المشتريات والموردين</h1><p>أوامر الشراء، الاستلامات، الفواتير المرحلة، المرتجعات وGRNI بشكل منفصل، دون إنشاء التزام مورد من أمر شراء أو استلام.</p></div>
+    <div class="sp-report__actions">
+      <button class="btn btn-outline-secondary btn-sm" disabled="@_busy" @onclick="ResetAsync">إعادة ضبط</button>
+      <button class="btn btn-outline-secondary btn-sm" disabled="@_busy" @onclick="PrintAsync">طباعة</button>
+      <button class="btn btn-outline-primary btn-sm" disabled="@_busy" @onclick="() => ExportAsync(SupplierPerformanceExportFormat.Csv)">CSV</button>
+      <button class="btn btn-primary btn-sm" disabled="@_busy" @onclick="() => ExportAsync(SupplierPerformanceExportFormat.Xlsx)">Excel</button>
+    </div>
+  </header>
+  <section class="sp-report__panel sp-report__filters">
+    <div><label>المورد</label><div class="input-group input-group-sm"><input class="form-control" @bind="_supplierSearch" @bind:event="oninput" placeholder="كود أو اسم المورد" /><button class="btn btn-outline-secondary" @onclick="SearchSuppliersAsync">بحث</button></div>
+      @foreach (var s in _suppliers) { <button class="sp-report__choice" @onclick="() => SelectSupplier(s)">@s.SupplierCode — @s.NameAr</button> }
+      @if (_supplierId.HasValue) { <button class="btn btn-link btn-sm p-0" @onclick="ClearSupplier">إلغاء اختيار المورد</button> }
+    </div>
+    <div><label>المخزن</label><select class="form-select form-select-sm" @bind="_warehouseId"><option value="">الكل</option>@foreach (var w in _warehouses) { <option value="@w.Id">@w.Code — @w.Name</option> }</select></div>
+    <div><label>الصنف</label><div class="input-group input-group-sm"><input class="form-control" @bind="_productSearch" @bind:event="oninput" placeholder="الرمز أو اسم الصنف" /><button class="btn btn-outline-secondary" @onclick="SearchProductsAsync">بحث</button></div>
+      @foreach (var p in _products) { <button class="sp-report__choice" @onclick="() => SelectProduct(p)">@p.SKU — @p.ProductName</button> }
+      @if (_productId.HasValue) { <button class="btn btn-link btn-sm p-0" @onclick="ClearProduct">إلغاء اختيار الصنف</button> }
+    </div>
+    <div><label>العملة</label><select class="form-select form-select-sm" @bind="_currencyId"><option value="">الكل</option>@foreach (var c in _currencies) { <option value="@c.Id">@c.Code — @c.NameAr</option> }</select></div>
+    <div><label>من تاريخ</label><input type="date" class="form-control form-control-sm" @bind="_from" /></div>
+    <div><label>إلى تاريخ</label><input type="date" class="form-control form-control-sm" @bind="_to" /></div>
+    <div><label>بحث</label><input class="form-control form-control-sm" @bind="_search" @bind:event="oninput" placeholder="مورد / صنف / رقم أمر" /></div>
+    <div><label>الترتيب</label><select class="form-select form-select-sm" @bind="_sort"><option value="OrderDate">تاريخ الطلب</option><option value="PurchaseOrderCode">رقم الطلب</option><option value="SupplierName">المورد</option><option value="Warehouse">المخزن</option><option value="ProductName">الصنف</option><option value="ExpectedDeliveryDate">تاريخ الوعد</option></select></div>
+    <div class="sp-report__checks"><label><input type="checkbox" @bind="_open" /> أوامر مفتوحة</label><label><input type="checkbox" @bind="_late" /> مفتوحة متأخرة</label><label><input type="checkbox" @bind="_descending" /> ترتيب تنازلي</label></div>
+    <button class="btn btn-primary btn-sm" disabled="@_busy" @onclick="ApplyAsync">تطبيق المرشحات</button>
+  </section>
+  @if (!string.IsNullOrWhiteSpace(_error)) { <div class="alert alert-danger" role="alert">@_error</div> }
+  @if (_busy) { <p>جاري تحميل التقرير...</p> }
+  @if (_summary is not null)
+  {
+    <section class="sp-report__kpis">
+      <article><small>المطلوب (أساسي)</small><strong>@_summary.OrderedBaseQuantity.ToString("N3")</strong></article>
+      <article><small>المستلم المرحّل</small><strong>@_summary.ReceivedBaseQuantity.ToString("N3")</strong></article>
+      <article><small>المرتجع المرحّل</small><strong>@_summary.ReturnedBaseQuantity.ToString("N3")</strong></article>
+      <article><small>المفتوح</small><strong>@_summary.OpenPurchaseOrderBaseQuantity.ToString("N3")</strong></article>
+      <article><small>عدد أوامر الشراء المفتوحة</small><strong>@_summary.OpenPurchaseOrders</strong></article>
+      <article><small>المفتوحة المتأخرة</small><strong>@_summary.LatePurchaseOrders</strong></article>
+      <article><small>متوسط مدة التوريد</small><strong>@Format(_summary.AverageLeadTimeDays) يوم</strong></article>
+      <article><small>الالتزام بالموعد</small><strong>@Format(_summary.OnTimeDeliveryRatePercent) %</strong></article>
+      @if (_summary.OrderedBaseAmount.HasValue)
+      {
+        <article><small>الطلبات — أساسي</small><strong>@Format(_summary.OrderedBaseAmount)</strong></article>
+        <article><small>تكلفة الاستلام</small><strong>@Format(_summary.ReceivedCostBaseAmount)</strong></article>
+        <article><small>الفواتير المرحلة</small><strong>@Format(_summary.PostedInvoicedGrossBaseAmount)</strong></article>
+        <article><small>مرتجعات المورد</small><strong>@Format(_summary.PurchaseReturnBaseAmount)</strong></article>
+        <article><small>GRNI</small><strong>@Format(_summary.GrniBaseAmount)</strong></article>
+        <article><small>PPV</small><strong>@Format(_summary.PurchasePriceVarianceBaseAmount)</strong></article>
+      }
+    </section>
+  }
+  <section class="sp-report__panel">
+    <div class="sp-report__toolbar">
+      <button class="btn btn-sm @(!_pricesMode ? "btn-primary" : "btn-outline-secondary")" @onclick="() => ChangeModeAsync(false)">الحركات</button>
+      <button class="btn btn-sm @(_pricesMode ? "btn-primary" : "btn-outline-secondary")" @onclick="() => ChangeModeAsync(true)">تاريخ أسعار الموردين</button>
+      <small>الحركة حسب فترة البحث؛ المفتوح وGRNI حسب تاريخ نهاية التقرير.</small>
+    </div>
+    @if (!_pricesMode)
+    {
+      <div class="table-responsive"><table class="table table-sm table-hover sp-report__table">
+        <thead><tr><th>المورد</th><th>المخزن</th><th>الصنف</th><th>أمر الشراء</th><th>الوعد</th><th>المطلوب</th><th>المستلم</th><th>المرتجع</th><th>المفتوح</th><th>التأخر</th><th>آخر استلام</th><th>آخر فاتورة</th><th>تفاصيل</th></tr></thead>
+        <tbody>
+          @foreach (var item in _lines.Items)
+          {
+            <tr>
+              <td>@item.SupplierName</td><td>@item.WarehouseName</td><td>@item.ProductName <small>@item.ProductCode</small></td>
+              <td><a href="@DocumentUrl("PurchaseOrder", item.PurchaseOrderId)">@item.PurchaseOrderCode</a></td>
+              <td>@Date(item.ExpectedDeliveryDate)</td><td>@item.PeriodOrderedBaseQuantity.ToString("N3")</td><td>@item.PeriodReceivedBaseQuantity.ToString("N3")</td><td>@item.PeriodReturnedBaseQuantity.ToString("N3")</td>
+              <td><strong>@item.OpenBaseQuantity.ToString("N3")</strong></td><td>@(item.IsLate ? "متأخر" : "—")</td>
+              <td>@if (item.LatestPurchaseReceiptId is Guid rid) { <a href="@DocumentUrl("PurchaseReceipt", rid)">@item.LatestPurchaseReceiptCode</a> } else { <span>—</span> }</td>
+              <td>@if (item.LatestPurchaseInvoiceId is Guid iid) { <a href="@DocumentUrl("PurchaseInvoice", iid)">@item.LatestPurchaseInvoiceCode</a> } else { <span>—</span> }</td>
+              <td><button class="btn btn-outline-primary btn-sm" @onclick="() => DrillAsync(item.PurchaseOrderLineId)">فتح</button></td>
+            </tr>
+            @if (item.OrderedBaseAmount.HasValue)
+            {
+              <tr class="sp-report__cost"><td colspan="13">الطلب @Format(item.OrderedBaseAmount) · الاستلام @Format(item.ReceivedCostBaseAmount) · الفاتورة @Format(item.PostedInvoicedGrossBaseAmount) · المرتجع @Format(item.PurchaseReturnBaseAmount) · GRNI @Format(item.GrniBaseAmount) · PPV @Format(item.PurchasePriceVarianceBaseAmount) (عملة أساسية)</td></tr>
+            }
+          }
+        </tbody>
+      </table></div>
+      @if (_lines.Items.Count == 0 && !_busy) { <p class="text-muted">لا توجد حركات مطابقة.</p> }
+      <div class="sp-report__pager"><button class="btn btn-outline-secondary btn-sm" disabled="@(_busy || _page <= 1)" @onclick="PreviousAsync">السابق</button><span>صفحة @_page من @Math.Max(1, _lines.TotalPages) — @_lines.TotalCount سطر</span><button class="btn btn-outline-secondary btn-sm" disabled="@(_busy || _page >= _lines.TotalPages)" @onclick="NextAsync">التالي</button></div>
+    }
+    else
+    {
+      <div class="table-responsive"><table class="table table-sm"><thead><tr><th>المورد</th><th>الصنف</th><th>العملة</th><th>السعر</th><th>من</th><th>إلى</th><th>التوريد / يوم</th></tr></thead>
+        <tbody>@foreach (var p in _prices.Items) { <tr><td>@p.SupplierName</td><td>@p.SupplierProductName (@p.SupplierProductCode)</td><td>@p.CurrencyCode</td><td>@Format(p.UnitPrice)</td><td>@Date(p.EffectiveFrom)</td><td>@Date(p.EffectiveTo)</td><td>@p.LeadTimeDays</td></tr> }</tbody>
+      </table></div>
+      <div class="sp-report__pager"><button class="btn btn-outline-secondary btn-sm" disabled="@(_busy || _page <= 1)" @onclick="PreviousAsync">السابق</button><span>صفحة @_page من @Math.Max(1, _prices.TotalPages)</span><button class="btn btn-outline-secondary btn-sm" disabled="@(_busy || _page >= _prices.TotalPages)" @onclick="NextAsync">التالي</button></div>
+    }
+  </section>
+  @if (_drill is not null)
+  {
+    <section class="sp-report__panel">
+      <header class="sp-report__toolbar"><h2>حركة أمر <a href="@DocumentUrl("PurchaseOrder", _drill.PurchaseOrderId)">@_drill.PurchaseOrderCode</a></h2><button class="btn btn-outline-secondary btn-sm" @onclick="() => _drill = null">إغلاق التفاصيل</button></header>
+      @foreach (var group in new[] { ("استلامات مرحلة", _drill.Receipts), ("فواتير مرحلة", _drill.PostedInvoices), ("مرتجعات مرحلة", _drill.PurchaseReturns) })
+      {
+        <h3>@group.Item1</h3>
+        <table class="table table-sm"><thead><tr><th>المستند</th><th>التاريخ</th><th>الكمية</th><th>المبلغ الأساسي</th></tr></thead>
+        <tbody>@foreach (var doc in group.Item2) { <tr><td><a href="@DocumentUrl(doc.DocumentType, doc.DocumentId)">@doc.DocumentCode</a></td><td>@Date(doc.DocumentDate)</td><td>@Format(doc.BaseQuantity)</td><td>@Format(doc.BaseAmount)</td></tr> }</tbody></table>
+      }
+    </section>
+  }
+</div>
+@code {
+    [Parameter, SupplyParameterFromQuery(Name = "supplierId")] public Guid? SupplierId { get; set; }
+    private Guid? _supplierId, _warehouseId, _productId, _currencyId;
+    private string? _supplierSearch, _productSearch, _search, _error;
+    private DateOnly? _from, _to;
+    private bool _open, _late, _descending = true, _busy, _pricesMode;
+    private int _page = 1;
+    private string _sort = "OrderDate";
+    private IReadOnlyList<SupplierLookupDto> _suppliers = [];
+    private IReadOnlyList<ProductVariantLookupDto> _products = [];
+    private IReadOnlyList<WarehouseDto> _warehouses = [];
+    private IReadOnlyList<CurrencyDto> _currencies = [];
+    private SupplierPerformanceSummaryDto? _summary;
+    private PagedResult<SupplierPerformanceLineDto> _lines = new();
+    private PagedResult<SupplierPriceHistoryItemDto> _prices = new();
+    private SupplierPerformanceDrillDownDto? _drill;
+    protected override async Task OnInitializedAsync()
+    {
+        _supplierId = SupplierId;
+        try
+        {
+            _warehouses = (await Inventory.GetWarehousesAsync(new PageRequest { PageSize = 200 })).Items;
+            _currencies = (await Accounting.GetCurrenciesPageAsync(new PageRequest { PageSize = 200 })).Items;
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        await RefreshAsync();
+    }
+    protected override async Task OnParametersSetAsync()
+    {
+        if (SupplierId.HasValue && _supplierId != SupplierId) { _supplierId = SupplierId; _page = 1; await RefreshAsync(); }
+    }
+    private SupplierPerformanceQueryRequest Request => new() {
+        SupplierId = _supplierId, WarehouseId = _warehouseId, ProductVariantId = _productId, CurrencyId = _currencyId,
+        FromDate = _from, ToDate = _to, Search = _search, OnlyOpen = _open, OnlyLate = _late, PageNumber = _page,
+        PageSize = 25, SortBy = _sort, SortDirection = _descending ? SortDirection.Descending : SortDirection.Ascending
+    };
+    private async Task RefreshAsync()
+    {
+        if (_busy) return;
+        _busy = true; _error = null; _drill = null;
+        try
+        {
+            if (_from.HasValue && _to.HasValue && _from > _to) throw new InvalidOperationException("تاريخ البداية أكبر من تاريخ النهاية.");
+            _summary = await Purchasing.GetSupplierPerformanceSummaryAsync(Request);
+            if (_pricesMode) _prices = await Purchasing.GetSupplierPriceHistoryReportAsync(Request);
+            else _lines = await Purchasing.GetSupplierPerformanceLinesAsync(Request);
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+    private async Task ApplyAsync() { _page = 1; await RefreshAsync(); }
+    private async Task SearchSuppliersAsync() { try { _suppliers = await Accounting.LookupSuppliersAsync(_supplierSearch) ?? []; } catch (Exception ex) { _error = ex.Message; } }
+    private async Task SearchProductsAsync() { try { _products = await Inventory.SearchProductVariantsAsync(_productSearch); } catch (Exception ex) { _error = ex.Message; } }
+    private void SelectSupplier(SupplierLookupDto s) { _supplierId = s.Id; _supplierSearch = s.DisplayText; _suppliers = []; }
+    private void SelectProduct(ProductVariantLookupDto p) { _productId = p.Id; _productSearch = p.SKU + " — " + p.ProductName; _products = []; }
+    private void ClearSupplier() { _supplierId = null; _supplierSearch = null; }
+    private void ClearProduct() { _productId = null; _productSearch = null; }
+    private async Task ChangeModeAsync(bool prices) { _pricesMode = prices; _page = 1; await RefreshAsync(); }
+    private async Task PreviousAsync() { if (_page > 1) { _page--; await RefreshAsync(); } }
+    private async Task NextAsync() { _page++; await RefreshAsync(); }
+    private async Task DrillAsync(Guid lineId) { try { _drill = await Purchasing.GetSupplierPerformanceDrillDownAsync(lineId, Request); } catch (Exception ex) { _error = ex.Message; } }
+    private async Task ExportAsync(SupplierPerformanceExportFormat format)
+    {
+        _busy = true; _error = null;
+        try {
+            var bytes = await Purchasing.ExportSupplierPerformanceAsync(Request, format);
+            var ext = format == SupplierPerformanceExportFormat.Csv ? "csv" : "xlsx";
+            var mime = format == SupplierPerformanceExportFormat.Csv ? "text/csv" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            await JS.InvokeVoidAsync("oasDownloadFile", $"supplier-performance-{DateTime.UtcNow:yyyyMMdd-HHmmss}.{ext}", mime, bytes);
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+    private async Task PrintAsync()
+    {
+        try
+        {
+            var model = await Purchasing.GetSupplierPerformancePrintAsync(Request);
+            if (model is not null)
+            {
+                _summary = model.Summary; _pricesMode = false;
+                _lines = new() { Items = model.Lines, PageNumber = 1, PageSize = Math.Max(1, model.Lines.Count), TotalCount = model.Lines.Count };
+            }
+            await JS.InvokeVoidAsync("print");
+        }
+        catch (Exception ex) { _error = ex.Message; }
+    }
+    private async Task ResetAsync() {
+        _supplierId = _warehouseId = _productId = _currencyId = null;
+        _supplierSearch = _productSearch = _search = null; _from = _to = null;
+        _open = _late = false; _page = 1; await RefreshAsync();
+    }
+    private static string Date(DateOnly? date) => date?.ToString("yyyy-MM-dd") ?? "—";
+    private static string Date(DateOnly date) => date.ToString("yyyy-MM-dd");
+    private static string Format(decimal? value) => value?.ToString("N2") ?? "—";
+    private static string DocumentUrl(string kind, Guid id) => kind switch {
+        "PurchaseOrder" => $"/purchases/orders?openId={id:D}",
+        "PurchaseReceipt" => $"/purchases/receipts?openId={id:D}",
+        "PurchaseInvoice" => $"/purchases/invoices?openId={id:D}",
+        "PurchaseReturn" => $"/purchases/returns?openId={id:D}",
+        _ => "/purchases"
+    };
+}

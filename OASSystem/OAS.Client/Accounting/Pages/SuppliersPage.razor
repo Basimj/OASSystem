@@ -4,6 +4,9 @@
 @using OAS.UiLib.Components.Spreadsheets
 
 <PageTitle>الموردون | المحاسبة | OAS</PageTitle>
+<div dir="rtl" class="mb-2"><a class="btn btn-outline-primary btn-sm" href="@SupplierPerformanceUrl"><i class="fa-solid fa-chart-line"></i>
+@(EditorOpen && ActiveForm.Id.HasValue ? "أداء المورد الحالي" : "تقارير أداء المشتريات والموردين")
+</a></div>
 
 <UiAccountingPartyWorkspace IsSupplier="true"
                             Busy="@_busy"

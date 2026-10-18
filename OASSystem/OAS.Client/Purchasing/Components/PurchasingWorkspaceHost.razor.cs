@@ -28,6 +28,8 @@ public partial class PurchasingWorkspaceHost
 {
     private const int PageSize=24;
     [Parameter,EditorRequired] public PurchasingEntityType Section {get;set;}
+    [Parameter] public Guid? OpenId {get;set;}
+    private Guid? _lastOpenedExternalId;
     [Inject] private IPurchasingClientService Purchasing {get;set;}=default!;
     [Inject] private IInventoryClientService Inventory {get;set;}=default!;
     [Inject] private IAccountingClientService Accounting {get;set;}=default!;
@@ -92,13 +94,23 @@ public partial class PurchasingWorkspaceHost
 
     protected override async Task OnParametersSetAsync()
     {
-        if(_initializedSection==Section)return;
-        _initializedSection=Section;
-        var activeId=Workspace.ActiveTab?.EntityType==Section?Workspace.ActiveTabId:Guid.Empty;
-        Workspace.OpenList(Section);
-        if(activeId!=Guid.Empty)Workspace.ActiveTabId=activeId;
-        _search=null;_pageNumber=1;
-        if(IsListTab)await LoadListAsync(); else if(ActiveTab is { } tab)await EnsureLoadedAsync(tab);
+        if (_initializedSection != Section)
+        {
+            _initializedSection = Section;
+            _lastOpenedExternalId = null;
+            var activeId = Workspace.ActiveTab?.EntityType == Section ? Workspace.ActiveTabId : Guid.Empty;
+            Workspace.OpenList(Section);
+            if (activeId != Guid.Empty) Workspace.ActiveTabId = activeId;
+            _search = null;
+            _pageNumber = 1;
+            if (IsListTab) await LoadListAsync();
+            else if (ActiveTab is { } tab) await EnsureLoadedAsync(tab);
+        }
+        if (OpenId is Guid documentId && documentId != Guid.Empty && _lastOpenedExternalId != documentId)
+        {
+            _lastOpenedExternalId = documentId;
+            await OpenRecordAsync(documentId);
+        }
     }
 
     private async Task LoadListAsync()

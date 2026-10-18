@@ -26,6 +26,15 @@ public sealed class OasApiClient(
             cancellationToken);
     }
 
+    // Preserve database-selection headers for authenticated report downloads.
+    public async Task<byte[]> GetBytesAsync(string uri, CancellationToken cancellationToken = default)
+    {
+        using var request = CreateRequest(HttpMethod.Get, uri);
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadAsByteArrayAsync(cancellationToken);
+    }
+
     public async Task<T?> PostAsync<TRequest, T>(
         string uri,
         TRequest payload,
