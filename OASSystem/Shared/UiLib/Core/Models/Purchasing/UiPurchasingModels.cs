@@ -178,6 +178,7 @@ public sealed class UiPurchaseReceiptLineModel
     public decimal ReceivedQuantity { get; set; }
     public decimal AcceptedQuantity { get; set; }
     public decimal RejectedQuantity { get; set; }
+    public decimal ReturnedQuantity { get; set; }
     public decimal BaseAcceptedQuantity { get; set; }
     public decimal ActualUnitCost { get; set; }
     public decimal TotalAcceptedCost { get; set; }

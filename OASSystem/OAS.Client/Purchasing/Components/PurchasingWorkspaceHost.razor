@@ -44,6 +44,27 @@
                 @if (ShowCancelInvoice) { <UiButton Text="إلغاء الفاتورة" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" OnClick="CancelInvoiceAsync" /> }
                 @if (ShowInvoiceJournal) { <UiButton Text="عرض القيد" IconCssClass="fa-solid fa-book-journal-whills" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="OpenInvoiceJournalAsync" /> }
                 @if (ShowPrintInvoice) { <UiButton Text="طباعة" IconCssClass="fa-solid fa-print" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Loading="@_isPrintingPurchaseInvoice" Disabled="@_isPrintingPurchaseInvoice" OnClick="PrintPurchaseInvoiceAsync" /> }
+                @if (ActiveTab?.Model is UiPurchaseOrderEditorModel po && po.Id.HasValue)
+                {
+                    <a class="btn btn-outline-secondary btn-sm" href="@($"/purchases/receipts?purchaseOrderId={po.Id.Value:D}")">استلامات أمر الشراء</a>
+                    <a class="btn btn-outline-primary btn-sm" href="@($"/purchases/receipts?fromOrderId={po.Id.Value:D}")">استلام جديد من الأمر</a>
+                }
+                @if (ActiveTab?.Model is UiPurchaseReceiptEditorModel receipt && receipt.Id.HasValue && receipt.PurchaseOrderId.HasValue)
+                {
+                    <a class="btn btn-outline-secondary btn-sm" href="@($"/purchases/orders?openId={receipt.PurchaseOrderId.Value:D}")">أمر الشراء الأصلي</a>
+                    @if (receipt.Status == (byte)OAS.Contracts.Purchasing.Enums.PurchaseReceiptStatus.Posted)
+                    {
+                        <a class="btn btn-outline-primary btn-sm" href="@($"/purchases/returns?receiptId={receipt.Id.Value:D}")">مرتجع من الاستلام</a>
+                    }
+                }
+                @if (ActiveTab?.Model is UiPurchaseInvoiceEditorModel invoice && invoice.Id.HasValue && invoice.SupplierId.HasValue)
+                {
+                    <a class="btn btn-outline-primary btn-sm" href="@($"/purchases/supplier-allocations?supplierId={invoice.SupplierId.Value:D}&invoiceId={invoice.Id.Value:D}")">تخصيص دفعات وائتمانات</a>
+                    @if (invoice.Status == (byte)OAS.Contracts.Purchasing.Enums.PurchaseInvoiceStatus.Posted && !PayInvoiceDisabled)
+                    {
+                        <a class="btn btn-outline-primary btn-sm" href="@($"/accounting/payment-vouchers?fromInvoice={invoice.Id.Value:D}")">سند صرف عام — طرق وعملات متعددة</a>
+                    }
+                }
                 @if (ShowPayInvoice) { <UiButton Text="@PayInvoiceButtonText" IconCssClass="fa-solid fa-money-check-dollar" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@PayInvoiceDisabled" OnClick="PayInvoiceAsync" /> }
             }
         </UiWorkspaceActionBar>
@@ -52,6 +73,68 @@
         <UiApplicationTabStrip Tabs="WorkspaceTabs" AriaLabel="@TabsAriaLabel" OnSelect="SelectTabAsync" OnClose="CloseTabAsync" OnCloseOthers="CloseOtherTabsAsync" OnCloseAll="CloseAllTabsAsync" />
     </Tabs>
     <Content>
+        @if (ActiveTab?.Model is UiPurchaseOrderEditorModel orderSummary && !IsListTab)
+        {
+            <div class="alert alert-light border py-2 mb-2" role="status">
+                <strong>أمر الشراء → الاستلام → الفاتورة → المطابقة → الترحيل → السداد</strong>
+                <span class="ms-3">المورد: @orderSummary.SupplierName — المخزن: @orderSummary.DestinationWarehouseName</span>
+                <span class="ms-3">المطلوب: @orderSummary.Lines.Sum(x => x.BaseQuantity).ToString("N3")</span>
+                <span class="ms-3">المستلم: @orderSummary.Lines.Sum(x => x.ReceivedBaseQuantity).ToString("N3")</span>
+                <span class="ms-3">المتبقي: @orderSummary.Lines.Sum(x => x.RemainingBaseQuantity).ToString("N3") (وحدة أساسية)</span>
+                <span class="ms-3">الحالة: @orderSummary.StatusText</span>
+            </div>
+        }
+        else if (ActiveTab?.Model is UiPurchaseReceiptEditorModel receiptSummary && !IsListTab)
+        {
+            <div class="alert alert-light border py-2 mb-2" role="status">
+                <strong>الاستلام → إنشاء فاتورة مورد → المطابقة</strong>
+                <span class="ms-3">المورد: @receiptSummary.SupplierName — المخزن: @receiptSummary.WarehouseName</span>
+                <span class="ms-3">المستلم: @receiptSummary.Lines.Sum(x => x.ReceivedQuantity).ToString("N3")</span>
+                <span class="ms-3">المقبول: @receiptSummary.Lines.Sum(x => x.AcceptedQuantity).ToString("N3")</span>
+                <span class="ms-3">المرتجع: @receiptSummary.Lines.Sum(x => x.ReturnedQuantity).ToString("N3")</span>
+                <span class="ms-3">الحالة: @receiptSummary.StatusText</span>
+            </div>
+        }
+        else if (ActiveTab?.Model is UiPurchaseInvoiceEditorModel invoiceSummary && !IsListTab)
+        {
+            <div class="alert alert-light border py-2 mb-2" role="status">
+                <strong>فاتورة المورد → المطابقة → الترحيل → السداد/التخصيص</strong>
+                <span class="ms-3">المورد: @invoiceSummary.SupplierName</span>
+                <span class="ms-3">المفوتر: @invoiceSummary.Lines.Sum(x => x.Quantity).ToString("N3") (وحدة شراء)</span>
+                <span class="ms-3">المتبقي للسداد: @(ActiveInvoicePaymentSummary?.OutstandingAmount.ToString("N2") ?? "بعد الترحيل") @invoiceSummary.CurrencyCode</span>
+                <span class="ms-3">الحالة: @invoiceSummary.StatusText</span>
+            </div>
+        }
+        @if (Section is PurchasingEntityType.PurchaseOrders or PurchasingEntityType.PurchaseReceipts or PurchasingEntityType.PurchaseInvoices)
+        {
+            <nav class="d-flex flex-wrap gap-2 mb-3" aria-label="مراحل دورة المشتريات">
+                <a class="btn btn-sm btn-outline-secondary" href="/purchases/orders">1. أوامر الشراء</a>
+                <a class="btn btn-sm btn-outline-secondary" href="/purchases/receipts">2. الاستلامات</a>
+                <a class="btn btn-sm btn-outline-secondary" href="/purchases/invoices">3. الفواتير والمطابقة</a>
+                <a class="btn btn-sm btn-outline-secondary" href="/accounting/payment-vouchers">4. سندات الصرف</a>
+                <a class="btn btn-sm btn-outline-secondary" href="/purchases/supplier-allocations">5. تخصيص الدفع والائتمان</a>
+            </nav>
+        }
+        @if (ActiveOrderProgress is { } progress && ActiveTab is { IsListTab: false })
+        {
+            <div class="card mb-3">
+                <div class="card-body p-2">
+                    <h3 class="h6">تقدم المستندات والكميات — @progress.PurchaseOrderCode</h3>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-1">
+                            <thead><tr><th>المنتج</th><th>مطلوب</th><th>مستلم</th><th>مفوتر</th><th>مرتجع</th><th>باقٍ للاستلام</th><th>باقٍ للفوترة</th><th>متاح للمرتجع</th></tr></thead>
+                            <tbody>
+                            @foreach (var l in progress.Lines)
+                            {
+                                <tr><td>@l.LineSequence — @l.ProductName</td><td>@l.Ordered.ToString("N3")</td><td>@l.Received.ToString("N3")</td><td>@l.Invoiced.ToString("N3")</td><td>@l.Returned.ToString("N3")</td><td>@l.RemainingToReceive.ToString("N3")</td><td>@l.RemainingToInvoice.ToString("N3")</td><td>@l.RemainingToReturn.ToString("N3")</td></tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="small text-muted mb-0">تعتمد الكميات على الاستلامات والفواتير المرحلة والمطابقة فقط. قيد GRNI لا يحتسب فاتورة مورد.</p>
+                </div>
+            </div>
+        }
         @if (IsListTab)
         {
             @if (Section == PurchasingEntityType.SupplierCatalog)

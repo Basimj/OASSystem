@@ -9,6 +9,7 @@
 @using OAS.Contracts.Purchasing.SupplierAllocations
 @inject IPurchasingClientService Purchasing
 @inject IAccountingClientService Accounting
+@using Microsoft.AspNetCore.Components
 
 <PageTitle>مركز تخصيص دفعات المورد | OAS</PageTitle>
 
@@ -252,6 +253,27 @@
 </div>
 
 @code {
+    [SupplyParameterFromQuery(Name = "supplierId")]
+    public Guid? InitialSupplierId { get; set; }
+    [SupplyParameterFromQuery(Name = "invoiceId")]
+    public Guid? InitialInvoiceId { get; set; }
+    private Guid? _loadedSupplierId;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!InitialSupplierId.HasValue || _loadedSupplierId == InitialSupplierId) return;
+        _loadedSupplierId = InitialSupplierId;
+        try
+        {
+            var supplier = await Accounting.GetSupplierByIdAsync(InitialSupplierId.Value);
+            if (supplier is not null && supplier.IsActive)
+                await SelectSupplierAsync(new SupplierLookupDto(supplier.Id, supplier.SupplierCode,
+                    supplier.AccountCode, supplier.NameAr, supplier.IsActive));
+            else SetError("المورد المحدد غير موجود أو غير فعال.");
+        }
+        catch (Exception ex) { SetError($"تعذر فتح المورد: {ex.Message}"); }
+    }
+
     private string? _supplierSearch;
     private IReadOnlyList<SupplierLookupDto> _supplierResults = Array.Empty<SupplierLookupDto>();
     private SupplierLookupDto? _selectedSupplier;
@@ -299,6 +321,12 @@
             _center = await Purchasing.GetSupplierAllocationCenterAsync(_selectedSupplier.Id);
             if (_center is null)
                 SetError("تعذر تحميل مركز تخصيص المورد.");
+            else if (InitialInvoiceId.HasValue)
+            {
+                // Preselect only if the invoice is actually open for this supplier.
+                var invoice = _center.OpenInvoices.FirstOrDefault(x => x.PurchaseInvoiceId == InitialInvoiceId.Value);
+                if (invoice is not null) SelectInvoice(invoice);
+            }
         }
         catch (Exception ex)
         {

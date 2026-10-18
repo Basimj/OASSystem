@@ -25,6 +25,11 @@ public sealed class PurchaseReceiptsController(ISender sender) : ControllerBase
         CancellationToken cancellationToken)
         => Ok(await sender.Send(new GetPurchaseReceiptsQuery(request, status, purchaseOrderId, supplierId), cancellationToken));
 
+    [HttpGet("{id:guid}/matched-invoices")]
+    public async Task<ActionResult<PagedResult<OAS.Contracts.Purchasing.PurchaseInvoices.PurchaseInvoiceDto>>> GetMatchedInvoices(
+        Guid id, [FromQuery] PageRequest request, CancellationToken cancellationToken)
+        => Ok(await sender.Send(new OAS.Application.Purchasing.PurchaseInvoices.Queries.GetMatchedPurchaseInvoicesForReceiptQuery(id, request), cancellationToken));
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<PurchaseReceiptDto>> GetById(Guid id, CancellationToken cancellationToken)
         => Ok(await sender.Send(new GetPurchaseReceiptByIdQuery(id), cancellationToken));

@@ -5,6 +5,9 @@ using OAS.Client.Accounting.Services;
 using OAS.Client.Accounting.Workspace;
 using OAS.Client.Common.Feedback.Services;
 using OAS.Client.Printing.Services;
+using OAS.Client.Purchasing.Services;
+using OAS.Contracts.Purchasing.Enums;
+using OAS.UiLib.Core.Models.Purchasing;
 using OAS.Client.Services.Http;
 using OAS.Contracts.Accounting.Accounts;
 using OAS.Contracts.Accounting.BankAccounts;
@@ -46,6 +49,7 @@ namespace OAS.Client.Accounting.Components;
 public partial class AccountingWorkspaceHost : IDisposable
 {
     [Inject] private IAccountingWorkspaceState Workspace { get; set; } = default!;
+    [Inject] private IPurchasingClientService PurchasingService { get; set; } = default!;
     [Inject] private IAccountingClientService AccountingService { get; set; } = default!;
     [Inject] private IUiSnackbarService Snackbar { get; set; } = default!;
     [Inject] private IUiDialogService Dialog { get; set; } = default!;
@@ -54,6 +58,8 @@ public partial class AccountingWorkspaceHost : IDisposable
 
     [Parameter] public AccountingEntityType? Section { get; set; }
     [Parameter] public Guid? InitialRecordId { get; set; }
+    [Parameter] public Guid? InitialPurchaseInvoiceId { get; set; }
+    private Guid? _openedFromPurchaseInvoiceId;
 
     private const int PageSize = 25;
     private bool _isLoading;
@@ -281,6 +287,59 @@ public partial class AccountingWorkspaceHost : IDisposable
             _loadedInitialRecordId = InitialRecordId;
             await OpenRecordInTab(Section.Value, InitialRecordId.Value, GetEntityDisplayName(Section.Value));
         }
+        if (Section.Value == AccountingEntityType.PaymentVouchers && InitialPurchaseInvoiceId.HasValue &&
+            _openedFromPurchaseInvoiceId != InitialPurchaseInvoiceId)
+        {
+            _openedFromPurchaseInvoiceId = InitialPurchaseInvoiceId;
+            await OpenPaymentVoucherFromInvoiceAsync(InitialPurchaseInvoiceId.Value);
+        }
+    }
+
+    private async Task OpenPaymentVoucherFromInvoiceAsync(Guid invoiceId)
+    {
+        try
+        {
+            var invoice = await PurchasingService.GetPurchaseInvoiceAsync(invoiceId);
+            if (invoice is null || invoice.Status != PurchaseInvoiceStatus.Posted)
+            {
+                Snackbar.Warning("يجب أن تكون فاتورة المورد مرحلة قبل إعداد سند الصرف.");
+                return;
+            }
+            var payment = await PurchasingService.GetPurchaseInvoicePaymentSummaryAsync(invoiceId);
+            if (payment is null || payment.OutstandingAmount <= 0m)
+            {
+                Snackbar.Info("الفاتورة مسددة بالكامل؛ لا حاجة إلى سند صرف جديد.");
+                return;
+            }
+            await OpenNewRecord(AccountingEntityType.PaymentVouchers);
+            if (Workspace.ActiveTab?.Model is not PaymentVoucherEditor.FormModel model) return;
+
+            model.Description = $"سداد فاتورة المورد {invoice.PurchaseInvoiceCode} — يتم التخصيص بعد ترحيل السند";
+            model.Lines.Clear();
+            model.Lines.Add(new UiVoucherSettlementLinesEditor.EditableSettlementLine
+            {
+                PartyType = UiSettlementPartyKind.Supplier,
+                SupplierId = invoice.SupplierId,
+                PartyName = invoice.SupplierName,
+                PartyLookupItem = new UiLookupItem(invoice.SupplierId.ToString("D"),
+                    invoice.SupplierName ?? invoice.SupplierCode ?? "المورد", invoice.SupplierCode),
+                CurrencyId = invoice.CurrencyId,
+                CurrencyCodeSnapshot = invoice.CurrencyCode,
+                CurrencyLookupItem = new UiLookupItem(invoice.CurrencyId.ToString("D"),
+                    invoice.CurrencyCode ?? "العملة"),
+                Amount = payment.OutstandingAmount,
+                ReferenceType = "PurchaseInvoice",
+                ReferenceId = invoice.Id,
+                ReferenceNumber = invoice.PurchaseInvoiceCode,
+                Description = $"سداد فاتورة المورد {invoice.PurchaseInvoiceCode}"
+            });
+            // The user must choose valid settlement account, method and confirm saving/posting.
+            // A voucher reference is NOT a PaymentAllocation. No cross-currency allocation here.
+            Workspace.NotifyStateChanged();
+            Snackbar.Info("تم تجهيز سند الصرف من الفاتورة. اختر طريقة السداد والحساب ثم احفظ ورحّل السند، وبعد ذلك خصص الدفعة في مركز تخصيص المورد.");
+        }
+        catch (ApiClientException ex) { ShowAccountingError(ex.Error); }
+        catch (Exception) { ApiFeedback.ShowUnexpected(); }
     }
 
     public void Dispose()
