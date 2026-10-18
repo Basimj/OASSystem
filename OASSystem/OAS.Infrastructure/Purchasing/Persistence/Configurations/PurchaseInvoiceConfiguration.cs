@@ -17,6 +17,8 @@ public sealed class PurchaseInvoiceConfiguration : IEntityTypeConfiguration<Purc
             t.HasCheckConstraint("CK_PurchaseInvoices_Totals_NonNegative", "[Subtotal] >= 0 AND [DiscountAmount] >= 0 AND [TaxAmount] >= 0 AND [TotalAmount] >= 0 AND [BaseSubtotal] >= 0 AND [BaseTaxAmount] >= 0 AND [BaseTotalAmount] >= 0");
             t.HasCheckConstraint("CK_PurchaseInvoices_CurrencyDecimalPlacesSnapshot", "[CurrencyDecimalPlacesSnapshot] IS NULL OR ([CurrencyDecimalPlacesSnapshot] BETWEEN 0 AND 6)");
             t.HasCheckConstraint("CK_PurchaseInvoices_BaseCurrencyDecimalPlacesSnapshot", "[BaseCurrencyDecimalPlacesSnapshot] IS NULL OR ([BaseCurrencyDecimalPlacesSnapshot] BETWEEN 0 AND 6)");
+            t.HasCheckConstraint("CK_PurchaseInvoices_PaymentTermDaysSnapshot", "[PaymentTermDaysSnapshot] IS NULL OR [PaymentTermDaysSnapshot] >= 0");
+            t.HasCheckConstraint("CK_PurchaseInvoices_DueDateProvenance", "[DueDateProvenance] BETWEEN 0 AND 3");
         });
 
         builder.HasKey(x => x.Id);
@@ -27,6 +29,9 @@ public sealed class PurchaseInvoiceConfiguration : IEntityTypeConfiguration<Purc
         builder.Property(x => x.SupplierId).IsRequired();
         builder.Property(x => x.InvoiceDate).HasColumnType("date").IsRequired();
         builder.Property(x => x.PostingDate).HasColumnType("date").IsRequired();
+        builder.Property(x => x.PaymentTermDaysSnapshot);
+        builder.Property(x => x.DueDate).HasColumnType("date");
+        builder.Property(x => x.DueDateProvenance).HasConversion<byte>().IsRequired();
         builder.Property(x => x.CurrencyId).IsRequired();
         builder.Property(x => x.CurrencyCodeSnapshot).HasMaxLength(8);
         builder.Property(x => x.CurrencyDecimalPlacesSnapshot);
@@ -64,6 +69,7 @@ public sealed class PurchaseInvoiceConfiguration : IEntityTypeConfiguration<Purc
         builder.HasIndex(x => x.PostingDate).HasDatabaseName("IX_PurchaseInvoices_PostingDate");
         builder.HasIndex(x => x.Status).HasDatabaseName("IX_PurchaseInvoices_Status");
         builder.HasIndex(x => x.BaseCurrencyId).HasDatabaseName("IX_PurchaseInvoices_BaseCurrencyId");
+        builder.HasIndex(x => new { x.SupplierId, x.DueDate, x.Status }).HasDatabaseName("IX_PurchaseInvoices_Supplier_DueDate_Status");
 
         builder.HasOne<Supplier>().WithMany().HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_PurchaseInvoices_Suppliers_SupplierId");
         builder.HasOne<Currency>().WithMany().HasForeignKey(x => x.CurrencyId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_PurchaseInvoices_Currencies_CurrencyId");

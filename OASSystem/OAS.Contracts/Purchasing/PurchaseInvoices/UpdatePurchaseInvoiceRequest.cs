@@ -13,4 +13,6 @@ public sealed record UpdatePurchaseInvoiceRequest(
     TaxCalculationMode TaxCalculationMode,
     string? Notes,
     IReadOnlyList<UpdatePurchaseInvoiceLineRequest> Lines,
-    string RowVersion);
+    string RowVersion,
+    DateOnly? DueDate = null,
+    int? PaymentTermDays = null);
