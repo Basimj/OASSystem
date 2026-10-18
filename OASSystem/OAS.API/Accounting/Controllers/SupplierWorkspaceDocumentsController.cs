@@ -23,8 +23,9 @@ public sealed class SupplierWorkspaceDocumentsController(ISender sender) : Contr
         [FromQuery] string? currencyCode = null,
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 50,
+        [FromQuery] byte? status = null,
         CancellationToken cancellationToken = default)
         => Ok(await sender.Send(new GetSupplierWorkspaceDocumentsQuery(
             new SupplierWorkspaceDocumentsFilter(supplierId, documentType, fromDate, toDate,
-                search, currencyCode, pageNumber, pageSize)), cancellationToken));
+                search, currencyCode, pageNumber, pageSize, status)), cancellationToken));
 }
