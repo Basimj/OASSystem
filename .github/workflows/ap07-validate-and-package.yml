@@ -1,0 +1,46 @@
+name: AP-07 Build, Test and ZIPs
+on:
+  push:
+    branches: [feature/ap-07-purchasing-workflow]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - run: dotnet restore OASSystem/OASSystem.sln
+      - run: dotnet build OASSystem/OASSystem.sln --no-restore
+      - run: dotnet test OASSystem/OAS.Tests/OAS.Tests.csproj --no-restore --filter "FullyQualifiedName~Ap07|FullyQualifiedName~AP07"
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Generate files-only and full-project archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          mkdir -p dist/modified
+          git diff --name-only --diff-filter=ACMR -z origin/main...HEAD | while IFS= read -r -d '' path; do
+            if [[ -f "$path" ]]; then
+              mkdir -p "dist/modified/$(dirname "$path")"
+              cp "$path" "dist/modified/$path"
+            fi
+          done
+          (cd dist/modified && zip -qr ../AP07_Modified_Files.zip .)
+          git archive --format=zip -o dist/OASSystem_AP07_Full_Project.zip HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AP07-Modified-Files
+          path: dist/AP07_Modified_Files.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OASSystem-AP07-Full-Project
+          path: dist/OASSystem_AP07_Full_Project.zip

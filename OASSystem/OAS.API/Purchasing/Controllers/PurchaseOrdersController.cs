@@ -25,6 +25,10 @@ public sealed class PurchaseOrdersController(ISender sender) : ControllerBase
         CancellationToken cancellationToken)
         => Ok(await sender.Send(new GetPurchaseOrdersQuery(request, status, supplierId, warehouseId), cancellationToken));
 
+    [HttpGet("{id:guid}/progress")]
+    public async Task<ActionResult<PurchaseOrderProgressDto>> GetProgress(Guid id, CancellationToken cancellationToken)
+        => Ok(await sender.Send(new GetPurchaseOrderProgressQuery(id), cancellationToken));
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<PurchaseOrderDto>> GetById(Guid id, CancellationToken cancellationToken)
         => Ok(await sender.Send(new GetPurchaseOrderByIdQuery(id), cancellationToken));

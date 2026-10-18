@@ -5,4 +5,9 @@
 
 <PageTitle>سندات الصرف | OAS</PageTitle>
 
-<AccountingWorkspaceHost Section="AccountingEntityType.PaymentVouchers" />
+<AccountingWorkspaceHost Section="AccountingEntityType.PaymentVouchers" InitialPurchaseInvoiceId="@FromInvoice" />
+
+@code {
+    [Microsoft.AspNetCore.Components.SupplyParameterFromQuery(Name = "fromInvoice")]
+    public Guid? FromInvoice { get; set; }
+}

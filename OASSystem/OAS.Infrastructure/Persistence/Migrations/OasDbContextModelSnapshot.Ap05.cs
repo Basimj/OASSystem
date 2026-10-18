@@ -188,6 +188,8 @@ partial class OasDbContextModelSnapshot
             b.Navigation("Items").UsePropertyAccessMode(PropertyAccessMode.Field);
         });
 
+        // SA-03: Include the customer credit application table in the effective snapshot.
+        AddSa03CustomerCreditModel(modelBuilder);
         return (IModel)modelBuilder.Model;
     }
 
@@ -195,9 +197,9 @@ partial class OasDbContextModelSnapshot
     {
         b.Property<DateTimeOffset>("CreatedAtUtc").HasColumnName("CreatedAt").HasColumnType("datetimeoffset");
         b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnName("CreatedBy").HasColumnType("nvarchar(64)");
-        b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnName("CreatedFromDevice").HasColumnType("nvarchar(256)");
+        b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
         b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnName("UpdatedAt").HasColumnType("datetimeoffset");
         b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnName("UpdatedBy").HasColumnType("nvarchar(64)");
-        b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnName("UpdatedFromDevice").HasColumnType("nvarchar(256)");
+        b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
     }
 }

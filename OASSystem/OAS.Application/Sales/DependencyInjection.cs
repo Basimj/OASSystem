@@ -60,6 +60,7 @@ public static class DependencyInjection
         services.AddScoped<ISalesInvoiceConfirmationService, SalesInvoiceConfirmationService>();
         services.AddScoped<ISalesInvoicePostingWorkflow, SalesInvoicePostingWorkflow>();
         services.AddScoped<ISalesInvoiceBalanceService, SalesInvoiceBalanceService>();
+        services.AddScoped<CustomerCreditLedgerService>();
 
         services.AddScoped<SalesSettlementService>();
         services.AddScoped<ISalesSettlementService, SalesSettlementFxDecorator>();
