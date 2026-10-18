@@ -28,6 +28,26 @@ public partial class PurchasingWorkspaceHost
 {
     private const int PageSize=24;
     [Parameter,EditorRequired] public PurchasingEntityType Section {get;set;}
+    [Parameter] public Guid? InitialRecordId {get;set;}
+    [Parameter] public Guid? RelatedPurchaseOrderId {get;set;}
+    private Guid? _previousOrderFilter;
+    private readonly Dictionary<Guid, PurchaseOrderProgressDto> _orderProgress = [];
+    private PurchaseOrderProgressDto? ActiveOrderProgress
+    {
+        get
+        {
+            var orderId = ActiveTab?.Model switch
+            {
+                UiPurchaseOrderEditorModel order => order.Id,
+                UiPurchaseReceiptEditorModel receipt => receipt.PurchaseOrderId,
+                _ => null
+            };
+            return orderId.HasValue && _orderProgress.TryGetValue(orderId.Value, out var result) ? result : null;
+        }
+    }
+    [Parameter] public Guid? InitialPurchaseOrderId {get;set;}
+    private Guid? _lastReceiptFromOrderId;
+    private (PurchasingEntityType Type, Guid Id)? _lastLinkedRecord;
     [Inject] private IPurchasingClientService Purchasing {get;set;}=default!;
     [Inject] private IInventoryClientService Inventory {get;set;}=default!;
     [Inject] private IAccountingClientService Accounting {get;set;}=default!;
@@ -92,13 +112,36 @@ public partial class PurchasingWorkspaceHost
 
     protected override async Task OnParametersSetAsync()
     {
-        if(_initializedSection==Section)return;
-        _initializedSection=Section;
-        var activeId=Workspace.ActiveTab?.EntityType==Section?Workspace.ActiveTabId:Guid.Empty;
-        Workspace.OpenList(Section);
-        if(activeId!=Guid.Empty)Workspace.ActiveTabId=activeId;
-        _search=null;_pageNumber=1;
-        if(IsListTab)await LoadListAsync(); else if(ActiveTab is { } tab)await EnsureLoadedAsync(tab);
+        if(_initializedSection!=Section)
+        {
+            _initializedSection=Section;
+            _lastLinkedRecord=null;
+            var activeId=Workspace.ActiveTab?.EntityType==Section?Workspace.ActiveTabId:Guid.Empty;
+            Workspace.OpenList(Section);
+            if(activeId!=Guid.Empty)Workspace.ActiveTabId=activeId;
+            _search=null;_pageNumber=1;
+            if(IsListTab)await LoadListAsync(); else if(ActiveTab is { } tab)await EnsureLoadedAsync(tab);
+        }
+        if(Section == PurchasingEntityType.PurchaseReceipts && _previousOrderFilter != RelatedPurchaseOrderId)
+        {
+            _previousOrderFilter = RelatedPurchaseOrderId;
+            _pageNumber = 1;
+            if(IsListTab) await LoadListAsync();
+        }
+        if(InitialRecordId.HasValue && _lastLinkedRecord != (Section,InitialRecordId.Value))
+        {
+            _lastLinkedRecord = (Section,InitialRecordId.Value);
+            await OpenRecordAsync(InitialRecordId.Value);
+        }
+        if(Section == PurchasingEntityType.PurchaseReceipts && InitialPurchaseOrderId.HasValue &&
+           _lastReceiptFromOrderId != InitialPurchaseOrderId)
+        {
+            _lastReceiptFromOrderId = InitialPurchaseOrderId;
+            var tab = Workspace.OpenNew(Section, "استلام من أمر شراء");
+            tab.Model = new UiPurchaseReceiptEditorModel();
+            tab.IsEditMode = true;
+            await ReceiptPurchaseOrderChangedAsync(InitialPurchaseOrderId.Value);
+        }
     }
 
     private async Task LoadListAsync()
@@ -116,7 +159,7 @@ public partial class PurchasingWorkspaceHost
                 case PurchasingEntityType.PurchaseOrders:
                     var o=await Purchasing.GetPurchaseOrdersAsync(request);SetPage(o.PageNumber,o.TotalPages,o.TotalCount,o.Items.Select(x=>new UiPurchasingListItem(x.Id,x.PurchaseOrderCode,x.SupplierName??"مورد",x.DestinationWarehouseName,PurchasingArabicPresenter.OrderStatus(x.Status),$"{x.TotalAmount:N2} {x.CurrencyCode}","fa-solid fa-file-signature")).ToArray());break;
                 case PurchasingEntityType.PurchaseReceipts:
-                    var gr=await Purchasing.GetPurchaseReceiptsAsync(request);SetPage(gr.PageNumber,gr.TotalPages,gr.TotalCount,gr.Items.Select(x=>new UiPurchasingListItem(x.Id,x.ReceiptCode,x.SupplierName??"استلام",x.PurchaseOrderCode,PurchasingArabicPresenter.ReceiptStatus(x.Status),x.ReceiptDate.ToString("yyyy-MM-dd"),"fa-solid fa-truck-ramp-box")).ToArray());break;
+                    var gr=await Purchasing.GetPurchaseReceiptsAsync(request, purchaseOrderId: RelatedPurchaseOrderId);SetPage(gr.PageNumber,gr.TotalPages,gr.TotalCount,gr.Items.Select(x=>new UiPurchasingListItem(x.Id,x.ReceiptCode,x.SupplierName??"استلام",x.PurchaseOrderCode,PurchasingArabicPresenter.ReceiptStatus(x.Status),x.ReceiptDate.ToString("yyyy-MM-dd"),"fa-solid fa-truck-ramp-box")).ToArray());break;
                 case PurchasingEntityType.PurchaseInvoices:
                     var pi=await Purchasing.GetPurchaseInvoicesAsync(request);SetPage(pi.PageNumber,pi.TotalPages,pi.TotalCount,pi.Items.Select(x=>new UiPurchasingListItem(x.Id,x.PurchaseInvoiceCode,x.SupplierName??"فاتورة مورد",x.SupplierInvoiceCode,PurchasingArabicPresenter.InvoiceStatus(x.Status),$"{x.TotalAmount:N2} {x.CurrencyCode}","fa-solid fa-file-invoice-dollar")).ToArray());break;
             }
@@ -165,9 +208,28 @@ public partial class PurchasingWorkspaceHost
             if(tab.Model is null)throw new InvalidOperationException();
             tab.Title=ModelTitle(tab.Model);tab.IsDirty=false;tab.IsEditMode=false;
             if(tab.Model is UiPurchaseInvoiceEditorModel invoice)await LoadInvoicePaymentSummaryAsync(invoice,force);
+            if(tab.Model is UiPurchaseOrderEditorModel order && order.Id is Guid orderId)
+                await LoadOrderProgressAsync(orderId);
+            if(tab.Model is UiPurchaseReceiptEditorModel receipt && receipt.PurchaseOrderId is Guid purchaseOrderId)
+                await LoadOrderProgressAsync(purchaseOrderId);
         }
         catch(ApiClientException ex){ApiFeedback.Show(ex.Error);Workspace.Close(tab.TabId);}catch{ApiFeedback.ShowUnexpected();Workspace.Close(tab.TabId);}
         finally{tab.IsLoading=false;}
+    }
+
+    private async Task LoadOrderProgressAsync(Guid orderId)
+    {
+        try
+        {
+            var progress = await Purchasing.GetPurchaseOrderProgressAsync(orderId);
+            if (progress is not null) _orderProgress[orderId] = progress;
+        }
+        catch (ApiClientException)
+        {
+            // The progress endpoint requires separate invoices/receipts permissions.
+            // Do not prevent permitted order/receipt access when a role lacks them.
+            _orderProgress.Remove(orderId);
+        }
     }
 
     private Task EditorChangedAsync(){if(ActiveTab is { } t)t.IsDirty=true;StateHasChanged();return Task.CompletedTask;}

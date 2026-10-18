@@ -3,4 +3,18 @@
 @using OAS.Client.Purchasing.Components
 @using OAS.Client.Purchasing.Workspace
 <PageTitle>استلام المشتريات | OAS</PageTitle>
-<PurchasingWorkspaceHost Section="PurchasingEntityType.PurchaseReceipts" />
+<PurchasingWorkspaceHost Section="PurchasingEntityType.PurchaseReceipts"
+                         InitialRecordId="@OpenId"
+                         RelatedPurchaseOrderId="@PurchaseOrderId"
+                         InitialPurchaseOrderId="@FromOrderId" />
+
+@code {
+    [Microsoft.AspNetCore.Components.SupplyParameterFromQuery(Name = "openId")]
+    public Guid? OpenId { get; set; }
+
+    [Microsoft.AspNetCore.Components.SupplyParameterFromQuery(Name = "purchaseOrderId")]
+    public Guid? PurchaseOrderId { get; set; }
+
+    [Microsoft.AspNetCore.Components.SupplyParameterFromQuery(Name = "fromOrderId")]
+    public Guid? FromOrderId { get; set; }
+}
