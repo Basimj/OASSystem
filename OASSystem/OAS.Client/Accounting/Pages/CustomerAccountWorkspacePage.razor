@@ -1,0 +1,253 @@
+@page "/accounting/customers/{CustomerId:guid}/account"
+@attribute [Authorize]
+@using OAS.Contracts.Accounting.Reports
+@using OAS.Client.Services.Http
+@using OAS.Client.Services.Browser
+@using OAS.Client.Common.Feedback.Services
+@using OAS.UiLib.Services.Feedback
+@inject OasApiClient Api
+@inject BrowserFileDownloadService Downloads
+@inject IApiFeedbackService ApiFeedback
+@inject IUiSnackbarService Snackbar
+@inject Microsoft.JSInterop.IJSRuntime JS
+
+<PageTitle>كشف حساب العميل | OAS</PageTitle>
+
+<UiWorkspaceLayout ShowAside="false" ShowFilters="false">
+    <Actions>
+        <UiWorkspaceActionBar>
+            <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Loading="@_busy" Size="ControlSize.Small" OnClick="LoadAsync" />
+            <UiButton Text="تصدير كشف الحساب CSV" Variant="ButtonVariant.Secondary" Loading="@_busy" Size="ControlSize.Small" OnClick="ExportCsvAsync" />
+            <a href="@($"/sales/customer-credits/{CustomerId:D}")">تطبيق أو استرداد رصيد المرتجعات</a>
+            <UiButton Text="طباعة" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(_model is null)" OnClick="PrintAsync" />
+        </UiWorkspaceActionBar>
+    </Actions>
+    <Content>
+        <UiStackLayout Gap="StackGap.Small">
+            <UiCard Title="المركز المالي للعميل" Subtitle="الأرصدة من القيود المحاسبية المرحلة، والمبالغ بالعملة الأساسية.">
+                <UiGrid Columns="2">
+                    <UiInputDate Label="من تاريخ" Value="@_from" ValueChanged="OnFromChanged" Size="ControlSize.Small" />
+                    <UiInputDate Label="إلى تاريخ / تاريخ الأعمار" Value="@_to" ValueChanged="OnToChanged" Size="ControlSize.Small" />
+                </UiGrid>
+                @if (_model is not null)
+                {
+                    <UiGrid Columns="2">
+                        <UiKeyValue Label="العميل" Value="@($"{_model.CustomerCode} - {_model.CustomerName}")" />
+                        <UiKeyValue Label="العملة الأساسية" Value="@_model.Statement.BaseCurrencyCode" />
+                        <UiKeyValue Label="الرصيد الافتتاحي (مدين + / دائن -)" Value="@_model.Statement.OpeningBase.ToString("N2")" />
+                        <UiKeyValue Label="الرصيد الختامي" Value="@_model.Statement.ClosingBase.ToString("N2")" />
+                        <UiKeyValue Label="المستحق على الفواتير" Value="@_model.Aging.TotalOutstandingBase.ToString("N2")" />
+                        <UiKeyValue Label="رصيد المرتجعات غير المطبق" Value="@_model.UnappliedReturnCreditsBase.ToString("N2")" />
+                        <UiKeyValue Label="المقبوضات غير المخصصة" Value="@_model.UnappliedReceiptsBase.ToString("N2")" />
+                        <UiKeyValue Label="العربون (التزام مستقل)" Value="@_model.CustomerAdvancesLiabilityBase.ToString("N2")" />
+                    </UiGrid>
+                }
+            </UiCard>
+
+            @if (_busy && _model is null)
+            {
+                <UiAlert Message="جارٍ تحميل حساب العميل..." Tone="AlertTone.Info" />
+            }
+            else if (_model is not null)
+            {
+                <UiCard Title="كشف الحساب من الأستاذ العام" Subtitle="الأرقام مدين/دائن بالعملة الأساسية. لا تُحتسب أسطر الصندوق والبنك مرتين.">
+                    <div class="ar-report-scroll">
+                        <table class="ar-report-table">
+                            <thead><tr><th>تاريخ الترحيل</th><th>القيد</th><th>المرجع</th><th>البيان</th><th>مدين</th><th>دائن</th><th>الرصيد</th></tr></thead>
+                            <tbody>
+                                @foreach (var row in _model.Statement.Movements)
+                                {
+                                    <tr>
+                                        <td>@row.PostingDate.ToString("yyyy-MM-dd")</td>
+                                        <td>@row.JournalNumber</td>
+                                        <td>@(row.SourceDocumentType ?? "تسوية")</td>
+                                        <td>@row.Description</td>
+                                        <td class="num">@row.DebitBase.ToString("N2")</td>
+                                        <td class="num">@row.CreditBase.ToString("N2")</td>
+                                        <td class="num">@row.BalanceBase.ToString("N2")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    @if (_model.Statement.Movements.Count == 0)
+                    {
+                        <UiAlert Message="لا توجد حركات في هذه الفترة." Tone="AlertTone.Info" />
+                    }
+                    <UiGrid Columns="2">
+                        <UiKeyValue Label="إجمالي المدين للفترة" Value="@_model.Statement.PeriodDebitBase.ToString("N2")" />
+                        <UiKeyValue Label="إجمالي الدائن للفترة" Value="@_model.Statement.PeriodCreditBase.ToString("N2")" />
+                    </UiGrid>
+                    <UiWorkspaceActionBar>
+                        <UiButton Text="السابق" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(_page <= 1)" OnClick="PreviousAsync" />
+                        <UiButton Text="التالي" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@((long)_page * 50 >= _model.Statement.TotalCount)" OnClick="NextAsync" />
+                    </UiWorkspaceActionBar>
+                </UiCard>
+                <UiCard Title="أعمار ديون العميل" Subtitle="تاريخ الاستحقاق المحفوظ تاريخيًا؛ المقبوضات والمرتجعات اللاحقة لتاريخ التقرير مستبعدة.">
+                    <UiGrid Columns="2">
+                        <UiKeyValue Label="غير مستحق" Value="@_model.Aging.NotDueBase.ToString("N2")" />
+                        <UiKeyValue Label="0–30 يومًا" Value="@_model.Aging.Days0To30Base.ToString("N2")" />
+                        <UiKeyValue Label="31–60 يومًا" Value="@_model.Aging.Days31To60Base.ToString("N2")" />
+                        <UiKeyValue Label="61–90 يومًا" Value="@_model.Aging.Days61To90Base.ToString("N2")" />
+                        <UiKeyValue Label="أكثر من 90 يومًا" Value="@_model.Aging.Over90Base.ToString("N2")" />
+                        <UiKeyValue Label="استحقاق غير معروف / بحاجة مراجعة" Value="@_model.Aging.UnknownBase.ToString("N2")" />
+                    </UiGrid>
+                    <div class="ar-report-scroll">
+                        <table class="ar-report-table">
+                            <thead><tr><th>الفاتورة</th><th>تاريخ الاستحقاق</th><th>الفئة</th><th>المبلغ الأصلي</th><th>المدفوع</th><th>المرتجع</th><th>رصيد مطبق</th><th>المتبقي</th></tr></thead>
+                            <tbody>
+                                @foreach (var row in _model.Aging.Invoices)
+                                {
+                                    <tr>
+                                        <td>@row.InvoiceNumber</td>
+                                        <td>@(row.DueDate?.ToString("yyyy-MM-dd") ?? "غير محدد")</td>
+                                        <td>@ArabicBucket(row.Bucket)</td>
+                                        <td class="num">@row.OriginalBase.ToString("N2")</td>
+                                        <td class="num">@row.PaymentBase.ToString("N2")</td>
+                                        <td class="num">@row.ReturnBase.ToString("N2")</td>
+                                        <td class="num">@row.CreditAppliedBase.ToString("N2")</td>
+                                        <td class="num">@row.OutstandingBase.ToString("N2")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </UiCard>
+                <UiCard Title="سجل مستندات العميل" Subtitle="الفواتير والمرتجعات والقبض والعربون واستخدام الرصيد الدائن، دون خلطها في الرصيد الدفتري.">
+                    <UiWorkspaceActionBar>
+                        <UiButton Text="الفواتير" Size="ControlSize.Small" Variant="ButtonVariant.Secondary" OnClick="@(() => ChangeDocumentKindAsync("invoices"))" />
+                        <UiButton Text="المرتجعات" Size="ControlSize.Small" Variant="ButtonVariant.Secondary" OnClick="@(() => ChangeDocumentKindAsync("returns"))" />
+                        <UiButton Text="سندات القبض" Size="ControlSize.Small" Variant="ButtonVariant.Secondary" OnClick="@(() => ChangeDocumentKindAsync("receipts"))" />
+                        <UiButton Text="العربون" Size="ControlSize.Small" Variant="ButtonVariant.Secondary" OnClick="@(() => ChangeDocumentKindAsync("advances"))" />
+                        <UiButton Text="تطبيق الرصيد / الاسترداد" Size="ControlSize.Small" Variant="ButtonVariant.Secondary" OnClick="@(() => ChangeDocumentKindAsync("credits"))" />
+                    </UiWorkspaceActionBar>
+                    @if (_documents is not null)
+                    {
+                        <div class="ar-report-scroll">
+                            <table class="ar-report-table">
+                                <thead><tr><th>رقم المستند</th><th>النوع</th><th>التاريخ</th><th>المبلغ الأساسي</th><th>العملة</th><th>الحالة</th><th>القيد</th></tr></thead>
+                                <tbody>
+                                    @foreach (var doc in _documents.Rows)
+                                    {
+                                        <tr>
+                                            <td>@doc.Number</td><td>@doc.Kind</td>
+                                            <td>@doc.PostingDate.ToString("yyyy-MM-dd")</td>
+                                            <td class="num">@doc.BaseAmount.ToString("N2")</td>
+                                            <td>@doc.Currency</td><td>@doc.Status</td>
+                                            <td>@(doc.JournalEntryId?.ToString("D") ?? "—")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        @if (_documents.Rows.Count == 0)
+                        {
+                            <UiAlert Tone="AlertTone.Info" Message="لا توجد مستندات لهذا النوع في الفترة المحددة." />
+                        }
+                        <UiWorkspaceActionBar>
+                            <UiButton Text="السابق" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(_docPage<=1)" OnClick="DocumentPreviousAsync" />
+                            <UiButton Text="التالي" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@((long)_docPage*50>=_documents.TotalCount)" OnClick="DocumentNextAsync" />
+                        </UiWorkspaceActionBar>
+                    }
+                </UiCard>
+            }
+        </UiStackLayout>
+    </Content>
+</UiWorkspaceLayout>
+
+
+
+@code {
+    [Parameter] public Guid CustomerId { get; set; }
+    private CustomerArWorkspaceDto? _model;
+    private DateOnly? _from = new DateOnly(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private DateOnly? _to = DateOnly.FromDateTime(DateTime.Today);
+    private int _page = 1;
+    private bool _busy;
+    private string _docKind = "invoices";
+    private int _docPage = 1;
+    private CustomerArDocumentPageDto? _documents;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _page = 1;
+        _docPage = 1;
+        await LoadAsync();
+    }
+
+    private void OnFromChanged(DateOnly? value)
+    {
+        _from = value;
+        if (_to < _from) _to = _from;
+        _page = 1;
+    }
+    private void OnToChanged(DateOnly? value)
+    {
+        _to = value;
+        if (_from > _to) _from = _to;
+        _page = 1;
+    }
+    private async Task PreviousAsync() { if (_page > 1) { _page--; await LoadAsync(); } }
+    private async Task NextAsync() { _page++; await LoadAsync(); }
+
+    private async Task LoadAsync()
+    {
+        if (CustomerId == Guid.Empty || !_from.HasValue || !_to.HasValue) return;
+        _busy = true;
+        try
+        {
+            var url = $"api/accounting/reports/customers/{CustomerId:D}/workspace?fromDate={_from:yyyy-MM-dd}&toDate={_to:yyyy-MM-dd}&pageNumber={_page}&pageSize=50";
+            _model = await Api.GetAsync<CustomerArWorkspaceDto>(url);
+            await LoadDocumentsAsync();
+        }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
+        finally { _busy = false; }
+    }
+
+    private async Task ChangeDocumentKindAsync(string kind)
+    {
+        _docKind = kind;
+        _docPage = 1;
+        await LoadDocumentsAsync();
+    }
+    private async Task DocumentPreviousAsync()
+    {
+        if (_docPage > 1) { _docPage--; await LoadDocumentsAsync(); }
+    }
+    private async Task DocumentNextAsync() { _docPage++; await LoadDocumentsAsync(); }
+    private async Task LoadDocumentsAsync()
+    {
+        if (!_to.HasValue) return;
+        try
+        {
+            var uri = $"api/accounting/reports/customers/{CustomerId:D}/documents?asOfDate={_to:yyyy-MM-dd}&kind={_docKind}&pageNumber={_docPage}&pageSize=50";
+            _documents = await Api.GetAsync<CustomerArDocumentPageDto>(uri);
+        }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
+    }
+
+    private async Task ExportCsvAsync()
+    {
+        if (!_from.HasValue || !_to.HasValue || _busy) return;
+        _busy = true;
+        try
+        {
+            var uri = $"api/accounting/reports/customers/{CustomerId:D}/statement.csv?fromDate={_from:yyyy-MM-dd}&toDate={_to:yyyy-MM-dd}";
+            var bytes = await Api.GetFileAsync(uri);
+            await Downloads.DownloadAsync(bytes, $"Customer-{CustomerId:N}-Statement.csv", "text/csv;charset=utf-8");
+            Snackbar.Success("تم تجهيز كشف حساب العميل للتصدير.");
+        }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
+        finally { _busy = false; }
+    }
+
+    private Task PrintAsync() => JS.InvokeVoidAsync("print").AsTask();
+    private static string ArabicBucket(string bucket) => bucket switch
+    {
+        "NotDue" => "غير مستحق", "0-30" => "0–30", "31-60" => "31–60",
+        "61-90" => "61–90", "+90" => ">90", _ => "مراجعة الاستحقاق"
+    };
+}

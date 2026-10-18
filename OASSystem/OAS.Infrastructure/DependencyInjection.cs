@@ -112,6 +112,7 @@ public static class DependencyInjection
         services.AddScoped<ISupplierApReportingQueryService, SupplierApReportingQueryService>();
         services.AddScoped<ISupplierWorkspaceDocumentsService, SupplierWorkspaceDocumentsService>();
         services.AddScoped<ISupplierAgingQueryService, SupplierAgingQueryService>();
+        services.AddScoped<ICustomerArReportingQueryService, CustomerArReportingQueryService>();
         services.AddScoped<ISupplierOpeningRepository, OAS.Infrastructure.Accounting.Persistence.SupplierOpeningRepository>();
         services.AddScoped<ISupplierOpeningJournalVerificationPort, OAS.Infrastructure.Accounting.SupplierOpeningJournalVerificationPort>();
         services.AddScoped<ISupplierOpeningConcurrencyPort, OAS.Infrastructure.Accounting.SupplierOpeningConcurrencyPort>();

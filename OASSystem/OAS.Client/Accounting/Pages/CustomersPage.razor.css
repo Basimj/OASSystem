@@ -1,0 +1,4 @@
+
+.customer-ar-shortcuts{padding:.5rem 1rem;display:flex;gap:.45rem;font-size:.875rem;align-items:center}
+.customer-ar-shortcuts a{text-decoration:underline;color:var(--color-primary,#145f9a)}
+@media print{.customer-ar-shortcuts{display:none}}

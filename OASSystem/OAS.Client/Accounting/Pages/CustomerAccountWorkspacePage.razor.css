@@ -1,0 +1,12 @@
+
+.ar-report-scroll{overflow-x:auto;width:100%}
+.ar-report-table{border-collapse:collapse;min-width:850px;width:100%;font-size:.85rem;text-align:right}
+.ar-report-table th,.ar-report-table td{padding:.5rem .65rem;border-bottom:1px solid var(--border-color,#ddd);vertical-align:middle}
+.ar-report-table thead{background:var(--surface-subtle,#f6f7f8)}
+.ar-report-table td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+@media print {
+  header, nav, aside, button, .sidebar, .topbar {display:none!important}
+  .ar-report-scroll{overflow:visible}
+  .ar-report-table{min-width:0;font-size:9pt}
+  .ar-report-table th,.ar-report-table td{padding:3pt}
+}

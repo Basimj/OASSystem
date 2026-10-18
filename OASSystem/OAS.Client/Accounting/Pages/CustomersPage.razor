@@ -5,6 +5,15 @@
 
 <PageTitle>العملاء | المحاسبة | OAS</PageTitle>
 
+<div class="customer-ar-shortcuts">
+    <a href="/accounting/customer-ar">أرصدة العملاء وأعمار الديون</a>
+    @if (ActiveEditorTab?.EntityId is Guid customerId)
+    {
+        <span> | </span>
+        <a href="@($"/accounting/customers/{customerId:D}/account")">المركز المالي للعميل الحالي</a>
+    }
+</div>
+
 <UiAccountingPartyWorkspace IsSupplier="false"
                             Busy="@_busy"
                             EditorOpen="@EditorOpen"
@@ -50,3 +59,5 @@
                          OnClear="ClearImport"
                          OnClose="CloseImport" />
 }
+
+

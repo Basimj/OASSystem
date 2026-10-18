@@ -90,7 +90,7 @@ public sealed class AP10PurchasingPostingReadinessTests
             new FakeGenericRepository<Currency, Guid>([currency]),
             new FakeGenericRepository<FiscalPeriod, Guid>([period]),
             new FakeGenericRepository<PostingProfile, Guid>([receipt, invoice]),
-            new FakeGenericRepository<PostingProfileLine, Guid>(roleLines),
+            new FakeGenericRepository<PostingProfileLine, Guid>(roleLines.ToList()),
             new FakeGenericRepository<Account, Guid>([inventory, grni]),
             new FakeGenericRepository<Supplier, Guid>());
         return (handler, inventory.Id);
