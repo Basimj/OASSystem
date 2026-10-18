@@ -11,6 +11,9 @@ builder.Services.AddRazorComponents()
     .AddInteractiveWebAssemblyComponents();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+// AP-12 read-only SQL projections; no new persistence tables or posting engine.
+builder.Services.AddScoped<OAS.Application.Purchasing.Performance.IPurchasingPerformanceQueryService,
+    OAS.Infrastructure.Purchasing.Persistence.Queries.PurchasingPerformanceQueryService>();
 builder.Services.AddApiFoundation(builder.Configuration);
 builder.Services.AddReceiptIntegrationFollowUps();
 builder.Services.AddHealthChecks();

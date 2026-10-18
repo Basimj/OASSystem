@@ -1,0 +1,253 @@
+@page "/purchases/performance"
+@attribute [Authorize]
+@using System.Globalization
+@using OAS.Client.Accounting.Services
+@using OAS.Client.Inventory.Services
+@using OAS.Client.Services.Browser
+@using OAS.Contracts.Purchasing.Performance
+@using OAS.UiLib.Core.Models
+@inject OasApiClient Api
+@inject IAccountingClientService Accounting
+@inject IInventoryClientService Inventory
+@inject BrowserFileDownloadService Download
+@inject IJSRuntime Js
+
+<PageTitle>تقارير أداء المشتريات والموردين | OAS</PageTitle>
+
+<div class="container-fluid py-3" dir="rtl">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 ap12-actions">
+        <div>
+            <h1 class="h5">تقارير أداء المشتريات والموردين</h1>
+            <small class="text-muted">الطلبات ليست مديونية. الاستلام المرحل مستقل عن فاتورة المورد المرحلة وعن المرتجع.</small>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+            <a class="btn btn-outline-secondary btn-sm" href="/purchases">مركز المشتريات</a>
+            <button class="btn btn-outline-secondary btn-sm" disabled="@(_busy || _report is null)" @onclick="ExportCsvAsync">CSV</button>
+            <button class="btn btn-outline-secondary btn-sm" disabled="@(_busy || _report is null)" @onclick="ExportExcelAsync">Excel</button>
+            <button class="btn btn-outline-secondary btn-sm" disabled="@(_report is null)" @onclick="PrintAsync">طباعة الصفحة الحالية</button>
+        </div>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(_error)) { <div class="alert alert-danger" role="alert">@_error</div> }
+    <div class="card mb-3 ap12-filters"><div class="card-body">
+        <div class="row g-2 align-items-end">
+            <div class="col-6 col-md-2"><label class="form-label">من تاريخ</label><input class="form-control form-control-sm" type="date" @bind="_fromDate" /></div>
+            <div class="col-6 col-md-2"><label class="form-label">إلى تاريخ</label><input class="form-control form-control-sm" type="date" @bind="_toDate" /></div>
+            <div class="col-12 col-md-3">
+                <UiLookup Label="المورد" Value="@_supplier" ValueChanged="@(value => _supplier = value)"
+                          SearchAsync="SearchSuppliersAsync" Placeholder="ابحث عن المورد بالاسم أو الكود..." />
+            </div>
+            <div class="col-12 col-md-3">
+                <UiLookup Label="المخزن" Value="@_warehouse" ValueChanged="@(value => _warehouse = value)"
+                          SearchAsync="SearchWarehousesAsync" Placeholder="جميع المخازن" />
+            </div>
+            <div class="col-12 col-md-2">
+                <UiLookup Label="الصنف" Value="@_variant" ValueChanged="@(value => _variant = value)"
+                          SearchAsync="SearchProductsAsync" Placeholder="جميع الأصناف" />
+            </div>
+            <div class="col-12 col-md-3"><label class="form-label">العملة</label>
+                <UiLookup Value="@_currency" ValueChanged="@(value => _currency = value)" SearchAsync="SearchCurrenciesAsync" Placeholder="كل العملات" />
+            </div>
+            <div class="col-12 col-md-6"><label class="form-label">بحث برقم المستند أو الصنف</label>
+                <input class="form-control form-control-sm" @bind="_search" placeholder="ابحث..." />
+            </div>
+            <div class="col-12 col-md-3"><button class="btn btn-primary btn-sm w-100" disabled="@_busy" @onclick="ApplyAsync">عرض التقرير</button></div>
+        </div>
+    </div></div>
+
+    @if (_report is not null)
+    {
+        var s = _report.Summary;
+        <div class="row g-2 mb-3 ap12-summary">
+            <div class="col-6 col-lg-2"><div class="card h-100"><div class="card-body py-2"><small>أوامر شراء</small><h4>@s.OrderCount</h4><small>المفتوحة: @s.OpenOrderCount</small></div></div></div>
+            <div class="col-6 col-lg-2"><div class="card h-100"><div class="card-body py-2"><small>تسليمات متأخرة</small><h4>@s.LateOrderCount</h4><small>من المستندات المفتوحة</small></div></div></div>
+            <div class="col-6 col-lg-2"><div class="card h-100"><div class="card-body py-2"><small>استلامات مرحلة</small><h4>@s.PostedReceiptCount</h4><small>@Money(s.PostedReceiptCostBase) @s.BaseCurrencyCode (تكلفة)</small></div></div></div>
+            <div class="col-6 col-lg-2"><div class="card h-100"><div class="card-body py-2"><small>فواتير مرحلة</small><h4>@s.PostedInvoiceCount</h4><small>@Money(s.PostedInvoiceTotalBase) @s.BaseCurrencyCode</small></div></div></div>
+            <div class="col-6 col-lg-2"><div class="card h-100"><div class="card-body py-2"><small>مرتجعات مرحلة</small><h4>@s.PostedReturnCount</h4><small>@Money(s.PostedReturnTotalBase) @s.BaseCurrencyCode</small></div></div></div>
+            <div class="col-6 col-lg-2"><div class="card h-100"><div class="card-body py-2"><small>متوسط وقت التوريد</small><h4>@(s.AverageReceiptLeadDays?.ToString("N1") ?? "—")</h4><small>يوم لكل بند استلام مرحل</small></div></div></div>
+        </div>
+    }
+    <div class="card">
+        <div class="card-header ap12-tabs d-flex gap-2 flex-wrap">
+            @foreach (var tab in _tabs)
+            {
+                <button class="btn btn-sm @(_kind == tab.Id ? "btn-primary" : "btn-outline-primary")"
+                        disabled="@_busy" @onclick="() => SetTabAsync(tab.Id)">@tab.Label</button>
+            }
+        </div>
+        <div class="card-body p-2">
+            @if (_busy) { <div class="text-muted" role="status">جارٍ تحميل التقرير...</div> }
+            else if (_report is null) { <div class="text-muted">اختر المرشحات واضغط عرض التقرير.</div> }
+            else if (_report.Page.Items.Count == 0) { <div class="alert alert-info">لا توجد بيانات مطابقة.</div> }
+            else
+            {
+                <div class="table-responsive ap12-print-table">
+                    <table class="table table-sm table-striped table-bordered align-middle">
+                        <thead><tr>
+                            <th>المستند</th><th>التاريخ</th><th>المورد / الصنف</th><th>الحالة</th>
+                            <th>المطلوب</th><th>المستلم</th><th>المفوتر</th><th>المرتجع</th><th>المتبقي للتوريد</th>
+                            <th>غير مفوتر (كمية)</th><th>المبلغ</th><th>فارق السعر</th><th>موعد التسليم</th>
+                        </tr></thead>
+                        <tbody>
+                        @foreach (var row in _report.Page.Items)
+                        {
+                            <tr>
+                                <td>
+                                    @if (TargetUrl(row) is { } target)
+                                    { <a href="@target" title="فتح المستند الأصلي">@row.DocumentCode</a> }
+                                    else { @row.DocumentCode }
+                                </td>
+                                <td>@row.DocumentDate.ToString("yyyy-MM-dd")</td>
+                                <td><strong>@row.SupplierName</strong><div class="small">@row.ProductName @row.UnitName</div></td>
+                                <td>@row.Status @if (row.IsLate) { <span class="text-danger">متأخر</span> }</td>
+                                <td>@Qty(row.OrderedQuantity)</td><td>@Qty(row.AcceptedQuantity)</td>
+                                <td>@Qty(row.InvoicedQuantity)</td><td>@Qty(row.ReturnedQuantity)</td>
+                                <td>@Qty(row.OpenQuantity)</td><td>@Qty(row.UninvoicedAcceptedQuantity)</td>
+                                <td>@(row.BaseAmount.HasValue ? $"{Money(row.BaseAmount)} {_report.Summary.BaseCurrencyCode} (أساسي)" : row.DocumentAmount.HasValue ? $"{Money(row.DocumentAmount)} {row.CurrencyCode}" : row.UnitPrice.HasValue ? $"{Money(row.UnitPrice)} {row.CurrencyCode} / وحدة" : "—")</td>
+                                <td>@(row.PriceVariance.HasValue ? $"{Money(row.PriceVariance)} {row.CurrencyCode}" : "—")</td>
+                                <td>@(row.ExpectedDeliveryDate?.ToString("yyyy-MM-dd") ?? "—")</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap ap12-pagination">
+                    <small>صفحة @_report.Page.PageNumber من @_report.Page.TotalPages — إجمالي @_report.Page.TotalCount صف</small>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-secondary btn-sm" disabled="@(_busy || !_report.Page.HasPreviousPage)" @onclick="PreviousAsync">السابق</button>
+                        <button class="btn btn-outline-secondary btn-sm" disabled="@(_busy || !_report.Page.HasNextPage)" @onclick="NextAsync">التالي</button>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+    <p class="small text-muted mt-2">قيمة الطلب بعملة المستند، وتكلفة الاستلام والفاتورة والمرتجع بالعملة الأساسية؛ لا تجمع بين العملات. الكميات بوحدة سطر الشراء. غير المفوتر مؤشر كمي وليس رصيد حساب GRNI. لا تدخل أوامر الشراء أو الاستلامات في مديونية AP.</p>
+</div>
+
+<style>
+@@media print {
+    .ap12-actions .btn, .ap12-filters, .ap12-tabs, .ap12-pagination { display: none !important; }
+    .ap12-print-table { overflow: visible !important; }
+    .ap12-print-table table { font-size: 9pt; }
+    thead { display: table-header-group; }
+    tr { break-inside: avoid; }
+}
+</style>
+
+@code {
+    [Parameter, SupplyParameterFromQuery(Name = "supplierId")]
+    public Guid? InitialSupplierId { get; set; }
+
+    private DateOnly _fromDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(-3));
+    private DateOnly _toDate = DateOnly.FromDateTime(DateTime.Today);
+    private string _kind = "orders";
+    private string? _supplier;
+    private string? _warehouse;
+    private string? _variant;
+    private string? _currency;
+    private string? _search;
+    private int _page = 1;
+    private bool _busy;
+    private string? _error;
+    private PurchasingPerformanceReportDto? _report;
+    private static readonly (string Id, string Label)[] _tabs =
+    [
+        ("orders", "أوامر الشراء والرصيد المفتوح"), ("receipts", "الاستلام المرحل"),
+        ("invoices", "الفواتير المرحلة"), ("returns", "المرتجعات المرحلة"),
+        ("prices", "تاريخ أسعار المورد")
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (InitialSupplierId.HasValue) _supplier = InitialSupplierId.Value.ToString("D");
+        await LoadAsync();
+    }
+
+    private PurchasingPerformanceFilterDto Filter() => new(
+        _fromDate, _toDate, _kind, Parse(_supplier), Parse(_warehouse), Parse(_variant), Parse(_currency),
+        _search, _page, 25);
+
+    private static Guid? Parse(string? value) => Guid.TryParse(value, out var id) ? id : null;
+    private static string Qty(decimal? value) => value?.ToString("N3", CultureInfo.CurrentCulture) ?? "—";
+    private static string Money(decimal? value) => value?.ToString("N2", CultureInfo.CurrentCulture) ?? "—";
+
+    private string Url(string? format = null)
+    {
+        var f = Filter();
+        var args = new List<string> {
+            $"fromDate={f.FromDate:yyyy-MM-dd}", $"toDate={f.ToDate:yyyy-MM-dd}",
+            $"kind={f.Kind}", $"pageNumber={f.PageNumber}", $"pageSize={f.PageSize}"
+        };
+        if (f.SupplierId.HasValue) args.Add($"supplierId={f.SupplierId:D}");
+        if (f.WarehouseId.HasValue) args.Add($"warehouseId={f.WarehouseId:D}");
+        if (f.ProductVariantId.HasValue) args.Add($"productVariantId={f.ProductVariantId:D}");
+        if (f.CurrencyId.HasValue) args.Add($"currencyId={f.CurrencyId:D}");
+        if (!string.IsNullOrWhiteSpace(f.Search)) args.Add("search=" + Uri.EscapeDataString(f.Search));
+        if (format is not null) args.Add("format=" + format);
+        return "api/purchasing/performance" + (format is null ? "" : "/export") + "?" + string.Join("&", args);
+    }
+
+    private async Task LoadAsync()
+    {
+        _error = null; _busy = true;
+        try
+        {
+            _report = await Api.GetAsync<PurchasingPerformanceReportDto>(Url());
+            if (_report is null) _error = "لم يعُد الخادم بنتيجة التقرير.";
+        }
+        catch (Exception ex) { _error = ex.Message; _report = null; }
+        finally { _busy = false; }
+    }
+
+    private Task ApplyAsync() { _page = 1; return LoadAsync(); }
+    private Task SetTabAsync(string id) { _kind = id; _page = 1; return LoadAsync(); }
+    private Task PreviousAsync() { _page--; return LoadAsync(); }
+    private Task NextAsync() { _page++; return LoadAsync(); }
+    private Task PrintAsync() => Js.InvokeVoidAsync("print").AsTask();
+
+    private Task ExportCsvAsync() => ExportAsync("csv");
+    private Task ExportExcelAsync() => ExportAsync("xlsx");
+
+    private async Task ExportAsync(string format)
+    {
+        _error = null; _busy = true;
+        try
+        {
+            var bytes = await Api.GetFileAsync(Url(format));
+            await Download.DownloadAsync(bytes, $"PurchasingPerformance-{_kind}-{_fromDate:yyyyMMdd}-{_toDate:yyyyMMdd}.{format}",
+                format == "csv" ? "text/csv;charset=utf-8" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private static string? TargetUrl(PurchasingPerformanceRowDto row) => row.Kind switch
+    {
+        "orders" when row.PurchaseOrderId.HasValue => $"/purchases/orders?openId={row.PurchaseOrderId.Value:D}",
+        "receipts" when row.PurchaseReceiptId.HasValue => $"/purchases/receipts?openId={row.PurchaseReceiptId.Value:D}",
+        "invoices" when row.PurchaseInvoiceId.HasValue => $"/purchases/invoices?openId={row.PurchaseInvoiceId.Value:D}",
+        "returns" => "/purchases/returns",
+        "prices" => "/purchases/supplier-catalog",
+        _ => null
+    };
+
+    private async Task<IReadOnlyList<UiLookupItem>> SearchSuppliersAsync(string text, CancellationToken ct)
+    {
+        var items = await Accounting.LookupSuppliersAsync(string.IsNullOrWhiteSpace(text) ? null : text, ct) ?? [];
+        return items.Take(20).Select(x => new UiLookupItem(x.Id.ToString("D"), $"{x.SupplierCode} - {x.NameAr}", x.AccountCode)).ToArray();
+    }
+    private async Task<IReadOnlyList<UiLookupItem>> SearchWarehousesAsync(string text, CancellationToken ct)
+    {
+        var page = await Inventory.GetWarehousesAsync(new PageRequest { PageNumber = 1, PageSize = 20, Search = text, SortBy = "Code" }, ct);
+        return page.Items.Select(x => new UiLookupItem(x.Id.ToString("D"), $"{x.Code} - {x.Name}")).ToArray();
+    }
+    private async Task<IReadOnlyList<UiLookupItem>> SearchProductsAsync(string text, CancellationToken ct)
+    {
+        var items = await Inventory.SearchProductVariantsAsync(string.IsNullOrWhiteSpace(text) ? null : text, 20, ct);
+        return items.Select(x => new UiLookupItem(x.Id.ToString("D"), x.ProductName + " — " + x.VariantName, x.SKU)).ToArray();
+    }
+    private async Task<IReadOnlyList<UiLookupItem>> SearchCurrenciesAsync(string text, CancellationToken ct)
+    {
+        var page = await Accounting.GetCurrenciesPageAsync(new PageRequest { PageNumber = 1, PageSize = 20, Search = text }, ct);
+        return page.Items.Select(x => new UiLookupItem(x.Id.ToString("D"), x.Code + " - " + x.NameAr)).ToArray();
+    }
+}

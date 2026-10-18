@@ -19,6 +19,7 @@
         </div>
         <div class="d-flex gap-2 flex-wrap">
             <a class="btn btn-outline-secondary btn-sm" href="/accounting/suppliers">الموردون</a>
+            <a class="btn btn-outline-primary btn-sm" href="@($"/purchases/performance?supplierId={SupplierId:D}")">أداء مشتريات المورد</a>
             <button class="btn btn-outline-primary btn-sm" disabled="@_busy" @onclick="LoadAsync">تحديث</button>
             <button class="btn btn-outline-secondary btn-sm" disabled="@(_busy || _statement is null)" @onclick="PreviewPrintAsync">معاينة كشف المورد</button>
             <button class="btn btn-outline-secondary btn-sm" disabled="@(_busy || _statement is null)" @onclick="PrintAsync">طباعة OAS</button>
