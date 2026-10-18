@@ -6,6 +6,7 @@
 @using OAS.Contracts.Purchasing.PurchaseInvoices
 @using OAS.Contracts.Purchasing.Enums
 @inject IPurchasingClientService Purchasing
+@using Microsoft.AspNetCore.Components
 
 <PageTitle>مرتجعات المشتريات | OAS</PageTitle>
 
@@ -80,6 +81,16 @@
                     {
                         <UiAlert Message="@_editorError" Tone="AlertTone.Danger" />
                     }
+                    <label for="ap07-receipt-search" class="form-label">البحث في الاستلامات المرحلة (جميع الصفحات)</label>
+                    <div class="input-group input-group-sm mb-2">
+                        <input id="ap07-receipt-search" class="form-control" placeholder="رقم الاستلام أو المورد..." @bind="_receiptSearch" @bind:event="oninput" />
+                        <button type="button" class="btn btn-outline-primary" disabled="@_busy" @onclick="SearchReceiptsAsync">بحث</button>
+                    </div>
+                    <div class="d-flex gap-2 align-items-center mb-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@(_busy || _receiptPageNumber <= 1)" @onclick="PreviousReceiptPageAsync">السابق</button>
+                        <span class="small text-muted">صفحة @_receiptPageNumber من @_receiptTotalPages — @_receiptTotalCount استلام</span>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@(_busy || _receiptPageNumber >= _receiptTotalPages)" @onclick="NextReceiptPageAsync">التالي</button>
+                    </div>
                     <UiSelect Label="استلام المشتريات"
                               Placeholder="اختر استلامًا مرحلًا"
                               Value="@_receiptIdText"
@@ -88,12 +99,27 @@
                               Size="ControlSize.Small" />
                     @if (_sourceReceipt is not null)
                     {
+                        <label for="ap07-invoice-search" class="form-label">فاتورة المورد المرتبطة فعليًا بهذا الاستلام</label>
+                        <div class="input-group input-group-sm mb-2">
+                            <input id="ap07-invoice-search" class="form-control" placeholder="رقم الفاتورة أو رقم فاتورة المورد..." @bind="_invoiceSearch" @bind:event="oninput" />
+                            <button type="button" class="btn btn-outline-primary" disabled="@_busy" @onclick="SearchInvoicesAsync">بحث</button>
+                        </div>
+                        <div class="d-flex gap-2 align-items-center mb-2">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@(_busy || _invoicePageNumber <= 1)" @onclick="PreviousInvoicePageAsync">السابق</button>
+                            <span class="small text-muted">صفحة @_invoicePageNumber من @_invoiceTotalPages — @_invoiceTotalCount فاتورة مرتبطة</span>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@(_busy || _invoicePageNumber >= _invoiceTotalPages)" @onclick="NextInvoicePageAsync">التالي</button>
+                        </div>
                         <UiSelect Label="فاتورة المورد المرتبطة (اختياري)"
                                   Placeholder="غير مفوتر - عكس GRNI"
                                   Value="@_invoiceIdText"
                                   ValueChanged="@(value => _invoiceIdText = value)"
                                   Options="@InvoiceOptions"
                                   Size="ControlSize.Small" />
+                    }
+                    @if (_sourceReceipt is not null)
+                    {
+                        <div class="small text-muted">الاستلام: @_sourceReceipt.ReceiptCode — المورد: @_sourceReceipt.SupplierName — المخزن: @_sourceReceipt.WarehouseName</div>
+                        <a href="@($"/purchases/receipts?openId={_sourceReceipt.Id:D}")" class="btn btn-outline-secondary btn-sm">فتح الاستلام الأصلي</a>
                     }
                     <UiGrid Columns="2">
                         <UiInputDate Label="تاريخ المرتجع" Value="@_returnDate" ValueChanged="@(value => _returnDate = value)" Size="ControlSize.Small" />
@@ -143,8 +169,19 @@
                         <UiKeyValue Label="قيمة المخزون" Value="@_selected.InventoryCostBaseAmount.ToString("N2")" />
                         <UiKeyValue Label="فرق سعر الشراء" Value="@_selected.PurchasePriceVarianceBaseAmount.ToString("N2")" />
                         <UiKeyValue Label="المعالجة" Value="@(_selected.PurchaseInvoiceId.HasValue ? "عكس حساب المورد والضريبة" : "عكس GRNI")" />
-                        <UiKeyValue Label="القيد" Value="@(_selected.JournalEntryId?.ToString("D") ?? "غير مرحل")" />
+                        <UiKeyValue Label="القيد" Value="@(_selected.JournalEntryId.HasValue ? "مرحّل" : "غير مرحل")" />
                     </UiGrid>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a class="btn btn-outline-secondary btn-sm" href="@($"/purchases/receipts?openId={_selected.PurchaseReceiptId:D}")">فتح الاستلام</a>
+                        @if (_selected.PurchaseInvoiceId.HasValue)
+                        {
+                            <a class="btn btn-outline-secondary btn-sm" href="@($"/purchases/invoices?openId={_selected.PurchaseInvoiceId.Value:D}")">فتح فاتورة المورد</a>
+                        }
+                        @if (_selected.JournalEntryId.HasValue)
+                        {
+                            <a class="btn btn-outline-secondary btn-sm" href="@($"/accounting/journals?journalId={_selected.JournalEntryId.Value:D}")">فتح القيد</a>
+                        }
+                    </div>
                     @if (!string.IsNullOrWhiteSpace(_selected.Reason))
                     {
                         <UiAlert Message="@_selected.Reason" Tone="AlertTone.Info" />
@@ -175,6 +212,16 @@
     private IReadOnlyList<PurchaseReceiptDto> _postedReceipts = [];
     private IReadOnlyList<PurchaseInvoiceDto> _postedInvoices = [];
     private readonly List<ReturnLineForm> _returnLines = [];
+    [SupplyParameterFromQuery(Name = "receiptId")]
+    private Guid? LinkedReceiptId { get; set; }
+    private int _receiptPageNumber = 1;
+    private int _receiptTotalPages;
+    private long _receiptTotalCount;
+    private string? _receiptSearch;
+    private int _invoicePageNumber = 1;
+    private int _invoiceTotalPages;
+    private long _invoiceTotalCount;
+    private string? _invoiceSearch;
     private bool _creating;
     private bool _busy;
     private int _pageNumber = 1;
@@ -195,7 +242,16 @@
         .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.PurchaseInvoiceCode} - {x.SupplierInvoiceCode ?? "بدون رقم مورد"}"))
         .ToArray();
 
-    protected override async Task OnInitializedAsync() => await RefreshAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshAsync();
+        if (LinkedReceiptId.HasValue)
+        {
+            await BeginCreateAsync();
+            var id = LinkedReceiptId.Value;
+            await ReceiptChangedAsync(id.ToString("D"));
+        }
+    }
 
     private async Task RefreshAsync()
     {
@@ -226,11 +282,60 @@
         _creating = true; _selected = null; _editorError = null; _sourceReceipt = null;
         _returnLines.Clear(); _receiptIdText = null; _invoiceIdText = null; _reason = null;
         _returnDate = DateOnly.FromDateTime(DateTime.Today); _postingDate = _returnDate;
-        _busy = true;
+        _receiptSearch = null; _invoiceSearch = null;
+        _receiptPageNumber = 1; _invoicePageNumber = 1;
+        await LoadReceiptsAsync();
+    }
+
+    private async Task SearchReceiptsAsync() { _receiptPageNumber = 1; await LoadReceiptsAsync(); }
+    private async Task PreviousReceiptPageAsync() { if (_receiptPageNumber > 1) { _receiptPageNumber--; await LoadReceiptsAsync(); } }
+    private async Task NextReceiptPageAsync() { if (_receiptPageNumber < _receiptTotalPages) { _receiptPageNumber++; await LoadReceiptsAsync(); } }
+
+    private async Task LoadReceiptsAsync()
+    {
+        _busy = true; _editorError = null;
         try
         {
-            var receipts = await Purchasing.GetPurchaseReceiptsAsync(new PageRequest { PageNumber = 1, PageSize = 200, SortBy = "receiptDate", SortDirection = SortDirection.Descending }, PurchaseReceiptStatus.Posted);
-            _postedReceipts = receipts.Items;
+            var page = await Purchasing.GetPurchaseReceiptsAsync(new PageRequest
+            {
+                PageNumber = _receiptPageNumber, PageSize = 20, Search = _receiptSearch,
+                SortBy = "ReceiptDate", SortDirection = SortDirection.Descending
+            }, PurchaseReceiptStatus.Posted);
+            _postedReceipts = page.Items;
+            _receiptTotalPages = page.TotalPages;
+            _receiptTotalCount = page.TotalCount;
+            // Preserve the active selection when navigating to another page.
+            if (_sourceReceipt is not null && !_postedReceipts.Any(x => x.Id == _sourceReceipt.Id))
+                _postedReceipts = [ _sourceReceipt, .._postedReceipts ];
+        }
+        catch (Exception ex) { _editorError = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private async Task SearchInvoicesAsync() { _invoicePageNumber = 1; await LoadInvoicesAsync(); }
+    private async Task PreviousInvoicePageAsync() { if (_invoicePageNumber > 1) { _invoicePageNumber--; await LoadInvoicesAsync(); } }
+    private async Task NextInvoicePageAsync() { if (_invoicePageNumber < _invoiceTotalPages) { _invoicePageNumber++; await LoadInvoicesAsync(); } }
+
+    private async Task LoadInvoicesAsync()
+    {
+        if (_sourceReceipt is null) return;
+        _busy = true; _editorError = null;
+        try
+        {
+            var page = await Purchasing.GetMatchedPurchaseInvoicesForReceiptAsync(_sourceReceipt.Id, new PageRequest
+            {
+                PageNumber = _invoicePageNumber, PageSize = 20, Search = _invoiceSearch,
+                SortBy = "InvoiceDate", SortDirection = SortDirection.Descending
+            });
+            _postedInvoices = page.Items;
+            _invoiceTotalPages = page.TotalPages;
+            _invoiceTotalCount = page.TotalCount;
+            if (Guid.TryParse(_invoiceIdText, out var invoiceId) && !_postedInvoices.Any(x => x.Id == invoiceId))
+            {
+                var selected = await Purchasing.GetPurchaseInvoiceAsync(invoiceId);
+                if (selected is not null && selected.SupplierId == _sourceReceipt.SupplierId)
+                    _postedInvoices = [ selected, .._postedInvoices ];
+            }
         }
         catch (Exception ex) { _editorError = ex.Message; }
         finally { _busy = false; }
@@ -245,13 +350,22 @@
         {
             _sourceReceipt = await Purchasing.GetPurchaseReceiptAsync(id);
             if (_sourceReceipt is null) return;
+            if (_sourceReceipt.Status != PurchaseReceiptStatus.Posted)
+            {
+                _editorError = "الاستلام المحدد ليس مرحلًا.";
+                _sourceReceipt = null;
+                return;
+            }
+            if (!_postedReceipts.Any(x => x.Id == _sourceReceipt.Id))
+                _postedReceipts = [ _sourceReceipt, .._postedReceipts ];
             foreach (var line in _sourceReceipt.Lines)
             {
                 var remaining = Math.Max(0m, line.AcceptedQuantity - line.ReturnedQuantity);
                 _returnLines.Add(new ReturnLineForm(line, remaining));
             }
-            var invoices = await Purchasing.GetPurchaseInvoicesAsync(new PageRequest { PageNumber = 1, PageSize = 200, SortBy = "invoiceDate", SortDirection = SortDirection.Descending }, PurchaseInvoiceStatus.Posted, _sourceReceipt.SupplierId);
-            _postedInvoices = invoices.Items;
+            _invoicePageNumber = 1; _invoiceSearch = null;
+            // Server enforces that invoice lines actually match this receipt and supplier.
+            await LoadInvoicesAsync();
         }
         catch (Exception ex) { _editorError = ex.Message; }
         finally { _busy = false; }

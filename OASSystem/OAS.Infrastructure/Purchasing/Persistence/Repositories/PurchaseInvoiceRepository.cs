@@ -27,6 +27,25 @@ public sealed class PurchaseInvoiceRepository(OasDbContext dbContext) : IPurchas
         return PurchasingRepositoryHelpers.PageAsync(query, request, (q, term) => q.Where(x => x.PurchaseInvoiceCode.Contains(term) || (x.SupplierInvoiceCode != null && x.SupplierInvoiceCode.Contains(term))), cancellationToken);
     }
 
+    // AP-07: SQL-side receipt / invoice relationship (not "first 200" client filtering).
+    public Task<PagedData<PurchaseInvoice>> GetMatchedPostedForReceiptPageAsync(
+        Guid receiptId, Guid supplierId, PageRequest request, CancellationToken cancellationToken = default)
+    {
+        var receiptLineIds = dbContext.Set<PurchaseReceiptLine>().AsNoTracking()
+            .Where(x => x.PurchaseReceiptId == receiptId).Select(x => x.Id);
+        var invoiceLineIds = Allocations.AsNoTracking()
+            .Where(x => receiptLineIds.Contains(x.PurchaseReceiptLineId))
+            .Select(x => x.PurchaseInvoiceLineId);
+        var invoiceIds = Lines.AsNoTracking()
+            .Where(x => invoiceLineIds.Contains(x.Id)).Select(x => x.PurchaseInvoiceId);
+        var query = Invoices.AsNoTracking().Include(x => x.Lines)
+            .Where(x => x.SupplierId == supplierId && x.Status == DomainStatus.Posted && invoiceIds.Contains(x.Id))
+            .OrderByDescending(x => x.InvoiceDate).ThenByDescending(x => x.PurchaseInvoiceCode);
+        return PurchasingRepositoryHelpers.PageAsync(query, request,
+            (q, term) => q.Where(x => x.PurchaseInvoiceCode.Contains(term) ||
+                (x.SupplierInvoiceCode != null && x.SupplierInvoiceCode.Contains(term))), cancellationToken);
+    }
+
     public Task<bool> SupplierInvoiceCodeExistsAsync(Guid supplierId, string supplierInvoiceCode, Guid? exceptInvoiceId, CancellationToken cancellationToken = default) =>
         Invoices.AsNoTracking().AnyAsync(x => x.SupplierId == supplierId && x.SupplierInvoiceCode == supplierInvoiceCode && (!exceptInvoiceId.HasValue || x.Id != exceptInvoiceId.Value), cancellationToken);
 

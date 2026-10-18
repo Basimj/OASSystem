@@ -30,6 +30,7 @@ public interface IPurchasingClientService
     Task<PurchaseOrderDto?> CreatePurchaseOrderFromRequestAsync(Guid id, CreatePurchaseOrderFromRequestRequest request, CancellationToken cancellationToken = default);
 
     Task<PagedResult<PurchaseOrderDto>> GetPurchaseOrdersAsync(PageRequest request, PurchaseOrderStatus? status = null, Guid? supplierId = null, Guid? warehouseId = null, CancellationToken cancellationToken = default);
+    Task<PurchaseOrderProgressDto?> GetPurchaseOrderProgressAsync(Guid id, CancellationToken cancellationToken = default);
     Task<PurchaseOrderDto?> GetPurchaseOrderAsync(Guid id, CancellationToken cancellationToken = default);
     Task<PurchaseOrderDto?> CreatePurchaseOrderAsync(CreatePurchaseOrderRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseOrderDto?> UpdatePurchaseOrderAsync(Guid id, UpdatePurchaseOrderRequest request, CancellationToken cancellationToken = default);
@@ -41,6 +42,7 @@ public interface IPurchasingClientService
     Task<PurchaseOrderDto?> ClosePurchaseOrderAsync(Guid id, ClosePurchaseOrderRequest request, CancellationToken cancellationToken = default);
 
     Task<PagedResult<PurchaseReceiptDto>> GetPurchaseReceiptsAsync(PageRequest request, PurchaseReceiptStatus? status = null, Guid? purchaseOrderId = null, Guid? supplierId = null, CancellationToken cancellationToken = default);
+    Task<PagedResult<PurchaseInvoiceDto>> GetMatchedPurchaseInvoicesForReceiptAsync(Guid receiptId, PageRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseReceiptDto?> GetPurchaseReceiptAsync(Guid id, CancellationToken cancellationToken = default);
     Task<PurchaseReceiptDto?> CreatePurchaseReceiptAsync(CreatePurchaseReceiptRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseReceiptDto?> UpdatePurchaseReceiptAsync(Guid id, UpdatePurchaseReceiptRequest request, CancellationToken cancellationToken = default);

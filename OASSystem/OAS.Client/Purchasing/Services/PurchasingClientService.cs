@@ -46,6 +46,8 @@ public sealed partial class PurchasingClientService(OasApiClient api) : IPurchas
 
     public Task<PagedResult<PurchaseOrderDto>> GetPurchaseOrdersAsync(PageRequest r,PurchaseOrderStatus? status=null,Guid? supplierId=null,Guid? warehouseId=null,CancellationToken ct=default)
     { var q=Add(Add(Add("api/purchasing/orders"+PageQuery(r),"status",status),"supplierId",supplierId),"warehouseId",warehouseId); return GetPage<PurchaseOrderDto>(q,ct); }
+    public Task<PurchaseOrderProgressDto?> GetPurchaseOrderProgressAsync(Guid id, CancellationToken ct = default)
+        => api.GetAsync<PurchaseOrderProgressDto>($"api/purchasing/orders/{id:D}/progress", ct);
     public Task<PurchaseOrderDto?> GetPurchaseOrderAsync(Guid id,CancellationToken ct=default)=>api.GetAsync<PurchaseOrderDto>($"api/purchasing/orders/{id}",ct);
     public Task<PurchaseOrderDto?> CreatePurchaseOrderAsync(CreatePurchaseOrderRequest r,CancellationToken ct=default)=>Post<CreatePurchaseOrderRequest,PurchaseOrderDto>("api/purchasing/orders",r,ct);
     public Task<PurchaseOrderDto?> UpdatePurchaseOrderAsync(Guid id,UpdatePurchaseOrderRequest r,CancellationToken ct=default)=>api.PutAsync<UpdatePurchaseOrderRequest,PurchaseOrderDto>($"api/purchasing/orders/{id}",r,ct);
@@ -58,6 +60,8 @@ public sealed partial class PurchasingClientService(OasApiClient api) : IPurchas
 
     public Task<PagedResult<PurchaseReceiptDto>> GetPurchaseReceiptsAsync(PageRequest r,PurchaseReceiptStatus? status=null,Guid? purchaseOrderId=null,Guid? supplierId=null,CancellationToken ct=default)
     { var q=Add(Add(Add("api/purchasing/receipts"+PageQuery(r),"status",status),"purchaseOrderId",purchaseOrderId),"supplierId",supplierId); return GetPage<PurchaseReceiptDto>(q,ct); }
+    public Task<PagedResult<PurchaseInvoiceDto>> GetMatchedPurchaseInvoicesForReceiptAsync(Guid receiptId, PageRequest request, CancellationToken ct=default)
+        => GetPage<PurchaseInvoiceDto>($"api/purchasing/receipts/{receiptId:D}/matched-invoices"+PageQuery(request),ct);
     public Task<PurchaseReceiptDto?> GetPurchaseReceiptAsync(Guid id,CancellationToken ct=default)=>api.GetAsync<PurchaseReceiptDto>($"api/purchasing/receipts/{id}",ct);
     public Task<PurchaseReceiptDto?> CreatePurchaseReceiptAsync(CreatePurchaseReceiptRequest r,CancellationToken ct=default)=>Post<CreatePurchaseReceiptRequest,PurchaseReceiptDto>("api/purchasing/receipts",r,ct);
     public Task<PurchaseReceiptDto?> UpdatePurchaseReceiptAsync(Guid id,UpdatePurchaseReceiptRequest r,CancellationToken ct=default)=>api.PutAsync<UpdatePurchaseReceiptRequest,PurchaseReceiptDto>($"api/purchasing/receipts/{id}",r,ct);
