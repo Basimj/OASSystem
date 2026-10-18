@@ -104,6 +104,7 @@ public static class DependencyInjection
         services.AddScoped<ICustomerOrderOperationsQueryService, CustomerOrderOperationsQueryService>();
         services.AddScoped<IOpticalJobQueryService, OpticalJobQueryService>();
         services.AddScoped<ISalesPaymentAllocationConcurrencyPort, SalesPaymentAllocationConcurrencyPort>();
+        services.AddScoped<ICustomerCreditConcurrencyPort, CustomerCreditConcurrencyPort>();
 
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddScoped<IAccountingPartyQueryService, AccountingPartyQueryService>();
