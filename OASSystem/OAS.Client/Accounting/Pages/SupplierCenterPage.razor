@@ -92,6 +92,8 @@
                     <option value="5">الحالة 5</option>
                     <option value="6">الحالة 6</option>
                     <option value="7">الحالة 7</option>
+                    <option value="8">الحالة 8</option>
+                    <option value="9">الحالة 9</option>
                 </select>
                 <button class="btn btn-outline-primary btn-sm" disabled="@_busy" @onclick="SearchAsync">تطبيق الحالة</button>
             </div>
@@ -131,7 +133,7 @@
                         <tr>
                             <td>@item.Reference</td>
                             <td>@item.DocumentDate.ToString("yyyy-MM-dd")</td>
-                            <td>@item.Status</td>
+                            <td>@StatusText(item.DocumentType, item.Status)</td>
                             <td>@(item.DocumentAmount.HasValue ? Amount(item.DocumentAmount.Value) : "—") @item.CurrencyCode</td>
                             <td>@(item.BaseAmount.HasValue ? Amount(item.BaseAmount.Value) : "—")</td>
                             <td>@(item.UnappliedPaymentBaseAmount.HasValue ? Amount(item.UnappliedPaymentBaseAmount.Value) : "—")</td>
@@ -406,6 +408,33 @@
         "payments" => "سندات الصرف", "returns" => "مرتجعات المشتريات",
         _ => "جميع الحركات"
     };
+
+    private static string StatusText(string documentType, byte status)
+    {
+        if (status == 1) return "مسودة";
+        return documentType switch
+        {
+            "PurchaseOrder" => status switch
+            {
+                2 => "بانتظار الاعتماد", 3 => "معتمد", 4 => "مرسل",
+                5 => "مستلم جزئيًا", 6 => "مستلم كاملًا",
+                7 => "مغلق", 8 => "مرفوض", 9 => "ملغى", _ => status.ToString()
+            },
+            "PurchaseInvoice" => status switch
+            {
+                2 => "مؤكدة", 3 => "بانتظار اعتماد المطابقة",
+                4 => "مرحّلة", 5 => "ملغاة", _ => status.ToString()
+            },
+            "PaymentVoucher" => status switch
+            {
+                2 => "معتمد", 3 => "مرحّل", 4 => "ملغى", _ => status.ToString()
+            },
+            _ => status switch
+            {
+                2 => "مؤكد", 3 => "مرحّل", 4 => "ملغى", _ => status.ToString()
+            }
+        };
+    }
 
     private static string DocumentLabel(string type) => type switch
     {
