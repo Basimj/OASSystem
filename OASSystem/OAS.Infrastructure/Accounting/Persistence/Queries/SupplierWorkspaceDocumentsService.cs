@@ -117,7 +117,8 @@ public sealed class SupplierWorkspaceDocumentsService(OasDbContext db) : ISuppli
                 query = lines.Select(x => new SupplierWorkspaceDocumentRowDto(
                     x.Voucher.Id, type, x.Voucher.VoucherNumber, x.Voucher.VoucherDate,
                     (byte)x.Voucher.Status, x.Line.Amount,
-                    x.Line.CounterpartyBaseAmount ?? x.Line.BaseAmount, x.Line.CurrencyCodeSnapshot,
+                    x.Line.CounterpartyBaseAmount ?? x.Line.BaseAmount ?? x.Line.Amount * (x.Line.ExchangeRate ?? 1m),
+                    x.Line.CurrencyCodeSnapshot,
                     x.Voucher.JournalEntryId, x.Line.Id));
                 break;
             }
@@ -128,7 +129,7 @@ public sealed class SupplierWorkspaceDocumentsService(OasDbContext db) : ISuppli
 
         var count = await query.LongCountAsync(cancellationToken);
         var rows = await query.OrderByDescending(x => x.DocumentDate)
-            .ThenBy(x => x.Reference).ThenBy(x => x.Id)
+            .ThenBy(x => x.Reference).ThenBy(x => x.Id).ThenBy(x => x.PaymentVoucherLineId)
             .Skip((page - 1) * size).Take(size).ToListAsync(cancellationToken);
 
         if (type == "PaymentVoucher" && rows.Count > 0)
