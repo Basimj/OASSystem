@@ -21,8 +21,8 @@
         <div class="d-flex gap-2 flex-wrap">
             <a class="btn btn-outline-secondary btn-sm" href="/accounting/suppliers">الموردون</a>
             <button class="btn btn-outline-primary btn-sm" disabled="@_busy" @onclick="LoadAsync">تحديث</button>
-            <button class="btn btn-outline-secondary btn-sm" disabled="@(_busy || _statement is null)" @onclick="PrintAsync">طباعة</button>
-            <button class="btn btn-outline-secondary btn-sm" disabled="@(_busy || _statement is null || _statement.Movements.Count == 0)" @onclick="ExportCurrentPageAsync">تصدير صفحة الكشف CSV</button>
+            <button class="btn btn-outline-secondary btn-sm" disabled="@(_busy || (_statement is null && _documents is null))" @onclick="PrintAsync">طباعة</button>
+            <button class="btn btn-outline-secondary btn-sm" disabled="@(_busy || ((_statement?.Movements.Count ?? 0) == 0 && (_documents?.Rows.Count ?? 0) == 0))" @onclick="ExportCurrentPageAsync">تصدير صفحة الكشف CSV</button>
         </div>
     </div>
 
@@ -68,6 +68,34 @@
             </div>
         </div></div>
 
+        @if (_tab == "orders")
+        {
+            <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+                <label class="small" for="supplier-doc-type">مستندات المشتريات</label>
+                <select id="supplier-doc-type" class="form-select form-select-sm w-auto" @bind="_operationalType">
+                    <option value="PurchaseOrder">أوامر الشراء</option>
+                    <option value="PurchaseReceipt">سندات الاستلام</option>
+                </select>
+                <button class="btn btn-outline-primary btn-sm" disabled="@_busy" @onclick="SearchAsync">عرض المستندات</button>
+            </div>
+        }
+        @if (_tab is "invoices" or "payments" or "returns" or "orders")
+        {
+            <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+                <label class="small" for="supplier-doc-status">حالة المستند</label>
+                <select id="supplier-doc-status" class="form-select form-select-sm w-auto" @bind="_statusFilter">
+                    <option value="">جميع الحالات</option>
+                    <option value="1">الحالة 1</option>
+                    <option value="2">الحالة 2</option>
+                    <option value="3">الحالة 3</option>
+                    <option value="4">الحالة 4</option>
+                    <option value="5">الحالة 5</option>
+                    <option value="6">الحالة 6</option>
+                    <option value="7">الحالة 7</option>
+                </select>
+                <button class="btn btn-outline-primary btn-sm" disabled="@_busy" @onclick="SearchAsync">تطبيق الحالة</button>
+            </div>
+        }
         <div class="d-flex flex-wrap gap-2 mb-3" role="tablist" aria-label="تبويبات مركز المورد">
             @foreach (var tab in Tabs)
             {
@@ -88,6 +116,41 @@
                     </div></div>
                 }
             </div>
+        }
+
+        @if (_documents is not null)
+        {
+            <div class="card mb-3"><div class="card-body">
+                <h2 class="h6">سجل مستندات المورد — @DocumentLabel(_documents.DocumentType)</h2>
+                <p class="small text-muted">السندات المشتركة تظهر بسطر المورد فقط. مبالغ المستندات التشغيلية لا تُجمع ضمن رصيد الذمم.</p>
+                <div class="table-responsive"><table class="table table-sm table-hover align-middle">
+                    <thead><tr><th>رقم المستند</th><th>تاريخ</th><th>حالة</th><th>المبلغ الأصلي</th><th>المبلغ الأساسي</th><th>غير مخصص</th><th>فتح المستند</th><th>القيد</th></tr></thead>
+                    <tbody>
+                    @foreach (var item in _documents.Rows)
+                    {
+                        <tr>
+                            <td>@item.Reference</td>
+                            <td>@item.DocumentDate.ToString("yyyy-MM-dd")</td>
+                            <td>@item.Status</td>
+                            <td>@(item.DocumentAmount.HasValue ? Amount(item.DocumentAmount.Value) : "—") @item.CurrencyCode</td>
+                            <td>@(item.BaseAmount.HasValue ? Amount(item.BaseAmount.Value) : "—")</td>
+                            <td>@(item.UnappliedPaymentBaseAmount.HasValue ? Amount(item.UnappliedPaymentBaseAmount.Value) : "—")</td>
+                            <td><a href="@DocumentUrl(item)">عرض</a></td>
+                            <td>@if (item.JournalEntryId.HasValue)
+                            {
+                                <a href="@("/accounting/journals?journalId=" + item.JournalEntryId.Value.ToString("D"))">القيد</a>
+                            }</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table></div>
+                @if (_documents.TotalCount == 0) { <p class="small text-muted">لا توجد مستندات في نطاق البحث.</p> }
+                <div class="d-flex align-items-center justify-content-center gap-3">
+                    <button class="btn btn-outline-secondary btn-sm" disabled="@(_page <= 1 || _busy)" @onclick="PreviousAsync">السابق</button>
+                    <span class="small">صفحة @_page — عدد السطور @_documents.TotalCount</span>
+                    <button class="btn btn-outline-secondary btn-sm" disabled="@(_page * PageSize >= _documents.TotalCount || _busy)" @onclick="NextAsync">التالي</button>
+                </div>
+            </div></div>
         }
 
         @if (_tab == "summary" || _tab == "orders")
@@ -211,6 +274,9 @@
     private SupplierDto? _supplier;
     private SupplierStatementDto? _statement;
     private SupplierAgingReportDto? _aging;
+    private SupplierWorkspaceDocumentsDto? _documents;
+    private string _operationalType = "PurchaseOrder";
+    private string? _statusFilter;
     private string _tab = "summary";
     private DateOnly _fromDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(-1));
     private DateOnly _toDate = DateOnly.FromDateTime(DateTime.Today);
@@ -260,7 +326,8 @@
 
             _statement = null;
             _aging = null;
-            if (_tab != "invoices")
+            _documents = null;
+            if (_tab is "summary" or "statement" or "orders")
             {
                 var url = "api/accounting/reports/suppliers/" + SupplierId.ToString("D") +
                     "/statement?fromDate=" + _fromDate.ToString("yyyy-MM-dd") +
@@ -281,12 +348,34 @@
                     url += "&currencyCode=" + Uri.EscapeDataString(_currency.Trim());
                 _statement = await Api.GetAsync<SupplierStatementDto>(url);
             }
-            if (_tab is "summary" or "invoices" or "orders")
+            if (_tab is "summary" or "invoices" or "orders" or "payments" or "returns")
             {
                 var url = "api/accounting/reports/supplier-aging?asOfDate=" +
                     _toDate.ToString("yyyy-MM-dd") + "&supplierId=" + SupplierId.ToString("D") +
                     "&pageNumber=" + _page + "&pageSize=" + PageSize;
                 _aging = await Api.GetAsync<SupplierAgingReportDto>(url);
+            }
+            if (_tab is "invoices" or "payments" or "returns" or "orders")
+            {
+                var type = _tab switch
+                {
+                    "invoices" => "PurchaseInvoice",
+                    "payments" => "PaymentVoucher",
+                    "returns" => "PurchaseReturn",
+                    _ => _operationalType
+                };
+                var url = "api/accounting/suppliers/" + SupplierId.ToString("D") +
+                    "/workspace-documents?documentType=" + type +
+                    "&fromDate=" + _fromDate.ToString("yyyy-MM-dd") +
+                    "&toDate=" + _toDate.ToString("yyyy-MM-dd") +
+                    "&pageNumber=" + _page + "&pageSize=" + PageSize;
+                if (!string.IsNullOrWhiteSpace(_reference))
+                    url += "&search=" + Uri.EscapeDataString(_reference.Trim());
+                if (!string.IsNullOrWhiteSpace(_currency))
+                    url += "&currencyCode=" + Uri.EscapeDataString(_currency.Trim());
+                if (byte.TryParse(_statusFilter, out var parsedStatus))
+                    url += "&status=" + parsedStatus;
+                _documents = await Api.GetAsync<SupplierWorkspaceDocumentsDto>(url);
             }
         }
         catch (Exception ex) { _error = ex.Message; }
@@ -318,6 +407,30 @@
         _ => "جميع الحركات"
     };
 
+    private static string DocumentLabel(string type) => type switch
+    {
+        "PurchaseOrder" => "أوامر الشراء",
+        "PurchaseReceipt" => "سندات الاستلام",
+        "PurchaseInvoice" => "فواتير المورد",
+        "PurchaseReturn" => "المرتجعات",
+        "PaymentVoucher" => "سندات الصرف",
+        _ => type
+    };
+
+    private static string DocumentUrl(SupplierWorkspaceDocumentRowDto x)
+    {
+        var id = x.Id.ToString("D");
+        return x.DocumentType switch
+        {
+            "PurchaseInvoice" => "/purchases/invoices?openId=" + id,
+            "PurchaseOrder" => "/purchases/orders?openId=" + id,
+            "PurchaseReceipt" => "/purchases/receipts?openId=" + id,
+            "PurchaseReturn" => "/purchases/returns",
+            "PaymentVoucher" => "/accounting/payment-vouchers",
+            _ => "/accounting/suppliers"
+        };
+    }
+
     private static string? DocumentUrl(SupplierStatementMovementDto movement)
     {
         if (!movement.SourceDocumentId.HasValue) return null;
@@ -337,7 +450,25 @@
 
     private async Task ExportCurrentPageAsync()
     {
-        if (_statement is null) return;
+        if (_statement is null && _documents is null) return;
+        if (_documents is not null)
+        {
+            var source = new StringBuilder("المستند,التاريخ,الحالة,المبلغ الأصلي,المبلغ الأساسي,غير مخصص\r\n");
+            foreach (var doc in _documents.Rows)
+            {
+                var values = new[]
+                {
+                    doc.Reference, doc.DocumentDate.ToString("yyyy-MM-dd"), doc.Status.ToString(CultureInfo.InvariantCulture),
+                    doc.DocumentAmount?.ToString(CultureInfo.InvariantCulture) ?? "",
+                    doc.BaseAmount?.ToString(CultureInfo.InvariantCulture) ?? "",
+                    doc.UnappliedPaymentBaseAmount?.ToString(CultureInfo.InvariantCulture) ?? ""
+                };
+                source.AppendLine(string.Join(",", values.Select(EscapeCsv)));
+            }
+            await Download.DownloadAsync(Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(source.ToString())).ToArray(),
+                "SupplierDocuments-" + SupplierId.ToString("N") + "-page-" + _page + ".csv", "text/csv;charset=utf-8");
+            return;
+        }
         var csv = new StringBuilder("تاريخ الترحيل,رقم القيد,نوع المستند,المرجع,الوصف,مدين,دائن,الرصيد\r\n");
         foreach (var line in _statement.Movements)
         {
