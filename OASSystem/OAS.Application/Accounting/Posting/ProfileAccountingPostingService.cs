@@ -52,13 +52,36 @@ public sealed class ProfileAccountingPostingService(
             if (request.ExchangeRate <= 0m) throw new ConflictException("accounting_exchange_rate_invalid", "سعر الصرف يجب أن يكون أكبر من صفر.");
         }
 
+        // AP-10: validate every supplier and profile role before creating a journal
+        // number or staging any posting. Posting must never create/enable profiles.
+        if (string.Equals(request.Module, "Purchasing", StringComparison.OrdinalIgnoreCase) &&
+            request.Lines.Where(x => x.SupplierId.HasValue)
+                .Select(x => x.SupplierId!.Value).Distinct().Take(2).Count() > 1)
+            throw new ConflictException("purchasing_supplier_mixed", "لا يجوز ترحيل موردين مختلفين في مستند مشتريات واحد.");
+
+        if (!request.Lines.Any(x => x.DebitBase != 0m || x.CreditBase != 0m))
+            throw new ConflictException("accounting_posting_lines_empty", "لا يوجد أي مبلغ فعلي للترحيل.");
+        var profileCache = new Dictionary<string, IReadOnlyList<PostingProfileLine>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var source in request.Lines)
+        {
+            if (source.DebitBase < 0m || source.CreditBase < 0m ||
+                (source.DebitBase > 0m && source.CreditBase > 0m))
+                throw new ConflictException("accounting_posting_line_invalid", "سطر الترحيل المحاسبي غير صالح.");
+            if (source.DebitBase == 0m && source.CreditBase == 0m) continue;
+            if (source.UseSupplierSubledger)
+                _ = await ResolveSupplierAccountAsync(source.SupplierId
+                    ?? throw new ConflictException("accounting_supplier_required", "معرف المورد مطلوب للترحيل."), cancellationToken);
+            else
+                _ = await ResolveRoleAccountAsync(request.Module, source.ProfileDocumentType,
+                    source.AccountRole, profileCache, cancellationToken);
+        }
+
         var sequence = await sequences.NextAsync($"JournalEntry-{request.PostingDate.Year}", cancellationToken);
         var journal = JournalEntry.Create(Guid.NewGuid(), $"JV-{request.PostingDate.Year:0000}-{sequence:000000}", JournalType.Automatic,
             request.PostingDate, request.DocumentDate, period.Id, request.Description, request.Module,
             request.SourceDocumentType, request.SourceDocumentId, JournalEntryStatus.Draft);
         journal.SetBaseCurrencySnapshot(baseCurrency.Id, baseCurrency.Code, baseCurrency.DecimalPlaces);
 
-        var profileCache = new Dictionary<string, IReadOnlyList<PostingProfileLine>>(StringComparer.OrdinalIgnoreCase);
         var lineNumber = 1;
         foreach (var source in request.Lines)
         {
@@ -120,12 +143,9 @@ public sealed class ProfileAccountingPostingService(
                 .ApplyPaging(0, 2);
             var matches = await profiles.ListAsync(profileSpec, ct);
 
-            if (matches.Count == 0 && string.Equals(module, "Purchasing", StringComparison.OrdinalIgnoreCase))
-            {
-                await TryProvisionPurchasingProfileAsync(documentType, ct);
-                matches = await profiles.ListAsync(profileSpec, ct);
-            }
-            else if (matches.Count == 0 && string.Equals(module, "Optical", StringComparison.OrdinalIgnoreCase))
+            // Only Optical's legacy fallback is kept. Purchasing profiles are a
+            // privileged, explicit setup action: never auto-create/reactivate them.
+            if (matches.Count == 0 && string.Equals(module, "Optical", StringComparison.OrdinalIgnoreCase))
             {
                 await TryProvisionOpticalProfileAsync(documentType, ct);
                 matches = await profiles.ListAsync(profileSpec, ct);
@@ -134,7 +154,7 @@ public sealed class ProfileAccountingPostingService(
             if (matches.Count != 1)
             {
                 var message = matches.Count == 0 && string.Equals(module, "Purchasing", StringComparison.OrdinalIgnoreCase)
-                    ? $"إعدادات ترحيل المشتريات غير مكتملة للمستند '{documentType}'. افتح إعدادات المحاسبة وحدد حسابات ترحيل المشتريات المطلوبة ثم احفظ الإعدادات."
+                    ? $"ملف الترحيل '{documentType}' غير مهيأ أو غير نشط. افتح ملفات الترحيل الآلي، واضبط الأدوار ثم فعّل الملف قبل الترحيل."
                     : matches.Count == 0 && string.Equals(module, "Optical", StringComparison.OrdinalIgnoreCase)
                         ? "إعداد ترحيل تلف/كسر المعمل غير مكتمل. يجب إعداد حساب المخزون وتكلفة المبيعات في إعدادات المحاسبة."
                         : $"يجب وجود Posting Profile فعال واحد للموديول '{module}' والمستند '{documentType}'.";
@@ -151,6 +171,12 @@ public sealed class ProfileAccountingPostingService(
         if (roleMatches.Length != 1)
             throw new ConflictException("accounting_posting_role_invalid", $"يجب تعريف حساب واحد فقط للدور '{role}'.");
         var account = await EnsurePostingAccountAsync(roleMatches[0].AccountId, ct);
+        if (string.Equals(module, "Purchasing", StringComparison.OrdinalIgnoreCase))
+        {
+            var problem = PurchasingPostingAccountRolePolicy.Validate(role, account);
+            if (problem is not null)
+                throw new ConflictException(problem.Value.Code, problem.Value.Message);
+        }
         return account.Id;
     }
 
@@ -206,129 +232,8 @@ public sealed class ProfileAccountingPostingService(
         return rows.Count == 1 ? rows[0].AccountId : null;
     }
 
-    private async Task TryProvisionPurchasingProfileAsync(string documentType, CancellationToken ct)
-    {
-        // First recover an existing inactive profile when it already contains the
-        // minimum roles required for the document. This supports older databases
-        // that contain configured profiles which were simply disabled.
-        var existingProfiles = await profiles.ListAsync(
-            new Specification<PostingProfile>()
-                .Where(x => x.Module == "Purchasing" && x.DocumentType == documentType)
-                .Tracking(),
-            ct);
-
-        if (existingProfiles.Count == 1 && !existingProfiles[0].IsActive)
-        {
-            var existingLines = await profileLines.ListAsync(
-                new Specification<PostingProfileLine>()
-                    .Where(x => x.PostingProfileId == existingProfiles[0].Id),
-                ct);
-
-            var hasGrni = existingLines.Count(x => x.AccountRole == "GoodsReceivedNotInvoiced") == 1;
-            var hasInventory = existingLines.Count(x => x.AccountRole == "Inventory") == 1;
-            var canActivate = string.Equals(documentType, "PurchaseReceipt", StringComparison.OrdinalIgnoreCase)
-                ? hasGrni && hasInventory
-                : hasGrni;
-
-            if (canActivate)
-            {
-                existingProfiles[0].SetActive(true);
-                profiles.Update(existingProfiles[0]);
-                return;
-            }
-        }
-
-        var accountingSettings = await settings.GetByIdAsync(AccountingSettings.SingletonId, ct);
-        if (accountingSettings is null || !accountingSettings.GrniAccountId.HasValue)
-            return;
-
-        if (string.Equals(documentType, "PurchaseReceipt", StringComparison.OrdinalIgnoreCase))
-        {
-            var inventoryAccountId = accountingSettings.InventoryAccountId
-                ?? await ResolveExistingInventoryAccountAsync(ct);
-            if (!inventoryAccountId.HasValue)
-                return;
-
-            var profile = await EnsurePurchasingProfileAsync(
-                "PURCHASE-RECEIPT",
-                "ترحيل استلام المشتريات",
-                "PurchaseReceipt",
-                ct);
-
-            await UpsertProfileRoleAsync(profile.Id, "Inventory", inventoryAccountId.Value, ct);
-            await UpsertProfileRoleAsync(profile.Id, "GoodsReceivedNotInvoiced", accountingSettings.GrniAccountId.Value, ct);
-            return;
-        }
-
-        if (string.Equals(documentType, "PurchaseInvoice", StringComparison.OrdinalIgnoreCase))
-        {
-            var profile = await EnsurePurchasingProfileAsync(
-                "PURCHASE-INVOICE",
-                "ترحيل فاتورة المورد",
-                "PurchaseInvoice",
-                ct);
-
-            await UpsertProfileRoleAsync(profile.Id, "GoodsReceivedNotInvoiced", accountingSettings.GrniAccountId.Value, ct);
-
-            if (accountingSettings.PurchaseTaxAccountId.HasValue)
-                await UpsertProfileRoleAsync(profile.Id, "PurchaseTax", accountingSettings.PurchaseTaxAccountId.Value, ct);
-
-            if (accountingSettings.PurchasePriceVarianceAccountId.HasValue)
-                await UpsertProfileRoleAsync(profile.Id, "PurchasePriceVariance", accountingSettings.PurchasePriceVarianceAccountId.Value, ct);
-        }
-    }
-
-    private async Task<Guid?> ResolveExistingInventoryAccountAsync(CancellationToken ct)
-    {
-        var salesProfiles = await profiles.ListAsync(
-            new Specification<PostingProfile>()
-                .Where(x => x.IsActive && x.Module == "Sales" && x.DocumentType == "SalesInvoice")
-                .ApplyPaging(0, 2),
-            ct);
-
-        if (salesProfiles.Count != 1)
-            return null;
-
-        var inventoryLines = await profileLines.ListAsync(
-            new Specification<PostingProfileLine>()
-                .Where(x => x.PostingProfileId == salesProfiles[0].Id && x.AccountRole == "Inventory")
-                .ApplyPaging(0, 2),
-            ct);
-
-        return inventoryLines.Count == 1 ? inventoryLines[0].AccountId : null;
-    }
-
-    private async Task<PostingProfile> EnsurePurchasingProfileAsync(
-        string code,
-        string name,
-        string documentType,
-        CancellationToken ct)
-    {
-        var all = await profiles.ListAsync(
-            new Specification<PostingProfile>()
-                .Where(x => x.Module == "Purchasing" && x.DocumentType == documentType)
-                .Tracking(),
-            ct);
-
-        var active = all.Where(x => x.IsActive).ToList();
-        if (active.Count > 1)
-            throw new ConflictException("purchasing_posting_profile_duplicate", $"يوجد أكثر من ملف ترحيل فعال للمستند {documentType}.");
-
-        var profile = active.SingleOrDefault() ?? all.FirstOrDefault();
-        if (profile is null)
-        {
-            profile = PostingProfile.Create(Guid.NewGuid(), code, name, "Purchasing", documentType, true);
-            await profiles.AddAsync(profile, ct);
-        }
-        else if (!profile.IsActive)
-        {
-            profile.SetActive(true);
-            profiles.Update(profile);
-        }
-
-        return profile;
-    }
-
+    // Required by the existing OpticalBreakage legacy profile setup.
+    // AP-10 removes implicit *Purchasing* profile provisioning only.
     private async Task UpsertProfileRoleAsync(Guid profileId, string role, Guid accountId, CancellationToken ct)
     {
         var existing = await profileLines.ListAsync(
@@ -360,8 +265,12 @@ public sealed class ProfileAccountingPostingService(
         if (!supplier.IsActive) throw new ConflictException("accounting_supplier_inactive", "المورد غير فعال.");
         if (supplier.AccountId == Guid.Empty) throw new ConflictException("accounting_supplier_account_missing", "لا يوجد حساب محاسبي صالح للمورد.");
         var account = await EnsurePostingAccountAsync(supplier.AccountId, ct);
-        if (account.AccountType != AccountType.Subledger)
-            throw new ConflictException("accounting_supplier_account_not_subledger", "حساب المورد يجب أن يكون حساب Subledger قابلًا للترحيل.");
+        var parent = account.ParentAccountId.HasValue
+            ? await accounts.GetByIdAsync(account.ParentAccountId.Value, ct)
+            : null;
+        var problem = SupplierSubledgerPostingPolicy.Validate(account, parent);
+        if (problem is not null)
+            throw new ConflictException(problem.Value.Code, problem.Value.Message);
         return (supplier, account);
     }
 

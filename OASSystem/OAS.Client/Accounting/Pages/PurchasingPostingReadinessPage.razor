@@ -1,0 +1,137 @@
+@page "/accounting/purchasing-readiness"
+@attribute [Authorize]
+@using OAS.Contracts.Accounting.PostingProfiles
+@using OAS.Contracts.Accounting.Suppliers
+@inject OasApiClient Api
+
+<PageTitle>جاهزية ترحيل المشتريات | OAS</PageTitle>
+
+<div class="container-fluid py-3" dir="rtl">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+            <h1 class="h5 mb-1">فحص جاهزية ترحيل المشتريات</h1>
+            <small class="text-muted">فحص للقراءة فقط. لا يفعّل أي ملف ترحيل ولا ينشئ قيودًا.</small>
+        </div>
+        <a class="btn btn-outline-secondary btn-sm" href="/accounting/posting-profiles">ملفات الترحيل</a>
+    </div>
+
+    <div class="card mb-3"><div class="card-body">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label" for="readiness-date">تاريخ الترحيل</label>
+                <input id="readiness-date" class="form-control form-control-sm" type="date" @bind="_postingDate" />
+            </div>
+            <div class="col-md-5">
+                <label class="form-label" for="readiness-supplier">المورد (اختياري)</label>
+                <div class="input-group input-group-sm">
+                    <input id="readiness-supplier" class="form-control" @bind="_supplierSearch" placeholder="ابحث باسم المورد أو الكود" />
+                    <button type="button" class="btn btn-outline-secondary" disabled="@_loading" @onclick="SearchSuppliersAsync">بحث</button>
+                </div>
+                @if (_supplierChoices.Count > 0)
+                {
+                    <select class="form-select form-select-sm mt-1" @bind="_supplierId">
+                        <option value="">فحص الإعدادات العامة فقط</option>
+                        @foreach (var s in _supplierChoices)
+                        {
+                            <option value="@s.Id">@s.SupplierCode — @s.NameAr</option>
+                        }
+                    </select>
+                }
+                else if (_supplierId.HasValue)
+                {
+                    <small class="text-muted">سيتم التحقق من المورد المحدد في الرابط.</small>
+                }
+            </div>
+            <div class="col-md-4">
+                <button class="btn btn-primary btn-sm w-100" disabled="@_loading" @onclick="LoadAsync">التحقق من الجاهزية</button>
+            </div>
+        </div>
+        <div class="d-flex flex-wrap gap-3 small mt-3">
+            <label><input type="checkbox" @bind="_requireTax" /> توجد ضريبة مشتريات</label>
+            <label><input type="checkbox" @bind="_requireVariance" /> توجد فروق أسعار (PPV)</label>
+            <label><input type="checkbox" @bind="_requireFx" /> يوجد ترحيل متعدد العملات</label>
+        </div>
+    </div></div>
+
+    @if (!string.IsNullOrEmpty(_error)) { <div class="alert alert-danger" role="alert">@_error</div> }
+    @if (_loading) { <p role="status">جارٍ فحص الإعدادات...</p> }
+    else if (_result is not null)
+    {
+        <div class="alert @(_result.IsReady ? "alert-success" : "alert-danger")" role="status">
+            <strong>@(_result.IsReady ? "الإعدادات جاهزة وفق الخيارات المحددة" : "الترحيل غير جاهز — أصلح الموانع أدناه")</strong>
+            <span class="ms-2">العملة الأساسية: @(_result.BaseCurrencyCode ?? "غير محددة")</span>
+        </div>
+        <div class="card"><div class="card-body">
+            <h2 class="h6">الموانع والتنبيهات</h2>
+            @if (_result.Issues.Count == 0) { <p class="text-success">لم تُرصد موانع أو تحذيرات.</p> }
+            <div class="table-responsive"><table class="table table-sm table-striped align-middle">
+                <thead><tr><th>النوع</th><th>التحقق</th><th>المستند</th><th>دور الحساب</th></tr></thead>
+                <tbody>
+                    @foreach (var item in _result.Issues)
+                    {
+                        <tr>
+                            <td><span class="badge @(item.Severity == "Block" ? "text-bg-danger" : "text-bg-warning")">@(item.Severity == "Block" ? "مانع" : "تحذير")</span></td>
+                            <td>@item.Message <small class="text-muted">(@item.Code)</small></td>
+                            <td>@item.DocumentType</td><td>@item.Role</td>
+                        </tr>
+                    }
+                </tbody>
+            </table></div>
+        </div></div>
+        <p class="small text-muted mt-2">الفحص لحظي، ويُعاد التحقق عند الترحيل نفسه؛ لا يعد تصريحًا لتجاوز صلاحيات المستخدم أو إغلاق الفترة.</p>
+    }
+</div>
+
+@code {
+    [Parameter, SupplyParameterFromQuery(Name = "supplierId")]
+    public Guid? SupplierId { get; set; }
+
+    private DateOnly _postingDate = DateOnly.FromDateTime(DateTime.Today);
+    private Guid? _supplierId;
+    private bool _requireTax;
+    private bool _requireVariance;
+    private bool _requireFx;
+    private bool _loading;
+    private string? _error;
+    private string? _supplierSearch;
+    private List<SupplierLookupDto> _supplierChoices = [];
+    private PurchasingPostingReadinessDto? _result;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (SupplierId.HasValue && _supplierId != SupplierId)
+            _supplierId = SupplierId;
+        await LoadAsync();
+    }
+
+    private async Task SearchSuppliersAsync()
+    {
+        _error = null;
+        try
+        {
+            var search = Uri.EscapeDataString(_supplierSearch ?? "");
+            var result = await Api.GetAsync<List<SupplierLookupDto>>($"api/accounting/suppliers/lookup?search={search}&take=30");
+            _supplierChoices = result ?? [];
+        }
+        catch (Exception ex) { _error = $"تعذر البحث عن المورد: {ex.Message}"; }
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        _result = null;
+        try
+        {
+            var date = _postingDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+            var url = $"api/accounting/posting-profiles/purchasing-readiness?postingDate={date}" +
+                $"&requirePurchaseTax={_requireTax.ToString().ToLowerInvariant()}" +
+                $"&requirePriceVariance={_requireVariance.ToString().ToLowerInvariant()}" +
+                $"&requireForeignCurrency={_requireFx.ToString().ToLowerInvariant()}";
+            if (_supplierId.HasValue) url += $"&supplierId={_supplierId.Value:D}";
+            _result = await Api.GetAsync<PurchasingPostingReadinessDto>(url);
+        }
+        catch (Exception ex) { _error = $"فشل تحميل فحص الجاهزية: {ex.Message}"; }
+        finally { _loading = false; }
+    }
+}

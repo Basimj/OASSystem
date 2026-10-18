@@ -7,6 +7,7 @@ using OAS.Application.Accounting.PostingProfiles.Commands.SetPostingProfileStatu
 using OAS.Application.Accounting.PostingProfiles.Commands.UpdatePostingProfile;
 using OAS.Application.Accounting.PostingProfiles.Queries.GetPostingProfileById;
 using OAS.Application.Accounting.PostingProfiles.Queries.GetPostingProfiles;
+using OAS.Application.Accounting.Posting.Queries;
 using OAS.Contracts.Accounting.PostingProfiles;
 using OAS.Contracts.Common.Pagination;
 
@@ -26,6 +27,22 @@ public sealed class PostingProfilesController(ISender sender) : ControllerBase
     {
         request = AccountingPageRequestCompatibility.Apply(request, searchTerm);
         var result = await sender.Send(new GetPostingProfilesQuery(request), cancellationToken);
+        return Ok(result);
+    }
+
+    // Read-only diagnostic: authorization is checked by the MediatR request pipeline.
+    [HttpGet("purchasing-readiness")]
+    public async Task<ActionResult<PurchasingPostingReadinessDto>> PurchasingReadiness(
+        [FromQuery] DateOnly postingDate,
+        [FromQuery] Guid? supplierId,
+        [FromQuery] bool requirePurchaseTax,
+        [FromQuery] bool requirePriceVariance,
+        [FromQuery] bool requireForeignCurrency,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetPurchasingPostingReadinessQuery(
+            postingDate, supplierId, requirePurchaseTax, requirePriceVariance,
+            requireForeignCurrency), cancellationToken);
         return Ok(result);
     }
 

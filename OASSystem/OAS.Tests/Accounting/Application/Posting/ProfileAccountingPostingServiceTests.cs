@@ -59,7 +59,7 @@ public sealed class ProfileAccountingPostingServiceTests
     }
 
     [Test]
-    public async Task PostAsync_ProvisionMissingPurchaseReceiptProfile_FromPersistedAccountingSettings()
+    public async Task PostAsync_RejectsMissingPurchaseProfile_WithoutMutatingProfilesOrJournals()
     {
         var currency = Currency.Create(Guid.NewGuid(), "YER", "ريال", null, "﷼", 2);
         var inventory = CreateAccount("1100", AccountClass.Asset, NormalBalance.Debit);
@@ -111,18 +111,12 @@ public sealed class ProfileAccountingPostingServiceTests
                 new("PurchaseReceipt", "GoodsReceivedNotInvoiced", false, 0m, 50m, false, "GRNI")
             ]);
 
-        _ = await service.PostAsync(request, Guid.NewGuid(), DateTime.UtcNow);
-
-        Assert.That(profileRepo.Items.Count(x =>
-            x.Module == "Purchasing" &&
-            x.DocumentType == "PurchaseReceipt" &&
-            x.IsActive), Is.EqualTo(1));
-
-        var receiptProfile = profileRepo.Items.Single(x => x.Module == "Purchasing" && x.DocumentType == "PurchaseReceipt");
-        Assert.That(profileLineRepo.Items.Any(x => x.PostingProfileId == receiptProfile.Id && x.AccountRole == "Inventory" && x.AccountId == inventory.Id), Is.True);
-        Assert.That(profileLineRepo.Items.Any(x => x.PostingProfileId == receiptProfile.Id && x.AccountRole == "GoodsReceivedNotInvoiced" && x.AccountId == grni.Id), Is.True);
-        Assert.That(journalRepo.Items, Has.Count.EqualTo(1));
-        Assert.That(journalRepo.Items.Single().IsBalanced(), Is.True);
+        var error = Assert.ThrowsAsync<OAS.Application.Common.Exceptions.ConflictException>(
+            async () => await service.PostAsync(request, Guid.NewGuid(), DateTime.UtcNow));
+        Assert.That(error, Is.Not.Null);
+        Assert.That(profileRepo.Items, Is.Empty, "Posting cannot auto-create profiles.");
+        Assert.That(profileLineRepo.Items, Is.Empty, "Posting cannot auto-create roles.");
+        Assert.That(journalRepo.Items, Is.Empty, "No partial automatic journal may be added.");
     }
 
     [Test]
