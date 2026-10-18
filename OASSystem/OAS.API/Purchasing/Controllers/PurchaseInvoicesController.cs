@@ -48,6 +48,16 @@ public sealed class PurchaseInvoicesController(ISender sender) : ControllerBase
         return Ok(await sender.Send(new GetPurchaseInvoiceByIdQuery(id), cancellationToken));
     }
 
+    [HttpPost("{id:guid}/due-date/verify")]
+    public async Task<ActionResult<PurchaseInvoiceDto>> VerifyDueDate(
+        Guid id,
+        [FromBody] VerifyPurchaseInvoiceDueDateRequest request,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new VerifyPurchaseInvoiceDueDateCommand(id, request), cancellationToken);
+        return Ok(await sender.Send(new GetPurchaseInvoiceByIdQuery(id), cancellationToken));
+    }
+
     [HttpPost("{id:guid}/match")]
     public async Task<ActionResult<PurchaseMatchResultDto>> Match(
         Guid id,

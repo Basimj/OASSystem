@@ -46,4 +46,7 @@ public sealed record PurchaseInvoiceDto(
     string? BaseCurrencyCodeSnapshot = null,
     byte? BaseCurrencyDecimalPlacesSnapshot = null,
     byte? ExchangeRateType = null,
-    byte? ExchangeRateSource = null);
+    byte? ExchangeRateSource = null,
+    int? PaymentTermDaysSnapshot = null,
+    DateOnly? DueDate = null,
+    PurchaseInvoiceDueDateProvenance DueDateProvenance = PurchaseInvoiceDueDateProvenance.Unknown);

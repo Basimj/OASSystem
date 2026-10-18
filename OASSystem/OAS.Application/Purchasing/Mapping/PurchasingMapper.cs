@@ -148,7 +148,10 @@ public sealed class PurchasingMapper(
             invoice.BaseCurrencyCodeSnapshot,
             invoice.BaseCurrencyDecimalPlacesSnapshot,
             invoice.ExchangeRateType.HasValue ? (byte)invoice.ExchangeRateType.Value : null,
-            invoice.ExchangeRateSource.HasValue ? (byte)invoice.ExchangeRateSource.Value : null);
+            invoice.ExchangeRateSource.HasValue ? (byte)invoice.ExchangeRateSource.Value : null,
+            invoice.PaymentTermDaysSnapshot,
+            invoice.DueDate,
+            (OAS.Contracts.Purchasing.Enums.PurchaseInvoiceDueDateProvenance)(byte)invoice.DueDateProvenance);
     }
 
     public async Task<PurchaseMatchResultDto> ToMatchDtoAsync(PurchaseInvoice invoice, PurchaseMatchEvaluation evaluation, CancellationToken cancellationToken)

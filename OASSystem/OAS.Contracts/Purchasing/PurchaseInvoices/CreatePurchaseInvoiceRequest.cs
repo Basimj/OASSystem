@@ -12,4 +12,6 @@ public sealed record CreatePurchaseInvoiceRequest(
     DateOnly ExchangeRateDate,
     TaxCalculationMode TaxCalculationMode,
     string? Notes,
-    IReadOnlyList<CreatePurchaseInvoiceLineRequest> Lines);
+    IReadOnlyList<CreatePurchaseInvoiceLineRequest> Lines,
+    DateOnly? DueDate = null,
+    int? PaymentTermDays = null);

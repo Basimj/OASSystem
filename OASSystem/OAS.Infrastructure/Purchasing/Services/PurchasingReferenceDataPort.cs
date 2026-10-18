@@ -11,8 +11,8 @@ public sealed class PurchasingReferenceDataPort(OasDbContext dbContext) : IPurch
     public async Task<PurchasingSupplierSnapshot?> GetSupplierAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var value = await dbContext.Set<Supplier>().AsNoTracking().Where(x => x.Id == id)
-            .Select(x => new { x.Id, x.SupplierCode, x.NameAr, x.IsActive, x.AccountId }).FirstOrDefaultAsync(cancellationToken);
-        return value is null ? null : new PurchasingSupplierSnapshot(value.Id, value.SupplierCode, value.NameAr, value.IsActive, value.AccountId);
+            .Select(x => new { x.Id, x.SupplierCode, x.NameAr, x.IsActive, x.AccountId, x.PaymentTermDays }).FirstOrDefaultAsync(cancellationToken);
+        return value is null ? null : new PurchasingSupplierSnapshot(value.Id, value.SupplierCode, value.NameAr, value.IsActive, value.AccountId, value.PaymentTermDays);
     }
 
     public async Task<PurchasingWarehouseSnapshot?> GetWarehouseAsync(Guid id, CancellationToken cancellationToken = default)

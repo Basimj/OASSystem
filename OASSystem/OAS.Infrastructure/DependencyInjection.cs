@@ -109,6 +109,10 @@ public static class DependencyInjection
         services.AddScoped<IAccountingPartyQueryService, AccountingPartyQueryService>();
         services.AddScoped<IAccountingReportingQueryService, AccountingReportingQueryService>();
         services.AddScoped<ISupplierApReportingQueryService, SupplierApReportingQueryService>();
+        services.AddScoped<ISupplierAgingQueryService, SupplierAgingQueryService>();
+        services.AddScoped<ISupplierOpeningRepository, OAS.Infrastructure.Accounting.Persistence.SupplierOpeningRepository>();
+        services.AddScoped<ISupplierOpeningJournalVerificationPort, OAS.Infrastructure.Accounting.SupplierOpeningJournalVerificationPort>();
+        services.AddScoped<ISupplierOpeningConcurrencyPort, OAS.Infrastructure.Accounting.SupplierOpeningConcurrencyPort>();
 
         services.AddScoped<
             IIdentityRepository,

@@ -28,6 +28,7 @@ public sealed class PurchaseInvoice : AuditableEntity<Guid>
         Id = PurchasingDomainGuard.Required(id, "Purchase invoice id");
         PurchaseInvoiceCode = PurchasingDomainGuard.Required(purchaseInvoiceCode, 40, "Purchase invoice code");
         Status = PurchaseInvoiceStatus.Draft;
+        DueDateProvenance = PurchaseInvoiceDueDateProvenance.Unknown;
         UpdateHeader(supplierInvoiceCode, supplierId, invoiceDate, postingDate, currencyId, exchangeRate,
             exchangeRateDate, taxCalculationMode, notes);
     }
@@ -37,6 +38,9 @@ public sealed class PurchaseInvoice : AuditableEntity<Guid>
     public Guid SupplierId { get; private set; }
     public DateOnly InvoiceDate { get; private set; }
     public DateOnly PostingDate { get; private set; }
+    public int? PaymentTermDaysSnapshot { get; private set; }
+    public DateOnly? DueDate { get; private set; }
+    public PurchaseInvoiceDueDateProvenance DueDateProvenance { get; private set; }
     public Guid CurrencyId { get; private set; }
     public string? CurrencyCodeSnapshot { get; private set; }
     public byte? CurrencyDecimalPlacesSnapshot { get; private set; }
@@ -108,6 +112,51 @@ public sealed class PurchaseInvoice : AuditableEntity<Guid>
         Notes = PurchasingDomainGuard.Optional(notes, 1000, "Notes");
     }
 
+    public void SetPaymentTerms(
+        int? paymentTermDaysSnapshot,
+        DateOnly? dueDate,
+        PurchaseInvoiceDueDateProvenance provenance)
+    {
+        EnsureDraft();
+        if (paymentTermDaysSnapshot < 0)
+            throw new DomainException("Payment term days cannot be negative.");
+        if (!Enum.IsDefined(provenance))
+            throw new DomainException("Purchase invoice due-date provenance is invalid.");
+
+        if (provenance == PurchaseInvoiceDueDateProvenance.Unknown)
+        {
+            if (paymentTermDaysSnapshot.HasValue || dueDate.HasValue)
+                throw new DomainException("Unknown due-date provenance cannot contain a due date or payment-term snapshot.");
+        }
+        else
+        {
+            if (!dueDate.HasValue)
+                throw new DomainException("Due date is required when its provenance is known.");
+            if (dueDate.Value < InvoiceDate)
+                throw new DomainException("Due date cannot be before the purchase invoice date.");
+            if (provenance == PurchaseInvoiceDueDateProvenance.DerivedAtInvoice && !paymentTermDaysSnapshot.HasValue)
+                throw new DomainException("Payment-term snapshot is required for a derived due date.");
+        }
+
+        PaymentTermDaysSnapshot = paymentTermDaysSnapshot;
+        DueDate = dueDate;
+        DueDateProvenance = provenance;
+    }
+
+    public void VerifyHistoricalDueDate(DateOnly dueDate, int? paymentTermDaysSnapshot = null)
+    {
+        if (Status == PurchaseInvoiceStatus.Cancelled)
+            throw new DomainException("Cancelled purchase invoices cannot receive a historical due-date verification.");
+        if (paymentTermDaysSnapshot < 0)
+            throw new DomainException("Payment term days cannot be negative.");
+        if (dueDate < InvoiceDate)
+            throw new DomainException("Due date cannot be before the purchase invoice date.");
+
+        PaymentTermDaysSnapshot = paymentTermDaysSnapshot;
+        DueDate = dueDate;
+        DueDateProvenance = PurchaseInvoiceDueDateProvenance.VerifiedHistoricalBackfill;
+    }
+
     public void CaptureCurrencySnapshot(
         string currencyCode,
         byte currencyDecimalPlaces,
@@ -173,6 +222,8 @@ public sealed class PurchaseInvoice : AuditableEntity<Guid>
     {
         EnsureDraft();
         if (_lines.Count == 0) throw new DomainException("Purchase invoice must contain at least one line before confirmation.");
+        if (!DueDate.HasValue || DueDateProvenance == PurchaseInvoiceDueDateProvenance.Unknown)
+            throw new DomainException("Purchase invoice due date must be reviewed before confirmation.");
         RecalculateTotals();
         Status = PurchaseInvoiceStatus.Confirmed;
         ConfirmedAt = at;

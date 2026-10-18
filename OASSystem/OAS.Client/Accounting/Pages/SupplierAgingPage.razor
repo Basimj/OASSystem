@@ -1,0 +1,165 @@
+@page "/accounting/suppliers/aging"
+@attribute [Authorize]
+@using System.Globalization
+@using OAS.Contracts.Accounting.Reports
+@inject OasApiClient Api
+
+<PageTitle>أعمار ديون الموردين | OAS</PageTitle>
+
+<div class="container-fluid py-3" dir="rtl">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+            <h1 class="h5 mb-1">أعمار ديون الموردين</h1>
+            <small class="text-muted">الأرصدة بالعملة الأساسية حتى التاريخ المحدد. المبالغ غير المخصصة تظهر منفصلة ولا تُطرح من الفواتير دون تخصيص.</small>
+        </div>
+        <div class="d-flex gap-2">
+            <a class="btn btn-outline-secondary btn-sm" href="/accounting/suppliers">الموردون</a>
+            <a class="btn btn-outline-primary btn-sm" href="/accounting/suppliers/openings">الأرصدة الافتتاحية</a>
+        </div>
+    </div>
+
+    <div class="card mb-3"><div class="card-body">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3"><label class="form-label" for="supplier-aging-date">حتى تاريخ</label>
+                <input id="supplier-aging-date" class="form-control form-control-sm" type="date" @bind="_asOfDate" /></div>
+            <div class="col-md-5"><label class="form-label" for="supplier-aging-search">كود المورد أو اسمه</label>
+                <input id="supplier-aging-search" class="form-control form-control-sm" @bind="_search" @bind:event="oninput" placeholder="بحث في الموردين" /></div>
+            <div class="col-md-2"><button class="btn btn-primary btn-sm w-100" disabled="@_loading" @onclick="SearchAsync">عرض التقرير</button></div>
+            <div class="col-md-2"><button class="btn btn-outline-secondary btn-sm w-100" disabled="@_loading" @onclick="ResetAsync">إعادة تعيين</button></div>
+        </div>
+    </div></div>
+
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="alert alert-danger" role="alert">@_error</div>
+    }
+    @if (_loading)
+    {
+        <p aria-live="polite">جارٍ تحميل تقرير أعمار الديون...</p>
+    }
+    else if (_report is not null)
+    {
+        <div class="row g-2 mb-3">
+            @foreach (var metric in Metrics())
+            {
+                <div class="col-6 col-md-3 col-xl-2">
+                    <div class="card h-100"><div class="card-body py-2">
+                        <small class="text-muted">@metric.Label</small>
+                        <div class="fw-bold" style="font-variant-numeric:tabular-nums">@Amount(metric.Amount)</div>
+                    </div></div>
+                </div>
+            }
+        </div>
+        <div class="alert alert-info small">
+            المدفوعات غير المخصصة: <strong>@Amount(_report.UnappliedPayments)</strong> —
+            الائتمانات غير المطبقة: <strong>@Amount(_report.UnappliedCredits)</strong>.
+            هذه الأرصدة منفصلة عن إجمالي الفواتير المفتوحة، لتجنب ازدواج احتسابها.
+        </div>
+        <div class="card mb-3"><div class="card-body">
+            <h2 class="h6">ملخص الموردين</h2>
+            <div class="table-responsive"><table class="table table-sm table-striped align-middle">
+                <thead><tr><th>المورد</th><th>غير مستحق</th><th>0–30</th><th>31–60</th><th>61–90</th><th>أكثر من 90</th><th>غير مؤكد</th><th>الإجمالي</th><th>غير مخصص</th></tr></thead>
+                <tbody>
+                    @foreach (var s in _report.Suppliers)
+                    {
+                        <tr><td>@s.SupplierCode — @s.SupplierName</td>
+                            <td>@Amount(s.NotDue)</td><td>@Amount(s.Days0To30)</td><td>@Amount(s.Days31To60)</td>
+                            <td>@Amount(s.Days61To90)</td><td>@Amount(s.DaysOver90)</td><td>@Amount(s.Unknown)</td>
+                            <td><strong>@Amount(s.TotalOutstanding)</strong></td>
+                            <td>@Amount(s.UnappliedPayments + s.UnappliedCredits)</td></tr>
+                    }
+                </tbody>
+            </table></div>
+            @if (_report.Suppliers.Count == 0) { <p class="text-muted small">لا توجد ذمم مفتوحة وفق المرشحات الحالية.</p> }
+        </div></div>
+        <div class="card"><div class="card-body">
+            <h2 class="h6">تفاصيل المستندات المفتوحة</h2>
+            <div class="table-responsive"><table class="table table-sm table-hover align-middle">
+                <thead><tr><th>المورد</th><th>المستند</th><th>تاريخ المستند</th><th>تاريخ الاستحقاق</th><th>أيام التأخير</th><th>الفئة</th><th>المبلغ الأساسي</th><th>المتبقي</th></tr></thead>
+                <tbody>
+                    @foreach (var line in _report.Lines)
+                    {
+                        <tr>
+                            <td>@line.SupplierCode — @line.SupplierName</td>
+                            <td>@line.Reference <small class="text-muted">(@(line.SourceType == "SupplierOpening" ? "افتتاحي" : "فاتورة"))</small></td>
+                            <td>@line.DocumentDate.ToString("yyyy-MM-dd")</td>
+                            <td>@(line.DueDate?.ToString("yyyy-MM-dd") ?? "غير معروف")
+                                @if (line.NeedsReview) { <span class="badge text-bg-warning">يتطلب مراجعة</span> }
+                            </td>
+                            <td>@(line.DaysPastDue?.ToString(CultureInfo.InvariantCulture) ?? "—")</td>
+                            <td>@BucketText(line.Bucket)</td>
+                            <td>@Amount(line.OriginalBaseAmount)</td>
+                            <td class="fw-semibold">@Amount(line.OutstandingBaseAmount)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table></div>
+            @if (_report.TotalCount == 0) { <p class="text-muted small">لا توجد مستندات مطابقة.</p> }
+            <div class="d-flex align-items-center justify-content-center gap-3">
+                <button class="btn btn-outline-secondary btn-sm" disabled="@(_page == 1)" @onclick="PreviousAsync">السابق</button>
+                <span class="small">الصفحة @_page من @Math.Max(1, (int)Math.Ceiling(_report.TotalCount / (double)_pageSize)) — إجمالي المستندات @_report.TotalCount</span>
+                <button class="btn btn-outline-secondary btn-sm" disabled="@(_page * _pageSize >= _report.TotalCount)" @onclick="NextAsync">التالي</button>
+            </div>
+        </div></div>
+    }
+</div>
+
+@code {
+    [Parameter, SupplyParameterFromQuery(Name = "supplierId")]
+    public Guid? SupplierId { get; set; }
+
+    private DateOnly _asOfDate = DateOnly.FromDateTime(DateTime.Today);
+    private string? _search;
+    private string? _error;
+    private bool _loading;
+    private int _page = 1;
+    private const int _pageSize = 50;
+    private SupplierAgingReportDto? _report;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task SearchAsync() { _page = 1; await LoadAsync(); }
+    private async Task ResetAsync()
+    {
+        _search = null;
+        _asOfDate = DateOnly.FromDateTime(DateTime.Today);
+        _page = 1;
+        await LoadAsync();
+    }
+    private async Task PreviousAsync() { if (_page > 1) { _page--; await LoadAsync(); } }
+    private async Task NextAsync() { _page++; await LoadAsync(); }
+
+    private async Task LoadAsync()
+    {
+        if (_loading) return;
+        _loading = true;
+        _error = null;
+        try
+        {
+            var url = $"api/accounting/reports/supplier-aging?asOfDate={_asOfDate:yyyy-MM-dd}&pageNumber={_page}&pageSize={_pageSize}";
+            if (SupplierId.HasValue) url += $"&supplierId={SupplierId.Value:D}";
+            if (!string.IsNullOrWhiteSpace(_search)) url += "&search=" + Uri.EscapeDataString(_search.Trim());
+            _report = await Api.GetAsync<SupplierAgingReportDto>(url);
+        }
+        catch (Exception ex) { _error = ex.Message; _report = null; }
+        finally { _loading = false; }
+    }
+
+    private IEnumerable<(string Label, decimal Amount)> Metrics()
+    {
+        if (_report is null) yield break;
+        yield return ("غير مستحق", _report.NotDue);
+        yield return ("0–30 يومًا", _report.Days0To30);
+        yield return ("31–60 يومًا", _report.Days31To60);
+        yield return ("61–90 يومًا", _report.Days61To90);
+        yield return ("أكثر من 90 يومًا", _report.DaysOver90);
+        yield return ("يحتاج مراجعة", _report.Unknown);
+        yield return ("إجمالي المستحق", _report.TotalOutstanding);
+    }
+    private static string Amount(decimal amount) => amount.ToString("N2", CultureInfo.CurrentCulture);
+    private static string BucketText(string value) => value switch
+    {
+        "NotDue" => "غير مستحق", "0-30" => "0–30", "31-60" => "31–60",
+        "61-90" => "61–90", "+90" => "أكثر من 90", "Unknown" => "يتطلب مراجعة", _ => value
+    };
+}

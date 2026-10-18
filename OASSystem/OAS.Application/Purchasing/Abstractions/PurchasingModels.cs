@@ -2,7 +2,7 @@ using OAS.Contracts.Purchasing.Enums;
 
 namespace OAS.Application.Purchasing.Abstractions;
 
-public sealed record PurchasingSupplierSnapshot(Guid Id, string Code, string Name, bool IsActive, Guid AccountId);
+public sealed record PurchasingSupplierSnapshot(Guid Id, string Code, string Name, bool IsActive, Guid AccountId, int PaymentTermDays = 0);
 public sealed record PurchasingWarehouseSnapshot(Guid Id, string Code, string Name, bool IsActive);
 public sealed record PurchasingUnitSnapshot(Guid Id, string Code, string Name, bool IsActive);
 public sealed record PurchasingCurrencySnapshot(Guid Id, string Code, bool IsActive);
@@ -79,4 +79,3 @@ public sealed record PurchaseMatchEvaluation(
     decimal InvoiceNetBaseAmount,
     decimal InvoiceTaxBaseAmount,
     decimal PriceVarianceBaseAmount);
-
