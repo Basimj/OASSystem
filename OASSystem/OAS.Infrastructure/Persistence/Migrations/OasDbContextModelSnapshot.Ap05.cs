@@ -190,6 +190,7 @@ partial class OasDbContextModelSnapshot
 
         // SA-03: Include the customer credit application table in the effective snapshot.
         AddSa03CustomerCreditModel(modelBuilder);
+        modelBuilder.ApplyConfiguration(new OAS.Infrastructure.Purchasing.Persistence.Configurations.PurchaseReceiptFollowUpJobConfiguration());
         return (IModel)modelBuilder.Model;
     }
 
@@ -199,7 +200,7 @@ partial class OasDbContextModelSnapshot
         b.Property<string>("CreatedBy").HasMaxLength(64).HasColumnName("CreatedBy").HasColumnType("nvarchar(64)");
         b.Property<string>("CreatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
         b.Property<DateTimeOffset?>("LastModifiedAtUtc").HasColumnName("UpdatedAt").HasColumnType("datetimeoffset");
-        b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnName("UpdatedBy").HasColumnType("nvarchar(64)");
+        b.Property<string>("LastModifiedBy").HasMaxLength(64).HasColumnType("nvarchar(64)");
         b.Property<string>("UpdatedFromDevice").HasMaxLength(256).HasColumnType("nvarchar(256)");
     }
 }

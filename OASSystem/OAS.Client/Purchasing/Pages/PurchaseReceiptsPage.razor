@@ -3,6 +3,9 @@
 @using OAS.Client.Purchasing.Components
 @using OAS.Client.Purchasing.Workspace
 <PageTitle>استلام المشتريات | OAS</PageTitle>
+<div dir="rtl" class="d-flex justify-content-end px-3 pt-2">
+  <a href="/purchases/receipt-follow-ups" class="btn btn-outline-secondary btn-sm">متابعة تحديثات الطلبات والمعمل</a>
+</div>
 <PurchasingWorkspaceHost Section="PurchasingEntityType.PurchaseReceipts"
                          InitialRecordId="@OpenId"
                          RelatedPurchaseOrderId="@PurchaseOrderId"

@@ -1,3 +1,4 @@
+using OAS.API.Purchasing;
 using OAS.API.Components;
 using OAS.API.Extensions;
 using OAS.API.Middleware;
@@ -11,6 +12,7 @@ builder.Services.AddRazorComponents()
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddApiFoundation(builder.Configuration);
+builder.Services.AddReceiptIntegrationFollowUps();
 builder.Services.AddHealthChecks();
 
 // Register each simple CRUD entity explicitly here (or in a feature-specific registration class):

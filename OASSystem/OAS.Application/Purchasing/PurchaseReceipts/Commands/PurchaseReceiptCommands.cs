@@ -1,5 +1,4 @@
-﻿using MediatR;
-using Microsoft.Extensions.Logging;
+using MediatR;
 using OAS.Application.Abstractions.Messaging;
 using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Abstractions.Security;
@@ -7,7 +6,6 @@ using OAS.Application.Common.Exceptions;
 using OAS.Application.Purchasing.Abstractions;
 using OAS.Application.Purchasing.Authorization;
 using OAS.Application.Purchasing.Common;
-using OAS.Application.Sales.Abstractions;
 using OAS.Contracts.Purchasing.PurchaseReceipts;
 using OAS.Domain.Purchasing.Entities;
 using DomainOrderStatus = OAS.Domain.Purchasing.Enums.PurchaseOrderStatus;
@@ -129,63 +127,17 @@ public sealed class PostPurchaseReceiptCommandHandler(
     IPurchasingInventoryPort inventory,
     IPurchasingAccountingPort accounting,
     IPurchaseRequestRepository requestRepository,
-    ICustomerOrderFulfillmentService fulfillment,
-    IOpticalReplacementReceiptService opticalReplacementReceipts,
+    IPurchaseReceiptFollowUpJobs followUps,
     ICurrentUser currentUser,
     TimeProvider timeProvider,
-    IUnitOfWork unitOfWork,
-    ILogger<PostPurchaseReceiptCommandHandler> logger) : IRequestHandler<PostPurchaseReceiptCommand, PurchaseReceiptPostResultDto>
+    IUnitOfWork unitOfWork) : IRequestHandler<PostPurchaseReceiptCommand, PurchaseReceiptPostResultDto>
 {
     public async Task<PurchaseReceiptPostResultDto> Handle(PostPurchaseReceiptCommand command, CancellationToken ct)
     {
-        // Purchase receipt posting is its own committed transaction. Customer-order fulfillment
-        // runs only after that commit, so a sales-side validation failure can never roll back
-        // inventory/accounting effects of a valid purchasing receipt.
+        // Inventory, GRNI journal, purchase order and durable follow-up records commit together.
+        // Sales/optical work executes ONLY via the leased background reconciler after commit.
         var posted = await unitOfWork.ExecuteInTransactionAsync(
-            tx => PostReceiptAsync(command, tx),
-            ct);
-
-        if (posted.CustomerOrderIds.Count > 0)
-        {
-            try
-            {
-                await unitOfWork.ExecuteInTransactionAsync(async tx =>
-                {
-                    await fulfillment.ReconcileOrdersAsync(posted.CustomerOrderIds, tx);
-                    return true;
-                }, ct);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                // The receipt is already committed. Keep purchasing successful and leave the
-                // customer order resumable through Checkout/reconciliation instead of returning
-                // an error that misleadingly suggests the receipt was rolled back.
-                logger.LogWarning(
-                    ex,
-                    "Purchase receipt {ReceiptId} posted successfully, but follow-up sales fulfillment failed for customer orders {CustomerOrderIds}.",
-                    posted.Result.PurchaseReceiptId,
-                    string.Join(",", posted.CustomerOrderIds));
-            }
-        }
-
-        if (posted.PurchaseRequestLineIds.Count > 0)
-        {
-            try
-            {
-                await unitOfWork.ExecuteInTransactionAsync(async tx =>
-                {
-                    await opticalReplacementReceipts.ReconcileAsync(posted.WarehouseId, posted.PurchaseRequestLineIds, tx);
-                    return true;
-                }, ct);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                logger.LogWarning(ex,
-                    "Purchase receipt {ReceiptId} posted successfully, but optical replacement reconciliation failed.",
-                    posted.Result.PurchaseReceiptId);
-            }
-        }
-
+            tx => PostReceiptAsync(command, tx), ct);
         return posted.Result;
     }
 
@@ -197,6 +149,7 @@ public sealed class PostPurchaseReceiptCommandHandler(
         if (receipt.Status == DomainReceiptStatus.Posted && receipt.InventoryTransactionId.HasValue && receipt.JournalEntryId.HasValue)
         {
             var existingSources = await ResolveReceiptSourcesAsync(receipt, ct);
+            await followUps.EnqueueAsync(receipt.Id, existingSources.CustomerOrderIds, existingSources.PurchaseRequestLineIds, ct);
             return new PostedReceiptWork(
                 new PurchaseReceiptPostResultDto(receipt.Id, receipt.InventoryTransactionId.Value, receipt.JournalEntryId.Value, receipt.PurchaseOrderId, receipt.ReceiptCode),
                 existingSources.CustomerOrderIds, existingSources.PurchaseRequestLineIds, receipt.WarehouseId);
@@ -258,6 +211,7 @@ public sealed class PostPurchaseReceiptCommandHandler(
         orderRepository.Update(order);
 
         var linked = await ResolveReceiptSourcesAsync(receipt, ct);
+        await followUps.EnqueueAsync(receipt.Id, linked.CustomerOrderIds, linked.PurchaseRequestLineIds, ct);
         return new PostedReceiptWork(
             new PurchaseReceiptPostResultDto(receipt.Id, inventoryResult.InventoryTransactionId, accountingResult.JournalEntryId, order.Id, receipt.ReceiptCode),
             linked.CustomerOrderIds, linked.PurchaseRequestLineIds, receipt.WarehouseId);

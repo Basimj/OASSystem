@@ -1,5 +1,6 @@
 using OAS.Application.Database.Abstractions;
 using OAS.Infrastructure.Database.Services;
+using OAS.API.Purchasing.Services;
 
 namespace OAS.API.Database;
 
@@ -17,7 +18,9 @@ public sealed class HttpDatabaseProfileSelection(IHttpContextAccessor httpContex
             // Before authentication (login/bootstrap), the caller may select a database profile.
             // After authentication, the database profile is bound to the authenticated session and
             // cannot be overridden by a client-controlled request header.
-            var raw = context?.User.Identity?.IsAuthenticated == true
+            var raw = context is null && ReceiptWorkerAmbient.CurrentProfile is not null
+                ? ReceiptWorkerAmbient.CurrentProfile
+                : context?.User.Identity?.IsAuthenticated == true
                 ? context.User.FindFirst(ClaimName)?.Value
                 : context?.Request.Headers[HeaderName].FirstOrDefault();
 
