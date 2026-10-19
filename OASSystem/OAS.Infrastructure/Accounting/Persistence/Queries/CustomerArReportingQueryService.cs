@@ -131,81 +131,124 @@ public sealed class CustomerArReportingQueryService(OasDbContext db) : ICustomer
             count, pageNumber, pageSize);
     }
 
+    /// <summary>
+    /// Compute as-of AR aging in bounded batches. Avoid composing an EF GroupBy/LeftJoin
+    /// projection into additional WHERE/SUM/COUNT queries: EF Core 9 cannot translate
+    /// those predicates for every SQL Server provider/version combination.
+    /// Each aggregate below remains server-side SQL; only the final arithmetic on
+    /// a 500-invoice batch runs in memory. No tracking, no mutable balances.
+    /// </summary>
     public async Task<CustomerAgingReportDto> AgingAsync(DateOnly asOf, Guid? customerId = null,
         int pageNumber = 1, int pageSize = 50, CancellationToken ct = default)
     {
         pageNumber = Math.Max(1, pageNumber);
         pageSize = Math.Clamp(pageSize, 1, 200);
         var cutoff = DateTime.SpecifyKind(asOf.AddDays(1).ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
-        var payments = db.Set<PaymentAllocation>().AsNoTracking()
-            .Where(x => x.TargetDocumentType == AllocationTargetDocumentType.SalesInvoice
-                && x.AllocatedAtUtc < cutoff
-                && (!x.ReversedAtUtc.HasValue || x.ReversedAtUtc.Value >= cutoff))
-            .GroupBy(x => x.TargetDocumentId).Select(g => new {
-                InvoiceId = g.Key,
-                Amount = g.Sum(x => x.TargetBaseAllocatedAmount ?? x.BaseAllocatedAmount ??
-                                     (x.AllocatedAmount * (x.ExchangeRate ?? 1m)))
-            });
-        var returns = db.Set<SalesReturn>().AsNoTracking()
-            .Where(x => x.Status == SalesReturnStatus.Posted && x.PostingDate <= asOf)
-            .GroupBy(x => x.SalesInvoiceId).Select(g => new {
-                InvoiceId = g.Key, Amount = g.Sum(x => x.BaseTotalAmount)
-            });
-        // The originating invoice is already reduced by its posted return.
-        // Only credit applications to OTHER invoices reduce their outstanding.
-        var applications = db.Set<CustomerCreditApplication>().AsNoTracking()
-            .Join(db.Set<SalesReturn>().AsNoTracking(), a => a.SalesReturnId, r => r.Id,
-                (a, r) => new { a, r })
-            .Where(x => x.a.SettlementKind == CustomerCreditSettlementKind.ApplyToInvoice &&
-                x.a.TargetSalesInvoiceId.HasValue && x.a.TargetSalesInvoiceId.Value != x.r.SalesInvoiceId &&
-                x.r.Status == SalesReturnStatus.Posted && x.r.PostingDate <= asOf &&
-                x.a.AppliedAtUtc < cutoff &&
-                (!x.a.ReversedAtUtc.HasValue || x.a.ReversedAtUtc.Value >= cutoff))
-            .GroupBy(x => x.a.TargetSalesInvoiceId!.Value).Select(g => new {
-                InvoiceId = g.Key, Amount = g.Sum(x => x.a.TargetBaseAmount ?? 0m)
-            });
+        const int batchSize = 500;
+        var pageOffset = ((long)pageNumber - 1L) * pageSize;
+        var invoiceOffset = 0;
+        long count = 0;
+        decimal notDue = 0m, days30 = 0m, days60 = 0m, days90 = 0m, over90 = 0m, unknown = 0m;
+        var rows = new List<CustomerAgingLineDto>(pageSize);
 
-        var invoices = from i in db.Set<SalesInvoice>().AsNoTracking()
-                       join c in db.Set<Customer>().AsNoTracking() on i.CustomerId equals c.Id
-                       join p in payments on i.Id equals p.InvoiceId into gp
-                       from p in gp.DefaultIfEmpty()
-                       join r in returns on i.Id equals r.InvoiceId into gr
-                       from r in gr.DefaultIfEmpty()
-                       join a in applications on i.Id equals a.InvoiceId into ga
-                       from a in ga.DefaultIfEmpty()
-                       where i.Status == SalesInvoiceStatus.Posted && i.PostingDate <= asOf
-                         && (!customerId.HasValue || i.CustomerId == customerId.Value)
-                       select new {
-                           i.Id, i.CustomerId, c.CustomerCode, c.NameAr, i.InvoiceCode,
-                           i.InvoiceDate, i.PostingDate, i.DueDate, i.CurrencyCodeSnapshot,
-                           Original = i.BaseTotalAmount,
-                           Paid = p == null ? 0m : p.Amount,
-                           Returned = r == null ? 0m : r.Amount,
-                           Applied = a == null ? 0m : a.Amount
-                       };
-        var due = invoices.Select(x => new {
-            x.Id, x.CustomerId, x.CustomerCode, x.NameAr, x.InvoiceCode,
-            x.InvoiceDate, x.PostingDate, x.DueDate, x.CurrencyCodeSnapshot,
-            x.Original, x.Paid, x.Returned, x.Applied,
-            Remaining = x.Original > x.Paid + x.Returned + x.Applied
-                ? x.Original - x.Paid - x.Returned - x.Applied : 0m
-        }).Where(x => x.Remaining > 0m);
+        // Stable ordering is essential: page N must contain the same set of *open*
+        // invoices regardless of how many settled invoices precede it.
+        var baseInvoices =
+            from i in db.Set<SalesInvoice>().AsNoTracking()
+            join c in db.Set<Customer>().AsNoTracking() on i.CustomerId equals c.Id
+            where i.Status == SalesInvoiceStatus.Posted && i.PostingDate <= asOf &&
+                (!customerId.HasValue || i.CustomerId == customerId.Value)
+            orderby i.DueDate, i.InvoiceCode, i.Id
+            select new
+            {
+                i.Id, i.CustomerId, c.CustomerCode, c.NameAr, i.InvoiceCode,
+                i.InvoiceDate, i.PostingDate, i.DueDate, i.CurrencyCodeSnapshot,
+                Original = i.BaseTotalAmount
+            };
 
-        var count = await due.LongCountAsync(ct);
-        var notDue = await due.Where(x => x.DueDate.HasValue && x.DueDate > asOf).SumAsync(x => x.Remaining, ct);
-        var days30 = await due.Where(x => x.DueDate.HasValue && x.DueDate <= asOf && x.DueDate >= asOf.AddDays(-30)).SumAsync(x => x.Remaining, ct);
-        var days60 = await due.Where(x => x.DueDate.HasValue && x.DueDate < asOf.AddDays(-30) && x.DueDate >= asOf.AddDays(-60)).SumAsync(x => x.Remaining, ct);
-        var days90 = await due.Where(x => x.DueDate.HasValue && x.DueDate < asOf.AddDays(-60) && x.DueDate >= asOf.AddDays(-90)).SumAsync(x => x.Remaining, ct);
-        var over90 = await due.Where(x => x.DueDate.HasValue && x.DueDate < asOf.AddDays(-90)).SumAsync(x => x.Remaining, ct);
-        var unknown = await due.Where(x => !x.DueDate.HasValue).SumAsync(x => x.Remaining, ct);
-        var items = await due.OrderBy(x => x.DueDate).ThenBy(x => x.InvoiceCode)
-            .Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync(ct);
-        var rows = items.Select(x => new CustomerAgingLineDto(x.Id, x.CustomerId,
-            x.CustomerCode, x.NameAr, x.InvoiceCode, x.InvoiceDate,
-            x.PostingDate, x.DueDate, CustomerArMath.Bucket(x.DueDate, asOf),
-            x.DueDate.HasValue ? asOf.DayNumber - x.DueDate.Value.DayNumber : null,
-            R(x.Original), R(x.Paid), R(x.Returned), R(x.Applied),
-            R(x.Remaining), x.CurrencyCodeSnapshot)).ToArray();
+        while (true)
+        {
+            ct.ThrowIfCancellationRequested();
+            var batch = await baseInvoices.Skip(invoiceOffset).Take(batchSize).ToListAsync(ct);
+            if (batch.Count == 0) break;
+            invoiceOffset = checked(invoiceOffset + batch.Count);
+            var invoiceIds = batch.Select(x => x.Id).ToArray();
+
+            // Independent SQL GROUP BYs are fully translatable. In particular we do
+            // not LeftJoin these groups back into an IQueryable then filter by a
+            // computed field (the source of the InvalidOperationException).
+            var payments = await db.Set<PaymentAllocation>().AsNoTracking()
+                .Where(x => invoiceIds.Contains(x.TargetDocumentId) &&
+                    x.TargetDocumentType == AllocationTargetDocumentType.SalesInvoice &&
+                    x.AllocatedAtUtc < cutoff &&
+                    (!x.ReversedAtUtc.HasValue || x.ReversedAtUtc.Value >= cutoff))
+                .GroupBy(x => x.TargetDocumentId)
+                .Select(g => new
+                {
+                    InvoiceId = g.Key,
+                    Amount = g.Sum(x => x.TargetBaseAllocatedAmount ?? x.BaseAllocatedAmount ??
+                                        (x.AllocatedAmount * (x.ExchangeRate ?? 1m)))
+                })
+                .ToDictionaryAsync(x => x.InvoiceId, x => x.Amount, ct);
+
+            var postedReturns = await db.Set<SalesReturn>().AsNoTracking()
+                .Where(x => invoiceIds.Contains(x.SalesInvoiceId) &&
+                    x.Status == SalesReturnStatus.Posted && x.PostingDate <= asOf)
+                .GroupBy(x => x.SalesInvoiceId)
+                .Select(g => new { InvoiceId = g.Key, Amount = g.Sum(x => x.BaseTotalAmount) })
+                .ToDictionaryAsync(x => x.InvoiceId, x => x.Amount, ct);
+
+            // Never subtract an application to the originating invoice a second
+            // time: its Posted sales return has already reversed that invoice's AR.
+            var crossInvoiceCredits = await db.Set<CustomerCreditApplication>().AsNoTracking()
+                .Join(db.Set<SalesReturn>().AsNoTracking(), a => a.SalesReturnId,
+                    r => r.Id, (a, r) => new { a, r })
+                .Where(x => x.a.SettlementKind == CustomerCreditSettlementKind.ApplyToInvoice &&
+                    x.a.TargetSalesInvoiceId.HasValue &&
+                    invoiceIds.Contains(x.a.TargetSalesInvoiceId.Value) &&
+                    x.a.TargetSalesInvoiceId.Value != x.r.SalesInvoiceId &&
+                    x.a.CustomerId == x.r.CustomerId &&
+                    x.r.Status == SalesReturnStatus.Posted && x.r.PostingDate <= asOf &&
+                    x.a.AppliedAtUtc < cutoff &&
+                    (!x.a.ReversedAtUtc.HasValue || x.a.ReversedAtUtc.Value >= cutoff))
+                .GroupBy(x => x.a.TargetSalesInvoiceId!.Value)
+                .Select(g => new
+                {
+                    InvoiceId = g.Key,
+                    Amount = g.Sum(x => x.a.TargetBaseAmount ?? 0m)
+                })
+                .ToDictionaryAsync(x => x.InvoiceId, x => x.Amount, ct);
+
+            foreach (var invoice in batch)
+            {
+                payments.TryGetValue(invoice.Id, out var paid);
+                postedReturns.TryGetValue(invoice.Id, out var returned);
+                crossInvoiceCredits.TryGetValue(invoice.Id, out var applied);
+                var remaining = CustomerArMath.OpenInvoice(invoice.Original, paid, returned, applied);
+                if (remaining <= 0m) continue;
+
+                var bucket = CustomerArMath.Bucket(invoice.DueDate, asOf);
+                switch (bucket)
+                {
+                    case "NotDue": notDue += remaining; break;
+                    case "0-30": days30 += remaining; break;
+                    case "31-60": days60 += remaining; break;
+                    case "61-90": days90 += remaining; break;
+                    case "+90": over90 += remaining; break;
+                    default: unknown += remaining; break;
+                }
+                if (count >= pageOffset && rows.Count < pageSize)
+                {
+                    rows.Add(new CustomerAgingLineDto(invoice.Id, invoice.CustomerId,
+                        invoice.CustomerCode, invoice.NameAr, invoice.InvoiceCode,
+                        invoice.InvoiceDate, invoice.PostingDate, invoice.DueDate, bucket,
+                        invoice.DueDate.HasValue ? asOf.DayNumber - invoice.DueDate.Value.DayNumber : null,
+                        R(invoice.Original), R(paid), R(returned), R(applied),
+                        remaining, invoice.CurrencyCodeSnapshot));
+                }
+                count++;
+            }
+        }
 
         var unappliedReceipts = await UnappliedReceiptsAsync(asOf, cutoff, customerId, ct);
         var returnCredits = await UnappliedReturnCreditsAsync(asOf, cutoff, customerId, ct);
@@ -220,96 +263,143 @@ public sealed class CustomerArReportingQueryService(OasDbContext db) : ICustomer
     private async Task<decimal> UnappliedReceiptsAsync(DateOnly asOf, DateTime cutoff,
         Guid? customerId, CancellationToken ct)
     {
-        // Advance receipts belong to a LIABILITY account, not unallocated AR cash.
-        var settled = db.Set<PaymentAllocation>().AsNoTracking()
-            .Where(x => x.ReceiptVoucherLineId.HasValue && x.AllocatedAtUtc < cutoff &&
-                (!x.ReversedAtUtc.HasValue || x.ReversedAtUtc.Value >= cutoff))
-            .GroupBy(x => x.ReceiptVoucherLineId!.Value)
-            .Select(g => new { LineId = g.Key,
-                Amount = g.Sum(x => x.BaseAllocatedAmount ?? x.AllocatedAmount * (x.ExchangeRate ?? 1m)) });
-        var lines = from l in db.Set<ReceiptVoucherLine>().AsNoTracking()
-                    join v in db.Set<ReceiptVoucher>().AsNoTracking() on l.ReceiptVoucherId equals v.Id
-                    join used in settled on l.Id equals used.LineId into joined
-                    from used in joined.DefaultIfEmpty()
-                    where l.CustomerId.HasValue && v.Status == ReceiptVoucherStatus.Posted &&
-                        v.VoucherDate <= asOf && (!customerId.HasValue || l.CustomerId == customerId.Value) &&
-                        !db.Set<CustomerAdvance>().Any(a => a.ReceiptVoucherLineId == l.Id && a.IsActive)
-                    select new {
-                        Amount = l.BaseAmount ??
-                            (l.Amount * (l.ExchangeRate ?? 1m)),
-                        Used = used == null ? 0m : used.Amount
-                    };
-        var total = await lines.Select(x => x.Amount > x.Used ? x.Amount - x.Used : 0m)
-            .SumAsync(ct);
-        return total;
+        // Exclude genuine customer advances from AR unapplied receipts. Gather only
+        // line IDs/amounts; avoid an aggregate LEFT JOIN in a subsequent SUM.
+        var receiptLines = await (
+            from l in db.Set<ReceiptVoucherLine>().AsNoTracking()
+            join v in db.Set<ReceiptVoucher>().AsNoTracking() on l.ReceiptVoucherId equals v.Id
+            where l.CustomerId.HasValue && v.Status == ReceiptVoucherStatus.Posted &&
+                v.VoucherDate <= asOf &&
+                (!customerId.HasValue || l.CustomerId == customerId.Value) &&
+                !db.Set<CustomerAdvance>().Any(a => a.ReceiptVoucherLineId == l.Id && a.IsActive)
+            select new
+            {
+                l.Id,
+                Amount = l.BaseAmount ?? (l.Amount * (l.ExchangeRate ?? 1m))
+            }).ToListAsync(ct);
+
+        decimal total = 0m;
+        const int batchSize = 500;
+        for (var start = 0; start < receiptLines.Count; start += batchSize)
+        {
+            var batch = receiptLines.Skip(start).Take(batchSize).ToArray();
+            var ids = batch.Select(x => x.Id).ToArray();
+            var used = await db.Set<PaymentAllocation>().AsNoTracking()
+                .Where(x => x.ReceiptVoucherLineId.HasValue &&
+                    ids.Contains(x.ReceiptVoucherLineId.Value) &&
+                    x.AllocatedAtUtc < cutoff &&
+                    (!x.ReversedAtUtc.HasValue || x.ReversedAtUtc.Value >= cutoff))
+                .GroupBy(x => x.ReceiptVoucherLineId!.Value)
+                .Select(g => new
+                {
+                    LineId = g.Key,
+                    Amount = g.Sum(x => x.BaseAllocatedAmount ??
+                                        (x.AllocatedAmount * (x.ExchangeRate ?? 1m)))
+                })
+                .ToDictionaryAsync(x => x.LineId, x => x.Amount, ct);
+            foreach (var line in batch)
+            {
+                used.TryGetValue(line.Id, out var allocated);
+                total += Math.Max(0m, line.Amount - allocated);
+            }
+        }
+        return R(total);
     }
 
     private async Task<decimal> UnappliedReturnCreditsAsync(DateOnly asOf, DateTime cutoff,
         Guid? customerId, CancellationToken ct)
     {
-        // At the invoice level, only payments exceeding original minus posted returns
-        // produce a refundable credit. The source return may have been applied elsewhere.
-        var paid = db.Set<PaymentAllocation>().AsNoTracking()
-            .Where(x => x.TargetDocumentType == AllocationTargetDocumentType.SalesInvoice &&
-                        x.AllocatedAtUtc < cutoff && (!x.ReversedAtUtc.HasValue || x.ReversedAtUtc.Value >= cutoff))
-            .GroupBy(x => x.TargetDocumentId).Select(g => new {
-                Id = g.Key, Amount = g.Sum(x => x.TargetBaseAllocatedAmount ?? x.BaseAllocatedAmount ??
-                                                    x.AllocatedAmount * (x.ExchangeRate ?? 1m))
-            });
-        var credited = db.Set<CustomerCreditApplication>().AsNoTracking()
-            .Join(db.Set<SalesReturn>().AsNoTracking(), a => a.SalesReturnId, r => r.Id,
-                  (a, r) => new { a, r })
-            .Where(x => x.r.Status == SalesReturnStatus.Posted && x.r.PostingDate <= asOf &&
+        // Return entitlement is the *paid* part of a posted return not yet used;
+        // the source return must not create credit merely for reducing unpaid AR.
+        var returned = await db.Set<SalesReturn>().AsNoTracking()
+            .Where(x => x.Status == SalesReturnStatus.Posted &&
+                x.PostingDate <= asOf &&
+                (!customerId.HasValue || x.CustomerId == customerId.Value))
+            .GroupBy(x => x.SalesInvoiceId)
+            .Select(g => new { InvoiceId = g.Key, Amount = g.Sum(x => x.BaseTotalAmount) })
+            .ToListAsync(ct);
+
+        decimal total = 0m;
+        const int batchSize = 500;
+        for (var start = 0; start < returned.Count; start += batchSize)
+        {
+            ct.ThrowIfCancellationRequested();
+            var batch = returned.Skip(start).Take(batchSize).ToArray();
+            var ids = batch.Select(x => x.InvoiceId).ToArray();
+            var invoices = await db.Set<SalesInvoice>().AsNoTracking()
+                .Where(x => ids.Contains(x.Id) &&
+                    x.Status == SalesInvoiceStatus.Posted && x.PostingDate <= asOf)
+                .Select(x => new { x.Id, Original = x.BaseTotalAmount })
+                .ToDictionaryAsync(x => x.Id, x => x.Original, ct);
+            var payments = await db.Set<PaymentAllocation>().AsNoTracking()
+                .Where(x => ids.Contains(x.TargetDocumentId) &&
+                    x.TargetDocumentType == AllocationTargetDocumentType.SalesInvoice &&
+                    x.AllocatedAtUtc < cutoff &&
+                    (!x.ReversedAtUtc.HasValue || x.ReversedAtUtc.Value >= cutoff))
+                .GroupBy(x => x.TargetDocumentId)
+                .Select(g => new
+                {
+                    InvoiceId = g.Key,
+                    Amount = g.Sum(x => x.TargetBaseAllocatedAmount ?? x.BaseAllocatedAmount ??
+                                        (x.AllocatedAmount * (x.ExchangeRate ?? 1m)))
+                })
+                .ToDictionaryAsync(x => x.InvoiceId, x => x.Amount, ct);
+            var applied = await db.Set<CustomerCreditApplication>().AsNoTracking()
+                .Join(db.Set<SalesReturn>().AsNoTracking(), a => a.SalesReturnId,
+                    r => r.Id, (a, r) => new { a, r })
+                .Where(x => ids.Contains(x.r.SalesInvoiceId) &&
+                    x.r.Status == SalesReturnStatus.Posted && x.r.PostingDate <= asOf &&
                     x.a.AppliedAtUtc < cutoff &&
                     (!x.a.ReversedAtUtc.HasValue || x.a.ReversedAtUtc.Value >= cutoff))
-            .GroupBy(x => x.r.SalesInvoiceId).Select(g => new {
-                Id = g.Key, Amount = g.Sum(x => x.a.AppliedSourceBaseAmount)
-            });
-        var returned = db.Set<SalesReturn>().AsNoTracking()
-            .Where(x => x.Status == SalesReturnStatus.Posted && x.PostingDate <= asOf)
-            .GroupBy(x => x.SalesInvoiceId)
-            .Select(g => new { Id = g.Key, Amount = g.Sum(x => x.BaseTotalAmount) });
-        var available = from i in db.Set<SalesInvoice>().AsNoTracking()
-                        join r in returned on i.Id equals r.Id
-                        join p in paid on i.Id equals p.Id into ps
-                        from p in ps.DefaultIfEmpty()
-                        join a in credited on i.Id equals a.Id into apps
-                        from a in apps.DefaultIfEmpty()
-                        where i.Status == SalesInvoiceStatus.Posted && i.PostingDate <= asOf &&
-                            (!customerId.HasValue || i.CustomerId == customerId.Value)
-                        select new {
-                            Return = r.Amount,
-                            Paid = p == null ? 0m : p.Amount,
-                            Used = a == null ? 0m : a.Amount,
-                            Original = i.BaseTotalAmount
-                        };
-        return await available.Select(x =>
-            x.Return > x.Used && x.Paid + x.Return > x.Original + x.Used
-                ? (x.Paid + x.Return - x.Original - x.Used > x.Return - x.Used
-                    ? x.Return - x.Used : x.Paid + x.Return - x.Original - x.Used)
-                : 0m).SumAsync(ct);
+                .GroupBy(x => x.r.SalesInvoiceId)
+                .Select(g => new
+                {
+                    InvoiceId = g.Key,
+                    Amount = g.Sum(x => x.a.AppliedSourceBaseAmount)
+                })
+                .ToDictionaryAsync(x => x.InvoiceId, x => x.Amount, ct);
+
+            foreach (var item in batch)
+            {
+                if (!invoices.TryGetValue(item.InvoiceId, out var original)) continue;
+                payments.TryGetValue(item.InvoiceId, out var paid);
+                applied.TryGetValue(item.InvoiceId, out var used);
+                // Keep the legacy formula's financial intent, with explicit caps.
+                var unusedReturn = Math.Max(0m, item.Amount - used);
+                var paidExcess = Math.Max(0m, paid + item.Amount - original - used);
+                total += Math.Min(unusedReturn, paidExcess);
+            }
+        }
+        return R(total);
     }
 
     private async Task<decimal> CustomerAdvancesAsync(DateOnly asOf, Guid? customerId, CancellationToken ct)
     {
-        // Advance outstanding is separated explicitly; it must never be double
-        // subtracted from invoice aging or AR ledger.
-        var advances = db.Set<CustomerAdvance>().AsNoTracking()
-            .Where(x => x.ReceivedAtUtc <
-                DateTime.SpecifyKind(asOf.AddDays(1).ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc) &&
-                (!customerId.HasValue || x.CustomerId == customerId.Value));
-        // BaseAppliedAmount is a current-state field; use dated applications for historical as-of.
         var cutoff = DateTime.SpecifyKind(asOf.AddDays(1).ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
-        var used = db.Set<CustomerAdvanceApplication>().AsNoTracking()
-            .Where(x => x.AppliedAtUtc < cutoff)
-            .GroupBy(x => x.CustomerAdvanceId).Select(g => new {
-                Id = g.Key, Amount = g.Sum(x => x.BaseAmount)
-            });
-        var amounts = from a in advances
-                      join b in used on a.Id equals b.Id into bg
-                      from b in bg.DefaultIfEmpty()
-                      select new { a.BaseAmount, Used = b == null ? 0m : b.Amount };
-        return await amounts.Select(x => x.BaseAmount > x.Used ? x.BaseAmount - x.Used : 0m).SumAsync(ct);
+        var advances = await db.Set<CustomerAdvance>().AsNoTracking()
+            .Where(x => x.ReceivedAtUtc < cutoff &&
+                (!customerId.HasValue || x.CustomerId == customerId.Value))
+            .Select(x => new { x.Id, x.BaseAmount })
+            .ToListAsync(ct);
+        decimal total = 0m;
+        const int batchSize = 500;
+        for (var start = 0; start < advances.Count; start += batchSize)
+        {
+            ct.ThrowIfCancellationRequested();
+            var batch = advances.Skip(start).Take(batchSize).ToArray();
+            var ids = batch.Select(x => x.Id).ToArray();
+            var used = await db.Set<CustomerAdvanceApplication>().AsNoTracking()
+                .Where(x => ids.Contains(x.CustomerAdvanceId) && x.AppliedAtUtc < cutoff)
+                .GroupBy(x => x.CustomerAdvanceId)
+                .Select(g => new { Id = g.Key, Amount = g.Sum(x => x.BaseAmount) })
+                .ToDictionaryAsync(x => x.Id, x => x.Amount, ct);
+            foreach (var advance in batch)
+            {
+                used.TryGetValue(advance.Id, out var applied);
+                total += Math.Max(0m, advance.BaseAmount - applied);
+            }
+        }
+        return R(total);
     }
 
     public async Task<CustomerArReconciliationDto> ReconcileAsync(DateOnly asOf,

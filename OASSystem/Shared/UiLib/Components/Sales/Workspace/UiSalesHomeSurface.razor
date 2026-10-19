@@ -12,6 +12,7 @@
         <button type="button" @onclick="() => NavigateAsync(OrderTrackingRoute)"><i class="fa-solid fa-route"></i><strong>متابعة طلبات العملاء</strong><span>المخزون والتوريد والمعمل والتسليم</span></button>
         <button type="button" @onclick="() => NavigateAsync(OpticalJobsRoute)"><i class="fa-solid fa-flask"></i><strong>المعمل</strong><span>طابور العمل الفني والمواصفات التشغيلية</span></button>
         <button type="button" @onclick="() => NavigateAsync(InvoicesRoute)"><i class="fa-solid fa-file-invoice-dollar"></i><strong>فواتير المبيعات</strong><span>التأكيد والترحيل المحاسبي والمخزني</span></button>
+        <button type="button" @onclick="() => NavigateAsync(ReportsRoute)"><i class="fa-solid fa-chart-line"></i><strong>تقارير المبيعات والربحية</strong><span>صافي الإيرادات والمرتجعات والتكلفة والهامش</span></button>
     </div>
 </div>
 
@@ -22,6 +23,7 @@
     [Parameter] public string CheckoutRoute { get; set; } = "/sales/checkout";
     [Parameter] public string OrderTrackingRoute { get; set; } = "/sales/order-tracking";
     [Parameter] public string OpticalJobsRoute { get; set; } = "/optical/jobs";
+    [Parameter] public string ReportsRoute { get; set; } = "/sales/reports";
     [Parameter] public EventCallback<string> OnNavigate { get; set; }
     private Task NavigateAsync(string route) => OnNavigate.InvokeAsync(route);
 }

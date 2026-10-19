@@ -1,0 +1,72 @@
+@page "/sales/returns/{ReturnId:guid}/print"
+@attribute [Authorize]
+@using OAS.Contracts.Sales.Returns
+@using OAS.Client.Services.Http
+@inject OasApiClient Api
+@inject IJSRuntime Js
+
+<PageTitle>طباعة مرتجع مبيعات | OAS</PageTitle>
+
+<div class="return-print" dir="rtl">
+    <div class="return-print__toolbar">
+        <button type="button" @onclick="PrintAsync" disabled="@(_return is null)">طباعة المستند</button>
+    </div>
+    @if (_return is null)
+    {
+        <p>@(_error ?? "جاري تحميل المرتجع...")</p>
+    }
+    else
+    {
+        <div class="return-print__body">
+            <header>
+                <div><h1>مرتجع مبيعات</h1><strong>@_return.ReturnCode</strong></div>
+                <div><span>حالة المستند</span><strong>@(_return.Status == SalesReturnStatus.Posted ? "مرحّل" : "غير مرحّل")</strong></div>
+            </header>
+            @if (_return.Status != SalesReturnStatus.Posted)
+            {
+                <p class="return-print__notice">نسخة غير معتمدة — هذا المستند غير مرحّل محاسبيًا</p>
+            }
+            <div class="return-print__details">
+                <div><small>تاريخ المرتجع</small><strong>@_return.ReturnDate.ToString("yyyy-MM-dd")</strong></div>
+                <div><small>تاريخ الترحيل</small><strong>@_return.PostingDate.ToString("yyyy-MM-dd")</strong></div>
+                <div><small>معرّف العميل</small><strong>@_return.CustomerId</strong></div>
+                <div><small>معرّف الفاتورة الأصلية</small><strong>@_return.SalesInvoiceId</strong></div>
+            </div>
+            <table>
+                <thead><tr><th>م</th><th>الصنف</th><th>الكمية</th><th>الصافي</th><th>الضريبة</th><th>الإجمالي</th></tr></thead>
+                <tbody>
+                    @foreach (var line in _return.Lines.OrderBy(x => x.LineNumber))
+                    {
+                        <tr><td>@line.LineNumber</td><td>@line.ProductName</td><td>@line.Quantity.ToString("N3")</td><td>@line.NetAmount.ToString("N2")</td><td>@line.TaxAmount.ToString("N2")</td><td>@line.FinalAmount.ToString("N2")</td></tr>
+                    }
+                </tbody>
+            </table>
+            <div class="return-print__totals">
+                <div><span>الصافي</span><strong>@_return.NetAmount.ToString("N2")</strong></div>
+                <div><span>الضريبة</span><strong>@_return.TaxAmount.ToString("N2")</strong></div>
+                <div><span>إجمالي المرتجع (@_return.CurrencyCode)</span><strong>@_return.TotalAmount.ToString("N2")</strong></div>
+                <div><span>القيمة بالعملة الأساسية (@_return.BaseCurrencyCode)</span><strong>@_return.BaseTotalAmount.ToString("N2")</strong></div>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(_return.Reason))
+            {
+                <p>سبب المرتجع: @_return.Reason</p>
+            }
+            <footer>هذا المستند طُبع من بيانات OASSystem دون إعادة احتساب القيم التاريخية.</footer>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid ReturnId { get; set; }
+    private SalesReturnDto? _return;
+    private string? _error;
+    protected override async Task OnParametersSetAsync()
+    {
+        _return = null;
+        _error = null;
+        var result = await Api.GetResultAsync<SalesReturnDto>($"api/sales/returns/{ReturnId:D}");
+        if (result.Succeeded) _return = result.Value;
+        else _error = result.Error?.Message ?? "تعذر تحميل المرتجع.";
+    }
+    private Task PrintAsync() => Js.InvokeVoidAsync("print").AsTask();
+}

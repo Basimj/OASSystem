@@ -1,0 +1,24 @@
+.sales-report { display: grid; gap: 1rem; padding: 1rem; }
+.sales-report__header { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; align-items: center; }
+.sales-report h1 { font-size: 1.35rem; margin: 0 0 .4rem; }
+.sales-report h2 { font-size: 1.08rem; margin: 0 0 .8rem; }
+.sales-report p { margin: 0; color: var(--text-secondary, #64748b); }
+.sales-report__actions, .sales-report__pagination { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.sales-report button { cursor: pointer; background: var(--surface, #fff); color: inherit; border: 1px solid #cbd5e1; border-radius: .55rem; padding: .5rem .75rem; }
+.sales-report button:disabled { cursor: not-allowed; opacity: .6; }
+.sales-report__filters { display: flex; gap: 1rem; flex-wrap: wrap; align-items: end; padding: .8rem; border: 1px solid #e2e8f0; border-radius: .8rem; }
+.sales-report__filters label { display: grid; gap: .4rem; font-size: .85rem; }
+.sales-report__filters input, .sales-report__filters select { min-height: 2.25rem; border: 1px solid #cbd5e1; border-radius: .4rem; padding: .25rem .5rem; background: var(--surface, #fff); color: inherit; }
+.sales-report__cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .65rem; }
+.sales-report__cards article, .sales-report__panel { border: 1px solid #e2e8f0; border-radius: .8rem; padding: .9rem; background: var(--surface, #fff); }
+.sales-report__cards article { display: grid; gap: .4rem; }
+.sales-report__cards span { font-size: .8rem; color: var(--text-secondary, #64748b); }
+.sales-report__cards strong { font-size: 1rem; font-variant-numeric: tabular-nums; }
+.sales-report__scroll { overflow-x: auto; }
+.sales-report table { border-collapse: collapse; width: 100%; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
+.sales-report td, .sales-report th { padding: .65rem; border-bottom: 1px solid #e2e8f0; font-size: .85rem; }
+.sales-report th { font-weight: 700; }
+.sales-report .sales-report__link { text-decoration: underline; border: none; padding: 0; }
+.sales-report__message { color: #a34200 !important; }
+.sales-report__pagination { justify-content: center; padding: .7rem; }
+@media print { .sales-report__actions, .sales-report__filters, .sales-report__pagination, .sales-report__link { display: none !important; } .sales-report { padding: 0; } .sales-report__panel { break-inside: avoid; } }

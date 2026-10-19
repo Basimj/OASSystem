@@ -1,0 +1,17 @@
+.return-print { direction: rtl; padding: 1rem; }
+.return-print__toolbar { display:flex; justify-content: flex-end; padding: .5rem 0 1rem; }
+.return-print__toolbar button { padding:.55rem 1rem; border:1px solid #aaa; border-radius:.4rem; background:white; cursor:pointer; }
+.return-print__body { max-width: 210mm; margin: auto; padding: 1rem; border: 1px solid #ddd; background: white; color: #222; font-family: Cairo, Tahoma, sans-serif; }
+.return-print header { display:flex; justify-content:space-between; align-items:center; border-bottom: 2px solid #444; padding-bottom: 1rem; }
+.return-print header div, .return-print__details div { display:grid; gap:.3rem; }
+.return-print h1 { font-size: 1.5rem; margin:0; }
+.return-print__details { display:grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap:.6rem; padding:1rem 0; overflow-wrap:anywhere; }
+.return-print small { color:#555; }
+.return-print table { width:100%; border-collapse:collapse; }
+.return-print th, .return-print td { border:1px solid #ddd; text-align:right; padding:.55rem; }
+.return-print th { background:#eee; }
+.return-print__totals { margin:1rem 0; margin-right:auto; max-width:360px; display:grid; gap:.5rem; }
+.return-print__totals div { display:flex; justify-content:space-between; border-bottom:1px solid #ddd; padding:.3rem; }
+.return-print__notice { background:#fff3db; padding:.5rem; font-weight:bold; }
+.return-print footer { border-top:1px solid #ddd; margin-top:1.5rem; padding-top:.6rem; color:#555; font-size:.8rem; }
+@media print { .return-print { padding:0; } .return-print__toolbar { display:none !important; } .return-print__body { border:none; padding:0; } }
