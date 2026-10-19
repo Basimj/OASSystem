@@ -106,10 +106,10 @@ public sealed partial class PurchasingPerformanceQueryService
             ?? throw new NotFoundException(nameof(PurchaseOrderLine), purchaseOrderLineId);
 
         var settings = await db.Set<AccountingSettings>().AsNoTracking()
-            .Where(x => x.Id == AccountingSettings.SingletonId).Select(x => x.BaseCurrencyId)
-            .FirstOrDefaultAsync(ct);
-        var baseCode = settings.HasValue
-            ? await db.Set<Currency>().AsNoTracking().Where(x => x.Id == settings.Value)
+            .Where(x => x.Id == AccountingSettings.SingletonId)
+            .Select(x => new { x.BaseCurrencyId }).FirstOrDefaultAsync(ct);
+        var baseCode = settings is not null && settings.BaseCurrencyId != Guid.Empty
+            ? await db.Set<Currency>().AsNoTracking().Where(x => x.Id == settings.BaseCurrencyId)
                 .Select(x => x.Code).FirstOrDefaultAsync(ct) ?? "العملة الأساسية"
             : "العملة الأساسية";
 
