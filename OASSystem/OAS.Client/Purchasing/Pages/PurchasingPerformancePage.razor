@@ -64,6 +64,9 @@
             <div class="col-6 col-lg-2"><div class="card h-100"><div class="card-body py-2"><small>فواتير مرحلة</small><h4>@s.PostedInvoiceCount</h4><small>@Money(s.PostedInvoiceTotalBase) @s.BaseCurrencyCode</small></div></div></div>
             <div class="col-6 col-lg-2"><div class="card h-100"><div class="card-body py-2"><small>مرتجعات مرحلة</small><h4>@s.PostedReturnCount</h4><small>@Money(s.PostedReturnTotalBase) @s.BaseCurrencyCode</small></div></div></div>
             <div class="col-6 col-lg-2"><div class="card h-100"><div class="card-body py-2"><small>متوسط وقت التوريد</small><h4>@(s.AverageReceiptLeadDays?.ToString("N1") ?? "—")</h4><small>يوم لكل بند استلام مرحل</small></div></div></div>
+            <div class="col-6 col-lg-2"><div class="card h-100"><div class="card-body py-2"><small>الالتزام بموعد التسليم</small><h4>@(s.OnTimeDeliveryRatePercent?.ToString("N2") ?? "—")%</h4><small>مرجح بكمية الاستلام الأساسية</small></div></div></div>
+            <div class="col-6 col-lg-2"><div class="card h-100"><div class="card-body py-2"><small>التكلفة غير المفوترة (تقديرية)</small><h4>@Money(s.UninvoicedReceiptCostBase)</h4><small>GRNI تشغيلي، ليس رصيد الأستاذ العام</small></div></div></div>
+            <div class="col-6 col-lg-2"><div class="card h-100"><div class="card-body py-2"><small>فرق سعر المشتريات</small><h4>@Money(s.PurchasePriceVarianceBase)</h4><small>PPV لبنود المطابقة المرحلة خلال الفترة</small></div></div></div>
         </div>
     }
     <div class="card">
@@ -85,7 +88,7 @@
                         <thead><tr>
                             <th>المستند</th><th>التاريخ</th><th>المورد / الصنف</th><th>الحالة</th>
                             <th>المطلوب</th><th>المستلم</th><th>المفوتر</th><th>المرتجع</th><th>المتبقي للتوريد</th>
-                            <th>غير مفوتر (كمية)</th><th>المبلغ</th><th>فارق السعر</th><th>موعد التسليم</th>
+                            <th>غير مفوتر (كمية)</th><th>المبلغ</th><th>فارق السعر</th><th>موعد التسليم</th><th>التفاصيل</th>
                         </tr></thead>
                         <tbody>
                         @foreach (var row in _report.Page.Items)
@@ -105,6 +108,13 @@
                                 <td>@(row.BaseAmount.HasValue ? $"{Money(row.BaseAmount)} {_report.Summary.BaseCurrencyCode} (أساسي)" : row.DocumentAmount.HasValue ? $"{Money(row.DocumentAmount)} {row.CurrencyCode}" : row.UnitPrice.HasValue ? $"{Money(row.UnitPrice)} {row.CurrencyCode} / وحدة" : "—")</td>
                                 <td>@(row.PriceVariance.HasValue ? $"{Money(row.PriceVariance)} {row.CurrencyCode}" : "—")</td>
                                 <td>@(row.ExpectedDeliveryDate?.ToString("yyyy-MM-dd") ?? "—")</td>
+                                <td>
+                                    @if (row.Kind == "orders" && row.PurchaseOrderLineId.HasValue)
+                                    {
+                                        <button class="btn btn-outline-primary btn-sm" type="button"
+                                                disabled="@_busy" @onclick="() => OpenDrillDownAsync(row.PurchaseOrderLineId.Value)">المستندات</button>
+                                    }
+                                </td>
                             </tr>
                         }
                         </tbody>
@@ -120,6 +130,40 @@
             }
         </div>
     </div>
+    @if (_drill is not null)
+    {
+        <div class="card mt-3 ap12-drilldown">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <strong>المستندات المرتبطة بأمر الشراء @_drill.PurchaseOrderCode (حتى @_toDate.ToString("yyyy-MM-dd"))</strong>
+                <button class="btn btn-sm btn-outline-secondary" type="button" @onclick="() => _drill = null">إغلاق</button>
+            </div>
+            <div class="card-body">
+                @if (_drill.IsTruncated)
+                {
+                    <div class="alert alert-warning">تُعرض آخر 200 حركة لكل نوع. ضيّق النطاق أو راجع المستندات الأصلية.</div>
+                }
+                @foreach (var group in new[] { ("الاستلامات المرحلة", _drill.Receipts), ("الفواتير المرحلة", _drill.Invoices), ("مرتجعات المشتريات المرحلة", _drill.Returns) })
+                {
+                    <h3 class="h6 mt-3">@group.Item1</h3>
+                    <table class="table table-sm table-bordered">
+                        <thead><tr><th>المستند</th><th>تاريخ الترحيل</th><th>الكمية</th><th>القيمة الأساسية</th></tr></thead>
+                        <tbody>
+                            @foreach (var document in group.Item2)
+                            {
+                                <tr>
+                                    <td><a href="@DrillDocumentUrl(document)">@document.DocumentCode</a></td>
+                                    <td>@document.PostingDate.ToString("yyyy-MM-dd")</td>
+                                    <td>@Qty(document.Quantity)</td>
+                                    <td>@Money(document.BaseAmount) @_drill.BaseCurrencyCode</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                <small class="text-muted">قيمة الفاتورة هنا صافي مبلغ المطابقة؛ المرتجع بقيمته الإجمالية. تُعرض المصادر منفصلة ولا تُجمع لإنتاج رصيد مورد.</small>
+            </div>
+        </div>
+    }
     <p class="small text-muted mt-2">قيمة الطلب بعملة المستند، وتكلفة الاستلام والفاتورة والمرتجع بالعملة الأساسية؛ لا تجمع بين العملات. الكميات بوحدة سطر الشراء. غير المفوتر مؤشر كمي وليس رصيد حساب GRNI. لا تدخل أوامر الشراء أو الاستلامات في مديونية AP.</p>
 </div>
 
@@ -149,6 +193,7 @@
     private bool _busy;
     private string? _error;
     private PurchasingPerformanceReportDto? _report;
+    private PurchasingPerformanceOrderLineDrillDownDto? _drill;
     private static readonly (string Id, string Label)[] _tabs =
     [
         ("orders", "أوامر الشراء والرصيد المفتوح"), ("receipts", "الاستلام المرحل"),
@@ -188,7 +233,7 @@
 
     private async Task LoadAsync()
     {
-        _error = null; _busy = true;
+        _error = null; _busy = true; _drill = null;
         try
         {
             _report = await Api.GetAsync<PurchasingPerformanceReportDto>(Url());
@@ -219,6 +264,29 @@
         catch (Exception ex) { _error = ex.Message; }
         finally { _busy = false; }
     }
+
+    private async Task OpenDrillDownAsync(Guid purchaseOrderLineId)
+    {
+        _error = null;
+        _busy = true;
+        try
+        {
+            var query = Url();
+            var suffix = query.Substring(query.IndexOf('?', StringComparison.Ordinal));
+            _drill = await Api.GetAsync<PurchasingPerformanceOrderLineDrillDownDto>(
+                $"api/purchasing/performance/orders/{purchaseOrderLineId:D}/drilldown{suffix}");
+        }
+        catch (Exception ex) { _error = ex.Message; _drill = null; }
+        finally { _busy = false; }
+    }
+
+    private static string DrillDocumentUrl(PurchasingPerformanceLinkedDocumentDto document) => document.Kind switch
+    {
+        "receipts" => $"/purchases/receipts?openId={document.DocumentId:D}",
+        "invoices" => $"/purchases/invoices?openId={document.DocumentId:D}",
+        "returns" => "/purchases/returns",
+        _ => "/purchases"
+    };
 
     private static string? TargetUrl(PurchasingPerformanceRowDto row) => row.Kind switch
     {
