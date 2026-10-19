@@ -89,7 +89,8 @@ partial class OasDbContextModelSnapshot
             b.Property<byte[]>("RowVersion").IsConcurrencyToken().IsRequired().ValueGeneratedOnAddOrUpdate().HasColumnType("rowversion");
             b.Property<Guid>("SupplierId").HasColumnType("uniqueidentifier");
             b.HasKey("Id");
-            b.HasIndex("BatchId");
+            b.HasIndex("BatchId")
+                .HasDatabaseName("IX_SupplierOpeningItems_BatchId");
             b.HasIndex("CurrencyId");
             b.HasIndex("SupplierId", "DueDate").HasDatabaseName("IX_SupplierOpeningItems_Supplier_DueDate");
             b.HasIndex("BatchId", "SupplierId", "LegacyReference").IsUnique().HasFilter("[LegacyReference] IS NOT NULL")
@@ -190,7 +191,9 @@ partial class OasDbContextModelSnapshot
 
         // SA-03: Include the customer credit application table in the effective snapshot.
         AddSa03CustomerCreditModel(modelBuilder);
-        modelBuilder.ApplyConfiguration(new OAS.Infrastructure.Purchasing.Persistence.Configurations.PurchaseReceiptFollowUpJobConfiguration());
+        // AP-09: Keep the migration snapshot property-bag model free of CLR entity collisions.
+        AddAp09PurchaseReceiptFollowUpModel(modelBuilder);
+        AddSa07PreviouslyMigratedModel(modelBuilder);
         return (IModel)modelBuilder.Model;
     }
 

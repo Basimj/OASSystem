@@ -32,6 +32,10 @@ public sealed class SupplierOpeningItemConfiguration : IEntityTypeConfiguration<
         builder.Property(x => x.ExchangeRateSnapshot).HasPrecision(19,8).IsRequired();
         builder.Property(x => x.BaseOpenAmount).HasPrecision(19,4).IsRequired();
         builder.Property(x => x.RowVersion).IsRowVersion().IsConcurrencyToken();
+        // Match the existing migration and snapshot. EF's convention uses
+        // IX_tbl_SupplierOpeningItems_BatchId, which creates a false pending rename.
+        builder.HasIndex(x => x.BatchId)
+            .HasDatabaseName("IX_SupplierOpeningItems_BatchId");
         builder.HasIndex(x => new { x.BatchId, x.SupplierId, x.LegacyReference })
             .IsUnique().HasFilter("[LegacyReference] IS NOT NULL")
             .HasDatabaseName("UX_SupplierOpeningItems_Batch_Supplier_LegacyReference");
