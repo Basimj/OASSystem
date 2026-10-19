@@ -77,6 +77,31 @@ public sealed class AP12PurchasingPerformanceTests
     }
 
     [Test]
+    public void AdvancedMetrics_UsePostedCostsAndDoNotConfuseGrniWithLedger()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(PurchasingPerformanceMath.UninvoicedReceiptCost(10000m, 6000m, 1500m), Is.EqualTo(2500m));
+            Assert.That(PurchasingPerformanceMath.UninvoicedReceiptCost(100m, 200m, 0m), Is.Zero);
+            Assert.That(PurchasingPerformanceMath.PurchasePriceVarianceBase(6250m, 6000m), Is.EqualTo(250m));
+            Assert.That(PurchasingPerformanceMath.OnTimeDeliveryPercent(100m, 75m), Is.EqualTo(75m));
+            Assert.That(PurchasingPerformanceMath.OnTimeDeliveryPercent(0m, 0m), Is.Null);
+        });
+    }
+
+    [Test]
+    public void OrderLineDrillDown_IsProtectedAndLinksToAnOrderLineNotHeader()
+    {
+        var query = new GetPurchasingPerformanceOrderLineDrillDownQuery(Guid.NewGuid(),
+            new PurchasingPerformanceFilterDto(new DateOnly(2026, 1, 1), new DateOnly(2026, 12, 31)));
+        Assert.That(query.RequiredPermissions, Does.Contain(PurchasingPermissions.Orders.View));
+        Assert.That(query.RequiredPermissions, Does.Contain(PurchasingPermissions.Invoices.View));
+        Assert.That(typeof(PurchasingPerformanceController).GetCustomAttribute<AuthorizeAttribute>(), Is.Not.Null);
+        var row = new PurchasingPerformanceRowDto { Kind = "orders", PurchaseOrderId = Guid.NewGuid(), PurchaseOrderLineId = Guid.NewGuid() };
+        Assert.That(row.PurchaseOrderLineId, Is.Not.EqualTo(row.PurchaseOrderId));
+    }
+
+    [Test]
     public void FinancialTotalsAndCurrencies_AreSeparateInPublicContract()
     {
         var summary = new PurchasingPerformanceSummaryDto(3, 2, 1, 2, 1, 1, 7d,

@@ -27,7 +27,10 @@ public sealed record PurchasingPerformanceSummaryDto(
     decimal PostedReceiptCostBase,
     decimal PostedInvoiceTotalBase,
     decimal PostedReturnTotalBase,
-    string BaseCurrencyCode);
+    string BaseCurrencyCode,
+    decimal? OnTimeDeliveryRatePercent = null,
+    decimal? UninvoicedReceiptCostBase = null,
+    decimal? PurchasePriceVarianceBase = null);
 
 /// <summary>Amounts remain separate by source and currency; no cross-currency grand total is provided.
 /// Open quantity is PO ordered minus posted accepted receipts (returns do not reopen a PO).
@@ -61,6 +64,7 @@ public sealed record PurchasingPerformanceRowDto
     public int? LeadTimeDays { get; init; }
     public bool IsLate { get; init; }
     public Guid? PurchaseOrderId { get; init; }
+    public Guid? PurchaseOrderLineId { get; init; }
     public Guid? PurchaseReceiptId { get; init; }
     public Guid? PurchaseInvoiceId { get; init; }
     public Guid? PurchaseReturnId { get; init; }
@@ -70,3 +74,19 @@ public sealed record PurchasingPerformanceReportDto(
     PurchasingPerformanceFilterDto Filter,
     PurchasingPerformanceSummaryDto Summary,
     PagedResult<PurchasingPerformanceRowDto> Page);
+
+
+/// <summary>Historical posted documents linked to one purchase order line.
+/// Quantities are purchase-unit quantities; amounts are base-currency values.
+/// Return amounts include supplier tax; invoice amounts are matched net amounts.</summary>
+public sealed record PurchasingPerformanceLinkedDocumentDto(
+    string Kind, Guid DocumentId, string DocumentCode, DateOnly PostingDate,
+    decimal Quantity, decimal? BaseAmount);
+
+public sealed record PurchasingPerformanceOrderLineDrillDownDto(
+    Guid PurchaseOrderId, Guid PurchaseOrderLineId, string PurchaseOrderCode,
+    string BaseCurrencyCode,
+    IReadOnlyList<PurchasingPerformanceLinkedDocumentDto> Receipts,
+    IReadOnlyList<PurchasingPerformanceLinkedDocumentDto> Invoices,
+    IReadOnlyList<PurchasingPerformanceLinkedDocumentDto> Returns,
+    bool IsTruncated);

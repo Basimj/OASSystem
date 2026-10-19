@@ -14,7 +14,7 @@ namespace OAS.Infrastructure.Purchasing.Persistence.Queries;
 /// Each source is aggregated independently, and all pagination happens in SQL.
 /// Monetary amounts are identified as document currency or base currency explicitly.
 /// </summary>
-public sealed class PurchasingPerformanceQueryService(OasDbContext db) : IPurchasingPerformanceQueryService
+public sealed partial class PurchasingPerformanceQueryService(OasDbContext db) : IPurchasingPerformanceQueryService
 {
     public async Task<PurchasingPerformanceReportDto> GetAsync(PurchasingPerformanceFilterDto filter, CancellationToken ct = default)
     {
@@ -141,8 +141,10 @@ public sealed class PurchasingPerformanceQueryService(OasDbContext db) : IPurcha
         var receiptBase = await receipts.SumAsync(x => (decimal?)x.TotalAcceptedCost, ct) ?? 0m;
         var invoiceBase = await invoices.SumAsync(x => (decimal?)x.BaseFinalAmount, ct) ?? 0m;
         var returnBase = await returns.SumAsync(x => (decimal?)x.SupplierGrossBaseAmount, ct) ?? 0m;
+        var advanced = await GetAdvancedMetricsAsync(filter, ct);
         var summary = new PurchasingPerformanceSummaryDto(orderCount, openOrderCount, lateCount,
-            receiptCount, invoiceCount, returnCount, averageLead, receiptBase, invoiceBase, returnBase, baseCurrencyCode);
+            receiptCount, invoiceCount, returnCount, averageLead, receiptBase, invoiceBase, returnBase, baseCurrencyCode,
+            advanced.OnTimeDeliveryRatePercent, advanced.UninvoicedReceiptCostBase, advanced.PurchasePriceVarianceBase);
 
         var rows = new List<PurchasingPerformanceRowDto>();
         var total = 0;
@@ -197,7 +199,7 @@ public sealed class PurchasingPerformanceQueryService(OasDbContext db) : IPurcha
                 var open = PurchasingPerformanceMath.OpenQuantity(x.OrderedQuantity, received,
                     x.Status is PurchaseOrderStatus.Closed or PurchaseOrderStatus.FullyReceived);
                 rows.Add(new PurchasingPerformanceRowDto {
-                    Kind = kind, DocumentId = x.Id, PurchaseOrderId = x.Id, DocumentCode = x.PurchaseOrderCode,
+                    Kind = kind, DocumentId = x.Id, PurchaseOrderId = x.Id, PurchaseOrderLineId = x.LineId, DocumentCode = x.PurchaseOrderCode,
                     DocumentDate = x.OrderDate, SupplierId = x.SupplierId, SupplierName = x.NameAr,
                     WarehouseId = x.DestinationWarehouseId, ProductVariantId = x.ProductVariantId,
                     ProductName = x.ProductNameSnapshot, UnitName = x.UnitNameSnapshot, CurrencyCode = x.Code,
@@ -304,4 +306,16 @@ public static class PurchasingPerformanceMath
 
     public static decimal UninvoicedAccepted(decimal accepted, decimal invoiced, decimal preInvoiceReturned) =>
         Math.Max(0m, accepted - invoiced - preInvoiceReturned);
+
+    /// <summary>An operational GRNI estimate, NOT the posted GRNI GL account balance.</summary>
+    public static decimal UninvoicedReceiptCost(decimal receiptCost, decimal matchedReceiptCost,
+        decimal unmatchedReturnCost) =>
+        Math.Max(0m, Math.Round(receiptCost - matchedReceiptCost - unmatchedReturnCost, 4));
+
+    public static decimal PurchasePriceVarianceBase(decimal invoiceMatchedNet, decimal matchedReceiptCost) =>
+        Math.Round(invoiceMatchedNet - matchedReceiptCost, 4, MidpointRounding.AwayFromZero);
+
+    public static decimal? OnTimeDeliveryPercent(decimal eligibleBaseQuantity, decimal deliveredOnTimeBaseQuantity) =>
+        eligibleBaseQuantity <= 0m ? null :
+        Math.Round(deliveredOnTimeBaseQuantity * 100m / eligibleBaseQuantity, 2, MidpointRounding.AwayFromZero);
 }

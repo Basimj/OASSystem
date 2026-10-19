@@ -1,0 +1,82 @@
+name: AP-12 Consolidation SQL Verification
+
+on:
+  push:
+    branches: [feature/ap12-report-consolidation]
+    paths:
+      - '.github/workflows/ap12-report-consolidation.yml'
+      - 'OASSystem/OAS.Infrastructure/**'
+      - 'OASSystem/OAS.Application/**'
+      - 'OASSystem/OAS.Domain/**'
+      - 'OASSystem/OAS.Contracts/**'
+      - 'OASSystem/OAS.Tests/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-sqlserver:
+    name: AP-12 consolidated reports and disposable SQL Server regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        ports:
+          - 1433:1433
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: "OasDisposalOnly_2026_Tests!"
+          MSSQL_PID: "Developer"
+    env:
+      OAS_PURCHASING_TEST_SQLSERVER: "Server=127.0.0.1,1433;Initial Catalog=master;User ID=sa;Password=OasDisposalOnly_2026_Tests!;Encrypt=False;TrustServerCertificate=True;"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - name: Wait for test-only SQL Server (never connect to production)
+        shell: bash
+        run: |
+          set -euo pipefail
+          container="${{ job.services.sqlserver.id }}"
+          for attempt in $(seq 1 40); do
+            if docker exec "$container" /bin/sh -c '
+              if [ -x /opt/mssql-tools18/bin/sqlcmd ]; then
+                /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "OasDisposalOnly_2026_Tests!" -C -l 2 -Q "SELECT 1" > /dev/null 2>&1
+              elif [ -x /opt/mssql-tools/bin/sqlcmd ]; then
+                /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "OasDisposalOnly_2026_Tests!" -l 2 -Q "SELECT 1" > /dev/null 2>&1
+              else
+                exit 1
+              fi
+            '; then
+              echo "Disposable SQL Server is ready."
+              exit 0
+            fi
+            sleep 5
+          done
+          docker logs "$container" --tail 80 || true
+          echo "SQL Server did not become ready." >&2
+          exit 1
+      # Restore the test dependency graph, not the Windows-only WPF desktop printer.
+      # Building the entire solution on Linux fails with NETSDK1100 before tests start.
+      - name: Restore test dependency graph
+        run: dotnet restore OASSystem/OAS.Tests/OAS.Tests.csproj
+      - name: Build test project and referenced production projects
+        run: dotnet build OASSystem/OAS.Tests/OAS.Tests.csproj --no-restore -c Debug
+      - name: EF model parity diagnostic
+        run: dotnet test OASSystem/OAS.Tests/OAS.Tests.csproj --no-restore -c Debug --filter 'FullyQualifiedName~PendingModelChangesDiagnosticsTests' --logger 'trx;LogFileName=ef-model-parity.trx' --logger 'console;verbosity=normal'
+      - name: AP-11 disposable SQL Server and purchasing regressions
+        run: dotnet test OASSystem/OAS.Tests/OAS.Tests.csproj --no-restore -c Debug --filter 'TestCategory=PurchasingSqlServer|TestCategory=AP11DisposableSqlServer|TestCategory=AP12|FullyQualifiedName~AP10PurchasingPostingReadinessTests' --logger 'trx;LogFileName=ap11-disposable.trx' --logger 'console;verbosity=normal'
+      - name: Preserve verification reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ap11-sqlserver-test-reports
+          path: OASSystem/OAS.Tests/TestResults/**/*.trx
+          if-no-files-found: warn
+
+# This verifies migrations and SQL locking against disposable databases only.
+# AP11SqlServer (financial invariants) and true HTTP/UI E2E remain a separate
+# test-data acceptance gate; don't claim those passed without a populated replica.

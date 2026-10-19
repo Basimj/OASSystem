@@ -26,6 +26,21 @@ public sealed class PurchasingPerformanceController(ISender sender) : Controller
         return Ok(await sender.Send(new GetPurchasingPerformanceQuery(filter), cancellationToken));
     }
 
+    /// <summary>Posted receipt, invoice and return lineage for a single purchase-order line.
+    /// Uses the same permissions and supplier-scope filtering as the parent report.</summary>
+    [HttpGet("orders/{purchaseOrderLineId:guid}/drilldown")]
+    public async Task<ActionResult<PurchasingPerformanceOrderLineDrillDownDto>> OrderLineDrillDown(
+        Guid purchaseOrderLineId, [FromQuery] PurchasingPerformanceFilterDto filter,
+        CancellationToken cancellationToken)
+    {
+        var error = Validate(filter);
+        if (error is not null) return BadRequest(error);
+        if (filter.Kind != "orders") return BadRequest("التفاصيل متاحة لأسطر أوامر الشراء.");
+        return Ok(await sender.Send(
+            new GetPurchasingPerformanceOrderLineDrillDownQuery(purchaseOrderLineId, filter),
+            cancellationToken));
+    }
+
     /// <summary>Exports precisely the server-authorized paged DTO. Hard capped to prevent unbounded reads.</summary>
     [HttpGet("export")]
     public async Task<IActionResult> Export([FromQuery] PurchasingPerformanceFilterDto filter,
