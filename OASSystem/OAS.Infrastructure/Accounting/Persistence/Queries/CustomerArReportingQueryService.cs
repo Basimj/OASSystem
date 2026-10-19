@@ -97,37 +97,67 @@ public sealed class CustomerArReportingQueryService(OasDbContext db) : ICustomer
     {
         pageNumber = Math.Max(1, pageNumber);
         pageSize = Math.Clamp(pageSize, 1, 200);
-        var sums = from l in db.Set<JournalEntryLine>().AsNoTracking()
-                   join j in db.Set<JournalEntry>().AsNoTracking() on l.JournalEntryId equals j.Id
-                   where j.Status == JournalEntryStatus.Posted && j.PostingDate <= asOf
-                   group l by l.AccountId into g
-                   select new { AccountId = g.Key, Debit = g.Sum(x => x.DebitAmount), Credit = g.Sum(x => x.CreditAmount) };
-        var query = from c in db.Set<Customer>().AsNoTracking()
-                    join a in db.Set<Account>().AsNoTracking() on c.AccountId equals a.Id
-                    join g in sums on a.Id equals g.AccountId into ag
-                    from g in ag.DefaultIfEmpty()
-                    select new {
-                        c.Id, c.CustomerCode, c.NameAr, c.AccountId, a.Code,
-                        Debit = g == null ? 0m : g.Debit,
-                        Credit = g == null ? 0m : g.Credit
-                    };
+
+        // Query customer metadata independently of the ledger. In particular, avoid
+        // materializing a non-nullable decimal from an aggregate LEFT JOIN whose
+        // debit/credit columns are NULL when the customer has no posted entries.
+        var customers = from c in db.Set<Customer>().AsNoTracking()
+                        join a in db.Set<Account>().AsNoTracking() on c.AccountId equals a.Id
+                        select new { c.Id, c.CustomerCode, c.NameAr, c.AccountId, a.Code };
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim();
-            query = query.Where(x => x.CustomerCode.Contains(term) || x.NameAr.Contains(term) || x.Code.Contains(term));
+            customers = customers.Where(x =>
+                x.CustomerCode.Contains(term) || x.NameAr.Contains(term) || x.Code.Contains(term));
         }
-        var count = await query.LongCountAsync(ct);
-        var totals = await query.GroupBy(x => 1).Select(g => new {
-            DebitBalances = g.Sum(x => x.Debit > x.Credit ? x.Debit - x.Credit : 0m),
-            CreditBalances = g.Sum(x => x.Credit > x.Debit ? x.Credit - x.Debit : 0m),
-            Net = g.Sum(x => x.Debit - x.Credit)
-        }).SingleOrDefaultAsync(ct);
-        var page = await query.OrderBy(x => x.CustomerCode)
+
+        var count = await customers.LongCountAsync(ct);
+        var page = await customers.OrderBy(x => x.CustomerCode).ThenBy(x => x.Id)
             .Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync(ct);
+        var visibleIds = page.Select(x => x.Id).ToHashSet();
+        var pageBalances = new Dictionary<Guid, (decimal Debit, decimal Credit)>();
+
+        // One simple server-side GROUP BY, without nesting GROUP BY over a LEFT JOIN.
+        // Customers without journal entries are absent from this query and have a
+        // zero balance. Stream the per-customer aggregates without buffering all
+        // customers or ledger lines in memory; cache only the current display page.
+        var postedCustomerBalances =
+            from c in customers
+            join l in db.Set<JournalEntryLine>().AsNoTracking() on c.AccountId equals l.AccountId
+            join j in db.Set<JournalEntry>().AsNoTracking() on l.JournalEntryId equals j.Id
+            where j.Status == JournalEntryStatus.Posted && j.PostingDate <= asOf
+            group l by c.Id into g
+            select new
+            {
+                CustomerId = g.Key,
+                Debit = g.Sum(x => x.DebitAmount),
+                Credit = g.Sum(x => x.CreditAmount)
+            };
+
+        decimal debitBalances = 0m;
+        decimal creditBalances = 0m;
+        await foreach (var balance in postedCustomerBalances.AsAsyncEnumerable().WithCancellation(ct))
+        {
+            var signed = balance.Debit - balance.Credit;
+            if (signed >= 0m)
+                debitBalances += signed;
+            else
+                creditBalances -= signed;
+
+            if (visibleIds.Contains(balance.CustomerId))
+                pageBalances[balance.CustomerId] = (balance.Debit, balance.Credit);
+        }
+
         return new CustomerBalancesReportDto(asOf, await BaseCurrencyAsync(ct),
-            page.Select(x => new CustomerBalanceRowDto(x.Id, x.CustomerCode,
-                x.NameAr, x.AccountId, x.Code, R(x.Debit), R(x.Credit), R(x.Debit - x.Credit))).ToArray(),
-            R(totals?.DebitBalances ?? 0m), R(totals?.CreditBalances ?? 0m), R(totals?.Net ?? 0m),
+            page.Select(x =>
+            {
+                // No GL entries = zero debit and credit, not NULL.
+                var balance = pageBalances.GetValueOrDefault(x.Id);
+                return new CustomerBalanceRowDto(x.Id, x.CustomerCode, x.NameAr,
+                    x.AccountId, x.Code, R(balance.Debit), R(balance.Credit),
+                    R(balance.Debit - balance.Credit));
+            }).ToArray(),
+            R(debitBalances), R(creditBalances), R(debitBalances - creditBalances),
             count, pageNumber, pageSize);
     }
 
