@@ -59,10 +59,12 @@ jobs:
           docker logs "$container" --tail 80 || true
           echo "SQL Server did not become ready." >&2
           exit 1
-      - name: Restore
-        run: dotnet restore OASSystem/OASSystem.sln
-      - name: Build entire solution
-        run: dotnet build OASSystem/OASSystem.sln --no-restore -c Debug
+      # Restore the test dependency graph, not the Windows-only WPF desktop printer.
+      # Building the entire solution on Linux fails with NETSDK1100 before tests start.
+      - name: Restore test dependency graph
+        run: dotnet restore OASSystem/OAS.Tests/OAS.Tests.csproj
+      - name: Build test project and referenced production projects
+        run: dotnet build OASSystem/OAS.Tests/OAS.Tests.csproj --no-restore -c Debug
       - name: EF model parity diagnostic
         run: dotnet test OASSystem/OAS.Tests/OAS.Tests.csproj --no-restore -c Debug --filter 'FullyQualifiedName~PendingModelChangesDiagnosticsTests' --logger 'trx;LogFileName=ef-model-parity.trx' --logger 'console;verbosity=normal'
       - name: AP-11 disposable SQL Server and purchasing regressions
