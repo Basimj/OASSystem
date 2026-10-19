@@ -52,9 +52,9 @@
                 <label class="form-label">الفاتورة المستهدفة (فواتير العميل فقط)</label>
                 <select class="form-select mb-2" @bind="_invoiceId">
                     <option value="@Guid.Empty">— اختر فاتورة مرحّلة —</option>
-                    @foreach (var invoice in _invoices)
+                    @foreach (var invoice in _invoices.Where(i => i.PaymentSummary.OutstandingAmount > 0m))
                     {
-                        <option value="@invoice.Id">@invoice.InvoiceCode — @invoice.TotalAmount.ToString("N2")</option>
+                        <option value="@invoice.Id">@invoice.InvoiceCode — متبقي @invoice.PaymentSummary.OutstandingAmount.ToString("N2") @invoice.CurrencyCodeSnapshot</option>
                     }
                 </select>
                 <div class="d-flex align-items-center gap-2 mb-2">
@@ -62,7 +62,8 @@
                     <span>صفحة @_invoicePage من @Math.Max(1L, (_invoiceTotal + InvoicePageSize - 1) / InvoicePageSize)</span>
                     <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@(_busy || _invoicePage * InvoicePageSize >= _invoiceTotal)" @onclick="NextInvoicesAsync">التالي</button>
                 </div>
-                @if (_invoices.Count == 0) { <p role="status">لا توجد فواتير مرحّلة في هذه الصفحة.</p> }
+                @if (!_invoices.Any(i => i.PaymentSummary.OutstandingAmount > 0m))
+                { <p role="status">لا توجد فواتير مفتوحة في هذه الصفحة؛ يمكنك الانتقال إلى الصفحة التالية.</p> }
                 <label class="form-label">المبلغ بعملة الفاتورة المستهدفة</label>
             }
             else
@@ -215,7 +216,7 @@
         {
             if (_action == "apply")
             {
-                if (_invoiceId == Guid.Empty || !_invoices.Any(i => i.Id == _invoiceId))
+                if (_invoiceId == Guid.Empty || !_invoices.Any(i => i.Id == _invoiceId && i.PaymentSummary.OutstandingAmount > 0m))
                 { _error = "اختر فاتورة من القائمة الحالية."; return; }
                 await Api.PostAsync<ApplyCustomerReturnCreditRequest, CustomerCreditSettlementDto>(
                     $"api/sales/customer-credits/{CustomerId:D}/apply",

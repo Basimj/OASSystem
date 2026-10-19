@@ -33,12 +33,14 @@ public sealed class GetCustomerCreditTargetInvoicesQueryHandler(
         if (request.CustomerId == Guid.Empty)
             throw new ArgumentException("Customer ID is required.", nameof(request.CustomerId));
 
-        var pageNumber = Math.Max(1, request.PageNumber);
         var pageSize = Math.Clamp(request.PageSize, 1, 100);
+        // Avoid a checked overflow from an arbitrary untrusted query-string page number.
+        var pageNumber = Math.Clamp(request.PageNumber, 1, 1 + (int.MaxValue - pageSize) / pageSize);
         var specification = new Specification<SalesInvoice>()
             .Where(x => x.CustomerId == request.CustomerId && x.Status == SalesInvoiceStatus.Posted)
             .AddSort(nameof(SalesInvoice.InvoiceDate), SortDirection.Descending)
-            .ApplyPaging(checked((pageNumber - 1) * pageSize), pageSize);
+            .AddSort(nameof(SalesInvoice.InvoiceCode), SortDirection.Ascending)
+            .ApplyPaging((pageNumber - 1) * pageSize, pageSize);
 
         var result = await invoices.GetPageAsync(specification, ct);
         var items = new List<SalesInvoiceDto>(result.Items.Count);

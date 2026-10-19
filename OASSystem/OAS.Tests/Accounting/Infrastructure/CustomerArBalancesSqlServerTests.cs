@@ -103,6 +103,70 @@ public sealed class CustomerArBalancesSqlServerTests
         });
     }
 
+    [Test]
+    public async Task Statement_OpeningAndRunningBalances_AcrossPages_MatchPostedGL()
+    {
+        await using var db = Context();
+        var customerId = await db.Set<Customer>().Where(x => x.CustomerCode == "AR-001")
+            .Select(x => x.Id).SingleAsync();
+        var query = new CustomerArReportingQueryService(db);
+        var from = new DateOnly(2026, 11, 7);
+        var first = await query.StatementAsync(customerId, from, NovemberEnd, 1, 2);
+        var second = await query.StatementAsync(customerId, from, NovemberEnd, 2, 2);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(first.OpeningBase, Is.EqualTo(30000m));
+            Assert.That(first.PeriodDebitBase, Is.EqualTo(200000m));
+            Assert.That(first.PeriodCreditBase, Is.EqualTo(140000m));
+            Assert.That(first.ClosingBase, Is.EqualTo(90000m));
+            Assert.That(first.TotalCount, Is.EqualTo(3));
+            Assert.That(first.Movements.Select(x => x.BalanceBase), Is.EqualTo(new[] { 230000m, 210000m }));
+            Assert.That(second.Movements.Select(x => x.BalanceBase), Is.EqualTo(new[] { 90000m }));
+        });
+    }
+
+    [Test]
+    public async Task Statement_WithoutJournalMovements_ReturnsZeroOpeningClosingAndNoRows()
+    {
+        await using var db = Context();
+        var customerId = await db.Set<Customer>().Where(x => x.CustomerCode == "AR-002")
+            .Select(x => x.Id).SingleAsync();
+        var statement = await new CustomerArReportingQueryService(db).StatementAsync(
+            customerId, new DateOnly(2026, 1, 1), NovemberEnd);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(statement.OpeningBase, Is.Zero);
+            Assert.That(statement.ClosingBase, Is.Zero);
+            Assert.That(statement.Movements, Is.Empty);
+            Assert.That(statement.TotalCount, Is.Zero);
+        });
+    }
+
+    [Test]
+    public async Task Balances_IgnoreUnpostedJournal_AndKeepPostedCustomerBalance()
+    {
+        await using var db = Context();
+        var accountId = await db.Set<Customer>().Where(x => x.CustomerCode == "AR-001")
+            .Select(x => x.AccountId).SingleAsync();
+        var periodId = await db.Set<FiscalPeriod>().Select(x => x.Id).SingleAsync();
+        var date = new DateOnly(2026, 11, 15);
+        var journal = JournalEntry.Create(Guid.NewGuid(), $"DRAFT-{Guid.NewGuid():N}",
+            JournalType.Manual, date, date, periodId, "Unposted draft is excluded",
+            "SA07-Test", null, null, JournalEntryStatus.Draft);
+        var offsetAccountId = await db.Set<Account>().Where(x => x.Code == "AR-REV")
+            .Select(x => x.Id).SingleAsync();
+        db.AddRange(journal,
+            JournalEntryLine.Create(Guid.NewGuid(), journal.Id, 1, accountId,
+                9999m, 0m, "not posted", null, null, null, null, null),
+            JournalEntryLine.Create(Guid.NewGuid(), journal.Id, 2, offsetAccountId,
+                0m, 9999m, "not posted offset", null, null, null, null, null));
+        await db.SaveChangesAsync();
+        var actual = await new CustomerArReportingQueryService(db).BalancesAsync(NovemberEnd);
+        Assert.That(actual.NetReceivableBase, Is.EqualTo(90000m));
+    }
+
     private OasDbContext Context() => new(
         new DbContextOptionsBuilder<OasDbContext>()
             .UseSqlServer(_connection)
