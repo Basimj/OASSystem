@@ -14,6 +14,7 @@
 <UiWorkspaceLayout ShowAside="false" ShowFilters="false">
     <Actions>
         <UiWorkspaceActionBar>
+            <UiButton Text="قائمة العملاء" IconCssClass="fa-solid fa-users" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="BackToCustomersAsync" />
             <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Loading="@_busy" Size="ControlSize.Small" OnClick="LoadAsync" />
             <UiButton Text="تصدير الأرصدة CSV" Loading="@_busy" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="ExportBalancesAsync" />
             <UiButton Text="تصدير الأعمار CSV" Loading="@_busy" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="ExportAgingAsync" />
@@ -115,6 +116,12 @@
         catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
         catch { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
+    }
+
+    private Task BackToCustomersAsync()
+    {
+        Navigation.NavigateTo("/accounting/customers");
+        return Task.CompletedTask;
     }
 
     private void OpenCustomer(Guid id) => Navigation.NavigateTo($"/accounting/customers/{id:D}/account");

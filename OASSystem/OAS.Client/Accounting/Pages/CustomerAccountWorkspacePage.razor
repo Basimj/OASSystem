@@ -10,12 +10,14 @@
 @inject IApiFeedbackService ApiFeedback
 @inject IUiSnackbarService Snackbar
 @inject Microsoft.JSInterop.IJSRuntime JS
+@inject NavigationManager Navigation
 
 <PageTitle>كشف حساب العميل | OAS</PageTitle>
 
 <UiWorkspaceLayout ShowAside="false" ShowFilters="false">
     <Actions>
         <UiWorkspaceActionBar>
+            <UiButton Text="العودة إلى قائمة العملاء" IconCssClass="fa-solid fa-users" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="BackToCustomersAsync" />
             <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Loading="@_busy" Size="ControlSize.Small" OnClick="LoadAsync" />
             <UiButton Text="تصدير كشف الحساب CSV" Variant="ButtonVariant.Secondary" Loading="@_busy" Size="ControlSize.Small" OnClick="ExportCsvAsync" />
             <a href="@($"/sales/customer-credits/{CustomerId:D}")">تطبيق أو استرداد رصيد المرتجعات</a>
@@ -242,6 +244,12 @@
         catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
         catch { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
+    }
+
+    private Task BackToCustomersAsync()
+    {
+        Navigation.NavigateTo("/accounting/customers");
+        return Task.CompletedTask;
     }
 
     private Task PrintAsync() => JS.InvokeVoidAsync("print").AsTask();
