@@ -109,7 +109,7 @@ CREATE TABLE #LensDetailsMerged
     [CreatedBy] nvarchar(64) NULL,
     [LastModifiedAtUtc] datetimeoffset NULL,
     [LastModifiedBy] nvarchar(64) NULL,
-    CONSTRAINT [PK_LensDetailsMerged] PRIMARY KEY ([ProductVariantId])
+    PRIMARY KEY ([ProductVariantId])
 );
 
 IF OBJECT_ID(N'[dbo].[tbl_LensDetails]', N'U') IS NOT NULL

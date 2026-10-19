@@ -79,7 +79,15 @@ ALTER TABLE [dbo].[tbl_CommissionRules] ADD CONSTRAINT [CK_CommissionRules_Prior
         migrationBuilder.DropIndex(name: "IX_CommissionRules_ProductVariantId", schema: "dbo", table: "tbl_CommissionRules");
         migrationBuilder.DropIndex(name: "IX_CommissionRules_ProductCategoryId", schema: "dbo", table: "tbl_CommissionRules");
 
+        // Drop ALL SA-05 CHECK constraints referring to header discount columns before
+        // dropping those columns. SQL Server otherwise rejects ALTER TABLE DROP COLUMN.
         migrationBuilder.Sql("""
+IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE [name] = N'CK_CustomerOrders_Totals_NonNegative' AND [parent_object_id] = OBJECT_ID(N'[dbo].[tbl_CustomerOrders]'))
+    ALTER TABLE [dbo].[tbl_CustomerOrders] DROP CONSTRAINT [CK_CustomerOrders_Totals_NonNegative];
+IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE [name] = N'CK_SalesInvoices_Totals_NonNegative' AND [parent_object_id] = OBJECT_ID(N'[dbo].[tbl_SalesInvoices]'))
+    ALTER TABLE [dbo].[tbl_SalesInvoices] DROP CONSTRAINT [CK_SalesInvoices_Totals_NonNegative];
+IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE [name] = N'CK_SalesInvoices_BaseTotals_NonNegative' AND [parent_object_id] = OBJECT_ID(N'[dbo].[tbl_SalesInvoices]'))
+    ALTER TABLE [dbo].[tbl_SalesInvoices] DROP CONSTRAINT [CK_SalesInvoices_BaseTotals_NonNegative];
 IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE [name] = N'CK_CommissionRules_Priority') ALTER TABLE [dbo].[tbl_CommissionRules] DROP CONSTRAINT [CK_CommissionRules_Priority];
 IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE [name] = N'CK_SalesInvoiceLines_DiscountsWithinGross') ALTER TABLE [dbo].[tbl_SalesInvoiceLines] DROP CONSTRAINT [CK_SalesInvoiceLines_DiscountsWithinGross];
 IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE [name] = N'CK_SalesInvoiceLines_HeaderDiscount_NonNegative') ALTER TABLE [dbo].[tbl_SalesInvoiceLines] DROP CONSTRAINT [CK_SalesInvoiceLines_HeaderDiscount_NonNegative];
@@ -117,6 +125,21 @@ IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE [name] = N'CK_CustomerOrder
         migrationBuilder.DropColumn(name: "HeaderDiscountReason", schema: "dbo", table: "tbl_SalesInvoices");
         migrationBuilder.DropColumn(name: "HeaderDiscountApprovedAtUtc", schema: "dbo", table: "tbl_SalesInvoices");
         migrationBuilder.DropColumn(name: "HeaderDiscountApprovedBy", schema: "dbo", table: "tbl_SalesInvoices");
+
+        // Restore the CHECK constraints which were present before SA-05. They MUST be
+        // added only after the header discount columns have been dropped.
+        migrationBuilder.Sql("""
+ALTER TABLE [dbo].[tbl_CustomerOrders] WITH CHECK ADD CONSTRAINT [CK_CustomerOrders_Totals_NonNegative]
+    CHECK ([Subtotal] >= 0 AND [DiscountAmount] >= 0 AND [TaxAmount] >= 0 AND [TotalAmount] >= 0);
+ALTER TABLE [dbo].[tbl_SalesInvoices] WITH CHECK ADD CONSTRAINT [CK_SalesInvoices_Totals_NonNegative]
+    CHECK ([Subtotal] >= 0 AND [DiscountAmount] >= 0 AND [TaxAmount] >= 0 AND [TotalAmount] >= 0);
+ALTER TABLE [dbo].[tbl_SalesInvoices] WITH CHECK ADD CONSTRAINT [CK_SalesInvoices_BaseTotals_NonNegative]
+    CHECK ([BaseSubtotal] >= 0 AND [BaseDiscountAmount] >= 0 AND [BaseTaxAmount] >= 0 AND [BaseTotalAmount] >= 0);
+ALTER TABLE [dbo].[tbl_CustomerOrderLines] WITH CHECK ADD CONSTRAINT [CK_CustomerOrderLines_DiscountWithinGross]
+    CHECK ([DiscountAmount] <= ([Quantity] * [ActualUnitPrice]));
+ALTER TABLE [dbo].[tbl_SalesInvoiceLines] WITH CHECK ADD CONSTRAINT [CK_SalesInvoiceLines_DiscountWithinGross]
+    CHECK ([DiscountAmount] <= ([Quantity] * [ActualUnitPrice]));
+""");
 
         migrationBuilder.CreateIndex(name: "IX_CommissionRules_Resolution", schema: "dbo", table: "tbl_CommissionRules", columns: new[] { "EmployeeId", "EffectiveFrom", "EffectiveTo", "IsActive" });
     }
