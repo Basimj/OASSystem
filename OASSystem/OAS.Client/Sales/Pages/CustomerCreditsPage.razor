@@ -4,21 +4,18 @@
 @using OAS.Contracts.Sales.SalesInvoices
 @using OAS.Contracts.Common.Pagination
 @using OAS.Client.Services.Http
-@using OAS.Client.Sales.Services
-@using OAS.Contracts.Sales.Enums
 @using OAS.Contracts.Accounting.CashAccounts
 @using OAS.Contracts.Accounting.BankAccounts
 @using OAS.Contracts.Accounting.Currencies
 @using OAS.Client.Accounting.Services
 @inject OasApiClient Api
-@inject ISalesClientService Sales
 @inject IAccountingClientService Accounting
 
 <PageTitle>الرصيد الدائن للعميل | OAS</PageTitle>
 <section dir="rtl" class="p-3" style="max-width:1200px;margin:auto">
     <header class="d-flex justify-content-between align-items-center mb-3">
         <h3>الرصيد الدائن من مرتجعات العميل</h3>
-        <button class="btn btn-outline-secondary" @onclick="ReloadAsync" disabled="@_busy">تحديث</button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="ReloadAsync" disabled="@_busy">تحديث</button>
     </header>
     @if (!string.IsNullOrWhiteSpace(_error)) { <div class="alert alert-danger" role="alert">@_error</div> }
     @if (!string.IsNullOrWhiteSpace(_notice)) { <div class="alert alert-success" role="status">@_notice</div> }
@@ -32,30 +29,40 @@
         </div>
         <div class="border rounded p-3 mb-4">
             <h5>تسوية رصيد مرتجع مرحّل</h5>
-            <p class="text-muted">الرصيد الدائن محسوب بالعملة الأساسية. لا يسمح النظام بصرف مبلغ أكبر من المتاح.</p>
+            <p class="text-muted">المبالغ الدائنة بالعملة الأساسية؛ ولا يمكن استعمال رصيد المرتجع أكثر من مرة.</p>
             <label class="form-label">اختر المرتجع</label>
             <select class="form-select mb-2" @bind="_returnId">
-                <option value="@Guid.Empty">— اختر مرتجعًا مرحّلًا —</option>
-                @foreach(var x in _state.Returns.Where(x=>x.EstimatedUnappliedBaseCredit>0))
+                <option value="@Guid.Empty">— اختر مرتجعًا متاحًا —</option>
+                @foreach (var x in _state.Returns.Where(x => RemainingCredit(x.SalesReturnId, x.EstimatedUnappliedBaseCredit) > 0m))
                 {
-                    <option value="@x.SalesReturnId">@x.ReturnCode — @x.EstimatedUnappliedBaseCredit.ToString("N2") (@x.BaseCurrencyCode)</option>
+                    <option value="@x.SalesReturnId">@x.ReturnCode — @(RemainingCredit(x.SalesReturnId, x.EstimatedUnappliedBaseCredit).ToString("N2")) (@x.BaseCurrencyCode)</option>
                 }
             </select>
+            @if (!_state.Returns.Any(x => RemainingCredit(x.SalesReturnId, x.EstimatedUnappliedBaseCredit) > 0m))
+            {
+                <p class="text-muted" role="status">لا يوجد مرتجع برصيد متاح حاليًا.</p>
+            }
             <label class="form-label">طريقة التسوية</label>
             <select class="form-select mb-2" @bind="_action">
                 <option value="apply">تطبيق الرصيد على فاتورة أخرى</option>
                 <option value="refund">رد المال للعميل</option>
             </select>
-            @if (_action=="apply")
+            @if (_action == "apply")
             {
-                <label class="form-label">الفاتورة المستهدفة</label>
+                <label class="form-label">الفاتورة المستهدفة (فواتير العميل فقط)</label>
                 <select class="form-select mb-2" @bind="_invoiceId">
-                    <option value="@Guid.Empty">— اختر فاتورة —</option>
-                    @foreach(var x in _invoices.Where(x=>x.CustomerId==CustomerId && x.Status==SalesInvoiceStatus.Posted))
+                    <option value="@Guid.Empty">— اختر فاتورة مرحّلة —</option>
+                    @foreach (var invoice in _invoices)
                     {
-                        <option value="@x.Id">@x.InvoiceCode — @x.TotalAmount.ToString("N2")</option>
+                        <option value="@invoice.Id">@invoice.InvoiceCode — @invoice.TotalAmount.ToString("N2")</option>
                     }
                 </select>
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@(_busy || _invoicePage <= 1)" @onclick="PreviousInvoicesAsync">السابق</button>
+                    <span>صفحة @_invoicePage من @Math.Max(1L, (_invoiceTotal + InvoicePageSize - 1) / InvoicePageSize)</span>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@(_busy || _invoicePage * InvoicePageSize >= _invoiceTotal)" @onclick="NextInvoicesAsync">التالي</button>
+                </div>
+                @if (_invoices.Count == 0) { <p role="status">لا توجد فواتير مرحّلة في هذه الصفحة.</p> }
                 <label class="form-label">المبلغ بعملة الفاتورة المستهدفة</label>
             }
             else
@@ -67,15 +74,15 @@
                 <label class="form-label">العملة</label>
                 <select class="form-select mb-2" @bind="_currencyId">
                     <option value="@Guid.Empty">— اختر عملة —</option>
-                    @foreach(var x in _currencies.Where(x=>x.IsActive))
+                    @foreach (var x in _currencies.Where(x => x.IsActive))
                     { <option value="@x.Id">@x.Code — @x.NameAr</option> }
                 </select>
-                @if(_method==1)
+                @if (_method == 1)
                 {
                     <label class="form-label">الصندوق</label>
                     <select class="form-select mb-2" @bind="_selectedCash">
                         <option value="@Guid.Empty">— اختر الصندوق —</option>
-                        @foreach(var account in _cash.Where(x=>x.IsActive && (!x.CurrencyId.HasValue || x.CurrencyId==_currencyId)))
+                        @foreach (var account in _cash.Where(x => x.IsActive && (!x.CurrencyId.HasValue || x.CurrencyId == _currencyId)))
                         { <option value="@account.Id">@account.Code — @account.Name</option> }
                     </select>
                 }
@@ -84,31 +91,31 @@
                     <label class="form-label">الحساب البنكي</label>
                     <select class="form-select mb-2" @bind="_selectedBank">
                         <option value="@Guid.Empty">— اختر البنك —</option>
-                        @foreach(var account in _banks.Where(x=>x.IsActive && (!x.CurrencyId.HasValue || x.CurrencyId==_currencyId)))
+                        @foreach (var account in _banks.Where(x => x.IsActive && (!x.CurrencyId.HasValue || x.CurrencyId == _currencyId)))
                         { <option value="@account.Id">@account.Code — @account.BankName (@account.AccountName)</option> }
                     </select>
                 }
                 <label class="form-label">المبلغ بعملة رد المال</label>
             }
             <input type="number" min="0.01" step="0.01" class="form-control mb-3" @bind="_amount" />
-            <button class="btn btn-primary" disabled="@_busy" @onclick="SubmitAsync">
-                @(_busy?"جارٍ التنفيذ...":_action=="apply"?"تطبيق الرصيد":"إنشاء وترحيل سند الاسترداد")
+            <button type="button" class="btn btn-primary" disabled="@_busy" @onclick="SubmitAsync">
+                @(_busy ? "جارٍ التنفيذ..." : _action == "apply" ? "تطبيق الرصيد" : "إنشاء وترحيل سند الاسترداد")
             </button>
         </div>
         <h5>سجل تسويات الرصيد الدائن</h5>
         <div class="table-responsive"><table class="table table-sm table-striped">
             <thead><tr><th>التاريخ</th><th>المرتجع</th><th>العملية</th><th>المبلغ الأساسي</th><th>الحالة</th><th>العكس</th></tr></thead>
             <tbody>
-            @foreach(var x in _state.Applications)
+            @foreach (var x in _state.Applications)
             {
                 <tr>
                     <td>@x.AppliedAtUtc.ToString("yyyy-MM-dd")</td>
                     <td>@x.SalesReturnId</td>
-                    <td>@(x.SettlementKind==1?"تطبيق على فاتورة":"رد مال")</td>
+                    <td>@(x.SettlementKind == 1 ? "تطبيق على فاتورة" : "رد مال")</td>
                     <td>@x.AppliedSourceBaseAmount.ToString("N2")</td>
-                    <td>@(x.Status==1?"ساري":"معكوس")</td>
-                    <td>@if(x.Status==1 && x.SettlementKind==1)
-                        {<button class="btn btn-sm btn-outline-danger" disabled="@_busy" @onclick="() => ReverseAsync(x)">عكس التطبيق</button>}
+                    <td>@(x.Status == 1 ? "ساري" : "معكوس")</td>
+                    <td>@if (x.Status == 1 && x.SettlementKind == 1)
+                        { <button type="button" class="btn btn-sm btn-outline-danger" disabled="@_busy" @onclick="() => ReverseAsync(x)">عكس التطبيق</button> }
                     </td>
                 </tr>
             }
@@ -120,82 +127,131 @@
 @code {
     [Parameter] public Guid CustomerId { get; set; }
     private CustomerCreditBalanceDto? _state;
-    private IReadOnlyList<SalesInvoiceDto> _invoices=[];
+    private IReadOnlyList<SalesInvoiceDto> _invoices = [];
+    private const int InvoicePageSize = 50;
+    private int _invoicePage = 1;
+    private long _invoiceTotal;
     private Guid _returnId, _invoiceId, _currencyId;
-    private string _action="apply", _error="", _notice="";
+    private string _action = "apply", _error = "", _notice = "";
     private Guid _selectedCash, _selectedBank;
-    private IReadOnlyList<CashAccountDto> _cash=[];
-    private IReadOnlyList<BankAccountDto> _banks=[];
-    private IReadOnlyList<CurrencyDto> _currencies=[];
+    private IReadOnlyList<CashAccountDto> _cash = [];
+    private IReadOnlyList<BankAccountDto> _banks = [];
+    private IReadOnlyList<CurrencyDto> _currencies = [];
     private decimal _amount;
-    private byte _method=1;
+    private byte _method = 1;
     private bool _busy;
-    protected override async Task OnParametersSetAsync()=>await ReloadAsync();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _invoicePage = 1;
+        _invoiceId = Guid.Empty;
+        _returnId = Guid.Empty;
+        await ReloadAsync();
+    }
+
+    // The preview is gross credit. Only active applications consume it.
+    private decimal RemainingCredit(Guid returnId, decimal gross) => Math.Max(0m,
+        gross - (_state?.Applications.Where(a => a.SalesReturnId == returnId && a.Status == 1)
+            .Sum(a => a.AppliedSourceBaseAmount) ?? 0m));
+
+    private async Task LoadInvoicesAsync()
+    {
+        var page = await Api.GetAsync<PagedResult<SalesInvoiceDto>>(
+            $"api/sales/customer-credit-target-invoices/{CustomerId:D}?pageNumber={_invoicePage}&pageSize={InvoicePageSize}");
+        _invoices = page.Items;
+        _invoiceTotal = page.TotalCount;
+        _invoiceId = Guid.Empty; // Old page selection must never be applied to a new page.
+    }
+
+    private async Task PreviousInvoicesAsync()
+    {
+        if (_busy || _invoicePage <= 1) return;
+        _busy = true;
+        try { _invoicePage--; await LoadInvoicesAsync(); }
+        catch (Exception ex) { _error = ex.Message; _invoicePage++; }
+        finally { _busy = false; }
+    }
+
+    private async Task NextInvoicesAsync()
+    {
+        if (_busy || (long)_invoicePage * InvoicePageSize >= _invoiceTotal) return;
+        _busy = true;
+        try { _invoicePage++; await LoadInvoicesAsync(); }
+        catch (Exception ex) { _error = ex.Message; _invoicePage--; }
+        finally { _busy = false; }
+    }
+
     private async Task ReloadAsync()
     {
-        _busy=true; _error="";
+        if (_busy) return;
+        _busy = true;
+        _error = "";
         try
         {
-            _state=await Api.GetAsync<CustomerCreditBalanceDto>($"api/sales/customer-credits/{CustomerId:D}");
-            var all=new List<SalesInvoiceDto>();
-            // Bounded paging: no unbounded client-side query.
-            for(int n=1;n<=10;n++)
-            {
-                var page=await Sales.GetSalesInvoicesPageAsync(new PageRequest{PageNumber=n,PageSize=200});
-                all.AddRange(page.Items.Where(x=>x.CustomerId==CustomerId));
-                if(n>=page.TotalPages)break;
-            }
-            _invoices=all;
-            var cash=await Accounting.GetCashAccountsPageAsync(new PageRequest{PageSize=200});
-            var banks=await Accounting.GetBankAccountsPageAsync(new PageRequest{PageSize=200});
-            var currencies=await Accounting.GetCurrenciesPageAsync(new PageRequest{PageSize=200});
-            _cash=cash.Items; _banks=banks.Items; _currencies=currencies.Items;
-            if(_currencyId==Guid.Empty)_currencyId=_state?.Returns.FirstOrDefault()?.CurrencyId??Guid.Empty;
+            _state = await Api.GetAsync<CustomerCreditBalanceDto>($"api/sales/customer-credits/{CustomerId:D}");
+            await LoadInvoicesAsync();
+            var cash = await Accounting.GetCashAccountsPageAsync(new PageRequest { PageSize = 200 });
+            var banks = await Accounting.GetBankAccountsPageAsync(new PageRequest { PageSize = 200 });
+            var currencies = await Accounting.GetCurrenciesPageAsync(new PageRequest { PageSize = 200 });
+            _cash = cash.Items;
+            _banks = banks.Items;
+            _currencies = currencies.Items;
+            if (_currencyId == Guid.Empty) _currencyId = _state.Returns.FirstOrDefault()?.CurrencyId ?? Guid.Empty;
         }
-        catch(Exception ex){_error=ex.Message;}
-        finally{_busy=false;}
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
     }
+
     private async Task SubmitAsync()
     {
-        if(_state is null || _returnId==Guid.Empty || _amount<=0){_error="اختر المرتجع والمبلغ.";return;}
-        _busy=true;_error="";_notice="";
+        if (_state is null || _returnId == Guid.Empty || _amount <= 0m)
+        { _error = "اختر المرتجع والمبلغ."; return; }
+        if (!_state.Returns.Any(r => r.SalesReturnId == _returnId &&
+            RemainingCredit(r.SalesReturnId, r.EstimatedUnappliedBaseCredit) > 0m))
+        { _error = "هذا المرتجع لا يملك رصيدًا متاحًا."; return; }
+
+        _busy = true; _error = ""; _notice = "";
         try
         {
-            if(_action=="apply")
+            if (_action == "apply")
             {
-                if(_invoiceId==Guid.Empty){_error="اختر الفاتورة الهدف.";return;}
-                await Api.PostAsync<ApplyCustomerReturnCreditRequest,CustomerCreditSettlementDto>(
+                if (_invoiceId == Guid.Empty || !_invoices.Any(i => i.Id == _invoiceId))
+                { _error = "اختر فاتورة من القائمة الحالية."; return; }
+                await Api.PostAsync<ApplyCustomerReturnCreditRequest, CustomerCreditSettlementDto>(
                     $"api/sales/customer-credits/{CustomerId:D}/apply",
-                    new ApplyCustomerReturnCreditRequest(_returnId,_invoiceId,_amount,Guid.NewGuid().ToString("N")));
+                    new ApplyCustomerReturnCreditRequest(_returnId, _invoiceId, _amount, Guid.NewGuid().ToString("N")));
             }
             else
             {
-                if(_currencyId==Guid.Empty || (_method==1 && _selectedCash==Guid.Empty) ||
-                    (_method==3 && _selectedBank==Guid.Empty))
-                { _error="اختر عملة الصرف والصندوق أو البنك.";return; }
-                await Api.PostAsync<RefundCustomerReturnCreditRequest,CustomerCreditSettlementDto>(
+                if (_currencyId == Guid.Empty || (_method == 1 && _selectedCash == Guid.Empty) ||
+                    (_method == 3 && _selectedBank == Guid.Empty))
+                { _error = "اختر عملة الصرف والصندوق أو البنك."; return; }
+                await Api.PostAsync<RefundCustomerReturnCreditRequest, CustomerCreditSettlementDto>(
                     $"api/sales/customer-credits/{CustomerId:D}/refund",
-                    new RefundCustomerReturnCreditRequest(_returnId,_currencyId,_amount,_method,
-                        _method==1?_selectedCash:null,_method==3?_selectedBank:null,null,
-                        null,"استرداد رصيد مرتجع",Guid.NewGuid().ToString("N")));
+                    new RefundCustomerReturnCreditRequest(_returnId, _currencyId, _amount, _method,
+                        _method == 1 ? _selectedCash : null, _method == 3 ? _selectedBank : null,
+                        null, null, "استرداد رصيد مرتجع", Guid.NewGuid().ToString("N")));
             }
-            _notice="تمت التسوية؛ تحقق من السند وسجل القيود.";
-            _amount=0;await ReloadAsync();
+            _notice = "تمت التسوية؛ تحقق من السند وسجل القيود.";
+            _amount = 0m;
         }
-        catch(Exception ex){_error=ex.Message;}
-        finally{_busy=false;}
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+        if (string.IsNullOrWhiteSpace(_error)) await ReloadAsync();
     }
+
     private async Task ReverseAsync(CustomerCreditSettlementDto x)
     {
-        _busy=true;_error="";
+        _busy = true; _error = "";
         try
         {
-            await Api.PostAsync<ReverseCustomerReturnCreditRequest,CustomerCreditSettlementDto>(
+            await Api.PostAsync<ReverseCustomerReturnCreditRequest, CustomerCreditSettlementDto>(
                 $"api/sales/customer-credits/{CustomerId:D}/applications/{x.Id:D}/reverse",
-                new ReverseCustomerReturnCreditRequest(x.RowVersion,"عكس تطبيق الرصيد الدائن"));
-            _notice="تم عكس التطبيق.";await ReloadAsync();
+                new ReverseCustomerReturnCreditRequest(x.RowVersion, "عكس تطبيق الرصيد الدائن"));
+            _notice = "تم عكس التطبيق.";
         }
-        catch(Exception ex){_error=ex.Message;}
-        finally{_busy=false;}
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _busy = false; }
+        if (string.IsNullOrWhiteSpace(_error)) await ReloadAsync();
     }
 }
