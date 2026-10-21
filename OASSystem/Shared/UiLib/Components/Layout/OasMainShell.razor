@@ -77,18 +77,46 @@
                 var active = groupModules.Any(IsModuleActive);
                 var expanded = IsGroupExpanded(group);
                 <div class="@(active ? "oas-nav-group active" : "oas-nav-group")">
-                    <button type="button"
-                            class="oas-nav-group__header"
-                            title="@group.Title"
-                            aria-expanded="@(!isSidebarCollapsed && expanded)"
-                            @onclick="() => HandleGroupClickAsync(group)">
-                        <span class="oas-nav-icon" aria-hidden="true"><i class="@group.IconCssClass"></i></span>
-                        <span class="oas-nav-text">@group.Title</span>
+                    @if (group.Key == "accounting" && groupModules.Any(m => m.Href == "/accounting"))
+                    {
+                        // The accounting group has a landing page; navigation and expansion are separate.
+                        var accountingHome = groupModules.First(m => m.Href == "/accounting");
+                        <button type="button"
+                                class="oas-nav-group__header oas-nav-group__header--landing"
+                                title="فتح المحاسبة العامة"
+                                aria-label="فتح المحاسبة العامة"
+                                aria-current="@(_currentPath == "/accounting" ? "page" : null)"
+                                @onclick="() => NavigateModuleAsync(accountingHome)">
+                            <span class="oas-nav-icon" aria-hidden="true"><i class="@group.IconCssClass"></i></span>
+                            <span class="oas-nav-text">@group.Title</span>
+                        </button>
                         @if (!isSidebarCollapsed)
                         {
-                            <i class="oas-nav-group__chevron fa-solid @(expanded ? "fa-chevron-up" : "fa-chevron-down")" aria-hidden="true"></i>
+                            <button type="button"
+                                    class="oas-nav-group__expand"
+                                    title="@(expanded ? "طي صفحات المحاسبة" : "عرض صفحات المحاسبة")"
+                                    aria-label="@(expanded ? "طي صفحات المحاسبة" : "عرض صفحات المحاسبة")"
+                                    aria-expanded="@expanded"
+                                    @onclick="() => HandleGroupClickAsync(group)">
+                                <i class="fa-solid @(expanded ? "fa-chevron-up" : "fa-chevron-down")" aria-hidden="true"></i>
+                            </button>
                         }
-                    </button>
+                    }
+                    else
+                    {
+                        <button type="button"
+                                class="oas-nav-group__header"
+                                title="@group.Title"
+                                aria-expanded="@(!isSidebarCollapsed && expanded)"
+                                @onclick="() => HandleGroupClickAsync(group)">
+                            <span class="oas-nav-icon" aria-hidden="true"><i class="@group.IconCssClass"></i></span>
+                            <span class="oas-nav-text">@group.Title</span>
+                            @if (!isSidebarCollapsed)
+                            {
+                                <i class="oas-nav-group__chevron fa-solid @(expanded ? "fa-chevron-up" : "fa-chevron-down")" aria-hidden="true"></i>
+                            }
+                        </button>
+                    }
 
                     @if (!isSidebarCollapsed && expanded)
                     {
@@ -107,7 +135,7 @@
                         </div>
                     }
 
-                    @if (isSidebarCollapsed)
+                    @if (isSidebarCollapsed && group.Key != "accounting")
                     {
                         <UiContextMenu Visible="@string.Equals(_contextGroupKey, group.Key, StringComparison.Ordinal)"
                                        Title="@group.Title"

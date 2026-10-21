@@ -283,3 +283,35 @@
 @media (max-width: 640px) {
     .oas-shell .oas-shell-search kbd { display: none; }
 }
+
+/* Ocean UI v5: accounting heading navigates /accounting; chevron only expands children. */
+.oas-sidebar .oas-nav-group__header--landing {
+    padding-inline-end: 46px;
+}
+.oas-sidebar .oas-nav-group__expand {
+    position: absolute;
+    z-index: 1;
+    inset-inline-end: 7px;
+    top: 5px;
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--oas-ui-sidebar-fg);
+    cursor: pointer;
+    transition: background-color .18s ease;
+}
+.oas-sidebar .oas-nav-group__expand:hover { background: rgba(255,255,255,.17); }
+.oas-sidebar .oas-nav-group__expand:focus-visible {
+    outline: 2px solid #b9e9fa;
+    outline-offset: -2px;
+}
+.oas-sidebar .oas-nav-group__expand i { font-size: 12px; }
+.oas-shell.sidebar-collapsed .oas-nav-group__header--landing { padding-inline-end: 2px; }
+@media (prefers-reduced-motion: reduce) {
+    .oas-sidebar .oas-nav-group__expand { transition: none; }
+}
