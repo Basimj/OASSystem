@@ -20,6 +20,7 @@
                           OnSettings="OnSettings"
                           OnSupport="OnSupport"
                           OnLogout="OnLogout" />
+            <OasModuleSearch Modules="@VisibleModules.ToArray()" OnNavigate="NavigateModuleAsync" />
         </div>
 
         <div class="oas-global-tabs-row" @onclick="CloseHeaderAccountMenu" @oncontextmenu="CloseHeaderAccountMenu">
@@ -33,8 +34,21 @@
         </div>
     </header>
 
-    <aside class="oas-sidebar" @onclick="CloseHeaderAccountMenu">
+    <aside class="oas-sidebar" aria-label="القائمة الجانبية" @onclick="CloseHeaderAccountMenu">
         <div class="oas-sidebar-toolbar">
+            <div class="oas-sidebar-brand" title="@SystemName">
+                @if (!string.IsNullOrWhiteSpace(SystemLogoUrl))
+                {
+                    <img class="oas-sidebar-brand__logo" src="@SystemLogoUrl" alt="" />
+                }
+                else
+                {
+                    <span class="oas-sidebar-brand__mark" aria-hidden="true">
+                        <i class="fa-solid fa-cube"></i>
+                    </span>
+                }
+                <span class="oas-sidebar-brand__name" dir="ltr">@SystemName</span>
+            </div>
             <button type="button"
                     class="oas-collapse-btn"
                     title="@(isSidebarCollapsed ? "توسيع القائمة" : "طي القائمة")"

@@ -1,0 +1,83 @@
+@namespace OAS.UiLib.Components.Layout
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+@using OAS.UiLib.Core.Models
+
+<div class="oas-shell-search" role="search" @onkeydown="HandleSearchKeyDownAsync">
+    <label class="visually-hidden" for="oas-shell-search-input">البحث عن صفحة في النظام</label>
+    <i class="fa-solid fa-magnifying-glass oas-shell-search__icon" aria-hidden="true"></i>
+    <input id="oas-shell-search-input" type="search" autocomplete="off"
+           placeholder="البحث عن صفحة في النظام..."
+           aria-expanded="@(_searchText.Length > 0 && SearchResults.Count > 0)"
+           aria-controls="oas-shell-search-results"
+           @bind="_searchText" @bind:event="oninput" />
+    <kbd>Ctrl + K</kbd>
+    @if (!string.IsNullOrWhiteSpace(_searchText))
+    {
+        <div id="oas-shell-search-results" class="oas-shell-search__results" aria-label="نتائج البحث عن الصفحات">
+            @if (SearchResults.Count == 0)
+            {
+                <span class="oas-shell-search__empty">لا توجد صفحات مطابقة</span>
+            }
+            else
+            {
+                @foreach (var module in SearchResults)
+                {
+                    <button type="button" @onclick="() => SelectAsync(module)">
+                        <i class="@module.IconCssClass" aria-hidden="true"></i>
+                        <span>@module.Title</span>
+                        <i class="fa-solid fa-arrow-up-left" aria-hidden="true"></i>
+                    </button>
+                }
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<UiShellModuleItem> Modules { get; set; } = [];
+    [Parameter] public EventCallback<UiShellModuleItem> OnNavigate { get; set; }
+
+    private string _searchText = string.Empty;
+    private IJSObjectReference? _module;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            _module = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/OAS.UiLib/js/oas-shell-search.js");
+            await _module.InvokeVoidAsync("attachSearchShortcut", "oas-shell-search-input");
+        }
+        catch (JSException) { /* Search remains available without the shortcut. */ }
+        catch (InvalidOperationException) { /* JS may be unavailable during early rendering. */ }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_module is null) return;
+        try { await _module.InvokeVoidAsync("detachSearchShortcut"); }
+        catch (JSDisconnectedException) { }
+        await _module.DisposeAsync();
+    }
+
+    private IReadOnlyList<UiShellModuleItem> SearchResults =>
+        string.IsNullOrWhiteSpace(_searchText) ? [] : Modules
+            .Where(module => module.Title.Contains(_searchText.Trim(), StringComparison.OrdinalIgnoreCase)
+                         || module.Key.Contains(_searchText.Trim(), StringComparison.OrdinalIgnoreCase))
+            .Take(8).ToArray();
+
+    private async Task HandleSearchKeyDownAsync(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape") _searchText = string.Empty;
+        else if (args.Key == "Enter" && SearchResults.Count > 0)
+            await SelectAsync(SearchResults[0]);
+    }
+
+    private async Task SelectAsync(UiShellModuleItem module)
+    {
+        _searchText = string.Empty;
+        await OnNavigate.InvokeAsync(module);
+    }
+}

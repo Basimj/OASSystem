@@ -1,34 +1,11 @@
 <div class="oas-top-header" @onclick="CloseAccountMenu">
-    <UiSystemBrand Name="@SystemName" LogoUrl="@SystemLogoUrl" />
-
-    <div class="oas-header-system-meta" aria-label="معلومات النظام">
-        <div class="oas-header-meta-item" title="الوقت"><i class="fa-regular fa-clock" aria-hidden="true"></i><span>@CurrentTimeText</span></div>
-        <span class="oas-header-meta-separator" aria-hidden="true"></span>
-        <div class="oas-header-meta-item" title="التاريخ"><i class="fa-regular fa-calendar" aria-hidden="true"></i><span>@CurrentDateText</span></div>
-        <span class="oas-header-meta-separator" aria-hidden="true"></span>
-        <div class="oas-header-meta-item oas-header-connection" title="حالة الاتصال"><span class="oas-connection-dot" aria-hidden="true"></span><span>@ConnectionStatus</span></div>
-        <span class="oas-header-meta-separator" aria-hidden="true"></span>
-        <div class="oas-header-meta-item" title="قاعدة البيانات"><i class="fa-solid fa-database" aria-hidden="true"></i><span>@DatabaseName</span></div>
-        <span class="oas-header-meta-separator" aria-hidden="true"></span>
-        <div class="oas-header-meta-item" title="الإصدار"><span>إصدار @VersionText</span></div>
-    </div>
-
-    <div class="oas-header-spacer"></div>
-
-    <div class="oas-header-quick-actions">
-        <button type="button" class="oas-header-icon-button" title="الإشعارات" aria-label="الإشعارات">
-            <i class="fa-regular fa-bell" aria-hidden="true"></i>
-            <span class="oas-notification-badge">3</span>
-        </button>
-    </div>
-
     <div class="oas-header-user-wrap">
-        <button type="button" class="oas-header-user" aria-expanded="@_accountMenuOpen" @onclick="ToggleAccountMenu" @onclick:stopPropagation="true">
-            <UiAvatar Initials="@UserInitials" ImageUrl="@UserImageUrl" AltText="@UserDisplayName" Size="32" />
+        <button type="button" class="oas-header-user" aria-label="قائمة المستخدم @UserDisplayName"
+                aria-expanded="@_accountMenuOpen" @onclick="ToggleAccountMenu" @onclick:stopPropagation="true">
+            <UiAvatar Initials="@UserInitials" ImageUrl="@UserImageUrl" AltText="@UserDisplayName" Size="28" />
             <span class="oas-user-details"><strong>@UserDisplayName</strong><small>@UserName</small></span>
             <i class="oas-user-chevron fa-solid fa-chevron-down" aria-hidden="true"></i>
         </button>
-
         <UiAccountMenu Visible="@_accountMenuOpen"
                        DisplayName="@UserDisplayName"
                        UserName="@UserName"
@@ -39,5 +16,28 @@
                        OnSettings="SettingsAsync"
                        OnSupport="SupportAsync"
                        OnLogout="LogoutAsync" />
+    </div>
+
+    <div class="oas-header-quick-actions" aria-label="الاختصارات">
+        <button type="button" class="oas-header-icon-button" title="الإشعارات غير مفعّلة حاليًا"
+                aria-label="الإشعارات غير مفعّلة حاليًا" disabled>
+            <i class="fa-regular fa-bell" aria-hidden="true"></i>
+        </button>
+    </div>
+
+    <div class="oas-header-system-meta" aria-label="معلومات جلسة النظام">
+        <div class="oas-header-meta-item oas-header-database" title="قاعدة البيانات الحالية">
+            <i class="fa-solid fa-database" aria-hidden="true"></i>
+            <span>قاعدة البيانات: @DatabaseName</span>
+        </div>
+        <span class="oas-header-meta-separator" aria-hidden="true"></span>
+        <a class="oas-header-meta-item oas-header-finance-link" href="/accounting/fiscal-years" title="إدارة السنوات المالية">
+            <i class="fa-solid fa-calendar-days" aria-hidden="true"></i>
+            <span>السنوات المالية</span>
+        </a>
+        <span class="oas-header-meta-separator" aria-hidden="true"></span>
+        <div class="oas-header-meta-item oas-header-date" title="التاريخ الحالي">
+            <i class="fa-regular fa-calendar" aria-hidden="true"></i><span>@CurrentDateText</span>
+        </div>
     </div>
 </div>
