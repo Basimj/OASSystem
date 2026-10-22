@@ -1,4 +1,5 @@
 <div class="oas-shell @(isSidebarCollapsed ? "sidebar-collapsed" : "") @(isMobileMenuOpen ? "mobile-menu-open" : "")">
+    <OasAppearanceBoot OnSidebarModeLoaded="ApplyStoredSidebarModeAsync" />
     <div class="oas-mobile-overlay" @onclick="CloseMobileMenu"></div>
 
     <header class="oas-workspace-topbar">
@@ -53,7 +54,7 @@
                     class="oas-collapse-btn"
                     title="@(isSidebarCollapsed ? "توسيع القائمة" : "طي القائمة")"
                     aria-label="@(isSidebarCollapsed ? "توسيع القائمة" : "طي القائمة")"
-                    @onclick="ToggleSidebarAsync">
+                    @onclick="ToggleAppearanceSidebarAsync">
                 <i class="fa-solid @(isSidebarCollapsed ? "fa-chevron-left" : "fa-chevron-right")" aria-hidden="true"></i>
             </button>
         </div>

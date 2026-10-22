@@ -4,6 +4,8 @@ using OAS.API.Extensions;
 using OAS.API.Middleware;
 using OAS.Application;
 using OAS.Infrastructure;
+using OAS.Application.Identity.Appearance;
+using OAS.Infrastructure.Identity.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,6 +13,7 @@ builder.Services.AddRazorComponents()
     .AddInteractiveWebAssemblyComponents();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddScoped<IAppearancePreferencesService, SqlAppearancePreferencesService>();
 // AP-12 read-only SQL projections; no new persistence tables or posting engine.
 builder.Services.AddScoped<OAS.Application.Purchasing.Performance.IPurchasingPerformanceQueryService,
     OAS.Infrastructure.Purchasing.Persistence.Queries.PurchasingPerformanceQueryService>();

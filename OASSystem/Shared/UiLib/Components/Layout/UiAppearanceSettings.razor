@@ -1,0 +1,279 @@
+@namespace OAS.UiLib.Components.Layout
+@using OAS.UiLib.Core.Models
+
+<section class="oas-appearance-settings" dir="rtl">
+    <header class="oas-appearance-settings__header">
+        <div>
+            <p class="oas-appearance-settings__eyebrow">الإعدادات / المظهر والتخصيص</p>
+            <h1>المظهر والتخصيص</h1>
+            <p>اختر ألوانك وخطك وترتيب الشريط العلوي وشكل تبويبات الصفحات. تظهر المعاينة على النظام مباشرة وتُحفظ الخيارات لحسابك فقط.</p>
+        </div>
+        <button class="oas-appearance-settings__secondary" type="button" disabled="@Busy" @onclick="OnReset">استعادة Ocean UI</button>
+    </header>
+
+    @if (Loading)
+    {
+        <p class="oas-appearance-settings__loading">جاري قراءة إعدادات المظهر من قاعدة البيانات...</p>
+    }
+    else
+    {
+        <div class="oas-appearance-settings__layout">
+            <div class="oas-appearance-settings__form">
+                <section class="oas-appearance-settings__card">
+                    <h2><i class="fa-solid fa-palette" aria-hidden="true"></i> الألوان</h2>
+                    <div class="oas-appearance-settings__presets" role="group" aria-label="ثيمات جاهزة">
+                        <button type="button" @onclick="ApplyOceanPresetAsync">Ocean UI</button>
+                        <button type="button" @onclick="ApplyMidnightPresetAsync">Midnight</button>
+                        <button type="button" @onclick="ApplySlatePresetAsync">Slate</button>
+                    </div>
+                    <div class="oas-appearance-settings__color-grid">
+                        @ColorInput("اللون الأساسي", "primary")
+                        @ColorInput("خلفية القائمة الجانبية", "sidebarBg")
+                        @ColorInput("لون النصوص الجانبية", "sidebarText")
+                        @ColorInput("لون الأيقونات الجانبية", "sidebarIcon")
+                        @ColorInput("خلفية المرور على عنصر", "sidebarHover")
+                        @ColorInput("خلفية العنصر المحدد", "activeBg")
+                        @ColorInput("نص العنصر المحدد", "activeText")
+                        @ColorInput("أيقونة العنصر المحدد", "activeIcon")
+                        @ColorInput("خلفية الشريط العلوي", "headerBg")
+                        @ColorInput("نصوص الشريط العلوي", "headerText")
+                        @ColorInput("أيقونات الشريط العلوي", "headerIcon")
+                    </div>
+                </section>
+                <section class="oas-appearance-settings__card">
+                    <h2><i class="fa-solid fa-window-maximize" aria-hidden="true"></i> شريط تبويبات الصفحات</h2>
+                    <p>يمكنك تخصيص شريط الصفحات المفتوحة بشكل مستقل عن الشريط العلوي؛ دون أي اشتراط لتباين الألوان.</p>
+                    <div class="oas-appearance-settings__form-grid">
+                        <label>شكل التبويبات
+                            <select @bind="Model.TabsStyle" @bind:after="PreviewAsync">
+                                <option value="Classic">كلاسيكي (مستطيلات)</option>
+                                <option value="Pills">كبسولات مستديرة</option>
+                                <option value="Underline">خط أسفل التبويب النشط</option>
+                            </select>
+                        </label>
+                        <label>حجم التبويبات
+                            <select @bind="Model.TabsSize" @bind:after="PreviewAsync">
+                                <option value="Compact">مدمج</option>
+                                <option value="Normal">متوسط</option>
+                                <option value="Comfortable">مريح</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="oas-appearance-settings__color-grid">
+                        @ColorInput("خلفية شريط الصفحات", "tabsBarBg")
+                        @ColorInput("خلفية التبويب العادي", "tabsBg")
+                        @ColorInput("نص التبويب العادي", "tabsText")
+                        @ColorInput("أيقونة التبويب العادي", "tabsIcon")
+                        @ColorInput("خلفية التبويب النشط", "tabsActiveBg")
+                        @ColorInput("نص التبويب النشط", "tabsActiveText")
+                        @ColorInput("أيقونة التبويب النشط", "tabsActiveIcon")
+                        @ColorInput("حدود التبويبات", "tabsBorder")
+                    </div>
+                </section>
+                <section class="oas-appearance-settings__card">
+                    <h2><i class="fa-solid fa-font" aria-hidden="true"></i> الخط والتخطيط</h2>
+                    <div class="oas-appearance-settings__form-grid">
+                        <label>الخط العربي
+                            <select @bind="Model.FontFamily" @bind:after="PreviewAsync">
+                                <option value="Cairo">Cairo</option>
+                                <option value="Tajawal">Tajawal</option>
+                                <option value="IBM Plex Sans Arabic">IBM Plex Sans Arabic</option>
+                                <option value="Segoe UI">Segoe UI</option>
+                            </select>
+                        </label>
+                        <label>مقياس الخط
+                            <select @bind="Model.FontScale" @bind:after="PreviewAsync">
+                                <option value="0.85">صغير (85%)</option>
+                                <option value="1.0">افتراضي (100%)</option>
+                                <option value="1.1">كبير (110%)</option>
+                                <option value="1.25">كبير جدًا (125%)</option>
+                            </select>
+                        </label>
+                        <label>شكل الشريط العلوي
+                            <select @bind="Model.HeaderLayout" @bind:after="PreviewAsync">
+                                <option value="Classic">كلاسيكي</option>
+                                <option value="Compact">مدمج</option>
+                                <option value="Minimal">بسيط</option>
+                            </select>
+                        </label>
+                        <label>القائمة الجانبية
+                            <select @bind="Model.SidebarMode" @bind:after="PreviewAsync">
+                                <option value="Expanded">موسعة</option>
+                                <option value="Collapsed">مطوية</option>
+                            </select>
+                        </label>
+                    </div>
+                </section>
+                <section class="oas-appearance-settings__card">
+                    <h2><i class="fa-solid fa-arrows-up-down" aria-hidden="true"></i> ترتيب الشريط العلوي</h2>
+                    <p>رتب عناصر المستخدم والإشعارات ومعلومات الجلسة. يظل حقل البحث مستقلًا حتى لا تتداخل العناصر.</p>
+                    <div class="oas-appearance-settings__header-items">
+                        @foreach (var key in Model.HeaderOrder)
+                        {
+                            <div class="oas-appearance-settings__header-item" @key="key">
+                                <strong>@HeaderLabel(key)</strong>
+                                <div>
+                                    <button type="button" title="تحريك للأمام" aria-label="تحريك @HeaderLabel(key) للأمام" @onclick="() => MoveHeaderAsync(key, -1)">↑</button>
+                                    <button type="button" title="تحريك للخلف" aria-label="تحريك @HeaderLabel(key) للخلف" @onclick="() => MoveHeaderAsync(key, 1)">↓</button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </section>
+                <div class="oas-appearance-settings__actions">
+                    <button type="button" class="oas-appearance-settings__primary" disabled="@Busy" @onclick="OnSave">@(Busy ? "جاري الحفظ..." : "حفظ التغييرات")</button>
+                    <button type="button" class="oas-appearance-settings__secondary" disabled="@Busy" @onclick="OnCancel">إلغاء التغييرات</button>
+                </div>
+            </div>
+            <aside class="oas-appearance-settings__preview" aria-label="معاينة المظهر">
+                <h2>معاينة سريعة</h2>
+                <p>تُطبّق تغييراتك فورًا أيضًا على القائمة الجانبية والشريط العلوي الحقيقيين.</p>
+                <div class="oas-appearance-settings__demo">
+                    <div class="oas-appearance-settings__demo-sidebar" style="background:@Model.SidebarBackground;color:@Model.SidebarTextColor">
+                        <strong>OASSystem</strong>
+                        <span><i class="fa-solid fa-house" style="color:@Model.SidebarIconColor"></i> الرئيسية</span>
+                        <span style="background:@Model.SidebarActiveBackground;color:@Model.SidebarActiveTextColor"><i class="fa-solid fa-calculator" style="color:@Model.SidebarActiveIconColor"></i> المحاسبة</span>
+                        <span><i class="fa-solid fa-warehouse" style="color:@Model.SidebarIconColor"></i> المخزون</span>
+                    </div>
+                    <div class="oas-appearance-settings__demo-content">
+                        <div style="background:@Model.HeaderBackground;color:@Model.HeaderTextColor">الإشعارات · المستخدم</div>
+                        <div class="oas-appearance-settings__demo-tabs" style="background:@Model.TabsBarBackground">
+                            <span style="background:@Model.TabsActiveBackground;color:@Model.TabsActiveTextColor;border-color:@Model.TabsBorderColor">
+                                <i class="fa-solid fa-calculator" style="color:@Model.TabsActiveIconColor"></i> المحاسبة
+                            </span>
+                            <span style="background:@Model.TabsBackground;color:@Model.TabsTextColor;border-color:@Model.TabsBorderColor">
+                                <i class="fa-solid fa-warehouse" style="color:@Model.TabsIconColor"></i> المخزون
+                            </span>
+                        </div>
+                        <strong>شجرة الحسابات</strong>
+                        <small>التصنيف · اسم الحساب · الحالة</small>
+                        <div class="oas-appearance-settings__demo-line"></div>
+                        <div class="oas-appearance-settings__demo-line"></div>
+                    </div>
+                </div>
+                <small>لا تُحفظ التفضيلات إلا بعد الضغط على «حفظ التغييرات».</small>
+            </aside>
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public AppearanceSettingsModel Model { get; set; } = new();
+    [Parameter] public bool Loading { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public EventCallback OnPreview { get; set; }
+    [Parameter] public EventCallback OnSave { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public EventCallback OnReset { get; set; }
+
+    private Task PreviewAsync()
+    {
+        Model.ThemePreset = "Custom";
+        return OnPreview.InvokeAsync();
+    }
+    // Named callbacks avoid nested Razor attribute quotes and generated C# parser errors.
+    private Task ApplyOceanPresetAsync() => ApplyPresetAsync("Ocean");
+    private Task ApplyMidnightPresetAsync() => ApplyPresetAsync("Midnight");
+    private Task ApplySlatePresetAsync() => ApplyPresetAsync("Slate");
+
+    private async Task ApplyPresetAsync(string preset)
+    {
+        switch (preset)
+        {
+            case "Ocean":
+                Model.PrimaryColor = "#459DB9"; Model.SidebarBackground = "#1B4659";
+                Model.SidebarTextColor = "#FFFFFF"; Model.SidebarIconColor = "#D6EAF1";
+                Model.SidebarHoverBackground = "#335F72"; Model.SidebarActiveBackground = "#287E9A";
+                Model.SidebarActiveTextColor = "#FFFFFF"; Model.SidebarActiveIconColor = "#FFFFFF";
+                Model.HeaderBackground = "#FFFFFF"; Model.HeaderTextColor = "#1C3444";
+                Model.HeaderIconColor = "#526C87";
+                break;
+            case "Midnight":
+                Model.PrimaryColor = "#317995"; Model.SidebarBackground = "#162A3B";
+                Model.SidebarTextColor = "#FFFFFF"; Model.SidebarIconColor = "#D6EAF1";
+                Model.SidebarHoverBackground = "#304A5B"; Model.SidebarActiveBackground = "#246E88";
+                Model.SidebarActiveTextColor = "#FFFFFF"; Model.SidebarActiveIconColor = "#FFFFFF";
+                Model.HeaderBackground = "#F6F9FC"; Model.HeaderTextColor = "#182F41";
+                Model.HeaderIconColor = "#45647B";
+                break;
+            case "Slate":
+                Model.PrimaryColor = "#526C8B"; Model.SidebarBackground = "#273847";
+                Model.SidebarTextColor = "#FFFFFF"; Model.SidebarIconColor = "#D5E2EB";
+                Model.SidebarHoverBackground = "#405361"; Model.SidebarActiveBackground = "#425E7D";
+                Model.SidebarActiveTextColor = "#FFFFFF"; Model.SidebarActiveIconColor = "#FFFFFF";
+                Model.HeaderBackground = "#FFFFFF"; Model.HeaderTextColor = "#253A4D";
+                Model.HeaderIconColor = "#4C637D";
+                break;
+            default: return;
+        }
+        Model.ThemePreset = preset;
+        await OnPreview.InvokeAsync();
+    }
+    private async Task MoveHeaderAsync(string key, int delta)
+    {
+        var i = Array.IndexOf(Model.HeaderOrder, key);
+        var j = i + delta;
+        if (i < 0 || j < 0 || j >= Model.HeaderOrder.Length) return;
+        (Model.HeaderOrder[i], Model.HeaderOrder[j]) = (Model.HeaderOrder[j], Model.HeaderOrder[i]);
+        await PreviewAsync();
+    }
+    private static string HeaderLabel(string key) => key switch
+    {
+        "user" => "المستخدم", "notifications" => "الإشعارات", "session" => "معلومات الجلسة", _ => key
+    };
+    private RenderFragment ColorInput(string label, string key) => @<label class="oas-appearance-settings__color-input">
+        <span>@label</span>
+        <input type="color" value="@GetColor(key)" @oninput="e => UpdateColorAsync(key, e.Value?.ToString())" aria-label="@label" />
+        <small dir="ltr">@GetColor(key)</small>
+    </label>;
+    private string GetColor(string key) => key switch
+    {
+        "primary" => Model.PrimaryColor,
+        "sidebarBg" => Model.SidebarBackground,
+        "sidebarText" => Model.SidebarTextColor,
+        "sidebarIcon" => Model.SidebarIconColor,
+        "sidebarHover" => Model.SidebarHoverBackground,
+        "activeBg" => Model.SidebarActiveBackground,
+        "activeText" => Model.SidebarActiveTextColor,
+        "activeIcon" => Model.SidebarActiveIconColor,
+        "headerBg" => Model.HeaderBackground,
+        "headerText" => Model.HeaderTextColor,
+        "headerIcon" => Model.HeaderIconColor,
+        "tabsBarBg" => Model.TabsBarBackground,
+        "tabsBg" => Model.TabsBackground,
+        "tabsText" => Model.TabsTextColor,
+        "tabsIcon" => Model.TabsIconColor,
+        "tabsActiveBg" => Model.TabsActiveBackground,
+        "tabsActiveText" => Model.TabsActiveTextColor,
+        "tabsActiveIcon" => Model.TabsActiveIconColor,
+        "tabsBorder" => Model.TabsBorderColor,
+        _ => "#FFFFFF"
+    };
+    private async Task UpdateColorAsync(string key, string? value)
+    {
+        if (value?.Length != 7 || value[0] != '#') return;
+        switch (key)
+        {
+            case "primary": Model.PrimaryColor=value; break;
+            case "sidebarBg": Model.SidebarBackground=value; break;
+            case "sidebarText": Model.SidebarTextColor=value; break;
+            case "sidebarIcon": Model.SidebarIconColor=value; break;
+            case "sidebarHover": Model.SidebarHoverBackground=value; break;
+            case "activeBg": Model.SidebarActiveBackground=value; break;
+            case "activeText": Model.SidebarActiveTextColor=value; break;
+            case "activeIcon": Model.SidebarActiveIconColor=value; break;
+            case "headerBg": Model.HeaderBackground=value; break;
+            case "headerText": Model.HeaderTextColor=value; break;
+            case "headerIcon": Model.HeaderIconColor=value; break;
+            case "tabsBarBg": Model.TabsBarBackground=value; break;
+            case "tabsBg": Model.TabsBackground=value; break;
+            case "tabsText": Model.TabsTextColor=value; break;
+            case "tabsIcon": Model.TabsIconColor=value; break;
+            case "tabsActiveBg": Model.TabsActiveBackground=value; break;
+            case "tabsActiveText": Model.TabsActiveTextColor=value; break;
+            case "tabsActiveIcon": Model.TabsActiveIconColor=value; break;
+            case "tabsBorder": Model.TabsBorderColor=value; break;
+        }
+        await PreviewAsync();
+    }
+}

@@ -1,0 +1,177 @@
+@page "/settings"
+@page "/settings/appearance"
+@attribute [Authorize]
+@using System.Net.Http.Json
+@using System.Text.Json
+@using Microsoft.JSInterop
+@using OAS.Contracts.Identity.Appearance
+@using OAS.UiLib.Core.Models
+@using OAS.UiLib.Components.Layout
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject OAS.UiLib.Services.Feedback.IUiSnackbarService Snackbar
+@implements IAsyncDisposable
+
+<PageTitle>المظهر والتخصيص | OASSystem</PageTitle>
+<UiAppearanceSettings Model="_draft" Loading="_loading" Busy="_saving" OnSave="SaveAsync"
+                      OnPreview="PreviewAsync" OnCancel="CancelAsync" OnReset="ResetAsync" />
+
+@code {
+    private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
+    private const string Endpoint = "api/identity/profile/appearance";
+    private AppearanceSettingsDto _saved = new();
+    private AppearanceSettingsModel _draft = new();
+    private bool _loading = true, _saving;
+    private IJSObjectReference? _js;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _saved = await Http.GetFromJsonAsync<AppearanceSettingsDto>(Endpoint) ?? new();
+            _draft = AsModel(_saved);
+        }
+        catch (Exception)
+        {
+            Snackbar.Error("تعذر تحميل إعدادات المظهر من قاعدة البيانات. تحقق من الاتصال وتحديث قاعدة البيانات.");
+        }
+        finally { _loading = false; }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            _js = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/OAS.UiLib/js/oas-appearance.js");
+        }
+        catch (JSException) { /* The static preview remains available. */ }
+    }
+
+    private async Task PreviewAsync()
+    {
+        if (_js is null) return;
+        try { await _js.InvokeVoidAsync("apply", AsContract(_draft)); }
+        catch (JSException) { }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_saving) return;
+        _saving = true;
+        try
+        {
+            using var response = await Http.PutAsJsonAsync(Endpoint, AsContract(_draft));
+            if (!response.IsSuccessStatusCode)
+            {
+                var reason = await GetSaveErrorAsync(response);
+                Snackbar.Error($"تعذر الحفظ ({(int)response.StatusCode}): {reason}");
+                return;
+            }
+            _saved = await response.Content.ReadFromJsonAsync<AppearanceSettingsDto>() ?? AsContract(_draft);
+            _draft = AsModel(_saved);
+            Snackbar.Success("تم حفظ المظهر في قاعدة البيانات لهذا المستخدم.");
+            await PreviewAsync();
+        }
+        catch (Exception)
+        {
+            Snackbar.Error("تعذر حفظ الإعدادات بسبب مشكلة اتصال.");
+        }
+        finally { _saving = false; }
+    }
+
+    // The API returns { message: "..." } for validation errors. ASP.NET
+    // model binding may instead return ProblemDetails { title, errors }.
+    // Preserve those explanations so users know exactly what to change.
+    private static async Task<string> GetSaveErrorAsync(HttpResponseMessage response)
+    {
+        try
+        {
+            var raw = await response.Content.ReadAsStringAsync();
+            if (!string.IsNullOrWhiteSpace(raw))
+            {
+                using var doc = JsonDocument.Parse(raw);
+                var root = doc.RootElement;
+                if (root.ValueKind == JsonValueKind.Object)
+                {
+                    if (root.TryGetProperty("message", out var message) &&
+                        message.ValueKind == JsonValueKind.String &&
+                        !string.IsNullOrWhiteSpace(message.GetString()))
+                        return message.GetString()!;
+
+                    if (root.TryGetProperty("errors", out var errors) &&
+                        errors.ValueKind == JsonValueKind.Object)
+                    {
+                        var details = errors.EnumerateObject()
+                            .SelectMany(property => property.Value.ValueKind == JsonValueKind.Array
+                                ? property.Value.EnumerateArray()
+                                    .Where(item => item.ValueKind == JsonValueKind.String)
+                                    .Select(item => item.GetString())
+                                : Enumerable.Empty<string?>())
+                            .Where(value => !string.IsNullOrWhiteSpace(value))
+                            .Take(3)
+                            .ToArray();
+                        if (details.Length > 0)
+                            return string.Join("؛ ", details);
+                    }
+
+                    if (root.TryGetProperty("title", out var title) &&
+                        title.ValueKind == JsonValueKind.String &&
+                        !string.IsNullOrWhiteSpace(title.GetString()))
+                        return title.GetString()!;
+                }
+            }
+        }
+        catch (JsonException) { /* Response is not JSON; use an appropriate fallback. */ }
+
+        return response.StatusCode switch
+        {
+            System.Net.HttpStatusCode.BadRequest => "البيانات المرسلة غير صالحة. تحقق من صيغة اللون أو خيارات التخطيط.",
+            System.Net.HttpStatusCode.Unauthorized => "انتهت جلسة المستخدم. أعد تسجيل الدخول.",
+            System.Net.HttpStatusCode.Forbidden => "لا توجد صلاحية لتعديل إعدادات المظهر.",
+            System.Net.HttpStatusCode.NotFound => "خدمة إعدادات المظهر غير متاحة على الخادم.",
+            _ => "تعذر حفظ إعدادات المظهر. تحقق من الاتصال بالخادم."
+        };
+    }
+
+    private async Task ResetAsync()
+    {
+        if (_saving) return;
+        _saving = true;
+        try
+        {
+            using var response = await Http.DeleteAsync(Endpoint);
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException();
+            _saved = new AppearanceSettingsDto();
+            _draft = AsModel(_saved);
+            Snackbar.Success("تمت استعادة Ocean UI وحذف تخصيصك من قاعدة البيانات.");
+            await PreviewAsync();
+        }
+        catch (Exception)
+        {
+            Snackbar.Error("تعذرت استعادة الإعدادات الافتراضية.");
+        }
+        finally { _saving = false; }
+    }
+
+    private async Task CancelAsync()
+    {
+        _draft = AsModel(_saved);
+        Snackbar.Info("تم إلغاء التغييرات غير المحفوظة.");
+        await PreviewAsync();
+    }
+
+    private static AppearanceSettingsModel AsModel(AppearanceSettingsDto dto) =>
+        JsonSerializer.Deserialize<AppearanceSettingsModel>(JsonSerializer.Serialize(dto, Options), Options) ?? new();
+    private static AppearanceSettingsDto AsContract(AppearanceSettingsModel model) =>
+        JsonSerializer.Deserialize<AppearanceSettingsDto>(JsonSerializer.Serialize(model, Options), Options) ?? new();
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_js is null) return;
+        try { await _js.InvokeVoidAsync("apply", _saved); }
+        catch (JSException) { }
+        try { await _js.DisposeAsync(); }
+        catch (JSDisconnectedException) { }
+    }
+}
