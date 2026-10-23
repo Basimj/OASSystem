@@ -55,6 +55,26 @@ export function apply(settings, notify = true) {
         '--oas-ui-font-scale': String(Math.max(.85, Math.min(1.25, Number(settings.fontScale) || 1)))
     };
     for (const [key, value] of Object.entries(vars)) el.style.setProperty(key, value);
+    // Prior versions stored a scale token but most CSS components never read it.
+    // Publish scale-aware semantic tokens used by tables, form controls and side navigation.
+    const scale = Math.max(.85, Math.min(1.25, Number(settings.fontScale) || 1));
+    el.style.setProperty('--oas-ui-font-scale', String(scale));
+    el.style.setProperty('--oas-font-xs', `${(11 * scale).toFixed(2)}px`);
+    el.style.setProperty('--oas-font-sm', `${(12 * scale).toFixed(2)}px`);
+    el.style.setProperty('--oas-font-md', `${(13 * scale).toFixed(2)}px`);
+    el.style.setProperty('--oas-font-lg', `${(14.4 * scale).toFixed(2)}px`);
+    el.style.setProperty('--oas-sidebar-nav-font-size', `${(13 * scale).toFixed(2)}px`);
+    el.style.setProperty('--oas-sidebar-child-font-size', `${(12 * scale).toFixed(2)}px`);
+    const darkMode = settings.themeMode === 'Dark';
+    el.classList.toggle('oas-theme-dark', darkMode);
+    // Dark mode uses neutral charcoal surfaces; accent stays configurable.
+    // All page-level styles consume the tokens inherited from .oas-shell.
+    el.style.setProperty('--oas-theme-content-bg', darkMode ? '#0E0F12' : '#EFF7FC');
+    el.style.setProperty('--oas-theme-card-bg', darkMode ? '#191B1F' : '#FFFFFF');
+    el.style.setProperty('--oas-theme-input-bg', darkMode ? '#22252A' : '#FFFFFF');
+    el.style.setProperty('--oas-theme-text', darkMode ? '#F3F5F7' : '#243849');
+    el.style.setProperty('--oas-theme-muted', darkMode ? '#B5BCC6' : '#63798C');
+    el.style.setProperty('--oas-theme-border', darkMode ? '#353940' : '#DCE7EF');
     for (const name of ['Classic', 'Compact', 'Minimal']) el.classList.remove(`oas-appearance-header-${name.toLowerCase()}`);
     const layout = ['Classic', 'Compact', 'Minimal'].includes(settings.headerLayout) ? settings.headerLayout : 'Classic';
     el.classList.add(`oas-appearance-header-${layout.toLowerCase()}`);

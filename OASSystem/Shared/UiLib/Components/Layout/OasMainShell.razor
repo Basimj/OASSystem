@@ -60,6 +60,12 @@
         </div>
 
         <nav class="oas-nav" aria-label="التنقل الرئيسي">
+            @{
+                var standaloneSettings = VisibleNavigationGroups
+                    .SelectMany(g => GetVisibleGroupModules(g))
+                    .FirstOrDefault(m => string.Equals(m.Href, "/settings", StringComparison.OrdinalIgnoreCase)
+                                      || string.Equals(m.Href, "/settings/appearance", StringComparison.OrdinalIgnoreCase));
+            }
             @foreach (var module in VisibleUngroupedModules)
             {
                 <button type="button"
@@ -74,10 +80,14 @@
 
             @foreach (var group in VisibleNavigationGroups)
             {
-                var groupModules = GetVisibleGroupModules(group);
+                var groupModules = GetVisibleGroupModules(group)
+                    .Where(m => standaloneSettings is null || !string.Equals(m.Href, standaloneSettings.Href, StringComparison.OrdinalIgnoreCase))
+                    .ToArray();
                 var active = groupModules.Any(IsModuleActive);
                 var expanded = IsGroupExpanded(group);
-                <div class="@(active ? "oas-nav-group active" : "oas-nav-group")">
+                @if (groupModules.Any())
+                {
+                    <div class="@(active ? "oas-nav-group active" : "oas-nav-group")">
                     @if (group.Key == "accounting" && groupModules.Any(m => m.Href == "/accounting"))
                     {
                         // The accounting group has a landing page; navigation and expansion are separate.
@@ -142,6 +152,52 @@
                                        Title="@group.Title"
                                        Items="@BuildContextItems(group)"
                                        OnSelect="SelectCollapsedGroupItemAsync" />
+                    }
+                    </div>
+                }
+            }
+
+            @if (standaloneSettings is not null)
+            {
+                var settingsActive = _currentPath.StartsWith("/settings", StringComparison.OrdinalIgnoreCase);
+                <div class="@(settingsActive ? "oas-nav-group oas-nav-settings-group active" : "oas-nav-group oas-nav-settings-group")">
+                    <button type="button" class="oas-nav-group__header"
+                            title="الإعدادات" aria-label="عرض صفحات الإعدادات"
+                            aria-expanded="@(!isSidebarCollapsed && _settingsGroupExpanded)"
+                            @onclick="ToggleSettingsGroupAsync">
+                        <span class="oas-nav-icon"><i class="fa-solid fa-gear" aria-hidden="true"></i></span>
+                        <span class="oas-nav-text">الإعدادات</span>
+                        @if (!isSidebarCollapsed)
+                        {
+                            <i class="oas-nav-group__chevron fa-solid @(_settingsGroupExpanded ? "fa-chevron-up" : "fa-chevron-down")" aria-hidden="true"></i>
+                        }
+                    </button>
+                    @if (!isSidebarCollapsed && _settingsGroupExpanded)
+                    {
+                        <div class="oas-nav-group__items">
+                            <button type="button" class="@(_currentPath.Equals("/settings", StringComparison.OrdinalIgnoreCase) ? "oas-nav-item oas-nav-item--child active" : "oas-nav-item oas-nav-item--child")"
+                                    title="الإعدادات العامة" @onclick="NavigateSettingsHomeAsync">
+                                <span class="oas-nav-icon"><i class="fa-solid fa-sliders" aria-hidden="true"></i></span><span class="oas-nav-text">الإعدادات العامة</span>
+                            </button>
+                            <button type="button" class="@(_currentPath.StartsWith("/settings/appearance", StringComparison.OrdinalIgnoreCase) ? "oas-nav-item oas-nav-item--child active" : "oas-nav-item oas-nav-item--child")"
+                                    title="المظهر" @onclick="NavigateSettingsAppearanceAsync">
+                                <span class="oas-nav-icon"><i class="fa-solid fa-palette" aria-hidden="true"></i></span><span class="oas-nav-text">المظهر</span>
+                            </button>
+                            @foreach (var option in VisibleModules.Where(m => m.Key is "users" or "roles"))
+                            {
+                                <button type="button" class="@(IsModuleActive(option) ? "oas-nav-item oas-nav-item--child active" : "oas-nav-item oas-nav-item--child")"
+                                        title="@option.Title" @onclick="() => NavigateModuleAsync(option)">
+                                    <span class="oas-nav-icon"><i class="@option.IconCssClass" aria-hidden="true"></i></span>
+                                    <span class="oas-nav-text">@(option.Key == "users" ? "إدارة المستخدمين" : "الأدوار والصلاحيات")</span>
+                                </button>
+                            }
+                        </div>
+                    }
+                    @if (isSidebarCollapsed)
+                    {
+                        <UiContextMenu Visible="@string.Equals(_contextGroupKey, SettingsContextKey, StringComparison.Ordinal)"
+                                       Title="الإعدادات" Items="@BuildSettingsContextItems()"
+                                       OnSelect="SelectSettingsContextItemAsync" />
                     }
                 </div>
             }

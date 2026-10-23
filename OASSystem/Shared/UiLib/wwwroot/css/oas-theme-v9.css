@@ -1,0 +1,134 @@
+/* OASSystem V9 — neutral dark UI integration and working typography controls. */
+.oas-shell {
+  font-size:calc(16px * var(--oas-ui-font-scale, 1));
+  --oas-ui-font-scale: 1;
+  --oas-font-xs: 11px;
+  --oas-font-sm: 12px;
+  --oas-font-md: 13px;
+  --oas-font-lg: 14.4px;
+}
+/* Fixed px values in legacy pages prevented font settings from having a visible effect.
+   Apply scale only to text-bearing controls, avoiding compounding descendants. */
+.oas-shell .oas-main-inner :is(.ui-data-table,.ui-data-table th,.ui-data-table td,
+    .ui-purchasing-list__title,.ui-purchasing-list__status,
+    .ui-purchasing-list small,.ui-workspace__actions button,
+    .ui-workspace__tabs button,.ui-workspace__filters button,
+    .ui-workspace__filters input,.ui-workspace__filters select,
+    .ui-form-section label,.form-label,.form-control,.form-select,
+    input:not([type=checkbox]):not([type=radio]):not([type=color]):not([type=range]),
+    select,textarea) {
+  font-size: var(--oas-font-sm, 12px);
+}
+.oas-shell .oas-main-inner :is(.ui-purchasing-list__meta,.ui-purchasing-list small,.ui-data-table__empty) {
+  font-size:var(--oas-font-xs,11px);
+}
+.oas-shell .oas-main-inner :is(.ui-section-title,.ui-purchasing-line-card__head strong,
+    .ui-po-lines-toolbar__info strong) {font-size:var(--oas-font-lg,14.4px)}
+.oas-shell .oas-global-tabs-row .ui-application-tab__select {font-size:calc(10.5px * var(--oas-ui-font-scale,1))}
+.oas-shell .oas-top-header :is(.oas-user-details strong,.oas-header-meta-item,.oas-header-meta-item span) {font-size:calc(10px * var(--oas-ui-font-scale,1))}
+.oas-shell .oas-sidebar :is(.oas-nav-item,.oas-nav-group__header) {font-size:var(--oas-sidebar-nav-font-size,13px)}
+.oas-shell .oas-sidebar .oas-nav-item--child {font-size:var(--oas-sidebar-child-font-size,12px)}
+.oas-shell .oas-sidebar .oas-nav-text {font-size:inherit}
+.oas-shell.sidebar-collapsed .oas-sidebar .oas-nav-text {font-size:calc(8px * var(--oas-ui-font-scale,1))}
+/* Expanded settings group is a parent, not a duplicate standalone page. */
+.oas-sidebar .oas-nav-settings-group {margin-block:6px 10px}
+.oas-sidebar .oas-nav-settings-group > .oas-nav-group__header {font-weight:700}
+.oas-sidebar .oas-nav-settings-group > .oas-nav-group__header:hover {background:var(--oas-ui-sidebar-hover,#335F72)}
+.oas-sidebar .oas-nav-settings-group .oas-nav-group__items {margin-bottom:8px}
+/* Neutral dark palette; a single source of truth for old Bootstrap and OAS tokens. */
+.oas-shell.oas-theme-dark {
+  color-scheme:dark;
+  --oas-color-background:#0e0f12;
+  --oas-color-surface:#191b1f;
+  --oas-color-subtle:#22252a;
+  --oas-color-hover:#26292e;
+  --oas-color-text:#f3f5f7;
+  --oas-color-text-muted:#b9c0ca;
+  --oas-color-border:#383c44;
+  --oas-color-border-subtle:#30343b;
+  --oas-theme-content-bg:#0e0f12;
+  --oas-theme-card-bg:#191b1f;
+  --oas-theme-input-bg:#22252a;
+  --oas-theme-text:#f3f5f7;
+  --oas-theme-muted:#b9c0ca;
+  --oas-theme-border:#383c44;
+  --bs-body-bg:#0e0f12;
+  --bs-body-color:#f3f5f7;
+  --bs-secondary-color:#b9c0ca;
+  --bs-border-color:#383c44;
+  --bs-tertiary-bg:#22252a;
+  --bs-secondary-bg:#191b1f;
+  --bs-emphasis-color:#f3f5f7;
+  --bs-table-bg:#191b1f;
+  --bs-table-color:#f3f5f7;
+  --bs-table-border-color:#383c44;
+  background-color:#0e0f12;
+  color:#f3f5f7;
+}
+/* Fix V8 white workspaces wrapping charcoal tables (as reported in Sales / Inventory).
+   Limit the change to surface-like UI library containers, not status chips. */
+.oas-shell.oas-theme-dark .oas-main-inner :is(
+  .ui-workspace__actions,.ui-workspace__tabs,.ui-workspace__filters,.ui-workspace__main,
+  .ui-data-table__container,.ui-data-table,.ui-purchasing-list__card,.ui-purchasing-list__empty,
+  .ui-form-section,.ui-form-grid,.ui-card,.ui-panel,.card,.card-body,.panel,
+  .table-responsive,[class^="ui-"][class*="__panel"],[class^="ui-"][class*="__toolbar"],
+  [class^="ui-"][class*="__section"],[class^="ui-"][class*="__container"],
+  [class^="ui-"][class*="__filters"],[class^="ui-"][class*="__summary"]
+) {
+  background-color:var(--oas-theme-card-bg) !important;
+  color:var(--oas-theme-text) !important;
+  border-color:var(--oas-theme-border) !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-workspace__body,.ui-workspace__main--scrollable,.ui-purchasing-workspace) {
+  background-color:transparent !important;
+  color:var(--oas-theme-text);
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-data-table,.table,table) {
+  background-color:var(--oas-theme-card-bg) !important;
+  color:var(--oas-theme-text);
+  --bs-table-bg:var(--oas-theme-card-bg);
+  --bs-table-color:var(--oas-theme-text);
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-data-table th,.table thead th,table thead th) {
+  background-color:#272a30 !important;
+  color:#f3f5f7 !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-data-table td,.table tbody td,table tbody td) {
+  background-color:var(--oas-theme-card-bg) !important;
+  color:var(--oas-theme-text) !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-data-table tbody tr:nth-child(even) td,table tbody tr:nth-child(even) td) {
+  background-color:#202228 !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-data-table tbody tr:hover td,table tbody tr:hover td) {
+  background-color:#2c3038 !important;
+}
+/* Prevent dark text/white background split in filter bars and controls; preserve user-selectable accent colors. */
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-workspace__filters,.ui-workspace__actions,.ui-workspace__tabs) {
+  background-color:#191b1f !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(
+  .form-control,.form-select,input:not([type=checkbox]):not([type=radio]):not([type=color]):not([type=range]),
+  select,textarea,[class^="ui-"][class*="__input"]
+) {
+  background-color:var(--oas-theme-input-bg) !important;
+  border-color:#464b54 !important;
+  color:var(--oas-theme-text) !important;
+  caret-color:var(--oas-theme-text);
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(input,textarea)::placeholder {color:#b5bec9 !important;opacity:1}
+.oas-shell.oas-theme-dark .oas-main-inner :is(.btn-light,.btn-outline-secondary,.ui-action-button,.ui-toolbar-button) {
+  background-color:#26292e !important;
+  color:#f3f5f7 !important;
+  border-color:#444952 !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-data-table__empty,.text-muted,.text-secondary,.form-text,.ui-field-hint,small) {
+  color:#b9c0ca;
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-purchasing-list__title,.ui-purchasing-list__body,
+  .ui-data-table__container,.ui-workspace__actions,.ui-workspace__tabs,.ui-workspace__filters) {
+  color:var(--oas-theme-text);
+}
+/* Native date inputs in dark mode use native dark picker chrome. */
+.oas-shell.oas-theme-dark .oas-main-inner input[type="date"] {color-scheme:dark}
+@media(prefers-reduced-motion:reduce){.oas-sidebar .oas-nav-settings-group *{transition:none}}

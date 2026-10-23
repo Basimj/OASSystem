@@ -1,4 +1,3 @@
-@page "/settings"
 @page "/settings/appearance"
 @attribute [Authorize]
 @using System.Net.Http.Json
@@ -12,7 +11,7 @@
 @inject OAS.UiLib.Services.Feedback.IUiSnackbarService Snackbar
 @implements IAsyncDisposable
 
-<PageTitle>المظهر والتخصيص | OASSystem</PageTitle>
+<PageTitle>المظهر | الإعدادات | OASSystem</PageTitle>
 <UiAppearanceSettings Model="_draft" Loading="_loading" Busy="_saving" OnSave="SaveAsync"
                       OnPreview="PreviewAsync" OnCancel="CancelAsync" OnReset="ResetAsync" />
 

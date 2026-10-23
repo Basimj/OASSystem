@@ -1,0 +1,280 @@
+/* OASSystem Ocean V10 — module-specific dark theme surface normalization.
+   All rules intentionally scoped to .oas-shell.oas-theme-dark so the light theme
+   and user-specified header/sidebar/tab colors are untouched.
+
+   WHY THIS EXISTS:
+   - :root derived tokens (--oas-sales-surface/bg/primary) can compute to their
+     initial light values before .oas-shell switches to dark mode.
+   - Some UiLib components hardcode white panel backgrounds & dark headings.
+   - Certain Sales/Optical containers use light-only gradients and accent chips.
+*/
+.oas-shell.oas-theme-dark {
+    /* Recompute derived tokens at the actual dark-theme scope. */
+    --oas-sales-surface: var(--oas-color-surface);
+    --oas-sales-bg: var(--oas-color-background);
+    --oas-sales-border: var(--oas-color-border);
+    --oas-sales-muted: var(--oas-color-text-muted);
+    --oas-sales-primary: var(--oas-ui-accent, #48abd1);
+    --oas-color-primary: var(--oas-ui-accent, #48abd1);
+    --oas-color-primary-hover: color-mix(in srgb, var(--oas-ui-accent, #48abd1) 75%, white);
+    --oas-color-primary-soft: color-mix(in srgb, var(--oas-ui-accent, #48abd1) 16%, #191b1f);
+    --oas-color-primary-border: color-mix(in srgb, var(--oas-ui-accent, #48abd1) 45%, #383c44);
+    --oas-color-disabled-surface: #22252a;
+    --oas-dark-bg: #0e0f12;
+    --oas-dark-panel: #191b1f;
+    --oas-dark-panel-alt: #202228;
+    --oas-dark-header: #272a30;
+    --oas-dark-border: #383c44;
+    --oas-dark-ink: #f3f5f7;
+    --oas-dark-subtle: #b9c0ca;
+}
+
+/* Inventory master pages: UiDataGridPanel declares #fff in component CSS,
+   which was the exact source of the white table surround in the screenshots. */
+.oas-shell.oas-theme-dark .oas-main-inner .ui-data-grid-panel,
+.oas-shell.oas-theme-dark .oas-main-inner .ui-data-grid-panel__toolbar,
+.oas-shell.oas-theme-dark .oas-main-inner .ui-data-grid-panel__body,
+.oas-shell.oas-theme-dark .oas-main-inner .ui-data-grid-panel__footer {
+    background: var(--oas-dark-panel) !important;
+    color: var(--oas-dark-ink) !important;
+    border-color: var(--oas-dark-border) !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner .ui-data-grid-panel__header {
+    background: var(--oas-dark-header) !important;
+    color: var(--oas-dark-ink) !important;
+    border-color: var(--oas-dark-border) !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner .ui-data-grid-panel__title strong,
+.oas-shell.oas-theme-dark .oas-main-inner .ui-card__header h2,
+.oas-shell.oas-theme-dark .oas-main-inner .ui-card__header strong {
+    color: var(--oas-dark-ink) !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner .ui-data-grid-panel__title span,
+.oas-shell.oas-theme-dark .oas-main-inner .ui-card__header p {
+    color: var(--oas-dark-subtle) !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner .ui-card,
+.oas-shell.oas-theme-dark .oas-main-inner .ui-card__header,
+.oas-shell.oas-theme-dark .oas-main-inner .ui-card__body {
+    background-color: var(--oas-dark-panel) !important;
+    color: var(--oas-dark-ink) !important;
+    border-color: var(--oas-dark-border) !important;
+}
+
+/* Search component: prior dark fixes recolored input but left its parent white. */
+.oas-shell.oas-theme-dark .oas-main-inner .ui-search-input,
+.oas-shell.oas-theme-dark .oas-main-inner .ui-search-input--disabled {
+    background: #22252a !important;
+    color: var(--oas-dark-subtle) !important;
+    border-color: #484d56 !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner .ui-search-input input {
+    background: transparent !important;
+    color: var(--oas-dark-ink) !important;
+    border: none !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner .ui-search-input input::placeholder {
+    color: #b9c0ca !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner .ui-search-input button {
+    background: transparent !important;
+    color: var(--oas-dark-subtle) !important;
+}
+
+/* Sales / Prescriptions: root sales tokens were frozen on light theme;
+   selectors below also cover hard-coded white and lavender surfaces. */
+.oas-shell.oas-theme-dark .oas-main-inner .ui-sales-workspace {
+    background: var(--oas-dark-bg) !important;
+    color: var(--oas-dark-ink);
+}
+.oas-shell.oas-theme-dark .oas-main-inner .ui-sales-home__hero {
+    background: linear-gradient(125deg, #202228, #191b1f) !important;
+    border-color: var(--oas-dark-border) !important;
+    color: var(--oas-dark-ink) !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner .ui-sales-home__hero h1,
+.oas-shell.oas-theme-dark .oas-main-inner .ui-sales-home__grid strong,
+.oas-shell.oas-theme-dark .oas-main-inner .ui-sales-list__header h2,
+.oas-shell.oas-theme-dark .oas-main-inner .ui-sales-document-card__title,
+.oas-shell.oas-theme-dark .oas-main-inner .ui-sales-empty strong {
+    color: var(--oas-dark-ink) !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(
+    .ui-sales-home__grid button,.ui-sales-list__header,.ui-sales-document-card,
+    .ui-sales-editor__header,.ui-sales-editor__actions,.ui-sales-section,
+    .ui-sales-revision-card,.ui-sales-line-card,.ui-sales-payment-line,
+    .ui-sales-checkout__payment-plan,.ui-sales-totals,
+    .ui-sales-payment-summary,.ui-sales-posting-summary,.ui-sales-empty,
+    .ui-sales-workspace__actions,.ui-sales-workspace__tabs,
+    .ui-sales-line-card__optical,.ui-sales-line-card__notes,
+    .ui-sales-price-override__summary,.ui-sales-checkout__summary,
+    .ui-sales-checkout__shortage,.ui-sales-optical-range-note,
+    .ui-sales-line-card__range-banner,.ui-workflow-drawer,
+    .ui-workflow-metric,.ui-workflow-optical,.ui-sales-icon-button,
+    .ui-sales-eye-card,.ui-sales-revisions,.ui-sales-lines__table-wrap
+) {
+    background: var(--oas-dark-panel) !important;
+    color: var(--oas-dark-ink) !important;
+    border-color: var(--oas-dark-border) !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(
+    .ui-sales-line-card__header,.ui-sales-section__header,
+    .ui-workflow-drawer__header,.ui-workflow-drawer__footer,
+    .ui-sales-lines__detail-row,.ui-sales-payment-line__amount,
+    .ui-sales-lines__table th,.ui-sales-lines__table thead,
+    .ui-workflow-metric__icon
+) {
+    background-color: var(--oas-dark-header) !important;
+    color: var(--oas-dark-ink) !important;
+    border-color: var(--oas-dark-border) !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner .ui-sales-lines__table td,
+.oas-shell.oas-theme-dark .oas-main-inner .ui-sales-lines__table tr {
+    background: var(--oas-dark-panel) !important;
+    color: var(--oas-dark-ink) !important;
+    border-color: var(--oas-dark-border) !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(
+    .ui-sales-home__hero p,.ui-sales-home__grid span,
+    .ui-sales-list__header p,.ui-sales-list__count,
+    .ui-sales-document-card__secondary,.ui-sales-document-card__meta,
+    .ui-sales-revision-card p,.ui-sales-section__header p,
+    .ui-sales-line-card__range-hint,.ui-sales-line-card__number-field,
+    .ui-sales-eye-card__range-hint,.ui-sales-checkout__datetime,
+    .ui-workflow-check,.ui-workflow-drawer__body h4
+) {
+    color: var(--oas-dark-subtle) !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(
+    .ui-sales-home__grid i,.ui-sales-editor__title > i,
+    .ui-sales-line-card__number,.ui-sales-line-card__subheader > i,
+    .ui-workflow-metric i
+) {
+    background: #263441 !important;
+    color: #76c8ed !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner .ui-sales-home__eyebrow,
+.oas-shell.oas-theme-dark .oas-main-inner .ui-sales-document-card__code {
+    color: #83cff2 !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(
+    .ui-sales-lines__table input,.ui-sales-lines__table select,
+    .ui-sales-eye-card--editor input,.ui-sales-line-card__number-field input,
+    .ui-sales-line-card__number-field select,
+    .ui-sales-price-override input,.ui-sales-price-override textarea,
+    .ui-sales-checkout__datetime input
+) {
+    background: #22252a !important;
+    color: #f3f5f7 !important;
+    border-color: #484d56 !important;
+}
+
+/* Operational tracking cards are not actual green/red status badges. */
+.oas-shell.oas-theme-dark .oas-main-inner .ui-workflow-metric:is(.is-danger,.is-warning,.is-success,.is-info) {
+    border-color: #383c44 !important;
+    background: var(--oas-dark-panel) !important;
+    color: var(--oas-dark-ink) !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner .ui-workflow-metric.is-danger i {color: #ffa0a5 !important;background:#382328 !important}
+.oas-shell.oas-theme-dark .oas-main-inner .ui-workflow-metric.is-warning i {color: #f4ca7a !important;background:#3c3022 !important}
+.oas-shell.oas-theme-dark .oas-main-inner .ui-workflow-metric.is-success i {color: #67e5a8 !important;background:#183d2c !important}
+.oas-shell.oas-theme-dark .oas-main-inner .ui-workflow-metric.is-info i {color: #83c6ff !important;background:#213147 !important}
+
+/* Preserve status meaning with subtle, readable dark variants. */
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-sales-status--active,.ui-sales-status.is-success) {
+    background: #143629 !important; color: #85ebbb !important; border-color:#29614a !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-sales-status--warning,.ui-sales-status.is-warning) {
+    background: #40321d !important; color: #f5cf8c !important; border-color:#705530 !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-sales-status--cancelled,.ui-sales-status.is-danger) {
+    background: #402326 !important; color: #ffabad !important; border-color:#734044 !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-sales-status--draft,.ui-sales-status.is-info) {
+    background: #233446 !important; color: #b8dcf8 !important; border-color:#35536e !important;
+}
+
+/* Generic UiLib data tables, including split inventory editors. */
+.oas-shell.oas-theme-dark .oas-main-inner .ui-data-table__container,
+.oas-shell.oas-theme-dark .oas-main-inner .ui-data-table {
+    background: var(--oas-dark-panel) !important;
+    color: var(--oas-dark-ink) !important;
+    border-color: var(--oas-dark-border) !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner .ui-data-table thead th {
+    background: var(--oas-dark-header) !important;
+    color: var(--oas-dark-ink) !important;
+    border-color: var(--oas-dark-border) !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner .ui-data-table tbody td {
+    border-color: var(--oas-dark-border) !important;
+}
+
+/* Avoid native white select dropdowns and disabled fields at night. */
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-input-text__control,.ui-select__control) {
+    background-color: #22252a !important;
+    color: #f3f5f7 !important;
+    border-color: #484d56 !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-input-text__control,.ui-select__control):disabled {
+    background-color: #292c32 !important;
+    color: #c0c5ce !important;
+}
+
+/* Individual module color variables must be re-evaluated in the dark scope,
+   not just at :root where the light palette first resolves. */
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-sales-home,.ui-sales-list,.ui-sales-editor,.ui-sales-workspace) {
+    --oas-sales-surface: #191b1f;
+    --oas-sales-bg: #0e0f12;
+    --oas-sales-border: #383c44;
+    --oas-sales-muted: #b9c0ca;
+    --oas-sales-primary: var(--oas-ui-accent, #48abd1);
+}
+
+/* Dark-theme quality improvements do not alter user-selected light palette. */
+@media (prefers-reduced-motion:reduce) {
+    .oas-shell.oas-theme-dark .oas-main-inner :is(.ui-sales-home__grid button,.ui-sales-document-card,.ui-workflow-metric) {transition:none}
+}
+
+/* Inputs used by Purchase-demand and Sales tracking screens. Their inner
+   text boxes were dark but the lookup wrapper remained white (user screenshots). */
+.oas-shell.oas-theme-dark .oas-main-inner :is(
+    .ui-lookup__control,.ui-lookup__results,
+    .ui-input-date__control,.ui-input-date__control[readonly],
+    .ui-pagination button
+) {
+    background: #22252a !important;
+    color: #f3f5f7 !important;
+    border-color: #484d56 !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner .ui-lookup__input {
+    background: transparent !important;
+    color: #f3f5f7 !important;
+    border: 0 !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-lookup__label,.ui-lookup__item) {
+    color: #f3f5f7 !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner .ui-lookup__item:hover {
+    background: #30353d !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(
+    .ui-lookup__input::placeholder,.ui-lookup__item-text small,
+    .ui-lookup__search-icon,.ui-lookup__clear,.ui-lookup__empty
+) {
+    color: #b9c0ca !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner .ui-input-date__control:disabled,
+.oas-shell.oas-theme-dark .oas-main-inner .ui-lookup__control--disabled {
+    background: #292c32 !important;
+    color: #bec5cf !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-lookup__control,.ui-input-date__control,.ui-search-input) :focus-visible {
+    outline-color: var(--oas-ui-accent, #48abd1);
+}
+/* Actual table-wrapper captions sometimes use solid muted colors meant for
+   white backgrounds; give secondary text a legible charcoal-mode shade. */
+.oas-shell.oas-theme-dark .oas-main-inner :is(
+    .ui-workflow-cell-muted,.ui-data-grid-panel__title span,
+    .ui-sales-list__count,.ui-pagination,.ui-input-date__label
+) { color: #b9c0ca !important; }

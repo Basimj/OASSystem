@@ -1,0 +1,116 @@
+/* OASSystem V8 — neutral true dark surfaces and faithful mini ERP preview.
+   Only active when user explicitly selects Dark. Light/Ocean pages remain untouched. */
+.oas-shell.oas-theme-dark {
+  color-scheme: dark;
+  --oas-color-background: #0e0f12;
+  --oas-color-surface: #191b1f;
+  --oas-color-subtle: #22252a;
+  --oas-color-hover: #282c32;
+  --oas-color-disabled-surface: #24262b;
+  --oas-color-text: #f3f5f7;
+  --oas-color-text-muted: #b5bec9;
+  --oas-color-border: #343942;
+  --oas-color-border-subtle: #2a2d34;
+  --oas-color-primary-hover: #64b8eb;
+  --oas-color-primary-soft: #1c3545;
+  --oas-color-primary-border: #35637f;
+  --oas-color-danger: #ff8083;
+  --oas-color-danger-surface: #392125;
+  --oas-color-success: #52dd9e;
+  --oas-color-success-surface: #143629;
+  --oas-color-warning: #f6b86e;
+  --oas-color-warning-surface: #3b2f1f;
+  --oas-color-info-border: #456787;
+  --oas-color-info-surface: #1c3045;
+  --oas-theme-content-bg: #0e0f12;
+  --oas-theme-card-bg: #191b1f;
+  --oas-theme-input-bg: #22252a;
+  --oas-theme-text: #f3f5f7;
+  --oas-theme-muted: #b5bcc6;
+  --oas-theme-border: #353940;
+  background: var(--oas-theme-content-bg);
+  color: var(--oas-theme-text);
+}
+/* Header/sidebar use user-selected colors. Do NOT force blue-black here. */
+.oas-shell.oas-theme-dark .oas-main-content,
+.oas-shell.oas-theme-dark .oas-main-inner {background:var(--oas-theme-content-bg);color:var(--oas-theme-text)}
+.oas-shell.oas-theme-dark .oas-workspace-topbar,
+.oas-shell.oas-theme-dark .oas-global-header-row {background:var(--oas-ui-header);border-color:var(--oas-theme-border)}
+.oas-shell.oas-theme-dark .oas-user-details strong,
+.oas-shell.oas-theme-dark .oas-header-meta-item,
+.oas-shell.oas-theme-dark .oas-header-meta-item i,
+.oas-shell.oas-theme-dark .oas-shell-search input {color:var(--oas-ui-header-fg)}
+.oas-shell.oas-theme-dark .oas-header-icon-button,
+.oas-shell.oas-theme-dark .oas-shell-search__icon {color:var(--oas-ui-header-icon)}
+.oas-shell.oas-theme-dark .oas-shell-search,
+.oas-shell.oas-theme-dark .oas-header-meta-item,
+.oas-shell.oas-theme-dark .oas-header-user {border-color:var(--oas-theme-border)}
+.oas-shell.oas-theme-dark .oas-shell-search {background:var(--oas-theme-input-bg)}
+.oas-shell.oas-theme-dark .oas-shell-search input::placeholder {color:var(--oas-theme-muted)}
+.oas-shell.oas-theme-dark .oas-header-user:hover,
+.oas-shell.oas-theme-dark .oas-header-icon-button:hover {background:var(--oas-color-hover)}
+/* Common cards, panels, grid containers and native card tables: same surface and text tokens. */
+.oas-shell.oas-theme-dark .oas-main-inner :is(.card,.card-body,.panel,.widget,.content-card,.ui-card,.ui-panel,.ui-surface,.ui-workspace,.ui-accounting-workspace,.ui-form-section,.ui-form-grid,.ui-data-grid,.ui-data-table,.table-responsive,.ui-purchasing-line-card,.ui-purchasing-invoice-line,.ui-purchasing-po-line,.ui-po-lines-toolbar,.ui-purchasing-invoice-totals,.ui-purchasing-total-grid,.ui-purchasing-price-row) {
+  background-color:var(--oas-theme-card-bg);color:var(--oas-theme-text);border-color:var(--oas-theme-border);
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(.table,.table-striped,.table-bordered,table) {--bs-table-bg:var(--oas-theme-card-bg);--bs-table-color:var(--oas-theme-text);--bs-table-border-color:var(--oas-theme-border);color:var(--oas-theme-text);border-color:var(--oas-theme-border);background-color:var(--oas-theme-card-bg)}
+.oas-shell.oas-theme-dark .oas-main-inner :is(th,thead,thead tr,thead td) {background-color:#22252a;color:#e8edf2;border-color:var(--oas-theme-border)}
+.oas-shell.oas-theme-dark .oas-main-inner :is(td,tbody tr,tbody th) {background-color:var(--oas-theme-card-bg);color:var(--oas-theme-text);border-color:var(--oas-theme-border)}
+.oas-shell.oas-theme-dark .oas-main-inner tbody tr:nth-child(even) :is(td,th) {background-color:#1e2025}
+.oas-shell.oas-theme-dark .oas-main-inner tbody tr:hover :is(td,th) {background-color:#2b3037}
+/* Fields and labels: explicit dark text on dark surface, never white text on white inputs. */
+.oas-shell.oas-theme-dark .oas-main-inner :is(input:not([type=checkbox]):not([type=radio]):not([type=color]),select,textarea,.form-control,.form-select,.ui-input,.ui-input-text) {background-color:var(--oas-theme-input-bg);color:var(--oas-theme-text);border-color:#464b54;caret-color:var(--oas-theme-text)}
+.oas-shell.oas-theme-dark .oas-main-inner :is(input,textarea)::placeholder {color:#aab3bf;opacity:1}
+.oas-shell.oas-theme-dark .oas-main-inner :is(input,select,textarea):disabled {background:#26292e;color:#a6afbc;opacity:1}
+.oas-shell.oas-theme-dark .oas-main-inner :is(label,.form-label,small,.text-muted,.text-secondary,.ui-muted,.ui-field-hint,.ui-purchasing-line-card__summary,.ui-purchasing-po-line__summary) {color:var(--oas-theme-muted)}
+.oas-shell.oas-theme-dark .oas-main-inner :is(h1,h2,h3,h4,h5,h6,.ui-section-title) {color:var(--oas-theme-text)}
+.oas-shell.oas-theme-dark .oas-main-inner :is(.btn-primary,.ui-btn-primary,[class*="--primary"].ui-button) {background:var(--oas-ui-accent);color:var(--oas-color-on-primary);border-color:var(--oas-ui-accent)}
+.oas-shell.oas-theme-dark .oas-main-inner :is(.btn-light,.btn-outline-secondary,.ui-action-button,.ui-toolbar-button) {background:var(--oas-theme-input-bg);color:var(--oas-theme-text);border-color:var(--oas-theme-border)}
+.oas-shell.oas-theme-dark .oas-main-inner :is(a,.text-primary) {color:#8dcbf1}
+/* Status badges retain semantic colors, not a generic grey override. */
+.oas-shell.oas-theme-dark .oas-main-inner :is(.badge,.ui-badge,.alert) {border-color:var(--oas-theme-border)}
+.oas-shell.oas-theme-dark .oas-global-tabs-row .ui-tab-context-menu {background:var(--oas-theme-card-bg);color:var(--oas-theme-text);border-color:var(--oas-theme-border)}
+.oas-shell.oas-theme-dark .oas-global-tabs-row .ui-tab-context-menu button {color:var(--oas-theme-text)}
+/* System-wide scrollbars in dark mode */
+.oas-shell.oas-theme-dark .oas-main-inner {scrollbar-color:#555963 #17191d}
+
+/* V8 fixes for the purchasing, stock and workspace widgets shown in screenshots.
+   Their original styles correctly use tokens; these selectors cover the few fixed white containers. */
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-workspace__actions,.ui-workspace__tabs,.ui-workspace__filters,.ui-workspace__body,.ui-purchasing-list__card,.ui-purchasing-list__empty,.ui-data-table__container,.ui-data-table,.ui-data-table th,.ui-data-table td) {
+  background-color:var(--oas-theme-card-bg);
+  color:var(--oas-theme-text);
+  border-color:var(--oas-theme-border);
+}
+.oas-shell.oas-theme-dark .oas-main-inner .ui-workspace__body {background-color:transparent}
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-purchasing-list__card:hover,.ui-data-table__row--clickable:hover td,.ui-data-table__row--selected td) {
+  background-color:#292d33;
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-data-table th,.ui-data-table thead th) {background-color:#24272d;color:#eef0f3}
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-purchasing-list small,.ui-purchasing-list__status,.ui-po-lines-toolbar__info small,.ui-purchasing-po-line__identity small) {color:var(--oas-theme-muted)}
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-purchasing-list__title,.ui-purchasing-list__body,.ui-purchasing-total-grid strong,.ui-purchasing-invoice-totals strong) {color:var(--oas-theme-text)}
+/* Keep the settings hub in neutral dark shades too, never blue-black surfaces. */
+.oas-shell.oas-theme-dark .oas-theme-studio__panel,
+.oas-shell.oas-theme-dark .oas-theme-studio__tabs,
+.oas-shell.oas-theme-dark .oas-settings-home__card {background:#191b1f;color:#f3f5f7;border-color:#343940}
+.oas-shell.oas-theme-dark .oas-theme-studio__intro h1,
+.oas-shell.oas-theme-dark .oas-theme-studio__panel-head h2,
+.oas-shell.oas-theme-dark .oas-settings-home h1,
+.oas-shell.oas-theme-dark .oas-theme-studio__form-group label,
+.oas-shell.oas-theme-dark .oas-theme-studio__color-field {color:#f1f3f6}
+.oas-shell.oas-theme-dark .oas-theme-studio__intro p,
+.oas-shell.oas-theme-dark .oas-theme-studio__panel-head p,
+.oas-shell.oas-theme-dark .oas-theme-studio__breadcrumbs,
+.oas-shell.oas-theme-dark .oas-theme-studio__mini-caption {color:#b5bec9}
+.oas-shell.oas-theme-dark .oas-theme-studio__tab {background:#25272c;color:#d5dae2}
+.oas-shell.oas-theme-dark .oas-theme-studio__tab.is-current {background:#263b4b;color:#c6e9ff}
+.oas-shell.oas-theme-dark .oas-theme-studio__preset {background:#22252a;border-color:#41454d;color:#f3f5f7}
+.oas-shell.oas-theme-dark .oas-theme-studio__preset strong {color:#f3f5f7}
+.oas-shell.oas-theme-dark .oas-theme-studio__color-control,
+.oas-shell.oas-theme-dark .oas-theme-studio__option-pills button,
+.oas-shell.oas-theme-dark .oas-theme-studio__form-group select,
+.oas-shell.oas-theme-dark .oas-theme-studio__header-order > div {background:#22252a;color:#f3f5f7;border-color:#424751}
+.oas-shell.oas-theme-dark .oas-theme-studio__hex {color:#f3f5f7}
+.oas-shell.oas-theme-dark .oas-theme-studio__option-pills button.is-active {background:#263f50;color:#c7eaff;border-color:#428eb6}
+.oas-shell.oas-theme-dark .oas-theme-studio__footer {background:#191b1ff2;border-color:#343940}
+.oas-shell.oas-theme-dark .oas-theme-studio__footer button:not(.oas-theme-studio__save) {background:#25272c;color:#f3f5f7;border-color:#41454d}
+.oas-shell.oas-theme-dark .oas-theme-studio--dark .oas-theme-studio__mini-main {background:#0e0f12}

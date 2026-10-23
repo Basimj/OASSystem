@@ -1,0 +1,39 @@
+@page "/settings"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Components.Authorization
+
+<PageTitle>الإعدادات | OASSystem</PageTitle>
+
+<section class="oas-settings-home" dir="rtl">
+    <p class="oas-settings-home__breadcrumb">النظام / الإعدادات</p>
+    <h1><i class="fa-solid fa-gear" aria-hidden="true"></i> الإعدادات</h1>
+    <p>إدارة إعدادات الحساب والمظهر وتهيئة النظام من مكان واحد.</p>
+    <div class="oas-settings-home__grid">
+        <a class="oas-settings-home__card" href="/settings/appearance">
+            <i class="fa-solid fa-palette" aria-hidden="true"></i>
+            <strong>المظهر</strong>
+            <small>تخصيص الثيمات والألوان والخطوط والشريط الجانبي والعلوي وتبويبات الصفحات. يتم حفظ كل اختيار لحسابك.</small>
+            <span>فتح إعدادات المظهر <i class="fa-solid fa-arrow-left"></i></span>
+        </a>
+        <div class="oas-settings-home__card is-unavailable" aria-disabled="true">
+            <i class="fa-regular fa-user" aria-hidden="true"></i>
+            <strong>الملف الشخصي</strong>
+            <small>يمكن فتحه حاليًا من قائمة المستخدم في الشريط العلوي.</small>
+        </div>
+        <div class="oas-settings-home__card is-unavailable" aria-disabled="true">
+            <i class="fa-regular fa-bell" aria-hidden="true"></i>
+            <strong>الإشعارات</strong>
+            <small>إعدادات إشعارات النظام غير مفعّلة بعد.</small>
+        </div>
+        <AuthorizeView Roles="Administrator">
+            <Authorized>
+                <a class="oas-settings-home__card" href="/identity/users">
+                    <i class="fa-solid fa-users" aria-hidden="true"></i>
+                    <strong>إدارة المستخدمين</strong>
+                    <small>استعراض المستخدمين وحساباتهم والصلاحيات من واجهة الإدارة.</small>
+                    <span>فتح إدارة المستخدمين <i class="fa-solid fa-arrow-left"></i></span>
+                </a>
+            </Authorized>
+        </AuthorizeView>
+    </div>
+</section>
