@@ -30,7 +30,13 @@
                         <span class="oas-theme-studio__preset-shot ocean"><span class="side"></span><span class="top"></span><span class="tile a"></span><span class="tile b"></span><span class="tile c"></span></span>
                         @if (Model.ThemePreset == "Ocean") { <i class="fa-solid fa-circle-check oas-theme-studio__check"></i> }
                         <strong>Ocean</strong><small>الافتراضي</small>
-                        <span class="oas-theme-studio__swatches"><i style="background:#11A6D4"></i><i style="background:#00799F"></i><i style="background:#516477"></i><i style="background:#A1B5C3"></i></span>
+                        <span class="oas-theme-studio__swatches"><i style="background:#DDF3F8"></i><i style="background:#F1FBFD"></i><i style="background:#0B8095"></i><i style="background:#B9E5F1"></i></span>
+                    </button>
+                    <button type="button" class="@(Model.ThemePreset == "SkyYellow" ? "oas-theme-studio__preset is-selected" : "oas-theme-studio__preset")" @onclick="ApplySkyYellowPresetAsync" aria-pressed="@(Model.ThemePreset == "SkyYellow")" title="أزرق فاتح مع أصفر ناعم ومقروء">
+                        <span class="oas-theme-studio__preset-shot sky-yellow"><span class="side"></span><span class="top"></span><span class="tile a"></span><span class="tile b"></span><span class="tile c"></span></span>
+                        @if (Model.ThemePreset == "SkyYellow") { <i class="fa-solid fa-circle-check oas-theme-studio__check"></i> }
+                        <strong>سماء وشمس</strong><small>أزرق فاتح وأصفر</small>
+                        <span class="oas-theme-studio__swatches"><i style="background:#D9F0FF"></i><i style="background:#0B6FAF"></i><i style="background:#FFF1B8"></i><i style="background:#FFFFFF"></i></span>
                     </button>
                     <button type="button" class="@(Model.ThemePreset == "Midnight" ? "oas-theme-studio__preset is-selected" : "oas-theme-studio__preset")" @onclick="ApplyMidnightPresetAsync" aria-pressed="@(Model.ThemePreset == "Midnight")">
                         <span class="oas-theme-studio__preset-shot midnight"><span class="side"></span><span class="top"></span><span class="tile a"></span><span class="tile b"></span><span class="tile c"></span></span>
@@ -51,7 +57,7 @@
                 <div class="oas-theme-studio__panel-head">
                     <div><h2><i class="fa-regular fa-eye"></i> معاينة مباشرة</h2><p>شاهد التغييرات مباشرة كما ستظهر في النظام</p></div>
                 </div>
-                <div class="oas-theme-studio__mini @(Model.ThemeMode == "Dark" ? "is-dark" : "")" aria-label="معاينة تفصيلية للنظام" style="--preview-accent:@Model.PrimaryColor">
+                <div class="oas-theme-studio__mini @(Model.ThemeMode == "Dark" ? "is-dark" : "")" aria-label="معاينة تفصيلية للنظام" style="--preview-accent:@Model.PrimaryColor;--oas-preview-canvas:@(Model.ThemePreset == "SkyYellow" ? "#F4FAFF" : Model.ThemePreset == "Slate" ? "#F5F8FC" : "#F1FBFD")">
                     <div class="oas-theme-studio__mini-stage">
                         <div class="oas-theme-studio__mini-side" style="background:@Model.SidebarBackground;color:@Model.SidebarTextColor">
                             <div class="oas-theme-studio__mini-brand"><span class="oas-theme-studio__mini-brand-mark"><i class="fa-solid fa-cube" aria-hidden="true"></i></span> OASSystem</div>
@@ -87,10 +93,10 @@
                                 <div class="oas-theme-studio__mini-chart">
                                     <div class="oas-theme-studio__mini-chart-head"><strong>المبيعات خلال الفترة</strong><small>يناير — يونيو 2026</small></div>
                                     <svg viewBox="0 0 320 110" preserveAspectRatio="none" aria-hidden="true">
-                                        <defs><linearGradient id="oastsGraph" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#109be2" stop-opacity=".24"/><stop offset="1" stop-color="#109be2" stop-opacity="0"/></linearGradient></defs>
+                                        <defs><linearGradient id="oastsGraph" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="@Model.PrimaryColor" stop-opacity=".24"/><stop offset="1" stop-color="@Model.PrimaryColor" stop-opacity="0"/></linearGradient></defs>
                                         <path d="M7 101 L58 70 L107 82 L157 51 L210 48 L260 20 L312 27 L312 110 L7 110 Z" fill="url(#oastsGraph)"/>
-                                        <path d="M7 101 L58 70 L107 82 L157 51 L210 48 L260 20 L312 27" stroke="#168FE3" stroke-width="3" fill="none"/>
-                                        <g fill="#168FE3"><circle cx="7" cy="101" r="3"/><circle cx="58" cy="70" r="3"/><circle cx="107" cy="82" r="3"/><circle cx="157" cy="51" r="3"/><circle cx="210" cy="48" r="3"/><circle cx="260" cy="20" r="3"/><circle cx="312" cy="27" r="3"/></g>
+                                        <path d="M7 101 L58 70 L107 82 L157 51 L210 48 L260 20 L312 27" stroke="@Model.PrimaryColor" stroke-width="3" fill="none"/>
+                                        <g fill="@Model.PrimaryColor"><circle cx="7" cy="101" r="3"/><circle cx="58" cy="70" r="3"/><circle cx="107" cy="82" r="3"/><circle cx="157" cy="51" r="3"/><circle cx="210" cy="48" r="3"/><circle cx="260" cy="20" r="3"/><circle cx="312" cy="27" r="3"/></g>
                                     </svg>
                                     <div class="oas-theme-studio__mini-months"><span>يناير</span><span>فبراير</span><span>مارس</span><span>أبريل</span><span>مايو</span><span>يونيو</span></div>
                                 </div>
@@ -190,15 +196,12 @@
     [Parameter] public EventCallback OnCancel { get; set; }
     [Parameter] public EventCallback OnReset { get; set; }
 
-    private Task PreviewAsync()
-    {
-        Model.ThemePreset = "Custom";
-        return OnPreview.InvokeAsync();
-    }
+    private Task PreviewAsync() => OnPreview.InvokeAsync();
 
     private Task ApplyOceanPresetAsync() => ApplyPresetAsync("Ocean");
     private Task ApplyMidnightPresetAsync() => ApplyPresetAsync("Midnight");
     private Task ApplySlatePresetAsync() => ApplyPresetAsync("Slate");
+    private Task ApplySkyYellowPresetAsync() => ApplyPresetAsync("SkyYellow");
     private Task SetHeaderClassicAsync() => SetHeaderLayoutAsync("Classic");
     private Task SetHeaderCompactAsync() => SetHeaderLayoutAsync("Compact");
     private Task SetHeaderMinimalAsync() => SetHeaderLayoutAsync("Minimal");
@@ -206,8 +209,12 @@
     private Task SetTabsNormalAsync() => SetTabsSizeAsync("Normal");
     private Task SetTabsComfortableAsync() => SetTabsSizeAsync("Comfortable");
 
-    // Picking Light/Dark loads a complete coherent palette; every color remains editable afterwards.
-    private Task ApplyThemeModeAsync() => ApplyPresetAsync(Model.ThemeMode == "Dark" ? "Midnight" : "Ocean");
+    // Keep the chosen palette when switching modes. Only the Midnight-specific
+    // palette needs a light replacement when returning to Light from the selector.
+    private Task ApplyThemeModeAsync() =>
+        Model.ThemeMode == "Light" && Model.ThemePreset == "Midnight"
+            ? ApplyPresetAsync("Ocean")
+            : OnPreview.InvokeAsync();
 
     private Task SetHeaderLayoutAsync(string value)
     {
@@ -227,17 +234,33 @@
         switch (preset)
         {
             case "Ocean":
+                // Default Ocean now uses a soft aqua sidebar, not the old petrol tone.
                 Model.ThemeMode = "Light";
-                Model.PrimaryColor = "#459DB9"; Model.SidebarBackground = "#1B4659";
-                Model.SidebarTextColor = "#FFFFFF"; Model.SidebarIconColor = "#D6EAF1";
-                Model.SidebarHoverBackground = "#335F72"; Model.SidebarActiveBackground = "#287E9A";
-                Model.SidebarActiveTextColor = "#FFFFFF"; Model.SidebarActiveIconColor = "#FFFFFF";
-                Model.HeaderBackground = "#FFFFFF"; Model.HeaderTextColor = "#1C3444";
-                Model.HeaderIconColor = "#526C87";
+                Model.PrimaryColor = "#0B8095"; Model.SidebarBackground = "#DDF3F8";
+                Model.SidebarTextColor = "#174558"; Model.SidebarIconColor = "#28667B";
+                Model.SidebarHoverBackground = "#C8EAF2"; Model.SidebarActiveBackground = "#B9E5F1";
+                Model.SidebarActiveTextColor = "#123D56"; Model.SidebarActiveIconColor = "#086C87";
+                Model.HeaderBackground = "#FFFFFF"; Model.HeaderTextColor = "#21485C";
+                Model.HeaderIconColor = "#3B7185";
                 Model.TabsBarBackground = "#FFFFFF"; Model.TabsBackground = "#FFFFFF";
-                Model.TabsTextColor = "#61647F"; Model.TabsIconColor = "#61647F";
-                Model.TabsActiveBackground = "#E8F6FA"; Model.TabsActiveTextColor = "#216781";
-                Model.TabsActiveIconColor = "#216781"; Model.TabsBorderColor = "#B4DCE9";
+                Model.TabsTextColor = "#42657B"; Model.TabsIconColor = "#42657B";
+                Model.TabsActiveBackground = "#D7F1F8"; Model.TabsActiveTextColor = "#126078";
+                Model.TabsActiveIconColor = "#0B8095"; Model.TabsBorderColor = "#C8E5EE";
+                break;
+            case "SkyYellow":
+                // Sky blue for navigation and actions; soft yellow ONLY for selection/highlights.
+                // Dark ink on both pastels ensures readable labels and navigation items.
+                Model.ThemeMode = "Light";
+                Model.PrimaryColor = "#0B6FAF"; Model.SidebarBackground = "#D9F0FF";
+                Model.SidebarTextColor = "#163E5E"; Model.SidebarIconColor = "#24547C";
+                Model.SidebarHoverBackground = "#C1E5FF"; Model.SidebarActiveBackground = "#FFF1B8";
+                Model.SidebarActiveTextColor = "#634C00"; Model.SidebarActiveIconColor = "#634C00";
+                Model.HeaderBackground = "#FFFFFF"; Model.HeaderTextColor = "#173B59";
+                Model.HeaderIconColor = "#24547C";
+                Model.TabsBarBackground = "#F4FAFF"; Model.TabsBackground = "#FFFFFF";
+                Model.TabsTextColor = "#24547C"; Model.TabsIconColor = "#24547C";
+                Model.TabsActiveBackground = "#FFF1B8"; Model.TabsActiveTextColor = "#634C00";
+                Model.TabsActiveIconColor = "#634C00"; Model.TabsBorderColor = "#BEDDF1";
                 break;
             case "Midnight":
                 Model.ThemeMode = "Dark";
@@ -344,6 +367,9 @@
             case "tabsBorder": Model.TabsBorderColor=value; break;
             case "activeIcon": Model.SidebarActiveIconColor=value; break;
         }
+        // Keep Sky & Sun's blue/yellow surface palette when its individual colors
+        // are customized; otherwise custom edits would unexpectedly revert the canvas.
+        if (Model.ThemePreset != "SkyYellow") Model.ThemePreset = "Custom";
         await PreviewAsync();
     }
 }

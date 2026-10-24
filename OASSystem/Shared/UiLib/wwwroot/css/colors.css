@@ -1,25 +1,50 @@
+/* Fresh Mint theme tokens: bright, readable, and consistent across OASSystem */
 :root {
-    --oas-color-primary: #5A2DD6;
-    --oas-color-primary-hover: #4E25C4;
-    --oas-color-primary-soft: #f4f0ff;
-    --oas-color-primary-border: #d9ccff;
+    --oas-color-primary: #0B8095;
+    --oas-color-primary-hover: #09697C;
+    --oas-color-primary-soft: #E4F6F9;
+    --oas-color-primary-border: #B5E3EC;
     --oas-color-on-primary: #ffffff;
-    --oas-color-danger: #d92d20;
-    --oas-color-danger-surface: #fff1f0;
+
+    --oas-color-danger: #DC2626;
+    --oas-color-danger-surface: #FEF2F2;
     --oas-color-on-danger: #ffffff;
-    --oas-color-success: #067647;
-    --oas-color-success-surface: #ecfdf3;
-    --oas-color-warning: #b54708;
-    --oas-color-warning-surface: #fffaeb;
-    --oas-color-info-border: #c8b8ff;
-    --oas-color-info-surface: #f5f2ff;
-    --oas-color-background: #fbfbfd;
-    --oas-color-surface: #ffffff;
-    --oas-color-subtle: #fafafa;
-    --oas-color-hover: #f7f4ff;
-    --oas-color-disabled-surface: #f4f4f5;
-    --oas-color-text: #27263b;
-    --oas-color-text-muted: #77758c;
-    --oas-color-border: #e7e5ef;
-    --oas-color-border-subtle: #f0eef5;
+
+    --oas-color-success: #059669;
+    --oas-color-success-surface: #ECFDF5;
+
+    --oas-color-warning: #99520B;
+    --oas-color-warning-surface: #FFF4E4;
+
+    --oas-color-info-border: #99F6E4;
+    --oas-color-info-surface: #F0FDFA;
+
+    --oas-color-background: #F1FBFD;
+    --oas-color-surface: #FFFFFF;
+    --oas-color-subtle: #F3FAFC;
+    --oas-color-hover: #EAF6F8;
+    --oas-color-disabled-surface: #F2F5F4;
+
+    --oas-color-text: #21485C;
+    --oas-color-text-muted: #5F7885;
+
+    --oas-color-border: #D7E8ED;
+    --oas-color-border-subtle: #E9F2F5;
+
+    --oas-color-topbar-background: #FFFFFF;
+    --oas-color-topbar-subtle: #F7FFFB;
+    --oas-color-topbar-border: #D7E8ED;
+
+    --oas-color-sidebar-background: #DDF3F8;
+    --oas-color-sidebar-border: #C8E5EE;
+    --oas-color-sidebar-hover: #C8EAF2;
+    --oas-color-sidebar-active-background: #B9E5F1;
+    --oas-color-sidebar-active-foreground: #123D56;
+
+    --oas-color-card-border: #DFEBF0;
+    --oas-color-card-shadow: 0 10px 30px rgba(16, 185, 129, .08);
+    --oas-color-table-header: #E4F4F8;
+    --oas-color-table-row-hover: color-mix(in srgb, var(--oas-color-primary) 5%, var(--oas-color-surface));
+    --oas-color-table-row-selected: color-mix(in srgb, var(--oas-color-primary) 10%, var(--oas-color-surface));
+    --oas-color-focus-ring: rgb(16 185 129 / 20%);
 }

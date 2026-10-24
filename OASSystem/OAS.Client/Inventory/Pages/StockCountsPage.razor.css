@@ -16,3 +16,60 @@
 .stock-counts__line-product { display: grid; min-width: 0; }
 .stock-counts__count-input { display: grid; grid-template-columns: 1fr auto; gap: .35rem; align-items: end; }
 @media (max-width: 1100px) { .stock-counts__line { grid-template-columns: 1.5fr .7fr 1fr .65fr; } .stock-counts__line > div:nth-child(5), .stock-counts__line > div:nth-child(6) { display: none; } }
+
+
+/* Dedicated inventory create/edit/details screen: scoped to this routed page. */
+.oas-inventory-form-screen {
+    width: min(100%, 1180px);
+    min-width: 0;
+    margin-inline: auto;
+    display: grid;
+    gap: .8rem;
+}
+.oas-inventory-form-screen__intro {
+    padding: .8rem 1.15rem;
+    border: 1px solid var(--oas-color-border);
+    border-radius: 14px;
+    background: var(--oas-surface, var(--oas-color-surface, transparent));
+}
+.oas-inventory-form-screen__eyebrow {
+    font-size: .75rem;
+    color: var(--oas-color-primary);
+    font-weight: 750;
+    margin-bottom: .12rem;
+}
+.oas-inventory-form-screen__intro h2 {
+    margin: 0;
+    color: var(--oas-color-text);
+    line-height: 1.4;
+    font-size: clamp(1.05rem, 1.6vw, 1.35rem);
+    font-weight: 750;
+}
+.oas-inventory-form-screen__intro p {
+    margin: .12rem 0 0;
+    color: var(--oas-color-text-muted);
+    font-size: .8rem;
+}
+.oas-inventory-form-screen__body { min-width: 0; }
+.oas-inventory-form-screen__body > * { min-width: 0; }
+.oas-inventory-form-screen__body .inventory-master-editor,
+.oas-inventory-form-screen__body .inventory-warehouses__editor {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .75rem 1rem;
+}
+@media (max-width: 760px) {
+    .oas-inventory-form-screen { gap: .5rem; }
+    .oas-inventory-form-screen__intro { padding: .6rem .75rem; }
+    .oas-inventory-form-screen__intro p { display: none; }
+    .oas-inventory-form-screen__body .inventory-master-editor,
+    .oas-inventory-form-screen__body .inventory-warehouses__editor,
+    .oas-inventory-form-screen__body .inventory-products__specialized-grid,
+    .oas-inventory-form-screen__body .inventory-transactions__line-editor {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .oas-inventory-form-screen__body .inventory-transactions__details,
+    .oas-inventory-form-screen__body .stock-counts__summary {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

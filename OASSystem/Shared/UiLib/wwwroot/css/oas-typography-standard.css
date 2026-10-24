@@ -1,0 +1,162 @@
+/* ============================================================
+   OASSystem | Compact Standard Typography
+
+   Default text scale (100%):
+     13px application body; 12.5px primary navigation;
+     12px tabular data; 13px form values;
+     14.5px section headings; 19px page headings.
+
+   The --oas-ui-font-scale token is set by Appearance settings.
+   All overrides stay scoped to .oas-shell, affect only typography,
+   and leave the current light/dark color palette untouched.
+   ============================================================ */
+
+.oas-shell {
+    --oas-type-body: calc(13px * var(--oas-ui-font-scale, 1));
+    --oas-type-input: calc(13px * var(--oas-ui-font-scale, 1));
+    --oas-type-button: calc(12.5px * var(--oas-ui-font-scale, 1));
+    --oas-type-nav: calc(12.5px * var(--oas-ui-font-scale, 1));
+    --oas-type-subnav: calc(12px * var(--oas-ui-font-scale, 1));
+    --oas-type-tabs: calc(11.75px * var(--oas-ui-font-scale, 1));
+    --oas-type-table: calc(12px * var(--oas-ui-font-scale, 1));
+    --oas-type-label: calc(12px * var(--oas-ui-font-scale, 1));
+    --oas-type-caption: calc(11px * var(--oas-ui-font-scale, 1));
+    --oas-type-section: calc(14.5px * var(--oas-ui-font-scale, 1));
+    --oas-type-page-title: calc(19px * var(--oas-ui-font-scale, 1));
+    font-size: var(--oas-type-body);
+    line-height: 1.5;
+}
+
+/* Top bar, right sidebar and global record tabs. */
+.oas-shell .oas-sidebar .oas-sidebar-brand__name {
+    font-size: calc(14px * var(--oas-ui-font-scale, 1));
+}
+.oas-shell .oas-sidebar :is(.oas-nav-item, .oas-nav-group__header) {
+    font-size: var(--oas-type-nav);
+    line-height: 1.45;
+}
+.oas-shell .oas-sidebar .oas-nav-item--child,
+.oas-shell .oas-sidebar .oas-nav-settings-child {
+    font-size: var(--oas-type-subnav);
+    line-height: 1.45;
+}
+.oas-shell.sidebar-collapsed .oas-sidebar .oas-nav-text {
+    font-size: calc(10.5px * var(--oas-ui-font-scale, 1));
+    line-height: 1.3;
+}
+.oas-shell .oas-top-header .oas-header-meta-item,
+.oas-shell .oas-top-header .oas-header-user,
+.oas-shell .oas-top-header .oas-header-finance-link {
+    font-size: calc(11px * var(--oas-ui-font-scale, 1));
+}
+.oas-shell .oas-top-header .oas-user-details strong {
+    font-size: calc(11.5px * var(--oas-ui-font-scale, 1));
+}
+.oas-shell .oas-top-header .oas-user-details small {
+    font-size: calc(10.5px * var(--oas-ui-font-scale, 1));
+}
+.oas-shell .oas-top-header :is(.oas-shell-search input, .oas-theme-toggle) {
+    font-size: var(--oas-type-subnav);
+}
+.oas-shell .oas-global-tabs-row .ui-application-tab__select,
+.oas-shell.oas-appearance-tabs-size-compact .ui-application-tab__select,
+.oas-shell.oas-appearance-tabs-size-normal .ui-application-tab__select,
+.oas-shell.oas-appearance-tabs-size-comfortable .ui-application-tab__select {
+    font-size: var(--oas-type-tabs);
+}
+.oas-shell .ui-workspace-tab__select,
+.oas-shell .ui-section-tab__select { font-size: var(--oas-type-tabs); }
+
+/* Workspaces and familiar title hierarchy. Stats remain visually prominent. */
+.oas-shell .oas-main-inner { font-size: var(--oas-type-body); line-height: 1.48; }
+.oas-shell .oas-main-inner h1,
+.oas-shell .oas-main-inner :is(
+    .ui-acc-home__title, .ui-sales-home__hero h1,
+    .oas-appearance-settings__hero h1, .oas-appearance-settings__header h1,
+    .oas-theme-studio__intro h1, .oas-settings-home h1
+) {
+    font-size: var(--oas-type-page-title);
+    line-height: 1.4;
+}
+.oas-shell .oas-main-inner h2 { font-size: calc(16px * var(--oas-ui-font-scale, 1)); line-height: 1.4; }
+.oas-shell .oas-main-inner h3 { font-size: var(--oas-type-section); line-height: 1.4; }
+.oas-shell .oas-main-inner h4 { font-size: var(--oas-type-body); line-height: 1.4; }
+.oas-shell .oas-main-inner :is(
+    .ui-card__header h2, .ui-data-grid-panel__title strong,
+    .ui-acc-card__title, .ui-acc-section__title, .ui-acc-hub-card__title,
+    .ui-sales-section__header h3, .ui-sales-list__header h2,
+    .ui-sales-editor__title h2, .ui-sales-document-card__title,
+    .oas-theme-studio__panel-head h2
+) {
+    font-size: var(--oas-type-section);
+    line-height: 1.4;
+}
+.oas-shell .oas-main-inner :is(
+    .ui-card__header p, .ui-data-grid-panel__title span,
+    .ui-acc-section__subtitle, .ui-acc-home__subtitle,
+    .ui-sales-list__header p, .ui-sales-editor__title p,
+    .ui-sales-section__header p,
+    .ui-acc-number-field__hint, .ui-acc-doc-header__subtitle
+) { font-size: var(--oas-type-caption); line-height: 1.45; }
+
+/* Grid and table typography. Keep table size independent from large headings. */
+.oas-shell .oas-main-inner :is(
+    .ui-data-table, .ui-acc-grid-table, .ui-sales-lines__table,
+    .ui-purchasing-line-table, table.table
+) { font-size: var(--oas-type-table) !important; }
+.oas-shell .oas-main-inner :is(
+    .ui-data-table, .ui-acc-grid-table, .ui-sales-lines__table,
+    .ui-purchasing-line-table, table.table
+) :is(th, td) {
+    font-size: var(--oas-type-table) !important;
+    line-height: 1.45;
+}
+.oas-shell .oas-main-inner :is(
+    .ui-data-table__pager, .ui-data-table__pager button,
+    .ui-record-list-header, .ui-workspace-filterbar,
+    .ui-workspace-filter-bar, .ui-pagination
+) { font-size: var(--oas-type-label); }
+.oas-shell .oas-main-inner .ui-data-grid-panel__title span { font-size: var(--oas-type-caption); }
+
+/* Form controls and interactive text throughout the ERP. */
+.oas-shell .oas-main-inner :is(
+    .ui-input-text__control, .ui-select__control,
+    .ui-acc-number-field__input, .ui-acc-readonly-field__value,
+    input.form-control, select.form-select, textarea.form-control,
+    input:not([type]), input[type="text"], input[type="number"],
+    input[type="search"], input[type="email"], input[type="tel"],
+    input[type="password"], input[type="date"],
+    select, textarea
+) { font-size: var(--oas-type-input) !important; }
+.oas-shell .oas-main-inner :is(
+    label, .form-label, .ui-acc-number-field__label,
+    .ui-acc-readonly-field__label, .ui-acc-status-action-bar__label,
+    .ui-sales-price-override label, .ui-sales-flow__payment-line label,
+    .oas-theme-studio__form-group label
+) { font-size: var(--oas-type-label); line-height: 1.45; }
+.oas-shell .oas-main-inner :is(
+    .ui-button, .btn:not(.btn-close),
+    .ui-workspace-actionbar .ui-button--small,
+    .ui-sales-home__grid button, .oas-theme-studio__option-pills button,
+    .oas-theme-studio__footer button
+) { font-size: var(--oas-type-button); }
+
+/* Fine print remains readable; do not squeeze operational fields to 8px. */
+.oas-shell .oas-main-inner :is(
+    .ui-acc-account-kpi__label, .ui-acc-metric-tile__label,
+    .ui-acc-doc-header__subtitle, .ui-sales-checkout__header-grid span,
+    .ui-sales-checkout__readonly span, .ui-sales-payment-lines__header span,
+    .ui-sales-flow__metric span, .ui-sales-line-card__subheader span
+) { font-size: var(--oas-type-caption); }
+
+/* Mobile controls at 16px avoid iOS Safari auto-zoom during data entry.
+   Desktop/tablet typography remains compact. */
+@media (max-width: 767px) {
+    .oas-shell .oas-main-inner :is(
+        .ui-input-text__control, .ui-select__control,
+        input.form-control, select.form-select, textarea.form-control,
+        input:not([type]), input[type="text"], input[type="number"],
+        input[type="search"], input[type="email"], input[type="tel"],
+        input[type="password"], input[type="date"], select, textarea
+    ) { font-size: max(16px, var(--oas-type-input)) !important; }
+}

@@ -176,7 +176,7 @@ public partial class ProductsPage
         ProductSection.ProductTypes => "أنواع المنتجات",
         ProductSection.Units => "وحدات القياس",
         ProductSection.Products => "المنتجات",
-        ProductSection.Variants => "متغيرات المنتجات",
+        ProductSection.Variants => "الأصناف القابلة للبيع",
         _ => "المنتجات"
     };
 
@@ -195,7 +195,7 @@ public partial class ProductsPage
 
     private static readonly IReadOnlyList<string> SimpleHeaders = ["الكود", "الاسم", "الحالة"];
     private static readonly IReadOnlyList<string> ProductHeaders = ["الكود", "المنتج", "النوع", "مخزني", "المتغيرات", "حالة المخزون", "الحالة"];
-    private static readonly IReadOnlyList<string> VariantHeaders = ["SKU", "المتغير", "الباركود", "سعر البيع", "الحالة"];
+    private static readonly IReadOnlyList<string> VariantHeaders = ["رمز الصنف", "الصنف", "الباركود", "سعر البيع", "الحالة"];
 
 
     private int VisibleCount => _section switch
@@ -224,11 +224,31 @@ public partial class ProductsPage
         ProductSection.ProductTypes => "نوع منتج",
         ProductSection.Units => "وحدة",
         ProductSection.Products => "منتج",
-        ProductSection.Variants => "متغير منتج",
+        ProductSection.Variants => "صنف قابل للبيع",
         _ => "سجل"
     };
 
     private string? EditorSubtitle => _selectedId.HasValue ? _code : null;
+
+    // Reuse values already entered in this business, and suggest common optical-industry values.
+    // Suggestions are never a closed enumeration: the operator can keep any existing value.
+    private IReadOnlyList<string> SuggestedValues(IEnumerable<string?> existing, params string[] common) =>
+        common.Concat(existing.Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x!.Trim()))
+            .Distinct(StringComparer.CurrentCultureIgnoreCase).OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase).ToArray();
+
+    private IReadOnlyList<string> FrameMaterialSuggestions => SuggestedValues(_frameDetails.Select(x => x.Material), "معدن", "بلاستيك", "أسيتات", "تيتانيوم", "مختلط");
+    private IReadOnlyList<string> FrameRimSuggestions => SuggestedValues(_frameDetails.Select(x => x.RimType), "إطار كامل", "نصف إطار", "بدون إطار");
+    private IReadOnlyList<string> FrameGenderSuggestions => SuggestedValues(_frameDetails.Select(x => x.Gender), "رجالي", "نسائي", "للجميع", "أطفال");
+    private IReadOnlyList<string> FrameShapeSuggestions => SuggestedValues(_frameDetails.Select(x => x.Shape), "دائري", "مربع", "مستطيل", "بيضاوي", "طيار", "عين القطة");
+    private IReadOnlyList<string> LensTypeSuggestions => SuggestedValues(_lensDetails.Select(x => x.LensType), "أحادية البؤرة", "ثنائية البؤرة", "متدرجة", "للقراءة", "للشمس");
+    private IReadOnlyList<string> LensMaterialSuggestions => SuggestedValues(_lensDetails.Select(x => x.Material), "بلاستيك", "بولي كربونات", "زجاج", "ترايفكس");
+    private IReadOnlyList<string> LensCoatingSuggestions => SuggestedValues(_lensDetails.Select(x => x.Coating), "مضاد للانعكاس", "حماية من الخدش", "حماية من الضوء الأزرق", "فوتوكروميك", "بدون طلاء");
+    private bool ShowsSpecializedInput => _mode != EditorMode.View;
+    private IReadOnlyList<string> ColorSuggestions => SuggestedValues(_variants.Select(x => x.Color), "أسود", "بني", "ذهبي", "فضي", "شفاف", "أزرق", "رمادي");
+    private IReadOnlyList<string> SizeSuggestions => SuggestedValues(_variants.Select(x => x.Size), "صغير", "متوسط", "كبير");
+    private string? PreferredUnitId => _units.FirstOrDefault(x => x.IsActive && (x.Name.Contains("قطعة", StringComparison.OrdinalIgnoreCase) || x.Code.Equals("PCS", StringComparison.OrdinalIgnoreCase)))?.Id.ToString("D")
+        ?? (_units.Count(x => x.IsActive) == 1 ? _units.First(x => x.IsActive).Id.ToString("D") : null);
+
 
     private IReadOnlyList<UiSelectOption> CategoryOptions =>
         [
@@ -401,6 +421,8 @@ public partial class ProductsPage
 
         if (_section == ProductSection.Products)
             _initialSku = await GetGeneratedCodeAsync(InventoryCodeKinds.ProductVariant) ?? _initialSku;
+        if (_section == ProductSection.Products && _categories.Count(x => x.IsActive && x.ProductTypeId.ToString("D") == _productTypeId) == 1)
+            _categoryId = _categories.First(x => x.IsActive && x.ProductTypeId.ToString("D") == _productTypeId).Id.ToString("D");
     }
 
     private Task BeginEditAsync(MouseEventArgs args)
@@ -454,6 +476,7 @@ public partial class ProductsPage
             await LoadAsync();
             LoadSelectedIntoForm(savedId.Value);
             Snackbar.Success(_saveSuccessMessage ?? "تم حفظ البيانات بنجاح.");
+            OpenDetailsScreen(savedId.Value);
             _saveSuccessMessage = null;
         }
         catch (ApiClientException ex)
@@ -766,7 +789,7 @@ public partial class ProductsPage
                 Required("سعر البيع", _sellingPrice);
                 MaxLength("SKU", _code, 64);
                 MaxLength("الباركود", _barcode, 64);
-                MaxLength("اسم المتغير", _variantName, 100);
+                MaxLength("اسم الصنف عند البيع", _variantName, 100);
                 MaxLength("اللون", _color, 50);
                 MaxLength("المقاس", _size, 50);
 
@@ -999,9 +1022,9 @@ public partial class ProductsPage
         _templeLength = null; _bridgeSize = null; _lensWidth = null;
         _lensType = string.Empty; _lensMaterial = null; _lensCoating = null; _refractiveIndex = null;
         _sph = null; _cyl = null; _add = null; _baseCurve = null; _diameter = null; _isPrescriptionLens = false;
-        _productId = null; _barcode = null; _variantName = null; _color = null; _size = null; _unitId = null;
+        _productId = null; _barcode = null; _variantName = null; _color = null; _size = null; _unitId = PreferredUnitId;
         _purchasePrice = "0"; _sellingPrice = "0";
-        _initialSku = string.Empty; _initialBarcode = null; _initialVariantName = null; _initialColor = null; _initialSize = null; _initialUnitId = null;
+        _initialSku = string.Empty; _initialBarcode = null; _initialVariantName = null; _initialColor = null; _initialSize = null; _initialUnitId = PreferredUnitId;
         _initialPurchasePrice = "0"; _initialSellingPrice = "0"; _addOpeningInventory = false;
         _openingWarehouseId = _warehouses.FirstOrDefault(x => x.IsActive && x.IsDefault)?.Id.ToString("D");
         _openingQuantity = string.Empty; _openingUnitCost = "0";
@@ -1217,12 +1240,12 @@ public partial class ProductsPage
     private void RenderProductEditor(RenderTreeBuilder b, ref int s)
     {
         AddText(b, ref s, "كود المنتج", _code, v => _code = v, () => _code, (!IsEditing || _saving), true, 32);
-        AddText(b, ref s, "الاسم", _name, v => _name = v, () => _name, (!IsEditing || _saving), true, 200);
+        AddText(b, ref s, "اسم المنتج", _name, v => _name = v, () => _name, (!IsEditing || _saving), true, 200);
         AddSelect(b, ref s, "نوع المنتج", _productTypeId, SetProductType, () => _productTypeId, ProductTypeOptions, true);
         AddSelect(b, ref s, "التصنيف", _categoryId, SetProductCategory, () => _categoryId, CategoryOptions.Where(x => !string.IsNullOrEmpty(x.Value)).ToArray(), true);
         AddSelect(b, ref s, "العلامة التجارية", _brandId, v => _brandId = v, () => _brandId, BrandOptions);
         AddText(b, ref s, "الوصف", _description, v => _description = v, () => _description, (!IsEditing || _saving), false, 1000);
-        AddCheckbox(b, ref s, "صنف مخزني", _isStockItem, SetStockItem, forceDisabled: IsServiceProductType);
+        AddCheckbox(b, ref s, "يُخزَّن هذا المنتج", _isStockItem, SetStockItem, forceDisabled: IsServiceProductType);
         AddActive(b, ref s);
     }
 
@@ -1232,11 +1255,11 @@ public partial class ProductsPage
         AddSelect(b, ref s, "نوع المنتج", _productTypeId, SetProductType, () => _productTypeId, ProductTypeOptions, true, lockHierarchy);
         AddSelect(b, ref s, "التصنيف", _categoryId, SetProductCategory, () => _categoryId, CategoryOptions.Where(x => !string.IsNullOrEmpty(x.Value)).ToArray(), true, lockHierarchy);
         AddSelect(b, ref s, "المنتج", _productId, SetVariantProduct, () => _productId, ProductOptions, true, lockHierarchy);
-        AddText(b, ref s, "SKU", _code, v => _code = v, () => _code, (!IsEditing || _saving), true, 64);
+        AddText(b, ref s, "رمز الصنف (SKU)", _code, v => _code = v, () => _code, (!IsEditing || _saving), true, 64);
         AddText(b, ref s, "الباركود", _barcode, v => _barcode = v, () => _barcode, (!IsEditing || _saving), false, 64);
-        AddText(b, ref s, "اسم المتغير", _variantName, v => _variantName = v, () => _variantName, (!IsEditing || _saving), false, 100);
-        AddText(b, ref s, "اللون", _color, v => _color = v, () => _color, (!IsEditing || _saving), false, 50);
-        AddText(b, ref s, "المقاس", _size, v => _size = v, () => _size, (!IsEditing || _saving), false, 50);
+        AddText(b, ref s, "اسم الصنف عند البيع", _variantName, v => _variantName = v, () => _variantName, (!IsEditing || _saving), false, 100);
+        AddSuggestion(b, ref s, "اللون", _color, v => _color = v, ColorSuggestions, 50);
+        AddSuggestion(b, ref s, "المقاس", _size, v => _size = v, SizeSuggestions, 50);
         AddSelect(b, ref s, "الوحدة", _unitId, v => _unitId = v, () => _unitId, UnitOptions);
         AddText(b, ref s, "سعر الشراء", _purchasePrice, v => _purchasePrice = v, () => _purchasePrice, (!IsEditing || _saving), true);
         AddText(b, ref s, "سعر البيع", _sellingPrice, v => _sellingPrice = v, () => _sellingPrice, (!IsEditing || _saving), true);
@@ -1251,6 +1274,9 @@ public partial class ProductsPage
             _productId = null;
         }
         _productTypeId = value;
+        var availableCategories = _categories.Where(x => x.IsActive && x.ProductTypeId.ToString("D") == value).ToArray();
+        if (_mode == EditorMode.Create && availableCategories.Length == 1)
+            _categoryId = availableCategories[0].Id.ToString("D");
         if (IsServiceProductType)
         {
             _isStockItem = false;
@@ -1280,6 +1306,8 @@ public partial class ProductsPage
 
         _categoryId = product.CategoryId.ToString("D");
         _productTypeId = _categories.FirstOrDefault(x => x.Id == product.CategoryId)?.ProductTypeId.ToString("D") ?? _productTypeId;
+        if (_mode == EditorMode.Create && string.IsNullOrWhiteSpace(_unitId))
+            _unitId = _variants.FirstOrDefault(x => x.ProductId == productId && x.UnitId.HasValue)?.UnitId?.ToString("D") ?? PreferredUnitId;
     }
 
     private void ToggleOpeningInventory(bool value)
@@ -1349,18 +1377,31 @@ public partial class ProductsPage
         return balances.Any(x => x.OnHandQuantity > 0m) ? "يوجد مخزون" : "رصيد صفري";
     }
 
-    private void AddActive(RenderTreeBuilder b, ref int s) => AddCheckbox(b, ref s, "نشط", _isActive, v => _isActive = v, _mode == EditorMode.Create);
+    private void AddActive(RenderTreeBuilder b, ref int s) => AddCheckbox(b, ref s, "متاح للاستخدام", _isActive, v => _isActive = v, _mode == EditorMode.Create);
 
     private void AddText(RenderTreeBuilder b, ref int s, string label, string? value, Action<string> changed, Expression<Func<string?>> expression, bool disabled, bool required = false, int? maxLength = null)
     {
         b.OpenComponent<OAS.UiLib.Components.Inputs.UiInputText>(s++);
         b.AddAttribute(s++, "Label", label); b.AddAttribute(s++, "Value", value ?? string.Empty);
-        b.AddAttribute(s++, "ValueChanged", EventCallback.Factory.Create<string?>(this, v => SetField(label, () => changed(v ?? string.Empty))));
+        var validationKey = label switch { "رمز الصنف (SKU)" => "SKU", "اسم المنتج" => "الاسم", _ => label };
+        b.AddAttribute(s++, "ValueChanged", EventCallback.Factory.Create<string?>(this, v => SetField(validationKey, () => changed(v ?? string.Empty))));
         b.AddAttribute(s++, "ValueExpression", expression);
         b.AddAttribute(s++, "Disabled", disabled); b.AddAttribute(s++, "Required", required); b.AddAttribute(s++, "Size", ControlSize.Small);
-        b.AddAttribute(s++, "ErrorText", ErrorFor(label));
+        b.AddAttribute(s++, "ErrorText", ErrorFor(validationKey));
         if (!required) b.AddAttribute(s++, "Placeholder", "(اختياري)");
         if (maxLength.HasValue) b.AddAttribute(s++, "MaxLength", maxLength.Value);
+        b.CloseComponent();
+    }
+
+    private void AddSuggestion(RenderTreeBuilder b, ref int s, string label, string? value, Action<string?> changed, IReadOnlyList<string> suggestions, int maxLength)
+    {
+        b.OpenComponent<OAS.Client.Inventory.Components.InventorySuggestedInput>(s++);
+        b.AddAttribute(s++, "Label", label);
+        b.AddAttribute(s++, "Value", value);
+        b.AddAttribute(s++, "Suggestions", suggestions);
+        b.AddAttribute(s++, "MaxLength", maxLength);
+        b.AddAttribute(s++, "Disabled", !IsEditing || _saving);
+        b.AddAttribute(s++, "ValueChanged", EventCallback.Factory.Create<string?>(this, v => SetField(label, () => changed(v))));
         b.CloseComponent();
     }
 

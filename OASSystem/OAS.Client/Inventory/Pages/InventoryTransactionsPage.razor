@@ -1,6 +1,9 @@
 @page "/inventory/transactions"
+@page "/inventory/transactions/{Screen}"
+@page "/inventory/transactions/{Screen}/{RecordId:guid}"
 @attribute [Authorize]
 @using OAS.Client.Inventory.Common
+@using OAS.Client.Inventory.Components
 @using OAS.Client.Inventory.Services
 @using OAS.Client.Services.Browser
 @using OAS.Contracts.Enums.Inventory
@@ -10,29 +13,36 @@
 @using System.Globalization
 
 @using OAS.UiLib.Components.Spreadsheets
-<PageTitle>عمليات المخزون | OAS</PageTitle>
+<PageTitle>@(IsFormRoute ? "نموذج المخزون" : "قائمة المخزون") - عمليات المخزون | OAS</PageTitle>
+<span class="oas-inventory-view" hidden aria-hidden="true"></span>
 
-<UiWorkspaceLayout ShowAside="true" ShowFilters="true">
+<UiWorkspaceLayout ShowAside="false" ShowFilters="@(!IsFormRoute && true)">
     <Actions>
         <UiWorkspaceActionBar>
-            <UiButton Text="عملية جديدة" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small"
-                      Disabled="@(_mode == ViewMode.Create)" OnClick="BeginCreateAsync" />
-            <UiButton Text="حفظ" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small"
+            @if (IsFormRoute)
+            {
+                <UiButton Text="العودة إلى القائمة" IconCssClass="fa-solid fa-arrow-right" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="BackToListAsync" />
+                <UiButton Text="حفظ" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small"
                       Disabled="@(_mode != ViewMode.Create)" Loading="@_saving" OnClick="SaveAsync" />
-            <UiButton Text="ترحيل" IconCssClass="fa-solid fa-check-double" Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
+                <UiButton Text="ترحيل" IconCssClass="fa-solid fa-check-double" Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
                       Disabled="@(!CanPost)" Loading="@_posting" OnClick="PostAsync" />
-            <UiButton Text="إلغاء" IconCssClass="fa-solid fa-xmark" Variant="ButtonVariant.Ghost" Size="ControlSize.Small"
-                      Disabled="@(_mode != ViewMode.Create)" OnClick="CancelCreateAsync" />
-            <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
+            }
+            else
+            {
+                <UiButton Text="عملية جديدة" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small"
+                      Disabled="@(_mode == ViewMode.Create)" OnClick="OpenCreateScreenAsync" />
+                <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
                       Loading="@_loading" OnClick="RefreshAsync" />
-            <UiSpreadsheetActions CanImport="false" Busy="@_exporting" OnExport="ExportAsync" />
-            <UiSearchInput @bind-Value="_search" Placeholder="ابحث برقم العملية أو المرجع..."
+                <UiSpreadsheetActions CanImport="false" Busy="@_exporting" OnExport="ExportAsync" />
+                <UiSearchInput @bind-Value="_search" Placeholder="ابحث برقم العملية أو المرجع..."
                            AriaLabel="البحث في عمليات المخزون" ClearText="مسح البحث"
                            DebounceMilliseconds="250" OnSearch="SearchChangedAsync" />
+            }
         </UiWorkspaceActionBar>
     </Actions>
-
     <Filters>
+        @if (!IsFormRoute)
+        {
         <UiWorkspaceFilterBar Compact="true">
             <UiSelect Label="نوع العملية"
                       Value="@_typeFilter"
@@ -53,39 +63,20 @@
                       Options="@WarehouseFilterOptions"
                       Size="ControlSize.Small" />
         </UiWorkspaceFilterBar>
+        }
     </Filters>
-
     <Content>
-        <UiDataGridPanel Title="عمليات المخزون" Subtitle="@($"{FilteredTransactions.Count} عملية")">
-            <Body>
-                @if (_loading)
-                {
-                    <UiAlert Message="جاري تحميل عمليات المخزون..." />
-                }
-                else
-                {
-                    <UiDataTable TItem="InventoryTransactionDto" Items="@FilteredTransactions" Headers="@TransactionHeaders" EmptyText="لا توجد عمليات مطابقة."
-                                 SidebarTypography="true"
-                                 UniformCellTypography="true"
-                                 OnRowClick="@(x => SelectAsync(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
-                        <RowTemplate Context="transaction">
-                            <td>@transaction.TransactionNumber</td>
-                            <td>@InventoryArabicPresenter.TransactionTypeText(transaction.TransactionType)</td>
-                            <td>@transaction.TransactionDate.ToLocalTime().ToString("yyyy-MM-dd")</td>
-                            <td>@WarehouseName(transaction.SourceWarehouseId)</td>
-                            <td>@WarehouseName(transaction.DestinationWarehouseId)</td>
-                            <td>
-                                <UiBadge Text="@InventoryArabicPresenter.TransactionStatusText(transaction.Status)"
-                                         Tone="@(transaction.Status == InventoryTransactionStatus.Posted ? AlertTone.Success : AlertTone.Info)" />
-                            </td>
-                        </RowTemplate>
-                    </UiDataTable>
-                }
-            </Body>
-        </UiDataGridPanel>
-    </Content>
-
-    <Aside>
+        @if (IsFormRoute)
+        {
+            <div class="oas-inventory-form-screen">
+                <div class="oas-inventory-form-screen__intro">
+                    <div>
+                        <div class="oas-inventory-form-screen__eyebrow">إدارة المخزون</div>
+                        <h2>@AsideTitle</h2>
+                        <p>راجع البيانات ثم احفظ التغييرات. الحقول الإضافية تظهر عند الحاجة.</p>
+                    </div>
+                </div>
+                <div class="oas-inventory-form-screen__body">
         <UiCard Title="@AsideTitle" Subtitle="@AsideSubtitle">
             @if (_mode == ViewMode.Empty)
             {
@@ -100,7 +91,7 @@
                     }
                     @if (!_variants.Any(IsUsableVariant))
                     {
-                        <UiAlert Tone="AlertTone.Danger" Message="لا يوجد Product Variant نشط يمكن إضافته إلى العملية." />
+                        <UiAlert Tone="AlertTone.Danger" Message="لا توجد أصناف نشطة. أضف صنفًا من صفحة المنتجات أولًا." />
                     }
 
                     <UiSelect Label="نوع العملية"
@@ -146,35 +137,22 @@
 
                     @if (IsAdjustment)
                     {
-                        <UiInputText Label="سبب التعديل"
-                                     Value="@_reason"
-                                     ValueExpression="@(() => _reason)"
-                                     ValueChanged="OnReasonChanged"
-                                     ErrorText="@_reasonError"
-                                     MaxLength="500"
-                                     Required="true"
-                                     Size="ControlSize.Small" />
+                        <InventorySuggestedInput Label="سبب تعديل الرصيد" Value="@_reason" ValueChanged="OnReasonChanged"
+                                                 Suggestions="@AdjustmentReasons" ErrorText="@_reasonError"
+                                                 Required="true" MaxLength="500" />
                     }
                     else
                     {
-                        <UiInputText Label="السبب"
-                                     Value="@_reason"
-                                     ValueExpression="@(() => _reason)"
-                                     ValueChanged="OnReasonChanged"
-                                     ErrorText="@_reasonError"
-                                     Placeholder="(اختياري)"
-                                     MaxLength="500"
-                                     Size="ControlSize.Small" />
+                        <InventorySuggestedInput Label="سبب العملية (اختياري)" Value="@_reason" ValueChanged="OnReasonChanged"
+                                                 Suggestions="@CommonReasons" ErrorText="@_reasonError" MaxLength="500" />
                     }
 
-                    <UiInputText Label="ملاحظات"
-                                 Value="@_notes"
-                                 ValueExpression="@(() => _notes)"
-                                 ValueChanged="OnNotesChanged"
-                                 ErrorText="@_notesError"
-                                 Placeholder="(اختياري)"
-                                 MaxLength="1000"
-                                 Size="ControlSize.Small" />
+                    <details class="inventory-transactions__optional">
+                        <summary>ملاحظات إضافية (اختياري)</summary>
+                        <UiInputText Label="ملاحظات" Value="@_notes" ValueExpression="@(() => _notes)"
+                                     ValueChanged="OnNotesChanged" ErrorText="@_notesError"
+                                     MaxLength="1000" Size="ControlSize.Small" />
+                    </details>
 
                     <div class="inventory-transactions__lines-title">
                         <strong>الأصناف والكميات</strong>
@@ -185,7 +163,7 @@
                     {
                         var line = _draftLines[i];
                         <div class="inventory-transactions__line-editor">
-                            <UiSelect Label="الصنف / SKU"
+                            <UiSelect Label="اختر الصنف"
                                       Value="@line.ProductVariantId"
                                       ValueExpression="@(() => line.ProductVariantId)"
                                       ValueChanged="@(v => OnLineVariantChanged(line, v))"
@@ -203,7 +181,7 @@
                                          step="0.001" min="0.001"
                                          Required="true"
                                          Size="ControlSize.Small" />
-                            <UiInputText Label="تكلفة الوحدة"
+                            <UiInputText Label="تكلفة الوحدة (يمكن تعديلها)"
                                          Value="@line.UnitCost"
                                          ValueExpression="@(() => line.UnitCost)"
                                          ValueChanged="@(v => OnLineUnitCostChanged(line, v))"
@@ -251,10 +229,97 @@
                 </div>
             }
         </UiCard>
-    </Aside>
+
+                </div>
+            </div>
+        }
+        else
+        {
+        <UiDataGridPanel Title="عمليات المخزون" Subtitle="@($"{FilteredTransactions.Count} عملية")">
+            <Body>
+                @if (_loading)
+                {
+                    <UiAlert Message="جاري تحميل عمليات المخزون..." />
+                }
+                else
+                {
+                    <UiDataTable TItem="InventoryTransactionDto" Items="@FilteredTransactions" PageSize="12" Headers="@TransactionHeaders" EmptyText="لا توجد عمليات مطابقة."
+                                 SidebarTypography="true"
+                                 UniformCellTypography="true"
+                                 OnRowClick="@(x => OpenDetailsScreen(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
+                        <RowTemplate Context="transaction">
+                            <td>@transaction.TransactionNumber</td>
+                            <td>@InventoryArabicPresenter.TransactionTypeText(transaction.TransactionType)</td>
+                            <td>@transaction.TransactionDate.ToLocalTime().ToString("yyyy-MM-dd")</td>
+                            <td>@WarehouseName(transaction.SourceWarehouseId)</td>
+                            <td>@WarehouseName(transaction.DestinationWarehouseId)</td>
+                            <td>
+                                <UiBadge Text="@InventoryArabicPresenter.TransactionStatusText(transaction.Status)"
+                                         Tone="@(transaction.Status == InventoryTransactionStatus.Posted ? AlertTone.Success : AlertTone.Info)" />
+                            </td>
+                        </RowTemplate>
+                    </UiDataTable>
+                }
+            </Body>
+        </UiDataGridPanel>
+
+        }
+    </Content>
 </UiWorkspaceLayout>
 
 @code {
+    // Each CRUD action has its own route. No editable form is mounted on the list screen.
+    [Microsoft.AspNetCore.Components.Inject]
+    private Microsoft.AspNetCore.Components.NavigationManager InventoryNavigation { get; set; } = default!;
+
+    [Microsoft.AspNetCore.Components.Parameter]
+    public string? Screen { get; set; }
+
+    [Microsoft.AspNetCore.Components.Parameter]
+    public Guid? RecordId { get; set; }
+
+    private const string InventoryListRoute = "/inventory/transactions";
+    private bool IsFormRoute => Screen is "new" or "edit" or "details";
+    private string? _appliedInventoryRoute;
+
+    private Task OpenCreateScreenAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _) {
+        InventoryNavigation.NavigateTo($"{InventoryListRoute}/new");
+        return Task.CompletedTask;
+    }
+
+    private Task OpenEditScreenAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _) {
+        if (_selectedId is { } id)
+            InventoryNavigation.NavigateTo($"{InventoryListRoute}/edit/{id:D}");
+        return Task.CompletedTask;
+    }
+
+    private void OpenDetailsScreen(Guid id) =>
+        InventoryNavigation.NavigateTo($"{InventoryListRoute}/details/{id:D}");
+
+    private Task BackToListAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _) {
+        InventoryNavigation.NavigateTo($"{InventoryListRoute}");
+        return Task.CompletedTask;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var key = $"{Screen}/{RecordId}";
+        if (_appliedInventoryRoute == key) return;
+        _appliedInventoryRoute = key;
+        if (Screen == "new")
+            await BeginCreateAsync(new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
+        else if (RecordId is { } id && Screen is ("details" or "edit"))
+        {
+            _mode = ViewMode.Empty;
+            await SelectAsync(id);
+        }
+        else
+        {
+            _selectedId = null;
+            _mode = ViewMode.Empty;
+        }
+    }
+
     private enum ViewMode { Empty, View, Create }
     private sealed class TransactionLineForm
     {
@@ -306,6 +371,15 @@
     private string? _reasonError;
     private string? _notesError;
     private readonly List<TransactionLineForm> _draftLines = [];
+
+    // Offer proven historic values alongside common reasons. The operator can always enter a new reason.
+    private IReadOnlyList<string> CommonReasons => new[] { "توريد بضاعة", "صرف للمبيعات", "نقل بين المخازن", "مرتجع", "تصحيح رصيد" }
+        .Concat(_transactions.Select(x => x.Reason).Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x!))
+        .Distinct(StringComparer.CurrentCultureIgnoreCase).ToArray();
+    private IReadOnlyList<string> AdjustmentReasons => new[] { "فرق جرد", "تالف", "خطأ في تسجيل الكمية", "فاقد", "تسوية مخزون" }
+        .Concat(CommonReasons).Distinct(StringComparer.CurrentCultureIgnoreCase).ToArray();
+    private string? DefaultWarehouseId => _warehouses.FirstOrDefault(x => x.IsActive && x.IsDefault)?.Id.ToString("D")
+        ?? (_warehouses.Count(x => x.IsActive) == 1 ? _warehouses.First(x => x.IsActive).Id.ToString("D") : null);
 
     private IReadOnlyList<UiSelectOption> TransactionTypeFilterOptions =>
         [new UiSelectOption(string.Empty, "كل الأنواع"), .. InventoryArabicPresenter.TransactionTypeOptions];
@@ -425,7 +499,7 @@
         _transactionType = ((int)InventoryTransactionType.Receipt).ToString();
         _transactionDate = DateOnly.FromDateTime(DateTime.Today);
         _sourceWarehouseId = null;
-        _destinationWarehouseId = null;
+        _destinationWarehouseId = DefaultWarehouseId;
         _reason = null;
         _notes = null;
         ClearValidationErrors();
@@ -459,6 +533,16 @@
             _destinationWarehouseError = null;
         }
 
+        if (RequiresSourceWarehouse && string.IsNullOrWhiteSpace(_sourceWarehouseId))
+            _sourceWarehouseId = DefaultWarehouseId;
+        if (RequiresDestinationWarehouse && string.IsNullOrWhiteSpace(_destinationWarehouseId))
+        {
+            _destinationWarehouseId = _warehouses.Where(x => x.IsActive)
+                .FirstOrDefault(x => x.Id.ToString("D") != _sourceWarehouseId && x.IsDefault)?.Id.ToString("D")
+                ?? _warehouses.FirstOrDefault(x => x.IsActive && x.Id.ToString("D") != _sourceWarehouseId)?.Id.ToString("D");
+        }
+        if (CurrentType == InventoryTransactionType.Transfer && _sourceWarehouseId == _destinationWarehouseId)
+            _destinationWarehouseId = _warehouses.FirstOrDefault(x => x.IsActive && x.Id.ToString("D") != _sourceWarehouseId)?.Id.ToString("D");
         if (!IsAdjustment)
             _reasonError = null;
     }
@@ -509,6 +593,13 @@
     {
         line.ProductVariantId = value;
         line.ProductVariantError = null;
+        if (Guid.TryParse(value, out var variantId) && _variants.FirstOrDefault(x => x.Id == variantId) is { } selected)
+        {
+            // Purchase price is a suggestion only; the operator can change it before saving.
+            if ((CurrentType is InventoryTransactionType.Receipt or InventoryTransactionType.Opening or InventoryTransactionType.AdjustmentIncrease)
+                && (string.IsNullOrWhiteSpace(line.UnitCost) || line.UnitCost == "0"))
+                line.UnitCost = selected.PurchasePrice.ToString("0.##", CultureInfo.InvariantCulture);
+        }
     }
 
     private void OnLineQuantityChanged(TransactionLineForm line, string? value)
@@ -548,6 +639,7 @@
             await LoadAsync();
             await SelectAsync(saved.Id);
             Snackbar.Success("تم إنشاء عملية المخزون.");
+            OpenDetailsScreen(saved.Id);
         }
         catch (ApiClientException ex)
         {

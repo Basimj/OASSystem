@@ -6,11 +6,11 @@
     --oas-tabs-row-height: 30px;
     --oas-sidebar-nav-font-size: 14px;
     --oas-sidebar-child-font-size: 13px;
-    --oas-ui-sidebar: #1b4659;
-    --oas-ui-sidebar-fg: #ffffff;
+    --oas-ui-sidebar: #DDF3F8;
+    --oas-ui-sidebar-fg: #174558;
     --oas-ui-header: #ffffff;
-    --oas-ui-header-fg: #1c3444;
-    --oas-ui-accent: #459db9;
+    --oas-ui-header-fg: #21485C;
+    --oas-ui-accent: #0B8095;
     --oas-ui-accent-fg: #ffffff;
     --oas-ui-font: "Cairo", "Tajawal", "Segoe UI", Tahoma, sans-serif;
 }
@@ -319,25 +319,25 @@
 
 /* User-specific appearance values are attached to .oas-shell by oas-appearance.js.
    These late rules intentionally override legacy fixed Ocean colors. */
-.oas-shell .oas-nav-icon { color: var(--oas-ui-sidebar-icon, #D6EAF1); }
+.oas-shell .oas-nav-icon { color: var(--oas-ui-sidebar-icon, #28667B); }
 .oas-shell .oas-nav-item.active, .oas-shell .oas-nav-item--child.active {
-    background: var(--oas-ui-sidebar-active-bg, #287E9A);
-    color: var(--oas-ui-sidebar-active-fg, #FFFFFF);
+    background: var(--oas-ui-sidebar-active-bg, #B9E5F1);
+    color: var(--oas-ui-sidebar-active-fg, #123D56);
 }
 .oas-shell .oas-nav-item.active .oas-nav-icon,
 .oas-shell .oas-nav-item--child.active .oas-nav-icon {
-    color: var(--oas-ui-sidebar-active-icon, #FFFFFF);
+    color: var(--oas-ui-sidebar-active-icon, #086C87);
 }
 .oas-shell .oas-nav-item:hover:not(.active),
 .oas-shell .oas-nav-group__header:hover {
-    background: var(--oas-ui-sidebar-hover, #335F72);
+    background: var(--oas-ui-sidebar-hover, #C8EAF2);
 }
 .oas-shell .oas-header-icon-button,
 .oas-shell .oas-header-meta-item i,
 .oas-shell .oas-shell-search__icon { color: var(--oas-ui-header-icon, #526C87); }
 .oas-shell .oas-nav-item, .oas-shell .oas-nav-group__header,
-.oas-shell .oas-sidebar-brand__name { color: var(--oas-ui-sidebar-fg, #FFFFFF); }
-.oas-shell .oas-sidebar { background: var(--oas-ui-sidebar, #1B4659); }
+.oas-shell .oas-sidebar-brand__name { color: var(--oas-ui-sidebar-fg, #174558); }
+.oas-shell .oas-sidebar { background: var(--oas-ui-sidebar, #DDF3F8); }
 .oas-shell .oas-workspace-topbar, .oas-shell .oas-global-header-row,
 .oas-shell .oas-global-tabs-row { background: var(--oas-ui-header, #FFFFFF); }
 .oas-shell .oas-top-header, .oas-shell .oas-header-meta-item,

@@ -18,3 +18,11 @@
 @import "./oas-theme-v9.css";
 @import "./oas-theme-v10.css";
 @import "./oas-theme-v11-accounting.css";
+
+@import "./features/inventory-modern.css";
+
+/* Unified Sea Glass palette and global quick theme switch. */
+@import "./oas-seaglass-theme.css";
+
+/* Consistent type scale across every theme and workspace. */
+@import "./oas-typography-standard.css";

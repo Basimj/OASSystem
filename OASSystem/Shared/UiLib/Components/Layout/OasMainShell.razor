@@ -1,5 +1,5 @@
 <div class="oas-shell @(isSidebarCollapsed ? "sidebar-collapsed" : "") @(isMobileMenuOpen ? "mobile-menu-open" : "")">
-    <OasAppearanceBoot OnSidebarModeLoaded="ApplyStoredSidebarModeAsync" />
+    <OasAppearanceBoot OnSidebarModeLoaded="ApplyStoredSidebarModeAsync" OnThemeModeLoaded="ApplyStoredThemeModeAsync" />
     <div class="oas-mobile-overlay" @onclick="CloseMobileMenu"></div>
 
     <header class="oas-workspace-topbar">
@@ -21,6 +21,20 @@
                           OnSettings="OnSettings"
                           OnSupport="OnSupport"
                           OnLogout="OnLogout" />
+            <button type="button"
+                    class="oas-theme-toggle"
+                    title="@(_isDarkTheme ? "التبديل إلى الوضع الفاتح" : "التبديل إلى الوضع المظلم")"
+                    aria-label="@(_isDarkTheme ? "تفعيل الوضع الفاتح" : "تفعيل الوضع المظلم")"
+                    aria-pressed="@_isDarkTheme"
+                    disabled="@_themeChangeBusy"
+                    @onclick="ToggleThemeModeAsync">
+                <i class="@(_isDarkTheme ? "fa-solid fa-sun" : "fa-solid fa-moon")" aria-hidden="true"></i>
+                <span>@(_isDarkTheme ? "الوضع الفاتح" : "الوضع المظلم")</span>
+            </button>
+            @if (_themeToggleError)
+            {
+                <span class="oas-theme-toggle-error" role="alert">تعذر حفظ المظهر</span>
+            }
             <OasModuleSearch Modules="@VisibleModules.ToArray()" OnNavigate="NavigateModuleAsync" />
         </div>
 

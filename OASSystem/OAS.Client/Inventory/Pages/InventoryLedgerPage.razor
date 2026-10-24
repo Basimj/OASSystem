@@ -10,6 +10,7 @@
 
 @using OAS.UiLib.Components.Spreadsheets
 <PageTitle>حركات المخزون | OAS</PageTitle>
+<span class="oas-inventory-view" hidden aria-hidden="true"></span>
 
 <UiWorkspaceLayout ShowAside="false" ShowFilters="true">
     <Actions>
@@ -22,7 +23,7 @@
                 <UiButton Text="إلغاء التصفية المرتبطة" IconCssClass="fa-solid fa-filter-circle-xmark" Variant="ButtonVariant.Ghost"
                           Size="ControlSize.Small" OnClick="ClearLinkedFilterAsync" />
             }
-            <UiSearchInput @bind-Value="_search" Placeholder="ابحث برقم الحركة أو المنتج أو SKU أو Barcode..."
+            <UiSearchInput @bind-Value="_search" Placeholder="ابحث برقم الحركة أو المنتج أو رمز الصنف أو الباركود..."
                            AriaLabel="البحث في حركات المخزون" ClearText="مسح البحث"
                            DebounceMilliseconds="250" OnSearch="SearchChangedAsync" />
         </UiWorkspaceActionBar>
@@ -70,7 +71,7 @@
                 }
                 else
                 {
-                    <UiDataTable TItem="InventoryLedgerDto" Items="@FilteredEntries" Headers="@LedgerHeaders" EmptyText="لا توجد حركات مطابقة للفلاتر الحالية."
+                    <UiDataTable TItem="InventoryLedgerDto" Items="@FilteredEntries" PageSize="12" Headers="@LedgerHeaders" EmptyText="لا توجد حركات مطابقة للفلاتر الحالية."
                                  SidebarTypography="true"
                                  UniformCellTypography="true" Compact="true">
                         <RowTemplate Context="entry">

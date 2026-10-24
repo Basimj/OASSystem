@@ -9,6 +9,7 @@
 
 @using OAS.UiLib.Components.Spreadsheets
 <PageTitle>أرصدة المخزون | OAS</PageTitle>
+<span class="oas-inventory-view" hidden aria-hidden="true"></span>
 
 <UiWorkspaceLayout ShowAside="false" ShowFilters="true">
     <Actions>
@@ -16,7 +17,7 @@
             <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary"
                       Size="ControlSize.Small" Loading="@(_loading || _loadingBalances)" OnClick="RefreshAsync" />
             <UiSpreadsheetActions CanImport="false" Busy="@(_exporting || _loading || _loadingBalances || _balanceLoadFailed)" OnExport="ExportAsync" />
-            <UiSearchInput @bind-Value="_search" Placeholder="ابحث بالمنتج أو SKU أو Barcode..."
+            <UiSearchInput @bind-Value="_search" Placeholder="ابحث بالمنتج أو رمز الصنف أو الباركود..."
                            AriaLabel="البحث في أرصدة المخزون" ClearText="مسح البحث"
                            DebounceMilliseconds="250" OnSearch="SearchChangedAsync" />
         </UiWorkspaceActionBar>
@@ -51,7 +52,7 @@
                 }
                 else
                 {
-                    <UiDataTable TItem="InventoryDisplayRow" Items="@FilteredBalances" Headers="@BalanceHeaders" EmptyText="لا توجد أصناف مخزنية مطابقة للفلتر الحالي."
+                    <UiDataTable TItem="InventoryDisplayRow" Items="@FilteredBalances" PageSize="12" Headers="@BalanceHeaders" EmptyText="لا توجد أصناف مخزنية مطابقة للفلتر الحالي."
                                  SidebarTypography="true"
                                  UniformCellTypography="true" Compact="true" FitToContainer="true">
                         <RowTemplate Context="row">
@@ -97,7 +98,7 @@
     private string? _search;
     private string? _warehouseFilter;
     private IReadOnlyList<InventoryBalanceDto> _balances = [];
-    private static readonly IReadOnlyList<string> BalanceHeaders = ["المنتج", "الصنف / SKU / الباركود", "المخزن", "الكمية الفعلية", "المحجوز", "المتاح", "قيد الطلب", "متوسط التكلفة", "القيمة", "إجراءات"];
+    private static readonly IReadOnlyList<string> BalanceHeaders = ["المنتج", "الصنف / الرمز / الباركود", "المخزن", "الكمية الفعلية", "المحجوز", "المتاح", "قيد الطلب", "متوسط التكلفة", "القيمة", "إجراءات"];
     private IReadOnlyList<WarehouseDto> _warehouses = [];
     private IReadOnlyList<ProductDto> _products = [];
     private IReadOnlyList<ProductVariantDto> _variants = [];
@@ -173,7 +174,8 @@
             _variants = variantsTask.Result;
 
             if (!Guid.TryParse(_warehouseFilter, out var selectedWarehouseId) || !_warehouses.Any(x => x.Id == selectedWarehouseId && x.IsActive))
-                _warehouseFilter = _warehouses.FirstOrDefault(x => x.IsActive && x.IsDefault)?.Id.ToString("D");
+                _warehouseFilter = _warehouses.FirstOrDefault(x => x.IsActive && x.IsDefault)?.Id.ToString("D")
+                    ?? (_warehouses.Count(x => x.IsActive) == 1 ? _warehouses.First(x => x.IsActive).Id.ToString("D") : null);
 
             await LoadBalancesForSelectedWarehouseAsync();
         }

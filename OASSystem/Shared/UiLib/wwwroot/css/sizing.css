@@ -1,7 +1,9 @@
+/* OAS standard compact business typography (at font scale 100%). */
 :root {
-    --oas-font-sm: .75rem;
-    --oas-font-md: .8125rem;
-    --oas-font-lg: .9rem;
+    --oas-font-xs: 11px;
+    --oas-font-sm: 11.5px;
+    --oas-font-md: 12.5px;
+    --oas-font-lg: 13.5px;
     --oas-control-sm: 1.875rem;
     --oas-control-md: 2.125rem;
     --oas-control-lg: 2.625rem;
