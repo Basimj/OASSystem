@@ -1,0 +1,141 @@
+@namespace OAS.UiLib.Components.Sales.Workspace
+@using OAS.UiLib.Core.Models.Sales
+
+<section class="oas-invoice-list" dir="rtl" aria-label="قائمة فواتير المبيعات">
+    <header class="oas-invoice-list__header">
+        <div class="oas-invoice-list__heading">
+            <span class="oas-invoice-list__icon" aria-hidden="true"><i class="fa-solid fa-file-invoice-dollar"></i></span>
+            <div>
+                <h2>فواتير المبيعات</h2>
+                <p>استعرض الفواتير وحالة اعتمادها وترحيلها وسدادها، وافتح أي فاتورة لعرض تفاصيلها.</p>
+            </div>
+        </div>
+        <div class="oas-invoice-list__view-meta">
+            <span class="oas-invoice-list__count">@TotalCount فاتورة</span>
+            <div class="oas-invoice-list__view-options" aria-label="طريقة عرض الفواتير">
+                <button type="button" title="عرض كجدول" class="@(!_cardsView ? "is-selected" : null)" aria-pressed="@(!_cardsView)" @onclick="() => _cardsView = false"><i class="fa-solid fa-table-list"></i><span>جدول</span></button>
+                <button type="button" title="عرض كبطاقات" class="@(_cardsView ? "is-selected" : null)" aria-pressed="@_cardsView" @onclick="() => _cardsView = true"><i class="fa-solid fa-border-all"></i><span>بطاقات</span></button>
+            </div>
+        </div>
+    </header>
+
+    @if (IsLoading)
+    {
+        <div class="oas-invoice-list__empty" role="status"><i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i> جاري تحميل الفواتير...</div>
+    }
+    else if (Items.Count == 0)
+    {
+        <div class="oas-invoice-list__empty">
+            <i class="fa-regular fa-folder-open" aria-hidden="true"></i>
+            <strong>لا توجد فواتير مطابقة</strong>
+            <p>يمكنك تعديل البحث أو إنشاء فاتورة جديدة من زر «جديد» أعلى الصفحة.</p>
+        </div>
+    }
+    else
+    {
+        <div class="oas-invoice-list__subhead">
+            <span>عرض <strong>@FirstRecord–@LastRecord</strong> من <strong>@TotalCount</strong></span>
+            <span>اضغط على أي صف للاطلاع على الفاتورة</span>
+        </div>
+        <div class="@(_cardsView ? "oas-invoice-list__table-wrap is-card-mode" : "oas-invoice-list__table-wrap")">
+            <table class="oas-invoice-list__table">
+                <thead>
+                    <tr>
+                        <th scope="col">رقم الفاتورة</th>
+                        <th scope="col">العميل</th>
+                        <th scope="col">تاريخ الفاتورة</th>
+                        <th scope="col">حالة الفاتورة</th>
+                        <th scope="col">إجمالي الفاتورة</th>
+                        <th scope="col">حالة السداد</th>
+                        <th scope="col" class="oas-invoice-list__action-th">الإجراء</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Items)
+                    {
+                        <tr @key="item.Id" tabindex="0" @onclick="() => OpenAsync(item.Id)" @onkeydown="e => HandleRowKeyAsync(e, item.Id)" title="فتح الفاتورة @item.Code">
+                            <td data-label="رقم الفاتورة"><strong class="oas-invoice-list__code" dir="ltr">@item.Code</strong></td>
+                            <td data-label="العميل">
+                                <strong class="oas-invoice-list__customer">@item.PrimaryText</strong>
+                                @if (!string.IsNullOrWhiteSpace(item.SecondaryText))
+                                {
+                                    <small>@item.SecondaryText</small>
+                                }
+                            </td>
+                            <td data-label="تاريخ الفاتورة"><span dir="ltr" class="oas-invoice-list__date">@item.DateText</span></td>
+                            <td data-label="حالة الفاتورة"><span class="ui-sales-status @item.StatusCssClass">@item.StatusText</span></td>
+                            <td data-label="الإجمالي"><strong class="oas-invoice-list__amount" dir="ltr">@item.AmountText</strong></td>
+                            <td data-label="حالة السداد"><span class="@PaymentCss(item)">@PaymentText(item)</span></td>
+                            <td data-label="الإجراء" class="oas-invoice-list__action">
+                                <button type="button" class="oas-invoice-list__open" @onclick:stopPropagation="true" @onclick="() => OpenAsync(item.Id)" aria-label="عرض الفاتورة @item.Code">
+                                    <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                                    <span>عرض</span>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="@(_cardsView ? "oas-invoice-list__cards is-card-mode" : "oas-invoice-list__cards")">
+            @foreach (var item in Items)
+            {
+                <button type="button" class="oas-invoice-list__card" @key="item.Id" @onclick="() => OpenAsync(item.Id)">
+                    <div class="oas-invoice-list__card-top">
+                        <strong dir="ltr" class="oas-invoice-list__code">@item.Code</strong>
+                        <span class="ui-sales-status @item.StatusCssClass">@item.StatusText</span>
+                    </div>
+                    <strong class="oas-invoice-list__customer">@item.PrimaryText</strong>
+                    <div class="oas-invoice-list__card-meta">
+                        <span><i class="fa-regular fa-calendar" aria-hidden="true"></i> @item.DateText</span>
+                        <span class="@PaymentCss(item)">@PaymentText(item)</span>
+                    </div>
+                    <div class="oas-invoice-list__card-bottom">
+                        <span class="oas-invoice-list__amount" dir="ltr">@item.AmountText</span>
+                        <span class="oas-invoice-list__view-link">عرض الفاتورة <i class="fa-solid fa-arrow-left" aria-hidden="true"></i></span>
+                    </div>
+                </button>
+            }
+        </div>
+    }
+    @if (!IsLoading && TotalPages > 1)
+    {
+        <div class="oas-invoice-list__pagination">
+            <UiPagination PageNumber="@PageNumber" TotalPages="@TotalPages" TotalCount="@TotalCount" OnPrevious="OnPrevious" OnNext="OnNext" />
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter] public IReadOnlyList<UiSalesDocumentListItem> Items { get; set; } = [];
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public long TotalCount { get; set; }
+    [Parameter] public int PageNumber { get; set; } = 1;
+    [Parameter] public int PageSize { get; set; } = 20;
+    [Parameter] public int TotalPages { get; set; }
+    [Parameter] public EventCallback<Guid> OnOpen { get; set; }
+    [Parameter] public EventCallback OnPrevious { get; set; }
+    [Parameter] public EventCallback OnNext { get; set; }
+
+    private bool _cardsView;
+    private long FirstRecord => TotalCount == 0 ? 0 : (long)(Math.Max(1, PageNumber) - 1) * Math.Max(1, PageSize) + 1;
+    private long LastRecord => Math.Min(TotalCount, FirstRecord + Items.Count - 1);
+
+    // Payment data is only final after posting. Do not mark a draft as settled.
+    private static string PaymentText(UiSalesDocumentListItem item) => item.StatusText switch
+    {
+        "مسودة" => "بانتظار التأكيد",
+        "مؤكدة" => "بانتظار الترحيل",
+        "ملغاة" => "ملغاة",
+        _ => string.IsNullOrWhiteSpace(item.MetaText) ? "غير محدد" : item.MetaText
+    };
+    private static string PaymentCss(UiSalesDocumentListItem item) => PaymentText(item) switch
+    {
+        "مسددة" or "مسددة بالكامل" => "oas-invoice-list__payment is-paid",
+        "ملغاة" => "oas-invoice-list__payment is-muted",
+        _ => "oas-invoice-list__payment is-due"
+    };
+    private Task OpenAsync(Guid id) => OnOpen.InvokeAsync(id);
+    private Task HandleRowKeyAsync(Microsoft.AspNetCore.Components.Web.KeyboardEventArgs e, Guid id)
+        => e.Key is "Enter" or " " ? OpenAsync(id) : Task.CompletedTask;
+}

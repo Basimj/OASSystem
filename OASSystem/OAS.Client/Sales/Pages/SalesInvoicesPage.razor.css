@@ -1,0 +1,48 @@
+/* Sales invoice page shell — isolated to /sales/invoices; other sales pages stay untouched. */
+.oas-sales-invoices-page {
+    min-width: 0;
+    width: 100%;
+    color: var(--oas-color-text, #27263b);
+}
+.oas-sales-invoices-page ::deep .ui-sales-workspace {
+    min-width: 0;
+    gap: .5rem;
+    padding: .6rem;
+    background: var(--oas-color-background, #fbfbfd);
+}
+.oas-sales-invoices-page ::deep .ui-sales-workspace__actions,
+.oas-sales-invoices-page ::deep .ui-sales-workspace__tabs,
+.oas-sales-invoices-page ::deep .ui-sales-editor__header,
+.oas-sales-invoices-page ::deep .ui-sales-editor__actions {
+    background: var(--oas-color-surface, #fff);
+    border-color: var(--oas-color-border, #e7e5ef);
+    border-radius: .7rem;
+}
+.oas-sales-invoices-page ::deep .ui-sales-editor__header { padding: .85rem 1rem; }
+.oas-sales-invoices-page ::deep .ui-sales-editor__title h2 { font-size: 1.05rem; color: var(--oas-color-text, #27263b); }
+.oas-sales-invoices-page ::deep .ui-sales-editor__title p { color: var(--oas-color-text-muted, #77758c); }
+.oas-sales-invoices-page ::deep .ui-sales-editor__title > i {
+    color: var(--oas-color-primary, #5a2dd6);
+    background: var(--oas-color-primary-soft, #f4f0ff);
+}
+.oas-sales-invoices-page ::deep .ui-sales-editor__actions {
+    display: flex;
+    align-items: center;
+    min-height: 46px;
+    gap: .5rem;
+    padding: .45rem .7rem;
+}
+.oas-sales-invoices-page ::deep .ui-sales-editor__content { gap: .55rem; }
+@media (max-width: 720px) {
+    .oas-sales-invoices-page ::deep .ui-sales-workspace { padding: .3rem; }
+    .oas-sales-invoices-page ::deep .ui-sales-editor__header { padding: .65rem; }
+    .oas-sales-invoices-page ::deep .ui-sales-editor__title h2 { font-size: .95rem; }
+    .oas-sales-invoices-page ::deep .ui-sales-editor__actions {
+        position: sticky;
+        top: 0;
+        z-index: 40;
+        background: var(--oas-color-surface, #fff);
+        border-color: var(--oas-color-border, #e7e5ef);
+        box-shadow: 0 2px 8px rgb(0 0 0 / 8%);
+    }
+}

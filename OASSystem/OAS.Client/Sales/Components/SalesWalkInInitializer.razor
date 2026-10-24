@@ -1,0 +1,50 @@
+@namespace OAS.Client.Sales.Components
+@using OAS.Client.Services.Http
+@using OAS.Contracts.Accounting.Settings
+@using OAS.UiLib.Core.Models.Sales
+@inject OasApiClient Api
+
+@code {
+    [Parameter] public UiSalesInvoiceFormModel? Model { get; set; }
+    [Parameter] public EventCallback<WalkInCashCustomerSettingsDto?> OnSettingsLoaded { get; set; }
+
+    private bool _loaded;
+    private UiSalesInvoiceFormModel? _processedModel;
+    private WalkInCashCustomerSettingsDto? _settings;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _settings = await Api.GetAsync<WalkInCashCustomerSettingsDto>("api/accounting/walk-in-customer");
+        }
+        catch
+        {
+            // Optional feature must never stop an ordinary registered-customer invoice.
+            _settings = null;
+        }
+        _loaded = true;
+        await OnSettingsLoaded.InvokeAsync(_settings);
+        await TryInitializeAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!_loaded || ReferenceEquals(_processedModel, Model)) return;
+        await TryInitializeAsync();
+    }
+
+    private async Task TryInitializeAsync()
+    {
+        _processedModel = Model;
+        if (Model is null || Model.Id.HasValue || !string.IsNullOrWhiteSpace(Model.CustomerId) ||
+            _settings?.CustomerId is not { } customerId)
+            return;
+        Model.CustomerId = customerId.ToString("D");
+        Model.CustomerCode = _settings.CustomerCode ?? string.Empty;
+        Model.CustomerDisplay = $"{_settings.CustomerCode} - {_settings.CustomerName}";
+        Model.PaymentPlan = "FullNow";
+        Model.PaymentTermType = "Immediate";
+        await OnSettingsLoaded.InvokeAsync(_settings);
+    }
+}

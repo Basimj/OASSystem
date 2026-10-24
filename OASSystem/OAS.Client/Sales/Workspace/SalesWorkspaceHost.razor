@@ -7,12 +7,15 @@
 @using OAS.UiLib.Components.Sales.Orders
 @using OAS.UiLib.Components.Sales.Invoices
 
-<UiSalesWorkspace>
+<SalesWalkInInitializer Model="@(ActiveTab?.Model as UiSalesInvoiceFormModel)"
+                        OnSettingsLoaded="OnWalkInSettingsLoadedAsync" />
+
+<UiSalesWorkspace HideActions="@(ActiveTab is { IsListTab: false })">
     <Actions>
         <UiWorkspaceActionBar>
             <UiButton Text="جديد" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" OnClick="NewAsync" />
             <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Loading="@_isLoading" OnClick="RefreshAsync" />
-            <UiSearchInput Value="@_search" ValueChanged="SearchValueChanged" OnSearch="SearchAsync" Placeholder="بحث بالكود أو العميل..." />
+            <UiSearchInput Value="@_search" ValueChanged="SearchValueChanged" OnSearch="SearchAsync" Placeholder="@(Section == SalesEntityType.SalesInvoices ? "بحث برقم الفاتورة أو البيان..." : "بحث بالكود أو العميل...")" />
         </UiWorkspaceActionBar>
     </Actions>
     <Tabs>
@@ -25,16 +28,26 @@
         }
         else if (ActiveTab.IsListTab)
         {
-            <UiSalesDocumentList Title="@ListTitle" Subtitle="@ListSubtitle" Items="@ListItems" IsLoading="@_isLoading"
-                                 TotalCount="@_totalCount" PageNumber="@_pageNumber" TotalPages="@_totalPages"
-                                 EmptyTitle="@EmptyTitle" EmptyText="@EmptyText" EmptyIconCss="@ListIcon"
-                                 OnOpen="OpenEntityAsync" OnPrevious="PreviousPageAsync" OnNext="NextPageAsync" />
+            @if (ActiveEntityType == SalesEntityType.SalesInvoices)
+            {
+                <UiSalesInvoiceList Items="@ListItems" IsLoading="@_isLoading"
+                                    TotalCount="@_totalCount" PageNumber="@_pageNumber" TotalPages="@_totalPages"
+                                    OnOpen="OpenEntityAsync" OnPrevious="PreviousPageAsync" OnNext="NextPageAsync" />
+            }
+            else
+            {
+                <UiSalesDocumentList Title="@ListTitle" Subtitle="@ListSubtitle" Items="@ListItems" IsLoading="@_isLoading"
+                                     TotalCount="@_totalCount" PageNumber="@_pageNumber" TotalPages="@_totalPages"
+                                     EmptyTitle="@EmptyTitle" EmptyText="@EmptyText" EmptyIconCss="@ListIcon"
+                                     OnOpen="OpenEntityAsync" OnPrevious="PreviousPageAsync" OnNext="NextPageAsync" />
+            }
         }
         else if (ActiveTab.Model is UiPrescriptionFormModel prescription)
         {
             <UiSalesEditorSurface Title="@(prescription.Id.HasValue ? prescription.PrescriptionCode : "وصفة جديدة")"
                                   Subtitle="الوصفة الطبية وإصدارات قياسات العين" IconCss="fa-solid fa-glasses"
-                                  StatusText="@prescription.StatusText" StatusCssClass="@StatusCss(prescription.Status)">
+                                  StatusText="@prescription.StatusText" StatusCssClass="@StatusCss(prescription.Status)"
+                                  OnBack="ReturnToSalesListAsync">
                 <Actions>
                     @if (ActiveTab.IsNew)
                     {
@@ -82,7 +95,8 @@
         else if (ActiveTab.Model is UiCustomerOrderFormModel order)
         {
             <UiSalesEditorSurface Title="@(order.Id.HasValue ? order.OrderCode : "طلب عميل جديد")" Subtitle="طلب العميل وحجز المخزون" IconCss="fa-solid fa-clipboard-list"
-                                  StatusText="@order.StatusText" StatusCssClass="@StatusCss(order.Status)">
+                                  StatusText="@order.StatusText" StatusCssClass="@StatusCss(order.Status)"
+                                  OnBack="ReturnToSalesListAsync">
                 <Actions>
                     @if (ActiveTab.IsEditMode)
                     {
@@ -109,7 +123,10 @@
                                            OnProductSelected="ProductSelectedAsync" OnWarehouseSelected="WarehouseSelectedAsync" OnChanged="MarkDirtyAsync" />
                     @if (order.Id.HasValue)
                     {
-                        <SalesHeaderDiscountPanel DocumentKind="order" DocumentId="@order.Id.Value" />
+                        <SalesHeaderDiscountPanel DocumentKind="order" DocumentId="@order.Id.Value"
+                                                  ParentRowVersion="@order.RowVersion"
+                                                  ParentHasUnsavedChanges="@ActiveTab.IsDirty" ParentIsEditing="@ActiveTab.IsEditMode"
+                                                  OnOrderUpdated="OrderHeaderDiscountUpdatedAsync" />
                     }
                 </ChildContent>
             </UiSalesEditorSurface>
@@ -117,7 +134,8 @@
         else if (ActiveTab.Model is UiSalesInvoiceFormModel invoice)
         {
             <UiSalesEditorSurface Title="@(invoice.Id.HasValue ? invoice.InvoiceCode : "فاتورة مبيعات جديدة")" Subtitle="فاتورة المبيعات والترحيل المخزني والمحاسبي" IconCss="fa-solid fa-file-invoice-dollar"
-                                  StatusText="@invoice.StatusText" StatusCssClass="@StatusCss(invoice.Status)">
+                                  StatusText="@invoice.StatusText" StatusCssClass="@StatusCss(invoice.Status)"
+                                  OnBack="ReturnToSalesListAsync">
                 <Actions>
                     @if (ActiveTab.IsEditMode)
                     {
@@ -127,7 +145,7 @@
                     else if (invoice.Status == "Draft")
                     {
                         <UiButton Text="تعديل" IconCssClass="fa-solid fa-pen" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="BeginEditAsync" />
-                        <UiButton Text="تأكيد" IconCssClass="fa-solid fa-check" Size="ControlSize.Small" OnClick="ConfirmInvoiceAsync" />
+                        <UiButton Text="تأكيد" IconCssClass="fa-solid fa-check" Size="ControlSize.Small" Loading="@_isConfirmingInvoice" Disabled="@_isConfirmingInvoice" OnClick="ConfirmInvoiceCurrentAsync" />
                         <UiButton Text="إلغاء" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" OnClick="CancelInvoiceAsync" />
                     }
                     else if (invoice.Status == "Confirmed")
@@ -152,6 +170,8 @@
                 </Actions>
                 <ChildContent>
                     <UiSalesInvoiceEditor Model="@invoice" ReadOnly="@InvoiceReadOnly(invoice)"
+                                          WalkInCustomerId="@_walkInCustomerId"
+                                          WalkInCustomerLabel="@_walkInCustomerLabel"
                                           SearchCustomersAsync="SearchCustomerItemsAsync" SearchEmployeesAsync="SearchEmployeeItemsAsync" SearchPrescriptionsAsync="SearchPrescriptionRevisionItemsAsync" SearchCurrenciesAsync="SearchCurrencyItemsAsync"
                                           SearchPaymentCashAccountsAsync="SearchPaymentCashAccountItemsAsync" SearchPaymentBankAccountsAsync="SearchPaymentBankAccountItemsAsync" SearchSettlementAccountsAsync="SearchSettlementAccountItemsAsync"
                                           SearchProductTypesAsync="SearchProductTypeItemsAsync" SearchCategoriesAsync="SearchCategoryItemsAsync" SearchProductsAsync="SearchProductItemsAsync" SearchWarehousesAsync="SearchWarehouseItemsAsync"
@@ -160,7 +180,10 @@
                                           OnProductSelected="ProductSelectedAsync" OnWarehouseSelected="WarehouseSelectedAsync" OnRequestPriceOverride="RequestPriceOverrideAsync" OnChanged="MarkDirtyAsync" />
                     @if (invoice.Id.HasValue)
                     {
-                        <SalesHeaderDiscountPanel DocumentKind="invoice" DocumentId="@invoice.Id.Value" />
+                        <SalesHeaderDiscountPanel DocumentKind="invoice" DocumentId="@invoice.Id.Value"
+                                                  ParentRowVersion="@invoice.RowVersion"
+                                                  ParentHasUnsavedChanges="@ActiveTab.IsDirty" ParentIsEditing="@ActiveTab.IsEditMode"
+                                                  OnInvoiceUpdated="InvoiceHeaderDiscountUpdatedAsync" />
                     }
                 </ChildContent>
             </UiSalesEditorSurface>

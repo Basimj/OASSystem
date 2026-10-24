@@ -3,59 +3,172 @@
 @using OAS.UiLib.Components.Sales.Orders
 @using OAS.UiLib.Components.Sales.Checkout
 
-<UiSalesFormSection Title="بيانات الفاتورة" Description="فاتورة البيع المباشر تستخدم عند توفر الصنف الآن. الطلبات المرتبطة بطلب عميل يتم إصدار فاتورتها تلقائيًا من شاشة بيع جديد / Checkout." IconCss="fa-solid fa-file-invoice-dollar">
-    <div class="ui-sales-form-grid">
-        <UiInputText Label="كود الفاتورة" Value="@Model.InvoiceCode" ReadOnly="true" />
-        @if (!string.IsNullOrWhiteSpace(Model.CustomerOrderId))
+@* Invoice entry is intentionally kept inside the existing UiLib workflow.
+   No API contracts, status transitions, callbacks or posting rules are replaced. *@
+<div class="oas-invoice-layout" dir="rtl">
+    <div class="oas-invoice-main">
+        <UiSalesFormSection Title="بيانات الفاتورة" Description="بيانات البيع المباشر الأساسية" IconCss="fa-solid fa-file-invoice-dollar">
+            <div class="oas-invoice-primary-fields">
+                <div class="oas-invoice-code-field">
+                    <UiInputText Label="رقم الفاتورة" Value="@Model.InvoiceCode" ReadOnly="true" />
+                </div>
+                <div class="oas-invoice-customer-field">
+                    @if (WalkInCustomerId.HasValue)
+                    {
+                        <div class="oas-invoice-walkin-options" aria-label="نوع العميل">
+                            <UiButton Text="بيع مباشر — عميل نقدي" Variant="@(IsWalkIn ? ButtonVariant.Primary : ButtonVariant.Secondary)"
+                                      Size="ControlSize.Small" Disabled="@ReadOnly" OnClick="EnableWalkInAsync" />
+                            <UiButton Text="عميل مسجل" Variant="@(!IsWalkIn ? ButtonVariant.Primary : ButtonVariant.Secondary)"
+                                      Size="ControlSize.Small" Disabled="@ReadOnly" OnClick="EnableRegisteredAsync" />
+                        </div>
+                    }
+                    @if (!WalkInCustomerId.HasValue && Model.Id is null)
+                    {
+                        <div class="oas-invoice-walkin-note">
+                            لتمكين البيع دون إنشاء حساب لكل زبون،
+                            <a href="/accounting/settings/walk-in-customer">حدّد العميل النقدي الافتراضي من إعدادات المحاسبة</a>.
+                        </div>
+                    }
+                    @if (IsWalkIn)
+                    {
+                        <UiInputText Label="العميل النقدي" Value="@(WalkInCustomerLabel ?? Model.CustomerDisplay ?? "عميل نقدي عام")" ReadOnly="true" />
+                        <div class="oas-invoice-walkin-note">يُستخدم حساب الذمم المرتبط بالعميل النقدي العام، ويشترط تحصيل المبلغ بالكامل.
+                            <a href="/accounting/settings/walk-in-customer">إعدادات العميل النقدي</a>
+                        </div>
+                    }
+                    else
+                    {
+                        <UiLookup Label="العميل" Value="@Model.CustomerId" ValueChanged="CustomerChanged"
+                                  SelectedItem="@CustomerItem" SearchAsync="SearchCustomersAsync"
+                                  Placeholder="ابحث باسم العميل أو رقمه..." Required="true" Disabled="@ReadOnly" />
+                    }
+                </div>
+                <UiInputDate Label="تاريخ الفاتورة" Value="@Model.InvoiceDate" ValueChanged="InvoiceDateChanged" Required="true" ReadOnly="@ReadOnly" />
+                <UiInputDate Label="تاريخ الترحيل" Value="@Model.PostingDate" ValueChanged="PostingDateChanged" Required="true" ReadOnly="@ReadOnly" />
+                <UiLookup Label="العملة" Value="@Model.CurrencyId" ValueChanged="CurrencyChanged"
+                          SelectedItem="@CurrencyItem" SearchAsync="SearchCurrenciesAsync"
+                          Placeholder="اختر عملة الفاتورة..." Required="true" Disabled="@ReadOnly" />
+                <UiSelect Label="طريقة الضريبة" Value="@Model.TaxCalculationMode" ValueChanged="TaxModeChanged" Disabled="@ReadOnly" Options="@TaxOptions" />
+                <UiSelect Label="خطة السداد" Value="@Model.PaymentPlan" ValueChanged="PaymentPlanChanged" Disabled="@(ReadOnly || IsWalkIn)" Options="@PaymentPlanOptions" />
+            </div>
+
+            <details class="oas-invoice-advanced">
+                <summary><i class="fa-solid fa-sliders" aria-hidden="true"></i> تفاصيل إضافية وبيانات الوصفة <i class="fa-solid fa-chevron-down oas-invoice-advanced__chevron" aria-hidden="true"></i></summary>
+                <div class="oas-invoice-advanced__fields">
+                    <UiInputText Label="كود العميل" Value="@Model.CustomerCode" ReadOnly="true" />
+                    @if (!string.IsNullOrWhiteSpace(Model.CustomerOrderId))
+                    {
+                        <UiInputText Label="طلب العميل المصدر" Value="@(Model.CustomerOrderDisplay ?? Model.CustomerOrderId)" ReadOnly="true" />
+                    }
+                    <UiLookup Label="موظف المبيعات" Value="@Model.SalesEmployeeId" ValueChanged="SalesEmployeeChanged"
+                              SelectedItem="@SalesEmployeeItem" SearchAsync="SearchEmployeesAsync"
+                              Placeholder="اختر موظف المبيعات (اختياري)" Disabled="@ReadOnly" />
+                    <UiInputText Label="كود الوصفة" Value="@Model.PrescriptionCode" ReadOnly="true" />
+                    <UiLookup Label="الوصفة / الإصدار" Value="@Model.PrescriptionRevisionId" ValueChanged="PrescriptionChanged"
+                              SelectedItem="@PrescriptionItem" SearchAsync="SearchPrescriptionsAsync"
+                              Placeholder="ابحث عن الوصفة (اختياري)" Disabled="@ReadOnly" />
+                    <div class="oas-invoice-advanced__description">
+                        <UiInputText Label="البيان" Value="@Model.Description" ValueChanged="DescriptionChanged" ReadOnly="@ReadOnly"
+                                     Placeholder="وصف مختصر للعملية عند الحاجة" />
+                    </div>
+                </div>
+            </details>
+            @if (!string.IsNullOrWhiteSpace(Model.CustomerOrderId))
+            {
+                <p class="oas-invoice-source-note"><i class="fa-solid fa-link" aria-hidden="true"></i> هذه الفاتورة مرتبطة بطلب عميل. تصدر فواتير الطلبات من شاشة «بيع جديد / Checkout».</p>
+            }
+        </UiSalesFormSection>
+
+        <UiSalesFormSection Title="بنود الفاتورة" Description="اختر الصنف، ثم الكمية؛ تظهر حقول العدسات فقط عند الحاجة." IconCss="fa-solid fa-cubes-stacked">
+            <UiSalesLinesEditor Model="@Model.Lines" ReadOnly="@ReadOnly"
+                                SearchProductTypesAsync="SearchProductTypesAsync"
+                                SearchCategoriesAsync="SearchCategoriesAsync"
+                                SearchProductsAsync="SearchProductsAsync"
+                                SearchWarehousesAsync="SearchWarehousesAsync"
+                                SearchPrescriptionRevisionsAsync="SearchPrescriptionRevisionsAsync"
+                                OnProductTypeSelected="OnProductTypeSelected"
+                                OnCategorySelected="OnCategorySelected"
+                                OnProductSelected="OnProductSelected"
+                                OnWarehouseSelected="OnWarehouseSelected"
+                                EnablePriceOverride="true"
+                                OnRequestPriceOverride="OnRequestPriceOverride"
+                                OnChanged="OnChanged" />
+            @if (!ReadOnly)
+            {
+                <p class="oas-invoice-direct-note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> البيع المباشر للأصناف المتاحة. الأصناف التي تحتاج توريدًا خارجيًا تُباع عبر طلب العميل ثم إتمام البيع.</p>
+            }
+        </UiSalesFormSection>
+
+        @if (ShowSettlement)
         {
-            <UiInputText Label="طلب العميل المصدر" Value="@(Model.CustomerOrderDisplay ?? Model.CustomerOrderId)" ReadOnly="true" />
+            <UiSalesFormSection Title="تحصيل البيع المباشر" Description="يمكن توزيع المبلغ المستحق على أكثر من طريقة دفع." IconCss="fa-solid fa-wallet">
+                <UiSalesPaymentLinesEditor Lines="@Model.PaymentLines"
+                                           SearchCurrenciesAsync="SearchCurrenciesAsync"
+                                           SearchCashAccountsAsync="SearchPaymentCashAccountsAsync"
+                                           SearchBankAccountsAsync="SearchPaymentBankAccountsAsync"
+                                           SearchSettlementAccountsAsync="SearchSettlementAccountsAsync"
+                                           OnAdd="AddPaymentLineAsync"
+                                           OnRemove="RemovePaymentLineAsync"
+                                           OnChanged="PaymentLinesChangedAsync" />
+            </UiSalesFormSection>
         }
-
-        <UiInputText Label="كود العميل" Value="@Model.CustomerCode" ReadOnly="true" />
-        <UiLookup Label="العميل" Value="@Model.CustomerId" ValueChanged="CustomerChanged" SelectedItem="@CustomerItem" SearchAsync="SearchCustomersAsync" Placeholder="ابحث بكود العميل أو الاسم..." Required="true" Disabled="@ReadOnly" />
-
-        <UiLookup Label="موظف المبيعات" Value="@Model.SalesEmployeeId" ValueChanged="SalesEmployeeChanged" SelectedItem="@SalesEmployeeItem" SearchAsync="SearchEmployeesAsync" Placeholder="اختياري - اختر موظف المبيعات" Disabled="@ReadOnly" />
-        <UiInputText Label="كود الوصفة" Value="@Model.PrescriptionCode" ReadOnly="true" />
-        <UiLookup Label="الوصفة / الإصدار" Value="@Model.PrescriptionRevisionId" ValueChanged="PrescriptionChanged" SelectedItem="@PrescriptionItem" SearchAsync="SearchPrescriptionsAsync" Placeholder="اختياري" Disabled="@ReadOnly" />
-
-        <UiInputDate Label="تاريخ الفاتورة" Value="@Model.InvoiceDate" ValueChanged="InvoiceDateChanged" Required="true" ReadOnly="@ReadOnly" />
-        <UiInputDate Label="تاريخ الترحيل" Value="@Model.PostingDate" ValueChanged="PostingDateChanged" Required="true" ReadOnly="@ReadOnly" />
-        <UiLookup Label="العملة" Value="@Model.CurrencyId" ValueChanged="CurrencyChanged" SelectedItem="@CurrencyItem" SearchAsync="SearchCurrenciesAsync" Placeholder="اختر العملة..." Required="true" Disabled="@ReadOnly" />
-        <UiSelect Label="طريقة الضريبة" Value="@Model.TaxCalculationMode" ValueChanged="TaxModeChanged" Disabled="@ReadOnly" Options="@TaxOptions" />
-        <UiSelect Label="خطة السداد" Value="@Model.PaymentPlan" ValueChanged="PaymentPlanChanged" Disabled="@ReadOnly" Options="@PaymentPlanOptions" />
-        <UiInputText Label="البيان" Value="@Model.Description" ValueChanged="DescriptionChanged" ReadOnly="@ReadOnly" />
     </div>
-</UiSalesFormSection>
 
-<UiSalesFormSection Title="بنود الفاتورة" Description="البيع المباشر مخصص للأصناف المتاحة؛ إذا كان الصنف يحتاج توريدًا خارجيًا أنشئ طلب عميل واستخدم Checkout." IconCss="fa-solid fa-list-check">
-    <UiSalesLinesEditor Model="@Model.Lines" ReadOnly="@ReadOnly" SearchProductTypesAsync="SearchProductTypesAsync" SearchCategoriesAsync="SearchCategoriesAsync" SearchProductsAsync="SearchProductsAsync" SearchWarehousesAsync="SearchWarehousesAsync"
-                        SearchPrescriptionRevisionsAsync="SearchPrescriptionRevisionsAsync" OnProductTypeSelected="OnProductTypeSelected" OnCategorySelected="OnCategorySelected" OnProductSelected="OnProductSelected" OnWarehouseSelected="OnWarehouseSelected"
-                        EnablePriceOverride="true" OnRequestPriceOverride="OnRequestPriceOverride" OnChanged="OnChanged" />
-</UiSalesFormSection>
+    <aside class="oas-invoice-aside" aria-label="ملخص الفاتورة والسداد والترحيل">
+        <section class="oas-invoice-aside__card oas-invoice-aside__totals" aria-label="إجمالي الفاتورة">
+            <h3><i class="fa-solid fa-calculator" aria-hidden="true"></i> إجمالي الفاتورة</h3>
+            <UiSalesTotalsPanel CurrencyCode="@Model.CurrencyCode" Subtotal="@Model.Subtotal"
+                                DiscountAmount="@Model.DiscountAmount" TaxAmount="@Model.TaxAmount" TotalAmount="@Model.TotalAmount" />
+        </section>
 
-@if (ShowSettlement)
-{
-    <UiSalesFormSection Title="تحصيل البيع المباشر" Description="الدفع الكامل أو الجزئي يمكن توزيعه على أكثر من طريقة. البيع الآجل لا يقبل دفعات عند الترحيل الأولي." IconCss="fa-solid fa-wallet">
-        <UiSalesPaymentLinesEditor Lines="@Model.PaymentLines"
-                                   SearchCurrenciesAsync="SearchCurrenciesAsync"
-                                   SearchCashAccountsAsync="SearchPaymentCashAccountsAsync"
-                                   SearchBankAccountsAsync="SearchPaymentBankAccountsAsync"
-                                   SearchSettlementAccountsAsync="SearchSettlementAccountsAsync"
-                                   OnAdd="AddPaymentLineAsync"
-                                   OnRemove="RemovePaymentLineAsync"
-                                   OnChanged="PaymentLinesChangedAsync" />
-    </UiSalesFormSection>
-}
+        <section class="oas-invoice-aside__card" aria-label="ملخص السداد">
+            <h3><i class="fa-regular fa-credit-card" aria-hidden="true"></i> ملخص السداد</h3>
+            @if (Model.Status == "Posted")
+            {
+                <UiSalesPaymentSummary CurrencyCode="@Model.CurrencyCode" InvoiceTotal="@Model.TotalAmount"
+                                       PaidAmount="@Model.PaidAmount" ReturnedAmount="@Model.ReturnedAmount"
+                                       OutstandingAmount="@Model.OutstandingAmount" />
+            }
+            else
+            {
+                <div class="oas-invoice-unposted-payment">
+                    <div><span>قيمة الفاتورة</span><strong>@Model.TotalAmount.ToString("N2") @Model.CurrencyCode</strong></div>
+                    <div><span>خطة السداد</span><strong>@PaymentPlanText</strong></div>
+                    <div class="oas-invoice-unposted-payment__status"><span>حالة السداد</span><strong>لم يتم الترحيل</strong></div>
+                    <p>يظهر المبلغ المسدد والمتبقي الفعلي بعد ترحيل الفاتورة.</p>
+                </div>
+            }
+        </section>
 
-<div class="ui-sales-summary-grid">
-    <UiSalesTotalsPanel CurrencyCode="@Model.CurrencyCode" Subtotal="@Model.Subtotal" DiscountAmount="@Model.DiscountAmount" TaxAmount="@Model.TaxAmount" TotalAmount="@Model.TotalAmount" />
-    <UiSalesPaymentSummary CurrencyCode="@Model.CurrencyCode" InvoiceTotal="@Model.TotalAmount" PaidAmount="@Model.PaidAmount" ReturnedAmount="@Model.ReturnedAmount" OutstandingAmount="@Model.OutstandingAmount" />
+        <section class="oas-invoice-aside__card oas-invoice-aside__posting" aria-label="الترحيل والمحاسبة">
+            <h3><i class="fa-solid fa-building-columns" aria-hidden="true"></i> الترحيل والمحاسبة</h3>
+            @if (Model.JournalEntryId.HasValue)
+            {
+                <div class="oas-invoice-posting-status oas-invoice-posting-status--success">
+                    <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                    <div><strong>تم إنشاء القيد المحاسبي</strong><span>يمكن استعراضه من إجراءات الفاتورة.</span></div>
+                </div>
+            }
+            else
+            {
+                <div class="oas-invoice-posting-status">
+                    <i class="fa-solid fa-clock" aria-hidden="true"></i>
+                    <div><strong>لم يتم إنشاء القيد المحاسبي بعد</strong><span>يُنشأ عند ترحيل الفاتورة وفق قواعد النظام.</span></div>
+                </div>
+            }
+            <UiSalesPostingSummary JournalEntryId="@Model.JournalEntryId"
+                                   JournalEntryNumber="@Model.JournalEntryNumber" Issues="@Model.PostingIssues" />
+        </section>
+    </aside>
 </div>
 
-<UiSalesPostingSummary JournalEntryId="@Model.JournalEntryId" JournalEntryNumber="@Model.JournalEntryNumber" Issues="@Model.PostingIssues" />
-
 @code {
-    private static readonly IReadOnlyList<UiSelectOption> TaxOptions = [new("Exclusive", "غير شامل الضريبة"), new("Inclusive", "شامل الضريبة")];
+    private static readonly IReadOnlyList<UiSelectOption> TaxOptions =
+    [
+        new("Exclusive", "غير شامل الضريبة"),
+        new("Inclusive", "شامل الضريبة")
+    ];
+
     private static readonly IReadOnlyList<UiSelectOption> PaymentPlanOptions =
     [
         new("FullNow", "دفع كامل الآن"),
@@ -65,6 +178,8 @@
 
     [Parameter, EditorRequired] public UiSalesInvoiceFormModel Model { get; set; } = new();
     [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public Guid? WalkInCustomerId { get; set; }
+    [Parameter] public string? WalkInCustomerLabel { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchCustomersAsync { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchEmployeesAsync { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchPrescriptionsAsync { get; set; }
@@ -85,16 +200,73 @@
     [Parameter] public EventCallback<UiSalesLineModel> OnRequestPriceOverride { get; set; }
     [Parameter] public EventCallback OnChanged { get; set; }
 
-    private bool ShowSettlement => Model.Status == "Confirmed" && Model.PaymentPlan is "FullNow" or "PartialNow";
-    private UiLookupItem? CustomerItem => string.IsNullOrWhiteSpace(Model.CustomerId) ? null : new(Model.CustomerId, Model.CustomerDisplay ?? (string.IsNullOrWhiteSpace(Model.CustomerCode) ? "العميل المحدد" : Model.CustomerCode));
-    private UiLookupItem? SalesEmployeeItem => string.IsNullOrWhiteSpace(Model.SalesEmployeeId) ? null : new(Model.SalesEmployeeId, Model.SalesEmployeeDisplay ?? "موظف المبيعات المحدد");
-    private UiLookupItem? PrescriptionItem => string.IsNullOrWhiteSpace(Model.PrescriptionRevisionId) ? null : new(Model.PrescriptionRevisionId, Model.PrescriptionDisplay ?? (string.IsNullOrWhiteSpace(Model.PrescriptionCode) ? "الوصفة المحددة" : Model.PrescriptionCode));
-    private UiLookupItem? CurrencyItem => string.IsNullOrWhiteSpace(Model.CurrencyId) ? null : new(Model.CurrencyId, Model.CurrencyDisplay ?? (string.IsNullOrWhiteSpace(Model.CurrencyCode) ? "العملة المحددة" : Model.CurrencyCode));
+    private bool IsWalkIn => WalkInCustomerId.HasValue &&
+        Guid.TryParse(Model.CustomerId, out var id) && id == WalkInCustomerId.Value;
 
-    private async Task CustomerChanged(string? v) { Model.CustomerId = v ?? string.Empty; await OnSelectionChanged.InvokeAsync(new("Customer", v)); await OnChanged.InvokeAsync(); }
-    private async Task SalesEmployeeChanged(string? v) { Model.SalesEmployeeId = v ?? string.Empty; await OnSelectionChanged.InvokeAsync(new("SalesEmployee", v)); await OnChanged.InvokeAsync(); }
-    private async Task PrescriptionChanged(string? v) { Model.PrescriptionRevisionId = v ?? string.Empty; await OnSelectionChanged.InvokeAsync(new("PrescriptionRevision", v)); await OnChanged.InvokeAsync(); }
-    private async Task CurrencyChanged(string? v) { Model.CurrencyId = v ?? string.Empty; await OnSelectionChanged.InvokeAsync(new("Currency", v)); await OnChanged.InvokeAsync(); }
+    private async Task EnableWalkInAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _)
+    {
+        if (ReadOnly || WalkInCustomerId is not { } id) return;
+        Model.CustomerId = id.ToString("D");
+        Model.CustomerDisplay = WalkInCustomerLabel ?? "عميل نقدي عام";
+        Model.CustomerCode = string.Empty;
+        Model.PaymentPlan = "FullNow";
+        Model.PaymentTermType = "Immediate";
+        Model.PaymentLines.Clear();
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task EnableRegisteredAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _)
+    {
+        if (ReadOnly) return;
+        Model.CustomerId = string.Empty;
+        Model.CustomerCode = string.Empty;
+        Model.CustomerDisplay = null;
+        await OnChanged.InvokeAsync();
+    }
+
+    private bool ShowSettlement => Model.Status == "Confirmed" && Model.PaymentPlan is "FullNow" or "PartialNow";
+
+    private string PaymentPlanText => Model.PaymentPlan switch
+    {
+        "FullNow" => "دفع كامل الآن",
+        "PartialNow" => "دفع جزئي الآن",
+        "AccountCredit" => "آجل على الحساب",
+        _ => "غير محددة"
+    };
+
+    private UiLookupItem? CustomerItem => string.IsNullOrWhiteSpace(Model.CustomerId)
+        ? null : new(Model.CustomerId, Model.CustomerDisplay ?? (string.IsNullOrWhiteSpace(Model.CustomerCode) ? "العميل المحدد" : Model.CustomerCode));
+    private UiLookupItem? SalesEmployeeItem => string.IsNullOrWhiteSpace(Model.SalesEmployeeId)
+        ? null : new(Model.SalesEmployeeId, Model.SalesEmployeeDisplay ?? "موظف المبيعات المحدد");
+    private UiLookupItem? PrescriptionItem => string.IsNullOrWhiteSpace(Model.PrescriptionRevisionId)
+        ? null : new(Model.PrescriptionRevisionId, Model.PrescriptionDisplay ?? (string.IsNullOrWhiteSpace(Model.PrescriptionCode) ? "الوصفة المحددة" : Model.PrescriptionCode));
+    private UiLookupItem? CurrencyItem => string.IsNullOrWhiteSpace(Model.CurrencyId)
+        ? null : new(Model.CurrencyId, Model.CurrencyDisplay ?? (string.IsNullOrWhiteSpace(Model.CurrencyCode) ? "العملة المحددة" : Model.CurrencyCode));
+
+    private async Task CustomerChanged(string? v)
+    {
+        Model.CustomerId = v ?? string.Empty;
+        await OnSelectionChanged.InvokeAsync(new("Customer", v));
+        await OnChanged.InvokeAsync();
+    }
+    private async Task SalesEmployeeChanged(string? v)
+    {
+        Model.SalesEmployeeId = v ?? string.Empty;
+        await OnSelectionChanged.InvokeAsync(new("SalesEmployee", v));
+        await OnChanged.InvokeAsync();
+    }
+    private async Task PrescriptionChanged(string? v)
+    {
+        Model.PrescriptionRevisionId = v ?? string.Empty;
+        await OnSelectionChanged.InvokeAsync(new("PrescriptionRevision", v));
+        await OnChanged.InvokeAsync();
+    }
+    private async Task CurrencyChanged(string? v)
+    {
+        Model.CurrencyId = v ?? string.Empty;
+        await OnSelectionChanged.InvokeAsync(new("Currency", v));
+        await OnChanged.InvokeAsync();
+    }
     private async Task InvoiceDateChanged(DateOnly? v) { Model.InvoiceDate = v; await OnChanged.InvokeAsync(); }
     private async Task PostingDateChanged(DateOnly? v) { Model.PostingDate = v; await OnChanged.InvokeAsync(); }
     private async Task TaxModeChanged(string? v) { Model.TaxCalculationMode = v ?? "Exclusive"; await OnChanged.InvokeAsync(); }
@@ -108,7 +280,7 @@
     }
     private async Task DescriptionChanged(string? v) { Model.Description = v; await OnChanged.InvokeAsync(); }
 
-    // Payment lines are transient posting inputs; changing them must not mark a Confirmed invoice as dirty.
+    // Payment lines are transient posting inputs; they must not dirty a confirmed invoice.
     private Task PaymentLinesChangedAsync() => Task.CompletedTask;
     private Task AddPaymentLineAsync()
     {
@@ -117,7 +289,8 @@
             PaymentMethod = "Cash",
             CurrencyId = Model.CurrencyId,
             CurrencyDisplay = Model.CurrencyDisplay ?? Model.CurrencyCode,
-            Amount = Model.PaymentPlan == "FullNow" && Model.PaymentLines.Count == 0 ? Math.Max(0m, Model.OutstandingAmount) : 0m
+            Amount = Model.PaymentPlan == "FullNow" && Model.PaymentLines.Count == 0
+                ? Math.Max(0m, Model.OutstandingAmount) : 0m
         });
         return Task.CompletedTask;
     }

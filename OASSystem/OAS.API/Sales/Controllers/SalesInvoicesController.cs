@@ -2,13 +2,17 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using OAS.Application.Common.Exceptions;
 using OAS.Application.Sales.PriceOverrides.Commands;
 using OAS.Application.Sales.SalesInvoices.Commands;
 using OAS.Application.Sales.SalesInvoices.Queries;
+using OAS.API.Accounting.Controllers;
 using OAS.Contracts.Common.Pagination;
 using OAS.Contracts.Sales.Common;
+using OAS.Contracts.Sales.Enums;
 using OAS.Contracts.Sales.PriceOverrides;
 using OAS.Contracts.Sales.SalesInvoices;
+using OAS.Infrastructure.Persistence;
 
 namespace OAS.API.Sales.Controllers;
 
@@ -16,8 +20,23 @@ namespace OAS.API.Sales.Controllers;
 [Authorize]
 [EnableRateLimiting("api")]
 [Route("api/sales/invoices")]
-public sealed class SalesInvoicesController(ISender sender) : ControllerBase
+public sealed class SalesInvoicesController(ISender sender, OasDbContext db) : ControllerBase
 {
+    private async Task EnsureWalkInPaymentPlanAsync(Guid customerId, SalesPaymentPlan plan, CancellationToken ct)
+    {
+        if (plan == SalesPaymentPlan.FullNow) return;
+        var configuredId = await WalkInCashSaleSettingsStore.GetCustomerIdAsync(db, ct);
+        if (WalkInCashSaleRules.RequiresFullPayment(customerId, configuredId, plan))
+            throw new ConflictException("walkin_requires_full_payment",
+                "البيع للعميل النقدي العام يتطلب سداد الفاتورة بالكامل. اختر عميلًا مسجلًا للدفع الجزئي أو الآجل.");
+    }
+
+    private async Task EnsureExistingInvoicePlanAsync(Guid id, CancellationToken ct)
+    {
+        var invoice = await sender.Send(new GetSalesInvoiceByIdQuery(id), ct);
+        await EnsureWalkInPaymentPlanAsync(invoice.CustomerId, invoice.PaymentPlan, ct);
+    }
+
     [HttpGet]
     public async Task<ActionResult<PagedResult<SalesInvoiceDto>>> Get([FromQuery] PageRequest request, CancellationToken cancellationToken)
         => Ok(await sender.Send(new GetSalesInvoicesQuery(request), cancellationToken));
@@ -33,6 +52,7 @@ public sealed class SalesInvoicesController(ISender sender) : ControllerBase
     [HttpPost]
     public async Task<ActionResult<SalesInvoiceDto>> Create([FromBody] CreateSalesInvoiceRequest request, CancellationToken cancellationToken)
     {
+        await EnsureWalkInPaymentPlanAsync(request.CustomerId, request.PaymentPlan, cancellationToken);
         var entity = await sender.Send(new CreateSalesInvoiceCommand(request), cancellationToken);
         var dto = await sender.Send(new GetSalesInvoiceByIdQuery(entity.Id), cancellationToken);
         return CreatedAtAction(nameof(GetById), new { id = entity.Id }, dto);
@@ -48,6 +68,7 @@ public sealed class SalesInvoicesController(ISender sender) : ControllerBase
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<SalesInvoiceDto>> Update(Guid id, [FromBody] UpdateSalesInvoiceRequest request, CancellationToken cancellationToken)
     {
+        await EnsureWalkInPaymentPlanAsync(request.CustomerId, request.PaymentPlan, cancellationToken);
         await sender.Send(new UpdateSalesInvoiceCommand(id, request), cancellationToken);
         return Ok(await sender.Send(new GetSalesInvoiceByIdQuery(id), cancellationToken));
     }
@@ -72,7 +93,10 @@ public sealed class SalesInvoicesController(ISender sender) : ControllerBase
 
     [HttpPost("{id:guid}/confirm")]
     public async Task<ActionResult<SalesInvoiceDto>> Confirm(Guid id, [FromBody] ConfirmSalesInvoiceRequest request, CancellationToken cancellationToken)
-        => Ok(await sender.Send(new ConfirmSalesInvoiceCommand(id, request), cancellationToken));
+    {
+        await EnsureExistingInvoicePlanAsync(id, cancellationToken);
+        return Ok(await sender.Send(new ConfirmSalesInvoiceCommand(id, request), cancellationToken));
+    }
 
     [HttpGet("{id:guid}/posting-prevalidation")]
     public async Task<ActionResult<SalesPostingPreValidationDto>> PreValidatePosting(Guid id, CancellationToken cancellationToken)
@@ -80,7 +104,11 @@ public sealed class SalesInvoicesController(ISender sender) : ControllerBase
 
     [HttpPost("{id:guid}/post")]
     public async Task<ActionResult<SalesInvoicePostingResultDto>> Post(Guid id, [FromBody] PostSalesInvoiceRequest request, CancellationToken cancellationToken)
-        => Ok(await sender.Send(new PostSalesInvoiceCommand(id, request), cancellationToken));
+    {
+        await EnsureExistingInvoicePlanAsync(id, cancellationToken);
+        // Original handler also requires full collection before posting a FullNow invoice.
+        return Ok(await sender.Send(new PostSalesInvoiceCommand(id, request), cancellationToken));
+    }
 
     [HttpPost("{id:guid}/collect-payment")]
     public async Task<ActionResult<CollectSalesInvoicePaymentResultDto>> CollectPayment(Guid id, [FromBody] CollectSalesInvoicePaymentRequest request, CancellationToken cancellationToken)
