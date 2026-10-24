@@ -1,10 +1,224 @@
 @page "/sales"
 @attribute [Authorize]
-@using OAS.UiLib.Components.Sales.Workspace
+@using OAS.Contracts.Common.Pagination
+@using OAS.Contracts.Sales.SalesInvoices
+@using OAS.Contracts.Sales.CustomerOrders
+@using OAS.Contracts.Sales.Enums
+@using OAS.Client.Sales.Services
+@inject ISalesClientService Sales
 @inject NavigationManager Navigation
+@implements IDisposable
 
-<UiSalesHomeSurface OnNavigate="NavigateAsync" />
+<PageTitle>المبيعات | OASSystem</PageTitle>
+
+<div class="oas-sales-dashboard" dir="rtl">
+    <header class="sd-topbar">
+        <div class="sd-heading">
+            <div class="sd-heading-icon"><i class="fa-solid fa-chart-column" aria-hidden="true"></i></div>
+            <div><h1>المبيعات</h1><p>الرئيسية <span>‹</span> المبيعات</p></div>
+        </div>
+        <form class="sd-global-search" @onsubmit="SearchAsync" @onsubmit:preventDefault>
+            <button aria-label="بحث" type="submit"><i class="fa-solid fa-magnifying-glass"></i></button>
+            <input placeholder="البحث في الفواتير أو أسماء العملاء ..." aria-label="بحث في المبيعات" @bind="_search" @bind:event="oninput" />
+        </form>
+        <div class="sd-top-actions">
+            <button type="button" class="sd-action-icon" title="تحديث البيانات" aria-label="تحديث البيانات" disabled="@_loading" @onclick="RefreshAsync"><i class="fa-solid fa-rotate @( _loading ? "fa-spin" : "")"></i></button>
+            <button type="button" class="sd-primary-btn" @onclick="() => Go(CheckoutRoute)"><i class="fa-solid fa-plus"></i> بيع مباشر جديد</button>
+        </div>
+    </header>
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="sd-alert" role="alert"><i class="fa-solid fa-circle-exclamation"></i><span>@_error</span><button @onclick="RefreshAsync" type="button">إعادة المحاولة</button></div>
+    }
+
+    <div class="sd-context-note"><i class="fa-solid fa-circle-info"></i> الإحصاءات المعروضة مستخرجة من أحدث @(_invoices.Count) فاتورة و@(_orders.Count) طلب؛ لعرض إجماليات معتمدة لكل الفترات استخدم تقارير المبيعات.</div>
+
+    <section class="sd-metrics" aria-label="مؤشرات المبيعات">
+        <article class="sd-metric"><span class="sd-icon sd-green"><i class="fa-solid fa-chart-simple"></i></span><span class="sd-metric-label">مبيعات اليوم</span><div class="sd-metric-value">@Money(_todaySales)</div><p>من @_todayInvoices فاتورة مرحلة أو مسددة</p><small>ضمن آخر @(_invoices.Count) فاتورة</small></article>
+        <article class="sd-metric"><span class="sd-icon sd-amber"><i class="fa-regular fa-file-lines"></i></span><span class="sd-metric-label">الفواتير غير المسددة</span><div class="sd-metric-value">@Money(_unpaidAmount)</div><p>من @_unpaidInvoices فاتورة</p><small>ضمن البيانات المحملة</small></article>
+        <article class="sd-metric"><span class="sd-icon sd-gold"><i class="fa-solid fa-cart-shopping"></i></span><span class="sd-metric-label">الطلبات المفتوحة</span><div class="sd-metric-value">@_openOrders</div><p>طلب عميل قيد التنفيذ</p><small>ضمن آخر @(_orders.Count) طلب</small></article>
+        <article class="sd-metric"><span class="sd-icon sd-red"><i class="fa-solid fa-rotate-left"></i></span><span class="sd-metric-label">مرتجعات اليوم</span><div class="sd-metric-value">@_todayReturns</div><p>مستندات مرتجع اليوم</p><small>ضمن آخر @(_returns.Count) مرتجع</small></article>
+    </section>
+
+    <section class="sd-panel sd-quick-panel">
+        <div class="sd-section-head"><h2><i class="fa-solid fa-bolt sd-blue-text"></i> العمليات السريعة</h2></div>
+        <div class="sd-quick-actions">
+            <button class="sd-quick sd-quick-primary" type="button" @onclick="() => Go(CheckoutRoute)"><span class="sd-quick-icon"><i class="fa-solid fa-cart-shopping"></i></span><span><strong>بيع مباشر</strong><small>إنشاء عملية بيع سريعة</small></span></button>
+            <button class="sd-quick" type="button" @onclick="() => Go(InvoicesRoute)"><span class="sd-quick-icon"><i class="fa-regular fa-file-lines"></i></span><span><strong>إنشاء فاتورة</strong><small>فواتير المبيعات</small></span></button>
+            <button class="sd-quick" type="button" @onclick="() => Go(OrdersRoute)"><span class="sd-quick-icon"><i class="fa-solid fa-user-plus"></i></span><span><strong>طلب عميل</strong><small>إضافة طلب جديد</small></span></button>
+            <button class="sd-quick" type="button" @onclick="() => Go(ReturnsRoute)"><span class="sd-quick-icon sd-icon-red"><i class="fa-solid fa-rotate-left"></i></span><span><strong>مرتجع مبيعات</strong><small>إدارة المرتجعات</small></span></button>
+            <button class="sd-quick" type="button" @onclick="() => Go(InvoicesRoute)"><span class="sd-quick-icon"><i class="fa-solid fa-coins"></i></span><span><strong>تحصيل دفعة</strong><small>من فاتورة المبيعات</small></span></button>
+        </div>
+    </section>
+
+    <section class="sd-panel sd-table-panel">
+        <div class="sd-section-head"><h2><i class="fa-regular fa-file-lines sd-blue-text"></i> آخر فواتير المبيعات</h2><button type="button" class="sd-link" @onclick="() => Go(InvoicesRoute)">عرض الكل <i class="fa-solid fa-chevron-left"></i></button></div>
+        <div class="sd-table-wrap">
+            <table class="sd-invoice-table">
+                <thead><tr><th>رقم الفاتورة</th><th>العميل</th><th>التاريخ</th><th>الحالة</th><th class="sd-num">الإجمالي</th><th class="sd-num">المدفوع</th><th class="sd-num">المتبقي</th><th>الإجراءات</th></tr></thead>
+                <tbody>
+                    @if (_loading && _invoices.Count == 0) { <tr><td colspan="8" class="sd-empty">جارٍ تحميل الفواتير...</td></tr> }
+                    else if (VisibleInvoices.Count == 0) { <tr><td colspan="8" class="sd-empty">لا توجد فواتير مطابقة للبحث ضمن أحدث 40 فاتورة.</td></tr> }
+                    else
+                    {
+                        @foreach (var item in VisibleInvoices.Take(5))
+                        {
+                            <tr>
+                                <td><button class="sd-invoice-link" type="button" title="انتقل إلى فواتير المبيعات" @onclick="() => Go(InvoicesRoute)">@item.InvoiceCode</button></td>
+                                <td>@(item.CustomerName ?? item.CustomerCode ?? "عميل نقدي")</td>
+                                <td class="sd-muted">@item.InvoiceDate.ToString("yyyy/MM/dd")</td>
+                                <td><span class="sd-status @StatusClass(item)">@StatusText(item)</span></td>
+                                <td class="sd-num">@Money(item.TotalAmount, item.CurrencyCodeSnapshot)</td>
+                                <td class="sd-num">@Money(item.PaymentSummary.PaidAmount, item.CurrencyCodeSnapshot)</td>
+                                <td class="sd-num @(item.PaymentSummary.OutstandingAmount > 0m ? "sd-danger-text" : "sd-success-text")">@Money(item.PaymentSummary.OutstandingAmount, item.CurrencyCodeSnapshot)</td>
+                                <td><button class="sd-more" title="إدارة الفاتورة" aria-label="إدارة الفاتورة" type="button" @onclick="() => Go(InvoicesRoute)"><i class="fa-solid fa-ellipsis-vertical"></i></button></td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <div class="sd-bottom-grid">
+        <section class="sd-panel sd-alerts-panel">
+            <div class="sd-section-head"><h2><i class="fa-regular fa-bell sd-blue-text"></i> تنبيهات ومتابعات</h2><button type="button" class="sd-link" @onclick="() => Go(OrdersRoute)">عرض الكل <i class="fa-solid fa-chevron-left"></i></button></div>
+            <button type="button" class="sd-alert-row" @onclick="() => Go(InvoicesRoute)"><span class="sd-alert-icon sd-red"><i class="fa-regular fa-file-lines"></i></span><span class="sd-alert-title"><strong>فواتير غير مسددة</strong><small>هناك @_unpaidInvoices فاتورة ضمن البيانات المحملة</small></span><span class="sd-count sd-count-red">@_unpaidInvoices</span><i class="fa-solid fa-chevron-left sd-muted"></i></button>
+            <button type="button" class="sd-alert-row" @onclick="() => Go(ProductionRoute)"><span class="sd-alert-icon sd-amber"><i class="fa-solid fa-flask"></i></span><span class="sd-alert-title"><strong>طلبات معمل قيد التنفيذ</strong><small>انتقل إلى لوحة المعمل لمتابعة العمليات</small></span><span class="sd-count sd-count-neutral"><i class="fa-solid fa-arrow-up-left-from-circle"></i></span><i class="fa-solid fa-chevron-left sd-muted"></i></button>
+            <button type="button" class="sd-alert-row" @onclick="() => Go(OrdersRoute)"><span class="sd-alert-icon sd-gold"><i class="fa-solid fa-box-open"></i></span><span class="sd-alert-title"><strong>جاهزة للاستلام</strong><small>@_readyOrders طلب عميل جاهز للتسليم</small></span><span class="sd-count sd-count-blue">@_readyOrders</span><i class="fa-solid fa-chevron-left sd-muted"></i></button>
+            <button type="button" class="sd-alert-row" @onclick="() => Go(ReportsRoute)"><span class="sd-alert-icon sd-blue"><i class="fa-solid fa-chart-line"></i></span><span class="sd-alert-title"><strong>تقارير المبيعات</strong><small>عرض الإيرادات والربحية للفترة الكاملة</small></span><span class="sd-count sd-count-neutral"><i class="fa-solid fa-arrow-up-left-from-circle"></i></span><i class="fa-solid fa-chevron-left sd-muted"></i></button>
+        </section>
+        <section class="sd-panel sd-chart-panel">
+            <div class="sd-section-head"><h2><i class="fa-solid fa-chart-line sd-blue-text"></i> اتجاه المبيعات الأسبوعي</h2><span class="sd-chart-filter"><i class="fa-regular fa-calendar"></i> آخر 7 أيام</span></div>
+            <div class="sd-chart">
+                @if (_weekValues.All(v => v == 0))
+                { <div class="sd-chart-empty">لا توجد فواتير مرحلة خلال الأيام السبعة الأخيرة في البيانات المحملة.</div> }
+                else
+                {
+                    <svg viewBox="0 0 700 205" preserveAspectRatio="none" role="img" aria-label="اتجاه مبيعات آخر سبعة أيام">
+                        <defs><linearGradient id="sd-line-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2484f6" stop-opacity=".35"/><stop offset="100%" stop-color="#2484f6" stop-opacity="0"/></linearGradient></defs>
+                        @for (int i = 0; i < 5; i++) { <line x1="8" x2="690" y1="@(15 + i * 41)" y2="@(15 + i * 41)" stroke="currentColor" stroke-opacity=".1" stroke-width="1" /> }
+                        <polygon points="@ChartArea" fill="url(#sd-line-fill)" />
+                        <polyline points="@ChartLine" fill="none" stroke="#258afa" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+                        @for (int i = 0; i < 7; i++) { <circle cx="@(15 + i * 112)" cy="@ChartY(i)" r="4.5" fill="#48a2ff" stroke="#b8dcff" stroke-width="1.5" /> }
+                    </svg>
+                }
+                <div class="sd-chart-days">@foreach(var date in _weekDates) { <span>@date.ToString("ddd", new System.Globalization.CultureInfo("ar"))<small>@date.ToString("dd/MM")</small></span> }</div>
+            </div>
+            <div class="sd-chart-note">المبالغ بالعملة الأساسية من الفواتير المرحلة ضمن أحدث 40 فاتورة؛ التقرير الكامل متاح في قسم التقارير.</div>
+        </section>
+    </div>
+</div>
 
 @code {
-    private Task NavigateAsync(string route) { Navigation.NavigateTo(route); return Task.CompletedTask; }
+    private const string CheckoutRoute = "/sales/checkout";
+    private const string InvoicesRoute = "/sales/invoices";
+    private const string OrdersRoute = "/sales/customer-orders";
+    private const string ReturnsRoute = "/sales/returns";
+    private const string ProductionRoute = "/optical/jobs";
+    private const string ReportsRoute = "/sales/reports";
+    private readonly List<SalesInvoiceDto> _invoices = [];
+    private readonly List<CustomerOrderDto> _orders = [];
+    private readonly List<OAS.Contracts.Sales.Returns.SalesReturnDto> _returns = [];
+    private readonly decimal[] _weekValues = new decimal[7];
+    private readonly DateOnly[] _weekDates = new DateOnly[7];
+    private bool _loading;
+    private bool _disposed;
+    private string? _error;
+    private string? _search;
+    private decimal _todaySales;
+    private decimal _unpaidAmount;
+    private int _todayInvoices;
+    private int _unpaidInvoices;
+    private int _openOrders;
+    private int _readyOrders;
+    private int _todayReturns;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+    private void Go(string route) => Navigation.NavigateTo(route);
+    private Task SearchAsync() => Task.CompletedTask;
+    private IReadOnlyList<SalesInvoiceDto> VisibleInvoices => string.IsNullOrWhiteSpace(_search)
+        ? _invoices
+        : _invoices.Where(x => x.InvoiceCode.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase)
+            || (x.CustomerName?.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase) ?? false)
+            || (x.CustomerCode?.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase) ?? false)).ToArray();
+    private Task RefreshAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        if (_loading || _disposed) return;
+        _loading = true;
+        _error = null;
+        try
+        {
+            var invoiceTask = Sales.GetSalesInvoicesPageAsync(new PageRequest { PageNumber = 1, PageSize = 40, SortBy = "InvoiceDate", SortDirection = SortDirection.Descending });
+            var ordersTask = Sales.GetCustomerOrdersPageAsync(new PageRequest { PageNumber = 1, PageSize = 60, SortBy = "OrderDate", SortDirection = SortDirection.Descending });
+            var returnsTask = Sales.GetSalesReturnsPageAsync(new PageRequest { PageNumber = 1, PageSize = 30 });
+            // A failure in one endpoint must not prevent the other dashboard panels from loading.
+            try
+            {
+                var page = await invoiceTask;
+                if (!_disposed) { _invoices.Clear(); _invoices.AddRange(page.Items.OrderByDescending(x => x.InvoiceDate).ThenByDescending(x => x.CreatedAtUtc)); }
+            }
+            catch (Exception) { _error = "تعذر تحميل بعض بيانات المبيعات؛ يمكنك إعادة المحاولة."; }
+            try
+            {
+                var page = await ordersTask;
+                if (!_disposed) { _orders.Clear(); _orders.AddRange(page.Items); }
+            }
+            catch (Exception) { _error = "تعذر تحميل بعض بيانات المبيعات؛ يمكنك إعادة المحاولة."; }
+            try
+            {
+                var page = await returnsTask;
+                if (!_disposed) { _returns.Clear(); _returns.AddRange(page.Items); }
+            }
+            catch (Exception) { _error = "تعذر تحميل بعض بيانات المبيعات؛ يمكنك إعادة المحاولة."; }
+            if (!_disposed) Recalculate();
+        }
+        catch (Exception)
+        {
+            _error = "تعذر تحميل بعض بيانات المبيعات. تحقق من الاتصال والصلاحيات ثم أعد المحاولة.";
+        }
+        finally { _loading = false; if (!_disposed) await InvokeAsync(StateHasChanged); }
+    }
+
+    private void Recalculate()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        _todaySales = _invoices.Where(x => x.InvoiceDate == today && x.Status == SalesInvoiceStatus.Posted).Sum(x => x.BaseTotalAmount);
+        _todayInvoices = _invoices.Count(x => x.InvoiceDate == today && x.Status == SalesInvoiceStatus.Posted);
+        _unpaidInvoices = _invoices.Count(x => x.Status == SalesInvoiceStatus.Posted && x.PaymentSummary.OutstandingAmount > 0m);
+        _unpaidAmount = _invoices.Where(x => x.Status == SalesInvoiceStatus.Posted && x.PaymentSummary.OutstandingAmount > 0m).Sum(x => x.PaymentSummary.OutstandingAmount * x.ExchangeRate);
+        _openOrders = _orders.Count(x => x.Status is not (CustomerOrderStatus.Completed or CustomerOrderStatus.Cancelled));
+        _readyOrders = _orders.Count(x => x.Status == CustomerOrderStatus.ReadyForDelivery);
+        _todayReturns = _returns.Count(x => x.ReturnDate == today && x.Status == OAS.Contracts.Sales.Returns.SalesReturnStatus.Posted);
+        for (var i = 0; i < 7; i++)
+        {
+            _weekDates[i] = today.AddDays(i - 6);
+            _weekValues[i] = _invoices.Where(x => x.InvoiceDate == _weekDates[i] && x.Status == SalesInvoiceStatus.Posted).Sum(x => x.BaseTotalAmount);
+        }
+    }
+
+    private static string Money(decimal value, string? currency = null) => $"{value:N2} {(string.IsNullOrWhiteSpace(currency) ? "بالعملة الأساسية" : currency)}";
+    private static string StatusText(SalesInvoiceDto x)
+    {
+        if (x.Status == SalesInvoiceStatus.Posted && x.PaymentSummary.OutstandingAmount <= 0m) return "مسددة";
+        if (x.Status == SalesInvoiceStatus.Posted && x.PaymentSummary.PaidAmount > 0m) return "جزئيًا";
+        return x.Status switch { SalesInvoiceStatus.Draft => "مسودة", SalesInvoiceStatus.Confirmed => "مؤكدة", SalesInvoiceStatus.Posted => "مرحلة", SalesInvoiceStatus.Cancelled => "ملغاة", _ => "—" };
+    }
+    private static string StatusClass(SalesInvoiceDto x) => x.Status switch
+    {
+        SalesInvoiceStatus.Cancelled => "sd-status-red",
+        SalesInvoiceStatus.Draft => "sd-status-gray",
+        SalesInvoiceStatus.Confirmed => "sd-status-amber",
+        SalesInvoiceStatus.Posted when x.PaymentSummary.OutstandingAmount <= 0m => "sd-status-green",
+        SalesInvoiceStatus.Posted when x.PaymentSummary.PaidAmount > 0m => "sd-status-amber",
+        _ => "sd-status-blue"
+    };
+    private decimal ChartMax => Math.Max(1m, _weekValues.Max());
+    private int ChartY(int i) => 179 - (int)Math.Round((_weekValues[i] / ChartMax) * 156m);
+    private string ChartLine => string.Join(" ", Enumerable.Range(0, 7).Select(i => $"{15 + i * 112},{ChartY(i)}"));
+    private string ChartArea => $"15,185 {ChartLine} 687,185";
+    public void Dispose() => _disposed = true;
 }
