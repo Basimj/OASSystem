@@ -1,0 +1,208 @@
+/* OASSystem V11 — ACCOUNTING dark-theme harmonization.
+   Scoped entirely to the authenticated app shell in Dark mode. Ocean/Light,
+   user-defined header/sidebar/tab colors and functional accounting markup
+   remain unchanged. Loaded AFTER V10 via oas-ui-bundle.css.
+
+   Accounting's feature stylesheet has light-only gradients, fixed #fff panels,
+   fixed dark typography and :root-derived tokens. This file rebinds those
+   tokens inside the dark shell and handles the remaining fixed declarations.
+*/
+.oas-shell.oas-theme-dark {
+    --oas-acc-primary: var(--oas-ui-accent, #48abd1);
+    --oas-acc-primary-light: var(--oas-color-primary-hover, #78c6e8);
+    --oas-acc-card-bg: var(--oas-color-surface, #191b1f);
+    --oas-acc-card-border: var(--oas-color-border, #383c44);
+    --oas-acc-card-hover-border: var(--oas-color-primary-border, #4e839d);
+    --oas-acc-muted: var(--oas-color-text-muted, #b9c0ca);
+    --oas-acc-surface-bg: var(--oas-color-background, #0e0f12);
+    --oas-acc-debit: #5ee0a8;
+    --oas-acc-debit-bg: #19362e;
+    --oas-acc-credit: #ff9096;
+    --oas-acc-credit-bg: #3b242b;
+    --oas-acc-balance: #a7b3ff;
+}
+
+/* Page shells, split/account tree and primary panels */
+.oas-shell.oas-theme-dark .oas-main-inner :is(
+    .ui-acc-workspace, .ui-acc-home
+) {
+    background: var(--oas-dark-bg, #0e0f12) !important;
+    color: var(--oas-dark-ink, #f3f5f7);
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(
+    .ui-acc-workspace__actions, .ui-acc-workspace__tabs,
+    .ui-acc-card, .ui-acc-section, .ui-acc-metric-tile,
+    .ui-acc-hub-card, .ui-acc-doc-header, .ui-acc-record-row,
+    .ui-acc-account-tree-panel, .ui-acc-account-editor,
+    .ui-acc-account-overview, .ui-acc-account-kpi,
+    .ui-acc-home__action, .ui-acc-home-metric,
+    .ui-acc-home-group, .ui-acc-home-nav, .ui-acc-home-panel,
+    .ui-acc-home-group__menu, .ui-acc-settlement-line
+) {
+    background: var(--oas-dark-panel, #191b1f) !important;
+    color: var(--oas-dark-ink, #f3f5f7);
+    border-color: var(--oas-dark-border, #383c44) !important;
+}
+/* A little visual differentiation without returning to white/light gradients. */
+.oas-shell.oas-theme-dark .oas-main-inner :is(
+    .ui-acc-section__header, .ui-acc-account-tree-panel > .ui-acc-section__header,
+    .ui-acc-account-editor .ui-acc-section__header,
+    .ui-acc-grid-table th, .ui-acc-grid-table tfoot td
+) {
+    background: var(--oas-dark-header, #272a30) !important;
+    color: var(--oas-dark-ink, #f3f5f7) !important;
+    border-color: var(--oas-dark-border, #383c44) !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(
+    .ui-acc-workspace__body, .ui-acc-accounts-split,
+    .ui-acc-accounts-split__detail, .ui-acc-accounts-split__tree
+) {
+    color: var(--oas-dark-ink, #f3f5f7);
+}
+
+/* Accounting's table cell styles explicitly use pale borders and dark ink. */
+.oas-shell.oas-theme-dark .oas-main-inner .ui-acc-grid-table {
+    background: var(--oas-dark-panel, #191b1f) !important;
+    color: var(--oas-dark-ink, #f3f5f7);
+    border-color: var(--oas-dark-border, #383c44) !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner .ui-acc-grid-table :is(td, tbody tr, tfoot td) {
+    background-color: var(--oas-dark-panel, #191b1f) !important;
+    color: var(--oas-dark-ink, #f3f5f7) !important;
+    border-color: var(--oas-dark-border, #383c44) !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner .ui-acc-grid-table tbody tr:hover td,
+.oas-shell.oas-theme-dark .oas-main-inner .ui-acc-grid-table .ui-acc-grid-table__clickable-row:is(:hover, :focus-within) td {
+    background-color: #292d34 !important;
+}
+/* Keep headings readable; never whiten semantic status badges. */
+.oas-shell.oas-theme-dark .oas-main-inner :is(
+    .ui-acc-metric-tile__value, .ui-acc-card__title,
+    .ui-acc-section__title, .ui-acc-hub-card__title,
+    .ui-acc-doc-header__title, .ui-acc-tree__code,
+    .ui-acc-tree__name, .ui-acc-tree__link,
+    .ui-acc-account-tree-panel .ui-acc-tree__row.is-root .ui-acc-tree__name,
+    .ui-acc-account-overview__title-line h2,
+    .ui-acc-account-overview__meta strong,
+    .ui-acc-account-kpi__value,
+    .ui-acc-home__title, .ui-acc-home-metric__value,
+    .ui-acc-home-group__heading h2,
+    .ui-acc-home-nav__content strong,
+    .ui-acc-home-row__reference, .ui-acc-home-row__text
+) {
+    color: var(--oas-dark-ink, #f3f5f7) !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(
+    .ui-acc-home__subtitle, .ui-acc-metric-tile__label,
+    .ui-acc-account-overview__breadcrumb, .ui-acc-account-overview__meta,
+    .ui-acc-account-kpi__label, .ui-acc-home-metric__label,
+    .ui-acc-home-row__meta, .ui-acc-home-row__time,
+    .ui-acc-home-row__detail, .ui-acc-home-group__description,
+    .ui-acc-tree__empty, .ui-acc-section__subtitle
+) {
+    color: var(--oas-dark-subtle, #b9c0ca) !important;
+}
+
+/* Home dashboard: command center menus and metric variants are light gradients. */
+.oas-shell.oas-theme-dark .oas-main-inner :is(
+    .ui-acc-home-metric--danger, .ui-acc-home-metric--info,
+    .ui-acc-home-metric--warning, .ui-acc-home-metric--success,
+    .ui-acc-home-panel--attention, .ui-acc-home-nav:hover,
+    .ui-acc-home-group__menu a:hover,
+    .ui-acc-account-kpi--balance, .ui-acc-account-kpi--debit,
+    .ui-acc-account-kpi--credit, .ui-acc-account-kpi--last
+) {
+    background: var(--oas-dark-panel-alt, #202228) !important;
+    border-color: var(--oas-dark-border, #383c44) !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner .ui-acc-home-group__menu a {
+    color: var(--oas-dark-ink, #f3f5f7) !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(
+    .ui-acc-home-group__icon, .ui-acc-home-group__menu-icon,
+    .ui-acc-home-nav__icon, .ui-acc-home-metric__icon,
+    .ui-acc-home__identity-icon, .ui-acc-home-row__activity-icon,
+    .ui-acc-account-overview__icon, .ui-acc-account-kpi__icon,
+    .ui-acc-metric-tile__icon
+) {
+    background: #29303a !important;
+    border-color: #38434f !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(
+    .ui-acc-home-group__icon, .ui-acc-home-nav__icon,
+    .ui-acc-home__identity-icon, .ui-acc-account-overview__icon
+) {
+    color: #96d8f2 !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner .ui-acc-home-metric--danger .ui-acc-home-metric__icon { color: #ff9198 !important; }
+.oas-shell.oas-theme-dark .oas-main-inner .ui-acc-home-metric--warning .ui-acc-home-metric__icon { color: #ffd18b !important; }
+.oas-shell.oas-theme-dark .oas-main-inner .ui-acc-home-metric--success .ui-acc-home-metric__icon { color: #71e7b0 !important; }
+.oas-shell.oas-theme-dark .oas-main-inner .ui-acc-home-metric--info .ui-acc-home-metric__icon { color: #91caff !important; }
+
+/* Accounting tree selection should follow the current user accent without a pale panel. */
+.oas-shell.oas-theme-dark .oas-main-inner :is(
+    .ui-acc-tree__link:hover, .ui-acc-account-tree-panel .ui-acc-tree__row:hover,
+    .ui-acc-record-row:hover
+) { background: #272d36 !important; }
+.oas-shell.oas-theme-dark .oas-main-inner :is(
+    .ui-acc-tree__row.is-selected .ui-acc-tree__link,
+    .ui-acc-account-tree-panel .ui-acc-tree__row.is-selected,
+    .ui-acc-account-tree-panel .ui-acc-tree__row.is-selected .ui-acc-tree__link
+) {
+    background: #263946 !important;
+    border-color: #437b98 !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner .ui-acc-tree__row.is-selected :is(.ui-acc-tree__name,.ui-acc-tree__code,.ui-acc-tree__link) {
+    color: #c1ebfc !important;
+}
+
+/* Editor controls/read-only values: no white control on charcoal panel. */
+.oas-shell.oas-theme-dark .oas-main-inner :is(
+    .ui-acc-number-field__input, .ui-acc-readonly-field__value,
+    .ui-acc-account-editor .ui-acc-readonly-field__value,
+    .ui-acc-empty-state, .ui-acc-status-action-bar
+) {
+    background: var(--oas-dark-panel-alt, #202228) !important;
+    color: var(--oas-dark-ink, #f3f5f7) !important;
+    border-color: var(--oas-dark-border, #383c44) !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner .ui-acc-number-field__input:disabled,
+.oas-shell.oas-theme-dark .oas-main-inner .ui-acc-readonly-field__value {
+    color: var(--oas-dark-subtle, #b9c0ca) !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner .ui-acc-home__error {
+    background: #392025 !important;
+    color: #ffd3d5 !important;
+    border-color: #72424a !important;
+}
+
+/* Preserve accounting status semantics, while removing pastel/white chips. */
+.oas-shell.oas-theme-dark .oas-main-inner .ui-acc-badge--draft,
+.oas-shell.oas-theme-dark .oas-main-inner .ui-acc-account-overview__status.is-new {
+    background: #30343c !important; color: #d5dbe5 !important; border-color: #555b66 !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(
+    .ui-acc-badge--posted,.ui-acc-badge--approved,.ui-acc-badge--active,
+    .ui-acc-balanced-badge--balanced, .ui-acc-account-overview__status.is-active
+) {
+    background: #173b2f !important; color: #82ebba !important; border-color: #326f57 !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-acc-badge--closed,.ui-acc-badge--locked) {
+    background: #44341f !important; color: #ffd18b !important; border-color: #80603b !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(
+    .ui-acc-badge--inactive,.ui-acc-badge--cancelled,.ui-acc-badge--reversed,
+    .ui-acc-balanced-badge--unbalanced,.ui-acc-account-overview__status.is-inactive
+) {
+    background: #412429 !important; color: #ff9fa6 !important; border-color: #89505b !important;
+}
+/* Badges for root/inactive accounts must remain visually distinct. */
+.oas-shell.oas-theme-dark .oas-main-inner .ui-acc-tree__badge {
+    background: #432629 !important; color: #ffc1bc !important; border-color: #9a5657 !important;
+}
+
+/* The selection/action text follows the theme; never paint status classes white. */
+.oas-shell.oas-theme-dark .oas-main-inner .ui-acc-home__action--primary {
+    color: #afe6ff !important;
+    border-color: #457a94 !important;
+}
