@@ -2,4 +2,7 @@
 @attribute [Authorize]
 @using OAS.Client.Sales.Workspace
 
-<SalesWorkspaceHost Section="SalesEntityType.SalesInvoices" />
+@* Invoice-route-only presentation boundary; all state remains in SalesWorkspaceHost. *@
+<div class="oas-sales-invoices-page">
+    <SalesWorkspaceHost Section="SalesEntityType.SalesInvoices" />
+</div>

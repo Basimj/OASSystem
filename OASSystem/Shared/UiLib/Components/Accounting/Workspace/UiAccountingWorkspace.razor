@@ -15,13 +15,7 @@
         </div>
     }
 
-    @if (ShowTabs && Tabs is not null)
-    {
-        <div class="ui-acc-workspace__tabs">
-            @Tabs
-        </div>
-    }
-
+    @* Document-level tabs intentionally removed. Local in-form section tabs remain. *@
     <div class="ui-acc-workspace__body">
         @Body
     </div>
@@ -30,8 +24,9 @@
 @code {
     [Parameter] public RenderFragment? Actions { get; set; }
     [Parameter] public RenderFragment? Metrics { get; set; }
+    // Compatibility: existing pages may still pass ShowTabs and Tabs.
     [Parameter] public RenderFragment? Tabs { get; set; }
-    [Parameter] public bool ShowTabs { get; set; } = true;
+    [Parameter] public bool ShowTabs { get; set; }
     [Parameter] public RenderFragment? Body { get; set; }
     [Parameter] public string? AdditionalCssClass { get; set; }
 

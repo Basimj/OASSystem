@@ -1,18 +1,28 @@
 @namespace OAS.UiLib.Components.Sales.Workspace
 
 <section class="ui-sales-workspace" dir="rtl">
-    @if (Actions is not null)
+    @if (!HideActions && Actions is not null)
     {
         <div class="ui-sales-workspace__actions">@Actions</div>
     }
-    @if (Tabs is not null)
+    @if (ShowTabs && Tabs is not null)
     {
         <div class="ui-sales-workspace__tabs">@Tabs</div>
     }
     <div class="ui-sales-workspace__body">@Body</div>
 </section>
 
+<style>
+    /* Search and New belong to the list, not to an open invoice/order/prescription. */
+    .ui-sales-workspace:has(.ui-sales-editor) > .ui-sales-workspace__actions {
+        display: none;
+    }
+</style>
+
 @code {
+    [Parameter] public bool HideActions { get; set; }
+    // The old cross-document tabs are disabled by default. Inner content tabs remain unchanged.
+    [Parameter] public bool ShowTabs { get; set; }
     [Parameter] public RenderFragment? Actions { get; set; }
     [Parameter] public RenderFragment? Tabs { get; set; }
     [Parameter] public RenderFragment? Body { get; set; }
