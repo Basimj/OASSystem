@@ -38,7 +38,11 @@ public static class WalkInCashSaleSettingsStore
             return new WalkInCashCustomerSettingsDto(null, null, null, null);
 
         return new WalkInCashCustomerSettingsDto(
-            customer.Id, customer.CustomerCode, customer.NameAr, account.Code);
+            customer.Id, customer.CustomerCode, customer.NameAr, account.Code)
+        {
+            ReceivablesAccountId = account.Id,
+            ReceivablesAccountName = account.NameAr
+        };
     }
 
     public static async Task SaveAsync(OasDbContext db, Guid? customerId, CancellationToken ct)

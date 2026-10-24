@@ -100,6 +100,9 @@
                               MinimumSearchLength="0"
                               DebounceMilliseconds="250" />
 
+                    @* الحساب النقدي العام هو سجل عميل واحد؛ يُعرض حساب الذمم المرتبط به تلقائيًا. *@
+                    <WalkInCashSettingsField @ref="_walkInSettingsField" />
+
                     <UiLookup Label="حساب المخزون"
                               Value="@ToLookupValue(_settingsInventoryAccountId)"
                               ValueChanged="SetInventoryAccount"
@@ -202,7 +205,7 @@
                           IconCssClass="fa-solid fa-floppy-disk"
                           Size="ControlSize.Small"
                           Disabled="@_busy"
-                          OnClick="SaveSettingsAsync" />
+                          OnClick="SaveSettingsWithWalkInAsync" />
             </UiAccountingFormSection>
 
             <UiAccountingFormSection Title="العملات"

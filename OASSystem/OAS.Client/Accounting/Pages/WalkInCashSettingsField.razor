@@ -1,0 +1,204 @@
+@namespace OAS.Client.Accounting.Pages
+@using OAS.Contracts.Accounting.Settings
+@using OAS.Contracts.Accounting.Customers
+@using OAS.Contracts.Common.Pagination
+@using OAS.Client.Accounting.Services
+@using OAS.Client.Services.Http
+@using OAS.Client.Common.Feedback.Services
+@using OAS.UiLib.Core.Models
+@using OAS.UiLib.Services.Feedback
+@inject IAccountingClientService Accounting
+@inject OasApiClient Api
+@inject IUiSnackbarService Snackbar
+@inject IApiFeedbackService ApiFeedback
+
+@* A cash customer is selected from Customers; its chart-of-accounts posting
+   account is displayed automatically, never picked independently. *@
+<UiLookup Label="العميل النقدي الافتراضي"
+          Value="@_customerId"
+          ValueChanged="OnCustomerChanged"
+          SelectedItem="@_selected"
+          SearchAsync="SearchCashCustomersAsync"
+          Placeholder="اختر عميلًا باسم عميل نقدي عام..."
+          MinimumSearchLength="0"
+          DebounceMilliseconds="250"
+          EmptyText="لا يوجد عميل نقدي عام. أنشئ عميلًا بهذا الاسم في صفحة العملاء أولًا."
+          ClearText="إلغاء اختيار العميل الافتراضي"
+          Disabled="@(!_loaded || _busy)" />
+
+<UiAccountingReadOnlyValue Label="حساب ذمم العميل النقدي (تلقائي)"
+                           Value="@_accountPreview" />
+
+@code {
+    private bool _loaded;
+    private bool _busy;
+    private string _customerId = string.Empty;
+    private string _accountPreview = "— اختر العميل النقدي العام أولًا —";
+    private UiLookupItem? _selected;
+    private readonly Dictionary<string, (UiLookupItem Item, string Account)> _options = new();
+
+    public bool IsLoaded => _loaded;
+
+    // A default anonymous customer must not be a real person's account, even if
+    // the account permits immediate payment. WALKIN-* covers technical customers
+    // created by older OAS releases; named generic customers cover normal setup.
+    private static bool IsGenericCashCustomer(string? code, string? name) =>
+        (!string.IsNullOrWhiteSpace(code) &&
+         code.StartsWith("WALKIN-", StringComparison.OrdinalIgnoreCase)) ||
+        string.Equals(name?.Trim(), "عميل نقدي عام", StringComparison.Ordinal) ||
+        string.Equals(name?.Trim(), "عميل نقدي", StringComparison.Ordinal);
+
+    private static bool IsEligible(CustomerDto customer) =>
+        customer.IsActive && !customer.IsCreditAllowed &&
+        customer.AccountId != Guid.Empty &&
+        IsGenericCashCustomer(customer.CustomerCode, customer.NameAr);
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _busy = true;
+        try
+        {
+            var saved = await Api.GetAsync<WalkInCashCustomerSettingsDto>(
+                "api/accounting/walk-in-customer");
+            if (saved is null) return;
+            ApplyFromServer(saved);
+            _loaded = true;
+        }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
+        finally { _busy = false; }
+    }
+
+    private void ApplyFromServer(WalkInCashCustomerSettingsDto settings)
+    {
+        _options.Clear();
+        _selected = null;
+        _customerId = string.Empty;
+        _accountPreview = "— اختر العميل النقدي العام أولًا —";
+
+        if (settings.CustomerId is not { } id) return;
+
+        if (!IsGenericCashCustomer(settings.CustomerCode, settings.CustomerName))
+        {
+            _accountPreview = "— الإعداد السابق مرتبط بعميل عادي؛ اختر عميلًا نقديًا عامًا —";
+            return;
+        }
+
+        _customerId = id.ToString("D");
+        _selected = new UiLookupItem(
+            _customerId, $"{settings.CustomerCode} - {settings.CustomerName}");
+        _accountPreview = FormatAccount(
+            settings.ReceivablesAccountCode, settings.ReceivablesAccountName);
+        _options[_customerId] = (_selected, _accountPreview);
+    }
+
+    private static string FormatAccount(string? code, string? name) =>
+        string.IsNullOrWhiteSpace(code)
+            ? "— لا يوجد حساب ذمم مرتبط صالح —"
+            : string.IsNullOrWhiteSpace(name) ? code : $"{code} - {name}";
+
+    private async Task<IReadOnlyList<UiLookupItem>> SearchCashCustomersAsync(
+        string search, CancellationToken ct)
+    {
+        try
+        {
+            // Blank searches should locate generic cash customers, rather than
+            // fetching the first page of every unrelated customer in the ERP.
+            var normalized = string.IsNullOrWhiteSpace(search) ? "نقدي" : search.Trim();
+            var results = new List<UiLookupItem>();
+            var pageNumber = 1;
+
+            while (results.Count < 80)
+            {
+                var page = await Accounting.GetCustomersPageAsync(new PageRequest
+                {
+                    PageNumber = pageNumber,
+                    PageSize = PageRequest.MaximumPageSize,
+                    Search = normalized
+                }, cancellationToken: ct);
+
+                foreach (var customer in page.Items.Where(IsEligible))
+                {
+                    var id = customer.Id.ToString("D");
+                    var item = new UiLookupItem(id,
+                        $"{customer.CustomerCode} - {customer.NameAr}");
+                    _options[id] = (item,
+                        FormatAccount(customer.AccountCode, customer.AccountNameAr));
+                    results.Add(item);
+                    if (results.Count >= 80) break;
+                }
+
+                if (!page.HasNextPage) break;
+                pageNumber++;
+            }
+
+            return results;
+        }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); return []; }
+        catch { ApiFeedback.ShowUnexpected(); return []; }
+    }
+
+    private async Task OnCustomerChanged(string? value)
+    {
+        _customerId = value ?? string.Empty;
+        _selected = null;
+        _accountPreview = "— اختر العميل النقدي العام أولًا —";
+
+        if (string.IsNullOrWhiteSpace(_customerId)) return;
+
+        if (_options.TryGetValue(_customerId, out var cached))
+        {
+            _selected = cached.Item;
+            _accountPreview = cached.Account;
+            return;
+        }
+
+        if (Guid.TryParse(_customerId, out var id))
+        {
+            try
+            {
+                var customer = await Accounting.GetCustomerByIdAsync(id);
+                if (customer is not null && IsEligible(customer))
+                {
+                    _selected = new UiLookupItem(_customerId,
+                        $"{customer.CustomerCode} - {customer.NameAr}");
+                    _accountPreview = FormatAccount(
+                        customer.AccountCode, customer.AccountNameAr);
+                    _options[_customerId] = (_selected, _accountPreview);
+                    return;
+                }
+            }
+            catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+            catch { ApiFeedback.ShowUnexpected(); }
+        }
+
+        _customerId = string.Empty;
+        Snackbar.Warning(
+            "اختر عميلًا باسم «عميل نقدي عام» يكون فعالًا وغير آجل وله حساب ذمم مرتبط.");
+    }
+
+    // Called by the existing accounting settings Save button.
+    public async Task<bool> SaveAsync()
+    {
+        if (!_loaded || _busy) return false;
+        _busy = true;
+        try
+        {
+            var selectedId = Guid.TryParse(_customerId, out var parsed)
+                ? parsed : (Guid?)null;
+            var saved = await Api.PutAsync<UpdateWalkInCashCustomerSettingsRequest,
+                WalkInCashCustomerSettingsDto>(
+                "api/accounting/walk-in-customer",
+                new UpdateWalkInCashCustomerSettingsRequest(selectedId));
+            if (saved is null) return false;
+            ApplyFromServer(saved);
+            return true;
+        }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
+        finally { _busy = false; }
+        return false;
+    }
+}
