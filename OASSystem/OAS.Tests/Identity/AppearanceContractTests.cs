@@ -14,7 +14,7 @@ public sealed class AppearanceContractTests
         Assert.Multiple(() =>
         {
             Assert.That(settings.ThemePreset, Is.EqualTo("Ocean"));
-            Assert.That(settings.SidebarBackground, Is.EqualTo("#1B4659"));
+            Assert.That(settings.SidebarBackground, Is.EqualTo("#DDF3F8"));
             Assert.That(settings.HeaderLayout, Is.EqualTo("Classic"));
             Assert.That(settings.HeaderOrder, Is.EquivalentTo(new[] { "user", "notifications", "session" }));
         });

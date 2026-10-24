@@ -1,0 +1,33 @@
+@using Microsoft.AspNetCore.Components
+
+<div class="inventory-suggested-input">
+    <label for="@_inputId">@Label @if (Required) { <span aria-hidden="true">*</span> }</label>
+    <input id="@_inputId" list="@_listId" value="@Value" @onchange="ChangedAsync"
+           type="text" placeholder="@(Placeholder ?? "اختر من الاقتراحات أو اكتب قيمة أخرى")"
+           maxlength="@MaxLength" disabled="@Disabled" required="@Required" aria-invalid="@(!string.IsNullOrWhiteSpace(ErrorText))" />
+    <datalist id="@_listId">
+        @foreach (var suggestion in Suggestions.Where(s => !string.IsNullOrWhiteSpace(s)).Distinct(StringComparer.CurrentCultureIgnoreCase))
+        {
+            <option value="@suggestion"></option>
+        }
+    </datalist>
+    @if (!string.IsNullOrWhiteSpace(ErrorText))
+    {
+        <span class="inventory-suggested-input__error" role="alert">@ErrorText</span>
+    }
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = string.Empty;
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter] public IEnumerable<string> Suggestions { get; set; } = Array.Empty<string>();
+    [Parameter] public string? Placeholder { get; set; }
+    [Parameter] public string? ErrorText { get; set; }
+    [Parameter] public int MaxLength { get; set; } = 100;
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool Required { get; set; }
+    private readonly string _inputId = $"inventory-suggestion-{Guid.NewGuid():N}";
+    private readonly string _listId = $"inventory-options-{Guid.NewGuid():N}";
+    private Task ChangedAsync(ChangeEventArgs args) => ValueChanged.InvokeAsync(args.Value?.ToString());
+}

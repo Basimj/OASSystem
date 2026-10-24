@@ -10,4 +10,5 @@ public sealed record UiShellModuleItem(
     string Href,
     string IconCssClass,
     bool AdministratorOnly = false,
-    bool DividerBefore = false);
+    bool DividerBefore = false,
+    bool OpenBaseRouteFromMenu = false);

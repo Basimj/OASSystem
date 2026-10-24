@@ -1,0 +1,167 @@
+/* OASSystem dynamic theme bridge (loaded last). 
+   NO preset owns fixed sidebar, header or content colors here.
+   The appearance renderer defines semantic tokens on .oas-shell; all workspaces
+   use those same tokens, including custom colors and charcoal dark mode. */
+
+.oas-shell {color-scheme:light;background:var(--oas-color-background);color:var(--oas-color-text);}
+.oas-shell.oas-theme-dark {color-scheme:dark;}
+.oas-shell,
+.oas-shell .oas-main-content,
+.oas-shell .oas-main-inner {background-color:var(--oas-color-background);color:var(--oas-color-text);}
+
+/* Global navigation chrome: these tokens are updated for every preset. */
+.oas-shell .oas-sidebar {background:var(--oas-ui-sidebar);color:var(--oas-ui-sidebar-fg);border-inline-end:1px solid var(--oas-color-sidebar-border);box-shadow:-3px 0 18px rgba(15,55,75,.06);}
+.oas-shell .oas-sidebar-toolbar {border-bottom:1px solid var(--oas-ui-tabs-border);}
+.oas-shell .oas-sidebar-brand__name {color:var(--oas-ui-sidebar-fg);}
+.oas-shell .oas-sidebar-brand__mark {background:var(--oas-ui-accent);color:var(--oas-color-on-primary);border:1px solid var(--oas-color-primary-border);box-shadow:none;}
+.oas-shell .oas-sidebar :is(.oas-nav-item,.oas-nav-group__header,.oas-nav-group__chevron,.oas-nav-group__expand) {color:var(--oas-ui-sidebar-fg);}
+.oas-shell .oas-sidebar :is(.oas-nav-item,.oas-nav-group__header) .oas-nav-icon {color:var(--oas-ui-sidebar-icon);}
+.oas-shell .oas-sidebar :is(.oas-nav-item:hover:not(.active),.oas-nav-group__header:hover,.oas-nav-group__expand:hover) {background:var(--oas-ui-sidebar-hover);color:var(--oas-ui-sidebar-fg);}
+.oas-shell .oas-sidebar :is(.oas-nav-item.active,.oas-nav-item--child.active),
+.oas-shell.sidebar-collapsed .oas-nav-group.active > .oas-nav-group__header {background:var(--oas-ui-sidebar-active-bg);color:var(--oas-ui-sidebar-active-fg);border-color:var(--oas-color-primary-border);box-shadow:none;}
+.oas-shell .oas-sidebar :is(.oas-nav-item.active,.oas-nav-item--child.active) .oas-nav-icon {color:var(--oas-ui-sidebar-active-icon);}
+.oas-shell .oas-sidebar .oas-nav-item.active::before {background:var(--oas-ui-sidebar-active-icon);}
+.oas-shell .oas-sidebar .oas-nav-group__items {border-inline-end-color:var(--oas-ui-tabs-border);}
+.oas-shell .oas-sidebar .oas-collapse-btn {background:var(--oas-ui-tabs-bg);color:var(--oas-ui-tabs-fg);border:1px solid var(--oas-ui-tabs-border);}
+.oas-shell .oas-sidebar .oas-collapse-btn:hover {background:var(--oas-ui-sidebar-hover);color:var(--oas-ui-sidebar-fg);}
+.oas-shell.sidebar-collapsed .oas-sidebar .oas-nav-text {color:inherit;}
+.oas-shell .oas-sidebar .oas-nav-settings-child {color:var(--oas-ui-sidebar-fg);}
+.oas-shell .oas-sidebar .oas-nav-settings-child i {color:var(--oas-ui-sidebar-icon);}
+.oas-shell .oas-sidebar .oas-nav-settings-child:is(:hover,.is-active) {background:var(--oas-ui-sidebar-active-bg);color:var(--oas-ui-sidebar-active-fg);}
+.oas-shell .oas-nav::-webkit-scrollbar-thumb {background:var(--oas-ui-sidebar-hover);}
+
+.oas-shell .oas-workspace-topbar,
+.oas-shell .oas-global-header-row {background:var(--oas-ui-header);color:var(--oas-ui-header-fg);border-bottom-color:var(--oas-ui-tabs-border);box-shadow:0 2px 13px rgba(35,77,94,.035);}
+.oas-shell .oas-global-tabs-row {background:var(--oas-ui-tabs-bar-bg);border-bottom:1px solid var(--oas-ui-tabs-border);}
+.oas-shell .oas-top-header,
+.oas-shell .oas-top-header :is(.oas-header-user,.oas-header-system-meta,.oas-header-meta-item,.oas-header-database,.oas-user-details strong,.oas-header-finance-link) {color:var(--oas-ui-header-fg);}
+.oas-shell .oas-top-header :is(.oas-header-icon-button,.oas-header-meta-item i,.oas-shell-search__icon,.oas-user-chevron) {color:var(--oas-ui-header-icon);}
+.oas-shell .oas-header-icon-button:hover,
+.oas-shell .oas-header-user:hover {background:var(--oas-color-primary-soft);color:var(--oas-color-primary-hover);}
+.oas-shell .oas-shell-search {border-color:var(--oas-ui-tabs-border);}
+.oas-shell .oas-shell-search :is(input,kbd) {color:var(--oas-ui-header-fg);}
+.oas-shell .oas-global-tabs-row .ui-application-tab {background:var(--oas-ui-tabs-bg);color:var(--oas-ui-tabs-fg);border-color:var(--oas-ui-tabs-border);}
+.oas-shell .oas-global-tabs-row .ui-application-tab__icon {color:var(--oas-ui-tabs-icon);}
+.oas-shell .oas-global-tabs-row .ui-application-tab:is(:hover,:focus-within) {background:var(--oas-color-primary-soft);border-color:var(--oas-color-primary-border);}
+.oas-shell .oas-global-tabs-row .ui-application-tab--active {background:var(--oas-ui-tabs-active-bg);color:var(--oas-ui-tabs-active-fg);border-color:var(--oas-ui-tabs-border);box-shadow:inset 0 -2px var(--oas-color-primary);}
+.oas-shell .oas-global-tabs-row .ui-application-tab--active .ui-application-tab__icon {color:var(--oas-ui-tabs-active-icon);}
+.oas-shell .oas-global-tabs-row .ui-tab-context-menu {background:var(--oas-color-surface);color:var(--oas-color-text);border-color:var(--oas-color-border);}
+.oas-shell .oas-global-tabs-row .ui-tab-context-menu button {color:var(--oas-color-text);}
+.oas-shell .oas-global-tabs-row .ui-tab-context-menu button:hover {background:var(--oas-color-primary-soft);color:var(--oas-color-primary-hover);}
+
+/* The quick dark/light switch belongs to the global record/header bar. */
+.oas-shell .oas-theme-toggle {display:inline-flex;align-items:center;justify-content:center;order:3;gap:7px;flex:0 0 auto;padding:0 12px;min-height:32px;border:1px solid var(--oas-color-border);border-radius:10px;background:var(--oas-color-surface);color:var(--oas-color-text);font:inherit;font-size:calc(11px * var(--oas-ui-font-scale,1));font-weight:750;white-space:nowrap;cursor:pointer;transition:color .15s,background-color .15s,border-color .15s;}
+.oas-shell .oas-theme-toggle i {font-size:14px;color:var(--oas-color-primary);}
+.oas-shell .oas-theme-toggle:hover {background:var(--oas-color-primary-soft);border-color:var(--oas-color-primary-border);color:var(--oas-color-text);}
+.oas-shell .oas-theme-toggle:focus-visible {outline:2px solid var(--oas-color-primary);outline-offset:2px;}
+.oas-shell .oas-theme-toggle:disabled {opacity:.6;cursor:progress;}
+.oas-shell .oas-shell-search {order:4;}
+.oas-shell .oas-theme-toggle-error {order:3;font-size:11px;color:var(--oas-color-warning);white-space:nowrap;}
+@media(max-width:1100px){.oas-shell .oas-theme-toggle span{display:none}.oas-shell .oas-theme-toggle{padding-inline:9px;width:34px}}
+@media(max-width:440px){.oas-shell .oas-theme-toggle{width:30px;padding:0;min-height:30px}}
+@media(max-width:720px){.oas-shell .oas-theme-toggle-error{font-size:0}.oas-shell .oas-theme-toggle-error::after{content:"!";font-size:15px}}
+@media(prefers-reduced-motion:reduce){.oas-shell .oas-theme-toggle{transition:none}}
+
+/* Universal semantic surfaces: accounting / inventory / purchasing / sales. */
+.oas-shell .oas-main-inner :is(.ui-acc-workspace,.ui-sales-workspace,.ui-workspace__body,.ui-sales-home,.ui-acc-home) {color:var(--oas-color-text);}
+.oas-shell .oas-main-inner :is(.ui-acc-workspace,.ui-sales-workspace) {background-color:var(--oas-color-background);}
+.oas-shell .oas-main-inner :is(
+  .ui-card,.card,.ui-data-grid-panel,.ui-data-table__container,
+  .ui-workspace__actions,.ui-workspace__filters,.ui-workspace__tabs,
+  .ui-acc-card,.ui-acc-section,.ui-acc-home-panel,.ui-acc-workspace__actions,.ui-acc-workspace__tabs,
+  .ui-sales-workspace__actions,.ui-sales-workspace__tabs,.ui-sales-section,
+  .ui-sales-list__header,.ui-sales-document-card,.ui-sales-editor__header,.ui-sales-editor__actions,
+  .ui-purchasing-list__card,.ui-purchasing-invoice-totals,.ui-sales-revision-card,
+  .ui-acc-account-tree-panel,.ui-acc-account-editor,.ui-acc-home-group,.ui-acc-hub-card,
+  .ui-acc-metric-tile,.ui-acc-doc-header,.ui-sales-eye-card,
+  .oas-theme-studio__panel,.oas-settings-home__card
+) {background-color:var(--oas-color-surface);color:var(--oas-color-text);border-color:var(--oas-color-card-border);}
+.oas-shell .oas-main-inner :is(.ui-card,.card,.ui-data-grid-panel,.ui-sales-document-card,.ui-acc-card,.ui-sales-list__header) {box-shadow:var(--oas-color-card-shadow);}
+.oas-shell .oas-main-inner :is(.ui-acc-section__header,.ui-data-grid-panel__header,.ui-data-grid-panel__footer,.ui-sales-section__header) {background-color:var(--oas-color-subtle);color:var(--oas-color-text);border-color:var(--oas-color-border);}
+.oas-shell .oas-main-inner .ui-sales-home__hero {background:linear-gradient(135deg,var(--oas-color-surface),var(--oas-color-subtle));border-color:var(--oas-color-border);}
+.oas-shell .oas-main-inner :is(.ui-sales-home__grid i,.ui-sales-editor__title>i,.ui-sales-home__eyebrow) {color:var(--oas-color-primary);}
+.oas-shell .oas-main-inner :is(.ui-sales-home__grid i,.ui-sales-editor__title>i) {background:var(--oas-color-primary-soft);}
+.oas-shell .oas-main-inner :is(.ui-sales-home__grid button,.ui-sales-revision-card) {background:var(--oas-color-surface);color:var(--oas-color-text);border-color:var(--oas-color-border);}
+.oas-shell .oas-main-inner :is(.ui-sales-home__grid button:hover,.ui-sales-document-card:hover) {border-color:var(--oas-color-primary-border);}
+.oas-shell .oas-main-inner :is(.ui-sales-empty strong,.ui-sales-home__hero h1,.ui-sales-list__header h2,.ui-acc-card__title,.ui-card__header h2) {color:var(--oas-color-text);}
+
+/* Tables use theme token surfaces in every module, not fixed sea-glass cyan. */
+.oas-shell .oas-main-inner :is(.ui-data-table,.ui-sales-lines__table,.ui-acc-grid-table,.table) {
+    --bs-table-bg:var(--oas-color-surface);
+    --bs-table-color:var(--oas-color-text);
+    --bs-table-border-color:var(--oas-color-border);
+    color:var(--oas-color-text);
+    border-color:var(--oas-color-border);
+    background-color:var(--oas-color-surface);
+}
+.oas-shell .oas-main-inner :is(.ui-data-table th,.ui-sales-lines__table thead th,.ui-acc-grid-table thead th,.table thead th,table thead th) {
+    color:var(--oas-color-text);background-color:var(--oas-color-table-header);border-color:var(--oas-color-border);
+}
+.oas-shell .oas-main-inner :is(.ui-data-table td,.ui-sales-lines__table td,.ui-acc-grid-table td,.table tbody td) {color:var(--oas-color-text);border-color:var(--oas-color-border);}
+.oas-shell .oas-main-inner :is(.ui-data-table tbody tr:hover td,.ui-sales-lines__table tbody tr:hover td,.ui-acc-grid-table tbody tr:hover td,.table tbody tr:hover td) {background-color:var(--oas-color-table-row-hover);}
+.oas-shell .oas-main-inner :is(.ui-data-table__row--selected td,.ui-acc-grid-table tr.is-selected td,.table tbody tr.table-active td) {background-color:var(--oas-color-table-row-selected);}
+.oas-shell .oas-main-inner .ui-data-table__container {border-color:var(--oas-color-border);}
+
+/* Inputs, buttons and panels share the palette. Form-specific validation is unchanged. */
+.oas-shell .oas-main-inner :is(.form-control,.form-select,.ui-input-text,.ui-input-date,.ui-search-input input,.ui-lookup__input,.ui-sales-form-grid input,.ui-sales-form-grid select,.ui-acc-workspace input,.ui-acc-workspace select,.ui-acc-workspace textarea) {background-color:var(--oas-theme-input-bg);color:var(--oas-color-text);border-color:var(--oas-color-border);}
+.oas-shell .oas-main-inner :is(.form-control,.form-select,.ui-search-input input,.ui-input-text):focus-visible {border-color:var(--oas-color-primary);box-shadow:0 0 0 3px var(--oas-color-focus-ring);}
+.oas-shell .oas-main-inner :is(.ui-button--primary,.btn-primary) {background-color:var(--oas-color-primary);color:var(--oas-color-on-primary);border-color:var(--oas-color-primary);}
+.oas-shell .oas-main-inner :is(.ui-button--primary,.btn-primary):hover:not(:disabled) {background-color:var(--oas-color-primary-hover);color:var(--oas-color-on-primary);border-color:var(--oas-color-primary-hover);}
+.oas-shell .oas-main-inner :is(.ui-button--secondary,.btn-outline-primary) {background-color:var(--oas-color-surface);color:var(--oas-color-primary-hover);border-color:var(--oas-color-primary-border);}
+.oas-shell .oas-main-inner :is(.ui-button--secondary,.btn-outline-primary):hover:not(:disabled) {background-color:var(--oas-color-primary-soft);border-color:var(--oas-color-primary);}
+.oas-shell .oas-main-inner :is(.ui-workspace-tab--active,.ui-nav-link.active) {background-color:var(--oas-color-primary-soft);color:var(--oas-color-primary-hover);border-color:var(--oas-color-primary);}
+.oas-shell .oas-main-inner :is(.alert-success,.ui-sales-alert--success) {background:var(--oas-color-success-surface);color:var(--oas-color-success);border-color:var(--oas-color-success);}
+.oas-shell .oas-main-inner :is(.alert-warning,.ui-sales-alert--warning) {background:var(--oas-color-warning-surface);color:var(--oas-color-warning);border-color:var(--oas-color-warning);}
+.oas-shell .oas-main-inner :is(.alert-danger,.ui-sales-alert--error) {background:var(--oas-color-danger-surface);color:var(--oas-color-danger);border-color:var(--oas-color-danger);}
+
+/* Legacy dark CSS has !important values. Override these only for the same
+   surface classes, never on semantic badges/alerts or hidden overlays. */
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-card,.card,.ui-data-grid-panel,.ui-data-table__container,.ui-workspace__actions,.ui-workspace__filters,.ui-workspace__tabs,.ui-acc-card,.ui-acc-section,.ui-acc-home-panel,.ui-sales-workspace__actions,.ui-sales-workspace__tabs,.ui-sales-section,.ui-sales-editor__header,.ui-sales-editor__actions,.ui-sales-list__header,.ui-purchasing-list__card) {
+    background-color:var(--oas-color-surface) !important;
+    color:var(--oas-color-text);border-color:var(--oas-color-border) !important;
+}
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-data-table th,.ui-sales-lines__table thead th,.ui-acc-grid-table thead th,table thead th) {background-color:var(--oas-color-table-header) !important;color:var(--oas-color-text) !important;border-color:var(--oas-color-border) !important;}
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-data-table td,.ui-sales-lines__table td,.ui-acc-grid-table td,table tbody td) {background-color:var(--oas-color-surface) !important;color:var(--oas-color-text) !important;border-color:var(--oas-color-border) !important;}
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-data-table tbody tr:hover td,.ui-sales-lines__table tbody tr:hover td,.ui-acc-grid-table tbody tr:hover td,table tbody tr:hover td) {background-color:var(--oas-color-table-row-hover) !important;}
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-button--primary,.btn-primary) {background-color:var(--oas-color-primary) !important;color:var(--oas-color-on-primary) !important;border-color:var(--oas-color-primary) !important;}
+.oas-shell.oas-theme-dark .oas-main-inner :is(.ui-button--primary,.btn-primary):hover:not(:disabled) {background-color:var(--oas-color-primary-hover) !important;border-color:var(--oas-color-primary-hover) !important;}
+
+/* Remaining legacy workspace surfaces that declared their own colors. */
+.oas-shell:not(.oas-theme-dark) .oas-main-inner :is(
+  .ui-acc-account-overview,.ui-acc-account-kpi,.ui-acc-home-metric,
+  .ui-acc-home-group,.ui-acc-home-nav,.ui-acc-home__action,
+  .ui-acc-account-editor,.ui-acc-account-tree-panel,.ui-acc-hub-card,
+  .ui-acc-metric-tile,.ui-acc-doc-header,.ui-acc-record-row,
+  .ui-sales-eye-card,.ui-sales-editor__content,.ui-purchasing-line-card,
+  .ui-purchasing-invoice-line,.ui-sales-revision-card,.ui-sales-lines__table-wrap
+) {background-color:var(--oas-color-surface);color:var(--oas-color-text);border-color:var(--oas-color-border);}
+.oas-shell:not(.oas-theme-dark) .oas-main-inner :is(
+  .ui-acc-home-group__heading,.ui-acc-section__header,.ui-acc-account-tree-panel > .ui-acc-section__header,
+  .ui-purchasing-list__header,.ui-sales-section__header
+) {background-color:var(--oas-color-subtle);border-color:var(--oas-color-border);}
+.oas-shell .oas-main-inner :is(
+  .ui-acc-metric-tile__value,.ui-acc-card__title,.ui-acc-section__title,
+  .ui-acc-hub-card__title,.ui-acc-doc-header__title,.ui-acc-tree__name,
+  .ui-acc-home-metric__value,.ui-acc-account-kpi__value,
+  .ui-sales-document-card__title,.ui-purchasing-list__title
+) {color:var(--oas-color-text);}
+.oas-shell .oas-main-inner :is(
+  .ui-sales-document-card__secondary,.ui-sales-list__header p,
+  .ui-purchasing-line-card__summary,.ui-acc-card__subtitle,
+  .ui-acc-account-overview__meta,.ui-acc-home-metric__label
+) {color:var(--oas-color-text-muted);}
+
+/* The appearance editor itself should not remain Ocean-blue on every preset.
+   Preset thumbnails intentionally retain their own palette for comparison. */
+.oas-shell .oas-main-inner .oas-theme-studio,
+.oas-shell .oas-main-inner .oas-settings-home {color:var(--oas-color-text);}
+.oas-shell .oas-main-inner :is(.oas-theme-studio__intro h1,.oas-theme-studio__panel-head h2,.oas-settings-home h1,.oas-theme-studio__option-title,.oas-theme-studio__form-group label,.oas-theme-studio__color-field) {color:var(--oas-color-text);}
+.oas-shell .oas-main-inner :is(.oas-theme-studio__intro p,.oas-theme-studio__panel-head p,.oas-theme-studio__color-field small,.oas-settings-home > p) {color:var(--oas-color-text-muted);}
+.oas-shell .oas-main-inner :is(.oas-theme-studio__tab,.oas-theme-studio__preset,.oas-theme-studio__option-pills button,.oas-theme-studio__color-control,.oas-theme-studio__form-group select,.oas-theme-studio__footer button) {background:var(--oas-color-surface);color:var(--oas-color-text);border-color:var(--oas-color-border);}
+.oas-shell .oas-main-inner :is(.oas-theme-studio__tab.is-current,.oas-theme-studio__option-pills button.is-active) {background:var(--oas-color-primary-soft);color:var(--oas-color-primary-hover);border-color:var(--oas-color-primary-border);}
+.oas-shell .oas-main-inner .oas-theme-studio__preset.is-selected {border-color:var(--oas-color-primary);box-shadow:0 0 0 2px var(--oas-color-focus-ring);}
+.oas-shell .oas-main-inner .oas-theme-studio__check {color:var(--oas-color-primary);}
+.oas-shell .oas-main-inner :is(.oas-theme-studio__save,.oas-theme-studio__footer .oas-theme-studio__save) {background:var(--oas-color-primary);color:var(--oas-color-on-primary);border-color:var(--oas-color-primary);}
+.oas-shell .oas-main-inner .oas-theme-studio__footer {background:var(--oas-color-surface);border-color:var(--oas-color-border);}
+.oas-shell .oas-main-inner :is(.oas-theme-studio__hex,.oas-theme-studio__form-group select,.oas-theme-studio__color-field input) {color:var(--oas-color-text);}
+.oas-shell .oas-main-inner :is(.oas-theme-studio__form-group input[type=range],.oas-theme-studio__font-grid input[type=range]) {accent-color:var(--oas-color-primary);}

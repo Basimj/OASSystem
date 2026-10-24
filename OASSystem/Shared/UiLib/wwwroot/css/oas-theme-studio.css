@@ -255,3 +255,29 @@
 .oas-theme-studio__preset-shot.midnight .tile {background:#393e47}
 @media(max-width:1200px){.oas-theme-studio__mini,.oas-theme-studio__mini-stage {min-height:440px!important;height:440px}}
 @media(max-width:680px){.oas-theme-studio__mini-header .oas-theme-studio__mini-header-chip {display:none}.oas-theme-studio__mini-side {flex-basis:34%}.oas-theme-studio__mini-stage {min-height:420px!important;height:420px}}
+
+/* Four accessible presets in a readable two-column grid. */
+.oas-theme-studio__presets-grid {grid-template-columns: repeat(2,minmax(0,1fr));gap:10px}
+.oas-theme-studio__presets .oas-theme-studio__preset {min-height:141px}
+.oas-theme-studio__preset:focus-visible {outline:3px solid #0B6FAF;outline-offset:2px}
+.oas-theme-studio__preset-shot.ocean {background:#F1FBFD;border-color:#C8E5EE}
+.oas-theme-studio__preset-shot.ocean .top {background:#FFFFFF;border-color:#D7E8ED}
+.oas-theme-studio__preset-shot.ocean .side {background:#DDF3F8}
+.oas-theme-studio__preset-shot.ocean .tile {background:#B9E5F1}
+.oas-theme-studio__preset-shot.sky-yellow {background:#F4FAFF;border-color:#D5E8F4}
+.oas-theme-studio__preset-shot.sky-yellow .top {background:#FFFFFF;border-color:#D5E8F4}
+.oas-theme-studio__preset-shot.sky-yellow .side {background:#D9F0FF}
+.oas-theme-studio__preset-shot.sky-yellow .tile {background:#FFF1B8;border:1px solid #EAD99F}
+.oas-theme-studio__preset-shot.sky-yellow .b {background:#D0E9FC;border-color:#C1E1F7}
+.oas-theme-studio__preset-shot.sky-yellow .c {background:#FFFFFF;border-color:#D8EAF5}
+.oas-theme-studio__preset.is-selected {border-color:#0B6FAF;box-shadow:0 0 0 2px rgb(11 111 175 / 15%)}
+.oas-theme-studio__preset .oas-theme-studio__check {color:#0B6FAF}
+.oas-theme-studio__mini:not(.is-dark) .oas-theme-studio__mini-main {background:var(--oas-preview-canvas,#EFF8FB)}
+.oas-theme-studio__mini:not(.is-dark) .oas-theme-studio__mini-page-heading,
+.oas-theme-studio__mini:not(.is-dark) .oas-theme-studio__mini-chart-head strong,
+.oas-theme-studio__mini:not(.is-dark) .oas-theme-studio__mini-stats b {color:#213C50}
+.oas-theme-studio__mini:not(.is-dark) .oas-theme-studio__mini-stats i {color:var(--preview-accent,#0B6FAF)}
+.oas-theme-studio__mini:not(.is-dark) .oas-theme-studio__mini-chart,
+.oas-theme-studio__mini:not(.is-dark) .oas-theme-studio__mini-stats div,
+.oas-theme-studio__mini:not(.is-dark) .oas-theme-studio__mini-table {border-color:#D5E8F4}
+@media(max-width:590px){.oas-theme-studio__presets-grid {gap:7px}.oas-theme-studio__presets .oas-theme-studio__preset {min-height:119px}}

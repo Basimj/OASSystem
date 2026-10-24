@@ -28,7 +28,7 @@
             }
             else
             {
-                @foreach (var item in Items)
+                @foreach (var item in PagedItems)
                 {
                     <tr class="@GetRowCss(item)" @onclick="() => HandleRowClickAsync(item)">
                         @if (RowTemplate is not null)
@@ -47,4 +47,12 @@
             }
         </tbody>
     </table>
+    @if (IsPaged && TotalPages > 1)
+    {
+        <nav class="ui-data-table__pager" aria-label="التنقل بين صفحات الجدول">
+            <button type="button" @onclick="PreviousPage" disabled="@(CurrentPage <= 1)" aria-label="الصفحة السابقة">السابق</button>
+            <span>صفحة @CurrentPage من @TotalPages</span>
+            <button type="button" @onclick="NextPage" disabled="@(CurrentPage >= TotalPages)" aria-label="الصفحة التالية">التالي</button>
+        </nav>
+    }
 </div>

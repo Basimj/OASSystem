@@ -5,6 +5,7 @@
 
 @code {
     [Parameter] public EventCallback<string> OnSidebarModeLoaded { get; set; }
+    [Parameter] public EventCallback<string> OnThemeModeLoaded { get; set; }
     private IJSObjectReference? _module;
     private DotNetObjectReference<OasAppearanceBoot>? _reference;
 
@@ -23,6 +24,9 @@
 
     [JSInvokable]
     public Task AppearanceChanged(string sidebarMode) => OnSidebarModeLoaded.InvokeAsync(sidebarMode);
+
+    [JSInvokable]
+    public Task ThemeModeChanged(string mode) => OnThemeModeLoaded.InvokeAsync(mode);
 
     public async ValueTask DisposeAsync()
     {

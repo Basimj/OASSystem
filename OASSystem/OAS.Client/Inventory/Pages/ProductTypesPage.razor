@@ -1,4 +1,6 @@
 @page "/inventory/product-types"
+@page "/inventory/product-types/{Screen}"
+@page "/inventory/product-types/{Screen}/{RecordId:guid}"
 @attribute [Authorize]
 @using OAS.Client.Inventory.Services
 @using OAS.Client.Services.Browser
@@ -6,52 +8,45 @@
 @using OAS.Contracts.Inventory.Products
 @using OAS.UiLib.Components.Spreadsheets
 
-<PageTitle>أنواع المنتجات | OAS</PageTitle>
+<PageTitle>@(IsFormRoute ? "نموذج المخزون" : "قائمة المخزون") - أنواع المنتجات | OAS</PageTitle>
+<span class="oas-inventory-view" hidden aria-hidden="true"></span>
 
-<UiWorkspaceLayout ShowAside="true" ShowFilters="false">
+<UiWorkspaceLayout ShowAside="false" ShowFilters="false">
     <Actions>
         <UiWorkspaceActionBar>
-            <UiButton Text="جديد" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small"
-                      Disabled="@IsEditing" OnClick="BeginCreateAsync" />
-            <UiButton Text="حفظ" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small"
+            @if (IsFormRoute)
+            {
+                <UiButton Text="العودة إلى القائمة" IconCssClass="fa-solid fa-arrow-right" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="BackToListAsync" />
+                <UiButton Text="حفظ" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small"
                       Disabled="@(!IsEditing)" Loading="@_saving" OnClick="SaveAsync" />
-            <UiButton Text="تعديل" IconCssClass="fa-solid fa-pen" Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
-                      Disabled="@(!CanEdit)" OnClick="BeginEditAsync" />
-            <UiButton Text="إلغاء" IconCssClass="fa-solid fa-xmark" Variant="ButtonVariant.Ghost" Size="ControlSize.Small"
-                      Disabled="@(!IsEditing)" OnClick="CancelAsync" />
-            <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
+                <UiButton Text="تعديل" IconCssClass="fa-solid fa-pen" Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
+                      Disabled="@(!CanEdit)" OnClick="OpenEditScreenAsync" />
+            }
+            else
+            {
+                <UiButton Text="جديد" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small"
+                      Disabled="@IsEditing" OnClick="OpenCreateScreenAsync" />
+                <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
                       Disabled="@IsEditing" Loading="@_loading" OnClick="RefreshAsync" />
-            <UiSpreadsheetActions CanImport="true" Busy="@(_exporting || _spreadsheetBusy)" OnImport="OpenSpreadsheetImportAsync" OnTemplate="DownloadTemplateAsync" OnExport="ExportAsync" />
-            <UiSearchInput @bind-Value="_search" Placeholder="ابحث بالكود أو اسم نوع المنتج..."
+                <UiSpreadsheetActions CanImport="true" Busy="@(_exporting || _spreadsheetBusy)" OnImport="OpenSpreadsheetImportAsync" OnTemplate="DownloadTemplateAsync" OnExport="ExportAsync" />
+                <UiSearchInput @bind-Value="_search" Placeholder="ابحث بالكود أو اسم نوع المنتج..."
                            AriaLabel="البحث في أنواع المنتجات" ClearText="مسح البحث"
                            DebounceMilliseconds="250" OnSearch="SearchChangedAsync" />
+            }
         </UiWorkspaceActionBar>
     </Actions>
-
     <Content>
-        <UiDataGridPanel Title="أنواع المنتجات" Subtitle="@($"{FilteredItems.Count} نوع")">
-            <Body>
-                @if (_loading)
-                {
-                    <UiAlert Message="جاري تحميل أنواع المنتجات..." />
-                }
-                else
-                {
-                    <UiDataTable TItem="ProductTypeDto" Items="@FilteredItems" Headers="@Headers" EmptyText="لا توجد أنواع منتجات مطابقة."
-                                 SidebarTypography="true" UniformCellTypography="true"
-                                 OnRowClick="@(x => Select(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
-                        <RowTemplate Context="item">
-                            <td><strong>@item.Code</strong></td>
-                            <td>@item.Name</td>
-                            <td><UiBadge Text="@(item.IsActive ? "نشط" : "غير نشط")" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
-                        </RowTemplate>
-                    </UiDataTable>
-                }
-            </Body>
-        </UiDataGridPanel>
-    </Content>
-
-    <Aside>
+        @if (IsFormRoute)
+        {
+            <div class="oas-inventory-form-screen">
+                <div class="oas-inventory-form-screen__intro">
+                    <div>
+                        <div class="oas-inventory-form-screen__eyebrow">إدارة المخزون</div>
+                        <h2>@EditorTitle</h2>
+                        <p>راجع البيانات ثم احفظ التغييرات. الحقول الإضافية تظهر عند الحاجة.</p>
+                    </div>
+                </div>
+                <div class="oas-inventory-form-screen__body">
         <UiCard Title="@EditorTitle" Subtitle="@(_selectedId.HasValue ? _code : null)">
             @if (_mode == EditorMode.Empty)
             {
@@ -78,7 +73,35 @@
                 </div>
             }
         </UiCard>
-    </Aside>
+
+                </div>
+            </div>
+        }
+        else
+        {
+        <UiDataGridPanel Title="أنواع المنتجات" Subtitle="@($"{FilteredItems.Count} نوع")">
+            <Body>
+                @if (_loading)
+                {
+                    <UiAlert Message="جاري تحميل أنواع المنتجات..." />
+                }
+                else
+                {
+                    <UiDataTable TItem="ProductTypeDto" Items="@FilteredItems" PageSize="12" Headers="@Headers" EmptyText="لا توجد أنواع منتجات مطابقة."
+                                 SidebarTypography="true" UniformCellTypography="true"
+                                 OnRowClick="@(x => OpenDetailsScreen(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
+                        <RowTemplate Context="item">
+                            <td><strong>@item.Code</strong></td>
+                            <td>@item.Name</td>
+                            <td><UiBadge Text="@(item.IsActive ? "نشط" : "غير نشط")" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
+                        </RowTemplate>
+                    </UiDataTable>
+                }
+            </Body>
+        </UiDataGridPanel>
+
+        }
+    </Content>
 </UiWorkspaceLayout>
 
 @if (_spreadsheetImportOpen)
@@ -90,6 +113,60 @@
 }
 
 @code {
+    // Each CRUD action has its own route. No editable form is mounted on the list screen.
+    [Microsoft.AspNetCore.Components.Inject]
+    private Microsoft.AspNetCore.Components.NavigationManager InventoryNavigation { get; set; } = default!;
+
+    [Microsoft.AspNetCore.Components.Parameter]
+    public string? Screen { get; set; }
+
+    [Microsoft.AspNetCore.Components.Parameter]
+    public Guid? RecordId { get; set; }
+
+    private const string InventoryListRoute = "/inventory/product-types";
+    private bool IsFormRoute => Screen is "new" or "edit" or "details";
+    private string? _appliedInventoryRoute;
+
+    private Task OpenCreateScreenAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _) {
+        InventoryNavigation.NavigateTo($"{InventoryListRoute}/new");
+        return Task.CompletedTask;
+    }
+
+    private Task OpenEditScreenAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _) {
+        if (_selectedId is { } id)
+            InventoryNavigation.NavigateTo($"{InventoryListRoute}/edit/{id:D}");
+        return Task.CompletedTask;
+    }
+
+    private void OpenDetailsScreen(Guid id) =>
+        InventoryNavigation.NavigateTo($"{InventoryListRoute}/details/{id:D}");
+
+    private Task BackToListAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _) {
+        InventoryNavigation.NavigateTo($"{InventoryListRoute}");
+        return Task.CompletedTask;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var key = $"{Screen}/{RecordId}";
+        if (_appliedInventoryRoute == key) return;
+        _appliedInventoryRoute = key;
+        if (Screen == "new")
+            await BeginCreateAsync(new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
+        else if (RecordId is { } id && Screen is ("details" or "edit"))
+        {
+            _mode = EditorMode.Empty;
+            Select(id);
+            if (Screen == "edit")
+                await BeginEditAsync(new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
+        }
+        else
+        {
+            _selectedId = null;
+            _mode = EditorMode.Empty;
+        }
+    }
+
     private enum EditorMode { Empty, View, Create, Edit }
     private const string CodeField = "كود نوع المنتج";
     private const string NameField = "الاسم";
@@ -203,7 +280,7 @@
             _mode = EditorMode.View;
             await LoadAsync();
             LoadSelected(saved.Id);
-            Snackbar.Success("تم حفظ نوع المنتج بنجاح.");
+            Snackbar.Success("تم حفظ نوع المنتج بنجاح."); InventoryNavigation.NavigateTo(InventoryListRoute);
         }
         catch (ApiClientException ex)
         {

@@ -1,10 +1,11 @@
+
 .ui-application-tabs {
     min-width: 0;
     height: 100%;
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    gap: 3px;
+    gap: 4px;
     overflow-x: auto;
     overflow-y: hidden;
     padding: 2px 7px 3px;
@@ -19,15 +20,15 @@
     display: flex;
     align-items: center;
     overflow: hidden;
-    border: 1px solid #e8e5ef;
-    border-radius: 5px;
-    background: #fff;
-    color: #61647f;
+    border: 1px solid var(--oas-color-card-border);
+    border-radius: 8px;
+    background: var(--oas-color-surface);
+    color: var(--oas-color-text-muted);
     box-shadow: 0 1px 2px rgba(34,31,64,.018);
-    transition: border-color .14s ease, background .14s ease, color .14s ease;
+    transition: border-color .14s ease, background .14s ease, color .14s ease, box-shadow .14s ease;
 }
-.ui-application-tab:hover { border-color: var(--oas-color-primary-border); background: #faf8ff; color: var(--oas-color-primary); }
-.ui-application-tab--active { border-color: #ded2ff; background: #f4efff; color: var(--oas-color-primary); }
+.ui-application-tab:hover { border-color: var(--oas-color-primary-border); background: var(--oas-color-primary-soft); color: var(--oas-color-primary-hover); }
+.ui-application-tab--active { border-color: var(--oas-color-primary-border); background: color-mix(in srgb, var(--oas-color-primary) 10%, var(--oas-color-surface)); color: var(--oas-color-primary-hover); box-shadow: inset 0 -2px 0 var(--oas-color-primary); }
 .ui-application-tab__select,
 .ui-application-tab__close {
     height: 100%;
@@ -40,11 +41,11 @@
     font-family: inherit;
     cursor: pointer;
 }
-.ui-application-tab__select { gap: 6px; padding: 0 9px; font-size: 10.5px; font-weight: 650; white-space: nowrap; }
+.ui-application-tab__select { gap: 6px; padding: 0 9px; font-size: 10.5px; font-weight: 700; white-space: nowrap; }
 .ui-application-tab__icon { width: 13px; font-size: 11px; text-align: center; }
 .ui-application-tab__title { max-width: 125px; overflow: hidden; text-overflow: ellipsis; }
 .ui-application-tab__close { width: 23px; margin-inline-start: -3px; font-size: 9px; opacity: .68; }
-.ui-application-tab__close:hover { background: rgba(90,45,214,.08); opacity: 1; }
+.ui-application-tab__close:hover { background: var(--oas-color-hover); opacity: 1; }
 .ui-application-tab__select:focus-visible,
 .ui-application-tab__close:focus-visible { outline: 2px solid var(--oas-color-primary); outline-offset: -2px; }
 @media (max-width: 700px) {
@@ -52,4 +53,8 @@
     .ui-application-tab__select { padding-inline: 7px; font-size: 10px; }
     .ui-application-tab__title { max-width: 95px; }
 }
-.ui-tab-context-menu{max-height:min(320px,60vh);overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;position:fixed;z-index:1900;width:178px;display:flex;flex-direction:column;gap:2px;padding:5px;border:1px solid #e3dfeb;border-radius:7px;background:#fff;box-shadow:0 10px 28px rgba(31,27,58,.16);direction:rtl}.ui-tab-context-menu button{min-height:31px;display:flex;align-items:center;gap:8px;padding:5px 8px;border:0;border-radius:5px;background:transparent;color:#34354a;font-family:inherit;font-size:10px;font-weight:650;text-align:right;cursor:pointer}.ui-tab-context-menu button:hover:not(:disabled){background:#f5f1ff;color:var(--oas-color-primary)}.ui-tab-context-menu button:disabled{opacity:.45;cursor:not-allowed}.ui-tab-context-menu i{width:14px;text-align:center;font-size:10px}
+.ui-tab-context-menu{max-height:min(320px,60vh);overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;position:fixed;z-index:1900;width:178px;display:flex;flex-direction:column;gap:2px;padding:5px;border:1px solid var(--oas-color-card-border);border-radius:10px;background:var(--oas-color-surface);box-shadow:0 16px 40px rgba(24,59,53,.14);direction:rtl}
+.ui-tab-context-menu button{min-height:31px;display:flex;align-items:center;gap:8px;padding:5px 8px;border:0;border-radius:7px;background:transparent;color:var(--oas-color-text);font-family:inherit;font-size:10px;font-weight:650;text-align:right;cursor:pointer}
+.ui-tab-context-menu button:hover:not(:disabled){background:var(--oas-color-primary-soft);color:var(--oas-color-primary-hover)}
+.ui-tab-context-menu button:disabled{opacity:.45;cursor:not-allowed}
+.ui-tab-context-menu i{width:14px;text-align:center;font-size:10px}

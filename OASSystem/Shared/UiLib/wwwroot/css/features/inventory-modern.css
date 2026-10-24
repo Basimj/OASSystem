@@ -1,0 +1,174 @@
+/* OAS inventory workspaces | isolated to inventory routes using the page marker.
+   No layout changes leak into Accounting, Sales or Purchasing. */
+.oas-shell:has(.oas-inventory-view) {
+  --inv-surface: var(--oas-color-surface);
+  --inv-border: var(--oas-color-border);
+  --inv-text: var(--oas-color-text);
+  --inv-muted: var(--oas-color-text-muted);
+  --inv-accent: var(--oas-color-primary);
+}
+body:has(.oas-inventory-view) .ui-workspace {
+  gap: 8px;
+  color: var(--inv-text);
+}
+body:has(.oas-inventory-view) .ui-workspace__actions,
+body:has(.oas-inventory-view) .ui-workspace__filters,
+body:has(.oas-inventory-view) .ui-workspace__tabs {
+  border: 1px solid var(--inv-border);
+  background: var(--inv-surface);
+  border-radius: 12px;
+  box-shadow: 0 3px 16px rgb(0 0 0 / 3%);
+}
+body:has(.oas-inventory-view) .ui-workspace__actions {padding: 6px 9px;}
+body:has(.oas-inventory-view) .ui-workspace__filters {padding: 6px 9px;}
+body:has(.oas-inventory-view) .ui-workspace__body {gap: 9px;}
+body:has(.oas-inventory-view) .ui-workspace__body--split {
+  grid-template-columns: minmax(0, 1.65fr) minmax(355px, 1fr);
+}
+body:has(.oas-inventory-view) .ui-data-grid-panel,
+body:has(.oas-inventory-view) .ui-card {
+  color: var(--inv-text);
+  background: var(--inv-surface);
+  border: 1px solid var(--inv-border);
+  border-radius: 12px;
+  box-shadow: 0 5px 18px rgb(0 0 0 / 4%);
+}
+body:has(.oas-inventory-view) .ui-data-grid-panel__toolbar {
+  min-height: 44px;
+  background: var(--inv-surface);
+  border-bottom: 1px solid var(--inv-border);
+  padding: 6px 12px;
+}
+body:has(.oas-inventory-view) .ui-data-grid-panel__title strong,
+body:has(.oas-inventory-view) .ui-card__header h2 {
+  font-size: clamp(12px, .89rem, 15px);
+  font-weight: 750;
+  color: var(--inv-text);
+  letter-spacing: 0;
+}
+body:has(.oas-inventory-view) .ui-data-grid-panel__title span,
+body:has(.oas-inventory-view) .ui-card__header p {
+  font-size: clamp(10px, .75rem, 12px);
+  color: var(--inv-muted);
+}
+body:has(.oas-inventory-view) .ui-data-grid-panel__header,
+body:has(.oas-inventory-view) .ui-data-grid-panel__footer {
+  background: var(--inv-surface);
+  border-color: var(--inv-border);
+}
+body:has(.oas-inventory-view) .ui-data-table__container {border: 0; border-radius: 0;}
+body:has(.oas-inventory-view) .ui-data-table {font-size: clamp(11px, .76rem, 13px);}
+body:has(.oas-inventory-view) .ui-data-table th {
+  background: var(--oas-color-subtle);
+  color: var(--inv-text);
+  font-size: clamp(11px, .75rem, 13px) !important;
+  font-weight: 700;
+  border-color: var(--inv-border);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+body:has(.oas-inventory-view) .ui-data-table th,
+body:has(.oas-inventory-view) .ui-data-table td {
+  padding: 9px 10px;
+  border-color: var(--inv-border);
+  line-height: 1.45 !important;
+}
+body:has(.oas-inventory-view) .ui-data-table td,
+body:has(.oas-inventory-view) .ui-data-table td strong,
+body:has(.oas-inventory-view) .ui-data-table td span {
+  font-size: clamp(11px, .76rem, 13px) !important;
+  color: var(--inv-text);
+}
+body:has(.oas-inventory-view) .ui-card__header {padding: 11px 13px 3px;}
+body:has(.oas-inventory-view) .ui-card__body {padding: 10px 13px 13px;}
+body:has(.oas-inventory-view) .ui-workspace__aside { scrollbar-width: thin; }
+body:has(.oas-inventory-view) .ui-workspace-actionbar {gap: 6px;}
+body:has(.oas-inventory-view) .ui-workspace-actionbar .ui-button {
+  border-radius: 9px;
+  min-height: 32px;
+}
+body:has(.oas-inventory-view) :is(.inventory-master-editor,.inventory-warehouses__editor,.inventory-products__editor,.inventory-transactions__editor,.stock-counts__editor) {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 10px;
+  align-items: start;
+}
+body:has(.oas-inventory-view) :is(.inventory-master-editor,.inventory-warehouses__editor,.inventory-products__editor,.inventory-transactions__editor,.stock-counts__editor) > * {min-width: 0;}
+body:has(.oas-inventory-view) :is(.inventory-products__specialized,.inventory-transactions__optional) {
+  margin: 6px 0 0;
+  padding: 0;
+  background: color-mix(in srgb,var(--inv-accent) 3%,var(--inv-surface));
+  border: 1px solid var(--inv-border);
+  border-radius: 11px;
+  overflow: hidden;
+}
+body:has(.oas-inventory-view) :is(.inventory-products__specialized,.inventory-transactions__optional) > summary {
+  cursor: pointer;
+  padding: 10px 12px;
+  color: var(--inv-text);
+  font-size: .84rem;
+  font-weight: 700;
+  list-style-position: inside;
+}
+body:has(.oas-inventory-view) .inventory-products__specialized > summary span {
+  font-size: .69rem;
+  font-weight: 400;
+  color: var(--inv-muted);
+  margin-inline-start: 5px;
+}
+body:has(.oas-inventory-view) .inventory-products__specialized[open] {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 10px;
+  padding: 0 10px 10px;
+}
+body:has(.oas-inventory-view) .inventory-products__specialized[open] summary {grid-column: 1/-1; margin: 0 -10px;}
+body:has(.oas-inventory-view) .inventory-products__specialized-grid {grid-column: 1/-1; grid-template-columns: repeat(3,minmax(0,1fr));}
+body:has(.oas-inventory-view) .inventory-transactions__optional[open] {padding-bottom: 10px;}
+body:has(.oas-inventory-view) .inventory-transactions__optional[open] > .ui-input-text {margin:0 10px;}
+body:has(.oas-inventory-view) .inventory-transactions__lines-title {grid-column:1/-1;margin-top:4px;}
+body:has(.oas-inventory-view) .inventory-transactions__line-editor {
+  grid-column: 1/-1;
+  border: 1px solid var(--inv-border);
+  border-radius: 10px;
+  background: var(--inv-surface);
+  padding: 8px;
+  grid-template-columns: minmax(120px,1.4fr) minmax(65px,.6fr) minmax(85px,.7fr) auto;
+}
+body:has(.oas-inventory-view) .inventory-transactions__line-editor select {min-width:0;}
+body:has(.oas-inventory-view) .stock-counts__line {
+  border-radius: 10px;
+  border-color: var(--inv-border);
+  padding: 8px;
+  background: var(--inv-surface);
+}
+body:has(.oas-inventory-view) .stock-counts__count-input {grid-template-columns: 1fr auto;}
+body:has(.oas-inventory-view) .inventory-products__aside {min-width:0;}
+@media (max-width: 1350px) {
+  body:has(.oas-inventory-view) .ui-workspace__body--split {
+    grid-template-columns: minmax(0,1.4fr) minmax(315px, 1fr);
+  }
+  body:has(.oas-inventory-view) :is(.inventory-transactions__editor,.inventory-products__editor) {grid-template-columns:1fr;}
+}
+@media (max-width: 1050px) {
+  body:has(.oas-inventory-view) .ui-workspace {height:auto; min-height: 100%; overflow:visible;}
+  body:has(.oas-inventory-view) .ui-workspace__body--split {grid-template-columns: minmax(0,1fr);}
+  body:has(.oas-inventory-view) .ui-workspace__main,
+  body:has(.oas-inventory-view) .ui-workspace__aside {height:auto;overflow:visible;}
+  body:has(.oas-inventory-view) .ui-data-grid-panel {min-height:270px;max-height:55vh;}
+  body:has(.oas-inventory-view) .ui-workspace__aside {max-height:none;}
+}
+@media (max-width: 580px) {
+  body:has(.oas-inventory-view) .ui-workspace {gap:6px;}
+  body:has(.oas-inventory-view) .ui-data-grid-panel {max-height:45vh;}
+  body:has(.oas-inventory-view) .ui-workspace__actions {padding:6px;}
+  body:has(.oas-inventory-view) :is(.inventory-master-editor,.inventory-warehouses__editor,.inventory-products__editor,.inventory-transactions__editor,.stock-counts__editor) {grid-template-columns:1fr;}
+  body:has(.oas-inventory-view) .inventory-products__specialized[open] {grid-template-columns:1fr;}
+  body:has(.oas-inventory-view) .inventory-products__specialized-grid {grid-template-columns:repeat(2,minmax(0,1fr));}
+  body:has(.oas-inventory-view) .inventory-transactions__line-editor {grid-template-columns:repeat(2,minmax(0,1fr));}
+  body:has(.oas-inventory-view) .inventory-transactions__line-editor > :first-child {grid-column:1/-1;}
+  body:has(.oas-inventory-view) .stock-counts__line {grid-template-columns:1fr 1fr;}
+  body:has(.oas-inventory-view) .stock-counts__line > div:nth-child(5),
+  body:has(.oas-inventory-view) .stock-counts__line > div:nth-child(6) {display:none;}
+}

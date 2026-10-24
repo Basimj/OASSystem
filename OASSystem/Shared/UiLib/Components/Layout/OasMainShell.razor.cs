@@ -38,6 +38,9 @@ public partial class OasMainShell : IAsyncDisposable
     private string _currentPath = "/workspace";
     private bool isSidebarCollapsed;
     private bool isMobileMenuOpen;
+    private bool _isDarkTheme;
+    private bool _themeChangeBusy;
+    private bool _themeToggleError;
     private bool _restored;
     private string? _contextGroupKey;
 
@@ -114,6 +117,40 @@ public partial class OasMainShell : IAsyncDisposable
         await InvokeAsync(StateHasChanged);
     }
 
+    private Task ApplyStoredThemeModeAsync(string mode)
+    {
+        _isDarkTheme = string.Equals(mode, "Dark", StringComparison.Ordinal);
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ToggleThemeModeAsync()
+    {
+        if (_themeChangeBusy) return;
+        _themeChangeBusy = true;
+        try
+        {
+            // Uses the same authenticated appearance endpoint as Settings > Appearance.
+            // JS changes the mode only after a successful server response.
+            var mode = await JS.InvokeAsync<string>("oasAppearanceInterop.toggleThemeMode");
+            _isDarkTheme = string.Equals(mode, "Dark", StringComparison.Ordinal);
+            _themeToggleError = false;
+        }
+        catch (JSException)
+        {
+            // Leave the last confirmed mode visible. A transient network issue
+            // must not create a false persisted preference.
+            _themeToggleError = true;
+        }
+        catch (InvalidOperationException)
+        {
+            _themeToggleError = true;
+        }
+        finally
+        {
+            _themeChangeBusy = false;
+        }
+    }
+
     private bool IsVisible(UiShellModuleItem module) => !module.AdministratorOnly || IsAdministrator;
 
     private IReadOnlyList<UiShellModuleItem> GetVisibleGroupModules(UiShellNavigationGroup group)
@@ -139,12 +176,16 @@ public partial class OasMainShell : IAsyncDisposable
         if (!IsVisible(module)) return;
         _topHeader?.CloseAccountMenu();
         var tab = EnsureTab(module);
+        // Sidebar/module-search navigation should open the module's list page when configured,
+        // not an older /new, /edit or /details URL retained by the tab.
+        var destination = module.OpenBaseRouteFromMenu ? module.Href : tab.LastHref;
+        tab.LastHref = destination;
         _activeTabId = tab.Id;
-        _currentPath = tab.LastHref;
+        _currentPath = destination;
         isMobileMenuOpen = false;
         _contextGroupKey = null;
         await PersistStateAsync();
-        Navigation.NavigateTo(tab.LastHref);
+        Navigation.NavigateTo(destination);
     }
 
     private async Task SelectApplicationTabAsync(Guid tabId)
