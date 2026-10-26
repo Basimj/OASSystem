@@ -12,6 +12,10 @@
 @inject IUiSnackbarService Snackbar
 @inject IApiFeedbackService ApiFeedback
 
+@* One central account selection for all new customers, next to other
+   accounting settings. It is saved with the existing settings Save action. *@
+<CustomerReceivablesSettingsField @ref="_receivablesField" />
+
 @* A cash customer is selected from Customers; its chart-of-accounts posting
    account is displayed automatically, never picked independently. *@
 <UiLookup Label="العميل النقدي الافتراضي"
@@ -30,6 +34,7 @@
                            Value="@_accountPreview" />
 
 @code {
+    private CustomerReceivablesSettingsField? _receivablesField;
     private bool _loaded;
     private bool _busy;
     private string _customerId = string.Empty;
@@ -37,7 +42,8 @@
     private UiLookupItem? _selected;
     private readonly Dictionary<string, (UiLookupItem Item, string Account)> _options = new();
 
-    public bool IsLoaded => _loaded;
+    // The existing settings page checks this before saving any sub-settings.
+    public bool IsLoaded => _loaded && (_receivablesField?.IsLoaded ?? false);
 
     // A default anonymous customer must not be a real person's account, even if
     // the account permits immediate payment. WALKIN-* covers technical customers
@@ -77,7 +83,6 @@
         _selected = null;
         _customerId = string.Empty;
         _accountPreview = "— اختر العميل النقدي العام أولًا —";
-
         if (settings.CustomerId is not { } id) return;
 
         if (!IsGenericCashCustomer(settings.CustomerCode, settings.CustomerName))
@@ -104,12 +109,9 @@
     {
         try
         {
-            // Blank searches should locate generic cash customers, rather than
-            // fetching the first page of every unrelated customer in the ERP.
             var normalized = string.IsNullOrWhiteSpace(search) ? "نقدي" : search.Trim();
             var results = new List<UiLookupItem>();
             var pageNumber = 1;
-
             while (results.Count < 80)
             {
                 var page = await Accounting.GetCustomersPageAsync(new PageRequest
@@ -133,7 +135,6 @@
                 if (!page.HasNextPage) break;
                 pageNumber++;
             }
-
             return results;
         }
         catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); return []; }
@@ -145,7 +146,6 @@
         _customerId = value ?? string.Empty;
         _selected = null;
         _accountPreview = "— اختر العميل النقدي العام أولًا —";
-
         if (string.IsNullOrWhiteSpace(_customerId)) return;
 
         if (_options.TryGetValue(_customerId, out var cached))
@@ -179,10 +179,10 @@
             "اختر عميلًا باسم «عميل نقدي عام» يكون فعالًا وغير آجل وله حساب ذمم مرتبط.");
     }
 
-    // Called by the existing accounting settings Save button.
+    // Called by the accounting settings Save button.
     public async Task<bool> SaveAsync()
     {
-        if (!_loaded || _busy) return false;
+        if (!IsLoaded || _busy) return false;
         _busy = true;
         try
         {
@@ -194,6 +194,13 @@
                 new UpdateWalkInCashCustomerSettingsRequest(selectedId));
             if (saved is null) return false;
             ApplyFromServer(saved);
+            // Preserve the existing walk-in setting, then save the new parent.
+            // The server treats the configured account as authoritative for new customers.
+            if (_receivablesField is null || !await _receivablesField.SaveAsync())
+            {
+                Snackbar.Warning("تم حفظ إعداد العميل النقدي، لكن تعذر حفظ حساب ذمم العملاء الرئيسي.");
+                return false;
+            }
             return true;
         }
         catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }

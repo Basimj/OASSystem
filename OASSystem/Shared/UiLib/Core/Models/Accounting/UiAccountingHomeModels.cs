@@ -5,7 +5,8 @@ public sealed record UiAccountingHomeMetric(
     string Value,
     string IconCssClass,
     string Accent = "primary",
-    string? Meta = null);
+    string? Meta = null,
+    string? Href = null);
 
 public sealed record UiAccountingHomeTile(
     string Title,

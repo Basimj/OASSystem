@@ -5,10 +5,15 @@
 
 <PageTitle>القيود المحاسبية | OAS</PageTitle>
 
-<AccountingWorkspaceHost Section="AccountingEntityType.Journals" InitialRecordId="JournalIdFromQuery" />
-
+<AccountingWorkspaceHost Section="AccountingEntityType.Journals"
+                         InitialRecordId="JournalIdFromQuery"
+                         OpenNewJournalFromDashboard="OpenNewFromQuery" />
 
 @code {
     [Parameter, SupplyParameterFromQuery(Name = "journalId")]
     public Guid? JournalIdFromQuery { get; set; }
+
+    // The accounting dashboard's primary action opens the editor, not just the list.
+    [Parameter, SupplyParameterFromQuery(Name = "new")]
+    public bool OpenNewFromQuery { get; set; }
 }

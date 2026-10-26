@@ -5,50 +5,43 @@
 
 <PageTitle>العملاء | المحاسبة | OAS</PageTitle>
 
-<div class="customer-ar-shortcuts" dir="rtl">
-    <strong>العملاء — القائمة والإدارة</strong>
-    <span aria-hidden="true">|</span>
-    <a href="/accounting/customer-ar">أرصدة العملاء وأعمار الديون</a>
-    @if (ActiveEditorTab?.EntityId is Guid customerId)
-    {
-        <span> | </span>
-        <a href="@($"/accounting/customers/{customerId:D}/account")">المركز المالي للعميل الحالي</a>
-    }
-</div>
-
-<UiAccountingPartyWorkspace IsSupplier="false"
-                            Busy="@_busy"
-                            EditorOpen="@EditorOpen"
-                            IsNew="@IsNew"
-                            Form="@ActiveForm"
-                            Items="@_items"
-                            WorkspaceTabs="@WorkspaceTabs"
-                            OnSelectTab="SelectTabAsync"
-                            OnCloseTab="CloseTabAsync"
-                            OnCloseOtherTabs="CloseOtherTabsAsync"
-                            OnCloseAllTabs="CloseAllTabsAsync"
-                            OnFormChanged="MarkActiveTabDirty"
-                            ParentLookupItem="@ParentAccountLookupItem"
-                            ParentSearchAsync="SearchParentAccountsAsync"
-                            Search="@_search"
-                            Filter="@_filter"
-                            PageNumber="@_pageNumber"
-                            TotalPages="@_totalPages"
-                            TotalCount="@_totalCount"
-                            SearchChanged="SetSearch"
-                            FilterChanged="FilterChangedAsync"
-                            OnSearch="SearchAsync"
-                            OnNew="NewAsync"
-                            OnRefresh="LoadAsync"
-                            OnOpen="OpenAsync"
-                            OnSave="SaveAsync"
-                            OnCancel="CancelAsync"
-                            OnToggleStatus="ToggleStatusAsync"
-                            OnPreviousPage="PreviousPageAsync"
-                            OnNextPage="NextPageAsync"
-                            OnImport="OpenImport"
-                            OnTemplate="DownloadTemplateAsync"
-                            OnExport="ExportAsync" />
+@* Keep the list and editor as separate full-width workspaces. This avoids nesting
+   the customer editor within the legacy accounting workspace and duplicated tabs. *@
+@if (!EditorOpen)
+{
+    <UiCustomerListDashboard Busy="@_busy"
+                             Items="@_items"
+                             Search="@_search"
+                             Filter="@_filter"
+                             PageNumber="@_pageNumber"
+                             TotalPages="@_totalPages"
+                             TotalCount="@_totalCount"
+                             SearchChanged="SetSearch"
+                             OnSearch="SearchAsync"
+                             FilterChanged="FilterChangedAsync"
+                             OnNew="NewCustomerWithSuggestedAccountAsync"
+                             OnRefresh="LoadAsync"
+                             OnOpen="OpenAsync"
+                             OnEdit="OpenCustomerForEditingAsync"
+                             OnPreviousPage="PreviousPageAsync"
+                             OnNextPage="NextPageAsync"
+                             OnImport="OpenImport"
+                             OnTemplate="DownloadTemplateAsync"
+                             OnExport="ExportAsync" />
+}
+else
+{
+    <UiCustomerProfileWorkspace @key="ActiveEditorTab!.TabId"
+                                Busy="@(_busy || _resolvingCustomerParent)"
+                                IsNew="@IsNew"
+                                StartInEditMode="@(_startInEditModeFor.HasValue && _startInEditModeFor == ActiveEditorTab?.EntityId)"
+                                Form="@ActiveForm"
+                                OnFormChanged="MarkActiveTabDirty"
+                                OnBack="BackToCustomerListAsync"
+                                OnSave="SaveCustomerWithAutoParentAsync"
+                                OnCancel="CancelCustomerEditAsync"
+                                OnToggleStatus="ToggleCustomerStatusWithConfirmationAsync" />
+}
 
 @if (_importOpen)
 {
@@ -61,5 +54,3 @@
                          OnClear="ClearImport"
                          OnClose="CloseImport" />
 }
-
-

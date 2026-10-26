@@ -12,152 +12,183 @@
 @inject Microsoft.JSInterop.IJSRuntime JS
 @inject NavigationManager Navigation
 
-<PageTitle>كشف حساب العميل | OAS</PageTitle>
+<PageTitle>ملف العميل المالي | OAS</PageTitle>
 
-<UiWorkspaceLayout ShowAside="false" ShowFilters="false">
-    <Actions>
-        <UiWorkspaceActionBar>
-            <UiButton Text="العودة إلى قائمة العملاء" IconCssClass="fa-solid fa-users" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="BackToCustomersAsync" />
-            <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Loading="@_busy" Size="ControlSize.Small" OnClick="LoadAsync" />
-            <UiButton Text="تصدير كشف الحساب CSV" Variant="ButtonVariant.Secondary" Loading="@_busy" Size="ControlSize.Small" OnClick="ExportCsvAsync" />
-            <a href="@($"/sales/customer-credits/{CustomerId:D}")">تطبيق أو استرداد رصيد المرتجعات</a>
-            <UiButton Text="طباعة" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(_model is null)" OnClick="PrintAsync" />
-        </UiWorkspaceActionBar>
-    </Actions>
-    <Content>
-        <UiStackLayout Gap="StackGap.Small">
-            <UiCard Title="المركز المالي للعميل" Subtitle="الأرصدة من القيود المحاسبية المرحلة، والمبالغ بالعملة الأساسية.">
-                <UiGrid Columns="2">
-                    <UiInputDate Label="من تاريخ" Value="@_from" ValueChanged="OnFromChanged" Size="ControlSize.Small" />
-                    <UiInputDate Label="إلى تاريخ / تاريخ الأعمار" Value="@_to" ValueChanged="OnToChanged" Size="ControlSize.Small" />
-                </UiGrid>
-                @if (_model is not null)
-                {
-                    <UiGrid Columns="2">
-                        <UiKeyValue Label="العميل" Value="@($"{_model.CustomerCode} - {_model.CustomerName}")" />
-                        <UiKeyValue Label="العملة الأساسية" Value="@_model.Statement.BaseCurrencyCode" />
-                        <UiKeyValue Label="الرصيد الافتتاحي (مدين + / دائن -)" Value="@_model.Statement.OpeningBase.ToString("N2")" />
-                        <UiKeyValue Label="الرصيد الختامي" Value="@_model.Statement.ClosingBase.ToString("N2")" />
-                        <UiKeyValue Label="المستحق على الفواتير" Value="@_model.Aging.TotalOutstandingBase.ToString("N2")" />
-                        <UiKeyValue Label="رصيد المرتجعات غير المطبق" Value="@_model.UnappliedReturnCreditsBase.ToString("N2")" />
-                        <UiKeyValue Label="المقبوضات غير المخصصة" Value="@_model.UnappliedReceiptsBase.ToString("N2")" />
-                        <UiKeyValue Label="العربون (التزام مستقل)" Value="@_model.CustomerAdvancesLiabilityBase.ToString("N2")" />
-                    </UiGrid>
-                }
-            </UiCard>
+<div class="customer-workspace-page" dir="rtl">
+    <header class="cw-page-header">
+        <div class="cw-heading">
+            <div class="cw-breadcrumb">المحاسبة والمالية <span>/</span> العملاء <span>/</span> ملف العميل المالي</div>
+            <h1>ملف العميل المالي</h1>
+            <p>كشف الحساب، المستحقات، أعمار الديون والمستندات المرتبطة بالعميل في مكان واحد.</p>
+        </div>
+        <div class="cw-header-actions">
+            <button type="button" class="cw-button cw-button--quiet" @onclick="BackToCustomersAsync"><span aria-hidden="true">←</span> قائمة العملاء</button>
+            <button type="button" class="cw-button cw-button--quiet" @onclick="LoadAsync" disabled="@_busy">تحديث</button>
+            <button type="button" class="cw-button cw-button--secondary" @onclick="ExportCsvAsync" disabled="@(_busy || _model is null)">تصدير الكشف</button>
+            <a class="cw-button cw-button--primary" href="@($"/sales/customer-credits/{CustomerId:D}")">تطبيق المرتجعات</a>
+            <button type="button" class="cw-button cw-button--quiet" @onclick="PrintAsync" disabled="@(_model is null)">طباعة</button>
+        </div>
+    </header>
 
-            @if (_busy && _model is null)
-            {
-                <UiAlert Message="جارٍ تحميل حساب العميل..." Tone="AlertTone.Info" />
-            }
-            else if (_model is not null)
-            {
-                <UiCard Title="كشف الحساب من الأستاذ العام" Subtitle="الأرقام مدين/دائن بالعملة الأساسية. لا تُحتسب أسطر الصندوق والبنك مرتين.">
-                    <div class="ar-report-scroll">
-                        <table class="ar-report-table">
-                            <thead><tr><th>تاريخ الترحيل</th><th>القيد</th><th>المرجع</th><th>البيان</th><th>مدين</th><th>دائن</th><th>الرصيد</th></tr></thead>
-                            <tbody>
-                                @foreach (var row in _model.Statement.Movements)
-                                {
-                                    <tr>
-                                        <td>@row.PostingDate.ToString("yyyy-MM-dd")</td>
-                                        <td>@row.JournalNumber</td>
-                                        <td>@(row.SourceDocumentType ?? "تسوية")</td>
-                                        <td>@row.Description</td>
-                                        <td class="num">@row.DebitBase.ToString("N2")</td>
-                                        <td class="num">@row.CreditBase.ToString("N2")</td>
-                                        <td class="num">@row.BalanceBase.ToString("N2")</td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                    @if (_model.Statement.Movements.Count == 0)
-                    {
-                        <UiAlert Message="لا توجد حركات في هذه الفترة." Tone="AlertTone.Info" />
-                    }
-                    <UiGrid Columns="2">
-                        <UiKeyValue Label="إجمالي المدين للفترة" Value="@_model.Statement.PeriodDebitBase.ToString("N2")" />
-                        <UiKeyValue Label="إجمالي الدائن للفترة" Value="@_model.Statement.PeriodCreditBase.ToString("N2")" />
-                    </UiGrid>
-                    <UiWorkspaceActionBar>
-                        <UiButton Text="السابق" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(_page <= 1)" OnClick="PreviousAsync" />
-                        <UiButton Text="التالي" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@((long)_page * 50 >= _model.Statement.TotalCount)" OnClick="NextAsync" />
-                    </UiWorkspaceActionBar>
-                </UiCard>
-                <UiCard Title="أعمار ديون العميل" Subtitle="تاريخ الاستحقاق المحفوظ تاريخيًا؛ المقبوضات والمرتجعات اللاحقة لتاريخ التقرير مستبعدة.">
-                    <UiGrid Columns="2">
-                        <UiKeyValue Label="غير مستحق" Value="@_model.Aging.NotDueBase.ToString("N2")" />
-                        <UiKeyValue Label="0–30 يومًا" Value="@_model.Aging.Days0To30Base.ToString("N2")" />
-                        <UiKeyValue Label="31–60 يومًا" Value="@_model.Aging.Days31To60Base.ToString("N2")" />
-                        <UiKeyValue Label="61–90 يومًا" Value="@_model.Aging.Days61To90Base.ToString("N2")" />
-                        <UiKeyValue Label="أكثر من 90 يومًا" Value="@_model.Aging.Over90Base.ToString("N2")" />
-                        <UiKeyValue Label="استحقاق غير معروف / بحاجة مراجعة" Value="@_model.Aging.UnknownBase.ToString("N2")" />
-                    </UiGrid>
-                    <div class="ar-report-scroll">
-                        <table class="ar-report-table">
-                            <thead><tr><th>الفاتورة</th><th>تاريخ الاستحقاق</th><th>الفئة</th><th>المبلغ الأصلي</th><th>المدفوع</th><th>المرتجع</th><th>رصيد مطبق</th><th>المتبقي</th></tr></thead>
-                            <tbody>
-                                @foreach (var row in _model.Aging.Invoices)
-                                {
-                                    <tr>
-                                        <td>@row.InvoiceNumber</td>
-                                        <td>@(row.DueDate?.ToString("yyyy-MM-dd") ?? "غير محدد")</td>
-                                        <td>@ArabicBucket(row.Bucket)</td>
-                                        <td class="num">@row.OriginalBase.ToString("N2")</td>
-                                        <td class="num">@row.PaymentBase.ToString("N2")</td>
-                                        <td class="num">@row.ReturnBase.ToString("N2")</td>
-                                        <td class="num">@row.CreditAppliedBase.ToString("N2")</td>
-                                        <td class="num">@row.OutstandingBase.ToString("N2")</td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                </UiCard>
-                <UiCard Title="سجل مستندات العميل" Subtitle="الفواتير والمرتجعات والقبض والعربون واستخدام الرصيد الدائن، دون خلطها في الرصيد الدفتري.">
-                    <UiWorkspaceActionBar>
-                        <UiButton Text="الفواتير" Size="ControlSize.Small" Variant="ButtonVariant.Secondary" OnClick="@(() => ChangeDocumentKindAsync("invoices"))" />
-                        <UiButton Text="المرتجعات" Size="ControlSize.Small" Variant="ButtonVariant.Secondary" OnClick="@(() => ChangeDocumentKindAsync("returns"))" />
-                        <UiButton Text="سندات القبض" Size="ControlSize.Small" Variant="ButtonVariant.Secondary" OnClick="@(() => ChangeDocumentKindAsync("receipts"))" />
-                        <UiButton Text="العربون" Size="ControlSize.Small" Variant="ButtonVariant.Secondary" OnClick="@(() => ChangeDocumentKindAsync("advances"))" />
-                        <UiButton Text="تطبيق الرصيد / الاسترداد" Size="ControlSize.Small" Variant="ButtonVariant.Secondary" OnClick="@(() => ChangeDocumentKindAsync("credits"))" />
-                    </UiWorkspaceActionBar>
-                    @if (_documents is not null)
-                    {
-                        <div class="ar-report-scroll">
-                            <table class="ar-report-table">
-                                <thead><tr><th>رقم المستند</th><th>النوع</th><th>التاريخ</th><th>المبلغ الأساسي</th><th>العملة</th><th>الحالة</th><th>القيد</th></tr></thead>
-                                <tbody>
-                                    @foreach (var doc in _documents.Rows)
-                                    {
-                                        <tr>
-                                            <td>@doc.Number</td><td>@doc.Kind</td>
-                                            <td>@doc.PostingDate.ToString("yyyy-MM-dd")</td>
-                                            <td class="num">@doc.BaseAmount.ToString("N2")</td>
-                                            <td>@doc.Currency</td><td>@doc.Status</td>
-                                            <td>@(doc.JournalEntryId?.ToString("D") ?? "—")</td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
-                        @if (_documents.Rows.Count == 0)
+    @if (_busy && _model is null)
+    {
+        <div class="cw-state-card"><span class="cw-spinner" aria-hidden="true"></span><div><strong>جارٍ تحميل ملف العميل</strong><p>يتم جلب الأرصدة والحركات والمستندات من النظام.</p></div></div>
+    }
+    else if (_model is not null)
+    {
+        <section class="cw-customer-banner">
+            <div class="cw-customer-avatar" aria-hidden="true">@(_model.CustomerName.Length > 0 ? _model.CustomerName[..1] : "ع")</div>
+            <div class="cw-customer-main">
+                <span class="cw-eyebrow">بيانات العميل</span>
+                <h2>@_model.CustomerName</h2>
+                <div class="cw-customer-meta">
+                    <span>رقم العميل: <strong>@_model.CustomerCode</strong></span>
+                    <span>الحساب: <strong>@_model.Statement.AccountCode</strong></span>
+                    <span>العملة: <strong>@_model.Statement.BaseCurrencyCode</strong></span>
+                </div>
+            </div>
+            <div class="cw-closing-balance">
+                <span>الرصيد الختامي</span>
+                <strong>@_model.Statement.ClosingBase.ToString("N2")</strong>
+                <small>@_model.Statement.BaseCurrencyCode · موجب = مدين، سالب = دائن</small>
+            </div>
+        </section>
+
+        <section class="cw-filter-panel" aria-label="تحديد فترة التقرير">
+            <div class="cw-date-field"><UiInputDate Label="من تاريخ" Value="@_from" ValueChanged="OnFromChanged" Size="ControlSize.Small" /></div>
+            <div class="cw-date-field"><UiInputDate Label="إلى تاريخ" Value="@_to" ValueChanged="OnToChanged" Size="ControlSize.Small" /></div>
+            <button type="button" class="cw-button cw-button--primary cw-show-report" @onclick="LoadAsync" disabled="@_busy">عرض التقرير</button>
+            @if (_busy) { <span class="cw-loading-note">جارٍ التحديث...</span> }
+        </section>
+
+        <nav class="cw-section-nav" aria-label="أقسام ملف العميل">
+            <a href="#cw-financial">المركز المالي</a>
+            <a href="#cw-statement">كشف الحساب</a>
+            <a href="#cw-aging">أعمار الديون</a>
+            <a href="#cw-documents">مستندات العميل</a>
+        </nav>
+
+        <section id="cw-financial" class="cw-panel">
+            <div class="cw-panel-heading"><div><h2>المركز المالي للعميل</h2><p>ملخص الحركة والأرصدة حتى تاريخ التقرير.</p></div><span class="cw-panel-icon" aria-hidden="true">▤</span></div>
+            <div class="cw-metric-grid">
+                <article class="cw-metric"><span>الرصيد الافتتاحي</span><strong>@_model.Statement.OpeningBase.ToString("N2")</strong><small>@_model.Statement.BaseCurrencyCode</small></article>
+                <article class="cw-metric"><span>إجمالي المدين</span><strong>@_model.Statement.PeriodDebitBase.ToString("N2")</strong><small>حركة الفترة</small></article>
+                <article class="cw-metric"><span>إجمالي الدائن</span><strong>@_model.Statement.PeriodCreditBase.ToString("N2")</strong><small>حركة الفترة</small></article>
+                <article class="cw-metric cw-metric--accent"><span>المستحق على الفواتير</span><strong>@_model.Aging.TotalOutstandingBase.ToString("N2")</strong><small>@_model.Statement.BaseCurrencyCode</small></article>
+                <article class="cw-metric"><span>مرتجعات غير مطبقة</span><strong>@_model.UnappliedReturnCreditsBase.ToString("N2")</strong><small>رصيد دائن متاح للمراجعة</small></article>
+                <article class="cw-metric"><span>مقبوضات غير مخصصة</span><strong>@_model.UnappliedReceiptsBase.ToString("N2")</strong><small>تحتاج إلى تخصيص</small></article>
+                <article class="cw-metric"><span>عربون العميل</span><strong>@_model.CustomerAdvancesLiabilityBase.ToString("N2")</strong><small>التزام مستقل عن الذمم</small></article>
+            </div>
+        </section>
+
+        <section id="cw-statement" class="cw-panel">
+            <div class="cw-panel-heading"><div><h2>كشف حساب العميل</h2><p>الحركات المرحلة من الأستاذ العام، مع رصيد متراكم بعد كل حركة.</p></div><span class="cw-record-count">@_model.Statement.TotalCount حركة</span></div>
+            <div class="cw-table-wrap">
+                <table class="cw-table">
+                    <thead><tr><th>تاريخ الترحيل</th><th>رقم القيد</th><th>نوع المستند</th><th>البيان</th><th>مدين</th><th>دائن</th><th>الرصيد</th></tr></thead>
+                    <tbody>
+                        @foreach (var row in _model.Statement.Movements)
                         {
-                            <UiAlert Tone="AlertTone.Info" Message="لا توجد مستندات لهذا النوع في الفترة المحددة." />
+                            <tr>
+                                <td data-label="تاريخ الترحيل">@row.PostingDate.ToString("yyyy-MM-dd")</td>
+                                <td data-label="رقم القيد"><span class="cw-mono">@row.JournalNumber</span></td>
+                                <td data-label="نوع المستند">@(row.SourceDocumentType ?? "تسوية")</td>
+                                <td data-label="البيان" class="cw-description">@row.Description</td>
+                                <td data-label="مدين" class="cw-number">@row.DebitBase.ToString("N2")</td>
+                                <td data-label="دائن" class="cw-number">@row.CreditBase.ToString("N2")</td>
+                                <td data-label="الرصيد" class="cw-number cw-number--strong">@row.BalanceBase.ToString("N2")</td>
+                            </tr>
                         }
-                        <UiWorkspaceActionBar>
-                            <UiButton Text="السابق" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(_docPage<=1)" OnClick="DocumentPreviousAsync" />
-                            <UiButton Text="التالي" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@((long)_docPage*50>=_documents.TotalCount)" OnClick="DocumentNextAsync" />
-                        </UiWorkspaceActionBar>
-                    }
-                </UiCard>
+                    </tbody>
+                </table>
+            </div>
+            @if (_model.Statement.Movements.Count == 0) { <div class="cw-empty-state">لا توجد حركات في الفترة المحددة. جرّب تغيير تاريخ البداية أو النهاية.</div> }
+            <div class="cw-table-summary">
+                <div><span>إجمالي المدين</span><strong>@_model.Statement.PeriodDebitBase.ToString("N2")</strong></div>
+                <div><span>إجمالي الدائن</span><strong>@_model.Statement.PeriodCreditBase.ToString("N2")</strong></div>
+                <div><span>الرصيد الختامي</span><strong>@_model.Statement.ClosingBase.ToString("N2")</strong></div>
+            </div>
+            <div class="cw-pagination">
+                <span>الصفحة @_page · إجمالي الحركات @_model.Statement.TotalCount</span>
+                <div><button type="button" class="cw-button cw-button--quiet" disabled="@(_page <= 1 || _busy)" @onclick="PreviousAsync">السابق</button><button type="button" class="cw-button cw-button--quiet" disabled="@((long)_page * 50 >= _model.Statement.TotalCount || _busy)" @onclick="NextAsync">التالي</button></div>
+            </div>
+        </section>
+
+        <section id="cw-aging" class="cw-panel">
+            <div class="cw-panel-heading"><div><h2>أعمار ديون العميل</h2><p>تصنيف المبالغ المتبقية حسب تاريخ الاستحقاق المحفوظ للفواتير.</p></div><span class="cw-record-count">@_model.Aging.TotalCount فاتورة</span></div>
+            <div class="cw-aging-grid">
+                <article><span>غير مستحق</span><strong>@_model.Aging.NotDueBase.ToString("N2")</strong></article>
+                <article><span>0–30 يومًا</span><strong>@_model.Aging.Days0To30Base.ToString("N2")</strong></article>
+                <article><span>31–60 يومًا</span><strong>@_model.Aging.Days31To60Base.ToString("N2")</strong></article>
+                <article><span>61–90 يومًا</span><strong>@_model.Aging.Days61To90Base.ToString("N2")</strong></article>
+                <article class="cw-aging-danger"><span>أكثر من 90 يومًا</span><strong>@_model.Aging.Over90Base.ToString("N2")</strong></article>
+                <article><span>استحقاق غير محدد</span><strong>@_model.Aging.UnknownBase.ToString("N2")</strong></article>
+            </div>
+            <div class="cw-table-wrap">
+                <table class="cw-table cw-table--wide">
+                    <thead><tr><th>الفاتورة</th><th>تاريخ الفاتورة</th><th>تاريخ الاستحقاق</th><th>العمر</th><th>الأصل</th><th>المدفوع</th><th>المرتجع</th><th>الرصيد المطبق</th><th>المتبقي</th></tr></thead>
+                    <tbody>
+                        @foreach (var row in _model.Aging.Invoices)
+                        {
+                            <tr>
+                                <td data-label="الفاتورة"><span class="cw-mono">@row.InvoiceNumber</span></td>
+                                <td data-label="تاريخ الفاتورة">@row.InvoiceDate.ToString("yyyy-MM-dd")</td>
+                                <td data-label="تاريخ الاستحقاق">@(row.DueDate?.ToString("yyyy-MM-dd") ?? "غير محدد")</td>
+                                <td data-label="العمر"><span class="cw-status">@ArabicBucket(row.Bucket)</span></td>
+                                <td data-label="الأصل" class="cw-number">@row.OriginalBase.ToString("N2")</td>
+                                <td data-label="المدفوع" class="cw-number">@row.PaymentBase.ToString("N2")</td>
+                                <td data-label="المرتجع" class="cw-number">@row.ReturnBase.ToString("N2")</td>
+                                <td data-label="الرصيد المطبق" class="cw-number">@row.CreditAppliedBase.ToString("N2")</td>
+                                <td data-label="المتبقي" class="cw-number cw-number--strong">@row.OutstandingBase.ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            @if (_model.Aging.Invoices.Count == 0) { <div class="cw-empty-state">لا توجد فواتير مفتوحة ضمن أعمار الديون في هذه الفترة.</div> }
+        </section>
+
+        <section id="cw-documents" class="cw-panel">
+            <div class="cw-panel-heading"><div><h2>مستندات العميل</h2><p>الفواتير والمرتجعات وسندات القبض والعربون وتسويات الرصيد الدائن.</p></div></div>
+            <div class="cw-document-tabs" role="group" aria-label="نوع المستند">
+                <button type="button" class="@(_docKind == "invoices" ? "is-active" : "")" aria-pressed="@(_docKind == "invoices")" @onclick='() => ChangeDocumentKindAsync("invoices")'>الفواتير</button>
+                <button type="button" class="@(_docKind == "returns" ? "is-active" : "")" aria-pressed="@(_docKind == "returns")" @onclick='() => ChangeDocumentKindAsync("returns")'>المرتجعات</button>
+                <button type="button" class="@(_docKind == "receipts" ? "is-active" : "")" aria-pressed="@(_docKind == "receipts")" @onclick='() => ChangeDocumentKindAsync("receipts")'>سندات القبض</button>
+                <button type="button" class="@(_docKind == "advances" ? "is-active" : "")" aria-pressed="@(_docKind == "advances")" @onclick='() => ChangeDocumentKindAsync("advances")'>العربون</button>
+                <button type="button" class="@(_docKind == "credits" ? "is-active" : "")" aria-pressed="@(_docKind == "credits")" @onclick='() => ChangeDocumentKindAsync("credits")'>تطبيق الرصيد / الاسترداد</button>
+            </div>
+            @if (_documents is not null)
+            {
+                <div class="cw-table-wrap">
+                    <table class="cw-table">
+                        <thead><tr><th>رقم المستند</th><th>النوع</th><th>التاريخ</th><th>المبلغ الأساسي</th><th>العملة</th><th>الحالة</th><th>القيد</th></tr></thead>
+                        <tbody>
+                            @foreach (var doc in _documents.Rows)
+                            {
+                                <tr>
+                                    <td data-label="رقم المستند"><span class="cw-mono">@doc.Number</span></td><td data-label="النوع">@doc.Kind</td>
+                                    <td data-label="التاريخ">@doc.PostingDate.ToString("yyyy-MM-dd")</td>
+                                    <td data-label="المبلغ الأساسي" class="cw-number">@doc.BaseAmount.ToString("N2")</td>
+                                    <td data-label="العملة">@doc.Currency</td><td data-label="الحالة"><span class="cw-status">@doc.Status</span></td>
+                                    <td data-label="القيد"><span class="cw-mono">@(doc.JournalEntryId?.ToString("D") ?? "—")</span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                @if (_documents.Rows.Count == 0) { <div class="cw-empty-state">لا توجد مستندات من هذا النوع حتى تاريخ التقرير.</div> }
+                <div class="cw-pagination">
+                    <span>صفحة @_docPage · إجمالي المستندات @_documents.TotalCount</span>
+                    <div><button type="button" class="cw-button cw-button--quiet" disabled="@(_docPage <= 1 || _busy)" @onclick="DocumentPreviousAsync">السابق</button><button type="button" class="cw-button cw-button--quiet" disabled="@((long)_docPage * 50 >= _documents.TotalCount || _busy)" @onclick="DocumentNextAsync">التالي</button></div>
+                </div>
             }
-        </UiStackLayout>
-    </Content>
-</UiWorkspaceLayout>
-
-
+        </section>
+    }
+    else if (!_busy)
+    {
+        <div class="cw-empty-state">تعذر تحميل ملف العميل. حاول التحديث أو ارجع إلى قائمة العملاء.</div>
+    }
+</div>
 
 @code {
     [Parameter] public Guid CustomerId { get; set; }

@@ -1,0 +1,113 @@
+@namespace OAS.Client.Accounting.Pages
+@using OAS.Contracts.Accounting.Settings
+@using OAS.Contracts.Accounting.Customers
+@using OAS.Client.Services.Http
+@using OAS.Client.Common.Feedback.Services
+@using OAS.UiLib.Core.Models
+@using OAS.UiLib.Services.Feedback
+@inject OasApiClient Api
+@inject IApiFeedbackService ApiFeedback
+@inject IUiSnackbarService Snackbar
+
+<UiLookup Label="الحساب الرئيسي لذمم العملاء"
+          Value="@_parentId"
+          ValueChanged="OnParentChangedAsync"
+          SelectedItem="@_selected"
+          SearchAsync="FindParentsAsync"
+          Placeholder="اختر من شجرة الحسابات بالاسم أو الرقم..."
+          EmptyText="لا توجد حسابات تحكمية نشطة من الأصول. أنشئ حساب ذمم العملاء أولًا."
+          ClearText="إلغاء حساب ذمم العملاء الافتراضي"
+          MinimumSearchLength="0"
+          DebounceMilliseconds="250"
+          Disabled="@(!_loaded || _busy)" />
+<p style="font-size:12px;margin:3px 0 9px;color:var(--oas-color-text-muted,var(--oas-color-text-secondary,#64748b))">
+    يُستخدم هذا الحساب تلقائيًا لإنشاء الحسابات الفرعية للعملاء الجدد. اختيار واحد فقط لجميع العملاء، ولا يؤثر تغييره في العملاء السابقين.
+</p>
+
+@code {
+    private const string Endpoint = "api/accounting/customer-receivables-settings";
+    private bool _loaded;
+    private bool _busy;
+    private string _parentId = string.Empty;
+    private string _savedId = string.Empty;
+    private UiLookupItem? _selected;
+    private readonly Dictionary<string, UiLookupItem> _options = [];
+
+    public bool IsLoaded => _loaded;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private static UiLookupItem MakeOption(Guid id, string? code, string? name) =>
+        new(id.ToString("D"), string.IsNullOrWhiteSpace(name) ? code ?? "حساب" : $"{code} - {name}");
+
+    private async Task LoadAsync()
+    {
+        _busy = true;
+        try
+        {
+            var settings = await Api.GetAsync<CustomerReceivablesSettingsDto>(Endpoint);
+            if (settings is null) return;
+            _parentId = settings.ParentAccountId?.ToString("D") ?? string.Empty;
+            _savedId = _parentId;
+            _selected = settings.ParentAccountId is { } id
+                ? MakeOption(id, settings.ParentAccountCode, settings.ParentAccountName)
+                : null;
+            _loaded = true;
+        }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
+        finally { _busy = false; }
+    }
+
+    private async Task<IReadOnlyList<UiLookupItem>> FindParentsAsync(string search, CancellationToken ct)
+    {
+        try
+        {
+            var url = "api/accounting/customers/account-parents?take=100&search=" +
+                      Uri.EscapeDataString(search?.Trim() ?? string.Empty);
+            var results = await Api.GetAsync<IReadOnlyList<CustomerAccountParentDto>>(url, ct)
+                ?? Array.Empty<CustomerAccountParentDto>();
+            var choices = results.Select(a => MakeOption(a.Id, a.Code, a.NameAr)).ToArray();
+            foreach (var choice in choices) _options[choice.Value] = choice;
+            return choices;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { return []; }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); return []; }
+        catch { ApiFeedback.ShowUnexpected(); return []; }
+    }
+
+    private Task OnParentChangedAsync(string? value)
+    {
+        _parentId = value ?? string.Empty;
+        _selected = _options.TryGetValue(_parentId, out var selected) ? selected : null;
+        return Task.CompletedTask;
+    }
+
+    // Called by the existing accounting settings Save button, not a separate submit.
+    public async Task<bool> SaveAsync()
+    {
+        if (!_loaded || _busy) return false;
+        if (string.Equals(_savedId, _parentId, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        _busy = true;
+        try
+        {
+            var chosen = Guid.TryParse(_parentId, out var id) ? id : (Guid?)null;
+            var saved = await Api.PutAsync<UpdateCustomerReceivablesSettingsRequest,
+                CustomerReceivablesSettingsDto>(
+                Endpoint, new UpdateCustomerReceivablesSettingsRequest(chosen));
+            if (saved is null) return false;
+            _parentId = saved.ParentAccountId?.ToString("D") ?? string.Empty;
+            _savedId = _parentId;
+            _selected = saved.ParentAccountId is { } stored
+                ? MakeOption(stored, saved.ParentAccountCode, saved.ParentAccountName)
+                : null;
+            return true;
+        }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
+        finally { _busy = false; }
+        return false;
+    }
+}

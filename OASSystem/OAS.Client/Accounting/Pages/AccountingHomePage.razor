@@ -7,12 +7,13 @@
 @using OAS.UiLib.Core.Models.Accounting
 @inject IAccountingClientService Accounting
 
-<PageTitle>المحاسبة | OAS</PageTitle>
+<PageTitle>المحاسبة العامة | OAS</PageTitle>
 
 <UiAccountingHomeDashboard Metrics="@Metrics"
                            Sections="@Sections"
                            AttentionItems="@AttentionItems"
                            RecentActivities="@RecentActivities"
+                           CurrentPeriodName="@(_dashboard?.CurrentFiscalPeriodName ?? "—")"
                            IsLoading="@_loading"
                            ErrorText="@_error"
                            OnRefresh="LoadDashboardAsync" />
@@ -27,72 +28,75 @@
         new(
             "قيود غير مرحلة",
             _dashboard is null ? "—" : _dashboard.UnpostedJournalCount.ToString("N0"),
-            "fa-regular fa-rectangle-list",
+            "fa-regular fa-file-lines",
             _dashboard?.UnpostedJournalCount > 0 ? "danger" : "success",
-            _dashboard?.UnpostedJournalCount > 0 ? "تحتاج مراجعة أو ترحيل" : "لا توجد قيود معلقة"),
+            _dashboard?.UnpostedJournalCount > 0 ? "تحتاج مراجعة أو ترحيل" : "لا توجد قيود معلقة",
+            "/accounting/journals"),
         new(
             "الفترة الحالية",
             _dashboard?.CurrentFiscalPeriodName ?? "—",
-            "fa-regular fa-calendar",
+            "fa-regular fa-calendar-days",
             "info",
-            _dashboard?.CurrentFiscalPeriodEndDate is DateOnly endDate ? $"تنتهي {endDate:yyyy/MM/dd}" : null),
+            _dashboard?.CurrentFiscalPeriodEndDate is DateOnly endDate ? $"تنتهي {endDate:yyyy/MM/dd}" : "الفترة المالية النشطة",
+            "/accounting/fiscal-years"),
         new(
             "ورديات صندوق مفتوحة",
             _dashboard is null ? "—" : _dashboard.OpenCashShiftCount.ToString("N0"),
             "fa-solid fa-cash-register",
             _dashboard?.OpenCashShiftCount > 0 ? "warning" : "success",
-            _dashboard?.OpenCashShiftCount > 0 ? "تابع الورديات قبل الإقفال" : "لا توجد ورديات مفتوحة"),
+            _dashboard?.OpenCashShiftCount > 0 ? "تابع الورديات قبل الإقفال" : "لا توجد ورديات مفتوحة",
+            "/accounting/cash-shifts"),
         new(
-            "البنوك النشطة",
+            "الحسابات البنكية النشطة",
             _dashboard is null ? "—" : _dashboard.ActiveBankAccountCount.ToString("N0"),
             "fa-solid fa-building-columns",
             "success",
-            "حسابات بنكية مفعلة")
+            "حسابات بنكية مفعلة",
+            "/accounting/bank-accounts")
     ];
 
     private static IReadOnlyList<UiAccountingHomeSection> Sections { get; } =
     [
         new(
             "الإعداد المحاسبي",
-            "fa-solid fa-sliders",
+            "fa-solid fa-gear",
             [
-                new("شجرة الحسابات", "إدارة الحسابات والتصنيفات", "/accounting/accounts", "fa-solid fa-folder-tree", "primary"),
+                new("شجرة الحسابات", "إدارة دليل الحسابات", "/accounting/accounts", "fa-solid fa-folder-tree", "primary"),
                 new("السنوات والفترات المالية", "فتح وإقفال الفترات", "/accounting/fiscal-years", "fa-regular fa-calendar-days", "blue"),
                 new("ملفات الترحيل", "ربط المستندات بالحسابات", "/accounting/posting-profiles", "fa-solid fa-layer-group", "green"),
-                new("مراكز التكلفة", "تعريف وربط المراكز", "/accounting/cost-centers", "fa-solid fa-network-wired", "orange"),
-                new("إعدادات المحاسبة", "الحسابات النظامية وإعدادات الترحيل", "/accounting/settings", "fa-solid fa-gear", "primary", true),
+                new("إعدادات المحاسبة", "إعدادات الحسابات النظامية", "/accounting/settings", "fa-solid fa-sliders", "primary"),
+                new("مراكز التكلفة", "تعريف وربط المراكز", "/accounting/cost-centers", "fa-solid fa-network-wired", "orange", true),
                 new("العملات", "إدارة العملات ودقة الكسور", "/accounting/currencies", "fa-solid fa-coins", "green", true),
-                new("أسعار الصرف", "إدارة أسعار الصرف المحاسبية", "/accounting/exchange-rates", "fa-solid fa-arrow-right-arrow-left", "blue", true)
+                new("أسعار الصرف", "إدارة أسعار الصرف", "/accounting/exchange-rates", "fa-solid fa-arrow-right-arrow-left", "blue", true)
             ]),
         new(
             "العمليات اليومية",
-            "fa-solid fa-gears",
+            "fa-regular fa-file-lines",
             [
-                new("القيود اليومية", "تسجيل ومراجعة القيود", "/accounting/journals", "fa-solid fa-book-journal-whills", "primary"),
-                new("سندات القبض", "إدارة التحصيلات", "/accounting/receipt-vouchers", "fa-solid fa-arrow-down-long", "green"),
+                new("القيود اليومية", "إدخال ومراجعة القيود", "/accounting/journals", "fa-solid fa-book-journal-whills", "primary"),
+                new("سندات القبض", "إدارة المقبوضات", "/accounting/receipt-vouchers", "fa-solid fa-arrow-down-long", "green"),
                 new("سندات الصرف", "إدارة المدفوعات", "/accounting/payment-vouchers", "fa-solid fa-arrow-up-long", "red"),
-                new("المصروفات", "إدخال واعتماد المصروفات", "/accounting/expenses", "fa-solid fa-wallet", "orange")
+                new("المصروفات", "تسجيل ومتابعة المصروفات", "/accounting/expenses", "fa-solid fa-wallet", "orange")
             ]),
         new(
             "التقارير",
             "fa-solid fa-chart-column",
             [
-                new("دفتر الأستاذ", "حركة الحسابات والأرصدة", "/accounting/reports?mode=general-ledger", "fa-solid fa-book-open", "primary"),
-                new("تقرير القيود", "استعراض القيود المحاسبية", "/accounting/journal-report", "fa-solid fa-list-ul", "blue"),
-                new("ميزان المراجعة", "الأرصدة والحركات", "/accounting/reports?mode=trial-balance", "fa-solid fa-scale-balanced", "green"),
-                new("تقارير إضافية", "تقارير مالية أخرى", "/accounting/reports", "fa-solid fa-chart-pie", "orange")
+                new("دفتر الأستاذ", "عرض حركات الحسابات", "/accounting/reports?mode=general-ledger", "fa-solid fa-book-open", "primary"),
+                new("ميزان المراجعة", "مراجعة الأرصدة", "/accounting/reports?mode=trial-balance", "fa-solid fa-scale-balanced", "green"),
+                new("تقرير القيود", "استعراض وتصفية القيود", "/accounting/journal-report", "fa-solid fa-list-ul", "blue"),
+                new("التقارير المالية", "عرض التقارير المحاسبية", "/accounting/reports", "fa-solid fa-chart-line", "orange")
             ]),
         new(
             "النقد والبنوك",
             "fa-solid fa-building-columns",
             [
                 new("الصناديق", "إدارة الصناديق النقدية", "/accounting/cash-accounts", "fa-solid fa-vault", "primary"),
-                new("البنوك", "إدارة الحسابات البنكية", "/accounting/bank-accounts", "fa-solid fa-building-columns", "blue"),
-                new("ورديات الصندوق", "فتح وإغلاق الورديات", "/accounting/cash-shifts", "fa-regular fa-clock", "green"),
-                new("الحسابات المساعدة", "حسابات العملاء والموردين", "/accounting/customers", "fa-solid fa-users", "orange"),
+                new("البنوك", "الحسابات البنكية", "/accounting/bank-accounts", "fa-solid fa-building-columns", "blue"),
+                new("ورديات الصندوق", "فتح وإقفال الورديات", "/accounting/cash-shifts", "fa-regular fa-clock", "green"),
+                new("حسابات الموظفين", "ربط الموظفين بحساباتهم", "/accounting/employee-accounts", "fa-solid fa-user-tie", "primary"),
                 new("العملاء", "الحسابات المحاسبية للعملاء", "/accounting/customers", "fa-solid fa-user-group", "orange", true),
-                new("الموردون", "الحسابات المحاسبية للموردين", "/accounting/suppliers", "fa-solid fa-truck-field", "red", true),
-                new("حسابات الموظفين", "ربط الموظفين بحساباتهم", "/accounting/employee-accounts", "fa-solid fa-user-tie", "primary", true)
+                new("الموردون", "الحسابات المحاسبية للموردين", "/accounting/suppliers", "fa-solid fa-truck-field", "red", true)
             ])
     ];
 
@@ -123,9 +127,9 @@
         {
             _dashboard = await Accounting.GetAccountingDashboardAsync();
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _error = ex.Message;
+            _error = "تحقق من اتصال الخدمة ثم حاول التحديث مرة أخرى.";
         }
         finally
         {

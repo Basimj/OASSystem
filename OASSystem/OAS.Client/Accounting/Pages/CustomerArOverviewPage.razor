@@ -11,76 +11,120 @@
 @inject IApiFeedbackService ApiFeedback
 
 <PageTitle>أرصدة العملاء وأعمار الديون | OAS</PageTitle>
-<UiWorkspaceLayout ShowAside="false" ShowFilters="false">
-    <Actions>
-        <UiWorkspaceActionBar>
-            <UiButton Text="قائمة العملاء" IconCssClass="fa-solid fa-users" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="BackToCustomersAsync" />
-            <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Loading="@_busy" Size="ControlSize.Small" OnClick="LoadAsync" />
-            <UiButton Text="تصدير الأرصدة CSV" Loading="@_busy" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="ExportBalancesAsync" />
-            <UiButton Text="تصدير الأعمار CSV" Loading="@_busy" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="ExportAgingAsync" />
-        </UiWorkspaceActionBar>
-    </Actions>
-    <Content>
-        <UiStackLayout Gap="StackGap.Small">
-            <UiCard Title="أرصدة العملاء" Subtitle="رصيد مدين موجب ورصيد دائن سالب؛ جميع الأرقام بالعملة الأساسية.">
-                <UiGrid Columns="2">
-                    <UiInputDate Label="حتى تاريخ" Value="@_asOf" ValueChanged="@(v => _asOf = v)" Size="ControlSize.Small" />
-                    <UiSearchInput Value="@_search" ValueChanged="@(v => _search = v ?? string.Empty)" OnSearch="SearchAsync" Placeholder="اسم العميل أو رمزه أو رقم الحساب" />
-                </UiGrid>
-                @if (_balances is not null)
+
+<div class="customer-ar-page" dir="rtl">
+    <header class="ar-page-header">
+        <div>
+            <div class="ar-breadcrumb">المحاسبة والمالية <span>/</span> العملاء <span>/</span> التقارير</div>
+            <h1>أرصدة العملاء</h1>
+            <p>تابع الأرصدة المدينة والدائنة وأعمار الديون، وافتح كشف حساب أي عميل مباشرة.</p>
+        </div>
+        <div class="ar-page-actions">
+            <button type="button" class="ar-button ar-button--quiet" @onclick="BackToCustomersAsync">قائمة العملاء</button>
+            <button type="button" class="ar-button ar-button--quiet" @onclick="LoadAsync" disabled="@_busy">تحديث</button>
+            <button type="button" class="ar-button ar-button--secondary" @onclick="ExportBalancesAsync" disabled="@_busy">تصدير الأرصدة CSV</button>
+            <button type="button" class="ar-button ar-button--secondary" @onclick="ExportAgingAsync" disabled="@_busy">تصدير أعمار الديون</button>
+        </div>
+    </header>
+
+    <section class="ar-filter-panel" aria-label="تصفية تقرير الأرصدة">
+        <label class="ar-field"><span>الأرصدة حتى تاريخ</span><input type="date" value="@(_asOf?.ToString("yyyy-MM-dd"))" @onchange="OnAsOfChangedAsync" /></label>
+        <label class="ar-field ar-search-field"><span>البحث عن عميل</span><input type="search" placeholder="اسم العميل أو رقمه أو الحساب..." @bind="_search" @bind:event="oninput" /></label>
+        <button type="button" class="ar-button ar-button--primary" @onclick="() => SearchAsync(_search)" disabled="@_busy">بحث</button>
+        @if (_busy) { <span class="ar-loading-label"><span class="ar-spinner" aria-hidden="true"></span> جارٍ التحديث</span> }
+    </section>
+
+    @if (_balances is not null)
+    {
+        <section class="ar-metric-grid" aria-label="ملخص الأرصدة">
+            <article class="ar-metric ar-metric--blue"><div class="ar-metric-top"><span>صافي ذمم العملاء</span><span class="ar-metric-icon" aria-hidden="true">↗</span></div><strong>@_balances.NetReceivableBase.ToString("N2")</strong><small>@_balances.BaseCurrencyCode · حتى @_balances.AsOf.ToString("yyyy-MM-dd")</small></article>
+            <article class="ar-metric"><div class="ar-metric-top"><span>الأرصدة المدينة</span><span class="ar-metric-icon" aria-hidden="true">＋</span></div><strong>@_balances.DebitBalancesBase.ToString("N2")</strong><small>مبالغ مستحقة من العملاء</small></article>
+            <article class="ar-metric ar-metric--green"><div class="ar-metric-top"><span>الأرصدة الدائنة</span><span class="ar-metric-icon" aria-hidden="true">−</span></div><strong>@_balances.CreditBalancesBase.ToString("N2")</strong><small>أرصدة لصالح العملاء</small></article>
+            <article class="ar-metric"><div class="ar-metric-top"><span>عدد العملاء في التقرير</span><span class="ar-metric-icon" aria-hidden="true">♙</span></div><strong>@_balances.TotalCount.ToString("N0")</strong><small>إجمالي السجلات المطابقة</small></article>
+        </section>
+
+        <section class="ar-panel">
+            <div class="ar-panel-heading"><div><h2>أرصدة العملاء حسب الحساب</h2><p>اضغط على اسم العميل لفتح ملفه المالي وكشف الحساب.</p></div><span class="ar-record-count">@_balances.Customers.Count سجل في هذه الصفحة</span></div>
+            <div class="ar-table-wrap">
+                <table class="ar-table">
+                    <thead><tr><th>رقم العميل</th><th>اسم العميل</th><th>رقم الحساب</th><th>مدين</th><th>دائن</th><th>الرصيد</th><th>الإجراء</th></tr></thead>
+                    <tbody>
+                        @foreach (var c in _balances.Customers)
+                        {
+                            <tr>
+                                <td data-label="رقم العميل"><span class="ar-code">@c.CustomerCode</span></td>
+                                <td data-label="اسم العميل"><a class="ar-customer-link" href="@($"/accounting/customers/{c.CustomerId:D}/account")">@c.CustomerName</a></td>
+                                <td data-label="رقم الحساب"><span class="ar-code">@c.AccountCode</span></td>
+                                <td data-label="مدين" class="ar-number">@c.DebitBase.ToString("N2")</td>
+                                <td data-label="دائن" class="ar-number">@c.CreditBase.ToString("N2")</td>
+                                <td data-label="الرصيد" class="ar-number ar-number--strong">@c.BalanceBase.ToString("N2")</td>
+                                <td data-label="الإجراء"><a class="ar-row-action" href="@($"/accounting/customers/{c.CustomerId:D}/account")">كشف الحساب <span aria-hidden="true">←</span></a></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="ar-mobile-customer-list">
+                @foreach (var c in _balances.Customers)
                 {
-                    <UiGrid Columns="2">
-                        <UiKeyValue Label="صافي الذمم" Value="@_balances.NetReceivableBase.ToString("N2")" />
-                        <UiKeyValue Label="إجمالي أرصدة العملاء المدينة" Value="@_balances.DebitBalancesBase.ToString("N2")" />
-                        <UiKeyValue Label="إجمالي أرصدة العملاء الدائنة" Value="@_balances.CreditBalancesBase.ToString("N2")" />
-                        <UiKeyValue Label="العملة" Value="@_balances.BaseCurrencyCode" />
-                    </UiGrid>
+                    <a class="ar-mobile-customer" href="@($"/accounting/customers/{c.CustomerId:D}/account")">
+                        <span class="ar-mobile-customer-head"><strong>@c.CustomerName</strong><span class="ar-code">@c.CustomerCode</span></span>
+                        <span class="ar-mobile-customer-meta">الحساب @c.AccountCode</span>
+                        <span class="ar-mobile-customer-balance"><span>الرصيد</span><strong>@c.BalanceBase.ToString("N2") @_balances.BaseCurrencyCode</strong></span>
+                    </a>
                 }
-            </UiCard>
-            @if (_balances is not null)
-            {
-                <UiCard Title="العملاء" Subtitle="افتح العميل لعرض كشف حسابه والمستندات وأعمار ديونه.">
-                    @foreach (var c in _balances.Customers)
-                    {
-                        <UiRecordRow Title="@($"{c.CustomerCode} - {c.CustomerName}")" Subtitle="@($"الرصيد {c.BalanceBase:N2} {_balances.BaseCurrencyCode}")" OnClick="@(() => OpenCustomer(c.CustomerId))" />
-                    }
-                    <UiWorkspaceActionBar>
-                        <UiButton Text="السابق" Size="ControlSize.Small" Variant="ButtonVariant.Secondary" Disabled="@(_page<=1)" OnClick="PreviousAsync" />
-                        <UiButton Text="التالي" Size="ControlSize.Small" Variant="ButtonVariant.Secondary" Disabled="@((long)_page*50>=_balances.TotalCount)" OnClick="NextAsync" />
-                    </UiWorkspaceActionBar>
-                </UiCard>
-            }
-            @if (_aging is not null)
-            {
-                <UiCard Title="أعمار الديون الإجمالية" Subtitle="المستحقات المحاسبية المفتوحة حتى التاريخ المحدد.">
-                    <UiGrid Columns="2">
-                        <UiKeyValue Label="غير مستحق" Value="@_aging.NotDueBase.ToString("N2")" />
-                        <UiKeyValue Label="0–30" Value="@_aging.Days0To30Base.ToString("N2")" />
-                        <UiKeyValue Label="31–60" Value="@_aging.Days31To60Base.ToString("N2")" />
-                        <UiKeyValue Label="61–90" Value="@_aging.Days61To90Base.ToString("N2")" />
-                        <UiKeyValue Label="أكثر من 90" Value="@_aging.Over90Base.ToString("N2")" />
-                        <UiKeyValue Label="استحقاق غير معروف" Value="@_aging.UnknownBase.ToString("N2")" />
-                        <UiKeyValue Label="مقبوضات غير مخصصة" Value="@_aging.UnappliedReceiptsBase.ToString("N2")" />
-                        <UiKeyValue Label="رصيد مرتجعات غير مطبق" Value="@_aging.UnappliedReturnCreditsBase.ToString("N2")" />
-                    </UiGrid>
-                </UiCard>
-            }
-            @if (_reconcile is not null)
-            {
-                <UiCard Title="مطابقة حساب رقابة العملاء" Subtitle="تُعرض الفروق ولا تُسوَّى أو تُصفّر تلقائيًا.">
-                    <UiKeyValue Label="حساب الرقابة" Value="@(_reconcile.ControlAccountCode ?? "يحتاج تحديدًا")" />
-                    <UiKeyValue Label="إجمالي الرقابة" Value="@_reconcile.ControlAccountBalanceBase.ToString("N2")" />
-                    <UiKeyValue Label="إجمالي حسابات العملاء" Value="@_reconcile.CustomerSubledgerBase.ToString("N2")" />
-                    <UiKeyValue Label="الفرق" Value="@_reconcile.DifferenceBase.ToString("N2")" />
-                    @if (!_reconcile.IsReconciled)
-                    {
-                        <UiAlert Tone="AlertTone.Warning" Message="@(_reconcile.Message ?? "توجد فروق تحتاج مراجعة.")" />
-                    }
-                </UiCard>
-            }
-        </UiStackLayout>
-    </Content>
-</UiWorkspaceLayout>
+            </div>
+            @if (_balances.Customers.Count == 0) { <div class="ar-empty-state">لا توجد نتائج مطابقة. غيّر البحث أو تاريخ التقرير.</div> }
+            <div class="ar-pagination">
+                <span>عرض @_balances.Customers.Count من أصل @_balances.TotalCount · الصفحة @_page</span>
+                <div><button type="button" class="ar-button ar-button--quiet" disabled="@(_page <= 1 || _busy)" @onclick="PreviousAsync">السابق</button><button type="button" class="ar-button ar-button--quiet" disabled="@((long)_page * 50 >= _balances.TotalCount || _busy)" @onclick="NextAsync">التالي</button></div>
+            </div>
+        </section>
+
+        @if (_aging is not null)
+        {
+            <section class="ar-panel">
+                <div class="ar-panel-heading"><div><h2>أعمار الديون</h2><p>المبالغ المتبقية على الفواتير حسب تاريخ الاستحقاق حتى تاريخ التقرير.</p></div><span class="ar-record-count">العملة الأساسية: @_aging.BaseCurrencyCode</span></div>
+                <div class="ar-aging-grid">
+                    <article><span>غير مستحق</span><strong>@_aging.NotDueBase.ToString("N2")</strong></article>
+                    <article><span>0–30 يومًا</span><strong>@_aging.Days0To30Base.ToString("N2")</strong></article>
+                    <article><span>31–60 يومًا</span><strong>@_aging.Days31To60Base.ToString("N2")</strong></article>
+                    <article><span>61–90 يومًا</span><strong>@_aging.Days61To90Base.ToString("N2")</strong></article>
+                    <article class="ar-aging-danger"><span>أكثر من 90 يومًا</span><strong>@_aging.Over90Base.ToString("N2")</strong></article>
+                    <article><span>استحقاق غير محدد</span><strong>@_aging.UnknownBase.ToString("N2")</strong></article>
+                </div>
+                <div class="ar-aging-footer">
+                    <div><span>إجمالي المتبقي على الفواتير</span><strong>@_aging.TotalOutstandingBase.ToString("N2")</strong></div>
+                    <div><span>مقبوضات غير مخصصة</span><strong>@_aging.UnappliedReceiptsBase.ToString("N2")</strong></div>
+                    <div><span>مرتجعات غير مطبقة</span><strong>@_aging.UnappliedReturnCreditsBase.ToString("N2")</strong></div>
+                    <div><span>عربون العملاء (التزام مستقل)</span><strong>@_aging.CustomerAdvancesLiabilityBase.ToString("N2")</strong></div>
+                </div>
+            </section>
+        }
+
+        @if (_reconcile is not null)
+        {
+            <section class="ar-panel ar-reconciliation">
+                <div class="ar-panel-heading"><div><h2>مطابقة حساب ذمم العملاء</h2><p>يقارن النظام حساب الرقابة مع أرصدة حسابات العملاء الفرعية دون إجراء تسوية تلقائية.</p></div><span class="@(_reconcile.IsReconciled ? "ar-status ar-status--ok" : "ar-status ar-status--warning")">@(_reconcile.IsReconciled ? "متطابق" : "يحتاج مراجعة")</span></div>
+                <div class="ar-reconciliation-grid">
+                    <div><span>حساب الرقابة</span><strong>@(_reconcile.ControlAccountCode ?? "غير محدد")</strong></div>
+                    <div><span>رصيد حساب الرقابة</span><strong>@_reconcile.ControlAccountBalanceBase.ToString("N2")</strong></div>
+                    <div><span>مجموع حسابات العملاء</span><strong>@_reconcile.CustomerSubledgerBase.ToString("N2")</strong></div>
+                    <div class="@(!_reconcile.IsReconciled ? "ar-difference-warning" : "")"><span>الفرق</span><strong>@_reconcile.DifferenceBase.ToString("N2")</strong></div>
+                </div>
+                @if (!_reconcile.IsReconciled) { <div class="ar-warning-message">@(_reconcile.Message ?? "توجد فروق تحتاج إلى مراجعة قبل إقفال الفترة.")</div> }
+            </section>
+        }
+    }
+    else if (_busy)
+    {
+        <div class="ar-empty-state"><span class="ar-spinner" aria-hidden="true"></span> جارٍ تحميل تقرير الأرصدة...</div>
+    }
+    else
+    {
+        <div class="ar-empty-state">لا توجد بيانات لعرضها حتى الآن. اضغط «تحديث» للمحاولة مرة أخرى.</div>
+    }
+</div>
 
 @code {
     [Inject] private NavigationManager Navigation { get; set; } = default!;
@@ -90,6 +134,16 @@
     private CustomerArReconciliationDto? _reconcile;
     private int _page = 1;
     private string _search = string.Empty;
+    private async Task OnAsOfChangedAsync(ChangeEventArgs args)
+    {
+        if (DateOnly.TryParse(args.Value?.ToString(), out var value))
+        {
+            _asOf = value;
+            _page = 1;
+            await LoadAsync();
+        }
+    }
+
     private async Task SearchAsync(string? search)
     {
         _search = search ?? string.Empty;

@@ -1,4 +1,7 @@
-
-.customer-ar-shortcuts{padding:.5rem 1rem;display:flex;gap:.45rem;font-size:.875rem;align-items:center}
-.customer-ar-shortcuts a{text-decoration:underline;color:var(--color-primary,#145f9a)}
-@media print{.customer-ar-shortcuts{display:none}}
+/* Customer page layout is now owned by the two modern UiLib workspaces.
+   Scoped styles are kept minimal to avoid overriding active theme tokens. */
+@media print {
+    .oas-customers-list__actions,
+    .oas-customer-profile__top-actions,
+    .oas-customer-profile__bottom {display:none!important;}
+}

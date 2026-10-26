@@ -1,0 +1,292 @@
+@namespace OAS.UiLib.Components.Accounting.Parties
+@using OAS.UiLib.Core.Models
+@using OAS.UiLib.Core.Models.Accounting
+
+<section class="oas-customer-profile" dir="rtl" aria-busy="@Busy">
+    <header class="oas-customer-profile__top">
+        <div class="oas-customer-profile__heading">
+            <button class="oas-customer-profile__back" type="button" @onclick="() => OnBack.InvokeAsync()" title="العودة إلى جميع العملاء">
+                <i class="fa-solid fa-arrow-right" aria-hidden="true"></i><span>جميع العملاء</span>
+            </button>
+            <span class="oas-customer-profile__divider">/</span>
+            <div class="oas-customer-profile__title-wrap">
+                <span class="oas-customer-profile__title-icon"><i class="fa-solid @(IsNew ? "fa-user-plus" : "fa-user-tie")" aria-hidden="true"></i></span>
+                <div>
+                    <h1>@(IsNew ? "إضافة عميل جديد" : _editing ? "تعديل بيانات العميل" : "تفاصيل العميل")</h1>
+                    <p>@(IsNew ? "أدخل البيانات الأساسية، وسيُنشئ النظام رقم العميل تلقائيًا." : Form.NameAr)</p>
+                </div>
+            </div>
+        </div>
+        <div class="oas-customer-profile__top-actions">
+            @if (_editing || IsNew)
+            {
+                <button class="oas-customer-profile__btn oas-customer-profile__btn--primary" disabled="@Busy" type="button" @onclick="() => OnSave.InvokeAsync()">
+                    <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> @(Busy ? "جارٍ الحفظ..." : "حفظ العميل")
+                </button>
+                <button class="oas-customer-profile__btn" disabled="@Busy" type="button" @onclick="() => OnCancel.InvokeAsync()">
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i> إلغاء
+                </button>
+            }
+            else
+            {
+                <button class="oas-customer-profile__btn oas-customer-profile__btn--primary" disabled="@Busy" type="button" @onclick="EnterEdit">
+                    <i class="fa-solid fa-pen" aria-hidden="true"></i> تعديل
+                </button>
+                @if (Form.Id is Guid id)
+                {
+                    <a class="oas-customer-profile__btn" href="@($"/accounting/customers/{id:D}/account")">
+                        <i class="fa-solid fa-file-invoice-dollar" aria-hidden="true"></i> كشف الحساب
+                    </a>
+                }
+                <button class="oas-customer-profile__btn @(Form.IsActive ? "oas-customer-profile__btn--danger" : "")" disabled="@Busy" type="button" @onclick="() => OnToggleStatus.InvokeAsync()">
+                    <i class="fa-solid @(Form.IsActive ? "fa-user-slash" : "fa-user-check")" aria-hidden="true"></i> @(Form.IsActive ? "إيقاف التعامل" : "تفعيل العميل")
+                </button>
+            }
+        </div>
+    </header>
+
+    @if (!_editing && !IsNew)
+    {
+        <div class="oas-customer-profile__identity">
+            <span class="oas-customer-profile__avatar"><i class="fa-solid @(Form.EntityType == "2" ? "fa-building" : "fa-user")" aria-hidden="true"></i></span>
+            <div class="oas-customer-profile__identity-copy">
+                <h2>@TextOrDash(Form.NameAr)</h2>
+                <div class="oas-customer-profile__identity-meta">
+                    <span>رقم العميل <strong dir="ltr">@TextOrDash(Form.Code)</strong></span>
+                    <span>الحساب <strong dir="ltr">@TextOrDash(Form.AccountCode)</strong></span>
+                    <span class="oas-customer-profile__state @(Form.IsActive ? "is-active" : "is-inactive")">@(Form.IsActive ? "نشط" : "موقوف")</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="oas-customer-profile__metrics">
+            <div class="oas-customer-profile__metric"><span class="oas-customer-profile__metric-icon"><i class="fa-solid fa-wallet"></i></span><div><small>الرصيد الحالي</small><strong>من كشف الحساب</strong></div></div>
+            <div class="oas-customer-profile__metric"><span class="oas-customer-profile__metric-icon"><i class="fa-solid fa-credit-card"></i></span><div><small>الحد الائتماني</small><strong>@(Form.IsCreditAllowed ? Form.CreditLimit.ToString("N2") : "غير مفعل")</strong></div></div>
+            <div class="oas-customer-profile__metric"><span class="oas-customer-profile__metric-icon"><i class="fa-solid fa-calendar-days"></i></span><div><small>مدة السداد</small><strong>@(Form.IsCreditAllowed ? $"{Form.PaymentTermDays} يوم" : "نقدًا")</strong></div></div>
+            <div class="oas-customer-profile__metric"><span class="oas-customer-profile__metric-icon"><i class="fa-solid fa-building-columns"></i></span><div><small>الحساب المحاسبي</small><strong dir="ltr">@TextOrDash(Form.AccountCode)</strong></div></div>
+        </div>
+
+        <nav class="oas-customer-profile__tabs" aria-label="أقسام بيانات العميل">
+            <button type="button" class="@(_detailsTab == "summary" ? "is-active" : "")" aria-current="@(_detailsTab == "summary" ? "page" : null)" @onclick="ShowSummaryTab">نظرة عامة</button>
+            <button type="button" class="@(_detailsTab == "contact" ? "is-active" : "")" aria-current="@(_detailsTab == "contact" ? "page" : null)" @onclick="ShowContactTab">التواصل والعنوان</button>
+            <button type="button" class="@(_detailsTab == "credit" ? "is-active" : "")" aria-current="@(_detailsTab == "credit" ? "page" : null)" @onclick="ShowCreditTab">الشروط المالية</button>
+        </nav>
+
+        <div class="oas-customer-profile__scroll">
+            @if (_detailsTab == "summary")
+            {
+                <div class="oas-customer-profile__info-grid">
+                    <section class="oas-customer-profile__card">
+                        <h3><i class="fa-solid fa-address-card"></i> معلومات العميل</h3>
+                        <dl>
+                            <div><dt>اسم العميل</dt><dd>@TextOrDash(Form.NameAr)</dd></div>
+                            <div><dt>نوع العميل</dt><dd>@EntityLabel</dd></div>
+                            <div><dt>اسم المنشأة / الاسم التجاري</dt><dd>@TextOrDash(Form.TradeName)</dd></div>
+                            <div><dt>رقم العميل</dt><dd dir="ltr">@TextOrDash(Form.Code)</dd></div>
+                            <div><dt>رقم الحساب المحاسبي</dt><dd dir="ltr">@TextOrDash(Form.AccountCode)</dd></div>
+                            <div><dt>بداية التعامل</dt><dd>@DateLabel(Form.Since)</dd></div>
+                        </dl>
+                    </section>
+                    <section class="oas-customer-profile__card">
+                        <h3><i class="fa-solid fa-phone"></i> معلومات التواصل</h3>
+                        <dl>
+                            <div><dt>الجوال</dt><dd dir="ltr">@TextOrDash(Form.Mobile)</dd></div>
+                            <div><dt>الهاتف</dt><dd dir="ltr">@TextOrDash(Form.Phone)</dd></div>
+                            <div><dt>البريد الإلكتروني</dt><dd class="oas-customer-profile__truncate">@TextOrDash(Form.Email)</dd></div>
+                            <div><dt>المدينة</dt><dd>@TextOrDash(Form.City)</dd></div>
+                            <div><dt>المحافظة</dt><dd>@TextOrDash(Form.Governorate)</dd></div>
+                            <div><dt>مسؤول التواصل</dt><dd>@TextOrDash(Form.ContactPersonName)</dd></div>
+                        </dl>
+                    </section>
+                    <section class="oas-customer-profile__card">
+                        <h3><i class="fa-solid fa-location-dot"></i> العنوان</h3>
+                        <dl>
+                            <div><dt>الدولة</dt><dd>@TextOrDash(Form.Country)</dd></div>
+                            <div><dt>المنطقة / الحي</dt><dd>@TextOrDash(Form.District)</dd></div>
+                            <div><dt>الشارع</dt><dd>@TextOrDash(Form.Street)</dd></div>
+                            <div><dt>تفاصيل العنوان</dt><dd>@TextOrDash(Form.AddressDetails)</dd></div>
+                        </dl>
+                    </section>
+                    <section class="oas-customer-profile__card oas-customer-profile__card--quick">
+                        <h3><i class="fa-solid fa-bolt"></i> إجراءات سريعة</h3>
+                        @if (Form.Id is Guid customerId)
+                        {
+                            <a href="@($"/accounting/customers/{customerId:D}/account")"><i class="fa-solid fa-chart-line"></i> عرض كشف الحساب</a>
+                        }
+                        <button type="button" @onclick="EnterEdit"><i class="fa-solid fa-pen"></i> تعديل بيانات العميل</button>
+                        <a href="/accounting/customer-ar"><i class="fa-solid fa-scale-balanced"></i> تقرير أرصدة العملاء</a>
+                    </section>
+                </div>
+            }
+            else if (_detailsTab == "contact")
+            {
+                <div class="oas-customer-profile__info-grid">
+                    <section class="oas-customer-profile__card"><h3><i class="fa-solid fa-address-book"></i> وسائل التواصل</h3><dl>
+                        <div><dt>الجوال</dt><dd dir="ltr">@TextOrDash(Form.Mobile)</dd></div>
+                        <div><dt>الهاتف</dt><dd dir="ltr">@TextOrDash(Form.Phone)</dd></div>
+                        <div><dt>رقم بديل</dt><dd dir="ltr">@TextOrDash(Form.AlternatePhone)</dd></div>
+                        <div><dt>واتساب</dt><dd dir="ltr">@TextOrDash(Form.WhatsAppNumber)</dd></div>
+                        <div><dt>البريد الإلكتروني</dt><dd>@TextOrDash(Form.Email)</dd></div>
+                        <div><dt>الموقع الإلكتروني</dt><dd>@TextOrDash(Form.Website)</dd></div>
+                    </dl></section>
+                    <section class="oas-customer-profile__card"><h3><i class="fa-solid fa-location-dot"></i> عنوان العميل</h3><dl>
+                        <div><dt>الدولة</dt><dd>@TextOrDash(Form.Country)</dd></div>
+                        <div><dt>المحافظة</dt><dd>@TextOrDash(Form.Governorate)</dd></div>
+                        <div><dt>المدينة</dt><dd>@TextOrDash(Form.City)</dd></div>
+                        <div><dt>الحي</dt><dd>@TextOrDash(Form.District)</dd></div>
+                        <div><dt>الشارع والمبنى</dt><dd>@TextOrDash(string.Join("، ", new[] { Form.Street, Form.Building }.Where(x => !string.IsNullOrWhiteSpace(x))))</dd></div>
+                        <div><dt>تفاصيل</dt><dd>@TextOrDash(Form.AddressDetails)</dd></div>
+                    </dl></section>
+                </div>
+            }
+            else
+            {
+                <div class="oas-customer-profile__info-grid">
+                    <section class="oas-customer-profile__card"><h3><i class="fa-solid fa-money-bill-wave"></i> طريقة التعامل</h3><dl>
+                        <div><dt>البيع الآجل</dt><dd>@(Form.IsCreditAllowed ? "مسموح" : "غير مسموح")</dd></div>
+                        <div><dt>حد الائتمان</dt><dd>@Form.CreditLimit.ToString("N2")</dd></div>
+                        <div><dt>مهلة السداد</dt><dd>@Form.PaymentTermDays يوم</dd></div>
+                        <div><dt>الحساب</dt><dd dir="ltr">@TextOrDash(Form.AccountCode)</dd></div>
+                    </dl></section>
+                    <section class="oas-customer-profile__card"><h3><i class="fa-solid fa-receipt"></i> بيانات المنشأة والضريبة</h3><dl>
+                        <div><dt>الرقم الضريبي</dt><dd>@TextOrDash(Form.TaxNumber)</dd></div>
+                        <div><dt>السجل التجاري</dt><dd>@TextOrDash(Form.CommercialRegistrationNo)</dd></div>
+                        <div><dt>رقم الهوية</dt><dd>@TextOrDash(Form.NationalId)</dd></div>
+                        <div><dt>ملاحظات</dt><dd>@TextOrDash(Form.Notes)</dd></div>
+                    </dl></section>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="oas-customer-profile__edit-scroll">
+            <div class="oas-customer-profile__edit-layout">
+                <div class="oas-customer-profile__edit-main">
+                    <section class="oas-customer-profile__card oas-customer-profile__form-card">
+                        <h2><i class="fa-solid fa-user"></i> البيانات الأساسية</h2>
+                        <div class="oas-customer-profile__fields">
+                            <label class="oas-customer-profile__field"><span>اسم العميل <em>*</em></span><input type="text" maxlength="150" required="required" placeholder="اكتب اسم العميل أو المنشأة" @bind="Form.NameAr" @bind:event="oninput" @bind:after="Changed" disabled="@Busy" /></label>
+                            <label class="oas-customer-profile__field"><span>نوع العميل <em>*</em></span><select @bind="Form.EntityType" @bind:after="Changed" disabled="@Busy"><option value="1">فرد</option><option value="2">منشأة</option></select></label>
+                            <label class="oas-customer-profile__field"><span>طريقة التعامل</span><select value="@(Form.IsCreditAllowed ? "credit" : "cash")" @onchange="PaymentModeChanged" disabled="@Busy"><option value="cash">نقدًا</option><option value="credit">نقدًا وآجلًا</option></select></label>
+                            <label class="oas-customer-profile__field"><span>المدينة</span><input type="text" maxlength="100" @bind="Form.City" @bind:event="oninput" @bind:after="Changed" placeholder="اسم المدينة" disabled="@Busy" /></label>
+                            <label class="oas-customer-profile__field"><span>رقم الجوال</span><input type="tel" dir="ltr" maxlength="32" @bind="Form.Mobile" @bind:event="oninput" @bind:after="Changed" placeholder="رقم الجوال" disabled="@Busy" /></label>
+                            <label class="oas-customer-profile__field"><span>البريد الإلكتروني</span><input type="email" dir="ltr" maxlength="256" @bind="Form.Email" @bind:event="oninput" @bind:after="Changed" placeholder="example@domain.com" disabled="@Busy" /></label>
+                            @if (Form.IsCreditAllowed)
+                            {
+                                <label class="oas-customer-profile__field"><span>حد الائتمان</span><input type="number" min="0" step="0.01" @bind="Form.CreditLimit" @bind:after="Changed" disabled="@Busy" /></label>
+                                <label class="oas-customer-profile__field"><span>مهلة السداد (بالأيام)</span><input type="number" min="0" step="1" @bind="Form.PaymentTermDays" @bind:after="Changed" disabled="@Busy" /></label>
+                            }
+                        </div>
+                        @if (IsNew)
+                        {
+                            <p class="oas-customer-profile__auto-hint"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> رقم العميل وحسابه المحاسبي سيُنشآن تلقائيًا عند الحفظ، دون أي اختيار يدوي.</p>
+                        }
+                    </section>
+                    <section class="oas-customer-profile__card oas-customer-profile__form-card">
+                        <h2><i class="fa-solid fa-phone"></i> معلومات التواصل</h2>
+                        <div class="oas-customer-profile__fields">
+                            <label class="oas-customer-profile__field"><span>الهاتف الثابت</span><input type="tel" dir="ltr" maxlength="32" @bind="Form.Phone" @bind:event="oninput" @bind:after="Changed" disabled="@Busy" /></label>
+                            <label class="oas-customer-profile__field"><span>مسؤول التواصل</span><input type="text" maxlength="150" @bind="Form.ContactPersonName" @bind:event="oninput" @bind:after="Changed" disabled="@Busy" /></label>
+                        </div>
+                    </section>
+                    <details class="oas-customer-profile__card oas-customer-profile__extra">
+                        <summary><span><i class="fa-solid fa-angle-down"></i> خيارات إضافية: العنوان والضريبة وبيانات التواصل</span><small>اختيارية</small></summary>
+                        <div class="oas-customer-profile__fields oas-customer-profile__extra-fields">
+                            <label class="oas-customer-profile__field"><span>الاسم بالإنجليزية</span><input maxlength="150" @bind="Form.NameEn" @bind:event="oninput" @bind:after="Changed" disabled="@Busy" /></label>
+                            <label class="oas-customer-profile__field"><span>الاسم التجاري</span><input maxlength="150" @bind="Form.TradeName" @bind:event="oninput" @bind:after="Changed" disabled="@Busy" /></label>
+                            <label class="oas-customer-profile__field"><span>الدولة</span><input maxlength="100" @bind="Form.Country" @bind:event="oninput" @bind:after="Changed" disabled="@Busy" /></label>
+                            <label class="oas-customer-profile__field"><span>المحافظة</span><input maxlength="100" @bind="Form.Governorate" @bind:event="oninput" @bind:after="Changed" disabled="@Busy" /></label>
+                            <label class="oas-customer-profile__field"><span>الحي / المنطقة</span><input maxlength="100" @bind="Form.District" @bind:event="oninput" @bind:after="Changed" disabled="@Busy" /></label>
+                            <label class="oas-customer-profile__field"><span>الشارع</span><input maxlength="150" @bind="Form.Street" @bind:event="oninput" @bind:after="Changed" disabled="@Busy" /></label>
+                            <label class="oas-customer-profile__field"><span>رقم المبنى</span><input maxlength="100" @bind="Form.Building" @bind:event="oninput" @bind:after="Changed" disabled="@Busy" /></label>
+                            <label class="oas-customer-profile__field"><span>الرمز البريدي</span><input maxlength="24" @bind="Form.PostalCode" @bind:event="oninput" @bind:after="Changed" disabled="@Busy" /></label>
+                            <label class="oas-customer-profile__field"><span>الرقم الضريبي</span><input maxlength="50" @bind="Form.TaxNumber" @bind:event="oninput" @bind:after="Changed" disabled="@Busy" /></label>
+                            <label class="oas-customer-profile__field"><span>السجل التجاري</span><input maxlength="50" @bind="Form.CommercialRegistrationNo" @bind:event="oninput" @bind:after="Changed" disabled="@Busy" /></label>
+                            <label class="oas-customer-profile__field"><span>رقم الهوية</span><input maxlength="50" @bind="Form.NationalId" @bind:event="oninput" @bind:after="Changed" disabled="@Busy" /></label>
+                            <label class="oas-customer-profile__field"><span>تاريخ الميلاد</span><input type="date" @bind="Form.DateOfBirth" @bind:after="Changed" disabled="@Busy" /></label>
+                            <label class="oas-customer-profile__field"><span>الجنس</span><select @bind="Form.Gender" @bind:after="Changed" disabled="@Busy"><option value="0">غير محدد</option><option value="1">ذكر</option><option value="2">أنثى</option></select></label>
+                            <label class="oas-customer-profile__field"><span>بداية التعامل</span><input type="date" @bind="Form.Since" @bind:after="Changed" disabled="@Busy" /></label>
+                            <label class="oas-customer-profile__field"><span>رقم آخر</span><input maxlength="32" dir="ltr" @bind="Form.AlternatePhone" @bind:event="oninput" @bind:after="Changed" disabled="@Busy" /></label>
+                            <label class="oas-customer-profile__field"><span>واتساب</span><input maxlength="32" dir="ltr" @bind="Form.WhatsAppNumber" @bind:event="oninput" @bind:after="Changed" disabled="@Busy" /></label>
+                            <label class="oas-customer-profile__field"><span>وسيلة التواصل المفضلة</span><select @bind="Form.PreferredContactMethod" @bind:after="Changed" disabled="@Busy"><option value="1">هاتف</option><option value="2">جوال</option><option value="3">واتساب</option><option value="4">بريد إلكتروني</option></select></label>
+                            <label class="oas-customer-profile__field"><span>صفة مسؤول التواصل</span><input maxlength="100" @bind="Form.ContactPersonTitle" @bind:event="oninput" @bind:after="Changed" disabled="@Busy" /></label>
+                            <label class="oas-customer-profile__field"><span>الموقع الإلكتروني</span><input maxlength="300" @bind="Form.Website" @bind:event="oninput" @bind:after="Changed" disabled="@Busy" /></label>
+                            <label class="oas-customer-profile__field oas-customer-profile__field--full"><span>تفاصيل العنوان</span><input maxlength="300" @bind="Form.AddressDetails" @bind:event="oninput" @bind:after="Changed" disabled="@Busy" /></label>
+                            @if (IsNew)
+                            {
+                                <label class="oas-customer-profile__field"><span>حالة العميل عند الإضافة</span><select value="@(Form.IsActive ? "active" : "inactive")" @onchange="ActiveChanged" disabled="@Busy"><option value="active">نشط</option><option value="inactive">موقوف</option></select></label>
+                            }
+                            <label class="oas-customer-profile__field oas-customer-profile__field--full"><span>ملاحظات</span><textarea rows="2" maxlength="1000" @bind="Form.Notes" @bind:event="oninput" @bind:after="Changed" disabled="@Busy"></textarea></label>
+                        </div>
+                    </details>
+                </div>
+            </div>
+        </div>
+        <footer class="oas-customer-profile__bottom">
+            <span><i class="fa-solid fa-circle-info"></i> يُراجع النظام البيانات قبل الحفظ</span>
+            <div><button type="button" class="oas-customer-profile__btn" disabled="@Busy" @onclick="() => OnCancel.InvokeAsync()">إلغاء</button><button type="button" class="oas-customer-profile__btn oas-customer-profile__btn--primary" disabled="@Busy" @onclick="() => OnSave.InvokeAsync()"><i class="fa-solid fa-floppy-disk"></i> حفظ العميل</button></div>
+        </footer>
+    }
+</section>
+
+@code {
+    [Parameter] public UiAccountingPartyFormModel Form { get; set; } = new();
+    [Parameter] public bool IsNew { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public bool StartInEditMode { get; set; }
+    [Parameter] public EventCallback OnFormChanged { get; set; }
+    [Parameter] public EventCallback OnBack { get; set; }
+    [Parameter] public EventCallback OnSave { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public EventCallback OnToggleStatus { get; set; }
+
+    private bool _editing;
+    private string _detailsTab = "summary";
+    private UiAccountingPartyFormModel? _lastModel;
+    private bool _lastStartRequested;
+    private string EntityLabel => Form.EntityType == "2" ? "منشأة" : "فرد";
+
+    protected override void OnParametersSet()
+    {
+        // After a successful save, the parent replaces Form with the saved DTO.
+        // An unsuccessful save leaves the same object in place and preserves entered data.
+        if (!ReferenceEquals(_lastModel, Form))
+        {
+            var firstRenderOfThisRecord = _lastModel is null;
+            _lastModel = Form;
+            _editing = IsNew || (firstRenderOfThisRecord && StartInEditMode);
+            _detailsTab = "summary";
+        }
+        else if (StartInEditMode && !_lastStartRequested && !IsNew)
+        {
+            // Supports clicking the list's Edit action even when the model
+            // loads before the parent sets the edit-request flag.
+            _editing = true;
+        }
+        _lastStartRequested = StartInEditMode;
+    }
+
+    private static string TextOrDash(string? text) => string.IsNullOrWhiteSpace(text) ? "—" : text;
+    private static string DateLabel(DateOnly? value) => value?.ToString("yyyy/MM/dd") ?? "—";
+    private Task Changed() => OnFormChanged.InvokeAsync();
+    private void EnterEdit() => _editing = true;
+    private void ShowSummaryTab() => _detailsTab = "summary";
+    private void ShowContactTab() => _detailsTab = "contact";
+    private void ShowCreditTab() => _detailsTab = "credit";
+    private async Task ActiveChanged(ChangeEventArgs args)
+    {
+        Form.IsActive = args.Value?.ToString() == "active";
+        await Changed();
+    }
+    private async Task PaymentModeChanged(ChangeEventArgs args)
+    {
+        Form.IsCreditAllowed = args.Value?.ToString() == "credit";
+        if (!Form.IsCreditAllowed)
+        {
+            Form.CreditLimit = 0;
+            Form.PaymentTermDays = 0;
+        }
+        await Changed();
+    }
+}
