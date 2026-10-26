@@ -28,7 +28,7 @@
     </header>
 
     <section class="ar-filter-panel" aria-label="تصفية تقرير الأرصدة">
-        <label class="ar-field"><span>الأرصدة حتى تاريخ</span><input type="date" value="@_asOf?.ToString("yyyy-MM-dd")" @onchange="OnAsOfChangedAsync" /></label>
+        <label class="ar-field"><span>الأرصدة حتى تاريخ</span><input type="date" value="@(_asOf?.ToString("yyyy-MM-dd"))" @onchange="OnAsOfChangedAsync" /></label>
         <label class="ar-field ar-search-field"><span>البحث عن عميل</span><input type="search" placeholder="اسم العميل أو رقمه أو الحساب..." @bind="_search" @bind:event="oninput" /></label>
         <button type="button" class="ar-button ar-button--primary" @onclick="() => SearchAsync(_search)" disabled="@_busy">بحث</button>
         @if (_busy) { <span class="ar-loading-label"><span class="ar-spinner" aria-hidden="true"></span> جارٍ التحديث</span> }
