@@ -153,12 +153,36 @@
                                 </div>
                             </div>
 
-                            <div class="cust-kpis">
-                                <div class="cust-kpi cust-kpi--purple"><div class="cust-kpi-icon"><i class="fa-solid fa-coins"></i></div><div><span>الرصيد الحالي</span><strong>—</strong></div></div>
-                                <div class="cust-kpi cust-kpi--blue"><div class="cust-kpi-icon"><i class="fa-regular fa-file-lines"></i></div><div><span>الفواتير المفتوحة</span><strong>—</strong></div></div>
-                                <div class="cust-kpi cust-kpi--red"><div class="cust-kpi-icon"><i class="fa-regular fa-clock"></i></div><div><span>المتأخر</span><strong>—</strong></div></div>
-                                <div class="cust-kpi cust-kpi--green"><div class="cust-kpi-icon"><i class="fa-solid fa-chart-pie"></i></div><div><span>الحد الائتماني</span><strong>@CreditLimitText</strong></div></div>
-                            </div>
+                            @if (!IsEditing && ActiveId != Guid.Empty)
+                            {
+                                <nav class="cust-shortcuts" aria-label="روابط ملف العميل">
+                                    <a class="cust-shortcut cust-shortcut--blue" href="@($"/accounting/customers/{ActiveId:D}/account#cw-financial")">
+                                        <span class="cust-shortcut__icon"><i class="fa-solid fa-chart-pie"></i></span>
+                                        <span><strong>المركز المالي</strong><small>الرصيد والمستحقات</small></span>
+                                        <i class="fa-solid fa-arrow-left cust-shortcut__arrow"></i>
+                                    </a>
+                                    <a class="cust-shortcut cust-shortcut--purple" href="@($"/accounting/customers/{ActiveId:D}/account#cw-statement")">
+                                        <span class="cust-shortcut__icon"><i class="fa-regular fa-file-lines"></i></span>
+                                        <span><strong>كشف الحساب</strong><small>الحركات المدينة والدائنة</small></span>
+                                        <i class="fa-solid fa-arrow-left cust-shortcut__arrow"></i>
+                                    </a>
+                                    <a class="cust-shortcut cust-shortcut--green" href="@($"/sales/customer-credits/{ActiveId:D}")">
+                                        <span class="cust-shortcut__icon"><i class="fa-solid fa-rotate-left"></i></span>
+                                        <span><strong>تطبيق المرتجعات</strong><small>تسوية الرصيد الدائن</small></span>
+                                        <i class="fa-solid fa-arrow-left cust-shortcut__arrow"></i>
+                                    </a>
+                                    <a class="cust-shortcut cust-shortcut--amber" href="/accounting/customer-ar">
+                                        <span class="cust-shortcut__icon"><i class="fa-solid fa-users"></i></span>
+                                        <span><strong>أرصدة العملاء</strong><small>الأرصدة وأعمار الديون</small></span>
+                                        <i class="fa-solid fa-arrow-left cust-shortcut__arrow"></i>
+                                    </a>
+                                    <a class="cust-shortcut cust-shortcut--cyan" href="@($"/accounting/customers/{ActiveId:D}/account#cw-documents")">
+                                        <span class="cust-shortcut__icon"><i class="fa-solid fa-folder-open"></i></span>
+                                        <span><strong>مستندات العميل</strong><small>الفواتير والقبض والمرتجعات</small></span>
+                                        <i class="fa-solid fa-arrow-left cust-shortcut__arrow"></i>
+                                    </a>
+                                </nav>
+                            }
 
                             <div class="cust-tabs">
                                 <button type="button" class="@TabCss(CustomerSection.General)" @onclick="() => SetSection(CustomerSection.General)">عام</button>
