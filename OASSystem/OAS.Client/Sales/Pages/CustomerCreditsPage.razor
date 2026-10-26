@@ -11,119 +11,140 @@
 @inject OasApiClient Api
 @inject IAccountingClientService Accounting
 
-<PageTitle>الرصيد الدائن للعميل | OAS</PageTitle>
-<section dir="rtl" class="p-3" style="max-width:1200px;margin:auto">
-    <header class="d-flex justify-content-between align-items-center mb-3">
-        <h3>الرصيد الدائن من مرتجعات العميل</h3>
-        <button type="button" class="btn btn-outline-secondary" @onclick="ReloadAsync" disabled="@_busy">تحديث</button>
+<PageTitle>تطبيق مرتجعات العميل | OAS</PageTitle>
+
+<div class="customer-credit-page" dir="rtl">
+    <header class="cc-page-header">
+        <div>
+            <div class="cc-breadcrumb">المبيعات <span>/</span> العملاء <span>/</span> تسوية رصيد المرتجعات</div>
+            <h1>تطبيق مرتجعات العميل</h1>
+            <p>استخدم الرصيد الدائن الناتج عن مرتجع مرحّل لتخفيض فاتورة أخرى أو رد المبلغ للعميل.</p>
+        </div>
+        <div class="cc-header-actions">
+            <a class="cc-button cc-button--quiet" href="@($"/accounting/customers/{CustomerId:D}/account")">العودة إلى ملف العميل</a>
+            <button type="button" class="cc-button cc-button--quiet" @onclick="ReloadAsync" disabled="@_busy">تحديث البيانات</button>
+        </div>
     </header>
-    @if (!string.IsNullOrWhiteSpace(_error)) { <div class="alert alert-danger" role="alert">@_error</div> }
-    @if (!string.IsNullOrWhiteSpace(_notice)) { <div class="alert alert-success" role="status">@_notice</div> }
-    @if (_state is null) { <p>جارٍ تحميل رصيد المرتجعات...</p> }
+
+    @if (!string.IsNullOrWhiteSpace(_error)) { <div class="cc-alert cc-alert--error" role="alert"><strong>تعذر إكمال العملية</strong><span>@_error</span></div> }
+    @if (!string.IsNullOrWhiteSpace(_notice)) { <div class="cc-alert cc-alert--success" role="status"><strong>تمت العملية</strong><span>@_notice</span></div> }
+
+    @if (_state is null)
+    {
+        <div class="cc-loading-card"><span class="cc-spinner" aria-hidden="true"></span><div><strong>جارٍ تحميل أرصدة المرتجعات</strong><p>يتم التحقق من الرصيد والفواتير وحسابات الصندوق والبنك.</p></div></div>
+    }
     else
     {
-        <div class="row mb-3 g-2">
-            <div class="col-md-4"><div class="border rounded p-3"><small>إجمالي الرصيد الدائن</small><h4>@_state.EarnedBase.ToString("N2")</h4></div></div>
-            <div class="col-md-4"><div class="border rounded p-3"><small>الرصيد المستخدم</small><h4>@_state.ConsumedBase.ToString("N2")</h4></div></div>
-            <div class="col-md-4"><div class="border rounded p-3"><small>الرصيد المتاح</small><h4>@_state.AvailableBase.ToString("N2")</h4></div></div>
-        </div>
-        <div class="border rounded p-3 mb-4">
-            <h5>تسوية رصيد مرتجع مرحّل</h5>
-            <p class="text-muted">المبالغ الدائنة بالعملة الأساسية؛ ولا يمكن استعمال رصيد المرتجع أكثر من مرة.</p>
-            <label class="form-label">اختر المرتجع</label>
-            <select class="form-select mb-2" @bind="_returnId">
-                <option value="@Guid.Empty">— اختر مرتجعًا متاحًا —</option>
-                @foreach (var x in _state.Returns.Where(x => RemainingCredit(x.SalesReturnId, x.EstimatedUnappliedBaseCredit) > 0m))
-                {
-                    <option value="@x.SalesReturnId">@x.ReturnCode — @(RemainingCredit(x.SalesReturnId, x.EstimatedUnappliedBaseCredit).ToString("N2")) (@x.BaseCurrencyCode)</option>
-                }
-            </select>
-            @if (!_state.Returns.Any(x => RemainingCredit(x.SalesReturnId, x.EstimatedUnappliedBaseCredit) > 0m))
-            {
-                <p class="text-muted" role="status">لا يوجد مرتجع برصيد متاح حاليًا.</p>
-            }
-            <label class="form-label">طريقة التسوية</label>
-            <select class="form-select mb-2" @bind="_action">
-                <option value="apply">تطبيق الرصيد على فاتورة أخرى</option>
-                <option value="refund">رد المال للعميل</option>
-            </select>
-            @if (_action == "apply")
-            {
-                <label class="form-label">الفاتورة المستهدفة (فواتير العميل فقط)</label>
-                <select class="form-select mb-2" @bind="_invoiceId">
-                    <option value="@Guid.Empty">— اختر فاتورة مرحّلة —</option>
-                    @foreach (var invoice in _invoices.Where(i => i.PaymentSummary.OutstandingAmount > 0m))
-                    {
-                        <option value="@invoice.Id">@invoice.InvoiceCode — متبقي @invoice.PaymentSummary.OutstandingAmount.ToString("N2") @invoice.CurrencyCodeSnapshot</option>
-                    }
-                </select>
-                <div class="d-flex align-items-center gap-2 mb-2">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@(_busy || _invoicePage <= 1)" @onclick="PreviousInvoicesAsync">السابق</button>
-                    <span>صفحة @_invoicePage من @Math.Max(1L, (_invoiceTotal + InvoicePageSize - 1) / InvoicePageSize)</span>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@(_busy || _invoicePage * InvoicePageSize >= _invoiceTotal)" @onclick="NextInvoicesAsync">التالي</button>
-                </div>
-                @if (!_invoices.Any(i => i.PaymentSummary.OutstandingAmount > 0m))
-                { <p role="status">لا توجد فواتير مفتوحة في هذه الصفحة؛ يمكنك الانتقال إلى الصفحة التالية.</p> }
-                <label class="form-label">المبلغ بعملة الفاتورة المستهدفة</label>
-            }
-            else
-            {
-                <label class="form-label">طريقة رد المال</label>
-                <select class="form-select mb-2" @bind="_method">
-                    <option value="1">نقدًا</option><option value="3">حوالة بنكية</option>
-                </select>
-                <label class="form-label">العملة</label>
-                <select class="form-select mb-2" @bind="_currencyId">
-                    <option value="@Guid.Empty">— اختر عملة —</option>
-                    @foreach (var x in _currencies.Where(x => x.IsActive))
-                    { <option value="@x.Id">@x.Code — @x.NameAr</option> }
-                </select>
-                @if (_method == 1)
-                {
-                    <label class="form-label">الصندوق</label>
-                    <select class="form-select mb-2" @bind="_selectedCash">
-                        <option value="@Guid.Empty">— اختر الصندوق —</option>
-                        @foreach (var account in _cash.Where(x => x.IsActive && (!x.CurrencyId.HasValue || x.CurrencyId == _currencyId)))
-                        { <option value="@account.Id">@account.Code — @account.Name</option> }
+        <section class="cc-summary-grid" aria-label="ملخص الرصيد الدائن">
+            <article class="cc-summary-card"><div><span>إجمالي الرصيد المكتسب</span><small>قيمة أرصدة المرتجعات</small></div><strong>@_state.EarnedBase.ToString("N2")</strong></article>
+            <article class="cc-summary-card"><div><span>الرصيد المستخدم</span><small>التطبيقات والاستردادات المسجلة</small></div><strong>@_state.ConsumedBase.ToString("N2")</strong></article>
+            <article class="cc-summary-card cc-summary-card--available"><div><span>الرصيد المتاح</span><small>يمكن تسويته حسب الضوابط</small></div><strong>@_state.AvailableBase.ToString("N2")</strong></article>
+        </section>
+
+        <section class="cc-panel">
+            <div class="cc-panel-heading"><div><h2>تسوية رصيد مرتجع مرحّل</h2><p>اختر المرتجع وطريقة التسوية. لن يسمح النظام باستخدام الرصيد نفسه أكثر من مرة.</p></div><span class="cc-step-badge">1 <span>بيانات التسوية</span></span></div>
+            <div class="cc-form-grid">
+                <label class="cc-field cc-field--wide"><span>المرتجع الذي يحتوي على رصيد متاح <b>*</b></span>
+                    <select class="cc-control" @bind="_returnId">
+                        <option value="@Guid.Empty">اختر مرتجعًا</option>
+                        @foreach (var x in _state.Returns.Where(x => RemainingCredit(x.SalesReturnId, x.EstimatedUnappliedBaseCredit) > 0m))
+                        {
+                            <option value="@x.SalesReturnId">@x.ReturnCode — متاح @RemainingCredit(x.SalesReturnId, x.EstimatedUnappliedBaseCredit).ToString("N2") @x.BaseCurrencyCode</option>
+                        }
                     </select>
+                    @if (!_state.Returns.Any(x => RemainingCredit(x.SalesReturnId, x.EstimatedUnappliedBaseCredit) > 0m)) { <small class="cc-help">لا يوجد مرتجع برصيد متاح حاليًا.</small> }
+                </label>
+                <label class="cc-field"><span>طريقة التسوية <b>*</b></span>
+                    <select class="cc-control" @bind="_action">
+                        <option value="apply">تطبيق على فاتورة أخرى</option>
+                        <option value="refund">رد المبلغ للعميل</option>
+                    </select>
+                </label>
+
+                @if (_action == "apply")
+                {
+                    <label class="cc-field cc-field--wide"><span>الفاتورة المستهدفة <b>*</b></span>
+                        <select class="cc-control" @bind="_invoiceId">
+                            <option value="@Guid.Empty">اختر فاتورة مفتوحة للعميل</option>
+                            @foreach (var invoice in _invoices.Where(i => i.PaymentSummary.OutstandingAmount > 0m))
+                            {
+                                <option value="@invoice.Id">@invoice.InvoiceCode — المتبقي @invoice.PaymentSummary.OutstandingAmount.ToString("N2") @invoice.CurrencyCodeSnapshot</option>
+                            }
+                        </select>
+                        <small class="cc-help">تظهر الفواتير التابعة لهذا العميل فقط. اختر الصفحة المطلوبة إذا لم تجد الفاتورة.</small>
+                    </label>
+                    <div class="cc-invoice-pager">
+                        <span>صفحة @_invoicePage من @Math.Max(1L, (_invoiceTotal + InvoicePageSize - 1) / InvoicePageSize)</span>
+                        <div><button type="button" class="cc-button cc-button--quiet" disabled="@(_busy || _invoicePage <= 1)" @onclick="PreviousInvoicesAsync">السابق</button><button type="button" class="cc-button cc-button--quiet" disabled="@(_busy || (long)_invoicePage * InvoicePageSize >= _invoiceTotal)" @onclick="NextInvoicesAsync">التالي</button></div>
+                    </div>
+                    @if (!_invoices.Any(i => i.PaymentSummary.OutstandingAmount > 0m)) { <div class="cc-inline-note">لا توجد فاتورة مفتوحة في الصفحة الحالية؛ انتقل للصفحة التالية أو اختر رد المبلغ.</div> }
                 }
                 else
                 {
-                    <label class="form-label">الحساب البنكي</label>
-                    <select class="form-select mb-2" @bind="_selectedBank">
-                        <option value="@Guid.Empty">— اختر البنك —</option>
-                        @foreach (var account in _banks.Where(x => x.IsActive && (!x.CurrencyId.HasValue || x.CurrencyId == _currencyId)))
-                        { <option value="@account.Id">@account.Code — @account.BankName (@account.AccountName)</option> }
-                    </select>
+                    <label class="cc-field"><span>طريقة رد المبلغ <b>*</b></span>
+                        <select class="cc-control" @bind="_method"><option value="1">نقدًا</option><option value="3">حوالة بنكية</option></select>
+                    </label>
+                    <label class="cc-field"><span>عملة رد المبلغ <b>*</b></span>
+                        <select class="cc-control" @bind="_currencyId">
+                            <option value="@Guid.Empty">اختر العملة</option>
+                            @foreach (var x in _currencies.Where(x => x.IsActive)) { <option value="@x.Id">@x.Code — @x.NameAr</option> }
+                        </select>
+                    </label>
+                    @if (_method == 1)
+                    {
+                        <label class="cc-field"><span>الصندوق <b>*</b></span>
+                            <select class="cc-control" @bind="_selectedCash">
+                                <option value="@Guid.Empty">اختر الصندوق</option>
+                                @foreach (var account in _cash.Where(x => x.IsActive && (!x.CurrencyId.HasValue || x.CurrencyId == _currencyId))) { <option value="@account.Id">@account.Code — @account.Name</option> }
+                            </select>
+                        </label>
+                    }
+                    else
+                    {
+                        <label class="cc-field"><span>الحساب البنكي <b>*</b></span>
+                            <select class="cc-control" @bind="_selectedBank">
+                                <option value="@Guid.Empty">اختر الحساب البنكي</option>
+                                @foreach (var account in _banks.Where(x => x.IsActive && (!x.CurrencyId.HasValue || x.CurrencyId == _currencyId))) { <option value="@account.Id">@account.Code — @account.BankName (@account.AccountName)</option> }
+                            </select>
+                        </label>
+                    }
                 }
-                <label class="form-label">المبلغ بعملة رد المال</label>
-            }
-            <input type="number" min="0.01" step="0.01" class="form-control mb-3" @bind="_amount" />
-            <button type="button" class="btn btn-primary" disabled="@_busy" @onclick="SubmitAsync">
-                @(_busy ? "جارٍ التنفيذ..." : _action == "apply" ? "تطبيق الرصيد" : "إنشاء وترحيل سند الاسترداد")
-            </button>
-        </div>
-        <h5>سجل تسويات الرصيد الدائن</h5>
-        <div class="table-responsive"><table class="table table-sm table-striped">
-            <thead><tr><th>التاريخ</th><th>المرتجع</th><th>العملية</th><th>المبلغ الأساسي</th><th>الحالة</th><th>العكس</th></tr></thead>
-            <tbody>
-            @foreach (var x in _state.Applications)
-            {
-                <tr>
-                    <td>@x.AppliedAtUtc.ToString("yyyy-MM-dd")</td>
-                    <td>@x.SalesReturnId</td>
-                    <td>@(x.SettlementKind == 1 ? "تطبيق على فاتورة" : "رد مال")</td>
-                    <td>@x.AppliedSourceBaseAmount.ToString("N2")</td>
-                    <td>@(x.Status == 1 ? "ساري" : "معكوس")</td>
-                    <td>@if (x.Status == 1 && x.SettlementKind == 1)
-                        { <button type="button" class="btn btn-sm btn-outline-danger" disabled="@_busy" @onclick="() => ReverseAsync(x)">عكس التطبيق</button> }
-                    </td>
-                </tr>
-            }
-            </tbody>
-        </table></div>
+
+                <label class="cc-field"><span>@(_action == "apply" ? "المبلغ المراد تطبيقه بعملة الفاتورة" : "المبلغ المراد رده") <b>*</b></span>
+                    <input class="cc-control" type="number" min="0.01" step="0.01" @bind="_amount" />
+                    <small class="cc-help">أدخل مبلغًا موجبًا. يتحقق الخادم من الرصيد المتاح وصحة التسوية قبل الترحيل.</small>
+                </label>
+            </div>
+            <div class="cc-form-footer">
+                <div class="cc-safety-note"><span aria-hidden="true">ⓘ</span><span>التطبيق يخفض رصيد فاتورة أخرى. أما رد المبلغ فينشئ سند استرداد وفق الصندوق أو البنك والعملة المحددة.</span></div>
+                <button type="button" class="cc-button cc-button--primary cc-submit" disabled="@_busy" @onclick="SubmitAsync">@(_busy ? "جارٍ التنفيذ..." : _action == "apply" ? "تطبيق الرصيد" : "إنشاء سند الاسترداد وترحيله")</button>
+            </div>
+        </section>
+
+        <section class="cc-panel">
+            <div class="cc-panel-heading"><div><h2>سجل تسويات المرتجعات</h2><p>راجع عمليات تطبيق الرصيد أو رد المبلغ وحالة كل عملية.</p></div><span class="cc-record-count">@_state.Applications.Count عملية</span></div>
+            <div class="cc-table-wrap">
+                <table class="cc-table">
+                    <thead><tr><th>التاريخ</th><th>رقم المرتجع</th><th>نوع التسوية</th><th>المبلغ الأساسي</th><th>الحالة</th><th>الإجراء</th></tr></thead>
+                    <tbody>
+                        @foreach (var x in _state.Applications)
+                        {
+                            <tr>
+                                <td data-label="التاريخ">@x.AppliedAtUtc.ToString("yyyy-MM-dd")</td>
+                                <td data-label="رقم المرتجع"><span class="cc-code">@(_state.Returns.FirstOrDefault(r => r.SalesReturnId == x.SalesReturnId)?.ReturnCode ?? x.SalesReturnId.ToString("D"))</span></td>
+                                <td data-label="نوع التسوية">@(x.SettlementKind == 1 ? "تطبيق على فاتورة" : "رد مبلغ")</td>
+                                <td data-label="المبلغ الأساسي" class="cc-number">@x.AppliedSourceBaseAmount.ToString("N2")</td>
+                                <td data-label="الحالة"><span class="cc-status @(x.Status == 1 ? "cc-status--active" : "cc-status--reversed")">@(x.Status == 1 ? "ساري" : "معكوس")</span></td>
+                                <td data-label="الإجراء">@if (x.Status == 1 && x.SettlementKind == 1) { <button type="button" class="cc-button cc-button--danger" disabled="@_busy" @onclick="() => ReverseAsync(x)">عكس التطبيق</button> } else { <span class="cc-muted">—</span> }</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            @if (_state.Applications.Count == 0) { <div class="cc-empty-state">لا توجد تسويات مسجلة لهذا العميل حتى الآن.</div> }
+        </section>
     }
-</section>
+</div>
 
 @code {
     [Parameter] public Guid CustomerId { get; set; }
