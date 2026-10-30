@@ -91,8 +91,8 @@
                         {
                             <tr>
                                 <td data-label="تاريخ الترحيل">@row.PostingDate.ToString("yyyy-MM-dd")</td>
-                                <td data-label="رقم القيد"><span class="cw-mono">@row.JournalNumber</span></td>
-                                <td data-label="نوع المستند">@(row.SourceDocumentType ?? "تسوية")</td>
+                                <td data-label="رقم القيد"><a class="cw-mono" href="@($"/accounting/journals?journalId={row.JournalId:D}")" title="فتح القيد اليومي">@row.JournalNumber</a></td>
+                                <td data-label="نوع المستند">@ArabicSourceDocument(row.SourceDocumentType)</td>
                                 <td data-label="البيان" class="cw-description">@row.Description</td>
                                 <td data-label="مدين" class="cw-number">@row.DebitBase.ToString("N2")</td>
                                 <td data-label="دائن" class="cw-number">@row.CreditBase.ToString("N2")</td>
@@ -170,7 +170,16 @@
                                     <td data-label="التاريخ">@doc.PostingDate.ToString("yyyy-MM-dd")</td>
                                     <td data-label="المبلغ الأساسي" class="cw-number">@doc.BaseAmount.ToString("N2")</td>
                                     <td data-label="العملة">@doc.Currency</td><td data-label="الحالة"><span class="cw-status">@doc.Status</span></td>
-                                    <td data-label="القيد"><span class="cw-mono">@(doc.JournalEntryId?.ToString("D") ?? "—")</span></td>
+                                    <td data-label="القيد">
+                                        @if (doc.JournalEntryId is Guid journalId)
+                                        {
+                                            <a href="@($"/accounting/journals?journalId={journalId:D}")" title="فتح قيد المستند">فتح القيد</a>
+                                        }
+                                        else
+                                        {
+                                            <span>—</span>
+                                        }
+                                    </td>
                                 </tr>
                             }
                         </tbody>
@@ -192,6 +201,19 @@
 
 @code {
     [Parameter] public Guid CustomerId { get; set; }
+    private static string ArabicSourceDocument(string? type) => type switch
+    {
+        "SalesInvoice" => "فاتورة بيع",
+        "SalesReturn" => "مرتجع بيع",
+        "ReceiptVoucher" => "سند قبض",
+        "PaymentVoucher" => "سند صرف",
+        "JournalEntry" => "قيد يومية",
+        "CustomerAdvance" => "عربون عميل",
+        "CustomerOpening" => "رصيد افتتاحي",
+        null or "" => "تسوية",
+        _ => type ?? "مستند"
+    };
+
     private CustomerArWorkspaceDto? _model;
     private DateOnly? _from = new DateOnly(DateTime.Today.Year, DateTime.Today.Month, 1);
     private DateOnly? _to = DateOnly.FromDateTime(DateTime.Today);

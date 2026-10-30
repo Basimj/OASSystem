@@ -3,6 +3,8 @@
 @using System.Globalization
 @using OAS.Contracts.Accounting.Reports
 @using OAS.Contracts.Accounting.Suppliers
+@using OAS.Contracts.Accounting.Currencies
+@using OAS.Contracts.Common.Pagination
 @using OAS.Client.Services.Browser
 @inject IAccountingClientService Accounting
 @inject OasApiClient Api
@@ -52,7 +54,13 @@
                 </div>
                 <div class="col-6 col-md-2">
                     <label class="form-label small">العملة (الكود)</label>
-                    <input class="form-control form-control-sm" @bind="_currency" placeholder="كل العملات" />
+                    <select class="form-select form-select-sm" @bind="_currency" aria-label="تصفية المركز حسب العملة">
+                        <option value="">كل العملات</option>
+                        @foreach (var currency in _currencies)
+                        {
+                            <option value="@currency.Code">@currency.Code — @currency.NameAr</option>
+                        }
+                    </select>
                 </div>
                 <div class="col-6 col-md-3">
                     <label class="form-label small">بحث في المرجع أو الوصف</label>
@@ -78,7 +86,7 @@
         {
             <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
                 <label class="small" for="supplier-doc-type">مستندات المشتريات</label>
-                <select id="supplier-doc-type" class="form-select form-select-sm w-auto" @bind="_operationalType">
+                <select id="supplier-doc-type" class="form-select form-select-sm w-auto" value="@_operationalType" @onchange="OnOperationalTypeChanged">
                     <option value="PurchaseOrder">أوامر الشراء</option>
                     <option value="PurchaseReceipt">سندات الاستلام</option>
                 </select>
@@ -91,15 +99,10 @@
                 <label class="small" for="supplier-doc-status">حالة المستند</label>
                 <select id="supplier-doc-status" class="form-select form-select-sm w-auto" @bind="_statusFilter">
                     <option value="">جميع الحالات</option>
-                    <option value="1">الحالة 1</option>
-                    <option value="2">الحالة 2</option>
-                    <option value="3">الحالة 3</option>
-                    <option value="4">الحالة 4</option>
-                    <option value="5">الحالة 5</option>
-                    <option value="6">الحالة 6</option>
-                    <option value="7">الحالة 7</option>
-                    <option value="8">الحالة 8</option>
-                    <option value="9">الحالة 9</option>
+                    @foreach (var statusOption in CurrentStatusOptions)
+                    {
+                        <option value="@statusOption.Value">@statusOption.Label</option>
+                    }
                 </select>
                 <button class="btn btn-outline-primary btn-sm" disabled="@_busy" @onclick="SearchAsync">تطبيق الحالة</button>
             </div>
@@ -280,11 +283,37 @@
 
     private Guid _loadedSupplierId;
     private SupplierDto? _supplier;
+    private IReadOnlyList<CurrencyDto> _currencies = [];
     private SupplierStatementDto? _statement;
     private SupplierAgingReportDto? _aging;
     private SupplierWorkspaceDocumentsDto? _documents;
     private string _operationalType = "PurchaseOrder";
     private string? _statusFilter;
+    private string CurrentStatusDocumentType => _tab switch
+    {
+        "invoices" => "PurchaseInvoice",
+        "payments" => "PaymentVoucher",
+        "returns" => "PurchaseReturn",
+        "orders" => _operationalType,
+        _ => "PurchaseInvoice"
+    };
+
+    private IReadOnlyList<(byte Value, string Label)> CurrentStatusOptions
+    {
+        get
+        {
+            // Status codes correspond to the purchasing and payment enums.
+            var lastValue = CurrentStatusDocumentType switch
+            {
+                "PurchaseOrder" => (byte)9,
+                "PurchaseInvoice" => (byte)5,
+                _ => (byte)4
+            };
+            return Enumerable.Range(1, lastValue)
+                .Select(value => ((byte)value, StatusText(CurrentStatusDocumentType, (byte)value)))
+                .ToArray();
+        }
+    }
     private string _tab = "summary";
     private DateOnly _fromDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(-1));
     private DateOnly _toDate = DateOnly.FromDateTime(DateTime.Today);
@@ -303,12 +332,22 @@
     private async Task SelectTabAsync(string tab)
     {
         _tab = tab;
+        _statusFilter = null; // Status values have different meanings across documents.
         _page = 1;
         await LoadAsync();
     }
 
+    private void OnOperationalTypeChanged(ChangeEventArgs args)
+    {
+        _operationalType = args.Value?.ToString() ?? "PurchaseOrder";
+        _statusFilter = null;
+    }
+
     private async Task SearchAsync()
     {
+        if (byte.TryParse(_statusFilter, out var selected) &&
+            !CurrentStatusOptions.Any(x => x.Value == selected))
+            _statusFilter = null;
         _page = 1;
         await LoadAsync();
     }
@@ -331,6 +370,19 @@
         try
         {
             _supplier ??= await Accounting.GetSupplierByIdAsync(SupplierId);
+            if (_currencies.Count == 0)
+            {
+                try
+                {
+                    var currenciesPage = await Accounting.GetCurrenciesPageAsync(new PageRequest { PageSize = 100 });
+                    _currencies = currenciesPage.Items.OrderBy(x => x.Code).ToArray();
+                }
+                catch (Exception)
+                {
+                    // Currency choices are supplementary; do not block the supplier statement.
+                    _currencies = [];
+                }
+            }
             if (_supplier is null) { _error = "لم يتم العثور على المورد."; return; }
 
             _statement = null;

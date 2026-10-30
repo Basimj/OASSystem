@@ -45,6 +45,7 @@ public partial class SuppliersPage
     private long _importKey;
     private string _search = string.Empty;
     private string _filter = "all";
+    private Guid? _startInEditModeFor;
     private string _fileName = string.Empty;
     private byte[]? _fileBytes;
     private SpreadsheetPreview? _preview;
@@ -67,7 +68,7 @@ public partial class SuppliersPage
             {
                 new(
                     _listTabId,
-                    "الموردون",
+                    "جميع الموردين",
                     "/accounting/suppliers",
                     "fa-solid fa-truck-field",
                     _activeTabId == _listTabId,
@@ -286,6 +287,19 @@ public partial class SuppliersPage
         });
     }
 
+    private Task BackToSupplierListAsync()
+    {
+        _activeTabId = _listTabId;
+        _startInEditModeFor = null;
+        return Task.CompletedTask;
+    }
+
+    private async Task OpenSupplierForEditingAsync(Guid id)
+    {
+        _startInEditModeFor = id;
+        await OpenAsync(id);
+    }
+
     private async Task SaveAsync()
     {
         var tab = ActiveEditorTab;
@@ -420,6 +434,7 @@ public partial class SuppliersPage
             tab.Form = FromDto(result);
             tab.Title = GetTabTitle(result.NameAr, result.SupplierCode);
             tab.IsDirty = false;
+            _startInEditModeFor = null;
 
             await EnsureParentLookupAsync(result.ParentAccountId);
             Snackbar.Success("تم حفظ المورد بنجاح.");

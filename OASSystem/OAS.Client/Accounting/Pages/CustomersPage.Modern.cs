@@ -83,31 +83,19 @@ public partial class CustomersPage
         return id;
     }
 
-    private async Task BackToCustomerListAsync()
+    private Task BackToCustomerListAsync()
     {
-        var tab = ActiveEditorTab;
-        if (tab is not null)
-        {
-            if (tab.IsDirty)
-            {
-                var discard = await Dialog.ConfirmAsync(
-                    "تغييرات لم تُحفظ",
-                    "هناك بيانات عدلتها ولم تحفظها. هل تريد العودة إلى قائمة العملاء دون حفظها؟",
-                    AlertTone.Warning,
-                    confirmText: "العودة دون حفظ",
-                    cancelText: "متابعة التعديل");
-                if (!discard) return;
-            }
-
-            // The new design has no second tab strip. Remove an unused editor
-            // when going back so stale, unsaved forms are never reopened.
-            _editorTabs.Remove(tab);
-        }
+        // Switching tabs is not cancellation. Preserve any draft in its own tab.
         _activeTabId = _listTabId;
         _startInEditModeFor = null;
+        return Task.CompletedTask;
     }
 
-    private Task CancelCustomerEditAsync() => BackToCustomerListAsync();
+    private async Task CancelCustomerEditAsync()
+    {
+        if (ActiveEditorTab is { } tab)
+            await CloseTabAsync(tab.TabId); // existing unsaved-changes confirmation
+    }
 
     private async Task ToggleCustomerStatusWithConfirmationAsync()
     {

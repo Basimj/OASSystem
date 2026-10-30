@@ -1,0 +1,358 @@
+@namespace OAS.UiLib.Components.Accounting.Parties
+@using Microsoft.AspNetCore.Components.Web
+@using OAS.UiLib.Core.Models.Accounting
+@implements IDisposable
+
+<section class="oas-customers-list" dir="rtl" aria-busy="@Busy">
+    <header class="oas-customers-list__head">
+        <div class="oas-customers-list__heading">
+            <div class="oas-customers-list__heading-icon"><i class="fa-solid fa-users" aria-hidden="true"></i></div>
+            <div class="oas-customers-list__heading-text">
+                <nav class="oas-customers-list__breadcrumbs" aria-label="مسار الصفحة">المحاسبة والمالية <i class="fa-solid fa-chevron-left" aria-hidden="true"></i> الموردين</nav>
+                <h1>إدارة الموردين</h1>
+                <p>عرض الموردين وبياناتهم وحالة حساباتهم</p>
+            </div>
+        </div>
+        <div class="oas-customers-list__actions">
+            <button type="button" class="oas-customer-btn oas-customer-btn--primary" disabled="@Busy" @onclick="() => OnNew.InvokeAsync()">
+                <i class="fa-solid fa-plus" aria-hidden="true"></i> مورد جديد
+            </button>
+            <details class="oas-customers-list__excel">
+                <summary class="oas-customer-btn" aria-label="خيارات Excel">
+                    <i class="fa-solid fa-file-excel" aria-hidden="true"></i> Excel <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                </summary>
+                <div class="oas-customers-list__excel-menu">
+                    <button type="button" disabled="@Busy" @onclick="() => OnImport.InvokeAsync()"><i class="fa-solid fa-file-import" aria-hidden="true"></i> استيراد من Excel</button>
+                    <button type="button" disabled="@Busy" @onclick="() => OnTemplate.InvokeAsync()"><i class="fa-solid fa-download" aria-hidden="true"></i> تنزيل قالب Excel</button>
+                    <button type="button" disabled="@Busy" @onclick="() => OnExport.InvokeAsync()"><i class="fa-solid fa-file-export" aria-hidden="true"></i> تصدير إلى Excel</button>
+                </div>
+            </details>
+            <button type="button" class="oas-customer-btn" disabled="@Busy" @onclick="() => OnRefresh.InvokeAsync()">
+                <i class="fa-solid fa-rotate @(Busy ? "fa-spin" : "")" aria-hidden="true"></i> تحديث
+            </button>
+            <a class="oas-customer-btn oas-customers-list__ar-link" href="/accounting/suppliers/aging">
+                <i class="fa-solid fa-chart-pie" aria-hidden="true"></i> أعمار ديون الموردين
+            </a>
+            <a class="oas-customer-btn" href="/accounting/suppliers/openings">
+                <i class="fa-solid fa-book-open" aria-hidden="true"></i> الأرصدة الافتتاحية
+            </a>
+        </div>
+    </header>
+
+    <div class="oas-customers-list__stats" aria-label="ملخص الموردين">
+        <div class="oas-customer-stat oas-customer-stat--blue">
+            <span class="oas-customer-stat__icon"><i class="fa-solid fa-users" aria-hidden="true"></i></span>
+            <div><span>@(IsUnfiltered ? "إجمالي الموردين" : "نتائج البحث والتصفية")</span><strong>@TotalCount.ToString("N0")</strong></div>
+        </div>
+        <div class="oas-customer-stat oas-customer-stat--green">
+            <span class="oas-customer-stat__icon"><i class="fa-solid fa-user-check" aria-hidden="true"></i></span>
+            <div><span>النشطون في هذه الصفحة</span><strong>@Items.Count(x => x.IsActive).ToString("N0")</strong></div>
+        </div>
+        <div class="oas-customer-stat oas-customer-stat--red">
+            <span class="oas-customer-stat__icon"><i class="fa-solid fa-user-xmark" aria-hidden="true"></i></span>
+            <div><span>غير النشطين في هذه الصفحة</span><strong>@Items.Count(x => !x.IsActive).ToString("N0")</strong></div>
+        </div>
+        <a href="/accounting/suppliers/aging" class="oas-customer-stat oas-customer-stat--amber oas-customer-stat--link">
+            <span class="oas-customer-stat__icon"><i class="fa-solid fa-wallet" aria-hidden="true"></i></span>
+            <div><span>ذمم الموردين</span><strong class="oas-customer-stat__link-text">عرض أعمار الديون <i class="fa-solid fa-arrow-up-left" aria-hidden="true"></i></strong></div>
+        </a>
+    </div>
+
+    <div class="oas-customers-list__filters">
+        <div class="oas-customers-list__search">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <input type="search" value="@_searchValue" placeholder="ابحث بالاسم أو الرقم أو الجوال أو البريد الإلكتروني..."
+                   aria-label="البحث عن مورد" disabled="@Busy" @oninput="SearchInputAsync" @onkeydown="SearchKeyDownAsync" />
+            @if (!string.IsNullOrEmpty(_searchValue))
+            {
+                <button type="button" title="مسح البحث" aria-label="مسح البحث" @onclick="ClearSearchAsync"><i class="fa-solid fa-xmark"></i></button>
+            }
+        </div>
+        <label class="oas-customers-list__filter-field">
+            <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+            <select value="@Filter" aria-label="تصفية الموردين" disabled="@Busy" @onchange="FilterChangeAsync">
+                <option value="all">جميع الموردين</option>
+                <optgroup label="الحالة">
+                    <option value="active">النشطون</option>
+                    <option value="inactive">غير النشطين</option>
+                </optgroup>
+                <optgroup label="نوع المورد">
+                    <option value="individual">الأفراد</option>
+                    <option value="organization">المنشآت</option>
+                </optgroup>
+                <optgroup label="نطاق المورد">
+                    <option value="local">محليون</option>
+                    <option value="international">دوليون</option>
+                </optgroup>
+            </select>
+            <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+        </label>
+        <label class="oas-customers-list__filter-field oas-customers-list__city-field" title="تصفية المدن ضمن سجلات الصفحة الحالية فقط">
+            <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
+            <select value="@_city" aria-label="المدينة في الصفحة الحالية" @onchange="CityChange">
+                <option value="">كل مدن هذه الصفحة</option>
+                @foreach (var city in Cities)
+                {
+                    <option value="@city">@city</option>
+                }
+            </select>
+            <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+        </label>
+        <label class="oas-customers-list__filter-field oas-customers-list__sort-field">
+            <i class="fa-solid fa-arrow-down-wide-short" aria-hidden="true"></i>
+            <select value="@_sort" aria-label="ترتيب موردي الصفحة" @onchange="SortChange">
+                <option value="code">ترتيب الرقم</option>
+                <option value="name">الاسم: أ إلى ي</option>
+                <option value="name-desc">الاسم: ي إلى أ</option>
+            </select>
+            <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+        </label>
+    </div>
+
+    <div class="oas-customers-list__grid" role="region" aria-label="جدول الموردين" tabindex="0">
+        <table>
+            <thead>
+                <tr>
+                    <th class="oas-customers-list__check-col" scope="col"><input type="checkbox" checked="@AllVisibleSelected" aria-label="تحديد جميع الموردين في الصفحة المعروضة" @onchange="SelectAllVisible" /></th>
+                    <th scope="col">الرقم</th>
+                    <th scope="col">اسم المورد</th>
+                    <th scope="col">النوع</th>
+                    <th scope="col" class="oas-col-location">المدينة</th>
+                    <th scope="col" class="oas-col-contact">الجوال</th>
+                    <th scope="col" class="oas-col-account">الحساب المحاسبي</th>
+                    <th scope="col">الحالة</th>
+                    <th scope="col" class="oas-customers-list__actions-col">الإجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Busy && Items.Count == 0)
+                {
+                    <tr><td colspan="9" class="oas-customers-list__empty"><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> جارٍ تحميل الموردين...</td></tr>
+                }
+                else if (VisibleRows.Count == 0)
+                {
+                    <tr><td colspan="9" class="oas-customers-list__empty"><i class="fa-solid fa-truck-field" aria-hidden="true"></i> لا توجد سجلات مطابقة. جرّب تغيير البحث أو التصفية.</td></tr>
+                }
+                else
+                {
+                    @foreach (var item in VisibleRows)
+                    {
+                        <tr @key="item.Id" class="@(_selected.Contains(item.Id) ? "is-selected" : "")">
+                            <td class="oas-customers-list__check-col"><input type="checkbox" checked="@_selected.Contains(item.Id)" aria-label="تحديد @item.Name" @onchange="e => ToggleSelected(item.Id, e.Value is bool b && b)" /></td>
+                            <td><button class="oas-customers-list__code" type="button" @onclick="() => OnOpen.InvokeAsync(item.Id)">@item.Code</button></td>
+                            <td>
+                                <button class="oas-customers-list__name" type="button" @onclick="() => OnOpen.InvokeAsync(item.Id)">
+                                    <span class="oas-customers-list__name-icon"><i class="@(item.EntityLabel == "منشأة" ? "fa-solid fa-building" : "fa-solid fa-user")" aria-hidden="true"></i></span>
+                                    <span>@item.Name</span>
+                                </button>
+                            </td>
+                            <td>@(string.IsNullOrWhiteSpace(item.EntityLabel) ? "—" : item.EntityLabel)</td>
+                            <td class="oas-col-location">@DisplayCity(item)</td>
+                            <td class="oas-col-contact"><span dir="ltr" class="oas-customers-list__ltr">@(!string.IsNullOrWhiteSpace(item.Mobile) ? item.Mobile : "—")</span></td>
+                            <td class="oas-col-account"><span dir="ltr" class="oas-customers-list__account-code">@item.AccountCode</span></td>
+                            <td><span class="oas-customers-list__status @(item.IsActive ? "is-active" : "is-inactive")"><span class="oas-customers-list__status-dot"></span>@(item.IsActive ? "نشط" : "غير نشط")</span></td>
+                            <td>
+                                <div class="oas-customers-list__row-actions">
+                                    <button type="button" title="عرض بيانات المورد" aria-label="عرض بيانات @item.Name" @onclick="() => OnOpen.InvokeAsync(item.Id)"><i class="fa-regular fa-eye" aria-hidden="true"></i></button>
+                                    <button type="button" title="تعديل بيانات المورد" aria-label="تعديل @item.Name" @onclick="() => OnEdit.InvokeAsync(item.Id)"><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
+                                    <a title="المركز المالي للمورد" aria-label="كشف حساب @item.Name" href="@($"/accounting/suppliers/{item.Id:D}/center")"><i class="fa-regular fa-file-lines" aria-hidden="true"></i></a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @* Phone-specific cards show the same current-page results, without a wide table. *@
+    <div class="oas-customers-list__mobile-cards" role="region" aria-label="قائمة الموردين للجوال" tabindex="0">
+        @if (Busy && Items.Count == 0)
+        {
+            <p class="oas-customers-list__mobile-empty">جارٍ تحميل الموردين...</p>
+        }
+        else if (VisibleRows.Count == 0)
+        {
+            <p class="oas-customers-list__mobile-empty">لا يوجد موردون مطابقون للبحث.</p>
+        }
+        else
+        {
+            @foreach (var item in VisibleRows)
+            {
+                <article class="oas-customers-list__mobile-card" @key="item.Id">
+                    <div class="oas-customers-list__mobile-card-head">
+                        <button class="oas-customers-list__mobile-name" type="button" @onclick="() => OnOpen.InvokeAsync(item.Id)">
+                            <i class="@(item.EntityLabel == "منشأة" ? "fa-solid fa-building" : "fa-solid fa-user")" aria-hidden="true"></i>
+                            <span>@item.Name</span>
+                        </button>
+                        <span class="oas-customers-list__status @(item.IsActive ? "is-active" : "is-inactive")">@(item.IsActive ? "نشط" : "موقوف")</span>
+                    </div>
+                    <div class="oas-customers-list__mobile-meta">
+                        <span dir="ltr">@item.Code</span>
+                        <span>@item.EntityLabel</span>
+                        <span>@DisplayCity(item)</span>
+                    </div>
+                    <div class="oas-customers-list__mobile-foot">
+                        <span dir="ltr"><i class="fa-solid fa-mobile-screen-button" aria-hidden="true"></i> @(!string.IsNullOrWhiteSpace(item.Mobile) ? item.Mobile : "—")</span>
+                        <div>
+                            <button type="button" @onclick="() => OnOpen.InvokeAsync(item.Id)"><i class="fa-regular fa-eye" aria-hidden="true"></i> تفاصيل</button>
+                            <button type="button" @onclick="() => OnEdit.InvokeAsync(item.Id)"><i class="fa-solid fa-pen" aria-hidden="true"></i> تعديل</button>
+                            <a href="@($"/accounting/suppliers/{item.Id:D}/center")" title="المركز المالي للمورد"><i class="fa-regular fa-file-lines" aria-hidden="true"></i> كشف الحساب</a>
+                        </div>
+                    </div>
+                </article>
+            }
+        }
+    </div>
+
+    <footer class="oas-customers-list__footer">
+        <div class="oas-customers-list__footer-summary">
+            @if (_selected.Count > 0)
+            {
+                <span>@_selected.Count محدد</span>
+                @if (_selected.Count == 1)
+                {
+                    <button type="button" @onclick="() => OnOpen.InvokeAsync(_selected.First())">فتح المحدد</button>
+                }
+                <button type="button" @onclick="ClearSelection">إلغاء التحديد</button>
+            }
+            else
+            {
+                <span>عرض @StartRecord–@EndRecord من @TotalCount.ToString("N0") سجل</span>
+                @if (!string.IsNullOrWhiteSpace(_city))
+                {
+                    <span class="oas-customers-list__local-hint">المدينة: تصفية الصفحة الحالية</span>
+                }
+            }
+        </div>
+        <nav class="oas-customers-list__pagination" aria-label="صفحات الموردين">
+            <button type="button" aria-label="الصفحة السابقة" title="الصفحة السابقة" disabled="@(Busy || PageNumber <= 1)" @onclick="() => OnPreviousPage.InvokeAsync()"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+            <span>صفحة <strong>@PageNumber</strong> من @Math.Max(1, TotalPages)</span>
+            <button type="button" aria-label="الصفحة التالية" title="الصفحة التالية" disabled="@(Busy || PageNumber >= TotalPages)" @onclick="() => OnNextPage.InvokeAsync()"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button>
+        </nav>
+    </footer>
+</section>
+
+@code {
+    [Parameter] public IReadOnlyList<UiAccountingPartyListItem> Items { get; set; } = [];
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string Search { get; set; } = string.Empty;
+    [Parameter] public string Filter { get; set; } = "all";
+    [Parameter] public long TotalCount { get; set; }
+    [Parameter] public int PageNumber { get; set; } = 1;
+    [Parameter] public int TotalPages { get; set; } = 1;
+    [Parameter] public EventCallback<string?> SearchChanged { get; set; }
+    [Parameter] public EventCallback<string?> OnSearch { get; set; }
+    [Parameter] public EventCallback<string?> FilterChanged { get; set; }
+    [Parameter] public EventCallback OnNew { get; set; }
+    [Parameter] public EventCallback OnRefresh { get; set; }
+    [Parameter] public EventCallback<Guid> OnOpen { get; set; }
+    [Parameter] public EventCallback<Guid> OnEdit { get; set; }
+    [Parameter] public EventCallback OnPreviousPage { get; set; }
+    [Parameter] public EventCallback OnNextPage { get; set; }
+    [Parameter] public EventCallback OnImport { get; set; }
+    [Parameter] public EventCallback OnTemplate { get; set; }
+    [Parameter] public EventCallback OnExport { get; set; }
+
+    private string _searchValue = string.Empty;
+    private string _city = string.Empty;
+    private string _sort = "code";
+    private int _lastPage = -1;
+    private readonly HashSet<Guid> _selected = [];
+    private CancellationTokenSource? _searchCts;
+    private bool IsUnfiltered => string.IsNullOrWhiteSpace(Search) && (Filter is "all" or "");
+    private long StartRecord => TotalCount == 0 ? 0 : ((long)PageNumber - 1) * 25 + 1;
+    private long EndRecord => Math.Min(TotalCount, (long)PageNumber * 25);
+
+    protected override void OnParametersSet()
+    {
+        _searchValue = Search;
+        if (_lastPage != PageNumber)
+        {
+            _lastPage = PageNumber;
+            _selected.Clear();
+            _city = string.Empty;
+        }
+    }
+
+    private IReadOnlyList<string> Cities => Items.Select(DisplayCity)
+        .Where(x => x != "—")
+        .Distinct(StringComparer.CurrentCultureIgnoreCase)
+        .OrderBy(x => x, StringComparer.CurrentCulture)
+        .ToArray();
+
+    private IReadOnlyList<UiAccountingPartyListItem> VisibleRows
+    {
+        get
+        {
+            IEnumerable<UiAccountingPartyListItem> query = Items;
+            if (!string.IsNullOrWhiteSpace(_city))
+                query = query.Where(x => string.Equals(DisplayCity(x), _city, StringComparison.CurrentCultureIgnoreCase));
+            query = _sort switch
+            {
+                "name" => query.OrderBy(x => x.Name, StringComparer.CurrentCulture),
+                "name-desc" => query.OrderByDescending(x => x.Name, StringComparer.CurrentCulture),
+                _ => query.OrderBy(x => x.Code, StringComparer.OrdinalIgnoreCase)
+            };
+            return query.ToArray();
+        }
+    }
+
+    private bool AllVisibleSelected => VisibleRows.Count > 0 && VisibleRows.All(x => _selected.Contains(x.Id));
+    private static string DisplayCity(UiAccountingPartyListItem item) =>
+        string.IsNullOrWhiteSpace(item.Location) ? "—" : item.Location.Split(" / ", StringSplitOptions.None)[0];
+
+    private async Task SearchInputAsync(ChangeEventArgs e)
+    {
+        _searchValue = e.Value?.ToString() ?? string.Empty;
+        await SearchChanged.InvokeAsync(_searchValue);
+        _searchCts?.Cancel();
+        _searchCts?.Dispose();
+        var cts = new CancellationTokenSource();
+        _searchCts = cts;
+        try
+        {
+            await Task.Delay(380, cts.Token);
+            if (!cts.IsCancellationRequested)
+                await OnSearch.InvokeAsync(_searchValue);
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private async Task SearchKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (e.Key != "Enter") return;
+        _searchCts?.Cancel();
+        await OnSearch.InvokeAsync(_searchValue);
+    }
+
+    private async Task ClearSearchAsync()
+    {
+        _searchCts?.Cancel();
+        _searchValue = string.Empty;
+        await SearchChanged.InvokeAsync(_searchValue);
+        await OnSearch.InvokeAsync(_searchValue);
+    }
+
+    private async Task FilterChangeAsync(ChangeEventArgs e)
+    {
+        _selected.Clear();
+        _city = string.Empty;
+        await FilterChanged.InvokeAsync(e.Value?.ToString() ?? "all");
+    }
+
+    private void CityChange(ChangeEventArgs e) { _city = e.Value?.ToString() ?? string.Empty; _selected.Clear(); }
+    private void SortChange(ChangeEventArgs e) { _sort = e.Value?.ToString() ?? "code"; }
+    private void ToggleSelected(Guid id, bool value) { if (value) _selected.Add(id); else _selected.Remove(id); }
+    private void SelectAllVisible(ChangeEventArgs e)
+    {
+        var selected = e.Value is bool b && b;
+        foreach (var item in VisibleRows)
+        {
+            if (selected) _selected.Add(item.Id);
+            else _selected.Remove(item.Id);
+        }
+    }
+    private void ClearSelection() => _selected.Clear();
+    public void Dispose() { _searchCts?.Cancel(); _searchCts?.Dispose(); }
+}

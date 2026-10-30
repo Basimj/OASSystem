@@ -1,0 +1,16 @@
+/* Customer page document tabs; kept separate from the in-profile section tabs. */
+.oas-customer-workspace-tabs {
+    min-width: 0;
+    margin: 0 9px 5px;
+    padding: 4px 6px;
+    border-radius: 9px;
+    border: 1px solid var(--oas-color-border, #dbe5f0);
+    background: var(--oas-color-surface, #fff);
+}
+.oas-customer-workspace-tabs ::deep .ui-application-tabs {
+    width: 100%;
+    min-width: 0;
+}
+@media (max-width: 640px) {
+    .oas-customer-workspace-tabs { margin-inline: 5px; }
+}

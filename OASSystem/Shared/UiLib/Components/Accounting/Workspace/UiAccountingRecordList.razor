@@ -11,6 +11,7 @@
     {
         @foreach (var item in Items)
         {
+            <div class="@(ItemActionHref is null ? "ui-acc-record-list__entry ui-acc-record-list__entry--plain" : "ui-acc-record-list__entry")">
             <button type="button"
                     class="ui-acc-record-row"
                     @onclick="() => OpenAsync(item.Id)">
@@ -50,6 +51,16 @@
                     <i class="fa-solid fa-chevron-left ui-acc-record-row__chevron" aria-hidden="true"></i>
                 </span>
             </button>
+            @if (ItemActionHref is not null)
+            {
+                <a class="ui-acc-record-list__secondary-action"
+                   href="@ItemActionHref(item.Id)"
+                   aria-label="@($"{ItemActionLabel} — {item.Title}")">
+                    <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+                    @ItemActionLabel
+                </a>
+            }
+            </div>
         }
     }
 </div>
@@ -71,6 +82,8 @@
     [Parameter] public string EmptyDescription { get; set; } = "ابدأ بإضافة أول سجل أو غيّر معايير البحث.";
     [Parameter] public string EmptyIconCssClass { get; set; } = "fa-regular fa-folder-open";
     [Parameter] public EventCallback<Guid> OnOpen { get; set; }
+    [Parameter] public Func<Guid, string>? ItemActionHref { get; set; }
+    [Parameter] public string ItemActionLabel { get; set; } = "التفاصيل";
 
     private Task OpenAsync(Guid id) => OnOpen.InvokeAsync(id);
 }

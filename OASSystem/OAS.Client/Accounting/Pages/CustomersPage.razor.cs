@@ -67,7 +67,7 @@ public partial class CustomersPage
             {
                 new(
                     _listTabId,
-                    "العملاء",
+                    "جميع العملاء",
                     "/accounting/customers",
                     "fa-solid fa-users",
                     _activeTabId == _listTabId,
@@ -467,8 +467,16 @@ public partial class CustomersPage
 
     private Task SelectTabAsync(Guid tabId)
     {
-        if (tabId == _listTabId || _editorTabs.Any(x => x.TabId == tabId))
+        if (tabId == _listTabId)
+        {
+            _activeTabId = _listTabId;
+            _startInEditModeFor = null;
+        }
+        else if (_editorTabs.FirstOrDefault(x => x.TabId == tabId) is { } tab)
+        {
             _activeTabId = tabId;
+            _startInEditModeFor = !tab.IsNew && tab.IsDirty ? tab.EntityId : null;
+        }
 
         return Task.CompletedTask;
     }

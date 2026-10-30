@@ -3694,3 +3694,75 @@
         margin-inline-start: 0;
     }
 }
+
+
+/* Customer/supplier UX: inline supplier document tabs and direct financial access. */
+.ui-acc-workspace--supplier-management .ui-acc-workspace__combined-toolbar {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    min-width: 0;
+    padding: .35rem .45rem;
+    border: 1px solid var(--oas-acc-card-border);
+    background: var(--oas-acc-card-bg);
+    border-radius: var(--oas-acc-radius);
+}
+.ui-acc-workspace--supplier-management .ui-acc-workspace__combined-toolbar > .ui-acc-workspace__tabs {
+    flex: 1 1 0;
+    min-width: 0;
+    width: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+}
+.ui-acc-workspace--supplier-management .ui-acc-workspace__combined-toolbar > .ui-acc-workspace__actions {
+    flex: 0 0 auto;
+    width: auto;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+}
+.ui-acc-workspace--supplier-management .ui-acc-workspace__combined-toolbar .ui-workspace-actionbar {
+    flex-wrap: wrap;
+    gap: .35rem;
+}
+.ui-acc-record-list__entry {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: .45rem;
+    min-width: 0;
+}
+.ui-acc-record-list__entry--plain { display: contents; }
+.ui-acc-record-list__entry .ui-acc-record-row { min-width: 0; }
+.ui-acc-record-list__secondary-action {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    white-space: nowrap;
+    padding: .42rem .65rem;
+    margin-inline-end: .45rem;
+    border: 1px solid var(--oas-acc-card-border);
+    border-radius: .5rem;
+    color: var(--oas-acc-primary);
+    background: var(--oas-acc-card-bg);
+    font-size: .75rem;
+    font-weight: 700;
+    text-decoration: none;
+}
+.ui-acc-record-list__secondary-action:hover { border-color: var(--oas-acc-primary); }
+@media (max-width: 1100px) {
+    .ui-acc-workspace--supplier-management .ui-acc-workspace__combined-toolbar { flex-wrap: wrap; }
+    .ui-acc-workspace--supplier-management .ui-acc-workspace__combined-toolbar > .ui-acc-workspace__tabs,
+    .ui-acc-workspace--supplier-management .ui-acc-workspace__combined-toolbar > .ui-acc-workspace__actions { flex: 1 1 100%; width: 100%; }
+}
+@media (max-width: 680px) {
+    .ui-acc-record-list__entry { grid-template-columns: minmax(0, 1fr); }
+    .ui-acc-record-list__secondary-action { width: fit-content; margin: 0 0 .4rem; }
+}
+.oas-shell.oas-theme-dark .ui-acc-workspace--supplier-management .ui-acc-workspace__combined-toolbar {
+    background: var(--oas-color-surface, #151d2b);
+    border-color: var(--oas-color-border, #2c3648);
+}

@@ -183,3 +183,16 @@
   .oas-customer-stat--red,.oas-customer-stat--amber {display:none;}
   .oas-customers-list__mobile-foot {align-items:flex-start;flex-wrap:wrap;}
 }
+
+/* Account for the permanent customer document-tab strip above this workspace. */
+@media (min-width: 801px) {
+    .oas-customers-list {
+        height: calc(100dvh - var(--oas-topbar-height, 80px) - 68px);
+        min-height: 420px;
+    }
+}
+@media (max-width: 700px) {
+    .oas-customers-list {
+        height: calc(100dvh - var(--oas-topbar-height, 80px) - 62px);
+    }
+}

@@ -5,7 +5,7 @@
 @using OAS.UiLib.Core.Models
 @using OAS.UiLib.Core.Models.Accounting
 
-<UiAccountingWorkspace ShowTabs="true">
+<UiAccountingWorkspace ShowTabs="true" InlineTabsWithActions="@IsSupplier" AdditionalCssClass="@(IsSupplier ? "ui-acc-workspace--supplier-management" : null)">
     <Actions>
         <UiWorkspaceActionBar>
             @if (!EditorOpen)
@@ -39,7 +39,12 @@
     <Body>
         @if (!EditorOpen)
         {
-            <UiAccountingRecordList Items="@RecordItems" OnOpen="OnOpen" EmptyTitle="@(IsSupplier ? "لا يوجد موردون" : "لا يوجد عملاء")" EmptyDescription="ابدأ بإضافة أول سجل أو غيّر معايير البحث." EmptyIconCssClass="@(IsSupplier ? "fa-solid fa-truck-field" : "fa-solid fa-users")" />
+            <UiAccountingRecordList Items="@RecordItems" OnOpen="OnOpen"
+                                    ItemActionHref="@(IsSupplier ? (Func<Guid, string>)(id => $"/accounting/suppliers/{id:D}/center") : null)"
+                                    ItemActionLabel="المركز المالي"
+                                    EmptyTitle="@(IsSupplier ? "لا يوجد موردون" : "لا يوجد عملاء")"
+                                    EmptyDescription="ابدأ بإضافة أول سجل أو غيّر معايير البحث."
+                                    EmptyIconCssClass="@(IsSupplier ? "fa-solid fa-truck-field" : "fa-solid fa-users")" />
             <div class="ui-acc-pager" dir="rtl">
                 <UiButton Text="السابق" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Disabled="@(Busy || PageNumber <= 1)" OnClick="@(_ => OnPreviousPage.InvokeAsync())" />
                 <span>صفحة @PageNumber من @Math.Max(1, TotalPages) — @TotalCount سجل</span>

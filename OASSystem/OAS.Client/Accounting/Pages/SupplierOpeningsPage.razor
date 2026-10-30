@@ -4,8 +4,11 @@
 @using OAS.Contracts.Accounting.Currencies
 @using OAS.Contracts.Accounting.Suppliers
 @using OAS.Contracts.Accounting.SupplierOpenings
+@using OAS.UiLib.Services.Dialogs
+@using OAS.UiLib.Core.Enums
 @inject OasApiClient Api
 @inject IAccountingClientService Accounting
+@inject IUiDialogService Dialog
 
 <PageTitle>الأرصدة الافتتاحية للموردين | OAS</PageTitle>
 
@@ -80,6 +83,12 @@
             <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap mb-2">
                 <div><h2 class="h6 mb-1">@_batch.BatchCode</h2><small>حالة الدفعة: @Status(_batch.Status) | تاريخ: @_batch.AsOfDate | إجمالي أساسي: @_batch.TotalBaseOpenAmount.ToString("N2")</small></div>
                 <button class="btn btn-outline-secondary btn-sm" disabled="@_busy" @onclick="StartNew">دفعة جديدة</button>
+            </div>
+            <div class="row g-2 mb-3" aria-label="مراجعة الدفعة قبل الترحيل">
+                <div class="col-6 col-lg-3"><div class="border rounded p-2 h-100"><small class="text-muted d-block">عدد المستندات الافتتاحية</small><strong>@_batch.Items.Count</strong></div></div>
+                <div class="col-6 col-lg-3"><div class="border rounded p-2 h-100"><small class="text-muted d-block">عدد الموردين</small><strong>@_batch.Items.Select(x => x.SupplierId).Distinct().Count()</strong></div></div>
+                <div class="col-6 col-lg-3"><div class="border rounded p-2 h-100"><small class="text-muted d-block">العملات في الدفعة</small><strong>@string.Join("، ", _batch.Items.Select(x => x.CurrencyCode).Distinct())</strong></div></div>
+                <div class="col-6 col-lg-3"><div class="border rounded p-2 h-100"><small class="text-muted d-block">الإجمالي بالعملة الأساسية</small><strong>@_batch.TotalBaseOpenAmount.ToString("N2") @_batch.BaseCurrencyCode</strong></div></div>
             </div>
             <div class="table-responsive"><table class="table table-sm">
                 <thead><tr><th>المورد</th><th>المرجع القديم</th><th>الاستحقاق</th><th>العملة</th><th>الرصيد الأساسي</th><th>المخصص</th><th>المتبقي</th></tr></thead>
@@ -158,7 +167,17 @@
     }
     private async Task PostAsync()
     {
-        if (_batch is null) return;
+        if (_batch is null || _busy) return;
+        var approved = await Dialog.ConfirmAsync(
+            "مراجعة وترحيل الأرصدة الافتتاحية",
+            $"سيتم ترحيل الدفعة «{_batch.BatchCode}» بتاريخ {_batch.AsOfDate:yyyy-MM-dd}: " +
+            $"{_batch.Items.Count} مستندًا، لعدد {_batch.Items.Select(x => x.SupplierId).Distinct().Count()} مورد، " +
+            $"بإجمالي {_batch.TotalBaseOpenAmount:N2} {_batch.BaseCurrencyCode}. " +
+            "تأكد من عدم ترحيل هذه الأرصدة سابقًا. هل تريد المتابعة؟",
+            AlertTone.Warning,
+            "تأكيد الترحيل",
+            "رجوع للمراجعة");
+        if (!approved) return;
         await RunAsync(async () =>
         {
             var id = _batch.Id;

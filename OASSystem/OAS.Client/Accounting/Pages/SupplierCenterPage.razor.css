@@ -1,0 +1,30 @@
+/* OAS supplier report surfaces adapt to the active light/dark shell theme. */
+.container-fluid {
+    color: var(--oas-color-text, #17253d);
+    min-width: 0;
+}
+.container-fluid .card,
+.container-fluid .card-body,
+.container-fluid .bg-white {
+    background: var(--oas-color-surface, #fff);
+    color: var(--oas-color-text, #17253d);
+    border-color: var(--oas-color-border, #dce3ee);
+}
+.container-fluid .table {
+    --bs-table-bg: var(--oas-color-surface, #fff);
+    --bs-table-color: var(--oas-color-text, #17253d);
+    --bs-table-border-color: var(--oas-color-border, #dce3ee);
+}
+.container-fluid .form-control,
+.container-fluid .form-select {
+    background-color: var(--oas-color-surface, #fff);
+    color: var(--oas-color-text, #17253d);
+    border-color: var(--oas-color-border, #dce3ee);
+}
+.container-fluid .form-control::placeholder { color: var(--oas-color-text-muted, #78869c); }
+.container-fluid .form-select option {
+    background: var(--oas-color-surface, #fff);
+    color: var(--oas-color-text, #17253d);
+}
+.container-fluid .text-muted { color: var(--oas-color-text-muted, #78869c) !important; }
+.container-fluid .border { border-color: var(--oas-color-border, #dce3ee) !important; }

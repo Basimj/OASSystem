@@ -2,11 +2,21 @@
 @attribute [Authorize]
 @using OAS.UiLib.Components.Accounting.Parties
 @using OAS.UiLib.Components.Spreadsheets
+@using OAS.UiLib.Components.Navigation
 
 <PageTitle>العملاء | المحاسبة | OAS</PageTitle>
 
-@* Keep the list and editor as separate full-width workspaces. This avoids nesting
-   the customer editor within the legacy accounting workspace and duplicated tabs. *@
+<div class="oas-customer-workspace-tabs" dir="rtl">
+    <UiApplicationTabStrip Tabs="@WorkspaceTabs"
+                           AriaLabel="تبويبات العملاء"
+                           EnableContextMenu="true"
+                           OnSelect="SelectTabAsync"
+                           OnClose="CloseTabAsync"
+                           OnCloseOthers="CloseOtherTabsAsync"
+                           OnCloseAll="CloseAllTabsAsync" />
+</div>
+
+@* The list and editor retain their dedicated layout and share one tab state. *@
 @if (!EditorOpen)
 {
     <UiCustomerListDashboard Busy="@_busy"
