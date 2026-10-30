@@ -8,6 +8,15 @@ public sealed record UiAccountingHomeMetric(
     string? Meta = null,
     string? Href = null);
 
+public sealed record UiAccountingHomeFinancialMetric(
+    string Label,
+    string Value,
+    string Currency,
+    string IconCssClass,
+    string Accent,
+    string Meta,
+    string Href);
+
 public sealed record UiAccountingHomeTile(
     string Title,
     string Description,
@@ -34,4 +43,7 @@ public sealed record UiAccountingHomeActivityItem(
     string Meta,
     string Tone,
     string IconCssClass,
-    string Href);
+    string Href,
+    string DocumentType = "مستند",
+    string? Description = null,
+    string StatusLabel = "محدث");

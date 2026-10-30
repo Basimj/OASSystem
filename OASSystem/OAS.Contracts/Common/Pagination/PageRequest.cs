@@ -8,6 +8,8 @@ public sealed record PageRequest
     public int PageNumber { get; init; } = 1;
     public int PageSize { get; init; } = DefaultPageSize;
     public string? Search { get; init; }
+    // Optional server-side status filter, currently used by accounting journals.
+    public string? Status { get; init; }
     public string? SortBy { get; init; }
     public SortDirection SortDirection { get; init; } = SortDirection.Ascending;
 
@@ -16,6 +18,7 @@ public sealed record PageRequest
         PageNumber = Math.Max(1, PageNumber),
         PageSize = Math.Clamp(PageSize, 1, MaximumPageSize),
         Search = string.IsNullOrWhiteSpace(Search) ? null : Search.Trim(),
+        Status = string.IsNullOrWhiteSpace(Status) ? null : Status.Trim().ToLowerInvariant(),
         SortBy = string.IsNullOrWhiteSpace(SortBy) ? null : SortBy.Trim()
     };
 }

@@ -22,12 +22,16 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
         var localNow = TimeZoneInfo.ConvertTime(nowUtc, timeProvider.LocalTimeZone);
         var today = DateOnly.FromDateTime(localNow.DateTime);
 
-        var unpostedJournalCount = await db.Set<JournalEntry>()
+        var journalStatusRows = await db.Set<JournalEntry>()
             .AsNoTracking()
-            .LongCountAsync(x =>
-                x.Status != JournalEntryStatus.Posted &&
-                x.Status != JournalEntryStatus.Reversed,
-                cancellationToken);
+            .Where(x => x.Status != JournalEntryStatus.Posted && x.Status != JournalEntryStatus.Reversed)
+            .GroupBy(x => x.Status)
+            .Select(g => new { Status = g.Key, Count = g.LongCount() })
+            .ToListAsync(cancellationToken);
+        var draftCount = journalStatusRows.Where(x => x.Status == JournalEntryStatus.Draft).Sum(x => x.Count);
+        var pendingCount = journalStatusRows.Where(x => x.Status == JournalEntryStatus.PendingApproval).Sum(x => x.Count);
+        var approvedCount = journalStatusRows.Where(x => x.Status == JournalEntryStatus.Approved).Sum(x => x.Count);
+        var unpostedJournalCount = draftCount + pendingCount + approvedCount;
 
         var currentPeriod = await (
             from period in db.Set<FiscalPeriod>().AsNoTracking()
@@ -40,6 +44,7 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
                 period.Id,
                 period.Name,
                 period.PeriodNumber,
+                period.StartDate,
                 period.EndDate,
                 period.Status,
                 FiscalYearCode = year.Code
@@ -63,15 +68,13 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
             .AsNoTracking()
             .LongCountAsync(x => x.IsActive, cancellationToken);
 
-        var attention = new List<AccountingDashboardAttentionDto>(3);
-        if (unpostedJournalCount > 0)
-        {
-            attention.Add(new AccountingDashboardAttentionDto(
-                "unposted-journals",
-                $"{unpostedJournalCount:N0} قيود تنتظر الترحيل",
-                "danger",
-                "القيود اليومية"));
-        }
+        var attention = new List<AccountingDashboardAttentionDto>(5);
+        if (pendingCount > 0)
+            attention.Add(new AccountingDashboardAttentionDto("pending-approval-journals", "قيود تنتظر الاعتماد", "danger", $"{pendingCount:N0}"));
+        if (approvedCount > 0)
+            attention.Add(new AccountingDashboardAttentionDto("approved-journals", "قيود جاهزة للترحيل", "warning", $"{approvedCount:N0}"));
+        if (draftCount > 0)
+            attention.Add(new AccountingDashboardAttentionDto("draft-journals", "مسودات قيود غير مكتملة", "info", $"{draftCount:N0}"));
 
         if (currentPeriod is null)
         {
@@ -114,6 +117,62 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
                 $"{openCashShiftCount:N0} ورديات صندوق مفتوحة",
                 openCashShiftCount > 1 ? "warning" : "info",
                 meta));
+        }
+
+        // The dashboard never inserts decorative/mock money figures. All figures
+        // are computed from posted accounting data in the configured base currency.
+        var currency = await (from settings in db.Set<AccountingSettings>().AsNoTracking()
+                              join c in db.Set<Currency>().AsNoTracking()
+                                  on settings.BaseCurrencyId equals c.Id
+                              where settings.Id == AccountingSettings.SingletonId
+                              select new { c.Code, c.DecimalPlaces })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        AccountingDashboardFinancialDto? financial = null;
+        if (currency is not null)
+        {
+            var postedLines = from line in db.Set<JournalEntryLine>().AsNoTracking()
+                              join journal in db.Set<JournalEntry>().AsNoTracking()
+                                  on line.JournalEntryId equals journal.Id
+                              where journal.Status == JournalEntryStatus.Posted && journal.PostingDate <= today
+                              select new { line.AccountId, line.DebitAmount, line.CreditAmount };
+
+            var bankAccounts = db.Set<BankAccount>().AsNoTracking()
+                .Where(x => x.IsActive).Select(x => x.AccountId);
+            var bankBalance = await postedLines
+                .Where(x => bankAccounts.Contains(x.AccountId))
+                .SumAsync(x => x.DebitAmount - x.CreditAmount, cancellationToken);
+
+            // Group by GL account first: the same linked account must never be
+            // counted twice when multiple parties point to it.
+            var customerAccounts = db.Set<Customer>().AsNoTracking().Select(x => x.AccountId);
+            var customerBalances = await postedLines
+                .Where(x => customerAccounts.Contains(x.AccountId))
+                .GroupBy(x => x.AccountId)
+                .Select(g => g.Sum(x => x.DebitAmount - x.CreditAmount))
+                .ToListAsync(cancellationToken);
+            var receivables = customerBalances.Sum(x => Math.Max(0m, x));
+
+            var supplierAccounts = db.Set<Supplier>().AsNoTracking().Select(x => x.AccountId);
+            var supplierBalances = await postedLines
+                .Where(x => supplierAccounts.Contains(x.AccountId))
+                .GroupBy(x => x.AccountId)
+                .Select(g => g.Sum(x => x.CreditAmount - x.DebitAmount))
+                .ToListAsync(cancellationToken);
+            var payables = supplierBalances.Sum(x => Math.Max(0m, x));
+
+            decimal postedExpenses = 0m;
+            if (currentPeriod is not null)
+            {
+                postedExpenses = await db.Set<Expense>().AsNoTracking()
+                    .Where(x => x.Status == ExpenseStatus.Posted &&
+                        x.ExpenseDate >= currentPeriod.StartDate && x.ExpenseDate <= today)
+                    .SumAsync(x => x.Amount, cancellationToken);
+            }
+
+            financial = new AccountingDashboardFinancialDto(
+                currency.Code, currency.DecimalPlaces, today, currentPeriod?.StartDate,
+                bankBalance, receivables, payables, postedExpenses);
         }
 
         var journalActivities = await db.Set<JournalEntry>()
@@ -183,7 +242,18 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
             openCashShiftCount,
             activeBankAccountCount,
             attention,
-            activities);
+            activities,
+            new AccountingDashboardJournalCountsDto(draftCount, pendingCount, approvedCount),
+            financial,
+            currentPeriod?.StartDate,
+            currentPeriod?.Status switch
+            {
+                FiscalPeriodStatus.Open => "مفتوحة",
+                FiscalPeriodStatus.SoftClosed => "إقفال مبدئي",
+                FiscalPeriodStatus.Closed => "مغلقة",
+                _ => currentPeriod is null ? "غير محددة" : "غير معروفة"
+            },
+            nowUtc);
     }
 
     public Task<GeneralLedgerReportDto> GetGeneralLedgerAsync(

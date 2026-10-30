@@ -14,6 +14,11 @@
                            AttentionItems="@AttentionItems"
                            RecentActivities="@RecentActivities"
                            CurrentPeriodName="@(_dashboard?.CurrentFiscalPeriodName ?? "—")"
+                           CurrentPeriodStatus="@(_dashboard?.CurrentFiscalPeriodStatus ?? "غير محددة")"
+                           CurrentPeriodStartDate="@(_dashboard?.CurrentFiscalPeriodStartDate)"
+                           CurrentPeriodEndDate="@(_dashboard?.CurrentFiscalPeriodEndDate)"
+                           LastUpdatedText="@LastUpdatedText"
+                           FinancialMetrics="@FinancialMetrics"
                            IsLoading="@_loading"
                            ErrorText="@_error"
                            OnRefresh="LoadDashboardAsync" />
@@ -22,82 +27,84 @@
     private AccountingDashboardDto? _dashboard;
     private bool _loading;
     private string? _error;
+    private DateTimeOffset? _lastSuccessfulUpdate;
+
+    private string? LastUpdatedText => _lastSuccessfulUpdate?.ToLocalTime().ToString("yyyy/MM/dd hh:mm tt");
+
+    private IReadOnlyList<UiAccountingHomeFinancialMetric> FinancialMetrics
+    {
+        get
+        {
+            var finance = _dashboard?.Financial;
+            if (finance is null) return [];
+            var decimals = Math.Clamp((int)finance.DecimalPlaces, 0, 6);
+            string Format(decimal amount) => amount.ToString($"N{decimals}");
+            var asOf = finance.AsOfDate.ToString("yyyy/MM/dd");
+            return
+            [
+                new("مستحقات العملاء", Format(finance.CustomerDebitBalances), finance.CurrencyCode,
+                    "fa-solid fa-user-group", "blue", $"أرصدة مدينة حتى {asOf}", "/accounting/customer-ar"),
+                new("الحسابات البنكية", Format(finance.BankBalance), finance.CurrencyCode,
+                    "fa-solid fa-building-columns", "green", $"صافي حسابات البنوك النشطة حتى {asOf}", "/accounting/bank-accounts"),
+                new("المصروفات", finance.PeriodStartDate.HasValue ? Format(finance.PostedPeriodExpenses) : "—", finance.CurrencyCode,
+                    "fa-solid fa-wallet", "purple", finance.PeriodStartDate.HasValue ? $"سندات مرحلة منذ {finance.PeriodStartDate:yyyy/MM/dd}" : "لا توجد فترة مالية حالية", "/accounting/expenses"),
+                new("مستحقات الموردين", Format(finance.SupplierCreditBalances), finance.CurrencyCode,
+                    "fa-solid fa-truck-field", "red", $"أرصدة دائنة حتى {asOf}", "/accounting/suppliers/aging")
+            ];
+        }
+    }
 
     private IReadOnlyList<UiAccountingHomeMetric> Metrics =>
     [
-        new(
-            "قيود غير مرحلة",
-            _dashboard is null ? "—" : _dashboard.UnpostedJournalCount.ToString("N0"),
-            "fa-regular fa-file-lines",
-            _dashboard?.UnpostedJournalCount > 0 ? "danger" : "success",
-            _dashboard?.UnpostedJournalCount > 0 ? "تحتاج مراجعة أو ترحيل" : "لا توجد قيود معلقة",
-            "/accounting/journals"),
-        new(
-            "الفترة الحالية",
-            _dashboard?.CurrentFiscalPeriodName ?? "—",
-            "fa-regular fa-calendar-days",
-            "info",
-            _dashboard?.CurrentFiscalPeriodEndDate is DateOnly endDate ? $"تنتهي {endDate:yyyy/MM/dd}" : "الفترة المالية النشطة",
-            "/accounting/fiscal-years"),
-        new(
-            "ورديات صندوق مفتوحة",
-            _dashboard is null ? "—" : _dashboard.OpenCashShiftCount.ToString("N0"),
-            "fa-solid fa-cash-register",
-            _dashboard?.OpenCashShiftCount > 0 ? "warning" : "success",
-            _dashboard?.OpenCashShiftCount > 0 ? "تابع الورديات قبل الإقفال" : "لا توجد ورديات مفتوحة",
-            "/accounting/cash-shifts"),
-        new(
-            "الحسابات البنكية النشطة",
-            _dashboard is null ? "—" : _dashboard.ActiveBankAccountCount.ToString("N0"),
-            "fa-solid fa-building-columns",
-            "success",
-            "حسابات بنكية مفعلة",
-            "/accounting/bank-accounts")
+        new("الفترة المالية الحالية", _dashboard?.CurrentFiscalPeriodName ?? "—",
+            "fa-regular fa-calendar-days", "warning",
+            _dashboard?.CurrentFiscalPeriodEndDate is DateOnly endDate
+                ? $"{_dashboard.CurrentFiscalPeriodStatus} · حتى {endDate:yyyy/MM/dd}"
+                : "لا توجد فترة مالية حالية", "/accounting/fiscal-years"),
+        new("القيود غير المرحلة", _dashboard is null ? "—" : _dashboard.UnpostedJournalCount.ToString("N0"),
+            "fa-regular fa-file-lines", "danger",
+            _dashboard?.JournalCounts is { } counts
+                ? $"مسودات {counts.Draft:N0} · للاعتماد {counts.PendingApproval:N0} · للترحيل {counts.Approved:N0}"
+                : "القيود عبر جميع الفترات", "/accounting/journals?status=unposted"),
+        new("ورديات الصندوق المفتوحة", _dashboard is null ? "—" : _dashboard.OpenCashShiftCount.ToString("N0"),
+            "fa-solid fa-cash-register", "info",
+            _dashboard?.OpenCashShiftCount > 0 ? "تتطلب مراجعة قبل الإقفال" : "لا توجد ورديات مفتوحة", "/accounting/cash-shifts"),
+        new("الحسابات البنكية النشطة", _dashboard is null ? "—" : _dashboard.ActiveBankAccountCount.ToString("N0"),
+            "fa-solid fa-building-columns", "success", "الحسابات البنكية المفعّلة", "/accounting/bank-accounts")
     ];
 
     private static IReadOnlyList<UiAccountingHomeSection> Sections { get; } =
     [
-        new(
-            "الإعداد المحاسبي",
-            "fa-solid fa-gear",
-            [
-                new("شجرة الحسابات", "إدارة دليل الحسابات", "/accounting/accounts", "fa-solid fa-folder-tree", "primary"),
-                new("السنوات والفترات المالية", "فتح وإقفال الفترات", "/accounting/fiscal-years", "fa-regular fa-calendar-days", "blue"),
-                new("ملفات الترحيل", "ربط المستندات بالحسابات", "/accounting/posting-profiles", "fa-solid fa-layer-group", "green"),
-                new("إعدادات المحاسبة", "إعدادات الحسابات النظامية", "/accounting/settings", "fa-solid fa-sliders", "primary"),
-                new("مراكز التكلفة", "تعريف وربط المراكز", "/accounting/cost-centers", "fa-solid fa-network-wired", "orange", true),
-                new("العملات", "إدارة العملات ودقة الكسور", "/accounting/currencies", "fa-solid fa-coins", "green", true),
-                new("أسعار الصرف", "إدارة أسعار الصرف", "/accounting/exchange-rates", "fa-solid fa-arrow-right-arrow-left", "blue", true)
-            ]),
-        new(
-            "العمليات اليومية",
-            "fa-regular fa-file-lines",
-            [
-                new("القيود اليومية", "إدخال ومراجعة القيود", "/accounting/journals", "fa-solid fa-book-journal-whills", "primary"),
-                new("سندات القبض", "إدارة المقبوضات", "/accounting/receipt-vouchers", "fa-solid fa-arrow-down-long", "green"),
-                new("سندات الصرف", "إدارة المدفوعات", "/accounting/payment-vouchers", "fa-solid fa-arrow-up-long", "red"),
-                new("المصروفات", "تسجيل ومتابعة المصروفات", "/accounting/expenses", "fa-solid fa-wallet", "orange")
-            ]),
-        new(
-            "التقارير",
-            "fa-solid fa-chart-column",
-            [
-                new("دفتر الأستاذ", "عرض حركات الحسابات", "/accounting/reports?mode=general-ledger", "fa-solid fa-book-open", "primary"),
-                new("ميزان المراجعة", "مراجعة الأرصدة", "/accounting/reports?mode=trial-balance", "fa-solid fa-scale-balanced", "green"),
-                new("تقرير القيود", "استعراض وتصفية القيود", "/accounting/journal-report", "fa-solid fa-list-ul", "blue"),
-                new("التقارير المالية", "عرض التقارير المحاسبية", "/accounting/reports", "fa-solid fa-chart-line", "orange")
-            ]),
-        new(
-            "النقد والبنوك",
-            "fa-solid fa-building-columns",
-            [
-                new("الصناديق", "إدارة الصناديق النقدية", "/accounting/cash-accounts", "fa-solid fa-vault", "primary"),
-                new("البنوك", "الحسابات البنكية", "/accounting/bank-accounts", "fa-solid fa-building-columns", "blue"),
-                new("ورديات الصندوق", "فتح وإقفال الورديات", "/accounting/cash-shifts", "fa-regular fa-clock", "green"),
-                new("حسابات الموظفين", "ربط الموظفين بحساباتهم", "/accounting/employee-accounts", "fa-solid fa-user-tie", "primary"),
-                new("العملاء", "الحسابات المحاسبية للعملاء", "/accounting/customers", "fa-solid fa-user-group", "orange", true),
-                new("الموردون", "الحسابات المحاسبية للموردين", "/accounting/suppliers", "fa-solid fa-truck-field", "red", true)
-            ])
+        new("الإعداد المحاسبي", "fa-solid fa-gear", [
+            new("دليل الحسابات", "إدارة دليل الحسابات", "/accounting/accounts", "fa-solid fa-folder-tree"),
+            new("مراكز التكلفة", "إدارة المراكز", "/accounting/cost-centers", "fa-solid fa-network-wired"),
+            new("السنوات والفترات المالية", "إدارة الفترات", "/accounting/fiscal-years", "fa-regular fa-calendar-days"),
+            new("العملات وأسعار الصرف", "العملات وأسعارها", "/accounting/exchange-rates", "fa-solid fa-coins"),
+            new("إعدادات المحاسبة", "الربط والإعدادات", "/accounting/settings", "fa-solid fa-sliders")
+        ]),
+        new("العمليات اليومية", "fa-regular fa-file-lines", [
+            new("القيود اليومية", "إدخال ومتابعة القيود", "/accounting/journals", "fa-solid fa-book-journal-whills"),
+            new("سندات القبض", "إدارة المقبوضات", "/accounting/receipt-vouchers", "fa-solid fa-money-bill-trend-up"),
+            new("سندات الصرف", "إدارة المدفوعات", "/accounting/payment-vouchers", "fa-solid fa-money-bill-transfer"),
+            new("المصروفات", "المصروفات وأنواعها", "/accounting/expenses", "fa-solid fa-wallet"),
+            new("ورديات الصندوق", "إدارة ورديات الصندوق", "/accounting/cash-shifts", "fa-solid fa-cash-register"),
+            new("الصناديق النقدية", "إدارة الصناديق", "/accounting/cash-accounts", "fa-solid fa-vault"),
+            new("الحسابات البنكية", "إدارة البنوك", "/accounting/bank-accounts", "fa-solid fa-building-columns")
+        ]),
+        new("العملاء والموردون", "fa-solid fa-user-group", [
+            new("قائمة العملاء", "إدارة العملاء", "/accounting/customers", "fa-solid fa-users"),
+            new("أرصدة العملاء", "أرصدة الذمم المدينة", "/accounting/customer-ar", "fa-solid fa-chart-simple"),
+            new("قائمة الموردين", "إدارة الموردين", "/accounting/suppliers", "fa-solid fa-truck-field"),
+            new("أرصدة الموردين", "الأرصدة الافتتاحية", "/accounting/suppliers/openings", "fa-solid fa-list-ul"),
+            new("أعمار الديون", "أعمار الديون الدائنة", "/accounting/suppliers/aging", "fa-solid fa-hourglass-half")
+        ]),
+        new("التقارير المالية", "fa-solid fa-chart-column", [
+            new("ميزان المراجعة", "مراجعة الحسابات", "/accounting/reports?mode=trial-balance", "fa-solid fa-scale-balanced"),
+            new("دفتر الأستاذ", "تفاصيل حركات الحسابات", "/accounting/reports?mode=general-ledger", "fa-solid fa-book-open"),
+            new("تقرير اليومية", "تقرير القيود اليومية", "/accounting/journal-report", "fa-solid fa-file-lines"),
+            new("أرصدة العملاء", "متابعة الذمم المدينة", "/accounting/customer-ar", "fa-solid fa-user-group"),
+            new("أعمار الموردين", "الأرصدة والآجال", "/accounting/suppliers/aging", "fa-solid fa-file-invoice")
+        ])
     ];
 
     private IReadOnlyList<UiAccountingHomeAttentionItem> AttentionItems =>
@@ -125,7 +132,16 @@
         _error = null;
         try
         {
-            _dashboard = await Accounting.GetAccountingDashboardAsync();
+            var data = await Accounting.GetAccountingDashboardAsync();
+            if (data is null)
+            {
+                _error = "لم تُرجع الخدمة بيانات للوحة المحاسبة.";
+            }
+            else
+            {
+                _dashboard = data;
+                _lastSuccessfulUpdate = data.GeneratedAtUtc ?? DateTimeOffset.UtcNow;
+            }
         }
         catch (Exception)
         {
@@ -153,8 +169,37 @@
             RelativeTime(activity.OccurredAtUtc),
             tone,
             icon,
-            href);
+            href,
+            activity.ActivityType switch
+            {
+                "journal" => "قيد يومي",
+                "receipt" => "سند قبض",
+                "payment" => "سند صرف",
+                _ => "مستند"
+            },
+            activity.Description,
+            ActivityStatus(activity));
     }
+
+    private static string ActivityStatus(AccountingDashboardActivityDto activity) => activity.ActivityType switch
+    {
+        "journal" => ((JournalEntryStatus)activity.Status) switch
+        {
+            JournalEntryStatus.Posted => "مرحل",
+            JournalEntryStatus.Approved => "معتمد",
+            JournalEntryStatus.PendingApproval => "بانتظار الاعتماد",
+            JournalEntryStatus.Reversed => "معكوس",
+            _ => "مسودة"
+        },
+        "receipt" or "payment" => activity.Status switch
+        {
+            3 => "مرحل",
+            2 => "معتمد",
+            4 => "ملغى",
+            _ => "مسودة"
+        },
+        _ => "محدث"
+    };
 
     private static (string Title, string Tone, string Icon, string Href) JournalActivity(AccountingDashboardActivityDto activity)
     {
@@ -173,7 +218,9 @@
         AccountingDashboardActivityDto activity,
         bool isReceipt)
     {
-        var href = isReceipt ? "/accounting/receipt-vouchers" : "/accounting/payment-vouchers";
+        var href = isReceipt
+            ? $"/accounting/receipt-vouchers?voucherId={activity.EntityId:D}"
+            : $"/accounting/payment-vouchers?voucherId={activity.EntityId:D}";
         var icon = isReceipt ? "fa-solid fa-money-bill-trend-up" : "fa-solid fa-money-bill-transfer";
         var label = isReceipt ? "سند القبض" : "سند الصرف";
 
@@ -188,7 +235,10 @@
 
     private static string AttentionHref(string code) => code switch
     {
-        "unposted-journals" => "/accounting/journals",
+        "unposted-journals" => "/accounting/journals?status=unposted",
+        "pending-approval-journals" => "/accounting/journals?status=pending",
+        "approved-journals" => "/accounting/journals?status=approved",
+        "draft-journals" => "/accounting/journals?status=draft",
         "missing-current-period" => "/accounting/fiscal-years",
         "period-closing-soon" => "/accounting/fiscal-years",
         "open-cash-shifts" => "/accounting/cash-shifts",

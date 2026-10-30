@@ -5,4 +5,14 @@
 
 <PageTitle>سندات القبض | OAS</PageTitle>
 
-<AccountingWorkspaceHost Section="AccountingEntityType.ReceiptVouchers" />
+<AccountingWorkspaceHost Section="AccountingEntityType.ReceiptVouchers"
+                         InitialRecordId="@VoucherIdFromQuery"
+                         OpenNewRecordFromDashboard="@OpenNewFromQuery" />
+
+@code {
+    [Parameter, Microsoft.AspNetCore.Components.SupplyParameterFromQuery(Name = "voucherId")]
+    public Guid? VoucherIdFromQuery { get; set; }
+
+    [Parameter, Microsoft.AspNetCore.Components.SupplyParameterFromQuery(Name = "new")]
+    public bool OpenNewFromQuery { get; set; }
+}

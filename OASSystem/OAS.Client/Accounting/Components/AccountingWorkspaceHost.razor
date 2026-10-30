@@ -985,6 +985,13 @@
             }
             else
             {
+                @if (CurrentListEntity == AccountingEntityType.Journals && !string.IsNullOrWhiteSpace(InitialJournalStatus))
+                {
+                    <div class="oas-journal-filter-indicator" role="status">
+                        <span>مرشح القيود النشط: @JournalFilterText(InitialJournalStatus)</span>
+                        <a href="/accounting/journals" class="oas-journal-filter-indicator__clear">عرض كل القيود</a>
+                    </div>
+                }
                 <UiAccountingRecordList Items="@CurrentRecordItems"
                                         EmptyTitle="@CurrentEmptyTitle"
                                         EmptyDescription="@CurrentEmptyDescription"

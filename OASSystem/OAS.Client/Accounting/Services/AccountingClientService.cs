@@ -51,6 +51,11 @@ public sealed class AccountingClientService(
                 $"&search={Uri.EscapeDataString(normalized.Search)}";
         }
 
+        if (!string.IsNullOrWhiteSpace(normalized.Status))
+        {
+            query += $"&status={Uri.EscapeDataString(normalized.Status)}";
+        }
+
         if (!string.IsNullOrWhiteSpace(
                 normalized.SortBy))
         {

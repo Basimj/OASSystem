@@ -9,21 +9,23 @@ namespace OAS.Client.Accounting.Components;
 public partial class AccountingWorkspaceHost
 {
     [Parameter] public bool OpenNewJournalFromDashboard { get; set; }
+    [Parameter] public bool OpenNewRecordFromDashboard { get; set; }
 
     private bool _dashboardNewJournalOpened;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (_dashboardNewJournalOpened ||
-            !OpenNewJournalFromDashboard ||
-            Section != AccountingEntityType.Journals ||
-            _loadedSection != AccountingEntityType.Journals)
+            !((OpenNewJournalFromDashboard && Section == AccountingEntityType.Journals) ||
+              (OpenNewRecordFromDashboard && Section is AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers)) ||
+            !Section.HasValue ||
+            _loadedSection != Section.Value)
         {
             return;
         }
 
         // Set the flag before awaiting, avoiding creation of duplicate tabs.
         _dashboardNewJournalOpened = true;
-        await OpenNewRecord(AccountingEntityType.Journals);
+        await OpenNewRecord(Section!.Value);
     }
 }

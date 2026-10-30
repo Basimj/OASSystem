@@ -7,9 +7,13 @@
 
 <AccountingWorkspaceHost Section="AccountingEntityType.Journals"
                          InitialRecordId="JournalIdFromQuery"
+                         InitialJournalStatus="StatusFromQuery"
                          OpenNewJournalFromDashboard="OpenNewFromQuery" />
 
 @code {
+    [Parameter, SupplyParameterFromQuery(Name = "status")]
+    public string? StatusFromQuery { get; set; }
+
     [Parameter, SupplyParameterFromQuery(Name = "journalId")]
     public Guid? JournalIdFromQuery { get; set; }
 

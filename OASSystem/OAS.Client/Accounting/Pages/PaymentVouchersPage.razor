@@ -5,9 +5,18 @@
 
 <PageTitle>سندات الصرف | OAS</PageTitle>
 
-<AccountingWorkspaceHost Section="AccountingEntityType.PaymentVouchers" InitialPurchaseInvoiceId="@FromInvoice" />
+<AccountingWorkspaceHost Section="AccountingEntityType.PaymentVouchers"
+                         InitialPurchaseInvoiceId="@FromInvoice"
+                         InitialRecordId="@VoucherIdFromQuery"
+                         OpenNewRecordFromDashboard="@OpenNewFromQuery" />
 
 @code {
+    [Parameter, Microsoft.AspNetCore.Components.SupplyParameterFromQuery(Name = "voucherId")]
+    public Guid? VoucherIdFromQuery { get; set; }
+
+    [Parameter, Microsoft.AspNetCore.Components.SupplyParameterFromQuery(Name = "new")]
+    public bool OpenNewFromQuery { get; set; }
+
     [Microsoft.AspNetCore.Components.SupplyParameterFromQuery(Name = "fromInvoice")]
     public Guid? FromInvoice { get; set; }
 }

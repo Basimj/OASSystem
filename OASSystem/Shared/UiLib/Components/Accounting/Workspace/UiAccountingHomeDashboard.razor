@@ -4,37 +4,44 @@
 
 <section class="oas-acc-dashboard" dir="rtl" aria-busy="@IsLoading">
     <header class="oas-acc-dashboard__header">
-        <div class="oas-acc-dashboard__intro">
-            <span class="oas-acc-dashboard__intro-icon" aria-hidden="true"><i class="fa-solid fa-calculator"></i></span>
-            <div>
-                <div class="oas-acc-dashboard__breadcrumbs" aria-label="المسار الحالي">الرئيسية <i class="fa-solid fa-chevron-left" aria-hidden="true"></i> المحاسبة والمالية</div>
-                <h1>@Title</h1>
-                <p>@Subtitle</p>
+        <div class="oas-acc-dashboard__headline">
+            <div class="oas-acc-dashboard__breadcrumbs">الرئيسية <i class="fa-solid fa-chevron-left" aria-hidden="true"></i> المحاسبة العامة</div>
+            <h1>@Title</h1>
+            <p>@Subtitle</p>
+        </div>
+        <div class="oas-acc-dashboard__header-tools">
+            <a class="oas-acc-dashboard__period" href="/accounting/fiscal-years" aria-label="فتح إدارة الفترات المالية">
+                <span class="oas-acc-dashboard__period-icon"><i class="fa-regular fa-calendar-days" aria-hidden="true"></i></span>
+                <span><small>الفترة المالية الحالية</small><strong>@CurrentPeriodName</strong>
+                    <small class="oas-acc-dashboard__period-status @(CurrentPeriodStatus == "مفتوحة" ? "oas-acc-dashboard__period-status--open" : "oas-acc-dashboard__period-status--closed")">@CurrentPeriodStatus
+                        @if (CurrentPeriodStartDate.HasValue && CurrentPeriodEndDate.HasValue)
+                        {
+                            <span> · @CurrentPeriodStartDate.Value.ToString("yyyy/MM/dd") — @CurrentPeriodEndDate.Value.ToString("yyyy/MM/dd")</span>
+                        }
+                    </small>
+                </span>
+            </a>
+            <div class="oas-acc-dashboard__update" role="status" aria-live="polite">
+                <i class="fa-solid fa-rotate" aria-hidden="true"></i>
+                <span><small>آخر تحديث ناجح</small><strong>@(LastUpdatedText ?? "لم يتم التحديث بعد")</strong></span>
+                <button type="button" disabled="@IsLoading" @onclick="InvokeRefreshAsync" title="تحديث لوحة المحاسبة" aria-label="تحديث لوحة المحاسبة">
+                    <i class="fa-solid fa-arrows-rotate @(IsLoading ? "fa-spin" : null)" aria-hidden="true"></i>
+                </button>
             </div>
         </div>
-
-        <div class="oas-acc-dashboard__header-actions">
-            <a class="oas-acc-dashboard__action oas-acc-dashboard__action--primary" href="@PrimaryHref">
-                <i class="fa-solid fa-plus" aria-hidden="true"></i>
-                <span>@PrimaryActionText</span>
-            </a>
-            <button type="button" class="oas-acc-dashboard__action oas-acc-dashboard__action--secondary"
-                    disabled="@IsLoading" @onclick="InvokeRefreshAsync">
-                <i class="fa-solid fa-rotate @(IsLoading ? "fa-spin" : null)" aria-hidden="true"></i>
-                <span>تحديث</span>
-            </button>
-            <a class="oas-acc-dashboard__period" href="/accounting/fiscal-years" title="عرض السنوات والفترات المالية">
-                <i class="fa-regular fa-calendar-days" aria-hidden="true"></i>
-                <span>الفترة المالية: <strong>@CurrentPeriodName</strong></span>
-            </a>
-        </div>
     </header>
+
+    <nav class="oas-acc-dashboard__quick-actions" aria-label="إجراءات محاسبية سريعة">
+        <a class="oas-acc-dashboard__action oas-acc-dashboard__action--journal" href="@PrimaryHref"><i class="fa-solid fa-file-circle-plus" aria-hidden="true"></i> @PrimaryActionText</a>
+        <a class="oas-acc-dashboard__action oas-acc-dashboard__action--receipt" href="/accounting/receipt-vouchers?new=true"><i class="fa-solid fa-money-bill-transfer" aria-hidden="true"></i> سند قبض جديد</a>
+        <a class="oas-acc-dashboard__action oas-acc-dashboard__action--payment" href="/accounting/payment-vouchers?new=true"><i class="fa-solid fa-file-invoice-dollar" aria-hidden="true"></i> سند صرف جديد</a>
+    </nav>
 
     @if (!string.IsNullOrWhiteSpace(ErrorText))
     {
         <div class="oas-acc-dashboard__error" role="alert">
             <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-            <span>تعذر تحديث لوحة المحاسبة. @ErrorText</span>
+            <span>تعذر تحديث لوحة المحاسبة. @ErrorText @(LastUpdatedText is not null ? "الأرقام الظاهرة تخص آخر تحديث ناجح." : "")</span>
             <button type="button" disabled="@IsLoading" @onclick="InvokeRefreshAsync">إعادة المحاولة</button>
         </div>
     }
@@ -44,132 +51,148 @@
         {
             <a href="@metric.Href" class="oas-acc-dashboard__metric oas-acc-dashboard__metric--@metric.Accent"
                aria-label="@($"{metric.Label}: {metric.Value}. {metric.Meta}")">
-                <div class="oas-acc-dashboard__metric-top">
-                    <span class="oas-acc-dashboard__metric-title">@metric.Label</span>
-                    <span class="oas-acc-dashboard__metric-icon" aria-hidden="true"><i class="@metric.IconCssClass"></i></span>
-                </div>
+                <span class="oas-acc-dashboard__metric-icon" aria-hidden="true"><i class="@metric.IconCssClass"></i></span>
+                <span class="oas-acc-dashboard__metric-title">@metric.Label</span>
                 <strong class="oas-acc-dashboard__metric-value">@metric.Value</strong>
-                @if (!string.IsNullOrWhiteSpace(metric.Meta))
-                {
-                    <span class="oas-acc-dashboard__metric-note">@metric.Meta</span>
-                }
-                <i class="fa-solid fa-chevron-left oas-acc-dashboard__metric-arrow" aria-hidden="true"></i>
+                <span class="oas-acc-dashboard__metric-note">@metric.Meta</span>
+                <span class="oas-acc-dashboard__metric-go"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i> عرض التفاصيل</span>
             </a>
         }
     </section>
 
-    <section class="oas-acc-dashboard__navigation" aria-labelledby="accounting-shortcuts-title">
-        <div class="oas-acc-dashboard__navigation-header">
-            <h2 id="accounting-shortcuts-title">الوصول السريع للوحدات</h2>
-            <p>أهم المهام، مرتبة حسب مجال العمل</p>
-        </div>
-        <div class="oas-acc-dashboard__groups">
-            @foreach (var entry in Sections.Select((section, index) => new { Section = section, Index = index }))
-            {
-                var group = entry.Section;
-                <section class="oas-acc-dashboard__group oas-acc-dashboard__group--@entry.Index">
-                    <div class="oas-acc-dashboard__group-header">
-                        <h3><i class="@group.IconCssClass" aria-hidden="true"></i> @group.Title</h3>
-                        @if (group.Tiles.Any(tile => tile.IsSecondary))
-                        {
-                            <details class="oas-acc-dashboard__group-more">
-                                <summary title="المزيد من صفحات @group.Title" aria-label="المزيد من صفحات @group.Title"><i class="fa-solid fa-ellipsis" aria-hidden="true"></i></summary>
-                                <div class="oas-acc-dashboard__group-menu">
-                                    @foreach (var tile in group.Tiles.Where(tile => tile.IsSecondary))
-                                    {
-                                        <a href="@tile.Href">@tile.Title</a>
-                                    }
-                                </div>
-                            </details>
-                        }
-                    </div>
-                    <div class="oas-acc-dashboard__tiles">
-                        @foreach (var tile in group.Tiles.Where(tile => !tile.IsSecondary).Take(4))
-                        {
-                            <a class="oas-acc-dashboard__tile" href="@tile.Href" title="@tile.Description">
-                                <span class="oas-acc-dashboard__tile-icon" aria-hidden="true"><i class="@tile.IconCssClass"></i></span>
-                                <span class="oas-acc-dashboard__tile-content"><strong>@tile.Title</strong><small>@tile.Description</small></span>
-                            </a>
-                        }
-                    </div>
-                </section>
-            }
-        </div>
-    </section>
-
     <div class="oas-acc-dashboard__work-grid">
-        <section class="oas-acc-dashboard__panel oas-acc-dashboard__panel--attention" aria-labelledby="accounting-attention-title">
-            <div class="oas-acc-dashboard__panel-header">
-                <h2 id="accounting-attention-title"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i> تحتاج إلى انتباه</h2>
+        <section class="oas-acc-dashboard__panel oas-acc-dashboard__panel--activity" aria-labelledby="oas-activity-title">
+            <div class="oas-acc-dashboard__panel-head">
+                <h2 id="oas-activity-title"><i class="fa-regular fa-clock" aria-hidden="true"></i> آخر الأنشطة</h2>
+                <a href="/accounting/journal-report">تقرير اليومية <i class="fa-solid fa-chevron-left" aria-hidden="true"></i></a>
+            </div>
+            @if (IsLoading && LastUpdatedText is null)
+            {
+                <p class="oas-acc-dashboard__empty">جارٍ تحميل الأنشطة...</p>
+            }
+            else if (RecentActivities.Count == 0)
+            {
+                <p class="oas-acc-dashboard__empty">@(string.IsNullOrWhiteSpace(ErrorText) ? "لا توجد أنشطة حديثة." : "تعذر تحميل الأنشطة.")</p>
+            }
+            else
+            {
+                <div class="oas-acc-dashboard__activity-scroll" role="region" aria-label="آخر العمليات المحاسبية" tabindex="0">
+                    <table class="oas-acc-dashboard__activity-table">
+                        <thead><tr><th scope="col">الوقت</th><th scope="col">النوع والرقم</th><th scope="col">الوصف</th><th scope="col">الحالة</th></tr></thead>
+                        <tbody>
+                            @foreach (var item in RecentActivities.Take(5))
+                            {
+                                <tr>
+                                    <td class="oas-acc-dashboard__activity-time">@item.Meta</td>
+                                    <td><a href="@item.Href" class="oas-acc-dashboard__activity-ref"><i class="@item.IconCssClass" aria-hidden="true"></i><span><small>@item.DocumentType</small><strong dir="ltr">@item.Reference</strong></span></a></td>
+                                    <td><a href="@item.Href" class="oas-acc-dashboard__activity-description">@(string.IsNullOrWhiteSpace(item.Description) ? item.Title : item.Description)</a></td>
+                                    <td><span class="oas-acc-dashboard__status oas-acc-dashboard__status--@item.Tone">@item.StatusLabel</span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+
+        <section class="oas-acc-dashboard__panel oas-acc-dashboard__panel--financial" aria-labelledby="oas-financial-title">
+            <div class="oas-acc-dashboard__panel-head">
+                <h2 id="oas-financial-title"><i class="fa-solid fa-chart-column" aria-hidden="true"></i> الملخص المالي</h2>
+                <a href="/accounting/reports">التقارير <i class="fa-solid fa-chevron-left" aria-hidden="true"></i></a>
+            </div>
+            @if (FinancialMetrics.Count == 0)
+            {
+                <div class="oas-acc-dashboard__empty">
+                    @if (IsLoading && LastUpdatedText is null)
+                    {
+                        <span>جارٍ تحميل الملخص المالي...</span>
+                    }
+                    else
+                    {
+                        <span>الملخص المالي غير متاح حتى ضبط العملة الأساسية وتحميل البيانات بنجاح.</span>
+                        <a href="/accounting/settings">إعدادات المحاسبة</a>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="oas-acc-dashboard__financial-grid">
+                    @foreach (var item in FinancialMetrics)
+                    {
+                        <a href="@item.Href" class="oas-acc-dashboard__finance-card oas-acc-dashboard__finance-card--@item.Accent" aria-label="@($"{item.Label}: {item.Value} {item.Currency}. {item.Meta}")">
+                            <span class="oas-acc-dashboard__finance-icon"><i class="@item.IconCssClass" aria-hidden="true"></i></span>
+                            <strong class="oas-acc-dashboard__finance-title">@item.Label</strong>
+                            <span class="oas-acc-dashboard__finance-amount" dir="ltr">@item.Value</span>
+                            <small class="oas-acc-dashboard__finance-currency">@item.Currency</small>
+                            <small class="oas-acc-dashboard__finance-note">@item.Meta</small>
+                        </a>
+                    }
+                </div>
+                <p class="oas-acc-dashboard__financial-footnote"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> جميع القيم بالعملة الأساسية؛ الأرصدة حتى تاريخ اليوم ومن قيود مرحلة فقط، والمصروفات تخص سندات الفترة.</p>
+            }
+        </section>
+
+        <section class="oas-acc-dashboard__panel oas-acc-dashboard__panel--attention" aria-labelledby="oas-attention-title">
+            <div class="oas-acc-dashboard__panel-head">
+                <h2 id="oas-attention-title"><i class="fa-solid fa-bell" aria-hidden="true"></i> المهام التي تحتاج إلى إجراء</h2>
                 <span class="oas-acc-dashboard__panel-count">@AttentionItems.Count</span>
             </div>
-            <div class="oas-acc-dashboard__panel-body" tabindex="0" role="region" aria-label="قائمة التنبيهات المحاسبية">
-                @if (IsLoading && AttentionItems.Count == 0)
+            <div class="oas-acc-dashboard__attention-list">
+                @if (IsLoading && LastUpdatedText is null)
                 {
-                    <div class="oas-acc-dashboard__empty"><i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i> جارٍ تحميل التنبيهات...</div>
+                    <p class="oas-acc-dashboard__empty">جارٍ تحميل التنبيهات...</p>
                 }
                 else if (AttentionItems.Count == 0)
                 {
-                    <div class="oas-acc-dashboard__empty @(string.IsNullOrWhiteSpace(ErrorText) ? "oas-acc-dashboard__empty--success" : "")">
-                        <i class="@(string.IsNullOrWhiteSpace(ErrorText) ? "fa-regular fa-circle-check" : "fa-solid fa-circle-info")" aria-hidden="true"></i>
-                        <span>@(string.IsNullOrWhiteSpace(ErrorText) ? "لا توجد مهام محاسبية تحتاج انتباهًا حاليًا." : "تعذر تحميل التنبيهات المحاسبية.")</span>
-                    </div>
+                    <p class="oas-acc-dashboard__empty">@(string.IsNullOrWhiteSpace(ErrorText) ? "لا توجد مهام معلقة حاليًا." : "تعذر تحميل التنبيهات.")</p>
                 }
                 else
                 {
-                    @foreach (var item in AttentionItems.Take(4))
+                    @foreach (var item in AttentionItems)
                     {
                         <a href="@item.Href" class="oas-acc-dashboard__attention-row oas-acc-dashboard__attention-row--@item.Severity">
-                            <span class="oas-acc-dashboard__attention-icon" aria-hidden="true"><i class="@GetAttentionIcon(item.Href)"></i></span>
-                            <span class="oas-acc-dashboard__attention-copy"><strong>@item.Title</strong></span>
-                            @if (!string.IsNullOrWhiteSpace(item.Meta))
-                            {
-                                <span class="oas-acc-dashboard__attention-meta">@item.Meta</span>
-                            }
-                            <i class="fa-solid fa-chevron-left oas-acc-dashboard__attention-chevron" aria-hidden="true"></i>
-                        </a>
-                    }
-                }
-            </div>
-        </section>
-
-        <section class="oas-acc-dashboard__panel oas-acc-dashboard__panel--activity" aria-labelledby="accounting-activity-title">
-            <div class="oas-acc-dashboard__panel-header">
-                <h2 id="accounting-activity-title"><i class="fa-regular fa-clock" aria-hidden="true"></i> آخر الأنشطة</h2>
-                <a class="oas-acc-dashboard__panel-link" href="/accounting/journal-report">تقرير القيود <i class="fa-solid fa-chevron-left" aria-hidden="true"></i></a>
-            </div>
-            <div class="oas-acc-dashboard__panel-body" tabindex="0" role="region" aria-label="قائمة الأنشطة المحاسبية">
-                @if (IsLoading && RecentActivities.Count == 0)
-                {
-                    <div class="oas-acc-dashboard__empty"><i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i> جارٍ تحميل الأنشطة...</div>
-                }
-                else if (RecentActivities.Count == 0)
-                {
-                    <div class="oas-acc-dashboard__empty"><i class="fa-regular fa-folder-open" aria-hidden="true"></i> @(string.IsNullOrWhiteSpace(ErrorText) ? "لا توجد أنشطة محاسبية حديثة." : "تعذر تحميل الأنشطة المحاسبية.")</div>
-                }
-                else
-                {
-                    @foreach (var item in RecentActivities.Take(4))
-                    {
-                        <a class="oas-acc-dashboard__activity-row" href="@item.Href">
-                            <span class="oas-acc-dashboard__activity-icon oas-acc-dashboard__activity-icon--@item.Tone" aria-hidden="true"><i class="@item.IconCssClass"></i></span>
-                            <span class="oas-acc-dashboard__activity-copy"><strong>@item.Title</strong><small>@item.Reference</small></span>
-                            <span class="oas-acc-dashboard__activity-time">@item.Meta</span>
+                            <span class="oas-acc-dashboard__attention-icon"><i class="@GetAttentionIcon(item.Href)" aria-hidden="true"></i></span>
+                            <span class="oas-acc-dashboard__attention-text"><strong>@item.Title</strong><small>@GetAttentionDescription(item)</small></span>
+                            <span class="oas-acc-dashboard__attention-count">@item.Meta</span>
+                            <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
                         </a>
                     }
                 }
             </div>
         </section>
     </div>
+
+    <section class="oas-acc-dashboard__navigation" aria-labelledby="oas-shortcuts-title">
+        <div class="oas-acc-dashboard__navigation-head"><h2 id="oas-shortcuts-title"><i class="fa-solid fa-bolt" aria-hidden="true"></i> الوصول السريع</h2></div>
+        <div class="oas-acc-dashboard__groups">
+            @foreach (var navGroup in Sections.Select((value, index) => new { value, index }))
+            {
+                <section class="oas-acc-dashboard__group oas-acc-dashboard__group--@navGroup.index">
+                    <h3><i class="@navGroup.value.IconCssClass" aria-hidden="true"></i> @navGroup.value.Title</h3>
+                    <div class="oas-acc-dashboard__tiles">
+                        @foreach (var tile in navGroup.value.Tiles)
+                        {
+                            <a href="@tile.Href" title="@tile.Description"><span>@tile.Title</span><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></a>
+                        }
+                    </div>
+                </section>
+            }
+        </div>
+    </section>
 </section>
 
 @code {
     [Parameter] public string Title { get; set; } = "المحاسبة العامة";
-    [Parameter] public string Subtitle { get; set; } = "متابعة العمليات والحالات المالية اليومية";
+    [Parameter] public string Subtitle { get; set; } = "لوحة متابعة العمليات المالية والفترة الحالية";
     [Parameter] public string PrimaryActionText { get; set; } = "قيد يومي جديد";
     [Parameter] public string PrimaryHref { get; set; } = "/accounting/journals?new=true";
     [Parameter] public string CurrentPeriodName { get; set; } = "—";
+    [Parameter] public string CurrentPeriodStatus { get; set; } = "غير محددة";
+    [Parameter] public DateOnly? CurrentPeriodStartDate { get; set; }
+    [Parameter] public DateOnly? CurrentPeriodEndDate { get; set; }
+    [Parameter] public string? LastUpdatedText { get; set; }
     [Parameter] public IReadOnlyList<UiAccountingHomeMetric> Metrics { get; set; } = [];
+    [Parameter] public IReadOnlyList<UiAccountingHomeFinancialMetric> FinancialMetrics { get; set; } = [];
     [Parameter] public IReadOnlyList<UiAccountingHomeSection> Sections { get; set; } = [];
     [Parameter] public IReadOnlyList<UiAccountingHomeAttentionItem> AttentionItems { get; set; } = [];
     [Parameter] public IReadOnlyList<UiAccountingHomeActivityItem> RecentActivities { get; set; } = [];
@@ -183,7 +206,12 @@
     {
         var path when path.Contains("cash-shifts", StringComparison.OrdinalIgnoreCase) => "fa-solid fa-cash-register",
         var path when path.Contains("fiscal", StringComparison.OrdinalIgnoreCase) => "fa-regular fa-calendar-days",
-        var path when path.Contains("journals", StringComparison.OrdinalIgnoreCase) => "fa-solid fa-file-circle-exclamation",
-        _ => "fa-solid fa-clipboard-check"
+        var path when path.Contains("journals", StringComparison.OrdinalIgnoreCase) => "fa-solid fa-file-lines",
+        _ => "fa-solid fa-circle-exclamation"
     };
+
+    private static string GetAttentionDescription(UiAccountingHomeAttentionItem item) =>
+        item.Href.Contains("journals", StringComparison.OrdinalIgnoreCase) ? "عرض القيود ومراجعة حالتها" :
+        item.Href.Contains("cash-shifts", StringComparison.OrdinalIgnoreCase) ? "مراجعة ورديات الصندوق المفتوحة" :
+        item.Href.Contains("fiscal", StringComparison.OrdinalIgnoreCase) ? "مراجعة الفترات المالية" : "مراجعة التفاصيل";
 }

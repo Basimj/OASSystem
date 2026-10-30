@@ -58,6 +58,7 @@ public partial class AccountingWorkspaceHost : IDisposable
 
     [Parameter] public AccountingEntityType? Section { get; set; }
     [Parameter] public Guid? InitialRecordId { get; set; }
+    [Parameter] public string? InitialJournalStatus { get; set; }
     [Parameter] public Guid? InitialPurchaseInvoiceId { get; set; }
     private Guid? _openedFromPurchaseInvoiceId;
 
@@ -67,6 +68,7 @@ public partial class AccountingWorkspaceHost : IDisposable
     private bool _initialized;
     private AccountingEntityType? _loadedSection;
     private Guid? _loadedInitialRecordId;
+    private string? _loadedInitialJournalStatus;
 
     private string _accountTreeSearch = string.Empty;
     private bool _accountOverviewLoading;
@@ -274,12 +276,22 @@ public partial class AccountingWorkspaceHost : IDisposable
         {
             _loadedSection = Section.Value;
             _loadedInitialRecordId = null;
+            _loadedInitialJournalStatus = Section.Value == AccountingEntityType.Journals ? InitialJournalStatus : null;
             Workspace.OpenOrActivateListTab(Section.Value);
 
             if (Section.Value is AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers)
                 _pageByEntity[AccountingEntityType.PaymentAllocations] = 1;
 
             await LoadSectionDataAsync(Section.Value);
+        }
+        // The query string may change while the same journal page component lives.
+        // Requery the server instead of leaving rows from the previous status filter.
+        if (!sectionChanged && Section.Value == AccountingEntityType.Journals &&
+            !string.Equals(_loadedInitialJournalStatus, InitialJournalStatus, StringComparison.OrdinalIgnoreCase))
+        {
+            _loadedInitialJournalStatus = InitialJournalStatus;
+            _pageByEntity[AccountingEntityType.Journals] = 1;
+            await LoadSectionDataAsync(AccountingEntityType.Journals);
         }
 
         if (InitialRecordId.HasValue && _loadedInitialRecordId != InitialRecordId)
@@ -653,11 +665,23 @@ public partial class AccountingWorkspaceHost : IDisposable
         await LoadSectionDataAsync(section);
     }
 
+    private static string JournalFilterText(string? status) => status?.Trim().ToLowerInvariant() switch
+    {
+        "pending" => "بانتظار الاعتماد",
+        "approved" => "معتمدة وجاهزة للترحيل",
+        "draft" => "مسودات",
+        "posted" => "مرحلة",
+        "reversed" => "معكوسة",
+        "unposted" => "غير مرحلة",
+        _ => "جميع الحالات"
+    };
+
     private PageRequest BuildPageRequest(AccountingEntityType type) => new()
     {
         PageNumber = type == AccountingEntityType.Accounts ? 1 : GetPage(type),
         PageSize = type == AccountingEntityType.Accounts ? PageRequest.MaximumPageSize : PageSize,
-        Search = string.IsNullOrWhiteSpace(GetSearch(type)) ? null : GetSearch(type)
+        Search = string.IsNullOrWhiteSpace(GetSearch(type)) ? null : GetSearch(type),
+        Status = type == AccountingEntityType.Journals ? InitialJournalStatus : null
     };
 
     private static IReadOnlyList<AccountingEntityType> GetSectionEntityTypes(AccountingEntityType section) => section switch

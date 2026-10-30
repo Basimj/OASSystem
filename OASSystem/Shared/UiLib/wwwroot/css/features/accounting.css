@@ -3289,3 +3289,19 @@
     .ui-acc-home-group__tiles { grid-template-columns:repeat(2,minmax(0,1fr)); }
     .ui-acc-home-nav { min-height:6.5rem; }
 }
+
+/* Journal status deep links from the accounting home dashboard. */
+.oas-journal-filter-indicator {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    padding: 8px 12px; margin-bottom: 8px;
+    color: var(--oas-color-text);
+    background: var(--oas-color-surface);
+    border: 1px solid var(--oas-color-border); border-radius: 8px;
+}
+.oas-journal-filter-indicator__clear {
+    color: var(--oas-color-primary); text-decoration: underline;
+    font-weight: 650;
+}
+.oas-journal-filter-indicator__clear:focus-visible {
+    outline: 2px solid var(--oas-color-primary); outline-offset: 3px;
+}
