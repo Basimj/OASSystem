@@ -191,6 +191,18 @@ public sealed class AccountingClientService(
                 cancellationToken);
 
 
+    public Task<AccountSaveCheckDto?>
+        GetAccountSaveCheckAsync(
+            Guid id,
+            UpdateAccountRequest request,
+            CancellationToken cancellationToken = default)
+        =>
+            apiClient.PostAsync<UpdateAccountRequest, AccountSaveCheckDto>(
+                $"api/accounting/accounts/{id}/save-check",
+                request,
+                cancellationToken);
+
+
     public Task<AccountDto?>
         CreateAccountAsync(
             CreateAccountRequest request,

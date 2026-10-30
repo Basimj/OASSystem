@@ -71,6 +71,14 @@ public partial class AccountingWorkspaceHost : IDisposable
     private string? _loadedInitialJournalStatus;
 
     private string _accountTreeSearch = string.Empty;
+    private int _accountTreeExpandAllKey;
+    private int _accountTreeCollapseAllKey;
+    private bool _accountTreeExpanded;
+    // The tree toolbar toggles between expanding and collapsing all branches.
+    private string AccountTreeToggleText => _accountTreeExpanded ? "طي الكل" : "توسيع الكل";
+    private string AccountTreeToggleIcon => _accountTreeExpanded
+        ? "fa-solid fa-square-minus"
+        : "fa-solid fa-square-plus";
     private bool _accountOverviewLoading;
     private Guid? _accountOverviewAccountId;
     private AccountOverviewMetrics _accountOverview = AccountOverviewMetrics.Empty;
@@ -382,7 +390,27 @@ public partial class AccountingWorkspaceHost : IDisposable
         Workspace.NotifyStateChanged();
 
         if (!tab.IsInitialized && tab.EntityId is Guid id)
+        {
             await LoadExistingRecordAsync(tab, id);
+        }
+        else if (Section == AccountingEntityType.Accounts &&
+                 tab.EntityType == AccountingEntityType.Accounts && !tab.IsListTab)
+        {
+            if (tab.EntityId is Guid accountId && _accountOverviewAccountId != accountId)
+            {
+                await LoadAccountOverviewAsync(accountId);
+            }
+            else if (tab.IsNew)
+            {
+                _accountOverviewAccountId = null;
+                _accountOverviewLoading = false;
+                _accountOverview = AccountOverviewMetrics.Empty with
+                {
+                    CurrencyText = _baseCurrencyText ?? string.Empty,
+                    PeriodCaption = "لا توجد حركة بعد"
+                };
+            }
+        }
     }
 
     private async Task CloseActiveTabAsync()
@@ -530,17 +558,7 @@ public partial class AccountingWorkspaceHost : IDisposable
     {
         try
         {
-            if (entityType == AccountingEntityType.Accounts &&
-                Workspace.ActiveTab is { IsListTab: false, EntityType: AccountingEntityType.Accounts, IsDirty: true })
-            {
-                Snackbar.Warning("احفظ تغييرات الحساب الحالي أو ألغها قبل إنشاء حساب جديد.");
-                return;
-            }
-
             var tab = Workspace.OpenNewEntityTab(entityType);
-            if (entityType == AccountingEntityType.Accounts)
-                RemoveInactiveCleanAccountTabs();
-
             InitializeNewModel(tab);
             if (entityType == AccountingEntityType.Accounts)
             {
@@ -849,39 +867,106 @@ public partial class AccountingWorkspaceHost : IDisposable
     private Task OpenCurrentRecordAsync(Guid id) =>
         OpenRecordInTab(CurrentListEntity, id, GetEntityDisplayName(CurrentListEntity));
 
-    private async Task OpenAccountFromTreeAsync(Guid id)
+    private Task OpenAccountFromTreeAsync(Guid id)
+        => OpenRecordInTab(AccountingEntityType.Accounts, id, "حساب");
+
+    private Task ExpandAllAccountTreeAsync()
     {
-        if (Workspace.ActiveTab is
-            { IsListTab: false, EntityType: AccountingEntityType.Accounts, IsDirty: true } active &&
-            active.EntityId != id)
+        _accountTreeCollapseAllKey = Math.Max(_accountTreeCollapseAllKey, _accountTreeExpandAllKey);
+        _accountTreeExpandAllKey++;
+        _accountTreeExpanded = true;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task CollapseAllAccountTreeAsync()
+    {
+        _accountTreeExpandAllKey = Math.Max(_accountTreeExpandAllKey, _accountTreeCollapseAllKey);
+        _accountTreeCollapseAllKey++;
+        _accountTreeExpanded = false;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task ToggleAccountTreeExpansionAsync()
+        => _accountTreeExpanded
+            ? CollapseAllAccountTreeAsync()
+            : ExpandAllAccountTreeAsync();
+
+    private async Task OpenChildAccountAsync()
+    {
+        var parentId = SelectedAccountId;
+        if (!parentId.HasValue)
         {
-            Snackbar.Warning("لديك تغييرات غير محفوظة في الحساب الحالي. احفظ التغييرات أو ألغها قبل الانتقال إلى حساب آخر.");
+            Snackbar.Warning("اختر حسابًا من الشجرة أولًا ثم أنشئ حسابًا فرعيًا.");
             return;
         }
 
-        await OpenRecordInTab(AccountingEntityType.Accounts, id, "حساب");
-        RemoveInactiveCleanAccountTabs();
-    }
+        var parent = _accountsPage.Items.FirstOrDefault(x => x.Id == parentId.Value);
+        if (parent is null)
+        {
+            try
+            {
+                parent = await AccountingService.GetAccountByIdAsync(parentId.Value);
+            }
+            catch
+            {
+                parent = null;
+            }
+        }
 
-    private void RemoveInactiveCleanAccountTabs()
-    {
-        var activeTabId = Workspace.ActiveTabId;
-        var removable = Workspace.Tabs
-            .Where(x =>
-                !x.IsListTab &&
-                x.EntityType == AccountingEntityType.Accounts &&
-                x.TabId != activeTabId &&
-                !x.IsDirty)
-            .Select(x => x.TabId)
-            .ToArray();
+        if (parent is null)
+        {
+            Snackbar.Error("تعذر تحميل بيانات الحساب الأب.");
+            return;
+        }
 
-        foreach (var tabId in removable)
-            Workspace.RemoveTab(tabId);
+        try
+        {
+            var tab = Workspace.OpenNewEntityTab(AccountingEntityType.Accounts);
+            InitializeNewModel(tab);
+
+            if (tab.Model is AccountEditor.FormModel model)
+            {
+                model.ParentAccountId = parent.Id;
+                model.Level = Math.Clamp(parent.Level + 1, 1, 255);
+                model.AccountClass = parent.AccountClass;
+                model.NormalBalance = parent.NormalBalance;
+                model.AccountType = AccountType.Posting;
+                model.IsPostingAccount = true;
+                model.AllowManualPosting = true;
+                model.IsControlAccount = false;
+            }
+
+            _accountOverviewAccountId = null;
+            _accountOverviewLoading = false;
+            _accountOverview = AccountOverviewMetrics.Empty with
+            {
+                CurrencyText = _baseCurrencyText ?? string.Empty,
+                PeriodCaption = "سيُنشأ تحت الحساب المحدد"
+            };
+
+            await EnsureAccountLookupAsync(parent.Id);
+            await ReserveAutomaticNumberAsync(tab);
+            tab.CaptureBaseline(SerializeModel(tab.Model));
+            Workspace.NotifyStateChanged();
+        }
+        catch (ApiClientException ex)
+        {
+            ShowAccountingError(ex.Error);
+        }
+        catch (Exception)
+        {
+            ApiFeedback.ShowUnexpected();
+        }
     }
 
     private async Task OpenRecordInTab(AccountingEntityType entityType, Guid id, string title)
     {
-        var tab = Workspace.OpenOrActivateEntityTab(entityType, id, title);
+        // Preserve the already loaded account name on an existing tab. Opening it
+        // again from the tree must not rename the tab to the generic "حساب" label.
+        var existingAccountTab = entityType == AccountingEntityType.Accounts
+            ? Workspace.Tabs.FirstOrDefault(t => t.EntityType == entityType && !t.IsListTab && t.EntityId == id)
+            : null;
+        var tab = Workspace.OpenOrActivateEntityTab(entityType, id, existingAccountTab?.Title ?? title);
         if (!tab.IsInitialized)
         {
             await LoadExistingRecordAsync(tab, id);
@@ -1390,6 +1475,9 @@ public partial class AccountingWorkspaceHost : IDisposable
             if (!await ValidateUniqueFieldsBeforeSaveAsync(tab))
                 return;
 
+            // Account updates perform their no-write save check immediately before PUT,
+            // using the *same immutable request* for both calls (see SaveAccountAsync).
+
             switch (tab.EntityType)
             {
                 case AccountingEntityType.Accounts:
@@ -1482,11 +1570,13 @@ public partial class AccountingWorkspaceHost : IDisposable
         else
         {
             EnsureEntityIdAndRowVersion(tab, model.RowVersion);
-            result = await AccountingService.UpdateAccountAsync(tab.EntityId!.Value, new UpdateAccountRequest(
-                model.Code.Trim(), model.NameAr.Trim(), NullIfBlank(model.NameEn), model.ParentAccountId,
-                checked((byte)model.Level), model.AccountClass, model.AccountType, model.NormalBalance,
-                model.IsPostingAccount, model.IsControlAccount, model.AllowManualPosting,
-                model.IsSystemAccount, model.IsActive, model.EffectiveDate, model.RowVersion));
+            var accountId = tab.EntityId!.Value;
+            // Capture once: no divergence between the inspected values and the PUT body.
+            var update = BuildAccountUpdateRequest(model);
+            if (!await ValidateAccountBeforeSaveAsync(accountId, update))
+                return;
+
+            result = await AccountingService.UpdateAccountAsync(accountId, update);
         }
 
         await CompleteSaveAsync(tab, result?.Id, result is null ? null : $"{result.Code} - {result.NameAr}", "تم حفظ الحساب بنجاح.");

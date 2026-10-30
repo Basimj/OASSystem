@@ -104,6 +104,38 @@ public class AccountCommandAndQueryTests
     }
 
     [Test]
+    public void UpdateAccountCommandHandler_ManagedAccount_StillThrowsConflictException()
+    {
+        var existing = CreateAccountEntity("1101", "حساب مرتبط");
+        _repository.AddAsync(existing).GetAwaiter().GetResult();
+
+        var handler = new UpdateAccountCommandHandler(
+            _repository, _mapper, new ManagedAccountGuardStub(), new AllowAllAccountIntegrityService());
+        var request = new UpdateAccountRequest(
+            Code: "1101",
+            NameAr: "حساب مرتبط",
+            NameEn: null,
+            ParentAccountId: null,
+            Level: 1,
+            AccountClass: AccountClass.Asset,
+            AccountType: AccountType.Posting,
+            NormalBalance: NormalBalance.Debit,
+            IsPostingAccount: true,
+            IsControlAccount: false,
+            AllowManualPosting: true,
+            IsSystemAccount: false,
+            IsActive: false,
+            EffectiveDate: null,
+            RowVersion: Convert.ToBase64String(existing.RowVersion));
+
+        var error = Assert.ThrowsAsync<ConflictException>(async () =>
+            await handler.Handle(new UpdateAccountCommand(existing.Id, request), CancellationToken.None));
+
+        Assert.That(error!.Code, Is.EqualTo("accounting_managed_account_edit_forbidden"));
+        Assert.That(_repository.LastUpdated, Is.Null);
+    }
+
+    [Test]
     public void UpdateAccountCommandHandler_ChangingCode_ThrowsConflictException()
     {
         var existing = CreateAccountEntity("1101", "الصندوق");
@@ -224,6 +256,12 @@ public class AccountCommandAndQueryTests
             Guid.NewGuid(), code, name, null, null, 1,
             DomainAccountClass.Asset, DomainAccountType.Posting, DomainNormalBalance.Debit,
             true, false, true, false, true, null);
+    private sealed class ManagedAccountGuardStub : IManagedAccountGuard
+    {
+        public Task<bool> IsManagedAsync(Guid accountId, CancellationToken cancellationToken = default)
+            => Task.FromResult(true);
+    }
+
     private sealed class UnmanagedAccountGuard : IManagedAccountGuard
     {
         public Task<bool> IsManagedAsync(Guid accountId, CancellationToken cancellationToken = default) => Task.FromResult(false);
@@ -237,6 +275,11 @@ public class AccountCommandAndQueryTests
             Account current, Guid? parentAccountId, byte level, DomainAccountClass accountClass, DomainAccountType accountType,
             DomainNormalBalance normalBalance, bool isPostingAccount, bool isControlAccount, bool isSystemAccount, bool isActive,
             CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task<string?> InspectUpdateAsync(
+            Account current, Guid? parentAccountId, byte level, DomainAccountClass accountClass, DomainAccountType accountType,
+            DomainNormalBalance normalBalance, bool isPostingAccount, bool isControlAccount, bool allowManualPosting,
+            bool isSystemAccount, bool isActive, CancellationToken cancellationToken = default) => Task.FromResult<string?>(null);
 
         public Task ValidateDeactivationAsync(Account account, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }

@@ -13,7 +13,8 @@
     var isList = activeTab is null || activeTab.IsListTab;
 }
 
-<UiAccountingWorkspace ShowTabs="@(Section.HasValue && Section != AccountingEntityType.Accounts)"
+<UiAccountingWorkspace ShowTabs="@Section.HasValue"
+                       InlineTabsWithActions="@(Section == AccountingEntityType.Accounts)"
                        AdditionalCssClass='@(Section == AccountingEntityType.Accounts ? "ui-acc-workspace--account-management" : null)'>
 
     <Actions>
@@ -484,14 +485,25 @@
                                              IconCssClass="fa-solid fa-folder-tree"
                                              AdditionalCssClass="ui-acc-account-tree-panel">
 
-                        <UiSearchInput Value="@_accountTreeSearch"
-                                       ValueChanged="SetAccountTreeSearch"
-                                       Placeholder="البحث في الحسابات..."
-                                       AriaLabel="البحث في شجرة الحسابات"
-                                       DebounceMilliseconds="0" />
+                        <div class="ui-acc-account-tree-toolbar ui-acc-account-tree-toolbar--inline">
+                            <UiSearchInput Value="@_accountTreeSearch"
+                                           ValueChanged="SetAccountTreeSearch"
+                                           Placeholder="البحث في الحسابات..."
+                                           AriaLabel="البحث في شجرة الحسابات"
+                                           DebounceMilliseconds="0" />
+
+                            <UiButton Text="@AccountTreeToggleText"
+                                      IconCssClass="@AccountTreeToggleIcon"
+                                      Variant="ButtonVariant.Secondary"
+                                      Size="ControlSize.Small"
+                                      OnClick="ToggleAccountTreeExpansionAsync" />
+                        </div>
 
                         <UiAccountTreeView Nodes="@FilteredAccountTreeNodes"
                                            SelectedAccountId="@SelectedAccountId"
+                                           AutoExpandAll="@(!string.IsNullOrWhiteSpace(_accountTreeSearch))"
+                                           ExpandAllRequestKey="@_accountTreeExpandAllKey"
+                                           CollapseAllRequestKey="@_accountTreeCollapseAllKey"
                                            OnSelect="OpenAccountFromTreeAsync" />
 
                     </UiAccountingFormSection>
@@ -515,7 +527,27 @@
                                                  LastMovementText="@AccountLastMovementText"
                                                  CurrencyText="@_accountOverview.CurrencyText"
                                                  PeriodCaption="@_accountOverview.PeriodCaption"
-                                                 MetricsLoading="@_accountOverviewLoading" />
+                                                 MetricsLoading="@_accountOverviewLoading">
+                            <Actions>
+                                <div class="ui-acc-account-overview-actions">
+                                    <UiButton Text="حساب فرعي جديد"
+                                              IconCssClass="fa-solid fa-folder-plus"
+                                              Variant="ButtonVariant.Secondary"
+                                              Size="ControlSize.Small"
+                                              Disabled="@(activeTab.IsNew)"
+                                              OnClick="OpenChildAccountAsync" />
+                                    @if (activeTab.EntityId is Guid accountId)
+                                    {
+                                        <a class="ui-acc-account-detail-actions__link"
+                                           href="@($"/accounting/journal-report?accountId={accountId:D}")"
+                                           title="عرض قيود هذا الحساب فقط">
+                                            <i class="fa-solid fa-book-open" aria-hidden="true"></i>
+                                            <span>قيود الحساب</span>
+                                        </a>
+                                    }
+                                </div>
+                            </Actions>
+                        </UiAccountOverviewHeader>
 
                         <AccountEditor Model="@accountModel"
                                        IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"

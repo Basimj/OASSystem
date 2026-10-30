@@ -6,6 +6,7 @@ using OAS.Application.Accounting.Accounts.Commands.CreateAccount;
 using OAS.Application.Accounting.Accounts.Commands.SetAccountStatus;
 using OAS.Application.Accounting.Accounts.Commands.UpdateAccount;
 using OAS.Application.Accounting.Accounts.Queries.GetAccountById;
+using OAS.Application.Accounting.Accounts.Queries.GetAccountSaveCheck;
 using OAS.Application.Accounting.Accounts.Queries.GetAccounts;
 using OAS.Contracts.Accounting.Accounts;
 using OAS.Contracts.Common.Pagination;
@@ -35,6 +36,18 @@ public sealed class AccountsController(ISender sender) : ControllerBase
         CancellationToken cancellationToken)
     {
         var result = await sender.Send(new GetAccountByIdQuery(id), cancellationToken);
+        return Ok(result);
+    }
+
+    // Non-mutating validation for the Save action in the chart-of-accounts UI.
+    // The update command still throws ConflictException for invalid writes/races.
+    [HttpPost("{id:guid}/save-check")]
+    public async Task<ActionResult<AccountSaveCheckDto>> GetSaveCheck(
+        Guid id,
+        [FromBody] UpdateAccountRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await sender.Send(new GetAccountSaveCheckQuery(id, request), cancellationToken);
         return Ok(result);
     }
 

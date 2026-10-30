@@ -27,6 +27,7 @@ public interface IAccountingClientService
 {
     Task<PagedResult<AccountDto>> GetAccountsPageAsync(PageRequest request, CancellationToken cancellationToken = default);
     Task<AccountDto?> GetAccountByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<AccountSaveCheckDto?> GetAccountSaveCheckAsync(Guid id, UpdateAccountRequest request, CancellationToken cancellationToken = default);
     Task<AccountDto?> CreateAccountAsync(CreateAccountRequest request, CancellationToken cancellationToken = default);
     Task<AccountDto?> UpdateAccountAsync(Guid id, UpdateAccountRequest request, CancellationToken cancellationToken = default);
     Task<AccountDto?> SetAccountStatusAsync(Guid id, SetAccountStatusRequest request, CancellationToken cancellationToken = default);

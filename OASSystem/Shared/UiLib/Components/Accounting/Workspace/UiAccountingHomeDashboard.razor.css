@@ -213,3 +213,70 @@
     background: color-mix(in srgb, #df415c 12%, var(--acc-panel));
     color: #ffabb7;
 }
+
+
+/* Dark theme hardening for accounting dashboard, especially the quick-access groups. */
+.oas-shell.oas-theme-dark .oas-acc-dashboard {
+    --acc-bg: #0b1220;
+    --acc-panel: #121a2b;
+    --acc-text: #edf2ff;
+    --acc-muted: #9fb0ca;
+    --acc-border: #22304a;
+    --acc-primary: #64a3ff;
+}
+.oas-shell.oas-theme-dark .oas-acc-dashboard {
+    background: linear-gradient(180deg, #0b1220 0%, #0e1626 100%);
+}
+.oas-shell.oas-theme-dark .oas-acc-dashboard__panel,
+.oas-shell.oas-theme-dark .oas-acc-dashboard__navigation,
+.oas-shell.oas-theme-dark .oas-acc-dashboard__period,
+.oas-shell.oas-theme-dark .oas-acc-dashboard__update,
+.oas-shell.oas-theme-dark .oas-acc-dashboard__attention-row,
+.oas-shell.oas-theme-dark .oas-acc-dashboard__tiles a {
+    background: #121a2b;
+    border-color: #22304a;
+    box-shadow: 0 10px 24px rgba(0,0,0,.18);
+}
+.oas-shell.oas-theme-dark .oas-acc-dashboard__update button {
+    background: #0f1728;
+    border-color: #2c3b58;
+}
+.oas-shell.oas-theme-dark .oas-acc-dashboard__group {
+    border-color: #2a3550;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.02);
+}
+.oas-shell.oas-theme-dark .oas-acc-dashboard__group--1 { --group-bg: rgba(168, 108, 18, .12); }
+.oas-shell.oas-theme-dark .oas-acc-dashboard__group--2 { --group-bg: rgba(120, 67, 191, .12); }
+.oas-shell.oas-theme-dark .oas-acc-dashboard__group--3 { --group-bg: rgba(11, 139, 93, .12); }
+.oas-shell.oas-theme-dark .oas-acc-dashboard__group:not(.oas-acc-dashboard__group--1):not(.oas-acc-dashboard__group--2):not(.oas-acc-dashboard__group--3) { --group-bg: rgba(21, 101, 204, .12); }
+.oas-shell.oas-theme-dark .oas-acc-dashboard__tiles a:hover,
+.oas-shell.oas-theme-dark .oas-acc-dashboard__attention-row:hover {
+    background: #182236;
+}
+.oas-shell.oas-theme-dark .oas-acc-dashboard__panel-count,
+.oas-shell.oas-theme-dark .oas-acc-dashboard__attention-count,
+.oas-shell.oas-theme-dark .oas-acc-dashboard__status,
+.oas-shell.oas-theme-dark .oas-acc-dashboard__activity-table thead {
+    border-color: #2b3852;
+}
+.oas-shell.oas-theme-dark .oas-acc-dashboard__panel-count {
+    background: rgba(223, 65, 92, .15);
+    color: #ff92a6;
+}
+.oas-shell.oas-theme-dark .oas-acc-dashboard__attention-count {
+    background: rgba(255,255,255,.05);
+}
+.oas-shell.oas-theme-dark .oas-acc-dashboard__activity-table thead {
+    background: rgba(255,255,255,.03);
+}
+.oas-shell.oas-theme-dark .oas-acc-dashboard__activity-table td {
+    border-bottom-color: #22304a;
+}
+.oas-shell.oas-theme-dark .oas-acc-dashboard__activity-description,
+.oas-shell.oas-theme-dark .oas-acc-dashboard__headline h1,
+.oas-shell.oas-theme-dark .oas-acc-dashboard__navigation-head h2,
+.oas-shell.oas-theme-dark .oas-acc-dashboard__group h3,
+.oas-shell.oas-theme-dark .oas-acc-dashboard__finance-amount,
+.oas-shell.oas-theme-dark .oas-acc-dashboard__metric-value {
+    color: var(--acc-text);
+}

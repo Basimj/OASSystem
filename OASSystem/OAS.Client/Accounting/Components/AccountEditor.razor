@@ -102,20 +102,20 @@
 
             <UiAccountingCheckGroup>
 
-                <UiCheckbox Label="حساب ترحيل (يقبل القيود)"
+                <UiCheckbox Label="يقبل الترحيل (حساب ترحيل)"
                             Value="@Model.IsPostingAccount"
                             ValueChanged="OnIsPostingAccountChanged"
-                            Disabled="@(!IsEditable)" />
+                            Disabled="@(!CanChangePostingAccount)" />
 
                 <UiCheckbox Label="السماح بالترحيل اليدوي"
                             Value="@Model.AllowManualPosting"
                             ValueChanged="OnAllowManualPostingChanged"
-                            Disabled="@(!IsEditable)" />
+                            Disabled="@(!CanChangeManualPosting)" />
 
                 <UiCheckbox Label="حساب تحكمي (أستاذ مساعد)"
                             Value="@Model.IsControlAccount"
                             ValueChanged="OnIsControlAccountChanged"
-                            Disabled="@(!IsEditable)" />
+                            Disabled="@(!CanChangeControlAccount)" />
 
                 <UiCheckbox Label="حساب نظامي (أساسي)"
                             Value="@Model.IsSystemAccount"
@@ -139,7 +139,7 @@
                              Disabled="@(!IsEditable)"
                              Size="ControlSize.Small" />
 
-                <UiCheckbox Label="الحساب نشط"
+                <UiCheckbox Label="الحساب نشط (متاح للاستخدام)"
                             Value="@Model.IsActive"
                             ValueChanged="OnIsActiveChanged"
                             Disabled="@(!IsEditable)" />
@@ -149,6 +149,14 @@
         </UiAccountingFormSection>
 
     </UiAccountingFormGrid>
+
+    <div class="ui-acc-account-editor__definition-note" role="note" aria-live="polite">
+        <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+        <div>
+            <strong>@DefinitionHintTitle</strong>
+            <span>@DefinitionHintText</span>
+        </div>
+    </div>
 
 </UiAccountingEditorSurface>
 
@@ -243,6 +251,26 @@
         }
     }
 
+
+    private bool CanChangePostingAccount => IsEditable && Model.AccountType != AccountType.Header;
+    private bool CanChangeManualPosting => IsEditable && Model.AccountType != AccountType.Header && Model.IsPostingAccount;
+    private bool CanChangeControlAccount => IsEditable && Model.AccountType != AccountType.Control;
+
+    private string DefinitionHintTitle => Model.AccountType switch
+    {
+        AccountType.Header => "حساب تجميعي",
+        AccountType.Control => "حساب تحكمي",
+        AccountType.Subledger => "حساب أستاذ مساعد",
+        _ => "حساب تفصيلي"
+    };
+
+    private string DefinitionHintText => Model.AccountType switch
+    {
+        AccountType.Header => "الحساب التجميعي لا يقبل الترحيل المباشر أو اليدوي، ويُستخدم فقط لتجميع الحسابات الفرعية.",
+        AccountType.Control => "الحساب التحكمي يجب أن يبقى مفعّلًا كحساب تحكمي، ويُستخدم عادة لربط الأستاذ المساعد.",
+        AccountType.Subledger => "حساب الأستاذ المساعد يصلح للحسابات المرتبطة بالأطراف أو السجلات الفرعية، مع بقاء المراجعة المحاسبية مطلوبة.",
+        _ => "الحساب التفصيلي مخصص للترحيل المباشر، ويمكن ضبط الترحيل اليدوي وفق سياسة العمل لديك."
+    };
 
     [Parameter]
     public FormModel Model { get; set; } = new();
@@ -363,6 +391,7 @@
                 out var result))
         {
             Model.AccountClass = result;
+            Model.NormalBalance = GetSuggestedNormalBalance(result);
 
             await OnChanged();
         }
@@ -381,6 +410,7 @@
                 out var result))
         {
             Model.AccountType = result;
+            ApplyAccountTypeRules();
 
             await OnChanged();
         }
@@ -459,6 +489,11 @@
     {
         Model.IsPostingAccount = value;
 
+        if (!Model.IsPostingAccount)
+        {
+            Model.AllowManualPosting = false;
+        }
+
         await OnChanged();
     }
 
@@ -466,7 +501,7 @@
     private async Task OnIsControlAccountChanged(
         bool value)
     {
-        Model.IsControlAccount = value;
+        Model.IsControlAccount = Model.AccountType == AccountType.Control || value;
 
         await OnChanged();
     }
@@ -475,7 +510,7 @@
     private async Task OnAllowManualPostingChanged(
         bool value)
     {
-        Model.AllowManualPosting = value;
+        Model.AllowManualPosting = Model.IsPostingAccount && value;
 
         await OnChanged();
     }
@@ -496,5 +531,43 @@
         Model.IsActive = value;
 
         await OnChanged();
+    }
+
+    private static NormalBalance GetSuggestedNormalBalance(AccountClass accountClass)
+        => accountClass is AccountClass.Asset or AccountClass.Expense
+            ? NormalBalance.Debit
+            : NormalBalance.Credit;
+
+    private void ApplyAccountTypeRules()
+    {
+        switch (Model.AccountType)
+        {
+            case AccountType.Header:
+                Model.IsPostingAccount = false;
+                Model.AllowManualPosting = false;
+                Model.IsControlAccount = false;
+                break;
+
+            case AccountType.Control:
+                Model.IsPostingAccount = true;
+                Model.AllowManualPosting = true;
+                Model.IsControlAccount = true;
+                break;
+
+            case AccountType.Subledger:
+                Model.IsPostingAccount = true;
+                Model.AllowManualPosting = true;
+                Model.IsControlAccount = false;
+                break;
+
+            default:
+                Model.IsPostingAccount = true;
+                Model.AllowManualPosting = true;
+                if (Model.AccountType != AccountType.Control)
+                {
+                    Model.IsControlAccount = false;
+                }
+                break;
+        }
     }
 }

@@ -3305,3 +3305,392 @@
 .oas-journal-filter-indicator__clear:focus-visible {
     outline: 2px solid var(--oas-color-primary); outline-offset: 3px;
 }
+
+
+/* ========================================================================== 
+   Account Management — 2026-10 dark-theme and productivity update
+   ========================================================================== */
+.ui-acc-account-tree-toolbar {
+    display: grid;
+    gap: 0.42rem;
+}
+.ui-acc-account-tree-toolbar__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+.ui-acc-account-detail-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin: 0.42rem 0 0.55rem;
+}
+.ui-acc-account-detail-actions__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.38rem;
+    min-height: 2rem;
+    padding: 0.38rem 0.72rem;
+    border-radius: 0.55rem;
+    border: 1px solid var(--oas-acc-card-border);
+    background: var(--oas-acc-card-bg);
+    color: var(--oas-acc-primary);
+    text-decoration: none;
+    font-size: 0.74rem;
+    font-weight: 700;
+}
+.ui-acc-account-detail-actions__link:hover {
+    border-color: var(--oas-acc-primary);
+}
+.ui-acc-account-editor__definition-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    margin-bottom: 0.55rem;
+    padding: 0.62rem 0.78rem;
+    border: 1px solid rgba(var(--oas-acc-primary-rgb), 0.18);
+    border-radius: 0.62rem;
+    background: linear-gradient(180deg, #f8fbff 0%, #f3f7ff 100%);
+    color: #334155;
+}
+.ui-acc-account-editor__definition-note > i {
+    color: var(--oas-acc-primary);
+    margin-top: 0.08rem;
+}
+.ui-acc-account-editor__definition-note strong,
+.ui-acc-account-editor__definition-note span {
+    display: block;
+}
+.ui-acc-account-editor__definition-note strong {
+    margin-bottom: 0.12rem;
+    font-size: 0.78rem;
+    color: #172554;
+}
+.ui-acc-account-editor__definition-note span {
+    font-size: 0.7rem;
+    line-height: 1.6;
+    color: #516174;
+}
+.oas-shell.oas-theme-dark .ui-acc-workspace--account-management {
+    --oas-acc-surface-bg: #0b1220;
+    --oas-acc-card-bg: #121a2b;
+    --oas-acc-card-border: #22304a;
+    --oas-acc-card-hover-border: #35517a;
+    --oas-acc-muted: #94a3b8;
+}
+.oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-section,
+.oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-overview,
+.oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-detail-actions__link,
+.oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-editor__definition-note {
+    background: #121a2b;
+    border-color: #22304a;
+    color: #e5ecfb;
+}
+.oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-section__header {
+    background: #0f1728;
+    border-bottom-color: #22304a;
+}
+.oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-overview {
+    background: linear-gradient(180deg, #121a2b 0%, #101827 100%);
+}
+.oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-overview__title-line h2,
+.oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-overview__meta strong,
+.oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-tree-panel .ui-acc-tree__link,
+.oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-tree-panel .ui-acc-tree__name {
+    color: #e5ecfb;
+}
+.oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-overview__meta,
+.oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-overview__breadcrumb,
+.oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-tree-panel .ui-acc-tree__code,
+.oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-editor__definition-note span {
+    color: #9fb0ca;
+}
+.oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-tree-panel .ui-acc-tree__row:hover {
+    background: rgba(100, 163, 255, 0.08);
+}
+.oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-tree-panel .ui-acc-tree__row.is-selected {
+    background: linear-gradient(90deg, rgba(100, 163, 255, 0.12), rgba(100, 163, 255, 0.2));
+    border-color: rgba(100, 163, 255, 0.28);
+}
+.oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-editor__definition-note strong {
+    color: #dbeafe;
+}
+.oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-readonly-field__value,
+.oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-editor .ui-input-text__control--small,
+.oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-editor .ui-select__control--small,
+.oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-editor .ui-input-date__control--small,
+.oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-editor .ui-lookup__control {
+    background: #0f1728;
+    border-color: #2b3852;
+    color: #e5ecfb;
+}
+@media (max-width: 960px) {
+    .ui-acc-account-tree-toolbar__actions,
+    .ui-acc-account-detail-actions {
+        justify-content: stretch;
+    }
+}
+
+
+/* Account editor visibility fix — preserve all posting/manual-posting/active controls.
+   Older single-viewport rules used overflow:hidden and clipped the last sections
+   after the tree toolbar and account-type guidance increased the content height. */
+@media (min-width: 980px) {
+    .ui-acc-workspace--account-management .ui-acc-accounts-split__detail {
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior-y: contain;
+        scrollbar-gutter: stable;
+        padding-bottom: 0.85rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor {
+        flex: 0 0 auto;
+        height: auto;
+        min-height: min-content;
+        max-height: none;
+        overflow: visible;
+        align-content: start;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-account-editor__lower-grid {
+        min-height: max-content;
+    }
+}
+
+/* Disabled options remain legible in view mode and for non-posting header accounts. */
+.ui-acc-workspace--account-management .ui-acc-account-editor__section--settings .ui-checkbox:has(input:disabled),
+.ui-acc-workspace--account-management .ui-acc-account-editor__section--status .ui-checkbox:has(input:disabled) {
+    opacity: 0.85;
+}
+
+.oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-accounts-split__detail {
+    scrollbar-color: #526583 #121a2b;
+}
+
+.oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-editor__section--settings .ui-checkbox,
+.oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-editor__section--status .ui-checkbox {
+    color: #e5ecfb;
+}
+
+
+/* ========================================================================== 
+   Account management requested UX refinements — 2026-10-30
+   ========================================================================== */
+.ui-acc-account-tree-toolbar--inline {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.42rem;
+}
+.ui-acc-account-tree-toolbar--inline .ui-search-input {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+}
+.ui-acc-account-tree-toolbar__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+.ui-acc-account-detail-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-height: 2.5rem;
+    width: 100%;
+    margin-bottom: 0.5rem;
+    padding: 0.1rem 0;
+}
+.ui-acc-account-detail-topbar__actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-inline-start: auto;
+}
+.ui-acc-account-detail-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin: 0.42rem 0 0.55rem;
+}
+.ui-acc-account-detail-actions__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.38rem;
+    min-height: 2rem;
+    padding: 0.38rem 0.72rem;
+    border-radius: 0.55rem;
+    border: 1px solid var(--oas-acc-card-border);
+    background: var(--oas-acc-card-bg);
+    color: var(--oas-acc-primary);
+    text-decoration: none;
+    font-size: 0.74rem;
+    font-weight: 700;
+}
+.ui-acc-account-detail-actions__link:hover {
+    border-color: var(--oas-acc-primary);
+}
+@media (max-width: 960px) {
+    .ui-acc-account-tree-toolbar--inline {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .ui-acc-account-detail-topbar,
+    .ui-acc-account-detail-topbar__actions {
+        justify-content: stretch;
+    }
+}
+
+
+/* ========================================================================
+   Chart of accounts: tabs inline with page actions + readable active switch.
+   Limited to this page; other accounting workspaces retain their layout.
+   ======================================================================== */
+.ui-acc-workspace--account-management .ui-acc-workspace__combined-toolbar {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.6rem;
+    width: 100%;
+    min-width: 0;
+    padding: 0.3rem 0.45rem;
+    background: var(--oas-acc-card-bg);
+    border: 1px solid var(--oas-acc-card-border);
+    border-radius: var(--oas-acc-radius);
+}
+
+/* RTL: tabs occupy the space on the right; actions stay on the left. */
+.ui-acc-workspace--account-management .ui-acc-workspace__combined-toolbar > .ui-acc-workspace__tabs {
+    flex: 1 1 0;
+    width: 0;
+    min-width: 0;
+    max-width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.ui-acc-workspace--account-management .ui-acc-workspace__combined-toolbar > .ui-acc-workspace__actions {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.ui-acc-workspace--account-management .ui-acc-workspace__combined-toolbar .ui-application-tabs {
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+}
+
+.ui-acc-workspace--account-management .ui-acc-workspace__combined-toolbar .ui-workspace-actionbar {
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    justify-content: flex-end;
+}
+
+/* The activity switch label was clipped by a 2-column grid and nowrap text. */
+.ui-acc-workspace--account-management .ui-acc-account-editor__section--status .ui-acc-form-grid--2col {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 0.5rem;
+}
+
+.ui-acc-workspace--account-management .ui-acc-account-editor__section--status .ui-checkbox-field {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+}
+
+.ui-acc-workspace--account-management .ui-acc-account-editor__section--status .ui-checkbox {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    min-height: 1.7rem;
+    white-space: normal;
+    text-align: start;
+    font-size: 0.73rem;
+    line-height: 1.45;
+    gap: 0.45rem;
+}
+
+.ui-acc-workspace--account-management .ui-acc-account-editor__section--status .ui-checkbox span {
+    display: inline-block;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: break-word;
+}
+
+/* On narrow screens the commands and tabs may use two rows rather than clip. */
+@media (max-width: 860px) {
+    .ui-acc-workspace--account-management .ui-acc-workspace__combined-toolbar {
+        flex-wrap: wrap;
+        gap: 0.35rem;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-workspace__combined-toolbar > .ui-acc-workspace__actions {
+        order: -1;
+        flex: 1 1 100%;
+    }
+
+    .ui-acc-workspace--account-management .ui-acc-workspace__combined-toolbar > .ui-acc-workspace__tabs {
+        flex: 1 1 100%;
+        width: 100%;
+    }
+}
+
+.oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-workspace__combined-toolbar {
+    background: #121a2b;
+    border-color: #22304a;
+}
+
+
+.ui-acc-account-overview__identity-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.ui-acc-account-overview__actions {
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    margin-inline-start: auto;
+    min-width: 0;
+}
+
+.ui-acc-account-overview-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+}
+
+@media (max-width: 900px) {
+    .ui-acc-account-overview__identity-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .ui-acc-account-overview__actions {
+        margin-inline-start: 0;
+    }
+}

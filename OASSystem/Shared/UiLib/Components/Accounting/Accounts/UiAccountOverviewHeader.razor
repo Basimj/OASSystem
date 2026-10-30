@@ -47,6 +47,13 @@
                 </div>
             </div>
         </div>
+
+        @if (Actions is not null)
+        {
+            <div class="ui-acc-account-overview__actions">
+                @Actions
+            </div>
+        }
     </div>
 
     <div class="ui-acc-account-overview__metrics" aria-label="ملخص حركة الحساب">
@@ -111,4 +118,5 @@
     [Parameter] public string CurrencyText { get; set; } = string.Empty;
     [Parameter] public string PeriodCaption { get; set; } = "الفترة الحالية";
     [Parameter] public bool MetricsLoading { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
 }

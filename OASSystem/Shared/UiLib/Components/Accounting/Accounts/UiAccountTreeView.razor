@@ -23,15 +23,59 @@ else
     [Parameter] public IReadOnlyList<AccountTreeNode> Nodes { get; set; } = [];
     [Parameter] public Guid? SelectedAccountId { get; set; }
     [Parameter] public EventCallback<Guid> OnSelect { get; set; }
+    [Parameter] public bool AutoExpandAll { get; set; }
+    [Parameter] public int ExpandAllRequestKey { get; set; }
+    [Parameter] public int CollapseAllRequestKey { get; set; }
+
     private readonly HashSet<Guid> _expanded = [];
+    private int _lastExpandAllRequestKey;
+    private int _lastCollapseAllRequestKey;
+
+    protected override void OnParametersSet()
+    {
+        if (AutoExpandAll)
+        {
+            _expanded.Clear();
+            ExpandNodesRecursively(Nodes);
+            return;
+        }
+
+        if (ExpandAllRequestKey != _lastExpandAllRequestKey)
+        {
+            _lastExpandAllRequestKey = ExpandAllRequestKey;
+            _expanded.Clear();
+            ExpandNodesRecursively(Nodes);
+        }
+
+        if (CollapseAllRequestKey != _lastCollapseAllRequestKey)
+        {
+            _lastCollapseAllRequestKey = CollapseAllRequestKey;
+            _expanded.Clear();
+        }
+    }
 
     private bool IsExpanded(AccountTreeNode node) =>
-        node.Children.Count > 0 && _expanded.Contains(node.Id);
+        node.Children.Count > 0 && (AutoExpandAll || _expanded.Contains(node.Id));
 
     private void Toggle(Guid id)
     {
+        if (AutoExpandAll)
+            return;
+
         if (!_expanded.Add(id))
             _expanded.Remove(id);
+    }
+
+    private void ExpandNodesRecursively(IReadOnlyList<AccountTreeNode> nodes)
+    {
+        foreach (var node in nodes)
+        {
+            if (node.Children.Count == 0)
+                continue;
+
+            _expanded.Add(node.Id);
+            ExpandNodesRecursively(node.Children);
+        }
     }
 
     private Task SelectNodeAsync(Guid id) =>

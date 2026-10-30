@@ -1,11 +1,36 @@
 @namespace OAS.UiLib.Components.Accounting.Workspace
 
 <section class="@CssClass" dir="rtl">
-    @if (Actions is not null)
+    @if (InlineTabsWithActions && ShowTabs && Tabs is not null)
     {
-        <div class="ui-acc-workspace__actions">
-            @Actions
+        @* شجرة الحسابات: تبويبات الحسابات وأوامر الصفحة في شريط واحد. *@
+        <div class="ui-acc-workspace__combined-toolbar">
+            <div class="ui-acc-workspace__tabs">
+                @Tabs
+            </div>
+            @if (Actions is not null)
+            {
+                <div class="ui-acc-workspace__actions">
+                    @Actions
+                </div>
+            }
         </div>
+    }
+    else
+    {
+        @if (Actions is not null)
+        {
+            <div class="ui-acc-workspace__actions">
+                @Actions
+            </div>
+        }
+
+        @if (ShowTabs && Tabs is not null)
+        {
+            <div class="ui-acc-workspace__tabs">
+                @Tabs
+            </div>
+        }
     }
 
     @if (Metrics is not null)
@@ -15,7 +40,6 @@
         </div>
     }
 
-    @* Document-level tabs intentionally removed. Local in-form section tabs remain. *@
     <div class="ui-acc-workspace__body">
         @Body
     </div>
@@ -27,6 +51,7 @@
     // Compatibility: existing pages may still pass ShowTabs and Tabs.
     [Parameter] public RenderFragment? Tabs { get; set; }
     [Parameter] public bool ShowTabs { get; set; }
+    [Parameter] public bool InlineTabsWithActions { get; set; }
     [Parameter] public RenderFragment? Body { get; set; }
     [Parameter] public string? AdditionalCssClass { get; set; }
 

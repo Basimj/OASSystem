@@ -173,6 +173,107 @@ public sealed class AccountIntegrityService(
         }
     }
 
+    /// <summary>
+    /// Inspect exactly the proposed values, without executing a write or deliberately
+    /// throwing any of the expected business-rule conflicts. The throwing update
+    /// and deactivation validators remain the authoritative write-time guard.
+    /// </summary>
+    public async Task<string?> InspectUpdateAsync(
+        Account current,
+        Guid? parentAccountId,
+        byte level,
+        AccountClass accountClass,
+        AccountType accountType,
+        NormalBalance normalBalance,
+        bool isPostingAccount,
+        bool isControlAccount,
+        bool allowManualPosting,
+        bool isSystemAccount,
+        bool isActive,
+        CancellationToken cancellationToken = default)
+    {
+        if (level == 0)
+            return "accounting_account_level_invalid";
+        if (!Enum.IsDefined(accountClass) || !Enum.IsDefined(accountType) || !Enum.IsDefined(normalBalance))
+            return "accounting_account_classification_invalid";
+        if (accountType == AccountType.Header && isPostingAccount)
+            return "accounting_account_header_posting_invalid";
+        if (accountType == AccountType.Header && allowManualPosting)
+            return "accounting_account_header_manual_invalid";
+        if (allowManualPosting && !isPostingAccount)
+            return "accounting_account_manual_without_posting_invalid";
+        if (accountType == AccountType.Control && !isControlAccount)
+            return "accounting_account_control_flag_required";
+
+        if (parentAccountId == current.Id)
+            return "accounting_account_self_parent";
+        if (!parentAccountId.HasValue)
+        {
+            if (level != 1)
+                return "accounting_account_root_level_invalid";
+        }
+        else
+        {
+            var parent = await accounts.GetByIdAsync(parentAccountId.Value, cancellationToken);
+            if (parent is null)
+                return "accounting_account_parent_not_found";
+            if (!parent.IsActive)
+                return "accounting_account_parent_inactive";
+            if (parent.Level == byte.MaxValue || level != parent.Level + 1)
+                return "accounting_account_level_parent_mismatch";
+
+            var visited = new HashSet<Guid>();
+            var cursor = parent;
+            while (true)
+            {
+                if (cursor.Id == current.Id)
+                    return "accounting_account_parent_cycle";
+                if (!visited.Add(cursor.Id))
+                    return "accounting_account_existing_parent_cycle";
+                if (!cursor.ParentAccountId.HasValue)
+                    break;
+                var next = await accounts.GetByIdAsync(cursor.ParentAccountId.Value, cancellationToken);
+                if (next is null)
+                    return "accounting_account_parent_chain_broken";
+                cursor = next;
+            }
+        }
+
+        if (isSystemAccount != current.IsSystemAccount)
+            return "accounting_system_account_flag_immutable";
+
+        var structuralChange =
+            accountClass != current.AccountClass ||
+            accountType != current.AccountType ||
+            normalBalance != current.NormalBalance ||
+            isPostingAccount != current.IsPostingAccount ||
+            isControlAccount != current.IsControlAccount;
+
+        if (structuralChange && await HasJournalHistoryAsync(current.Id, cancellationToken))
+            return "accounting_account_history_structure_immutable";
+
+        var mapped = false;
+        if (structuralChange || (!isActive && current.IsActive))
+            mapped = await IsMappedAsync(current.Id, cancellationToken);
+
+        if (structuralChange && (current.IsSystemAccount || mapped))
+            return "accounting_mapped_account_structure_immutable";
+
+        if (!isActive && current.IsActive)
+        {
+            if (current.IsSystemAccount)
+                return "accounting_system_account_deactivation_forbidden";
+            if (mapped)
+                return "accounting_mapped_account_deactivation_forbidden";
+            if (await accounts.CountAsync(
+                new Specification<Account>().Where(x => x.ParentAccountId == current.Id && x.IsActive),
+                cancellationToken) > 0)
+                return "accounting_account_active_children_exist";
+        }
+
+        return null;
+    }
+
     private Task<bool> HasJournalHistoryAsync(Guid accountId, CancellationToken ct) =>
         CountExistsAsync(journalLines, new Specification<JournalEntryLine>().Where(x => x.AccountId == accountId), ct);
 

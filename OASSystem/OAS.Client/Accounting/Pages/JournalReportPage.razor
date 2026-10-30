@@ -7,7 +7,7 @@
 @inject IAccountingClientService Accounting
 @inject NavigationManager Navigation
 
-<PageTitle>تقرير دفتر اليومية | OAS</PageTitle>
+<PageTitle>@(AccountIdFromQuery.HasValue ? "قيود الحساب | OAS" : "تقرير دفتر اليومية | OAS")</PageTitle>
 
 <UiAccountingWorkspace ShowTabs="false">
     <Actions>
@@ -70,8 +70,8 @@
                 <UiAlert Message="@_error" Tone="AlertTone.Danger" />
             }
 
-            <UiAccountingFormSection Title="تقرير دفتر اليومية"
-                                     Subtitle="تقرير مستقل عن شاشة إدارة القيود، ويعرض رأس القيد وسطور الحسابات والمصدر ضمن النطاق المحدد."
+            <UiAccountingFormSection Title="@(AccountIdFromQuery.HasValue ? "قيود الحساب المحدد" : "تقرير دفتر اليومية")"
+                                     Subtitle="@(AccountIdFromQuery.HasValue ? "النتائج مفلترة على هذا الحساب فقط ضمن نطاق التاريخ المختار. يمكنك تعديل التاريخ ثم الضغط على عرض التقرير." : "تقرير مستقل عن شاشة إدارة القيود، ويعرض رأس القيد وسطور الحسابات والمصدر ضمن النطاق المحدد.")"
                                      IconCssClass="fa-solid fa-book-journal-whills">
                 <UiAccountingRecordList Items="@JournalItems"
                                         EmptyTitle="لا توجد قيود مطابقة"
@@ -84,6 +84,11 @@
 </UiAccountingWorkspace>
 
 @code {
+    [Parameter, SupplyParameterFromQuery(Name = "accountId")]
+    public Guid? AccountIdFromQuery { get; set; }
+
+    private Guid? _loadedAccountId;
+    private bool _hasLoadedFilter;
     private DateOnly? _fromDate = new(DateTime.Today.Year, 1, 1);
     private DateOnly? _toDate = DateOnly.FromDateTime(DateTime.Today);
     private string _status = string.Empty;
@@ -118,7 +123,17 @@
             JournalState(line.Status)))
         .ToArray() ?? [];
 
-    protected override Task OnInitializedAsync() => LoadAsync();
+    protected override async Task OnParametersSetAsync()
+    {
+        // Also refresh when the browser navigates to a different account
+        // without destroying the existing report component.
+        if (!_hasLoadedFilter || _loadedAccountId != AccountIdFromQuery)
+        {
+            _hasLoadedFilter = true;
+            _loadedAccountId = AccountIdFromQuery;
+            await LoadAsync();
+        }
+    }
 
     private async Task LoadAsync()
     {
@@ -143,6 +158,7 @@
                 _fromDate.Value,
                 _toDate.Value,
                 Status: status,
+                AccountId: AccountIdFromQuery,
                 Reference: string.IsNullOrWhiteSpace(_reference) ? null : _reference.Trim(),
                 PageNumber: 1,
                 PageSize: 250));
