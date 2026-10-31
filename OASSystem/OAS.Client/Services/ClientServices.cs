@@ -85,7 +85,9 @@ public static class ClientServices
         // Printing
         services.AddScoped<IPrintingClientService, PrintingClientService>();
 
-        // Accounting
+        // Accounting: retain customer draft tabs across financial subpages.
+        services.AddScoped<OAS.Client.Accounting.Workspace.CustomerWorkspaceSession>();
+        services.AddScoped<OAS.Client.Accounting.Workspace.SupplierWorkspaceSession>();
         services.AddScoped<
             OAS.Client.Accounting.Services.IAccountingClientService,
             OAS.Client.Accounting.Services.AccountingClientService>();

@@ -3,22 +3,34 @@
 @using OAS.UiLib.Components.Accounting.Parties
 @using OAS.UiLib.Components.Spreadsheets
 @using OAS.UiLib.Components.Navigation
+@using OAS.Client.Accounting.Components
 
 <PageTitle>الموردون | المحاسبة | OAS</PageTitle>
 
-<div class="oas-customer-workspace-tabs" dir="rtl">
-    <UiApplicationTabStrip Tabs="@WorkspaceTabs"
-                           AriaLabel="تبويبات الموردين"
-                           EnableContextMenu="true"
-                           OnSelect="SelectTabAsync"
-                           OnClose="CloseTabAsync"
-                           OnCloseOthers="CloseOtherTabsAsync"
-                           OnCloseAll="CloseAllTabsAsync" />
-</div>
+<SupplierRelatedPageHeader Title="الموردون"
+                           IsListView="@(!EditorOpen)"
+                           TabItems="@WorkspaceTabs"
+                           OnTabSelect="SelectTabAsync"
+                           OnTabClose="CloseTabAsync"
+                           OnTabCloseOthers="CloseOtherTabsAsync"
+                           OnTabCloseAll="CloseAllTabsAsync">
+    <Actions>
+        @if (!EditorOpen)
+        {
+            <button type="button" class="crh-button crh-button--primary" disabled="@_busy" @onclick="NewAsync"><i class="fa-solid fa-plus"></i> مورد جديد</button>
+            <button type="button" class="crh-button" disabled="@_busy" @onclick="OpenImport">استيراد</button>
+            <button type="button" class="crh-button" disabled="@_busy" @onclick="DownloadTemplateAsync">قالب Excel</button>
+            <button type="button" class="crh-button" disabled="@_busy" @onclick="ExportAsync">تصدير</button>
+            <button type="button" class="crh-button" disabled="@_busy" @onclick="LoadAsync">تحديث</button>
+            <a class="crh-button" href="/accounting/suppliers/aging">أعمار ديون الموردين</a>
+            <a class="crh-button" href="/accounting/suppliers/openings">الأرصدة الافتتاحية</a>
+        }
+    </Actions>
+</SupplierRelatedPageHeader>
 
 @if (!EditorOpen)
 {
-    <UiSupplierListDashboard Busy="@_busy"
+    <UiSupplierListDashboard HideDefaultHeader="true" Busy="@_busy"
                              Items="@_items"
                              Search="@_search"
                              Filter="@_filter"

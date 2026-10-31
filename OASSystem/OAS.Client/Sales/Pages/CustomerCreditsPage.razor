@@ -8,30 +8,34 @@
 @using OAS.Contracts.Accounting.BankAccounts
 @using OAS.Contracts.Accounting.Currencies
 @using OAS.Client.Accounting.Services
+@using OAS.Client.Accounting.Components
+@using OAS.UiLib.Services.Feedback
+@using OAS.Client.Common.Feedback.Services
 @inject OasApiClient Api
 @inject IAccountingClientService Accounting
+@inject IUiSnackbarService Snackbar
+@inject IApiFeedbackService ApiFeedback
 
 <PageTitle>تطبيق مرتجعات العميل | OAS</PageTitle>
 
 <div class="customer-credit-page" dir="rtl">
-    <header class="cc-page-header">
-        <div>
-            <div class="cc-breadcrumb">المبيعات <span>/</span> العملاء <span>/</span> تسوية رصيد المرتجعات</div>
-            <h1>تطبيق مرتجعات العميل</h1>
-            <p>استخدم الرصيد الدائن الناتج عن مرتجع مرحّل لتخفيض فاتورة أخرى أو رد المبلغ للعميل.</p>
-        </div>
-        <div class="cc-header-actions">
+    <CustomerRelatedPageHeader CustomerId="@CustomerId" Title="تطبيق مرتجعات العميل" Subtitle="تطبيق رصيد مرتجع مرحّل على فاتورة أو رد المبلغ للعميل">
+        <Actions>
             <a class="cc-button cc-button--quiet" href="@($"/accounting/customers/{CustomerId:D}/account")">العودة إلى ملف العميل</a>
             <button type="button" class="cc-button cc-button--quiet" @onclick="ReloadAsync" disabled="@_busy">تحديث البيانات</button>
-        </div>
-    </header>
-
-    @if (!string.IsNullOrWhiteSpace(_error)) { <div class="cc-alert cc-alert--error" role="alert"><strong>تعذر إكمال العملية</strong><span>@_error</span></div> }
-    @if (!string.IsNullOrWhiteSpace(_notice)) { <div class="cc-alert cc-alert--success" role="status"><strong>تمت العملية</strong><span>@_notice</span></div> }
+        </Actions>
+    </CustomerRelatedPageHeader>
 
     @if (_state is null)
     {
-        <div class="cc-loading-card"><span class="cc-spinner" aria-hidden="true"></span><div><strong>جارٍ تحميل أرصدة المرتجعات</strong><p>يتم التحقق من الرصيد والفواتير وحسابات الصندوق والبنك.</p></div></div>
+        @if (_busy)
+        {
+            <div class="cc-loading-card"><span class="cc-spinner" aria-hidden="true"></span><div><strong>جارٍ تحميل أرصدة المرتجعات</strong><p>يتم التحقق من الرصيد والفواتير وحسابات الصندوق والبنك.</p></div></div>
+        }
+        else
+        {
+            <div class="cc-loading-card" role="alert">تعذر تحميل بيانات المرتجعات. تحقق من الاتصال ثم اضغط «تحديث البيانات».</div>
+        }
     }
     else
     {
@@ -82,10 +86,10 @@
                 else
                 {
                     <label class="cc-field"><span>طريقة رد المبلغ <b>*</b></span>
-                        <select class="cc-control" @bind="_method"><option value="1">نقدًا</option><option value="3">حوالة بنكية</option></select>
+                        <select class="cc-control" value="@_method" @onchange="OnMethodChanged"><option value="1">نقدًا</option><option value="3">حوالة بنكية</option></select>
                     </label>
                     <label class="cc-field"><span>عملة رد المبلغ <b>*</b></span>
-                        <select class="cc-control" @bind="_currencyId">
+                        <select class="cc-control" value="@_currencyId" @onchange="OnCurrencyChanged">
                             <option value="@Guid.Empty">اختر العملة</option>
                             @foreach (var x in _currencies.Where(x => x.IsActive)) { <option value="@x.Id">@x.Code — @x.NameAr</option> }
                         </select>
@@ -95,8 +99,12 @@
                         <label class="cc-field"><span>الصندوق <b>*</b></span>
                             <select class="cc-control" @bind="_selectedCash">
                                 <option value="@Guid.Empty">اختر الصندوق</option>
-                                @foreach (var account in _cash.Where(x => x.IsActive && (!x.CurrencyId.HasValue || x.CurrencyId == _currencyId))) { <option value="@account.Id">@account.Code — @account.Name</option> }
+                                @foreach (var account in AvailableCashAccounts) { <option value="@account.Id">@account.Code — @account.Name</option> }
                             </select>
+                            @if (_currencyId != Guid.Empty && AvailableCashAccounts.Count == 0)
+                            {
+                                <small class="cc-help">لا يوجد صندوق نشط مربوط بهذه العملة.</small>
+                            }
                         </label>
                     }
                     else
@@ -104,15 +112,19 @@
                         <label class="cc-field"><span>الحساب البنكي <b>*</b></span>
                             <select class="cc-control" @bind="_selectedBank">
                                 <option value="@Guid.Empty">اختر الحساب البنكي</option>
-                                @foreach (var account in _banks.Where(x => x.IsActive && (!x.CurrencyId.HasValue || x.CurrencyId == _currencyId))) { <option value="@account.Id">@account.Code — @account.BankName (@account.AccountName)</option> }
+                                @foreach (var account in AvailableBankAccounts) { <option value="@account.Id">@account.Code — @account.BankName (@account.AccountName)</option> }
                             </select>
+                            @if (_currencyId != Guid.Empty && AvailableBankAccounts.Count == 0)
+                            {
+                                <small class="cc-help">لا يوجد حساب بنكي نشط مربوط بهذه العملة.</small>
+                            }
                         </label>
                     }
                 }
 
                 <label class="cc-field"><span>@(_action == "apply" ? "المبلغ المراد تطبيقه بعملة الفاتورة" : "المبلغ المراد رده") <b>*</b></span>
                     <input class="cc-control" type="number" min="0.01" step="0.01" @bind="_amount" />
-                    <small class="cc-help">أدخل مبلغًا موجبًا. يتحقق الخادم من الرصيد المتاح وصحة التسوية قبل الترحيل.</small>
+                    <small class="cc-help">الرصيد المتاح للمرتجع المختار بالعملة الأساسية: @SelectedReturnAvailableBase.ToString("N2"). يُفحص المبلغ وسعر الصرف قبل التنفيذ، مع بقاء تحقق الخادم النهائي.</small>
                 </label>
             </div>
             <div class="cc-form-footer">
@@ -154,7 +166,7 @@
     private int _invoicePage = 1;
     private long _invoiceTotal;
     private Guid _returnId, _invoiceId, _currencyId;
-    private string _action = "apply", _error = "", _notice = "";
+    private string _action = "apply", _error = "";
     private Guid _selectedCash, _selectedBank;
     private IReadOnlyList<CashAccountDto> _cash = [];
     private IReadOnlyList<BankAccountDto> _banks = [];
@@ -162,6 +174,48 @@
     private decimal _amount;
     private byte _method = 1;
     private bool _busy;
+
+    private CustomerReturnCreditItemDto? SelectedReturn =>
+        _state?.Returns.FirstOrDefault(x => x.SalesReturnId == _returnId);
+
+    private decimal SelectedReturnAvailableBase => SelectedReturn is { } selected
+        ? RemainingCredit(selected.SalesReturnId, selected.EstimatedUnappliedBaseCredit)
+        : 0m;
+
+    private IReadOnlyList<CashAccountDto> AvailableCashAccounts =>
+        _currencyId == Guid.Empty ? [] : _cash.Where(x => x.IsActive && x.CurrencyId == _currencyId).ToArray();
+
+    private IReadOnlyList<BankAccountDto> AvailableBankAccounts =>
+        _currencyId == Guid.Empty ? [] : _banks.Where(x => x.IsActive && x.CurrencyId == _currencyId).ToArray();
+
+    private void OnCurrencyChanged(ChangeEventArgs args)
+    {
+        _currencyId = Guid.TryParse(args.Value?.ToString(), out var id) ? id : Guid.Empty;
+        _selectedCash = Guid.Empty;
+        _selectedBank = Guid.Empty;
+    }
+
+    private void OnMethodChanged(ChangeEventArgs args)
+    {
+        _method = byte.TryParse(args.Value?.ToString(), out var method) ? method : (byte)1;
+        _selectedCash = Guid.Empty;
+        _selectedBank = Guid.Empty;
+    }
+
+    private bool Reject(string message)
+    {
+        _error = message;
+        Snackbar.Warning(message);
+        return false;
+    }
+
+    private void ShowFailure(Exception exception)
+    {
+        if (exception is ApiClientException apiError)
+            ApiFeedback.Show(apiError.Error);
+        else
+            ApiFeedback.ShowUnexpected();
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -190,7 +244,7 @@
         if (_busy || _invoicePage <= 1) return;
         _busy = true;
         try { _invoicePage--; await LoadInvoicesAsync(); }
-        catch (Exception ex) { _error = ex.Message; _invoicePage++; }
+        catch (Exception ex) { ShowFailure(ex); _invoicePage++; }
         finally { _busy = false; }
     }
 
@@ -199,8 +253,25 @@
         if (_busy || (long)_invoicePage * InvoicePageSize >= _invoiceTotal) return;
         _busy = true;
         try { _invoicePage++; await LoadInvoicesAsync(); }
-        catch (Exception ex) { _error = ex.Message; _invoicePage--; }
+        catch (Exception ex) { ShowFailure(ex); _invoicePage--; }
         finally { _busy = false; }
+    }
+
+    private async Task<IReadOnlyList<T>> LoadAllPagesAsync<T>(
+        Func<PageRequest, Task<PagedResult<T>>> fetch)
+    {
+        var result = new List<T>();
+        for (var pageNumber = 1; ; pageNumber++)
+        {
+            var page = await fetch(new PageRequest
+            {
+                PageNumber = pageNumber,
+                PageSize = PageRequest.MaximumPageSize
+            });
+            result.AddRange(page.Items);
+            if (!page.HasNextPage) break;
+        }
+        return result;
     }
 
     private async Task ReloadAsync()
@@ -212,67 +283,136 @@
         {
             _state = await Api.GetAsync<CustomerCreditBalanceDto>($"api/sales/customer-credits/{CustomerId:D}");
             await LoadInvoicesAsync();
-            var cash = await Accounting.GetCashAccountsPageAsync(new PageRequest { PageSize = 200 });
-            var banks = await Accounting.GetBankAccountsPageAsync(new PageRequest { PageSize = 200 });
-            var currencies = await Accounting.GetCurrenciesPageAsync(new PageRequest { PageSize = 200 });
-            _cash = cash.Items;
-            _banks = banks.Items;
-            _currencies = currencies.Items;
-            if (_currencyId == Guid.Empty) _currencyId = _state.Returns.FirstOrDefault()?.CurrencyId ?? Guid.Empty;
+            _cash = await LoadAllPagesAsync<CashAccountDto>(request => Accounting.GetCashAccountsPageAsync(request));
+            _banks = await LoadAllPagesAsync<BankAccountDto>(request => Accounting.GetBankAccountsPageAsync(request));
+            _currencies = await LoadAllPagesAsync<CurrencyDto>(request => Accounting.GetCurrenciesPageAsync(request));
+            if (_currencyId == Guid.Empty || !_currencies.Any(x => x.IsActive && x.Id == _currencyId))
+                _currencyId = _state?.Returns.FirstOrDefault()?.CurrencyId ?? Guid.Empty;
+            if (!AvailableCashAccounts.Any(x => x.Id == _selectedCash)) _selectedCash = Guid.Empty;
+            if (!AvailableBankAccounts.Any(x => x.Id == _selectedBank)) _selectedBank = Guid.Empty;
         }
-        catch (Exception ex) { _error = ex.Message; }
+        catch (Exception ex)
+        {
+            _error = "تعذر تحديث بيانات تسويات العميل.";
+            ShowFailure(ex);
+        }
         finally { _busy = false; }
+    }
+
+    // No write is sent for predictable validation failures. The server's domain
+    // guards remain the final authority for concurrent data and FX changes.
+    private async Task<bool> ValidateSubmissionAsync()
+    {
+        if (_state is null || _returnId == Guid.Empty || _amount <= 0m)
+            return Reject("اختر المرتجع وأدخل مبلغًا أكبر من صفر.");
+
+        var source = SelectedReturn;
+        if (source is null || SelectedReturnAvailableBase <= 0m)
+            return Reject("هذا المرتجع ليس لديه رصيد متاح للتسوية.");
+
+        if (_action == "apply")
+        {
+            var invoice = _invoices.FirstOrDefault(x => x.Id == _invoiceId && x.PaymentSummary.OutstandingAmount > 0m);
+            if (invoice is null)
+                return Reject("اختر فاتورة مفتوحة من القائمة الحالية.");
+            if (invoice.Id == source.SalesInvoiceId)
+                return Reject("المرتجع يُخفض فاتورته الأصلية تلقائيًا؛ اختر فاتورة أخرى.");
+            if (invoice.BaseCurrencyId != source.BaseCurrencyId)
+                return Reject("العملة الأساسية للفاتورة والمرتجع غير متطابقة.");
+
+            var amount = Math.Round(_amount, invoice.CurrencyDecimalPlacesSnapshot, MidpointRounding.AwayFromZero);
+            var baseAmount = Math.Round(amount * invoice.ExchangeRate,
+                invoice.BaseCurrencyDecimalPlacesSnapshot, MidpointRounding.AwayFromZero);
+            if (amount <= 0m || baseAmount <= 0m)
+                return Reject("المبلغ أقل من الحد المسموح به لعملة الفاتورة.");
+            if (baseAmount > SelectedReturnAvailableBase + 0.0001m)
+                return Reject($"المبلغ يتجاوز رصيد المرتجع المتاح ({SelectedReturnAvailableBase:N2} {source.BaseCurrencyCode}).");
+            // The client summary exposes the outstanding amount in invoice currency only.
+            // The server independently validates the exact base-currency outstanding balance.
+            if (amount > invoice.PaymentSummary.OutstandingAmount + 0.0001m)
+                return Reject("المبلغ أكبر من المتبقي على الفاتورة المختارة.");
+            return true;
+        }
+
+        if (_action != "refund")
+            return Reject("طريقة التسوية غير صالحة.");
+
+        var currency = _currencies.FirstOrDefault(x => x.Id == _currencyId && x.IsActive);
+        if (currency is null)
+            return Reject("اختر عملة نشطة لرد المبلغ.");
+        if (_method == 1 && !AvailableCashAccounts.Any(x => x.Id == _selectedCash))
+            return Reject("اختر صندوقًا نشطًا مطابقًا لعملة الاسترداد.");
+        if (_method == 3 && !AvailableBankAccounts.Any(x => x.Id == _selectedBank))
+            return Reject("اختر حسابًا بنكيًا نشطًا مطابقًا لعملة الاسترداد.");
+        if (_method is not (1 or 3))
+            return Reject("طريقة استرداد المبلغ غير صالحة.");
+
+        // The refund command resolves an Accounting FX rate at the UTC voucher date.
+        // Use the same rate and currency decimal rounding before posting.
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var rate = await Accounting.GetEffectiveExchangeRateAsync(_currencyId, today);
+        if (rate is null || rate.Rate <= 0)
+            return Reject("لا يتوفر سعر صرف فعّال للعملة المختارة اليوم.");
+
+        var baseCurrency = _currencies.FirstOrDefault(x => x.Id == source.BaseCurrencyId);
+        if (baseCurrency is null)
+            return Reject("تعذر تحديد العملة الأساسية للمرتجع.");
+        var transactionAmount = Math.Round(_amount, currency.DecimalPlaces, MidpointRounding.AwayFromZero);
+        var baseAmountRefund = Math.Round(transactionAmount * rate.Rate,
+            baseCurrency.DecimalPlaces, MidpointRounding.AwayFromZero);
+        if (transactionAmount <= 0m || baseAmountRefund <= 0m)
+            return Reject("المبلغ أقل من الحد المسموح به لعملة الاسترداد.");
+        if (baseAmountRefund > SelectedReturnAvailableBase + 0.0001m)
+            return Reject($"مبلغ الاسترداد بعد التحويل ({baseAmountRefund:N2} {source.BaseCurrencyCode}) يتجاوز رصيد المرتجع المتاح ({SelectedReturnAvailableBase:N2}).");
+        return true;
     }
 
     private async Task SubmitAsync()
     {
-        if (_state is null || _returnId == Guid.Empty || _amount <= 0m)
-        { _error = "اختر المرتجع والمبلغ."; return; }
-        if (!_state.Returns.Any(r => r.SalesReturnId == _returnId &&
-            RemainingCredit(r.SalesReturnId, r.EstimatedUnappliedBaseCredit) > 0m))
-        { _error = "هذا المرتجع لا يملك رصيدًا متاحًا."; return; }
-
-        _busy = true; _error = ""; _notice = "";
+        if (_busy || _state is null) return;
+        _busy = true;
+        _error = "";
         try
         {
+            if (!await ValidateSubmissionAsync()) return;
+
             if (_action == "apply")
             {
-                if (_invoiceId == Guid.Empty || !_invoices.Any(i => i.Id == _invoiceId && i.PaymentSummary.OutstandingAmount > 0m))
-                { _error = "اختر فاتورة من القائمة الحالية."; return; }
                 await Api.PostAsync<ApplyCustomerReturnCreditRequest, CustomerCreditSettlementDto>(
                     $"api/sales/customer-credits/{CustomerId:D}/apply",
                     new ApplyCustomerReturnCreditRequest(_returnId, _invoiceId, _amount, Guid.NewGuid().ToString("N")));
             }
             else
             {
-                if (_currencyId == Guid.Empty || (_method == 1 && _selectedCash == Guid.Empty) ||
-                    (_method == 3 && _selectedBank == Guid.Empty))
-                { _error = "اختر عملة الصرف والصندوق أو البنك."; return; }
                 await Api.PostAsync<RefundCustomerReturnCreditRequest, CustomerCreditSettlementDto>(
                     $"api/sales/customer-credits/{CustomerId:D}/refund",
                     new RefundCustomerReturnCreditRequest(_returnId, _currencyId, _amount, _method,
                         _method == 1 ? _selectedCash : null, _method == 3 ? _selectedBank : null,
                         null, null, "استرداد رصيد مرتجع", Guid.NewGuid().ToString("N")));
             }
-            _notice = "تمت التسوية؛ تحقق من السند وسجل القيود.";
+            Snackbar.Success("تمت التسوية بنجاح. راجع السند والقيود المرتبطة.");
             _amount = 0m;
+            _returnId = Guid.Empty;
         }
-        catch (Exception ex) { _error = ex.Message; }
+        catch (Exception ex) { _error = "تعذر إتمام تسوية المرتجع."; ShowFailure(ex); }
         finally { _busy = false; }
+
         if (string.IsNullOrWhiteSpace(_error)) await ReloadAsync();
     }
 
     private async Task ReverseAsync(CustomerCreditSettlementDto x)
     {
-        _busy = true; _error = "";
+        if (_busy) return;
+        _busy = true;
+        _error = "";
         try
         {
             await Api.PostAsync<ReverseCustomerReturnCreditRequest, CustomerCreditSettlementDto>(
                 $"api/sales/customer-credits/{CustomerId:D}/applications/{x.Id:D}/reverse",
                 new ReverseCustomerReturnCreditRequest(x.RowVersion, "عكس تطبيق الرصيد الدائن"));
-            _notice = "تم عكس التطبيق.";
+            Snackbar.Success("تم عكس تطبيق الرصيد.");
         }
-        catch (Exception ex) { _error = ex.Message; }
+        catch (Exception ex) { _error = "تعذر عكس تسوية المرتجع."; ShowFailure(ex); }
         finally { _busy = false; }
         if (string.IsNullOrWhiteSpace(_error)) await ReloadAsync();
     }

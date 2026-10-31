@@ -1,0 +1,115 @@
+@namespace OAS.Client.Accounting.Components
+@using OAS.Client.Accounting.Workspace
+@using OAS.UiLib.Components.Navigation
+@using OAS.UiLib.Core.Models
+@using OAS.UiLib.Services.Dialogs
+@using OAS.UiLib.Core.Enums
+@inject CustomerWorkspaceSession CustomerSession
+@inject NavigationManager Navigation
+@inject IUiDialogService Dialog
+
+<div class="crh-container" dir="rtl">
+    <h1 class="crh-sr-only">@Title</h1>
+    @* A single document-tab position across the list, customer editor, financial
+       statement and return-credit pages. The individual page owns its actions. *@
+    <nav class="crh-tabs" aria-label="تبويبات مساحة عمل العملاء">
+        <UiApplicationTabStrip Tabs="@VisibleTabs"
+                               AriaLabel="تبويبات العملاء"
+                               EnableContextMenu="@UseHostTabs"
+                               OnSelect="HandleSelectAsync"
+                               OnClose="HandleCloseAsync"
+                               OnCloseOthers="HandleCloseOthersAsync"
+                               OnCloseAll="HandleCloseAllAsync" />
+    </nav>
+    @if (Actions is not null)
+    {
+        <div class="crh-toolbar">
+            <div class="crh-actions">@Actions</div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "ملف العميل المالي";
+    [Parameter] public string Subtitle { get; set; } = string.Empty;
+    [Parameter] public Guid CustomerId { get; set; }
+    [Parameter] public bool IsListView { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public IReadOnlyList<UiApplicationTabItem>? TabItems { get; set; }
+    [Parameter] public EventCallback<Guid> OnTabSelect { get; set; }
+    [Parameter] public EventCallback<Guid> OnTabClose { get; set; }
+    [Parameter] public EventCallback<Guid> OnTabCloseOthers { get; set; }
+    [Parameter] public EventCallback OnTabCloseAll { get; set; }
+    private bool UseHostTabs => TabItems is not null;
+    private IReadOnlyList<UiApplicationTabItem> VisibleTabs => TabItems ?? Tabs;
+
+    private Task HandleSelectAsync(Guid id) => OnTabSelect.HasDelegate
+        ? OnTabSelect.InvokeAsync(id)
+        : SelectRelatedTabAsync(id);
+    private Task HandleCloseAsync(Guid id) => OnTabClose.HasDelegate
+        ? OnTabClose.InvokeAsync(id)
+        : CloseTabAsync(id);
+    private Task HandleCloseOthersAsync(Guid id) => OnTabCloseOthers.HasDelegate
+        ? OnTabCloseOthers.InvokeAsync(id)
+        : Task.CompletedTask;
+    private Task HandleCloseAllAsync() => OnTabCloseAll.HasDelegate
+        ? OnTabCloseAll.InvokeAsync()
+        : Task.CompletedTask;
+
+    private Guid CurrentRelatedTabId => IsListView ? CustomerSession.ListTabId : CustomerId;
+
+    private IReadOnlyList<UiApplicationTabItem> Tabs
+    {
+        get
+        {
+            var tabs = new List<UiApplicationTabItem>
+            {
+                new(CustomerSession.ListTabId, "جميع العملاء", "/accounting/customers", "fa-solid fa-users", IsListView, CanClose: false)
+            };
+            tabs.AddRange(CustomerSession.EditorTabs.Select(tab => new UiApplicationTabItem(
+                tab.TabId, tab.Title, "/accounting/customers", tab.IsNew ? "fa-solid fa-user-plus" : "fa-solid fa-user-tie", false, CanClose: true)));
+            if (!IsListView)
+                tabs.Add(new UiApplicationTabItem(CurrentRelatedTabId, Title, "", "fa-solid fa-file-invoice-dollar", true, CanClose: true));
+            return tabs;
+        }
+    }
+
+    private Task SelectRelatedTabAsync(Guid tabId)
+    {
+        SelectTabAsync(tabId);
+        return Task.CompletedTask;
+    }
+
+    private void SelectTabAsync(Guid tabId)
+    {
+        if (tabId == CurrentRelatedTabId) return;
+        if (!CustomerSession.Activate(tabId)) return;
+        Navigation.NavigateTo($"/accounting/customers?tabId={tabId:D}");
+    }
+
+    private async Task CloseTabAsync(Guid tabId)
+    {
+        if (tabId == CurrentRelatedTabId)
+        {
+            CustomerSession.ActiveTabId = CustomerSession.ListTabId;
+            Navigation.NavigateTo("/accounting/customers");
+            return;
+        }
+
+        var tab = CustomerSession.EditorTabs.FirstOrDefault(x => x.TabId == tabId);
+        if (tab is null) return;
+        if (tab.IsDirty)
+        {
+            var confirmed = await Dialog.ConfirmAsync(
+                "تغييرات غير محفوظة",
+                $"توجد تغييرات لم تُحفظ في «{tab.Title}». هل تريد إغلاق التبويب؟",
+                AlertTone.Warning,
+                confirmText: "تجاهل وإغلاق",
+                cancelText: "إلغاء");
+            if (!confirmed) return;
+        }
+        CustomerSession.EditorTabs.Remove(tab);
+        if (CustomerSession.ActiveTabId == tabId)
+            CustomerSession.ActiveTabId = CustomerSession.ListTabId;
+    }
+}

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using OAS.Client.Accounting.Common;
+using OAS.Client.Accounting.Workspace;
 using OAS.Client.Accounting.Services;
 using OAS.Client.Common.Feedback.Services;
 using OAS.Client.Services.Browser;
@@ -27,30 +28,49 @@ public partial class CustomersPage
     [Inject] private IApiFeedbackService ApiFeedback { get; set; } = default!;
     [Inject] private IUiSnackbarService Snackbar { get; set; } = default!;
     [Inject] private IUiDialogService Dialog { get; set; } = default!;
+    [Inject] private CustomerWorkspaceSession CustomerSession { get; set; } = default!;
+    [SupplyParameterFromQuery(Name = "tabId")]
+    public Guid? RequestedTabId { get; set; }
 
     private const int PageSize = 25;
 
-    private readonly Guid _listTabId = Guid.NewGuid();
-    private readonly List<PartyEditorTab> _editorTabs = [];
+    private Guid _listTabId => CustomerSession.ListTabId;
+    private List<CustomerEditorTab> _editorTabs => CustomerSession.EditorTabs;
     private readonly UiAccountingPartyFormModel _emptyForm = new();
     private readonly Dictionary<Guid, AccountDto> _accountLookups = [];
 
-    private Guid _activeTabId;
+    private Guid _activeTabId
+    {
+        get => CustomerSession.ActiveTabId;
+        set => CustomerSession.ActiveTabId = value;
+    }
     private bool _busy;
     private bool _importOpen;
     private bool _spreadsheetBusy;
-    private int _pageNumber = 1;
+    private int _pageNumber
+    {
+        get => CustomerSession.PageNumber;
+        set => CustomerSession.PageNumber = value;
+    }
     private int _totalPages = 1;
     private long _totalCount;
     private long _importKey;
-    private string _search = string.Empty;
-    private string _filter = "all";
+    private string _search
+    {
+        get => CustomerSession.Search;
+        set => CustomerSession.Search = value;
+    }
+    private string _filter
+    {
+        get => CustomerSession.Filter;
+        set => CustomerSession.Filter = value;
+    }
     private string _fileName = string.Empty;
     private byte[]? _fileBytes;
     private SpreadsheetPreview? _preview;
     private IReadOnlyList<UiAccountingPartyListItem> _items = [];
 
-    private PartyEditorTab? ActiveEditorTab =>
+    private CustomerEditorTab? ActiveEditorTab =>
         _editorTabs.FirstOrDefault(x => x.TabId == _activeTabId);
 
     private UiAccountingPartyFormModel ActiveForm =>
@@ -105,8 +125,14 @@ public partial class CustomersPage
 
     protected override async Task OnInitializedAsync()
     {
-        _activeTabId = _listTabId;
+        // A route change must not discard customer editor tabs and draft forms.
         await LoadAsync();
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (RequestedTabId is Guid tabId)
+            CustomerSession.Activate(tabId);
     }
 
     private Task SetSearch(string? value)
@@ -240,7 +266,7 @@ public partial class CustomersPage
     {
         var reserved = await Accounting.ReserveCustomerCodeAsync();
 
-        var tab = new PartyEditorTab(
+        var tab = new CustomerEditorTab(
             entityId: null,
             title: "عميل جديد",
             form: new UiAccountingPartyFormModel
@@ -275,7 +301,7 @@ public partial class CustomersPage
 
             await EnsureParentLookupAsync(dto.ParentAccountId);
 
-            var tab = new PartyEditorTab(
+            var tab = new CustomerEditorTab(
                 dto.Id,
                 GetTabTitle(dto.NameAr, dto.CustomerCode),
                 FromDto(dto));
@@ -539,7 +565,7 @@ public partial class CustomersPage
         _activeTabId = _listTabId;
     }
 
-    private async Task<bool> CanDiscardTabAsync(PartyEditorTab tab)
+    private async Task<bool> CanDiscardTabAsync(CustomerEditorTab tab)
     {
         if (!tab.IsDirty)
             return true;
@@ -794,16 +820,4 @@ public partial class CustomersPage
         RowVersion = x.RowVersion
     };
 
-    private sealed class PartyEditorTab(
-        Guid? entityId,
-        string title,
-        UiAccountingPartyFormModel form)
-    {
-        public Guid TabId { get; } = Guid.NewGuid();
-        public Guid? EntityId { get; set; } = entityId;
-        public string Title { get; set; } = title;
-        public UiAccountingPartyFormModel Form { get; set; } = form;
-        public bool IsDirty { get; set; }
-        public bool IsNew => !EntityId.HasValue;
-    }
 }

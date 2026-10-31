@@ -4,23 +4,28 @@
 @using OAS.Contracts.Accounting.Currencies
 @using OAS.Contracts.Accounting.Suppliers
 @using OAS.Contracts.Accounting.SupplierOpenings
+@using OAS.Contracts.Accounting.Enums
+@using OAS.Client.Accounting.Components
+@using OAS.Client.Services.Http
+@using OAS.Client.Common.Feedback.Services
+@using OAS.UiLib.Services.Feedback
 @using OAS.UiLib.Services.Dialogs
 @using OAS.UiLib.Core.Enums
 @inject OasApiClient Api
 @inject IAccountingClientService Accounting
 @inject IUiDialogService Dialog
+@inject IUiSnackbarService Snackbar
+@inject IApiFeedbackService ApiFeedback
 
 <PageTitle>الأرصدة الافتتاحية للموردين | OAS</PageTitle>
 
 <div class="container-fluid py-3" dir="rtl">
-    <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
-        <div><h1 class="h5 mb-1">الأرصدة الافتتاحية للموردين</h1>
-            <small class="text-muted">أنشئ تفاصيل الرصيد أولًا، ثم رحّل قيدًا واحدًا متوازنًا أو اربط دفعتك بقيد موجود بعد التحقق منه.</small></div>
-        <div class="d-flex gap-2">
-            <a class="btn btn-outline-secondary btn-sm" href="/accounting/suppliers">الموردون</a>
-            <a class="btn btn-outline-primary btn-sm" href="/accounting/suppliers/aging">أعمار الديون</a>
-        </div>
-    </div>
+    <SupplierRelatedPageHeader Title="الأرصدة الافتتاحية للموردين">
+        <Actions>
+            <a class="crh-button" href="/accounting/suppliers">قائمة الموردين</a>
+            <a class="crh-button" href="/accounting/suppliers/aging">أعمار الديون</a>
+        </Actions>
+    </SupplierRelatedPageHeader>
 
     @if (!string.IsNullOrWhiteSpace(_error)) { <div class="alert alert-danger" role="alert">@_error</div> }
     @if (!string.IsNullOrWhiteSpace(_success)) { <div class="alert alert-success" role="status">@_success</div> }
@@ -152,22 +157,26 @@
     }
     private async Task CreateAsync()
     {
-        if (!_baseCurrencyId.HasValue || _baseCurrencyId == Guid.Empty) { _error = "اختر العملة الأساسية."; return; }
+        if (!_baseCurrencyId.HasValue || _baseCurrencyId == Guid.Empty) { Snackbar.Warning("اختر العملة الأساسية."); return; }
         if (_items.Any(x => x.CurrencyId == Guid.Empty || x.Amount <= 0m || x.ExchangeRate <= 0m ||
                             (x.DueDate.HasValue && x.DueDate < x.DocumentDate)))
-        { _error = "راجع العملات والمبالغ والأسعار وتواريخ استحقاق البنود."; return; }
+        { Snackbar.Warning("راجع العملات والمبالغ وأسعار الصرف وتواريخ الاستحقاق."); return; }
         await RunAsync(async () =>
         {
             var request = new CreateSupplierOpeningBatchRequest(_asOfDate, _baseCurrencyId.Value, _notes,
                 _items.Select(x => new CreateSupplierOpeningItemRequest(x.SupplierId, x.LegacyReference,
                     x.DocumentDate, x.DueDate, x.CurrencyId, x.Amount, x.ExchangeRate)).ToArray());
             _batch = await Api.PostAsync<CreateSupplierOpeningBatchRequest, SupplierOpeningBatchDto>("api/accounting/supplier-openings", request);
-            _success = "تم حفظ الدفعة كمسودة. راجع الأرصدة ثم قرر الترحيل أو ربط قيد افتتاحي موجود.";
+            Snackbar.Success("تم حفظ الدفعة الافتتاحية كمسودة. راجع الأرصدة قبل الترحيل.");
         });
     }
     private async Task PostAsync()
     {
         if (_batch is null || _busy) return;
+        // Validate the existing supplier account hierarchy with read-only queries
+        // before calling the posting command; backend posting rules remain unchanged.
+        if (!await ValidateSupplierAccountsBeforePostingAsync(_batch))
+            return;
         var approved = await Dialog.ConfirmAsync(
             "مراجعة وترحيل الأرصدة الافتتاحية",
             $"سيتم ترحيل الدفعة «{_batch.BatchCode}» بتاريخ {_batch.AsOfDate:yyyy-MM-dd}: " +
@@ -183,20 +192,74 @@
             var id = _batch.Id;
             await Api.PostAsync<PostSupplierOpeningBatchRequest, Guid>($"api/accounting/supplier-openings/{id:D}/post", new(_batch.RowVersion));
             await ReloadAsync(id);
-            _success = "تم ترحيل الدفعة الافتتاحية بنجاح.";
+            Snackbar.Success("تم ترحيل الدفعة الافتتاحية بنجاح.");
         });
     }
+    private async Task<bool> ValidateSupplierAccountsBeforePostingAsync(SupplierOpeningBatchDto batch)
+    {
+        try
+        {
+            foreach (var item in batch.Items.GroupBy(x => x.SupplierId).Select(x => x.First()))
+            {
+                var supplier = await Accounting.GetSupplierByIdAsync(item.SupplierId);
+                if (supplier is null || !supplier.IsActive)
+                {
+                    Snackbar.Warning($"المورد «{item.SupplierName}» غير موجود أو غير نشط؛ لا يمكن ترحيل رصيده الافتتاحي.");
+                    return false;
+                }
+                if (supplier.AccountId == Guid.Empty)
+                {
+                    Snackbar.Warning($"المورد «{supplier.NameAr}» ليس له حساب محاسبي مرتبط.");
+                    return false;
+                }
+
+                var account = await Accounting.GetAccountByIdAsync(supplier.AccountId);
+                if (account is null || !account.IsActive || !account.IsPostingAccount ||
+                    account.AccountType != AccountType.Subledger ||
+                    account.AccountClass != AccountClass.Liability ||
+                    account.NormalBalance != NormalBalance.Credit)
+                {
+                    Snackbar.Warning($"حساب المورد «{supplier.NameAr}» يجب أن يكون حساب ذمم دائن نشطًا من نوع أستاذ مساعد ويقبل الترحيل. راجع حساب المورد في شجرة الحسابات.");
+                    return false;
+                }
+
+                var parent = account.ParentAccountId.HasValue
+                    ? await Accounting.GetAccountByIdAsync(account.ParentAccountId.Value)
+                    : null;
+                if (parent is null || !parent.IsActive || !parent.IsControlAccount ||
+                    parent.AccountType != AccountType.Control ||
+                    parent.AccountClass != AccountClass.Liability ||
+                    parent.NormalBalance != NormalBalance.Credit)
+                {
+                    Snackbar.Warning($"حساب المورد «{supplier.NameAr}» يجب أن يتبع مباشرةً حساب رقابة موردين نشطًا ضمن الخصوم وبطبيعة دائنة.");
+                    return false;
+                }
+            }
+            return true;
+        }
+        catch (ApiClientException ex)
+        {
+            ApiFeedback.Show(ex.Error);
+            return false;
+        }
+        catch (Exception)
+        {
+            ApiFeedback.ShowUnexpected();
+            return false;
+        }
+    }
+
     private async Task LinkAsync()
     {
         if (_batch is null || !Guid.TryParse(_existingJournalId, out var journalId))
-        { _error = "معرف القيد غير صالح."; return; }
+        { Snackbar.Warning("معرف القيد غير صالح."); return; }
         await RunAsync(async () =>
         {
             var id = _batch.Id;
             await Api.PostAsync<LinkSupplierOpeningJournalRequest, Guid>($"api/accounting/supplier-openings/{id:D}/link-existing-journal",
                 new(journalId, _batch.RowVersion));
             await ReloadAsync(id);
-            _success = "تم ربط الدفعة بالقيد الموجود بعد التحقق من توازنه وحسابات الموردين.";
+            Snackbar.Success("تم ربط الدفعة بالقيد الموجود بعد التحقق.");
         });
     }
     private Task ReloadAsync(Guid id) => ReloadCoreAsync(id);
@@ -206,7 +269,8 @@
         if (_busy) return;
         _busy = true; _error = null; _success = null;
         try { await action(); }
-        catch (Exception ex) { _error = ex.Message; }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch (Exception) { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
     }
     private void StartNew() { _batch = null; _items.Clear(); _existingJournalId = null; _error = _success = null; }

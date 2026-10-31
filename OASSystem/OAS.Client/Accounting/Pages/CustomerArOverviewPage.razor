@@ -1,6 +1,8 @@
 @page "/accounting/customer-ar"
 @attribute [Authorize]
 @using OAS.Contracts.Accounting.Reports
+@using OAS.Client.Accounting.Components
+@using OAS.Client.Accounting.Workspace
 @using OAS.Client.Services.Http
 @using OAS.Client.Common.Feedback.Services
 @using OAS.Client.Services.Browser
@@ -9,23 +11,19 @@
 @inject IUiSnackbarService Snackbar
 @inject OasApiClient Api
 @inject IApiFeedbackService ApiFeedback
+@inject CustomerWorkspaceSession CustomerSession
 
 <PageTitle>أرصدة العملاء وأعمار الديون | OAS</PageTitle>
 
 <div class="customer-ar-page" dir="rtl">
-    <header class="ar-page-header">
-        <div>
-            <div class="ar-breadcrumb">المحاسبة والمالية <span>/</span> العملاء <span>/</span> التقارير</div>
-            <h1>أرصدة العملاء</h1>
-            <p>تابع الأرصدة المدينة والدائنة وأعمار الديون، وافتح كشف حساب أي عميل مباشرة.</p>
-        </div>
-        <div class="ar-page-actions">
+    <CustomerRelatedPageHeader CustomerId="@Guid.Empty" Title="أرصدة العملاء" Subtitle="أرصدة العملاء وأعمار الديون">
+        <Actions>
             <button type="button" class="ar-button ar-button--quiet" @onclick="BackToCustomersAsync">قائمة العملاء</button>
             <button type="button" class="ar-button ar-button--quiet" @onclick="LoadAsync" disabled="@_busy">تحديث</button>
             <button type="button" class="ar-button ar-button--secondary" @onclick="ExportBalancesAsync" disabled="@_busy">تصدير الأرصدة CSV</button>
             <button type="button" class="ar-button ar-button--secondary" @onclick="ExportAgingAsync" disabled="@_busy">تصدير أعمار الديون</button>
-        </div>
-    </header>
+        </Actions>
+    </CustomerRelatedPageHeader>
 
     <section class="ar-filter-panel" aria-label="تصفية تقرير الأرصدة">
         <label class="ar-field"><span>الأرصدة حتى تاريخ</span><input type="date" value="@(_asOf?.ToString("yyyy-MM-dd"))" @onchange="OnAsOfChangedAsync" /></label>
@@ -174,6 +172,7 @@
 
     private Task BackToCustomersAsync()
     {
+        CustomerSession.ActiveTabId = CustomerSession.ListTabId;
         Navigation.NavigateTo("/accounting/customers");
         return Task.CompletedTask;
     }

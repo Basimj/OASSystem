@@ -28,3 +28,30 @@
 }
 .container-fluid .text-muted { color: var(--oas-color-text-muted, #78869c) !important; }
 .container-fluid .border { border-color: var(--oas-color-border, #dce3ee) !important; }
+
+/* Supplier financial pages share the compact customer-workspace visual rhythm. */
+.supplier-compact-identity {
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    padding:10px 14px;margin-bottom:10px;
+    border:1px solid var(--oas-color-border,#dbe5ef);border-radius:10px;
+    background:var(--oas-color-surface,#fff);color:var(--oas-color-text,#162a40);
+}
+.supplier-compact-identity strong {font-size:15px}
+.supplier-compact-identity span {color:var(--oas-color-text-muted,#74829b);font-size:12px}
+.supplier-center-sections {display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:10px 0 15px}
+.supplier-section-button {
+    min-height:34px;padding:6px 13px;border:1px solid var(--oas-color-border,#dbe5ef);
+    background:var(--oas-color-surface,#fff);border-radius:8px;
+    color:var(--oas-color-text,#1a2b43);font:inherit;font-size:12px;font-weight:650;cursor:pointer;
+}
+.supplier-section-button.is-active {background:var(--oas-color-primary,#2668b0);border-color:var(--oas-color-primary,#2668b0);color:#fff}
+.supplier-section-button:hover:not(:disabled) {border-color:var(--oas-color-primary,#2668b0)}
+.supplier-section-button:disabled {opacity:.6;cursor:wait}
+.supplier-compact-note {font-size:12px;color:var(--oas-color-text-muted,#718096);margin:4px 2px 12px}
+@media print {.crh-container,.supplier-center-sections {display:none!important}}
+
+/* Compact supplier workspaces: align surfaces and spacing with customer financial pages. */
+.container-fluid.py-3 {padding-top: .55rem !important; padding-bottom:.75rem !important;}
+.container-fluid .card {border-radius: 11px; box-shadow: 0 1px 3px rgba(15,30,56,.04);}
+.container-fluid .btn {border-radius:8px;}
+.container-fluid .form-control:focus, .container-fluid .form-select:focus {border-color:var(--oas-color-primary,#3472c0); box-shadow:0 0 0 2px color-mix(in srgb,var(--oas-color-primary,#3472c0) 12%,transparent);}

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using OAS.Client.Accounting.Common;
+using OAS.Client.Accounting.Workspace;
 using OAS.Client.Accounting.Services;
 using OAS.Client.Common.Feedback.Services;
 using OAS.Client.Services.Browser;
@@ -22,6 +23,9 @@ namespace OAS.Client.Accounting.Pages;
 public partial class SuppliersPage
 {
     [Inject] private IAccountingClientService Accounting { get; set; } = default!;
+    [Inject] private SupplierWorkspaceSession SupplierSession { get; set; } = default!;
+    [SupplyParameterFromQuery(Name = "tabId")]
+    public Guid? RequestedTabId { get; set; }
     [Inject] private AccountingSpreadsheetClient Spreadsheets { get; set; } = default!;
     [Inject] private BrowserFileDownloadService Download { get; set; } = default!;
     [Inject] private IApiFeedbackService ApiFeedback { get; set; } = default!;
@@ -30,28 +34,44 @@ public partial class SuppliersPage
 
     private const int PageSize = 25;
 
-    private readonly Guid _listTabId = Guid.NewGuid();
-    private readonly List<PartyEditorTab> _editorTabs = [];
+    private Guid _listTabId => SupplierSession.ListTabId;
+    private List<SupplierEditorTab> _editorTabs => SupplierSession.EditorTabs;
     private readonly UiAccountingPartyFormModel _emptyForm = new();
     private readonly Dictionary<Guid, AccountDto> _accountLookups = [];
 
-    private Guid _activeTabId;
+    private Guid _activeTabId
+    {
+        get => SupplierSession.ActiveTabId;
+        set => SupplierSession.ActiveTabId = value;
+    }
     private bool _busy;
     private bool _importOpen;
     private bool _spreadsheetBusy;
-    private int _pageNumber = 1;
+    private int _pageNumber
+    {
+        get => SupplierSession.PageNumber;
+        set => SupplierSession.PageNumber = value;
+    }
     private int _totalPages = 1;
     private long _totalCount;
     private long _importKey;
-    private string _search = string.Empty;
-    private string _filter = "all";
+    private string _search
+    {
+        get => SupplierSession.Search;
+        set => SupplierSession.Search = value;
+    }
+    private string _filter
+    {
+        get => SupplierSession.Filter;
+        set => SupplierSession.Filter = value;
+    }
     private Guid? _startInEditModeFor;
     private string _fileName = string.Empty;
     private byte[]? _fileBytes;
     private SpreadsheetPreview? _preview;
     private IReadOnlyList<UiAccountingPartyListItem> _items = [];
 
-    private PartyEditorTab? ActiveEditorTab =>
+    private SupplierEditorTab? ActiveEditorTab =>
         _editorTabs.FirstOrDefault(x => x.TabId == _activeTabId);
 
     private UiAccountingPartyFormModel ActiveForm =>
@@ -106,8 +126,17 @@ public partial class SuppliersPage
 
     protected override async Task OnInitializedAsync()
     {
-        _activeTabId = _listTabId;
+        // Navigating to the supplier list without tabId activates its permanent list
+        // tab, but retains existing editor tabs and unsaved drafts in the session.
+        if (!RequestedTabId.HasValue)
+            _activeTabId = _listTabId;
         await LoadAsync();
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (RequestedTabId is Guid tabId)
+            SupplierSession.Activate(tabId);
     }
 
     private Task SetSearch(string? value)
@@ -241,7 +270,7 @@ public partial class SuppliersPage
     {
         var reserved = await Accounting.ReserveSupplierCodeAsync();
 
-        var tab = new PartyEditorTab(
+        var tab = new SupplierEditorTab(
             entityId: null,
             title: "مورد جديد",
             form: new UiAccountingPartyFormModel
@@ -277,7 +306,7 @@ public partial class SuppliersPage
 
             await EnsureParentLookupAsync(dto.ParentAccountId);
 
-            var tab = new PartyEditorTab(
+            var tab = new SupplierEditorTab(
                 dto.Id,
                 GetTabTitle(dto.NameAr, dto.SupplierCode),
                 FromDto(dto));
@@ -548,7 +577,7 @@ public partial class SuppliersPage
         _activeTabId = _listTabId;
     }
 
-    private async Task<bool> CanDiscardTabAsync(PartyEditorTab tab)
+    private async Task<bool> CanDiscardTabAsync(SupplierEditorTab tab)
     {
         if (!tab.IsDirty)
             return true;
@@ -806,17 +835,4 @@ public partial class SuppliersPage
         Notes = x.Notes,
         RowVersion = x.RowVersion
     };
-
-    private sealed class PartyEditorTab(
-        Guid? entityId,
-        string title,
-        UiAccountingPartyFormModel form)
-    {
-        public Guid TabId { get; } = Guid.NewGuid();
-        public Guid? EntityId { get; set; } = entityId;
-        public string Title { get; set; } = title;
-        public UiAccountingPartyFormModel Form { get; set; } = form;
-        public bool IsDirty { get; set; }
-        public bool IsNew => !EntityId.HasValue;
-    }
 }

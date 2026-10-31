@@ -1,6 +1,8 @@
 @page "/accounting/customers/{CustomerId:guid}/account"
 @attribute [Authorize]
 @using OAS.Contracts.Accounting.Reports
+@using OAS.Client.Accounting.Components
+@using OAS.Client.Accounting.Workspace
 @using OAS.Client.Services.Http
 @using OAS.Client.Services.Browser
 @using OAS.Client.Common.Feedback.Services
@@ -11,24 +13,20 @@
 @inject IUiSnackbarService Snackbar
 @inject Microsoft.JSInterop.IJSRuntime JS
 @inject NavigationManager Navigation
+@inject CustomerWorkspaceSession CustomerSession
 
 <PageTitle>ملف العميل المالي | OAS</PageTitle>
 
 <div class="customer-workspace-page" dir="rtl">
-    <header class="cw-page-header">
-        <div class="cw-heading">
-            <div class="cw-breadcrumb">المحاسبة والمالية <span>/</span> العملاء <span>/</span> ملف العميل المالي</div>
-            <h1>ملف العميل المالي</h1>
-            <p>كشف الحساب، المستحقات، أعمار الديون والمستندات المرتبطة بالعميل في مكان واحد.</p>
-        </div>
-        <div class="cw-header-actions">
+    <CustomerRelatedPageHeader CustomerId="@CustomerId" Title="ملف العميل المالي" Subtitle="كشف الحساب، المستحقات، أعمار الديون والمستندات المرتبطة">
+        <Actions>
             <button type="button" class="cw-button cw-button--quiet" @onclick="BackToCustomersAsync"><span aria-hidden="true">←</span> قائمة العملاء</button>
             <button type="button" class="cw-button cw-button--quiet" @onclick="LoadAsync" disabled="@_busy">تحديث</button>
             <button type="button" class="cw-button cw-button--secondary" @onclick="ExportCsvAsync" disabled="@(_busy || _model is null)">تصدير الكشف</button>
             <a class="cw-button cw-button--primary" href="@($"/sales/customer-credits/{CustomerId:D}")">تطبيق المرتجعات</a>
             <button type="button" class="cw-button cw-button--quiet" @onclick="PrintAsync" disabled="@(_model is null)">طباعة</button>
-        </div>
-    </header>
+        </Actions>
+    </CustomerRelatedPageHeader>
 
     @if (_busy && _model is null)
     {
@@ -301,6 +299,7 @@
 
     private Task BackToCustomersAsync()
     {
+        CustomerSession.ActiveTabId = CustomerSession.ListTabId;
         Navigation.NavigateTo("/accounting/customers");
         return Task.CompletedTask;
     }

@@ -4,6 +4,8 @@
 @implements IDisposable
 
 <section class="oas-customers-list" dir="rtl" aria-busy="@Busy">
+    @if (!HideDefaultHeader)
+    {
     <header class="oas-customers-list__head">
         <div class="oas-customers-list__heading">
             <div class="oas-customers-list__heading-icon"><i class="fa-solid fa-users" aria-hidden="true"></i></div>
@@ -38,6 +40,7 @@
             </a>
         </div>
     </header>
+    }
 
     <div class="oas-customers-list__stats" aria-label="ملخص الموردين">
         <div class="oas-customer-stat oas-customer-stat--blue">
@@ -234,6 +237,7 @@
 </section>
 
 @code {
+    [Parameter] public bool HideDefaultHeader { get; set; }
     [Parameter] public IReadOnlyList<UiAccountingPartyListItem> Items { get; set; } = [];
     [Parameter] public bool Busy { get; set; }
     [Parameter] public string Search { get; set; } = string.Empty;

@@ -1,29 +1,29 @@
 @page "/accounting/suppliers/aging"
+@using OAS.Client.Accounting.Components
 @attribute [Authorize]
 @using System.Globalization
+@using OAS.Client.Services.Http
+@using OAS.Client.Common.Feedback.Services
+@using OAS.UiLib.Services.Feedback
 @using OAS.Contracts.Accounting.Reports
 @inject OasApiClient Api
+@inject IApiFeedbackService ApiFeedback
+@inject IUiSnackbarService Snackbar
 @inject OAS.Client.Services.Browser.BrowserFileDownloadService Download
 
 <PageTitle>أعمار ديون الموردين | OAS</PageTitle>
 
 <div class="container-fluid py-3" dir="rtl">
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-        <div>
-            <h1 class="h5 mb-1">أعمار ديون الموردين</h1>
-            <small class="text-muted">الأرصدة بالعملة الأساسية حتى التاريخ المحدد. المبالغ غير المخصصة تظهر منفصلة ولا تُطرح من الفواتير دون تخصيص.</small>
-        </div>
-        <div class="d-flex gap-2">
-            <a class="btn btn-outline-secondary btn-sm" href="/accounting/suppliers">الموردون</a>
-            <a class="btn btn-outline-primary btn-sm" href="/accounting/suppliers/openings">الأرصدة الافتتاحية</a>
-        </div>
-    </div>
-
-    <div class="d-flex flex-wrap gap-2 mb-3">
-        <button class="btn btn-outline-secondary btn-sm" disabled="@(_loading || _exporting)" @onclick="ExportAgingCsvAsync">تصدير أعمار الديون CSV</button>
-        <button class="btn btn-outline-primary btn-sm" disabled="@(_loading || _exporting)" @onclick="ExportAgingExcelAsync">تصدير أعمار الديون Excel</button>
-        <button class="btn btn-outline-secondary btn-sm" disabled="@(_loading || _exporting)" @onclick="ExportBalancesExcelAsync">تصدير أرصدة الموردين Excel</button>
-    </div>
+    <SupplierRelatedPageHeader Title="أعمار ديون الموردين">
+        <Actions>
+            <a class="crh-button" href="/accounting/suppliers">قائمة الموردين</a>
+            <a class="crh-button" href="/accounting/suppliers/openings">الأرصدة الافتتاحية</a>
+            <button type="button" class="crh-button" disabled="@(_loading || _exporting)" @onclick="ExportAgingCsvAsync">تصدير CSV</button>
+            <button type="button" class="crh-button" disabled="@(_loading || _exporting)" @onclick="ExportAgingExcelAsync">تصدير Excel</button>
+            <button type="button" class="crh-button" disabled="@(_loading || _exporting)" @onclick="ExportBalancesExcelAsync">أرصدة الموردين Excel</button>
+        </Actions>
+    </SupplierRelatedPageHeader>
+    <p class="supplier-compact-note">التقرير بالعملة الأساسية حتى التاريخ المحدد؛ المدفوعات غير المخصصة تظهر منفصلة.</p>
 
     <div class="card mb-3"><div class="card-body">
         <div class="row g-2 align-items-end">
@@ -149,7 +149,8 @@
             if (!string.IsNullOrWhiteSpace(_search)) url += "&search=" + Uri.EscapeDataString(_search.Trim());
             _report = await Api.GetAsync<SupplierAgingReportDto>(url);
         }
-        catch (Exception ex) { _error = ex.Message; _report = null; }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); _report = null; }
+        catch { ApiFeedback.ShowUnexpected(); _report = null; }
         finally { _loading = false; }
     }
 
@@ -171,8 +172,10 @@
                 $"Supplier-{report}-{_asOfDate:yyyyMMdd}.{format}",
                 format == "csv" ? "text/csv;charset=utf-8"
                     : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            Snackbar.Success("تم تصدير تقرير الموردين.");
         }
-        catch (Exception ex) { _error = ex.Message; }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
         finally { _exporting = false; }
     }
 

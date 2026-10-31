@@ -187,12 +187,12 @@
 /* Account for the permanent customer document-tab strip above this workspace. */
 @media (min-width: 801px) {
     .oas-customers-list {
-        height: calc(100dvh - var(--oas-topbar-height, 80px) - 68px);
+        height: calc(100dvh - var(--oas-topbar-height, 80px) - 112px);
         min-height: 420px;
     }
 }
 @media (max-width: 700px) {
     .oas-customers-list {
-        height: calc(100dvh - var(--oas-topbar-height, 80px) - 62px);
+        height: calc(100dvh - var(--oas-topbar-height, 80px) - 106px);
     }
 }

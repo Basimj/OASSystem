@@ -1,0 +1,92 @@
+@namespace OAS.Client.Accounting.Components
+@using OAS.Client.Accounting.Workspace
+@using OAS.UiLib.Components.Navigation
+@using OAS.UiLib.Core.Models
+@using OAS.UiLib.Services.Dialogs
+@using OAS.UiLib.Core.Enums
+@inject SupplierWorkspaceSession SupplierSession
+@inject NavigationManager Navigation
+@inject IUiDialogService Dialog
+
+<div class="crh-container" dir="rtl">
+    <h1 class="crh-sr-only">@Title</h1>
+    <nav class="crh-tabs" aria-label="تبويبات مساحة عمل الموردين">
+        <UiApplicationTabStrip Tabs="@VisibleTabs"
+                               AriaLabel="تبويبات الموردين"
+                               EnableContextMenu="@UseHostTabs"
+                               OnSelect="HandleSelectAsync"
+                               OnClose="HandleCloseAsync"
+                               OnCloseOthers="HandleCloseOthersAsync"
+                               OnCloseAll="HandleCloseAllAsync" />
+    </nav>
+    @if (Actions is not null)
+    {
+        <div class="crh-toolbar"><div class="crh-actions">@Actions</div></div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "الموردون";
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public bool IsListView { get; set; }
+    [Parameter] public Guid SupplierId { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public IReadOnlyList<UiApplicationTabItem>? TabItems { get; set; }
+    [Parameter] public EventCallback<Guid> OnTabSelect { get; set; }
+    [Parameter] public EventCallback<Guid> OnTabClose { get; set; }
+    [Parameter] public EventCallback<Guid> OnTabCloseOthers { get; set; }
+    [Parameter] public EventCallback OnTabCloseAll { get; set; }
+
+    private readonly Guid _pageTabId = Guid.NewGuid();
+    private bool UseHostTabs => TabItems is not null;
+    private IReadOnlyList<UiApplicationTabItem> VisibleTabs => TabItems ?? BuildTabs();
+
+    private IReadOnlyList<UiApplicationTabItem> BuildTabs()
+    {
+        var tabs = new List<UiApplicationTabItem>
+        {
+            new(SupplierSession.ListTabId, "جميع الموردين", "/accounting/suppliers", "fa-solid fa-truck-field", IsListView, CanClose: false)
+        };
+        tabs.AddRange(SupplierSession.EditorTabs.Select(tab => new UiApplicationTabItem(
+            tab.TabId, tab.Title, "/accounting/suppliers",
+            tab.IsNew ? "fa-solid fa-square-plus" : "fa-solid fa-truck-field", false, CanClose: true)));
+        if (!IsListView)
+            tabs.Add(new UiApplicationTabItem(_pageTabId, Title, "", "fa-solid fa-file-invoice-dollar", true, CanClose: true));
+        return tabs;
+    }
+
+    private Task HandleSelectAsync(Guid id)
+        => OnTabSelect.HasDelegate ? OnTabSelect.InvokeAsync(id) : SelectRelatedTabAsync(id);
+    private Task HandleCloseAsync(Guid id)
+        => OnTabClose.HasDelegate ? OnTabClose.InvokeAsync(id) : CloseRelatedTabAsync(id);
+    private Task HandleCloseOthersAsync(Guid id)
+        => OnTabCloseOthers.HasDelegate ? OnTabCloseOthers.InvokeAsync(id) : Task.CompletedTask;
+    private Task HandleCloseAllAsync()
+        => OnTabCloseAll.HasDelegate ? OnTabCloseAll.InvokeAsync() : Task.CompletedTask;
+
+    private Task SelectRelatedTabAsync(Guid tabId)
+    {
+        if (SupplierSession.Activate(tabId))
+            Navigation.NavigateTo($"/accounting/suppliers?tabId={tabId:D}");
+        return Task.CompletedTask;
+    }
+    private async Task CloseRelatedTabAsync(Guid tabId)
+    {
+        if (tabId == _pageTabId)
+        {
+            SupplierSession.ActiveTabId = SupplierSession.ListTabId;
+            Navigation.NavigateTo("/accounting/suppliers");
+            return;
+        }
+        var tab = SupplierSession.EditorTabs.FirstOrDefault(x => x.TabId == tabId);
+        if (tab is null) return;
+        if (tab.IsDirty && !await Dialog.ConfirmAsync(
+                "تغييرات غير محفوظة", $"هل تريد تجاهل التعديلات في «{tab.Title}» وإغلاق التبويب؟",
+                AlertTone.Warning, "تجاهل وإغلاق", "إلغاء"))
+            return;
+        SupplierSession.EditorTabs.Remove(tab);
+        if (SupplierSession.ActiveTabId == tabId)
+            SupplierSession.ActiveTabId = SupplierSession.ListTabId;
+        StateHasChanged();
+    }
+}

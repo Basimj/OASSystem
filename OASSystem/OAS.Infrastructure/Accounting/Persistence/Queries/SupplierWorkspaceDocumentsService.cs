@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Common.Exceptions;
@@ -36,7 +37,10 @@ public sealed class SupplierWorkspaceDocumentsService(OasDbContext db) : ISuppli
         var startDate = filter.FromDate;
         var to = filter.ToDate;
 
-        IQueryable<SupplierWorkspaceDocumentRowDto> query;
+        // Sort and page on EF-mapped entity fields *before* constructing the positional
+        // SupplierWorkspaceDocumentRowDto. EF Core cannot translate accessing a property
+        // of a DTO constructed in the middle of a query (e.g. new Dto(...).DocumentDate).
+        (List<SupplierWorkspaceDocumentRowDto> Rows, long Count) result;
         switch (type)
         {
             case "PurchaseOrder":
@@ -46,11 +50,19 @@ public sealed class SupplierWorkspaceDocumentsService(OasDbContext db) : ISuppli
                 if (status.HasValue) orders = orders.Where(x => (byte)x.Status == status.Value);
                 if (!string.IsNullOrWhiteSpace(search))
                     orders = orders.Where(x => x.PurchaseOrderCode.Contains(search));
-                query = from o in orders
-                        join c in db.Set<Currency>().AsNoTracking() on o.CurrencyId equals c.Id
-                        where currency == null || currency == "" || c.Code == currency
-                        select new SupplierWorkspaceDocumentRowDto(o.Id, type, o.PurchaseOrderCode,
-                            o.OrderDate, (byte)o.Status, o.TotalAmount, null, c.Code, null, null, null);
+                var source = from o in orders
+                             join c in db.Set<Currency>().AsNoTracking() on o.CurrencyId equals c.Id
+                             where currency == null || currency == "" || c.Code == currency
+                             select new { Order = o, Currency = c };
+                result = await PageAsync(source,
+                    q => q.OrderByDescending(x => x.Order.OrderDate)
+                          .ThenBy(x => x.Order.PurchaseOrderCode)
+                          .ThenBy(x => x.Order.Id),
+                    x => new SupplierWorkspaceDocumentRowDto(x.Order.Id, type,
+                        x.Order.PurchaseOrderCode, x.Order.OrderDate,
+                        (byte)x.Order.Status, x.Order.TotalAmount, null,
+                        x.Currency.Code, null, null, null),
+                    page, size, cancellationToken);
                 break;
             }
             case "PurchaseReceipt":
@@ -61,13 +73,21 @@ public sealed class SupplierWorkspaceDocumentsService(OasDbContext db) : ISuppli
                 if (!string.IsNullOrWhiteSpace(search))
                     receipts = receipts.Where(x => x.ReceiptCode.Contains(search));
                 // Receipt values use the purchase-order currency and are not an AP/GL balance.
-                query = from r in receipts
-                        join o in db.Set<PurchaseOrder>().AsNoTracking()
-                            on r.PurchaseOrderId equals o.Id
-                        join c in db.Set<Currency>().AsNoTracking() on o.CurrencyId equals c.Id
-                        where currency == null || currency == "" || c.Code == currency
-                        select new SupplierWorkspaceDocumentRowDto(r.Id, type, r.ReceiptCode,
-                            r.ReceiptDate, (byte)r.Status, null, null, c.Code, r.JournalEntryId, null, null);
+                var source = from r in receipts
+                             join o in db.Set<PurchaseOrder>().AsNoTracking()
+                                 on r.PurchaseOrderId equals o.Id
+                             join c in db.Set<Currency>().AsNoTracking() on o.CurrencyId equals c.Id
+                             where currency == null || currency == "" || c.Code == currency
+                             select new { Receipt = r, Currency = c };
+                result = await PageAsync(source,
+                    q => q.OrderByDescending(x => x.Receipt.ReceiptDate)
+                          .ThenBy(x => x.Receipt.ReceiptCode)
+                          .ThenBy(x => x.Receipt.Id),
+                    x => new SupplierWorkspaceDocumentRowDto(x.Receipt.Id, type,
+                        x.Receipt.ReceiptCode, x.Receipt.ReceiptDate,
+                        (byte)x.Receipt.Status, null, null,
+                        x.Currency.Code, x.Receipt.JournalEntryId, null, null),
+                    page, size, cancellationToken);
                 break;
             }
             case "PurchaseInvoice":
@@ -80,9 +100,15 @@ public sealed class SupplierWorkspaceDocumentsService(OasDbContext db) : ISuppli
                         (x.SupplierInvoiceCode != null && x.SupplierInvoiceCode.Contains(search)));
                 if (!string.IsNullOrWhiteSpace(currency))
                     invoices = invoices.Where(x => x.CurrencyCodeSnapshot == currency);
-                query = invoices.Select(x => new SupplierWorkspaceDocumentRowDto(
-                    x.Id, type, x.PurchaseInvoiceCode, x.InvoiceDate, (byte)x.Status,
-                    x.TotalAmount, x.BaseTotalAmount, x.CurrencyCodeSnapshot, x.JournalEntryId, null, null));
+                result = await PageAsync(invoices,
+                    q => q.OrderByDescending(x => x.InvoiceDate)
+                          .ThenBy(x => x.PurchaseInvoiceCode)
+                          .ThenBy(x => x.Id),
+                    x => new SupplierWorkspaceDocumentRowDto(x.Id, type,
+                        x.PurchaseInvoiceCode, x.InvoiceDate, (byte)x.Status,
+                        x.TotalAmount, x.BaseTotalAmount, x.CurrencyCodeSnapshot,
+                        x.JournalEntryId, null, null),
+                    page, size, cancellationToken);
                 break;
             }
             case "PurchaseReturn":
@@ -93,11 +119,18 @@ public sealed class SupplierWorkspaceDocumentsService(OasDbContext db) : ISuppli
                 if (!string.IsNullOrWhiteSpace(search))
                     returns = returns.Where(x => x.ReturnCode.Contains(search));
                 // Return has verified base totals, but those are not outstanding AP.
-                query = returns.Select(x => new SupplierWorkspaceDocumentRowDto(
-                    x.Id, type, x.ReturnCode, x.ReturnDate, (byte)x.Status, null,
-                    x.SupplierGrossBaseAmount, null, x.JournalEntryId, null, null));
+                // No original-currency snapshot exists on PurchaseReturn.
                 if (!string.IsNullOrWhiteSpace(currency))
-                    query = query.Where(_ => false); // No original-currency snapshot in return.
+                    returns = returns.Where(x => false);
+                result = await PageAsync(returns,
+                    q => q.OrderByDescending(x => x.ReturnDate)
+                          .ThenBy(x => x.ReturnCode)
+                          .ThenBy(x => x.Id),
+                    x => new SupplierWorkspaceDocumentRowDto(x.Id, type,
+                        x.ReturnCode, x.ReturnDate, (byte)x.Status,
+                        null, x.SupplierGrossBaseAmount, null,
+                        x.JournalEntryId, null, null),
+                    page, size, cancellationToken);
                 break;
             }
             case "PaymentVoucher":
@@ -114,12 +147,19 @@ public sealed class SupplierWorkspaceDocumentsService(OasDbContext db) : ISuppli
                 if (!string.IsNullOrWhiteSpace(currency))
                     lines = lines.Where(x => x.Line.CurrencyCodeSnapshot == currency);
                 // Scope to voucher LINES. A voucher may contain several suppliers.
-                query = lines.Select(x => new SupplierWorkspaceDocumentRowDto(
-                    x.Voucher.Id, type, x.Voucher.VoucherNumber, x.Voucher.VoucherDate,
-                    (byte)x.Voucher.Status, x.Line.Amount,
-                    x.Line.CounterpartyBaseAmount ?? x.Line.BaseAmount ?? x.Line.Amount * (x.Line.ExchangeRate ?? 1m),
-                    x.Line.CurrencyCodeSnapshot,
-                    x.Voucher.JournalEntryId, x.Line.Id, null));
+                result = await PageAsync(lines,
+                    q => q.OrderByDescending(x => x.Voucher.VoucherDate)
+                          .ThenBy(x => x.Voucher.VoucherNumber)
+                          .ThenBy(x => x.Voucher.Id)
+                          .ThenBy(x => x.Line.Id),
+                    x => new SupplierWorkspaceDocumentRowDto(
+                        x.Voucher.Id, type, x.Voucher.VoucherNumber, x.Voucher.VoucherDate,
+                        (byte)x.Voucher.Status, x.Line.Amount,
+                        x.Line.CounterpartyBaseAmount ?? x.Line.BaseAmount ??
+                            x.Line.Amount * (x.Line.ExchangeRate ?? 1m),
+                        x.Line.CurrencyCodeSnapshot,
+                        x.Voucher.JournalEntryId, x.Line.Id, null),
+                    page, size, cancellationToken);
                 break;
             }
             default:
@@ -127,15 +167,30 @@ public sealed class SupplierWorkspaceDocumentsService(OasDbContext db) : ISuppli
                     "اختر نوع مستند صحيحًا.");
         }
 
-        var count = await query.LongCountAsync(cancellationToken);
-        var rows = await query.OrderByDescending(x => x.DocumentDate)
-            .ThenBy(x => x.Reference).ThenBy(x => x.Id).ThenBy(x => x.PaymentVoucherLineId)
-            .Skip((page - 1) * size).Take(size).ToListAsync(cancellationToken);
-
+        var (rows, count) = result;
         if (type == "PaymentVoucher" && rows.Count > 0)
             rows = await AddPaymentUnappliedAsync(rows, filter.ToDate, cancellationToken);
 
         return new SupplierWorkspaceDocumentsDto(id, type, rows, count, page, size);
+    }
+
+    // Both Count and paging run on the filtered EF query, while the DTO is only
+    // created in the final Select. No full-table client evaluation is required.
+    private static async Task<(List<SupplierWorkspaceDocumentRowDto> Rows, long Count)> PageAsync<T>(
+        IQueryable<T> source,
+        Func<IQueryable<T>, IOrderedQueryable<T>> orderBy,
+        Expression<Func<T, SupplierWorkspaceDocumentRowDto>> projection,
+        int page,
+        int size,
+        CancellationToken cancellationToken)
+    {
+        var count = await source.LongCountAsync(cancellationToken);
+        var offset = (int)Math.Min((long)(page - 1) * size, int.MaxValue);
+        var rows = await orderBy(source)
+            .Skip(offset).Take(size)
+            .Select(projection)
+            .ToListAsync(cancellationToken);
+        return (rows, count);
     }
 
     private async Task<List<SupplierWorkspaceDocumentRowDto>> AddPaymentUnappliedAsync(

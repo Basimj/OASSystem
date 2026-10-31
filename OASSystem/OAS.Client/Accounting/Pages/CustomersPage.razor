@@ -3,23 +3,46 @@
 @using OAS.UiLib.Components.Accounting.Parties
 @using OAS.UiLib.Components.Spreadsheets
 @using OAS.UiLib.Components.Navigation
+@using OAS.Client.Accounting.Components
 
 <PageTitle>العملاء | المحاسبة | OAS</PageTitle>
 
-<div class="oas-customer-workspace-tabs" dir="rtl">
-    <UiApplicationTabStrip Tabs="@WorkspaceTabs"
-                           AriaLabel="تبويبات العملاء"
-                           EnableContextMenu="true"
-                           OnSelect="SelectTabAsync"
-                           OnClose="CloseTabAsync"
-                           OnCloseOthers="CloseOtherTabsAsync"
-                           OnCloseAll="CloseAllTabsAsync" />
+<div class="oas-customer-document-header">
+@if (EditorOpen)
+{
+    <CustomerRelatedPageHeader Title="تفاصيل العميل"
+                               CustomerId="@(ActiveEditorTab?.EntityId ?? Guid.Empty)"
+                               TabItems="@WorkspaceTabs"
+                               OnTabSelect="SelectTabAsync"
+                               OnTabClose="CloseTabAsync"
+                               OnTabCloseOthers="CloseOtherTabsAsync"
+                               OnTabCloseAll="CloseAllTabsAsync" />
+}
+else
+{
+    <CustomerRelatedPageHeader Title="جميع العملاء"
+                               IsListView="true"
+                               TabItems="@WorkspaceTabs"
+                               OnTabSelect="SelectTabAsync"
+                               OnTabClose="CloseTabAsync"
+                               OnTabCloseOthers="CloseOtherTabsAsync"
+                               OnTabCloseAll="CloseAllTabsAsync">
+        <Actions>
+            <button type="button" class="crh-button crh-button--primary" disabled="@_busy" @onclick="NewCustomerWithSuggestedAccountAsync"><i class="fa-solid fa-plus" aria-hidden="true"></i> عميل جديد</button>
+            <button type="button" class="crh-button" disabled="@_busy" @onclick="OpenImport"><i class="fa-solid fa-file-import" aria-hidden="true"></i> استيراد</button>
+            <button type="button" class="crh-button" disabled="@_busy" @onclick="DownloadTemplateAsync"><i class="fa-solid fa-download" aria-hidden="true"></i> قالب Excel</button>
+            <button type="button" class="crh-button" disabled="@_busy" @onclick="ExportAsync"><i class="fa-solid fa-file-export" aria-hidden="true"></i> تصدير</button>
+            <button type="button" class="crh-button" disabled="@_busy" @onclick="LoadAsync"><i class="fa-solid fa-rotate" aria-hidden="true"></i> تحديث</button>
+            <a class="crh-button" href="/accounting/customer-ar"><i class="fa-solid fa-chart-pie" aria-hidden="true"></i> أرصدة العملاء</a>
+        </Actions>
+    </CustomerRelatedPageHeader>
+}
 </div>
 
 @* The list and editor retain their dedicated layout and share one tab state. *@
 @if (!EditorOpen)
 {
-    <UiCustomerListDashboard Busy="@_busy"
+    <UiCustomerListDashboard HideDefaultHeader="true" Busy="@_busy"
                              Items="@_items"
                              Search="@_search"
                              Filter="@_filter"
@@ -37,7 +60,8 @@
                              OnNextPage="NextPageAsync"
                              OnImport="OpenImport"
                              OnTemplate="DownloadTemplateAsync"
-                             OnExport="ExportAsync" />
+                             OnExport="ExportAsync">
+    </UiCustomerListDashboard>
 }
 else
 {

@@ -254,6 +254,11 @@ public sealed class SupplierApReportingQueryService(OasDbContext db) : ISupplier
             join aggregate in aggregates
                 on account.Id equals aggregate.AccountId into aggregateJoin
             from aggregate in aggregateJoin.DefaultIfEmpty()
+            // Filter directly on aggregate columns before projecting null aggregates as zero.
+            // Comparing the projected (CASE WHEN ... THEN 0 ELSE ...) columns in Where
+            // produced a non-translatable EF Core expression in supplier balance exports.
+            where filter.IncludeZeroBalance ||
+                (aggregate != null && aggregate.Credit != aggregate.Debit)
             select new
             {
                 SupplierId = supplier.Id,
@@ -275,8 +280,7 @@ public sealed class SupplierApReportingQueryService(OasDbContext db) : ISupplier
                 x.AccountCode.Contains(term) ||
                 x.AccountName.Contains(term));
         }
-        if (!filter.IncludeZeroBalance)
-            query = query.Where(x => x.Credit != x.Debit);
+        // Zero balance filtering is applied in SQL before projection above.
 
         var totalCount = await query.LongCountAsync(cancellationToken);
         var totals = await query

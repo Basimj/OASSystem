@@ -1,0 +1,64 @@
+/* Unified document tabs across all customer routes. Do not add a separate
+   title/breadcrumb block above them: the active tab and page body provide context. */
+.crh-container {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 8px;
+    min-width: 0;
+    font-family: inherit;
+    color: var(--oas-color-text, #19344d);
+}
+.crh-tabs {
+    flex: 1 1 340px;
+    min-width: 0;
+    padding: 4px 6px;
+    border: 1px solid var(--oas-color-border, #dde8f0);
+    border-radius: 9px;
+    background: var(--oas-color-surface, #fff);
+}
+.crh-tabs ::deep .ui-application-tabs { width: 100%; min-width: 0; }
+.crh-toolbar {
+    display: flex;
+    flex: 0 1 auto;
+    align-items: center;
+    justify-content: flex-start;
+    min-height: 40px;
+    min-width: 0;
+}
+.crh-actions { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; min-width: 0; }
+.crh-actions ::deep .crh-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 34px;
+    padding: 6px 11px;
+    border: 1px solid var(--oas-color-border, #dde8f0);
+    border-radius: 8px;
+    background: var(--oas-color-surface, #fff);
+    color: var(--oas-color-text, #19344d);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.crh-actions ::deep .crh-button:hover:not(:disabled) { border-color: var(--oas-color-primary, #0c73ca); color: var(--oas-color-primary, #0c73ca); }
+.crh-actions ::deep .crh-button--primary { background: var(--oas-color-primary, #0c73ca); border-color: var(--oas-color-primary, #0c73ca); color: #fff; }
+.crh-actions ::deep .crh-button--primary:hover:not(:disabled) { color: #fff; filter: brightness(.95); }
+.crh-actions ::deep .crh-button:disabled { opacity: .55; cursor: wait; }
+@media (max-width: 1180px) {
+    .crh-tabs { flex-basis: 100%; }
+    .crh-toolbar { flex-basis: 100%; min-height: 0; }
+}
+@media (max-width: 680px) {
+    .crh-actions { width: 100%; }
+}
+@media print { .crh-container { display: none !important; } }
+
+/* Maintain a page heading for screen readers without the redundant visual block. */
+.crh-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
