@@ -6,92 +6,126 @@
 @using OAS.UiLib.Components.Inputs
 @using OAS.UiLib.Core.Models
 
-<UiAccountingEditorSurface>
-    @if (!IsNew)
-    {
-        <UiAccountingFormSection Title="حالة السند والترحيل"
-                                 Subtitle="الحالة التشغيلية ومرجع القيد المحاسبي الناتج"
-                                 IconCssClass="fa-solid fa-circle-check">
-            <UiAccountingStatusActionBar Label="الحالة الحالية"
-                                         StatusText="@AccountingArabicPresenter.GetPaymentVoucherStatusText(Model.Status)"
-                                         StatusState="@Model.Status.ToString().ToLowerInvariant()" />
+<div class="oas-voucher-editor oas-voucher-editor--form oas-voucher-editor--reference" dir="rtl">
+    <div class="oas-voucher-editor__heading">
+        <div>
+            <span class="oas-voucher-editor__eyebrow">المحاسبة <i class="fa-solid fa-angle-left" aria-hidden="true"></i> سندات الصرف <i class="fa-solid fa-angle-left" aria-hidden="true"></i> @(IsNew ? "إضافة سند" : "عرض سند")</span>
+            <h2><i class="fa-solid fa-file-circle-plus" aria-hidden="true"></i> @(IsNew ? "إضافة سند جديد" : "سند صرف " + Model.VoucherNumber)</h2>
+            <p>إدخال سند صرف ومراجعة أسطره ومبالغه قبل الحفظ والاعتماد والترحيل.</p>
+        </div>
+        <span class="oas-voucher-editor__status"><i class="fa-solid fa-circle" aria-hidden="true"></i> @(IsNew ? "مسودة" : AccountingArabicPresenter.GetPaymentVoucherStatusText(Model.Status))</span>
+    </div>
+
+    <UiVoucherSettlementLinesEditor Lines="@Model.Lines"
+                                    BaseCurrencyId="@Model.BaseCurrencyId"
+                                    IsEditable="@IsEditable"
+                                    ShowDetailContent="@(_activePane == "details")"
+                                    DefaultPartyType="@(UiVoucherSettlementLinesEditor.SettlementPartyKind.Supplier)"
+                                    PartyTypeOptions="@AccountingArabicPresenter.SettlementPartyTypeOptions"
+                                    PaymentMethodOptions="@AccountingArabicPresenter.PaymentMethodOptions"
+                                    CustomerSearchAsync="CustomerSearchAsync"
+                                    SupplierSearchAsync="SupplierSearchAsync"
+                                    EmployeeSearchAsync="EmployeeSearchAsync"
+                                    CashAccountSearchAsync="CashAccountSearchAsync"
+                                    BankAccountSearchAsync="BankAccountSearchAsync"
+                                    CurrencySearchAsync="CurrencySearchAsync"
+                                    CounterpartyAccountSearchAsync="CounterpartyAccountSearchAsync"
+                                    SettlementAccountSearchAsync="SettlementAccountSearchAsync"
+                                    EffectiveRateAsync="EffectiveRateAsync"
+                                    RateDate="@Model.VoucherDate"
+                                    OnLinesChanged="OnChanged">
+        <VoucherHeader>
+            <div class="oas-voucher-editor__identity-heading">
+                <nav class="oas-voucher-editor__nav" aria-label="أقسام سند صرف">
+                    <button type="button" class="@(_activePane == "details" ? "is-active" : "")" aria-pressed="@(_activePane == "details")" @onclick='() => SetPane("details")'><i class="fa-solid fa-file-lines" aria-hidden="true"></i> بيانات السند</button>
+                    <button type="button" class="@(_activePane == "review" ? "is-active" : "")" aria-pressed="@(_activePane == "review")" @onclick='() => SetPane("review")'><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i> المراجعة المالية</button>
+                </nav>
+            </div>
+            <div class="oas-voucher-editor__identity-fields">
+                <UiInputText Label="رقم السند"
+                             Value="@Model.VoucherNumber"
+                             ValueExpression="@(() => Model.VoucherNumber)"
+                             ReadOnly="true"
+                             Disabled="true"
+                             Placeholder="يُولّد تلقائيًا"
+                             Size="ControlSize.Small" />
+                <UiInputDate Label="التاريخ"
+                             Value="@Model.VoucherDateInput"
+                             ValueExpression="@(() => Model.VoucherDateInput)"
+                             ValueChanged="OnVoucherDateChanged"
+                             Required="true"
+                             Disabled="@(!IsEditable)"
+                             Size="ControlSize.Small" />
+                <div class="oas-voucher-editor__readonly" title="تُحدد الفترة المالية بناءً على تاريخ المستند في الخادم">
+                    <span>الفترة المالية</span>
+                    <strong><i class="fa-regular fa-calendar" aria-hidden="true"></i> تُتحقق عند الحفظ</strong>
+                </div>
+                <div class="oas-voucher-editor__readonly">
+                    <span>حالة السند</span>
+                    <strong><i class="fa-solid fa-circle" aria-hidden="true"></i> @(IsNew ? "مسودة" : AccountingArabicPresenter.GetPaymentVoucherStatusText(Model.Status))</strong>
+                </div>
+            </div>
+            <div class="oas-voucher-editor__kind-band">
+                <span><i class="fa-solid fa-receipt" aria-hidden="true"></i> نوع السند</span>
+                <strong>سند صرف</strong>
+                <span class="oas-voucher-editor__kind-caption">العملة الأساسية: <b>@(Model.BaseCurrencyCode ?? "لم تُحدد")</b> · يمكن استخدام عملة مختلفة لكل سطر</span>
+            </div>
+        </VoucherHeader>
+        <VoucherFooter>
+            <div class="oas-voucher-editor__identity-description">
+                <UiInputText Label="البيان / وصف السند"
+                             Value="@Model.Description"
+                             ValueExpression="@(() => Model.Description)"
+                             ValueChanged="OnDescriptionChanged"
+                             Disabled="@(!IsEditable)"
+                             Placeholder="اكتب وصفًا مختصرًا لحركة الصرف..." />
+            </div>
             @if (Model.JournalEntryId.HasValue)
             {
-                <UiAccountingReadOnlyValue Label="القيد المحاسبي الناتج"
-                                           Value='@Model.JournalEntryId.Value.ToString("D")'
-                                           Tone="@UiAccountingReadOnlyValue.ValueTone.Primary" />
+                <div class="oas-voucher-editor__journal">
+                    <span>القيد المحاسبي الناتج:</span>
+                    <a href="@($"/accounting/journals?journalId={Model.JournalEntryId.Value:D}")" title="فتح القيد المحاسبي">
+                        <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                        @(string.IsNullOrWhiteSpace(Model.GeneratedJournalNumber) ? "فتح القيد المحاسبي" : Model.GeneratedJournalNumber)
+                    </a>
+                </div>
             }
-        </UiAccountingFormSection>
-    }
-
-    <UiAccountingFormSection Title="بيانات سند الصرف"
-                             Subtitle="الرأس يحتوي بيانات المستند فقط، بينما الطرف وطريقة الدفع والعملة موجودة على مستوى كل سطر."
-                             IconCssClass="fa-solid fa-money-bill-transfer">
-        <UiAccountingFormGrid Columns="3">
-            <UiInputText Label="رقم السند"
-                         Value="@Model.VoucherNumber"
-                         ValueExpression="@(() => Model.VoucherNumber)"
-                         ReadOnly="true"
-                         Disabled="true"
-                         Placeholder="توليد تلقائي..."
-                         Size="ControlSize.Small" />
-
-            <UiInputDate Label="تاريخ السند"
-                         Value="@Model.VoucherDateInput"
-                         ValueExpression="@(() => Model.VoucherDateInput)"
-                         ValueChanged="OnVoucherDateChanged"
-                         Required="true"
-                         Disabled="@(!IsEditable)"
-                         Size="ControlSize.Small" />
-
-            <UiAccountingReadOnlyValue Label="الإجمالي بالعملة الأساسية"
-                                       Value="@FormatBaseTotal()"
-                                       Tone="@UiAccountingReadOnlyValue.ValueTone.Primary" />
-        </UiAccountingFormGrid>
-
-        <UiAccountingStack>
-            <UiInputText Label="البيان العام"
-                         Value="@Model.Description"
-                         ValueExpression="@(() => Model.Description)"
-                         ValueChanged="OnDescriptionChanged"
-                         Disabled="@(!IsEditable)"
-                         Placeholder="بيان عام للسند..." />
-        </UiAccountingStack>
-
-    </UiAccountingFormSection>
-
-    @{ var linkedSupplierInvoice = Model.Lines.FirstOrDefault(x =>
-        x.PartyType == UiVoucherSettlementLinesEditor.SettlementPartyKind.Supplier &&
-        x.ReferenceType == "PurchaseInvoice" && x.SupplierId.HasValue && x.ReferenceId.HasValue); }
-    @if (linkedSupplierInvoice is not null)
+        </VoucherFooter>
+        <SummaryContent>
+            <UiVoucherQuickSummary Lines="@Model.Lines"
+                                   BaseCurrencyId="@Model.BaseCurrencyId"
+                                   BaseCurrencyCode="@Model.BaseCurrencyCode"
+                                   BaseCurrencyDecimalPlaces="@(Model.BaseCurrencyDecimalPlaces ?? 2)"
+                                   SavedBaseTotal="@Model.BaseTotalAmount"
+                                   IsNew="@IsNew"
+                                   VoucherDate="@Model.VoucherDate"
+                                   StatusText="@(IsNew ? "مسودة" : AccountingArabicPresenter.GetPaymentVoucherStatusText(Model.Status))" />
+        </SummaryContent>
+    </UiVoucherSettlementLinesEditor>
+    @if (LinkedSupplierInvoice is { } linkedSupplierInvoice)
     {
-        <div class="alert alert-info mb-2" role="status">
-            سند الصرف العام يدعم أسطرًا وطرقًا وعملات متعددة. مرجع الفاتورة للتتبع فقط؛
-            <strong>لن يُخصص المبلغ للفاتورة تلقائيًا.</strong>
-            بعد ترحيل السند افتح
-            <a href="@($"/purchases/supplier-allocations?supplierId={linkedSupplierInvoice.SupplierId!.Value:D}&invoiceId={linkedSupplierInvoice.ReferenceId!.Value:D}")">مركز تخصيص دفعات المورد</a>.
+        <div class="oas-voucher-editor__invoice-note" role="status">
+            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+            <span>مرجع فاتورة المورد للتتبع فقط، ولا يتم تخصيص مبلغ السند للفواتير تلقائيًا عند الترحيل.
+                <a href="@($"/purchases/supplier-allocations?supplierId={linkedSupplierInvoice.SupplierId!.Value:D}&invoiceId={linkedSupplierInvoice.ReferenceId!.Value:D}")">الانتقال لتخصيص دفعات المورد</a>
+            </span>
         </div>
     }
-    <UiAccountingFormSection Title="أسطر الصرف"
-                             Subtitle="يمكن للسند الواحد أن يحتوي عدة أطراف وطرق دفع وصناديق/بنوك وعملات."
-                             IconCssClass="fa-solid fa-list-check">
-        <UiVoucherSettlementLinesEditor Lines="@Model.Lines"
-                                        IsEditable="@IsEditable"
-                                        PartyTypeOptions="@AccountingArabicPresenter.SettlementPartyTypeOptions"
-                                        PaymentMethodOptions="@AccountingArabicPresenter.PaymentMethodOptions"
-                                        CustomerSearchAsync="CustomerSearchAsync"
-                                        SupplierSearchAsync="SupplierSearchAsync"
-                                        EmployeeSearchAsync="EmployeeSearchAsync"
-                                        CashAccountSearchAsync="CashAccountSearchAsync"
-                                        BankAccountSearchAsync="BankAccountSearchAsync"
-                                        CurrencySearchAsync="CurrencySearchAsync"
-                                        CounterpartyAccountSearchAsync="CounterpartyAccountSearchAsync"
-                                        SettlementAccountSearchAsync="SettlementAccountSearchAsync"
-                                        EffectiveRateAsync="EffectiveRateAsync"
-                                        RateDate="@Model.VoucherDate"
-                                        OnLinesChanged="OnChanged" />
-    </UiAccountingFormSection>
-</UiAccountingEditorSurface>
+    <UiVoucherFinancialReview Lines="@Model.Lines"
+                              BaseCurrencyId="@Model.BaseCurrencyId"
+                              BaseCurrencyCode="@Model.BaseCurrencyCode"
+                              BaseCurrencyDecimalPlaces="@(Model.BaseCurrencyDecimalPlaces ?? 2)"
+                              SavedBaseTotal="@Model.BaseTotalAmount"
+                              IsNew="@IsNew" />
+    @if (_activePane == "review")
+    {
+        <div class="oas-voucher-editor__review-help">
+            <strong>المراجعة قبل الاعتماد أو الترحيل</strong>
+            <p>المؤشرات في الأسفل إرشادية ولا تغني عن تحقق الخادم. احتُفظ بمدخلات جميع الأسطر أثناء الانتقال بين التبويبين.</p>
+            <button type="button" class="oas-voucher-lines__toggle" @onclick='() => SetPane("details")'>العودة إلى بيانات السند والأسطر</button>
+        </div>
+    }
+</div>
 
 @code {
     public sealed class FormModel
@@ -110,8 +144,10 @@
         public string Description { get; set; } = string.Empty;
         public PaymentVoucherStatus Status { get; set; } = PaymentVoucherStatus.Draft;
         public Guid? JournalEntryId { get; set; }
+        public string? GeneratedJournalNumber { get; set; }
         public string RowVersion { get; set; } = string.Empty;
-        public List<UiVoucherSettlementLinesEditor.EditableSettlementLine> Lines { get; set; } = [];
+        public List<UiVoucherSettlementLinesEditor.EditableSettlementLine> Lines { get; set; } =
+            [new UiVoucherSettlementLinesEditor.EditableSettlementLine { PartyType = UiVoucherSettlementLinesEditor.SettlementPartyKind.Supplier }];
     }
 
     [Parameter] public FormModel Model { get; set; } = new();
@@ -128,6 +164,18 @@
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SettlementAccountSearchAsync { get; set; }
     [Parameter] public Func<Guid, DateOnly, CancellationToken, Task<decimal?>>? EffectiveRateAsync { get; set; }
     [Parameter] public EventCallback OnModelChanged { get; set; }
+    [Parameter] public EventCallback<DateOnly> OnNewVoucherYearChanged { get; set; }
+
+    // Keep Razor markup free of nested inline code blocks inside the details condition.
+    // The invoice link is informational; posting a voucher does not allocate it.
+    private UiVoucherSettlementLinesEditor.EditableSettlementLine? LinkedSupplierInvoice =>
+        Model.Lines.FirstOrDefault(line =>
+            line.PartyType == UiVoucherSettlementLinesEditor.SettlementPartyKind.Supplier &&
+            line.ReferenceType == "PurchaseInvoice" &&
+            line.SupplierId.HasValue && line.ReferenceId.HasValue);
+
+    private string _activePane = "details";
+    private void SetPane(string pane) => _activePane = pane;
 
     private Task OnChanged() => OnModelChanged.InvokeAsync();
 
@@ -135,18 +183,22 @@
     {
         if (value.HasValue)
         {
+            var previousYear = Model.VoucherDate.Year;
             Model.VoucherDate = value.Value;
             foreach (var line in Model.Lines)
             {
-                if (line.ExchangeRateSource != UiVoucherSettlementLinesEditor.ExchangeRateSourceKind.Manual)
+                line.BaseAmount = null;
+                line.ExchangeRateDate = null;
+                line.ExchangeRateSource = null;
+                if (line.ManualExchangeRate is not > 0)
                 {
                     line.ResolvedExchangeRate = null;
-                    line.ExchangeRateDate = null;
-                    line.BaseAmount = null;
                     if (line.CurrencyId is Guid currencyId && EffectiveRateAsync is not null)
                         line.ResolvedExchangeRate = await EffectiveRateAsync(currencyId, Model.VoucherDate, CancellationToken.None);
                 }
             }
+            if (IsNew && previousYear != Model.VoucherDate.Year)
+                await OnNewVoucherYearChanged.InvokeAsync(Model.VoucherDate);
         }
         await OnChanged();
     }
@@ -160,7 +212,7 @@
     private string FormatBaseTotal()
     {
         if (!Model.BaseTotalAmount.HasValue)
-            return "يحسب عند الحفظ";
+            return "لم يُحفظ بعد";
 
         var decimals = Math.Clamp((int)(Model.BaseCurrencyDecimalPlaces ?? 2), 0, 6);
         return Model.BaseTotalAmount.Value.ToString($"N{decimals}");

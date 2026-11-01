@@ -31,6 +31,7 @@ public interface ISalesClientService
     Task<CustomerOrderDto?> CancelCustomerOrderAsync(Guid id, CancelCustomerOrderRequest request, CancellationToken cancellationToken = default);
 
     Task<PagedResult<SalesInvoiceDto>> GetSalesInvoicesPageAsync(PageRequest request, CancellationToken cancellationToken = default);
+    Task<PagedResult<SalesInvoiceDto>> GetCustomerInvoicesPageAsync(Guid customerId, PageRequest request, CancellationToken cancellationToken = default);
     Task<SalesInvoiceDto?> GetSalesInvoiceByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<SalesCodeReservationDto?> ReserveSalesInvoiceCodeAsync(DateOnly invoiceDate, CancellationToken cancellationToken = default);
     Task<SalesInvoiceDto?> CreateSalesInvoiceAsync(CreateSalesInvoiceRequest request, CancellationToken cancellationToken = default);

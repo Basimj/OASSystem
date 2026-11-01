@@ -1,171 +1,222 @@
 @namespace OAS.Client.Accounting.Components
-@using OAS.Contracts.Accounting.PaymentAllocations
+@using OAS.Client.Accounting.Services
+@using OAS.Client.Purchasing.Services
+@using OAS.Client.Sales.Services
 @using OAS.Contracts.Accounting.Enums
-@using OAS.Client.Accounting.Common
-@using OAS.UiLib.Components.Accounting.Workspace
-@using OAS.UiLib.Components.Inputs
-@using OAS.UiLib.Core.Models
+@using OAS.Contracts.Accounting.PaymentAllocations
+@using OAS.Contracts.Accounting.ReceiptVouchers
+@using OAS.Contracts.Accounting.PaymentVouchers
+@using OAS.Contracts.Purchasing.SupplierAllocations
+@using OAS.Contracts.Sales.Enums
+@using OAS.Contracts.Common.Pagination
+@inject IAccountingClientService Accounting
+@inject IPurchasingClientService Purchasing
+@inject ISalesClientService Sales
 
-<UiAccountingEditorSurface>
-    <UiAccountingFormSection Title="سطر السداد المصدر"
-                             Subtitle="يتم التخصيص من سطر قبض أو صرف فعلي، وليس من رأس السند."
-                             IconCssClass="fa-solid fa-money-check-dollar">
-        <UiAccountingFormGrid Columns="2">
-            <UiSelect Label="نوع المصدر"
-                      Value="@Model.PaymentSourceType.ToString()"
-                      ValueChanged="OnSourceTypeChanged"
-                      Options="@SourceTypeOptions"
-                      Disabled="@(!IsEditable || !IsNew)"
-                      Size="ControlSize.Small" />
+<div class="oas-allocation" dir="rtl">
+    <div class="oas-allocation__heading">
+        <div>
+            <p class="oas-allocation__breadcrumb">المحاسبة / @(IsReceipt ? "سندات القبض" : "سندات الصرف") / تخصيص دفعة</p>
+            <h2><i class="fa-solid fa-link" aria-hidden="true"></i> @(IsReceipt ? "تخصيص مبلغ قبض" : "تخصيص مبلغ صرف")</h2>
+            <p>ربط مبلغ من سطر سند مرحّل بفواتير @(IsReceipt ? "العميل" : "المورد") المفتوحة، مع متابعة المتاح قبل الحفظ.</p>
+        </div>
+        <span class="oas-allocation__tag">@(IsReceipt ? "سند قبض" : "سند صرف")</span>
+    </div>
 
-            <UiLookup Label="سطر السداد"
-                      Value='@Model.SourceLineId?.ToString("D")'
-                      ValueChanged="OnSourceLineChanged"
-                      SelectedItem="@SourceLookupItem"
-                      SearchAsync="SourceSearchAsync"
-                      Placeholder="ابحث برقم السند أو الطرف..."
-                      Disabled="@(!IsEditable || !IsNew)"
-                      Required="true"
-                      MinimumSearchLength="0"
-                      DebounceMilliseconds="250" />
-        </UiAccountingFormGrid>
-
-        @if (!string.IsNullOrWhiteSpace(Model.CurrencyCodeSnapshot))
-        {
-            <UiAccountingReadOnlyValue Label="عملة سطر السداد"
-                                       Value="@Model.CurrencyCodeSnapshot"
-                                       Tone="@UiAccountingReadOnlyValue.ValueTone.Primary" />
-        }
-    </UiAccountingFormSection>
-
-    <UiAccountingFormSection Title="المستند الهدف المراد تسويته"
-                             Subtitle="سيتم ربط الفواتير الفعلية من موديولات المبيعات والمشتريات لاحقاً؛ المعرّف يبقى داخلياً في المرحلة الحالية."
-                             IconCssClass="fa-solid fa-file-invoice">
-        <UiAccountingFormGrid Columns="2">
-            <UiSelect Label="نوع المستند الهدف"
-                      Value="@Model.TargetDocumentType.ToString()"
-                      ValueChanged="OnTargetTypeChanged"
-                      Options="@AccountingArabicPresenter.AllocationTargetDocumentTypeOptions"
-                      Disabled="@(!IsEditable || !IsNew)"
-                      Size="ControlSize.Small" />
-
-            @if (TargetSearchAsync is not null)
+    @if (!IsNew)
+    {
+        <section class="oas-allocation__card">
+            <h3>تفاصيل التخصيص المسجل</h3>
+            <div class="oas-allocation__metrics">
+                <div><small>المبلغ المخصص</small><strong>@Amount(Model.AllocatedAmount) @Model.CurrencyCodeSnapshot</strong></div>
+                <div><small>المبلغ الأساسي</small><strong>@Amount(Model.BaseAllocatedAmount ?? 0m)</strong></div>
+                <div><small>الحالة</small><strong>@(Model.IsReversed ? "معكوس" : "نشط")</strong></div>
+            </div>
+            <p class="oas-allocation__hint">المبالغ المسجلة على الفواتير لا تعدَّل مباشرة بعد الحفظ. لتصحيحها، اعكس التخصيص ثم أنشئ تخصيصًا جديدًا.</p>
+            @if (Model.IsReversed)
             {
-                <UiLookup Label="المستند المستهدف"
-                          Value='@Model.TargetDocumentId?.ToString("D")'
-                          ValueChanged="OnTargetIdChanged"
-                          SelectedItem="@TargetLookupItem"
-                          SearchAsync="TargetSearchAsync"
-                          Placeholder="ابحث عن المستند..."
-                          Disabled="@(!IsEditable || !IsNew)"
-                          Required="true"
-                          MinimumSearchLength="0"
-                          DebounceMilliseconds="250" />
+                <p class="oas-allocation__hint">الحالة: معكوس. السبب المسجل: @Model.ReversalReason</p>
             }
             else
             {
-                <UiInputText Label="معرف المستند المستهدف"
-                             Value="@Model.TargetDocumentIdText"
-                             ValueChanged="OnTargetIdTextChanged"
-                             Placeholder="سيتم استبداله باختيار الفاتورة عند تنفيذ الفواتير"
-                             Disabled="@(!IsEditable || !IsNew)"
-                             Required="true"
-                             Size="ControlSize.Small" />
+                <div class="oas-allocation__reverse">
+                    <label>تاريخ العكس <input type="date" class="oas-allocation__input" value="@_reverseDateText" @onchange="HandleReverseDateChange" /></label>
+                    <label>سبب العكس (إلزامي) <input class="oas-allocation__input" @bind="_reverseReason" placeholder="سبب تصحيح التخصيص..." /></label>
+                    <button type="button" class="oas-allocation__btn is-danger" disabled="@(_busy || string.IsNullOrWhiteSpace(_reverseReason))" @onclick="ReverseAsync">عكس التخصيص</button>
+                </div>
             }
-        </UiAccountingFormGrid>
-    </UiAccountingFormSection>
-
-    <UiAccountingFormSection Title="مبلغ التخصيص"
-                             Subtitle="المبلغ بعملة سطر السداد؛ المبلغ الأساسي يحسبه السيرفر."
-                             IconCssClass="fa-solid fa-receipt">
-        <UiAccountingFormGrid Columns="2">
-            <UiAccountingNumberField Label="المبلغ المخصص"
-                                     Value="@Model.AllocatedAmount"
-                                     ValueChanged="OnAllocatedAmountChanged"
-                                     Min="0.0001"
-                                     Tone="@UiAccountingNumberField.NumberTone.Primary"
-                                     Disabled="@(!IsEditable)" />
-
-            @if (!IsNew)
-            {
-                <UiAccountingReadOnlyValue Label="المبلغ الأساسي"
-                                           Value="@(Model.BaseAllocatedAmount?.ToString("N4") ?? "-")"
-                                           Tone="@UiAccountingReadOnlyValue.ValueTone.Default" />
-            }
-        </UiAccountingFormGrid>
-    </UiAccountingFormSection>
-</UiAccountingEditorSurface>
-
-@code {
-    public sealed class FormModel
+        </section>
+    }
+    else
     {
-        public PaymentSourceType PaymentSourceType { get; set; } = PaymentSourceType.ReceiptVoucher;
-        public Guid? ReceiptVoucherLineId { get; set; }
-        public Guid? PaymentVoucherLineId { get; set; }
-        public Guid? SourceLineId
-        {
-            get => PaymentSourceType == PaymentSourceType.ReceiptVoucher ? ReceiptVoucherLineId : PaymentVoucherLineId;
-            set
+        <section class="oas-allocation__card oas-allocation__source">
+            <div class="oas-allocation__section-title">
+                <h3><i class="fa-solid fa-file-invoice" aria-hidden="true"></i> بيانات السند</h3>
+                @if (_voucherId.HasValue)
+                {
+                    <span class="oas-allocation__tag is-posted">مرحّل</span>
+                }
+            </div>
+            <div class="oas-allocation__lookup-row">
+                <UiLookup Label="السند المرحّل"
+                          Value="@(_voucherId?.ToString("D"))"
+                          SelectedItem="@VoucherLookupItem"
+                          SearchAsync="SearchVoucherOptionsAsync"
+                          ValueChanged="OnVoucherLookupChangedAsync"
+                          Placeholder="افتح القائمة أو اكتب رقم السند أو بيانه..."
+                          EmptyText="لا توجد سندات مرحلة مطابقة؛ جرّب رقمًا أدق."
+                          ClearText="إلغاء تحديد السند"
+                          Disabled="@_busy" />
+                <span class="oas-allocation__hint">تظهر السندات المرحلة فقط. لا تحتاج لكتابة رقم أو معرف السند كاملًا.</span>
+            </div>
+            @if (_voucherId.HasValue)
             {
-                if (PaymentSourceType == PaymentSourceType.ReceiptVoucher) { ReceiptVoucherLineId = value; PaymentVoucherLineId = null; }
-                else { PaymentVoucherLineId = value; ReceiptVoucherLineId = null; }
+                <div class="oas-allocation__metrics">
+                    <div><small>رقم السند</small><strong>@_voucherNumber</strong></div>
+                    <div><small>التاريخ</small><strong>@_voucherDate.ToString("yyyy/MM/dd")</strong></div>
+                    <div><small>الطرف</small><strong>@(_partyName ?? "يُحدد حسب السطر")</strong></div>
+                    <div><small>النوع</small><strong>@(IsReceipt ? "قبض" : "صرف")</strong></div>
+                </div>
+            }
+        </section>
+
+        @if (_voucherId.HasValue)
+        {
+            <div class="oas-allocation__columns">
+                <section class="oas-allocation__card">
+                    <div class="oas-allocation__section-title"><h3><i class="fa-solid fa-layer-group" aria-hidden="true"></i> أسطر السند</h3></div>
+                    <p class="oas-allocation__hint">اختر طريقة السداد من القائمة، أو اختر السطر من الجدول. إذا كان السند بسطر مؤهل واحد يختاره النظام تلقائيًا.</p>
+                    <div class="oas-allocation__lookup-row">
+                        <UiLookup Label="سطر القبض / الصرف"
+                                  Value="@(_selectedLineId?.ToString("D"))"
+                                  SelectedItem="@SourceLineLookupItem"
+                                  SearchAsync="SearchSourceLinesAsync"
+                                  ValueChanged="OnSourceLineLookupChangedAsync"
+                                  Placeholder="ابحث بطريقة الدفع أو العملة أو الطرف..."
+                                  EmptyText="لا توجد أسطر مؤهلة للتخصيص."
+                                  Disabled="@(_busy || _loadingInvoices)" />
+                    </div>
+                    <div class="oas-allocation__table-wrap">
+                        <table class="oas-allocation__table">
+                            <thead><tr><th>اختيار</th><th>طريقة الدفع</th><th>العملة</th><th>المبلغ</th><th>المخصص</th><th>المتاح</th></tr></thead>
+                            <tbody>
+                                @foreach (var line in _sourceLines)
+                                {
+                                    <tr class="@(line.Id == _selectedLineId ? "is-selected" : "")">
+                                        <td><button type="button" class="oas-allocation__choose" disabled="@(_busy || line.CurrencyId is null || line.ExchangeRate <= 0m || line.PartyId is null)" @onclick="() => SelectLineAsync(line)">@(line.Id == _selectedLineId ? "✓" : "اختيار")</button></td>
+                                        <td>@line.Method</td><td>@line.Currency</td><td>@Amount(line.Amount)</td><td>@Amount(line.Applied)</td><td><strong>@Amount(line.Available)</strong></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+                <section class="oas-allocation__card oas-allocation__summary">
+                    <div class="oas-allocation__section-title"><h3><i class="fa-solid fa-chart-pie" aria-hidden="true"></i> ملخص التخصيص</h3></div>
+                    <div class="oas-allocation__summary-row"><span>قيمة سطر السداد</span><strong>@Amount(SelectedLine?.Amount ?? 0m) @SelectedLine?.Currency</strong></div>
+                    <div class="oas-allocation__summary-row"><span>المخصص سابقًا</span><strong>@Amount(SelectedLine?.Applied ?? 0m) @SelectedLine?.Currency</strong></div>
+                    <div class="oas-allocation__summary-row is-available"><span>المتاح للتخصيص</span><strong>@Amount(SelectedLine?.Available ?? 0m) @SelectedLine?.Currency</strong></div>
+                    <div class="oas-allocation__summary-row"><span>المحدد الآن</span><strong>@Amount(PendingTotal) @SelectedLine?.Currency</strong></div>
+                    <div class="oas-allocation__summary-row"><span>المتبقي بعد الحفظ</span><strong>@Amount((SelectedLine?.Available ?? 0m) - PendingTotal) @SelectedLine?.Currency</strong></div>
+                </section>
+            </div>
+        }
+
+        @if (_selectedLineId.HasValue)
+        {
+            <section class="oas-allocation__card">
+                <div class="oas-allocation__section-title">
+                    <h3><i class="fa-solid fa-file-invoice-dollar" aria-hidden="true"></i> فواتير @(IsReceipt ? "العميل" : "المورد") المفتوحة (@_invoiceRows.Count)</h3>
+                </div>
+                <div class="oas-allocation__lookup-row oas-allocation__invoice-lookup">
+                    <UiLookup Label="البحث واختيار فاتورة للتخصيص"
+                              Value="@_invoiceLookupValue"
+                              SelectedItem="@InvoiceLookupItem"
+                              ValueChanged="OnInvoiceLookupChangedAsync"
+                              SearchAsync="SearchInvoiceOptionsAsync"
+                              Placeholder="اختر فاتورة، أو ابحث بالرقم..."
+                              EmptyText="لم تُعثر على فاتورة مفتوحة مطابقة لهذا الطرف."
+                              Disabled="@(_busy || _loadingInvoices)" />
+                    <span class="oas-allocation__hint">عند الاختيار يُقترح مبلغ التخصيص تلقائيًا، ويمكن تعديله في الجدول للسداد الجزئي.</span>
+                </div>
+                @if (_loadingInvoices)
+                {
+                    <p class="oas-allocation__hint">جاري تحميل الفواتير والأرصدة الفعلية...</p>
+                }
+                else if (_invoiceRows.Count == 0)
+                {
+                    <p class="oas-allocation__empty">لا توجد فواتير مرحلة بأرصدة مفتوحة لهذا الطرف، أو تعذر استرجاعها.</p>
+                }
+                else
+                {
+                    <div class="oas-allocation__table-wrap">
+                        <table class="oas-allocation__table">
+                            <thead><tr><th>اختيار</th><th>الفاتورة</th><th>التاريخ</th><th>العملة</th><th>الإجمالي</th><th>المسوّى سابقًا</th><th>المتبقي</th><th>تخصيص من السند</th></tr></thead>
+                            <tbody>
+                                @foreach (var invoice in FilteredInvoices)
+                                {
+                                    <tr class="@(invoice.Amount > 0 ? "is-selected" : "")">
+                                        <td><input type="checkbox" checked="@(invoice.Amount > 0)" disabled="@(_busy || invoice.Saved || invoice.RequestKey is not null)" @onchange="e => ToggleInvoice(invoice, e.Value is true)" aria-label="تخصيص الفاتورة @invoice.Code" /></td>
+                                        <td><strong>@invoice.Code</strong>@if (invoice.Saved) { <span class="oas-allocation__tag is-posted">تم الحفظ</span> }</td>
+                                        <td>@invoice.Date.ToString("yyyy/MM/dd")</td><td>@invoice.Currency</td><td>@Amount(invoice.Total)</td><td>@Amount(invoice.Paid)</td><td><strong>@Amount(invoice.Outstanding)</strong></td>
+                                        <td><input type="number" min="0" step="0.0001" class="oas-allocation__input oas-allocation__amount" disabled="@(_busy || invoice.Saved || invoice.RequestKey is not null)" title="الحد الأعلى المتاح من هذه الفاتورة بعملة السند: @Amount(invoice.MaxSourceAmount)" value="@invoice.Amount" @onchange="e => ChangeInvoiceAmount(invoice, e.Value?.ToString())" aria-label="مبلغ التخصيص للفاتورة @invoice.Code بعملة سطر السند" /></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="oas-allocation__hint">تُدخل مبالغ التخصيص بعملة <strong>@SelectedLine?.Currency</strong>؛ وعند اختلاف عملة الفاتورة، يُعرض الحد التقريبي بناءً على أسعار الصرف. يعيد الخادم التحقق من المتاح والفروق عند الحفظ.</p>
+                }
+            </section>
+            <section class="oas-allocation__bottom">
+                <div class="oas-allocation__card">
+                    <h3>حالة التخصيص</h3>
+                    <div class="oas-allocation__progress"><span style="width: @ProgressPercent%"></span></div>
+                    <p>@ProgressPercent.ToString("N1")% من المتاح المحدد</p>
+                </div>
+                <div class="oas-allocation__card">
+                    <h3>مراجعة المبلغ</h3>
+                    <div class="oas-allocation__summary-row"><span>إجمالي المحدد</span><strong>@Amount(PendingTotal) @SelectedLine?.Currency</strong></div>
+                    <div class="oas-allocation__summary-row"><span>الباقي غير المخصص</span><strong>@Amount((SelectedLine?.Available ?? 0m) - PendingTotal) @SelectedLine?.Currency</strong></div>
+                </div>
+            </section>
+            <div class="oas-allocation__footer">
+                <span>كل فاتورة تحفظ كتخصيص مستقل مرتبط بسطر السند؛ لا يُعتبر الحفظ الجماعي معاملة واحدة.</span>
+                <button type="button" class="oas-allocation__btn is-secondary" disabled="@_busy" @onclick="() => _showHistory = !_showHistory">@(_showHistory ? "إخفاء التخصيصات" : "عرض التخصيصات الحالية")</button>
+                <button type="button" class="oas-allocation__btn is-secondary" disabled="@(_busy || PendingTotal <= 0m)" @onclick="ClearDraftAmountsAsync">إلغاء المبالغ المحددة</button>
+                <button type="button" class="oas-allocation__btn is-secondary" disabled="@_busy" @onclick="ReloadSelectedAsync">تحديث الأرصدة</button>
+                <button type="button" class="oas-allocation__btn is-primary" disabled="@(_busy || _loadingInvoices || PendingTotal <= 0 || SelectedLine is null || PendingTotal > SelectedLine.Available || _invoiceRows.Any(x => !x.Saved && x.Amount > x.MaxSourceAmount))" @onclick="SaveAllocationsAsync">@(_busy ? "جاري الحفظ..." : "حفظ التخصيصات المحددة")</button>
+            </div>
+            @if (_showHistory)
+            {
+                <section class="oas-allocation__card">
+                    <h3>تخصيصات سطر السند المسجلة</h3>
+                    @if (_selectedAllocations.Count == 0)
+                    {
+                        <p class="oas-allocation__empty">لا توجد تخصيصات سابقة لهذا السطر.</p>
+                    }
+                    else
+                    {
+                        <div class="oas-allocation__table-wrap">
+                            <table class="oas-allocation__table">
+                                <thead><tr><th>تاريخ التخصيص</th><th>المبلغ</th><th>العملة</th><th>الحالة</th><th>إجراء</th></tr></thead>
+                                <tbody>
+                                    @foreach (var allocation in _selectedAllocations)
+                                    {
+                                        <tr>
+                                            <td>@allocation.AllocatedAtUtc.ToLocalTime().ToString("yyyy/MM/dd")</td>
+                                            <td>@Amount(allocation.AllocatedAmount)</td>
+                                            <td>@allocation.CurrencyCodeSnapshot</td>
+                                            <td>@(allocation.IsReversed ? "معكوس" : "نشط")</td>
+                                            <td><button class="oas-allocation__choose" type="button" disabled="@_busy" @onclick="() => OpenAllocationAsync(allocation.Id)">تفاصيل / عكس</button></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </section>
             }
         }
-        public AllocationTargetDocumentType TargetDocumentType { get; set; } = AllocationTargetDocumentType.SalesInvoice;
-        public Guid? TargetDocumentId { get; set; }
-        public string TargetDocumentIdText { get => TargetDocumentId?.ToString("D") ?? string.Empty; set => TargetDocumentId = Guid.TryParse(value, out var id) ? id : null; }
-        public Guid? CurrencyId { get; set; }
-        public string? CurrencyCodeSnapshot { get; set; }
-        public decimal AllocatedAmount { get; set; }
-        public decimal? ExchangeRate { get; set; }
-        public decimal? BaseAllocatedAmount { get; set; }
-        public DateTimeOffset AllocatedAtUtc { get; set; } = DateTimeOffset.UtcNow;
     }
-
-    private static readonly IReadOnlyList<UiSelectOption> SourceTypeOptions =
-    [
-        new(PaymentSourceType.ReceiptVoucher.ToString(), "سند قبض"),
-        new(PaymentSourceType.PaymentVoucher.ToString(), "سند صرف")
-    ];
-
-    [Parameter] public FormModel Model { get; set; } = new();
-    [Parameter] public bool IsEditable { get; set; }
-    [Parameter] public bool IsNew { get; set; }
-    [Parameter] public UiLookupItem? SourceLookupItem { get; set; }
-    [Parameter] public UiLookupItem? TargetLookupItem { get; set; }
-    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SourceSearchAsync { get; set; }
-    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? TargetSearchAsync { get; set; }
-    [Parameter] public EventCallback OnModelChanged { get; set; }
-
-    private Task ChangedAsync() => OnModelChanged.InvokeAsync();
-
-    private async Task OnSourceTypeChanged(string val)
-    {
-        if (Enum.TryParse<PaymentSourceType>(val, out var value))
-        {
-            Model.PaymentSourceType = value;
-            Model.ReceiptVoucherLineId = null;
-            Model.PaymentVoucherLineId = null;
-            Model.CurrencyId = null;
-            Model.CurrencyCodeSnapshot = null;
-            Model.BaseAllocatedAmount = null;
-            await ChangedAsync();
-        }
-    }
-
-    private async Task OnSourceLineChanged(string? value)
-    {
-        Model.SourceLineId = Guid.TryParse(value, out var id) ? id : null;
-        await ChangedAsync();
-    }
-
-    private async Task OnTargetTypeChanged(string value)
-    {
-        if (Enum.TryParse<AllocationTargetDocumentType>(value, out var parsed)) Model.TargetDocumentType = parsed;
-        await ChangedAsync();
-    }
-
-    private async Task OnTargetIdChanged(string? value) { Model.TargetDocumentId = Guid.TryParse(value, out var id) ? id : null; await ChangedAsync(); }
-    private async Task OnTargetIdTextChanged(string? value) { Model.TargetDocumentIdText = value ?? string.Empty; await ChangedAsync(); }
-    private async Task OnAllocatedAmountChanged(decimal value) { Model.AllocatedAmount = value; await ChangedAsync(); }
-}
+</div>

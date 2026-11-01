@@ -136,6 +136,7 @@ public interface IAccountingClientService
     Task<PaymentAllocationDto?> GetPaymentAllocationByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<PaymentAllocationDto?> CreatePaymentAllocationAsync(CreatePaymentAllocationRequest request, CancellationToken cancellationToken = default);
     Task<PaymentAllocationDto?> UpdatePaymentAllocationAsync(Guid id, UpdatePaymentAllocationRequest request, CancellationToken cancellationToken = default);
+    Task<ReversePaymentAllocationResultDto?> ReversePaymentAllocationAsync(Guid id, ReversePaymentAllocationRequest request, CancellationToken cancellationToken = default);
 
     Task<PagedResult<CurrencyDto>> GetCurrenciesPageAsync(PageRequest request, CancellationToken cancellationToken = default);
     Task<CurrencyDto?> GetCurrencyByIdAsync(Guid id, CancellationToken cancellationToken = default);

@@ -14,8 +14,8 @@
 }
 
 <UiAccountingWorkspace ShowTabs="@Section.HasValue"
-                       InlineTabsWithActions="@(Section == AccountingEntityType.Accounts)"
-                       AdditionalCssClass='@(Section == AccountingEntityType.Accounts ? "ui-acc-workspace--account-management" : null)'>
+                       InlineTabsWithActions="@(Section is AccountingEntityType.Accounts or AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers)"
+                       AdditionalCssClass='@(Section == AccountingEntityType.Accounts ? "ui-acc-workspace--account-management" : Section is AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers ? "ui-acc-workspace--vouchers" : null)'>
 
     <Actions>
 
@@ -151,7 +151,7 @@
                               IconCssClass="fa-solid fa-link"
                               Variant="ButtonVariant.Secondary"
                               Size="ControlSize.Small"
-                              OnClick="@(() => OpenNewRecord(AccountingEntityType.PaymentAllocations))" />
+                              OnClick="OpenNewAllocationForSectionAsync" />
                 }
 
                 <UiButton Text="تحديث"
@@ -178,7 +178,7 @@
             }
             else
             {
-                @if (ShowStandardEditActions)
+                @if (ShowStandardEditActions && activeTab?.EntityType != AccountingEntityType.PaymentAllocations)
                 {
                     <UiButton Text="تعديل"
                               IconCssClass="fa-solid fa-pen-to-square"
@@ -214,6 +214,17 @@
                               Loading="@_isPrinting"
                               Disabled="@(!CanPrintActive || _isPrinting)"
                               OnClick="PrintActiveVoucherAsync" />
+                }
+
+                @if (activeTab is { IsNew: false, IsDirty: false } &&
+                     (activeTab.Model is ReceiptVoucherEditor.FormModel { Status: ReceiptVoucherStatus.Posted } ||
+                      activeTab.Model is PaymentVoucherEditor.FormModel { Status: PaymentVoucherStatus.Posted }))
+                {
+                    <UiButton Text="تخصيص دفعة"
+                              IconCssClass="fa-solid fa-link"
+                              Variant="ButtonVariant.Secondary"
+                              Size="ControlSize.Small"
+                              OnClick="OpenAllocationForActiveVoucherAsync" />
                 }
 
                 <UiButton Text="تحديث"
@@ -669,6 +680,7 @@
                                           CounterpartyAccountSearchAsync="SearchOtherCounterpartyAccountsAsync"
                                           SettlementAccountSearchAsync="SearchOtherSettlementAccountsAsync"
                                           EffectiveRateAsync="ResolveEffectiveRatePreviewAsync"
+                                          OnNewVoucherYearChanged="RefreshVoucherNumberAfterYearChangeAsync"
                                           OnModelChanged="MarkActiveDirty" />
 
                     break;
@@ -688,6 +700,7 @@
                                           CounterpartyAccountSearchAsync="SearchOtherCounterpartyAccountsAsync"
                                           SettlementAccountSearchAsync="SearchOtherSettlementAccountsAsync"
                                           EffectiveRateAsync="ResolveEffectiveRatePreviewAsync"
+                                          OnNewVoucherYearChanged="RefreshVoucherNumberAfterYearChangeAsync"
                                           OnModelChanged="MarkActiveDirty" />
 
                     break;
@@ -698,10 +711,9 @@
                     <PaymentAllocationEditor Model="@model"
                                              IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
                                              IsNew="@activeTab.IsNew"
-                                             SourceLookupItem="@GetPaymentSourceLookup(model.SourceLineId)"
-                                             TargetLookupItem='@GetExternalReferenceLookup(model.TargetDocumentId, "مستند")'
-                                             SourceSearchAsync="SearchPaymentSourcesAsync"
-                                             TargetSearchAsync="@null"
+                                             AllocationId="@activeTab.EntityId"
+                                             OnAllocationsChanged="RefreshAllocationListAfterChangeAsync"
+                                             OnOpenAllocation="OpenExistingAllocationAsync"
                                              OnModelChanged="MarkActiveDirty" />
 
                     break;
@@ -944,9 +956,14 @@
                                          Subtitle="عرض السندات وفتحها للتفاصيل أو التعديل حسب حالتها"
                                          IconCssClass='@(Section == AccountingEntityType.ReceiptVouchers ? "fa-solid fa-money-bill-trend-up" : "fa-solid fa-money-bill-transfer")'>
 
-                    <UiAccountingRecordList Items="@(Section == AccountingEntityType.ReceiptVouchers ? BuildReceiptItems() : BuildPaymentItems())"
-                                            EmptyTitle='@(Section == AccountingEntityType.ReceiptVouchers ? "لا توجد سندات قبض" : "لا توجد سندات صرف")'
-                                            OnOpen="OpenCurrentRecordAsync" />
+                    <VoucherDocumentsList IsReceipt="@(Section == AccountingEntityType.ReceiptVouchers)"
+                                          Rows="@BuildVoucherDocumentRows()"
+                                          StatusFilter="@CurrentVoucherStatusFilter"
+                                          StatusFilterChanged="SetVoucherStatusFilter"
+                                          TotalCount="@CurrentTotalCount"
+                                          PageNumber="@CurrentPageNumber"
+                                          TotalPages="@CurrentTotalPages"
+                                          OnOpen="OpenCurrentRecordAsync" />
 
                     <UiPagination PageNumber="@CurrentPageNumber"
                                   TotalPages="@CurrentTotalPages"

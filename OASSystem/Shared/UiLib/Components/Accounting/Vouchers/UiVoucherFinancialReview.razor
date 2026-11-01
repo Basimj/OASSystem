@@ -1,0 +1,106 @@
+@namespace OAS.UiLib.Components.Accounting.Vouchers
+
+<div class="oas-voucher-review" dir="rtl">
+    <div class="oas-voucher-review__head">
+        <div>
+            <h3><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i> ملخص المراجعة المالية</h3>
+            <p>معاينة من المدخلات الحالية؛ الحساب والتحقق النهائيان لدى الخادم عند الحفظ والترحيل.</p>
+        </div>
+        <span class="oas-voucher-review__pill">@Lines.Count سطر</span>
+    </div>
+    <div class="oas-voucher-review__body">
+        <div class="oas-voucher-review__currencies">
+            <h4><i class="fa-solid fa-calculator" aria-hidden="true"></i> الإجماليات حسب العملة</h4>
+            <div class="oas-voucher-review__table-scroller" role="region" aria-label="إجماليات العملات" tabindex="0">
+                <table class="oas-voucher-review__currency-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">العملة</th>
+                            <th scope="col">إجمالي المبلغ</th>
+                            <th scope="col">المعادل بالعملة الأساسية</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @if (Lines.Count == 0)
+                    {
+                        <tr><td colspan="3">لا توجد أسطر بعد. أضف سطرًا لإظهار الإجماليات.</td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var group in Lines.GroupBy(l => l.CurrencyId).OrderBy(g => g.First().CurrencyCodeSnapshot))
+                        {
+                            var groupComplete = group.All(line => line.CurrencyId.HasValue &&
+                                line.Amount > 0 && !line.ManualRatePending &&
+                                (line.CurrencyId == BaseCurrencyId || line.EffectiveExchangeRate is > 0));
+                            var groupBase = group.Sum(line => line.Amount *
+                                (line.CurrencyId.HasValue && line.CurrencyId == BaseCurrencyId
+                                    ? 1m : line.EffectiveExchangeRate ?? 0m));
+                            <tr>
+                                <td><span class="oas-voucher-lines__currency">@(group.First().CurrencyCodeSnapshot ?? "غير محددة")</span></td>
+                                <td dir="ltr">@(group.Sum(line => line.Amount).ToString("N2"))</td>
+                                <td dir="ltr">@(groupComplete ? groupBase.ToString($"N{Math.Clamp((int)BaseCurrencyDecimalPlaces, 0, 6)}") : "غير مكتمل")</td>
+                            </tr>
+                        }
+                    }
+                    </tbody>
+                </table>
+            </div>
+            <div class="oas-voucher-review__base">
+                <span><i class="fa-solid fa-coins" aria-hidden="true"></i> الإجمالي بالعملة الأساسية (@(BaseCurrencyCode ?? "غير محددة"))</span>
+                <strong dir="ltr">@(PreviewComplete ? PreviewTotal.ToString($"N{Math.Clamp((int)BaseCurrencyDecimalPlaces, 0, 6)}") : "غير مكتمل")</strong>
+            </div>
+            @if (SavedBaseTotal.HasValue && !IsNew)
+            {
+                <p class="oas-voucher-review__notice">آخر إجمالي محفوظ: @SavedBaseTotal.Value.ToString($"N{Math.Clamp((int)BaseCurrencyDecimalPlaces, 0, 6)}") @(BaseCurrencyCode ?? "")؛ قد يختلف عن المعاينة حتى يتم الحفظ.</p>
+            }
+            <p class="oas-voucher-review__notice">المعاينة من الأسطر الحالية؛ لا تعني إتمام الحفظ أو الترحيل.</p>
+        </div>
+        <div class="oas-voucher-review__checks" aria-live="polite">
+            <h4>مراجعة قبل الاعتماد والترحيل</h4>
+            <div class="@(PartiesComplete ? "oas-voucher-review__check--ok" : "oas-voucher-review__check--warn")"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> @(PartiesComplete ? "تم إدخال الأطراف لجميع الأسطر." : "حدد الطرف الصحيح في كل سطر.")</div>
+            <div class="@(SourcesComplete ? "oas-voucher-review__check--ok" : "oas-voucher-review__check--warn")"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> @(SourcesComplete ? "مصادر الدفع مدخلة لجميع الأسطر." : "حدد الصندوق أو البنك أو حساب التسوية لكل سطر.")</div>
+            <div class="@(AmountsComplete ? "oas-voucher-review__check--ok" : "oas-voucher-review__check--warn")"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> @(AmountsComplete ? "مبالغ الأسطر وعملاتها مدخلة." : "تحقق من المبلغ والعملة لكل سطر.")</div>
+            <div class="@(PreviewComplete ? "oas-voucher-review__check--ok" : "oas-voucher-review__check--warn")"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> @(PreviewComplete ? "أسعار الصرف مكتملة للمعاينة." : "يوجد سعر صرف مفقود أو عملة لم تحدد.")</div>
+            <div class="@(ReferencesComplete ? "oas-voucher-review__check--ok" : "oas-voucher-review__check--warn")"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> @(ReferencesComplete ? "مراجع الشيكات المطلوبة مدخلة." : "أدخل رقم المرجع لكل سطر دفع بشيك.")</div>
+            <p class="oas-voucher-review__notice">هذه المؤشرات إرشادية. تعرض إجماليات العملات هنا بمنزلتين للمعاينة فقط، ولا تغني عن دقة العملة والتحقق النهائي عند الحفظ والترحيل.</p>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<UiVoucherSettlementLinesEditor.EditableSettlementLine> Lines { get; set; } = [];
+    [Parameter] public Guid? BaseCurrencyId { get; set; }
+    [Parameter] public string? BaseCurrencyCode { get; set; }
+    [Parameter] public byte BaseCurrencyDecimalPlaces { get; set; } = 2;
+    [Parameter] public decimal? SavedBaseTotal { get; set; }
+    [Parameter] public bool IsNew { get; set; }
+
+    private bool PartiesComplete => Lines.Count > 0 && Lines.All(l => l.PartyType switch
+    {
+        UiVoucherSettlementLinesEditor.SettlementPartyKind.Customer => l.CustomerId.HasValue,
+        UiVoucherSettlementLinesEditor.SettlementPartyKind.Supplier => l.SupplierId.HasValue,
+        UiVoucherSettlementLinesEditor.SettlementPartyKind.Employee => l.EmployeeId.HasValue,
+        _ => !string.IsNullOrWhiteSpace(l.PartyName) && l.CounterpartyAccountId.HasValue
+    });
+    private bool SourcesComplete => Lines.Count > 0 && Lines.All(l => l.PaymentMethod switch
+    {
+        UiVoucherSettlementLinesEditor.PaymentMethodKind.Cash => l.CashAccountId.HasValue,
+        UiVoucherSettlementLinesEditor.PaymentMethodKind.BankTransfer or
+        UiVoucherSettlementLinesEditor.PaymentMethodKind.Cheque or
+        UiVoucherSettlementLinesEditor.PaymentMethodKind.Card => l.BankAccountId.HasValue,
+        _ => l.SettlementAccountId.HasValue
+    });
+    private bool AmountsComplete => Lines.Count > 0 && Lines.All(l => l.Amount > 0 && l.CurrencyId.HasValue);
+    private bool ReferencesComplete => Lines.Count > 0 && Lines.All(l =>
+        l.PaymentMethod != UiVoucherSettlementLinesEditor.PaymentMethodKind.Cheque ||
+        !string.IsNullOrWhiteSpace(l.ReferenceNumber));
+
+    private bool PreviewComplete => Lines.Count > 0 && Lines.All(line =>
+        line.CurrencyId.HasValue && line.Amount > 0 &&
+        (!line.ManualRatePending && (line.CurrencyId == BaseCurrencyId || line.EffectiveExchangeRate is > 0)));
+
+    private decimal PreviewTotal => Lines.Sum(line => line.Amount *
+        (line.CurrencyId.HasValue && line.CurrencyId == BaseCurrencyId
+            ? 1m
+            : line.EffectiveExchangeRate ?? 0m));
+}

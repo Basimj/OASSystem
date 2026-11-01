@@ -38,8 +38,9 @@ public sealed class SalesInvoicesController(ISender sender, OasDbContext db) : C
     }
 
     [HttpGet]
-    public async Task<ActionResult<PagedResult<SalesInvoiceDto>>> Get([FromQuery] PageRequest request, CancellationToken cancellationToken)
-        => Ok(await sender.Send(new GetSalesInvoicesQuery(request), cancellationToken));
+    public async Task<ActionResult<PagedResult<SalesInvoiceDto>>> Get(
+        [FromQuery] PageRequest request, [FromQuery] Guid? customerId, CancellationToken cancellationToken)
+        => Ok(await sender.Send(new GetSalesInvoicesQuery(request, customerId), cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<SalesInvoiceDto>> GetById(Guid id, CancellationToken cancellationToken)

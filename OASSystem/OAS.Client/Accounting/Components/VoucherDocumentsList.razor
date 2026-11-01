@@ -1,0 +1,90 @@
+@namespace OAS.Client.Accounting.Components
+@using OAS.UiLib.Components.Accounting.Workspace
+
+<div class="oas-voucher-documents" dir="rtl">
+    <div class="oas-voucher-documents__heading">
+        <div>
+            <h2><i class="@(IsReceipt ? "fa-solid fa-arrow-down-to-bracket" : "fa-solid fa-arrow-up-from-bracket")" aria-hidden="true"></i> @(IsReceipt ? "سندات القبض" : "سندات الصرف")</h2>
+            <p>اختر رقم السند لفتح تفاصيله في تبويب مستقل. البحث الرئيسي يشمل جميع الصفحات؛ الفلاتر أدناه تخص الصفحة المعروضة.</p>
+        </div>
+        <span class="oas-voucher-documents__count">@TotalCount.ToString("N0") سند في نتيجة البحث</span>
+    </div>
+
+    <div class="oas-voucher-documents__filters">
+        <label for="voucher-visible-status">الحالة في الصفحة الحالية</label>
+        <select id="voucher-visible-status" class="form-select form-select-sm" value="@StatusFilter" @onchange="StatusChanged">
+            <option value="">جميع الحالات</option>
+            <option value="Draft">مسودة</option>
+            <option value="Approved">معتمد</option>
+            <option value="Posted">مرحّل</option>
+            <option value="Cancelled">ملغي</option>
+        </select>
+        <label for="voucher-visible-order">ترتيب الصفحة</label>
+        <select id="voucher-visible-order" class="form-select form-select-sm" @bind="_sort">
+            <option value="newest">الأحدث أولاً</option>
+            <option value="oldest">الأقدم أولاً</option>
+            <option value="number">رقم السند</option>
+        </select>
+        <span class="oas-voucher-documents__filter-note">عرض @VisibleRows.Count من @Rows.Count في الصفحة الحالية</span>
+    </div>
+
+    <div class="oas-voucher-documents__table-wrap" role="region" aria-label="جدول السندات" tabindex="0">
+        <table class="oas-voucher-documents__table">
+            <thead><tr><th scope="col">رقم السند</th><th scope="col">التاريخ</th><th scope="col">الطرف</th><th scope="col">البيان</th><th scope="col">العملة</th><th scope="col">المبلغ</th><th scope="col">الإجمالي الأساسي</th><th scope="col">الحالة</th><th scope="col">الإجراءات</th></tr></thead>
+            <tbody>
+                @foreach (var item in VisibleRows)
+                {
+                    <tr @key="item.Id">
+                        <td><button type="button" class="oas-voucher-documents__open" @onclick="() => OnOpen.InvokeAsync(item.Id)">@item.Number</button></td>
+                        <td class="oas-voucher-documents__numeric">@item.Date.ToString("yyyy/MM/dd")</td>
+                        <td>@item.Party</td>
+                        <td class="oas-voucher-documents__description" title="@item.Description">@item.Description</td>
+                        <td dir="ltr">@item.CurrencySummary</td>
+                        <td class="oas-voucher-documents__numeric">@item.AmountSummary</td>
+                        <td class="oas-voucher-documents__numeric">@item.BaseTotal</td>
+                        <td><UiAccountingStatusBadge Text="@item.StatusText" State="@item.StatusState" /></td>
+                        <td><button type="button" class="oas-voucher-documents__detail" @onclick="() => OnOpen.InvokeAsync(item.Id)" aria-label="@($"فتح السند {item.Number}")"><i class="fa-solid fa-eye" aria-hidden="true"></i> عرض</button></td>
+                    </tr>
+                }
+                @if (VisibleRows.Count == 0)
+                {
+                    <tr><td colspan="9" class="oas-voucher-documents__empty">@(Rows.Count == 0 ? "لا توجد سندات تطابق البحث." : "لا توجد حالات مطابقة في الصفحة الحالية. غيّر الفلتر أو انتقل لصفحة أخرى.")</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="oas-voucher-documents__footer">
+        <span>الصفحة @PageNumber من @Math.Max(1, TotalPages) · الإجماليات تخص كل سند ولا تُجمع العملات المختلفة</span>
+    </div>
+</div>
+
+@code {
+    public sealed record VoucherRow(Guid Id, string Number, DateOnly Date, string Party, string Description,
+        string CurrencySummary, string AmountSummary, string BaseTotal, string StatusText, string StatusState, string StatusCode);
+
+    [Parameter] public bool IsReceipt { get; set; }
+    [Parameter] public string StatusFilter { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> StatusFilterChanged { get; set; }
+    private Task StatusChanged(ChangeEventArgs e) => StatusFilterChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty);
+    [Parameter] public IReadOnlyList<VoucherRow> Rows { get; set; } = [];
+    [Parameter] public long TotalCount { get; set; }
+    [Parameter] public int PageNumber { get; set; }
+    [Parameter] public int TotalPages { get; set; }
+    [Parameter] public EventCallback<Guid> OnOpen { get; set; }
+
+    private string _sort = "newest";
+    private IReadOnlyList<VoucherRow> VisibleRows
+    {
+        get
+        {
+            var filtered = Rows.Where(x => string.IsNullOrEmpty(StatusFilter) ||
+                string.Equals(x.StatusCode, StatusFilter, StringComparison.OrdinalIgnoreCase));
+            return (_sort switch
+            {
+                "oldest" => filtered.OrderBy(x => x.Date).ThenBy(x => x.Number),
+                "number" => filtered.OrderBy(x => x.Number),
+                _ => filtered.OrderByDescending(x => x.Date).ThenByDescending(x => x.Number)
+            }).ToArray();
+        }
+    }
+}

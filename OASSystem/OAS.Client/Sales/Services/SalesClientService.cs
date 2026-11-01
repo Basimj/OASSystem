@@ -60,6 +60,9 @@ public sealed class SalesClientService(OasApiClient apiClient) : ISalesClientSer
     public Task<CustomerOrderDto?> CancelCustomerOrderAsync(Guid id, CancelCustomerOrderRequest r, CancellationToken ct = default) => apiClient.PostAsync<CancelCustomerOrderRequest, CustomerOrderDto>($"api/sales/customer-orders/{id}/cancel", r, ct);
 
     public Task<PagedResult<SalesInvoiceDto>> GetSalesInvoicesPageAsync(PageRequest r, CancellationToken ct = default) => GetPageAsync<SalesInvoiceDto>("api/sales/invoices", r, ct);
+    public async Task<PagedResult<SalesInvoiceDto>> GetCustomerInvoicesPageAsync(Guid customerId, PageRequest r, CancellationToken ct = default)
+        => await apiClient.GetAsync<PagedResult<SalesInvoiceDto>>(
+            $"api/sales/invoices{PageQuery(r)}&customerId={customerId:D}", ct) ?? new PagedResult<SalesInvoiceDto>();
     public Task<SalesInvoiceDto?> GetSalesInvoiceByIdAsync(Guid id, CancellationToken ct = default) => apiClient.GetAsync<SalesInvoiceDto>($"api/sales/invoices/{id}", ct);
     public Task<SalesCodeReservationDto?> ReserveSalesInvoiceCodeAsync(DateOnly date, CancellationToken ct = default) => apiClient.PostAsync<object, SalesCodeReservationDto>($"api/sales/invoices/code/reserve?invoiceDate={date:yyyy-MM-dd}", new { }, ct);
     public Task<SalesInvoiceDto?> CreateSalesInvoiceAsync(CreateSalesInvoiceRequest r, CancellationToken ct = default) => apiClient.PostAsync<CreateSalesInvoiceRequest, SalesInvoiceDto>("api/sales/invoices", r, ct);

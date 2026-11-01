@@ -1,0 +1,65 @@
+@namespace OAS.UiLib.Components.Accounting.Vouchers
+
+<aside class="oas-voucher-quick-summary" aria-label="ملخص السند الحالي" dir="rtl">
+    <h3><i class="fa-solid fa-layer-group" aria-hidden="true"></i> ملخص سريع</h3>
+    <div class="oas-voucher-quick-summary__content">
+        <div class="oas-voucher-quick-summary__row oas-voucher-quick-summary__row--primary">
+            <span>إجمالي السند حسب العملات</span>
+            @if (Lines.Count == 0)
+            {
+                <strong>لا توجد أسطر</strong>
+            }
+            else
+            {
+                @foreach (var group in Lines.GroupBy(l => l.CurrencyId).OrderBy(g => g.First().CurrencyCodeSnapshot))
+                {
+                    <strong dir="ltr">@(group.Sum(l => l.Amount).ToString("N2")) @(group.First().CurrencyCodeSnapshot ?? "عملة غير محددة")</strong>
+                }
+            }
+        </div>
+        <div class="oas-voucher-quick-summary__row">
+            <span>الإجمالي بالعملة الأساسية (@(BaseCurrencyCode ?? "غير محددة"))</span>
+            <strong dir="ltr">@(PreviewComplete ? PreviewTotal.ToString($"N{Math.Clamp((int)BaseCurrencyDecimalPlaces, 0, 6)}") : "غير مكتمل")</strong>
+        </div>
+        <div class="oas-voucher-quick-summary__row">
+            <span>عدد الأسطر</span><strong>@Lines.Count</strong>
+        </div>
+        <div class="oas-voucher-quick-summary__row">
+            <span>تاريخ السند</span><strong dir="ltr">@VoucherDate.ToString("yyyy/MM/dd")</strong>
+        </div>
+        <div class="oas-voucher-quick-summary__row">
+            <span>حالة السند</span><strong>@StatusText</strong>
+        </div>
+        <div class="oas-voucher-quick-summary__row">
+            <span>أسعار الصرف</span>
+            <strong class="@(PreviewComplete ? "is-ready" : "is-pending")">@(PreviewComplete ? "مكتملة للمعاينة" : "تحتاج مراجعة")</strong>
+        </div>
+        @if (SavedBaseTotal.HasValue && !IsNew)
+        {
+            <div class="oas-voucher-quick-summary__saved">
+                آخر إجمالي محفوظ: <strong dir="ltr">@(SavedBaseTotal.Value.ToString($"N{Math.Clamp((int)BaseCurrencyDecimalPlaces, 0, 6)}"))</strong>
+            </div>
+        }
+    </div>
+    <p class="oas-voucher-quick-summary__note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> ملخص إرشادي من الأسطر الحالية؛ يعتمد الترحيل على تحقق الخادم.</p>
+</aside>
+
+@code {
+    [Parameter] public IReadOnlyList<UiVoucherSettlementLinesEditor.EditableSettlementLine> Lines { get; set; } = [];
+    [Parameter] public Guid? BaseCurrencyId { get; set; }
+    [Parameter] public string? BaseCurrencyCode { get; set; }
+    [Parameter] public byte BaseCurrencyDecimalPlaces { get; set; } = 2;
+    [Parameter] public decimal? SavedBaseTotal { get; set; }
+    [Parameter] public bool IsNew { get; set; }
+    [Parameter] public DateOnly VoucherDate { get; set; }
+    [Parameter] public string StatusText { get; set; } = "مسودة";
+
+    private bool PreviewComplete => Lines.Count > 0 && Lines.All(line =>
+        line.CurrencyId.HasValue && line.Amount > 0 &&
+        !line.ManualRatePending &&
+        (BaseCurrencyId.HasValue && line.CurrencyId == BaseCurrencyId || line.EffectiveExchangeRate is > 0));
+
+    private decimal PreviewTotal => Lines.Sum(line => line.Amount *
+        (BaseCurrencyId.HasValue && line.CurrencyId == BaseCurrencyId
+            ? 1m : line.EffectiveExchangeRate ?? 0m));
+}

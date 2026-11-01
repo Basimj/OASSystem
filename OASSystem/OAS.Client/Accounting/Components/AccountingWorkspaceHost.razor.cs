@@ -152,6 +152,15 @@ public partial class AccountingWorkspaceHost : IDisposable
 
     private string CurrentSearch => GetSearch(CurrentListEntity);
 
+    private readonly Dictionary<AccountingEntityType, string> _voucherStatusFilters = [];
+    private string CurrentVoucherStatusFilter => _voucherStatusFilters.GetValueOrDefault(CurrentListEntity) ?? string.Empty;
+    private Task SetVoucherStatusFilter(string value)
+    {
+        _voucherStatusFilters[CurrentListEntity] = value;
+        return Task.CompletedTask;
+    }
+
+
     private string CurrentSearchPlaceholder => CurrentListEntity switch
     {
         AccountingEntityType.Accounts => "بحث بالكود أو اسم الحساب...",
@@ -552,6 +561,43 @@ public partial class AccountingWorkspaceHost : IDisposable
         Workspace.NotifyStateChanged();
     }
 
+    private Task OpenNewAllocationForSectionAsync() => OpenNewRecord(AccountingEntityType.PaymentAllocations);
+
+    private async Task OpenAllocationForActiveVoucherAsync()
+    {
+        var current = Workspace.ActiveTab;
+        if (current is null || current.EntityId is null || current.IsDirty) return;
+        var sourceType = current.EntityType == AccountingEntityType.ReceiptVouchers
+            ? PaymentSourceType.ReceiptVoucher : PaymentSourceType.PaymentVoucher;
+        if (current.EntityType is not (AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers)) return;
+
+        var voucherId = current.EntityId.Value;
+        await OpenNewRecord(AccountingEntityType.PaymentAllocations);
+        if (Workspace.ActiveTab is { Model: PaymentAllocationEditor.FormModel allocation } tab)
+        {
+            allocation.PaymentSourceType = sourceType;
+            allocation.TargetDocumentType = sourceType == PaymentSourceType.ReceiptVoucher
+                ? AllocationTargetDocumentType.SalesInvoice : AllocationTargetDocumentType.PurchaseInvoice;
+            allocation.InitialVoucherId = voucherId;
+            tab.Title = $"تخصيص {(sourceType == PaymentSourceType.ReceiptVoucher ? "قبض" : "صرف")}";
+            tab.CaptureBaseline(SerializeModel(tab.Model));
+            Workspace.NotifyStateChanged();
+        }
+    }
+
+    private Task OpenExistingAllocationAsync(Guid id) =>
+        OpenRecordInTab(AccountingEntityType.PaymentAllocations, id, "تخصيص دفعة");
+
+    private async Task RefreshAllocationListAfterChangeAsync()
+    {
+        if (Section is AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers)
+            await LoadPaymentAllocationsForVoucherSectionAsync(Section.Value);
+        if (Workspace.ActiveTab is { Model: PaymentAllocationEditor.FormModel model } tab &&
+            model.DraftAllocatedAmount == 0m)
+            tab.CaptureBaseline(SerializeModel(tab.Model));
+        Workspace.NotifyStateChanged();
+    }
+
     private Task OpenNewRecord() => OpenNewRecord(CurrentListEntity);
 
     private async Task OpenNewRecord(AccountingEntityType entityType)
@@ -612,6 +658,40 @@ public partial class AccountingWorkspaceHost : IDisposable
         }
     }
 
+    // New vouchers reserve a code based on their document year. Re-reserve whenever
+    // the user changes to a different year, rather than submitting an old-year code.
+    private async Task RefreshVoucherNumberAfterYearChangeAsync(DateOnly date)
+    {
+        var tab = Workspace.ActiveTab;
+        if (tab is not { IsNew: true }) return;
+        try
+        {
+            switch (tab.Model)
+            {
+                case ReceiptVoucherEditor.FormModel receipt:
+                    receipt.VoucherNumber = (await AccountingService.ReserveReceiptVoucherNumberAsync(date))?.Number ?? string.Empty;
+                    break;
+                case PaymentVoucherEditor.FormModel payment:
+                    payment.VoucherNumber = (await AccountingService.ReservePaymentVoucherNumberAsync(date))?.Number ?? string.Empty;
+                    break;
+            }
+        }
+        catch (ApiClientException ex)
+        {
+            // Never leave a number belonging to a previous financial year.
+            if (tab.Model is ReceiptVoucherEditor.FormModel r) r.VoucherNumber = string.Empty;
+            if (tab.Model is PaymentVoucherEditor.FormModel p) p.VoucherNumber = string.Empty;
+            ShowAccountingError(ex.Error);
+        }
+        catch (Exception)
+        {
+            if (tab.Model is ReceiptVoucherEditor.FormModel r) r.VoucherNumber = string.Empty;
+            if (tab.Model is PaymentVoucherEditor.FormModel p) p.VoucherNumber = string.Empty;
+            ApiFeedback.ShowUnexpected();
+        }
+        Workspace.NotifyStateChanged();
+    }
+
     private void InitializeNewModel(AccountingTabState tab)
     {
         tab.Model = tab.EntityType switch
@@ -635,7 +715,11 @@ public partial class AccountingWorkspaceHost : IDisposable
             AccountingEntityType.CostCenters => new CostCenterEditor.FormModel(),
             AccountingEntityType.ReceiptVouchers => new ReceiptVoucherEditor.FormModel(),
             AccountingEntityType.PaymentVouchers => new PaymentVoucherEditor.FormModel(),
-            AccountingEntityType.PaymentAllocations => new PaymentAllocationEditor.FormModel(),
+            AccountingEntityType.PaymentAllocations => new PaymentAllocationEditor.FormModel
+            {
+                PaymentSourceType = Section == AccountingEntityType.PaymentVouchers
+                    ? PaymentSourceType.PaymentVoucher : PaymentSourceType.ReceiptVoucher
+            },
             AccountingEntityType.CashAccounts => new CashAccountEditor.FormModel(),
             AccountingEntityType.BankAccounts => new BankAccountEditor.FormModel(),
             AccountingEntityType.CashShifts => new CashShiftEditor.FormModel(),
@@ -699,7 +783,10 @@ public partial class AccountingWorkspaceHost : IDisposable
         PageNumber = type == AccountingEntityType.Accounts ? 1 : GetPage(type),
         PageSize = type == AccountingEntityType.Accounts ? PageRequest.MaximumPageSize : PageSize,
         Search = string.IsNullOrWhiteSpace(GetSearch(type)) ? null : GetSearch(type),
-        Status = type == AccountingEntityType.Journals ? InitialJournalStatus : null
+        Status = type == AccountingEntityType.Journals ? InitialJournalStatus : null,
+        SortBy = type is AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers ? "VoucherDate" : null,
+        SortDirection = type is AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers
+            ? SortDirection.Descending : SortDirection.Ascending
     };
 
     private static IReadOnlyList<AccountingEntityType> GetSectionEntityTypes(AccountingEntityType section) => section switch
@@ -1180,6 +1267,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                             Description = dto.Description ?? string.Empty,
                             Status = dto.Status,
                             JournalEntryId = dto.JournalEntryId,
+                            GeneratedJournalNumber = await ResolveJournalNumberAsync(dto.JournalEntryId),
                             RowVersion = dto.RowVersion,
                             Lines = lines
                         };
@@ -1202,6 +1290,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                             Description = dto.Description ?? string.Empty,
                             Status = dto.Status,
                             JournalEntryId = dto.JournalEntryId,
+                            GeneratedJournalNumber = await ResolveJournalNumberAsync(dto.JournalEntryId),
                             RowVersion = dto.RowVersion,
                             Lines = lines
                         };
@@ -1227,7 +1316,10 @@ public partial class AccountingWorkspaceHost : IDisposable
                             AllocatedAmount = dto.AllocatedAmount,
                             ExchangeRate = dto.ExchangeRate,
                             BaseAllocatedAmount = dto.BaseAllocatedAmount,
-                            AllocatedAtUtc = dto.AllocatedAtUtc
+                            AllocatedAtUtc = dto.AllocatedAtUtc,
+                            IsReversed = dto.IsReversed,
+                            RowVersion = dto.RowVersion,
+                            ReversalReason = dto.ReversalReason
                         };
                         CompleteLoadedTab(tab, dto.Id, $"تخصيص {dto.AllocatedAmount:N2} {dto.CurrencyCodeSnapshot}", model);
                         break;
@@ -1899,24 +1991,34 @@ public partial class AccountingWorkspaceHost : IDisposable
     private bool ValidateSettlementLines(IReadOnlyList<UiVoucherSettlementLinesEditor.EditableSettlementLine> lines)
     {
         if (lines.Count == 0) { Snackbar.Warning("يجب إضافة سطر تسوية واحد على الأقل."); return false; }
+        foreach (var candidate in lines) candidate.ValidationError = null;
         for (var i = 0; i < lines.Count; i++)
         {
             var line = lines[i]; var number = i + 1;
-            if (line.Amount <= 0 || !line.CurrencyId.HasValue) { Snackbar.Warning($"السطر {number}: العملة والمبلغ الأكبر من صفر مطلوبان."); return false; }
+            if (line.Amount <= 0 || !line.CurrencyId.HasValue) return RejectVoucherLine(line, number, "العملة والمبلغ الأكبر من صفر مطلوبان.");
+            if (line.ManualRatePending) return RejectVoucherLine(line, number, "أدخل سعر صرف يدويًا صالحًا أو اختر السعر التلقائي.");
             var invalidParty =
                 (line.PartyType == UiSettlementPartyKind.Customer && !line.CustomerId.HasValue) ||
                 (line.PartyType == UiSettlementPartyKind.Supplier && !line.SupplierId.HasValue) ||
                 (line.PartyType == UiSettlementPartyKind.Employee && !line.EmployeeId.HasValue) ||
                 (line.PartyType == UiSettlementPartyKind.Other && (string.IsNullOrWhiteSpace(line.PartyName) || !line.CounterpartyAccountId.HasValue));
-            if (invalidParty) { Snackbar.Warning($"السطر {number}: أكمل بيانات الطرف والحساب المقابل."); return false; }
+            if (invalidParty) return RejectVoucherLine(line, number, "أكمل بيانات الطرف والحساب المقابل.");
             var invalidSettlement =
                 (line.PaymentMethod == UiPaymentMethodKind.Cash && !line.CashAccountId.HasValue) ||
                 (line.PaymentMethod is UiPaymentMethodKind.BankTransfer or UiPaymentMethodKind.Cheque or UiPaymentMethodKind.Card && !line.BankAccountId.HasValue) ||
                 (line.PaymentMethod == UiPaymentMethodKind.Other && !line.SettlementAccountId.HasValue);
-            if (invalidSettlement) { Snackbar.Warning($"السطر {number}: اختر حساب التسوية الموافق لطريقة الدفع."); return false; }
-            if (line.PaymentMethod == UiPaymentMethodKind.Cheque && string.IsNullOrWhiteSpace(line.ReferenceNumber)) { Snackbar.Warning($"السطر {number}: رقم الشيك مطلوب."); return false; }
+            if (invalidSettlement) return RejectVoucherLine(line, number, "اختر الصندوق أو البنك أو حساب التسوية الموافق لطريقة الدفع.");
+            if (line.PaymentMethod == UiPaymentMethodKind.Cheque && string.IsNullOrWhiteSpace(line.ReferenceNumber)) return RejectVoucherLine(line, number, "رقم الشيك مطلوب.");
         }
         return true;
+    }
+
+    private bool RejectVoucherLine(UiVoucherSettlementLinesEditor.EditableSettlementLine line, int number, string reason)
+    {
+        line.ValidationError = reason;
+        Snackbar.Warning($"السطر {number}: {reason}");
+        Workspace.NotifyStateChanged();
+        return false;
     }
 
     private async Task<bool> ValidateSettlementAccountEligibilityAsync(
@@ -2532,6 +2634,40 @@ public partial class AccountingWorkspaceHost : IDisposable
         return true;
     }
 
+    private string VoucherActionReviewText()
+    {
+        string number;
+        DateOnly date;
+        IReadOnlyList<UiVoucherSettlementLinesEditor.EditableSettlementLine> lines;
+        decimal? baseAmount;
+        string? baseCurrency;
+
+        switch (Workspace.ActiveTab?.Model)
+        {
+            case ReceiptVoucherEditor.FormModel receipt:
+                number = receipt.VoucherNumber;
+                date = receipt.VoucherDate;
+                lines = receipt.Lines;
+                baseAmount = receipt.BaseTotalAmount;
+                baseCurrency = receipt.BaseCurrencyCode;
+                break;
+            case PaymentVoucherEditor.FormModel payment:
+                number = payment.VoucherNumber;
+                date = payment.VoucherDate;
+                lines = payment.Lines;
+                baseAmount = payment.BaseTotalAmount;
+                baseCurrency = payment.BaseCurrencyCode;
+                break;
+            default:
+                return string.Empty;
+        }
+
+        var amounts = lines.GroupBy(x => x.CurrencyCodeSnapshot ?? "عملة غير محددة")
+            .Select(g => $"{g.Sum(x => x.Amount):N2} {g.Key}");
+        var baseTotal = baseAmount.HasValue ? $"{baseAmount.Value:N2} {baseCurrency}" : "غير متاح";
+        return $"رقم السند: {number}\nالتاريخ: {date:yyyy-MM-dd}\nالأسطر: {lines.Count}\nالإجماليات: {string.Join("، ", amounts)}\nالإجمالي الأساسي المحفوظ: {baseTotal}\n";
+    }
+
     private async Task<bool> ConfirmVoucherStatusActionAsync(string voucherName, string status)
     {
         if (string.Equals(status, nameof(ReceiptVoucherStatus.Posted), StringComparison.Ordinal))
@@ -2556,7 +2692,7 @@ public partial class AccountingWorkspaceHost : IDisposable
 
             return await Dialog.ConfirmAsync(
                 "تأكيد ترحيل السند",
-                "سيتم ترحيل السند وإنشاء قيد محاسبي رسمي.\nبعد الترحيل لن يمكن تعديل السند مباشرة.\nهل تريد المتابعة؟",
+                $"{VoucherActionReviewText()}\nسيتم إنشاء قيد محاسبي رسمي، وبعد الترحيل لن يمكن تعديل السند مباشرة.\nهل تريد المتابعة؟",
                 AlertTone.Warning,
                 confirmText: "ترحيل",
                 cancelText: "رجوع");
@@ -2566,7 +2702,7 @@ public partial class AccountingWorkspaceHost : IDisposable
         {
             return await Dialog.ConfirmAsync(
                 "تأكيد إلغاء السند",
-                $"سيتم إلغاء {voucherName} ولن يكون قابلاً للاعتماد أو الترحيل بعد ذلك. هل تريد المتابعة؟",
+                $"{VoucherActionReviewText()}\nسيتم إلغاء {voucherName} ولن يكون قابلاً للاعتماد أو الترحيل بعد ذلك. هل تريد المتابعة؟",
                 AlertTone.Danger,
                 confirmText: "إلغاء السند",
                 cancelText: "رجوع");
@@ -3397,6 +3533,15 @@ public partial class AccountingWorkspaceHost : IDisposable
                         await EnsureCashAccountLookupAsync(line.CashAccountId);
                         await EnsureBankAccountLookupAsync(line.BankAccountId);
                         await EnsureCurrencyLookupAsync(line.CurrencyId);
+                        // Historical lines may not have a party-name snapshot.
+                        // Enrich those rows once and cache lookups for the visible page.
+                        if (string.IsNullOrWhiteSpace(line.PartyNameSnapshot))
+                        {
+                            await EnsureCustomerLookupAsync(line.CustomerId);
+                            await EnsureSupplierLookupAsync(line.SupplierId);
+                            await EnsureEmployeeAccountLookupAsync(line.EmployeeId);
+                            await EnsureAccountLookupAsync(line.CounterpartyAccountId);
+                        }
                     }
                 break;
             case AccountingEntityType.PaymentVouchers:
@@ -3406,6 +3551,15 @@ public partial class AccountingWorkspaceHost : IDisposable
                         await EnsureCashAccountLookupAsync(line.CashAccountId);
                         await EnsureBankAccountLookupAsync(line.BankAccountId);
                         await EnsureCurrencyLookupAsync(line.CurrencyId);
+                        // Historical lines may not have a party-name snapshot.
+                        // Enrich those rows once and cache lookups for the visible page.
+                        if (string.IsNullOrWhiteSpace(line.PartyNameSnapshot))
+                        {
+                            await EnsureCustomerLookupAsync(line.CustomerId);
+                            await EnsureSupplierLookupAsync(line.SupplierId);
+                            await EnsureEmployeeAccountLookupAsync(line.EmployeeId);
+                            await EnsureAccountLookupAsync(line.CounterpartyAccountId);
+                        }
                     }
                 break;
             case AccountingEntityType.PaymentAllocations:
@@ -3920,6 +4074,91 @@ public partial class AccountingWorkspaceHost : IDisposable
             [new("المركز الأب", x.ParentCostCenterId.HasValue ? GetCostCenterLookup(x.ParentCostCenterId)?.PrimaryText ?? ShortId(x.ParentCostCenterId.Value) : "رئيسي")],
             x.IsActive ? "نشط" : "معطل",
             x.IsActive ? "active" : "inactive")).ToArray();
+
+    private IReadOnlyList<VoucherDocumentsList.VoucherRow> BuildVoucherDocumentRows()
+    {
+        if (Section == AccountingEntityType.ReceiptVouchers)
+            return _receiptsPage.Items.Select(x =>
+            {
+                return new VoucherDocumentsList.VoucherRow(
+                    x.Id, x.VoucherNumber, x.VoucherDate,
+                    VoucherPartyText(x.Lines.Select(l => (l.PartyType, l.CustomerId, l.SupplierId,
+                        l.EmployeeId, l.PartyNameSnapshot, l.CounterpartyAccountId))),
+                    x.Description ?? "—",
+                    VoucherCurrencyText(x.Lines.Select(l => l.CurrencyCodeSnapshot)),
+                    VoucherAmountText(x.Lines.Select(l => (l.CurrencyCodeSnapshot, l.Amount))),
+                    x.BaseTotalAmount?.ToString($"N{Math.Clamp((int)(x.BaseCurrencyDecimalPlacesSnapshot ?? 2), 0, 6)}") ?? "—",
+                    AccountingArabicPresenter.GetReceiptVoucherStatusText(x.Status),
+                    VoucherState(x.Status.ToString()), x.Status.ToString());
+            }).ToArray();
+
+        return _paymentsPage.Items.Select(x =>
+        {
+            return new VoucherDocumentsList.VoucherRow(
+                x.Id, x.VoucherNumber, x.VoucherDate,
+                VoucherPartyText(x.Lines.Select(l => (l.PartyType, l.CustomerId, l.SupplierId,
+                        l.EmployeeId, l.PartyNameSnapshot, l.CounterpartyAccountId))),
+                x.Description ?? "—",
+                VoucherCurrencyText(x.Lines.Select(l => l.CurrencyCodeSnapshot)),
+                VoucherAmountText(x.Lines.Select(l => (l.CurrencyCodeSnapshot, l.Amount))),
+                x.BaseTotalAmount?.ToString($"N{Math.Clamp((int)(x.BaseCurrencyDecimalPlacesSnapshot ?? 2), 0, 6)}") ?? "—",
+                AccountingArabicPresenter.GetPaymentVoucherStatusText(x.Status),
+                VoucherState(x.Status.ToString()), x.Status.ToString());
+        }).ToArray();
+    }
+
+    // Show the actual parties from ALL settlement lines, not just the first line.
+    // An accounting counterparty is identified as an account, never invented as a person.
+    private string VoucherPartyText(IEnumerable<(SettlementPartyType? PartyType,
+        Guid? CustomerId, Guid? SupplierId, Guid? EmployeeId,
+        string? PartyNameSnapshot, Guid? CounterpartyAccountId)> lines)
+    {
+        var parties = lines.Select(x => ResolveVoucherPartyName(x.PartyType,
+                x.CustomerId, x.SupplierId, x.EmployeeId,
+                x.PartyNameSnapshot, x.CounterpartyAccountId))
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (parties.Length == 0) return "لا توجد أسطر";
+        return parties.Length == 1
+            ? parties[0]
+            : $"{parties[0]} (+{parties.Length - 1} أطراف)";
+    }
+
+    private string ResolveVoucherPartyName(SettlementPartyType? type,
+        Guid? customerId, Guid? supplierId, Guid? employeeId,
+        string? snapshot, Guid? counterpartyAccountId)
+    {
+        if (!string.IsNullOrWhiteSpace(snapshot)) return snapshot.Trim();
+        if (customerId.HasValue)
+            return GetCustomerLookup(customerId)?.PrimaryText ?? "عميل (الاسم غير متاح)";
+        if (supplierId.HasValue)
+            return GetSupplierLookup(supplierId)?.PrimaryText ?? "مورد (الاسم غير متاح)";
+        if (employeeId.HasValue)
+            return GetEmployeeAccountLookup(employeeId)?.PrimaryText ?? "موظف (الاسم غير متاح)";
+        if (counterpartyAccountId.HasValue)
+        {
+            var account = GetAccountLookup(counterpartyAccountId)?.PrimaryText;
+            return !string.IsNullOrWhiteSpace(account)
+                ? $"حساب مقابل: {account}"
+                : "حساب مقابل (الاسم غير متاح)";
+        }
+        return type == SettlementPartyType.Other ? "طرف آخر غير مسمى" : "طرف غير محدد";
+    }
+
+    private static string VoucherCurrencyText(IEnumerable<string?> currencies)
+    {
+        var codes = currencies.Where(c => !string.IsNullOrWhiteSpace(c))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        return codes.Length == 0 ? "—" : string.Join("، ", codes);
+    }
+
+    private static string VoucherAmountText(IEnumerable<(string? CurrencyCodeSnapshot, decimal Amount)> lines)
+    {
+        var groups = lines.GroupBy(x => x.CurrencyCodeSnapshot ?? "—")
+            .Select(g => $"{g.Sum(x => x.Amount):N2}");
+        return string.Join(" / ", groups);
+    }
 
     private IReadOnlyList<AccountingRecordItem> BuildReceiptItems() => _receiptsPage.Items.Select(x =>
         new AccountingRecordItem(

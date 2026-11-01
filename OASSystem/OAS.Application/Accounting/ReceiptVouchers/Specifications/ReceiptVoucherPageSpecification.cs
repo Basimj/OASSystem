@@ -1,5 +1,6 @@
 using OAS.Application.Abstractions.Persistence.Specifications;
 using OAS.Contracts.Common.Pagination;
+using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Accounting.Entities;
 
 namespace OAS.Application.Accounting.ReceiptVouchers.Specifications;
@@ -10,6 +11,11 @@ public sealed class ReceiptVoucherPageSpecification
     {
         var normalized = request.Normalize();
         var specification = new Specification<ReceiptVoucher>();
+
+        // The allocation dropdown needs only posted vouchers; apply before paging
+        // so that many drafts cannot hide eligible vouchers on later pages.
+        if (normalized.Status == "posted")
+            specification.Where(x => x.Status == ReceiptVoucherStatus.Posted);
 
         if (!string.IsNullOrWhiteSpace(normalized.Search))
         {

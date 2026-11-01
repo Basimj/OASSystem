@@ -3,39 +3,28 @@
 @using OAS.UiLib.Components.Inputs
 @using OAS.UiLib.Core.Models
 
-<div class="ui-acc-settlement-lines" dir="rtl">
-    @if (Lines.Count == 0)
-    {
-        <UiAccountingEmptyState Title="لا توجد أسطر تسوية"
-                                Description="أضف سطر قبض/صرف وحدد الطرف وطريقة الدفع والعملة والمبلغ."
-                                IconCssClass="fa-solid fa-money-bill-transfer" />
-    }
-
-    @for (var i = 0; i < Lines.Count; i++)
-    {
-        var line = Lines[i];
-
-        <div class="ui-acc-settlement-line">
-            <div class="ui-acc-settlement-line__header">
-                <div>
-                    <strong>سطر @(i + 1)</strong>
-                    @if (!string.IsNullOrWhiteSpace(line.CurrencyCodeSnapshot))
-                    {
-                        <span class="text-muted"> · @line.CurrencyCodeSnapshot</span>
-                    }
-                </div>
-
-                @if (IsEditable)
-                {
-                    <UiButton Text=""
-                              IconCssClass="fa-solid fa-trash-can"
-                              Variant="ButtonVariant.Ghost"
-                              Size="ControlSize.Small"
-                              OnClick="@(() => RemoveAsync(line))" />
-                }
+<div class="ui-acc-settlement-lines oas-voucher-lines oas-voucher-lines--ledger" dir="rtl">
+    <div class="oas-voucher-lines__top-grid">
+    <section class="oas-voucher-lines__entry-card" aria-label="بيانات السند والسطر المحدد">
+        @VoucherHeader
+        @if (ShowDetailContent)
+        {
+        <div class="oas-voucher-lines__entry-head">
+            <div>
+                <h3><i class="fa-solid fa-file-lines" aria-hidden="true"></i> بيانات السطر المحدد <span class="oas-voucher-lines__selected-badge">@(SelectedIndex >= 0 ? $"سطر {SelectedIndex + 1} من {Lines.Count}" : "لا توجد أسطر")</span></h3>
             </div>
-
-            <UiAccountingFormGrid Columns="3">
+            <button type="button" class="oas-voucher-lines__toggle" @onclick="ToggleAdvancedAsync" aria-expanded="@ShowAdvanced">
+                <i class="fa-solid @(ShowAdvanced ? "fa-compress" : "fa-sliders")" aria-hidden="true"></i>
+                @(ShowAdvanced ? "إخفاء الخيارات المتقدمة" : "خيارات متقدمة")
+            </button>
+        </div>
+        @if (SelectedLine is { } line)
+        {
+            @if (!string.IsNullOrWhiteSpace(line.ValidationError))
+            {
+                <div class="oas-voucher-lines__error" role="alert"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i> @line.ValidationError</div>
+            }
+            <UiAccountingFormGrid Columns="4" AdditionalCssClass="oas-voucher-lines__fields">
                 <UiSelect Label="نوع الطرف"
                           Value="@line.PartyTypeValue"
                           ValueExpression="@(() => line.PartyTypeValue)"
@@ -134,16 +123,26 @@
                                          Tone="@UiAccountingNumberField.NumberTone.Primary" />
 
                 <div class="ui-acc-settlement-line__rate">
-                    <span class="text-muted small">
-                        السعر التلقائي: @(line.ResolvedExchangeRate?.ToString("0.########") ?? "-")
-                    </span>
-                    <UiAccountingNumberField Label="سعر صرف يدوي (اختياري)"
-                                             Value="@(line.ManualExchangeRate ?? 0m)"
-                                             ValueChanged="@(value => RateChangedAsync(line, value))"
-                                             Min="0"
-                                             Disabled="@(!IsEditable)"
-                                             Tone="@UiAccountingNumberField.NumberTone.Default" />
-                    <span class="text-muted small">0 = استخدام السعر التلقائي</span>
+                    <span class="oas-voucher-lines__rate-label">سعر الصرف: @(line.ManualRatePending ? "سعر يدوي مطلوب" : line.EffectiveExchangeRate?.ToString("0.########") ?? "غير متاح")</span>
+                    @if (ShowAdvanced)
+                    {
+                        <label class="oas-voucher-lines__rate-select-label">مصدر سعر الصرف
+                            <select class="form-select form-select-sm" value="@(UsesManualRate(line) ? "manual" : "auto")"
+                                    @onchange="@(e => ChangeRateModeAsync(line, e.Value?.ToString()))" disabled="@(!IsEditable)">
+                                <option value="auto">تلقائي من إعدادات النظام</option>
+                                <option value="manual">إدخال يدوي</option>
+                            </select>
+                        </label>
+                        @if (UsesManualRate(line))
+                        {
+                            <UiAccountingNumberField Label="سعر الصرف اليدوي"
+                                                     Value="@(line.ManualExchangeRate ?? 0m)"
+                                                     ValueChanged="@(value => RateChangedAsync(line, value))"
+                                                     Min="0.00000001"
+                                                     Disabled="@(!IsEditable)"
+                                                     Tone="@UiAccountingNumberField.NumberTone.Default" />
+                        }
+                    }
                 </div>
 
                 @if (line.PaymentMethod == PaymentMethodKind.Cash)
@@ -194,23 +193,24 @@
                              Required="@(line.PaymentMethod == PaymentMethodKind.Cheque)"
                              Placeholder="رقم شيك/تحويل/مرجع..." />
 
+                @if (ShowAdvanced || line.PaymentMethod == PaymentMethodKind.Cheque)
+                {
                 <UiInputDate Label="تاريخ المرجع"
                              Value="@line.ReferenceDate"
                              ValueExpression="@(() => line.ReferenceDate)"
                              ValueChanged="@(value => ReferenceDateChangedAsync(line, value))"
                              Disabled="@(!IsEditable)"
                              Size="ControlSize.Small" />
+                }
             </UiAccountingFormGrid>
-
             <UiAccountingStack>
                 <UiInputText Label="بيان السطر"
                              Value="@line.Description"
                              ValueExpression="@(() => line.Description)"
                              ValueChanged="@(value => DescriptionChangedAsync(line, value))"
                              Disabled="@(!IsEditable)"
-                             Placeholder="بيان مختصر للسطر..." />
+                             Placeholder="وصف الحركة أو المرجع المحاسبي..." />
             </UiAccountingStack>
-
             @if (line.BaseAmount.HasValue || line.ExchangeRateDate.HasValue)
             {
                 <div class="ui-acc-settlement-line__snapshot">
@@ -228,18 +228,95 @@
                     }
                 </div>
             }
-        </div>
-    }
+        }
+        else
+        {
+            <UiAccountingEmptyState Title="لا توجد أسطر"
+                                    Description="استخدم إضافة سطر لبدء إدخال المستند."
+                                    IconCssClass="fa-solid fa-list-check" />
+        }
+        }
+        @VoucherFooter
+    </section>
+    @SummaryContent
+    </div>
 
-    @if (IsEditable)
+    @if (ShowDetailContent)
     {
-        <div class="ui-acc-lines-editor__actions">
-            <UiButton Text="إضافة سطر تسوية"
-                      IconCssClass="fa-solid fa-plus"
-                      Variant="ButtonVariant.Secondary"
-                      Size="ControlSize.Small"
-                      OnClick="AddAsync" />
+    <section class="oas-voucher-lines__ledger-card" aria-label="جدول أسطر السند">
+        <div class="oas-voucher-lines__ledger-head">
+            <div>
+                <h3><i class="fa-solid fa-table-list" aria-hidden="true"></i> أسطر السند</h3>
+                <span>انقر تحرير لتغيير السطر في النموذج العلوي. تعرض القيم الحالية دون انتظار الحفظ.</span>
+            </div>
+            @if (IsEditable)
+            {
+                <button type="button" class="oas-voucher-lines__add" @onclick="AddAsync">
+                    <i class="fa-solid fa-plus" aria-hidden="true"></i> إضافة سطر جديد
+                </button>
+            }
         </div>
+        <div class="oas-voucher-lines__table-scroll" role="region" aria-label="أسطر سند القبض أو الصرف" tabindex="0">
+            <table class="oas-voucher-lines__table">
+                <thead>
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">الحساب / نوع الطرف</th>
+                        <th scope="col">الطرف</th>
+                        <th scope="col">البيان</th>
+                        <th scope="col">العملة</th>
+                        <th scope="col">سعر الصرف</th>
+                        <th scope="col">المبلغ</th>
+                        <th scope="col">طريقة الدفع / المصدر</th>
+                        <th scope="col">المرجع</th>
+                        <th scope="col">إجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (var index = 0; index < Lines.Count; index++)
+                    {
+                        var row = Lines[index];
+                        var rowNumber = index + 1;
+                        <tr class="@(ReferenceEquals(SelectedLine, row) ? "is-selected" : "")" @key="row">
+                            <td>@(index + 1)</td>
+                            <td>@AccountDisplay(row)</td>
+                            <td>@PartyDisplay(row)</td>
+                            <td class="oas-voucher-lines__ellipsis" title="@row.Description">@(string.IsNullOrWhiteSpace(row.Description) ? "—" : row.Description)</td>
+                            <td><span class="oas-voucher-lines__currency">@(row.CurrencyCodeSnapshot ?? "—")</span></td>
+                            <td class="oas-voucher-lines__amount" dir="ltr">@(row.EffectiveExchangeRate is > 0 && !row.ManualRatePending ? row.EffectiveExchangeRate.Value.ToString("0.########") : "—")</td>
+                            <td class="oas-voucher-lines__amount" dir="ltr">@row.Amount.ToString("N2")</td>
+                            <td>@PaymentSourceDisplay(row)</td>
+                            <td dir="ltr">@(row.ReferenceNumber ?? "—")</td>
+                            <td>
+                                <div class="oas-voucher-lines__row-actions">
+                                    <button type="button" class="oas-voucher-lines__row-button" @onclick="@(() => SelectLine(row))" aria-label="@(IsEditable ? "تحرير" : "عرض") السطر @rowNumber" title="عرض السطر المحدد">
+                                        <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
+                                    </button>
+                                    @if (IsEditable)
+                                    {
+                                        <button type="button" class="oas-voucher-lines__row-button oas-voucher-lines__row-button--danger" @onclick="@(() => RemoveAsync(row))" aria-label="حذف السطر @rowNumber" title="حذف السطر">
+                                            <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+                                        </button>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="oas-voucher-lines__ledger-footer">
+            <span><i class="fa-solid fa-layer-group" aria-hidden="true"></i> @Lines.Count سطر</span>
+            @if (Lines.Any(row => row.ManualRatePending || (row.CurrencyId.HasValue && row.CurrencyId != BaseCurrencyId && row.EffectiveExchangeRate is not > 0)))
+            {
+                <span class="oas-voucher-lines__pending">تحقق من أسعار الصرف المطلوبة قبل الاعتماد</span>
+            }
+            else
+            {
+                <span>الإجماليات المفصلة حسب العملة في المراجعة المالية أدناه</span>
+            }
+        </div>
+    </section>
     }
 </div>
 
@@ -284,6 +361,10 @@
         public Guid? CurrencyId { get; set; }
         public string? CurrencyCodeSnapshot { get; set; }
         public decimal Amount { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string? ValidationError { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore]
+        public bool ManualRatePending { get; set; }
         public decimal? ResolvedExchangeRate { get; set; }
         public decimal? ManualExchangeRate { get; set; }
         public DateOnly? ExchangeRateDate { get; set; }
@@ -317,8 +398,80 @@
         }
     }
 
+    // Keep the same line objects when switching between the table and its editor;
+    // this avoids losing unsaved inputs and does not change the API payload.
+    private EditableSettlementLine? _selectedLine;
+    private EditableSettlementLine? SelectedLine =>
+        _selectedLine is not null && Lines.Contains(_selectedLine) ? _selectedLine : Lines.FirstOrDefault();
+    private int SelectedIndex => SelectedLine is { } line ? Lines.IndexOf(line) : -1;
+    private void SelectLine(EditableSettlementLine line) => _selectedLine = line;
+
+    private static string AccountDisplay(EditableSettlementLine line) => line.PartyType switch
+    {
+        SettlementPartyKind.Customer => "عميل (حساب مرتبط)",
+        SettlementPartyKind.Supplier => "مورد (حساب مرتبط)",
+        SettlementPartyKind.Employee => "حساب الموظف",
+        _ => line.CounterpartyAccountLookupItem?.PrimaryText ?? "حساب مقابل غير محدد"
+    };
+    private static string PartyDisplay(EditableSettlementLine line) => line.PartyType == SettlementPartyKind.Other
+        ? line.PartyName ?? "—"
+        : line.PartyLookupItem?.PrimaryText ?? "لم يُحدد";
+    private static string PaymentSourceDisplay(EditableSettlementLine line)
+    {
+        var method = line.PaymentMethod switch
+        {
+            PaymentMethodKind.Cash => "نقدي",
+            PaymentMethodKind.Card => "بطاقة",
+            PaymentMethodKind.BankTransfer => "تحويل بنكي",
+            PaymentMethodKind.Cheque => "شيك",
+            _ => "تسوية أخرى"
+        };
+        var source = line.SettlementLookupItem?.PrimaryText;
+        return string.IsNullOrWhiteSpace(source) ? method : $"{method} · {source}";
+    }
+
+    private bool _advanced;
+    private bool _advancedUserSet;
+    private readonly HashSet<EditableSettlementLine> _manualRateLines = [];
+    private bool ShowAdvanced => _advancedUserSet ? _advanced : Lines.Count > 1;
+    private Task ToggleAdvancedAsync()
+    {
+        _advanced = !ShowAdvanced;
+        _advancedUserSet = true;
+        return Task.CompletedTask;
+    }
+    private bool UsesManualRate(EditableSettlementLine line) => line.ManualExchangeRate is > 0 || line.ManualRatePending || _manualRateLines.Contains(line);
+    private async Task ChangeRateModeAsync(EditableSettlementLine line, string? mode)
+    {
+        if (mode == "manual")
+        {
+            _manualRateLines.Add(line);
+            line.ManualExchangeRate ??= line.ResolvedExchangeRate;
+        }
+        else
+        {
+            _manualRateLines.Remove(line);
+            line.ManualExchangeRate = null;
+        }
+        line.ManualRatePending = mode == "manual" && line.ManualExchangeRate is not > 0;
+        InvalidateSnapshot(line);
+        await ChangedAsync();
+    }
+    private static void InvalidateSnapshot(EditableSettlementLine line)
+    {
+        line.BaseAmount = null;
+        line.ExchangeRateDate = null;
+        line.ExchangeRateSource = null;
+    }
+
+    [Parameter] public RenderFragment? VoucherHeader { get; set; }
+    [Parameter] public RenderFragment? VoucherFooter { get; set; }
+    [Parameter] public RenderFragment? SummaryContent { get; set; }
+    [Parameter] public bool ShowDetailContent { get; set; } = true;
     [Parameter] public List<EditableSettlementLine> Lines { get; set; } = [];
+    [Parameter] public Guid? BaseCurrencyId { get; set; }
     [Parameter] public bool IsEditable { get; set; }
+    [Parameter] public SettlementPartyKind DefaultPartyType { get; set; } = SettlementPartyKind.Customer;
     [Parameter] public IReadOnlyList<UiSelectOption> PartyTypeOptions { get; set; } = [];
     [Parameter] public IReadOnlyList<UiSelectOption> PaymentMethodOptions { get; set; } = [];
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CustomerSearchAsync { get; set; }
@@ -335,13 +488,17 @@
 
     private async Task AddAsync()
     {
-        Lines.Add(new EditableSettlementLine());
+        var line = new EditableSettlementLine { PartyType = DefaultPartyType };
+        Lines.Add(line);
+        _selectedLine = line;
         await ChangedAsync();
     }
 
     private async Task RemoveAsync(EditableSettlementLine line)
     {
         Lines.Remove(line);
+        if (ReferenceEquals(_selectedLine, line)) _selectedLine = Lines.FirstOrDefault();
+        _manualRateLines.Remove(line);
         await ChangedAsync();
     }
 
@@ -523,17 +680,23 @@
     }
 
     private async Task PartyNameChangedAsync(EditableSettlementLine line, string? value) { line.PartyName = value; await ChangedAsync(); }
-    private async Task AmountChangedAsync(EditableSettlementLine line, decimal value) { line.Amount = value; await ChangedAsync(); }
+    private async Task AmountChangedAsync(EditableSettlementLine line, decimal value) { line.Amount = value; InvalidateSnapshot(line); await ChangedAsync(); }
     private async Task RateChangedAsync(EditableSettlementLine line, decimal value)
     {
         line.ManualExchangeRate = value > 0 ? value : null;
+        line.ManualRatePending = _manualRateLines.Contains(line) && value <= 0;
+        InvalidateSnapshot(line);
         await ChangedAsync();
     }
     private async Task ReferenceNumberChangedAsync(EditableSettlementLine line, string? value) { line.ReferenceNumber = value; await ChangedAsync(); }
     private async Task ReferenceDateChangedAsync(EditableSettlementLine line, DateOnly? value) { line.ReferenceDate = value; await ChangedAsync(); }
     private async Task DescriptionChangedAsync(EditableSettlementLine line, string? value) { line.Description = value; await ChangedAsync(); }
 
-    private Task ChangedAsync() => OnLinesChanged.InvokeAsync();
+    private Task ChangedAsync()
+    {
+        foreach (var line in Lines) line.ValidationError = null;
+        return OnLinesChanged.InvokeAsync();
+    }
 
     private static Guid? Parse(string? value) => Guid.TryParse(value, out var id) ? id : null;
 

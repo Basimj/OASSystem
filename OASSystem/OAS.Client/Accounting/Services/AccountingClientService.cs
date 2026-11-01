@@ -1428,6 +1428,11 @@ public sealed class AccountingClientService(
                 cancellationToken);
 
 
+    public Task<ReversePaymentAllocationResultDto?> ReversePaymentAllocationAsync(
+        Guid id, ReversePaymentAllocationRequest request, CancellationToken cancellationToken = default)
+        => apiClient.PostAsync<ReversePaymentAllocationRequest, ReversePaymentAllocationResultDto>(
+            $"api/accounting/payment-allocations/{id:D}/reverse", request, cancellationToken);
+
     // ============================================================
     // Currencies
     // ============================================================
