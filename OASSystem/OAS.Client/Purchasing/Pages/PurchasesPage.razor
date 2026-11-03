@@ -1,97 +1,353 @@
 @page "/purchases"
 @attribute [Authorize]
-@inject NavigationManager Navigation
+@using OAS.Client.Purchasing.Common
+@using OAS.Client.Purchasing.Services
+@using OAS.Contracts.Common.Pagination
+@using OAS.Contracts.Purchasing.Enums
+@using OAS.Contracts.Purchasing.PurchaseInvoices
+@using OAS.Contracts.Purchasing.PurchaseOrders
+@using OAS.Contracts.Purchasing.PurchaseReceipts
+@using OAS.Contracts.Purchasing.PurchaseRequests
+@inject IPurchasingClientService Purchasing
+@implements IDisposable
 
-<PageTitle>المشتريات | OAS</PageTitle>
+<PageTitle>مركز المشتريات | OASSystem</PageTitle>
 
-<div class="purchasing-home">
-    <section class="purchasing-home__hero">
-        <div class="purchasing-home__hero-copy">
-            <span class="purchasing-home__eyebrow">مركز المشتريات</span>
-            <h1>إدارة دورة الشراء من الاحتياج حتى السداد</h1>
-            <p>ابدأ من طلب الشراء، ثم حوّله إلى أمر شراء، استلم الأصناف، وسجّل فاتورة المورد. كل مرحلة لها شاشة مستقلة حتى لا تختلط المهام على المستخدم.</p>
+<div class="oas-purchasing-dashboard" dir="rtl">
+    <header class="sd-topbar">
+        <div class="sd-heading">
+            <div class="sd-heading-icon"><i class="fa-solid fa-chart-column" aria-hidden="true"></i></div>
+            <div><h1>مركز المشتريات</h1><p>الرئيسية <span>‹</span> المشتريات</p></div>
         </div>
-        <div class="purchasing-home__hero-actions">
-            <UiButton Text="طلبات الشراء" IconCssClass="fa-solid fa-clipboard-list" Size="ControlSize.Small" OnClick="GoRequests" />
-            <UiButton Text="أوامر الشراء" IconCssClass="fa-solid fa-file-signature" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="GoOrders" />
+        <form class="sd-global-search" @onsubmit="SearchAsync" @onsubmit:preventDefault>
+            <button type="submit" aria-label="بحث"><i class="fa-solid fa-magnifying-glass"></i></button>
+            <input type="search" placeholder="ابحث برقم الفاتورة أو اسم المورد..." aria-label="بحث في أحدث فواتير المشتريات" @bind="_search" @bind:event="oninput" />
+        </form>
+        <div class="sd-top-actions">
+            <button type="button" class="sd-action-icon" title="تحديث البيانات" aria-label="تحديث البيانات" disabled="@_loading" @onclick="RefreshAsync"><i class="fa-solid fa-rotate @(_loading ? "fa-spin" : "")"></i></button>
+            <a class="sd-primary-btn" href="/purchases/orders"><i class="fa-solid fa-plus"></i> أوامر الشراء</a>
         </div>
-    </section>
+    </header>
 
-    <section class="purchasing-home__flow" aria-label="دورة المشتريات">
-        <a class="purchasing-flow-card" href="/purchases/requests">
-            <span class="purchasing-flow-card__step">1</span>
-            <span class="purchasing-flow-card__icon"><i class="fa-solid fa-clipboard-list"></i></span>
-            <span class="purchasing-flow-card__body">
-                <strong>طلبات الشراء</strong>
-                <small>تسجيل الاحتياج الداخلي والكميات المطلوبة قبل الالتزام مع المورد.</small>
-            </span>
-            <i class="fa-solid fa-chevron-left purchasing-flow-card__arrow"></i>
-        </a>
+    @if (_error is not null)
+    {
+        <div class="sd-alert" role="alert"><i class="fa-solid fa-circle-exclamation"></i><span>@_error</span><button type="button" @onclick="RefreshAsync">إعادة المحاولة</button></div>
+    }
 
-        <a class="purchasing-flow-card" href="/purchases/orders">
-            <span class="purchasing-flow-card__step">2</span>
-            <span class="purchasing-flow-card__icon"><i class="fa-solid fa-file-signature"></i></span>
-            <span class="purchasing-flow-card__body">
-                <strong>أوامر الشراء</strong>
-                <small>اختيار المورد والأسعار والوحدات واعتماد الطلب التجاري.</small>
-            </span>
-            <i class="fa-solid fa-chevron-left purchasing-flow-card__arrow"></i>
-        </a>
+    <div class="sd-context-note"><i class="fa-solid fa-circle-info"></i> المؤشرات من أحدث @(_invoices.Count) فاتورة و@(_orders.Count) أمر و@(_receipts.Count) استلام و@(_requests.Count) طلب. ليست إجماليات تاريخية؛ راجع تقارير أداء المشتريات للأرقام الشاملة.</div>
 
-        <a class="purchasing-flow-card" href="/purchases/receipts">
-            <span class="purchasing-flow-card__step">3</span>
-            <span class="purchasing-flow-card__icon"><i class="fa-solid fa-truck-ramp-box"></i></span>
-            <span class="purchasing-flow-card__body">
-                <strong>استلام المشتريات</strong>
-                <small>تسجيل المقبول والمرفوض وتحديث المخزون وربط الاستلام بأمر الشراء.</small>
-            </span>
-            <i class="fa-solid fa-chevron-left purchasing-flow-card__arrow"></i>
-        </a>
-
-        <a class="purchasing-flow-card" href="/purchases/invoices">
-            <span class="purchasing-flow-card__step">4</span>
-            <span class="purchasing-flow-card__icon"><i class="fa-solid fa-file-invoice-dollar"></i></span>
-            <span class="purchasing-flow-card__body">
-                <strong>فواتير المشتريات</strong>
-                <small>مطابقة الفاتورة مع أمر الشراء والاستلام ثم الترحيل والسداد.</small>
-            </span>
-            <i class="fa-solid fa-chevron-left purchasing-flow-card__arrow"></i>
-        </a>
-    </section>
-
-    <section class="purchasing-home__tools">
-        <header>
-            <div>
-                <h2>أدوات المشتريات</h2>
-                <p>شاشات مساندة للدورة الرئيسية.</p>
+    <section class="sd-metrics" aria-label="مؤشرات المشتريات">
+        <article class="sd-metric">
+            <span class="sd-icon sd-green"><i class="fa-solid fa-file-invoice-dollar"></i></span>
+            <span class="sd-metric-label">فواتير مشتريات اليوم</span>
+            <div class="sd-metric-amount" aria-label="إجمالي قيمة فواتير المشتريات المرحلة بتاريخ اليوم">
+                <strong class="sd-metric-number" dir="ltr">@(_hasInvoices ? _todayPurchases.ToString("N2") : "—")</strong>
+                @if (_hasInvoices && !string.IsNullOrWhiteSpace(BaseCurrencyNameAr))
+                {
+                    <span class="sd-metric-currency" dir="rtl" title="العملة الأساسية">@BaseCurrencyNameAr</span>
+                }
             </div>
-        </header>
-        <div class="purchasing-home__tools-grid">
-            <a class="purchasing-tool-card" href="/purchases/supplier-allocations">
-                <i class="fa-solid fa-money-bill-transfer"></i>
-                <span><strong>مركز تخصيص دفعات المورد</strong><small>ربط الدفعات المرحلة وائتمانات المرتجعات بالفواتير المفتوحة ومتابعة الأرصدة غير المطبقة.</small></span>
-            </a>
-            <a class="purchasing-tool-card" href="/purchasing/customer-demand">
-                <i class="fa-solid fa-truck-fast"></i>
-                <span><strong>متابعة النواقص والتوريد</strong><small>متابعة الطلبات التي تحتاج توريدًا وربطها بالمشتريات.</small></span>
-            </a>
-            <a class="purchasing-tool-card" href="/purchases/returns">
-                <i class="fa-solid fa-rotate-left"></i>
-                <span><strong>مرتجعات المشتريات</strong><small>إرجاع الأصناف المستلمة وعكس الأثر المخزني والمحاسبي.</small></span>
-            </a>
-            <a class="purchasing-tool-card" href="/purchases/performance">
-                <i class="fa-solid fa-chart-column"></i>
-                <span><strong>تقارير أداء المشتريات والموردين</strong><small>الطلبات المفتوحة، الاستلامات المرحلة، الفواتير، المرتجعات، وفروق الأسعار في تقرير منفصل عن مديونية المورد.</small></span>
-            </a>
-            <a class="purchasing-tool-card" href="/purchases/supplier-catalog">
-                <i class="fa-solid fa-box-open"></i>
-                <span><strong>كتالوج المورد</strong><small>إدارة وحدات وأسعار الموردين المستخدمة في أوامر الشراء.</small></span>
-            </a>
+            <p>@(_hasInvoices ? $"الفواتير المرحلة بتاريخ اليوم: {_todayPostedInvoices}" : "تعذر تحميل الفواتير")</p>
+            <small>@(_hasInvoices ? $"النتيجة من أحدث {_invoices.Count} فاتورة فقط" : "")</small>
+        </article>
+        <article class="sd-metric">
+            <span class="sd-icon sd-amber"><i class="fa-solid fa-file-signature"></i></span>
+            <span class="sd-metric-label">أوامر الشراء المفتوحة</span>
+            <div class="sd-metric-value">@(_hasOrders ? _openOrders.ToString() : "—")</div>
+            <p>منها @(_hasOrders ? _awaitingReceiptOrders.ToString() : "—") بانتظار استلام</p>
+            <small>ضمن أحدث @(_orders.Count) أمر شراء</small>
+        </article>
+        <article class="sd-metric">
+            <span class="sd-icon sd-blue"><i class="fa-solid fa-truck-ramp-box"></i></span>
+            <span class="sd-metric-label">استلامات اليوم</span>
+            <div class="sd-metric-value">@(_hasReceipts ? _todayReceipts.ToString() : "—")</div>
+            <p>سندات استلام مرحلة اليوم</p>
+            <small>ضمن أحدث @(_receipts.Count) استلام</small>
+        </article>
+        <article class="sd-metric">
+            <span class="sd-icon sd-red"><i class="fa-solid fa-list-check"></i></span>
+            <span class="sd-metric-label">فواتير قيد المعالجة</span>
+            <div class="sd-metric-value">@(_hasInvoices ? _pendingInvoices.ToString() : "—")</div>
+            <p>مؤكدة أو بانتظار اعتماد الفروقات</p>
+            <small>ضمن أحدث @(_invoices.Count) فاتورة</small>
+        </article>
+    </section>
+
+    <section class="sd-panel sd-quick-panel" aria-label="العمليات السريعة">
+        <div class="sd-section-head"><h2><i class="fa-solid fa-bolt sd-blue-text"></i> العمليات السريعة</h2></div>
+        <div class="sd-quick-actions">
+            <a class="sd-quick sd-quick-primary" href="/purchases/orders"><span class="sd-quick-icon"><i class="fa-solid fa-file-signature"></i></span><span><strong>أوامر الشراء</strong><small>إنشاء ومتابعة الأوامر</small></span></a>
+            <a class="sd-quick" href="/purchases/receipts"><span class="sd-quick-icon"><i class="fa-solid fa-truck-ramp-box"></i></span><span><strong>استلام المشتريات</strong><small>إدخال البضاعة وترحيلها</small></span></a>
+            <a class="sd-quick" href="/purchases/invoices"><span class="sd-quick-icon"><i class="fa-solid fa-file-invoice-dollar"></i></span><span><strong>فواتير الموردين</strong><small>مطابقة وترحيل الفواتير</small></span></a>
+            <a class="sd-quick" href="/purchases/requests"><span class="sd-quick-icon"><i class="fa-solid fa-clipboard-list"></i></span><span><strong>طلبات الشراء</strong><small>طلبات وموافقات الشراء</small></span></a>
+            <a class="sd-quick" href="/purchases/returns"><span class="sd-quick-icon sd-icon-red"><i class="fa-solid fa-rotate-left"></i></span><span><strong>مرتجعات المشتريات</strong><small>معالجة مرتجعات المورد</small></span></a>
+        </div>
+    </section>
+
+    <section class="sd-panel sd-table-panel" aria-label="آخر فواتير المشتريات">
+        <div class="sd-section-head"><h2><i class="fa-regular fa-file-lines sd-blue-text"></i> آخر فواتير المشتريات</h2><a class="sd-link" href="/purchases/invoices">عرض الكل <i class="fa-solid fa-chevron-left"></i></a></div>
+        <div class="sd-table-wrap">
+            <table class="sd-invoice-table">
+                <thead><tr><th>رقم الفاتورة</th><th>المورد</th><th>التاريخ</th><th>حالة الفاتورة</th><th class="sd-num">الإجمالي</th><th>رقم فاتورة المورد</th><th>الإجراءات</th></tr></thead>
+                <tbody>
+                    @if (_loading && !_hasInvoices)
+                    {
+                        <tr><td colspan="7" class="sd-empty">جارٍ تحميل الفواتير...</td></tr>
+                    }
+                    else if (!_hasInvoices)
+                    {
+                        <tr><td colspan="7" class="sd-empty">تعذر تحميل الفواتير. استخدم زر تحديث البيانات لإعادة المحاولة.</td></tr>
+                    }
+                    else if (VisibleInvoices.Count == 0)
+                    {
+                        <tr><td colspan="7" class="sd-empty">لا توجد فواتير مطابقة ضمن أحدث @(_invoices.Count) فاتورة.</td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var invoice in VisibleInvoices.Take(5))
+                        {
+                            <tr>
+                                <td><a class="sd-invoice-link" href="@InvoiceUrl(invoice.Id)">@invoice.PurchaseInvoiceCode</a></td>
+                                <td>@(invoice.SupplierName ?? invoice.SupplierCode ?? "—")</td>
+                                <td class="sd-muted">@invoice.InvoiceDate.ToString("yyyy/MM/dd")</td>
+                                <td><span class="sd-status @StatusClass(invoice.Status)">@PurchasingArabicPresenter.InvoiceStatus(invoice.Status)</span></td>
+                                <td class="sd-num">@Money(invoice.TotalAmount, invoice.CurrencyCodeSnapshot ?? invoice.CurrencyCode)</td>
+                                <td class="sd-muted">@(invoice.SupplierInvoiceCode ?? "—")</td>
+                                <td><a class="sd-more" href="@InvoiceUrl(invoice.Id)" title="فتح فاتورة المورد" aria-label="فتح فاتورة المورد"><i class="fa-solid fa-arrow-up-left-from-square"></i></a></td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <div class="sd-bottom-grid">
+        <section class="sd-panel sd-alerts-panel" aria-label="تنبيهات المشتريات">
+            <div class="sd-section-head"><h2><i class="fa-regular fa-bell sd-blue-text"></i> تنبيهات ومتابعات</h2><a class="sd-link" href="/purchases/performance">التقارير <i class="fa-solid fa-chevron-left"></i></a></div>
+            <a class="sd-alert-row" href="/purchases/requests"><span class="sd-alert-icon sd-amber"><i class="fa-solid fa-clipboard-list"></i></span><span class="sd-alert-title"><strong>طلبات بانتظار الاعتماد</strong><small>طلبات تحتاج مراجعة قبل الشراء</small></span><span class="sd-count sd-count-blue">@(_hasRequests ? _pendingRequests.ToString() : "—")</span><i class="fa-solid fa-chevron-left sd-muted"></i></a>
+            <a class="sd-alert-row" href="/purchases/orders"><span class="sd-alert-icon sd-amber"><i class="fa-solid fa-file-signature"></i></span><span class="sd-alert-title"><strong>أوامر شراء بانتظار الاعتماد</strong><small>أوامر لم تعتمد بعد</small></span><span class="sd-count sd-count-blue">@(_hasOrders ? _pendingApprovalOrders.ToString() : "—")</span><i class="fa-solid fa-chevron-left sd-muted"></i></a>
+            <a class="sd-alert-row" href="/purchases/receipts"><span class="sd-alert-icon sd-red"><i class="fa-solid fa-truck-ramp-box"></i></span><span class="sd-alert-title"><strong>طلبات توريد متأخرة</strong><small>أوامر مرسلة فات موعد تسليمها</small></span><span class="sd-count sd-count-red">@(_hasOrders ? _lateOrders.ToString() : "—")</span><i class="fa-solid fa-chevron-left sd-muted"></i></a>
+            <a class="sd-alert-row" href="/purchases/invoices"><span class="sd-alert-icon sd-blue"><i class="fa-solid fa-code-compare"></i></span><span class="sd-alert-title"><strong>فواتير تنتظر معالجة</strong><small>مؤكدة أو بانتظار اعتماد الفروقات</small></span><span class="sd-count sd-count-blue">@(_hasInvoices ? _pendingInvoices.ToString() : "—")</span><i class="fa-solid fa-chevron-left sd-muted"></i></a>
+        </section>
+        <section class="sd-panel sd-chart-panel" aria-label="اتجاه المشتريات الأسبوعي">
+            <div class="sd-section-head"><h2><i class="fa-solid fa-chart-line sd-blue-text"></i> اتجاه المشتريات الأسبوعي</h2><span class="sd-chart-filter"><i class="fa-regular fa-calendar"></i> آخر 7 أيام</span></div>
+            <div class="sd-chart">
+                @if (!_hasInvoices)
+                {
+                    <div class="sd-chart-empty">تعذر تحميل بيانات اتجاه المشتريات.</div>
+                }
+                else if (_weekValues.All(v => v == 0m))
+                {
+                    <div class="sd-chart-empty">لا توجد فواتير مشتريات مرحلة خلال الأيام السبعة الأخيرة ضمن البيانات المحملة.</div>
+                }
+                else
+                {
+                    <svg viewBox="0 0 700 205" preserveAspectRatio="none" role="img" aria-label="قيمة فواتير المشتريات المرحلة خلال الأيام السبعة الأخيرة">
+                        <defs><linearGradient id="pd-line-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="currentColor" stop-opacity=".23"/><stop offset="100%" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs>
+                        @for (var i = 0; i < 5; i++)
+                        {
+                            <line x1="8" x2="690" y1="@(15 + i * 41)" y2="@(15 + i * 41)" stroke="currentColor" stroke-opacity=".13" stroke-width="1" />
+                        }
+                        <polygon points="@ChartArea" fill="url(#pd-line-fill)" />
+                        <polyline points="@ChartLine" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+                        @for (var i = 0; i < 7; i++)
+                        {
+                            <circle cx="@(15 + i * 112)" cy="@ChartY(i)" r="4.5" fill="currentColor" stroke="var(--pd-surface)" stroke-width="1.5" />
+                        }
+                    </svg>
+                }
+                <div class="sd-chart-days">
+                    @foreach (var date in _weekDates)
+                    {
+                        <span>@date.ToString("ddd", new System.Globalization.CultureInfo("ar"))<small>@date.ToString("dd/MM")</small></span>
+                    }
+                </div>
+            </div>
+            <div class="sd-chart-note">القيم بالعملة الأساسية من الفواتير المرحلة ضمن أحدث @(_invoices.Count) فاتورة. للتقرير الكامل افتح <a href="/purchases/performance">أداء المشتريات</a>.</div>
+        </section>
+    </div>
+
+    <section class="sd-panel sd-tools-panel" aria-label="أدوات أخرى للمشتريات">
+        <div class="sd-section-head"><h2><i class="fa-solid fa-toolbox sd-blue-text"></i> أدوات المشتريات</h2></div>
+        <div class="sd-tools-actions">
+            <a href="/purchases/receipt-follow-ups"><i class="fa-solid fa-clipboard-check"></i> متابعة الاستلامات</a>
+            <a href="/purchases/supplier-catalog"><i class="fa-solid fa-box-open"></i> كتالوج المورد</a>
+            <a href="/purchases/supplier-allocations"><i class="fa-solid fa-money-bill-transfer"></i> تخصيص دفعات المورد</a>
+            <a href="/purchasing/customer-demand"><i class="fa-solid fa-truck-fast"></i> متابعة النواقص والتوريد</a>
+            <a href="/purchases/performance"><i class="fa-solid fa-chart-column"></i> تقارير أداء المشتريات</a>
         </div>
     </section>
 </div>
 
 @code {
-    private void GoRequests(MouseEventArgs _) => Navigation.NavigateTo("/purchases/requests");
-    private void GoOrders(MouseEventArgs _) => Navigation.NavigateTo("/purchases/orders");
+    private readonly List<PurchaseInvoiceDto> _invoices = [];
+    private readonly List<PurchaseOrderDto> _orders = [];
+    private readonly List<PurchaseReceiptDto> _receipts = [];
+    private readonly List<PurchaseRequestDto> _requests = [];
+    private readonly decimal[] _weekValues = new decimal[7];
+    private readonly DateOnly[] _weekDates = new DateOnly[7];
+    private bool _loading;
+    private bool _disposed;
+    private bool _hasInvoices;
+    private bool _hasOrders;
+    private bool _hasReceipts;
+    private bool _hasRequests;
+    private string? _error;
+    private string? _search;
+    private decimal _todayPurchases;
+    private int _todayPostedInvoices;
+    private int _openOrders;
+    private int _awaitingReceiptOrders;
+    private int _pendingApprovalOrders;
+    private int _lateOrders;
+    private int _todayReceipts;
+    private int _pendingInvoices;
+    private int _pendingRequests;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+    private Task SearchAsync() => Task.CompletedTask;
+    private Task RefreshAsync() => LoadAsync();
+    private static string InvoiceUrl(Guid id) => $"/purchases/invoices?openId={id:D}";
+
+    private IReadOnlyList<PurchaseInvoiceDto> VisibleInvoices => string.IsNullOrWhiteSpace(_search)
+        ? _invoices
+        : _invoices.Where(x => x.PurchaseInvoiceCode.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase)
+            || (x.SupplierInvoiceCode?.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase) ?? false)
+            || (x.SupplierName?.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase) ?? false)
+            || (x.SupplierCode?.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase) ?? false)).ToArray();
+
+    private async Task LoadAsync()
+    {
+        if (_loading || _disposed) return;
+        _loading = true;
+        _error = null;
+        try
+        {
+            // The dashboard is an operational preview (not a full-period accounting report).
+            var invoiceTask = Purchasing.GetPurchaseInvoicesAsync(new PageRequest { PageNumber = 1, PageSize = 40, SortBy = "InvoiceDate", SortDirection = SortDirection.Descending });
+            var orderTask = Purchasing.GetPurchaseOrdersAsync(new PageRequest { PageNumber = 1, PageSize = 60, SortBy = "OrderDate", SortDirection = SortDirection.Descending });
+            var receiptTask = Purchasing.GetPurchaseReceiptsAsync(new PageRequest { PageNumber = 1, PageSize = 40, SortBy = "ReceiptDate", SortDirection = SortDirection.Descending });
+            var requestTask = Purchasing.GetPurchaseRequestsAsync(new PageRequest { PageNumber = 1, PageSize = 40, SortBy = "RequestDate", SortDirection = SortDirection.Descending });
+            // A failure in one endpoint must not blank out the remaining panels.
+            try
+            {
+                var page = await invoiceTask;
+                if (!_disposed)
+                {
+                    _invoices.Clear();
+                    _invoices.AddRange(page.Items.OrderByDescending(x => x.InvoiceDate).ThenByDescending(x => x.CreatedAtUtc));
+                    _hasInvoices = true;
+                }
+            }
+            catch (Exception)
+            {
+                _invoices.Clear();
+                _hasInvoices = false;
+                _error = "تعذر تحميل بعض بيانات المشتريات؛ يمكنك إعادة المحاولة.";
+            }
+            try
+            {
+                var page = await orderTask;
+                if (!_disposed)
+                {
+                    _orders.Clear();
+                    _orders.AddRange(page.Items);
+                    _hasOrders = true;
+                }
+            }
+            catch (Exception)
+            {
+                _orders.Clear();
+                _hasOrders = false;
+                _error = "تعذر تحميل بعض بيانات المشتريات؛ يمكنك إعادة المحاولة.";
+            }
+            try
+            {
+                var page = await receiptTask;
+                if (!_disposed)
+                {
+                    _receipts.Clear();
+                    _receipts.AddRange(page.Items);
+                    _hasReceipts = true;
+                }
+            }
+            catch (Exception)
+            {
+                _receipts.Clear();
+                _hasReceipts = false;
+                _error = "تعذر تحميل بعض بيانات المشتريات؛ يمكنك إعادة المحاولة.";
+            }
+            try
+            {
+                var page = await requestTask;
+                if (!_disposed)
+                {
+                    _requests.Clear();
+                    _requests.AddRange(page.Items);
+                    _hasRequests = true;
+                }
+            }
+            catch (Exception)
+            {
+                _requests.Clear();
+                _hasRequests = false;
+                _error = "تعذر تحميل بعض بيانات المشتريات؛ يمكنك إعادة المحاولة.";
+            }
+        }
+        catch (Exception)
+        {
+            _error = "تعذر تحميل بيانات مركز المشتريات. تحقق من الاتصال والصلاحيات ثم أعد المحاولة.";
+        }
+        finally
+        {
+            _loading = false;
+            if (!_disposed)
+            {
+                Recalculate();
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+    private void Recalculate()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        _todayPurchases = _invoices.Where(x => x.Status == PurchaseInvoiceStatus.Posted && x.InvoiceDate == today).Sum(x => x.BaseTotalAmount);
+        _todayPostedInvoices = _invoices.Count(x => x.Status == PurchaseInvoiceStatus.Posted && x.InvoiceDate == today);
+        _openOrders = _orders.Count(x => x.Status is PurchaseOrderStatus.Draft or PurchaseOrderStatus.PendingApproval or PurchaseOrderStatus.Approved or PurchaseOrderStatus.Sent or PurchaseOrderStatus.PartiallyReceived);
+        _awaitingReceiptOrders = _orders.Count(x => (x.Status is PurchaseOrderStatus.Sent or PurchaseOrderStatus.PartiallyReceived));
+        _pendingApprovalOrders = _orders.Count(x => x.Status == PurchaseOrderStatus.PendingApproval);
+        _lateOrders = _orders.Count(x => x.ExpectedDeliveryDate is { } due && due < today && (x.Status is PurchaseOrderStatus.Sent or PurchaseOrderStatus.PartiallyReceived));
+        _todayReceipts = _receipts.Count(x => x.Status == PurchaseReceiptStatus.Posted && x.PostingDate == today);
+        _pendingInvoices = _invoices.Count(x => x.Status is PurchaseInvoiceStatus.Confirmed or PurchaseInvoiceStatus.PendingMatchApproval);
+        _pendingRequests = _requests.Count(x => x.Status == PurchaseRequestStatus.PendingApproval);
+        for (var i = 0; i < 7; i++)
+        {
+            _weekDates[i] = today.AddDays(i - 6);
+            _weekValues[i] = _invoices.Where(x => x.Status == PurchaseInvoiceStatus.Posted && x.InvoiceDate == _weekDates[i]).Sum(x => x.BaseTotalAmount);
+        }
+    }
+
+    // The API resolves the Arabic name of the base currency from the currency record.
+    // Do not fall back to the ISO code, which is not the requested display label.
+    private string? BaseCurrencyNameAr => _invoices
+        .Select(x => x.BaseCurrencyNameAr)
+        .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x));
+
+    private static string Money(decimal value, string? currency = null)
+        => $"{value:N2} {(string.IsNullOrWhiteSpace(currency) ? "بالعملة الأساسية" : currency)}";
+    private static string StatusClass(PurchaseInvoiceStatus status) => status switch
+    {
+        PurchaseInvoiceStatus.Posted => "sd-status-green",
+        PurchaseInvoiceStatus.Confirmed => "sd-status-blue",
+        PurchaseInvoiceStatus.PendingMatchApproval => "sd-status-amber",
+        PurchaseInvoiceStatus.Cancelled => "sd-status-red",
+        _ => "sd-status-gray"
+    };
+    private decimal ChartMax => Math.Max(1m, _weekValues.Max());
+    private int ChartY(int i) => 179 - (int)Math.Round((_weekValues[i] / ChartMax) * 156m);
+    private string ChartLine => string.Join(" ", Enumerable.Range(0, 7).Select(i => $"{15 + i * 112},{ChartY(i)}"));
+    private string ChartArea => $"15,185 {ChartLine} 687,185";
+    public void Dispose() => _disposed = true;
 }

@@ -1,6 +1,7 @@
 using FluentValidation;
 using OAS.Contracts.Enums.Inventory;
 using OAS.Contracts.Inventory.Transactions;
+using OAS.Application.Inventory.Transactions;
 
 namespace OAS.Application.Inventory.Transactions.Commands.CreateInventoryTransaction;
 
@@ -12,7 +13,10 @@ public sealed class CreateInventoryTransactionCommandValidator : AbstractValidat
             .MaximumLength(32).WithErrorCode("transaction_number_too_long");
 
         RuleFor(x => x.Request.TransactionType)
-            .IsInEnum().WithErrorCode("transaction_type_invalid");
+            .IsInEnum().WithErrorCode("transaction_type_invalid")
+            .Must(type => ManualInventoryTransactionPolicy.IsAllowed((OAS.Domain.Enums.Inventory.InventoryTransactionType)(int)type))
+            .WithErrorCode(ManualInventoryTransactionPolicy.ErrorCode)
+            .WithMessage(ManualInventoryTransactionPolicy.ErrorMessage);
 
         RuleFor(x => x.Request.TransactionDate)
             .NotEmpty().WithErrorCode("transaction_date_required");

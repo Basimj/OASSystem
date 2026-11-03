@@ -48,7 +48,7 @@ public sealed class SearchProductVariantsQueryHandler(
 
         variantSpec
             .AddSort(nameof(ProductVariant.SKU), SortDirection.Ascending)
-            .ApplyPaging(0, take);
+            .ApplyPaging(Math.Max(0, request.Skip), take);
 
         var variantRows = await variants.ListAsync(variantSpec, cancellationToken);
         if (variantRows.Count == 0)

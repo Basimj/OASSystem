@@ -79,9 +79,9 @@ public sealed class InventoryTransactionTests
 
         var request = new CreateInventoryTransactionRequest(
             TransactionNumber: "TXN-TEST-01",
-            TransactionType: ContractType.Receipt,
-            SourceWarehouseId: null,
-            DestinationWarehouseId: _warehouseAId,
+            TransactionType: ContractType.Issue,
+            SourceWarehouseId: _warehouseAId,
+            DestinationWarehouseId: null,
             TransactionDate: DateTimeOffset.UtcNow,
             ReferenceType: null,
             ReferenceId: null,
@@ -117,7 +117,7 @@ public sealed class InventoryTransactionTests
         warehouse.UpdateDetails(warehouse.Code, warehouse.Name, warehouse.Description, warehouse.IsDefault, isActive: false);
 
         var handler = CreateTransactionHandler();
-        var request = CreateReceiptRequest();
+        var request = CreateIssueRequest();
 
         Assert.ThrowsAsync<RequestValidationException>(() =>
             handler.Handle(new CreateInventoryTransactionCommand(request), CancellationToken.None));
@@ -139,7 +139,7 @@ public sealed class InventoryTransactionTests
             isActive: false);
 
         var handler = CreateTransactionHandler();
-        var request = CreateReceiptRequest();
+        var request = CreateIssueRequest();
 
         Assert.ThrowsAsync<RequestValidationException>(() =>
             handler.Handle(new CreateInventoryTransactionCommand(request), CancellationToken.None));
@@ -160,7 +160,7 @@ public sealed class InventoryTransactionTests
             isActive: false);
 
         var handler = CreateTransactionHandler();
-        var request = CreateReceiptRequest();
+        var request = CreateIssueRequest();
 
         Assert.ThrowsAsync<RequestValidationException>(() =>
             handler.Handle(new CreateInventoryTransactionCommand(request), CancellationToken.None));
@@ -181,53 +181,51 @@ public sealed class InventoryTransactionTests
             isActive: product.IsActive);
 
         var handler = CreateTransactionHandler();
-        var request = CreateReceiptRequest();
+        var request = CreateIssueRequest();
 
         Assert.ThrowsAsync<RequestValidationException>(() =>
             handler.Handle(new CreateInventoryTransactionCommand(request), CancellationToken.None));
     }
 
     [Test]
-    public async Task PostTransaction_InboundReceipt_IncreasesBalanceAndCreatesLedger()
+    public void PostTransaction_ManualInboundReceiptIsBlockedEvenForHistoricDraft()
     {
-        var txn = new InventoryTransaction(
-            "TXN-001",
-            InventoryTransactionType.Receipt,
-            DateTimeOffset.UtcNow,
-            sourceWarehouseId: null,
-            destinationWarehouseId: _warehouseAId);
-        await _transactionRepository.AddAsync(txn);
-
-        var line = new InventoryTransactionLine(txn.Id, _variantId, 15, 30m);
-        _lineRepository.Items.Add(line);
-
-        var postHandler = new PostInventoryTransactionCommandHandler(
-            _transactionRepository,
-            _postingService,
-            _warehouseRepository,
-            _variantRepository,
-            _productRepository,
-            _currentUser,
-            TimeProvider.System);
-
-        await postHandler.Handle(new PostInventoryTransactionCommand(txn.Id), CancellationToken.None);
-
-        Assert.That(txn.Status, Is.EqualTo(InventoryTransactionStatus.Posted));
-        Assert.That(txn.PostedBy, Is.EqualTo("test-user-123"));
-        Assert.That(txn.PostedAtUtc, Is.Not.Null);
-
-        var balance = await _balanceRepository.GetByWarehouseAndVariantAsync(_warehouseAId, _variantId);
-        Assert.That(balance, Is.Not.Null);
-        Assert.That(balance!.OnHandQuantity, Is.EqualTo(15));
-        Assert.That(balance.AverageUnitCost, Is.EqualTo(30m));
-        Assert.That(balance.InventoryValue, Is.EqualTo(450m));
-
-        Assert.That(_ledgerRepository.Items.Count, Is.EqualTo(1));
-        var ledger = _ledgerRepository.Items[0];
-        Assert.That(ledger.MovementType, Is.EqualTo(InventoryMovementType.In));
-        Assert.That(ledger.QuantityIn, Is.EqualTo(15));
-        Assert.That(ledger.BalanceAfter, Is.EqualTo(15));
+        var txn = new InventoryTransaction("TXN-001", InventoryTransactionType.Receipt,
+            DateTimeOffset.UtcNow, destinationWarehouseId: _warehouseAId,
+            referenceType: "PurchaseReceipt", referenceId: Guid.NewGuid());
+        _transactionRepository.AddAsync(txn).GetAwaiter().GetResult();
+        _lineRepository.Items.Add(new InventoryTransactionLine(txn.Id, _variantId, 15, 30m));
+        var handler = PostTransactionHandler();
+        var ex = Assert.ThrowsAsync<ConflictException>(() =>
+            handler.Handle(new PostInventoryTransactionCommand(txn.Id), CancellationToken.None));
+        Assert.That(ex?.Code, Is.EqualTo("manual_inventory_inbound_disabled"));
+        Assert.That(txn.Status, Is.EqualTo(InventoryTransactionStatus.Draft));
+        Assert.That(_balanceRepository.Items, Is.Empty);
+        Assert.That(_ledgerRepository.Items, Is.Empty);
     }
+
+    [TestCase(ContractType.Receipt)]
+    [TestCase(ContractType.Opening)]
+    [TestCase(ContractType.AdjustmentIncrease)]
+    [TestCase(ContractType.SalesReturn)]
+    public void CreateTransaction_ManualInboundIsRejected(ContractType type)
+    {
+        var request = CreateIssueRequest() with { TransactionType = type, SourceWarehouseId = null,
+            DestinationWarehouseId = _warehouseAId };
+        var validator = new CreateInventoryTransactionCommandValidator();
+        var validation = validator.Validate(new CreateInventoryTransactionCommand(request));
+        Assert.That(validation.Errors.Any(x => x.ErrorCode == "manual_inventory_inbound_disabled"), Is.True);
+
+        var ex = Assert.ThrowsAsync<ConflictException>(() =>
+            CreateTransactionHandler().Handle(new CreateInventoryTransactionCommand(request), CancellationToken.None));
+        Assert.That(ex?.Code, Is.EqualTo("manual_inventory_inbound_disabled"));
+        Assert.That(_transactionItems, Is.Empty);
+        Assert.That(_lineItems, Is.Empty);
+    }
+
+    private PostInventoryTransactionCommandHandler PostTransactionHandler() => new(
+        _transactionRepository, _postingService, _warehouseRepository,
+        _variantRepository, _productRepository, _currentUser, TimeProvider.System);
 
     [Test]
     public async Task PostTransaction_OutboundIssue_DecreasesBalanceAndCreatesLedger()
@@ -381,11 +379,11 @@ public sealed class InventoryTransactionTests
         _productRepository,
         _sequenceGenerator);
 
-    private CreateInventoryTransactionRequest CreateReceiptRequest() => new(
+    private CreateInventoryTransactionRequest CreateIssueRequest() => new(
         TransactionNumber: null,
-        TransactionType: ContractType.Receipt,
-        SourceWarehouseId: null,
-        DestinationWarehouseId: _warehouseAId,
+        TransactionType: ContractType.Issue,
+        SourceWarehouseId: _warehouseAId,
+        DestinationWarehouseId: null,
         TransactionDate: DateTimeOffset.UtcNow,
         ReferenceType: null,
         ReferenceId: null,

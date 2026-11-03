@@ -9,6 +9,10 @@
             {
                 <UiButton Text="@NewButtonText" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" OnClick="OpenNewAsync" />
                 <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Loading="_isLoadingList" OnClick="RefreshListAsync" />
+                @if (Section == PurchasingEntityType.PurchaseReceipts)
+                {
+                    <a href="/purchases/receipt-follow-ups" class="btn btn-outline-secondary btn-sm">متابعة الاستلامات</a>
+                }
                 <UiSearchInput Value="_search" ValueChanged="SearchTextChanged" OnSearch="SearchAsync" Placeholder="@SearchPlaceholder" DebounceMilliseconds="300" />
             }
             else
@@ -73,53 +77,11 @@
         <UiApplicationTabStrip Tabs="WorkspaceTabs" AriaLabel="@TabsAriaLabel" OnSelect="SelectTabAsync" OnClose="CloseTabAsync" OnCloseOthers="CloseOtherTabsAsync" OnCloseAll="CloseAllTabsAsync" />
     </Tabs>
     <Content>
-        @if (ActiveTab?.Model is UiPurchaseOrderEditorModel orderSummary && !IsListTab)
-        {
-            <div class="alert alert-light border py-2 mb-2" role="status">
-                <strong>أمر الشراء → الاستلام → الفاتورة → المطابقة → الترحيل → السداد</strong>
-                <span class="ms-3">المورد: @orderSummary.SupplierName — المخزن: @orderSummary.DestinationWarehouseName</span>
-                <span class="ms-3">المطلوب: @orderSummary.Lines.Sum(x => x.BaseQuantity).ToString("N3")</span>
-                <span class="ms-3">المستلم: @orderSummary.Lines.Sum(x => x.ReceivedBaseQuantity).ToString("N3")</span>
-                <span class="ms-3">المتبقي: @orderSummary.Lines.Sum(x => x.RemainingBaseQuantity).ToString("N3") (وحدة أساسية)</span>
-                <span class="ms-3">الحالة: @orderSummary.StatusText</span>
-            </div>
-        }
-        else if (ActiveTab?.Model is UiPurchaseReceiptEditorModel receiptSummary && !IsListTab)
-        {
-            <div class="alert alert-light border py-2 mb-2" role="status">
-                <strong>الاستلام → إنشاء فاتورة مورد → المطابقة</strong>
-                <span class="ms-3">المورد: @receiptSummary.SupplierName — المخزن: @receiptSummary.WarehouseName</span>
-                <span class="ms-3">المستلم: @receiptSummary.Lines.Sum(x => x.ReceivedQuantity).ToString("N3")</span>
-                <span class="ms-3">المقبول: @receiptSummary.Lines.Sum(x => x.AcceptedQuantity).ToString("N3")</span>
-                <span class="ms-3">المرتجع: @receiptSummary.Lines.Sum(x => x.ReturnedQuantity).ToString("N3")</span>
-                <span class="ms-3">الحالة: @receiptSummary.StatusText</span>
-            </div>
-        }
-        else if (ActiveTab?.Model is UiPurchaseInvoiceEditorModel invoiceSummary && !IsListTab)
-        {
-            <div class="alert alert-light border py-2 mb-2" role="status">
-                <strong>فاتورة المورد → المطابقة → الترحيل → السداد/التخصيص</strong>
-                <span class="ms-3">المورد: @invoiceSummary.SupplierName</span>
-                <span class="ms-3">المفوتر: @invoiceSummary.Lines.Sum(x => x.Quantity).ToString("N3") (وحدة شراء)</span>
-                <span class="ms-3">المتبقي للسداد: @(ActiveInvoicePaymentSummary?.OutstandingAmount.ToString("N2") ?? "بعد الترحيل") @invoiceSummary.CurrencyCode</span>
-                <span class="ms-3">الحالة: @invoiceSummary.StatusText</span>
-            </div>
-        }
-        @if (Section is PurchasingEntityType.PurchaseOrders or PurchasingEntityType.PurchaseReceipts or PurchasingEntityType.PurchaseInvoices)
-        {
-            <nav class="d-flex flex-wrap gap-2 mb-3" aria-label="مراحل دورة المشتريات">
-                <a class="btn btn-sm btn-outline-secondary" href="/purchases/orders">1. أوامر الشراء</a>
-                <a class="btn btn-sm btn-outline-secondary" href="/purchases/receipts">2. الاستلامات</a>
-                <a class="btn btn-sm btn-outline-secondary" href="/purchases/invoices">3. الفواتير والمطابقة</a>
-                <a class="btn btn-sm btn-outline-secondary" href="/accounting/payment-vouchers">4. سندات الصرف</a>
-                <a class="btn btn-sm btn-outline-secondary" href="/purchases/supplier-allocations">5. تخصيص الدفع والائتمان</a>
-            </nav>
-        }
         @if (ActiveOrderProgress is { } progress && ActiveTab is { IsListTab: false })
         {
-            <div class="card mb-3">
-                <div class="card-body p-2">
-                    <h3 class="h6">تقدم المستندات والكميات — @progress.PurchaseOrderCode</h3>
+            <details class="ui-purchasing-order-progress">
+                <summary>تفاصيل كميات أمر الشراء — @progress.PurchaseOrderCode</summary>
+                <div class="ui-purchasing-order-progress__body">
                     <div class="table-responsive">
                         <table class="table table-sm align-middle mb-1">
                             <thead><tr><th>المنتج</th><th>مطلوب</th><th>مستلم</th><th>مفوتر</th><th>مرتجع</th><th>باقٍ للاستلام</th><th>باقٍ للفوترة</th><th>متاح للمرتجع</th></tr></thead>
@@ -131,9 +93,8 @@
                             </tbody>
                         </table>
                     </div>
-                    <p class="small text-muted mb-0">تعتمد الكميات على الاستلامات والفواتير المرحلة والمطابقة فقط. قيد GRNI لا يحتسب فاتورة مورد.</p>
                 </div>
-            </div>
+            </details>
         }
         @if (IsListTab)
         {
@@ -165,15 +126,15 @@
         }
         else if (ActiveTab?.Model is UiSupplierCatalogEditorModel catalog)
         {
-            <UiSupplierCatalogEditor Model="catalog" IsEditable="@IsEditable" SupplierSearchAsync="SearchSuppliersAsync" ProductSearchAsync="SearchProductsAsync" UnitSearchAsync="SearchUnitsAsync" CurrencySearchAsync="SearchCurrenciesAsync" OnAddPrice="AddCatalogPriceAsync" OnChanged="EditorChangedAsync" />
+            <UiSupplierCatalogEditor Model="catalog" IsEditable="@IsEditable" SupplierSearchAsync="SearchSuppliersAsync" ProductSearchAsync="SearchProductsAsync" ProductSearchPageAsync="SearchProductsPageAsync" UnitSearchAsync="SearchUnitsAsync" CurrencySearchAsync="SearchCurrenciesAsync" OnAddPrice="AddCatalogPriceAsync" OnChanged="EditorChangedAsync" />
         }
         else if (ActiveTab?.Model is UiPurchaseRequestEditorModel request)
         {
-            <UiPurchaseRequestEditor Model="request" IsEditable="@IsEditable" WarehouseSearchAsync="SearchWarehousesAsync" ProductSearchAsync="SearchProductsAsync" SupplierSearchAsync="SearchSuppliersAsync" OnChanged="EditorChangedAsync" />
+            <UiPurchaseRequestEditor Model="request" IsEditable="@IsEditable" WarehouseSearchAsync="SearchWarehousesAsync" ProductSearchAsync="SearchProductsAsync" ProductSearchPageAsync="SearchProductsPageAsync" SupplierSearchAsync="SearchSuppliersAsync" OnChanged="EditorChangedAsync" />
         }
         else if (ActiveTab?.Model is UiPurchaseOrderEditorModel order)
         {
-            <UiPurchaseOrderEditor Model="order" IsEditable="@IsEditable" SupplierSearchAsync="SearchSuppliersAsync" WarehouseSearchAsync="SearchWarehousesAsync" ProductSearchAsync="SearchProductsAsync" UnitSearchAsync="SearchUnitsAsync" CurrencySearchAsync="SearchCurrenciesAsync" OnSupplierChanged="PurchaseOrderSupplierChangedAsync" OnCurrencyChanged="PurchaseOrderCurrencyChangedAsync" OnOrderDateChanged="PurchaseOrderDateChangedAsync" OnLineUnitChanged="PurchaseOrderLineUnitChangedAsync" OnChanged="EditorChangedAsync" />
+            <UiPurchaseOrderEditor Model="order" IsEditable="@IsEditable" SupplierSearchAsync="SearchSuppliersAsync" WarehouseSearchAsync="SearchWarehousesAsync" ProductSearchAsync="SearchProductsAsync" ProductSearchPageAsync="SearchProductsPageAsync" UnitSearchAsync="SearchUnitsAsync" CurrencySearchAsync="SearchCurrenciesAsync" OnSupplierChanged="PurchaseOrderSupplierChangedAsync" OnCurrencyChanged="PurchaseOrderCurrencyChangedAsync" OnOrderDateChanged="PurchaseOrderDateChangedAsync" OnLineUnitChanged="PurchaseOrderLineUnitChangedAsync" OnChanged="EditorChangedAsync" />
         }
         else if (ActiveTab?.Model is UiPurchaseReceiptEditorModel receipt)
         {
@@ -181,7 +142,7 @@
         }
         else if (ActiveTab?.Model is UiPurchaseInvoiceEditorModel invoice)
         {
-            <UiPurchaseInvoiceEditor Model="invoice" IsEditable="@IsEditable" SupplierSearchAsync="SearchSuppliersAsync" CurrencySearchAsync="SearchCurrenciesAsync" ProductSearchAsync="SearchProductsAsync" ShowPaymentSummary="@ShowInvoicePaymentSummary" PaymentSummaryLoading="@IsActiveInvoicePaymentSummaryLoading" PaymentTotalAmount="@ActiveInvoicePaymentSummary?.TotalAmount" PaymentPaidAmount="@ActiveInvoicePaymentSummary?.PaidAmount" PaymentCreditAmount="@ActiveInvoicePaymentSummary?.AppliedCreditAmount" PaymentOutstandingAmount="@ActiveInvoicePaymentSummary?.OutstandingAmount" PaymentStatusText="@ActiveInvoicePaymentStatusText" PaymentBaseTotalAmount="@ActiveInvoicePaymentSummary?.BaseTotalAmount" PaymentAppliedBaseAmount="@ActiveInvoicePaymentSummary?.AppliedPaymentBaseAmount" PaymentCreditBaseAmount="@ActiveInvoicePaymentSummary?.AppliedCreditBaseAmount" PaymentOutstandingBaseAmount="@ActiveInvoicePaymentSummary?.OutstandingBaseAmount" PaymentRealizedExchangeDifferenceBase="@ActiveInvoicePaymentSummary?.RealizedExchangeDifferenceBase" PaymentBaseCurrencyCode="@ActiveInvoicePaymentSummary?.BaseCurrencyCode" PaymentSettlements="@ActiveInvoicePaymentSettlements" OnOpenFxJournal="OpenInvoiceFxJournalAsync" OnChanged="EditorChangedAsync" />
+            <UiPurchaseInvoiceEditor Model="invoice" IsEditable="@IsEditable" SupplierSearchAsync="SearchSuppliersAsync" CurrencySearchAsync="SearchCurrenciesAsync" ProductSearchAsync="SearchProductsAsync" ProductSearchPageAsync="SearchProductsPageAsync" ShowPaymentSummary="@ShowInvoicePaymentSummary" PaymentSummaryLoading="@IsActiveInvoicePaymentSummaryLoading" PaymentTotalAmount="@ActiveInvoicePaymentSummary?.TotalAmount" PaymentPaidAmount="@ActiveInvoicePaymentSummary?.PaidAmount" PaymentCreditAmount="@ActiveInvoicePaymentSummary?.AppliedCreditAmount" PaymentOutstandingAmount="@ActiveInvoicePaymentSummary?.OutstandingAmount" PaymentStatusText="@ActiveInvoicePaymentStatusText" PaymentBaseTotalAmount="@ActiveInvoicePaymentSummary?.BaseTotalAmount" PaymentAppliedBaseAmount="@ActiveInvoicePaymentSummary?.AppliedPaymentBaseAmount" PaymentCreditBaseAmount="@ActiveInvoicePaymentSummary?.AppliedCreditBaseAmount" PaymentOutstandingBaseAmount="@ActiveInvoicePaymentSummary?.OutstandingBaseAmount" PaymentRealizedExchangeDifferenceBase="@ActiveInvoicePaymentSummary?.RealizedExchangeDifferenceBase" PaymentBaseCurrencyCode="@ActiveInvoicePaymentSummary?.BaseCurrencyCode" PaymentSettlements="@ActiveInvoicePaymentSettlements" OnOpenFxJournal="OpenInvoiceFxJournalAsync" OnChanged="EditorChangedAsync" />
         }
     </Content>
 </UiPurchasingWorkspace>

@@ -92,9 +92,10 @@ public sealed class InventoryClientService(OasApiClient apiClient) : IInventoryC
     public async Task<IReadOnlyList<ProductVariantLookupDto>> SearchProductVariantsAsync(
         string? search,
         int take = 20,
-        CancellationToken cancellationToken = default) =>
+        CancellationToken cancellationToken = default,
+        int skip = 0) =>
         await apiClient.GetAsync<IReadOnlyList<ProductVariantLookupDto>>(
-            $"{BaseEndpoint}/product-variants/lookup?search={Uri.EscapeDataString(search ?? string.Empty)}&take={Math.Clamp(take, 1, 50)}",
+            $"{BaseEndpoint}/product-variants/lookup?search={Uri.EscapeDataString(search ?? string.Empty)}&take={Math.Clamp(take, 1, 50)}&skip={Math.Max(0, skip)}",
             cancellationToken) ?? [];
 
     public Task<ProductVariantDto?> GetProductVariantAsync(Guid id, CancellationToken cancellationToken = default) =>

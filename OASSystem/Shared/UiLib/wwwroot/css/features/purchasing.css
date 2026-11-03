@@ -113,3 +113,36 @@
     .ui-purchasing-price-row { grid-template-columns: 1fr; }
     .ui-purchasing-price-row span { white-space: normal; }
 }
+
+/* Operational details remain available on demand without crowding the editors. */
+.ui-purchasing-order-progress,
+.ui-purchasing-advanced {
+    min-width: 0;
+    border: 1px solid var(--oas-color-border);
+    border-radius: var(--oas-radius-md);
+    background: var(--oas-color-surface);
+    margin-block: 4px 8px;
+}
+
+.ui-purchasing-order-progress > summary,
+.ui-purchasing-advanced > summary {
+    cursor: pointer;
+    padding: 8px 10px;
+    font-weight: 600;
+    font-size: var(--oas-font-sm);
+    color: var(--oas-color-text);
+}
+
+.ui-purchasing-order-progress > summary:focus-visible,
+.ui-purchasing-advanced > summary:focus-visible {
+    outline: 2px solid var(--oas-color-primary);
+    outline-offset: 2px;
+}
+
+.ui-purchasing-order-progress__body,
+.ui-purchasing-advanced > .ui-purchasing-invoice-totals,
+.ui-purchasing-advanced > .ui-purchasing-lines {
+    padding: 8px 10px;
+}
+
+.ui-purchasing-order-progress__body .table-responsive { max-width: 100%; }

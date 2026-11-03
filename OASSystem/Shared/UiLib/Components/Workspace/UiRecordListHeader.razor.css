@@ -6,9 +6,9 @@
     align-items: center;
     gap: 8px;
     padding: 5px 9px;
-    border-bottom: 1px solid #e9e7ef;
-    background: #fbfbfd;
-    color: #55586f;
+    border-bottom: 1px solid var(--oas-color-border);
+    background: var(--oas-color-surface);
+    color: var(--oas-color-text);
     font-size: 9.5px;
     font-weight: 700;
 }

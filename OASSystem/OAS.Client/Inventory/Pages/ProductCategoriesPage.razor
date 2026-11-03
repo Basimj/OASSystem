@@ -48,7 +48,7 @@
                 <div class="inventory-master-editor">
                     <UiInputText Label="كود التصنيف" Value="@_code" ValueExpression="@(() => _code)" ValueChanged="@(v => SetField(CodeField, () => _code = v ?? string.Empty))" Required="true" ErrorText="@ErrorFor(CodeField)" MaxLength="32" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
                     <UiInputText Label="اسم التصنيف" Value="@_name" ValueExpression="@(() => _name)" ValueChanged="@(v => SetField(NameField, () => _name = v ?? string.Empty))" Required="true" ErrorText="@ErrorFor(NameField)" MaxLength="100" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
-                    <UiSelect Label="نوع المنتج" Value="@_productTypeId" ValueChanged="SetProductTypeAsync" Options="@ProductTypeOptions" Required="true" ErrorText="@ErrorFor(ProductTypeField)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
+                    <UiSearchableSelect Label="نوع المنتج" Value="@_productTypeId" ValueChanged="SetProductTypeAsync" Options="@ProductTypeOptions" Required="true" ErrorText="@ErrorFor(ProductTypeField)" Disabled="@(!IsEditing)" Size="ControlSize.Small" />
                     <UiCheckbox Label="التصنيف نشط" Value="@_isActive" ValueChanged="SetActiveAsync" Disabled="@(!IsEditing || _mode == EditorMode.Create)" />
                 </div>
             }

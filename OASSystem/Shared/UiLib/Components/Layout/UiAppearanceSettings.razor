@@ -32,11 +32,11 @@
                         <strong>Ocean</strong><small>الافتراضي</small>
                         <span class="oas-theme-studio__swatches"><i style="background:#DDF3F8"></i><i style="background:#F1FBFD"></i><i style="background:#0B8095"></i><i style="background:#B9E5F1"></i></span>
                     </button>
-                    <button type="button" class="@(Model.ThemePreset == "SkyYellow" ? "oas-theme-studio__preset is-selected" : "oas-theme-studio__preset")" @onclick="ApplySkyYellowPresetAsync" aria-pressed="@(Model.ThemePreset == "SkyYellow")" title="أزرق فاتح مع أصفر ناعم ومقروء">
+                    <button type="button" class="@(Model.ThemePreset == "SkyYellow" ? "oas-theme-studio__preset is-selected" : "oas-theme-studio__preset")" @onclick="ApplySkyYellowPresetAsync" aria-pressed="@(Model.ThemePreset == "SkyYellow")" title="سماء زرقاء وشمس مشرقة ولمسات من الطبيعة">
                         <span class="oas-theme-studio__preset-shot sky-yellow"><span class="side"></span><span class="top"></span><span class="tile a"></span><span class="tile b"></span><span class="tile c"></span></span>
                         @if (Model.ThemePreset == "SkyYellow") { <i class="fa-solid fa-circle-check oas-theme-studio__check"></i> }
-                        <strong>سماء وشمس</strong><small>أزرق فاتح وأصفر</small>
-                        <span class="oas-theme-studio__swatches"><i style="background:#D9F0FF"></i><i style="background:#0B6FAF"></i><i style="background:#FFF1B8"></i><i style="background:#FFFFFF"></i></span>
+                        <strong>سماء وشمس</strong><small>زرقة السماء وإشراق الشمس</small>
+                        <span class="oas-theme-studio__swatches"><i style="background:#26B2FF"></i><i style="background:#F9FF26"></i><i style="background:#E5F7ED"></i><i style="background:#FFFFFF"></i></span>
                     </button>
                     <button type="button" class="@(Model.ThemePreset == "Midnight" ? "oas-theme-studio__preset is-selected" : "oas-theme-studio__preset")" @onclick="ApplyMidnightPresetAsync" aria-pressed="@(Model.ThemePreset == "Midnight")">
                         <span class="oas-theme-studio__preset-shot midnight"><span class="side"></span><span class="top"></span><span class="tile a"></span><span class="tile b"></span><span class="tile c"></span></span>
@@ -57,7 +57,7 @@
                 <div class="oas-theme-studio__panel-head">
                     <div><h2><i class="fa-regular fa-eye"></i> معاينة مباشرة</h2><p>شاهد التغييرات مباشرة كما ستظهر في النظام</p></div>
                 </div>
-                <div class="oas-theme-studio__mini @(Model.ThemeMode == "Dark" ? "is-dark" : "")" aria-label="معاينة تفصيلية للنظام" style="--preview-accent:@Model.PrimaryColor;--oas-preview-canvas:@(Model.ThemePreset == "SkyYellow" ? "#F4FAFF" : Model.ThemePreset == "Slate" ? "#F5F8FC" : "#F1FBFD")">
+                <div class="oas-theme-studio__mini @(Model.ThemeMode == "Dark" ? "is-dark" : "") @(Model.ThemePreset == "SkyYellow" ? "preview-sky-sun" : "")" aria-label="معاينة تفصيلية للنظام" style="--preview-accent:@Model.PrimaryColor;--oas-preview-canvas:@(Model.ThemePreset == "SkyYellow" ? "#F2FAF2" : Model.ThemePreset == "Slate" ? "#F5F8FC" : "#F1FBFD")">
                     <div class="oas-theme-studio__mini-stage">
                         <div class="oas-theme-studio__mini-side" style="background:@Model.SidebarBackground;color:@Model.SidebarTextColor">
                             <div class="oas-theme-studio__mini-brand"><span class="oas-theme-studio__mini-brand-mark"><i class="fa-solid fa-cube" aria-hidden="true"></i></span> OASSystem</div>
@@ -248,19 +248,19 @@
                 Model.TabsActiveIconColor = "#0B8095"; Model.TabsBorderColor = "#C8E5EE";
                 break;
             case "SkyYellow":
-                // Sky blue for navigation and actions; soft yellow ONLY for selection/highlights.
-                // Dark ink on both pastels ensures readable labels and navigation items.
+                // Nature-inspired sky and sunlight: white on the blue navigation,
+                // white on the bright yellow selected states. No stock values change.
                 Model.ThemeMode = "Light";
-                Model.PrimaryColor = "#0B6FAF"; Model.SidebarBackground = "#D9F0FF";
-                Model.SidebarTextColor = "#163E5E"; Model.SidebarIconColor = "#24547C";
-                Model.SidebarHoverBackground = "#C1E5FF"; Model.SidebarActiveBackground = "#FFF1B8";
-                Model.SidebarActiveTextColor = "#634C00"; Model.SidebarActiveIconColor = "#634C00";
-                Model.HeaderBackground = "#FFFFFF"; Model.HeaderTextColor = "#173B59";
-                Model.HeaderIconColor = "#24547C";
-                Model.TabsBarBackground = "#F4FAFF"; Model.TabsBackground = "#FFFFFF";
-                Model.TabsTextColor = "#24547C"; Model.TabsIconColor = "#24547C";
-                Model.TabsActiveBackground = "#FFF1B8"; Model.TabsActiveTextColor = "#634C00";
-                Model.TabsActiveIconColor = "#634C00"; Model.TabsBorderColor = "#BEDDF1";
+                Model.PrimaryColor = "#26B2FF"; Model.SidebarBackground = "#26B2FF";
+                Model.SidebarTextColor = "#FFFFFF"; Model.SidebarIconColor = "#FFFFFF";
+                Model.SidebarHoverBackground = "#159DE8"; Model.SidebarActiveBackground = "#F9FF26";
+                Model.SidebarActiveTextColor = "#FFFFFF"; Model.SidebarActiveIconColor = "#FFFFFF";
+                Model.HeaderBackground = "#26B2FF"; Model.HeaderTextColor = "#FFFFFF";
+                Model.HeaderIconColor = "#FFFFFF";
+                Model.TabsBarBackground = "#EDF9EF"; Model.TabsBackground = "#FFFFFF";
+                Model.TabsTextColor = "#20586A"; Model.TabsIconColor = "#20586A";
+                Model.TabsActiveBackground = "#F9FF26"; Model.TabsActiveTextColor = "#FFFFFF";
+                Model.TabsActiveIconColor = "#FFFFFF"; Model.TabsBorderColor = "#B4D9D6";
                 break;
             case "Midnight":
                 Model.ThemeMode = "Dark";

@@ -10,6 +10,7 @@
 
 <PageTitle>مرتجعات المشتريات | OAS</PageTitle>
 
+<div class="purchasing-module-root">
 <UiWorkspaceLayout ShowAside="@(_creating || _selected is not null)" ShowFilters="false">
     <Actions>
         <UiWorkspaceActionBar>
@@ -75,7 +76,7 @@
     <Aside>
         @if (_creating)
         {
-            <UiCard Title="مرتجع مشتريات جديد" Subtitle="ابدأ من استلام مشتريات مرحل؛ اربطه بفاتورة المورد إذا كانت الكميات قد فُوترت.">
+            <UiCard Title="مرتجع مشتريات جديد">
                 <UiStackLayout Gap="StackGap.Small">
                     @if (!string.IsNullOrWhiteSpace(_editorError))
                     {
@@ -129,7 +130,7 @@
 
                     @if (_sourceReceipt is not null)
                     {
-                        <UiCard Title="أسطر الاستلام" Subtitle="الكمية المتاحة محسوبة بعد خصم المرتجعات السابقة والمحجوزة.">
+                        <UiCard Title="أسطر الاستلام">
                             <UiStackLayout Gap="StackGap.Small">
                                 @foreach (var line in _returnLines)
                                 {
@@ -204,6 +205,7 @@
         }
     </Aside>
 </UiWorkspaceLayout>
+</div>
 
 @code {
     private PagedResult<PurchaseReturnDto> _page = new();

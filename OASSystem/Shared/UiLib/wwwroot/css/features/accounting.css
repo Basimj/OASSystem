@@ -7,13 +7,13 @@
 
 :root {
     --oas-acc-primary: var(--oas-color-primary, #5A2DD6);
-    --oas-acc-primary-rgb: 90, 45, 214;
+    /* Primary overlays derive from the current appearance using color-mix. */
     --oas-acc-primary-light: var(--oas-color-primary-hover, #4E25C4);
-    --oas-acc-debit: #059669;
-    --oas-acc-debit-bg: #ecfdf5;
-    --oas-acc-credit: #dc2626;
-    --oas-acc-credit-bg: #fef2f2;
-    --oas-acc-balance: #4f46e5;
+    --oas-acc-debit: var(--oas-color-success);
+    --oas-acc-debit-bg: var(--oas-color-surface);
+    --oas-acc-credit: var(--oas-color-danger);
+    --oas-acc-credit-bg: var(--oas-color-surface);
+    --oas-acc-balance: var(--oas-color-primary);
     --oas-acc-card-bg: var(--oas-color-surface, #ffffff);
     --oas-acc-card-border: var(--oas-color-border, #e7e5ef);
     --oas-acc-card-hover-border: var(--oas-color-primary-border, #d9ccff);
@@ -47,7 +47,7 @@
     background: var(--oas-acc-card-bg);
     border: 1px solid var(--oas-acc-card-border);
     border-radius: var(--oas-acc-radius);
-    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.035);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--oas-color-text) 4%, transparent);
 }
 
     .ui-acc-workspace__actions .ui-workspace-actionbar {
@@ -75,7 +75,7 @@
     background: var(--oas-acc-card-bg);
     border: 1px solid var(--oas-acc-card-border);
     border-radius: var(--oas-acc-radius);
-    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.025);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--oas-color-text) 2%, transparent);
 }
 
 .ui-acc-workspace__body {
@@ -131,14 +131,14 @@
     background: var(--oas-acc-card-bg);
     border: 1px solid var(--oas-acc-card-border);
     border-radius: var(--oas-acc-radius);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.035);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--oas-color-text) 4%, transparent);
     transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
     .ui-acc-metric-tile:hover {
         transform: translateY(-1px);
         border-color: var(--oas-acc-card-hover-border);
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.055);
+        box-shadow: 0 4px 10px color-mix(in srgb, var(--oas-color-text) 6%, transparent);
     }
 
 .ui-acc-metric-tile__icon {
@@ -165,7 +165,7 @@
 }
 
 .ui-acc-metric-tile--balance .ui-acc-metric-tile__icon {
-    background: #eef2ff;
+    background: var(--oas-color-surface);
     color: var(--oas-acc-balance);
 }
 
@@ -185,7 +185,7 @@
 .ui-acc-metric-tile__value {
     font-size: 0.95rem;
     font-weight: 750;
-    color: #0f172a;
+    color: var(--oas-color-primary);
 }
 
 /* ==========================================================================
@@ -205,32 +205,32 @@
 }
 
 .ui-acc-badge--draft {
-    background: #f1f5f9;
-    color: #475569;
-    border: 1px solid #cbd5e1;
+    background: var(--oas-color-surface);
+    color: var(--oas-color-primary);
+    border: 1px solid var(--oas-color-border);
 }
 
 .ui-acc-badge--posted,
 .ui-acc-badge--approved,
 .ui-acc-badge--active {
-    background: #ecfdf5;
-    color: #065f46;
-    border: 1px solid #a7f3d0;
+    background: var(--oas-color-surface);
+    color: var(--oas-color-success);
+    border: 1px solid var(--oas-color-border);
 }
 
 .ui-acc-badge--closed,
 .ui-acc-badge--locked {
-    background: #fff7ed;
-    color: #9a3412;
-    border: 1px solid #fed7aa;
+    background: var(--oas-color-surface);
+    color: var(--oas-color-danger);
+    border: 1px solid var(--oas-color-border);
 }
 
 .ui-acc-badge--inactive,
 .ui-acc-badge--cancelled,
 .ui-acc-badge--reversed {
-    background: #fef2f2;
-    color: #991b1b;
-    border: 1px solid #fecaca;
+    background: var(--oas-color-surface);
+    color: var(--oas-color-danger);
+    border: 1px solid var(--oas-color-border);
 }
 
 /* ==========================================================================
@@ -245,13 +245,13 @@
     background: var(--oas-acc-card-bg);
     border: 1px solid var(--oas-acc-card-border);
     border-radius: var(--oas-acc-radius);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.035);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--oas-color-text) 4%, transparent);
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
     .ui-acc-card:hover {
         border-color: var(--oas-acc-card-hover-border);
-        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
+        box-shadow: 0 3px 8px color-mix(in srgb, var(--oas-color-text) 5%, transparent);
     }
 
 .ui-acc-card__header {
@@ -260,7 +260,7 @@
     justify-content: space-between;
     gap: 0.5rem;
     padding-bottom: 0.35rem;
-    border-bottom: 1px solid #f1f5f9;
+    border-bottom: 1px solid var(--oas-color-border);
 }
 
 .ui-acc-card__title {
@@ -269,7 +269,7 @@
     gap: 0.35rem;
     font-size: 0.82rem;
     font-weight: 700;
-    color: #0f172a;
+    color: var(--oas-color-primary);
 }
 
 .ui-acc-card__body {
@@ -285,7 +285,7 @@
     justify-content: flex-end;
     gap: 0.35rem;
     padding-top: 0.35rem;
-    border-top: 1px solid #f1f5f9;
+    border-top: 1px solid var(--oas-color-border);
 }
 
 /* ==========================================================================
@@ -298,7 +298,7 @@
     background: var(--oas-acc-card-bg);
     border: 1px solid var(--oas-acc-card-border);
     border-radius: var(--oas-acc-radius);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.025);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--oas-color-text) 2%, transparent);
     overflow: visible;
 }
 
@@ -313,7 +313,7 @@
     justify-content: space-between;
     gap: 0.5rem;
     padding: 0.42rem 0.6rem;
-    background: #f8fafc;
+    background: var(--oas-color-surface);
     border-bottom: 1px solid var(--oas-acc-card-border);
     cursor: pointer;
 }
@@ -335,7 +335,7 @@
     margin: 0;
     font-size: 0.8rem;
     font-weight: 750;
-    color: #1e293b;
+    color: var(--oas-color-primary);
 }
 
 .ui-acc-section__subtitle {
@@ -596,7 +596,7 @@
     .ui-acc-record-row:hover {
         border-color: var(--oas-color-primary-border);
         background: var(--oas-color-primary-soft);
-        box-shadow: 0 3px 10px rgba(47, 37, 86, 0.06);
+        box-shadow: 0 3px 10px color-mix(in srgb, var(--oas-color-text) 6%, transparent);
     }
 
     .ui-acc-record-row:focus-visible {
@@ -739,7 +739,7 @@
 }
 
     .ui-acc-tree__toggle:hover {
-        background: rgba(var(--oas-acc-primary-rgb), 0.08);
+        background: color-mix(in srgb, var(--oas-color-primary) 8%, transparent);
     }
 
 .ui-acc-tree__toggle--spacer {
@@ -759,19 +759,19 @@
     border: 1px solid transparent;
     border-radius: 0.35rem;
     background: transparent;
-    color: #1f2937;
+    color: var(--oas-color-primary);
     text-align: start;
     cursor: pointer;
 }
 
     .ui-acc-tree__link:hover {
-        background: rgba(var(--oas-acc-primary-rgb), 0.055);
-        border-color: rgba(var(--oas-acc-primary-rgb), 0.12);
+        background: color-mix(in srgb, var(--oas-color-primary) 5.5%, transparent);
+        border-color: color-mix(in srgb, var(--oas-color-primary) 12%, transparent);
     }
 
 .ui-acc-tree__row.is-selected .ui-acc-tree__link {
-    background: rgba(var(--oas-acc-primary-rgb), 0.1);
-    border-color: rgba(var(--oas-acc-primary-rgb), 0.22);
+    background: color-mix(in srgb, var(--oas-color-primary) 10%, transparent);
+    border-color: color-mix(in srgb, var(--oas-color-primary) 22%, transparent);
     color: var(--oas-acc-primary);
 }
 
@@ -797,7 +797,7 @@
     flex: 0 0 auto;
     font-size: 0.68rem;
     font-weight: 800;
-    color: #111827;
+    color: var(--oas-color-primary);
     white-space: nowrap;
 }
 
@@ -805,7 +805,7 @@
     overflow: hidden;
     min-width: 0;
     font-size: 0.68rem;
-    color: #4b5563;
+    color: var(--oas-color-text);
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -818,10 +818,10 @@
 .ui-acc-tree__badge {
     flex: 0 0 auto;
     padding: 0.03rem 0.25rem;
-    border: 1px solid #fecdca;
+    border: 1px solid var(--oas-color-border);
     border-radius: 999px;
-    background: #fef3f2;
-    color: #b42318;
+    background: var(--oas-color-surface);
+    color: var(--oas-color-danger);
     font-size: 0.55rem;
     white-space: nowrap;
 }
@@ -842,9 +842,9 @@
 
     .ui-acc-grid-table th {
         padding: 0.42rem 0.5rem;
-        background: #f8fafc;
+        background: var(--oas-color-surface);
         border-bottom: 1px solid var(--oas-acc-card-border);
-        color: #475569;
+        color: var(--oas-color-primary);
         font-size: 0.68rem;
         font-weight: 700;
         text-align: right;
@@ -852,8 +852,8 @@
 
     .ui-acc-grid-table td {
         padding: 0.38rem 0.5rem;
-        border-bottom: 1px solid #f1f5f9;
-        color: #1e293b;
+        border-bottom: 1px solid var(--oas-color-border);
+        color: var(--oas-color-primary);
         font-size: 0.7rem;
         vertical-align: middle;
     }
@@ -863,12 +863,12 @@
     }
 
     .ui-acc-grid-table tbody tr:hover {
-        background: #f8fafc;
+        background: var(--oas-color-surface);
     }
 
     .ui-acc-grid-table tfoot td {
         padding: 0.42rem 0.5rem;
-        background: #f8fafc;
+        background: var(--oas-color-surface);
         border-top: 2px solid var(--oas-acc-card-border);
         font-weight: 750;
     }
@@ -904,13 +904,13 @@
 }
 
 .ui-acc-balanced-badge--balanced {
-    background: #ecfdf5;
-    color: #065f46;
+    background: var(--oas-color-surface);
+    color: var(--oas-color-success);
 }
 
 .ui-acc-balanced-badge--unbalanced {
-    background: #fef2f2;
-    color: #991b1b;
+    background: var(--oas-color-surface);
+    color: var(--oas-color-danger);
 }
 
 /* ==========================================================================
@@ -967,7 +967,7 @@
     background: var(--oas-acc-card-bg);
     border: 1px solid var(--oas-acc-card-border);
     border-radius: 0.55rem;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.035);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--oas-color-text) 4%, transparent);
     cursor: pointer;
     text-decoration: none;
     color: inherit;
@@ -977,7 +977,7 @@
     .ui-acc-hub-card:hover {
         transform: translateY(-2px);
         border-color: var(--oas-acc-primary-light);
-        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.065);
+        box-shadow: 0 6px 12px color-mix(in srgb, var(--oas-color-text) 6%, transparent);
     }
 
 .ui-acc-hub-card__icon {
@@ -995,7 +995,7 @@
 .ui-acc-hub-card__title {
     font-size: 0.85rem;
     font-weight: 750;
-    color: #0f172a;
+    color: var(--oas-color-primary);
 }
 
 .ui-acc-hub-card__desc {
@@ -1018,7 +1018,7 @@
     background: var(--oas-acc-card-bg);
     border: 1px solid var(--oas-acc-card-border);
     border-radius: var(--oas-acc-radius);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--oas-color-text) 3%, transparent);
 }
 
 .ui-acc-doc-header__title-row {
@@ -1031,7 +1031,7 @@
     margin: 0;
     font-size: 0.88rem;
     font-weight: 750;
-    color: #0f172a;
+    color: var(--oas-color-primary);
 }
 
 .ui-acc-doc-header__subtitle {
@@ -1066,9 +1066,9 @@
         inset-inline-end: -3px;
         width: 6px;
         height: 6px;
-        border: 1px solid #fff;
+        border: 1px solid var(--oas-color-border);
         border-radius: 50%;
-        background: #dc2626;
+        background: var(--oas-color-danger);
     }
 
 /* ==========================================================================
@@ -1303,13 +1303,13 @@
     margin-bottom: 0;
     border-radius: 0.65rem;
     overflow: hidden;
-    box-shadow: 0 3px 12px rgba(30, 41, 59, 0.045);
+    box-shadow: 0 3px 12px color-mix(in srgb, var(--oas-color-text) 4%, transparent);
 }
 
 .ui-acc-account-tree-panel > .ui-acc-section__header {
     min-height: 2.45rem;
     padding: 0.5rem 0.65rem;
-    background: linear-gradient(180deg, #ffffff 0%, #fbfaff 100%);
+    background: linear-gradient(180deg, var(--oas-color-surface) 0%, var(--oas-color-surface) 100%);
 }
 
 .ui-acc-account-tree-panel > .ui-acc-section__header .ui-acc-section__title {
@@ -1347,9 +1347,9 @@
 }
 
 .ui-acc-account-tree-panel .ui-acc-tree__row.is-selected .ui-acc-tree__link {
-    background: linear-gradient(90deg, rgba(var(--oas-acc-primary-rgb), 0.07), rgba(var(--oas-acc-primary-rgb), 0.13));
-    border-color: rgba(var(--oas-acc-primary-rgb), 0.28);
-    box-shadow: inset 0 0 0 1px rgba(var(--oas-acc-primary-rgb), 0.03);
+    background: linear-gradient(90deg, color-mix(in srgb, var(--oas-color-primary) 7%, transparent), color-mix(in srgb, var(--oas-color-primary) 13%, transparent));
+    border-color: color-mix(in srgb, var(--oas-color-primary) 28%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--oas-color-primary) 3%, transparent);
 }
 
 .ui-acc-account-tree-panel .ui-acc-tree__code {
@@ -1369,8 +1369,8 @@
     padding: 0.65rem 0.72rem;
     border: 1px solid var(--oas-acc-card-border);
     border-radius: 0.68rem;
-    background: linear-gradient(180deg, #ffffff 0%, #fcfbff 100%);
-    box-shadow: 0 2px 8px rgba(30, 41, 59, 0.035);
+    background: linear-gradient(180deg, var(--oas-color-surface) 0%, var(--oas-color-surface) 100%);
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--oas-color-text) 4%, transparent);
 }
 
 .ui-acc-account-overview__identity-row {
@@ -1387,7 +1387,7 @@
     min-width: 0;
     gap: 0.28rem;
     margin-bottom: 0.34rem;
-    color: #7c7891;
+    color: var(--oas-color-text-muted);
     font-size: 0.64rem;
     font-weight: 650;
     white-space: nowrap;
@@ -1405,7 +1405,7 @@
 
 .ui-acc-account-overview__crumb-separator {
     flex: 0 0 auto;
-    color: #bbb6ca;
+    color: var(--oas-color-text-muted);
     font-size: 0.5rem;
 }
 
@@ -1423,9 +1423,9 @@
     width: 2.65rem;
     min-width: 2.65rem;
     height: 2.65rem;
-    border: 1px solid rgba(var(--oas-acc-primary-rgb), 0.12);
+    border: 1px solid color-mix(in srgb, var(--oas-color-primary) 12%, transparent);
     border-radius: 0.62rem;
-    background: linear-gradient(145deg, #f8f5ff, #efebff);
+    background: linear-gradient(145deg, var(--oas-color-surface), var(--oas-color-surface));
     color: var(--oas-acc-primary);
     font-size: 1.08rem;
 }
@@ -1444,7 +1444,7 @@
 .ui-acc-account-overview__title-line h2 {
     margin: 0;
     overflow: hidden;
-    color: #15122c;
+    color: var(--oas-color-primary);
     font-size: 1.18rem;
     font-weight: 850;
     line-height: 1.2;
@@ -1464,18 +1464,18 @@
 }
 
 .ui-acc-account-overview__status.is-active {
-    background: #ecfdf3;
-    color: #027a48;
+    background: var(--oas-color-surface);
+    color: var(--oas-color-success);
 }
 
 .ui-acc-account-overview__status.is-inactive {
-    background: #fff1f3;
-    color: #c01048;
+    background: var(--oas-color-surface);
+    color: var(--oas-color-danger);
 }
 
 .ui-acc-account-overview__status.is-new {
-    background: #f2f4f7;
-    color: #475467;
+    background: var(--oas-color-surface);
+    color: var(--oas-color-primary);
 }
 
 .ui-acc-account-overview__status-dot {
@@ -1491,12 +1491,12 @@
     flex-wrap: wrap;
     gap: 0.2rem 0.8rem;
     margin-top: 0.17rem;
-    color: #77738a;
+    color: var(--oas-color-text-muted);
     font-size: 0.62rem;
 }
 
 .ui-acc-account-overview__meta strong {
-    color: #39354c;
+    color: var(--oas-color-primary);
     font-weight: 750;
 }
 
@@ -1512,29 +1512,29 @@
     min-width: 0;
     gap: 0.48rem;
     padding: 0.48rem 0.55rem;
-    border: 1px solid #ece9f3;
+    border: 1px solid var(--oas-color-border);
     border-radius: 0.52rem;
-    background: #fff;
+    background: var(--oas-color-surface);
 }
 
 .ui-acc-account-kpi--balance {
-    background: linear-gradient(135deg, #f7f8ff 0%, #f1f4ff 100%);
-    border-color: #dfe4ff;
+    background: linear-gradient(135deg, var(--oas-color-surface) 0%, var(--oas-color-surface) 100%);
+    border-color: var(--oas-color-border);
 }
 
 .ui-acc-account-kpi--debit {
-    background: linear-gradient(135deg, #f4fdf8 0%, #edfbf4 100%);
-    border-color: #d5f2e1;
+    background: linear-gradient(135deg, var(--oas-color-surface) 0%, var(--oas-color-surface) 100%);
+    border-color: var(--oas-color-border);
 }
 
 .ui-acc-account-kpi--credit {
-    background: linear-gradient(135deg, #fff8f8 0%, #fff1f1 100%);
-    border-color: #f6dddd;
+    background: linear-gradient(135deg, var(--oas-color-surface) 0%, var(--oas-color-surface) 100%);
+    border-color: var(--oas-color-border);
 }
 
 .ui-acc-account-kpi--last {
-    background: linear-gradient(135deg, #fbfaff 0%, #f7f5ff 100%);
-    border-color: #e9e4fa;
+    background: linear-gradient(135deg, var(--oas-color-surface) 0%, var(--oas-color-surface) 100%);
+    border-color: var(--oas-color-border);
 }
 
 .ui-acc-account-kpi__icon {
@@ -1545,19 +1545,19 @@
     min-width: 2rem;
     height: 2rem;
     border-radius: 50%;
-    background: rgba(var(--oas-acc-primary-rgb), 0.09);
+    background: color-mix(in srgb, var(--oas-color-primary) 9%, transparent);
     color: var(--oas-acc-primary);
     font-size: 0.78rem;
 }
 
 .ui-acc-account-kpi--debit .ui-acc-account-kpi__icon {
-    background: #dcfae6;
-    color: #039855;
+    background: var(--oas-color-subtle);
+    color: var(--oas-color-success);
 }
 
 .ui-acc-account-kpi--credit .ui-acc-account-kpi__icon {
-    background: #fee4e2;
-    color: #d92d20;
+    background: var(--oas-color-surface);
+    color: var(--oas-color-danger);
 }
 
 .ui-acc-account-kpi__body {
@@ -1568,7 +1568,7 @@
 }
 
 .ui-acc-account-kpi__label {
-    color: #77738a;
+    color: var(--oas-color-text-muted);
     font-size: 0.58rem;
     font-weight: 650;
 }
@@ -1576,7 +1576,7 @@
 .ui-acc-account-kpi__value {
     margin-top: 0.12rem;
     overflow: hidden;
-    color: #19162f;
+    color: var(--oas-color-primary);
     font-size: 0.92rem;
     font-weight: 850;
     text-overflow: ellipsis;
@@ -1586,7 +1586,7 @@
 .ui-acc-account-kpi small {
     margin-top: 0.08rem;
     overflow: hidden;
-    color: #8c8799;
+    color: var(--oas-color-text-muted);
     font-size: 0.53rem;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1603,19 +1603,19 @@
 .ui-acc-account-editor .ui-acc-section {
     margin-bottom: 0;
     border-radius: 0.58rem;
-    box-shadow: 0 1px 4px rgba(30, 41, 59, 0.025);
+    box-shadow: 0 1px 4px color-mix(in srgb, var(--oas-color-text) 2%, transparent);
 }
 
 .ui-acc-account-editor .ui-acc-section__header {
     min-height: 2rem;
     padding: 0.34rem 0.52rem;
-    background: linear-gradient(90deg, rgba(var(--oas-acc-primary-rgb), 0.045), #fbfbfd 68%);
+    background: linear-gradient(90deg, color-mix(in srgb, var(--oas-color-primary) 4.5%, transparent), var(--oas-color-surface) 68%);
 }
 
 .ui-acc-account-editor .ui-acc-section__title {
     font-size: 0.72rem;
     font-weight: 800;
-    color: #26223d;
+    color: var(--oas-color-primary);
 }
 
 .ui-acc-account-editor .ui-acc-section__icon {
@@ -1677,8 +1677,8 @@
 
 .ui-acc-account-editor .ui-acc-readonly-field__value {
     min-height: 1.88rem;
-    background: #f7f7fa;
-    color: #5f5a70;
+    background: var(--oas-color-surface);
+    color: var(--oas-color-text);
 }
 
 .ui-acc-account-editor .ui-acc-readonly-field__label,
@@ -1743,8 +1743,8 @@
 .ui-acc-workspace--account-management .ui-acc-workspace__actions {
     padding: 0.24rem 0.42rem;
     border: 1px solid var(--oas-acc-card-border);
-    background: #fff;
-    box-shadow: 0 1px 5px rgba(30, 41, 59, 0.035);
+    background: var(--oas-color-surface);
+    box-shadow: 0 1px 5px color-mix(in srgb, var(--oas-color-text) 4%, transparent);
 }
 
 .ui-acc-workspace--account-management .ui-acc-workspace__actions .ui-workspace-actionbar {
@@ -1787,26 +1787,26 @@
 }
 
 .ui-acc-account-tree-panel .ui-acc-tree__row:hover {
-    background: rgba(var(--oas-acc-primary-rgb), 0.045);
+    background: color-mix(in srgb, var(--oas-color-primary) 4.5%, transparent);
 }
 
 .ui-acc-account-tree-panel .ui-acc-tree__row.is-selected {
-    background: linear-gradient(90deg, rgba(var(--oas-acc-primary-rgb), 0.055), rgba(var(--oas-acc-primary-rgb), 0.115));
-    border-color: rgba(var(--oas-acc-primary-rgb), 0.3);
-    box-shadow: 0 0 0 1px rgba(var(--oas-acc-primary-rgb), 0.035);
+    background: linear-gradient(90deg, color-mix(in srgb, var(--oas-color-primary) 5.5%, transparent), color-mix(in srgb, var(--oas-color-primary) 11.5%, transparent));
+    border-color: color-mix(in srgb, var(--oas-color-primary) 30%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--oas-color-primary) 3.5%, transparent);
 }
 
 .ui-acc-account-tree-panel .ui-acc-tree__toggle {
     width: 1.22rem;
     min-width: 1.22rem;
     height: 1.65rem;
-    color: #756b98;
+    color: var(--oas-color-primary);
     outline: none;
 }
 
 .ui-acc-account-tree-panel .ui-acc-tree__toggle:focus-visible {
-    background: rgba(var(--oas-acc-primary-rgb), 0.09);
-    box-shadow: 0 0 0 2px rgba(var(--oas-acc-primary-rgb), 0.13);
+    background: color-mix(in srgb, var(--oas-color-primary) 9%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--oas-color-primary) 13%, transparent);
 }
 
 .ui-acc-account-tree-panel .ui-acc-tree__link {
@@ -1822,7 +1822,7 @@
     border-radius: 0.34rem;
     background: transparent;
     outline: none;
-    color: #29243e;
+    color: var(--oas-color-primary);
 }
 
 .ui-acc-account-tree-panel .ui-acc-tree__link:hover,
@@ -1833,7 +1833,7 @@
 }
 
 .ui-acc-account-tree-panel .ui-acc-tree__link:focus-visible {
-    box-shadow: inset 0 0 0 2px rgba(var(--oas-acc-primary-rgb), 0.18);
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--oas-color-primary) 18%, transparent);
 }
 
 .ui-acc-account-tree-panel .ui-acc-tree__icon {
@@ -1843,7 +1843,7 @@
 }
 
 .ui-acc-account-tree-panel .ui-acc-tree__row.is-branch .ui-acc-tree__icon {
-    color: #f59e0b;
+    color: var(--oas-color-warning);
 }
 
 .ui-acc-account-tree-panel .ui-acc-tree__row.is-selected .ui-acc-tree__icon,
@@ -1856,7 +1856,7 @@
     display: block;
     overflow: hidden;
     min-width: 0;
-    color: #38334d;
+    color: var(--oas-color-primary);
     font-size: 0.72rem;
     font-weight: 650;
     line-height: 1.2;
@@ -1867,7 +1867,7 @@
 .ui-acc-account-tree-panel .ui-acc-tree__code {
     justify-self: end;
     min-width: 2.25rem;
-    color: #171329;
+    color: var(--oas-color-primary);
     font-size: 0.68rem;
     font-weight: 850;
     font-variant-numeric: tabular-nums;
@@ -1878,7 +1878,7 @@
 .ui-acc-account-tree-panel .ui-acc-tree__row.is-root .ui-acc-tree__name {
     font-size: 0.76rem;
     font-weight: 800;
-    color: #201a35;
+    color: var(--oas-color-primary);
 }
 
 .ui-acc-account-tree-panel .ui-acc-tree__badge {
@@ -2152,9 +2152,9 @@
     margin: 0;
     appearance: none;
     -webkit-appearance: none;
-    border: 1px solid #d7dce8;
+    border: 1px solid var(--oas-color-border);
     border-radius: 999px;
-    background: #e8ebf2;
+    background: var(--oas-color-subtle);
     outline: none;
     cursor: pointer;
     transition: background-color .16s ease, border-color .16s ease, box-shadow .16s ease;
@@ -2169,8 +2169,8 @@
     width: 0.78rem;
     height: 0.78rem;
     border-radius: 50%;
-    background: #fff;
-    box-shadow: 0 1px 3px rgba(15, 23, 42, .22);
+    background: var(--oas-color-surface);
+    box-shadow: 0 1px 3px color-mix(in srgb, var(--oas-color-text) 22%, transparent);
     transform: translateY(-50%);
     transition: left .16s ease, transform .16s ease;
 }
@@ -2179,7 +2179,7 @@
 .ui-acc-account-editor__section--status .ui-checkbox input[type="checkbox"]:checked {
     border-color: var(--oas-acc-primary);
     background: var(--oas-acc-primary);
-    box-shadow: 0 0 0 1px rgba(var(--oas-acc-primary-rgb), .06);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--oas-color-primary) 6%, transparent);
 }
 
 .ui-acc-account-editor__section--settings .ui-checkbox input[type="checkbox"]:checked::after,
@@ -2189,7 +2189,7 @@
 
 .ui-acc-account-editor__section--settings .ui-checkbox input[type="checkbox"]:focus-visible,
 .ui-acc-account-editor__section--status .ui-checkbox input[type="checkbox"]:focus-visible {
-    box-shadow: 0 0 0 3px rgba(var(--oas-acc-primary-rgb), .16);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--oas-color-primary) 16%, transparent);
 }
 
 .ui-acc-account-editor__section--settings .ui-checkbox:has(input:disabled),
@@ -2784,8 +2784,8 @@
     gap: var(--ui-acc-home-gap);
     padding: .55rem .7rem .65rem;
     box-sizing: border-box;
-    color: #172033;
-    background: linear-gradient(180deg, #fbfcff 0%, #f8fafc 100%);
+    color: var(--oas-color-primary);
+    background: linear-gradient(180deg, var(--oas-color-surface) 0%, var(--oas-color-surface) 100%);
 }
 
 .ui-acc-home__header {
@@ -2812,7 +2812,7 @@
     justify-content: center;
     flex: 0 0 auto;
     border-radius: .85rem;
-    background: linear-gradient(145deg, #eee9ff, #f8f6ff);
+    background: linear-gradient(145deg, var(--oas-color-surface), var(--oas-color-surface));
     color: var(--oas-acc-primary, #6338e8);
     font-size: 1.15rem;
 }
@@ -2822,14 +2822,14 @@
     font-size: 1.45rem;
     line-height: 1.12;
     font-weight: 900;
-    color: #12182b;
+    color: var(--oas-color-primary);
 }
 
 .ui-acc-home__subtitle {
     margin: .2rem 0 0;
     font-size: .74rem;
     line-height: 1.25;
-    color: #7b8498;
+    color: var(--oas-color-text-muted);
     font-weight: 600;
 }
 
@@ -2847,29 +2847,29 @@
     justify-content: center;
     gap: .48rem;
     padding: .48rem .9rem;
-    border: 1px solid #dfe3ec;
+    border: 1px solid var(--oas-color-border);
     border-radius: .72rem;
-    background: #fff;
-    color: #596276;
+    background: var(--oas-color-surface);
+    color: var(--oas-color-text);
     font: inherit;
     font-size: .77rem;
     font-weight: 800;
     text-decoration: none;
     cursor: pointer;
-    box-shadow: 0 2px 5px rgba(34, 45, 72, .035);
+    box-shadow: 0 2px 5px color-mix(in srgb, var(--oas-color-text) 4%, transparent);
     transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
 }
 
 .ui-acc-home__action:hover:not(:disabled) {
-    border-color: rgba(var(--oas-acc-primary-rgb), .4);
-    box-shadow: 0 5px 14px rgba(42, 31, 86, .08);
+    border-color: color-mix(in srgb, var(--oas-color-primary) 40%, transparent);
+    box-shadow: 0 5px 14px color-mix(in srgb, var(--oas-color-text) 8%, transparent);
     transform: translateY(-1px);
 }
 
 .ui-acc-home__action--primary {
     color: var(--oas-acc-primary, #6338e8);
-    border-color: rgba(var(--oas-acc-primary-rgb), .48);
-    background: #fff;
+    border-color: color-mix(in srgb, var(--oas-color-primary) 48%, transparent);
+    background: var(--oas-color-surface);
 }
 
 .ui-acc-home__action:disabled { opacity: .62; cursor: wait; }
@@ -2879,10 +2879,10 @@
     align-items: center;
     gap: .45rem;
     padding: .45rem .7rem;
-    border: 1px solid #fecaca;
+    border: 1px solid var(--oas-color-danger);
     border-radius: .62rem;
-    background: #fff7f7;
-    color: #991b1b;
+    background: var(--oas-color-danger-surface);
+    color: var(--oas-color-danger);
     font-size: .72rem;
     font-weight: 700;
 }
@@ -2900,10 +2900,10 @@
     align-items: center;
     gap: .78rem;
     padding: .7rem .95rem;
-    border: 1px solid #e7eaf1;
+    border: 1px solid var(--oas-color-border);
     border-radius: .85rem;
-    background: #fff;
-    box-shadow: 0 3px 10px rgba(30, 41, 59, .045);
+    background: var(--oas-color-surface);
+    box-shadow: 0 3px 10px color-mix(in srgb, var(--oas-color-text) 4%, transparent);
 }
 
 .ui-acc-home-metric__icon {
@@ -2915,8 +2915,8 @@
     justify-content: center;
     flex: 0 0 auto;
     font-size: 1.03rem;
-    background: #f2efff;
-    color: #6842dc;
+    background: var(--oas-color-surface);
+    color: var(--oas-color-primary);
 }
 
 .ui-acc-home-metric__content {
@@ -2928,7 +2928,7 @@
 
 .ui-acc-home-metric__label {
     font-size: .74rem;
-    color: #596175;
+    color: var(--oas-color-text);
     font-weight: 750;
     white-space: nowrap;
 }
@@ -2941,21 +2941,21 @@
     white-space: nowrap;
     font-size: 1.22rem;
     line-height: 1.15;
-    color: #12182b;
+    color: var(--oas-color-primary);
     font-weight: 900;
 }
 
-.ui-acc-home-metric__meta { font-size: .62rem; color: #9299aa; }
+.ui-acc-home-metric__meta { font-size: .62rem; color: var(--oas-color-text-muted); }
 
-.ui-acc-home-metric--danger { background: linear-gradient(180deg,#fff 0%,#fff6f7 100%); border-color:#f5dfe3; }
-.ui-acc-home-metric--danger .ui-acc-home-metric__icon { background:#fff0f2; color:#e12d4c; }
-.ui-acc-home-metric--danger .ui-acc-home-metric__value { color:#a81731; }
-.ui-acc-home-metric--info { background: linear-gradient(180deg,#fff 0%,#f6f9ff 100%); border-color:#dfe8fa; }
-.ui-acc-home-metric--info .ui-acc-home-metric__icon { background:#eef4ff; color:#2868d8; }
-.ui-acc-home-metric--warning { background: linear-gradient(180deg,#fff 0%,#fff9f0 100%); border-color:#f1e2ca; }
-.ui-acc-home-metric--warning .ui-acc-home-metric__icon { background:#fff3df; color:#e1760a; }
-.ui-acc-home-metric--success { background: linear-gradient(180deg,#fff 0%,#f3fbf7 100%); border-color:#d7ecdf; }
-.ui-acc-home-metric--success .ui-acc-home-metric__icon { background:#e9f9f0; color:#118653; }
+.ui-acc-home-metric--danger { background: linear-gradient(180deg,var(--oas-color-danger-surface) 0%,var(--oas-color-danger-surface) 100%); border-color:var(--oas-color-danger); }
+.ui-acc-home-metric--danger .ui-acc-home-metric__icon { background:var(--oas-color-danger-surface); color:var(--oas-color-danger); }
+.ui-acc-home-metric--danger .ui-acc-home-metric__value { color:var(--oas-color-danger); }
+.ui-acc-home-metric--info { background: linear-gradient(180deg,var(--oas-color-info-surface) 0%,var(--oas-color-info-surface) 100%); border-color:var(--oas-color-primary); }
+.ui-acc-home-metric--info .ui-acc-home-metric__icon { background:var(--oas-color-info-surface); color:var(--oas-color-primary); }
+.ui-acc-home-metric--warning { background: linear-gradient(180deg,var(--oas-color-warning-surface) 0%,var(--oas-color-warning-surface) 100%); border-color:var(--oas-color-warning); }
+.ui-acc-home-metric--warning .ui-acc-home-metric__icon { background:var(--oas-color-warning-surface); color:var(--oas-color-warning); }
+.ui-acc-home-metric--success { background: linear-gradient(180deg,var(--oas-color-success-surface) 0%,var(--oas-color-success-surface) 100%); border-color:var(--oas-color-success); }
+.ui-acc-home-metric--success .ui-acc-home-metric__icon { background:var(--oas-color-success-surface); color:var(--oas-color-success); }
 
 .ui-acc-home__section-grid {
     min-height: 0;
@@ -2971,10 +2971,10 @@
     display: flex;
     flex-direction: column;
     padding: .68rem .75rem .72rem;
-    border: 1px solid #e5e8ef;
+    border: 1px solid var(--oas-color-border);
     border-radius: .86rem;
-    background: rgba(255,255,255,.98);
-    box-shadow: 0 3px 11px rgba(30,41,59,.045);
+    background: color-mix(in srgb, var(--oas-color-surface) 98%, transparent);
+    box-shadow: 0 3px 11px color-mix(in srgb, var(--oas-color-text) 4%, transparent);
     overflow: visible;
 }
 
@@ -2989,7 +2989,7 @@
 }
 
 .ui-acc-home-group__heading { display:flex; align-items:center; gap:.5rem; }
-.ui-acc-home-group__heading h2 { margin:0; font-size:.92rem; font-weight:900; color:#172033; }
+.ui-acc-home-group__heading h2 { margin:0; font-size:.92rem; font-weight:900; color:var(--oas-color-primary); }
 
 .ui-acc-home-group__icon {
     width: 1.95rem;
@@ -2998,19 +2998,19 @@
     align-items: center;
     justify-content: center;
     border-radius: .58rem;
-    background:#f1edff;
-    color:#6842dc;
+    background:var(--oas-color-surface);
+    color:var(--oas-color-primary);
     font-size:.8rem;
 }
 
-.ui-acc-home-group__more { position:relative; color:#6842dc; }
+.ui-acc-home-group__more { position:relative; color:var(--oas-color-primary); }
 .ui-acc-home-group__more > summary {
     list-style:none;
     cursor:pointer;
     display:inline-flex;
     align-items:center;
     gap:.35rem;
-    color:#6842dc;
+    color:var(--oas-color-primary);
     font-size:.72rem;
     font-weight:800;
     user-select:none;
@@ -3027,10 +3027,10 @@
     max-height:16rem;
     overflow:auto;
     padding:.35rem;
-    border:1px solid #e2e4ec;
+    border:1px solid var(--oas-color-border);
     border-radius:.7rem;
-    background:#fff;
-    box-shadow:0 12px 30px rgba(30,41,59,.15);
+    background:var(--oas-color-surface);
+    box-shadow:0 12px 30px color-mix(in srgb, var(--oas-color-text) 15%, transparent);
 }
 .ui-acc-home-group__menu a {
     min-height:2.25rem;
@@ -3039,12 +3039,12 @@
     gap:.5rem;
     padding:.35rem .42rem;
     border-radius:.48rem;
-    color:#30394d;
+    color:var(--oas-color-primary);
     text-decoration:none;
     font-size:.69rem;
     font-weight:750;
 }
-.ui-acc-home-group__menu a:hover { background:#f7f5ff; color:#5c36cf; }
+.ui-acc-home-group__menu a:hover { background:var(--oas-color-surface); color:var(--oas-color-primary); }
 .ui-acc-home-group__menu-icon {
     width:1.65rem;
     height:1.65rem;
@@ -3052,14 +3052,14 @@
     align-items:center;
     justify-content:center;
     border-radius:.45rem;
-    background:#f2efff;
-    color:#6842dc;
+    background:var(--oas-color-surface);
+    color:var(--oas-color-primary);
     flex:0 0 auto;
 }
-.ui-acc-home-group__menu-icon.ui-acc-home-nav--green { background:#eaf9f1; color:#13935b; }
-.ui-acc-home-group__menu-icon.ui-acc-home-nav--blue { background:#eef5ff; color:#246ad9; }
-.ui-acc-home-group__menu-icon.ui-acc-home-nav--orange { background:#fff3e4; color:#e7790d; }
-.ui-acc-home-group__menu-icon.ui-acc-home-nav--red { background:#fff0f2; color:#d93651; }
+.ui-acc-home-group__menu-icon.ui-acc-home-nav--green { background:var(--oas-color-success-surface); color:var(--oas-color-success); }
+.ui-acc-home-group__menu-icon.ui-acc-home-nav--blue { background:var(--oas-color-info-surface); color:var(--oas-color-primary); }
+.ui-acc-home-group__menu-icon.ui-acc-home-nav--orange { background:var(--oas-color-surface); color:var(--oas-color-warning); }
+.ui-acc-home-group__menu-icon.ui-acc-home-nav--red { background:var(--oas-color-danger-surface); color:var(--oas-color-danger); }
 
 .ui-acc-home-group__tiles {
     flex: 1 1 auto;
@@ -3080,9 +3080,9 @@
     justify-content:center;
     gap:.42rem;
     padding:.62rem .45rem 1.3rem;
-    border:1px solid #e6e8ef;
+    border:1px solid var(--oas-color-border);
     border-radius:.72rem;
-    background:#fff;
+    background:var(--oas-color-surface);
     color:inherit;
     text-decoration:none;
     text-align:center;
@@ -3091,9 +3091,9 @@
 
 .ui-acc-home-nav:hover {
     transform: translateY(-2px);
-    border-color: rgba(var(--oas-acc-primary-rgb), .32);
-    box-shadow:0 7px 18px rgba(43,32,83,.08);
-    background:#fff;
+    border-color: color-mix(in srgb, var(--oas-color-primary) 32%, transparent);
+    box-shadow:0 7px 18px color-mix(in srgb, var(--oas-color-text) 8%, transparent);
+    background:var(--oas-color-surface);
 }
 
 .ui-acc-home-nav__icon {
@@ -3104,14 +3104,14 @@
     justify-content:center;
     border-radius:.72rem;
     flex:0 0 auto;
-    background:#f2efff;
-    color:#6842dc;
+    background:var(--oas-color-surface);
+    color:var(--oas-color-primary);
     font-size:1rem;
 }
-.ui-acc-home-nav--green .ui-acc-home-nav__icon { background:#eaf9f1; color:#13935b; }
-.ui-acc-home-nav--blue .ui-acc-home-nav__icon { background:#eef5ff; color:#246ad9; }
-.ui-acc-home-nav--orange .ui-acc-home-nav__icon { background:#fff3e4; color:#e7790d; }
-.ui-acc-home-nav--red .ui-acc-home-nav__icon { background:#fff0f2; color:#d93651; }
+.ui-acc-home-nav--green .ui-acc-home-nav__icon { background:var(--oas-color-success-surface); color:var(--oas-color-success); }
+.ui-acc-home-nav--blue .ui-acc-home-nav__icon { background:var(--oas-color-info-surface); color:var(--oas-color-primary); }
+.ui-acc-home-nav--orange .ui-acc-home-nav__icon { background:var(--oas-color-surface); color:var(--oas-color-warning); }
+.ui-acc-home-nav--red .ui-acc-home-nav__icon { background:var(--oas-color-danger-surface); color:var(--oas-color-danger); }
 
 .ui-acc-home-nav__content {
     min-width:0;
@@ -3124,7 +3124,7 @@
     max-width:100%;
     font-size:.78rem;
     line-height:1.25;
-    color:#20283a;
+    color:var(--oas-color-primary);
     font-weight:850;
     white-space:nowrap;
     overflow:hidden;
@@ -3135,7 +3135,7 @@
     min-height:1.8em;
     font-size:.61rem;
     line-height:1.35;
-    color:#858d9e;
+    color:var(--oas-color-text-muted);
     display:-webkit-box;
     -webkit-line-clamp:2;
     -webkit-box-orient:vertical;
@@ -3145,7 +3145,7 @@
     position:absolute;
     left:.55rem;
     bottom:.55rem;
-    color:#9ca5b6;
+    color:var(--oas-color-text-muted);
     font-size:.58rem;
 }
 
@@ -3159,17 +3159,17 @@
 .ui-acc-home-panel {
     min-width:0;
     padding:.55rem .75rem;
-    border:1px solid #e5e8ef;
+    border:1px solid var(--oas-color-border);
     border-radius:.78rem;
-    background:#fff;
-    box-shadow:0 3px 10px rgba(30,41,59,.04);
+    background:var(--oas-color-surface);
+    box-shadow:0 3px 10px color-mix(in srgb, var(--oas-color-text) 4%, transparent);
 }
-.ui-acc-home-panel--attention { border-color:#f3d8dc; background:linear-gradient(180deg,#fff 0%,#fffafa 100%); }
+.ui-acc-home-panel--attention { border-color:var(--oas-color-border); background:linear-gradient(180deg,var(--oas-color-surface) 0%,var(--oas-color-surface) 100%); }
 .ui-acc-home-panel__header { min-height:1.5rem; margin-bottom:.2rem; display:flex; align-items:center; justify-content:space-between; }
 .ui-acc-home-panel__header > div { display:flex; align-items:center; gap:.42rem; }
 .ui-acc-home-panel__header h2 { margin:0; font-size:.82rem; font-weight:900; }
 .ui-acc-home-panel__header i { color:var(--oas-acc-primary,#6338e8); }
-.ui-acc-home-panel--attention .ui-acc-home-panel__header i { color:#d93651; }
+.ui-acc-home-panel--attention .ui-acc-home-panel__header i { color:var(--oas-color-primary); }
 .ui-acc-home-panel__rows { display:grid; gap:.05rem; }
 
 .ui-acc-home-row {
@@ -3180,27 +3180,27 @@
     align-items:center;
     gap:.38rem;
     padding:.16rem .12rem;
-    border-top:1px solid #eef0f4;
+    border-top:1px solid var(--oas-color-border);
     color:inherit;
     text-decoration:none;
 }
 .ui-acc-home-row:first-child { border-top:0; }
 .ui-acc-home-row:hover .ui-acc-home-row__text { color:var(--oas-acc-primary,#6338e8); }
-.ui-acc-home-row__dot { width:.45rem; height:.45rem; border-radius:50%; background:#94a3b8; }
-.ui-acc-home-row__dot--danger { background:#e23b55; }
-.ui-acc-home-row__dot--warning { background:#e88a12; }
-.ui-acc-home-row__dot--info { background:#3d7be4; }
-.ui-acc-home-row__dot--success { background:#14935d; }
+.ui-acc-home-row__dot { width:.45rem; height:.45rem; border-radius:50%; background:var(--oas-color-surface); }
+.ui-acc-home-row__dot--danger { background:var(--oas-color-danger); }
+.ui-acc-home-row__dot--warning { background:var(--oas-color-warning); }
+.ui-acc-home-row__dot--info { background:var(--oas-color-primary); }
+.ui-acc-home-row__dot--success { background:var(--oas-color-success); }
 .ui-acc-home-row__activity-icon {
     width:1.35rem; height:1.35rem; display:inline-flex; align-items:center; justify-content:center;
-    border-radius:.38rem; background:#f1edff; color:#6842dc; font-size:.58rem;
+    border-radius:.38rem; background:var(--oas-color-surface); color:var(--oas-color-primary); font-size:.58rem;
 }
-.ui-acc-home-row__activity-icon--success { background:#eaf9f1; color:#13935b; }
-.ui-acc-home-row__activity-icon--warning { background:#fff3e4; color:#d97813; }
-.ui-acc-home-row__activity-icon--danger { background:#fff0f2; color:#d93651; }
-.ui-acc-home-row__activity-icon--info { background:#eef5ff; color:#246ad9; }
-.ui-acc-home-row__reference { font-size:.65rem; font-weight:850; color:#323a4d; direction:ltr; }
-.ui-acc-home-row__text { min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:.67rem; font-weight:750; color:#3c4558; }
+.ui-acc-home-row__activity-icon--success { background:var(--oas-color-success-surface); color:var(--oas-color-success); }
+.ui-acc-home-row__activity-icon--warning { background:var(--oas-color-warning-surface); color:var(--oas-color-warning); }
+.ui-acc-home-row__activity-icon--danger { background:var(--oas-color-danger-surface); color:var(--oas-color-danger); }
+.ui-acc-home-row__activity-icon--info { background:var(--oas-color-info-surface); color:var(--oas-color-primary); }
+.ui-acc-home-row__reference { font-size:.65rem; font-weight:850; color:var(--oas-color-primary); direction:ltr; }
+.ui-acc-home-row__text { min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:.67rem; font-weight:750; color:var(--oas-color-primary); }
 .ui-acc-home-row__meta {
     max-width:9.5rem;
     white-space:nowrap;
@@ -3208,11 +3208,11 @@
     text-overflow:ellipsis;
     padding:.12rem .38rem;
     border-radius:999px;
-    background:#f3f1fb;
+    background:var(--oas-color-surface);
     font-size:.54rem;
-    color:#858c9d;
+    color:var(--oas-color-text-muted);
 }
-.ui-acc-home-panel__empty { min-height:3.4rem; display:flex; align-items:center; justify-content:center; gap:.4rem; color:#8a91a1; font-size:.66rem; }
+.ui-acc-home-panel__empty { min-height:3.4rem; display:flex; align-items:center; justify-content:center; gap:.4rem; color:var(--oas-color-text-muted); font-size:.66rem; }
 
 @media (max-width: 1180px) {
     .ui-acc-home { --ui-acc-home-gap:.48rem; padding:.35rem .45rem .45rem; }
@@ -3350,10 +3350,10 @@
     gap: 0.55rem;
     margin-bottom: 0.55rem;
     padding: 0.62rem 0.78rem;
-    border: 1px solid rgba(var(--oas-acc-primary-rgb), 0.18);
+    border: 1px solid color-mix(in srgb, var(--oas-color-primary) 18%, transparent);
     border-radius: 0.62rem;
-    background: linear-gradient(180deg, #f8fbff 0%, #f3f7ff 100%);
-    color: #334155;
+    background: linear-gradient(180deg, var(--oas-color-surface) 0%, var(--oas-color-surface) 100%);
+    color: var(--oas-color-primary);
 }
 .ui-acc-account-editor__definition-note > i {
     color: var(--oas-acc-primary);
@@ -3366,65 +3366,65 @@
 .ui-acc-account-editor__definition-note strong {
     margin-bottom: 0.12rem;
     font-size: 0.78rem;
-    color: #172554;
+    color: var(--oas-color-primary);
 }
 .ui-acc-account-editor__definition-note span {
     font-size: 0.7rem;
     line-height: 1.6;
-    color: #516174;
+    color: var(--oas-color-primary);
 }
 .oas-shell.oas-theme-dark .ui-acc-workspace--account-management {
-    --oas-acc-surface-bg: #0b1220;
-    --oas-acc-card-bg: #121a2b;
-    --oas-acc-card-border: #22304a;
-    --oas-acc-card-hover-border: #35517a;
-    --oas-acc-muted: #94a3b8;
+    --oas-acc-surface-bg: var(--oas-color-surface);
+    --oas-acc-card-bg: var(--oas-color-surface);
+    --oas-acc-card-border: var(--oas-color-surface);
+    --oas-acc-card-hover-border: var(--oas-color-surface);
+    --oas-acc-muted: var(--oas-color-text-muted);
 }
 .oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-section,
 .oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-overview,
 .oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-detail-actions__link,
 .oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-editor__definition-note {
-    background: #121a2b;
-    border-color: #22304a;
-    color: #e5ecfb;
+    background: var(--oas-color-surface);
+    border-color: var(--oas-color-primary-border);
+    color: var(--oas-color-on-primary);
 }
 .oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-section__header {
-    background: #0f1728;
-    border-bottom-color: #22304a;
+    background: var(--oas-color-surface);
+    border-bottom-color: var(--oas-color-primary-border);
 }
 .oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-overview {
-    background: linear-gradient(180deg, #121a2b 0%, #101827 100%);
+    background: linear-gradient(180deg, var(--oas-color-surface) 0%, var(--oas-color-surface) 100%);
 }
 .oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-overview__title-line h2,
 .oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-overview__meta strong,
 .oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-tree-panel .ui-acc-tree__link,
 .oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-tree-panel .ui-acc-tree__name {
-    color: #e5ecfb;
+    color: var(--oas-color-on-primary);
 }
 .oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-overview__meta,
 .oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-overview__breadcrumb,
 .oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-tree-panel .ui-acc-tree__code,
 .oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-editor__definition-note span {
-    color: #9fb0ca;
+    color: var(--oas-color-text-muted);
 }
 .oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-tree-panel .ui-acc-tree__row:hover {
-    background: rgba(100, 163, 255, 0.08);
+    background: color-mix(in srgb, var(--oas-color-primary) 8%, transparent);
 }
 .oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-tree-panel .ui-acc-tree__row.is-selected {
-    background: linear-gradient(90deg, rgba(100, 163, 255, 0.12), rgba(100, 163, 255, 0.2));
-    border-color: rgba(100, 163, 255, 0.28);
+    background: linear-gradient(90deg, color-mix(in srgb, var(--oas-color-primary) 12%, transparent), color-mix(in srgb, var(--oas-color-primary) 20%, transparent));
+    border-color: color-mix(in srgb, var(--oas-color-primary-border) 28%, transparent);
 }
 .oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-editor__definition-note strong {
-    color: #dbeafe;
+    color: var(--oas-color-on-primary);
 }
 .oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-editor .ui-acc-readonly-field__value,
 .oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-editor .ui-input-text__control--small,
 .oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-editor .ui-select__control--small,
 .oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-editor .ui-input-date__control--small,
 .oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-editor .ui-lookup__control {
-    background: #0f1728;
-    border-color: #2b3852;
-    color: #e5ecfb;
+    background: var(--oas-color-surface);
+    border-color: var(--oas-color-primary-border);
+    color: var(--oas-color-on-primary);
 }
 @media (max-width: 960px) {
     .ui-acc-account-tree-toolbar__actions,
@@ -3472,7 +3472,7 @@
 
 .oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-editor__section--settings .ui-checkbox,
 .oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-account-editor__section--status .ui-checkbox {
-    color: #e5ecfb;
+    color: var(--oas-color-on-primary);
 }
 
 
@@ -3657,8 +3657,8 @@
 }
 
 .oas-shell.oas-theme-dark .ui-acc-workspace--account-management .ui-acc-workspace__combined-toolbar {
-    background: #121a2b;
-    border-color: #22304a;
+    background: var(--oas-color-surface);
+    border-color: var(--oas-color-primary-border);
 }
 
 
@@ -3998,8 +3998,8 @@
 .oas-voucher-review__currency strong, .oas-voucher-review__base strong { font-variant-numeric: tabular-nums; }
 .oas-voucher-review__base { font-weight: 750; color: var(--oas-voucher-accent, var(--oas-acc-primary)); }
 .oas-voucher-review__check--ok, .oas-voucher-review__check--warn { padding: .48rem .3rem; border-bottom: 1px solid var(--oas-acc-card-border); font-size: .81rem; }
-.oas-voucher-review__check--ok i { color: #059669; }
-.oas-voucher-review__check--warn i { color: #d97706; }
+.oas-voucher-review__check--ok i { color: var(--oas-color-success); }
+.oas-voucher-review__check--warn i { color: var(--oas-color-warning); }
 .oas-voucher-review__notice { font-size: .76rem; color: var(--oas-acc-muted); margin: .55rem 0 0; }
 @media(max-width:850px) {
     .oas-voucher-review__body { grid-template-columns: minmax(0,1fr); }
@@ -4008,8 +4008,8 @@
     .oas-voucher-editor__heading h2 { font-size: 1.05rem; }
 }
 
-.oas-voucher-lines__error { display:flex;align-items:center;gap:.4rem;margin:.45rem 0;padding:.55rem .7rem;border:1px solid #f59e0b;border-radius:.45rem;color:var(--oas-color-text,inherit);background:var(--oas-acc-surface-bg);font-size:.8rem;}
-.oas-voucher-lines__error i {color:#d97706;}
+.oas-voucher-lines__error { display:flex;align-items:center;gap:.4rem;margin:.45rem 0;padding:.55rem .7rem;border:1px solid var(--oas-color-danger);border-radius:.45rem;color:var(--oas-color-text,inherit);background:var(--oas-acc-surface-bg);font-size:.8rem;}
+.oas-voucher-lines__error i {color:var(--oas-color-danger);}
 
 /* Voucher entry / edit surface: compact document header, live sidebar, editable ledger.
    Uses the accounting theme tokens in both light and dark modes. */
@@ -4024,7 +4024,7 @@
 }
 .oas-voucher-editor--form .oas-voucher-editor__heading { margin-bottom: 0; padding: .2rem .2rem .4rem; }
 .oas-voucher-editor--form .oas-voucher-editor__heading h2 { font-size: 1.28rem; }
-.oas-voucher-editor--form .oas-voucher-editor__status i { color: #d99c2b; font-size: .5rem; margin-inline-end: .25rem; }
+.oas-voucher-editor--form .oas-voucher-editor__status i { color: var(--oas-color-warning); font-size: .5rem; margin-inline-end: .25rem; }
 .oas-voucher-editor__top-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(210px, 24%);
@@ -4039,7 +4039,7 @@
     border-radius: .72rem;
     min-width: 0;
     overflow: hidden;
-    box-shadow: 0 2px 10px rgba(2, 8, 23, .035);
+    box-shadow: 0 2px 10px color-mix(in srgb, var(--oas-color-text) 4%, transparent);
 }
 .oas-voucher-editor__identity { padding: 0 1rem 1rem; }
 .oas-voucher-editor__identity-heading {
@@ -4093,7 +4093,7 @@
     border-radius: .4rem; background: var(--oas-acc-surface-bg);
     font-size: .78rem; font-weight: 700;
 }
-.oas-voucher-editor__readonly > strong i { color: #d99c2b; font-size: .54rem; margin-inline-end: .35rem; }
+.oas-voucher-editor__readonly > strong i { color: var(--oas-color-warning); font-size: .54rem; margin-inline-end: .35rem; }
 .oas-voucher-editor__identity-description { margin-top: .75rem; }
 .oas-voucher-editor__journal { margin-top: .75rem; padding: .6rem .7rem; border: 1px solid var(--oas-acc-card-border); border-radius: .5rem; }
 .oas-voucher-quick-summary { display: flex; flex-direction: column; }
@@ -4111,8 +4111,8 @@
 .oas-voucher-quick-summary__row strong { font-variant-numeric: tabular-nums; font-size: .85rem; }
 .oas-voucher-quick-summary__row--primary { align-items: flex-start; flex-direction: column; }
 .oas-voucher-quick-summary__row--primary strong { font-size: 1.02rem; }
-.oas-voucher-quick-summary__row .is-ready { color: #16a34a; }
-.oas-voucher-quick-summary__row .is-pending { color: #d97706; }
+.oas-voucher-quick-summary__row .is-ready { color: var(--oas-color-success); }
+.oas-voucher-quick-summary__row .is-pending { color: var(--oas-color-warning); }
 .oas-voucher-quick-summary__saved { padding: .7rem .1rem; color: var(--oas-acc-muted); font-size: .75rem; }
 .oas-voucher-quick-summary__note {
     font-size: .72rem; line-height: 1.6; color: var(--oas-acc-muted);
@@ -4188,14 +4188,14 @@
     padding: .35rem .43rem; cursor: pointer;
 }
 .oas-voucher-lines__row-button:hover { background: var(--oas-acc-surface-bg); border-color: var(--oas-acc-card-border); }
-.oas-voucher-lines__row-button--danger { color: #dc5260; }
+.oas-voucher-lines__row-button--danger { color: var(--oas-color-danger); }
 .oas-voucher-lines__ledger-footer {
     display: flex; align-items: center; justify-content: space-between;
     gap: .65rem; flex-wrap: wrap; padding: .6rem .15rem 0;
     color: var(--oas-acc-muted); font-size: .73rem;
 }
 .oas-voucher-lines__ledger-footer i { margin-inline-end: .25rem; }
-.oas-voucher-lines__pending { color: #d97706; }
+.oas-voucher-lines__pending { color: var(--oas-color-warning); }
 .oas-voucher-editor--form .oas-voucher-review { margin-top: 0; }
 .oas-voucher-editor--form .oas-voucher-review__body { direction: rtl; }
 .oas-voucher-editor--form .oas-voucher-review__base {
@@ -4217,7 +4217,7 @@
     .oas-voucher-editor__heading h2 { flex-wrap: wrap; }
 }
 /* Blue action emphasis from the approved dark voucher mockup, without fixing surface colors. */
-.ui-acc-workspace--vouchers { --oas-voucher-accent: #2478f2; }
+.ui-acc-workspace--vouchers { --oas-voucher-accent: var(--oas-color-primary); }
 
 /* ===========================================================================
    Voucher ADD / EDIT — layout aligned with approved Arabic reference (Nov 2026)
@@ -4246,18 +4246,18 @@
     padding: .25rem 0;
 }
 .oas-voucher-editor--reference {
-    --oas-voucher-accent: #187dff;
-    --oas-acc-card-bg: #14253d;
-    --oas-acc-surface-bg: #0e1e34;
-    --oas-acc-card-border: #344b68;
-    --oas-acc-muted: #a8bbd8;
+    --oas-voucher-accent: var(--oas-color-primary);
+    --oas-acc-card-bg: var(--oas-color-surface);
+    --oas-acc-surface-bg: var(--oas-color-surface);
+    --oas-acc-card-border: var(--oas-color-surface);
+    --oas-acc-muted: var(--oas-color-text-muted);
     --oas-color-text: #edf5ff;
     --oas-color-primary: #187dff;
     --oas-color-surface: #14253d;
     --oas-color-border: #344b68;
     --oas-color-text-muted: #a8bbd8;
     --oas-color-input-bg: #102038;
-    color: #edf5ff;
+    color: var(--oas-color-on-primary);
     color-scheme: dark;
     line-height: 1.5;
     gap: .75rem;
@@ -4276,16 +4276,16 @@
     font-weight: 800;
     letter-spacing: -.025rem;
     margin-bottom: .15rem;
-    color: #f1f7ff;
+    color: var(--oas-color-on-primary);
 }
-.oas-voucher-editor--reference .oas-voucher-editor__heading h2 i { color: #339fff; }
+.oas-voucher-editor--reference .oas-voucher-editor__heading h2 i { color: var(--oas-color-primary); }
 .oas-voucher-editor--reference .oas-voucher-editor__heading p { margin: .1rem 0 0; font-size: .82rem; }
-.oas-voucher-editor--reference .oas-voucher-editor__eyebrow { color: #9db6d8; }
+.oas-voucher-editor--reference .oas-voucher-editor__eyebrow { color: var(--oas-color-primary); }
 .oas-voucher-editor--reference .oas-voucher-editor__eyebrow i { padding-inline: .3rem; font-size: .65rem; }
 .oas-voucher-editor--reference .oas-voucher-editor__status {
-    background: #22334c;
-    border: 1px solid #354b6b;
-    color: #eaf1fc;
+    background: var(--oas-color-surface);
+    border: 1px solid var(--oas-color-primary-border);
+    color: var(--oas-color-on-primary);
     border-radius: 50rem;
     font-weight: 800;
     font-size: .79rem;
@@ -4300,17 +4300,17 @@
 }
 .oas-voucher-editor--reference .oas-voucher-lines__entry-card {
     padding: 0 .95rem .8rem;
-    background: linear-gradient(180deg, #192c46 0, #122239 100%);
-    border: 1px solid #344b69;
-    box-shadow: 0 3px 10px rgba(0,0,0,.13);
+    background: linear-gradient(180deg, var(--oas-color-surface) 0, var(--oas-color-surface) 100%);
+    border: 1px solid var(--oas-color-primary-border);
+    box-shadow: 0 3px 10px color-mix(in srgb, var(--oas-color-text) 13%, transparent);
 }
 .oas-voucher-editor--reference .oas-voucher-editor__identity-heading {
     min-height: 49px;
     justify-content: flex-start;
     margin: 0 -.95rem .55rem;
     padding: 0 .85rem;
-    background: rgba(18,36,60,.8);
-    border-bottom: 1px solid #344b69;
+    background: color-mix(in srgb, var(--oas-color-surface) 80%, transparent);
+    border-bottom: 1px solid var(--oas-color-primary-border);
 }
 .oas-voucher-editor--reference .oas-voucher-editor__nav {
     display: flex;
@@ -4322,9 +4322,9 @@
     padding: 0;
 }
 .oas-voucher-editor--reference .oas-voucher-editor__nav button {
-    background: #101e33;
-    color: #dfebfa;
-    border: 1px solid #344b69;
+    background: var(--oas-color-surface);
+    color: var(--oas-color-on-primary);
+    border: 1px solid var(--oas-color-primary-border);
     border-radius: .35rem .35rem 0 0;
     padding: .53rem .95rem;
     cursor: pointer;
@@ -4332,10 +4332,10 @@
     font-weight: 750;
 }
 .oas-voucher-editor--reference .oas-voucher-editor__nav button.is-active {
-    color: #fff;
-    border-color: #2474d0;
-    background: linear-gradient(180deg, #1f83f9 0%, #0854c2 100%);
-    box-shadow: inset 0 1px 0 #4fbbff;
+    color: var(--oas-color-on-primary);
+    border-color: var(--oas-color-primary-border);
+    background: linear-gradient(180deg, var(--oas-color-primary) 0%, var(--oas-color-primary) 100%);
+    box-shadow: inset 0 1px 0 var(--oas-color-on-primary);
 }
 .oas-voucher-editor--reference .oas-voucher-editor__identity-fields {
     grid-template-columns: repeat(4, minmax(0,1fr));
@@ -4344,9 +4344,9 @@
 }
 .oas-voucher-editor--reference .oas-voucher-editor__readonly > strong {
     min-height: 38px;
-    color: #e6f0ff;
-    background: #10223a;
-    border-color: #38506e;
+    color: var(--oas-color-on-primary);
+    background: var(--oas-color-surface);
+    border-color: var(--oas-color-primary-border);
     white-space: nowrap;
     font-size: .78rem;
 }
@@ -4358,13 +4358,13 @@
     min-height: 33px;
     padding: .5rem 0 0;
     font-size: .75rem;
-    color: #bfcee4;
+    color: var(--oas-color-text-muted);
 }
 .oas-voucher-editor--reference .oas-voucher-editor__kind-band > strong {
-    color: #fff;
-    background: linear-gradient(180deg,#1f80f5,#0952b9);
+    color: var(--oas-color-on-primary);
+    background: linear-gradient(180deg,var(--oas-color-primary),var(--oas-color-primary));
     border-radius: .35rem;
-    border: 1px solid #338be8;
+    border: 1px solid var(--oas-color-primary-border);
     padding: .2rem .85rem;
     font-size: .75rem;
 }
@@ -4372,20 +4372,20 @@
 .oas-voucher-editor--reference .oas-voucher-lines__entry-head {
     padding: .46rem 0 .25rem;
     margin-bottom: .4rem;
-    border-color: #263e5c;
+    border-color: var(--oas-color-primary-border);
 }
 .oas-voucher-editor--reference .oas-voucher-lines__entry-head h3 { font-size: .82rem; }
 .oas-voucher-editor--reference .oas-voucher-lines__entry-head p {
     font-size: .71rem;
     margin-top: .05rem;
-    color: #91a9ca;
+    color: var(--oas-color-primary);
 }
 .oas-voucher-editor--reference .oas-voucher-lines__selected-badge {
     padding: .15rem .55rem;
     margin-bottom: .38rem;
-    background: #14325a;
-    border-color: #2364a9;
-    color: #b9d9ff;
+    background: var(--oas-color-surface);
+    border-color: var(--oas-color-primary-border);
+    color: var(--oas-color-primary);
     font-size: .72rem;
 }
 .oas-voucher-editor--reference .oas-voucher-lines__fields {
@@ -4398,135 +4398,135 @@
 .oas-voucher-editor--reference .oas-voucher-lines__fields > * { min-width: 0; }
 .oas-voucher-editor--reference .oas-voucher-editor__identity-description { margin-top: .5rem; }
 .oas-voucher-editor--reference .oas-voucher-lines__fields .ui-acc-settlement-line__rate {
-    background: #122840;
-    border-color: #375574;
+    background: var(--oas-color-surface);
+    border-color: var(--oas-color-primary-border);
     padding: .25rem .45rem;
     min-height: 38px;
     display: flex;
     flex-direction: column;
     justify-content: center;
 }
-.oas-voucher-editor--reference .oas-voucher-lines__fields .oas-voucher-lines__rate-label { color: #e0eeff; }
+.oas-voucher-editor--reference .oas-voucher-lines__fields .oas-voucher-lines__rate-label { color: var(--oas-color-on-primary); }
 .oas-voucher-editor--reference .oas-voucher-lines__rate-select-label select {
-    color: #e8f1ff;
-    background: #10213b;
+    color: var(--oas-color-on-primary);
+    background: var(--oas-color-surface);
 }
 .oas-voucher-editor--reference :is(input, select, textarea, .form-control, .form-select) {
-    background-color: #101f35;
-    border-color: #3a5474;
-    color: #f0f6ff;
+    background-color: var(--oas-color-surface);
+    border-color: var(--oas-color-primary-border);
+    color: var(--oas-color-on-primary);
     box-shadow: none;
 }
-.oas-voucher-editor--reference :is(input, select, textarea, .form-control, .form-select)::placeholder { color: #839bbd; }
+.oas-voucher-editor--reference :is(input, select, textarea, .form-control, .form-select)::placeholder { color: var(--oas-color-primary); }
 .oas-voucher-editor--reference :is(input, select, textarea, .form-control, .form-select):focus {
-    outline: 2px solid #2688fb;
+    outline: 2px solid var(--oas-color-primary-border);
     outline-offset: 0;
-    border-color: #328cf0;
+    border-color: var(--oas-color-primary-border);
 }
 .oas-voucher-editor--reference :is(input, select, textarea, .form-control, .form-select):disabled,
 .oas-voucher-editor--reference :is(input, select, textarea, .form-control, .form-select)[readonly] {
     opacity: .83;
-    color: #c6d5e9;
-    background-color: #182941;
+    color: var(--oas-color-text);
+    background-color: var(--oas-color-surface);
 }
-.oas-voucher-editor--reference :is(.ui-text-label,.ui-acc-number-field__label,label) { color: #c8d9ef; }
+.oas-voucher-editor--reference :is(.ui-text-label,.ui-acc-number-field__label,label) { color: var(--oas-color-text); }
 .oas-voucher-editor--reference .oas-voucher-quick-summary {
     display: flex;
     flex-direction: column;
-    background: linear-gradient(180deg,#182a43,#101f35);
-    border: 1px solid #344b69;
+    background: linear-gradient(180deg,var(--oas-color-surface),var(--oas-color-surface));
+    border: 1px solid var(--oas-color-primary-border);
     border-radius: .7rem;
     overflow: hidden;
-    color: #f0f6ff;
+    color: var(--oas-color-on-primary);
 }
 .oas-voucher-editor--reference .oas-voucher-quick-summary h3 {
-    background: #1a304c;
-    color: #eef5ff;
+    background: var(--oas-color-surface);
+    color: var(--oas-color-on-primary);
     min-height: 48px;
     padding: .75rem .9rem;
 }
 .oas-voucher-editor--reference .oas-voucher-quick-summary__row {
-    border-color: #314762;
+    border-color: var(--oas-color-primary-border);
     padding: .68rem .1rem;
 }
 .oas-voucher-editor--reference .oas-voucher-quick-summary__row--primary { flex-direction: column; align-items: flex-start; }
-.oas-voucher-editor--reference .oas-voucher-quick-summary__row strong { color: #f3f7ff; }
-.oas-voucher-editor--reference .oas-voucher-quick-summary__row--primary strong { color: #e4f1ff; font-size: 1rem; }
-.oas-voucher-editor--reference .oas-voucher-quick-summary__note { color: #a8bddd; }
+.oas-voucher-editor--reference .oas-voucher-quick-summary__row strong { color: var(--oas-color-on-primary); }
+.oas-voucher-editor--reference .oas-voucher-quick-summary__row--primary strong { color: var(--oas-color-on-primary); font-size: 1rem; }
+.oas-voucher-editor--reference .oas-voucher-quick-summary__note { color: var(--oas-color-text-muted); }
 .oas-voucher-editor--reference .oas-voucher-lines__ledger-card {
-    background: linear-gradient(180deg,#172a43,#101e33);
-    border-color: #344b69;
+    background: linear-gradient(180deg,var(--oas-color-surface),var(--oas-color-surface));
+    border-color: var(--oas-color-primary-border);
     border-radius: .7rem;
     padding: 0 .7rem .6rem;
 }
 .oas-voucher-editor--reference .oas-voucher-lines__ledger-head { margin-bottom: .15rem; padding: .68rem .4rem; border: 0; }
-.oas-voucher-editor--reference .oas-voucher-lines__ledger-head span { color: #9fb5d4; }
+.oas-voucher-editor--reference .oas-voucher-lines__ledger-head span { color: var(--oas-color-primary); }
 .oas-voucher-editor--reference .oas-voucher-lines__add {
-    color: #fff;
-    border: 1px solid #319aff;
-    background: linear-gradient(180deg,#268ffc,#0451c7);
-    box-shadow: 0 1px 4px rgba(0,0,0,.14);
+    color: var(--oas-color-on-primary);
+    border: 1px solid var(--oas-color-primary-border);
+    background: linear-gradient(180deg,var(--oas-color-primary),var(--oas-color-primary));
+    box-shadow: 0 1px 4px color-mix(in srgb, var(--oas-color-text) 14%, transparent);
 }
-.oas-voucher-editor--reference .oas-voucher-lines__table-scroll { border-color: #354e6c; border-radius: .35rem; }
+.oas-voucher-editor--reference .oas-voucher-lines__table-scroll { border-color: var(--oas-color-primary-border); border-radius: .35rem; }
 .oas-voucher-editor--reference .oas-voucher-lines__table { min-width: 1020px; border-spacing: 0; }
 .oas-voucher-editor--reference .oas-voucher-lines__table th {
-    color: #dae7f9;
-    background: #21354f;
-    border-color: #344b69;
+    color: var(--oas-color-on-primary);
+    background: var(--oas-color-surface);
+    border-color: var(--oas-color-primary-border);
     font-size: .74rem;
     padding: .5rem .55rem;
 }
 .oas-voucher-editor--reference .oas-voucher-lines__table td {
-    background: #14263d;
-    color: #edf5ff;
-    border-color: #293f5e;
+    background: var(--oas-color-surface);
+    color: var(--oas-color-on-primary);
+    border-color: var(--oas-color-primary-border);
     padding: .47rem .55rem;
 }
-.oas-voucher-editor--reference .oas-voucher-lines__table tbody tr:nth-child(even) td { background: #102137; }
-.oas-voucher-editor--reference .oas-voucher-lines__table tbody tr.is-selected td { background: #183f6c; }
-.oas-voucher-editor--reference .oas-voucher-lines__currency { color: #d7eaff; background: #123b7e; border-color: #25579b; }
-.oas-voucher-editor--reference .oas-voucher-lines__ledger-footer { color: #9eb5d5; }
+.oas-voucher-editor--reference .oas-voucher-lines__table tbody tr:nth-child(even) td { background: var(--oas-color-surface); }
+.oas-voucher-editor--reference .oas-voucher-lines__table tbody tr.is-selected td { background: var(--oas-color-surface); }
+.oas-voucher-editor--reference .oas-voucher-lines__currency { color: var(--oas-color-text); background: var(--oas-color-primary); border-color: var(--oas-color-primary-border); }
+.oas-voucher-editor--reference .oas-voucher-lines__ledger-footer { color: var(--oas-color-primary); }
 .oas-voucher-editor--reference .oas-voucher-review {
-    background: linear-gradient(180deg,#182c46,#0f2035);
-    border: 1px solid #344b69;
+    background: linear-gradient(180deg,var(--oas-color-surface),var(--oas-color-surface));
+    border: 1px solid var(--oas-color-primary-border);
     border-radius: .7rem;
     overflow: hidden;
     padding: 0 .8rem .75rem;
-    color: #f0f6ff;
+    color: var(--oas-color-on-primary);
 }
 .oas-voucher-editor--reference .oas-voucher-review__head {
     margin: 0 -.8rem .6rem;
     padding: .67rem .85rem;
     min-height: 45px;
-    background: #1b304a;
-    border-bottom: 1px solid #344b69;
+    background: var(--oas-color-surface);
+    border-bottom: 1px solid var(--oas-color-primary-border);
 }
-.oas-voucher-editor--reference .oas-voucher-review__head h3 { color: #f0f6ff; }
+.oas-voucher-editor--reference .oas-voucher-review__head h3 { color: var(--oas-color-on-primary); }
 .oas-voucher-editor--reference .oas-voucher-review__body { gap: .75rem; align-items: start; }
 .oas-voucher-editor--reference .oas-voucher-review__body > div {
-    background: #102139;
-    border: 1px solid #304967;
+    background: var(--oas-color-surface);
+    border: 1px solid var(--oas-color-primary-border);
     border-radius: .55rem;
-    color: #eaf3ff;
+    color: var(--oas-color-on-primary);
     min-height: 185px;
 }
 .oas-voucher-editor--reference .oas-voucher-review__base {
-    background: linear-gradient(180deg,#1266d6,#0845ae);
-    border: 1px solid #347dda;
+    background: linear-gradient(180deg,var(--oas-color-primary),var(--oas-color-primary));
+    border: 1px solid var(--oas-color-primary-border);
     padding: .52rem .6rem;
     border-radius: .35rem;
-    color: #fff;
+    color: var(--oas-color-on-primary);
 }
-.oas-voucher-editor--reference .oas-voucher-review__base strong { color: #fff; }
-.oas-voucher-editor--reference .oas-voucher-review__check--ok i { color: #45df9d; }
-.oas-voucher-editor--reference .oas-voucher-review__check--warn i { color: #ffba54; }
-.oas-voucher-editor--reference .oas-voucher-review__notice { color: #abc0dd; }
+.oas-voucher-editor--reference .oas-voucher-review__base strong { color: var(--oas-color-on-primary); }
+.oas-voucher-editor--reference .oas-voucher-review__check--ok i { color: var(--oas-color-success); }
+.oas-voucher-editor--reference .oas-voucher-review__check--warn i { color: var(--oas-color-warning); }
+.oas-voucher-editor--reference .oas-voucher-review__notice { color: var(--oas-color-text-muted); }
 .oas-voucher-editor--reference .oas-voucher-editor__review-help {
-    background: #12233b;
-    border-color: #385473;
-    color: #eaf2ff;
+    background: var(--oas-color-surface);
+    border-color: var(--oas-color-primary-border);
+    color: var(--oas-color-on-primary);
 }
-.oas-voucher-editor--reference .oas-voucher-editor__review-help p { color: #abbfdc; }
+.oas-voucher-editor--reference .oas-voucher-editor__review-help p { color: var(--oas-color-text-muted); }
 
 /* Accommodate the shell's real content width; never cover an input or action. */
 @media (max-width: 1340px) {
@@ -4557,12 +4557,12 @@
 .oas-voucher-editor--reference .oas-voucher-review__table-scroller { width: 100%; max-width: 100%; overflow-x: auto; }
 .oas-voucher-editor--reference .oas-voucher-review__currency-table { width: 100%; border-collapse: collapse; font-size: .77rem; }
 .oas-voucher-editor--reference .oas-voucher-review__currency-table th {
-    background: #243951; color: #d7e7ff; padding: .5rem .55rem;
-    text-align: right; font-weight: 750; white-space: nowrap; border: 1px solid #304966;
+    background: var(--oas-color-surface); color: var(--oas-color-text); padding: .5rem .55rem;
+    text-align: right; font-weight: 750; white-space: nowrap; border: 1px solid var(--oas-color-primary-border);
 }
 .oas-voucher-editor--reference .oas-voucher-review__currency-table td {
-    padding: .55rem; text-align: right; color: #eef5ff;
-    background: #142940; border: 1px solid #2a4260; white-space: nowrap;
+    padding: .55rem; text-align: right; color: var(--oas-color-on-primary);
+    background: var(--oas-color-surface); border: 1px solid var(--oas-color-primary-border); white-space: nowrap;
 }
 .oas-voucher-editor--reference .oas-voucher-review__currency-table td[dir="ltr"] { text-align: center; font-variant-numeric: tabular-nums; }
 .oas-voucher-editor--reference .oas-voucher-lines__entry-card { overflow: visible; }
@@ -4658,9 +4658,9 @@
 }
 /* The selected tab stays blue with white text, as in the approved layout. */
 .oas-shell:not(.oas-theme-dark) .oas-voucher-editor--reference .oas-voucher-editor__nav button.is-active {
-    background: linear-gradient(180deg, #1f83f9 0%, #0854c2 100%);
-    color: #fff;
-    border-color: #2474d0;
+    background: linear-gradient(180deg, var(--oas-color-primary) 0%, var(--oas-color-primary) 100%);
+    color: var(--oas-color-on-primary);
+    border-color: var(--oas-color-primary-border);
 }
 .oas-shell:not(.oas-theme-dark) .oas-voucher-editor--reference .oas-voucher-editor__readonly > strong,
 .oas-shell:not(.oas-theme-dark) .oas-voucher-editor--reference .oas-voucher-lines__fields .ui-acc-settlement-line__rate,
@@ -4771,5 +4771,5 @@
 /* Keep the financial total clearly differentiated in either appearance. */
 .oas-shell:not(.oas-theme-dark) .oas-voucher-editor--reference .oas-voucher-review__base,
 .oas-shell:not(.oas-theme-dark) .oas-voucher-editor--reference .oas-voucher-review__base strong {
-    color: #fff;
+    color: var(--oas-color-on-primary);
 }

@@ -1,5 +1,5 @@
 .ui-purchasing-number { min-width:0; display:grid; gap:4px; }
-.ui-purchasing-number label { font-size:10px; font-weight:700; color:#3a3a4f; }
-.ui-purchasing-number input { width:100%; box-sizing:border-box; min-height:34px; border:1px solid #dedbe6; border-radius:6px; background:var(--oas-color-surface); color:var(--oas-color-text); padding-inline:7px; font-family:inherit; font-size:10.5px; }
+.ui-purchasing-number label { font-size:var(--oas-font-xs); font-weight:700; color:var(--oas-color-text); }
+.ui-purchasing-number input { width:100%; box-sizing:border-box; min-height:34px; border:1px solid var(--oas-color-border); border-radius:6px; background:var(--oas-color-surface); color:var(--oas-color-text); padding-inline:7px; font-family:inherit; font-size:var(--oas-font-sm); }
 .ui-purchasing-number input:focus { outline:none; border-color:var(--oas-color-primary); box-shadow:0 0 0 2px color-mix(in srgb,var(--oas-color-primary) 14%,transparent); }
-.ui-purchasing-number input:disabled { background:#f7f6f9; color:#777382; }
+.ui-purchasing-number input:disabled { background:var(--oas-color-disabled-surface); color:var(--oas-color-text-muted); }

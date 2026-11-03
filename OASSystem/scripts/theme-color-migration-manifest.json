@@ -1,0 +1,214 @@
+[
+  {
+    "file": "OAS.Client/Accounting/Components/CustomerRelatedPageHeader.razor.css",
+    "replacements": 2
+  },
+  {
+    "file": "OAS.Client/Accounting/Components/PaymentAllocationEditor.razor.css",
+    "replacements": 20
+  },
+  {
+    "file": "OAS.Client/Accounting/Components/SupplierRelatedPageHeader.razor.css",
+    "replacements": 2
+  },
+  {
+    "file": "OAS.Client/Accounting/Pages/CustomerAccountWorkspacePage.razor.css",
+    "replacements": 7
+  },
+  {
+    "file": "OAS.Client/Accounting/Pages/CustomerArOverviewPage.razor.css",
+    "replacements": 14
+  },
+  {
+    "file": "OAS.Client/Accounting/Pages/SupplierAgingPage.razor.css",
+    "replacements": 2
+  },
+  {
+    "file": "OAS.Client/Accounting/Pages/SupplierCenterPage.razor.css",
+    "replacements": 2
+  },
+  {
+    "file": "OAS.Client/Accounting/Pages/SupplierOpeningsPage.razor.css",
+    "replacements": 2
+  },
+  {
+    "file": "OAS.Client/Features/Employees/Pages/JobTitles.razor.css",
+    "replacements": 7
+  },
+  {
+    "file": "OAS.Client/Identity/Pages/Roles.razor.css",
+    "replacements": 7
+  },
+  {
+    "file": "OAS.Client/Identity/Users/Components/UserEditor.razor.css",
+    "replacements": 3
+  },
+  {
+    "file": "OAS.Client/Inventory/Components/InventorySuggestedInput.razor.css",
+    "replacements": 2
+  },
+  {
+    "file": "OAS.Client/Sales/Pages/CustomerCreditsPage.razor.css",
+    "replacements": 15
+  },
+  {
+    "file": "OAS.Client/Sales/Pages/SalesHomePage.razor.css",
+    "replacements": 50
+  },
+  {
+    "file": "OAS.Client/Sales/Pages/SalesReportsPage.razor.css",
+    "replacements": 6
+  },
+  {
+    "file": "OAS.Client/Sales/Pages/SalesReturnPrintPage.razor.css",
+    "replacements": 11
+  },
+  {
+    "file": "Shared/UiLib/Components/Accounting/Parties/UiAccountingPartyWorkspace.razor.css",
+    "replacements": 67
+  },
+  {
+    "file": "Shared/UiLib/Components/Accounting/Parties/UiCustomerListDashboard.razor.css",
+    "replacements": 2
+  },
+  {
+    "file": "Shared/UiLib/Components/Accounting/Parties/UiCustomerWorkspace.razor.css",
+    "replacements": 114
+  },
+  {
+    "file": "Shared/UiLib/Components/Accounting/Parties/UiSupplierListDashboard.razor.css",
+    "replacements": 2
+  },
+  {
+    "file": "Shared/UiLib/Components/Accounting/Workspace/UiAccountingHomeDashboard.razor.css",
+    "replacements": 86
+  },
+  {
+    "file": "Shared/UiLib/Components/Dialogs/UiOperationResultDialog.razor.css",
+    "replacements": 13
+  },
+  {
+    "file": "Shared/UiLib/Components/Dialogs/UiProfileEditorDialog.razor.css",
+    "replacements": 5
+  },
+  {
+    "file": "Shared/UiLib/Components/Employees/UiEmployeeCard.razor.css",
+    "replacements": 22
+  },
+  {
+    "file": "Shared/UiLib/Components/Employees/UiEmployeeEditorForm.razor.css",
+    "replacements": 8
+  },
+  {
+    "file": "Shared/UiLib/Components/Employees/UiEmployeeExportChoiceDialog.razor.css",
+    "replacements": 13
+  },
+  {
+    "file": "Shared/UiLib/Components/Employees/UiEmployeeFilterMenu.razor.css",
+    "replacements": 6
+  },
+  {
+    "file": "Shared/UiLib/Components/Employees/UiEmployeeImportChoiceDialog.razor.css",
+    "replacements": 13
+  },
+  {
+    "file": "Shared/UiLib/Components/Employees/UiEmployeeListSurface.razor.css",
+    "replacements": 9
+  },
+  {
+    "file": "Shared/UiLib/Components/Employees/UiEmployeeModalHost.razor.css",
+    "replacements": 4
+  },
+  {
+    "file": "Shared/UiLib/Components/Employees/UiEmployeePager.razor.css",
+    "replacements": 7
+  },
+  {
+    "file": "Shared/UiLib/Components/Employees/UiEmployeeWorkspace.razor.css",
+    "replacements": 4
+  },
+  {
+    "file": "Shared/UiLib/Components/Feedback/UiStatusAction.razor.css",
+    "replacements": 6
+  },
+  {
+    "file": "Shared/UiLib/Components/Inputs/UiInputDate.razor.css",
+    "replacements": 4
+  },
+  {
+    "file": "Shared/UiLib/Components/Inputs/UiLookup.razor.css",
+    "replacements": 21
+  },
+  {
+    "file": "Shared/UiLib/Components/Inputs/UiSearchableSelect.razor.css",
+    "replacements": 2
+  },
+  {
+    "file": "Shared/UiLib/Components/Layout/UiAccountMenu.razor.css",
+    "replacements": 14
+  },
+  {
+    "file": "Shared/UiLib/Components/Layout/UiSystemBrand.razor.css",
+    "replacements": 1
+  },
+  {
+    "file": "Shared/UiLib/Components/Navigation/UiApplicationTabStrip.razor.css",
+    "replacements": 2
+  },
+  {
+    "file": "Shared/UiLib/Components/Navigation/UiContextMenu.razor.css",
+    "replacements": 9
+  },
+  {
+    "file": "Shared/UiLib/Components/Workspace/UiAvatar.razor.css",
+    "replacements": 2
+  },
+  {
+    "file": "Shared/UiLib/Components/Workspace/UiAvatarEditor.razor.css",
+    "replacements": 9
+  },
+  {
+    "file": "Shared/UiLib/Components/Workspace/UiDataGridPanel.razor.css",
+    "replacements": 11
+  },
+  {
+    "file": "Shared/UiLib/Components/Workspace/UiDetailsHeader.razor.css",
+    "replacements": 1
+  },
+  {
+    "file": "Shared/UiLib/Components/Workspace/UiPagination.razor.css",
+    "replacements": 1
+  },
+  {
+    "file": "Shared/UiLib/Components/Workspace/UiRecordListHeader.razor.css",
+    "replacements": 3
+  },
+  {
+    "file": "Shared/UiLib/Components/Workspace/UiRecordRow.razor.css",
+    "replacements": 3
+  },
+  {
+    "file": "Shared/UiLib/Components/Workspace/UiSearchInput.razor.css",
+    "replacements": 7
+  },
+  {
+    "file": "Shared/UiLib/Components/Workspace/UiSecretValue.razor.css",
+    "replacements": 1
+  },
+  {
+    "file": "Shared/UiLib/Components/Workspace/UiWorkspaceLayout.razor.css",
+    "replacements": 5
+  },
+  {
+    "file": "Shared/UiLib/wwwroot/css/features/accounting.css",
+    "replacements": 386
+  },
+  {
+    "file": "Shared/UiLib/wwwroot/css/features/employee-import-bulk.css",
+    "replacements": 130
+  },
+  {
+    "file": "Shared/UiLib/wwwroot/css/features/sales.css",
+    "replacements": 143
+  }
+]

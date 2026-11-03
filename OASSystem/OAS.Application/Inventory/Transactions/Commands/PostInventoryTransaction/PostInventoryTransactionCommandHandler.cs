@@ -4,6 +4,7 @@ using OAS.Application.Abstractions.Security;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.Inventory.Repositories;
 using OAS.Application.Inventory.Services;
+using OAS.Application.Inventory.Transactions;
 using OAS.Domain.Entities.Inventory;
 using OAS.Domain.Enums.Inventory;
 
@@ -32,6 +33,10 @@ public sealed class PostInventoryTransactionCommandHandler(
 
         if (transaction.Status == InventoryTransactionStatus.Posted)
             throw new ConflictException("transaction_already_posted", "Transaction has already been posted.");
+
+        // Also guard drafts created before this change, regardless of their ReferenceType/Id.
+        if (!ManualInventoryTransactionPolicy.IsAllowed(transaction.TransactionType))
+            throw new ConflictException(ManualInventoryTransactionPolicy.ErrorCode, ManualInventoryTransactionPolicy.ErrorMessage);
 
         var lines = await transactionRepository.GetLinesAsync(command.TransactionId, cancellationToken);
         if (lines.Count == 0)

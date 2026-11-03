@@ -35,9 +35,10 @@ public sealed class ProductVariantsController(
     public async Task<ActionResult<IReadOnlyList<ProductVariantLookupDto>>> Lookup(
         [FromQuery] string? search,
         [FromQuery] int take = 20,
+        [FromQuery] int skip = 0,
         CancellationToken cancellationToken = default)
     {
-        return Ok(await sender.Send(new SearchProductVariantsQuery(search, take), cancellationToken));
+        return Ok(await sender.Send(new SearchProductVariantsQuery(search, take, Math.Max(0, skip)), cancellationToken));
     }
 
     [HttpGet("{id:guid}")]

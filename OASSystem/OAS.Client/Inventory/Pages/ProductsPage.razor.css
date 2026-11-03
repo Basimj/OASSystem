@@ -1,63 +1,91 @@
-.inventory-products { display: grid; gap: .5rem; min-width: 0; }
-.inventory-products__aside { min-width: 0; }
-.inventory-products__editor { display: grid; gap: .6rem; }
-.inventory-products__specialized { margin-top: .5rem; border: 1px solid var(--oas-color-border); border-radius: 12px; }
-.inventory-products__specialized-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: .5rem; }
-@media (max-width: 700px) { .inventory-products__specialized-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+/* Product create/edit/details only. The list remains unchanged. */
+.inventory-products {
+    display: grid;
+    gap: .5rem;
+    min-width: 0;
+}
 
+.inventory-products__aside,
+.oas-inventory-form-screen__body,
+.oas-inventory-form-screen__body > * {
+    min-width: 0;
+}
 
-/* Dedicated inventory create/edit/details screen: scoped to this routed page. */
+/* UiWorkspaceLayout owns the scrolling viewport (ScrollableMain=true on form routes).
+   This form must not create another fixed-height or clipped scroll region. */
 .oas-inventory-form-screen {
+    box-sizing: border-box;
     width: min(100%, 1180px);
     min-width: 0;
     margin-inline: auto;
-    display: grid;
-    gap: .8rem;
+    padding-bottom: 1.25rem;
 }
-.oas-inventory-form-screen__intro {
-    padding: .8rem 1.15rem;
+
+/* RenderEditor() creates its wrapper in C#, so use ::deep from a Razor-scoped ancestor. */
+.inventory-products__primary-fields ::deep .inventory-products__editor,
+.inventory-products__variant-fields,
+.inventory-products__specialized-fields {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .5rem .75rem;
+    align-items: start;
+    min-width: 0;
+}
+
+.inventory-products__primary-fields { margin-bottom: .65rem; }
+.inventory-products__variant-fields { padding-top: .15rem; }
+
+.inventory-products__specialized {
+    margin-top: .65rem;
     border: 1px solid var(--oas-color-border);
-    border-radius: 14px;
-    background: var(--oas-surface, var(--oas-color-surface, transparent));
+    border-radius: 10px;
+    padding: .4rem .65rem .65rem;
+    min-width: 0;
 }
-.oas-inventory-form-screen__eyebrow {
-    font-size: .75rem;
-    color: var(--oas-color-primary);
-    font-weight: 750;
-    margin-bottom: .12rem;
-}
-.oas-inventory-form-screen__intro h2 {
-    margin: 0;
+.inventory-products__specialized > summary {
+    cursor: pointer;
     color: var(--oas-color-text);
-    line-height: 1.4;
-    font-size: clamp(1.05rem, 1.6vw, 1.35rem);
-    font-weight: 750;
+    font-weight: 650;
+    padding-block: .25rem;
 }
-.oas-inventory-form-screen__intro p {
-    margin: .12rem 0 0;
+.inventory-products__specialized > summary span {
     color: var(--oas-color-text-muted);
-    font-size: .8rem;
+    font-size: .75rem;
+    font-weight: 400;
 }
-.oas-inventory-form-screen__body { min-width: 0; }
-.oas-inventory-form-screen__body > * { min-width: 0; }
-.oas-inventory-form-screen__body .inventory-master-editor,
-.oas-inventory-form-screen__body .inventory-warehouses__editor {
+.inventory-products__specialized-fields { margin-top: .45rem; }
+.inventory-products__specialized-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: .75rem 1rem;
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .5rem .75rem;
+    min-width: 0;
 }
-@media (max-width: 760px) {
-    .oas-inventory-form-screen { gap: .5rem; }
-    .oas-inventory-form-screen__intro { padding: .6rem .75rem; }
-    .oas-inventory-form-screen__intro p { display: none; }
-    .oas-inventory-form-screen__body .inventory-master-editor,
-    .oas-inventory-form-screen__body .inventory-warehouses__editor,
-    .oas-inventory-form-screen__body .inventory-products__specialized-grid,
-    .oas-inventory-form-screen__body .inventory-transactions__line-editor {
-        grid-template-columns: minmax(0, 1fr);
-    }
-    .oas-inventory-form-screen__body .inventory-transactions__details,
-    .oas-inventory-form-screen__body .stock-counts__summary {
-        grid-template-columns: minmax(0, 1fr);
-    }
+
+/* Dense but usable controls and less duplicated card whitespace. Scoped to this page. */
+.oas-inventory-form-screen ::deep .ui-card__header { padding: .65rem .85rem 0; }
+.oas-inventory-form-screen ::deep .ui-card__body { padding: .6rem .85rem .85rem; }
+.oas-inventory-form-screen ::deep .ui-input-text,
+.oas-inventory-form-screen ::deep .ui-select,
+.oas-inventory-form-screen ::deep .inventory-suggested-input { min-width: 0; gap: .15rem; }
+.oas-inventory-form-screen ::deep .ui-input-text__control--small,
+.oas-inventory-form-screen ::deep .ui-select__control--small,
+.oas-inventory-form-screen ::deep .inventory-suggested-input input {
+    min-height: 30px;
+}
+
+@media (max-width: 1050px) {
+    .inventory-products__primary-fields ::deep .inventory-products__editor,
+    .inventory-products__variant-fields,
+    .inventory-products__specialized-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .inventory-products__specialized-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 580px) {
+    .inventory-products__primary-fields ::deep .inventory-products__editor,
+    .inventory-products__variant-fields,
+    .inventory-products__specialized-fields,
+    .inventory-products__specialized-grid { grid-template-columns: minmax(0, 1fr); }
+    .oas-inventory-form-screen ::deep .ui-card__header { padding: .5rem .65rem 0; }
+    .oas-inventory-form-screen ::deep .ui-card__body { padding: .5rem .65rem .7rem; }
 }

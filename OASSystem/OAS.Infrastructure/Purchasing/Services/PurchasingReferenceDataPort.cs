@@ -32,8 +32,8 @@ public sealed class PurchasingReferenceDataPort(OasDbContext dbContext) : IPurch
     public async Task<PurchasingCurrencySnapshot?> GetCurrencyAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var value = await dbContext.Set<Currency>().AsNoTracking().Where(x => x.Id == id)
-            .Select(x => new { x.Id, x.Code, x.IsActive }).FirstOrDefaultAsync(cancellationToken);
-        return value is null ? null : new PurchasingCurrencySnapshot(value.Id, value.Code, value.IsActive);
+            .Select(x => new { x.Id, x.Code, x.IsActive, x.NameAr }).FirstOrDefaultAsync(cancellationToken);
+        return value is null ? null : new PurchasingCurrencySnapshot(value.Id, value.Code, value.IsActive, value.NameAr);
     }
 
     public async Task<PurchasingProductSnapshot?> GetProductVariantAsync(Guid id, CancellationToken cancellationToken = default)

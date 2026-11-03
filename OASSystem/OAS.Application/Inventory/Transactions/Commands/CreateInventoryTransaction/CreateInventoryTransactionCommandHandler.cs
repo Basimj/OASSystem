@@ -3,6 +3,7 @@ using OAS.Application.Abstractions.Numbering;
 using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.Inventory.Repositories;
+using OAS.Application.Inventory.Transactions;
 using OAS.Domain.Entities.Inventory;
 using DomainType = OAS.Domain.Enums.Inventory.InventoryTransactionType;
 
@@ -22,6 +23,10 @@ public sealed class CreateInventoryTransactionCommandHandler(
         CancellationToken cancellationToken)
     {
         var request = command.Request;
+
+        // Never trust the client-side transaction type list: enforce this at the API handler.
+        if (!ManualInventoryTransactionPolicy.IsAllowed((DomainType)(int)request.TransactionType))
+            throw new ConflictException(ManualInventoryTransactionPolicy.ErrorCode, ManualInventoryTransactionPolicy.ErrorMessage);
 
         if (request.SourceWarehouseId.HasValue)
         {

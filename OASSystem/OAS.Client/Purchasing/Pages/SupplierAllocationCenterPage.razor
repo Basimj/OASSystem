@@ -17,7 +17,6 @@
     <header class="supplier-allocation-page__header">
         <div>
             <h1>مركز تخصيص دفعات المورد</h1>
-            <p>اعرض الدفعات المرحلة غير المطبقة، الفواتير المفتوحة، وائتمانات المرتجعات حسب المورد.</p>
         </div>
         @if (_center is not null)
         {
@@ -80,7 +79,6 @@
             <div class="supplier-allocation-section-title">
                 <div>
                     <h2>1. الدفعات المرحلة غير المطبقة</h2>
-                    <p>الرصيد هنا هو ما خرج فعليًا من الصندوق/البنك ولم يُربط بعد بفواتير المورد.</p>
                 </div>
             </div>
             @if (_center.UnappliedPayments.Count == 0)
@@ -115,7 +113,6 @@
             <div class="supplier-allocation-section-title">
                 <div>
                     <h2>2. الفواتير المفتوحة</h2>
-                    <p>المتبقي محسوب من الفاتورة ناقص الدفعات النشطة وائتمانات المورد، وليس من قيمة سند الصرف.</p>
                 </div>
             </div>
             @if (_center.OpenInvoices.Count == 0)

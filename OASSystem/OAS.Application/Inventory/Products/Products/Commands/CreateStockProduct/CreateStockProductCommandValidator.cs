@@ -85,24 +85,9 @@ public sealed class CreateStockProductCommandValidator : AbstractValidator<Creat
             RuleFor(x => x.Request.Variant).NotNull().WithErrorCode("lens_details_variant_required");
         });
 
-        When(x => x.Request.OpeningInventory is not null && x.Request.Product is not null, () =>
-        {
-            RuleFor(x => x.Request.Product.IsStockItem)
-                .Equal(true).WithErrorCode("opening_inventory_requires_stock_product");
-            RuleFor(x => x.Request.Variant)
-                .NotNull().WithErrorCode("opening_inventory_variant_required");
-            RuleFor(x => x.Request.OpeningInventory!.WarehouseId)
-                .NotEmpty().WithErrorCode("opening_warehouse_required");
-            RuleFor(x => x.Request.OpeningInventory!.Quantity)
-                .GreaterThan(0).WithErrorCode("opening_quantity_must_be_positive")
-                .Must(x => FitsNullableDecimal(x, 18, 3)).WithErrorCode("opening_quantity_precision_invalid");
-            RuleFor(x => x.Request.OpeningInventory!.UnitCost)
-                .GreaterThanOrEqualTo(0).WithErrorCode("opening_unit_cost_invalid")
-                .Must(x => FitsNullableDecimal(x, 18, 2)).WithErrorCode("opening_unit_cost_precision_invalid");
-            RuleFor(x => x.Request.OpeningInventory!)
-                .Must(x => x.Quantity <= 0 || x.UnitCost <= 1 || x.Quantity <= 9999999999999999.99m / x.UnitCost)
-                .WithErrorCode("opening_total_cost_precision_invalid");
-        });
+        RuleFor(x => x.Request.OpeningInventory)
+            .Null().WithErrorCode("opening_inventory_disabled")
+            .WithMessage("لا يمكن إضافة رصيد عند إنشاء المنتج؛ تتم زيادة المخزون عبر ترحيل استلام المشتريات فقط.");
     }
     private static bool FitsNullableDecimal6x2(decimal? value) => FitsNullableDecimal(value, 6, 2);
 

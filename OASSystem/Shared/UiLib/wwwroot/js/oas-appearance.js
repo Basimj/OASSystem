@@ -28,10 +28,12 @@ const surfacePalettes = {
         warningBg: '#FFF4E2', warningInk: '#80500B', infoBg: '#E5F5FB'
     },
     SkyYellow: {
-        bg: '#F4FAFF', surface: '#FFFFFF', subtle: '#EDF6FE',
-        text: '#173B59', muted: '#496B84', border: '#D5E8F4',
-        borderSubtle: '#E9F3F9', table: '#E8F5FF',
-        warningBg: '#FFF1B8', warningInk: '#765400', infoBg: '#E7F4FE'
+        // Sky / meadow neutrals preserve table legibility without introducing
+        // a competing dominant color to #26B2FF and #F9FF26.
+        bg: '#F2FAF2', surface: '#FFFFFF', subtle: '#EAF8EF',
+        text: '#173D46', muted: '#536F70', border: '#BFDFD6',
+        borderSubtle: '#E2F1EA', table: '#E8F7FB',
+        warningBg: '#FFF8D8', warningInk: '#6F4C00', infoBg: '#E4F6FF'
     },
     Slate: {
         bg: '#F5F8FC', surface: '#FFFFFF', subtle: '#EEF3F9',
@@ -84,7 +86,7 @@ export function apply(settings, notify = true) {
         : settings.themePreset === 'Slate' ? 'Slate'
         : settings.themePreset === 'Custom' ? 'Custom' : 'Ocean';
     const darkMode = settings.themeMode === 'Dark';
-    const defaultAccent = preset === 'SkyYellow' ? '#0B6FAF'
+    const defaultAccent = preset === 'SkyYellow' ? '#26B2FF'
         : preset === 'Slate' ? '#526C8B' : '#0B8095';
     const accent = safeHex(settings.primaryColor, defaultAccent);
     // Custom accent picks very faint coordinating surfaces rather than
@@ -128,33 +130,41 @@ export function apply(settings, notify = true) {
         tabIcon: '#C9D6E0', tabActive: '#364047', tabActiveFg: '#FFFFFF',
         tabActiveIcon: '#9BE2E0', tabBorder: '#414A54'
     };
+    const skySidebarBlue = !darkMode && preset === 'SkyYellow' && sidebarColor.toUpperCase() === '#26B2FF';
+    const skyHeaderBlue = !darkMode && preset === 'SkyYellow' && headerColor.toUpperCase() === '#26B2FF';
+    const sunSelected = !darkMode && preset === 'SkyYellow' && sidebarSelected.toUpperCase() === '#F9FF26';
+    const sunTab = !darkMode && preset === 'SkyYellow' && tabsSelected.toUpperCase() === '#F9FF26';
     const chrome = darkMode ? darkChrome : {
         sidebar: sidebarColor,
-        sidebarFg: readableInk(sidebarColor, sidebarText),
-        sidebarIcon: readableInk(sidebarColor, sidebarIcon, 3),
+        sidebarFg: skySidebarBlue ? '#FFFFFF' : readableInk(sidebarColor, sidebarText),
+        sidebarIcon: skySidebarBlue ? '#FFFFFF' : readableInk(sidebarColor, sidebarIcon, 3),
         sidebarHover,
         sidebarActive: sidebarSelected,
-        sidebarActiveFg: readableInk(sidebarSelected, sidebarSelectedText),
-        sidebarActiveIcon: readableInk(sidebarSelected, oldOceanSidebar ? '#086C87' : settings.sidebarActiveIconColor, 3),
+        sidebarActiveFg: sunSelected ? '#FFFFFF' : readableInk(sidebarSelected, sidebarSelectedText),
+        sidebarActiveIcon: sunSelected ? '#FFFFFF' : readableInk(sidebarSelected, oldOceanSidebar ? '#086C87' : settings.sidebarActiveIconColor, 3),
         header: headerColor,
-        headerFg: readableInk(headerColor, settings.headerTextColor),
-        headerIcon: readableInk(headerColor, settings.headerIconColor, 3),
+        headerFg: skyHeaderBlue ? '#FFFFFF' : readableInk(headerColor, settings.headerTextColor),
+        headerIcon: skyHeaderBlue ? '#FFFFFF' : readableInk(headerColor, settings.headerIconColor, 3),
         tabBar: tabColor,
         tabBg: tabsBg,
         tabFg: readableInk(tabsBg, settings.tabsTextColor),
         tabIcon: readableInk(tabsBg, settings.tabsIconColor, 3),
         tabActive: tabsSelected,
-        tabActiveFg: readableInk(tabsSelected, settings.tabsActiveTextColor),
-        tabActiveIcon: readableInk(tabsSelected, settings.tabsActiveIconColor, 3),
+        tabActiveFg: sunTab ? '#FFFFFF' : readableInk(tabsSelected, settings.tabsActiveTextColor),
+        tabActiveIcon: sunTab ? '#FFFFFF' : readableInk(tabsSelected, settings.tabsActiveIconColor, 3),
         tabBorder: safeHex(settings.tabsBorderColor, palette.border)
     };
+    // White text on both SkyBlue and SunYellow is intentional for this preset.
+    // Other user-picked primary colors keep automatic contrast selection.
+    const skySunBlue = !darkMode && preset === 'SkyYellow' && accent.toUpperCase() === '#26B2FF';
+    const onPrimary = skySunBlue ? '#FFFFFF' : primaryInk(accent);
     const primarySoft = blendHex(accent, darkMode ? '#20262D' : '#FFFFFF', darkMode ? .79 : .90);
     const primaryBorder = blendHex(accent, darkMode ? '#485862' : '#FFFFFF', darkMode ? .48 : .67);
     const primaryHover = blendHex(accent, darkMode ? '#FFFFFF' : '#000000', darkMode ? .13 : .16);
     const semanticVars = {
         '--oas-ui-accent': accent,
-        '--oas-ui-accent-fg': primaryInk(accent),
-        '--oas-color-on-primary': primaryInk(accent),
+        '--oas-ui-accent-fg': onPrimary,
+        '--oas-color-on-primary': onPrimary,
         '--oas-color-primary': accent,
         '--oas-color-primary-hover': primaryHover,
         '--oas-color-primary-soft': primarySoft,
@@ -172,7 +182,7 @@ export function apply(settings, notify = true) {
         '--oas-color-card-shadow': darkMode ? '0 4px 18px rgba(0,0,0,.16)' : '0 4px 18px rgba(39,79,99,.055)',
         '--oas-color-table-header': palette.table,
         '--oas-color-table-row-hover': darkMode ? '#292F36' : blendHex(accent,palette.surface,.94),
-        '--oas-color-table-row-selected': darkMode ? '#343E45' : (preset === 'SkyYellow' ? '#FFF1B8' : blendHex(accent,palette.surface,.87)),
+        '--oas-color-table-row-selected': darkMode ? '#343E45' : (preset === 'SkyYellow' ? '#F9FF26' : blendHex(accent,palette.surface,.87)),
         '--oas-color-warning': palette.warningInk,
         '--oas-color-warning-surface': palette.warningBg,
         '--oas-color-info-surface': palette.infoBg,
@@ -181,7 +191,7 @@ export function apply(settings, notify = true) {
         '--oas-color-success-surface': darkMode ? '#1B372D' : '#E7F8F1',
         '--oas-color-danger': darkMode ? '#FF848A' : '#C92F39',
         '--oas-color-danger-surface': darkMode ? '#3F272B' : '#FFF0F0',
-        '--oas-color-focus-ring': darkMode ? 'rgba(100,205,180,.32)' : 'rgba(16,120,160,.24)',
+        '--oas-color-focus-ring': darkMode ? 'rgba(100,205,180,.32)' : (preset === 'SkyYellow' ? 'rgba(38,178,255,.30)' : 'rgba(16,120,160,.24)'),
         '--oas-ui-sidebar': chrome.sidebar,
         '--oas-ui-sidebar-fg': chrome.sidebarFg,
         '--oas-ui-sidebar-icon': chrome.sidebarIcon,

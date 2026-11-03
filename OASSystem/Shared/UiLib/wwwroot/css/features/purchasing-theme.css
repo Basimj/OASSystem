@@ -1,0 +1,224 @@
+/* Purchasing appearance bridge. Loaded AFTER all theme presets.
+ * No palette is owned by Purchasing; appearance tokens are the only color source.
+ * Scopes: dashboard, purchasing editors, supplier allocations, reporting, follow-ups
+ * and procurement/customer-demand tracking.
+ */
+
+:is(.oas-purchasing-dashboard,.ui-purchasing-workspace,.purchasing-module-root,.purchasing-aux-page,.supplier-allocation-page,.purchasing-demand-page){
+    color:var(--oas-color-text);
+    accent-color:var(--oas-color-primary);
+}
+
+/* Keep the workspace's existing grid/height semantics while assigning a
+ * Purchasing-only CSS boundary to action bars, tabs and scrollbars. */
+.purchasing-module-root{display:contents}
+.oas-shell .oas-main-inner .purchasing-module-root .ui-workspace__actions,
+.oas-shell .oas-main-inner .purchasing-module-root .ui-workspace__tabs,
+.oas-shell .oas-main-inner .purchasing-module-root .ui-workspace__filters{
+    background-color:var(--oas-color-surface);
+    color:var(--oas-color-text);
+    border-color:var(--oas-color-border);
+    box-shadow:var(--oas-color-card-shadow);
+}
+.oas-shell .oas-main-inner .purchasing-module-root :is(.ui-workspace__main--scrollable,.ui-workspace__aside){
+    scrollbar-color:var(--oas-color-border) transparent;
+}
+.oas-shell .oas-main-inner .purchasing-module-root :is(.ui-workspace__main--scrollable,.ui-workspace__aside)::-webkit-scrollbar-thumb{
+    background:var(--oas-color-border);
+}
+.oas-shell .oas-main-inner .purchasing-module-root :is(.ui-workspace__main--scrollable,.ui-workspace__aside)::-webkit-scrollbar-thumb:hover{
+    background:var(--oas-color-primary-border);
+}
+
+/* Lightweight, theme-sourced cards and headings across purchase workspaces. */
+.oas-shell .oas-main-inner :is(.ui-purchasing-workspace,.purchasing-module-root,.purchasing-aux-page,.supplier-allocation-page,.purchasing-demand-page) :is(.ui-purchasing-editor,.ui-purchasing-po-line,.ui-purchasing-invoice-line,.ui-purchasing-receipt-line,.ui-purchasing-line-card,.ui-purchasing-list__card,.ui-purchasing-invoice-totals,.ui-purchasing-order-progress,.ui-purchasing-advanced,.card,.supplier-allocation-card){
+    background-color:var(--oas-color-surface);
+    color:var(--oas-color-text);
+    border-color:var(--oas-color-border);
+}
+.oas-shell .oas-main-inner :is(.purchasing-aux-page,.supplier-allocation-page,.ui-purchasing-workspace) :is(.card-header,.card-footer,.ui-purchasing-editor__header,.ui-po-lines-toolbar){
+    background:var(--oas-color-subtle);
+    color:var(--oas-color-text);
+    border-color:var(--oas-color-border);
+}
+.oas-shell .oas-main-inner :is(.ui-purchasing-workspace,.purchasing-module-root,.purchasing-aux-page,.supplier-allocation-page,.purchasing-demand-page) :is(h1,h2,h3,h4,strong,legend,label){
+    color:inherit;
+}
+.oas-shell .oas-main-inner :is(.ui-purchasing-workspace,.purchasing-module-root,.purchasing-aux-page,.supplier-allocation-page,.purchasing-demand-page) :is(.text-muted,.small.text-muted,.form-text,.form-label){
+    color:var(--oas-color-text-muted) !important;
+}
+
+/* Bootstrap controls inherit the active appearance (including custom colors). */
+.oas-shell .oas-main-inner :is(.ui-purchasing-workspace,.purchasing-module-root,.purchasing-aux-page,.supplier-allocation-page,.purchasing-demand-page) :is(.form-control,.form-select,textarea,input[type=number],input[type=date],input[type=datetime-local]){
+    background-color:var(--oas-theme-input-bg);
+    color:var(--oas-color-text);
+    border-color:var(--oas-color-border);
+}
+.oas-shell .oas-main-inner :is(.ui-purchasing-workspace,.purchasing-module-root,.purchasing-aux-page,.supplier-allocation-page,.purchasing-demand-page) :is(.form-control,.form-select,textarea,input[type=number],input[type=date],input[type=datetime-local]):focus{
+    border-color:var(--oas-color-primary);
+    box-shadow:0 0 0 3px var(--oas-color-focus-ring);
+}
+.oas-shell .oas-main-inner :is(.ui-purchasing-workspace,.purchasing-module-root,.purchasing-aux-page,.supplier-allocation-page,.purchasing-demand-page) :is(input,textarea)::placeholder{
+    color:var(--oas-color-text-muted);
+}
+.oas-shell .oas-main-inner :is(.ui-purchasing-workspace,.purchasing-module-root,.purchasing-aux-page,.supplier-allocation-page,.purchasing-demand-page) :is(input,select,textarea):disabled{
+    background-color:var(--oas-color-disabled-surface);
+    color:var(--oas-color-text-muted);
+}
+
+/* Every Bootstrap table color is scoped; fixed Bootstrap striping is bypassed. */
+.oas-shell .oas-main-inner :is(.ui-purchasing-workspace,.purchasing-module-root,.purchasing-aux-page,.supplier-allocation-page,.purchasing-demand-page) :is(.table,table){
+    --bs-table-bg:var(--oas-color-surface);
+    --bs-table-color:var(--oas-color-text);
+    --bs-table-border-color:var(--oas-color-border);
+    --bs-table-striped-bg:var(--oas-color-subtle);
+    --bs-table-striped-color:var(--oas-color-text);
+    --bs-table-hover-bg:var(--oas-color-hover);
+    --bs-table-hover-color:var(--oas-color-text);
+    --bs-table-active-bg:var(--oas-color-table-row-selected);
+    --bs-table-active-color:var(--oas-color-text);
+    background-color:var(--oas-color-surface);
+    color:var(--oas-color-text);
+    border-color:var(--oas-color-border);
+}
+.oas-shell .oas-main-inner :is(.ui-purchasing-workspace,.purchasing-module-root,.purchasing-aux-page,.supplier-allocation-page,.purchasing-demand-page) :is(.table,table) :is(th,td){
+    border-color:var(--oas-color-border);
+    color:var(--oas-color-text);
+}
+.oas-shell .oas-main-inner :is(.ui-purchasing-workspace,.purchasing-module-root,.purchasing-aux-page,.supplier-allocation-page,.purchasing-demand-page) :is(.table,table) thead th{
+    background-color:var(--oas-color-table-header) !important;
+    color:var(--oas-color-text) !important;
+}
+.oas-shell .oas-main-inner :is(.ui-purchasing-workspace,.purchasing-module-root,.purchasing-aux-page,.supplier-allocation-page,.purchasing-demand-page) :is(.table,table) tbody tr:nth-child(even):not(.is-selected):not(.table-active)>td{
+    background-color:var(--oas-color-subtle) !important;
+    color:var(--oas-color-text) !important;
+}
+.oas-shell .oas-main-inner :is(.ui-purchasing-workspace,.purchasing-module-root,.purchasing-aux-page,.supplier-allocation-page,.purchasing-demand-page) :is(.table,table) tbody tr:hover:not(.is-selected):not(.table-active)>td{
+    background-color:var(--oas-color-table-row-hover) !important;
+    color:var(--oas-color-text) !important;
+}
+.oas-shell .oas-main-inner :is(.ui-purchasing-workspace,.purchasing-module-root,.purchasing-aux-page,.supplier-allocation-page,.purchasing-demand-page) :is(.table,table) tbody tr.is-selected>td{
+    background-color:var(--oas-color-table-row-selected) !important;
+    color:var(--oas-ui-tabs-active-fg) !important;
+}
+
+/* Bootstrap action semantics remain meaningful, but their colors come from theme. */
+.oas-shell .oas-main-inner :is(.ui-purchasing-workspace,.purchasing-module-root,.purchasing-aux-page,.supplier-allocation-page,.purchasing-demand-page) .btn-primary{
+    --bs-btn-bg:var(--oas-color-primary);
+    --bs-btn-border-color:var(--oas-color-primary);
+    --bs-btn-color:var(--oas-color-on-primary);
+    --bs-btn-hover-bg:var(--oas-color-primary-hover);
+    --bs-btn-hover-border-color:var(--oas-color-primary-hover);
+    --bs-btn-hover-color:var(--oas-color-on-primary);
+    --bs-btn-disabled-bg:var(--oas-color-primary);
+    --bs-btn-disabled-border-color:var(--oas-color-primary);
+    --bs-btn-disabled-color:var(--oas-color-on-primary);
+}
+.oas-shell .oas-main-inner :is(.ui-purchasing-workspace,.purchasing-module-root,.purchasing-aux-page,.supplier-allocation-page,.purchasing-demand-page) .btn-outline-primary{
+    --bs-btn-color:var(--oas-color-primary-hover);
+    --bs-btn-border-color:var(--oas-color-primary-border);
+    --bs-btn-hover-bg:var(--oas-color-primary-soft);
+    --bs-btn-hover-color:var(--oas-color-text);
+    --bs-btn-hover-border-color:var(--oas-color-primary);
+    background-color:var(--oas-color-surface);
+}
+.oas-shell .oas-main-inner :is(.ui-purchasing-workspace,.purchasing-module-root,.purchasing-aux-page,.supplier-allocation-page,.purchasing-demand-page) .btn-outline-secondary{
+    --bs-btn-color:var(--oas-color-text);
+    --bs-btn-border-color:var(--oas-color-border);
+    --bs-btn-hover-bg:var(--oas-color-hover);
+    --bs-btn-hover-color:var(--oas-color-text);
+    --bs-btn-hover-border-color:var(--oas-color-primary-border);
+    background-color:var(--oas-color-surface);
+}
+.oas-shell .oas-main-inner :is(.ui-purchasing-workspace,.purchasing-module-root,.purchasing-aux-page,.supplier-allocation-page,.purchasing-demand-page) .btn-danger{
+    --bs-btn-bg:var(--oas-color-danger);
+    --bs-btn-border-color:var(--oas-color-danger);
+    --bs-btn-color:var(--oas-color-on-danger);
+    --bs-btn-hover-bg:var(--oas-color-danger);
+    --bs-btn-hover-border-color:var(--oas-color-danger);
+    --bs-btn-hover-color:var(--oas-color-on-danger);
+}
+.oas-shell .oas-main-inner :is(.ui-purchasing-workspace,.purchasing-module-root,.purchasing-aux-page,.supplier-allocation-page,.purchasing-demand-page) .btn-outline-danger{
+    --bs-btn-color:var(--oas-color-danger);
+    --bs-btn-border-color:var(--oas-color-danger);
+    --bs-btn-hover-bg:var(--oas-color-danger-surface);
+    --bs-btn-hover-color:var(--oas-color-danger);
+    --bs-btn-hover-border-color:var(--oas-color-danger);
+}
+
+
+/* Auxiliary actions and report status text must not fall back to Bootstrap colors. */
+.oas-shell .oas-main-inner :is(.purchasing-aux-page,.supplier-allocation-page,.ui-purchasing-workspace) .btn-outline-warning{
+    --bs-btn-color:var(--oas-color-warning);
+    --bs-btn-border-color:var(--oas-color-warning);
+    --bs-btn-hover-bg:var(--oas-color-warning-surface);
+    --bs-btn-hover-color:var(--oas-color-warning);
+    --bs-btn-hover-border-color:var(--oas-color-warning);
+    background-color:var(--oas-color-surface);
+}
+.oas-shell .oas-main-inner :is(.purchasing-aux-page,.supplier-allocation-page,.ui-purchasing-workspace) .text-danger{color:var(--oas-color-danger) !important}
+.oas-shell .oas-main-inner :is(.purchasing-aux-page,.supplier-allocation-page,.ui-purchasing-workspace) .text-warning{color:var(--oas-color-warning) !important}
+.oas-shell .oas-main-inner :is(.purchasing-aux-page,.supplier-allocation-page,.ui-purchasing-workspace) .text-success{color:var(--oas-color-success) !important}
+.oas-shell .oas-main-inner :is(.purchasing-aux-page,.supplier-allocation-page,.ui-purchasing-workspace) .text-info{color:var(--oas-color-primary) !important}
+
+/* Alerts and status containers use semantic shades, not preset-specific constants. */
+.oas-shell .oas-main-inner :is(.purchasing-aux-page,.supplier-allocation-page,.ui-purchasing-workspace) .alert-danger{
+    --bs-alert-bg:var(--oas-color-danger-surface);
+    --bs-alert-color:var(--oas-color-danger);
+    --bs-alert-border-color:var(--oas-color-danger);
+}
+.oas-shell .oas-main-inner :is(.purchasing-aux-page,.supplier-allocation-page,.ui-purchasing-workspace) .alert-info{
+    --bs-alert-bg:var(--oas-color-info-surface);
+    --bs-alert-color:var(--oas-color-text);
+    --bs-alert-border-color:var(--oas-color-info-border);
+}
+.oas-shell .oas-main-inner :is(.purchasing-aux-page,.supplier-allocation-page,.ui-purchasing-workspace) .alert-warning{
+    --bs-alert-bg:var(--oas-color-warning-surface);
+    --bs-alert-color:var(--oas-color-warning);
+    --bs-alert-border-color:var(--oas-color-warning);
+}
+.oas-shell .oas-main-inner :is(.purchasing-aux-page,.supplier-allocation-page,.ui-purchasing-workspace) .alert-success{
+    --bs-alert-bg:var(--oas-color-success-surface);
+    --bs-alert-color:var(--oas-color-success);
+    --bs-alert-border-color:var(--oas-color-success);
+}
+
+/* Procurement demand tracking reuses sales widgets; re-theme only this screen. */
+.oas-shell .oas-main-inner .purchasing-demand-page .ui-workflow-metric{
+    background:var(--oas-color-surface);
+    color:var(--oas-color-text);
+    border-color:var(--oas-color-border);
+}
+.oas-shell .oas-main-inner .purchasing-demand-page .ui-workflow-metric i{
+    background:var(--oas-color-primary-soft);
+    color:var(--oas-color-primary);
+}
+.oas-shell .oas-main-inner .purchasing-demand-page .ui-workflow-metric :is(span,strong){color:var(--oas-color-text)}
+.oas-shell .oas-main-inner .purchasing-demand-page .ui-workflow-metric.is-danger{background:var(--oas-color-danger-surface);color:var(--oas-color-danger)}
+.oas-shell .oas-main-inner .purchasing-demand-page .ui-workflow-metric.is-warning{background:var(--oas-color-warning-surface);color:var(--oas-color-warning)}
+.oas-shell .oas-main-inner .purchasing-demand-page .ui-workflow-metric.is-success{background:var(--oas-color-success-surface);color:var(--oas-color-success)}
+.oas-shell .oas-main-inner .purchasing-demand-page .ui-workflow-metric.is-info{background:var(--oas-color-info-surface);color:var(--oas-color-primary)}
+.oas-shell .oas-main-inner .purchasing-demand-page .ui-workflow-metric:is(.is-danger,.is-warning,.is-success,.is-info) :is(span,strong,i){color:inherit;background:transparent}
+.oas-shell .oas-main-inner .purchasing-demand-page .ui-workflow-check{color:var(--oas-color-text-muted)}
+.oas-shell .oas-main-inner .purchasing-demand-page .ui-workflow-delay{color:var(--oas-color-danger)}
+.oas-shell .purchasing-demand-drawer{
+    background:var(--oas-color-surface);
+    color:var(--oas-color-text);
+    border-color:var(--oas-color-border);
+    box-shadow:var(--oas-color-card-shadow);
+}
+.oas-shell .purchasing-demand-drawer :is(.ui-workflow-drawer__header,.ui-workflow-drawer__footer){
+    background:var(--oas-color-subtle);
+    border-color:var(--oas-color-border);
+    color:var(--oas-color-text);
+}
+.oas-shell .purchasing-demand-drawer :is(.ui-workflow-drawer__body,.ui-workflow-detail-grid>span,.ui-workflow-optical){
+    background:var(--oas-color-surface);
+    border-color:var(--oas-color-border);
+    color:var(--oas-color-text);
+}
+.oas-shell .purchasing-demand-drawer :is(.ui-workflow-drawer__body h4,.ui-workflow-detail-grid strong,.ui-workflow-drawer__header strong){color:var(--oas-color-text)}
+.oas-shell .purchasing-demand-drawer :is(.ui-workflow-detail-grid>span,.ui-workflow-drawer__header span){color:var(--oas-color-text-muted)}
+.oas-shell .purchasing-demand-drawer .ui-workflow-optical i{color:var(--oas-color-primary)}
+.oas-shell .purchasing-demand-drawer .ui-workflow-drawer__header button{background:var(--oas-color-hover);color:var(--oas-color-text)}
+.oas-shell .purchasing-demand-drawer :is(.form-control,input[type=datetime-local]){background:var(--oas-theme-input-bg);color:var(--oas-color-text);border-color:var(--oas-color-border)}

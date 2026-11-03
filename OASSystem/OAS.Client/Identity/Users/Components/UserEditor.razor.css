@@ -13,10 +13,10 @@
     display: flex;
     align-items: stretch;
     overflow: hidden;
-    border: 1px solid #ebe9f1;
+    border: 1px solid var(--oas-color-border);
     border-radius: 6px;
     background: var(--oas-color-surface);
-    box-shadow: 0 1px 2px rgba(16, 24, 40, .025);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--oas-color-text) 2%, transparent);
 }
 
 .user-editor__tabs ::deep .ui-application-tabs {
@@ -67,7 +67,7 @@
 
 .user-editor__content ::deep .ui-card__body::-webkit-scrollbar-thumb {
     border-radius: 999px;
-    background: #d8d3e2;
+    background: var(--oas-color-subtle);
 }
 
 @media (max-width: 1050px) {

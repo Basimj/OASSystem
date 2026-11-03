@@ -51,13 +51,13 @@
         @if (!IsFormRoute)
         {
         <div class="stock-counts__filters">
-            <UiSelect Label="المخزن"
+            <UiSearchableSelect Label="المخزن"
                       Value="@_warehouseFilter"
                       ValueExpression="@(() => _warehouseFilter)"
                       ValueChanged="@(v => _warehouseFilter = v)"
                       Options="@WarehouseFilterOptions"
                       Size="ControlSize.Small" />
-            <UiSelect Label="الحالة"
+            <UiSearchableSelect Label="الحالة"
                       Value="@_statusFilter"
                       ValueExpression="@(() => _statusFilter)"
                       ValueChanged="@(v => _statusFilter = v)"
@@ -86,7 +86,7 @@
             else if (_mode == ViewMode.Create)
             {
                 <div class="stock-counts__editor">
-                    <UiSelect Label="المخزن"
+                    <UiSearchableSelect Label="المخزن"
                               Value="@_createWarehouseId"
                               ValueExpression="@(() => _createWarehouseId)"
                               ValueChanged="CreateWarehouseChanged"
@@ -126,6 +126,11 @@
                     <div><span>رُحّل بواسطة</span><strong>@(_selectedCount.PostedBy ?? "—")</strong></div>
                     <div><span>الملاحظات</span><strong>@(_selectedCount.Notes ?? "—")</strong></div>
                 </div>
+
+                @if (HasPositiveVariance && _selectedCount.Status != StockCountStatus.Posted)
+                {
+                    <UiAlert Tone="AlertTone.Warning" Message="يوجد فائض في الجرد. يمكن مراجعته، لكن لا يمكن ترحيله كزيادة مخزون دون قيد محاسبي. الإدخال الجديد يتم عبر استلام المشتريات." />
+                }
 
                 <div class="stock-counts__workflow">
                     <span class="@WorkflowCss(StockCountStatus.Draft)">إنشاء</span>
@@ -322,7 +327,8 @@
     private bool CanRecord => _mode == ViewMode.View && _selectedCount?.Status is StockCountStatus.Counting or StockCountStatus.Review && !_busy;
     private bool CanComplete => _mode == ViewMode.View && _selectedCount?.Status == StockCountStatus.Counting && !_busy;
     private bool CanApprove => _mode == ViewMode.View && _selectedCount?.Status == StockCountStatus.Review && !_busy;
-    private bool CanPost => _mode == ViewMode.View && _selectedCount?.Status == StockCountStatus.Approved && !_busy;
+    private bool HasPositiveVariance => _lineForms.Any(x => x.Line.DifferenceQuantity > 0);
+    private bool CanPost => _mode == ViewMode.View && _selectedCount?.Status == StockCountStatus.Approved && !_busy && !HasPositiveVariance;
     private bool CanCancel => _mode == ViewMode.View && _selectedCount is not null && _selectedCount.Status is not (StockCountStatus.Posted or StockCountStatus.Cancelled) && !_busy;
     private int CountedLinesCount => _lineForms.Count(x => x.Line.CountedAtUtc.HasValue);
     private string AsideTitle => _mode == ViewMode.Create ? "جرد جديد" : "تفاصيل الجرد";

@@ -1,0 +1,203 @@
+/* OASSystem — global appearance contract.
+ * Imported LAST. The active appearance sets --oas-color-* / --oas-ui-* on
+ * .oas-shell via oas-appearance.js. No module has its own static palette.
+ * Preset reference swatches, SVG illustrations, print layouts and validation
+ * semantics intentionally remain independent from the application's chrome.
+ */
+.oas-shell {
+    --ui-color-primary: var(--oas-color-primary);
+    --ui-primary: var(--oas-color-primary);
+    --ui-border-color: var(--oas-color-border);
+    --ui-border: var(--oas-color-border);
+    --ui-surface-muted: var(--oas-color-subtle);
+    --ui-text-muted: var(--oas-color-text-muted);
+    --ui-success: var(--oas-color-success);
+    --ui-danger: var(--oas-color-danger);
+    --ui-warning: var(--oas-color-warning);
+    --surface-color: var(--oas-color-surface);
+    --surface-subtle: var(--oas-color-subtle);
+    --surface: var(--oas-color-surface);
+    --text-color: var(--oas-color-text);
+    --text-muted-color: var(--oas-color-text-muted);
+    --text-secondary: var(--oas-color-text-muted);
+    --border-color: var(--oas-color-border);
+    --oas-appearance-shadow: 0 5px 18px color-mix(in srgb, var(--oas-color-text) 9%, transparent);
+    --oas-appearance-overlay: color-mix(in srgb, var(--oas-color-text) 45%, transparent);
+    --oas-appearance-ring: 0 0 0 3px var(--oas-color-focus-ring);
+    --oas-appearance-input: var(--oas-theme-input-bg, var(--oas-color-surface));
+    --oas-appearance-selected-text: var(--oas-ui-tabs-active-fg, var(--oas-color-text));
+    --oas-appearance-muted-surface: var(--oas-color-subtle);
+    --bs-body-bg: var(--oas-color-background);
+    --bs-body-color: var(--oas-color-text);
+    --bs-secondary-color: var(--oas-color-text-muted);
+    --bs-border-color: var(--oas-color-border);
+    --bs-tertiary-bg: var(--oas-color-subtle);
+    --bs-secondary-bg: var(--oas-color-surface);
+    --bs-emphasis-color: var(--oas-color-text);
+    --bs-primary: var(--oas-color-primary);
+    --bs-link-color: var(--oas-color-primary);
+    --bs-link-hover-color: var(--oas-color-primary-hover);
+    --bs-focus-ring-color: var(--oas-color-focus-ring);
+    color: var(--oas-color-text);
+    accent-color: var(--oas-color-primary);
+}
+
+/* Content and workspaces across accounting, sales, purchasing, inventory,
+   customers, suppliers, human resources, identity, reports and settings. */
+.oas-shell .oas-main-content,
+.oas-shell .oas-main-inner,
+.oas-shell .oas-main-inner :is(.ui-workspace,.ui-sales-workspace,.ui-acc-workspace,.ui-inventory-workspace,.ui-purchasing-workspace,.employee-workspace,.oas-customers-list,.oas-suppliers-list,.purchasing-aux-page,.inventory-module-root,.purchasing-module-root) {
+    color: var(--oas-color-text);
+}
+.oas-shell .oas-main-inner :is(.ui-workspace__actions,.ui-workspace__filters,.ui-workspace__tabs,.ui-workspace__aside,.ui-sales-workspace__tabs,.ui-acc-workspace__tabs,.ui-sales-workspace__actions,.ui-acc-workspace__actions) {
+    background-color: var(--oas-color-surface);
+    border-color: var(--oas-color-border);
+    color: var(--oas-color-text);
+}
+.oas-shell .oas-main-inner :is(.ui-card,.ui-surface,.ui-data-grid-panel,.ui-data-grid-panel__toolbar,.ui-data-grid-panel__body,.ui-data-grid-panel__footer,.ui-acc-card,.ui-acc-section,.ui-sales-section,.ui-purchasing-editor,.ui-purchasing-list__card,.ui-sales-document-card,.ui-sales-list__header,.ui-sales-revision-card,.ui-acc-home-panel,.ui-workflow-metric,.card,.card-body,.panel,.widget,.content-card,.supplier-allocation-card,.cust-profile-card,.cust-list-panel,.cust-section-card,.sd-panel,.sd-metric,.sd-quick,.oas-settings-home__card,.oas-theme-studio__panel) {
+    background-color: var(--oas-color-surface);
+    color: var(--oas-color-text);
+    border-color: var(--oas-color-border);
+}
+.oas-shell .oas-main-inner :is(.card-header,.card-footer,.ui-card__header,.ui-acc-section__header,.ui-data-grid-panel__header,.ui-sales-section__header,.ui-workspace__section-header,.ui-purchasing-editor__header) {
+    background-color: var(--oas-color-subtle);
+    color: var(--oas-color-text);
+    border-color: var(--oas-color-border);
+}
+.oas-shell .oas-main-inner :is(.text-muted,.text-secondary,.form-text,.ui-field-hint,.ui-empty-state__description,.cust-muted,.sd-muted) { color: var(--oas-color-text-muted) !important; }
+.oas-shell .oas-main-inner :is(.bg-white,.bg-light,.bg-body,.bg-body-tertiary,.bg-body-secondary) { background-color: var(--oas-color-surface) !important; color: var(--oas-color-text); }
+.oas-shell .oas-main-inner :is(.text-dark,.text-body,.text-body-emphasis) { color: var(--oas-color-text) !important; }
+.oas-shell .oas-main-inner :is(.border,.border-top,.border-bottom,.border-start,.border-end,.border-light) { border-color: var(--oas-color-border) !important; }
+.oas-shell .oas-main-inner :is(.shadow,.shadow-sm,.shadow-lg,.ui-card,.ui-data-grid-panel,.widget,.sd-panel) { box-shadow: var(--oas-appearance-shadow); }
+.oas-shell .oas-main-inner :is(a,.link-primary,.text-primary) { --bs-link-color-rgb: initial; }
+.oas-shell .oas-main-inner :is(.link-primary,.text-primary,.ui-link) { color: var(--oas-color-primary) !important; }
+
+/* Native and Bootstrap inputs. Keep values, validation behavior and geometry. */
+.oas-shell .oas-main-inner :is(.form-control,.form-select,.form-check-input,.input-group-text,.ui-input,.ui-input-text,.ui-input-date,.ui-lookup__input,.ui-search-input,input:not([type=checkbox]):not([type=radio]):not([type=color]):not([type=range]):not([type=hidden]),select,textarea) {
+    background-color: var(--oas-appearance-input);
+    border-color: var(--oas-color-border);
+    color: var(--oas-color-text);
+    caret-color: var(--oas-color-text);
+}
+.oas-shell .oas-main-inner :is(input,textarea)::placeholder { color: var(--oas-color-text-muted); opacity: 1; }
+.oas-shell .oas-main-inner :is(.form-control,.form-select,.ui-input,.ui-lookup__input,input,textarea,select):is(:focus,:focus-visible) {
+    border-color: var(--oas-color-primary);
+    outline-color: var(--oas-color-primary);
+    box-shadow: var(--oas-appearance-ring);
+}
+.oas-shell .oas-main-inner :is(.form-control,.form-select,.ui-input,input,textarea,select):disabled:not([type=checkbox]):not([type=radio]) {
+    background-color: var(--oas-color-disabled-surface);
+    border-color: var(--oas-color-border);
+    color: var(--oas-color-text-muted);
+}
+.oas-shell .oas-main-inner :is(.form-select,select) option { background-color: var(--oas-color-surface); color: var(--oas-color-text); }
+.oas-shell .oas-main-inner .form-check-input:checked { background-color: var(--oas-color-primary); border-color: var(--oas-color-primary); }
+.oas-shell .oas-main-inner .form-check-input:focus { border-color: var(--oas-color-primary); box-shadow: var(--oas-appearance-ring); }
+
+/* Common buttons and Bootstrap variants are semantic instead of brand literals. */
+.oas-shell .oas-main-inner :is(.btn-primary,.ui-button--primary,.ui-btn-primary) {
+    --bs-btn-bg: var(--oas-color-primary);
+    --bs-btn-border-color: var(--oas-color-primary);
+    --bs-btn-color: var(--oas-color-on-primary);
+    --bs-btn-hover-bg: var(--oas-color-primary-hover);
+    --bs-btn-hover-border-color: var(--oas-color-primary-hover);
+    --bs-btn-hover-color: var(--oas-color-on-primary);
+    --bs-btn-disabled-bg: var(--oas-color-primary);
+    --bs-btn-disabled-border-color: var(--oas-color-primary);
+    background-color: var(--oas-color-primary);
+    border-color: var(--oas-color-primary);
+    color: var(--oas-color-on-primary);
+}
+.oas-shell .oas-main-inner :is(.btn-primary,.ui-button--primary,.ui-btn-primary):hover:not(:disabled) { background-color: var(--oas-color-primary-hover); border-color: var(--oas-color-primary-hover); color: var(--oas-color-on-primary); }
+.oas-shell .oas-main-inner :is(.btn-secondary,.btn-light,.ui-button--secondary,.ui-btn-secondary,.btn-outline-secondary,.btn-outline-primary) {
+    --bs-btn-bg: var(--oas-color-surface);
+    --bs-btn-border-color: var(--oas-color-border);
+    --bs-btn-color: var(--oas-color-text);
+    --bs-btn-hover-bg: var(--oas-color-hover);
+    --bs-btn-hover-color: var(--oas-color-text);
+    --bs-btn-hover-border-color: var(--oas-color-primary-border);
+    background-color: var(--oas-color-surface);
+    border-color: var(--oas-color-border);
+    color: var(--oas-color-text);
+}
+.oas-shell .oas-main-inner :is(.btn-secondary,.btn-light,.ui-button--secondary,.ui-btn-secondary,.btn-outline-secondary,.btn-outline-primary):hover:not(:disabled) { background-color: var(--oas-color-hover); color: var(--oas-color-text); border-color: var(--oas-color-primary-border); }
+.oas-shell .oas-main-inner .btn-danger { --bs-btn-bg: var(--oas-color-danger); --bs-btn-border-color: var(--oas-color-danger); --bs-btn-color: var(--oas-color-on-danger); --bs-btn-hover-bg: var(--oas-color-danger); --bs-btn-hover-color: var(--oas-color-on-danger); }
+.oas-shell .oas-main-inner .btn-success { --bs-btn-bg: var(--oas-color-success); --bs-btn-border-color: var(--oas-color-success); --bs-btn-color: var(--oas-color-on-primary); --bs-btn-hover-bg: var(--oas-color-success); }
+.oas-shell .oas-main-inner .btn-warning { --bs-btn-bg: var(--oas-color-warning); --bs-btn-border-color: var(--oas-color-warning); --bs-btn-color: var(--oas-color-on-primary); --bs-btn-hover-bg: var(--oas-color-warning); }
+.oas-shell .oas-main-inner .btn-outline-danger { --bs-btn-color: var(--oas-color-danger); --bs-btn-border-color: var(--oas-color-danger); --bs-btn-hover-bg: var(--oas-color-danger-surface); --bs-btn-hover-color: var(--oas-color-danger); }
+.oas-shell .oas-main-inner .btn-outline-success { --bs-btn-color: var(--oas-color-success); --bs-btn-border-color: var(--oas-color-success); --bs-btn-hover-bg: var(--oas-color-success-surface); --bs-btn-hover-color: var(--oas-color-success); }
+
+/* Tables, report grids, interactive cells and selected rows. */
+.oas-shell .oas-main-inner :is(.table,.table-responsive,.ui-data-table,.ui-sales-lines__table,.ui-acc-grid-table,.sd-invoice-table,table) {
+    --bs-table-bg: var(--oas-color-surface);
+    --bs-table-color: var(--oas-color-text);
+    --bs-table-border-color: var(--oas-color-border);
+    --bs-table-striped-bg: var(--oas-color-subtle);
+    --bs-table-striped-color: var(--oas-color-text);
+    --bs-table-hover-bg: var(--oas-color-table-row-hover);
+    --bs-table-hover-color: var(--oas-color-text);
+    --bs-table-active-bg: var(--oas-color-table-row-selected);
+    --bs-table-active-color: var(--oas-appearance-selected-text);
+    background-color: var(--oas-color-surface);
+    color: var(--oas-color-text);
+    border-color: var(--oas-color-border);
+}
+.oas-shell .oas-main-inner :is(.table,.ui-data-table,.ui-sales-lines__table,.ui-acc-grid-table,.sd-invoice-table,table) thead :is(th,td) { background-color: var(--oas-color-table-header); color: var(--oas-color-text); border-color: var(--oas-color-border); }
+.oas-shell .oas-main-inner :is(.table,.ui-data-table,.ui-sales-lines__table,.ui-acc-grid-table,.sd-invoice-table,table) tbody :is(th,td) { border-color: var(--oas-color-border); }
+.oas-shell .oas-main-inner :is(.table,.ui-data-table,.ui-sales-lines__table,.ui-acc-grid-table,.sd-invoice-table,table) tbody tr:hover:not(.is-selected):not(.table-active) > :is(td,th) { background-color: var(--oas-color-table-row-hover); }
+.oas-shell .oas-main-inner :is(.table,.ui-data-table,.ui-sales-lines__table,.ui-acc-grid-table,.sd-invoice-table,table) tbody :is(.is-selected,.table-active,.ui-data-table__row--selected) > :is(td,th) { background-color: var(--oas-color-table-row-selected); color: var(--oas-appearance-selected-text); }
+.oas-shell .oas-main-inner :is(.table,.ui-data-table,.ui-sales-lines__table,.ui-acc-grid-table,.sd-invoice-table,table) tbody :is(.is-selected,.table-active,.ui-data-table__row--selected) > :is(td,th) :is(i,svg,span) { color: inherit; }
+
+/* Tabs, page navigation and flyouts. Don't style the Studio's preset artwork. */
+.oas-shell .oas-main-inner :is(.nav-tabs,.ui-workspace__tabs,.ui-sales-workspace__tabs,.ui-acc-workspace__tabs,.ui-application-tab-strip,.cust-tabs) { background-color: var(--oas-color-surface); border-color: var(--oas-color-border); }
+.oas-shell .oas-main-inner :is(.nav-link,.ui-workspace-tab,.ui-section-tab,.cust-tab) { color: var(--oas-color-text-muted); border-color: var(--oas-color-border); }
+.oas-shell .oas-main-inner :is(.nav-link.active,.ui-workspace-tab--active,.ui-section-tab--active,.cust-tab.is-active) { background-color: var(--oas-ui-tabs-active-bg,var(--oas-color-primary-soft)); color: var(--oas-appearance-selected-text); border-color: var(--oas-ui-tabs-border,var(--oas-color-primary-border)); }
+.oas-shell :is(.dropdown-menu,.popover,.ui-context-menu,.ui-lookup__popover,.ui-searchable-select__dropdown,.ui-dialog,.modal-content,.offcanvas,.toast) { background-color: var(--oas-color-surface); color: var(--oas-color-text); border-color: var(--oas-color-border); box-shadow: var(--oas-appearance-shadow); }
+.oas-shell :is(.dropdown-item,.ui-context-menu__item,.list-group-item) { background-color: var(--oas-color-surface); color: var(--oas-color-text); border-color: var(--oas-color-border); }
+.oas-shell :is(.dropdown-item,.ui-context-menu__item,.list-group-item):hover { background-color: var(--oas-color-hover); color: var(--oas-color-text); }
+.oas-shell :is(.modal-header,.modal-footer,.offcanvas-header,.toast-header,.ui-dialog__header,.ui-dialog__footer) { background-color: var(--oas-color-subtle); color: var(--oas-color-text); border-color: var(--oas-color-border); }
+.oas-shell :is(.modal-backdrop,.ui-dialog-backdrop) { background-color: var(--oas-appearance-overlay); }
+
+.oas-shell .ui-acc-dialog-backdrop {
+    background-color: var(--oas-appearance-overlay);
+    backdrop-filter: blur(2px);
+}
+
+/* Preserve warnings, failures and successes independent of the brand hue. */
+.oas-shell .oas-main-inner :is(.alert-success,.ui-sales-alert--success,.bg-success-subtle) { --bs-alert-bg: var(--oas-color-success-surface); --bs-alert-color: var(--oas-color-success); --bs-alert-border-color: var(--oas-color-success); background-color: var(--oas-color-success-surface); color: var(--oas-color-success); border-color: var(--oas-color-success); }
+.oas-shell .oas-main-inner :is(.alert-danger,.ui-sales-alert--error,.bg-danger-subtle) { --bs-alert-bg: var(--oas-color-danger-surface); --bs-alert-color: var(--oas-color-danger); --bs-alert-border-color: var(--oas-color-danger); background-color: var(--oas-color-danger-surface); color: var(--oas-color-danger); border-color: var(--oas-color-danger); }
+.oas-shell .oas-main-inner :is(.alert-warning,.bg-warning-subtle) { --bs-alert-bg: var(--oas-color-warning-surface); --bs-alert-color: var(--oas-color-warning); --bs-alert-border-color: var(--oas-color-warning); background-color: var(--oas-color-warning-surface); color: var(--oas-color-warning); border-color: var(--oas-color-warning); }
+.oas-shell .oas-main-inner :is(.alert-info,.bg-info-subtle) { --bs-alert-bg: var(--oas-color-info-surface); --bs-alert-color: var(--oas-color-text); --bs-alert-border-color: var(--oas-color-info-border); background-color: var(--oas-color-info-surface); color: var(--oas-color-text); border-color: var(--oas-color-info-border); }
+.oas-shell .oas-main-inner .text-success { color: var(--oas-color-success) !important; }
+.oas-shell .oas-main-inner .text-danger { color: var(--oas-color-danger) !important; }
+.oas-shell .oas-main-inner .text-warning { color: var(--oas-color-warning) !important; }
+.oas-shell .oas-main-inner .text-info { color: var(--oas-color-primary) !important; }
+.oas-shell .oas-main-inner .badge.bg-primary { background-color: var(--oas-color-primary) !important; color: var(--oas-color-on-primary); }
+.oas-shell .oas-main-inner .badge.bg-success { background-color: var(--oas-color-success) !important; color: var(--oas-color-on-primary); }
+.oas-shell .oas-main-inner .badge.bg-danger { background-color: var(--oas-color-danger) !important; color: var(--oas-color-on-danger); }
+.oas-shell .oas-main-inner .badge.bg-warning { background-color: var(--oas-color-warning) !important; color: var(--oas-color-on-primary); }
+
+/* The Appearance Studio itself follows the active appearance; swatches/preset
+   miniature previews retain their intentionally demonstrated colors. */
+.oas-shell .oas-main-inner :is(.oas-theme-studio,.oas-settings-home) { color: var(--oas-color-text); }
+.oas-shell .oas-main-inner :is(.oas-theme-studio__panel,.oas-theme-studio__tabs,.oas-theme-studio__color-control,.oas-theme-studio__form-group select,.oas-theme-studio__option-pills button,.oas-settings-home__card) { background-color: var(--oas-color-surface); color: var(--oas-color-text); border-color: var(--oas-color-border); }
+.oas-shell .oas-main-inner :is(.oas-theme-studio__panel-head h2,.oas-theme-studio__intro h1,.oas-settings-home h1,.oas-theme-studio__form-group label,.oas-theme-studio__color-field) { color: var(--oas-color-text); }
+.oas-shell .oas-main-inner :is(.oas-theme-studio__intro p,.oas-theme-studio__panel-head p,.oas-settings-home > p) { color: var(--oas-color-text-muted); }
+.oas-shell .oas-main-inner .oas-theme-studio__footer { background: var(--oas-color-surface); color: var(--oas-color-text); border-color: var(--oas-color-border); }
+.oas-shell .oas-main-inner .oas-theme-studio__save { background: var(--oas-color-primary); color: var(--oas-color-on-primary); border-color: var(--oas-color-primary); }
+.oas-shell .oas-main-inner .oas-theme-studio__tab.is-current { background: var(--oas-color-primary-soft); color: var(--oas-color-primary-hover); }
+.oas-shell .oas-main-inner .oas-theme-studio__option-pills button.is-active { background: var(--oas-color-primary-soft); color: var(--oas-color-primary-hover); border-color: var(--oas-color-primary-border); }
+
+/* Scrollbar and text selection reflect appearance; leave layout sizes intact. */
+.oas-shell :is(.oas-main-inner,.ui-workspace__main--scrollable,.ui-workspace__aside,.ui-data-grid-panel__body,.table-responsive) { scrollbar-color: var(--oas-color-border) transparent; }
+.oas-shell :is(.oas-main-inner,.ui-workspace__main--scrollable,.ui-workspace__aside,.ui-data-grid-panel__body)::-webkit-scrollbar-thumb { background-color: var(--oas-color-border); }
+.oas-shell ::selection { background: var(--oas-color-primary-soft); color: var(--oas-color-text); }
+@media (prefers-reduced-motion:reduce) {
+    .oas-shell :is(.ui-card,.ui-workspace-tab,.btn,.ui-button,.ui-sales-document-card) { transition-duration:0s; }
+}
+
+/* Search-field interiors stay transparent when the wrapper owns the surface. */
+.oas-shell .oas-main-inner :is(.ui-search-input,.sd-global-search,.cust-search-wrap) input {
+    background-color: transparent;
+    box-shadow: none;
+}

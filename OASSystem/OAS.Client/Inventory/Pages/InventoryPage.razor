@@ -25,7 +25,7 @@
 
     <Filters>
         <div class="inventory-balance__filters">
-            <UiSelect Value="@(_warehouseFilter ?? string.Empty)"
+            <UiSearchableSelect Value="@(_warehouseFilter ?? string.Empty)"
                       ValueExpression="@(() => _warehouseFilter)"
                       ValueChanged="OnWarehouseChangedAsync"
                       Label="المخزن"

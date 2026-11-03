@@ -213,7 +213,7 @@ public sealed class StockCountTests
     }
 
     [Test]
-    public async Task FullLifecycle_DraftToCountingToReviewToApprovedToPosted_AdjustsBalances()
+    public async Task FullLifecycle_PositiveVarianceCannotBePostedWithoutAccounting()
     {
         // 1. Setup existing balance
         var balance =
@@ -325,74 +325,18 @@ public sealed class StockCountTests
             count.ApprovedBy,
             Is.EqualTo("test-auditor"));
 
-        // 6. Post -> Posted & inventory balance updated
-        var postHandler =
-            new PostStockCountCommandHandler(
-                _stockCountRepository,
-                _transactionRepository,
-                _transactionLineRepository,
-                _postingService,
-                _sequenceGenerator,
-                _currentUser,
-                TimeProvider.System);
-
-        await postHandler.Handle(
-            new PostStockCountCommand(count.Id),
-            CancellationToken.None);
-
-        Assert.That(
-            count.Status,
-            Is.EqualTo(StockCountStatus.Posted));
-
-        Assert.That(
-            count.PostedBy,
-            Is.EqualTo("test-auditor"));
-
-        // Balance updated to 13
-        Assert.That(
-            balance.OnHandQuantity,
-            Is.EqualTo(13));
-
-        Assert.That(
-            balance.AverageUnitCost,
-            Is.EqualTo(25m));
-
-        // Transaction generated for the variance.
-        Assert.That(
-            _transactionItems.Count,
-            Is.EqualTo(1));
-
-        Assert.That(
-            _transactionItems[0].TransactionType,
-            Is.EqualTo(InventoryTransactionType.AdjustmentIncrease));
-
-        Assert.That(
-            _transactionItems[0].Status,
-            Is.EqualTo(InventoryTransactionStatus.Posted));
-
-        Assert.That(
-            _transactionLineItems.Count,
-            Is.EqualTo(1));
-
-        // Ledger created with In movement of 3
-        Assert.That(
-            _ledgerRepository.Items.Count,
-            Is.EqualTo(1));
-
-        var ledger =
-            _ledgerRepository.Items[0];
-
-        Assert.That(
-            ledger.MovementType,
-            Is.EqualTo(InventoryMovementType.In));
-
-        Assert.That(
-            ledger.QuantityIn,
-            Is.EqualTo(3));
-
-        Assert.That(
-            ledger.BalanceAfter,
-            Is.EqualTo(13));
+        // 6. Posting an increase would create stock without a GL entry: reject atomically.
+        var postHandler = new PostStockCountCommandHandler(
+            _stockCountRepository, _transactionRepository, _transactionLineRepository,
+            _postingService, _sequenceGenerator, _currentUser, TimeProvider.System);
+        var ex = Assert.ThrowsAsync<ConflictException>(() =>
+            postHandler.Handle(new PostStockCountCommand(count.Id), CancellationToken.None));
+        Assert.That(ex?.Code, Is.EqualTo("stock_count_increase_disabled"));
+        Assert.That(count.Status, Is.EqualTo(StockCountStatus.Approved));
+        Assert.That(balance.OnHandQuantity, Is.EqualTo(10m));
+        Assert.That(_transactionItems, Is.Empty);
+        Assert.That(_transactionLineItems, Is.Empty);
+        Assert.That(_ledgerRepository.Items, Is.Empty);
     }
 
     [Test]

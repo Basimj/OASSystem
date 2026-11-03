@@ -1,13 +1,8 @@
 using MediatR;
-using OAS.Application.Abstractions.Numbering;
 using OAS.Application.Abstractions.Persistence;
-using OAS.Application.Abstractions.Security;
 using OAS.Application.Common.Exceptions;
-using OAS.Application.Inventory.Repositories;
-using OAS.Application.Inventory.Services;
 using OAS.Contracts.Inventory.Products;
 using OAS.Domain.Entities.Inventory;
-using OAS.Domain.Enums.Inventory;
 using DomainFrameDetails = OAS.Domain.Entities.Inventory.FrameDetails;
 using DomainLensDetails = OAS.Domain.Entities.Inventory.LensDetails;
 using InventoryUnit = OAS.Domain.Entities.Inventory.Unit;
@@ -22,14 +17,7 @@ public sealed class CreateStockProductCommandHandler(
     IReadRepository<ProductCategory, Guid> categoryRepository,
     IReadRepository<Brand, Guid> brandRepository,
     IReadRepository<ProductType, Guid> productTypeRepository,
-    IReadRepository<InventoryUnit, Guid> unitRepository,
-    IReadRepository<Warehouse, Guid> warehouseRepository,
-    IInventoryTransactionRepository transactionRepository,
-    IRepository<InventoryTransactionLine, Guid> lineRepository,
-    IInventoryPostingService postingService,
-    ISequenceNumberGenerator sequenceNumberGenerator,
-    ICurrentUser currentUser,
-    TimeProvider timeProvider)
+    IReadRepository<InventoryUnit, Guid> unitRepository)
     : IRequestHandler<CreateStockProductCommand, CreateStockProductResult>
 {
     public async Task<CreateStockProductResult> Handle(CreateStockProductCommand command, CancellationToken cancellationToken)
@@ -55,8 +43,9 @@ public sealed class CreateStockProductCommandHandler(
         var isService = string.Equals(productType.SystemKey, ProductTypeSystemKeys.Service, StringComparison.OrdinalIgnoreCase);
         if (isService && productRequest.IsStockItem)
             throw Validation("product_type", "service_cannot_be_stock_item", "Service products cannot be stock items.");
-        if (isService && request.OpeningInventory is not null)
-            throw Validation("opening_inventory", "service_cannot_have_inventory", "Service products cannot have opening inventory.");
+        // Enforce the policy even for direct handler callers that bypass FluentValidation.
+        if (request.OpeningInventory is not null)
+            throw Validation("opening_inventory", "opening_inventory_disabled", "لا يمكن إضافة رصيد عند إنشاء المنتج؛ تتم زيادة المخزون عبر ترحيل استلام المشتريات فقط.");
 
         if (productRequest.IsStockItem && request.Variant is null)
             throw Validation("variant", "stock_product_variant_required", "A stock product must have an initial variant.");
@@ -134,70 +123,11 @@ public sealed class CreateStockProductCommandHandler(
                 lens.Diameter), cancellationToken);
         }
 
-        Guid? transactionId = null;
-        if (request.OpeningInventory is not null)
-        {
-            if (variant is null)
-                throw Validation("variant", "opening_inventory_variant_required", "Opening inventory requires an active product variant.");
-
-            var opening = request.OpeningInventory;
-            Ensure(opening.Quantity > 0m, "opening_quantity_must_be_positive", "Opening quantity must be greater than zero.");
-            Ensure(opening.UnitCost >= 0m, "opening_unit_cost_invalid", "Opening unit cost cannot be negative.");
-            Ensure(product.IsActive && product.IsStockItem, "opening_inventory_requires_stock_product", "Opening inventory requires an active stock product.");
-            Ensure(variant.IsActive, "product_variant_inactive", "Opening inventory requires an active product variant.");
-
-            var warehouse = await warehouseRepository.GetByIdAsync(opening.WarehouseId, cancellationToken)
-                ?? throw new NotFoundException(nameof(Warehouse), opening.WarehouseId);
-            Ensure(warehouse.IsActive, "warehouse_inactive", "Selected warehouse is inactive.");
-
-            var now = timeProvider.GetUtcNow();
-            var seq = await sequenceNumberGenerator.NextAsync("InventoryTransaction", cancellationToken);
-            var transaction = new InventoryTransaction(
-                $"TXN-{now.Year:0000}-{seq:000000}",
-                InventoryTransactionType.Opening,
-                now,
-                destinationWarehouseId: warehouse.Id,
-                referenceType: "ProductOpening",
-                referenceId: product.Id,
-                reason: "Opening inventory from product creation");
-            await transactionRepository.AddAsync(transaction, cancellationToken);
-
-            var line = new InventoryTransactionLine(
-                transaction.Id,
-                variant.Id,
-                opening.Quantity,
-                opening.UnitCost,
-                "Initial stock created with product");
-            await lineRepository.AddAsync(line, cancellationToken);
-
-            var userId = currentUser.UserId ?? "system";
-            await postingService.PostMovementAsync(
-                warehouse.Id,
-                variant.Id,
-                InventoryMovementType.In,
-                opening.Quantity,
-                opening.UnitCost,
-                transaction.Id,
-                line.Id,
-                transaction.TransactionDate,
-                userId,
-                cancellationToken);
-
-            transaction.Post(now, userId);
-            // Already tracked as Added; keep its first INSERT inside the outer transaction.
-            transactionId = transaction.Id;
-        }
-
+        // Product creation is catalog-only: inbound stock must be posted by an approved purchase receipt.
+        // Keep the response shape compatible with existing clients, but never create inventory here.
         return new CreateStockProductResult(
-            product.Id,
-            product.ProductCode,
-            variant?.Id,
-            variant?.SKU,
-            request.OpeningInventory is not null,
-            request.OpeningInventory?.WarehouseId,
-            request.OpeningInventory?.Quantity,
-            request.OpeningInventory?.UnitCost,
-            transactionId);
+            product.Id, product.ProductCode, variant?.Id, variant?.SKU,
+            false, null, null, null, null);
     }
 
     private static void Ensure(bool condition, string code, string message)
