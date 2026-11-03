@@ -35,9 +35,10 @@ public sealed class SetJournalEntryStatusCommandHandler(
         if (!Guid.TryParse(currentUser.UserId, out var userId))
             throw new ForbiddenException();
 
-        // Aggregate repositories do not eager-load journal lines. Hydrate explicitly so
-        // domain balance rules and posting integrity checks see the persisted lines.
-        var lines = await lineRepository.ListAsync(
+        // Both repositories share the same scoped EF Core DbContext. The tracked
+        // query hydrates journal.Lines through relationship fix-up automatically.
+        // Do not call AddLine here: it would re-add existing lines and throw.
+        await lineRepository.ListAsync(
             new Specification<JournalEntryLine>()
                 .Where(x => x.JournalEntryId == journal.Id)
                 .AddSort(
@@ -45,9 +46,6 @@ public sealed class SetJournalEntryStatusCommandHandler(
                     OAS.Contracts.Common.Pagination.SortDirection.Ascending)
                 .Tracking(),
             cancellationToken);
-
-        foreach (var line in lines)
-            journal.AddLine(line);
 
         var status = (DomainJournalEntryStatus)(int)request.Request.Status;
         var nowUtc = timeProvider.GetUtcNow().UtcDateTime;

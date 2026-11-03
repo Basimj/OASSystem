@@ -14,8 +14,8 @@
 }
 
 <UiAccountingWorkspace ShowTabs="@Section.HasValue"
-                       InlineTabsWithActions="@(Section is AccountingEntityType.Accounts or AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers)"
-                       AdditionalCssClass='@(Section == AccountingEntityType.Accounts ? "ui-acc-workspace--account-management" : Section is AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers ? "ui-acc-workspace--vouchers" : null)'>
+                       InlineTabsWithActions="@(Section is AccountingEntityType.Accounts or AccountingEntityType.Journals or AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers)"
+                       AdditionalCssClass='@(Section == AccountingEntityType.Accounts ? "ui-acc-workspace--account-management" : Section == AccountingEntityType.Journals ? "ui-acc-workspace--journals" : Section is AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers ? "ui-acc-workspace--vouchers" : null)'>
 
     <Actions>
 
@@ -96,7 +96,14 @@
             }
             else if (isList)
             {
-                @if (Section == AccountingEntityType.CashAccounts)
+                @if (Section == AccountingEntityType.Journals)
+                {
+                    <UiButton Text="قيد جديد"
+                              IconCssClass="fa-solid fa-plus"
+                              Size="ControlSize.Small"
+                              OnClick="@(() => OpenNewRecord(AccountingEntityType.Journals))" />
+                }
+                else if (Section == AccountingEntityType.CashAccounts)
                 {
                     <UiButton Text="صندوق جديد"
                               IconCssClass="fa-solid fa-vault"
@@ -187,7 +194,7 @@
                               Disabled="@(!CanEditActive)"
                               OnClick="BeginEditActive" />
 
-                    <UiButton Text="حفظ"
+                    <UiButton Text="@(activeTab?.EntityType == AccountingEntityType.Journals ? "حفظ المسودة" : "حفظ")"
                               IconCssClass="fa-solid fa-floppy-disk"
                               Size="ControlSize.Small"
                               Disabled="@(!CanSaveActive)"
@@ -245,6 +252,7 @@
                                       IconCssClass="fa-solid fa-paper-plane"
                                       Variant="ButtonVariant.Secondary"
                                       Size="ControlSize.Small"
+                                      Disabled="@(activeTab.IsNew || activeTab.IsDirty || activeTab.IsEditMode || activeTab.IsSaving)"
                                       OnClick="@(() => ChangeJournalStatusAsync(JournalEntryStatus.PendingApproval))" />
                         }
                         else if (journal.Status == JournalEntryStatus.PendingApproval)
@@ -253,6 +261,7 @@
                                       IconCssClass="fa-solid fa-circle-check"
                                       Variant="ButtonVariant.Secondary"
                                       Size="ControlSize.Small"
+                                      Disabled="@(activeTab.IsNew || activeTab.IsDirty || activeTab.IsEditMode || activeTab.IsSaving)"
                                       OnClick="@(() => ChangeJournalStatusAsync(JournalEntryStatus.Approved))" />
                         }
                         else if (journal.Status == JournalEntryStatus.Approved)
@@ -260,6 +269,7 @@
                             <UiButton Text="ترحيل"
                                       IconCssClass="fa-solid fa-check-double"
                                       Size="ControlSize.Small"
+                                      Disabled="@(activeTab.IsNew || activeTab.IsDirty || activeTab.IsEditMode || activeTab.IsSaving)"
                                       OnClick="@(() => ChangeJournalStatusAsync(JournalEntryStatus.Posted))" />
                         }
                         else if (journal.Status == JournalEntryStatus.Posted && !journal.ReversedJournalId.HasValue)
@@ -268,6 +278,7 @@
                                       IconCssClass="fa-solid fa-arrow-rotate-left"
                                       Variant="ButtonVariant.Danger"
                                       Size="ControlSize.Small"
+                                      Disabled="@(activeTab.IsNew || activeTab.IsDirty || activeTab.IsEditMode || activeTab.IsSaving)"
                                       OnClick="ReverseActiveJournalAsync" />
                         }
                     }
@@ -638,6 +649,7 @@
                                         EmployeeSearchAsync="SearchEmployeeAccountsAsync"
                                         CurrencySearchAsync="SearchCurrenciesAsync"
                                         EffectiveRateAsync="ResolveEffectiveRatePreviewAsync"
+                                        ReserveNumberForPostingDateAsync="ReserveJournalNumberForDateAsync"
                                         OnModelChanged="MarkActiveDirty" />
 
                     break;
@@ -1034,19 +1046,30 @@
             }
             else
             {
-                @if (CurrentListEntity == AccountingEntityType.Journals && !string.IsNullOrWhiteSpace(InitialJournalStatus))
+                @if (CurrentListEntity == AccountingEntityType.Journals && !string.IsNullOrWhiteSpace(CurrentJournalStatusFilter))
                 {
                     <div class="oas-journal-filter-indicator" role="status">
-                        <span>مرشح القيود النشط: @JournalFilterText(InitialJournalStatus)</span>
+                        <span>مرشح القيود النشط: @JournalFilterText(CurrentJournalStatusFilter)</span>
                         <a href="/accounting/journals" class="oas-journal-filter-indicator__clear">عرض كل القيود</a>
                     </div>
                 }
-                <UiAccountingRecordList Items="@CurrentRecordItems"
-                                        EmptyTitle="@CurrentEmptyTitle"
-                                        EmptyDescription="@CurrentEmptyDescription"
-                                        EmptyIconCssClass="@CurrentEmptyIcon"
-                                        OnOpen="OpenCurrentRecordAsync" />
-
+                @if (CurrentListEntity == AccountingEntityType.Journals)
+                {
+                    <JournalDocumentsList Rows="@_journalsPage.Items"
+                                          TotalCount="@_journalsPage.TotalCount"
+                                          StatusFilter="@CurrentJournalStatusFilter"
+                                          StatusFilterChanged="ChangeJournalStatusFilterAsync"
+                                          OnOpen="OpenCurrentRecordAsync" />
+                }
+                else
+                {
+                    <UiAccountingRecordList Items="@CurrentRecordItems"
+                                            EmptyTitle="@CurrentEmptyTitle"
+                                            EmptyDescription="@CurrentEmptyDescription"
+                                            EmptyIconCssClass="@CurrentEmptyIcon"
+                                            OnOpen="OpenCurrentRecordAsync" />
+                }
+                @* Pagination remains server-side and preserves the active status filter. *@
                 <UiPagination PageNumber="@CurrentPageNumber"
                               TotalPages="@CurrentTotalPages"
                               TotalCount="@CurrentTotalCount"

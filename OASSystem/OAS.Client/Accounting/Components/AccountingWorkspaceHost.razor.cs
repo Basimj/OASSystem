@@ -153,6 +153,16 @@ public partial class AccountingWorkspaceHost : IDisposable
     private string CurrentSearch => GetSearch(CurrentListEntity);
 
     private readonly Dictionary<AccountingEntityType, string> _voucherStatusFilters = [];
+    private string? _journalStatusFilter;
+    private string CurrentJournalStatusFilter => _journalStatusFilter ?? InitialJournalStatus ?? string.Empty;
+
+    private async Task ChangeJournalStatusFilterAsync(string value)
+    {
+        _journalStatusFilter = value;
+        _pageByEntity[AccountingEntityType.Journals] = 1;
+        await LoadEntityListAsync(AccountingEntityType.Journals);
+    }
+
     private string CurrentVoucherStatusFilter => _voucherStatusFilters.GetValueOrDefault(CurrentListEntity) ?? string.Empty;
     private Task SetVoucherStatusFilter(string value)
     {
@@ -294,6 +304,7 @@ public partial class AccountingWorkspaceHost : IDisposable
             _loadedSection = Section.Value;
             _loadedInitialRecordId = null;
             _loadedInitialJournalStatus = Section.Value == AccountingEntityType.Journals ? InitialJournalStatus : null;
+            if (Section.Value == AccountingEntityType.Journals) _journalStatusFilter = null;
             Workspace.OpenOrActivateListTab(Section.Value);
 
             if (Section.Value is AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers)
@@ -307,6 +318,7 @@ public partial class AccountingWorkspaceHost : IDisposable
             !string.Equals(_loadedInitialJournalStatus, InitialJournalStatus, StringComparison.OrdinalIgnoreCase))
         {
             _loadedInitialJournalStatus = InitialJournalStatus;
+            _journalStatusFilter = null;
             _pageByEntity[AccountingEntityType.Journals] = 1;
             await LoadSectionDataAsync(AccountingEntityType.Journals);
         }
@@ -630,6 +642,24 @@ public partial class AccountingWorkspaceHost : IDisposable
         }
     }
 
+    private async Task<string?> ReserveJournalNumberForDateAsync(DateOnly postingDate)
+    {
+        try
+        {
+            return (await AccountingService.ReserveJournalNumberAsync(postingDate))?.Number;
+        }
+        catch (ApiClientException ex)
+        {
+            ShowAccountingError(ex.Error);
+            return null;
+        }
+        catch (Exception)
+        {
+            ApiFeedback.ShowUnexpected();
+            return null;
+        }
+    }
+
     private async Task ReserveAutomaticNumberAsync(AccountingTabState tab)
     {
         switch (tab.Model)
@@ -783,9 +813,10 @@ public partial class AccountingWorkspaceHost : IDisposable
         PageNumber = type == AccountingEntityType.Accounts ? 1 : GetPage(type),
         PageSize = type == AccountingEntityType.Accounts ? PageRequest.MaximumPageSize : PageSize,
         Search = string.IsNullOrWhiteSpace(GetSearch(type)) ? null : GetSearch(type),
-        Status = type == AccountingEntityType.Journals ? InitialJournalStatus : null,
-        SortBy = type is AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers ? "VoucherDate" : null,
-        SortDirection = type is AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers
+        Status = type == AccountingEntityType.Journals ? CurrentJournalStatusFilter : null,
+        SortBy = type == AccountingEntityType.Journals ? "PostingDate" :
+            type is AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers ? "VoucherDate" : null,
+        SortDirection = type is AccountingEntityType.Journals or AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers
             ? SortDirection.Descending : SortDirection.Ascending
     };
 
@@ -1784,7 +1815,26 @@ public partial class AccountingWorkspaceHost : IDisposable
             return;
         }
 
-        var validLines = model.Lines.Where(x => x.AccountId.HasValue && (x.DebitAmount > 0 || x.CreditAmount > 0)).ToArray();
+        // Only truly empty placeholders may be ignored. A partially entered row must not disappear silently.
+        var validLines = model.Lines.Where(x =>
+            x.AccountId.HasValue || x.DebitAmount != 0 || x.CreditAmount != 0 ||
+            x.TransactionCurrencyId.HasValue || x.CostCenterId.HasValue ||
+            x.CustomerId.HasValue || x.SupplierId.HasValue || x.EmployeeId.HasValue ||
+            !string.IsNullOrWhiteSpace(x.Description)).ToArray();
+        for (var i = 0; i < validLines.Length; i++)
+        {
+            var line = validLines[i];
+            if (!line.AccountId.HasValue || (line.DebitAmount <= 0 && line.CreditAmount <= 0))
+            {
+                Snackbar.Warning($"السطر {i + 1}: اختر حسابًا وأدخل مبلغ مدين أو دائن. لن يُستبعد السطر أثناء الحفظ.");
+                return;
+            }
+            if (line.MissingExchangeRate)
+            {
+                Snackbar.Warning($"السطر {i + 1}: سعر الصرف غير متوفر. اختر سعرًا صحيحًا قبل حفظ القيد.");
+                return;
+            }
+        }
         if (validLines.Length < 2)
         {
             Snackbar.Warning("القيد يحتاج سطرين صالحين على الأقل.");
@@ -1799,7 +1849,7 @@ public partial class AccountingWorkspaceHost : IDisposable
         var totalCredit = validLines.Sum(x => x.BaseCreditAmount);
         if (totalDebit != totalCredit)
         {
-            Snackbar.Warning($"القيد غير متزن. المدين {totalDebit:N2} والدائن {totalCredit:N2}.");
+            Snackbar.Warning($"القيد غير متزن. المدين {totalDebit:N4} والدائن {totalCredit:N4}.");
             return;
         }
 
@@ -2418,11 +2468,32 @@ public partial class AccountingWorkspaceHost : IDisposable
         if (Workspace.ActiveTab is not { EntityId: Guid id, Model: JournalEntryEditor.FormModel model } tab)
             return;
 
+        if (tab.IsNew || tab.IsDirty || tab.IsEditMode || tab.IsSaving)
+        {
+            Snackbar.Warning("احفظ التعديلات أو ألغها قبل تغيير حالة القيد.");
+            return;
+        }
+
         if (status == JournalEntryStatus.Posted &&
             !await ValidateSelectedFiscalPeriodForPostingAsync(model.FiscalPeriodId, model.PostingDate))
         {
             return;
         }
+
+        var action = status switch
+        {
+            JournalEntryStatus.PendingApproval => "إرسال للاعتماد",
+            JournalEntryStatus.Approved => "اعتماد القيد",
+            JournalEntryStatus.Posted => "ترحيل القيد",
+            _ => "تغيير الحالة"
+        };
+        var confirmed = await Dialog.ConfirmAsync(
+            action,
+            $"القيد: {model.JournalNumber} — التاريخ: {model.PostingDate:yyyy/MM/dd}. " +
+            $"المدين الأساسي: {model.Lines.Sum(x => x.BaseDebitAmount):N4}، " +
+            $"الدائن الأساسي: {model.Lines.Sum(x => x.BaseCreditAmount):N4}. هل تريد المتابعة؟",
+            AlertTone.Warning, action, "رجوع");
+        if (!confirmed) return;
 
         try
         {
@@ -2446,6 +2517,11 @@ public partial class AccountingWorkspaceHost : IDisposable
     private async Task ReverseActiveJournalAsync()
     {
         if (Workspace.ActiveTab is not { EntityId: Guid id } tab) return;
+        if (tab.IsDirty || tab.IsEditMode || tab.IsSaving)
+        {
+            Snackbar.Warning("احفظ التعديلات أو ألغها قبل عكس القيد.");
+            return;
+        }
         var confirmed = await Dialog.ConfirmAsync(
             "عكس القيد",
             "سيتم إنشاء قيد عكسي مستقل ولن يتم حذف القيد التاريخي. هل تريد المتابعة؟",

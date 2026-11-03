@@ -4,275 +4,267 @@
 @using OAS.UiLib.Components.Accounting.Workspace
 @using OAS.UiLib.Core.Models
 
-<div class="ui-acc-lines-editor" dir="rtl">
-    <div class="table-responsive">
-        <table class="ui-acc-grid-table ui-acc-journal-lines-table ui-acc-journal-lines-table--multicurrency">
-            <thead>
-                <tr>
-                    <th style="width: 40px;">#</th>
-                    <th class="ui-acc-journal-account-col">الحساب المحاسبي</th>
-                    <th class="ui-acc-journal-description-col">البيان</th>
-                    <th class="ui-acc-journal-dimension-col">مركز التكلفة</th>
-                    <th class="ui-acc-journal-party-col">العميل</th>
-                    <th class="ui-acc-journal-party-col">المورد</th>
-                    <th class="ui-acc-journal-party-col">الموظف</th>
-                    <th class="ui-acc-journal-currency-col">العملة</th>
-                    <th class="ui-acc-journal-rate-col">سعر الصرف</th>
-                    <th class="ui-acc-journal-amount-col">مدين (أصلي)</th>
-                    <th class="ui-acc-journal-amount-col">دائن (أصلي)</th>
-                    <th class="ui-acc-journal-base-col">مدين أساسي</th>
-                    <th class="ui-acc-journal-base-col">دائن أساسي</th>
-                    @if (IsEditable)
-                    {
-                        <th style="width: 40px;">إجراء</th>
-                    }
-                </tr>
-            </thead>
-            <tbody>
-                @if (Lines.Count == 0)
+<div class="oas-journal-entry oas-journal-entry--side" dir="rtl">
+    <div class="oas-journal-entry__workspace">
+        <section class="oas-journal-entry__main" aria-label="أسطر القيد والملخص المالي">
+            <div class="oas-journal-entry__toolbar">
+                <div>
+                    <strong><i class="fa-solid fa-list-check" aria-hidden="true"></i> أسطر القيد (@Lines.Count)</strong>
+                    <small>حدد سطرًا لعرض إعدادات الطرف والعملة بجواره.</small>
+                </div>
+                @if (IsEditable)
                 {
-                    <tr>
-                        <td colspan="@(IsEditable ? 14 : 13)" class="text-center text-muted py-3">
-                            لا توجد أسطر بعد. انقر على «إضافة سطر» بالأسفل.
-                        </td>
-                    </tr>
+                    <div class="oas-journal-entry__toolbar-actions">
+                        <UiButton Text="إضافة سطر" IconCssClass="fa-solid fa-plus"
+                                  Size="ControlSize.Small" OnClick="AddLine" />
+                        <button type="button" class="oas-journal-entry__icon-button"
+                                title="نسخ بيانات السطر المحدد إلى سطر جديد دون المبالغ"
+                                aria-label="نسخ السطر" disabled="@(SelectedLine is null)"
+                                @onclick="CopySelectedLineAsync">
+                            <i class="fa-regular fa-copy" aria-hidden="true"></i>
+                        </button>
+                        <button type="button" class="oas-journal-entry__icon-button oas-journal-entry__icon-button--delete"
+                                title="حذف السطر المحدد" aria-label="حذف السطر المحدد"
+                                disabled="@(SelectedLine is null)" @onclick="RemoveSelectedLineAsync">
+                            <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+                        </button>
+                    </div>
                 }
-                else
-                {
-                    var idx = 1;
-                    foreach (var line in Lines)
-                    {
-                        var currentLine = line;
+            </div>
+
+            <div class="oas-journal-entry__table-wrap" role="region" aria-label="جميع أسطر القيد">
+                <table class="ui-acc-grid-table oas-journal-entry__table">
+                    <thead>
                         <tr>
-                            <td>@idx</td>
-                            <td>
-                                @if (IsEditable)
-                                {
-                                    <UiLookup Value='@currentLine.AccountId?.ToString("D")'
-                                              ValueChanged="@(val => OnAccountSelected(currentLine, val))"
-                                              SelectedItem="@currentLine.AccountLookupItem"
-                                              SearchAsync="AccountSearchAsync"
-                                              Placeholder="ابحث برقم أو اسم الحساب..."
-                                              Required="true"
-                                              MinimumSearchLength="0"
-                                              DebounceMilliseconds="250" />
-                                }
-                                else
-                                {
-                                    <span>@(currentLine.AccountLookupItem?.PrimaryText ?? currentLine.AccountDisplay)</span>
-                                }
-                            </td>
-                            <td>
-                                @if (IsEditable)
-                                {
-                                    <UiInputText Value="@currentLine.Description"
-                                                 ValueExpression="@(() => currentLine.Description)"
-                                                 ValueChanged="@(val => OnDescriptionChanged(currentLine, val))"
-                                                 Placeholder="بيان السطر..."
-                                                 Size="ControlSize.Small" />
-                                }
-                                else
-                                {
-                                    <span>@currentLine.Description</span>
-                                }
-                            </td>
-                            <td>
-                                @if (IsEditable)
-                                {
-                                    <UiLookup Value='@currentLine.CostCenterId?.ToString("D")'
-                                              ValueChanged="@(val => OnCostCenterSelected(currentLine, val))"
-                                              SelectedItem="@currentLine.CostCenterLookupItem"
-                                              SearchAsync="CostCenterSearchAsync"
-                                              Placeholder="اختياري: مركز التكلفة..."
-                                              MinimumSearchLength="0"
-                                              DebounceMilliseconds="250" />
-                                }
-                                else
-                                {
-                                    <span>@(currentLine.CostCenterLookupItem?.PrimaryText ?? currentLine.CostCenterDisplay ?? "-")</span>
-                                }
-                            </td>
-                            <td>
-                                @if (IsEditable)
-                                {
-                                    <UiLookup Value='@currentLine.CustomerId?.ToString("D")'
-                                              ValueChanged="@(val => OnCustomerSelected(currentLine, val))"
-                                              SelectedItem="@currentLine.CustomerLookupItem"
-                                              SearchAsync="CustomerSearchAsync"
-                                              Placeholder="اختياري: العميل..."
-                                              MinimumSearchLength="0"
-                                              DebounceMilliseconds="250" />
-                                }
-                                else
-                                {
-                                    <span>@(currentLine.CustomerLookupItem?.PrimaryText ?? "-")</span>
-                                }
-                            </td>
-                            <td>
-                                @if (IsEditable)
-                                {
-                                    <UiLookup Value='@currentLine.SupplierId?.ToString("D")'
-                                              ValueChanged="@(val => OnSupplierSelected(currentLine, val))"
-                                              SelectedItem="@currentLine.SupplierLookupItem"
-                                              SearchAsync="SupplierSearchAsync"
-                                              Placeholder="اختياري: المورد..."
-                                              MinimumSearchLength="0"
-                                              DebounceMilliseconds="250" />
-                                }
-                                else
-                                {
-                                    <span>@(currentLine.SupplierLookupItem?.PrimaryText ?? "-")</span>
-                                }
-                            </td>
-                            <td>
-                                @if (IsEditable)
-                                {
-                                    <UiLookup Value='@currentLine.EmployeeId?.ToString("D")'
-                                              ValueChanged="@(val => OnEmployeeSelected(currentLine, val))"
-                                              SelectedItem="@currentLine.EmployeeLookupItem"
-                                              SearchAsync="EmployeeSearchAsync"
-                                              Placeholder="اختياري: الموظف..."
-                                              MinimumSearchLength="0"
-                                              DebounceMilliseconds="250" />
-                                }
-                                else
-                                {
-                                    <span>@(currentLine.EmployeeLookupItem?.PrimaryText ?? "-")</span>
-                                }
-                            </td>
-                            <td>
-                                @if (IsEditable)
-                                {
-                                    <UiLookup Value='@currentLine.TransactionCurrencyId?.ToString("D")'
-                                              ValueChanged="@(val => OnCurrencySelected(currentLine, val))"
-                                              SelectedItem="@currentLine.CurrencyLookupItem"
-                                              SearchAsync="CurrencySearchAsync"
-                                              Placeholder="العملة الأساسية افتراضياً..."
-                                              MinimumSearchLength="0"
-                                              DebounceMilliseconds="250" />
-                                }
-                                else
-                                {
-                                    <span>@(currentLine.CurrencyLookupItem?.PrimaryText ?? currentLine.CurrencyCode ?? "-")</span>
-                                }
-                            </td>
-                            <td class="ui-acc-journal-rate-col">
-                                @if (IsEditable)
-                                {
-                                    <div class="ui-acc-journal-rate-editor">
-                                        <span class="text-muted small">
-                                            تلقائي: @(currentLine.ResolvedExchangeRate?.ToString("N8") ?? "-")
+                            <th scope="col" class="oas-journal-entry__number">#</th>
+                            <th scope="col" class="oas-journal-entry__account">الحساب</th>
+                            <th scope="col" class="oas-journal-entry__memo">بيان السطر</th>
+                            <th scope="col" class="oas-journal-entry__amount">مدين</th>
+                            <th scope="col" class="oas-journal-entry__amount">دائن</th>
+                            <th scope="col" class="oas-journal-entry__currency">العملة</th>
+                            <th scope="col" class="oas-journal-entry__action">تفاصيل</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Lines.Count == 0)
+                        {
+                            <tr><td colspan="7" class="text-center py-3">لا توجد أسطر. استخدم «إضافة سطر».</td></tr>
+                        }
+                        else
+                        {
+                            @foreach (var line in Lines)
+                            {
+                                <tr @key="line" class="@(ReferenceEquals(SelectedLine, line) ? "oas-journal-entry__selected" : "")">
+                                    <td>@(Lines.IndexOf(line) + 1)</td>
+                                    <td>
+                                        @if (IsEditable)
+                                        {
+                                            <div class="oas-journal-entry__inline-account" @onfocusin="(() => SelectLine(line))">
+                                                <UiLookup Value='@line.AccountId?.ToString("D")'
+                                                          ValueChanged="@(value => OnAccountSelected(line, value))"
+                                                          SelectedItem="@line.AccountLookupItem"
+                                                          SelectedItemChanged="@(item => OnAccountLookupItemChanged(line, item))"
+                                                          SearchAsync="AccountSearchAsync"
+                                                          Disabled="@(!IsEditable)"
+                                                          AriaLabel="الحساب المحاسبي للسطر"
+                                                          Placeholder="ابحث عن الحساب..."
+                                                          MinimumSearchLength="0"
+                                                          DebounceMilliseconds="250" />
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span>@(line.AccountLookupItem?.PrimaryText ?? line.AccountDisplay)</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (IsEditable)
+                                        {
+                                            <UiInputText Value="@line.Description"
+                                                         ValueExpression="@(() => line.Description)"
+                                                         ValueChanged="@(value => OnDescriptionChanged(line, value))"
+                                                         Placeholder="بيان السطر" Size="ControlSize.Small" />
+                                        }
+                                        else
+                                        {
+                                            <span>@line.Description</span>
+                                        }
+                                    </td>
+                                    <td class="oas-journal-entry__amount">
+                                        @if (IsEditable)
+                                        {
+                                            <UiAccountingNumberField Label="" Value="@line.DebitAmount"
+                                                                     ValueChanged="@(value => OnDebitChanged(line, value))"
+                                                                     Min="0" Step="0.01"
+                                                                     Tone="@UiAccountingNumberField.NumberTone.Success" />
+                                        }
+                                        else
+                                        {
+                                            <span>@(line.DebitAmount > 0 ? line.DebitAmount.ToString("N4") : "—")</span>
+                                        }
+                                    </td>
+                                    <td class="oas-journal-entry__amount">
+                                        @if (IsEditable)
+                                        {
+                                            <UiAccountingNumberField Label="" Value="@line.CreditAmount"
+                                                                     ValueChanged="@(value => OnCreditChanged(line, value))"
+                                                                     Min="0" Step="0.01"
+                                                                     Tone="@UiAccountingNumberField.NumberTone.Danger" />
+                                        }
+                                        else
+                                        {
+                                            <span>@(line.CreditAmount > 0 ? line.CreditAmount.ToString("N4") : "—")</span>
+                                        }
+                                    </td>
+                                    <td class="oas-journal-entry__currency">
+                                        <span class="oas-journal-entry__currency-chip" title="عملة السطر">
+                                            @(string.IsNullOrWhiteSpace(line.CurrencyCode) ? "الأساسية" : line.CurrencyCode)
                                         </span>
-                                        <UiAccountingNumberField Label=""
-                                                                 Value="@(currentLine.ManualExchangeRate ?? 0m)"
-                                                                 ValueChanged="@(value => OnManualRateChanged(currentLine, value))"
-                                                                 Min="0"
-                                                                 Step="0.00000001"
-                                                                 Tone="@UiAccountingNumberField.NumberTone.Default" />
-                                        <span class="text-muted small">0 = استخدام السعر التلقائي</span>
+                                        @if (line.MissingExchangeRate)
+                                        {
+                                            <i class="fa-solid fa-triangle-exclamation oas-journal-entry__rate-alert" title="سعر الصرف غير متوفر" aria-label="سعر الصرف غير متوفر"></i>
+                                        }
+                                    </td>
+                                    <td>
+                                        <button type="button" class="oas-journal-entry__icon-button"
+                                                aria-label="عرض تفاصيل السطر @(Lines.IndexOf(line) + 1)"
+                                                title="تفاصيل السطر" aria-pressed="@(ReferenceEquals(SelectedLine, line))"
+                                                @onclick="(() => SelectLine(line))">
+                                            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <section class="oas-journal-entry__summary" aria-label="ملخص توازن القيد">
+                <div><small>إجمالي المدين الأساسي</small><strong>@(HasMissingRates ? "غير مكتمل" : TotalDebit.ToString("N4"))</strong></div>
+                <div><small>إجمالي الدائن الأساسي</small><strong>@(HasMissingRates ? "غير مكتمل" : TotalCredit.ToString("N4"))</strong></div>
+                <div><small>الفرق</small><strong>@(HasMissingRates ? "—" : Difference.ToString("N4"))</strong></div>
+                <div class="@(HasMissingRates ? "oas-journal-entry__balance--warning" : IsBalanced ? "oas-journal-entry__balance--good" : "oas-journal-entry__balance--warning")" role="status">
+                    <i class="fa-solid @(HasMissingRates ? "fa-triangle-exclamation" : IsBalanced ? "fa-circle-check" : "fa-scale-unbalanced")" aria-hidden="true"></i>
+                    @(HasMissingRates ? "سعر صرف مفقود" : IsBalanced ? "القيد متوازن" : "القيد غير متوازن")
+                </div>
+            </section>
+        </section>
+
+        <aside class="oas-journal-entry__details" aria-label="لوحة تفاصيل السطر المحدد">
+            @if (SelectedLine is { } selected)
+            {
+                <div class="oas-journal-entry__section-heading">
+                    <strong><i class="fa-solid fa-layer-group" aria-hidden="true"></i> تفاصيل السطر @(Lines.IndexOf(selected) + 1)</strong>
+                    <span>إعدادات مستقلة لهذا السطر</span>
+                </div>
+                <div @key="selected" class="oas-journal-entry__details-all">
+                    <div class="oas-journal-entry__group">
+                        <h3><i class="fa-solid fa-users" aria-hidden="true"></i> الطرف المرتبط بالسطر</h3>
+                        <div class="oas-journal-entry__party-grid">
+                            <div>
+                                <label class="oas-journal-entry__field-label" for="journal-party-kind">نوع الطرف</label>
+                                <select id="journal-party-kind" class="oas-journal-entry__select"
+                                        value="@GetPartyKind(selected)" disabled="@(!IsEditable)"
+                                        @onchange="@(e => OnPartyKindChanged(selected, e))">
+                                    <option value="none">بدون طرف</option>
+                                    <option value="customer">عميل</option>
+                                    <option value="supplier">مورد</option>
+                                    <option value="employee">موظف</option>
+                                </select>
+                            </div>
+                            <div>
+                                @if (GetPartyKind(selected) == "customer")
+                                {
+                                    <UiLookup Label="العميل" Value='@selected.CustomerId?.ToString("D")'
+                                              ValueChanged="@(value => OnCustomerSelected(selected, value))"
+                                              SelectedItem="@selected.CustomerLookupItem" SearchAsync="CustomerSearchAsync"
+                                              Disabled="@(!IsEditable)" Placeholder="ابحث عن العميل" MinimumSearchLength="0" />
+                                }
+                                else if (GetPartyKind(selected) == "supplier")
+                                {
+                                    <UiLookup Label="المورد" Value='@selected.SupplierId?.ToString("D")'
+                                              ValueChanged="@(value => OnSupplierSelected(selected, value))"
+                                              SelectedItem="@selected.SupplierLookupItem" SearchAsync="SupplierSearchAsync"
+                                              Disabled="@(!IsEditable)" Placeholder="ابحث عن المورد" MinimumSearchLength="0" />
+                                }
+                                else if (GetPartyKind(selected) == "employee")
+                                {
+                                    <UiLookup Label="الموظف" Value='@selected.EmployeeId?.ToString("D")'
+                                              ValueChanged="@(value => OnEmployeeSelected(selected, value))"
+                                              SelectedItem="@selected.EmployeeLookupItem" SearchAsync="EmployeeSearchAsync"
+                                              Disabled="@(!IsEditable)" Placeholder="ابحث عن الموظف" MinimumSearchLength="0" />
+                                }
+                                else
+                                {
+                                    <div class="oas-journal-entry__readonly-rate"><small>الطرف</small><strong>غير مرتبط</strong></div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                    <div class="oas-journal-entry__group">
+                        <h3><i class="fa-solid fa-coins" aria-hidden="true"></i> العملة وسعر الصرف</h3>
+                        <UiLookup Label="العملة"
+                                  Value='@selected.TransactionCurrencyId?.ToString("D")'
+                                  ValueChanged="@(value => OnCurrencySelected(selected, value))"
+                                  SelectedItem="@selected.CurrencyLookupItem"
+                                  SearchAsync="CurrencySearchAsync"
+                                  Placeholder="الأساسية أو اختر عملة"
+                                  Disabled="@(!IsEditable)" MinimumSearchLength="0" DebounceMilliseconds="250" />
+                        <div class="oas-journal-entry__party-grid">
+                            <div>
+                                <label class="oas-journal-entry__field-label" for="journal-rate-mode">مصدر السعر</label>
+                                <select id="journal-rate-mode" class="oas-journal-entry__select"
+                                        value="@(IsManualMode(selected) ? "manual" : "auto")"
+                                        disabled="@(!IsEditable || !selected.TransactionCurrencyId.HasValue)"
+                                        @onchange="@(e => OnRateModeChanged(selected, e))">
+                                    <option value="auto">تلقائي</option>
+                                    <option value="manual">يدوي</option>
+                                </select>
+                            </div>
+                            <div>
+                                @if (IsManualMode(selected))
+                                {
+                                    <UiAccountingNumberField Label="سعر الصرف اليدوي"
+                                                             Value="@(selected.ManualExchangeRate ?? 0m)"
+                                                             ValueChanged="@(value => OnManualRateChanged(selected, value))"
+                                                             Min="0" Step="0.00000001" Disabled="@(!IsEditable)" />
+                                }
+                                else
+                                {
+                                    <div class="oas-journal-entry__readonly-rate">
+                                        <small>سعر الصرف التلقائي</small>
+                                        <strong>@(selected.TransactionCurrencyId.HasValue ? selected.ResolvedExchangeRate?.ToString("N8") ?? "غير متوفر" : "1 · عملة أساسية")</strong>
                                     </div>
                                 }
-                                else
-                                {
-                                    <span>@(currentLine.EffectiveExchangeRate?.ToString("N8") ?? "-")</span>
-                                }
-                            </td>
-                            <td class="ui-acc-journal-amount-col">
-                                @if (IsEditable)
-                                {
-                                    <UiAccountingNumberField Label=""
-                                                             Value="@currentLine.DebitAmount"
-                                                             ValueChanged="@(value => OnDebitChanged(currentLine, value))"
-                                                             Min="0"
-                                                             Step="0.01"
-                                                             Tone="@UiAccountingNumberField.NumberTone.Success" />
-                                }
-                                else
-                                {
-                                    <span class="ui-acc-val--debit">
-                                        @(currentLine.DebitAmount > 0 ? currentLine.DebitAmount.ToString("N4") : "-")
-                                    </span>
-                                }
-                            </td>
-                            <td class="ui-acc-journal-amount-col">
-                                @if (IsEditable)
-                                {
-                                    <UiAccountingNumberField Label=""
-                                                             Value="@currentLine.CreditAmount"
-                                                             ValueChanged="@(value => OnCreditChanged(currentLine, value))"
-                                                             Min="0"
-                                                             Step="0.01"
-                                                             Tone="@UiAccountingNumberField.NumberTone.Danger" />
-                                }
-                                else
-                                {
-                                    <span class="ui-acc-val--credit">
-                                        @(currentLine.CreditAmount > 0 ? currentLine.CreditAmount.ToString("N4") : "-")
-                                    </span>
-                                }
-                            </td>
-                            <td class="ui-acc-journal-base-col ui-acc-val--debit">
-                                @(currentLine.BaseDebitAmount > 0 ? currentLine.BaseDebitAmount.ToString("N4") : "-")
-                            </td>
-                            <td class="ui-acc-journal-base-col ui-acc-val--credit">
-                                @(currentLine.BaseCreditAmount > 0 ? currentLine.BaseCreditAmount.ToString("N4") : "-")
-                            </td>
-                            @if (IsEditable)
-                            {
-                                <td>
-                                    <UiButton Text=""
-                                              IconCssClass="fa-solid fa-trash-can"
-                                              Variant="ButtonVariant.Ghost"
-                                              Size="ControlSize.Small"
-                                              OnClick="@(() => RemoveLine(currentLine))" />
-                                </td>
-                            }
-                        </tr>
-                        idx++;
-                    }
-                }
-            </tbody>
-            <tfoot>
-                <tr>
-                    <td colspan="11" class="text-start font-bold">
-                        <span>الإجمالي بالعملة الأساسية</span>
-                        <span class="ms-3">
-                            @if (IsBalanced)
-                            {
-                                <span class="badge bg-success-subtle text-success p-1 ms-2">
-                                    <i class="fa-solid fa-check me-1"></i> متوازن ✓
-                                </span>
-                            }
-                            else
-                            {
-                                <span class="badge bg-danger-subtle text-danger p-1 ms-2">
-                                    <i class="fa-solid fa-triangle-exclamation me-1"></i>
-                                    غير متوازن (الفرق: @Difference.ToString("N4"))
-                                </span>
-                            }
-                        </span>
-                    </td>
-                    <td class="ui-acc-val--debit font-bold">@TotalDebit.ToString("N4")</td>
-                    <td class="ui-acc-val--credit font-bold">@TotalCredit.ToString("N4")</td>
-                    @if (IsEditable)
-                    {
-                        <td></td>
-                    }
-                </tr>
-            </tfoot>
-        </table>
+                            </div>
+                        </div>
+                        @if (selected.MissingExchangeRate)
+                        {
+                            <p class="oas-journal-entry__error" role="alert">سعر الصرف غير متوفر؛ لا يمكن تأكيد توازن القيد.</p>
+                        }
+                    </div>
+                    <div class="oas-journal-entry__group">
+                        <h3><i class="fa-solid fa-sliders" aria-hidden="true"></i> مركز التكلفة والمعادل الأساسي</h3>
+                        <UiLookup Label="مركز التكلفة" Value='@selected.CostCenterId?.ToString("D")'
+                                  ValueChanged="@(value => OnCostCenterSelected(selected, value))"
+                                  SelectedItem="@selected.CostCenterLookupItem" SearchAsync="CostCenterSearchAsync"
+                                  Disabled="@(!IsEditable)" Placeholder="اختياري: مركز التكلفة" MinimumSearchLength="0" />
+                        <div class="oas-journal-entry__converted">
+                            <span>مدين أساسي: <strong>@(selected.MissingExchangeRate ? "—" : selected.BaseDebitAmount.ToString("N4"))</strong></span>
+                            <span>دائن أساسي: <strong>@(selected.MissingExchangeRate ? "—" : selected.BaseCreditAmount.ToString("N4"))</strong></span>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <p class="oas-journal-entry__aside-empty">أضف سطرًا أو حدده لعرض إعداداته.</p>
+            }
+        </aside>
     </div>
 
-    @if (IsEditable)
-    {
-        <div class="ui-acc-lines-editor__actions">
-            <UiButton Text="إضافة سطر جديد"
-                      IconCssClass="fa-solid fa-plus"
-                      Variant="ButtonVariant.Secondary"
-                      Size="ControlSize.Small"
-                      OnClick="AddLine" />
-        </div>
-    }
+
 </div>
 
 @code {
@@ -281,53 +273,40 @@
         public Guid? AccountId { get; set; }
         public string AccountDisplay { get; set; } = string.Empty;
         public UiLookupItem? AccountLookupItem { get; set; }
-
         public string Description { get; set; } = string.Empty;
-
         public Guid? CostCenterId { get; set; }
         public string? CostCenterDisplay { get; set; }
         public UiLookupItem? CostCenterLookupItem { get; set; }
-
         public Guid? CustomerId { get; set; }
         public UiLookupItem? CustomerLookupItem { get; set; }
-
         public Guid? SupplierId { get; set; }
         public UiLookupItem? SupplierLookupItem { get; set; }
-
         public Guid? EmployeeId { get; set; }
         public UiLookupItem? EmployeeLookupItem { get; set; }
-
         public Guid? ProductVariantId { get; set; }
         public Guid? WarehouseId { get; set; }
-
         public Guid? TransactionCurrencyId { get; set; }
         public string? CurrencyCode { get; set; }
         public UiLookupItem? CurrencyLookupItem { get; set; }
-
-        // System rate is preview-only. ManualExchangeRate is sent only when the user
-        // explicitly enters a non-zero override, so normal users do not accidentally
-        // trigger the override permission rule.
         public decimal? ResolvedExchangeRate { get; set; }
         public decimal? ManualExchangeRate { get; set; }
-
-        // Debit/Credit here are transaction-currency amounts.
+        public bool UseManualRate { get; set; }
         public decimal DebitAmount { get; set; }
         public decimal CreditAmount { get; set; }
-
-        public decimal? EffectiveExchangeRate =>
-            ManualExchangeRate is > 0 ? ManualExchangeRate : ResolvedExchangeRate;
-
-        public decimal BaseDebitAmount =>
-            DebitAmount <= 0 ? 0m : DebitAmount * (EffectiveExchangeRate ?? 1m);
-
-        public decimal BaseCreditAmount =>
-            CreditAmount <= 0 ? 0m : CreditAmount * (EffectiveExchangeRate ?? 1m);
+        public decimal? EffectiveExchangeRate => UseManualRate || ManualExchangeRate is > 0
+            ? ManualExchangeRate : ResolvedExchangeRate;
+        // Currency null means the system's base currency; a selected currency requires a verified rate.
+        public bool MissingExchangeRate => TransactionCurrencyId.HasValue &&
+            (DebitAmount > 0 || CreditAmount > 0) && !(EffectiveExchangeRate is > 0);
+        public decimal BaseDebitAmount => DebitAmount <= 0 ? 0m :
+            (TransactionCurrencyId.HasValue ? DebitAmount * (EffectiveExchangeRate ?? 0m) : DebitAmount);
+        public decimal BaseCreditAmount => CreditAmount <= 0 ? 0m :
+            (TransactionCurrencyId.HasValue ? CreditAmount * (EffectiveExchangeRate ?? 0m) : CreditAmount);
     }
 
     [Parameter] public List<EditableJournalLine> Lines { get; set; } = [];
     [Parameter] public bool IsEditable { get; set; } = true;
     [Parameter] public DateOnly RateDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
-
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? AccountSearchAsync { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CostCenterSearchAsync { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CustomerSearchAsync { get; set; }
@@ -335,134 +314,210 @@
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? EmployeeSearchAsync { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CurrencySearchAsync { get; set; }
     [Parameter] public Func<Guid, DateOnly, CancellationToken, Task<decimal?>>? EffectiveRateAsync { get; set; }
-
     [Parameter] public EventCallback OnLinesChanged { get; set; }
 
-    public decimal TotalDebit => Lines.Sum(l => l.BaseDebitAmount);
-    public decimal TotalCredit => Lines.Sum(l => l.BaseCreditAmount);
+    private Task RemoveSelectedLineAsync() => SelectedLine is { } line ? RemoveLine(line) : Task.CompletedTask;
+
+    private async Task CopySelectedLineAsync()
+    {
+        if (SelectedLine is not { } from) return;
+        var line = new EditableJournalLine
+        {
+            AccountId = from.AccountId,
+            AccountDisplay = from.AccountDisplay,
+            AccountLookupItem = from.AccountLookupItem,
+            Description = from.Description,
+            CostCenterId = from.CostCenterId,
+            CostCenterDisplay = from.CostCenterDisplay,
+            CostCenterLookupItem = from.CostCenterLookupItem,
+            CustomerId = from.CustomerId,
+            CustomerLookupItem = from.CustomerLookupItem,
+            SupplierId = from.SupplierId,
+            SupplierLookupItem = from.SupplierLookupItem,
+            EmployeeId = from.EmployeeId,
+            EmployeeLookupItem = from.EmployeeLookupItem,
+            TransactionCurrencyId = from.TransactionCurrencyId,
+            CurrencyCode = from.CurrencyCode,
+            CurrencyLookupItem = from.CurrencyLookupItem,
+            ResolvedExchangeRate = from.ResolvedExchangeRate,
+            ManualExchangeRate = from.ManualExchangeRate,
+            UseManualRate = from.UseManualRate
+        };
+        Lines.Insert(Lines.IndexOf(from) + 1, line);
+        SelectLine(line);
+        await OnLinesChanged.InvokeAsync();
+    }
+
+    private EditableJournalLine? _selectedLine;
+    private DateOnly? _previousRateDate;
+    private readonly Dictionary<EditableJournalLine, string> _partyModes = [];
+    private EditableJournalLine? SelectedLine => _selectedLine is not null && Lines.Contains(_selectedLine)
+        ? _selectedLine : Lines.FirstOrDefault();
+    public bool HasMissingRates => Lines.Any(x => x.MissingExchangeRate);
+    public decimal TotalDebit => Lines.Sum(x => x.BaseDebitAmount);
+    public decimal TotalCredit => Lines.Sum(x => x.BaseCreditAmount);
     public decimal Difference => Math.Abs(TotalDebit - TotalCredit);
-    public bool IsBalanced => TotalDebit == TotalCredit && TotalDebit > 0;
+    public bool IsBalanced => !HasMissingRates && TotalDebit == TotalCredit && TotalDebit > 0;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsEditable && _previousRateDate.HasValue && _previousRateDate != RateDate && EffectiveRateAsync is not null)
+        {
+            foreach (var line in Lines.Where(x => x.TransactionCurrencyId.HasValue && !IsManualMode(x)))
+            {
+                line.ResolvedExchangeRate = null;
+                try
+                {
+                    line.ResolvedExchangeRate = await EffectiveRateAsync(line.TransactionCurrencyId!.Value, RateDate, CancellationToken.None);
+                }
+                catch
+                {
+                    // Treat unavailable rate previews as missing; never assume a conversion rate of 1.
+                }
+            }
+        }
+        _previousRateDate = RateDate;
+    }
+
+    private void SelectLine(EditableJournalLine line)
+    {
+        _selectedLine = line;
+    }
+    private static bool IsManualMode(EditableJournalLine line) => line.UseManualRate || line.ManualExchangeRate.HasValue;
+    private string GetPartyKind(EditableJournalLine line) =>
+        line.CustomerId.HasValue ? "customer" : line.SupplierId.HasValue ? "supplier" :
+        line.EmployeeId.HasValue ? "employee" : _partyModes.GetValueOrDefault(line) ?? "none";
 
     private async Task AddLine()
     {
-        Lines.Add(new EditableJournalLine());
+        var line = new EditableJournalLine();
+        Lines.Add(line);
+        SelectLine(line);
         await OnLinesChanged.InvokeAsync();
     }
-
     private async Task RemoveLine(EditableJournalLine line)
     {
         Lines.Remove(line);
+        _partyModes.Remove(line);
+        if (ReferenceEquals(_selectedLine, line)) _selectedLine = Lines.FirstOrDefault();
         await OnLinesChanged.InvokeAsync();
     }
-
+    private async Task OnRateModeChanged(EditableJournalLine line, ChangeEventArgs e)
+    {
+        line.UseManualRate = e.Value?.ToString() == "manual";
+        if (!line.UseManualRate)
+        {
+            line.ManualExchangeRate = null;
+            if (line.TransactionCurrencyId is Guid currencyId &&
+                line.ResolvedExchangeRate is not > 0 && EffectiveRateAsync is not null)
+            {
+                try { line.ResolvedExchangeRate = await EffectiveRateAsync(currencyId, RateDate, CancellationToken.None); }
+                catch { /* The unavailable rate remains visible as missing. */ }
+            }
+        }
+        await OnLinesChanged.InvokeAsync();
+    }
+    private async Task OnPartyKindChanged(EditableJournalLine line, ChangeEventArgs e)
+    {
+        var kind = e.Value?.ToString() ?? "none";
+        _partyModes[line] = kind;
+        line.CustomerId = null;
+        line.SupplierId = null;
+        line.EmployeeId = null;
+        line.CustomerLookupItem = null;
+        line.SupplierLookupItem = null;
+        line.EmployeeLookupItem = null;
+        await OnLinesChanged.InvokeAsync();
+    }
+    private void OnAccountLookupItemChanged(EditableJournalLine line, UiLookupItem? item)
+    {
+        line.AccountLookupItem = item;
+        line.AccountDisplay = item?.PrimaryText ?? string.Empty;
+    }
     private async Task OnAccountSelected(EditableJournalLine line, string? val)
     {
         line.AccountId = Parse(val);
-        line.AccountLookupItem = await ResolveAsync(AccountSearchAsync, line.AccountId);
+        if (!line.AccountId.HasValue)
+        {
+            line.AccountLookupItem = null;
+            line.AccountDisplay = string.Empty;
+        }
+        else if (!string.Equals(line.AccountLookupItem?.Value, val, StringComparison.OrdinalIgnoreCase))
+        {
+            // Keep the selected item's display text when it came from a filtered lookup.
+            line.AccountLookupItem = await ResolveAsync(AccountSearchAsync, line.AccountId);
+            line.AccountDisplay = line.AccountLookupItem?.PrimaryText ?? line.AccountDisplay;
+        }
         await OnLinesChanged.InvokeAsync();
     }
-
     private async Task OnCostCenterSelected(EditableJournalLine line, string? val)
     {
         line.CostCenterId = Parse(val);
         line.CostCenterLookupItem = await ResolveAsync(CostCenterSearchAsync, line.CostCenterId);
         await OnLinesChanged.InvokeAsync();
     }
-
     private async Task OnCustomerSelected(EditableJournalLine line, string? val)
     {
         line.CustomerId = Parse(val);
-        if (line.CustomerId.HasValue)
-        {
-            line.SupplierId = null;
-            line.SupplierLookupItem = null;
-            line.EmployeeId = null;
-            line.EmployeeLookupItem = null;
-        }
         line.CustomerLookupItem = await ResolveAsync(CustomerSearchAsync, line.CustomerId);
         await OnLinesChanged.InvokeAsync();
     }
-
     private async Task OnSupplierSelected(EditableJournalLine line, string? val)
     {
         line.SupplierId = Parse(val);
-        if (line.SupplierId.HasValue)
-        {
-            line.CustomerId = null;
-            line.CustomerLookupItem = null;
-            line.EmployeeId = null;
-            line.EmployeeLookupItem = null;
-        }
         line.SupplierLookupItem = await ResolveAsync(SupplierSearchAsync, line.SupplierId);
         await OnLinesChanged.InvokeAsync();
     }
-
     private async Task OnEmployeeSelected(EditableJournalLine line, string? val)
     {
         line.EmployeeId = Parse(val);
-        if (line.EmployeeId.HasValue)
-        {
-            line.CustomerId = null;
-            line.CustomerLookupItem = null;
-            line.SupplierId = null;
-            line.SupplierLookupItem = null;
-        }
         line.EmployeeLookupItem = await ResolveAsync(EmployeeSearchAsync, line.EmployeeId);
         await OnLinesChanged.InvokeAsync();
     }
-
     private async Task OnCurrencySelected(EditableJournalLine line, string? val)
     {
         line.TransactionCurrencyId = Parse(val);
         line.CurrencyLookupItem = await ResolveAsync(CurrencySearchAsync, line.TransactionCurrencyId);
         line.CurrencyCode = line.CurrencyLookupItem?.PrimaryText?.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
         line.ManualExchangeRate = null;
+        line.UseManualRate = false;
         line.ResolvedExchangeRate = null;
-
         if (line.TransactionCurrencyId is Guid currencyId && EffectiveRateAsync is not null)
         {
-            line.ResolvedExchangeRate = await EffectiveRateAsync(currencyId, RateDate, CancellationToken.None);
+            try { line.ResolvedExchangeRate = await EffectiveRateAsync(currencyId, RateDate, CancellationToken.None); }
+            catch { /* Keep rate missing until an actual rate can be retrieved. */ }
         }
-
         await OnLinesChanged.InvokeAsync();
     }
-
     private async Task OnManualRateChanged(EditableJournalLine line, decimal value)
     {
         line.ManualExchangeRate = value > 0 ? value : null;
+        line.UseManualRate = true;
         await OnLinesChanged.InvokeAsync();
     }
-
     private async Task OnDescriptionChanged(EditableJournalLine line, string? val)
     {
         line.Description = val ?? string.Empty;
         await OnLinesChanged.InvokeAsync();
     }
-
     private async Task OnDebitChanged(EditableJournalLine line, decimal amount)
     {
         line.DebitAmount = Math.Max(0, amount);
         if (line.DebitAmount > 0) line.CreditAmount = 0;
         await OnLinesChanged.InvokeAsync();
     }
-
     private async Task OnCreditChanged(EditableJournalLine line, decimal amount)
     {
         line.CreditAmount = Math.Max(0, amount);
         if (line.CreditAmount > 0) line.DebitAmount = 0;
         await OnLinesChanged.InvokeAsync();
     }
-
-    private static Guid? Parse(string? value) =>
-        Guid.TryParse(value, out var id) ? id : null;
-
+    private static Guid? Parse(string? value) => Guid.TryParse(value, out var id) ? id : null;
     private static async Task<UiLookupItem?> ResolveAsync(
-        Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? search,
-        Guid? id)
+        Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? search, Guid? id)
     {
         if (!id.HasValue || search is null) return null;
         var items = await search(string.Empty, CancellationToken.None);
-        return items.FirstOrDefault(x =>
-            string.Equals(x.Value, id.Value.ToString("D"), StringComparison.OrdinalIgnoreCase));
+        return items.FirstOrDefault(x => string.Equals(x.Value, id.Value.ToString("D"), StringComparison.OrdinalIgnoreCase));
     }
 }

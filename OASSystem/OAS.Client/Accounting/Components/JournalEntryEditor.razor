@@ -7,140 +7,90 @@
 @using OAS.UiLib.Components.Inputs
 @using OAS.UiLib.Core.Models
 
-<UiAccountingEditorSurface>
-
-    @if (!IsNew)
-    {
-        <UiAccountingFormSection Title="حالة القيد"
-                                 Subtitle="حالة دورة الاعتماد والترحيل وعلاقة القيد العكسي"
-                                 IconCssClass="fa-solid fa-circle-check">
-
-            <UiAccountingStatusActionBar Label="الحالة الحالية"
-                                         StatusText="@AccountingArabicPresenter.GetJournalStatusText(Model.Status)"
-                                         StatusState="@Model.Status.ToString().ToLowerInvariant()" />
-
+<UiAccountingEditorSurface AdditionalCssClass="oas-journal-editor--compact">
+    <div class="oas-journal-editor__heading">
+        <div class="oas-journal-editor__identity">
+            <h2><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> @(IsNew ? "إضافة قيد يومية" : "تفاصيل قيد يومية")</h2>
+            <span class="oas-journal-editor__number">@Model.JournalNumber</span>
+        </div>
+        <div class="oas-journal-editor__heading-actions">
+            <span class="oas-journal-editor__status">@AccountingArabicPresenter.GetJournalStatusText(Model.Status)</span>
             @if (Model.ReversedJournalId.HasValue)
             {
-                <UiAccountingReadOnlyValue Label="القيد المرتبط بالعكس"
-                                           Value="@ReversedJournalCodeText"
-                                           Tone="@UiAccountingReadOnlyValue.ValueTone.Primary" />
+                <span class="oas-journal-editor__number">القيد العكسي: @ReversedJournalCodeText</span>
             }
+            @if (!IsNew && (!string.IsNullOrWhiteSpace(Model.SourceModule) ||
+                 !string.IsNullOrWhiteSpace(Model.SourceDocumentType) || Model.SourceDocumentId.HasValue))
+            {
+                <details class="oas-journal-editor__source">
+                    <summary><i class="fa-solid fa-link" aria-hidden="true"></i> المستند المصدر</summary>
+                    <div class="oas-journal-editor__source-content">
+                        <span>الوحدة: @SourceModuleText</span>
+                        <span>النوع: @SourceDocumentTypeText</span>
+                        <span>رقم المستند: @SourceDocumentCodeText</span>
+                    </div>
+                </details>
+            }
+        </div>
+    </div>
 
-        </UiAccountingFormSection>
-    }
-
-    <UiAccountingFormSection Title="ترويسة وبيانات القيد"
-                             Subtitle="نوع القيد، التواريخ، والبيان العام"
-                             IconCssClass="fa-solid fa-file-invoice">
-
-        <UiAccountingFormGrid Columns="3">
-
+    <section class="oas-journal-editor__meta" aria-label="بيانات القيد الأساسية">
+        <div class="oas-journal-editor__meta-title">
+            <strong><i class="fa-solid fa-file-invoice" aria-hidden="true"></i> بيانات القيد</strong>
+            <small>الترحيل والاعتماد من شريط الإجراءات العلوي</small>
+        </div>
+        <div class="oas-journal-editor__fields">
             <UiInputText Label="رقم القيد"
                          Value="@Model.JournalNumber"
                          ValueExpression="@(() => Model.JournalNumber)"
-                         ReadOnly="true"
-                         Disabled="true"
-                         Placeholder="توليد تلقائي..."
-                         Size="ControlSize.Small" />
-
-            <UiSelect Label="نوع القيد"
-                      Value="@Model.JournalTypeValue"
-                      ValueExpression="@(() => Model.JournalTypeValue)"
-                      ValueChanged="OnTypeChanged"
-                      Options="@AccountingArabicPresenter.JournalTypeOptions"
-                      Disabled="@(!IsEditable)"
-                      Size="ControlSize.Small" />
-
+                         ReadOnly="true" Disabled="true"
+                         Placeholder="يولّد تلقائيًا" Size="ControlSize.Small" />
+            <UiInputDate Label="تاريخ القيد"
+                         Value="@Model.DocumentDateInput"
+                         ValueExpression="@(() => Model.DocumentDateInput)"
+                         ValueChanged="OnDocumentDateChanged"
+                         Required="true" Disabled="@(!IsEditable)" Size="ControlSize.Small" />
+            <UiInputDate Label="تاريخ الترحيل"
+                         Value="@Model.PostingDateInput"
+                         ValueExpression="@(() => Model.PostingDateInput)"
+                         ValueChanged="OnPostingDateChanged"
+                         Required="true" Disabled="@(!IsEditable)" Size="ControlSize.Small" />
             <UiLookup Label="الفترة المالية"
                       Value='@Model.FiscalPeriodId?.ToString("D")'
                       ValueChanged="OnPeriodChanged"
                       SelectedItem="@FiscalPeriodLookupItem"
                       SearchAsync="FiscalPeriodSearchAsync"
-                      Placeholder="اختر الفترة المالية..."
-                      Disabled="@(!IsEditable)"
-                      MinimumSearchLength="0"
-                      DebounceMilliseconds="250" />
-
-            <UiInputDate Label="تاريخ الترحيل"
-                         Value="@Model.PostingDateInput"
-                         ValueExpression="@(() => Model.PostingDateInput)"
-                         ValueChanged="OnPostingDateChanged"
-                         Required="true"
-                         Disabled="@(!IsEditable)"
-                         Size="ControlSize.Small" />
-
-            <UiInputDate Label="تاريخ المستند"
-                         Value="@Model.DocumentDateInput"
-                         ValueExpression="@(() => Model.DocumentDateInput)"
-                         ValueChanged="OnDocumentDateChanged"
-                         Required="true"
-                         Disabled="@(!IsEditable)"
-                         Size="ControlSize.Small" />
-
-        </UiAccountingFormGrid>
-
-        <UiAccountingStack>
-
+                      Placeholder="اختر الفترة المالية"
+                      Disabled="@(!IsEditable)" MinimumSearchLength="0" DebounceMilliseconds="250" />
+            <UiSelect Label="نوع القيد"
+                      Value="@Model.JournalTypeValue"
+                      ValueExpression="@(() => Model.JournalTypeValue)"
+                      ValueChanged="OnTypeChanged"
+                      Options="@AccountingArabicPresenter.JournalTypeOptions"
+                      Disabled="@(!IsEditable)" Size="ControlSize.Small" />
+        </div>
+        <div class="oas-journal-editor__description">
             <UiInputText Label="البيان العام للقيد"
                          Value="@Model.Description"
                          ValueExpression="@(() => Model.Description)"
                          ValueChanged="OnDescriptionChanged"
-                         Required="true"
-                         Disabled="@(!IsEditable)"
-                         Placeholder="شرح وافٍ عن طبيعة القيد والعملية المالية..." />
+                         Required="true" Disabled="@(!IsEditable)"
+                         Placeholder="وصف مختصر لسبب القيد..." Size="ControlSize.Small" />
+        </div>
+    </section>
 
-        </UiAccountingStack>
-
-    </UiAccountingFormSection>
-
-
-    @if (!IsNew &&
-        (!string.IsNullOrWhiteSpace(Model.SourceModule) ||
-        !string.IsNullOrWhiteSpace(Model.SourceDocumentType) ||
-        Model.SourceDocumentId.HasValue))
-    {
-        <UiAccountingFormSection Title="مرجع العملية المصدر"
-                                 Subtitle="بيانات الربط بالمستند الذي أنشأ القيد تلقائياً"
-                                 IconCssClass="fa-solid fa-link">
-
-            <UiAccountingFormGrid Columns="3">
-
-                <UiAccountingReadOnlyValue Label="الوحدة المصدر"
-                                           Value="@SourceModuleText" />
-
-                <UiAccountingReadOnlyValue Label="نوع المستند"
-                                           Value="@SourceDocumentTypeText" />
-
-                <UiAccountingReadOnlyValue Label="رقم المستند"
-                                           Value="@SourceDocumentCodeText"
-                                           Tone="@UiAccountingReadOnlyValue.ValueTone.Primary" />
-
-            </UiAccountingFormGrid>
-
-        </UiAccountingFormSection>
-    }
-
-
-    <UiAccountingFormSection Title="أسطر القيد اليومي (الحسابات والمدين والدائن)"
-                             Subtitle="إدخال الحسابات المحاسبية ومراكز التكلفة والمبالغ المتوازنة"
-                             IconCssClass="fa-solid fa-scale-balanced">
-
-        <UiJournalLinesEditor Lines="@Model.Lines"
-                              IsEditable="@IsEditable"
-                              AccountSearchAsync="@AccountSearchAsync"
-                              CostCenterSearchAsync="@CostCenterSearchAsync"
-                              CustomerSearchAsync="@CustomerSearchAsync"
-                              SupplierSearchAsync="@SupplierSearchAsync"
-                              EmployeeSearchAsync="@EmployeeSearchAsync"
-                              CurrencySearchAsync="@CurrencySearchAsync"
-                              EffectiveRateAsync="@EffectiveRateAsync"
-                              RateDate="@Model.DocumentDate"
-                              OnLinesChanged="@OnChanged" />
-
-    </UiAccountingFormSection>
-
+    <UiJournalLinesEditor Lines="@Model.Lines"
+                          IsEditable="@IsEditable"
+                          AccountSearchAsync="@AccountSearchAsync"
+                          CostCenterSearchAsync="@CostCenterSearchAsync"
+                          CustomerSearchAsync="@CustomerSearchAsync"
+                          SupplierSearchAsync="@SupplierSearchAsync"
+                          EmployeeSearchAsync="@EmployeeSearchAsync"
+                          CurrencySearchAsync="@CurrencySearchAsync"
+                          EffectiveRateAsync="@EffectiveRateAsync"
+                          RateDate="@Model.DocumentDate"
+                          OnLinesChanged="@OnChanged" />
 </UiAccountingEditorSurface>
-
 
 @code {
 
@@ -361,6 +311,9 @@
 
 
     [Parameter]
+    public Func<DateOnly, Task<string?>>? ReserveNumberForPostingDateAsync { get; set; }
+
+    [Parameter]
     public EventCallback OnModelChanged { get; set; }
 
 
@@ -488,18 +441,18 @@
     }
 
 
-    private async Task OnPostingDateChanged(
-        DateOnly? value)
+    private async Task OnPostingDateChanged(DateOnly? value)
     {
-        if (value.HasValue)
+        if (!value.HasValue) return;
+        var yearChanged = Model.PostingDate.Year != value.Value.Year;
+        Model.PostingDate = value.Value;
+        if (IsNew && yearChanged && ReserveNumberForPostingDateAsync is not null)
         {
-            Model.PostingDate =
-                value.Value;
+            // A reserved number belongs to the posting year; refresh it when the year changes.
+            Model.JournalNumber = await ReserveNumberForPostingDateAsync(value.Value) ?? string.Empty;
         }
-
         await OnChanged();
     }
-
 
     private async Task OnDocumentDateChanged(
         DateOnly? value)
