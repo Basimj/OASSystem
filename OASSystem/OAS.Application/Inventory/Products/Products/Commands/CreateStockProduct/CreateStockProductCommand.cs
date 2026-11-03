@@ -18,11 +18,6 @@ public sealed record CreateStockProductCommand(CreateStockProductRequest Request
                 permissions.Add(InventoryPermissions.FrameDetails.Create);
             if (Request.LensDetails is not null)
                 permissions.Add(InventoryPermissions.LensDetails.Create);
-            if (Request.OpeningInventory is not null)
-            {
-                permissions.Add(InventoryPermissions.Transactions.Create);
-                permissions.Add(InventoryPermissions.Transactions.Post);
-            }
             return permissions;
         }
     }

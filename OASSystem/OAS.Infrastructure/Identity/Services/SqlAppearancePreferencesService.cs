@@ -32,7 +32,7 @@ public sealed class SqlAppearancePreferencesService(
             AddParameter(command, "@userId", id);
             var value = await command.ExecuteScalarAsync(cancellationToken);
             if (value is not string json) return new AppearanceSettingsDto();
-            try { return NormalizeLegacyOcean(Validate(JsonSerializer.Deserialize<AppearanceSettingsDto>(json, JsonOptions) ?? new())); }
+            try { return NormalizeSkyYellowWhiteText(NormalizeLegacySkyYellow(NormalizeLegacyOcean(Validate(JsonSerializer.Deserialize<AppearanceSettingsDto>(json, JsonOptions) ?? new())))); }
             catch (Exception ex) when (ex is JsonException or ArgumentException) { return new AppearanceSettingsDto(); }
         }
         finally { await db.Database.CloseConnectionAsync(); }
@@ -41,7 +41,7 @@ public sealed class SqlAppearancePreferencesService(
     public async Task<AppearanceSettingsDto> SaveAsync(AppearanceSettingsDto settings, CancellationToken cancellationToken = default)
     {
         var id = UserId;
-        var safe = Validate(settings);
+        var safe = NormalizeSkyYellowWhiteText(Validate(settings));
         var json = JsonSerializer.Serialize(safe, JsonOptions);
         await db.Database.OpenConnectionAsync(cancellationToken);
         try
@@ -156,6 +156,74 @@ public sealed class SqlAppearancePreferencesService(
             if (settings.SidebarActiveTextColor.Equals("#FFFFFF", StringComparison.OrdinalIgnoreCase)) settings.SidebarActiveTextColor = "#123D56";
             if (settings.SidebarActiveIconColor.Equals("#FFFFFF", StringComparison.OrdinalIgnoreCase)) settings.SidebarActiveIconColor = "#086C87";
             if (settings.PrimaryColor.Equals("#459DB9", StringComparison.OrdinalIgnoreCase)) settings.PrimaryColor = "#0B8095";
+        }
+        return settings;
+    }
+
+    // Upgrade only the UNMODIFIED old Sky & Sun preset. People who edited any
+    // preset color retain their individual choices. Other appearance settings
+    // (font, layout, sidebar mode, etc.) are intentionally not touched.
+    private static AppearanceSettingsDto NormalizeLegacySkyYellow(AppearanceSettingsDto settings)
+    {
+        if (settings.ThemePreset != "SkyYellow" ||
+            !settings.PrimaryColor.Equals("#0B6FAF", StringComparison.OrdinalIgnoreCase) ||
+            !settings.SidebarBackground.Equals("#D9F0FF", StringComparison.OrdinalIgnoreCase) ||
+            !settings.SidebarTextColor.Equals("#163E5E", StringComparison.OrdinalIgnoreCase) ||
+            !settings.SidebarIconColor.Equals("#24547C", StringComparison.OrdinalIgnoreCase) ||
+            !settings.SidebarHoverBackground.Equals("#C1E5FF", StringComparison.OrdinalIgnoreCase) ||
+            !settings.SidebarActiveBackground.Equals("#FFF1B8", StringComparison.OrdinalIgnoreCase) ||
+            !settings.SidebarActiveTextColor.Equals("#634C00", StringComparison.OrdinalIgnoreCase) ||
+            !settings.SidebarActiveIconColor.Equals("#634C00", StringComparison.OrdinalIgnoreCase) ||
+            !settings.HeaderBackground.Equals("#FFFFFF", StringComparison.OrdinalIgnoreCase) ||
+            !settings.HeaderTextColor.Equals("#173B59", StringComparison.OrdinalIgnoreCase) ||
+            !settings.HeaderIconColor.Equals("#24547C", StringComparison.OrdinalIgnoreCase) ||
+            !settings.TabsBarBackground.Equals("#F4FAFF", StringComparison.OrdinalIgnoreCase) ||
+            !settings.TabsBackground.Equals("#FFFFFF", StringComparison.OrdinalIgnoreCase) ||
+            !settings.TabsTextColor.Equals("#24547C", StringComparison.OrdinalIgnoreCase) ||
+            !settings.TabsIconColor.Equals("#24547C", StringComparison.OrdinalIgnoreCase) ||
+            !settings.TabsActiveBackground.Equals("#FFF1B8", StringComparison.OrdinalIgnoreCase) ||
+            !settings.TabsActiveTextColor.Equals("#634C00", StringComparison.OrdinalIgnoreCase) ||
+            !settings.TabsActiveIconColor.Equals("#634C00", StringComparison.OrdinalIgnoreCase) ||
+            !settings.TabsBorderColor.Equals("#BEDDF1", StringComparison.OrdinalIgnoreCase))
+            return settings;
+
+        settings.PrimaryColor = "#26B2FF";
+        settings.SidebarBackground = "#26B2FF";
+        settings.SidebarTextColor = "#FFFFFF";
+        settings.SidebarIconColor = "#FFFFFF";
+        settings.SidebarHoverBackground = "#159DE8";
+        settings.SidebarActiveBackground = "#F9FF26";
+        settings.SidebarActiveTextColor = "#FFFFFF";
+        settings.SidebarActiveIconColor = "#FFFFFF";
+        settings.HeaderBackground = "#26B2FF";
+        settings.HeaderTextColor = "#FFFFFF";
+        settings.HeaderIconColor = "#FFFFFF";
+        settings.TabsBarBackground = "#EDF9EF";
+        settings.TabsBackground = "#FFFFFF";
+        settings.TabsTextColor = "#20586A";
+        settings.TabsIconColor = "#20586A";
+        settings.TabsActiveBackground = "#F9FF26";
+        settings.TabsActiveTextColor = "#FFFFFF";
+        settings.TabsActiveIconColor = "#FFFFFF";
+        settings.TabsBorderColor = "#B4D9D6";
+        return settings;
+    }
+
+    // Existing users may have saved Sky & Sun while its yellow surface used
+    // black text. Normalize only yellow-backed selections, not other presets
+    // or differently customized active backgrounds.
+    private static AppearanceSettingsDto NormalizeSkyYellowWhiteText(AppearanceSettingsDto settings)
+    {
+        if (settings.ThemePreset != "SkyYellow") return settings;
+        if (settings.SidebarActiveBackground.Equals("#F9FF26", StringComparison.OrdinalIgnoreCase))
+        {
+            settings.SidebarActiveTextColor = "#FFFFFF";
+            settings.SidebarActiveIconColor = "#FFFFFF";
+        }
+        if (settings.TabsActiveBackground.Equals("#F9FF26", StringComparison.OrdinalIgnoreCase))
+        {
+            settings.TabsActiveTextColor = "#FFFFFF";
+            settings.TabsActiveIconColor = "#FFFFFF";
         }
         return settings;
     }

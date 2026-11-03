@@ -31,6 +31,7 @@
             {
                 <UiButton Text="عملية جديدة" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small"
                       Disabled="@(_mode == ViewMode.Create)" OnClick="OpenCreateScreenAsync" />
+                <UiButton Text="استلام مشتريات" IconCssClass="fa-solid fa-truck-ramp-box" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="OpenPurchaseReceiptsAsync" />
                 <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
                       Loading="@_loading" OnClick="RefreshAsync" />
                 <UiSpreadsheetActions CanImport="false" Busy="@_exporting" OnExport="ExportAsync" />
@@ -44,19 +45,19 @@
         @if (!IsFormRoute)
         {
         <UiWorkspaceFilterBar Compact="true">
-            <UiSelect Label="نوع العملية"
+            <UiSearchableSelect Label="نوع العملية"
                       Value="@_typeFilter"
                       ValueExpression="@(() => _typeFilter)"
                       ValueChanged="@(v => _typeFilter = v)"
                       Options="@TransactionTypeFilterOptions"
                       Size="ControlSize.Small" />
-            <UiSelect Label="الحالة"
+            <UiSearchableSelect Label="الحالة"
                       Value="@_statusFilter"
                       ValueExpression="@(() => _statusFilter)"
                       ValueChanged="@(v => _statusFilter = v)"
                       Options="@InventoryArabicPresenter.TransactionStatusOptions"
                       Size="ControlSize.Small" />
-            <UiSelect Label="المخزن"
+            <UiSearchableSelect Label="المخزن"
                       Value="@_warehouseFilter"
                       ValueExpression="@(() => _warehouseFilter)"
                       ValueChanged="@(v => _warehouseFilter = v)"
@@ -85,6 +86,7 @@
             else if (_mode == ViewMode.Create)
             {
                 <div class="inventory-transactions__editor">
+                    <UiAlert Tone="AlertTone.Info" Message="الإدخال الجديد إلى المخزون يتم حصريًا من استلام المشتريات. هذه الشاشة للحركات الصادرة والتحويلات بين المخازن فقط." />
                     @if (!_warehouses.Any(x => x.IsActive))
                     {
                         <UiAlert Tone="AlertTone.Danger" Message="لا يوجد مخزن نشط يمكن استخدامه في عملية مخزون جديدة." />
@@ -94,7 +96,7 @@
                         <UiAlert Tone="AlertTone.Danger" Message="لا توجد أصناف نشطة. أضف صنفًا من صفحة المنتجات أولًا." />
                     }
 
-                    <UiSelect Label="نوع العملية"
+                    <UiSearchableSelect Label="نوع العملية"
                               Value="@_transactionType"
                               ValueExpression="@(() => _transactionType)"
                               ValueChanged="OnTransactionTypeChanged"
@@ -113,7 +115,7 @@
 
                     @if (RequiresSourceWarehouse)
                     {
-                        <UiSelect Label="من مخزن"
+                        <UiSearchableSelect Label="من مخزن"
                                   Value="@_sourceWarehouseId"
                                   ValueExpression="@(() => _sourceWarehouseId)"
                                   ValueChanged="OnSourceWarehouseChanged"
@@ -125,7 +127,7 @@
 
                     @if (RequiresDestinationWarehouse)
                     {
-                        <UiSelect Label="إلى مخزن"
+                        <UiSearchableSelect Label="إلى مخزن"
                                   Value="@_destinationWarehouseId"
                                   ValueExpression="@(() => _destinationWarehouseId)"
                                   ValueChanged="OnDestinationWarehouseChanged"
@@ -163,7 +165,7 @@
                     {
                         var line = _draftLines[i];
                         <div class="inventory-transactions__line-editor">
-                            <UiSelect Label="اختر الصنف"
+                            <UiSearchableSelect Label="اختر الصنف"
                                       Value="@line.ProductVariantId"
                                       ValueExpression="@(() => line.ProductVariantId)"
                                       ValueChanged="@(v => OnLineVariantChanged(line, v))"
@@ -198,6 +200,12 @@
             }
             else if (_selectedTransaction is not null)
             {
+                @if (_selectedTransaction.Status == InventoryTransactionStatus.Draft && !CanPost &&
+                    _selectedTransaction.TransactionType is (InventoryTransactionType.Receipt or InventoryTransactionType.Opening or
+                        InventoryTransactionType.AdjustmentIncrease or InventoryTransactionType.SalesReturn))
+                {
+                    <UiAlert Tone="AlertTone.Warning" Message="هذه مسودة وارد يدوي قديمة ولا يمكن ترحيلها. أنشئ سند استلام مشتريات بدلاً منها." />
+                }
                 <div class="inventory-transactions__details">
                     <div><span>النوع</span><strong>@InventoryArabicPresenter.TransactionTypeText(_selectedTransaction.TransactionType)</strong></div>
                     <div><span>التاريخ</span><strong>@_selectedTransaction.TransactionDate.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</strong></div>
@@ -296,6 +304,11 @@
     private void OpenDetailsScreen(Guid id) =>
         InventoryNavigation.NavigateTo($"{InventoryListRoute}/details/{id:D}");
 
+    private Task OpenPurchaseReceiptsAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _) {
+        InventoryNavigation.NavigateTo("/purchases/receipts");
+        return Task.CompletedTask;
+    }
+
     private Task BackToListAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _) {
         InventoryNavigation.NavigateTo($"{InventoryListRoute}");
         return Task.CompletedTask;
@@ -358,7 +371,7 @@
     private string? _statusFilter;
     private string? _warehouseFilter;
 
-    private string _transactionType = ((int)InventoryTransactionType.Receipt).ToString();
+    private string _transactionType = ((int)InventoryTransactionType.Issue).ToString();
     private DateOnly? _transactionDate = DateOnly.FromDateTime(DateTime.Today);
     private string? _sourceWarehouseId;
     private string? _destinationWarehouseId;
@@ -373,7 +386,7 @@
     private readonly List<TransactionLineForm> _draftLines = [];
 
     // Offer proven historic values alongside common reasons. The operator can always enter a new reason.
-    private IReadOnlyList<string> CommonReasons => new[] { "توريد بضاعة", "صرف للمبيعات", "نقل بين المخازن", "مرتجع", "تصحيح رصيد" }
+    private IReadOnlyList<string> CommonReasons => new[] { "صرف للمبيعات", "نقل بين المخازن", "مرتجع", "تصحيح رصيد" }
         .Concat(_transactions.Select(x => x.Reason).Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x!))
         .Distinct(StringComparer.CurrentCultureIgnoreCase).ToArray();
     private IReadOnlyList<string> AdjustmentReasons => new[] { "فرق جرد", "تالف", "خطأ في تسجيل الكمية", "فاقد", "تسوية مخزون" }
@@ -382,7 +395,7 @@
         ?? (_warehouses.Count(x => x.IsActive) == 1 ? _warehouses.First(x => x.IsActive).Id.ToString("D") : null);
 
     private IReadOnlyList<UiSelectOption> TransactionTypeFilterOptions =>
-        [new UiSelectOption(string.Empty, "كل الأنواع"), .. InventoryArabicPresenter.TransactionTypeOptions];
+        [new UiSelectOption(string.Empty, "كل الأنواع"), .. InventoryArabicPresenter.TransactionTypeHistoryOptions];
 
     private IReadOnlyList<UiSelectOption> WarehouseFilterOptions =>
         [new UiSelectOption(string.Empty, "كل المخازن"), .. _warehouses.Select(x => new UiSelectOption(x.Id.ToString("D"), x.Name))];
@@ -396,7 +409,7 @@
 
     private InventoryTransactionType CurrentType => Enum.TryParse<InventoryTransactionType>(_transactionType, out var parsedByName)
         ? parsedByName
-        : int.TryParse(_transactionType, out var raw) ? (InventoryTransactionType)raw : InventoryTransactionType.Receipt;
+        : int.TryParse(_transactionType, out var raw) ? (InventoryTransactionType)raw : InventoryTransactionType.Issue;
 
     private bool RequiresSourceWarehouse => CurrentType is InventoryTransactionType.Issue
         or InventoryTransactionType.Transfer
@@ -411,7 +424,9 @@
         or InventoryTransactionType.SalesReturn;
 
     private bool IsAdjustment => CurrentType is InventoryTransactionType.AdjustmentIncrease or InventoryTransactionType.AdjustmentDecrease;
-    private bool CanPost => _mode == ViewMode.View && _selectedTransaction?.Status == InventoryTransactionStatus.Draft && !_posting;
+    private bool CanPost => _mode == ViewMode.View && _selectedTransaction is { Status: InventoryTransactionStatus.Draft } transaction &&
+        transaction.TransactionType is not (InventoryTransactionType.Opening or InventoryTransactionType.Receipt or
+            InventoryTransactionType.AdjustmentIncrease or InventoryTransactionType.SalesReturn) && !_posting;
     private string AsideTitle => _mode == ViewMode.Create ? "عملية مخزون جديدة" : "تفاصيل العملية";
     private string? AsideSubtitle => _selectedTransaction?.TransactionNumber ?? (_mode == ViewMode.Create ? "سيتم توليد الرقم تلقائيًا" : null);
 
@@ -496,7 +511,7 @@
         _selectedId = null;
         _selectedTransaction = null;
         _selectedLines = [];
-        _transactionType = ((int)InventoryTransactionType.Receipt).ToString();
+        _transactionType = ((int)InventoryTransactionType.Issue).ToString();
         _transactionDate = DateOnly.FromDateTime(DateTime.Today);
         _sourceWarehouseId = null;
         _destinationWarehouseId = DefaultWarehouseId;
@@ -663,7 +678,7 @@
 
         if (!int.TryParse(_transactionType, out var transactionTypeValue) ||
             !Enum.IsDefined(typeof(InventoryTransactionType), transactionTypeValue) ||
-            transactionTypeValue == (int)InventoryTransactionType.ProductionIssue)
+            !InventoryArabicPresenter.TransactionTypeOptions.Any(x => x.Value == _transactionType))
         {
             _transactionTypeError = "نوع العملية غير صحيح.";
             isValid = false;

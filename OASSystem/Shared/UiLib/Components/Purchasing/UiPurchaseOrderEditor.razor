@@ -2,14 +2,14 @@
 @using OAS.UiLib.Core.Models.Purchasing
 @using OAS.UiLib.Core.Models
 
-<UiPurchasingEditorShell Eyebrow="أوامر الشراء" Title="@Model.PurchaseOrderCode" Subtitle="أمر شراء للمورد" StatusText="@Model.StatusText">
+<UiPurchasingEditorShell Title="@Model.PurchaseOrderCode" StatusText="@Model.StatusText">
     <UiPurchasingSection Title="البيانات الأساسية">
         <UiPurchasingFormGrid>
-            <UiLookup Label="المورد" Required="true" Value="@GuidText(Model.SupplierId)" SelectedItem="@Selected(Model.SupplierId,Model.SupplierName,"fa-solid fa-truck-field")" SearchAsync="SupplierSearchAsync" ValueChanged="SupplierChanged" Disabled="@(!IsEditable)" />
-            <UiLookup Label="المخزن المستهدف" Required="true" Value="@GuidText(Model.DestinationWarehouseId)" SelectedItem="@Selected(Model.DestinationWarehouseId,Model.DestinationWarehouseName,"fa-solid fa-warehouse")" SearchAsync="WarehouseSearchAsync" ValueChanged="WarehouseChanged" Disabled="@(!IsEditable)" />
+            <UiLookup UsePopover="true" Label="المورد" Required="true" Value="@GuidText(Model.SupplierId)" SelectedItem="@Selected(Model.SupplierId,Model.SupplierName,"fa-solid fa-truck-field")" SearchAsync="SupplierSearchAsync" ValueChanged="SupplierChanged" Disabled="@(!IsEditable)" />
+            <UiLookup UsePopover="true" Label="المخزن المستهدف" Required="true" Value="@GuidText(Model.DestinationWarehouseId)" SelectedItem="@Selected(Model.DestinationWarehouseId,Model.DestinationWarehouseName,"fa-solid fa-warehouse")" SearchAsync="WarehouseSearchAsync" ValueChanged="WarehouseChanged" Disabled="@(!IsEditable)" />
             <UiInputDate Label="تاريخ الأمر" Value="@Model.OrderDate" ValueChanged="OrderDateChanged" Disabled="@(!IsEditable)" Required="true" />
             <UiInputDate Label="التاريخ المتوقع" Value="@Model.ExpectedDeliveryDate" ValueChanged="ExpectedDateChanged" Disabled="@(!IsEditable)" />
-            <UiLookup Label="العملة" Required="true" Value="@GuidText(Model.CurrencyId)" SelectedItem="@Selected(Model.CurrencyId,Model.CurrencyCode,"fa-solid fa-coins")" SearchAsync="CurrencySearchAsync" ValueChanged="CurrencyChanged" Disabled="@(!IsEditable)" />
+            <UiLookup UsePopover="true" Label="العملة" Required="true" Value="@GuidText(Model.CurrencyId)" SelectedItem="@Selected(Model.CurrencyId,Model.CurrencyCode,"fa-solid fa-coins")" SearchAsync="CurrencySearchAsync" ValueChanged="CurrencyChanged" Disabled="@(!IsEditable)" />
             <UiPurchasingNumberField Label="سعر الصرف" Value="@Model.ExchangeRate" ValueChanged="ExchangeRateChanged" Disabled="@(!IsEditable)" Step="0.00000001" Min="0.00000001" />
             <UiInputDate Label="تاريخ سعر الصرف" Value="@Model.ExchangeRateDate" ValueChanged="ExchangeRateDateChanged" Disabled="@(!IsEditable)" />
             <UiSelect Label="طريقة الضريبة" Value="@Model.TaxCalculationMode.ToString()" Options="TaxModeOptions" Disabled="@(!IsEditable)" OnValueChanged="TaxModeChanged" />
@@ -18,7 +18,7 @@
         </UiPurchasingFormGrid>
     </UiPurchasingSection>
 
-    <UiPurchasingSection Title="بنود أمر الشراء" Subtitle="اختر المنتج أولًا ثم أدخل بيانات الشراء">
+    <UiPurchasingSection Title="بنود أمر الشراء">
         <div class="ui-po-lines-toolbar">
             <div class="ui-po-lines-toolbar__info">
                 <span class="ui-po-lines-toolbar__icon"><i class="fa-solid fa-cart-flatbed" aria-hidden="true"></i></span>
@@ -64,10 +64,10 @@
                         </header>
 
                         <div class="ui-purchasing-po-line__product">
-                            <UiLookup Label="المنتج" Required="true"
+                            <UiLookup UsePopover="true" Label="المنتج" Required="true"
                                       Value="@GuidText(line.ProductVariantId)"
                                       SelectedItem="@Selected(line.ProductVariantId,line.ProductName,"fa-solid fa-box")"
-                                      SearchAsync="ProductSearchAsync"
+                                      SearchAsync="ProductSearchAsync" SearchPageAsync="ProductSearchPageAsync"
                                       SelectedItemChanged="@(item=>ProductSelectionChanged(line,item))"
                                       ValueChanged="@(v=>ProductChanged(line,v))"
                                       Disabled="@(!IsEditable || line.Sources.Count>0)"
@@ -75,7 +75,7 @@
                         </div>
 
                         <div class="ui-purchasing-po-line__fields ui-purchasing-po-line__fields--primary">
-                            <UiLookup Label="وحدة الشراء" Required="true"
+                            <UiLookup UsePopover="true" Label="وحدة الشراء" Required="true"
                                       Value="@GuidText(line.PurchaseUnitId)"
                                       SelectedItem="@Selected(line.PurchaseUnitId,line.PurchaseUnitName,"fa-solid fa-ruler")"
                                       SearchAsync="UnitSearchAsync"
@@ -137,6 +137,7 @@
     [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SupplierSearchAsync {get;set;}
     [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? WarehouseSearchAsync {get;set;}
     [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? ProductSearchAsync {get;set;}
+    [Parameter] public Func<string,int,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? ProductSearchPageAsync {get;set;}
     [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? UnitSearchAsync {get;set;}
     [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? CurrencySearchAsync {get;set;}
     [Parameter] public EventCallback<Guid?> OnSupplierChanged {get;set;}

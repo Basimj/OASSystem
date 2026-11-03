@@ -128,6 +128,14 @@ public sealed class PurchasingMapper(
     {
         var supplier = await references.GetSupplierAsync(invoice.SupplierId, cancellationToken);
         var currency = await references.GetCurrencyAsync(invoice.CurrencyId, cancellationToken);
+        // The dashboard needs the configured Arabic name of the accounting base currency,
+        // not the (possibly foreign) invoice currency code. This lookup is performed
+        // server-side so purchasing users do not need accounting setup permissions.
+        var baseCurrency = invoice.BaseCurrencyId is { } baseCurrencyId
+            ? (baseCurrencyId == invoice.CurrencyId
+                ? currency
+                : await references.GetCurrencyAsync(baseCurrencyId, cancellationToken))
+            : null;
         var lines = invoice.Lines.OrderBy(x => x.LineSequence).Select(line => new PurchaseInvoiceLineDto(line.Id,
             line.PurchaseInvoiceId, line.LineSequence, line.PurchaseOrderLineId, line.ProductVariantId, line.ProductCodeSnapshot,
             line.DescriptionSnapshot, line.Quantity, line.UnitPrice, line.GrossAmount, line.DiscountAmount, line.NetAmount,
@@ -151,7 +159,8 @@ public sealed class PurchasingMapper(
             invoice.ExchangeRateSource.HasValue ? (byte)invoice.ExchangeRateSource.Value : null,
             invoice.PaymentTermDaysSnapshot,
             invoice.DueDate,
-            (OAS.Contracts.Purchasing.Enums.PurchaseInvoiceDueDateProvenance)(byte)invoice.DueDateProvenance);
+            (OAS.Contracts.Purchasing.Enums.PurchaseInvoiceDueDateProvenance)(byte)invoice.DueDateProvenance,
+            baseCurrency?.NameAr);
     }
 
     public async Task<PurchaseMatchResultDto> ToMatchDtoAsync(PurchaseInvoice invoice, PurchaseMatchEvaluation evaluation, CancellationToken cancellationToken)

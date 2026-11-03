@@ -46,9 +46,6 @@ public partial class ProductsPage
     private const string InitialBarcodeField = "باركود الصنف الأول";
     private const string InitialPurchasePriceField = "سعر شراء الصنف الأول";
     private const string InitialSellingPriceField = "سعر بيع الصنف الأول";
-    private const string OpeningWarehouseField = "مخزن الرصيد الافتتاحي";
-    private const string OpeningQuantityField = "الكمية الافتتاحية";
-    private const string OpeningUnitCostField = "تكلفة الوحدة الافتتاحية";
 
     [Inject] private IInventoryClientService Inventory { get; set; } = default!;
     [Inject] private InventorySpreadsheetClient SpreadsheetClient { get; set; } = default!;
@@ -142,7 +139,7 @@ public partial class ProductsPage
     private string _purchasePrice = "0";
     private string _sellingPrice = "0";
 
-    // First variant + optional opening inventory when creating a stock product
+    // The initial variant is catalog data only; receipts supply actual stock.
     private string _initialSku = string.Empty;
     private string? _initialBarcode;
     private string? _initialVariantName;
@@ -151,10 +148,6 @@ public partial class ProductsPage
     private string? _initialUnitId;
     private string _initialPurchasePrice = "0";
     private string _initialSellingPrice = "0";
-    private bool _addOpeningInventory;
-    private string? _openingWarehouseId;
-    private string _openingQuantity = string.Empty;
-    private string _openingUnitCost = "0";
     private string? _saveSuccessMessage;
 
     private bool IsEditing => _mode is EditorMode.Create or EditorMode.Edit;
@@ -288,28 +281,8 @@ public partial class ProductsPage
         }
     }
 
-    private IReadOnlyList<UiSelectOption> OpeningWarehouseOptions =>
-        _warehouses.Where(x => x.IsActive)
-            .OrderByDescending(x => x.IsDefault)
-            .ThenBy(x => x.Name)
-            .Select(x => new UiSelectOption(x.Id.ToString("D"), x.IsDefault ? $"{x.Code} - {x.Name} (افتراضي)" : $"{x.Code} - {x.Name}"))
-            .ToArray();
-
     private bool IsServiceProductType => CurrentProductType?.SystemKey == ProductTypeSystemKeys.Service;
     private bool ShowInitialVariantSection => _section == ProductSection.Products && _mode == EditorMode.Create && _isStockItem && !IsServiceProductType;
-    private bool ShowOpeningInventorySection => ShowInitialVariantSection;
-    private string OpeningTotalValueText
-    {
-        get
-        {
-            if (!TryParseDecimalInput(_openingQuantity, out var quantity) ||
-                !TryParseDecimalInput(_openingUnitCost, out var cost)) return "—";
-            try { return checked(quantity * cost).ToString("N2"); }
-            catch (OverflowException) { return "القيمة تتجاوز الحد المسموح"; }
-        }
-    }
-
-
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
     private async Task LoadAsync()
@@ -582,15 +555,6 @@ public partial class ProductsPage
                     sellingPrice);
             }
 
-            OpeningInventoryRequest? openingRequest = null;
-            if (_addOpeningInventory)
-            {
-                if (!Guid.TryParse(_openingWarehouseId, out var warehouseId) ||
-                    !TryParseDecimalInput(_openingQuantity, out var openingQuantity) ||
-                    !TryParseDecimalInput(_openingUnitCost, out var openingUnitCost)) return null;
-                openingRequest = new OpeningInventoryRequest(warehouseId, openingQuantity, openingUnitCost);
-            }
-
             InitialFrameDetailsRequest? frameDetailsRequest = null;
             if (ShowsFrameDetails && HasFrameDetailsInput() && !string.IsNullOrWhiteSpace(_frameModel))
             {
@@ -624,18 +588,16 @@ public partial class ProductsPage
             var request = new CreateStockProductRequest(
                 new CreateProductRequest(_code.Trim(), _name.Trim(), categoryId, brandId, NullIfBlank(_description), _isStockItem),
                 variantRequest,
-                openingRequest,
+                null, // No inventory creation from product catalog.
                 frameDetailsRequest,
                 lensDetailsRequest);
 
             var result = await Inventory.CreateStockProductAsync(request);
             if (result is null) return null;
 
-            _saveSuccessMessage = result.OpeningInventoryCreated
-                ? "تم إنشاء المنتج والصنف وإضافة الرصيد الافتتاحي بنجاح."
-                : _isStockItem
-                    ? "تم إنشاء المنتج والصنف القابل للبيع بنجاح. لم يتم إدخال رصيد افتتاحي."
-                    : "تم إنشاء المنتج بنجاح.";
+            _saveSuccessMessage = _isStockItem
+                ? "تم تعريف المنتج والصنف دون إضافة كمية. يمكن إدخال الكمية من استلام المشتريات."
+                : "تم إنشاء المنتج بنجاح.";
             return result.ProductId;
         }
 
@@ -775,7 +737,7 @@ public partial class ProductsPage
                     SetError("صنف مخزني", "الخدمة لا يمكن أن تكون صنفًا مخزنيًا.");
 
                 if (_mode == EditorMode.Create && _isStockItem)
-                    ValidateInitialVariantAndOpening(ref missingRequired);
+                    ValidateInitialVariant(ref missingRequired);
 
                 ValidateSpecializedProductFields(ref missingRequired);
                 break;
@@ -1025,9 +987,7 @@ public partial class ProductsPage
         _productId = null; _barcode = null; _variantName = null; _color = null; _size = null; _unitId = PreferredUnitId;
         _purchasePrice = "0"; _sellingPrice = "0";
         _initialSku = string.Empty; _initialBarcode = null; _initialVariantName = null; _initialColor = null; _initialSize = null; _initialUnitId = PreferredUnitId;
-        _initialPurchasePrice = "0"; _initialSellingPrice = "0"; _addOpeningInventory = false;
-        _openingWarehouseId = _warehouses.FirstOrDefault(x => x.IsActive && x.IsDefault)?.Id.ToString("D");
-        _openingQuantity = string.Empty; _openingUnitCost = "0";
+        _initialPurchasePrice = "0"; _initialSellingPrice = "0";
     }
 
     private void LoadSpecializedDetails(Guid productId)
@@ -1280,7 +1240,6 @@ public partial class ProductsPage
         if (IsServiceProductType)
         {
             _isStockItem = false;
-            _addOpeningInventory = false;
         }
     }
 
@@ -1310,26 +1269,17 @@ public partial class ProductsPage
             _unitId = _variants.FirstOrDefault(x => x.ProductId == productId && x.UnitId.HasValue)?.UnitId?.ToString("D") ?? PreferredUnitId;
     }
 
-    private void ToggleOpeningInventory(bool value)
-    {
-        _addOpeningInventory = value;
-        if (value && string.IsNullOrWhiteSpace(_openingWarehouseId))
-            _openingWarehouseId = _warehouses.FirstOrDefault(x => x.IsActive && x.IsDefault)?.Id.ToString("D");
-    }
-
     private void SetStockItem(bool value)
     {
         if (IsServiceProductType)
         {
             _isStockItem = false;
-            _addOpeningInventory = false;
             return;
         }
         _isStockItem = value;
-        if (!value) _addOpeningInventory = false;
     }
 
-    private void ValidateInitialVariantAndOpening(ref bool missingRequired)
+    private void ValidateInitialVariant(ref bool missingRequired)
     {
         if (string.IsNullOrWhiteSpace(_initialSku))
         {
@@ -1344,21 +1294,6 @@ public partial class ProductsPage
 
         ValidateDecimalField(InitialPurchasePriceField, _initialPurchasePrice, true, 18, 2, true, ref missingRequired);
         ValidateDecimalField(InitialSellingPriceField, _initialSellingPrice, true, 18, 2, true, ref missingRequired);
-
-        if (!_addOpeningInventory) return;
-        if (!Guid.TryParse(_openingWarehouseId, out var warehouseId) || !_warehouses.Any(x => x.Id == warehouseId && x.IsActive))
-        {
-            SetError(OpeningWarehouseField, "اختر مخزنًا فعالًا.");
-            missingRequired = true;
-        }
-        ValidateDecimalField(OpeningQuantityField, _openingQuantity, true, 18, 3, true, ref missingRequired);
-        if (TryParseDecimalInput(_openingQuantity, out var quantity) && quantity <= 0)
-            SetError(OpeningQuantityField, "يجب أن تكون الكمية أكبر من صفر.");
-        ValidateDecimalField(OpeningUnitCostField, _openingUnitCost, true, 18, 2, true, ref missingRequired);
-        if (TryParseDecimalInput(_openingQuantity, out var totalQuantity) &&
-            TryParseDecimalInput(_openingUnitCost, out var cost) && cost > 1 &&
-            totalQuantity > 9999999999999999.99m / cost)
-            SetError(OpeningUnitCostField, "القيمة الإجمالية تتجاوز الحد المسموح.");
     }
 
     private int ProductVariantCount(Guid productId) => _variants.Count(x => x.ProductId == productId);
@@ -1407,7 +1342,7 @@ public partial class ProductsPage
 
     private void AddSelect(RenderTreeBuilder b, ref int s, string label, string? value, Action<string?> changed, Expression<Func<string?>> expression, IReadOnlyList<UiSelectOption> options, bool required = false, bool forceDisabled = false)
     {
-        b.OpenComponent<OAS.UiLib.Components.Inputs.UiSelect>(s++);
+        b.OpenComponent<OAS.UiLib.Components.Inputs.UiSearchableSelect>(s++);
         b.AddAttribute(s++, "Label", label); b.AddAttribute(s++, "Value", value ?? string.Empty);
         b.AddAttribute(s++, "ValueChanged", EventCallback.Factory.Create<string?>(this, v => SetField(label, () => changed(v))));
         b.AddAttribute(s++, "ValueExpression", expression);
@@ -1416,6 +1351,8 @@ public partial class ProductsPage
         b.AddAttribute(s++, "Disabled", (!IsEditing || _saving) || forceDisabled);
         b.AddAttribute(s++, "Required", required); b.AddAttribute(s++, "Size", ControlSize.Small);
         b.AddAttribute(s++, "ErrorText", ErrorFor(label));
+        if (label == "المنتج" && !Guid.TryParse(_categoryId, out _))
+            b.AddAttribute(s++, "EmptyText", "اختر التصنيف أولًا لعرض منتجاته.");
         b.CloseComponent();
     }
 

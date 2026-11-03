@@ -2,10 +2,10 @@
 @using OAS.UiLib.Core.Models.Purchasing
 @using OAS.UiLib.Core.Models
 
-<UiPurchasingEditorShell Eyebrow="استلام المشتريات" Title="@Model.ReceiptCode" Subtitle="استلام مشتريات مرتبط بأمر شراء" StatusText="@Model.StatusText">
+<UiPurchasingEditorShell Title="@Model.ReceiptCode" StatusText="@Model.StatusText">
     <UiPurchasingSection Title="بيانات الاستلام">
         <UiPurchasingFormGrid>
-            <UiLookup Label="أمر الشراء" Required="true" Value="@GuidText(Model.PurchaseOrderId)" SelectedItem="@Selected(Model.PurchaseOrderId,Model.PurchaseOrderCode,"fa-solid fa-file-signature")" SearchAsync="PurchaseOrderSearchAsync" ValueChanged="PurchaseOrderChangedAsync" Disabled="@(!IsEditable || Model.Id.HasValue)" />
+            <UiLookup UsePopover="true" Label="أمر الشراء" Required="true" Value="@GuidText(Model.PurchaseOrderId)" SelectedItem="@Selected(Model.PurchaseOrderId,Model.PurchaseOrderCode,"fa-solid fa-file-signature")" SearchAsync="PurchaseOrderSearchAsync" ValueChanged="PurchaseOrderChangedAsync" Disabled="@(!IsEditable || Model.Id.HasValue)" />
             <UiInputText Label="المورد" Value="@Model.SupplierName" ReadOnly="true" />
             <UiInputText Label="المخزن" Value="@Model.WarehouseName" ReadOnly="true" />
             <UiInputDate Label="تاريخ الاستلام" Value="@Model.ReceiptDate" ValueChanged="ReceiptDateChanged" Disabled="@(!IsEditable)" />
@@ -14,7 +14,7 @@
             <UiInputText Label="ملاحظات" Value="@Model.Notes" ValueChanged="NotesChanged" Disabled="@(!IsEditable)" />
         </UiPurchasingFormGrid>
     </UiPurchasingSection>
-    <UiPurchasingSection Title="بنود الاستلام" Subtitle="الكمية المرفوضة لا تدخل المخزون ولا تغلق الالتزام تلقائياً">
+    <UiPurchasingSection Title="بنود الاستلام">
         <UiPurchasingLineTable>
             @foreach(var line in Model.Lines.OrderBy(x=>x.LineSequence))
             {
@@ -35,10 +35,6 @@
             }
         </UiPurchasingLineTable>
     </UiPurchasingSection>
-    @if(Model.InventoryTransactionId.HasValue || Model.JournalEntryId.HasValue)
-    {
-        <UiPurchasingSection Title="نتيجة الترحيل"><div class="ui-purchasing-post-links">@if(Model.InventoryTransactionId.HasValue){<span><i class="fa-solid fa-boxes-stacked"></i> حركة مخزون مرتبطة</span>}@if(Model.JournalEntryId.HasValue){<span><i class="fa-solid fa-book"></i> قيد محاسبي مرتبط</span>}</div></UiPurchasingSection>
-    }
 </UiPurchasingEditorShell>
 
 @code {

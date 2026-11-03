@@ -97,11 +97,11 @@
                 else
                 {
                     <svg viewBox="0 0 700 205" preserveAspectRatio="none" role="img" aria-label="اتجاه مبيعات آخر سبعة أيام">
-                        <defs><linearGradient id="sd-line-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2484f6" stop-opacity=".35"/><stop offset="100%" stop-color="#2484f6" stop-opacity="0"/></linearGradient></defs>
+                        <defs><linearGradient id="sd-line-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--oas-color-primary)" stop-opacity=".35"/><stop offset="100%" stop-color="var(--oas-color-primary)" stop-opacity="0"/></linearGradient></defs>
                         @for (int i = 0; i < 5; i++) { <line x1="8" x2="690" y1="@(15 + i * 41)" y2="@(15 + i * 41)" stroke="currentColor" stroke-opacity=".1" stroke-width="1" /> }
                         <polygon points="@ChartArea" fill="url(#sd-line-fill)" />
-                        <polyline points="@ChartLine" fill="none" stroke="#258afa" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
-                        @for (int i = 0; i < 7; i++) { <circle cx="@(15 + i * 112)" cy="@ChartY(i)" r="4.5" fill="#48a2ff" stroke="#b8dcff" stroke-width="1.5" /> }
+                        <polyline points="@ChartLine" fill="none" stroke="var(--oas-color-primary)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+                        @for (int i = 0; i < 7; i++) { <circle cx="@(15 + i * 112)" cy="@ChartY(i)" r="4.5" fill="var(--oas-color-primary-hover)" stroke="var(--oas-color-primary-border)" stroke-width="1.5" /> }
                     </svg>
                 }
                 <div class="sd-chart-days">@foreach(var date in _weekDates) { <span>@date.ToString("ddd", new System.Globalization.CultureInfo("ar"))<small>@date.ToString("dd/MM")</small></span> }</div>

@@ -31,13 +31,13 @@
 
     <Filters>
         <UiWorkspaceFilterBar Compact="true">
-            <UiSelect Label="المخزن"
+            <UiSearchableSelect Label="المخزن"
                       Value="@_warehouseFilter"
                       ValueExpression="@(() => _warehouseFilter)"
                       ValueChanged="@(v => _warehouseFilter = v)"
                       Options="@WarehouseFilterOptions"
                       Size="ControlSize.Small" />
-            <UiSelect Label="الحركة"
+            <UiSearchableSelect Label="الحركة"
                       Value="@_movementFilter"
                       ValueExpression="@(() => _movementFilter)"
                       ValueChanged="@(v => _movementFilter = v)"

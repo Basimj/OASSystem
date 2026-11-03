@@ -2,19 +2,47 @@
 
 <div class="inventory-suggested-input">
     <label for="@_inputId">@Label @if (Required) { <span aria-hidden="true">*</span> }</label>
-    <input id="@_inputId" list="@_listId" value="@Value" @onchange="ChangedAsync"
-           type="text" placeholder="@(Placeholder ?? "اختر من الاقتراحات أو اكتب قيمة أخرى")"
-           maxlength="@MaxLength" disabled="@Disabled" required="@Required" aria-invalid="@(!string.IsNullOrWhiteSpace(ErrorText))" />
-    <datalist id="@_listId">
-        @foreach (var suggestion in Suggestions.Where(s => !string.IsNullOrWhiteSpace(s)).Distinct(StringComparer.CurrentCultureIgnoreCase))
-        {
-            <option value="@suggestion"></option>
-        }
-    </datalist>
+    <div class="inventory-suggested-input__control">
+        <input id="@_inputId" value="@Value" @onchange="ChangedAsync"
+               type="text" placeholder="@(Placeholder ?? "اختر اقتراحًا أو اكتب قيمة أخرى")"
+               maxlength="@MaxLength" disabled="@Disabled" required="@Required"
+               aria-invalid="@(!string.IsNullOrWhiteSpace(ErrorText))" />
+        <button type="button" class="inventory-suggested-input__open"
+                popovertarget="@_listId" disabled="@Disabled"
+                aria-haspopup="dialog" aria-controls="@_listId"
+                aria-label="عرض اقتراحات @Label" @onclick="ResetSearch">▾</button>
+    </div>
     @if (!string.IsNullOrWhiteSpace(ErrorText))
     {
         <span class="inventory-suggested-input__error" role="alert">@ErrorText</span>
     }
+</div>
+
+@* A top-layer popover keeps suggestions visible above clipped cards and workspace panels. *@
+<div id="@_listId" class="inventory-suggested-input__popover" popover="auto"
+     role="dialog" aria-label="اقتراحات @Label" dir="rtl">
+    <div class="inventory-suggested-input__popover-header">
+        <strong>اقتراحات @Label</strong>
+        <button type="button" class="inventory-suggested-input__close" popovertarget="@_listId"
+                popovertargetaction="hide" aria-label="إغلاق الاقتراحات">×</button>
+    </div>
+    <input type="search" class="inventory-suggested-input__search" value="@_search"
+           @oninput="OnSearchInput" placeholder="ابحث في الاقتراحات..." aria-label="البحث في اقتراحات @Label" />
+    <div class="inventory-suggested-input__options" role="group" aria-label="الاقتراحات" tabindex="0">
+        @if (FilteredSuggestions.Count == 0)
+        {
+            <div class="inventory-suggested-input__empty">لا توجد اقتراحات مطابقة، يمكنك كتابة قيمة مباشرة.</div>
+        }
+        else
+        {
+            @foreach (var suggestion in FilteredSuggestions)
+            {
+                <button @key="suggestion" type="button" class="inventory-suggested-input__option"
+                        popovertarget="@_listId" popovertargetaction="hide"
+                        @onclick="() => ChooseAsync(suggestion)">@suggestion</button>
+            }
+        }
+    </div>
 </div>
 
 @code {
@@ -29,5 +57,16 @@
     [Parameter] public bool Required { get; set; }
     private readonly string _inputId = $"inventory-suggestion-{Guid.NewGuid():N}";
     private readonly string _listId = $"inventory-options-{Guid.NewGuid():N}";
+    private string _search = string.Empty;
+
+    private IReadOnlyList<string> FilteredSuggestions => Suggestions
+        .Where(s => !string.IsNullOrWhiteSpace(s) &&
+                    (string.IsNullOrWhiteSpace(_search) || s.Contains(_search.Trim(), StringComparison.CurrentCultureIgnoreCase)))
+        .Distinct(StringComparer.CurrentCultureIgnoreCase)
+        .ToArray();
+
+    private void ResetSearch() => _search = string.Empty;
+    private void OnSearchInput(ChangeEventArgs args) => _search = args.Value?.ToString() ?? string.Empty;
+    private Task ChooseAsync(string value) => ValueChanged.InvokeAsync(value);
     private Task ChangedAsync(ChangeEventArgs args) => ValueChanged.InvokeAsync(args.Value?.ToString());
 }

@@ -1,7 +1,41 @@
- .inventory-suggested-input{display:grid;gap:.25rem;min-width:0}
-.inventory-suggested-input label{font-size:var(--oas-font-sm,.82rem);font-weight:600;color:var(--oas-color-text)}
-.inventory-suggested-input label span{color:var(--oas-color-danger,#b42318)}
-.inventory-suggested-input input{box-sizing:border-box;width:100%;min-height:35px;border:1px solid var(--oas-color-border);border-radius:9px;background:var(--oas-color-surface);color:var(--oas-color-text);padding:.35rem .65rem;font:inherit;font-size:var(--oas-font-sm,.86rem);min-width:0}
-.inventory-suggested-input input:focus{outline:2px solid var(--oas-color-primary);outline-offset:1px}
-.inventory-suggested-input input:disabled{opacity:.7;cursor:not-allowed}
-.inventory-suggested-input__error{color:var(--oas-color-danger,#b42318);font-size:.75rem}
+.inventory-suggested-input { display: grid; gap: .2rem; min-width: 0; }
+.inventory-suggested-input label { font-size: var(--oas-font-sm, .82rem); font-weight: 600; color: var(--oas-color-text); }
+.inventory-suggested-input label span { color: var(--oas-color-danger, #b42318); }
+.inventory-suggested-input__control { display: flex; min-width: 0; width: 100%; }
+.inventory-suggested-input input {
+    box-sizing: border-box; width: 100%; min-width: 0; min-height: 30px; border: 1px solid var(--oas-color-border);
+    border-radius: 9px 0 0 9px; background: var(--oas-color-surface); color: var(--oas-color-text);
+    padding: .3rem .55rem; font: inherit; font-size: var(--oas-font-sm, .86rem);
+}
+.inventory-suggested-input input:focus { outline: 2px solid var(--oas-color-primary); outline-offset: 1px; }
+.inventory-suggested-input input:disabled { opacity: .7; cursor: not-allowed; }
+.inventory-suggested-input__open { min-width: 32px; border: 1px solid var(--oas-color-border); border-inline-start: 0;
+    border-radius: 0 9px 9px 0; background: var(--oas-color-surface); color: var(--oas-color-text);
+    cursor: pointer; font: inherit; }
+.inventory-suggested-input__open:disabled { opacity: .65; cursor: not-allowed; }
+.inventory-suggested-input__error { color: var(--oas-color-danger, #b42318); font-size: .75rem; }
+
+.inventory-suggested-input__popover:popover-open {
+    display: flex; flex-direction: column; gap: .65rem; position: fixed;
+    inset: auto; top: min(12vh, 5rem); left: 50%; transform: translateX(-50%); margin: 0;
+    width: min(32rem, calc(100vw - 1.5rem)); max-height: 78dvh; box-sizing: border-box;
+    border: 1px solid var(--oas-color-border); border-radius: 12px;
+    background: var(--oas-color-surface); color: var(--oas-color-text);
+    padding: .85rem; box-shadow: 0 12px 40px color-mix(in srgb, var(--oas-color-text) 20%, transparent);
+}
+.inventory-suggested-input__popover::backdrop { background: color-mix(in srgb, var(--oas-color-surface) 14%, transparent); }
+.inventory-suggested-input__popover-header { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.inventory-suggested-input__close { border: 0; background: transparent; color: var(--oas-color-text);
+    font-size: 1.5rem; padding: .1rem .5rem; cursor: pointer; }
+.inventory-suggested-input__search { width: 100%; min-height: 36px; padding: .45rem .65rem; box-sizing: border-box;
+    border: 1px solid var(--oas-color-border); border-radius: 7px; background: var(--oas-color-surface);
+    color: var(--oas-color-text); font: inherit; }
+.inventory-suggested-input__options { display: grid; align-content: start; gap: 2px; max-height: min(55dvh, 22rem);
+    min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: auto; }
+.inventory-suggested-input__option { display: block; width: 100%; min-height: 36px; padding: .5rem .65rem;
+    text-align: start; font: inherit; border: 0; border-radius: 6px; cursor: pointer;
+    background: transparent; color: var(--oas-color-text); white-space: normal; overflow-wrap: anywhere; }
+.inventory-suggested-input__option:hover, .inventory-suggested-input__option:focus-visible {
+    background: var(--oas-color-primary-soft, #eff2ff); }
+.inventory-suggested-input__empty { color: var(--oas-color-text-muted); padding: .75rem; text-align: center; }
+@media (max-width: 580px) { .inventory-suggested-input__popover:popover-open { top: 5dvh; max-height: 90dvh; } }

@@ -3,10 +3,10 @@
 .oas-allocation__heading h2 { font-size:1.4rem; font-weight:800; margin:0 0 4px; }
 .oas-allocation__heading p { color:var(--bs-secondary-color, #5c708d); margin:0; }
 .oas-allocation__breadcrumb {font-size:.79rem; margin-bottom:6px!important;}
-.oas-allocation__card { border:1px solid var(--a-border); background:var(--a-bg); border-radius:12px; padding:16px; min-width:0; box-shadow:0 2px 9px #00000007; }
+.oas-allocation__card { border:1px solid var(--a-border); background:var(--a-bg); border-radius:12px; padding:16px; min-width:0; box-shadow:0 2px 9px color-mix(in srgb, var(--oas-color-text) 3%, transparent); }
 .oas-allocation__card h3 { font-size:1rem; font-weight:750; margin:0 0 10px; }
 .oas-allocation__tag {display:inline-flex; padding:5px 12px; border-radius:20px; background:var(--a-soft); font-weight:650; font-size:.81rem; border:1px solid var(--a-border); white-space:nowrap;}
-.oas-allocation__tag.is-posted { background:#07855617; border-color:#07855655; color:#15835b; }
+.oas-allocation__tag.is-posted { background:color-mix(in srgb, var(--oas-color-success) 9%, transparent); border-color:color-mix(in srgb, var(--oas-color-primary-border) 33%, transparent); color:var(--oas-color-success); }
 .oas-allocation__metrics {display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:12px;}
 .oas-allocation__metrics>div { display:grid; gap:4px; background:var(--a-soft); padding:12px; border-radius:8px; min-width:0; }
 .oas-allocation__metrics small {color:var(--bs-secondary-color, #62738b); font-size:.76rem;}
@@ -14,10 +14,10 @@
 .oas-allocation__search {justify-content:flex-start;}
 .oas-allocation__input {background:var(--a-bg); color:var(--a-fg); border:1px solid var(--a-border); border-radius:7px; min-height:37px; padding:7px 10px; min-width:0; }
 .oas-allocation__search input { flex:1; max-width:440px; }
-.oas-allocation__input:focus-visible,.oas-allocation__btn:focus-visible,.oas-allocation__choose:focus-visible { outline:2px solid #2680eb; outline-offset:2px; }
+.oas-allocation__input:focus-visible,.oas-allocation__btn:focus-visible,.oas-allocation__choose:focus-visible { outline:2px solid var(--oas-color-primary-border); outline-offset:2px; }
 .oas-allocation__btn {border:1px solid var(--a-border); background:var(--a-soft); color:var(--a-fg); border-radius:7px; min-height:38px; padding:7px 13px; font-weight:700; cursor:pointer;}
-.oas-allocation__btn.is-primary,.oas-allocation__choose {background:#0969d5; color:white; border:1px solid #0969d5;}
-.oas-allocation__btn.is-danger {background:#b72c3717; color:#c13b47; border-color:#ca566a;}
+.oas-allocation__btn.is-primary,.oas-allocation__choose {background:var(--oas-color-primary); color:white; border:1px solid var(--oas-color-primary-border);}
+.oas-allocation__btn.is-danger {background:color-mix(in srgb, var(--oas-color-danger) 9%, transparent); color:var(--oas-color-danger); border-color:var(--oas-color-danger);}
 .oas-allocation__btn:disabled,.oas-allocation__choose:disabled {opacity:.5; cursor:not-allowed;}
 .oas-allocation__voucher-results {display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
 .oas-allocation__voucher-option {border:1px solid var(--a-border); background:var(--a-soft); color:var(--a-fg); border-radius:9px; padding:10px 12px; display:grid; text-align:right; gap:4px; min-width:200px; cursor:pointer;}
@@ -28,7 +28,7 @@
 .oas-allocation__table th {background:var(--a-soft); color:var(--a-fg); font-size:.79rem; font-weight:750; white-space:nowrap;}
 .oas-allocation__table th,.oas-allocation__table td {padding:10px 12px; border-bottom:1px solid var(--a-border); text-align:right; vertical-align:middle;}
 .oas-allocation__table tbody tr:last-child td {border-bottom:0;}
-.oas-allocation__table .is-selected {background:#1877ef13;}
+.oas-allocation__table .is-selected {background:color-mix(in srgb, var(--oas-color-primary) 7%, transparent);}
 .oas-allocation__choose { border-radius:6px; padding:5px 10px; cursor:pointer; }
 .oas-allocation__hint {color:var(--bs-secondary-color,#5f6f87); font-size:.82rem; margin:8px 0;}
 .oas-allocation__empty {padding:26px; text-align:center; color:var(--bs-secondary-color,#5f6f87);}
@@ -36,15 +36,15 @@
 .oas-allocation__amount { width:140px; text-align:left; direction:ltr; }
 .oas-allocation__summary-row {display:flex; justify-content:space-between; gap:10px; border-bottom:1px solid var(--a-border); padding:13px 1px; font-variant-numeric:tabular-nums;}
 .oas-allocation__summary-row:last-child {border-bottom:0;}
-.oas-allocation__summary-row.is-available {background:#07855617; color:#15835b; padding:12px; border-radius:7px;}
+.oas-allocation__summary-row.is-available {background:color-mix(in srgb, var(--oas-color-success) 9%, transparent); color:var(--oas-color-success); padding:12px; border-radius:7px;}
 .oas-allocation__bottom {display:grid; grid-template-columns:1fr 1fr; gap:14px;}
 .oas-allocation__progress {height:10px; background:var(--a-soft); border-radius:10px; overflow:hidden; border:1px solid var(--a-border);}
-.oas-allocation__progress span {display:block; background:#0da872; height:100%; border-radius:10px;}
+.oas-allocation__progress span {display:block; background:var(--oas-color-success); height:100%; border-radius:10px;}
 .oas-allocation__footer {padding:15px 0; border-top:1px solid var(--a-border);}
 .oas-allocation__footer span {color:var(--bs-secondary-color,#5f6f87); flex:1; font-size:.8rem;}
 .oas-allocation__notice {padding:12px; border-radius:8px; border:1px solid var(--a-border); background:var(--a-soft);}
-.oas-allocation__notice.is-error {background:#c5303010; color:#d24c50; border-color:#cc56566b;}
-.oas-allocation__notice.is-success {background:#14a16b14; color:#0b9167; border-color:#14a16b6b;}
+.oas-allocation__notice.is-error {background:color-mix(in srgb, var(--oas-color-danger) 6%, transparent); color:var(--oas-color-danger); border-color:color-mix(in srgb, var(--oas-color-danger) 42%, transparent);}
+.oas-allocation__notice.is-success {background:color-mix(in srgb, var(--oas-color-success) 8%, transparent); color:var(--oas-color-success); border-color:color-mix(in srgb, var(--oas-color-success) 42%, transparent);}
 .oas-allocation__reverse {display:flex; align-items:flex-end; flex-wrap:wrap; gap:12px; margin-top:12px;}
 .oas-allocation__reverse label {display:grid; gap:6px; flex:1; min-width:170px;}
 @media (max-width:1100px) {.oas-allocation__columns{grid-template-columns:1fr;} .oas-allocation__metrics{grid-template-columns:repeat(2,minmax(0,1fr));}}

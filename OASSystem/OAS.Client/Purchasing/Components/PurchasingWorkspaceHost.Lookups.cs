@@ -18,12 +18,16 @@ public partial class PurchasingWorkspaceHost
         var page=await Inventory.GetWarehousesAsync(LookupRequest(search),ct);
         return page.Items.Where(x=>x.IsActive).Select(x=>new UiLookupItem(x.Id.ToString("D"),x.Name,x.Code,"fa-solid fa-warehouse")).ToArray();
     }
-    private async Task<IReadOnlyList<UiLookupItem>> SearchProductsAsync(string search,CancellationToken ct)
+    private Task<IReadOnlyList<UiLookupItem>> SearchProductsAsync(string search,CancellationToken ct) =>
+        SearchProductsPageAsync(search,0,ct);
+
+    private async Task<IReadOnlyList<UiLookupItem>> SearchProductsPageAsync(string search,int skip,CancellationToken ct)
     {
         var items=await Inventory.SearchProductVariantsAsync(
             string.IsNullOrWhiteSpace(search)?null:search.Trim(),
-            20,
-            ct);
+            30,
+            ct,
+            skip);
 
         return items
             .Where(x=>x.IsActive)

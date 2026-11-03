@@ -5,17 +5,25 @@ namespace OAS.Client.Inventory.Common;
 
 public static class InventoryArabicPresenter
 {
+    // Only manual outbound operations and warehouse-to-warehouse transfers can be created here.
+    // Purchase receipts (and sales returns) use dedicated document workflows.
     public static readonly IReadOnlyList<UiSelectOption> TransactionTypeOptions =
     [
-        new(((int)InventoryTransactionType.Opening).ToString(), "رصيد افتتاحي"),
-        new(((int)InventoryTransactionType.Receipt).ToString(), "إدخال مخزون"),
         new(((int)InventoryTransactionType.Issue).ToString(), "إخراج مخزون"),
         new(((int)InventoryTransactionType.Transfer).ToString(), "تحويل بين المخازن"),
-        new(((int)InventoryTransactionType.AdjustmentIncrease).ToString(), "تعديل زيادة"),
         new(((int)InventoryTransactionType.AdjustmentDecrease).ToString(), "تعديل نقص"),
         new(((int)InventoryTransactionType.PurchaseReturn).ToString(), "مرتجع شراء"),
-        new(((int)InventoryTransactionType.SalesReturn).ToString(), "مرتجع بيع"),
         new(((int)InventoryTransactionType.Scrap).ToString(), "تالف / Scrap")
+    ];
+
+    // History filters still display old inward movements and receipt-generated transactions.
+    public static readonly IReadOnlyList<UiSelectOption> TransactionTypeHistoryOptions =
+    [
+        new(((int)InventoryTransactionType.Opening).ToString(), "رصيد افتتاحي (سابق)"),
+        new(((int)InventoryTransactionType.Receipt).ToString(), "استلام مشتريات / إدخال مخزون"),
+        new(((int)InventoryTransactionType.AdjustmentIncrease).ToString(), "تعديل زيادة (سابق)"),
+        new(((int)InventoryTransactionType.SalesReturn).ToString(), "مرتجع بيع"),
+        .. TransactionTypeOptions
     ];
 
     public static readonly IReadOnlyList<UiSelectOption> TransactionStatusOptions =

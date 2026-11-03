@@ -1,0 +1,62 @@
+@using OAS.UiLib.Core.Enums
+@using OAS.UiLib.Core.Models
+
+<div class="ui-searchable-select">
+    @if (!string.IsNullOrWhiteSpace(Label))
+    {
+        <label class="ui-searchable-select__label" for="@_triggerId">
+            @Label @if (Required) { <span aria-hidden="true">*</span> }
+        </label>
+    }
+    <button id="@_triggerId" type="button" class="@TriggerClass"
+            popovertarget="@_popoverId" disabled="@Disabled" aria-haspopup="dialog"
+            aria-controls="@_popoverId" aria-invalid="@HasError.ToString().ToLowerInvariant()"
+            aria-describedby="@(HasError ? _errorId : null)" @onclick="ResetSearch">
+        <span class="ui-searchable-select__selected">@SelectedText</span>
+        <span aria-hidden="true" class="ui-searchable-select__chevron">▾</span>
+    </button>
+    @if (HasError)
+    {
+        <span id="@_errorId" class="ui-searchable-select__error" role="alert">@ErrorText</span>
+    }
+</div>
+
+@* The native HTML popover enters the browser top layer. Unlike an inline menu,
+   it is not clipped by UiCard or UiWorkspaceLayout's overflow:hidden rules. *@
+<div id="@_popoverId" class="ui-searchable-select__popover" popover="auto"
+     role="dialog" aria-label="@DialogTitle" dir="rtl">
+    <div class="ui-searchable-select__popover-header">
+        <strong>@DialogTitle</strong>
+        <button type="button" class="ui-searchable-select__close" popovertarget="@_popoverId"
+                popovertargetaction="hide" aria-label="إغلاق القائمة">×</button>
+    </div>
+    <input class="ui-searchable-select__search" type="search" value="@_search"
+           @oninput="OnSearchInput" placeholder="ابحث في الخيارات..." aria-label="البحث في خيارات @Label" />
+    <div class="ui-searchable-select__options" role="group" aria-label="خيارات @Label" tabindex="0">
+        @if (ShowClearOption && string.IsNullOrWhiteSpace(_search))
+        {
+            <button type="button" class="ui-searchable-select__option" popovertarget="@_popoverId"
+                    popovertargetaction="hide" @onclick="() => SelectAsync(null)">
+                @(Placeholder ?? "(بدون)")
+            </button>
+        }
+        @if (FilteredOptions.Count == 0)
+        {
+            <div class="ui-searchable-select__empty">@EmptyText</div>
+        }
+        else
+        {
+            @foreach (var option in FilteredOptions)
+            {
+                <button type="button" @key="option.Value"
+                        class="@(IsSelected(option.Value) ? "ui-searchable-select__option ui-searchable-select__option--selected" : "ui-searchable-select__option")"
+                        aria-current="@(IsSelected(option.Value) ? "true" : null)"
+                        popovertarget="@_popoverId" popovertargetaction="hide"
+                        @onclick="() => SelectAsync(option.Value)">
+                    @option.Text
+                </button>
+            }
+        }
+    </div>
+    <div class="ui-searchable-select__count">@FilteredOptions.Count من @Options.Count عنصر</div>
+</div>

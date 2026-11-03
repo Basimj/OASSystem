@@ -2,11 +2,11 @@
 @using OAS.UiLib.Core.Models.Purchasing
 @using OAS.UiLib.Core.Models
 
-<UiPurchasingEditorShell Eyebrow="طلبات الشراء" Title="@Model.RequestCode" Subtitle="طلب شراء واحتياج تشغيلي" StatusText="@Model.StatusText">
+<UiPurchasingEditorShell Title="@Model.RequestCode" StatusText="@Model.StatusText">
     <UiPurchasingSection Title="البيانات الأساسية">
         <UiPurchasingFormGrid>
             <UiSelect Label="نوع الطلب" Value="@Model.RequestType.ToString()" Options="RequestTypeOptions" Disabled="@(!IsEditable)" OnValueChanged="RequestTypeChanged" />
-            <UiLookup Label="المخزن" Required="true" Value="@GuidText(Model.WarehouseId)" SelectedItem="@Selected(Model.WarehouseId,Model.WarehouseName,"fa-solid fa-warehouse")" SearchAsync="WarehouseSearchAsync" ValueChanged="WarehouseChanged" Disabled="@(!IsEditable)" />
+            <UiLookup UsePopover="true" Label="المخزن" Required="true" Value="@GuidText(Model.WarehouseId)" SelectedItem="@Selected(Model.WarehouseId,Model.WarehouseName,"fa-solid fa-warehouse")" SearchAsync="WarehouseSearchAsync" ValueChanged="WarehouseChanged" Disabled="@(!IsEditable)" />
             <UiInputDate Label="تاريخ الطلب" Value="@Model.RequestDate" ValueChanged="RequestDateChanged" Disabled="@(!IsEditable)" Required="true" />
             <UiInputDate Label="التاريخ المطلوب" Value="@Model.RequiredDate" ValueChanged="RequiredDateChanged" Disabled="@(!IsEditable)" />
             @if (Model.RequestType == 1)
@@ -17,7 +17,7 @@
             <UiInputText Label="ملاحظات" Value="@Model.Notes" ValueChanged="NotesChanged" Disabled="@(!IsEditable)" MaxLength="1000" />
         </UiPurchasingFormGrid>
     </UiPurchasingSection>
-    <UiPurchasingSection Title="بنود الطلب" Subtitle="المنتجات والكميات المطلوبة">
+    <UiPurchasingSection Title="بنود الطلب">
         @if (IsEditable)
         {
             <UiButton Text="إضافة بند" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" Variant="ButtonVariant.Secondary" OnClick="AddLineAsync" />
@@ -28,10 +28,10 @@
                 <div class="ui-purchasing-line-card">
                     <div class="ui-purchasing-line-card__head"><strong>البند @line.LineSequence</strong>@if(IsEditable){<UiButton Text="حذف" IconCssClass="fa-regular fa-trash-can" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="@(_=>RemoveLineAsync(line))" />}</div>
                     <UiPurchasingFormGrid>
-                        <UiLookup Label="المنتج" Required="true" Value="@GuidText(line.ProductVariantId)" SelectedItem="@Selected(line.ProductVariantId,line.ProductName,"fa-solid fa-box")" SearchAsync="ProductSearchAsync" SelectedItemChanged="@(item=>ProductSelectionChanged(line,item))" ValueChanged="@(v=>ProductChanged(line,v))" Disabled="@(!IsEditable)" />
+                        <UiLookup UsePopover="true" Label="المنتج" Required="true" Value="@GuidText(line.ProductVariantId)" SelectedItem="@Selected(line.ProductVariantId,line.ProductName,"fa-solid fa-box")" SearchAsync="ProductSearchAsync" SearchPageAsync="ProductSearchPageAsync" SelectedItemChanged="@(item=>ProductSelectionChanged(line,item))" ValueChanged="@(v=>ProductChanged(line,v))" Disabled="@(!IsEditable)" />
                         <UiPurchasingNumberField Label="الكمية المطلوبة" Value="@line.RequestedQuantity" ValueChanged="@(v=>LineQuantityChanged(line,v))" Disabled="@(!IsEditable)" />
                         <UiInputDate Label="التاريخ المطلوب" Value="@line.RequiredDate" ValueChanged="@(v=>LineDateChanged(line,v))" Disabled="@(!IsEditable)" />
-                        <UiLookup Label="المورد المفضل" Value="@GuidText(line.PreferredSupplierId)" SelectedItem="@Selected(line.PreferredSupplierId,line.PreferredSupplierName,"fa-solid fa-truck-field")" SearchAsync="SupplierSearchAsync" ValueChanged="@(v=>LineSupplierChanged(line,v))" Disabled="@(!IsEditable)" />
+                        <UiLookup UsePopover="true" Label="المورد المفضل" Value="@GuidText(line.PreferredSupplierId)" SelectedItem="@Selected(line.PreferredSupplierId,line.PreferredSupplierName,"fa-solid fa-truck-field")" SearchAsync="SupplierSearchAsync" ValueChanged="@(v=>LineSupplierChanged(line,v))" Disabled="@(!IsEditable)" />
                         <UiInputText Label="ملاحظات البند" Value="@line.Notes" ValueChanged="@(v=>LineNotesChanged(line,v))" Disabled="@(!IsEditable)" />
                     </UiPurchasingFormGrid>
                     @if (line.Id.HasValue)
@@ -49,6 +49,7 @@
     [Parameter] public bool IsEditable { get; set; }=true;
     [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? WarehouseSearchAsync { get; set; }
     [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? ProductSearchAsync { get; set; }
+    [Parameter] public Func<string,int,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? ProductSearchPageAsync {get;set;}
     [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SupplierSearchAsync { get; set; }
     [Parameter] public EventCallback OnChanged { get; set; }
     private static readonly IReadOnlyList<UiSelectOption> RequestTypeOptions=[new("1","طلب عميل"),new("2","إعادة تعبئة"),new("3","يدوي")];

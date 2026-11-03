@@ -2,7 +2,7 @@
 @using OAS.UiLib.Components.Sales.Workflow
 @using OAS.UiLib.Core.Models.Sales
 
-<div class="ui-sales-workspace" dir="rtl">
+<div class="ui-sales-workspace purchasing-demand-page" dir="rtl">
     <UiWorkflowSummaryCards Metrics="@Metrics" OnSelect="OnMetricSelected" />
     <UiSectionTabStrip Tabs="@Tabs" OnSelect="TabSelectedAsync" />
     <UiWorkspaceFilterBar Compact="true">
@@ -23,7 +23,7 @@
     @if(!string.IsNullOrWhiteSpace(ErrorText)){<UiAlert Tone="AlertTone.Danger">@ErrorText</UiAlert>}
     @if(!string.IsNullOrWhiteSpace(SuccessText)){<UiAlert Tone="AlertTone.Success">@SuccessText</UiAlert>}
 
-    <UiDataGridPanel Title="متابعة النواقص والتوريد" Subtitle="الحالة المشتقة من طلب الشراء وأمر الشراء والاستلام، بدون جدول Tracking مستقل.">
+    <UiDataGridPanel Title="متابعة النواقص والتوريد">
         <Body>
             <UiDataTable TItem="UiDemandTrackingRowModel" Items="@Rows" Headers="@Headers" Compact="true" OnRowClick="@((UiDemandTrackingRowModel row) => OpenAsync(row))" EmptyText="لا توجد نواقص مطابقة للفلاتر.">
                 <RowTemplate Context="row">
@@ -43,7 +43,7 @@
 @if(Selected is not null)
 {
     <div class="ui-workflow-drawer-backdrop" @onclick="CloseAsync"></div>
-    <aside class="ui-workflow-drawer ui-workflow-drawer--wide" dir="rtl">
+    <aside class="ui-workflow-drawer ui-workflow-drawer--wide purchasing-demand-drawer" dir="rtl">
         <header class="ui-workflow-drawer__header"><div><strong>@Selected.RequestCode</strong><span>@Selected.CustomerText • @Selected.OrderCode</span></div><button type="button" @onclick="CloseAsync">×</button></header>
         <div class="ui-workflow-drawer__body">
             <div class="ui-workflow-detail-grid"><span>الصنف<strong>@Selected.ProductText</strong></span><span>الحالة<strong>@Selected.TrackingText</strong></span><span>المتبقي<strong>@Selected.Remaining.ToString("N3")</strong></span><span>الوصول<strong>@(Selected.ExpectedDate ?? "—")</strong></span></div>

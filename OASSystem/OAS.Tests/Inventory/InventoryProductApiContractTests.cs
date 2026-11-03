@@ -20,16 +20,16 @@ public sealed class InventoryProductApiContractTests
     }
 
     [Test]
-    public void CreateWithOpeningInventory_RequiresCatalogAndInventoryPermissions()
+    public void CatalogCreation_DoesNotRequireInventoryPostingPermissions()
     {
         var command = new CreateStockProductCommand(new CreateStockProductRequest(
             new CreateProductRequest("P-API", "منتج", Guid.NewGuid(), null, null, true),
             new InitialProductVariantRequest("SKU-API", null, null, null, null, null, 10m, 20m),
-            new OpeningInventoryRequest(Guid.NewGuid(), 1m, 10m)));
+            null));
 
         Assert.That(command.RequiredPermissions, Does.Contain(InventoryPermissions.Products.Create));
         Assert.That(command.RequiredPermissions, Does.Contain(InventoryPermissions.ProductVariants.Create));
-        Assert.That(command.RequiredPermissions, Does.Contain(InventoryPermissions.Transactions.Create));
-        Assert.That(command.RequiredPermissions, Does.Contain(InventoryPermissions.Transactions.Post));
+        Assert.That(command.RequiredPermissions, Does.Not.Contain(InventoryPermissions.Transactions.Create));
+        Assert.That(command.RequiredPermissions, Does.Not.Contain(InventoryPermissions.Transactions.Post));
     }
 }

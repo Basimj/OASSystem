@@ -1,6 +1,6 @@
 @namespace OAS.UiLib.Components.Purchasing
 @using OAS.UiLib.Core.Models.Purchasing
-<UiPurchasingSection Title="المطابقة الثلاثية" Subtitle="Purchase Order ↔ Receipt ↔ Invoice">
+<UiPurchasingSection Title="المطابقة الثلاثية">
     <div class="ui-purchase-match-summary"><strong>@Model.OverallStatus</strong><span>@(Model.RequiresApproval ? "يوجد فرق يحتاج اعتماد" : "لا توجد فروقات معلقة للاعتماد")</span></div>
     @if(Model.Allocations.Count>0)
     {

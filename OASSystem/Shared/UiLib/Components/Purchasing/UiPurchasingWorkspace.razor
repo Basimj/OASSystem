@@ -1,5 +1,6 @@
 @namespace OAS.UiLib.Components.Purchasing
 
+<div class="purchasing-module-root">
 <UiWorkspaceLayout ShowFilters="false" ShowAside="false" ScrollableMain="true">
     <Actions>@Actions</Actions>
     <Content>
@@ -8,6 +9,7 @@
         </div>
     </Content>
 </UiWorkspaceLayout>
+</div>
 
 @code {
     [Parameter] public RenderFragment? Actions { get; set; }

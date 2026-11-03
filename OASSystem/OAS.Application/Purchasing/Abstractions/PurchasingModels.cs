@@ -5,7 +5,7 @@ namespace OAS.Application.Purchasing.Abstractions;
 public sealed record PurchasingSupplierSnapshot(Guid Id, string Code, string Name, bool IsActive, Guid AccountId, int PaymentTermDays = 0);
 public sealed record PurchasingWarehouseSnapshot(Guid Id, string Code, string Name, bool IsActive);
 public sealed record PurchasingUnitSnapshot(Guid Id, string Code, string Name, bool IsActive);
-public sealed record PurchasingCurrencySnapshot(Guid Id, string Code, bool IsActive);
+public sealed record PurchasingCurrencySnapshot(Guid Id, string Code, bool IsActive, string? NameAr = null);
 public sealed record PurchasingCatalogDefaults(Guid CatalogItemId, Guid PurchaseUnitId, decimal UnitConversionFactor, decimal? UnitPrice);
 public sealed record PurchasingProductSnapshot(Guid VariantId, string? ProductCode, string ProductName, bool VariantIsActive, bool ProductIsActive, bool IsStockItem, Guid? DefaultUnitId);
 

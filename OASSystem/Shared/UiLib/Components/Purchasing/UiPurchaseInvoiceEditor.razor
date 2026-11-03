@@ -2,14 +2,14 @@
 @using OAS.UiLib.Core.Models.Purchasing
 @using OAS.UiLib.Core.Models
 
-<UiPurchasingEditorShell Eyebrow="فواتير المشتريات" Title="@Model.PurchaseInvoiceCode" Subtitle="فاتورة المورد والمطابقة الثلاثية" StatusText="@Model.StatusText">
+<UiPurchasingEditorShell Title="@Model.PurchaseInvoiceCode" StatusText="@Model.StatusText">
     <UiPurchasingSection Title="بيانات الفاتورة">
         <UiPurchasingFormGrid>
             <UiInputText Label="رقم فاتورة المورد" Value="@Model.SupplierInvoiceCode" ValueChanged="SupplierInvoiceCodeChanged" Disabled="@(!IsEditable)" MaxLength="100" />
-            <UiLookup Label="المورد" Required="true" Value="@GuidText(Model.SupplierId)" SelectedItem="@Selected(Model.SupplierId,Model.SupplierName,"fa-solid fa-truck-field")" SearchAsync="SupplierSearchAsync" ValueChanged="SupplierChanged" Disabled="@(!IsEditable)" />
+            <UiLookup UsePopover="true" Label="المورد" Required="true" Value="@GuidText(Model.SupplierId)" SelectedItem="@Selected(Model.SupplierId,Model.SupplierName,"fa-solid fa-truck-field")" SearchAsync="SupplierSearchAsync" ValueChanged="SupplierChanged" Disabled="@(!IsEditable)" />
             <UiInputDate Label="تاريخ الفاتورة" Value="@Model.InvoiceDate" ValueChanged="InvoiceDateChanged" Disabled="@(!IsEditable)" />
             <UiInputDate Label="تاريخ الترحيل" Value="@Model.PostingDate" ValueChanged="PostingDateChanged" Disabled="@(!IsEditable)" />
-            <UiLookup Label="العملة" Required="true" Value="@GuidText(Model.CurrencyId)" SelectedItem="@Selected(Model.CurrencyId,Model.CurrencyCode,"fa-solid fa-coins")" SearchAsync="CurrencySearchAsync" ValueChanged="CurrencyChanged" Disabled="@(!IsEditable)" />
+            <UiLookup UsePopover="true" Label="العملة" Required="true" Value="@GuidText(Model.CurrencyId)" SelectedItem="@Selected(Model.CurrencyId,Model.CurrencyCode,"fa-solid fa-coins")" SearchAsync="CurrencySearchAsync" ValueChanged="CurrencyChanged" Disabled="@(!IsEditable)" />
             <UiPurchasingNumberField Label="سعر الصرف" Value="@Model.ExchangeRate" ValueChanged="ExchangeRateChanged" Disabled="@(!IsEditable)" Step="0.00000001" Min="0.00000001" />
             <UiInputDate Label="تاريخ سعر الصرف" Value="@Model.ExchangeRateDate" ValueChanged="ExchangeRateDateChanged" Disabled="@(!IsEditable)" />
             <UiSelect Label="طريقة الضريبة" Value="@Model.TaxCalculationMode.ToString()" Options="TaxModeOptions" Disabled="@(!IsEditable)" OnValueChanged="TaxModeChanged" />
@@ -25,7 +25,7 @@
                 <div class="ui-purchasing-invoice-line">
                     <div class="ui-purchasing-invoice-line__head"><strong>البند @line.LineSequence</strong>@if(IsEditable){<UiButton Text="حذف" IconCssClass="fa-regular fa-trash-can" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="@(_=>RemoveLineAsync(line))" />}</div>
                     <UiPurchasingFormGrid>
-                        <UiLookup Label="المنتج" Required="true" Value="@GuidText(line.ProductVariantId)" SelectedItem="@Selected(line.ProductVariantId,line.ProductName,"fa-solid fa-box")" SearchAsync="ProductSearchAsync" SelectedItemChanged="@(item=>ProductSelectionChanged(line,item))" ValueChanged="@(v=>ProductChanged(line,v))" Disabled="@(line.PurchaseOrderLineId.HasValue || !IsEditable)" />
+                        <UiLookup UsePopover="true" Label="المنتج" Required="true" Value="@GuidText(line.ProductVariantId)" SelectedItem="@Selected(line.ProductVariantId,line.ProductName,"fa-solid fa-box")" SearchAsync="ProductSearchAsync" SearchPageAsync="ProductSearchPageAsync" SelectedItemChanged="@(item=>ProductSelectionChanged(line,item))" ValueChanged="@(v=>ProductChanged(line,v))" Disabled="@(line.PurchaseOrderLineId.HasValue || !IsEditable)" />
                         <UiInputText Label="ربط أمر الشراء" Value="@PurchaseOrderLinkText(line)" Disabled="true" />
                         <UiPurchasingNumberField Label="الكمية" Value="@line.Quantity" ValueChanged="@(v=>QuantityChanged(line,v))" Disabled="@(!IsEditable)" />
                         <UiPurchasingNumberField Label="سعر الوحدة" Value="@line.UnitPrice" ValueChanged="@(v=>PriceChanged(line,v))" Disabled="@(!IsEditable)" Step="0.0001" />
@@ -69,7 +69,9 @@
 
                 @if(PaymentBaseTotalAmount.HasValue)
                 {
-                    <div class="ui-purchasing-invoice-totals">
+                    <details class="ui-purchasing-advanced">
+                        <summary>التفاصيل المحاسبية بالعملة الأساسية</summary>
+                        <div class="ui-purchasing-invoice-totals">
                         <span><small>القيمة التاريخية الأساسية</small><strong>@FormatBaseAmount(PaymentBaseTotalAmount.Value)</strong></span>
                         <span><small>المسدد من حساب المورد</small><strong>@FormatBaseAmount(PaymentAppliedBaseAmount ?? 0m)</strong></span>
                         @if(PaymentCreditBaseAmount is > 0m)
@@ -81,13 +83,15 @@
                         {
                             <span><small>@(fx > 0m ? "خسارة صرف محققة" : "ربح صرف محقق")</small><strong>@FormatBaseAmount(Math.Abs(fx))</strong></span>
                         }
-                    </div>
+                        </div>
+                    </details>
                 }
 
                 @if(PaymentSettlements.Count > 0)
                 {
-                    <h4>تفاصيل التسويات وفروق الصرف</h4>
-                    <UiPurchasingLineTable>
+                    <details class="ui-purchasing-advanced">
+                        <summary>تفاصيل التسويات وفروق الصرف (@PaymentSettlements.Count)</summary>
+                        <UiPurchasingLineTable>
                         @foreach(var settlement in PaymentSettlements.OrderBy(x=>x.AllocatedAtUtc))
                         {
                             <div class="ui-purchasing-invoice-line">
@@ -109,7 +113,8 @@
                                 <small>@FormatSettlementSourceInfo(settlement)</small>
                             </div>
                         }
-                    </UiPurchasingLineTable>
+                        </UiPurchasingLineTable>
+                    </details>
                 }
             }
             else
@@ -132,6 +137,7 @@
     [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SupplierSearchAsync {get;set;}
     [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? CurrencySearchAsync {get;set;}
     [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? ProductSearchAsync {get;set;}
+    [Parameter] public Func<string,int,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? ProductSearchPageAsync {get;set;}
     [Parameter] public bool ShowPaymentSummary {get;set;}
     [Parameter] public bool PaymentSummaryLoading {get;set;}
     [Parameter] public decimal? PaymentTotalAmount {get;set;}

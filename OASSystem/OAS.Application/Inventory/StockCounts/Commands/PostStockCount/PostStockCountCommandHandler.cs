@@ -46,20 +46,13 @@ public sealed class PostStockCountCommandHandler(
         var movementDate = new DateTimeOffset(
             stockCount.CountDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
 
-        var increases = lines.Where(x => x.DifferenceQuantity > 0).ToArray();
-        var decreases = lines.Where(x => x.DifferenceQuantity < 0).ToArray();
+        // A positive variance would introduce stock with no general-ledger entry.
+        // Do not partially post a count: reject the entire operation before any movement.
+        if (lines.Any(x => x.DifferenceQuantity > 0))
+            throw new ConflictException("stock_count_increase_disabled",
+                "يتضمن الجرد زيادة في المخزون. لا يمكن ترحيل زيادة الجرد دون قيد محاسبي؛ يجب معالجة الفروقات قبل الترحيل.");
 
-        if (increases.Length > 0)
-        {
-            await PostAdjustmentAsync(
-                stockCount,
-                increases,
-                InventoryTransactionType.AdjustmentIncrease,
-                movementDate,
-                nowUtc,
-                userId,
-                cancellationToken);
-        }
+        var decreases = lines.Where(x => x.DifferenceQuantity < 0).ToArray();
 
         if (decreases.Length > 0)
         {

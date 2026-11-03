@@ -10,8 +10,8 @@
 .cw-button{appearance:none;border:1px solid var(--cw-border);border-radius:9px;min-height:35px;padding:8px 12px;display:inline-flex;align-items:center;justify-content:center;gap:7px;font:inherit;font-size:12px;font-weight:650;text-decoration:none;white-space:nowrap;cursor:pointer;transition:background .15s,border-color .15s,color .15s;background:var(--cw-bg);color:var(--cw-text)}
 .cw-button:hover:not(:disabled){border-color:var(--cw-primary);color:var(--cw-primary)}
 .cw-button:disabled{opacity:.5;cursor:not-allowed}
-.cw-button--primary{background:var(--cw-primary);border-color:var(--cw-primary);color:#fff}
-.cw-button--primary:hover:not(:disabled){color:#fff;filter:brightness(.96)}
+.cw-button--primary{background:var(--cw-primary);border-color:var(--cw-primary);color:var(--oas-color-on-primary)}
+.cw-button--primary:hover:not(:disabled){color:var(--oas-color-on-primary);filter:brightness(.96)}
 .cw-button--secondary{background:var(--cw-soft);color:var(--cw-text)}
 .cw-button--quiet{background:transparent}
 .cw-customer-banner{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(210px,auto);align-items:center;gap:14px;padding:16px;border:1px solid var(--cw-border);border-radius:15px;background:linear-gradient(115deg,var(--cw-soft),var(--cw-bg) 62%);min-width:0}
@@ -32,7 +32,7 @@
 .cw-section-nav{display:flex;gap:5px;overflow-x:auto;padding:5px;border:1px solid var(--cw-border);border-radius:11px;background:var(--cw-soft);scrollbar-width:thin}
 .cw-section-nav a{padding:9px 13px;border-radius:8px;color:var(--cw-muted);font-size:12px;font-weight:650;text-decoration:none;white-space:nowrap}
 .cw-section-nav a:hover,.cw-section-nav a:focus{background:var(--cw-bg);color:var(--cw-primary)}
-.cw-panel{border:1px solid var(--cw-border);border-radius:14px;background:var(--cw-bg);padding:15px;min-width:0;scroll-margin-top:12px;box-shadow:0 2px 8px rgba(25,55,90,.025)}
+.cw-panel{border:1px solid var(--cw-border);border-radius:14px;background:var(--cw-bg);padding:15px;min-width:0;scroll-margin-top:12px;box-shadow:0 2px 8px color-mix(in srgb, var(--oas-color-text) 2%, transparent)}
 .cw-panel-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:13px;flex-wrap:wrap}
 .cw-panel-heading h2{font-size:15px;font-weight:750;margin:0 0 4px}
 .cw-panel-heading p{font-size:11px;color:var(--cw-muted);margin:0;line-height:1.5}
@@ -67,12 +67,12 @@
 .cw-aging-grid article{border:1px solid var(--cw-border);background:var(--cw-soft);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px;min-width:0}
 .cw-aging-grid span{font-size:10px;color:var(--cw-muted)}
 .cw-aging-grid strong{font-size:13px;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
-.cw-aging-grid .cw-aging-danger{border-color:#e7c9c9;background:color-mix(in srgb,#b42318 5%,var(--cw-bg))}
-.cw-aging-grid .cw-aging-danger strong{color:#b42318}
+.cw-aging-grid .cw-aging-danger{border-color:var(--oas-color-danger);background:color-mix(in srgb,var(--oas-color-danger) 5%,var(--cw-bg))}
+.cw-aging-grid .cw-aging-danger strong{color:var(--oas-color-danger)}
 .cw-status{display:inline-flex;border-radius:20px;padding:4px 8px;background:var(--cw-soft);font-size:10px;color:var(--cw-muted);white-space:nowrap}
 .cw-document-tabs{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px}
 .cw-document-tabs button{border:1px solid var(--cw-border);border-radius:8px;padding:8px 12px;background:transparent;color:var(--cw-muted);font:inherit;font-size:11px;cursor:pointer}
-.cw-document-tabs button.is-active{background:var(--cw-primary);border-color:var(--cw-primary);color:#fff}
+.cw-document-tabs button.is-active{background:var(--cw-primary);border-color:var(--cw-primary);color:var(--oas-color-on-primary)}
 .cw-empty-state,.cw-state-card{display:flex;align-items:center;gap:12px;padding:18px;border:1px dashed var(--cw-border);border-radius:11px;color:var(--cw-muted);font-size:12px;background:var(--cw-soft)}
 .cw-state-card strong{color:var(--cw-text);display:block;margin-bottom:3px}
 .cw-state-card p{margin:0;color:var(--cw-muted);font-size:11px}

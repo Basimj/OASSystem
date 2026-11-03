@@ -86,13 +86,13 @@ else
     private static string GetLevelColor(int level) =>
         (level % 7) switch
         {
-            0 => "#F59E0B",
-            1 => "#2563EB",
-            2 => "#8B5CF6",
-            3 => "#10B981",
-            4 => "#EC4899",
-            5 => "#0EA5E9",
-            _ => "#EF4444"
+            0 => "var(--oas-color-primary)",
+            1 => "var(--oas-color-primary-hover)",
+            2 => "color-mix(in srgb, var(--oas-color-primary) 80%, var(--oas-color-text))",
+            3 => "color-mix(in srgb, var(--oas-color-primary) 72%, var(--oas-color-surface))",
+            4 => "color-mix(in srgb, var(--oas-color-primary) 60%, var(--oas-color-text))",
+            5 => "color-mix(in srgb, var(--oas-color-primary) 85%, var(--oas-color-surface))",
+            _ => "var(--oas-color-primary-border)"
         };
 
     private RenderFragment RenderNode(AccountTreeNode node, int level) => @<div class="ui-acc-tree__node">

@@ -1,0 +1,90 @@
+/* Sky & Sun — scoped to the SkyYellow preset in light mode only.
+   Primary: #26B2FF (white lettering), Sun: #F9FF26 (white lettering with dark edge shadow).
+   Landscape cues are gentle, so operational ERP screens remain legible. */
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) {
+    /* The requested white-on-yellow pairing has low native contrast. */
+    --oas-sun-white-ink-shadow:0 1px 2px rgba(22,48,32,.94),0 0 3px rgba(22,48,32,.86);
+}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-sidebar {
+    background-color:#26B2FF;
+    background-image:linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,.05) 64%,rgba(144,216,161,.18));
+    border-inline-end-color:#1394D3;
+}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-sidebar :is(.oas-sidebar-brand__name,.oas-nav-item,.oas-nav-group__header,.oas-nav-group__chevron,.oas-nav-settings-child) {
+    color:var(--oas-ui-sidebar-fg);
+}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-sidebar :is(.oas-nav-item,.oas-nav-group__header) .oas-nav-icon,
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-sidebar .oas-nav-settings-child i {color:var(--oas-ui-sidebar-icon);}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-sidebar :is(.oas-nav-item:hover:not(.active),.oas-nav-group__header:hover) {
+    background:#159DE8;color:#FFFFFF;
+}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-sidebar :is(.oas-nav-item.active,.oas-nav-item--child.active) {
+    background:#F9FF26;color:#FFFFFF;border-color:#D9E20B;text-shadow:var(--oas-sun-white-ink-shadow);
+}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-sidebar :is(.oas-nav-item.active,.oas-nav-item--child.active) .oas-nav-icon {color:#FFFFFF;text-shadow:var(--oas-sun-white-ink-shadow);}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-sidebar .oas-nav-item.active::before {background:#FFFFFF;}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-sidebar .oas-nav-group.active > .oas-nav-group__header:not(.active) {
+    color:#FFFFFF;background:rgba(16,111,169,.26);
+}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-sidebar :is(.oas-nav-group__items,.oas-sidebar-toolbar) {border-color:rgba(255,255,255,.35);}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-sidebar .oas-collapse-btn {background:#F9FF26;color:#FFFFFF;border-color:#E4E906;text-shadow:var(--oas-sun-white-ink-shadow);}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-sidebar .oas-collapse-btn:hover {background:#F0F51E;color:#FFFFFF;}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-sidebar .oas-nav-text {color:inherit;}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-sidebar :is(.oas-sidebar-brand__name,.oas-nav-item:not(.active),.oas-nav-group__header) {
+    text-shadow:0 1px 1px rgba(0,67,114,.54);
+}
+/* All selected navigation surfaces follow the same white-on-sun rule. */
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-sidebar .oas-nav-settings-child:is(.is-active,:hover),
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark).sidebar-collapsed .oas-nav-group.active > .oas-nav-group__header {
+    color:#FFFFFF;text-shadow:var(--oas-sun-white-ink-shadow);
+}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-sidebar .oas-nav-settings-child:is(.is-active,:hover) i {
+    color:#FFFFFF;text-shadow:var(--oas-sun-white-ink-shadow);
+}
+/* Sky header stays clearly sky-blue; sun yellow belongs to active indicators. */
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) :is(.oas-workspace-topbar,.oas-global-header-row) {
+    background:#26B2FF;color:#FFFFFF;border-bottom-color:#1998D9;
+}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-top-header :is(.oas-header-user,.oas-user-details strong,.oas-user-details small,.oas-header-meta-item,.oas-header-meta-item i,.oas-header-icon-button,.oas-header-finance-link,.oas-user-chevron,.oas-shell-search__icon) {
+    color:#FFFFFF;
+}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-header-user:hover,
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-header-icon-button:hover {background:rgba(0,101,161,.26);color:#FFFFFF;}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-shell-search {border-color:rgba(255,255,255,.55);}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-top-header {text-shadow:0 1px 1px rgba(0,67,114,.56);}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-global-tabs-row {background:#EDF9EF;border-bottom-color:#A6D6CF;}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-global-tabs-row .ui-application-tab--active {
+    background:#F9FF26;color:#FFFFFF;border-color:#D4DA14;box-shadow:inset 0 -2px #D2D908;text-shadow:var(--oas-sun-white-ink-shadow);
+}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-global-tabs-row .ui-application-tab--active :is(.ui-application-tab__icon,.ui-application-tab__select,.ui-application-tab__close) {color:#FFFFFF;text-shadow:var(--oas-sun-white-ink-shadow);}
+/* Landscapes: distant sky glow and a soft meadow wash, without visual noise on data cards. */
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-main-content {background:#F2FAF2;}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-main-inner {
+    background-color:#F2FAF2;
+    background-image:radial-gradient(ellipse 360px 205px at 84% -10%,rgba(249,255,38,.23),transparent 72%),
+                     radial-gradient(ellipse 70% 340px at 6% 115%,rgba(129,199,150,.14),transparent 74%),
+                     linear-gradient(180deg,#E7F7FF 0%,#F5FBF3 58%,#EFF8EE 100%);
+    background-attachment:local;
+}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-main-inner :is(.ui-workspace__actions,.ui-workspace__filters,.ui-acc-section__header,.ui-sales-section__header) {
+    border-color:#C6E5D8;
+}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-main-inner :is(.ui-button--primary,.btn-primary) {
+    background-color:#26B2FF;color:#FFFFFF;border-color:#26B2FF;
+    text-shadow:0 1px 1px rgba(0,67,114,.55);
+}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-main-inner :is(.ui-button--primary,.btn-primary):hover:not(:disabled) {
+    background-color:#159DE8;color:#FFFFFF;border-color:#159DE8;
+}
+/* Selected rows and yellow emphasis use white text with an edge shadow (including nested cells). */
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-main-inner :is(.ui-data-table__row--selected td,.ui-acc-grid-table tr.is-selected td,.table tbody tr.table-active td) {
+    background-color:#F9FF26;color:#FFFFFF;text-shadow:var(--oas-sun-white-ink-shadow);
+}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-main-inner :is(.ui-data-table__row--selected td,.ui-acc-grid-table tr.is-selected td,.table tbody tr.table-active td) :is(span,strong,small,i,a) {color:#FFFFFF;text-shadow:var(--oas-sun-white-ink-shadow);}
+/* Visible keyboard focus without changing the user's requested foreground pairing. */
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) :is(button,a,input,select,textarea):focus-visible {
+    outline:2px solid #184C64;outline-offset:2px;
+}
+@media (prefers-reduced-motion:reduce) {
+    .oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-sidebar {transition:none;}
+}

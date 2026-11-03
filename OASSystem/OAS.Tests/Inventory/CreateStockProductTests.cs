@@ -1,14 +1,8 @@
-using Microsoft.EntityFrameworkCore;
-using OAS.Application.Inventory.Repositories;
-using OAS.Infrastructure.Persistence;
-using OAS.Infrastructure.Persistence.Repositories.Inventory;
 using NUnit.Framework;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.Inventory.Products.Products.Commands.CreateStockProduct;
-using OAS.Application.Inventory.Services;
 using OAS.Contracts.Inventory.Products;
 using OAS.Domain.Entities.Inventory;
-using OAS.Domain.Enums.Inventory;
 using OAS.Tests.Inventory.Fakes;
 
 namespace OAS.Tests.Inventory;
@@ -18,157 +12,80 @@ public sealed class CreateStockProductTests
 {
     private FakeGenericRepository<Product, Guid> _products = null!;
     private FakeGenericRepository<ProductVariant, Guid> _variants = null!;
-    private FakeGenericRepository<FrameDetails, Guid> _frameDetails = null!;
-    private FakeGenericRepository<LensDetails, Guid> _lensDetails = null!;
+    private FakeGenericRepository<FrameDetails, Guid> _frames = null!;
+    private FakeGenericRepository<LensDetails, Guid> _lenses = null!;
     private FakeGenericRepository<ProductCategory, Guid> _categories = null!;
     private FakeGenericRepository<Brand, Guid> _brands = null!;
     private FakeGenericRepository<ProductType, Guid> _types = null!;
     private FakeGenericRepository<Unit, Guid> _units = null!;
-    private FakeGenericRepository<Warehouse, Guid> _warehouses = null!;
-    private FakeInventoryTransactionRepository _transactions = null!;
-    private FakeGenericRepository<InventoryTransactionLine, Guid> _lines = null!;
-    private FakeInventoryBalanceRepository _balances = null!;
-    private FakeGenericRepository<InventoryLedger, Guid> _ledger = null!;
-    private FakeInventorySequenceNumberGenerator _sequence = null!;
-    private InventoryPostingService _posting = null!;
-    private ProductCategory _frameCategory = null!;
+    private ProductCategory _category = null!;
     private ProductCategory _serviceCategory = null!;
-    private ProductType _frameType = null!;
-    private ProductType _serviceType = null!;
-    private Warehouse _warehouse = null!;
 
     [SetUp]
     public void SetUp()
     {
         _products = new();
         _variants = new();
-        _frameDetails = new();
-        _lensDetails = new();
+        _frames = new();
+        _lenses = new();
         _categories = new();
         _brands = new();
         _types = new();
         _units = new();
-        _warehouses = new();
-        _transactions = new([], []);
-        _lines = new(_transactions.Lines);
-        _balances = new();
-        _ledger = new();
-        _sequence = new();
-        _posting = new InventoryPostingService(_balances, _ledger, _sequence, TimeProvider.System);
-
-        _frameType = new ProductType("FRAME", "إطار", systemKey: ProductTypeSystemKeys.Frame);
-        _serviceType = new ProductType("SERVICE", "خدمة", systemKey: ProductTypeSystemKeys.Service);
-        _frameCategory = new ProductCategory("CAT-FRAME", "تصنيف الإطارات", _frameType.Id);
-        _serviceCategory = new ProductCategory("CAT-SERVICE", "تصنيف الخدمات", _serviceType.Id);
-        _warehouse = new Warehouse("MAIN", "المخزن الرئيسي", isDefault: true);
-        _categories.Items.AddRange([_frameCategory, _serviceCategory]);
-        _types.Items.AddRange([_frameType, _serviceType]);
-        _warehouses.Items.Add(_warehouse);
+        var frameType = new ProductType("FRAME", "إطار", systemKey: ProductTypeSystemKeys.Frame);
+        var serviceType = new ProductType("SERVICE", "خدمة", systemKey: ProductTypeSystemKeys.Service);
+        _category = new ProductCategory("CAT-FRAME", "تصنيف الإطارات", frameType.Id);
+        _serviceCategory = new ProductCategory("CAT-SERVICE", "تصنيف الخدمات", serviceType.Id);
+        _categories.Items.AddRange([_category, _serviceCategory]);
+        _types.Items.AddRange([frameType, serviceType]);
     }
 
     [Test]
-    public async Task CreateWithOpeningInventory_CreatesAndPostsCompleteFlow()
+    public async Task CreateStockProduct_CreatesCatalogAndVariantWithoutStock()
     {
-        var handler = CreateHandler();
         var request = new CreateStockProductRequest(
-            new CreateProductRequest("P-001", "إطار تجريبي", _frameCategory.Id, null, null, true),
+            new CreateProductRequest("P-001", "إطار تجريبي", _category.Id, null, null, true),
             new InitialProductVariantRequest("SKU-001", "111", "أسود", "Black", "52", null, 100m, 180m),
-            new OpeningInventoryRequest(_warehouse.Id, 10m, 100m),
+            null,
             new InitialFrameDetailsRequest("RB-001", "Acetate", "Full Rim", null, "Square", 140m, 18m, 52m));
 
-        var result = await handler.Handle(new CreateStockProductCommand(request), CancellationToken.None);
+        var result = await Handler().Handle(new CreateStockProductCommand(request), CancellationToken.None);
 
         Assert.That(_products.Items.Count, Is.EqualTo(1));
         Assert.That(_variants.Items.Count, Is.EqualTo(1));
-        Assert.That(_frameDetails.Items.Count, Is.EqualTo(1));
-        Assert.That(_frameDetails.Items[0].ProductId, Is.EqualTo(_products.Items[0].Id));
-        Assert.That(_transactions.Items.Count, Is.EqualTo(1));
-        Assert.That(_lines.Items.Count, Is.EqualTo(1));
-        Assert.That(_balances.Items.Count, Is.EqualTo(1));
-        Assert.That(_ledger.Items.Count, Is.EqualTo(1));
-        Assert.That(_transactions.Items[0].TransactionType, Is.EqualTo(InventoryTransactionType.Opening));
-        Assert.That(_transactions.Items[0].Status, Is.EqualTo(InventoryTransactionStatus.Posted));
-        Assert.That(_balances.Items[0].OnHandQuantity, Is.EqualTo(10m));
-        Assert.That(_balances.Items[0].AverageUnitCost, Is.EqualTo(100m));
-        Assert.That(_balances.Items[0].InventoryValue, Is.EqualTo(1000m));
-        Assert.That(result.OpeningInventoryCreated, Is.True);
+        Assert.That(_frames.Items.Count, Is.EqualTo(1));
+        Assert.That(_frames.Items[0].ProductId, Is.EqualTo(result.ProductId));
+        Assert.That(result.VariantId, Is.EqualTo(_variants.Items[0].Id));
+        Assert.That(result.OpeningInventoryCreated, Is.False);
+        Assert.That(result.InventoryTransactionId, Is.Null);
+        Assert.That(result.WarehouseId, Is.Null);
+        Assert.That(result.OpeningQuantity, Is.Null);
     }
 
     [Test]
-    public async Task CreateStockProductWithoutOpening_CreatesProductAndVariantOnly()
+    public void CreateStockProduct_OpeningIsRejectedBeforeAnyCatalogWrite()
     {
-        var handler = CreateHandler();
         var request = new CreateStockProductRequest(
-            new CreateProductRequest("P-002", "منتج بدون رصيد", _frameCategory.Id, null, null, true),
-            new InitialProductVariantRequest("SKU-002", null, null, null, null, null, 10m, 20m),
-            null);
+            new CreateProductRequest("P-BLOCK", "منتج", _category.Id, null, null, true),
+            new InitialProductVariantRequest("SKU-BLOCK", null, null, null, null, null, 10m, 20m),
+            new OpeningInventoryRequest(Guid.NewGuid(), 1m, 10m));
 
-        var result = await handler.Handle(new CreateStockProductCommand(request), CancellationToken.None);
-
-        Assert.That(_products.Items.Count, Is.EqualTo(1));
-        Assert.That(_variants.Items.Count, Is.EqualTo(1));
-        Assert.That(_transactions.Items, Is.Empty);
-        Assert.That(_balances.Items, Is.Empty);
-        Assert.That(result.OpeningInventoryCreated, Is.False);
+        Assert.ThrowsAsync<RequestValidationException>(() =>
+            Handler().Handle(new CreateStockProductCommand(request), CancellationToken.None));
+        Assert.That(_products.Items, Is.Empty);
+        Assert.That(_variants.Items, Is.Empty);
     }
 
     [Test]
     public void ServiceCannotBeStockItem()
     {
-        var handler = CreateHandler();
         var request = new CreateStockProductRequest(
             new CreateProductRequest("S-001", "خدمة", _serviceCategory.Id, null, null, true),
-            new InitialProductVariantRequest("SERVICE-SKU", null, null, null, null, null, 0m, 0m),
-            null);
-
+            new InitialProductVariantRequest("SERVICE-SKU", null, null, null, null, null, 0m, 0m));
         Assert.ThrowsAsync<RequestValidationException>(() =>
-            handler.Handle(new CreateStockProductCommand(request), CancellationToken.None));
+            Handler().Handle(new CreateStockProductCommand(request), CancellationToken.None));
     }
 
-    [Test]
-    public void InactiveWarehouseRejectsOpeningInventory()
-    {
-        _warehouse.UpdateDetails(_warehouse.Code, _warehouse.Name, _warehouse.Description, _warehouse.IsDefault, false);
-        var handler = CreateHandler();
-        var request = new CreateStockProductRequest(
-            new CreateProductRequest("P-003", "منتج", _frameCategory.Id, null, null, true),
-            new InitialProductVariantRequest("SKU-003", null, null, null, null, null, 10m, 20m),
-            new OpeningInventoryRequest(_warehouse.Id, 1m, 10m));
-
-        Assert.ThrowsAsync<RequestValidationException>(() =>
-            handler.Handle(new CreateStockProductCommand(request), CancellationToken.None));
-    }
-
-    [Test]
-    public async Task OpeningTransaction_RemainsAddedUntilUnitOfWorkCommits()
-    {
-        using var context = new OasDbContext(new DbContextOptionsBuilder<OasDbContext>()
-            .UseSqlServer("Server=(localdb)\\mssqllocaldb;Database=tracking_only;Trusted_Connection=True;").Options);
-        var request = new CreateStockProductRequest(
-            new CreateProductRequest("P-TRACK", "منتج", _frameCategory.Id, null, null, true),
-            new InitialProductVariantRequest("SKU-TRACK", null, null, null, null, null, 100m, 150m),
-            new OpeningInventoryRequest(_warehouse.Id, 10m, 100m));
-        await CreateHandler(new InventoryTransactionRepository(context))
-            .Handle(new CreateStockProductCommand(request), CancellationToken.None);
-        var transaction = context.InventoryTransactions.Local.Single();
-        Assert.That(transaction.Status, Is.EqualTo(InventoryTransactionStatus.Posted));
-        Assert.That(context.Entry(transaction).State, Is.EqualTo(EntityState.Added));
-    }
-
-    private CreateStockProductCommandHandler CreateHandler(IInventoryTransactionRepository? transactions = null) => new(
-        _products,
-        _variants,
-        _frameDetails,
-        _lensDetails,
-        _categories,
-        _brands,
-        _types,
-        _units,
-        _warehouses,
-        transactions ?? _transactions,
-        _lines,
-        _posting,
-        _sequence,
-        new FakeCurrentUser("tester"),
-        TimeProvider.System);
+    private CreateStockProductCommandHandler Handler() => new(
+        _products, _variants, _frames, _lenses, _categories, _brands, _types, _units);
 }
