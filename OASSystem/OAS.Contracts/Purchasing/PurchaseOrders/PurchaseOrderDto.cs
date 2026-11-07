@@ -45,4 +45,5 @@ public sealed record PurchaseOrderDto(
     DateTimeOffset CreatedAtUtc,
     string? CreatedBy,
     DateTimeOffset? LastModifiedAtUtc,
-    string? LastModifiedBy);
+    string? LastModifiedBy,
+    string? CurrencyNameAr = null);

@@ -3,3 +3,6 @@
 .ui-purchasing-number input { width:100%; box-sizing:border-box; min-height:34px; border:1px solid var(--oas-color-border); border-radius:6px; background:var(--oas-color-surface); color:var(--oas-color-text); padding-inline:7px; font-family:inherit; font-size:var(--oas-font-sm); }
 .ui-purchasing-number input:focus { outline:none; border-color:var(--oas-color-primary); box-shadow:0 0 0 2px color-mix(in srgb,var(--oas-color-primary) 14%,transparent); }
 .ui-purchasing-number input:disabled { background:var(--oas-color-disabled-surface); color:var(--oas-color-text-muted); }
+
+.ui-purchasing-number input.ui-purchasing-number__invalid{border-color:var(--oas-color-danger);box-shadow:0 0 0 2px color-mix(in srgb,var(--oas-color-danger) 13%,transparent)}
+.ui-purchasing-number__error{color:var(--oas-color-danger);font-size:var(--oas-font-xs);line-height:1.45}

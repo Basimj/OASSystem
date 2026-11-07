@@ -1,9 +1,121 @@
 @namespace OAS.UiLib.Components.Purchasing
 @using OAS.UiLib.Core.Models.Purchasing
-<UiPurchasingList Items="@Items" Loading="@Loading" EmptyText="@EmptyText" OnOpen="@OnOpen" />
+
+<section class="ui-po-cards" aria-busy="@Loading.ToString().ToLowerInvariant()" aria-label="قائمة أوامر الشراء">
+    <div class="ui-po-cards__filters" role="group" aria-label="تصفية أوامر الشراء حسب المرحلة">
+        @foreach (var category in FilterOptions)
+        {
+            <button type="button" class="ui-po-cards__filter @(SelectedGroup == category.Value ? "is-active" : string.Empty)"
+                    aria-pressed="@(SelectedGroup == category.Value ? "true" : "false")"
+                    disabled="@Loading" @onclick="() => OnGroupChanged.InvokeAsync(category.Value)">
+                @category.Label
+            </button>
+        }
+    </div>
+    <div class="ui-po-cards__summary" aria-live="polite">
+        <span>@(Loading ? "جاري تحديث النتائج..." : $"المعروض في الصفحة: {Items.Count} من أصل {TotalCount} أمر ضمن التصفية")</span>
+        <span>استخدم البحث أعلاه للعثور على أمر أو مورد</span>
+    </div>
+    @if (Loading)
+    {
+        <div class="ui-po-cards__empty"><i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i> جاري تحميل أوامر الشراء...</div>
+    }
+    else if (Items.Count == 0)
+    {
+        <div class="ui-po-cards__empty"><i class="fa-regular fa-folder-open" aria-hidden="true"></i> @EmptyText</div>
+    }
+    else
+    {
+        <div class="ui-po-cards__list">
+            @foreach (var order in Items)
+            {
+                <article class="ui-po-card" @key="order.Id">
+                    <div class="ui-po-card__head">
+                        <div class="ui-po-card__identity">
+                            <button class="ui-po-card__code" type="button" @onclick="() => OnOpen.InvokeAsync(order.Id)" aria-label="فتح أمر الشراء @order.Code">@order.Code</button>
+                            <strong class="ui-po-card__supplier" title="@order.SupplierName">@order.SupplierName</strong>
+                        </div>
+                        <span class="ui-po-card__status @StatusCss(order.Status)">@order.StatusText</span>
+                        <div class="ui-po-card__amount">
+                            <strong dir="ltr">@order.TotalAmountDisplay</strong>
+                            <span dir="rtl">@order.CurrencyDisplayName</span>
+                        </div>
+                    </div>
+                    <div class="ui-po-card__facts">
+                        <span title="تاريخ الأمر">
+                            <i class="fa-regular fa-calendar" aria-hidden="true"></i>
+                            <span class="ui-po-card__fact-label">التاريخ:</span>
+                            <time class="ui-po-card__date" dir="ltr" datetime="@order.OrderDate.ToString("yyyy-MM-dd")">@order.OrderDateDisplay</time>
+                        </span>
+                        <span title="موعد التسليم المتوقع">
+                            <i class="fa-solid fa-truck" aria-hidden="true"></i>
+                            <span class="ui-po-card__fact-label">التسليم:</span>
+                            @if (order.ExpectedDeliveryDate is { } expectedDate)
+                            {
+                                <time class="ui-po-card__date" dir="ltr" datetime="@expectedDate.ToString("yyyy-MM-dd")">@order.ExpectedDeliveryDateDisplay</time>
+                            }
+                            else
+                            {
+                                <b>غير محدد</b>
+                            }
+                        </span>
+                        <span title="المستودع المستهدف"><i class="fa-solid fa-warehouse" aria-hidden="true"></i> <span class="ui-po-card__fact-label">المستودع:</span> <b>@(string.IsNullOrWhiteSpace(order.WarehouseName) ? "غير محدد" : order.WarehouseName)</b></span>
+                        @if (order.IsOverdue)
+                        {
+                            <span class="ui-po-card__overdue"><i class="fa-solid fa-clock" aria-hidden="true"></i> متأخر</span>
+                        }
+                    </div>
+                    <div class="ui-po-card__footer">
+                        <div class="ui-po-card__progress">
+                            <span class="ui-po-card__progress-text" title="@ProgressDescription(order)">الاستلام: @(order.TotalLines == 0 ? "لا توجد بنود" : $"{order.CompletedLines}/{order.TotalLines} بنود")</span>
+                            <div class="ui-po-card__track" role="progressbar" aria-label="تقدم استلام بنود أمر الشراء"
+                                 aria-valuemin="0" aria-valuemax="100" aria-valuenow="@order.CompletedPercentage">
+                                <span style="@($"width:{order.CompletedPercentage}%")"></span>
+                            </div>
+                            @if (order.StartedLines > order.CompletedLines)
+                            {
+                                <span class="ui-po-card__partial">@((order.StartedLines - order.CompletedLines).ToString()) جزئي</span>
+                            }
+                        </div>
+                        <button type="button" class="ui-po-card__open" @onclick="() => OnOpen.InvokeAsync(order.Id)" aria-label="عرض تفاصيل أمر الشراء @order.Code">
+                            التفاصيل <i class="fa-solid fa-arrow-up-left-from-square" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </article>
+            }
+        </div>
+    }
+</section>
+
 @code {
-    [Parameter] public IReadOnlyList<UiPurchasingListItem> Items { get; set; } = [];
+    [Parameter] public IReadOnlyList<UiPurchaseOrderCardItem> Items { get; set; } = [];
     [Parameter] public bool Loading { get; set; }
-    [Parameter] public string EmptyText { get; set; } = "لا توجد بيانات.";
+    [Parameter] public long TotalCount { get; set; }
+    [Parameter] public string SelectedGroup { get; set; } = "all";
+    [Parameter] public string EmptyText { get; set; } = "لا توجد أوامر شراء مطابقة للتصفية.";
+    [Parameter] public EventCallback<string> OnGroupChanged { get; set; }
     [Parameter] public EventCallback<Guid> OnOpen { get; set; }
+
+    private static readonly (string Value, string Label)[] FilterOptions =
+    [
+        ("all", "الكل"),
+        ("approval", "تنتظر الاعتماد"),
+        ("supply", "قيد التوريد"),
+        ("completed", "مكتملة")
+    ];
+
+    private static string StatusCss(byte status) => status switch
+    {
+        2 => "is-pending", 4 or 5 => "is-supply", 6 or 7 => "is-completed",
+        8 or 9 => "is-danger", 3 => "is-approved", _ => "is-neutral"
+    };
+
+    private static string ProgressDescription(UiPurchaseOrderCardItem order)
+    {
+        var remaining = order.TotalLines - order.CompletedLines;
+        if (remaining == 0) return "جميع بنود الأمر مستلمة بالكامل";
+        if (order.StartedLines > order.CompletedLines)
+            return $"{remaining} بنود غير مكتملة، منها {order.StartedLines - order.CompletedLines} استُلمت جزئيًا";
+        return $"{remaining} بنود لم يكتمل استلامها";
+    }
 }

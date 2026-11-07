@@ -128,7 +128,7 @@ public sealed class CreatePurchaseOrderFromRequestTests
         public Task<PurchaseOrder?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) => Task.FromResult<PurchaseOrder?>(null);
         public Task<PurchaseOrder?> GetForUpdateAsync(Guid id, CancellationToken cancellationToken = default) => Task.FromResult<PurchaseOrder?>(null);
         public Task<PurchaseOrder?> GetByLineIdAsync(Guid purchaseOrderLineId, CancellationToken cancellationToken = default) => Task.FromResult<PurchaseOrder?>(null);
-        public Task<PagedData<PurchaseOrder>> GetPageAsync(PageRequest request, OAS.Contracts.Purchasing.Enums.PurchaseOrderStatus? status, Guid? supplierId, Guid? warehouseId, CancellationToken cancellationToken = default) => Task.FromResult(new PagedData<PurchaseOrder>([], 0));
+        public Task<PagedData<PurchaseOrder>> GetPageAsync(PageRequest request, OAS.Contracts.Purchasing.Enums.PurchaseOrderStatus? status, Guid? supplierId, Guid? warehouseId, CancellationToken cancellationToken = default, OAS.Contracts.Purchasing.Enums.PurchaseOrderListGroup? group = null) => Task.FromResult(new PagedData<PurchaseOrder>([], 0));
         public Task<IReadOnlyList<PurchaseOrderLineSource>> GetSourcesAsync(Guid purchaseOrderId, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<PurchaseOrderLineSource>>([]);
         public Task<IReadOnlyDictionary<Guid, decimal>> GetPostedReceivedBaseQuantitiesAsync(Guid purchaseOrderId, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyDictionary<Guid, decimal>>(new Dictionary<Guid, decimal>());
         public Task<bool> HasPostedReceiptAsync(Guid purchaseOrderId, CancellationToken cancellationToken = default) => Task.FromResult(false);

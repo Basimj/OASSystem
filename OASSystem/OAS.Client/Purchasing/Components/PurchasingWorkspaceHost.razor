@@ -108,7 +108,9 @@
             }
             else if (Section == PurchasingEntityType.PurchaseOrders)
             {
-                <UiPurchaseOrderList Items="CurrentListItems" Loading="_isLoadingList" EmptyText="لا توجد أوامر شراء." OnOpen="OpenRecordAsync" />
+                <UiPurchaseOrderList Items="CurrentOrderCards" Loading="_isLoadingList" TotalCount="_totalCount"
+                                     SelectedGroup="@_orderGroup" OnGroupChanged="ChangeOrderGroupAsync"
+                                     EmptyText="لا توجد أوامر شراء مطابقة للبحث أو التصفية." OnOpen="OpenRecordAsync" />
             }
             else if (Section == PurchasingEntityType.PurchaseReceipts)
             {
@@ -134,7 +136,7 @@
         }
         else if (ActiveTab?.Model is UiPurchaseOrderEditorModel order)
         {
-            <UiPurchaseOrderEditor Model="order" IsEditable="@IsEditable" SupplierSearchAsync="SearchSuppliersAsync" WarehouseSearchAsync="SearchWarehousesAsync" ProductSearchAsync="SearchProductsAsync" ProductSearchPageAsync="SearchProductsPageAsync" UnitSearchAsync="SearchUnitsAsync" CurrencySearchAsync="SearchCurrenciesAsync" OnSupplierChanged="PurchaseOrderSupplierChangedAsync" OnCurrencyChanged="PurchaseOrderCurrencyChangedAsync" OnOrderDateChanged="PurchaseOrderDateChangedAsync" OnLineUnitChanged="PurchaseOrderLineUnitChangedAsync" OnChanged="EditorChangedAsync" />
+            <UiPurchaseOrderEditor @ref="_purchaseOrderEditor" Model="order" IsEditable="@IsEditable" SupplierSearchAsync="SearchSuppliersAsync" WarehouseSearchAsync="SearchWarehousesAsync" ProductSearchAsync="SearchProductsAsync" ProductSearchPageAsync="SearchProductsPageAsync" UnitSearchAsync="SearchUnitsAsync" CurrencySearchAsync="SearchCurrenciesAsync" OnSupplierChanged="PurchaseOrderSupplierChangedAsync" OnCurrencyChanged="PurchaseOrderCurrencyChangedAsync" OnOrderDateChanged="PurchaseOrderDateChangedAsync" OnLineUnitChanged="PurchaseOrderLineUnitChangedAsync" OnChanged="EditorChangedAsync" />
         }
         else if (ActiveTab?.Model is UiPurchaseReceiptEditorModel receipt)
         {

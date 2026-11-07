@@ -17,7 +17,8 @@
     @if (UsePopover)
     {
         @* Popovers are placed in the browser top layer, avoiding clipping by purchase-workspace containers. *@
-        <button type="button" class="ui-lookup__popover-trigger" disabled="@Disabled"
+        <button type="button" class="@PopoverTriggerClass" disabled="@Disabled"
+                aria-invalid="@(HasError ? "true" : null)" aria-describedby="@(HasError ? _errorId : null)"
                 popovertarget="@_popoverId" aria-haspopup="dialog" aria-controls="@_popoverId"
                 @onclick="OpenPopoverAsync">
             <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
@@ -86,6 +87,7 @@
     <div class="@RootClass">
         <i class="ui-lookup__search-icon fa-solid fa-magnifying-glass" aria-hidden="true"></i>
         <input class="ui-lookup__input"
+               aria-invalid="@(HasError ? "true" : null)" aria-describedby="@(HasError ? _errorId : null)"
                value="@_query"
                placeholder="@Placeholder"
                disabled="@Disabled"
@@ -150,11 +152,15 @@
         </div>
     }
     }
-
+    @if (HasError)
+    {
+        <div id="@_errorId" class="ui-lookup__error" role="alert">@ErrorText</div>
+    }
 </div>
 
 @code {
     private readonly List<UiLookupItem> _items = [];
+    private readonly string _errorId = $"oas-lookup-error-{Guid.NewGuid():N}";
     private readonly string _popoverId = $"oas-lookup-options-{Guid.NewGuid():N}";
     private int _nextSkip;
     private bool _hasMore;
@@ -173,6 +179,7 @@
     [Parameter] public UiLookupItem? SelectedItem { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchAsync { get; set; }
     [Parameter] public string? Label { get; set; }
+    [Parameter] public string? ErrorText { get; set; }
     [Parameter] public string Placeholder { get; set; } = "ابحث...";
     [Parameter] public string? AriaLabel { get; set; }
     [Parameter] public string EmptyText { get; set; } = "لا توجد نتائج.";
@@ -185,10 +192,12 @@
     [Parameter] public int PageSize { get; set; } = 30;
     [Parameter] public Func<string, int, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchPageAsync { get; set; }
 
+    private bool HasError => !string.IsNullOrWhiteSpace(ErrorText);
+    private string PopoverTriggerClass => HasError
+        ? "ui-lookup__popover-trigger ui-lookup__popover-trigger--invalid"
+        : "ui-lookup__popover-trigger";
     private string RootClass =>
-        Disabled
-            ? "ui-lookup__control ui-lookup__control--disabled"
-            : "ui-lookup__control";
+        $"ui-lookup__control{(Disabled ? " ui-lookup__control--disabled" : string.Empty)}{(HasError ? " ui-lookup__control--invalid" : string.Empty)}";
 
     protected override void OnParametersSet()
     {

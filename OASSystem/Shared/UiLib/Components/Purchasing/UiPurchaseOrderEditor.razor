@@ -2,132 +2,175 @@
 @using OAS.UiLib.Core.Models.Purchasing
 @using OAS.UiLib.Core.Models
 
-<UiPurchasingEditorShell Title="@Model.PurchaseOrderCode" StatusText="@Model.StatusText">
-    <UiPurchasingSection Title="البيانات الأساسية">
-        <UiPurchasingFormGrid>
-            <UiLookup UsePopover="true" Label="المورد" Required="true" Value="@GuidText(Model.SupplierId)" SelectedItem="@Selected(Model.SupplierId,Model.SupplierName,"fa-solid fa-truck-field")" SearchAsync="SupplierSearchAsync" ValueChanged="SupplierChanged" Disabled="@(!IsEditable)" />
-            <UiLookup UsePopover="true" Label="المخزن المستهدف" Required="true" Value="@GuidText(Model.DestinationWarehouseId)" SelectedItem="@Selected(Model.DestinationWarehouseId,Model.DestinationWarehouseName,"fa-solid fa-warehouse")" SearchAsync="WarehouseSearchAsync" ValueChanged="WarehouseChanged" Disabled="@(!IsEditable)" />
-            <UiInputDate Label="تاريخ الأمر" Value="@Model.OrderDate" ValueChanged="OrderDateChanged" Disabled="@(!IsEditable)" Required="true" />
-            <UiInputDate Label="التاريخ المتوقع" Value="@Model.ExpectedDeliveryDate" ValueChanged="ExpectedDateChanged" Disabled="@(!IsEditable)" />
-            <UiLookup UsePopover="true" Label="العملة" Required="true" Value="@GuidText(Model.CurrencyId)" SelectedItem="@Selected(Model.CurrencyId,Model.CurrencyCode,"fa-solid fa-coins")" SearchAsync="CurrencySearchAsync" ValueChanged="CurrencyChanged" Disabled="@(!IsEditable)" />
-            <UiPurchasingNumberField Label="سعر الصرف" Value="@Model.ExchangeRate" ValueChanged="ExchangeRateChanged" Disabled="@(!IsEditable)" Step="0.00000001" Min="0.00000001" />
-            <UiInputDate Label="تاريخ سعر الصرف" Value="@Model.ExchangeRateDate" ValueChanged="ExchangeRateDateChanged" Disabled="@(!IsEditable)" />
-            <UiSelect Label="طريقة الضريبة" Value="@Model.TaxCalculationMode.ToString()" Options="TaxModeOptions" Disabled="@(!IsEditable)" OnValueChanged="TaxModeChanged" />
-            <UiPurchasingNumberField Label="أجل السداد بالأيام" Value="@Model.PaymentTermDays" ValueChanged="PaymentTermChanged" Disabled="@(!IsEditable)" Step="1" />
-            <UiInputText Label="ملاحظات" Value="@Model.Notes" ValueChanged="NotesChanged" Disabled="@(!IsEditable)" MaxLength="1000" />
-        </UiPurchasingFormGrid>
+<UiPurchasingEditorShell Title="@(Model.Id.HasValue ? Model.PurchaseOrderCode : "أمر شراء جديد")" StatusText="@Model.StatusText">
+    @if (!string.IsNullOrWhiteSpace(_saveError))
+    {
+        <div class="ui-po-form-alert ui-po-form-alert--error" role="alert">
+            <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+            <span>@_saveError</span>
+        </div>
+    }
+
+    <UiPurchasingSection Title="بيانات أمر الشراء" Subtitle="اختر المورد والمستودع، ثم حدّد موعد التوريد والعملة.">
+        <div class="ui-po-order-fields">
+            <UiLookup UsePopover="true" Label="المورد" Required="true"
+                      Value="@GuidText(Model.SupplierId)" SelectedItem="@Selected(Model.SupplierId,Model.SupplierName,"fa-solid fa-truck-field")"
+                      SearchAsync="SupplierSearchAsync" ValueChanged="SupplierChanged" Disabled="@(!IsEditable)"
+                      ErrorText="@ErrorFor(nameof(Model.SupplierId))" Placeholder="اختر المورد..." />
+            <UiLookup UsePopover="true" Label="المستودع المستهدف" Required="true"
+                      Value="@GuidText(Model.DestinationWarehouseId)" SelectedItem="@Selected(Model.DestinationWarehouseId,Model.DestinationWarehouseName,"fa-solid fa-warehouse")"
+                      SearchAsync="WarehouseSearchAsync" ValueChanged="WarehouseChanged" SelectedItemChanged="WarehouseSelectionChanged" Disabled="@(!IsEditable)"
+                      ErrorText="@ErrorFor(nameof(Model.DestinationWarehouseId))" Placeholder="اختر المستودع..." />
+            <UiInputDate Label="تاريخ الأمر" Value="@Model.OrderDate" ValueChanged="OrderDateChanged"
+                         Disabled="@(!IsEditable)" Required="true" ErrorText="@ErrorFor(nameof(Model.OrderDate))" />
+            <UiInputDate Label="التسليم المتوقع" Value="@Model.ExpectedDeliveryDate" ValueChanged="ExpectedDateChanged"
+                         Disabled="@(!IsEditable)" ErrorText="@ErrorFor(nameof(Model.ExpectedDeliveryDate))" />
+            <UiLookup UsePopover="true" Label="عملة الشراء" Required="true"
+                      Value="@GuidText(Model.CurrencyId)" SelectedItem="@Selected(Model.CurrencyId,Model.CurrencyCode,"fa-solid fa-coins")"
+                      SearchAsync="CurrencySearchAsync" ValueChanged="CurrencyChanged" Disabled="@(!IsEditable)"
+                      ErrorText="@ErrorFor(nameof(Model.CurrencyId))" Placeholder="اختر العملة..." />
+            <UiPurchasingNumberField Label="سعر الصرف" Value="@Model.ExchangeRate" ValueChanged="ExchangeRateChanged"
+                                     Disabled="@(!IsEditable)" Step="0.00000001" Min="0.00000001"
+                                     ErrorText="@ErrorFor(nameof(Model.ExchangeRate))" />
+        </div>
+        <p class="ui-po-help"><i class="fa-solid fa-lightbulb" aria-hidden="true"></i> عند استخدام العملة الأساسية يكون سعر الصرف عادةً 1؛ إذا اخترت عملة أخرى فتحقق من السعر الصحيح قبل الحفظ.</p>
+        <button type="button" class="ui-po-more-toggle" aria-expanded="@_advancedOpen" @onclick="ToggleAdvancedOptions">
+            <i class="fa-solid @(_advancedOpen ? "fa-chevron-up" : "fa-chevron-down")" aria-hidden="true"></i>
+            @(_advancedOpen ? "إخفاء خيارات الدفع والضريبة" : "خيارات إضافية: الضريبة وأجل السداد والملاحظات")
+        </button>
+        @if (_advancedOpen)
+        {
+            <div class="ui-po-advanced-fields">
+                <UiSelect Label="طريقة احتساب الضريبة" Value="@Model.TaxCalculationMode.ToString()" Options="TaxModeOptions"
+                          Disabled="@(!IsEditable)" OnValueChanged="TaxModeChanged" ErrorText="@ErrorFor(nameof(Model.TaxCalculationMode))" />
+                <UiPurchasingNumberField Label="أجل السداد (يوم)" Value="@Model.PaymentTermDays" ValueChanged="PaymentTermChanged"
+                                         Disabled="@(!IsEditable)" Step="1" ErrorText="@ErrorFor(nameof(Model.PaymentTermDays))" />
+                <UiInputDate Label="تاريخ سعر الصرف" Value="@Model.ExchangeRateDate" ValueChanged="ExchangeRateDateChanged"
+                             Disabled="@(!IsEditable)" ErrorText="@ErrorFor(nameof(Model.ExchangeRateDate))" />
+                <UiInputText Label="ملاحظات الطلب" Value="@Model.Notes" ValueChanged="NotesChanged" Disabled="@(!IsEditable)" MaxLength="1000" />
+                <p class="ui-po-help ui-po-help--inside">أجل السداد صفر يعني الدفع دون مهلة. طريقة الضريبة تحدد ما إذا كان السعر شاملًا للضريبة أو تُضاف إليه.</p>
+            </div>
+        }
     </UiPurchasingSection>
 
-    <UiPurchasingSection Title="بنود أمر الشراء">
+    <UiPurchasingSection Title="المنتجات والكميات" Subtitle="أضف المنتجات المطلوبة، ثم حدّد لكل منها الوحدة والكمية وسعر الشراء.">
         <div class="ui-po-lines-toolbar">
             <div class="ui-po-lines-toolbar__info">
                 <span class="ui-po-lines-toolbar__icon"><i class="fa-solid fa-cart-flatbed" aria-hidden="true"></i></span>
-                <div>
-                    <strong>@LineCountText</strong>
-                    <small>يمكن البحث باسم المنتج أو كوده أو SKU</small>
-                </div>
+                <div><strong>@LineCountText</strong><small>يمكن البحث باسم المنتج أو كوده أو SKU</small></div>
             </div>
             @if (IsEditable)
             {
                 <UiButton Text="إضافة منتج" IconCssClass="fa-solid fa-plus" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="AddLineAsync" />
             }
         </div>
-
         @if (Model.Lines.Count == 0)
         {
-            <div class="ui-po-lines-empty">
+            <div class="ui-po-lines-empty @(HasError(nameof(Model.Lines)) ? "ui-po-lines-empty--invalid" : "")">
                 <i class="fa-solid fa-box-open" aria-hidden="true"></i>
                 <div>
-                    <strong>لم تتم إضافة منتجات بعد</strong>
-                    <small>اضغط «إضافة منتج» لبدء إدخال بنود أمر الشراء.</small>
+                    <strong>لا توجد منتجات في أمر الشراء</strong>
+                    <small>ابدأ بالضغط على «إضافة منتج»، ثم اختر الوحدة والكمية والسعر.</small>
+                    @if (HasError(nameof(Model.Lines))) { <small class="ui-po-field-error" role="alert">@ErrorFor(nameof(Model.Lines))</small> }
                 </div>
             </div>
         }
         else
         {
             <UiPurchasingLineTable>
-                @foreach (var line in Model.Lines.OrderBy(x=>x.LineSequence))
+                @foreach (var line in Model.Lines.OrderBy(x => x.LineSequence))
                 {
-                    <article class="ui-purchasing-po-line">
+                    <article class="ui-purchasing-po-line" @key="line">
                         <header class="ui-purchasing-po-line__head">
                             <div class="ui-purchasing-po-line__identity">
                                 <span class="ui-purchasing-po-line__number">@line.LineSequence</span>
-                                <div>
-                                    <strong>@LineTitle(line)</strong>
-                                    <small>@LineSubtitle(line)</small>
-                                </div>
+                                <div><strong>@LineTitle(line)</strong><small>@LineSubtitle(line)</small></div>
                             </div>
-                            @if(IsEditable)
+                            @if (IsEditable)
                             {
-                                <UiButton Text="حذف" IconCssClass="fa-regular fa-trash-can" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="@(_=>RemoveLineAsync(line))" />
+                                <UiButton Text="حذف" IconCssClass="fa-regular fa-trash-can" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="@(_ => RemoveLineAsync(line))" />
                             }
                         </header>
 
-                        <div class="ui-purchasing-po-line__product">
-                            <UiLookup UsePopover="true" Label="المنتج" Required="true"
-                                      Value="@GuidText(line.ProductVariantId)"
-                                      SelectedItem="@Selected(line.ProductVariantId,line.ProductName,"fa-solid fa-box")"
-                                      SearchAsync="ProductSearchAsync" SearchPageAsync="ProductSearchPageAsync"
-                                      SelectedItemChanged="@(item=>ProductSelectionChanged(line,item))"
-                                      ValueChanged="@(v=>ProductChanged(line,v))"
-                                      Disabled="@(!IsEditable || line.Sources.Count>0)"
-                                      Placeholder="ابحث باسم المنتج أو الكود أو SKU..." />
-                        </div>
-
-                        <div class="ui-purchasing-po-line__fields ui-purchasing-po-line__fields--primary">
+                        <div class="ui-po-line-main">
+                            <div class="ui-po-line-product">
+                                <UiLookup UsePopover="true" Label="المنتج" Required="true"
+                                          Value="@GuidText(line.ProductVariantId)"
+                                          SelectedItem="@Selected(line.ProductVariantId,line.ProductName,"fa-solid fa-box")"
+                                          SearchAsync="ProductSearchAsync" SearchPageAsync="ProductSearchPageAsync"
+                                          SelectedItemChanged="@(item => ProductSelectionChanged(line,item))"
+                                          ValueChanged="@(v => ProductChanged(line,v))"
+                                          Disabled="@(!IsEditable || line.Sources.Count > 0)"
+                                          ErrorText="@ErrorFor(LineKey(line,nameof(line.ProductVariantId)))"
+                                          Placeholder="ابحث باسم المنتج أو الكود أو SKU..." />
+                            </div>
                             <UiLookup UsePopover="true" Label="وحدة الشراء" Required="true"
                                       Value="@GuidText(line.PurchaseUnitId)"
                                       SelectedItem="@Selected(line.PurchaseUnitId,line.PurchaseUnitName,"fa-solid fa-ruler")"
                                       SearchAsync="UnitSearchAsync"
-                                      SelectedItemChanged="@(item=>UnitSelectionChanged(line,item))"
-                                      ValueChanged="@(v=>UnitChanged(line,v))"
-                                      Disabled="@(!IsEditable)"
+                                      SelectedItemChanged="@(item => UnitSelectionChanged(line,item))"
+                                      ValueChanged="@(v => UnitChanged(line,v))" Disabled="@(!IsEditable)"
+                                      ErrorText="@ErrorFor(LineKey(line,nameof(line.PurchaseUnitId)))"
                                       Placeholder="اختر الوحدة..." />
-                            @if(line.Sources.Count>0)
+                            @if (line.Sources.Count > 0)
                             {
-                                <UiPurchasingNumberField Label="كمية طلب الشراء" Value="@SourceQuantity(line)" ValueChanged="@(v=>SourceQuantityChanged(line,v))" Disabled="@(!IsEditable || line.Sources.Count!=1)" Step="0.001" Min="0.001" />
+                                <UiPurchasingNumberField Label="كمية طلب الشراء" Value="@SourceQuantity(line)"
+                                                         ValueChanged="@(v => SourceQuantityChanged(line,v))"
+                                                         Disabled="@(!IsEditable || line.Sources.Count != 1)" Step="0.001" Min="0.001"
+                                                         ErrorText="@ErrorFor(LineKey(line,"Sources"))" />
                             }
-                            <UiPurchasingNumberField Label="الكمية" Value="@line.OrderedQuantity" ValueChanged="@(v=>QuantityChanged(line,v))" Disabled="@(!IsEditable || line.Sources.Count>0)" />
-                            <UiPurchasingNumberField Label="سعر الوحدة" Value="@line.UnitPrice" ValueChanged="@(v=>PriceChanged(line,v))" Disabled="@(!IsEditable)" Step="0.0001" />
-                            <UiPurchasingNumberField Label="الخصم" Value="@line.DiscountAmount" ValueChanged="@(v=>DiscountChanged(line,v))" Disabled="@(!IsEditable)" Step="0.0001" />
-                            <UiPurchasingNumberField Label="الضريبة %" Value="@line.TaxRate" ValueChanged="@(v=>TaxChanged(line,v))" Disabled="@(!IsEditable)" Step="0.000001" />
+                            <UiPurchasingNumberField Label="الكمية" Value="@line.OrderedQuantity"
+                                                     ValueChanged="@(v => QuantityChanged(line,v))" Disabled="@(!IsEditable || line.Sources.Count > 0)"
+                                                     ErrorText="@ErrorFor(LineKey(line,nameof(line.OrderedQuantity)))" />
+                            <UiPurchasingNumberField Label="سعر الوحدة" Value="@line.UnitPrice" ValueChanged="@(v => PriceChanged(line,v))"
+                                                     Disabled="@(!IsEditable)" Step="0.0001"
+                                                     ErrorText="@ErrorFor(LineKey(line,nameof(line.UnitPrice)))" />
                         </div>
-
-                        <div class="ui-purchasing-po-line__fields ui-purchasing-po-line__fields--secondary">
-                            <UiPurchasingNumberField Label="معامل التحويل" Value="@line.UnitConversionFactor" ValueChanged="@(v=>ConversionChanged(line,v))" Disabled="@(!IsEditable)" Step="0.000001" Min="0.000001" />
-                            <UiInputDate Label="موعد التوريد" Value="@line.ExpectedDeliveryDate" ValueChanged="@(v=>LineDateChanged(line,v))" Disabled="@(!IsEditable)" />
-                            <div class="ui-purchasing-po-line__notes">
-                                <UiInputText Label="ملاحظات البند" Value="@line.Notes" ValueChanged="@(v=>LineNotesChanged(line,v))" Disabled="@(!IsEditable)" />
-                            </div>
-                        </div>
-
-                        <footer class="ui-purchasing-po-line__summary">
-                            @if(line.Sources.Count>0)
-                            {
-                                <span><i class="fa-solid fa-link" aria-hidden="true"></i> من طلب شراء</span>
-                                <span>الكمية المخصصة <strong>@SourceQuantity(line).ToString("N3")</strong></span>
-                            }
-                            @if(line.Id.HasValue)
-                            {
-                                <span>الأساسية <strong>@line.BaseQuantity.ToString("N3")</strong></span>
-                                <span>المستلم <strong>@line.ReceivedBaseQuantity.ToString("N3")</strong></span>
-                                <span>المتبقي <strong>@line.RemainingBaseQuantity.ToString("N3")</strong></span>
-                            }
+                        <div class="ui-po-line-bottom">
                             <span class="ui-purchasing-po-line__total">إجمالي البند <strong>@LineTotal(line).ToString("N2")</strong></span>
-                        </footer>
+                            @if (line.Sources.Count > 0) { <span class="ui-po-source-hint"><i class="fa-solid fa-link" aria-hidden="true"></i> مرتبط بطلب شراء</span> }
+                            @if (line.Id.HasValue)
+                            {
+                                <span class="ui-po-source-hint">المستلم: @line.ReceivedBaseQuantity.ToString("N3") · المتبقي: @line.RemainingBaseQuantity.ToString("N3")</span>
+                            }
+                            <button type="button" class="ui-po-more-toggle ui-po-line-more" aria-expanded="@IsLineOptionsOpen(line)" @onclick="() => ToggleLineOptions(line)">
+                                <i class="fa-solid @(IsLineOptionsOpen(line) ? "fa-chevron-up" : "fa-chevron-down")" aria-hidden="true"></i>
+                                @(IsLineOptionsOpen(line) ? "إخفاء التفاصيل الإضافية" : "الخصم والضريبة وتفاصيل البند")
+                            </button>
+                        </div>
+                        @if (IsLineOptionsOpen(line))
+                        {
+                            <div class="ui-po-line-advanced">
+                                <UiPurchasingNumberField Label="الخصم على البند" Value="@line.DiscountAmount" ValueChanged="@(v => DiscountChanged(line,v))"
+                                                         Disabled="@(!IsEditable)" Step="0.0001" ErrorText="@ErrorFor(LineKey(line,nameof(line.DiscountAmount)))" />
+                                <UiPurchasingNumberField Label="الضريبة %" Value="@line.TaxRate" ValueChanged="@(v => TaxChanged(line,v))"
+                                                         Disabled="@(!IsEditable)" Step="0.000001" ErrorText="@ErrorFor(LineKey(line,nameof(line.TaxRate)))" />
+                                <UiPurchasingNumberField Label="معامل التحويل" Value="@line.UnitConversionFactor" ValueChanged="@(v => ConversionChanged(line,v))"
+                                                         Disabled="@(!IsEditable)" Step="0.000001" Min="0.000001"
+                                                         ErrorText="@ErrorFor(LineKey(line,nameof(line.UnitConversionFactor)))" />
+                                <UiInputDate Label="موعد توريد هذا البند" Value="@line.ExpectedDeliveryDate" ValueChanged="@(v => LineDateChanged(line,v))"
+                                             Disabled="@(!IsEditable)" ErrorText="@ErrorFor(LineKey(line,nameof(line.ExpectedDeliveryDate)))" />
+                                <div class="ui-po-line-note"><UiInputText Label="ملاحظات البند" Value="@line.Notes" ValueChanged="@(v => LineNotesChanged(line,v))" Disabled="@(!IsEditable)" /></div>
+                                <p class="ui-po-help ui-po-help--inside">معامل التحويل يحدد عدد الوحدات الأساسية في وحدة الشراء؛ مثلًا الكرتون الذي يحتوي على 12 قطعة يكون معامله 12.</p>
+                            </div>
+                        }
                     </article>
                 }
             </UiPurchasingLineTable>
         }
     </UiPurchasingSection>
 
-    <UiPurchasingSection Title="ملخص الإجماليات">
+    <UiPurchasingSection Title="@(IsEditable ? "مراجعة المبلغ قبل الحفظ" : "ملخص الإجماليات")" Subtitle="يُنشئ الحفظ مسودة أمر شراء فقط، ولا يزيد مخزون المستودع حتى ترحيل الاستلام.">
         <div class="ui-purchasing-total-grid">
-            <span><small>قبل الخصم والضريبة</small><strong>@Model.Subtotal.ToString("N2")</strong></span>
-            <span><small>الخصم</small><strong>@Model.DiscountAmount.ToString("N2")</strong></span>
-            <span><small>الضريبة</small><strong>@Model.TaxAmount.ToString("N2")</strong></span>
-            <span><small>الإجمالي</small><strong>@Model.TotalAmount.ToString("N2")</strong></span>
+            <span><small>الإجمالي قبل الخصم والضريبة</small><strong>@((IsEditable ? PreviewTotals.Subtotal : Model.Subtotal).ToString("N2"))</strong></span>
+            <span><small>الخصومات</small><strong>@((IsEditable ? PreviewTotals.Discount : Model.DiscountAmount).ToString("N2"))</strong></span>
+            <span><small>الضريبة</small><strong>@((IsEditable ? PreviewTotals.Tax : Model.TaxAmount).ToString("N2"))</strong></span>
+            <span class="ui-po-grand-total"><small>الإجمالي النهائي</small><strong>@((IsEditable ? PreviewTotals.Total : Model.TotalAmount).ToString("N2")) @Model.CurrencyCode</strong></span>
         </div>
+        @if (IsEditable)
+        {
+            <p class="ui-po-help"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> راجع الكميات والأسعار، ثم اضغط «حفظ» في شريط الإجراءات أعلى الصفحة. يمكنك العودة إلى المسودة لتعديلها لاحقًا قبل الاعتماد.</p>
+        }
     </UiPurchasingSection>
 </UiPurchasingEditorShell>
 
@@ -145,6 +188,105 @@
     [Parameter] public EventCallback<DateOnly> OnOrderDateChanged {get;set;}
     [Parameter] public EventCallback<UiPurchaseOrderLineModel> OnLineUnitChanged {get;set;}
     [Parameter] public EventCallback OnChanged {get;set;}
+    private UiPurchaseOrderEditorModel? _lastModel;
+    private readonly Dictionary<UiPurchaseOrderLineModel, bool> _lineOptions = new();
+    private IReadOnlyDictionary<string, string> _errors = new Dictionary<string, string>();
+    private bool _showErrors;
+    private bool _advancedOpen;
+    private string? _saveError;
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_lastModel, Model)) return;
+        _lastModel = Model;
+        _errors = new Dictionary<string, string>();
+        _showErrors = false;
+        _saveError = null;
+        _lineOptions.Clear();
+        _advancedOpen = Model.PaymentTermDays != 0 || Model.TaxCalculationMode != 1 ||
+            !string.IsNullOrWhiteSpace(Model.Notes) || Model.ExchangeRateDate != Model.OrderDate;
+    }
+
+    public bool ValidateForSave()
+    {
+        _showErrors = true;
+        _saveError = null;
+        _errors = UiPurchaseOrderFormValidator.Validate(Model);
+        RevealHiddenErrors();
+        StateHasChanged();
+        return _errors.Count == 0;
+    }
+
+    public void ShowSaveError(string message, IReadOnlyDictionary<string, string[]>? serverErrors = null)
+    {
+        _saveError = message;
+        if (serverErrors is { Count: > 0 })
+        {
+            _showErrors = true;
+            var mapped = new Dictionary<string, string>(UiPurchaseOrderFormValidator.Validate(Model));
+            foreach (var entry in serverErrors)
+            {
+                var key = entry.Key.StartsWith("Request.", StringComparison.OrdinalIgnoreCase)
+                    ? entry.Key["Request.".Length..] : entry.Key;
+                var fieldHint = ServerFieldHint(key);
+                if (fieldHint is not null && !mapped.ContainsKey(key)) mapped[key] = fieldHint;
+            }
+            _errors = mapped;
+            RevealHiddenErrors();
+        }
+        StateHasChanged();
+    }
+
+    private static string? ServerFieldHint(string key)
+    {
+        if (key is "SupplierId") return "تعذر قبول المورد المحدد. تحقق من أنه نشط ومسموح التعامل معه.";
+        if (key is "DestinationWarehouseId") return "تعذر قبول المستودع المحدد. تحقق من أنه نشط ومتاح للاستلام.";
+        if (key is "CurrencyId") return "تعذر قبول العملة. تحقق من تفعيلها في إعدادات النظام.";
+        if (key is "ExchangeRate") return "سعر الصرف غير مقبول. راجع قيمة السعر وتاريخ الصرف.";
+        if (key is "ExpectedDeliveryDate" or "OrderDate") return "تحقق من صحة التاريخ، ويجب ألا يسبق موعد التسليم تاريخ الأمر.";
+        if (key is "PaymentTermDays") return "راجع أجل السداد؛ لا يمكن إدخال عدد أيام سالب.";
+        if (key is "TaxCalculationMode") return "راجع طريقة احتساب الضريبة واختر إحدى الطريقتين المتاحتين.";
+        if (key is "Lines") return "أضف بندًا صالحًا واحدًا على الأقل إلى أمر الشراء.";
+        if (!key.StartsWith("Lines[", StringComparison.Ordinal)) return null;
+        if (key.EndsWith("ProductVariantId", StringComparison.Ordinal)) return "راجع المنتج المختار وتأكد من أنه نشط وقابل للشراء.";
+        if (key.EndsWith("PurchaseUnitId", StringComparison.Ordinal)) return "راجع وحدة الشراء المختارة وتأكد من توافقها مع المنتج.";
+        if (key.EndsWith("OrderedQuantity", StringComparison.Ordinal)) return "راجع كمية البند، ويجب أن تكون أكبر من صفر.";
+        if (key.EndsWith("UnitPrice", StringComparison.Ordinal)) return "راجع سعر الوحدة؛ لا يمكن أن يكون سالبًا.";
+        if (key.EndsWith("UnitConversionFactor", StringComparison.Ordinal)) return "راجع معامل تحويل وحدة الشراء إلى الوحدة الأساسية.";
+        if (key.EndsWith("DiscountAmount", StringComparison.Ordinal)) return "راجع قيمة الخصم؛ لا يمكن إدخال خصم غير صحيح.";
+        if (key.EndsWith("TaxRate", StringComparison.Ordinal)) return "راجع نسبة الضريبة المدخلة لهذا البند.";
+        if (key.EndsWith("ExpectedDeliveryDate", StringComparison.Ordinal)) return "راجع موعد توريد هذا البند.";
+        return null;
+    }
+
+    private void RevealHiddenErrors()
+    {
+        if (_errors.ContainsKey(nameof(Model.ExchangeRateDate)) ||
+            _errors.ContainsKey(nameof(Model.TaxCalculationMode)) ||
+            _errors.ContainsKey(nameof(Model.PaymentTermDays))) _advancedOpen = true;
+        foreach (var line in Model.Lines)
+        {
+            var prefix = $"Lines[{Model.Lines.IndexOf(line)}].";
+            if (_errors.Keys.Any(key => key.StartsWith(prefix, StringComparison.Ordinal) &&
+                (key.EndsWith("UnitConversionFactor", StringComparison.Ordinal) ||
+                key.EndsWith("DiscountAmount", StringComparison.Ordinal) ||
+                key.EndsWith("TaxRate", StringComparison.Ordinal) ||
+                key.EndsWith("ExpectedDeliveryDate", StringComparison.Ordinal))))
+                _lineOptions[line] = true;
+        }
+    }
+
+    private string? ErrorFor(string key) => _showErrors && _errors.TryGetValue(key, out var message) ? message : null;
+    private bool HasError(string key) => _showErrors && _errors.ContainsKey(key);
+    private string LineKey(UiPurchaseOrderLineModel line, string field) => $"Lines[{Model.Lines.IndexOf(line)}].{field}";
+    private void ToggleAdvancedOptions() => _advancedOpen = !_advancedOpen;
+    private bool IsLineOptionsOpen(UiPurchaseOrderLineModel line) =>
+        _lineOptions.TryGetValue(line, out var expanded) ? expanded :
+        line.DiscountAmount != 0 || line.TaxRate != 0 || line.UnitConversionFactor != 1 ||
+        !string.IsNullOrWhiteSpace(line.Notes) ||
+        (line.ExpectedDeliveryDate.HasValue && line.ExpectedDeliveryDate != Model.ExpectedDeliveryDate);
+    private void ToggleLineOptions(UiPurchaseOrderLineModel line) => _lineOptions[line] = !IsLineOptionsOpen(line);
+
     private static readonly IReadOnlyList<UiSelectOption> TaxModeOptions=[new("1","غير شامل"),new("2","شامل")];
     private string LineCountText=>Model.Lines.Count switch{0=>"لا توجد بنود",1=>"بند واحد",2=>"بندان",_=>$"{Model.Lines.Count} بنود"};
     private static string? GuidText(Guid? id)=>id?.ToString("D"); private static Guid? Parse(string? v)=>Guid.TryParse(v,out var x)?x:null;
@@ -153,14 +295,20 @@
     private static string LineSubtitle(UiPurchaseOrderLineModel line)=>line.Sources.Count>0?"مرتبط بطلب شراء":"بند شراء مباشر";
     private decimal LineTotal(UiPurchaseOrderLineModel line)
     {
-        var discounted=Math.Max(0m,(line.OrderedQuantity*line.UnitPrice)-line.DiscountAmount);
-        return Model.TaxCalculationMode==1
-            ? discounted+(discounted*line.TaxRate/100m)
-            : discounted;
+        var preview = new UiPurchaseOrderEditorModel { TaxCalculationMode = Model.TaxCalculationMode };
+        preview.Lines.Add(line);
+        return UiPurchaseOrderAmountPreview.FromModel(preview).Total;
     }
-    private Task Changed()=>OnChanged.InvokeAsync();
+    private UiPurchaseOrderAmountPreview.Totals PreviewTotals => UiPurchaseOrderAmountPreview.FromModel(Model);
+    private Task Changed()
+    {
+        if (_showErrors) _errors = UiPurchaseOrderFormValidator.Validate(Model);
+        _saveError = null;
+        return OnChanged.InvokeAsync();
+    }
     private async Task SupplierChanged(string? v){Model.SupplierId=Parse(v);Model.SupplierName=null;if(OnSupplierChanged.HasDelegate)await OnSupplierChanged.InvokeAsync(Model.SupplierId);await Changed();}
-    private async Task WarehouseChanged(string? v){Model.DestinationWarehouseId=Parse(v);await Changed();}
+    private void WarehouseSelectionChanged(UiLookupItem? item) => Model.DestinationWarehouseName = item?.PrimaryText;
+    private async Task WarehouseChanged(string? v){Model.DestinationWarehouseId=Parse(v);if(!Model.DestinationWarehouseId.HasValue)Model.DestinationWarehouseName=null;await Changed();}
     private async Task OrderDateChanged(DateOnly? v){if(v.HasValue){Model.OrderDate=v.Value;if(OnOrderDateChanged.HasDelegate)await OnOrderDateChanged.InvokeAsync(v.Value);}await Changed();}
     private async Task ExpectedDateChanged(DateOnly? v){Model.ExpectedDeliveryDate=v;await Changed();}
     private async Task CurrencyChanged(string? v){Model.CurrencyId=Parse(v);Model.CurrencyCode=null;if(OnCurrencyChanged.HasDelegate)await OnCurrencyChanged.InvokeAsync(Model.CurrencyId);await Changed();}
@@ -170,7 +318,7 @@
     private async Task PaymentTermChanged(decimal v){Model.PaymentTermDays=(int)v;await Changed();}
     private async Task NotesChanged(string? v){Model.Notes=v;await Changed();}
     private async Task AddLineAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _){Model.Lines.Add(new(){LineSequence=Model.Lines.Count+1,ExpectedDeliveryDate=Model.ExpectedDeliveryDate});await Changed();}
-    private async Task RemoveLineAsync(UiPurchaseOrderLineModel l){Model.Lines.Remove(l);for(var i=0;i<Model.Lines.Count;i++)Model.Lines[i].LineSequence=i+1;await Changed();}
+    private async Task RemoveLineAsync(UiPurchaseOrderLineModel l){Model.Lines.Remove(l);_lineOptions.Remove(l);for(var i=0;i<Model.Lines.Count;i++)Model.Lines[i].LineSequence=i+1;await Changed();}
     private static void ProductSelectionChanged(UiPurchaseOrderLineModel l,UiLookupItem? item)=>l.ProductName=item?.PrimaryText;
     private static void UnitSelectionChanged(UiPurchaseOrderLineModel l,UiLookupItem? item)=>l.PurchaseUnitName=item?.PrimaryText;
     private async Task ProductChanged(UiPurchaseOrderLineModel l,string? v){l.ProductVariantId=Parse(v);l.SupplierCatalogItemId=null;l.PurchaseUnitId=null;l.PurchaseUnitName=null;l.UnitConversionFactor=1m;l.UnitPrice=0m;await Changed();}

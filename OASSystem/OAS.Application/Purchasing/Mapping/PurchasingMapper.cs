@@ -96,7 +96,7 @@ public sealed class PurchasingMapper(
             order.SubmittedBy, order.SubmittedAt, order.ApprovedBy, order.ApprovedAt, order.RejectedBy, order.RejectedAt,
             order.RejectionReason, order.SentBy, order.SentAt, order.ClosedBy, order.ClosedAt, order.CancelledBy, order.CancelledAt,
             order.CancellationReason, lineDtos, PurchasingRowVersion.Encode(order.RowVersion), order.CreatedAtUtc, order.CreatedBy,
-            order.LastModifiedAtUtc, order.LastModifiedBy);
+            order.LastModifiedAtUtc, order.LastModifiedBy, currency?.NameAr);
     }
 
     public async Task<PurchaseReceiptDto> ToDtoAsync(PurchaseReceipt receipt, CancellationToken cancellationToken)

@@ -4,6 +4,8 @@ using OAS.Application.Purchasing.Abstractions;
 using OAS.Contracts.Common.Pagination;
 using OAS.Contracts.Purchasing.Enums;
 using OAS.Domain.Purchasing.Entities;
+using OAS.Domain.Accounting.Entities;
+using OAS.Domain.Entities.Inventory;
 using OAS.Infrastructure.Persistence;
 using DomainOrderStatus = OAS.Domain.Purchasing.Enums.PurchaseOrderStatus;
 using DomainReceiptStatus = OAS.Domain.Purchasing.Enums.PurchaseReceiptStatus;
@@ -27,14 +29,31 @@ public sealed class PurchaseOrderRepository(OasDbContext dbContext) : IPurchaseO
     public Task<PurchaseOrder?> GetForUpdateAsync(Guid id, CancellationToken cancellationToken = default) => Orders.Include(x => x.Lines).FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
     public Task<PurchaseOrder?> GetByLineIdAsync(Guid purchaseOrderLineId, CancellationToken cancellationToken = default) => Orders.AsNoTracking().Include(x => x.Lines).FirstOrDefaultAsync(x => x.Lines.Any(l => l.Id == purchaseOrderLineId), cancellationToken);
 
-    public Task<PagedData<PurchaseOrder>> GetPageAsync(PageRequest request, PurchaseOrderStatus? status, Guid? supplierId, Guid? warehouseId, CancellationToken cancellationToken = default)
+    public Task<PagedData<PurchaseOrder>> GetPageAsync(PageRequest request, PurchaseOrderStatus? status, Guid? supplierId, Guid? warehouseId, CancellationToken cancellationToken = default, PurchaseOrderListGroup? group = null)
     {
         var query = Orders.AsNoTracking().Include(x => x.Lines).AsQueryable();
         if (status.HasValue) query = query.Where(x => x.Status == (DomainOrderStatus)(byte)status.Value);
+        // Apply the selected category in SQL before pagination so counts and pages are accurate.
+        if (group.HasValue)
+        {
+            query = group.Value switch
+            {
+                PurchaseOrderListGroup.PendingApproval => query.Where(x => x.Status == DomainOrderStatus.PendingApproval),
+                PurchaseOrderListGroup.InSupply => query.Where(x => x.Status == DomainOrderStatus.Sent || x.Status == DomainOrderStatus.PartiallyReceived),
+                PurchaseOrderListGroup.Completed => query.Where(x => x.Status == DomainOrderStatus.FullyReceived || x.Status == DomainOrderStatus.Closed),
+                _ => query
+            };
+        }
         if (supplierId.HasValue) query = query.Where(x => x.SupplierId == supplierId.Value);
         if (warehouseId.HasValue) query = query.Where(x => x.DestinationWarehouseId == warehouseId.Value);
         query = query.OrderByDescending(x => x.OrderDate).ThenByDescending(x => x.PurchaseOrderCode);
-        return PurchasingRepositoryHelpers.PageAsync(query, request, (q, term) => q.Where(x => x.PurchaseOrderCode.Contains(term) || (x.Notes != null && x.Notes.Contains(term))), cancellationToken);
+        return PurchasingRepositoryHelpers.PageAsync(query, request,
+            (q, term) => q.Where(x => x.PurchaseOrderCode.Contains(term)
+                || (x.Notes != null && x.Notes.Contains(term))
+                || dbContext.Set<Supplier>().Any(s => s.Id == x.SupplierId &&
+                    (s.NameAr.Contains(term) || (s.NameEn != null && s.NameEn.Contains(term)) || s.SupplierCode.Contains(term)))
+                || dbContext.Set<Warehouse>().Any(w => w.Id == x.DestinationWarehouseId &&
+                    (w.Name.Contains(term) || w.Code.Contains(term)))), cancellationToken);
     }
 
     public async Task<IReadOnlyList<PurchaseOrderLineSource>> GetSourcesAsync(Guid purchaseOrderId, CancellationToken cancellationToken = default)

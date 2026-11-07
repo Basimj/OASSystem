@@ -29,7 +29,7 @@ public interface IPurchasingClientService
     Task<PurchaseRequestDto?> CancelPurchaseRequestAsync(Guid id, SetPurchaseRequestStatusRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseOrderDto?> CreatePurchaseOrderFromRequestAsync(Guid id, CreatePurchaseOrderFromRequestRequest request, CancellationToken cancellationToken = default);
 
-    Task<PagedResult<PurchaseOrderDto>> GetPurchaseOrdersAsync(PageRequest request, PurchaseOrderStatus? status = null, Guid? supplierId = null, Guid? warehouseId = null, CancellationToken cancellationToken = default);
+    Task<PagedResult<PurchaseOrderDto>> GetPurchaseOrdersAsync(PageRequest request, PurchaseOrderStatus? status = null, Guid? supplierId = null, Guid? warehouseId = null, CancellationToken cancellationToken = default, PurchaseOrderListGroup? group = null);
     Task<PurchaseOrderProgressDto?> GetPurchaseOrderProgressAsync(Guid id, CancellationToken cancellationToken = default);
     Task<PurchaseOrderDto?> GetPurchaseOrderAsync(Guid id, CancellationToken cancellationToken = default);
     Task<PurchaseOrderDto?> CreatePurchaseOrderAsync(CreatePurchaseOrderRequest request, CancellationToken cancellationToken = default);

@@ -23,3 +23,7 @@
 .ui-lookup__popover-footer{font-size:11px;color:var(--oas-color-text-muted,#858294)}
 .ui-lookup__popover-clear{padding:5px;border:0;background:transparent;color:var(--oas-color-primary,#5042ad);font:inherit;cursor:pointer}
 @media(max-width:600px){.ui-lookup__popover:popover-open{top:4dvh;max-height:92dvh;padding:10px}.ui-lookup__popover-options{max-height:69dvh}}
+
+/* Inline validation shared by popover and conventional lookups. */
+.ui-lookup__popover-trigger--invalid,.ui-lookup__control--invalid{border-color:var(--oas-color-danger)!important;box-shadow:0 0 0 2px color-mix(in srgb,var(--oas-color-danger) 13%,transparent)}
+.ui-lookup__error{color:var(--oas-color-danger);font-size:var(--oas-font-xs);line-height:1.45;overflow-wrap:anywhere}

@@ -44,8 +44,8 @@ public sealed partial class PurchasingClientService(OasApiClient api) : IPurchas
     public Task<PurchaseRequestDto?> CancelPurchaseRequestAsync(Guid id,SetPurchaseRequestStatusRequest r,CancellationToken ct=default)=>Post<SetPurchaseRequestStatusRequest,PurchaseRequestDto>($"api/purchasing/requests/{id}/cancel",r,ct);
     public Task<PurchaseOrderDto?> CreatePurchaseOrderFromRequestAsync(Guid id,CreatePurchaseOrderFromRequestRequest r,CancellationToken ct=default)=>Post<CreatePurchaseOrderFromRequestRequest,PurchaseOrderDto>($"api/purchasing/requests/{id}/create-purchase-order",r,ct);
 
-    public Task<PagedResult<PurchaseOrderDto>> GetPurchaseOrdersAsync(PageRequest r,PurchaseOrderStatus? status=null,Guid? supplierId=null,Guid? warehouseId=null,CancellationToken ct=default)
-    { var q=Add(Add(Add("api/purchasing/orders"+PageQuery(r),"status",status),"supplierId",supplierId),"warehouseId",warehouseId); return GetPage<PurchaseOrderDto>(q,ct); }
+    public Task<PagedResult<PurchaseOrderDto>> GetPurchaseOrdersAsync(PageRequest r,PurchaseOrderStatus? status=null,Guid? supplierId=null,Guid? warehouseId=null,CancellationToken ct=default,PurchaseOrderListGroup? group=null)
+    { var q=Add(Add(Add(Add("api/purchasing/orders"+PageQuery(r),"status",status),"supplierId",supplierId),"warehouseId",warehouseId),"group",group); return GetPage<PurchaseOrderDto>(q,ct); }
     public Task<PurchaseOrderProgressDto?> GetPurchaseOrderProgressAsync(Guid id, CancellationToken ct = default)
         => api.GetAsync<PurchaseOrderProgressDto>($"api/purchasing/orders/{id:D}/progress", ct);
     public Task<PurchaseOrderDto?> GetPurchaseOrderAsync(Guid id,CancellationToken ct=default)=>api.GetAsync<PurchaseOrderDto>($"api/purchasing/orders/{id}",ct);

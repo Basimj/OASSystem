@@ -19,6 +19,7 @@ using OAS.Contracts.Sales.Enums;
 using OAS.UiLib.Core.Enums;
 using OAS.UiLib.Core.Models;
 using OAS.UiLib.Core.Models.Purchasing;
+using OAS.UiLib.Components.Purchasing;
 using OAS.UiLib.Services.Dialogs;
 using OAS.UiLib.Services.Feedback;
 
@@ -66,9 +67,32 @@ public partial class PurchasingWorkspaceHost
     private long _totalCount;
     private bool _isPrintingPurchaseInvoice;
     private IReadOnlyList<UiPurchasingListItem> CurrentListItems=[];
+    private IReadOnlyList<UiPurchaseOrderCardItem> CurrentOrderCards=[];
+    private string _orderGroup = "all";
+    private static PurchaseOrderListGroup? SelectedOrderGroup(string selected) => selected switch
+    {
+        "approval" => PurchaseOrderListGroup.PendingApproval,
+        "supply" => PurchaseOrderListGroup.InSupply,
+        "completed" => PurchaseOrderListGroup.Completed,
+        _ => null
+    };
+    private static UiPurchaseOrderCardItem ToOrderCard(PurchaseOrderDto order)
+    {
+        var completed = order.Lines.Count(x => x.BaseQuantity > 0m && x.RemainingBaseQuantity <= 0m);
+        var started = order.Lines.Count(x => x.ReceivedBaseQuantity > 0m);
+        var overdue = order.ExpectedDeliveryDate is { } due && due < DateOnly.FromDateTime(DateTime.Today)
+            && (order.Status is PurchaseOrderStatus.Sent or PurchaseOrderStatus.PartiallyReceived);
+        return new UiPurchaseOrderCardItem(order.Id, order.PurchaseOrderCode,
+            order.SupplierName ?? order.SupplierCode ?? "مورد غير محدد",
+            order.DestinationWarehouseName ?? order.DestinationWarehouseCode,
+            PurchasingArabicPresenter.OrderStatus(order.Status), (byte)order.Status,
+            order.TotalAmount, order.CurrencyCode, order.OrderDate, order.ExpectedDeliveryDate,
+            completed, started, order.Lines.Count, overdue, order.CurrencyNameAr);
+    }
     private readonly Dictionary<Guid,PurchaseInvoicePaymentSummaryDto> _invoicePaymentSummaries=[];
     private readonly HashSet<Guid> _loadingInvoicePaymentSummaries=[];
 
+    private UiPurchaseOrderEditor? _purchaseOrderEditor;
     private PurchasingTabState? ActiveTab=>Workspace.Find(Workspace.ActiveTabId);
     private PurchaseInvoicePaymentSummaryDto? ActiveInvoicePaymentSummary
         => ActiveTab?.Model is UiPurchaseInvoiceEditorModel { Id: Guid id } && _invoicePaymentSummaries.TryGetValue(id,out var summary) ? summary : null;
@@ -119,7 +143,7 @@ public partial class PurchasingWorkspaceHost
             var activeId=Workspace.ActiveTab?.EntityType==Section?Workspace.ActiveTabId:Guid.Empty;
             Workspace.OpenList(Section);
             if(activeId!=Guid.Empty)Workspace.ActiveTabId=activeId;
-            _search=null;_pageNumber=1;
+            _search=null;_pageNumber=1;_orderGroup="all";CurrentOrderCards=[];
             if(IsListTab)await LoadListAsync(); else if(ActiveTab is { } tab)await EnsureLoadedAsync(tab);
         }
         if(Section == PurchasingEntityType.PurchaseReceipts && _previousOrderFilter != RelatedPurchaseOrderId)
@@ -157,7 +181,9 @@ public partial class PurchasingWorkspaceHost
                 case PurchasingEntityType.PurchaseRequests:
                     var r=await Purchasing.GetPurchaseRequestsAsync(request);SetPage(r.PageNumber,r.TotalPages,r.TotalCount,r.Items.Select(x=>new UiPurchasingListItem(x.Id,x.RequestCode,x.Reason??x.WarehouseName??"طلب شراء",x.WarehouseName,PurchasingArabicPresenter.RequestStatus(x.Status),x.RequestDate.ToString("yyyy-MM-dd"),"fa-solid fa-clipboard-list")).ToArray());break;
                 case PurchasingEntityType.PurchaseOrders:
-                    var o=await Purchasing.GetPurchaseOrdersAsync(request);SetPage(o.PageNumber,o.TotalPages,o.TotalCount,o.Items.Select(x=>new UiPurchasingListItem(x.Id,x.PurchaseOrderCode,x.SupplierName??"مورد",x.DestinationWarehouseName,PurchasingArabicPresenter.OrderStatus(x.Status),$"{x.TotalAmount:N2} {x.CurrencyCode}","fa-solid fa-file-signature")).ToArray());break;
+                    var o=await Purchasing.GetPurchaseOrdersAsync(request,group:SelectedOrderGroup(_orderGroup));
+                    CurrentOrderCards=o.Items.Select(ToOrderCard).ToArray();
+                    SetPage(o.PageNumber,o.TotalPages,o.TotalCount,[]);break;
                 case PurchasingEntityType.PurchaseReceipts:
                     var gr=await Purchasing.GetPurchaseReceiptsAsync(request, purchaseOrderId: RelatedPurchaseOrderId);SetPage(gr.PageNumber,gr.TotalPages,gr.TotalCount,gr.Items.Select(x=>new UiPurchasingListItem(x.Id,x.ReceiptCode,x.SupplierName??"استلام",x.PurchaseOrderCode,PurchasingArabicPresenter.ReceiptStatus(x.Status),x.ReceiptDate.ToString("yyyy-MM-dd"),"fa-solid fa-truck-ramp-box")).ToArray());break;
                 case PurchasingEntityType.PurchaseInvoices:
@@ -251,7 +277,15 @@ public partial class PurchasingWorkspaceHost
 
     private async Task SaveAsync(MouseEventArgs _)
     {
-        var tab=ActiveTab;if(tab is null||tab.IsSaving)return;tab.IsSaving=true;
+        var tab=ActiveTab;
+        if(tab is null || tab.IsSaving) return;
+        if(tab.Model is UiPurchaseOrderEditorModel && _purchaseOrderEditor is not null &&
+            ReferenceEquals(_purchaseOrderEditor.Model, tab.Model) && !_purchaseOrderEditor.ValidateForSave())
+        {
+            Snackbar.Warning("راجع الحقول المحددة بالأحمر: ستجد شرح الخطأ وطريقة التصحيح تحت كل حقل.");
+            return;
+        }
+        tab.IsSaving=true;
         try
         {
             object? saved=tab.Model switch
@@ -266,7 +300,18 @@ public partial class PurchasingWorkspaceHost
             if(saved is null)return;
             tab.Model=saved;tab.EntityId=ModelId(saved);tab.Title=ModelTitle(saved);tab.IsEditMode=false;tab.IsDirty=false;Snackbar.Success("تم حفظ البيانات بنجاح.");
         }
-        catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}catch{ApiFeedback.ShowUnexpected();}
+        catch(ApiClientException ex)
+        {
+            if (tab.Model is UiPurchaseOrderEditorModel)
+                _purchaseOrderEditor?.ShowSaveError("لم يقبل الخادم حفظ أمر الشراء. راجع الحقول والرسالة التي يعرضها النظام، ثم أعد المحاولة.", ex.Error.Errors);
+            ApiFeedback.Show(ex.Error);
+        }
+        catch
+        {
+            if (tab.Model is UiPurchaseOrderEditorModel)
+                _purchaseOrderEditor?.ShowSaveError("حدث خطأ غير متوقع عند الحفظ. تأكد من الاتصال ثم أعد المحاولة؛ بقيت بياناتك في النموذج.");
+            ApiFeedback.ShowUnexpected();
+        }
         finally{tab.IsSaving=false;}
     }
 
@@ -360,6 +405,14 @@ public partial class PurchasingWorkspaceHost
         _=>"غير محددة"
     };
 
+    private async Task ChangeOrderGroupAsync(string group)
+    {
+        if (_isLoadingList || _orderGroup == group ||
+            group is not ("all" or "approval" or "supply" or "completed")) return;
+        _orderGroup = group;
+        _pageNumber = 1;
+        await LoadListAsync();
+    }
     private async Task SearchTextChanged(string? value){_search=value;await Task.CompletedTask;}
     private async Task SearchAsync(string? value){_search=value;_pageNumber=1;await LoadListAsync();}
     private async Task RefreshListAsync(MouseEventArgs _)=>await LoadListAsync();
