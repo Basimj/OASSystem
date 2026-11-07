@@ -1,4 +1,6 @@
 using System.Threading.RateLimiting;
+using System.Security.Claims;
+using OAS.Contracts.Common.Errors;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.RateLimiting;
 using OAS.API.Database;
@@ -65,13 +67,37 @@ public static class ServiceCollectionExtensions
                 limiter.QueueLimit = 0;
                 limiter.AutoReplenishment = true;
             });
-            options.AddFixedWindowLimiter("api", limiter =>
+            // Authentication must run before the limiter so every signed-in user
+            // receives an independent request budget (not one shared by the ERP).
+            options.AddPolicy("api", context =>
             {
-                limiter.PermitLimit = 120;
-                limiter.Window = TimeSpan.FromMinutes(1);
-                limiter.QueueLimit = 0;
-                limiter.AutoReplenishment = true;
+                var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                             ?? context.User.Identity?.Name;
+                var partition = !string.IsNullOrWhiteSpace(userId)
+                    ? $"user:{userId}"
+                    : $"ip:{context.Connection.RemoteIpAddress}";
+
+                return RateLimitPartition.GetFixedWindowLimiter(partition, _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 300,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                    AutoReplenishment = true
+                });
             });
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.OnRejected = async (context, cancellationToken) =>
+            {
+                context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+                    context.HttpContext.Response.Headers.RetryAfter = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds)).ToString();
+                await context.HttpContext.Response.WriteAsJsonAsync(new ApiError
+                {
+                    Code = "api_rate_limited",
+                    Status = StatusCodes.Status429TooManyRequests,
+                    Message = "تم تجاوز عدد الطلبات المسموح. أعد المحاولة بعد قليل."
+                }, cancellationToken);
+            };
             options.AddPolicy("login", httpContext => RateLimitPartition.GetFixedWindowLimiter(
                 httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions

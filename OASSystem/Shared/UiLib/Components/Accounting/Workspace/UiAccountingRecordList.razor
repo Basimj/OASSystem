@@ -1,6 +1,6 @@
 @namespace OAS.UiLib.Components.Accounting.Workspace
 
-<div class="ui-acc-record-list" dir="rtl">
+<div class="@(FinancialStyle ? "ui-acc-record-list ui-acc-record-list--financial" : "ui-acc-record-list")" dir="rtl">
     @if (Items.Count == 0)
     {
         <UiAccountingEmptyState IconCssClass="@EmptyIconCssClass"
@@ -12,6 +12,59 @@
         @foreach (var item in Items)
         {
             <div class="@(ItemActionHref is null ? "ui-acc-record-list__entry ui-acc-record-list__entry--plain" : "ui-acc-record-list__entry")">
+            @if (FinancialStyle)
+            {
+                @* Compact two-line row. Extra data remains available in the record editor. *@
+                <button type="button"
+                        class="@(string.IsNullOrWhiteSpace(item.HighlightValue) ? "ui-acc-record-row ui-acc-record-row--compact ui-acc-record-row--no-amount" : "ui-acc-record-row ui-acc-record-row--compact")"
+                        title="@item.Title"
+                        @onclick="() => OpenAsync(item.Id)">
+                    <span class="ui-acc-record-row__icon" aria-hidden="true">
+                        <i class="@item.IconCssClass"></i>
+                    </span>
+                    <span class="ui-acc-compact__content">
+                        <span class="ui-acc-compact__primary">
+                            <strong dir="auto" title="@item.Title">@item.Title</strong>
+                            @if (!string.IsNullOrWhiteSpace(item.Subtitle))
+                            {
+                                <span class="ui-acc-compact__subtitle" dir="auto" title="@item.Subtitle">@item.Subtitle</span>
+                            }
+                        </span>
+                        <span class="ui-acc-compact__secondary">
+                            @foreach (var detail in item.Details)
+                            {
+                                <span class="ui-acc-compact__detail" title="@($"{detail.Label}: {detail.Value}")">
+                                    <span class="ui-acc-compact__label">@detail.Label:</span>
+                                    <span class="@detail.ValueCssClass" dir="auto">@detail.Value</span>
+                                </span>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(item.Description))
+                            {
+                                <span class="ui-acc-compact__description" title="@item.Description">@item.Description</span>
+                            }
+                        </span>
+                    </span>
+                    @if (!string.IsNullOrWhiteSpace(item.HighlightValue))
+                    {
+                        <span class="ui-acc-compact__amount" title="@($"{item.HighlightCaption}: {item.HighlightValue}")">
+                            <strong dir="auto">@item.HighlightValue</strong>
+                            @if (!string.IsNullOrWhiteSpace(item.HighlightCaption))
+                            {
+                                <small>@item.HighlightCaption</small>
+                            }
+                        </span>
+                    }
+                    <span class="ui-acc-compact__status">
+                        @if (!string.IsNullOrWhiteSpace(item.StatusText))
+                        {
+                            <UiAccountingStatusBadge Text="@item.StatusText" State="@item.StatusState" />
+                        }
+                    </span>
+                    <i class="fa-solid fa-chevron-left ui-acc-compact__chevron" aria-hidden="true"></i>
+                </button>
+            }
+            else
+            {
             <button type="button"
                     class="ui-acc-record-row"
                     @onclick="() => OpenAsync(item.Id)">
@@ -20,14 +73,29 @@
                 </span>
 
                 <span class="ui-acc-record-row__content">
-                    <span class="ui-acc-record-row__heading">
-                        <strong>@item.Title</strong>
-                        @if (!string.IsNullOrWhiteSpace(item.Subtitle))
+                    <span class="ui-acc-record-row__summary">
+                        <span class="ui-acc-record-row__heading">
+                            <strong dir="auto">@item.Title</strong>
+                            @if (!string.IsNullOrWhiteSpace(item.Subtitle))
+                            {
+                                <small dir="auto">@item.Subtitle</small>
+                            }
+                        </span>
+                        @if (!string.IsNullOrWhiteSpace(item.HighlightValue))
                         {
-                            <small>@item.Subtitle</small>
+                            <span class="ui-acc-record-row__highlight">
+                                <strong dir="auto">@item.HighlightValue</strong>
+                                @if (!string.IsNullOrWhiteSpace(item.HighlightCaption))
+                                {
+                                    <small>@item.HighlightCaption</small>
+                                }
+                            </span>
                         }
                     </span>
-
+                    @if (!string.IsNullOrWhiteSpace(item.Description))
+                    {
+                        <span class="ui-acc-record-row__description" title="@item.Description">@item.Description</span>
+                    }
                     @if (item.Details.Count > 0)
                     {
                         <span class="ui-acc-record-row__details">
@@ -35,7 +103,7 @@
                             {
                                 <span class="ui-acc-record-detail">
                                     <small>@detail.Label</small>
-                                    <strong class="@detail.ValueCssClass">@detail.Value</strong>
+                                    <strong class="@detail.ValueCssClass" dir="auto">@detail.Value</strong>
                                 </span>
                             }
                         </span>
@@ -51,6 +119,7 @@
                     <i class="fa-solid fa-chevron-left ui-acc-record-row__chevron" aria-hidden="true"></i>
                 </span>
             </button>
+            }
             @if (ItemActionHref is not null)
             {
                 <a class="ui-acc-record-list__secondary-action"
@@ -75,9 +144,13 @@
         string IconCssClass,
         IReadOnlyList<DetailItem> Details,
         string? StatusText = null,
-        string StatusState = "draft");
+        string StatusState = "draft",
+        string? HighlightValue = null,
+        string? HighlightCaption = null,
+        string? Description = null);
 
     [Parameter] public IReadOnlyList<RecordItem> Items { get; set; } = [];
+    [Parameter] public bool FinancialStyle { get; set; }
     [Parameter] public string EmptyTitle { get; set; } = "لا توجد بيانات";
     [Parameter] public string EmptyDescription { get; set; } = "ابدأ بإضافة أول سجل أو غيّر معايير البحث.";
     [Parameter] public string EmptyIconCssClass { get; set; } = "fa-regular fa-folder-open";

@@ -1,80 +1,80 @@
 @namespace OAS.Client.Accounting.Components
 @using OAS.UiLib.Components.Accounting.Workspace
+@using OAS.Contracts.Accounting.BankAccounts
 @using OAS.UiLib.Components.Inputs
 @using OAS.UiLib.Core.Models
 
-<UiAccountingEditorSurface>
-    <UiAccountingFormSection Title="بيانات الحساب البنكي"
-                             Subtitle="عند إنشاء حساب بنكي جديد ينشئ النظام حساب GL رقمياً تلقائياً تحت الحساب الرئيسي المحدد في إعدادات المحاسبة."
-                             IconCssClass="fa-solid fa-building-columns">
+<UiAccountingEditorSurface AdditionalCssClass="oas-cashbank-editor">
+    <div class="oas-cashbank-editor__intro">
+        <div class="oas-cashbank-editor__intro-icon"><i class="fa-solid fa-building-columns" aria-hidden="true"></i></div>
+        <div>
+            <h3>@(IsNew ? "إضافة حساب بنكي" : "بيانات الحساب البنكي")</h3>
+            <p>@(IsNew ? "أدخل بيانات البنك والحساب؛ يربط النظام الحساب بالأستاذ العام تلقائيًا عند الحفظ." : "اعرض البيانات أو اختر تعديل من الشريط العلوي. رقم الحساب والعملة ثابتان بعد الإنشاء.")</p>
+        </div>
+    </div>
+    <UiAccountingFormSection Title="البيانات الأساسية" IconCssClass="fa-solid fa-building-columns">
         <UiAccountingFormGrid Columns="2">
-            <UiInputText Label="كود الحساب البنكي (تلقائي)"
-                         Value="@Model.Code"
-                         ValueExpression="@(() => Model.Code)"
-                         ValueChanged="OnCodeChanged"
-                         Required="true"
-                         ReadOnly="true"
-                         Disabled="@(!IsEditable)"
-                         Size="ControlSize.Small" />
-
-            <UiInputText Label="اسم البنك"
-                         Value="@Model.BankName"
-                         ValueExpression="@(() => Model.BankName)"
-                         ValueChanged="OnBankNameChanged"
-                         Required="true"
-                         Disabled="@(!IsEditable)"
-                         Size="ControlSize.Small" />
-
-            <UiInputText Label="اسم الحساب الرسمي"
-                         Value="@Model.AccountName"
-                         ValueExpression="@(() => Model.AccountName)"
-                         ValueChanged="OnAccountNameChanged"
-                         Required="true"
-                         Disabled="@(!IsEditable)"
-                         Size="ControlSize.Small" />
-
-            <UiInputText Label="رقم الحساب البنكي"
-                         Value="@Model.AccountNumber"
-                         ValueExpression="@(() => Model.AccountNumber)"
-                         ValueChanged="OnAccountNumberChanged"
-                         Required="true"
-                         ErrorText="@Model.AccountNumberError"
-                         ReadOnly="@(!IsNew)"
-                         Disabled="@(!IsEditable || !IsNew)"
-                         Size="ControlSize.Small" />
-
-            <UiInputText Label="رقم الآيبان (IBAN)"
-                         Value="@Model.IBAN"
-                         ValueExpression="@(() => Model.IBAN)"
-                         ValueChanged="OnIbanChanged"
-                         Disabled="@(!IsEditable)"
-                         Size="ControlSize.Small" />
-
-            <UiLookup Label="العملة"
-                      Value='@Model.CurrencyId?.ToString("D")'
-                      ValueChanged="OnCurrencyChanged"
-                      SelectedItem="@CurrencyLookupItem"
-                      SearchAsync="CurrencySearchAsync"
-                      Placeholder="اختر عملة الحساب البنكي..."
-                      Disabled="@(!IsEditable)"
-                      Required="true"
-                      MinimumSearchLength="0"
-                      DebounceMilliseconds="250" />
-
+            <UiInputText Label="كود الحساب البنكي (تلقائي)" Value="@Model.Code"
+                         ValueExpression="@(() => Model.Code)" ValueChanged="OnCodeChanged"
+                         ReadOnly="true" Disabled="true" Size="ControlSize.Small" />
+            <UiInputText Label="اسم البنك" Value="@Model.BankName"
+                         ValueExpression="@(() => Model.BankName)" ValueChanged="OnBankNameChanged"
+                         Required="true" MaxLength="150" Placeholder="اسم البنك كما في المستندات"
+                         Disabled="@(!IsEditable)" Size="ControlSize.Small" />
+            <UiInputText Label="اسم الحساب الرسمي" Value="@Model.AccountName"
+                         ValueExpression="@(() => Model.AccountName)" ValueChanged="OnAccountNameChanged"
+                         Required="true" MaxLength="150" Placeholder="اسم صاحب الحساب / الحساب البنكي"
+                         Disabled="@(!IsEditable)" Size="ControlSize.Small" />
+            <UiInputText Label="رقم الحساب البنكي" Value="@Model.AccountNumber"
+                         ValueExpression="@(() => Model.AccountNumber)" ValueChanged="OnAccountNumberChanged"
+                         Required="true" MaxLength="100" ErrorText="@Model.AccountNumberError"
+                         ReadOnly="@(!IsNew)" Disabled="@(!IsEditable || !IsNew)"
+                         dir="ltr" inputmode="text" Size="ControlSize.Small" />
+            <div class="oas-cashbank-editor__wide">
+                <UiInputText Label="رقم الآيبان (IBAN) — اختياري" Value="@Model.IBAN"
+                             ValueExpression="@(() => Model.IBAN)" ValueChanged="OnIbanChanged"
+                             ErrorText="@IbanError" MaxLength="50"
+                             Placeholder="اكتب IBAN دون مسافات أو اتركه فارغًا"
+                             dir="ltr" Disabled="@(!IsEditable)" Size="ControlSize.Small" />
+                <small class="oas-cashbank-editor__hint">يُتحقق من أرقام IBAN المدخلة؛ لا يلزم وجود IBAN لكل حساب بنكي.</small>
+            </div>
+        </UiAccountingFormGrid>
+    </UiAccountingFormSection>
+    <UiAccountingFormSection Title="الربط المحاسبي" IconCssClass="fa-solid fa-link">
+        <UiAccountingFormGrid Columns="2">
+            <UiLookup Label="العملة" Value='@Model.CurrencyId?.ToString("D")'
+                      ValueChanged="OnCurrencyChanged" SelectedItem="@CurrencyLookupItem"
+                      SearchAsync="CurrencySearchAsync" Placeholder="اختر العملة..."
+                      Disabled="@(!IsEditable || !IsNew)" Required="true"
+                      MinimumSearchLength="0" DebounceMilliseconds="250" />
             @if (Model.AccountId.HasValue)
             {
                 <UiAccountingReadOnlyValue Label="الحساب المحاسبي المرتبط"
-                                           Value="@(AccountLookupItem?.PrimaryText ?? Model.AccountId.Value.ToString("D"))"
+                                           Value="@(AccountLookupItem?.PrimaryText ?? "جارٍ جلب بيانات الحساب...")"
                                            Tone="@UiAccountingReadOnlyValue.ValueTone.Primary" />
             }
-
-            <UiAccountingCheckGroup>
-                <UiCheckbox Label="الحساب البنكي نشط"
-                            Value="@Model.IsActive"
-                            ValueChanged="OnActiveChanged"
-                            Disabled="@(!IsEditable)" />
-            </UiAccountingCheckGroup>
+            else
+            {
+                <div class="oas-cashbank-editor__readonly">
+                    <span>الحساب المحاسبي المرتبط</span>
+                    <strong>يُنشأ تلقائيًا عند الحفظ</strong>
+                </div>
+            }
         </UiAccountingFormGrid>
+        @if (Model.AccountId.HasValue)
+        {
+            <a class="oas-cashbank-editor__account-link" href="@AccountRoute"><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i> فتح الحساب المرتبط في شجرة الحسابات</a>
+        }
+        @if (!IsNew)
+        {
+            <p class="oas-cashbank-editor__note"><i class="fa-solid fa-lock" aria-hidden="true"></i> رقم الحساب والعملة غير قابلين للتغيير من التعديل العادي حفاظًا على السجلات المحاسبية.</p>
+        }
+    </UiAccountingFormSection>
+    <UiAccountingFormSection Title="الحالة" IconCssClass="fa-solid fa-sliders">
+        <UiAccountingCheckGroup>
+            <UiCheckbox Label="الحساب البنكي نشط" Value="@Model.IsActive"
+                        ValueChanged="OnActiveChanged" Disabled="@(!IsEditable)" />
+        </UiAccountingCheckGroup>
     </UiAccountingFormSection>
 </UiAccountingEditorSurface>
 
@@ -102,12 +102,15 @@
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CurrencySearchAsync { get; set; }
     [Parameter] public EventCallback OnModelChanged { get; set; }
 
-    private Task OnChanged()=>OnModelChanged.InvokeAsync();
-    private async Task OnCodeChanged(string? value){Model.Code=value??string.Empty;Model.CodeError=null;await OnChanged();}
-    private async Task OnBankNameChanged(string? value){Model.BankName=value??string.Empty;await OnChanged();}
-    private async Task OnAccountNameChanged(string? value){Model.AccountName=value??string.Empty;await OnChanged();}
-    private async Task OnAccountNumberChanged(string? value){Model.AccountNumber=value??string.Empty;Model.AccountNumberError=null;await OnChanged();}
-    private async Task OnIbanChanged(string? value){Model.IBAN=value;await OnChanged();}
-    private async Task OnCurrencyChanged(string? value){Model.CurrencyId=Guid.TryParse(value,out var id)?id:null;await OnChanged();}
-    private async Task OnActiveChanged(bool value){Model.IsActive=value;await OnChanged();}
+    private string? IbanError => BankIban.IsValid(Model.IBAN)
+        ? null : "الآيبان غير صالح؛ تحقق من رمز البلد ورقمي التحقق وبقية الأحرف.";
+    private string? AccountRoute => Model.AccountId.HasValue ? $"/accounting/accounts/{Model.AccountId.Value:D}" : null;
+    private Task OnChanged() => OnModelChanged.InvokeAsync();
+    private async Task OnCodeChanged(string? value) { Model.Code = value ?? string.Empty; Model.CodeError = null; await OnChanged(); }
+    private async Task OnBankNameChanged(string? value) { Model.BankName = value ?? string.Empty; await OnChanged(); }
+    private async Task OnAccountNameChanged(string? value) { Model.AccountName = value ?? string.Empty; await OnChanged(); }
+    private async Task OnAccountNumberChanged(string? value) { Model.AccountNumber = value ?? string.Empty; Model.AccountNumberError = null; await OnChanged(); }
+    private async Task OnIbanChanged(string? value) { Model.IBAN = value; await OnChanged(); }
+    private async Task OnCurrencyChanged(string? value) { Model.CurrencyId = Guid.TryParse(value, out var id) ? id : null; await OnChanged(); }
+    private async Task OnActiveChanged(bool value) { Model.IsActive = value; await OnChanged(); }
 }

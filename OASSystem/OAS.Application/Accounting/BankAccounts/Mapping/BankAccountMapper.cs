@@ -11,7 +11,7 @@ public sealed class BankAccountMapper : ICrudMapper<BankAccount, Guid, BankAccou
 
     public void Update(UpdateBankAccountRequest source, BankAccount destination)
     {
-        destination.UpdateDetails(destination.Code, source.BankName, source.AccountName, source.AccountNumber, source.IBAN, destination.AccountId, source.CurrencyId);
+        destination.UpdateDetails(destination.Code, source.BankName, source.AccountName, source.AccountNumber, BankIban.Normalize(source.IBAN), destination.AccountId, source.CurrencyId);
         destination.SetActive(source.IsActive);
     }
 

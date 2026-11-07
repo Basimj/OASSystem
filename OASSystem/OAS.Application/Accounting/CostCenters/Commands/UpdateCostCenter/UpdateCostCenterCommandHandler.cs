@@ -1,6 +1,7 @@
 using MediatR;
 using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Accounting.CostCenters.Mapping;
+using OAS.Application.Accounting.CostCenters.Services;
 using OAS.Application.Common.Exceptions;
 using OAS.Domain.Accounting.Entities;
 
@@ -34,6 +35,8 @@ public sealed class UpdateCostCenterCommandHandler(
             throw new ConcurrencyException("The cost center has been modified by another user.");
         }
 
+        await CostCenterHierarchyValidator.ValidateAsync(
+            repository, request.Data.ParentCostCenterId, entity.Id, cancellationToken);
         mapper.Update(request.Data, entity);
         repository.Update(entity);
         return entity;

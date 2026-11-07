@@ -49,31 +49,11 @@
 
     </UiAccountingFormSection>
 
-    <UiAccountingFormSection Title="حالة السنة المالية"
-                             Subtitle="إدارة دورة السنة المالية"
-                             IconCssClass="fa-solid fa-lock">
-
-        <UiAccountingFormGrid Columns="2">
-
-            <UiSelect Label="حالة السنة"
-                      @bind-Value="StatusValue"
-                      @bind-Value:after="NotifyModelChangedAsync"
-                      Options="@AccountingArabicPresenter.FiscalYearStatusOptions"
-                      Disabled="@(!CanEditWorkflow)"
-                      Size="ControlSize.Small" />
-
-            @if (!string.IsNullOrWhiteSpace(Model.RowVersion))
-            {
-                <UiInputText Label="إصدار السجل"
-                             @bind-Value="Model.RowVersion"
-                             ReadOnly="true"
-                             Disabled="true"
-                             Size="ControlSize.Small" />
-            }
-
-        </UiAccountingFormGrid>
-
-    </UiAccountingFormSection>
+    <section class="oas-fiscal-editor__workflow" aria-label="دورة السنة المالية">
+        <div><i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+            <strong>حالة السنة: @AccountingArabicPresenter.GetFiscalYearStatusText(Model.Status)</strong></div>
+        <p>حفظ البيانات لا يفتح السنة ولا يغيّر حالة الإقفال. بعد حفظ السنة، استخدم إجراءات الحالة المستقلة في الشريط العلوي، مع فحص جاهزية الإقفال قبل الإغلاق النهائي.</p>
+    </section>
 
 </UiAccountingEditorSurface>
 
@@ -91,7 +71,7 @@
         public DateOnly? EndDate { get; set; }
 
         public FiscalYearStatus Status { get; set; } =
-            FiscalYearStatus.Open;
+            FiscalYearStatus.Future;
 
         public FiscalYearStatus OriginalStatus { get; set; } =
             FiscalYearStatus.Future;
@@ -112,7 +92,7 @@
             12,
             31),
 
-        Status = FiscalYearStatus.Open,
+        Status = FiscalYearStatus.Future,
 
         OriginalStatus = FiscalYearStatus.Future
     };
@@ -134,34 +114,6 @@
                    (IsNew ||
                     Model.OriginalStatus ==
                     FiscalYearStatus.Future);
-        }
-    }
-
-    private bool CanEditWorkflow
-    {
-        get
-        {
-            return IsEditable &&
-                   Model.Status !=
-                   FiscalYearStatus.Closed;
-        }
-    }
-
-    private string StatusValue
-    {
-        get
-        {
-            return Model.Status.ToString();
-        }
-        set
-        {
-            if (Enum.TryParse<FiscalYearStatus>(
-                    value,
-                    true,
-                    out var status))
-            {
-                Model.Status = status;
-            }
         }
     }
 

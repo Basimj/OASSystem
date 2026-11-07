@@ -1,3 +1,4 @@
+using OAS.Contracts.Accounting.BankAccounts;
 using FluentValidation;
 
 namespace OAS.Application.Accounting.BankAccounts.Commands.CreateBankAccount;
@@ -33,6 +34,9 @@ public sealed class CreateBankAccountCommandValidator
         RuleFor(x => x.Data.IBAN)
             .MaximumLength(50)
             .WithErrorCode("iban_max_length")
+            .Must(BankIban.IsValid)
+            .WithErrorCode("iban_invalid")
+            .WithMessage("The IBAN format or check digits are invalid.")
             .When(x => !string.IsNullOrWhiteSpace(x.Data.IBAN));
 
         RuleFor(x => x.Data.CurrencyId)

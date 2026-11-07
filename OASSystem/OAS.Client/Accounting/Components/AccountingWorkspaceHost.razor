@@ -14,8 +14,8 @@
 }
 
 <UiAccountingWorkspace ShowTabs="@Section.HasValue"
-                       InlineTabsWithActions="@(Section is AccountingEntityType.Accounts or AccountingEntityType.Journals or AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers)"
-                       AdditionalCssClass='@(Section == AccountingEntityType.Accounts ? "ui-acc-workspace--account-management" : Section == AccountingEntityType.Journals ? "ui-acc-workspace--journals" : Section is AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers ? "ui-acc-workspace--vouchers" : null)'>
+                       InlineTabsWithActions="@(Section is AccountingEntityType.Accounts or AccountingEntityType.Journals or AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers or AccountingEntityType.CashAccounts or AccountingEntityType.BankAccounts or AccountingEntityType.CashShifts or AccountingEntityType.FiscalYears or AccountingEntityType.CostCenters)"
+                       AdditionalCssClass='@(Section == AccountingEntityType.Accounts ? "ui-acc-workspace--account-management" : Section == AccountingEntityType.Journals ? "ui-acc-workspace--journals" : Section is AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers ? "ui-acc-workspace--vouchers" : Section is AccountingEntityType.CashAccounts or AccountingEntityType.BankAccounts or AccountingEntityType.CashShifts ? "ui-acc-workspace--cashbank" : Section == AccountingEntityType.FiscalYears ? "ui-acc-workspace--fiscal" : Section == AccountingEntityType.CostCenters ? "ui-acc-workspace--cost-centers" : null)'>
 
     <Actions>
 
@@ -117,6 +117,13 @@
                               Size="ControlSize.Small"
                               OnClick="@(() => OpenNewRecord(AccountingEntityType.BankAccounts))" />
                 }
+                else if (Section == AccountingEntityType.CashShifts)
+                {
+                    <UiButton Text="فتح وردية جديدة"
+                              IconCssClass="fa-solid fa-cash-register"
+                              Size="ControlSize.Small"
+                              OnClick="@(() => OpenNewRecord(AccountingEntityType.CashShifts))" />
+                }
                 else if (Section == AccountingEntityType.FiscalYears)
                 {
                     <UiButton Text="سنة مالية جديدة"
@@ -126,6 +133,7 @@
 
                     <UiButton Text="فترة مالية جديدة"
                               IconCssClass="fa-solid fa-calendar-week"
+                              Disabled="@(!_selectedFiscalYearId.HasValue)"
                               Variant="ButtonVariant.Secondary"
                               Size="ControlSize.Small"
                               OnClick="@(() => OpenNewRecord(AccountingEntityType.FiscalPeriods))" />
@@ -185,7 +193,28 @@
             }
             else
             {
-                @if (ShowStandardEditActions && activeTab?.EntityType != AccountingEntityType.PaymentAllocations)
+                @if (activeTab is not null &&
+                     (activeTab.EntityType == AccountingEntityType.CashAccounts ||
+                      activeTab.EntityType == AccountingEntityType.BankAccounts ||
+                      activeTab.EntityType == AccountingEntityType.CashShifts))
+                {
+                    @if (activeTab.IsNew || activeTab.IsEditMode)
+                    {
+                        <UiButton Text="حفظ" IconCssClass="fa-solid fa-floppy-disk"
+                                  Size="ControlSize.Small" Disabled="@(!CanSaveActive)"
+                                  Loading="@activeTab.IsSaving" OnClick="SaveActiveAsync" />
+                        <UiButton Text="إلغاء" IconCssClass="fa-solid fa-arrow-rotate-left"
+                                  Variant="ButtonVariant.Ghost" Size="ControlSize.Small"
+                                  Disabled="@(!CanCancelActive)" OnClick="CancelActiveEdit" />
+                    }
+                    else if (activeTab.EntityType == AccountingEntityType.CashAccounts || activeTab.EntityType == AccountingEntityType.BankAccounts)
+                    {
+                        <UiButton Text="تعديل" IconCssClass="fa-solid fa-pen-to-square"
+                                  Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
+                                  Disabled="@(!CanEditActive)" OnClick="BeginEditActive" />
+                    }
+                }
+                else if (ShowStandardEditActions && activeTab?.EntityType != AccountingEntityType.PaymentAllocations)
                 {
                     <UiButton Text="تعديل"
                               IconCssClass="fa-solid fa-pen-to-square"
@@ -207,6 +236,61 @@
                               Size="ControlSize.Small"
                               Disabled="@(!CanCancelActive)"
                               OnClick="CancelActiveEdit" />
+                }
+
+                @if (activeTab is { IsNew: false, Model: FiscalYearEditor.FormModel activeYear } &&
+                     activeTab.EntityType == AccountingEntityType.FiscalYears)
+                {
+                    @if (activeYear.Status == FiscalYearStatus.Future || activeYear.Status == FiscalYearStatus.Closing)
+                    {
+                        <UiButton Text="فتح السنة" IconCssClass="fa-solid fa-lock-open"
+                                  Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
+                                  Disabled="@(!CanRunFiscalAction(activeTab) || _fiscalActionBusy)"
+                                  OnClick="@(() => ChangeActiveFiscalYearStatusAsync(FiscalYearStatus.Open))" />
+                    }
+                    @if (activeYear.Status == FiscalYearStatus.Open)
+                    {
+                        <UiButton Text="بدء الإقفال" IconCssClass="fa-solid fa-hourglass-start"
+                                  Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
+                                  Disabled="@(!CanRunFiscalAction(activeTab) || _fiscalActionBusy)"
+                                  OnClick="@(() => ChangeActiveFiscalYearStatusAsync(FiscalYearStatus.Closing))" />
+                    }
+                    @if (activeYear.Status == FiscalYearStatus.Closing)
+                    {
+                        <UiButton Text="فحص الجاهزية" IconCssClass="fa-solid fa-list-check"
+                                  Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
+                                  Disabled="@(!CanRunFiscalAction(activeTab) || _fiscalActionBusy)"
+                                  OnClick="CheckActiveFiscalReadinessAsync" />
+                        <UiButton Text="الإقفال النهائي" IconCssClass="fa-solid fa-lock"
+                                  Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
+                                  Disabled="@(!CanRunFiscalAction(activeTab) || _fiscalActionBusy)"
+                                  OnClick="@(() => ChangeActiveFiscalYearStatusAsync(FiscalYearStatus.Closed))" />
+                    }
+                }
+                @if (activeTab is { IsNew: false, Model: FiscalPeriodEditor.FormModel activePeriod } &&
+                     activeTab.EntityType == AccountingEntityType.FiscalPeriods)
+                {
+                    @if (activePeriod.Status == FiscalPeriodStatus.Open)
+                    {
+                        <UiButton Text="إغلاق مبدئي" IconCssClass="fa-solid fa-clock"
+                                  Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
+                                  Disabled="@(!CanRunFiscalAction(activeTab) || _fiscalActionBusy)"
+                                  OnClick="@(() => ChangeActiveFiscalPeriodStatusAsync(FiscalPeriodStatus.SoftClosed))" />
+                    }
+                    @if (activePeriod.Status != FiscalPeriodStatus.Closed)
+                    {
+                        <UiButton Text="فحص الجاهزية" IconCssClass="fa-solid fa-list-check"
+                                  Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
+                                  Disabled="@(!CanRunFiscalAction(activeTab) || _fiscalActionBusy)"
+                                  OnClick="CheckActiveFiscalReadinessAsync" />
+                        @if (activePeriod.Status == FiscalPeriodStatus.SoftClosed)
+                        {
+                        <UiButton Text="إغلاق نهائي" IconCssClass="fa-solid fa-lock"
+                                  Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
+                                  Disabled="@(!CanRunFiscalAction(activeTab) || _fiscalActionBusy)"
+                                  OnClick="@(() => ChangeActiveFiscalPeriodStatusAsync(FiscalPeriodStatus.Closed))" />
+                        }
+                    }
                 }
 
                 @if (activeTab is not null &&
@@ -232,6 +316,23 @@
                               Variant="ButtonVariant.Secondary"
                               Size="ControlSize.Small"
                               OnClick="OpenAllocationForActiveVoucherAsync" />
+                }
+
+                @if (activeTab is { EntityType: AccountingEntityType.CashShifts, EntityId: Guid, IsNew: false, IsSaving: false } &&
+                     activeTab.Model is CashShiftEditor.FormModel activeShift)
+                {
+                    @if (activeShift.Status == CashShiftStatus.Open)
+                    {
+                        <UiButton Text="إغلاق الوردية" IconCssClass="fa-solid fa-lock"
+                                  Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
+                                  OnClick="CloseActiveCashShiftAsync" />
+                    }
+                    else if (activeShift.Status == CashShiftStatus.Closed)
+                    {
+                        <UiButton Text="اعتماد الوردية" IconCssClass="fa-solid fa-circle-check"
+                                  Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
+                                  OnClick="ApproveActiveCashShiftAsync" />
+                    }
                 }
 
                 <UiButton Text="تحديث"
@@ -672,6 +773,7 @@
                                       IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
                                       IsNew="@activeTab.IsNew"
                                       ParentCostCenterLookupItem="@GetCostCenterLookup(model.ParentCostCenterId)"
+                                      ParentPath="@GetCostCenterParentPath(model.ParentCostCenterId)"
                                       CostCenterSearchAsync="SearchCostCentersAsync"
                                       OnModelChanged="MarkActiveDirty" />
 
@@ -764,29 +866,9 @@
                                      IsNew="@activeTab.IsNew"
                                      CashAccountLookupItem="@GetCashAccountLookup(model.CashAccountId)"
                                      CashAccountSearchAsync="SearchCashAccountsAsync"
-                                     OnModelChanged="MarkActiveDirty">
-
-                        <Actions>
-
-                            @if (model.Status == CashShiftStatus.Open)
-                            {
-                                <UiButton Text="إغلاق الوردية"
-                                          IconCssClass="fa-solid fa-lock"
-                                          Variant="ButtonVariant.Secondary"
-                                          Size="ControlSize.Small"
-                                          OnClick="CloseActiveCashShiftAsync" />
-                            }
-                            else if (model.Status == CashShiftStatus.Closed)
-                            {
-                                <UiButton Text="اعتماد الوردية"
-                                          IconCssClass="fa-solid fa-circle-check"
-                                          Size="ControlSize.Small"
-                                          OnClick="ApproveActiveCashShiftAsync" />
-                            }
-
-                        </Actions>
-
-                    </CashShiftEditor>
+                                     CurrencyLabel="@GetShiftCurrencyLabel(model.CashAccountId)"
+                                     CurrencyDecimalPlaces="@GetShiftCurrencyDecimals(model.CashAccountId)"
+                                     OnModelChanged="OnCashShiftModelChangedAsync" />
 
                     break;
 
@@ -839,91 +921,205 @@
         {
             @if (Section == AccountingEntityType.CashAccounts)
             {
-                <UiAccountingFormSection Title="الصناديق والخزائن"
-                                         Subtitle="الصناديق النقدية المرتبطة بحسابات الأستاذ العام"
-                                         IconCssClass="fa-solid fa-vault">
-
+                <section class="oas-cashbank-directory" aria-label="قائمة الصناديق والخزائن">
+                    <div class="oas-cashbank-directory__heading">
+                        <div><h2><i class="fa-solid fa-vault" aria-hidden="true"></i> الصناديق والخزائن</h2><p>إدارة الصناديق وعملاتها وربطها بحسابات الأستاذ العام</p></div>
+                        <span class="oas-cashbank-directory__page-label">الإجمالي يشمل جميع النتائج المطابقة؛ تفصيل النشاط يخص الصفحة الحالية</span>
+                    </div>
+                    <div class="oas-cashbank-kpis">
+                        <div class="oas-cashbank-kpi"><i class="fa-solid fa-vault"></i><div><span>إجمالي الصناديق المطابقة للبحث</span><strong>@_cashAccountsPage.TotalCount</strong></div></div>
+                        <div class="oas-cashbank-kpi"><i class="fa-solid fa-circle-check"></i><div><span>نشط في الصفحة</span><strong>@_cashAccountsPage.Items.Count(x => x.IsActive)</strong></div></div>
+                        <div class="oas-cashbank-kpi"><i class="fa-solid fa-circle-pause"></i><div><span>غير نشط في الصفحة</span><strong>@_cashAccountsPage.Items.Count(x => !x.IsActive)</strong></div></div>
+                        <div class="oas-cashbank-kpi"><i class="fa-solid fa-star"></i><div><span>افتراضي في الصفحة</span><strong>@_cashAccountsPage.Items.Count(x => x.IsDefault)</strong></div></div>
+                    </div>
+                    <div class="oas-cashbank-directory__filter">
+                        <label for="oas-cash-state">الحالة</label>
+                        <select id="oas-cash-state" value="@CashBankStatusFilter" @onchange="OnCashBankStatusFilterChanged">
+                            <option value="">الكل</option><option value="active">نشط</option><option value="inactive">غير نشط</option>
+                        </select>
+                    </div>
                     <UiAccountingRecordList Items="@BuildCashAccountItems()"
-                                            EmptyTitle="لا توجد صناديق"
-                                            OnOpen='@(id => OpenRecordInTab(AccountingEntityType.CashAccounts, id, "صندوق"))' />
-
-                    <UiPagination PageNumber="@_cashAccountsPage.PageNumber"
-                                  TotalPages="@_cashAccountsPage.TotalPages"
-                                  TotalCount="@_cashAccountsPage.TotalCount"
-                                  OnPrevious="@(() => ChangePageAsync(AccountingEntityType.CashAccounts, -1))"
-                                  OnNext="@(() => ChangePageAsync(AccountingEntityType.CashAccounts, 1))" />
-
-                </UiAccountingFormSection>
+                                            FinancialStyle="true"
+                                            EmptyTitle="لا توجد صناديق مطابقة للبحث"
+                                            OnOpen="OpenCashAccountRecord" />
+                    <UiPagination PageNumber="@_cashAccountsPage.PageNumber" TotalPages="@_cashAccountsPage.TotalPages" TotalCount="@_cashAccountsPage.TotalCount"
+                                  OnPrevious="@(() => ChangePageAsync(AccountingEntityType.CashAccounts, -1))" OnNext="@(() => ChangePageAsync(AccountingEntityType.CashAccounts, 1))" />
+                </section>
             }
             else if (Section == AccountingEntityType.BankAccounts)
             {
-                <UiAccountingFormSection Title="الحسابات البنكية"
-                                         Subtitle="الحسابات البنكية المرتبطة بدليل الحسابات"
-                                         IconCssClass="fa-solid fa-building-columns">
-
+                <section class="oas-cashbank-directory" aria-label="قائمة الحسابات البنكية">
+                    <div class="oas-cashbank-directory__heading">
+                        <div><h2><i class="fa-solid fa-building-columns" aria-hidden="true"></i> الحسابات البنكية</h2><p>الحسابات البنكية وربطها المحاسبي وبياناتها الحقيقية من النظام</p></div>
+                        <span class="oas-cashbank-directory__page-label">لا تعرض القائمة رصيدًا غير متوفر من مصدر موثوق</span>
+                    </div>
+                    <div class="oas-cashbank-kpis">
+                        <div class="oas-cashbank-kpi"><i class="fa-solid fa-building-columns"></i><div><span>إجمالي الحسابات المطابقة للبحث</span><strong>@_bankAccountsPage.TotalCount</strong></div></div>
+                        <div class="oas-cashbank-kpi"><i class="fa-solid fa-circle-check"></i><div><span>نشط في الصفحة</span><strong>@_bankAccountsPage.Items.Count(x => x.IsActive)</strong></div></div>
+                        <div class="oas-cashbank-kpi"><i class="fa-solid fa-circle-pause"></i><div><span>غير نشط في الصفحة</span><strong>@_bankAccountsPage.Items.Count(x => !x.IsActive)</strong></div></div>
+                    </div>
+                    <div class="oas-cashbank-directory__filter"><label for="oas-bank-state">الحالة</label>
+                        <select id="oas-bank-state" value="@CashBankStatusFilter" @onchange="OnCashBankStatusFilterChanged">
+                            <option value="">الكل</option><option value="active">نشط</option><option value="inactive">غير نشط</option>
+                        </select>
+                    </div>
                     <UiAccountingRecordList Items="@BuildBankAccountItems()"
-                                            EmptyTitle="لا توجد حسابات بنكية"
-                                            OnOpen='@(id => OpenRecordInTab(AccountingEntityType.BankAccounts, id, "حساب بنكي"))' />
-
-                    <UiPagination PageNumber="@_bankAccountsPage.PageNumber"
-                                  TotalPages="@_bankAccountsPage.TotalPages"
-                                  TotalCount="@_bankAccountsPage.TotalCount"
-                                  OnPrevious="@(() => ChangePageAsync(AccountingEntityType.BankAccounts, -1))"
-                                  OnNext="@(() => ChangePageAsync(AccountingEntityType.BankAccounts, 1))" />
-
-                </UiAccountingFormSection>
+                                            FinancialStyle="true"
+                                            EmptyTitle="لا توجد حسابات بنكية مطابقة"
+                                            OnOpen="OpenBankAccountRecord" />
+                    <UiPagination PageNumber="@_bankAccountsPage.PageNumber" TotalPages="@_bankAccountsPage.TotalPages" TotalCount="@_bankAccountsPage.TotalCount"
+                                  OnPrevious="@(() => ChangePageAsync(AccountingEntityType.BankAccounts, -1))" OnNext="@(() => ChangePageAsync(AccountingEntityType.BankAccounts, 1))" />
+                </section>
+            }
+            else if (Section == AccountingEntityType.CashShifts)
+            {
+                <section class="oas-cashbank-directory" aria-label="قائمة ورديات الصندوق">
+                    <div class="oas-cashbank-directory__heading"><div><h2><i class="fa-solid fa-cash-register"></i> ورديات الصندوق</h2><p>سجل الافتتاح والإغلاق والجرد، مع إبراز حالة كل وردية</p></div>
+                        <span class="oas-cashbank-directory__page-label">الرصيد المتوقع وفرق الجرد مبدئيان حتى استكمال مطابقة الحركات</span>
+                    </div>
+                    <div class="oas-cashbank-kpis">
+                        <div class="oas-cashbank-kpi"><i class="fa-solid fa-list-check"></i><div><span>إجمالي الورديات المطابقة للبحث</span><strong>@_cashShiftsPage.TotalCount</strong></div></div>
+                        <div class="oas-cashbank-kpi"><i class="fa-solid fa-door-open"></i><div><span>مفتوحة في الصفحة</span><strong>@_cashShiftsPage.Items.Count(x => x.Status == CashShiftStatus.Open)</strong></div></div>
+                        <div class="oas-cashbank-kpi"><i class="fa-solid fa-lock"></i><div><span>مغلقة في الصفحة</span><strong>@_cashShiftsPage.Items.Count(x => x.Status == CashShiftStatus.Closed)</strong></div></div>
+                        <div class="oas-cashbank-kpi"><i class="fa-solid fa-circle-check"></i><div><span>معتمدة في الصفحة</span><strong>@_cashShiftsPage.Items.Count(x => x.Status == CashShiftStatus.Approved)</strong></div></div>
+                    </div>
+                    <div class="oas-cashbank-directory__filter"><label for="oas-shift-state">الحالة</label>
+                        <select id="oas-shift-state" value="@CashBankStatusFilter" @onchange="OnCashBankStatusFilterChanged">
+                            <option value="">الكل</option><option value="open">مفتوحة</option><option value="closing">قيد الإغلاق</option><option value="closed">مغلقة</option><option value="approved">معتمدة</option>
+                        </select>
+                    </div>
+                    <UiAccountingRecordList Items="@BuildCashShiftItems()"
+                                            FinancialStyle="true"
+                                            EmptyTitle="لا توجد ورديات مطابقة للبحث"
+                                            OnOpen="OpenCashShiftRecord" />
+                    <UiPagination PageNumber="@_cashShiftsPage.PageNumber" TotalPages="@_cashShiftsPage.TotalPages" TotalCount="@_cashShiftsPage.TotalCount"
+                                  OnPrevious="@(() => ChangePageAsync(AccountingEntityType.CashShifts, -1))" OnNext="@(() => ChangePageAsync(AccountingEntityType.CashShifts, 1))" />
+                </section>
             }
             else if (Section == AccountingEntityType.FiscalYears)
             {
-                <UiAccountingFormSection Title="السنوات المالية"
-                                         Subtitle="تعريف نطاقات السنة وحالتها"
-                                         IconCssClass="fa-solid fa-calendar-days">
-
-                    <UiAccountingRecordList Items="@BuildFiscalYearItems()"
-                                            EmptyTitle="لا توجد سنوات مالية"
-                                            OnOpen='@(id => OpenRecordInTab(AccountingEntityType.FiscalYears, id, "سنة مالية"))' />
-
-                    <UiPagination PageNumber="@_fiscalYearsPage.PageNumber"
-                                  TotalPages="@_fiscalYearsPage.TotalPages"
-                                  TotalCount="@_fiscalYearsPage.TotalCount"
-                                  OnPrevious="@(() => ChangePageAsync(AccountingEntityType.FiscalYears, -1))"
-                                  OnNext="@(() => ChangePageAsync(AccountingEntityType.FiscalYears, 1))" />
-
-                </UiAccountingFormSection>
-
-                <UiAccountingFormSection Title="الفترات المالية"
-                                         Subtitle="الفترات وحالات إقفال المبيعات والمخزون والمحاسبة"
-                                         IconCssClass="fa-solid fa-calendar-week">
-
-                    <UiWorkspaceActionBar>
-
-                        <UiSpreadsheetActions CanImport="false"
-                                              Busy="_spreadsheetBusy"
-                                              OnImport="@(() => OpenSpreadsheet(AccountingEntityType.FiscalPeriods))"
-                                              OnTemplate="@(() => DownloadSpreadsheet(AccountingEntityType.FiscalPeriods, true))"
-                                              OnExport="@(() => DownloadSpreadsheet(AccountingEntityType.FiscalPeriods, false))" />
-
-                    </UiWorkspaceActionBar>
-
-                    <UiAccountingRecordList Items="@BuildFiscalPeriodItems()"
-                                            EmptyTitle="لا توجد فترات مالية"
-                                            OnOpen='@(id => OpenRecordInTab(AccountingEntityType.FiscalPeriods, id, "فترة مالية"))' />
-
-                    <UiPagination PageNumber="@_fiscalPeriodsPage.PageNumber"
-                                  TotalPages="@_fiscalPeriodsPage.TotalPages"
-                                  TotalCount="@_fiscalPeriodsPage.TotalCount"
-                                  OnPrevious="@(() => ChangePageAsync(AccountingEntityType.FiscalPeriods, -1))"
-                                  OnNext="@(() => ChangePageAsync(AccountingEntityType.FiscalPeriods, 1))" />
-
-                </UiAccountingFormSection>
+                <div class="oas-fiscal-overview" dir="rtl">
+                    <section class="oas-fiscal-overview__years" aria-label="قائمة السنوات المالية">
+                        <header class="oas-fiscal-overview__heading">
+                            <div>
+                                <h2><i class="fa-solid fa-calendar-days" aria-hidden="true"></i> السنوات المالية</h2>
+                                <p>اختر السنة لعرض فتراتها، أو افتح سجلها لإدارة البيانات والحالة.</p>
+                            </div>
+                            <span class="oas-fiscal-overview__total">@_fiscalYearsPage.TotalCount سنة</span>
+                        </header>
+                        <div class="oas-fiscal-overview__year-list">
+                            @if (_fiscalYearsPage.Items.Count == 0)
+                            {
+                                <UiAccountingEmptyState Title="لا توجد سنوات مالية" Description="أنشئ سنة مالية أولًا، ثم أضف الفترات التابعة لها." />
+                            }
+                            @foreach (var year in _fiscalYearsPage.Items)
+                            {
+                                <div class="@(_selectedFiscalYearId == year.Id ? "oas-fiscal-year is-selected" : "oas-fiscal-year")" @key="year.Id">
+                                    <button type="button" class="oas-fiscal-year__select"
+                                            aria-pressed="@(_selectedFiscalYearId == year.Id)"
+                                            title="عرض فترات @year.Name" @onclick="@(() => SelectFiscalYearAsync(year.Id))">
+                                        <span class="oas-fiscal-year__icon"><i class="fa-solid fa-calendar-days" aria-hidden="true"></i></span>
+                                        <span class="oas-fiscal-year__content">
+                                            <strong dir="auto">@year.Code — @year.Name</strong>
+                                            <small dir="ltr">@year.StartDate.ToString("yyyy/MM/dd") — @year.EndDate.ToString("yyyy/MM/dd")</small>
+                                        </span>
+                                        <span class="@($"oas-fiscal-state {FiscalYearState(year.Status)}")">@AccountingArabicPresenter.GetFiscalYearStatusText(year.Status)</span>
+                                    </button>
+                                    <button type="button" class="oas-fiscal-year__details"
+                                            title="فتح بيانات السنة @year.Name" aria-label="فتح بيانات السنة @year.Name"
+                                            @onclick="@(() => OpenFiscalYearDetailsAsync(year.Id))">
+                                        <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
+                                    </button>
+                                </div>
+                            }
+                        </div>
+                        <UiPagination PageNumber="@_fiscalYearsPage.PageNumber"
+                                      TotalPages="@_fiscalYearsPage.TotalPages" TotalCount="@_fiscalYearsPage.TotalCount"
+                                      OnPrevious="@(() => ChangePageAsync(AccountingEntityType.FiscalYears, -1))"
+                                      OnNext="@(() => ChangePageAsync(AccountingEntityType.FiscalYears, 1))" />
+                    </section>
+                    <section class="oas-fiscal-overview__periods" aria-label="فترات السنة المحددة">
+                        <header class="oas-fiscal-overview__heading">
+                            <div>
+                                <h2><i class="fa-solid fa-calendar-week" aria-hidden="true"></i> الفترات المالية</h2>
+                                <p>@(_fiscalYearsPage.Items.FirstOrDefault(x => x.Id == _selectedFiscalYearId)?.Name ?? GetFiscalYearLookup(_selectedFiscalYearId)?.PrimaryText ?? "حدد سنة مالية لعرض فتراتها")</p>
+                            </div>
+                            <span class="oas-fiscal-overview__total">@_fiscalPeriodsPage.TotalCount فترة</span>
+                        </header>
+                        @if (_selectedFiscalYearId.HasValue)
+                        {
+                            <UiAccountingRecordList Items="@BuildFiscalPeriodItems()"
+                                                    FinancialStyle="true" EmptyTitle="لا توجد فترات لهذه السنة"
+                                                    EmptyDescription="أضف فترة مالية للسنة المحددة أو اختر سنة أخرى."
+                                                    OnOpen="OpenSelectedFiscalPeriodAsync" />
+                            <UiPagination PageNumber="@_fiscalPeriodsPage.PageNumber"
+                                          TotalPages="@_fiscalPeriodsPage.TotalPages" TotalCount="@_fiscalPeriodsPage.TotalCount"
+                                          OnPrevious="@(() => ChangePageAsync(AccountingEntityType.FiscalPeriods, -1))"
+                                          OnNext="@(() => ChangePageAsync(AccountingEntityType.FiscalPeriods, 1))" />
+                        }
+                        else
+                        {
+                            <UiAccountingEmptyState Title="اختر السنة المالية" Description="ستظهر هنا الفترات المالية المرتبطة بالسنة المختارة." />
+                        }
+                    </section>
+                </div>
             }
             else if (Section == AccountingEntityType.Expenses)
             {
+                <nav class="oas-expense-directory__views" aria-label="التبديل بين المصروفات وأنواعها">
+                    <button type="button" class="@(!_showExpenseTypes ? "is-active" : string.Empty)"
+                            aria-pressed="@(!_showExpenseTypes)" @onclick="() => SetExpenseView(false)">
+                        <i class="fa-solid fa-receipt" aria-hidden="true"></i> المصروفات
+                    </button>
+                    <button type="button" class="@(_showExpenseTypes ? "is-active" : string.Empty)"
+                            aria-pressed="@(_showExpenseTypes)" @onclick="() => SetExpenseView(true)">
+                        <i class="fa-solid fa-tags" aria-hidden="true"></i> أنواع المصروفات
+                    </button>
+                </nav>
+                @if (!_showExpenseTypes)
+                {
                 <UiAccountingFormSection Title="المصروفات"
                                          Subtitle="المصروفات التشغيلية وحالة اعتمادها وترحيلها"
                                          IconCssClass="fa-solid fa-receipt">
 
+                    <div class="oas-expense-directory__stats">
+                        <div><small>المصروفات المطابقة للبحث والفلاتر</small><strong>@_expensesPage.TotalCount.ToString("N0")</strong></div>
+                        <div><small>مرحلة في الصفحة الحالية</small><strong>@_expensesPage.Items.Count(x => x.Status == ExpenseStatus.Posted)</strong></div>
+                        <div><small>غير مرحلة في الصفحة الحالية</small><strong>@_expensesPage.Items.Count(x => x.Status is ExpenseStatus.Draft or ExpenseStatus.Approved)</strong></div>
+                    </div>
+                    <div class="oas-financial-directory__filters oas-expense-directory__filters">
+                        <label for="expense-status-filter">الحالة</label>
+                        <select id="expense-status-filter" value="@_expenseStatusFilter" @onchange="OnExpenseStatusChanged">
+                            <option value="">كل الحالات</option>
+                            <option value="draft">مسودة</option>
+                            <option value="approved">معتمد</option>
+                            <option value="posted">مرحّل</option>
+                            <option value="cancelled">ملغي</option>
+                        </select>
+                        <label for="expense-method-filter">طريقة الدفع</label>
+                        <select id="expense-method-filter" value="@_expensePaymentFilter" @onchange="OnExpensePaymentChanged">
+                            <option value="">جميع الطرق</option>
+                            <option value="1">نقدًا</option>
+                            <option value="2">بطاقة</option>
+                            <option value="3">تحويل بنكي</option>
+                            <option value="4">شيك</option>
+                            <option value="5">أخرى</option>
+                        </select>
+                        <label for="expense-from-filter">من تاريخ</label>
+                        <input id="expense-from-filter" type="date" value="@ExpenseDateFromText" @onchange="OnExpenseDateFromChanged" />
+                        <label for="expense-to-filter">إلى تاريخ</label>
+                        <input id="expense-to-filter" type="date" value="@ExpenseDateToText" min="@ExpenseDateFromText" @onchange="OnExpenseDateToChanged" />
+                        <div class="oas-expense-directory__type-filter">
+                            <UiLookup Label="نوع المصروف" Value='@_expenseTypeFilter?.ToString("D")'
+                                      ValueChanged="OnExpenseTypeFilterChanged"
+                                      SelectedItem="@GetExpenseTypeLookup(_expenseTypeFilter)"
+                                      SearchAsync="SearchExpenseTypesAsync"
+                                      Placeholder="جميع الأنواع" UsePopover="true"
+                                      MinimumSearchLength="0" DebounceMilliseconds="250" />
+                        </div>
+                    </div>
                     <UiAccountingRecordList Items="@BuildExpenseItems()"
+                                            FinancialStyle="true"
                                             EmptyTitle="لا توجد مصروفات"
                                             OnOpen='@(id => OpenRecordInTab(AccountingEntityType.Expenses, id, "مصروف"))' />
 
@@ -934,9 +1130,11 @@
                                   OnNext="@(() => ChangePageAsync(AccountingEntityType.Expenses, 1))" />
 
                 </UiAccountingFormSection>
-
+                }
+                else
+                {
                 <UiAccountingFormSection Title="أنواع المصروفات"
-                                         Subtitle="التصنيف والحساب الافتراضي لكل نوع"
+                                         Subtitle="الأكواد والتصنيفات والحسابات الافتراضية، مع تصفية النشاط"
                                          IconCssClass="fa-solid fa-tags">
 
                     <UiWorkspaceActionBar>
@@ -949,8 +1147,18 @@
 
                     </UiWorkspaceActionBar>
 
+                    <div class="oas-expense-types__toolbar" dir="rtl">
+                        <span class="oas-expense-types__count"><i class="fa-solid fa-tags" aria-hidden="true"></i> @_expenseTypesPage.TotalCount.ToString("N0") نوع ضمن نتائج البحث</span>
+                        <label for="oas-expense-type-status">الحالة</label>
+                        <select id="oas-expense-type-status" value="@_expenseTypeStatusFilter" @onchange="OnExpenseTypeStatusChanged">
+                            <option value="">جميع الأنواع</option>
+                            <option value="active">الأنواع النشطة</option>
+                            <option value="inactive">الأنواع المعطلة</option>
+                        </select>
+                    </div>
                     <UiAccountingRecordList Items="@BuildExpenseTypeItems()"
-                                            EmptyTitle="لا توجد أنواع مصروفات"
+                                            FinancialStyle="true"
+                                            EmptyTitle="لا توجد أنواع مطابقة"
                                             OnOpen='@(id => OpenRecordInTab(AccountingEntityType.ExpenseTypes, id, "نوع مصروف"))' />
 
                     <UiPagination PageNumber="@_expenseTypesPage.PageNumber"
@@ -960,6 +1168,7 @@
                                   OnNext="@(() => ChangePageAsync(AccountingEntityType.ExpenseTypes, 1))" />
 
                 </UiAccountingFormSection>
+                }
             }
             else if (Section is AccountingEntityType.ReceiptVouchers
             or AccountingEntityType.PaymentVouchers)
@@ -1009,6 +1218,55 @@
                                   OnNext="@(() => ChangeAllocationPageAsync(1))" />
 
                 </UiAccountingFormSection>
+            }
+            else if (Section == AccountingEntityType.CostCenters)
+            {
+                <section class="oas-cost-tree-panel" aria-label="شجرة مراكز التكلفة" dir="rtl">
+                    <header class="oas-fiscal-overview__heading">
+                        <div>
+                            <h2><i class="fa-solid fa-sitemap" aria-hidden="true"></i> شجرة مراكز التكلفة</h2>
+                            <p>مراكز رئيسية وفرعية، مع إمكانية البحث في كامل الشجرة وفتح التفاصيل.</p>
+                        </div>
+                        <span class="oas-fiscal-overview__total">@_allCostCenters.Count مركز</span>
+                    </header>
+                    <div class="oas-cost-tree__toolbar">
+                        <button type="button" @onclick="ToggleAllCostCentersAsync"><i class="fa-solid fa-list-tree" aria-hidden="true"></i> @(AllCostCentersExpanded ? "طي الكل" : "توسيع الكل")</button>
+                        <label for="oas-cost-center-status">الحالة</label>
+                        <select id="oas-cost-center-status" value="@_costCenterStatusFilter" @onchange="OnCostCenterStatusChanged">
+                            <option value="">الكل</option><option value="active">نشط</option><option value="inactive">معطل</option>
+                        </select>
+                    </div>
+                    <div class="oas-cost-tree" role="tree" aria-label="مراكز التكلفة">
+                        @foreach (var node in BuildCostCenterTreeRows())
+                        {
+                            <div @key="node.Center.Id" class="oas-cost-tree__node" role="treeitem"
+                                 aria-level="@(node.Depth + 1)"
+                                 style="@CostCenterIndentStyle(node.Depth)">
+                                <button type="button" class="oas-cost-tree__toggle"
+                                        aria-label="@(node.HasChildren ? (node.IsExpanded ? "طي فروع " : "توسيع فروع ") + node.Center.NameAr : "مركز بدون فروع")"
+                                        aria-expanded="@(node.HasChildren && node.IsExpanded)"
+                                        disabled="@(!node.HasChildren)"
+                                        @onclick="@(() => ToggleCostCenterTreeAsync(node.Center.Id))">
+                                    <i class="@(node.HasChildren ? (node.IsExpanded ? "fa-solid fa-chevron-down" : "fa-solid fa-chevron-left") : "fa-regular fa-circle")" aria-hidden="true"></i>
+                                </button>
+                                <button type="button" class="oas-cost-tree__record"
+                                        @onclick="@(() => OpenRecordInTab(AccountingEntityType.CostCenters, node.Center.Id, "مركز تكلفة"))">
+                                    <span class="oas-cost-tree__icon"><i class="fa-solid fa-folder-tree" aria-hidden="true"></i></span>
+                                    <span class="oas-cost-tree__content">
+                                        <strong dir="auto">@node.Center.Code — @node.Center.NameAr</strong>
+                                        <small>@(node.Center.ParentCostCenterId.HasValue ? "يتبع: " + (GetCostCenterLookup(node.Center.ParentCostCenterId)?.PrimaryText ?? "المركز الأب") : "مركز رئيسي")</small>
+                                    </span>
+                                    <span class="@(node.Center.IsActive ? "oas-fiscal-state active" : "oas-fiscal-state inactive")">@(node.Center.IsActive ? "نشط" : "معطل")</span>
+                                    <i class="fa-solid fa-chevron-left oas-cost-tree__open" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                        }
+                        @if (BuildCostCenterTreeRows().Count == 0)
+                        {
+                            <UiAccountingEmptyState Title="لا توجد مراكز مطابقة" Description="غيّر البحث أو فلتر الحالة أو أضف مركزًا جديدًا." />
+                        }
+                    </div>
+                </section>
             }
             else if (Section == AccountingEntityType.Accounts)
             {

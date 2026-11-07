@@ -29,7 +29,7 @@
                          Disabled="@(!CanEditDetails)"
                          Size="ControlSize.Small" />
 
-            <UiInputText Label="رقم الفترة (1-12)"
+            <UiInputText Label="رقم الفترة"
                          Value="@Model.PeriodNumberText"
                          ValueChanged="OnPeriodNumberChanged"
                          ErrorText="@Model.PeriodNumberError"
@@ -56,15 +56,7 @@
     <UiAccountingFormSection Title="حالة الفترة وأقفال الوحدات التشغيلية"
                              Subtitle="التحكم في إمكانية إجراء العمليات المحاسبية والمخزنية والمبيعات"
                              IconCssClass="fa-solid fa-shield-halved">
-        <UiAccountingFormGrid Columns="2">
-            <UiSelect Label="حالة الفترة"
-                      Value="@Model.Status.ToString()"
-                      ValueChanged="OnStatusChanged"
-                      Options="@AccountingArabicPresenter.FiscalPeriodStatusOptions"
-                      Disabled="@(!CanEditWorkflow)"
-                      Size="ControlSize.Small" />
-        </UiAccountingFormGrid>
-
+        <p class="oas-fiscal-editor__help">الحالة الحالية: <strong>@AccountingArabicPresenter.GetFiscalPeriodStatusText(Model.Status)</strong>. حفظ البيانات والأقفال لا يغيّر حالة الإغلاق؛ استخدم الإجراءات المستقلة أعلى الصفحة للإغلاق المبدئي أو النهائي.</p>
         <UiAccountingCheckGroup>
             <UiCheckbox Label="قفل المبيعات (منع ترحيل فواتير المبيعات)"
                         Value="@Model.SalesLocked"
@@ -111,7 +103,6 @@
 
     private bool CanEditIdentity => IsEditable && IsNew;
     private bool CanEditDetails => IsEditable && (IsNew || Model.OriginalStatus == FiscalPeriodStatus.Open);
-    private bool CanEditWorkflow => IsEditable && Model.OriginalStatus != FiscalPeriodStatus.Closed;
     private bool CanEditLocks => IsEditable && Model.OriginalStatus != FiscalPeriodStatus.Closed;
 
     private void OnChanged() => OnModelChanged.InvokeAsync();
@@ -130,12 +121,4 @@
         OnChanged();
     }
 
-    private void OnStatusChanged(string val)
-    {
-        if (Enum.TryParse<FiscalPeriodStatus>(val, out var res))
-        {
-            Model.Status = res;
-            OnChanged();
-        }
-    }
 }

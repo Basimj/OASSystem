@@ -47,8 +47,8 @@ app.UseRouting();
 var origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 if (origins.Length > 0) app.UseCors("ConfiguredOrigins");
 
-app.UseRateLimiter();
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseMiddleware<ForcedPasswordSetupMiddleware>();
 app.UseAuthorization();
 app.UseAntiforgery();

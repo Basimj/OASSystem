@@ -2,8 +2,9 @@
 @using OAS.Contracts.Accounting.Journals
 @using OAS.Contracts.Accounting.Enums
 @using OAS.Client.Accounting.Common
+@using OAS.UiLib.Components.Accounting.Workspace
 
-<section class="oas-journal-documents" dir="rtl" aria-label="جدول القيود اليومية">
+<section class="oas-journal-documents" dir="rtl" aria-label="قائمة القيود اليومية">
     <div class="oas-journal-documents__header">
         <div>
             <h2><i class="fa-solid fa-book-journal-whills" aria-hidden="true"></i> القيود اليومية</h2>
@@ -30,41 +31,11 @@
         </select>
         <span>يطبق المرشح على جميع النتائج في الخادم، وليس الصفحة المعروضة فقط.</span>
     </div>
-    <div class="table-responsive oas-journal-documents__scroll">
-        <table class="oas-journal-documents__table">
-            <thead>
-                <tr>
-                    <th scope="col">رقم القيد</th>
-                    <th scope="col">تاريخ الترحيل</th>
-                    <th scope="col">البيان</th>
-                    <th scope="col">المصدر</th>
-                    <th scope="col">المدين الأساسي</th>
-                    <th scope="col">الدائن الأساسي</th>
-                    <th scope="col">الحالة</th>
-                    <th scope="col">الإجراءات</th>
-                </tr>
-            </thead>
-            <tbody>
-                @if (Rows.Count == 0)
-                {
-                    <tr><td colspan="8" class="oas-journal-documents__empty">لا توجد قيود مطابقة للبحث والمرشحات.</td></tr>
-                }
-                @foreach (var entry in Rows)
-                {
-                    <tr @key="entry.Id">
-                        <td><button type="button" class="oas-journal-documents__link" @onclick="(() => Open(entry.Id))">@entry.JournalNumber</button></td>
-                        <td class="oas-journal-documents__numeric">@entry.PostingDate.ToString("yyyy/MM/dd")</td>
-                        <td class="oas-journal-documents__description" title="@entry.Description">@entry.Description</td>
-                        <td>@GetSourceText(entry.SourceModule)</td>
-                        <td class="oas-journal-documents__numeric">@FormatBaseAmount(entry, true)</td>
-                        <td class="oas-journal-documents__numeric">@FormatBaseAmount(entry, false)</td>
-                        <td><span class="oas-journal-documents__badge oas-journal-documents__badge--@(entry.Status.ToString().ToLowerInvariant())">@AccountingArabicPresenter.GetJournalStatusText(entry.Status)</span></td>
-                        <td><button type="button" class="oas-journal-documents__view" @onclick="(() => Open(entry.Id))"><i class="fa-solid fa-eye" aria-hidden="true"></i> عرض</button></td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
+    <UiAccountingRecordList Items="@JournalItems"
+                            FinancialStyle="true"
+                            EmptyTitle="لا توجد قيود مطابقة"
+                            EmptyDescription="غيّر البحث أو مرشح الحالة لعرض قيود أخرى."
+                            OnOpen="OnOpen" />
     <p class="oas-journal-documents__hint">المدين والدائن معروضان بالعملة الأساسية من أسطر القيد. علامـة — تعني عدم وجود أسطر محملة، ولا تعني مبلغًا صفريًا.</p>
 </section>
 
@@ -75,7 +46,29 @@
     [Parameter] public EventCallback<string> StatusFilterChanged { get; set; }
     [Parameter] public EventCallback<Guid> OnOpen { get; set; }
 
-    private Task Open(Guid id) => OnOpen.InvokeAsync(id);
+    private IReadOnlyList<UiAccountingRecordList.RecordItem> JournalItems => Rows.Select(entry =>
+        new UiAccountingRecordList.RecordItem(
+            entry.Id,
+            entry.JournalNumber,
+            GetSourceText(entry.SourceModule),
+            "fa-solid fa-book-journal-whills",
+            [
+                new("تاريخ الترحيل", entry.PostingDate.ToString("yyyy/MM/dd"))
+            ],
+            AccountingArabicPresenter.GetJournalStatusText(entry.Status),
+            JournalState(entry.Status),
+            $"مدين: {FormatBaseAmount(entry, true)}",
+            $"دائن: {FormatBaseAmount(entry, false)} · أساسي",
+            entry.Description)).ToArray();
+
+    private static string JournalState(JournalEntryStatus status) => status switch
+    {
+        JournalEntryStatus.Posted => "posted",
+        JournalEntryStatus.Approved => "approved",
+        JournalEntryStatus.Reversed => "cancelled",
+        JournalEntryStatus.PendingApproval => "pending",
+        _ => "draft"
+    };
     private Task OnStatusChanged(ChangeEventArgs e) => StatusFilterChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty);
     private static string FormatBaseAmount(JournalEntryDto entry, bool debit)
     {

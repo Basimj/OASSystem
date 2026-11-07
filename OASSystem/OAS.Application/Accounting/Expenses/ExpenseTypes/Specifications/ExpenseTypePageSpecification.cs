@@ -13,13 +13,18 @@ public sealed class ExpenseTypePageSpecification
         var normalized = request.Normalize();
         var specification = new Specification<ExpenseType>();
 
-        if (!string.IsNullOrWhiteSpace(normalized.Search))
+        // Combine search and activity status in a single predicate. The repository
+        // specification's Where replaces its previous predicate instead of composing it.
+        var search = normalized.Search;
+        var activeOnly = normalized.Status == "active";
+        var inactiveOnly = normalized.Status == "inactive";
+        if (search != null || activeOnly || inactiveOnly)
         {
-            var search = normalized.Search.Trim();
             specification.Where(x =>
-                x.Code.Contains(search) ||
-                x.NameAr.Contains(search) ||
-                (x.NameEn != null && x.NameEn.Contains(search)));
+                (search == null || x.Code.Contains(search) || x.NameAr.Contains(search) ||
+                    (x.NameEn != null && x.NameEn.Contains(search))) &&
+                (!activeOnly || x.IsActive) &&
+                (!inactiveOnly || !x.IsActive));
         }
 
         var sortBy = ResolveSortProperty(normalized.SortBy);

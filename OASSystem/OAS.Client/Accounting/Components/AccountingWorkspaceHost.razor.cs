@@ -92,9 +92,13 @@ public partial class AccountingWorkspaceHost : IDisposable
     private readonly Dictionary<Guid, AccountDto> _accountDtos = [];
     private readonly Dictionary<Guid, UiLookupItem> _costCenterLookups = [];
     private readonly Dictionary<Guid, UiLookupItem> _fiscalYearLookups = [];
+    private readonly Dictionary<Guid, FiscalYearDto> _fiscalYearDtos = [];
     private readonly Dictionary<Guid, UiLookupItem> _fiscalPeriodLookups = [];
     private readonly Dictionary<Guid, UiLookupItem> _cashAccountLookups = [];
+    private readonly Dictionary<Guid, CashAccountDto> _cashAccountDtos = [];
+    private readonly Dictionary<Guid, CurrencyDto> _currencyDtos = [];
     private readonly Dictionary<Guid, UiLookupItem> _bankAccountLookups = [];
+    private readonly Dictionary<Guid, BankAccountDto> _bankAccountDtos = [];
     private readonly Dictionary<Guid, UiLookupItem> _expenseTypeLookups = [];
     private readonly Dictionary<Guid, UiLookupItem> _paymentSourceLookups = [];
     private readonly Dictionary<Guid, UiLookupItem> _customerLookups = [];
@@ -114,6 +118,15 @@ public partial class AccountingWorkspaceHost : IDisposable
     private PagedResult<FiscalYearDto> _fiscalYearsPage = new();
     private PagedResult<FiscalPeriodDto> _fiscalPeriodsPage = new();
     private PagedResult<CostCenterDto> _costCentersPage = new();
+
+    // Years are browsed as master records; periods remain server-paged inside the chosen year.
+    private Guid? _selectedFiscalYearId;
+    private bool _fiscalActionBusy;
+    private string _costCenterStatusFilter = string.Empty;
+    private IReadOnlyList<CostCenterDto> _allCostCenters = [];
+    private readonly HashSet<Guid> _expandedCostCenterIds = [];
+    private sealed record CostCenterTreeRow(CostCenterDto Center, int Depth, bool HasChildren, bool IsExpanded);
+
     private PagedResult<PostingProfileDto> _postingProfilesPage = new();
     private PagedResult<PaymentAllocationDto> _allocationsPage = new();
 
@@ -150,8 +163,40 @@ public partial class AccountingWorkspaceHost : IDisposable
         ? $"تبويبات {Workspace.Tabs.FirstOrDefault(t => t.IsListTab && t.EntityType == Section.Value)?.Title ?? "المحاسبة"}"
         : "تبويبات المحاسبة";
 
-    private string CurrentSearch => GetSearch(CurrentListEntity);
+    private AccountingEntityType CurrentSearchEntity => Section == AccountingEntityType.Expenses && _showExpenseTypes
+        ? AccountingEntityType.ExpenseTypes : CurrentListEntity;
+    private string CurrentSearch => GetSearch(CurrentSearchEntity);
 
+    // Server-side filters: status is part of the API request and therefore affects totals and paging.
+    private readonly Dictionary<AccountingEntityType, string> _cashBankStatusFilters = [];
+    private string CashBankStatusFilter => Section.HasValue
+        ? _cashBankStatusFilters.GetValueOrDefault(Section.Value) ?? string.Empty
+        : string.Empty;
+
+    private async Task OnCashBankStatusFilterChanged(ChangeEventArgs change)
+    {
+        if (!Section.HasValue) return;
+        _cashBankStatusFilters[Section.Value] = change.Value?.ToString() ?? string.Empty;
+        _pageByEntity[Section.Value] = 1;
+        await LoadEntityListAsync(Section.Value);
+    }
+
+    private Task OpenCashAccountRecord(Guid id) => OpenRecordInTab(AccountingEntityType.CashAccounts, id, "صندوق");
+    private Task OpenBankAccountRecord(Guid id) => OpenRecordInTab(AccountingEntityType.BankAccounts, id, "حساب بنكي");
+    private Task OpenCashShiftRecord(Guid id) => OpenRecordInTab(AccountingEntityType.CashShifts, id, "وردية");
+    private string GetShiftCurrencyLabel(Guid? cashId)
+    {
+        if (!cashId.HasValue || !_cashAccountDtos.TryGetValue(cashId.Value, out var cash)) return "العملة غير متاحة";
+        return GetCurrencyLookup(cash.CurrencyId)?.PrimaryText ?? "العملة غير متاحة";
+    }
+    private int GetShiftCurrencyDecimals(Guid? cashId)
+    {
+        if (!cashId.HasValue || !_cashAccountDtos.TryGetValue(cashId.Value, out var cash) ||
+            !cash.CurrencyId.HasValue || !_currencyDtos.TryGetValue(cash.CurrencyId.Value, out var currency)) return 2;
+        return Math.Clamp((int)currency.DecimalPlaces, 0, 6);
+    }
+    private string FormatShiftAmount(Guid? cashId, decimal amount) =>
+        amount.ToString($"N{GetShiftCurrencyDecimals(cashId)}");
     private readonly Dictionary<AccountingEntityType, string> _voucherStatusFilters = [];
     private string? _journalStatusFilter;
     private string CurrentJournalStatusFilter => _journalStatusFilter ?? InitialJournalStatus ?? string.Empty;
@@ -164,14 +209,68 @@ public partial class AccountingWorkspaceHost : IDisposable
     }
 
     private string CurrentVoucherStatusFilter => _voucherStatusFilters.GetValueOrDefault(CurrentListEntity) ?? string.Empty;
-    private Task SetVoucherStatusFilter(string value)
+    private async Task SetVoucherStatusFilter(string value)
     {
         _voucherStatusFilters[CurrentListEntity] = value;
-        return Task.CompletedTask;
+        _pageByEntity[CurrentListEntity] = 1;
+        await LoadEntityListAsync(CurrentListEntity);
     }
 
 
-    private string CurrentSearchPlaceholder => CurrentListEntity switch
+    private bool _showExpenseTypes;
+    private string _expenseTypeStatusFilter = string.Empty;
+    private string _expenseStatusFilter = string.Empty;
+    private string _expensePaymentFilter = string.Empty;
+    private Guid? _expenseTypeFilter;
+    private DateOnly? _expenseDateFrom;
+    private DateOnly? _expenseDateTo;
+    private string ExpenseDateFromText => _expenseDateFrom?.ToString("yyyy-MM-dd") ?? string.Empty;
+    private string ExpenseDateToText => _expenseDateTo?.ToString("yyyy-MM-dd") ?? string.Empty;
+
+    private void SetExpenseView(bool showTypes) => _showExpenseTypes = showTypes;
+
+    private async Task OnExpenseTypeStatusChanged(ChangeEventArgs e)
+    {
+        _expenseTypeStatusFilter = e.Value?.ToString() ?? string.Empty;
+        _pageByEntity[AccountingEntityType.ExpenseTypes] = 1;
+        await LoadEntityListAsync(AccountingEntityType.ExpenseTypes);
+    }
+
+    private async Task ReloadFilteredExpensesAsync()
+    {
+        _pageByEntity[AccountingEntityType.Expenses] = 1;
+        await LoadEntityListAsync(AccountingEntityType.Expenses);
+    }
+    private async Task OnExpenseStatusChanged(ChangeEventArgs e)
+    {
+        _expenseStatusFilter = e.Value?.ToString() ?? string.Empty;
+        await ReloadFilteredExpensesAsync();
+    }
+    private async Task OnExpensePaymentChanged(ChangeEventArgs e)
+    {
+        _expensePaymentFilter = e.Value?.ToString() ?? string.Empty;
+        await ReloadFilteredExpensesAsync();
+    }
+    private async Task OnExpenseTypeFilterChanged(string? value)
+    {
+        _expenseTypeFilter = Guid.TryParse(value, out var id) ? id : null;
+        await ReloadFilteredExpensesAsync();
+    }
+    private async Task OnExpenseDateFromChanged(ChangeEventArgs e)
+    {
+        _expenseDateFrom = ParseExpenseFilterDate(e.Value?.ToString());
+        await ReloadFilteredExpensesAsync();
+    }
+    private async Task OnExpenseDateToChanged(ChangeEventArgs e)
+    {
+        _expenseDateTo = ParseExpenseFilterDate(e.Value?.ToString());
+        await ReloadFilteredExpensesAsync();
+    }
+    private static DateOnly? ParseExpenseFilterDate(string? text) =>
+        DateOnly.TryParseExact(text, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out var date) ? date : null;
+
+    private string CurrentSearchPlaceholder => CurrentSearchEntity switch
     {
         AccountingEntityType.Accounts => "بحث بالكود أو اسم الحساب...",
         AccountingEntityType.Journals => "بحث برقم القيد أو البيان...",
@@ -180,8 +279,9 @@ public partial class AccountingWorkspaceHost : IDisposable
         AccountingEntityType.CashAccounts => "بحث بالكود أو اسم الصندوق...",
         AccountingEntityType.BankAccounts => "بحث بالكود أو اسم البنك أو رقم الحساب...",
         AccountingEntityType.CashShifts => "بحث برقم الوردية...",
-        AccountingEntityType.Expenses => "بحث في المصروفات وأنواعها...",
-        AccountingEntityType.FiscalYears => "بحث في السنوات والفترات المالية...",
+        AccountingEntityType.Expenses => "بحث برقم المصروف أو المستفيد أو البيان...",
+        AccountingEntityType.ExpenseTypes => "بحث بالكود أو اسم نوع المصروف...",
+        AccountingEntityType.FiscalYears => "بحث بكود أو اسم السنة المالية...",
         AccountingEntityType.PostingProfiles => "بحث بكود أو اسم ملف الترحيل...",
         AccountingEntityType.CostCenters => "بحث بكود أو اسم مركز التكلفة...",
         _ => "بحث..."
@@ -397,7 +497,7 @@ public partial class AccountingWorkspaceHost : IDisposable
         ReceiptVoucherEditor.FormModel m => m.Status == ReceiptVoucherStatus.Draft,
         PaymentVoucherEditor.FormModel m => m.Status == PaymentVoucherStatus.Draft,
         ExpenseEditor.FormModel m => m.Status == ExpenseStatus.Draft,
-        FiscalYearEditor.FormModel m => m.OriginalStatus != FiscalYearStatus.Closed,
+        FiscalYearEditor.FormModel m => m.OriginalStatus == FiscalYearStatus.Future,
         FiscalPeriodEditor.FormModel m => m.OriginalStatus != FiscalPeriodStatus.Closed,
         _ => true
     };
@@ -731,12 +831,15 @@ public partial class AccountingWorkspaceHost : IDisposable
             {
                 StartDate = new DateOnly(DateTime.Today.Year, 1, 1),
                 EndDate = new DateOnly(DateTime.Today.Year, 12, 31),
-                Status = FiscalYearStatus.Open
+                Status = FiscalYearStatus.Future
             },
             AccountingEntityType.FiscalPeriods => new FiscalPeriodEditor.FormModel
             {
-                StartDate = DateOnly.FromDateTime(DateTime.Today),
-                EndDate = DateOnly.FromDateTime(DateTime.Today),
+                FiscalYearId = Section == AccountingEntityType.FiscalYears ? _selectedFiscalYearId ?? Guid.Empty : Guid.Empty,
+                StartDate = _selectedFiscalYearId.HasValue && _fiscalYearDtos.TryGetValue(_selectedFiscalYearId.Value, out var yearForStart)
+                    ? yearForStart.StartDate : DateOnly.FromDateTime(DateTime.Today),
+                EndDate = _selectedFiscalYearId.HasValue && _fiscalYearDtos.TryGetValue(_selectedFiscalYearId.Value, out var yearForEnd)
+                    ? yearForEnd.StartDate : DateOnly.FromDateTime(DateTime.Today),
                 PeriodNumber = 1,
                 Status = FiscalPeriodStatus.Open
             },
@@ -768,7 +871,11 @@ public partial class AccountingWorkspaceHost : IDisposable
         if (Workspace.ActiveTab is { IsListTab: false, EntityId: Guid id } tab)
             await LoadExistingRecordAsync(tab, id);
         else if (Section.HasValue)
+        {
+            if (Section == AccountingEntityType.CostCenters)
+                _allCostCenters = [];
             await LoadSectionDataAsync(Section.Value);
+        }
     }
 
     private string GetSearch(AccountingEntityType type) =>
@@ -779,7 +886,7 @@ public partial class AccountingWorkspaceHost : IDisposable
 
     private Task SetCurrentSearch(string? value)
     {
-        _searchByEntity[CurrentListEntity] = value?.Trim() ?? string.Empty;
+        _searchByEntity[CurrentSearchEntity] = value?.Trim() ?? string.Empty;
         return Task.CompletedTask;
     }
 
@@ -787,6 +894,31 @@ public partial class AccountingWorkspaceHost : IDisposable
     {
         var value = text?.Trim() ?? string.Empty;
         var section = CurrentListEntity;
+
+        if (section == AccountingEntityType.CostCenters)
+        {
+            // The complete hierarchy is already loaded. Do not make a paged search
+            // hide the ancestors of matching child centers.
+            _searchByEntity[AccountingEntityType.CostCenters] = value;
+            return;
+        }
+        if (section == AccountingEntityType.FiscalYears)
+        {
+            _searchByEntity[AccountingEntityType.FiscalYears] = value;
+            _pageByEntity[AccountingEntityType.FiscalYears] = 1;
+            await LoadEntityListAsync(AccountingEntityType.FiscalYears);
+            return;
+        }
+
+        // The expense and expense-type views keep independent searches and paging.
+        if (section == AccountingEntityType.Expenses)
+        {
+            var target = CurrentSearchEntity;
+            _searchByEntity[target] = value;
+            _pageByEntity[target] = 1;
+            await LoadEntityListAsync(target);
+            return;
+        }
 
         foreach (var type in GetSectionEntityTypes(section))
         {
@@ -813,10 +945,32 @@ public partial class AccountingWorkspaceHost : IDisposable
         PageNumber = type == AccountingEntityType.Accounts ? 1 : GetPage(type),
         PageSize = type == AccountingEntityType.Accounts ? PageRequest.MaximumPageSize : PageSize,
         Search = string.IsNullOrWhiteSpace(GetSearch(type)) ? null : GetSearch(type),
-        Status = type == AccountingEntityType.Journals ? CurrentJournalStatusFilter : null,
-        SortBy = type == AccountingEntityType.Journals ? "PostingDate" :
-            type is AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers ? "VoucherDate" : null,
-        SortDirection = type is AccountingEntityType.Journals or AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers
+        Status = type switch
+        {
+            AccountingEntityType.Journals => CurrentJournalStatusFilter,
+            AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers => _voucherStatusFilters.GetValueOrDefault(type),
+            AccountingEntityType.CashAccounts or AccountingEntityType.BankAccounts or AccountingEntityType.CashShifts => _cashBankStatusFilters.GetValueOrDefault(type),
+            AccountingEntityType.Expenses => _expenseStatusFilter,
+            AccountingEntityType.ExpenseTypes => _expenseTypeStatusFilter,
+            _ => null
+        },
+        DateFrom = type == AccountingEntityType.Expenses ? _expenseDateFrom : null,
+        DateTo = type == AccountingEntityType.Expenses ? _expenseDateTo : null,
+        ExpenseTypeId = type == AccountingEntityType.Expenses ? _expenseTypeFilter : null,
+        FiscalYearId = type == AccountingEntityType.FiscalPeriods && Section == AccountingEntityType.FiscalYears
+            ? _selectedFiscalYearId : null,
+        PaymentMethod = type == AccountingEntityType.Expenses && int.TryParse(_expensePaymentFilter, out var method) ? method : null,
+        SortBy = type switch
+        {
+            AccountingEntityType.FiscalYears => "StartDate",
+            AccountingEntityType.Journals => "PostingDate",
+            AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers => "VoucherDate",
+            AccountingEntityType.Expenses => "ExpenseDate",
+            AccountingEntityType.CashShifts => "OpenedAtUtc",
+            _ => null
+        },
+        SortDirection = type is AccountingEntityType.FiscalYears or AccountingEntityType.Journals or AccountingEntityType.ReceiptVouchers
+            or AccountingEntityType.PaymentVouchers or AccountingEntityType.Expenses or AccountingEntityType.CashShifts
             ? SortDirection.Descending : SortDirection.Ascending
     };
 
@@ -909,9 +1063,16 @@ public partial class AccountingWorkspaceHost : IDisposable
             case AccountingEntityType.FiscalYears:
                 _fiscalYearsPage = await AccountingService.GetFiscalYearsPageAsync(request);
                 RememberFiscalYearLookups(_fiscalYearsPage.Items);
+                foreach (var fiscalYear in _fiscalYearsPage.Items)
+                    _fiscalYearDtos[fiscalYear.Id] = fiscalYear;
+                if (!_selectedFiscalYearId.HasValue && _fiscalYearsPage.Items.Count > 0)
+                    _selectedFiscalYearId = _fiscalYearsPage.Items[0].Id;
                 break;
             case AccountingEntityType.FiscalPeriods:
-                _fiscalPeriodsPage = await AccountingService.GetFiscalPeriodsPageAsync(request);
+                if (Section == AccountingEntityType.FiscalYears && !_selectedFiscalYearId.HasValue)
+                    _fiscalPeriodsPage = new PagedResult<FiscalPeriodDto>();
+                else
+                    _fiscalPeriodsPage = await AccountingService.GetFiscalPeriodsPageAsync(request);
                 RememberFiscalPeriodLookups(_fiscalPeriodsPage.Items);
                 break;
             case AccountingEntityType.Journals:
@@ -921,8 +1082,9 @@ public partial class AccountingWorkspaceHost : IDisposable
                 _postingProfilesPage = await AccountingService.GetPostingProfilesPageAsync(request);
                 break;
             case AccountingEntityType.CostCenters:
-                _costCentersPage = await AccountingService.GetCostCentersPageAsync(request);
-                RememberCostCenterLookups(_costCentersPage.Items);
+                // Load a complete hierarchy rather than an arbitrary 25-record page.
+                if (_allCostCenters.Count == 0)
+                    await LoadCostCenterTreeAsync();
                 break;
             case AccountingEntityType.ReceiptVouchers:
                 _receiptsPage = await AccountingService.GetReceiptVouchersPageAsync(request);
@@ -956,6 +1118,144 @@ public partial class AccountingWorkspaceHost : IDisposable
         }
 
         await HydrateListLookupsAsync(type);
+    }
+
+    private async Task LoadCostCenterTreeAsync()
+    {
+        var rows = new List<CostCenterDto>();
+        for (var pageNumber = 1; ; pageNumber++)
+        {
+            var page = await AccountingService.GetCostCentersPageAsync(new PageRequest
+            {
+                PageNumber = pageNumber,
+                PageSize = PageRequest.MaximumPageSize,
+                SortBy = "Code"
+            });
+            rows.AddRange(page.Items);
+            if (!page.HasNextPage)
+                break;
+        }
+        _allCostCenters = rows;
+        RememberCostCenterLookups(rows);
+        _costCentersPage = new PagedResult<CostCenterDto>
+        {
+            Items = rows, PageNumber = 1,
+            PageSize = Math.Max(1, rows.Count), TotalCount = rows.Count
+        };
+    }
+
+    private async Task SelectFiscalYearAsync(Guid yearId)
+    {
+        _selectedFiscalYearId = yearId;
+        _pageByEntity[AccountingEntityType.FiscalPeriods] = 1;
+        await LoadEntityListAsync(AccountingEntityType.FiscalPeriods);
+    }
+
+    private Task OpenSelectedFiscalPeriodAsync(Guid id) =>
+        OpenRecordInTab(AccountingEntityType.FiscalPeriods, id, "فترة مالية");
+
+    private Task OpenFiscalYearDetailsAsync(Guid id) =>
+        OpenRecordInTab(AccountingEntityType.FiscalYears, id, "سنة مالية");
+
+    private static string CostCenterIndentStyle(int depth) =>
+        $"padding-inline-start: {(0.55 + depth * 1.1).ToString(System.Globalization.CultureInfo.InvariantCulture)}rem;";
+
+    private Task ToggleCostCenterTreeAsync(Guid id)
+    {
+        if (!_expandedCostCenterIds.Add(id))
+            _expandedCostCenterIds.Remove(id);
+        return Task.CompletedTask;
+    }
+
+    private bool AllCostCentersExpanded =>
+        _allCostCenters.Where(x => x.ParentCostCenterId.HasValue)
+            .Select(x => x.ParentCostCenterId!.Value).Distinct()
+            .All(_expandedCostCenterIds.Contains);
+
+    private Task ToggleAllCostCentersAsync()
+    {
+        var parents = _allCostCenters.Where(x => x.ParentCostCenterId.HasValue)
+            .Select(x => x.ParentCostCenterId!.Value).ToHashSet();
+        if (parents.All(_expandedCostCenterIds.Contains))
+            _expandedCostCenterIds.Clear();
+        else
+            foreach (var id in parents) _expandedCostCenterIds.Add(id);
+        return Task.CompletedTask;
+    }
+
+    private string GetCostCenterParentPath(Guid? id)
+    {
+        if (!id.HasValue) return "مركز رئيسي";
+        var byId = _allCostCenters.ToDictionary(x => x.Id);
+        var labels = new List<string>();
+        var visited = new HashSet<Guid>();
+        var parentId = id;
+        while (parentId.HasValue && visited.Add(parentId.Value) && byId.TryGetValue(parentId.Value, out var parent))
+        {
+            labels.Add($"{parent.Code} - {parent.NameAr}");
+            parentId = parent.ParentCostCenterId;
+        }
+        if (labels.Count == 0)
+            return GetCostCenterLookup(id)?.PrimaryText ?? "المركز الأب غير متاح";
+        labels.Reverse();
+        return string.Join(" / ", labels);
+    }
+
+    private IReadOnlyList<CostCenterTreeRow> BuildCostCenterTreeRows()
+    {
+        var all = _allCostCenters;
+        var byId = all.ToDictionary(x => x.Id);
+        var children = all.Where(x => x.ParentCostCenterId.HasValue)
+            .GroupBy(x => x.ParentCostCenterId!.Value)
+            .ToDictionary(g => g.Key, g => g.OrderBy(x => x.Code, StringComparer.OrdinalIgnoreCase).ToArray());
+        var search = GetSearch(AccountingEntityType.CostCenters).Trim();
+        var searching = search.Length > 0;
+        var candidates = all.Where(x =>
+                (_costCenterStatusFilter != "active" || x.IsActive) &&
+                (_costCenterStatusFilter != "inactive" || !x.IsActive) &&
+                (!searching || x.Code.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                 x.NameAr.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                 (x.NameEn?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)))
+            .Select(x => x.Id).ToHashSet();
+        // Retain all ancestors of matched descendants so the result keeps its context.
+        var visible = new HashSet<Guid>(candidates);
+        foreach (var id in candidates)
+        {
+            var visitedParents = new HashSet<Guid> { id };
+            var parent = byId[id].ParentCostCenterId;
+            while (parent is Guid parentId && byId.TryGetValue(parentId, out var ancestor) && visitedParents.Add(parentId))
+            {
+                visible.Add(parentId);
+                parent = ancestor.ParentCostCenterId;
+            }
+        }
+        var result = new List<CostCenterTreeRow>();
+        var visited = new HashSet<Guid>();
+        void Visit(CostCenterDto center, int depth)
+        {
+            if (!visible.Contains(center.Id) || !visited.Add(center.Id)) return;
+            var descendants = children.GetValueOrDefault(center.Id) ?? [];
+            var hasChildren = descendants.Any(x => visible.Contains(x.Id));
+            var expanded = searching || _expandedCostCenterIds.Contains(center.Id);
+            result.Add(new CostCenterTreeRow(center, Math.Min(depth, 12), hasChildren, expanded));
+            if (expanded)
+                foreach (var child in descendants) Visit(child, depth + 1);
+        }
+        var roots = all.Where(x => !x.ParentCostCenterId.HasValue || !byId.ContainsKey(x.ParentCostCenterId.Value))
+            .OrderBy(x => x.Code, StringComparer.OrdinalIgnoreCase);
+        foreach (var root in roots) Visit(root, 0);
+        // A fully orphaned legacy cycle has no root. Show those records rather
+        // than hiding the entire directory; do not unhide collapsed children.
+        if (result.Count == 0)
+            foreach (var orphan in all.Where(x => visible.Contains(x.Id) && !visited.Contains(x.Id)))
+                Visit(orphan, 0);
+        return result;
+    }
+
+    private Task OnCostCenterStatusChanged(ChangeEventArgs change)
+    {
+        _costCenterStatusFilter = change.Value?.ToString() ?? string.Empty;
+        return Task.CompletedTask;
     }
 
     private async Task LoadPaymentAllocationsForVoucherSectionAsync(AccountingEntityType section)
@@ -1135,6 +1435,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                     {
                         var dto = await AccountingService.GetFiscalYearByIdAsync(id) ?? throw NotFound("السنة المالية");
                         RememberFiscalYearLookups([dto]);
+                        _fiscalYearDtos[dto.Id] = dto;
                         var model = new FiscalYearEditor.FormModel
                         {
                             Code = dto.Code,
@@ -1358,6 +1659,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                 case AccountingEntityType.CashAccounts:
                     {
                         var dto = await AccountingService.GetCashAccountByIdAsync(id) ?? throw NotFound("الصندوق");
+                        _cashAccountDtos[dto.Id] = dto;
                         await EnsureAccountLookupAsync(dto.AccountId);
                         await EnsureCurrencyLookupAsync(dto.CurrencyId);
                         await RememberCashAccountLookupsAsync([dto]);
@@ -1399,6 +1701,8 @@ public partial class AccountingWorkspaceHost : IDisposable
                     {
                         var dto = await AccountingService.GetCashShiftByIdAsync(id) ?? throw NotFound("وردية الصندوق");
                         await EnsureCashAccountLookupAsync(dto.CashAccountId);
+                        if (_cashAccountDtos.TryGetValue(dto.CashAccountId, out var shiftCash))
+                            await EnsureCurrencyLookupAsync(shiftCash.CurrencyId);
                         var model = new CashShiftEditor.FormModel
                         {
                             ShiftNumber = dto.ShiftNumber,
@@ -1407,6 +1711,8 @@ public partial class AccountingWorkspaceHost : IDisposable
                             ExpectedClosingBalance = dto.ExpectedClosingBalance,
                             ActualClosingBalance = dto.ActualClosingBalance,
                             DifferenceAmount = dto.DifferenceAmount,
+                            OpenedAtUtc = dto.OpenedAtUtc,
+                            ClosedAtUtc = dto.ClosedAtUtc,
                             Status = dto.Status,
                             RowVersion = dto.RowVersion
                         };
@@ -1718,6 +2024,7 @@ public partial class AccountingWorkspaceHost : IDisposable
             return;
         }
 
+        var wasNewYear = tab.IsNew;
         FiscalYearDto? result;
         if (tab.IsNew)
         {
@@ -1733,9 +2040,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                 : await AccountingService.GetFiscalYearByIdAsync(tab.EntityId!.Value);
         }
 
-        if (result is not null && result.Status != model.Status)
-            result = await AccountingService.SetFiscalYearStatusAsync(result.Id, new SetFiscalYearStatusRequest(model.Status, result.RowVersion));
-
+        // Workflow transitions are deliberately separate from saving the year.
         if (result is not null)
         {
             model.Status = result.Status;
@@ -1744,6 +2049,10 @@ public partial class AccountingWorkspaceHost : IDisposable
         }
 
         await CompleteSaveAsync(tab, result?.Id, result is null ? null : $"{result.Code} - {result.Name}", "تم حفظ السنة المالية بنجاح.");
+        if (result is not null)
+            _fiscalYearDtos[result.Id] = result;
+        if (wasNewYear && result is not null && Section == AccountingEntityType.FiscalYears)
+            await SelectFiscalYearAsync(result.Id);
     }
 
     private async Task SaveFiscalPeriodAsync(AccountingTabState tab, FiscalPeriodEditor.FormModel model)
@@ -1761,6 +2070,14 @@ public partial class AccountingWorkspaceHost : IDisposable
         if (model.EndDate < model.StartDate)
         {
             Snackbar.Warning("تاريخ نهاية الفترة يجب أن يكون بعد تاريخ البداية.");
+            return;
+        }
+        // Early feedback; the application integrity service remains authoritative.
+        var owningYear = _fiscalYearDtos.GetValueOrDefault(model.FiscalYearId)
+            ?? await AccountingService.GetFiscalYearByIdAsync(model.FiscalYearId);
+        if (owningYear is null || model.StartDate < owningYear.StartDate || model.EndDate > owningYear.EndDate)
+        {
+            Snackbar.Warning("تواريخ الفترة يجب أن تقع بالكامل ضمن تاريخ بداية ونهاية السنة المالية المختارة.");
             return;
         }
 
@@ -1786,9 +2103,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                 model.SalesLocked, model.InventoryLocked, model.AccountingLocked, result.RowVersion));
         }
 
-        if (result is not null && result.Status != model.Status)
-            result = await AccountingService.SetFiscalPeriodStatusAsync(result.Id, new SetFiscalPeriodStatusRequest(model.Status, result.RowVersion));
-
+        // Closing a period is never a side effect of saving its details or locks.
         if (result is not null)
         {
             model.Status = result.Status;
@@ -1800,6 +2115,114 @@ public partial class AccountingWorkspaceHost : IDisposable
         }
 
         await CompleteSaveAsync(tab, result?.Id, result is null ? null : $"الفترة {result.PeriodNumber} - {result.Name}", "تم حفظ الفترة المالية بنجاح.");
+    }
+
+    private bool CanRunFiscalAction(AccountingTabState? tab) =>
+        tab is { IsListTab: false, IsNew: false, IsSaving: false, IsLoading: false,
+                 IsDirty: false, IsEditMode: false, EntityId: Guid };
+
+    private static string FiscalReadinessMessage(FiscalCloseReadinessDto? readiness)
+    {
+        if (readiness is null) return "لم يتوفر تقرير الجاهزية.";
+        var issues = readiness.Checks.Where(x => !x.Passed).Select(x =>
+            $"• {x.Description} (عدد الموانع: {x.BlockingCount})").ToArray();
+        return issues.Length == 0
+            ? "اجتاز فحص الجاهزية الحالي جميع المتطلبات المسجلة."
+            : string.Join("\n", issues);
+    }
+
+    private async Task CheckActiveFiscalReadinessAsync()
+    {
+        if (!CanRunFiscalAction(Workspace.ActiveTab) || _fiscalActionBusy) return;
+        var tab = Workspace.ActiveTab!;
+        if (tab.EntityType is not (AccountingEntityType.FiscalYears or AccountingEntityType.FiscalPeriods)) return;
+        _fiscalActionBusy = true;
+        try
+        {
+            var result = tab.EntityType == AccountingEntityType.FiscalYears
+                ? await AccountingService.GetFiscalYearCloseReadinessAsync(tab.EntityId!.Value)
+                : await AccountingService.GetFiscalPeriodCloseReadinessAsync(tab.EntityId!.Value);
+            await Dialog.ConfirmAsync("فحص جاهزية الإقفال", FiscalReadinessMessage(result),
+                result?.CanClose == true ? AlertTone.Success : AlertTone.Warning,
+                confirmText: "حسنًا", cancelText: "إغلاق");
+        }
+        catch (ApiClientException ex) { ShowAccountingError(ex.Error); }
+        catch (Exception) { ApiFeedback.ShowUnexpected(); }
+        finally { _fiscalActionBusy = false; }
+    }
+
+    private async Task ChangeActiveFiscalYearStatusAsync(FiscalYearStatus target)
+    {
+        if (!CanRunFiscalAction(Workspace.ActiveTab) || _fiscalActionBusy ||
+            Workspace.ActiveTab is not { EntityType: AccountingEntityType.FiscalYears,
+                Model: FiscalYearEditor.FormModel model, EntityId: Guid id } tab) return;
+        if (target == FiscalYearStatus.Open && model.Status is not (FiscalYearStatus.Future or FiscalYearStatus.Closing)) return;
+        if (target == FiscalYearStatus.Closing && model.Status != FiscalYearStatus.Open) return;
+        if (target == FiscalYearStatus.Closed && model.Status != FiscalYearStatus.Closing) return;
+        _fiscalActionBusy = true;
+        try
+        {
+            if (target == FiscalYearStatus.Closed)
+            {
+                var readiness = await AccountingService.GetFiscalYearCloseReadinessAsync(id);
+                if (readiness?.CanClose != true)
+                {
+                    Snackbar.Warning("تعذر الإقفال: " + FiscalReadinessMessage(readiness));
+                    return;
+                }
+            }
+            var actionText = target switch
+            {
+                FiscalYearStatus.Open => "فتح السنة المالية",
+                FiscalYearStatus.Closing => "بدء إجراءات الإقفال",
+                _ => "الإقفال النهائي للسنة"
+            };
+            if (!await Dialog.ConfirmAsync("تأكيد " + actionText,
+                $"السنة: {model.Code} — {model.Name}\nالحالة الحالية: {AccountingArabicPresenter.GetFiscalYearStatusText(model.Status)}\nلن يغيّر هذا الإجراء بيانات السنة، وإنما ينتقل بحالتها المحاسبية. هل تؤكد؟",
+                target == FiscalYearStatus.Closed ? AlertTone.Danger : AlertTone.Warning,
+                confirmText: actionText, cancelText: "رجوع")) return;
+            await AccountingService.SetFiscalYearStatusAsync(id, new SetFiscalYearStatusRequest(target, model.RowVersion));
+            await LoadExistingRecordAsync(tab, id);
+            await LoadEntityListAsync(AccountingEntityType.FiscalYears);
+            Snackbar.Success("تم تحديث حالة السنة المالية.");
+        }
+        catch (ApiClientException ex) { ShowAccountingError(ex.Error); }
+        catch (Exception) { ApiFeedback.ShowUnexpected(); }
+        finally { _fiscalActionBusy = false; }
+    }
+
+    private async Task ChangeActiveFiscalPeriodStatusAsync(FiscalPeriodStatus target)
+    {
+        if (!CanRunFiscalAction(Workspace.ActiveTab) || _fiscalActionBusy ||
+            Workspace.ActiveTab is not { EntityType: AccountingEntityType.FiscalPeriods,
+                Model: FiscalPeriodEditor.FormModel model, EntityId: Guid id } tab) return;
+        if (target == FiscalPeriodStatus.SoftClosed && model.Status != FiscalPeriodStatus.Open) return;
+        if (target == FiscalPeriodStatus.Closed && model.Status != FiscalPeriodStatus.SoftClosed) return;
+        _fiscalActionBusy = true;
+        try
+        {
+            if (target == FiscalPeriodStatus.Closed)
+            {
+                var readiness = await AccountingService.GetFiscalPeriodCloseReadinessAsync(id);
+                if (readiness?.CanClose != true)
+                {
+                    Snackbar.Warning("تعذر الإقفال: " + FiscalReadinessMessage(readiness));
+                    return;
+                }
+            }
+            var actionText = target == FiscalPeriodStatus.Closed ? "الإقفال النهائي" : "الإغلاق المبدئي";
+            if (!await Dialog.ConfirmAsync("تأكيد " + actionText,
+                $"الفترة: {model.PeriodNumber} — {model.Name}\nالسنة المرتبطة: {GetFiscalYearLookup(model.FiscalYearId)?.PrimaryText ?? "غير متاحة"}\nقد يؤثر الإقفال على العمليات والترحيل داخل الفترة، ولا يدعم النظام إعادة فتح الفترة المغلقة. هل تؤكد؟",
+                target == FiscalPeriodStatus.Closed ? AlertTone.Danger : AlertTone.Warning,
+                confirmText: actionText, cancelText: "رجوع")) return;
+            await AccountingService.SetFiscalPeriodStatusAsync(id, new SetFiscalPeriodStatusRequest(target, model.RowVersion));
+            await LoadExistingRecordAsync(tab, id);
+            await LoadEntityListAsync(AccountingEntityType.FiscalPeriods);
+            Snackbar.Success("تم تحديث حالة الفترة المالية.");
+        }
+        catch (ApiClientException ex) { ShowAccountingError(ex.Error); }
+        catch (Exception) { ApiFeedback.ShowUnexpected(); }
+        finally { _fiscalActionBusy = false; }
     }
 
     private async Task SaveJournalAsync(AccountingTabState tab, JournalEntryEditor.FormModel model)
@@ -1950,6 +2373,11 @@ public partial class AccountingWorkspaceHost : IDisposable
             return;
         }
 
+        if (!tab.IsNew && model.ParentCostCenterId == tab.EntityId)
+        {
+            Snackbar.Warning("لا يمكن اختيار مركز التكلفة نفسه مركزًا أبًا.");
+            return;
+        }
         CostCenterDto? result;
         if (tab.IsNew)
         {
@@ -2220,6 +2648,25 @@ public partial class AccountingWorkspaceHost : IDisposable
             return;
         }
 
+        if (!tab.IsNew && tab.EntityId.HasValue)
+        {
+            var current = await AccountingService.GetCashAccountByIdAsync(tab.EntityId.Value);
+            if (current is not null && current.CurrencyId != model.CurrencyId)
+            {
+                Snackbar.Warning("لا يمكن تغيير عملة صندوق موجود. أنشئ صندوقًا جديدًا عند الحاجة إلى عملة مختلفة.");
+                return;
+            }
+        }
+        if (model.IsDefault && model.IsActive)
+        {
+            var duplicates = _cashAccountsPage.Items.Where(x => x.IsDefault && x.IsActive && x.CurrencyId == model.CurrencyId && x.Id != tab.EntityId).ToArray();
+            if (duplicates.Length > 0)
+            {
+                Snackbar.Warning($"يوجد صندوق افتراضي نشط لهذه العملة: {duplicates[0].Name}. ألغِ صفته الافتراضية أولًا.");
+                return;
+            }
+        }
+
         CashAccountDto? result;
         if (tab.IsNew)
         {
@@ -2255,6 +2702,21 @@ public partial class AccountingWorkspaceHost : IDisposable
         {
             Snackbar.Warning("أكمل بيانات الحساب البنكي وحدد العملة.");
             return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(model.IBAN) && !BankIban.IsValid(model.IBAN))
+        {
+            Snackbar.Warning("رقم IBAN غير صالح. تحقق من رمز البلد ورقمي التحقق وتنسيق الرقم.");
+            return;
+        }
+        if (!tab.IsNew && tab.EntityId.HasValue)
+        {
+            var current = await AccountingService.GetBankAccountByIdAsync(tab.EntityId.Value);
+            if (current is not null && current.CurrencyId != model.CurrencyId)
+            {
+                Snackbar.Warning("لا يمكن تغيير عملة حساب بنكي قائم من التعديل العادي.");
+                return;
+            }
         }
 
         BankAccountDto? result;
@@ -2437,6 +2899,9 @@ public partial class AccountingWorkspaceHost : IDisposable
 
     private async Task RefreshListsForEntityAsync(AccountingEntityType entityType)
     {
+        if (entityType == AccountingEntityType.CostCenters)
+            _allCostCenters = [];
+
         if (entityType == AccountingEntityType.PaymentAllocations &&
             Section is AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers)
         {
@@ -2460,6 +2925,25 @@ public partial class AccountingWorkspaceHost : IDisposable
         tab.CheckDirty(SerializeModel(tab.Model));
         Workspace.NotifyStateChanged();
     }
+
+    private async Task OnCashShiftModelChangedAsync()
+    {
+        MarkActiveDirty();
+        if (Workspace.ActiveTab?.Model is not CashShiftEditor.FormModel { CashAccountId: Guid cashAccountId } ||
+            !_cashAccountDtos.TryGetValue(cashAccountId, out var cashAccount) ||
+            !cashAccount.CurrencyId.HasValue ||
+            _currencyLookups.ContainsKey(cashAccount.CurrencyId.Value)) return;
+        try
+        {
+            await EnsureCurrencyLookupAsync(cashAccount.CurrencyId);
+            Workspace.NotifyStateChanged();
+        }
+        catch (ApiClientException)
+        {
+            // Currency lookup is supplemental for display; saving still validates on the server.
+        }
+    }
+
 
     private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
@@ -3005,7 +3489,7 @@ public partial class AccountingWorkspaceHost : IDisposable
 
         var confirmed = await Dialog.ConfirmAsync(
             "إغلاق الوردية",
-            $"سيتم إغلاق الوردية على جرد فعلي قدره {model.ActualClosingBalance.Value:N2}. هل تريد المتابعة؟",
+            $"الجرد الفعلي: {FormatShiftAmount(model.CashAccountId, model.ActualClosingBalance.Value)}. تنبيه: الرصيد المتوقع الحالي لا يجمع حركات الوردية، وقد يكون فرق الجرد المبدئي غير دقيق. هل تريد المتابعة؟",
             AlertTone.Warning,
             "إغلاق الوردية",
             "إلغاء");
@@ -3028,6 +3512,13 @@ public partial class AccountingWorkspaceHost : IDisposable
     private async Task ApproveActiveCashShiftAsync()
     {
         if (Workspace.ActiveTab is not { EntityId: Guid id, Model: CashShiftEditor.FormModel model } tab) return;
+        var confirmed = await Dialog.ConfirmAsync(
+            "مراجعة اعتماد الوردية",
+            "تنبيه: لم يُحتسب الرصيد المتوقع من جميع حركات الوردية بعد؛ لا تعتمد فرق الجرد على أنه تسوية محاسبية مؤكدة. هل راجعت الحركات يدويًا وتريد اعتماد الحالة؟",
+            AlertTone.Warning,
+            "اعتماد بعد المراجعة",
+            "إلغاء");
+        if (!confirmed) return;
         try
         {
             EnsureEntityIdAndRowVersion(tab, model.RowVersion);
@@ -3035,7 +3526,7 @@ public partial class AccountingWorkspaceHost : IDisposable
             if (result is null) throw new InvalidOperationException("لم يُرجع الخادم الوردية المحدثة.");
             await LoadExistingRecordAsync(tab, result.Id);
             await LoadEntityListAsync(AccountingEntityType.CashShifts);
-            Snackbar.Success("تم اعتماد الوردية.");
+            Snackbar.Success("تم اعتماد حالة الوردية بعد المراجعة اليدوية.");
         }
         catch (ApiClientException ex) { ShowAccountingError(ex.Error); }
         catch (Exception) { ApiFeedback.ShowUnexpected(); }
@@ -3128,7 +3619,10 @@ public partial class AccountingWorkspaceHost : IDisposable
 
         var lookups = await Task.WhenAll(result.Items.Select(x => BuildCashAccountLookupAsync(x, null, cancellationToken)));
         for (var i = 0; i < result.Items.Count; i++)
+        {
+            _cashAccountDtos[result.Items[i].Id] = result.Items[i];
             _cashAccountLookups[result.Items[i].Id] = lookups[i];
+        }
         return lookups;
     }
 
@@ -3161,6 +3655,7 @@ public partial class AccountingWorkspaceHost : IDisposable
             },
             cancellationToken);
 
+        foreach (var cash in result.Items) _cashAccountDtos[cash.Id] = cash;
         return await Task.WhenAll(
             result.Items.Select(x => BuildCashAccountLookupAsync(x, currencyId, cancellationToken)));
     }
@@ -3253,7 +3748,11 @@ public partial class AccountingWorkspaceHost : IDisposable
     private async Task<IReadOnlyList<UiLookupItem>> SearchCurrenciesAsync(string text, CancellationToken cancellationToken)
     {
         var result = await AccountingService.GetCurrenciesPageAsync(new PageRequest { PageNumber = 1, PageSize = 50, Search = text }, cancellationToken);
-        foreach (var currency in result.Items) _currencyLookups[currency.Id] = ToCurrencyLookup(currency);
+        foreach (var currency in result.Items)
+        {
+            _currencyDtos[currency.Id] = currency;
+            _currencyLookups[currency.Id] = ToCurrencyLookup(currency);
+        }
         return result.Items.Where(x => x.IsActive).Select(ToCurrencyLookup).ToArray();
     }
 
@@ -3381,6 +3880,7 @@ public partial class AccountingWorkspaceHost : IDisposable
         if (_currencyLookups.TryGetValue(id.Value, out var existing)) return existing;
         var dto = await AccountingService.GetCurrencyByIdAsync(id.Value);
         if (dto is null) return null;
+        _currencyDtos[dto.Id] = dto;
         var item = ToCurrencyLookup(dto);
         _currencyLookups[dto.Id] = item;
         return item;
@@ -3455,8 +3955,10 @@ public partial class AccountingWorkspaceHost : IDisposable
     private async Task<UiLookupItem?> EnsureCashAccountLookupAsync(Guid? id)
     {
         if (!id.HasValue) return null;
+        if (_cashAccountLookups.TryGetValue(id.Value, out var cached)) return cached;
         var dto = await AccountingService.GetCashAccountByIdAsync(id.Value);
         if (dto is null) return null;
+        _cashAccountDtos[id.Value] = dto;
         var item = await BuildCashAccountLookupAsync(dto, null, CancellationToken.None);
         _cashAccountLookups[id.Value] = item;
         return item;
@@ -3465,8 +3967,10 @@ public partial class AccountingWorkspaceHost : IDisposable
     private async Task<UiLookupItem?> EnsureBankAccountLookupAsync(Guid? id)
     {
         if (!id.HasValue) return null;
+        if (_bankAccountLookups.TryGetValue(id.Value, out var cached)) return cached;
         var dto = await AccountingService.GetBankAccountByIdAsync(id.Value);
         if (dto is null) return null;
+        _bankAccountDtos[dto.Id] = dto;
         var item = await BuildBankAccountLookupAsync(dto, null, CancellationToken.None);
         _bankAccountLookups[id.Value] = item;
         return item;
@@ -3565,14 +4069,24 @@ public partial class AccountingWorkspaceHost : IDisposable
     }
     private async Task RememberCashAccountLookupsAsync(IEnumerable<CashAccountDto> items)
     {
-        foreach (var item in items)
-            _cashAccountLookups[item.Id] = await BuildCashAccountLookupAsync(item, null, CancellationToken.None);
+        var rows = items.ToArray();
+        foreach (var item in rows) _cashAccountDtos[item.Id] = item;
+        foreach (var batch in rows.Chunk(6))
+        {
+            var lookups = await Task.WhenAll(batch.Select(x => BuildCashAccountLookupAsync(x, null, CancellationToken.None)));
+            for (var i = 0; i < batch.Length; i++) _cashAccountLookups[batch[i].Id] = lookups[i];
+        }
     }
 
     private async Task RememberBankAccountLookupsAsync(IEnumerable<BankAccountDto> items)
     {
-        foreach (var item in items)
-            _bankAccountLookups[item.Id] = await BuildBankAccountLookupAsync(item, null, CancellationToken.None);
+        var rows = items.ToArray();
+        foreach (var item in rows) _bankAccountDtos[item.Id] = item;
+        foreach (var batch in rows.Chunk(6))
+        {
+            var lookups = await Task.WhenAll(batch.Select(x => BuildBankAccountLookupAsync(x, null, CancellationToken.None)));
+            for (var i = 0; i < batch.Length; i++) _bankAccountLookups[batch[i].Id] = lookups[i];
+        }
     }
     private void RememberExpenseTypeLookups(IEnumerable<ExpenseTypeDto> items)
     {
@@ -3662,6 +4176,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                     await EnsureAccountLookupAsync(x.ExpenseAccountId);
                     await EnsureCashAccountLookupAsync(x.CashAccountId);
                     await EnsureBankAccountLookupAsync(x.BankAccountId);
+                    await EnsureCurrencyLookupAsync(ExpenseCurrencyId(x));
                 }
                 break;
             case AccountingEntityType.ExpenseTypes:
@@ -4106,11 +4621,11 @@ public partial class AccountingWorkspaceHost : IDisposable
         new AccountingRecordItem(
             x.Id,
             $"الفترة {x.PeriodNumber} - {x.Name}",
-            GetFiscalYearLookup(x.FiscalYearId)?.PrimaryText,
+            $"{x.StartDate:yyyy/MM/dd} — {x.EndDate:yyyy/MM/dd}",
             "fa-solid fa-calendar-week",
             [
-                new("من", x.StartDate.ToString("yyyy-MM-dd")),
-                new("إلى", x.EndDate.ToString("yyyy-MM-dd")),
+                new("المبيعات", x.SalesLocked ? "مقفلة" : "مفتوحة"),
+                new("المخزون", x.InventoryLocked ? "مقفلة" : "مفتوحة"),
                 new("المحاسبة", x.AccountingLocked ? "مقفلة" : "مفتوحة")
             ],
             AccountingArabicPresenter.GetFiscalPeriodStatusText(x.Status),
@@ -4162,8 +4677,10 @@ public partial class AccountingWorkspaceHost : IDisposable
                         l.EmployeeId, l.PartyNameSnapshot, l.CounterpartyAccountId))),
                     x.Description ?? "—",
                     VoucherCurrencyText(x.Lines.Select(l => l.CurrencyCodeSnapshot)),
-                    VoucherAmountText(x.Lines.Select(l => (l.CurrencyCodeSnapshot, l.Amount))),
-                    x.BaseTotalAmount?.ToString($"N{Math.Clamp((int)(x.BaseCurrencyDecimalPlacesSnapshot ?? 2), 0, 6)}") ?? "—",
+                    VoucherAmountText(x.Lines.Select(l => (l.CurrencyCodeSnapshot, l.Amount, l.CurrencyDecimalPlacesSnapshot))),
+                    x.BaseTotalAmount is decimal total
+                        ? $"{total.ToString($"N{Math.Clamp((int)(x.BaseCurrencyDecimalPlacesSnapshot ?? 2), 0, 6)}")} {x.BaseCurrencyCodeSnapshot ?? "(العملة الأساسية)"}"
+                        : "غير متاح",
                     AccountingArabicPresenter.GetReceiptVoucherStatusText(x.Status),
                     VoucherState(x.Status.ToString()), x.Status.ToString());
             }).ToArray();
@@ -4176,8 +4693,10 @@ public partial class AccountingWorkspaceHost : IDisposable
                         l.EmployeeId, l.PartyNameSnapshot, l.CounterpartyAccountId))),
                 x.Description ?? "—",
                 VoucherCurrencyText(x.Lines.Select(l => l.CurrencyCodeSnapshot)),
-                VoucherAmountText(x.Lines.Select(l => (l.CurrencyCodeSnapshot, l.Amount))),
-                x.BaseTotalAmount?.ToString($"N{Math.Clamp((int)(x.BaseCurrencyDecimalPlacesSnapshot ?? 2), 0, 6)}") ?? "—",
+                VoucherAmountText(x.Lines.Select(l => (l.CurrencyCodeSnapshot, l.Amount, l.CurrencyDecimalPlacesSnapshot))),
+                x.BaseTotalAmount is decimal total
+                        ? $"{total.ToString($"N{Math.Clamp((int)(x.BaseCurrencyDecimalPlacesSnapshot ?? 2), 0, 6)}")} {x.BaseCurrencyCodeSnapshot ?? "(العملة الأساسية)"}"
+                        : "غير متاح",
                 AccountingArabicPresenter.GetPaymentVoucherStatusText(x.Status),
                 VoucherState(x.Status.ToString()), x.Status.ToString());
         }).ToArray();
@@ -4229,11 +4748,17 @@ public partial class AccountingWorkspaceHost : IDisposable
         return codes.Length == 0 ? "—" : string.Join("، ", codes);
     }
 
-    private static string VoucherAmountText(IEnumerable<(string? CurrencyCodeSnapshot, decimal Amount)> lines)
+    private static string VoucherAmountText(IEnumerable<(string? CurrencyCodeSnapshot, decimal Amount, byte? CurrencyDecimalPlacesSnapshot)> lines)
     {
-        var groups = lines.GroupBy(x => x.CurrencyCodeSnapshot ?? "—")
-            .Select(g => $"{g.Sum(x => x.Amount):N2}");
-        return string.Join(" / ", groups);
+        // Never show amounts from different currencies as anonymous adjacent numbers.
+        var groups = lines.GroupBy(x => string.IsNullOrWhiteSpace(x.CurrencyCodeSnapshot) ? "عملة غير محددة" : x.CurrencyCodeSnapshot!)
+            .Select(g =>
+            {
+                var digits = Math.Clamp((int)(g.First().CurrencyDecimalPlacesSnapshot ?? 2), 0, 6);
+                return $"{g.Sum(x => x.Amount).ToString($"N{digits}")} {g.Key}";
+            });
+        var amounts = string.Join(" / ", groups);
+        return string.IsNullOrWhiteSpace(amounts) ? "لا توجد أسطر" : amounts;
     }
 
     private IReadOnlyList<AccountingRecordItem> BuildReceiptItems() => _receiptsPage.Items.Select(x =>
@@ -4266,68 +4791,102 @@ public partial class AccountingWorkspaceHost : IDisposable
             AccountingArabicPresenter.GetPaymentVoucherStatusText(x.Status),
             VoucherState(x.Status.ToString()))).ToArray();
 
+    private static string MaskAccountNumber(string? number)
+    {
+        if (string.IsNullOrWhiteSpace(number)) return "غير متاح";
+        var normalized = new string(number.Where(char.IsLetterOrDigit).ToArray());
+        return normalized.Length <= 4 ? normalized : $"•••• {normalized[^4..]}";
+    }
+
     private IReadOnlyList<AccountingRecordItem> BuildCashAccountItems() => _cashAccountsPage.Items.Select(x =>
         new AccountingRecordItem(
-            x.Id,
-            $"{x.Code} - {x.Name}",
-            x.IsDefault ? "الصندوق الافتراضي" : null,
+            x.Id, x.Name, x.Code,
             "fa-solid fa-vault",
-            [new("حساب GL", GetAccountLookup(x.AccountId)?.PrimaryText ?? ShortId(x.AccountId)), new("العملة", GetCurrencyLookup(x.CurrencyId)?.PrimaryText ?? "-")],
-            x.IsActive ? "نشط" : "معطل",
-            x.IsActive ? "active" : "inactive")).ToArray();
+            [
+                new("الحساب المحاسبي", GetAccountLookup(x.AccountId)?.PrimaryText ?? "الحساب غير متاح"),
+                new("افتراضي", x.IsDefault ? "نعم" : "لا")
+            ],
+            x.IsActive ? "نشط" : "غير نشط",
+            x.IsActive ? "active" : "inactive",
+            GetCurrencyLookup(x.CurrencyId)?.PrimaryText ?? "غير محددة",
+            "عملة الصندوق")).ToArray();
 
     private IReadOnlyList<AccountingRecordItem> BuildBankAccountItems() => _bankAccountsPage.Items.Select(x =>
         new AccountingRecordItem(
-            x.Id,
-            $"{x.Code} - {x.BankName}",
-            x.AccountName,
+            x.Id, x.BankName, x.AccountName,
             "fa-solid fa-building-columns",
             [
-                new("رقم الحساب", x.AccountNumber),
-                new("IBAN", string.IsNullOrWhiteSpace(x.IBAN) ? "-" : x.IBAN),
-                new("العملة", GetCurrencyLookup(x.CurrencyId)?.PrimaryText ?? "-"),
-                new("حساب GL", GetAccountLookup(x.AccountId)?.PrimaryText ?? ShortId(x.AccountId))
+                new("الكود", x.Code),
+                new("رقم الحساب", MaskAccountNumber(x.AccountNumber)),
+                new("الحساب المحاسبي", GetAccountLookup(x.AccountId)?.PrimaryText ?? "الحساب غير متاح")
             ],
-            x.IsActive ? "نشط" : "معطل",
-            x.IsActive ? "active" : "inactive")).ToArray();
+            x.IsActive ? "نشط" : "غير نشط",
+            x.IsActive ? "active" : "inactive",
+            GetCurrencyLookup(x.CurrencyId)?.PrimaryText ?? "غير محددة",
+            "عملة الحساب")).ToArray();
 
     private IReadOnlyList<AccountingRecordItem> BuildCashShiftItems() => _cashShiftsPage.Items.Select(x =>
         new AccountingRecordItem(
             x.Id,
             $"وردية {x.ShiftNumber}",
-            GetCashAccountLookup(x.CashAccountId)?.PrimaryText,
+            GetCashAccountLookup(x.CashAccountId)?.PrimaryText ?? "الصندوق غير متاح",
             "fa-solid fa-cash-register",
             [
-                new("الافتتاح", x.OpeningBalance.ToString("N2")),
-                new("المتوقع", x.ExpectedClosingBalance?.ToString("N2") ?? "-"),
-                new("الفعلي", x.ActualClosingBalance?.ToString("N2") ?? "-"),
-                new("الفارق", x.DifferenceAmount?.ToString("N2") ?? "-")
+                new("الافتتاح (UTC)", x.OpenedAtUtc.ToUniversalTime().ToString("yyyy/MM/dd HH:mm")),
+                new("الفرق (مبدئي)", x.DifferenceAmount.HasValue ? FormatShiftAmount(x.CashAccountId, x.DifferenceAmount.Value) : "—"),
+                new("المتوقع (مبدئي)", x.ExpectedClosingBalance.HasValue ? FormatShiftAmount(x.CashAccountId, x.ExpectedClosingBalance.Value) : "غير محتسب"),
+                new("رصيد الافتتاح", FormatShiftAmount(x.CashAccountId, x.OpeningBalance))
             ],
             AccountingArabicPresenter.GetCashShiftStatusText(x.Status),
-            CashShiftState(x.Status))).ToArray();
+            CashShiftState(x.Status),
+            x.ActualClosingBalance.HasValue ? $"{FormatShiftAmount(x.CashAccountId, x.ActualClosingBalance.Value)} {GetShiftCurrencyLabel(x.CashAccountId)}" : "لم يسجل جرد",
+            "الجرد الفعلي")).ToArray();
+
+    private Guid? ExpenseCurrencyId(ExpenseDto expense)
+    {
+        if (expense.CashAccountId is Guid cashId && _cashAccountDtos.TryGetValue(cashId, out var cash))
+            return cash.CurrencyId;
+        if (expense.BankAccountId is Guid bankId && _bankAccountDtos.TryGetValue(bankId, out var bank))
+            return bank.CurrencyId;
+        return null;
+    }
+
+    private string ExpenseAmountText(ExpenseDto expense)
+    {
+        var currencyId = ExpenseCurrencyId(expense);
+        if (currencyId.HasValue && _currencyDtos.TryGetValue(currencyId.Value, out var currency))
+            return $"{expense.Amount.ToString($"N{Math.Clamp((int)currency.DecimalPlaces, 0, 6)}")} {currency.Code}";
+        return $"{expense.Amount:N2} · العملة غير متاحة";
+    }
 
     private IReadOnlyList<AccountingRecordItem> BuildExpenseItems() => _expensesPage.Items.Select(x =>
         new AccountingRecordItem(
             x.Id,
             x.ExpenseNumber,
-            x.Beneficiary,
+            GetExpenseTypeLookup(x.ExpenseTypeId)?.PrimaryText ?? "نوع المصروف غير متاح",
             "fa-solid fa-receipt",
             [
-                new("التاريخ", x.ExpenseDate.ToString("yyyy-MM-dd")),
-                new("النوع", GetExpenseTypeLookup(x.ExpenseTypeId)?.PrimaryText ?? ShortId(x.ExpenseTypeId)),
-                new("المبلغ", x.Amount.ToString("N2"), "ui-acc-val--credit"),
-                new("الدفع", AccountingArabicPresenter.GetPaymentMethodText(x.PaymentMethod))
+                new("التاريخ", x.ExpenseDate.ToString("yyyy/MM/dd")),
+                new("الدفع", AccountingArabicPresenter.GetPaymentMethodText(x.PaymentMethod)),
+                new("من", GetMoneyAccountText(x.PaymentMethod, x.CashAccountId, x.BankAccountId)),
+                new("المستفيد", string.IsNullOrWhiteSpace(x.Beneficiary) ? "غير محدد" : x.Beneficiary)
             ],
             AccountingArabicPresenter.GetExpenseStatusText(x.Status),
-            ExpenseState(x.Status))).ToArray();
+            ExpenseState(x.Status),
+            ExpenseAmountText(x),
+            "مبلغ المصروف",
+            x.Description)).ToArray();
 
     private IReadOnlyList<AccountingRecordItem> BuildExpenseTypeItems() => _expenseTypesPage.Items.Select(x =>
         new AccountingRecordItem(
             x.Id,
-            $"{x.Code} - {x.NameAr}",
-            x.NameEn,
+            x.Code,
+            x.NameAr,
             "fa-solid fa-tags",
-            [new("الحساب الافتراضي", x.DefaultExpenseAccountId.HasValue ? GetAccountLookup(x.DefaultExpenseAccountId)?.PrimaryText ?? ShortId(x.DefaultExpenseAccountId.Value) : "غير محدد")],
+            [
+                new("الحساب الافتراضي", x.DefaultExpenseAccountId.HasValue ? GetAccountLookup(x.DefaultExpenseAccountId)?.PrimaryText ?? "حساب غير متاح" : "غير محدد"),
+                new("الاسم الإنجليزي", string.IsNullOrWhiteSpace(x.NameEn) ? "—" : x.NameEn)
+            ],
             x.IsActive ? "نشط" : "معطل",
             x.IsActive ? "active" : "inactive")).ToArray();
 

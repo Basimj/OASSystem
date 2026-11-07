@@ -56,6 +56,17 @@ public sealed class AccountingClientService(
             query += $"&status={Uri.EscapeDataString(normalized.Status)}";
         }
 
+        if (normalized.DateFrom.HasValue)
+            query += $"&dateFrom={normalized.DateFrom.Value:yyyy-MM-dd}";
+        if (normalized.DateTo.HasValue)
+            query += $"&dateTo={normalized.DateTo.Value:yyyy-MM-dd}";
+        if (normalized.ExpenseTypeId.HasValue)
+            query += $"&expenseTypeId={normalized.ExpenseTypeId.Value:D}";
+        if (normalized.PaymentMethod.HasValue)
+            query += $"&paymentMethod={normalized.PaymentMethod.Value}";
+        if (normalized.FiscalYearId.HasValue)
+            query += $"&fiscalYearId={normalized.FiscalYearId.Value:D}";
+
         if (!string.IsNullOrWhiteSpace(
                 normalized.SortBy))
         {

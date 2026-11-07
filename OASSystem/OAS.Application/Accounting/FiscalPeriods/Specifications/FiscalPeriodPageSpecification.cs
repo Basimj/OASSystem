@@ -1,4 +1,4 @@
-﻿using OAS.Application.Abstractions.Persistence.Specifications;
+using OAS.Application.Abstractions.Persistence.Specifications;
 using OAS.Contracts.Common.Pagination;
 using OAS.Domain.Accounting.Entities;
 
@@ -22,13 +22,22 @@ public sealed class FiscalPeriodPageSpecification
     {
         request = request.Normalize();
 
-        if (!string.IsNullOrWhiteSpace(request.Search))
+        // Specification.Where replaces the preceding predicate, so compose the
+        // period/year constraints with text search in ONE expression.
+        var search = request.Search;
+        var yearId = request.FiscalYearId;
+        if (yearId.HasValue && !string.IsNullOrWhiteSpace(search))
         {
-            var search = request.Search;
-
-            Where(x =>
-                x.Name.Contains(search) ||
-                x.PeriodNumber.ToString().Contains(search));
+            Where(x => x.FiscalYearId == yearId.Value &&
+                (x.Name.Contains(search) || x.PeriodNumber.ToString().Contains(search)));
+        }
+        else if (yearId.HasValue)
+        {
+            Where(x => x.FiscalYearId == yearId.Value);
+        }
+        else if (!string.IsNullOrWhiteSpace(search))
+        {
+            Where(x => x.Name.Contains(search) || x.PeriodNumber.ToString().Contains(search));
         }
 
         var sortBy =

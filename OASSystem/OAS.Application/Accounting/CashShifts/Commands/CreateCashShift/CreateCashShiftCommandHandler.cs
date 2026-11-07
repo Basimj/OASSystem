@@ -19,6 +19,13 @@ public sealed class CreateCashShiftCommandHandler(
     public async Task<Guid> Handle(CreateCashShiftCommand request, CancellationToken cancellationToken)
     {
         if (!Guid.TryParse(currentUser.UserId, out var userId)) throw new ForbiddenException();
+        // Only one active handover at a time for the same cashbox.
+        // A filtered unique index is still recommended to cover simultaneous requests.
+        if (await repository.CountAsync(
+            new Specification<CashShift>().Where(x => x.CashAccountId == request.Data.CashAccountId &&
+                (x.Status == DomainCashShiftStatus.Open || x.Status == DomainCashShiftStatus.Closing)),
+            cancellationToken) > 0)
+            throw new ConflictException("cash_shift_already_open", "The selected cash account already has an open or closing shift.");
         var now=timeProvider.GetUtcNow().UtcDateTime;
         var number=await ResolveNumberAsync(request.Data.ShiftNumber,now.Year,cancellationToken);
         var shift=CashShift.Create(Guid.NewGuid(),number,request.Data.CashAccountId,userId,now,request.Data.OpeningBalance,DomainCashShiftStatus.Open);

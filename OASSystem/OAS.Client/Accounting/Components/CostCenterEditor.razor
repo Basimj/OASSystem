@@ -7,7 +7,7 @@
 <UiAccountingEditorSurface>
 
     <UiAccountingFormSection Title="بيانات مركز التكلفة"
-                             Subtitle="الرمز، التسمية، والتبعية الهيكلية"
+                             Subtitle="تعريف المركز وعلاقته بالمراكز الأخرى"
                              IconCssClass="fa-solid fa-network-wired">
 
         <UiAccountingFormGrid Columns="2">
@@ -58,6 +58,21 @@
             </UiAccountingCheckGroup>
 
         </UiAccountingFormGrid>
+        <p class="oas-fiscal-editor__help">
+            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+            @if (Model.ParentCostCenterId.HasValue)
+            {
+                <span>المركز الأب: <strong>@(ParentPath ?? ParentCostCenterLookupItem?.PrimaryText ?? "يُرجى اختيار مركز أب صالح")</strong>. لا يمكن نقل المركز تحت نفسه أو أحد فروعه.</span>
+            }
+            else
+            {
+                <span>عند ترك المركز الأب فارغًا يُعتبر المركز رئيسيًا.</span>
+            }
+            @if (!IsNew)
+            {
+                <span> كود المركز ثابت بعد الإنشاء.</span>
+            }
+        </p>
 
     </UiAccountingFormSection>
 
@@ -93,6 +108,9 @@
 
     [Parameter]
     public UiLookupItem? ParentCostCenterLookupItem { get; set; }
+
+    [Parameter]
+    public string? ParentPath { get; set; }
 
     [Parameter]
     public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CostCenterSearchAsync { get; set; }
