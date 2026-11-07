@@ -12,18 +12,17 @@ public sealed class PaymentVoucherPageSpecification
         var normalized = request.Normalize();
         var specification = new Specification<PaymentVoucher>();
 
-        // The allocation dropdown needs only posted vouchers; apply before paging
-        // so that many drafts cannot hide eligible vouchers on later pages.
-        if (normalized.Status == "posted")
-            specification.Where(x => x.Status == PaymentVoucherStatus.Posted);
-
-        if (!string.IsNullOrWhiteSpace(normalized.Search))
-        {
-            var search = normalized.Search.Trim();
-            specification.Where(x =>
-                x.VoucherNumber.Contains(search) ||
-                (x.Description != null && x.Description.Contains(search)));
-        }
+        // Specification.Where replaces the previous predicate, so every active filter
+        // must be combined into one expression BEFORE database pagination.
+        var status = normalized.Status ?? string.Empty;
+        var search = normalized.Search ?? string.Empty;
+        specification.Where(x =>
+            (status != "draft" || x.Status == PaymentVoucherStatus.Draft) &&
+            (status != "approved" || x.Status == PaymentVoucherStatus.Approved) &&
+            (status != "posted" || x.Status == PaymentVoucherStatus.Posted) &&
+            (status != "cancelled" || x.Status == PaymentVoucherStatus.Cancelled) &&
+            (search == string.Empty || x.VoucherNumber.Contains(search) ||
+                (x.Description != null && x.Description.Contains(search))));
 
         var sortBy = ResolveSortProperty(normalized.SortBy);
         specification.AddSort(sortBy, normalized.SortDirection);

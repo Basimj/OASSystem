@@ -13,13 +13,14 @@ public sealed class CashAccountPageSpecification
         var normalized = request.Normalize();
         var specification = new Specification<CashAccount>();
 
-        if (!string.IsNullOrWhiteSpace(normalized.Search))
-        {
-            var search = normalized.Search.Trim();
-            specification.Where(x =>
-                x.Code.Contains(search) ||
-                x.Name.Contains(search));
-        }
+        // A single predicate combines status and search (Where overwrites Criteria).
+        var status = normalized.Status ?? string.Empty;
+        var search = normalized.Search ?? string.Empty;
+        specification.Where(x =>
+            (status != "active" || x.IsActive) &&
+            (status != "inactive" || !x.IsActive) &&
+            (search == string.Empty || x.Code.Contains(search) ||
+                x.Name.Contains(search)));
 
         var sortBy = ResolveSortProperty(normalized.SortBy);
         specification.AddSort(sortBy, normalized.SortDirection);

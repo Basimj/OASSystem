@@ -5,8 +5,8 @@
 @using OAS.UiLib.Core.Models
 
 <UiAccountingEditorSurface>
-    <UiAccountingFormSection Title="بيانات نوع وبند المصروف"
-                             Subtitle="الرمز، التسمية، والحساب المحاسبي الافتراضي المرتبط"
+    <UiAccountingFormSection Title="بيانات نوع المصروف"
+                             Subtitle="الكود والاسم والحساب الذي يُقترح تلقائيًا عند اختيار هذا النوع"
                              IconCssClass="fa-solid fa-tags">
         <UiAccountingFormGrid Columns="2">
             <UiInputText Label="كود نوع المصروف"
@@ -51,6 +51,10 @@
                             Disabled="@(!IsEditable)" />
             </UiAccountingCheckGroup>
         </UiAccountingFormGrid>
+        <p class="oas-expense-type-editor__note">
+            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+            الحساب الافتراضي اختياري، ويظهر كاقتراح عند تسجيل مصروف من هذا النوع. تعطيل النوع لا يحذف السجلات السابقة.
+        </p>
     </UiAccountingFormSection>
 </UiAccountingEditorSurface>
 

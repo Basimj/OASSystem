@@ -13,16 +13,15 @@ public sealed class BankAccountPageSpecification
         var normalized = request.Normalize();
         var specification = new Specification<BankAccount>();
 
-        if (!string.IsNullOrWhiteSpace(normalized.Search))
-        {
-            var search = normalized.Search.Trim();
-            specification.Where(x =>
-                x.Code.Contains(search) ||
-                x.BankName.Contains(search) ||
-                x.AccountName.Contains(search) ||
-                x.AccountNumber.Contains(search) ||
-                (x.IBAN != null && x.IBAN.Contains(search)));
-        }
+        // A single predicate combines status and search (Where overwrites Criteria).
+        var status = normalized.Status ?? string.Empty;
+        var search = normalized.Search ?? string.Empty;
+        specification.Where(x =>
+            (status != "active" || x.IsActive) &&
+            (status != "inactive" || !x.IsActive) &&
+            (search == string.Empty || x.Code.Contains(search) || x.BankName.Contains(search) ||
+                x.AccountName.Contains(search) || x.AccountNumber.Contains(search) ||
+                (x.IBAN != null && x.IBAN.Contains(search))));
 
         var sortBy = ResolveSortProperty(normalized.SortBy);
         specification.AddSort(sortBy, normalized.SortDirection);

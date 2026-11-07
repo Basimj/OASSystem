@@ -1,8 +1,13 @@
 @page "/accounting/accounts"
+@page "/accounting/accounts/{AccountId:guid}"
 @attribute [Authorize]
 @using OAS.Client.Accounting.Components
 @using OAS.Client.Accounting.Workspace
 
 <PageTitle>دليل شجرة الحسابات | OAS</PageTitle>
 
-<AccountingWorkspaceHost Section="AccountingEntityType.Accounts" />
+<AccountingWorkspaceHost Section="AccountingEntityType.Accounts" InitialRecordId="@AccountId" />
+
+@code {
+    [Parameter] public Guid? AccountId { get; set; }
+}

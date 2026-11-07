@@ -5,6 +5,7 @@ using OAS.Application.Abstractions.Persistence.Specifications;
 using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Accounting.BankAccounts.Specifications;
 using OAS.Application.Common.Exceptions;
+using OAS.Contracts.Accounting.BankAccounts;
 using OAS.Domain.Accounting;
 using OAS.Domain.Accounting.Entities;
 
@@ -65,7 +66,7 @@ public sealed class CreateBankAccountCommandHandler(
             data.BankName,
             data.AccountName,
             accountNumber,
-            data.IBAN,
+            BankIban.Normalize(data.IBAN),
             account.Id,
             currency.Id,
             data.IsActive);

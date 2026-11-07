@@ -1,6 +1,7 @@
 using OAS.Application.Abstractions.Persistence.Specifications;
 using OAS.Contracts.Common.Pagination;
 using OAS.Domain.Accounting.Entities;
+using OAS.Domain.Accounting.Enums;
 
 namespace OAS.Application.Accounting.Expenses.Specifications;
 
@@ -11,14 +12,27 @@ public sealed class ExpensePageSpecification
         var normalized = request.Normalize();
         var specification = new Specification<Expense>();
 
-        if (!string.IsNullOrWhiteSpace(normalized.Search))
-        {
-            var search = normalized.Search.Trim();
-            specification.Where(x =>
-                x.ExpenseNumber.Contains(search) ||
+        // Compose a single Criteria: the Specification.Where implementation replaces
+        // (rather than appends) previous Where calls.
+        var status = normalized.Status ?? string.Empty;
+        var search = normalized.Search ?? string.Empty;
+        var dateFrom = normalized.DateFrom;
+        var dateTo = normalized.DateTo;
+        var typeId = normalized.ExpenseTypeId;
+        PaymentMethod? method = normalized.PaymentMethod is >= 1 and <= 5
+            ? (PaymentMethod)normalized.PaymentMethod.Value : null;
+        specification.Where(x =>
+            (status != "draft" || x.Status == ExpenseStatus.Draft) &&
+            (status != "approved" || x.Status == ExpenseStatus.Approved) &&
+            (status != "posted" || x.Status == ExpenseStatus.Posted) &&
+            (status != "cancelled" || x.Status == ExpenseStatus.Cancelled) &&
+            (!dateFrom.HasValue || x.ExpenseDate >= dateFrom.Value) &&
+            (!dateTo.HasValue || x.ExpenseDate <= dateTo.Value) &&
+            (!typeId.HasValue || x.ExpenseTypeId == typeId.Value) &&
+            (!method.HasValue || x.PaymentMethod == method.Value) &&
+            (search == string.Empty || x.ExpenseNumber.Contains(search) ||
                 (x.Beneficiary != null && x.Beneficiary.Contains(search)) ||
-                (x.Description != null && x.Description.Contains(search)));
-        }
+                (x.Description != null && x.Description.Contains(search))));
 
         var sortBy = ResolveSortProperty(normalized.SortBy);
         specification.AddSort(sortBy, normalized.SortDirection);

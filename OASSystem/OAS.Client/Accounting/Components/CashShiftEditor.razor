@@ -5,64 +5,56 @@
 @using OAS.UiLib.Components.Inputs
 @using OAS.UiLib.Core.Models
 
-<UiAccountingEditorSurface>
-    <UiAccountingFormSection Title="دورة حياة الوردية النقدية"
-                             Subtitle="متابعة حالة الوردية الحالية والتحولات المعتمدة"
-                             IconCssClass="fa-solid fa-timeline">
-        <UiAccountingStatusActionBar Label="الحالة الحالية"
-                                     StatusText="@AccountingArabicPresenter.GetCashShiftStatusText(Model.Status)"
-                                     StatusState="@StatusState"
-                                     Actions="@StatusActions" />
-    </UiAccountingFormSection>
+<UiAccountingEditorSurface AdditionalCssClass="oas-cashbank-editor oas-cashbank-editor--shift">
+    <div class="oas-cashbank-editor__intro">
+        <div class="oas-cashbank-editor__intro-icon"><i class="fa-solid fa-cash-register" aria-hidden="true"></i></div>
+        <div>
+            <h3>@(IsNew ? "فتح وردية صندوق" : "تفاصيل وردية الصندوق")</h3>
+            <p>@(IsNew ? "حدد الصندوق والعهدة المسلّمة عند الافتتاح." : "راجع بيانات الافتتاح والجرد وحالة الوردية. إجراءات الإغلاق والاعتماد في الشريط العلوي.")</p>
+        </div>
+        <span class="@StatusCssClass">@AccountingArabicPresenter.GetCashShiftStatusText(Model.Status)</span>
+    </div>
 
-    <UiAccountingFormSection Title="بيانات فتح الوردية والصندوق"
-                             Subtitle="رقم الوردية، الصندوق، ورصيد البداية"
-                             IconCssClass="fa-solid fa-cash-register">
-
+    <UiAccountingFormSection Title="بيانات الوردية" IconCssClass="fa-solid fa-cash-register">
         <UiAccountingFormGrid Columns="2">
-            <UiInputText Label="رقم الوردية"
-                         Value="@Model.ShiftNumber"
-                         ReadOnly="true"
-                         Disabled="true"
-                         Placeholder="توليد تلقائي..."
-                         Size="ControlSize.Small" />
-
-            <UiLookup Label="الصندوق / الخزينة"
-                      Value="@CashAccountValue"
-                      ValueChanged="OnCashAccountChanged"
-                      SelectedItem="@CashAccountLookupItem"
-                      SearchAsync="@CashAccountSearchAsync"
-                      Placeholder="اختر الصندوق..."
-                      Disabled="@CashAccountDisabled"
-                      Required="true"
-                      MinimumSearchLength="0"
-                      DebounceMilliseconds="250" />
-
+            <UiInputText Label="رقم الوردية (تلقائي)" Value="@Model.ShiftNumber"
+                         ReadOnly="true" Disabled="true" Placeholder="يُحجز تلقائيًا..." Size="ControlSize.Small" />
+            <UiLookup Label="الصندوق / الخزينة" Value="@CashAccountValue"
+                      ValueChanged="OnCashAccountChanged" SelectedItem="@CashAccountLookupItem"
+                      SearchAsync="@CashAccountSearchAsync" Placeholder="اختر الصندوق..."
+                      Disabled="@(!IsEditable || !IsNew)" Required="true"
+                      MinimumSearchLength="0" DebounceMilliseconds="250" />
             <UiAccountingNumberField Label="رصيد الافتتاح (العهدة المستلمة)"
-                                     Value="@Model.OpeningBalance"
-                                     ValueChanged="OnOpeningBalanceChanged"
-                                     Min="0"
-                                     Disabled="@OpeningBalanceDisabled" />
+                                     Value="@Model.OpeningBalance" ValueChanged="OnOpeningBalanceChanged"
+                                     Min="0" Disabled="@(!IsEditable || !IsNew)" />
+            <div class="oas-cashbank-editor__readonly">
+                <span>عملة الصندوق</span>
+                <strong>@(string.IsNullOrWhiteSpace(CurrencyLabel) ? "حدد الصندوق لعرض عملته" : CurrencyLabel)</strong>
+            </div>
+            @if (!IsNew)
+            {
+                <div class="oas-cashbank-editor__readonly"><span>وقت فتح الوردية (UTC)</span><strong>@FormatUtc(Model.OpenedAtUtc)</strong></div>
+                <div class="oas-cashbank-editor__readonly"><span>وقت الإغلاق (UTC)</span><strong>@FormatUtc(Model.ClosedAtUtc)</strong></div>
+            }
         </UiAccountingFormGrid>
     </UiAccountingFormSection>
 
     @if (!IsNew)
     {
-        <UiAccountingFormSection Title="بيانات الإغلاق والجرد الفعلي"
-                                 Subtitle="المبالغ المتوقعة والجرد الفعلي والفارق المحسوب"
-                                 IconCssClass="fa-solid fa-calculator">
-
+        <UiAccountingFormSection Title="الجرد والإغلاق" IconCssClass="fa-solid fa-scale-balanced">
+            <div class="oas-cashbank-warning" role="status">
+                <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                <span>تنبيه محاسبي: الرصيد المتوقع الحالي غير مرتبط بجميع حركات القبض والصرف أثناء الوردية. الفارق المعروض مبدئي ولا يصلح وحده لإثبات عجز أو زيادة أو تسوية محاسبية.</span>
+            </div>
             <UiAccountingFormGrid Columns="3">
-                <UiAccountingReadOnlyValue Label="المبلغ المتوقع بالصندوق"
+                <UiAccountingReadOnlyValue Label="الرصيد المتوقع المسجل (غير محقق)"
                                            Value="@ExpectedClosingBalanceText" />
-
                 @if (Model.Status == CashShiftStatus.Open)
                 {
                     <UiAccountingNumberField Label="الجرد الفعلي عند الإغلاق"
                                              Value="@ActualClosingBalanceValue"
                                              ValueChanged="OnActualClosingBalanceChanged"
-                                             Min="0"
-                                             Tone="@UiAccountingNumberField.NumberTone.Primary" />
+                                             Min="0" Tone="@UiAccountingNumberField.NumberTone.Primary" />
                 }
                 else
                 {
@@ -70,12 +62,15 @@
                                                Value="@ActualClosingBalanceText"
                                                Tone="@UiAccountingReadOnlyValue.ValueTone.Primary" />
                 }
-
-                <UiAccountingReadOnlyValue Label="الفارق (عجز / زيادة)"
+                <UiAccountingReadOnlyValue Label="الفارق المبدئي غير المعتمد"
                                            Value="@DifferenceAmountText"
                                            Tone="@DifferenceTone" />
             </UiAccountingFormGrid>
         </UiAccountingFormSection>
+    }
+    else
+    {
+        <p class="oas-cashbank-editor__note">سيتم احتساب أي تسوية وجرد عند إغلاق الوردية. تأكد من استلام العهدة فعليًا قبل الحفظ.</p>
     }
 </UiAccountingEditorSurface>
 
@@ -83,171 +78,44 @@
     public sealed class FormModel
     {
         public string ShiftNumber { get; set; } = string.Empty;
-
         public Guid? CashAccountId { get; set; }
-
         public decimal OpeningBalance { get; set; }
-
         public decimal? ExpectedClosingBalance { get; set; }
-
         public decimal? ActualClosingBalance { get; set; }
-
         public decimal? DifferenceAmount { get; set; }
-
+        public DateTimeOffset? OpenedAtUtc { get; set; }
+        public DateTimeOffset? ClosedAtUtc { get; set; }
         public CashShiftStatus Status { get; set; } = CashShiftStatus.Open;
-
         public string RowVersion { get; set; } = string.Empty;
     }
 
-    [Parameter]
-    public FormModel Model { get; set; } = new();
+    [Parameter] public FormModel Model { get; set; } = new();
+    [Parameter] public bool IsEditable { get; set; }
+    [Parameter] public bool IsNew { get; set; }
+    [Parameter] public string? CurrencyLabel { get; set; }
+    [Parameter] public int CurrencyDecimalPlaces { get; set; } = 2;
+    [Parameter] public UiLookupItem? CashAccountLookupItem { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CashAccountSearchAsync { get; set; }
+    [Parameter] public EventCallback OnModelChanged { get; set; }
 
-    [Parameter]
-    public bool IsEditable { get; set; }
-
-    [Parameter]
-    public bool IsNew { get; set; }
-
-    [Parameter]
-    public UiLookupItem? CashAccountLookupItem { get; set; }
-
-    [Parameter]
-    public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>?
-        CashAccountSearchAsync
-    { get; set; }
-
-    [Parameter]
-    public RenderFragment? Actions { get; set; }
-
-    [Parameter]
-    public EventCallback OnModelChanged { get; set; }
-
-    private string? CashAccountValue
+    private string StatusCssClass => "oas-cashbank-state oas-cashbank-state--" + Model.Status.ToString().ToLowerInvariant();
+    private string? CashAccountValue => Model.CashAccountId?.ToString("D");
+    private decimal ActualClosingBalanceValue => Model.ActualClosingBalance ?? 0m;
+    private string Amount(decimal amount) => amount.ToString($"N{Math.Clamp(CurrencyDecimalPlaces, 0, 6)}");
+    private string ExpectedClosingBalanceText => Model.ExpectedClosingBalance.HasValue ? Amount(Model.ExpectedClosingBalance.Value) : "لم يُحتسب";
+    private string ActualClosingBalanceText => Model.ActualClosingBalance.HasValue ? Amount(Model.ActualClosingBalance.Value) : "لم يتم الجرد بعد";
+    private string DifferenceAmountText => Model.DifferenceAmount.HasValue
+        ? $"{(Model.DifferenceAmount < 0 ? "عجز" : Model.DifferenceAmount > 0 ? "زيادة" : "متوازن")} · {Amount(Math.Abs(Model.DifferenceAmount.Value))}"
+        : "غير متاح";
+    private static string FormatUtc(DateTimeOffset? value) => value.HasValue ? value.Value.ToUniversalTime().ToString("yyyy/MM/dd HH:mm") : "—";
+    private UiAccountingReadOnlyValue.ValueTone DifferenceTone => Math.Sign(Model.DifferenceAmount.GetValueOrDefault()) switch
     {
-        get
-        {
-            return Model.CashAccountId.HasValue
-                ? Model.CashAccountId.Value.ToString("D")
-                : null;
-        }
-    }
-
-    private string StatusState
-    {
-        get
-        {
-            return Model.Status.ToString().ToLowerInvariant();
-        }
-    }
-
-    private RenderFragment? StatusActions
-    {
-        get
-        {
-            return IsNew ? null : Actions;
-        }
-    }
-
-    private bool CashAccountDisabled
-    {
-        get
-        {
-            return !IsEditable || !IsNew;
-        }
-    }
-
-    private bool OpeningBalanceDisabled
-    {
-        get
-        {
-            return !IsEditable || !IsNew;
-        }
-    }
-
-    private decimal ActualClosingBalanceValue
-    {
-        get
-        {
-            return Model.ActualClosingBalance ?? 0m;
-        }
-    }
-
-    private string ExpectedClosingBalanceText
-    {
-        get
-        {
-            return Model.ExpectedClosingBalance.HasValue
-                ? Model.ExpectedClosingBalance.Value.ToString("N2")
-                : "0.00";
-        }
-    }
-
-    private string ActualClosingBalanceText
-    {
-        get
-        {
-            return Model.ActualClosingBalance.HasValue
-                ? Model.ActualClosingBalance.Value.ToString("N2")
-                : "لم يتم الجرد بعد";
-        }
-    }
-
-    private string DifferenceAmountText
-    {
-        get
-        {
-            return Model.DifferenceAmount.HasValue
-                ? Model.DifferenceAmount.Value.ToString("N2")
-                : "-";
-        }
-    }
-
-    private UiAccountingReadOnlyValue.ValueTone DifferenceTone
-    {
-        get
-        {
-            if (!Model.DifferenceAmount.HasValue)
-            {
-                return UiAccountingReadOnlyValue.ValueTone.Default;
-            }
-
-            if (Model.DifferenceAmount.Value < 0m)
-            {
-                return UiAccountingReadOnlyValue.ValueTone.Danger;
-            }
-
-            if (Model.DifferenceAmount.Value > 0m)
-            {
-                return UiAccountingReadOnlyValue.ValueTone.Success;
-            }
-
-            return UiAccountingReadOnlyValue.ValueTone.Default;
-        }
-    }
-
-    private Task OnChanged()
-    {
-        return OnModelChanged.InvokeAsync();
-    }
-
-    private async Task OnCashAccountChanged(string? value)
-    {
-        Model.CashAccountId = Guid.TryParse(value, out var id)
-            ? id
-            : null;
-
-        await OnChanged();
-    }
-
-    private async Task OnOpeningBalanceChanged(decimal amount)
-    {
-        Model.OpeningBalance = amount;
-        await OnChanged();
-    }
-
-    private async Task OnActualClosingBalanceChanged(decimal amount)
-    {
-        Model.ActualClosingBalance = amount;
-        await OnChanged();
-    }
+        -1 => UiAccountingReadOnlyValue.ValueTone.Danger,
+        1 => UiAccountingReadOnlyValue.ValueTone.Success,
+        _ => UiAccountingReadOnlyValue.ValueTone.Default
+    };
+    private Task OnChanged() => OnModelChanged.InvokeAsync();
+    private async Task OnCashAccountChanged(string? value) { Model.CashAccountId = Guid.TryParse(value, out var id) ? id : null; await OnChanged(); }
+    private async Task OnOpeningBalanceChanged(decimal amount) { Model.OpeningBalance = amount; await OnChanged(); }
+    private async Task OnActualClosingBalanceChanged(decimal amount) { Model.ActualClosingBalance = amount; await OnChanged(); }
 }

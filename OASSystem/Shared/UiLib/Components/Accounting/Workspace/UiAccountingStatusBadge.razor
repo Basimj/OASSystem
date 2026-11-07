@@ -12,6 +12,7 @@
     private string BadgeClass => State.ToLowerInvariant() switch
     {
         "draft" => "ui-acc-badge--draft",
+        "pending" or "closing" => "ui-acc-badge--pending",
         "posted" or "approved" or "active" or "open" => "ui-acc-badge--posted",
         "closed" or "locked" => "ui-acc-badge--closed",
         "inactive" or "cancelled" or "reversed" or "void" => "ui-acc-badge--cancelled",
@@ -21,6 +22,7 @@
     private string IconClass => State.ToLowerInvariant() switch
     {
         "draft" => "fa-regular fa-file-lines",
+        "pending" or "closing" => "fa-regular fa-clock",
         "posted" or "approved" or "active" or "open" => "fa-solid fa-check-circle",
         "closed" or "locked" => "fa-solid fa-lock",
         "inactive" or "cancelled" or "reversed" or "void" => "fa-solid fa-ban",

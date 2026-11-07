@@ -1,6 +1,7 @@
 using MediatR;
 using OAS.Application.Abstractions.Numbering;
 using OAS.Application.Abstractions.Persistence;
+using OAS.Application.Abstractions.Persistence.Specifications;
 using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Accounting.CashAccounts.Specifications;
 using OAS.Application.Common.Exceptions;
@@ -29,6 +30,12 @@ public sealed class CreateCashAccountCommandHandler(
             throw new ConflictException(
                 "cash_currency_inactive",
                 "The selected currency is inactive.");
+
+        if (data.IsDefault && data.IsActive &&
+            await repository.CountAsync(
+                new Specification<CashAccount>().Where(x => x.CurrencyId == data.CurrencyId && x.IsDefault && x.IsActive),
+                cancellationToken) > 0)
+            throw new ConflictException("cash_default_already_exists", "An active default cash account already exists for this currency.");
 
         var code = data.Code?.Trim();
 

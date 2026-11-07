@@ -2,6 +2,7 @@ using NUnit.Framework;
 using OAS.Application.Accounting.CashShifts.Commands.CloseCashShift;
 using OAS.Application.Accounting.CashShifts.Commands.CreateCashShift;
 using OAS.Application.Accounting.CashShifts.Mapping;
+using OAS.Application.Common.Exceptions;
 using OAS.Application.Accounting.CashShifts.Queries.GetCashShiftById;
 using OAS.Application.Accounting.CashShifts.Queries.GetCashShifts;
 using OAS.Contracts.Accounting.CashShifts;
@@ -53,6 +54,22 @@ public class CashShiftCommandAndQueryTests
         var shift = _repository.Items[0];
         Assert.That(shift.Status, Is.EqualTo(DomainCashShiftStatus.Open));
         Assert.That(shift.OpeningBalance, Is.EqualTo(500m));
+    }
+
+    [Test]
+    public async Task CreateCashShiftCommandHandler_PreventsSecondOpenShiftForSameCashbox()
+    {
+        var alreadyOpen = CashShift.Create(
+            Guid.NewGuid(), "CS-2026-000001", _cashAccountId,
+            Guid.Parse(_currentUser.UserId!), DateTime.UtcNow, 100m,
+            DomainCashShiftStatus.Open);
+        await _repository.AddAsync(alreadyOpen);
+        var handler = new CreateCashShiftCommandHandler(
+            _repository, _sequenceGenerator, _currentUser, TimeProvider.System);
+
+        Assert.ThrowsAsync<ConflictException>(async () =>
+            await handler.Handle(new CreateCashShiftCommand(
+                new CreateCashShiftRequest(_cashAccountId, 100m)), CancellationToken.None));
     }
 
     [Test]
