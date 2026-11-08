@@ -1,4 +1,5 @@
 @namespace OAS.UiLib.Components.Purchasing
+@using OAS.UiLib.Core.Formatting
 @using OAS.UiLib.Core.Models.Purchasing
 @using OAS.UiLib.Core.Models
 
@@ -121,17 +122,19 @@
                             }
                             <UiPurchasingNumberField Label="الكمية" Value="@line.OrderedQuantity"
                                                      ValueChanged="@(v => QuantityChanged(line,v))" Disabled="@(!IsEditable || line.Sources.Count > 0)"
+                                                     WholeNumbersOnly="@QuantityInputRules.UsesWholeNumbers(null, line.PurchaseUnitName, line.Id.HasValue ? line.OrderedQuantity : 0m)"
+                                                     Step="@QuantityInputRules.StepForUnit(null, line.PurchaseUnitName, line.Id.HasValue ? line.OrderedQuantity : 0m)"
                                                      ErrorText="@ErrorFor(LineKey(line,nameof(line.OrderedQuantity)))" />
                             <UiPurchasingNumberField Label="سعر الوحدة" Value="@line.UnitPrice" ValueChanged="@(v => PriceChanged(line,v))"
                                                      Disabled="@(!IsEditable)" Step="0.0001"
                                                      ErrorText="@ErrorFor(LineKey(line,nameof(line.UnitPrice)))" />
                         </div>
                         <div class="ui-po-line-bottom">
-                            <span class="ui-purchasing-po-line__total">إجمالي البند <strong>@LineTotal(line).ToString("N2")</strong></span>
+                            <span class="ui-purchasing-po-line__total">إجمالي البند <strong>@LineTotal(line).ToString("#,##0.##")</strong></span>
                             @if (line.Sources.Count > 0) { <span class="ui-po-source-hint"><i class="fa-solid fa-link" aria-hidden="true"></i> مرتبط بطلب شراء</span> }
                             @if (line.Id.HasValue)
                             {
-                                <span class="ui-po-source-hint">المستلم: @line.ReceivedBaseQuantity.ToString("N3") · المتبقي: @line.RemainingBaseQuantity.ToString("N3")</span>
+                                <span class="ui-po-source-hint">المستلم: @line.ReceivedBaseQuantity.ToString("#,##0.###") · المتبقي: @line.RemainingBaseQuantity.ToString("#,##0.###")</span>
                             }
                             <button type="button" class="ui-po-more-toggle ui-po-line-more" aria-expanded="@IsLineOptionsOpen(line)" @onclick="() => ToggleLineOptions(line)">
                                 <i class="fa-solid @(IsLineOptionsOpen(line) ? "fa-chevron-up" : "fa-chevron-down")" aria-hidden="true"></i>
@@ -162,10 +165,10 @@
 
     <UiPurchasingSection Title="@(IsEditable ? "مراجعة المبلغ قبل الحفظ" : "ملخص الإجماليات")" Subtitle="يُنشئ الحفظ مسودة أمر شراء فقط، ولا يزيد مخزون المستودع حتى ترحيل الاستلام.">
         <div class="ui-purchasing-total-grid">
-            <span><small>الإجمالي قبل الخصم والضريبة</small><strong>@((IsEditable ? PreviewTotals.Subtotal : Model.Subtotal).ToString("N2"))</strong></span>
-            <span><small>الخصومات</small><strong>@((IsEditable ? PreviewTotals.Discount : Model.DiscountAmount).ToString("N2"))</strong></span>
-            <span><small>الضريبة</small><strong>@((IsEditable ? PreviewTotals.Tax : Model.TaxAmount).ToString("N2"))</strong></span>
-            <span class="ui-po-grand-total"><small>الإجمالي النهائي</small><strong>@((IsEditable ? PreviewTotals.Total : Model.TotalAmount).ToString("N2")) @Model.CurrencyCode</strong></span>
+            <span><small>الإجمالي قبل الخصم والضريبة</small><strong>@((IsEditable ? PreviewTotals.Subtotal : Model.Subtotal).ToString("#,##0.##"))</strong></span>
+            <span><small>الخصومات</small><strong>@((IsEditable ? PreviewTotals.Discount : Model.DiscountAmount).ToString("#,##0.##"))</strong></span>
+            <span><small>الضريبة</small><strong>@((IsEditable ? PreviewTotals.Tax : Model.TaxAmount).ToString("#,##0.##"))</strong></span>
+            <span class="ui-po-grand-total"><small>الإجمالي النهائي</small><strong>@((IsEditable ? PreviewTotals.Total : Model.TotalAmount).ToString("#,##0.##")) @Model.CurrencyCode</strong></span>
         </div>
         @if (IsEditable)
         {

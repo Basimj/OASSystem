@@ -1,3 +1,4 @@
+@using static OAS.UiLib.Core.Formatting.PurchasingDisplayFormat
 @page "/purchases/receipt-follow-ups"
 @attribute [Authorize]
 @using OAS.Contracts.Purchasing.PurchaseReceipts
@@ -42,7 +43,7 @@
               <td>@(x.TargetKind == 1 ? "طلب عميل" : "بديل مواد معمل")</td>
               <td>@(x.CustomerOrderId?.ToString("D") ?? x.PurchaseRequestLineId?.ToString("D"))</td>
               <td>@StatusText(x.Status)</td><td>@x.AttemptCount</td>
-              <td>@x.NextAttemptAtUtc.ToString("yyyy-MM-dd HH:mm")</td>
+              <td>@DisplayDateTime(x.NextAttemptAtUtc)</td>
               <td>@(x.LastErrorCode is null ? "—" : x.LastErrorCode + " / " + x.LastErrorSummary)</td>
               <td>@if (x.Status is 4 or 5)
               {<button class="btn btn-outline-warning btn-sm" disabled="@_busy" @onclick="() => RetryAsync(x.Id)">إعادة المحاولة</button>}</td>

@@ -1,3 +1,4 @@
+using static OAS.UiLib.Core.Formatting.PurchasingDisplayFormat;
 using Microsoft.AspNetCore.Components;
 using OAS.Client.Accounting.Services;
 using OAS.Client.Inventory.Services;
@@ -250,13 +251,13 @@ public partial class CustomerDemandTrackingPage : ComponentBase
             });
             _history = page.Items.Select(x => new UiSupplierHistoryRowModel(
                 x.PurchaseOrderCode,
-                x.OrderDate.ToString("yyyy-MM-dd"),
+                DisplayDate(x.OrderDate),
                 string.IsNullOrWhiteSpace(x.ProductCode) ? x.ProductName : $"{x.ProductCode} - {x.ProductName}",
                 x.OrderedQuantity,
                 x.AcceptedQuantity,
-                x.ExpectedDeliveryDate?.ToString("yyyy-MM-dd"),
+                (x.ExpectedDeliveryDate.HasValue ? DisplayDate(x.ExpectedDeliveryDate.Value) : null),
                 x.ReceiptCode,
-                x.ReceiptDate?.ToString("yyyy-MM-dd"),
+                (x.ReceiptDate.HasValue ? DisplayDate(x.ReceiptDate.Value) : null),
                 x.UnitPrice,
                 x.ActualUnitCost)).ToArray();
         }

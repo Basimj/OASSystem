@@ -1,4 +1,4 @@
-using OAS.UiLib.Core.Models;
+﻿using OAS.UiLib.Core.Models;
 
 namespace OAS.UiLib.Core.Models.Purchasing;
 
@@ -157,6 +157,7 @@ public sealed class UiPurchaseReceiptEditorModel
     public string? WarehouseName { get; set; }
     public DateOnly ReceiptDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
     public DateOnly PostingDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+    public string? PostingDateError { get; set; }
     public string? SupplierDeliveryCode { get; set; }
     public Guid? InventoryTransactionId { get; set; }
     public Guid? JournalEntryId { get; set; }
@@ -172,6 +173,7 @@ public sealed class UiPurchaseReceiptLineModel
     public int LineSequence { get; set; }
     public Guid ProductVariantId { get; set; }
     public string? ProductName { get; set; }
+    public string? PurchaseUnitName { get; set; }
     public decimal OrderedQuantitySnapshot { get; set; }
     public decimal PreviouslyReceivedQty { get; set; }
     public decimal RemainingReceivableQuantity { get; set; }
@@ -190,6 +192,9 @@ public sealed class UiPurchaseReceiptLineModel
 
 public sealed class UiPurchaseInvoiceEditorModel
 {
+    // UI-only source, not part of the invoice persistence contract.
+    public Guid? SourceReceiptId { get; set; }
+    public string? SourceReceiptCode { get; set; }
     public Guid? Id { get; set; }
     public string PurchaseInvoiceCode { get; set; } = "يولد تلقائياً";
     public string? SupplierInvoiceCode { get; set; }
@@ -213,6 +218,7 @@ public sealed class UiPurchaseInvoiceEditorModel
     public string? RowVersion { get; set; }
     public List<UiPurchaseInvoiceLineModel> Lines { get; } = [];
     public UiPurchaseMatchModel? Match { get; set; }
+    public string? MatchingNotice { get; set; }
 }
 
 public sealed class UiPurchaseInvoiceLineModel

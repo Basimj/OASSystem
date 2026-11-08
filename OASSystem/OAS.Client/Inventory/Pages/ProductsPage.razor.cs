@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Components.Rendering;
 using System.Linq.Expressions;
 using System.Globalization;
 using OAS.Client.Common.Feedback.Services;
+using OAS.Client.Inventory.Common;
 using OAS.Client.Inventory.Services;
 using OAS.Client.Services.Browser;
 using OAS.Client.Services.Http;
@@ -46,6 +47,9 @@ public partial class ProductsPage
     private const string InitialBarcodeField = "باركود الصنف الأول";
     private const string InitialPurchasePriceField = "سعر شراء الصنف الأول";
     private const string InitialSellingPriceField = "سعر بيع الصنف الأول";
+    private const string ActiveAvailabilityField = "متاح للاستخدام";
+    private const string LastStockVariantActivationError =
+        "لا يمكن تعطيل آخر صنف نشط لمنتج مخزني. لتعطيل الصنف وحده، فعّل صنفًا آخر للمنتج أولًا. ولإيقاف المنتج كاملًا، غيّر حالته من تبويب «المنتجات».";
 
     [Inject] private IInventoryClientService Inventory { get; set; } = default!;
     [Inject] private InventorySpreadsheetClient SpreadsheetClient { get; set; } = default!;
@@ -59,7 +63,7 @@ public partial class ProductsPage
     private static readonly IReadOnlyList<SectionItem> Sections =
     [
         new(ProductSection.Products, "المنتجات", "fa-solid fa-glasses"),
-        new(ProductSection.Variants, "المتغيرات", "fa-solid fa-barcode"),
+        new(ProductSection.Variants, "الأصناف", "fa-solid fa-barcode"),
         new(ProductSection.Units, "الوحدات", "fa-solid fa-ruler")
     ];
 
@@ -169,7 +173,7 @@ public partial class ProductsPage
         ProductSection.ProductTypes => "أنواع المنتجات",
         ProductSection.Units => "وحدات القياس",
         ProductSection.Products => "المنتجات",
-        ProductSection.Variants => "الأصناف القابلة للبيع",
+        ProductSection.Variants => "الأصناف",
         _ => "المنتجات"
     };
 
@@ -187,7 +191,7 @@ public partial class ProductsPage
     };
 
     private static readonly IReadOnlyList<string> SimpleHeaders = ["الكود", "الاسم", "الحالة"];
-    private static readonly IReadOnlyList<string> ProductHeaders = ["الكود", "المنتج", "النوع", "مخزني", "المتغيرات", "حالة المخزون", "الحالة"];
+    private static readonly IReadOnlyList<string> ProductHeaders = ["الكود", "المنتج", "النوع", "مخزني", "عدد الأصناف", "حالة المخزون", "الحالة"];
     private static readonly IReadOnlyList<string> VariantHeaders = ["رمز الصنف", "الصنف", "الباركود", "سعر البيع", "الحالة"];
 
 
@@ -217,7 +221,7 @@ public partial class ProductsPage
         ProductSection.ProductTypes => "نوع منتج",
         ProductSection.Units => "وحدة",
         ProductSection.Products => "منتج",
-        ProductSection.Variants => "صنف قابل للبيع",
+        ProductSection.Variants => "صنف",
         _ => "سجل"
     };
 
@@ -265,21 +269,18 @@ public partial class ProductsPage
     private IReadOnlyList<UiSelectOption> UnitOptions =>
         [new UiSelectOption(string.Empty, "— بدون —"), .. _units.Where(x => x.IsActive).Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.Name}"))];
 
-    private IReadOnlyList<UiSelectOption> ProductOptions
-    {
-        get
-        {
-            if (!Guid.TryParse(_categoryId, out var categoryId))
-                return [];
-
-            return _products
-                .Where(x => x.CategoryId == categoryId &&
-                            (x.IsActive || string.Equals(x.Id.ToString("D"), _productId, StringComparison.OrdinalIgnoreCase)))
-                .OrderBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase)
-                .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.ProductCode} - {x.Name}"))
-                .ToArray();
-        }
-    }
+    // A variant belongs to a product, not to a manually preselected category.
+    // Offer all active products immediately; choosing one fills in its type/category.
+    // Keep the existing parent visible when inspecting/editing an older variant,
+    // even when that product was subsequently deactivated.
+    private IReadOnlyList<UiSelectOption> ProductOptions =>
+        _products
+            .Where(x => x.IsActive || (_mode != EditorMode.Create &&
+                         string.Equals(x.Id.ToString("D"), _productId, StringComparison.OrdinalIgnoreCase)))
+            .OrderBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(x => x.ProductCode, StringComparer.CurrentCultureIgnoreCase)
+            .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.ProductCode} - {x.Name}"))
+            .ToArray();
 
     private bool IsServiceProductType => CurrentProductType?.SystemKey == ProductTypeSystemKeys.Service;
     private bool ShowInitialVariantSection => _section == ProductSection.Products && _mode == EditorMode.Create && _isStockItem && !IsServiceProductType;
@@ -470,6 +471,15 @@ public partial class ProductsPage
                 var key = _section == ProductSection.Products ? InitialBarcodeField : "الباركود";
                 SetError(key, "الباركود مستخدم مسبقًا.");
                 Snackbar.Error("الباركود مستخدم مسبقًا.");
+            }
+            else if (_section == ProductSection.Variants &&
+                     string.Equals(ex.Error.Code, "validation_failed", StringComparison.OrdinalIgnoreCase) &&
+                     ex.Error.Errors.TryGetValue("is_active", out var activeErrors) &&
+                     activeErrors.Any(error => error.Contains("stock_product_requires_active_variant", StringComparison.OrdinalIgnoreCase)))
+            {
+                // Preserve the backend invariant, but explain the reason beside the checkbox.
+                SetError(ActiveAvailabilityField, LastStockVariantActivationError);
+                Snackbar.Error(LastStockVariantActivationError);
             }
             else if (string.Equals(ex.Error.Code, "unique_constraint_conflict", StringComparison.OrdinalIgnoreCase))
             {
@@ -743,8 +753,7 @@ public partial class ProductsPage
                 break;
 
             case ProductSection.Variants:
-                Required("نوع المنتج", _productTypeId);
-                Required("التصنيف", _categoryId);
+                // The selected product supplies its category and type automatically.
                 Required("المنتج", _productId);
                 Required("SKU", _code);
                 Required("سعر الشراء", _purchasePrice);
@@ -755,19 +764,25 @@ public partial class ProductsPage
                 MaxLength("اللون", _color, 50);
                 MaxLength("المقاس", _size, 50);
 
-                if (!string.IsNullOrWhiteSpace(_productId) && !Guid.TryParse(_productId, out _))
-                    SetError("المنتج", "قيمة المنتج غير صحيحة.");
-                if (Guid.TryParse(_categoryId, out var variantCategoryId) && Guid.TryParse(_productTypeId, out var variantTypeId))
+                if (!string.IsNullOrWhiteSpace(_productId))
                 {
-                    var category = _categories.FirstOrDefault(x => x.Id == variantCategoryId);
-                    if (category is null || category.ProductTypeId != variantTypeId)
-                        SetError("التصنيف", "التصنيف المحدد لا يتبع نوع المنتج المختار.");
-                }
-                if (Guid.TryParse(_productId, out var variantProductId) && Guid.TryParse(_categoryId, out var selectedVariantCategoryId))
-                {
-                    var product = _products.FirstOrDefault(x => x.Id == variantProductId);
-                    if (product is null || product.CategoryId != selectedVariantCategoryId)
-                        SetError("المنتج", "المنتج المحدد لا يتبع التصنيف المختار.");
+                    if (!Guid.TryParse(_productId, out var variantProductId))
+                    {
+                        SetError("المنتج", "قيمة المنتج غير صحيحة. اختر منتجًا من القائمة.");
+                    }
+                    else
+                    {
+                        var product = _products.FirstOrDefault(x => x.Id == variantProductId);
+                        var category = product is null ? null : _categories.FirstOrDefault(x => x.Id == product.CategoryId);
+                        if (product is null)
+                            SetError("المنتج", "المنتج المحدد غير موجود. حدّث الصفحة واختر منتجًا متاحًا.");
+                        else if (_mode == EditorMode.Create && !product.IsActive)
+                            SetError("المنتج", "هذا المنتج غير نشط. اختر منتجًا متاحًا للاستخدام.");
+                        else if (category is null ||
+                                 !string.Equals(_categoryId, product.CategoryId.ToString("D"), StringComparison.OrdinalIgnoreCase) ||
+                                 !string.Equals(_productTypeId, category.ProductTypeId.ToString("D"), StringComparison.OrdinalIgnoreCase))
+                            SetError("المنتج", "تعذر تحديد تصنيف المنتج ونوعه. أعد اختيار المنتج من القائمة.");
+                    }
                 }
                 if (_variants.Any(x => x.Id != _selectedId && string.Equals(x.SKU, _code.Trim(), StringComparison.OrdinalIgnoreCase)))
                     SetError("SKU", "SKU مستخدم مسبقًا.");
@@ -776,14 +791,30 @@ public partial class ProductsPage
 
                 ValidateDecimalField("سعر الشراء", _purchasePrice, required: true, precision: 18, scale: 2, nonNegative: true, ref missingRequired);
                 ValidateDecimalField("سعر البيع", _sellingPrice, required: true, precision: 18, scale: 2, nonNegative: true, ref missingRequired);
+
+                // An inventory item must retain at least one active variant. Check before
+                // saving so users see a helpful message rather than an API exception.
+                if (_mode == EditorMode.Edit && !_isActive && _selectedId.HasValue)
+                {
+                    var selectedVariant = _variants.FirstOrDefault(x => x.Id == _selectedId.Value);
+                    if (selectedVariant is { IsActive: true } &&
+                        _products.Any(x => x.Id == selectedVariant.ProductId && x.IsStockItem) &&
+                        !_variants.Any(x => x.ProductId == selectedVariant.ProductId &&
+                                            x.Id != selectedVariant.Id && x.IsActive))
+                    {
+                        SetError(ActiveAvailabilityField, LastStockVariantActivationError);
+                    }
+                }
                 break;
         }
 
         if (_fieldErrors.Count == 0) return true;
 
-        Snackbar.Error(missingRequired
-            ? "هناك بيانات إجبارية لم يتم إدخالها."
-            : "توجد بيانات غير صحيحة. راجع الحقول المميزة باللون الأحمر.");
+        Snackbar.Error(_fieldErrors.ContainsKey(ActiveAvailabilityField)
+            ? LastStockVariantActivationError
+            : missingRequired
+                ? "هناك بيانات إجبارية لم يتم إدخالها."
+                : "توجد بيانات غير صحيحة. راجع الحقول المميزة باللون الأحمر.");
         return false;
     }
 
@@ -962,8 +993,8 @@ public partial class ProductsPage
                     }
                     _variantName = variant.VariantName; _color = variant.Color; _size = variant.Size;
                     _unitId = variant.UnitId?.ToString("D");
-                    _purchasePrice = variant.PurchasePrice.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                    _sellingPrice = variant.SellingPrice.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    _purchasePrice = InventoryDisplayFormat.InputNumber(variant.PurchasePrice);
+                    _sellingPrice = InventoryDisplayFormat.InputNumber(variant.SellingPrice);
                     _isActive = variant.IsActive;
                     LoadLensDetailsForVariant(variant.Id);
                 }
@@ -977,8 +1008,10 @@ public partial class ProductsPage
         _code = string.Empty; _name = string.Empty; _isActive = true;
         _brandName = string.Empty;
         _categoryId = null; _brandId = null;
-        _productTypeId = _productTypes.FirstOrDefault(x => x.IsActive && x.SystemKey == ProductTypeSystemKeys.Frame)?.Id.ToString("D")
-            ?? _productTypes.FirstOrDefault(x => x.IsActive)?.Id.ToString("D");
+        _productTypeId = _section == ProductSection.Variants
+            ? null // Do not suggest a type until the operator chooses the parent product.
+            : _productTypes.FirstOrDefault(x => x.IsActive && x.SystemKey == ProductTypeSystemKeys.Frame)?.Id.ToString("D")
+              ?? _productTypes.FirstOrDefault(x => x.IsActive)?.Id.ToString("D");
         _description = null; _isStockItem = !IsServiceProductType;
         _frameModel = string.Empty; _frameMaterial = null; _frameRimType = null; _frameGender = null; _frameShape = null;
         _templeLength = null; _bridgeSize = null; _lensWidth = null;
@@ -1211,10 +1244,17 @@ public partial class ProductsPage
 
     private void RenderVariantEditor(RenderTreeBuilder b, ref int s)
     {
-        var lockHierarchy = _mode != EditorMode.Create;
-        AddSelect(b, ref s, "نوع المنتج", _productTypeId, SetProductType, () => _productTypeId, ProductTypeOptions, true, lockHierarchy);
-        AddSelect(b, ref s, "التصنيف", _categoryId, SetProductCategory, () => _categoryId, CategoryOptions.Where(x => !string.IsNullOrEmpty(x.Value)).ToArray(), true, lockHierarchy);
-        AddSelect(b, ref s, "المنتج", _productId, SetVariantProduct, () => _productId, ProductOptions, true, lockHierarchy);
+        // Choose the parent first. Type and category are read-only context derived
+        // from that product; they must not block or empty the product picker.
+        AddSelect(b, ref s, "المنتج", _productId, SetVariantProduct, () => _productId,
+            ProductOptions, true, _mode != EditorMode.Create);
+        if (Guid.TryParse(_productId, out _))
+        {
+            AddSelect(b, ref s, "نوع المنتج", _productTypeId, SetProductType, () => _productTypeId,
+                ProductTypeOptions, forceDisabled: true);
+            AddSelect(b, ref s, "التصنيف", _categoryId, SetProductCategory, () => _categoryId,
+                CategoryOptions.Where(x => !string.IsNullOrEmpty(x.Value)).ToArray(), forceDisabled: true);
+        }
         AddText(b, ref s, "رمز الصنف (SKU)", _code, v => _code = v, () => _code, (!IsEditing || _saving), true, 64);
         AddText(b, ref s, "الباركود", _barcode, v => _barcode = v, () => _barcode, (!IsEditing || _saving), false, 64);
         AddText(b, ref s, "اسم الصنف عند البيع", _variantName, v => _variantName = v, () => _variantName, (!IsEditing || _saving), false, 100);
@@ -1312,7 +1352,10 @@ public partial class ProductsPage
         return balances.Any(x => x.OnHandQuantity > 0m) ? "يوجد مخزون" : "رصيد صفري";
     }
 
-    private void AddActive(RenderTreeBuilder b, ref int s) => AddCheckbox(b, ref s, "متاح للاستخدام", _isActive, v => _isActive = v, _mode == EditorMode.Create);
+    private void AddActive(RenderTreeBuilder b, ref int s) =>
+        AddCheckbox(b, ref s, ActiveAvailabilityField, _isActive,
+            v => SetField(ActiveAvailabilityField, () => _isActive = v),
+            _mode == EditorMode.Create, ActiveAvailabilityField);
 
     private void AddText(RenderTreeBuilder b, ref int s, string label, string? value, Action<string> changed, Expression<Func<string?>> expression, bool disabled, bool required = false, int? maxLength = null)
     {
@@ -1351,17 +1394,22 @@ public partial class ProductsPage
         b.AddAttribute(s++, "Disabled", (!IsEditing || _saving) || forceDisabled);
         b.AddAttribute(s++, "Required", required); b.AddAttribute(s++, "Size", ControlSize.Small);
         b.AddAttribute(s++, "ErrorText", ErrorFor(label));
-        if (label == "المنتج" && !Guid.TryParse(_categoryId, out _))
-            b.AddAttribute(s++, "EmptyText", "اختر التصنيف أولًا لعرض منتجاته.");
+        if (_section == ProductSection.Variants && label == "المنتج")
+            b.AddAttribute(s++, "EmptyText", _products.Any(x => x.IsActive)
+                ? "لا توجد منتجات مطابقة للبحث."
+                : "لا توجد منتجات نشطة. أضف منتجًا أو فعّل منتجًا من تبويب «المنتجات».");
         b.CloseComponent();
     }
 
-    private void AddCheckbox(RenderTreeBuilder b, ref int s, string label, bool value, Action<bool> changed, bool forceDisabled = false)
+    private void AddCheckbox(RenderTreeBuilder b, ref int s, string label, bool value, Action<bool> changed,
+        bool forceDisabled = false, string? errorKey = null)
     {
         b.OpenComponent<OAS.UiLib.Components.Inputs.UiCheckbox>(s++);
         b.AddAttribute(s++, "Label", label); b.AddAttribute(s++, "Value", value);
         b.AddAttribute(s++, "ValueChanged", EventCallback.Factory.Create<bool>(this, changed));
-        b.AddAttribute(s++, "Disabled", (!IsEditing || _saving) || forceDisabled); b.CloseComponent();
+        b.AddAttribute(s++, "Disabled", (!IsEditing || _saving) || forceDisabled);
+        if (errorKey is not null) b.AddAttribute(s++, "ErrorText", ErrorFor(errorKey));
+        b.CloseComponent();
     }
 
     private string ProductName(Guid id) => _products.FirstOrDefault(x => x.Id == id)?.Name ?? "—";
@@ -1385,6 +1433,6 @@ public partial class ProductsPage
         return decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out parsed);
     }
 
-    private static string? FormatNullableDecimal(decimal? value) => value?.ToString(CultureInfo.InvariantCulture);
+    private static string? FormatNullableDecimal(decimal? value) => value.HasValue ? InventoryDisplayFormat.InputNumber(value.Value) : null;
     private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

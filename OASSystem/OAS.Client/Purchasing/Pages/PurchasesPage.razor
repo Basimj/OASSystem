@@ -1,3 +1,4 @@
+@using static OAS.UiLib.Core.Formatting.PurchasingDisplayFormat
 @page "/purchases"
 @attribute [Authorize]
 @using OAS.Client.Purchasing.Common
@@ -41,7 +42,7 @@
             <span class="sd-icon sd-green"><i class="fa-solid fa-file-invoice-dollar"></i></span>
             <span class="sd-metric-label">فواتير مشتريات اليوم</span>
             <div class="sd-metric-amount" aria-label="إجمالي قيمة فواتير المشتريات المرحلة بتاريخ اليوم">
-                <strong class="sd-metric-number" dir="ltr">@(_hasInvoices ? _todayPurchases.ToString("N2") : "—")</strong>
+                <strong class="sd-metric-number" dir="ltr">@(_hasInvoices ? _todayPurchases.ToString("#,##0.##") : "—")</strong>
                 @if (_hasInvoices && !string.IsNullOrWhiteSpace(BaseCurrencyNameAr))
                 {
                     <span class="sd-metric-currency" dir="rtl" title="العملة الأساسية">@BaseCurrencyNameAr</span>
@@ -109,7 +110,7 @@
                             <tr>
                                 <td><a class="sd-invoice-link" href="@InvoiceUrl(invoice.Id)">@invoice.PurchaseInvoiceCode</a></td>
                                 <td>@(invoice.SupplierName ?? invoice.SupplierCode ?? "—")</td>
-                                <td class="sd-muted">@invoice.InvoiceDate.ToString("yyyy/MM/dd")</td>
+                                <td class="sd-muted">@DisplayDate(invoice.InvoiceDate)</td>
                                 <td><span class="sd-status @StatusClass(invoice.Status)">@PurchasingArabicPresenter.InvoiceStatus(invoice.Status)</span></td>
                                 <td class="sd-num">@Money(invoice.TotalAmount, invoice.CurrencyCodeSnapshot ?? invoice.CurrencyCode)</td>
                                 <td class="sd-muted">@(invoice.SupplierInvoiceCode ?? "—")</td>
@@ -160,7 +161,7 @@
                 <div class="sd-chart-days">
                     @foreach (var date in _weekDates)
                     {
-                        <span>@date.ToString("ddd", new System.Globalization.CultureInfo("ar"))<small>@date.ToString("dd/MM")</small></span>
+                        <span>@date.ToString("ddd", new System.Globalization.CultureInfo("ar"))<small>@DisplayShortDate(date)</small></span>
                     }
                 </div>
             </div>
@@ -336,7 +337,7 @@
         .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x));
 
     private static string Money(decimal value, string? currency = null)
-        => $"{value:N2} {(string.IsNullOrWhiteSpace(currency) ? "بالعملة الأساسية" : currency)}";
+        => $"{value:#,##0.##} {(string.IsNullOrWhiteSpace(currency) ? "بالعملة الأساسية" : currency)}";
     private static string StatusClass(PurchaseInvoiceStatus status) => status switch
     {
         PurchaseInvoiceStatus.Posted => "sd-status-green",

@@ -1,3 +1,4 @@
+@using static OAS.UiLib.Core.Formatting.PurchasingDisplayFormat
 @namespace OAS.UiLib.Components.Purchasing.CustomerDemand
 @using OAS.UiLib.Components.Sales.Workflow
 @using OAS.UiLib.Core.Models.Sales
@@ -27,11 +28,11 @@
         <Body>
             <UiDataTable TItem="UiDemandTrackingRowModel" Items="@Rows" Headers="@Headers" Compact="true" OnRowClick="@((UiDemandTrackingRowModel row) => OpenAsync(row))" EmptyText="لا توجد نواقص مطابقة للفلاتر.">
                 <RowTemplate Context="row">
-                    <td><strong>@row.RequestCode</strong><small class="ui-workflow-cell-muted">@row.RequestDate</small></td>
+                    <td><strong>@row.RequestCode</strong><small class="ui-workflow-cell-muted">@DisplayDateText(row.RequestDate)</small></td>
                     <td>@row.OrderCode<br/><small>@row.CustomerCode - @row.CustomerName</small></td>
                     <td>@row.ProductText<br/><small>@(row.OpticalSummary ?? row.EyeText ?? "")</small></td>
-                    <td>@row.Requested.ToString("N3")</td><td>@row.Received.ToString("N3")</td><td><strong>@row.Remaining.ToString("N3")</strong></td>
-                    <td>@(row.ActualSupplier ?? row.PreferredSupplier ?? "—")</td><td>@(row.PurchaseOrderCode ?? "—")</td><td>@(row.ExpectedDate ?? "—")</td>
+                    <td>@row.Requested.ToString("#,##0.###")</td><td>@row.Received.ToString("#,##0.###")</td><td><strong>@row.Remaining.ToString("#,##0.###")</strong></td>
+                    <td>@(row.ActualSupplier ?? row.PreferredSupplier ?? "—")</td><td>@(row.PurchaseOrderCode ?? "—")</td><td>@DisplayDateText(row.ExpectedDate)</td>
                     <td><span class="ui-sales-status @row.TrackingCss">@row.TrackingText</span>@if(row.DelayDays.HasValue){<small class="ui-workflow-delay">@row.DelayDays يوم</small>}</td>
                 </RowTemplate>
             </UiDataTable>
@@ -46,7 +47,7 @@
     <aside class="ui-workflow-drawer ui-workflow-drawer--wide purchasing-demand-drawer" dir="rtl">
         <header class="ui-workflow-drawer__header"><div><strong>@Selected.RequestCode</strong><span>@Selected.CustomerText • @Selected.OrderCode</span></div><button type="button" @onclick="CloseAsync">×</button></header>
         <div class="ui-workflow-drawer__body">
-            <div class="ui-workflow-detail-grid"><span>الصنف<strong>@Selected.ProductText</strong></span><span>الحالة<strong>@Selected.TrackingText</strong></span><span>المتبقي<strong>@Selected.Remaining.ToString("N3")</strong></span><span>الوصول<strong>@(Selected.ExpectedDate ?? "—")</strong></span></div>
+            <div class="ui-workflow-detail-grid"><span>الصنف<strong>@Selected.ProductText</strong></span><span>الحالة<strong>@Selected.TrackingText</strong></span><span>المتبقي<strong>@Selected.Remaining.ToString("#,##0.###")</strong></span><span>الوصول<strong>@DisplayDateText(Selected.ExpectedDate)</strong></span></div>
             @if(!string.IsNullOrWhiteSpace(Selected.OpticalSummary)){<div class="ui-workflow-optical"><i class="fa-solid fa-glasses"></i><span>@Selected.OpticalSummary</span></div>}
             <section><h4>المورد والجدولة</h4><div class="ui-workflow-form-grid">
                 <UiLookup Label="المورد المفضل" Value="@Selected.PreferredSupplierId" SelectedItem="@SelectedSupplier" SearchAsync="SearchSuppliersAsync" ValueChanged="PreferredSupplierChangedAsync" />
@@ -54,7 +55,7 @@
                 <UiInputDate Label="الوصول المتوقع" Value="@Selected.ExpectedDeliveryDateInput" ValueChanged="v => Selected.ExpectedDeliveryDateInput=v" />
             </div></section>
             <section><h4>إعادة توجيه المتبقي</h4><div class="ui-workflow-form-grid"><UiLookup Label="المورد الجديد" Value="@Selected.ResupplySupplierId" SelectedItem="@ResupplySupplier" SearchAsync="SearchSuppliersAsync" ValueChanged="ResupplySupplierChangedAsync" /><label class="ui-sales-checkout__datetime"><span>موعد الطلب الجديد</span><input type="datetime-local" value="@FormatDateTime(Selected.ResupplyScheduledAt)" @onchange="ResupplyScheduleChanged" /></label></div></section>
-            @if(History.Count>0){<section><h4>سجل المورد</h4><UiDataTable Items="@History" Headers="@HistoryHeaders" Compact="true"><RowTemplate Context="h"><td>@h.OrderCode</td><td>@h.OrderDate</td><td>@h.ProductText</td><td>@h.Ordered.ToString("N3")</td><td>@h.Received.ToString("N3")</td><td>@(h.UnitPrice?.ToString("N2")??"—")</td><td>@(h.ActualUnitCost?.ToString("N2")??"—")</td></RowTemplate></UiDataTable></section>}
+            @if(History.Count>0){<section><h4>سجل المورد</h4><UiDataTable Items="@History" Headers="@HistoryHeaders" Compact="true"><RowTemplate Context="h"><td>@h.OrderCode</td><td>@DisplayDateText(h.OrderDate)</td><td>@h.ProductText</td><td>@h.Ordered.ToString("#,##0.###")</td><td>@h.Received.ToString("#,##0.###")</td><td>@(h.UnitPrice?.ToString("#,##0.##")??"—")</td><td>@(h.ActualUnitCost?.ToString("#,##0.##")??"—")</td></RowTemplate></UiDataTable></section>}
         </div>
         <footer class="ui-workflow-drawer__footer">
             @if(Selected.TrackingKey is "New" or "AwaitingSupplier" or "Scheduled")

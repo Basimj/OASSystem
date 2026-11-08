@@ -88,13 +88,13 @@ body:has(.oas-inventory-view) .ui-workspace-actionbar .ui-button {
   border-radius: 9px;
   min-height: 32px;
 }
-body:has(.oas-inventory-view) :is(.inventory-master-editor,.inventory-warehouses__editor,.inventory-products__editor,.inventory-transactions__editor,.stock-counts__editor) {
+body:has(.oas-inventory-view) :is(.inventory-master-editor,.inventory-warehouses__editor,.inventory-products__editor,.stock-counts__editor) {
   display: grid;
   grid-template-columns: repeat(2,minmax(0,1fr));
   gap: 10px;
   align-items: start;
 }
-body:has(.oas-inventory-view) :is(.inventory-master-editor,.inventory-warehouses__editor,.inventory-products__editor,.inventory-transactions__editor,.stock-counts__editor) > * {min-width: 0;}
+body:has(.oas-inventory-view) :is(.inventory-master-editor,.inventory-warehouses__editor,.inventory-products__editor,.stock-counts__editor) > * {min-width: 0;}
 body:has(.oas-inventory-view) :is(.inventory-products__specialized,.inventory-transactions__optional) {
   margin: 6px 0 0;
   padding: 0;
@@ -127,16 +127,8 @@ body:has(.oas-inventory-view) .inventory-products__specialized[open] summary {gr
 body:has(.oas-inventory-view) .inventory-products__specialized-grid {grid-column: 1/-1; grid-template-columns: repeat(3,minmax(0,1fr));}
 body:has(.oas-inventory-view) .inventory-transactions__optional[open] {padding-bottom: 10px;}
 body:has(.oas-inventory-view) .inventory-transactions__optional[open] > .ui-input-text {margin:0 10px;}
-body:has(.oas-inventory-view) .inventory-transactions__lines-title {grid-column:1/-1;margin-top:4px;}
-body:has(.oas-inventory-view) .inventory-transactions__line-editor {
-  grid-column: 1/-1;
-  border: 1px solid var(--inv-border);
-  border-radius: 10px;
-  background: var(--inv-surface);
-  padding: 8px;
-  grid-template-columns: minmax(120px,1.4fr) minmax(65px,.6fr) minmax(85px,.7fr) auto;
-}
-body:has(.oas-inventory-view) .inventory-transactions__line-editor select {min-width:0;}
+/* InventoryTransactionsPage.razor.css owns the split-pane and line grid.
+   Do not force the legacy four-column grid over its five-column editor. */
 body:has(.oas-inventory-view) .stock-counts__line {
   border-radius: 10px;
   border-color: var(--inv-border);
@@ -149,7 +141,7 @@ body:has(.oas-inventory-view) .inventory-products__aside {min-width:0;}
   body:has(.oas-inventory-view) .ui-workspace__body--split {
     grid-template-columns: minmax(0,1.4fr) minmax(315px, 1fr);
   }
-  body:has(.oas-inventory-view) :is(.inventory-transactions__editor,.inventory-products__editor) {grid-template-columns:1fr;}
+  body:has(.oas-inventory-view) .inventory-products__editor {grid-template-columns:1fr;}
 }
 @media (max-width: 1050px) {
   body:has(.oas-inventory-view) .ui-workspace {height:auto; min-height: 100%; overflow:visible;}
@@ -163,12 +155,19 @@ body:has(.oas-inventory-view) .inventory-products__aside {min-width:0;}
   body:has(.oas-inventory-view) .ui-workspace {gap:6px;}
   body:has(.oas-inventory-view) .ui-data-grid-panel {max-height:45vh;}
   body:has(.oas-inventory-view) .ui-workspace__actions {padding:6px;}
-  body:has(.oas-inventory-view) :is(.inventory-master-editor,.inventory-warehouses__editor,.inventory-products__editor,.inventory-transactions__editor,.stock-counts__editor) {grid-template-columns:1fr;}
+  body:has(.oas-inventory-view) :is(.inventory-master-editor,.inventory-warehouses__editor,.inventory-products__editor,.stock-counts__editor) {grid-template-columns:1fr;}
   body:has(.oas-inventory-view) .inventory-products__specialized[open] {grid-template-columns:1fr;}
   body:has(.oas-inventory-view) .inventory-products__specialized-grid {grid-template-columns:repeat(2,minmax(0,1fr));}
-  body:has(.oas-inventory-view) .inventory-transactions__line-editor {grid-template-columns:repeat(2,minmax(0,1fr));}
-  body:has(.oas-inventory-view) .inventory-transactions__line-editor > :first-child {grid-column:1/-1;}
   body:has(.oas-inventory-view) .stock-counts__line {grid-template-columns:1fr 1fr;}
   body:has(.oas-inventory-view) .stock-counts__line > div:nth-child(5),
   body:has(.oas-inventory-view) .stock-counts__line > div:nth-child(6) {display:none;}
+}
+
+/* Inventory date pickers: keep native date segments ordered inside RTL screens.
+   This only affects presentation and never changes the HTML input value. */
+body:has(.oas-inventory-view) :is(input[type="date"],input[type="datetime-local"]) {
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
 }

@@ -305,10 +305,10 @@ public sealed partial class InventorySpreadsheetService
             ValidateRequiredText(row, "Name", "الاسم", 200);
             ValidateOptionalText(row, "Description", "الوصف", 1000);
             ValidateOptionalText(row, "InitialSKU", "SKU الأول", 64);
-            ValidateOptionalText(row, "InitialBarcode", "باركود المتغير الأول", 64);
-            ValidateOptionalText(row, "InitialVariantName", "اسم المتغير الأول", 100);
-            ValidateOptionalText(row, "InitialColor", "لون المتغير الأول", 50);
-            ValidateOptionalText(row, "InitialSize", "مقاس المتغير الأول", 50);
+            ValidateOptionalText(row, "InitialBarcode", "باركود الصنف الأول", 64);
+            ValidateOptionalText(row, "InitialVariantName", "اسم الصنف الأول", 100);
+            ValidateOptionalText(row, "InitialColor", "لون الصنف الأول", 50);
+            ValidateOptionalText(row, "InitialSize", "مقاس الصنف الأول", 50);
             ValidateOptionalText(row, "FrameModel", "موديل الإطار", 100);
             ValidateOptionalText(row, "FrameMaterial", "خامة الإطار", 50);
             ValidateOptionalText(row, "FrameRimType", "نوع الإطار / Rim", 50);
@@ -393,7 +393,7 @@ public sealed partial class InventorySpreadsheetService
             if ((isStock || hasInitialVariantData) && sku is null)
                 row.Errors.Add(isStock
                     ? "SKU الأول: مطلوب للمنتج المخزني."
-                    : "SKU الأول: مطلوب عند إدخال بيانات المتغير الأول.");
+                    : "SKU الأول: مطلوب عند إدخال بيانات الصنف الأول.");
 
             if (sku is not null)
             {
@@ -407,24 +407,24 @@ public sealed partial class InventorySpreadsheetService
             if (barcode is not null)
             {
                 if (existingBarcodes.Contains(barcode))
-                    row.Errors.Add("باركود المتغير الأول: مستخدم مسبقًا.");
+                    row.Errors.Add("باركود الصنف الأول: مستخدم مسبقًا.");
                 else if (!fileBarcodes.Add(barcode))
-                    row.Errors.Add("باركود المتغير الأول: مكرر داخل الملف.");
+                    row.Errors.Add("باركود الصنف الأول: مكرر داخل الملف.");
             }
 
             var unitCode = row.Optional("InitialUnitCode");
             var unit = unitCode is null ? null : units.FirstOrDefault(x => Eq(x.Code, unitCode));
             if (unitCode is not null && unit is null)
-                row.Errors.Add("كود وحدة المتغير الأول: الكود غير موجود.");
+                row.Errors.Add("كود وحدة الصنف الأول: الكود غير موجود.");
             else if (unit is { IsActive: false })
-                row.Errors.Add("كود وحدة المتغير الأول: الوحدة غير نشطة.");
+                row.Errors.Add("كود وحدة الصنف الأول: الوحدة غير نشطة.");
 
             if (sku is not null || isStock || hasInitialVariantData)
             {
-                ValidateRequiredDecimal(row, "InitialPurchasePrice", "سعر شراء المتغير الأول", 2);
-                ValidateRequiredDecimal(row, "InitialSellingPrice", "سعر بيع المتغير الأول", 2);
-                ValidateDecimalPrecision(row, "InitialPurchasePrice", "سعر شراء المتغير الأول", 18, 2, allowNegative: false);
-                ValidateDecimalPrecision(row, "InitialSellingPrice", "سعر بيع المتغير الأول", 18, 2, allowNegative: false);
+                ValidateRequiredDecimal(row, "InitialPurchasePrice", "سعر شراء الصنف الأول", 2);
+                ValidateRequiredDecimal(row, "InitialSellingPrice", "سعر بيع الصنف الأول", 2);
+                ValidateDecimalPrecision(row, "InitialPurchasePrice", "سعر شراء الصنف الأول", 18, 2, allowNegative: false);
+                ValidateDecimalPrecision(row, "InitialSellingPrice", "سعر بيع الصنف الأول", 18, 2, allowNegative: false);
             }
         }
     }
@@ -451,7 +451,7 @@ public sealed partial class InventorySpreadsheetService
                 row.Errors.Add("كود المنتج: المنتج غير نشط.");
 
             ValidateOptionalText(row, "Barcode", "الباركود", 64);
-            ValidateOptionalText(row, "VariantName", "اسم المتغير", 100);
+            ValidateOptionalText(row, "VariantName", "اسم الصنف", 100);
             ValidateOptionalText(row, "Color", "اللون", 50);
             ValidateOptionalText(row, "Size", "المقاس", 50);
             ValidateOptionalText(row, "LensType", "نوع العدسة", 100);
@@ -463,7 +463,7 @@ public sealed partial class InventorySpreadsheetService
                 var category = product is null ? null : categories.FirstOrDefault(x => x.Id == product.CategoryId);
                 var productType = category is null ? null : productTypes.FirstOrDefault(x => x.Id == category.ProductTypeId);
                 if (!string.Equals(productType?.SystemKey, ProductTypeSystemKeys.Lens, StringComparison.OrdinalIgnoreCase))
-                    row.Errors.Add("نوع العدسة: بيانات قياس العدسة مسموحة فقط لمتغير تابع لمنتج من نوع عدسة.");
+                    row.Errors.Add("نوع العدسة: بيانات قياس العدسة مسموحة فقط لصنف تابع لمنتج من نوع عدسة.");
                 if (row.Optional("LensType") is null) row.Errors.Add("نوع العدسة: مطلوب عند إدخال بيانات العدسة.");
                 ValidateDecimalPrecision(row, "LensRefractiveIndex", "معامل الانكسار", 5, 3, allowNegative: false);
                 ValidateDecimalPrecision(row, "LensSPH", "SPH", 6, 2, allowNegative: true);

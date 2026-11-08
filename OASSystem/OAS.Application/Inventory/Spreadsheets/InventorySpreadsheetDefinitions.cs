@@ -66,13 +66,13 @@ public static class InventorySpreadsheetDefinitions
                 Text("Description", "الوصف"),
                 Bool("IsStockItem", "صنف مخزني", false, "نعم"),
                 Text("InitialSKU", "SKU الأول"),
-                Text("InitialBarcode", "باركود المتغير الأول"),
-                Text("InitialVariantName", "اسم المتغير الأول"),
-                Text("InitialColor", "لون المتغير الأول"),
-                Text("InitialSize", "مقاس المتغير الأول"),
-                Text("InitialUnitCode", "كود وحدة المتغير الأول"),
-                Decimal("InitialPurchasePrice", "سعر شراء المتغير الأول"),
-                Decimal("InitialSellingPrice", "سعر بيع المتغير الأول"),
+                Text("InitialBarcode", "باركود الصنف الأول"),
+                Text("InitialVariantName", "اسم الصنف الأول"),
+                Text("InitialColor", "لون الصنف الأول"),
+                Text("InitialSize", "مقاس الصنف الأول"),
+                Text("InitialUnitCode", "كود وحدة الصنف الأول"),
+                Decimal("InitialPurchasePrice", "سعر شراء الصنف الأول"),
+                Decimal("InitialSellingPrice", "سعر بيع الصنف الأول"),
                 Text("FrameModel", "موديل الإطار"),
                 Text("FrameMaterial", "خامة الإطار"),
                 Text("FrameRimType", "نوع الإطار / Rim"),
@@ -100,7 +100,7 @@ public static class InventorySpreadsheetDefinitions
                 Text("ProductCode", "كود المنتج", true),
                 Text("SKU", "SKU", true),
                 Text("Barcode", "الباركود"),
-                Text("VariantName", "اسم المتغير"),
+                Text("VariantName", "اسم الصنف"),
                 Text("Color", "اللون"),
                 Text("Size", "المقاس"),
                 Text("UnitCode", "كود الوحدة"),
@@ -116,7 +116,7 @@ public static class InventorySpreadsheetDefinitions
                 Decimal("LensBaseCurve", "Base Curve"),
                 Decimal("LensDiameter", "Diameter"),
                 Bool("LensIsPrescription", "عدسة طبية", false, "لا")
-            ], "متغيرات المنتجات")
+            ], "أصناف المنتجات")
         ],
         "warehouses" =>
         [

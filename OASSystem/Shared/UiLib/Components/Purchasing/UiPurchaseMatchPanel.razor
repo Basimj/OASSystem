@@ -7,7 +7,7 @@
         <div class="ui-purchase-match-grid">
             @foreach(var allocation in Model.Allocations)
             {
-                <div class="ui-purchase-match-row"><span>كمية المطابقة: @allocation.MatchedQuantity.ToString("N3")</span><span>الصافي: @allocation.MatchedNetAmount.ToString("N2")</span><span>فرق السعر: @allocation.PriceVarianceAmount.ToString("N2")</span><strong>@allocation.Status</strong></div>
+                <div class="ui-purchase-match-row"><span>كمية المطابقة: @allocation.MatchedQuantity.ToString("#,##0.###")</span><span>الصافي: @allocation.MatchedNetAmount.ToString("#,##0.##")</span><span>فرق السعر: @allocation.PriceVarianceAmount.ToString("#,##0.##")</span><strong>@allocation.Status</strong></div>
             }
         </div>
     }

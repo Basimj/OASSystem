@@ -2,6 +2,7 @@ using OAS.Client.Services.Http;
 using OAS.Contracts.Common.Pagination;
 using OAS.Contracts.Purchasing.Enums;
 using OAS.UiLib.Core.Models;
+using OAS.UiLib.Core.Formatting;
 using OAS.UiLib.Core.Models.Purchasing;
 
 namespace OAS.Client.Purchasing.Components;
@@ -63,6 +64,22 @@ public partial class PurchasingWorkspaceHost
         var page=await Accounting.GetCurrenciesPageAsync(LookupRequest(search),ct);
         return page.Items.Where(x=>x.IsActive).Select(x=>new UiLookupItem(x.Id.ToString("D"),$"{x.Code} - {x.NameAr}",x.Symbol,"fa-solid fa-coins")).ToArray();
     }
+    // Only posted receipts may become the starting point for a supplier invoice.
+    private async Task<IReadOnlyList<UiLookupItem>> SearchPostedReceiptsAsync(string search,CancellationToken ct)
+    {
+        var page=await Purchasing.GetPurchaseReceiptsAsync(
+            new PageRequest { PageNumber=1, PageSize=30,
+                Search=string.IsNullOrWhiteSpace(search)?null:search.Trim(),
+                SortBy="PostingDate", SortDirection=SortDirection.Descending },
+            PurchaseReceiptStatus.Posted,cancellationToken:ct);
+        return page.Items.Where(x=>x.Status==PurchaseReceiptStatus.Posted)
+            .Take(30)
+            .Select(x=>new UiLookupItem(x.Id.ToString("D"),x.ReceiptCode,
+                $"{x.SupplierName} • {x.PurchaseOrderCode} • {PurchasingDisplayFormat.DisplayDate(x.PostingDate)}",
+                "fa-solid fa-truck-ramp-box"))
+            .ToArray();
+    }
+
     private async Task<IReadOnlyList<UiLookupItem>> SearchReceivableOrdersAsync(string search,CancellationToken ct)
     {
         var request=LookupRequest(search);
@@ -105,7 +122,7 @@ public partial class PurchasingWorkspaceHost
             foreach(var line in po.Lines.Where(x=>x.RemainingBaseQuantity>0))
             {
                 var factor=line.UnitConversionFactor<=0?1m:line.UnitConversionFactor;var remaining=Math.Round(line.RemainingBaseQuantity/factor,3);
-                m.Lines.Add(new(){PurchaseOrderLineId=line.Id,LineSequence=m.Lines.Count+1,ProductVariantId=line.ProductVariantId,ProductName=line.ProductNameSnapshot,OrderedQuantitySnapshot=line.OrderedQuantity,PreviouslyReceivedQty=Math.Max(0,line.OrderedQuantity-remaining),RemainingReceivableQuantity=remaining,ActualUnitCost=CalculateBaseReceiptUnitCost(line, po.ExchangeRate)});
+                m.Lines.Add(new(){PurchaseOrderLineId=line.Id,LineSequence=m.Lines.Count+1,ProductVariantId=line.ProductVariantId,ProductName=line.ProductNameSnapshot,PurchaseUnitName=line.UnitNameSnapshot,OrderedQuantitySnapshot=line.OrderedQuantity,PreviouslyReceivedQty=Math.Max(0,line.OrderedQuantity-remaining),RemainingReceivableQuantity=remaining,ActualUnitCost=CalculateBaseReceiptUnitCost(line, po.ExchangeRate)});
             }
             if(ActiveTab is { } tab)tab.IsDirty=true;StateHasChanged();
         }

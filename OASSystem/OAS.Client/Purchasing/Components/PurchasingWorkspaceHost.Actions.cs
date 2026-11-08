@@ -1,6 +1,8 @@
 using OAS.Client.Services.Http;
 using Microsoft.AspNetCore.Components.Web;
+using OAS.Client.Purchasing.Common;
 using OAS.Client.Purchasing.Workspace;
+using OAS.Contracts.Accounting.FiscalPeriods;
 using OAS.Contracts.Common.Pagination;
 using OAS.Contracts.Purchasing.Enums;
 using OAS.Contracts.Purchasing.PurchaseInvoices;
@@ -362,7 +364,7 @@ public partial class PurchasingWorkspaceHost
         {
             var factor=line.UnitConversionFactor<=0?1m:line.UnitConversionFactor;
             var remaining=Math.Round(line.RemainingBaseQuantity/factor,3);
-            m.Lines.Add(new(){PurchaseOrderLineId=line.Id!.Value,LineSequence=m.Lines.Count+1,ProductVariantId=line.ProductVariantId!.Value,ProductName=line.ProductName,OrderedQuantitySnapshot=line.OrderedQuantity,PreviouslyReceivedQty=Math.Max(0,line.OrderedQuantity-remaining),RemainingReceivableQuantity=remaining,ActualUnitCost=CalculateBaseReceiptUnitCost(line, po.ExchangeRate)});
+            m.Lines.Add(new(){PurchaseOrderLineId=line.Id!.Value,LineSequence=m.Lines.Count+1,ProductVariantId=line.ProductVariantId!.Value,ProductName=line.ProductName,PurchaseUnitName=line.PurchaseUnitName,OrderedQuantitySnapshot=line.OrderedQuantity,PreviouslyReceivedQty=Math.Max(0,line.OrderedQuantity-remaining),RemainingReceivableQuantity=remaining,ActualUnitCost=CalculateBaseReceiptUnitCost(line, po.ExchangeRate)});
         }
         var tab=Workspace.OpenNew(PurchasingEntityType.PurchaseReceipts,"استلام جديد");tab.Model=m;tab.IsDirty=false;tab.IsEditMode=true;Navigation.NavigateTo("/purchases/receipts");await InvokeAsync(StateHasChanged);
     }
@@ -396,107 +398,192 @@ public partial class PurchasingWorkspaceHost
                 return;
             }
 
+            // Validate the period before confirmation so a missing/locked period is
+            // explained at the posting-date field instead of surfacing as a thrown conflict.
+            // The transaction's server-side validation remains mandatory.
+            if (!await CheckReceiptPostingPeriodAsync(m)) return;
+
             if(!await Dialog.ConfirmAsync("ترحيل الاستلام","سيتم تحديث المخزون وإنشاء قيد Inventory / GRNI داخل عملية واحدة.",AlertTone.Warning,"ترحيل","رجوع"))return;
             await Purchasing.PostPurchaseReceiptAsync(id,new(m.RowVersion??string.Empty));
             var dto=await Purchasing.GetPurchaseReceiptAsync(id);
             if(dto is not null)SetActive(Map(dto));
             Snackbar.Success("تم ترحيل الاستلام وتحديث المخزون والمحاسبة.");
         }
-        catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}catch{ApiFeedback.ShowUnexpected();}
+        catch (ApiClientException ex)
+        {
+            // A period may have changed between the UI check and the transaction.
+            var error = PurchaseReceiptPostingPeriodValidation.Explain(ex.Error.Code, m.PostingDate);
+            if (error is not null)
+            {
+                m.PostingDateError = error;
+                Snackbar.Warning(error);
+            }
+            else ApiFeedback.Show(ex.Error);
+        }
+        catch { ApiFeedback.ShowUnexpected(); }
+    }
+
+    private async Task<bool> CheckReceiptPostingPeriodAsync(UiPurchaseReceiptEditorModel receipt)
+    {
+        receipt.PostingDateError = null;
+        var periods = new List<FiscalPeriodDto>();
+        try
+        {
+            // Read every page: checking the first 20 periods can produce false
+            // 'not found' results for older dates or businesses with many years.
+            for (var pageNumber = 1; ; pageNumber++)
+            {
+                var page = await Accounting.GetFiscalPeriodsPageAsync(
+                    new PageRequest { PageNumber = pageNumber, PageSize = PageRequest.MaximumPageSize });
+                periods.AddRange(page.Items);
+                if (pageNumber >= page.TotalPages || page.Items.Count == 0) break;
+            }
+        }
+        catch (ApiClientException)
+        {
+            // Period-list permissions may differ from purchase-posting permissions.
+            // Never deny a valid posting just because the client cannot read the list.
+            // The authoritative server validation still runs within the transaction.
+            return true;
+        }
+
+        var error = PurchaseReceiptPostingPeriodValidation.Validate(receipt.PostingDate, periods);
+        if (error is null) return true;
+
+        receipt.PostingDateError = error;
+        Snackbar.Warning(error);
+        return false;
     }
 
     private async Task CreateInvoiceFromReceiptAsync(MouseEventArgs _)
     {
-        if(ActiveTab?.Model is not UiPurchaseReceiptEditorModel receipt||receipt.Id is not Guid||receipt.Status!=(byte)PurchaseReceiptStatus.Posted)return;
-        if(receipt.PurchaseOrderId is not Guid purchaseOrderId)
-        {
-            Snackbar.Warning("سند الاستلام غير مرتبط بأمر شراء صالح.");
-            return;
-        }
-
+        if(ActiveTab?.Model is not UiPurchaseReceiptEditorModel current ||
+           current.Id is not Guid receiptId ||
+           current.Status!=(byte)PurchaseReceiptStatus.Posted) return;
         try
         {
-            var order=await Purchasing.GetPurchaseOrderAsync(purchaseOrderId);
-            if(order is null)
-            {
-                Snackbar.Warning("تعذر تحميل أمر الشراء المرتبط بسند الاستلام.");
-                return;
-            }
-            if(order.SupplierId!=receipt.SupplierId)
-            {
-                Snackbar.Warning("مورد سند الاستلام لا يطابق مورد أمر الشراء.");
-                return;
-            }
-
-            var orderLines=order.Lines.ToDictionary(x=>x.Id);
-            var model=new UiPurchaseInvoiceEditorModel
-            {
-                SupplierId=order.SupplierId,
-                SupplierName=order.SupplierName,
-                InvoiceDate=DateOnly.FromDateTime(DateTime.Today),
-                PostingDate=DateOnly.FromDateTime(DateTime.Today),
-                CurrencyId=order.CurrencyId,
-                CurrencyCode=order.CurrencyCode,
-                ExchangeRate=order.ExchangeRate,
-                ExchangeRateDate=order.ExchangeRateDate,
-                TaxCalculationMode=(byte)order.TaxCalculationMode,
-                Notes=$"فاتورة مورد من الاستلام {receipt.ReceiptCode} / أمر الشراء {order.PurchaseOrderCode}"
-            };
-
-            foreach(var receiptLine in receipt.Lines.Where(x=>x.AcceptedQuantity>0m).OrderBy(x=>x.LineSequence))
-            {
-                if(!orderLines.TryGetValue(receiptLine.PurchaseOrderLineId,out var poLine))
-                {
-                    Snackbar.Warning($"تعذر العثور على سطر أمر الشراء المرتبط ببند الاستلام {receiptLine.LineSequence}.");
-                    return;
-                }
-
-                var quantity=Math.Round(Math.Max(0m,receiptLine.AcceptedQuantity),3);
-                if(quantity<=0m)continue;
-                var ratio=poLine.OrderedQuantity<=0m?0m:quantity/poLine.OrderedQuantity;
-                var discount=Math.Round(poLine.DiscountAmount*ratio,4);
-                var gross=Math.Round(quantity*poLine.UnitPrice,4);
-                var net=Math.Round(poLine.NetAmount*ratio,4);
-                var tax=Math.Round(poLine.TaxAmount*ratio,4);
-                var final=Math.Round(poLine.FinalAmount*ratio,4);
-
-                model.Lines.Add(new UiPurchaseInvoiceLineModel
-                {
-                    LineSequence=model.Lines.Count+1,
-                    PurchaseOrderLineId=poLine.Id,
-                    ProductVariantId=poLine.ProductVariantId,
-                    ProductName=poLine.ProductNameSnapshot,
-                    Quantity=quantity,
-                    UnitPrice=poLine.UnitPrice,
-                    GrossAmount=gross,
-                    DiscountAmount=discount,
-                    NetAmount=net,
-                    TaxRate=poLine.TaxRate,
-                    TaxAmount=tax,
-                    FinalAmount=final
-                });
-            }
-
-            if(model.Lines.Count==0)
-            {
-                Snackbar.Warning("لا توجد كميات مقبولة متاحة لإنشاء فاتورة من هذا الاستلام.");
-                return;
-            }
-
-            model.Subtotal=Math.Round(model.Lines.Sum(x=>x.GrossAmount),4);
-            model.DiscountAmount=Math.Round(model.Lines.Sum(x=>x.DiscountAmount),4);
-            model.TaxAmount=Math.Round(model.Lines.Sum(x=>x.TaxAmount),4);
-            model.TotalAmount=Math.Round(model.Lines.Sum(x=>x.FinalAmount),4);
-
+            var receipt=await Purchasing.GetPurchaseReceiptAsync(receiptId);
+            if(receipt is null){Snackbar.Warning("تعذر تحميل سند الاستلام.");return;}
+            var model=await PrepareInvoiceFromReceiptAsync(receipt);
+            if(model is null)return;
             var tab=Workspace.OpenNew(PurchasingEntityType.PurchaseInvoices,$"فاتورة من {receipt.ReceiptCode}");
-            tab.Model=model;
-            tab.IsDirty=true;
-            tab.IsEditMode=true;
+            tab.Model=model;tab.IsDirty=true;tab.IsEditMode=true;
             Navigation.NavigateTo("/purchases/invoices");
-            Snackbar.Success("تم تجهيز فاتورة المورد وربط البنود بأمر الشراء. أدخل رقم فاتورة المورد ثم احفظ وشغّل المطابقة.");
-            await InvokeAsync(StateHasChanged);
+            Snackbar.Success("تم جلب بيانات الفاتورة من الاستلام. راجع رقم فاتورة المورد واحفظ؛ ستتم محاولة المطابقة تلقائيًا.");
         }
         catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}catch{ApiFeedback.ShowUnexpected();}
+    }
+
+    private async Task InvoiceReceiptChangedAsync(Guid? receiptId)
+    {
+        var tab=ActiveTab;
+        if(tab?.Model is not UiPurchaseInvoiceEditorModel invoice || invoice.Id.HasValue || !IsEditable)return;
+        if(!receiptId.HasValue)
+        {
+            var blank=NewInvoice();
+            blank.SupplierInvoiceCode=invoice.SupplierInvoiceCode;
+            tab.Model=blank;tab.Title="فاتورة مورد جديدة";tab.IsDirty=true;
+            return;
+        }
+        try
+        {
+            var receipt=await Purchasing.GetPurchaseReceiptAsync(receiptId.Value);
+            if(receipt is null){Snackbar.Warning("لم يُعثر على سند الاستلام.");return;}
+            var prepared=await PrepareInvoiceFromReceiptAsync(receipt);
+            if(prepared is null)return;
+            // Keep fields the user may have typed before selecting the receipt.
+            prepared.SupplierInvoiceCode=invoice.SupplierInvoiceCode;
+            prepared.InvoiceDate=invoice.InvoiceDate;
+            prepared.PostingDate=invoice.PostingDate;
+            tab.Model=prepared;tab.Title=$"فاتورة من {receipt.ReceiptCode}";tab.IsDirty=true;
+            Snackbar.Success("تمت تعبئة المورد والعملة والأصناف والكميات والأسعار تلقائيًا من سند الاستلام.");
+        }
+        catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}catch{ApiFeedback.ShowUnexpected();}
+    }
+
+    private async Task<UiPurchaseInvoiceEditorModel?> PrepareInvoiceFromReceiptAsync(PurchaseReceiptDto receipt)
+    {
+        if(receipt.Status!=PurchaseReceiptStatus.Posted)
+        {
+            Snackbar.Warning("يجب ترحيل سند الاستلام قبل إعداد فاتورة المورد.");
+            return null;
+        }
+        var purchaseOrderId=receipt.PurchaseOrderId;
+        var order=await Purchasing.GetPurchaseOrderAsync(purchaseOrderId);
+        if(order is null)
+        {
+            Snackbar.Warning("تعذر تحميل أمر الشراء المرتبط بسند الاستلام.");
+            return null;
+        }
+        if(order.SupplierId!=receipt.SupplierId)
+        {
+            Snackbar.Warning("مورد سند الاستلام لا يطابق مورد أمر الشراء.");
+            return null;
+        }
+
+        var orderLines=order.Lines.ToDictionary(x=>x.Id);
+        var model=new UiPurchaseInvoiceEditorModel
+        {
+            SupplierId=order.SupplierId,
+            SupplierName=order.SupplierName,
+            InvoiceDate=DateOnly.FromDateTime(DateTime.Today),
+            PostingDate=DateOnly.FromDateTime(DateTime.Today),
+            CurrencyId=order.CurrencyId,
+            CurrencyCode=order.CurrencyCode,
+            ExchangeRate=order.ExchangeRate,
+            ExchangeRateDate=order.ExchangeRateDate,
+            TaxCalculationMode=(byte)order.TaxCalculationMode,
+            Notes=$"فاتورة مورد من الاستلام {receipt.ReceiptCode} / أمر الشراء {order.PurchaseOrderCode}"
+        };
+
+        foreach(var receiptLine in receipt.Lines.Where(x=>x.AcceptedQuantity>x.ReturnedQuantity).OrderBy(x=>x.LineSequence))
+        {
+            if(!orderLines.TryGetValue(receiptLine.PurchaseOrderLineId,out var poLine))
+            {
+                Snackbar.Warning($"تعذر العثور على سطر أمر الشراء المرتبط ببند الاستلام {receiptLine.LineSequence}.");
+                return null;
+            }
+
+            var quantity=Math.Round(Math.Max(0m,receiptLine.AcceptedQuantity-receiptLine.ReturnedQuantity),3);
+            if(quantity<=0m)continue;
+            var ratio=poLine.OrderedQuantity<=0m?0m:quantity/poLine.OrderedQuantity;
+            var discount=Math.Round(poLine.DiscountAmount*ratio,4);
+            var gross=Math.Round(quantity*poLine.UnitPrice,4);
+            var net=Math.Round(poLine.NetAmount*ratio,4);
+            var tax=Math.Round(poLine.TaxAmount*ratio,4);
+            var final=Math.Round(poLine.FinalAmount*ratio,4);
+
+            model.Lines.Add(new UiPurchaseInvoiceLineModel
+            {
+                LineSequence=model.Lines.Count+1,
+                PurchaseOrderLineId=poLine.Id,
+                ProductVariantId=poLine.ProductVariantId,
+                ProductName=poLine.ProductNameSnapshot,
+                Quantity=quantity,
+                UnitPrice=poLine.UnitPrice,
+                GrossAmount=gross,
+                DiscountAmount=discount,
+                NetAmount=net,
+                TaxRate=poLine.TaxRate,
+                TaxAmount=tax,
+                FinalAmount=final
+            });
+        }
+
+        if(model.Lines.Count==0)
+        {
+            Snackbar.Warning("لا توجد كميات مقبولة متاحة لإنشاء فاتورة من هذا الاستلام.");
+            return null;
+        }
+
+        model.Subtotal=Math.Round(model.Lines.Sum(x=>x.GrossAmount),4);
+        model.DiscountAmount=Math.Round(model.Lines.Sum(x=>x.DiscountAmount),4);
+        model.TaxAmount=Math.Round(model.Lines.Sum(x=>x.TaxAmount),4);
+        model.TotalAmount=Math.Round(model.Lines.Sum(x=>x.FinalAmount),4);
+
+        model.SourceReceiptId=receipt.Id;
+        model.SourceReceiptCode=receipt.ReceiptCode;
+        return model;
     }
 
     private async Task ConfirmInvoiceAsync(MouseEventArgs _)=>await ChangeInvoiceAsync((id,rv)=>Purchasing.ConfirmPurchaseInvoiceAsync(id,new(rv)));
@@ -508,7 +595,16 @@ public partial class PurchasingWorkspaceHost
     private async Task ChangeInvoiceAsync(Func<Guid,string,Task<PurchaseInvoiceDto?>> action)
     {
         if(ActiveTab?.Model is not UiPurchaseInvoiceEditorModel m||m.Id is not Guid id)return;
-        try{var dto=await action(id,m.RowVersion??string.Empty);if(dto is not null)SetActive(Map(dto));}
+        try
+        {
+            var dto=await action(id,m.RowVersion??string.Empty);
+            if(dto is not null)
+            {
+                var updated=Map(dto);
+                SetActive(updated);
+                await LoadInvoiceMatchingReadinessAsync(updated);
+            }
+        }
         catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}catch{ApiFeedback.ShowUnexpected();}
     }
     private async Task MatchInvoiceAsync(MouseEventArgs _)
@@ -537,7 +633,13 @@ public partial class PurchasingWorkspaceHost
             }
             if(allocations.Count==0){Snackbar.Warning("لا توجد استلامات مرحلة مناسبة للمطابقة.");return;}
             var result=await Purchasing.MatchPurchaseInvoiceAsync(id,new(allocations,m.RowVersion??string.Empty));if(result is null)return;
-            var refreshed=await Purchasing.GetPurchaseInvoiceAsync(id);if(refreshed is null)return;var mapped=Map(refreshed);mapped.Match=Map(result);SetActive(mapped);Snackbar.Success("تم تشغيل المطابقة الثلاثية.");
+            var refreshed=await Purchasing.GetPurchaseInvoiceAsync(id);
+            if(refreshed is null)return;
+            var mapped=Map(refreshed);
+            mapped.Match=Map(result);
+            SetActive(mapped);
+            await LoadInvoiceMatchingReadinessAsync(mapped);
+            Snackbar.Success("تم تشغيل المطابقة الثلاثية. راجع الفروقات قبل ترحيل الفاتورة.");
         }
         catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}catch{ApiFeedback.ShowUnexpected();}
     }
@@ -551,16 +653,42 @@ public partial class PurchasingWorkspaceHost
         try
         {
             foreach(var a in pending){var dto=await Purchasing.ApprovePurchaseVarianceAsync(id,new(a.Id,"تمت مراجعة الفرق واعتماده من واجهة المشتريات",a.RowVersion!,m.RowVersion??string.Empty));if(dto is not null)m.RowVersion=dto.RowVersion;}
-            var refreshed=await Purchasing.GetPurchaseInvoiceAsync(id);if(refreshed is not null)SetActive(Map(refreshed));Snackbar.Success("تم اعتماد الفروقات.");
+            var refreshed=await Purchasing.GetPurchaseInvoiceAsync(id);
+            if(refreshed is not null)
+            {
+                var mapped=Map(refreshed);
+                SetActive(mapped);
+                await LoadInvoiceMatchingReadinessAsync(mapped);
+            }
+            Snackbar.Success("تم اعتماد الفروقات.");
         }
         catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}catch{ApiFeedback.ShowUnexpected();}
     }
     private async Task PostInvoiceAsync(MouseEventArgs _)
     {
         if(ActiveTab?.Model is not UiPurchaseInvoiceEditorModel m||m.Id is not Guid id)return;
-        if(!await Dialog.ConfirmAsync("ترحيل فاتورة المورد","سيتم إنشاء قيد GRNI / الضريبة / فروقات السعر / حساب المورد.",AlertTone.Warning,"ترحيل","رجوع"))return;
         try
         {
+            // Read the persisted allocations, not the in-memory Match panel. A re-opened
+            // invoice can be fully matched even though that panel has not been populated.
+            var readiness=await Purchasing.GetPurchaseInvoiceMatchingReadinessAsync(id);
+            if(readiness is null)
+            {
+                Snackbar.Warning("تعذر التحقق من مطابقة الفاتورة. حدّث الصفحة ثم أعد المحاولة.");
+                return;
+            }
+            if(!readiness.IsComplete)
+            {
+                m.MatchingNotice=readiness.Message;
+                Snackbar.Warning(readiness.Message);
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+            m.MatchingNotice=null;
+            if(!await Dialog.ConfirmAsync("ترحيل فاتورة المورد",
+                "المطابقة مكتملة. سيتم إنشاء قيد GRNI / الضريبة / فروقات السعر / حساب المورد.",
+                AlertTone.Warning,"ترحيل","رجوع"))return;
+
             await Purchasing.PostPurchaseInvoiceAsync(id,new(m.RowVersion??string.Empty));
             var dto=await Purchasing.GetPurchaseInvoiceAsync(id);
             if(dto is not null)
@@ -570,6 +698,20 @@ public partial class PurchasingWorkspaceHost
                 await LoadInvoicePaymentSummaryAsync(mapped,true);
             }
             Snackbar.Success("تم ترحيل فاتورة المورد.");
+        }
+        catch(ApiClientException ex) when(ex.Error.Code is
+            "purchasing_invoice_matching_required" or "purchasing_invoice_matching_incomplete" or
+            "purchasing_invoice_variance_approval_required")
+        {
+            // The server remains authoritative if allocations change after the pre-check.
+            m.MatchingNotice=ex.Error.Code switch
+            {
+                "purchasing_invoice_matching_required" => "لم تتم مطابقة الفاتورة. اضغط «تشغيل المطابقة» أولًا، ثم راجع النتيجة.",
+                "purchasing_invoice_variance_approval_required" => "توجد فروقات مطابقة تحتاج إلى اعتماد قبل الترحيل.",
+                _ => "المطابقة غير مكتملة. راجع بنود المطابقة واعتمد الفروقات المعلقة قبل الترحيل."
+            };
+            Snackbar.Warning(m.MatchingNotice);
+            await InvokeAsync(StateHasChanged);
         }
         catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}catch{ApiFeedback.ShowUnexpected();}
     }
@@ -620,7 +762,7 @@ public partial class PurchasingWorkspaceHost
 
             Snackbar.Success(response.OutstandingAmount<=0m
                 ? $"تم سداد الفاتورة بالكامل وإنشاء سند الصرف {response.PaymentVoucherNumber}."
-                : $"تم تسجيل السداد وإنشاء سند الصرف {response.PaymentVoucherNumber}. المتبقي {response.OutstandingAmount:N2} {m.CurrencyCode}.");
+                : $"تم تسجيل السداد وإنشاء سند الصرف {response.PaymentVoucherNumber}. المتبقي {response.OutstandingAmount:#,##0.##} {m.CurrencyCode}.");
         }
         catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}catch{ApiFeedback.ShowUnexpected();}
     }

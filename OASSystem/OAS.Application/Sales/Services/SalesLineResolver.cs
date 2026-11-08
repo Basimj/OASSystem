@@ -42,7 +42,7 @@ public sealed class SalesLineResolver(
         var variant = await variants.GetByIdAsync(productVariantId.Value, cancellationToken)
             ?? throw new NotFoundException(nameof(ProductVariant), productVariantId.Value);
         if (!variant.IsActive)
-            throw new ConflictException("sales_product_variant_inactive", "متغير المنتج المحدد غير فعال.");
+            throw new ConflictException("sales_product_variant_inactive", "الصنف المحدد غير فعال.");
 
         var product = await products.GetByIdAsync(variant.ProductId, cancellationToken)
             ?? throw new NotFoundException(nameof(Product), variant.ProductId);
@@ -91,7 +91,7 @@ public sealed class SalesLineResolver(
                 new Specification<LensDetails>().Where(x => x.ProductVariantId == variant.Id && x.IsActive),
                 cancellationToken)).SingleOrDefault();
             if (lens is null)
-                throw new ConflictException("sales_lens_details_required", "متغير العدسة المحدد لا يحتوي على بيانات قياس LensDetails. أكمل بيانات العدسة في المخزون أولاً.");
+                throw new ConflictException("sales_lens_details_required", "صنف العدسة المحدد لا يحتوي على بيانات قياس LensDetails. أكمل بيانات العدسة في المخزون أولاً.");
             prescriptionRequired = lens.IsPrescriptionLens;
         }
 

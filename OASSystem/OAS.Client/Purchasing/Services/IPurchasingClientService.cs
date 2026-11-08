@@ -54,6 +54,7 @@ public interface IPurchasingClientService
     Task<PurchaseInvoiceDto?> GetPurchaseInvoiceAsync(Guid id, CancellationToken cancellationToken = default);
     Task<PurchaseInvoiceDto?> CreatePurchaseInvoiceAsync(CreatePurchaseInvoiceRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseInvoiceDto?> UpdatePurchaseInvoiceAsync(Guid id, UpdatePurchaseInvoiceRequest request, CancellationToken cancellationToken = default);
+    Task<PurchaseInvoiceMatchingReadinessDto?> GetPurchaseInvoiceMatchingReadinessAsync(Guid id, CancellationToken ct = default);
     Task<PurchaseMatchResultDto?> MatchPurchaseInvoiceAsync(Guid id, MatchPurchaseInvoiceRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseInvoiceDto?> ConfirmPurchaseInvoiceAsync(Guid id, ConfirmPurchaseInvoiceRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseInvoiceDto?> ApprovePurchaseVarianceAsync(Guid id, ApprovePurchaseVarianceRequest request, CancellationToken cancellationToken = default);

@@ -1,18 +1,65 @@
-.inventory-transactions__editor { display: grid; gap: .8rem; }
-.inventory-transactions__lines-title { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-top: .35rem; }
-.inventory-transactions__line-editor { display: grid; grid-template-columns: 1.8fr .7fr .8fr auto; gap: .5rem; align-items: end; padding: .65rem; border: 1px solid var(--oas-color-border); border-radius: var(--oas-radius-md); }
-.inventory-transactions__details { display: grid; grid-template-columns: 1fr 1fr; gap: .65rem; }
-.inventory-transactions__details > div { display: grid; gap: .15rem; padding: .55rem; border: 1px solid var(--oas-color-border); border-radius: var(--oas-radius-md); }
+/* Inventory operation editor: account for the ACTUAL content width inside the app shell,
+   not only the browser viewport. The navigation drawer may use a large part of a laptop screen. */
+.inventory-transactions__editor {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: .65rem;
+    container-name: inventory-operation;
+    container-type: inline-size;
+}
+.inventory-transactions__layout { display: grid; grid-template-columns: minmax(240px, 295px) minmax(0, 1fr); align-items: start; gap: .85rem; min-width: 0; }
+.inventory-transactions__sidebar { min-width: 0; display: grid; gap: .65rem; padding: .85rem; border: 1px solid var(--oas-color-border); border-radius: var(--oas-radius-md); background: var(--oas-color-surface); }
+.inventory-transactions__section-title { margin: 0; color: var(--oas-color-text); font-size: .91rem; font-weight: 750; line-height: 1.4; }
+.inventory-transactions__fields { display: grid; grid-template-columns: minmax(0,1fr); gap: .65rem; }
+.inventory-transactions__field { min-width: 0; }
+.inventory-transactions__optional { min-width: 0; border-top: 1px solid var(--oas-color-border); padding-top: .35rem; }
+.inventory-transactions__optional > summary { cursor: pointer; padding: .35rem 0; font-size: .8rem; font-weight: 600; color: var(--oas-color-text-muted); }
+.inventory-transactions__optional-content { padding-top: .35rem; }
+.inventory-transactions__items { min-width: 0; display: grid; align-content: start; gap: .5rem; }
+.inventory-transactions__lines-title { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .4rem .65rem; padding: .2rem .15rem .4rem; }
+.inventory-transactions__heading { display: inline-flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
+.inventory-transactions__line-count { font-size: .75rem; color: var(--oas-color-text-muted); }
+.inventory-transactions__lines { min-width: 0; display: grid; gap: 0; border: 1px solid var(--oas-color-border); border-radius: var(--oas-radius-md); overflow: visible; }
+.inventory-transactions__table-head,
+.inventory-transactions__line-editor { display: grid; grid-template-columns: 1.5rem minmax(155px,1fr) minmax(82px,.37fr) minmax(100px,.42fr) minmax(4.25rem,auto); gap: .45rem; }
+.inventory-transactions__table-head { align-items: center; padding: .5rem .6rem; background: var(--oas-color-surface); border: 1px solid var(--oas-color-border); border-radius: var(--oas-radius-md); color: var(--oas-color-text-muted); font-size: .75rem; font-weight: 650; }
+.inventory-transactions__line-editor { min-width: 0; align-items: center; padding: .55rem .6rem; background: var(--oas-color-surface); }
+.inventory-transactions__line-editor + .inventory-transactions__line-editor { border-top: 1px solid var(--oas-color-border); }
+.inventory-transactions__line-number { display: grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; color: var(--oas-color-text-muted); background: var(--oas-color-hover); font-size: .75rem; font-weight: 650; }
+.inventory-transactions__line-product,
+.inventory-transactions__line-quantity,
+.inventory-transactions__line-cost { min-width: 0; }
+/* The delete button must not squeeze a numeric field or cover a neighbour. */
+.inventory-transactions__line-remove { justify-self: end; align-self: center; min-width: 0; white-space: nowrap; }
+.inventory-transactions__line-editor > * { min-width: 0; }
+.inventory-transactions__line-editor ::deep :is(.ui-input-text, .ui-searchable-select) { max-width: 100%; min-width: 0; }
+.inventory-transactions__line-editor ::deep .ui-input-text__control { min-width: 0; }
+/* Keep component labels accessible to assistive tech while not repeating the column headings. */
+.inventory-transactions__line-editor ::deep .ui-searchable-select__label,
+.inventory-transactions__line-editor ::deep .ui-input-text > .ui-text-label { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.inventory-transactions__items-bottom { text-align: start; font-size: .75rem; color: var(--oas-color-text-muted); padding: .3rem .15rem; }
+.inventory-transactions__context { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .35rem .8rem; padding: .35rem .7rem; border-inline-start: 2px solid var(--oas-color-primary); background: var(--oas-color-surface); color: var(--oas-color-text-muted); font-size: .76rem; border-radius: var(--oas-radius-md); }
+
+.inventory-transactions__details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
+.inventory-transactions__record-number { display: flex; align-items: baseline; flex-wrap: wrap; gap: .4rem; margin-bottom: .6rem; font-size: var(--oas-font-sm); }
+.inventory-transactions__record-number span { color: var(--oas-color-text-muted); }
+.inventory-transactions__record-number strong { color: var(--oas-color-text); overflow-wrap: anywhere; }
+.inventory-transactions__details > div { display: grid; min-width: 0; gap: .15rem; padding: .5rem; border: 1px solid var(--oas-color-border); border-radius: var(--oas-radius-md); }
 .inventory-transactions__details span { font-size: var(--oas-font-sm); color: var(--oas-color-text-muted); }
-.inventory-transactions__details strong { font-size: var(--oas-font-sm); line-height: 1.35; }
+.inventory-transactions__details strong { font-size: var(--oas-font-sm); line-height: 1.35; overflow-wrap: anywhere; }
 .inventory-transactions__wide { grid-column: 1 / -1; }
 .inventory-transactions__view-lines { display: grid; gap: .55rem; margin-top: 1rem; font-size: var(--oas-font-sm); }
-.inventory-transactions__view-line { display: grid; grid-template-columns: 1.8fr .8fr .8fr .8fr; gap: .5rem; align-items: center; padding: .55rem; border-top: 1px solid var(--oas-color-border); }
-.inventory-transactions__view-line > div { display: grid; }
+.inventory-transactions__view-line { display: grid; grid-template-columns: minmax(0, 1.8fr) repeat(3, minmax(0, .8fr)); gap: .5rem; align-items: center; padding: .55rem; border-top: 1px solid var(--oas-color-border); }
+.inventory-transactions__view-line > * { min-width: 0; overflow-wrap: anywhere; }
+.inventory-transactions__view-line > div { display: grid; min-width: 0; }
 .inventory-transactions__view-line > div span { font-size: var(--oas-font-sm); color: var(--oas-color-text-muted); }
 .inventory-transactions__view-line > span,
 .inventory-transactions__view-line strong { font-size: var(--oas-font-sm); line-height: 1.35; }
-@media (max-width: 1000px) { .inventory-transactions__line-editor { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 650px) {
+    .inventory-transactions__view-line { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .3rem .55rem; }
+    .inventory-transactions__view-line > div:first-child { grid-column: 1 / -1; }
+}
 
 
 /* Dedicated inventory create/edit/details screen: scoped to this routed page. */
@@ -21,34 +68,14 @@
     min-width: 0;
     margin-inline: auto;
     display: grid;
-    gap: .8rem;
-}
-.oas-inventory-form-screen__intro {
-    padding: .8rem 1.15rem;
-    border: 1px solid var(--oas-color-border);
-    border-radius: 14px;
-    background: var(--oas-surface, var(--oas-color-surface, transparent));
-}
-.oas-inventory-form-screen__eyebrow {
-    font-size: .75rem;
-    color: var(--oas-color-primary);
-    font-weight: 750;
-    margin-bottom: .12rem;
-}
-.oas-inventory-form-screen__intro h2 {
-    margin: 0;
-    color: var(--oas-color-text);
-    line-height: 1.4;
-    font-size: clamp(1.05rem, 1.6vw, 1.35rem);
-    font-weight: 750;
-}
-.oas-inventory-form-screen__intro p {
-    margin: .12rem 0 0;
-    color: var(--oas-color-text-muted);
-    font-size: .8rem;
+    gap: .45rem;
+    padding-bottom: 1.5rem; /* Keep the final operation line reachable when scrolled to the bottom. */
 }
 .oas-inventory-form-screen__body { min-width: 0; }
 .oas-inventory-form-screen__body > * { min-width: 0; }
+/* The workspace main is the single scrollable viewport on details/new routes.
+   Do not create a second constrained-height scroll area in the card. */
+.oas-inventory-form-screen ::deep .ui-card__body { overflow: visible; }
 .oas-inventory-form-screen__body .inventory-master-editor,
 .oas-inventory-form-screen__body .inventory-warehouses__editor {
     display: grid;
@@ -57,16 +84,89 @@
 }
 @media (max-width: 760px) {
     .oas-inventory-form-screen { gap: .5rem; }
-    .oas-inventory-form-screen__intro { padding: .6rem .75rem; }
-    .oas-inventory-form-screen__intro p { display: none; }
     .oas-inventory-form-screen__body .inventory-master-editor,
     .oas-inventory-form-screen__body .inventory-warehouses__editor,
-    .oas-inventory-form-screen__body .inventory-products__specialized-grid,
-    .oas-inventory-form-screen__body .inventory-transactions__line-editor {
+    .oas-inventory-form-screen__body .inventory-products__specialized-grid {
         grid-template-columns: minmax(0, 1fr);
     }
     .oas-inventory-form-screen__body .inventory-transactions__details,
     .oas-inventory-form-screen__body .stock-counts__summary {
         grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+
+/* Compact inputs without reducing the visible error messages. */
+.oas-inventory-form-screen ::deep .ui-card__body { padding: .7rem .85rem .9rem; }
+.inventory-transactions__editor ::deep .ui-input-text,
+.inventory-transactions__editor ::deep .ui-select,
+.inventory-transactions__editor ::deep .inventory-suggested-input { min-width: 0; gap: .2rem; }
+.inventory-transactions__editor ::deep .ui-input-text__control--small,
+.inventory-transactions__editor ::deep .ui-select__control--small { min-height: 32px; }
+/* Breakpoints follow the editor width, so a 1366px laptop with the sidebar
+   open gets the same safe layout as a narrower browser window. */
+@container inventory-operation (max-width: 1010px) {
+    .inventory-transactions__layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .inventory-transactions__fields {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .inventory-transactions__field--reason { grid-column: 1 / -1; }
+}
+@container inventory-operation (max-width: 720px) {
+    .inventory-transactions__table-head { display: none; }
+    .inventory-transactions__lines { gap: .55rem; border: 0; }
+    .inventory-transactions__line-editor {
+        grid-template-columns: 1.5rem minmax(0, 1fr) minmax(0, 1fr) auto;
+        gap: .4rem .65rem;
+        border: 1px solid var(--oas-color-border);
+        border-radius: var(--oas-radius-md);
+        padding: .7rem;
+        align-items: end;
+    }
+    .inventory-transactions__line-editor + .inventory-transactions__line-editor { border-top: 1px solid var(--oas-color-border); }
+    .inventory-transactions__line-number { grid-column: 1; grid-row: 1; align-self: center; }
+    .inventory-transactions__line-product { grid-column: 2 / -1; grid-row: 1; }
+    .inventory-transactions__line-quantity { grid-column: 2; grid-row: 2; }
+    .inventory-transactions__line-cost { grid-column: 3; grid-row: 2; }
+    .inventory-transactions__line-remove { grid-column: 4; grid-row: 2; }
+    /* Column headings are hidden in this mode: show each input label again. */
+    .inventory-transactions__line-editor ::deep .ui-searchable-select__label,
+    .inventory-transactions__line-editor ::deep .ui-input-text > .ui-text-label {
+        position: static; width: auto; height: auto; padding: initial; margin: initial;
+        overflow: visible; clip: auto; white-space: normal;
+    }
+}
+@container inventory-operation (max-width: 480px) {
+    .inventory-transactions__fields { grid-template-columns: minmax(0, 1fr); }
+    .inventory-transactions__sidebar { padding: .65rem; gap: .55rem; }
+    .inventory-transactions__line-editor {
+        grid-template-columns: 1.5rem repeat(2, minmax(0, 1fr));
+    }
+    .inventory-transactions__line-product { grid-column: 2 / -1; grid-row: 1; }
+    .inventory-transactions__line-quantity { grid-column: 2; grid-row: 2; }
+    .inventory-transactions__line-cost { grid-column: 3; grid-row: 2; }
+    .inventory-transactions__line-remove { grid-column: 2 / -1; grid-row: 3; justify-self: start; }
+    .oas-inventory-form-screen ::deep .ui-card__body { padding: .55rem .65rem .8rem; }
+}
+/* Fallback for engines without container queries: safe stacked form. */
+@supports not (container-type: inline-size) {
+    .inventory-transactions__layout { grid-template-columns: minmax(0, 1fr); }
+    .inventory-transactions__fields { grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
+    .inventory-transactions__table-head { display: none; }
+    .inventory-transactions__line-editor {
+        grid-template-columns: 1.5rem repeat(2, minmax(0,1fr));
+        gap: .4rem .6rem;
+        border: 1px solid var(--oas-color-border);
+    }
+    .inventory-transactions__line-product { grid-column: 2 / -1; }
+    .inventory-transactions__line-quantity { grid-column: 2; }
+    .inventory-transactions__line-cost { grid-column: 3; }
+    .inventory-transactions__line-remove { grid-column: 2 / -1; justify-self: start; }
+    .inventory-transactions__line-editor ::deep .ui-searchable-select__label,
+    .inventory-transactions__line-editor ::deep .ui-input-text > .ui-text-label {
+        position: static; width: auto; height: auto; padding: initial; margin: initial;
+        overflow: visible; clip: auto; white-space: normal;
     }
 }

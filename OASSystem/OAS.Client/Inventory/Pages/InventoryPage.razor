@@ -1,6 +1,7 @@
 @page "/inventory"
 @page "/inventory/balances"
 @attribute [Authorize]
+@using OAS.Client.Inventory.Common
 @using OAS.Client.Inventory.Services
 @using OAS.Client.Services.Browser
 @using OAS.Contracts.Inventory.Products
@@ -59,12 +60,12 @@
                             <td>@row.Product.Name<br /><UiTextLabel Text="@row.Product.ProductCode" Size="ControlSize.Small" Tone="TextTone.Muted" /></td>
                             <td>@(row.Variant.VariantName ?? "—")<br /><UiTextLabel Text="@VariantIdentity(row.Variant)" Size="ControlSize.Small" Tone="TextTone.Muted" /></td>
                             <td>@WarehouseName(row.WarehouseId)</td>
-                            <td>@row.OnHandQuantity.ToString("N3")</td>
-                            <td>@row.ReservedQuantity.ToString("N3")</td>
-                            <td>@row.AvailableQuantity.ToString("N3")</td>
-                            <td>@row.OnOrderQuantity.ToString("N3")</td>
-                            <td>@row.AverageUnitCost.ToString("N2")</td>
-                            <td>@row.InventoryValue.ToString("N2")</td>
+                            <td>@InventoryDisplayFormat.Number(row.OnHandQuantity)</td>
+                            <td>@InventoryDisplayFormat.Number(row.ReservedQuantity)</td>
+                            <td>@InventoryDisplayFormat.Number(row.AvailableQuantity)</td>
+                            <td>@InventoryDisplayFormat.Number(row.OnOrderQuantity)</td>
+                            <td>@InventoryDisplayFormat.Number(row.AverageUnitCost)</td>
+                            <td>@InventoryDisplayFormat.Number(row.InventoryValue)</td>
                             <td>
                                 <div class="inventory-balance__actions">
                                     <UiButton IconCssClass="fa-solid fa-box" Variant="ButtonVariant.Ghost" Size="ControlSize.Small"

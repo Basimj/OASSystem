@@ -1,3 +1,4 @@
+@using static OAS.UiLib.Core.Formatting.PurchasingDisplayFormat
 @page "/purchases/supplier-allocations"
 @attribute [Authorize]
 @using OAS.Client.Accounting.Services
@@ -63,11 +64,11 @@
             </div>
             <div class="supplier-allocation-card">
                 <small>دفعات غير مطبقة — بالأساسي</small>
-                <strong>@_center.TotalUnappliedPaymentBaseAmount.ToString("N2")</strong>
+                <strong>@_center.TotalUnappliedPaymentBaseAmount.ToString("#,##0.##")</strong>
             </div>
             <div class="supplier-allocation-card">
                 <small>ائتمانات مرتجعات متاحة — بالأساسي</small>
-                <strong>@_center.TotalAvailableCreditBaseAmount.ToString("N2")</strong>
+                <strong>@_center.TotalAvailableCreditBaseAmount.ToString("#,##0.##")</strong>
             </div>
             <div class="supplier-allocation-card">
                 <small>فواتير مفتوحة</small>
@@ -95,11 +96,11 @@
                         {
                             <tr class="@(SelectedPaymentId == payment.PaymentVoucherLineId ? "is-selected" : null)">
                                 <td>@payment.VoucherNumber</td>
-                                <td>@payment.VoucherDate.ToString("yyyy-MM-dd")</td>
+                                <td>@DisplayDate(payment.VoucherDate)</td>
                                 <td>@payment.CurrencyCode</td>
-                                <td>@payment.SourceAmount.ToString("N2")</td>
-                                <td>@payment.AppliedAmount.ToString("N2")</td>
-                                <td><strong>@payment.UnappliedAmount.ToString("N2")</strong></td>
+                                <td>@payment.SourceAmount.ToString("#,##0.##")</td>
+                                <td>@payment.AppliedAmount.ToString("#,##0.##")</td>
+                                <td><strong>@payment.UnappliedAmount.ToString("#,##0.##")</strong></td>
                                 <td><button class="btn btn-sm btn-outline-primary" disabled="@_busy" @onclick="() => SelectPayment(payment)">اختيار</button></td>
                             </tr>
                         }
@@ -129,12 +130,12 @@
                         {
                             <tr class="@(SelectedInvoiceId == invoice.PurchaseInvoiceId ? "is-selected" : null)">
                                 <td>@invoice.PurchaseInvoiceCode<br /><small>@invoice.SupplierInvoiceCode</small></td>
-                                <td>@invoice.InvoiceDate.ToString("yyyy-MM-dd")</td>
+                                <td>@DisplayDate(invoice.InvoiceDate)</td>
                                 <td>@invoice.CurrencyCode</td>
-                                <td>@invoice.TotalAmount.ToString("N2")</td>
-                                <td>@invoice.AppliedPaymentAmount.ToString("N2")</td>
-                                <td>@invoice.AppliedCreditAmount.ToString("N2")</td>
-                                <td><strong>@invoice.OutstandingAmount.ToString("N2")</strong></td>
+                                <td>@invoice.TotalAmount.ToString("#,##0.##")</td>
+                                <td>@invoice.AppliedPaymentAmount.ToString("#,##0.##")</td>
+                                <td>@invoice.AppliedCreditAmount.ToString("#,##0.##")</td>
+                                <td><strong>@invoice.OutstandingAmount.ToString("#,##0.##")</strong></td>
                                 <td><button class="btn btn-sm btn-outline-primary" disabled="@_busy" @onclick="() => SelectInvoice(invoice)">اختيار</button></td>
                             </tr>
                         }
@@ -153,8 +154,8 @@
             else
             {
                 <div class="supplier-allocation-action__selection">
-                    <span>السند: <strong>@_selectedPayment.VoucherNumber</strong> — المتاح @_selectedPayment.UnappliedAmount.ToString("N2") @_selectedPayment.CurrencyCode</span>
-                    <span>الفاتورة: <strong>@_selectedInvoice.PurchaseInvoiceCode</strong> — المتبقي @_selectedInvoice.OutstandingAmount.ToString("N2") @_selectedInvoice.CurrencyCode</span>
+                    <span>السند: <strong>@_selectedPayment.VoucherNumber</strong> — المتاح @_selectedPayment.UnappliedAmount.ToString("#,##0.##") @_selectedPayment.CurrencyCode</span>
+                    <span>الفاتورة: <strong>@_selectedInvoice.PurchaseInvoiceCode</strong> — المتبقي @_selectedInvoice.OutstandingAmount.ToString("#,##0.##") @_selectedInvoice.CurrencyCode</span>
                 </div>
                 <label>المبلغ من عملة سطر سند الصرف</label>
                 <input class="form-control" type="number" min="0.0001" step="0.0001" @bind="_allocationAmount" />
@@ -182,10 +183,10 @@
                         {
                             <tr class="@(SelectedCreditId == credit.PurchaseReturnId ? "is-selected" : null)">
                                 <td>@credit.ReturnCode</td>
-                                <td>@credit.PostingDate.ToString("yyyy-MM-dd")</td>
-                                <td>@credit.TotalCreditBaseAmount.ToString("N2")</td>
-                                <td>@credit.AppliedCreditBaseAmount.ToString("N2")</td>
-                                <td><strong>@credit.AvailableCreditBaseAmount.ToString("N2")</strong></td>
+                                <td>@DisplayDate(credit.PostingDate)</td>
+                                <td>@credit.TotalCreditBaseAmount.ToString("#,##0.##")</td>
+                                <td>@credit.AppliedCreditBaseAmount.ToString("#,##0.##")</td>
+                                <td><strong>@credit.AvailableCreditBaseAmount.ToString("#,##0.##")</strong></td>
                                 <td><button class="btn btn-sm btn-outline-primary" disabled="@_busy" @onclick="() => SelectCredit(credit)">اختيار</button></td>
                             </tr>
                         }
@@ -222,10 +223,10 @@
                             <tr>
                                 <td>@allocation.VoucherNumber</td>
                                 <td>@allocation.PurchaseInvoiceCode</td>
-                                <td>@allocation.SourceAmount.ToString("N2") @allocation.SourceCurrencyCode</td>
-                                <td>@allocation.TargetDocumentAmount.ToString("N2")</td>
-                                <td>@allocation.RealizedExchangeDifferenceBase.ToString("N2")</td>
-                                <td>@allocation.AllocatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                                <td>@allocation.SourceAmount.ToString("#,##0.##") @allocation.SourceCurrencyCode</td>
+                                <td>@allocation.TargetDocumentAmount.ToString("#,##0.##")</td>
+                                <td>@allocation.RealizedExchangeDifferenceBase.ToString("#,##0.##")</td>
+                                <td>@DisplayDateTime(allocation.AllocatedAtUtc.ToLocalTime())</td>
                                 <td><button class="btn btn-sm btn-outline-danger" disabled="@_busy" @onclick="() => BeginReverse(allocation)">عكس</button></td>
                             </tr>
                         }

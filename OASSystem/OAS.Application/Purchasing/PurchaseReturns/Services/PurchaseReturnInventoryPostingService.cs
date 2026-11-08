@@ -46,8 +46,11 @@ public sealed class PurchaseReturnInventoryPostingService(
         }
 
         purchaseReturn.RefreshInventoryTotals();
+        // The transaction was added to the same EF Core DbContext above and is still tracked as Added.
+        // Calling Update here changes its state to Modified before the first SaveChanges, preventing
+        // the parent INSERT and causing FK violations for transaction lines / ledger entries.
+        // Tracked changes to a newly Added entity (including Post) are persisted by the INSERT.
         transaction.Post(postedAtUtc, postedBy);
-        transactions.Update(transaction);
         return new PurchaseReturnInventoryPostingResult([transaction.Id]);
     }
 }

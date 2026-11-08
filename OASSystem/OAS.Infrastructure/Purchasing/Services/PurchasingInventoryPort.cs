@@ -58,7 +58,7 @@ public sealed class PurchasingInventoryPort(
     {
         var periods = await dbContext.Set<FiscalPeriod>().AsNoTracking()
             .Where(x => x.StartDate <= postingDate && x.EndDate >= postingDate).Take(2).ToListAsync(cancellationToken);
-        if (periods.Count == 0) throw new ConflictException("fiscal_period_not_found", "لا توجد فترة مالية تغطي تاريخ الترحيل.");
+        if (periods.Count == 0) throw new ConflictException("fiscal_period_not_found", $"لا توجد فترة مالية تغطي تاريخ الترحيل {postingDate:yyyy/MM/dd}. أنشئ فترة مالية تشمل هذا التاريخ من المحاسبة، أو صحح تاريخ السند.");
         if (periods.Count > 1) throw new ConflictException("fiscal_period_overlap", "يوجد أكثر من فترة مالية تغطي تاريخ الترحيل.");
         var period = periods[0];
         if (period.Status == FiscalPeriodStatus.Closed || period.InventoryLocked)

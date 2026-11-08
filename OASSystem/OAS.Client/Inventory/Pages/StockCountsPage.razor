@@ -8,6 +8,7 @@
 @using OAS.Client.Services.Browser
 @using OAS.Contracts.Enums.Inventory
 @using OAS.Contracts.Inventory.Products
+@using OAS.UiLib.Core.Formatting
 @using OAS.Contracts.Inventory.Stock
 @using OAS.Contracts.Inventory.Warehouses
 
@@ -116,7 +117,7 @@
             {
                 <div class="stock-counts__summary">
                     <div><span>المخزن</span><strong>@WarehouseName(_selectedCount.WarehouseId)</strong></div>
-                    <div><span>التاريخ</span><strong>@_selectedCount.CountDate.ToString("yyyy-MM-dd")</strong></div>
+                    <div><span>التاريخ</span><strong>@InventoryDisplayFormat.Date(_selectedCount.CountDate)</strong></div>
                     <div><span>الحالة</span><strong>@InventoryArabicPresenter.StockCountStatusText(_selectedCount.Status)</strong></div>
                     <div><span>بدأ</span><strong>@FormatDate(_selectedCount.StartedAtUtc)</strong></div>
                     <div><span>اكتمل</span><strong>@FormatDate(_selectedCount.CompletedAtUtc)</strong></div>
@@ -168,15 +169,15 @@
                                     <strong>@VariantLabel(form.Line.ProductVariantId)</strong>
                                     <span>@VariantSku(form.Line.ProductVariantId)</span>
                                 </div>
-                                <div><span>كمية النظام</span><strong>@form.Line.SystemQuantity.ToString("N3")</strong></div>
+                                <div><span>كمية النظام</span><strong>@InventoryDisplayFormat.Number(form.Line.SystemQuantity)</strong></div>
                                 <div class="stock-counts__count-input">
                                     <UiInputText Label="الكمية الفعلية"
                                                  Value="@form.CountedQuantity"
                                                  ValueExpression="@(() => form.CountedQuantity)"
                                                  ValueChanged="@(v => CountedQuantityChanged(form, v))"
                                                  Type="number"
-                                                 InputMode="decimal"
-                                                 step="0.001"
+                                                 InputMode="@(UsesWholeCount(form) ? "numeric" : "decimal")"
+                                                 step="@(UsesWholeCount(form) ? "1" : "0.001")"
                                                  Required="true"
                                                  ErrorText="@form.Error"
                                                  Disabled="@(!CanRecord)"
@@ -218,7 +219,7 @@
                         <RowTemplate Context="count">
                             <td><strong>@count.CountNumber</strong></td>
                             <td>@WarehouseName(count.WarehouseId)</td>
-                            <td>@count.CountDate.ToString("yyyy-MM-dd")</td>
+                            <td>@InventoryDisplayFormat.Date(count.CountDate)</td>
                             <td><UiBadge Text="@InventoryArabicPresenter.StockCountStatusText(count.Status)" Tone="@StockCountTone(count.Status)" /></td>
                             <td>@FormatDate(count.StartedAtUtc)</td>
                             <td>@FormatDate(count.CompletedAtUtc)</td>
@@ -305,6 +306,7 @@
     private IReadOnlyList<WarehouseDto> _warehouses = [];
     private IReadOnlyList<ProductDto> _products = [];
     private IReadOnlyList<ProductVariantDto> _variants = [];
+    private IReadOnlyList<UnitDto> _units = [];
     private StockCountDto? _selectedCount;
     private Guid? _selectedId;
     private readonly List<CountLineForm> _lineForms = [];
@@ -364,6 +366,9 @@
             _warehouses = warehousesTask.Result;
             _products = productsTask.Result;
             _variants = variantsTask.Result;
+            // Unit lookup is advisory; count recording must still work if unavailable.
+            try { _units = await LoadAllPagesAsync(page => Inventory.GetUnitsAsync(page)); }
+            catch (ApiClientException) { _units = []; }
 
             if (_selectedId.HasValue)
                 _selectedCount = _counts.FirstOrDefault(x => x.Id == _selectedId.Value);
@@ -566,6 +571,13 @@
         }
     }
 
+    private bool UsesWholeCount(CountLineForm form)
+    {
+        var unitId = _variants.FirstOrDefault(x => x.Id == form.Line.ProductVariantId)?.UnitId;
+        var unit = _units.FirstOrDefault(x => x.Id == unitId);
+        return QuantityInputRules.UsesWholeNumbers(unit?.Code, unit?.Name, form.Line.SystemQuantity);
+    }
+
     private Task CountedQuantityChanged(CountLineForm form, string? value)
     {
         form.CountedQuantity = value ?? string.Empty;
@@ -577,7 +589,7 @@
     {
         if (!CanRecord || !_selectedId.HasValue || _busy) return;
 
-        form.Error = ValidateCountedQuantity(form.CountedQuantity, out var quantity);
+        form.Error = ValidateCountedQuantity(form, out var quantity);
         if (form.Error is not null)
         {
             Snackbar.Error(form.Error == "هذا الحقل إجباري."
@@ -719,8 +731,9 @@
         }));
     }
 
-    private static string? ValidateCountedQuantity(string? raw, out decimal quantity)
+    private string? ValidateCountedQuantity(CountLineForm form, out decimal quantity)
     {
+        var raw = form.CountedQuantity;
         quantity = 0;
         if (string.IsNullOrWhiteSpace(raw))
             return "هذا الحقل إجباري.";
@@ -730,6 +743,9 @@
 
         if (quantity < 0)
             return "الكمية الفعلية يجب أن تكون صفرًا أو أكبر.";
+
+        if (UsesWholeCount(form) && !QuantityInputRules.IsWhole(quantity))
+            return QuantityInputRules.WholeNumberMessage;
 
         if (!FitsPrecision(quantity, 18, 3))
             return "الكمية الفعلية تسمح بحد أقصى 3 منازل عشرية و15 رقمًا قبل الفاصلة.";
@@ -780,9 +796,9 @@
     }
 
     private string VariantSku(Guid id) => Variant(id)?.SKU ?? "—";
-    private static string FormatDate(DateTimeOffset? value) => value.HasValue ? value.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm") : "—";
-    private static string FormatDifference(StockCountLineDto line) => line.CountedAtUtc.HasValue ? line.DifferenceQuantity.ToString("N3") : "—";
-    private static string FormatVariance(StockCountLineDto line) => line.CountedAtUtc.HasValue ? line.VarianceValue.ToString("N2") : "—";
+    private static string FormatDate(DateTimeOffset? value) => InventoryDisplayFormat.DateTime(value?.ToLocalTime());
+    private static string FormatDifference(StockCountLineDto line) => line.CountedAtUtc.HasValue ? InventoryDisplayFormat.Number(line.DifferenceQuantity) : "—";
+    private static string FormatVariance(StockCountLineDto line) => line.CountedAtUtc.HasValue ? InventoryDisplayFormat.Number(line.VarianceValue) : "—";
     private string WorkflowCss(StockCountStatus status) => $"stock-counts__workflow-step {(_selectedCount?.Status == status ? "stock-counts__workflow-step--active" : string.Empty)}";
     private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     private static string ResolveCreateWarehouseError(string? code) => code switch

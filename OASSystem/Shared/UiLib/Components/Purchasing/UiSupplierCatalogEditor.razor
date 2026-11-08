@@ -1,4 +1,6 @@
+@using static OAS.UiLib.Core.Formatting.PurchasingDisplayFormat
 @namespace OAS.UiLib.Components.Purchasing
+@using OAS.UiLib.Core.Formatting
 @using OAS.UiLib.Core.Models.Purchasing
 @using OAS.UiLib.Core.Models
 
@@ -13,11 +15,12 @@
                       SearchAsync="ProductSearchAsync" SearchPageAsync="ProductSearchPageAsync" SelectedItemChanged="ProductSelectionChanged" ValueChanged="ProductChangedAsync" Placeholder="ابحث باسم المنتج أو الكود أو SKU..." />
             <UiLookup UsePopover="true" Label="وحدة الشراء" Required="true" Disabled="@(!IsEditable)"
                       Value="@GuidText(Model.PurchaseUnitId)" SelectedItem="@Selected(Model.PurchaseUnitId, Model.PurchaseUnitName, "fa-solid fa-ruler")"
-                      SearchAsync="UnitSearchAsync" ValueChanged="UnitChangedAsync" Placeholder="اختر الوحدة..." />
+                      SearchAsync="UnitSearchAsync" ValueChanged="UnitChangedAsync" SelectedItemChanged="@(item => Model.PurchaseUnitName = item?.PrimaryText)" Placeholder="اختر الوحدة..." />
             <UiInputText Label="كود المنتج لدى المورد" Value="@Model.SupplierProductCode" ValueChanged="SetSupplierCode" Disabled="@(!IsEditable)" MaxLength="64" />
             <UiInputText Label="اسم المنتج لدى المورد" Value="@Model.SupplierProductName" ValueChanged="SetSupplierName" Disabled="@(!IsEditable)" MaxLength="200" />
             <UiPurchasingNumberField Label="معامل التحويل" Value="@Model.UnitConversionFactor" ValueChanged="SetConversion" Disabled="@(!IsEditable)" Step="0.000001" Min="0.000001" />
-            <UiPurchasingNumberField Label="الحد الأدنى للطلب" Value="@Model.MinimumOrderQuantity" ValueChanged="SetMoq" Disabled="@(!IsEditable)" />
+            <UiPurchasingNumberField Label="الحد الأدنى للطلب" Value="@Model.MinimumOrderQuantity" ValueChanged="SetMoq" Disabled="@(!IsEditable)" WholeNumbersOnly="@QuantityInputRules.UsesWholeNumbers(null, Model.PurchaseUnitName, Model.Id.HasValue ? Model.MinimumOrderQuantity : 0m)"
+                                      Step="@QuantityInputRules.StepForUnit(null, Model.PurchaseUnitName, Model.Id.HasValue ? Model.MinimumOrderQuantity : 0m)" />
             <UiPurchasingNumberField Label="مدة التوريد بالأيام" Value="@(Model.LeadTimeDays ?? 0)" ValueChanged="SetLeadTime" Disabled="@(!IsEditable)" Step="1" />
             <UiCheckbox Label="مورد مفضل لهذا الصنف" Value="@Model.IsPreferred" ValueChanged="SetPreferred" Disabled="@(!IsEditable)" />
             <UiCheckbox Label="فعال" Value="@Model.IsActive" ValueChanged="SetActive" Disabled="@(!IsEditable)" />
@@ -49,8 +52,8 @@
                     @foreach (var price in Model.PriceHistory.OrderByDescending(x => x.EffectiveFrom))
                     {
                         <div class="ui-purchasing-price-row">
-                            <strong>@price.UnitPrice.ToString("N2") @price.CurrencyCode</strong>
-                            <span>@price.EffectiveFrom.ToString("yyyy-MM-dd") → @(price.EffectiveTo?.ToString("yyyy-MM-dd") ?? "مستمر")</span>
+                            <strong>@price.UnitPrice.ToString("#,##0.##") @price.CurrencyCode</strong>
+                            <span>@DisplayDate(price.EffectiveFrom) → @DisplayDate(price.EffectiveTo, "مستمر")</span>
                             <span>@(price.IsCurrent ? "السعر الحالي" : "تاريخي")</span>
                         </div>
                     }

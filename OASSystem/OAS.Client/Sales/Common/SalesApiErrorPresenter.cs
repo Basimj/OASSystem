@@ -57,7 +57,7 @@ public static class SalesApiErrorPresenter
         ["sales_product_inactive"] = "المنتج المحدد غير نشط.",
         ["sales_product_not_stock_item"] = "المنتج المحدد ليس صنفًا مخزنيًا صالحًا لهذا النوع من أسطر البيع.",
         ["sales_product_required"] = "يجب تحديد المنتج لهذا السطر.",
-        ["sales_product_variant_inactive"] = "متغير المنتج المحدد غير نشط.",
+        ["sales_product_variant_inactive"] = "الصنف المحدد غير نشط.",
         ["sales_reservation_conflict"] = "الكمية المتاحة تغيرت أثناء تنفيذ العملية. حدّث المستند وحاول مرة أخرى.",
         ["sales_warehouse_inactive"] = "المخزن المحدد غير نشط.",
         ["sales_warehouse_required"] = "يجب تحديد المخزن لهذا السطر.",

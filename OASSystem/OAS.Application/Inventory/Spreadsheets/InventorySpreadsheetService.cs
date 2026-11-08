@@ -242,8 +242,8 @@ public sealed partial class InventorySpreadsheetService(
             ? (await LensDetailsAsync(new PageRequest(), ct)).ToDictionary(x => x.ProductVariantId)
             : new Dictionary<Guid, LensDetailsDto>();
 
-        return [Table("متغيرات المنتجات",
-            [Text("رمز SKU"), Text("الباركود"), Text("المنتج"), Text("اسم المتغير"), Text("اللون"), Text("المقاس"), Text("الوحدة"), Number("سعر الشراء"), Number("سعر البيع"),
+        return [Table("أصناف المنتجات",
+            [Text("رمز SKU"), Text("الباركود"), Text("المنتج"), Text("اسم الصنف"), Text("اللون"), Text("المقاس"), Text("الوحدة"), Number("سعر الشراء"), Number("سعر البيع"),
              Text("نوع العدسة"), Text("خامة العدسة"), Text("طلاء العدسة"), Number("معامل الانكسار"), Number("SPH"), Number("CYL"), Number("ADD"), Number("Base Curve"), Number("Diameter"), Text("عدسة طبية"), Text("الحالة")],
             items.Select(x =>
             {
@@ -252,7 +252,7 @@ public sealed partial class InventorySpreadsheetService(
                     ("رمز SKU", x.SKU),
                     ("الباركود", x.Barcode),
                     ("المنتج", products.GetValueOrDefault(x.ProductId)),
-                    ("اسم المتغير", x.VariantName),
+                    ("اسم الصنف", x.VariantName),
                     ("اللون", x.Color),
                     ("المقاس", x.Size),
                     ("الوحدة", x.UnitId is Guid unitId ? units.GetValueOrDefault(unitId) : null),
@@ -321,14 +321,14 @@ public sealed partial class InventorySpreadsheetService(
         }
 
         return [Table("أرصدة المخزون",
-            [Text("المنتج"), Text("متغير المنتج"), Text("رمز SKU"), Text("الباركود"), Text("المخزن"), Number("المتوفر فعليًا"), Number("المحجوز"), Number("المتاح"), Number("قيد الطلب"), Number("متوسط التكلفة"), Number("قيمة المخزون"), Text("آخر حركة")],
+            [Text("المنتج"), Text("الصنف"), Text("رمز SKU"), Text("الباركود"), Text("المخزن"), Number("المتوفر فعليًا"), Number("المحجوز"), Number("المتاح"), Number("قيد الطلب"), Number("متوسط التكلفة"), Number("قيمة المخزون"), Text("آخر حركة")],
             items.Select(x =>
             {
                 variantMap.TryGetValue(x.ProductVariantId, out var variant);
                 var product = variant is null ? null : productMap.GetValueOrDefault(variant.ProductId);
                 return Row(
                     ("المنتج", product is null ? null : $"{product.ProductCode} - {product.Name}"),
-                    ("متغير المنتج", variant?.VariantName),
+                    ("الصنف", variant?.VariantName),
                     ("رمز SKU", variant?.SKU),
                     ("الباركود", variant?.Barcode),
                     ("المخزن", warehouseMap.GetValueOrDefault(x.WarehouseId)?.Name),
@@ -375,7 +375,7 @@ public sealed partial class InventorySpreadsheetService(
                 lineRows.Add(Row(
                     ("رقم العملية", transaction.TransactionNumber),
                     ("المنتج", product is null ? null : $"{product.ProductCode} - {product.Name}"),
-                    ("متغير المنتج", variant?.VariantName),
+                    ("الصنف", variant?.VariantName),
                     ("رمز SKU", variant?.SKU),
                     ("الباركود", variant?.Barcode),
                     ("الكمية", F(line.Quantity)),
@@ -403,7 +403,7 @@ public sealed partial class InventorySpreadsheetService(
                     ("تاريخ الترحيل", DateTimeText(x.PostedAtUtc)),
                     ("رحّل بواسطة", x.PostedBy)))),
             Table("بنود العمليات",
-                [Text("رقم العملية"), Text("المنتج"), Text("متغير المنتج"), Text("رمز SKU"), Text("الباركود"), Number("الكمية"), Number("تكلفة الوحدة"), Number("الإجمالي"), Text("ملاحظات")],
+                [Text("رقم العملية"), Text("المنتج"), Text("الصنف"), Text("رمز SKU"), Text("الباركود"), Number("الكمية"), Number("تكلفة الوحدة"), Number("الإجمالي"), Text("ملاحظات")],
                 lineRows)
         ];
     }
@@ -441,7 +441,7 @@ public sealed partial class InventorySpreadsheetService(
         }
 
         return [Table("حركات المخزون",
-            [Text("التسلسل"), Text("التاريخ"), Text("رقم العملية"), Text("نوع الحركة"), Text("المنتج"), Text("متغير المنتج"), Text("رمز SKU"), Text("الباركود"), Text("المخزن"), Number("الكمية الداخلة"), Number("الكمية الخارجة"), Number("الرصيد بعد الحركة"), Number("التكلفة"), Number("متوسط التكلفة"), Number("قيمة المخزون"), Text("مصدر الحركة"), Text("أنشئ بواسطة")],
+            [Text("التسلسل"), Text("التاريخ"), Text("رقم العملية"), Text("نوع الحركة"), Text("المنتج"), Text("الصنف"), Text("رمز SKU"), Text("الباركود"), Text("المخزن"), Number("الكمية الداخلة"), Number("الكمية الخارجة"), Number("الرصيد بعد الحركة"), Number("التكلفة"), Number("متوسط التكلفة"), Number("قيمة المخزون"), Text("مصدر الحركة"), Text("أنشئ بواسطة")],
             items.Select(x =>
             {
                 transactionMap.TryGetValue(x.TransactionId, out var transaction);
@@ -456,7 +456,7 @@ public sealed partial class InventorySpreadsheetService(
                     ("رقم العملية", transaction?.TransactionNumber),
                     ("نوع الحركة", MovementTypeText(x.MovementType)),
                     ("المنتج", product is null ? null : $"{product.ProductCode} - {product.Name}"),
-                    ("متغير المنتج", variant?.VariantName),
+                    ("الصنف", variant?.VariantName),
                     ("رمز SKU", variant?.SKU),
                     ("الباركود", variant?.Barcode),
                     ("المخزن", warehouses.GetValueOrDefault(x.WarehouseId)?.Name),
@@ -499,7 +499,7 @@ public sealed partial class InventorySpreadsheetService(
                 lineRows.Add(Row(
                     ("رقم الجرد", count.CountNumber),
                     ("المنتج", product is null ? null : $"{product.ProductCode} - {product.Name}"),
-                    ("متغير المنتج", variant?.VariantName),
+                    ("الصنف", variant?.VariantName),
                     ("رمز SKU", variant?.SKU),
                     ("الباركود", variant?.Barcode),
                     ("كمية النظام", F(line.SystemQuantity)),
@@ -530,7 +530,7 @@ public sealed partial class InventorySpreadsheetService(
                     ("رحّل بواسطة", x.PostedBy),
                     ("ملاحظات", x.Notes)))),
             Table("بنود الجرد",
-                [Text("رقم الجرد"), Text("المنتج"), Text("متغير المنتج"), Text("رمز SKU"), Text("الباركود"), Number("كمية النظام"), Number("الكمية الفعلية"), Number("الفرق"), Number("متوسط التكلفة"), Number("قيمة الفرق"), Text("وقت العد"), Text("عُد بواسطة"), Text("ملاحظات")],
+                [Text("رقم الجرد"), Text("المنتج"), Text("الصنف"), Text("رمز SKU"), Text("الباركود"), Number("كمية النظام"), Number("الكمية الفعلية"), Number("الفرق"), Number("متوسط التكلفة"), Number("قيمة الفرق"), Text("وقت العد"), Text("عُد بواسطة"), Text("ملاحظات")],
                 lineRows)
         ];
     }

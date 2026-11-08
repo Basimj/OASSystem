@@ -1,36 +1,57 @@
 @namespace OAS.UiLib.Components.Purchasing
+@using OAS.UiLib.Core.Formatting
 @using OAS.UiLib.Core.Models.Purchasing
 @using OAS.UiLib.Core.Models
 
 <UiPurchasingEditorShell Title="@Model.ReceiptCode" StatusText="@Model.StatusText">
+    @if (!string.IsNullOrWhiteSpace(_serverError))
+    {
+        <div class="ui-purchasing-receipt-alert" role="alert">
+            <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+            <span>@_serverError</span>
+        </div>
+    }
     <UiPurchasingSection Title="بيانات الاستلام">
         <UiPurchasingFormGrid>
-            <UiLookup UsePopover="true" Label="أمر الشراء" Required="true" Value="@GuidText(Model.PurchaseOrderId)" SelectedItem="@Selected(Model.PurchaseOrderId,Model.PurchaseOrderCode,"fa-solid fa-file-signature")" SearchAsync="PurchaseOrderSearchAsync" ValueChanged="PurchaseOrderChangedAsync" Disabled="@(!IsEditable || Model.Id.HasValue)" />
+            <UiLookup UsePopover="true" Label="أمر الشراء" Required="true" Value="@GuidText(Model.PurchaseOrderId)" SelectedItem="@Selected(Model.PurchaseOrderId,Model.PurchaseOrderCode,"fa-solid fa-file-signature")" SearchAsync="PurchaseOrderSearchAsync" ValueChanged="PurchaseOrderChangedAsync" Disabled="@(!IsEditable || Model.Id.HasValue)" ErrorText="@ErrorFor(nameof(Model.PurchaseOrderId))" />
             <UiInputText Label="المورد" Value="@Model.SupplierName" ReadOnly="true" />
             <UiInputText Label="المخزن" Value="@Model.WarehouseName" ReadOnly="true" />
-            <UiInputDate Label="تاريخ الاستلام" Value="@Model.ReceiptDate" ValueChanged="ReceiptDateChanged" Disabled="@(!IsEditable)" />
-            <UiInputDate Label="تاريخ الترحيل" Value="@Model.PostingDate" ValueChanged="PostingDateChanged" Disabled="@(!IsEditable)" />
+            <UiInputDate Label="تاريخ الاستلام" Value="@Model.ReceiptDate" ValueChanged="ReceiptDateChanged" Disabled="@(!IsEditable)" ErrorText="@ErrorFor(nameof(Model.ReceiptDate))" />
+            <UiInputDate Label="تاريخ الترحيل" Value="@Model.PostingDate" ValueChanged="PostingDateChanged" ErrorText="@(ErrorFor(nameof(Model.PostingDate)) ?? Model.PostingDateError)" Disabled="@(!IsEditable)" />
             <UiInputText Label="كود تسليم المورد" Value="@Model.SupplierDeliveryCode" ValueChanged="DeliveryCodeChanged" Disabled="@(!IsEditable)" />
             <UiInputText Label="ملاحظات" Value="@Model.Notes" ValueChanged="NotesChanged" Disabled="@(!IsEditable)" />
         </UiPurchasingFormGrid>
     </UiPurchasingSection>
     <UiPurchasingSection Title="بنود الاستلام">
+        <p class="ui-purchasing-receipt-guidance">للاستلام الجزئي: أدخل الكمية في الأصناف التي وصلت فقط. الأصناف التي تتركها بصفر لن تُضاف إلى السند. يُفترض قبول كامل الكمية ما لم تعدّل «المقبول» و«المرفوض».</p>
+        @if (!string.IsNullOrWhiteSpace(ErrorFor(nameof(Model.Lines))))
+        {
+            <p class="ui-purchasing-receipt-error" role="alert">@ErrorFor(nameof(Model.Lines))</p>
+        }
         <UiPurchasingLineTable>
             @foreach(var line in Model.Lines.OrderBy(x=>x.LineSequence))
             {
                 <div class="ui-purchasing-receipt-line">
-                    <div class="ui-purchasing-receipt-line__head"><strong>@line.ProductName</strong><span>المتبقي: @line.RemainingReceivableQuantity.ToString("N3")</span></div>
+                    <div class="ui-purchasing-receipt-line__head"><strong>@line.ProductName</strong><span>المتبقي: @line.RemainingReceivableQuantity.ToString("#,##0.###")</span></div>
+                    @if (!string.IsNullOrWhiteSpace(ErrorFor(LineKey(line, nameof(line.PurchaseOrderLineId)))))
+                    {
+                        <small class="ui-purchasing-receipt-error" role="alert">@ErrorFor(LineKey(line, nameof(line.PurchaseOrderLineId)))</small>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(ErrorFor(LineKey(line, nameof(line.LineSequence)))))
+                    {
+                        <small class="ui-purchasing-receipt-error" role="alert">@ErrorFor(LineKey(line, nameof(line.LineSequence)))</small>
+                    }
                     <UiPurchasingFormGrid>
-                        <UiPurchasingNumberField Label="المطلوب" Value="@line.OrderedQuantitySnapshot" Disabled="true" />
-                        <UiPurchasingNumberField Label="مستلم سابقاً" Value="@line.PreviouslyReceivedQty" Disabled="true" />
-                        <UiPurchasingNumberField Label="المستلم الآن" Value="@line.ReceivedQuantity" ValueChanged="@(v=>ReceivedChanged(line,v))" Disabled="@(!IsEditable)" />
-                        <UiPurchasingNumberField Label="المقبول" Value="@line.AcceptedQuantity" ValueChanged="@(v=>AcceptedChanged(line,v))" Disabled="@(!IsEditable)" />
-                        <UiPurchasingNumberField Label="المرفوض" Value="@line.RejectedQuantity" ValueChanged="@(v=>RejectedChanged(line,v))" Disabled="@(!IsEditable)" />
-                        <UiPurchasingNumberField Label="التكلفة الفعلية" Value="@line.ActualUnitCost" ValueChanged="@(v=>CostChanged(line,v))" Disabled="@(!IsEditable)" Step="0.0001" />
+                        <UiPurchasingNumberField Label="المطلوب" Value="@line.OrderedQuantitySnapshot" Step="@QuantityInputRules.StepForUnit(null, line.PurchaseUnitName, line.OrderedQuantitySnapshot)" Disabled="true" />
+                        <UiPurchasingNumberField Label="مستلم سابقاً" Value="@line.PreviouslyReceivedQty" Step="@QuantityInputRules.StepForUnit(null, line.PurchaseUnitName, line.OrderedQuantitySnapshot)" Disabled="true" />
+                        <UiPurchasingNumberField Label="المستلم الآن" WholeNumbersOnly="@QuantityInputRules.UsesWholeNumbers(null, line.PurchaseUnitName, line.OrderedQuantitySnapshot)" Value="@line.ReceivedQuantity" Step="@QuantityInputRules.StepForUnit(null, line.PurchaseUnitName, line.OrderedQuantitySnapshot)" ValueChanged="@(v=>ReceivedChanged(line,v))" Disabled="@(!IsEditable)" ErrorText="@ErrorFor(LineKey(line, nameof(line.ReceivedQuantity)))" />
+                        <UiPurchasingNumberField Label="المقبول" WholeNumbersOnly="@QuantityInputRules.UsesWholeNumbers(null, line.PurchaseUnitName, line.OrderedQuantitySnapshot)" Value="@line.AcceptedQuantity" Step="@QuantityInputRules.StepForUnit(null, line.PurchaseUnitName, line.OrderedQuantitySnapshot)" ValueChanged="@(v=>AcceptedChanged(line,v))" Disabled="@(!IsEditable)" ErrorText="@ErrorFor(LineKey(line, nameof(line.AcceptedQuantity)))" />
+                        <UiPurchasingNumberField Label="المرفوض" WholeNumbersOnly="@QuantityInputRules.UsesWholeNumbers(null, line.PurchaseUnitName, line.OrderedQuantitySnapshot)" Value="@line.RejectedQuantity" Step="@QuantityInputRules.StepForUnit(null, line.PurchaseUnitName, line.OrderedQuantitySnapshot)" ValueChanged="@(v=>RejectedChanged(line,v))" Disabled="@(!IsEditable)" ErrorText="@ErrorFor(LineKey(line, nameof(line.RejectedQuantity)))" />
+                        <UiPurchasingNumberField Label="التكلفة الفعلية" Value="@line.ActualUnitCost" ValueChanged="@(v=>CostChanged(line,v))" Disabled="@(!IsEditable)" Step="0.0001" ErrorText="@ErrorFor(LineKey(line, nameof(line.ActualUnitCost)))" />
                         <UiInputDate Label="تاريخ الانتهاء" Value="@line.ExpiryDate" ValueChanged="@(v=>ExpiryChanged(line,v))" Disabled="@(!IsEditable)" />
                         <UiInputText Label="Batch" Value="@line.BatchCode" ValueChanged="@(v=>BatchChanged(line,v))" Disabled="@(!IsEditable)" />
                     </UiPurchasingFormGrid>
-                    <div class="ui-purchasing-receipt-line__summary">إجمالي تكلفة المقبول: @line.TotalAcceptedCost.ToString("N2")</div>
+                    <div class="ui-purchasing-receipt-line__summary">إجمالي تكلفة المقبول: @line.TotalAcceptedCost.ToString("#,##0.##")</div>
                 </div>
             }
         </UiPurchasingLineTable>
@@ -43,15 +64,61 @@
     [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? PurchaseOrderSearchAsync {get;set;}
     [Parameter] public EventCallback<Guid?> OnPurchaseOrderChanged {get;set;}
     [Parameter] public EventCallback OnChanged {get;set;}
+    private UiPurchaseReceiptEditorModel? _validatedModel;
+    private IReadOnlyDictionary<string,string> _errors = new Dictionary<string,string>();
+    private bool _showErrors;
+    private string? _serverError;
+    protected override void OnParametersSet()
+    {
+        if (!ReferenceEquals(Model, _validatedModel))
+        {
+            _validatedModel = Model;
+            _errors = new Dictionary<string,string>();
+            _showErrors = false;
+            _serverError = null;
+        }
+    }
+    public bool ValidateForSave()
+    {
+        _showErrors = true;
+        _serverError = null;
+        _errors = UiPurchaseReceiptFormValidator.Validate(Model);
+        StateHasChanged();
+        return _errors.Count == 0;
+    }
+    public void ShowSaveError(string message, IReadOnlyDictionary<string,string[]>? serverErrors = null)
+    {
+        _showErrors = true;
+        _serverError = null;
+        var errors = UiPurchaseReceiptFormValidator.Validate(Model)
+            .ToDictionary(x => x.Key, x => x.Value, StringComparer.Ordinal);
+        if (serverErrors is { Count: > 0 })
+            foreach (KeyValuePair<string, string> error in UiPurchaseReceiptFormValidator.TranslateServerErrors(Model, serverErrors))
+            {
+                if (error.Key == "Form") _serverError = error.Value;
+                else errors[error.Key] = error.Value;
+            }
+        if (serverErrors is not { Count: > 0 } || errors.Count == 0)
+            _serverError ??= message;
+        _errors = errors;
+        StateHasChanged();
+    }
+    private string? ErrorFor(string field) => _showErrors && _errors.TryGetValue(field, out var description) ? description : null;
+    private string LineKey(UiPurchaseReceiptLineModel line, string field) => $"Lines[{Model.Lines.IndexOf(line)}].{field}";
+    private async Task Changed()
+    {
+        _serverError = null;
+        if (_showErrors) _errors = UiPurchaseReceiptFormValidator.Validate(Model);
+        await OnChanged.InvokeAsync();
+    }
     private static string? GuidText(Guid? id)=>id?.ToString("D"); private static Guid? Parse(string? v)=>Guid.TryParse(v,out var x)?x:null;
     private static UiLookupItem? Selected(Guid? id,string? text,string icon)=>id.HasValue?new(id.Value.ToString("D"),text??id.Value.ToString("D"),null,icon):null;
-    private Task Changed()=>OnChanged.InvokeAsync();
     private async Task PurchaseOrderChangedAsync(string? v){Model.PurchaseOrderId=Parse(v);await OnPurchaseOrderChanged.InvokeAsync(Model.PurchaseOrderId);await Changed();}
     private async Task ReceiptDateChanged(DateOnly? v){if(v.HasValue)Model.ReceiptDate=v.Value;await Changed();}
-    private async Task PostingDateChanged(DateOnly? v){if(v.HasValue)Model.PostingDate=v.Value;await Changed();}
+    private async Task PostingDateChanged(DateOnly? v){if(v.HasValue)Model.PostingDate=v.Value;Model.PostingDateError=null;await Changed();}
     private async Task DeliveryCodeChanged(string? v){Model.SupplierDeliveryCode=v;await Changed();}
     private async Task NotesChanged(string? v){Model.Notes=v;await Changed();}
-    private async Task ReceivedChanged(UiPurchaseReceiptLineModel l,decimal v){l.ReceivedQuantity=v;await Changed();}
+    private async Task ReceivedChanged(UiPurchaseReceiptLineModel l,decimal v){UiPurchaseReceiptFormValidator.SetReceivedQuantity(l,v);await Changed();}
     private async Task AcceptedChanged(UiPurchaseReceiptLineModel l,decimal v){l.AcceptedQuantity=v;await Changed();}
     private async Task RejectedChanged(UiPurchaseReceiptLineModel l,decimal v){l.RejectedQuantity=v;await Changed();}
     private async Task CostChanged(UiPurchaseReceiptLineModel l,decimal v){l.ActualUnitCost=v;await Changed();}

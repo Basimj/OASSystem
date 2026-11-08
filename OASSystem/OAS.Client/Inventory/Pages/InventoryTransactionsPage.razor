@@ -8,6 +8,7 @@
 @using OAS.Client.Services.Browser
 @using OAS.Contracts.Enums.Inventory
 @using OAS.Contracts.Inventory.Products
+@using OAS.UiLib.Core.Formatting
 @using OAS.Contracts.Inventory.Transactions
 @using OAS.Contracts.Inventory.Warehouses
 @using System.Globalization
@@ -16,13 +17,13 @@
 <PageTitle>@(IsFormRoute ? "نموذج المخزون" : "قائمة المخزون") - عمليات المخزون | OAS</PageTitle>
 <span class="oas-inventory-view" hidden aria-hidden="true"></span>
 
-<UiWorkspaceLayout ShowAside="false" ShowFilters="@(!IsFormRoute && true)">
+<UiWorkspaceLayout ShowAside="false" ShowFilters="@(!IsFormRoute && true)" ScrollableMain="@IsFormRoute">
     <Actions>
         <UiWorkspaceActionBar>
             @if (IsFormRoute)
             {
                 <UiButton Text="العودة إلى القائمة" IconCssClass="fa-solid fa-arrow-right" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="BackToListAsync" />
-                <UiButton Text="حفظ" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small"
+                <UiButton Text="حفظ المسودة" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small"
                       Disabled="@(_mode != ViewMode.Create)" Loading="@_saving" OnClick="SaveAsync" />
                 <UiButton Text="ترحيل" IconCssClass="fa-solid fa-check-double" Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
                       Disabled="@(!CanPost)" Loading="@_posting" OnClick="PostAsync" />
@@ -70,15 +71,8 @@
         @if (IsFormRoute)
         {
             <div class="oas-inventory-form-screen">
-                <div class="oas-inventory-form-screen__intro">
-                    <div>
-                        <div class="oas-inventory-form-screen__eyebrow">إدارة المخزون</div>
-                        <h2>@AsideTitle</h2>
-                        <p>راجع البيانات ثم احفظ التغييرات. الحقول الإضافية تظهر عند الحاجة.</p>
-                    </div>
-                </div>
                 <div class="oas-inventory-form-screen__body">
-        <UiCard Title="@AsideTitle" Subtitle="@AsideSubtitle">
+        <UiCard>
             @if (_mode == ViewMode.Empty)
             {
                 <UiAlert Message="اختر عملية من القائمة أو أنشئ عملية جديدة." />
@@ -86,7 +80,6 @@
             else if (_mode == ViewMode.Create)
             {
                 <div class="inventory-transactions__editor">
-                    <UiAlert Tone="AlertTone.Info" Message="الإدخال الجديد إلى المخزون يتم حصريًا من استلام المشتريات. هذه الشاشة للحركات الصادرة والتحويلات بين المخازن فقط." />
                     @if (!_warehouses.Any(x => x.IsActive))
                     {
                         <UiAlert Tone="AlertTone.Danger" Message="لا يوجد مخزن نشط يمكن استخدامه في عملية مخزون جديدة." />
@@ -96,106 +89,152 @@
                         <UiAlert Tone="AlertTone.Danger" Message="لا توجد أصناف نشطة. أضف صنفًا من صفحة المنتجات أولًا." />
                     }
 
-                    <UiSearchableSelect Label="نوع العملية"
-                              Value="@_transactionType"
-                              ValueExpression="@(() => _transactionType)"
-                              ValueChanged="OnTransactionTypeChanged"
-                              Options="@InventoryArabicPresenter.TransactionTypeOptions"
-                              ErrorText="@_transactionTypeError"
-                              Required="true"
-                              Size="ControlSize.Small" />
+                    <div class="inventory-transactions__layout">
+                        <aside class="inventory-transactions__sidebar" aria-labelledby="inventory-transaction-info">
+                            <h3 id="inventory-transaction-info" class="inventory-transactions__section-title">بيانات العملية</h3>
+                        <div class="inventory-transactions__fields">
+                            <div class="inventory-transactions__field">
+                                <UiSearchableSelect Label="نوع العملية"
+                                          Value="@_transactionType"
+                                          ValueExpression="@(() => _transactionType)"
+                                          ValueChanged="OnTransactionTypeChanged"
+                                          Options="@InventoryArabicPresenter.TransactionTypeOptions"
+                                          ErrorText="@_transactionTypeError"
+                                          Required="true"
+                                          Size="ControlSize.Small" />
+                            </div>
+                            <div class="inventory-transactions__field">
+                                <UiInputDate Label="تاريخ العملية"
+                                             Value="@_transactionDate"
+                                             ValueExpression="@(() => _transactionDate)"
+                                             ValueChanged="OnTransactionDateChanged"
+                                             ErrorText="@_transactionDateError"
+                                             Required="true"
+                                             Size="ControlSize.Small" />
+                            </div>
 
-                    <UiInputDate Label="تاريخ العملية"
-                                 Value="@_transactionDate"
-                                 ValueExpression="@(() => _transactionDate)"
-                                 ValueChanged="OnTransactionDateChanged"
-                                 ErrorText="@_transactionDateError"
-                                 Required="true"
-                                 Size="ControlSize.Small" />
+                            @if (RequiresSourceWarehouse)
+                            {
+                                <div class="inventory-transactions__field">
+                                    <UiSearchableSelect Label="من مخزن"
+                                              Value="@_sourceWarehouseId"
+                                              ValueExpression="@(() => _sourceWarehouseId)"
+                                              ValueChanged="OnSourceWarehouseChanged"
+                                              Options="@WarehouseOptions"
+                                              ErrorText="@_sourceWarehouseError"
+                                              Required="true"
+                                              Size="ControlSize.Small" />
+                                </div>
+                            }
 
-                    @if (RequiresSourceWarehouse)
-                    {
-                        <UiSearchableSelect Label="من مخزن"
-                                  Value="@_sourceWarehouseId"
-                                  ValueExpression="@(() => _sourceWarehouseId)"
-                                  ValueChanged="OnSourceWarehouseChanged"
-                                  Options="@WarehouseOptions"
-                                  ErrorText="@_sourceWarehouseError"
-                                  Required="true"
-                                  Size="ControlSize.Small" />
-                    }
+                            @if (RequiresDestinationWarehouse)
+                            {
+                                <div class="inventory-transactions__field">
+                                    <UiSearchableSelect Label="إلى مخزن"
+                                              Value="@_destinationWarehouseId"
+                                              ValueExpression="@(() => _destinationWarehouseId)"
+                                              ValueChanged="OnDestinationWarehouseChanged"
+                                              Options="@WarehouseOptions"
+                                              ErrorText="@_destinationWarehouseError"
+                                              Required="true"
+                                              Size="ControlSize.Small" />
+                                </div>
+                            }
 
-                    @if (RequiresDestinationWarehouse)
-                    {
-                        <UiSearchableSelect Label="إلى مخزن"
-                                  Value="@_destinationWarehouseId"
-                                  ValueExpression="@(() => _destinationWarehouseId)"
-                                  ValueChanged="OnDestinationWarehouseChanged"
-                                  Options="@WarehouseOptions"
-                                  ErrorText="@_destinationWarehouseError"
-                                  Required="true"
-                                  Size="ControlSize.Small" />
-                    }
-
-                    @if (IsAdjustment)
-                    {
-                        <InventorySuggestedInput Label="سبب تعديل الرصيد" Value="@_reason" ValueChanged="OnReasonChanged"
-                                                 Suggestions="@AdjustmentReasons" ErrorText="@_reasonError"
-                                                 Required="true" MaxLength="500" />
-                    }
-                    else
-                    {
-                        <InventorySuggestedInput Label="سبب العملية (اختياري)" Value="@_reason" ValueChanged="OnReasonChanged"
-                                                 Suggestions="@CommonReasons" ErrorText="@_reasonError" MaxLength="500" />
-                    }
-
-                    <details class="inventory-transactions__optional">
-                        <summary>ملاحظات إضافية (اختياري)</summary>
-                        <UiInputText Label="ملاحظات" Value="@_notes" ValueExpression="@(() => _notes)"
-                                     ValueChanged="OnNotesChanged" ErrorText="@_notesError"
-                                     MaxLength="1000" Size="ControlSize.Small" />
-                    </details>
-
-                    <div class="inventory-transactions__lines-title">
-                        <strong>الأصناف والكميات</strong>
-                        <UiButton Text="إضافة صنف" IconCssClass="fa-solid fa-plus" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="@(_ => AddLine())" />
-                    </div>
-
-                    @for (var i = 0; i < _draftLines.Count; i++)
-                    {
-                        var line = _draftLines[i];
-                        <div class="inventory-transactions__line-editor">
-                            <UiSearchableSelect Label="اختر الصنف"
-                                      Value="@line.ProductVariantId"
-                                      ValueExpression="@(() => line.ProductVariantId)"
-                                      ValueChanged="@(v => OnLineVariantChanged(line, v))"
-                                      Options="@VariantOptions"
-                                      ErrorText="@line.ProductVariantError"
-                                      Required="true"
-                                      Size="ControlSize.Small" />
-                            <UiInputText Label="الكمية"
-                                         Value="@line.Quantity"
-                                         ValueExpression="@(() => line.Quantity)"
-                                         ValueChanged="@(v => OnLineQuantityChanged(line, v))"
-                                         ErrorText="@line.QuantityError"
-                                         Type="number"
-                                         InputMode="decimal"
-                                         step="0.001" min="0.001"
-                                         Required="true"
-                                         Size="ControlSize.Small" />
-                            <UiInputText Label="تكلفة الوحدة (يمكن تعديلها)"
-                                         Value="@line.UnitCost"
-                                         ValueExpression="@(() => line.UnitCost)"
-                                         ValueChanged="@(v => OnLineUnitCostChanged(line, v))"
-                                         ErrorText="@line.UnitCostError"
-                                         Type="number"
-                                         InputMode="decimal"
-                                         step="0.01" min="0"
-                                         Required="true"
-                                         Size="ControlSize.Small" />
-                            <UiButton Text="حذف" IconCssClass="fa-solid fa-trash" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Disabled="@(_draftLines.Count == 1)" OnClick="@(_ => RemoveLine(line))" />
+                            <div class="inventory-transactions__field inventory-transactions__field--reason">
+                                @if (IsAdjustment)
+                                {
+                                    <InventorySuggestedInput Label="سبب تعديل الرصيد" Value="@_reason" ValueChanged="OnReasonChanged"
+                                                             Suggestions="@AdjustmentReasons" ErrorText="@_reasonError"
+                                                             Required="true" MaxLength="500" />
+                                }
+                                else
+                                {
+                                    <InventorySuggestedInput Label="سبب العملية (اختياري)" Value="@_reason" ValueChanged="OnReasonChanged"
+                                                             Suggestions="@CommonReasons" ErrorText="@_reasonError" MaxLength="500" />
+                                }
+                            </div>
                         </div>
-                    }
+                            <details class="inventory-transactions__optional">
+                                <summary>ملاحظات (اختياري)</summary>
+                                <div class="inventory-transactions__optional-content">
+                                    <UiInputText Label="ملاحظات" Value="@_notes" ValueExpression="@(() => _notes)"
+                                                 ValueChanged="OnNotesChanged" ErrorText="@_notesError"
+                                                 MaxLength="1000" Size="ControlSize.Small" />
+                                </div>
+                            </details>
+                        </aside>
+
+                        <section class="inventory-transactions__items" aria-labelledby="inventory-transaction-lines">
+                            <div class="inventory-transactions__lines-title">
+                                <div class="inventory-transactions__heading">
+                                    <h3 id="inventory-transaction-lines" class="inventory-transactions__section-title">بنود العملية</h3>
+                                    <span class="inventory-transactions__line-count">@_draftLines.Count بند</span>
+                                </div>
+                                <UiButton Text="إضافة صنف" IconCssClass="fa-solid fa-plus"
+                                          Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="@(_ => AddLine())" />
+                            </div>
+                            <div class="inventory-transactions__table-head" aria-hidden="true">
+                                <span>#</span><span>الصنف</span><span>الكمية</span><span>تكلفة الوحدة</span><span></span>
+                            </div>
+                        <div class="inventory-transactions__lines">
+                            @for (var i = 0; i < _draftLines.Count; i++)
+                            {
+                                var line = _draftLines[i];
+                                <div @key="line" class="inventory-transactions__line-editor">
+                                    <span class="inventory-transactions__line-number" aria-label="البند رقم @(i + 1)">@(i + 1)</span>
+                                    <div class="inventory-transactions__line-product">
+                                        <UiSearchableSelect Label="الصنف"
+                                                  Value="@line.ProductVariantId"
+                                                  ValueExpression="@(() => line.ProductVariantId)"
+                                                  ValueChanged="@(v => OnLineVariantChanged(line, v))"
+                                                  Options="@VariantOptions"
+                                                  ErrorText="@line.ProductVariantError"
+                                                  Required="true"
+                                                  Size="ControlSize.Small" />
+                                    </div>
+                                    <div class="inventory-transactions__line-quantity">
+                                        <UiInputText Label="الكمية"
+                                                     Value="@line.Quantity"
+                                                     ValueExpression="@(() => line.Quantity)"
+                                                     ValueChanged="@(v => OnLineQuantityChanged(line, v))"
+                                                     ErrorText="@line.QuantityError"
+                                                     Type="number"
+                                                     InputMode="@(UsesWholeQuantity(line) ? "numeric" : "decimal")"
+                                                     step="@(UsesWholeQuantity(line) ? "1" : "0.001")" min="@(UsesWholeQuantity(line) ? "1" : "0.001")"
+                                                     Required="true"
+                                                     Size="ControlSize.Small" />
+                                    </div>
+                                    <div class="inventory-transactions__line-cost">
+                                        <UiInputText Label="تكلفة الوحدة"
+                                                     Value="@line.UnitCost"
+                                                     ValueExpression="@(() => line.UnitCost)"
+                                                     ValueChanged="@(v => OnLineUnitCostChanged(line, v))"
+                                                     ErrorText="@line.UnitCostError"
+                                                     Type="number"
+                                                     InputMode="decimal"
+                                                     step="0.01" min="0"
+                                                     Required="true"
+                                                     Size="ControlSize.Small" />
+                                    </div>
+                                    <div class="inventory-transactions__line-remove">
+                                        <UiButton Text="حذف" IconCssClass="fa-solid fa-trash"
+                                                  Variant="ButtonVariant.Ghost" Size="ControlSize.Small"
+                                                  Disabled="@(_draftLines.Count == 1)" OnClick="@(_ => RemoveLine(line))" />
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                            <div class="inventory-transactions__items-bottom">
+                                <span>تُحفظ العملية كمسودة، ثم يمكن ترحيلها بعد المراجعة.</span>
+                            </div>
+                        </section>
+                    </div>
+                    <div class="inventory-transactions__context">
+                        <span>لإدخال بضاعة جديدة إلى المخزون، استخدم استلام المشتريات.</span>
+                        <UiButton Text="استلام المشتريات" IconCssClass="fa-solid fa-truck-ramp-box"
+                                  Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="OpenPurchaseReceiptsAsync" />
+                    </div>
                 </div>
             }
             else if (_selectedTransaction is not null)
@@ -206,9 +245,12 @@
                 {
                     <UiAlert Tone="AlertTone.Warning" Message="هذه مسودة وارد يدوي قديمة ولا يمكن ترحيلها. أنشئ سند استلام مشتريات بدلاً منها." />
                 }
+                <div class="inventory-transactions__record-number">
+                    <span>رقم العملية:</span> <strong>@_selectedTransaction.TransactionNumber</strong>
+                </div>
                 <div class="inventory-transactions__details">
                     <div><span>النوع</span><strong>@InventoryArabicPresenter.TransactionTypeText(_selectedTransaction.TransactionType)</strong></div>
-                    <div><span>التاريخ</span><strong>@_selectedTransaction.TransactionDate.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</strong></div>
+                    <div><span>التاريخ</span><strong>@InventoryDisplayFormat.DateTime(_selectedTransaction.TransactionDate.ToLocalTime())</strong></div>
                     <div><span>من مخزن</span><strong>@WarehouseName(_selectedTransaction.SourceWarehouseId)</strong></div>
                     <div><span>إلى مخزن</span><strong>@WarehouseName(_selectedTransaction.DestinationWarehouseId)</strong></div>
                     <div><span>الحالة</span><strong>@InventoryArabicPresenter.TransactionStatusText(_selectedTransaction.Status)</strong></div>
@@ -228,9 +270,9 @@
                         {
                             <div class="inventory-transactions__view-line">
                                 <div><strong>@VariantLabel(line.ProductVariantId)</strong><span>@VariantSku(line.ProductVariantId)</span></div>
-                                <span>الكمية: @line.Quantity.ToString("N3")</span>
-                                <span>التكلفة: @line.UnitCost.ToString("N2")</span>
-                                <strong>@line.TotalCost.ToString("N2")</strong>
+                                <span>الكمية: @InventoryDisplayFormat.Number(line.Quantity)</span>
+                                <span>التكلفة: @InventoryDisplayFormat.Number(line.UnitCost)</span>
+                                <strong>@InventoryDisplayFormat.Number(line.TotalCost)</strong>
                             </div>
                         }
                     }
@@ -258,7 +300,7 @@
                         <RowTemplate Context="transaction">
                             <td>@transaction.TransactionNumber</td>
                             <td>@InventoryArabicPresenter.TransactionTypeText(transaction.TransactionType)</td>
-                            <td>@transaction.TransactionDate.ToLocalTime().ToString("yyyy-MM-dd")</td>
+                            <td>@InventoryDisplayFormat.Date(transaction.TransactionDate.ToLocalTime())</td>
                             <td>@WarehouseName(transaction.SourceWarehouseId)</td>
                             <td>@WarehouseName(transaction.DestinationWarehouseId)</td>
                             <td>
@@ -358,6 +400,7 @@
     private IReadOnlyList<WarehouseDto> _warehouses = [];
     private IReadOnlyList<ProductDto> _products = [];
     private IReadOnlyList<ProductVariantDto> _variants = [];
+    private IReadOnlyList<UnitDto> _units = [];
     private IReadOnlyList<InventoryTransactionLineDto> _selectedLines = [];
     private InventoryTransactionDto? _selectedTransaction;
     private Guid? _selectedId;
@@ -427,8 +470,6 @@
     private bool CanPost => _mode == ViewMode.View && _selectedTransaction is { Status: InventoryTransactionStatus.Draft } transaction &&
         transaction.TransactionType is not (InventoryTransactionType.Opening or InventoryTransactionType.Receipt or
             InventoryTransactionType.AdjustmentIncrease or InventoryTransactionType.SalesReturn) && !_posting;
-    private string AsideTitle => _mode == ViewMode.Create ? "عملية مخزون جديدة" : "تفاصيل العملية";
-    private string? AsideSubtitle => _selectedTransaction?.TransactionNumber ?? (_mode == ViewMode.Create ? "سيتم توليد الرقم تلقائيًا" : null);
 
     private IReadOnlyList<InventoryTransactionDto> FilteredTransactions => _transactions.Where(x =>
     {
@@ -461,6 +502,9 @@
             _warehouses = warehousesTask.Result;
             _products = productsTask.Result;
             _variants = variantsTask.Result;
+            // Units are optional lookup metadata; failure must not block inventory operations.
+            try { _units = await LoadAllPagesAsync(page => Inventory.GetUnitsAsync(page)); }
+            catch (ApiClientException) { _units = []; }
 
             if (_selectedId.HasValue && _transactions.FirstOrDefault(x => x.Id == _selectedId.Value) is { } selected)
                 _selectedTransaction = selected;
@@ -513,8 +557,8 @@
         _selectedLines = [];
         _transactionType = ((int)InventoryTransactionType.Issue).ToString();
         _transactionDate = DateOnly.FromDateTime(DateTime.Today);
-        _sourceWarehouseId = null;
-        _destinationWarehouseId = DefaultWarehouseId;
+        _sourceWarehouseId = DefaultWarehouseId;
+        _destinationWarehouseId = null;
         _reason = null;
         _notes = null;
         ClearValidationErrors();
@@ -615,6 +659,14 @@
                 && (string.IsNullOrWhiteSpace(line.UnitCost) || line.UnitCost == "0"))
                 line.UnitCost = selected.PurchasePrice.ToString("0.##", CultureInfo.InvariantCulture);
         }
+    }
+
+    private bool UsesWholeQuantity(TransactionLineForm line)
+    {
+        if (!Guid.TryParse(line.ProductVariantId, out var variantId)) return false;
+        var unitId = _variants.FirstOrDefault(x => x.Id == variantId)?.UnitId;
+        var unit = _units.FirstOrDefault(x => x.Id == unitId);
+        return QuantityInputRules.UsesWholeNumbers(unit?.Code, unit?.Name);
     }
 
     private void OnLineQuantityChanged(TransactionLineForm line, string? value)
@@ -788,6 +840,11 @@
             else if (quantity <= 0)
             {
                 line.QuantityError = "يجب أن تكون الكمية أكبر من صفر.";
+                isValid = false;
+            }
+            else if (UsesWholeQuantity(line) && !QuantityInputRules.IsWhole(quantity))
+            {
+                line.QuantityError = QuantityInputRules.WholeNumberMessage;
                 isValid = false;
             }
             else if (!FitsPrecision(quantity, 18, 3))

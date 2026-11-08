@@ -27,7 +27,7 @@ public sealed class LensVariantResolver(
         CancellationToken cancellationToken = default)
     {
         if (request.SeedProductVariantId == Guid.Empty)
-            throw new ConflictException("sales_lens_variant_seed_required", "يجب تحديد عدسة/متغير منتج مرجعي لتحديد القياس الصحيح.");
+            throw new ConflictException("sales_lens_variant_seed_required", "يجب تحديد صنف عدسة مرجعي لتحديد القياس الصحيح.");
 
         var seed = await variants.GetByIdAsync(request.SeedProductVariantId, cancellationToken)
             ?? throw new NotFoundException(nameof(ProductVariant), request.SeedProductVariantId);

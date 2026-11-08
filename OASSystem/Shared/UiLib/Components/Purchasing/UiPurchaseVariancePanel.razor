@@ -6,7 +6,7 @@
         <div class="ui-purchase-variance-list">
             @foreach(var variance in Model.Variances)
             {
-                <div class="ui-purchase-variance-row"><strong>@variance.Type</strong><span>المتوقع: @variance.ExpectedValue.ToString("N3")</span><span>الفعلي: @variance.ActualValue.ToString("N3")</span><span>الفرق: @variance.Variance.ToString("N3")</span><span>الحد: @variance.Tolerance.ToString("N3")</span><b>@variance.Status</b>@if(!string.IsNullOrWhiteSpace(variance.Message)){<small>@variance.Message</small>}</div>
+                <div class="ui-purchase-variance-row"><strong>@variance.Type</strong><span>المتوقع: @variance.ExpectedValue.ToString("#,##0.###")</span><span>الفعلي: @variance.ActualValue.ToString("#,##0.###")</span><span>الفرق: @variance.Variance.ToString("#,##0.###")</span><span>الحد: @variance.Tolerance.ToString("#,##0.###")</span><b>@variance.Status</b>@if(!string.IsNullOrWhiteSpace(variance.Message)){<small>@variance.Message</small>}</div>
             }
         </div>
     </UiPurchasingSection>

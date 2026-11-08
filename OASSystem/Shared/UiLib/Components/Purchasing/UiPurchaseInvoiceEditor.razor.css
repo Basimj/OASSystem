@@ -1,0 +1,10 @@
+/* Compact supplier invoice entry. All colors follow the active application theme. */
+.ui-invoice-help { margin:0 0 .65rem; font-size:.83rem; line-height:1.6; opacity:.85; }
+.ui-invoice-origin { margin-top:.65rem; padding:.55rem .8rem; display:flex; gap:.5rem; align-items:center; border:1px solid var(--oas-ui-border,#9ca3af); border-radius:.65rem; font-size:.83rem; }
+.ui-invoice-advanced { margin-top:.7rem; }
+.ui-invoice-advanced summary, .ui-invoice-line-advanced summary { cursor:pointer; padding:.45rem 0; font-size:.82rem; }
+.ui-invoice-simple-line { min-width:0; padding:.7rem; }
+.ui-invoice-simple-line .ui-purchasing-invoice-line__head { gap:.6rem; flex-wrap:wrap; }
+.ui-invoice-next { margin:.6rem 0 0; font-size:.83rem; line-height:1.5; }
+.ui-invoice-simple-line :is(input,select) { min-width:0; max-width:100%; }
+@media (max-width:850px) { .ui-invoice-simple-line { padding:.55rem; } }

@@ -1,3 +1,4 @@
+using static OAS.UiLib.Core.Formatting.PurchasingDisplayFormat;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using OAS.Client.Accounting.Services;
@@ -20,6 +21,7 @@ using OAS.UiLib.Core.Enums;
 using OAS.UiLib.Core.Models;
 using OAS.UiLib.Core.Models.Purchasing;
 using OAS.UiLib.Components.Purchasing;
+using OAS.UiLib.Core.Formatting;
 using OAS.UiLib.Services.Dialogs;
 using OAS.UiLib.Services.Feedback;
 
@@ -93,6 +95,7 @@ public partial class PurchasingWorkspaceHost
     private readonly HashSet<Guid> _loadingInvoicePaymentSummaries=[];
 
     private UiPurchaseOrderEditor? _purchaseOrderEditor;
+    private UiPurchaseReceiptEditor? _purchaseReceiptEditor;
     private PurchasingTabState? ActiveTab=>Workspace.Find(Workspace.ActiveTabId);
     private PurchaseInvoicePaymentSummaryDto? ActiveInvoicePaymentSummary
         => ActiveTab?.Model is UiPurchaseInvoiceEditorModel { Id: Guid id } && _invoicePaymentSummaries.TryGetValue(id,out var summary) ? summary : null;
@@ -108,6 +111,9 @@ public partial class PurchasingWorkspaceHost
     private bool PayInvoiceDisabled=>IsActiveInvoicePaymentSummaryLoading || ActiveInvoicePaymentSummary is { OutstandingAmount: <= 0m };
     private bool IsListTab=>ActiveTab is null || ActiveTab.IsListTab;
     private bool IsEditable=>ActiveTab is { } t && !t.IsListTab && (t.IsNew||t.IsEditMode) && IsDomainEditable(t.Model);
+    private string SaveButtonText => ActiveTab?.Model is UiPurchaseInvoiceEditorModel { Id: null, SourceReceiptId: not null }
+        ? "حفظ ومطابقة تلقائية"
+        : "حفظ";
     private bool CanBeginEdit=>ActiveTab is {IsListTab:false,IsNew:false,IsEditMode:false} t && IsDomainEditable(t.Model);
     private bool CanSave=>ActiveTab is {IsListTab:false} t && (t.IsNew||t.IsEditMode) && IsDomainEditable(t.Model);
     private bool CanCancelEdit=>ActiveTab is {IsListTab:false} t && (t.IsNew||t.IsEditMode);
@@ -179,15 +185,15 @@ public partial class PurchasingWorkspaceHost
                 case PurchasingEntityType.SupplierCatalog:
                     var c=await Purchasing.GetSupplierCatalogAsync(request);SetPage(c.PageNumber,c.TotalPages,c.TotalCount,c.Items.Select(x=>new UiPurchasingListItem(x.Id,x.SupplierProductCode??x.ProductCode??"—",x.ProductName??x.SupplierProductName??"صنف",x.SupplierName,x.IsActive?"فعال":"غير فعال",x.PurchaseUnitName,"fa-solid fa-box-open")).ToArray());break;
                 case PurchasingEntityType.PurchaseRequests:
-                    var r=await Purchasing.GetPurchaseRequestsAsync(request);SetPage(r.PageNumber,r.TotalPages,r.TotalCount,r.Items.Select(x=>new UiPurchasingListItem(x.Id,x.RequestCode,x.Reason??x.WarehouseName??"طلب شراء",x.WarehouseName,PurchasingArabicPresenter.RequestStatus(x.Status),x.RequestDate.ToString("yyyy-MM-dd"),"fa-solid fa-clipboard-list")).ToArray());break;
+                    var r=await Purchasing.GetPurchaseRequestsAsync(request);SetPage(r.PageNumber,r.TotalPages,r.TotalCount,r.Items.Select(x=>new UiPurchasingListItem(x.Id,x.RequestCode,x.Reason??x.WarehouseName??"طلب شراء",x.WarehouseName,PurchasingArabicPresenter.RequestStatus(x.Status),DisplayDate(x.RequestDate),"fa-solid fa-clipboard-list")).ToArray());break;
                 case PurchasingEntityType.PurchaseOrders:
                     var o=await Purchasing.GetPurchaseOrdersAsync(request,group:SelectedOrderGroup(_orderGroup));
                     CurrentOrderCards=o.Items.Select(ToOrderCard).ToArray();
                     SetPage(o.PageNumber,o.TotalPages,o.TotalCount,[]);break;
                 case PurchasingEntityType.PurchaseReceipts:
-                    var gr=await Purchasing.GetPurchaseReceiptsAsync(request, purchaseOrderId: RelatedPurchaseOrderId);SetPage(gr.PageNumber,gr.TotalPages,gr.TotalCount,gr.Items.Select(x=>new UiPurchasingListItem(x.Id,x.ReceiptCode,x.SupplierName??"استلام",x.PurchaseOrderCode,PurchasingArabicPresenter.ReceiptStatus(x.Status),x.ReceiptDate.ToString("yyyy-MM-dd"),"fa-solid fa-truck-ramp-box")).ToArray());break;
+                    var gr=await Purchasing.GetPurchaseReceiptsAsync(request, purchaseOrderId: RelatedPurchaseOrderId);SetPage(gr.PageNumber,gr.TotalPages,gr.TotalCount,gr.Items.Select(x=>new UiPurchasingListItem(x.Id,x.ReceiptCode,x.SupplierName??"استلام",x.PurchaseOrderCode,PurchasingArabicPresenter.ReceiptStatus(x.Status),DisplayDate(x.ReceiptDate),"fa-solid fa-truck-ramp-box")).ToArray());break;
                 case PurchasingEntityType.PurchaseInvoices:
-                    var pi=await Purchasing.GetPurchaseInvoicesAsync(request);SetPage(pi.PageNumber,pi.TotalPages,pi.TotalCount,pi.Items.Select(x=>new UiPurchasingListItem(x.Id,x.PurchaseInvoiceCode,x.SupplierName??"فاتورة مورد",x.SupplierInvoiceCode,PurchasingArabicPresenter.InvoiceStatus(x.Status),$"{x.TotalAmount:N2} {x.CurrencyCode}","fa-solid fa-file-invoice-dollar")).ToArray());break;
+                    var pi=await Purchasing.GetPurchaseInvoicesAsync(request);SetPage(pi.PageNumber,pi.TotalPages,pi.TotalCount,pi.Items.Select(x=>new UiPurchasingListItem(x.Id,x.PurchaseInvoiceCode,x.SupplierName??"فاتورة مورد",x.SupplierInvoiceCode,PurchasingArabicPresenter.InvoiceStatus(x.Status),$"{x.TotalAmount:#,##0.##} {x.CurrencyCode}","fa-solid fa-file-invoice-dollar")).ToArray());break;
             }
         }
         catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}catch{ApiFeedback.ShowUnexpected();}
@@ -211,7 +217,7 @@ public partial class PurchasingWorkspaceHost
     }
     private static UiPurchaseRequestEditorModel NewRequest(){var m=new UiPurchaseRequestEditorModel();m.Lines.Add(new(){LineSequence=1});return m;}
     private static UiPurchaseOrderEditorModel NewOrder(){var m=new UiPurchaseOrderEditorModel();m.Lines.Add(new(){LineSequence=1});return m;}
-    private static UiPurchaseInvoiceEditorModel NewInvoice(){var m=new UiPurchaseInvoiceEditorModel();m.Lines.Add(new(){LineSequence=1});return m;}
+    private static UiPurchaseInvoiceEditorModel NewInvoice()=>new();
 
     private async Task OpenRecordAsync(Guid id)
     {
@@ -233,7 +239,11 @@ public partial class PurchasingWorkspaceHost
             };
             if(tab.Model is null)throw new InvalidOperationException();
             tab.Title=ModelTitle(tab.Model);tab.IsDirty=false;tab.IsEditMode=false;
-            if(tab.Model is UiPurchaseInvoiceEditorModel invoice)await LoadInvoicePaymentSummaryAsync(invoice,force);
+            if(tab.Model is UiPurchaseInvoiceEditorModel invoice)
+            {
+                await LoadInvoicePaymentSummaryAsync(invoice,force);
+                await LoadInvoiceMatchingReadinessAsync(invoice);
+            }
             if(tab.Model is UiPurchaseOrderEditorModel order && order.Id is Guid orderId)
                 await LoadOrderProgressAsync(orderId);
             if(tab.Model is UiPurchaseReceiptEditorModel receipt && receipt.PurchaseOrderId is Guid purchaseOrderId)
@@ -241,6 +251,52 @@ public partial class PurchasingWorkspaceHost
         }
         catch(ApiClientException ex){ApiFeedback.Show(ex.Error);Workspace.Close(tab.TabId);}catch{ApiFeedback.ShowUnexpected();Workspace.Close(tab.TabId);}
         finally{tab.IsLoading=false;}
+    }
+
+    private async Task LoadInvoiceMatchingReadinessAsync(UiPurchaseInvoiceEditorModel invoice)
+    {
+        invoice.MatchingNotice = null;
+        if (invoice.Id is not Guid id ||
+            (invoice.Status != (byte)PurchaseInvoiceStatus.Draft &&
+             invoice.Status != (byte)PurchaseInvoiceStatus.Confirmed &&
+             invoice.Status != (byte)PurchaseInvoiceStatus.PendingMatchApproval))
+            return;
+        try
+        {
+            var readiness = await Purchasing.GetPurchaseInvoiceMatchingReadinessAsync(id);
+            if (readiness is { IsComplete: false }) invoice.MatchingNotice = readiness.Message;
+            // Rehydrate saved matching allocations when reopening any editable invoice.
+            // Otherwise the "Approve variances" action disappears after a refresh.
+            if (readiness is { AllocationCount: > 0 } && invoice.Match is null)
+            {
+                var match = new UiPurchaseMatchModel
+                {
+                    OverallStatus = readiness.IsComplete ? "المطابقة مكتملة" : "تحتاج مراجعة",
+                    RequiresApproval = readiness.Allocations.Any(x =>
+                        x.MatchStatus == PurchaseMatchStatus.RequiresApproval)
+                };
+                match.Allocations.AddRange(readiness.Allocations.Select(x =>
+                    new UiPurchaseMatchAllocationModel
+                    {
+                        Id = x.Id,
+                        PurchaseInvoiceLineId = x.PurchaseInvoiceLineId,
+                        PurchaseReceiptLineId = x.PurchaseReceiptLineId,
+                        MatchedQuantity = x.MatchedQuantity,
+                        MatchedNetAmount = x.MatchedNetAmount,
+                        QuantityVariance = x.QuantityVariance,
+                        PriceVarianceAmount = x.PriceVarianceAmount,
+                        TaxVarianceAmount = x.TaxVarianceAmount,
+                        Status = PurchasingArabicPresenter.MatchStatus(x.MatchStatus),
+                        RowVersion = x.RowVersion
+                    }));
+                invoice.Match = match;
+            }
+        }
+        catch (ApiClientException)
+        {
+            // Do not block viewing the invoice when the optional readiness check fails.
+            // The explicit posting action always repeats this check and reports its error.
+        }
     }
 
     private async Task LoadOrderProgressAsync(Guid orderId)
@@ -269,7 +325,11 @@ public partial class PurchasingWorkspaceHost
     }
     private async Task RefreshActiveAsync(MouseEventArgs _){if(ActiveTab is not {IsNew:false} tab)return;if(tab.IsDirty&&!await ConfirmDiscardAsync(tab))return;tab.Model=null;await EnsureLoadedAsync(tab,true);await InvokeAsync(StateHasChanged);}
     private async Task CloseActiveAsync(MouseEventArgs _){if(ActiveTab is { } tab)await CloseTabAsync(tab.TabId);}
-    private async Task SelectTabAsync(Guid id){Workspace.ActiveTabId=id;if(Workspace.Find(id) is { } t){await EnsureLoadedAsync(t);if(t.Model is UiPurchaseInvoiceEditorModel invoice)await LoadInvoicePaymentSummaryAsync(invoice);}if(IsListTab)await LoadListAsync();}
+    private async Task SelectTabAsync(Guid id){Workspace.ActiveTabId=id;if(Workspace.Find(id) is { } t){await EnsureLoadedAsync(t);if(t.Model is UiPurchaseInvoiceEditorModel invoice)
+        {
+            await LoadInvoicePaymentSummaryAsync(invoice);
+            await LoadInvoiceMatchingReadinessAsync(invoice);
+        }}if(IsListTab)await LoadListAsync();}
     private async Task CloseTabAsync(Guid id){var tab=Workspace.Find(id);if(tab is null||!tab.CanClose)return;if(!await ConfirmDiscardAsync(tab))return;Workspace.Close(id);await InvokeAsync(StateHasChanged);}
     private async Task CloseOtherTabsAsync(Guid id){var keep=Workspace.Find(id);foreach(var tab in Workspace.VisibleTabs(Section).Where(x=>x.CanClose&&x.TabId!=id).ToArray()){if(!await ConfirmDiscardAsync(tab))return;}foreach(var tab in Workspace.VisibleTabs(Section).Where(x=>x.CanClose&&x.TabId!=id).ToArray())Workspace.Close(tab.TabId);Workspace.ActiveTabId=keep?.TabId??Workspace.OpenList(Section).TabId;}
     private async Task CloseAllTabsAsync(){var tabs=Workspace.VisibleTabs(Section).Where(x=>x.CanClose).ToArray();foreach(var t in tabs)if(!await ConfirmDiscardAsync(t))return;foreach(var t in tabs)Workspace.Close(t.TabId);Workspace.OpenList(Section);}
@@ -283,6 +343,12 @@ public partial class PurchasingWorkspaceHost
             ReferenceEquals(_purchaseOrderEditor.Model, tab.Model) && !_purchaseOrderEditor.ValidateForSave())
         {
             Snackbar.Warning("راجع الحقول المحددة بالأحمر: ستجد شرح الخطأ وطريقة التصحيح تحت كل حقل.");
+            return;
+        }
+        if(tab.Model is UiPurchaseReceiptEditorModel && _purchaseReceiptEditor is not null &&
+            ReferenceEquals(_purchaseReceiptEditor.Model, tab.Model) && !_purchaseReceiptEditor.ValidateForSave())
+        {
+            Snackbar.Warning("راجع الحقول المحددة بالأحمر في سند الاستلام، ثم أعد الحفظ.");
             return;
         }
         tab.IsSaving=true;
@@ -304,10 +370,18 @@ public partial class PurchasingWorkspaceHost
         {
             if (tab.Model is UiPurchaseOrderEditorModel)
                 _purchaseOrderEditor?.ShowSaveError("لم يقبل الخادم حفظ أمر الشراء. راجع الحقول والرسالة التي يعرضها النظام، ثم أعد المحاولة.", ex.Error.Errors);
-            ApiFeedback.Show(ex.Error);
+            if (tab.Model is UiPurchaseReceiptEditorModel &&
+                string.Equals(ex.Error.Code, "validation_failed", StringComparison.OrdinalIgnoreCase))
+            {
+                _purchaseReceiptEditor?.ShowSaveError("رفض الخادم حفظ سند الاستلام. راجع الكميات والحقول المحددة ثم أعد المحاولة.", ex.Error.Errors);
+                Snackbar.Warning("لم يُحفظ سند الاستلام. راجع رسائل الأخطاء أسفل الحقول.");
+            }
+            else ApiFeedback.Show(ex.Error);
         }
         catch
         {
+            if (tab.Model is UiPurchaseReceiptEditorModel)
+                _purchaseReceiptEditor?.ShowSaveError("حدث خطأ غير متوقع أثناء حفظ سند الاستلام. بياناتك ما زالت في النموذج؛ تحقق من الاتصال ثم أعد المحاولة.");
             if (tab.Model is UiPurchaseOrderEditorModel)
                 _purchaseOrderEditor?.ShowSaveError("حدث خطأ غير متوقع عند الحفظ. تأكد من الاتصال ثم أعد المحاولة؛ بقيت بياناتك في النموذج.");
             ApiFeedback.ShowUnexpected();
@@ -318,6 +392,12 @@ public partial class PurchasingWorkspaceHost
     private async Task<object?> SaveCatalogAsync(UiSupplierCatalogEditorModel m)
     {
         if(m.SupplierId is not Guid supplier||m.ProductVariantId is not Guid product||m.PurchaseUnitId is not Guid unit){Snackbar.Warning("حدد المورد والمنتج ووحدة الشراء.");return null;}
+        if(QuantityInputRules.UsesWholeNumbers(null, m.PurchaseUnitName, m.Id.HasValue ? m.MinimumOrderQuantity : 0m) &&
+            !QuantityInputRules.IsWhole(m.MinimumOrderQuantity))
+        {
+            Snackbar.Warning("الحد الأدنى للطلب لهذه الوحدة يجب أن يكون عددًا صحيحًا دون كسور.");
+            return null;
+        }
         if(!m.Id.HasValue)return Map((await Purchasing.CreateSupplierCatalogItemAsync(new(supplier,product,m.SupplierProductCode,m.SupplierProductName,unit,m.UnitConversionFactor,m.LeadTimeDays,m.MinimumOrderQuantity,m.IsPreferred,m.IsActive)))!);
         return Map((await Purchasing.UpdateSupplierCatalogItemAsync(m.Id.Value,new(m.SupplierProductCode,m.SupplierProductName,unit,m.UnitConversionFactor,m.LeadTimeDays,m.MinimumOrderQuantity,m.IsPreferred,m.IsActive,m.RowVersion??string.Empty)))!);
     }
@@ -351,25 +431,110 @@ public partial class PurchasingWorkspaceHost
         if(m.PurchaseOrderId is not Guid po||m.Lines.Count==0){Snackbar.Warning("حدد أمر شراء وأدخل كميات الاستلام.");return null;}
         if(!m.Id.HasValue)
         {
-            var lines=m.Lines.Select(x=>new CreatePurchaseReceiptLineRequest(x.PurchaseOrderLineId,x.LineSequence,x.ReceivedQuantity,x.AcceptedQuantity,x.RejectedQuantity,x.ActualUnitCost,x.ExpiryDate,x.BatchCode,x.Notes)).ToArray();
+            var lines=UiPurchaseReceiptFormValidator.LinesToSubmit(m).Select(x=>new CreatePurchaseReceiptLineRequest(x.PurchaseOrderLineId,x.LineSequence,x.ReceivedQuantity,x.AcceptedQuantity,x.RejectedQuantity,x.ActualUnitCost,x.ExpiryDate,x.BatchCode,x.Notes)).ToArray();
             return Map((await Purchasing.CreatePurchaseReceiptAsync(new(po,m.ReceiptDate,m.PostingDate,m.SupplierDeliveryCode,m.Notes,lines)))!);
         }
-        var updates=m.Lines.Select(x=>new UpdatePurchaseReceiptLineRequest(x.Id,x.PurchaseOrderLineId,x.LineSequence,x.ReceivedQuantity,x.AcceptedQuantity,x.RejectedQuantity,x.ActualUnitCost,x.ExpiryDate,x.BatchCode,x.Notes,x.RowVersion)).ToArray();
+        var updates=UiPurchaseReceiptFormValidator.LinesToSubmit(m).Select(x=>new UpdatePurchaseReceiptLineRequest(x.Id,x.PurchaseOrderLineId,x.LineSequence,x.ReceivedQuantity,x.AcceptedQuantity,x.RejectedQuantity,x.ActualUnitCost,x.ExpiryDate,x.BatchCode,x.Notes,x.RowVersion)).ToArray();
         return Map((await Purchasing.UpdatePurchaseReceiptAsync(m.Id.Value,new(m.ReceiptDate,m.PostingDate,m.SupplierDeliveryCode,m.Notes,updates,m.RowVersion??string.Empty)))!);
     }
+    private static IReadOnlyList<ReceiptAvailableLine> AvailableReceiptLines(PurchaseReceiptDto receipt)
+        => receipt.Lines.Select(x=>new ReceiptAvailableLine(x.Id,x.PurchaseOrderLineId,
+            x.ProductVariantId,x.AcceptedQuantity,x.ReturnedQuantity)).ToArray();
+
     private async Task<object?> SaveInvoiceAsync(UiPurchaseInvoiceEditorModel m)
     {
-        if(m.SupplierId is not Guid supplier||m.CurrencyId is not Guid currency||m.Lines.Count==0||m.Lines.Any(x=>!x.ProductVariantId.HasValue)){Snackbar.Warning("أكمل المورد والعملة ومنتجات الفاتورة.");return null;}
-        if(m.Lines.Any(x=>!x.PurchaseOrderLineId.HasValue)){Snackbar.Warning("يجب إنشاء فاتورة المورد من استلام مرحّل حتى ترتبط جميع البنود بأمر الشراء قبل المطابقة الثلاثية.");return null;}
+        if(m.SupplierId is not Guid supplier||m.CurrencyId is not Guid currency||m.Lines.Count==0||m.Lines.Any(x=>!x.ProductVariantId.HasValue))
+        {
+            Snackbar.Warning("اختر استلامًا مرحّلًا يحتوي أصنافًا صحيحة قبل حفظ الفاتورة.");return null;
+        }
+        if(m.Lines.Any(x=>!x.PurchaseOrderLineId.HasValue))
+        {
+            Snackbar.Warning("يجب أن ترتبط أصناف الفاتورة بأمر شراء. اختر استلامًا مرحّلًا أولًا.");return null;
+        }
         if(m.ExchangeRate<=0m){Snackbar.Warning("سعر الصرف يجب أن يكون أكبر من صفر.");return null;}
-        if(m.Lines.Any(x=>x.Quantity<=0m)){Snackbar.Warning("كمية كل بند في فاتورة المورد يجب أن تكون أكبر من صفر.");return null;}
+        if(m.Lines.Any(x=>x.Quantity<=0m)){Snackbar.Warning("كمية كل بند يجب أن تكون أكبر من صفر.");return null;}
+
+        PurchaseReceiptDto? sourceReceipt=null;
         if(!m.Id.HasValue)
         {
-            var lines=m.Lines.Select(x=>new CreatePurchaseInvoiceLineRequest(x.LineSequence,x.PurchaseOrderLineId,x.ProductVariantId!.Value,x.Quantity,x.UnitPrice,x.DiscountAmount,x.TaxRate)).ToArray();
-            return Map((await Purchasing.CreatePurchaseInvoiceAsync(new(m.SupplierInvoiceCode,supplier,m.InvoiceDate,m.PostingDate,currency,m.ExchangeRate,m.ExchangeRateDate,(TaxCalculationMode)m.TaxCalculationMode,m.Notes,lines)))!);
+            if(m.SourceReceiptId is not Guid sourceId)
+            {
+                Snackbar.Warning("اختر سند استلام مرحّلًا لتعبئة الفاتورة تلقائيًا.");return null;
+            }
+            sourceReceipt=await Purchasing.GetPurchaseReceiptAsync(sourceId);
+            if(sourceReceipt is null || sourceReceipt.Status!=PurchaseReceiptStatus.Posted || sourceReceipt.SupplierId!=supplier)
+            {
+                Snackbar.Warning("سند الاستلام غير مرحّل أو المورد لا يطابق الفاتورة. اختر استلامًا صالحًا.");return null;
+            }
+            var draftDemands=m.Lines.Select(x=>new InvoiceReceiptDemand(Guid.Empty,x.PurchaseOrderLineId,
+                x.ProductVariantId,x.Quantity,x.LineSequence)).ToArray();
+            if(!PurchaseInvoiceReceiptAllocationPlanner.TryPlan(draftDemands,AvailableReceiptLines(sourceReceipt),
+                out _,out var preflightError))
+            {
+                Snackbar.Warning(preflightError);return null;
+            }
+
+            var lines=m.Lines.Select(x=>new CreatePurchaseInvoiceLineRequest(x.LineSequence,x.PurchaseOrderLineId,
+                x.ProductVariantId!.Value,x.Quantity,x.UnitPrice,x.DiscountAmount,x.TaxRate)).ToArray();
+            var created=await Purchasing.CreatePurchaseInvoiceAsync(new(m.SupplierInvoiceCode,supplier,
+                m.InvoiceDate,m.PostingDate,currency,m.ExchangeRate,m.ExchangeRateDate,
+                (TaxCalculationMode)m.TaxCalculationMode,m.Notes,lines));
+            if(created is null)return null;
+
+            var mapped=Map(created);
+            mapped.SourceReceiptId=sourceId;
+            mapped.SourceReceiptCode=sourceReceipt.ReceiptCode;
+            // Creating the invoice and matching it are separate calls. A failed match must
+            // never look like an entirely failed save or trigger a duplicate invoice creation.
+            try
+            {
+                var demands=created.Lines.Select(x=>new InvoiceReceiptDemand(x.Id,x.PurchaseOrderLineId,
+                    x.ProductVariantId,x.Quantity,x.LineSequence)).ToArray();
+                if(!PurchaseInvoiceReceiptAllocationPlanner.TryPlan(demands,AvailableReceiptLines(sourceReceipt),
+                    out var plan,out var planError))
+                {
+                    mapped.MatchingNotice=$"حُفظت المسودة، لكن تعذرت المطابقة التلقائية: {planError}";
+                    Snackbar.Warning(mapped.MatchingNotice);
+                    return mapped;
+                }
+                var requests=plan.Select(x=>new PurchaseInvoiceMatchAllocationRequest(
+                    x.InvoiceLineId,x.ReceiptLineId,x.Quantity)).ToArray();
+                var match=await Purchasing.MatchPurchaseInvoiceAsync(created.Id,new(requests,created.RowVersion));
+                var refreshed=await Purchasing.GetPurchaseInvoiceAsync(created.Id);
+                if(refreshed is not null) mapped=Map(refreshed);
+                mapped.SourceReceiptId=sourceId;
+                mapped.SourceReceiptCode=sourceReceipt.ReceiptCode;
+                if(match is not null)
+                {
+                    mapped.Match=Map(match);
+                    mapped.MatchingNotice=match.RequiresApproval
+                        ? "تمت المطابقة تلقائيًا، لكن توجد فروقات تحتاج إلى المراجعة والاعتماد."
+                        : "تمت المطابقة تلقائيًا مع الاستلام. راجع الفاتورة ثم اضغط تأكيد قبل الترحيل.";
+                }
+                else mapped.MatchingNotice="حُفظت المسودة. راجع المطابقة قبل التأكيد والترحيل.";
+            }
+            catch(ApiClientException ex)
+            {
+                mapped.MatchingNotice="تم حفظ الفاتورة كمسودة، لكن المطابقة التلقائية لم تكتمل. راجع الفروقات أو اضغط تشغيل المطابقة؛ لن تحتاج لإنشاء فاتورة ثانية.";
+                Snackbar.Warning(mapped.MatchingNotice);
+                ApiFeedback.Show(ex.Error);
+            }
+            catch(Exception)
+            {
+                // Never leave a successfully created invoice looking unsaved: doing so
+                // encourages the user to create the same supplier invoice twice.
+                mapped.MatchingNotice="تم حفظ الفاتورة كمسودة، لكن تعذر التأكد من المطابقة التلقائية. حدّث هذه الفاتورة وراجع المطابقة قبل المتابعة؛ لا تنشئ فاتورة ثانية.";
+                Snackbar.Warning(mapped.MatchingNotice);
+            }
+            return mapped;
         }
-        var updates=m.Lines.Select(x=>new UpdatePurchaseInvoiceLineRequest(x.Id,x.LineSequence,x.PurchaseOrderLineId,x.ProductVariantId!.Value,x.Quantity,x.UnitPrice,x.DiscountAmount,x.TaxRate,x.RowVersion)).ToArray();
-        return Map((await Purchasing.UpdatePurchaseInvoiceAsync(m.Id.Value,new(m.SupplierInvoiceCode,supplier,m.InvoiceDate,m.PostingDate,currency,m.ExchangeRate,m.ExchangeRateDate,(TaxCalculationMode)m.TaxCalculationMode,m.Notes,updates,m.RowVersion??string.Empty)))!);
+
+        var updates=m.Lines.Select(x=>new UpdatePurchaseInvoiceLineRequest(x.Id,x.LineSequence,
+            x.PurchaseOrderLineId,x.ProductVariantId!.Value,x.Quantity,x.UnitPrice,
+            x.DiscountAmount,x.TaxRate,x.RowVersion)).ToArray();
+        return Map((await Purchasing.UpdatePurchaseInvoiceAsync(m.Id.Value,new(m.SupplierInvoiceCode,supplier,
+            m.InvoiceDate,m.PostingDate,currency,m.ExchangeRate,m.ExchangeRateDate,
+            (TaxCalculationMode)m.TaxCalculationMode,m.Notes,updates,m.RowVersion??string.Empty)))!);
     }
 
     private async Task LoadInvoicePaymentSummaryAsync(UiPurchaseInvoiceEditorModel invoice,bool force=false)

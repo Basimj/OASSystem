@@ -75,7 +75,7 @@
                                  SidebarTypography="true"
                                  UniformCellTypography="true" Compact="true">
                         <RowTemplate Context="entry">
-                            <td>@entry.MovementDate.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                            <td>@InventoryDisplayFormat.DateTime(entry.MovementDate.ToLocalTime())</td>
                             <td>@TransactionNumber(entry)</td>
                             <td>@InventoryArabicPresenter.MovementTypeText(entry.MovementType)</td>
                             <td>
@@ -83,12 +83,12 @@
                                 <UiTextLabel Text="@VariantSku(entry.ProductVariantId)" Size="ControlSize.Small" Tone="TextTone.Muted" />
                             </td>
                             <td>@WarehouseName(entry.WarehouseId)</td>
-                            <td>@entry.QuantityIn.ToString("N3")</td>
-                            <td>@entry.QuantityOut.ToString("N3")</td>
-                            <td>@entry.BalanceAfter.ToString("N3")</td>
-                            <td>@entry.UnitCost.ToString("N2")</td>
-                            <td>@entry.AverageCostAfter.ToString("N2")</td>
-                            <td>@entry.InventoryValueAfter.ToString("N2")</td>
+                            <td>@InventoryDisplayFormat.Number(entry.QuantityIn)</td>
+                            <td>@InventoryDisplayFormat.Number(entry.QuantityOut)</td>
+                            <td>@InventoryDisplayFormat.Number(entry.BalanceAfter)</td>
+                            <td>@InventoryDisplayFormat.Number(entry.UnitCost)</td>
+                            <td>@InventoryDisplayFormat.Number(entry.AverageCostAfter)</td>
+                            <td>@InventoryDisplayFormat.Number(entry.InventoryValueAfter)</td>
                             <td>@SourceText(Transaction(entry.TransactionId))</td>
                             <td>
                                 <div class="inventory-ledger__actions">

@@ -1,3 +1,4 @@
+@using static OAS.UiLib.Core.Formatting.PurchasingDisplayFormat
 @page "/purchases/performance"
 @attribute [Authorize]
 @using System.Globalization
@@ -62,8 +63,8 @@
             <div class="col-6 col-lg-2"><div class="card h-100"><div class="card-body py-2"><small>استلامات مرحلة</small><h4>@s.PostedReceiptCount</h4><small>@Money(s.PostedReceiptCostBase) @s.BaseCurrencyCode (تكلفة)</small></div></div></div>
             <div class="col-6 col-lg-2"><div class="card h-100"><div class="card-body py-2"><small>فواتير مرحلة</small><h4>@s.PostedInvoiceCount</h4><small>@Money(s.PostedInvoiceTotalBase) @s.BaseCurrencyCode</small></div></div></div>
             <div class="col-6 col-lg-2"><div class="card h-100"><div class="card-body py-2"><small>مرتجعات مرحلة</small><h4>@s.PostedReturnCount</h4><small>@Money(s.PostedReturnTotalBase) @s.BaseCurrencyCode</small></div></div></div>
-            <div class="col-6 col-lg-2"><div class="card h-100"><div class="card-body py-2"><small>متوسط وقت التوريد</small><h4>@(s.AverageReceiptLeadDays?.ToString("N1") ?? "—")</h4><small>يوم لكل بند استلام مرحل</small></div></div></div>
-            <div class="col-6 col-lg-2"><div class="card h-100"><div class="card-body py-2"><small>الالتزام بموعد التسليم</small><h4>@(s.OnTimeDeliveryRatePercent?.ToString("N2") ?? "—")%</h4><small>مرجح بكمية الاستلام الأساسية</small></div></div></div>
+            <div class="col-6 col-lg-2"><div class="card h-100"><div class="card-body py-2"><small>متوسط وقت التوريد</small><h4>@(s.AverageReceiptLeadDays?.ToString("#,##0.#") ?? "—")</h4><small>يوم لكل بند استلام مرحل</small></div></div></div>
+            <div class="col-6 col-lg-2"><div class="card h-100"><div class="card-body py-2"><small>الالتزام بموعد التسليم</small><h4>@(s.OnTimeDeliveryRatePercent?.ToString("#,##0.##") ?? "—")%</h4><small>مرجح بكمية الاستلام الأساسية</small></div></div></div>
             <div class="col-6 col-lg-2"><div class="card h-100"><div class="card-body py-2"><small>التكلفة غير المفوترة (تقديرية)</small><h4>@Money(s.UninvoicedReceiptCostBase)</h4><small>GRNI تشغيلي، ليس رصيد الأستاذ العام</small></div></div></div>
             <div class="col-6 col-lg-2"><div class="card h-100"><div class="card-body py-2"><small>فرق سعر المشتريات</small><h4>@Money(s.PurchasePriceVarianceBase)</h4><small>PPV لبنود المطابقة المرحلة خلال الفترة</small></div></div></div>
         </div>
@@ -98,7 +99,7 @@
                                     { <a href="@target" title="فتح المستند الأصلي">@row.DocumentCode</a> }
                                     else { @row.DocumentCode }
                                 </td>
-                                <td>@row.DocumentDate.ToString("yyyy-MM-dd")</td>
+                                <td>@DisplayDate(row.DocumentDate)</td>
                                 <td><strong>@row.SupplierName</strong><div class="small">@row.ProductName @row.UnitName</div></td>
                                 <td>@row.Status @if (row.IsLate) { <span class="text-danger">متأخر</span> }</td>
                                 <td>@Qty(row.OrderedQuantity)</td><td>@Qty(row.AcceptedQuantity)</td>
@@ -106,7 +107,7 @@
                                 <td>@Qty(row.OpenQuantity)</td><td>@Qty(row.UninvoicedAcceptedQuantity)</td>
                                 <td>@(row.BaseAmount.HasValue ? $"{Money(row.BaseAmount)} {_report.Summary.BaseCurrencyCode} (أساسي)" : row.DocumentAmount.HasValue ? $"{Money(row.DocumentAmount)} {row.CurrencyCode}" : row.UnitPrice.HasValue ? $"{Money(row.UnitPrice)} {row.CurrencyCode} / وحدة" : "—")</td>
                                 <td>@(row.PriceVariance.HasValue ? $"{Money(row.PriceVariance)} {row.CurrencyCode}" : "—")</td>
-                                <td>@(row.ExpectedDeliveryDate?.ToString("yyyy-MM-dd") ?? "—")</td>
+                                <td>@DisplayDate(row.ExpectedDeliveryDate)</td>
                                 <td>
                                     @if (row.Kind == "orders" && row.PurchaseOrderLineId.HasValue)
                                     {
@@ -133,7 +134,7 @@
     {
         <div class="card mt-3 ap12-drilldown">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <strong>المستندات المرتبطة بأمر الشراء @_drill.PurchaseOrderCode (حتى @_toDate.ToString("yyyy-MM-dd"))</strong>
+                <strong>المستندات المرتبطة بأمر الشراء @_drill.PurchaseOrderCode (حتى @DisplayDate(_toDate))</strong>
                 <button class="btn btn-sm btn-outline-secondary" type="button" @onclick="() => _drill = null">إغلاق</button>
             </div>
             <div class="card-body">
@@ -151,7 +152,7 @@
                             {
                                 <tr>
                                     <td><a href="@DrillDocumentUrl(document)">@document.DocumentCode</a></td>
-                                    <td>@document.PostingDate.ToString("yyyy-MM-dd")</td>
+                                    <td>@DisplayDate(document.PostingDate)</td>
                                     <td>@Qty(document.Quantity)</td>
                                     <td>@Money(document.BaseAmount) @_drill.BaseCurrencyCode</td>
                                 </tr>
@@ -210,8 +211,8 @@
         _search, _page, 25);
 
     private static Guid? Parse(string? value) => Guid.TryParse(value, out var id) ? id : null;
-    private static string Qty(decimal? value) => value?.ToString("N3", CultureInfo.CurrentCulture) ?? "—";
-    private static string Money(decimal? value) => value?.ToString("N2", CultureInfo.CurrentCulture) ?? "—";
+    private static string Qty(decimal? value) => value?.ToString("#,##0.###", CultureInfo.CurrentCulture) ?? "—";
+    private static string Money(decimal? value) => value?.ToString("#,##0.##", CultureInfo.CurrentCulture) ?? "—";
 
     private string Url(string? format = null)
     {

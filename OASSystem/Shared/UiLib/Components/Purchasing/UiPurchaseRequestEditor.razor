@@ -36,7 +36,7 @@
                     </UiPurchasingFormGrid>
                     @if (line.Id.HasValue)
                     {
-                        <div class="ui-purchasing-line-card__summary">مخصص لأوامر الشراء: @line.AllocatedQuantity.ToString("N3") · المتبقي: @line.RemainingQuantity.ToString("N3")</div>
+                        <div class="ui-purchasing-line-card__summary">مخصص لأوامر الشراء: @line.AllocatedQuantity.ToString("#,##0.###") · المتبقي: @line.RemainingQuantity.ToString("#,##0.###")</div>
                     }
                 </div>
             }

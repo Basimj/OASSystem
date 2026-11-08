@@ -18,7 +18,7 @@
             else
             {
                 <UiButton Text="تعديل" IconCssClass="fa-solid fa-pen-to-square" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(!CanBeginEdit)" OnClick="BeginEditAsync" />
-                <UiButton Text="حفظ" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small" Loading="@(ActiveTab?.IsSaving==true)" Disabled="@(!CanSave)" OnClick="SaveAsync" />
+                <UiButton Text="@SaveButtonText" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small" Loading="@(ActiveTab?.IsSaving==true)" Disabled="@(!CanSave)" OnClick="SaveAsync" />
                 <UiButton Text="إلغاء التعديل" IconCssClass="fa-solid fa-arrow-rotate-left" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Disabled="@(!CanCancelEdit)" OnClick="CancelEditAsync" />
                 <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Disabled="@(ActiveTab?.IsNew==true)" OnClick="RefreshActiveAsync" />
                 <UiButton Text="إغلاق" IconCssClass="fa-solid fa-xmark" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CloseActiveAsync" />
@@ -88,7 +88,7 @@
                             <tbody>
                             @foreach (var l in progress.Lines)
                             {
-                                <tr><td>@l.LineSequence — @l.ProductName</td><td>@l.Ordered.ToString("N3")</td><td>@l.Received.ToString("N3")</td><td>@l.Invoiced.ToString("N3")</td><td>@l.Returned.ToString("N3")</td><td>@l.RemainingToReceive.ToString("N3")</td><td>@l.RemainingToInvoice.ToString("N3")</td><td>@l.RemainingToReturn.ToString("N3")</td></tr>
+                                <tr><td>@l.LineSequence — @l.ProductName</td><td>@l.Ordered.ToString("#,##0.###")</td><td>@l.Received.ToString("#,##0.###")</td><td>@l.Invoiced.ToString("#,##0.###")</td><td>@l.Returned.ToString("#,##0.###")</td><td>@l.RemainingToReceive.ToString("#,##0.###")</td><td>@l.RemainingToInvoice.ToString("#,##0.###")</td><td>@l.RemainingToReturn.ToString("#,##0.###")</td></tr>
                             }
                             </tbody>
                         </table>
@@ -140,11 +140,11 @@
         }
         else if (ActiveTab?.Model is UiPurchaseReceiptEditorModel receipt)
         {
-            <UiPurchaseReceiptEditor Model="receipt" IsEditable="@IsEditable" PurchaseOrderSearchAsync="SearchReceivableOrdersAsync" OnPurchaseOrderChanged="ReceiptPurchaseOrderChangedAsync" OnChanged="EditorChangedAsync" />
+            <UiPurchaseReceiptEditor @ref="_purchaseReceiptEditor" Model="receipt" IsEditable="@IsEditable" PurchaseOrderSearchAsync="SearchReceivableOrdersAsync" OnPurchaseOrderChanged="ReceiptPurchaseOrderChangedAsync" OnChanged="EditorChangedAsync" />
         }
         else if (ActiveTab?.Model is UiPurchaseInvoiceEditorModel invoice)
         {
-            <UiPurchaseInvoiceEditor Model="invoice" IsEditable="@IsEditable" SupplierSearchAsync="SearchSuppliersAsync" CurrencySearchAsync="SearchCurrenciesAsync" ProductSearchAsync="SearchProductsAsync" ProductSearchPageAsync="SearchProductsPageAsync" ShowPaymentSummary="@ShowInvoicePaymentSummary" PaymentSummaryLoading="@IsActiveInvoicePaymentSummaryLoading" PaymentTotalAmount="@ActiveInvoicePaymentSummary?.TotalAmount" PaymentPaidAmount="@ActiveInvoicePaymentSummary?.PaidAmount" PaymentCreditAmount="@ActiveInvoicePaymentSummary?.AppliedCreditAmount" PaymentOutstandingAmount="@ActiveInvoicePaymentSummary?.OutstandingAmount" PaymentStatusText="@ActiveInvoicePaymentStatusText" PaymentBaseTotalAmount="@ActiveInvoicePaymentSummary?.BaseTotalAmount" PaymentAppliedBaseAmount="@ActiveInvoicePaymentSummary?.AppliedPaymentBaseAmount" PaymentCreditBaseAmount="@ActiveInvoicePaymentSummary?.AppliedCreditBaseAmount" PaymentOutstandingBaseAmount="@ActiveInvoicePaymentSummary?.OutstandingBaseAmount" PaymentRealizedExchangeDifferenceBase="@ActiveInvoicePaymentSummary?.RealizedExchangeDifferenceBase" PaymentBaseCurrencyCode="@ActiveInvoicePaymentSummary?.BaseCurrencyCode" PaymentSettlements="@ActiveInvoicePaymentSettlements" OnOpenFxJournal="OpenInvoiceFxJournalAsync" OnChanged="EditorChangedAsync" />
+            <UiPurchaseInvoiceEditor Model="invoice" IsEditable="@IsEditable" PostedReceiptSearchAsync="SearchPostedReceiptsAsync" OnReceiptSelected="InvoiceReceiptChangedAsync" SupplierSearchAsync="SearchSuppliersAsync" CurrencySearchAsync="SearchCurrenciesAsync" ProductSearchAsync="SearchProductsAsync" ProductSearchPageAsync="SearchProductsPageAsync" ShowPaymentSummary="@ShowInvoicePaymentSummary" PaymentSummaryLoading="@IsActiveInvoicePaymentSummaryLoading" PaymentTotalAmount="@ActiveInvoicePaymentSummary?.TotalAmount" PaymentPaidAmount="@ActiveInvoicePaymentSummary?.PaidAmount" PaymentCreditAmount="@ActiveInvoicePaymentSummary?.AppliedCreditAmount" PaymentOutstandingAmount="@ActiveInvoicePaymentSummary?.OutstandingAmount" PaymentStatusText="@ActiveInvoicePaymentStatusText" PaymentBaseTotalAmount="@ActiveInvoicePaymentSummary?.BaseTotalAmount" PaymentAppliedBaseAmount="@ActiveInvoicePaymentSummary?.AppliedPaymentBaseAmount" PaymentCreditBaseAmount="@ActiveInvoicePaymentSummary?.AppliedCreditBaseAmount" PaymentOutstandingBaseAmount="@ActiveInvoicePaymentSummary?.OutstandingBaseAmount" PaymentRealizedExchangeDifferenceBase="@ActiveInvoicePaymentSummary?.RealizedExchangeDifferenceBase" PaymentBaseCurrencyCode="@ActiveInvoicePaymentSummary?.BaseCurrencyCode" PaymentSettlements="@ActiveInvoicePaymentSettlements" OnOpenFxJournal="OpenInvoiceFxJournalAsync" OnChanged="EditorChangedAsync" />
         }
     </Content>
 </UiPurchasingWorkspace>

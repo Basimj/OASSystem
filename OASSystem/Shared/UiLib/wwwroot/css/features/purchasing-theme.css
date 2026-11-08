@@ -66,6 +66,14 @@
     color:var(--oas-color-text-muted);
 }
 
+/* Date input controls remain editable in ISO form. Their visual segments must
+   stay LTR inside RTL screens; do not alter their submitted values. */
+.oas-shell .oas-main-inner :is(.oas-purchasing-dashboard,.ui-purchasing-workspace,.purchasing-module-root,.purchasing-aux-page,.supplier-allocation-page,.purchasing-demand-page) :is(input[type=date],input[type=datetime-local]) {
+    direction:ltr;
+    unicode-bidi:isolate;
+    text-align:left;
+}
+
 /* Every Bootstrap table color is scoped; fixed Bootstrap striping is bypassed. */
 .oas-shell .oas-main-inner :is(.ui-purchasing-workspace,.purchasing-module-root,.purchasing-aux-page,.supplier-allocation-page,.purchasing-demand-page) :is(.table,table){
     --bs-table-bg:var(--oas-color-surface);

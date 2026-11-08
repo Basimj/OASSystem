@@ -1,3 +1,5 @@
+using OAS.UiLib.Core.Formatting;
+
 namespace OAS.UiLib.Core.Models.Purchasing;
 
 /// <summary>
@@ -44,6 +46,10 @@ public static class UiPurchaseOrderFormValidator
                 Error(prefix + nameof(line.PurchaseUnitId), $"البند {number}: حدد وحدة الشراء، مثل قطعة أو كرتون.");
             if (line.OrderedQuantity <= 0)
                 Error(prefix + nameof(line.OrderedQuantity), $"البند {number}: الكمية المطلوبة يجب أن تكون أكبر من صفر.");
+            if (!line.Id.HasValue && line.Sources.Count == 0 &&
+                QuantityInputRules.UsesWholeNumbers(null, line.PurchaseUnitName) &&
+                !QuantityInputRules.IsWhole(line.OrderedQuantity))
+                Error(prefix + nameof(line.OrderedQuantity), $"البند {number}: {QuantityInputRules.WholeNumberMessage}");
             if (line.UnitPrice < 0)
                 Error(prefix + nameof(line.UnitPrice), $"البند {number}: سعر الوحدة لا يمكن أن يكون سالبًا. يمكنك استخدام صفر في المسودة.");
             if (line.UnitConversionFactor <= 0)

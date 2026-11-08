@@ -1062,7 +1062,7 @@
     <value>اسم الوحدة بالإنجليزية يجب ألا يتجاوز 100 حرف.</value>
   </data>
   <data name="variant_name_max_length" xml:space="preserve">
-    <value>اسم المتغير يجب ألا يتجاوز 100 حرف.</value>
+    <value>اسم الصنف يجب ألا يتجاوز 100 حرف.</value>
   </data>
   <data name="warehouse_code_max_length" xml:space="preserve">
     <value>كود المخزن يجب ألا يتجاوز 32 حرفًا.</value>

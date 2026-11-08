@@ -58,6 +58,13 @@ public sealed class PurchaseInvoicesController(ISender sender) : ControllerBase
         return Ok(await sender.Send(new GetPurchaseInvoiceByIdQuery(id), cancellationToken));
     }
 
+    // Used by the editor before showing the posting confirmation. The posting command
+    // repeats these checks inside its transaction; this endpoint never changes data.
+    [HttpGet("{id:guid}/matching-readiness")]
+    public async Task<ActionResult<PurchaseInvoiceMatchingReadinessDto>> GetMatchingReadiness(
+        Guid id, CancellationToken cancellationToken)
+        => Ok(await sender.Send(new GetPurchaseInvoiceMatchingReadinessQuery(id), cancellationToken));
+
     [HttpPost("{id:guid}/match")]
     public async Task<ActionResult<PurchaseMatchResultDto>> Match(
         Guid id,

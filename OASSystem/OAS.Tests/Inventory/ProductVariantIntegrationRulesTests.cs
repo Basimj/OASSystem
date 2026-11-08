@@ -22,8 +22,29 @@ public sealed class ProductVariantIntegrationRulesTests
         var handler = new UpdateProductVariantCommandHandler(variants, products, units, new ProductVariantMapper());
         var request = new UpdateProductVariantRequest(variant.SKU, null, null, null, null, null, 10m, 20m, false);
 
-        Assert.ThrowsAsync<RequestValidationException>(() =>
+        var exception = Assert.ThrowsAsync<RequestValidationException>(() =>
             handler.Handle(new UpdateProductVariantCommand(variant.Id, request), CancellationToken.None));
+
+        Assert.That(exception, Is.Not.Null);
+        Assert.That(exception!.Errors.ContainsKey("is_active"), Is.True);
+        Assert.That(exception.Errors["is_active"].Any(message =>
+            message.Contains("stock_product_requires_active_variant", StringComparison.Ordinal)), Is.True);
+    }
+
+    [Test]
+    public async Task LastVariantOfNonStockProductCanBeDeactivated()
+    {
+        var product = new Product("P-3", "منتج غير مخزني", Guid.NewGuid(), isStockItem: false);
+        var variant = new ProductVariant(product.Id, "SKU-3", 10m, 20m);
+        var variants = new FakeGenericRepository<ProductVariant, Guid>([variant]);
+        var products = new FakeGenericRepository<Product, Guid>([product]);
+        var units = new FakeGenericRepository<Unit, Guid>();
+        var handler = new UpdateProductVariantCommandHandler(variants, products, units, new ProductVariantMapper());
+        var request = new UpdateProductVariantRequest(variant.SKU, null, null, null, null, null, 10m, 20m, false);
+
+        var result = await handler.Handle(new UpdateProductVariantCommand(variant.Id, request), CancellationToken.None);
+
+        Assert.That(result.IsActive, Is.False);
     }
 
     [Test]

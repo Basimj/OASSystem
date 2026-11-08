@@ -2,6 +2,7 @@
 @page "/products/{Screen}"
 @page "/products/{Screen}/{RecordId:guid}"
 @attribute [Authorize]
+@using OAS.Client.Inventory.Common
 @using OAS.Client.Inventory.Services
 @using OAS.Client.Inventory.Components
 @using OAS.Contracts.Inventory.Products
@@ -223,14 +224,14 @@
                     }
                     else
                     {
-                        <UiDataTable TItem="ProductVariantDto" Items="@FilterVariants()" PageSize="12" Headers="@VariantHeaders" EmptyText="لا توجد متغيرات مطابقة."
+                        <UiDataTable TItem="ProductVariantDto" Items="@FilterVariants()" PageSize="12" Headers="@VariantHeaders" EmptyText="لا توجد أصناف مطابقة."
                                      SidebarTypography="true"
                                      OnRowClick="@(x => OpenDetailsScreen(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
                             <RowTemplate Context="item">
                                 <td><strong>@item.SKU</strong></td>
                                 <td>@(item.VariantName ?? ProductName(item.ProductId))</td>
                                 <td>@(item.Barcode ?? "—")</td>
-                                <td>@item.SellingPrice.ToString("N2")</td>
+                                <td>@InventoryDisplayFormat.Number(item.SellingPrice)</td>
                                 <td><UiBadge Text="@StatusText(item.IsActive)" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
                             </RowTemplate>
                         </UiDataTable>

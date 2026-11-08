@@ -256,9 +256,9 @@ public sealed class PostPurchaseInvoiceCommandHandler(
         await accounting.ValidateSupplierAccountAsync(invoice.SupplierId,ct);
 
         var allocations=await repository.GetAllocationsAsync(invoice.Id,ct);
-        if(allocations.Count==0)throw new ConflictException("purchasing_invoice_matching_required","لا يمكن ترحيل فاتورة المورد قبل اكتمال المطابقة.");
+        if(allocations.Count==0)throw new ConflictException("purchasing_invoice_matching_required","لم تُسجّل مطابقة لفاتورة المورد. نفّذ المطابقة مع سندات الاستلام المرحلة وراجع نتيجتها قبل الترحيل.");
         if(allocations.Any(x=>x.MatchStatus is DomainMatchStatus.Pending or DomainMatchStatus.RequiresApproval or DomainMatchStatus.Rejected))
-            throw new ConflictException("purchasing_invoice_matching_incomplete","لا يمكن ترحيل فاتورة المورد قبل اكتمال المطابقة واعتماد الفروقات.");
+            throw new ConflictException("purchasing_invoice_matching_incomplete","المطابقة غير مكتملة أو تحتوي فروقات معلقة. راجع البنود واعتمد الفروقات المطلوبة قبل ترحيل الفاتورة.");
         var requested=allocations.Select(x=>new PurchaseInvoiceMatchAllocationRequest(x.PurchaseInvoiceLineId,x.PurchaseReceiptLineId,x.MatchedQuantity)).ToArray();
         var evaluation=await matching.EvaluateAsync(invoice,requested,ct);
         var priceVariance=Math.Round(invoice.BaseSubtotal-evaluation.ReceiptCostBaseAmount,4);
