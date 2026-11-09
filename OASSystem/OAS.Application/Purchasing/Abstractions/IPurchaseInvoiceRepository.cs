@@ -5,6 +5,8 @@ using OAS.Domain.Purchasing.Entities;
 
 namespace OAS.Application.Purchasing.Abstractions;
 
+public sealed record PurchaseInvoiceMatchCounts(int AllocationCount, int UnresolvedCount);
+
 public interface IPurchaseInvoiceRepository
 {
     Task<PurchaseInvoice?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
@@ -13,6 +15,8 @@ public interface IPurchaseInvoiceRepository
     Task<PagedData<PurchaseInvoice>> GetMatchedPostedForReceiptPageAsync(Guid receiptId, Guid supplierId, PageRequest request, CancellationToken cancellationToken = default);
     Task<bool> SupplierInvoiceCodeExistsAsync(Guid supplierId, string supplierInvoiceCode, Guid? exceptInvoiceId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PurchaseInvoiceReceiptAllocation>> GetAllocationsAsync(Guid purchaseInvoiceId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyDictionary<Guid, PurchaseInvoiceMatchCounts>> GetMatchingCountsAsync(
+        IReadOnlyCollection<Guid> invoiceIds, CancellationToken cancellationToken = default);
     Task<PurchaseInvoiceReceiptAllocation?> GetAllocationForUpdateAsync(Guid allocationId, CancellationToken cancellationToken = default);
     Task AddAsync(PurchaseInvoice invoice, CancellationToken cancellationToken = default);
     Task ReplaceLinesAsync(PurchaseInvoice invoice, CancellationToken cancellationToken = default);

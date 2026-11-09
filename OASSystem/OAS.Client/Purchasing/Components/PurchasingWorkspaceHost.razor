@@ -118,7 +118,10 @@
             }
             else if (Section == PurchasingEntityType.PurchaseInvoices)
             {
-                <UiPurchaseInvoiceList Items="CurrentListItems" Loading="_isLoadingList" EmptyText="لا توجد فواتير مشتريات." OnOpen="OpenRecordAsync" />
+                <UiPurchaseInvoiceList Items="CurrentInvoiceCards" Loading="_isLoadingList" TotalCount="_totalCount"
+                                       SelectedStatus="@_invoiceStatus" OnStatusChanged="ChangeInvoiceStatusAsync"
+                                       SelectedSort="@_invoiceSort" OnSortChanged="ChangeInvoiceSortAsync"
+                                       EmptyText="لا توجد فواتير مشتريات مطابقة للبحث أو الحالة المختارة." OnOpen="OpenRecordAsync" />
             }
             <UiPagination PageNumber="_pageNumber" TotalPages="_totalPages" TotalCount="_totalCount" OnPrevious="PreviousPageAsync" OnNext="NextPageAsync" />
         }
@@ -144,7 +147,7 @@
         }
         else if (ActiveTab?.Model is UiPurchaseInvoiceEditorModel invoice)
         {
-            <UiPurchaseInvoiceEditor Model="invoice" IsEditable="@IsEditable" PostedReceiptSearchAsync="SearchPostedReceiptsAsync" OnReceiptSelected="InvoiceReceiptChangedAsync" SupplierSearchAsync="SearchSuppliersAsync" CurrencySearchAsync="SearchCurrenciesAsync" ProductSearchAsync="SearchProductsAsync" ProductSearchPageAsync="SearchProductsPageAsync" ShowPaymentSummary="@ShowInvoicePaymentSummary" PaymentSummaryLoading="@IsActiveInvoicePaymentSummaryLoading" PaymentTotalAmount="@ActiveInvoicePaymentSummary?.TotalAmount" PaymentPaidAmount="@ActiveInvoicePaymentSummary?.PaidAmount" PaymentCreditAmount="@ActiveInvoicePaymentSummary?.AppliedCreditAmount" PaymentOutstandingAmount="@ActiveInvoicePaymentSummary?.OutstandingAmount" PaymentStatusText="@ActiveInvoicePaymentStatusText" PaymentBaseTotalAmount="@ActiveInvoicePaymentSummary?.BaseTotalAmount" PaymentAppliedBaseAmount="@ActiveInvoicePaymentSummary?.AppliedPaymentBaseAmount" PaymentCreditBaseAmount="@ActiveInvoicePaymentSummary?.AppliedCreditBaseAmount" PaymentOutstandingBaseAmount="@ActiveInvoicePaymentSummary?.OutstandingBaseAmount" PaymentRealizedExchangeDifferenceBase="@ActiveInvoicePaymentSummary?.RealizedExchangeDifferenceBase" PaymentBaseCurrencyCode="@ActiveInvoicePaymentSummary?.BaseCurrencyCode" PaymentSettlements="@ActiveInvoicePaymentSettlements" OnOpenFxJournal="OpenInvoiceFxJournalAsync" OnChanged="EditorChangedAsync" />
+            <UiPurchaseInvoiceEditor Model="invoice" IsEditable="@IsEditable" PostedReceiptSearchAsync="SearchPostedReceiptsAsync" OnReceiptSelected="InvoiceReceiptChangedAsync" OnRefreshReceipt="RefreshSelectedInvoiceReceiptAsync" SupplierSearchAsync="SearchSuppliersAsync" CurrencySearchAsync="SearchCurrenciesAsync" ProductSearchAsync="SearchProductsAsync" ProductSearchPageAsync="SearchProductsPageAsync" ShowPaymentSummary="@ShowInvoicePaymentSummary" PaymentSummaryLoading="@IsActiveInvoicePaymentSummaryLoading" PaymentTotalAmount="@ActiveInvoicePaymentSummary?.TotalAmount" PaymentPaidAmount="@ActiveInvoicePaymentSummary?.PaidAmount" PaymentCreditAmount="@ActiveInvoicePaymentSummary?.AppliedCreditAmount" PaymentOutstandingAmount="@ActiveInvoicePaymentSummary?.OutstandingAmount" PaymentStatusText="@ActiveInvoicePaymentStatusText" PaymentBaseTotalAmount="@ActiveInvoicePaymentSummary?.BaseTotalAmount" PaymentAppliedBaseAmount="@ActiveInvoicePaymentSummary?.AppliedPaymentBaseAmount" PaymentCreditBaseAmount="@ActiveInvoicePaymentSummary?.AppliedCreditBaseAmount" PaymentOutstandingBaseAmount="@ActiveInvoicePaymentSummary?.OutstandingBaseAmount" PaymentRealizedExchangeDifferenceBase="@ActiveInvoicePaymentSummary?.RealizedExchangeDifferenceBase" PaymentBaseCurrencyCode="@ActiveInvoicePaymentSummary?.BaseCurrencyCode" PaymentSettlements="@ActiveInvoicePaymentSettlements" OnOpenFxJournal="OpenInvoiceFxJournalAsync" OnChanged="EditorChangedAsync" />
         }
     </Content>
 </UiPurchasingWorkspace>

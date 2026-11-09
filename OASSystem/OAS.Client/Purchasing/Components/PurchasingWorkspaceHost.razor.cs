@@ -70,7 +70,36 @@ public partial class PurchasingWorkspaceHost
     private bool _isPrintingPurchaseInvoice;
     private IReadOnlyList<UiPurchasingListItem> CurrentListItems=[];
     private IReadOnlyList<UiPurchaseOrderCardItem> CurrentOrderCards=[];
+    private IReadOnlyList<UiPurchaseInvoiceCardItem> CurrentInvoiceCards=[];
     private string _orderGroup = "all";
+    private string _invoiceStatus = "all";
+    private string _invoiceSort = "date_desc";
+    private static (string Field, SortDirection Direction) InvoiceSort(string value) => value switch
+    {
+        "date_asc" => ("InvoiceDate", SortDirection.Ascending),
+        "amount_desc" => ("TotalAmount", SortDirection.Descending),
+        "amount_asc" => ("TotalAmount", SortDirection.Ascending),
+        "supplier_asc" => ("SupplierName", SortDirection.Ascending),
+        "supplier_desc" => ("SupplierName", SortDirection.Descending),
+        _ => ("InvoiceDate", SortDirection.Descending)
+    };
+    private static PurchaseInvoiceStatus? SelectedInvoiceStatus(string selected) => selected switch
+    {
+        "draft" => PurchaseInvoiceStatus.Draft,
+        "confirmed" => PurchaseInvoiceStatus.Confirmed,
+        "matching" => PurchaseInvoiceStatus.PendingMatchApproval,
+        "posted" => PurchaseInvoiceStatus.Posted,
+        "cancelled" => PurchaseInvoiceStatus.Cancelled,
+        _ => null
+    };
+    private static UiPurchaseInvoiceCardItem ToInvoiceCard(PurchaseInvoiceDto invoice)
+        => new(invoice.Id, invoice.PurchaseInvoiceCode,
+            invoice.SupplierName ?? invoice.SupplierCode ?? "مورد غير محدد",
+            invoice.SupplierInvoiceCode, (byte)invoice.Status,
+            PurchasingArabicPresenter.InvoiceStatus(invoice.Status),
+            invoice.TotalAmount, invoice.CurrencyNameAr, invoice.CurrencyCode,
+            invoice.InvoiceDate, invoice.DueDate, invoice.Lines.Count,
+            invoice.SavedMatchingAllocationCount, invoice.UnresolvedMatchingAllocationCount);
     private static PurchaseOrderListGroup? SelectedOrderGroup(string selected) => selected switch
     {
         "approval" => PurchaseOrderListGroup.PendingApproval,
@@ -149,7 +178,7 @@ public partial class PurchasingWorkspaceHost
             var activeId=Workspace.ActiveTab?.EntityType==Section?Workspace.ActiveTabId:Guid.Empty;
             Workspace.OpenList(Section);
             if(activeId!=Guid.Empty)Workspace.ActiveTabId=activeId;
-            _search=null;_pageNumber=1;_orderGroup="all";CurrentOrderCards=[];
+            _search=null;_pageNumber=1;_orderGroup="all";CurrentOrderCards=[];_invoiceStatus="all";_invoiceSort="date_desc";CurrentInvoiceCards=[];
             if(IsListTab)await LoadListAsync(); else if(ActiveTab is { } tab)await EnsureLoadedAsync(tab);
         }
         if(Section == PurchasingEntityType.PurchaseReceipts && _previousOrderFilter != RelatedPurchaseOrderId)
@@ -179,7 +208,10 @@ public partial class PurchasingWorkspaceHost
         if(_isLoadingList)return;_isLoadingList=true;
         try
         {
-            var request=new PageRequest{PageNumber=_pageNumber,PageSize=PageSize,Search=string.IsNullOrWhiteSpace(_search)?null:_search.Trim(),SortBy=SortField(Section),SortDirection=SortDirection.Descending};
+            var invoiceSort = InvoiceSort(_invoiceSort);
+            var request=new PageRequest{PageNumber=_pageNumber,PageSize=PageSize,Search=string.IsNullOrWhiteSpace(_search)?null:_search.Trim(),
+                SortBy=Section==PurchasingEntityType.PurchaseInvoices?invoiceSort.Field:SortField(Section),
+                SortDirection=Section==PurchasingEntityType.PurchaseInvoices?invoiceSort.Direction:SortDirection.Descending};
             switch(Section)
             {
                 case PurchasingEntityType.SupplierCatalog:
@@ -193,7 +225,9 @@ public partial class PurchasingWorkspaceHost
                 case PurchasingEntityType.PurchaseReceipts:
                     var gr=await Purchasing.GetPurchaseReceiptsAsync(request, purchaseOrderId: RelatedPurchaseOrderId);SetPage(gr.PageNumber,gr.TotalPages,gr.TotalCount,gr.Items.Select(x=>new UiPurchasingListItem(x.Id,x.ReceiptCode,x.SupplierName??"استلام",x.PurchaseOrderCode,PurchasingArabicPresenter.ReceiptStatus(x.Status),DisplayDate(x.ReceiptDate),"fa-solid fa-truck-ramp-box")).ToArray());break;
                 case PurchasingEntityType.PurchaseInvoices:
-                    var pi=await Purchasing.GetPurchaseInvoicesAsync(request);SetPage(pi.PageNumber,pi.TotalPages,pi.TotalCount,pi.Items.Select(x=>new UiPurchasingListItem(x.Id,x.PurchaseInvoiceCode,x.SupplierName??"فاتورة مورد",x.SupplierInvoiceCode,PurchasingArabicPresenter.InvoiceStatus(x.Status),$"{x.TotalAmount:#,##0.##} {x.CurrencyCode}","fa-solid fa-file-invoice-dollar")).ToArray());break;
+                    var pi=await Purchasing.GetPurchaseInvoicesAsync(request,status:SelectedInvoiceStatus(_invoiceStatus));
+                    CurrentInvoiceCards=pi.Items.Select(ToInvoiceCard).ToArray();
+                    SetPage(pi.PageNumber,pi.TotalPages,pi.TotalCount,[]);break;
             }
         }
         catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}catch{ApiFeedback.ShowUnexpected();}
@@ -364,7 +398,11 @@ public partial class PurchasingWorkspaceHost
                 _=>null
             };
             if(saved is null)return;
-            tab.Model=saved;tab.EntityId=ModelId(saved);tab.Title=ModelTitle(saved);tab.IsEditMode=false;tab.IsDirty=false;Snackbar.Success("تم حفظ البيانات بنجاح.");
+            tab.Model=saved;tab.EntityId=ModelId(saved);tab.Title=ModelTitle(saved);tab.IsEditMode=false;tab.IsDirty=false;
+            if(saved is UiPurchaseInvoiceEditorModel invoiceWithError &&
+                invoiceWithError.Lines.Any(x=>!string.IsNullOrWhiteSpace(x.QuantityError)))
+                Snackbar.Warning("حُفظت الفاتورة كمسودة، لكن المطابقة تحتاج تصحيح الكمية المحددة بالأحمر.");
+            else Snackbar.Success("تم حفظ البيانات بنجاح.");
         }
         catch(ApiClientException ex)
         {
@@ -437,41 +475,134 @@ public partial class PurchasingWorkspaceHost
         var updates=UiPurchaseReceiptFormValidator.LinesToSubmit(m).Select(x=>new UpdatePurchaseReceiptLineRequest(x.Id,x.PurchaseOrderLineId,x.LineSequence,x.ReceivedQuantity,x.AcceptedQuantity,x.RejectedQuantity,x.ActualUnitCost,x.ExpiryDate,x.BatchCode,x.Notes,x.RowVersion)).ToArray();
         return Map((await Purchasing.UpdatePurchaseReceiptAsync(m.Id.Value,new(m.ReceiptDate,m.PostingDate,m.SupplierDeliveryCode,m.Notes,updates,m.RowVersion??string.Empty)))!);
     }
+    private static void ClearInvoiceQuantityErrors(UiPurchaseInvoiceEditorModel invoice)
+    {
+        invoice.SourceReceiptError=null;
+        foreach (var line in invoice.Lines) line.QuantityError=null;
+    }
+
+    private static void ShowInvoiceQuantityIssue(UiPurchaseInvoiceEditorModel invoice,
+        InvoiceReceiptAllocationIssue? issue, string fallback)
+    {
+        if(issue is null)
+        {
+            invoice.SourceReceiptError=fallback;
+            return;
+        }
+        var line=invoice.Lines.FirstOrDefault(x=>x.LineSequence==issue.LineSequence);
+        if(line is not null) line.QuantityError=issue.Message;
+        else invoice.SourceReceiptError=fallback;
+    }
+
+    /// <summary>Recheck the same receipt after a server-side matching conflict, so
+    /// the user sees a field-level error instead of an unhelpful global exception.</summary>
+    private async Task<bool> RefreshInvoiceQuantityIssueAsync(UiPurchaseInvoiceEditorModel invoice,
+        Guid receiptId, Guid? invoiceId)
+    {
+        try
+        {
+            var receipt=await Purchasing.GetPurchaseReceiptAsync(receiptId);
+            if(receipt is null)return false;
+            var availability=invoiceId.HasValue
+                ? await Purchasing.GetPurchaseInvoiceMatchAvailabilityAsync(invoiceId.Value,
+                    receipt.Lines.Select(x=>x.Id).ToArray())
+                : await Purchasing.GetPurchaseReceiptInvoiceAvailabilityAsync(receiptId);
+            var remaining=(availability??[]).ToDictionary(x=>x.ReceiptLineId,x=>x.AvailableQuantity);
+            foreach(var line in invoice.Lines.Where(x=>x.SourceReceiptLineId.HasValue))
+                line.AvailableToInvoiceQuantity=remaining.GetValueOrDefault(line.SourceReceiptLineId!.Value);
+            var lines=AvailableReceiptLines(receipt)
+                .Where(x=>remaining.ContainsKey(x.ReceiptLineId))
+                .Select(x=>x with { AcceptedQuantity=remaining[x.ReceiptLineId], ReturnedQuantity=0m })
+                .ToArray();
+            var demands=invoice.Lines.Select(x=>new InvoiceReceiptDemand(x.Id??Guid.Empty,
+                x.PurchaseOrderLineId,x.ProductVariantId,x.Quantity,x.LineSequence,
+                x.SourceReceiptLineId)).ToArray();
+            if(!PurchaseInvoiceReceiptAllocationPlanner.TryPlanDetailed(demands,lines,
+                out _,out var issue,out var error))
+            {
+                ShowInvoiceQuantityIssue(invoice,issue,error);
+                return true;
+            }
+        }
+        catch(Exception)
+        {
+            // This optional UI diagnostic must never mask the original server rejection.
+        }
+        return false;
+    }
+
     private static IReadOnlyList<ReceiptAvailableLine> AvailableReceiptLines(PurchaseReceiptDto receipt)
         => receipt.Lines.Select(x=>new ReceiptAvailableLine(x.Id,x.PurchaseOrderLineId,
             x.ProductVariantId,x.AcceptedQuantity,x.ReturnedQuantity)).ToArray();
 
+    private static void PreserveInvoiceReceiptLineContext(
+        UiPurchaseInvoiceEditorModel source, UiPurchaseInvoiceEditorModel target)
+    {
+        // A fresh API DTO does not carry the UI-only selected receipt-line identity.
+        // Preserve it for error messages and for an automatic retry in the same tab.
+        var originals=source.Lines.ToDictionary(x=>x.LineSequence);
+        foreach(var line in target.Lines)
+        {
+            if(!originals.TryGetValue(line.LineSequence,out var original))continue;
+            line.SourceReceiptLineId=original.SourceReceiptLineId;
+            line.SourceReceiptLineSequence=original.SourceReceiptLineSequence;
+            line.AvailableToInvoiceQuantity=original.AvailableToInvoiceQuantity;
+            line.ProductCode??=original.ProductCode;
+        }
+    }
+
     private async Task<object?> SaveInvoiceAsync(UiPurchaseInvoiceEditorModel m)
     {
+        ClearInvoiceQuantityErrors(m);
         if(m.SupplierId is not Guid supplier||m.CurrencyId is not Guid currency||m.Lines.Count==0||m.Lines.Any(x=>!x.ProductVariantId.HasValue))
         {
-            Snackbar.Warning("اختر استلامًا مرحّلًا يحتوي أصنافًا صحيحة قبل حفظ الفاتورة.");return null;
+            m.SourceReceiptError="اختر استلامًا مرحّلًا يحتوي أصنافًا صحيحة وكميات متاحة للمطابقة.";
+            return null;
         }
         if(m.Lines.Any(x=>!x.PurchaseOrderLineId.HasValue))
         {
-            Snackbar.Warning("يجب أن ترتبط أصناف الفاتورة بأمر شراء. اختر استلامًا مرحّلًا أولًا.");return null;
+            m.SourceReceiptError="يجب أن ترتبط أصناف الفاتورة بأمر شراء. اختر استلامًا مرحّلًا أولًا.";
+            return null;
         }
         if(m.ExchangeRate<=0m){Snackbar.Warning("سعر الصرف يجب أن يكون أكبر من صفر.");return null;}
-        if(m.Lines.Any(x=>x.Quantity<=0m)){Snackbar.Warning("كمية كل بند يجب أن تكون أكبر من صفر.");return null;}
+        var invalidQuantity=m.Lines.FirstOrDefault(x=>x.Quantity<=0m);
+        if(invalidQuantity is not null)
+        {
+            invalidQuantity.QuantityError="أدخل كمية أكبر من صفر لهذا الصنف.";
+            return null;
+        }
 
         PurchaseReceiptDto? sourceReceipt=null;
         if(!m.Id.HasValue)
         {
             if(m.SourceReceiptId is not Guid sourceId)
             {
-                Snackbar.Warning("اختر سند استلام مرحّلًا لتعبئة الفاتورة تلقائيًا.");return null;
+                m.SourceReceiptError="اختر سند استلام مرحّلًا لتعبئة الفاتورة تلقائيًا.";
+                return null;
             }
             sourceReceipt=await Purchasing.GetPurchaseReceiptAsync(sourceId);
             if(sourceReceipt is null || sourceReceipt.Status!=PurchaseReceiptStatus.Posted || sourceReceipt.SupplierId!=supplier)
             {
-                Snackbar.Warning("سند الاستلام غير مرحّل أو المورد لا يطابق الفاتورة. اختر استلامًا صالحًا.");return null;
+                m.SourceReceiptError="سند الاستلام غير مرحّل أو المورد لا يطابق الفاتورة. اختر استلامًا صالحًا.";
+                return null;
             }
+            // The receipt's AcceptedQuantity does not deduct quantities already invoiced.
+            // Check the true ledger availability BEFORE creating any invoice draft.
+            var receiptAvailability=await Purchasing.GetPurchaseReceiptInvoiceAvailabilityAsync(sourceId);
+            var remainingBeforeCreate=(receiptAvailability??[]).ToDictionary(x=>x.ReceiptLineId,x=>x.AvailableQuantity);
+            foreach(var line in m.Lines.Where(x=>x.SourceReceiptLineId.HasValue))
+                line.AvailableToInvoiceQuantity=remainingBeforeCreate.GetValueOrDefault(line.SourceReceiptLineId!.Value);
+            var currentCandidates=AvailableReceiptLines(sourceReceipt)
+                .Where(x=>remainingBeforeCreate.ContainsKey(x.ReceiptLineId))
+                .Select(x=>x with { AcceptedQuantity=remainingBeforeCreate[x.ReceiptLineId],ReturnedQuantity=0m })
+                .ToArray();
             var draftDemands=m.Lines.Select(x=>new InvoiceReceiptDemand(Guid.Empty,x.PurchaseOrderLineId,
-                x.ProductVariantId,x.Quantity,x.LineSequence)).ToArray();
-            if(!PurchaseInvoiceReceiptAllocationPlanner.TryPlan(draftDemands,AvailableReceiptLines(sourceReceipt),
-                out _,out var preflightError))
+                x.ProductVariantId,x.Quantity,x.LineSequence,x.SourceReceiptLineId)).ToArray();
+            if(!PurchaseInvoiceReceiptAllocationPlanner.TryPlanDetailed(draftDemands,currentCandidates,
+                out _,out var quantityIssue,out var preflightError))
             {
-                Snackbar.Warning(preflightError);return null;
+                ShowInvoiceQuantityIssue(m,quantityIssue,preflightError);
+                return null;
             }
 
             var lines=m.Lines.Select(x=>new CreatePurchaseInvoiceLineRequest(x.LineSequence,x.PurchaseOrderLineId,
@@ -482,26 +613,45 @@ public partial class PurchasingWorkspaceHost
             if(created is null)return null;
 
             var mapped=Map(created);
+            PreserveInvoiceReceiptLineContext(m,mapped);
             mapped.SourceReceiptId=sourceId;
             mapped.SourceReceiptCode=sourceReceipt.ReceiptCode;
             // Creating the invoice and matching it are separate calls. A failed match must
             // never look like an entirely failed save or trigger a duplicate invoice creation.
             try
             {
+                var originalReceiptLines=m.Lines.ToDictionary(x=>x.LineSequence,
+                    x=>x.SourceReceiptLineId);
                 var demands=created.Lines.Select(x=>new InvoiceReceiptDemand(x.Id,x.PurchaseOrderLineId,
-                    x.ProductVariantId,x.Quantity,x.LineSequence)).ToArray();
-                if(!PurchaseInvoiceReceiptAllocationPlanner.TryPlan(demands,AvailableReceiptLines(sourceReceipt),
-                    out var plan,out var planError))
+                    x.ProductVariantId,x.Quantity,x.LineSequence,
+                    originalReceiptLines.GetValueOrDefault(x.LineSequence))).ToArray();
+                // Compute remaining quantities using the server's matching ledger, not only
+                // AcceptedQuantity - ReturnedQuantity from the receipt document.
+                var availability=await Purchasing.GetPurchaseInvoiceMatchAvailabilityAsync(created.Id,
+                    sourceReceipt.Lines.Select(x=>x.Id).ToArray());
+                var remaining=(availability??[]).ToDictionary(x=>x.ReceiptLineId,x=>x.AvailableQuantity);
+                var availableLines=AvailableReceiptLines(sourceReceipt)
+                    .Where(x=>remaining.ContainsKey(x.ReceiptLineId))
+                    .Select(x=>x with{AcceptedQuantity=remaining[x.ReceiptLineId],ReturnedQuantity=0m})
+                    .ToArray();
+                if(!PurchaseInvoiceReceiptAllocationPlanner.TryPlanDetailed(demands,availableLines,
+                    out var plan,out var matchIssue,out var planError))
                 {
-                    mapped.MatchingNotice=$"حُفظت المسودة، لكن تعذرت المطابقة التلقائية: {planError}";
-                    Snackbar.Warning(mapped.MatchingNotice);
+                    ShowInvoiceQuantityIssue(mapped,matchIssue,planError);
+                    mapped.MatchingNotice="تم حفظ الفاتورة كمسودة، لكن تعذرت المطابقة. " +
+                        "راجع الكمية المحددة بالأحمر ثم أعد المطابقة؛ لا تنشئ فاتورة ثانية.";
+                    Snackbar.Warning("حُفظت المسودة. راجع حقل الكمية المحدد بالأحمر.");
                     return mapped;
                 }
                 var requests=plan.Select(x=>new PurchaseInvoiceMatchAllocationRequest(
                     x.InvoiceLineId,x.ReceiptLineId,x.Quantity)).ToArray();
                 var match=await Purchasing.MatchPurchaseInvoiceAsync(created.Id,new(requests,created.RowVersion));
                 var refreshed=await Purchasing.GetPurchaseInvoiceAsync(created.Id);
-                if(refreshed is not null) mapped=Map(refreshed);
+                if(refreshed is not null)
+                {
+                    mapped=Map(refreshed);
+                    PreserveInvoiceReceiptLineContext(m,mapped);
+                }
                 mapped.SourceReceiptId=sourceId;
                 mapped.SourceReceiptCode=sourceReceipt.ReceiptCode;
                 if(match is not null)
@@ -515,9 +665,19 @@ public partial class PurchasingWorkspaceHost
             }
             catch(ApiClientException ex)
             {
-                mapped.MatchingNotice="تم حفظ الفاتورة كمسودة، لكن المطابقة التلقائية لم تكتمل. راجع الفروقات أو اضغط تشغيل المطابقة؛ لن تحتاج لإنشاء فاتورة ثانية.";
-                Snackbar.Warning(mapped.MatchingNotice);
-                ApiFeedback.Show(ex.Error);
+                var isQuantityConflict=ex.Error.Code is
+                    "purchasing_match_quantity_exceeds_available_receipt" or
+                    "purchasing_match_quantity_exceeds_invoice";
+                var fieldMarked=isQuantityConflict &&
+                    await RefreshInvoiceQuantityIssueAsync(mapped,sourceId,created.Id);
+                mapped.MatchingNotice=fieldMarked
+                    ? "حُفظت الفاتورة كمسودة، لكن المطابقة لم تكتمل. راجع الكمية المحددة بالأحمر؛ لا تنشئ فاتورة أخرى."
+                    : "حُفظت الفاتورة كمسودة، لكن المطابقة التلقائية لم تكتمل: " +
+                      PurchaseInvoiceMatchingMessages.FromApiError(ex.Error) +
+                      " لا تنشئ فاتورة أخرى لنفس الاستلام.";
+                Snackbar.Warning(fieldMarked
+                    ? "حُفظت المسودة. راجع رسالة الكمية أسفل الصنف المحدد."
+                    : mapped.MatchingNotice);
             }
             catch(Exception)
             {
@@ -575,6 +735,22 @@ public partial class PurchasingWorkspaceHost
         if (_isLoadingList || _orderGroup == group ||
             group is not ("all" or "approval" or "supply" or "completed")) return;
         _orderGroup = group;
+        _pageNumber = 1;
+        await LoadListAsync();
+    }
+    private async Task ChangeInvoiceStatusAsync(string status)
+    {
+        if (_isLoadingList || _invoiceStatus == status ||
+            status is not ("all" or "draft" or "confirmed" or "matching" or "posted" or "cancelled")) return;
+        _invoiceStatus = status;
+        _pageNumber = 1;
+        await LoadListAsync();
+    }
+    private async Task ChangeInvoiceSortAsync(string value)
+    {
+        if (_isLoadingList || _invoiceSort == value ||
+            value is not ("date_desc" or "date_asc" or "amount_desc" or "amount_asc" or "supplier_asc" or "supplier_desc")) return;
+        _invoiceSort = value;
         _pageNumber = 1;
         await LoadListAsync();
     }

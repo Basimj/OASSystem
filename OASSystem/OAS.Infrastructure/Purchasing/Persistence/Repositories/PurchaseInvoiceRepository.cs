@@ -4,6 +4,7 @@ using OAS.Application.Purchasing.Abstractions;
 using OAS.Contracts.Common.Pagination;
 using OAS.Contracts.Purchasing.Enums;
 using OAS.Domain.Purchasing.Entities;
+using OAS.Domain.Accounting.Entities;
 using OAS.Infrastructure.Persistence;
 using DomainStatus = OAS.Domain.Purchasing.Enums.PurchaseInvoiceStatus;
 
@@ -23,8 +24,31 @@ public sealed class PurchaseInvoiceRepository(OasDbContext dbContext) : IPurchas
         var query = Invoices.AsNoTracking().Include(x => x.Lines).AsQueryable();
         if (status.HasValue) query = query.Where(x => x.Status == (DomainStatus)(byte)status.Value);
         if (supplierId.HasValue) query = query.Where(x => x.SupplierId == supplierId.Value);
-        query = query.OrderByDescending(x => x.InvoiceDate).ThenByDescending(x => x.PurchaseInvoiceCode);
-        return PurchasingRepositoryHelpers.PageAsync(query, request, (q, term) => q.Where(x => x.PurchaseInvoiceCode.Contains(term) || (x.SupplierInvoiceCode != null && x.SupplierInvoiceCode.Contains(term))), cancellationToken);
+        // Whitelisted, database-side sorting before Skip/Take. Never sort a single page in the browser.
+        // The supplier name is taken from the associated supplier for a true alphabetical sort.
+        var ascending = request.SortDirection == SortDirection.Ascending;
+        var ordered = request.SortBy?.Trim().ToLowerInvariant() switch
+        {
+            "totalamount" => ascending
+                ? query.OrderBy(x => x.TotalAmount)
+                : query.OrderByDescending(x => x.TotalAmount),
+            "suppliername" => ascending
+                ? query.OrderBy(x => dbContext.Set<Supplier>().Where(s => s.Id == x.SupplierId)
+                    .Select(s => s.NameAr).FirstOrDefault())
+                : query.OrderByDescending(x => dbContext.Set<Supplier>().Where(s => s.Id == x.SupplierId)
+                    .Select(s => s.NameAr).FirstOrDefault()),
+            "invoicedate" => ascending
+                ? query.OrderBy(x => x.InvoiceDate)
+                : query.OrderByDescending(x => x.InvoiceDate),
+            _ => query.OrderByDescending(x => x.InvoiceDate)
+        };
+        query = ordered.ThenByDescending(x => x.PurchaseInvoiceCode).ThenBy(x => x.Id);
+        return PurchasingRepositoryHelpers.PageAsync(query, request,
+            (q, term) => q.Where(x => x.PurchaseInvoiceCode.Contains(term)
+                || (x.SupplierInvoiceCode != null && x.SupplierInvoiceCode.Contains(term))
+                || dbContext.Set<Supplier>().Any(s => s.Id == x.SupplierId &&
+                    (s.NameAr.Contains(term) || (s.NameEn != null && s.NameEn.Contains(term)) ||
+                     s.SupplierCode.Contains(term)))), cancellationToken);
     }
 
     // AP-07: SQL-side receipt / invoice relationship (not "first 200" client filtering).
@@ -53,6 +77,30 @@ public sealed class PurchaseInvoiceRepository(OasDbContext dbContext) : IPurchas
     {
         var lineIds = Lines.AsNoTracking().Where(x => x.PurchaseInvoiceId == purchaseInvoiceId).Select(x => x.Id);
         return await Allocations.AsNoTracking().Where(x => lineIds.Contains(x.PurchaseInvoiceLineId)).ToListAsync(cancellationToken);
+    }
+
+    // One aggregate query per page instead of one request per invoice card.
+    // Group by invoice through invoice lines; no inferred matching status from invoice workflow state.
+    public async Task<IReadOnlyDictionary<Guid, PurchaseInvoiceMatchCounts>> GetMatchingCountsAsync(
+        IReadOnlyCollection<Guid> invoiceIds, CancellationToken cancellationToken = default)
+    {
+        if (invoiceIds.Count == 0) return new Dictionary<Guid, PurchaseInvoiceMatchCounts>();
+        var ids = invoiceIds.Distinct().ToArray();
+        var counts = await (from allocation in Allocations.AsNoTracking()
+                            join line in Lines.AsNoTracking() on allocation.PurchaseInvoiceLineId equals line.Id
+                            where ids.Contains(line.PurchaseInvoiceId)
+                            group allocation by line.PurchaseInvoiceId into groupItems
+                            select new
+                            {
+                                Id = groupItems.Key,
+                                Total = groupItems.Count(),
+                                Unresolved = groupItems.Count(a =>
+                                    a.MatchStatus == OAS.Domain.Purchasing.Enums.PurchaseMatchStatus.Pending ||
+                                    a.MatchStatus == OAS.Domain.Purchasing.Enums.PurchaseMatchStatus.RequiresApproval ||
+                                    a.MatchStatus == OAS.Domain.Purchasing.Enums.PurchaseMatchStatus.Rejected)
+                            }).ToListAsync(cancellationToken);
+        return counts.ToDictionary(x => x.Id,
+            x => new PurchaseInvoiceMatchCounts(x.Total, x.Unresolved));
     }
 
     public Task<PurchaseInvoiceReceiptAllocation?> GetAllocationForUpdateAsync(Guid allocationId, CancellationToken cancellationToken = default) => Allocations.FirstOrDefaultAsync(x => x.Id == allocationId, cancellationToken);

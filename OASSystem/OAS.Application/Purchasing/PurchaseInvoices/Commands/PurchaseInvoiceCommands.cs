@@ -7,6 +7,7 @@ using OAS.Application.Purchasing.Abstractions;
 using OAS.Application.Purchasing.Authorization;
 using OAS.Application.Purchasing.Common;
 using OAS.Application.Purchasing.Mapping;
+using OAS.Application.Purchasing.PurchaseInvoices.Services;
 using OAS.Contracts.Purchasing.PurchaseInvoices;
 using OAS.Domain.Purchasing.Entities;
 using DomainDueDateProvenance = OAS.Domain.Purchasing.Enums.PurchaseInvoiceDueDateProvenance;
@@ -60,17 +61,38 @@ public sealed class CreatePurchaseInvoiceCommandHandler(
         decimal unitPrice,decimal discountAmount,decimal taxRate,Guid supplierId,Guid currencyId,decimal exchangeRate,OAS.Domain.Sales.Enums.TaxCalculationMode taxCalculationMode,
         IPurchaseOrderRepository orderRepository,IPurchasingReferenceDataPort references,CancellationToken ct,Guid? id=null)
     {
-        var product=await references.GetProductVariantAsync(productVariantId,ct);PurchasingApplicationGuard.Product(product);
-        if(poLineId.HasValue)
+        var product = await references.GetProductVariantAsync(productVariantId, ct);
+        decimal postedReceivedBaseQuantity = 0m;
+        string? productCodeSnapshot = product?.ProductCode;
+        string? productNameSnapshot = product?.ProductName;
+
+        if (poLineId.HasValue)
         {
-            var order=await orderRepository.GetByLineIdAsync(poLineId.Value,ct)??throw new NotFoundException("PurchaseOrderLine",poLineId.Value);
-            var poLine=order.Lines.Single(x=>x.Id==poLineId.Value);
-            if(order.SupplierId!=supplierId)throw new ConflictException("purchasing_invoice_po_supplier_mismatch","سطر أمر الشراء يعود إلى مورد مختلف عن مورد الفاتورة.");
-            if(order.CurrencyId!=currencyId)throw new ConflictException("purchasing_invoice_po_currency_mismatch","عملة أمر الشراء لا تطابق عملة فاتورة المورد.");
-            if(poLine.ProductVariantId!=productVariantId)throw new ConflictException("purchasing_invoice_po_product_mismatch","المنتج لا يطابق سطر أمر الشراء المحدد.");
+            var order = await orderRepository.GetByLineIdAsync(poLineId.Value, ct)
+                ?? throw new NotFoundException("PurchaseOrderLine", poLineId.Value);
+            var poLine = order.Lines.Single(x => x.Id == poLineId.Value);
+            if (order.SupplierId != supplierId)
+                throw new ConflictException("purchasing_invoice_po_supplier_mismatch", "سطر أمر الشراء يعود إلى مورد مختلف عن مورد الفاتورة.");
+            if (order.CurrencyId != currencyId)
+                throw new ConflictException("purchasing_invoice_po_currency_mismatch", "عملة أمر الشراء لا تطابق عملة فاتورة المورد.");
+            if (poLine.ProductVariantId != productVariantId)
+                throw new ConflictException("purchasing_invoice_po_product_mismatch", "المنتج لا يطابق سطر أمر الشراء المحدد.");
+
+            // Deactivating a product must not prevent invoicing goods already received.
+            // Check the posted quantity for THIS order line, not merely for its order.
+            if (product is { } snapshot && (!snapshot.ProductIsActive || !snapshot.VariantIsActive))
+            {
+                var postedQuantities = await orderRepository.GetPostedReceivedBaseQuantitiesAsync(order.Id, ct);
+                postedQuantities.TryGetValue(poLine.Id, out postedReceivedBaseQuantity);
+                // The historical order snapshots preserve the purchased item's identity.
+                productCodeSnapshot = poLine.ProductCodeSnapshot;
+                productNameSnapshot = poLine.ProductNameSnapshot;
+            }
         }
-        return PurchaseInvoiceLine.Create(id??Guid.NewGuid(),invoiceId,sequence,poLineId,productVariantId,product!.ProductCode,product.ProductName,
-            quantity,unitPrice,discountAmount,taxRate,taxCalculationMode,exchangeRate);
+
+        PurchaseInvoiceProductEligibility.Validate(product, poLineId.HasValue, postedReceivedBaseQuantity);
+        return PurchaseInvoiceLine.Create(id ?? Guid.NewGuid(), invoiceId, sequence, poLineId, productVariantId,
+            productCodeSnapshot, productNameSnapshot!, quantity, unitPrice, discountAmount, taxRate, taxCalculationMode, exchangeRate);
     }
 
     internal static async Task<ResolvedPaymentTerms> ResolvePaymentTermsAsync(

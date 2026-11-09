@@ -71,7 +71,7 @@ public partial class PurchasingWorkspaceHost
             new PageRequest { PageNumber=1, PageSize=30,
                 Search=string.IsNullOrWhiteSpace(search)?null:search.Trim(),
                 SortBy="PostingDate", SortDirection=SortDirection.Descending },
-            PurchaseReceiptStatus.Posted,cancellationToken:ct);
+            PurchaseReceiptStatus.Posted,cancellationToken:ct,onlyInvoiceable:true);
         return page.Items.Where(x=>x.Status==PurchaseReceiptStatus.Posted)
             .Take(30)
             .Select(x=>new UiLookupItem(x.Id.ToString("D"),x.ReceiptCode,

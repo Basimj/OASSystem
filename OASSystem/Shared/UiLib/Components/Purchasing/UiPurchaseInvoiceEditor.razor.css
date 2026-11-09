@@ -8,3 +8,12 @@
 .ui-invoice-next { margin:.6rem 0 0; font-size:.83rem; line-height:1.5; }
 .ui-invoice-simple-line :is(input,select) { min-width:0; max-width:100%; }
 @media (max-width:850px) { .ui-invoice-simple-line { padding:.55rem; } }
+
+/* Differentiate invoice lines that share the same product display name. */
+.ui-invoice-line-identification { min-width:0; display:grid; gap:.2rem; }
+.ui-invoice-line-identification strong { overflow-wrap:anywhere; }
+.ui-invoice-line-meta { display:flex; align-items:center; flex-wrap:wrap; gap:.3rem .75rem;
+    font-size:.76rem; line-height:1.55; color:var(--oas-ui-muted,var(--oas-ui-text-muted,#687788)); }
+.ui-invoice-line-meta span { white-space:normal; overflow-wrap:anywhere; }
+.ui-invoice-origin { flex-wrap:wrap; }
+.ui-invoice-origin span { flex:1 1 200px; min-width:0; }

@@ -41,9 +41,11 @@ public interface IPurchasingClientService
     Task<PurchaseOrderDto?> CancelPurchaseOrderAsync(Guid id, CancelPurchaseOrderRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseOrderDto?> ClosePurchaseOrderAsync(Guid id, ClosePurchaseOrderRequest request, CancellationToken cancellationToken = default);
 
-    Task<PagedResult<PurchaseReceiptDto>> GetPurchaseReceiptsAsync(PageRequest request, PurchaseReceiptStatus? status = null, Guid? purchaseOrderId = null, Guid? supplierId = null, CancellationToken cancellationToken = default);
+    Task<PagedResult<PurchaseReceiptDto>> GetPurchaseReceiptsAsync(PageRequest request, PurchaseReceiptStatus? status = null, Guid? purchaseOrderId = null, Guid? supplierId = null, CancellationToken cancellationToken = default, bool onlyInvoiceable = false);
     Task<PagedResult<PurchaseInvoiceDto>> GetMatchedPurchaseInvoicesForReceiptAsync(Guid receiptId, PageRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseReceiptDto?> GetPurchaseReceiptAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<PurchaseReceiptMatchAvailabilityDto>?> GetPurchaseReceiptInvoiceAvailabilityAsync(
+        Guid receiptId, CancellationToken cancellationToken = default);
     Task<PurchaseReceiptDto?> CreatePurchaseReceiptAsync(CreatePurchaseReceiptRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseReceiptDto?> UpdatePurchaseReceiptAsync(Guid id, UpdatePurchaseReceiptRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseReceiptDto?> ConfirmPurchaseReceiptAsync(Guid id, ConfirmPurchaseReceiptRequest request, CancellationToken cancellationToken = default);
@@ -55,6 +57,8 @@ public interface IPurchasingClientService
     Task<PurchaseInvoiceDto?> CreatePurchaseInvoiceAsync(CreatePurchaseInvoiceRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseInvoiceDto?> UpdatePurchaseInvoiceAsync(Guid id, UpdatePurchaseInvoiceRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseInvoiceMatchingReadinessDto?> GetPurchaseInvoiceMatchingReadinessAsync(Guid id, CancellationToken ct = default);
+    Task<IReadOnlyList<PurchaseReceiptMatchAvailabilityDto>?> GetPurchaseInvoiceMatchAvailabilityAsync(
+        Guid invoiceId, IReadOnlyList<Guid> receiptLineIds, CancellationToken cancellationToken = default);
     Task<PurchaseMatchResultDto?> MatchPurchaseInvoiceAsync(Guid id, MatchPurchaseInvoiceRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseInvoiceDto?> ConfirmPurchaseInvoiceAsync(Guid id, ConfirmPurchaseInvoiceRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseInvoiceDto?> ApprovePurchaseVarianceAsync(Guid id, ApprovePurchaseVarianceRequest request, CancellationToken cancellationToken = default);

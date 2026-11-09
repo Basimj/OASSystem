@@ -4,8 +4,10 @@ using OAS.Application.Purchasing.Abstractions;
 using OAS.Contracts.Common.Pagination;
 using OAS.Contracts.Purchasing.Enums;
 using OAS.Domain.Purchasing.Entities;
+using OAS.Domain.Accounting.Entities;
 using OAS.Infrastructure.Persistence;
 using DomainStatus = OAS.Domain.Purchasing.Enums.PurchaseReceiptStatus;
+using DomainInvoiceStatus = OAS.Domain.Purchasing.Enums.PurchaseInvoiceStatus;
 
 namespace OAS.Infrastructure.Purchasing.Persistence.Repositories;
 
@@ -17,14 +19,44 @@ public sealed class PurchaseReceiptRepository(OasDbContext dbContext) : IPurchas
     public Task<PurchaseReceipt?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) => Receipts.AsNoTracking().Include(x => x.Lines).FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
     public Task<PurchaseReceipt?> GetForUpdateAsync(Guid id, CancellationToken cancellationToken = default) => Receipts.Include(x => x.Lines).FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
-    public Task<PagedData<PurchaseReceipt>> GetPageAsync(PageRequest request, PurchaseReceiptStatus? status, Guid? purchaseOrderId, Guid? supplierId, CancellationToken cancellationToken = default)
+    public Task<PagedData<PurchaseReceipt>> GetPageAsync(PageRequest request, PurchaseReceiptStatus? status, Guid? purchaseOrderId, Guid? supplierId, CancellationToken cancellationToken = default, bool onlyInvoiceable = false)
     {
         var query = Receipts.AsNoTracking().Include(x => x.Lines).AsQueryable();
         if (status.HasValue) query = query.Where(x => x.Status == (DomainStatus)(byte)status.Value);
         if (purchaseOrderId.HasValue) query = query.Where(x => x.PurchaseOrderId == purchaseOrderId.Value);
         if (supplierId.HasValue) query = query.Where(x => x.SupplierId == supplierId.Value);
+
+        if (onlyInvoiceable)
+        {
+            query = query.Where(receipt =>
+                receipt.Status == DomainStatus.Posted &&
+                Lines.AsNoTracking().Any(line =>
+                    line.PurchaseReceiptId == receipt.Id &&
+                    (
+                        line.AcceptedQuantity - line.ReturnedQuantity -
+                        (
+                            (from allocation in dbContext.Set<PurchaseInvoiceReceiptAllocation>()
+                             join invoiceLine in dbContext.Set<PurchaseInvoiceLine>()
+                                 on allocation.PurchaseInvoiceLineId equals invoiceLine.Id
+                             join invoice in dbContext.Set<PurchaseInvoice>()
+                                 on invoiceLine.PurchaseInvoiceId equals invoice.Id
+                             where allocation.PurchaseReceiptLineId == line.Id
+                                   && invoice.Status != DomainInvoiceStatus.Cancelled
+                             select (decimal?)allocation.MatchedQuantity)
+                            .Sum() ?? 0m
+                        )
+                    ) > 0m
+                )
+            );
+        }
+
         query = query.OrderByDescending(x => x.ReceiptDate).ThenByDescending(x => x.ReceiptCode);
-        return PurchasingRepositoryHelpers.PageAsync(query, request, (q, term) => q.Where(x => x.ReceiptCode.Contains(term) || (x.SupplierDeliveryCode != null && x.SupplierDeliveryCode.Contains(term))), cancellationToken);
+        return PurchasingRepositoryHelpers.PageAsync(query, request,
+            (q, term) => q.Where(x => x.ReceiptCode.Contains(term)
+                || (x.SupplierDeliveryCode != null && x.SupplierDeliveryCode.Contains(term))
+                || (onlyInvoiceable && dbContext.Set<Supplier>().Any(s => s.Id == x.SupplierId &&
+                    (s.NameAr.Contains(term) || (s.NameEn != null && s.NameEn.Contains(term)) || s.SupplierCode.Contains(term))))),
+            cancellationToken);
     }
 
     public async Task<decimal> GetPostedAcceptedQuantityAsync(Guid purchaseOrderLineId, CancellationToken cancellationToken = default) =>

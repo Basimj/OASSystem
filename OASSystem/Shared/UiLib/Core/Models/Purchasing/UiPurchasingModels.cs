@@ -219,6 +219,8 @@ public sealed class UiPurchaseInvoiceEditorModel
     public List<UiPurchaseInvoiceLineModel> Lines { get; } = [];
     public UiPurchaseMatchModel? Match { get; set; }
     public string? MatchingNotice { get; set; }
+    // UI-only errors: never sent to the API or persisted.
+    public string? SourceReceiptError { get; set; }
 }
 
 public sealed class UiPurchaseInvoiceLineModel
@@ -228,7 +230,13 @@ public sealed class UiPurchaseInvoiceLineModel
     public Guid? PurchaseOrderLineId { get; set; }
     public Guid? ProductVariantId { get; set; }
     public string? ProductName { get; set; }
+    public string? ProductCode { get; set; }
+    // Only populated for a new invoice prepared from a posted receipt.
+    public Guid? SourceReceiptLineId { get; set; }
+    public int? SourceReceiptLineSequence { get; set; }
+    public decimal? AvailableToInvoiceQuantity { get; set; }
     public decimal Quantity { get; set; } = 1m;
+    public string? QuantityError { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal GrossAmount { get; set; }
     public decimal DiscountAmount { get; set; }

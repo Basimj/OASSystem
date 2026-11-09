@@ -50,4 +50,7 @@ public sealed record PurchaseInvoiceDto(
     int? PaymentTermDaysSnapshot = null,
     DateOnly? DueDate = null,
     PurchaseInvoiceDueDateProvenance DueDateProvenance = PurchaseInvoiceDueDateProvenance.Unknown,
-    string? BaseCurrencyNameAr = null);
+    string? BaseCurrencyNameAr = null,
+    string? CurrencyNameAr = null,
+    int? SavedMatchingAllocationCount = null,
+    int? UnresolvedMatchingAllocationCount = null);
