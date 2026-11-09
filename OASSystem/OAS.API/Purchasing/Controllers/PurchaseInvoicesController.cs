@@ -65,6 +65,13 @@ public sealed class PurchaseInvoicesController(ISender sender) : ControllerBase
         Guid id, CancellationToken cancellationToken)
         => Ok(await sender.Send(new GetPurchaseInvoiceMatchingReadinessQuery(id), cancellationToken));
 
+    // Read-only availability preflight to show an actionable message before matching.
+    // Posting the match still repeats all checks within the transaction.
+    [HttpPost("{id:guid}/match/availability")]
+    public async Task<ActionResult<IReadOnlyList<PurchaseReceiptMatchAvailabilityDto>>> GetMatchAvailability(
+        Guid id, [FromBody] Guid[] receiptLineIds, CancellationToken cancellationToken)
+        => Ok(await sender.Send(new GetPurchaseInvoiceMatchAvailabilityQuery(id, receiptLineIds), cancellationToken));
+
     [HttpPost("{id:guid}/match")]
     public async Task<ActionResult<PurchaseMatchResultDto>> Match(
         Guid id,

@@ -490,7 +490,11 @@ public partial class PurchasingWorkspaceHost
             var receipt=await Purchasing.GetPurchaseReceiptAsync(receiptId.Value);
             if(receipt is null){Snackbar.Warning("لم يُعثر على سند الاستلام.");return;}
             var prepared=await PrepareInvoiceFromReceiptAsync(receipt);
-            if(prepared is null)return;
+            if(prepared is null)
+            {
+                invoice.SourceReceiptError="لا توجد كمية غير مفوترة متاحة في هذا الاستلام. اختر استلامًا آخر أو راجع الفواتير المرتبطة به.";
+                return;
+            }
             // Keep fields the user may have typed before selecting the receipt.
             prepared.SupplierInvoiceCode=invoice.SupplierInvoiceCode;
             prepared.InvoiceDate=invoice.InvoiceDate;
@@ -499,6 +503,16 @@ public partial class PurchasingWorkspaceHost
             Snackbar.Success("تمت تعبئة المورد والعملة والأصناف والكميات والأسعار تلقائيًا من سند الاستلام.");
         }
         catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}catch{ApiFeedback.ShowUnexpected();}
+    }
+
+    private async Task RefreshSelectedInvoiceReceiptAsync()
+    {
+        if(ActiveTab?.Model is not UiPurchaseInvoiceEditorModel invoice ||
+           invoice.Id.HasValue || !invoice.SourceReceiptId.HasValue || !IsEditable)return;
+        if(!await Dialog.ConfirmAsync("تحديث كميات الاستلام",
+            "سيُعاد جلب الأصناف والكميات المتاحة من الاستلام، وستُستبدل التعديلات غير المحفوظة على الكميات والأسعار. هل تريد المتابعة؟",
+            AlertTone.Warning,"تحديث","إلغاء"))return;
+        await InvoiceReceiptChangedAsync(invoice.SourceReceiptId.Value);
     }
 
     private async Task<UiPurchaseInvoiceEditorModel?> PrepareInvoiceFromReceiptAsync(PurchaseReceiptDto receipt)
@@ -521,6 +535,9 @@ public partial class PurchasingWorkspaceHost
             return null;
         }
 
+        // Do not offer quantities that have already been matched to another invoice.
+        var availability=await Purchasing.GetPurchaseReceiptInvoiceAvailabilityAsync(receipt.Id);
+        var remainingByLine=(availability??[]).ToDictionary(x=>x.ReceiptLineId,x=>x.AvailableQuantity);
         var orderLines=order.Lines.ToDictionary(x=>x.Id);
         var model=new UiPurchaseInvoiceEditorModel
         {
@@ -536,7 +553,7 @@ public partial class PurchasingWorkspaceHost
             Notes=$"فاتورة مورد من الاستلام {receipt.ReceiptCode} / أمر الشراء {order.PurchaseOrderCode}"
         };
 
-        foreach(var receiptLine in receipt.Lines.Where(x=>x.AcceptedQuantity>x.ReturnedQuantity).OrderBy(x=>x.LineSequence))
+        foreach(var receiptLine in receipt.Lines.Where(x=>remainingByLine.GetValueOrDefault(x.Id)>0m).OrderBy(x=>x.LineSequence))
         {
             if(!orderLines.TryGetValue(receiptLine.PurchaseOrderLineId,out var poLine))
             {
@@ -544,7 +561,7 @@ public partial class PurchasingWorkspaceHost
                 return null;
             }
 
-            var quantity=Math.Round(Math.Max(0m,receiptLine.AcceptedQuantity-receiptLine.ReturnedQuantity),3);
+            var quantity=remainingByLine[receiptLine.Id];
             if(quantity<=0m)continue;
             var ratio=poLine.OrderedQuantity<=0m?0m:quantity/poLine.OrderedQuantity;
             var discount=Math.Round(poLine.DiscountAmount*ratio,4);
@@ -559,6 +576,10 @@ public partial class PurchasingWorkspaceHost
                 PurchaseOrderLineId=poLine.Id,
                 ProductVariantId=poLine.ProductVariantId,
                 ProductName=poLine.ProductNameSnapshot,
+                ProductCode=receiptLine.ProductCode ?? poLine.ProductCodeSnapshot,
+                SourceReceiptLineId=receiptLine.Id,
+                SourceReceiptLineSequence=receiptLine.LineSequence,
+                AvailableToInvoiceQuantity=quantity,
                 Quantity=quantity,
                 UnitPrice=poLine.UnitPrice,
                 GrossAmount=gross,
@@ -572,7 +593,7 @@ public partial class PurchasingWorkspaceHost
 
         if(model.Lines.Count==0)
         {
-            Snackbar.Warning("لا توجد كميات مقبولة متاحة لإنشاء فاتورة من هذا الاستلام.");
+            Snackbar.Warning("جميع كميات هذا الاستلام تمت فوترتها أو إرجاعها. اختر استلامًا آخر يحتوي كميات غير مفوترة.");
             return null;
         }
 
@@ -610,38 +631,97 @@ public partial class PurchasingWorkspaceHost
     private async Task MatchInvoiceAsync(MouseEventArgs _)
     {
         if(ActiveTab?.Model is not UiPurchaseInvoiceEditorModel m||m.Id is not Guid id||m.SupplierId is not Guid supplier)return;
+        m.MatchingNotice=null;
+        ClearInvoiceQuantityErrors(m);
         try
         {
-            var page=await Purchasing.GetPurchaseReceiptsAsync(new PageRequest{PageNumber=1,PageSize=100,SortBy="PostingDate",SortDirection=SortDirection.Descending},PurchaseReceiptStatus.Posted,null,supplier);
-            var candidates=page.Items.SelectMany(x=>x.Lines).ToList();
-            var remainingByReceiptLine=candidates.ToDictionary(x=>x.Id,x=>Math.Max(0m,x.AcceptedQuantity-x.ReturnedQuantity));
-            var allocations=new List<PurchaseInvoiceMatchAllocationRequest>();
-            foreach(var line in m.Lines.Where(x=>x.Id.HasValue&&x.ProductVariantId.HasValue))
+            // When an invoice was prepared from a specific posted receipt, match only
+            // against that receipt. For invoices reopened later, search ALL receipt pages:
+            // using just the latest 100 can incorrectly report zero available for an older PO.
+            var receiptPool=new List<PurchaseReceiptDto>();
+            if(m.SourceReceiptId is Guid selectedReceiptId)
             {
-                var remaining=line.Quantity;
-                foreach(var r in candidates.Where(x=>x.ProductVariantId==line.ProductVariantId&&(!line.PurchaseOrderLineId.HasValue||x.PurchaseOrderLineId==line.PurchaseOrderLineId)).OrderBy(x=>x.LineSequence))
-                {
-                    if(remaining<=0)break;
-                    var available=remainingByReceiptLine[r.Id];
-                    if(available<=0)continue;
-                    var qty=Math.Min(remaining,available);
-                    allocations.Add(new(line.Id!.Value,r.Id,qty));
-                    remainingByReceiptLine[r.Id]=available-qty;
-                    remaining-=qty;
-                }
-                if(remaining>0){Snackbar.Warning($"لا توجد كمية استلام مرحلة كافية لمطابقة البند {line.LineSequence}.");return;}
+                var selectedReceipt=await Purchasing.GetPurchaseReceiptAsync(selectedReceiptId);
+                if(selectedReceipt is not null && selectedReceipt.Status==PurchaseReceiptStatus.Posted &&
+                    selectedReceipt.SupplierId==supplier)
+                    receiptPool.Add(selectedReceipt);
             }
-            if(allocations.Count==0){Snackbar.Warning("لا توجد استلامات مرحلة مناسبة للمطابقة.");return;}
-            var result=await Purchasing.MatchPurchaseInvoiceAsync(id,new(allocations,m.RowVersion??string.Empty));if(result is null)return;
+            else
+            {
+                var receiptPageNumber=1;
+                var totalReceiptPages=1;
+                while(receiptPageNumber<=totalReceiptPages)
+                {
+                    var page=await Purchasing.GetPurchaseReceiptsAsync(
+                        new PageRequest{PageNumber=receiptPageNumber,PageSize=100,
+                            SortBy="PostingDate",SortDirection=SortDirection.Descending},
+                        PurchaseReceiptStatus.Posted,null,supplier);
+                    receiptPool.AddRange(page.Items);
+                    totalReceiptPages=page.TotalPages;
+                    receiptPageNumber++;
+                }
+            }
+            var lines=m.Lines.Where(x=>x.Id.HasValue&&x.ProductVariantId.HasValue&&x.PurchaseOrderLineId.HasValue).ToArray();
+            if(lines.Length==0||lines.Length!=m.Lines.Count)
+            {
+                m.MatchingNotice="يجب ربط جميع أصناف الفاتورة ببنود أوامر الشراء قبل تشغيل المطابقة.";
+                Snackbar.Warning(m.MatchingNotice);return;
+            }
+            var receipts=receiptPool.SelectMany(x=>x.Lines)
+                .Where(x=>lines.Any(l=>l.ProductVariantId==x.ProductVariantId&&l.PurchaseOrderLineId==x.PurchaseOrderLineId))
+                .ToArray();
+            if(receipts.Length==0)
+            {
+                m.MatchingNotice="لا توجد استلامات مرحلة مناسبة لأصناف الفاتورة. تأكد من استلام البضاعة وترحيل سندها أولًا.";
+                Snackbar.Warning(m.MatchingNotice);return;
+            }
+
+            // The receipt DTO's AcceptedQuantity does not deduct quantities already matched
+            // to other invoices. Ask the server for its actual remaining quantity first.
+            var availability=await Purchasing.GetPurchaseInvoiceMatchAvailabilityAsync(id,receipts.Select(x=>x.Id).Distinct().ToArray());
+            var remaining=(availability??[]).ToDictionary(x=>x.ReceiptLineId,x=>x.AvailableQuantity);
+            var candidates=receipts.Where(x=>remaining.ContainsKey(x.Id))
+                .Select(x=>new ReceiptAvailableLine(x.Id,x.PurchaseOrderLineId,x.ProductVariantId,remaining[x.Id],0m))
+                .ToArray();
+            var demands=lines.Select(x=>new InvoiceReceiptDemand(x.Id!.Value,x.PurchaseOrderLineId,
+                x.ProductVariantId,x.Quantity,x.LineSequence)).ToArray();
+            if(!PurchaseInvoiceReceiptAllocationPlanner.TryPlanDetailed(demands,candidates,
+                out var plan,out var issue,out var error))
+            {
+                ShowInvoiceQuantityIssue(m,issue,error);
+                if(issue is null) m.MatchingNotice=error;
+                Snackbar.Warning("راجع الكمية المحددة بالأحمر أو اختر استلامًا آخر متاحًا للمطابقة.");
+                return;
+            }
+            var allocations=plan.Select(x=>new PurchaseInvoiceMatchAllocationRequest(
+                x.InvoiceLineId,x.ReceiptLineId,x.Quantity)).ToArray();
+            var result=await Purchasing.MatchPurchaseInvoiceAsync(id,new(allocations,m.RowVersion??string.Empty));
+            if(result is null)return;
             var refreshed=await Purchasing.GetPurchaseInvoiceAsync(id);
             if(refreshed is null)return;
             var mapped=Map(refreshed);
             mapped.Match=Map(result);
+            mapped.MatchingNotice=result.RequiresApproval
+                ? "تمت المطابقة. توجد فروقات تحتاج إلى المراجعة والاعتماد قبل الترحيل."
+                : null;
             SetActive(mapped);
             await LoadInvoiceMatchingReadinessAsync(mapped);
             Snackbar.Success("تم تشغيل المطابقة الثلاثية. راجع الفروقات قبل ترحيل الفاتورة.");
         }
-        catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}catch{ApiFeedback.ShowUnexpected();}
+        catch(ApiClientException ex)
+        {
+            if(ex.Error.Code is "purchasing_match_quantity_exceeds_available_receipt" or "purchasing_match_quantity_exceeds_invoice" or "purchasing_invoice_line_match_required")
+            {
+                var marked=m.SourceReceiptId.HasValue &&
+                    await RefreshInvoiceQuantityIssueAsync(m,m.SourceReceiptId.Value,id);
+                if(!marked)m.MatchingNotice=PurchaseInvoiceMatchingMessages.FromApiError(ex.Error);
+                Snackbar.Warning(marked
+                    ? "راجع الكمية المحددة بالأحمر في بنود الفاتورة."
+                    : m.MatchingNotice!);
+            }
+            else ApiFeedback.Show(ex.Error);
+        }
+        catch{ApiFeedback.ShowUnexpected();}
     }
     private async Task ApproveVariancesAsync(MouseEventArgs _)
     {

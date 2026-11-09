@@ -160,7 +160,8 @@ public sealed class PurchasingMapper(
             invoice.PaymentTermDaysSnapshot,
             invoice.DueDate,
             (OAS.Contracts.Purchasing.Enums.PurchaseInvoiceDueDateProvenance)(byte)invoice.DueDateProvenance,
-            baseCurrency?.NameAr);
+            baseCurrency?.NameAr,
+            currency?.NameAr);
     }
 
     public async Task<PurchaseMatchResultDto> ToMatchDtoAsync(PurchaseInvoice invoice, PurchaseMatchEvaluation evaluation, CancellationToken cancellationToken)

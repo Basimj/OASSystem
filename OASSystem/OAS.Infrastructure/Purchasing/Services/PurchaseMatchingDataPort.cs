@@ -37,9 +37,15 @@ public sealed class PurchaseMatchingDataPort(OasDbContext dbContext) : IPurchase
                          }).FirstOrDefaultAsync(cancellationToken);
         if (row is null) return null;
 
+        // Cancelled invoices retain their historical allocations for audit, but those
+        // allocations must NOT consume invoiceable receipt quantities. The invoice never
+        // posted, so its cancellation releases the receipt for a replacement invoice.
         var alreadyMatched = await (from allocation in dbContext.Set<PurchaseInvoiceReceiptAllocation>().AsNoTracking()
                                     join invoiceLine in dbContext.Set<PurchaseInvoiceLine>().AsNoTracking() on allocation.PurchaseInvoiceLineId equals invoiceLine.Id
-                                    where allocation.PurchaseReceiptLineId == purchaseReceiptLineId && invoiceLine.PurchaseInvoiceId != purchaseInvoiceId
+                                    join invoice in dbContext.Set<PurchaseInvoice>().AsNoTracking() on invoiceLine.PurchaseInvoiceId equals invoice.Id
+                                    where allocation.PurchaseReceiptLineId == purchaseReceiptLineId &&
+                                          invoiceLine.PurchaseInvoiceId != purchaseInvoiceId &&
+                                          invoice.Status != OAS.Domain.Purchasing.Enums.PurchaseInvoiceStatus.Cancelled
                                     select (decimal?)allocation.MatchedQuantity).SumAsync(cancellationToken) ?? 0m;
         var available = Math.Max(0m, row.AcceptedQuantity - row.ReturnedQuantity - alreadyMatched);
         var purchaseOrderNetUnitPriceBase = row.OrderedQuantity <= 0m

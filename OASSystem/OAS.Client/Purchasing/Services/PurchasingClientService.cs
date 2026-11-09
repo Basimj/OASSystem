@@ -58,11 +58,15 @@ public sealed partial class PurchasingClientService(OasApiClient api) : IPurchas
     public Task<PurchaseOrderDto?> CancelPurchaseOrderAsync(Guid id,CancelPurchaseOrderRequest r,CancellationToken ct=default)=>Post<CancelPurchaseOrderRequest,PurchaseOrderDto>($"api/purchasing/orders/{id}/cancel",r,ct);
     public Task<PurchaseOrderDto?> ClosePurchaseOrderAsync(Guid id,ClosePurchaseOrderRequest r,CancellationToken ct=default)=>Post<ClosePurchaseOrderRequest,PurchaseOrderDto>($"api/purchasing/orders/{id}/close",r,ct);
 
-    public Task<PagedResult<PurchaseReceiptDto>> GetPurchaseReceiptsAsync(PageRequest r,PurchaseReceiptStatus? status=null,Guid? purchaseOrderId=null,Guid? supplierId=null,CancellationToken ct=default)
-    { var q=Add(Add(Add("api/purchasing/receipts"+PageQuery(r),"status",status),"purchaseOrderId",purchaseOrderId),"supplierId",supplierId); return GetPage<PurchaseReceiptDto>(q,ct); }
+    public Task<PagedResult<PurchaseReceiptDto>> GetPurchaseReceiptsAsync(PageRequest r,PurchaseReceiptStatus? status=null,Guid? purchaseOrderId=null,Guid? supplierId=null,CancellationToken ct=default,bool onlyInvoiceable=false)
+    { var q=Add(Add(Add(Add("api/purchasing/receipts"+PageQuery(r),"status",status),"purchaseOrderId",purchaseOrderId),"supplierId",supplierId),"onlyInvoiceable",onlyInvoiceable ? (bool?)true : null); return GetPage<PurchaseReceiptDto>(q,ct); }
     public Task<PagedResult<PurchaseInvoiceDto>> GetMatchedPurchaseInvoicesForReceiptAsync(Guid receiptId, PageRequest request, CancellationToken ct=default)
         => GetPage<PurchaseInvoiceDto>($"api/purchasing/receipts/{receiptId:D}/matched-invoices"+PageQuery(request),ct);
     public Task<PurchaseReceiptDto?> GetPurchaseReceiptAsync(Guid id,CancellationToken ct=default)=>api.GetAsync<PurchaseReceiptDto>($"api/purchasing/receipts/{id}",ct);
+    public Task<IReadOnlyList<PurchaseReceiptMatchAvailabilityDto>?> GetPurchaseReceiptInvoiceAvailabilityAsync(
+        Guid receiptId, CancellationToken ct=default)
+        => api.GetAsync<IReadOnlyList<PurchaseReceiptMatchAvailabilityDto>>(
+            $"api/purchasing/receipts/{receiptId:D}/invoice-availability", ct);
     public Task<PurchaseReceiptDto?> CreatePurchaseReceiptAsync(CreatePurchaseReceiptRequest r,CancellationToken ct=default)=>Post<CreatePurchaseReceiptRequest,PurchaseReceiptDto>("api/purchasing/receipts",r,ct);
     public Task<PurchaseReceiptDto?> UpdatePurchaseReceiptAsync(Guid id,UpdatePurchaseReceiptRequest r,CancellationToken ct=default)=>api.PutAsync<UpdatePurchaseReceiptRequest,PurchaseReceiptDto>($"api/purchasing/receipts/{id}",r,ct);
     public Task<PurchaseReceiptDto?> ConfirmPurchaseReceiptAsync(Guid id,ConfirmPurchaseReceiptRequest r,CancellationToken ct=default)=>Post<ConfirmPurchaseReceiptRequest,PurchaseReceiptDto>($"api/purchasing/receipts/{id}/confirm",r,ct);
@@ -76,6 +80,10 @@ public sealed partial class PurchasingClientService(OasApiClient api) : IPurchas
     public Task<PurchaseInvoiceDto?> UpdatePurchaseInvoiceAsync(Guid id,UpdatePurchaseInvoiceRequest r,CancellationToken ct=default)=>api.PutAsync<UpdatePurchaseInvoiceRequest,PurchaseInvoiceDto>($"api/purchasing/invoices/{id}",r,ct);
     public Task<PurchaseInvoiceMatchingReadinessDto?> GetPurchaseInvoiceMatchingReadinessAsync(Guid id, CancellationToken ct = default)
         => api.GetAsync<PurchaseInvoiceMatchingReadinessDto>($"api/purchasing/invoices/{id:D}/matching-readiness", ct);
+    public Task<IReadOnlyList<PurchaseReceiptMatchAvailabilityDto>?> GetPurchaseInvoiceMatchAvailabilityAsync(
+        Guid invoiceId, IReadOnlyList<Guid> receiptLineIds, CancellationToken ct=default)
+        => Post<IReadOnlyList<Guid>,IReadOnlyList<PurchaseReceiptMatchAvailabilityDto>>(
+            $"api/purchasing/invoices/{invoiceId:D}/match/availability",receiptLineIds,ct);
     public Task<PurchaseMatchResultDto?> MatchPurchaseInvoiceAsync(Guid id,MatchPurchaseInvoiceRequest r,CancellationToken ct=default)=>Post<MatchPurchaseInvoiceRequest,PurchaseMatchResultDto>($"api/purchasing/invoices/{id}/match",r,ct);
     public Task<PurchaseInvoiceDto?> ConfirmPurchaseInvoiceAsync(Guid id,ConfirmPurchaseInvoiceRequest r,CancellationToken ct=default)=>Post<ConfirmPurchaseInvoiceRequest,PurchaseInvoiceDto>($"api/purchasing/invoices/{id}/confirm",r,ct);
     public Task<PurchaseInvoiceDto?> ApprovePurchaseVarianceAsync(Guid id,ApprovePurchaseVarianceRequest r,CancellationToken ct=default)=>Post<ApprovePurchaseVarianceRequest,PurchaseInvoiceDto>($"api/purchasing/invoices/{id}/variances/approve",r,ct);

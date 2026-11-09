@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using OAS.Application.Purchasing.PurchaseReceipts.Commands;
 using OAS.Application.Purchasing.PurchaseReceipts.Queries;
+using OAS.Application.Purchasing.PurchaseInvoices.Queries;
+using OAS.Contracts.Purchasing.PurchaseInvoices;
 using OAS.Contracts.Common.Pagination;
 using OAS.Contracts.Purchasing.Enums;
 using OAS.Contracts.Purchasing.PurchaseReceipts;
@@ -22,13 +24,21 @@ public sealed class PurchaseReceiptsController(ISender sender) : ControllerBase
         [FromQuery] PurchaseReceiptStatus? status,
         [FromQuery] Guid? purchaseOrderId,
         [FromQuery] Guid? supplierId,
+        [FromQuery] bool onlyInvoiceable,
         CancellationToken cancellationToken)
-        => Ok(await sender.Send(new GetPurchaseReceiptsQuery(request, status, purchaseOrderId, supplierId), cancellationToken));
+        => Ok(await sender.Send(new GetPurchaseReceiptsQuery(request, status, purchaseOrderId, supplierId, onlyInvoiceable), cancellationToken));
 
     [HttpGet("{id:guid}/matched-invoices")]
     public async Task<ActionResult<PagedResult<OAS.Contracts.Purchasing.PurchaseInvoices.PurchaseInvoiceDto>>> GetMatchedInvoices(
         Guid id, [FromQuery] PageRequest request, CancellationToken cancellationToken)
         => Ok(await sender.Send(new OAS.Application.Purchasing.PurchaseInvoices.Queries.GetMatchedPurchaseInvoicesForReceiptQuery(id, request), cancellationToken));
+
+    // Shows quantities not yet used by other invoices (and not returned).
+    // A new invoice has no Id, so the existing invoice match endpoint cannot be used here.
+    [HttpGet("{id:guid}/invoice-availability")]
+    public async Task<ActionResult<IReadOnlyList<PurchaseReceiptMatchAvailabilityDto>>> GetInvoiceAvailability(
+        Guid id, CancellationToken cancellationToken)
+        => Ok(await sender.Send(new GetPurchaseReceiptInvoiceAvailabilityQuery(id), cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<PurchaseReceiptDto>> GetById(Guid id, CancellationToken cancellationToken)

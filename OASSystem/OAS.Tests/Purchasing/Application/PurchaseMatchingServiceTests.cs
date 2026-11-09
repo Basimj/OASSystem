@@ -126,6 +126,22 @@ public sealed class PurchaseMatchingServiceTests
     }
 
     [Test]
+    public void Exceeding_available_receipt_quantity_explains_requested_and_remaining_without_weakening_the_rule()
+    {
+        var fixture=CreateFixture(invoiceQuantity:10m,availableReceiptQuantity:3m);
+        var ex=Assert.ThrowsAsync<ConflictException>(async()=>await fixture.Service.EvaluateAsync(
+            fixture.Invoice,[new PurchaseInvoiceMatchAllocationRequest(fixture.InvoiceLineId,fixture.ReceiptLineId,8m)]));
+        Assert.That(ex,Is.Not.Null);
+        Assert.Multiple(()=>
+        {
+            Assert.That(ex!.Code,Is.EqualTo("purchasing_match_quantity_exceeds_available_receipt"));
+            Assert.That(ex.Message,Does.Contain("GR-TEST-MATCH"));
+            Assert.That(ex.Message,Does.Contain("8"));
+            Assert.That(ex.Message,Does.Contain("3"));
+        });
+    }
+
+    [Test]
     public void InvoiceLineWithoutPurchaseOrderLine_CannotRunThreeWayMatching()
     {
         var fixture = CreateFixture(linkToPurchaseOrder: false);

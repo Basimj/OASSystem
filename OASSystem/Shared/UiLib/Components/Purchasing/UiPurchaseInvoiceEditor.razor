@@ -20,13 +20,21 @@
                 Value="@GuidText(Model.SourceReceiptId)"
                 SelectedItem="@Selected(Model.SourceReceiptId, Model.SourceReceiptCode, "fa-solid fa-truck-ramp-box")"
                 SearchAsync="PostedReceiptSearchAsync" ValueChanged="ReceiptChangedAsync"
+                ErrorText="@Model.SourceReceiptError"
                 Placeholder="ابحث برقم الاستلام أو المورد..."
-                EmptyText="لا توجد استلامات مرحلة مطابقة للبحث. رحّل الاستلام أولًا."
+                EmptyText="لا توجد استلامات بها كميات غير مفوترة. تأكد من ترحيل استلام جديد أو جرّب بحثًا آخر."
                 Disabled="@(!IsEditable)" />
             @if(Model.SourceReceiptId.HasValue)
             {
-                <div class="ui-invoice-origin" role="status"><i class="fa-solid fa-check-circle" aria-hidden="true"></i>
-                    استلام @Model.SourceReceiptCode جاهز. راجع بيانات الفاتورة واحفظها؛ سيحاول النظام مطابقتها تلقائيًا.
+                <div class="ui-invoice-origin" role="status">
+                    <i class="fa-solid fa-check-circle" aria-hidden="true"></i>
+                    <span>استلام @Model.SourceReceiptCode — تحقق من المتاح لكل بند قبل الحفظ.</span>
+                    @if(IsEditable)
+                    {
+                        <UiButton Text="تحديث الكميات من الاستلام" IconCssClass="fa-solid fa-rotate"
+                            Variant="ButtonVariant.Ghost" Size="ControlSize.Small"
+                            OnClick="@(_ => OnRefreshReceipt.InvokeAsync())" />
+                    }
                 </div>
             }
         </UiPurchasingSection>
@@ -60,14 +68,30 @@
                 {
                     <div class="ui-purchasing-invoice-line ui-invoice-simple-line" @key="line">
                         <div class="ui-purchasing-invoice-line__head">
-                            <strong>@line.LineSequence — @(line.ProductName ?? "صنف")</strong>
+                            <div class="ui-invoice-line-identification">
+                                <strong>@line.LineSequence — @(line.ProductName ?? "صنف")</strong>
+                                <div class="ui-invoice-line-meta">
+                                    @if(!string.IsNullOrWhiteSpace(line.ProductCode))
+                                    {
+                                        <span>الرمز: @line.ProductCode</span>
+                                    }
+                                    @if(line.SourceReceiptLineSequence.HasValue)
+                                    {
+                                        <span>بند الاستلام: @line.SourceReceiptLineSequence</span>
+                                    }
+                                    @if(line.AvailableToInvoiceQuantity.HasValue)
+                                    {
+                                        <span>المتاح لهذا البند: @line.AvailableToInvoiceQuantity.Value.ToString("#,##0.###")</span>
+                                    }
+                                </div>
+                            </div>
                             @if(IsEditable && Model.Id is null && Model.Lines.Count>1)
                             {
                                 <UiButton Text="استبعاد الصنف" IconCssClass="fa-regular fa-trash-can" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="@(_=>RemoveLineAsync(line))" />
                             }
                         </div>
                         <UiPurchasingFormGrid>
-                            <UiPurchasingNumberField Label="الكمية" Value="@line.Quantity" ValueChanged="@(v=>QuantityChanged(line,v))" Disabled="@(!IsEditable)" Min="0.001" />
+                            <UiPurchasingNumberField Label="الكمية" Value="@line.Quantity" ValueChanged="@(v=>QuantityChanged(line,v))" Disabled="@(!IsEditable)" Min="0.001" ErrorText="@line.QuantityError" />
                             <UiPurchasingNumberField Label="سعر الوحدة" Value="@line.UnitPrice" ValueChanged="@(v=>PriceChanged(line,v))" Disabled="@(!IsEditable)" Step="0.0001" Min="0" />
                         </UiPurchasingFormGrid>
                         <details class="ui-purchasing-advanced ui-invoice-line-advanced">
@@ -184,6 +208,7 @@
     [Parameter] public bool IsEditable {get;set;}=true;
     [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? PostedReceiptSearchAsync {get;set;}
     [Parameter] public EventCallback<Guid?> OnReceiptSelected {get;set;}
+    [Parameter] public EventCallback OnRefreshReceipt {get;set;}
     [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SupplierSearchAsync {get;set;}
     [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? CurrencySearchAsync {get;set;}
     [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? ProductSearchAsync {get;set;}
@@ -245,7 +270,15 @@
     private async Task RemoveLineAsync(UiPurchaseInvoiceLineModel l){Model.Lines.Remove(l);for(var i=0;i<Model.Lines.Count;i++)Model.Lines[i].LineSequence=i+1;await Changed();}
     private static void ProductSelectionChanged(UiPurchaseInvoiceLineModel l,UiLookupItem? item)=>l.ProductName=item?.PrimaryText;
     private async Task ProductChanged(UiPurchaseInvoiceLineModel l,string? v){l.ProductVariantId=Parse(v);await Changed();}
-    private async Task QuantityChanged(UiPurchaseInvoiceLineModel l,decimal v){l.Quantity=v;await Changed();}
+    private async Task QuantityChanged(UiPurchaseInvoiceLineModel l,decimal v)
+    {
+        l.Quantity=v;
+        l.QuantityError=l.AvailableToInvoiceQuantity.HasValue && v>l.AvailableToInvoiceQuantity.Value
+            ? $"الكمية المطلوبة {v:#,##0.###}، والمتاح لهذا البند {l.AvailableToInvoiceQuantity.Value:#,##0.###} فقط."
+            : null;
+        Model.MatchingNotice=null;
+        await Changed();
+    }
     private async Task PriceChanged(UiPurchaseInvoiceLineModel l,decimal v){l.UnitPrice=v;await Changed();}
     private async Task DiscountChanged(UiPurchaseInvoiceLineModel l,decimal v){l.DiscountAmount=v;await Changed();}
     private async Task TaxChanged(UiPurchaseInvoiceLineModel l,decimal v){l.TaxRate=v;await Changed();}

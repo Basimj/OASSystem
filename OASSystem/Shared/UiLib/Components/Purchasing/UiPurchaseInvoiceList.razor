@@ -1,9 +1,114 @@
 @namespace OAS.UiLib.Components.Purchasing
 @using OAS.UiLib.Core.Models.Purchasing
-<UiPurchasingList Items="@Items" Loading="@Loading" EmptyText="@EmptyText" OnOpen="@OnOpen" />
+
+<section class="ui-pi-cards" aria-busy="@Loading.ToString().ToLowerInvariant()" aria-label="قائمة فواتير المشتريات">
+    <div class="ui-pi-cards__tools">
+        <div class="ui-pi-cards__filters" role="group" aria-label="تصفية الفواتير حسب حالة المستند">
+            @foreach (var option in StatusOptions)
+            {
+                <button type="button" @key="option.Value"
+                        class="ui-pi-cards__filter @(SelectedStatus == option.Value ? "is-active" : string.Empty)"
+                        aria-pressed="@(SelectedStatus == option.Value ? "true" : "false")"
+                        disabled="@Loading"
+                        @onclick="() => OnStatusChanged.InvokeAsync(option.Value)">@option.Label</button>
+            }
+        </div>
+        <label class="ui-pi-cards__sort-label">
+            <span><i class="fa-solid fa-arrow-down-wide-short" aria-hidden="true"></i> ترتيب حسب</span>
+            <select class="ui-pi-cards__sort" value="@SelectedSort" disabled="@Loading" @onchange="ChangeSortAsync" aria-label="ترتيب فواتير المشتريات">
+                <option value="date_desc">الأحدث أولًا</option>
+                <option value="date_asc">الأقدم أولًا</option>
+                <option value="amount_desc">القيمة الأعلى</option>
+                <option value="amount_asc">القيمة الأقل</option>
+                <option value="supplier_asc">المورد: أ إلى ي</option>
+                <option value="supplier_desc">المورد: ي إلى أ</option>
+            </select>
+        </label>
+    </div>
+    <div class="ui-pi-cards__summary" aria-live="polite">
+        @(Loading ? "جارٍ تحميل الفواتير..." : $"المعروض: {Items.Count} من أصل {TotalCount} فاتورة")
+    </div>
+    @if (Loading)
+    {
+        <div class="ui-pi-cards__empty"><i class="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i> جارٍ تحميل الفواتير...</div>
+    }
+    else if (Items.Count == 0)
+    {
+        <div class="ui-pi-cards__empty"><i class="fa-regular fa-folder-open" aria-hidden="true"></i> @EmptyText</div>
+    }
+    else
+    {
+        <div class="ui-pi-cards__list">
+            @foreach (var invoice in Items)
+            {
+                <article @key="invoice.Id" class="ui-pi-card @invoice.StatusClass" aria-label="فاتورة @invoice.Code - @invoice.SupplierName">
+                    <div class="ui-pi-card__main">
+                        <div class="ui-pi-card__identity">
+                            <button type="button" class="ui-pi-card__code"
+                                    @onclick="() => OnOpen.InvokeAsync(invoice.Id)"
+                                    aria-label="فتح فاتورة المشتريات @invoice.Code">@invoice.Code</button>
+                            <strong class="ui-pi-card__supplier" title="@invoice.SupplierName">@invoice.SupplierName</strong>
+                            @if (!string.IsNullOrWhiteSpace(invoice.SupplierInvoiceCode))
+                            {
+                                <span class="ui-pi-card__supplier-ref" title="رقم الفاتورة لدى المورد">مرجع المورد: <b dir="auto">@invoice.SupplierInvoiceCode</b></span>
+                            }
+                        </div>
+                        <div class="ui-pi-card__amount">
+                            <strong dir="ltr">@invoice.TotalAmountDisplay</strong>
+                            <span>@invoice.CurrencyDisplayName</span>
+                        </div>
+                    </div>
+                    <div class="ui-pi-card__states">
+                        <span class="ui-pi-card__status @invoice.StatusClass" title="حالة مستند الفاتورة">
+                            <i class="fa-solid fa-file-invoice" aria-hidden="true"></i> @invoice.StatusText
+                        </span>
+                        <span class="ui-pi-card__match @invoice.MatchingClass" title="حالة المطابقة المحفوظة مع الاستلامات">
+                            <i class="fa-solid fa-code-compare" aria-hidden="true"></i> @invoice.MatchingText
+                        </span>
+                    </div>
+                    <div class="ui-pi-card__facts">
+                        <span title="تاريخ فاتورة المشتريات"><i class="fa-regular fa-calendar" aria-hidden="true"></i> الفاتورة:
+                            <time class="ui-pi-card__date" dir="ltr" datetime="@invoice.InvoiceDate.ToString("yyyy-MM-dd")">@invoice.InvoiceDateDisplay</time>
+                        </span>
+                        @if (invoice.DueDate is { } due)
+                        {
+                            <span title="تاريخ استحقاق الفاتورة"><i class="fa-regular fa-calendar-check" aria-hidden="true"></i> الاستحقاق:
+                                <time class="ui-pi-card__date" dir="ltr" datetime="@due.ToString("yyyy-MM-dd")">@invoice.DueDateDisplay</time>
+                            </span>
+                        }
+                        <span title="عدد بنود الفاتورة"><i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i> @invoice.LineCount بنود</span>
+                    </div>
+                    <div class="ui-pi-card__footer">
+                        <span class="ui-pi-card__next" title="الخطوة التالية"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> @invoice.NextStepText</span>
+                        <button type="button" class="ui-pi-card__open" @onclick="() => OnOpen.InvokeAsync(invoice.Id)"
+                                aria-label="عرض تفاصيل فاتورة المشتريات @invoice.Code">التفاصيل <i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button>
+                    </div>
+                </article>
+            }
+        </div>
+    }
+</section>
+
 @code {
-    [Parameter] public IReadOnlyList<UiPurchasingListItem> Items { get; set; } = [];
+    [Parameter] public IReadOnlyList<UiPurchaseInvoiceCardItem> Items { get; set; } = [];
     [Parameter] public bool Loading { get; set; }
-    [Parameter] public string EmptyText { get; set; } = "لا توجد بيانات.";
+    [Parameter] public long TotalCount { get; set; }
+    [Parameter] public string SelectedStatus { get; set; } = "all";
+    [Parameter] public string SelectedSort { get; set; } = "date_desc";
+    [Parameter] public string EmptyText { get; set; } = "لا توجد فواتير مشتريات مطابقة للتصفية.";
+    [Parameter] public EventCallback<string> OnStatusChanged { get; set; }
+    [Parameter] public EventCallback<string> OnSortChanged { get; set; }
     [Parameter] public EventCallback<Guid> OnOpen { get; set; }
+
+    private Task ChangeSortAsync(ChangeEventArgs e) => OnSortChanged.InvokeAsync(e.Value?.ToString() ?? "date_desc");
+
+    private static readonly (string Value, string Label)[] StatusOptions =
+    [
+        ("all", "الكل"),
+        ("draft", "مسودة"),
+        ("confirmed", "مؤكدة"),
+        ("matching", "بانتظار الفروقات"),
+        ("posted", "مرحّلة"),
+        ("cancelled", "ملغاة")
+    ];
 }

@@ -57,7 +57,10 @@ public sealed class PurchaseMatchingService(
             var candidate = candidates[group.Key];
             var requested = group.Sum(x => x.MatchedQuantity);
             if (requested > candidate.AvailableQuantity)
-                throw new ConflictException("purchasing_match_quantity_exceeds_available_receipt", "لا يمكن مطابقة كمية أكبر من الكمية المقبولة غير المطابقة والمتاحة بعد المرتجعات.");
+                throw new ConflictException("purchasing_match_quantity_exceeds_available_receipt",
+                    $"لا يمكن مطابقة {requested:0.###} من سند الاستلام {candidate.ReceiptCode}؛ المتاح " +
+                    $"{candidate.AvailableQuantity:0.###} فقط بعد احتساب المرتجعات والكميات المرتبطة بفواتير أخرى. " +
+                    "راجع كميات الفاتورة أو اختر استلامًا تتوفر فيه كمية غير مطابقة.");
         }
 
         foreach (var group in allocations.GroupBy(x => x.PurchaseInvoiceLineId))
