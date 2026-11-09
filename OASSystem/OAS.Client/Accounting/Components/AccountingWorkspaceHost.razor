@@ -4,6 +4,7 @@
 @using OAS.Client.Accounting.Workspace
 @using OAS.Contracts.Accounting.Enums
 @using OAS.UiLib.Components.Accounting.Accounts
+@using OAS.UiLib.Components.Accounting.PostingProfiles
 @using OAS.UiLib.Components.Accounting.Workspace
 @using OAS.UiLib.Components.Navigation
 @using OAS.UiLib.Components.Workspace
@@ -14,8 +15,8 @@
 }
 
 <UiAccountingWorkspace ShowTabs="@Section.HasValue"
-                       InlineTabsWithActions="@(Section is AccountingEntityType.Accounts or AccountingEntityType.Journals or AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers or AccountingEntityType.CashAccounts or AccountingEntityType.BankAccounts or AccountingEntityType.CashShifts or AccountingEntityType.FiscalYears or AccountingEntityType.CostCenters)"
-                       AdditionalCssClass='@(Section == AccountingEntityType.Accounts ? "ui-acc-workspace--account-management" : Section == AccountingEntityType.Journals ? "ui-acc-workspace--journals" : Section is AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers ? "ui-acc-workspace--vouchers" : Section is AccountingEntityType.CashAccounts or AccountingEntityType.BankAccounts or AccountingEntityType.CashShifts ? "ui-acc-workspace--cashbank" : Section == AccountingEntityType.FiscalYears ? "ui-acc-workspace--fiscal" : Section == AccountingEntityType.CostCenters ? "ui-acc-workspace--cost-centers" : null)'>
+                       InlineTabsWithActions="@(Section is AccountingEntityType.Accounts or AccountingEntityType.Journals or AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers or AccountingEntityType.CashAccounts or AccountingEntityType.BankAccounts or AccountingEntityType.CashShifts or AccountingEntityType.FiscalYears or AccountingEntityType.CostCenters or AccountingEntityType.PostingProfiles)"
+                       AdditionalCssClass='@(Section == AccountingEntityType.Accounts ? "ui-acc-workspace--account-management" : Section == AccountingEntityType.Journals ? "ui-acc-workspace--journals" : Section is AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers ? "ui-acc-workspace--vouchers" : Section is AccountingEntityType.CashAccounts or AccountingEntityType.BankAccounts or AccountingEntityType.CashShifts ? "ui-acc-workspace--cashbank" : Section == AccountingEntityType.FiscalYears ? "ui-acc-workspace--fiscal" : Section == AccountingEntityType.CostCenters ? "ui-acc-workspace--cost-centers" : Section == AccountingEntityType.PostingProfiles ? "ui-acc-workspace--posting-profiles" : null)'>
 
     <Actions>
 
@@ -138,6 +139,12 @@
                               Size="ControlSize.Small"
                               OnClick="@(() => OpenNewRecord(AccountingEntityType.FiscalPeriods))" />
                 }
+                else if (Section == AccountingEntityType.PostingProfiles)
+                {
+                    <UiButton Text="ملف ترحيل جديد" IconCssClass="fa-solid fa-plus"
+                              Size="ControlSize.Small"
+                              OnClick="@(() => OpenNewRecord(AccountingEntityType.PostingProfiles))" />
+                }
                 else if (Section == AccountingEntityType.Expenses)
                 {
                     <UiButton Text="مصروف جديد"
@@ -236,6 +243,17 @@
                               Size="ControlSize.Small"
                               Disabled="@(!CanCancelActive)"
                               OnClick="CancelActiveEdit" />
+                }
+
+                @if (activeTab is { IsNew: false, EntityType: AccountingEntityType.PostingProfiles,
+                    Model: PostingProfileEditor.FormModel postingProfile })
+                {
+                    <UiButton Text="@(postingProfile.IsActive ? "تعطيل ملف الترحيل" : "تفعيل ملف الترحيل")"
+                              IconCssClass="@(postingProfile.IsActive ? "fa-solid fa-ban" : "fa-solid fa-circle-check")"
+                              Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
+                              Disabled="@(!CanChangePostingProfileStatus)"
+                              Loading="@_postingProfileActionBusy"
+                              OnClick="@(() => ChangePostingProfileStatusAsync(!postingProfile.IsActive))" />
                 }
 
                 @if (activeTab is { IsNew: false, Model: FiscalYearEditor.FormModel activeYear } &&
@@ -1304,6 +1322,41 @@
             }
             else
             {
+                @if (CurrentListEntity == AccountingEntityType.PostingProfiles)
+                {
+                    <div class="oas-posting-stats" aria-label="مؤشرات ملفات الترحيل" dir="rtl">
+                        <div><span>إجمالي الملفات</span><strong>@(_postingProfileTotalCount?.ToString("N0") ?? "—")</strong></div>
+                        <div><span>الملفات النشطة</span><strong>@(_postingProfileActiveCount?.ToString("N0") ?? "—")</strong></div>
+                        <div><span>الملفات المعطلة</span><strong>@(_postingProfileInactiveCount?.ToString("N0") ?? "—")</strong></div>
+                    </div>
+                    <div class="oas-posting-filters" dir="rtl" aria-label="مرشحات ملفات الترحيل">
+                        <label>الوحدة
+                            <select value="@_postingProfileModuleFilter" @onchange="OnPostingModuleFilterChanged">
+                                <option value="">كل الوحدات</option>
+                                @foreach (var option in PostingProfileUiCatalog.Modules)
+                                {
+                                    <option value="@option.Value">@option.Text</option>
+                                }
+                            </select>
+                        </label>
+                        <label>نوع المستند
+                            <select value="@_postingProfileDocumentFilter" @onchange="OnPostingDocumentFilterChanged">
+                                <option value="">كل المستندات</option>
+                                @foreach (var option in PostingProfileUiCatalog.DocumentOptions(_postingProfileModuleFilter))
+                                {
+                                    <option value="@option.Value">@option.Text</option>
+                                }
+                            </select>
+                        </label>
+                        <label>الحالة
+                            <select value="@_postingProfileStatusFilter" @onchange="OnPostingStatusFilterChanged">
+                                <option value="">الكل</option>
+                                <option value="active">نشط</option>
+                                <option value="inactive">معطل</option>
+                            </select>
+                        </label>
+                    </div>
+                }
                 @if (CurrentListEntity == AccountingEntityType.Journals && !string.IsNullOrWhiteSpace(CurrentJournalStatusFilter))
                 {
                     <div class="oas-journal-filter-indicator" role="status">
@@ -1322,6 +1375,7 @@
                 else
                 {
                     <UiAccountingRecordList Items="@CurrentRecordItems"
+                                            FinancialStyle="@(CurrentListEntity == AccountingEntityType.PostingProfiles)"
                                             EmptyTitle="@CurrentEmptyTitle"
                                             EmptyDescription="@CurrentEmptyDescription"
                                             EmptyIconCssClass="@CurrentEmptyIcon"

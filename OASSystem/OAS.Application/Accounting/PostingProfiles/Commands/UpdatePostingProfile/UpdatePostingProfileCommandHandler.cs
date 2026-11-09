@@ -35,6 +35,14 @@ public sealed class UpdatePostingProfileCommandHandler(
                 "لا يمكن تغيير كود ملف الترحيل بعد الإنشاء.");
         }
 
+        if (request.Data.IsActive != entity.IsActive)
+            throw new ConflictException("posting_profile_activate_separately",
+                "تغيير التفعيل يتطلب استخدام إجراء التفعيل أو التعطيل المستقل.");
+        if (!string.Equals(entity.Module, request.Data.Module.Trim(), StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(entity.DocumentType, request.Data.DocumentType.Trim(), StringComparison.OrdinalIgnoreCase))
+            throw new ConflictException("posting_profile_scope_immutable",
+                "لا يمكن تغيير وحدة ملف الترحيل أو نوع مستنده بعد إنشائه. أنشئ ملفاً جديداً للنطاق الآخر.");
+
         var requestedRowVersion = Convert.FromBase64String(request.Data.RowVersion);
         if (!entity.RowVersion.SequenceEqual(requestedRowVersion))
         {

@@ -14,15 +14,19 @@ public sealed class PostingProfilePageSpecification
         var normalized = request.Normalize();
         var specification = new Specification<PostingProfile>();
 
-        if (!string.IsNullOrWhiteSpace(normalized.Search))
-        {
-            var search = normalized.Search.Trim();
-            specification.Where(x =>
-                x.Code.Contains(search) ||
-                x.Name.Contains(search) ||
-                x.Module.Contains(search) ||
-                x.DocumentType.Contains(search));
-        }
+        // The specification stores a single criteria expression; compose all filters
+        // to preserve search, status, module and document filters across pagination.
+        var search = normalized.Search;
+        var module = normalized.PostingModule;
+        var documentType = normalized.PostingDocumentType;
+        var status = normalized.Status;
+        specification.Where(x =>
+            (search == null || x.Code.Contains(search) || x.Name.Contains(search) ||
+             x.Module.Contains(search) || x.DocumentType.Contains(search)) &&
+            (module == null || x.Module == module) &&
+            (documentType == null || x.DocumentType == documentType) &&
+            (status != "active" || x.IsActive) &&
+            (status != "inactive" || !x.IsActive));
 
         var sortBy = ResolveSortProperty(normalized.SortBy);
         specification.AddSort(sortBy, normalized.SortDirection);

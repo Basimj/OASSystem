@@ -1,4 +1,4 @@
-﻿namespace OAS.Contracts.Accounting.PostingProfiles;
+namespace OAS.Contracts.Accounting.PostingProfiles;
 
 public sealed record CreatePostingProfileRequest(
     string Code,
@@ -6,4 +6,4 @@ public sealed record CreatePostingProfileRequest(
     string Module,
     string DocumentType,
     IReadOnlyList<CreatePostingProfileLineRequest> Lines,
-    bool IsActive = true);
+    bool IsActive = false);

@@ -1,0 +1,24 @@
+الملفات المعدلة بمساراتها الأصلية مقارنة بآخر نسخة معتمدة
+عدد الملفات: 21
+
+OASSystem/OAS.Application/Accounting/PostingProfiles/Commands/CreatePostingProfile/CreatePostingProfileCommandHandler.cs
+OASSystem/OAS.Application/Accounting/PostingProfiles/Commands/CreatePostingProfile/CreatePostingProfileCommandValidator.cs
+OASSystem/OAS.Application/Accounting/PostingProfiles/Commands/SetPostingProfileStatus/SetPostingProfileStatusCommandHandler.cs
+OASSystem/OAS.Application/Accounting/PostingProfiles/Commands/UpdatePostingProfile/UpdatePostingProfileCommandHandler.cs
+OASSystem/OAS.Application/Accounting/PostingProfiles/Commands/UpdatePostingProfile/UpdatePostingProfileCommandValidator.cs
+OASSystem/OAS.Application/Accounting/PostingProfiles/PostingProfileRoleRequirements.cs
+OASSystem/OAS.Application/Accounting/PostingProfiles/Queries/GetPostingProfiles/GetPostingProfilesQueryHandler.cs
+OASSystem/OAS.Application/Accounting/PostingProfiles/Specifications/PostingProfilePageSpecification.cs
+OASSystem/OAS.Client/Accounting/Components/AccountingWorkspaceHost.razor
+OASSystem/OAS.Client/Accounting/Components/AccountingWorkspaceHost.razor.cs
+OASSystem/OAS.Client/Accounting/Components/PostingProfileEditor.razor
+OASSystem/OAS.Client/Accounting/Services/AccountingClientService.cs
+OASSystem/OAS.Contracts/Accounting/PostingProfiles/CreatePostingProfileRequest.cs
+OASSystem/OAS.Contracts/Common/Pagination/PageRequest.cs
+OASSystem/OAS.Tests/Accounting/Application/PostingProfiles/PostingProfileActivationTests.cs
+OASSystem/OAS.Tests/Accounting/Application/PostingProfiles/PostingProfileCommandAndQueryTests.cs
+OASSystem/OAS.Tests/Accounting/Application/PostingProfiles/PostingProfileDirectoryAndSafetyTests.cs
+OASSystem/Shared/UiLib/Components/Accounting/PostingProfiles/PostingProfileUiCatalog.cs
+OASSystem/Shared/UiLib/Components/Accounting/PostingProfiles/UiPostingProfileLinesEditor.razor
+OASSystem/Shared/UiLib/wwwroot/css/features/accounting.css
+OASSystem/docs/accounting/Posting_Profiles_UI_Implementation_2026-11-09_AR.md

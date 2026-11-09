@@ -12,7 +12,8 @@ public sealed class GetAccountingSettingsQueryHandler(
     IReadRepository<AccountingSettings, Guid> repository,
     IReadRepository<Currency, Guid> currencies,
     IReadRepository<PostingProfile, Guid> postingProfiles,
-    IReadRepository<PostingProfileLine, Guid> postingProfileLines)
+    IReadRepository<PostingProfileLine, Guid> postingProfileLines,
+    IReadRepository<JournalEntry, Guid> journals)
     : IRequestHandler<GetAccountingSettingsQuery, AccountingSettingsDto?>
 {
     private const string SalesModule = "Sales";
@@ -43,6 +44,11 @@ public sealed class GetAccountingSettingsQueryHandler(
         var roles = await ResolveSalesInvoiceRoleAccountsAsync(cancellationToken);
         var customerAdvancesAccountId = await ResolveCustomerAdvancesAccountAsync(cancellationToken);
 
+        var postedJournals = await journals.CountAsync(
+            new Specification<JournalEntry>().Where(j =>
+                j.Status == OAS.Domain.Accounting.Enums.JournalEntryStatus.Posted ||
+                j.Status == OAS.Domain.Accounting.Enums.JournalEntryStatus.Reversed), cancellationToken);
+
         return new AccountingSettingsDto(
             entity.Id,
             entity.BaseCurrencyId,
@@ -62,7 +68,8 @@ public sealed class GetAccountingSettingsQueryHandler(
             entity.PurchasePriceVarianceAccountId,
             (ContractRateType)(byte)entity.DefaultExchangeRateType,
             Convert.ToBase64String(entity.RowVersion),
-            entity.RetainedEarningsAccountId);
+            entity.RetainedEarningsAccountId,
+            postedJournals == 0);
     }
 
     private async Task<SalesInvoiceRoleAccounts> ResolveSalesInvoiceRoleAccountsAsync(

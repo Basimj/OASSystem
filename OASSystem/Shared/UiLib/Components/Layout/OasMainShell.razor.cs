@@ -159,6 +159,19 @@ public partial class OasMainShell : IAsyncDisposable
         return VisibleModules.Where(x => keys.Contains(x.Key)).ToArray();
     }
 
+    private bool _accountingSettingsExpanded = true;
+    private static bool IsAccountingSettingsModule(UiShellModuleItem module) =>
+        module.Key == "accounting-exchange-rates" ||
+        module.Key == "accounting-employee-accounts" ||
+        module.Key == "accounting-posting-profiles" ||
+        module.Key.StartsWith("accounting-settings", StringComparison.Ordinal);
+
+    private async Task ToggleAccountingSettingsAsync()
+    {
+        _accountingSettingsExpanded = !_accountingSettingsExpanded;
+        await PersistStateAsync();
+    }
+
     private bool IsGroupExpanded(UiShellNavigationGroup group) =>
         _groupExpanded.TryGetValue(group.Key, out var expanded) ? expanded : group.DefaultExpanded;
 

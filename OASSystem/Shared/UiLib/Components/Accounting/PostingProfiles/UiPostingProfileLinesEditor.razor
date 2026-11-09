@@ -1,92 +1,91 @@
 @namespace OAS.UiLib.Components.Accounting.PostingProfiles
+@using OAS.UiLib.Components.Inputs
+@using OAS.UiLib.Core.Models
 
-<div class="ui-acc-lines-editor" dir="rtl">
-    <div class="table-responsive">
-        <table class="ui-acc-grid-table">
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>الدور المحاسبي</th>
-                    <th>الحساب المرتبط</th>
-                    <th>إلزامي</th>
-                    @if (IsEditable)
-                    {
-                        <th>إجراء</th>
-                    }
-                </tr>
-            </thead>
-            <tbody>
-                @if (Lines.Count == 0)
+<div class="oas-posting-rules" dir="rtl">
+    @if (IsEditable && PostingProfileUiCatalog.Roles(Module, DocumentType).Count > 0)
+    {
+        <div class="oas-posting-rules__toolbar">
+            <span>الأدوار المتاحة: @PostingProfileUiCatalog.Roles(Module, DocumentType).Count</span>
+            <UiButton Text="إضافة الأدوار المقترحة" IconCssClass="fa-solid fa-list-check"
+                      Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
+                      OnClick="AddSuggestedAsync" />
+        </div>
+    }
+    @if (Lines.Count == 0)
+    {
+        <div class="oas-posting-rules__empty">لا توجد قواعد. أضف الأدوار المقترحة أو أنشئ قاعدة جديدة.</div>
+    }
+    @foreach (var line in Lines)
+    {
+        <div class="oas-posting-rules__item" @key="line">
+            <div class="oas-posting-rules__role">
+                @if (IsEditable)
                 {
-                    <tr>
-                        <td colspan="@(IsEditable ? 5 : 4)" class="text-center text-muted py-3">لا توجد أدوار محاسبية في هذا الملف.</td>
-                    </tr>
+                    <UiSelect Label="الدور المحاسبي" Value="@line.AccountRole"
+                              ValueChanged="@(value => RoleChangedAsync(line, value))"
+                              Options="@GetRoleOptions(line)" ErrorText="@line.RoleError"
+                              Placeholder="اختر الدور المحاسبي" Size="ControlSize.Small" />
                 }
                 else
                 {
-                    @for (var i = 0; i < Lines.Count; i++)
-                    {
-                        var line = Lines[i];
-                        <tr>
-                            <td>@(i + 1)</td>
-                            <td>
-                                @if (IsEditable)
-                                {
-                                    <UiInputText Value="@line.AccountRole"
-                                                 ValueChanged="@(value => RoleChangedAsync(line, value))"
-                                                 Placeholder="مثال: Cash أو ARControl" />
-                                }
-                                else
-                                {
-                                    <strong>@line.AccountRole</strong>
-                                }
-                            </td>
-                            <td>
-                                @if (IsEditable)
-                                {
-                                    <UiLookup Value='@line.AccountId?.ToString("D")'
-                                              ValueChanged="@(value => AccountChangedAsync(line, value))"
-                                              SelectedItem="@line.AccountLookupItem"
-                                              SearchAsync="AccountSearchAsync"
-                                              Placeholder="اختر الحساب..."
-                                              Required="true"
-                                              MinimumSearchLength="0"
-                                              DebounceMilliseconds="250" />
-                                }
-                                else
-                                {
-                                    <span>@(line.AccountLookupItem?.PrimaryText ?? line.AccountDisplay)</span>
-                                }
-                            </td>
-                            <td>
-                                <UiCheckbox Value="@line.IsRequired"
-                                            ValueChanged="@(value => RequiredChangedAsync(line, value))"
-                                            Disabled="@(!IsEditable)" />
-                            </td>
-                            @if (IsEditable)
-                            {
-                                <td>
-                                    <UiButton Text=""
-                                              IconCssClass="fa-solid fa-trash-can"
-                                              Variant="ButtonVariant.Ghost"
-                                              Size="ControlSize.Small"
-                                              OnClick="@(() => RemoveAsync(line))" />
-                                </td>
-                            }
-                        </tr>
-                    }
+                    <strong>@PostingProfileUiCatalog.RoleText(line.AccountRole)</strong>
                 }
-            </tbody>
-        </table>
-    </div>
+                @if (!string.IsNullOrWhiteSpace(line.RoleError))
+                {
+                    <small class="oas-posting-rules__error" role="alert">@line.RoleError</small>
+                }
+            </div>
+            <div class="oas-posting-rules__account @(string.IsNullOrWhiteSpace(line.AccountError) ? "" : "oas-posting-rules__account--error")">
+                @if (IsEditable)
+                {
+                    <UiLookup Label="الحساب المرتبط" Value='@line.AccountId?.ToString("D")'
+                              ValueChanged="@(value => AccountChangedAsync(line, value))"
+                              SelectedItem="@line.AccountLookupItem"
+                              SelectedItemChanged="@(value => AccountItemChangedAsync(line, value))"
+                              SearchAsync="@AccountSearchAsync" Placeholder="ابحث عن حساب محاسبي..."
+                              Required="true" UsePopover="true" MinimumSearchLength="0"
+                              DebounceMilliseconds="250" />
+                }
+                else
+                {
+                    <span>@(line.AccountLookupItem?.PrimaryText ?? line.AccountDisplay)</span>
+                }
+                @if (!string.IsNullOrWhiteSpace(line.AccountError))
+                {
+                    <small class="oas-posting-rules__error" role="alert">@line.AccountError</small>
+                }
+            </div>
+            <div class="oas-posting-rules__required">
+                @if (GetRoleDefinition(line) is { AlwaysRequired: true })
+                {
+                    <span class="oas-posting-rules__mandatory">مطلوب</span>
+                }
+                else
+                {
+                    <UiCheckbox Label="إلزامي" Value="@line.IsRequired"
+                                ValueChanged="@(value => RequiredChangedAsync(line, value))"
+                                Disabled="@(!IsEditable)" />
+                }
+                @if (GetRoleDefinition(line) is { } roleDef)
+                {
+                    <small title="@roleDef.Hint">@roleDef.Hint</small>
+                }
+            </div>
+            @if (IsEditable)
+            {
+                <button class="oas-posting-rules__remove" type="button" title="حذف القاعدة"
+                        aria-label="حذف القاعدة" @onclick="() => RemoveAsync(line)">
+                    <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+                </button>
+            }
+        </div>
+    }
     @if (IsEditable)
     {
-        <div class="ui-acc-lines-editor__actions">
-            <UiButton Text="إضافة دور محاسبي"
-                      IconCssClass="fa-solid fa-plus"
-                      Variant="ButtonVariant.Secondary"
-                      Size="ControlSize.Small"
-                      OnClick="AddAsync" />
+        <div class="oas-posting-rules__toolbar">
+            <UiButton Text="إضافة قاعدة" IconCssClass="fa-solid fa-plus"
+                      Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="AddAsync" />
         </div>
     }
 </div>
@@ -94,51 +93,89 @@
 @code {
     public sealed class EditablePostingProfileLine
     {
-        public string AccountRole { get; set; } = "Cash";
+        public string AccountRole { get; set; } = string.Empty;
         public Guid? AccountId { get; set; }
         public string AccountDisplay { get; set; } = string.Empty;
         public UiLookupItem? AccountLookupItem { get; set; }
         public bool IsRequired { get; set; } = true;
+        public string? RoleError { get; set; }
+        public string? AccountError { get; set; }
     }
 
     [Parameter] public List<EditablePostingProfileLine> Lines { get; set; } = [];
+    [Parameter] public string Module { get; set; } = string.Empty;
+    [Parameter] public string DocumentType { get; set; } = string.Empty;
     [Parameter] public bool IsEditable { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? AccountSearchAsync { get; set; }
     [Parameter] public EventCallback OnLinesChanged { get; set; }
 
-    private async Task AddAsync()
+    private PostingProfileUiCatalog.Role? GetRoleDefinition(EditablePostingProfileLine line) =>
+        PostingProfileUiCatalog.Roles(Module, DocumentType)
+            .FirstOrDefault(x => string.Equals(x.Value, line.AccountRole, StringComparison.OrdinalIgnoreCase));
+
+    private IReadOnlyList<UiSelectOption> GetRoleOptions(EditablePostingProfileLine line)
     {
-        Lines.Add(new EditablePostingProfileLine());
-        await OnLinesChanged.InvokeAsync();
+        var options = PostingProfileUiCatalog.RoleOptions(Module, DocumentType).ToList();
+        if (!string.IsNullOrWhiteSpace(line.AccountRole) &&
+            !options.Any(x => string.Equals(x.Value, line.AccountRole, StringComparison.OrdinalIgnoreCase)))
+            options.Add(new UiSelectOption(line.AccountRole, $"دور محفوظ قديم: {line.AccountRole}"));
+        return options;
     }
 
+    private async Task AddSuggestedAsync()
+    {
+        foreach (var role in PostingProfileUiCatalog.Roles(Module, DocumentType))
+        {
+            if (Lines.Any(x => string.Equals(x.AccountRole, role.Value, StringComparison.OrdinalIgnoreCase))) continue;
+            Lines.Add(new EditablePostingProfileLine { AccountRole = role.Value, IsRequired = role.AlwaysRequired });
+        }
+        await OnLinesChanged.InvokeAsync();
+    }
+    private async Task AddAsync()
+    {
+        var candidate = PostingProfileUiCatalog.Roles(Module, DocumentType)
+            .FirstOrDefault(x => !Lines.Any(l => string.Equals(l.AccountRole, x.Value, StringComparison.OrdinalIgnoreCase)));
+        Lines.Add(new EditablePostingProfileLine
+        {
+            AccountRole = candidate?.Value ?? string.Empty,
+            IsRequired = candidate?.AlwaysRequired ?? false
+        });
+        await OnLinesChanged.InvokeAsync();
+    }
     private async Task RemoveAsync(EditablePostingProfileLine line)
     {
         Lines.Remove(line);
         await OnLinesChanged.InvokeAsync();
     }
-
     private async Task RoleChangedAsync(EditablePostingProfileLine line, string? value)
     {
         line.AccountRole = value?.Trim() ?? string.Empty;
+        line.RoleError = null;
+        if (GetRoleDefinition(line) is { AlwaysRequired: true }) line.IsRequired = true;
         await OnLinesChanged.InvokeAsync();
     }
-
-    private async Task AccountChangedAsync(EditablePostingProfileLine line, string? value)
+    private Task AccountItemChangedAsync(EditablePostingProfileLine line, UiLookupItem? item)
     {
-        line.AccountId = Guid.TryParse(value, out var id) ? id : null;
-        if (line.AccountId is Guid accountId && AccountSearchAsync is not null)
-        {
-            var items = await AccountSearchAsync(string.Empty, CancellationToken.None);
-            line.AccountLookupItem = items.FirstOrDefault(x => string.Equals(x.Value, accountId.ToString("D"), StringComparison.OrdinalIgnoreCase));
-            if (line.AccountLookupItem is not null)
-                line.AccountDisplay = line.AccountLookupItem.PrimaryText;
-        }
-        await OnLinesChanged.InvokeAsync();
+        line.AccountLookupItem = item;
+        line.AccountDisplay = item?.PrimaryText ?? string.Empty;
+        line.AccountId = Guid.TryParse(item?.Value, out var id) ? id : null;
+        line.AccountError = null;
+        return OnLinesChanged.InvokeAsync();
     }
-
+    private Task AccountChangedAsync(EditablePostingProfileLine line, string? value)
+    {
+        var id = Guid.TryParse(value, out var parsed) ? parsed : (Guid?)null;
+        if (line.AccountId != id)
+        {
+            line.AccountId = id;
+            if (id is null) { line.AccountLookupItem = null; line.AccountDisplay = string.Empty; }
+        }
+        line.AccountError = null;
+        return OnLinesChanged.InvokeAsync();
+    }
     private async Task RequiredChangedAsync(EditablePostingProfileLine line, bool value)
     {
+        if (GetRoleDefinition(line) is { AlwaysRequired: true }) return;
         line.IsRequired = value;
         await OnLinesChanged.InvokeAsync();
     }

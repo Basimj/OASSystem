@@ -16,6 +16,10 @@ public sealed class CreatePostingProfileCommandHandler(
         CreatePostingProfileCommand request,
         CancellationToken cancellationToken)
     {
+        if (request.Data.IsActive)
+            throw new ConflictException("posting_profile_activate_separately",
+                "يُنشأ ملف الترحيل معطلاً. احفظه وراجع قواعده، ثم فعّله بإجراء مستقل.");
+
         // Preserve the existing accounting rule: every account referenced by the
         // posting profile must exist and be eligible to receive postings.
         await ValidateAccountsAsync(

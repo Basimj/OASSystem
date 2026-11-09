@@ -13,8 +13,8 @@ public sealed class UpdateAccountingSettingsCommandHandler(
     IReadRepository<Currency, Guid> currencies,
     IReadRepository<Account, Guid> accounts,
     IReadRepository<JournalEntry, Guid> journals,
-    IRepository<PostingProfile, Guid> postingProfiles,
-    IRepository<PostingProfileLine, Guid> postingProfileLines)
+    IReadRepository<PostingProfile, Guid> postingProfiles,
+    IReadRepository<PostingProfileLine, Guid> postingProfileLines)
     : IRequestHandler<UpdateAccountingSettingsCommand>
 {
     private const string SalesModule = "Sales";
@@ -57,12 +57,8 @@ public sealed class UpdateAccountingSettingsCommandHandler(
 
         await ValidateRetainedEarningsAsync(data.RetainedEarningsAccountId, cancellationToken);
 
-        ValidateSalesInvoiceSettingsCompleteness(data);
-        await ValidateSalesRevenueAsync(data.SalesRevenueAccountId, cancellationToken);
-        await ValidateTaxPayableAsync(data.TaxPayableAccountId, cancellationToken);
-        await ValidateCustomerAdvancesAsync(data.CustomerAdvancesAccountId, cancellationToken);
+        await RejectPostingProfileRoleChangesAsync(data, cancellationToken);
         await ValidateInventoryAsync(data.InventoryAccountId, cancellationToken);
-        await ValidateCogsAsync(data.CogsAccountId, cancellationToken);
         ValidatePurchasingSettingsCompleteness(data);
         await ValidateGrniAsync(data.GrniAccountId, cancellationToken);
         await ValidatePurchaseTaxAsync(data.PurchaseTaxAccountId, cancellationToken);
@@ -138,47 +134,8 @@ public sealed class UpdateAccountingSettingsCommandHandler(
             repository.Update(entity);
         }
 
-        await UpsertSalesInvoiceRolesAsync(
-            data.SalesRevenueAccountId,
-            data.TaxPayableAccountId,
-            data.InventoryAccountId,
-            data.CogsAccountId,
-            cancellationToken);
-
-        await UpsertCustomerAdvanceProfileAsync(
-            data.CustomerAdvancesAccountId,
-            cancellationToken);
-
-        await UpsertPurchasingProfilesAsync(
-            data.InventoryAccountId,
-            data.GrniAccountId,
-            data.PurchaseTaxAccountId,
-            data.PurchasePriceVarianceAccountId,
-            cancellationToken);
-    }
-
-    private static void ValidateSalesInvoiceSettingsCompleteness(
-        OAS.Contracts.Accounting.Settings.UpdateAccountingSettingsRequest data)
-    {
-        var hasSalesSpecificAccount =
-            data.SalesRevenueAccountId.HasValue ||
-            data.TaxPayableAccountId.HasValue ||
-            data.CogsAccountId.HasValue;
-
-        var configured = new[]
-        {
-            data.SalesRevenueAccountId,
-            data.TaxPayableAccountId,
-            data.InventoryAccountId,
-            data.CogsAccountId
-        };
-
-        if (hasSalesSpecificAccount && configured.Any(x => !x.HasValue))
-        {
-            throw new ConflictException(
-                "sales_invoice_posting_accounts_incomplete",
-                "عند إعداد ترحيل فواتير المبيعات يجب تحديد حساب إيرادات المبيعات والضرائب المستحقة والمخزون وتكلفة البضاعة المباعة جميعًا.");
-        }
+        // Posting profiles have their own explicit editor and activation workflow.
+        // Never silently modify or reactivate them while updating general settings.
     }
 
     private async Task ValidateAssetControlAsync(
@@ -390,215 +347,46 @@ public sealed class UpdateAccountingSettingsCommandHandler(
         }
     }
 
-    private async Task UpsertSalesInvoiceRolesAsync(
-        Guid? salesRevenueAccountId,
-        Guid? taxPayableAccountId,
-        Guid? inventoryAccountId,
-        Guid? cogsAccountId,
+    // Settings read these roles from currently active posting profiles.
+    // An API caller must not be allowed to mutate those roles by changing settings.
+    private async Task RejectPostingProfileRoleChangesAsync(
+        OAS.Contracts.Accounting.Settings.UpdateAccountingSettingsRequest data,
         CancellationToken cancellationToken)
     {
-        var profiles = await postingProfiles.ListAsync(
-            new Specification<PostingProfile>()
-                .Where(x =>
-                    x.Module == SalesModule &&
-                    x.DocumentType == SalesInvoiceDocumentType &&
-                    x.IsActive)
-                .Tracking(),
-            cancellationToken);
+        var sales = await postingProfiles.ListAsync(new Specification<PostingProfile>()
+            .Where(p => p.Module == SalesModule &&
+                        p.DocumentType == SalesInvoiceDocumentType && p.IsActive), cancellationToken);
+        var advances = await postingProfiles.ListAsync(new Specification<PostingProfile>()
+            .Where(p => p.Module == AccountingModule &&
+                        p.DocumentType == CustomerAdvanceApplicationDocumentType && p.IsActive), cancellationToken);
+        if (sales.Count > 1 || advances.Count > 1)
+            throw new ConflictException("posting_profile_duplicate", "يوجد أكثر من ملف ترحيل نشط لنوع المستند نفسه.");
 
-        if (profiles.Count > 1)
+        var salesRoles = sales.Count == 0 ? new Dictionary<string, Guid>() :
+            await ReadPostingRolesAsync(sales[0].Id, cancellationToken);
+        var advancesRoles = advances.Count == 0 ? new Dictionary<string, Guid>() :
+            await ReadPostingRolesAsync(advances[0].Id, cancellationToken);
+
+        static Guid? Role(Dictionary<string, Guid> values, string key) =>
+            values.TryGetValue(key, out var id) ? id : null;
+        // Null legacy request fields mean "not supplied" and never remove an active role.
+        // Explicit IDs that differ from the active file must be edited in Posting Profiles.
+        if ((data.SalesRevenueAccountId.HasValue && data.SalesRevenueAccountId != Role(salesRoles, SalesRevenueRole)) ||
+            (data.TaxPayableAccountId.HasValue && data.TaxPayableAccountId != Role(salesRoles, TaxPayableRole)) ||
+            (data.CogsAccountId.HasValue && data.CogsAccountId != Role(salesRoles, CogsRole)) ||
+            (data.CustomerAdvancesAccountId.HasValue && data.CustomerAdvancesAccountId != Role(advancesRoles, CustomerAdvancesRole)))
         {
-            throw new ConflictException(
-                "sales_invoice_posting_profile_duplicate",
-                "يوجد أكثر من ملف ترحيل فعال لفاتورة المبيعات. يجب إبقاء ملف واحد فعال فقط.");
-        }
-
-        var profile = profiles.SingleOrDefault();
-        var hasAnyConfiguredAccount =
-            salesRevenueAccountId.HasValue ||
-            taxPayableAccountId.HasValue ||
-            cogsAccountId.HasValue;
-
-        if (profile is null)
-        {
-            if (hasAnyConfiguredAccount)
-            {
-                throw new ConflictException(
-                    "sales_invoice_posting_profile_missing",
-                    "لا يوجد ملف ترحيل فعال لفاتورة المبيعات. فعّل ملف Sales / SalesInvoice أولاً ثم احفظ حسابات ترحيل المبيعات.");
-            }
-
-            return;
-        }
-
-        await UpsertRoleAsync(profile.Id, SalesRevenueRole, salesRevenueAccountId, cancellationToken);
-        await UpsertRoleAsync(profile.Id, TaxPayableRole, taxPayableAccountId, cancellationToken);
-        await UpsertRoleAsync(profile.Id, InventoryRole, inventoryAccountId, cancellationToken);
-        await UpsertRoleAsync(profile.Id, CogsRole, cogsAccountId, cancellationToken);
-    }
-
-    private async Task UpsertCustomerAdvanceProfileAsync(
-        Guid? customerAdvancesAccountId,
-        CancellationToken cancellationToken)
-    {
-        var allProfiles = await postingProfiles.ListAsync(
-            new Specification<PostingProfile>()
-                .Where(x =>
-                    x.Module == AccountingModule &&
-                    x.DocumentType == CustomerAdvanceApplicationDocumentType)
-                .Tracking(),
-            cancellationToken);
-
-        var activeProfiles = allProfiles.Where(x => x.IsActive).ToList();
-        if (activeProfiles.Count > 1)
-        {
-            throw new ConflictException(
-                "customer_advance_posting_profile_duplicate",
-                "يوجد أكثر من ملف ترحيل فعال لعربون العميل. يجب إبقاء ملف واحد فقط.");
-        }
-
-        var profile = activeProfiles.SingleOrDefault() ?? allProfiles.FirstOrDefault();
-
-        if (!customerAdvancesAccountId.HasValue)
-        {
-            if (profile is null)
-                return;
-
-            await UpsertRoleAsync(profile.Id, CustomerAdvancesRole, null, cancellationToken);
-            if (profile.IsActive)
-            {
-                profile.SetActive(false);
-                postingProfiles.Update(profile);
-            }
-            return;
-        }
-
-        if (profile is null)
-        {
-            profile = PostingProfile.Create(
-                Guid.NewGuid(),
-                "ACCOUNTING-CUSTOMER-ADVANCE",
-                "ترحيل دفعات مقدمة من العملاء",
-                AccountingModule,
-                CustomerAdvanceApplicationDocumentType,
-                true);
-            await postingProfiles.AddAsync(profile, cancellationToken);
-        }
-        else if (!profile.IsActive)
-        {
-            profile.SetActive(true);
-            postingProfiles.Update(profile);
-        }
-
-        await UpsertRoleAsync(
-            profile.Id,
-            CustomerAdvancesRole,
-            customerAdvancesAccountId,
-            cancellationToken);
-    }
-
-    private async Task UpsertPurchasingProfilesAsync(
-        Guid? inventoryAccountId,
-        Guid? grniAccountId,
-        Guid? purchaseTaxAccountId,
-        Guid? purchasePriceVarianceAccountId,
-        CancellationToken cancellationToken)
-    {
-        // Receipt posting is independent from invoice-only roles.
-        if (inventoryAccountId.HasValue && grniAccountId.HasValue)
-        {
-            var receipt = await EnsurePurchasingProfileAsync(
-                "PURCHASE-RECEIPT",
-                "ترحيل استلام المشتريات",
-                PurchaseReceiptDocumentType,
-                cancellationToken);
-
-            await UpsertRoleAsync(receipt.Id, InventoryRole, inventoryAccountId, cancellationToken);
-            await UpsertRoleAsync(receipt.Id, GrniRole, grniAccountId, cancellationToken);
-        }
-
-        // Invoice posting always needs GRNI. Tax/PPV roles are conditional and are
-        // only required by the posting service when the corresponding amount is non-zero.
-        if (grniAccountId.HasValue)
-        {
-            var invoice = await EnsurePurchasingProfileAsync(
-                "PURCHASE-INVOICE",
-                "ترحيل فاتورة المورد",
-                PurchaseInvoiceDocumentType,
-                cancellationToken);
-
-            await UpsertRoleAsync(invoice.Id, GrniRole, grniAccountId, cancellationToken);
-            await UpsertRoleAsync(invoice.Id, PurchaseTaxRole, purchaseTaxAccountId, cancellationToken);
-            await UpsertRoleAsync(invoice.Id, PurchasePriceVarianceRole, purchasePriceVarianceAccountId, cancellationToken);
+            throw new ConflictException("posting_roles_owned_by_profiles",
+                "حسابات الترحيل تُعدل من صفحة ملفات الترحيل فقط. حدّث الصفحة بعد تعديل الملف النشط.");
         }
     }
 
-    private async Task<PostingProfile> EnsurePurchasingProfileAsync(
-        string code, string name, string documentType, CancellationToken cancellationToken)
+    private async Task<Dictionary<string, Guid>> ReadPostingRolesAsync(Guid profileId, CancellationToken ct)
     {
-        var profiles = await postingProfiles.ListAsync(
-            new Specification<PostingProfile>().Where(x => x.Module == PurchasingModule && x.DocumentType == documentType).Tracking(),
-            cancellationToken);
-
-        var active = profiles.Where(x => x.IsActive).ToList();
-        if (active.Count > 1)
-            throw new ConflictException("purchasing_posting_profile_duplicate", $"يوجد أكثر من ملف ترحيل فعال للمستند {documentType}.");
-
-        var profile = active.SingleOrDefault() ?? profiles.FirstOrDefault();
-        if (profile is null)
-        {
-            profile = PostingProfile.Create(Guid.NewGuid(), code, name, PurchasingModule, documentType, true);
-            await postingProfiles.AddAsync(profile, cancellationToken);
-        }
-        else if (!profile.IsActive)
-        {
-            profile.SetActive(true);
-            postingProfiles.Update(profile);
-        }
-
-        return profile;
-    }
-
-    private async Task UpsertRoleAsync(
-        Guid postingProfileId,
-        string role,
-        Guid? accountId,
-        CancellationToken cancellationToken)
-    {
-        var existingLines = await postingProfileLines.ListAsync(
-            new Specification<PostingProfileLine>()
-                .Where(x =>
-                    x.PostingProfileId == postingProfileId &&
-                    x.AccountRole == role)
-                .Tracking(),
-            cancellationToken);
-
-        if (!accountId.HasValue)
-        {
-            if (existingLines.Count > 0)
-                postingProfileLines.DeleteRange(existingLines);
-
-            return;
-        }
-
-        var line = existingLines.FirstOrDefault();
-        if (line is null)
-        {
-            line = PostingProfileLine.Create(
-                Guid.NewGuid(),
-                postingProfileId,
-                role,
-                accountId.Value,
-                true);
-
-            await postingProfileLines.AddAsync(line, cancellationToken);
-            return;
-        }
-
-        line.Update(role, accountId.Value, true);
-        postingProfileLines.Update(line);
-
-        if (existingLines.Count > 1)
-            postingProfileLines.DeleteRange(existingLines.Skip(1));
+        var lines = await postingProfileLines.ListAsync(new Specification<PostingProfileLine>()
+            .Where(x => x.PostingProfileId == profileId), ct);
+        if (lines.GroupBy(x => x.AccountRole).Any(g => g.Count() > 1))
+            throw new ConflictException("posting_role_duplicate", "يوجد أكثر من حساب للدور المحاسبي نفسه.");
+        return lines.ToDictionary(x => x.AccountRole, x => x.AccountId);
     }
 }

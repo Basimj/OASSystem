@@ -4,12 +4,12 @@
 @using OAS.UiLib.Components.Inputs
 @using OAS.UiLib.Core.Models
 
-<UiAccountingEditorSurface>
-    <UiAccountingFormSection Title="بيانات ملف الترحيل الآلي"
-                             Subtitle="الرمز، الاسم، الوحدة التشغيلية، ونوع المستند"
-                             IconCssClass="fa-solid fa-sliders">
+<UiAccountingEditorSurface AdditionalCssClass="oas-posting-editor">
+    <UiAccountingFormSection Title="بيانات ملف الترحيل"
+                             Subtitle="حدد الوحدة والمستند، ثم اربط الأدوار المحاسبية بحساباتها"
+                             IconCssClass="fa-solid fa-file-circle-plus">
         <UiAccountingFormGrid Columns="2">
-            <UiInputText Label="كود ملف الترحيل"
+            <UiInputText Label="كود الملف"
                          Value="@Model.Code"
                          ValueChanged="OnCodeChanged"
                          Required="true"
@@ -22,39 +22,48 @@
                          Value="@Model.Name"
                          ValueChanged="OnNameChanged"
                          Required="true"
-                         Placeholder="مثال: ملف ترحيل فواتير المبيعات"
+                         Placeholder="مثال: ترحيل فواتير المبيعات"
                          Disabled="@(!IsEditable)"
                          Size="ControlSize.Small" />
-            <UiInputText Label="الوحدة / النظام"
-                         Value="@Model.Module"
-                         ValueChanged="OnModuleChanged"
-                         Required="true"
-                         Placeholder="Sales / Purchasing / Inventory"
-                         Disabled="@(!IsEditable)"
-                         Size="ControlSize.Small" />
-            <UiInputText Label="نوع المستند"
-                         Value="@Model.DocumentType"
-                         ValueChanged="OnDocumentTypeChanged"
-                         Required="true"
-                         Placeholder="SalesInvoice / PurchaseInvoice"
-                         Disabled="@(!IsEditable)"
-                         Size="ControlSize.Small" />
+            @if (IsNew || PostingProfileUiCatalog.IsKnownScope(Model.Module, Model.DocumentType))
+            {
+                <UiSelect Label="الوحدة" Value="@Model.Module" ValueChanged="OnModuleChanged"
+                          Options="@PostingProfileUiCatalog.Modules" Required="true"
+                          Disabled="@(!IsEditable || !IsNew)" Size="ControlSize.Small" />
+                <UiSelect Label="نوع المستند" Value="@Model.DocumentType" ValueChanged="OnDocumentTypeChanged"
+                          Options="@PostingProfileUiCatalog.DocumentOptions(Model.Module)" Required="true"
+                          Disabled="@(!IsEditable || !IsNew)" Size="ControlSize.Small" />
+            }
+            else
+            {
+                <UiAccountingReadOnlyValue Label="الوحدة" Value="@PostingProfileUiCatalog.ModuleText(Model.Module)" />
+                <UiAccountingReadOnlyValue Label="نوع المستند" Value="@PostingProfileUiCatalog.DocumentText(Model.DocumentType)" />
+            }
         </UiAccountingFormGrid>
-        <UiAccountingCheckGroup>
-            <UiCheckbox Label="ملف الترحيل نشط"
-                        Value="@Model.IsActive"
-                        ValueChanged="OnActiveChanged"
-                        Disabled="@(!IsEditable)" />
-        </UiAccountingCheckGroup>
+        <div class="oas-posting-editor__status">
+            <span class="@(Model.IsActive ? "oas-posting-editor__active" : "oas-posting-editor__inactive")">
+                <i class="@(Model.IsActive ? "fa-solid fa-circle-check" : "fa-solid fa-circle-minus")" aria-hidden="true"></i>
+                @(Model.IsActive ? "ملف نشط" : "ملف معطل")
+            </span>
+            <span>@(IsNew
+                ? "يُحفظ الملف الجديد معطلًا؛ يُفعّل بعد مراجعة القواعد."
+                : "الحفظ لا يغيّر حالة التفعيل. استخدم زر التفعيل أو التعطيل المستقل.")</span>
+        </div>
     </UiAccountingFormSection>
 
     <UiAccountingFormSection Title="قواعد توجيه الحسابات"
-                             Subtitle="ربط الأدوار المحاسبية بالحسابات المقابلة في دليل الحسابات"
+                             Subtitle="لكل دور محاسبي حساب واحد مؤهل للترحيل؛ تظهر أخطاء السطر بجانب الحقل"
                              IconCssClass="fa-solid fa-route">
         <UiPostingProfileLinesEditor Lines="@Model.Lines"
+                                     Module="@Model.Module"
+                                     DocumentType="@Model.DocumentType"
                                      IsEditable="@IsEditable"
                                      AccountSearchAsync="@AccountSearchAsync"
                                      OnLinesChanged="OnChanged" />
+        @if (!string.IsNullOrWhiteSpace(Model.LinesError))
+        {
+            <div class="oas-posting-editor__error" role="alert">@Model.LinesError</div>
+        }
     </UiAccountingFormSection>
 </UiAccountingEditorSurface>
 
@@ -66,7 +75,8 @@
         public string Name { get; set; } = string.Empty;
         public string Module { get; set; } = "Sales";
         public string DocumentType { get; set; } = "SalesInvoice";
-        public bool IsActive { get; set; } = true;
+        public bool IsActive { get; set; } = false;
+        public string? LinesError { get; set; }
         public string RowVersion { get; set; } = string.Empty;
         public List<UiPostingProfileLinesEditor.EditablePostingProfileLine> Lines { get; set; } = [];
     }
@@ -77,10 +87,21 @@
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? AccountSearchAsync { get; set; }
     [Parameter] public EventCallback OnModelChanged { get; set; }
 
-    private Task OnChanged() => OnModelChanged.InvokeAsync();
+    private Task OnChanged() { Model.LinesError = null; return OnModelChanged.InvokeAsync(); }
     private async Task OnCodeChanged(string? value) { Model.Code = value ?? string.Empty; Model.CodeError = null; await OnChanged(); }
     private async Task OnNameChanged(string? value) { Model.Name = value ?? string.Empty; await OnChanged(); }
-    private async Task OnModuleChanged(string? value) { Model.Module = value ?? string.Empty; await OnChanged(); }
-    private async Task OnDocumentTypeChanged(string? value) { Model.DocumentType = value ?? string.Empty; await OnChanged(); }
-    private async Task OnActiveChanged(bool value) { Model.IsActive = value; await OnChanged(); }
+    private async Task OnModuleChanged(string? value)
+    {
+        if (!IsNew) return;
+        Model.Module = value ?? string.Empty;
+        Model.DocumentType = PostingProfileUiCatalog.DocumentOptions(Model.Module).FirstOrDefault()?.Value ?? string.Empty;
+        // Never discard a user's existing rules silently after changing document scope.
+        await OnChanged();
+    }
+    private async Task OnDocumentTypeChanged(string? value)
+    {
+        if (!IsNew) return;
+        Model.DocumentType = value ?? string.Empty;
+        await OnChanged();
+    }
 }

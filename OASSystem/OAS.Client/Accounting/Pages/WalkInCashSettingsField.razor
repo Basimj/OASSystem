@@ -14,7 +14,10 @@
 
 @* One central account selection for all new customers, next to other
    accounting settings. It is saved with the existing settings Save action. *@
-<CustomerReceivablesSettingsField @ref="_receivablesField" />
+@if (ShowReceivables)
+{
+    <CustomerReceivablesSettingsField @ref="_receivablesField" />
+}
 
 @* A cash customer is selected from Customers; its chart-of-accounts posting
    account is displayed automatically, never picked independently. *@
@@ -34,6 +37,7 @@
                            Value="@_accountPreview" />
 
 @code {
+    [Parameter] public bool ShowReceivables { get; set; } = true;
     private CustomerReceivablesSettingsField? _receivablesField;
     private bool _loaded;
     private bool _busy;
@@ -43,7 +47,7 @@
     private readonly Dictionary<string, (UiLookupItem Item, string Account)> _options = new();
 
     // The existing settings page checks this before saving any sub-settings.
-    public bool IsLoaded => _loaded && (_receivablesField?.IsLoaded ?? false);
+    public bool IsLoaded => _loaded && (!ShowReceivables || (_receivablesField?.IsLoaded ?? false));
 
     // A default anonymous customer must not be a real person's account, even if
     // the account permits immediate payment. WALKIN-* covers technical customers
@@ -179,33 +183,34 @@
             "اختر عميلًا باسم «عميل نقدي عام» يكون فعالًا وغير آجل وله حساب ذمم مرتبط.");
     }
 
-    // Called by the accounting settings Save button.
-    public async Task<bool> SaveAsync()
+    // Independent saves avoid falsely claiming a single atomic transaction.
+    public async Task<bool> SaveCustomerOnlyAsync()
     {
-        if (!IsLoaded || _busy) return false;
+        if (!_loaded || _busy) return false;
         _busy = true;
         try
         {
-            var selectedId = Guid.TryParse(_customerId, out var parsed)
-                ? parsed : (Guid?)null;
+            var chosen = Guid.TryParse(_customerId, out var id) ? id : (Guid?)null;
             var saved = await Api.PutAsync<UpdateWalkInCashCustomerSettingsRequest,
-                WalkInCashCustomerSettingsDto>(
-                "api/accounting/walk-in-customer",
-                new UpdateWalkInCashCustomerSettingsRequest(selectedId));
+                WalkInCashCustomerSettingsDto>("api/accounting/walk-in-customer",
+                    new UpdateWalkInCashCustomerSettingsRequest(chosen));
             if (saved is null) return false;
             ApplyFromServer(saved);
-            // Preserve the existing walk-in setting, then save the new parent.
-            // The server treats the configured account as authoritative for new customers.
-            if (_receivablesField is null || !await _receivablesField.SaveAsync())
-            {
-                Snackbar.Warning("تم حفظ إعداد العميل النقدي، لكن تعذر حفظ حساب ذمم العملاء الرئيسي.");
-                return false;
-            }
             return true;
         }
         catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
         catch { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
         return false;
+    }
+
+    public Task<bool> SaveReceivablesOnlyAsync() =>
+        _receivablesField is null ? Task.FromResult(false) : _receivablesField.SaveAsync();
+
+    // Legacy caller support: these are separate requests, not an atomic save.
+    public async Task<bool> SaveAsync()
+    {
+        if (!await SaveCustomerOnlyAsync()) return false;
+        return await SaveReceivablesOnlyAsync();
     }
 }

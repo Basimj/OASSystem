@@ -53,11 +53,11 @@ public class PostingProfileCommandAndQueryTests
             Name: "ملف ترحيل المبيعات",
             Module: "Sales",
             DocumentType: "SalesInvoice",
-            IsActive: true,
+            IsActive: false,
             Lines:
             [
                 new CreatePostingProfileLineRequest(
-                    AccountRole: "Customer",
+                    AccountRole: "SalesRevenue",
                     AccountId: account.Id,
                     IsRequired: true)
             ]);
@@ -115,7 +115,7 @@ public class PostingProfileCommandAndQueryTests
             Name: "ملف غير صالح",
             Module: "Accounting",
             DocumentType: "Test",
-            IsActive: true,
+            IsActive: false,
             Lines:
             [
                 new CreatePostingProfileLineRequest(

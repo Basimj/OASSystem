@@ -128,6 +128,108 @@ public partial class AccountingWorkspaceHost : IDisposable
     private sealed record CostCenterTreeRow(CostCenterDto Center, int Depth, bool HasChildren, bool IsExpanded);
 
     private PagedResult<PostingProfileDto> _postingProfilesPage = new();
+    private string _postingProfileModuleFilter = string.Empty;
+    private string _postingProfileDocumentFilter = string.Empty;
+    private string _postingProfileStatusFilter = string.Empty;
+    private bool _postingProfileActionBusy;
+    private long? _postingProfileActiveCount;
+    private long? _postingProfileInactiveCount;
+    private long? _postingProfileTotalCount => _postingProfileActiveCount.HasValue && _postingProfileInactiveCount.HasValue
+        ? _postingProfileActiveCount.Value + _postingProfileInactiveCount.Value : null;
+
+    private async Task RefreshPostingProfileCountsAsync()
+    {
+        try
+        {
+            // Always global counts, independent of search/filter/pagination.
+            var active = await AccountingService.GetPostingProfilesPageAsync(new PageRequest { PageNumber = 1, PageSize = 1, Status = "active" });
+            var inactive = await AccountingService.GetPostingProfilesPageAsync(new PageRequest { PageNumber = 1, PageSize = 1, Status = "inactive" });
+            _postingProfileActiveCount = active.TotalCount;
+            _postingProfileInactiveCount = inactive.TotalCount;
+        }
+        catch
+        {
+            _postingProfileActiveCount = null;
+            _postingProfileInactiveCount = null;
+        }
+    }
+
+    private async Task OnPostingModuleFilterChanged(ChangeEventArgs e)
+    {
+        _postingProfileModuleFilter = e.Value?.ToString() ?? string.Empty;
+        _postingProfileDocumentFilter = string.Empty;
+        await RefreshPostingProfilesAsync();
+    }
+    private async Task OnPostingDocumentFilterChanged(ChangeEventArgs e)
+    {
+        _postingProfileDocumentFilter = e.Value?.ToString() ?? string.Empty;
+        await RefreshPostingProfilesAsync();
+    }
+    private async Task OnPostingStatusFilterChanged(ChangeEventArgs e)
+    {
+        _postingProfileStatusFilter = e.Value?.ToString() ?? string.Empty;
+        await RefreshPostingProfilesAsync();
+    }
+    private async Task RefreshPostingProfilesAsync()
+    {
+        _pageByEntity[AccountingEntityType.PostingProfiles] = 1;
+        try { await LoadEntityListAsync(AccountingEntityType.PostingProfiles); }
+        catch (ApiClientException ex) { ShowAccountingError(ex.Error); }
+        catch (Exception) { ApiFeedback.ShowUnexpected(); }
+    }
+
+    private bool CanChangePostingProfileStatus =>
+        !_postingProfileActionBusy &&
+        Workspace.ActiveTab is { IsNew: false, IsEditMode: false, IsDirty: false,
+            IsSaving: false, EntityType: AccountingEntityType.PostingProfiles,
+            EntityId: Guid, Model: PostingProfileEditor.FormModel };
+
+    private async Task ChangePostingProfileStatusAsync(bool active)
+    {
+        if (!CanChangePostingProfileStatus ||
+            Workspace.ActiveTab is not { EntityId: Guid id,
+                Model: PostingProfileEditor.FormModel model } tab ||
+            model.IsActive == active) return;
+
+        _postingProfileActionBusy = true;
+        try
+        {
+            // Show the affected active profile before switching; the server remains
+            // responsible for enforcing single-active-profile and concurrency.
+            string predecessor = "لا يوجد ملف نشط آخر في هذا النطاق.";
+            if (active)
+            {
+                var matches = await AccountingService.GetPostingProfilesPageAsync(new PageRequest
+                {
+                    PageSize = PageRequest.MaximumPageSize,
+                    PostingModule = model.Module,
+                    PostingDocumentType = model.DocumentType,
+                    Status = "active"
+                });
+                var competing = matches.Items.Where(x => x.Id != id).ToArray();
+                if (competing.Length > 0)
+                    predecessor = "سيتعطل الملف الحالي: " + string.Join("، ", competing.Select(x => $"{x.Code} — {x.Name}"));
+            }
+            var action = active ? "تفعيل" : "تعطيل";
+            if (!await Dialog.ConfirmAsync($"تأكيد {action} ملف الترحيل",
+                $"الملف: {model.Code} — {model.Name}\nالوحدة: {PostingProfileUiCatalog.ModuleText(model.Module)}\n" +
+                $"نوع المستند: {PostingProfileUiCatalog.DocumentText(model.DocumentType)}\n" +
+                (active ? predecessor : "لن يُستخدم الملف بعد تعطيله لترحيل مستندات جديدة.") +
+                "\nتأكد من سلامة الأدوار والحسابات قبل المتابعة.",
+                active ? AlertTone.Warning : AlertTone.Danger,
+                confirmText: action, cancelText: "رجوع")) return;
+
+            await AccountingService.SetPostingProfileStatusAsync(id,
+                new SetPostingProfileStatusRequest(active, model.RowVersion));
+            await LoadExistingRecordAsync(tab, id);
+            await LoadEntityListAsync(AccountingEntityType.PostingProfiles);
+            Snackbar.Success(active ? "تم تفعيل ملف الترحيل." : "تم تعطيل ملف الترحيل.");
+        }
+        catch (ApiClientException ex) { ShowAccountingError(ex.Error); }
+        catch (Exception) { ApiFeedback.ShowUnexpected(); }
+        finally { _postingProfileActionBusy = false; }
+    }
+
     private PagedResult<PaymentAllocationDto> _allocationsPage = new();
 
     // Each accounting page owns its own visible tab strip: one permanent list tab
@@ -952,6 +1054,7 @@ public partial class AccountingWorkspaceHost : IDisposable
             AccountingEntityType.CashAccounts or AccountingEntityType.BankAccounts or AccountingEntityType.CashShifts => _cashBankStatusFilters.GetValueOrDefault(type),
             AccountingEntityType.Expenses => _expenseStatusFilter,
             AccountingEntityType.ExpenseTypes => _expenseTypeStatusFilter,
+            AccountingEntityType.PostingProfiles => _postingProfileStatusFilter,
             _ => null
         },
         DateFrom = type == AccountingEntityType.Expenses ? _expenseDateFrom : null,
@@ -959,6 +1062,8 @@ public partial class AccountingWorkspaceHost : IDisposable
         ExpenseTypeId = type == AccountingEntityType.Expenses ? _expenseTypeFilter : null,
         FiscalYearId = type == AccountingEntityType.FiscalPeriods && Section == AccountingEntityType.FiscalYears
             ? _selectedFiscalYearId : null,
+        PostingModule = type == AccountingEntityType.PostingProfiles ? _postingProfileModuleFilter : null,
+        PostingDocumentType = type == AccountingEntityType.PostingProfiles ? _postingProfileDocumentFilter : null,
         PaymentMethod = type == AccountingEntityType.Expenses && int.TryParse(_expensePaymentFilter, out var method) ? method : null,
         SortBy = type switch
         {
@@ -1080,6 +1185,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                 break;
             case AccountingEntityType.PostingProfiles:
                 _postingProfilesPage = await AccountingService.GetPostingProfilesPageAsync(request);
+                await RefreshPostingProfileCountsAsync();
                 break;
             case AccountingEntityType.CostCenters:
                 // Load a complete hierarchy rather than an arbitrary 25-record page.
@@ -2321,39 +2427,89 @@ public partial class AccountingWorkspaceHost : IDisposable
 
     private async Task SavePostingProfileAsync(AccountingTabState tab, PostingProfileEditor.FormModel model)
     {
+        model.CodeError = null;
+        model.LinesError = null;
+        foreach (var line in model.Lines)
+        {
+            line.RoleError = null;
+            line.AccountError = null;
+        }
         if (string.IsNullOrWhiteSpace(model.Code) || string.IsNullOrWhiteSpace(model.Name) ||
             string.IsNullOrWhiteSpace(model.Module) || string.IsNullOrWhiteSpace(model.DocumentType))
         {
+            model.CodeError = string.IsNullOrWhiteSpace(model.Code) ? "الكود مطلوب" : null;
             Snackbar.Warning("الكود والاسم والوحدة ونوع المستند مطلوبة.");
             return;
         }
-
-        var lines = model.Lines
-            .Where(x => x.AccountId.HasValue && !string.IsNullOrWhiteSpace(x.AccountRole))
-            .Select(x => new CreatePostingProfileLineRequest(x.AccountRole.Trim(), x.AccountId!.Value, x.IsRequired))
-            .ToArray();
-        if (lines.Length == 0)
+        if (model.Lines.Count == 0)
         {
-            Snackbar.Warning("أضف قاعدة حساب واحدة على الأقل إلى ملف الترحيل.");
+            model.LinesError = "أضف قاعدة حساب واحدة على الأقل إلى ملف الترحيل.";
+            Snackbar.Warning(model.LinesError);
             return;
         }
-
-        for (var i = 0; i < model.Lines.Count; i++)
+        var allowedRoles = PostingProfileUiCatalog.Roles(model.Module, model.DocumentType);
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        bool invalid = false;
+        foreach (var line in model.Lines)
         {
-            var line = model.Lines[i];
-            if (!line.AccountId.HasValue) continue;
-            if (!await ValidateAccountSelectionAsync(
-                    line.AccountId.Value,
-                    AccountingAccountEligibilityContext.PostingProfile,
-                    $"دور الترحيل {line.AccountRole}"))
-                return;
+            var role = line.AccountRole.Trim();
+            if (role.Length == 0)
+            {
+                line.RoleError = "اختر الدور المحاسبي.";
+                invalid = true;
+            }
+            else if (allowedRoles.Count > 0 &&
+                     !allowedRoles.Any(x => string.Equals(x.Value, role, StringComparison.OrdinalIgnoreCase)) &&
+                     tab.IsNew)
+            {
+                line.RoleError = "هذا الدور غير مدعوم لنوع المستند المحدد.";
+                invalid = true;
+            }
+            else if (!seen.Add(role))
+            {
+                line.RoleError = "الدور المحاسبي مكرر.";
+                invalid = true;
+            }
+            if (!line.AccountId.HasValue)
+            {
+                line.AccountError = "اختر حسابًا مرتبطًا بهذا الدور؛ لن يُحذف السطر تلقائيًا.";
+                invalid = true;
+            }
+            if (allowedRoles.Any(x => x.AlwaysRequired && string.Equals(x.Value, role, StringComparison.OrdinalIgnoreCase)))
+                line.IsRequired = true;
         }
+        var missingRoles = allowedRoles.Where(x => x.AlwaysRequired && !seen.Contains(x.Value))
+            .Select(x => x.Text).ToArray();
+        if (missingRoles.Length > 0)
+        {
+            model.LinesError = "الأدوار المطلوبة غير الموجودة: " + string.Join("، ", missingRoles);
+            invalid = true;
+        }
+        if (invalid)
+        {
+            Snackbar.Warning("راجع الأدوار والحسابات المميزة باللون الأحمر قبل الحفظ.");
+            return;
+        }
+        foreach (var line in model.Lines)
+        {
+            if (!await ValidateAccountSelectionAsync(
+                    line.AccountId!.Value,
+                    AccountingAccountEligibilityContext.PostingProfile,
+                    $"دور الترحيل {PostingProfileUiCatalog.RoleText(line.AccountRole)}"))
+            {
+                line.AccountError = "هذا الحساب غير مؤهل للترحيل. اختر حسابًا نشطًا وتفصيليًا صالحًا.";
+                return;
+            }
+        }
+        var lines = model.Lines.Select(x => new CreatePostingProfileLineRequest(
+            x.AccountRole.Trim(), x.AccountId!.Value, x.IsRequired)).ToArray();
 
         PostingProfileDto? result;
         if (tab.IsNew)
         {
+            // Creation never deactivates an existing profile. Activate explicitly afterward.
             result = await AccountingService.CreatePostingProfileAsync(new CreatePostingProfileRequest(
-                model.Code.Trim(), model.Name.Trim(), model.Module.Trim(), model.DocumentType.Trim(), lines, model.IsActive));
+                model.Code.Trim(), model.Name.Trim(), model.Module.Trim(), model.DocumentType.Trim(), lines, false));
         }
         else
         {
@@ -2361,8 +2517,8 @@ public partial class AccountingWorkspaceHost : IDisposable
             result = await AccountingService.UpdatePostingProfileAsync(tab.EntityId!.Value, new UpdatePostingProfileRequest(
                 model.Code.Trim(), model.Name.Trim(), model.Module.Trim(), model.DocumentType.Trim(), lines, model.IsActive, model.RowVersion));
         }
-
-        await CompleteSaveAsync(tab, result?.Id, result is null ? null : $"{result.Code} - {result.Name}", "تم حفظ ملف الترحيل بنجاح.");
+        await CompleteSaveAsync(tab, result?.Id, result is null ? null : $"{result.Code} - {result.Name}",
+            "تم حفظ قواعد وبيانات ملف الترحيل. التفعيل إجراء مستقل.");
     }
 
     private async Task SaveCostCenterAsync(AccountingTabState tab, CostCenterEditor.FormModel model)
@@ -4113,8 +4269,8 @@ public partial class AccountingWorkspaceHost : IDisposable
                 foreach (var x in _fiscalPeriodsPage.Items) await EnsureFiscalYearLookupAsync(x.FiscalYearId);
                 break;
             case AccountingEntityType.PostingProfiles:
-                foreach (var id in _postingProfilesPage.Items.SelectMany(x => x.Lines).Select(x => x.AccountId).Distinct())
-                    await EnsureAccountLookupAsync(id);
+                // List needs only the server-side rule count. Load account lookup labels
+                // only when a particular profile is opened to avoid N+1 requests.
                 break;
             case AccountingEntityType.ReceiptVouchers:
                 foreach (var x in _receiptsPage.Items)
@@ -4649,10 +4805,14 @@ public partial class AccountingWorkspaceHost : IDisposable
     private IReadOnlyList<AccountingRecordItem> BuildPostingProfileItems() => _postingProfilesPage.Items.Select(x =>
         new AccountingRecordItem(
             x.Id,
-            $"{x.Code} - {x.Name}",
-            $"{x.Module} / {x.DocumentType}",
-            "fa-solid fa-sliders",
-            [new("الوحدة", x.Module), new("نوع المستند", x.DocumentType)],
+            x.Name,
+            x.Code,
+            "fa-solid fa-layer-group",
+            [
+                new("الوحدة", PostingProfileUiCatalog.ModuleText(x.Module)),
+                new("المستند", PostingProfileUiCatalog.DocumentText(x.DocumentType)),
+                new("القواعد", x.Lines.Count.ToString())
+            ],
             x.IsActive ? "نشط" : "معطل",
             x.IsActive ? "active" : "inactive")).ToArray();
 

@@ -2,6 +2,7 @@ using NUnit.Framework;
 using OAS.Application.Accounting.PostingProfiles.Commands.CreatePostingProfile;
 using OAS.Application.Accounting.PostingProfiles.Commands.SetPostingProfileStatus;
 using OAS.Application.Accounting.PostingProfiles.Mapping;
+using OAS.Application.Common.Exceptions;
 using OAS.Contracts.Accounting.PostingProfiles;
 using OAS.Domain.Accounting.Entities;
 using OAS.Tests.Accounting.Application.Common;
@@ -12,7 +13,7 @@ namespace OAS.Tests.Accounting.Application.PostingProfiles;
 public class PostingProfileActivationTests
 {
     [Test]
-    public async Task CreatingActiveProfile_DeactivatesPreviousProfileForSameScope()
+    public async Task CreatingInactiveProfile_KeepsPreviousActiveForSameScope()
     {
         var previous = PostingProfile.Create(
             Guid.NewGuid(),
@@ -38,13 +39,13 @@ public class PostingProfileActivationTests
                     "Sales",
                     "SalesInvoice",
                     [],
-                    true)),
+                    false)),
             CancellationToken.None);
 
         Assert.Multiple(() =>
         {
-            Assert.That(created.IsActive, Is.True);
-            Assert.That(previous.IsActive, Is.False);
+            Assert.That(created.IsActive, Is.False);
+            Assert.That(previous.IsActive, Is.True);
             Assert.That(repository.Items.Count(x =>
                 x.IsActive &&
                 x.Module == "Sales" &&
@@ -52,6 +53,19 @@ public class PostingProfileActivationTests
         });
     }
 
+
+    [Test]
+    public void CreatingActiveProfile_RequiresSeparateStatusAction()
+    {
+        var repository = new FakeRepository<PostingProfile, Guid>();
+        var handler = new CreatePostingProfileCommandHandler(repository,
+            new FakeRepository<Account, Guid>(), new PostingProfileMapper());
+        Assert.ThrowsAsync<ConflictException>(async () => await handler.Handle(
+            new CreatePostingProfileCommand(new CreatePostingProfileRequest(
+                "PP-BLOCK", "ملف نشط", "Sales", "SalesInvoice", [], true)),
+            CancellationToken.None));
+        Assert.That(repository.Items, Is.Empty);
+    }
     [Test]
     public async Task ActivatingProfile_DeactivatesCompetingProfileForSameScope()
     {
@@ -72,7 +86,16 @@ public class PostingProfileActivationTests
             true);
 
         var repository = new FakeRepository<PostingProfile, Guid>([current, competing]);
-        var handler = new SetPostingProfileStatusCommandHandler(repository);
+        var account = Account.Create(Guid.NewGuid(), "410100", "إيرادات المبيعات",
+            null, null, 1, OAS.Domain.Accounting.Enums.AccountClass.Revenue,
+            OAS.Domain.Accounting.Enums.AccountType.Posting,
+            OAS.Domain.Accounting.Enums.NormalBalance.Credit,
+            isPostingAccount: true, isControlAccount: false, allowManualPosting: false,
+            isSystemAccount: false, isActive: true, effectiveDate: null);
+        var lines = new FakeRepository<PostingProfileLine, Guid>(
+            [PostingProfileLine.Create(Guid.NewGuid(), current.Id, "SalesRevenue", account.Id, true)]);
+        var accounts = new FakeRepository<Account, Guid>([account]);
+        var handler = new SetPostingProfileStatusCommandHandler(repository, lines, accounts);
 
         await handler.Handle(
             new SetPostingProfileStatusCommand(
@@ -116,7 +139,7 @@ public class PostingProfileActivationTests
                     "Purchasing",
                     "PurchaseInvoice",
                     [],
-                    true)),
+                    false)),
             CancellationToken.None);
 
         Assert.That(salesInvoice.IsActive, Is.True);

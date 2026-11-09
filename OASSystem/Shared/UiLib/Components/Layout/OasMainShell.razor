@@ -146,6 +146,44 @@
                     @if (!isSidebarCollapsed && expanded)
                     {
                         <div class="oas-nav-group__items">
+                            @if (group.Key == "accounting")
+                            {
+                                var accountingSettingsModules = groupModules.Where(IsAccountingSettingsModule).ToArray();
+                                @foreach (var module in groupModules.Where(m => !IsAccountingSettingsModule(m)))
+                                {
+                                    <button type="button"
+                                            class="@(IsModuleActive(module) ? "oas-nav-item oas-nav-item--child active" : "oas-nav-item oas-nav-item--child")"
+                                            title="@module.Title"
+                                            aria-current="@(IsModuleActive(module) ? "page" : null)"
+                                            @onclick="() => NavigateModuleAsync(module)">
+                                        <span class="oas-nav-icon" aria-hidden="true"><i class="@module.IconCssClass"></i></span>
+                                        <span class="oas-nav-text">@module.Title</span>
+                                    </button>
+                                }
+                                <button type="button" class="oas-nav-item oas-nav-item--child oas-accounting-settings-toggle"
+                                        aria-expanded="@_accountingSettingsExpanded"
+                                        @onclick="ToggleAccountingSettingsAsync">
+                                    <span class="oas-nav-icon"><i class="fa-solid fa-gears"></i></span>
+                                    <span class="oas-nav-text">إعدادات المحاسبة</span>
+                                    <i class="fa-solid @(_accountingSettingsExpanded ? "fa-chevron-up" : "fa-chevron-down")" aria-hidden="true"></i>
+                                </button>
+                                @if (_accountingSettingsExpanded)
+                                {
+                                    <div class="oas-accounting-settings-submenu">
+                                        @foreach (var module in accountingSettingsModules)
+                                        {
+                                            <button type="button" class="@(IsModuleActive(module) ? "oas-nav-item oas-nav-item--child active" : "oas-nav-item oas-nav-item--child")"
+                                                    title="@module.Title" aria-current="@(IsModuleActive(module) ? "page" : null)"
+                                                    @onclick="() => NavigateModuleAsync(module)">
+                                                <span class="oas-nav-icon"><i class="@module.IconCssClass"></i></span>
+                                                <span class="oas-nav-text">@module.Title</span>
+                                            </button>
+                                        }
+                                    </div>
+                                }
+                            }
+                            else
+                            {
                             @foreach (var module in groupModules)
                             {
                                 <button type="button"
@@ -156,6 +194,7 @@
                                     <span class="oas-nav-icon" aria-hidden="true"><i class="@module.IconCssClass"></i></span>
                                     <span class="oas-nav-text">@module.Title</span>
                                 </button>
+                            }
                             }
                         </div>
                     }

@@ -97,17 +97,6 @@
 
 .oas-nav { padding: 14px 10px 20px; gap: 5px; scrollbar-color: rgba(255,255,255,.3) transparent; }
 .oas-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.25); }
-/* Keep sidebar navigation scrollable, but hide its visual scrollbar on all devices and layouts. */
-.oas-shell .oas-sidebar > .oas-nav {
-    scrollbar-width: none; /* Firefox and current Chromium */
-    -ms-overflow-style: none; /* Legacy Microsoft browsers */
-}
-.oas-shell .oas-sidebar > .oas-nav::-webkit-scrollbar {
-    display: none; /* Safari and older Chromium */
-    width: 0;
-    height: 0;
-}
-
 .oas-nav-item, .oas-nav-group__header {
     min-height: 43px;
     border-radius: 10px;
@@ -185,7 +174,7 @@
 .oas-shell-search__icon { color: var(--oas-ui-header-fg); opacity: .75; font-size: 14px; }
 .oas-shell-search input { background: transparent; color: var(--oas-ui-header-fg); border: 0; outline: 0; min-width: 0; width: 100%; flex: 1; font-family: inherit; font-size: 12px; }
 .oas-shell-search input::placeholder { color: var(--oas-ui-header-fg); opacity: .75; }
-.oas-shell-search kbd { flex: 0 0 auto; font: inherit; font-size: 10px; color: var(--oas-ui-header-fg); opacity: .8; border: 0; border-radius: 0; padding: 0; background: transparent; box-shadow: none; }
+.oas-shell-search kbd { flex: 0 0 auto; font: inherit; font-size: 10px; color: var(--oas-ui-header-fg); opacity: .8; border-radius: 5px; padding: 2px 5px; border: 1px solid currentColor; }
 .oas-shell-search__results { position: absolute; z-index: 2000; inset-block-start: calc(100% + 8px); inset-inline: 0; max-height: 345px; overflow-y: auto; background: #fff; color: #19384b; border: 1px solid #d3e5ee; border-radius: 12px; box-shadow: 0 16px 42px rgba(15,45,62,.19); padding: 5px; }
 .oas-shell-search__results button { background: none; width: 100%; text-align: right; display: flex; align-items: center; gap: 10px; padding: 11px; border: 0; border-radius: 7px; font-family: inherit; color: #19384b; font-size: 13px; }
 .oas-shell-search__results button:hover,.oas-shell-search__results button:focus-visible { background: #e7f4f8; outline: none; }
@@ -256,7 +245,7 @@
 .oas-header-finance-link:hover { background: #e9f5fa; border-color: #a6d6e5; color: #245b70; }
 .oas-header-finance-link:focus-visible, .oas-shell-search input:focus-visible { outline: 2px solid #459db9; outline-offset: 3px; }
 .oas-sidebar .oas-nav-group__header:focus-visible, .oas-sidebar .oas-nav-item:focus-visible { outline: 2px solid #b9e9fa; outline-offset: -2px; }
-.oas-shell.sidebar-collapsed .oas-nav { scrollbar-width: none; }
+.oas-shell.sidebar-collapsed .oas-nav { scrollbar-width: thin; }
 @media (max-width: 1160px) { .oas-header-finance-link { display: none; } }
 
 /* Shrink gracefully on intermediate widths without overlapping the search field. */
@@ -273,23 +262,23 @@
     .oas-header-user { min-width: 32px; }
 }
 
-/* Search shortcut: text only, tinted by the active appearance's header color.
-   Keep the selector scoped so other keyboard hints retain their usual styling. */
+/* Ocean UI v4 — match the reference design for the Ctrl+K search hint.
+   Scoped to the header search so keyboard hints elsewhere remain unchanged. */
 .oas-shell .oas-shell-search kbd {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: transparent;
-    color: var(--oas-ui-header-fg);
-    border: 0;
-    border-radius: 0;
+    background: #f9ff26;
+    color: #111111;
+    border: 1px solid #d7dc38;
+    border-radius: 5px;
     box-shadow: none;
-    opacity: .85;
+    opacity: 1;
     font-size: 10px;
     font-weight: 650;
     line-height: 1.2;
-    padding: 0;
-    min-height: 0;
+    padding: 3px 6px;
+    min-height: 20px;
 }
 @media (max-width: 640px) {
     .oas-shell .oas-shell-search kbd { display: none; }
@@ -605,3 +594,12 @@
   .oas-appearance-settings__demo-sidebar { flex:auto; }
   .oas-appearance-settings__hero { flex-wrap:wrap; }
 }
+
+/* Accounting settings: a true nested sidebar section, inheriting theme colors. */
+.oas-accounting-settings-submenu {
+    margin-inline-start: 12px;
+    padding-inline-start: 7px;
+    border-inline-start: 1px solid var(--oas-ui-border, rgba(255,255,255,.22));
+}
+.oas-accounting-settings-submenu .oas-nav-item--child { font-size: .88em; min-height: 33px; }
+.oas-accounting-settings-toggle { font-weight: 650; }

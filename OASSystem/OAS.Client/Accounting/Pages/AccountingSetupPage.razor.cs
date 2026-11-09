@@ -19,6 +19,8 @@ using OAS.Contracts.Common.Pagination;
 using OAS.Contracts.Features.Employees;
 using OAS.UiLib.Core.Models;
 using OAS.UiLib.Services.Feedback;
+using OAS.UiLib.Services.Dialogs;
+using OAS.UiLib.Core.Enums;
 
 namespace OAS.Client.Accounting.Pages;
 
@@ -36,6 +38,128 @@ public partial class AccountingSetupPage
     [Inject]
     private IUiSnackbarService Snackbar { get; set; } = default!;
 
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private IUiDialogService Dialogs { get; set; } = default!;
+
+    [Parameter] public string Section { get; set; } = "general";
+    private string SectionTitle => Section switch
+    {
+        "cash" => "العميل النقدي", "receivables" => "ذمم العملاء",
+        "exchange" => "فروقات العملات", "purchasing" => "حسابات المخزون والمشتريات",
+        "currencies" => "العملات", "rates" => "أسعار الصرف",
+        "employees" => "الربط المحاسبي للموظفين", _ => "الإعدادات الأساسية"
+    };
+    private CustomerReceivablesSettingsField? _standaloneReceivablesField;
+    private async Task SaveStandaloneReceivablesAsync()
+    {
+        if (_standaloneReceivablesField is null || !_standaloneReceivablesField.IsLoaded)
+        {
+            Snackbar.Warning("لم تُحمّل إعدادات ذمم العملاء بعد.");
+            return;
+        }
+        if (await _standaloneReceivablesField.SaveAsync())
+            Snackbar.Success("تم حفظ الحساب الرئيسي لذمم العملاء.");
+    }
+    private string _activeSection = string.Empty;
+    private bool _currencyEditorOpen;
+    private bool _rateEditorOpen;
+    private string? _settingsError;
+    private string? _baseCurrencyError;
+    private string? _currencyCodeError;
+    private string? _currencyNameError;
+    private string? _currencyDecimalsError;
+    private string? _rateCurrencyError;
+    private string? _rateDateError;
+    private string? _currencyError;
+    private string? _rateError;
+    private string? _rateFilterError;
+    private string _currencySearch = string.Empty;
+    private string _currencyStatusFilter = "all";
+    private string _rateSearch = string.Empty;
+    private string _rateStatusFilter = "all";
+    private Guid? _rateFilterCurrencyId;
+    private DateOnly? _rateDateFrom;
+    private DateOnly? _rateDateTo;
+    private int _ratePageNumber = 1;
+    private long _rateTotalCount;
+    private const int RatePageSize = 30;
+    private string _employeeAccountSearch = string.Empty;
+    private int _employeeAccountPageNumber = 1;
+    private long _employeeAccountTotalCount;
+    private const int EmployeeAccountsPageSize = 30;
+
+    private static IReadOnlyList<UiSelectOption> CurrencyStatusFilterOptions { get; } =
+    [
+        new("all", "جميع العملات"), new("active", "نشطة"), new("inactive", "معطلة")
+    ];
+    private static IReadOnlyList<UiSelectOption> RateStatusFilterOptions { get; } =
+    [
+        new("all", "جميع الحالات"), new("active", "نشطة"), new("inactive", "معطلة")
+    ];
+    private IReadOnlyList<UiSelectOption> RateFilterCurrencyOptions =>
+        _currencies.Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} — {x.NameAr}")).ToArray();
+    private IEnumerable<CurrencyDto> FilteredCurrencies => _currencies.Where(c =>
+        (_currencyStatusFilter == "all" ||
+         (_currencyStatusFilter == "active" ? c.IsActive : !c.IsActive)) &&
+        (string.IsNullOrWhiteSpace(_currencySearch) ||
+         c.Code.Contains(_currencySearch.Trim(), StringComparison.OrdinalIgnoreCase) ||
+         c.NameAr.Contains(_currencySearch.Trim(), StringComparison.OrdinalIgnoreCase) ||
+         (c.NameEn?.Contains(_currencySearch.Trim(), StringComparison.OrdinalIgnoreCase) ?? false)));
+    private string BaseCurrencyLabel => _currencies.FirstOrDefault(x => x.Id == _settingsBaseCurrencyId)?.Code
+        ?? _settings?.BaseCurrencyCode ?? "العملة الأساسية";
+    private string CurrencyFormatPreview =>
+        1234.5m.ToString("N" + Math.Clamp(_currencyDecimalPlaces, 0, 6));
+    private string RateConversionPreview => _rateCurrencyId.HasValue
+        ? $"1 {(_currencies.FirstOrDefault(x => x.Id == _rateCurrencyId)?.Code ?? "عملة")} = {FormatExchangeRate(IsSelectedRateBaseCurrency ? 1m : _rateValue)} {BaseCurrencyLabel}"
+        : "اختر العملة لعرض اتجاه التحويل إلى العملة الأساسية.";
+    private string? SettingsFieldError(string label)
+    {
+        if (string.IsNullOrWhiteSpace(_settingsError)) return null;
+        var lookupKey = label switch
+        {
+            "حساب بضاعة مستلمة غير مفوترة (GRNI)" => "حساب بضاعة مستلمة غير مفوترة",
+            "حساب أرباح فروقات الصرف" => "حساب أرباح فروق العملة",
+            "حساب خسائر فروقات الصرف" => "حساب خسائر فروق العملة",
+            _ => label
+        };
+        return _settingsError.StartsWith(lookupKey + ":", StringComparison.Ordinal)
+            ? _settingsError : null;
+    }
+
+    private string AccountDisplay(Guid? id)
+    {
+        if (!id.HasValue) return "— لا يوجد حساب في ملف ترحيل نشط —";
+        var account = _accounts.FirstOrDefault(x => x.Id == id.Value);
+        return account is null ? "حساب مرتبط (حدّث بيانات الحسابات)" : $"{account.Code} — {account.NameAr}";
+    }
+
+    private Task SetCurrencyStatusFilter(string? value) { _currencyStatusFilter = value ?? "all"; return Task.CompletedTask; }
+    private Task SetRateStatusFilter(string? value) { _rateStatusFilter = value ?? "all"; return Task.CompletedTask; }
+    private Task SetRateFilterCurrency(string? value) { _rateFilterCurrencyId = ParseNullableGuid(value); return Task.CompletedTask; }
+    private Task SetRateDateFrom(DateOnly? value) { _rateDateFrom = value; return Task.CompletedTask; }
+    private Task SetRateDateTo(DateOnly? value) { _rateDateTo = value; return Task.CompletedTask; }
+    private void NewCurrency() { _ = CancelCurrencyEdit(); _currencyEditorOpen = true; }
+    private void CloseCurrencyEditor() { _ = CancelCurrencyEdit(); }
+    private void NewRate() { _ = CancelRateEdit(); _rateEditorOpen = true; }
+    private void CloseRateEditor() { _ = CancelRateEdit(); }
+
+
+
+    private void CurrencyWarning(string message)
+    {
+        _currencyError = message;
+        if (message.Contains("كود العملة")) _currencyCodeError = message;
+        else if (message.Contains("اسم العملة بالعربي")) _currencyNameError = message;
+        else if (message.Contains("الخانات العشرية")) _currencyDecimalsError = message;
+        Snackbar.Warning(message);
+    }
+    private void RateWarning(string message)
+    {
+        _rateError = message;
+        if (message.Contains("اختر العملة")) _rateCurrencyError = message;
+        else if (message.Contains("تاريخ")) _rateDateError = message;
+        Snackbar.Warning(message);
+    }
 
     // ================================================================
     // الحالة العامة
@@ -150,11 +274,11 @@ public partial class AccountingSetupPage
 
     private IReadOnlyList<UiSelectOption> RateCurrencyOptions =>
         _currencies
-            .Where(x => x.IsActive)
+            .Where(x => x.IsActive || x.Id == _rateCurrencyId)
             .OrderBy(x => x.Code)
             .Select(x => new UiSelectOption(
                 x.Id.ToString("D"),
-                $"{x.Code} - {x.NameAr}{(IsBaseCurrency(x.Id) ? " (العملة الأساسية)" : string.Empty)}"))
+                $"{x.Code} - {x.NameAr}{(IsBaseCurrency(x.Id) ? " (العملة الأساسية)" : string.Empty)}{(!x.IsActive ? " (معطلة)" : string.Empty)}"))
             .ToArray();
 
     private static IReadOnlyList<UiSelectOption> RateTypeOptions { get; } =
@@ -585,105 +709,132 @@ public partial class AccountingSetupPage
     // التهيئة
     // ================================================================
 
-    protected override Task
-        OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
-        return LoadAsync();
+        var section = Section switch
+        {
+            "general" or "cash" or "receivables" or "exchange" or "purchasing"
+                or "currencies" or "rates" or "employees" => Section,
+            _ => "general"
+        };
+        if (_activeSection == section) return;
+        _activeSection = section;
+        await LoadAsync();
     }
 
-
-    // ================================================================
-    // تحميل الصفحة
-    // ================================================================
-
-    private async Task
-        LoadAsync()
+    private async Task LoadAsync()
     {
-        if (_busy)
-        {
-            return;
-        }
-
-
+        if (_busy) return;
         _busy = true;
-
-
         try
         {
-            var currencies =
-                await LoadAllPagesAsync<CurrencyDto>(
-                    request => Accounting.GetCurrenciesPageAsync(request),
-                    "Code",
-                    SortDirection.Ascending);
-
-
-            var rates =
-                await LoadAllPagesAsync<ExchangeRateDto>(
-                    request => Accounting.GetExchangeRatesPageAsync(request),
-                    "RateDate",
-                    SortDirection.Descending);
-
-
-            /*
-             * تحميل جميع الحسابات على عدة صفحات.
-             *
-             * هذا مهم لأن MaximumPageSize = 200.
-             */
-            var accounts =
-                await LoadAllAccountsAsync();
-
-
-            var employees =
-                await LoadAllPagesAsync<EmployeeDto>(
-                    request => Employees.GetPageAsync(request),
-                    "EmployeeCode",
-                    SortDirection.Ascending);
-
-
-            var employeeAccounts =
-                await LoadAllPagesAsync<EmployeeAccountDto>(
-                    request => Accounting.GetEmployeeAccountsPageAsync(request));
-
-
-            _currencies = currencies;
-
-
-            _rates = rates;
-
-
-            _accounts =
-                accounts;
-
-
-            _employees = employees;
-
-
-            _employeeAccounts = employeeAccounts;
-
-
-            _settings =
-                await Accounting
-                    .GetAccountingSettingsAsync();
-
-
-            ApplySettings(
-                _settings);
+            switch (_activeSection)
+            {
+                case "general":
+                case "exchange":
+                case "purchasing":
+                    _currencies = await LoadAllPagesAsync<CurrencyDto>(
+                        request => Accounting.GetCurrenciesPageAsync(request), "Code");
+                    _settings = await Accounting.GetAccountingSettingsAsync();
+                    ApplySettings(_settings);
+                    await LoadSelectedAccountsAsync();
+                    _settingsError = null;
+                    break;
+                case "currencies":
+                    _currencies = await LoadAllPagesAsync<CurrencyDto>(
+                        request => Accounting.GetCurrenciesPageAsync(request), "Code");
+                    _settings = await Accounting.GetAccountingSettingsAsync();
+                    ApplySettings(_settings);
+                    break;
+                case "rates":
+                    _currencies = await LoadAllPagesAsync<CurrencyDto>(
+                        request => Accounting.GetCurrenciesPageAsync(request), "Code");
+                    _settings = await Accounting.GetAccountingSettingsAsync();
+                    ApplySettings(_settings);
+                    await ReloadRatesPageAsync();
+                    break;
+                case "employees":
+                    _employees = await LoadAllPagesAsync<EmployeeDto>(
+                        request => Employees.GetPageAsync(request), "EmployeeCode");
+                    await ReloadEmployeeAccountsPageAsync();
+                    break;
+            }
         }
-        catch (ApiClientException ex)
-        {
-            ShowAccountingError(ex.Error);
-        }
-        catch
-        {
-            ApiFeedback
-                .ShowUnexpected();
-        }
-        finally
-        {
-            _busy = false;
-        }
+        catch (ApiClientException ex) { ShowAccountingError(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
+        finally { _busy = false; }
     }
 
+    private async Task ReloadRatesPageAsync()
+    {
+        var page = await Accounting.GetExchangeRatesPageAsync(new PageRequest
+        {
+            PageNumber = _ratePageNumber,
+            PageSize = RatePageSize,
+            Search = _rateSearch,
+            Status = _rateStatusFilter == "all" ? null : _rateStatusFilter,
+            ExchangeRateCurrencyId = _rateFilterCurrencyId,
+            DateFrom = _rateDateFrom,
+            DateTo = _rateDateTo,
+            SortBy = "RateDate", SortDirection = SortDirection.Descending
+        });
+        _rates = page.Items.ToList();
+        _rateTotalCount = page.TotalCount;
+    }
+
+    private async Task ApplyRateFiltersAsync()
+    {
+        if (_rateDateFrom.HasValue && _rateDateTo.HasValue && _rateDateFrom > _rateDateTo)
+        {
+            _rateFilterError = "تاريخ البداية يجب ألا يكون بعد تاريخ النهاية.";
+            return;
+        }
+        _rateFilterError = null;
+        _ratePageNumber = 1;
+        await RunAsync(ReloadRatesPageAsync);
+    }
+
+    private async Task PreviousRatePageAsync()
+    {
+        if (_ratePageNumber <= 1) return;
+        _ratePageNumber--;
+        await RunAsync(ReloadRatesPageAsync);
+    }
+    private async Task NextRatePageAsync()
+    {
+        if (_ratePageNumber * RatePageSize >= _rateTotalCount) return;
+        _ratePageNumber++;
+        await RunAsync(ReloadRatesPageAsync);
+    }
+
+    private async Task ReloadEmployeeAccountsPageAsync()
+    {
+        var page = await Accounting.GetEmployeeAccountsPageAsync(new PageRequest
+        {
+            PageNumber = _employeeAccountPageNumber,
+            PageSize = EmployeeAccountsPageSize,
+            Search = _employeeAccountSearch
+        });
+        _employeeAccounts = page.Items.ToList();
+        _employeeAccountTotalCount = page.TotalCount;
+    }
+    private async Task SearchEmployeeAccountsAsync()
+    {
+        _employeeAccountPageNumber = 1;
+        await RunAsync(ReloadEmployeeAccountsPageAsync);
+    }
+    private async Task PreviousEmployeeAccountsPageAsync()
+    {
+        if (_employeeAccountPageNumber <= 1) return;
+        _employeeAccountPageNumber--;
+        await RunAsync(ReloadEmployeeAccountsPageAsync);
+    }
+    private async Task NextEmployeeAccountsPageAsync()
+    {
+        if (_employeeAccountPageNumber * EmployeeAccountsPageSize >= _employeeAccountTotalCount) return;
+        _employeeAccountPageNumber++;
+        await RunAsync(ReloadEmployeeAccountsPageAsync);
+    }
 
     private static async Task<List<T>> LoadAllPagesAsync<T>(
         Func<PageRequest, Task<PagedResult<T>>> loader,
@@ -712,6 +863,28 @@ public partial class AccountingSetupPage
         }
     }
 
+
+    // Loading every account from the chart is costly. Selected accounts are
+    // requested by ID; all other candidates come from the server-side lookup.
+    private async Task LoadSelectedAccountsAsync()
+    {
+        _accounts.Clear();
+        var ids = new Guid?[]
+        {
+            _settingsEmployeeParentAccountId, _settingsCashParentAccountId,
+            _settingsBankParentAccountId, _settingsRetainedEarningsAccountId,
+            _settingsExchangeGainAccountId, _settingsExchangeLossAccountId,
+            _settingsInventoryAccountId, _settingsGrniAccountId,
+            _settingsPurchaseTaxAccountId, _settingsPurchasePriceVarianceAccountId,
+            _settingsSalesRevenueAccountId, _settingsTaxPayableAccountId,
+            _settingsCogsAccountId, _settingsCustomerAdvancesAccountId
+        };
+        foreach (var id in ids.Where(x => x.HasValue).Select(x => x!.Value).Distinct())
+        {
+            var account = await Accounting.GetAccountByIdAsync(id);
+            if (account is not null) _accounts.Add(account);
+        }
+    }
 
     // ================================================================
     // تحميل جميع الحسابات
@@ -841,12 +1014,19 @@ public partial class AccountingSetupPage
         await RunAsync(
             async () =>
             {
-                if (!_settingsBaseCurrencyId
-                    .HasValue)
+                _settingsError = null;
+                _baseCurrencyError = null;
+                if (!_settingsBaseCurrencyId.HasValue)
                 {
-                    Snackbar.Warning(
-                        "اختر العملة الأساسية أولاً.");
-
+                    _settingsError = "اختر العملة الأساسية قبل حفظ الإعدادات.";
+                    _baseCurrencyError = _settingsError;
+                    return;
+                }
+                if (_settings is { BaseCurrencyChangeAllowed: false } &&
+                    _settingsBaseCurrencyId != _settings.BaseCurrencyId)
+                {
+                    _settingsError = "لا يمكن تغيير العملة الأساسية بعد وجود قيود مرحلة.";
+                    _baseCurrencyError = _settingsError;
                     return;
                 }
 
@@ -875,29 +1055,6 @@ public partial class AccountingSetupPage
                     return;
                 }
 
-                if (!await ValidateSettingsAccountAsync(
-                        _settingsSalesRevenueAccountId,
-                        AccountingAccountEligibilityContext.SalesRevenue,
-                        "حساب إيرادات المبيعات"))
-                {
-                    return;
-                }
-
-                if (!await ValidateSettingsAccountAsync(
-                        _settingsTaxPayableAccountId,
-                        AccountingAccountEligibilityContext.TaxPayable,
-                        "حساب الضرائب المستحقة"))
-                {
-                    return;
-                }
-
-                if (!await ValidateSettingsAccountAsync(
-                        _settingsCustomerAdvancesAccountId,
-                        AccountingAccountEligibilityContext.CustomerAdvances,
-                        "حساب دفعات مقدمة من العملاء"))
-                {
-                    return;
-                }
 
                 if (!await ValidateSettingsAccountAsync(
                         _settingsInventoryAccountId,
@@ -907,13 +1064,6 @@ public partial class AccountingSetupPage
                     return;
                 }
 
-                if (!await ValidateSettingsAccountAsync(
-                        _settingsCogsAccountId,
-                        AccountingAccountEligibilityContext.CostOfGoodsSold,
-                        "حساب تكلفة البضاعة المباعة"))
-                {
-                    return;
-                }
 
                 if (!await ValidateSettingsAccountAsync(_settingsGrniAccountId, AccountingAccountEligibilityContext.GoodsReceivedNotInvoiced, "حساب بضاعة مستلمة غير مفوترة")) return;
                 if (!await ValidateSettingsAccountAsync(_settingsPurchaseTaxAccountId, AccountingAccountEligibilityContext.PurchaseTax, "حساب ضريبة المشتريات")) return;
@@ -922,29 +1072,15 @@ public partial class AccountingSetupPage
                 var hasPurchasingReceiptAccount = _settingsInventoryAccountId.HasValue || _settingsGrniAccountId.HasValue;
                 if (hasPurchasingReceiptAccount && (!_settingsInventoryAccountId.HasValue || !_settingsGrniAccountId.HasValue))
                 {
-                    Snackbar.Warning("لترحيل استلامات المشتريات حدد حساب المخزون وحساب بضاعة مستلمة غير مفوترة (GRNI).");
+                    _settingsError = "حساب بضاعة مستلمة غير مفوترة: حدد حساب المخزون وحساب GRNI معًا.";
+                    Snackbar.Warning(_settingsError);
                     return;
                 }
 
                 if ((_settingsPurchaseTaxAccountId.HasValue || _settingsPurchasePriceVarianceAccountId.HasValue) && !_settingsGrniAccountId.HasValue)
                 {
-                    Snackbar.Warning("حدد حساب GRNI قبل إعداد حساب ضريبة المشتريات أو فرق سعر المشتريات.");
-                    return;
-                }
-
-                var salesPostingAccounts = new[]
-                {
-                    _settingsSalesRevenueAccountId,
-                    _settingsTaxPayableAccountId,
-                    _settingsInventoryAccountId,
-                    _settingsCogsAccountId
-                };
-
-                var hasSalesSpecificAccount = _settingsSalesRevenueAccountId.HasValue || _settingsTaxPayableAccountId.HasValue || _settingsCogsAccountId.HasValue;
-                if (hasSalesSpecificAccount && salesPostingAccounts.Any(x => !x.HasValue))
-                {
-                    Snackbar.Warning(
-                        "حدد حسابات ترحيل المبيعات الأربعة: الإيرادات، الضرائب، المخزون، وتكلفة البضاعة المباعة.");
+                    _settingsError = "حساب بضاعة مستلمة غير مفوترة: حدد حساب GRNI قبل إعداد الضريبة أو فرق السعر.";
+                    Snackbar.Warning(_settingsError);
                     return;
                 }
 
@@ -1048,7 +1184,8 @@ public partial class AccountingSetupPage
         var account = await Accounting.GetAccountByIdAsync(accountId.Value);
         if (account is null)
         {
-            Snackbar.Warning($"{fieldLabel}: الحساب المحدد لم يعد موجودًا.");
+            _settingsError = $"{fieldLabel}: الحساب المحدد لم يعد موجودًا.";
+            Snackbar.Warning(_settingsError);
             return false;
         }
 
@@ -1062,9 +1199,8 @@ public partial class AccountingSetupPage
             return true;
         }
 
-        Snackbar.Warning(
-            $"{fieldLabel}: {eligibility.Reason ?? "الحساب المحدد غير صالح لهذه العملية."}");
-
+        _settingsError = $"{fieldLabel}: {eligibility.Reason ?? "الحساب المحدد غير صالح لهذه العملية."}";
+        Snackbar.Warning(_settingsError);
         return false;
     }
 
@@ -1079,6 +1215,8 @@ public partial class AccountingSetupPage
         await RunAsync(
             async () =>
             {
+                _currencyError = null;
+                _currencyCodeError = _currencyNameError = _currencyDecimalsError = null;
                 var code =
                     _currencyCode
                         .Trim()
@@ -1093,7 +1231,7 @@ public partial class AccountingSetupPage
                 if (string.IsNullOrWhiteSpace(
                     code))
                 {
-                    Snackbar.Warning(
+                    CurrencyWarning(
                         "كود العملة مطلوب.");
 
                     return;
@@ -1102,7 +1240,7 @@ public partial class AccountingSetupPage
 
                 if (code.Length < 3)
                 {
-                    Snackbar.Warning(
+                    CurrencyWarning(
                         "كود العملة يجب ألا يقل عن 3 أحرف.");
 
                     return;
@@ -1111,7 +1249,7 @@ public partial class AccountingSetupPage
 
                 if (code.Length > 8)
                 {
-                    Snackbar.Warning(
+                    CurrencyWarning(
                         "كود العملة يجب ألا يزيد عن 8 أحرف.");
 
                     return;
@@ -1121,7 +1259,7 @@ public partial class AccountingSetupPage
                 if (string.IsNullOrWhiteSpace(
                     name))
                 {
-                    Snackbar.Warning(
+                    CurrencyWarning(
                         "اسم العملة بالعربي مطلوب.");
 
                     return;
@@ -1130,7 +1268,7 @@ public partial class AccountingSetupPage
 
                 if (name.Length > 100)
                 {
-                    Snackbar.Warning(
+                    CurrencyWarning(
                         "اسم العملة بالعربي يجب ألا يزيد عن 100 حرف.");
 
                     return;
@@ -1144,7 +1282,7 @@ public partial class AccountingSetupPage
                         .Trim()
                         .Length > 100)
                 {
-                    Snackbar.Warning(
+                    CurrencyWarning(
                         "اسم العملة بالإنجليزي يجب ألا يزيد عن 100 حرف.");
 
                     return;
@@ -1158,7 +1296,7 @@ public partial class AccountingSetupPage
                         .Trim()
                         .Length > 12)
                 {
-                    Snackbar.Warning(
+                    CurrencyWarning(
                         "رمز العملة يجب ألا يزيد عن 12 حرفًا.");
 
                     return;
@@ -1168,7 +1306,7 @@ public partial class AccountingSetupPage
                 if (_currencyDecimalPlaces
                     is < 0 or > 6)
                 {
-                    Snackbar.Warning(
+                    CurrencyWarning(
                         "عدد الخانات العشرية يجب أن يكون بين 0 و6.");
 
                     return;
@@ -1177,6 +1315,29 @@ public partial class AccountingSetupPage
 
                 CurrencyDto? result;
 
+                if (_editingCurrencyId.HasValue)
+                {
+                    var existing = _currencies.FirstOrDefault(x => x.Id == _editingCurrencyId.Value);
+                    if (existing is not null)
+                    {
+                        if (_settings?.BaseCurrencyId == existing.Id && !_currencyIsActive)
+                        {
+                            CurrencyWarning("لا يمكن تعطيل العملة الأساسية. غيّر هذا الخيار قبل الحفظ.");
+                            return;
+                        }
+                        if (existing.DecimalPlaces != _currencyDecimalPlaces &&
+                            !await Dialogs.ConfirmAsync("تأكيد تغيير دقة العملة",
+                                $"العملة: {existing.Code} — {existing.NameAr}\n" +
+                                $"الدقة القديمة: {existing.DecimalPlaces}، الجديدة: {_currencyDecimalPlaces}.\n" +
+                                "قد يرفض الخادم التغيير إذا استُخدمت العملة في قيود. راجع الأثر قبل المتابعة.",
+                                AlertTone.Warning, confirmText: "متابعة", cancelText: "رجوع")) return;
+                        if (existing.IsActive && !_currencyIsActive &&
+                            !await Dialogs.ConfirmAsync("تأكيد تعطيل العملة",
+                                $"العملة: {existing.Code} — {existing.NameAr}\n" +
+                                "لن تظهر هذه العملة ضمن خيارات العمليات الجديدة بعد تعطيلها.",
+                                AlertTone.Warning, confirmText: "تعطيل", cancelText: "رجوع")) return;
+                    }
+                }
 
                 if (_editingCurrencyId.HasValue)
                 {
@@ -1252,6 +1413,9 @@ public partial class AccountingSetupPage
         EditCurrency(
             CurrencyDto item)
     {
+        _currencyEditorOpen = true;
+        _currencyError = null;
+        _currencyCodeError = _currencyNameError = _currencyDecimalsError = null;
         _editingCurrencyId =
             item.Id;
 
@@ -1292,6 +1456,9 @@ public partial class AccountingSetupPage
     private Task
         CancelCurrencyEdit()
     {
+        _currencyEditorOpen = false;
+        _currencyError = null;
+        _currencyCodeError = _currencyNameError = _currencyDecimalsError = null;
         _editingCurrencyId =
             null;
 
@@ -1338,10 +1505,12 @@ public partial class AccountingSetupPage
         await RunAsync(
             async () =>
             {
+                _rateError = null;
+                _rateCurrencyError = _rateDateError = null;
                 if (!_rateCurrencyId
                     .HasValue)
                 {
-                    Snackbar.Warning(
+                    RateWarning(
                         "اختر العملة.");
 
                     return;
@@ -1351,7 +1520,7 @@ public partial class AccountingSetupPage
                 if (!_rateDate
                     .HasValue)
                 {
-                    Snackbar.Warning(
+                    RateWarning(
                         "تاريخ سعر الصرف مطلوب.");
 
                     return;
@@ -1370,7 +1539,7 @@ public partial class AccountingSetupPage
 
                 if (_rateValue <= 0)
                 {
-                    Snackbar.Warning(
+                    RateWarning(
                         "سعر الصرف يجب أن يكون أكبر من صفر.");
 
                     return;
@@ -1444,6 +1613,9 @@ public partial class AccountingSetupPage
         EditRate(
             ExchangeRateDto item)
     {
+        _rateEditorOpen = true;
+        _rateError = null;
+        _rateCurrencyError = _rateDateError = null;
         _editingRateId =
             item.Id;
 
@@ -1483,6 +1655,9 @@ public partial class AccountingSetupPage
     private Task
         CancelRateEdit()
     {
+        _rateEditorOpen = false;
+        _rateError = null;
+        _rateCurrencyError = _rateDateError = null;
         _editingRateId =
             null;
 
@@ -1631,6 +1806,11 @@ public partial class AccountingSetupPage
         ToggleEmployeeAccountAsync(
             EmployeeAccountDto item)
     {
+        var operation = item.IsActive ? "تعطيل" : "تفعيل";
+        if (!await Dialogs.ConfirmAsync($"تأكيد {operation} ربط الموظف",
+            $"الموظف: {item.EmployeeCode} — {item.EmployeeName}\nالحساب: {item.AccountCode} — {item.AccountName}\n" +
+            (item.IsActive ? "لن يمكن استخدام هذا الربط في عمليات جديدة بعد التعطيل." : "سيصبح الربط المحاسبي نشطًا."),
+            AlertTone.Warning, confirmText: operation, cancelText: "رجوع")) return;
         await RunAsync(
             async () =>
             {
@@ -1666,36 +1846,20 @@ public partial class AccountingSetupPage
     // إعادة تحميل العملات وأسعار الصرف
     // ================================================================
 
-    private async Task
-        ReloadReferenceListsAsync()
+    private async Task ReloadReferenceListsAsync()
     {
-        _currencies =
-            await LoadAllPagesAsync<CurrencyDto>(
-                request => Accounting.GetCurrenciesPageAsync(request),
-                "Code",
-                SortDirection.Ascending);
-
-
-        _rates =
-            await LoadAllPagesAsync<ExchangeRateDto>(
-                request => Accounting.GetExchangeRatesPageAsync(request),
-                "RateDate",
-                SortDirection.Descending);
+        if (_activeSection == "currencies" || _activeSection == "rates")
+            _currencies = await LoadAllPagesAsync<CurrencyDto>(
+                request => Accounting.GetCurrenciesPageAsync(request), "Code");
+        if (_activeSection == "rates")
+            await ReloadRatesPageAsync();
     }
-
 
     // ================================================================
     // إعادة تحميل الربط المحاسبي للموظفين
     // ================================================================
 
-    private async Task
-        ReloadEmployeeAccountsAsync()
-    {
-        _employeeAccounts =
-            await LoadAllPagesAsync<EmployeeAccountDto>(
-                request => Accounting.GetEmployeeAccountsPageAsync(request));
-    }
-
+    private Task ReloadEmployeeAccountsAsync() => ReloadEmployeeAccountsPageAsync();
 
     // ================================================================
     // تشغيل عملية مع معالجة الأخطاء
@@ -1720,12 +1884,14 @@ public partial class AccountingSetupPage
         }
         catch (ApiClientException ex)
         {
+            if (_activeSection is "general" or "exchange" or "purchasing") _settingsError = "تعذر حفظ الإعدادات؛ راجع الرسالة وصحح البيانات.";
+            if (_activeSection == "currencies") _currencyError = "تعذر حفظ العملة؛ راجع الرسالة وصحح الحقول.";
+            if (_activeSection == "rates") _rateError = "تعذر حفظ سعر الصرف؛ راجع الرسالة وصحح الحقول.";
             ShowAccountingError(ex.Error);
         }
         catch
         {
-            ApiFeedback
-                .ShowUnexpected();
+            ApiFeedback.ShowUnexpected();
         }
         finally
         {

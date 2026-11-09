@@ -1,40 +1,37 @@
-@page "/accounting/settings"
-@page "/accounting/currencies"
-@page "/accounting/exchange-rates"
-@page "/accounting/employee-accounts"
-
 @attribute [Authorize]
-
 @using OAS.Contracts.Accounting.Enums
 
-<PageTitle>إعدادات المحاسبة والعملات | OAS</PageTitle>
-
+<PageTitle>@SectionTitle | OAS</PageTitle>
 <UiAccountingWorkspace ShowTabs="false">
     <Actions>
+        @if (Section is not "cash" and not "receivables")
+        {
         <UiWorkspaceActionBar>
-            <UiButton Text="تحديث"
-                      IconCssClass="fa-solid fa-rotate"
-                      Variant="ButtonVariant.Secondary"
-                      Size="ControlSize.Small"
-                      Loading="@_busy"
-                      OnClick="LoadAsync" />
+            <UiButton Text="تحديث القسم" IconCssClass="fa-solid fa-rotate"
+                      Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
+                      Loading="@_busy" OnClick="LoadAsync" />
         </UiWorkspaceActionBar>
+        }
     </Actions>
-
     <Body>
+        <div class="oas-settings-layout" dir="rtl">
+            <div class="oas-settings-content">
+                @if (_activeSection == "general")
+                {
+                    <div class="oas-settings-standalone" dir="rtl">
+        <div class="oas-settings-page-heading"><h2>الإعدادات الأساسية</h2><p>العملة الأساسية والحسابات الرئيسية للصناديق والبنوك والموظفين والأرباح المحتجزة.</p></div>
         <UiAccountingEditorSurface>
-            <UiAccountingFormSection Title="إعدادات المحاسبة الأساسية"
-                                     Subtitle="حدد العملة الأساسية والحسابات الرئيسية وحسابات الترحيل، بما فيها دفعات العملاء المقدمة، التي يستخدمها النظام تلقائيًا."
-                                     IconCssClass="fa-solid fa-sliders">
-                <UiAccountingFormGrid Columns="3">
-                    <UiSelect Label="العملة الأساسية"
-                              Value="@ToLookupValue(_settingsBaseCurrencyId)"
-                              ValueChanged="SetBaseCurrency"
-                              Options="@BaseCurrencyOptions"
-                              Placeholder="-- اختر العملة --"
-                              Size="ControlSize.Small" />
-
-                    <UiLookup Label="الحساب الرئيسي لذمم الموظفين"
+            <UiAccountingFormSection Title="الإعدادات الأساسية" Subtitle="العملة الأساسية والحسابات الرئيسية. حفظ هذه المجموعة لا يُفعّل ملفات الترحيل." IconCssClass="fa-solid fa-landmark">
+                            <UiAccountingFormGrid Columns="2">
+                                <UiSelect Label="العملة الأساسية"
+                                          ErrorText="@_baseCurrencyError"
+                                          Value="@ToLookupValue(_settingsBaseCurrencyId)"
+                                          ValueChanged="SetBaseCurrency"
+                                          Options="@BaseCurrencyOptions"
+                                          Disabled="@(_settings is not null && !_settings.BaseCurrencyChangeAllowed)"
+                                          Placeholder="-- اختر العملة --" Size="ControlSize.Small" />
+                                <div class="oas-settings-field @(SettingsFieldError("الحساب الرئيسي لذمم الموظفين") is not null ? "has-error" : "")">
+<UiLookup Label="الحساب الرئيسي لذمم الموظفين"
                               Value="@ToLookupValue(_settingsEmployeeParentAccountId)"
                               ValueChanged="SetEmployeeParentAccount"
                               SelectedItem="@EmployeeParentAccountLookupItem"
@@ -44,8 +41,13 @@
                               ClearText="إلغاء اختيار حساب ذمم الموظفين"
                               MinimumSearchLength="0"
                               DebounceMilliseconds="200" />
-
-                    <UiLookup Label="الحساب الرئيسي للصناديق"
+@if (SettingsFieldError("الحساب الرئيسي لذمم الموظفين") is not null)
+{
+    <small class="oas-settings-field-error" role="alert">@SettingsFieldError("الحساب الرئيسي لذمم الموظفين")</small>
+}
+</div>
+                                <div class="oas-settings-field @(SettingsFieldError("الحساب الرئيسي للصناديق") is not null ? "has-error" : "")">
+<UiLookup Label="الحساب الرئيسي للصناديق"
                               Value="@ToLookupValue(_settingsCashParentAccountId)"
                               ValueChanged="SetCashParentAccount"
                               SelectedItem="@CashParentAccountLookupItem"
@@ -55,8 +57,13 @@
                               ClearText="إلغاء اختيار الحساب الرئيسي للصناديق"
                               MinimumSearchLength="0"
                               DebounceMilliseconds="200" />
-
-                    <UiLookup Label="الحساب الرئيسي للبنوك"
+@if (SettingsFieldError("الحساب الرئيسي للصناديق") is not null)
+{
+    <small class="oas-settings-field-error" role="alert">@SettingsFieldError("الحساب الرئيسي للصناديق")</small>
+}
+</div>
+                                <div class="oas-settings-field @(SettingsFieldError("الحساب الرئيسي للبنوك") is not null ? "has-error" : "")">
+<UiLookup Label="الحساب الرئيسي للبنوك"
                               Value="@ToLookupValue(_settingsBankParentAccountId)"
                               ValueChanged="SetBankParentAccount"
                               SelectedItem="@BankParentAccountLookupItem"
@@ -66,121 +73,13 @@
                               ClearText="إلغاء اختيار الحساب الرئيسي للبنوك"
                               MinimumSearchLength="0"
                               DebounceMilliseconds="200" />
-
-                    <UiLookup Label="حساب إيرادات المبيعات"
-                              Value="@ToLookupValue(_settingsSalesRevenueAccountId)"
-                              ValueChanged="SetSalesRevenueAccount"
-                              SelectedItem="@SalesRevenueAccountLookupItem"
-                              SearchAsync="SearchSalesRevenueAccountsAsync"
-                              Placeholder="ابحث برقم الحساب أو الاسم..."
-                              EmptyText="لا توجد حسابات إيرادات صالحة للترحيل."
-                              ClearText="إلغاء اختيار حساب إيرادات المبيعات"
-                              MinimumSearchLength="0"
-                              DebounceMilliseconds="250" />
-
-                    <UiLookup Label="حساب الضرائب المستحقة"
-                              Value="@ToLookupValue(_settingsTaxPayableAccountId)"
-                              ValueChanged="SetTaxPayableAccount"
-                              SelectedItem="@TaxPayableAccountLookupItem"
-                              SearchAsync="SearchTaxPayableAccountsAsync"
-                              Placeholder="ابحث برقم الحساب أو الاسم..."
-                              EmptyText="لا توجد حسابات التزامات صالحة للترحيل."
-                              ClearText="إلغاء اختيار حساب الضرائب المستحقة"
-                              MinimumSearchLength="0"
-                              DebounceMilliseconds="250" />
-
-                    <UiLookup Label="حساب دفعات مقدمة من العملاء"
-                              Value="@ToLookupValue(_settingsCustomerAdvancesAccountId)"
-                              ValueChanged="SetCustomerAdvancesAccount"
-                              SelectedItem="@CustomerAdvancesAccountLookupItem"
-                              SearchAsync="SearchCustomerAdvancesAccountsAsync"
-                              Placeholder="ابحث عن حساب التزام دائن..."
-                              EmptyText="لا توجد حسابات التزامات صالحة لعربون العميل."
-                              ClearText="إلغاء اختيار حساب دفعات مقدمة من العملاء"
-                              MinimumSearchLength="0"
-                              DebounceMilliseconds="250" />
-
-                    @* الحساب النقدي العام هو سجل عميل واحد؛ يُعرض حساب الذمم المرتبط به تلقائيًا. *@
-                    <WalkInCashSettingsField @ref="_walkInSettingsField" />
-
-                    <UiLookup Label="حساب المخزون"
-                              Value="@ToLookupValue(_settingsInventoryAccountId)"
-                              ValueChanged="SetInventoryAccount"
-                              SelectedItem="@InventoryAccountLookupItem"
-                              SearchAsync="SearchInventoryAccountsAsync"
-                              Placeholder="ابحث برقم الحساب أو الاسم..."
-                              EmptyText="لا توجد حسابات أصول صالحة للترحيل."
-                              ClearText="إلغاء اختيار حساب المخزون"
-                              MinimumSearchLength="0"
-                              DebounceMilliseconds="250" />
-
-                    <UiLookup Label="حساب تكلفة البضاعة المباعة"
-                              Value="@ToLookupValue(_settingsCogsAccountId)"
-                              ValueChanged="SetCogsAccount"
-                              SelectedItem="@CogsAccountLookupItem"
-                              SearchAsync="SearchCogsAccountsAsync"
-                              Placeholder="ابحث برقم الحساب أو الاسم..."
-                              EmptyText="لا توجد حسابات مصروفات صالحة للترحيل."
-                              ClearText="إلغاء اختيار حساب تكلفة البضاعة المباعة"
-                              MinimumSearchLength="0"
-                              DebounceMilliseconds="250" />
-
-                    <UiLookup Label="حساب بضاعة مستلمة غير مفوترة (GRNI)"
-                              Value="@ToLookupValue(_settingsGrniAccountId)"
-                              ValueChanged="SetGrniAccount"
-                              SelectedItem="@GrniAccountLookupItem"
-                              SearchAsync="SearchGrniAccountsAsync"
-                              Placeholder="ابحث عن حساب التزام دائن..."
-                              EmptyText="لا توجد حسابات التزامات صالحة لـ GRNI."
-                              ClearText="إلغاء اختيار حساب GRNI"
-                              MinimumSearchLength="0"
-                              DebounceMilliseconds="250" />
-
-                    <UiLookup Label="حساب ضريبة المشتريات"
-                              Value="@ToLookupValue(_settingsPurchaseTaxAccountId)"
-                              ValueChanged="SetPurchaseTaxAccount"
-                              SelectedItem="@PurchaseTaxAccountLookupItem"
-                              SearchAsync="SearchPurchaseTaxAccountsAsync"
-                              Placeholder="ابحث عن حساب أصل مدين..."
-                              EmptyText="لا توجد حسابات أصول صالحة لضريبة المشتريات."
-                              ClearText="إلغاء اختيار حساب ضريبة المشتريات"
-                              MinimumSearchLength="0"
-                              DebounceMilliseconds="250" />
-
-                    <UiLookup Label="حساب فرق سعر المشتريات"
-                              Value="@ToLookupValue(_settingsPurchasePriceVarianceAccountId)"
-                              ValueChanged="SetPurchasePriceVarianceAccount"
-                              SelectedItem="@PurchasePriceVarianceAccountLookupItem"
-                              SearchAsync="SearchPurchasePriceVarianceAccountsAsync"
-                              Placeholder="ابحث عن حساب مصروف مدين..."
-                              EmptyText="لا توجد حسابات مصروفات صالحة لفروقات سعر المشتريات."
-                              ClearText="إلغاء اختيار حساب فرق سعر المشتريات"
-                              MinimumSearchLength="0"
-                              DebounceMilliseconds="250" />
-
-                    <UiLookup Label="حساب أرباح فروقات الصرف"
-                              Value="@ToLookupValue(_settingsExchangeGainAccountId)"
-                              ValueChanged="SetExchangeGainAccount"
-                              SelectedItem="@ExchangeGainAccountLookupItem"
-                              SearchAsync="SearchExchangeGainAccountsAsync"
-                              Placeholder="ابحث برقم الحساب أو الاسم..."
-                              EmptyText="لا توجد حسابات مطابقة."
-                              ClearText="إلغاء اختيار حساب أرباح فروق العملة"
-                              MinimumSearchLength="0"
-                              DebounceMilliseconds="250" />
-
-                    <UiLookup Label="حساب خسائر فروقات الصرف"
-                              Value="@ToLookupValue(_settingsExchangeLossAccountId)"
-                              ValueChanged="SetExchangeLossAccount"
-                              SelectedItem="@ExchangeLossAccountLookupItem"
-                              SearchAsync="SearchExchangeLossAccountsAsync"
-                              Placeholder="ابحث برقم الحساب أو الاسم..."
-                              EmptyText="لا توجد حسابات مطابقة."
-                              ClearText="إلغاء اختيار حساب خسائر فروق العملة"
-                              MinimumSearchLength="0"
-                              DebounceMilliseconds="250" />
-
-                    <UiLookup Label="حساب الأرباح المحتجزة"
+@if (SettingsFieldError("الحساب الرئيسي للبنوك") is not null)
+{
+    <small class="oas-settings-field-error" role="alert">@SettingsFieldError("الحساب الرئيسي للبنوك")</small>
+}
+</div>
+                                <div class="oas-settings-field @(SettingsFieldError("حساب الأرباح المحتجزة") is not null ? "has-error" : "")">
+<UiLookup Label="حساب الأرباح المحتجزة"
                               Value="@ToLookupValue(_settingsRetainedEarningsAccountId)"
                               ValueChanged="SetRetainedEarningsAccount"
                               SelectedItem="@RetainedEarningsAccountLookupItem"
@@ -190,35 +89,208 @@
                               ClearText="إلغاء اختيار حساب الأرباح المحتجزة"
                               MinimumSearchLength="0"
                               DebounceMilliseconds="250" />
-                </UiAccountingFormGrid>
+@if (SettingsFieldError("حساب الأرباح المحتجزة") is not null)
+{
+    <small class="oas-settings-field-error" role="alert">@SettingsFieldError("حساب الأرباح المحتجزة")</small>
+}
+</div>
+                            </UiAccountingFormGrid>
+                            @if (_settings is not null && !_settings.BaseCurrencyChangeAllowed)
+                            {
+                                <UiAlert Tone="AlertTone.Info" Message="العملة الأساسية ثابتة لأن النظام يحتوي على قيود محاسبية مرحلة أو معكوسة. يمكنك تعديل باقي الحسابات." />
+                            }
+                        </UiAccountingFormSection>
 
-                <UiAlert Message="البحث يعرض الحسابات المطابقة ويعطّل الحساب غير المؤهل مع توضيح السبب. للمشتريات: المخزون أصل مدين، GRNI التزام دائن، ضريبة المشتريات أصل مدين، وفرق سعر المشتريات مصروف مدين. عند حفظ المجموعة كاملة ينشئ النظام أو يحدّث ملفات ترحيل PurchaseReceipt وPurchaseInvoice تلقائيًا. جميع الحسابات يجب أن تكون نشطة وقابلة للترحيل."
-                         Tone="AlertTone.Info" />
-
-                @if (_settings is null)
-                {
-                    <UiAlert Message="لن يبدأ استخدام Multi-Currency في المستندات الجديدة قبل حفظ هذه الإعدادات."
-                             Tone="AlertTone.Warning" />
+                        
+            @if (!string.IsNullOrWhiteSpace(_settingsError))
+            {
+                <div class="oas-settings-error" role="alert">@_settingsError</div>
+            }
+            <UiWorkspaceActionBar><UiButton Text="حفظ الإعدادات" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small" Disabled="@_busy" OnClick="SaveSettingsAsync" /></UiWorkspaceActionBar>
+        </UiAccountingEditorSurface>
+    </div>
                 }
+                else if (_activeSection == "cash")
+                {
+                    <div class="oas-settings-standalone" dir="rtl"><div class="oas-settings-page-heading"><h2>العميل النقدي الافتراضي</h2><p>اختيار العميل النقدي وعرض حسابه المرتبط، دون تغيير حساب العميل عند الاختيار.</p></div>
+    <UiAccountingEditorSurface><UiAccountingFormSection Title="العميل النقدي" IconCssClass="fa-solid fa-user-check">
+       <WalkInCashSettingsField @ref="_walkInSettingsField" ShowReceivables="false" />
+       <UiButton Text="حفظ العميل النقدي" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small" Disabled="@_busy" OnClick="SaveWalkInCustomerAsync" />
+    </UiAccountingFormSection></UiAccountingEditorSurface></div>
+                }
+                else if (_activeSection == "receivables")
+                {
+                    <div class="oas-settings-standalone" dir="rtl"><div class="oas-settings-page-heading"><h2>إعدادات ذمم العملاء</h2><p>تحديد الحساب الرئيسي الذي تُنشأ تحته الحسابات الفرعية للعملاء الجدد.</p></div>
+    <UiAccountingEditorSurface><UiAccountingFormSection Title="الحساب الرئيسي لذمم العملاء" IconCssClass="fa-solid fa-users">
+       <CustomerReceivablesSettingsField @ref="_standaloneReceivablesField" />
+       <UiButton Text="حفظ حساب الذمم" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small" Disabled="@_busy" OnClick="SaveStandaloneReceivablesAsync" />
+    </UiAccountingFormSection></UiAccountingEditorSurface></div>
+                }
+                else if (_activeSection == "exchange")
+                {
+                    <div class="oas-settings-standalone" dir="rtl">
+        <div class="oas-settings-page-heading"><h2>حسابات فروقات العملات</h2><p>تحديد حسابات أرباح وخسائر فروق أسعار الصرف.</p></div>
+        <UiAccountingEditorSurface>
+            <UiAccountingFormSection Title="فروق العملات" Subtitle="الحسابات المستخدمة لمعالجة أرباح وخسائر اختلاف أسعار الصرف." IconCssClass="fa-solid fa-arrow-right-arrow-left">
+                            <UiAccountingFormGrid Columns="2">
+                                <div class="oas-settings-field @(SettingsFieldError("حساب أرباح فروقات الصرف") is not null ? "has-error" : "")">
+<UiLookup Label="حساب أرباح فروقات الصرف"
+                              Value="@ToLookupValue(_settingsExchangeGainAccountId)"
+                              ValueChanged="SetExchangeGainAccount"
+                              SelectedItem="@ExchangeGainAccountLookupItem"
+                              SearchAsync="SearchExchangeGainAccountsAsync"
+                              Placeholder="ابحث برقم الحساب أو الاسم..."
+                              EmptyText="لا توجد حسابات مطابقة."
+                              ClearText="إلغاء اختيار حساب أرباح فروق العملة"
+                              MinimumSearchLength="0"
+                              DebounceMilliseconds="250" />
+@if (SettingsFieldError("حساب أرباح فروقات الصرف") is not null)
+{
+    <small class="oas-settings-field-error" role="alert">@SettingsFieldError("حساب أرباح فروقات الصرف")</small>
+}
+</div>
+                                <div class="oas-settings-field @(SettingsFieldError("حساب خسائر فروقات الصرف") is not null ? "has-error" : "")">
+<UiLookup Label="حساب خسائر فروقات الصرف"
+                              Value="@ToLookupValue(_settingsExchangeLossAccountId)"
+                              ValueChanged="SetExchangeLossAccount"
+                              SelectedItem="@ExchangeLossAccountLookupItem"
+                              SearchAsync="SearchExchangeLossAccountsAsync"
+                              Placeholder="ابحث برقم الحساب أو الاسم..."
+                              EmptyText="لا توجد حسابات مطابقة."
+                              ClearText="إلغاء اختيار حساب خسائر فروق العملة"
+                              MinimumSearchLength="0"
+                              DebounceMilliseconds="250" />
+@if (SettingsFieldError("حساب خسائر فروقات الصرف") is not null)
+{
+    <small class="oas-settings-field-error" role="alert">@SettingsFieldError("حساب خسائر فروقات الصرف")</small>
+}
+</div>
+                            </UiAccountingFormGrid>
+                        </UiAccountingFormSection>
 
-                <UiButton Text="حفظ الإعدادات"
-                          IconCssClass="fa-solid fa-floppy-disk"
-                          Size="ControlSize.Small"
-                          Disabled="@_busy"
-                          OnClick="SaveSettingsWithWalkInAsync" />
-            </UiAccountingFormSection>
+                        
+            @if (!string.IsNullOrWhiteSpace(_settingsError))
+            {
+                <div class="oas-settings-error" role="alert">@_settingsError</div>
+            }
+            <UiWorkspaceActionBar><UiButton Text="حفظ الإعدادات" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small" Disabled="@_busy" OnClick="SaveSettingsAsync" /></UiWorkspaceActionBar>
+        </UiAccountingEditorSurface>
+    </div>
+                }
+                else if (_activeSection == "purchasing")
+                {
+                    <div class="oas-settings-standalone" dir="rtl">
+        <div class="oas-settings-page-heading"><h2>حسابات المخزون والمشتريات</h2><p>الحسابات المرجعية وقواعد الترحيل النشطة للقراءة فقط.</p></div>
+        <UiAccountingEditorSurface>
+            <UiAccountingFormSection Title="الحسابات المرجعية للمخزون والمشتريات" Subtitle="هذه الإعدادات المرجعية لا تُنشئ ولا تُفعّل ملفات الترحيل. إعداد الأدوار الفعلية يتم من ملفات الترحيل." IconCssClass="fa-solid fa-boxes-stacked">
+                            <UiAccountingFormGrid Columns="2">
+                                <div class="oas-settings-field @(SettingsFieldError("حساب المخزون") is not null ? "has-error" : "")">
+<UiLookup Label="حساب المخزون"
+                              Value="@ToLookupValue(_settingsInventoryAccountId)"
+                              ValueChanged="SetInventoryAccount"
+                              SelectedItem="@InventoryAccountLookupItem"
+                              SearchAsync="SearchInventoryAccountsAsync"
+                              Placeholder="ابحث برقم الحساب أو الاسم..."
+                              EmptyText="لا توجد حسابات أصول صالحة للترحيل."
+                              ClearText="إلغاء اختيار حساب المخزون"
+                              MinimumSearchLength="0"
+                              DebounceMilliseconds="250" />
+@if (SettingsFieldError("حساب المخزون") is not null)
+{
+    <small class="oas-settings-field-error" role="alert">@SettingsFieldError("حساب المخزون")</small>
+}
+</div>
+                                <div class="oas-settings-field @(SettingsFieldError("حساب بضاعة مستلمة غير مفوترة (GRNI)") is not null ? "has-error" : "")">
+<UiLookup Label="حساب بضاعة مستلمة غير مفوترة (GRNI)"
+                              Value="@ToLookupValue(_settingsGrniAccountId)"
+                              ValueChanged="SetGrniAccount"
+                              SelectedItem="@GrniAccountLookupItem"
+                              SearchAsync="SearchGrniAccountsAsync"
+                              Placeholder="ابحث عن حساب التزام دائن..."
+                              EmptyText="لا توجد حسابات التزامات صالحة لـ GRNI."
+                              ClearText="إلغاء اختيار حساب GRNI"
+                              MinimumSearchLength="0"
+                              DebounceMilliseconds="250" />
+@if (SettingsFieldError("حساب بضاعة مستلمة غير مفوترة (GRNI)") is not null)
+{
+    <small class="oas-settings-field-error" role="alert">@SettingsFieldError("حساب بضاعة مستلمة غير مفوترة (GRNI)")</small>
+}
+</div>
+                                <div class="oas-settings-field @(SettingsFieldError("حساب ضريبة المشتريات") is not null ? "has-error" : "")">
+<UiLookup Label="حساب ضريبة المشتريات"
+                              Value="@ToLookupValue(_settingsPurchaseTaxAccountId)"
+                              ValueChanged="SetPurchaseTaxAccount"
+                              SelectedItem="@PurchaseTaxAccountLookupItem"
+                              SearchAsync="SearchPurchaseTaxAccountsAsync"
+                              Placeholder="ابحث عن حساب أصل مدين..."
+                              EmptyText="لا توجد حسابات أصول صالحة لضريبة المشتريات."
+                              ClearText="إلغاء اختيار حساب ضريبة المشتريات"
+                              MinimumSearchLength="0"
+                              DebounceMilliseconds="250" />
+@if (SettingsFieldError("حساب ضريبة المشتريات") is not null)
+{
+    <small class="oas-settings-field-error" role="alert">@SettingsFieldError("حساب ضريبة المشتريات")</small>
+}
+</div>
+                                <div class="oas-settings-field @(SettingsFieldError("حساب فرق سعر المشتريات") is not null ? "has-error" : "")">
+<UiLookup Label="حساب فرق سعر المشتريات"
+                              Value="@ToLookupValue(_settingsPurchasePriceVarianceAccountId)"
+                              ValueChanged="SetPurchasePriceVarianceAccount"
+                              SelectedItem="@PurchasePriceVarianceAccountLookupItem"
+                              SearchAsync="SearchPurchasePriceVarianceAccountsAsync"
+                              Placeholder="ابحث عن حساب مصروف مدين..."
+                              EmptyText="لا توجد حسابات مصروفات صالحة لفروقات سعر المشتريات."
+                              ClearText="إلغاء اختيار حساب فرق سعر المشتريات"
+                              MinimumSearchLength="0"
+                              DebounceMilliseconds="250" />
+@if (SettingsFieldError("حساب فرق سعر المشتريات") is not null)
+{
+    <small class="oas-settings-field-error" role="alert">@SettingsFieldError("حساب فرق سعر المشتريات")</small>
+}
+</div>
+                            </UiAccountingFormGrid>
+                            <a class="oas-settings-inline-link" href="/accounting/posting-profiles">إدارة قواعد وملفات الترحيل <i class="fa-solid fa-arrow-up-left-from-square"></i></a>
+                        </UiAccountingFormSection>
 
-            <UiAccountingFormSection Title="العملات"
-                                     Subtitle="إدارة العملات ودقتها. كود العملة لا يتغير بعد الإنشاء."
-                                     IconCssClass="fa-solid fa-coins">
-                <UiAccountingFormGrid Columns="4">
-                    <UiInputText Label="الكود"
+                        <UiAccountingFormSection Title="حسابات الترحيل الحالية — عرض فقط" Subtitle="تُقرأ من ملفات الترحيل النشطة؛ لا يمكن تغييرها من الحفظ العام." IconCssClass="fa-solid fa-file-circle-check">
+                            <UiAccountingFormGrid Columns="2">
+                                <UiAccountingReadOnlyValue Label="إيرادات المبيعات" Value="@AccountDisplay(_settingsSalesRevenueAccountId)" />
+                                <UiAccountingReadOnlyValue Label="الضرائب المستحقة" Value="@AccountDisplay(_settingsTaxPayableAccountId)" />
+                                <UiAccountingReadOnlyValue Label="تكلفة البضاعة المباعة" Value="@AccountDisplay(_settingsCogsAccountId)" />
+                                <UiAccountingReadOnlyValue Label="دفعات العملاء المقدمة" Value="@AccountDisplay(_settingsCustomerAdvancesAccountId)" />
+                            </UiAccountingFormGrid>
+                            <a class="oas-settings-inline-link" href="/accounting/posting-profiles">تعديل هذه الحسابات من ملفات الترحيل <i class="fa-solid fa-arrow-up-left-from-square"></i></a>
+                        </UiAccountingFormSection>
+
+
+            @if (!string.IsNullOrWhiteSpace(_settingsError))
+            {
+                <div class="oas-settings-error" role="alert">@_settingsError</div>
+            }
+            <UiWorkspaceActionBar><UiButton Text="حفظ الإعدادات" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small" Disabled="@_busy" OnClick="SaveSettingsAsync" /></UiWorkspaceActionBar>
+        </UiAccountingEditorSurface>
+    </div>
+                }
+                else if (_activeSection == "currencies")
+                {
+                    <div class="oas-settings-work-tabs" aria-label="مساحة عمل العملات">
+                        <button class="@(!_currencyEditorOpen ? "active" : "")" type="button" @onclick="CloseCurrencyEditor">الكل</button>
+                        @if (_currencyEditorOpen)
+                        {
+                            <button class="active" type="button">@(_editingCurrencyId.HasValue ? "تعديل عملة: " + _currencyCode : "عملة جديدة")</button>
+                        }
+                    </div>
+                    @if (_currencyEditorOpen)
+                    {
+                        <UiAccountingFormSection Title="@(_editingCurrencyId.HasValue ? "تعديل العملة" : "إضافة عملة")" Subtitle="الكود ثابت بعد إنشاء العملة. راجع الدقة والرمز قبل الحفظ." IconCssClass="fa-solid fa-coins">
+                            <UiAccountingFormGrid Columns="2">
+<UiInputText Label="الكود" ErrorText="@_currencyCodeError"
                                  Value="@_currencyCode"
                                  ValueChanged="@(value => _currencyCode = value ?? string.Empty)"
                                  ValueExpression="@(() => _currencyCode)"
                                  Disabled="@_editingCurrencyId.HasValue" />
 
-                    <UiInputText Label="الاسم العربي"
+                    <UiInputText Label="الاسم العربي" ErrorText="@_currencyNameError"
                                  Value="@_currencyNameAr"
                                  ValueChanged="@(value => _currencyNameAr = value ?? string.Empty)"
                                  ValueExpression="@(() => _currencyNameAr)" />
@@ -233,7 +305,7 @@
                                  ValueChanged="@(value => _currencySymbol = value)"
                                  ValueExpression="@(() => _currencySymbol)" />
 
-                    <UiSelect Label="الدقة"
+                    <UiSelect Label="الدقة" ErrorText="@_currencyDecimalsError"
                               Value="@_currencyDecimalPlaces.ToString()"
                               ValueChanged="SetCurrencyDecimalPlaces"
                               Options="@CurrencyDecimalOptions"
@@ -242,62 +314,52 @@
                     <UiCheckbox Label="نشطة"
                                 Value="@_currencyIsActive"
                                 ValueChanged="@(value => _currencyIsActive = value)" />
-                </UiAccountingFormGrid>
-
-                <UiWorkspaceActionBar>
-                    <UiButton Text="@(_editingCurrencyId.HasValue ? "حفظ" : "إضافة")"
-                              IconCssClass="fa-solid fa-check"
-                              Size="ControlSize.Small"
-                              OnClick="SaveCurrencyAsync" />
-                    @if (_editingCurrencyId.HasValue)
-                    {
-                        <UiButton Text="إلغاء"
-                                  IconCssClass="fa-solid fa-xmark"
-                                  Variant="ButtonVariant.Ghost"
-                                  Size="ControlSize.Small"
-                                  OnClick="CancelCurrencyEdit" />
+                            </UiAccountingFormGrid>
+                            <div class="oas-settings-preview">معاينة المبلغ: <strong>@CurrencyFormatPreview</strong> @(_currencySymbol ?? _currencyCode)</div>
+                            @if (!string.IsNullOrWhiteSpace(_currencyError))
+                            {
+                                <div class="oas-settings-error" role="alert">@_currencyError</div>
+                            }
+                            <UiWorkspaceActionBar>
+                                <UiButton Text="حفظ العملة" IconCssClass="fa-solid fa-check" Size="ControlSize.Small" OnClick="SaveCurrencyAsync" Disabled="@_busy" />
+                                <UiButton Text="إلغاء" IconCssClass="fa-solid fa-xmark" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CancelCurrencyEdit" />
+                            </UiWorkspaceActionBar>
+                        </UiAccountingFormSection>
                     }
-                </UiWorkspaceActionBar>
-            </UiAccountingFormSection>
-
-            <UiAccountingFormSection Title="قائمة العملات"
-                                     Subtitle="العملات المعرفة حاليًا في المحاسبة"
-                                     IconCssClass="fa-solid fa-list">
-                @if (_currencies.Count == 0)
-                {
-                    <UiAccountingEmptyState Title="لا توجد عملات"
-                                            Description="أضف أول عملة لبدء إعداد المحاسبة متعددة العملات."
-                                            IconCssClass="fa-solid fa-coins" />
-                }
-                else
-                {
-                    <UiStackLayout Gap="StackGap.Small">
-                        @foreach (var currency in _currencies)
+                    else
+                    {
+                        <div class="oas-settings-toolbar">
+                            <input class="oas-settings-search" aria-label="البحث عن عملة" placeholder="بحث بالكود أو الاسم..." @bind="_currencySearch" @bind:event="oninput" />
+                            <UiSelect Value="@_currencyStatusFilter" ValueChanged="SetCurrencyStatusFilter" Options="@CurrencyStatusFilterOptions" Size="ControlSize.Small" />
+                            <UiButton Text="عملة جديدة" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" OnClick="NewCurrency" />
+                        </div>
+                        @if (!FilteredCurrencies.Any())
                         {
-                            <UiAccountingFormSection Title="@($"{currency.Code} - {currency.NameAr}")"
-                                                     Subtitle="@(IsBaseCurrency(currency.Id) ? "العملة الأساسية" : (currency.IsActive ? "نشطة" : "معطلة"))"
-                                                     IconCssClass="fa-solid fa-coins">
-                                <UiAccountingFormGrid Columns="4">
-                                    <UiAccountingReadOnlyValue Label="الرمز" Value="@(currency.Symbol ?? "—")" />
-                                    <UiAccountingReadOnlyValue Label="الدقة" Value="@currency.DecimalPlaces.ToString()" />
-                                    <UiAccountingReadOnlyValue Label="الحالة" Value="@(currency.IsActive ? "نشطة" : "معطلة")" />
-                                    <UiButton Text="تعديل"
-                                              IconCssClass="fa-solid fa-pen"
-                                              Variant="ButtonVariant.Ghost"
-                                              Size="ControlSize.Small"
-                                              OnClick="@(() => EditCurrency(currency))" />
-                                </UiAccountingFormGrid>
-                            </UiAccountingFormSection>
+                            <UiAccountingEmptyState Title="لا توجد عملات مطابقة" Description="غيّر البحث أو أضف عملة جديدة." IconCssClass="fa-solid fa-coins" />
                         }
-                    </UiStackLayout>
+                        @foreach (var currency in FilteredCurrencies)
+                        {
+                            <button type="button" class="oas-settings-record" @onclick="@(() => EditCurrency(currency))">
+                                <span class="oas-settings-record-line"><strong><i class="fa-solid fa-coins"></i> @currency.Code — @currency.NameAr</strong><span class="oas-settings-state @(currency.IsActive ? "is-active" : "is-inactive")">@(currency.IsActive ? "نشطة" : "معطلة")</span></span>
+                                <span class="oas-settings-record-line oas-settings-muted"><span>@(currency.Symbol ?? currency.Code) · الدقة: @currency.DecimalPlaces @(IsBaseCurrency(currency.Id) ? "· العملة الأساسية" : "")</span><span>تعديل <i class="fa-solid fa-chevron-left"></i></span></span>
+                            </button>
+                        }
+                    }
                 }
-            </UiAccountingFormSection>
-
-            <UiAccountingFormSection Title="أسعار الصرف"
-                                     Subtitle="السعر = عدد وحدات العملة الأساسية مقابل وحدة واحدة من العملة المحددة."
-                                     IconCssClass="fa-solid fa-arrow-right-arrow-left">
-                <UiAccountingFormGrid Columns="4">
-                    <UiSelect Label="العملة"
+                else if (_activeSection == "rates")
+                {
+                    <div class="oas-settings-work-tabs" aria-label="مساحة عمل أسعار الصرف">
+                        <button class="@(!_rateEditorOpen ? "active" : "")" type="button" @onclick="CloseRateEditor">الكل</button>
+                        @if (_rateEditorOpen)
+                        {
+                            <button class="active" type="button">@(_editingRateId.HasValue ? "تعديل سعر الصرف" : "سعر صرف جديد")</button>
+                        }
+                    </div>
+                    @if (_rateEditorOpen)
+                    {
+                        <UiAccountingFormSection Title="@(_editingRateId.HasValue ? "تعديل سعر الصرف" : "سعر صرف جديد")" Subtitle="السعر = قيمة وحدة واحدة من العملة المختارة بالعملة الأساسية." IconCssClass="fa-solid fa-arrow-right-arrow-left">
+                            <UiAccountingFormGrid Columns="2">
+<UiSelect Label="العملة" ErrorText="@_rateCurrencyError"
                               Value="@ToLookupValue(_rateCurrencyId)"
                               ValueChanged="SetRateCurrency"
                               Options="@RateCurrencyOptions"
@@ -305,7 +367,7 @@
                               Disabled="@_editingRateId.HasValue"
                               Size="ControlSize.Small" />
 
-                    <UiInputDate Label="تاريخ السعر"
+                    <UiInputDate Label="تاريخ السعر" ErrorText="@_rateDateError"
                                  Value="@_rateDate"
                                  ValueExpression="@(() => _rateDate)"
                                  ValueChanged="@(value => _rateDate = value)"
@@ -320,117 +382,84 @@
                                              Min="0.00000001"
                                              Hint="@(IsSelectedRateBaseCurrency ? "سعر العملة الأساسية ثابت = 1." : null)" />
 
-                    <UiSelect Label="نوع السعر"
-                              Value="@RateTypeValue"
-                              ValueChanged="SetRateType"
-                              Options="@RateTypeOptions"
-                              Size="ControlSize.Small" />
-
                     <UiCheckbox Label="نشط"
                                 Value="@_rateIsActive"
                                 ValueChanged="@(value => _rateIsActive = value)" />
-                </UiAccountingFormGrid>
-
-                @if (IsSelectedRateBaseCurrency)
-                {
-                    <UiAlert Message="هذه هي العملة الأساسية وسعر صرفها ثابت = 1."
-                             Tone="AlertTone.Info" />
-                }
-
-                <UiWorkspaceActionBar>
-                    <UiButton Text="@(_editingRateId.HasValue ? "حفظ" : "إضافة")"
-                              IconCssClass="fa-solid fa-check"
-                              Size="ControlSize.Small"
-                              OnClick="SaveRateAsync" />
-                    @if (_editingRateId.HasValue)
-                    {
-                        <UiButton Text="إلغاء"
-                                  IconCssClass="fa-solid fa-xmark"
-                                  Variant="ButtonVariant.Ghost"
-                                  Size="ControlSize.Small"
-                                  OnClick="CancelRateEdit" />
+                            </UiAccountingFormGrid>
+                            <div class="oas-settings-preview">@RateConversionPreview</div>
+                            @if (!string.IsNullOrWhiteSpace(_rateError))
+                            {
+                                <div class="oas-settings-error" role="alert">@_rateError</div>
+                            }
+                            <UiWorkspaceActionBar>
+                                <UiButton Text="حفظ السعر" IconCssClass="fa-solid fa-check" Size="ControlSize.Small" OnClick="SaveRateAsync" Disabled="@_busy" />
+                                <UiButton Text="إلغاء" IconCssClass="fa-solid fa-xmark" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CancelRateEdit" />
+                            </UiWorkspaceActionBar>
+                        </UiAccountingFormSection>
                     }
-                </UiWorkspaceActionBar>
-            </UiAccountingFormSection>
-
-            <UiAccountingFormSection Title="قائمة أسعار الصرف"
-                                     Subtitle="أسعار الصرف المسجلة مرتبة حسب التاريخ"
-                                     IconCssClass="fa-solid fa-chart-line">
-                @if (_rates.Count == 0)
-                {
-                    <UiAccountingEmptyState Title="لا توجد أسعار صرف"
-                                            Description="أضف سعر صرف للعملات غير الأساسية."
-                                            IconCssClass="fa-solid fa-arrow-right-arrow-left" />
-                }
-                else
-                {
-                    <UiStackLayout Gap="StackGap.Small">
+                    else
+                    {
+                        <div class="oas-settings-toolbar">
+                            <input class="oas-settings-search" aria-label="البحث في أسعار الصرف" placeholder="بحث بالعملة..." @bind="_rateSearch" />
+                            <UiSelect Value="@ToLookupValue(_rateFilterCurrencyId)" ValueChanged="SetRateFilterCurrency" Options="@RateFilterCurrencyOptions" Placeholder="كل العملات" Size="ControlSize.Small" />
+                            <UiSelect Value="@_rateStatusFilter" ValueChanged="SetRateStatusFilter" Options="@RateStatusFilterOptions" Size="ControlSize.Small" />
+                            <UiInputDate Label="من تاريخ" Value="@_rateDateFrom" ValueChanged="SetRateDateFrom" Size="ControlSize.Small" />
+                            <UiInputDate Label="إلى تاريخ" Value="@_rateDateTo" ValueChanged="SetRateDateTo" Size="ControlSize.Small" />
+                            <UiButton Text="تطبيق" IconCssClass="fa-solid fa-filter" Size="ControlSize.Small" Variant="ButtonVariant.Secondary" OnClick="ApplyRateFiltersAsync" />
+                            <UiButton Text="سعر جديد" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" OnClick="NewRate" />
+                        </div>
+                        @if (_rateFilterError is not null)
+                        {
+                            <div class="oas-settings-error" role="alert">@_rateFilterError</div>
+                        }
+                        @if (_rates.Count == 0)
+                        {
+                            <UiAccountingEmptyState Title="لا توجد أسعار مطابقة" Description="راجع العملة والتاريخ وحالة السعر." IconCssClass="fa-solid fa-arrow-right-arrow-left" />
+                        }
                         @foreach (var rate in _rates)
                         {
-                            <UiAccountingFormSection Title="@rate.CurrencyCode"
-                                                     Subtitle="@(IsBaseCurrency(rate.CurrencyId) ? "العملة الأساسية" : (rate.IsActive ? "نشط" : "معطل"))"
-                                                     IconCssClass="fa-solid fa-arrow-right-arrow-left">
-                                <UiAccountingFormGrid Columns="4">
-                                    <UiAccountingReadOnlyValue Label="التاريخ" Value="@rate.RateDate.ToString("yyyy-MM-dd")" />
-                                    <UiAccountingReadOnlyValue Label="السعر" Value="@FormatExchangeRate(rate.Rate)" />
-                                    <UiAccountingReadOnlyValue Label="النوع" Value="@(rate.RateType == ExchangeRateType.Accounting ? "محاسبي" : rate.RateType.ToString())" />
-                                    <UiButton Text="تعديل"
-                                              IconCssClass="fa-solid fa-pen"
-                                              Variant="ButtonVariant.Ghost"
-                                              Size="ControlSize.Small"
-                                              OnClick="@(() => EditRate(rate))" />
-                                </UiAccountingFormGrid>
-                            </UiAccountingFormSection>
+                            <button type="button" class="oas-settings-record" @onclick="@(() => EditRate(rate))">
+                                <span class="oas-settings-record-line"><strong><i class="fa-solid fa-arrow-right-arrow-left"></i> @rate.CurrencyCode</strong><span class="oas-settings-state @(rate.IsActive ? "is-active" : "is-inactive")">@(rate.IsActive ? "نشط" : "معطل")</span></span>
+                                <span class="oas-settings-record-line oas-settings-muted"><span>@rate.RateDate.ToString("yyyy-MM-dd") · @FormatExchangeRate(rate.Rate) @BaseCurrencyLabel · محاسبي</span><span>تعديل <i class="fa-solid fa-chevron-left"></i></span></span>
+                            </button>
                         }
-                    </UiStackLayout>
+                        <div class="oas-settings-pagination">
+                            <span>الصفحة @_ratePageNumber · إجمالي @_rateTotalCount سعر</span>
+                            <UiButton Text="السابق" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Disabled="@(_ratePageNumber <= 1 || _busy)" OnClick="PreviousRatePageAsync" />
+                            <UiButton Text="التالي" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Disabled="@(_ratePageNumber * RatePageSize >= _rateTotalCount || _busy)" OnClick="NextRatePageAsync" />
+                        </div>
+                    }
                 }
-            </UiAccountingFormSection>
-
-            <UiAccountingFormSection Title="الربط المحاسبي للموظفين"
-                                     Subtitle="يتم إنشاء الحساب المحاسبي للموظف فقط عند تفعيله محاسبيًا هنا."
-                                     IconCssClass="fa-solid fa-user-tie">
-                <UiAccountingFormGrid Columns="2">
-                    <UiSelect Label="الموظف"
-                              Value="@ToLookupValue(_employeeToActivateId)"
-                              ValueChanged="SetEmployeeToActivate"
-                              Options="@AvailableEmployeeOptions"
-                              Placeholder="-- اختر موظفًا --"
-                              Size="ControlSize.Small" />
-
-                    <UiButton Text="تفعيل محاسبي"
-                              IconCssClass="fa-solid fa-user-plus"
-                              Size="ControlSize.Small"
-                              Disabled="@(!_employeeToActivateId.HasValue)"
-                              OnClick="ActivateEmployeeAsync" />
-                </UiAccountingFormGrid>
-
-                @if (_employeeAccounts.Count == 0)
+                else if (_activeSection == "employees")
                 {
-                    <UiAccountingEmptyState Title="لا توجد روابط محاسبية للموظفين"
-                                            Description="اختر موظفًا نشطًا ثم فعّله محاسبيًا."
-                                            IconCssClass="fa-solid fa-user-tie" />
+                    <UiAccountingFormSection Title="الربط المحاسبي للموظفين" Subtitle="يُنشأ الحساب عند تفعيل الموظف محاسبيًا. يتم التأكد من وجود الحساب الرئيسي أولًا." IconCssClass="fa-solid fa-user-tie">
+                        <UiAccountingFormGrid Columns="2">
+                            <UiSelect Label="الموظف" Value="@ToLookupValue(_employeeToActivateId)" ValueChanged="SetEmployeeToActivate" Options="@AvailableEmployeeOptions" Placeholder="-- اختر موظفًا --" Size="ControlSize.Small" />
+                            <UiButton Text="تفعيل محاسبي" IconCssClass="fa-solid fa-user-plus" Size="ControlSize.Small" Disabled="@(!_employeeToActivateId.HasValue || _busy)" OnClick="ActivateEmployeeAsync" />
+                        </UiAccountingFormGrid>
+                    </UiAccountingFormSection>
+                    <div class="oas-settings-toolbar">
+                        <input class="oas-settings-search" aria-label="البحث عن ربط موظف" placeholder="بحث بالموظف أو الحساب..." @bind="_employeeAccountSearch" />
+                        <UiButton Text="بحث" IconCssClass="fa-solid fa-magnifying-glass" Size="ControlSize.Small" OnClick="SearchEmployeeAccountsAsync" />
+                    </div>
+                    @if (_employeeAccounts.Count == 0)
+                    {
+                        <UiAccountingEmptyState Title="لا توجد روابط محاسبية مطابقة" Description="فعّل موظفًا أو غيّر البحث." IconCssClass="fa-solid fa-user-tie" />
+                    }
+                    @foreach (var item in _employeeAccounts)
+                    {
+                        <div class="oas-settings-record" role="group">
+                            <span class="oas-settings-record-line"><strong><i class="fa-solid fa-user-tie"></i> @item.EmployeeCode — @item.EmployeeName</strong><span class="oas-settings-state @(item.IsActive ? "is-active" : "is-inactive")">@(item.IsActive ? "نشط" : "معطل")</span></span>
+                            <span class="oas-settings-record-line oas-settings-muted"><span>@item.AccountCode — @item.AccountName</span><UiButton Text="@(item.IsActive ? "تعطيل" : "تفعيل")" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="@(() => ToggleEmployeeAccountAsync(item))" /></span>
+                        </div>
+                    }
+                    <div class="oas-settings-pagination">
+                        <span>الصفحة @_employeeAccountPageNumber · إجمالي @_employeeAccountTotalCount ربط</span>
+                        <UiButton Text="السابق" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Disabled="@(_employeeAccountPageNumber <= 1 || _busy)" OnClick="PreviousEmployeeAccountsPageAsync" />
+                        <UiButton Text="التالي" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Disabled="@(_employeeAccountPageNumber * EmployeeAccountsPageSize >= _employeeAccountTotalCount || _busy)" OnClick="NextEmployeeAccountsPageAsync" />
+                    </div>
                 }
-                else
-                {
-                    <UiStackLayout Gap="StackGap.Small">
-                        @foreach (var item in _employeeAccounts)
-                        {
-                            <UiAccountingFormSection Title="@($"{item.EmployeeCode} - {item.EmployeeName}")"
-                                                     Subtitle="@($"{item.AccountCode} - {item.AccountName}")"
-                                                     IconCssClass="fa-solid fa-user-tie">
-                                <UiAccountingFormGrid Columns="2">
-                                    <UiAccountingReadOnlyValue Label="الحالة" Value="@(item.IsActive ? "نشط" : "معطل")" />
-                                    <UiButton Text="@(item.IsActive ? "تعطيل" : "تفعيل")"
-                                              IconCssClass="fa-solid fa-power-off"
-                                              Variant="ButtonVariant.Ghost"
-                                              Size="ControlSize.Small"
-                                              OnClick="@(() => ToggleEmployeeAccountAsync(item))" />
-                                </UiAccountingFormGrid>
-                            </UiAccountingFormSection>
-                        }
-                    </UiStackLayout>
-                }
-            </UiAccountingFormSection>
-        </UiAccountingEditorSurface>
+            </div>
+        </div>
     </Body>
 </UiAccountingWorkspace>

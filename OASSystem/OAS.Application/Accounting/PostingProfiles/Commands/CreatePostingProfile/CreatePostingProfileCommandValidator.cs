@@ -1,5 +1,6 @@
 using FluentValidation;
 using OAS.Contracts.Accounting.PostingProfiles;
+using OAS.Application.Accounting.PostingProfiles;
 
 namespace OAS.Application.Accounting.PostingProfiles.Commands.CreatePostingProfile;
 
@@ -31,6 +32,14 @@ public sealed class CreatePostingProfileCommandValidator
             .WithErrorCode("posting_profile_document_type_required")
             .MaximumLength(50)
             .WithErrorCode("posting_profile_document_type_max_length");
+
+        RuleFor(x => x.Data.Lines)
+            .NotEmpty().WithMessage("ملف الترحيل يحتاج قاعدة واحدة على الأقل.");
+
+        RuleFor(x => x.Data)
+            .Must(data => data.Module is not null && data.DocumentType is not null && data.Lines is not null && PostingProfileRoleRequirements.HasRequiredRoles(
+                data.Module, data.DocumentType, data.Lines.Select(x => x.AccountRole)))
+            .WithMessage("ملف الترحيل ينقصه دور محاسبي مطلوب لنوع المستند المحدد.");
 
         RuleFor(x => x.Data.Lines)
             .Must(HaveUniqueRoles)

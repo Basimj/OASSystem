@@ -64,8 +64,14 @@ public sealed class AccountingClientService(
             query += $"&expenseTypeId={normalized.ExpenseTypeId.Value:D}";
         if (normalized.PaymentMethod.HasValue)
             query += $"&paymentMethod={normalized.PaymentMethod.Value}";
+        if (normalized.ExchangeRateCurrencyId.HasValue)
+            query += $"&exchangeRateCurrencyId={normalized.ExchangeRateCurrencyId.Value:D}";
         if (normalized.FiscalYearId.HasValue)
             query += $"&fiscalYearId={normalized.FiscalYearId.Value:D}";
+        if (!string.IsNullOrWhiteSpace(normalized.PostingModule))
+            query += $"&postingModule={Uri.EscapeDataString(normalized.PostingModule)}";
+        if (!string.IsNullOrWhiteSpace(normalized.PostingDocumentType))
+            query += $"&postingDocumentType={Uri.EscapeDataString(normalized.PostingDocumentType)}";
 
         if (!string.IsNullOrWhiteSpace(
                 normalized.SortBy))

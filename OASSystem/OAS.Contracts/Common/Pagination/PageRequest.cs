@@ -15,7 +15,11 @@ public sealed record PageRequest
     public DateOnly? DateTo { get; init; }
     public Guid? ExpenseTypeId { get; init; }
     // Fiscal-period directory scope. Ignored by unrelated list endpoints.
+    public Guid? ExchangeRateCurrencyId { get; init; }
     public Guid? FiscalYearId { get; init; }
+    // Posting profile directory filters; ignored by unrelated specifications.
+    public string? PostingModule { get; init; }
+    public string? PostingDocumentType { get; init; }
     public int? PaymentMethod { get; init; }
     public string? SortBy { get; init; }
     public SortDirection SortDirection { get; init; } = SortDirection.Ascending;
@@ -26,6 +30,8 @@ public sealed record PageRequest
         PageSize = Math.Clamp(PageSize, 1, MaximumPageSize),
         Search = string.IsNullOrWhiteSpace(Search) ? null : Search.Trim(),
         Status = string.IsNullOrWhiteSpace(Status) ? null : Status.Trim().ToLowerInvariant(),
+        PostingModule = string.IsNullOrWhiteSpace(PostingModule) ? null : PostingModule.Trim(),
+        PostingDocumentType = string.IsNullOrWhiteSpace(PostingDocumentType) ? null : PostingDocumentType.Trim(),
         SortBy = string.IsNullOrWhiteSpace(SortBy) ? null : SortBy.Trim()
     };
 }

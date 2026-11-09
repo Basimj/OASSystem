@@ -21,4 +21,5 @@ public sealed record AccountingSettingsDto(
     Guid? PurchasePriceVarianceAccountId,
     ExchangeRateType DefaultExchangeRateType,
     string RowVersion,
-    Guid? RetainedEarningsAccountId);
+    Guid? RetainedEarningsAccountId,
+    bool BaseCurrencyChangeAllowed = true);
