@@ -88,3 +88,21 @@
 @media (prefers-reduced-motion:reduce) {
     .oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-sidebar {transition:none;}
 }
+
+/* Sales homepage approved mockup: deep-navy rail, blue selected row, small sun accent.
+   Scoped by :has to this dashboard only, without changing other ERP workspaces. */
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark):has(.oas-sales-dashboard) .oas-sidebar {
+    background:#0d3156;
+    background-image:linear-gradient(160deg,#092948 0%,#123c63 55%,#092848 100%);
+    border-inline-end-color:#082540;
+}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark):has(.oas-sales-dashboard) .oas-sidebar .oas-nav-item.active,
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark):has(.oas-sales-dashboard) .oas-sidebar .oas-nav-item--child.active {
+    background:linear-gradient(105deg,#058ee6,#16b5ff);
+    border-color:#1aa6ed;
+    color:#fff;
+    text-shadow:none;
+}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark):has(.oas-sales-dashboard) .oas-sidebar .oas-nav-item.active::before{background:#f9ff26}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark):has(.oas-sales-dashboard) .oas-sidebar .oas-nav-item.active .oas-nav-icon{color:#fff;text-shadow:none}
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark):has(.oas-sales-dashboard) .oas-sidebar .oas-nav-group__header{color:#e9f5ff;text-shadow:none}

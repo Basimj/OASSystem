@@ -31,6 +31,9 @@ namespace OAS.Client.Sales.Workspace;
 public partial class SalesWorkspaceHost : IDisposable
 {
     [Parameter] public SalesEntityType Section { get; set; }
+    [Parameter] public Guid? RequestedInvoiceId { get; set; }
+    [Parameter] public bool CreateNew { get; set; }
+    [Parameter] public bool CollectPayment { get; set; }
     [Inject] private ISalesClientService Sales { get; set; } = default!;
     [Inject] private IAccountingClientService Accounting { get; set; } = default!;
     [Inject] private IEmployeeClientService Employees { get; set; } = default!;
@@ -63,6 +66,8 @@ public partial class SalesWorkspaceHost : IDisposable
     private bool _isPrintingInvoice;
     private bool _isCollectingInvoicePayment;
     private SalesEntityType? _lastSection;
+    private string? _lastRouteRequest;
+    private bool _pendingCollectionDialog;
 
     private SalesWorkspaceTabState? ActiveTab => Workspace.ActiveTab;
     private UiPrescriptionRevisionModel? ActiveRevisionDraft =>
@@ -82,13 +87,40 @@ public partial class SalesWorkspaceHost : IDisposable
 
     protected override async Task OnParametersSetAsync()
     {
-        if (_lastSection == Section) return;
-        _lastSection = Section;
-        if (Workspace.ActiveTab?.EntityType != Section)
-            Workspace.OpenOrActivateListTab(Section);
-        _pageNumber = 1;
-        _search = null;
-        await LoadListAsync(Section);
+        if (_lastSection != Section)
+        {
+            _lastSection = Section;
+            if (Workspace.ActiveTab?.EntityType != Section)
+                Workspace.OpenOrActivateListTab(Section);
+            _pageNumber = 1;
+            _search = null;
+            await LoadListAsync(Section);
+        }
+
+        // Deep-link from the dashboard. Do not repeat tab creation if the component
+        // rerenders with the same route parameters.
+        var requestKey = $"{Section}:{RequestedInvoiceId}:{CreateNew}:{CollectPayment}";
+        if (_lastRouteRequest == requestKey) return;
+        _lastRouteRequest = requestKey;
+        if (RequestedInvoiceId.HasValue && Section == SalesEntityType.SalesInvoices)
+        {
+            await OpenEntityAsync(RequestedInvoiceId.Value);
+            _pendingCollectionDialog = CollectPayment &&
+                ActiveTab?.Model is UiSalesInvoiceFormModel;
+        }
+        else if (CreateNew)
+        {
+            await NewAsync(default!);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_pendingCollectionDialog)
+        {
+            _pendingCollectionDialog = false;
+            await CollectInvoicePaymentAsync(default!);
+        }
     }
 
     private void WorkspaceChanged() => _ = InvokeAsync(StateHasChanged);

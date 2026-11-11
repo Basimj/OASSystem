@@ -4,5 +4,11 @@
 
 @* Invoice-route-only presentation boundary; all state remains in SalesWorkspaceHost. *@
 <div class="oas-sales-invoices-page">
-    <SalesWorkspaceHost Section="SalesEntityType.SalesInvoices" />
+    <SalesWorkspaceHost Section="SalesEntityType.SalesInvoices" RequestedInvoiceId="@InvoiceId" CreateNew="@Create" CollectPayment="@Collect" />
 </div>
+
+@code {
+    [Parameter, SupplyParameterFromQuery(Name = "invoiceId")] public Guid? InvoiceId { get; set; }
+    [Parameter, SupplyParameterFromQuery(Name = "create")] public bool Create { get; set; }
+    [Parameter, SupplyParameterFromQuery(Name = "collect")] public bool Collect { get; set; }
+}
