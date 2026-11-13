@@ -8,9 +8,12 @@
                                   Rows="@_rows"
                                   Selected="@_selected"
                                   IsBusy="@State.IsBusy"
+                                  ErrorText="@State.Error"
+                                  LastUpdatedAt="@State.LastUpdatedAt"
                                   SearchWarehousesAsync="SearchWarehousesAsync"
                                   SearchTechniciansAsync="SearchTechniciansAsync"
                                   PageNumber="@State.Page.PageNumber"
+                                  PageSize="@State.Query.PageSize"
                                   TotalPages="@State.Page.TotalPages"
                                   TotalCount="@State.Page.TotalCount"
                                   OnApplyFilters="ApplyFiltersAsync"
@@ -18,10 +21,12 @@
                                   OnTabSelected="TabSelectedAsync"
                                   OnMetricSelected="MetricSelectedAsync"
                                   OnOpen="OpenAsync"
+                                  OnOpenCustomerOrder="OpenCustomerOrderAsync"
                                   OnCloseDetails="CloseDetailsAsync"
                                   OnDeliver="OpenDeliveryAsync"
                                   OnOpenSupply="OpenSupplyAsync"
                                   OnOpenJob="OpenJobAsync"
                                   OnPrevious="PreviousAsync"
-                                  OnNext="NextAsync" />
+                                  OnNext="NextAsync"
+                                  OnPageSizeChanged="PageSizeChangedAsync" />
 

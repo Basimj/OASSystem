@@ -18,23 +18,35 @@
             {
                 var line = Lines[i];
                 <div class="ui-sales-payment-line">
-                    <UiSelect Label="الطريقة" Value="@line.PaymentMethod" ValueChanged="v => MethodChangedAsync(line, v)" Options="@PaymentMethodOptions" Disabled="@Disabled" />
-                    <UiLookup Label="العملة" Value="@line.CurrencyId" SelectedItem="@SelectedCurrency(line)" SearchAsync="SearchCurrenciesAsync" ValueChanged="v => CurrencyChangedAsync(line, v)" Disabled="@Disabled" />
-                    <div class="ui-sales-payment-line__amount"><span>المبلغ</span><UiAccountingMoneyInput Value="@line.Amount" ValueChanged="v => AmountChangedAsync(line, v)" Currency="@CurrencyLabel(line)" Disabled="@Disabled" /></div>
+                    <UiSelect Label="الطريقة" ErrorText="@(line.ValidationField == "method" ? line.ValidationError : null)" Value="@line.PaymentMethod" ValueChanged="v => MethodChangedAsync(line, v)" Options="@PaymentMethodOptions" Disabled="@Disabled" />
+                    <UiLookup Label="العملة" UsePopover="true" ErrorText="@(line.ValidationField == "currency" ? line.ValidationError : null)" Value="@line.CurrencyId" SelectedItem="@SelectedCurrency(line)" SearchAsync="SearchCurrenciesAsync" ValueChanged="v => CurrencyChangedAsync(line, v)" Disabled="@Disabled" />
+                    <div class="ui-sales-payment-line__amount @(line.ValidationField == "amount" ? "has-error" : "")"><span>المبلغ</span><UiAccountingMoneyInput Value="@line.Amount" ValueChanged="v => AmountChangedAsync(line, v)" Currency="@CurrencyLabel(line)" Disabled="@Disabled" />@if (line.ValidationField == "amount" && !string.IsNullOrWhiteSpace(line.ValidationError)) { <small class="oas-checkout-field-error" role="alert">@line.ValidationError</small> }</div>
                     @if (line.PaymentMethod == "Cash")
                     {
-                        <UiLookup Label="الصندوق" Value="@line.CashAccountId" SelectedItem="@SelectedCash(line)" SearchAsync="(q,ct) => SearchCashAsync(line,q,ct)" ValueChanged="v => CashChangedAsync(line, v)" Disabled="@Disabled" />
+                        <UiLookup Label="الصندوق" UsePopover="true" ErrorText="@(line.ValidationField == "cash" ? line.ValidationError : null)" Value="@line.CashAccountId" SelectedItem="@SelectedCash(line)" SearchAsync="(q,ct) => SearchCashAsync(line,q,ct)" ValueChanged="v => CashChangedAsync(line, v)" Disabled="@Disabled" />
                     }
                     else if (line.PaymentMethod is "Card" or "BankTransfer" or "Cheque")
                     {
-                        <UiLookup Label="الحساب البنكي" Value="@line.BankAccountId" SelectedItem="@SelectedBank(line)" SearchAsync="(q,ct) => SearchBankAsync(line,q,ct)" ValueChanged="v => BankChangedAsync(line, v)" Disabled="@Disabled" />
+                        <UiLookup Label="الحساب البنكي" UsePopover="true" ErrorText="@(line.ValidationField == "bank" ? line.ValidationError : null)" Value="@line.BankAccountId" SelectedItem="@SelectedBank(line)" SearchAsync="(q,ct) => SearchBankAsync(line,q,ct)" ValueChanged="v => BankChangedAsync(line, v)" Disabled="@Disabled" />
                     }
                     else if (line.PaymentMethod == "Other")
                     {
-                        <UiLookup Label="حساب التسوية" Value="@line.SettlementAccountId" SelectedItem="@SelectedSettlement(line)" SearchAsync="SearchSettlementAccountsAsync" ValueChanged="v => SettlementChangedAsync(line, v)" Disabled="@Disabled" />
+                        <UiLookup Label="حساب التسوية" UsePopover="true" ErrorText="@(line.ValidationField == "settlement" ? line.ValidationError : null)" Value="@line.SettlementAccountId" SelectedItem="@SelectedSettlement(line)" SearchAsync="SearchSettlementAccountsAsync" ValueChanged="v => SettlementChangedAsync(line, v)" Disabled="@Disabled" />
                     }
-                    <UiInputText Label="المرجع" Value="@line.ReferenceNumber" ValueChanged="v => TextChangedAsync(line, v)" Placeholder="رقم التحويل/الشيك" Disabled="@Disabled" />
-                    <UiButton Text="حذف" IconCssClass="fa-solid fa-trash" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Disabled="@Disabled" OnClick="_ => RemoveAsync(line)" />
+                    <div><UiInputText Label="المرجع" Value="@line.ReferenceNumber" ValueChanged="v => TextChangedAsync(line, v)" Placeholder="رقم التحويل/الشيك" Disabled="@Disabled" />@if (line.ValidationField == "reference") { <small class="oas-checkout-field-error" role="alert">@line.ValidationError</small> }</div>
+                    <div class="oas-checkout-payment-confirm">
+                        @if (line.IsConfirmed)
+                        {
+                            <span class="oas-checkout-payment-confirmed"><i class="fa-solid fa-circle-check"></i> الدفعة مؤكدة داخل النموذج</span>
+                        }
+                        else
+                        {
+                            <button type="button" class="oas-checkout-btn is-primary" disabled="@Disabled" @onclick="() => ConfirmAsync(line)">
+                                <i class="fa-solid fa-check"></i> تأكيد الدفعة
+                            </button>
+                        }
+                        <UiButton Text="إلغاء الدفعة" IconCssClass="fa-solid fa-trash" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Disabled="@Disabled" OnClick="_ => RemoveAsync(line)" />
+                    </div>
                 </div>
             }
         </div>
@@ -49,6 +61,7 @@
     [Parameter] public Func<UiCheckoutPaymentLineModel,string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchBankAccountsAsync { get; set; }
     [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchSettlementAccountsAsync { get; set; }
     [Parameter] public EventCallback OnAdd { get; set; }
+    [Parameter] public EventCallback<UiCheckoutPaymentLineModel> OnConfirm { get; set; }
     [Parameter] public EventCallback<UiCheckoutPaymentLineModel> OnRemove { get; set; }
     [Parameter] public EventCallback OnChanged { get; set; }
 
@@ -70,11 +83,12 @@
     private static string CurrencyLabel(UiCheckoutPaymentLineModel line) => string.IsNullOrWhiteSpace(line.CurrencyDisplay) ? "" : line.CurrencyDisplay;
     private Task AddAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _) => OnAdd.InvokeAsync();
     private Task RemoveAsync(UiCheckoutPaymentLineModel line) => OnRemove.InvokeAsync(line);
-    private async Task MethodChangedAsync(UiCheckoutPaymentLineModel line,string? value){ line.PaymentMethod=value??"Cash"; line.CashAccountId=string.Empty; line.CashAccountDisplay=null; line.BankAccountId=string.Empty; line.BankAccountDisplay=null; line.SettlementAccountId=string.Empty; line.SettlementAccountDisplay=null; await OnChanged.InvokeAsync(); }
-    private async Task AmountChangedAsync(UiCheckoutPaymentLineModel line,decimal value){ line.Amount=value; await OnChanged.InvokeAsync(); }
-    private async Task TextChangedAsync(UiCheckoutPaymentLineModel line,string? value){ line.ReferenceNumber=value; await OnChanged.InvokeAsync(); }
-    private async Task CurrencyChangedAsync(UiCheckoutPaymentLineModel line,string? value){line.CurrencyId=value??string.Empty;line.CurrencyDisplay=null;line.CashAccountId=string.Empty;line.CashAccountDisplay=null;line.BankAccountId=string.Empty;line.BankAccountDisplay=null;await OnChanged.InvokeAsync();}
-    private async Task CashChangedAsync(UiCheckoutPaymentLineModel line,string? value){line.CashAccountId=value??string.Empty;line.CashAccountDisplay=null;await OnChanged.InvokeAsync();}
-    private async Task BankChangedAsync(UiCheckoutPaymentLineModel line,string? value){line.BankAccountId=value??string.Empty;line.BankAccountDisplay=null;await OnChanged.InvokeAsync();}
-    private async Task SettlementChangedAsync(UiCheckoutPaymentLineModel line,string? value){line.SettlementAccountId=value??string.Empty;line.SettlementAccountDisplay=null;await OnChanged.InvokeAsync();}
+    private Task ConfirmAsync(UiCheckoutPaymentLineModel line) => OnConfirm.InvokeAsync(line);
+    private async Task MethodChangedAsync(UiCheckoutPaymentLineModel line,string? value){ line.IsConfirmed=false; line.PaymentMethod=value??"Cash"; line.CashAccountId=string.Empty; line.CashAccountDisplay=null; line.BankAccountId=string.Empty; line.BankAccountDisplay=null; line.SettlementAccountId=string.Empty; line.SettlementAccountDisplay=null; await OnChanged.InvokeAsync(); }
+    private async Task AmountChangedAsync(UiCheckoutPaymentLineModel line,decimal value){ line.IsConfirmed=false; line.Amount=value; line.ValidationError=value <= 0m ? "يجب أن يكون المبلغ أكبر من صفر." : null;line.ValidationField=value <= 0m ? "amount" : null; await OnChanged.InvokeAsync(); }
+    private async Task TextChangedAsync(UiCheckoutPaymentLineModel line,string? value){ line.IsConfirmed=false; line.ReferenceNumber=value; await OnChanged.InvokeAsync(); }
+    private async Task CurrencyChangedAsync(UiCheckoutPaymentLineModel line,string? value){line.IsConfirmed=false; line.CurrencyId=value??string.Empty;line.CurrencyDisplay=null;line.CashAccountId=string.Empty;line.CashAccountDisplay=null;line.BankAccountId=string.Empty;line.BankAccountDisplay=null;await OnChanged.InvokeAsync();}
+    private async Task CashChangedAsync(UiCheckoutPaymentLineModel line,string? value){line.IsConfirmed=false; line.CashAccountId=value??string.Empty;line.CashAccountDisplay=null;await OnChanged.InvokeAsync();}
+    private async Task BankChangedAsync(UiCheckoutPaymentLineModel line,string? value){line.IsConfirmed=false; line.BankAccountId=value??string.Empty;line.BankAccountDisplay=null;await OnChanged.InvokeAsync();}
+    private async Task SettlementChangedAsync(UiCheckoutPaymentLineModel line,string? value){line.IsConfirmed=false; line.SettlementAccountId=value??string.Empty;line.SettlementAccountDisplay=null;await OnChanged.InvokeAsync();}
 }

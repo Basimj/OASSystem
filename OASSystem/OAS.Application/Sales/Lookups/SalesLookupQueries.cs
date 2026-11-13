@@ -66,7 +66,7 @@ public sealed record SearchSalesBankAccountsQuery(Guid CurrencyId, string? Searc
     public IReadOnlyCollection<string> RequiredPermissions { get; } = [SalesPermissions.View];
 }
 
-public sealed record SearchCustomerOrdersLookupQuery(Guid? CustomerId, string? Search, int Take = 20)
+public sealed record SearchCustomerOrdersLookupQuery(Guid? CustomerId, string? Search, int Take = 20, bool CheckoutOnly = false)
     : IQuery<IReadOnlyList<CustomerOrderLookupDto>>, IAuthorizedRequest
 {
     public IReadOnlyCollection<string> RequiredPermissions { get; } = [SalesPermissions.Orders.View];

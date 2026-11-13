@@ -17,6 +17,8 @@ public static class SalesWorkflowUiMapper
         {
             OrderId = dto.Order.Id,
             OrderCode = dto.Order.OrderCode,
+            InvoiceId = dto.SalesInvoiceId,
+            InvoiceCode = dto.InvoiceCode,
             CustomerCode = dto.Customer.CustomerCode,
             CustomerName = dto.Customer.NameAr,
             Mobile = dto.Customer.Mobile,
@@ -32,13 +34,16 @@ public static class SalesWorkflowUiMapper
             TotalAmount = dto.Order.TotalAmount,
             PaidAmount = dto.PaymentSummary.PaidAmount,
             ExistingAdvance = dto.PaymentSummary.ExistingAdvanceBalance,
+            AppliedAdvanceAmount = dto.PaymentSummary.AppliedAdvanceAmount,
             OutstandingAmount = dto.PaymentSummary.OutstandingAmount,
+            ReturnedAmount = dto.PaymentSummary.ReturnedAmount,
             PaymentPlan = dto.Order.PaymentPlan.ToString(),
             PaymentPlanLocked = dto.Order.Status != CustomerOrderStatus.Draft,
             CreditAllowed = dto.Credit.IsActive
                 && dto.Credit.IsCreditAllowed
                 && !string.IsNullOrWhiteSpace(dto.Credit.CustomerCode)
-                && dto.Credit.AvailableCredit >= dto.Order.TotalAmount,
+                && dto.Order.ExchangeRate > 0m
+                && dto.Credit.AvailableCredit + 0.0001m >= dto.Order.TotalAmount * dto.Order.ExchangeRate,
             CreditLimit = dto.Credit.CreditLimit,
             CurrentCreditExposure = dto.Credit.CurrentCreditExposure,
             AvailableCredit = dto.Credit.AvailableCredit,
@@ -60,6 +65,8 @@ public static class SalesWorkflowUiMapper
                 WarehouseText = Display(line.WarehouseCode, line.WarehouseName),
                 AvailabilityText = Availability(status, a?.ShortageQuantity ?? 0m),
                 AvailabilityCss = AvailabilityCss(status, a?.ShortageQuantity ?? 0m),
+                AvailableQuantity = a is null ? null : Math.Max(0m, a.RequestedQuantity - a.ShortageQuantity),
+                ShortageQuantity = a?.ShortageQuantity ?? 0m,
                 Quantity = line.Quantity,
                 UnitPrice = line.ActualUnitPrice,
                 FinalAmount = line.FinalAmount,

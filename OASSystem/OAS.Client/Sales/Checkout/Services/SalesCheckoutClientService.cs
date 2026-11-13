@@ -13,6 +13,9 @@ public sealed class SalesCheckoutClientService(OasApiClient api) : ISalesCheckou
     public Task<SalesCheckoutContextDto?> GetCheckoutContextAsync(Guid orderId, CancellationToken ct = default)
         => api.GetAsync<SalesCheckoutContextDto>($"api/sales/orders/{orderId:D}/checkout-context", ct);
 
+    public Task<SalesCheckoutPaymentPreviewDto?> PreviewPaymentsAsync(Guid orderId, IReadOnlyList<CheckoutPaymentLineRequest> payments, CancellationToken ct = default)
+        => api.PostAsync<IReadOnlyList<CheckoutPaymentLineRequest>, SalesCheckoutPaymentPreviewDto>($"api/sales/orders/{orderId:D}/checkout-preview", payments, ct);
+
     public Task<CustomerOrderAvailabilityDto?> AssessAvailabilityAsync(Guid orderId, CancellationToken ct = default)
         => api.PostAsync<object, CustomerOrderAvailabilityDto>($"api/sales/orders/{orderId:D}/availability", new { }, ct);
 

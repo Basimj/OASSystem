@@ -28,6 +28,13 @@ public sealed class SalesCheckoutController(ISender sender) : ControllerBase
         CancellationToken cancellationToken)
         => Ok(await sender.Send(new GetSalesCheckoutContextQuery(orderId), cancellationToken));
 
+    [HttpPost("orders/{orderId:guid}/checkout-preview")]
+    public async Task<ActionResult<SalesCheckoutPaymentPreviewDto>> PreviewPayments(
+        Guid orderId,
+        [FromBody] IReadOnlyList<CheckoutPaymentLineRequest> payments,
+        CancellationToken cancellationToken)
+        => Ok(await sender.Send(new PreviewSalesCheckoutPaymentsQuery(orderId, payments), cancellationToken));
+
     [HttpPost("orders/{orderId:guid}/checkout")]
     public async Task<ActionResult<CheckoutCustomerOrderResultDto>> Checkout(
         Guid orderId,

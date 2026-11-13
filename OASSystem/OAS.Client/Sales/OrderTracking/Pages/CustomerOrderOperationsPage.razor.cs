@@ -27,7 +27,7 @@ public partial class CustomerOrderOperationsPage : ComponentBase
 
     [Parameter, SupplyParameterFromQuery(Name = "orderId")] public Guid? OrderId { get; set; }
 
-    private readonly UiOrderOperationsFilterModel _filter = new();
+    private UiOrderOperationsFilterModel _filter => State.Filter;
     private IReadOnlyList<UiWorkflowMetric> _metrics = [];
     private IReadOnlyList<UiOrderOperationsRowModel> _rows = [];
     private UiOrderOperationsDetailsModel? _selected;
@@ -38,10 +38,12 @@ public partial class CustomerOrderOperationsPage : ComponentBase
         if (!_initialLoaded)
         {
             _initialLoaded = true;
-            await LoadAsync(resetPage: true);
+            await LoadAsync(resetPage: false);
         }
         if (OrderId.HasValue && (_selected?.OrderId != OrderId.Value))
             await OpenOrderIdAsync(OrderId.Value);
+        else if (!OrderId.HasValue && _selected is null && State.Selected is not null)
+            _selected = SalesWorkflowUiMapper.ToUi(State.Selected);
     }
 
     private async Task LoadAsync(bool resetPage = false)
@@ -57,16 +59,40 @@ public partial class CustomerOrderOperationsPage : ComponentBase
             State.Summary = summaryTask.Result;
             _rows = State.Page.Items.Select(SalesWorkflowUiMapper.ToUi).ToArray();
             _metrics = BuildMetrics(State.Summary);
+            State.LastUpdatedAt = DateTimeOffset.Now;
+
+            // Keep the selected order if it remains visible; otherwise show the
+            // first result in the compact details panel. Deep links take priority.
+            if (!OrderId.HasValue)
+            {
+                if (_selected is null && State.Selected is not null)
+                    _selected = SalesWorkflowUiMapper.ToUi(State.Selected);
+                if (_selected is null || !State.Page.Items.Any(x => x.CustomerOrderId == _selected.OrderId))
+                {
+                    _selected = null;
+                    State.Selected = null;
+                    if (State.Page.Items.Count > 0)
+                        await OpenOrderIdAsync(State.Page.Items[0].CustomerOrderId);
+                }
+            }
         }
-        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
-        catch { Snackbar.Error("تعذر تحميل متابعة طلبات العملاء."); }
+        catch (ApiClientException ex)
+        {
+            State.Error = "تعذر تحديث المتابعة. تُعرض آخر بيانات تم تحميلها؛ تحقق من الاتصال ثم حاول مرة أخرى.";
+            ApiFeedback.Show(ex.Error);
+        }
+        catch
+        {
+            State.Error = "تعذر تحديث المتابعة. تُعرض آخر بيانات تم تحميلها؛ تحقق من الاتصال ثم حاول مرة أخرى.";
+            Snackbar.Error("تعذر تحميل متابعة طلبات العملاء.");
+        }
         finally { State.IsBusy = false; }
     }
 
     private CustomerOrderOperationsQueryRequest BuildQuery(int page) => new()
     {
         PageNumber = page,
-        PageSize = State.Query.PageSize <= 0 ? 25 : State.Query.PageSize,
+        PageSize = State.Query.PageSize <= 0 ? 10 : State.Query.PageSize,
         Search = _filter.Search,
         OrderDateFrom = _filter.OrderDateFrom,
         OrderDateTo = _filter.OrderDateTo,
@@ -93,16 +119,41 @@ public partial class CustomerOrderOperationsPage : ComponentBase
     ];
 
     private Task ApplyFiltersAsync() => LoadAsync(resetPage: true);
-    private async Task ClearFiltersAsync(){_filter.Search=null;_filter.OrderDateFrom=null;_filter.OrderDateTo=null;_filter.Status="";_filter.ProductType="";_filter.WarehouseId="";_filter.WarehouseDisplay=null;_filter.RequiresProduction="";_filter.Availability="";_filter.RequiredDate=null;_filter.TechnicianId="";_filter.TechnicianDisplay=null;_filter.OverdueOnly=false;await LoadAsync(true);}
-    private async Task TabSelectedAsync(string key){_filter.Status=key;_filter.OverdueOnly=false;await LoadAsync(true);}
-    private async Task MetricSelectedAsync(string key)
+    private async Task ClearFiltersAsync(){_filter.ActiveMetric=null;_filter.Search=null;_filter.OrderDateFrom=null;_filter.OrderDateTo=null;_filter.Status="";_filter.ProductType="";_filter.WarehouseId="";_filter.WarehouseDisplay=null;_filter.RequiresProduction="";_filter.Availability="";_filter.RequiredDate=null;_filter.TechnicianId="";_filter.TechnicianDisplay=null;_filter.OverdueOnly=false;await LoadAsync(true);}
+    private async Task TabSelectedAsync(string key)
     {
-        _filter.OverdueOnly = key == "overdue";
-        _filter.Status = key is "today" or "overdue" ? "" : key;
-        if(key=="today"){var today=DateOnly.FromDateTime(DateTime.Today);_filter.OrderDateFrom=today;_filter.OrderDateTo=today;}
-        else if(key!="overdue"){_filter.OrderDateFrom=null;_filter.OrderDateTo=null;}
+        _filter.ActiveMetric = null;
+        _filter.Status = key;
+        _filter.OverdueOnly = false;
+        _filter.OrderDateFrom = null;
+        _filter.OrderDateTo = null;
         await LoadAsync(true);
     }
+    private async Task MetricSelectedAsync(string key)
+    {
+        // Clicking a KPI replaces the previous KPI/date scope instead of
+        // silently retaining "today" when the user chooses "overdue".
+        _filter.ActiveMetric = key;
+        _filter.OrderDateFrom = null;
+        _filter.OrderDateTo = null;
+        _filter.OverdueOnly = key == "overdue";
+        _filter.Status = key is "today" or "overdue" ? "" : key;
+        if (key == "today")
+        {
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            _filter.OrderDateFrom = today;
+            _filter.OrderDateTo = today;
+        }
+        await LoadAsync(true);
+    }
+    private async Task PageSizeChangedAsync(int pageSize)
+    {
+        if (pageSize is not (5 or 10 or 15 or 20)) return;
+        if (State.Query.PageSize == pageSize) return;
+        State.Query = State.Query with { PageSize = pageSize };
+        await LoadAsync(resetPage: true);
+    }
+
     private async Task PreviousAsync(){if(State.Page.HasPreviousPage){State.Query=BuildQuery(State.Page.PageNumber-1);await LoadAsync();}}
     private async Task NextAsync(){if(State.Page.HasNextPage){State.Query=BuildQuery(State.Page.PageNumber+1);await LoadAsync();}}
     private Task OpenAsync(UiOrderOperationsRowModel row)=>OpenOrderIdAsync(row.Id);
@@ -114,6 +165,12 @@ public partial class CustomerOrderOperationsPage : ComponentBase
         finally{State.IsBusy=false;}
     }
     private Task CloseDetailsAsync(){State.Selected=null;_selected=null;return Task.CompletedTask;}
+    private Task OpenCustomerOrderAsync(Guid id)
+    {
+        Navigation.NavigateTo($"/sales/customer-orders?orderId={id:D}");
+        return Task.CompletedTask;
+    }
+
     private Task OpenSupplyAsync(Guid id){Navigation.NavigateTo($"/purchasing/customer-demand?orderId={id:D}");return Task.CompletedTask;}
     private Task OpenJobAsync(Guid id){Navigation.NavigateTo($"/optical/jobs?jobId={id:D}");return Task.CompletedTask;}
 

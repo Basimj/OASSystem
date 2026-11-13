@@ -15,12 +15,13 @@ public sealed class SalesCheckoutState
 
     public void SetContext(SalesCheckoutContextDto? context)
     {
+        var changedOrder = Context?.Order.Id != context?.Order.Id;
         Context = context;
         PaymentPlan = context?.Order.PaymentPlan ?? SalesPaymentPlan.FullNow;
         Result = null;
         Error = null;
         Success = null;
-        IdempotencyKey = Guid.NewGuid().ToString("N");
+        if (changedOrder) IdempotencyKey = Guid.NewGuid().ToString("N");
     }
 
     public void SetResult(CheckoutCustomerOrderResultDto? result)

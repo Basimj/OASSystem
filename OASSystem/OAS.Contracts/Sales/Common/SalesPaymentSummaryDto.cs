@@ -6,4 +6,5 @@ public sealed record SalesPaymentSummaryDto(
     decimal ExistingAdvanceBalance,
     decimal AppliedAdvanceAmount,
     decimal PaidAmount,
-    decimal OutstandingAmount);
+    decimal OutstandingAmount,
+    decimal ReturnedAmount = 0m);

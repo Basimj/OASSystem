@@ -101,7 +101,16 @@ public sealed class CustomerOrderOperationsQueryService(
         CancellationToken cancellationToken = default)
     {
         var today = DateOnly.FromDateTime(timeProvider.GetLocalNow().DateTime);
-        var baseRequest = request with { Status = null, Availability = null, OverdueOnly = false };
+        // KPI cards must not inherit the previously clicked KPI/date filter. Other
+        // search / product / warehouse / technician filters continue to scope them.
+        var baseRequest = request with
+        {
+            Status = null,
+            Availability = null,
+            OverdueOnly = false,
+            OrderDateFrom = null,
+            OrderDateTo = null
+        };
         var query = BuildBaseQuery(baseRequest, today);
 
         var total = await query.CountAsync(cancellationToken);
@@ -120,20 +129,26 @@ public sealed class CustomerOrderOperationsQueryService(
         CancellationToken cancellationToken = default)
     {
         var today = DateOnly.FromDateTime(timeProvider.GetLocalNow().DateTime);
+        // Resolve the order once, independently of the number of historical
+        // or active optical jobs linked to it.
         var order = await (
             from o in db.Set<CustomerOrder>().AsNoTracking()
             join c in db.Set<Customer>().AsNoTracking() on o.CustomerId equals c.Id
-            join j in db.Set<OpticalJob>().AsNoTracking() on o.Id equals j.CustomerOrderId into jobJoin
-            from j in jobJoin.Where(x => x.IsActive || x.Status == OAS.Domain.Sales.Enums.OpticalJobStatus.Delivered).DefaultIfEmpty()
             where o.Id == customerOrderId
-            select new
-            {
-                Order = o,
-                Customer = c,
-                OpticalJobId = j == null ? null : (Guid?)j.Id,
-                OpticalJobCode = j == null ? null : j.JobCode
-            }).SingleOrDefaultAsync(cancellationToken)
+            select new { Order = o, Customer = c })
+            .SingleOrDefaultAsync(cancellationToken)
             ?? throw new NotFoundException(nameof(CustomerOrder), customerOrderId);
+
+        // Prefer the active job; otherwise the most recent delivered job.
+        // FirstOrDefault avoids SingleOrDefault failing when multiple jobs exist.
+        var opticalJob = await db.Set<OpticalJob>().AsNoTracking()
+            .Where(j => j.CustomerOrderId == customerOrderId &&
+                (j.IsActive || j.Status == OAS.Domain.Sales.Enums.OpticalJobStatus.Delivered))
+            .OrderByDescending(j => j.IsActive)
+            .ThenByDescending(j => j.CreatedAtUtc)
+            .ThenByDescending(j => j.Id)
+            .Select(j => new { j.Id, j.JobCode })
+            .FirstOrDefaultAsync(cancellationToken);
 
         var lines = await BuildLineDetailsAsync(customerOrderId, today, cancellationToken);
         var supply = (await BuildSupplySummariesAsync([customerOrderId], today, cancellationToken))
@@ -152,8 +167,8 @@ public sealed class CustomerOrderOperationsQueryService(
             order.Customer.ContactInfo.Mobile,
             order.Order.Notes,
             supply,
-            order.OpticalJobId,
-            order.OpticalJobCode,
+            opticalJob?.Id,
+            opticalJob?.JobCode,
             lines,
             timeline);
     }
@@ -161,6 +176,15 @@ public sealed class CustomerOrderOperationsQueryService(
     private IQueryable<OrderRow> BuildBaseQuery(CustomerOrderOperationsQueryRequest request, DateOnly today)
     {
         var orders = db.Set<CustomerOrder>().AsNoTracking();
+        // The API filter is a Contracts enum; EF maps the entity's Domain enum
+        // through a value converter. Convert the enum *before* building the SQL
+        // expression to avoid passing a Contracts enum into the Domain converter.
+        if (request.Status is { } contractStatus)
+        {
+            var domainStatus = (OAS.Domain.Sales.Enums.CustomerOrderStatus)(byte)contractStatus;
+            orders = orders.Where(order => order.Status == domainStatus);
+        }
+
         var customers = db.Set<Customer>().AsNoTracking();
         var jobs = db.Set<OpticalJob>().AsNoTracking();
         var employees = db.Set<Employee>().AsNoTracking();
@@ -172,7 +196,15 @@ public sealed class CustomerOrderOperationsQueryService(
         var query =
             from order in orders
             join customer in customers on order.CustomerId equals customer.Id
-            join job in jobs.Where(x => x.IsActive || x.Status == OAS.Domain.Sales.Enums.OpticalJobStatus.Delivered) on order.Id equals job.CustomerOrderId into jobJoin
+            let preferredJobId = jobs
+                .Where(j => j.CustomerOrderId == order.Id &&
+                    (j.IsActive || j.Status == OAS.Domain.Sales.Enums.OpticalJobStatus.Delivered))
+                .OrderByDescending(j => j.IsActive)
+                .ThenByDescending(j => j.CreatedAtUtc)
+                .ThenByDescending(j => j.Id)
+                .Select(j => (Guid?)j.Id)
+                .FirstOrDefault()
+            join job in jobs on preferredJobId equals (Guid?)job.Id into jobJoin
             from job in jobJoin.DefaultIfEmpty()
             join technician in employees on job.AssignedTechnicianId equals (Guid?)technician.Id into technicianJoin
             from technician in technicianJoin.DefaultIfEmpty()
@@ -215,8 +247,6 @@ public sealed class CustomerOrderOperationsQueryService(
             query = query.Where(x => x.OrderDate >= request.OrderDateFrom.Value);
         if (request.OrderDateTo.HasValue)
             query = query.Where(x => x.OrderDate <= request.OrderDateTo.Value);
-        if (request.Status.HasValue)
-            query = query.Where(x => (byte)x.Status == (byte)request.Status.Value);
         if (request.RequiredDate.HasValue)
             query = query.Where(x => x.RequiredDate == request.RequiredDate.Value);
         if (request.OverdueOnly)

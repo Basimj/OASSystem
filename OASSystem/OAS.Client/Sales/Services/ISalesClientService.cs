@@ -133,5 +133,5 @@ public interface ISalesClientService
     Task<IReadOnlyList<SalesCurrencyLookupDto>> SearchCurrenciesAsync(DateOnly documentDate, string? search, int take = 20, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SalesCashAccountLookupDto>> SearchCashAccountsAsync(Guid currencyId, string? search, int take = 20, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SalesBankAccountLookupDto>> SearchBankAccountsAsync(Guid currencyId, string? search, int take = 20, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<CustomerOrderLookupDto>> SearchCustomerOrdersAsync(Guid? customerId, string? search, int take = 20, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<CustomerOrderLookupDto>> SearchCustomerOrdersAsync(Guid? customerId, string? search, int take = 20, CancellationToken cancellationToken = default, bool checkoutOnly = false);
 }

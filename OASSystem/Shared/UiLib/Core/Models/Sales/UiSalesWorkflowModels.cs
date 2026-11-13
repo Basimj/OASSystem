@@ -2,10 +2,14 @@ namespace OAS.UiLib.Core.Models.Sales;
 
 public sealed record UiWorkflowMetric(string Key, string Label, int Value, string IconCss, string? CssClass = null);
 
+public sealed record UiCheckoutOrderTab(Guid Id, string OrderCode);
+
 public sealed class UiSalesCheckoutModel
 {
     public Guid OrderId { get; set; }
     public string OrderCode { get; set; } = string.Empty;
+    public Guid? InvoiceId { get; set; }
+    public string? InvoiceCode { get; set; }
     public string CustomerCode { get; set; } = string.Empty;
     public string CustomerName { get; set; } = string.Empty;
     public string? Mobile { get; set; }
@@ -19,7 +23,15 @@ public sealed class UiSalesCheckoutModel
     public decimal TotalAmount { get; set; }
     public decimal PaidAmount { get; set; }
     public decimal ExistingAdvance { get; set; }
+    public decimal AppliedAdvanceAmount { get; set; }
+    public decimal PreviouslyPaidAmount => PaidAmount + AppliedAdvanceAmount;
     public decimal OutstandingAmount { get; set; }
+    public decimal ReturnedAmount { get; set; }
+    public decimal? PreviewPaidNow { get; set; }
+    public decimal? PreviewPaidBase { get; set; }
+    public decimal? PreviewRequiredBase { get; set; }
+    public decimal? PreviewRemaining { get; set; }
+    public string? PreviewMessage { get; set; }
     public string PaymentPlan { get; set; } = "FullNow";
     public bool PaymentPlanLocked { get; set; }
     public bool CreditAllowed { get; set; }
@@ -43,6 +55,8 @@ public sealed class UiSalesCheckoutLineModel
     public string? WarehouseText { get; set; }
     public string AvailabilityText { get; set; } = string.Empty;
     public string AvailabilityCss { get; set; } = string.Empty;
+    public decimal? AvailableQuantity { get; set; }
+    public decimal ShortageQuantity { get; set; }
     public decimal Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal FinalAmount { get; set; }
@@ -55,6 +69,10 @@ public sealed class UiCheckoutPaymentLineModel
     public string CurrencyId { get; set; } = string.Empty;
     public string? CurrencyDisplay { get; set; }
     public decimal Amount { get; set; }
+    // Local confirmation only; the receipt is posted by the final checkout transaction.
+    public bool IsConfirmed { get; set; }
+    public string? ValidationError { get; set; }
+    public string? ValidationField { get; set; }
     public string CashAccountId { get; set; } = string.Empty;
     public string? CashAccountDisplay { get; set; }
     public string BankAccountId { get; set; } = string.Empty;
@@ -242,6 +260,7 @@ public sealed class UiSalesCheckoutSelectionModel
 
 public sealed class UiOrderOperationsFilterModel
 {
+    public string? ActiveMetric { get; set; }
     public string? Search { get; set; }
     public DateOnly? OrderDateFrom { get; set; }
     public DateOnly? OrderDateTo { get; set; }

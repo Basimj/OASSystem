@@ -369,7 +369,8 @@ public sealed class SalesSettlementService(
             availableAdvance,
             appliedAdvance,
             Math.Min(balance.NetInvoiceAmount, Math.Max(0m, directPaid)),
-            balance.OutstandingAmount);
+            balance.OutstandingAmount,
+            balance.ReturnedAmount);
     }
 
 

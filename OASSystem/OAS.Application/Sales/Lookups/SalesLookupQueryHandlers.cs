@@ -728,7 +728,8 @@ public sealed class SearchSalesCurrenciesQueryHandler(
 }
 
 public sealed class SearchCustomerOrdersLookupQueryHandler(
-    IReadRepository<CustomerOrder, Guid> orders)
+    IReadRepository<CustomerOrder, Guid> orders,
+    IReadRepository<Customer, Guid> customers)
     : IRequestHandler<
         SearchCustomerOrdersLookupQuery,
         IReadOnlyList<CustomerOrderLookupDto>>
@@ -742,29 +743,35 @@ public sealed class SearchCustomerOrdersLookupQueryHandler(
         var spec =
             new Specification<CustomerOrder>();
 
-        if (request.CustomerId.HasValue &&
-            !string.IsNullOrWhiteSpace(search))
+        // Resolve matching customers first, then apply the combined SQL order predicate
+        // before paging. The ordinary lookup retains the same public contract.
+        Guid[] customerMatches = [];
+        if (!string.IsNullOrWhiteSpace(search))
         {
-            spec.Where(x =>
-                x.CustomerId == request.CustomerId.Value &&
-                x.IsActive &&
-                x.OrderCode.Contains(search));
+            var matchingCustomers = await customers.ListAsync(new Specification<Customer>()
+                .Where(x => x.IsActive && (
+                    x.CustomerCode.Contains(search) || x.NameAr.Contains(search)
+                    || (x.NameEn != null && x.NameEn.Contains(search))
+                    || (x.ContactInfo.Mobile != null && x.ContactInfo.Mobile.Contains(search))
+                )).ApplyPaging(0, 200), ct);
+            customerMatches = matchingCustomers.Select(x => x.Id).ToArray();
         }
-        else if (request.CustomerId.HasValue)
+
+        // Specification.Where replaces previous criteria, so combine all filters once.
+        if (request.CheckoutOnly)
         {
-            spec.Where(x =>
-                x.CustomerId == request.CustomerId.Value &&
-                x.IsActive);
-        }
-        else if (!string.IsNullOrWhiteSpace(search))
-        {
-            spec.Where(x =>
-                x.IsActive &&
-                x.OrderCode.Contains(search));
+            spec.Where(x => x.IsActive
+                && x.Status != CustomerOrderStatus.Completed && x.Status != CustomerOrderStatus.Cancelled
+                && (!request.CustomerId.HasValue || (Guid?)x.CustomerId == request.CustomerId)
+                && (string.IsNullOrWhiteSpace(search) || x.OrderCode.Contains(search)
+                    || customerMatches.Contains(x.CustomerId)));
         }
         else
         {
-            spec.Where(x => x.IsActive);
+            spec.Where(x => x.IsActive
+                && (!request.CustomerId.HasValue || (Guid?)x.CustomerId == request.CustomerId)
+                && (string.IsNullOrWhiteSpace(search) || x.OrderCode.Contains(search)
+                    || customerMatches.Contains(x.CustomerId)));
         }
 
         spec

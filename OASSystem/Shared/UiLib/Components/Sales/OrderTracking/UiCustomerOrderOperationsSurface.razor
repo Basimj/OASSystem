@@ -1,116 +1,364 @@
 @namespace OAS.UiLib.Components.Sales.OrderTracking
-@using OAS.UiLib.Components.Sales.Workflow
 @using OAS.UiLib.Core.Models.Sales
 
-<UiSalesWorkspace>
-    <Actions>
-        <UiWorkflowSummaryCards Metrics="@Metrics" OnSelect="OnMetricSelected" />
-    </Actions>
-    <Tabs>
-        <UiSectionTabStrip Tabs="@Tabs" OnSelect="TabSelectedAsync" />
-    </Tabs>
-    <Body>
-        <div class="ui-workflow-page" dir="rtl">
-            <UiWorkspaceFilterBar Compact="true">
-                <UiSearchInput Value="@Filter.Search" ValueChanged="SearchChangedAsync" OnSearch="_ => ApplyFiltersAsync()" Placeholder="الطلب / العميل / الجوال / الصنف" />
-                <UiInputDate Label="من تاريخ الطلب" Value="@Filter.OrderDateFrom" ValueChanged="OrderDateFromChangedAsync" />
-                <UiInputDate Label="إلى تاريخ الطلب" Value="@Filter.OrderDateTo" ValueChanged="OrderDateToChangedAsync" />
-                <UiSelect Value="@Filter.ProductType" ValueChanged="ProductTypeChangedAsync" Options="@ProductTypeOptions" Placeholder="نوع المنتج: الكل" />
-                <UiLookup Value="@Filter.WarehouseId" SelectedItem="@WarehouseItem" SearchAsync="SearchWarehousesAsync" ValueChanged="WarehouseChangedAsync" Placeholder="المخزن" />
-                <UiSelect Value="@Filter.RequiresProduction" ValueChanged="RequiresProductionChangedAsync" Options="@ProductionOptions" Placeholder="يحتاج معمل: الكل" />
-                <UiSelect Value="@Filter.Availability" ValueChanged="AvailabilityChangedAsync" Options="@AvailabilityOptions" Placeholder="التوفر: الكل" />
-                <UiInputDate Label="موعد التسليم" Value="@Filter.RequiredDate" ValueChanged="RequiredDateChangedAsync" />
-                <UiLookup Value="@Filter.TechnicianId" SelectedItem="@TechnicianItem" SearchAsync="SearchTechniciansAsync" ValueChanged="TechnicianChangedAsync" Placeholder="الفني" />
-                <label class="ui-workflow-check"><input type="checkbox" checked="@Filter.OverdueOnly" @onchange="OverdueChangedAsync" /><span>متأخر فقط</span></label>
-                <UiButton Text="مسح الفلاتر" IconCssClass="fa-solid fa-filter-circle-xmark" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="ClearAsync" />
-                <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Loading="@IsBusy" OnClick="RefreshAsync" />
-            </UiWorkspaceFilterBar>
-
-            @if (!string.IsNullOrWhiteSpace(ErrorText)){<UiAlert Tone="AlertTone.Danger">@ErrorText</UiAlert>}
-
-            <UiDataGridPanel Title="متابعة طلبات العملاء" Subtitle="التوفر والتوريد والمعمل والتسليم من شاشة تشغيلية واحدة.">
-                <Body>
-                    <UiDataTable TItem="UiOrderOperationsRowModel" Items="@Rows" Headers="@Headers" Compact="true" OnRowClick="@((UiOrderOperationsRowModel row) => OpenAsync(row))" EmptyText="لا توجد طلبات مطابقة للفلاتر.">
-                        <RowTemplate Context="row">
-                            <td><strong>@row.OrderCode</strong><small class="ui-workflow-cell-muted">@row.OrderDate</small></td>
-                            <td>@row.CustomerCode<br/><small>@row.CustomerName</small></td>
-                            <td>@(row.Mobile ?? "—")</td><td>@row.ItemsSummary</td>
-                            <td>@row.AvailableLines / @row.TotalLines</td><td>@row.ShortageLines</td><td>@row.SupplyText</td>
-                            <td><span class="ui-sales-status @row.StatusCss">@row.StatusText</span></td><td>@(row.RequiredDate ?? "—")</td><td>@(row.JobCode ?? "—")</td>
-                        </RowTemplate>
-                    </UiDataTable>
-                </Body>
-                <Footer><UiPagination PageNumber="@PageNumber" TotalPages="@TotalPages" TotalCount="@TotalCount" OnPrevious="OnPrevious" OnNext="OnNext" /></Footer>
-            </UiDataGridPanel>
+<section class="oas-ordertrack" dir="rtl" aria-label="متابعة طلبات العملاء">
+    <header class="oas-ordertrack__heading">
+        <div class="oas-ordertrack__heading-title">
+            <i class="fa-solid fa-truck-fast" aria-hidden="true"></i>
+            <div>
+                <h1>متابعة طلبات العملاء</h1>
+                <p>المبيعات <i class="fa-solid fa-angle-left" aria-hidden="true"></i> متابعة الطلبات</p>
+            </div>
         </div>
-    </Body>
-</UiSalesWorkspace>
+        <nav class="oas-ordertrack__tabs" aria-label="حالات الطلبات">
+            @foreach (var tab in StatusTabs)
+            {
+                <button type="button" class="oas-ordertrack__tab @(IsActiveTab(tab.Key) ? "is-active" : "")"
+                        aria-current="@(IsActiveTab(tab.Key) ? "page" : null)"
+                        @onclick="() => SelectTabAsync(tab.Key)">@tab.Label</button>
+            }
+        </nav>
+    </header>
 
-@if (Selected is not null)
-{
-    <div class="ui-workflow-drawer-backdrop" @onclick="CloseDetailsAsync"></div>
-    <aside class="ui-workflow-drawer" dir="rtl">
-        <header class="ui-workflow-drawer__header"><div><strong>@Selected.OrderCode</strong><span>@Selected.CustomerText • @(Selected.Mobile ?? "—")</span></div><button type="button" @onclick="CloseDetailsAsync">×</button></header>
-        <div class="ui-workflow-drawer__body">
-            <div class="ui-workflow-detail-grid"><span>الحالة<strong>@Selected.StatusText</strong></span><span>موعد التسليم<strong>@(Selected.RequiredDate ?? "—")</strong></span><span>التوريد<strong>@Selected.SupplyText</strong></span><span>Job<strong>@(Selected.JobCode ?? "—")</strong></span></div>
-            <section><h4>البنود</h4><UiDataTable Items="@Selected.Lines" Headers="@DetailHeaders" Compact="true"><RowTemplate Context="line"><td>@line.LineNumber</td><td>@line.TypeText</td><td>@line.ProductText</td><td>@(line.EyeText ?? "—")</td><td>@line.Quantity.ToString("N3")</td><td><span class="ui-sales-status @line.AvailabilityCss">@line.AvailabilityText</span></td><td>@line.ProcurementText</td><td>@(line.ExpectedDelivery ?? "—")</td></RowTemplate></UiDataTable></section>
-            <section><h4>المسار التشغيلي</h4><div class="ui-workflow-timeline">@foreach(var item in Selected.Timeline){<div><i class="fa-solid fa-circle"></i><span><strong>@item.Title</strong><small>@item.OccurredAt @(string.IsNullOrWhiteSpace(item.Meta)?"":$"• {item.Meta}")</small></span></div>}</div></section>
+    <div class="oas-ordertrack__metrics" aria-label="مؤشرات متابعة الطلبات">
+        @foreach (var metric in Metrics)
+        {
+            <button type="button" class="oas-ordertrack__metric @MetricStyle(metric.Key) @(Filter.ActiveMetric == metric.Key ? "is-selected" : "")"
+                    @onclick="() => SelectMetricAsync(metric.Key)"
+                    title="انقر لتصفية القائمة بهذا المؤشر">
+                <span class="oas-ordertrack__metric-icon"><i class="@metric.IconCss" aria-hidden="true"></i></span>
+                <span class="oas-ordertrack__metric-text"><span>@metric.Label</span><strong>@metric.Value</strong></span>
+            </button>
+        }
+    </div>
+
+    <div class="oas-ordertrack__filters">
+        <div class="oas-ordertrack__search">
+            <UiSearchInput Value="@Filter.Search" ValueChanged="SearchChangedAsync" OnSearch="_ => ApplyFiltersAsync()"
+                           Placeholder="ابحث برقم الطلب أو اسم العميل أو الجوال أو الصنف..." />
         </div>
-        <footer class="ui-workflow-drawer__footer">
-            @if (Selected.Lines.Any(x => x.ShortageQuantity > 0m)){<UiButton Text="فتح النقص" IconCssClass="fa-solid fa-truck-fast" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="_ => OnOpenSupply.InvokeAsync(Selected.OrderId)" />}
-            @if (Selected.JobId.HasValue){<UiButton Text="فتح Job" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="_ => OnOpenJob.InvokeAsync(Selected.JobId.Value)" />}
-            @if (Selected.StatusKey == "ReadyForDelivery"){<UiButton Text="التسوية والتسليم" IconCssClass="fa-solid fa-cash-register" Size="ControlSize.Small" OnClick="_ => OnDeliver.InvokeAsync(Selected.OrderId)" />}
-        </footer>
-    </aside>
-}
+        <div class="oas-ordertrack__filters-controls">
+            <UiSelect Value="@Filter.Status" ValueChanged="StatusChangedAsync" Options="@StatusOptions" Placeholder="جميع الحالات" />
+            <UiSelect Value="@Filter.Availability" ValueChanged="AvailabilityChangedAsync" Options="@AvailabilityOptions" Placeholder="التوفر" />
+            <button type="button" class="oas-ordertrack__button" @onclick="ToggleAdvanced">
+                <i class="fa-solid fa-sliders" aria-hidden="true"></i> فلاتر إضافية
+            </button>
+            <button type="button" class="oas-ordertrack__button" @onclick="ApplyFiltersAsync" disabled="@IsBusy">
+                <i class="fa-solid fa-rotate" aria-hidden="true"></i> تحديث
+            </button>
+        </div>
+    </div>
+    @if (AdvancedOpen)
+    {
+        <div class="oas-ordertrack__advanced">
+            <UiInputDate Label="من تاريخ الطلب" Value="@Filter.OrderDateFrom" ValueChanged="OrderDateFromChangedAsync" />
+            <UiInputDate Label="إلى تاريخ الطلب" Value="@Filter.OrderDateTo" ValueChanged="OrderDateToChangedAsync" />
+            <UiSelect Value="@Filter.ProductType" ValueChanged="ProductTypeChangedAsync" Options="@ProductTypeOptions" Placeholder="نوع الصنف: الكل" />
+            <UiLookup Value="@Filter.WarehouseId" SelectedItem="@WarehouseItem" SearchAsync="SearchWarehousesAsync" ValueChanged="WarehouseChangedAsync" Placeholder="المخزن" />
+            <UiSelect Value="@Filter.RequiresProduction" ValueChanged="RequiresProductionChangedAsync" Options="@ProductionOptions" Placeholder="المعمل: الكل" />
+            <UiInputDate Label="موعد التسليم" Value="@Filter.RequiredDate" ValueChanged="RequiredDateChangedAsync" />
+            <UiLookup Value="@Filter.TechnicianId" SelectedItem="@TechnicianItem" SearchAsync="SearchTechniciansAsync" ValueChanged="TechnicianChangedAsync" Placeholder="الفني" />
+            <label class="oas-ordertrack__checkbox"><input type="checkbox" checked="@Filter.OverdueOnly" @onchange="OverdueChangedAsync" /> متأخرة فقط</label>
+        </div>
+    }
+    <div class="oas-ordertrack__filter-foot">
+        <span class="oas-ordertrack__scope">المؤشرات ضمن البحث والفلاتر العامة؛ دون تقييد بالحالة أو تاريخ إنشاء الطلب أو التوفر.</span>
+        <div class="oas-ordertrack__active-filters">
+            @if (!string.IsNullOrWhiteSpace(Filter.Search))
+            {
+                <button type="button" @onclick='() => RemoveFilterAsync("search")'>البحث: @Filter.Search <i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+            }
+            @if (Filter.OverdueOnly)
+            {
+                <button type="button" @onclick='() => RemoveFilterAsync("overdue")'>متأخرة فقط <i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+            }
+            @if (!string.IsNullOrWhiteSpace(Filter.Status))
+            {
+                <button type="button" @onclick='() => RemoveFilterAsync("status")'>الحالة: @StatusLabel(Filter.Status) <i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+            }
+            @if (Filter.OrderDateFrom.HasValue || Filter.OrderDateTo.HasValue)
+            {
+                <button type="button" @onclick='() => RemoveFilterAsync("date")'>الفترة: @(Filter.OrderDateFrom?.ToString("yyyy-MM-dd") ?? "...") – @(Filter.OrderDateTo?.ToString("yyyy-MM-dd") ?? "...") <i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+            }
+            @if (!string.IsNullOrWhiteSpace(Filter.Availability))
+            {
+                <button type="button" @onclick='() => RemoveFilterAsync("availability")'>التوفر: @Filter.Availability <i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+            }
+            @if (!string.IsNullOrWhiteSpace(Filter.ProductType))
+            {
+                <button type="button" @onclick='() => RemoveFilterAsync("product")'>نوع الصنف: @Filter.ProductType <i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+            }
+            @if (!string.IsNullOrWhiteSpace(Filter.WarehouseId))
+            {
+                <button type="button" @onclick='() => RemoveFilterAsync("warehouse")'>المخزن: @(Filter.WarehouseDisplay ?? "محدد") <i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+            }
+            @if (!string.IsNullOrWhiteSpace(Filter.RequiresProduction))
+            {
+                <button type="button" @onclick='() => RemoveFilterAsync("production")'>المعمل: @(Filter.RequiresProduction == "true" ? "مطلوب" : "غير مطلوب") <i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+            }
+            @if (Filter.RequiredDate.HasValue)
+            {
+                <button type="button" @onclick='() => RemoveFilterAsync("due")'>موعد التسليم: @Filter.RequiredDate.Value.ToString("yyyy-MM-dd") <i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+            }
+            @if (!string.IsNullOrWhiteSpace(Filter.TechnicianId))
+            {
+                <button type="button" @onclick='() => RemoveFilterAsync("technician")'>الفني: @(Filter.TechnicianDisplay ?? "محدد") <i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+            }
+            @if (HasActiveFilter)
+            {
+                <button type="button" class="oas-ordertrack__clear" @onclick="ClearAsync">مسح الكل</button>
+            }
+        </div>
+        <span class="oas-ordertrack__last-update">@(LastUpdatedAt.HasValue ? $"آخر تحديث: {LastUpdatedAt.Value:HH:mm}" : "لم يكتمل التحميل بعد")</span>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(ErrorText))
+    {
+        <div class="oas-ordertrack__error" role="alert">
+            <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+            @ErrorText
+            <button type="button" @onclick="ApplyFiltersAsync">إعادة المحاولة</button>
+        </div>
+    }
+
+    <div class="oas-ordertrack__workarea">
+        <div class="oas-ordertrack__list-card">
+            <div class="oas-ordertrack__card-title">
+                <h2><i class="fa-solid fa-layer-group" aria-hidden="true"></i> قائمة المتابعة التشغيلية</h2>
+                <span>@TotalCount طلب ضمن الفلاتر</span>
+            </div>
+            <div class="oas-ordertrack__table-wrap">
+                <table class="oas-ordertrack__table">
+                    <thead><tr>
+                        <th>رقم الطلب / الموعد</th><th>العميل</th><th>البنود المستوفاة</th><th>المعمل</th><th>حالة الطلب</th><th>الخطوة التالية</th><th>الإجراء</th>
+                    </tr></thead>
+                    <tbody>
+                        @foreach (var row in Rows)
+                        {
+                            <tr class="@(Selected?.OrderId == row.Id ? "is-selected" : "")">
+                                <td><button type="button" class="oas-ordertrack__order-link" @onclick="() => OpenAsync(row)">@row.OrderCode</button>
+                                    <small>الموعد: @(row.RequiredDate ?? "غير محدد")</small>
+                                </td>
+                                <td><strong>@row.CustomerName</strong><small>@(row.Mobile ?? row.CustomerCode)</small></td>
+                                <td><span class="oas-ordertrack__pill @(row.ShortageLines > 0 ? "is-danger" : "is-success")">@row.AvailableLines / @row.TotalLines بنود</span>
+                                    @if (row.ShortageLines > 0) { <small>@row.ShortageLines بنود ناقصة</small> }
+                                </td>
+                                <td><span class="oas-ordertrack__pill is-neutral">@(row.JobCode ?? (row.RequiresProduction ? "لم يبدأ" : "غير مطلوب"))</span></td>
+                                <td><span class="ui-sales-status @row.StatusCss">@row.StatusText</span></td>
+                                <td><span class="oas-ordertrack__step">@NextStep(row)</span></td>
+                                <td><button type="button" class="oas-ordertrack__view" @onclick="() => OpenAsync(row)"><i class="fa-solid fa-eye" aria-hidden="true"></i> التفاصيل</button></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                @if (Rows.Count == 0)
+                {
+                    <div class="oas-ordertrack__empty">@(IsBusy ? "جارٍ تحميل الطلبات..." : "لا توجد طلبات مطابقة للفلاتر الحالية.")</div>
+                }
+            </div>
+            <div class="oas-ordertrack__pager">
+                <span>صفحة @PageNumber من @Math.Max(TotalPages, 1) • إجمالي @TotalCount طلب</span>
+                <div class="oas-ordertrack__pager-controls">
+                    <label class="oas-ordertrack__page-size-label" for="oas-ordertrack-page-size">الطلبات في الصفحة</label>
+                    <select id="oas-ordertrack-page-size" class="oas-ordertrack__page-size"
+                            value="@PageSize" @onchange="PageSizeChangedAsync" disabled="@IsBusy">
+                        <option value="5">5</option>
+                        <option value="10">10</option>
+                        <option value="15">15</option>
+                        <option value="20">20</option>
+                    </select>
+                    <button type="button" @onclick="PreviousAsync" disabled="@(IsBusy || PageNumber <= 1)" aria-label="السابق"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+                    <span>@PageNumber</span>
+                    <button type="button" @onclick="NextAsync" disabled="@(IsBusy || PageNumber >= TotalPages)" aria-label="التالي"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button>
+                </div>
+            </div>
+        </div>
+
+        <aside class="oas-ordertrack__details" aria-label="تفاصيل الطلب المحدد">
+            @if (Selected is null)
+            {
+                <div class="oas-ordertrack__details-empty">
+                    <i class="fa-regular fa-clipboard" aria-hidden="true"></i>
+                    <h2>تفاصيل المتابعة</h2>
+                    <p>اختر طلبًا من الجدول لعرض التوفر والتوريد والمعمل والتسليم والسجل الزمني.</p>
+                </div>
+            }
+            else
+            {
+                <div class="oas-ordertrack__details-head">
+                    <div><h2>@Selected.OrderCode</h2><span>تفاصيل المتابعة</span></div>
+                    <button type="button" aria-label="إغلاق التفاصيل" @onclick="CloseDetailsAsync"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+                </div>
+                <div class="oas-ordertrack__details-body">
+                    <section>
+                        <h3><i class="fa-solid fa-circle-info" aria-hidden="true"></i> ملخص الطلب</h3>
+                        <dl><dt>الحالة</dt><dd><span class="oas-ordertrack__pill is-success">@Selected.StatusText</span></dd>
+                            <dt>العميل</dt><dd>@Selected.CustomerText</dd>
+                            <dt>موعد التسليم</dt><dd>@(Selected.RequiredDate ?? "غير محدد")</dd>
+                            <dt>التوريد</dt><dd>@Selected.SupplyText</dd></dl>
+                    </section>
+                    <section>
+                        <h3><i class="fa-solid fa-box" aria-hidden="true"></i> التوفر والكميات</h3>
+                        @foreach (var line in Selected.Lines)
+                        {
+                            <div class="oas-ordertrack__line"><div class="oas-ordertrack__line-title">@line.ProductText <span class="oas-ordertrack__pill @line.AvailabilityCss">@line.AvailabilityText</span></div>
+                                <small>مطلوب: @line.Quantity.ToString("0.##") • محجوز حاليًا: @line.ReservedQuantity.ToString("0.##") • ناقص: @line.ShortageQuantity.ToString("0.##")</small>
+                                @if (line.ShortageQuantity > 0m) { <small>التوريد: @line.ProcurementText @(line.ExpectedDelivery is null ? "" : $"• الوصول المتوقع: {line.ExpectedDelivery}")</small> }
+                            </div>
+                        }
+                    </section>
+                    <section><h3><i class="fa-solid fa-flask" aria-hidden="true"></i> المعمل</h3>
+                        <div class="oas-ordertrack__detail-line">@(Selected.JobCode is null ? "لم يتم ربط أمر معمل" : $"أمر المعمل: {Selected.JobCode}")</div>
+                    </section>
+                    <section><h3><i class="fa-solid fa-route" aria-hidden="true"></i> الخطوة التالية</h3>
+                        <div class="oas-ordertrack__detail-line">@DetailNextStep(Selected)</div>
+                    </section>
+                    <section><h3><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> السجل الزمني</h3>
+                        <div class="oas-ordertrack__timeline">
+                            @foreach (var item in Selected.Timeline)
+                            {
+                                <div><i class="fa-solid fa-circle-check" aria-hidden="true"></i><strong>@item.Title</strong><small>@item.OccurredAt @(string.IsNullOrWhiteSpace(item.Meta) ? "" : $"• {item.Meta}")</small></div>
+                            }
+                            @if (Selected.Timeline.Count == 0) { <p>لا توجد أحداث مسجلة لهذا الطلب.</p> }
+                        </div>
+                    </section>
+                </div>
+                <div class="oas-ordertrack__details-actions">
+                    <button type="button" class="oas-ordertrack__action is-primary" @onclick="() => OnOpenCustomerOrder.InvokeAsync(Selected.OrderId)"><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i> فتح طلب العميل</button>
+                    @if (Selected.Lines.Any(x => x.ShortageQuantity > 0m)) { <button type="button" class="oas-ordertrack__action" @onclick="() => OnOpenSupply.InvokeAsync(Selected.OrderId)">فتح النواقص</button> }
+                    @if (Selected.JobId.HasValue) { <button type="button" class="oas-ordertrack__action" @onclick="() => OnOpenJob.InvokeAsync(Selected.JobId.Value)">فتح أمر المعمل</button> }
+                    @if (Selected.StatusKey == "ReadyForDelivery") { <button type="button" class="oas-ordertrack__action is-primary" @onclick="() => OnDeliver.InvokeAsync(Selected.OrderId)">التسوية والتسليم</button> }
+                </div>
+            }
+        </aside>
+    </div>
+</section>
 
 @code {
-    [Parameter,EditorRequired] public UiOrderOperationsFilterModel Filter { get; set; } = new();
-    [Parameter] public IReadOnlyList<UiWorkflowMetric> Metrics { get; set; }=[];
-    [Parameter] public IReadOnlyList<UiOrderOperationsRowModel> Rows { get; set; }=[];
+    [Parameter, EditorRequired] public UiOrderOperationsFilterModel Filter { get; set; } = new();
+    [Parameter] public IReadOnlyList<UiWorkflowMetric> Metrics { get; set; } = [];
+    [Parameter] public IReadOnlyList<UiOrderOperationsRowModel> Rows { get; set; } = [];
     [Parameter] public UiOrderOperationsDetailsModel? Selected { get; set; }
     [Parameter] public bool IsBusy { get; set; }
     [Parameter] public string? ErrorText { get; set; }
-    [Parameter] public int PageNumber { get; set; }=1;
+    [Parameter] public DateTimeOffset? LastUpdatedAt { get; set; }
+    [Parameter] public int PageNumber { get; set; } = 1;
+    [Parameter] public int PageSize { get; set; } = 10;
     [Parameter] public int TotalPages { get; set; }
     [Parameter] public long TotalCount { get; set; }
-    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchWarehousesAsync { get; set; }
-    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchTechniciansAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchWarehousesAsync { get; set; }
+    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchTechniciansAsync { get; set; }
     [Parameter] public EventCallback OnApplyFilters { get; set; }
     [Parameter] public EventCallback OnClearFilters { get; set; }
     [Parameter] public EventCallback<string> OnTabSelected { get; set; }
     [Parameter] public EventCallback<string> OnMetricSelected { get; set; }
     [Parameter] public EventCallback<UiOrderOperationsRowModel> OnOpen { get; set; }
+    [Parameter] public EventCallback<Guid> OnOpenCustomerOrder { get; set; }
     [Parameter] public EventCallback OnCloseDetails { get; set; }
     [Parameter] public EventCallback<Guid> OnDeliver { get; set; }
     [Parameter] public EventCallback<Guid> OnOpenSupply { get; set; }
     [Parameter] public EventCallback<Guid> OnOpenJob { get; set; }
     [Parameter] public EventCallback OnPrevious { get; set; }
     [Parameter] public EventCallback OnNext { get; set; }
+    [Parameter] public EventCallback<int> OnPageSizeChanged { get; set; }
 
-    private static readonly IReadOnlyList<string> Headers=["الطلب","العميل","الجوال","المطلوب","المتاح","الناقص","التوريد","الحالة","الموعد","Job"];
-    private static readonly IReadOnlyList<string> DetailHeaders=["#","النوع","الصنف","العين","الكمية","التوفر","التوريد","الوصول"];
-    private static readonly IReadOnlyList<UiSelectOption> ProductTypeOptions=[new("Frame","إطار"),new("Lens","عدسة"),new("Accessory","إكسسوار"),new("Service","خدمة"),new("Other","أخرى")];
-    private static readonly IReadOnlyList<UiSelectOption> ProductionOptions=[new("true","نعم"),new("false","لا")];
-    private static readonly IReadOnlyList<UiSelectOption> AvailabilityOptions=[new("Available","كامل"),new("Reserved","محجوز"),new("Shortage","ناقص")];
-    private IReadOnlyList<UiSectionTabItem> Tabs => new[]{("","الكل"),("Confirmed","جديدة"),("AwaitingStock","بانتظار مخزون"),("PartiallyAvailable","متاحة جزئيًا"),("ReadyForProduction","جاهزة للمعمل"),("InProduction","قيد التجهيز"),("ReadyForDelivery","جاهزة للتسليم"),("Completed","مكتملة"),("Cancelled","ملغاة")}.Select(x=>new UiSectionTabItem(x.Item1,x.Item2,string.Equals(Filter.Status,x.Item1,StringComparison.OrdinalIgnoreCase))).ToArray();
-    private UiLookupItem? WarehouseItem=>Lookup(Filter.WarehouseId,Filter.WarehouseDisplay,"fa-solid fa-warehouse");
-    private UiLookupItem? TechnicianItem=>Lookup(Filter.TechnicianId,Filter.TechnicianDisplay,"fa-solid fa-user-gear");
-    private static UiLookupItem? Lookup(string? id,string? text,string icon)=>string.IsNullOrWhiteSpace(id)||string.IsNullOrWhiteSpace(text)?null:new(id,text,null,icon);
-    private Task SearchChangedAsync(string? v){Filter.Search=v;return Task.CompletedTask;}
-    private async Task OrderDateFromChangedAsync(DateOnly? v){Filter.OrderDateFrom=v;await ApplyFiltersAsync();}
-    private async Task OrderDateToChangedAsync(DateOnly? v){Filter.OrderDateTo=v;await ApplyFiltersAsync();}
-    private async Task ProductTypeChangedAsync(string? v){Filter.ProductType=v??"";await ApplyFiltersAsync();}
-    private async Task WarehouseChangedAsync(string? v){Filter.WarehouseId=v??"";Filter.WarehouseDisplay=null;await ApplyFiltersAsync();}
-    private async Task RequiresProductionChangedAsync(string? v){Filter.RequiresProduction=v??"";await ApplyFiltersAsync();}
-    private async Task AvailabilityChangedAsync(string? v){Filter.Availability=v??"";await ApplyFiltersAsync();}
-    private async Task RequiredDateChangedAsync(DateOnly? v){Filter.RequiredDate=v;await ApplyFiltersAsync();}
-    private async Task TechnicianChangedAsync(string? v){Filter.TechnicianId=v??"";Filter.TechnicianDisplay=null;await ApplyFiltersAsync();}
-    private async Task OverdueChangedAsync(ChangeEventArgs e){Filter.OverdueOnly=e.Value is bool b&&b;await ApplyFiltersAsync();}
-    private Task ApplyFiltersAsync()=>OnApplyFilters.InvokeAsync();
-    private Task TabSelectedAsync(string key){Filter.Status=key;return OnTabSelected.InvokeAsync(key);}
-    private Task OpenAsync(UiOrderOperationsRowModel row)=>OnOpen.InvokeAsync(row);
-    private Task CloseDetailsAsync()=>OnCloseDetails.InvokeAsync();
-    private Task ClearAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _)=>OnClearFilters.InvokeAsync();
-    private Task RefreshAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _)=>OnApplyFilters.InvokeAsync();
+    private bool AdvancedOpen { get; set; }
+    private static readonly (string Key, string Label)[] StatusTabs =
+    [
+        ("", "الكل"), ("AwaitingStock", "بانتظار مخزون"), ("InProduction", "قيد التجهيز"),
+        ("ReadyForDelivery", "جاهزة للتسليم"), ("overdue", "متأخرة")
+    ];
+    private static readonly IReadOnlyList<UiSelectOption> StatusOptions =
+    [
+        new("Confirmed", "جديدة"), new("AwaitingStock", "بانتظار مخزون"),
+        new("PartiallyAvailable", "متاحة جزئيًا"), new("ReadyForProduction", "جاهزة للمعمل"),
+        new("InProduction", "قيد التجهيز"), new("ReadyForDelivery", "جاهزة للتسليم"),
+        new("Completed", "مكتملة"), new("Cancelled", "ملغاة")
+    ];
+    private static readonly IReadOnlyList<UiSelectOption> ProductTypeOptions =
+    [new("Frame", "إطار"), new("Lens", "عدسة"), new("Accessory", "إكسسوار"), new("Service", "خدمة"), new("Other", "أخرى")];
+    private static readonly IReadOnlyList<UiSelectOption> ProductionOptions = [new("true", "نعم"), new("false", "لا")];
+    private static readonly IReadOnlyList<UiSelectOption> AvailabilityOptions =
+    [new("Available", "مستوفى"), new("Reserved", "محجوز"), new("Shortage", "بنود ناقصة")];
+
+    private UiLookupItem? WarehouseItem => Lookup(Filter.WarehouseId, Filter.WarehouseDisplay, "fa-solid fa-warehouse");
+    private UiLookupItem? TechnicianItem => Lookup(Filter.TechnicianId, Filter.TechnicianDisplay, "fa-solid fa-user-gear");
+    private static UiLookupItem? Lookup(string? id, string? label, string icon) =>
+        string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(label) ? null : new(id, label, null, icon);
+    private bool HasActiveFilter => !string.IsNullOrWhiteSpace(Filter.Search) || Filter.OrderDateFrom.HasValue ||
+        Filter.OrderDateTo.HasValue || !string.IsNullOrWhiteSpace(Filter.Status) || !string.IsNullOrWhiteSpace(Filter.ProductType) ||
+        !string.IsNullOrWhiteSpace(Filter.WarehouseId) || !string.IsNullOrWhiteSpace(Filter.RequiresProduction) ||
+        !string.IsNullOrWhiteSpace(Filter.Availability) || Filter.RequiredDate.HasValue ||
+        !string.IsNullOrWhiteSpace(Filter.TechnicianId) || Filter.OverdueOnly;
+    private bool IsActiveTab(string key) => key == "overdue" ? Filter.OverdueOnly :
+        !Filter.OverdueOnly && Filter.ActiveMetric != "today" &&
+        string.Equals(Filter.Status, key, StringComparison.OrdinalIgnoreCase);
+    private static string MetricStyle(string key) => key switch
+    {
+        "today" => "is-today", "AwaitingStock" => "is-stock", "ReadyForProduction" => "is-lab",
+        "InProduction" => "is-production", "ReadyForDelivery" => "is-delivery", "overdue" => "is-overdue", _ => ""
+    };
+    private static string StatusLabel(string key) => key switch
+    {
+        "Confirmed" => "جديدة", "AwaitingStock" => "بانتظار مخزون", "PartiallyAvailable" => "متاحة جزئيًا",
+        "ReadyForProduction" => "جاهزة للمعمل", "InProduction" => "قيد التجهيز",
+        "ReadyForDelivery" => "جاهزة للتسليم", "Completed" => "مكتملة", "Cancelled" => "ملغاة", _ => key
+    };
+    private static string NextStep(UiOrderOperationsRowModel row) => row.ShortageLines > 0 ? "مراجعة النواقص والتوريد" :
+        row.StatusText == "جاهز للتسليم" ? "التسوية والتسليم" :
+        row.RequiresProduction ? "متابعة تجهيز المعمل" : "عرض تفاصيل الطلب";
+    private static string DetailNextStep(UiOrderOperationsDetailsModel order) => order.Lines.Any(x => x.ShortageQuantity > 0m) ?
+        "استكمال الأصناف الناقصة ومراجعة التوريد" : order.StatusKey == "ReadyForDelivery" ?
+        "مراجعة التسوية وتأكيد التسليم" : order.JobId.HasValue ?
+        "متابعة أمر المعمل حتى اكتمال التجهيز" : "فتح الطلب لمراجعة الإجراءات المتاحة";
+    private void ToggleAdvanced() => AdvancedOpen = !AdvancedOpen;
+    private Task ApplyFiltersAsync() => OnApplyFilters.InvokeAsync();
+    private Task ClearAsync() => OnClearFilters.InvokeAsync();
+    private Task SelectTabAsync(string key) => key == "overdue" ? OnMetricSelected.InvokeAsync(key) : OnTabSelected.InvokeAsync(key);
+    private Task SelectMetricAsync(string key) => OnMetricSelected.InvokeAsync(key);
+    private Task OpenAsync(UiOrderOperationsRowModel row) => OnOpen.InvokeAsync(row);
+    private Task CloseDetailsAsync() => OnCloseDetails.InvokeAsync();
+    private Task PreviousAsync() => OnPrevious.InvokeAsync();
+    private Task NextAsync() => OnNext.InvokeAsync();
+    private Task PageSizeChangedAsync(ChangeEventArgs e)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var size) || size is not (5 or 10 or 15 or 20))
+            return Task.CompletedTask;
+        return OnPageSizeChanged.InvokeAsync(size);
+    }
+    private Task SearchChangedAsync(string? value) { Filter.Search = value; return Task.CompletedTask; }
+    private async Task StatusChangedAsync(string? value)
+    {
+        if (Filter.ActiveMetric == "today") { Filter.OrderDateFrom = null; Filter.OrderDateTo = null; }
+        Filter.ActiveMetric = null;
+        Filter.Status = value ?? "";
+        Filter.OverdueOnly = false;
+        await ApplyFiltersAsync();
+    }
+    private async Task OrderDateFromChangedAsync(DateOnly? value) { Filter.ActiveMetric = null; Filter.OrderDateFrom = value; await ApplyFiltersAsync(); }
+    private async Task OrderDateToChangedAsync(DateOnly? value) { Filter.ActiveMetric = null; Filter.OrderDateTo = value; await ApplyFiltersAsync(); }
+    private async Task ProductTypeChangedAsync(string? value) { Filter.ProductType = value ?? ""; await ApplyFiltersAsync(); }
+    private async Task WarehouseChangedAsync(string? value) { Filter.WarehouseId = value ?? ""; Filter.WarehouseDisplay = null; await ApplyFiltersAsync(); }
+    private async Task RequiresProductionChangedAsync(string? value) { Filter.RequiresProduction = value ?? ""; await ApplyFiltersAsync(); }
+    private async Task AvailabilityChangedAsync(string? value) { Filter.Availability = value ?? ""; await ApplyFiltersAsync(); }
+    private async Task RequiredDateChangedAsync(DateOnly? value) { Filter.RequiredDate = value; await ApplyFiltersAsync(); }
+    private async Task TechnicianChangedAsync(string? value) { Filter.TechnicianId = value ?? ""; Filter.TechnicianDisplay = null; await ApplyFiltersAsync(); }
+    private async Task OverdueChangedAsync(ChangeEventArgs e) { Filter.ActiveMetric = null; Filter.OverdueOnly = e.Value is bool b && b; await ApplyFiltersAsync(); }
+    private async Task RemoveFilterAsync(string key)
+    {
+        Filter.ActiveMetric = null;
+        switch (key)
+        {
+            case "search": Filter.Search = null; break;
+            case "overdue": Filter.OverdueOnly = false; break;
+            case "status": Filter.Status = ""; break;
+            case "date": Filter.OrderDateFrom = null; Filter.OrderDateTo = null; break;
+            case "availability": Filter.Availability = ""; break;
+            case "product": Filter.ProductType = ""; break;
+            case "warehouse": Filter.WarehouseId = ""; Filter.WarehouseDisplay = null; break;
+            case "production": Filter.RequiresProduction = ""; break;
+            case "due": Filter.RequiredDate = null; break;
+            case "technician": Filter.TechnicianId = ""; Filter.TechnicianDisplay = null; break;
+        }
+        await ApplyFiltersAsync();
+    }
 }

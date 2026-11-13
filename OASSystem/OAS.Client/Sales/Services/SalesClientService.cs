@@ -251,6 +251,6 @@ public sealed class SalesClientService(OasApiClient apiClient) : ISalesClientSer
     public async Task<IReadOnlyList<SalesBankAccountLookupDto>> SearchBankAccountsAsync(Guid currencyId, string? search, int take = 20, CancellationToken ct = default)
         => await apiClient.GetAsync<IReadOnlyList<SalesBankAccountLookupDto>>(AddQuery("api/sales/lookups/bank-accounts", ("currencyId", currencyId.ToString()), ("search", search), ("take", take.ToString())), ct) ?? [];
 
-    public async Task<IReadOnlyList<CustomerOrderLookupDto>> SearchCustomerOrdersAsync(Guid? customerId, string? search, int take = 20, CancellationToken ct = default)
-        => await apiClient.GetAsync<IReadOnlyList<CustomerOrderLookupDto>>(AddQuery("api/sales/lookups/customer-orders", ("customerId", customerId?.ToString()), ("search", search), ("take", take.ToString())), ct) ?? [];
+    public async Task<IReadOnlyList<CustomerOrderLookupDto>> SearchCustomerOrdersAsync(Guid? customerId, string? search, int take = 20, CancellationToken ct = default, bool checkoutOnly = false)
+        => await apiClient.GetAsync<IReadOnlyList<CustomerOrderLookupDto>>(AddQuery("api/sales/lookups/customer-orders", ("customerId", customerId?.ToString()), ("search", search), ("take", take.ToString()), ("checkoutOnly", checkoutOnly.ToString())), ct) ?? [];
 }

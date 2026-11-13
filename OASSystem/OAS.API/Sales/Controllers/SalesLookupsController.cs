@@ -96,6 +96,7 @@ public sealed class SalesLookupsController(ISender sender) : ControllerBase
         [FromQuery] Guid? customerId,
         [FromQuery] string? search,
         [FromQuery] int take = 20,
+        [FromQuery] bool checkoutOnly = false,
         CancellationToken cancellationToken = default)
-        => Ok(await sender.Send(new SearchCustomerOrdersLookupQuery(customerId, search, take), cancellationToken));
+        => Ok(await sender.Send(new SearchCustomerOrdersLookupQuery(customerId, search, take, checkoutOnly), cancellationToken));
 }

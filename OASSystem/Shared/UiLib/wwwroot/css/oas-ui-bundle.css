@@ -40,3 +40,9 @@
 
 /* Customer orders approved compact dashboard and editor; after global appearance. */
 @import "./features/customer-orders-approved.css";
+
+/* Checkout redesign: scope-limited and last to retain approved button and tab colors. */
+@import "./features/checkout-approved.css";
+
+/* Compact customer-order operations, after global theme and other sales rules. */
+@import "./features/order-tracking-approved.css";
