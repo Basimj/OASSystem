@@ -75,6 +75,8 @@ public sealed class CreatePurchaseOrderCommandHandler(
             }
         }
 
+        // Reject unpriced and zero-valued orders before persisting a new draft.
+        order.ValidatePricingForSave();
         ValidateSourceTotals(order, sources);
         await UpdateRequestConversionStatesAsync(requestRepository, sources.Select(x => x.PurchaseRequestLineId), sources, null, ct);
         await orderRepository.AddAsync(order, sources, ct);
@@ -232,6 +234,8 @@ public sealed class UpdatePurchaseOrderCommandHandler(
         }
 
         order.RecalculateTotals();
+        // Also reject invalid pricing when updating a previously saved draft.
+        order.ValidatePricingForSave();
         CreatePurchaseOrderCommandHandler.ValidateSourceTotals(order, newSources);
         await CreatePurchaseOrderCommandHandler.UpdateRequestConversionStatesAsync(requestRepository,
             oldSources.Select(x => x.PurchaseRequestLineId).Concat(newSources.Select(x => x.PurchaseRequestLineId)), newSources, order.Id, ct);

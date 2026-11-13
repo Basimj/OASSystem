@@ -21,6 +21,8 @@ public sealed record ConfirmPurchaseReceiptCommand(Guid Id, ConfirmPurchaseRecei
 { public IReadOnlyCollection<string> RequiredPermissions { get; }=[PurchasingPermissions.Receipts.Confirm]; }
 public sealed record PostPurchaseReceiptCommand(Guid Id, PostPurchaseReceiptRequest Request) : INonTransactionalCommand<PurchaseReceiptPostResultDto>, IAuthorizedRequest
 { public IReadOnlyCollection<string> RequiredPermissions { get; }=[PurchasingPermissions.Receipts.Post]; }
+public sealed record ReopenPurchaseReceiptCommand(Guid Id, ReopenPurchaseReceiptRequest Request) : ICommand, IAuthorizedRequest
+{ public IReadOnlyCollection<string> RequiredPermissions { get; }=[PurchasingPermissions.Receipts.Edit]; }
 public sealed record CancelPurchaseReceiptCommand(Guid Id, CancelPurchaseReceiptRequest Request) : ICommand, IAuthorizedRequest
 { public IReadOnlyCollection<string> RequiredPermissions { get; }=[PurchasingPermissions.Receipts.Cancel]; }
 
@@ -112,7 +114,41 @@ public sealed class UpdatePurchaseReceiptCommandHandler(
 
 public sealed class ConfirmPurchaseReceiptCommandHandler(IPurchaseReceiptRepository repository, ICurrentUser currentUser, TimeProvider timeProvider) : IRequestHandler<ConfirmPurchaseReceiptCommand>
 {
-    public async Task Handle(ConfirmPurchaseReceiptCommand c,CancellationToken ct){var e=await repository.GetForUpdateAsync(c.Id,ct)??throw new NotFoundException("PurchaseReceipt",c.Id);PurchasingRowVersion.EnsureMatches(e.RowVersion,c.Request.RowVersion,"Purchase receipt");e.Confirm(timeProvider.GetUtcNow(),currentUser.UserId);repository.Update(e);}
+    public async Task Handle(ConfirmPurchaseReceiptCommand c, CancellationToken ct)
+    {
+        var e = await repository.GetForUpdateAsync(c.Id, ct) ?? throw new NotFoundException("PurchaseReceipt", c.Id);
+        PurchasingRowVersion.EnsureMatches(e.RowVersion, c.Request.RowVersion, "Purchase receipt");
+        PurchaseReceiptPostingValueGuard.EnsureValid(e);
+        e.Confirm(timeProvider.GetUtcNow(), currentUser.UserId);
+        repository.Update(e);
+    }
+}
+
+public sealed class ReopenPurchaseReceiptCommandHandler(IPurchaseReceiptRepository repository) : IRequestHandler<ReopenPurchaseReceiptCommand>
+{
+    public async Task Handle(ReopenPurchaseReceiptCommand c, CancellationToken ct)
+    {
+        var receipt = await repository.GetForUpdateAsync(c.Id, ct) ?? throw new NotFoundException("PurchaseReceipt", c.Id);
+        PurchasingRowVersion.EnsureMatches(receipt.RowVersion, c.Request.RowVersion, "Purchase receipt");
+        if (receipt.Status != DomainReceiptStatus.Confirmed)
+            throw new ConflictException("purchasing_receipt_reopen_invalid", "يمكن إعادة سند الاستلام المؤكد وغير المرحّل فقط إلى المسودة.");
+        receipt.ReopenForCorrection();
+        repository.Update(receipt);
+    }
+}
+
+public static class PurchaseReceiptPostingValueGuard
+{
+    public static void EnsureValid(PurchaseReceipt receipt)
+    {
+        ArgumentNullException.ThrowIfNull(receipt);
+        var accepted = receipt.Lines.Where(x => x.AcceptedQuantity > 0m).ToArray();
+        if (accepted.Length == 0)
+            throw new ConflictException("purchasing_receipt_no_accepted_quantity", "لا توجد كمية مقبولة للترحيل؛ راجع بنود الاستلام.");
+        if (accepted.Sum(x => Math.Round(x.TotalAcceptedCost, 4)) <= 0m)
+            throw new ConflictException("purchasing_receipt_value_invalid",
+                "قيمة الاستلام المحاسبية صفر. افتح بنود الاستلام وأدخل تكلفة فعلية صحيحة للصنف المقبول قبل التأكيد والترحيل. إذا كان السند مؤكدًا فأعده إلى المسودة أولاً.");
+    }
 }
 
 public sealed class CancelPurchaseReceiptCommandHandler(IPurchaseReceiptRepository repository, ICurrentUser currentUser, TimeProvider timeProvider) : IRequestHandler<CancelPurchaseReceiptCommand>
@@ -195,8 +231,9 @@ public sealed class PostPurchaseReceiptCommandHandler(
             decreaseLines.Add(new(line.ProductVariantId, line.BaseAcceptedQuantity));
         }
 
-        if (inventoryLines.Count == 0)
-            throw new ConflictException("purchasing_receipt_no_accepted_quantity", "لا توجد كمية مقبولة لترحيلها إلى المخزون.");
+        // Do not modify stock or create GRNI work until the receipt has a
+        // real accounting value. Existing confirmed zero-value receipts need correction.
+        PurchaseReceiptPostingValueGuard.EnsureValid(receipt);
 
         var inventoryResult = await inventory.PostPurchaseReceiptAsync(
             new(receipt.Id, receipt.ReceiptCode, receipt.WarehouseId, receipt.PostingDate, inventoryLines), ct);

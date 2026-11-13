@@ -6,7 +6,7 @@
     <UiPurchasingSection Title="البيانات الأساسية">
         <UiPurchasingFormGrid>
             <UiSelect Label="نوع الطلب" Value="@Model.RequestType.ToString()" Options="RequestTypeOptions" Disabled="@(!IsEditable)" OnValueChanged="RequestTypeChanged" />
-            <UiLookup UsePopover="true" Label="المخزن" Required="true" Value="@GuidText(Model.WarehouseId)" SelectedItem="@Selected(Model.WarehouseId,Model.WarehouseName,"fa-solid fa-warehouse")" SearchAsync="WarehouseSearchAsync" ValueChanged="WarehouseChanged" Disabled="@(!IsEditable)" />
+            <UiLookup UsePopover="true" Label="المخزن" Required="true" Value="@GuidText(Model.WarehouseId)" SelectedItem="@Selected(Model.WarehouseId,Model.WarehouseName,"fa-solid fa-warehouse")" SearchAsync="WarehouseSearchAsync" SelectedItemChanged="WarehouseSelectionChanged" ValueChanged="WarehouseChanged" Disabled="@(!IsEditable)" />
             <UiInputDate Label="تاريخ الطلب" Value="@Model.RequestDate" ValueChanged="RequestDateChanged" Disabled="@(!IsEditable)" Required="true" />
             <UiInputDate Label="التاريخ المطلوب" Value="@Model.RequiredDate" ValueChanged="RequiredDateChanged" Disabled="@(!IsEditable)" />
             @if (Model.RequestType == 1)
@@ -18,10 +18,6 @@
         </UiPurchasingFormGrid>
     </UiPurchasingSection>
     <UiPurchasingSection Title="بنود الطلب">
-        @if (IsEditable)
-        {
-            <UiButton Text="إضافة بند" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" Variant="ButtonVariant.Secondary" OnClick="AddLineAsync" />
-        }
         <UiPurchasingLineTable>
             @foreach (var line in Model.Lines.OrderBy(x=>x.LineSequence))
             {
@@ -31,7 +27,7 @@
                         <UiLookup UsePopover="true" Label="المنتج" Required="true" Value="@GuidText(line.ProductVariantId)" SelectedItem="@Selected(line.ProductVariantId,line.ProductName,"fa-solid fa-box")" SearchAsync="ProductSearchAsync" SearchPageAsync="ProductSearchPageAsync" SelectedItemChanged="@(item=>ProductSelectionChanged(line,item))" ValueChanged="@(v=>ProductChanged(line,v))" Disabled="@(!IsEditable)" />
                         <UiPurchasingNumberField Label="الكمية المطلوبة" Value="@line.RequestedQuantity" ValueChanged="@(v=>LineQuantityChanged(line,v))" Disabled="@(!IsEditable)" />
                         <UiInputDate Label="التاريخ المطلوب" Value="@line.RequiredDate" ValueChanged="@(v=>LineDateChanged(line,v))" Disabled="@(!IsEditable)" />
-                        <UiLookup UsePopover="true" Label="المورد المفضل" Value="@GuidText(line.PreferredSupplierId)" SelectedItem="@Selected(line.PreferredSupplierId,line.PreferredSupplierName,"fa-solid fa-truck-field")" SearchAsync="SupplierSearchAsync" ValueChanged="@(v=>LineSupplierChanged(line,v))" Disabled="@(!IsEditable)" />
+                        <UiLookup UsePopover="true" Label="المورد المفضل" Value="@GuidText(line.PreferredSupplierId)" SelectedItem="@Selected(line.PreferredSupplierId,line.PreferredSupplierName,"fa-solid fa-truck-field")" SearchAsync="SupplierSearchAsync" SelectedItemChanged="@(item=>LineSupplierSelectionChanged(line,item))" ValueChanged="@(v=>LineSupplierChanged(line,v))" Disabled="@(!IsEditable)" />
                         <UiInputText Label="ملاحظات البند" Value="@line.Notes" ValueChanged="@(v=>LineNotesChanged(line,v))" Disabled="@(!IsEditable)" />
                     </UiPurchasingFormGrid>
                     @if (line.Id.HasValue)
@@ -41,6 +37,10 @@
                 </div>
             }
         </UiPurchasingLineTable>
+        @if (IsEditable)
+        {
+            <UiButton Text="إضافة بند" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" Variant="ButtonVariant.Secondary" OnClick="AddLineAsync" />
+        }
     </UiPurchasingSection>
 </UiPurchasingEditorShell>
 
@@ -58,7 +58,8 @@
     private static UiLookupItem? Selected(Guid? id,string? text,string icon)=>id.HasValue?new(id.Value.ToString("D"),text??id.Value.ToString("D"),null,icon):null;
     private async Task Changed(){await OnChanged.InvokeAsync();}
     private async Task RequestTypeChanged(string? v){if(byte.TryParse(v,out var x))Model.RequestType=x;await Changed();}
-    private async Task WarehouseChanged(string? v){Model.WarehouseId=Parse(v);await Changed();}
+    private void WarehouseSelectionChanged(UiLookupItem? item)=>Model.WarehouseName=item?.PrimaryText;
+    private async Task WarehouseChanged(string? v){Model.WarehouseId=Parse(v);if(!Model.WarehouseId.HasValue)Model.WarehouseName=null;await Changed();}
     private async Task RequestDateChanged(DateOnly? v){if(v.HasValue)Model.RequestDate=v.Value;await Changed();}
     private async Task RequiredDateChanged(DateOnly? v){Model.RequiredDate=v;await Changed();}
     private async Task CustomerOrderChanged(string? v){Model.CustomerOrderId=Parse(v);await Changed();}
@@ -70,6 +71,7 @@
     private async Task ProductChanged(UiPurchaseRequestLineModel l,string? v){l.ProductVariantId=Parse(v);await Changed();}
     private async Task LineQuantityChanged(UiPurchaseRequestLineModel l,decimal v){l.RequestedQuantity=v;await Changed();}
     private async Task LineDateChanged(UiPurchaseRequestLineModel l,DateOnly? v){l.RequiredDate=v;await Changed();}
-    private async Task LineSupplierChanged(UiPurchaseRequestLineModel l,string? v){l.PreferredSupplierId=Parse(v);await Changed();}
+    private static void LineSupplierSelectionChanged(UiPurchaseRequestLineModel l,UiLookupItem? item)=>l.PreferredSupplierName=item?.PrimaryText;
+    private async Task LineSupplierChanged(UiPurchaseRequestLineModel l,string? v){l.PreferredSupplierId=Parse(v);if(!l.PreferredSupplierId.HasValue)l.PreferredSupplierName=null;await Changed();}
     private async Task LineNotesChanged(UiPurchaseRequestLineModel l,string? v){l.Notes=v;await Changed();}
 }

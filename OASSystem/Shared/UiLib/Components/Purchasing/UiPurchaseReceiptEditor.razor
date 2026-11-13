@@ -23,7 +23,7 @@
         </UiPurchasingFormGrid>
     </UiPurchasingSection>
     <UiPurchasingSection Title="بنود الاستلام">
-        <p class="ui-purchasing-receipt-guidance">للاستلام الجزئي: أدخل الكمية في الأصناف التي وصلت فقط. الأصناف التي تتركها بصفر لن تُضاف إلى السند. يُفترض قبول كامل الكمية ما لم تعدّل «المقبول» و«المرفوض».</p>
+        <p class="ui-purchasing-receipt-guidance">للاستلام الجزئي: أدخل الكمية في الأصناف التي وصلت فقط. الأصناف التي تتركها بصفر لن تُضاف إلى السند. يُفترض قبول كامل الكمية ما لم تعدّل «المقبول» و«المرفوض». تأكد من أن إجمالي تكلفة الأصناف المقبولة أكبر من صفر قبل تأكيد السند؛ وإن كان سعر أمر الشراء صفراً فأدخل التكلفة الفعلية الصحيحة.</p>
         @if (!string.IsNullOrWhiteSpace(ErrorFor(nameof(Model.Lines))))
         {
             <p class="ui-purchasing-receipt-error" role="alert">@ErrorFor(nameof(Model.Lines))</p>
@@ -85,6 +85,23 @@
         _errors = UiPurchaseReceiptFormValidator.Validate(Model);
         StateHasChanged();
         return _errors.Count == 0;
+    }
+    public bool ValidateForPosting()
+    {
+        _showErrors = true;
+        _serverError = null;
+        _errors = UiPurchaseReceiptFormValidator.ValidateForPosting(Model);
+        StateHasChanged();
+        return _errors.Count == 0;
+    }
+    public void ShowPostingValueError()
+    {
+        _showErrors = true;
+        _errors = UiPurchaseReceiptFormValidator.ValidateForPosting(Model);
+        _serverError = _errors.Count == 0
+            ? "القيمة المحاسبية للاستلام غير صالحة. حدّث السند، ثم راجع التكلفة الفعلية للبنود المقبولة."
+            : null;
+        StateHasChanged();
     }
     public void ShowSaveError(string message, IReadOnlyDictionary<string,string[]>? serverErrors = null)
     {

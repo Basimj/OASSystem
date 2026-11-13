@@ -84,6 +84,30 @@ public sealed class PurchasingDomainWorkflowTests
     }
 
     [Test]
+    public void PurchaseReceipt_ConfirmedUnposted_CanReturnToDraftToCorrectCost()
+    {
+        var receipt = PurchaseReceipt.Create(Guid.NewGuid(), "GRN-REOPEN", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            new DateOnly(2026, 11, 11), new DateOnly(2026, 11, 11), null, null);
+        receipt.AddLine(PurchaseReceiptLine.Create(Guid.NewGuid(), receipt.Id, Guid.NewGuid(), 1, Guid.NewGuid(),
+            5m, 0m, 5m, 5m, 0m, 1m, 0m, null, null, null));
+        receipt.Confirm(DateTimeOffset.UtcNow, "receiver");
+
+        receipt.ReopenForCorrection();
+        Assert.Multiple(() =>
+        {
+            Assert.That(receipt.Status, Is.EqualTo(PurchaseReceiptStatus.Draft));
+            Assert.That(receipt.ConfirmedAt, Is.Null);
+            Assert.That(receipt.ConfirmedBy, Is.Null);
+        });
+        var line = receipt.Lines.Single();
+        line.Update(5m, 5m, 0m, 1m, 20m, null, null, null);
+        Assert.That(line.TotalAcceptedCost, Is.EqualTo(100m));
+        receipt.Confirm(DateTimeOffset.UtcNow, "receiver");
+        receipt.MarkPosted(Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow, "poster");
+        Assert.Throws<DomainException>(() => receipt.ReopenForCorrection());
+    }
+
+    [Test]
     public void PurchaseReceiptLine_AcceptedPlusRejectedMustEqualReceived()
     {
         Assert.Throws<DomainException>(() => PurchaseReceiptLine.Create(

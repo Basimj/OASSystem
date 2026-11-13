@@ -19,7 +19,7 @@ public sealed class CreatePurchaseOrderCommandValidator : AbstractValidator<Crea
         RuleForEach(x => x.Request.Lines).ChildRules(line =>
         {
             line.RuleFor(x => x.LineSequence).GreaterThan(0); line.RuleFor(x=>x.ProductVariantId).NotEmpty(); line.RuleFor(x=>x.PurchaseUnitId).NotEmpty();
-            line.RuleFor(x=>x.UnitConversionFactor).GreaterThan(0); line.RuleFor(x=>x.OrderedQuantity).GreaterThan(0); line.RuleFor(x=>x.UnitPrice).GreaterThanOrEqualTo(0);
+            line.RuleFor(x=>x.UnitConversionFactor).GreaterThan(0); line.RuleFor(x=>x.OrderedQuantity).GreaterThan(0); line.RuleFor(x=>x.UnitPrice).GreaterThan(0).WithMessage("يجب إدخال سعر وحدة أكبر من صفر قبل حفظ أمر الشراء.").WithErrorCode("purchase_order_unit_price_required");
             line.RuleFor(x=>x.DiscountAmount).GreaterThanOrEqualTo(0); line.RuleFor(x=>x.TaxRate).GreaterThanOrEqualTo(0);
             line.RuleForEach(x=>x.Sources).ChildRules(source=>{source.RuleFor(x=>x.PurchaseRequestLineId).NotEmpty();source.RuleFor(x=>x.AllocatedQuantity).GreaterThan(0);});
         });
@@ -38,7 +38,7 @@ public sealed class UpdatePurchaseOrderCommandValidator : AbstractValidator<Upda
         RuleForEach(x=>x.Request.Lines).ChildRules(line=>
         {
             line.RuleFor(x=>x.LineSequence).GreaterThan(0); line.RuleFor(x=>x.ProductVariantId).NotEmpty(); line.RuleFor(x=>x.PurchaseUnitId).NotEmpty();
-            line.RuleFor(x=>x.UnitConversionFactor).GreaterThan(0); line.RuleFor(x=>x.OrderedQuantity).GreaterThan(0); line.RuleFor(x=>x.UnitPrice).GreaterThanOrEqualTo(0);
+            line.RuleFor(x=>x.UnitConversionFactor).GreaterThan(0); line.RuleFor(x=>x.OrderedQuantity).GreaterThan(0); line.RuleFor(x=>x.UnitPrice).GreaterThan(0).WithMessage("يجب إدخال سعر وحدة أكبر من صفر قبل حفظ أمر الشراء.").WithErrorCode("purchase_order_unit_price_required");
             line.RuleFor(x=>x.DiscountAmount).GreaterThanOrEqualTo(0); line.RuleFor(x=>x.TaxRate).GreaterThanOrEqualTo(0);
             line.RuleFor(x=>x.RowVersion).Must(v=>v is null||PurchasingRowVersion.IsValid(v)).WithErrorCode("row_version_invalid");
             line.RuleForEach(x=>x.Sources).ChildRules(source=>{source.RuleFor(x=>x.PurchaseRequestLineId).NotEmpty();source.RuleFor(x=>x.AllocatedQuantity).GreaterThan(0);source.RuleFor(x=>x.RowVersion).Must(v=>v is null||PurchasingRowVersion.IsValid(v)).WithErrorCode("row_version_invalid");});

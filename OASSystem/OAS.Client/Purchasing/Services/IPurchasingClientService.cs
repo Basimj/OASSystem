@@ -49,6 +49,7 @@ public interface IPurchasingClientService
     Task<PurchaseReceiptDto?> CreatePurchaseReceiptAsync(CreatePurchaseReceiptRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseReceiptDto?> UpdatePurchaseReceiptAsync(Guid id, UpdatePurchaseReceiptRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseReceiptDto?> ConfirmPurchaseReceiptAsync(Guid id, ConfirmPurchaseReceiptRequest request, CancellationToken cancellationToken = default);
+    Task<PurchaseReceiptDto?> ReopenPurchaseReceiptAsync(Guid id, ReopenPurchaseReceiptRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseReceiptPostResultDto?> PostPurchaseReceiptAsync(Guid id, PostPurchaseReceiptRequest request, CancellationToken cancellationToken = default);
     Task<PurchaseReceiptDto?> CancelPurchaseReceiptAsync(Guid id, CancelPurchaseReceiptRequest request, CancellationToken cancellationToken = default);
 

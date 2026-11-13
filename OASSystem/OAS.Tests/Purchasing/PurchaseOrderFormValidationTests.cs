@@ -94,11 +94,71 @@ public sealed class PurchaseOrderFormValidationTests
     }
 
     [Test]
-    public void Valid_draft_with_zero_unit_price_can_be_saved()
+    public void Legacy_draft_can_be_inspected_but_zero_price_is_rejected_before_save()
     {
         var model = ValidOrder();
         model.Lines[0].UnitPrice = 0;
         Assert.That(UiPurchaseOrderFormValidator.Validate(model), Is.Empty);
+        Assert.That(UiPurchaseOrderFormValidator.ValidateForSave(model),
+            Does.ContainKey("Lines[0].UnitPrice"));
+    }
+
+    [Test]
+    public void Saving_checks_positive_price_without_modifying_the_input()
+    {
+        var model = ValidOrder();
+        var errors = UiPurchaseOrderFormValidator.ValidateForSave(model);
+        Assert.That(errors, Does.ContainKey("Lines[0].UnitPrice"));
+        Assert.That(model.Lines[0].UnitPrice, Is.EqualTo(0m));
+    }
+
+    [Test]
+    public void Save_rejects_full_discount_even_with_positive_unit_price()
+    {
+        var model = ValidOrder();
+        model.Lines[0].UnitPrice = 20m;
+        model.Lines[0].DiscountAmount = 20m;
+        var errors = UiPurchaseOrderFormValidator.ValidateForSave(model);
+        Assert.That(errors, Does.ContainKey("Lines[0].DiscountAmount"));
+    }
+
+    [Test]
+    public void Save_rejects_base_unit_cost_rounded_to_zero()
+    {
+        var model = ValidOrder();
+        model.Lines[0].UnitPrice = 0.0001m;
+        model.ExchangeRate = 0.1m;
+        Assert.That(UiPurchaseOrderFormValidator.Validate(model), Is.Empty);
+        Assert.That(UiPurchaseOrderFormValidator.ValidateForSave(model),
+            Does.ContainKey("Lines[0].UnitPrice"));
+    }
+
+    [Test]
+    public void Save_rejects_base_quantity_rounded_to_zero()
+    {
+        var model = ValidOrder();
+        model.Lines[0].UnitPrice = 100m;
+        model.Lines[0].UnitConversionFactor = 0.0001m;
+        Assert.That(UiPurchaseOrderFormValidator.ValidateForSave(model),
+            Does.ContainKey("Lines[0].UnitConversionFactor"));
+    }
+
+    [Test]
+    public void Save_accepts_all_priced_lines()
+    {
+        var model = ValidOrder();
+        model.Lines[0].UnitPrice = 25m;
+        model.Lines.Add(new UiPurchaseOrderLineModel
+        {
+            LineSequence = 2,
+            ProductVariantId = Guid.NewGuid(),
+            PurchaseUnitId = Guid.NewGuid(),
+            UnitConversionFactor = 12m,
+            OrderedQuantity = 3m,
+            UnitPrice = 120m,
+            DiscountAmount = 5m
+        });
+        Assert.That(UiPurchaseOrderFormValidator.ValidateForSave(model), Is.Empty);
     }
 
     private static UiPurchaseOrderEditorModel ValidOrder()
