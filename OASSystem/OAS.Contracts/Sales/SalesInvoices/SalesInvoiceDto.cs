@@ -70,5 +70,7 @@ public sealed record SalesInvoiceDto(
     public string? HeaderDiscountReason { get; init; }
     public DateTimeOffset? HeaderDiscountApprovedAtUtc { get; init; }
     public string? HeaderDiscountApprovedBy { get; init; }
+    /// <summary>Readable approver name for sales views; the original user ID stays in HeaderDiscountApprovedBy.</summary>
+    public string? HeaderDiscountApprovedByName { get; init; }
     public bool HeaderDiscountRequiresApproval { get; init; }
 }

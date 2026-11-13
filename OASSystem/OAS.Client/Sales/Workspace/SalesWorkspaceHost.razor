@@ -168,6 +168,20 @@
             <UiSalesEditorSurface Title="@(order.Id.HasValue ? order.OrderCode : "طلب عميل جديد")" Subtitle="طلب العميل وحجز المخزون" IconCss="fa-solid fa-clipboard-list"
                                   StatusText="@order.StatusText" StatusCssClass="@StatusCss(order.Status)"
                                   OnBack="ReturnToSalesListAsync" ActionsInFooter="true">
+                <HeaderExtra>
+                    @if (!ActiveTab.IsNew)
+                    {
+                        <div class="oas-order-inline-followup" role="status">
+                            <span><i class="fa-solid fa-circle-info" aria-hidden="true"></i> @OrderNextStep(order.Status)</span>
+                            @if (order.Status is not ("Cancelled" or "Completed"))
+                            {
+                                <button type="button" @onclick="GoToOrderTracking">
+                                    متابعة الطلب <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                                </button>
+                            }
+                        </div>
+                    }
+                </HeaderExtra>
                 <Actions>
                     @if (ActiveTab.IsEditMode)
                     {
@@ -183,33 +197,36 @@
                     else if (order.Status != "Cancelled" && order.Status != "Completed")
                     {
                         <UiButton Text="متابعة الطلب" IconCssClass="fa-solid fa-arrow-up-right-from-square" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="OpenOrderTrackingAsync" />
-                        <UiButton Text="إلغاء الطلب" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" OnClick="CancelOrderAsync" />
+                        @if (CanCancelOrder(order.Status))
+                        {
+                            <UiButton Text="إلغاء الطلب" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" OnClick="CancelOrderAsync" />
+                        }
                     }
                 </Actions>
                 <ChildContent>
-                    @if (!ActiveTab.IsNew)
-                    {
-                        <div class="oas-order-next-step" role="status">
-                            <span class="oas-order-next-step__state"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> حالة الطلب: @order.StatusText</span>
-                            <span>@OrderNextStep(order.Status)</span>
-                            <button type="button" @onclick="GoToOrderTracking">عرض المتابعة التشغيلية <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></button>
-                        </div>
-                    }
                     <UiCustomerOrderEditor @ref="_activeCustomerOrderEditor" Model="@order" ReadOnly="@(!ActiveTab.IsEditMode)" SearchCustomersAsync="SearchCustomerItemsAsync"
                                            SearchPrescriptionsAsync="SearchPrescriptionRevisionItemsAsync" SearchCurrenciesAsync="SearchCurrencyItemsAsync"
                                            SearchProductTypesAsync="SearchProductTypeItemsAsync" SearchCategoriesAsync="SearchCategoryItemsAsync" SearchProductsAsync="SearchProductItemsAsync" SearchWarehousesAsync="SearchWarehouseItemsAsync"
                                            SearchPrescriptionRevisionsAsync="SearchLinePrescriptionItemsAsync" OnSelectionChanged="SelectionChangedAsync"
                                            OnProductTypeSelected="ProductTypeSelectedAsync" OnCategorySelected="CategorySelectedAsync"
                                            OnProductSelected="ProductSelectedAsync" OnWarehouseSelected="WarehouseSelectedAsync" OnChanged="MarkDirtyAsync" />
-                    @if (order.Id.HasValue)
+                    @if (order.Id.HasValue && (order.Status == "Draft" || order.HeaderDiscountAmount > 0m))
                     {
                         <details class="oas-order-extra-discount">
-                            <summary><i class="fa-solid fa-percent" aria-hidden="true"></i> خصم إضافي على الطلب
-                                <span>اختياري — مستقل عن خصومات البنود، وقد يحتاج إعادة اعتماد عند تعديل الأسعار.</span>
+                            <summary>
+                                <span class="oas-order-extra-discount__label"><i class="fa-solid fa-percent" aria-hidden="true"></i> خصم إضافي على الطلب</span>
                                 @if (order.HeaderDiscountAmount > 0m)
                                 {
-                                    <b class="oas-order-extra-discount__amount">@order.HeaderDiscountAmount.ToString("N2") @(order.HeaderDiscountApproved ? "• معتمد" : "• بانتظار الاعتماد")</b>
+                                    <strong class="oas-order-extra-discount__amount">@order.HeaderDiscountAmount.ToString("N2") @order.CurrencyCode</strong>
+                                    <span class="oas-order-extra-discount__status @(order.HeaderDiscountApproved ? "is-approved" : "is-pending")">
+                                        @(order.HeaderDiscountApproved ? "معتمد" : "بانتظار الاعتماد")
+                                    </span>
                                 }
+                                else
+                                {
+                                    <small class="oas-order-extra-discount__empty">لا يوجد خصم إضافي</small>
+                                }
+                                <i class="fa-solid fa-chevron-down oas-order-extra-discount__chevron" aria-hidden="true"></i>
                             </summary>
                             <SalesHeaderDiscountPanel DocumentKind="order" DocumentId="@order.Id.Value"
                                                       ParentRowVersion="@order.RowVersion"

@@ -266,3 +266,52 @@
 }
 
 .oas-order-screen .oas-order-extra-discount__amount {font-size:12px;color:var(--ord-blue);margin-inline-start:auto;white-space:nowrap}
+
+
+/* Post-confirmation order: compact heading with the workflow step on the SAME row.
+   Keeps the status badge and close button provided by UiSalesEditorSurface. */
+.oas-shell .oas-main-inner .oas-order-screen .ui-sales-editor__header {
+    display:grid;grid-template-columns:minmax(165px,auto) minmax(170px,1fr) auto;
+    align-items:center;gap:8px 14px;padding:10px 13px!important;min-height:58px;
+}
+.oas-order-screen .ui-sales-editor__header-extra {min-width:0;}
+.oas-order-screen .ui-sales-editor__header-extra:empty {display:none}
+.oas-order-screen .oas-order-inline-followup {
+    display:flex;align-items:center;gap:10px;justify-content:space-between;
+    min-width:0;font-size:12px;color:var(--ord-muted);
+}
+.oas-order-screen .oas-order-inline-followup > span {min-width:0;line-height:1.4}
+.oas-order-screen .oas-order-inline-followup > span i {color:var(--ord-blue)}
+.oas-order-screen .oas-order-inline-followup > button {
+    flex-shrink:0;display:inline-flex;align-items:center;gap:5px;
+    border:1px solid var(--ord-line);border-radius:7px;background:var(--ord-surface);
+    color:var(--ord-blue);font-size:11px;font-weight:800;padding:6px 9px;cursor:pointer;
+}
+.oas-order-screen .oas-order-inline-followup > button:hover {background:color-mix(in srgb,var(--ord-blue) 9%,var(--ord-surface))}
+.oas-order-screen .oas-order-extra-discount > summary {min-height:41px;padding:8px 12px;gap:9px;flex-wrap:wrap}
+.oas-order-screen .oas-order-extra-discount > summary .oas-order-extra-discount__label {font-size:13px;font-weight:850;color:var(--ord-ink)}
+.oas-order-screen .oas-order-extra-discount__empty {font-size:11px;color:var(--ord-muted);font-weight:500}
+.oas-order-screen .oas-order-extra-discount__status {font-size:11px;border-radius:999px;padding:3px 9px;font-weight:800}
+.oas-order-screen .oas-order-extra-discount__status.is-approved {background:#d7f7e2;color:#076a40}
+.oas-order-screen .oas-order-extra-discount__status.is-pending {background:#fff0b8;color:#795300}
+.oas-order-screen .oas-order-extra-discount__amount {margin-inline-start:auto;color:var(--ord-blue);font-weight:900}
+.oas-order-screen .oas-order-extra-discount__chevron {color:var(--ord-muted);font-size:11px;transition:transform .15s ease}
+.oas-order-screen .oas-order-extra-discount[open] .oas-order-extra-discount__chevron {transform:rotate(180deg)}
+.oas-order-screen .oas-order-discount-readonly {
+    display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;
+    margin:8px;padding:10px;background:color-mix(in srgb,var(--ord-blue) 4%,var(--ord-surface));
+    border-radius:8px;border:1px solid var(--ord-line);
+}
+.oas-order-screen .oas-order-discount-readonly__item {display:flex;flex-direction:column;gap:4px;min-width:0}
+.oas-order-screen .oas-order-discount-readonly__item > span {font-size:11px;color:var(--ord-muted)}
+.oas-order-screen .oas-order-discount-readonly__item > strong {font-size:12px;color:var(--ord-ink);overflow-wrap:anywhere}
+.oas-order-screen .oas-order-discount-readonly__reason {grid-column:1/-1}
+@media(max-width:980px) {
+ .oas-shell .oas-main-inner .oas-order-screen .ui-sales-editor__header {grid-template-columns:minmax(165px,auto) minmax(0,1fr);}
+ .oas-order-screen .ui-sales-editor__heading-tools {grid-column:1/-1;justify-content:flex-start}
+}
+@media(max-width:600px) {
+ .oas-shell .oas-main-inner .oas-order-screen .ui-sales-editor__header {grid-template-columns:1fr;}
+ .oas-order-screen .ui-sales-editor__header-extra,.oas-order-screen .ui-sales-editor__heading-tools {grid-column:1}
+ .oas-order-screen .oas-order-discount-readonly {grid-template-columns:repeat(2,minmax(0,1fr))}
+}

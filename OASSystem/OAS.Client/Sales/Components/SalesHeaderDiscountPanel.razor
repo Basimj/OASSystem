@@ -8,6 +8,43 @@
 @inject IUiSnackbarService Snackbar
 @inject IApiFeedbackService ApiFeedback
 
+@if (DocumentKind == "order" && !_loading && !_isDraft)
+{
+    @if (_amount > 0m)
+    {
+        <div class="oas-order-discount-readonly" dir="rtl">
+            <div class="oas-order-discount-readonly__item">
+                <span>نوع الخصم</span>
+                <strong>@DiscountTypeLabel</strong>
+            </div>
+            <div class="oas-order-discount-readonly__item">
+                <span>القيمة المطبقة</span>
+                <strong>@_amount.ToString("N2")</strong>
+            </div>
+            <div class="oas-order-discount-readonly__item">
+                <span>الحالة</span>
+                <strong>@(_approved ? "معتمد" : "بانتظار الاعتماد")</strong>
+            </div>
+            <div class="oas-order-discount-readonly__item">
+                <span>المعتمد بواسطة</span>
+                <strong>@ApproverDisplayName</strong>
+            </div>
+            <div class="oas-order-discount-readonly__item">
+                <span>تاريخ الاعتماد (UTC)</span>
+                <strong>@(_approvedAtUtc?.ToString("yyyy/MM/dd HH:mm") ?? "—")</strong>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(_reason))
+            {
+                <div class="oas-order-discount-readonly__item oas-order-discount-readonly__reason">
+                    <span>سبب الخصم</span>
+                    <strong>@_reason</strong>
+                </div>
+            }
+        </div>
+    }
+}
+else
+{
 <UiSalesFormSection Title="خصم رأس المستند" Description="خصم مستقل عن خصومات البنود؛ يوزّع على البنود قبل احتساب الضريبة." IconCss="fa-solid fa-percent">
     @if (_loading)
     {
@@ -18,7 +55,7 @@
         <UiGrid Columns="3">
             <UiKeyValue Label="خصم الرأس الحالي" Value="@_amount.ToString("N2")" />
             <UiKeyValue Label="الحالة" Value="@(_amount <= 0m ? "لا يوجد" : _approved ? "معتمد" : "بانتظار الاعتماد")" />
-            <UiKeyValue Label="المعتمد بواسطة" Value="@(_approvedBy ?? "-")" />
+            <UiKeyValue Label="المعتمد بواسطة" Value="@ApproverDisplayName" />
         </UiGrid>
 
         @if (_isDraft)
@@ -49,6 +86,7 @@
         }
     }
 </UiSalesFormSection>
+}
 
 @code {
     [Parameter, EditorRequired] public string DocumentKind { get; set; } = string.Empty;
@@ -66,6 +104,19 @@
     private bool _approved;
     private decimal _amount;
     private string? _approvedBy;
+    private string? _approvedByName;
+    private DateTimeOffset? _approvedAtUtc;
+    private string ApproverDisplayName => !_approved ? "—" :
+        !string.IsNullOrWhiteSpace(_approvedByName) ? _approvedByName :
+        string.IsNullOrWhiteSpace(_approvedBy) ? "غير مسجل" : "مستخدم غير متاح";
+    private string DiscountTypeLabel => byte.TryParse(_type, out var code)
+        ? ((SalesDiscountType)code switch
+        {
+            SalesDiscountType.Percentage => "نسبة مئوية",
+            SalesDiscountType.FixedAmount => "مبلغ ثابت",
+            _ => "بدون خصم"
+        })
+        : "—";
     private string? _rowVersion;
     private string? _type = ((byte)SalesDiscountType.None).ToString();
     private string _value = "0";
@@ -133,6 +184,8 @@
         _amount = dto.HeaderDiscountAmount;
         _approved = dto.HeaderDiscountApprovedAtUtc.HasValue;
         _approvedBy = dto.HeaderDiscountApprovedBy;
+        _approvedByName = dto.HeaderDiscountApprovedByName;
+        _approvedAtUtc = dto.HeaderDiscountApprovedAtUtc;
         _rowVersion = dto.RowVersion;
         _type = ((byte)dto.HeaderDiscountType).ToString();
         _value = dto.HeaderDiscountValue?.ToString() ?? "0";
@@ -146,6 +199,8 @@
         _amount = dto.HeaderDiscountAmount;
         _approved = dto.HeaderDiscountApprovedAtUtc.HasValue;
         _approvedBy = dto.HeaderDiscountApprovedBy;
+        _approvedByName = dto.HeaderDiscountApprovedByName;
+        _approvedAtUtc = dto.HeaderDiscountApprovedAtUtc;
         _rowVersion = dto.RowVersion;
         _type = ((byte)dto.HeaderDiscountType).ToString();
         _value = dto.HeaderDiscountValue?.ToString() ?? "0";

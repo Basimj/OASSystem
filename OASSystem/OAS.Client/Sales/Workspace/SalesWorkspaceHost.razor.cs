@@ -239,6 +239,10 @@ public partial class SalesWorkspaceHost : IDisposable
         _pageNumber = 1;
         await LoadListAsync(SalesEntityType.CustomerOrders);
     }
+    // Keep UI actions aligned with CustomerOrder.Cancel; the server performs all other cancellation checks.
+    private static bool CanCancelOrder(string status) => status is not
+        ("Cancelled" or "Completed" or "InProduction" or "ReadyForDelivery");
+
     private static string OrderNextStep(string status) => status switch
     {
         "Draft" => "الخطوة التالية: مراجعة البنود ثم إتمام البيع.",
@@ -631,6 +635,11 @@ public partial class SalesWorkspaceHost : IDisposable
     private async Task CancelOrderAsync(MouseEventArgs _)
     {
         if (ActiveTab?.Model is not UiCustomerOrderFormModel m || !m.Id.HasValue) return;
+        if (!CanCancelOrder(m.Status))
+        {
+            Snackbar.Warning("لا يمكن إلغاء الطلب في حالته الحالية. راجع متابعة الطلب.");
+            return;
+        }
         if (!await Dialogs.ConfirmAsync("إلغاء الطلب", "قبل الإلغاء، يتحقق النظام من عدم وجود فاتورة غير ملغاة أو عربون فعّال أو أمر معمل نشط أو توريد ملتزم به. إذا وُجد أي منها سيُرفض الإلغاء. عند السماح، تُحرر الحجوزات النشطة. هل تريد المتابعة؟", AlertTone.Warning, "إلغاء الطلب", "رجوع")) return;
         var call = await Sales.CancelCustomerOrderResultAsync(m.Id.Value, new CancelCustomerOrderRequest(m.RowVersion));
         if (!TryGetApiResult(call, out var dto)) return;

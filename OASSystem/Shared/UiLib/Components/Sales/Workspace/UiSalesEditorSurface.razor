@@ -6,6 +6,10 @@
             <i class="@IconCss"></i>
             <div><h2>@Title</h2>@if (!string.IsNullOrWhiteSpace(Subtitle)){<p>@Subtitle</p>}</div>
         </div>
+        @if (HeaderExtra is not null)
+        {
+            <div class="ui-sales-editor__header-extra">@HeaderExtra</div>
+        }
         <div class="ui-sales-editor__heading-tools">
             @if (!string.IsNullOrWhiteSpace(StatusText))
             {
@@ -45,6 +49,7 @@
     [Parameter] public string? ErrorText { get; set; }
     [Parameter] public string? SuccessText { get; set; }
     [Parameter] public EventCallback OnBack { get; set; }
+    [Parameter] public RenderFragment? HeaderExtra { get; set; }
     [Parameter] public RenderFragment? Actions { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
 }

@@ -1,4 +1,5 @@
 using OAS.Application.Abstractions.Persistence;
+using OAS.Application.Identity.Abstractions;
 using OAS.Application.Abstractions.Persistence.Specifications;
 using OAS.Application.Sales.Abstractions;
 using OAS.Application.Sales.Common;
@@ -28,8 +29,12 @@ public sealed class SalesDtoAssembler(
     IReadRepository<LensDetails, Guid> lensDetails,
     IReadRepository<Warehouse, Guid> warehouses,
     IReadRepository<CustomerOrderLineOpticalSnapshot, Guid> orderOpticalSnapshots,
-    IReadRepository<Employee, Guid> employees)
+    IReadRepository<Employee, Guid> employees,
+    IIdentityRepository identityRepository)
 {
+    // Scoped memoization: a sales list may contain several discounts approved by the same user.
+    private readonly Dictionary<Guid, string?> _approverNames = new();
+
     public async Task<PrescriptionDto> PrescriptionAsync(Prescription entity, CancellationToken ct = default)
     {
         var customer = await customers.GetByIdAsync(entity.CustomerId, ct);
@@ -50,8 +55,22 @@ public sealed class SalesDtoAssembler(
             Lines = lines,
             PrescriptionCode = prescription.Code,
             PrescriptionRevisionNumber = prescription.RevisionNumber,
-            CustomerPhone = customer?.ContactInfo.Mobile ?? customer?.ContactInfo.Phone
+            CustomerPhone = customer?.ContactInfo.Mobile ?? customer?.ContactInfo.Phone,
+            HeaderDiscountApprovedByName = await ResolveApproverNameAsync(entity.HeaderDiscountApprovedBy, ct)
         };
+    }
+
+    private async Task<string?> ResolveApproverNameAsync(string? approverId, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(approverId)) return null;
+        // Older audit records can contain a username rather than a GUID.
+        if (!Guid.TryParse(approverId, out var userId)) return approverId;
+        if (_approverNames.TryGetValue(userId, out var cachedName)) return cachedName;
+        var record = await identityRepository.GetUserAsync(userId, false, ct);
+        var resolvedName = record is null ? null :
+            string.IsNullOrWhiteSpace(record.User.DisplayName) ? record.User.UserName : record.User.DisplayName;
+        _approverNames[userId] = resolvedName;
+        return resolvedName;
     }
 
     public async Task<SalesInvoicePaymentSummaryDto> PaymentSummaryAsync(SalesInvoice entity, CancellationToken ct = default)
@@ -96,7 +115,8 @@ public sealed class SalesDtoAssembler(
             PrescriptionCode = prescription.Code,
             PrescriptionRevisionNumber = prescription.RevisionNumber,
             JournalEntryNumber = journalNumber,
-            SalesEmployeeName = salesEmployeeName
+            SalesEmployeeName = salesEmployeeName,
+            HeaderDiscountApprovedByName = await ResolveApproverNameAsync(entity.HeaderDiscountApprovedBy, ct)
         };
     }
 
