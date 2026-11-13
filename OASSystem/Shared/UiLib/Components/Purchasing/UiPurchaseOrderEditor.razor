@@ -54,7 +54,7 @@
         }
     </UiPurchasingSection>
 
-    <UiPurchasingSection Title="المنتجات والكميات" Subtitle="أضف المنتجات المطلوبة، ثم حدّد لكل منها الوحدة والكمية وسعر الشراء.">
+    <UiPurchasingSection Title="المنتجات والكميات" Subtitle="يجب إدخال سعر وحدة صحيح لكل بند قبل حفظ أمر الشراء، حتى عند حفظه كمسودة.">
         <div class="ui-po-lines-toolbar">
             <div class="ui-po-lines-toolbar__info">
                 <span class="ui-po-lines-toolbar__icon"><i class="fa-solid fa-cart-flatbed" aria-hidden="true"></i></span>
@@ -125,9 +125,15 @@
                                                      WholeNumbersOnly="@QuantityInputRules.UsesWholeNumbers(null, line.PurchaseUnitName, line.Id.HasValue ? line.OrderedQuantity : 0m)"
                                                      Step="@QuantityInputRules.StepForUnit(null, line.PurchaseUnitName, line.Id.HasValue ? line.OrderedQuantity : 0m)"
                                                      ErrorText="@ErrorFor(LineKey(line,nameof(line.OrderedQuantity)))" />
-                            <UiPurchasingNumberField Label="سعر الوحدة" Value="@line.UnitPrice" ValueChanged="@(v => PriceChanged(line,v))"
-                                                     Disabled="@(!IsEditable)" Step="0.0001"
-                                                     ErrorText="@ErrorFor(LineKey(line,nameof(line.UnitPrice)))" />
+                            <div class="ui-po-price-field">
+                                <UiPurchasingNumberField Label="سعر الوحدة" Value="@line.UnitPrice" ValueChanged="@(v => PriceChanged(line,v))"
+                                                         Disabled="@(!IsEditable)" Step="0.0001"
+                                                         ErrorText="@ErrorFor(LineKey(line,nameof(line.UnitPrice)))" />
+                                @if (IsEditable && line.UnitPrice == 0m && !HasError(LineKey(line,nameof(line.UnitPrice))))
+                                {
+                                    <small class="ui-po-price-warning">يمكن حفظ المسودة، لكن يلزم سعر موجب قبل الاعتماد.</small>
+                                }
+                            </div>
                         </div>
                         <div class="ui-po-line-bottom">
                             <span class="ui-purchasing-po-line__total">إجمالي البند <strong>@LineTotal(line).ToString("#,##0.##")</strong></span>
@@ -214,8 +220,22 @@
     {
         _showErrors = true;
         _saveError = null;
-        _errors = UiPurchaseOrderFormValidator.Validate(Model);
+        _errors = UiPurchaseOrderFormValidator.ValidateForSave(Model);
         RevealHiddenErrors();
+        if (_errors.Count > 0)
+            _saveError = "لم يُحفظ أمر الشراء؛ صحّح أسعار البنود والحقول المحددة بالأحمر أولًا.";
+        StateHasChanged();
+        return _errors.Count == 0;
+    }
+
+    public bool ValidateForSubmission()
+    {
+        _showErrors = true;
+        _saveError = null;
+        _errors = UiPurchaseOrderFormValidator.Validate(Model, requirePricedLines: true);
+        RevealHiddenErrors();
+        if (_errors.Count > 0)
+            _saveError = "لا يمكن إرسال أمر الشراء للاعتماد أو اعتماده أو إرساله للمورد قبل تصحيح أسعار البنود والقيم غير الصالحة.";
         StateHasChanged();
         return _errors.Count == 0;
     }
@@ -226,7 +246,7 @@
         if (serverErrors is { Count: > 0 })
         {
             _showErrors = true;
-            var mapped = new Dictionary<string, string>(UiPurchaseOrderFormValidator.Validate(Model));
+            var mapped = new Dictionary<string, string>(UiPurchaseOrderFormValidator.ValidateForSave(Model));
             foreach (var entry in serverErrors)
             {
                 var key = entry.Key.StartsWith("Request.", StringComparison.OrdinalIgnoreCase)
@@ -254,7 +274,7 @@
         if (key.EndsWith("ProductVariantId", StringComparison.Ordinal)) return "راجع المنتج المختار وتأكد من أنه نشط وقابل للشراء.";
         if (key.EndsWith("PurchaseUnitId", StringComparison.Ordinal)) return "راجع وحدة الشراء المختارة وتأكد من توافقها مع المنتج.";
         if (key.EndsWith("OrderedQuantity", StringComparison.Ordinal)) return "راجع كمية البند، ويجب أن تكون أكبر من صفر.";
-        if (key.EndsWith("UnitPrice", StringComparison.Ordinal)) return "راجع سعر الوحدة؛ لا يمكن أن يكون سالبًا.";
+        if (key.EndsWith("UnitPrice", StringComparison.Ordinal)) return "راجع سعر الوحدة؛ يجب أن يكون أكبر من صفر قبل حفظ أمر الشراء.";
         if (key.EndsWith("UnitConversionFactor", StringComparison.Ordinal)) return "راجع معامل تحويل وحدة الشراء إلى الوحدة الأساسية.";
         if (key.EndsWith("DiscountAmount", StringComparison.Ordinal)) return "راجع قيمة الخصم؛ لا يمكن إدخال خصم غير صحيح.";
         if (key.EndsWith("TaxRate", StringComparison.Ordinal)) return "راجع نسبة الضريبة المدخلة لهذا البند.";
@@ -305,7 +325,7 @@
     private UiPurchaseOrderAmountPreview.Totals PreviewTotals => UiPurchaseOrderAmountPreview.FromModel(Model);
     private Task Changed()
     {
-        if (_showErrors) _errors = UiPurchaseOrderFormValidator.Validate(Model);
+        if (_showErrors) _errors = UiPurchaseOrderFormValidator.ValidateForSave(Model);
         _saveError = null;
         return OnChanged.InvokeAsync();
     }

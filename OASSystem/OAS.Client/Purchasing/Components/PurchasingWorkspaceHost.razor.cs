@@ -373,11 +373,18 @@ public partial class PurchasingWorkspaceHost
     {
         var tab=ActiveTab;
         if(tab is null || tab.IsSaving) return;
-        if(tab.Model is UiPurchaseOrderEditorModel && _purchaseOrderEditor is not null &&
-            ReferenceEquals(_purchaseOrderEditor.Model, tab.Model) && !_purchaseOrderEditor.ValidateForSave())
+        if (tab.Model is UiPurchaseOrderEditorModel order)
         {
-            Snackbar.Warning("راجع الحقول المحددة بالأحمر: ستجد شرح الخطأ وطريقة التصحيح تحت كل حقل.");
-            return;
+            // Do not persist a new or edited draft with an unpriced line. The
+            // server rechecks the same invariant for direct API callers.
+            var valid = _purchaseOrderEditor is not null && ReferenceEquals(_purchaseOrderEditor.Model, order)
+                ? _purchaseOrderEditor.ValidateForSave()
+                : UiPurchaseOrderFormValidator.ValidateForSave(order).Count == 0;
+            if (!valid)
+            {
+                Snackbar.Warning("لم يُحفظ أمر الشراء: راجع السعر والصافي في البنود المحددة بالأحمر قبل الحفظ.");
+                return;
+            }
         }
         if(tab.Model is UiPurchaseReceiptEditorModel && _purchaseReceiptEditor is not null &&
             ReferenceEquals(_purchaseReceiptEditor.Model, tab.Model) && !_purchaseReceiptEditor.ValidateForSave())

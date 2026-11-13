@@ -140,6 +140,8 @@
 .ui-purchasing-po-line{gap:9px;padding:11px 12px}
 .ui-po-line-main{display:grid;grid-template-columns:minmax(160px,2.1fr) minmax(115px,1.15fr) minmax(95px,.85fr) minmax(110px,1fr);gap:8px 12px;align-items:start}
 .ui-po-line-main>*{min-width:0}
+.ui-po-price-field{display:grid;gap:3px;min-width:0}
+.ui-po-price-warning{display:block;color:var(--oas-color-text-muted);font-size:var(--oas-font-xs);line-height:1.5}
 .ui-po-line-bottom{display:flex;align-items:center;flex-wrap:wrap;gap:6px 16px;border-top:1px dashed var(--oas-color-border);padding-top:7px}
 .ui-po-line-bottom .ui-purchasing-po-line__total{margin-inline-start:0}
 .ui-po-line-bottom .ui-po-line-more{margin-inline-start:auto}

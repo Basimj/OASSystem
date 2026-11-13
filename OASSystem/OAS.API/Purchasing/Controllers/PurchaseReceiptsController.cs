@@ -74,6 +74,16 @@ public sealed class PurchaseReceiptsController(ISender sender) : ControllerBase
         return Ok(await sender.Send(new GetPurchaseReceiptByIdQuery(id), cancellationToken));
     }
 
+    [HttpPost("{id:guid}/reopen")]
+    public async Task<ActionResult<PurchaseReceiptDto>> Reopen(
+        Guid id,
+        [FromBody] ReopenPurchaseReceiptRequest request,
+        CancellationToken cancellationToken)
+    {
+        await sender.Send(new ReopenPurchaseReceiptCommand(id, request), cancellationToken);
+        return Ok(await sender.Send(new GetPurchaseReceiptByIdQuery(id), cancellationToken));
+    }
+
     [HttpPost("{id:guid}/post")]
     public async Task<ActionResult<PurchaseReceiptPostResultDto>> Post(
         Guid id,

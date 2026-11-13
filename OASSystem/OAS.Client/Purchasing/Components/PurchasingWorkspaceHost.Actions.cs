@@ -71,6 +71,7 @@ public partial class PurchasingWorkspaceHost
     private bool ShowCancelOrder=>ActiveTab?.Model is UiPurchaseOrderEditorModel m&&(m.Status is (byte)PurchaseOrderStatus.Draft or (byte)PurchaseOrderStatus.Approved or (byte)PurchaseOrderStatus.Sent);
     private bool ShowConfirmReceipt=>ActiveTab?.Model is UiPurchaseReceiptEditorModel m&&m.Status==(byte)PurchaseReceiptStatus.Draft&&!ActiveTab.IsDirty;
     private bool ShowPostReceipt=>ActiveTab?.Model is UiPurchaseReceiptEditorModel m&&m.Status==(byte)PurchaseReceiptStatus.Confirmed;
+    private bool ShowReopenReceipt=>ActiveTab?.Model is UiPurchaseReceiptEditorModel m&&m.Status==(byte)PurchaseReceiptStatus.Confirmed;
     private bool ShowCancelReceipt=>ActiveTab?.Model is UiPurchaseReceiptEditorModel m&&(m.Status is (byte)PurchaseReceiptStatus.Draft or (byte)PurchaseReceiptStatus.Confirmed);
     private bool ShowReceiptInventory=>ActiveTab?.Model is UiPurchaseReceiptEditorModel m&&m.Status==(byte)PurchaseReceiptStatus.Posted&&m.InventoryTransactionId.HasValue;
     private bool ShowReceiptJournal=>ActiveTab?.Model is UiPurchaseReceiptEditorModel m&&m.Status==(byte)PurchaseReceiptStatus.Posted&&m.JournalEntryId.HasValue;
@@ -331,14 +332,37 @@ public partial class PurchasingWorkspaceHost
         catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}catch{ApiFeedback.ShowUnexpected();}
     }
 
-    private async Task SubmitOrderAsync(MouseEventArgs _)=>await ChangeOrderAsync((id,rv)=>Purchasing.SubmitPurchaseOrderAsync(id,new(rv)));
-    private async Task ApproveOrderAsync(MouseEventArgs _)=>await ChangeOrderAsync((id,rv)=>Purchasing.ApprovePurchaseOrderAsync(id,new(rv)));
+    private bool ValidateOrderPricesBeforeTransition()
+    {
+        if (ActiveTab?.Model is not UiPurchaseOrderEditorModel order) return false;
+        var valid = _purchaseOrderEditor is not null && ReferenceEquals(_purchaseOrderEditor.Model, order)
+            ? _purchaseOrderEditor.ValidateForSubmission()
+            : UiPurchaseOrderFormValidator.Validate(order, requirePricedLines: true).Count == 0;
+        if (!valid)
+            Snackbar.Warning("لا يمكن إرسال أمر الشراء للاعتماد أو اعتماده أو إرساله للمورد: راجع سعر الوحدة وصافي التكلفة في كل بند.");
+        return valid;
+    }
+
+    private async Task SubmitOrderAsync(MouseEventArgs _)
+    {
+        if (!ValidateOrderPricesBeforeTransition()) return;
+        await ChangeOrderAsync((id,rv)=>Purchasing.SubmitPurchaseOrderAsync(id,new(rv)));
+    }
+    private async Task ApproveOrderAsync(MouseEventArgs _)
+    {
+        if (!ValidateOrderPricesBeforeTransition()) return;
+        await ChangeOrderAsync((id,rv)=>Purchasing.ApprovePurchaseOrderAsync(id,new(rv)));
+    }
     private async Task RejectOrderAsync(MouseEventArgs _)
     {
         if(!await Dialog.ConfirmAsync("رفض أمر الشراء","سيتم رفض أمر الشراء.",AlertTone.Warning,"رفض","رجوع"))return;
         await ChangeOrderAsync((id,rv)=>Purchasing.RejectPurchaseOrderAsync(id,new("رفض من واجهة المشتريات",rv)));
     }
-    private async Task SendOrderAsync(MouseEventArgs _)=>await ChangeOrderAsync((id,rv)=>Purchasing.SendPurchaseOrderAsync(id,new(rv)));
+    private async Task SendOrderAsync(MouseEventArgs _)
+    {
+        if (!ValidateOrderPricesBeforeTransition()) return;
+        await ChangeOrderAsync((id,rv)=>Purchasing.SendPurchaseOrderAsync(id,new(rv)));
+    }
     private async Task CancelOrderAsync(MouseEventArgs _)
     {
         if(!await Dialog.ConfirmAsync("إلغاء أمر الشراء","سيتم تحرير الكمية المفتوحة من OnOrder إذا كان الأمر مرسلاً.",AlertTone.Warning,"إلغاء الأمر","رجوع"))return;
@@ -369,7 +393,36 @@ public partial class PurchasingWorkspaceHost
         var tab=Workspace.OpenNew(PurchasingEntityType.PurchaseReceipts,"استلام جديد");tab.Model=m;tab.IsDirty=false;tab.IsEditMode=true;Navigation.NavigateTo("/purchases/receipts");await InvokeAsync(StateHasChanged);
     }
 
-    private async Task ConfirmReceiptAsync(MouseEventArgs _)=>await ChangeReceiptAsync((id,rv)=>Purchasing.ConfirmPurchaseReceiptAsync(id,new(rv)));
+    private async Task ConfirmReceiptAsync(MouseEventArgs _)
+    {
+        if (ActiveTab?.Model is not UiPurchaseReceiptEditorModel receipt) return;
+        if (_purchaseReceiptEditor is not null && !_purchaseReceiptEditor.ValidateForPosting())
+        {
+            Snackbar.Warning("قيمة الاستلام صفر؛ راجع التكلفة الفعلية المحددة بالأحمر، ثم عدّل السند واحفظه قبل التأكيد.");
+            return;
+        }
+        await ChangeReceiptAsync((id,rv)=>Purchasing.ConfirmPurchaseReceiptAsync(id,new(rv)));
+    }
+    private async Task ReopenReceiptAsync(MouseEventArgs _)
+    {
+        if (ActiveTab?.Model is not UiPurchaseReceiptEditorModel receipt || receipt.Id is not Guid id) return;
+        if (!await Dialog.ConfirmAsync("إعادة سند الاستلام إلى المسودة",
+            "سيتم إلغاء تأكيد السند غير المرحّل كي تتمكن من تعديل التكلفة الفعلية ثم حفظه وتأكيده مجددًا. هل تريد المتابعة؟",
+            AlertTone.Warning, "إعادة إلى المسودة", "رجوع")) return;
+        try
+        {
+            var dto = await Purchasing.ReopenPurchaseReceiptAsync(id, new(receipt.RowVersion??string.Empty));
+            if (dto is not null)
+            {
+                SetActive(Map(dto));
+                if (ActiveTab is { } tab) tab.IsEditMode = true;
+                StateHasChanged();
+                Snackbar.Success("أعيد الاستلام إلى المسودة. صحح التكلفة الفعلية، ثم احفظ السند وأكده مجددًا.");
+            }
+        }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
+    }
     private async Task CancelReceiptAsync(MouseEventArgs _)
     {
         if(!await Dialog.ConfirmAsync("إلغاء الاستلام","هل تريد إلغاء سند الاستلام؟",AlertTone.Warning,"إلغاء","رجوع"))return;
@@ -379,11 +432,25 @@ public partial class PurchasingWorkspaceHost
     {
         if(ActiveTab?.Model is not UiPurchaseReceiptEditorModel m||m.Id is not Guid id)return;
         try{var dto=await action(id,m.RowVersion??string.Empty);if(dto is not null)SetActive(Map(dto));}
-        catch(ApiClientException ex){ApiFeedback.Show(ex.Error);}catch{ApiFeedback.ShowUnexpected();}
+        catch(ApiClientException ex)
+        {
+            if (ex.Error.Code == "purchasing_receipt_value_invalid")
+            {
+                _purchaseReceiptEditor?.ShowPostingValueError();
+                Snackbar.Warning("قيمة الاستلام صفر: صحح التكلفة الفعلية في المسودة قبل التأكيد.");
+            }
+            else ApiFeedback.Show(ex.Error);
+        }
+        catch{ApiFeedback.ShowUnexpected();}
     }
     private async Task PostReceiptAsync(MouseEventArgs _)
     {
         if(ActiveTab?.Model is not UiPurchaseReceiptEditorModel m||m.Id is not Guid id)return;
+        if (_purchaseReceiptEditor is not null && !_purchaseReceiptEditor.ValidateForPosting())
+        {
+            Snackbar.Warning("قيمة الاستلام صفر: أعد السند إلى المسودة وصحح تكلفة البند المحدد بالأحمر ثم احفظه وأكده.");
+            return;
+        }
         try
         {
             var accountingSettings=await Accounting.GetAccountingSettingsAsync();
@@ -417,6 +484,11 @@ public partial class PurchasingWorkspaceHost
             {
                 m.PostingDateError = error;
                 Snackbar.Warning(error);
+            }
+            else if (ex.Error.Code == "purchasing_receipt_value_invalid")
+            {
+                _purchaseReceiptEditor?.ShowPostingValueError();
+                Snackbar.Warning("قيمة الاستلام صفر: أعد السند إلى المسودة وعدل التكلفة الفعلية، ثم احفظ وأكد السند قبل ترحيله.");
             }
             else ApiFeedback.Show(ex.Error);
         }

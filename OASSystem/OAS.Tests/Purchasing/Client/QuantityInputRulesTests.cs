@@ -72,6 +72,27 @@ public class QuantityInputRulesTests
     }
 
     [Test]
+    public void ReceiptPostingValidator_HighlightsZeroCostAndAllowsCorrectedReceipt()
+    {
+        var receipt = new UiPurchaseReceiptEditorModel { PurchaseOrderId = Guid.NewGuid() };
+        var line = new UiPurchaseReceiptLineModel
+        {
+            PurchaseOrderLineId = Guid.NewGuid(), LineSequence = 1, ProductVariantId = Guid.NewGuid(),
+            OrderedQuantitySnapshot = 5m, RemainingReceivableQuantity = 5m,
+            ReceivedQuantity = 5m, AcceptedQuantity = 5m, BaseAcceptedQuantity = 5m,
+            ActualUnitCost = 0m, TotalAcceptedCost = 0m
+        };
+        receipt.Lines.Add(line);
+        var errors = UiPurchaseReceiptFormValidator.ValidateForPosting(receipt);
+        Assert.That(errors.ContainsKey("Lines[0].ActualUnitCost"), Is.True);
+        Assert.That(UiPurchaseReceiptFormValidator.Validate(receipt).ContainsKey("Lines[0].ActualUnitCost"), Is.False,
+            "An unvalued draft can still be saved; only confirmation/posting are blocked.");
+        line.ActualUnitCost = 20m;
+        line.TotalAcceptedCost = 100m;
+        Assert.That(UiPurchaseReceiptFormValidator.ValidateForPosting(receipt), Is.Empty);
+    }
+
+    [Test]
     public void OrderValidator_AllowsMeasuredQuantities()
     {
         var model = new UiPurchaseOrderEditorModel

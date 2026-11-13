@@ -70,6 +70,34 @@ public static class UiPurchaseReceiptFormValidator
         return errors;
     }
 
+    /// <summary>
+    /// Posting and confirmation require a valued receipt. Saving an unvalued draft
+    /// is allowed so operators can correct supplier prices before confirmation.
+    /// </summary>
+    public static IReadOnlyDictionary<string, string> ValidateForPosting(UiPurchaseReceiptEditorModel receipt)
+    {
+        ArgumentNullException.ThrowIfNull(receipt);
+        var errors = new Dictionary<string, string>(StringComparer.Ordinal);
+        var accepted = receipt.Lines.Where(x => x.AcceptedQuantity > 0m).ToArray();
+        if (accepted.Length == 0)
+        {
+            errors[nameof(receipt.Lines)] = "لا توجد كمية مقبولة للترحيل. أدخل كمية مقبولة واحفظ السند أولاً.";
+            return errors;
+        }
+        // Confirm/post operate on persisted receipts: BaseAcceptedQuantity and
+        // TotalAcceptedCost are authoritative snapshots from the server.
+        var total = accepted.Sum(x => Math.Round(x.TotalAcceptedCost, 4));
+        if (total > 0m) return errors;
+
+        foreach (var line in accepted)
+        {
+            var index = receipt.Lines.IndexOf(line);
+            errors[$"Lines[{index}].{nameof(line.ActualUnitCost)}"] =
+                "قيمة الاستلام المحاسبية صفر. أدخل تكلفة فعلية صحيحة لهذا الصنف، ثم احفظ السند وأكده قبل الترحيل.";
+        }
+        return errors;
+    }
+
     /// <summary>When no rejected split was entered, treat the received amount as accepted by default.</summary>
     public static void SetReceivedQuantity(UiPurchaseReceiptLineModel line, decimal amount)
     {

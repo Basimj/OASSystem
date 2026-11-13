@@ -143,6 +143,7 @@ public sealed class PurchaseOrder : AuditableEntity<Guid>
         EnsureDraft();
         if (_lines.Count == 0) throw new DomainException("Purchase order must contain at least one line before submission.");
         RecalculateTotals();
+        EnsurePricedForApproval();
         Status = PurchaseOrderStatus.PendingApproval;
         SubmittedAt = at;
         SubmittedBy = PurchasingDomainGuard.User(by);
@@ -151,6 +152,7 @@ public sealed class PurchaseOrder : AuditableEntity<Guid>
     public void Approve(DateTimeOffset at, string? by)
     {
         if (Status != PurchaseOrderStatus.PendingApproval) throw new DomainException("Only pending purchase orders can be approved.");
+        EnsurePricedForApproval();
         Status = PurchaseOrderStatus.Approved;
         ApprovedAt = at;
         ApprovedBy = PurchasingDomainGuard.User(by);
@@ -168,6 +170,7 @@ public sealed class PurchaseOrder : AuditableEntity<Guid>
     public void Send(DateTimeOffset at, string? by)
     {
         if (Status != PurchaseOrderStatus.Approved) throw new DomainException("Only approved purchase orders can be sent to supplier.");
+        EnsurePricedForApproval();
         Status = PurchaseOrderStatus.Sent;
         SentAt = at;
         SentBy = PurchasingDomainGuard.User(by);
@@ -198,6 +201,39 @@ public sealed class PurchaseOrder : AuditableEntity<Guid>
         CancelledAt = at;
         CancelledBy = PurchasingDomainGuard.User(by);
         CancellationReason = PurchasingDomainGuard.Optional(reason, 500, "Cancellation reason");
+    }
+
+    /// <summary>
+    /// Verify that every line has a positive accounting value before saving,
+    /// submitting, approving, or sending the order. Existing legacy drafts may
+    /// be loaded, but cannot be saved again until their prices are corrected.
+    /// </summary>
+    public void ValidatePricingForSave() => EnsurePricedForApproval();
+
+    /// <summary>
+    /// Receipt stock valuation uses net cost excluding tax and a four-decimal
+    /// base-inventory-unit cost. Keep the same checks at every transition gate.
+    /// </summary>
+    private void EnsurePricedForApproval()
+    {
+        if (_lines.Count == 0)
+            throw new DomainException("يجب إضافة بند واحد على الأقل قبل اعتماد أمر الشراء أو إرساله للمورد.");
+        foreach (var line in _lines.OrderBy(x => x.LineSequence))
+        {
+            if (line.UnitPrice <= 0m)
+                throw new DomainException($"البند {line.LineSequence}: يجب إدخال سعر وحدة أكبر من صفر قبل حفظ أمر الشراء أو اعتماده أو إرساله للمورد.");
+            if (line.NetAmount <= 0m)
+                throw new DomainException($"البند {line.LineSequence}: صافي قيمة البند بعد الخصم والضريبة يجب أن يكون أكبر من صفر قبل الحفظ أو الاعتماد.");
+            if (line.BaseQuantity <= 0m)
+                throw new DomainException($"البند {line.LineSequence}: الكمية بالوحدة الأساسية تصبح صفرًا بعد التحويل أو التقريب. راجع الكمية ومعامل التحويل.");
+
+            // Matches CalculateBaseReceiptUnitCost in the purchasing UI: base
+            // inventory-unit cost is rounded to four decimal places.
+            var baseUnitCost = Math.Round(
+                (line.NetAmount / line.OrderedQuantity * ExchangeRate) / line.UnitConversionFactor, 4);
+            if (baseUnitCost <= 0m)
+                throw new DomainException($"البند {line.LineSequence}: التكلفة بالعملة الأساسية تصبح صفرًا بعد التحويل أو التقريب. راجع السعر والخصم وسعر الصرف ووحدة الشراء.");
+        }
     }
 
     private void EnsureDraft()

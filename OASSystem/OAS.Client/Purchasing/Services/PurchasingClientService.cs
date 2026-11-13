@@ -70,6 +70,7 @@ public sealed partial class PurchasingClientService(OasApiClient api) : IPurchas
     public Task<PurchaseReceiptDto?> CreatePurchaseReceiptAsync(CreatePurchaseReceiptRequest r,CancellationToken ct=default)=>Post<CreatePurchaseReceiptRequest,PurchaseReceiptDto>("api/purchasing/receipts",r,ct);
     public Task<PurchaseReceiptDto?> UpdatePurchaseReceiptAsync(Guid id,UpdatePurchaseReceiptRequest r,CancellationToken ct=default)=>api.PutAsync<UpdatePurchaseReceiptRequest,PurchaseReceiptDto>($"api/purchasing/receipts/{id}",r,ct);
     public Task<PurchaseReceiptDto?> ConfirmPurchaseReceiptAsync(Guid id,ConfirmPurchaseReceiptRequest r,CancellationToken ct=default)=>Post<ConfirmPurchaseReceiptRequest,PurchaseReceiptDto>($"api/purchasing/receipts/{id}/confirm",r,ct);
+    public Task<PurchaseReceiptDto?> ReopenPurchaseReceiptAsync(Guid id,ReopenPurchaseReceiptRequest r,CancellationToken ct=default)=>Post<ReopenPurchaseReceiptRequest,PurchaseReceiptDto>($"api/purchasing/receipts/{id}/reopen",r,ct);
     public Task<PurchaseReceiptPostResultDto?> PostPurchaseReceiptAsync(Guid id,PostPurchaseReceiptRequest r,CancellationToken ct=default)=>Post<PostPurchaseReceiptRequest,PurchaseReceiptPostResultDto>($"api/purchasing/receipts/{id}/post",r,ct);
     public Task<PurchaseReceiptDto?> CancelPurchaseReceiptAsync(Guid id,CancelPurchaseReceiptRequest r,CancellationToken ct=default)=>Post<CancelPurchaseReceiptRequest,PurchaseReceiptDto>($"api/purchasing/receipts/{id}/cancel",r,ct);
 
