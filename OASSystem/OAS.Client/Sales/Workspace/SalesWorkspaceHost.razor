@@ -10,12 +10,37 @@
 <SalesWalkInInitializer Model="@(ActiveTab?.Model as UiSalesInvoiceFormModel)"
                         OnSettingsLoaded="OnWalkInSettingsLoadedAsync" />
 
+<div class="@(Section == SalesEntityType.Prescriptions ? "oas-rx-screen" : Section == SalesEntityType.CustomerOrders ? "oas-order-screen" : "oas-sales-host-screen")">
+@if (Section == SalesEntityType.Prescriptions)
+{
+    <header class="oas-rx-page-heading" dir="rtl">
+        <div class="oas-rx-page-heading__title">
+            <i class="fa-solid fa-glasses" aria-hidden="true"></i>
+            <div><h1>الوصفات البصرية</h1><span>المبيعات <i class="fa-solid fa-chevron-left"></i> الوصفات البصرية</span></div>
+        </div>
+        <div class="oas-rx-page-heading__tabs">
+            <UiApplicationTabStrip Tabs="@PrescriptionTabItems" AriaLabel="تبويبات الوصفات البصرية" OnSelect="SelectTabAsync" OnClose="CloseTabAsync" OnCloseOthers="CloseOtherTabsAsync" OnCloseAll="CloseAllTabsAsync" />
+        </div>
+    </header>
+}
+@if (Section == SalesEntityType.CustomerOrders)
+{
+    <header class="oas-order-page-heading" dir="rtl">
+        <div class="oas-order-page-heading__title">
+            <i class="fa-solid fa-cart-shopping" aria-hidden="true"></i>
+            <div><h1>طلبات العملاء</h1><span>المبيعات <i class="fa-solid fa-chevron-left"></i> طلبات العملاء</span></div>
+        </div>
+        <div class="oas-order-page-heading__tabs">
+            <UiApplicationTabStrip Tabs="@CustomerOrderTabItems" AriaLabel="تبويبات طلبات العملاء" OnSelect="SelectTabAsync" OnClose="CloseTabAsync" OnCloseOthers="CloseOtherTabsAsync" OnCloseAll="CloseAllTabsAsync" />
+        </div>
+    </header>
+}
 <UiSalesWorkspace HideActions="@(ActiveTab is { IsListTab: false })">
     <Actions>
         <UiWorkspaceActionBar>
-            <UiButton Text="جديد" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" OnClick="NewAsync" />
+            <UiButton Text="@(Section == SalesEntityType.Prescriptions ? "وصفة جديدة" : Section == SalesEntityType.CustomerOrders ? "طلب جديد" : "جديد")" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" OnClick="NewAsync" />
             <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Loading="@_isLoading" OnClick="RefreshAsync" />
-            <UiSearchInput Value="@_search" ValueChanged="SearchValueChanged" OnSearch="SearchAsync" Placeholder="@(Section == SalesEntityType.SalesInvoices ? "بحث برقم الفاتورة أو البيان..." : "بحث بالكود أو العميل...")" />
+            <UiSearchInput Value="@_search" ValueChanged="SearchValueChanged" OnSearch="SearchAsync" Placeholder="@(Section == SalesEntityType.Prescriptions ? "البحث برقم الوصفة أو اسم العميل أو الطبيب أو العيادة..." : Section == SalesEntityType.SalesInvoices ? "بحث برقم الفاتورة أو البيان..." : "البحث برقم الطلب أو اسم العميل أو رقمه أو هاتفه...")" />
         </UiWorkspaceActionBar>
     </Actions>
     <Tabs>
@@ -28,7 +53,26 @@
         }
         else if (ActiveTab.IsListTab)
         {
-            @if (ActiveEntityType == SalesEntityType.SalesInvoices)
+            @if (ActiveEntityType == SalesEntityType.Prescriptions)
+            {
+                <PrescriptionsDashboardList Items="@_prescriptionRows" Summary="@_prescriptionSummary" IsLoading="@_isLoading"
+                                            StatusFilter="@_prescriptionStatus" OnStatusChanged="PrescriptionStatusChangedAsync" OnSearchTerm="SearchAsync"
+                                            PageSize="@_prescriptionPageSize" OnPageSizeChanged="PrescriptionPageSizeChangedAsync"
+                                            OnGoToPage="GoToPrescriptionPageAsync"
+                                            TotalCount="@_totalCount" PageNumber="@_pageNumber" TotalPages="@_totalPages"
+                                            OnOpen="OpenEntityAsync" OnPrevious="PreviousPageAsync" OnNext="NextPageAsync" />
+            }
+            else if (ActiveEntityType == SalesEntityType.CustomerOrders)
+            {
+                <CustomerOrdersDashboardList Items="@_customerOrderRows" Summary="@_customerOrderSummary" IsLoading="@_isLoading"
+                                            StatusFilter="@_orderStatusFilter" OnStatusChanged="OrderStatusChangedAsync"
+                                            DateFrom="@_orderDateFrom" DateTo="@_orderDateTo"
+                                            OnDateFromChanged="OrderDateFromChangedAsync" OnDateToChanged="OrderDateToChangedAsync"
+                                            PageSize="@_orderPageSize" OnPageSizeChanged="OrderPageSizeChangedAsync"
+                                            PageNumber="@_pageNumber" TotalPages="@_totalPages" TotalCount="@_totalCount"
+                                            OnGoToPage="GoToOrderPageAsync" OnOpen="OpenEntityAsync" />
+            }
+            else if (ActiveEntityType == SalesEntityType.SalesInvoices)
             {
                 <UiSalesInvoiceList Items="@ListItems" IsLoading="@_isLoading"
                                     TotalCount="@_totalCount" PageNumber="@_pageNumber" TotalPages="@_totalPages"
@@ -44,14 +88,15 @@
         }
         else if (ActiveTab.Model is UiPrescriptionFormModel prescription)
         {
-            <UiSalesEditorSurface Title="@(prescription.Id.HasValue ? prescription.PrescriptionCode : "وصفة جديدة")"
-                                  Subtitle="الوصفة الطبية وإصدارات قياسات العين" IconCss="fa-solid fa-glasses"
-                                  StatusText="@prescription.StatusText" StatusCssClass="@StatusCss(prescription.Status)"
-                                  OnBack="ReturnToSalesListAsync">
+            <UiSalesEditorSurface Title="@(prescription.Id.HasValue ? prescription.PrescriptionCode : "إضافة وصفة جديدة")"
+                                  Subtitle="@(prescription.Id.HasValue ? "بيانات الوصفة وإصدارات قياسات العين" : "إنشاء وصفة بصرية جديدة للعميل")" IconCss="fa-solid fa-glasses"
+                                  StatusText="@(ActiveTab.IsNew ? null : prescription.StatusText)" StatusCssClass="@StatusCss(prescription.Status)"
+                                  OnBack="ReturnToSalesListAsync" BackText="العودة للقائمة" ActionsInFooter="true">
                 <Actions>
                     @if (ActiveTab.IsNew)
                     {
                         <UiButton Text="حفظ الوصفة" IconCssClass="fa-solid fa-floppy-disk" Loading="@ActiveTab.IsSaving" Size="ControlSize.Small" OnClick="SaveAsync" />
+                        <UiButton Text="إلغاء" IconCssClass="fa-solid fa-xmark" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="@(_ => ReturnToSalesListAsync())" />
                     }
                     else if (ActiveRevisionDraft is not null)
                     {
@@ -71,24 +116,50 @@
                     }
                 </Actions>
                 <ChildContent>
-                    <UiSalesFormSection Title="بيانات الوصفة" IconCss="fa-solid fa-file-medical">
-                        <UiPrescriptionEditor Model="@prescription" ReadOnly="@(!ActiveTab.IsEditMode)" SearchCustomersAsync="SearchCustomerItemsAsync" OnCustomerSelected="PrescriptionCustomerChangedAsync" OnChanged="MarkDirtyAsync" />
-                    </UiSalesFormSection>
-                    @if (ActiveRevisionDraft is not null)
-                    {
-                        @if (ActiveTab.IsNew)
+                    <div class="oas-rx-prescription-detail">
+                        <section class="oas-rx-prescription-card oas-rx-prescription-card--identity" aria-labelledby="rx-identity-heading">
+                            <div class="oas-rx-prescription-card__heading">
+                                <h3 id="rx-identity-heading"><i class="fa-solid fa-file-medical" aria-hidden="true"></i> بيانات الوصفة</h3>
+                            </div>
+                            <UiPrescriptionEditor Model="@prescription" ReadOnly="@(!ActiveTab.IsEditMode)" ShowNotes="@(ActiveRevisionDraft is null)"
+                                                  SearchCustomersAsync="SearchCustomerItemsAsync" OnCustomerSelected="PrescriptionCustomerChangedAsync" OnChanged="MarkDirtyAsync" />
+                        </section>
+                        @if (ActiveRevisionDraft is not null)
                         {
-                            <UiSalesFormSection Title="الإصدار الأول" Description="الإصدار الأول إلزامي. يتم حفظ الوصفة والإصدار والقياسات معًا، وبعد نجاح الحفظ تصبح الوصفة مفعلة تلقائيًا." IconCss="fa-solid fa-code-branch">
-                                <UiPrescriptionRevisionEditor Model="@ActiveRevisionDraft" OnChanged="MarkDirtyAsync" />
-                            </UiSalesFormSection>
+                            <section class="oas-rx-prescription-card oas-rx-prescription-card--revision" aria-labelledby="rx-measures-heading">
+                                <div class="oas-rx-prescription-card__heading">
+                                    <h3 id="rx-measures-heading"><i class="fa-solid fa-eye" aria-hidden="true"></i> قياسات النظر — الإصدار @ActiveRevisionDraft.RevisionNumber</h3>
+                                    @if (ActiveTab.IsNew)
+                                    {
+                                        <span class="oas-rx-prescription-current">الإصدار الأول إلزامي · ينشط بعد الحفظ</span>
+                                    }
+                                </div>
+                                @if (ActiveTab.IsNew)
+                                {
+                                    <UiPrescriptionRevisionEditor @key="ActiveTab.TabId" @ref="_activePrescriptionRevisionEditor"
+                                                                  Model="@ActiveRevisionDraft" Prescription="@prescription" ReadOnlyPrescription="false"
+                                                                  OnPrescriptionChanged="MarkDirtyAsync" OnChanged="MarkDirtyAsync" />
+                                }
+                                else
+                                {
+                                    <UiPrescriptionRevisionEditor @key="ActiveTab.TabId" @ref="_activePrescriptionRevisionEditor"
+                                                                  Model="@ActiveRevisionDraft" Prescription="@prescription" ReadOnlyPrescription="true"
+                                                                  OnPrescriptionChanged="MarkDirtyAsync" OnChanged="RevisionDraftChangedAsync" />
+                                }
+                            </section>
                         }
-                        else
+                        else if (prescription.Id.HasValue && prescription.Revisions.Count > 0)
                         {
-                            <UiSalesFormSection Title="@($"الإصدار {ActiveRevisionDraft.RevisionNumber} - إصدار جديد")" Description="أدخل القياسات ثم اضغط «حفظ الإصدار» من شريط الإجراءات أعلى الصفحة. لا تحتاج إلى الدخول في تعديل الوصفة لحفظ الإصدار." IconCss="fa-solid fa-code-branch">
-                                <UiPrescriptionRevisionEditor Model="@ActiveRevisionDraft" OnChanged="RevisionDraftChangedAsync" />
-                            </UiSalesFormSection>
+                            <section class="oas-rx-prescription-card oas-rx-prescription-card--history" aria-labelledby="rx-history-heading">
+                                <div class="oas-rx-prescription-card__heading">
+                                    <h3 id="rx-history-heading"><i class="fa-solid fa-eye" aria-hidden="true"></i> القياسات وسجل الإصدارات</h3>
+                                </div>
+                                <UiPrescriptionRevisionHistory Model="@prescription" />
+                            </section>
+                            <PrescriptionsRelatedDocuments Documents="@RelatedFor(prescription.Id)"
+                                                           Unavailable="@RelatedUnavailable(prescription.Id)" OnOpen="OpenRelatedPrescriptionDocument" />
                         }
-                    }
+                    </div>
                 </ChildContent>
             </UiSalesEditorSurface>
         }
@@ -96,7 +167,7 @@
         {
             <UiSalesEditorSurface Title="@(order.Id.HasValue ? order.OrderCode : "طلب عميل جديد")" Subtitle="طلب العميل وحجز المخزون" IconCss="fa-solid fa-clipboard-list"
                                   StatusText="@order.StatusText" StatusCssClass="@StatusCss(order.Status)"
-                                  OnBack="ReturnToSalesListAsync">
+                                  OnBack="ReturnToSalesListAsync" ActionsInFooter="true">
                 <Actions>
                     @if (ActiveTab.IsEditMode)
                     {
@@ -111,11 +182,20 @@
                     }
                     else if (order.Status != "Cancelled" && order.Status != "Completed")
                     {
+                        <UiButton Text="متابعة الطلب" IconCssClass="fa-solid fa-arrow-up-right-from-square" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="OpenOrderTrackingAsync" />
                         <UiButton Text="إلغاء الطلب" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" OnClick="CancelOrderAsync" />
                     }
                 </Actions>
                 <ChildContent>
-                    <UiCustomerOrderEditor Model="@order" ReadOnly="@(!ActiveTab.IsEditMode)" SearchCustomersAsync="SearchCustomerItemsAsync"
+                    @if (!ActiveTab.IsNew)
+                    {
+                        <div class="oas-order-next-step" role="status">
+                            <span class="oas-order-next-step__state"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> حالة الطلب: @order.StatusText</span>
+                            <span>@OrderNextStep(order.Status)</span>
+                            <button type="button" @onclick="GoToOrderTracking">عرض المتابعة التشغيلية <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></button>
+                        </div>
+                    }
+                    <UiCustomerOrderEditor @ref="_activeCustomerOrderEditor" Model="@order" ReadOnly="@(!ActiveTab.IsEditMode)" SearchCustomersAsync="SearchCustomerItemsAsync"
                                            SearchPrescriptionsAsync="SearchPrescriptionRevisionItemsAsync" SearchCurrenciesAsync="SearchCurrencyItemsAsync"
                                            SearchProductTypesAsync="SearchProductTypeItemsAsync" SearchCategoriesAsync="SearchCategoryItemsAsync" SearchProductsAsync="SearchProductItemsAsync" SearchWarehousesAsync="SearchWarehouseItemsAsync"
                                            SearchPrescriptionRevisionsAsync="SearchLinePrescriptionItemsAsync" OnSelectionChanged="SelectionChangedAsync"
@@ -123,10 +203,19 @@
                                            OnProductSelected="ProductSelectedAsync" OnWarehouseSelected="WarehouseSelectedAsync" OnChanged="MarkDirtyAsync" />
                     @if (order.Id.HasValue)
                     {
-                        <SalesHeaderDiscountPanel DocumentKind="order" DocumentId="@order.Id.Value"
-                                                  ParentRowVersion="@order.RowVersion"
-                                                  ParentHasUnsavedChanges="@ActiveTab.IsDirty" ParentIsEditing="@ActiveTab.IsEditMode"
-                                                  OnOrderUpdated="OrderHeaderDiscountUpdatedAsync" />
+                        <details class="oas-order-extra-discount">
+                            <summary><i class="fa-solid fa-percent" aria-hidden="true"></i> خصم إضافي على الطلب
+                                <span>اختياري — مستقل عن خصومات البنود، وقد يحتاج إعادة اعتماد عند تعديل الأسعار.</span>
+                                @if (order.HeaderDiscountAmount > 0m)
+                                {
+                                    <b class="oas-order-extra-discount__amount">@order.HeaderDiscountAmount.ToString("N2") @(order.HeaderDiscountApproved ? "• معتمد" : "• بانتظار الاعتماد")</b>
+                                }
+                            </summary>
+                            <SalesHeaderDiscountPanel DocumentKind="order" DocumentId="@order.Id.Value"
+                                                      ParentRowVersion="@order.RowVersion"
+                                                      ParentHasUnsavedChanges="@ActiveTab.IsDirty" ParentIsEditing="@ActiveTab.IsEditMode"
+                                                      OnOrderUpdated="OrderHeaderDiscountUpdatedAsync" />
+                        </details>
                     }
                 </ChildContent>
             </UiSalesEditorSurface>
@@ -135,7 +224,7 @@
         {
             <UiSalesEditorSurface Title="@(invoice.Id.HasValue ? invoice.InvoiceCode : "فاتورة مبيعات جديدة")" Subtitle="فاتورة المبيعات والترحيل المخزني والمحاسبي" IconCss="fa-solid fa-file-invoice-dollar"
                                   StatusText="@invoice.StatusText" StatusCssClass="@StatusCss(invoice.Status)"
-                                  OnBack="ReturnToSalesListAsync">
+                                  OnBack="ReturnToSalesListAsync" ActionsInFooter="true">
                 <Actions>
                     @if (ActiveTab.IsEditMode)
                     {
@@ -190,3 +279,5 @@
         }
     </Body>
 </UiSalesWorkspace>
+
+</div>

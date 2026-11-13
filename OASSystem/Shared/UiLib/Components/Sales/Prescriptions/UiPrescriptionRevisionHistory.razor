@@ -1,0 +1,73 @@
+@namespace OAS.UiLib.Components.Sales.Prescriptions
+@using OAS.UiLib.Core.Models.Sales
+
+@if (Model.Revisions.Count > 0)
+{
+    <section class="oas-rx-history-layout" dir="rtl" aria-label="تاريخ إصدارات الوصفة">
+        <div class="oas-rx-history-layout__main">
+            <div class="oas-rx-history-title">
+                <h3>قياسات النظر — الإصدار @Selected?.RevisionNumber</h3>
+                @if (Selected?.IsCurrent == true) { <span class="oas-rx-state oas-rx-state--active">الحالي</span> }
+            </div>
+            <div class="oas-rx-measure-scroll">
+                <table class="oas-rx-measure-table">
+                    <thead><tr><th scope="col">القياس</th><th scope="col">العين اليمنى OD</th><th scope="col">العين اليسرى OS</th></tr></thead>
+                    <tbody>
+                        @foreach (var f in Measurements)
+                        {
+                            <tr><th scope="row">@f.Label</th><td>@DisplayEye("RightOD", f.Key)</td><td>@DisplayEye("LeftOS", f.Key)</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(Selected?.Reason)) { <p class="oas-rx-revision-reason">سبب الإصدار: @Selected.Reason</p> }
+        </div>
+        <aside class="oas-rx-history-layout__aside">
+            <h3><i class="fa-solid fa-layer-group"></i> سجل الإصدارات</h3>
+            @foreach (var revision in Model.Revisions.OrderByDescending(x => x.RevisionNumber))
+            {
+                <button type="button" class="oas-rx-history-item @(Selected?.RevisionNumber == revision.RevisionNumber ? "oas-rx-history-item--selected" : "")" @onclick="() => _selectedNumber = revision.RevisionNumber">
+                    <strong>الإصدار @revision.RevisionNumber</strong>
+                    @if (revision.IsCurrent) { <span class="oas-rx-state oas-rx-state--active">الحالي</span> }
+                    <small>@revision.EffectiveDate?.ToString("yyyy/MM/dd")</small>
+                </button>
+            }
+            <p>تُحفظ القياسات السابقة للطلبات والفواتير التاريخية.</p>
+        </aside>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public UiPrescriptionFormModel Model { get; set; } = new();
+    private int? _selectedNumber;
+    private UiPrescriptionRevisionModel? Selected => Model.Revisions.FirstOrDefault(x => x.RevisionNumber == _selectedNumber)
+        ?? Model.Revisions.FirstOrDefault(x => x.IsCurrent) ?? Model.Revisions.OrderByDescending(x => x.RevisionNumber).FirstOrDefault();
+    private static readonly (string Key, string Label)[] Measurements =
+    [
+        ("SPH", "SPH (الكروية)"), ("CYL", "CYL (الأسطوانية)"), ("Axis", "Axis (المحور °)"),
+        ("ADD", "ADD (إضافة القراءة)"), ("Prism", "Prism (المنشور)"),
+        ("PrismBase", "Prism Base (اتجاه المنشور)"), ("PD", "PD (mm)"),
+        ("MonocularPD", "Mono PD (mm)"), ("VA", "VA (حدة الإبصار)"),
+        ("FittingHeight", "Fitting Height (mm)"), ("Notes", "ملاحظات العين")
+    ];
+    private string DisplayEye(string eyeName, string key)
+    {
+        var eye = Selected?.Eyes.FirstOrDefault(x => string.Equals(x.Eye, eyeName, StringComparison.OrdinalIgnoreCase));
+        if (eye is null) return "—";
+        return key switch
+        {
+            "SPH" => eye.SPH?.ToString("+0.00;-0.00;0.00") ?? "—",
+            "CYL" => eye.CYL?.ToString("+0.00;-0.00;0.00") ?? "—",
+            "Axis" => eye.Axis.HasValue ? $"{eye.Axis}°" : "—",
+            "ADD" => eye.ADD?.ToString("+0.00;-0.00;0.00") ?? "—",
+            "Prism" => eye.Prism?.ToString("0.00") ?? "—",
+            "PrismBase" => eye.PrismBase switch { "Up" => "أعلى", "Down" => "أسفل", "In" => "للداخل", "Out" => "للخارج", _ => "—" },
+            "PD" => eye.PD?.ToString("0.0") ?? "—",
+            "MonocularPD" => eye.MonocularPD?.ToString("0.0") ?? "—",
+            "VA" => eye.VA ?? "—",
+            "FittingHeight" => eye.FittingHeight?.ToString("0.0") ?? "—",
+            "Notes" => eye.Notes ?? "—",
+            _ => "—"
+        };
+    }
+}

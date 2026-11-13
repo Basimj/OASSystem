@@ -1,0 +1,211 @@
+@namespace OAS.Client.Sales.Workspace
+@using OAS.Contracts.Sales.Prescriptions
+@using OAS.Contracts.Sales.Enums
+
+<section class="oas-rx-list" dir="rtl">
+    <div class="oas-rx-kpis" aria-label="مؤشرات الوصفات في قاعدة البيانات">
+        <div class="oas-rx-kpi oas-rx-kpi--green">
+            <span class="oas-rx-kpi__icon"><i class="fa-solid fa-glasses" aria-hidden="true"></i></span>
+            <span class="oas-rx-kpi__label">إجمالي الوصفات</span>
+            <strong>@CountText(Summary?.TotalPrescriptions)</strong>
+            <small>كل الوصفات المسجلة</small>
+        </div>
+        <div class="oas-rx-kpi oas-rx-kpi--blue">
+            <span class="oas-rx-kpi__icon"><i class="fa-solid fa-layer-group" aria-hidden="true"></i></span>
+            <span class="oas-rx-kpi__label">إجمالي الإصدارات</span>
+            <strong>@CountText(Summary?.TotalRevisions)</strong>
+            <small>إصدارات القياسات المحفوظة</small>
+        </div>
+        <div class="oas-rx-kpi oas-rx-kpi--yellow">
+            <span class="oas-rx-kpi__icon"><i class="fa-solid fa-file-pen" aria-hidden="true"></i></span>
+            <span class="oas-rx-kpi__label">وصفات مسودة</span>
+            <strong>@CountText(Summary?.DraftPrescriptions)</strong>
+            <small>غير مفعلة بعد</small>
+        </div>
+        <div class="oas-rx-kpi oas-rx-kpi--red">
+            <span class="oas-rx-kpi__icon"><i class="fa-solid fa-circle-xmark" aria-hidden="true"></i></span>
+            <span class="oas-rx-kpi__label">وصفات ملغاة</span>
+            <strong>@CountText(Summary?.CancelledPrescriptions)</strong>
+            <small>لا توجد صلاحية انتهاء تلقائية في النظام</small>
+        </div>
+    </div>
+
+    <div class="oas-rx-filters" aria-label="تصفية الوصفات">
+        <strong><i class="fa-solid fa-filter" aria-hidden="true"></i> تصفية البيانات</strong>
+        <div class="oas-rx-filter-control">
+            <label for="rx-customer-filter"><i class="fa-solid fa-users" aria-hidden="true"></i> العملاء</label>
+            <input id="rx-customer-filter" type="search" value="@_customerFilter" @onchange="SearchCustomerAsync"
+                   placeholder="ابحث باسم العميل" title="بحث خادمي في بيانات الوصفات" aria-label="البحث باسم العميل في الوصفات" />
+        </div>
+        <div class="oas-rx-filter-control">
+            <label for="rx-doctor-filter"><i class="fa-solid fa-user-doctor" aria-hidden="true"></i> الأطباء</label>
+            <input id="rx-doctor-filter" type="search" value="@_doctorFilter" @onchange="SearchDoctorAsync"
+                   placeholder="ابحث باسم الطبيب" title="بحث خادمي في بيانات الوصفات" aria-label="البحث باسم الطبيب في الوصفات" />
+        </div>
+        <div class="oas-rx-filter-control oas-rx-filter-control--status">
+            <label for="rx-status-filter"><i class="fa-solid fa-list-check" aria-hidden="true"></i> الحالات</label>
+            <select id="rx-status-filter" value="@StatusFilter" @onchange="OnStatusChangedAsync">
+                <option value="">كل الحالات</option>
+                <option value="Active">نشطة</option>
+                <option value="Draft">مسودة</option>
+                <option value="Superseded">مستبدلة</option>
+                <option value="Cancelled">ملغاة</option>
+            </select>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(_customerFilter) || !string.IsNullOrWhiteSpace(_doctorFilter))
+        {
+            <button type="button" class="oas-rx-clear-search" @onclick="ClearFilterSearchAsync"><i class="fa-solid fa-xmark"></i> مسح البحث</button>
+        }
+    </div>
+
+    <div class="oas-rx-table-panel">
+        <div class="oas-rx-table-panel__head">
+            <h2><i class="fa-solid fa-list" aria-hidden="true"></i> قائمة الوصفات <span>(@TotalCount)</span></h2>
+            <span class="oas-rx-table-panel__hint">اضغط رقم الوصفة لفتحها في تبويب مستقل</span>
+        </div>
+        @if (IsLoading)
+        {
+            <div class="oas-rx-table-message" role="status"><i class="fa-solid fa-spinner fa-spin"></i> جاري تحميل الوصفات...</div>
+        }
+        else if (Items.Count == 0)
+        {
+            <div class="oas-rx-table-message"><i class="fa-solid fa-glasses"></i> لا توجد وصفات تطابق البحث أو التصفية.</div>
+        }
+        else
+        {
+            <div class="oas-rx-table-scroll">
+                <table class="oas-rx-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">رقم الوصفة</th>
+                            <th scope="col">العميل</th>
+                            <th scope="col">الطبيب / الفاحص</th>
+                            <th scope="col">العيادة</th>
+                            <th scope="col">تاريخ الوصفة</th>
+                            <th scope="col">الإصدار الحالي</th>
+                            <th scope="col">الحالة</th>
+                            <th scope="col">الإجراءات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Items)
+                        {
+                            var current = item.Revisions.FirstOrDefault(x => x.IsCurrent);
+                            <tr @key="item.Id">
+                                <td><button type="button" class="oas-rx-code" @onclick="() => OnOpen.InvokeAsync(item.Id)"><i class="fa-regular fa-file-lines"></i> @item.PrescriptionCode</button></td>
+                                <td>@(item.CustomerName ?? item.CustomerCode ?? "—")</td>
+                                <td>@(item.PrescribedBy ?? "—")</td>
+                                <td>@(item.ClinicName ?? "—")</td>
+                                <td><time dir="ltr" class="oas-rx-date" datetime="@item.PrescriptionDate.ToString("yyyy-MM-dd")">@item.PrescriptionDate.ToString("dd/MM/yyyy")</time></td>
+                                <td>@(current is null ? "—" : $"الإصدار {current.RevisionNumber}")</td>
+                                <td><span class="oas-rx-state @StatusClass(item.Status)"><i class="@StatusIcon(item.Status)" aria-hidden="true"></i> @StatusLabel(item.Status)</span></td>
+                                <td class="oas-rx-actions-cell">
+                                    <button type="button" class="oas-rx-view" @onclick="() => OnOpen.InvokeAsync(item.Id)"><i class="fa-solid fa-eye"></i> عرض</button>
+                                    <button type="button" class="oas-rx-view oas-rx-view--menu" title="فتح الوصفة @item.PrescriptionCode" aria-label="فتح الوصفة @item.PrescriptionCode" @onclick="() => OnOpen.InvokeAsync(item.Id)"><i class="fa-solid fa-ellipsis"></i></button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        @if (!IsLoading && TotalCount > 0)
+        {
+            <div class="oas-rx-table-pagination" dir="rtl">
+                <span>عرض @((PageNumber - 1) * PageSize + 1) - @Math.Min(TotalCount, (long)PageNumber * PageSize) من إجمالي @TotalCount وصفة</span>
+                <div class="oas-rx-table-pagination__controls" aria-label="صفحات الوصفات">
+                    <button type="button" disabled="@(PageNumber <= 1)" @onclick="() => OnGoToPage.InvokeAsync(1)" aria-label="الصفحة الأولى"><i class="fa-solid fa-angles-right"></i></button>
+                    <button type="button" disabled="@(PageNumber <= 1)" @onclick="() => OnPrevious.InvokeAsync()" aria-label="الصفحة السابقة"><i class="fa-solid fa-chevron-right"></i></button>
+                    @foreach (var page in VisiblePages)
+                    {
+                        <button type="button" class="@(page == PageNumber ? "oas-rx-page-active" : "")"
+                                aria-current="@(page == PageNumber ? "page" : null)" @onclick="() => OnGoToPage.InvokeAsync(page)">@(page)</button>
+                    }
+                    <button type="button" disabled="@(PageNumber >= TotalPages)" @onclick="() => OnNext.InvokeAsync()" aria-label="الصفحة التالية"><i class="fa-solid fa-chevron-left"></i></button>
+                    <button type="button" disabled="@(PageNumber >= TotalPages)" @onclick="() => OnGoToPage.InvokeAsync(TotalPages)" aria-label="الصفحة الأخيرة"><i class="fa-solid fa-angles-left"></i></button>
+                </div>
+                <label class="oas-rx-page-size">السجلات في الصفحة
+                    <select value="@PageSize" @onchange="ChangePageSizeAsync" aria-label="عدد السجلات في الصفحة">
+                        <option value="10">10</option><option value="20">20</option><option value="50">50</option>
+                    </select>
+                </label>
+            </div>
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter] public IReadOnlyList<PrescriptionDto> Items { get; set; } = [];
+    [Parameter] public PrescriptionDashboardSummaryDto? Summary { get; set; }
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public string? StatusFilter { get; set; }
+    [Parameter] public long TotalCount { get; set; }
+    [Parameter] public int PageNumber { get; set; } = 1;
+    [Parameter] public int PageSize { get; set; } = 20;
+    [Parameter] public EventCallback<string?> OnSearchTerm { get; set; }
+    [Parameter] public EventCallback<int> OnGoToPage { get; set; }
+    [Parameter] public EventCallback<int> OnPageSizeChanged { get; set; }
+    [Parameter] public int TotalPages { get; set; }
+    [Parameter] public EventCallback<string?> OnStatusChanged { get; set; }
+    [Parameter] public EventCallback<Guid> OnOpen { get; set; }
+    [Parameter] public EventCallback OnPrevious { get; set; }
+    [Parameter] public EventCallback OnNext { get; set; }
+
+    private string? _customerFilter;
+    private string? _doctorFilter;
+    private IEnumerable<int> VisiblePages
+    {
+        get
+        {
+            var count = Math.Min(5, TotalPages);
+            var start = Math.Max(1, Math.Min(PageNumber - 2, TotalPages - count + 1));
+            return Enumerable.Range(start, count);
+        }
+    }
+    private async Task SearchCustomerAsync(ChangeEventArgs args)
+    {
+        _customerFilter = args.Value?.ToString()?.Trim();
+        _doctorFilter = null;
+        await OnSearchTerm.InvokeAsync(_customerFilter);
+    }
+    private async Task SearchDoctorAsync(ChangeEventArgs args)
+    {
+        _doctorFilter = args.Value?.ToString()?.Trim();
+        _customerFilter = null;
+        await OnSearchTerm.InvokeAsync(_doctorFilter);
+    }
+    private async Task ClearFilterSearchAsync()
+    {
+        _customerFilter = null;
+        _doctorFilter = null;
+        await OnSearchTerm.InvokeAsync(null);
+    }
+    private Task ChangePageSizeAsync(ChangeEventArgs args) =>
+        OnPageSizeChanged.InvokeAsync(int.TryParse(args.Value?.ToString(), out var size) ? size : 20);
+    private static string StatusIcon(PrescriptionStatus status) => status switch
+    {
+        PrescriptionStatus.Active => "fa-solid fa-check",
+        PrescriptionStatus.Draft => "fa-solid fa-file-pen",
+        PrescriptionStatus.Superseded => "fa-solid fa-layer-group",
+        PrescriptionStatus.Cancelled => "fa-solid fa-xmark",
+        _ => "fa-solid fa-circle"
+    };
+    private static string CountText(long? value) => value?.ToString("N0") ?? "—";
+    private Task OnStatusChangedAsync(ChangeEventArgs args) => OnStatusChanged.InvokeAsync(args.Value?.ToString());
+    private static string StatusLabel(PrescriptionStatus status) => status switch
+    {
+        PrescriptionStatus.Active => "نشطة",
+        PrescriptionStatus.Draft => "مسودة",
+        PrescriptionStatus.Superseded => "مستبدلة",
+        PrescriptionStatus.Cancelled => "ملغاة",
+        _ => status.ToString()
+    };
+    private static string StatusClass(PrescriptionStatus status) => status switch
+    {
+        PrescriptionStatus.Active => "oas-rx-state--active",
+        PrescriptionStatus.Draft => "oas-rx-state--draft",
+        PrescriptionStatus.Superseded => "oas-rx-state--superseded",
+        PrescriptionStatus.Cancelled => "oas-rx-state--cancelled",
+        _ => ""
+    };
+}

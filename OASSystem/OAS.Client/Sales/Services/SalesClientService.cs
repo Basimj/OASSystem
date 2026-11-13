@@ -19,6 +19,9 @@ public sealed class SalesClientService(OasApiClient apiClient) : ISalesClientSer
         var r = request.Normalize();
         var query = $"?pageNumber={r.PageNumber}&pageSize={r.PageSize}";
         if (!string.IsNullOrWhiteSpace(r.Search)) query += $"&search={Uri.EscapeDataString(r.Search)}";
+        if (!string.IsNullOrWhiteSpace(r.Status)) query += $"&status={Uri.EscapeDataString(r.Status)}";
+        if (r.DateFrom.HasValue) query += $"&dateFrom={r.DateFrom.Value:yyyy-MM-dd}";
+        if (r.DateTo.HasValue) query += $"&dateTo={r.DateTo.Value:yyyy-MM-dd}";
         if (!string.IsNullOrWhiteSpace(r.SortBy)) query += $"&sortBy={Uri.EscapeDataString(r.SortBy)}&sortDirection={r.SortDirection}";
         return query;
     }
@@ -44,6 +47,9 @@ public sealed class SalesClientService(OasApiClient apiClient) : ISalesClientSer
     }
 
     public Task<PagedResult<PrescriptionDto>> GetPrescriptionsPageAsync(PageRequest r, CancellationToken ct = default) => GetPageAsync<PrescriptionDto>("api/sales/prescriptions", r, ct);
+    public Task<PrescriptionDashboardSummaryDto?> GetPrescriptionDashboardSummaryAsync(CancellationToken ct = default) => apiClient.GetAsync<PrescriptionDashboardSummaryDto>("api/sales/prescriptions/summary", ct);
+    public async Task<IReadOnlyList<PrescriptionRelatedDocumentDto>> GetPrescriptionRelatedDocumentsAsync(Guid id, CancellationToken ct = default) =>
+        await apiClient.GetAsync<IReadOnlyList<PrescriptionRelatedDocumentDto>>($"api/sales/prescriptions/{id:D}/documents", ct) ?? [];
     public Task<PrescriptionDto?> GetPrescriptionByIdAsync(Guid id, CancellationToken ct = default) => apiClient.GetAsync<PrescriptionDto>($"api/sales/prescriptions/{id}", ct);
     public Task<SalesCodeReservationDto?> ReservePrescriptionCodeAsync(CancellationToken ct = default) => apiClient.PostAsync<object, SalesCodeReservationDto>("api/sales/prescriptions/code/reserve", new { }, ct);
     public Task<PrescriptionDto?> CreatePrescriptionAsync(CreatePrescriptionRequest r, CancellationToken ct = default) => apiClient.PostAsync<CreatePrescriptionRequest, PrescriptionDto>("api/sales/prescriptions", r, ct);
@@ -51,6 +57,7 @@ public sealed class SalesClientService(OasApiClient apiClient) : ISalesClientSer
     public Task<PrescriptionDto?> CreatePrescriptionRevisionAsync(Guid id, CreatePrescriptionRevisionRequest r, CancellationToken ct = default) => apiClient.PostAsync<CreatePrescriptionRevisionRequest, PrescriptionDto>($"api/sales/prescriptions/{id}/revisions", r, ct);
     public Task<PrescriptionDto?> SetPrescriptionStatusAsync(Guid id, SetPrescriptionStatusRequest r, CancellationToken ct = default) => apiClient.PostAsync<SetPrescriptionStatusRequest, PrescriptionDto>($"api/sales/prescriptions/{id}/status", r, ct);
 
+    public Task<CustomerOrdersDashboardSummaryDto?> GetCustomerOrdersDashboardSummaryAsync(CancellationToken ct = default) => apiClient.GetAsync<CustomerOrdersDashboardSummaryDto>("api/sales/customer-orders/dashboard-summary", ct);
     public Task<PagedResult<CustomerOrderDto>> GetCustomerOrdersPageAsync(PageRequest r, CancellationToken ct = default) => GetPageAsync<CustomerOrderDto>("api/sales/customer-orders", r, ct);
     public Task<CustomerOrderDto?> GetCustomerOrderByIdAsync(Guid id, CancellationToken ct = default) => apiClient.GetAsync<CustomerOrderDto>($"api/sales/customer-orders/{id}", ct);
     public Task<SalesCodeReservationDto?> ReserveCustomerOrderCodeAsync(DateOnly date, CancellationToken ct = default) => apiClient.PostAsync<object, SalesCodeReservationDto>($"api/sales/customer-orders/code/reserve?orderDate={date:yyyy-MM-dd}", new { }, ct);

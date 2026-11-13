@@ -49,8 +49,23 @@ public sealed class CustomerOrderLineRequestValidator : AbstractValidator<Custom
     {
         RuleFor(x => x.Quantity).GreaterThan(0);
         RuleFor(x => x.ActualUnitPrice).GreaterThanOrEqualTo(0);
-        RuleFor(x => x.DiscountValue).GreaterThanOrEqualTo(0).When(x => x.DiscountValue.HasValue);
-        RuleFor(x => x.TaxRate).GreaterThanOrEqualTo(0).When(x => x.TaxRate.HasValue);
+        RuleFor(x => x.DiscountType).IsInEnum().WithMessage("نوع الخصم غير صالح.");
+        RuleFor(x => x.DiscountValue)
+            .NotNull().WithMessage("أدخل قيمة الخصم بعد اختيار نوعه.")
+            .When(x => x.DiscountType != SalesDiscountType.None);
+        RuleFor(x => x.DiscountValue)
+            .GreaterThanOrEqualTo(0m).WithMessage("قيمة الخصم لا يمكن أن تكون سالبة.")
+            .When(x => x.DiscountValue.HasValue);
+        RuleFor(x => x.DiscountValue)
+            .LessThanOrEqualTo(100m).WithMessage("نسبة الخصم يجب ألا تتجاوز 100%.")
+            .When(x => x.DiscountType == SalesDiscountType.Percentage && x.DiscountValue.HasValue);
+        RuleFor(x => x.DiscountValue)
+            .Must((line, value) => !value.HasValue || value.Value <= line.Quantity * line.ActualUnitPrice)
+            .WithMessage("الخصم الثابت لا يمكن أن يتجاوز قيمة البند.")
+            .When(x => x.DiscountType == SalesDiscountType.FixedAmount && x.DiscountValue.HasValue && x.ActualUnitPrice > 0m);
+        RuleFor(x => x.TaxRate)
+            .InclusiveBetween(0m, 100m).WithMessage("نسبة الضريبة يجب أن تكون بين 0 و100%.")
+            .When(x => x.TaxRate.HasValue);
         RuleFor(x => x.ProductVariantId).NotEmpty().When(x => x.LineType is SalesLineType.Frame or SalesLineType.Lens or SalesLineType.Accessory);
         // Warehouse depends on the selected product's IsStockItem flag and is therefore
         // validated authoritatively by ISalesLineResolver. Non-stock optical products must

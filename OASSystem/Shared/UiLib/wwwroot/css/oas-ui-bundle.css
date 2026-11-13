@@ -34,3 +34,9 @@
 
 /* Shared appearance normalization loaded last for EVERY module. */
 @import "./oas-global-appearance.css";
+
+/* Prescriptions reference UI: loaded last to avoid theme overwriting its design. */
+@import "./features/prescriptions-approved.css";
+
+/* Customer orders approved compact dashboard and editor; after global appearance. */
+@import "./features/customer-orders-approved.css";

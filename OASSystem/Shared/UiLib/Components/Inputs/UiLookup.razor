@@ -1,6 +1,8 @@
 @namespace OAS.UiLib.Components.Inputs
 @using System.Threading
 @implements IAsyncDisposable
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
 
 <div class="ui-lookup">
     @if (!string.IsNullOrWhiteSpace(Label))
@@ -21,8 +23,15 @@
                 aria-invalid="@(HasError ? "true" : null)" aria-describedby="@(HasError ? _errorId : null)"
                 popovertarget="@_popoverId" aria-haspopup="dialog" aria-controls="@_popoverId"
                 @onclick="OpenPopoverAsync">
-            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-            <span class="ui-lookup__popover-value">@(!string.IsNullOrWhiteSpace(Value) ? SelectedItem?.PrimaryText ?? _query : Placeholder)</span>
+            @if (!string.IsNullOrWhiteSpace(Value))
+            {
+                <i class="ui-lookup__selected-icon fa-solid fa-circle-check" aria-hidden="true"></i>
+            }
+            else
+            {
+                <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            }
+            <span class="ui-lookup__popover-value">@PopoverSelectionText</span>
             <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
         </button>
         <div id="@_popoverId" class="ui-lookup__popover" popover="auto" role="dialog"
@@ -172,6 +181,9 @@
     private string? _lastExternalValue;
     private long _searchVersion;
     private bool _disposed;
+    private IJSObjectReference? _popoverModule;
+    private string? _selectedPopoverValue;
+    private string? _selectedPopoverText;
 
     [Parameter] public string? Value { get; set; }
     [Parameter] public EventCallback<string?> ValueChanged { get; set; }
@@ -192,6 +204,16 @@
     [Parameter] public int PageSize { get; set; } = 30;
     [Parameter] public Func<string, int, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchPageAsync { get; set; }
 
+    // A popover selection must stay visible even while the parent model refreshes its display text.
+    private string PopoverSelectionText => string.IsNullOrWhiteSpace(Value)
+        ? Placeholder
+        : string.Equals(_selectedPopoverValue, Value, StringComparison.Ordinal) &&
+          !string.IsNullOrWhiteSpace(_selectedPopoverText)
+            ? _selectedPopoverText
+            : SelectedItem is not null && string.Equals(SelectedItem.Value, Value, StringComparison.Ordinal)
+                ? SelectedItem.PrimaryText
+                : !string.IsNullOrWhiteSpace(_query) ? _query : Value ?? Placeholder;
+
     private bool HasError => !string.IsNullOrWhiteSpace(ErrorText);
     private string PopoverTriggerClass => HasError
         ? "ui-lookup__popover-trigger ui-lookup__popover-trigger--invalid"
@@ -205,6 +227,11 @@
             return;
 
         _lastExternalValue = Value;
+        if (!string.Equals(_selectedPopoverValue, Value, StringComparison.Ordinal))
+        {
+            _selectedPopoverValue = null;
+            _selectedPopoverText = null;
+        }
 
         if (string.IsNullOrWhiteSpace(Value))
         {
@@ -371,7 +398,11 @@
         _open = false;
         _items.Clear();
         _lastExternalValue = item.Value;
+        _selectedPopoverValue = item.Value;
+        _selectedPopoverText = item.PrimaryText;
 
+        // Closing before ValueChanged avoids a race with the parent's Blazor re-render.
+        await ClosePopoverAsync();
         await SelectedItemChanged.InvokeAsync(item);
         await ValueChanged.InvokeAsync(item.Value);
     }
@@ -385,12 +416,30 @@
         _open = false;
         _items.Clear();
         _lastExternalValue = null;
+        _selectedPopoverValue = null;
+        _selectedPopoverText = null;
 
+        await ClosePopoverAsync();
         await SelectedItemChanged.InvokeAsync((UiLookupItem?)null);
         await ValueChanged.InvokeAsync((string?)null);
     }
 
-    public ValueTask DisposeAsync()
+    private async Task ClosePopoverAsync()
+    {
+        if (!UsePopover)
+            return;
+
+        try
+        {
+            _popoverModule ??= await JS.InvokeAsync<IJSObjectReference>(
+                "import", "./_content/OAS.UiLib/js/oas-lookup-popover.js");
+            await _popoverModule.InvokeVoidAsync("closePopover", _popoverId);
+        }
+        catch (JSException) { /* Native popovertargetaction=hide remains a fallback. */ }
+        catch (InvalidOperationException) { /* Prerendering or a disconnected circuit. */ }
+    }
+
+    public async ValueTask DisposeAsync()
     {
         _disposed = true;
         Interlocked.Increment(ref _searchVersion);
@@ -399,6 +448,11 @@
         _searchCts?.Dispose();
         _searchCts = null;
 
-        return ValueTask.CompletedTask;
+        if (_popoverModule is not null)
+        {
+            try { await _popoverModule.DisposeAsync(); }
+            catch (JSException) { /* The page may already be disconnected. */ }
+            catch (InvalidOperationException) { }
+        }
     }
 }

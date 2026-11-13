@@ -15,6 +15,8 @@ namespace OAS.Client.Sales.Services;
 public interface ISalesClientService
 {
     Task<PagedResult<PrescriptionDto>> GetPrescriptionsPageAsync(PageRequest request, CancellationToken cancellationToken = default);
+    Task<PrescriptionDashboardSummaryDto?> GetPrescriptionDashboardSummaryAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<PrescriptionRelatedDocumentDto>> GetPrescriptionRelatedDocumentsAsync(Guid id, CancellationToken cancellationToken = default);
     Task<PrescriptionDto?> GetPrescriptionByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<SalesCodeReservationDto?> ReservePrescriptionCodeAsync(CancellationToken cancellationToken = default);
     Task<PrescriptionDto?> CreatePrescriptionAsync(CreatePrescriptionRequest request, CancellationToken cancellationToken = default);
@@ -23,6 +25,7 @@ public interface ISalesClientService
     Task<PrescriptionDto?> SetPrescriptionStatusAsync(Guid id, SetPrescriptionStatusRequest request, CancellationToken cancellationToken = default);
 
     Task<PagedResult<CustomerOrderDto>> GetCustomerOrdersPageAsync(PageRequest request, CancellationToken cancellationToken = default);
+    Task<CustomerOrdersDashboardSummaryDto?> GetCustomerOrdersDashboardSummaryAsync(CancellationToken cancellationToken = default);
     Task<CustomerOrderDto?> GetCustomerOrderByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<SalesCodeReservationDto?> ReserveCustomerOrderCodeAsync(DateOnly orderDate, CancellationToken cancellationToken = default);
     Task<CustomerOrderDto?> CreateCustomerOrderAsync(CreateCustomerOrderRequest request, CancellationToken cancellationToken = default);

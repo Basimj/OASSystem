@@ -32,6 +32,7 @@ public partial class SalesWorkspaceHost : IDisposable
 {
     [Parameter] public SalesEntityType Section { get; set; }
     [Parameter] public Guid? RequestedInvoiceId { get; set; }
+    [Parameter] public Guid? RequestedOrderId { get; set; }
     [Parameter] public bool CreateNew { get; set; }
     [Parameter] public bool CollectPayment { get; set; }
     [Inject] private ISalesClientService Sales { get; set; } = default!;
@@ -45,6 +46,18 @@ public partial class SalesWorkspaceHost : IDisposable
     [Inject] private IApiFeedbackService ApiFeedback { get; set; } = default!;
 
     private readonly List<UiSalesDocumentListItem> _listItems = [];
+    private readonly List<PrescriptionDto> _prescriptionRows = [];
+    private readonly List<CustomerOrderDto> _customerOrderRows = [];
+    private CustomerOrdersDashboardSummaryDto? _customerOrderSummary;
+    private string? _orderStatusFilter;
+    private DateOnly? _orderDateFrom;
+    private DateOnly? _orderDateTo;
+    private int _orderPageSize = 20;
+    private readonly Dictionary<Guid, IReadOnlyList<PrescriptionRelatedDocumentDto>> _prescriptionRelated = [];
+    private readonly HashSet<Guid> _unavailablePrescriptionRelated = [];
+    private PrescriptionDashboardSummaryDto? _prescriptionSummary;
+    private string? _prescriptionStatus;
+    private int _prescriptionPageSize = 20;
     private readonly Dictionary<Guid, SalesCustomerLookupDto> _customers = [];
     private readonly Dictionary<Guid, EmployeeDto> _employees = [];
     private readonly Dictionary<Guid, SalesProductTypeLookupDto> _productTypes = [];
@@ -63,6 +76,8 @@ public partial class SalesWorkspaceHost : IDisposable
     private readonly Dictionary<Guid, UiPrescriptionRevisionModel> _revisionDrafts = [];
     private readonly HashSet<Guid> _dirtyRevisionDraftTabs = [];
     private bool _isSavingRevision;
+    private OAS.UiLib.Components.Sales.Prescriptions.UiPrescriptionRevisionEditor? _activePrescriptionRevisionEditor;
+    private OAS.UiLib.Components.Sales.Orders.UiCustomerOrderEditor? _activeCustomerOrderEditor;
     private bool _isPrintingInvoice;
     private bool _isCollectingInvoicePayment;
     private SalesEntityType? _lastSection;
@@ -76,11 +91,20 @@ public partial class SalesWorkspaceHost : IDisposable
             : null;
     private SalesEntityType ActiveEntityType => ActiveTab?.EntityType ?? Section;
     private IReadOnlyList<UiSalesDocumentListItem> ListItems => _listItems;
+    private bool RelatedUnavailable(Guid? prescriptionId) => prescriptionId.HasValue && _unavailablePrescriptionRelated.Contains(prescriptionId.Value);
+    private IReadOnlyList<PrescriptionRelatedDocumentDto> RelatedFor(Guid? prescriptionId) =>
+        prescriptionId.HasValue && _prescriptionRelated.TryGetValue(prescriptionId.Value, out var docs) ? docs : [];
     private string ListTitle => ActiveEntityType switch { SalesEntityType.Prescriptions => "الوصفات", SalesEntityType.CustomerOrders => "طلبات العملاء", _ => "فواتير المبيعات" };
     private string ListSubtitle => ActiveEntityType switch { SalesEntityType.Prescriptions => "إدارة الوصفات الطبية وإصدارات القياس", SalesEntityType.CustomerOrders => "طلبات العملاء وحالة توفر المخزون", _ => "الفواتير والتأكيد والترحيل المحاسبي والمخزني" };
     private string EmptyTitle => ActiveEntityType switch { SalesEntityType.Prescriptions => "لا توجد وصفات", SalesEntityType.CustomerOrders => "لا توجد طلبات عملاء", _ => "لا توجد فواتير مبيعات" };
     private string EmptyText => "اضغط «جديد» لإنشاء أول مستند.";
     private string ListIcon => ActiveEntityType switch { SalesEntityType.Prescriptions => "fa-solid fa-glasses", SalesEntityType.CustomerOrders => "fa-solid fa-clipboard-list", _ => "fa-solid fa-file-invoice-dollar" };
+    private IReadOnlyList<UiApplicationTabItem> PrescriptionTabItems => Workspace.Tabs
+        .Where(x => x.EntityType == SalesEntityType.Prescriptions)
+        .Select(x => new UiApplicationTabItem(x.TabId, x.IsListTab ? "الكل" : x.Title, RouteFor(x.EntityType), x.IconCss(), x.TabId == Workspace.ActiveTabId, x.CanClose)).ToArray();
+    private IReadOnlyList<UiApplicationTabItem> CustomerOrderTabItems => Workspace.Tabs
+        .Where(x => x.EntityType == SalesEntityType.CustomerOrders)
+        .Select(x => new UiApplicationTabItem(x.TabId, x.IsListTab ? "الكل" : x.Title, RouteFor(x.EntityType), x.IconCss(), x.TabId == Workspace.ActiveTabId, x.CanClose)).ToArray();
     private IReadOnlyList<UiApplicationTabItem> TabItems => Workspace.Tabs.Select(x => new UiApplicationTabItem(x.TabId, x.Title, RouteFor(x.EntityType), x.IconCss(), x.TabId == Workspace.ActiveTabId, x.CanClose)).ToArray();
 
     protected override void OnInitialized() => Workspace.OnChange += WorkspaceChanged;
@@ -94,12 +118,16 @@ public partial class SalesWorkspaceHost : IDisposable
                 Workspace.OpenOrActivateListTab(Section);
             _pageNumber = 1;
             _search = null;
+            _prescriptionStatus = null;
+            _orderStatusFilter = null;
+            _orderDateFrom = null;
+            _orderDateTo = null;
             await LoadListAsync(Section);
         }
 
         // Deep-link from the dashboard. Do not repeat tab creation if the component
         // rerenders with the same route parameters.
-        var requestKey = $"{Section}:{RequestedInvoiceId}:{CreateNew}:{CollectPayment}";
+        var requestKey = $"{Section}:{RequestedInvoiceId}:{RequestedOrderId}:{CreateNew}:{CollectPayment}";
         if (_lastRouteRequest == requestKey) return;
         _lastRouteRequest = requestKey;
         if (RequestedInvoiceId.HasValue && Section == SalesEntityType.SalesInvoices)
@@ -107,6 +135,10 @@ public partial class SalesWorkspaceHost : IDisposable
             await OpenEntityAsync(RequestedInvoiceId.Value);
             _pendingCollectionDialog = CollectPayment &&
                 ActiveTab?.Model is UiSalesInvoiceFormModel;
+        }
+        else if (RequestedOrderId.HasValue && Section == SalesEntityType.CustomerOrders)
+        {
+            await OpenEntityAsync(RequestedOrderId.Value);
         }
         else if (CreateNew)
         {
@@ -127,23 +159,29 @@ public partial class SalesWorkspaceHost : IDisposable
 
     private async Task LoadListAsync(SalesEntityType type)
     {
-        _isLoading = true; _listItems.Clear();
+        _isLoading = true; _listItems.Clear(); _prescriptionRows.Clear(); _customerOrderRows.Clear();
         try
         {
-            var request = new PageRequest { PageNumber = _pageNumber, PageSize = 20, Search = _search };
+            var request = new PageRequest { PageNumber = _pageNumber, PageSize = type == SalesEntityType.Prescriptions ? _prescriptionPageSize : type == SalesEntityType.CustomerOrders ? _orderPageSize : 20, Search = _search,
+                Status = type == SalesEntityType.Prescriptions ? _prescriptionStatus : type == SalesEntityType.CustomerOrders ? _orderStatusFilter : null,
+                DateFrom = type == SalesEntityType.CustomerOrders ? _orderDateFrom : null,
+                DateTo = type == SalesEntityType.CustomerOrders ? _orderDateTo : null,
+                SortDirection = type is SalesEntityType.Prescriptions or SalesEntityType.CustomerOrders ? SortDirection.Descending : SortDirection.Ascending };
             switch (type)
             {
                 case SalesEntityType.Prescriptions:
                 {
                     var page = await Sales.GetPrescriptionsPageAsync(request);
+                    _prescriptionRows.AddRange(page.Items);
                     _totalCount = page.TotalCount; _totalPages = page.TotalPages;
-                    _listItems.AddRange(page.Items.Select(x => { var current = x.Revisions.FirstOrDefault(r => r.IsCurrent); return new UiSalesDocumentListItem(x.Id, x.PrescriptionCode, x.CustomerName ?? x.CustomerCode ?? "عميل", x.PrescribedBy, SalesArabicPresenter.PrescriptionStatusText(x.Status), SalesArabicPresenter.StatusCss(x.Status.ToString()), DateText: x.PrescriptionDate.ToString("yyyy-MM-dd"), MetaText: current is not null ? $"Revision {current.RevisionNumber}" : null); }));
+                    _listItems.AddRange(page.Items.Select(x => { var current = x.Revisions.FirstOrDefault(r => r.IsCurrent); return new UiSalesDocumentListItem(x.Id, x.PrescriptionCode, x.CustomerName ?? x.CustomerCode ?? "عميل", x.PrescribedBy, SalesArabicPresenter.PrescriptionStatusText(x.Status), SalesArabicPresenter.StatusCss(x.Status.ToString()), DateText: x.PrescriptionDate.ToString("yyyy-MM-dd"), MetaText: current is not null ? $"الإصدار {current.RevisionNumber}" : null); }));
                     break;
                 }
                 case SalesEntityType.CustomerOrders:
                 {
                     var page = await Sales.GetCustomerOrdersPageAsync(request);
                     _totalCount = page.TotalCount; _totalPages = page.TotalPages;
+                    _customerOrderRows.AddRange(page.Items);
                     _listItems.AddRange(page.Items.Select(x => new UiSalesDocumentListItem(x.Id, x.OrderCode, x.CustomerName ?? x.CustomerCode ?? "عميل", x.CustomerCode, SalesArabicPresenter.OrderStatusText(x.Status), SalesArabicPresenter.StatusCss(x.Status.ToString()), $"{x.TotalAmount:N2} {x.CurrencyCodeSnapshot}", x.OrderDate.ToString("yyyy-MM-dd"), x.RequiredDate.HasValue ? $"مطلوب: {x.RequiredDate.Value:yyyy-MM-dd}" : null)));
                     break;
                 }
@@ -158,6 +196,118 @@ public partial class SalesWorkspaceHost : IDisposable
         }
         catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
         finally { _isLoading = false; await InvokeAsync(StateHasChanged); }
+        if (type == SalesEntityType.Prescriptions)
+            await LoadPrescriptionSummaryAsync();
+        else if (type == SalesEntityType.CustomerOrders)
+            await LoadCustomerOrderSummaryAsync();
+    }
+
+    private async Task LoadCustomerOrderSummaryAsync()
+    {
+        try { _customerOrderSummary = await Sales.GetCustomerOrdersDashboardSummaryAsync(); }
+        catch (ApiClientException ex) { _customerOrderSummary = null; ApiFeedback.Show(ex.Error); }
+    }
+
+    private async Task GoToOrderPageAsync(int number)
+    {
+        if (number < 1 || number > _totalPages || number == _pageNumber) return;
+        _pageNumber = number;
+        await LoadListAsync(SalesEntityType.CustomerOrders);
+    }
+    private async Task OrderPageSizeChangedAsync(int size)
+    {
+        if (size is not (10 or 20 or 50)) return;
+        _orderPageSize = size;
+        _pageNumber = 1;
+        await LoadListAsync(SalesEntityType.CustomerOrders);
+    }
+    private async Task OrderStatusChangedAsync(string? status)
+    {
+        _orderStatusFilter = status;
+        _pageNumber = 1;
+        await LoadListAsync(SalesEntityType.CustomerOrders);
+    }
+    private async Task OrderDateFromChangedAsync(DateOnly? date)
+    {
+        _orderDateFrom = date;
+        _pageNumber = 1;
+        await LoadListAsync(SalesEntityType.CustomerOrders);
+    }
+    private async Task OrderDateToChangedAsync(DateOnly? date)
+    {
+        _orderDateTo = date;
+        _pageNumber = 1;
+        await LoadListAsync(SalesEntityType.CustomerOrders);
+    }
+    private static string OrderNextStep(string status) => status switch
+    {
+        "Draft" => "الخطوة التالية: مراجعة البنود ثم إتمام البيع.",
+        "AwaitingStock" or "PartiallyAvailable" => "يوجد نقص في التوفر؛ راجع متابعة الطلب والتوريد.",
+        "ReadyForProduction" or "InProduction" => "الطلب في مسار المعمل؛ راجع مراحل التجهيز والجودة.",
+        "ReadyForDelivery" => "الطلب جاهز لمراجعة التسوية والتسليم.",
+        "Completed" => "اكتملت معالجة الطلب.",
+        "Cancelled" => "هذا الطلب ملغى.",
+        _ => "افتح متابعة الطلب لعرض التوفر والتجهيز والتسليم."
+    };
+    private void GoToOrderTracking()
+    {
+        if (ActiveTab?.Model is UiCustomerOrderFormModel order && order.Id.HasValue)
+            Navigation.NavigateTo($"/sales/order-tracking?orderId={order.Id.Value:D}");
+        else
+            Navigation.NavigateTo("/sales/order-tracking");
+    }
+    private Task OpenOrderTrackingAsync(MouseEventArgs _) { GoToOrderTracking(); return Task.CompletedTask; }
+
+    private async Task LoadPrescriptionSummaryAsync()
+    {
+        try { _prescriptionSummary = await Sales.GetPrescriptionDashboardSummaryAsync(); }
+        catch (ApiClientException ex) { _prescriptionSummary = null; ApiFeedback.Show(ex.Error); }
+    }
+
+    private async Task LoadRelatedPrescriptionDocumentsAsync(Guid prescriptionId)
+    {
+        try
+        {
+            _prescriptionRelated[prescriptionId] = await Sales.GetPrescriptionRelatedDocumentsAsync(prescriptionId);
+            _unavailablePrescriptionRelated.Remove(prescriptionId);
+        }
+        catch (ApiClientException ex)
+        {
+            _prescriptionRelated.Remove(prescriptionId);
+            _unavailablePrescriptionRelated.Add(prescriptionId);
+            // The prescription itself remains usable without permissions for orders/invoices.
+            // The related-documents section displays its own unavailable state.
+        }
+    }
+
+    private void OpenRelatedPrescriptionDocument(PrescriptionRelatedDocumentDto doc)
+    {
+        if (doc.DocumentType == "SalesInvoice")
+            Navigation.NavigateTo($"/sales/invoices?invoiceId={doc.DocumentId:D}");
+        else if (doc.DocumentType == "CustomerOrder")
+            Navigation.NavigateTo($"/sales/customer-orders?orderId={doc.DocumentId:D}");
+    }
+
+    private async Task GoToPrescriptionPageAsync(int page)
+    {
+        if (page < 1 || page > _totalPages || page == _pageNumber) return;
+        _pageNumber = page;
+        await LoadListAsync(SalesEntityType.Prescriptions);
+    }
+
+    private async Task PrescriptionPageSizeChangedAsync(int size)
+    {
+        if (size is not (10 or 20 or 50)) return;
+        _prescriptionPageSize = size;
+        _pageNumber = 1;
+        await LoadListAsync(SalesEntityType.Prescriptions);
+    }
+
+    private async Task PrescriptionStatusChangedAsync(string? status)
+    {
+        _prescriptionStatus = string.IsNullOrWhiteSpace(status) ? null : status;
+        _pageNumber = 1;
+        await LoadListAsync(SalesEntityType.Prescriptions);
     }
 
     private async Task NewAsync(MouseEventArgs _)
@@ -171,7 +321,7 @@ public partial class SalesWorkspaceHost : IDisposable
             switch (type)
             {
                 case SalesEntityType.Prescriptions:
-                            var rxCall = await Sales.ReservePrescriptionCodeResultAsync();
+                    var rxCall = await Sales.ReservePrescriptionCodeResultAsync();
                     if (!TryGetApiResult(rxCall, out var rx) || rx is null) { Workspace.RemoveTab(tab.TabId); return; }
                     tab.Model = new UiPrescriptionFormModel
                     {
@@ -213,8 +363,9 @@ public partial class SalesWorkspaceHost : IDisposable
             switch (type)
             {
                 case SalesEntityType.Prescriptions:
-                            var prescription = await Sales.GetPrescriptionByIdAsync(id); if (prescription is null) return;
+                    var prescription = await Sales.GetPrescriptionByIdAsync(id); if (prescription is null) return;
                     var rxTab = Workspace.OpenOrActivateEntityTab(type, id, prescription.PrescriptionCode); rxTab.CompleteSave(prescription.Id, prescription.PrescriptionCode, SalesUiMapper.ToUi(prescription));
+                    await LoadRelatedPrescriptionDocumentsAsync(prescription.Id);
                     break;
                 case SalesEntityType.CustomerOrders:
                     var order = await Sales.GetCustomerOrderByIdAsync(id); if (order is null) return;
@@ -234,6 +385,11 @@ public partial class SalesWorkspaceHost : IDisposable
     {
         if (ActiveTab is null || ActiveTab.Model is null) return;
         ClearMessages();
+        if (ActiveTab.Model is UiCustomerOrderFormModel && _activeCustomerOrderEditor is { } orderEditor && !orderEditor.ValidateRequiredInputs())
+        {
+            Snackbar.Error("صحح الحقول المطلوبة والكميات والأسعار ونسب الخصم والضريبة المميزة بالأحمر قبل حفظ الطلب.");
+            return;
+        }
         ActiveTab.IsSaving = true;
         try
         {
@@ -242,6 +398,16 @@ public partial class SalesWorkspaceHost : IDisposable
                 case UiPrescriptionFormModel model:
                 {
                     if (!RequireGuid(model.CustomerId, "يجب تحديد العميل.")) return;
+                    if (!model.PrescriptionDate.HasValue)
+                    {
+                        Snackbar.Error("حدد تاريخ الوصفة قبل الحفظ.");
+                        return;
+                    }
+                    if (model.PrescribedBy?.Length > 150 || model.ClinicName?.Length > 150 || model.Notes?.Length > 1000)
+                    {
+                        Snackbar.Error("راجع طول حقول الطبيب والعيادة والملاحظات قبل الحفظ.");
+                        return;
+                    }
 
                     PrescriptionDto? prescription;
                     if (model.Id.HasValue)
@@ -260,6 +426,11 @@ public partial class SalesWorkspaceHost : IDisposable
                             return;
                         }
 
+                        if (_activePrescriptionRevisionEditor?.HasInputErrors == true)
+                        {
+                            Snackbar.Error("صحح قياسات العين المميزة بالأحمر قبل الحفظ.");
+                            return;
+                        }
                         if (!ValidateRevisionDraft(initialRevision)) return;
 
                         var call = await Sales.CreatePrescriptionResultAsync(
@@ -276,6 +447,7 @@ public partial class SalesWorkspaceHost : IDisposable
                             prescription.Id,
                             prescription.PrescriptionCode,
                             SalesUiMapper.ToUi(prescription));
+                        await LoadRelatedPrescriptionDocumentsAsync(prescription.Id);
                     }
 
                     break;
@@ -459,7 +631,7 @@ public partial class SalesWorkspaceHost : IDisposable
     private async Task CancelOrderAsync(MouseEventArgs _)
     {
         if (ActiveTab?.Model is not UiCustomerOrderFormModel m || !m.Id.HasValue) return;
-        if (!await Dialogs.ConfirmAsync("إلغاء الطلب", "سيتم تحرير الحجوزات النشطة المرتبطة بالطلب. هل تريد المتابعة؟", AlertTone.Warning, "إلغاء الطلب", "رجوع")) return;
+        if (!await Dialogs.ConfirmAsync("إلغاء الطلب", "قبل الإلغاء، يتحقق النظام من عدم وجود فاتورة غير ملغاة أو عربون فعّال أو أمر معمل نشط أو توريد ملتزم به. إذا وُجد أي منها سيُرفض الإلغاء. عند السماح، تُحرر الحجوزات النشطة. هل تريد المتابعة؟", AlertTone.Warning, "إلغاء الطلب", "رجوع")) return;
         var call = await Sales.CancelCustomerOrderResultAsync(m.Id.Value, new CancelCustomerOrderRequest(m.RowVersion));
         if (!TryGetApiResult(call, out var dto)) return;
         if (dto is not null) ActiveTab.Model = SalesUiMapper.ToUi(dto);
@@ -925,6 +1097,11 @@ public partial class SalesWorkspaceHost : IDisposable
 
         try
         {
+            if (_activePrescriptionRevisionEditor?.HasInputErrors == true)
+            {
+                Snackbar.Error("صحح قياسات العين المميزة بالأحمر قبل حفظ الإصدار.");
+                return;
+            }
             if (!ValidateRevisionDraft(revisionDraft)) return;
 
             var call = await Sales.CreatePrescriptionRevisionResultAsync(
@@ -935,7 +1112,10 @@ public partial class SalesWorkspaceHost : IDisposable
             if (!TryGetApiResult(call, out var dto)) return;
 
             if (dto is not null)
+            {
                 ActiveTab.Model = SalesUiMapper.ToUi(dto);
+                await LoadRelatedPrescriptionDocumentsAsync(dto.Id);
+            }
 
             _revisionDrafts.Remove(ActiveTab.TabId);
             _dirtyRevisionDraftTabs.Remove(ActiveTab.TabId);
@@ -1091,7 +1271,7 @@ public partial class SalesWorkspaceHost : IDisposable
         foreach (var x in rows.Where(x => x.CurrentRevisionId.HasValue))
         {
             var rev = new SalesPrescriptionRevisionLookupDto(x.CurrentRevisionId!.Value, x.Id, x.PrescriptionCode, x.CurrentRevisionNumber ?? 0, x.PrescriptionDate, true, x.IsActive);
-            _revisions[rev.Id] = rev; result.Add(new UiLookupItem(rev.Id.ToString(), $"{x.PrescriptionCode} / Revision {rev.RevisionNumber}", x.PrescriptionDate.ToString("yyyy-MM-dd"), "fa-solid fa-glasses", !x.IsActive));
+            _revisions[rev.Id] = rev; result.Add(new UiLookupItem(rev.Id.ToString(), $"{x.PrescriptionCode} / إصدار {rev.RevisionNumber}", x.PrescriptionDate.ToString("yyyy-MM-dd"), "fa-solid fa-glasses", !x.IsActive));
         }
         return result;
     }

@@ -27,3 +27,6 @@
 /* Inline validation shared by popover and conventional lookups. */
 .ui-lookup__popover-trigger--invalid,.ui-lookup__control--invalid{border-color:var(--oas-color-danger)!important;box-shadow:0 0 0 2px color-mix(in srgb,var(--oas-color-danger) 13%,transparent)}
 .ui-lookup__error{color:var(--oas-color-danger);font-size:var(--oas-font-xs);line-height:1.45;overflow-wrap:anywhere}
+
+/* A chosen lookup item is confirmed in the closed trigger, in every theme. */
+.ui-lookup__popover-trigger > .ui-lookup__selected-icon {color:var(--oas-color-success,#168454);font-size:12px}

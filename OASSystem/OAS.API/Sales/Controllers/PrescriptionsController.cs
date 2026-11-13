@@ -22,6 +22,14 @@ public sealed class PrescriptionsController(ISender sender) : ControllerBase
         CancellationToken cancellationToken)
         => Ok(await sender.Send(new GetPrescriptionsQuery(request), cancellationToken));
 
+    [HttpGet("summary")]
+    public async Task<ActionResult<PrescriptionDashboardSummaryDto>> GetSummary(CancellationToken cancellationToken)
+        => Ok(await sender.Send(new GetPrescriptionDashboardSummaryQuery(), cancellationToken));
+
+    [HttpGet("{id:guid}/documents")]
+    public async Task<ActionResult<IReadOnlyList<PrescriptionRelatedDocumentDto>>> GetRelatedDocuments(Guid id, CancellationToken cancellationToken)
+        => Ok(await sender.Send(new GetPrescriptionRelatedDocumentsQuery(id), cancellationToken));
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<PrescriptionDto>> GetById(
         Guid id,

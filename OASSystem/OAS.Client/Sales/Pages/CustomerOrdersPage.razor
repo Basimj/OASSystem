@@ -2,8 +2,9 @@
 @attribute [Authorize]
 @using OAS.Client.Sales.Workspace
 
-<SalesWorkspaceHost Section="SalesEntityType.CustomerOrders" CreateNew="@Create" />
+<SalesWorkspaceHost Section="SalesEntityType.CustomerOrders" RequestedOrderId="@OrderId" CreateNew="@Create" />
 
 @code {
     [Parameter, SupplyParameterFromQuery(Name = "create")] public bool Create { get; set; }
+    [Parameter, SupplyParameterFromQuery(Name = "orderId")] public Guid? OrderId { get; set; }
 }

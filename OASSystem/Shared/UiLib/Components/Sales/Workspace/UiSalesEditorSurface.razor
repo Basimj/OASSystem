@@ -11,13 +11,13 @@
             {
                 <span class="ui-sales-status @StatusCssClass">@StatusText</span>
             }
-            @if (Actions is not null)
+            @if (Actions is not null && !ActionsInFooter)
             {
                 <div class="ui-sales-editor__actions">@Actions</div>
             }
             @if (OnBack.HasDelegate)
             {
-                <UiButton Text="إغلاق"
+                <UiButton Text="@BackText"
                           IconCssClass="fa-solid fa-xmark"
                           Variant="ButtonVariant.Ghost"
                           Size="ControlSize.Small"
@@ -28,9 +28,15 @@
     @if (!string.IsNullOrWhiteSpace(ErrorText)) { <div class="ui-sales-alert ui-sales-alert--error"><i class="fa-solid fa-circle-exclamation"></i><span>@ErrorText</span></div> }
     @if (!string.IsNullOrWhiteSpace(SuccessText)) { <div class="ui-sales-alert ui-sales-alert--success"><i class="fa-solid fa-circle-check"></i><span>@SuccessText</span></div> }
     <div class="ui-sales-editor__content">@ChildContent</div>
+    @if (Actions is not null && ActionsInFooter)
+    {
+        <div class="ui-sales-editor__footer-actions"><div class="ui-workspace-actionbar">@Actions</div></div>
+    }
 </div>
 
 @code {
+    [Parameter] public bool ActionsInFooter { get; set; }
+    [Parameter] public string BackText { get; set; } = "إغلاق";
     [Parameter] public string Title { get; set; } = string.Empty;
     [Parameter] public string? Subtitle { get; set; }
     [Parameter] public string IconCss { get; set; } = "fa-solid fa-file";

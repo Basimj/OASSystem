@@ -1,0 +1,384 @@
+/* OAS optical prescriptions — 2026-11-12 approved visual reference.
+   This file intentionally loads AFTER the global appearance and typography
+   rules: previously those rules overwrote the sky-blue table header, yellow
+   actions, field sizes and tabs.  Only prescriptions are affected. */
+.oas-shell .oas-main-inner .oas-rx-screen {
+    --rx-primary:#0785e3;
+    --rx-strong-blue:#086cbd;
+    --rx-sky:#26b2ff;
+    --rx-sun:#f9ff26;
+    --rx-ink:#102a4a;
+    --rx-muted:#567b9e;
+    --rx-surface:#fff;
+    --rx-border:#cbdff2;
+    --rx-glow:#eaf6ff;
+    --rx-blue-soft:#e2f3ff;
+    --rx-shadow:0 5px 15px rgba(28,88,144,.12);
+    color:var(--rx-ink);
+    background:linear-gradient(160deg,#f4faff 0%,#eef7ff 56%,#e8f5ff 100%);
+    padding:0 12px 14px;
+    font-size:14px;
+}
+/* Respect the chosen dark appearance while retaining the approved blue/yellow identity. */
+.oas-shell.oas-theme-dark .oas-main-inner .oas-rx-screen {
+    --rx-ink:var(--oas-color-text,#e7f2fc);
+    --rx-muted:var(--oas-color-text-muted,#b0c3d6);
+    --rx-surface:var(--oas-color-surface,#172b43);
+    --rx-border:var(--oas-color-border,#41566a);
+    --rx-glow:var(--oas-color-subtle,#243b51);
+    --rx-blue-soft:var(--oas-color-primary-soft,#213f61);
+    background:var(--oas-color-background,#102436);
+}
+/* Header: title at the top-right, larger tabs occupy the red-marked unused band. */
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading {
+    display:grid;grid-template-columns:270px minmax(0,1fr);gap:14px;
+    direction:rtl;align-items:end;padding:8px 14px 0;margin:0;
+    min-height:83px;background:transparent;border:0;border-bottom:3px solid var(--rx-sky);
+    border-radius:0;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading__title {
+    padding:0 6px 14px;align-self:center;gap:12px;min-width:0;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading__title>i {font-size:27px;color:#007cef}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading h1 {font-size:24px;line-height:1.3;font-weight:850;color:var(--rx-ink)}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading__title span {font-size:13px;color:var(--rx-muted);margin-top:4px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading__tabs {width:100%;overflow-x:auto;overflow-y:hidden;padding:0;align-self:end;scrollbar-width:thin;min-width:0}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading__tabs .ui-application-tabs {
+    display:flex;flex-direction:row;justify-content:flex-start;align-items:flex-end;
+    min-height:52px;height:52px;min-width:max-content;max-width:100%;gap:7px;
+    padding:0;background:transparent;border:0;box-shadow:none;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading__tabs .ui-application-tab {
+    min-width:clamp(145px,15vw,210px);max-width:220px;height:50px;min-height:50px;
+    border:1px solid #c4d9ec;border-bottom:0;border-radius:13px 13px 0 0;
+    background:#fff;color:#102b50;box-shadow:0 2px 8px rgba(32,88,143,.08);
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading__tabs .ui-application-tab--active {
+    background:linear-gradient(180deg,#14b1ff 0%,#087ae4 100%);color:#fff;
+    border-color:#1689e2;box-shadow:inset 0 -4px #f9ff26,0 3px 12px rgba(12,138,224,.18);
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading__tabs .ui-application-tab__select {font-size:14px;min-height:48px;height:48px;font-weight:850;padding:0 14px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading__tabs .ui-application-tab__close {width:31px;font-size:13px;opacity:1}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading__tabs .ui-application-tab__title {max-width:155px}
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-workspace {padding:11px 3px 6px;gap:10px;background:transparent}
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-workspace__actions {padding:7px 2px 8px;border:0;border-radius:0;background:transparent;box-shadow:none}
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-workspace__actions .ui-workspace-actionbar {display:flex;gap:12px;min-height:48px;align-items:center;flex-wrap:wrap}
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-workspace__actions .ui-search-input {width:min(50%,550px);min-width:250px;margin-inline-start:auto}
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-workspace__actions .ui-search-input input {min-height:46px;border-radius:11px;font-size:14px!important;background:#fff;border:1px solid #c4d8ed;color:#102b50}
+/* New and Save primary actions must stay solar yellow, independent of general theme. */
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-workspace__actions .ui-workspace-actionbar>.ui-button:first-child,
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-editor__footer-actions .ui-workspace-actionbar>.ui-button:first-child {
+    --bs-btn-bg:#f9ff26;--bs-btn-border-color:#e7e92f;--bs-btn-color:#14273d;
+    background:#f9ff26!important;border-color:#e7e92f!important;color:#14273d!important;
+    text-shadow:none!important;min-height:47px;padding-inline:19px;border-radius:11px;
+    font-size:14px;box-shadow:0 3px 11px rgba(213,193,8,.15);
+}
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-workspace__actions .ui-workspace-actionbar>.ui-button:not(:first-child) {min-height:45px;border-radius:10px;background:#fff;color:#1b538b;border:1px solid #cbdff2}
+/* Reference: four pastel KPI tiles with oversized values and icon cards. */
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-list {gap:12px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpis {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi {min-height:123px;padding:17px 17px 12px;border-radius:16px;gap:3px;border:1px solid rgba(255,255,255,.94);box-shadow:var(--rx-shadow);background:#fff}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi::before {display:none}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi--green {background:linear-gradient(124deg,#e7ffed,#d2f6dc)}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi--blue {background:linear-gradient(124deg,#edfaff,#cfeeff)}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi--yellow {background:linear-gradient(124deg,#fffefa,#fff0bc)}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi--red {background:linear-gradient(124deg,#fff8fb,#ffe0e7)}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi__icon {top:15px;right:15px;left:auto;width:49px;height:49px;font-size:23px;border-radius:12px;background:rgba(0,159,241,.10);color:#007edc}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi--green .oas-rx-kpi__icon{background:#c7f8d6;color:#069d6b}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi--yellow .oas-rx-kpi__icon{background:#ffedb3;color:#ed9d00}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi--red .oas-rx-kpi__icon{background:#ffd8e0;color:#df244c}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi__label {padding:0 58px 0 0;color:#142d4b;font-size:15px;line-height:1.4;font-weight:850}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi strong {padding:0 58px 0 0;font-size:31px;line-height:1.18;color:#102a4a;font-weight:900}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi small {padding:0 58px 0 0;color:#456e8c;font-size:12px;line-height:1.4}
+/* Clean filters and lively azure table header, both previously overwritten by the global layer. */
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-filters {display:flex;align-items:center;min-height:62px;padding:9px 13px;gap:11px;border:0;border-radius:15px;background:var(--rx-surface);box-shadow:0 2px 9px rgba(32,92,142,.07)}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-filters>strong {font-size:15px;min-width:120px;white-space:nowrap;color:var(--rx-ink)}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-filters>strong i {color:#087bd7;font-size:19px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-filter-control {flex:1 1 180px;gap:8px;min-width:0}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-filter-control label {font-size:13px;color:var(--rx-ink);font-weight:750}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-filter-control input,
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-filter-control select {min-height:42px;border-radius:10px;border:1px solid var(--rx-border);font-size:13px!important;padding:7px 12px;background:var(--rx-surface);color:var(--rx-ink)}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-table-panel {padding:16px 15px 14px;border:1px solid #d1e4f6;border-radius:16px;background:var(--rx-surface);box-shadow:var(--rx-shadow)}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-table-panel__head h2{font-size:19px;color:var(--rx-ink)}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-table-panel__hint{font-size:13px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-table-scroll{border:1px solid var(--rx-border);border-radius:12px;overflow:auto}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-table {width:100%;min-width:810px;border-collapse:collapse;font-size:14px;background:var(--rx-surface);color:var(--rx-ink)}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-table thead th,
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-table thead td {background:#088ef1!important;color:#fff!important;border-color:#2aa7fc;font-size:14px;line-height:1.4;font-weight:850;padding:13px 9px;text-align:center}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-table tbody td {background:transparent;border-bottom:1px solid #d9e7f3;color:var(--rx-ink);font-size:13px;padding:10px 8px;text-align:center}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-table tbody tr:nth-child(even){background:#e9f5ff}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-table tbody tr:hover {background:#d9ecfc}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-table tbody tr:hover td {background:transparent}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-code {font-size:13px;font-weight:850;color:#056cba;border-radius:9px;padding:6px 9px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-view{font-size:13px;padding:5px 9px;border-radius:8px;color:#086cbf}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-state {font-size:12px;min-height:28px;border-radius:8px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-table-pagination {font-size:13px;min-height:47px;margin-top:11px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-table-pagination__controls .oas-rx-page-active {background:#0788ea;color:#fff;border-color:#0788ea}
+/* Editor: enlarge title and input strip, then position the clinical table to the right and revision/notes on the left. */
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-editor {gap:11px}
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-editor__header {min-height:76px;border:0;border-radius:14px;padding:13px 18px;background:linear-gradient(105deg,#f6fbff 0%,#e6f4ff 100%);box-shadow:var(--rx-shadow)}
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-editor__title>i {width:49px;height:49px;border-radius:11px;background:#d8ebfc;color:#086dbf;font-size:25px}
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-editor__title h2 {font-size:22px;font-weight:850;color:#102a4a}
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-editor__title p{font-size:13px;color:#4f789c}
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-editor__heading-tools>.ui-button {min-height:42px;font-size:14px;border-radius:9px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-prescription-detail {gap:12px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-prescription-card{padding:15px 16px 16px;border-radius:16px;background:var(--rx-surface);box-shadow:var(--rx-shadow);border:1px solid var(--rx-border)}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-prescription-card__heading{margin-bottom:11px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-prescription-card__heading h3{font-size:18px;font-weight:850;color:var(--rx-ink)}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-prescription-card__heading h3 i{color:#0876cd;font-size:19px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-prescription-editor__fields{grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-prescription-editor__fields>*,
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-revision-meta>*{min-width:0}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-prescription-editor label,
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-prescription-editor .ui-text-label {font-size:14px;color:var(--rx-ink);font-weight:750}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-prescription-editor input,
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-prescription-editor .ui-lookup__input {min-height:44px;border-radius:9px;font-size:14px!important}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-prescription-card--revision{padding:15px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-revision-editor {display:grid;grid-template-columns:minmax(0,3fr) minmax(215px,.97fr);gap:13px;align-items:start}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-revision-meta {grid-column:2;grid-row:1;display:flex;flex-direction:column;gap:12px;padding:14px;background:#f7fbff;border:1px solid var(--rx-border);border-radius:13px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-revision-meta__title strong{font-size:17px;color:#123a61}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-revision-meta__title span{font-size:13px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-revision-meta label{font-size:13px;color:var(--rx-ink);font-weight:750}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-revision-meta input {min-height:42px;font-size:14px!important;border-radius:8px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-revision-meta__status{border:1px solid #b3e6c6;background:#e4f8eb;color:#145b3f;padding:10px;border-radius:9px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-revision-meta__status strong{color:#15613c}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-revision-notes textarea{min-height:100px;font-size:14px!important;border-radius:8px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-measure-input-wrap {grid-column:1;grid-row:1;padding:11px;border:1px solid var(--rx-border);border-radius:13px;background:var(--rx-surface)}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-history-title h3 {font-size:16px;font-weight:850}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-measure-table {width:100%;min-width:530px;font-size:14px;table-layout:fixed;background:var(--rx-surface)}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-measure-table thead th {background:#078df0!important;color:#fff!important;border-color:#289fec!important;padding:10px 6px;font-size:14px;font-weight:850}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-measure-table tbody th,
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-measure-table tbody td {background:transparent;border-bottom:1px solid #cfe0ef;color:var(--rx-ink);padding:5px 8px;font-size:13px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-measure-table tbody tr:nth-child(even) {background:#eaf5ff}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-measure-table--editor input,
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-measure-table--editor select {height:36px;min-height:36px;max-width:100%;width:min(96%,220px);font-size:14px!important;border-radius:7px;background:var(--rx-surface);border:1px solid var(--rx-border);color:var(--rx-ink)}
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-editor__footer-actions {position:sticky;bottom:0;z-index:7;margin-top:4px;padding:11px 14px;border:1px solid var(--rx-border);border-radius:14px;background:var(--rx-surface);box-shadow:0 -5px 16px rgba(34,83,129,.12)}
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-editor__footer-actions .ui-button{min-height:44px;min-width:125px;font-size:14px;font-weight:850;border-radius:10px}
+/* Keep the original mobile behavior: do not sacrifice measurement columns to fit tiny screens. */
+@media(max-width:1150px){
+ .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading{grid-template-columns:235px minmax(0,1fr)}
+ .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading__tabs .ui-application-tab{min-width:145px}
+ .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-prescription-editor__fields{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi__label,
+ .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi strong,
+ .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi small{padding-right:50px}
+ .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi__icon{width:42px;height:42px;font-size:20px}
+ .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi strong{font-size:27px}
+}
+@media(max-width:840px){
+ .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading{grid-template-columns:1fr;gap:4px;padding-top:8px}
+ .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading__title{padding-bottom:5px}
+ .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-revision-editor{grid-template-columns:1fr}
+ .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-measure-input-wrap{grid-column:1;grid-row:1}
+ .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-revision-meta{grid-column:1;grid-row:2}
+}
+@media(max-width:650px){
+ .oas-shell .oas-main-inner .oas-rx-screen{padding:0 4px 8px}
+ .oas-shell .oas-main-inner .oas-rx-screen .ui-sales-workspace__actions .ui-search-input{order:3;width:100%;min-width:0;margin:0}
+ .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-filters{flex-wrap:wrap}
+ .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-filter-control{flex:1 1 100%}
+ .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-prescription-editor__fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi strong{font-size:27px}
+}
+@media(max-width:420px){
+ .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpis{grid-template-columns:1fr}
+ .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-prescription-editor__fields{grid-template-columns:1fr}
+}
+/* Dark-appearance safety: the action colors stay recognizable, but table and
+   form surfaces follow the active appearance and maintain contrast. */
+.oas-shell.oas-theme-dark .oas-main-inner .oas-rx-screen .oas-rx-table tbody tr:nth-child(even),
+.oas-shell.oas-theme-dark .oas-main-inner .oas-rx-screen .oas-rx-measure-table tbody tr:nth-child(even) {background:color-mix(in srgb,var(--rx-primary) 14%,var(--rx-surface))}
+.oas-shell.oas-theme-dark .oas-main-inner .oas-rx-screen .oas-rx-table tbody tr:hover {background:color-mix(in srgb,var(--rx-primary) 19%,var(--rx-surface))}
+.oas-shell.oas-theme-dark .oas-main-inner .oas-rx-screen .oas-rx-prescription-editor input,
+.oas-shell.oas-theme-dark .oas-main-inner .oas-rx-screen .oas-rx-measure-table--editor input,
+.oas-shell.oas-theme-dark .oas-main-inner .oas-rx-screen .oas-rx-measure-table--editor select {background:var(--rx-surface);color:var(--rx-ink)}
+.oas-shell.oas-theme-dark .oas-main-inner .oas-rx-screen .oas-rx-revision-meta,
+.oas-shell.oas-theme-dark .oas-main-inner .oas-rx-screen .ui-sales-editor__header {background:var(--rx-glow)}
+.oas-shell.oas-theme-dark .oas-main-inner .oas-rx-screen .ui-sales-editor__title h2,
+.oas-shell.oas-theme-dark .oas-main-inner .oas-rx-screen .oas-rx-revision-meta__title strong {color:var(--rx-ink)}
+.oas-shell.oas-theme-dark .oas-main-inner .oas-rx-screen .oas-rx-table tbody td,
+.oas-shell.oas-theme-dark .oas-main-inner .oas-rx-screen .oas-rx-measure-table tbody :is(th,td) {border-color:var(--rx-border);color:var(--rx-ink)}
+.oas-shell.oas-theme-dark .oas-main-inner .oas-rx-screen .oas-rx-revision-meta__status {background:var(--rx-glow);border-color:var(--rx-border);color:var(--rx-ink)}
+.oas-shell.oas-theme-dark .oas-main-inner .oas-rx-screen .oas-rx-revision-meta__status strong {color:#7ed1ff}
+
+/* Compact prescription layout — 2026-11-12.
+   The approved colors, tab order, content and business logic remain unchanged.
+   At 1366x768 the previous dimensions (83px heading, 123px KPIs, 62px filters)
+   left almost no vertical space for the data table.  These overrides use a
+   consistent compact density; no global font scaling or browser zoom needed. */
+.oas-shell .oas-main-inner .oas-rx-screen {
+    padding:0 8px 10px;
+    font-size:13px;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading {
+    min-height:60px;
+    gap:10px;
+    padding:4px 8px 0;
+    border-bottom-width:2px;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading__title {
+    padding:0 4px 8px;
+    gap:8px;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading__title>i {font-size:23px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading h1 {font-size:20px;line-height:1.25}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading__title span {font-size:11px;margin-top:2px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading__tabs .ui-application-tabs {
+    min-height:39px;height:39px;gap:5px;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading__tabs .ui-application-tab {
+    min-width:clamp(112px,11vw,158px);max-width:176px;
+    height:38px;min-height:38px;border-radius:9px 9px 0 0;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading__tabs .ui-application-tab__select {
+    min-height:36px;height:36px;font-size:12px;padding:0 8px;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading__tabs .ui-application-tab__close {
+    width:25px;font-size:12px;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading__tabs .ui-application-tab__title {max-width:121px}
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-workspace {padding:5px 2px 4px;gap:7px}
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-workspace__actions {padding:4px 2px 5px}
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-workspace__actions .ui-workspace-actionbar {
+    min-height:37px;gap:8px;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-workspace__actions .ui-search-input input {
+    min-height:36px;font-size:12px!important;border-radius:8px;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-workspace__actions .ui-workspace-actionbar>.ui-button:first-child,
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-editor__footer-actions .ui-workspace-actionbar>.ui-button:first-child {
+    min-height:37px;padding-inline:13px;border-radius:8px;font-size:12px;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-workspace__actions .ui-workspace-actionbar>.ui-button:not(:first-child) {
+    min-height:35px;border-radius:8px;
+}
+/* List density: reduce vertical chrome while keeping the four KPI colors. */
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-list {gap:8px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpis {gap:8px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi {
+    min-height:90px;padding:10px 12px 8px;border-radius:12px;gap:2px;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi__icon {
+    top:10px;right:10px;width:37px;height:37px;font-size:18px;border-radius:9px;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi__label {
+    padding-right:44px;font-size:12px;line-height:1.3;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi strong {
+    padding-right:44px;font-size:24px;line-height:1.1;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi small {
+    padding-right:44px;font-size:11px;line-height:1.28;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-filters {
+    min-height:47px;padding:5px 10px;gap:8px;border-radius:11px;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-filters>strong {font-size:13px;min-width:100px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-filters>strong i {font-size:16px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-filter-control {gap:5px;flex-basis:150px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-filter-control label {font-size:12px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-filter-control input,
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-filter-control select {
+    min-height:34px;padding:4px 9px;border-radius:8px;font-size:12px!important;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-table-panel {
+    padding:10px 11px;border-radius:12px;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-table-panel__head {margin-bottom:7px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-table-panel__head h2 {font-size:16px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-table-panel__hint {font-size:11px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-table-scroll {border-radius:9px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-table {font-size:12px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-table thead th,
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-table thead td {
+    font-size:12px;padding:8px 6px;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-table tbody td {font-size:12px;padding:6px 5px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-code {padding:4px 7px;border-radius:7px;font-size:12px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-view {padding:4px 7px;font-size:12px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-state {min-height:23px;font-size:11px;border-radius:6px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-table-pagination {min-height:36px;margin-top:7px;font-size:12px}
+/* New prescription: preserve 5 fields, OD/OS and revision sidebar while
+   exposing more measurements in the initial viewport. */
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-editor {gap:7px}
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-editor__header {
+    min-height:56px;padding:8px 12px;border-radius:11px;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-editor__title>i {
+    width:36px;height:36px;font-size:19px;border-radius:8px;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-editor__title h2 {font-size:18px}
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-editor__title p {font-size:11px}
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-editor__heading-tools>.ui-button {
+    min-height:34px;font-size:12px;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-prescription-detail {gap:8px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-prescription-card {
+    padding:10px 11px;border-radius:12px;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-prescription-card__heading {margin-bottom:7px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-prescription-card__heading h3 {font-size:15px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-prescription-card__heading h3 i {font-size:16px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-prescription-editor__fields {gap:8px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-prescription-editor label,
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-prescription-editor .ui-text-label {font-size:12px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-prescription-editor input,
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-prescription-editor .ui-lookup__input {
+    min-height:35px;font-size:12px!important;border-radius:7px;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-prescription-card--revision {padding:10px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-revision-editor {
+    gap:9px;grid-template-columns:minmax(0,3fr) minmax(190px,.97fr);
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-revision-meta {
+    padding:9px;gap:8px;border-radius:10px;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-revision-meta__title strong {font-size:14px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-revision-meta__title span {font-size:11px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-revision-meta label {font-size:12px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-revision-meta input {min-height:34px;font-size:12px!important}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-revision-meta__status {padding:7px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-revision-notes textarea {
+    min-height:70px;font-size:12px!important;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-measure-input-wrap {padding:8px;border-radius:10px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-history-title h3 {font-size:14px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-measure-table {font-size:12px}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-measure-table thead th {
+    padding:6px 4px;font-size:12px;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-measure-table tbody th,
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-measure-table tbody td {
+    padding:3px 5px;font-size:12px;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-measure-table--editor input,
+.oas-shell .oas-main-inner .oas-rx-screen .oas-rx-measure-table--editor select {
+    height:31px;min-height:31px;font-size:12px!important;border-radius:6px;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-editor__footer-actions {
+    padding:7px 10px;margin-top:2px;border-radius:11px;
+}
+.oas-shell .oas-main-inner .oas-rx-screen .ui-sales-editor__footer-actions .ui-button {
+    min-height:36px;min-width:104px;font-size:12px;border-radius:8px;
+}
+@media (min-width:841px) {
+    .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading {
+        grid-template-columns:220px minmax(0,1fr);
+    }
+}
+@media (max-width:1150px) and (min-width:841px) {
+    .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading {
+        grid-template-columns:195px minmax(0,1fr);
+    }
+    .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi__label,
+    .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi strong,
+    .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi small {padding-right:42px}
+    .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi__icon {width:35px;height:35px;font-size:17px}
+    .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi strong {font-size:22px}
+}
+@media (max-width:840px) {
+    .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-page-heading {min-height:0}
+    .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-kpi {min-height:87px}
+    .oas-shell .oas-main-inner .oas-rx-screen .oas-rx-revision-editor {grid-template-columns:1fr}
+}

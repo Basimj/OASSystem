@@ -23,10 +23,32 @@
     }
     else
     {
+        @if (CompactMode)
+        {
+            <div class="oas-order-lines-table-wrap">
+                <table class="oas-order-lines-table">
+                    <thead><tr><th>البند</th><th>نوع البند</th><th>الصنف</th><th>المخزن</th><th>الكمية</th><th>السعر</th><th>الخصم</th><th>الضريبة</th><th>الإجمالي</th><th>تعديل</th></tr></thead>
+                    <tbody>
+                    @foreach (var row in Model)
+                    {
+                        <tr @key="row"><td>@row.LineNumber</td><td>@LineTypeText(row.LineType)</td>
+                            <td class="oas-order-lines-table__name">@LineHeading(row)</td>
+                            <td>@(row.WarehouseDisplay ?? "—")</td>
+                            <td>@row.Quantity.ToString("0.##")</td><td>@row.ActualUnitPrice.ToString("N2")</td>
+                            <td>@row.DiscountAmount.ToString("N2")</td><td>@row.TaxAmount.ToString("N2")</td>
+                            <td><b>@row.FinalAmount.ToString("N2")</b></td>
+                            <td><button type="button" class="oas-order-lines-table__edit" @onclick="() => ToggleLine(row.LineNumber)">@(row.LineNumber == _expandedLineNumber ? "إخفاء" : ReadOnly ? "عرض" : "تعديل")</button></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+            <p class="oas-order-lines-table__hint"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> اختر «تعديل» لأي بند لإظهار جميع حقوله والقياسات المرتبطة به دون فقدان التفاصيل.</p>
+        }
         <div class="ui-sales-line-cards">
             @foreach (var line in Model)
             {
-                <div class="ui-sales-line-card" @key="line">
+                <div class="ui-sales-line-card @(CompactMode && _expandedLineNumber != line.LineNumber ? "oas-order-line-hidden" : string.Empty)" @key="line">
                     <div class="ui-sales-line-card__header">
                         <div class="ui-sales-line-card__identity">
                             <span class="ui-sales-line-card__number">@line.LineNumber</span>
@@ -62,7 +84,7 @@
                                       Value="@line.ProductTypeId"
                                       ValueChanged="v => ProductTypeChanged(line, v)"
                                       SelectedItem="@ProductTypeItem(line)"
-                                      SearchAsync="SearchProductTypesAsync"
+                                      SearchAsync="SearchProductTypesAsync" UsePopover="@CompactMode"
                                       Placeholder="اختر نوع المنتج..."
                                       Required="true"
                                       Disabled="@ReadOnly"
@@ -74,7 +96,7 @@
                                       Value="@line.ProductCategoryId"
                                       ValueChanged="v => CategoryChanged(line, v)"
                                       SelectedItem="@CategoryItem(line)"
-                                      SearchAsync="(q, ct) => SearchCategory(line, q, ct)"
+                                      SearchAsync="(q, ct) => SearchCategory(line, q, ct)" UsePopover="@CompactMode"
                                       Placeholder="اختر التصنيف..."
                                       Disabled="@(ReadOnly || string.IsNullOrWhiteSpace(line.ProductTypeId))"
                                       MinimumSearchLength="0" />
@@ -85,7 +107,7 @@
                                       Value="@line.ProductVariantId"
                                       ValueChanged="v => ProductChanged(line, v)"
                                       SelectedItem="@ProductItem(line)"
-                                      SearchAsync="(q, ct) => SearchProduct(line, q, ct)"
+                                      SearchAsync="(q, ct) => SearchProduct(line, q, ct)" UsePopover="@CompactMode"
                                       Placeholder="ابحث بالاسم أو الكود أو SKU أو الباركود..."
                                       Disabled="@(ReadOnly || string.IsNullOrWhiteSpace(line.ProductTypeId) || string.IsNullOrWhiteSpace(line.ProductCategoryId))"
                                       MinimumSearchLength="0" />
@@ -98,7 +120,7 @@
                                           Value="@line.WarehouseId"
                                           ValueChanged="v => WarehouseChanged(line, v)"
                                           SelectedItem="@WarehouseItem(line)"
-                                          SearchAsync="(q, ct) => SearchWarehouse(line, q, ct)"
+                                          SearchAsync="(q, ct) => SearchWarehouse(line, q, ct)" UsePopover="@CompactMode"
                                           Placeholder="اختر المخزن..."
                                           Required="@(line.ProductIsStockItem == true)"
                                           Disabled="@(ReadOnly || string.IsNullOrWhiteSpace(line.ProductVariantId))"
@@ -108,7 +130,8 @@
 
                         <label class="ui-sales-line-card__number-field">
                             <span>الكمية</span>
-                            <input type="number" min="0.0001" step="0.01" value="@line.Quantity" disabled="@ReadOnly" @onchange="e => DecimalChanged(line, nameof(line.Quantity), e)" />
+                            <input type="number" min="0.0001" step="0.01" value="@line.Quantity" disabled="@ReadOnly" aria-invalid="@(NumericError(line, nameof(line.Quantity)) is not null)" @onchange="e => DecimalChanged(line, nameof(line.Quantity), e)" />
+                            @if (NumericError(line, nameof(line.Quantity)) is { } qtyErr) { <small class="oas-order-field-error">@qtyErr</small> }
                         </label>
 
                         <label class="ui-sales-line-card__number-field">
@@ -119,7 +142,9 @@
                                    value="@line.ActualUnitPrice"
                                    disabled="@(ReadOnly || (EnablePriceOverride && HasStoredProductPrice(line)))"
                                    title="@PriceTitle(line)"
+                                   aria-invalid="@(NumericError(line, nameof(line.ActualUnitPrice)) is not null)"
                                    @onchange="e => DecimalChanged(line, nameof(line.ActualUnitPrice), e)" />
+                            @if (NumericError(line, nameof(line.ActualUnitPrice)) is { } priceErr) { <small class="oas-order-field-error">@priceErr</small> }
                             @if (!string.IsNullOrWhiteSpace(line.ProductVariantId))
                             {
                                 <small class="ui-sales-line-card__price-hint">@OriginalPriceText(line)</small>
@@ -139,13 +164,15 @@
                         {
                             <label class="ui-sales-line-card__number-field">
                                 <span>قيمة الخصم</span>
-                                <input type="number" min="0" step="0.01" value="@line.DiscountValue" disabled="@ReadOnly" @onchange="e => NullableDecimalChanged(line, nameof(line.DiscountValue), e)" />
+                                <input type="number" min="0" max="@DiscountMax(line)" step="0.01" value="@line.DiscountValue" disabled="@ReadOnly" aria-invalid="@(NumericError(line, nameof(line.DiscountValue)) is not null)" @onchange="e => NullableDecimalChanged(line, nameof(line.DiscountValue), e)" />
+                                @if (NumericError(line, nameof(line.DiscountValue)) is { } discountErr) { <small class="oas-order-field-error">@discountErr</small> }
                             </label>
                         }
 
                         <label class="ui-sales-line-card__number-field">
                             <span>الضريبة %</span>
-                            <input type="number" min="0" step="0.01" value="@line.TaxRate" disabled="@ReadOnly" @onchange="e => NullableDecimalChanged(line, nameof(line.TaxRate), e)" />
+                            <input type="number" min="0" max="@TaxMax" step="0.01" value="@line.TaxRate" disabled="@ReadOnly" aria-invalid="@(NumericError(line, nameof(line.TaxRate)) is not null)" @onchange="e => NullableDecimalChanged(line, nameof(line.TaxRate), e)" />
+                            @if (NumericError(line, nameof(line.TaxRate)) is { } taxErr) { <small class="oas-order-field-error">@taxErr</small> }
                         </label>
 
                         <div class="ui-sales-line-card__field ui-sales-line-card__field--full">
@@ -202,7 +229,7 @@
                                                       Value="@line.PrescriptionRevisionId"
                                                       ValueChanged="v => PrescriptionRevisionChanged(line, v)"
                                                       SelectedItem="@PrescriptionItem(line)"
-                                                      SearchAsync="(q, ct) => SearchPrescription(line, q, ct)"
+                                                      SearchAsync="(q, ct) => SearchPrescription(line, q, ct)" UsePopover="@CompactMode"
                                                       Placeholder="اختر إصدار الوصفة..."
                                                       Disabled="@ReadOnly" />
                                         }
@@ -282,6 +309,65 @@
 
 @code {
     [Parameter, EditorRequired] public List<UiSalesLineModel> Model { get; set; } = [];
+    [Parameter] public bool CompactMode { get; set; }
+    private int _expandedLineNumber = 1;
+    private readonly Dictionary<string, string> _numericErrors = new();
+    public bool HasInputErrors => _numericErrors.Count > 0;
+
+    // Called immediately before creating/updating a customer order. A selected discount
+    // type without a value must not reach SalesPricingCalculator as null.
+    // Errors entered as invalid text are intentionally retained until corrected.
+    public bool ValidatePricingInputs()
+    {
+        foreach (var line in Model)
+        {
+            if (line.Quantity <= 0m && NumericError(line, nameof(line.Quantity)) is null)
+                StoreNumericError(line, nameof(line.Quantity), "أدخل كمية أكبر من صفر.");
+            if (line.ActualUnitPrice < 0m && NumericError(line, nameof(line.ActualUnitPrice)) is null)
+                StoreNumericError(line, nameof(line.ActualUnitPrice), "السعر لا يمكن أن يكون سالبًا.");
+
+            var discountError = DiscountValidationMessage(line);
+            if (discountError is not null && NumericError(line, nameof(line.DiscountValue)) is null)
+                StoreNumericError(line, nameof(line.DiscountValue), discountError);
+            if (line.TaxRate is < 0m or > 100m && NumericError(line, nameof(line.TaxRate)) is null)
+                StoreNumericError(line, nameof(line.TaxRate), "نسبة الضريبة يجب أن تكون بين 0 و100%.");
+        }
+
+        if (_numericErrors.Count == 0) return true;
+        // Reveal the first failing line, even if its compact editor is collapsed.
+        var first = Model.FirstOrDefault(line =>
+            NumericError(line, nameof(line.DiscountValue)) is not null ||
+            NumericError(line, nameof(line.TaxRate)) is not null ||
+            NumericError(line, nameof(line.Quantity)) is not null ||
+            NumericError(line, nameof(line.ActualUnitPrice)) is not null);
+        if (first is not null) _expandedLineNumber = first.LineNumber;
+        StateHasChanged();
+        return false;
+    }
+
+    private string? DiscountMax(UiSalesLineModel line) => CompactMode && line.DiscountType == "Percentage" ? "100" : null;
+    private string? TaxMax => CompactMode ? "100" : null;
+
+    private static string? DiscountValidationMessage(UiSalesLineModel line)
+    {
+        if (line.DiscountType == "None") return null;
+        if (line.DiscountType is not ("Percentage" or "FixedAmount")) return "نوع الخصم غير صالح.";
+        if (!line.DiscountValue.HasValue) return "أدخل قيمة الخصم بعد اختيار نوعه.";
+        if (line.DiscountValue.Value < 0m) return "قيمة الخصم لا يمكن أن تكون سالبة.";
+        if (line.DiscountType == "Percentage" && line.DiscountValue.Value > 100m)
+            return "نسبة الخصم يجب أن تكون بين 0 و100%.";
+        if (line.DiscountType == "FixedAmount" && line.ActualUnitPrice > 0m && line.DiscountValue.Value > line.Quantity * line.ActualUnitPrice)
+            return "الخصم الثابت لا يمكن أن يتجاوز قيمة البند.";
+        return null;
+    }
+    private void ToggleLine(int number) => _expandedLineNumber = _expandedLineNumber == number ? 0 : number;
+    private string? NumericError(UiSalesLineModel line, string field) => _numericErrors.GetValueOrDefault($"{line.LineNumber}:{field}");
+    private void StoreNumericError(UiSalesLineModel line, string field, string? message)
+    {
+        var key = $"{line.LineNumber}:{field}";
+        if (string.IsNullOrWhiteSpace(message)) _numericErrors.Remove(key);
+        else _numericErrors[key] = message;
+    }
     [Parameter] public bool ReadOnly { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchProductTypesAsync { get; set; }
     [Parameter] public Func<UiSalesLineModel, string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchCategoriesAsync { get; set; }
@@ -371,6 +457,7 @@
     private async Task AddLineAsync(MouseEventArgs _)
     {
         Model.Add(new UiSalesLineModel { LineNumber = Model.Count + 1 });
+        _expandedLineNumber = Model.Count;
         await OnChanged.InvokeAsync();
     }
 
@@ -410,6 +497,7 @@
 
     private async Task RemoveLineAsync(UiSalesLineModel line)
     {
+        _numericErrors.Clear();
         Model.Remove(line);
         for (var i = 0; i < Model.Count; i++)
             Model[i].LineNumber = i + 1;
@@ -503,7 +591,13 @@
 
     private async Task PrescriptionRevisionChanged(UiSalesLineModel line, string? value) { line.PrescriptionRevisionId = value ?? string.Empty; await OnChanged.InvokeAsync(); }
     private async Task DescriptionChanged(UiSalesLineModel line, string? value) { line.Description = value ?? string.Empty; await OnChanged.InvokeAsync(); }
-    private async Task DiscountTypeChanged(UiSalesLineModel line, ChangeEventArgs e) { line.DiscountType = e.Value?.ToString() ?? "None"; if (line.DiscountType == "None") line.DiscountValue = null; await OnChanged.InvokeAsync(); }
+    private async Task DiscountTypeChanged(UiSalesLineModel line, ChangeEventArgs e)
+    {
+        line.DiscountType = e.Value?.ToString() ?? "None";
+        if (line.DiscountType == "None") line.DiscountValue = null;
+        StoreNumericError(line, nameof(line.DiscountValue), CompactMode ? DiscountValidationMessage(line) : null);
+        await OnChanged.InvokeAsync();
+    }
     private async Task EyeChanged(UiSalesLineModel line, ChangeEventArgs e) { line.PrescriptionEye = e.Value?.ToString() ?? string.Empty; await OnChanged.InvokeAsync(); }
     private async Task OpticalSourceChanged(UiSalesLineModel line, ChangeEventArgs e)
     {
@@ -542,8 +636,60 @@
     private async Task PrismBaseChanged(UiSalesLineModel line, ChangeEventArgs e) { line.PrismBase = e.Value?.ToString() ?? "None"; await OnChanged.InvokeAsync(); }
     private async Task VaChanged(UiSalesLineModel line, string? value) { line.VA = value; await OnChanged.InvokeAsync(); }
     private async Task NotesChanged(UiSalesLineModel line, string? value) { line.Notes = value; await OnChanged.InvokeAsync(); }
-    private async Task DecimalChanged(UiSalesLineModel line, string field, ChangeEventArgs e) { var value = decimal.TryParse(e.Value?.ToString(), out var parsed) ? parsed : 0m; if (field == nameof(line.Quantity)) line.Quantity = value; else if (field == nameof(line.ActualUnitPrice)) line.ActualUnitPrice = value; await OnChanged.InvokeAsync(); }
-    private async Task NullableDecimalChanged(UiSalesLineModel line, string field, ChangeEventArgs e) { decimal? value = decimal.TryParse(e.Value?.ToString(), out var parsed) ? parsed : null; if (field == nameof(line.DiscountValue)) line.DiscountValue = value; else if (field == nameof(line.TaxRate)) line.TaxRate = value; await OnChanged.InvokeAsync(); }
+    private async Task DecimalChanged(UiSalesLineModel line, string field, ChangeEventArgs e)
+    {
+        if (!CompactMode)
+        {
+            var originalValue = decimal.TryParse(e.Value?.ToString(), out var originalParsed) ? originalParsed : 0m;
+            if (field == nameof(line.Quantity)) line.Quantity = originalValue;
+            else if (field == nameof(line.ActualUnitPrice)) line.ActualUnitPrice = originalValue;
+            await OnChanged.InvokeAsync();
+            return;
+        }
+        if (!decimal.TryParse(e.Value?.ToString(), out var value) || (field == nameof(line.Quantity) ? value <= 0m : value < 0m))
+        {
+            StoreNumericError(line, field, field == nameof(line.Quantity) ? "أدخل كمية أكبر من صفر." : "أدخل سعرًا صالحًا لا يقل عن صفر.");
+            await OnChanged.InvokeAsync();
+            return;
+        }
+        StoreNumericError(line, field, null);
+        if (field == nameof(line.Quantity)) line.Quantity = value;
+        else if (field == nameof(line.ActualUnitPrice)) line.ActualUnitPrice = value;
+        StoreNumericError(line, nameof(line.DiscountValue), DiscountValidationMessage(line));
+        await OnChanged.InvokeAsync();
+    }
+    private async Task NullableDecimalChanged(UiSalesLineModel line, string field, ChangeEventArgs e)
+    {
+        var raw = e.Value?.ToString();
+        if (!CompactMode)
+        {
+            decimal? original = decimal.TryParse(raw, out var oldValue) ? oldValue : null;
+            if (field == nameof(line.DiscountValue)) line.DiscountValue = original;
+            else if (field == nameof(line.TaxRate)) line.TaxRate = original;
+            await OnChanged.InvokeAsync();
+            return;
+        }
+        if (!string.IsNullOrWhiteSpace(raw) && !decimal.TryParse(raw, out _))
+        {
+            StoreNumericError(line, field, "أدخل رقمًا صالحًا.");
+            await OnChanged.InvokeAsync();
+            return;
+        }
+
+        decimal? value = decimal.TryParse(raw, out var parsed) ? parsed : null;
+        if (field == nameof(line.DiscountValue))
+        {
+            line.DiscountValue = value;
+            StoreNumericError(line, field, DiscountValidationMessage(line));
+        }
+        else if (field == nameof(line.TaxRate))
+        {
+            line.TaxRate = value;
+            StoreNumericError(line, field, value is < 0m or > 100m
+                ? "نسبة الضريبة يجب أن تكون بين 0 و100%." : null);
+        }
+        await OnChanged.InvokeAsync();
+    }
 
     private static void ClearManualMeasurementValues(UiSalesLineModel line)
     {

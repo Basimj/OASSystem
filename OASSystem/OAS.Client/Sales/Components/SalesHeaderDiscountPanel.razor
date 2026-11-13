@@ -28,9 +28,12 @@
                 <UiAlert Message="احفظ أو ألغِ التعديلات الجارية على المستند قبل تطبيق خصم الرأس أو اعتماده." Tone="AlertTone.Warning" />
             }
             <UiStackLayout Gap="StackGap.Small">
-                <UiSelect Label="نوع الخصم" Value="@_type" ValueChanged="@(v => _type = v)" Options="@DiscountTypeOptions" Disabled="@LockDiscount" Size="ControlSize.Small" />
-                <UiInputText Label="قيمة الخصم" Value="@_value" ValueChanged="@(v => _value = v ?? string.Empty)" InputMode="decimal" Disabled="@LockDiscount" Size="ControlSize.Small" />
-                <UiInputText Label="سبب الخصم" Value="@_reason" ValueChanged="@(v => _reason = v)" Disabled="@LockDiscount" Size="ControlSize.Small" MaxLength="500" />
+                <UiSelect Label="نوع الخصم" Value="@_type" ValueChanged="DiscountTypeChanged" Options="@DiscountTypeOptions" Disabled="@LockDiscount" Size="ControlSize.Small" />
+                @if (_type != ((byte)SalesDiscountType.None).ToString())
+                {
+                    <UiInputText Label="قيمة الخصم" Value="@_value" ValueChanged="DiscountValueChanged" ErrorText="@_valueError" InputMode="decimal" Disabled="@LockDiscount" Size="ControlSize.Small" />
+                    <UiInputText Label="سبب الخصم" Value="@_reason" ValueChanged="DiscountReasonChanged" ErrorText="@_reasonError" Disabled="@LockDiscount" Size="ControlSize.Small" MaxLength="500" />
+                }
                 <UiWorkspaceActionBar>
                     <UiButton Text="تطبيق الخصم" IconCssClass="fa-solid fa-percent" Loading="@_busy" Disabled="@LockDiscount" Size="ControlSize.Small" OnClick="SetDiscountAsync" />
                     @if (_amount > 0m && !_approved)
@@ -67,6 +70,38 @@
     private string? _type = ((byte)SalesDiscountType.None).ToString();
     private string _value = "0";
     private string? _reason;
+    private string? _valueError;
+    private string? _reasonError;
+
+    private void DiscountTypeChanged(string? value)
+    {
+        _type = value;
+        _valueError = null;
+        _reasonError = null;
+    }
+
+    private void DiscountValueChanged(string? value)
+    {
+        _value = value ?? string.Empty;
+        _valueError = ValidateDiscountValue();
+    }
+
+    private void DiscountReasonChanged(string? value)
+    {
+        _reason = value;
+        _reasonError = string.IsNullOrWhiteSpace(value) ? "اذكر سبب الخصم الإضافي." : null;
+    }
+
+    private string? ValidateDiscountValue()
+    {
+        if (!byte.TryParse(_type, out var code) || (SalesDiscountType)code == SalesDiscountType.None)
+            return null;
+        if (!decimal.TryParse(_value, out var amount)) return "أدخل قيمة رقمية للخصم.";
+        if (amount < 0m) return "قيمة الخصم لا يمكن أن تكون سالبة.";
+        if ((SalesDiscountType)code == SalesDiscountType.Percentage && amount > 100m)
+            return "نسبة الخصم يجب أن تكون بين 0 و100%.";
+        return null;
+    }
     private Guid _loadedId;
     private string? _loadedKind;
     private string? _lastParentVersion;
@@ -159,17 +194,19 @@
         decimal? value = null;
         if (type != SalesDiscountType.None)
         {
-            if (!decimal.TryParse(_value, out var parsed) || parsed < 0m)
+            _valueError = ValidateDiscountValue();
+            _reasonError = string.IsNullOrWhiteSpace(_reason) ? "سبب الخصم إلزامي." : null;
+            if (_valueError is not null || _reasonError is not null)
             {
-                Snackbar.Error("قيمة الخصم غير صحيحة.");
+                Snackbar.Error("صحح قيمة الخصم الإضافي وسببه قبل التطبيق.");
                 return;
             }
-            if (string.IsNullOrWhiteSpace(_reason))
-            {
-                Snackbar.Error("سبب الخصم إلزامي.");
-                return;
-            }
-            value = parsed;
+            value = decimal.Parse(_value);
+        }
+        else
+        {
+            _valueError = null;
+            _reasonError = null;
         }
 
         _busy = true;

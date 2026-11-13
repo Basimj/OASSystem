@@ -1,0 +1,268 @@
+/* Customer orders: compact approved layout aligned with Prescriptions.
+   Loaded AFTER global appearance and prescriptions. Scoped to order screen only. */
+.oas-shell .oas-main-inner .oas-order-screen {
+  --ord-ink: var(--oas-color-text, #102948);
+  --ord-muted: var(--oas-color-text-muted, #42617f);
+  --ord-surface: var(--oas-color-surface, #fff);
+  --ord-line: var(--oas-color-border, #c9dcf0);
+  --ord-blue: #008eee;
+  --ord-yellow: #f9ff26;
+  font-size: 13px;
+  color: var(--ord-ink);
+  max-width: 100%;
+  min-width: 0;
+  background:linear-gradient(155deg,#f4faff 0%,#eef7ff 54%,#eaf5ff 100%);
+  padding:0 8px 10px;
+}
+.oas-shell .oas-main-inner .oas-order-screen .oas-order-page-heading {
+  min-height: 60px; display:grid; grid-template-columns: 235px minmax(0,1fr); align-items:end;
+  gap:12px; padding:8px 12px 0; border-bottom:3px solid var(--ord-blue);
+  background: color-mix(in srgb, var(--ord-surface) 92%, #d8eeff);
+  direction:rtl;
+}
+.oas-shell .oas-main-inner .oas-order-page-heading__title {display:flex;gap:11px;align-items:center;justify-self:start;align-self:center}
+.oas-shell .oas-main-inner .oas-order-page-heading__title>i {font-size:24px;color:var(--ord-blue)}
+.oas-shell .oas-main-inner .oas-order-page-heading h1 {font-size:21px;line-height:1.2;font-weight:850;margin:0;color:var(--ord-ink)}
+.oas-shell .oas-main-inner .oas-order-page-heading__title span {font-size:11px;color:var(--ord-muted)}
+.oas-shell .oas-main-inner .oas-order-page-heading__title span i {font-size:10px;margin-inline:5px}
+.oas-shell .oas-main-inner .oas-order-page-heading__tabs {width:100%;min-width:0;overflow-x:auto;scrollbar-width:thin}
+.oas-shell .oas-main-inner .oas-order-page-heading__tabs .ui-application-tabs {display:flex;justify-content:flex-start;align-items:stretch;gap:5px;border:0;background:transparent;box-shadow:none;min-height:41px;flex-wrap:nowrap}
+.oas-shell .oas-main-inner .oas-order-page-heading__tabs .ui-application-tab {min-width:133px;max-width:210px;min-height:40px;border:1px solid var(--ord-line);border-bottom:0;border-radius:10px 10px 0 0;background:var(--ord-surface);box-shadow:0 1px 3px #0c407112}
+.oas-shell .oas-main-inner .oas-order-page-heading__tabs .ui-application-tab--active {background:var(--ord-blue);border-color:var(--ord-blue);box-shadow:inset 0 -3px var(--ord-yellow)}
+.oas-shell .oas-main-inner .oas-order-page-heading__tabs .ui-application-tab__select {font-size:13px;min-height:39px;height:39px;font-weight:800;padding-inline:10px;color:var(--ord-ink)}
+.oas-shell .oas-main-inner .oas-order-page-heading__tabs .ui-application-tab--active .ui-application-tab__select,
+.oas-shell .oas-main-inner .oas-order-page-heading__tabs .ui-application-tab--active .ui-application-tab__close,
+.oas-shell .oas-main-inner .oas-order-page-heading__tabs .ui-application-tab--active .ui-application-tab__select i {color:#fff!important;text-shadow:none!important}
+.oas-shell .oas-main-inner .oas-order-page-heading__tabs .ui-application-tab__close {width:26px;min-width:26px}
+.oas-shell .oas-main-inner .oas-order-page-heading__tabs .ui-application-tab__title {max-width:150px}
+.oas-shell .oas-main-inner .oas-order-screen .ui-sales-workspace {padding:8px 3px;gap:8px;background:transparent;min-width:0}
+.oas-shell .oas-main-inner .oas-order-screen .ui-sales-workspace__actions {background:transparent;border:0;box-shadow:none;padding:0 2px}
+.oas-shell .oas-main-inner .oas-order-screen .ui-sales-workspace__actions .ui-workspace-actionbar {display:flex;align-items:center;gap:8px;min-height:45px;flex-wrap:wrap}
+.oas-shell .oas-main-inner .oas-order-screen .ui-sales-workspace__actions .ui-search-input {width:min(48%,510px);margin-inline-start:auto}
+.oas-shell .oas-main-inner .oas-order-screen .ui-sales-workspace__actions .ui-search-input input {min-height:39px;border-radius:10px;border:1px solid var(--ord-line);background:var(--ord-surface);font-size:13px!important;color:var(--ord-ink)}
+.oas-shell .oas-main-inner .oas-order-screen .ui-sales-workspace__actions .ui-button {min-height:39px;border-radius:9px;font-weight:800;font-size:12px;padding-inline:14px}
+/* The main order action uses the same sky-blue / yellow-underline treatment as active tabs. */
+.oas-shell .oas-main-inner .oas-order-screen .ui-sales-workspace__actions .ui-workspace-actionbar>.ui-button:first-child,
+.oas-shell.oas-preset-sky-yellow .oas-main-inner .oas-order-screen .ui-sales-workspace__actions .ui-workspace-actionbar>.ui-button:first-child {
+ background:var(--ord-blue)!important;color:#fff!important;border-color:var(--ord-blue)!important;
+ box-shadow:inset 0 -3px 0 var(--ord-yellow),0 2px 7px #004a881a!important;
+ text-shadow:none!important;
+}
+.oas-shell .oas-main-inner .oas-order-screen .ui-sales-workspace__actions .ui-workspace-actionbar>.ui-button:not(:first-child) {background:var(--ord-surface)!important;color:var(--ord-ink)!important;border:1px solid var(--ord-line)!important}
+/* The dashboard itself */
+.oas-order-dashboard {display:flex;flex-direction:column;gap:9px;min-width:0}
+.oas-order-metrics {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.oas-order-metric {position:relative;display:flex;flex-direction:column;justify-content:center;gap:2px;height:91px;min-width:0;padding:11px 16px;padding-inline-start:66px;border:1px solid var(--ord-line);border-radius:13px;box-shadow:0 3px 8px #082f5110;color:var(--ord-ink)}
+.oas-order-metric--open {background:linear-gradient(115deg,#effffa,#d5f7dc)}
+.oas-order-metric--stock {background:linear-gradient(115deg,#f3faff,#d7f0ff)}
+.oas-order-metric--work {background:linear-gradient(115deg,#fffdf1,#fff0bd)}
+.oas-order-metric--ready {background:linear-gradient(115deg,#fffafb,#ffe0e8)}
+.oas-order-metric__icon {position:absolute;inset-inline-start:12px;top:13px;font-size:21px;width:43px;height:43px;border-radius:12px;display:grid;place-items:center;color:#0878c6;background:#008eef12}
+.oas-order-metric--open .oas-order-metric__icon {color:#008a66;background:#35c96b1a}
+.oas-order-metric--work .oas-order-metric__icon {color:#b68400;background:#fff10050}
+.oas-order-metric--ready .oas-order-metric__icon {color:#c42542;background:#ff476c18}
+.oas-order-metric>strong {font-size:13px;font-weight:850;white-space:nowrap}
+.oas-order-metric>b {font-size:24px;font-weight:900;line-height:1.1;font-variant-numeric:tabular-nums}
+.oas-order-metric>small {font-size:11px;line-height:1.35;color:#315b7b;min-width:0}
+.oas-order-filters {display:flex;align-items:end;gap:10px;padding:9px 13px;background:var(--ord-surface);border:1px solid var(--ord-line);border-radius:11px;min-width:0;flex-wrap:wrap}
+.oas-order-filters>strong {font-weight:850;white-space:nowrap;padding-bottom:10px;font-size:13px}
+.oas-order-filters>strong i {color:#006fc0;margin-inline-end:6px}
+.oas-order-filters label {display:flex;flex:1 1 150px;min-width:115px;flex-direction:column;gap:4px;font-size:11px;font-weight:750;color:var(--ord-muted)}
+.oas-order-filters select,.oas-order-filters input {height:32px;min-width:0;width:100%;border:1px solid var(--ord-line);background:var(--ord-surface);color:var(--ord-ink);border-radius:8px;padding:0 8px;font-size:12px}
+.oas-order-clear {height:32px;padding:0 10px;border:1px solid var(--ord-line);background:var(--ord-surface);border-radius:8px;color:var(--ord-muted);font-size:11px}
+.oas-order-date-warning {margin:0;background:#fff0b8;color:#705000;padding:8px 12px;border-radius:9px;font-size:12px}
+.oas-order-table-card {background:var(--ord-surface);border:1px solid var(--ord-line);border-radius:13px;padding:12px 13px;box-shadow:0 2px 7px #00243e0b;min-width:0}
+.oas-order-table-card__head {display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.oas-order-table-card__head h2 {font-size:16px;margin:0;font-weight:850;color:var(--ord-ink)}
+.oas-order-table-card__head h2 i {color:var(--ord-blue)}
+.oas-order-table-card__head h2 span {font-size:13px}
+.oas-order-table-card__head small {font-size:11px;color:var(--ord-muted)}
+.oas-order-table-scroll {overflow:auto;max-width:100%}
+.oas-order-table {width:100%;border-collapse:separate;border-spacing:0;table-layout:auto;min-width:890px;font-size:12px;direction:rtl}
+.oas-order-table th {background:#0794f7;color:#fff;text-align:center;white-space:nowrap;font-size:12px;font-weight:850;padding:9px 8px;border-inline-end:1px solid #ffffff24}
+.oas-order-table th:first-child {border-radius:9px 0 0 0}
+.oas-order-table th:last-child {border-radius:0 9px 0 0}
+.oas-order-table td {padding:6px 9px;text-align:center;white-space:nowrap;border-bottom:1px solid color-mix(in srgb,var(--ord-line) 55%,transparent);color:var(--ord-ink);height:36px}
+.oas-order-table tbody tr:nth-child(even) {background:color-mix(in srgb,#008aff 6%,var(--ord-surface))}
+.oas-order-table tbody tr:hover {background:color-mix(in srgb,#008aff 12%,var(--ord-surface))}
+.oas-order-table__empty {text-align:center!important;padding:24px!important;color:var(--ord-muted)!important}
+.oas-order-code,.oas-order-view {display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--ord-line);background:var(--ord-surface);border-radius:7px;padding:5px 9px;color:#0076db;font-weight:800;font-size:11px;cursor:pointer}
+.oas-order-code:hover,.oas-order-view:hover {background:#deefff}
+.oas-order-amount {font-variant-numeric:tabular-nums;font-weight:800}
+.oas-order-amount small {font-size:10px;color:var(--ord-muted)}
+.oas-order-state {display:inline-flex;align-items:center;justify-content:center;border-radius:7px;padding:5px 9px;font-size:11px;font-weight:800;white-space:nowrap}
+.oas-order-state.is-blue {background:#d9edff;color:#0057aa}
+.oas-order-state.is-green {background:#d6f6df;color:#087044}
+.oas-order-state.is-yellow {background:#fff0b8;color:#6d4b00}
+.oas-order-state.is-red {background:#ffe0e6;color:#a5223a}
+.oas-order-stock {font-size:11px;color:var(--ord-muted)}
+.oas-order-pagination {display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0 0;flex-wrap:wrap}
+.oas-order-pagination label {display:flex;gap:9px;align-items:center;font-size:11px;color:var(--ord-muted)}
+.oas-order-pagination select {height:30px;padding-inline:9px;border:1px solid var(--ord-line);border-radius:7px;background:var(--ord-surface);color:var(--ord-ink)}
+.oas-order-pagination nav {display:flex;gap:3px;align-items:center}
+.oas-order-pagination nav button {min-width:30px;height:31px;border:1px solid var(--ord-line);background:var(--ord-surface);border-radius:7px;color:var(--ord-ink);cursor:pointer}
+.oas-order-pagination nav button.is-current {background:var(--ord-blue);color:#fff;border-color:var(--ord-blue)}
+.oas-order-pagination nav button:disabled {opacity:.4;cursor:default}
+.oas-order-pagination>span {font-size:11px;color:var(--ord-muted)}
+/* Editor: preserve functional form, compact and align fields with approved mockup. */
+.oas-order-screen .ui-sales-editor {background:transparent!important;box-shadow:none!important;border:0!important;gap:9px!important}
+.oas-order-screen .ui-sales-editor__header {padding:9px 14px!important;min-height:55px;border-radius:11px;border:1px solid var(--ord-line);background:color-mix(in srgb,#d2eaff 25%,var(--ord-surface));margin-bottom:0}
+.oas-order-screen .ui-sales-editor__header h2 {font-size:16px!important;font-weight:850!important}
+.oas-order-screen .ui-sales-editor__header p {font-size:11px!important}
+.oas-order-screen .ui-sales-editor__content {gap:9px}
+.oas-order-screen .ui-sales-section {margin:0;border:1px solid var(--ord-line);background:var(--ord-surface);border-radius:12px;overflow:hidden}
+.oas-order-screen .ui-sales-section__header {min-height:36px!important;padding:7px 12px!important;background:color-mix(in srgb,#badaff 22%,var(--ord-surface));border-bottom:1px solid var(--ord-line)}
+.oas-order-screen .ui-sales-section__header h3 {font-size:14px!important;font-weight:850}
+.oas-order-screen .ui-sales-section__header p {font-size:10px}
+.oas-order-screen .ui-sales-section__body {padding:9px 12px!important}
+.oas-order-screen .oas-order-form {display:flex;flex-direction:column;gap:9px}
+.oas-order-screen .ui-sales-form-grid.oas-order-form__fields {display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px 9px}
+.oas-order-screen .oas-order-form__fields> :last-child {grid-column:span 2}
+.oas-order-screen .oas-order-form__fields input,.oas-order-screen .oas-order-form__fields select {min-height:33px!important;font-size:12px!important}
+.oas-order-screen .oas-order-form__fields label {font-size:11px!important}
+.oas-order-screen .ui-sales-lines__toolbar {padding:0 0 8px!important;gap:10px}
+.oas-order-screen .ui-sales-lines__toolbar strong {font-size:12px}
+/* Add line / add glasses: identical active-tab treatment, without changing their size. */
+.oas-shell .oas-main-inner .oas-order-screen .ui-sales-lines__toolbar .ui-button {
+ background:var(--ord-blue)!important;color:#fff!important;border:1px solid var(--ord-blue)!important;
+ box-shadow:inset 0 -3px 0 var(--ord-yellow),0 2px 5px #004a881a!important;
+ text-shadow:none!important;font-size:11px;min-height:32px;
+}
+.oas-shell .oas-main-inner .oas-order-screen .ui-sales-lines__toolbar .ui-button :is(i,.ui-button__icon),
+.oas-shell .oas-main-inner .oas-order-screen .ui-sales-workspace__actions .ui-workspace-actionbar>.ui-button:first-child :is(i,.ui-button__icon) {color:#fff!important}
+.oas-shell .oas-main-inner .oas-order-screen .ui-sales-lines__toolbar .ui-button:hover:not(:disabled),
+.oas-shell .oas-main-inner .oas-order-screen .ui-sales-workspace__actions .ui-workspace-actionbar>.ui-button:first-child:hover:not(:disabled) {
+ background:#0078d3!important;color:#fff!important;border-color:#0078d3!important;
+ box-shadow:inset 0 -3px 0 var(--ord-yellow),0 3px 7px #004a8826!important;
+}
+.oas-shell .oas-main-inner .oas-order-screen .ui-sales-lines__toolbar .ui-button:focus-visible,
+.oas-shell .oas-main-inner .oas-order-screen .ui-sales-workspace__actions .ui-workspace-actionbar>.ui-button:first-child:focus-visible {
+ outline:2px solid #08477a;outline-offset:2px;
+}
+.oas-order-lines-table-wrap {max-width:100%;overflow:auto}
+.oas-order-lines-table {min-width:740px;width:100%;border-collapse:collapse;text-align:center;font-size:11px}
+.oas-order-lines-table th {background:#078ff5;color:#fff;padding:8px 6px;white-space:nowrap;font-weight:850}
+.oas-order-lines-table td {padding:6px;border-bottom:1px solid var(--ord-line);white-space:nowrap}
+.oas-order-lines-table tbody tr:nth-child(even) {background:color-mix(in srgb,#008aff 6%,var(--ord-surface))}
+.oas-order-lines-table__name {max-width:180px;overflow:hidden;text-overflow:ellipsis}
+.oas-order-lines-table__edit {border:1px solid #b6d7f5;color:#006fc0;border-radius:7px;background:var(--ord-surface);padding:4px 9px;font-weight:800}
+.oas-order-lines-table__hint {padding:7px 0;margin:0;color:var(--ord-muted);font-size:11px}
+.oas-order-line-hidden {display:none!important}
+.oas-order-screen .ui-sales-line-card {background:var(--ord-surface);border:1px solid var(--ord-line);border-radius:9px;box-shadow:none;margin:3px 0 0;padding:9px}
+.oas-order-screen .ui-sales-line-card__grid {gap:6px!important}
+.oas-order-screen .ui-sales-line-card__number-field input,.oas-order-screen .ui-sales-line-card__number-field select {min-height:32px;font-size:12px}
+.oas-order-field-error {display:block;color:#c52137;font-weight:750;font-size:11px}
+.oas-order-screen input[aria-invalid="true"] {border:2px solid #c52137!important;background:color-mix(in srgb,#ff3d51 7%,var(--ord-surface))}
+.oas-order-form__bottom-panels {display:grid;grid-template-columns:minmax(0,2fr) minmax(205px,1fr);gap:9px}
+.oas-order-optical-panel,.oas-order-form__state-panel,.oas-order-form__totals {border:1px solid var(--ord-line);border-radius:12px;background:var(--ord-surface);padding:11px;min-width:0}
+.oas-order-optical-panel h3,.oas-order-form__state-panel h3,.oas-order-form__totals h3 {margin:0 0 9px;font-size:13px;font-weight:850}
+.oas-order-optical-panel h3 i {color:var(--ord-blue)}
+.oas-order-optical-panel__hint {color:var(--ord-muted);font-size:11px}
+.oas-order-optical-table-wrap {overflow:auto}
+.oas-order-optical-panel table {width:100%;border-collapse:collapse;min-width:480px;text-align:center;font-size:11px}
+.oas-order-optical-panel th {padding:7px;background:#078ff5;color:#fff}
+.oas-order-optical-panel td {padding:6px;border:1px solid var(--ord-line);white-space:nowrap}
+.oas-order-optical-panel tbody tr:nth-child(even){background:color-mix(in srgb,#058eff 7%,var(--ord-surface))}
+.oas-order-form__state-panel>div {display:flex;justify-content:space-between;gap:8px;padding:8px;border-bottom:1px solid var(--ord-line);font-size:11px}
+.oas-order-form__state-panel>div:last-child {border:0}
+.oas-order-form__state-panel>div>b {font-size:11px;color:var(--ord-ink)}
+.oas-order-form__totals {background:color-mix(in srgb,#ceefff 12%,var(--ord-surface))}
+.oas-order-form__totals .ui-sales-totals {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;background:transparent!important;border:0!important;padding:0!important}
+.oas-order-form__totals .ui-sales-totals>div {display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4px;padding:10px!important;border:1px solid var(--ord-line)!important;border-radius:9px;min-width:0}
+.oas-order-form__totals .ui-sales-totals>div:nth-child(1){background:#d5f7df}
+.oas-order-form__totals .ui-sales-totals>div:nth-child(2){background:#fff0bb}
+.oas-order-form__totals .ui-sales-totals>div:nth-child(3){background:#d7efff}
+.oas-order-form__totals .ui-sales-totals>.ui-sales-totals__grand{background:#ffe1eb;margin:0!important}
+.oas-order-form__totals .ui-sales-totals>div span {font-size:11px;color:#123c5d}
+.oas-order-form__totals .ui-sales-totals>div strong {font-size:16px;white-space:normal;overflow-wrap:anywhere;color:#0d3554}
+.oas-order-screen .ui-sales-editor__footer-actions {position:sticky;bottom:0;background:var(--ord-surface);z-index:12;padding:9px 12px;border:1px solid var(--ord-line);border-radius:11px;box-shadow:0 -4px 14px #18375814}
+.oas-order-screen .ui-sales-editor__footer-actions .ui-button {min-height:36px;border-radius:8px;font-size:12px;font-weight:800}
+.oas-order-screen .ui-sales-editor__footer-actions .ui-button:first-child {background:var(--ord-yellow)!important;border-color:#d5c800!important;color:#173446!important}
+.oas-order-next-step {display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;border:1px solid var(--ord-line);border-radius:9px;padding:9px 12px;background:color-mix(in srgb,#b5e4ff 24%,var(--ord-surface));font-size:11px}
+.oas-order-next-step__state {font-weight:850}
+.oas-order-next-step button {background:var(--ord-surface);border:1px solid var(--ord-line);border-radius:7px;padding:6px 10px;font-size:11px;color:#0077cf}
+/* preserve accessibility and dark theme: neutral surfaces use theme tokens */
+.oas-shell.oas-theme-dark .oas-main-inner .oas-order-screen {background:var(--oas-color-background,#102436)}
+.oas-shell.oas-theme-dark .oas-order-screen .oas-order-metric,.oas-shell[data-theme="dark"] .oas-order-screen .oas-order-metric {color:#102948}
+@media(max-width:1120px){
+ .oas-shell .oas-main-inner .oas-order-page-heading{grid-template-columns:210px minmax(0,1fr)}
+ .oas-order-metrics{gap:6px}
+ .oas-order-metric{padding:9px;padding-inline-start:49px}
+ .oas-order-metric__icon{width:34px;height:34px;font-size:18px;inset-inline-start:7px}
+ .oas-order-metric>strong{font-size:12px}
+ .oas-order-screen .ui-sales-form-grid.oas-order-form__fields{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:760px){
+ .oas-shell .oas-main-inner .oas-order-page-heading{grid-template-columns:1fr;gap:5px;padding:7px 4px 0}
+ .oas-shell .oas-main-inner .oas-order-page-heading__tabs .ui-application-tab{min-width:115px}
+ .oas-shell .oas-main-inner .oas-order-screen .ui-sales-workspace__actions .ui-search-input {order:3;width:100%;min-width:0;margin:0}
+ .oas-order-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .oas-order-metric {height:83px}
+ .oas-order-filters>strong{width:100%}
+ .oas-order-filters label{flex:1 1 40%}
+ .oas-order-screen .ui-sales-form-grid.oas-order-form__fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .oas-order-form__bottom-panels{grid-template-columns:1fr}
+ .oas-order-form__totals .ui-sales-totals{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:440px){
+ .oas-order-screen .ui-sales-form-grid.oas-order-form__fields{grid-template-columns:1fr}
+ .oas-order-screen .oas-order-form__fields> :last-child{grid-column:auto}
+ .oas-order-table-card__head{flex-direction:column;align-items:start}
+ .oas-order-metric>b{font-size:20px}
+}
+
+/* Fix: the generic sales toolbar sets its own text color on every span.
+   Override the actual child span, not only the button's inherited color. */
+.oas-shell .oas-main-inner .oas-order-screen .ui-sales-lines__toolbar > .ui-button > span,
+.oas-shell .oas-main-inner .oas-order-screen .ui-sales-lines__toolbar > .ui-button > i,
+.oas-shell .oas-main-inner .oas-order-screen .ui-sales-workspace__actions .ui-workspace-actionbar > .ui-button:first-child > span,
+.oas-shell .oas-main-inner .oas-order-screen .ui-sales-workspace__actions .ui-workspace-actionbar > .ui-button:first-child > i,
+.oas-shell .oas-main-inner .oas-order-page-heading__tabs .ui-application-tab--active .ui-application-tab__title,
+.oas-shell .oas-main-inner .oas-order-page-heading__tabs .ui-application-tab--active .ui-application-tab__select > span {
+    color:#fff !important;
+    -webkit-text-fill-color:#fff !important;
+    text-shadow:none !important;
+    opacity:1;
+}
+
+/* Customer order action buttons: same size, retained semantic backgrounds, yellow underline. */
+.oas-shell .oas-main-inner .oas-order-screen .ui-sales-editor__footer-actions .ui-workspace-actionbar {
+    display:flex;align-items:center;gap:7px;flex-wrap:wrap;
+}
+.oas-shell .oas-main-inner .oas-order-screen .ui-sales-editor__footer-actions .ui-workspace-actionbar > .ui-button {
+    flex:0 0 126px;width:126px;min-width:126px;max-width:126px;
+    min-height:38px;height:38px;box-sizing:border-box;
+    display:inline-flex;justify-content:center;align-items:center;gap:6px;
+    box-shadow:inset 0 -3px 0 #f9ff26,0 2px 4px #10294819 !important;
+    text-shadow:none !important;font-weight:850 !important;
+}
+.oas-shell .oas-main-inner .oas-order-screen .ui-sales-editor__footer-actions .ui-workspace-actionbar > .ui-button > :is(span,i) {
+    text-shadow:none !important;
+}
+.oas-shell .oas-main-inner .oas-order-screen .ui-sales-editor__footer-actions .ui-workspace-actionbar > .ui-button:not(:first-child) > :is(span,i) {
+    color:inherit !important;-webkit-text-fill-color:currentColor !important;
+}
+/* Optional order-wide discount: do not compete with per-line discounts. */
+.oas-order-screen .oas-order-extra-discount {
+    background:var(--ord-surface);border:1px solid var(--ord-line);border-radius:11px;overflow:visible;
+}
+.oas-order-screen .oas-order-extra-discount > summary {
+    display:flex;align-items:center;gap:9px;cursor:pointer;list-style:none;
+    font-size:13px;font-weight:850;padding:12px 14px;color:var(--ord-ink);
+}
+.oas-order-screen .oas-order-extra-discount > summary::-webkit-details-marker {display:none}
+.oas-order-screen .oas-order-extra-discount > summary i {color:var(--ord-blue)}
+.oas-order-screen .oas-order-extra-discount > summary span {font-size:11px;font-weight:500;color:var(--ord-muted)}
+.oas-order-screen .oas-order-extra-discount[open] > summary {border-bottom:1px solid var(--ord-line)}
+.oas-order-screen .oas-order-extra-discount .ui-sales-section {margin:8px;border:0}
+.oas-order-screen .ui-sales-line-card__number-field input[aria-invalid="true"] {
+    border:2px solid #cb2038!important;background:#fff1f3!important;
+}
+@media(max-width:460px){
+    .oas-shell .oas-main-inner .oas-order-screen .ui-sales-editor__footer-actions .ui-workspace-actionbar > .ui-button {
+       flex:1 1 108px;min-width:108px;width:auto;max-width:none;
+    }
+    .oas-order-screen .oas-order-extra-discount > summary {flex-wrap:wrap}
+}
+
+.oas-order-screen .oas-order-extra-discount__amount {font-size:12px;color:var(--ord-blue);margin-inline-start:auto;white-space:nowrap}

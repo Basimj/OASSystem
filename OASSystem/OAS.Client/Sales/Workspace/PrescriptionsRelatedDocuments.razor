@@ -1,0 +1,35 @@
+@namespace OAS.Client.Sales.Workspace
+@using OAS.Contracts.Sales.Prescriptions
+
+<section class="oas-rx-related" aria-label="المستندات المرتبطة بالوصفة">
+    <h3><i class="fa-solid fa-link" aria-hidden="true"></i> المستندات المرتبطة</h3>
+    @if (Unavailable)
+    {
+        <p>لا يمكن تحميل المستندات المرتبطة حاليًا. يتطلب عرضها صلاحيات الوصفات والطلبات والفواتير.</p>
+    }
+    else if (Documents.Count == 0)
+    {
+        <p>لا توجد طلبات أو فواتير مرتبطة بإصدارات هذه الوصفة.</p>
+    }
+    else
+    {
+        <div class="oas-rx-related__list">
+            @foreach (var doc in Documents)
+            {
+                <button type="button" @onclick="() => OnOpen.InvokeAsync(doc)" class="oas-rx-related__item">
+                    <i class="@(doc.DocumentType == "SalesInvoice" ? "fa-regular fa-file-lines" : "fa-solid fa-clipboard-list")"></i>
+                    <span>@(doc.DocumentType == "SalesInvoice" ? "فاتورة مبيعات" : "طلب عميل") <strong>@doc.DocumentCode</strong></span>
+                    @if (!string.IsNullOrWhiteSpace(doc.RevisionNumbers)) { <small>الإصدار @doc.RevisionNumbers</small> }
+                    <small>@doc.DocumentDate.ToString("yyyy/MM/dd")</small>
+                    <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                </button>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter] public IReadOnlyList<PrescriptionRelatedDocumentDto> Documents { get; set; } = [];
+    [Parameter] public bool Unavailable { get; set; }
+    [Parameter] public EventCallback<PrescriptionRelatedDocumentDto> OnOpen { get; set; }
+}

@@ -1,51 +1,29 @@
 @namespace OAS.UiLib.Components.Sales.Prescriptions
 @using OAS.UiLib.Core.Models.Sales
 
-<div class="ui-sales-form-grid">
-    <UiInputText Label="كود الوصفة" Value="@Model.PrescriptionCode" ValueChanged="CodeChanged" ReadOnly="true" />
-    <UiLookup Label="العميل" Value="@Model.CustomerId" ValueChanged="CustomerChanged" SearchAsync="SearchCustomersAsync"
-              SelectedItem="@CustomerItem" Placeholder="ابحث بالكود أو الاسم أو الجوال..." Required="true" Disabled="@ReadOnly" />
-    <UiInputDate Label="تاريخ الوصفة" Value="@Model.PrescriptionDate" ValueChanged="DateChanged" Required="true" ReadOnly="@ReadOnly" />
-    <UiInputText Label="الطبيب / الفاحص" Value="@Model.PrescribedBy" ValueChanged="PrescriberChanged" ReadOnly="@ReadOnly" />
-    <UiInputText Label="العيادة" Value="@Model.ClinicName" ValueChanged="ClinicChanged" ReadOnly="@ReadOnly" />
-    <UiInputText Label="ملاحظات" Value="@Model.Notes" ValueChanged="NotesChanged" ReadOnly="@ReadOnly" />
+<div class="oas-rx-prescription-editor" dir="rtl">
+    <div class="oas-rx-prescription-editor__fields">
+        <UiInputText Label="كود الوصفة" Value="@Model.PrescriptionCode" ValueChanged="CodeChanged" ReadOnly="true" />
+        <UiLookup Label="العميل" Value="@Model.CustomerId" ValueChanged="CustomerChanged" SearchAsync="SearchCustomersAsync"
+                  SelectedItem="@CustomerItem" Placeholder="ابحث بالكود أو الاسم أو الجوال..." Required="true" Disabled="@(ReadOnly || Model.Id.HasValue)" />
+        <UiInputText Label="الطبيب / الفاحص" Value="@Model.PrescribedBy" ValueChanged="PrescriberChanged" ReadOnly="@ReadOnly" />
+        <UiInputText Label="العيادة" Value="@Model.ClinicName" ValueChanged="ClinicChanged" ReadOnly="@ReadOnly" />
+        <UiInputDate Label="تاريخ الوصفة" Value="@Model.PrescriptionDate" ValueChanged="DateChanged" Required="true" ReadOnly="@ReadOnly" />
+    </div>
+    @if (ShowNotes)
+    {
+        <div class="oas-rx-prescription-editor__notes">
+            <UiInputText Label="ملاحظات الوصفة" Value="@Model.Notes" ValueChanged="NotesChanged" ReadOnly="@ReadOnly" />
+        </div>
+    }
 </div>
 
-@if (Model.Revisions.Count > 0)
-{
-    <div class="ui-sales-revisions">
-        <div class="ui-sales-revisions__title"><strong>إصدارات الوصفة</strong><span>@Model.Revisions.Count إصدار</span></div>
-        @foreach (var revision in Model.Revisions.OrderByDescending(x => x.RevisionNumber))
-        {
-            <div class="ui-sales-revision-card">
-                <div class="ui-sales-revision-card__header">
-                    <strong>الإصدار @revision.RevisionNumber</strong>
-                    @if (revision.IsCurrent) { <span class="ui-sales-status ui-sales-status--active">الحالي</span> }
-                    <span>@revision.EffectiveDate?.ToString("yyyy-MM-dd")</span>
-                </div>
-                @if (!string.IsNullOrWhiteSpace(revision.Reason)) { <p>@revision.Reason</p> }
-                <div class="ui-sales-eye-grid">
-                    @foreach (var eye in revision.Eyes)
-                    {
-                        <div class="ui-sales-eye-card">
-                            <strong>@eye.EyeText</strong>
-                            <span>SPH: @(eye.SPH?.ToString("0.00") ?? "-")</span>
-                            <span>CYL: @(eye.CYL?.ToString("0.00") ?? "-")</span>
-                            <span>Axis: @(eye.Axis?.ToString() ?? "-")</span>
-                            <span>ADD: @(eye.ADD?.ToString("0.00") ?? "-")</span>
-                            <span>PD: @(eye.PD?.ToString("0.00") ?? "-")</span>
-                            <span>VA: @(eye.VA ?? "-")</span>
-                        </div>
-                    }
-                </div>
-            </div>
-        }
-    </div>
-}
+<!-- Historic revisions are rendered in UiPrescriptionRevisionHistory to keep the form compact. -->
 
 @code {
     [Parameter, EditorRequired] public UiPrescriptionFormModel Model { get; set; } = new();
     [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool ShowNotes { get; set; } = true;
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchCustomersAsync { get; set; }
     [Parameter] public EventCallback<string?> OnCustomerSelected { get; set; }
     [Parameter] public EventCallback OnChanged { get; set; }

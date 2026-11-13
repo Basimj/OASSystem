@@ -79,6 +79,8 @@ public static class SalesUiMapper
         DiscountAmount = dto.DiscountAmount,
         TaxAmount = dto.TaxAmount,
         TotalAmount = dto.TotalAmount,
+        HeaderDiscountAmount = dto.HeaderDiscountAmount,
+        HeaderDiscountApproved = dto.HeaderDiscountApprovedAtUtc.HasValue,
         Notes = dto.Notes,
         RowVersion = dto.RowVersion,
         Lines = dto.Lines.OrderBy(x => x.LineNumber).Select(ToUi).ToList()

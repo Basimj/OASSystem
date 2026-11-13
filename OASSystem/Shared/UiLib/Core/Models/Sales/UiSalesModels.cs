@@ -146,6 +146,8 @@ public sealed class UiCustomerOrderFormModel
     public decimal DiscountAmount { get; set; }
     public decimal TaxAmount { get; set; }
     public decimal TotalAmount { get; set; }
+    public decimal HeaderDiscountAmount { get; set; }
+    public bool HeaderDiscountApproved { get; set; }
     public string? Notes { get; set; }
     public string RowVersion { get; set; } = string.Empty;
     public List<UiSalesLineModel> Lines { get; set; } = [];

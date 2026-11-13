@@ -1,0 +1,169 @@
+@namespace OAS.Client.Sales.Workspace
+@using OAS.Contracts.Sales.CustomerOrders
+@using OAS.Contracts.Sales.Enums
+
+<section class="oas-order-dashboard" dir="rtl" aria-label="قائمة طلبات العملاء">
+    <div class="oas-order-metrics" aria-label="مؤشرات الطلبات من قاعدة البيانات">
+        <article class="oas-order-metric oas-order-metric--open">
+            <span class="oas-order-metric__icon"><i class="fa-solid fa-clipboard-list" aria-hidden="true"></i></span>
+            <strong>الطلبات المفتوحة</strong><b>@Count(Summary?.OpenOrders)</b>
+            <small>الطلبات غير المكتملة وغير الملغاة</small>
+        </article>
+        <article class="oas-order-metric oas-order-metric--stock">
+            <span class="oas-order-metric__icon"><i class="fa-solid fa-truck" aria-hidden="true"></i></span>
+            <strong>بانتظار المخزون</strong><b>@Count(Summary?.AwaitingStock)</b>
+            <small>بانتظار التوفر أو توفر جزئي</small>
+        </article>
+        <article class="oas-order-metric oas-order-metric--work">
+            <span class="oas-order-metric__icon"><i class="fa-solid fa-gears" aria-hidden="true"></i></span>
+            <strong>قيد التجهيز</strong><b>@Count(Summary?.InProduction)</b>
+            <small>جاهزة للمعمل أو قيد التصنيع</small>
+        </article>
+        <article class="oas-order-metric oas-order-metric--ready">
+            <span class="oas-order-metric__icon"><i class="fa-solid fa-box-open" aria-hidden="true"></i></span>
+            <strong>جاهزة للتسليم</strong><b>@Count(Summary?.ReadyForDelivery)</b>
+            <small>طلبات تنتظر التسليم الفعلي</small>
+        </article>
+    </div>
+
+    <div class="oas-order-filters">
+        <strong><i class="fa-solid fa-filter" aria-hidden="true"></i> تصفية البيانات</strong>
+        <label>حالة الطلب
+            <select value="@(StatusFilter ?? string.Empty)" @onchange="ChangeStatusAsync">
+                <option value="">كل الحالات</option>
+                <option value="Draft">مسودة</option>
+                <option value="Confirmed">مؤكد</option>
+                <option value="AwaitingStock">بانتظار المخزون</option>
+                <option value="PartiallyAvailable">متوفر جزئيًا</option>
+                <option value="ReadyForProduction">جاهز للمعمل</option>
+                <option value="InProduction">قيد التجهيز</option>
+                <option value="ReadyForDelivery">جاهز للتسليم</option>
+                <option value="Completed">مكتمل</option>
+                <option value="Cancelled">ملغى</option>
+            </select>
+        </label>
+        <label>من تاريخ
+            <input type="date" value="@DateText(DateFrom)" @onchange="ChangeDateFromAsync" />
+        </label>
+        <label>إلى تاريخ
+            <input type="date" value="@DateText(DateTo)" @onchange="ChangeDateToAsync" />
+        </label>
+        <button type="button" class="oas-order-clear" @onclick="ClearFiltersAsync"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i> مسح الفلاتر</button>
+    </div>
+
+    @if (DateFrom.HasValue && DateTo.HasValue && DateFrom.Value > DateTo.Value)
+    {
+        <p class="oas-order-date-warning" role="alert">تاريخ البداية بعد تاريخ النهاية. راجع الفترة المحددة.</p>
+    }
+    <section class="oas-order-table-card" aria-label="جدول طلبات العملاء">
+        <div class="oas-order-table-card__head">
+            <h2><i class="fa-solid fa-list" aria-hidden="true"></i> قائمة الطلبات <span>(@TotalCount)</span></h2>
+            <small>اضغط رقم الطلب أو «عرض» لفتحه في تبويب مستقل</small>
+        </div>
+        <div class="oas-order-table-scroll">
+            <table class="oas-order-table">
+                <thead><tr>
+                    <th scope="col">رقم الطلب</th><th scope="col">العميل</th>
+                    <th scope="col">الهاتف</th><th scope="col">تاريخ الطلب</th><th scope="col">قيمة الطلب</th>
+                    <th scope="col">حالة الطلب</th><th scope="col">التوفر</th>
+                    <th scope="col">التاريخ المطلوب</th><th scope="col">الإجراءات</th>
+                </tr></thead>
+                <tbody>
+                    @if (IsLoading)
+                    {
+                        <tr><td colspan="9" class="oas-order-table__empty">جارٍ تحميل الطلبات...</td></tr>
+                    }
+                    else if (Items.Count == 0)
+                    {
+                        <tr><td colspan="9" class="oas-order-table__empty">لا توجد طلبات تطابق البحث والفلاتر المحددة.</td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var item in Items)
+                        {
+                            <tr @key="item.Id">
+                                <td><button type="button" class="oas-order-code" @onclick="() => OnOpen.InvokeAsync(item.Id)">@item.OrderCode <i class="fa-regular fa-file-lines" aria-hidden="true"></i></button></td>
+                                <td title="@(item.CustomerName ?? item.CustomerCode)">@(item.CustomerName ?? item.CustomerCode ?? "—")</td>
+                                <td dir="ltr">@(item.CustomerPhone ?? "—")</td>
+                                <td>@item.OrderDate.ToString("yyyy/MM/dd")</td>
+                                <td class="oas-order-amount">@item.TotalAmount.ToString("N2") <small>@item.CurrencyCodeSnapshot</small></td>
+                                <td><span class="oas-order-state @StateCss(item.Status)">@StateText(item.Status)</span></td>
+                                <td><span class="oas-order-stock">@StockText(item.Status)</span></td>
+                                <td>@(item.RequiredDate?.ToString("yyyy/MM/dd") ?? "—")</td>
+                                <td><button type="button" class="oas-order-view" @onclick="() => OnOpen.InvokeAsync(item.Id)"><i class="fa-regular fa-eye" aria-hidden="true"></i> عرض</button></td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+        <footer class="oas-order-pagination">
+            <label>عدد السجلات في الصفحة
+                <select value="@PageSize" @onchange="ChangePageSizeAsync"><option value="10">10</option><option value="20">20</option><option value="50">50</option></select>
+            </label>
+            <nav aria-label="صفحات الطلبات">
+                <button type="button" disabled="@(PageNumber <= 1 || IsLoading)" @onclick="() => OnGoToPage.InvokeAsync(PageNumber - 1)">‹</button>
+                @foreach (var number in VisiblePages)
+                {
+                    <button type="button" class="@(number == PageNumber ? "is-current" : null)" aria-current="@(number == PageNumber ? "page" : null)" @onclick="() => OnGoToPage.InvokeAsync(number)" disabled="@IsLoading">@(number)</button>
+                }
+                <button type="button" disabled="@(PageNumber >= TotalPages || IsLoading)" @onclick="() => OnGoToPage.InvokeAsync(PageNumber + 1)">›</button>
+            </nav>
+            <span>صفحة @PageNumber من @Math.Max(1, TotalPages) · الإجمالي @TotalCount طلب</span>
+        </footer>
+    </section>
+</section>
+
+@code {
+    [Parameter] public IReadOnlyList<CustomerOrderDto> Items { get; set; } = [];
+    [Parameter] public CustomerOrdersDashboardSummaryDto? Summary { get; set; }
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public int PageNumber { get; set; } = 1;
+    [Parameter] public int TotalPages { get; set; }
+    [Parameter] public long TotalCount { get; set; }
+    [Parameter] public int PageSize { get; set; } = 20;
+    [Parameter] public string? StatusFilter { get; set; }
+    [Parameter] public DateOnly? DateFrom { get; set; }
+    [Parameter] public DateOnly? DateTo { get; set; }
+    [Parameter] public EventCallback<string?> OnStatusChanged { get; set; }
+    [Parameter] public EventCallback<DateOnly?> OnDateFromChanged { get; set; }
+    [Parameter] public EventCallback<DateOnly?> OnDateToChanged { get; set; }
+    [Parameter] public EventCallback<int> OnPageSizeChanged { get; set; }
+    [Parameter] public EventCallback<int> OnGoToPage { get; set; }
+    [Parameter] public EventCallback<Guid> OnOpen { get; set; }
+
+    private static string Count(long? value) => value?.ToString("N0") ?? "—";
+    private static string DateText(DateOnly? value) => value?.ToString("yyyy-MM-dd") ?? "";
+    private IEnumerable<int> VisiblePages => Enumerable.Range(Math.Max(1, PageNumber - 2), Math.Max(0, Math.Min(TotalPages, PageNumber + 2) - Math.Max(1, PageNumber - 2) + 1));
+    private Task ChangeStatusAsync(ChangeEventArgs e) => OnStatusChanged.InvokeAsync(string.IsNullOrWhiteSpace(e.Value?.ToString()) ? null : e.Value?.ToString());
+    private Task ChangeDateFromAsync(ChangeEventArgs e) => OnDateFromChanged.InvokeAsync(DateOnly.TryParse(e.Value?.ToString(), out var value) ? value : null);
+    private Task ChangeDateToAsync(ChangeEventArgs e) => OnDateToChanged.InvokeAsync(DateOnly.TryParse(e.Value?.ToString(), out var value) ? value : null);
+    private Task ChangePageSizeAsync(ChangeEventArgs e) => OnPageSizeChanged.InvokeAsync(int.TryParse(e.Value?.ToString(), out var value) ? value : 20);
+    private async Task ClearFiltersAsync()
+    {
+        await OnStatusChanged.InvokeAsync(null);
+        await OnDateFromChanged.InvokeAsync(null);
+        await OnDateToChanged.InvokeAsync(null);
+    }
+    private static string StateCss(CustomerOrderStatus value) => value switch
+    {
+        CustomerOrderStatus.Completed or CustomerOrderStatus.ReadyForDelivery => "is-green",
+        CustomerOrderStatus.Cancelled => "is-red",
+        CustomerOrderStatus.AwaitingStock or CustomerOrderStatus.PartiallyAvailable => "is-yellow",
+        _ => "is-blue"
+    };
+    private static string StateText(CustomerOrderStatus value) => value switch
+    {
+        CustomerOrderStatus.Draft => "مسودة", CustomerOrderStatus.Confirmed => "مؤكد",
+        CustomerOrderStatus.AwaitingStock => "بانتظار المخزون", CustomerOrderStatus.PartiallyAvailable => "متوفر جزئيًا",
+        CustomerOrderStatus.ReadyForProduction => "جاهز للمعمل", CustomerOrderStatus.InProduction => "قيد التجهيز",
+        CustomerOrderStatus.ReadyForDelivery => "جاهز للتسليم", CustomerOrderStatus.Completed => "مكتمل",
+        CustomerOrderStatus.Cancelled => "ملغى", _ => value.ToString()
+    };
+    private static string StockText(CustomerOrderStatus status) => status switch
+    {
+        CustomerOrderStatus.AwaitingStock => "بانتظار المخزون",
+        CustomerOrderStatus.PartiallyAvailable => "متوفر جزئيًا",
+        _ => "راجع متابعة الطلب"
+    };
+}

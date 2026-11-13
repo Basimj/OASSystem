@@ -1,17 +1,18 @@
 @namespace OAS.UiLib.Components.Sales.Orders
 @using OAS.UiLib.Core.Models.Sales
 
+<div class="oas-order-form" dir="rtl">
 <UiSalesFormSection Title="بيانات الطلب" IconCss="fa-solid fa-clipboard-list">
-    <div class="ui-sales-form-grid">
+    <div class="ui-sales-form-grid oas-order-form__fields">
         <UiInputText Label="كود الطلب" Value="@Model.OrderCode" ReadOnly="true" />
         <UiLookup Label="العميل" Value="@Model.CustomerId" ValueChanged="CustomerChanged" SelectedItem="@CustomerItem"
-                  SearchAsync="SearchCustomersAsync" Placeholder="ابحث عن العميل..." Required="true" Disabled="@ReadOnly" />
-        <UiLookup Label="Revision الوصفة" Value="@Model.PrescriptionRevisionId" ValueChanged="PrescriptionChanged" SelectedItem="@PrescriptionItem"
-                  SearchAsync="SearchPrescriptionsAsync" Placeholder="اختياري" Disabled="@ReadOnly" />
-        <UiInputDate Label="تاريخ الطلب" Value="@Model.OrderDate" ValueChanged="OrderDateChanged" Required="true" ReadOnly="@ReadOnly" />
-        <UiInputDate Label="التاريخ المطلوب" Value="@Model.RequiredDate" ValueChanged="RequiredDateChanged" ReadOnly="@ReadOnly" />
+                  SearchAsync="SearchCustomersAsync" UsePopover="true" Placeholder="ابحث عن العميل..." Required="true" Disabled="@ReadOnly" ErrorText="@CustomerError" />
+        <UiLookup Label="إصدار الوصفة" Value="@Model.PrescriptionRevisionId" ValueChanged="PrescriptionChanged" SelectedItem="@PrescriptionItem"
+                  SearchAsync="SearchPrescriptionsAsync" UsePopover="true" Placeholder="اختياري" Disabled="@ReadOnly" />
+        <UiInputDate Label="تاريخ الطلب" Value="@Model.OrderDate" ValueChanged="OrderDateChanged" Required="true" ReadOnly="@ReadOnly" ErrorText="@OrderDateError" />
+        <UiInputDate Label="التاريخ المطلوب" Value="@Model.RequiredDate" ValueChanged="RequiredDateChanged" ReadOnly="@ReadOnly" ErrorText="@RequiredDateError" />
         <UiLookup Label="العملة" Value="@Model.CurrencyId" ValueChanged="CurrencyChanged" SelectedItem="@CurrencyItem"
-                  SearchAsync="SearchCurrenciesAsync" Placeholder="اختر العملة..." Required="true" Disabled="@ReadOnly" />
+                  SearchAsync="SearchCurrenciesAsync" UsePopover="true" Placeholder="اختر العملة..." Required="true" Disabled="@ReadOnly" ErrorText="@CurrencyError" />
         <UiSelect Label="طريقة الضريبة" Value="@Model.TaxCalculationMode" ValueChanged="TaxModeChanged" Disabled="@ReadOnly" Options="@TaxOptions" />
         <UiInputText Label="خطة السداد" Value="تُحدد عند إتمام البيع" ReadOnly="true" />
         <UiInputText Label="ملاحظات" Value="@Model.Notes" ValueChanged="NotesChanged" ReadOnly="@ReadOnly" />
@@ -19,15 +20,75 @@
 </UiSalesFormSection>
 
 <UiSalesFormSection Title="بنود الطلب" Description="محرر واسع للبند: نوع المنتج ثم التصنيف ثم المنتج/الصنف والمخزن، مع بيانات الوصفة عند الحاجة." IconCss="fa-solid fa-list">
-    <UiSalesLinesEditor Model="@Model.Lines" ReadOnly="@ReadOnly" SearchProductTypesAsync="SearchProductTypesAsync" SearchCategoriesAsync="SearchCategoriesAsync" SearchProductsAsync="SearchProductsAsync"
+    @if (LinesError is not null) { <p class="oas-order-field-error" role="alert">@LinesError</p> }
+    <UiSalesLinesEditor @ref="_salesLinesEditor" CompactMode="true" Model="@Model.Lines" ReadOnly="@ReadOnly" SearchProductTypesAsync="SearchProductTypesAsync" SearchCategoriesAsync="SearchCategoriesAsync" SearchProductsAsync="SearchProductsAsync"
                         SearchWarehousesAsync="SearchWarehousesAsync" SearchPrescriptionRevisionsAsync="SearchPrescriptionRevisionsAsync"
                         HeaderPrescriptionRevisionId="@Model.PrescriptionRevisionId" HeaderPrescriptionRevisionDisplay="@Model.PrescriptionDisplay"
                         OnProductTypeSelected="OnProductTypeSelected" OnCategorySelected="OnCategorySelected" OnProductSelected="OnProductSelected" OnWarehouseSelected="OnWarehouseSelected" OnChanged="OnChanged" />
 </UiSalesFormSection>
 
-<UiSalesTotalsPanel CurrencyCode="@Model.CurrencyCode" Subtotal="@Model.Subtotal" DiscountAmount="@Model.DiscountAmount" TaxAmount="@Model.TaxAmount" TotalAmount="@Model.TotalAmount" />
+<div class="oas-order-form__bottom-panels">
+    <section class="oas-order-optical-panel" aria-label="ملخص قياسات العدسات">
+        <h3><i class="fa-solid fa-glasses" aria-hidden="true"></i> قياسات العدسات المرتبطة بالطلب</h3>
+        @if (!Model.Lines.Any(x => x.LineType == "Lens"))
+        {
+            <p class="oas-order-optical-panel__hint">عند إضافة بند عدسة ستظهر قياساته هنا؛ ويمكن تعديل المصدر والقياسات من محرر البند.</p>
+        }
+        else
+        {
+            <div class="oas-order-optical-table-wrap">
+                <table>
+                    <thead><tr><th>العين</th><th>المصدر</th><th>SPH</th><th>CYL</th><th>Axis</th><th>ADD</th></tr></thead>
+                    <tbody>
+                    @foreach (var line in Model.Lines.Where(x => x.LineType == "Lens"))
+                    {
+                        <tr @key="line"><td>@EyeLabel(line.PrescriptionEye)</td><td>@MeasurementSource(line)</td>
+                            <td>@MeasurementValue(line.SPH, line)</td><td>@MeasurementValue(line.CYL, line)</td>
+                            <td>@MeasurementAxis(line)</td><td>@MeasurementValue(line.ADD, line)</td></tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+    <aside class="oas-order-form__state-panel">
+        <h3><i class="fa-solid fa-wave-square" aria-hidden="true"></i> الحالة والمتابعة</h3>
+        <div><span>حالة الطلب</span><b>@OrderStatusText(Model.Status)</b></div>
+        <div><span>إصدار الوصفة</span><b>@(string.IsNullOrWhiteSpace(Model.PrescriptionDisplay) ? "غير محدد" : Model.PrescriptionDisplay)</b></div>
+        <div><span>التوفر / المخزون</span><b>يُفحص عند إتمام البيع</b></div>
+        <div><span>خطة السداد</span><b>تُحدد عند إتمام البيع</b></div>
+    </aside>
+</div>
+<section class="oas-order-form__totals" aria-label="ملخص الطلب المالي">
+    <h3><i class="fa-solid fa-calculator" aria-hidden="true"></i> ملخص الطلب</h3>
+    <UiSalesTotalsPanel CurrencyCode="@Model.CurrencyCode" Subtotal="@Model.Subtotal" DiscountAmount="@Model.DiscountAmount" TaxAmount="@Model.TaxAmount" TotalAmount="@Model.TotalAmount" />
+</section>
+</div>
 
 @code {
+    private UiSalesLinesEditor? _salesLinesEditor;
+    public bool HasInputErrors => _salesLinesEditor?.HasInputErrors == true;
+    private bool _showErrors;
+    private static bool IsValidGuid(string? value) => Guid.TryParse(value, out var id) && id != Guid.Empty;
+    private string? CustomerError => _showErrors && !IsValidGuid(Model.CustomerId) ? "يجب تحديد العميل قبل الحفظ." : null;
+    private string? CurrencyError => _showErrors && !IsValidGuid(Model.CurrencyId) ? "يجب تحديد العملة قبل الحفظ." : null;
+    private string? OrderDateError => _showErrors && !Model.OrderDate.HasValue ? "يجب تحديد تاريخ الطلب." : null;
+    private string? RequiredDateError => _showErrors && Model.OrderDate.HasValue && Model.RequiredDate < Model.OrderDate
+        ? "التاريخ المطلوب لا يمكن أن يسبق تاريخ الطلب." : null;
+    private string? LinesError => _showErrors && Model.Lines.Count == 0 ? "أضف بندًا واحدًا على الأقل." : null;
+    public bool ValidateRequiredInputs()
+    {
+        _showErrors = true;
+        var pricingIsValid = _salesLinesEditor?.ValidatePricingInputs() ?? true;
+        StateHasChanged();
+        return CustomerError is null && CurrencyError is null && OrderDateError is null
+            && RequiredDateError is null && LinesError is null && pricingIsValid && !HasInputErrors;
+    }
+    private static string EyeLabel(string? eye) => eye switch { "RightOD" => "اليمنى OD", "LeftOS" => "اليسرى OS", _ => "غير محددة" };
+    private static string MeasurementSource(UiSalesLineModel line) => line.OpticalMeasurementSource == "Manual" ? "يدوي" : "وصفة محفوظة";
+    private static string MeasurementValue(decimal? value, UiSalesLineModel line) => line.OpticalMeasurementSource == "StoredPrescription" ? "من الإصدار المحفوظ" : value?.ToString("0.##") ?? "—";
+    private static string MeasurementAxis(UiSalesLineModel line) => line.OpticalMeasurementSource == "StoredPrescription" ? "من الإصدار المحفوظ" : line.Axis?.ToString() ?? "—";
+    private static string OrderStatusText(string status) => status switch { "Draft" => "مسودة", "Confirmed" => "مؤكد", "AwaitingStock" => "بانتظار المخزون", "PartiallyAvailable" => "متوفر جزئيًا", "ReadyForProduction" => "جاهز للمعمل", "InProduction" => "قيد التجهيز", "ReadyForDelivery" => "جاهز للتسليم", "Completed" => "مكتمل", "Cancelled" => "ملغى", _ => status };
     private static readonly IReadOnlyList<UiSelectOption> TaxOptions = [new("Exclusive", "غير شامل الضريبة"), new("Inclusive", "شامل الضريبة")];
     [Parameter, EditorRequired] public UiCustomerOrderFormModel Model { get; set; } = new();
     [Parameter] public bool ReadOnly { get; set; }

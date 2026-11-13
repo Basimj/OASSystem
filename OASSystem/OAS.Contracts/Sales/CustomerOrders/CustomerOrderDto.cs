@@ -43,6 +43,8 @@ public sealed record CustomerOrderDto(
     string? PrescriptionCode = null,
     int? PrescriptionRevisionNumber = null)
 {
+    /// <summary>Current customer contact for display; not a historical order snapshot.</summary>
+    public string? CustomerPhone { get; init; }
     public SalesPaymentPlan PaymentPlan { get; init; } =
         PaymentTermType == SalesPaymentTermType.Credit ? SalesPaymentPlan.AccountCredit : SalesPaymentPlan.FullNow;
     public SalesDiscountType HeaderDiscountType { get; init; } = SalesDiscountType.None;

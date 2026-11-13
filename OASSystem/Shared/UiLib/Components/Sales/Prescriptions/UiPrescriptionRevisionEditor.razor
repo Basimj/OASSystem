@@ -1,72 +1,181 @@
 @namespace OAS.UiLib.Components.Sales.Prescriptions
 @using OAS.UiLib.Core.Models.Sales
 
-<div class="ui-sales-revision-editor" dir="rtl">
-    <div class="ui-sales-form-grid">
+<div class="oas-rx-revision-editor" dir="rtl">
+    <aside class="oas-rx-revision-meta" aria-label="تفاصيل إصدار القياسات">
+        <div class="oas-rx-revision-meta__title">
+            <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+            <strong>الإصدار @Model.RevisionNumber</strong>
+            <span>إصدار القياسات @Model.RevisionNumber</span>
+        </div>
         <UiInputDate Label="تاريخ السريان" Value="@Model.EffectiveDate" ValueChanged="EffectiveDateChanged" Required="true" />
         <UiInputText Label="سبب الإصدار" Value="@Model.Reason" ValueChanged="ReasonChanged" />
-    </div>
-
-    <div class="ui-sales-optical-range-note" role="note">
-        <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
-        <span>أدخل قياسات الوصفة مباشرة. توفر العدسة في المخزون يتم التحقق منه لاحقًا بمطابقة SPH/CYL/ADD مع SKU العدسة.</span>
-    </div>
-
-    <div class="ui-sales-eye-grid ui-sales-eye-grid--editor">
-        @foreach (var eye in Model.Eyes)
+        @if (Prescription is not null)
         {
-            <div class="ui-sales-eye-card ui-sales-eye-card--editor">
-                <strong>@eye.EyeText</strong>
-                <label>
-                    SPH
-                    <input type="number" step="0.25" placeholder="SPH" value="@eye.SPH" @onchange="e => DecimalChanged(eye, nameof(eye.SPH), e)" />
-                    <small class="ui-sales-eye-card__range-hint">قيمة الوصفة مباشرة.</small>
-                </label>
-                <label>
-                    CYL
-                    <input type="number" step="0.25" placeholder="CYL" value="@eye.CYL" @onchange="e => DecimalChanged(eye, nameof(eye.CYL), e)" />
-                    <small class="ui-sales-eye-card__range-hint">قيمة الوصفة مباشرة.</small>
-                </label>
-                <label>
-                    Axis
-                    <input type="number" min="0" max="180" step="1" placeholder="من 0 إلى 180" title="Axis: أدخل قيمة بين 0 و 180" value="@eye.Axis" @onchange="e => AxisChanged(eye, e)" />
-                    <small class="ui-sales-eye-card__range-hint">أدخل قيمة بين 0 و 180.</small>
-                </label>
-                <label>
-                    ADD
-                    <input type="number" step="0.25" min="0" placeholder="ADD" value="@eye.ADD" @onchange="e => DecimalChanged(eye, nameof(eye.ADD), e)" />
-                    <small class="ui-sales-eye-card__range-hint">قيمة الوصفة مباشرة عند الحاجة.</small>
-                </label>
-                <label>Prism<input type="number" step="0.25" min="0" placeholder="0 أو أكثر" value="@eye.Prism" @onchange="e => DecimalChanged(eye, nameof(eye.Prism), e)" /></label>
-                <label>Prism Base
-                    <select value="@eye.PrismBase" @onchange="e => PrismBaseChanged(eye, e)">
-                        <option value="None">بدون</option><option value="Up">أعلى</option><option value="Down">أسفل</option><option value="In">للداخل</option><option value="Out">للخارج</option>
-                    </select>
-                </label>
-                <label>PD<input type="number" step="0.5" min="0" placeholder="أكبر من 0" value="@eye.PD" @onchange="e => DecimalChanged(eye, nameof(eye.PD), e)" /></label>
-                <label>Mono PD<input type="number" step="0.5" min="0" placeholder="أكبر من 0" value="@eye.MonocularPD" @onchange="e => DecimalChanged(eye, nameof(eye.MonocularPD), e)" /></label>
-                <label>VA<input value="@eye.VA" @onchange="e => TextChanged(eye, nameof(eye.VA), e)" /></label>
-                <label>Fitting Height<input type="number" step="0.5" min="0" placeholder="أكبر من 0" value="@eye.FittingHeight" @onchange="e => DecimalChanged(eye, nameof(eye.FittingHeight), e)" /></label>
-                <label class="ui-sales-eye-card__wide">ملاحظات<input value="@eye.Notes" @onchange="e => NotesChanged(eye, e)" /></label>
+            <div class="oas-rx-revision-meta__status">
+                <span>حالة الوصفة</span>
+                <strong>@(Prescription.Id.HasValue ? Prescription.StatusText : "ستصبح نشطة بعد الحفظ")</strong>
             </div>
+            <label class="oas-rx-revision-notes">
+                <span><i class="fa-solid fa-note-sticky" aria-hidden="true"></i> ملاحظات الوصفة</span>
+                <textarea rows="4" maxlength="2000" value="@Prescription.Notes" @onchange="PrescriptionNotesChangedAsync"
+                          readonly="@ReadOnlyPrescription" placeholder="ملاحظات حول الوصفة..."></textarea>
+            </label>
         }
+        <p class="oas-rx-revision-meta__help">تُحفظ قياسات كل إصدار بصورة مستقلة؛ لن تتغير القياسات المستخدمة في المستندات السابقة.</p>
+    </aside>
+    <div class="oas-rx-measure-input-wrap">
+        <div class="oas-rx-history-title"><h3>قياسات النظر — الإصدار @Model.RevisionNumber</h3><span>المدخلات الفارغة تبقى بدون قيمة</span></div>
+        <div class="oas-rx-measure-scroll">
+            <table class="oas-rx-measure-table oas-rx-measure-table--editor">
+                <thead><tr><th scope="col">القياس</th><th scope="col">العين اليمنى OD</th><th scope="col">العين اليسرى OS</th></tr></thead>
+                <tbody>
+            <tr><th scope="row">SPH (الكروية)</th>
+                @foreach (var eye in OrderedEyes)
+                {
+                    <td><input type="number" step="0.25" aria-label="SPH (الكروية) - @eye.EyeText" class="@(FieldClass(eye, nameof(eye.SPH)))" value="@eye.SPH" @onchange="e => DecimalChanged(eye, nameof(eye.SPH), e)" />@if (FieldError(eye, nameof(eye.SPH)) is { } error) { <small class="oas-rx-field-error">@error</small> }</td>
+                }
+            </tr>
+            <tr><th scope="row">CYL (الأسطوانية)</th>
+                @foreach (var eye in OrderedEyes)
+                {
+                    <td><input type="number" step="0.25" aria-label="CYL (الأسطوانية) - @eye.EyeText" class="@(FieldClass(eye, nameof(eye.CYL)))" value="@eye.CYL" @onchange="e => DecimalChanged(eye, nameof(eye.CYL), e)" />@if (FieldError(eye, nameof(eye.CYL)) is { } error) { <small class="oas-rx-field-error">@error</small> }</td>
+                }
+            </tr>
+            <tr><th scope="row">Axis (المحور °)</th>
+                @foreach (var eye in OrderedEyes)
+                {
+                    <td><input type="number" step="1" min="0" max="180" aria-label="Axis (المحور °) - @eye.EyeText" class="@(FieldClass(eye, nameof(eye.Axis)))" value="@eye.Axis" @onchange="e => AxisChanged(eye, e)" />@if (FieldError(eye, nameof(eye.Axis)) is { } error) { <small class="oas-rx-field-error">@error</small> }</td>
+                }
+            </tr>
+            <tr><th scope="row">ADD (إضافة القراءة)</th>
+                @foreach (var eye in OrderedEyes)
+                {
+                    <td><input type="number" step="0.25" min="0" aria-label="ADD (إضافة القراءة) - @eye.EyeText" class="@(FieldClass(eye, nameof(eye.ADD)))" value="@eye.ADD" @onchange="e => DecimalChanged(eye, nameof(eye.ADD), e)" />@if (FieldError(eye, nameof(eye.ADD)) is { } error) { <small class="oas-rx-field-error">@error</small> }</td>
+                }
+            </tr>
+            <tr><th scope="row">Prism (المنشور)</th>
+                @foreach (var eye in OrderedEyes)
+                {
+                    <td><input type="number" step="0.25" min="0" aria-label="Prism (المنشور) - @eye.EyeText" class="@(FieldClass(eye, nameof(eye.Prism)))" value="@eye.Prism" @onchange="e => DecimalChanged(eye, nameof(eye.Prism), e)" />@if (FieldError(eye, nameof(eye.Prism)) is { } error) { <small class="oas-rx-field-error">@error</small> }</td>
+                }
+            </tr>
+            <tr><th scope="row">Prism Base (الاتجاه)</th>
+                @foreach (var eye in OrderedEyes)
+                {
+                    <td><select aria-label="Prism Base (الاتجاه) - @eye.EyeText" value="@eye.PrismBase" @onchange="e => PrismBaseChanged(eye, e)"><option value="None">بدون</option><option value="Up">أعلى</option><option value="Down">أسفل</option><option value="In">للداخل</option><option value="Out">للخارج</option></select></td>
+                }
+            </tr>
+            <tr><th scope="row">PD (mm)</th>
+                @foreach (var eye in OrderedEyes)
+                {
+                    <td><input type="number" step="0.5" min="0" aria-label="PD (mm) - @eye.EyeText" class="@(FieldClass(eye, nameof(eye.PD)))" value="@eye.PD" @onchange="e => DecimalChanged(eye, nameof(eye.PD), e)" />@if (FieldError(eye, nameof(eye.PD)) is { } error) { <small class="oas-rx-field-error">@error</small> }</td>
+                }
+            </tr>
+            <tr><th scope="row">Mono PD (mm)</th>
+                @foreach (var eye in OrderedEyes)
+                {
+                    <td><input type="number" step="0.5" min="0" aria-label="Mono PD (mm) - @eye.EyeText" class="@(FieldClass(eye, nameof(eye.MonocularPD)))" value="@eye.MonocularPD" @onchange="e => DecimalChanged(eye, nameof(eye.MonocularPD), e)" />@if (FieldError(eye, nameof(eye.MonocularPD)) is { } error) { <small class="oas-rx-field-error">@error</small> }</td>
+                }
+            </tr>
+            <tr><th scope="row">VA (حدة الإبصار)</th>
+                @foreach (var eye in OrderedEyes)
+                {
+                    <td><input type="text" aria-label="VA (حدة الإبصار) - @eye.EyeText" class="@(FieldClass(eye, nameof(eye.VA)))" value="@eye.VA" @onchange="e => TextChanged(eye, nameof(eye.VA), e)" />@if (FieldError(eye, nameof(eye.VA)) is { } error) { <small class="oas-rx-field-error">@error</small> }</td>
+                }
+            </tr>
+            <tr><th scope="row">Fitting Height (mm)</th>
+                @foreach (var eye in OrderedEyes)
+                {
+                    <td><input type="number" step="0.5" min="0" aria-label="Fitting Height (mm) - @eye.EyeText" class="@(FieldClass(eye, nameof(eye.FittingHeight)))" value="@eye.FittingHeight" @onchange="e => DecimalChanged(eye, nameof(eye.FittingHeight), e)" />@if (FieldError(eye, nameof(eye.FittingHeight)) is { } error) { <small class="oas-rx-field-error">@error</small> }</td>
+                }
+            </tr>
+            <tr><th scope="row">ملاحظات العين</th>
+                @foreach (var eye in OrderedEyes)
+                {
+                    <td><input type="text" aria-label="ملاحظات العين - @eye.EyeText" class="@(FieldClass(eye, nameof(eye.Notes)))" value="@eye.Notes" @onchange="e => NotesChanged(eye, e)" />@if (FieldError(eye, nameof(eye.Notes)) is { } error) { <small class="oas-rx-field-error">@error</small> }</td>
+                }
+            </tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="oas-rx-measure-help"><i class="fa-solid fa-circle-info"></i> يتحقق النظام من النطاقات والقياسات عند الحفظ؛ مطابقة المخزون تتم لاحقًا عند اختيار العدسات.</p>
     </div>
 </div>
 
 @code {
     [Parameter, EditorRequired] public UiPrescriptionRevisionModel Model { get; set; } = new();
     [Parameter] public EventCallback OnChanged { get; set; }
-
+    [Parameter] public UiPrescriptionFormModel? Prescription { get; set; }
+    [Parameter] public bool ReadOnlyPrescription { get; set; }
+    [Parameter] public EventCallback OnPrescriptionChanged { get; set; }
+    private async Task PrescriptionNotesChangedAsync(ChangeEventArgs args)
+    {
+        if (Prescription is null || ReadOnlyPrescription) return;
+        Prescription.Notes = args.Value?.ToString();
+        await OnPrescriptionChanged.InvokeAsync();
+    }
+    private readonly Dictionary<string, string> _errors = new();
+    private UiPrescriptionRevisionModel? _lastModel;
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_lastModel, Model)) return;
+        _errors.Clear();
+        _lastModel = Model;
+    }
+    public bool HasInputErrors => _errors.Count > 0;
+    private IEnumerable<UiPrescriptionEyeModel> OrderedEyes => Model.Eyes.OrderBy(x => x.Eye == "RightOD" ? 0 : 1);
+    private string? FieldError(UiPrescriptionEyeModel eye, string field) => _errors.GetValueOrDefault($"{eye.Eye}:{field}");
+    private string FieldClass(UiPrescriptionEyeModel eye, string field) => FieldError(eye, field) is not null ? "oas-rx-invalid" : "";
+    private void Check(UiPrescriptionEyeModel eye, string field, string? value, decimal? numeric, decimal? min = null, decimal? max = null)
+    {
+        var key = $"{eye.Eye}:{field}";
+        _errors.Remove(key);
+        if (string.IsNullOrWhiteSpace(value)) return;
+        if (!numeric.HasValue) { _errors[key] = "أدخل رقمًا صالحًا."; return; }
+        if (min.HasValue && numeric < min.Value) _errors[key] = $"الحد الأدنى {min}.";
+        if (max.HasValue && numeric > max.Value) _errors[key] = $"الحد الأعلى {max}.";
+    }
     private async Task EffectiveDateChanged(DateOnly? value) { Model.EffectiveDate = value; await OnChanged.InvokeAsync(); }
     private async Task ReasonChanged(string? value) { Model.Reason = value; await OnChanged.InvokeAsync(); }
     private async Task DecimalChanged(UiPrescriptionEyeModel eye, string field, ChangeEventArgs args)
     {
-        decimal? value = decimal.TryParse(args.Value?.ToString(), out var parsed) ? parsed : null;
+        var raw = args.Value?.ToString();
+        decimal? value = decimal.TryParse(raw, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var parsed) ? parsed : null;
+        var minimum = field is nameof(eye.ADD) or nameof(eye.Prism) ? 0m
+            : field is nameof(eye.PD) or nameof(eye.MonocularPD) or nameof(eye.FittingHeight) ? 0.00001m : (decimal?)null;
+        Check(eye, field, raw, value, minimum);
         switch (field) { case nameof(eye.SPH): eye.SPH = value; break; case nameof(eye.CYL): eye.CYL = value; break; case nameof(eye.ADD): eye.ADD = value; break; case nameof(eye.Prism): eye.Prism = value; break; case nameof(eye.PD): eye.PD = value; break; case nameof(eye.MonocularPD): eye.MonocularPD = value; break; case nameof(eye.FittingHeight): eye.FittingHeight = value; break; }
         await OnChanged.InvokeAsync();
     }
-    private async Task AxisChanged(UiPrescriptionEyeModel eye, ChangeEventArgs args) { eye.Axis = short.TryParse(args.Value?.ToString(), out var value) ? value : null; await OnChanged.InvokeAsync(); }
+    private async Task AxisChanged(UiPrescriptionEyeModel eye, ChangeEventArgs args)
+    {
+        var raw = args.Value?.ToString();
+        short? value = short.TryParse(raw, out var parsed) ? parsed : null;
+        Check(eye, nameof(eye.Axis), raw, value, 0, 180);
+        eye.Axis = value;
+        await OnChanged.InvokeAsync();
+    }
     private async Task PrismBaseChanged(UiPrescriptionEyeModel eye, ChangeEventArgs args) { eye.PrismBase = args.Value?.ToString() ?? "None"; await OnChanged.InvokeAsync(); }
-    private async Task NotesChanged(UiPrescriptionEyeModel eye, ChangeEventArgs args) { eye.Notes = args.Value?.ToString(); await OnChanged.InvokeAsync(); }
-    private async Task TextChanged(UiPrescriptionEyeModel eye, string field, ChangeEventArgs args) { if (field == nameof(eye.VA)) eye.VA = args.Value?.ToString(); await OnChanged.InvokeAsync(); }
+    private async Task NotesChanged(UiPrescriptionEyeModel eye, ChangeEventArgs args)
+    {
+        eye.Notes = args.Value?.ToString();
+        CheckMaxLength(eye, nameof(eye.Notes), eye.Notes, 500);
+        await OnChanged.InvokeAsync();
+    }
+    private async Task TextChanged(UiPrescriptionEyeModel eye, string field, ChangeEventArgs args)
+    {
+        if (field == nameof(eye.VA))
+        {
+            eye.VA = args.Value?.ToString();
+            CheckMaxLength(eye, field, eye.VA, 20);
+        }
+        await OnChanged.InvokeAsync();
+    }
+    private void CheckMaxLength(UiPrescriptionEyeModel eye, string field, string? value, int max)
+    {
+        var key = $"{eye.Eye}:{field}";
+        if (value?.Length > max) _errors[key] = $"يجب ألا تتجاوز القيمة {max} حرفًا.";
+        else _errors.Remove(key);
+    }
 }

@@ -1,3 +1,4 @@
+using OAS.Domain.Accounting.Entities;
 using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Common.Entities;
 using OAS.Domain.Exceptions;
@@ -36,6 +37,8 @@ public sealed class CustomerOrder : AuditableEntity<Guid>
 
     public string OrderCode { get; private set; } = string.Empty;
     public Guid CustomerId { get; private set; }
+    // Existing FK; EF navigation only, does not add a database column.
+    public Customer? Customer { get; private set; }
     public Guid? PrescriptionRevisionId { get; private set; }
     public DateOnly OrderDate { get; private set; }
     public DateOnly? RequiredDate { get; private set; }

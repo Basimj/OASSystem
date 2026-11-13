@@ -49,7 +49,8 @@ public sealed class SalesDtoAssembler(
         {
             Lines = lines,
             PrescriptionCode = prescription.Code,
-            PrescriptionRevisionNumber = prescription.RevisionNumber
+            PrescriptionRevisionNumber = prescription.RevisionNumber,
+            CustomerPhone = customer?.ContactInfo.Mobile ?? customer?.ContactInfo.Phone
         };
     }
 

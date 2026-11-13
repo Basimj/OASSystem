@@ -20,6 +20,10 @@ public sealed class CustomerOrdersController(ISender sender) : ControllerBase
     public async Task<ActionResult<PagedResult<CustomerOrderDto>>> Get([FromQuery] PageRequest request, CancellationToken cancellationToken)
         => Ok(await sender.Send(new GetCustomerOrdersQuery(request), cancellationToken));
 
+    [HttpGet("dashboard-summary")]
+    public async Task<ActionResult<CustomerOrdersDashboardSummaryDto>> DashboardSummary(CancellationToken cancellationToken)
+        => Ok(await sender.Send(new GetCustomerOrdersDashboardSummaryQuery(), cancellationToken));
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<CustomerOrderDto>> GetById(Guid id, CancellationToken cancellationToken)
         => Ok(await sender.Send(new GetCustomerOrderByIdQuery(id), cancellationToken));

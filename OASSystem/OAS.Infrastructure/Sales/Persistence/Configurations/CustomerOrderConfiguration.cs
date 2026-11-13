@@ -60,7 +60,7 @@ public sealed class CustomerOrderConfiguration : IEntityTypeConfiguration<Custom
         builder.HasIndex(x => x.PrescriptionRevisionId).HasDatabaseName("IX_CustomerOrders_PrescriptionRevisionId");
         builder.HasIndex(x => x.CurrencyId).HasDatabaseName("IX_CustomerOrders_CurrencyId");
         builder.HasIndex(x => x.PaymentPlan).HasDatabaseName("IX_CustomerOrders_PaymentPlan");
-        builder.HasOne<Customer>().WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_CustomerOrders_Customers_CustomerId");
+        builder.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_CustomerOrders_Customers_CustomerId");
         builder.HasOne<PrescriptionRevision>().WithMany().HasForeignKey(x => x.PrescriptionRevisionId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_CustomerOrders_PrescriptionRevisions_PrescriptionRevisionId");
         builder.HasOne<Currency>().WithMany().HasForeignKey(x => x.CurrencyId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_CustomerOrders_Currencies_CurrencyId");
         builder.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.CustomerOrderId).OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_CustomerOrderLines_Orders_CustomerOrderId");
