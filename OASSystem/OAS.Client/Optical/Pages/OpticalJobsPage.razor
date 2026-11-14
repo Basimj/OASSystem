@@ -1,35 +1,33 @@
 @page "/optical/jobs"
+@page "/optical/jobs/production/{ProductionJobId:guid}"
 @attribute [Authorize]
 @namespace OAS.Client.Optical.Pages
 @using OAS.UiLib.Components.Optical
 
-<UiOpticalJobsSurface Filter="@_filter"
-                      Rows="@_rows"
-                      Selected="@_selected"
-                      IsBusy="@State.IsBusy"
-                      PageNumber="@State.Page.PageNumber"
-                      TotalPages="@State.Page.TotalPages"
-                      TotalCount="@State.Page.TotalCount"
-                      SearchTechniciansAsync="SearchTechniciansAsync"
-                      SearchBreakageWarehousesAsync="SearchBreakageWarehousesAsync"
-                      SearchMaterialWarehousesAsync="SearchMaterialWarehousesAsync"
-                      SearchRemakeWarehousesAsync="SearchRemakeWarehousesAsync"
-                      OnApplyFilters="ApplyFiltersAsync"
-                      OnClearFilters="ClearFiltersAsync"
-                      OnTabSelected="TabSelectedAsync"
-                      OnOpen="OpenAsync"
-                      OnCloseDetails="CloseDetailsAsync"
-                      OnAssign="AssignAsync"
-                      OnIssueMaterials="IssueMaterialsAsync"
-                      OnStart="StartAsync"
-                      OnSendToQualityControl="SendToQualityControlAsync"
-                      OnCompleteQualityControl="CompleteQualityControlAsync"
-                      OnRecordBreakage="RecordBreakageAsync"
-                      OnCreateRemake="CreateRemakeAsync"
-                      OnStartRemake="StartRemakeAsync"
-                      OnSendRemakeToQc="SendRemakeToQcAsync"
-                      OnReady="ReadyAsync"
-                      OnDeliver="DeliverAsync"
-                      OnCancel="CancelAsync"
-                      OnPrevious="PreviousAsync"
-                      OnNext="NextAsync" />
+<PageTitle>@(IsProductionRoute ? "متابعة التصنيع" : "أوامر المعمل") | OAS</PageTitle>
+@if (IsProductionRoute)
+{
+    <UiOpticalJobProductionSurface Selected="@_selected" IsBusy="@State.IsBusy" ErrorText="@State.Error"
+                                    SearchTechniciansAsync="SearchTechniciansAsync"
+                                    SearchBreakageWarehousesAsync="SearchBreakageWarehousesAsync"
+                                    SearchMaterialWarehousesAsync="SearchMaterialWarehousesAsync"
+                                    SearchRemakeWarehousesAsync="SearchRemakeWarehousesAsync"
+                                    OnBack="BackToListAsync" OnOpenCustomerOrder="OpenCustomerOrderAsync"
+                                    OnAssign="AssignAsync" OnIssueMaterials="IssueMaterialsAsync"
+                                    OnStart="StartAsync" OnSendToQualityControl="SendToQualityControlAsync"
+                                    OnCompleteQualityControl="CompleteQualityControlAsync"
+                                    OnRecordBreakage="RecordBreakageAsync" OnCreateRemake="CreateRemakeAsync"
+                                    OnStartRemake="StartRemakeAsync" OnSendRemakeToQc="SendRemakeToQcAsync"
+                                    OnReady="ReadyAsync" OnDeliver="DeliverAsync" OnCancel="CancelAsync" />
+}
+else
+{
+    <UiOpticalJobsSurface Filter="@_filter" Rows="@_rows" IsBusy="@State.IsBusy" ErrorText="@State.Error"
+                         PageNumber="@State.Page.PageNumber" PageSize="@State.Query.PageSize"
+                         TotalPages="@State.Page.TotalPages" TotalCount="@State.Page.TotalCount"
+                         SearchTechniciansAsync="SearchTechniciansAsync"
+                         OnApplyFilters="ApplyFiltersAsync" OnClearFilters="ClearFiltersAsync"
+                         OnTabSelected="TabSelectedAsync" OnOpen="OpenAsync"
+                         OnPageSizeChanged="PageSizeChangedAsync"
+                         OnPrevious="PreviousAsync" OnNext="NextAsync" />
+}

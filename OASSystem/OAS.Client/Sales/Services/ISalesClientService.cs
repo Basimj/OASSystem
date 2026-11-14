@@ -28,6 +28,7 @@ public interface ISalesClientService
     Task<CustomerOrdersDashboardSummaryDto?> GetCustomerOrdersDashboardSummaryAsync(CancellationToken cancellationToken = default);
     Task<CustomerOrderDto?> GetCustomerOrderByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<SalesCodeReservationDto?> ReserveCustomerOrderCodeAsync(DateOnly orderDate, CancellationToken cancellationToken = default);
+    Task<ApiCallResult<CustomerOrderOpticalPrevalidationResult>> PrevalidateCustomerOrderOpticalAsync(CustomerOrderOpticalPrevalidationRequest request, CancellationToken cancellationToken = default);
     Task<CustomerOrderDto?> CreateCustomerOrderAsync(CreateCustomerOrderRequest request, CancellationToken cancellationToken = default);
     Task<CustomerOrderDto?> UpdateCustomerOrderAsync(Guid id, UpdateCustomerOrderRequest request, CancellationToken cancellationToken = default);
     Task<CustomerOrderDto?> ConfirmCustomerOrderAsync(Guid id, ConfirmCustomerOrderRequest request, CancellationToken cancellationToken = default);

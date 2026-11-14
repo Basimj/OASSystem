@@ -1,0 +1,118 @@
+/* Optical entry guidance and pre-save validation on the customer-order editor. */
+.ui-sales-line-card__optical-grid .oas-order-manual-help {
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+    padding: .65rem .8rem;
+    border: 1px solid color-mix(in srgb, var(--bs-primary, #287ce8) 38%, transparent);
+    background: color-mix(in srgb, var(--bs-primary, #287ce8) 8%, var(--bs-body-bg, #fff));
+    border-radius: .6rem;
+    color: var(--bs-body-color, #173a62);
+    font-size: .78rem;
+    line-height: 1.55;
+}
+.ui-sales-line-card__optical-grid .oas-order-manual-help strong {
+    font-size: .83rem;
+}
+.ui-sales-line-card__optical-grid .oas-order-optical-validation {
+    border: 1px solid color-mix(in srgb, #d92e49 55%, transparent);
+    background: color-mix(in srgb, #d92e49 9%, var(--bs-body-bg, #fff));
+    border-radius: .6rem;
+    padding: .65rem .8rem;
+    color: var(--bs-danger-text-emphasis, #9e1526);
+    font-size: .81rem;
+    font-weight: 650;
+    line-height: 1.6;
+}
+.ui-sales-line-card__optical-grid .oas-order-optical-expand {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    padding: .35rem .75rem;
+    border: 1px solid var(--bs-border-color, #c9d6e6);
+    background: var(--bs-body-bg, #fff);
+    border-radius: .45rem;
+    color: var(--bs-primary, #116fe4);
+    cursor: pointer;
+    font-size: .77rem;
+    font-weight: 650;
+}
+.ui-sales-line-card__optical-grid .oas-order-optical-expand:hover {
+    background: var(--bs-tertiary-bg, #eaf1fa);
+}
+
+/* Explicit values of the selected stock lens, separate from the patient's prescription. */
+.oas-order-lens-table-specs {
+    display: block;
+    margin-top: .2rem;
+    font-size: .72rem;
+    line-height: 1.4;
+    color: var(--oas-color-primary, #126ec1);
+    font-weight: 700;
+    direction: ltr;
+    text-align: right;
+    unicode-bidi: isolate;
+}
+.oas-order-selected-lens {
+    display: flex;
+    flex-direction: column;
+    gap: .55rem;
+    padding: .7rem .8rem;
+    border: 1px solid color-mix(in srgb, var(--oas-color-primary, #168be0) 34%, var(--oas-color-border, #cbd6e5));
+    background: color-mix(in srgb, var(--oas-color-primary, #168be0) 6%, var(--oas-color-surface, #fff));
+    border-radius: .65rem;
+    color: var(--oas-color-text, #122b46);
+}
+.oas-order-selected-lens__heading {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    flex-wrap: wrap;
+    font-size: .8rem;
+}
+.oas-order-selected-lens__heading i { color: var(--oas-color-primary, #168be0); }
+.oas-order-selected-lens__heading span { font-size: .72rem; color: var(--oas-color-text-muted, #4a627a); }
+.oas-order-selected-lens__values {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .5rem;
+}
+.oas-order-selected-lens__values > div {
+    display: flex;
+    flex-direction: column;
+    text-align: center;
+    align-items: center;
+    gap: .12rem;
+    padding: .45rem .5rem;
+    border: 1px solid var(--oas-color-border, #cedbe7);
+    border-radius: .5rem;
+    background: var(--oas-color-surface, #fff);
+    font-variant-numeric: tabular-nums;
+}
+.oas-order-selected-lens__values span { font-size: .72rem; font-weight: 750; color: var(--oas-color-text-muted, #45617b); }
+.oas-order-selected-lens__values strong { font-size: 1.05rem; font-weight: 850; color: var(--oas-color-primary, #126ec1); }
+.oas-order-selected-lens__hint { color: var(--oas-color-warning, #975f00); }
+.oas-order-selected-lens__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .65rem;
+    flex-wrap: wrap;
+}
+.oas-order-selected-lens__footer small { font-size: .72rem; line-height: 1.55; color: var(--oas-color-text-muted, #45617b); }
+.oas-order-selected-lens__copy {
+    border: 1px solid var(--oas-color-primary, #087fd6);
+    border-radius: .45rem;
+    padding: .35rem .65rem;
+    background: var(--oas-color-primary, #087fd6);
+    color: #fff;
+    box-shadow: inset 0 -2px 0 #f9ff26;
+    cursor: pointer;
+    font-size: .72rem;
+    font-weight: 700;
+}
+.oas-order-selected-lens__copy:hover { filter: brightness(.95); }
+@media (max-width: 560px) {
+    .oas-order-selected-lens__values { gap: .3rem; }
+    .oas-order-selected-lens__values strong { font-size: .9rem; }
+}

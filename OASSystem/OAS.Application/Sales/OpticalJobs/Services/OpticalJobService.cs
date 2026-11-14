@@ -377,6 +377,10 @@ public sealed class OpticalJobService(
     public async Task<Guid> CreateRemakeAsync(Guid id, CreateOpticalJobRemakeRequest request, CancellationToken cancellationToken = default)
     {
         var job = await GetForUpdateAsync(id, request.RowVersion, cancellationToken);
+        if (!job.IsActive || job.Status is OpticalJobStatus.Delivered or OpticalJobStatus.Cancelled)
+            throw new ConflictException("optical_remake_job_closed", "لا يمكن إنشاء إعادة تصنيع لأمر معمل مُسلَّم أو مُلغى.");
+        if (job.Status is not (OpticalJobStatus.InProduction or OpticalJobStatus.AwaitingQC))
+            throw new ConflictException("optical_remake_job_state_invalid", "إنشاء إعادة تصنيع يدوية متاح أثناء التصنيع أو فحص الجودة فقط.");
         var remake = await CreateRemakeInternalAsync(job, request.OpticalJobLineId, request.SourceQualityCheckId,
             request.SourceBreakageId, request.ProductVariantId, request.Quantity, request.Reason, request.WarehouseId, cancellationToken);
         return remake.Id;
@@ -391,6 +395,21 @@ public sealed class OpticalJobService(
         SalesConcurrency.Ensure(request.RemakeRowVersion, remake.RowVersion, "إعادة التصنيع");
         if (job.Status != OpticalJobStatus.InProduction)
             throw new ConflictException("optical_remake_job_state", "يجب أن يكون أمر المعمل في الإنتاج لبدء إعادة التصنيع.");
+        // Never start Open/AwaitingMaterials remakes without checking physical availability.
+        // The check is repeated for Ready because stock may have changed since creation.
+        if (remake.Status is OpticalRemakeStatus.Open or OpticalRemakeStatus.Ready or OpticalRemakeStatus.AwaitingMaterials)
+        {
+            if (remake.ProductVariantId is Guid variantId)
+            {
+                if (request.WarehouseId is not Guid warehouseId || warehouseId == Guid.Empty)
+                    throw new ConflictException("optical_remake_warehouse_required", "حدد مخزن مواد إعادة التصنيع قبل البدء.");
+                var available = await inventory.GetAvailableQuantityAsync(warehouseId, variantId, cancellationToken);
+                if (available < remake.Quantity)
+                    throw new ConflictException("optical_remake_materials_unavailable", "لا توجد كمية متاحة تكفي لإعادة التصنيع في المخزن المحدد. أكمل التوريد أولاً.");
+            }
+            if (remake.Status == OpticalRemakeStatus.AwaitingMaterials || remake.Status == OpticalRemakeStatus.Open)
+                remake.MarkReady();
+        }
         remake.Start(timeProvider.GetUtcNow());
         remakes.Update(remake);
         await AddHistoryAsync(job.Id, job.Status, job.Status, $"بدء إعادة تصنيع {remake.Id:D}.", cancellationToken);

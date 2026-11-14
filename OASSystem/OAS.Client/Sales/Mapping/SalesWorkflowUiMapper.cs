@@ -116,7 +116,7 @@ public static class SalesWorkflowUiMapper
         PurchaseOrderId=x.Item.PurchaseOrderId, PurchaseOrderCode=x.Item.PurchaseOrderCode, ExpectedDate=x.Item.ExpectedDeliveryDate?.ToString("yyyy-MM-dd"), ExpectedDeliveryDateInput=x.Item.ExpectedDeliveryDate, LastReceiptDate=x.Item.LastReceiptDate?.ToString("yyyy-MM-dd"), UnitPrice=x.Item.UnitPrice, ActualUnitCost=x.Item.ActualUnitCost
     };
 
-    public static UiOpticalJobRowModel ToUi(OpticalJobWorkQueueDto x) => new(x.Id,x.JobCode,x.CustomerOrderCode,Display(x.CustomerCode,x.CustomerName) ?? x.CustomerName ?? x.CustomerCode ?? "عميل",x.Mobile,x.RequiredDate?.ToString("yyyy-MM-dd"),x.FrameSummary,x.ODSummary,x.OSSummary,x.AssignedTechnicianName,OpticalStatus(x.Status),StatusCss(x.Status.ToString()),x.HasOpenBreakage,x.HasOpenRemake);
+    public static UiOpticalJobRowModel ToUi(OpticalJobWorkQueueDto x) => new(x.Id,x.JobCode,x.CustomerOrderCode,Display(x.CustomerCode,x.CustomerName) ?? x.CustomerName ?? x.CustomerCode ?? "عميل",x.Mobile,x.RequiredDate?.ToString("yyyy-MM-dd"),x.FrameSummary,x.ODSummary,x.OSSummary,x.AssignedTechnicianName,OpticalStatus(x.Status),StatusCss(x.Status.ToString()),x.HasOpenBreakage,x.HasOpenRemake,x.Status.ToString());
 
     public static UiOpticalJobDetailsModel ToUi(OpticalJobDetailsDto x) => new()
     {
@@ -125,7 +125,7 @@ public static class SalesWorkflowUiMapper
         LatestQualityCheck=x.LatestQualityCheck is null?null:new UiOpticalQualityCheckModel{Id=x.LatestQualityCheck.Id,AttemptNumber=x.LatestQualityCheck.AttemptNumber,Result=x.LatestQualityCheck.Result.ToString(),GeneralNotes=x.LatestQualityCheck.GeneralNotes,RowVersion=x.LatestQualityCheck.RowVersion,Items=x.LatestQualityCheck.Items.OrderBy(i=>i.Sequence).Select(i=>new UiOpticalQualityCheckItemModel{Id=i.Id,CheckCode=i.CheckCode,CheckName=i.CheckName,Result=i.Result.ToString(),Notes=i.Notes,Sequence=i.Sequence}).ToList()},
         Breakages=(x.OpenBreakages??[]).Select(b=>new UiOpticalBreakageModel(b.Id,b.OpticalJobLineId,b.Status.ToString(),b.Quantity,b.ReasonText??b.ReasonCode,b.Eye.HasValue?Eye(b.Eye.Value):null,b.RecordedAtUtc)).ToList(),
         Remakes=(x.OpenRemakes??[]).Select(r=>new UiOpticalRemakeModel(r.Id,r.OpticalJobLineId,r.Status.ToString(),r.Quantity,r.Reason,r.ReplacementPurchaseRequestLineId,r.RowVersion)).ToList(),
-        Timeline=(x.Timeline??[]).OrderByDescending(t=>t.ChangedAtUtc).Select(t=>new UiOpticalTimelineModel(t.FromStatus.HasValue?OpticalStatus(t.FromStatus.Value):"—",OpticalStatus(t.ToStatus),t.Reason,t.ChangedAtUtc)).ToList()
+        Timeline=(x.Timeline??[]).OrderByDescending(t=>t.ChangedAtUtc).Select(t=>new UiOpticalTimelineModel(t.FromStatus.HasValue?OpticalStatus(t.FromStatus.Value):"—",OpticalStatus(t.ToStatus),t.Reason,t.ChangedAtUtc,t.ChangedBy == Guid.Empty ? null : t.ChangedBy.ToString("D"))).ToList()
     };
 
     public static string OrderStatus(CustomerOrderStatus s) => s switch { CustomerOrderStatus.Draft=>"مسودة",CustomerOrderStatus.Confirmed=>"جديد",CustomerOrderStatus.AwaitingStock=>"بانتظار مخزون",CustomerOrderStatus.PartiallyAvailable=>"متاح جزئيًا",CustomerOrderStatus.ReadyForProduction=>"جاهز للمعمل",CustomerOrderStatus.InProduction=>"قيد التجهيز",CustomerOrderStatus.ReadyForDelivery=>"جاهز للتسليم",CustomerOrderStatus.Completed=>"مكتمل",CustomerOrderStatus.Cancelled=>"ملغى",_=>s.ToString()};

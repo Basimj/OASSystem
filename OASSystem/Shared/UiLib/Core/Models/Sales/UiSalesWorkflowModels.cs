@@ -159,7 +159,7 @@ public sealed class UiDemandTrackingDetailsModel
     public DateTimeOffset? ResupplyScheduledAt { get; set; }
 }
 
-public sealed record UiOpticalJobRowModel(Guid Id,string JobCode,string? OrderCode,string CustomerText,string? Mobile,string? RequiredDate,string? Frame,string? OD,string? OS,string? Technician,string StatusText,string StatusCss,bool HasOpenBreakage=false,bool HasOpenRemake=false);
+public sealed record UiOpticalJobRowModel(Guid Id,string JobCode,string? OrderCode,string CustomerText,string? Mobile,string? RequiredDate,string? Frame,string? OD,string? OS,string? Technician,string StatusText,string StatusCss,bool HasOpenBreakage=false,bool HasOpenRemake=false,string StatusKey="");
 
 public sealed record UiOpticalJobLineModel(
     Guid Id, Guid? ProductVariantId, Guid? GroupId, int LineNumber, string TypeText, string ProductText,
@@ -187,7 +187,7 @@ public sealed class UiOpticalQualityCheckModel
 
 public sealed record UiOpticalBreakageModel(Guid Id, Guid OpticalJobLineId, string Status, decimal Quantity, string Reason, string? Eye, DateTimeOffset RecordedAtUtc);
 public sealed record UiOpticalRemakeModel(Guid Id, Guid OpticalJobLineId, string Status, decimal Quantity, string Reason, Guid? ReplacementPurchaseRequestLineId, string RowVersion);
-public sealed record UiOpticalTimelineModel(string FromStatus, string ToStatus, string? Reason, DateTimeOffset ChangedAtUtc);
+public sealed record UiOpticalTimelineModel(string FromStatus, string ToStatus, string? Reason, DateTimeOffset ChangedAtUtc, string? Actor = null);
 
 public sealed class UiOpticalJobDetailsModel
 {

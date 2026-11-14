@@ -5,7 +5,7 @@ namespace OAS.Client.Optical.State;
 
 public sealed class OpticalJobsState
 {
-    public OpticalJobWorkQueueRequest Query { get; set; } = new();
+    public OpticalJobWorkQueueRequest Query { get; set; } = new() { PageSize = 10 };
     public PagedResult<OpticalJobWorkQueueDto> Page { get; set; } = new();
     public OpticalJobDetailsDto? Selected { get; set; }
     public bool IsBusy { get; set; }

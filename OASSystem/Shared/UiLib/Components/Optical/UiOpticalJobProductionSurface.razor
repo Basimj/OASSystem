@@ -1,0 +1,202 @@
+@namespace OAS.UiLib.Components.Optical
+@using OAS.UiLib.Core.Models.Sales
+@using OAS.UiLib.Core.Models
+
+<div class="oas-lab oas-lab-production" dir="rtl">
+    <div class="oas-lab-heading"><div><h2><i class="fa-solid fa-gears"></i> متابعة التصنيع</h2><p>إجراءات التنفيذ والجودة والكسر وإعادة التصنيع لأمر المعمل</p></div><button type="button" class="oas-lab-back" @onclick="() => OnBack.InvokeAsync()"><i class="fa-solid fa-arrow-right"></i> جميع أوامر المعمل</button></div>
+    @if (!string.IsNullOrWhiteSpace(ErrorText)) { <div class="oas-lab-notice" role="alert">@ErrorText</div> }
+    @if (Selected is null)
+    {
+        <section class="oas-lab-card oas-lab-empty">@(IsBusy ? "جارٍ تحميل أمر المعمل..." : "تعذر عرض أمر المعمل المحدد.")</section>
+    }
+    else
+    {
+        <div class="oas-lab-order-strip">
+            <div><small>أمر المعمل</small><strong>@Selected.JobCode</strong></div>
+            <div><small>طلب العميل</small><strong>@(Selected.OrderCode ?? "—")</strong></div>
+            <div><small>العميل</small><strong>@Selected.CustomerText</strong></div>
+            <div><small>الفني</small><strong>@(Selected.Technician ?? "غير معيّن")</strong></div>
+            <div><small>موعد الإنجاز</small><strong>@(Selected.RequiredDate ?? "—")</strong></div>
+            <div><small>المرحلة الحالية</small><strong class="oas-lab-current">@Selected.StatusText</strong></div>
+        </div>
+        <section class="oas-lab-card oas-lab-steps" aria-label="مراحل المعمل">
+            @foreach (var step in Steps)
+            {
+                <div class="@(StageIndex(Selected.StatusKey) >= step.Index ? "done" : "") @(StageIndex(Selected.StatusKey) == step.Index ? "now" : "")"><i class="fa-solid @(StageIndex(Selected.StatusKey) > step.Index ? "fa-circle-check" : "fa-circle")"></i><span>@step.Label</span></div>
+            }
+        </section>
+        <div class="oas-lab-section-tabs" role="tablist" aria-label="تفاصيل التصنيع">
+            @foreach (var tab in Sections)
+            { <button type="button" role="tab" aria-selected="@(_section == tab.Key)" class="@(_section == tab.Key ? "active" : "")" @onclick="() => _section = tab.Key">@tab.Title</button> }
+        </div>
+        @if (_section == "info")
+        {
+            <div class="oas-lab-production-grid">
+                <section class="oas-lab-card"><h3>البيانات الأساسية</h3><div class="oas-lab-summary"><span>رقم الأمر <strong>@Selected.JobCode</strong></span><span>رقم طلب العميل <strong>@(Selected.OrderCode ?? "—")</strong></span><span>الحالة <strong>@Selected.StatusText</strong></span><span>موعد الإنجاز <strong>@(Selected.RequiredDate ?? "—")</strong></span></div>
+                    @if (CanAssign)
+                    {
+                        <UiLookup Label="الفني المسؤول" Value="@Selected.TechnicianId" SelectedItem="@SelectedTechnicianItem" SearchAsync="SearchTechniciansAsync" ValueChanged="SelectedTechnicianChangedAsync" Placeholder="اختر فنيًا" />
+                        <UiButton Text="حفظ تعيين الفني" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Loading="@IsBusy" OnClick="_ => OnAssign.InvokeAsync()" />
+                    }
+                    else { <p class="oas-lab-hint">الأمر مغلق؛ لا يمكن تعديل الفني.</p> }
+                </section>
+                <section class="oas-lab-card"><h3>الإطار والعدسات ومواصفات العمل</h3><div class="oas-lab-table-wrap"><table class="oas-lab-table"><thead><tr><th>البند</th><th>النوع</th><th>الصنف</th><th>العين</th><th>الكمية</th><th>المواصفات</th></tr></thead><tbody>@foreach(var line in Selected.Lines){<tr><td>@line.LineNumber</td><td>@line.TypeText</td><td>@line.ProductText</td><td>@(line.EyeText ?? "—")</td><td>@line.Quantity.ToString("0.###")</td><td>@(line.OpticalSummary ?? "—")</td></tr>}</tbody></table></div></section>
+            </div>
+        }
+        else if (_section == "materials")
+        {
+            <section class="oas-lab-card"><h3>صرف مادة إنتاج إضافية</h3><p class="oas-lab-hint">لا يُستخدم هذا الإجراء لصرف الإطار أو العدسات المخصومة مسبقًا من المبيعات.</p>
+                @if (CanIssue)
+                {
+                    <div class="oas-lab-form">
+                        <label>السطر<select class="form-select form-select-sm" @bind="Selected.MaterialLineId"><option value="">اختر المادة</option>@foreach(var line in Selected.Lines.Where(x => x.ProductVariantId.HasValue)){<option value="@line.Id">@line.LineNumber — @line.ProductText (@(line.EyeText ?? "—"))</option>}</select></label>
+                        <label>الكمية<input type="number" min="0.001" step="0.001" class="form-control form-control-sm" @bind="Selected.MaterialQuantity" /></label>
+                        <UiLookup Label="مخزن الصرف" Value="@Selected.MaterialWarehouseId" SelectedItem="@MaterialWarehouseItem" SearchAsync="SearchMaterialWarehousesAsync" ValueChanged="MaterialWarehouseChangedAsync" />
+                    </div><div class="oas-lab-actions"><UiButton Text="صرف مادة إضافية" Size="ControlSize.Small" Loading="@IsBusy" OnClick="_ => OnIssueMaterials.InvokeAsync()" /></div>
+                }
+                else { <p class="oas-lab-notice">صرف المواد الإضافية متاح فقط عندما تكون المواد متوفرة أو أثناء الإنتاج.</p> }
+            </section>
+        }
+        else if (_section == "quality")
+        {
+            <section class="oas-lab-card"><h3>قائمة فحص الجودة</h3>
+                @if (Selected.LatestQualityCheck is not null && Selected.StatusKey == "AwaitingQC")
+                {
+                    <p class="oas-lab-hint">المحاولة رقم @Selected.LatestQualityCheck.AttemptNumber — يُرجى تقييم كل فحص قبل الاعتماد.</p>
+                    <div class="oas-lab-table-wrap"><table class="oas-lab-table"><thead><tr><th>الفحص</th><th>النتيجة</th><th>ملاحظات</th></tr></thead><tbody>
+                    @foreach (var item in Selected.LatestQualityCheck.Items)
+                    {<tr><td>@item.CheckName</td><td><select class="form-select form-select-sm" @bind="item.Result"><option value="NotChecked">لم يفحص</option><option value="Pass">ناجح</option><option value="Fail">فشل</option><option value="NotApplicable">لا ينطبق</option></select></td><td><input class="form-control form-control-sm" @bind="item.Notes" /></td></tr>}
+                    </tbody></table></div>
+                    @if (Selected.LatestQualityCheck.Items.Any(x => x.Result == "Fail"))
+                    {
+                        <div class="oas-lab-form"><label>إجراء الفشل<select class="form-select form-select-sm" @bind="Selected.QcFailureAction"><option value="Rework">إعادة عمل</option><option value="Remake">إعادة تصنيع</option></select></label><label>سبب الفشل<input class="form-control form-control-sm" @bind="Selected.QcFailureReason" /></label>
+                        @if (Selected.QcFailureAction == "Remake")
+                        {<label>السطر<select class="form-select form-select-sm" @bind="Selected.QcRemakeLineId"><option value="">اختر السطر</option>@foreach(var line in Selected.Lines){<option value="@line.Id">@line.LineNumber — @line.ProductText</option>}</select></label><label>الكمية<input type="number" min="0.001" step="0.001" class="form-control form-control-sm" @bind="Selected.QcRemakeQuantity" /></label>}
+                        </div>
+                    }
+                    <div class="oas-lab-actions"><UiButton Text="اعتماد نتيجة فحص الجودة" Size="ControlSize.Small" Loading="@IsBusy" OnClick="_ => OnCompleteQualityControl.InvokeAsync()" /></div>
+                }
+                else { <p class="oas-lab-notice">لا توجد جلسة فحص جودة معلقة في المرحلة الحالية.</p> }
+            </section>
+        }
+        else if (_section == "exceptions")
+        {
+            <div class="oas-lab-production-grid">
+                <section class="oas-lab-card oas-lab-danger"><h3>تسجيل كسر أو تلف</h3>
+                    @if (CanBreakage)
+                    {
+                        <div class="oas-lab-form">
+                            <label>السطر<select class="form-select form-select-sm" @bind="Selected.BreakageLineId"><option value="">اختر السطر</option>@foreach(var line in Selected.Lines.Where(x => x.ProductVariantId.HasValue)){<option value="@line.Id">@line.LineNumber — @line.ProductText</option>}</select></label>
+                            <label>الكمية<input class="form-control form-control-sm" type="number" min="0.001" step="0.001" @bind="Selected.BreakageQuantity" /></label>
+                            <label>رمز السبب<input class="form-control form-control-sm" @bind="Selected.BreakageReasonCode" /></label>
+                            <label>تفاصيل الكسر<input class="form-control form-control-sm" @bind="Selected.BreakageReasonText" /></label>
+                            <label class="oas-lab-checkbox"><input type="checkbox" @bind="Selected.BreakageRequiresReplacement" /> يحتاج بديل</label>
+                            @if(Selected.BreakageRequiresReplacement)
+                            { <UiLookup Label="مخزن البديل" Value="@Selected.BreakageWarehouseId" SelectedItem="@BreakageWarehouseItem" SearchAsync="SearchBreakageWarehousesAsync" ValueChanged="BreakageWarehouseChangedAsync" /> }
+                        </div><div class="oas-lab-actions"><UiButton Text="تسجيل الكسر بعد التأكيد" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Loading="@IsBusy" OnClick="_ => OnRecordBreakage.InvokeAsync()" /></div>
+                    }
+                    else { <p class="oas-lab-notice">تسجيل الكسر متاح فقط أثناء الإنتاج أو فحص الجودة.</p> }
+                </section>
+                <section class="oas-lab-card oas-lab-danger"><h3>إعادة تصنيع</h3>
+                    @if (CanCreateRemake)
+                    {
+                        <div class="oas-lab-form"><label>السطر<select class="form-select form-select-sm" @bind="Selected.RemakeLineId"><option value="">اختر السطر</option>@foreach(var line in Selected.Lines){<option value="@line.Id">@line.LineNumber — @line.ProductText</option>}</select></label><label>الكمية<input type="number" min="0.001" step="0.001" class="form-control form-control-sm" @bind="Selected.RemakeQuantity" /></label><label>السبب<input class="form-control form-control-sm" @bind="Selected.RemakeReason" /></label><UiLookup Label="مخزن المواد (عند الحاجة)" Value="@Selected.RemakeWarehouseId" SelectedItem="@RemakeWarehouseItem" SearchAsync="SearchRemakeWarehousesAsync" ValueChanged="RemakeWarehouseChangedAsync" /></div><div class="oas-lab-actions"><UiButton Text="إنشاء إعادة تصنيع" Variant="ButtonVariant.Secondary" Loading="@IsBusy" Size="ControlSize.Small" OnClick="_ => OnCreateRemake.InvokeAsync()" /></div>
+                    }
+                    else { <p class="oas-lab-notice">لا يمكن إنشاء إعادة تصنيع لأمر مغلق.</p> }
+                    @if (Selected.Remakes.Count > 0)
+                    {
+                        <h4>طلبات إعادة التصنيع المفتوحة</h4><table class="oas-lab-table"><thead><tr><th>الكمية</th><th>السبب</th><th>الحالة</th><th>الإجراء</th></tr></thead><tbody>@foreach(var remake in Selected.Remakes){<tr><td>@remake.Quantity</td><td>@remake.Reason</td><td>@RemakeStatusText(remake.Status)</td><td>
+                        @if(Selected.StatusKey == "InProduction" && (remake.Status == "Open" || remake.Status == "Ready" || remake.Status == "AwaitingMaterials"))
+                        { <button class="oas-lab-mini" type="button" disabled="@IsBusy" @onclick="() => OnStartRemake.InvokeAsync(remake.Id)">التحقق من التوفر والبدء</button> }
+                        @if(Selected.StatusKey == "InProduction" && remake.Status == "InProduction")
+                        { <button class="oas-lab-mini" type="button" disabled="@IsBusy" @onclick="() => OnSendRemakeToQc.InvokeAsync(remake.Id)">إرسال للجودة</button> }
+                        </td></tr>}</tbody></table>
+                        <p class="oas-lab-hint">عند بدء إعادة التصنيع يلزم اختيار مخزن وتوافر المادة إن كانت إعادة التصنيع تتطلب صنفًا مخزنيًا.</p>
+                        <UiLookup Label="مخزن التحقق قبل بدء إعادة التصنيع" Value="@Selected.RemakeWarehouseId" SelectedItem="@RemakeWarehouseItem" SearchAsync="SearchRemakeWarehousesAsync" ValueChanged="RemakeWarehouseChangedAsync" />
+                    }
+                </section>
+            </div>
+            @if (Selected.Breakages.Count > 0)
+            {<section class="oas-lab-card"><h3>حالات الكسر المفتوحة</h3><table class="oas-lab-table"><thead><tr><th>العين</th><th>الكمية</th><th>السبب</th><th>الحالة</th></tr></thead><tbody>@foreach(var b in Selected.Breakages){<tr><td>@(b.Eye ?? "—")</td><td>@b.Quantity</td><td>@b.Reason</td><td>@b.Status</td></tr>}</tbody></table></section>}
+            @if (CanCancel)
+            {<div class="oas-lab-cancel"><span>إلغاء أمر المعمل إجراء استثنائي؛ يتطلب التأكيد قبل التنفيذ.</span><UiButton Text="إلغاء أمر المعمل" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Loading="@IsBusy" OnClick="_ => OnCancel.InvokeAsync()" /></div>}
+        }
+        else if (_section == "history")
+        {
+            <section class="oas-lab-card"><h3>سجل حالة أمر المعمل</h3>
+                @if(Selected.Timeline.Count == 0) {<p class="oas-lab-hint">لا توجد أحداث مسجلة حتى الآن.</p>}
+                else {<div class="oas-lab-history">@foreach(var item in Selected.Timeline){<div><strong>@item.ToStatus</strong><span>@item.ChangedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</span><p>@(item.Reason ?? "—")</p>@if(!string.IsNullOrWhiteSpace(item.Actor)){<small>المنفذ: @item.Actor</small>}</div>}</div>}
+            </section>
+        }
+        <div class="oas-lab-bottom">
+            <div class="oas-lab-next"><strong>الإجراء التالي:</strong><span>@NextStep</span></div>
+            <div class="oas-lab-actions">
+                @if (CanStart) {<UiButton Text="بدء العمل" Loading="@IsBusy" OnClick="_ => OnStart.InvokeAsync()" />}
+                @if (CanSendQc) {<UiButton Text="إرسال لفحص الجودة" Loading="@IsBusy" OnClick="_ => OnSendToQualityControl.InvokeAsync()" />}
+                @if (CanReady) {<UiButton Text="جاهز للتسليم" Loading="@IsBusy" OnClick="_ => OnReady.InvokeAsync()" />}
+                @if (Selected.StatusKey == "ReadyForDelivery") {<UiButton Text="التسوية والتسليم" Loading="@IsBusy" OnClick="_ => OnDeliver.InvokeAsync()" />}
+                <button type="button" class="oas-lab-back" @onclick="() => OnOpenCustomerOrder.InvokeAsync()">فتح طلب العميل</button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public UiOpticalJobDetailsModel? Selected { get; set; }
+    [Parameter] public bool IsBusy { get; set; }
+    [Parameter] public string? ErrorText { get; set; }
+    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchTechniciansAsync { get; set; }
+    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchBreakageWarehousesAsync { get; set; }
+    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchMaterialWarehousesAsync { get; set; }
+    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchRemakeWarehousesAsync { get; set; }
+    [Parameter] public EventCallback OnBack { get; set; }
+    [Parameter] public EventCallback OnOpenCustomerOrder { get; set; }
+    [Parameter] public EventCallback OnAssign { get; set; }
+    [Parameter] public EventCallback OnIssueMaterials { get; set; }
+    [Parameter] public EventCallback OnStart { get; set; }
+    [Parameter] public EventCallback OnSendToQualityControl { get; set; }
+    [Parameter] public EventCallback OnCompleteQualityControl { get; set; }
+    [Parameter] public EventCallback OnRecordBreakage { get; set; }
+    [Parameter] public EventCallback OnCreateRemake { get; set; }
+    [Parameter] public EventCallback<Guid> OnStartRemake { get; set; }
+    [Parameter] public EventCallback<Guid> OnSendRemakeToQc { get; set; }
+    [Parameter] public EventCallback OnReady { get; set; }
+    [Parameter] public EventCallback OnDeliver { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+    private string _section = "info";
+    private static readonly (string Key, string Title)[] Sections = [("info", "البيانات الأساسية"), ("materials", "صرف المواد"), ("quality", "فحص الجودة"), ("exceptions", "الكسر وإعادة التصنيع"), ("history", "سجل الحالة")];
+    private static readonly (int Index, string Label)[] Steps = [(0,"فتح الأمر"),(1,"المواد"),(2,"التصنيع"),(3,"الجودة"),(4,"جاهز للتسليم")];
+    private bool CanAssign => Selected is not null && Selected.StatusKey is not ("Delivered" or "Cancelled");
+    private bool CanIssue => Selected is not null && Selected.StatusKey is ("MaterialsAvailable" or "InProduction");
+    private bool CanBreakage => Selected is not null && Selected.StatusKey is ("InProduction" or "AwaitingQC");
+    private bool CanCreateRemake => Selected is not null && Selected.StatusKey is ("InProduction" or "AwaitingQC");
+    private bool CanCancel => CanAssign;
+    private bool CanSendQc => Selected is not null && Selected.StatusKey == "InProduction" && Selected.Breakages.Count == 0 && Selected.Remakes.Count == 0;
+    private bool CanReady => Selected is not null && Selected.StatusKey == "QCPassed" && Selected.Breakages.Count == 0 && Selected.Remakes.Count == 0;
+    private bool CanStart => Selected is not null && Selected.StatusKey is ("MaterialsAvailable" or "MaterialsIssued") && !string.IsNullOrWhiteSpace(Selected.TechnicianId) && Selected.Breakages.Count == 0 && Selected.Remakes.All(x => x.Status != "AwaitingMaterials");
+    private string NextStep => Selected?.StatusKey switch {
+        "Approved" => "تأكيد توفر المواد وتعيين الفني",
+        "AwaitingMaterials" => "انتظار وصول المواد",
+        "MaterialsAvailable" or "MaterialsIssued" => string.IsNullOrWhiteSpace(Selected.TechnicianId) ? "تعيين فني قبل بدء العمل" : "بدء التصنيع",
+        "InProduction" => Selected.Breakages.Count > 0 || Selected.Remakes.Count > 0 ? "عالج الكسور وإعادة التصنيع المفتوحة قبل إرسال الأمر للجودة" : "استكمال التصنيع ثم فحص الجودة",
+        "AwaitingQC" => "تقييم الفحوص واعتماد النتيجة",
+        "QCPassed" => Selected.Breakages.Count > 0 || Selected.Remakes.Count > 0 ? "إغلاق الموانع المفتوحة قبل التسليم" : "اعتماد الجاهزية للتسليم",
+        "ReadyForDelivery" => "الانتقال للتسوية والتسليم",
+        "Delivered" => "تم التسليم",
+        "Cancelled" => "الأمر ملغى",
+        _ => "مراجعة الأمر"};
+    private static int StageIndex(string status) => status switch {
+        "Approved" => 0, "AwaitingMaterials" or "MaterialsAvailable" or "MaterialsIssued" => 1,
+        "InProduction" => 2, "AwaitingQC" or "QCPassed" => 3,
+        "ReadyForDelivery" or "Delivered" => 4, _ => -1};
+    private static string RemakeStatusText(string s) => s switch {"Open" => "مفتوح — يحتاج تحقق توفر", "Ready" => "المواد جاهزة", "AwaitingMaterials" => "بانتظار مواد", "InProduction" => "قيد التصنيع", "AwaitingQC" => "بانتظار الجودة", _ => s};
+    private static UiLookupItem? Item(string? id, string? text, string css) => string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(text) ? null : new(id, text, null, css);
+    private UiLookupItem? SelectedTechnicianItem => Item(Selected?.TechnicianId, Selected?.Technician, "fa-solid fa-user-gear");
+    private UiLookupItem? BreakageWarehouseItem => Item(Selected?.BreakageWarehouseId, Selected?.BreakageWarehouseDisplay, "fa-solid fa-warehouse");
+    private UiLookupItem? MaterialWarehouseItem => Item(Selected?.MaterialWarehouseId, Selected?.MaterialWarehouseDisplay, "fa-solid fa-warehouse");
+    private UiLookupItem? RemakeWarehouseItem => Item(Selected?.RemakeWarehouseId, Selected?.RemakeWarehouseDisplay, "fa-solid fa-warehouse");
+    private Task SelectedTechnicianChangedAsync(string? id) { if(Selected is not null){Selected.TechnicianId = id ?? "";Selected.Technician = null;} return Task.CompletedTask; }
+    private Task BreakageWarehouseChangedAsync(string? id) { if(Selected is not null){Selected.BreakageWarehouseId = id ?? "";Selected.BreakageWarehouseDisplay = null;} return Task.CompletedTask; }
+    private Task MaterialWarehouseChangedAsync(string? id) { if(Selected is not null){Selected.MaterialWarehouseId = id ?? "";Selected.MaterialWarehouseDisplay = null;} return Task.CompletedTask; }
+    private Task RemakeWarehouseChangedAsync(string? id) { if(Selected is not null){Selected.RemakeWarehouseId = id ?? "";Selected.RemakeWarehouseDisplay = null;} return Task.CompletedTask; }
+}

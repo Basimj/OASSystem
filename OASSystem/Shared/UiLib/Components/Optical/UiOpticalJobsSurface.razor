@@ -2,167 +2,103 @@
 @using OAS.UiLib.Core.Models.Sales
 @using OAS.UiLib.Core.Models
 
-<div class="ui-sales-workspace" dir="rtl">
-    <UiSectionTabStrip Tabs="@Tabs" OnSelect="TabSelectedAsync" />
-    <UiWorkspaceFilterBar Compact="true">
-        <UiSearchInput Value="@Filter.Search" ValueChanged="v => Filter.Search=v" OnSearch="_ => OnApplyFilters.InvokeAsync()" Placeholder="Job / الطلب / العميل / الجوال" />
-        <UiLookup Value="@Filter.TechnicianId" SelectedItem="@TechnicianFilterItem" SearchAsync="SearchTechniciansAsync" ValueChanged="TechnicianFilterChangedAsync" Placeholder="الفني" />
-        <UiInputDate Value="@Filter.RequiredDateFrom" ValueChanged="RequiredDateFromChangedAsync" />
-        <UiInputDate Value="@Filter.RequiredDateTo" ValueChanged="RequiredDateToChangedAsync" />
-        <select class="form-select form-select-sm" value="@FlagValue(Filter.HasBreakage)" @onchange="BreakageFilterChangedAsync">
-            <option value="">كل حالات الكسر</option><option value="true">يوجد كسر مفتوح</option><option value="false">بدون كسر مفتوح</option>
-        </select>
-        <select class="form-select form-select-sm" value="@FlagValue(Filter.HasRemake)" @onchange="RemakeFilterChangedAsync">
-            <option value="">كل حالات الإعادة</option><option value="true">يوجد Remake مفتوح</option><option value="false">بدون Remake مفتوح</option>
-        </select>
-        <UiButton Text="مسح الفلاتر" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="_ => OnClearFilters.InvokeAsync()" />
-        <UiButton Text="تحديث" Variant="ButtonVariant.Secondary" IconCssClass="fa-solid fa-rotate" Size="ControlSize.Small" Loading="@IsBusy" OnClick="_ => OnApplyFilters.InvokeAsync()" />
-    </UiWorkspaceFilterBar>
-
-    <UiDataGridPanel Title="المعمل" Subtitle="طابور العمل الفني فقط؛ لا تعرض هذه الشاشة أي بيانات مالية.">
-        <Body>
-            <UiDataTable TItem="UiOpticalJobRowModel" Items="@Rows" Headers="@Headers" Compact="true" OnRowClick="@((UiOpticalJobRowModel row) => OpenAsync(row))" EmptyText="لا توجد Jobs مطابقة للفلاتر.">
-                <RowTemplate Context="row">
-                    <td><strong>@row.JobCode</strong>@if(row.HasOpenBreakage){<span title="كسر مفتوح"> ⚠</span>}@if(row.HasOpenRemake){<span title="إعادة تصنيع مفتوحة"> ↻</span>}</td>
-                    <td>@(row.OrderCode ?? "—")</td><td>@row.CustomerText<br/><small>@(row.Mobile ?? "—")</small></td><td>@(row.RequiredDate ?? "—")</td>
-                    <td>@(row.Frame ?? "—")</td><td>@(row.OD ?? "—")</td><td>@(row.OS ?? "—")</td><td>@(row.Technician ?? "—")</td><td><span class="ui-sales-status @row.StatusCss">@row.StatusText</span></td>
-                </RowTemplate>
-            </UiDataTable>
-        </Body>
-        <Footer><UiPagination PageNumber="@PageNumber" TotalPages="@TotalPages" TotalCount="@TotalCount" OnPrevious="OnPrevious" OnNext="OnNext" /></Footer>
-    </UiDataGridPanel>
+<div class="oas-lab oas-lab-list" dir="rtl">
+    <div class="oas-lab-heading"><div><h2><i class="fa-solid fa-glasses"></i> أوامر المعمل</h2><p>متابعة أوامر المعمل وحالات التنفيذ — دون بيانات مالية</p></div><span class="oas-lab-route">المبيعات / المعمل / أوامر المعمل</span></div>
+    <div class="oas-lab-metrics" aria-label="حالات الأوامر في الصفحة الحالية">
+        @foreach (var metric in Metrics)
+        {
+            <button type="button" class="oas-lab-metric @(Filter.Status == metric.Key ? "is-selected" : "")" @onclick="() => TabSelectedAsync(metric.Key)">
+                <span>@metric.Title</span><strong>@Count(metric.Key)</strong><small>في الصفحة الحالية</small>
+            </button>
+        }
+    </div>
+    <div class="oas-lab-status-tabs" role="tablist" aria-label="حالة أمر المعمل">
+        @foreach (var tab in Tabs)
+        {
+            <button type="button" role="tab" aria-selected="@(Filter.Status == tab.Key)" class="@(Filter.Status == tab.Key ? "active" : "")" @onclick="() => TabSelectedAsync(tab.Key)">@tab.Title</button>
+        }
+    </div>
+    @if (!string.IsNullOrWhiteSpace(ErrorText)) { <div class="oas-lab-notice" role="alert">@ErrorText</div> }
+    <section class="oas-lab-card oas-lab-filters">
+        <div class="oas-lab-filter-top">
+            <div class="oas-lab-search"><UiSearchInput Value="@Filter.Search" ValueChanged="v => Filter.Search = v" OnSearch="_ => OnApplyFilters.InvokeAsync()" Placeholder="بحث برقم أمر المعمل أو الطلب أو العميل أو الجوال" /></div>
+            <UiButton Text="بحث وتحديث" IconCssClass="fa-solid fa-magnifying-glass" Size="ControlSize.Small" Loading="@IsBusy" OnClick="_ => OnApplyFilters.InvokeAsync()" />
+            <UiButton Text="مسح الفلاتر" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="_ => OnClearFilters.InvokeAsync()" />
+        </div>
+        <div class="oas-lab-filter-secondary">
+            <UiLookup Label="الفني" Value="@Filter.TechnicianId" SelectedItem="@TechnicianFilterItem" SearchAsync="SearchTechniciansAsync" ValueChanged="TechnicianFilterChangedAsync" Placeholder="كل الفنيين" />
+            <label>موعد الإنجاز من <UiInputDate Value="@Filter.RequiredDateFrom" ValueChanged="RequiredDateFromChangedAsync" /></label>
+            <label>إلى <UiInputDate Value="@Filter.RequiredDateTo" ValueChanged="RequiredDateToChangedAsync" /></label>
+            <label>الكسر<select class="form-select form-select-sm" value="@FlagValue(Filter.HasBreakage)" @onchange="BreakageFilterChangedAsync"><option value="">كل الحالات</option><option value="true">يوجد كسر مفتوح</option><option value="false">دون كسر مفتوح</option></select></label>
+            <label>إعادة التصنيع<select class="form-select form-select-sm" value="@FlagValue(Filter.HasRemake)" @onchange="RemakeFilterChangedAsync"><option value="">كل الحالات</option><option value="true">إعادة مفتوحة</option><option value="false">دون إعادة مفتوحة</option></select></label>
+        </div>
+    </section>
+    <section class="oas-lab-card oas-lab-table-card">
+        <div class="oas-lab-card-title"><h3>قائمة أوامر المعمل</h3><span>إجمالي النتائج المطابقة: @TotalCount</span></div>
+        <div class="oas-lab-table-wrap">
+            <table class="oas-lab-table"><thead><tr><th>أمر المعمل</th><th>طلب العميل</th><th>العميل</th><th>الإطار</th><th>الفني</th><th>موعد الإنجاز</th><th>الحالة</th><th>الإجراء</th></tr></thead><tbody>
+            @if (Rows.Count == 0)
+            {
+                <tr><td colspan="8" class="oas-lab-empty">@(IsBusy ? "جارٍ تحميل الأوامر..." : "لا توجد أوامر معمل تطابق البحث الحالي")</td></tr>
+            }
+            else
+            {
+                @foreach (var row in Rows)
+                {
+                    <tr @key="row.Id">
+                        <td><strong>@row.JobCode</strong>@if(row.HasOpenBreakage){<span class="oas-lab-alert" title="يوجد كسر مفتوح"> ⚠</span>}@if(row.HasOpenRemake){<span class="oas-lab-alert" title="إعادة تصنيع مفتوحة"> ↻</span>}</td>
+                        <td>@(row.OrderCode ?? "—")</td><td>@row.CustomerText</td><td>@(row.Frame ?? "—")</td><td>@(row.Technician ?? "غير معيّن")</td><td>@(row.RequiredDate ?? "—")</td>
+                        <td><span class="ui-sales-status @row.StatusCss">@row.StatusText</span></td>
+                        <td><button class="oas-lab-link" type="button" @onclick="() => OnOpen.InvokeAsync(row)">فتح التصنيع <i class="fa-solid fa-arrow-up-right-from-square"></i></button></td>
+                    </tr>
+                }
+            }
+            </tbody></table>
+        </div>
+        <div class="oas-lab-table-footer">
+            <label>عدد الأوامر في الصفحة <select class="form-select form-select-sm" value="@PageSize" @onchange="PageSizeChangedAsync"><option value="5">5</option><option value="10">10</option><option value="15">15</option><option value="25">25</option></select></label>
+            <span>صفحة @PageNumber من @Math.Max(1,TotalPages) — إجمالي @TotalCount</span>
+            <div><button type="button" disabled="@(PageNumber <= 1 || IsBusy)" @onclick="() => OnPrevious.InvokeAsync()">السابق</button><button type="button" disabled="@(PageNumber >= TotalPages || IsBusy)" @onclick="() => OnNext.InvokeAsync()">التالي</button></div>
+        </div>
+    </section>
 </div>
 
-@if(Selected is not null)
-{
-    <div class="ui-workflow-drawer-backdrop" @onclick="CloseAsync"></div>
-    <aside class="ui-workflow-drawer" dir="rtl">
-        <header class="ui-workflow-drawer__header"><div><strong>@Selected.JobCode</strong><span>@Selected.CustomerText • @(Selected.Mobile ?? "—")</span></div><button type="button" @onclick="CloseAsync">×</button></header>
-        <div class="ui-workflow-drawer__body">
-            <div class="ui-workflow-detail-grid"><span>الطلب<strong>@(Selected.OrderCode ?? "—")</strong></span><span>الموعد<strong>@(Selected.RequiredDate ?? "—")</strong></span><span>الحالة<strong>@Selected.StatusText</strong></span><span>الفني<strong>@(Selected.Technician ?? "—")</strong></span></div>
-            <UiLookup Label="تعيين الفني" Value="@Selected.TechnicianId" SelectedItem="@SelectedTechnicianItem" SearchAsync="SearchTechniciansAsync" ValueChanged="SelectedTechnicianChangedAsync" />
+@code {
+    [Parameter, EditorRequired] public UiOpticalJobFilterModel Filter { get; set; } = new();
+    [Parameter] public IReadOnlyList<UiOpticalJobRowModel> Rows { get; set; } = [];
+    [Parameter] public bool IsBusy { get; set; }
+    [Parameter] public string? ErrorText { get; set; }
+    [Parameter] public int PageNumber { get; set; } = 1;
+    [Parameter] public int PageSize { get; set; } = 10;
+    [Parameter] public int TotalPages { get; set; }
+    [Parameter] public long TotalCount { get; set; }
+    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchTechniciansAsync { get; set; }
+    [Parameter] public EventCallback OnApplyFilters { get; set; }
+    [Parameter] public EventCallback OnClearFilters { get; set; }
+    [Parameter] public EventCallback<string> OnTabSelected { get; set; }
+    [Parameter] public EventCallback<UiOpticalJobRowModel> OnOpen { get; set; }
+    [Parameter] public EventCallback<int> OnPageSizeChanged { get; set; }
+    [Parameter] public EventCallback OnPrevious { get; set; }
+    [Parameter] public EventCallback OnNext { get; set; }
 
-            <section><h4>الإطار والعدسات ومواصفات العمل</h4>
-                <UiDataTable Items="@Selected.Lines" Headers="@LineHeaders" Compact="true">
-                    <RowTemplate Context="line"><td>@line.LineNumber</td><td>@line.TypeText</td><td>@line.ProductText</td><td>@(line.EyeText ?? "—")</td><td>@(line.GroupId?.ToString("N")[..8] ?? "—")</td><td>@line.Quantity.ToString("N3")</td><td>@(line.OpticalSummary ?? "—")</td></RowTemplate>
-                </UiDataTable>
-            </section>
-
-            @if(Selected.StatusKey is "Approved" or "AwaitingMaterials" or "MaterialsAvailable" or "MaterialsIssued" or "InProduction")
-            {
-                <section class="ui-workflow-section"><h4>مواد إضافية / بديل</h4>
-                    <div class="ui-workflow-form-grid">
-                        <label>السطر<select class="form-select" @bind="Selected.MaterialLineId"><option value="">اختر...</option>@foreach(var line in Selected.Lines.Where(x=>x.ProductVariantId.HasValue)){<option value="@line.Id">@line.LineNumber - @line.ProductText @(line.EyeText)</option>}</select></label>
-                        <label>الكمية<input class="form-control" type="number" min="0.001" step="0.001" @bind="Selected.MaterialQuantity" /></label>
-                        <UiLookup Label="المخزن" Value="@Selected.MaterialWarehouseId" SelectedItem="@MaterialWarehouseItem" SearchAsync="SearchMaterialWarehousesAsync" ValueChanged="MaterialWarehouseChangedAsync" />
-                    </div>
-                    <UiButton Text="صرف مادة إضافية" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Loading="@IsBusy" OnClick="_ => OnIssueMaterials.InvokeAsync()" />
-                    <small>لا يستخدم هذا الإجراء للعدسات/الإطارات التي خُصمت مسبقًا عند ترحيل فاتورة المبيعات.</small>
-                </section>
-            }
-
-            @if(Selected.LatestQualityCheck is not null && Selected.StatusKey == "AwaitingQC")
-            {
-                <section class="ui-workflow-section"><h4>فحص الجودة — المحاولة @Selected.LatestQualityCheck.AttemptNumber</h4>
-                    <table class="table table-sm"><thead><tr><th>الفحص</th><th>النتيجة</th><th>ملاحظات</th></tr></thead><tbody>
-                    @foreach(var item in Selected.LatestQualityCheck.Items)
-                    {<tr><td>@item.CheckName</td><td><select class="form-select form-select-sm" @bind="item.Result"><option value="NotChecked">لم يفحص</option><option value="Pass">ناجح</option><option value="Fail">فشل</option><option value="NotApplicable">لا ينطبق</option></select></td><td><input class="form-control form-control-sm" @bind="item.Notes" /></td></tr>}
-                    </tbody></table>
-                    @if(Selected.LatestQualityCheck.Items.Any(x=>x.Result=="Fail"))
-                    {
-                        <div class="ui-workflow-form-grid">
-                            <label>الإجراء<select class="form-select" @bind="Selected.QcFailureAction"><option value="Rework">إعادة عمل</option><option value="Remake">إعادة تصنيع</option></select></label>
-                            <label>السبب<input class="form-control" @bind="Selected.QcFailureReason" /></label>
-                            @if(Selected.QcFailureAction=="Remake")
-                            {<label>السطر<select class="form-select" @bind="Selected.QcRemakeLineId"><option value="">اختر...</option>@foreach(var line in Selected.Lines){<option value="@line.Id">@line.LineNumber - @line.ProductText @(line.EyeText)</option>}</select></label><label>الكمية<input class="form-control" type="number" min="0.001" step="0.001" @bind="Selected.QcRemakeQuantity" /></label>}
-                        </div>
-                    }
-                    <UiButton Text="اعتماد نتيجة QC" IconCssClass="fa-solid fa-clipboard-check" Size="ControlSize.Small" Loading="@IsBusy" OnClick="_ => OnCompleteQualityControl.InvokeAsync()" />
-                </section>
-            }
-
-            @if(Selected.StatusKey is not "Delivered" and not "Cancelled")
-            {
-                <section class="ui-workflow-section"><h4>تسجيل كسر / تلف</h4>
-                    <div class="ui-workflow-form-grid">
-                        <label>السطر<select class="form-select" @bind="Selected.BreakageLineId"><option value="">اختر...</option>@foreach(var line in Selected.Lines.Where(x=>x.ProductVariantId.HasValue)){<option value="@line.Id">@line.LineNumber - @line.ProductText @(line.EyeText)</option>}</select></label>
-                        <label>الكمية<input class="form-control" type="number" min="0.001" step="0.001" @bind="Selected.BreakageQuantity" /></label>
-                        <label>رمز السبب<input class="form-control" @bind="Selected.BreakageReasonCode" /></label>
-                        <label>التفاصيل<input class="form-control" @bind="Selected.BreakageReasonText" /></label>
-                        <UiLookup Label="مخزن البديل" Value="@Selected.BreakageWarehouseId" SelectedItem="@BreakageWarehouseItem" SearchAsync="SearchBreakageWarehousesAsync" ValueChanged="BreakageWarehouseChangedAsync" />
-                        <label><input type="checkbox" @bind="Selected.BreakageRequiresReplacement" /> يحتاج بديل</label>
-                    </div>
-                    <UiButton Text="تسجيل الكسر" Variant="ButtonVariant.Secondary" IconCssClass="fa-solid fa-triangle-exclamation" Size="ControlSize.Small" Loading="@IsBusy" OnClick="_ => OnRecordBreakage.InvokeAsync()" />
-                </section>
-
-                <section class="ui-workflow-section"><h4>إعادة تصنيع يدوية</h4>
-                    <div class="ui-workflow-form-grid">
-                        <label>السطر<select class="form-select" @bind="Selected.RemakeLineId"><option value="">اختر...</option>@foreach(var line in Selected.Lines){<option value="@line.Id">@line.LineNumber - @line.ProductText @(line.EyeText)</option>}</select></label>
-                        <label>الكمية<input class="form-control" type="number" min="0.001" step="0.001" @bind="Selected.RemakeQuantity" /></label>
-                        <label>السبب<input class="form-control" @bind="Selected.RemakeReason" /></label>
-                        <UiLookup Label="المخزن عند الحاجة" Value="@Selected.RemakeWarehouseId" SelectedItem="@RemakeWarehouseItem" SearchAsync="SearchRemakeWarehousesAsync" ValueChanged="RemakeWarehouseChangedAsync" />
-                    </div>
-                    <UiButton Text="إنشاء Remake" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Loading="@IsBusy" OnClick="_ => OnCreateRemake.InvokeAsync()" />
-                </section>
-            }
-
-            @if(Selected.Breakages.Count>0)
-            {<section><h4>الكسور المفتوحة</h4><table class="table table-sm"><thead><tr><th>العين</th><th>الكمية</th><th>السبب</th><th>الحالة</th></tr></thead><tbody>@foreach(var b in Selected.Breakages){<tr><td>@(b.Eye??"—")</td><td>@b.Quantity</td><td>@b.Reason</td><td>@b.Status</td></tr>}</tbody></table></section>}
-
-            @if(Selected.Remakes.Count>0)
-            {<section><h4>إعادات التصنيع المفتوحة</h4><table class="table table-sm"><thead><tr><th>الكمية</th><th>السبب</th><th>الحالة</th><th></th></tr></thead><tbody>@foreach(var r in Selected.Remakes){<tr><td>@r.Quantity</td><td>@r.Reason</td><td>@r.Status</td><td>@if(r.Status=="Ready"){<button class="btn btn-sm btn-outline-primary" @onclick="()=>OnStartRemake.InvokeAsync(r.Id)">بدء</button>} @if(r.Status=="InProduction"){<button class="btn btn-sm btn-outline-primary" @onclick="()=>OnSendRemakeToQc.InvokeAsync(r.Id)">إلى QC</button>}</td></tr>}</tbody></table></section>}
-
-            @if(Selected.Timeline.Count>0)
-            {<section><h4>سجل الحالة</h4><div class="ui-workflow-timeline">@foreach(var t in Selected.Timeline){<div><strong>@t.ToStatus</strong><span>@t.ChangedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</span><small>@(t.Reason??"")</small></div>}</div></section>}
-        </div>
-        <footer class="ui-workflow-drawer__footer">
-            <UiButton Text="حفظ الفني" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Loading="@IsBusy" OnClick="_ => OnAssign.InvokeAsync()" />
-            @if(Selected.StatusKey is "MaterialsAvailable" or "MaterialsIssued") {<UiButton Text="بدء العمل" IconCssClass="fa-solid fa-play" Size="ControlSize.Small" Loading="@IsBusy" OnClick="_ => OnStart.InvokeAsync()" />}
-            @if(Selected.StatusKey == "InProduction") {<UiButton Text="إرسال لفحص الجودة" IconCssClass="fa-solid fa-microscope" Size="ControlSize.Small" Loading="@IsBusy" OnClick="_ => OnSendToQualityControl.InvokeAsync()" />}
-            @if(Selected.StatusKey == "QCPassed") {<UiButton Text="جاهز للتسليم" IconCssClass="fa-solid fa-circle-check" Size="ControlSize.Small" Loading="@IsBusy" OnClick="_ => OnReady.InvokeAsync()" />}
-            @if(Selected.StatusKey == "ReadyForDelivery") {<UiButton Text="التسوية والتسليم" IconCssClass="fa-solid fa-cash-register" Size="ControlSize.Small" Loading="@IsBusy" OnClick="_ => OnDeliver.InvokeAsync()" />}
-            @if(Selected.StatusKey is not "Delivered" and not "Cancelled") {<UiButton Text="إلغاء" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" Loading="@IsBusy" OnClick="_ => OnCancel.InvokeAsync()" />}
-        </footer>
-    </aside>
-}
-
-@code{
-    [Parameter,EditorRequired] public UiOpticalJobFilterModel Filter{get;set;}=new();
-    [Parameter] public IReadOnlyList<UiOpticalJobRowModel> Rows{get;set;}=[];
-    [Parameter] public UiOpticalJobDetailsModel? Selected{get;set;}
-    [Parameter] public bool IsBusy{get;set;}
-    [Parameter] public int PageNumber{get;set;}=1; [Parameter] public int TotalPages{get;set;} [Parameter] public long TotalCount{get;set;}
-    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchTechniciansAsync{get;set;}
-    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchBreakageWarehousesAsync{get;set;}
-    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchMaterialWarehousesAsync{get;set;}
-    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchRemakeWarehousesAsync{get;set;}
-    [Parameter] public EventCallback OnApplyFilters{get;set;} [Parameter] public EventCallback OnClearFilters{get;set;} [Parameter] public EventCallback<string> OnTabSelected{get;set;}
-    [Parameter] public EventCallback<UiOpticalJobRowModel> OnOpen{get;set;} [Parameter] public EventCallback OnCloseDetails{get;set;}
-    [Parameter] public EventCallback OnAssign{get;set;} [Parameter] public EventCallback OnIssueMaterials{get;set;} [Parameter] public EventCallback OnStart{get;set;} [Parameter] public EventCallback OnSendToQualityControl{get;set;} [Parameter] public EventCallback OnCompleteQualityControl{get;set;}
-    [Parameter] public EventCallback OnRecordBreakage{get;set;} [Parameter] public EventCallback OnCreateRemake{get;set;} [Parameter] public EventCallback<Guid> OnStartRemake{get;set;} [Parameter] public EventCallback<Guid> OnSendRemakeToQc{get;set;}
-    [Parameter] public EventCallback OnReady{get;set;} [Parameter] public EventCallback OnDeliver{get;set;} [Parameter] public EventCallback OnCancel{get;set;}
-    [Parameter] public EventCallback OnPrevious{get;set;} [Parameter] public EventCallback OnNext{get;set;}
-
-    private static readonly IReadOnlyList<string> Headers=["Job","الطلب","العميل","الموعد","الإطار","OD","OS","الفني","الحالة"];
-    private static readonly IReadOnlyList<string> LineHeaders=["#","النوع","الصنف","العين","المجموعة","الكمية","المواصفات"];
-    private IReadOnlyList<UiSectionTabItem> Tabs=>new[]{("","الكل"),("Approved","جديدة"),("AwaitingMaterials","بانتظار مواد"),("MaterialsAvailable","جاهزة للعمل"),("InProduction","قيد التنفيذ"),("AwaitingQC","بانتظار QC"),("QCPassed","اجتازت QC"),("ReadyForDelivery","جاهزة للتسليم"),("Delivered","مكتملة")}.Select(x=>new UiSectionTabItem(x.Item1,x.Item2,string.Equals(Filter.Status,x.Item1,StringComparison.OrdinalIgnoreCase))).ToArray();
-    private UiLookupItem? TechnicianFilterItem=>Item(Filter.TechnicianId,Filter.TechnicianDisplay,"fa-solid fa-user-gear");
-    private UiLookupItem? SelectedTechnicianItem=>Item(Selected?.TechnicianId,Selected?.Technician,"fa-solid fa-user-gear");
-    private UiLookupItem? BreakageWarehouseItem=>Item(Selected?.BreakageWarehouseId,Selected?.BreakageWarehouseDisplay,"fa-solid fa-warehouse");
-    private UiLookupItem? MaterialWarehouseItem=>Item(Selected?.MaterialWarehouseId,Selected?.MaterialWarehouseDisplay,"fa-solid fa-warehouse");
-    private UiLookupItem? RemakeWarehouseItem=>Item(Selected?.RemakeWarehouseId,Selected?.RemakeWarehouseDisplay,"fa-solid fa-warehouse");
-    private static UiLookupItem? Item(string? id,string? text,string icon)=>string.IsNullOrWhiteSpace(id)||string.IsNullOrWhiteSpace(text)?null:new(id,text,null,icon);
-    private Task OpenAsync(UiOpticalJobRowModel row)=>OnOpen.InvokeAsync(row); private Task CloseAsync()=>OnCloseDetails.InvokeAsync();
-    private Task TabSelectedAsync(string key){Filter.Status=key;return OnTabSelected.InvokeAsync(key);}
-    private async Task TechnicianFilterChangedAsync(string? v){Filter.TechnicianId=v??"";Filter.TechnicianDisplay=null;await OnApplyFilters.InvokeAsync();}
-    private async Task RequiredDateFromChangedAsync(DateOnly? v){Filter.RequiredDateFrom=v;await OnApplyFilters.InvokeAsync();}
-    private async Task RequiredDateToChangedAsync(DateOnly? v){Filter.RequiredDateTo=v;await OnApplyFilters.InvokeAsync();}
-    private Task SelectedTechnicianChangedAsync(string? v){if(Selected is not null){Selected.TechnicianId=v??"";Selected.Technician=null;}return Task.CompletedTask;}
-    private Task BreakageWarehouseChangedAsync(string? v){if(Selected is not null){Selected.BreakageWarehouseId=v??"";Selected.BreakageWarehouseDisplay=null;}return Task.CompletedTask;}
-    private Task MaterialWarehouseChangedAsync(string? v){if(Selected is not null){Selected.MaterialWarehouseId=v??"";Selected.MaterialWarehouseDisplay=null;}return Task.CompletedTask;}
-    private Task RemakeWarehouseChangedAsync(string? v){if(Selected is not null){Selected.RemakeWarehouseId=v??"";Selected.RemakeWarehouseDisplay=null;}return Task.CompletedTask;}
-    private static string FlagValue(bool? value)=>value.HasValue?(value.Value?"true":"false"):"";
-    private async Task BreakageFilterChangedAsync(ChangeEventArgs e){Filter.HasBreakage=ParseFlag(e.Value?.ToString());await OnApplyFilters.InvokeAsync();}
-    private async Task RemakeFilterChangedAsync(ChangeEventArgs e){Filter.HasRemake=ParseFlag(e.Value?.ToString());await OnApplyFilters.InvokeAsync();}
-    private static bool? ParseFlag(string? value)=>value=="true"?true:value=="false"?false:null;
+    // Counts are explicitly page-level. Never describe them as entire-database totals.
+    private string Count(string status) => !string.IsNullOrEmpty(Filter.Status) && Filter.Status != status ? "—" : (string.IsNullOrEmpty(status) ? Rows.Count : Rows.Count(r => r.StatusKey == status)).ToString();
+    private static readonly (string Key, string Title)[] Metrics = [
+        ("", "المعروضة"), ("AwaitingMaterials", "بانتظار مواد"), ("MaterialsAvailable", "مواد متوفرة"),
+        ("InProduction", "قيد التصنيع"), ("AwaitingQC", "بانتظار الجودة"), ("ReadyForDelivery", "جاهزة للتسليم")];
+    private static readonly (string Key, string Title)[] Tabs = [
+        ("", "الكل"), ("Approved", "معتمد"), ("AwaitingMaterials", "بانتظار مواد"),
+        ("MaterialsAvailable", "مواد متوفرة"), ("MaterialsIssued", "مواد مصروفة"),
+        ("InProduction", "قيد التصنيع"), ("AwaitingQC", "بانتظار الجودة"),
+        ("QCPassed", "اجتاز الجودة"), ("ReadyForDelivery", "جاهز للتسليم"), ("Delivered", "تم التسليم"), ("Cancelled", "ملغى")];
+    private UiLookupItem? TechnicianFilterItem => string.IsNullOrWhiteSpace(Filter.TechnicianId) || string.IsNullOrWhiteSpace(Filter.TechnicianDisplay) ? null : new(Filter.TechnicianId, Filter.TechnicianDisplay, null, "fa-solid fa-user-gear");
+    private Task TabSelectedAsync(string key) => OnTabSelected.InvokeAsync(key);
+    private async Task TechnicianFilterChangedAsync(string? id) { Filter.TechnicianId = id ?? ""; Filter.TechnicianDisplay = null; await OnApplyFilters.InvokeAsync(); }
+    private async Task RequiredDateFromChangedAsync(DateOnly? date) { Filter.RequiredDateFrom = date; await OnApplyFilters.InvokeAsync(); }
+    private async Task RequiredDateToChangedAsync(DateOnly? date) { Filter.RequiredDateTo = date; await OnApplyFilters.InvokeAsync(); }
+    private async Task BreakageFilterChangedAsync(ChangeEventArgs e) { Filter.HasBreakage = ParseFlag(e.Value?.ToString()); await OnApplyFilters.InvokeAsync(); }
+    private async Task RemakeFilterChangedAsync(ChangeEventArgs e) { Filter.HasRemake = ParseFlag(e.Value?.ToString()); await OnApplyFilters.InvokeAsync(); }
+    private Task PageSizeChangedAsync(ChangeEventArgs e) => int.TryParse(e.Value?.ToString(), out var size) ? OnPageSizeChanged.InvokeAsync(size) : Task.CompletedTask;
+    private static bool? ParseFlag(string? s) => s == "true" ? true : s == "false" ? false : null;
+    private static string FlagValue(bool? x) => x.HasValue ? (x.Value ? "true" : "false") : "";
 }

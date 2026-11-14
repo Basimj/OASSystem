@@ -46,3 +46,9 @@
 
 /* Compact customer-order operations, after global theme and other sales rules. */
 @import "./features/order-tracking-approved.css";
+
+/* Dedicated optical lab screens, after shared sales and tracking styles. */
+@import "./features/lab-approved.css";
+
+/* Inline optical validation and compact manual-measurements editor. */
+@import "./features/customer-order-optical-prevalidation.css";

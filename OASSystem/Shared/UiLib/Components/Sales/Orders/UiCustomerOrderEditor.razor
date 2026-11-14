@@ -67,6 +67,11 @@
 
 @code {
     private UiSalesLinesEditor? _salesLinesEditor;
+    public void ShowOpticalValidationIssues(IReadOnlyList<(int LineNumber, string Message)> issues)
+    {
+        _salesLinesEditor?.ShowOpticalValidationIssues(issues);
+        StateHasChanged();
+    }
     public bool HasInputErrors => _salesLinesEditor?.HasInputErrors == true;
     private bool _showErrors;
     private static bool IsValidGuid(string? value) => Guid.TryParse(value, out var id) && id != Guid.Empty;

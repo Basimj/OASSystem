@@ -32,7 +32,13 @@
                     @foreach (var row in Model)
                     {
                         <tr @key="row"><td>@row.LineNumber</td><td>@LineTypeText(row.LineType)</td>
-                            <td class="oas-order-lines-table__name">@LineHeading(row)</td>
+                            <td class="oas-order-lines-table__name">
+                                @LineHeading(row)
+                                @if (HasSelectedLens(row))
+                                {
+                                    <small class="oas-order-lens-table-specs" title="قياسات SKU المحدد من المخزون">@LensMeasurementSummary(row)</small>
+                                }
+                            </td>
                             <td>@(row.WarehouseDisplay ?? "—")</td>
                             <td>@row.Quantity.ToString("0.##")</td><td>@row.ActualUnitPrice.ToString("N2")</td>
                             <td>@row.DiscountAmount.ToString("N2")</td><td>@row.TaxAmount.ToString("N2")</td>
@@ -113,6 +119,41 @@
                                       MinimumSearchLength="0" />
                         </div>
 
+                        @if (HasSelectedLens(line))
+                        {
+                            <div class="ui-sales-line-card__field ui-sales-line-card__field--full">
+                                <div class="oas-order-selected-lens" role="group" aria-label="قياسات العدسة المختارة من المخزون">
+                                    <div class="oas-order-selected-lens__heading">
+                                        <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                                        <strong>قياسات العدسة المختارة في المخزون</strong>
+                                        <span>هذه قيم الصنف (SKU) المحدد، وليست وصفة العميل.</span>
+                                    </div>
+                                    <div class="oas-order-selected-lens__values" dir="ltr">
+                                        <div><span>SPH</span><strong>@FormatLensNullable(line.LensSPH)</strong></div>
+                                        <div><span>CYL</span><strong>@FormatLensNullable(line.LensCYL)</strong></div>
+                                        <div><span>ADD</span><strong>@FormatLensNullable(line.LensADD)</strong></div>
+                                    </div>
+                                    @if (!HasLensMeasurements(line))
+                                    {
+                                        <small class="oas-order-selected-lens__hint">هذا الصنف لا يحتوي على قياسات SPH/CYL/ADD معرّفة؛ راجع بياناته في المخزون.</small>
+                                    }
+                                    else if (line.PrescriptionRequired && line.OpticalMeasurementSource == "Manual")
+                                    {
+                                        <div class="oas-order-selected-lens__footer">
+                                            <small>أدخل وصفة العميل الفعلية أدناه. يمكن نسخ قياسات الصنف إذا كانت مطابقة لوصفة العميل.</small>
+                                            @if (!ReadOnly && line.LensSPH.HasValue && line.LensCYL.HasValue)
+                                            {
+                                                <button type="button" class="oas-order-selected-lens__copy" @onclick="() => CopyLensMeasurementsAsync(line)">
+                                                    <i class="fa-regular fa-copy" aria-hidden="true"></i>
+                                                    نسخ القياسات إلى الوصفة اليدوية
+                                                </button>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+
                         @if (ShouldShowWarehouse(line))
                         {
                             <div class="ui-sales-line-card__field">
@@ -191,17 +232,9 @@
                                 <i class="fa-solid fa-glasses"></i>
                                 <div>
                                     <strong>بيانات العدسة والوصفة</strong>
-                                    <span>الوصفة المختارة أعلى المستند تُستخدم تلقائيًا، لكن يجب تحديد العين OD أو OS لكل سطر عدسة.</span>
+                                    <span>اختر العين لكل عدسة؛ استخدم وصفة محفوظة أو أدخل القياسات الأساسية يدويًا. تفاصيل التركيب متاحة عند الحاجة.</span>
                                 </div>
                             </div>
-
-                            @if (line.PrescriptionRequired)
-                            {
-                                <div class="ui-sales-line-card__range-banner" role="note">
-                                    <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
-                                    <span>@LensMeasurementSummary(line)</span>
-                                </div>
-                            }
 
                             <div class="ui-sales-line-card__optical-grid">
                                 @if (line.PrescriptionRequired)
@@ -217,7 +250,7 @@
                                     @if (line.OpticalMeasurementSource == "StoredPrescription")
                                     {
                                         <div class="ui-sales-line-card__field ui-sales-line-card__field--wide">
-                                            <small class="ui-sales-line-card__range-hint">سيتم التحقق من قياسات الوصفة المختارة مقابل نطاق العدسة الموضح أعلاه.</small>
+                                            <small class="ui-sales-line-card__range-hint">سيتم التحقق من وجود SKU في المخزون يطابق SPH وCYL وADD للوصفة المختارة قبل حفظ الطلب.</small>
                                         </div>
                                         @if (!string.IsNullOrWhiteSpace(HeaderPrescriptionRevisionId))
                                         {
@@ -244,28 +277,48 @@
                                         </select>
                                     </label>
 
+                                    @if (OpticalError(line) is { } opticalMessage)
+                                    {
+                                        <div class="ui-sales-line-card__field ui-sales-line-card__field--wide oas-order-optical-validation" role="alert">
+                                            <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> @opticalMessage
+                                        </div>
+                                    }
                                     @if (line.OpticalMeasurementSource == "Manual")
                                     {
+                                        <div class="ui-sales-line-card__field ui-sales-line-card__field--wide oas-order-manual-help" role="note">
+                                            <strong>القياسات الأساسية للوصفة اليدوية</strong>
+                                            <span>SPH: القوة الكروية (اكتب 0 إذا كانت صفرًا). CYL: الاستجماتيزم (اكتب 0 إن لم يوجد). Axis: المحور ويُطلب فقط عند وجود CYL غير صفرية. ADD: إضافة القراءة عند الحاجة فقط.</span>
+                                            <span>يجب وجود SKU مطابق لـ SPH وCYL وADD في المخزون. لا تُستخدم قياسات التركيب الإضافية لتحديد SKU العدسة.</span>
+                                        </div>
                                         <label class="ui-sales-line-card__number-field">
-                                            <span>SPH</span>
+                                            <span>SPH <strong aria-hidden="true">*</strong></span>
                                             <input type="number" step="0.25" placeholder="SPH" value="@line.SPH" disabled="@ReadOnly" @onchange="e => OpticalDecimalChanged(line, nameof(line.SPH), e)" />
-                                            <small class="ui-sales-line-card__range-hint">يتم مطابقة القياس مع SKU العدسة عند الحفظ.</small>
+                                            <small class="ui-sales-line-card__range-hint">القوة الكروية، ويسمح بالصفر.</small>
                                         </label>
                                         <label class="ui-sales-line-card__number-field">
-                                            <span>CYL</span>
+                                            <span>CYL <strong aria-hidden="true">*</strong></span>
                                             <input type="number" step="0.25" placeholder="CYL" value="@line.CYL" disabled="@ReadOnly" @onchange="e => OpticalDecimalChanged(line, nameof(line.CYL), e)" />
-                                            <small class="ui-sales-line-card__range-hint">قيمة مباشرة من الوصفة.</small>
+                                            <small class="ui-sales-line-card__range-hint">اكتب صفرًا عند عدم وجود استجماتيزم.</small>
                                         </label>
                                         <label class="ui-sales-line-card__number-field">
                                             <span>Axis</span>
-                                            <input type="number" min="0" max="180" step="1" placeholder="0 إلى 180" title="Axis: أدخل قيمة بين 0 و 180" value="@line.Axis" disabled="@ReadOnly" @onchange="e => OpticalAxisChanged(line, e)" />
-                                            <small class="ui-sales-line-card__range-hint">أدخل قيمة بين 0 و 180.</small>
+                                            <input type="number" min="1" max="180" step="1" placeholder="1 إلى 180 عند وجود CYL" title="Axis: أدخل قيمة بين 1 و 180 عند وجود CYL" value="@line.Axis" disabled="@ReadOnly" @onchange="e => OpticalAxisChanged(line, e)" />
+                                            <small class="ui-sales-line-card__range-hint">مطلوب فقط إذا كانت CYL غير صفرية، من 1 إلى 180.</small>
                                         </label>
                                         <label class="ui-sales-line-card__number-field">
                                             <span>ADD</span>
                                             <input type="number" step="0.25" min="0" placeholder="ADD" value="@line.ADD" disabled="@ReadOnly" @onchange="e => OpticalDecimalChanged(line, nameof(line.ADD), e)" />
-                                            <small class="ui-sales-line-card__range-hint">قيمة مباشرة من الوصفة عند الحاجة.</small>
+                                            <small class="ui-sales-line-card__range-hint">اختياري: لعدسات القراءة أو متعددة البؤر فقط إذا نصت الوصفة عليه.</small>
                                         </label>
+                                        <div class="ui-sales-line-card__field ui-sales-line-card__field--wide">
+                                            <button type="button" class="oas-order-optical-expand" @onclick="() => ToggleAdvancedOptical(line)"
+                                                    aria-expanded="@_expandedOptical.Contains(line)">
+                                                <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+                                                @(_expandedOptical.Contains(line) ? "إخفاء القياسات الإضافية" : "إظهار القياسات الإضافية (اختياري)")
+                                            </button>
+                                        </div>
+                                        @if (_expandedOptical.Contains(line))
+                                        {
                                         <label class="ui-sales-line-card__number-field"><span>Prism</span><input type="number" min="0" step="0.25" value="@line.Prism" disabled="@ReadOnly" @onchange="e => OpticalDecimalChanged(line, nameof(line.Prism), e)" /></label>
                                         <label class="ui-sales-line-card__number-field">
                                             <span>Prism Base</span>
@@ -281,6 +334,7 @@
                                         <label class="ui-sales-line-card__number-field"><span>Mono PD</span><input type="number" min="0" step="0.5" value="@line.MonocularPD" disabled="@ReadOnly" @onchange="e => OpticalDecimalChanged(line, nameof(line.MonocularPD), e)" /></label>
                                         <label class="ui-sales-line-card__number-field"><span>Fitting Height</span><input type="number" min="0" step="0.5" value="@line.FittingHeight" disabled="@ReadOnly" @onchange="e => OpticalDecimalChanged(line, nameof(line.FittingHeight), e)" /></label>
                                         <div class="ui-sales-line-card__field"><UiInputText Label="VA" Value="@line.VA" ValueChanged="v => VaChanged(line, v)" ReadOnly="@ReadOnly" /></div>
+                                        }
                                     }
                                 }
 
@@ -312,6 +366,20 @@
     [Parameter] public bool CompactMode { get; set; }
     private int _expandedLineNumber = 1;
     private readonly Dictionary<string, string> _numericErrors = new();
+    private readonly Dictionary<int, string> _opticalValidationErrors = new();
+    private readonly HashSet<UiSalesLineModel> _expandedOptical = [];
+    private string? OpticalError(UiSalesLineModel line) => _opticalValidationErrors.GetValueOrDefault(line.LineNumber);
+    private void ToggleAdvancedOptical(UiSalesLineModel line)
+    {
+        if (!_expandedOptical.Add(line)) _expandedOptical.Remove(line);
+    }
+    public void ShowOpticalValidationIssues(IReadOnlyList<(int LineNumber, string Message)> issues)
+    {
+        _opticalValidationErrors.Clear();
+        foreach (var issue in issues) _opticalValidationErrors[issue.LineNumber] = issue.Message;
+        if (issues.Count > 0) _expandedLineNumber = issues[0].LineNumber;
+        StateHasChanged();
+    }
     public bool HasInputErrors => _numericErrors.Count > 0;
 
     // Called immediately before creating/updating a customer order. A selected discount
@@ -420,17 +488,34 @@
             ? "يدخل مسار المعمل تلقائيًا"
             : "جاهز للبيع دون مسار معمل";
 
-    private static string FormatLensValue(decimal value) => value > 0 ? $"+{value:0.##}" : $"{value:0.##}";
+    private static bool HasSelectedLens(UiSalesLineModel line) =>
+        line.LineType == "Lens" && !string.IsNullOrWhiteSpace(line.ProductVariantId);
 
-    private static string LensMeasurementSummary(UiSalesLineModel line)
+    private static bool HasLensMeasurements(UiSalesLineModel line) =>
+        line.LensSPH.HasValue || line.LensCYL.HasValue || line.LensADD.HasValue;
+
+    private static string FormatLensNullable(decimal? value) =>
+        value.HasValue ? value.Value.ToString("+0.00;-0.00;0.00", System.Globalization.CultureInfo.InvariantCulture) : "—";
+
+    private static string LensMeasurementSummary(UiSalesLineModel line) =>
+        $"SPH: {FormatLensNullable(line.LensSPH)} • CYL: {FormatLensNullable(line.LensCYL)} • ADD: {FormatLensNullable(line.LensADD)}";
+
+    // Copying is a deliberate user action. Never silently replace a customer's optical
+    // prescription with stock-variant attributes; Axis and fitting values remain separate.
+    private async Task CopyLensMeasurementsAsync(UiSalesLineModel line)
     {
-        var parts = new List<string>();
-        if (line.LensSPH.HasValue) parts.Add($"SPH {FormatLensValue(line.LensSPH.Value)}");
-        if (line.LensCYL.HasValue) parts.Add($"CYL {FormatLensValue(line.LensCYL.Value)}");
-        if (line.LensADD.HasValue) parts.Add($"ADD {FormatLensValue(line.LensADD.Value)}");
-        return parts.Count == 0
-            ? "القياس الفعلي يطابق الوصفة عند الحفظ؛ لا توجد حدود Min/Max للعدسة."
-            : "قياس SKU المحدد: " + string.Join(" • ", parts);
+        if (ReadOnly || !HasSelectedLens(line) || !line.PrescriptionRequired ||
+            line.OpticalMeasurementSource != "Manual" ||
+            !line.LensSPH.HasValue || !line.LensCYL.HasValue)
+            return;
+
+        _opticalValidationErrors.Remove(line.LineNumber);
+        line.SPH = line.LensSPH;
+        line.CYL = line.LensCYL;
+        line.ADD = line.LensADD;
+        // Axis is a measurement from the prescription and not a SKU field.
+        if (line.CYL == 0m) line.Axis = null;
+        await OnChanged.InvokeAsync();
     }
 
     private static string LineHeading(UiSalesLineModel line)
@@ -498,6 +583,8 @@
     private async Task RemoveLineAsync(UiSalesLineModel line)
     {
         _numericErrors.Clear();
+        _opticalValidationErrors.Clear();
+        _expandedOptical.Remove(line);
         Model.Remove(line);
         for (var i = 0; i < Model.Count; i++)
             Model[i].LineNumber = i + 1;
@@ -526,6 +613,7 @@
 
     private async Task ProductChanged(UiSalesLineModel line, string? value)
     {
+        _opticalValidationErrors.Remove(line.LineNumber);
         line.ProductVariantId = value ?? string.Empty;
         line.WarehouseId = string.Empty;
         line.WarehouseDisplay = null;
@@ -589,7 +677,7 @@
             line.Description = string.Empty;
     }
 
-    private async Task PrescriptionRevisionChanged(UiSalesLineModel line, string? value) { line.PrescriptionRevisionId = value ?? string.Empty; await OnChanged.InvokeAsync(); }
+    private async Task PrescriptionRevisionChanged(UiSalesLineModel line, string? value) { _opticalValidationErrors.Remove(line.LineNumber); line.PrescriptionRevisionId = value ?? string.Empty; await OnChanged.InvokeAsync(); }
     private async Task DescriptionChanged(UiSalesLineModel line, string? value) { line.Description = value ?? string.Empty; await OnChanged.InvokeAsync(); }
     private async Task DiscountTypeChanged(UiSalesLineModel line, ChangeEventArgs e)
     {
@@ -598,9 +686,10 @@
         StoreNumericError(line, nameof(line.DiscountValue), CompactMode ? DiscountValidationMessage(line) : null);
         await OnChanged.InvokeAsync();
     }
-    private async Task EyeChanged(UiSalesLineModel line, ChangeEventArgs e) { line.PrescriptionEye = e.Value?.ToString() ?? string.Empty; await OnChanged.InvokeAsync(); }
+    private async Task EyeChanged(UiSalesLineModel line, ChangeEventArgs e) { _opticalValidationErrors.Remove(line.LineNumber); line.PrescriptionEye = e.Value?.ToString() ?? string.Empty; await OnChanged.InvokeAsync(); }
     private async Task OpticalSourceChanged(UiSalesLineModel line, ChangeEventArgs e)
     {
+        _opticalValidationErrors.Remove(line.LineNumber);
         line.OpticalMeasurementSource = e.Value?.ToString() == "Manual" ? "Manual" : "StoredPrescription";
         if (line.OpticalMeasurementSource == "Manual")
         {
@@ -615,6 +704,7 @@
     }
     private async Task OpticalDecimalChanged(UiSalesLineModel line, string field, ChangeEventArgs e)
     {
+        _opticalValidationErrors.Remove(line.LineNumber);
         decimal? value = decimal.TryParse(e.Value?.ToString(), out var parsed) ? parsed : null;
         switch (field)
         {
@@ -630,6 +720,7 @@
     }
     private async Task OpticalAxisChanged(UiSalesLineModel line, ChangeEventArgs e)
     {
+        _opticalValidationErrors.Remove(line.LineNumber);
         line.Axis = short.TryParse(e.Value?.ToString(), out var parsed) ? parsed : null;
         await OnChanged.InvokeAsync();
     }

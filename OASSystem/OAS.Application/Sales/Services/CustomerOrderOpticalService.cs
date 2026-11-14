@@ -140,6 +140,14 @@ public sealed class CustomerOrderOpticalService(
             };
         }
 
+        // A manual power must be explicit: CYL=0 is valid, an empty CYL is not.
+        if (!snapshotRequest.SPH.HasValue || !snapshotRequest.CYL.HasValue)
+            throw new ConflictException("sales_optical_manual_power_required",
+                "في الإدخال اليدوي للعدسة، يجب إدخال SPH وCYL. أدخل صفرًا عند عدم وجود CYL.");
+        if (snapshotRequest.CYL.Value != 0m && (snapshotRequest.Axis is null or < 1 or > 180))
+            throw new ConflictException("sales_optical_manual_axis_required",
+                "يجب إدخال محور Axis بين 1 و180 عند وجود قيمة CYL غير صفرية.");
+
         var prismBase = snapshotRequest.PrismBase.HasValue
             ? (PrismBaseDirection?)(byte)snapshotRequest.PrismBase.Value
             : null;

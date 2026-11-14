@@ -161,6 +161,9 @@ public sealed class SalesClientService(OasApiClient apiClient) : ISalesClientSer
     public Task<ApiCallResult<PrescriptionDto>> SetPrescriptionStatusResultAsync(Guid id, SetPrescriptionStatusRequest r, CancellationToken ct = default)
         => apiClient.PostResultAsync<SetPrescriptionStatusRequest, PrescriptionDto>($"api/sales/prescriptions/{id}/status", r, ct);
 
+    public Task<ApiCallResult<CustomerOrderOpticalPrevalidationResult>> PrevalidateCustomerOrderOpticalAsync(CustomerOrderOpticalPrevalidationRequest r, CancellationToken ct = default)
+        => apiClient.PostResultAsync<CustomerOrderOpticalPrevalidationRequest, CustomerOrderOpticalPrevalidationResult>("api/sales/customer-orders/optical/prevalidate", r, ct);
+
     public Task<ApiCallResult<CustomerOrderDto>> CreateCustomerOrderResultAsync(CreateCustomerOrderRequest r, CancellationToken ct = default)
         => apiClient.PostResultAsync<CreateCustomerOrderRequest, CustomerOrderDto>("api/sales/customer-orders", r, ct);
     public Task<ApiCallResult<CustomerOrderDto>> UpdateCustomerOrderResultAsync(Guid id, UpdateCustomerOrderRequest r, CancellationToken ct = default)

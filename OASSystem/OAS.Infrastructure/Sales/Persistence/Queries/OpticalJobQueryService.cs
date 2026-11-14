@@ -35,13 +35,15 @@ public sealed class OpticalJobQueryService(OasDbContext db) : IOpticalJobQuerySe
         CancellationToken cancellationToken = default)
     {
         var page = request.ToPageRequest().Normalize();
+        var includeCancelled = request.Status == ContractJobStatus.Cancelled;
         var query =
             from job in db.Set<OpticalJob>().AsNoTracking()
             join order in db.Set<CustomerOrder>().AsNoTracking() on job.CustomerOrderId equals order.Id
             join customer in db.Set<Customer>().AsNoTracking() on job.CustomerId equals customer.Id
             join employee in db.Set<Employee>().AsNoTracking() on job.AssignedTechnicianId equals (Guid?)employee.Id into employeeJoin
             from employee in employeeJoin.DefaultIfEmpty()
-            where job.IsActive || job.Status == OAS.Domain.Sales.Enums.OpticalJobStatus.Delivered
+            where job.IsActive || job.Status == OAS.Domain.Sales.Enums.OpticalJobStatus.Delivered ||
+                  (includeCancelled && job.Status == OAS.Domain.Sales.Enums.OpticalJobStatus.Cancelled)
             select new JobRow
             {
                 Id = job.Id,
@@ -67,7 +69,11 @@ public sealed class OpticalJobQueryService(OasDbContext db) : IOpticalJobQuerySe
             };
 
         if (request.Status.HasValue)
-            query = query.Where(x => (byte)x.Status == (byte)request.Status.Value);
+        {
+            // The entity is mapped using the Domain enum. Convert before EF parameterization.
+            var domainStatus = (OAS.Domain.Sales.Enums.OpticalJobStatus)(byte)request.Status.Value;
+            query = query.Where(x => x.Status == domainStatus);
+        }
         if (request.TechnicianId.HasValue)
             query = query.Where(x => x.AssignedTechnicianId == request.TechnicianId.Value);
         if (request.RequiredDate.HasValue)

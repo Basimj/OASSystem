@@ -481,6 +481,31 @@ public partial class SalesWorkspaceHost : IDisposable
 
                     if (!ValidatePrescriptionLines(model.Lines, model.PrescriptionRevisionId)) return;
 
+                    // Validate the same LensDetails identity used by the server before issuing a
+                    // create/update request. Missing SKU is shown on its exact line without
+                    // triggering the normal ConflictException during order creation.
+                    var opticalRequest = SalesUiMapper.ToCreate(model);
+                    var opticalCheck = await Sales.PrevalidateCustomerOrderOpticalAsync(
+                        new CustomerOrderOpticalPrevalidationRequest(opticalRequest.PrescriptionRevisionId, opticalRequest.Lines));
+                    if (!opticalCheck.Succeeded)
+                    {
+                        if (opticalCheck.Error is not null) ApiFeedback.Show(opticalCheck.Error);
+                        else Snackbar.Error("تعذر التحقق من أصناف العدسات. لم يُحفظ الطلب؛ أعد المحاولة.");
+                        return;
+                    }
+                    if (opticalCheck.Value is null)
+                    {
+                        Snackbar.Error("لم تصل نتيجة فحص العدسات. لم يُحفظ الطلب.");
+                        return;
+                    }
+                    _activeCustomerOrderEditor?.ShowOpticalValidationIssues(
+                        opticalCheck.Value.Issues.Select(issue => (issue.LineNumber, issue.Message)).ToArray());
+                    if (!opticalCheck.Value.IsValid)
+                    {
+                        Snackbar.Error("بعض العدسات لا تطابق أصناف المخزون أو تنقصها قياسات أساسية. راجع التنبيه الأحمر تحت بند العدسة قبل الحفظ.");
+                        return;
+                    }
+
                     var orderCall = model.Id.HasValue
                         ? await Sales.UpdateCustomerOrderResultAsync(model.Id.Value, SalesUiMapper.ToUpdate(model))
                         : await Sales.CreateCustomerOrderResultAsync(SalesUiMapper.ToCreate(model));
