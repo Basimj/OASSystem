@@ -91,7 +91,15 @@ public sealed record SalesReturnDto(
     DateTimeOffset? PostedAtUtc,
     DateTimeOffset? CancelledAtUtc,
     string RowVersion,
-    IReadOnlyList<SalesReturnLineDto> Lines);
+    IReadOnlyList<SalesReturnLineDto> Lines)
+{
+    public string? SalesInvoiceCode { get; init; }
+    public string? CustomerName { get; init; }
+    public string? CustomerCode { get; init; }
+}
+
+public sealed record SalesReturnsDashboardSummaryDto(
+    int Total, int Today, int Draft, int Confirmed, int Posted, int Cancelled);
 
 public sealed record SalesReturnPostingResultDto(
     Guid SalesReturnId,

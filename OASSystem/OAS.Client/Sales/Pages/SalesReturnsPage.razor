@@ -2,207 +2,446 @@
 @attribute [Authorize]
 @using OAS.Contracts.Sales.Returns
 @using OAS.Contracts.Sales.SalesInvoices
-@using OAS.Contracts.Sales.Enums
 @using OAS.Contracts.Sales.Lookups
+@using OAS.Contracts.Sales.Enums
+@using OAS.UiLib.Core.Models
 @using OAS.Client.Common.Feedback.Services
 @using OAS.Client.Services.Http
+@using OAS.Client.Sales.Components
+@using OAS.UiLib.Services.Dialogs
+@using OAS.UiLib.Core.Enums
+@using OAS.UiLib.Core.Models
 @using OAS.UiLib.Services.Feedback
 @inject ISalesClientService Sales
 @inject OasApiClient ApiClient
 @inject IUiSnackbarService Snackbar
 @inject IApiFeedbackService ApiFeedback
+@inject IUiDialogService Dialog
 
 <PageTitle>مرتجعات المبيعات | OAS</PageTitle>
 
-<UiWorkspaceLayout ShowAside="@(_creating || _selected is not null)" ShowFilters="false">
-    <Actions>
-        <UiWorkspaceActionBar>
-            <UiButton Text="مرتجع جديد" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" OnClick="BeginCreateAsync" />
-            <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Loading="@_busy" OnClick="RefreshAsync" />
-            @if (_selected is { Status: SalesReturnStatus.Draft })
+<div class="oas-returns-screen" dir="rtl">
+    <header class="oas-returns-heading">
+        <div class="oas-returns-heading__title">
+            <i class="fa-solid fa-box-open" aria-hidden="true"></i>
+            <div><h1>مرتجعات المبيعات</h1><small>المبيعات <i class="fa-solid fa-chevron-left"></i> مرتجعات المبيعات</small></div>
+        </div>
+        <nav class="oas-returns-tabs" aria-label="تبويبات مرتجعات المبيعات">
+            <button type="button" class="oas-returns-tab @(_activeTabKey == "all" ? "is-active" : "")" @onclick="SelectAllAsync">
+                <i class="fa-solid fa-list"></i> الكل
+            </button>
+            @foreach (var tab in _openTabs)
             {
-                <UiButton Text="تأكيد" IconCssClass="fa-solid fa-check" Size="ControlSize.Small" Loading="@_busy" OnClick="ConfirmAsync" />
-                <UiButton Text="إلغاء" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" Loading="@_busy" OnClick="CancelAsync" />
+                <div class="oas-returns-tab @(_activeTabKey == tab.Key ? "is-active" : "")" @key="tab.Key">
+                    <button type="button" class="oas-returns-tab__select" @onclick="() => SelectWorkspaceTabAsync(tab.Key)">@tab.Label</button>
+                    <button type="button" class="oas-returns-tab__close" title="إغلاق التبويب" aria-label="إغلاق @tab.Label" @onclick="() => CloseWorkspaceTabAsync(tab.Key)">×</button>
+                </div>
             }
-            else if (_selected is { Status: SalesReturnStatus.Confirmed })
-            {
-                <UiButton Text="ترحيل" IconCssClass="fa-solid fa-arrow-up-right-dots" Size="ControlSize.Small" Loading="@_busy" OnClick="PostAsync" />
-                <UiButton Text="إلغاء" IconCssClass="fa-solid fa-ban" Variant="ButtonVariant.Danger" Size="ControlSize.Small" Loading="@_busy" OnClick="CancelAsync" />
-            }
-        </UiWorkspaceActionBar>
-    </Actions>
-    <Content>
-        <UiDataGridPanel Title="مرتجعات المبيعات" Subtitle="@($"{_page.TotalCount:N0} مستند")">
-            <Toolbar><UiSearchInput Value="@_search" ValueChanged="@(value => _search = value)" OnSearch="SearchAsync" Placeholder="بحث برقم المرتجع أو السبب..." /></Toolbar>
-            <Body>
-                <UiStackLayout Gap="StackGap.Small">
-                    @if (_busy && _page.Items.Count == 0)
-                    {
-                        <UiAlert Message="جارٍ تحميل مرتجعات المبيعات..." Tone="AlertTone.Info" />
-                    }
-                    else if (_page.Items.Count == 0)
-                    {
-                        <UiAlert Message="لا توجد مرتجعات مبيعات مطابقة." Tone="AlertTone.Info" />
-                    }
-                    else
-                    {
-                        @foreach (var item in _page.Items)
-                        {
-                            <UiRecordRow Title="@item.ReturnCode"
-                                         Subtitle="@($"{item.ReturnDate:yyyy-MM-dd} • {item.TotalAmount:N2} {item.CurrencyCode}")"
-                                         Selected="@(_selected?.Id == item.Id)" OnClick="@(() => SelectAsync(item.Id))">
-                                <Content><UiKeyValue Label="تاريخ الترحيل" Value="@item.PostingDate.ToString("yyyy-MM-dd")" /></Content>
-                                <Trailing><UiBadge Text="@StatusText(item.Status)" Tone="@StatusTone(item.Status)" /></Trailing>
-                            </UiRecordRow>
-                        }
-                    }
-                </UiStackLayout>
-            </Body>
-            <Footer><UiPagination PageNumber="@_page.PageNumber" TotalPages="@_page.TotalPages" TotalCount="@_page.TotalCount" OnPrevious="PreviousAsync" OnNext="NextAsync" /></Footer>
-        </UiDataGridPanel>
-    </Content>
-    <Aside>
-        @if (_creating)
+        </nav>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(_loadError))
+    {
+        <p class="oas-returns-alert is-error" role="alert"><i class="fa-solid fa-triangle-exclamation"></i> @_loadError</p>
+    }
+
+    @if (_activeTabKey == "all")
+    {
+        <div class="oas-returns-toolbar">
+            <div class="oas-returns-toolbar__buttons">
+                <button class="oas-returns-primary" type="button" @onclick="BeginCreateAsync"><i class="fa-solid fa-plus"></i> مرتجع جديد</button>
+                <button class="oas-returns-button" type="button" disabled="@_busy" @onclick="RefreshAsync"><i class="fa-solid fa-rotate"></i> تحديث</button>
+            </div>
+            <div class="oas-returns-search">
+                <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                <input type="search" aria-label="البحث عن مرتجع أو فاتورة أو عميل" placeholder="رقم المرتجع، رقم الفاتورة، العميل أو الجوال..." value="@_search" @oninput="@(e => _search = e.Value?.ToString())" @onkeydown="HandleSearchKeyDown" />
+                <button type="button" disabled="@_busy" @onclick="SearchNowAsync">بحث</button>
+            </div>
+        </div>
+        <div class="oas-returns-metrics" aria-label="مؤشرات مرتجعات المبيعات">
+            <article><i class="fa-solid fa-box-open"></i><span>إجمالي المرتجعات</span><strong>@Metric(_summary?.Total)</strong></article>
+            <article><i class="fa-regular fa-calendar-days"></i><span>مرتجعات اليوم</span><strong>@Metric(_summary?.Today)</strong></article>
+            <article><i class="fa-regular fa-file-lines"></i><span>مسودات</span><strong>@Metric(_summary?.Draft)</strong></article>
+            <article><i class="fa-solid fa-hourglass-half"></i><span>بانتظار الترحيل</span><strong>@Metric(_summary?.Confirmed)</strong></article>
+            <article><i class="fa-solid fa-circle-check"></i><span>مرحّلة</span><strong>@Metric(_summary?.Posted)</strong></article>
+            <article><i class="fa-solid fa-ban"></i><span>ملغاة</span><strong>@Metric(_summary?.Cancelled)</strong></article>
+        </div>
+        <section class="oas-returns-card oas-returns-filters" aria-label="فلاتر المرتجعات">
+            <div class="oas-returns-filters__heading"><i class="fa-solid fa-filter"></i> تصفية البيانات</div>
+            <label>حالة المستند
+                <select value="@(_statusFilter?.ToString() ?? "")" @onchange="ChangeStatusAsync">
+                    <option value="">جميع الحالات</option>
+                    <option value="Draft">مسودة</option><option value="Confirmed">مؤكد</option><option value="Posted">مرحّل</option><option value="Cancelled">ملغى</option>
+                </select>
+            </label>
+            <label>من تاريخ
+                <input type="date" value="@(_dateFrom?.ToString("yyyy-MM-dd"))" @onchange="ChangeDateFromAsync" />
+            </label>
+            <label>إلى تاريخ
+                <input type="date" value="@(_dateTo?.ToString("yyyy-MM-dd"))" @onchange="ChangeDateToAsync" />
+            </label>
+            <button class="oas-returns-button" type="button" @onclick="ResetFiltersAsync">مسح الفلاتر</button>
+        </section>
+        @if (_dateFrom.HasValue && _dateTo.HasValue && _dateFrom > _dateTo)
         {
-            <UiCard Title="مرتجع مبيعات جديد" Subtitle="اختر فاتورة مرحلة، وسيضبط النظام التواريخ والمخازن وفق شروطها.">
-                <UiStackLayout Gap="StackGap.Small">
-                    <UiSelect Label="فاتورة المبيعات" Placeholder="اختر فاتورة مرحلة" Value="@_invoiceIdText"
-                              ValueChanged="InvoiceChangedAsync" Options="@InvoiceOptions" Size="ControlSize.Small" />
-                    <UiGrid Columns="2">
-                        <UiInputDate Label="تاريخ المرتجع" Value="@_returnDate" ValueChanged="OnReturnDateChanged" Size="ControlSize.Small" />
-                        <UiInputDate Label="تاريخ الترحيل" Value="@_postingDate" ValueChanged="OnPostingDateChanged" Size="ControlSize.Small" />
-                    </UiGrid>
-                    <UiInputText Label="السبب" Value="@_reason" ValueChanged="@(value => _reason = value)" Size="ControlSize.Small" MaxLength="1000" />
+            <p class="oas-returns-alert is-error">تاريخ البداية أكبر من تاريخ النهاية.</p>
+        }
+        <section class="oas-returns-card oas-returns-list">
+            <div class="oas-returns-card__heading"><h2><i class="fa-solid fa-list"></i> قائمة المرتجعات <small>(@_page.TotalCount)</small></h2><small>اضغط رقم المرتجع لفتحه في تبويب مستقل</small></div>
+            <div class="oas-returns-table-wrap">
+                <table class="oas-returns-table">
+                    <thead><tr><th>رقم المرتجع</th><th>الفاتورة الأصلية</th><th>العميل</th><th>التاريخ</th><th>الإجمالي</th><th>حالة المستند</th><th>الإجراء</th></tr></thead>
+                    <tbody>
+                        @if (_busy && _page.Items.Count == 0)
+                        {
+                            <tr><td colspan="7" class="oas-returns-empty">جارٍ تحميل المرتجعات...</td></tr>
+                        }
+                        else if (_page.Items.Count == 0)
+                        {
+                            <tr><td colspan="7" class="oas-returns-empty">لا توجد مرتجعات تطابق شروط البحث.</td></tr>
+                        }
+                        else
+                        {
+                            @foreach (var item in _page.Items)
+                            {
+                                <tr @key="item.Id">
+                                    <td><button class="oas-returns-code" type="button" @onclick="() => SelectAsync(item.Id)">@item.ReturnCode</button></td>
+                                    <td><a href="@($"/sales/invoices?invoiceId={item.SalesInvoiceId:D}")">@(item.SalesInvoiceCode ?? "فتح الفاتورة")</a></td>
+                                    <td><strong>@(item.CustomerName ?? item.CustomerCode ?? "عميل")</strong><small>@item.CustomerCode</small></td>
+                                    <td dir="ltr">@item.ReturnDate.ToString("yyyy/MM/dd")</td>
+                                    <td class="oas-returns-amount" dir="ltr">@item.TotalAmount.ToString("N2") <small>@item.CurrencyCode</small></td>
+                                    <td><span class="oas-returns-status @StatusClass(item.Status)">@StatusText(item.Status)</span></td>
+                                    <td><button class="oas-returns-button is-small" type="button" @onclick="() => SelectAsync(item.Id)"><i class="fa-regular fa-eye"></i> عرض</button></td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="oas-returns-pagination">
+                <label>عرض
+                    <select value="@_pageSize" @onchange="ChangePageSizeAsync"><option value="5">5</option><option value="10">10</option><option value="15">15</option><option value="20">20</option></select> مرتجعات لكل صفحة
+                </label>
+                <span>صفحة @_page.PageNumber من @Math.Max(1, _page.TotalPages) — @_page.TotalCount مرتجع</span>
+                <div>
+                    <button type="button" disabled="@(_pageNumber <= 1 || _busy)" @onclick="PreviousAsync">السابق</button>
+                    <button type="button" disabled="@(!_page.HasNextPage || _busy)" @onclick="NextAsync">التالي</button>
+                </div>
+            </div>
+        </section>
+    }
+    else if (_creating)
+    {
+        <div class="oas-returns-editor-title"><h2>مرتجع مبيعات جديد</h2><span>اختر فاتورة مرحلة، ثم حدد الكميات وقرار المخزون</span></div>
+        <div class="oas-returns-create-layout">
+            <div class="oas-returns-create-main">
+                <section class="oas-returns-card oas-returns-section">
+                    <h3><i class="fa-solid fa-file-invoice"></i> بيانات المرتجع</h3>
+                    <div class="oas-returns-form-grid">
+                        <div class="oas-returns-form-field is-wide">
+                            <UiLookup Label="الفاتورة الأصلية المرحلة" Value="@_invoiceIdText" ValueChanged="InvoiceChangedAsync"
+                                      SelectedItem="@_invoiceLookup" SearchPageAsync="SearchPostedInvoicePageAsync" PageSize="25" UsePopover="true"
+                                      Placeholder="ابحث برقم الفاتورة أو اسم العميل أو الجوال..." Required="true" Disabled="@_busy"
+                                      ErrorText="@GetFormError("invoice")" />
+                        </div>
+                        <label class="oas-returns-form-field @(GetFormError("returnDate") is not null ? "is-invalid" : "")">تاريخ المرتجع
+                            <input type="date" value="@(_returnDate?.ToString("yyyy-MM-dd"))" @onchange="ChangeReturnDateInput" />
+                            @if (GetFormError("returnDate") is { } dateError) { <small role="alert">@dateError</small> }
+                        </label>
+                        <label class="oas-returns-form-field @(GetFormError("postingDate") is not null ? "is-invalid" : "")">تاريخ الترحيل
+                            <input type="date" value="@(_postingDate?.ToString("yyyy-MM-dd"))" @onchange="ChangePostingDateInput" />
+                            @if (GetFormError("postingDate") is { } postError) { <small role="alert">@postError</small> }
+                        </label>
+                        <label class="oas-returns-form-field is-wide">سبب المرتجع
+                            <textarea rows="2" maxlength="1000" placeholder="اذكر سبب الإرجاع..." value="@_reason" @oninput="@(e => _reason = e.Value?.ToString())"></textarea>
+                        </label>
+                    </div>
                     @if (_returnPolicy?.CanOverrideReturnWindow == true)
                     {
-                        <UiCheckbox Label="تجاوز مدة الإرجاع النظامية عند الحاجة" Value="@_overrideReturnWindow"
-                                    ValueChanged="@(value => _overrideReturnWindow = value)" />
+                        <label class="oas-returns-checkbox"><input type="checkbox" checked="@_overrideReturnWindow" @onchange="@(e => _overrideReturnWindow = e.Value is true)" /> تجاوز مدة الإرجاع النظامية عند الحاجة</label>
                     }
                     @if (_overrideReturnWindow)
                     {
-                        <UiInputText Label="سبب تجاوز مدة الإرجاع" Value="@_returnWindowOverrideReason"
-                                     ValueChanged="@(value => _returnWindowOverrideReason = value)" Size="ControlSize.Small" MaxLength="500" />
+                        <label class="oas-returns-form-field @(GetFormError("override") is not null ? "is-invalid" : "")">سبب تجاوز مدة الإرجاع
+                            <textarea rows="2" maxlength="500" value="@_returnWindowOverrideReason" @oninput="@(e => _returnWindowOverrideReason = e.Value?.ToString())"></textarea>
+                            @if (GetFormError("override") is { } overError) { <small role="alert">@overError</small> }
+                        </label>
                     }
-                    @if (_sourceInvoice is not null)
+                    @if (_returnPolicy?.LastReturnDateWithoutOverride is { } lastAllowed)
                     {
-                        <UiCard Title="أسطر الفاتورة" Subtitle="يحدد النظام مخزنًا صالحًا تلقائيًا بحسب قرار المخزون.">
-                            <UiStackLayout Gap="StackGap.Small">
+                        <p class="oas-returns-hint">آخر موعد للإرجاع دون تجاوز: @lastAllowed.ToString("yyyy/MM/dd") — يرجى مراجعة السياسة قبل الحفظ.</p>
+                    }
+                </section>
+                <section class="oas-returns-card oas-returns-section">
+                    <div class="oas-returns-card__heading"><h3><i class="fa-solid fa-boxes-stacked"></i> بنود المرتجع</h3><small>حدّد ما يراد إرجاعه من البنود المتاحة</small></div>
+                    @if (_sourceInvoice is null)
+                    {
+                        <p class="oas-returns-empty">اختر الفاتورة الأصلية لعرض البنود والكميات المتاحة.</p>
+                    }
+                    else
+                    {
+                        @if (!string.IsNullOrWhiteSpace(_warehouseLoadError))
+                        {
+                            <p class="oas-returns-alert is-error" role="alert">@_warehouseLoadError</p>
+                        }
+                        @if (MissingQuarantineWarehouse || MissingSellableWarehouse)
+                        {
+                            <div class="oas-returns-warehouse-notice" role="status">
+                                <i class="fa-solid fa-warehouse" aria-hidden="true"></i>
+                                <div class="oas-returns-warehouse-notice__message">
+                                    <strong>لا تتوفر مخازن مناسبة لقرار الإرجاع الحالي.</strong>
+                                    @if (MissingQuarantineWarehouse)
+                                    {
+                                        <span>قرار «حجر وفحص» يتطلب مخزنًا نشطًا مع إيقاف «يسمح بالحجز والبيع من هذا المخزن».</span>
+                                    }
+                                    @if (MissingSellableWarehouse)
+                                    {
+                                        <span>قرار «إعادة للمخزون القابل للبيع» يتطلب مخزنًا نشطًا يسمح بالحجز والبيع.</span>
+                                    }
+                                    <span>يمكنك إنشاء أو تعديل مخزن من إدارة المخزون، ثم تحديث القائمة هنا دون فقدان بيانات المرتجع.</span>
+                                </div>
+                                <a href="/inventory/warehouses/new" target="_blank" rel="noopener noreferrer">إعداد مخزن <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+                                <button type="button" class="oas-returns-button is-small" disabled="@_busy" @onclick="ReloadWarehouseOptionsAsync"><i class="fa-solid fa-rotate"></i> تحديث المخازن</button>
+                            </div>
+                        }
+                        <div class="oas-returns-table-wrap">
+                            <table class="oas-returns-table oas-returns-lines">
+                                <thead><tr><th>إرجاع</th><th>الصنف</th><th>المباع</th><th>مرتجع سابقًا</th><th>المتاح</th><th>كمية الإرجاع</th><th>حالة الصنف</th><th>قرار المخزون</th><th>المخزن</th></tr></thead>
+                                <tbody>
                                 @foreach (var line in _returnLines)
                                 {
-                                    <UiCard Title="@($"{line.Line.LineNumber} - {line.Line.ProductNameSnapshot}")"
-                                            Subtitle="@($"الكمية الأصلية {line.Line.Quantity:N3} • المتاح {line.Remaining:N3}")">
-                                        <UiGrid Columns="2">
-                                            <UiCheckbox Value="@line.Selected" ValueChanged="@(value => OnLineSelected(line, value))" Label="إرجاع هذا السطر" Disabled="@(line.Remaining <= 0m)" />
-                                            <UiInputText Label="الكمية المرتجعة" Value="@line.QuantityText"
-                                                         ValueChanged="@(value => line.QuantityText = value ?? string.Empty)"
-                                                         InputMode="decimal" Size="ControlSize.Small" Disabled="@(!line.Selected || line.Remaining <= 0m)" />
-                                            @if (line.RequiresInventory)
-                                            {
-                                                <UiSelect Label="حالة الصنف المرتجع" Value="@line.ReturnConditionText"
-                                                          ValueChanged="@(value => OnConditionChanged(line, value))"
-                                                          Options="@ConditionOptionsFor(line)" Size="ControlSize.Small"
-                                                          Disabled="@(!line.Selected || line.Remaining <= 0m)" />
-                                                <UiSelect Label="قرار المخزون" Value="@line.StockDispositionText"
-                                                          ValueChanged="@(value => OnDispositionChanged(line, value))"
-                                                          Options="@DispositionOptionsFor(line)" Size="ControlSize.Small"
-                                                          Disabled="@(!line.Selected || line.Remaining <= 0m)" />
-                                                <UiSelect Label="مخزن الإرجاع / الفحص" Placeholder="لا يوجد مخزن صالح"
-                                                          Value="@line.ReturnWarehouseIdText"
-                                                          ValueChanged="@(value => OnReturnWarehouseChanged(line, value))"
-                                                          Options="@WarehouseOptionsFor(line)" Size="ControlSize.Small"
-                                                          Disabled="@(!line.Selected || line.Remaining <= 0m)" />
-                                            }
-                                        </UiGrid>
-                                    </UiCard>
+                                    <tr @key="line.Line.Id">
+                                        <td><input type="checkbox" checked="@line.Selected" disabled="@(line.Remaining <= 0 || _busy)" @onchange="@(e => OnLineSelected(line, e.Value is true))" aria-label="إرجاع @line.Line.ProductNameSnapshot" /></td>
+                                        <td><strong>@line.Line.ProductNameSnapshot</strong><small>@line.Line.ProductCodeSnapshot</small></td>
+                                        <td>@line.Line.Quantity.ToString("0.###")</td>
+                                        <td>@line.Line.ReturnedQuantity.ToString("0.###")</td>
+                                        <td>@line.Remaining.ToString("0.###")</td>
+                                        <td>
+                                            <div class="oas-returns-line-input @(line.QuantityError is not null ? "is-invalid" : "")">
+                                                <input type="text" inputmode="decimal" value="@line.QuantityText" disabled="@(!line.Selected || _busy)" aria-invalid="@(line.QuantityError is not null)" @oninput="@(e => ChangeLineQuantity(line, e.Value?.ToString()))" />
+                                                @if (line.QuantityError is not null) { <small role="alert">@line.QuantityError</small> }
+                                            </div>
+                                        </td>
+                                        @if (line.RequiresInventory)
+                                        {
+                                            <td><select value="@line.ReturnConditionText" disabled="@(!line.Selected || _busy)" @onchange="@(e => OnConditionChanged(line, e.Value?.ToString()))">
+                                                @foreach (var option in ConditionOptionsFor(line)) { <option value="@option.Value">@option.Text</option> }
+                                            </select></td>
+                                            <td><select value="@line.StockDispositionText" disabled="@(!line.Selected || _busy)" @onchange="@(e => OnDispositionChanged(line, e.Value?.ToString()))">
+                                                @foreach (var option in DispositionOptionsFor(line)) { <option value="@option.Value">@option.Text</option> }
+                                            </select></td>
+                                            <td><div class="oas-returns-line-input @(line.WarehouseError is not null ? "is-invalid" : "")"><select value="@line.ReturnWarehouseIdText" disabled="@(!line.Selected || _busy)" @onchange="@(e => OnReturnWarehouseChanged(line, e.Value?.ToString()))">
+                                                <option value="">@(EligibleWarehouses(line).Count == 0 ? "لا يوجد مخزن مؤهل" : "اختر مخزنًا")</option>
+                                                @foreach (var warehouse in WarehouseOptionsFor(line)) { <option value="@warehouse.Value">@warehouse.Text</option> }
+                                                @if (IneligibleWarehousesFor(line).Count > 0)
+                                                {
+                                                    <optgroup label="مخازن غير مناسبة لهذا القرار">
+                                                        @foreach (var warehouse in IneligibleWarehousesFor(line))
+                                                        {
+                                                            <option disabled>@warehouse.Code - @warehouse.Name</option>
+                                                        }
+                                                    </optgroup>
+                                                }
+                                            </select>
+                                                @if (EligibleWarehouses(line).Count == 0)
+                                                {
+                                                    <small class="oas-returns-warehouse-hint">@(line.StockDispositionText == nameof(SalesReturnStockDisposition.Quarantine) ? "يلزم مخزن حجر وفحص؛ المخازن المسموح بالبيع منها لا تقبل هذا القرار." : "يلزم مخزن نشط يسمح بالحجز والبيع.")</small>
+                                                }
+                                                @if (line.WarehouseError is not null) { <small role="alert">@line.WarehouseError</small> }
+                                            </div></td>
+                                        }
+                                        else
+                                        {
+                                            <td colspan="3" class="oas-returns-no-stock">خدمة — لا توجد حركة مخزون</td>
+                                        }
+                                    </tr>
                                 }
-                            </UiStackLayout>
-                        </UiCard>
+                                </tbody>
+                            </table>
+                        </div>
+                        @if (GetFormError("lines") is { } linesError)
+                        {
+                            <p class="oas-returns-alert is-error" role="alert">@linesError</p>
+                        }
                     }
-                    <UiWorkspaceActionBar>
-                        <UiButton Text="حفظ المسودة" IconCssClass="fa-solid fa-floppy-disk" Loading="@_busy" Size="ControlSize.Small" OnClick="CreateAsync" />
-                        <UiButton Text="إلغاء" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CloseEditorAsync" />
-                    </UiWorkspaceActionBar>
-                </UiStackLayout>
-            </UiCard>
-        }
-        else if (_selected is not null)
-        {
-            <UiCard Title="@_selected.ReturnCode" Subtitle="@StatusText(_selected.Status)">
-                <UiStackLayout Gap="StackGap.Small">
-                    <UiGrid Columns="2">
-                        <UiKeyValue Label="تاريخ المرتجع" Value="@_selected.ReturnDate.ToString("yyyy-MM-dd")" />
-                        <UiKeyValue Label="تاريخ الترحيل" Value="@_selected.PostingDate.ToString("yyyy-MM-dd")" />
-                        <UiKeyValue Label="صافي المرتجع" Value="@($"{_selected.NetAmount:N2} {_selected.CurrencyCode}")" />
-                        <UiKeyValue Label="الضريبة" Value="@($"{_selected.TaxAmount:N2} {_selected.CurrencyCode}")" />
-                        <UiKeyValue Label="الإجمالي" Value="@($"{_selected.TotalAmount:N2} {_selected.CurrencyCode}")" />
-                        <UiKeyValue Label="القيد" Value="@(_selected.JournalEntryId?.ToString("D") ?? "غير مرحل")" />
-                    </UiGrid>
+                </section>
+            </div>
+            <aside class="oas-returns-create-summary">
+                <section class="oas-returns-card oas-returns-section">
+                    <h3><i class="fa-solid fa-calculator"></i> ملخص المرتجع</h3>
+                    <div class="oas-returns-keyvalue"><span>قيمة البنود المختارة التقريبية</span><strong>@EstimatedReturnTotal.ToString("N2") @(_sourceInvoice?.CurrencyCodeSnapshot ?? "")</strong></div>
+                    <p class="oas-returns-hint">هذا تقدير من البنود الأصلية فقط. يحسب الخادم الإجمالي والضريبة والخصم النهائي عند حفظ المرتجع.</p>
+                    <div class="oas-returns-keyvalue"><span>المتبقي الحالي للفاتورة</span><strong>@(_sourceInvoice?.PaymentSummary.OutstandingAmount.ToString("N2") ?? "—")</strong></div>
+                    <p class="oas-returns-notice"><i class="fa-solid fa-circle-info"></i> الترحيل لا يعني ردّ المال نقدًا. يُخفض المستحق أولًا، وقد ينشأ رصيد دائن حسب المدفوع والمرتجع؛ يتم تحديد ذلك حسابيًا بعد الترحيل.</p>
+                </section>
+            </aside>
+        </div>
+        <div class="oas-returns-actions">
+            <button class="oas-returns-primary" type="button" disabled="@_busy" @onclick="CreateAsync"><i class="fa-solid fa-floppy-disk"></i> حفظ المسودة</button>
+            <button class="oas-returns-button" type="button" @onclick="CloseNewTabAsync">إلغاء</button>
+        </div>
+    }
+    else if (_selected is not null)
+    {
+        <div class="oas-returns-editor-title"><h2>@_selected.ReturnCode</h2><span class="oas-returns-status @StatusClass(_selected.Status)">@StatusText(_selected.Status)</span></div>
+        <div class="oas-returns-detail-grid">
+            <div class="oas-returns-detail-main">
+                <section class="oas-returns-card oas-returns-section">
+                    <h3><i class="fa-solid fa-file-circle-check"></i> بيانات المرتجع</h3>
+                    <div class="oas-returns-facts">
+                        <div><span>رقم الفاتورة الأصلية</span><a href="@($"/sales/invoices?invoiceId={_selected.SalesInvoiceId:D}")">@(_selected.SalesInvoiceCode ?? "فتح الفاتورة")</a></div>
+                        <div><span>العميل</span><strong>@(_selected.CustomerName ?? _selected.CustomerCode ?? "—")</strong></div>
+                        <div><span>تاريخ المرتجع</span><strong>@_selected.ReturnDate.ToString("yyyy/MM/dd")</strong></div>
+                        <div><span>تاريخ الترحيل</span><strong>@_selected.PostingDate.ToString("yyyy/MM/dd")</strong></div>
+                        <div><span>سبب المرتجع</span><strong>@(_selected.Reason ?? "—")</strong></div>
+                        <div><span>رقم القيد</span><strong>@(_selected.JournalEntryId.HasValue ? "قيد مسجل" : "غير مرحّل")</strong></div>
+                    </div>
                     @if (_selected.ReturnPolicyReferenceDate.HasValue)
                     {
-                        <UiAlert Message="@($"مرجع سياسة الإرجاع: {_selected.ReturnPolicyReferenceDate:yyyy-MM-dd} • المدة {_selected.ReturnWindowDaysSnapshot ?? 0} يوم" + (_selected.ReturnWindowOverridden ? " • تم تجاوز المدة بصلاحية موثقة" : string.Empty))"
-                                 Tone="@(_selected.ReturnWindowOverridden ? AlertTone.Warning : AlertTone.Info)" />
+                        <p class="oas-returns-hint">مرجع سياسة الإرجاع: @_selected.ReturnPolicyReferenceDate.Value.ToString("yyyy/MM/dd") • المدة @_selected.ReturnWindowDaysSnapshot يوم</p>
                     }
-                    @if (!string.IsNullOrWhiteSpace(_selected.ReturnWindowOverrideReason))
-                    {
-                        <UiAlert Message="@($"سبب تجاوز المدة: {_selected.ReturnWindowOverrideReason}")" Tone="AlertTone.Warning" />
-                    }
-                    @if (!string.IsNullOrWhiteSpace(_selected.Reason))
-                    {
-                        <UiAlert Message="@_selected.Reason" Tone="AlertTone.Info" />
-                    }
-                    <UiCard Title="الأسطر" Subtitle="@($"{_selected.Lines.Count} سطر")">
-                        <UiStackLayout Gap="StackGap.Small">
+                </section>
+                <section class="oas-returns-card oas-returns-section">
+                    <h3><i class="fa-solid fa-boxes-stacked"></i> بنود المرتجع</h3>
+                    <div class="oas-returns-table-wrap">
+                        <table class="oas-returns-table"><thead><tr><th>البند</th><th>الصنف</th><th>الكمية</th><th>الصافي</th><th>الضريبة</th><th>الإجمالي</th><th>قرار المخزون</th></tr></thead>
+                            <tbody>
                             @foreach (var line in _selected.Lines)
                             {
-                                <UiRecordRow Title="@($"{line.LineNumber} - {line.ProductName}")"
-                                             Subtitle="@($"كمية {line.Quantity:N3} • إجمالي {line.FinalAmount:N2}")">
-                                    <Content>
-                                        <UiKeyValue Label="تكلفة المخزون" Value="@(line.TotalCostSnapshot?.ToString("N2") ?? "-")" />
-                                        <UiKeyValue Label="حالة المرتجع" Value="@ReturnConditionText(line.ReturnCondition)" />
-                                        <UiKeyValue Label="قرار المخزون" Value="@StockDispositionText(line.StockDisposition)" />
-                                        @if (line.InspectedAtUtc.HasValue)
-                                        {
-                                            <UiKeyValue Label="آخر فحص" Value="@line.InspectedAtUtc.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm")" />
-                                        }
-                                    </Content>
-                                </UiRecordRow>
-                                @if (_selected.Status == SalesReturnStatus.Posted && line.StockDisposition == SalesReturnStockDisposition.Quarantine)
-                                {
-                                    var inspection = GetInspectionForm(line.Id);
-                                    <UiCard Title="فحص / تسريح من الحجر" Subtitle="تُعرض مخازن البيع النشطة فقط عند التسريح.">
-                                        <UiGrid Columns="2">
-                                            <UiSelect Label="نتيجة الفحص" Value="@inspection.ConditionText"
-                                                      ValueChanged="@(value => OnInspectionConditionChanged(inspection, value))"
-                                                      Options="@InspectionConditionOptions" Size="ControlSize.Small" />
-                                            @if (inspection.ConditionText == nameof(SalesReturnCondition.Resellable))
-                                            {
-                                                <UiSelect Label="مخزن التسريح القابل للبيع" Placeholder="لا يوجد مخزن صالح"
-                                                          Value="@inspection.DestinationWarehouseIdText"
-                                                          ValueChanged="@(value => inspection.DestinationWarehouseIdText = value)"
-                                                          Options="@SellableWarehouseOptions" Size="ControlSize.Small" />
-                                            }
-                                        </UiGrid>
-                                        <UiWorkspaceActionBar>
-                                            <UiButton Text="حفظ نتيجة الفحص" IconCssClass="fa-solid fa-shield-check"
-                                                      Size="ControlSize.Small" Loading="@_busy" OnClick="@(() => InspectLineAsync(line))" />
-                                        </UiWorkspaceActionBar>
-                                    </UiCard>
-                                }
+                                <tr><td>@line.LineNumber</td><td>@line.ProductName</td><td>@line.Quantity.ToString("0.###")</td><td>@line.NetAmount.ToString("N2")</td><td>@line.TaxAmount.ToString("N2")</td><td>@line.FinalAmount.ToString("N2")</td><td>@StockDispositionText(line.StockDisposition)</td></tr>
                             }
-                        </UiStackLayout>
-                    </UiCard>
-                </UiStackLayout>
-            </UiCard>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+                @if (_selected.Status == SalesReturnStatus.Posted && _selected.Lines.Any(x => x.StockDisposition == SalesReturnStockDisposition.Quarantine))
+                {
+                    <section class="oas-returns-card oas-returns-section">
+                        <h3><i class="fa-solid fa-shield-halved"></i> فحص الأصناف المحجوزة</h3>
+                        @foreach (var line in _selected.Lines.Where(x => x.StockDisposition == SalesReturnStockDisposition.Quarantine))
+                        {
+                            var inspection = GetInspectionForm(line.Id);
+                            <div class="oas-returns-inspection">
+                                <strong>@line.ProductName — @line.Quantity.ToString("0.###")</strong>
+                                <div class="oas-returns-form-grid">
+                                    <label>نتيجة الفحص
+                                        <select value="@inspection.ConditionText" @onchange="@(e => OnInspectionConditionChanged(inspection, e.Value?.ToString()))">
+                                            @foreach (var option in InspectionConditionOptions) { <option value="@option.Value">@option.Text</option> }
+                                        </select>
+                                    </label>
+                                    @if (inspection.ConditionText == nameof(SalesReturnCondition.Resellable))
+                                    {
+                                        <label>مخزن التسريح القابل للبيع
+                                            <select value="@inspection.DestinationWarehouseIdText" @onchange="@(e => inspection.DestinationWarehouseIdText = e.Value?.ToString())">
+                                                <option value="">اختر مخزنًا</option>
+                                                @foreach (var option in SellableWarehouseOptions) { <option value="@option.Value">@option.Text</option> }
+                                            </select>
+                                        </label>
+                                    }
+                                </div>
+                                <button class="oas-returns-primary" type="button" disabled="@_busy" @onclick="() => InspectLineAsync(line)">حفظ نتيجة الفحص</button>
+                                @if (line.InspectedAtUtc.HasValue) { <small>آخر فحص: @line.InspectedAtUtc.Value.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</small> }
+                            </div>
+                        }
+                    </section>
+                }
+            </div>
+            <aside class="oas-returns-create-summary">
+                <section class="oas-returns-card oas-returns-section">
+                    <h3><i class="fa-solid fa-calculator"></i> الملخص المالي</h3>
+                    <div class="oas-returns-keyvalue"><span>الصافي</span><strong>@_selected.NetAmount.ToString("N2") @_selected.CurrencyCode</strong></div>
+                    <div class="oas-returns-keyvalue"><span>الضريبة</span><strong>@_selected.TaxAmount.ToString("N2") @_selected.CurrencyCode</strong></div>
+                    <div class="oas-returns-keyvalue is-emphasis"><span>إجمالي المرتجع</span><strong>@_selected.TotalAmount.ToString("N2") @_selected.CurrencyCode</strong></div>
+                    @if (_selected.Status == SalesReturnStatus.Posted)
+                    {
+                        @if (CurrentCreditItem is { } credit)
+                        {
+                            <div class="oas-returns-keyvalue"><span>مخفض من المديونية</span><strong>@credit.AppliedAgainstOriginalInvoice.ToString("N2") @credit.CurrencyCode</strong></div>
+                            <div class="oas-returns-keyvalue"><span>رصيد المرتجع الدائن (قبل التسويات)</span><strong>@credit.EstimatedUnappliedCredit.ToString("N2") @credit.CurrencyCode</strong></div>
+                            @if (_creditBalance is not null)
+                            {
+                                <div class="oas-returns-keyvalue is-emphasis"><span>المتاح حاليًا لرد المبلغ</span><strong>@CurrentRefundAvailableBase.ToString("N2") @credit.BaseCurrencyCode</strong></div>
+                                <div class="oas-returns-keyvalue"><span>المسترد سابقًا بسند صرف</span><strong>@CurrentRefundedBase.ToString("N2") @credit.BaseCurrencyCode</strong></div>
+                            }
+                        }
+                        @if (_creditBalance is not null && CurrentRefundAvailableBase > 0m)
+                        {
+                            <button type="button" class="oas-returns-primary oas-returns-refund-button" disabled="@_busy" @onclick="OpenRefundAsync"><i class="fa-solid fa-hand-holding-dollar"></i> رد المبلغ للعميل</button>
+                        }
+                        else if (_creditBalance is not null)
+                        {
+                            <p class="oas-returns-credit-explanation">لا يوجد رصيد دائن متاح لهذا المرتجع، فلا يمكن رد مبلغ نقدي أو بنكي.</p>
+                        }
+                        else
+                        {
+                            <p class="oas-returns-credit-explanation">لم يتم تحميل الرصيد القابل للاسترداد. اضغط «تحديث» لإعادة المحاولة.</p>
+                        }
+                        <a class="oas-returns-button" href="@($"/sales/customer-credits/{_selected.CustomerId:D}")">تسويات متقدمة وسجل أرصدة العميل</a>
+                    }
+                    <p class="oas-returns-notice">يُخفّض المرتجع المديونية أولًا. عند وجود رصيد دائن، يمكنك رده من هذه الصفحة بسند صرف مستقل؛ الترحيل وحده لا يصرف نقدًا.</p>
+                </section>
+            </aside>
+        </div>
+        @if (_postingIssues.Count > 0)
+        {
+            <div class="oas-returns-alert is-error" role="alert"><strong>أسباب عدم جاهزية الترحيل:</strong>
+                @foreach (var issue in _postingIssues) { <p>@issue.Message</p> }
+            </div>
         }
-    </Aside>
-</UiWorkspaceLayout>
+        <div class="oas-returns-actions">
+            @if (_selected.Status == SalesReturnStatus.Draft)
+            {
+                <button type="button" class="oas-returns-primary" disabled="@_busy" @onclick="ConfirmAsync">تأكيد المرتجع</button>
+                <button type="button" class="oas-returns-danger" disabled="@_busy" @onclick="StartCancel">إلغاء المستند</button>
+            }
+            else if (_selected.Status == SalesReturnStatus.Confirmed)
+            {
+                <button type="button" class="oas-returns-primary" disabled="@_busy" @onclick="PostAsync">ترحيل المرتجع</button>
+                <button type="button" class="oas-returns-danger" disabled="@_busy" @onclick="StartCancel">إلغاء المستند</button>
+            }
+            <a class="oas-returns-button" href="@($"/sales/returns/{_selected.Id:D}/print")" target="_blank" rel="noopener">طباعة المرتجع</a>
+            <a class="oas-returns-button" href="@($"/sales/invoices?invoiceId={_selected.SalesInvoiceId:D}")">فتح الفاتورة الأصلية</a>
+        </div>
+        @if (_showCancelPrompt && (_selected.Status == SalesReturnStatus.Draft || _selected.Status == SalesReturnStatus.Confirmed))
+        {
+            <div class="oas-returns-cancel-confirm">
+                <strong>تأكيد إلغاء المرتجع</strong>
+                <p>سوف يُلغى المستند وتُحرر كمياته المحجوزة. لا يمكن التراجع عن الإلغاء.</p>
+                <label>سبب الإلغاء <textarea rows="2" maxlength="500" value="@_cancelReason" @oninput="@(e => _cancelReason = e.Value?.ToString())"></textarea></label>
+                @if (!string.IsNullOrWhiteSpace(_cancelError)) { <small role="alert">@_cancelError</small> }
+                <button class="oas-returns-danger" type="button" disabled="@_busy" @onclick="CancelAsync">تأكيد الإلغاء</button>
+                <button class="oas-returns-button" type="button" @onclick="DismissCancel">العودة</button>
+            </div>
+        }
+    }
+    else
+    {
+        <p class="oas-returns-empty">جارٍ فتح المستند...</p>
+    }
+</div>
 
 @code {
     private PagedResult<SalesReturnDto> _page = new();
     private SalesReturnDto? _selected;
     private SalesInvoiceDto? _sourceInvoice;
-    private IReadOnlyList<SalesInvoiceDto> _postedInvoices = [];
+    private UiLookupItem? _invoiceLookup;
+    private SalesReturnsDashboardSummaryDto? _summary;
+    private CustomerReturnCreditPreviewDto? _creditPreview;
+    private CustomerCreditBalanceDto? _creditBalance;
+    private readonly List<SalesReturnPostingIssueDto> _postingIssues = [];
+    private readonly Dictionary<string, string> _formErrors = new();
+    private readonly List<ReturnWorkspaceTab> _openTabs = [];
+    private string _activeTabKey = "all";
+    private string? _loadError;
+    private bool _showCancelPrompt;
+    private string? _cancelReason;
+    private string? _cancelError;
+    private int _pageSize = 10;
+    private SalesReturnStatus? _statusFilter;
+    private DateOnly? _dateFrom;
+    private DateOnly? _dateTo;
     private IReadOnlyList<SalesWarehouseLookupDto> _returnWarehouses = [];
+    private string? _warehouseLoadError;
     private readonly List<ReturnLineForm> _returnLines = [];
     private readonly Dictionary<Guid, InspectionLineForm> _inspectionForms = [];
     private bool _creating;
@@ -217,9 +456,25 @@
     private string? _returnWindowOverrideReason;
     private SalesReturnCreationPolicyDto? _returnPolicy;
 
-    private IReadOnlyList<UiSelectOption> InvoiceOptions => _postedInvoices
-        .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.InvoiceCode} - {x.CustomerName ?? x.CustomerCode ?? "عميل"}"))
-        .ToArray();
+    [Parameter, SupplyParameterFromQuery(Name = "returnId")] public Guid? ReturnId { get; set; }
+    private sealed record ReturnWorkspaceTab(string Key, string Label);
+    private static string Metric(int? number) => number?.ToString("N0") ?? "—";
+    private string? GetFormError(string key) => _formErrors.TryGetValue(key, out var error) ? error : null;
+    private CustomerReturnCreditItemDto? CurrentCreditItem => _selected is null ? null :
+        _creditPreview?.Returns.FirstOrDefault(x => x.SalesReturnId == _selected.Id);
+    private CustomerReturnCreditItemDto? CurrentBalanceCreditItem => _selected is null ? null :
+        _creditBalance?.Returns.FirstOrDefault(x => x.SalesReturnId == _selected.Id);
+    private decimal CurrentConsumedBase => _selected is null ? 0m :
+        _creditBalance?.Applications.Where(x => x.SalesReturnId == _selected.Id && x.Status == 1)
+            .Sum(x => x.AppliedSourceBaseAmount) ?? 0m;
+    private decimal CurrentRefundAvailableBase => CurrentBalanceCreditItem is { } item
+        ? Math.Max(0m, item.EstimatedUnappliedBaseCredit - CurrentConsumedBase) : 0m;
+    private decimal CurrentRefundedBase => _selected is null ? 0m :
+        _creditBalance?.Applications.Where(x => x.SalesReturnId == _selected.Id && x.Status == 1 && x.SettlementKind == 2)
+            .Sum(x => x.AppliedSourceBaseAmount) ?? 0m;
+    private decimal EstimatedReturnTotal => _returnLines.Where(x => x.Selected && x.Remaining > 0m)
+        .Sum(x => decimal.TryParse(x.QuantityText, out var q) && q > 0m && x.Line.Quantity > 0m
+            ? Math.Min(q, x.Remaining) * (x.Line.FinalAmount / x.Line.Quantity) : 0m);
 
     private static readonly IReadOnlyList<UiSelectOption> StandardConditions =
     [
@@ -256,6 +511,49 @@
         _returnWarehouses.Where(x => x.IsActive &&
             (line.StockDispositionText == nameof(SalesReturnStockDisposition.Quarantine)
                 ? !x.AllowsSalesAllocation : x.AllowsSalesAllocation)).ToArray();
+    private IReadOnlyList<SalesWarehouseLookupDto> IneligibleWarehousesFor(ReturnLineForm line) =>
+        _returnWarehouses.Where(x => x.IsActive &&
+            (line.StockDispositionText == nameof(SalesReturnStockDisposition.Quarantine)
+                ? x.AllowsSalesAllocation : !x.AllowsSalesAllocation)).ToArray();
+    private bool MissingQuarantineWarehouse => _returnLines.Any(x => x.RequiresInventory &&
+        x.StockDispositionText == nameof(SalesReturnStockDisposition.Quarantine) && EligibleWarehouses(x).Count == 0);
+    private bool MissingSellableWarehouse => _returnLines.Any(x => x.RequiresInventory &&
+        x.StockDispositionText == nameof(SalesReturnStockDisposition.Restock) && EligibleWarehouses(x).Count == 0);
+
+    // Lookup results are capped at 50 on the server. Query each warehouse type before paging,
+    // otherwise many sellable warehouses can hide the quarantine warehouse needed for returns.
+    private async Task LoadReturnWarehousesAsync()
+    {
+        _warehouseLoadError = null;
+        try
+        {
+            var sellableTask = Sales.SearchWarehousesAsync(null, null, 50, true, allowsSalesAllocation: true);
+            var quarantineTask = Sales.SearchWarehousesAsync(null, null, 50, true, allowsSalesAllocation: false);
+            await Task.WhenAll(sellableTask, quarantineTask);
+            _returnWarehouses = sellableTask.Result.Concat(quarantineTask.Result)
+                .Where(x => x.IsActive).DistinctBy(x => x.Id).ToArray();
+        }
+        catch
+        {
+            _warehouseLoadError = "تعذر تحميل المخازن. تحقق من الاتصال والصلاحيات، ثم اضغط «تحديث المخازن».";
+            _returnWarehouses = [];
+            throw;
+        }
+    }
+    private async Task ReloadWarehouseOptionsAsync()
+    {
+        if (_busy) return;
+        _busy = true;
+        try
+        {
+            await LoadReturnWarehousesAsync();
+            foreach (var line in _returnLines.Where(x => x.Selected)) EnsureWarehouse(line);
+            Snackbar.Success("تم تحديث قائمة المخازن.");
+        }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
+        catch { ApiFeedback.ShowUnexpected(); }
+        finally { _busy = false; }
+    }
 
     private IReadOnlyList<UiSelectOption> WarehouseOptionsFor(ReturnLineForm line) => EligibleWarehouses(line)
         .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.Name}"))
@@ -265,30 +563,31 @@
         .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.Name}"))
         .ToArray();
 
-    // Invalid historical dates are never sent to the API. No under-field error rendering.
+    // Preserve what the cashier typed: validation explains invalid dates instead of silently changing them.
     private DateOnly EarliestDate => _returnPolicy?.EarliestReturnDate ?? _sourceInvoice?.PostingDate ?? DateOnly.FromDateTime(DateTime.Today);
-    private void OnReturnDateChanged(DateOnly? date)
+    private void ChangeReturnDateInput(ChangeEventArgs e)
     {
-        _returnDate = Later(date ?? EarliestDate, EarliestDate);
-        SynchronizePostingDate();
+        _returnDate = DateOnly.TryParse(e.Value?.ToString(), out var date) ? date : null;
+        _formErrors.Remove("returnDate");
+        if (!_returnDate.HasValue) _formErrors["returnDate"] = "تاريخ المرتجع مطلوب.";
+        else if (_sourceInvoice is not null && _returnDate.Value < EarliestDate)
+            _formErrors["returnDate"] = $"لا يمكن الإرجاع قبل {EarliestDate:yyyy/MM/dd}.";
     }
-    private void OnPostingDateChanged(DateOnly? date)
+    private void ChangePostingDateInput(ChangeEventArgs e)
     {
-        _postingDate = Later(date ?? _returnDate ?? EarliestDate,
-            Later(EarliestDate, _returnDate ?? EarliestDate));
+        _postingDate = DateOnly.TryParse(e.Value?.ToString(), out var date) ? date : null;
+        _formErrors.Remove("postingDate");
+        if (!_postingDate.HasValue) _formErrors["postingDate"] = "تاريخ الترحيل مطلوب.";
+        else if (_returnDate.HasValue && _postingDate.Value < _returnDate.Value)
+            _formErrors["postingDate"] = "تاريخ الترحيل لا يسبق تاريخ المرتجع.";
     }
-    private static DateOnly Later(DateOnly a, DateOnly b) => a > b ? a : b;
-    private void SynchronizePostingDate()
+    private void ChangeLineQuantity(ReturnLineForm line, string? value)
     {
-        if (_returnDate.HasValue)
-            _postingDate = Later(_postingDate ?? _returnDate.Value,
-                Later(_returnDate.Value, EarliestDate));
-    }
-    private void NormalizeDates()
-    {
-        if (_sourceInvoice is null) return;
-        _returnDate = Later(_returnDate ?? EarliestDate, EarliestDate);
-        SynchronizePostingDate();
+        line.QuantityText = value ?? string.Empty;
+        line.QuantityError = null;
+        if (!line.Selected) return;
+        if (!decimal.TryParse(line.QuantityText, out var quantity) || quantity <= 0m || quantity > line.Remaining)
+            line.QuantityError = $"أدخل كمية موجبة لا تتجاوز {line.Remaining:0.###}.";
     }
 
     private void EnsureWarehouse(ReturnLineForm line)
@@ -303,12 +602,18 @@
     private void OnLineSelected(ReturnLineForm line, bool selected)
     {
         line.Selected = selected;
+        line.QuantityError = null;
+        line.WarehouseError = null;
+        _formErrors.Remove("lines");
         if (selected) EnsureWarehouse(line);
     }
     private void OnReturnWarehouseChanged(ReturnLineForm line, string? value)
     {
         line.ReturnWarehouseIdText = value;
-        EnsureWarehouse(line);
+        line.WarehouseError = null;
+        if (line.Selected && (!Guid.TryParse(value, out var warehouseId) ||
+            !EligibleWarehouses(line).Any(x => x.Id == warehouseId)))
+            line.WarehouseError = "اختر مخزنًا مطابقًا لقرار المخزون.";
     }
     private void OnConditionChanged(ReturnLineForm line, string? value)
     {
@@ -338,50 +643,146 @@
             form.DestinationWarehouseIdText = _returnWarehouses.FirstOrDefault(x => x.IsActive && x.AllowsSalesAllocation)?.Id.ToString("D");
     }
 
-    protected override async Task OnInitializedAsync() => await RefreshAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshAsync();
+        if (ReturnId.HasValue) await SelectAsync(ReturnId.Value);
+    }
+
     private async Task RefreshAsync()
     {
         _busy = true;
+        _loadError = null;
         try
         {
-            _page = await Sales.GetSalesReturnsPageAsync(new PageRequest { PageNumber = _pageNumber, PageSize = 20, Search = _search });
+            _page = await Sales.GetSalesReturnsPageAsync(new PageRequest
+            {
+                PageNumber = _pageNumber, PageSize = _pageSize, Search = _search,
+                DateFrom = _dateFrom, DateTo = _dateTo,
+                SortBy = "ReturnDate", SortDirection = SortDirection.Descending
+            }, status: _statusFilter);
             if (_selected is not null)
             {
                 _selected = await Sales.GetSalesReturnByIdAsync(_selected.Id);
                 SyncInspectionForms();
+                await LoadCurrentCreditPreviewAsync();
             }
         }
-        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
-        catch { ApiFeedback.ShowUnexpected(); }
+        catch (ApiClientException ex) { _loadError = ex.Error?.Message ?? "تعذر تحديث المرتجعات."; ApiFeedback.Show(ex.Error); }
+        catch { _loadError = "تعذر تحديث المرتجعات. تحقق من الاتصال ثم حاول مجددًا."; ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
+        try { _summary = await ApiClient.GetAsync<SalesReturnsDashboardSummaryDto>("api/sales/returns/dashboard-summary"); }
+        catch { _summary = null; }
     }
-    private async Task SearchAsync(string? text) { _search = text; _pageNumber = 1; await RefreshAsync(); }
+    private Task SearchNowAsync() { _pageNumber = 1; return RefreshAsync(); }
+    private Task HandleSearchKeyDown(KeyboardEventArgs e) => e.Key == "Enter" ? SearchNowAsync() : Task.CompletedTask;
+    private async Task ChangeStatusAsync(ChangeEventArgs e)
+    {
+        _statusFilter = Enum.TryParse<SalesReturnStatus>(e.Value?.ToString(), out var parsed) ? parsed : null;
+        _pageNumber = 1; await RefreshAsync();
+    }
+    private async Task ChangeDateFromAsync(ChangeEventArgs e)
+    {
+        _dateFrom = DateOnly.TryParse(e.Value?.ToString(), out var date) ? date : null;
+        _pageNumber = 1; await RefreshAsync();
+    }
+    private async Task ChangeDateToAsync(ChangeEventArgs e)
+    {
+        _dateTo = DateOnly.TryParse(e.Value?.ToString(), out var date) ? date : null;
+        _pageNumber = 1; await RefreshAsync();
+    }
+    private async Task ResetFiltersAsync()
+    {
+        _search = null; _statusFilter = null; _dateFrom = null; _dateTo = null; _pageNumber = 1;
+        await RefreshAsync();
+    }
+    private async Task ChangePageSizeAsync(ChangeEventArgs e)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var size) || size is not (5 or 10 or 15 or 20)) return;
+        _pageSize = size; _pageNumber = 1; await RefreshAsync();
+    }
     private async Task PreviousAsync() { if (_pageNumber > 1) { _pageNumber--; await RefreshAsync(); } }
     private async Task NextAsync() { if (_page.HasNextPage) { _pageNumber++; await RefreshAsync(); } }
+
+    private void ActivateAll()
+    {
+        _creating = false;
+        _selected = null;
+        _activeTabKey = "all";
+        _postingIssues.Clear();
+        _showCancelPrompt = false;
+    }
+    private Task SelectAllAsync() { ActivateAll(); return Task.CompletedTask; }
+    private async Task SelectWorkspaceTabAsync(string key)
+    {
+        if (key == "new")
+        {
+            _selected = null;
+            _creating = true;
+            _activeTabKey = "new";
+            return;
+        }
+        if (key.StartsWith("return:", StringComparison.Ordinal) && Guid.TryParse(key[7..], out var id))
+            await SelectAsync(id);
+    }
+    private async Task CloseWorkspaceTabAsync(string key)
+    {
+        if (key == "new" && _sourceInvoice is not null && _returnLines.Any(x => x.Selected) &&
+            !await Dialog.ConfirmAsync("إغلاق مرتجع جديد", "ستُفقد بيانات المرتجع غير المحفوظة. هل تريد إغلاق التبويب؟", AlertTone.Warning, "إغلاق دون حفظ", "العودة")) return;
+        _openTabs.RemoveAll(x => x.Key == key);
+        if (_activeTabKey == key) ActivateAll();
+    }
+    private Task CloseNewTabAsync() => CloseWorkspaceTabAsync("new");
+
     private async Task SelectAsync(Guid id)
     {
         _creating = false;
+        _activeTabKey = $"return:{id:D}";
+        _showCancelPrompt = false;
+        _postingIssues.Clear();
         _busy = true;
         try
         {
             var selection = Sales.GetSalesReturnByIdAsync(id);
-            var warehouses = Sales.SearchWarehousesAsync(null, null, 100, true);
+            var warehouses = LoadReturnWarehousesAsync();
             await Task.WhenAll(selection, warehouses);
             _selected = selection.Result;
-            _returnWarehouses = warehouses.Result.Where(x => x.IsActive).ToArray();
+            if (_selected is null) { ActivateAll(); return; }
+            if (!_openTabs.Any(x => x.Key == _activeTabKey))
+                _openTabs.Add(new ReturnWorkspaceTab(_activeTabKey, _selected.ReturnCode));
             SyncInspectionForms();
+            await LoadCurrentCreditPreviewAsync();
         }
-        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
-        catch { ApiFeedback.ShowUnexpected(); }
+        catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); ActivateAll(); }
+        catch { ApiFeedback.ShowUnexpected(); ActivateAll(); }
         finally { _busy = false; }
+    }
+    private async Task LoadCurrentCreditPreviewAsync()
+    {
+        _creditPreview = null;
+        _creditBalance = null;
+        if (_selected?.Status != SalesReturnStatus.Posted) return;
+        try
+        {
+            _creditPreview = await ApiClient.GetAsync<CustomerReturnCreditPreviewDto>(
+                $"api/sales/customer-credits/{_selected.CustomerId:D}/preview");
+            _creditBalance = await ApiClient.GetAsync<CustomerCreditBalanceDto>(
+                $"api/sales/customer-credits/{_selected.CustomerId:D}");
+        }
+        catch { /* Financial summary is informational: keep the return accessible if unavailable. */ }
     }
     private async Task BeginCreateAsync()
     {
+        if (_openTabs.Any(x => x.Key == "new")) { await SelectWorkspaceTabAsync("new"); return; }
         _creating = true;
+        _activeTabKey = "new";
+        _openTabs.Add(new ReturnWorkspaceTab("new", "مرتجع جديد"));
         _selected = null;
         _sourceInvoice = null;
+        _invoiceLookup = null;
         _returnPolicy = null;
         _returnLines.Clear();
+        _formErrors.Clear();
         _invoiceIdText = null;
         _reason = null;
         _overrideReturnWindow = false;
@@ -391,19 +792,31 @@
         _busy = true;
         try
         {
-            var invoices = Sales.GetSalesInvoicesPageAsync(new PageRequest { PageNumber = 1, PageSize = 200, SortBy = "invoiceDate", SortDirection = SortDirection.Descending });
-            var warehouses = Sales.SearchWarehousesAsync(null, null, 100, true);
-            await Task.WhenAll(invoices, warehouses);
-            _postedInvoices = invoices.Result.Items.Where(x => x.Status == SalesInvoiceStatus.Posted).ToArray();
-            _returnWarehouses = warehouses.Result.Where(x => x.IsActive).ToArray();
+            await LoadReturnWarehousesAsync();
         }
         catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
         catch { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
     }
+    private async Task<IReadOnlyList<UiLookupItem>> SearchPostedInvoicePageAsync(
+        string search, int skip, CancellationToken ct)
+    {
+        const int size = 25;
+        var page = await Sales.GetSalesInvoicesPageAsync(new PageRequest
+        {
+            PageNumber = (skip / size) + 1, PageSize = size, Search = search,
+            Status = "Posted", SortBy = "InvoiceDate", SortDirection = SortDirection.Descending
+        }, ct);
+        return page.Items.Select(x => new UiLookupItem(x.Id.ToString("D"), x.InvoiceCode,
+            $"{x.CustomerName ?? x.CustomerCode ?? "عميل"} • {x.TotalAmount:N2} {x.CurrencyCodeSnapshot}",
+            "fa-solid fa-file-invoice")).ToArray();
+    }
+
     private async Task InvoiceChangedAsync(string? value)
     {
         _invoiceIdText = value;
+        _formErrors.Remove("invoice");
+        _invoiceLookup = null;
         _sourceInvoice = null;
         _returnPolicy = null;
         _returnLines.Clear();
@@ -417,14 +830,19 @@
             await Task.WhenAll(invoiceTask, policyTask);
             _sourceInvoice = invoiceTask.Result;
             _returnPolicy = policyTask.Result;
+            if (_sourceInvoice is not null)
+                _invoiceLookup = new UiLookupItem(_sourceInvoice.Id.ToString("D"), _sourceInvoice.InvoiceCode,
+                    _sourceInvoice.CustomerName ?? _sourceInvoice.CustomerCode, "fa-solid fa-file-invoice");
             if (_sourceInvoice is null || _returnPolicy is null) return;
             if (!_returnPolicy.CanCreate)
             {
-                Snackbar.Error(_returnPolicy.Reason ?? "الفاتورة غير متاحة للإرجاع.");
+                _formErrors["invoice"] = _returnPolicy.Reason ?? "الفاتورة غير متاحة للإرجاع.";
                 _sourceInvoice = null;
                 return;
             }
-            NormalizeDates();
+            // Do not silently change a date entered by the cashier.
+            if (_returnDate.HasValue && _returnDate.Value < EarliestDate)
+                _formErrors["returnDate"] = $"لا يمكن الإرجاع قبل {EarliestDate:yyyy/MM/dd}.";
             foreach (var line in _sourceInvoice.Lines.Where(x => x.IsActive))
             {
                 var remaining = Math.Max(0m, line.Quantity - line.ReturnedQuantity);
@@ -440,63 +858,63 @@
 
     private async Task CreateAsync()
     {
-        if (_sourceInvoice is null || !_returnDate.HasValue || !_postingDate.HasValue)
+        if (_busy) return;
+        _formErrors.Clear();
+        foreach (var form in _returnLines) { form.QuantityError = null; form.WarehouseError = null; }
+        if (_sourceInvoice is null)
+            _formErrors["invoice"] = "اختر فاتورة مبيعات مرحّلة أولًا.";
+        if (!_returnDate.HasValue)
+            _formErrors["returnDate"] = "تاريخ المرتجع مطلوب.";
+        else if (_sourceInvoice is not null && _returnDate.Value < EarliestDate)
+            _formErrors["returnDate"] = $"لا يمكن الإرجاع قبل {EarliestDate:yyyy/MM/dd}.";
+        if (!_postingDate.HasValue)
+            _formErrors["postingDate"] = "تاريخ الترحيل مطلوب.";
+        else if (_returnDate.HasValue && _postingDate.Value < _returnDate.Value)
+            _formErrors["postingDate"] = "تاريخ الترحيل يجب ألا يسبق تاريخ المرتجع.";
+        if (_returnPolicy is { CanCreate: false })
+            _formErrors["invoice"] = _returnPolicy.Reason ?? "الفاتورة غير مؤهلة للإرجاع.";
+        if (_returnPolicy?.LastReturnDateWithoutOverride is { } until &&
+            _returnDate.HasValue && _returnDate.Value > until)
         {
-            Snackbar.Error("اختر فاتورة وحدد التاريخ.");
-            return;
-        }
-        NormalizeDates();
-        if (_returnPolicy is not null && !_returnPolicy.CanCreate)
-        {
-            Snackbar.Error(_returnPolicy.Reason ?? "الفاتورة غير قابلة للإرجاع.");
-            return;
-        }
-        if (_returnPolicy?.LastReturnDateWithoutOverride is { } until && _returnDate.Value > until)
-        {
-            if (!_overrideReturnWindow)
-            {
-                Snackbar.Error("انتهت مدة الإرجاع النظامية. يلزم تجاوز مصرح به.");
-                return;
-            }
-            if (string.IsNullOrWhiteSpace(_returnWindowOverrideReason))
-            {
-                Snackbar.Error("سجّل سبب تجاوز مدة الإرجاع.");
-                return;
-            }
+            if (!_overrideReturnWindow) _formErrors["returnDate"] = "انتهت مهلة الإرجاع؛ يجب اعتماد تجاوز المدة.";
+            else if (string.IsNullOrWhiteSpace(_returnWindowOverrideReason))
+                _formErrors["override"] = "اكتب سبب تجاوز مدة الإرجاع.";
         }
         var lines = new List<CreateSalesReturnLineRequest>();
         foreach (var form in _returnLines.Where(x => x.Selected))
         {
             if (!decimal.TryParse(form.QuantityText, out var quantity) || quantity <= 0m || quantity > form.Remaining)
             {
-                Snackbar.Error($"تحقق من كمية السطر {form.Line.LineNumber}؛ الحد الأقصى {form.Remaining:N3}.");
-                return;
+                form.QuantityError = $"الكمية المطلوبة يجب أن تكون أكبر من صفر ولا تتجاوز {form.Remaining:0.###}.";
+                continue;
             }
             Guid? warehouseId = null;
             SalesReturnCondition? condition = null;
             SalesReturnStockDisposition? disposition = null;
             if (form.RequiresInventory)
             {
-                EnsureWarehouse(form);
                 if (!Guid.TryParse(form.ReturnWarehouseIdText, out var parsedWarehouseId) ||
                     !EligibleWarehouses(form).Any(x => x.Id == parsedWarehouseId))
                 {
-                    Snackbar.Error($"لا يوجد مخزن مناسب لقرار السطر {form.Line.LineNumber}؛ جهّز مخزنًا نشطًا ملائمًا أولًا.");
-                    return;
+                    form.WarehouseError = "اختر مخزنًا نشطًا صالحًا لقرار الصنف.";
+                    continue;
                 }
                 warehouseId = parsedWarehouseId;
                 if (!Enum.TryParse(form.ReturnConditionText, out SalesReturnCondition parsedCondition) ||
                     !Enum.TryParse(form.StockDispositionText, out SalesReturnStockDisposition parsedDisposition))
                 {
-                    Snackbar.Error($"راجع حالة المخزون للسطر {form.Line.LineNumber}.");
-                    return;
+                    form.WarehouseError = "راجع حالة الصنف وقرار المخزون.";
+                    continue;
                 }
                 condition = parsedCondition;
                 disposition = parsedDisposition;
             }
             lines.Add(new CreateSalesReturnLineRequest(form.Line.Id, quantity, warehouseId, condition, disposition));
         }
-        if (lines.Count == 0) { Snackbar.Error("حدد سطرًا واحدًا على الأقل."); return; }
+        if (_returnLines.All(x => !x.Selected))
+            _formErrors["lines"] = "حدد بندًا واحدًا على الأقل لإرجاعه.";
+        if (_formErrors.Count != 0 || _returnLines.Any(x => x.QuantityError is not null || x.WarehouseError is not null)) return;
+        if (_sourceInvoice is null || !_returnDate.HasValue || !_postingDate.HasValue || lines.Count == 0) return;
         _busy = true;
         try
         {
@@ -506,26 +924,52 @@
             if (!TryGetApiResult(result, out var created)) return;
             if (created is not null)
             {
+                _openTabs.RemoveAll(x => x.Key == "new");
                 _creating = false;
-                _selected = created;
                 _pageNumber = 1;
-                Snackbar.Success("تم إنشاء مرتجع المبيعات.");
+                Snackbar.Success("تم حفظ مسودة المرتجع وحجز الكميات. لا يمكن تعديل بنود المسودة المحفوظة؛ يمكن إلغاؤها وإعادة إنشائها قبل الترحيل.");
                 await RefreshAsync();
+                await SelectAsync(created.Id);
             }
         }
         catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
         catch { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
     }
+    private async Task OpenRefundAsync()
+    {
+        if (_busy || _selected is not { Status: SalesReturnStatus.Posted } selected) return;
+        if (_creditBalance is null || CurrentRefundAvailableBase <= 0m)
+        {
+            Snackbar.Warning("لا يوجد رصيد دائن متاح للاسترداد لهذا المرتجع. حدث البيانات أولًا.");
+            return;
+        }
+        var result = await Dialog.ShowAsync<SalesReturnRefundDialog>(
+            $"رد مبلغ المرتجع {selected.ReturnCode}",
+            new Dictionary<string, object>
+            {
+                [nameof(SalesReturnRefundDialog.CustomerId)] = selected.CustomerId,
+                [nameof(SalesReturnRefundDialog.SalesReturnId)] = selected.Id,
+                [nameof(SalesReturnRefundDialog.ReturnCode)] = selected.ReturnCode
+            },
+            new UiDialogOptions { Size = UiDialogSize.Large, CloseOnBackdrop = false, CloseOnEscape = false });
+        if (result.Cancelled || result.Value is not CustomerCreditSettlementDto) return;
+        Snackbar.Success("تم رد المبلغ وإنشاء سند صرف مرحّل. تم تحديث رصيد المرتجع.");
+        await LoadCurrentCreditPreviewAsync();
+        await RefreshAsync();
+    }
+
     private async Task ConfirmAsync()
     {
-        if (_selected is null) return;
+        if (_selected is null || _busy) return;
+        if (!await Dialog.ConfirmAsync("تأكيد مرتجع المبيعات", "سيُعتمد المرتجع وينتقل إلى انتظار الترحيل. هل تريد المتابعة؟", AlertTone.Warning, "تأكيد المرتجع", "العودة")) return;
         await RunSelectedActionAsync(async () => await Sales.ConfirmSalesReturnResultAsync(
             _selected.Id, new SalesReturnActionRequest(_selected.RowVersion)), "تم تأكيد المرتجع.");
     }
     private async Task PostAsync()
     {
-        if (_selected is null) return;
+        if (_selected is null || _busy) return;
+        _postingIssues.Clear();
         _busy = true;
         try
         {
@@ -536,12 +980,14 @@
             if (readiness is null) { Snackbar.Error("تعذر التحقق من جاهزية المرتجع."); return; }
             if (!readiness.CanPost)
             {
-                Snackbar.Error(string.Join(" | ", readiness.Issues.Select(x => x.Message).Distinct()));
+                _postingIssues.AddRange(readiness.Issues);
                 return;
             }
+            if (!await Dialog.ConfirmAsync("ترحيل مرتجع المبيعات", "سيُسجّل الأثر المحاسبي والمخزني. إذا نشأ رصيد دائن، يمكن رد المبلغ للعميل بعد الترحيل من هذه الصفحة؛ لن يُصرف تلقائيًا. هل تريد المتابعة؟", AlertTone.Warning, "ترحيل المرتجع", "العودة")) return;
             var call = await Sales.PostSalesReturnResultAsync(_selected.Id, new SalesReturnActionRequest(_selected.RowVersion));
             if (!TryGetApiResult(call, out _)) return;
             _selected = await Sales.GetSalesReturnByIdAsync(_selected.Id);
+            await LoadCurrentCreditPreviewAsync();
             Snackbar.Success("تم ترحيل المرتجع.");
             await RefreshAsync();
         }
@@ -549,12 +995,26 @@
         catch { ApiFeedback.ShowUnexpected(); }
         finally { _busy = false; }
     }
+    private void StartCancel()
+    {
+        _showCancelPrompt = true;
+        _cancelReason = null;
+        _cancelError = null;
+    }
+    private void DismissCancel() { _showCancelPrompt = false; _cancelError = null; }
     private async Task CancelAsync()
     {
-        if (_selected is null) return;
+        if (_selected is null || _busy) return;
+        if (string.IsNullOrWhiteSpace(_cancelReason))
+        {
+            _cancelError = "اكتب سبب الإلغاء قبل المتابعة.";
+            return;
+        }
+        if (!await Dialog.ConfirmAsync("إلغاء مرتجع المبيعات", "ستُحرَّر الكميات المحجوزة ولن يمكن إعادة استخدام المستند. هل تؤكد الإلغاء؟", AlertTone.Danger, "تأكيد الإلغاء", "العودة")) return;
+        var id = _selected.Id;
         await RunSelectedActionAsync(async () => await Sales.CancelSalesReturnResultAsync(
-            _selected.Id, new CancelSalesReturnRequest(_selected.RowVersion, "إلغاء من واجهة مرتجعات المبيعات")),
-            "تم إلغاء المرتجع.");
+            id, new CancelSalesReturnRequest(_selected.RowVersion, _cancelReason)), "تم إلغاء المرتجع.");
+        _showCancelPrompt = false;
     }
     private InspectionLineForm GetInspectionForm(Guid id)
     {
@@ -626,11 +1086,17 @@
         else ApiFeedback.ShowUnexpected();
         return false;
     }
-    private Task CloseEditorAsync() { _creating = false; return Task.CompletedTask; }
     private static string StatusText(SalesReturnStatus status) => status switch
     {
         SalesReturnStatus.Draft => "مسودة", SalesReturnStatus.Confirmed => "مؤكد",
         SalesReturnStatus.Posted => "مرحل", SalesReturnStatus.Cancelled => "ملغي", _ => status.ToString()
+    };
+    private static string StatusClass(SalesReturnStatus status) => status switch
+    {
+        SalesReturnStatus.Posted => "is-posted",
+        SalesReturnStatus.Confirmed => "is-confirmed",
+        SalesReturnStatus.Cancelled => "is-cancelled",
+        _ => "is-draft"
     };
     private static AlertTone StatusTone(SalesReturnStatus status) => status switch
     {
@@ -654,6 +1120,8 @@
     }
     private sealed class ReturnLineForm(SalesInvoiceLineDto line, decimal remaining)
     {
+        public string? QuantityError { get; set; }
+        public string? WarehouseError { get; set; }
         public SalesInvoiceLineDto Line { get; } = line;
         public decimal Remaining { get; } = remaining;
         public bool RequiresInventory { get; } = line.LineType != SalesLineType.Service && line.ProductVariantId.HasValue && line.WarehouseId.HasValue;

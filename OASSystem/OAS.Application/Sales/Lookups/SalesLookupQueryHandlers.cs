@@ -538,6 +538,7 @@ public sealed class SearchSalesWarehousesQueryHandler(
         CancellationToken ct)
     {
         var search = request.Search?.Trim();
+        var allocationFilter = request.AllowsSalesAllocation;
 
         var spec =
             new Specification<Warehouse>();
@@ -547,6 +548,7 @@ public sealed class SearchSalesWarehousesQueryHandler(
             spec.Where(x =>
                 x.IsActive &&
                 (request.IncludeNonSellable || x.AllowsSalesAllocation) &&
+                (!allocationFilter.HasValue || x.AllowsSalesAllocation == allocationFilter.Value) &&
                 (
                     x.Code.Contains(search) ||
                     x.Name.Contains(search)
@@ -554,7 +556,9 @@ public sealed class SearchSalesWarehousesQueryHandler(
         }
         else
         {
-            spec.Where(x => x.IsActive && (request.IncludeNonSellable || x.AllowsSalesAllocation));
+            spec.Where(x => x.IsActive &&
+                (request.IncludeNonSellable || x.AllowsSalesAllocation) &&
+                (!allocationFilter.HasValue || x.AllowsSalesAllocation == allocationFilter.Value));
         }
 
         spec

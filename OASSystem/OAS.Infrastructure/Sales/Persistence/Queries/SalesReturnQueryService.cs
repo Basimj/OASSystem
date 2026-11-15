@@ -3,6 +3,7 @@ using OAS.Application.Sales.Abstractions;
 using OAS.Contracts.Common.Pagination;
 using OAS.Contracts.Sales.Returns;
 using OAS.Domain.Sales.Entities;
+using OAS.Domain.Accounting.Entities;
 
 namespace OAS.Infrastructure.Sales.Persistence.Queries;
 
@@ -12,7 +13,26 @@ public sealed class SalesReturnQueryService(OAS.Infrastructure.Persistence.OasDb
     {
         var entity = await db.Set<SalesReturn>().AsNoTracking().Include(x => x.Lines)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
-        return entity is null ? null : Map(entity);
+        if (entity is null) return null;
+        return (await MapWithDirectoryAsync([entity], cancellationToken)).Single();
+    }
+
+    public async Task<SalesReturnsDashboardSummaryDto> GetSummaryAsync(CancellationToken cancellationToken = default)
+    {
+        var grouped = await db.Set<SalesReturn>().AsNoTracking()
+            .GroupBy(x => x.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var todayCount = await db.Set<SalesReturn>().AsNoTracking()
+            .CountAsync(x => x.ReturnDate == today, cancellationToken);
+        int Count(OAS.Domain.Sales.Enums.SalesReturnStatus status) =>
+            grouped.FirstOrDefault(x => x.Status == status)?.Count ?? 0;
+        return new SalesReturnsDashboardSummaryDto(grouped.Sum(x => x.Count), todayCount,
+            Count(OAS.Domain.Sales.Enums.SalesReturnStatus.Draft),
+            Count(OAS.Domain.Sales.Enums.SalesReturnStatus.Confirmed),
+            Count(OAS.Domain.Sales.Enums.SalesReturnStatus.Posted),
+            Count(OAS.Domain.Sales.Enums.SalesReturnStatus.Cancelled));
     }
 
     public async Task<PagedResult<SalesReturnDto>> GetPageAsync(
@@ -23,18 +43,38 @@ public sealed class SalesReturnQueryService(OAS.Infrastructure.Persistence.OasDb
         CancellationToken cancellationToken = default)
     {
         var normalized = request.Normalize();
-        var query = db.Set<SalesReturn>().AsNoTracking().Include(x => x.Lines).AsQueryable();
+        var query = db.Set<SalesReturn>().AsNoTracking().AsQueryable();
         if (salesInvoiceId.HasValue) query = query.Where(x => x.SalesInvoiceId == salesInvoiceId.Value);
         if (customerId.HasValue) query = query.Where(x => x.CustomerId == customerId.Value);
         if (status.HasValue)
         {
+            // Contracts and Domain enum types must not be mixed in an EF parameter.
             var domainStatus = (OAS.Domain.Sales.Enums.SalesReturnStatus)(byte)status.Value;
             query = query.Where(x => x.Status == domainStatus);
+        }
+        if (normalized.DateFrom.HasValue)
+        {
+            var from = normalized.DateFrom.Value;
+            query = query.Where(x => x.ReturnDate >= from);
+        }
+        if (normalized.DateTo.HasValue)
+        {
+            var to = normalized.DateTo.Value;
+            query = query.Where(x => x.ReturnDate <= to);
         }
         if (!string.IsNullOrWhiteSpace(normalized.Search))
         {
             var search = normalized.Search;
-            query = query.Where(x => x.ReturnCode.Contains(search) || (x.Reason != null && x.Reason.Contains(search)));
+            var matchingInvoices = db.Set<SalesInvoice>().AsNoTracking()
+                .Where(x => x.InvoiceCode.Contains(search)).Select(x => x.Id);
+            var matchingCustomers = db.Set<Customer>().AsNoTracking()
+                .Where(x => x.NameAr.Contains(search) || x.CustomerCode.Contains(search) ||
+                    (x.NameEn != null && x.NameEn.Contains(search)) ||
+                    (x.ContactInfo.Mobile != null && x.ContactInfo.Mobile.Contains(search)))
+                .Select(x => x.Id);
+            query = query.Where(x => x.ReturnCode.Contains(search) ||
+                (x.Reason != null && x.Reason.Contains(search)) ||
+                matchingInvoices.Contains(x.SalesInvoiceId) || matchingCustomers.Contains(x.CustomerId));
         }
 
         query = normalized.SortBy?.ToLowerInvariant() switch
@@ -46,14 +86,41 @@ public sealed class SalesReturnQueryService(OAS.Infrastructure.Persistence.OasDb
         };
 
         var total = await query.LongCountAsync(cancellationToken);
-        var items = await query.Skip((normalized.PageNumber - 1) * normalized.PageSize).Take(normalized.PageSize).ToListAsync(cancellationToken);
+        // Load line collections after paging; never expand all return lines when counting.
+        var items = await query.Skip((normalized.PageNumber - 1) * normalized.PageSize)
+            .Take(normalized.PageSize).Include(x => x.Lines).AsSplitQuery().ToListAsync(cancellationToken);
         return new PagedResult<SalesReturnDto>
         {
-            Items = items.Select(Map).ToList(),
+            Items = await MapWithDirectoryAsync(items, cancellationToken),
             PageNumber = normalized.PageNumber,
             PageSize = normalized.PageSize,
             TotalCount = total
         };
+    }
+
+    private async Task<IReadOnlyList<SalesReturnDto>> MapWithDirectoryAsync(
+        IReadOnlyList<SalesReturn> entities, CancellationToken ct)
+    {
+        if (entities.Count == 0) return [];
+        var invoiceIds = entities.Select(x => x.SalesInvoiceId).Distinct().ToArray();
+        var customerIds = entities.Select(x => x.CustomerId).Distinct().ToArray();
+        var invoices = await db.Set<SalesInvoice>().AsNoTracking()
+            .Where(x => invoiceIds.Contains(x.Id))
+            .Select(x => new { x.Id, x.InvoiceCode }).ToDictionaryAsync(x => x.Id, ct);
+        var customers = await db.Set<Customer>().AsNoTracking()
+            .Where(x => customerIds.Contains(x.Id))
+            .Select(x => new { x.Id, x.NameAr, x.CustomerCode }).ToDictionaryAsync(x => x.Id, ct);
+        return entities.Select(entity =>
+        {
+            invoices.TryGetValue(entity.SalesInvoiceId, out var invoice);
+            customers.TryGetValue(entity.CustomerId, out var customer);
+            return Map(entity) with
+            {
+                SalesInvoiceCode = invoice?.InvoiceCode,
+                CustomerName = customer?.NameAr,
+                CustomerCode = customer?.CustomerCode
+            };
+        }).ToArray();
     }
 
     private static SalesReturnDto Map(SalesReturn entity) => new(

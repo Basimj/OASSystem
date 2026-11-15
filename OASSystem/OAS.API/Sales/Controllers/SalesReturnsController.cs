@@ -22,6 +22,10 @@ public sealed class SalesReturnsController(ISender sender) : ControllerBase
         CancellationToken ct) =>
         Ok(await sender.Send(new GetSalesReturnsQuery(request, salesInvoiceId, customerId, status), ct));
 
+    [HttpGet("dashboard-summary")]
+    public async Task<ActionResult<SalesReturnsDashboardSummaryDto>> Summary(CancellationToken ct) =>
+        Ok(await sender.Send(new GetSalesReturnsDashboardSummaryQuery(), ct));
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<SalesReturnDto>> GetById(Guid id, CancellationToken ct) =>
         Ok(await sender.Send(new GetSalesReturnByIdQuery(id), ct));

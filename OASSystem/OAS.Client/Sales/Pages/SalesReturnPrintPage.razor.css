@@ -15,3 +15,13 @@
 .return-print__notice { background:var(--oas-color-warning-surface); padding:.5rem; font-weight:bold; }
 .return-print footer { border-top:1px solid var(--oas-color-border); margin-top:1.5rem; padding-top:.6rem; color:var(--oas-color-text); font-size:.8rem; }
 @media print { .return-print { padding:0; } .return-print__toolbar { display:none !important; } .return-print__body { border:none; padding:0; } }
+
+.return-print__notice--cancelled { background:#ffe6e9; border:2px solid #b92238; color:#8e1021; }
+@media print {
+    @page { size:auto; margin:12mm; }
+    .return-print thead { display:table-header-group; }
+    .return-print tfoot { display:table-footer-group; }
+    .return-print tr { break-inside:avoid; page-break-inside:avoid; }
+    .return-print__totals, .return-print header, .return-print__details, .return-print footer { break-inside:avoid; page-break-inside:avoid; }
+    .return-print__notice--cancelled { print-color-adjust:exact; -webkit-print-color-adjust:exact; }
+}

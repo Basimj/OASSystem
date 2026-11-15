@@ -14,6 +14,13 @@ public sealed class GetSalesReturnByIdQueryHandler(ISalesReturnQueryService quer
         await query.GetByIdAsync(request.Id, ct) ?? throw new NotFoundException(nameof(SalesReturn), request.Id);
 }
 
+public sealed class GetSalesReturnsDashboardSummaryQueryHandler(ISalesReturnQueryService query)
+    : IRequestHandler<GetSalesReturnsDashboardSummaryQuery, SalesReturnsDashboardSummaryDto>
+{
+    public Task<SalesReturnsDashboardSummaryDto> Handle(GetSalesReturnsDashboardSummaryQuery request, CancellationToken ct) =>
+        query.GetSummaryAsync(ct);
+}
+
 public sealed class GetSalesReturnsQueryHandler(ISalesReturnQueryService query)
     : IRequestHandler<GetSalesReturnsQuery, PagedResult<SalesReturnDto>>
 {

@@ -119,7 +119,11 @@ public sealed class SalesReturnHardeningSqlServerTests
 
         var normal = await handler.Handle(new SearchSalesWarehousesQuery(null, suffix, 20, false), CancellationToken.None);
         var returns = await handler.Handle(new SearchSalesWarehousesQuery(null, suffix, 20, true), CancellationToken.None);
+        var saleableOnly = await handler.Handle(new SearchSalesWarehousesQuery(null, suffix, 20, true, true), CancellationToken.None);
+        var quarantineOnly = await handler.Handle(new SearchSalesWarehousesQuery(null, suffix, 20, true, false), CancellationToken.None);
 
+        Assert.That(saleableOnly.Select(x => x.Id), Is.EquivalentTo(new[] { sellable.Id }));
+        Assert.That(quarantineOnly.Select(x => x.Id), Is.EquivalentTo(new[] { quarantine.Id }));
         Assert.That(normal.Any(x => x.Id == sellable.Id), Is.True);
         Assert.That(normal.Any(x => x.Id == quarantine.Id), Is.False);
         Assert.That(returns.Any(x => x.Id == sellable.Id), Is.True);

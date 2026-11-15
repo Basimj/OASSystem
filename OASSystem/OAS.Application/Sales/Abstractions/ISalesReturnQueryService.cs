@@ -6,6 +6,7 @@ namespace OAS.Application.Sales.Abstractions;
 public interface ISalesReturnQueryService
 {
     Task<SalesReturnDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<SalesReturnsDashboardSummaryDto> GetSummaryAsync(CancellationToken cancellationToken = default);
     Task<PagedResult<SalesReturnDto>> GetPageAsync(
         PageRequest request,
         Guid? salesInvoiceId = null,

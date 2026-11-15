@@ -20,17 +20,21 @@
         <div class="return-print__body">
             <header>
                 <div><h1>مرتجع مبيعات</h1><strong>@_return.ReturnCode</strong></div>
-                <div><span>حالة المستند</span><strong>@(_return.Status == SalesReturnStatus.Posted ? "مرحّل" : "غير مرحّل")</strong></div>
+                <div><span>حالة المستند</span><strong>@StatusText(_return.Status)</strong></div>
             </header>
-            @if (_return.Status != SalesReturnStatus.Posted)
+            @if (_return.Status == SalesReturnStatus.Cancelled)
             {
-                <p class="return-print__notice">نسخة غير معتمدة — هذا المستند غير مرحّل محاسبيًا</p>
+                <p class="return-print__notice return-print__notice--cancelled">مستند ملغى — غير صالح للاستخدام أو الصرف</p>
+            }
+            else if (_return.Status != SalesReturnStatus.Posted)
+            {
+                <p class="return-print__notice">نسخة غير معتمدة — هذا المستند لم يُرحّل محاسبيًا</p>
             }
             <div class="return-print__details">
                 <div><small>تاريخ المرتجع</small><strong>@_return.ReturnDate.ToString("yyyy-MM-dd")</strong></div>
                 <div><small>تاريخ الترحيل</small><strong>@_return.PostingDate.ToString("yyyy-MM-dd")</strong></div>
-                <div><small>معرّف العميل</small><strong>@_return.CustomerId</strong></div>
-                <div><small>معرّف الفاتورة الأصلية</small><strong>@_return.SalesInvoiceId</strong></div>
+                <div><small>العميل</small><strong>@(_return.CustomerName ?? _return.CustomerCode ?? "غير متاح")</strong></div>
+                <div><small>الفاتورة الأصلية</small><strong>@(_return.SalesInvoiceCode ?? "غير متاح")</strong></div>
             </div>
             <table>
                 <thead><tr><th>م</th><th>الصنف</th><th>الكمية</th><th>الصافي</th><th>الضريبة</th><th>الإجمالي</th></tr></thead>
@@ -68,5 +72,10 @@
         if (result.Succeeded) _return = result.Value;
         else _error = result.Error?.Message ?? "تعذر تحميل المرتجع.";
     }
+    private static string StatusText(SalesReturnStatus status) => status switch
+    {
+        SalesReturnStatus.Draft => "مسودة", SalesReturnStatus.Confirmed => "مؤكد — بانتظار الترحيل",
+        SalesReturnStatus.Posted => "مرحّل", SalesReturnStatus.Cancelled => "ملغى", _ => "غير معروف"
+    };
     private Task PrintAsync() => Js.InvokeVoidAsync("print").AsTask();
 }

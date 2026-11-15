@@ -1,0 +1,265 @@
+@namespace OAS.Client.Sales.Components
+@using OAS.Client.Accounting.Services
+@using OAS.Client.Common.Feedback.Services
+@using OAS.Client.Services.Http
+@using OAS.Contracts.Accounting.BankAccounts
+@using OAS.Contracts.Accounting.CashAccounts
+@using OAS.Contracts.Accounting.Currencies
+@using OAS.Contracts.Common.Pagination
+@using OAS.Contracts.Sales.Returns
+@using OAS.UiLib.Services.Dialogs
+@inject OasApiClient Api
+@inject IAccountingClientService Accounting
+@inject IUiDialogService Dialog
+@inject IApiFeedbackService ApiFeedback
+
+<div class="oas-return-refund" dir="rtl">
+    @if (_loading)
+    {
+        <p role="status">جارٍ التحقق من الرصيد والصناديق والحسابات...</p>
+    }
+    else if (!string.IsNullOrWhiteSpace(_loadError))
+    {
+        <div class="oas-return-refund__error" role="alert">@_loadError</div>
+        <button class="oas-return-refund__secondary" type="button" @onclick="LoadAsync">إعادة المحاولة</button>
+    }
+    else
+    {
+        <div class="oas-return-refund__summary">
+            <div><small>المرتجع</small><strong>@ReturnCode</strong></div>
+            <div><small>الرصيد المتاح للاسترداد</small><strong>@AvailableBase.ToString("N2") @BaseCurrencyCode</strong></div>
+            <div><small>الاستردادات المسجلة سابقًا</small><strong>@RefundedBase.ToString("N2") @BaseCurrencyCode</strong></div>
+        </div>
+        @if (AvailableBase <= 0m)
+        {
+            <div class="oas-return-refund__notice" role="status">لا يوجد رصيد دائن متاح لهذا المرتجع. لا يمكن صرف مبلغ للعميل.</div>
+        }
+        else
+        {
+            <div class="oas-return-refund__fields">
+                <label>طريقة رد المبلغ
+                    <select value="@_method" disabled="@(_busy || _review)" @onchange="ChangeMethod">
+                        <option value="1">نقدًا — من الصندوق</option>
+                        <option value="3">تحويل بنكي</option>
+                    </select>
+                </label>
+                <label>عملة الاسترداد
+                    <select value="@_currencyId" disabled="@(_busy || _review)" @onchange="ChangeCurrency">
+                        <option value="@Guid.Empty">اختر العملة</option>
+                        @foreach (var c in _currencies.Where(x => x.IsActive))
+                        {
+                            <option value="@c.Id">@c.Code — @c.NameAr</option>
+                        }
+                    </select>
+                </label>
+                @if (_method == 1)
+                {
+                    <label>صندوق الصرف
+                        <select @bind="_cashAccountId" disabled="@(_busy || _review)">
+                            <option value="@Guid.Empty">اختر الصندوق</option>
+                            @foreach (var x in AvailableCashAccounts)
+                            {
+                                <option value="@x.Id">@x.Code — @x.Name</option>
+                            }
+                        </select>
+                        @if (_currencyId != Guid.Empty && AvailableCashAccounts.Count == 0)
+                        {
+                            <small class="oas-return-refund__help">لا يوجد صندوق نشط مرتبط بهذه العملة.</small>
+                        }
+                    </label>
+                }
+                else
+                {
+                    <label>الحساب البنكي
+                        <select @bind="_bankAccountId" disabled="@(_busy || _review)">
+                            <option value="@Guid.Empty">اختر الحساب البنكي</option>
+                            @foreach (var x in AvailableBankAccounts)
+                            {
+                                <option value="@x.Id">@x.Code — @x.BankName (@x.AccountName)</option>
+                            }
+                        </select>
+                        @if (_currencyId != Guid.Empty && AvailableBankAccounts.Count == 0)
+                        {
+                            <small class="oas-return-refund__help">لا يوجد حساب بنكي نشط مرتبط بهذه العملة.</small>
+                        }
+                    </label>
+                }
+                <label>المبلغ المراد رده
+                    <input type="number" min="0.01" step="0.01" @bind="_amount" disabled="@(_busy || _review)" />
+                </label>
+            </div>
+            @if (_review)
+            {
+                <div class="oas-return-refund__review" role="status">
+                    <strong>مراجعة عملية الاسترداد</strong>
+                    <div>سيتم صرف <b>@_amount.ToString("N2") @SelectedCurrencyCode</b> للعميل عن طريق @(_method == 1 ? "الصندوق" : "البنك").</div>
+                    <div>القيمة المحاسبية: <b>@_baseAmount.ToString("N2") @BaseCurrencyCode</b></div>
+                    <div>المتبقي المتوقع بعد الصرف: <b>@(Math.Max(0m, AvailableBase - _baseAmount).ToString("N2")) @BaseCurrencyCode</b></div>
+                    <p>عند التأكيد سيُنشئ النظام سند صرف مرحّلًا. لا تكرر العملية إذا لم تتأكد من النتيجة؛ استخدم زر إعادة المحاولة نفسه.</p>
+                </div>
+            }
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <div class="oas-return-refund__error" role="alert">@_error</div>
+            }
+        }
+    }
+    <div class="oas-return-refund__actions">
+        <button type="button" class="oas-return-refund__secondary" disabled="@_busy" @onclick="CloseAsync">إغلاق</button>
+        @if (!_loading && string.IsNullOrWhiteSpace(_loadError) && AvailableBase > 0m)
+        {
+            @if (_review)
+            {
+                <button type="button" class="oas-return-refund__secondary" disabled="@_busy" @onclick="Edit">تعديل البيانات</button>
+                <button type="button" class="oas-return-refund__primary" disabled="@_busy" @onclick="ConfirmRefundAsync">
+                    @(_busy ? "جارٍ تنفيذ الاسترداد..." : "تأكيد رد المبلغ وإنشاء سند صرف")
+                </button>
+            }
+            else
+            {
+                <button type="button" class="oas-return-refund__primary" disabled="@_busy" @onclick="ReviewAsync">مراجعة المبلغ قبل الصرف</button>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public Guid CustomerId { get; set; }
+    [Parameter] public Guid SalesReturnId { get; set; }
+    [Parameter] public string ReturnCode { get; set; } = string.Empty;
+
+    private CustomerCreditBalanceDto? _balance;
+    private IReadOnlyList<CurrencyDto> _currencies = [];
+    private IReadOnlyList<CashAccountDto> _cash = [];
+    private IReadOnlyList<BankAccountDto> _banks = [];
+    private Guid _currencyId, _cashAccountId, _bankAccountId;
+    private byte _method = 1;
+    private decimal _amount, _baseAmount;
+    private bool _loading, _busy, _review;
+    private string? _error, _loadError;
+    // Do not regenerate the key after a timeout or a failed response: the server
+    // locks the return and replays an identical previously posted refund.
+    private readonly string _operationKey = Guid.NewGuid().ToString("N");
+    private CustomerReturnCreditItemDto? Credit => _balance?.Returns.FirstOrDefault(x => x.SalesReturnId == SalesReturnId);
+    private decimal UsedBase => _balance?.Applications.Where(x => x.SalesReturnId == SalesReturnId && x.Status == 1)
+        .Sum(x => x.AppliedSourceBaseAmount) ?? 0m;
+    private decimal AvailableBase => Credit is { } credit ? Math.Max(0m, credit.EstimatedUnappliedBaseCredit - UsedBase) : 0m;
+    private decimal RefundedBase => _balance?.Applications.Where(x => x.SalesReturnId == SalesReturnId && x.Status == 1 && x.SettlementKind == 2)
+        .Sum(x => x.AppliedSourceBaseAmount) ?? 0m;
+    private string BaseCurrencyCode => Credit?.BaseCurrencyCode ?? "";
+    private string SelectedCurrencyCode => _currencies.FirstOrDefault(x => x.Id == _currencyId)?.Code ?? "";
+    private IReadOnlyList<CashAccountDto> AvailableCashAccounts => _cash.Where(x => x.IsActive && x.CurrencyId == _currencyId).ToArray();
+    private IReadOnlyList<BankAccountDto> AvailableBankAccounts => _banks.Where(x => x.IsActive && x.CurrencyId == _currencyId).ToArray();
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private static async Task<IReadOnlyList<T>> LoadPagesAsync<T>(Func<PageRequest, Task<PagedResult<T>>> loader)
+    {
+        var list = new List<T>();
+        for (var pageNo = 1; ; pageNo++)
+        {
+            var page = await loader(new PageRequest { PageNumber = pageNo, PageSize = PageRequest.MaximumPageSize });
+            list.AddRange(page.Items);
+            if (!page.HasNextPage) return list;
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        if (_loading || _busy) return;
+        _loading = true;
+        _loadError = null;
+        try
+        {
+            _balance = await Api.GetAsync<CustomerCreditBalanceDto>($"api/sales/customer-credits/{CustomerId:D}");
+            _currencies = await LoadPagesAsync<CurrencyDto>(x => Accounting.GetCurrenciesPageAsync(x));
+            _cash = await LoadPagesAsync<CashAccountDto>(x => Accounting.GetCashAccountsPageAsync(x));
+            _banks = await LoadPagesAsync<BankAccountDto>(x => Accounting.GetBankAccountsPageAsync(x));
+            if (Credit is null) _loadError = "لم يُعثر على رصيد للمرتجع المحدد.";
+            else if (_currencyId == Guid.Empty || !_currencies.Any(x => x.Id == _currencyId && x.IsActive))
+                _currencyId = Credit.CurrencyId;
+            if (Credit is not null && _currencyId == Credit.BaseCurrencyId && _amount == 0m)
+                _amount = Math.Round(AvailableBase, _currencies.First(x => x.Id == _currencyId).DecimalPlaces, MidpointRounding.AwayFromZero);
+            if (!AvailableCashAccounts.Any(x => x.Id == _cashAccountId)) _cashAccountId = Guid.Empty;
+            if (!AvailableBankAccounts.Any(x => x.Id == _bankAccountId)) _bankAccountId = Guid.Empty;
+        }
+        catch (ApiClientException ex)
+        {
+            _loadError = ex.Error?.Message ?? "تعذر تحميل بيانات الاسترداد.";
+            ApiFeedback.Show(ex.Error);
+        }
+        catch
+        {
+            _loadError = "تعذر تحميل الرصيد والصناديق. تحقق من الاتصال والصلاحيات.";
+            ApiFeedback.ShowUnexpected();
+        }
+        finally { _loading = false; }
+    }
+
+    private void ChangeMethod(ChangeEventArgs e)
+    {
+        _method = byte.TryParse(e.Value?.ToString(), out var method) ? method : (byte)1;
+        _cashAccountId = _bankAccountId = Guid.Empty;
+        _error = null;
+    }
+    private void ChangeCurrency(ChangeEventArgs e)
+    {
+        _currencyId = Guid.TryParse(e.Value?.ToString(), out var currency) ? currency : Guid.Empty;
+        _cashAccountId = _bankAccountId = Guid.Empty;
+        _error = null;
+    }
+    private void Edit() { _review = false; _error = null; }
+    private void CloseAsync() => Dialog.Cancel();
+    private bool Reject(string error) { _error = error; return false; }
+
+    private async Task ReviewAsync()
+    {
+        if (_busy) return;
+        _busy = true;
+        _error = null;
+        try
+        {
+            // Reload the balance to include other cashiers' recent settlements.
+            _balance = await Api.GetAsync<CustomerCreditBalanceDto>($"api/sales/customer-credits/{CustomerId:D}");
+            if (Credit is null || AvailableBase <= 0m) { Reject("لا يوجد رصيد دائن متاح لهذا المرتجع."); return; }
+            var currency = _currencies.FirstOrDefault(x => x.Id == _currencyId && x.IsActive);
+            if (currency is null) { Reject("اختر عملة نشطة للاسترداد."); return; }
+            if (_method == 1 && !AvailableCashAccounts.Any(x => x.Id == _cashAccountId)) { Reject("اختر صندوق صرف نشطًا مطابقًا للعملة."); return; }
+            if (_method == 3 && !AvailableBankAccounts.Any(x => x.Id == _bankAccountId)) { Reject("اختر حسابًا بنكيًا نشطًا مطابقًا للعملة."); return; }
+            if (_method is not (1 or 3)) { Reject("طريقة رد المبلغ غير صالحة."); return; }
+            var original = _currencies.FirstOrDefault(x => x.Id == Credit.BaseCurrencyId);
+            if (original is null) { Reject("تعذر تحديد العملة الأساسية للمرتجع."); return; }
+            var rate = await Accounting.GetEffectiveExchangeRateAsync(_currencyId, DateOnly.FromDateTime(DateTime.UtcNow));
+            if (rate is null || rate.Rate <= 0m) { Reject("لا يوجد سعر صرف محاسبي فعّال اليوم."); return; }
+            var rounded = Math.Round(_amount, currency.DecimalPlaces, MidpointRounding.AwayFromZero);
+            if (_amount != rounded || rounded <= 0m) { Reject("أدخل مبلغًا موجبًا بعدد المنازل العشرية المسموح للعملة."); return; }
+            _baseAmount = Math.Round(rounded * rate.Rate, original.DecimalPlaces, MidpointRounding.AwayFromZero);
+            if (_baseAmount <= 0m || _baseAmount > AvailableBase + 0.0001m)
+            { Reject($"المبلغ بعد تحويل العملة ({_baseAmount:N2} {BaseCurrencyCode}) أكبر من الرصيد المتاح ({AvailableBase:N2})."); return; }
+            _review = true;
+        }
+        catch (ApiClientException ex) { _error = ex.Error?.Message ?? "تعذر مراجعة مبلغ الاسترداد."; ApiFeedback.Show(ex.Error); }
+        catch { _error = "تعذر مراجعة مبلغ الاسترداد. حاول مجددًا."; ApiFeedback.ShowUnexpected(); }
+        finally { _busy = false; }
+    }
+
+    private async Task ConfirmRefundAsync()
+    {
+        if (_busy || !_review || Credit is null || AvailableBase <= 0m) return;
+        _busy = true;
+        _error = null;
+        try
+        {
+            var response = await Api.PostAsync<RefundCustomerReturnCreditRequest, CustomerCreditSettlementDto>(
+                $"api/sales/customer-credits/{CustomerId:D}/refund",
+                new RefundCustomerReturnCreditRequest(SalesReturnId, _currencyId, _amount, _method,
+                    _method == 1 ? _cashAccountId : null, _method == 3 ? _bankAccountId : null,
+                    null, null, $"رد رصيد المرتجع {ReturnCode}", _operationKey));
+            if (response is null) { _error = "لم يصل تأكيد إنشاء سند الصرف. أعد المحاولة بنفس الزر ولا تنشئ عملية جديدة."; return; }
+            Dialog.Close(response);
+        }
+        catch (ApiClientException ex) { _error = ex.Error?.Message ?? "تعذر استرداد المبلغ."; ApiFeedback.Show(ex.Error); }
+        catch { _error = "لم تُؤكَّد نتيجة الاسترداد. أعد المحاولة بنفس الزر للحفاظ على مفتاح العملية."; ApiFeedback.ShowUnexpected(); }
+        finally { _busy = false; }
+    }
+}

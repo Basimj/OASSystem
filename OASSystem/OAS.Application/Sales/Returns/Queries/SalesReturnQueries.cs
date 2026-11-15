@@ -11,6 +11,11 @@ public sealed record GetSalesReturnByIdQuery(Guid Id) : IQuery<SalesReturnDto>, 
     public IReadOnlyCollection<string> RequiredPermissions { get; } = [SalesPermissions.Invoices.View];
 }
 
+public sealed record GetSalesReturnsDashboardSummaryQuery() : IQuery<SalesReturnsDashboardSummaryDto>, IAuthorizedRequest
+{
+    public IReadOnlyCollection<string> RequiredPermissions { get; } = [SalesPermissions.Invoices.View];
+}
+
 public sealed record GetSalesReturnsQuery(
     PageRequest Request,
     Guid? SalesInvoiceId = null,
