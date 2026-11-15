@@ -60,6 +60,7 @@ public sealed class CollectSalesInvoicePaymentCommandValidator : AbstractValidat
     public CollectSalesInvoicePaymentCommandValidator()
     {
         RuleFor(x => x.InvoiceId).NotEmpty().WithErrorCode("sales_invoice_id_required");
+        RuleFor(x => x.Request.OperationId).NotEmpty().WithErrorCode("sales_invoice_collection_operation_id_required");
         RuleFor(x => x.Request.PaymentLines)
             .NotEmpty()
             .WithErrorCode("sales_invoice_collection_payment_required");

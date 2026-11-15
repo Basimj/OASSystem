@@ -15150,6 +15150,8 @@ namespace OAS.Infrastructure.Persistence.Migrations
                     b.Navigation("EyeDetails");
                 });
 
+            AddSalesInvoiceCollectionAttemptSnapshot(modelBuilder);
+
             modelBuilder.Entity("OAS.Domain.Sales.Entities.SalesInvoice", b =>
                 {
                     b.Navigation("Lines");

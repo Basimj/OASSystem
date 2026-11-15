@@ -10,7 +10,7 @@
 <SalesWalkInInitializer Model="@(ActiveTab?.Model as UiSalesInvoiceFormModel)"
                         OnSettingsLoaded="OnWalkInSettingsLoadedAsync" />
 
-<div class="@(Section == SalesEntityType.Prescriptions ? "oas-rx-screen" : Section == SalesEntityType.CustomerOrders ? "oas-order-screen" : "oas-sales-host-screen")">
+<div class="@(Section == SalesEntityType.Prescriptions ? "oas-rx-screen" : Section == SalesEntityType.CustomerOrders ? "oas-order-screen" : Section == SalesEntityType.SalesInvoices ? "oas-invoice-screen" : "oas-sales-host-screen")">
 @if (Section == SalesEntityType.Prescriptions)
 {
     <header class="oas-rx-page-heading" dir="rtl">
@@ -35,7 +35,21 @@
         </div>
     </header>
 }
-<UiSalesWorkspace HideActions="@(ActiveTab is { IsListTab: false })">
+@if (Section == SalesEntityType.SalesInvoices)
+{
+    <header class="oas-invoice-page-heading" dir="rtl">
+        <div class="oas-invoice-page-heading__top">
+            <div class="oas-invoice-page-heading__title">
+                <i class="fa-solid fa-file-invoice-dollar" aria-hidden="true"></i>
+                <div><h1>فواتير المبيعات</h1><span>المبيعات <i class="fa-solid fa-chevron-left"></i> فواتير المبيعات</span></div>
+            </div>
+            <div class="oas-invoice-page-heading__tabs">
+                <UiApplicationTabStrip Tabs="@InvoiceTabItems" AriaLabel="تبويبات فواتير المبيعات" OnSelect="SelectTabAsync" OnClose="CloseTabAsync" OnCloseOthers="CloseOtherTabsAsync" OnCloseAll="CloseAllTabsAsync" />
+            </div>
+        </div>
+    </header>
+}
+<UiSalesWorkspace HideActions="@(Section == SalesEntityType.SalesInvoices || ActiveTab is { IsListTab: false })">
     <Actions>
         <UiWorkspaceActionBar>
             <UiButton Text="@(Section == SalesEntityType.Prescriptions ? "وصفة جديدة" : Section == SalesEntityType.CustomerOrders ? "طلب جديد" : "جديد")" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" OnClick="NewAsync" />
@@ -74,9 +88,13 @@
             }
             else if (ActiveEntityType == SalesEntityType.SalesInvoices)
             {
-                <UiSalesInvoiceList Items="@ListItems" IsLoading="@_isLoading"
-                                    TotalCount="@_totalCount" PageNumber="@_pageNumber" TotalPages="@_totalPages"
-                                    OnOpen="OpenEntityAsync" OnPrevious="PreviousPageAsync" OnNext="NextPageAsync" />
+                <SalesInvoicesDashboardList Items="@_invoiceRows" Summary="@_invoiceSummary" IsLoading="@_isLoading"
+                                            Search="@_search" StatusFilter="@_invoiceStatusFilter" DateFrom="@_invoiceDateFrom" DateTo="@_invoiceDateTo"
+                                            TotalCount="@_totalCount" PageNumber="@_pageNumber" PageSize="@_invoicePageSize" TotalPages="@_totalPages"
+                                            OnNew="NewInvoiceFromListAsync" OnRefresh="RefreshInvoiceListAsync" OnSearch="SearchAsync"
+                                            OnStatusChanged="InvoiceStatusChangedAsync" OnDateFromChanged="InvoiceDateFromChangedAsync"
+                                            OnDateToChanged="InvoiceDateToChangedAsync" OnReset="ResetInvoiceFiltersAsync"
+                                            OnPageSizeChanged="InvoicePageSizeChangedAsync" OnGoToPage="GoToInvoicePageAsync" OnOpen="OpenEntityAsync" />
             }
             else
             {
@@ -186,7 +204,8 @@
                     @if (ActiveTab.IsEditMode)
                     {
                         <UiButton Text="حفظ" IconCssClass="fa-solid fa-floppy-disk" Loading="@ActiveTab.IsSaving" Size="ControlSize.Small" OnClick="SaveAsync" />
-                        @if (!ActiveTab.IsNew) { <UiButton Text="إلغاء التعديل" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CancelEditAsync" /> }
+                        @if (ActiveTab.IsNew) { <UiButton Text="إلغاء" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="@(_ => ReturnToSalesListAsync())" /> }
+                        else { <UiButton Text="إلغاء التعديل" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CancelEditAsync" /> }
                     }
                     else if (order.Status == "Draft")
                     {
@@ -239,14 +258,16 @@
         }
         else if (ActiveTab.Model is UiSalesInvoiceFormModel invoice)
         {
-            <UiSalesEditorSurface Title="@(invoice.Id.HasValue ? invoice.InvoiceCode : "فاتورة مبيعات جديدة")" Subtitle="فاتورة المبيعات والترحيل المخزني والمحاسبي" IconCss="fa-solid fa-file-invoice-dollar"
-                                  StatusText="@invoice.StatusText" StatusCssClass="@StatusCss(invoice.Status)"
-                                  OnBack="ReturnToSalesListAsync" ActionsInFooter="true">
+            <div class="oas-invoice-editor-shell">
+                <UiSalesEditorSurface Title="@(invoice.Id.HasValue ? invoice.InvoiceCode : "فاتورة مبيعات جديدة")" Subtitle="فاتورة المبيعات والترحيل المخزني والمحاسبي" IconCss="fa-solid fa-file-invoice-dollar"
+                                      StatusText="@invoice.StatusText" StatusCssClass="@StatusCss(invoice.Status)"
+                                      OnBack="ReturnToSalesListAsync" BackText="العودة للفواتير" ActionsInFooter="true">
                 <Actions>
                     @if (ActiveTab.IsEditMode)
                     {
                         <UiButton Text="حفظ" IconCssClass="fa-solid fa-floppy-disk" Loading="@ActiveTab.IsSaving" Size="ControlSize.Small" OnClick="SaveAsync" />
-                        @if (!ActiveTab.IsNew) { <UiButton Text="إلغاء التعديل" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CancelEditAsync" /> }
+                        @if (ActiveTab.IsNew) { <UiButton Text="إلغاء" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="@(_ => ReturnToSalesListAsync())" /> }
+                        else { <UiButton Text="إلغاء التعديل" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CancelEditAsync" /> }
                     }
                     else if (invoice.Status == "Draft")
                     {
@@ -267,7 +288,7 @@
                         }
                         else
                         {
-                            <UiButton Text="مسددة بالكامل" IconCssClass="fa-solid fa-circle-check" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="true" />
+                            <UiButton Text="@(invoice.ReturnedAmount > 0.0001m ? "تمت التسوية بمرتجع — لا يوجد تحصيل" : "لا يوجد مبلغ متبقٍ للتحصيل")" IconCssClass="fa-solid fa-circle-check" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="true" />
                         }
                         <UiButton Text="طباعة" IconCssClass="fa-solid fa-print" Size="ControlSize.Small" Loading="@_isPrintingInvoice" Disabled="@_isPrintingInvoice" OnClick="PrintInvoiceAsync" />
                         <UiButton Text="عرض القيد" IconCssClass="fa-solid fa-book-journal-whills" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="ViewJournalAsync" />
@@ -275,7 +296,7 @@
                     }
                 </Actions>
                 <ChildContent>
-                    <UiSalesInvoiceEditor Model="@invoice" ReadOnly="@InvoiceReadOnly(invoice)"
+                    <UiSalesInvoiceEditor Model="@invoice" ReadOnly="@InvoiceReadOnly(invoice)" ShowValidationErrors="@_invoiceValidationAttempted.Contains(ActiveTab.TabId)"
                                           WalkInCustomerId="@_walkInCustomerId"
                                           WalkInCustomerLabel="@_walkInCustomerLabel"
                                           SearchCustomersAsync="SearchCustomerItemsAsync" SearchEmployeesAsync="SearchEmployeeItemsAsync" SearchPrescriptionsAsync="SearchPrescriptionRevisionItemsAsync" SearchCurrenciesAsync="SearchCurrencyItemsAsync"
@@ -292,7 +313,8 @@
                                                   OnInvoiceUpdated="InvoiceHeaderDiscountUpdatedAsync" />
                     }
                 </ChildContent>
-            </UiSalesEditorSurface>
+                </UiSalesEditorSurface>
+            </div>
         }
     </Body>
 </UiSalesWorkspace>

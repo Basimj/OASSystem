@@ -2,7 +2,7 @@
 
 <div class="ui-sales-payment-summary" dir="rtl">
     <div><span>قيمة الفاتورة</span><strong>@InvoiceTotal.ToString("N2") @CurrencyCode</strong></div>
-    <div><span>المبلغ المسدد</span><strong>@PaidAmount.ToString("N2") @CurrencyCode</strong></div>
+    <div><span>المخصص للسداد (قبض أو رصيد عميل)</span><strong>@PaidAmount.ToString("N2") @CurrencyCode</strong></div>
     @if (ReturnedAmount > 0m)
     {
         <div><span>المرتجعات المرحلة</span><strong>@ReturnedAmount.ToString("N2") @CurrencyCode</strong></div>
@@ -18,9 +18,13 @@
     [Parameter] public decimal ReturnedAmount { get; set; }
     [Parameter] public decimal OutstandingAmount { get; set; }
 
-    private string PaymentStatusText => OutstandingAmount <= 0.0001m
-        ? "مسددة بالكامل"
-        : PaidAmount > 0.0001m
-            ? "مسددة جزئيًا"
-            : "غير مسددة";
+    private string PaymentStatusText => ReturnedAmount > 0.0001m && ReturnedAmount >= InvoiceTotal - 0.0001m && PaidAmount <= 0.0001m
+        ? "مرتجعة بالكامل — لا تحصّل دفعة جديدة"
+        : OutstandingAmount <= 0.0001m && ReturnedAmount > 0.0001m
+            ? "مسواة بالمرتجع والسداد"
+            : OutstandingAmount <= 0.0001m
+                ? "مسواة بالكامل"
+                : ReturnedAmount > 0.0001m
+                    ? "مرتجعة جزئيًا — يوجد رصيد مستحق"
+                    : PaidAmount > 0.0001m ? "مسواة جزئيًا" : "غير مسددة";
 }

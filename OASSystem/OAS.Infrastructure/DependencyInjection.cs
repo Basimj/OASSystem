@@ -94,6 +94,7 @@ public static class DependencyInjection
         services.AddScoped<IPrescriptionAggregateRepository, PrescriptionAggregateRepository>();
         services.AddScoped<ICustomerOrderAggregateRepository, CustomerOrderAggregateRepository>();
         services.AddScoped<ISalesInvoiceAggregateRepository, SalesInvoiceAggregateRepository>();
+        services.AddScoped<ISalesInvoiceCollectionIdempotencyStore, SalesInvoiceCollectionIdempotencyStore>();
         services.AddScoped<ISalesReturnAggregateRepository, SalesReturnAggregateRepository>();
         services.AddScoped<ISalesReturnQueryService, SalesReturnQueryService>();
         services.AddScoped<ISalesReportQueryService, SalesReportQueryService>();

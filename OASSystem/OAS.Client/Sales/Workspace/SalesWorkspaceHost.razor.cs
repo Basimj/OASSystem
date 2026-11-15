@@ -53,6 +53,13 @@ public partial class SalesWorkspaceHost : IDisposable
     private DateOnly? _orderDateFrom;
     private DateOnly? _orderDateTo;
     private int _orderPageSize = 20;
+    private readonly List<SalesInvoiceDto> _invoiceRows = [];
+    private readonly HashSet<Guid> _invoiceValidationAttempted = [];
+    private SalesInvoicesDashboardSummaryDto? _invoiceSummary;
+    private int _invoicePageSize = 10;
+    private string? _invoiceStatusFilter;
+    private DateOnly? _invoiceDateFrom;
+    private DateOnly? _invoiceDateTo;
     private readonly Dictionary<Guid, IReadOnlyList<PrescriptionRelatedDocumentDto>> _prescriptionRelated = [];
     private readonly HashSet<Guid> _unavailablePrescriptionRelated = [];
     private PrescriptionDashboardSummaryDto? _prescriptionSummary;
@@ -80,6 +87,8 @@ public partial class SalesWorkspaceHost : IDisposable
     private OAS.UiLib.Components.Sales.Orders.UiCustomerOrderEditor? _activeCustomerOrderEditor;
     private bool _isPrintingInvoice;
     private bool _isCollectingInvoicePayment;
+    // Reuse the same UUID for a retry of the same submitted payment payload in this circuit.
+    private readonly Dictionary<Guid, (string Payload, Guid OperationId)> _pendingInvoiceCollections = [];
     private SalesEntityType? _lastSection;
     private string? _lastRouteRequest;
     private bool _pendingCollectionDialog;
@@ -105,6 +114,10 @@ public partial class SalesWorkspaceHost : IDisposable
     private IReadOnlyList<UiApplicationTabItem> CustomerOrderTabItems => Workspace.Tabs
         .Where(x => x.EntityType == SalesEntityType.CustomerOrders)
         .Select(x => new UiApplicationTabItem(x.TabId, x.IsListTab ? "الكل" : x.Title, RouteFor(x.EntityType), x.IconCss(), x.TabId == Workspace.ActiveTabId, x.CanClose)).ToArray();
+    private IReadOnlyList<UiApplicationTabItem> InvoiceTabItems => Workspace.Tabs
+        .Where(x => x.EntityType == SalesEntityType.SalesInvoices)
+        .OrderBy(x => x.IsListTab ? 0 : 1)
+        .Select(x => new UiApplicationTabItem(x.TabId, x.IsListTab ? "الكل" : x.Title, RouteFor(x.EntityType), x.IconCss(), x.TabId == Workspace.ActiveTabId, x.CanClose)).ToArray();
     private IReadOnlyList<UiApplicationTabItem> TabItems => Workspace.Tabs.Select(x => new UiApplicationTabItem(x.TabId, x.Title, RouteFor(x.EntityType), x.IconCss(), x.TabId == Workspace.ActiveTabId, x.CanClose)).ToArray();
 
     protected override void OnInitialized() => Workspace.OnChange += WorkspaceChanged;
@@ -122,6 +135,9 @@ public partial class SalesWorkspaceHost : IDisposable
             _orderStatusFilter = null;
             _orderDateFrom = null;
             _orderDateTo = null;
+            _invoiceStatusFilter = null;
+            _invoiceDateFrom = null;
+            _invoiceDateTo = null;
             await LoadListAsync(Section);
         }
 
@@ -159,14 +175,15 @@ public partial class SalesWorkspaceHost : IDisposable
 
     private async Task LoadListAsync(SalesEntityType type)
     {
-        _isLoading = true; _listItems.Clear(); _prescriptionRows.Clear(); _customerOrderRows.Clear();
+        _isLoading = true; _listItems.Clear(); _prescriptionRows.Clear(); _customerOrderRows.Clear(); _invoiceRows.Clear();
         try
         {
-            var request = new PageRequest { PageNumber = _pageNumber, PageSize = type == SalesEntityType.Prescriptions ? _prescriptionPageSize : type == SalesEntityType.CustomerOrders ? _orderPageSize : 20, Search = _search,
-                Status = type == SalesEntityType.Prescriptions ? _prescriptionStatus : type == SalesEntityType.CustomerOrders ? _orderStatusFilter : null,
-                DateFrom = type == SalesEntityType.CustomerOrders ? _orderDateFrom : null,
-                DateTo = type == SalesEntityType.CustomerOrders ? _orderDateTo : null,
-                SortDirection = type is SalesEntityType.Prescriptions or SalesEntityType.CustomerOrders ? SortDirection.Descending : SortDirection.Ascending };
+            var request = new PageRequest { PageNumber = _pageNumber, PageSize = type == SalesEntityType.Prescriptions ? _prescriptionPageSize : type == SalesEntityType.CustomerOrders ? _orderPageSize : _invoicePageSize, Search = _search,
+                Status = type == SalesEntityType.Prescriptions ? _prescriptionStatus : type == SalesEntityType.CustomerOrders ? _orderStatusFilter : _invoiceStatusFilter,
+                DateFrom = type == SalesEntityType.CustomerOrders ? _orderDateFrom : type == SalesEntityType.SalesInvoices ? _invoiceDateFrom : null,
+                DateTo = type == SalesEntityType.CustomerOrders ? _orderDateTo : type == SalesEntityType.SalesInvoices ? _invoiceDateTo : null,
+                SortBy = type == SalesEntityType.SalesInvoices ? "InvoiceDate" : null,
+                SortDirection = SortDirection.Descending };
             switch (type)
             {
                 case SalesEntityType.Prescriptions:
@@ -189,7 +206,11 @@ public partial class SalesWorkspaceHost : IDisposable
                 {
                     var page = await Sales.GetSalesInvoicesPageAsync(request);
                     _totalCount = page.TotalCount; _totalPages = page.TotalPages;
-                    _listItems.AddRange(page.Items.Select(x => new UiSalesDocumentListItem(x.Id, x.InvoiceCode, x.CustomerName ?? x.CustomerCode ?? "عميل", x.CustomerCode, SalesArabicPresenter.InvoiceStatusText(x.Status), SalesArabicPresenter.StatusCss(x.Status.ToString()), $"{x.TotalAmount:N2} {x.CurrencyCodeSnapshot}", x.InvoiceDate.ToString("yyyy-MM-dd"), x.PaymentSummary.OutstandingAmount > 0 ? $"متبقي {x.PaymentSummary.OutstandingAmount:N2}" : "مسددة")));
+                    _invoiceRows.AddRange(page.Items);
+                    _listItems.AddRange(page.Items.Select(x => new UiSalesDocumentListItem(x.Id, x.InvoiceCode, x.CustomerName ?? x.CustomerCode ?? "عميل", x.CustomerCode, SalesArabicPresenter.InvoiceStatusText(x.Status), SalesArabicPresenter.StatusCss(x.Status.ToString()), $"{x.TotalAmount:N2} {x.CurrencyCodeSnapshot}", x.InvoiceDate.ToString("yyyy-MM-dd"), x.Status != OAS.Contracts.Sales.Enums.SalesInvoiceStatus.Posted ? "بانتظار الترحيل" :
+                        x.PaymentSummary.ReturnedAmount > 0.0001m && x.PaymentSummary.ReturnedAmount >= x.TotalAmount - 0.0001m && x.PaymentSummary.PaidAmount <= 0.0001m ? "مرتجعة بالكامل" :
+                        x.PaymentSummary.OutstandingAmount <= 0.0001m && x.PaymentSummary.ReturnedAmount > 0m ? "مسواة بالمرتجع والسداد" :
+                        x.PaymentSummary.OutstandingAmount <= 0.0001m ? "مسواة بالكامل" : $"متبقي {x.PaymentSummary.OutstandingAmount:N2}")));
                     break;
                 }
             }
@@ -200,7 +221,53 @@ public partial class SalesWorkspaceHost : IDisposable
             await LoadPrescriptionSummaryAsync();
         else if (type == SalesEntityType.CustomerOrders)
             await LoadCustomerOrderSummaryAsync();
+        else if (type == SalesEntityType.SalesInvoices)
+            await LoadInvoiceSummaryAsync();
     }
+
+    private async Task LoadInvoiceSummaryAsync()
+    {
+        try { _invoiceSummary = await Sales.GetSalesInvoicesDashboardSummaryAsync(); }
+        catch (ApiClientException ex) { _invoiceSummary = null; ApiFeedback.Show(ex.Error); }
+    }
+
+    private async Task GoToInvoicePageAsync(int page)
+    {
+        if (page < 1 || page > _totalPages || page == _pageNumber) return;
+        _pageNumber = page;
+        await LoadListAsync(SalesEntityType.SalesInvoices);
+    }
+    private async Task InvoicePageSizeChangedAsync(int size)
+    {
+        if (size is not (5 or 10 or 15 or 20)) return;
+        _invoicePageSize = size;
+        _pageNumber = 1;
+        await LoadListAsync(SalesEntityType.SalesInvoices);
+    }
+    private async Task InvoiceStatusChangedAsync(string? status)
+    {
+        _invoiceStatusFilter = string.IsNullOrWhiteSpace(status) ? null : status;
+        _pageNumber = 1;
+        await LoadListAsync(SalesEntityType.SalesInvoices);
+    }
+    private async Task InvoiceDateFromChangedAsync(DateOnly? date)
+    {
+        _invoiceDateFrom = date; _pageNumber = 1;
+        await LoadListAsync(SalesEntityType.SalesInvoices);
+    }
+    private async Task InvoiceDateToChangedAsync(DateOnly? date)
+    {
+        _invoiceDateTo = date; _pageNumber = 1;
+        await LoadListAsync(SalesEntityType.SalesInvoices);
+    }
+    private async Task ResetInvoiceFiltersAsync()
+    {
+        _invoiceStatusFilter = null; _invoiceDateFrom = null; _invoiceDateTo = null;
+        _search = null; _pageNumber = 1;
+        await LoadListAsync(SalesEntityType.SalesInvoices);
+    }
+    private async Task NewInvoiceFromListAsync() => await NewAsync(default!);
+    private async Task RefreshInvoiceListAsync() => await LoadListAsync(SalesEntityType.SalesInvoices);
 
     private async Task LoadCustomerOrderSummaryAsync()
     {
@@ -517,6 +584,7 @@ public partial class SalesWorkspaceHost : IDisposable
                 }
                 case UiSalesInvoiceFormModel model:
                 {
+                    _invoiceValidationAttempted.Add(ActiveTab.TabId);
                     if (!model.Id.HasValue && !string.IsNullOrWhiteSpace(model.CustomerOrderId))
                     {
                         Snackbar.Error("طلبات العملاء تُفوتر من شاشة بيع جديد / Checkout. الفاتورة اليدوية مخصصة للبيع المباشر فقط.");
@@ -525,6 +593,18 @@ public partial class SalesWorkspaceHost : IDisposable
 
                     if (!RequireGuid(model.CustomerId, "يجب تحديد العميل.")) return;
                     if (!RequireGuid(model.CurrencyId, "يجب تحديد العملة.")) return;
+                    if (!model.InvoiceDate.HasValue || !model.PostingDate.HasValue)
+                    {
+                        Snackbar.Error("يجب تحديد تاريخ الفاتورة وتاريخ الترحيل قبل الحفظ.");
+                        return;
+                    }
+                    if (model.Lines.Any(line => (line.LineType is not "Service" && !Guid.TryParse(line.ProductVariantId, out var parsedVariantId)) ||
+                        (line.ProductIsStockItem == true && !Guid.TryParse(line.WarehouseId, out var parsedWarehouseId)) ||
+                        line.Quantity <= 0m || line.ActualUnitPrice < 0m))
+                    {
+                        Snackbar.Error("راجع أصناف البنود والمخازن والكميات والأسعار قبل حفظ الفاتورة.");
+                        return;
+                    }
 
                     model.PaymentTermType = string.Equals(model.PaymentPlan, "AccountCredit", StringComparison.OrdinalIgnoreCase)
                         ? "Credit"
@@ -546,7 +626,10 @@ public partial class SalesWorkspaceHost : IDisposable
                     if (!TryGetApiResult(invoiceCall, out var invoice)) return;
 
                     if (invoice is not null)
+                    {
+                        _invoiceValidationAttempted.Remove(ActiveTab.TabId);
                         CompleteSave(ActiveTab, invoice.Id, invoice.InvoiceCode, SalesUiMapper.ToUi(invoice));
+                    }
                     break;
                 }
             }
@@ -862,6 +945,21 @@ public partial class SalesWorkspaceHost : IDisposable
         return true;
     }
 
+    private async Task<UiSalesInvoiceCollectionDialog.CollectionPreviewModel> PreviewInvoiceCollectionDialogAsync(
+        IReadOnlyList<UiCheckoutPaymentLineModel> lines, CancellationToken ct)
+    {
+        if (ActiveTab?.Model is not UiSalesInvoiceFormModel invoice || !invoice.Id.HasValue)
+            return new(false, 0m, 0m, 0m, "", "لم تُحدّد فاتورة للتحصيل.");
+        if (!TryBuildPaymentLines(lines, out var payments, out var error))
+            return new(false, 0m, 0m, 0m, "", error ?? "راجع بيانات الدفعات.");
+        var result = await Sales.PreviewSalesInvoiceCollectionAsync(invoice.Id.Value,
+            new CollectSalesInvoicePaymentRequest(payments), ct);
+        return result is null
+            ? new(false, 0m, 0m, 0m, "", "تعذر استلام نتيجة معاينة التحصيل.")
+            : new(result.CanCollect, result.RequestedBaseAmount, result.OutstandingBaseAmount,
+                result.ExpectedRemainingBaseAmount, result.BaseCurrencyCode, result.Message);
+    }
+
     private async Task CollectInvoicePaymentAsync(MouseEventArgs _)
     {
         if (_isCollectingInvoicePayment || ActiveTab?.Model is not UiSalesInvoiceFormModel invoice || !invoice.Id.HasValue)
@@ -875,7 +973,9 @@ public partial class SalesWorkspaceHost : IDisposable
 
         if (invoice.OutstandingAmount <= 0.0001m)
         {
-            Snackbar.Info("فاتورة المبيعات مسددة بالكامل.");
+            Snackbar.Info(invoice.ReturnedAmount > 0.0001m
+                ? "هذه الفاتورة مسواة بمرتجع مبيعات ولا يوجد رصيد متبقٍ للتحصيل."
+                : "لا يوجد مبلغ متبقٍ للتحصيل على الفاتورة.");
             return;
         }
 
@@ -884,6 +984,8 @@ public partial class SalesWorkspaceHost : IDisposable
             new Dictionary<string, object>
             {
                 [nameof(UiSalesInvoiceCollectionDialog.InvoiceCode)] = invoice.InvoiceCode,
+                [nameof(UiSalesInvoiceCollectionDialog.PreviewCollectionAsync)] =
+                    new Func<IReadOnlyList<UiCheckoutPaymentLineModel>, CancellationToken, Task<UiSalesInvoiceCollectionDialog.CollectionPreviewModel>>(PreviewInvoiceCollectionDialogAsync),
                 [nameof(UiSalesInvoiceCollectionDialog.CurrencyId)] = invoice.CurrencyId,
                 [nameof(UiSalesInvoiceCollectionDialog.CurrencyCode)] = invoice.CurrencyCode,
                 [nameof(UiSalesInvoiceCollectionDialog.InvoiceTotal)] = invoice.TotalAmount,
@@ -911,6 +1013,13 @@ public partial class SalesWorkspaceHost : IDisposable
             return;
         }
 
+        // A connection loss after a successful posting must not create a second receipt on retry.
+        var payload = System.Text.Json.JsonSerializer.Serialize(paymentLines);
+        var operationId = _pendingInvoiceCollections.TryGetValue(invoice.Id.Value, out var pending) &&
+            string.Equals(pending.Payload, payload, StringComparison.Ordinal)
+            ? pending.OperationId : Guid.NewGuid();
+        _pendingInvoiceCollections[invoice.Id.Value] = (payload, operationId);
+
         ClearMessages();
         _isCollectingInvoicePayment = true;
         Workspace.NotifyStateChanged();
@@ -918,7 +1027,7 @@ public partial class SalesWorkspaceHost : IDisposable
         {
             var call = await Sales.CollectSalesInvoicePaymentResultAsync(
                 invoice.Id.Value,
-                new CollectSalesInvoicePaymentRequest(paymentLines));
+                new CollectSalesInvoicePaymentRequest(paymentLines, operationId));
             if (!TryGetApiResult(call, out var result) || result is null)
                 return;
 
@@ -932,6 +1041,7 @@ public partial class SalesWorkspaceHost : IDisposable
                 invoice.OutstandingAmount = result.PaymentSummary.OutstandingAmount;
             }
 
+            _pendingInvoiceCollections.Remove(invoice.Id.Value);
             Snackbar.Success($"تم إنشاء وترحيل سند القبض {result.ReceiptVoucherNumber} وتخصيصه على الفاتورة.");
             await LoadListAsync(SalesEntityType.SalesInvoices);
         }

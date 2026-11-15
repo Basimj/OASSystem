@@ -30,6 +30,14 @@
                                    OnChanged="PaymentLinesChangedAsync" />
     </UiSalesFormSection>
 
+    @if (_preview is not null)
+    {
+        <div class="alert @(_preview.CanCollect ? "alert-info" : "alert-warning") mt-2" role="status">
+            <strong>معاينة التحصيل بعملة الأساس: @_preview.RequestedBaseAmount.ToString("N2") @_preview.BaseCurrencyCode</strong>
+            <div>المتبقي الحالي: @_preview.OutstandingBaseAmount.ToString("N2") · المتبقي المتوقع: @_preview.ExpectedRemainingBaseAmount.ToString("N2")</div>
+            @if (!string.IsNullOrWhiteSpace(_preview.Message)) { <div>@_preview.Message</div> }
+        </div>
+    }
     @if (!string.IsNullOrWhiteSpace(_validationMessage))
     {
         <div class="alert alert-warning mt-3 mb-0" role="alert">@_validationMessage</div>
@@ -37,16 +45,20 @@
 
     <div class="d-flex gap-2 justify-content-end mt-3">
         <UiButton Text="إلغاء" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CancelAsync" />
-        <UiButton Text="إنشاء سند قبض وترحيله"
-                  IconCssClass="fa-solid fa-receipt"
-                  Size="ControlSize.Small"
-                  OnClick="SubmitAsync" />
+        <UiButton Text="معاينة التحصيل" IconCssClass="fa-solid fa-calculator" Variant="ButtonVariant.Secondary"
+                  Size="ControlSize.Small" Loading="@_previewing" Disabled="@_previewing" OnClick="PreviewAsync" />
+        <UiButton Text="تأكيد وإنشاء سند قبض" IconCssClass="fa-solid fa-receipt" Size="ControlSize.Small"
+                  Disabled="@(_previewing || _preview?.CanCollect != true)" OnClick="SubmitAsync" />
     </div>
 </div>
 
 @code {
     public sealed record CollectionRequestModel(IReadOnlyList<UiCheckoutPaymentLineModel> PaymentLines);
 
+    public sealed record CollectionPreviewModel(bool CanCollect, decimal RequestedBaseAmount,
+        decimal OutstandingBaseAmount, decimal ExpectedRemainingBaseAmount,
+        string BaseCurrencyCode, string? Message);
+    [Parameter] public Func<IReadOnlyList<UiCheckoutPaymentLineModel>, CancellationToken, Task<CollectionPreviewModel>>? PreviewCollectionAsync { get; set; }
     [Parameter] public string InvoiceCode { get; set; } = string.Empty;
     [Parameter] public string CurrencyId { get; set; } = string.Empty;
     [Parameter] public string CurrencyCode { get; set; } = string.Empty;
@@ -61,6 +73,8 @@
 
     private List<UiCheckoutPaymentLineModel> PaymentLines { get; } = [];
     private string? _validationMessage;
+    private CollectionPreviewModel? _preview;
+    private bool _previewing;
     private bool _initialized;
 
     protected override void OnParametersSet()
@@ -84,6 +98,7 @@
     private Task AddPaymentLineAsync()
     {
         PaymentLines.Add(NewPaymentLine());
+        _preview = null;
         _validationMessage = null;
         return Task.CompletedTask;
     }
@@ -91,11 +106,13 @@
     private Task RemovePaymentLineAsync(UiCheckoutPaymentLineModel line)
     {
         PaymentLines.Remove(line);
+        _preview = null;
         return Task.CompletedTask;
     }
 
     private Task PaymentLinesChangedAsync()
     {
+        _preview = null;
         _validationMessage = null;
         return Task.CompletedTask;
     }
@@ -106,9 +123,34 @@
         return Task.CompletedTask;
     }
 
+    private async Task PreviewAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _)
+    {
+        _preview = null;
+        _validationMessage = Validate();
+        if (_validationMessage is not null) return;
+        if (PreviewCollectionAsync is null)
+        {
+            _validationMessage = "معاينة التحويل غير متاحة. أعد فتح النافذة ثم حاول مجددًا.";
+            return;
+        }
+        _previewing = true;
+        try
+        {
+            _preview = await PreviewCollectionAsync(PaymentLines.Where(x => x.Amount > 0m).ToArray(), CancellationToken.None);
+            if (!_preview.CanCollect) _validationMessage = _preview.Message ?? "مبلغ التحصيل غير صالح.";
+        }
+        catch
+        {
+            _validationMessage = "تعذر معاينة التحويل. راجع الاتصال والخطوط وأعد المحاولة؛ لم يُنشأ سند قبض.";
+        }
+        finally { _previewing = false; }
+    }
+
     private Task SubmitAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _)
     {
         _validationMessage = Validate();
+        if (_preview?.CanCollect != true)
+            _validationMessage ??= "اضغط «معاينة التحصيل» وتحقق من العملات والمبلغ قبل التأكيد.";
         if (_validationMessage is not null)
             return Task.CompletedTask;
 

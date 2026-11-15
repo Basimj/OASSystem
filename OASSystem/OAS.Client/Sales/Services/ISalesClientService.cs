@@ -35,6 +35,7 @@ public interface ISalesClientService
     Task<CustomerOrderDto?> CancelCustomerOrderAsync(Guid id, CancelCustomerOrderRequest request, CancellationToken cancellationToken = default);
 
     Task<PagedResult<SalesInvoiceDto>> GetSalesInvoicesPageAsync(PageRequest request, CancellationToken cancellationToken = default);
+    Task<SalesInvoicesDashboardSummaryDto?> GetSalesInvoicesDashboardSummaryAsync(CancellationToken cancellationToken = default);
     Task<PagedResult<SalesInvoiceDto>> GetCustomerInvoicesPageAsync(Guid customerId, PageRequest request, CancellationToken cancellationToken = default);
     Task<SalesInvoiceDto?> GetSalesInvoiceByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<SalesCodeReservationDto?> ReserveSalesInvoiceCodeAsync(DateOnly invoiceDate, CancellationToken cancellationToken = default);
@@ -45,6 +46,7 @@ public interface ISalesClientService
     Task<SalesPostingPreValidationDto?> PreValidateSalesInvoicePostingAsync(Guid id, CancellationToken cancellationToken = default);
     Task<SalesInvoicePostingResultDto?> PostSalesInvoiceAsync(Guid id, PostSalesInvoiceRequest request, CancellationToken cancellationToken = default);
     Task<CollectSalesInvoicePaymentResultDto?> CollectSalesInvoicePaymentAsync(Guid id, CollectSalesInvoicePaymentRequest request, CancellationToken cancellationToken = default);
+    Task<SalesInvoiceCollectionPreviewDto?> PreviewSalesInvoiceCollectionAsync(Guid id, CollectSalesInvoicePaymentRequest request, CancellationToken cancellationToken = default);
     Task<SalesInvoiceDto?> CancelSalesInvoiceAsync(Guid id, CancelSalesInvoiceRequest request, CancellationToken cancellationToken = default);
     Task<SalesInvoicePaymentSummaryDto?> GetSalesInvoicePaymentSummaryAsync(Guid id, CancellationToken cancellationToken = default);
 

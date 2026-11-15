@@ -1,0 +1,177 @@
+@namespace OAS.Client.Sales.Workspace
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Web
+@using OAS.Contracts.Sales.Enums
+@using OAS.Contracts.Sales.SalesInvoices
+
+<section class="oas-invoices-dashboard" dir="rtl" aria-label="قائمة فواتير المبيعات">
+    <div class="oas-invoices-dashboard__toolbar">
+        <div class="oas-invoices-dashboard__buttons">
+            <button class="oas-invoices-btn is-new" type="button" @onclick="() => OnNew.InvokeAsync()"><i class="fa-solid fa-plus"></i> فاتورة جديدة</button>
+            <button class="oas-invoices-btn" type="button" @onclick="() => OnRefresh.InvokeAsync()" disabled="@IsLoading"><i class="fa-solid fa-rotate"></i> تحديث</button>
+        </div>
+        <div class="oas-invoices-dashboard__search">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <input aria-label="البحث عن فاتورة أو عميل" placeholder="رقم الفاتورة، اسم العميل، كود العميل أو الجوال..." value="@_query" @oninput="UpdateSearch" @onkeydown="SearchKeyDown" />
+            <button type="button" @onclick="SearchNowAsync" disabled="@IsLoading">بحث</button>
+        </div>
+    </div>
+
+    <div class="oas-invoices-dashboard__metrics" aria-label="مؤشرات جميع الفواتير من قاعدة البيانات">
+        <article><i class="fa-solid fa-file-invoice"></i><span>إجمالي الفواتير</span><strong>@Value(Summary?.Total)</strong></article>
+        <article><i class="fa-regular fa-calendar-days"></i><span>فواتير اليوم</span><strong>@Value(Summary?.Today)</strong></article>
+        <article><i class="fa-regular fa-file-lines"></i><span>مسودات</span><strong>@Value(Summary?.Draft)</strong></article>
+        <article><i class="fa-solid fa-hourglass-half"></i><span>بانتظار الترحيل</span><strong>@Value(Summary?.Confirmed)</strong></article>
+        <article><i class="fa-solid fa-circle-check"></i><span>مرحّلة</span><strong>@Value(Summary?.Posted)</strong></article>
+        <article><i class="fa-solid fa-rotate-left"></i><span>بها مرتجعات مرحلة</span><strong>@Value(Summary?.WithPostedReturns)</strong></article>
+    </div>
+
+    <div class="oas-invoices-dashboard__filters">
+        <label>حالة الفاتورة
+            <select value="@(StatusFilter ?? "")" @onchange="ChangeStatusAsync">
+                <option value="">جميع الحالات</option>
+                <option value="Draft">مسودة</option>
+                <option value="Confirmed">مؤكدة</option>
+                <option value="Posted">مرحّلة</option>
+                <option value="Cancelled">ملغاة</option>
+            </select>
+        </label>
+        <label>من تاريخ
+            <input type="date" value="@(DateFrom?.ToString("yyyy-MM-dd"))" @onchange="ChangeFromAsync" />
+        </label>
+        <label>إلى تاريخ
+            <input type="date" value="@(DateTo?.ToString("yyyy-MM-dd"))" @onchange="ChangeToAsync" />
+        </label>
+        <button type="button" class="oas-invoices-dashboard__reset" @onclick="() => OnReset.InvokeAsync()"><i class="fa-solid fa-filter-circle-xmark"></i> مسح الفلاتر</button>
+    </div>
+    @if (DateFrom.HasValue && DateTo.HasValue && DateFrom.Value > DateTo.Value)
+    {
+        <p role="alert" class="oas-invoices-dashboard__warning">تاريخ البداية أكبر من تاريخ النهاية؛ يرجى تصحيح الفترة.</p>
+    }
+    <div class="oas-invoices-dashboard__table-card">
+        <div class="oas-invoices-dashboard__table-title">
+            <strong><i class="fa-solid fa-list"></i> فواتير المبيعات <small>(@TotalCount)</small></strong>
+            <span>اضغط رقم الفاتورة لفتحها في تبويب مستقل</span>
+        </div>
+        <div class="oas-invoices-dashboard__table-scroll">
+            <table>
+                <thead><tr>
+                    <th>رقم الفاتورة</th><th>العميل</th><th>التاريخ</th><th>الإجمالي</th><th>المخصص للسداد</th><th>المتبقي</th><th>حالة الفاتورة</th><th>التسوية</th><th>الإجراء</th>
+                </tr></thead>
+                <tbody>
+                    @if (IsLoading)
+                    {
+                        <tr><td colspan="9" class="oas-invoices-dashboard__empty">جاري تحميل الفواتير...</td></tr>
+                    }
+                    else if (Items.Count == 0)
+                    {
+                        <tr><td colspan="9" class="oas-invoices-dashboard__empty">لا توجد فواتير تطابق البحث والفلاتر المحددة.</td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var item in Items)
+                        {
+                            <tr @key="item.Id">
+                                <td><button class="oas-invoices-dashboard__code" type="button" @onclick="() => OnOpen.InvokeAsync(item.Id)">@item.InvoiceCode</button></td>
+                                <td><strong>@(item.CustomerName ?? item.CustomerCode ?? "—")</strong><small>@item.CustomerCode</small></td>
+                                <td dir="ltr">@item.InvoiceDate.ToString("yyyy/MM/dd")</td>
+                                <td dir="ltr" class="oas-invoices-dashboard__money">@item.TotalAmount.ToString("N2") <small>@item.CurrencyCodeSnapshot</small></td>
+                                <td dir="ltr" class="oas-invoices-dashboard__money">@(item.Status == SalesInvoiceStatus.Posted ? item.PaymentSummary.PaidAmount.ToString("N2") : "—")</td>
+                                <td dir="ltr" class="oas-invoices-dashboard__money">@(item.Status == SalesInvoiceStatus.Posted ? item.PaymentSummary.OutstandingAmount.ToString("N2") : "—")</td>
+                                <td><span class="oas-invoices-state @DocumentCss(item.Status)">@DocumentStatus(item.Status)</span></td>
+                                <td><span class="oas-invoices-settlement @SettlementCss(item)">@SettlementStatus(item)</span></td>
+                                <td><button type="button" class="oas-invoices-dashboard__open" @onclick="() => OnOpen.InvokeAsync(item.Id)"><i class="fa-regular fa-eye"></i> عرض</button></td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+        <footer class="oas-invoices-dashboard__pagination">
+            <label>عرض
+                <select value="@PageSize" @onchange="ChangePageSizeAsync">
+                    <option value="5">5</option><option value="10">10</option><option value="15">15</option><option value="20">20</option>
+                </select> فاتورة في الصفحة
+            </label>
+            <span>صفحة @PageNumber من @Math.Max(1, TotalPages) · @TotalCount فاتورة</span>
+            <nav aria-label="التنقل بين صفحات الفواتير">
+                <button disabled="@(PageNumber <= 1 || IsLoading)" type="button" @onclick="() => OnGoToPage.InvokeAsync(PageNumber - 1)">‹</button>
+                @foreach (var pageNumber in VisiblePages)
+                {
+                    <button type="button" class="@(pageNumber == PageNumber ? "is-selected" : "")" disabled="@IsLoading" @onclick="() => OnGoToPage.InvokeAsync(pageNumber)">@pageNumber</button>
+                }
+                <button disabled="@(PageNumber >= TotalPages || IsLoading)" type="button" @onclick="() => OnGoToPage.InvokeAsync(PageNumber + 1)">›</button>
+            </nav>
+        </footer>
+    </div>
+</section>
+
+@code {
+    [Parameter] public IReadOnlyList<SalesInvoiceDto> Items { get; set; } = [];
+    [Parameter] public SalesInvoicesDashboardSummaryDto? Summary { get; set; }
+    [Parameter] public string? Search { get; set; }
+    [Parameter] public string? StatusFilter { get; set; }
+    [Parameter] public DateOnly? DateFrom { get; set; }
+    [Parameter] public DateOnly? DateTo { get; set; }
+    [Parameter] public int PageSize { get; set; } = 10;
+    [Parameter] public int PageNumber { get; set; } = 1;
+    [Parameter] public int TotalPages { get; set; }
+    [Parameter] public long TotalCount { get; set; }
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public EventCallback<Guid> OnOpen { get; set; }
+    [Parameter] public EventCallback OnNew { get; set; }
+    [Parameter] public EventCallback OnRefresh { get; set; }
+    [Parameter] public EventCallback<string?> OnSearch { get; set; }
+    [Parameter] public EventCallback<string?> OnStatusChanged { get; set; }
+    [Parameter] public EventCallback<DateOnly?> OnDateFromChanged { get; set; }
+    [Parameter] public EventCallback<DateOnly?> OnDateToChanged { get; set; }
+    [Parameter] public EventCallback<int> OnPageSizeChanged { get; set; }
+    [Parameter] public EventCallback<int> OnGoToPage { get; set; }
+    [Parameter] public EventCallback OnReset { get; set; }
+
+    private string? _query;
+    protected override void OnParametersSet() => _query = Search;
+    private void UpdateSearch(ChangeEventArgs e) => _query = e.Value?.ToString();
+    private Task SearchNowAsync() => OnSearch.InvokeAsync(_query);
+    private Task SearchKeyDown(KeyboardEventArgs e) => e.Key == "Enter" ? SearchNowAsync() : Task.CompletedTask;
+    private Task ChangeStatusAsync(ChangeEventArgs e) => OnStatusChanged.InvokeAsync(e.Value?.ToString());
+    private Task ChangeFromAsync(ChangeEventArgs e) => OnDateFromChanged.InvokeAsync(ParseDate(e.Value?.ToString()));
+    private Task ChangeToAsync(ChangeEventArgs e) => OnDateToChanged.InvokeAsync(ParseDate(e.Value?.ToString()));
+    private Task ChangePageSizeAsync(ChangeEventArgs e) => OnPageSizeChanged.InvokeAsync(int.TryParse(e.Value?.ToString(), out var n) ? n : 10);
+    private static DateOnly? ParseDate(string? value) => DateOnly.TryParse(value, out var n) ? n : null;
+    private static string Value(int? value) => value?.ToString("N0") ?? "—";
+    private IEnumerable<int> VisiblePages => Enumerable.Range(Math.Max(1, Math.Min(PageNumber - 2, Math.Max(1, TotalPages - 4))), Math.Min(5, TotalPages));
+    private static string DocumentStatus(SalesInvoiceStatus status) => status switch
+    {
+        SalesInvoiceStatus.Draft => "مسودة", SalesInvoiceStatus.Confirmed => "مؤكدة", SalesInvoiceStatus.Posted => "مرحّلة",
+        SalesInvoiceStatus.Cancelled => "ملغاة", _ => status.ToString()
+    };
+    private static string DocumentCss(SalesInvoiceStatus status) => status switch
+    {
+        SalesInvoiceStatus.Posted => "is-posted", SalesInvoiceStatus.Cancelled => "is-cancelled", _ => "is-open"
+    };
+    private static string SettlementStatus(SalesInvoiceDto invoice)
+    {
+        if (invoice.Status != SalesInvoiceStatus.Posted)
+            return invoice.Status == SalesInvoiceStatus.Cancelled ? "ملغاة" : "بانتظار الترحيل";
+        var summary = invoice.PaymentSummary;
+        const decimal tolerance = 0.0001m;
+        if (summary.ReturnedAmount > tolerance && summary.ReturnedAmount >= invoice.TotalAmount - tolerance && summary.PaidAmount <= tolerance)
+            return "مرتجعة بالكامل";
+        if (summary.OutstandingAmount <= tolerance && summary.ReturnedAmount > tolerance && summary.PaidAmount > tolerance)
+            return "مسواة بالمرتجع والسداد";
+        if (summary.OutstandingAmount <= tolerance && summary.ReturnedAmount > tolerance)
+            return "مسواة بمرتجع";
+        if (summary.OutstandingAmount <= tolerance)
+            return "مسواة بالكامل";
+        if (summary.ReturnedAmount > tolerance)
+            return "مرتجعة جزئيًا";
+        return summary.PaidAmount > tolerance ? "مسواة جزئيًا" : "غير مسددة";
+    }
+    private static string SettlementCss(SalesInvoiceDto invoice)
+    {
+        if (invoice.Status != SalesInvoiceStatus.Posted) return "is-muted";
+        if (invoice.PaymentSummary.ReturnedAmount > 0.0001m) return "is-return";
+        return invoice.PaymentSummary.OutstandingAmount <= 0.0001m ? "is-paid" : "is-due";
+    }
+}

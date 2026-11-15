@@ -1,4 +1,8 @@
 using MediatR;
+using Microsoft.EntityFrameworkCore;
+using OAS.Domain.Sales.Entities;
+using DomainInvoiceStatus = OAS.Domain.Sales.Enums.SalesInvoiceStatus;
+using DomainReturnStatus = OAS.Domain.Sales.Enums.SalesReturnStatus;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -41,6 +45,25 @@ public sealed class SalesInvoicesController(ISender sender, OasDbContext db) : C
     public async Task<ActionResult<PagedResult<SalesInvoiceDto>>> Get(
         [FromQuery] PageRequest request, [FromQuery] Guid? customerId, CancellationToken cancellationToken)
         => Ok(await sender.Send(new GetSalesInvoicesQuery(request, customerId), cancellationToken));
+
+    [HttpGet("dashboard-summary")]
+    public async Task<ActionResult<SalesInvoicesDashboardSummaryDto>> GetDashboardSummary(CancellationToken cancellationToken)
+    {
+        // Aggregate over all documents, never over the ten visible rows.
+        var invoices = db.Set<SalesInvoice>().AsNoTracking();
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var withReturns = await db.Set<SalesReturn>().AsNoTracking()
+            .Where(x => x.Status == DomainReturnStatus.Posted)
+            .Select(x => x.SalesInvoiceId).Distinct().CountAsync(cancellationToken);
+        return Ok(new SalesInvoicesDashboardSummaryDto(
+            await invoices.CountAsync(cancellationToken),
+            await invoices.CountAsync(x => x.InvoiceDate == today, cancellationToken),
+            await invoices.CountAsync(x => x.Status == DomainInvoiceStatus.Draft, cancellationToken),
+            await invoices.CountAsync(x => x.Status == DomainInvoiceStatus.Confirmed, cancellationToken),
+            await invoices.CountAsync(x => x.Status == DomainInvoiceStatus.Posted, cancellationToken),
+            await invoices.CountAsync(x => x.Status == DomainInvoiceStatus.Cancelled, cancellationToken),
+            withReturns));
+    }
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<SalesInvoiceDto>> GetById(Guid id, CancellationToken cancellationToken)
@@ -110,6 +133,11 @@ public sealed class SalesInvoicesController(ISender sender, OasDbContext db) : C
         // Original handler also requires full collection before posting a FullNow invoice.
         return Ok(await sender.Send(new PostSalesInvoiceCommand(id, request), cancellationToken));
     }
+
+    [HttpPost("{id:guid}/collection-preview")]
+    public async Task<ActionResult<SalesInvoiceCollectionPreviewDto>> PreviewCollection(
+        Guid id, [FromBody] CollectSalesInvoicePaymentRequest request, CancellationToken cancellationToken)
+        => Ok(await sender.Send(new PreviewSalesInvoiceCollectionQuery(id, request.PaymentLines), cancellationToken));
 
     [HttpPost("{id:guid}/collect-payment")]
     public async Task<ActionResult<CollectSalesInvoicePaymentResultDto>> CollectPayment(Guid id, [FromBody] CollectSalesInvoicePaymentRequest request, CancellationToken cancellationToken)

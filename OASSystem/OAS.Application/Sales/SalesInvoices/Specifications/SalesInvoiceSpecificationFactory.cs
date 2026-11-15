@@ -8,35 +8,36 @@ namespace OAS.Application.Sales.SalesInvoices.Specifications;
 public sealed class SalesInvoiceSpecificationFactory : ICrudSpecificationFactory<SalesInvoice>
 {
     public ISpecification<SalesInvoice> CreatePageSpecification(PageRequest request) =>
-        CreatePageSpecification(request, null);
+        CreatePageSpecification(request, null, []);
 
-    public ISpecification<SalesInvoice> CreatePageSpecification(PageRequest request, Guid? customerId)
+    public ISpecification<SalesInvoice> CreatePageSpecification(PageRequest request, Guid? customerId) =>
+        CreatePageSpecification(request, customerId, []);
+
+    public ISpecification<SalesInvoice> CreatePageSpecification(
+        PageRequest request, Guid? customerId, Guid[] matchingCustomerIds)
     {
         var r = request.Normalize();
         var spec = new Specification<SalesInvoice>();
+        var search = r.Search;
+        var from = r.DateFrom;
+        var to = r.DateTo;
+        var hasStatus = !string.IsNullOrWhiteSpace(r.Status);
+        var statusValid = !hasStatus || Enum.TryParse<OAS.Domain.Sales.Enums.SalesInvoiceStatus>(
+            r.Status, true, out _);
+        var selectedStatus = hasStatus && statusValid
+            ? Enum.Parse<OAS.Domain.Sales.Enums.SalesInvoiceStatus>(r.Status!, true)
+            : default;
 
-        // Specification.Where replaces Criteria; compose both conditions into one
-        // predicate so searches can never widen a customer-scoped result set.
-        if (!string.IsNullOrWhiteSpace(r.Search))
-        {
-            var q = r.Search.Trim();
-            if (customerId.HasValue)
-            {
-                var id = customerId.Value;
-                spec.Where(x => x.CustomerId == id &&
-                    (x.InvoiceCode.Contains(q) || (x.Description != null && x.Description.Contains(q))));
-            }
-            else
-            {
-                spec.Where(x => x.InvoiceCode.Contains(q) ||
-                    (x.Description != null && x.Description.Contains(q)));
-            }
-        }
-        else if (customerId.HasValue)
-        {
-            var id = customerId.Value;
-            spec.Where(x => x.CustomerId == id);
-        }
+        // Conditions are combined; repeated Specification.Where calls replace earlier criteria.
+        // Domain and Contracts statuses are different enums, so convert before EF translation.
+        spec.Where(x =>
+            (!customerId.HasValue || x.CustomerId == customerId.Value) &&
+            (!hasStatus || (statusValid && x.Status == selectedStatus)) &&
+            (!from.HasValue || x.InvoiceDate >= from.Value) &&
+            (!to.HasValue || x.InvoiceDate <= to.Value) &&
+            (search == null || x.InvoiceCode.Contains(search) ||
+             (x.Description != null && x.Description.Contains(search)) ||
+             matchingCustomerIds.Contains(x.CustomerId)));
 
         var sort = r.SortBy is nameof(SalesInvoice.InvoiceCode)
             or nameof(SalesInvoice.InvoiceDate)

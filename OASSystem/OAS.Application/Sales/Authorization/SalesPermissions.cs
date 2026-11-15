@@ -88,6 +88,7 @@ public static class SalesPermissions
         public const string Edit = "sales.edit";
         public const string Confirm = "sales.confirm";
         public const string Post = "sales.post";
+        public const string Collect = "sales.invoices.collect";
         public const string Cancel = "sales.cancel";
     }
 }

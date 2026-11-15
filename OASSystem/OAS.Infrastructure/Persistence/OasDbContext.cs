@@ -51,6 +51,7 @@ public sealed class OasDbContext(DbContextOptions<OasDbContext> options) : DbCon
     public DbSet<EndOfServiceSettlement> EndOfServiceSettlements => Set<EndOfServiceSettlement>();
     public DbSet<EndOfServiceSettlementLine> EndOfServiceSettlementLines => Set<EndOfServiceSettlementLine>();
     public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<SalesInvoiceCollectionAttempt> SalesInvoiceCollectionAttempts => Set<SalesInvoiceCollectionAttempt>();
     public DbSet<Supplier> Suppliers => Set<Supplier>();
     public DbSet<Currency> Currencies => Set<Currency>();
     public DbSet<ExchangeRate> ExchangeRates => Set<ExchangeRate>();
@@ -120,6 +121,17 @@ public sealed class OasDbContext(DbContextOptions<OasDbContext> options) : DbCon
         modelBuilder.HasSequence<long>("SalesReturnCodeSequence", "dbo");
         modelBuilder.HasSequence<long>("CommissionStatementCodeSequence", "dbo");
         modelBuilder.HasSequence<long>("OpticalProductionJobCodeSequence", "dbo");
+        modelBuilder.Entity<SalesInvoiceCollectionAttempt>(entity =>
+        {
+            entity.ToTable("tbl_SalesInvoiceCollectionAttempts", "dbo");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Id).ValueGeneratedNever();
+            entity.Property(x => x.InvoiceId).IsRequired();
+            entity.Property(x => x.Fingerprint).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.ResultJson).IsRequired();
+            entity.Property(x => x.CreatedAtUtc).IsRequired();
+            entity.HasIndex(x => x.InvoiceId);
+        });
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(OasDbContext).Assembly);
     }
 }

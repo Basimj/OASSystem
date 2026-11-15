@@ -1,0 +1,152 @@
+/* Sales invoices approved UI, using same workspace tabs as customer orders.
+   Scope all changes so accounting, prescriptions and customer orders retain their styles. */
+.oas-shell .oas-main-inner .oas-invoice-screen {
+  --inv-blue: #008eee;
+  --inv-yellow: #f9ff26;
+  --inv-ink: var(--oas-color-text, #143352);
+  --inv-muted: var(--oas-color-text-muted, #506981);
+  --inv-surface: var(--oas-color-surface, #fff);
+  --inv-border: var(--oas-color-border, #c9dcf0);
+  color:var(--inv-ink);
+  background:color-mix(in srgb,var(--inv-surface) 87%,#d4ecff);
+  font-size:13px;
+  min-width:0;
+  padding:3px 8px 12px;
+}
+.oas-invoice-page-heading {display:flex;flex-direction:column;gap:8px;padding:9px 10px 0;border-bottom:3px solid var(--inv-blue);direction:rtl}
+.oas-invoice-page-heading__top {display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:nowrap;min-width:0}
+.oas-invoice-page-heading__title {display:flex;align-items:center;gap:10px;justify-content:flex-start;flex:0 0 auto}
+.oas-invoice-page-heading__title>i {color:var(--inv-blue);font-size:24px}
+.oas-invoice-page-heading__title h1 {font-size:22px;line-height:1.2;font-weight:900;margin:0;color:var(--inv-ink)}
+.oas-invoice-page-heading__title span {color:var(--inv-muted);font-size:11px}
+.oas-invoice-page-heading__title span i {font-size:9px;margin-inline:4px}
+.oas-invoice-page-heading__tabs {flex:1 1 auto;max-width:100%;overflow-x:auto;scrollbar-width:thin;direction:rtl}
+.oas-invoice-page-heading__tabs .ui-application-tabs {display:flex;justify-content:flex-start;flex-wrap:nowrap;gap:5px;border:0;box-shadow:none;background:transparent;min-height:40px;direction:rtl;width:max-content;min-width:100%}
+.oas-invoice-page-heading__tabs .ui-application-tab {min-width:132px;max-width:218px;min-height:40px;background:var(--inv-surface);border:1px solid var(--inv-border);border-bottom:0;border-radius:9px 9px 0 0}
+.oas-invoice-page-heading__tabs .ui-application-tab--active {background:var(--inv-blue)!important;border-color:var(--inv-blue)!important;box-shadow:inset 0 -3px 0 var(--inv-yellow)!important}
+.oas-invoice-page-heading__tabs .ui-application-tab__select {font-size:12px;font-weight:850;color:var(--inv-ink);min-height:39px;padding-inline:11px}
+.oas-invoice-page-heading__tabs .ui-application-tab--active .ui-application-tab__select,
+.oas-invoice-page-heading__tabs .ui-application-tab--active .ui-application-tab__select i,
+.oas-invoice-page-heading__tabs .ui-application-tab--active .ui-application-tab__close {color:#fff!important;text-shadow:none!important}
+.oas-invoice-page-heading__tabs .ui-application-tab__title {max-width:168px}
+.oas-shell .oas-main-inner .oas-invoice-screen .ui-sales-workspace {min-width:0;background:transparent;padding:11px 1px 4px;gap:9px}
+.oas-invoices-dashboard {display:flex;flex-direction:column;gap:12px;min-width:0;direction:rtl}
+.oas-invoices-dashboard__toolbar {display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.oas-invoices-dashboard__buttons {display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.oas-invoices-btn {height:37px;padding:0 13px;border:1px solid var(--inv-border);background:var(--inv-surface);color:var(--inv-ink);font-size:12px;font-weight:800;border-radius:9px;display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+.oas-invoices-btn.is-new {background:var(--inv-blue);color:#fff;border-color:var(--inv-blue);box-shadow:inset 0 -3px 0 var(--inv-yellow)}
+.oas-invoices-dashboard__search {flex:1 1 320px;max-width:510px;min-width:220px;display:flex;align-items:center;gap:8px;height:38px;background:var(--inv-surface);border:1px solid var(--inv-border);border-radius:9px;padding:0 9px}
+.oas-invoices-dashboard__search>i {color:var(--inv-blue)}
+.oas-invoices-dashboard__search input {min-width:0;flex:1;width:100%;border:0;background:transparent;font-size:12px;color:var(--inv-ink);outline:0}
+.oas-invoices-dashboard__search button {border:0;border-radius:7px;background:var(--inv-blue);color:#fff;font-size:11px;font-weight:850;padding:6px 11px}
+.oas-invoices-dashboard__metrics {display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px}
+.oas-invoices-dashboard__metrics article {position:relative;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;min-width:0;height:82px;border:1px solid var(--inv-border);border-radius:11px;padding:9px 11px;background:color-mix(in srgb,var(--inv-surface) 91%,#d5ecff);box-shadow:0 2px 7px #143c5a0a}
+.oas-invoices-dashboard__metrics article:nth-child(2) {background:color-mix(in srgb,var(--inv-surface) 78%,#e0f9e6)}
+.oas-invoices-dashboard__metrics article:nth-child(3) {background:color-mix(in srgb,var(--inv-surface) 82%,#edf2ff)}
+.oas-invoices-dashboard__metrics article:nth-child(4) {background:color-mix(in srgb,var(--inv-surface) 77%,#ffe7b9)}
+.oas-invoices-dashboard__metrics article:nth-child(5) {background:color-mix(in srgb,var(--inv-surface) 78%,#d8f4f2)}
+.oas-invoices-dashboard__metrics article:nth-child(6) {background:color-mix(in srgb,var(--inv-surface) 77%,#ffe3e7)}
+.oas-invoices-dashboard__metrics article i {position:absolute;top:11px;inset-inline-end:13px;font-size:20px;color:var(--inv-blue);opacity:.8}
+.oas-invoices-dashboard__metrics article span {font-size:11px;font-weight:850;max-width:calc(100% - 30px);color:var(--inv-ink)}
+.oas-invoices-dashboard__metrics article strong {font-size:24px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1.1}
+.oas-invoices-dashboard__filters {display:flex;align-items:end;gap:10px;flex-wrap:wrap;padding:10px 13px;background:var(--inv-surface);border:1px solid var(--inv-border);border-radius:10px}
+.oas-invoices-dashboard__filters label {display:flex;flex:1 1 175px;flex-direction:column;gap:4px;font-size:11px;color:var(--inv-muted);font-weight:800}
+.oas-invoices-dashboard__filters select,.oas-invoices-dashboard__filters input {width:100%;height:34px;border:1px solid var(--inv-border);border-radius:7px;padding:0 9px;color:var(--inv-ink);background:var(--inv-surface);font-size:12px}
+.oas-invoices-dashboard__reset {height:34px;padding:0 12px;border:1px solid var(--inv-border);background:var(--inv-surface);border-radius:7px;color:var(--inv-muted);font-size:12px;font-weight:750}
+.oas-invoices-dashboard__warning {margin:0;padding:8px 12px;background:#fff4c5;color:#775700;border-radius:8px;font-size:12px}
+.oas-invoices-dashboard__table-card {min-width:0;border:1px solid var(--inv-border);border-radius:12px;padding:11px;background:var(--inv-surface);box-shadow:0 2px 8px #132f4b0a}
+.oas-invoices-dashboard__table-title {display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:9px;padding:2px 3px 11px}
+.oas-invoices-dashboard__table-title strong {font-weight:850;font-size:15px;color:var(--inv-ink)}
+.oas-invoices-dashboard__table-title strong i {color:var(--inv-blue)}
+.oas-invoices-dashboard__table-title small {font-size:12px;color:var(--inv-muted)}
+.oas-invoices-dashboard__table-title>span {font-size:11px;color:var(--inv-muted)}
+.oas-invoices-dashboard__table-scroll {width:100%;max-width:100%;overflow-x:auto}
+.oas-invoices-dashboard__table-scroll table {width:100%;min-width:840px;border-collapse:separate;border-spacing:0;font-size:12px;direction:rtl}
+.oas-invoices-dashboard__table-scroll th {height:39px;padding:8px 9px;text-align:center;background:color-mix(in srgb,var(--inv-blue) 90%,#1251a0);color:#fff;font-weight:850;white-space:nowrap}
+.oas-invoices-dashboard__table-scroll td {height:40px;padding:6px 9px;text-align:center;border-bottom:1px solid color-mix(in srgb,var(--inv-border) 65%,transparent);color:var(--inv-ink);white-space:nowrap;font-variant-numeric:tabular-nums}
+.oas-invoices-dashboard__table-scroll tbody tr:nth-child(even) {background:color-mix(in srgb,var(--inv-blue) 5%,var(--inv-surface))}
+.oas-invoices-dashboard__table-scroll tbody tr:hover {background:color-mix(in srgb,var(--inv-blue) 10%,var(--inv-surface))}
+.oas-invoices-dashboard__table-scroll td small {display:block;font-size:10px;color:var(--inv-muted)}
+.oas-invoices-dashboard__code {border:0;padding:4px;background:transparent;color:#0575d6;font-weight:850;direction:ltr}
+.oas-invoices-dashboard__money {font-weight:800}
+.oas-invoices-dashboard__open {border:1px solid var(--inv-border);color:var(--inv-blue);background:var(--inv-surface);border-radius:7px;padding:5px 9px;font-size:11px;font-weight:800;display:inline-flex;gap:5px;align-items:center}
+.oas-invoices-state,.oas-invoices-settlement {display:inline-flex;max-width:245px;align-items:center;justify-content:center;white-space:nowrap;border-radius:18px;padding:4px 9px;font-size:11px;font-weight:850}
+.oas-invoices-state.is-posted,.oas-invoices-settlement.is-paid {background:#d7f5df;color:#116837}
+.oas-invoices-state.is-open {background:#d9edff;color:#11599a}
+.oas-invoices-state.is-cancelled,.oas-invoices-settlement.is-muted {background:#edf0f4;color:#5e6874}
+.oas-invoices-settlement.is-due {background:#fff1c2;color:#815800}
+.oas-invoices-settlement.is-return {background:#ffe0e6;color:#a32b43}
+.oas-invoices-dashboard__empty {text-align:center!important;color:var(--inv-muted)!important;padding:30px!important}
+.oas-invoices-dashboard__pagination {display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:10px;color:var(--inv-muted);font-size:12px}
+.oas-invoices-dashboard__pagination label {display:flex;align-items:center;gap:7px}
+.oas-invoices-dashboard__pagination select {height:31px;border:1px solid var(--inv-border);background:var(--inv-surface);color:var(--inv-ink);border-radius:6px;padding:0 9px}
+.oas-invoices-dashboard__pagination nav {display:flex;gap:4px;align-items:center}
+.oas-invoices-dashboard__pagination button {min-width:30px;height:30px;background:var(--inv-surface);border:1px solid var(--inv-border);color:var(--inv-ink);border-radius:6px;font-weight:850}
+.oas-invoices-dashboard__pagination button.is-selected {background:var(--inv-blue);color:#fff;border-color:var(--inv-blue)}
+.oas-invoices-dashboard__pagination button:disabled {opacity:.43;cursor:not-allowed}
+/* The invoice editor is a separate workspace tab, NOT a detail pane in the list. */
+.oas-invoice-screen .ui-sales-editor {min-width:0;border-radius:12px;background:var(--inv-surface)}
+.oas-invoice-screen .oas-invoice-editor-shell > .ui-sales-editor > .ui-sales-editor__header {display:none}
+.oas-invoice-screen .oas-invoice-editor-shell > .ui-sales-editor > .ui-sales-editor__content {padding-top:0}
+.oas-invoice-screen .ui-sales-editor__header {background:var(--inv-surface);border-color:var(--inv-border);padding:10px 13px}
+.oas-invoice-screen .ui-sales-editor__title h2 {font-size:18px;font-weight:850}
+.oas-invoice-screen .ui-sales-editor__content {padding:10px 12px}
+.oas-invoice-screen .ui-sales-editor__footer-actions {background:var(--inv-surface);border-top:1px solid var(--inv-border)}
+.oas-invoice-screen .ui-sales-editor__footer-actions .ui-button:first-child {background:var(--inv-blue)!important;color:#fff!important;box-shadow:inset 0 -3px 0 var(--inv-yellow)!important;text-shadow:none!important}
+.oas-invoice-screen .oas-invoice-layout {grid-template-columns:minmax(235px,285px) minmax(0,1fr);gap:10px}
+.oas-invoice-screen .oas-invoice-walkin-options {display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 10px;padding:8px 10px;border:1px solid var(--inv-border);border-radius:10px;background:color-mix(in srgb,var(--inv-surface) 90%,#edf7ff)}
+.oas-invoice-screen .oas-invoice-walkin-options__label {font-size:12px;font-weight:850;color:var(--inv-muted);margin-inline-end:2px}
+.oas-invoice-screen .oas-invoice-layout .oas-invoice-primary-fields {gap:8px}
+.oas-invoice-screen .oas-invoice-source-link>a {color:var(--inv-blue);display:inline-flex;gap:5px;align-items:center;margin-top:5px;font-weight:750;font-size:11px}
+@media(max-width:1100px) {
+ .oas-invoices-dashboard__metrics {grid-template-columns:repeat(3,minmax(0,1fr))}
+ .oas-invoice-screen .oas-invoice-layout {grid-template-columns:minmax(0,1fr)}
+ .oas-invoice-screen .oas-invoice-layout .oas-invoice-main,.oas-invoice-screen .oas-invoice-layout .oas-invoice-aside {grid-column:1;grid-row:auto}
+}
+@media(max-width:650px) {
+ .oas-invoices-dashboard__metrics {grid-template-columns:repeat(2,minmax(0,1fr))}
+ .oas-invoice-page-heading__top {flex-direction:column;align-items:stretch}
+ .oas-invoice-page-heading__tabs {order:1}
+ .oas-invoice-page-heading__title {order:2}
+ .oas-invoice-page-heading__title h1 {font-size:18px}
+ .oas-invoices-dashboard__toolbar {flex-direction:column;align-items:stretch}
+ .oas-invoices-dashboard__search {max-width:none;min-width:0;flex-basis:auto}
+ .oas-invoice-screen .oas-invoice-layout .oas-invoice-primary-fields {grid-template-columns:1fr}
+ .oas-invoice-screen .oas-invoice-customer-field {grid-column:auto}
+}
+.oas-invoice-screen .oas-invoice-form-errors {margin:3px 0 9px;padding:9px 12px;border:1px solid #d95866;background:color-mix(in srgb,var(--inv-surface) 90%,#ff9aaa);border-radius:8px;color:#a72231;font-size:12px;font-weight:750}
+.oas-invoice-screen .oas-invoice-form-errors p {margin:0 0 4px}
+.oas-invoice-screen .oas-invoice-source-note>a {color:var(--inv-blue);font-weight:850;margin-inline-start:10px}
+
+/* Invoice sales-mode selector: placed in the invoice-data section header, not in the form body. */
+.oas-invoice-screen .ui-sales-section__header-actions {
+    margin-inline-start: auto;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+.oas-invoice-screen .ui-sales-section__header .oas-invoice-walkin-options {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+.oas-invoice-screen .ui-sales-section__header .oas-invoice-walkin-options__label {
+    font-size: 11px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+.oas-invoice-screen .ui-sales-section__header .oas-invoice-walkin-options .ui-button {
+    min-height: 30px;
+    white-space: nowrap;
+}
+@media (max-width: 700px) {
+    .oas-invoice-screen .ui-sales-section__header:has(.oas-invoice-walkin-options) { flex-wrap: wrap; }
+    .oas-invoice-screen .ui-sales-section__header-actions { flex: 1 1 100%; margin-inline-start: 0; }
+    .oas-invoice-screen .ui-sales-section__header .oas-invoice-walkin-options { justify-content: flex-start; }
+}

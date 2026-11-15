@@ -52,3 +52,6 @@
 
 /* Inline optical validation and compact manual-measurements editor. */
 @import "./features/customer-order-optical-prevalidation.css";
+
+/* Approved invoice list and independent invoice tabs, after all shared sales styles. */
+@import "./features/invoices-approved.css";

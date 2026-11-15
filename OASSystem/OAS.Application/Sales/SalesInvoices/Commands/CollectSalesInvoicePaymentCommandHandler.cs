@@ -1,4 +1,7 @@
 using MediatR;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.Sales.Abstractions;
 using OAS.Contracts.Sales.Common;
@@ -11,7 +14,8 @@ namespace OAS.Application.Sales.SalesInvoices.Commands;
 public sealed class CollectSalesInvoicePaymentCommandHandler(
     ISalesInvoiceAggregateRepository invoices,
     ISalesInvoiceBalanceService balances,
-    ISalesSettlementService settlement)
+    ISalesSettlementService settlement,
+    ISalesInvoiceCollectionIdempotencyStore idempotency)
     : IRequestHandler<CollectSalesInvoicePaymentCommand, CollectSalesInvoicePaymentResultDto>
 {
     private const decimal MoneyTolerance = 0.0001m;
@@ -20,6 +24,17 @@ public sealed class CollectSalesInvoicePaymentCommandHandler(
         CollectSalesInvoicePaymentCommand request,
         CancellationToken cancellationToken)
     {
+        if (request.Request.OperationId == Guid.Empty)
+            throw new ConflictException("sales_invoice_collection_operation_id_required",
+                "تعذر تحديد معرف التحصيل. حدّث شاشة الفاتورة قبل تنفيذ العملية.");
+
+        var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
+            JsonSerializer.Serialize(request.Request.PaymentLines))));
+        // The SQL app lock remains held by TransactionBehavior until receipt + result commit.
+        var previous = await idempotency.GetExistingAsync(
+            request.InvoiceId, request.Request.OperationId, fingerprint, cancellationToken);
+        if (previous is not null) return previous;
+
         var invoice = await invoices.GetAggregateAsync(request.InvoiceId, false, cancellationToken)
             ?? throw new NotFoundException(nameof(SalesInvoice), request.InvoiceId);
 
@@ -67,10 +82,13 @@ public sealed class CollectSalesInvoicePaymentCommandHandler(
             updated.OutstandingAmount,
             updated.ReturnedAmount);
 
-        return new CollectSalesInvoicePaymentResultDto(
+        var result = new CollectSalesInvoicePaymentResultDto(
             invoice.Id,
             collection.ReceiptVoucherId,
             collection.ReceiptVoucherNumber,
             summary);
+        await idempotency.StoreAsync(request.InvoiceId, request.Request.OperationId,
+            fingerprint, result, cancellationToken);
+        return result;
     }
 }

@@ -8,20 +8,33 @@
 <div class="oas-invoice-layout" dir="rtl">
     <div class="oas-invoice-main">
         <UiSalesFormSection Title="بيانات الفاتورة" Description="بيانات البيع المباشر الأساسية" IconCss="fa-solid fa-file-invoice-dollar">
+            <HeaderActions>
+                @if (WalkInCustomerId.HasValue)
+                {
+                    <div class="oas-invoice-walkin-options" aria-label="نوع الفاتورة والعميل">
+                        <span class="oas-invoice-walkin-options__label">نوع العميل</span>
+                        <UiButton Text="بيع مباشر — عميل نقدي" Variant="@(IsWalkIn ? ButtonVariant.Primary : ButtonVariant.Secondary)"
+                                  Size="ControlSize.Small" Disabled="@ReadOnly" OnClick="EnableWalkInAsync" />
+                        <UiButton Text="عميل مسجل" Variant="@(!IsWalkIn ? ButtonVariant.Primary : ButtonVariant.Secondary)"
+                                  Size="ControlSize.Small" Disabled="@ReadOnly" OnClick="EnableRegisteredAsync" />
+                    </div>
+                }
+            </HeaderActions>
+            <ChildContent>
+            @if (ShowValidationErrors)
+            {
+                <div class="oas-invoice-form-errors" role="alert">
+                    @if (string.IsNullOrWhiteSpace(Model.CustomerId)) { <p>اختر العميل قبل الحفظ.</p> }
+                    @if (string.IsNullOrWhiteSpace(Model.CurrencyId)) { <p>اختر عملة الفاتورة قبل الحفظ.</p> }
+                    @if (!Model.InvoiceDate.HasValue) { <p>تاريخ الفاتورة مطلوب.</p> }
+                    @if (!Model.PostingDate.HasValue) { <p>تاريخ الترحيل مطلوب.</p> }
+                </div>
+            }
             <div class="oas-invoice-primary-fields">
                 <div class="oas-invoice-code-field">
                     <UiInputText Label="رقم الفاتورة" Value="@Model.InvoiceCode" ReadOnly="true" />
                 </div>
                 <div class="oas-invoice-customer-field">
-                    @if (WalkInCustomerId.HasValue)
-                    {
-                        <div class="oas-invoice-walkin-options" aria-label="نوع العميل">
-                            <UiButton Text="بيع مباشر — عميل نقدي" Variant="@(IsWalkIn ? ButtonVariant.Primary : ButtonVariant.Secondary)"
-                                      Size="ControlSize.Small" Disabled="@ReadOnly" OnClick="EnableWalkInAsync" />
-                            <UiButton Text="عميل مسجل" Variant="@(!IsWalkIn ? ButtonVariant.Primary : ButtonVariant.Secondary)"
-                                      Size="ControlSize.Small" Disabled="@ReadOnly" OnClick="EnableRegisteredAsync" />
-                        </div>
-                    }
                     @if (!WalkInCustomerId.HasValue && Model.Id is null)
                     {
                         <div class="oas-invoice-walkin-note">
@@ -58,7 +71,13 @@
                     <UiInputText Label="كود العميل" Value="@Model.CustomerCode" ReadOnly="true" />
                     @if (!string.IsNullOrWhiteSpace(Model.CustomerOrderId))
                     {
-                        <UiInputText Label="طلب العميل المصدر" Value="@(Model.CustomerOrderDisplay ?? Model.CustomerOrderId)" ReadOnly="true" />
+                        <div class="oas-invoice-source-link">
+                            <UiInputText Label="طلب العميل المصدر" Value="@(Model.CustomerOrderDisplay ?? Model.CustomerOrderId)" ReadOnly="true" />
+                            @if (Guid.TryParse(Model.CustomerOrderId, out var sourceOrderId))
+                            {
+                                <a href="@($"/sales/customer-orders?orderId={sourceOrderId:D}")"><i class="fa-solid fa-arrow-up-right-from-square"></i> فتح طلب العميل</a>
+                            }
+                        </div>
                     }
                     <UiLookup Label="موظف المبيعات" Value="@Model.SalesEmployeeId" ValueChanged="SalesEmployeeChanged"
                               SelectedItem="@SalesEmployeeItem" SearchAsync="SearchEmployeesAsync"
@@ -75,11 +94,24 @@
             </details>
             @if (!string.IsNullOrWhiteSpace(Model.CustomerOrderId))
             {
-                <p class="oas-invoice-source-note"><i class="fa-solid fa-link" aria-hidden="true"></i> هذه الفاتورة مرتبطة بطلب عميل. تصدر فواتير الطلبات من شاشة «بيع جديد / Checkout».</p>
+                <p class="oas-invoice-source-note"><i class="fa-solid fa-link" aria-hidden="true"></i> هذه الفاتورة مرتبطة بطلب عميل، وتُنشأ من شاشة «إتمام البيع».
+                    @if (Guid.TryParse(Model.CustomerOrderId, out var relatedOrderId))
+                    {
+                        <a href="@($"/sales/customer-orders?orderId={relatedOrderId:D}")">فتح الطلب المصدر</a>
+                    }
+                </p>
             }
+            </ChildContent>
         </UiSalesFormSection>
 
         <UiSalesFormSection Title="بنود الفاتورة" Description="اختر الصنف، ثم الكمية؛ تظهر حقول العدسات فقط عند الحاجة." IconCss="fa-solid fa-cubes-stacked">
+            @if (ShowValidationErrors && (Model.Lines.Count == 0 || Model.Lines.Any(line =>
+                (line.LineType is not "Service" && !Guid.TryParse(line.ProductVariantId, out _)) ||
+                (line.ProductIsStockItem == true && !Guid.TryParse(line.WarehouseId, out _)) ||
+                line.Quantity <= 0m || line.ActualUnitPrice < 0m)))
+            {
+                <p class="oas-invoice-form-errors" role="alert">أدخل بندًا واحدًا على الأقل، وحدد الصنف للبنود السلعية، والمخزن للمنتجات المخزنية، والكمية الموجبة والسعر الصحيح لكل بند.</p>
+            }
             <UiSalesLinesEditor Model="@Model.Lines" ReadOnly="@ReadOnly"
                                 SearchProductTypesAsync="SearchProductTypesAsync"
                                 SearchCategoriesAsync="SearchCategoriesAsync"
@@ -178,6 +210,7 @@
 
     [Parameter, EditorRequired] public UiSalesInvoiceFormModel Model { get; set; } = new();
     [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public bool ShowValidationErrors { get; set; }
     [Parameter] public Guid? WalkInCustomerId { get; set; }
     [Parameter] public string? WalkInCustomerLabel { get; set; }
     [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? SearchCustomersAsync { get; set; }

@@ -10,5 +10,5 @@ public sealed record CollectSalesInvoicePaymentCommand(
     : ICommand<CollectSalesInvoicePaymentResultDto>, IAuthorizedRequest
 {
     public IReadOnlyCollection<string> RequiredPermissions { get; } =
-        [SalesPermissions.Invoices.Post];
+        [SalesPermissions.Invoices.Collect];
 }

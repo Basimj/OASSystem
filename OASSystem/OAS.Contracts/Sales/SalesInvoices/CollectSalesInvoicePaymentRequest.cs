@@ -3,4 +3,5 @@ using OAS.Contracts.Sales.Checkout;
 namespace OAS.Contracts.Sales.SalesInvoices;
 
 public sealed record CollectSalesInvoicePaymentRequest(
-    IReadOnlyList<CheckoutPaymentLineRequest> PaymentLines);
+    IReadOnlyList<CheckoutPaymentLineRequest> PaymentLines,
+    Guid OperationId = default);

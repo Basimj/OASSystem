@@ -67,6 +67,7 @@ public sealed class SalesClientService(OasApiClient apiClient) : ISalesClientSer
     public Task<CustomerOrderDto?> CancelCustomerOrderAsync(Guid id, CancelCustomerOrderRequest r, CancellationToken ct = default) => apiClient.PostAsync<CancelCustomerOrderRequest, CustomerOrderDto>($"api/sales/customer-orders/{id}/cancel", r, ct);
 
     public Task<PagedResult<SalesInvoiceDto>> GetSalesInvoicesPageAsync(PageRequest r, CancellationToken ct = default) => GetPageAsync<SalesInvoiceDto>("api/sales/invoices", r, ct);
+    public Task<SalesInvoicesDashboardSummaryDto?> GetSalesInvoicesDashboardSummaryAsync(CancellationToken ct = default) => apiClient.GetAsync<SalesInvoicesDashboardSummaryDto>("api/sales/invoices/dashboard-summary", ct);
     public async Task<PagedResult<SalesInvoiceDto>> GetCustomerInvoicesPageAsync(Guid customerId, PageRequest r, CancellationToken ct = default)
         => await apiClient.GetAsync<PagedResult<SalesInvoiceDto>>(
             $"api/sales/invoices{PageQuery(r)}&customerId={customerId:D}", ct) ?? new PagedResult<SalesInvoiceDto>();
@@ -79,6 +80,7 @@ public sealed class SalesClientService(OasApiClient apiClient) : ISalesClientSer
     public Task<SalesPostingPreValidationDto?> PreValidateSalesInvoicePostingAsync(Guid id, CancellationToken ct = default) => apiClient.GetAsync<SalesPostingPreValidationDto>($"api/sales/invoices/{id}/posting-prevalidation", ct);
     public Task<SalesInvoicePostingResultDto?> PostSalesInvoiceAsync(Guid id, PostSalesInvoiceRequest r, CancellationToken ct = default) => apiClient.PostAsync<PostSalesInvoiceRequest, SalesInvoicePostingResultDto>($"api/sales/invoices/{id}/post", r, ct);
     public Task<CollectSalesInvoicePaymentResultDto?> CollectSalesInvoicePaymentAsync(Guid id, CollectSalesInvoicePaymentRequest r, CancellationToken ct = default) => apiClient.PostAsync<CollectSalesInvoicePaymentRequest, CollectSalesInvoicePaymentResultDto>($"api/sales/invoices/{id}/collect-payment", r, ct);
+    public Task<SalesInvoiceCollectionPreviewDto?> PreviewSalesInvoiceCollectionAsync(Guid id, CollectSalesInvoicePaymentRequest r, CancellationToken ct = default) => apiClient.PostAsync<CollectSalesInvoicePaymentRequest, SalesInvoiceCollectionPreviewDto>($"api/sales/invoices/{id}/collection-preview", r, ct);
     public Task<SalesInvoiceDto?> CancelSalesInvoiceAsync(Guid id, CancelSalesInvoiceRequest r, CancellationToken ct = default) => apiClient.PostAsync<CancelSalesInvoiceRequest, SalesInvoiceDto>($"api/sales/invoices/{id}/cancel", r, ct);
     public Task<SalesInvoicePaymentSummaryDto?> GetSalesInvoicePaymentSummaryAsync(Guid id, CancellationToken ct = default) => apiClient.GetAsync<SalesInvoicePaymentSummaryDto>($"api/sales/invoices/{id}/payment-summary", ct);
 
