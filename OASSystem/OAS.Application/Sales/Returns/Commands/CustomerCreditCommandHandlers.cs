@@ -43,9 +43,17 @@ public sealed class ApplyCustomerReturnCreditCommandHandler(
                 .Where(x=>x.IdempotencyKey==key).ApplyPaging(0,2),ct)).FirstOrDefault();
             if (replay is not null)
             {
+                // The persisted invoice amount is currency-rounded. Compare at its
+                // authoritative precision so an exact retry with extra decimal input
+                // cannot incorrectly look like a different operation.
+                var replayInvoice=await invoices.GetByIdAsync(d.TargetSalesInvoiceId,ct);
+                var replayAmount=replayInvoice is null ? d.TargetInvoiceCurrencyAmount :
+                    Math.Round(d.TargetInvoiceCurrencyAmount,replayInvoice.CurrencyDecimalPlacesSnapshot,
+                        MidpointRounding.AwayFromZero);
                 if (replay.CustomerId!=request.CustomerId || replay.SalesReturnId!=d.SalesReturnId ||
+                    replay.SettlementKind!=CustomerCreditSettlementKind.ApplyToInvoice ||
                     replay.TargetSalesInvoiceId!=d.TargetSalesInvoiceId ||
-                    replay.TargetInvoiceCurrencyAmount!=d.TargetInvoiceCurrencyAmount ||
+                    replay.TargetInvoiceCurrencyAmount!=replayAmount ||
                     replay.Status!=CustomerCreditApplicationStatus.Active)
                     throw new ConflictException("customer_credit_idempotency_conflict","مفتاح العملية مستخدم لعملية مختلفة أو معكوسة.");
                 return CustomerCreditLedgerService.Map(replay);
@@ -137,11 +145,19 @@ public sealed class RefundCustomerReturnCreditCommandHandler(
                     throw new ConflictException("customer_refund_idempotency_conflict","تم استخدام المفتاح لعملية أخرى أو تم عكسه.");
                 // Verify retry is for the same source payment amount, not just the same key.
                 var existingLine=await voucherLines.GetByIdAsync(replay.RefundPaymentVoucherLineId!.Value,ct);
-                if (existingLine?.CurrencyId!=d.CurrencyId || existingLine?.Amount!=d.Amount ||
+                var replayAmount=existingLine?.CurrencyDecimalPlacesSnapshot is byte decimals
+                    ? Math.Round(d.Amount,decimals,MidpointRounding.AwayFromZero)
+                    : d.Amount;
+                if (existingLine?.CurrencyId!=d.CurrencyId || existingLine?.Amount!=replayAmount ||
                     (byte?)existingLine?.PaymentMethod!=d.PaymentMethod ||
                     existingLine?.CashAccountId!=d.CashAccountId || existingLine?.BankAccountId!=d.BankAccountId)
                     throw new ConflictException("customer_refund_idempotency_conflict","بيانات طلب الإعادة تختلف عن الطلب الأصلي.");
-                return CustomerCreditLedgerService.Map(replay);
+                var replayVoucher=existingLine is null ? null :
+                    await vouchers.GetByIdAsync(existingLine.PaymentVoucherId,ct);
+                return CustomerCreditLedgerService.Map(replay) with
+                {
+                    PaymentVoucherNumber = replayVoucher?.VoucherNumber
+                };
             }
         }
         var source=await returns.GetByIdAsync(d.SalesReturnId,ct)
@@ -196,7 +212,7 @@ public sealed class RefundCustomerReturnCreditCommandHandler(
         var application=CustomerCreditApplication.Refund(Guid.NewGuid(),source.Id,
             request.CustomerId,lineId,consumed,payment.BaseAmount,user,now,key);
         await credits.AddAsync(application,ct);
-        return CustomerCreditLedgerService.Map(application);
+        return CustomerCreditLedgerService.Map(application) with { PaymentVoucherNumber = voucherNo };
     }
 }
 

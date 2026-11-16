@@ -35,7 +35,8 @@ public sealed record CustomerCreditSettlementDto(
     decimal? RefundSettlementBaseAmount,
     DateTime AppliedAtUtc,
     byte Status,
-    string RowVersion);
+    string RowVersion,
+    string? PaymentVoucherNumber = null);
 
 public sealed record CustomerCreditBalanceDto(
     Guid CustomerId,

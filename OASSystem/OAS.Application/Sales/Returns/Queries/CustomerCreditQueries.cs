@@ -10,3 +10,10 @@ public sealed record GetCustomerCreditBalanceQuery(Guid CustomerId)
 {
     public IReadOnlyCollection<string> RequiredPermissions { get; } = [SalesPermissions.Invoices.View];
 }
+
+/// <summary>Read-only reconciliation of a previously submitted settlement after lost HTTP response.</summary>
+public sealed record GetCustomerCreditOperationQuery(Guid CustomerId, string IdempotencyKey)
+    : IQuery<CustomerCreditSettlementDto?>, IAuthorizedRequest
+{
+    public IReadOnlyCollection<string> RequiredPermissions { get; } = [SalesPermissions.Credit.Use];
+}

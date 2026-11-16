@@ -4,6 +4,10 @@
 @using OAS.Contracts.Sales.SalesInvoices
 @using OAS.Contracts.Common.Pagination
 @using OAS.Client.Services.Http
+@using OAS.Client.Sales.Services
+@using OAS.Client.Database.State
+@using System.Text.Json
+@using Microsoft.JSInterop
 @using OAS.Contracts.Accounting.CashAccounts
 @using OAS.Contracts.Accounting.BankAccounts
 @using OAS.Contracts.Accounting.Currencies
@@ -12,6 +16,8 @@
 @using OAS.UiLib.Services.Feedback
 @using OAS.Client.Common.Feedback.Services
 @inject OasApiClient Api
+@inject IJSRuntime Js
+@inject DatabaseProfileSelectionState DatabaseProfile
 @inject IAccountingClientService Accounting
 @inject IUiSnackbarService Snackbar
 @inject IApiFeedbackService ApiFeedback
@@ -28,6 +34,10 @@
 
     @if (_state is null)
     {
+        @if (_pending is not null)
+        {
+            <div class="cc-alert cc-alert--error" role="alert">هناك تسوية معلقة محفوظة. أعد الاتصال وحدّث البيانات للتحقق من نتيجتها قبل أي عملية أخرى.</div>
+        }
         @if (_busy)
         {
             <div class="cc-loading-card"><span class="cc-spinner" aria-hidden="true"></span><div><strong>جارٍ تحميل أرصدة المرتجعات</strong><p>يتم التحقق من الرصيد والفواتير وحسابات الصندوق والبنك.</p></div></div>
@@ -47,6 +57,32 @@
 
         <section class="cc-panel">
             <div class="cc-panel-heading"><div><h2>تسوية رصيد مرتجع مرحّل</h2><p>اختر المرتجع وطريقة التسوية. لن يسمح النظام باستخدام الرصيد نفسه أكثر من مرة.</p></div><span class="cc-step-badge">1 <span>بيانات التسوية</span></span></div>
+            @if (!_storageReady)
+            {
+                <div class="cc-alert cc-alert--error" role="alert">
+                    <strong>إيقاف التسوية لحماية الرصيد</strong>
+                    تعذر قراءة سجل المحاولة السابق من المتصفح. لن تُرسل تسوية جديدة حتى يعمل تخزين المتصفح ويُفحص الطلب المعلق.
+                </div>
+            }
+            else if (_pending is not null)
+            {
+                <div class="cc-alert cc-alert--error" role="alert">
+                    <strong>تسوية معلقة — لا تبدأ عملية جديدة</strong>
+                    قد يكون الخادم أكمل العملية ولم يصل الرد. تحقق من نتيجتها، أو أعد إرسال الطلب الأصلي المحفوظ بالمفتاح نفسه دون تغيير المبلغ أو المستند.
+                    <span>نوع العملية: @(_pending.Kind == "apply" ? "تطبيق رصيد" : "استرداد") — معرف المحاولة: @_pending.IdempotencyKey</span>
+                    @if (!string.IsNullOrWhiteSpace(_error)) { <span>@_error</span> }
+                </div>
+                <div class="cc-pending-actions">
+                    <button type="button" class="cc-button cc-button--quiet" disabled="@_busy" @onclick="() => CheckPendingAsync()">التحقق من نتيجة العملية</button>
+                    <button type="button" class="cc-button cc-button--primary" disabled="@_busy" @onclick="RetryPendingAsync">إعادة إرسال الطلب نفسه</button>
+                    @if (_canDiscardRejected)
+                    {
+                        <button type="button" class="cc-button cc-button--danger" disabled="@_busy" @onclick="DiscardRejectedAsync">إلغاء الطلب المرفوض</button>
+                    }
+                </div>
+            }
+            else
+            {
             <div class="cc-form-grid">
                 <label class="cc-field cc-field--wide"><span>المرتجع الذي يحتوي على رصيد متاح <b>*</b></span>
                     <select class="cc-control" @bind="_returnId">
@@ -131,6 +167,7 @@
                 <div class="cc-safety-note"><span aria-hidden="true">ⓘ</span><span>التطبيق يخفض رصيد فاتورة أخرى. أما رد المبلغ فينشئ سند استرداد وفق الصندوق أو البنك والعملة المحددة.</span></div>
                 <button type="button" class="cc-button cc-button--primary cc-submit" disabled="@_busy" @onclick="SubmitAsync">@(_busy ? "جارٍ التنفيذ..." : _action == "apply" ? "تطبيق الرصيد" : "إنشاء سند الاسترداد وترحيله")</button>
             </div>
+            }
         </section>
 
         <section class="cc-panel">
@@ -174,6 +211,15 @@
     private decimal _amount;
     private byte _method = 1;
     private bool _busy;
+    private bool _storageReady;
+    private bool _canDiscardRejected;
+    private bool _refreshAfterSettlement;
+    private CustomerCreditPendingOperation? _pending;
+
+    // Scope the snapshot to the current customer AND selected database.
+    private string PendingStorageKey =>
+        CustomerCreditPendingOperation.StorageKeyFor(CustomerId, DatabaseProfile.SelectedProfileKey);
+
 
     private CustomerReturnCreditItemDto? SelectedReturn =>
         _state?.Returns.FirstOrDefault(x => x.SalesReturnId == _returnId);
@@ -222,7 +268,175 @@
         _invoicePage = 1;
         _invoiceId = Guid.Empty;
         _returnId = Guid.Empty;
+        await RestorePendingAsync();
         await ReloadAsync();
+        if (_pending is not null && _storageReady)
+            await CheckPendingAsync(false);
+    }
+
+    /// <summary>Fail closed when browser persistence is unavailable or a snapshot is damaged.</summary>
+    private async Task RestorePendingAsync()
+    {
+        _pending = null;
+        _storageReady = false;
+        _canDiscardRejected = false;
+        try
+        {
+            var json = await Js.InvokeAsync<string?>("localStorage.getItem", PendingStorageKey);
+            if (!string.IsNullOrWhiteSpace(json))
+            {
+                var restored = JsonSerializer.Deserialize<CustomerCreditPendingOperation>(json);
+                if (restored?.IsValidFor(CustomerId) != true)
+                    throw new JsonException("Invalid pending credit settlement snapshot.");
+                _pending = restored;
+            }
+            _storageReady = true;
+        }
+        catch (Exception ex) when (ex is JSException or JsonException or InvalidOperationException)
+        {
+            _error = "تعذر استعادة تسوية سابقة. أوقف إرسال العمليات وتواصل مع الدعم لفحص المتصفح والسندات.";
+            Snackbar.Warning(_error);
+        }
+    }
+
+    private async Task SavePendingAsync(CustomerCreditPendingOperation pending)
+    {
+        if (!pending.IsValidFor(CustomerId))
+            throw new InvalidOperationException("Invalid customer credit settlement request.");
+        // Save BEFORE POST: a crashed tab or a lost response must retain the same key and payload.
+        await Js.InvokeVoidAsync("localStorage.setItem", PendingStorageKey,
+            JsonSerializer.Serialize(pending));
+        _pending = pending;
+        _canDiscardRejected = false;
+    }
+
+    private async Task FinishPendingAsync(CustomerCreditSettlementDto settlement)
+    {
+        // A completed server response (POST or GET status check) is the only success path.
+        await Js.InvokeVoidAsync("localStorage.removeItem", PendingStorageKey);
+        _pending = null;
+        _canDiscardRejected = false;
+        _amount = 0m;
+        _returnId = Guid.Empty;
+        _invoiceId = Guid.Empty;
+        _error = "";
+        var documentReference = settlement.PaymentVoucherNumber ?? settlement.Id.ToString("D");
+        Snackbar.Success($"{(settlement.Status == 2 ? "التسوية السابقة موجودة ولكن تم عكسها" : "تم تأكيد التسوية")}. رقم السند/العملية: {documentReference}");
+        _refreshAfterSettlement = true; // Reload only AFTER the current busy operation releases its guard.
+    }
+
+    private Task<CustomerCreditSettlementDto?> LookupPendingAsync(CustomerCreditPendingOperation pending) =>
+        Api.GetAsync<CustomerCreditSettlementDto>(
+            $"api/sales/customer-credits/{CustomerId:D}/operations/{pending.IdempotencyKey}");
+
+    private async Task CheckPendingAsync(bool notifyUnresolved = true)
+    {
+        if (_busy || _pending is null) return;
+        _busy = true;
+        try
+        {
+            var existing = await LookupPendingAsync(_pending);
+            if (existing is not null)
+                await FinishPendingAsync(existing);
+            else if (notifyUnresolved)
+                Snackbar.Warning("لا توجد تسوية مكتملة بهذا المعرف حتى الآن. استخدم إعادة إرسال الطلب نفسه فقط.");
+        }
+        catch (Exception ex)
+        {
+            _error = "تعذر التحقق من حالة التسوية. لم يُرسل أي طلب مالي جديد.";
+            ShowFailure(ex);
+        }
+        finally { _busy = false; }
+        await RefreshAfterSettlementAsync();
+    }
+
+    private async Task RefreshAfterSettlementAsync()
+    {
+        if (!_refreshAfterSettlement) return;
+        _refreshAfterSettlement = false;
+        await ReloadAsync();
+    }
+
+    private async Task SendPendingAsync(CustomerCreditPendingOperation pending)
+    {
+        var settlement = pending.Kind == "apply"
+            ? await Api.PostAsync<ApplyCustomerReturnCreditRequest, CustomerCreditSettlementDto>(
+                $"api/sales/customer-credits/{CustomerId:D}/apply", pending.Apply!)
+            : await Api.PostAsync<RefundCustomerReturnCreditRequest, CustomerCreditSettlementDto>(
+                $"api/sales/customer-credits/{CustomerId:D}/refund", pending.Refund!);
+        if (settlement is null)
+            throw new InvalidOperationException("The settlement response was empty. Reconcile using the saved key.");
+        await FinishPendingAsync(settlement);
+    }
+
+    private async Task HandlePendingFailureAsync(Exception ex)
+    {
+        _error = "نتيجة التسوية غير مؤكدة. احتفظنا بالطلب الأصلي ومفتاحه؛ تحقق من النتيجة أو أعد إرسال الطلب نفسه فقط.";
+        // A well-formed business validation rejection indicates the request was not committed.
+        // Require a further read before offering an explicit discard of the rejected draft.
+        if (ex is ApiClientException apiEx && apiEx.Error.Status is 400 or 409 or 422 && _pending is not null)
+        {
+            try
+            {
+                var existing = await LookupPendingAsync(_pending);
+                if (existing is not null)
+                {
+                    await FinishPendingAsync(existing);
+                    return;
+                }
+                _canDiscardRejected = true;
+                _error = "رفض الخادم الطلب دون تسجيل تسوية. يمكنك تصحيح البيانات بعد إلغاء الطلب المرفوض، أو إعادة فحص نتيجته.";
+            }
+            catch { /* Uncertain status: never allow discarding the pending payment. */ }
+        }
+        ShowFailure(ex);
+    }
+
+    private async Task RetryPendingAsync()
+    {
+        if (_busy || _pending is null || !_storageReady) return;
+        _busy = true;
+        _canDiscardRejected = false;
+        try
+        {
+            // Check first, then replay the EXACT immutable snapshot without revalidation.
+            // Client prevalidation against a now-consumed credit would wrongly reject a successful replay.
+            var pending = _pending;
+            var existing = await LookupPendingAsync(pending);
+            if (existing is not null)
+                await FinishPendingAsync(existing);
+            else
+                await SendPendingAsync(pending);
+        }
+        catch (Exception ex) { await HandlePendingFailureAsync(ex); }
+        finally { _busy = false; }
+        await RefreshAfterSettlementAsync();
+    }
+
+    private async Task DiscardRejectedAsync()
+    {
+        if (_busy || !_canDiscardRejected || _pending is null) return;
+        _busy = true;
+        try
+        {
+            // Discard only following an explicit business rejection and a second status check.
+            var existing = await LookupPendingAsync(_pending);
+            if (existing is not null)
+            {
+                await FinishPendingAsync(existing);
+                return;
+            }
+            if (!await Js.InvokeAsync<bool>("confirm",
+                    "رفض الخادم الطلب السابق دون إتمامه. هل تريد إلغاء بيانات المحاولة المرفوضة وبدء طلب جديد؟"))
+                return;
+            await Js.InvokeVoidAsync("localStorage.removeItem", PendingStorageKey);
+            _pending = null;
+            _canDiscardRejected = false;
+            _error = "";
+            Snackbar.Success("تم إلغاء الطلب المرفوض. يمكنك تعديل البيانات وإنشاء طلب جديد.");
+        }
+        catch (Exception ex) { _error = "تعذر التحقق من الطلب المرفوض؛ احتفظنا به للحماية."; ShowFailure(ex); }
+        finally { _busy = false; await RefreshAfterSettlementAsync(); }
     }
 
     // The preview is gross credit. Only active applications consume it.
@@ -369,35 +583,47 @@
 
     private async Task SubmitAsync()
     {
-        if (_busy || _state is null) return;
+        if (_busy || _state is null || !_storageReady || _pending is not null) return;
         _busy = true;
         _error = "";
         try
         {
+            // Another open tab might already have a pending operation for this customer.
+            // Never overwrite its saved key with a new one.
+            var existingSnapshot = await Js.InvokeAsync<string?>("localStorage.getItem", PendingStorageKey);
+            if (!string.IsNullOrWhiteSpace(existingSnapshot))
+            {
+                await RestorePendingAsync();
+                Reject("توجد تسوية معلقة محفوظة. تحقق من نتيجتها قبل إرسال عملية أخرى.");
+                return;
+            }
             if (!await ValidateSubmissionAsync()) return;
 
-            if (_action == "apply")
+            // Freeze the SAME currency-rounded amount that the server persists.
+            // Otherwise an input such as 10.005 might cause a false mismatch on a replay.
+            var places = _action == "apply"
+                ? _invoices.First(x => x.Id == _invoiceId).CurrencyDecimalPlacesSnapshot
+                : _currencies.First(x => x.Id == _currencyId).DecimalPlaces;
+            var roundedAmount = Math.Round(_amount, places, MidpointRounding.AwayFromZero);
+            var pending = _action == "apply"
+                ? CustomerCreditPendingOperation.ForApply(CustomerId, _returnId, _invoiceId, roundedAmount)
+                : CustomerCreditPendingOperation.ForRefund(CustomerId, _returnId, _currencyId, roundedAmount,
+                    _method, _method == 1 ? _selectedCash : null, _method == 3 ? _selectedBank : null);
+            await SavePendingAsync(pending);
+            await SendPendingAsync(pending);
+        }
+        catch (Exception ex)
+        {
+            if (_pending is null)
             {
-                await Api.PostAsync<ApplyCustomerReturnCreditRequest, CustomerCreditSettlementDto>(
-                    $"api/sales/customer-credits/{CustomerId:D}/apply",
-                    new ApplyCustomerReturnCreditRequest(_returnId, _invoiceId, _amount, Guid.NewGuid().ToString("N")));
+                _error = "لم تُرسل العملية: تعذر حفظ معرف المحاولة بأمان في المتصفح.";
+                ShowFailure(ex);
             }
             else
-            {
-                await Api.PostAsync<RefundCustomerReturnCreditRequest, CustomerCreditSettlementDto>(
-                    $"api/sales/customer-credits/{CustomerId:D}/refund",
-                    new RefundCustomerReturnCreditRequest(_returnId, _currencyId, _amount, _method,
-                        _method == 1 ? _selectedCash : null, _method == 3 ? _selectedBank : null,
-                        null, null, "استرداد رصيد مرتجع", Guid.NewGuid().ToString("N")));
-            }
-            Snackbar.Success("تمت التسوية بنجاح. راجع السند والقيود المرتبطة.");
-            _amount = 0m;
-            _returnId = Guid.Empty;
+                await HandlePendingFailureAsync(ex);
         }
-        catch (Exception ex) { _error = "تعذر إتمام تسوية المرتجع."; ShowFailure(ex); }
         finally { _busy = false; }
-
-        if (string.IsNullOrWhiteSpace(_error)) await ReloadAsync();
+        await RefreshAfterSettlementAsync();
     }
 
     private async Task ReverseAsync(CustomerCreditSettlementDto x)

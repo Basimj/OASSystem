@@ -22,6 +22,16 @@ public sealed class CustomerReturnCreditsController(ISender sender) : Controller
     public async Task<ActionResult<CustomerCreditBalanceDto>> GetBalance(Guid customerId,CancellationToken ct)
         => Ok(await sender.Send(new GetCustomerCreditBalanceQuery(customerId),ct));
 
+    // An explicit read-only status check allows safe recovery after a response is lost.
+    [HttpGet("{customerId:guid}/operations/{key}")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<ActionResult<CustomerCreditSettlementDto>> GetOperation(
+        Guid customerId, string key, CancellationToken ct)
+    {
+        var result = await sender.Send(new GetCustomerCreditOperationQuery(customerId, key), ct);
+        return result is null ? NoContent() : Ok(result);
+    }
+
     [HttpPost("{customerId:guid}/apply")]
     public async Task<ActionResult<CustomerCreditSettlementDto>> Apply(Guid customerId,
         [FromBody] ApplyCustomerReturnCreditRequest request,CancellationToken ct)

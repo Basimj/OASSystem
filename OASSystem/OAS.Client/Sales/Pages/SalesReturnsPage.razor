@@ -364,13 +364,13 @@
                                 <div class="oas-returns-keyvalue"><span>المسترد سابقًا بسند صرف</span><strong>@CurrentRefundedBase.ToString("N2") @credit.BaseCurrencyCode</strong></div>
                             }
                         }
-                        @if (_creditBalance is not null && CurrentRefundAvailableBase > 0m)
+                        @if (_creditBalance is not null)
                         {
-                            <button type="button" class="oas-returns-primary oas-returns-refund-button" disabled="@_busy" @onclick="OpenRefundAsync"><i class="fa-solid fa-hand-holding-dollar"></i> رد المبلغ للعميل</button>
-                        }
-                        else if (_creditBalance is not null)
-                        {
-                            <p class="oas-returns-credit-explanation">لا يوجد رصيد دائن متاح لهذا المرتجع، فلا يمكن رد مبلغ نقدي أو بنكي.</p>
+                            <button type="button" class="oas-returns-primary oas-returns-refund-button" disabled="@_busy" @onclick="OpenRefundAsync"><i class="fa-solid fa-hand-holding-dollar"></i> @(CurrentRefundAvailableBase > 0m ? "رد المبلغ للعميل" : "التحقق من استرداد سابق")</button>
+                            @if (CurrentRefundAvailableBase <= 0m)
+                            {
+                                <p class="oas-returns-credit-explanation">لا يوجد رصيد جديد متاح للصرف. زر التحقق يتيح استعادة نتيجة عملية سبق إرسالها عند انقطاع الاتصال.</p>
+                            }
                         }
                         else
                         {
@@ -939,9 +939,9 @@
     private async Task OpenRefundAsync()
     {
         if (_busy || _selected is not { Status: SalesReturnStatus.Posted } selected) return;
-        if (_creditBalance is null || CurrentRefundAvailableBase <= 0m)
+        if (_creditBalance is null)
         {
-            Snackbar.Warning("لا يوجد رصيد دائن متاح للاسترداد لهذا المرتجع. حدث البيانات أولًا.");
+            Snackbar.Warning("تعذر تحميل رصيد المرتجع. حدث البيانات أولًا.");
             return;
         }
         var result = await Dialog.ShowAsync<SalesReturnRefundDialog>(
@@ -953,8 +953,13 @@
                 [nameof(SalesReturnRefundDialog.ReturnCode)] = selected.ReturnCode
             },
             new UiDialogOptions { Size = UiDialogSize.Large, CloseOnBackdrop = false, CloseOnEscape = false });
-        if (result.Cancelled || result.Value is not CustomerCreditSettlementDto) return;
-        Snackbar.Success("تم رد المبلغ وإنشاء سند صرف مرحّل. تم تحديث رصيد المرتجع.");
+        if (result.Cancelled || result.Value is not CustomerCreditSettlementDto settlement) return;
+        var reference = settlement.PaymentVoucherNumber ?? settlement.Id.ToString("D");
+        Snackbar.Success(settlement.Status == 2
+            ? $"تم العثور على التسوية السابقة وقد عُكست. مرجع العملية: {reference}"
+            : settlement.SettlementKind == 2
+                ? $"تم تأكيد الاسترداد بسند الصرف: {reference}. تم تحديث رصيد المرتجع."
+                : $"تم تأكيد تطبيق الرصيد السابق. مرجع العملية: {reference}");
         await LoadCurrentCreditPreviewAsync();
         await RefreshAsync();
     }
