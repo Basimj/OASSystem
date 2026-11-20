@@ -33,6 +33,10 @@
             <div class="oas-invoice-primary-fields">
                 <div class="oas-invoice-code-field">
                     <UiInputText Label="رقم الفاتورة" Value="@Model.InvoiceCode" ReadOnly="true" />
+                    @if (Model.Id is null)
+                    {
+                        <small class="oas-invoice-preview-note">هذا رقم حجز مبدئي. عند بيع عدسة يحدد مسار إتمام البيع رقم الفاتورة النهائي ويربطها بطلب العميل تلقائيًا.</small>
+                    }
                 </div>
                 <div class="oas-invoice-customer-field">
                     @if (!WalkInCustomerId.HasValue && Model.Id is null)
@@ -58,6 +62,10 @@
                 </div>
                 <UiInputDate Label="تاريخ الفاتورة" Value="@Model.InvoiceDate" ValueChanged="InvoiceDateChanged" Required="true" ReadOnly="@ReadOnly" />
                 <UiInputDate Label="تاريخ الترحيل" Value="@Model.PostingDate" ValueChanged="PostingDateChanged" Required="true" ReadOnly="@ReadOnly" />
+                @if (!ReadOnly && Model.Id is null)
+                {
+                    <UiInputDate Label="التسليم المطلوب (للعدسات والتجهيز)" Value="@Model.RequiredDate" ValueChanged="RequiredDateChanged" ReadOnly="@ReadOnly" />
+                }
                 <UiLookup Label="العملة" Value="@Model.CurrencyId" ValueChanged="CurrencyChanged"
                           SelectedItem="@CurrencyItem" SearchAsync="SearchCurrenciesAsync"
                           Placeholder="اختر عملة الفاتورة..." Required="true" Disabled="@ReadOnly" />
@@ -76,6 +84,7 @@
                             @if (Guid.TryParse(Model.CustomerOrderId, out var sourceOrderId))
                             {
                                 <a href="@($"/sales/customer-orders?orderId={sourceOrderId:D}")"><i class="fa-solid fa-arrow-up-right-from-square"></i> فتح طلب العميل</a>
+                                <a href="@($"/sales/order-tracking?orderId={sourceOrderId:D}")"><i class="fa-solid fa-route"></i> متابعة المخزون والمعمل والتسليم</a>
                             }
                         </div>
                     }
@@ -94,7 +103,7 @@
             </details>
             @if (!string.IsNullOrWhiteSpace(Model.CustomerOrderId))
             {
-                <p class="oas-invoice-source-note"><i class="fa-solid fa-link" aria-hidden="true"></i> هذه الفاتورة مرتبطة بطلب عميل، وتُنشأ من شاشة «إتمام البيع».
+                <p class="oas-invoice-source-note"><i class="fa-solid fa-link" aria-hidden="true"></i> هذه الفاتورة مرتبطة بطلب عميل تشغيلي. التأكيد يراجع توفر المواد، والترحيل يبدأ الدورة المحاسبية والمعمل بعد السداد المطلوب. لتغيير البنود قبل التأكيد، ألغِ المسودة وأعد الإنشاء لحماية تطابق الطلب والفاتورة.
                     @if (Guid.TryParse(Model.CustomerOrderId, out var relatedOrderId))
                     {
                         <a href="@($"/sales/customer-orders?orderId={relatedOrderId:D}")">فتح الطلب المصدر</a>
@@ -112,33 +121,36 @@
             {
                 <p class="oas-invoice-form-errors" role="alert">أدخل بندًا واحدًا على الأقل، وحدد الصنف للبنود السلعية، والمخزن للمنتجات المخزنية، والكمية الموجبة والسعر الصحيح لكل بند.</p>
             }
-            <UiSalesLinesEditor Model="@Model.Lines" ReadOnly="@ReadOnly"
+            <UiSalesLinesEditor @ref="_salesLinesEditor" Model="@Model.Lines" ReadOnly="@ReadOnly"
                                 SearchProductTypesAsync="SearchProductTypesAsync"
                                 SearchCategoriesAsync="SearchCategoriesAsync"
                                 SearchProductsAsync="SearchProductsAsync"
                                 SearchWarehousesAsync="SearchWarehousesAsync"
                                 SearchPrescriptionRevisionsAsync="SearchPrescriptionRevisionsAsync"
+                                HeaderPrescriptionRevisionId="@Model.PrescriptionRevisionId" HeaderPrescriptionRevisionDisplay="@Model.PrescriptionDisplay"
                                 OnProductTypeSelected="OnProductTypeSelected"
                                 OnCategorySelected="OnCategorySelected"
                                 OnProductSelected="OnProductSelected"
                                 OnWarehouseSelected="OnWarehouseSelected"
                                 EnablePriceOverride="true"
                                 OnRequestPriceOverride="OnRequestPriceOverride"
-                                OnChanged="OnChanged" />
+                                OnChanged="InvoiceLinesChangedAsync" />
             @if (!ReadOnly)
             {
-                <p class="oas-invoice-direct-note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> البيع المباشر للأصناف المتاحة. الأصناف التي تحتاج توريدًا خارجيًا تُباع عبر طلب العميل ثم إتمام البيع.</p>
+                <p class="oas-invoice-direct-note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> حفظ الفاتورة ينشئ مسودة فقط دون دفعة أو ترحيل. عند وجود عدسات ينشئ النظام طلب العميل المرتبط تلقائيًا؛ ثم تتم مراجعة المخزون عند التأكيد، والتحصيل عند الترحيل.</p>
             }
         </UiSalesFormSection>
 
         @if (ShowSettlement)
         {
-            <UiSalesFormSection Title="تحصيل البيع المباشر" Description="يمكن توزيع المبلغ المستحق على أكثر من طريقة دفع." IconCss="fa-solid fa-wallet">
+            <UiSalesFormSection Title="بيانات السداد" Description="أدخل الدفعات بعد تأكيد الفاتورة؛ تُراجع وتُحصَّل عند الضغط على ترحيل، دون تأكيد منفصل لكل سطر." IconCss="fa-solid fa-wallet">
                 <UiSalesPaymentLinesEditor Lines="@Model.PaymentLines"
                                            SearchCurrenciesAsync="SearchCurrenciesAsync"
                                            SearchCashAccountsAsync="SearchPaymentCashAccountsAsync"
                                            SearchBankAccountsAsync="SearchPaymentBankAccountsAsync"
                                            SearchSettlementAccountsAsync="SearchSettlementAccountsAsync"
+                                           RequireExplicitConfirmation="false"
+                                           OnConfirm="ConfirmPaymentLineAsync"
                                            OnAdd="AddPaymentLineAsync"
                                            OnRemove="RemovePaymentLineAsync"
                                            OnChanged="PaymentLinesChangedAsync" />
@@ -151,6 +163,12 @@
             <h3><i class="fa-solid fa-calculator" aria-hidden="true"></i> إجمالي الفاتورة</h3>
             <UiSalesTotalsPanel CurrencyCode="@Model.CurrencyCode" Subtotal="@Model.Subtotal"
                                 DiscountAmount="@Model.DiscountAmount" TaxAmount="@Model.TaxAmount" TotalAmount="@Model.TotalAmount" />
+            @if (!ReadOnly && Model.Id is null)
+            {
+                <small class="oas-invoice-preview-note" role="status">
+                    @(_previewTotalsValid ? "إجمالي مبدئي يُحدّث مع البنود؛ تعتمد القيم النهائية من الخادم عند الحفظ." : "توجد قيمة بند غير صالحة؛ الإجمالي المعروض هو آخر تقدير صحيح.")
+                </small>
+            }
         </section>
 
         <section class="oas-invoice-aside__card" aria-label="ملخص السداد">
@@ -195,6 +213,20 @@
 </div>
 
 @code {
+    private UiSalesLinesEditor? _salesLinesEditor;
+    private bool _previewTotalsValid = true;
+    private async Task InvoiceLinesChangedAsync()
+    {
+        if (!ReadOnly && Model.Id is null)
+            _previewTotalsValid = UiSalesInvoicePreviewCalculator.TryRecalculate(Model);
+        await OnChanged.InvokeAsync();
+    }
+
+    public bool ValidateOpticalInputs() => _salesLinesEditor?.ValidateOpticalInputs() ?? true;
+    public bool ValidatePricingInputs() => _salesLinesEditor?.ValidatePricingInputs() ?? true;
+    public void ShowOpticalValidationIssues(IReadOnlyList<(int LineNumber, string Message)> issues) =>
+        _salesLinesEditor?.ShowOpticalValidationIssues(issues);
+
     private static readonly IReadOnlyList<UiSelectOption> TaxOptions =
     [
         new("Exclusive", "غير شامل الضريبة"),
@@ -298,11 +330,12 @@
     {
         Model.CurrencyId = v ?? string.Empty;
         await OnSelectionChanged.InvokeAsync(new("Currency", v));
-        await OnChanged.InvokeAsync();
+        await InvoiceLinesChangedAsync();
     }
     private async Task InvoiceDateChanged(DateOnly? v) { Model.InvoiceDate = v; await OnChanged.InvokeAsync(); }
     private async Task PostingDateChanged(DateOnly? v) { Model.PostingDate = v; await OnChanged.InvokeAsync(); }
-    private async Task TaxModeChanged(string? v) { Model.TaxCalculationMode = v ?? "Exclusive"; await OnChanged.InvokeAsync(); }
+    private async Task RequiredDateChanged(DateOnly? v) { Model.RequiredDate = v; await OnChanged.InvokeAsync(); }
+    private async Task TaxModeChanged(string? v) { Model.TaxCalculationMode = v ?? "Exclusive"; await InvoiceLinesChangedAsync(); }
     private async Task PaymentPlanChanged(string? v)
     {
         Model.PaymentPlan = v ?? "FullNow";
@@ -315,6 +348,44 @@
 
     // Payment lines are transient posting inputs; they must not dirty a confirmed invoice.
     private Task PaymentLinesChangedAsync() => Task.CompletedTask;
+    private Task ConfirmPaymentLineAsync(UiCheckoutPaymentLineModel line)
+    {
+        line.ValidationError = null;
+        line.ValidationField = null;
+        if (line.Amount <= 0m)
+        {
+            line.ValidationField = "amount";
+            line.ValidationError = "يجب إدخال مبلغ موجب.";
+        }
+        else if (!Guid.TryParse(line.CurrencyId, out _))
+        {
+            line.ValidationField = "currency";
+            line.ValidationError = "حدد عملة الدفعة.";
+        }
+        else if (line.PaymentMethod == "Cash" && !Guid.TryParse(line.CashAccountId, out _))
+        {
+            line.ValidationField = "cash";
+            line.ValidationError = "اختر الصندوق النقدي.";
+        }
+        else if ((line.PaymentMethod is "Card" or "BankTransfer" or "Cheque") &&
+                 !Guid.TryParse(line.BankAccountId, out _))
+        {
+            line.ValidationField = "bank";
+            line.ValidationError = "اختر الحساب البنكي.";
+        }
+        else if (line.PaymentMethod == "Cheque" && string.IsNullOrWhiteSpace(line.ReferenceNumber))
+        {
+            line.ValidationField = "reference";
+            line.ValidationError = "أدخل رقم الشيك.";
+        }
+        else if (line.PaymentMethod == "Other" && !Guid.TryParse(line.SettlementAccountId, out _))
+        {
+            line.ValidationField = "settlement";
+            line.ValidationError = "اختر حساب التسوية.";
+        }
+        line.IsConfirmed = line.ValidationError is null;
+        return Task.CompletedTask;
+    }
     private Task AddPaymentLineAsync()
     {
         Model.PaymentLines.Add(new UiCheckoutPaymentLineModel
@@ -323,7 +394,7 @@
             CurrencyId = Model.CurrencyId,
             CurrencyDisplay = Model.CurrencyDisplay ?? Model.CurrencyCode,
             Amount = Model.PaymentPlan == "FullNow" && Model.PaymentLines.Count == 0
-                ? Math.Max(0m, Model.OutstandingAmount) : 0m
+                ? Math.Max(0m, Model.Id.HasValue ? Model.OutstandingAmount : Model.TotalAmount) : 0m
         });
         return Task.CompletedTask;
     }

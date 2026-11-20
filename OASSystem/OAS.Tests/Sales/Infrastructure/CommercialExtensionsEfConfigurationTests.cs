@@ -53,6 +53,19 @@ public sealed class CommercialExtensionsEfConfigurationTests
     }
 
     [Test]
+    public void InvoiceFirst_AllowsOnlyOneNonCancelledInvoicePerOrder()
+    {
+        using var context = new OasDbContext(_options);
+        var entity = context.Model.FindEntityType(typeof(SalesInvoice));
+        Assert.That(entity, Is.Not.Null);
+        var index = entity!.GetIndexes().SingleOrDefault(x =>
+            x.GetDatabaseName() == "UX_SalesInvoices_ActiveCustomerOrderId");
+        Assert.That(index, Is.Not.Null);
+        Assert.That(index!.IsUnique, Is.True);
+        Assert.That(index.GetFilter(), Is.EqualTo("[CustomerOrderId] IS NOT NULL AND [Status] <> 4"));
+    }
+
+    [Test]
     public void OpticalProduction_AllowsOnlyOneActiveJobPerSalesInvoiceLine()
     {
         using var context = new OasDbContext(_options);

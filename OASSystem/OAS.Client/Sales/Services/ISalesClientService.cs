@@ -96,6 +96,7 @@ public interface ISalesClientService
     Task<ApiCallResult<CustomerOrderDto>> ConfirmCustomerOrderResultAsync(Guid id, ConfirmCustomerOrderRequest request, CancellationToken cancellationToken = default);
     Task<ApiCallResult<CustomerOrderDto>> CancelCustomerOrderResultAsync(Guid id, CancelCustomerOrderRequest request, CancellationToken cancellationToken = default);
 
+    Task<ApiCallResult<SalesInvoiceDto>> CreateSalesInvoiceFromOrderResultAsync(Guid orderId, CreateSalesInvoiceFromOrderRequest request, CancellationToken cancellationToken = default);
     Task<ApiCallResult<SalesInvoiceDto>> CreateSalesInvoiceResultAsync(CreateSalesInvoiceRequest request, CancellationToken cancellationToken = default);
     Task<ApiCallResult<SalesInvoiceDto>> UpdateSalesInvoiceResultAsync(Guid id, UpdateSalesInvoiceRequest request, CancellationToken cancellationToken = default);
     Task<ApiCallResult<SalesInvoiceDto>> ConfirmSalesInvoiceResultAsync(Guid id, ConfirmSalesInvoiceRequest request, CancellationToken cancellationToken = default);

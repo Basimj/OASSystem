@@ -1,4 +1,5 @@
 using MediatR;
+using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.Sales.Abstractions;
 using OAS.Application.Sales.Common;
@@ -7,6 +8,8 @@ using OAS.Contracts.Sales.Checkout;
 using OAS.Contracts.Sales.Enums;
 using OAS.Contracts.Sales.SalesInvoices;
 using OAS.Domain.Sales.Entities;
+using DomainSalesInvoiceStatus = OAS.Domain.Sales.Enums.SalesInvoiceStatus;
+using DomainCustomerOrderStatus = OAS.Domain.Sales.Enums.CustomerOrderStatus;
 using DomainPlan = OAS.Domain.Sales.Enums.SalesPaymentPlan;
 
 namespace OAS.Application.Sales.SalesInvoices.Commands;
@@ -14,7 +17,10 @@ namespace OAS.Application.Sales.SalesInvoices.Commands;
 public sealed class PostSalesInvoiceCommandHandler(
     ISalesInvoiceAggregateRepository invoices,
     ISalesInvoicePostingWorkflow posting,
-    ISalesSettlementService settlement)
+    ISalesSettlementService settlement,
+    ICustomerOrderAggregateRepository orders,
+    IOpticalProductionPort opticalProduction,
+    IUnitOfWork unitOfWork)
     : IRequestHandler<PostSalesInvoiceCommand, SalesInvoicePostingResultDto>
 {
     private const decimal MoneyTolerance = 0.0001m;
@@ -24,6 +30,11 @@ public sealed class PostSalesInvoiceCommandHandler(
         var invoice = await invoices.GetAggregateAsync(request.InvoiceId, true, ct)
             ?? throw new NotFoundException(nameof(SalesInvoice), request.InvoiceId);
         SalesConcurrency.Ensure(request.Request.RowVersion, invoice.RowVersion, "فاتورة المبيعات");
+        // Guard BEFORE computing/creating payment: PostAsync is idempotent for inventory
+        // but this handler must not create a second receipt against an already posted invoice.
+        if (invoice.Status == DomainSalesInvoiceStatus.Posted)
+            throw new ConflictException("sales_invoice_already_posted_use_collection",
+                "الفاتورة مرحلة بالفعل. راجع سند القبض الأصلي، واستخدم تحصيل دفعة فقط للمبلغ المتبقي.");
 
         var paymentLines = BuildEffectivePaymentLines(invoice, request.Request);
         var paymentBaseAmount = await settlement.CalculateInvoicePaymentTargetBaseAmountAsync(invoice, paymentLines, ct);
@@ -34,6 +45,20 @@ public sealed class PostSalesInvoiceCommandHandler(
         SalesPaymentCollectionResult? collection = null;
         if (paymentLines.Count > 0)
             collection = await settlement.CreateReceiptForInvoiceAsync(invoice, paymentLines, ct);
+
+        if (invoice.CustomerOrderId.HasValue)
+        {
+            var order = await orders.GetAggregateAsync(invoice.CustomerOrderId.Value, true, ct)
+                ?? throw new NotFoundException(nameof(CustomerOrder), invoice.CustomerOrderId.Value);
+            if (order.RequiresProduction)
+                await opticalProduction.EnsureJobAsync(order, invoice.Id, ct);
+            else if (order.Status == DomainCustomerOrderStatus.Confirmed)
+            {
+                order.MarkReadyForDelivery();
+                orders.Update(order);
+            }
+            await unitOfWork.SaveChangesAsync(ct);
+        }
 
         return new SalesInvoicePostingResultDto(
             invoice.Id,

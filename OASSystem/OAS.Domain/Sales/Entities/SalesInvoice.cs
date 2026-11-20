@@ -40,6 +40,9 @@ public sealed class SalesInvoice : AuditableEntity<Guid>
     public string InvoiceCode { get; private set; } = string.Empty;
     public Guid CustomerId { get; private set; }
     public Guid? CustomerOrderId { get; private set; }
+    // Null for pre-existing invoices; newly-created order invoices carry their order id.
+    // Allows preserving valid historical multiple-invoice orders while protecting new writes.
+    public Guid? NewOrderInvoiceKey { get; private set; }
     public Guid? PrescriptionRevisionId { get; private set; }
     public Guid? SalesEmployeeId { get; private set; }
     public DateOnly InvoiceDate { get; private set; }
@@ -117,11 +120,21 @@ public sealed class SalesInvoice : AuditableEntity<Guid>
             SalesPaymentPlanPolicy.FromLegacyPaymentTerm(paymentTermType), paymentTermDaysSnapshot,
             baseCurrencyId, baseCurrencyCodeSnapshot, baseCurrencyDecimalPlacesSnapshot, description);
 
+    public void ProtectNewOrderInvoice()
+    {
+        EnsureDraft();
+        if (!CustomerOrderId.HasValue || CustomerOrderId.Value == Guid.Empty)
+            throw new DomainException("Only invoices associated with an order can be protected by the new-order key.");
+        NewOrderInvoiceKey = CustomerOrderId.Value;
+    }
+
     public void UpdateHeader(
         Guid customerId, Guid? customerOrderId, Guid? prescriptionRevisionId, DateOnly invoiceDate, DateOnly postingDate,
         TaxCalculationMode taxCalculationMode, SalesPaymentPlan paymentPlan, int paymentTermDaysSnapshot, string? description)
     {
         EnsureDraft();
+        if (NewOrderInvoiceKey.HasValue && customerOrderId != NewOrderInvoiceKey)
+            throw new DomainException("The customer order of a protected invoice cannot be changed.");
         InvalidateHeaderDiscountApproval();
         CustomerId = SalesDomainGuard.Required(customerId, "Customer id");
         ValidateOptionalId(customerOrderId, "Customer order id");

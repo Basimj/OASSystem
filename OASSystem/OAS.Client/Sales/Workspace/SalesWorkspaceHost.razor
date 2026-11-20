@@ -265,7 +265,11 @@
                 <Actions>
                     @if (ActiveTab.IsEditMode)
                     {
-                        <UiButton Text="حفظ" IconCssClass="fa-solid fa-floppy-disk" Loading="@ActiveTab.IsSaving" Size="ControlSize.Small" OnClick="SaveAsync" />
+                        <UiButton Text="@InvoiceSaveText(invoice)" IconCssClass="fa-solid fa-floppy-disk" Loading="@ActiveTab.IsSaving" Size="ControlSize.Small" OnClick="SaveAsync" />
+                        @if (ActiveTab.IsNew)
+                        {
+                            <UiButton Text="استعادة عملية معلقة" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Loading="@ActiveTab.IsSaving" Size="ControlSize.Small" OnClick="RecoverInvoiceFirstAsync" />
+                        }
                         @if (ActiveTab.IsNew) { <UiButton Text="إلغاء" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="@(_ => ReturnToSalesListAsync())" /> }
                         else { <UiButton Text="إلغاء التعديل" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" OnClick="CancelEditAsync" /> }
                     }
@@ -290,13 +294,14 @@
                         {
                             <UiButton Text="@(invoice.ReturnedAmount > 0.0001m ? "تمت التسوية بمرتجع — لا يوجد تحصيل" : "لا يوجد مبلغ متبقٍ للتحصيل")" IconCssClass="fa-solid fa-circle-check" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="true" />
                         }
+                        <UiButton Text="التحقق من تحصيل معلق" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Loading="@_isCollectingInvoicePayment" Disabled="@_isCollectingInvoicePayment" OnClick="RecoverInvoiceCollectionAsync" />
                         <UiButton Text="طباعة" IconCssClass="fa-solid fa-print" Size="ControlSize.Small" Loading="@_isPrintingInvoice" Disabled="@_isPrintingInvoice" OnClick="PrintInvoiceAsync" />
                         <UiButton Text="عرض القيد" IconCssClass="fa-solid fa-book-journal-whills" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="ViewJournalAsync" />
                         <UiButton Text="عرض حركة المخزون" IconCssClass="fa-solid fa-boxes-stacked" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="ViewInventoryAsync" />
                     }
                 </Actions>
                 <ChildContent>
-                    <UiSalesInvoiceEditor Model="@invoice" ReadOnly="@InvoiceReadOnly(invoice)" ShowValidationErrors="@_invoiceValidationAttempted.Contains(ActiveTab.TabId)"
+                    <UiSalesInvoiceEditor @ref="_activeSalesInvoiceEditor" Model="@invoice" ReadOnly="@InvoiceReadOnly(invoice)" ShowValidationErrors="@_invoiceValidationAttempted.Contains(ActiveTab.TabId)"
                                           WalkInCustomerId="@_walkInCustomerId"
                                           WalkInCustomerLabel="@_walkInCustomerLabel"
                                           SearchCustomersAsync="SearchCustomerItemsAsync" SearchEmployeesAsync="SearchEmployeeItemsAsync" SearchPrescriptionsAsync="SearchPrescriptionRevisionItemsAsync" SearchCurrenciesAsync="SearchCurrencyItemsAsync"

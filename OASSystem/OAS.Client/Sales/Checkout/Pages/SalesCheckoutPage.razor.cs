@@ -29,6 +29,12 @@ public partial class SalesCheckoutPage : ComponentBase
     [Inject] private IJSRuntime JS { get; set; } = default!;
 
     [Parameter, SupplyParameterFromQuery(Name = "orderId")] public Guid? OrderId { get; set; }
+    [Parameter] public bool InvoiceWorkspace { get; set; }
+
+    private string CheckoutRoute(Guid? orderId = null) => InvoiceWorkspace
+        ? orderId.HasValue ? $"/sales/invoices?checkoutOrderId={orderId.Value:D}" : "/sales/invoices"
+        : orderId.HasValue ? $"/sales/checkout?orderId={orderId.Value:D}" : "/sales/checkout";
+
 
     private readonly UiSalesCheckoutSelectionModel _selection = new();
     private UiSalesCheckoutModel? _model;
@@ -89,7 +95,7 @@ public partial class SalesCheckoutPage : ComponentBase
         _selection.OrderId = string.Empty;
         _selection.OrderDisplay = null;
         State.SetContext(null);
-        Navigation.NavigateTo("/sales/checkout", replace: true);
+        Navigation.NavigateTo(CheckoutRoute(), replace: true);
         return Task.CompletedTask;
     }
 
@@ -98,7 +104,7 @@ public partial class SalesCheckoutPage : ComponentBase
         var tab = _orderTabs.FirstOrDefault(x => x.OrderId == orderId);
         if (tab is null) return Task.CompletedTask;
         ActivateTab(tab);
-        Navigation.NavigateTo($"/sales/checkout?orderId={orderId:D}", replace: true);
+        Navigation.NavigateTo(CheckoutRoute(orderId), replace: true);
         return Task.CompletedTask;
     }
 
@@ -132,7 +138,7 @@ public partial class SalesCheckoutPage : ComponentBase
     private async Task BackToOrdersAsync()
     {
         if (!await ConfirmDiscardAsync()) return;
-        Navigation.NavigateTo("/sales/customer-orders");
+        Navigation.NavigateTo(InvoiceWorkspace ? "/sales/invoices" : "/sales/customer-orders");
     }
 
     private async Task CancelCheckoutAsync()
@@ -169,7 +175,7 @@ public partial class SalesCheckoutPage : ComponentBase
             ActivateTab(cached);
         else
             await LoadAsync(id);
-        Navigation.NavigateTo($"/sales/checkout?orderId={id:D}", replace: true);
+        Navigation.NavigateTo(CheckoutRoute(id), replace: true);
     }
 
     private async Task LoadAsync(Guid orderId)

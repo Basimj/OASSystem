@@ -141,6 +141,7 @@ public sealed class UiCustomerOrderFormModel
     public decimal ExchangeRate { get; set; } = 1m;
     public string TaxCalculationMode { get; set; } = "Exclusive";
     public string PaymentTermType { get; set; } = "Immediate";
+    public string PaymentPlan { get; set; } = "FullNow";
     public int PaymentTermDays { get; set; }
     public decimal Subtotal { get; set; }
     public decimal DiscountAmount { get; set; }
@@ -169,6 +170,8 @@ public sealed class UiSalesInvoiceFormModel
     public string? PrescriptionDisplay { get; set; }
     public DateOnly? InvoiceDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
     public DateOnly? PostingDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+    // Operational orders created from invoice workspace use this date for delivery planning.
+    public DateOnly? RequiredDate { get; set; }
     public DateOnly? DueDate { get; set; }
     public string Status { get; set; } = "Draft";
     public string StatusText { get; set; } = "مسودة";

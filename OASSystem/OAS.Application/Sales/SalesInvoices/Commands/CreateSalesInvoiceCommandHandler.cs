@@ -32,6 +32,11 @@ public sealed class CreateSalesInvoiceCommandHandler(
     public async Task<SalesInvoice> Handle(CreateSalesInvoiceCommand request, CancellationToken ct)
     {
         var d = request.Data;
+        if (SalesInvoiceOperationalRoutingPolicy.RequiresOrder(d.Lines))
+            throw new ConflictException(
+                "sales_invoice_production_requires_order",
+                "لا يمكن إنشاء فاتورة عدسة أو تجهيز معمل مباشرة دون طلب عميل. ابدأ العملية من واجهة الفاتورة لتُنشأ دورة الطلب والمخزون والمعمل ثم الفاتورة من Checkout.");
+
         var customer = await customers.GetByIdAsync(d.CustomerId, ct)
             ?? throw new NotFoundException(nameof(Customer), d.CustomerId);
 

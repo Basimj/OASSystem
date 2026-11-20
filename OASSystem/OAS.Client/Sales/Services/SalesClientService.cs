@@ -175,6 +175,8 @@ public sealed class SalesClientService(OasApiClient apiClient) : ISalesClientSer
     public Task<ApiCallResult<CustomerOrderDto>> CancelCustomerOrderResultAsync(Guid id, CancelCustomerOrderRequest r, CancellationToken ct = default)
         => apiClient.PostResultAsync<CancelCustomerOrderRequest, CustomerOrderDto>($"api/sales/customer-orders/{id}/cancel", r, ct);
 
+    public Task<ApiCallResult<SalesInvoiceDto>> CreateSalesInvoiceFromOrderResultAsync(Guid orderId, CreateSalesInvoiceFromOrderRequest r, CancellationToken ct = default)
+        => apiClient.PostResultAsync<CreateSalesInvoiceFromOrderRequest, SalesInvoiceDto>($"api/sales/invoices/from-order/{orderId:D}", r, ct);
     public Task<ApiCallResult<SalesInvoiceDto>> CreateSalesInvoiceResultAsync(CreateSalesInvoiceRequest r, CancellationToken ct = default)
         => apiClient.PostResultAsync<CreateSalesInvoiceRequest, SalesInvoiceDto>("api/sales/invoices", r, ct);
     public Task<ApiCallResult<SalesInvoiceDto>> UpdateSalesInvoiceResultAsync(Guid id, UpdateSalesInvoiceRequest r, CancellationToken ct = default)

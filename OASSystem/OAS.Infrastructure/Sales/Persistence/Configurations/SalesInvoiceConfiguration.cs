@@ -23,6 +23,7 @@ public sealed class SalesInvoiceConfiguration : IEntityTypeConfiguration<SalesIn
         builder.Property(x => x.InvoiceCode).IsRequired().HasMaxLength(40);
         builder.Property(x => x.CustomerId).IsRequired();
         builder.Property(x => x.CustomerOrderId);
+        builder.Property(x => x.NewOrderInvoiceKey);
         builder.Property(x => x.PrescriptionRevisionId);
         builder.Property(x => x.SalesEmployeeId);
         builder.Property(x => x.InvoiceDate).IsRequired().HasColumnType("date");
@@ -75,6 +76,12 @@ public sealed class SalesInvoiceConfiguration : IEntityTypeConfiguration<SalesIn
         builder.HasIndex(x => x.PostingDate).HasDatabaseName("IX_SalesInvoices_PostingDate");
         builder.HasIndex(x => x.Status).HasDatabaseName("IX_SalesInvoices_Status");
         builder.HasIndex(x => x.CustomerOrderId).HasDatabaseName("IX_SalesInvoices_CustomerOrderId");
+        // Enforce uniqueness for invoices created from orders after the cutover.
+        // Historical orders may legitimately have several invoices; all their keys are NULL.
+        builder.HasIndex(x => x.NewOrderInvoiceKey)
+            .IsUnique()
+            .HasFilter("[NewOrderInvoiceKey] IS NOT NULL AND [Status] <> 4")
+            .HasDatabaseName("UX_SalesInvoices_NewActiveOrderInvoiceKey");
         builder.HasIndex(x => x.JournalEntryId).HasDatabaseName("IX_SalesInvoices_JournalEntryId");
         builder.HasIndex(x => x.PrescriptionRevisionId).HasDatabaseName("IX_SalesInvoices_PrescriptionRevisionId");
         builder.HasIndex(x => x.SalesEmployeeId).HasDatabaseName("IX_SalesInvoices_SalesEmployeeId");

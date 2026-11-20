@@ -35,7 +35,11 @@
                     }
                     <div><UiInputText Label="المرجع" Value="@line.ReferenceNumber" ValueChanged="v => TextChangedAsync(line, v)" Placeholder="رقم التحويل/الشيك" Disabled="@Disabled" />@if (line.ValidationField == "reference") { <small class="oas-checkout-field-error" role="alert">@line.ValidationError</small> }</div>
                     <div class="oas-checkout-payment-confirm">
-                        @if (line.IsConfirmed)
+                        @if (!RequireExplicitConfirmation)
+                        {
+                            <span class="oas-checkout-payment-confirmed"><i class="fa-solid fa-circle-info"></i> ستُراجع الدفعة عند الترحيل</span>
+                        }
+                        else if (line.IsConfirmed)
                         {
                             <span class="oas-checkout-payment-confirmed"><i class="fa-solid fa-circle-check"></i> الدفعة مؤكدة داخل النموذج</span>
                         }
@@ -56,6 +60,7 @@
 @code {
     [Parameter] public List<UiCheckoutPaymentLineModel> Lines { get; set; } = [];
     [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool RequireExplicitConfirmation { get; set; } = true;
     [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchCurrenciesAsync { get; set; }
     [Parameter] public Func<UiCheckoutPaymentLineModel,string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchCashAccountsAsync { get; set; }
     [Parameter] public Func<UiCheckoutPaymentLineModel,string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? SearchBankAccountsAsync { get; set; }

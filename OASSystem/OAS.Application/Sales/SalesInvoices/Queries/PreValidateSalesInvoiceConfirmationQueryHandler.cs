@@ -4,6 +4,7 @@ using OAS.Application.Sales.Abstractions;
 using OAS.Application.Sales.Common;
 using OAS.Contracts.Sales.Common;
 using OAS.Domain.Accounting.Entities;
+using OAS.Domain.Sales.Entities;
 using OAS.Domain.Sales.Enums;
 
 namespace OAS.Application.Sales.SalesInvoices.Queries;
@@ -12,7 +13,8 @@ public sealed class PreValidateSalesInvoiceConfirmationQueryHandler(
     ISalesInvoiceAggregateRepository invoices,
     IReadRepository<Customer, Guid> customers,
     ISalesCreditExposureService credit,
-    ISalesStockReservationService stock)
+    ISalesStockReservationService stock,
+    IReadRepository<CustomerOrder, Guid> orders)
     : IRequestHandler<PreValidateSalesInvoiceConfirmationQuery, SalesConfirmationPreValidationDto>
 {
     public async Task<SalesConfirmationPreValidationDto> Handle(
@@ -57,7 +59,11 @@ public sealed class PreValidateSalesInvoiceConfirmationQueryHandler(
                 "PaymentTermType"));
         }
 
-        if (!await stock.HasSufficientStockForInvoiceAsync(invoice, ct))
+        // Invoice-first linked drafts do not have stock reservations until the order is
+        // confirmed. Let the command perform confirmation and create shortage demand.
+        var orderDraft = invoice.CustomerOrderId.HasValue &&
+            (await orders.GetByIdAsync(invoice.CustomerOrderId.Value, ct))?.Status == CustomerOrderStatus.Draft;
+        if (!orderDraft && !await stock.HasSufficientStockForInvoiceAsync(invoice, ct))
         {
             issues.Add(new SalesValidationIssueDto(
                 SalesErrorCodes.InsufficientStock,

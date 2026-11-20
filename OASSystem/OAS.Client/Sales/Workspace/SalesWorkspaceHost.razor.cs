@@ -1,10 +1,14 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.JSInterop;
 using OAS.Client.Sales.Common;
 using OAS.Client.Common.Feedback.Services;
 using OAS.Client.Accounting.Services;
 using OAS.Client.Features.Employees.Services;
 using OAS.Client.Sales.Mapping;
+using OAS.Client.Sales.Checkout.Services;
+using OAS.Client.Database.State;
+using System.Text.Json;
 using OAS.Client.Sales.Services;
 using OAS.Client.Printing.Services;
 using OAS.Client.Sales.Workspace;
@@ -36,6 +40,8 @@ public partial class SalesWorkspaceHost : IDisposable
     [Parameter] public bool CreateNew { get; set; }
     [Parameter] public bool CollectPayment { get; set; }
     [Inject] private ISalesClientService Sales { get; set; } = default!;
+    [Inject] private ISalesCheckoutClientService Checkout { get; set; } = default!;
+    [Inject] private DatabaseProfileSelectionState DatabaseProfile { get; set; } = default!;
     [Inject] private IAccountingClientService Accounting { get; set; } = default!;
     [Inject] private IEmployeeClientService Employees { get; set; } = default!;
     [Inject] private ISalesWorkspaceState Workspace { get; set; } = default!;
@@ -44,6 +50,7 @@ public partial class SalesWorkspaceHost : IDisposable
     [Inject] private IPrintingClientService PrintingService { get; set; } = default!;
     [Inject] private IUiSnackbarService Snackbar { get; set; } = default!;
     [Inject] private IApiFeedbackService ApiFeedback { get; set; } = default!;
+    [Inject] private IJSRuntime JS { get; set; } = default!;
 
     private readonly List<UiSalesDocumentListItem> _listItems = [];
     private readonly List<PrescriptionDto> _prescriptionRows = [];
@@ -85,10 +92,9 @@ public partial class SalesWorkspaceHost : IDisposable
     private bool _isSavingRevision;
     private OAS.UiLib.Components.Sales.Prescriptions.UiPrescriptionRevisionEditor? _activePrescriptionRevisionEditor;
     private OAS.UiLib.Components.Sales.Orders.UiCustomerOrderEditor? _activeCustomerOrderEditor;
+    private OAS.UiLib.Components.Sales.Invoices.UiSalesInvoiceEditor? _activeSalesInvoiceEditor;
     private bool _isPrintingInvoice;
     private bool _isCollectingInvoicePayment;
-    // Reuse the same UUID for a retry of the same submitted payment payload in this circuit.
-    private readonly Dictionary<Guid, (string Payload, Guid OperationId)> _pendingInvoiceCollections = [];
     private SalesEntityType? _lastSection;
     private string? _lastRouteRequest;
     private bool _pendingCollectionDialog;
@@ -175,6 +181,12 @@ public partial class SalesWorkspaceHost : IDisposable
 
     private async Task LoadListAsync(SalesEntityType type)
     {
+        if (type == SalesEntityType.SalesInvoices && _invoiceDateFrom.HasValue &&
+            _invoiceDateTo.HasValue && _invoiceDateFrom.Value > _invoiceDateTo.Value)
+        {
+            Snackbar.Error("تاريخ بداية الفترة أكبر من تاريخ النهاية؛ صحح الفترة قبل تحميل الفواتير.");
+            return; // Keep the previously displayed rows instead of sending an invalid range.
+        }
         _isLoading = true; _listItems.Clear(); _prescriptionRows.Clear(); _customerOrderRows.Clear(); _invoiceRows.Clear();
         try
         {
@@ -461,6 +473,12 @@ public partial class SalesWorkspaceHost : IDisposable
             Snackbar.Error("صحح الحقول المطلوبة والكميات والأسعار ونسب الخصم والضريبة المميزة بالأحمر قبل حفظ الطلب.");
             return;
         }
+        if (ActiveTab.Model is UiSalesInvoiceFormModel && _activeSalesInvoiceEditor is { } invoiceEditor && !invoiceEditor.ValidateOpticalInputs())
+        {
+            _invoiceValidationAttempted.Add(ActiveTab.TabId);
+            Snackbar.Error("صحح القياسات اليدوية المميزة بالأحمر قبل حفظ فاتورة المبيعات.");
+            return;
+        }
         ActiveTab.IsSaving = true;
         try
         {
@@ -579,7 +597,10 @@ public partial class SalesWorkspaceHost : IDisposable
                     if (!TryGetApiResult(orderCall, out var order)) return;
 
                     if (order is not null)
+                    {
                         CompleteSave(ActiveTab, order.Id, order.OrderCode, SalesUiMapper.ToUi(order));
+                        await RefreshOpenLinkedInvoiceTabsAsync(order.Id);
+                    }
                     break;
                 }
                 case UiSalesInvoiceFormModel model:
@@ -619,6 +640,27 @@ public partial class SalesWorkspaceHost : IDisposable
                     }
 
                     if (!ValidatePrescriptionLines(model.Lines, model.PrescriptionRevisionId)) return;
+                    if (_activeSalesInvoiceEditor is { } pricingEditor &&
+                        !pricingEditor.ValidatePricingInputs())
+                    {
+                        Snackbar.Error("راجع الكمية والسعر والخصم والضريبة الموضحة باللون الأحمر قبل الحفظ.");
+                        return;
+                    }
+
+                    if (model.RequiredDate.HasValue && model.InvoiceDate.HasValue &&
+                        model.RequiredDate.Value < model.InvoiceDate.Value)
+                    {
+                        Snackbar.Error("موعد التسليم المطلوب لا يمكن أن يسبق تاريخ البيع.");
+                        return;
+                    }
+
+                    // Save a real invoice Draft linked to an operational order Draft.
+                    // Payment and posting remain separate, explicit steps.
+                    if (!model.Id.HasValue && model.Lines.Any(SalesUiMapper.RequiresOperationalOrder))
+                    {
+                        await SaveInvoiceFirstDraftAsync(model);
+                        return;
+                    }
 
                     var invoiceCall = model.Id.HasValue
                         ? await Sales.UpdateSalesInvoiceResultAsync(model.Id.Value, SalesUiMapper.ToUpdate(model))
@@ -629,6 +671,7 @@ public partial class SalesWorkspaceHost : IDisposable
                     {
                         _invoiceValidationAttempted.Remove(ActiveTab.TabId);
                         CompleteSave(ActiveTab, invoice.Id, invoice.InvoiceCode, SalesUiMapper.ToUi(invoice));
+                        await RefreshOpenLinkedOrderTabsAsync(invoice.CustomerOrderId);
                     }
                     break;
                 }
@@ -653,6 +696,377 @@ public partial class SalesWorkspaceHost : IDisposable
         {
             ActiveTab.IsSaving = false;
             Workspace.NotifyStateChanged();
+        }
+    }
+
+    private static string InvoiceSaveText(UiSalesInvoiceFormModel invoice) => "حفظ كمسودة";
+
+    private string PendingInvoiceFirstKey =>
+        SalesInvoicePendingCheckout.StorageKey(DatabaseProfile.SelectedProfileKey);
+
+    private string PendingInvoiceFirstSessionKey => PendingInvoiceFirstKey + ":details";
+
+    private async Task<SalesInvoicePendingCheckoutMarker?> ReadPendingInvoiceFirstMarkerAsync()
+    {
+        var json = await JS.InvokeAsync<string?>("localStorage.getItem", PendingInvoiceFirstKey);
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try { return JsonSerializer.Deserialize<SalesInvoicePendingCheckoutMarker>(json); }
+        catch (JsonException)
+        {
+            throw new InvalidOperationException("مرجع العملية المعلقة غير صالح. راجع السجلات قبل إنشاء عملية أخرى.");
+        }
+    }
+
+    private async Task<SalesInvoicePendingCheckout?> ReadPendingInvoiceFirstAsync()
+    {
+        var marker = await ReadPendingInvoiceFirstMarkerAsync();
+        if (marker is null) return null;
+        var json = await JS.InvokeAsync<string?>("sessionStorage.getItem", PendingInvoiceFirstSessionKey);
+        if (!string.IsNullOrWhiteSpace(json))
+        {
+            try
+            {
+                var pending = JsonSerializer.Deserialize<SalesInvoicePendingCheckout>(json);
+                if (pending?.IsValid() == true && pending.SourceInvoiceCode == marker.SourceInvoiceCode &&
+                    pending.Order.OrderCode == marker.OrderCode && pending.Order.CustomerId == marker.CustomerId)
+                    return pending;
+            }
+            catch (JsonException) { }
+        }
+        throw new InvalidOperationException("تعذر استعادة تفاصيل المحاولة بعد إغلاق التبويب؛ بقي مرجع الطلب محفوظًا لمنع التكرار.");
+    }
+
+    private async Task PersistPendingInvoiceFirstAsync(SalesInvoicePendingCheckout pending)
+    {
+        // Sensitive optical and settlement data stays in sessionStorage.
+        // The durable lock contains only document identifiers.
+        await JS.InvokeVoidAsync("sessionStorage.setItem", PendingInvoiceFirstSessionKey,
+            JsonSerializer.Serialize(pending));
+        await JS.InvokeVoidAsync("localStorage.setItem", PendingInvoiceFirstKey,
+            JsonSerializer.Serialize(pending.ToMarker()));
+    }
+
+    private async Task ClearPendingInvoiceFirstAsync()
+    {
+        // Remove the sensitive per-tab payload first. Keep the persistent marker
+        // until last: if cleanup fails, it still blocks accidental duplicate sales.
+        await JS.InvokeVoidAsync("sessionStorage.removeItem", PendingInvoiceFirstSessionKey);
+        await JS.InvokeVoidAsync("localStorage.removeItem", PendingInvoiceFirstKey);
+    }
+
+    private async Task SaveInvoiceFirstDraftAsync(UiSalesInvoiceFormModel model)
+    {
+        var pending = await ReadPendingInvoiceFirstAsync();
+        if (pending is not null && !pending.DraftOnly)
+        {
+            Snackbar.Error("توجد عملية إتمام بيع سابقة غير محسومة. استخدم استعادة العملية المعلقة أولًا.");
+            return;
+        }
+        if (pending is not null && pending.SourceInvoiceCode != model.InvoiceCode)
+        {
+            Snackbar.Error($"توجد مسودة معلقة للطلب {pending.Order.OrderCode}. استخدم استعادة المسودة أولًا.");
+            return;
+        }
+        if (pending is null)
+        {
+            var reserved = await Sales.ReserveCustomerOrderCodeResultAsync(model.InvoiceDate!.Value);
+            if (!TryGetApiResult(reserved, out var code) || code is null) return;
+            var orderRequest = SalesUiMapper.ToOperationalOrder(model, code.Code);
+            var opticalCheck = await Sales.PrevalidateCustomerOrderOpticalAsync(
+                new CustomerOrderOpticalPrevalidationRequest(orderRequest.PrescriptionRevisionId, orderRequest.Lines));
+            if (!opticalCheck.Succeeded)
+            {
+                if (opticalCheck.Error is not null) ApiFeedback.Show(opticalCheck.Error);
+                else Snackbar.Error("تعذر فحص قياسات العدسات قبل حفظ المسودة.");
+                return;
+            }
+            if (opticalCheck.Value is null)
+            {
+                Snackbar.Error("لم تصل نتيجة مطابقة العدسات. لم تُحفظ المسودة.");
+                return;
+            }
+            _activeSalesInvoiceEditor?.ShowOpticalValidationIssues(
+                opticalCheck.Value.Issues.Select(x => (x.LineNumber, x.Message)).ToArray());
+            if (!opticalCheck.Value.IsValid)
+            {
+                Snackbar.Error("قياسات بعض العدسات لا تطابق الأصناف المختارة. صحح التنبيه تحت البند قبل الحفظ.");
+                return;
+            }
+            pending = new SalesInvoicePendingCheckout(model.InvoiceCode,
+                orderRequest, [], Guid.NewGuid().ToString("N"), DraftOnly: true,
+                DraftPostingDate: model.PostingDate, DraftSalesEmployeeId: TryGuid(model.SalesEmployeeId));
+            await PersistPendingInvoiceFirstAsync(pending);
+        }
+        else
+        {
+            var current = SalesUiMapper.ToOperationalOrder(model, pending.Order.OrderCode);
+            if (JsonSerializer.Serialize(current) != JsonSerializer.Serialize(pending.Order) ||
+                pending.DraftPostingDate != model.PostingDate ||
+                pending.DraftSalesEmployeeId != TryGuid(model.SalesEmployeeId))
+            {
+                Snackbar.Error("تغيرت بيانات المسودة بعد بدء إنشائها. استخدم استعادة المسودة الأصلية قبل أي عملية جديدة.");
+                return;
+            }
+        }
+        await ResumeInvoiceFirstDraftAsync(pending);
+    }
+
+    private async Task ResumeInvoiceFirstDraftAsync(SalesInvoicePendingCheckout pending)
+    {
+        if (!pending.DraftOnly || !pending.IsValid())
+        {
+            Snackbar.Error("مرجع المسودة المعلقة غير صالح.");
+            return;
+        }
+        var orderId = pending.OrderId;
+        if (!orderId.HasValue)
+        {
+            var matches = await Sales.SearchCustomerOrdersAsync(pending.Order.CustomerId,
+                pending.Order.OrderCode, 10);
+            var existing = matches.FirstOrDefault(x =>
+                string.Equals(x.OrderCode, pending.Order.OrderCode, StringComparison.OrdinalIgnoreCase));
+            if (existing is not null)
+                orderId = existing.Id;
+            else
+            {
+                var created = await Sales.CreateCustomerOrderResultAsync(pending.Order);
+                if (!TryGetApiResult(created, out var dto) || dto is null)
+                {
+                    Snackbar.Warning("نتيجة إنشاء الطلب غير محسومة. استخدم استعادة المسودة، ولا تبدأ بيعًا جديدًا.");
+                    return;
+                }
+                orderId = dto.Id;
+            }
+            pending = pending.WithOrder(orderId.Value);
+            await PersistPendingInvoiceFirstAsync(pending);
+        }
+        var order = await Sales.GetCustomerOrderByIdAsync(orderId.Value);
+        if (order is null || !string.Equals(order.OrderCode, pending.Order.OrderCode,
+            StringComparison.OrdinalIgnoreCase))
+        {
+            Snackbar.Error("تعذر التحقق من طلب العميل الأصلي. لم يُنشأ مستند آخر.");
+            return;
+        }
+        var request = new CreateSalesInvoiceFromOrderRequest(
+            pending.SourceInvoiceCode, pending.Order.OrderDate,
+            pending.DraftPostingDate ?? pending.Order.OrderDate, pending.Order.Notes,
+            order.RowVersion, pending.DraftSalesEmployeeId);
+        // Replaying this command is safe: the server finds the invoice by CustomerOrderId.
+        var result = await Sales.CreateSalesInvoiceFromOrderResultAsync(orderId.Value, request);
+        if (!TryGetApiResult(result, out var invoice) || invoice is null)
+        {
+            Snackbar.Warning("تعذر تأكيد حفظ المسودة. استعد العملية نفسها قبل محاولة إنشاء مستند آخر.");
+            return;
+        }
+        await ClearPendingInvoiceFirstAsync();
+        if (ActiveTab is not null)
+        {
+            _invoiceValidationAttempted.Remove(ActiveTab.TabId);
+            CompleteSave(ActiveTab, invoice.Id, invoice.InvoiceCode, SalesUiMapper.ToUi(invoice));
+        }
+        Snackbar.Success($"تم حفظ الفاتورة {invoice.InvoiceCode} كمسودة وربطها بطلب العميل {order.OrderCode}، دون تحصيل أو ترحيل.");
+        Workspace.NotifyStateChanged();
+        await LoadListAsync(SalesEntityType.SalesInvoices);
+    }
+
+    private async Task FinishInvoiceFirstSaleAsync(UiSalesInvoiceFormModel model)
+    {
+        // Never reinterpret a pending sale after an uncertain response.
+        var pending = await ReadPendingInvoiceFirstAsync();
+        if (pending is not null && pending.SourceInvoiceCode != model.InvoiceCode)
+        {
+            Snackbar.Error($"توجد عملية بيع سابقة غير محسومة برقم فاتورة مبدئي {pending.SourceInvoiceCode} وطلب {pending.Order.OrderCode}. يجب التحقق منها أولًا من زر استعادة العملية المعلقة.");
+            return;
+        }
+        if (pending is null)
+        {
+            if (model.PaymentLines.Any(x => !x.IsConfirmed))
+            {
+                Snackbar.Error("أكد الدفعات أو احذف البنود غير المطلوبة قبل إتمام البيع.");
+                return;
+            }
+            if (!TryBuildPaymentLines(model.PaymentLines, out var payments, out var paymentError) ||
+                !ValidateDirectInvoicePaymentPlan(model, payments, out paymentError))
+            {
+                Snackbar.Error(paymentError ?? "راجع بيانات الدفعات.");
+                return;
+            }
+            var reserved = await Sales.ReserveCustomerOrderCodeResultAsync(model.InvoiceDate!.Value);
+            if (!TryGetApiResult(reserved, out var code) || code is null) return;
+            var request = SalesUiMapper.ToOperationalOrder(model, code.Code);
+            pending = new SalesInvoicePendingCheckout(model.InvoiceCode, request,
+                payments, Guid.NewGuid().ToString("N"));
+            // Fail closed when browser storage is unavailable.
+            await PersistPendingInvoiceFirstAsync(pending);
+        }
+        else if (!pending.CheckoutSubmitted)
+        {
+            // No checkout HTTP request has been sent yet. Allow correcting ONLY
+            // payment input for the same order; never silently change the order lines.
+            var currentOrder = SalesUiMapper.ToOperationalOrder(model, pending.Order.OrderCode);
+            if (JsonSerializer.Serialize(currentOrder) != JsonSerializer.Serialize(pending.Order))
+            {
+                Snackbar.Error("تم إنشاء طلب العميل بالفعل. لتعديل البنود أو خطة السداد افتح الطلب الأصلي بدل إعادة إنشائه من الفاتورة.");
+                return;
+            }
+            if (model.PaymentLines.Any(x => !x.IsConfirmed) ||
+                !TryBuildPaymentLines(model.PaymentLines, out var updatedPayments, out var paymentError) ||
+                !ValidateDirectInvoicePaymentPlan(model, updatedPayments, out paymentError))
+            {
+                Snackbar.Error("راجع الدفعات وأكدها قبل إتمام البيع.");
+                return;
+            }
+            pending = pending with { Payments = updatedPayments };
+            await PersistPendingInvoiceFirstAsync(pending);
+        }
+        await ResumeInvoiceFirstSaleAsync(pending);
+    }
+
+    private async Task ResumeInvoiceFirstSaleAsync(SalesInvoicePendingCheckout pending)
+    {
+        if (!pending.IsValid())
+        {
+            Snackbar.Error("بيانات عملية البيع المعلقة غير صالحة.");
+            return;
+        }
+        // Resolve the original order by its visible, unique SO code before creating it.
+        // This also covers a committed create whose HTTP response was lost.
+        var orderId = pending.OrderId;
+        if (!orderId.HasValue)
+        {
+            var matches = await Sales.SearchCustomerOrdersAsync(pending.Order.CustomerId,
+                pending.Order.OrderCode, 10);
+            var existing = matches.FirstOrDefault(x => string.Equals(x.OrderCode,
+                pending.Order.OrderCode, StringComparison.OrdinalIgnoreCase));
+            if (existing is not null)
+                orderId = existing.Id;
+            else
+            {
+                var created = await Sales.CreateCustomerOrderResultAsync(pending.Order);
+                if (!TryGetApiResult(created, out var dto) || dto is null)
+                {
+                    Snackbar.Warning("لم تتأكد نتيجة إنشاء طلب العميل. استخدم استعادة العملية المعلقة، ولا تُنشئ بيعًا جديدًا.");
+                    return;
+                }
+                orderId = dto.Id;
+            }
+            pending = pending.WithOrder(orderId.Value);
+            await PersistPendingInvoiceFirstAsync(pending);
+        }
+
+        var context = await Checkout.GetCheckoutContextAsync(orderId.Value);
+        if (context is null)
+        {
+            Snackbar.Error("تعذر تحميل طلب العميل المرتبط بالبيع.");
+            return;
+        }
+        if (!string.Equals(context.Order.OrderCode, pending.Order.OrderCode, StringComparison.OrdinalIgnoreCase))
+        {
+            Snackbar.Error("الطلب المستعاد لا يطابق رقم الطلب المحجوز. أُوقفت العملية حمايةً للبيانات.");
+            return;
+        }
+        // The server is authoritative for amounts, exchange rates and outstanding balance.
+        if (pending.Payments.Count > 0 && context.SalesInvoiceId is null &&
+            context.Order.Status == CustomerOrderStatus.Draft)
+        {
+            var preview = await Checkout.PreviewPaymentsAsync(orderId.Value, pending.Payments);
+            if (preview is null)
+            {
+                Snackbar.Error("تعذر التحقق من سعر الصرف للدفعات. يمكنك استعادة العملية بنفس البيانات.");
+                return;
+            }
+            var amount = preview.PaidBaseAmount;
+            var required = preview.RequiredBaseAmount;
+            if (pending.Order.PaymentPlan == SalesPaymentPlan.FullNow && Math.Abs(amount - required) > 0.0001m ||
+                pending.Order.PaymentPlan == SalesPaymentPlan.PartialNow && (amount <= 0m || amount >= required))
+            {
+                Snackbar.Error("المبلغ المدخل لا يطابق خطة السداد وفق سعر الصرف المعتمد. الطلب محفوظ ولم يُنفذ تحصيل؛ راجع العملية المعلقة.");
+                return;
+            }
+        }
+
+        // Commit the exact request snapshot before making a potentially irreversible
+        // financial call. Subsequent retries must replay this unchanged payload.
+        if (!pending.CheckoutSubmitted)
+        {
+            pending = pending with { CheckoutSubmitted = true };
+            await PersistPendingInvoiceFirstAsync(pending);
+        }
+        var checkoutRequest = new CheckoutCustomerOrderRequest(orderId.Value,
+            pending.Order.PaymentPlan, pending.Payments, [], context.Order.RowVersion,
+            pending.CheckoutKey);
+        var resultCall = await Checkout.CheckoutResultAsync(orderId.Value, checkoutRequest);
+        if (!TryGetApiResult(resultCall, out var result) || result is null)
+        {
+            Snackbar.Warning("نتيجة إتمام البيع غير محسومة. لا تضغط بيع جديد؛ استخدم استعادة العملية المعلقة بنفس بيانات الطلب.");
+            return;
+        }
+        await ClearPendingInvoiceFirstAsync();
+        Snackbar.Success(string.IsNullOrWhiteSpace(result.InvoiceCode)
+            ? $"تم تسجيل الطلب {result.OrderCode} للمتابعة؛ لم تُصدر فاتورة بعد لعدم اكتمال المتطلبات."
+            : $"تم إتمام البيع وإنشاء الفاتورة {result.InvoiceCode} والطلب {result.OrderCode}.");
+        if (result.SalesInvoiceId.HasValue)
+            Navigation.NavigateTo($"/sales/invoices?invoiceId={result.SalesInvoiceId.Value:D}");
+        else
+            Navigation.NavigateTo($"/sales/order-tracking?orderId={orderId.Value:D}");
+    }
+
+    private async Task RecoverInvoiceFirstAsync(MouseEventArgs _)
+    {
+        if (ActiveTab?.IsSaving == true) return;
+        try
+        {
+            var pending = await ReadPendingInvoiceFirstAsync();
+            if (pending is null)
+            {
+                Snackbar.Warning("لا توجد عملية بيع معلقة في هذا المتصفح.");
+                return;
+            }
+            ActiveTab!.IsSaving = true;
+            if (pending.DraftOnly)
+                await ResumeInvoiceFirstDraftAsync(pending);
+            else
+                await ResumeInvoiceFirstSaleAsync(pending); // legacy pending Checkout
+        }
+        catch (InvalidOperationException)
+        {
+            try { await ResolveLostInvoiceFirstSessionAsync(); }
+            catch { Snackbar.Error("تعذر التحقق من عملية البيع المحفوظة. لا تنشئ عملية جديدة حتى مراجعة الطلب."); }
+        }
+        catch (Exception)
+        {
+            Snackbar.Error("تعذر التحقق من العملية المعلقة؛ تحقق من اتصال API وتخزين المتصفح ولا تنشئ طلبًا جديدًا.");
+        }
+        finally
+        {
+            if (ActiveTab is not null) ActiveTab.IsSaving = false;
+            Workspace.NotifyStateChanged();
+        }
+    }
+
+    private async Task ResolveLostInvoiceFirstSessionAsync()
+    {
+        var marker = await ReadPendingInvoiceFirstMarkerAsync();
+        if (marker is null) return;
+        var orders = await Sales.SearchCustomerOrdersAsync(marker.CustomerId, marker.OrderCode, 10);
+        var existing = orders.FirstOrDefault(x => string.Equals(x.OrderCode, marker.OrderCode,
+            StringComparison.OrdinalIgnoreCase));
+        if (existing is null)
+        {
+            Snackbar.Error($"يوجد حجز سابق للطلب {marker.OrderCode}، لكن لم يثبت إنشاؤه. راجع الخادم قبل إنشاء طلب جديد.");
+            return;
+        }
+        var context = await Checkout.GetCheckoutContextAsync(existing.Id);
+        if (context?.SalesInvoiceId is Guid invoiceId)
+        {
+            await ClearPendingInvoiceFirstAsync();
+            Snackbar.Success($"وجدنا الفاتورة المرتبطة بالطلب {marker.OrderCode}.");
+            Navigation.NavigateTo($"/sales/invoices?invoiceId={invoiceId:D}");
+        }
+        else
+        {
+            Snackbar.Warning($"تم العثور على الطلب {marker.OrderCode}. افحص حالته قبل استكمال البيع؛ بيانات الدفع السابقة لم تعد متاحة في هذا التبويب.");
+            Navigation.NavigateTo($"/sales/order-tracking?orderId={existing.Id:D}");
         }
     }
 
@@ -801,7 +1215,10 @@ public partial class SalesWorkspaceHost : IDisposable
             if (dto is not null)
                 ActiveTab.Model = SalesUiMapper.ToUi(dto);
 
-            Snackbar.Success("تم تأكيد الفاتورة. أصبحت الحقول المالية الحرجة للقراءة فقط.");
+            if (dto?.Status.ToString() == "Draft")
+                Snackbar.Warning("تم تسجيل طلب المواد الناقصة، وما زالت الفاتورة مسودة. أكمل التأكيد بعد توفر المخزون.");
+            else
+                Snackbar.Success("تم تأكيد الفاتورة. أصبحت الحقول المالية الحرجة للقراءة فقط.");
             Workspace.NotifyStateChanged();
             await LoadListAsync(SalesEntityType.SalesInvoices);
         }
@@ -858,8 +1275,8 @@ public partial class SalesWorkspaceHost : IDisposable
                 return;
             }
             var confirmationText = paymentLines.Count > 0
-                ? "سيتم ترحيل فاتورة البيع المباشر وإنشاء الأثر المخزني والقيد المحاسبي، ثم إنشاء سند قبض واحد بخطوط الدفع المدخلة وتخصيصه على الفاتورة. هل تريد المتابعة؟"
-                : "سيتم ترحيل فاتورة البيع المباشر وإنشاء أثر مخزني وقيد محاسبي رسمي بدون تحصيل الآن. هل تريد المتابعة؟";
+                ? "سيتم ترحيل الفاتورة وإنشاء القيد والحركات المخزنية، ثم تحصيل الدفعة المدخلة. إذا كانت الفاتورة مرتبطة بطلب عدسات، ستُنشأ مهمة المعمل بعد نجاح الترحيل. هل تريد المتابعة؟"
+                : "سيتم ترحيل الفاتورة وإنشاء القيد والحركات المخزنية دون تحصيل الآن. هل تريد المتابعة؟";
 
             if (!await Dialogs.ConfirmAsync("ترحيل فاتورة المبيعات", confirmationText, AlertTone.Warning, "ترحيل", "رجوع")) return;
             var postCall = await Sales.PostSalesInvoiceResultAsync(
@@ -965,6 +1382,13 @@ public partial class SalesWorkspaceHost : IDisposable
         if (_isCollectingInvoicePayment || ActiveTab?.Model is not UiSalesInvoiceFormModel invoice || !invoice.Id.HasValue)
             return;
 
+        var pending = await ReadPendingInvoiceCollectionAsync(invoice.Id.Value);
+        if (pending is not null)
+        {
+            await RecoverPendingInvoiceCollectionAsync(invoice, pending);
+            return;
+        }
+
         if (!string.Equals(invoice.Status, "Posted", StringComparison.OrdinalIgnoreCase))
         {
             Snackbar.Info("يجب ترحيل الفاتورة قبل تحصيل دفعات لاحقة.");
@@ -1013,26 +1437,98 @@ public partial class SalesWorkspaceHost : IDisposable
             return;
         }
 
-        // A connection loss after a successful posting must not create a second receipt on retry.
-        var payload = System.Text.Json.JsonSerializer.Serialize(paymentLines);
-        var operationId = _pendingInvoiceCollections.TryGetValue(invoice.Id.Value, out var pending) &&
-            string.Equals(pending.Payload, payload, StringComparison.Ordinal)
-            ? pending.OperationId : Guid.NewGuid();
-        _pendingInvoiceCollections[invoice.Id.Value] = (payload, operationId);
+        // Save the exact request before network submission. Its OperationId is reused
+        // after a browser refresh, including when the old response was lost after commit.
+        var submission = new SalesInvoicePendingCollection(invoice.Id.Value,
+            new CollectSalesInvoicePaymentRequest(paymentLines, Guid.NewGuid()));
+        if (!await PersistPendingInvoiceCollectionAsync(submission)) return;
+        await SubmitInvoiceCollectionAsync(invoice, submission);
+    }
 
+    private async Task RecoverInvoiceCollectionAsync(MouseEventArgs _)
+    {
+        if (_isCollectingInvoicePayment || ActiveTab?.Model is not UiSalesInvoiceFormModel invoice || !invoice.Id.HasValue)
+            return;
+        var pending = await ReadPendingInvoiceCollectionAsync(invoice.Id.Value);
+        if (pending is null)
+        {
+            Snackbar.Info("لا توجد عملية تحصيل محفوظة بانتظار التحقق في هذا المتصفح.");
+            return;
+        }
+        await RecoverPendingInvoiceCollectionAsync(invoice, pending);
+    }
+
+    private async Task RecoverPendingInvoiceCollectionAsync(
+        UiSalesInvoiceFormModel invoice, SalesInvoicePendingCollection pending)
+    {
+        if (!pending.IsValidFor(invoice.Id!.Value))
+        {
+            Snackbar.Error("بيانات محاولة التحصيل المعلقة غير صالحة. لا تُنفذ تحصيلًا جديدًا قبل مراجعة سندات هذه الفاتورة.");
+            return;
+        }
+        if (!await Dialogs.ConfirmAsync("التحقق من تحصيل سابق",
+                "توجد محاولة تحصيل لم تصل نتيجتها. ستُعاد بالمعرّف والمبالغ نفسهما، ولن ينشئ الخادم سندًا ثانيًا إذا كانت العملية قد تمت. هل تريد التحقق الآن؟",
+                AlertTone.Warning, "التحقق بنفس العملية", "رجوع"))
+            return;
+        await SubmitInvoiceCollectionAsync(invoice, pending);
+    }
+
+    private async Task<SalesInvoicePendingCollection?> ReadPendingInvoiceCollectionAsync(Guid invoiceId)
+    {
+        try
+        {
+            var raw = await JS.InvokeAsync<string?>("localStorage.getItem",
+                SalesInvoicePendingCollection.StorageKey(invoiceId));
+            if (string.IsNullOrWhiteSpace(raw)) return null;
+            var pending = System.Text.Json.JsonSerializer.Deserialize<SalesInvoicePendingCollection>(raw);
+            if (pending is null || !pending.IsValidFor(invoiceId))
+            {
+                Snackbar.Error("توجد بيانات تحصيل معلقة تالفة. راجع سندات القبض قبل المحاولة من جديد.");
+                // Deliberately do not remove uncertain operation data.
+                return new SalesInvoicePendingCollection(invoiceId,
+                    new CollectSalesInvoicePaymentRequest([], Guid.Empty));
+            }
+            return pending;
+        }
+        catch
+        {
+            Snackbar.Error("تعذر قراءة حالة التحصيل المعلقة من المتصفح. لا تُكرر القبض قبل التحقق من السندات.");
+            return new SalesInvoicePendingCollection(invoiceId,
+                new CollectSalesInvoicePaymentRequest([], Guid.Empty));
+        }
+    }
+
+    private async Task<bool> PersistPendingInvoiceCollectionAsync(SalesInvoicePendingCollection pending)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("localStorage.setItem",
+                SalesInvoicePendingCollection.StorageKey(pending.InvoiceId),
+                System.Text.Json.JsonSerializer.Serialize(pending));
+            return true;
+        }
+        catch
+        {
+            Snackbar.Error("تعذر حفظ بيانات محاولة التحصيل بشكل آمن في المتصفح. لم يُرسل طلب التحصيل.");
+            return false;
+        }
+    }
+
+    private async Task SubmitInvoiceCollectionAsync(UiSalesInvoiceFormModel invoice,
+        SalesInvoicePendingCollection pending)
+    {
+        if (_isCollectingInvoicePayment || !pending.IsValidFor(invoice.Id!.Value)) return;
         ClearMessages();
         _isCollectingInvoicePayment = true;
         Workspace.NotifyStateChanged();
         try
         {
-            var call = await Sales.CollectSalesInvoicePaymentResultAsync(
-                invoice.Id.Value,
-                new CollectSalesInvoicePaymentRequest(paymentLines, operationId));
+            var call = await Sales.CollectSalesInvoicePaymentResultAsync(invoice.Id.Value, pending.Request);
             if (!TryGetApiResult(call, out var result) || result is null)
-                return;
+                return; // Preserve exact pending request for future reconciliation/replay.
 
             var dto = await Sales.GetSalesInvoiceByIdAsync(invoice.Id.Value);
-            if (dto is not null)
+            if (dto is not null && ActiveTab?.Model is UiSalesInvoiceFormModel current && current.Id == invoice.Id)
                 ActiveTab.Model = SalesUiMapper.ToUi(dto);
             else
             {
@@ -1041,8 +1537,9 @@ public partial class SalesWorkspaceHost : IDisposable
                 invoice.OutstandingAmount = result.PaymentSummary.OutstandingAmount;
             }
 
-            _pendingInvoiceCollections.Remove(invoice.Id.Value);
-            Snackbar.Success($"تم إنشاء وترحيل سند القبض {result.ReceiptVoucherNumber} وتخصيصه على الفاتورة.");
+            // Clearing after confirmed response is safe; replay with the same key is safe too.
+            await JS.InvokeVoidAsync("localStorage.removeItem", SalesInvoicePendingCollection.StorageKey(invoice.Id.Value));
+            Snackbar.Success($"تم التحقق من سند القبض {result.ReceiptVoucherNumber} وتخصيصه على الفاتورة.");
             await LoadListAsync(SalesEntityType.SalesInvoices);
         }
         catch (ApiClientException ex)

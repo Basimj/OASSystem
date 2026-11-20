@@ -85,9 +85,10 @@
     {
         _showErrors = true;
         var pricingIsValid = _salesLinesEditor?.ValidatePricingInputs() ?? true;
+        var opticalIsValid = _salesLinesEditor?.ValidateOpticalInputs() ?? true;
         StateHasChanged();
         return CustomerError is null && CurrencyError is null && OrderDateError is null
-            && RequiredDateError is null && LinesError is null && pricingIsValid && !HasInputErrors;
+            && RequiredDateError is null && LinesError is null && pricingIsValid && opticalIsValid && !HasInputErrors;
     }
     private static string EyeLabel(string? eye) => eye switch { "RightOD" => "اليمنى OD", "LeftOS" => "اليسرى OS", _ => "غير محددة" };
     private static string MeasurementSource(UiSalesLineModel line) => line.OpticalMeasurementSource == "Manual" ? "يدوي" : "وصفة محفوظة";

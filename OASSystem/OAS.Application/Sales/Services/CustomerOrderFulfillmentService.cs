@@ -55,6 +55,11 @@ public sealed class CustomerOrderFulfillmentService(
             if (status is CustomerOrderStatus.AwaitingStock or CustomerOrderStatus.PartiallyAvailable)
                 continue;
 
+            // A manually staged invoice must remain under its own Confirm/Post buttons,
+            // even after a new purchase receipt makes the order ready. Never auto-post it.
+            if (await invoiceFromOrder.HasUnpostedInvoiceAsync(order.Id, cancellationToken))
+                continue;
+
             // Once all materials are available, finalize the commercial document exactly once.
             // SalesInvoiceFromOrderService is the single idempotent entry point: it creates a new
             // tracked aggregate or loads the existing invoice aggregate with tracking. Avoid a

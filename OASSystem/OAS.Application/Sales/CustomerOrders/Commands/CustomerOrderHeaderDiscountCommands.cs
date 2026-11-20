@@ -6,6 +6,7 @@ using OAS.Application.Common.Exceptions;
 using OAS.Application.Sales.Abstractions;
 using OAS.Application.Sales.Authorization;
 using OAS.Application.Sales.Common;
+using OAS.Application.Sales.Services;
 using OAS.Contracts.Sales.CustomerOrders;
 using OAS.Domain.Sales.Entities;
 using OAS.Domain.Sales.Enums;
@@ -26,6 +27,7 @@ public sealed record ApproveCustomerOrderHeaderDiscountCommand(Guid Id, ApproveC
 
 public sealed class SetCustomerOrderHeaderDiscountCommandHandler(
     ICustomerOrderAggregateRepository orders,
+    LinkedSalesDraftSynchronizer linkedDrafts,
     IUnitOfWork unitOfWork)
     : IRequestHandler<SetCustomerOrderHeaderDiscountCommand, Guid>
 {
@@ -36,7 +38,11 @@ public sealed class SetCustomerOrderHeaderDiscountCommandHandler(
         SalesConcurrency.Ensure(request.Data.RowVersion, order.RowVersion, "طلب العميل");
         if (order.Status != CustomerOrderStatus.Draft)
             throw new ConflictException("sales_order_header_discount_locked", "يمكن تعديل خصم رأس الطلب في المسودة فقط.");
-        order.SetHeaderDiscount((SalesDiscountType)(byte)request.Data.DiscountType, request.Data.DiscountValue, request.Data.Reason);
+        var invoice = await linkedDrafts.FindLinkedInvoiceAsync(order.Id, ct);
+        if (invoice is not null) LinkedSalesDraftSynchronizer.EnsureEditable(order, invoice);
+        var discountType = (SalesDiscountType)(byte)request.Data.DiscountType;
+        order.SetHeaderDiscount(discountType, request.Data.DiscountValue, request.Data.Reason);
+        invoice?.SetHeaderDiscount(discountType, request.Data.DiscountValue, request.Data.Reason);
         await unitOfWork.SaveChangesAsync(ct);
         return order.Id;
     }
@@ -44,6 +50,7 @@ public sealed class SetCustomerOrderHeaderDiscountCommandHandler(
 
 public sealed class ApproveCustomerOrderHeaderDiscountCommandHandler(
     ICustomerOrderAggregateRepository orders,
+    LinkedSalesDraftSynchronizer linkedDrafts,
     ICurrentUser currentUser,
     TimeProvider timeProvider,
     IUnitOfWork unitOfWork)
@@ -54,8 +61,12 @@ public sealed class ApproveCustomerOrderHeaderDiscountCommandHandler(
         var order = await orders.GetAggregateAsync(request.Id, true, ct)
             ?? throw new NotFoundException(nameof(CustomerOrder), request.Id);
         SalesConcurrency.Ensure(request.Data.RowVersion, order.RowVersion, "طلب العميل");
+        var invoice = await linkedDrafts.FindLinkedInvoiceAsync(order.Id, ct);
+        if (invoice is not null) LinkedSalesDraftSynchronizer.EnsureEditable(order, invoice);
         var user = currentUser.UserId ?? throw new ForbiddenException();
-        order.ApproveHeaderDiscount(timeProvider.GetUtcNow(), user);
+        var now = timeProvider.GetUtcNow();
+        order.ApproveHeaderDiscount(now, user);
+        invoice?.ApproveHeaderDiscount(now, user);
         await unitOfWork.SaveChangesAsync(ct);
         return order.Id;
     }

@@ -49,6 +49,13 @@ public sealed class SalesCheckoutOrchestrator(
     {
         ArgumentNullException.ThrowIfNull(order);
 
+        // Invoice-first creates a genuine Draft invoice. Checkout must never confirm,
+        // post or collect it behind the invoice workflow's explicit stages.
+        var stagedInvoice = await FindInvoiceAsync(order.Id, cancellationToken);
+        if (stagedInvoice is { Status: SalesInvoiceStatus.Draft or SalesInvoiceStatus.Confirmed })
+            throw new ConflictException("sales_checkout_staged_invoice_exists",
+                "هذا الطلب مرتبط بفاتورة مسودة أو مؤكدة؛ أكمل التأكيد والترحيل والتحصيل من واجهة الفاتورة.");
+
         var requestedPlan = (SalesPaymentPlan)(byte)request.PaymentPlan;
         var wasDraft = order.Status == CustomerOrderStatus.Draft;
 

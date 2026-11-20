@@ -5,8 +5,10 @@ using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.Sales.Abstractions;
 using OAS.Application.Sales.Common;
+using OAS.Application.Sales.CustomerOrders.Commands;
 using OAS.Application.Sales.Services;
 using OAS.Contracts.Sales.SalesInvoices;
+using OAS.Contracts.Sales.CustomerOrders;
 using OAS.Domain.Accounting.Entities;
 using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Features.Employees.Entities;
@@ -26,7 +28,9 @@ public sealed class UpdateSalesInvoiceCommandHandler(
     IReadRepository<Employee, Guid> employees,
     IExchangeRateResolver rates,
     ICustomerOrderOpticalService optical,
-    IRepository<SalesInvoiceLinePrescriptionSnapshot, Guid> snapshotRepository)
+    IRepository<SalesInvoiceLinePrescriptionSnapshot, Guid> snapshotRepository,
+    ICustomerOrderAggregateRepository orders,
+    IRequestHandler<UpdateCustomerOrderCommand, CustomerOrder> orderUpdates)
     : IRequestHandler<UpdateSalesInvoiceCommand, SalesInvoice>
 {
     public async Task<SalesInvoice> Handle(
@@ -41,6 +45,15 @@ public sealed class UpdateSalesInvoiceCommandHandler(
                           nameof(SalesInvoice),
                           request.Id);
 
+        // Legacy direct drafts may exist. Do not allow adding or modifying production
+        // lines without an order, or they would still be invisible to the lab.
+        if (invoice.CustomerOrderId is null &&
+            SalesInvoiceOperationalRoutingPolicy.RequiresOrder(request.Data.Lines))
+            throw new ConflictException(
+                "sales_invoice_production_requires_order",
+                "بنود العدسات والتجهيز تحتاج طلب عميل مرتبطًا. أنشئ عملية جديدة من واجهة الفاتورة لتعمل دورة المعمل؛ لا تُعد ترحيل فاتورة قديمة.");
+
+
         SalesConcurrency.Ensure(
             request.Data.RowVersion,
             invoice.RowVersion,
@@ -51,6 +64,63 @@ public sealed class UpdateSalesInvoiceCommandHandler(
             throw new ConflictException(
                 "sales_invoice_locked_after_confirmation",
                 "لا يمكن تعديل فاتورة المبيعات بعد تأكيدها. استخدم سند قبض للتحصيل أو مستند تصحيح/مرتجع للتعديل المالي.");
+        }
+
+        if (invoice.CustomerOrderId is Guid linkedOrderId)
+        {
+            // Editing either UI edits both documents in the same TransactionBehavior
+            // transaction. The order handler performs its normal product/optical
+            // validation, then mirrors canonical lines back into this invoice.
+            var linkedOrder = await orders.GetAggregateAsync(linkedOrderId, true, ct)
+                ?? throw new NotFoundException(nameof(CustomerOrder), linkedOrderId);
+            LinkedSalesDraftSynchronizer.EnsureEditable(linkedOrder, invoice);
+            var orderedLines = request.Data.Lines.Select(line =>
+            {
+                var original = line.Id.HasValue
+                    ? invoice.Lines.SingleOrDefault(x => x.Id == line.Id.Value)
+                    : null;
+                if (line.Id.HasValue && original is null)
+                    throw new ConflictException("sales_invoice_line_not_found",
+                        "تغيّرت بنود الفاتورة؛ حدّثها قبل التعديل.");
+                if (line.CustomerOrderLineId.HasValue &&
+                    (original is null || original.CustomerOrderLineId != line.CustomerOrderLineId))
+                    throw new ConflictException("sales_linked_line_mismatch",
+                        "بند الفاتورة لا يطابق بند طلب العميل المرتبط.");
+                if (original is not null && !original.CustomerOrderLineId.HasValue)
+                    throw new ConflictException("sales_linked_line_missing_order",
+                        "هناك بند فاتورة غير مرتبط ببند طلب العميل؛ راجع البيانات قبل تعديلها.");
+                return new CustomerOrderLineRequest(
+                    original?.CustomerOrderLineId, line.GroupId, line.LineType,
+                    line.ProductVariantId, line.WarehouseId, line.Description,
+                    line.Quantity, line.ActualUnitPrice, line.DiscountType,
+                    line.DiscountValue, line.TaxRate, line.PrescriptionRevisionId,
+                    line.PrescriptionEye, line.RequiresProduction, line.Notes,
+                    null, line.OpticalSnapshot);
+            }).ToArray();
+            var orderRequest = new UpdateCustomerOrderRequest(
+                request.Data.CustomerId, request.Data.PrescriptionRevisionId,
+                request.Data.InvoiceDate, linkedOrder.RequiredDate, request.Data.CurrencyId,
+                request.Data.TaxCalculationMode, request.Data.PaymentTermType,
+                linkedOrder.Notes, orderedLines,
+                Convert.ToBase64String(linkedOrder.RowVersion))
+            { PaymentPlan = request.Data.PaymentPlan };
+            await orderUpdates.Handle(new UpdateCustomerOrderCommand(linkedOrder.Id, orderRequest), ct);
+            // Retain invoice-only posting date, description and salesperson.
+            invoice.UpdateHeader(request.Data.CustomerId, linkedOrder.Id,
+                request.Data.PrescriptionRevisionId, request.Data.InvoiceDate,
+                request.Data.PostingDate, (TaxCalculationMode)(byte)request.Data.TaxCalculationMode,
+                linkedOrder.PaymentPlan, linkedOrder.PaymentTermDaysSnapshot,
+                request.Data.Description);
+            if (request.Data.SalesEmployeeId.HasValue)
+            {
+                var selected = await employees.GetByIdAsync(request.Data.SalesEmployeeId.Value, ct)
+                    ?? throw new NotFoundException(nameof(Employee), request.Data.SalesEmployeeId.Value);
+                if (!selected.IsActive || !selected.IsSalesperson)
+                    throw new ConflictException("sales_employee_not_salesperson", "الموظف المختار ليس مندوب مبيعات نشطًا.");
+                invoice.SetSalesEmployee(selected.Id);
+            }
+            else invoice.SetSalesEmployee(null);
+            return invoice;
         }
 
         var customer = await customers.GetByIdAsync(

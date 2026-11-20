@@ -292,22 +292,26 @@
                                         </div>
                                         <label class="ui-sales-line-card__number-field">
                                             <span>SPH <strong aria-hidden="true">*</strong></span>
-                                            <input type="number" step="0.25" placeholder="SPH" value="@line.SPH" disabled="@ReadOnly" @onchange="e => OpticalDecimalChanged(line, nameof(line.SPH), e)" />
+                                            <input type="text" inputmode="decimal" dir="ltr" autocomplete="off" placeholder="SPH" value="@OpticalInputValue(line, nameof(line.SPH), line.SPH)" aria-invalid="@(OpticalFieldError(line, nameof(line.SPH)) is null ? "false" : "true")" disabled="@ReadOnly" @oninput="e => OpticalDecimalChanged(line, nameof(line.SPH), e)" />
+                                            @if (OpticalFieldError(line, nameof(line.SPH)) is { } sphError) { <small class="ui-sales-line-card__input-error" role="alert">@sphError</small> }
                                             <small class="ui-sales-line-card__range-hint">القوة الكروية، ويسمح بالصفر.</small>
                                         </label>
                                         <label class="ui-sales-line-card__number-field">
                                             <span>CYL <strong aria-hidden="true">*</strong></span>
-                                            <input type="number" step="0.25" placeholder="CYL" value="@line.CYL" disabled="@ReadOnly" @onchange="e => OpticalDecimalChanged(line, nameof(line.CYL), e)" />
+                                            <input type="text" inputmode="decimal" dir="ltr" autocomplete="off" placeholder="CYL" value="@OpticalInputValue(line, nameof(line.CYL), line.CYL)" aria-invalid="@(OpticalFieldError(line, nameof(line.CYL)) is null ? "false" : "true")" disabled="@ReadOnly" @oninput="e => OpticalDecimalChanged(line, nameof(line.CYL), e)" />
+                                            @if (OpticalFieldError(line, nameof(line.CYL)) is { } cylError) { <small class="ui-sales-line-card__input-error" role="alert">@cylError</small> }
                                             <small class="ui-sales-line-card__range-hint">اكتب صفرًا عند عدم وجود استجماتيزم.</small>
                                         </label>
                                         <label class="ui-sales-line-card__number-field">
                                             <span>Axis</span>
-                                            <input type="number" min="1" max="180" step="1" placeholder="1 إلى 180 عند وجود CYL" title="Axis: أدخل قيمة بين 1 و 180 عند وجود CYL" value="@line.Axis" disabled="@ReadOnly" @onchange="e => OpticalAxisChanged(line, e)" />
+                                            <input type="text" inputmode="numeric" dir="ltr" autocomplete="off" placeholder="1 إلى 180 عند وجود CYL" title="Axis: أدخل قيمة بين 1 و 180 عند وجود CYL" value="@OpticalInputValue(line, nameof(line.Axis), line.Axis)" aria-invalid="@(OpticalFieldError(line, nameof(line.Axis)) is null ? "false" : "true")" disabled="@ReadOnly" @oninput="e => OpticalAxisChanged(line, e)" />
+                                            @if (OpticalFieldError(line, nameof(line.Axis)) is { } axisError) { <small class="ui-sales-line-card__input-error" role="alert">@axisError</small> }
                                             <small class="ui-sales-line-card__range-hint">مطلوب فقط إذا كانت CYL غير صفرية، من 1 إلى 180.</small>
                                         </label>
                                         <label class="ui-sales-line-card__number-field">
                                             <span>ADD</span>
-                                            <input type="number" step="0.25" min="0" placeholder="ADD" value="@line.ADD" disabled="@ReadOnly" @onchange="e => OpticalDecimalChanged(line, nameof(line.ADD), e)" />
+                                            <input type="text" inputmode="decimal" dir="ltr" autocomplete="off" placeholder="ADD" value="@OpticalInputValue(line, nameof(line.ADD), line.ADD)" aria-invalid="@(OpticalFieldError(line, nameof(line.ADD)) is null ? "false" : "true")" disabled="@ReadOnly" @oninput="e => OpticalDecimalChanged(line, nameof(line.ADD), e)" />
+                                            @if (OpticalFieldError(line, nameof(line.ADD)) is { } addError) { <small class="ui-sales-line-card__input-error" role="alert">@addError</small> }
                                             <small class="ui-sales-line-card__range-hint">اختياري: لعدسات القراءة أو متعددة البؤر فقط إذا نصت الوصفة عليه.</small>
                                         </label>
                                         <div class="ui-sales-line-card__field ui-sales-line-card__field--wide">
@@ -319,7 +323,11 @@
                                         </div>
                                         @if (_expandedOptical.Contains(line))
                                         {
-                                        <label class="ui-sales-line-card__number-field"><span>Prism</span><input type="number" min="0" step="0.25" value="@line.Prism" disabled="@ReadOnly" @onchange="e => OpticalDecimalChanged(line, nameof(line.Prism), e)" /></label>
+                                        <label class="ui-sales-line-card__number-field">
+                                            <span>Prism</span>
+                                            <input type="number" min="0" step="0.25" dir="ltr" value="@OpticalInputValue(line, nameof(line.Prism), line.Prism)" aria-invalid="@(OpticalFieldError(line, nameof(line.Prism)) is null ? "false" : "true")" disabled="@ReadOnly" @onchange="e => OpticalDecimalChanged(line, nameof(line.Prism), e)" />
+                                            @if (OpticalFieldError(line, nameof(line.Prism)) is { } prismInputError) { <small class="ui-sales-line-card__input-error" role="alert">@prismInputError</small> }
+                                        </label>
                                         <label class="ui-sales-line-card__number-field">
                                             <span>Prism Base</span>
                                             <select disabled="@ReadOnly" value="@line.PrismBase" @onchange="e => PrismBaseChanged(line, e)">
@@ -330,9 +338,21 @@
                                                 <option value="BaseDown">Base Down</option>
                                             </select>
                                         </label>
-                                        <label class="ui-sales-line-card__number-field"><span>PD</span><input type="number" min="0" step="0.5" value="@line.PD" disabled="@ReadOnly" @onchange="e => OpticalDecimalChanged(line, nameof(line.PD), e)" /></label>
-                                        <label class="ui-sales-line-card__number-field"><span>Mono PD</span><input type="number" min="0" step="0.5" value="@line.MonocularPD" disabled="@ReadOnly" @onchange="e => OpticalDecimalChanged(line, nameof(line.MonocularPD), e)" /></label>
-                                        <label class="ui-sales-line-card__number-field"><span>Fitting Height</span><input type="number" min="0" step="0.5" value="@line.FittingHeight" disabled="@ReadOnly" @onchange="e => OpticalDecimalChanged(line, nameof(line.FittingHeight), e)" /></label>
+                                        <label class="ui-sales-line-card__number-field">
+                                            <span>PD</span>
+                                            <input type="number" min="0" step="0.5" dir="ltr" value="@OpticalInputValue(line, nameof(line.PD), line.PD)" aria-invalid="@(OpticalFieldError(line, nameof(line.PD)) is null ? "false" : "true")" disabled="@ReadOnly" @onchange="e => OpticalDecimalChanged(line, nameof(line.PD), e)" />
+                                            @if (OpticalFieldError(line, nameof(line.PD)) is { } pDInputError) { <small class="ui-sales-line-card__input-error" role="alert">@pDInputError</small> }
+                                        </label>
+                                        <label class="ui-sales-line-card__number-field">
+                                            <span>Mono PD</span>
+                                            <input type="number" min="0" step="0.5" dir="ltr" value="@OpticalInputValue(line, nameof(line.MonocularPD), line.MonocularPD)" aria-invalid="@(OpticalFieldError(line, nameof(line.MonocularPD)) is null ? "false" : "true")" disabled="@ReadOnly" @onchange="e => OpticalDecimalChanged(line, nameof(line.MonocularPD), e)" />
+                                            @if (OpticalFieldError(line, nameof(line.MonocularPD)) is { } monocularPDInputError) { <small class="ui-sales-line-card__input-error" role="alert">@monocularPDInputError</small> }
+                                        </label>
+                                        <label class="ui-sales-line-card__number-field">
+                                            <span>Fitting Height</span>
+                                            <input type="number" min="0" step="0.5" dir="ltr" value="@OpticalInputValue(line, nameof(line.FittingHeight), line.FittingHeight)" aria-invalid="@(OpticalFieldError(line, nameof(line.FittingHeight)) is null ? "false" : "true")" disabled="@ReadOnly" @onchange="e => OpticalDecimalChanged(line, nameof(line.FittingHeight), e)" />
+                                            @if (OpticalFieldError(line, nameof(line.FittingHeight)) is { } fittingHeightInputError) { <small class="ui-sales-line-card__input-error" role="alert">@fittingHeightInputError</small> }
+                                        </label>
                                         <div class="ui-sales-line-card__field"><UiInputText Label="VA" Value="@line.VA" ValueChanged="v => VaChanged(line, v)" ReadOnly="@ReadOnly" /></div>
                                         }
                                     }
@@ -367,8 +387,57 @@
     private int _expandedLineNumber = 1;
     private readonly Dictionary<string, string> _numericErrors = new();
     private readonly Dictionary<int, string> _opticalValidationErrors = new();
+    // Keep the exact in-progress text (including a leading minus sign) until it is valid.
+    // Never silently replace an invalid edit with null or reuse an older numeric value.
+    private readonly Dictionary<(UiSalesLineModel Line, string Field), string> _opticalDraftInputs = new();
+    private readonly Dictionary<(UiSalesLineModel Line, string Field), string> _opticalFieldErrors = new();
     private readonly HashSet<UiSalesLineModel> _expandedOptical = [];
     private string? OpticalError(UiSalesLineModel line) => _opticalValidationErrors.GetValueOrDefault(line.LineNumber);
+    private string? OpticalFieldError(UiSalesLineModel line, string field) =>
+        _opticalFieldErrors.GetValueOrDefault((line, field));
+
+    private string OpticalInputValue(UiSalesLineModel line, string field, decimal? value) =>
+        _opticalDraftInputs.TryGetValue((line, field), out var text)
+            ? text
+            : value?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
+
+    private void SetOpticalFieldError(UiSalesLineModel line, string field, string? message)
+    {
+        var key = (line, field);
+        if (string.IsNullOrWhiteSpace(message)) _opticalFieldErrors.Remove(key);
+        else _opticalFieldErrors[key] = message;
+    }
+
+    private void ClearOpticalInputState(UiSalesLineModel line)
+    {
+        foreach (var key in _opticalDraftInputs.Keys.Where(key => ReferenceEquals(key.Line, line)).ToArray())
+            _opticalDraftInputs.Remove(key);
+        foreach (var key in _opticalFieldErrors.Keys.Where(key => ReferenceEquals(key.Line, line)).ToArray())
+            _opticalFieldErrors.Remove(key);
+    }
+
+    public bool ValidateOpticalInputs()
+    {
+        foreach (var line in Model.Where(line => line.LineType == "Lens" &&
+                     line.PrescriptionRequired && line.OpticalMeasurementSource == "Manual"))
+        {
+            if (!line.SPH.HasValue && OpticalFieldError(line, nameof(line.SPH)) is null)
+                SetOpticalFieldError(line, nameof(line.SPH), "أدخل قياس SPH، واكتب صفرًا عند الحاجة.");
+            if (!line.CYL.HasValue && OpticalFieldError(line, nameof(line.CYL)) is null)
+                SetOpticalFieldError(line, nameof(line.CYL), "أدخل قياس CYL، واكتب صفرًا عند عدم وجود استجماتيزم.");
+            if (line.CYL is not null and not 0m && (line.Axis is null or < 1 or > 180)
+                && OpticalFieldError(line, nameof(line.Axis)) is null)
+                SetOpticalFieldError(line, nameof(line.Axis), "أدخل Axis من 1 إلى 180 عند وجود CYL غير صفرية.");
+        }
+
+        if (_opticalFieldErrors.Count == 0) return true;
+        var first = Model.FirstOrDefault(line =>
+            _opticalFieldErrors.Keys.Any(key => ReferenceEquals(key.Line, line)));
+        if (first is not null) _expandedLineNumber = first.LineNumber;
+        StateHasChanged();
+        return false;
+    }
+
     private void ToggleAdvancedOptical(UiSalesLineModel line)
     {
         if (!_expandedOptical.Add(line)) _expandedOptical.Remove(line);
@@ -510,6 +579,7 @@
             return;
 
         _opticalValidationErrors.Remove(line.LineNumber);
+        ClearOpticalInputState(line);
         line.SPH = line.LensSPH;
         line.CYL = line.LensCYL;
         line.ADD = line.LensADD;
@@ -585,6 +655,7 @@
         _numericErrors.Clear();
         _opticalValidationErrors.Clear();
         _expandedOptical.Remove(line);
+        ClearOpticalInputState(line);
         Model.Remove(line);
         for (var i = 0; i < Model.Count; i++)
             Model[i].LineNumber = i + 1;
@@ -646,7 +717,7 @@
         await OnChanged.InvokeAsync();
     }
 
-    private static void ClearProductSelection(UiSalesLineModel line, bool clearCategory = true, bool clearDescription = false)
+    private void ClearProductSelection(UiSalesLineModel line, bool clearCategory = true, bool clearDescription = false)
     {
         if (clearCategory)
         {
@@ -683,13 +754,14 @@
     {
         line.DiscountType = e.Value?.ToString() ?? "None";
         if (line.DiscountType == "None") line.DiscountValue = null;
-        StoreNumericError(line, nameof(line.DiscountValue), CompactMode ? DiscountValidationMessage(line) : null);
+        StoreNumericError(line, nameof(line.DiscountValue), DiscountValidationMessage(line));
         await OnChanged.InvokeAsync();
     }
     private async Task EyeChanged(UiSalesLineModel line, ChangeEventArgs e) { _opticalValidationErrors.Remove(line.LineNumber); line.PrescriptionEye = e.Value?.ToString() ?? string.Empty; await OnChanged.InvokeAsync(); }
     private async Task OpticalSourceChanged(UiSalesLineModel line, ChangeEventArgs e)
     {
         _opticalValidationErrors.Remove(line.LineNumber);
+        ClearOpticalInputState(line);
         line.OpticalMeasurementSource = e.Value?.ToString() == "Manual" ? "Manual" : "StoredPrescription";
         if (line.OpticalMeasurementSource == "Manual")
         {
@@ -705,7 +777,22 @@
     private async Task OpticalDecimalChanged(UiSalesLineModel line, string field, ChangeEventArgs e)
     {
         _opticalValidationErrors.Remove(line.LineNumber);
-        decimal? value = decimal.TryParse(e.Value?.ToString(), out var parsed) ? parsed : null;
+        var raw = e.Value?.ToString() ?? string.Empty;
+        _opticalDraftInputs[(line, field)] = raw;
+        if (!OpticalInputNumberParser.TryParseDecimal(raw, out var value))
+        {
+            SetOpticalFieldError(line, field, "أدخل رقمًا صالحًا؛ يمكن استخدام السالب مثل -6 والعشري مثل -1.25.");
+            await OnChanged.InvokeAsync();
+            return;
+        }
+        if ((field is nameof(line.ADD) or nameof(line.Prism) or nameof(line.PD)
+            or nameof(line.MonocularPD) or nameof(line.FittingHeight)) && value < 0m)
+        {
+            SetOpticalFieldError(line, field, "القيمة لا يمكن أن تكون سالبة.");
+            await OnChanged.InvokeAsync();
+            return;
+        }
+        SetOpticalFieldError(line, field, null);
         switch (field)
         {
             case nameof(line.SPH): line.SPH = value; break;
@@ -716,12 +803,29 @@
             case nameof(line.MonocularPD): line.MonocularPD = value; break;
             case nameof(line.FittingHeight): line.FittingHeight = value; break;
         }
+        // CYL=0 needs no Axis. Changing CYL to a non-zero value is checked before saving.
+        if (field == nameof(line.CYL) && value == 0m)
+        {
+            // Zero cylinder does not require an axis: remove stale values and UI errors.
+            line.Axis = null;
+            _opticalDraftInputs.Remove((line, nameof(line.Axis)));
+            SetOpticalFieldError(line, nameof(line.Axis), null);
+        }
         await OnChanged.InvokeAsync();
     }
     private async Task OpticalAxisChanged(UiSalesLineModel line, ChangeEventArgs e)
     {
         _opticalValidationErrors.Remove(line.LineNumber);
-        line.Axis = short.TryParse(e.Value?.ToString(), out var parsed) ? parsed : null;
+        var raw = e.Value?.ToString() ?? string.Empty;
+        _opticalDraftInputs[(line, nameof(line.Axis))] = raw;
+        if (!OpticalInputNumberParser.TryParseAxis(raw, out var axis))
+        {
+            SetOpticalFieldError(line, nameof(line.Axis), "أدخل رقمًا صحيحًا للمحور من 1 إلى 180.");
+            await OnChanged.InvokeAsync();
+            return;
+        }
+        SetOpticalFieldError(line, nameof(line.Axis), null);
+        line.Axis = axis;
         await OnChanged.InvokeAsync();
     }
     private async Task PrismBaseChanged(UiSalesLineModel line, ChangeEventArgs e) { line.PrismBase = e.Value?.ToString() ?? "None"; await OnChanged.InvokeAsync(); }
@@ -729,45 +833,30 @@
     private async Task NotesChanged(UiSalesLineModel line, string? value) { line.Notes = value; await OnChanged.InvokeAsync(); }
     private async Task DecimalChanged(UiSalesLineModel line, string field, ChangeEventArgs e)
     {
-        if (!CompactMode)
+        var raw = e.Value?.ToString();
+        if (!OpticalInputNumberParser.TryParseDecimal(raw, out var parsed) || !parsed.HasValue ||
+            (field == nameof(line.Quantity) ? parsed.Value <= 0m : parsed.Value < 0m))
         {
-            var originalValue = decimal.TryParse(e.Value?.ToString(), out var originalParsed) ? originalParsed : 0m;
-            if (field == nameof(line.Quantity)) line.Quantity = originalValue;
-            else if (field == nameof(line.ActualUnitPrice)) line.ActualUnitPrice = originalValue;
-            await OnChanged.InvokeAsync();
-            return;
-        }
-        if (!decimal.TryParse(e.Value?.ToString(), out var value) || (field == nameof(line.Quantity) ? value <= 0m : value < 0m))
-        {
-            StoreNumericError(line, field, field == nameof(line.Quantity) ? "أدخل كمية أكبر من صفر." : "أدخل سعرًا صالحًا لا يقل عن صفر.");
+            StoreNumericError(line, field, field == nameof(line.Quantity)
+                ? "أدخل كمية صالحة أكبر من صفر." : "أدخل سعرًا صالحًا لا يقل عن صفر.");
             await OnChanged.InvokeAsync();
             return;
         }
         StoreNumericError(line, field, null);
-        if (field == nameof(line.Quantity)) line.Quantity = value;
-        else if (field == nameof(line.ActualUnitPrice)) line.ActualUnitPrice = value;
+        if (field == nameof(line.Quantity)) line.Quantity = parsed.Value;
+        else if (field == nameof(line.ActualUnitPrice)) line.ActualUnitPrice = parsed.Value;
         StoreNumericError(line, nameof(line.DiscountValue), DiscountValidationMessage(line));
         await OnChanged.InvokeAsync();
     }
+
     private async Task NullableDecimalChanged(UiSalesLineModel line, string field, ChangeEventArgs e)
     {
-        var raw = e.Value?.ToString();
-        if (!CompactMode)
-        {
-            decimal? original = decimal.TryParse(raw, out var oldValue) ? oldValue : null;
-            if (field == nameof(line.DiscountValue)) line.DiscountValue = original;
-            else if (field == nameof(line.TaxRate)) line.TaxRate = original;
-            await OnChanged.InvokeAsync();
-            return;
-        }
-        if (!string.IsNullOrWhiteSpace(raw) && !decimal.TryParse(raw, out _))
+        if (!OpticalInputNumberParser.TryParseDecimal(e.Value?.ToString(), out var value))
         {
             StoreNumericError(line, field, "أدخل رقمًا صالحًا.");
             await OnChanged.InvokeAsync();
             return;
         }
-
-        decimal? value = decimal.TryParse(raw, out var parsed) ? parsed : null;
         if (field == nameof(line.DiscountValue))
         {
             line.DiscountValue = value;
@@ -796,8 +885,9 @@
         line.FittingHeight = null;
     }
 
-    private static void ClearOpticalMeasurements(UiSalesLineModel line)
+    private void ClearOpticalMeasurements(UiSalesLineModel line)
     {
+        ClearOpticalInputState(line);
         line.OpticalMeasurementSource = "StoredPrescription";
         ClearManualMeasurementValues(line);
         line.LensTypeSnapshot = null;

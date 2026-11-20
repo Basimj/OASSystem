@@ -23,23 +23,50 @@ public sealed class SalesInvoiceFromOrderService(
     ISalesLineResolver lineResolver,
     ISequenceNumberGenerator sequences) : ISalesInvoiceFromOrderService
 {
-    public async Task<SalesInvoice> CreateAsync(
+    public async Task<bool> HasUnpostedInvoiceAsync(Guid orderId, CancellationToken cancellationToken = default) =>
+        await invoices.CountAsync(new Specification<SalesInvoice>().Where(x =>
+            x.CustomerOrderId == orderId && x.Status != SalesInvoiceStatus.Cancelled &&
+            x.Status != SalesInvoiceStatus.Posted), cancellationToken) > 0;
+
+    // Called only by the invoice-first draft endpoint. No stock reservation, confirmation,
+    // accounting entry or payment is created here.
+    public Task<SalesInvoice> CreateDraftAsync(
+        CustomerOrder order, DateOnly invoiceDate, DateOnly postingDate,
+        string? invoiceCode, string? description, CancellationToken cancellationToken = default,
+        Guid? salesEmployeeId = null) =>
+        CreateCoreAsync(order, invoiceDate, postingDate, invoiceCode, description, true, cancellationToken, salesEmployeeId);
+
+    public Task<SalesInvoice> CreateAsync(
+        CustomerOrder order, DateOnly invoiceDate, DateOnly postingDate,
+        string? invoiceCode, string? description, CancellationToken cancellationToken = default) =>
+        CreateCoreAsync(order, invoiceDate, postingDate, invoiceCode, description, false, cancellationToken, null);
+
+    private async Task<SalesInvoice> CreateCoreAsync(
         CustomerOrder order,
         DateOnly invoiceDate,
         DateOnly postingDate,
         string? invoiceCode,
         string? description,
-        CancellationToken cancellationToken = default)
+        bool allowOrderDraft,
+        CancellationToken cancellationToken,
+        Guid? salesEmployeeId)
     {
         ArgumentNullException.ThrowIfNull(order);
-        if (order.Status is not (CustomerOrderStatus.Confirmed or CustomerOrderStatus.ReadyForProduction or CustomerOrderStatus.ReadyForDelivery))
-            throw new ConflictException("sales_order_invalid_status", "يمكن إنشاء الفاتورة فقط بعد اكتمال توفر مواد الطلب.");
-
         var existingHeader = (await invoices.ListAsync(
             new Specification<SalesInvoice>().Where(x => x.CustomerOrderId == order.Id && x.Status != SalesInvoiceStatus.Cancelled),
             cancellationToken)).FirstOrDefault();
         if (existingHeader is not null)
+        {
+            if (!string.IsNullOrWhiteSpace(invoiceCode) &&
+                !string.Equals(existingHeader.InvoiceCode, invoiceCode.Trim(), StringComparison.OrdinalIgnoreCase))
+                throw new ConflictException("sales_invoice_order_already_invoiced",
+                    "طلب العميل مرتبط بالفعل بفاتورة أخرى؛ افتح المستند الموجود بدل إنشاء فاتورة جديدة.");
             return await invoices.GetAggregateAsync(existingHeader.Id, true, cancellationToken) ?? existingHeader;
+        }
+
+        if ((allowOrderDraft && order.Status != CustomerOrderStatus.Draft) ||
+            (!allowOrderDraft && order.Status is not (CustomerOrderStatus.Confirmed or CustomerOrderStatus.ReadyForProduction or CustomerOrderStatus.ReadyForDelivery)))
+            throw new ConflictException("sales_order_invalid_status", "لا يمكن إنشاء فاتورة لهذا الطلب في حالته الحالية.");
 
         var code = invoiceCode?.Trim();
         if (string.IsNullOrWhiteSpace(code))
@@ -64,24 +91,37 @@ public sealed class SalesInvoiceFromOrderService(
             order.ExchangeRateType, order.ExchangeRateSource, order.TaxCalculationMode,
             order.PaymentPlan, order.PaymentTermDaysSnapshot,
             baseCurrency.Id, baseCurrency.Code, baseCurrency.DecimalPlaces, description);
+        // All new invoices from orders receive a uniqueness key. Historic rows remain NULL.
+        invoice.ProtectNewOrderInvoice();
 
         // CustomerOrder currently has no dedicated SalesEmployeeId. Preserve the salesperson
         // deterministically by resolving the employee linked to the user who created the order;
         // fall back to the current checkout user only for legacy orders without CreatedBy audit.
         // This prevents Checkout invoices from being omitted from employee commissions.
-        var salespersonUser = Guid.TryParse(order.CreatedBy, out var createdByUser) && createdByUser != Guid.Empty
-            ? createdByUser
-            : Guid.TryParse(currentUser.UserId, out var checkoutUser) && checkoutUser != Guid.Empty
-                ? checkoutUser
-                : (Guid?)null;
-        if (salespersonUser.HasValue)
+        if (salesEmployeeId.HasValue)
         {
-            var linkedEmployees = await employees.ListAsync(
-                new Specification<Employee>().Where(x =>
-                    x.UserAccountId == salespersonUser.Value && x.IsActive && x.IsSalesperson),
-                cancellationToken);
-            if (linkedEmployees.Count == 1)
-                invoice.SetSalesEmployee(linkedEmployees[0].Id);
+            var selected = await employees.GetByIdAsync(salesEmployeeId.Value, cancellationToken)
+                ?? throw new NotFoundException(nameof(Employee), salesEmployeeId.Value);
+            if (!selected.IsActive || !selected.IsSalesperson)
+                throw new ConflictException("sales_employee_not_salesperson", "موظف المبيعات غير نشط أو ليس من مندوبي المبيعات.");
+            invoice.SetSalesEmployee(selected.Id);
+        }
+        if (!salesEmployeeId.HasValue)
+        {
+            var salespersonUser = Guid.TryParse(order.CreatedBy, out var createdByUser) && createdByUser != Guid.Empty
+                ? createdByUser
+                : Guid.TryParse(currentUser.UserId, out var checkoutUser) && checkoutUser != Guid.Empty
+                    ? checkoutUser
+                    : (Guid?)null;
+            if (salespersonUser.HasValue)
+            {
+                var linkedEmployees = await employees.ListAsync(
+                    new Specification<Employee>().Where(x =>
+                        x.UserAccountId == salespersonUser.Value && x.IsActive && x.IsSalesperson),
+                    cancellationToken);
+                if (linkedEmployees.Count == 1)
+                    invoice.SetSalesEmployee(linkedEmployees[0].Id);
+            }
         }
 
         var lineNumber = 1;

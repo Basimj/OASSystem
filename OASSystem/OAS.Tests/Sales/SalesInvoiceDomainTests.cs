@@ -80,6 +80,37 @@ public sealed class SalesInvoiceDomainTests
             null));
     }
 
+    [Test]
+    public void NewOrderInvoiceKeyIsSetOnlyForProtectedOrderInvoices()
+    {
+        var directInvoice = CreateInvoice();
+        Assert.That(directInvoice.NewOrderInvoiceKey, Is.Null);
+
+        var orderId = Guid.NewGuid();
+        var invoice = CreateOrderInvoice(orderId);
+        Assert.That(invoice.NewOrderInvoiceKey, Is.Null);
+        invoice.ProtectNewOrderInvoice();
+        Assert.That(invoice.NewOrderInvoiceKey, Is.EqualTo(orderId));
+
+        Assert.Throws<DomainException>(() => invoice.UpdateHeader(
+            invoice.CustomerId, Guid.NewGuid(), null,
+            invoice.InvoiceDate, invoice.PostingDate,
+            invoice.TaxCalculationMode, invoice.PaymentPlan, 0, "test"));
+        Assert.Throws<DomainException>(() => directInvoice.ProtectNewOrderInvoice());
+    }
+
+    private static SalesInvoice CreateOrderInvoice(Guid orderId)
+    {
+        var currencyId = Guid.NewGuid();
+        return SalesInvoice.Create(
+            Guid.NewGuid(), "SI-ORDER-TEST", Guid.NewGuid(), orderId, null,
+            new DateOnly(2026, 11, 20), new DateOnly(2026, 11, 20),
+            currencyId, "YER", "ر.ي", 2, 1m, new DateOnly(2026, 11, 20),
+            ExchangeRateType.Accounting, ExchangeRateSource.System,
+            TaxCalculationMode.Exclusive, SalesPaymentPlan.FullNow, 0,
+            currencyId, "YER", 2, "test");
+    }
+
     private static SalesInvoice CreateInvoice()
     {
         var currencyId = Guid.NewGuid();

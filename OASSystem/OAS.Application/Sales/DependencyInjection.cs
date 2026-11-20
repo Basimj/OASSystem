@@ -51,6 +51,7 @@ public static class DependencyInjection
             sp => sp.GetRequiredService<SalesInvoiceApplicationService>());
 
         services.AddScoped<SalesDtoAssembler>();
+        services.AddScoped<LinkedSalesDraftSynchronizer>();
         services.AddScoped<ISalesLineResolver, SalesLineResolver>();
         services.AddScoped<ILensVariantResolver, LensVariantResolver>();
         services.AddScoped<ICustomerOrderOpticalService, CustomerOrderOpticalService>();

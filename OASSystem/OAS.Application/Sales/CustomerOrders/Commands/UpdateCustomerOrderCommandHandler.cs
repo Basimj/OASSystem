@@ -21,7 +21,8 @@ public sealed class UpdateCustomerOrderCommandHandler(
     IRepository<CustomerOrderLineOpticalSnapshot, Guid> snapshotRepository,
     IReadRepository<Customer, Guid> customers,
     IExchangeRateResolver rates,
-    ICustomerOrderOpticalService optical)
+    ICustomerOrderOpticalService optical,
+    LinkedSalesDraftSynchronizer linkedDrafts)
     : IRequestHandler<UpdateCustomerOrderCommand, CustomerOrder>
 {
     public async Task<CustomerOrder> Handle(UpdateCustomerOrderCommand request, CancellationToken ct)
@@ -30,6 +31,12 @@ public sealed class UpdateCustomerOrderCommandHandler(
                     ?? throw new NotFoundException(nameof(CustomerOrder), request.Id);
 
         SalesConcurrency.Ensure(request.Data.RowVersion, order.RowVersion, "طلب العميل");
+        // The order and its invoice are one editable commercial draft. Never allow
+        // a change on the order screen once its invoice has been confirmed.
+        var linkedInvoice = await linkedDrafts.FindLinkedInvoiceAsync(order.Id, ct);
+        if (linkedInvoice is not null)
+            LinkedSalesDraftSynchronizer.EnsureEditable(order, linkedInvoice);
+
         if (request.Data.Lines.Count == 0)
             throw new ConflictException("sales_order_lines_required", "يجب أن يحتوي الطلب على سطر واحد على الأقل.");
 
@@ -68,6 +75,8 @@ public sealed class UpdateCustomerOrderCommandHandler(
         }
 
         await SynchronizeLinesAsync(order, request.Data.Lines, previousExchangeRate, currencyContextChanged, ct);
+        if (linkedInvoice is not null)
+            await linkedDrafts.SynchronizeInvoiceAsync(order, linkedInvoice, ct);
         return order;
     }
 

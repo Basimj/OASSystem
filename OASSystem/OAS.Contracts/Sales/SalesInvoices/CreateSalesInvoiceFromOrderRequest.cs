@@ -5,4 +5,5 @@ public sealed record CreateSalesInvoiceFromOrderRequest(
     DateOnly InvoiceDate,
     DateOnly PostingDate,
     string? Description,
-    string OrderRowVersion);
+    string OrderRowVersion,
+    Guid? SalesEmployeeId = null);

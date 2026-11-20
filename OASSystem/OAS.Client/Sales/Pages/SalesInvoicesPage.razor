@@ -1,14 +1,30 @@
 @page "/sales/invoices"
 @attribute [Authorize]
 @using OAS.Client.Sales.Workspace
+@using OAS.Client.Sales.Checkout.Pages
 
 @* Invoice-route-only presentation boundary; all state remains in SalesWorkspaceHost. *@
 <div class="oas-sales-invoices-page">
-    <SalesWorkspaceHost Section="SalesEntityType.SalesInvoices" RequestedInvoiceId="@InvoiceId" CreateNew="@Create" CollectPayment="@Collect" />
+    @if (CheckoutOrderId.HasValue)
+    {
+        @* Checkout is embedded on the invoice route, so users need not create a
+           second document or leave invoice workspace to complete an optical sale. *@
+        <div class="oas-invoice-workflow-banner" dir="rtl" role="status">
+            <strong>متابعة بيع العدسات من واجهة الفاتورة</strong>
+            <span>تم إنشاء طلب عميل تشغيلي. أتمم السداد والتوفر من هنا؛ سيُنشئ النظام الفاتورة وأمر المعمل تلقائيًا عند تحقق الشروط.</span>
+            <a href="@($"/sales/order-tracking?orderId={CheckoutOrderId.Value:D}")">متابعة الطلب والمخزون</a>
+        </div>
+        <SalesCheckoutPage OrderId="@CheckoutOrderId" InvoiceWorkspace="true" />
+    }
+    else
+    {
+        <SalesWorkspaceHost Section="SalesEntityType.SalesInvoices" RequestedInvoiceId="@InvoiceId" CreateNew="@Create" CollectPayment="@Collect" />
+    }
 </div>
 
 @code {
     [Parameter, SupplyParameterFromQuery(Name = "invoiceId")] public Guid? InvoiceId { get; set; }
     [Parameter, SupplyParameterFromQuery(Name = "create")] public bool Create { get; set; }
     [Parameter, SupplyParameterFromQuery(Name = "collect")] public bool Collect { get; set; }
+    [Parameter, SupplyParameterFromQuery(Name = "checkoutOrderId")] public Guid? CheckoutOrderId { get; set; }
 }

@@ -150,3 +150,21 @@
     .oas-invoice-screen .ui-sales-section__header-actions { flex: 1 1 100%; margin-inline-start: 0; }
     .oas-invoice-screen .ui-sales-section__header .oas-invoice-walkin-options { justify-content: flex-start; }
 }
+
+/* Invoice-first operational checkout: readable in any active theme. */
+.oas-invoice-workflow-banner {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    margin: 10px 12px;
+    padding: 12px 16px;
+    border: 1px solid var(--inv-border, currentColor);
+    border-radius: 10px;
+    background: var(--inv-surface, transparent);
+    color: var(--inv-ink, inherit);
+}
+.oas-invoice-workflow-banner strong { font-size: 15px; }
+.oas-invoice-workflow-banner span { flex: 1 1 350px; font-size: 13px; }
+.oas-invoice-workflow-banner a { color: var(--inv-blue, currentColor); font-weight: 750; }
+.oas-invoice-preview-note { display: block; padding: 6px 4px 0; font-size: 12px; color: var(--inv-muted, inherit); }
