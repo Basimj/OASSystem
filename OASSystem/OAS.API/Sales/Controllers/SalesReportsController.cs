@@ -62,7 +62,7 @@ public sealed class SalesReportsController(ISender sender) : ControllerBase
             rows.AddRange(next.Documents);
         }
         var csv = string.Equals(format, "csv", StringComparison.OrdinalIgnoreCase);
-        var bytes = csv ? SalesReportExportFormatter.Csv(rows) : SalesReportExportFormatter.Excel(rows);
+        var bytes = csv ? SalesReportExportFormatter.Csv(rows) : SalesReportExportFormatter.Excel(first, rows);
         var ext = csv ? "csv" : "xlsx";
         var contentType = csv ? "text/csv; charset=utf-8" :
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";

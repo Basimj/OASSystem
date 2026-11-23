@@ -170,14 +170,14 @@ public sealed class SalesReportQueryService(OasDbContext db) : ISalesReportQuery
         {
             var a = await GroupAsync(invoices, x => x.Date, ct);
             var b = await GroupAsync(returns, x => x.Date, ct);
-            return Merge(a, b).Select(g => ToRow(g.Key.ToString("yyyy-MM-dd"),
+            return Merge(a, b, chronological: true).Select(g => ToRow(g.Key.ToString("yyyy-MM-dd"),
                 g.Key.ToString("yyyy-MM-dd"), g)).ToList();
         }
         if (kind == SalesReportGroupBy.Month)
         {
             var a = await GroupAsync(invoices, x => x.Date.Year * 100 + x.Date.Month, ct);
             var b = await GroupAsync(returns, x => x.Date.Year * 100 + x.Date.Month, ct);
-            return Merge(a, b).Select(g => ToRow(g.Key.ToString(),
+            return Merge(a, b, chronological: true).Select(g => ToRow(g.Key.ToString(),
                 $"{g.Key / 100:D4}-{g.Key % 100:D2}", g)).ToList();
         }
 
@@ -217,15 +217,25 @@ public sealed class SalesReportQueryService(OasDbContext db) : ISalesReportQuery
     }
 
     private static List<GroupAggregate<TKey>> Merge<TKey>(
-        IReadOnlyList<GroupAggregate<TKey>> a, IReadOnlyList<GroupAggregate<TKey>> b) =>
-        a.Concat(b).GroupBy(x => x.Key).Select(g => new GroupAggregate<TKey>
+        IReadOnlyList<GroupAggregate<TKey>> a, IReadOnlyList<GroupAggregate<TKey>> b,
+        bool chronological = false)
+    {
+        // Limit AFTER combining both sources for each key; otherwise returns
+        // outside either source's first 201 keys can produce false group profits.
+        var merged = a.Concat(b).GroupBy(x => x.Key).Select(g => new GroupAggregate<TKey>
         {
             Key = g.Key, Invoice = g.Sum(x => x.Invoice), Returned = g.Sum(x => x.Returned),
             Discounts = g.Sum(x => x.Discounts), Tax = g.Sum(x => x.Tax),
             Cogs = g.Sum(x => x.Cogs), InvoiceCount = g.Sum(x => x.InvoiceCount),
             ReturnCount = g.Sum(x => x.ReturnCount)
-        }).OrderByDescending(x => x.Invoice - x.Returned)
-          .Take(MaximumBreakdownGroups + 1).ToList();
+        });
+        // Time-series must retain the LATEST 200 days/months, not the 200
+        // biggest revenue days in random chronological order.
+        return (chronological
+            ? merged.OrderByDescending(x => x.Key)
+            : merged.OrderByDescending(x => x.Invoice - x.Returned))
+            .Take(MaximumBreakdownGroups + 1).ToList();
+    }
 
     private static SalesReportBreakdownDto ToRow<TKey>(string key, string label, GroupAggregate<TKey> row) =>
         new(key, label, SalesReportArithmetic.Compose(row.Invoice, row.Returned,
@@ -242,8 +252,10 @@ public sealed class SalesReportQueryService(OasDbContext db) : ISalesReportQuery
                 InvoiceCount = g.Where(x => x.Kind == 1).Select(x => x.DocumentId).Distinct().LongCount(),
                 ReturnCount = g.Where(x => x.Kind == 2).Select(x => x.DocumentId).Distinct().LongCount()
             })
-            .OrderByDescending(x => x.Invoice - x.Returned)
-            .Take(MaximumBreakdownGroups + 1).ToListAsync(ct);
+            // All SQL-aggregated keys must participate in the merge. Limiting each
+            // source first can silently omit a large return group and inflate
+            // displayed net revenue/profit for the remaining groups.
+            .ToListAsync(ct);
 
     private sealed class Summary
     {

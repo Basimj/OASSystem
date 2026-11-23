@@ -1,0 +1,40 @@
+/* OAS sales report: print isolation from the app shell. Loaded only for print.
+   The selector confines all layout changes to the sales reporting route. */
+/* Named pages prevent changing print settings for other ERP screens. */
+@page oas-sales-report {
+    size: A4 landscape;
+    margin: 11mm 12mm 15mm;
+    @bottom-center {
+        content: "صفحة " counter(page) " من " counter(pages);
+        font: 8pt Tahoma, Arial, sans-serif;
+        color: #64748b;
+    }
+}
+@media print {
+    .sales-report { page: oas-sales-report; }
+    body:has(.sales-report) { margin: 0 !important; padding: 0 !important; background: white !important; color: #15283d !important; }
+    body:has(.sales-report) .oas-workspace-topbar,
+    body:has(.sales-report) .oas-sidebar,
+    body:has(.sales-report) .oas-mobile-overlay,
+    body:has(.sales-report) #oas-startup-loader { display: none !important; }
+    body:has(.sales-report) .oas-shell,
+    body:has(.sales-report) .oas-main-content,
+    body:has(.sales-report) .oas-main-inner {
+        position: static !important; display: block !important; width: 100% !important;
+        max-width: none !important; height: auto !important; max-height: none !important;
+        min-height: 0 !important; margin: 0 !important; padding: 0 !important;
+        overflow: visible !important; transform: none !important;
+        background: #fff !important; box-shadow: none !important;
+    }
+    body:has(.sales-report) .sales-report { color: #132039 !important; }
+    body:has(.sales-report) .sales-report-chart__grid-line { stroke: #d4dfe9 !important; }
+    body:has(.sales-report) .sales-report-chart__zero { stroke: #64748b !important; }
+    body:has(.sales-report) .sales-report-chart__line { stroke: #237fb9 !important; }
+    body:has(.sales-report) .sales-report-chart__point { stroke: #237fb9 !important; fill: #fff !important; }
+    body:has(.sales-report) .sales-report-chart stop { stop-color: #237fb9 !important; }
+    body:has(.sales-report) .sales-report-chart__bar { background: #237fb9 !important; }
+    body:has(.sales-report) .sales-report-chart__bar--negative { background: #b83636 !important; }
+    body:has(.sales-report) .sales-report-chart__tick,
+    body:has(.sales-report) .sales-report-chart__x-label { fill: #283a50 !important; }
+    html:has(.sales-report), body:has(.sales-report) { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}

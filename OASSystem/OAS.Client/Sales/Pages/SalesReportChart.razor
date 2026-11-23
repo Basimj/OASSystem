@@ -1,0 +1,354 @@
+@using System.Globalization
+@using OAS.Contracts.Sales.Reports
+
+<section class="sales-report-chart" aria-label="الرسم البياني التفاعلي للمبيعات والربحية" dir="rtl">
+    <div class="sales-report-chart__header">
+        <div>
+            <h2><i class="fa-solid fa-chart-line" aria-hidden="true"></i> @ChartTitle</h2>
+            <p>مقارنة فعلية بحسب @GroupName، من نفس بيانات التحليل المحاسبي.</p>
+        </div>
+        <div class="sales-report-chart__controls">
+        @if (IsTimeline)
+        {
+            <label class="sales-report-chart__metric">شكل الرسم
+                <select value="@_timelineView" @onchange="SetTimelineView" aria-label="شكل الرسم البياني الزمني">
+                    <option value="Line">خطي</option>
+                    <option value="Combo">أعمدة وخط</option>
+                </select>
+            </label>
+        }
+        <label class="sales-report-chart__metric">المؤشر المالي
+            <select value="@_metric" @onchange="SetMetric" aria-label="المؤشر المالي للرسم البياني">
+                <option value="NetRevenue">صافي المبيعات</option>
+                <option value="GrossProfit">الربح الإجمالي</option>
+                <option value="NetCogs">تكلفة المبيعات</option>
+                <option value="ReturnedRevenue">المرتجعات</option>
+                <option value="GrossMargin">هامش الربح</option>
+                <option value="InvoiceRevenue">إيرادات الفواتير</option>
+                <option value="InvoiceDiscounts">خصومات الفواتير</option>
+                <option value="NetSalesTax">الضريبة الصافية</option>
+            </select>
+        </label>
+        </div>
+    </div>
+
+    @if (Rows.Count == 0)
+    {
+        <div class="sales-report-chart__empty">لا توجد عمليات مرحلة في الفترة المحددة لعرضها على الرسم البياني.</div>
+    }
+    else if (IsTimeline)
+    {
+        <div class="sales-report-chart__legend" aria-label="دليل الرسم">
+            <span><i class="@(IsLineView ? "sales-report-chart__legend-mainline" : "sales-report-chart__legend-bar")"></i> @MetricName</span>
+            @if (!IsPercent)
+            {
+                <span><i class="sales-report-chart__legend-line"></i> @LineMetricName</span>
+            }
+        </div>
+        <div class="sales-report-chart__svg-scroll">
+            <svg viewBox="0 0 920 305" role="img" aria-label="@ChartTitle بحسب @GroupName — @VisibleRows.Count فترات" preserveAspectRatio="xMidYMid meet">
+                <defs>
+                    <linearGradient id="oas-report-bar-fill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="var(--oas-color-primary, #26b2ff)" stop-opacity=".95" />
+                        <stop offset="100%" stop-color="var(--oas-color-primary, #26b2ff)" stop-opacity=".38" />
+                    </linearGradient>
+                </defs>
+                @for (var tick = 0; tick <= 4; tick++)
+                {
+                    <line x1="75" y1="@N(TickY(tick))" x2="885" y2="@N(TickY(tick))" class="sales-report-chart__grid-line" />
+                    @SvgAxisLabel("67", N(TickY(tick) + 4), "end", "sales-report-chart__tick", AxisLabel(tick))
+                }
+                <line x1="75" y1="@N(ValueY(0m))" x2="885" y2="@N(ValueY(0m))" class="sales-report-chart__zero" />
+                @if (IsLineView)
+                {
+                    @foreach (var segment in MainLineSegments)
+                    {
+                        <polyline points="@segment" class="sales-report-chart__main-line" />
+                    }
+                }
+                @for (var index = 0; index < VisibleRows.Count; index++)
+                {
+                    var row = VisibleRows[index];
+                    var value = MetricValue(row);
+                    @if (!IsMetricValid(row))
+                    {
+                        @if (ShouldShowXAxisLabel(index))
+                        {
+                            @SvgAxisLabel(N(PointX(index)), "281", "middle", "sales-report-chart__x-label", ShortDate(row.Label))
+                        }
+                    }
+                    else
+                    {
+                    @if (IsLineView)
+                    {
+                        @if (VisibleRows.Count == 1)
+                        {
+                            <line x1="@N(PointX(index) - 25)" y1="@N(ValueY(value))"
+                                  x2="@N(PointX(index) + 25)" y2="@N(ValueY(value))"
+                                  class="sales-report-chart__single-line" />
+                        }
+                        <circle cx="@N(PointX(index))" cy="@N(ValueY(value))" r="5.5" class="sales-report-chart__main-point">
+                            <title>@row.Label — @MetricName: @FormattedValue(row)</title>
+                        </circle>
+                    }
+                    else
+                    {
+                    <rect x="@N(PointX(index) - BarWidth / 2d)" y="@N(BarTop(value))"
+                          width="@N(BarWidth)" height="@N(BarHeight(value))" rx="6"
+                          class="sales-report-chart__column @(value < 0 ? "sales-report-chart__column--negative" : "")">
+                        <title>@row.Label — @MetricName: @FormattedValue(row)</title>
+                    </rect>
+                    }
+                    @if (VisibleRows.Count <= 8)
+                    {
+                        @SvgAxisLabel(N(PointX(index)), N(Math.Max(19, ValueY(value) - 12)), "middle", "sales-report-chart__value-label", CompactValue(value))
+                    }
+                    @if (ShouldShowXAxisLabel(index))
+                    {
+                        @SvgAxisLabel(N(PointX(index)), "281", "middle", "sales-report-chart__x-label", ShortDate(row.Label))
+                    }
+                    }
+                }
+                @if (!IsPercent)
+                {
+                    @if (VisibleRows.Count > 1)
+                    {
+                        <polyline points="@OtherLinePoints" class="sales-report-chart__profit-line" />
+                    }
+                    else if (VisibleRows.Count == 1)
+                    {
+                        <line x1="@N(PointX(0) - 25)" y1="@N(ValueY(OtherMetricValue(VisibleRows[0])))"
+                              x2="@N(PointX(0) + 25)" y2="@N(ValueY(OtherMetricValue(VisibleRows[0])))"
+                              class="sales-report-chart__profit-line" />
+                    }
+                    @for (var index = 0; index < VisibleRows.Count; index++)
+                    {
+                        var row = VisibleRows[index];
+                        <circle cx="@N(PointX(index))" cy="@N(ValueY(OtherMetricValue(row)))" r="5" class="sales-report-chart__profit-point">
+                            <title>@OtherTooltip(row)</title>
+                        </circle>
+                    }
+                }
+            </svg>
+        </div>
+    }
+    else
+    {
+        <div class="sales-report-chart__bars" role="img" aria-label="مقارنة @MetricName حسب @GroupName">
+            @foreach (var row in VisibleRows)
+            {
+                <div class="sales-report-chart__bar-row" title="@($"{row.Label}: {FormattedValue(row)}")">
+                    <span class="sales-report-chart__bar-label" title="@row.Label">@row.Label</span>
+                    <div class="sales-report-chart__bar-track">
+                        <div class="sales-report-chart__bar @(MetricValue(row) < 0 ? "sales-report-chart__bar--negative" : "")"
+                             style="width: @N(BarPercent(row))%"></div>
+                    </div>
+                    <strong class="sales-report-chart__bar-value" dir="ltr">@FormattedValue(row)</strong>
+                </div>
+            }
+        </div>
+    }
+    <p class="sales-report-chart__footnote">
+        @if (Rows.Count > VisibleRows.Count)
+        {
+            <span>@(IsTimeline ? $"المعروض آخر {VisibleRows.Count} فترة" : $"المعروض أعلى {VisibleRows.Count} مجموعات وفق المؤشر المحدد") من أصل @Rows.Count مجموعة. </span>
+        }
+        @if (Truncated)
+        {
+            <span>تنبيه: جدول التحليل محدود بـ200 @(IsTimeline ? "فترة حديثة" : "مجموعة حسب صافي الإيراد")؛ قد توجد نتائج أخرى خارج الرسم. </span>
+        }
+        @if (IsTimeline && VisibleRows.Count == 1)
+        {
+            <span>توجد فترة واحدة فقط بها عمليات مرحلة؛ تظهر نقطة قيمة وخط قصير للتحديد، ولا يمكن حساب اتجاه زمني من فترة واحدة. </span>
+        }
+        @if (IsPercent && VisibleRows.Any(row => !IsMetricValid(row)))
+        {
+            <span>لم تُرسم قيم هامش الربح للفترات التي يكون صافي إيراداتها صفرًا أو سالبًا. </span>
+        }
+        @if (IsTimeline && !Truncated && FromDate.HasValue && ToDate.HasValue)
+        {
+            <span>الفترات الخالية من العمليات تُعرض بصفر. @(GroupBy == SalesReportGroupBy.Day ? "يُعرض آخر 31 يومًا كحد أقصى." : "يُعرض آخر 12 شهرًا كحد أقصى.") </span>
+        }
+        <span>@(IsPercent ? "الوحدة: نسبة مئوية" : $"الوحدة: {BaseCurrencyCode}")</span>
+    </p>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<SalesReportBreakdownDto> Rows { get; set; } = Array.Empty<SalesReportBreakdownDto>();
+    [Parameter] public SalesReportGroupBy GroupBy { get; set; } = SalesReportGroupBy.Day;
+    [Parameter] public string BaseCurrencyCode { get; set; } = "";
+    [Parameter] public bool Truncated { get; set; }
+    [Parameter] public DateOnly? FromDate { get; set; }
+    [Parameter] public DateOnly? ToDate { get; set; }
+
+    // Razor reserves the <text> pseudo-element and raises RZ1023 when it has SVG attributes.
+    // RenderTreeBuilder creates a real SVG text node within the parent <svg>, with encoded text.
+    private static RenderFragment SvgAxisLabel(string x, string y, string anchor, string cssClass, string value) => builder =>
+    {
+        builder.OpenElement(0, "text");
+        builder.AddAttribute(1, "x", x);
+        builder.AddAttribute(2, "y", y);
+        builder.AddAttribute(3, "text-anchor", anchor);
+        builder.AddAttribute(4, "class", cssClass);
+        builder.AddAttribute(5, "direction", "ltr");
+        builder.AddContent(6, value);
+        builder.CloseElement();
+    };
+
+    private enum TimelineView { Line, Combo }
+    private TimelineView _timelineView = TimelineView.Line;
+    private bool IsLineView => _timelineView == TimelineView.Line;
+    private enum Metric { NetRevenue, GrossProfit, NetCogs, ReturnedRevenue, GrossMargin, InvoiceRevenue, InvoiceDiscounts, NetSalesTax }
+    private Metric _metric = Metric.NetRevenue;
+    private bool IsTimeline => GroupBy is SalesReportGroupBy.Day or SalesReportGroupBy.Month;
+    private bool IsPercent => _metric == Metric.GrossMargin;
+    private string MetricName => _metric switch
+    {
+        Metric.GrossProfit => "الربح الإجمالي", Metric.NetCogs => "تكلفة المبيعات",
+        Metric.ReturnedRevenue => "المرتجعات", Metric.GrossMargin => "هامش الربح",
+        Metric.InvoiceRevenue => "إيرادات الفواتير", Metric.InvoiceDiscounts => "خصومات الفواتير",
+        Metric.NetSalesTax => "الضريبة الصافية", _ => "صافي المبيعات"
+    };
+    private string ChartTitle => IsTimeline
+        ? $"اتجاه {MetricName}" + (IsPercent ? string.Empty : $" و{LineMetricName}")
+        : $"{MetricName} حسب {GroupName}";
+    private string LineMetricName => _metric == Metric.GrossProfit ? "صافي المبيعات" : "الربح الإجمالي";
+    private decimal OtherMetricValue(SalesReportBreakdownDto row) => _metric == Metric.GrossProfit
+        ? row.Totals.NetRevenueBase : row.Totals.GrossProfitBase;
+    private string GroupName => GroupBy switch
+    {
+        SalesReportGroupBy.Month => "الشهر", SalesReportGroupBy.Customer => "العميل",
+        SalesReportGroupBy.Employee => "الموظف", SalesReportGroupBy.Product => "الصنف",
+        SalesReportGroupBy.Category => "التصنيف", SalesReportGroupBy.Warehouse => "المخزن", _ => "اليوم"
+    };
+
+    private static readonly SalesReportTotalsDto EmptyTotals = new(0m, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 0L, 0L);
+    private IReadOnlyList<SalesReportBreakdownDto> VisibleRows => IsTimeline
+        ? TimelineRows()
+        : Rows.OrderByDescending(MetricValue).ThenBy(x => x.Label).Take(10).ToArray();
+
+    // Periods without posted documents genuinely contribute zero. Fill those dates
+    // only inside the selected interval, never outside it or for truncated results.
+    private IReadOnlyList<SalesReportBreakdownDto> TimelineRows()
+    {
+        var ordered = Rows.OrderBy(x => x.Label, StringComparer.Ordinal).ToArray();
+        if (Truncated || FromDate is null || ToDate is null || FromDate > ToDate)
+            return ordered.TakeLast(12).ToArray();
+
+        var byLabel = Rows.ToDictionary(x => x.Label, StringComparer.Ordinal);
+        if (GroupBy == SalesReportGroupBy.Day)
+        {
+            var first = Math.Max(FromDate.Value.DayNumber, ToDate.Value.DayNumber - 30);
+            return Enumerable.Range(first, ToDate.Value.DayNumber - first + 1)
+                .Select(n => DateOnly.FromDayNumber(n).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))
+                .Select(label => byLabel.TryGetValue(label, out var found)
+                    ? found : new SalesReportBreakdownDto(label, label, EmptyTotals))
+                .ToArray();
+        }
+
+        if (GroupBy == SalesReportGroupBy.Month)
+        {
+            var first = new DateOnly(FromDate.Value.Year, FromDate.Value.Month, 1);
+            var last = new DateOnly(ToDate.Value.Year, ToDate.Value.Month, 1);
+            var months = new List<DateOnly>();
+            for (var month = last; month >= first && months.Count < 12; month = month.AddMonths(-1))
+                months.Add(month);
+            months.Reverse();
+            return months.Select(month =>
+            {
+                var label = month.ToString("yyyy-MM", CultureInfo.InvariantCulture);
+                return byLabel.TryGetValue(label, out var found)
+                    ? found : new SalesReportBreakdownDto((month.Year * 100 + month.Month).ToString(CultureInfo.InvariantCulture), label, EmptyTotals);
+            }).ToArray();
+        }
+
+        return ordered.TakeLast(12).ToArray();
+    }
+
+    private bool ShouldShowXAxisLabel(int index)
+    {
+        var count = VisibleRows.Count;
+        return count <= 9 || index == 0 || index == count - 1 || index % (int)Math.Ceiling(count / 7d) == 0;
+    }
+
+    private decimal MetricValue(SalesReportBreakdownDto row) => _metric switch
+    {
+        Metric.GrossProfit => row.Totals.GrossProfitBase,
+        Metric.NetCogs => row.Totals.NetCogsBase,
+        Metric.ReturnedRevenue => row.Totals.ReturnedRevenueBase,
+        Metric.GrossMargin => row.Totals.GrossMarginPercent,
+        Metric.InvoiceRevenue => row.Totals.InvoiceRevenueBase,
+        Metric.InvoiceDiscounts => row.Totals.InvoiceDiscountsBase,
+        Metric.NetSalesTax => row.Totals.NetSalesTaxBase,
+        _ => row.Totals.NetRevenueBase
+    };
+
+    private void SetTimelineView(ChangeEventArgs args)
+    {
+        if (Enum.TryParse<TimelineView>(args.Value?.ToString(), out var next) && Enum.IsDefined(next))
+            _timelineView = next;
+    }
+
+    private void SetMetric(ChangeEventArgs args)
+    {
+        if (Enum.TryParse<Metric>(args.Value?.ToString(), out var next) && Enum.IsDefined(next))
+            _metric = next;
+    }
+
+    private bool IsMetricValid(SalesReportBreakdownDto row) =>
+        !IsPercent || row.Totals.NetRevenueBase > 0m;
+    private string FormattedValue(SalesReportBreakdownDto row) => IsMetricValid(row)
+        ? MetricValue(row).ToString("N2", CultureInfo.GetCultureInfo("en-US")) + (IsPercent ? "%" : string.Empty)
+        : "غير معبّر";
+    private string OtherTooltip(SalesReportBreakdownDto row) =>
+        $"{row.Label} — {LineMetricName}: {OtherMetricValue(row).ToString("N2", CultureInfo.GetCultureInfo("en-US"))}";
+    private static string N(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+    private IReadOnlyList<SalesReportBreakdownDto> ValidMetricRows => VisibleRows.Where(IsMetricValid).ToArray();
+    private decimal ChartMin => ValidMetricRows.Count == 0 ? 0m : Math.Min(0m,
+        IsPercent ? ValidMetricRows.Min(MetricValue) : Math.Min(VisibleRows.Min(MetricValue), VisibleRows.Min(OtherMetricValue)));
+    private decimal ChartMax => ValidMetricRows.Count == 0 ? 1m : Math.Max(1m,
+        IsPercent ? ValidMetricRows.Max(MetricValue) : Math.Max(VisibleRows.Max(MetricValue), VisibleRows.Max(OtherMetricValue)));
+    private decimal ChartSpan => ChartMax - ChartMin;
+    private double PointX(int index) => VisibleRows.Count <= 1 ? 480 : 85 + index * 790d / (VisibleRows.Count - 1);
+    private double ValueY(decimal value) => 235d - (double)((value - ChartMin) / ChartSpan) * 190d;
+    private double TickY(int tick) => 45d + tick * 47.5d;
+    private string AxisLabel(int tick) => (ChartMax - ChartSpan * tick / 4m).ToString(IsPercent ? "N1" : "N0");
+    private IReadOnlyList<string> MainLineSegments
+    {
+        get
+        {
+            var segments = new List<string>();
+            var points = new List<string>();
+            for (var index = 0; index < VisibleRows.Count; index++)
+            {
+                var row = VisibleRows[index];
+                if (!IsMetricValid(row))
+                {
+                    if (points.Count >= 2) segments.Add(string.Join(" ", points));
+                    points.Clear();
+                    continue;
+                }
+                points.Add($"{N(PointX(index))},{N(ValueY(MetricValue(row)))}");
+            }
+            if (points.Count >= 2) segments.Add(string.Join(" ", points));
+            return segments;
+        }
+    }
+    private string OtherLinePoints => string.Join(" ", VisibleRows.Select((row, index) =>
+        $"{N(PointX(index))},{N(ValueY(OtherMetricValue(row)))}"));
+    private double BarWidth => Math.Clamp(580d / Math.Max(1, VisibleRows.Count), 16d, 70d);
+    private double BarTop(decimal value) => Math.Min(ValueY(value), ValueY(0m));
+    private double BarHeight(decimal value) => Math.Max(1d, Math.Abs(ValueY(value) - ValueY(0m)));
+    private static string CompactValue(decimal value) => value.ToString("N0", CultureInfo.GetCultureInfo("en-US"));
+    private double BarPercent(SalesReportBreakdownDto row)
+    {
+        var maxAbsolute = VisibleRows.Count == 0 ? 1m : Math.Max(1m, VisibleRows.Max(x => Math.Abs(MetricValue(x))));
+        return (double)(Math.Abs(MetricValue(row)) / maxAbsolute * 100m);
+    }
+    private static string ShortDate(string label) =>
+        DateOnly.TryParseExact(label, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day)
+            ? day.ToString("dd/MM", CultureInfo.InvariantCulture)
+            : DateTime.TryParseExact(label, "yyyy-MM", CultureInfo.InvariantCulture, DateTimeStyles.None, out var month)
+                ? month.ToString("MM/yyyy", CultureInfo.InvariantCulture)
+                : label;
+}

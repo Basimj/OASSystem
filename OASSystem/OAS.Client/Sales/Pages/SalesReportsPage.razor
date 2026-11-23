@@ -4,7 +4,11 @@
 @using OAS.Client.Services.Http
 @using OAS.Client.Services.Browser
 @using OAS.Contracts.Sales.Reports
+@using OAS.Contracts.Sales.Lookups
+@using OAS.Client.Sales.Services
+@using System.Globalization
 @inject OasApiClient Api
+@inject ISalesClientService SalesLookups
 @inject BrowserFileDownloadService Downloads
 @inject IApiFeedbackService ApiFeedback
 @inject IJSRuntime Js
@@ -14,86 +18,267 @@
 
 <section class="sales-report" dir="rtl">
     <header class="sales-report__header">
-        <div>
-            <h1>تقارير المبيعات والربحية</h1>
-            <p>القيم بالعملة الأساسية، من الفواتير والمرتجعات المُرحّلة فقط، حسب تاريخ الترحيل.</p>
+        <div class="sales-report__title">
+            <span class="sales-report__title-icon"><i class="fa-solid fa-chart-column" aria-hidden="true"></i></span>
+            <div>
+                <h1>تقارير المبيعات والربحية</h1>
+                <p>تحليل الإيرادات والتكاليف والربح الإجمالي من الفواتير والمرتجعات المُرحّلة.</p>
+            </div>
         </div>
-        <div class="sales-report__actions">
-            <button type="button" @onclick="LoadAsync" disabled="@_busy">تحديث التقرير</button>
-            <button type="button" @onclick="ExportExcelAsync" disabled="@(_busy || _report is null)">تصدير Excel</button>
-            <button type="button" @onclick="ExportCsvAsync" disabled="@(_busy || _report is null)">تصدير CSV</button>
-            <button type="button" @onclick="PrintAsync" disabled="@(_busy || _report is null)">طباعة</button>
+        <div class="sales-report__actions" aria-label="إجراءات التقرير">
+            <button type="button" class="sales-report__primary" @onclick="ApplyFiltersAsync" disabled="@_busy"><i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i> إعادة تحميل</button>
+            <button type="button" @onclick="ExportExcelAsync" disabled="@(_busy || _report is null)"><i class="fa-regular fa-file-excel" aria-hidden="true"></i> تصدير Excel</button>
+            <button type="button" @onclick="ExportCsvAsync" disabled="@(_busy || _report is null)"><i class="fa-regular fa-file-lines" aria-hidden="true"></i> تصدير CSV</button>
+            <button type="button" @onclick="PrintAsync" disabled="@(_busy || _report is null)"><i class="fa-solid fa-print" aria-hidden="true"></i> طباعة</button>
         </div>
     </header>
 
-    <div class="sales-report__filters">
-        <label>من تاريخ <input type="date" @bind="_from" /></label>
-        <label>إلى تاريخ <input type="date" @bind="_to" /></label>
-        <label>تجميع حسب
-            <select @bind="_groupBy">
-                <option value="Day">اليوم</option>
-                <option value="Month">الشهر</option>
-                <option value="Customer">العميل</option>
-                <option value="Employee">موظف المبيعات</option>
-                <option value="Product">المنتج</option>
-                <option value="Category">الفئة</option>
-                <option value="Warehouse">المخزن</option>
-            </select>
-        </label>
-    </div>
+    <section class="sales-report__filter-area">
+        <div class="sales-report__filters" aria-label="فلاتر تقرير المبيعات">
+            <label>من تاريخ <input type="date" @bind="_from" @bind:after="ApplyFiltersAsync" /></label>
+            <label>إلى تاريخ <input type="date" @bind="_to" @bind:after="ApplyFiltersAsync" /></label>
+            <label>تجميع حسب
+                <select @bind="_groupBy" @bind:after="ApplyFiltersAsync">
+                    <option value="Day">اليوم</option>
+                    <option value="Month">الشهر</option>
+                    <option value="Customer">العميل</option>
+                    <option value="Employee">موظف المبيعات</option>
+                    <option value="Product">الصنف</option>
+                    <option value="Category">التصنيف</option>
+                    <option value="Warehouse">المخزن</option>
+                </select>
+            </label>
+            <button type="button" class="sales-report__advanced-toggle" @onclick="ToggleAdvancedAsync" aria-expanded="@_advancedOpen">
+                <i class="fa-solid fa-filter" aria-hidden="true"></i> فلاتر متقدمة
+                <i class="fa-solid @AdvancedChevronClass" aria-hidden="true"></i>
+            </button>
+        </div>
+        @if (_advancedOpen)
+        {
+            <div class="sales-report__advanced" aria-label="الفلاتر المتقدمة">
+                <div class="sales-report__lookup-search">
+                    <label>البحث عن عميل أو صنف أو تصنيف أو مخزن
+                        <input type="search" @bind="_lookupSearch" placeholder="اكتب جزءًا من الاسم أو الرمز" />
+                    </label>
+                    <button type="button" @onclick="LoadLookupsAsync" disabled="@_lookupsBusy"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> بحث في القوائم</button>
+                    @if (_lookupsBusy) { <span>جارٍ تحميل الخيارات...</span> }
+                </div>
+                <div class="sales-report__advanced-grid">
+                    <label>العميل
+                        <select @bind="_customerId" @bind:after="ApplyFiltersAsync"><option value="">كل العملاء</option>
+                        @if (_customerId.HasValue && !_customers.Any(x => x.Id == _customerId.Value)) { <option value="@_customerId">عميل محدد خارج نتائج البحث</option> }
+                        @foreach (var item in _customers) { <option value="@item.Id">@item.NameAr</option> }
+                        </select>
+                    </label>
+                    <label>موظف المبيعات
+                        <select @bind="_employeeId" @bind:after="ApplyFiltersAsync"><option value="">كل الموظفين</option>
+                        @if (_employeeId.HasValue && !_employees.Any(x => x.Key == _employeeId.Value.ToString("D"))) { <option value="@_employeeId">موظف محدد خارج نتائج البحث</option> }
+                        @foreach (var item in _employees) { <option value="@item.Key">@item.Label</option> }
+                        </select>
+                    </label>
+                    <label>الصنف
+                        <select @bind="_productVariantId" @bind:after="ApplyFiltersAsync"><option value="">كل الأصناف</option>
+                        @if (_productVariantId.HasValue && !_products.Any(x => x.Id == _productVariantId.Value)) { <option value="@_productVariantId">صنف محدد خارج نتائج البحث</option> }
+                        @foreach (var item in _products) { <option value="@item.Id">@item.ProductName — @item.SKU</option> }
+                        </select>
+                    </label>
+                    <label>التصنيف
+                        <select @bind="_categoryId" @bind:after="ApplyFiltersAsync"><option value="">كل التصنيفات</option>
+                        @if (_categoryId.HasValue && !_categories.Any(x => x.Id == _categoryId.Value)) { <option value="@_categoryId">تصنيف محدد خارج نتائج البحث</option> }
+                        @foreach (var item in _categories) { <option value="@item.Id">@item.Name</option> }
+                        </select>
+                    </label>
+                    <label>المخزن
+                        <select @bind="_warehouseId" @bind:after="ApplyFiltersAsync"><option value="">كل المخازن</option>
+                        @if (_warehouseId.HasValue && !_warehouses.Any(x => x.Id == _warehouseId.Value)) { <option value="@_warehouseId">مخزن محدد خارج نتائج البحث</option> }
+                        @foreach (var item in _warehouses) { <option value="@item.Id">@item.Name</option> }
+                        </select>
+                    </label>
+                </div>
+                <div class="sales-report__advanced-actions">
+                    <span>تُطبَّق الاختيارات تلقائيًا · البحث يعرض حتى 50 خيارًا من كل قائمة.</span>
+                    <button type="button" @onclick="ResetAdvancedAsync">مسح الفلاتر المتقدمة</button>
+                </div>
+            </div>
+        }
+        <div class="sales-report__filter-note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> جميع القيم بالعملة الأساسية · وفق تاريخ الترحيل.</div>
+    </section>
 
     @if (_busy)
     {
-        <p role="status">جاري تحميل التقرير...</p>
+        <p role="status" class="sales-report__loading"><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> جاري تجهيز بيانات التقرير...</p>
     }
     @if (!string.IsNullOrWhiteSpace(_message))
     {
         <p class="sales-report__message" role="alert">@_message</p>
     }
+
     @if (_report is not null)
     {
-        <div class="sales-report__cards">
-            <article><span>إيرادات الفواتير</span><strong>@Amount(_report.Totals.InvoiceRevenueBase)</strong></article>
-            <article><span>المرتجعات</span><strong>@Amount(_report.Totals.ReturnedRevenueBase)</strong></article>
-            <article><span>صافي الإيرادات</span><strong>@Amount(_report.Totals.NetRevenueBase)</strong></article>
-            <article><span>خصومات الفواتير</span><strong>@Amount(_report.Totals.InvoiceDiscountsBase)</strong></article>
-            <article><span>ضريبة المبيعات الصافية</span><strong>@Amount(_report.Totals.NetSalesTaxBase)</strong></article>
-            <article><span>تكلفة المبيعات الصافية</span><strong>@Amount(_report.Totals.NetCogsBase)</strong></article>
-            <article><span>الربح الإجمالي</span><strong>@Amount(_report.Totals.GrossProfitBase)</strong></article>
-            <article><span>هامش الربح</span><strong>@(_report.Totals.GrossMarginPercent.ToString("N2"))%</strong></article>
+        <header class="sales-report__print-heading">
+            <div class="sales-report__print-brand">OAS System <span>— تقرير إداري</span></div>
+            <h1>تقرير المبيعات والربحية</h1>
+            <div class="sales-report__print-metadata">
+                <span>الفترة: @_report.Filter.FromDate.ToString("yyyy/MM/dd") — @_report.Filter.ToDate.ToString("yyyy/MM/dd")</span>
+                <span>التجميع: @GroupTitle(_report.Filter.GroupBy)</span>
+                <span>العملة الأساسية: @_report.BaseCurrencyCode</span>
+                <span>تاريخ إعداد النسخة: @_printCreatedAt.ToString("yyyy/MM/dd HH:mm")</span>
+                @if (!string.IsNullOrWhiteSpace(PrintFilterSummary)) { <span>الفلاتر: @PrintFilterSummary</span> }
+            </div>
+            <p>المصدر: الفواتير والمرتجعات المرحلة فقط، بحسب تاريخ الترحيل. القيم لا تشمل المصروفات الإدارية والتشغيلية.</p>
+        </header>
+
+        <section class="sales-report__cards" aria-label="ملخص المؤشرات المالية">
+            <article class="sales-report__card sales-report__card--main sales-report__card--featured"><div><span>صافي المبيعات</span><strong class="@NegativeClass(_report.Totals.NetRevenueBase)" dir="ltr">@Amount(_report.Totals.NetRevenueBase)</strong></div><i class="fa-solid fa-coins" aria-hidden="true"></i></article>
+            <article class="sales-report__card sales-report__card--main sales-report__card--featured"><div><span>@(_report.Totals.GrossProfitBase < 0 ? "الخسارة الإجمالية" : "الربح الإجمالي")</span><strong class="@NegativeClass(_report.Totals.GrossProfitBase)" dir="ltr">@Amount(_report.Totals.GrossProfitBase)</strong></div><i class="fa-solid fa-chart-line" aria-hidden="true"></i></article>
+            <article class="sales-report__card sales-report__card--main"><div><span>تكلفة المبيعات الصافية</span><strong class="@NegativeClass(_report.Totals.NetCogsBase)" dir="ltr">@Amount(_report.Totals.NetCogsBase)</strong></div><i class="fa-solid fa-box" aria-hidden="true"></i></article>
+            <article class="sales-report__card sales-report__card--main sales-report__card--margin"><div><span>هامش الربح</span><strong class="@MarginClass(_report.Totals)" dir="ltr">@MarginText(_report.Totals)</strong></div><i class="fa-solid fa-percent" aria-hidden="true"></i></article>
+            <article class="sales-report__card sales-report__card--secondary"><div><span>إيرادات الفواتير</span><strong class="@NegativeClass(_report.Totals.InvoiceRevenueBase)" dir="ltr">@Amount(_report.Totals.InvoiceRevenueBase)</strong></div><i class="fa-regular fa-file-lines" aria-hidden="true"></i></article>
+            <article class="sales-report__card sales-report__card--secondary"><div><span>المرتجعات</span><strong class="@NegativeClass(_report.Totals.ReturnedRevenueBase)" dir="ltr">@Amount(_report.Totals.ReturnedRevenueBase)</strong></div><i class="fa-solid fa-arrow-rotate-left" aria-hidden="true"></i></article>
+            <article class="sales-report__card sales-report__card--secondary"><div><span>خصومات الفواتير</span><strong class="@NegativeClass(_report.Totals.InvoiceDiscountsBase)" dir="ltr">@Amount(_report.Totals.InvoiceDiscountsBase)</strong></div><i class="fa-solid fa-tag" aria-hidden="true"></i></article>
+            <article class="sales-report__card sales-report__card--secondary"><div><span>ضريبة المبيعات الصافية</span><strong class="@NegativeClass(_report.Totals.NetSalesTaxBase)" dir="ltr">@Amount(_report.Totals.NetSalesTaxBase)</strong></div><i class="fa-solid fa-layer-group" aria-hidden="true"></i></article>
+        </section>
+        @if (_report.Totals.NetRevenueBase <= 0m)
+        {
+            <p class="sales-report__margin-notice" role="note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> هامش الربح غير معبّر عندما يكون صافي الإيرادات صفرًا أو سالبًا؛ وقد تتضمن الفترة مرتجعات لفواتير من فترات سابقة.</p>
+        }
+        <div class="sales-report__caption">
+            <span><i class="fa-solid fa-coins" aria-hidden="true"></i> العملة الأساسية: <b>@_report.BaseCurrencyCode</b></span>
+            <span><i class="fa-regular fa-file-lines" aria-hidden="true"></i> @_report.Totals.InvoiceCount.ToString("N0") فاتورة، @_report.Totals.ReturnCount.ToString("N0") مرتجع</span>
+            <span>الربح الإجمالي قبل المصروفات الإدارية والتشغيلية؛ إيرادات الفواتير بعد الخصومات.</span>
         </div>
-        <p class="sales-report__caption">العملة الأساسية: @_report.BaseCurrencyCode — @(_report.Totals.InvoiceCount.ToString("N0")) فاتورة، @(_report.Totals.ReturnCount.ToString("N0")) مرتجع. الربح الإجمالي قبل المصروفات الإدارية والتشغيلية.</p>
-        <section class="sales-report__panel">
-            <h2>تحليل الأداء: @GroupTitle()</h2>
+
+        <section class="sales-report__visuals" aria-label="اتجاه المبيعات والأرباح">
+            <div class="sales-report__panel sales-report__chart-panel">
+                @if (_timelineReport is not null)
+                {
+                    <SalesReportChart Rows="@_timelineReport.Breakdown" GroupBy="@_timelineReport.Filter.GroupBy"
+                                      BaseCurrencyCode="@_report.BaseCurrencyCode" Truncated="@_timelineReport.BreakdownTruncated"
+                                      FromDate="@_report.Filter.FromDate" ToDate="@_report.Filter.ToDate" />
+                }
+                else
+                {
+                    <h2>اتجاه المبيعات والأرباح</h2>
+                    <p class="sales-report__empty">تعذر تحميل الاتجاه الزمني لهذه الفترة. بقية التقرير متاحة.</p>
+                }
+            </div>
+        </section>
+        <div class="sales-report__optional-actions">
+            <button type="button" class="sales-report__category-toggle" @onclick="ToggleCategoryAsync" disabled="@_busy"
+                    aria-expanded="@_showCategoryDonut">
+                <i class="fa-solid fa-chart-pie" aria-hidden="true"></i>
+                @(_showCategoryDonut ? "إخفاء توزيع المبيعات حسب التصنيف" : "عرض توزيع المبيعات حسب التصنيف")
+                <i class="fa-solid @(_showCategoryDonut ? "fa-chevron-up" : "fa-chevron-down")" aria-hidden="true"></i>
+            </button>
+        </div>
+        @if (_showCategoryDonut)
+        {
+            <section class="sales-report__panel sales-report__donut-panel">
+                @if (_categoryReport is not null)
+                {
+                    <SalesReportCategoryDonut Rows="@_categoryReport.Breakdown" Currency="@_report.BaseCurrencyCode"
+                                              Truncated="@_categoryReport.BreakdownTruncated" />
+                }
+                else
+                {
+                    <p class="sales-report__empty">@(_categoryBusy ? "جارٍ تحميل بيانات التصنيفات..." : "لم تتوفر بيانات توزيع التصنيفات.")</p>
+                }
+            </section>
+        }
+
+        <nav class="sales-report__views" aria-label="طرق عرض التقرير">
+            <button type="button" class="@AnalysisViewClass" @onclick="ShowAnalysisAsync"><i class="fa-solid fa-chart-column" aria-hidden="true"></i> تحليل الأداء</button>
+            <button type="button" class="@DocumentsViewClass" @onclick="ShowDocumentsAsync"><i class="fa-regular fa-file-lines" aria-hidden="true"></i> المستندات</button>
+            <button type="button" class="@ComparisonViewClass" @onclick="ShowComparisonAsync"><i class="fa-solid fa-arrow-right-arrow-left" aria-hidden="true"></i> المقارنات</button>
+        </nav>
+        <div class="sales-report__tables sales-report__tables--analysis @(_activeView == "analysis" ? "" : "sales-report__tables--screen-hidden")">
+            <section class="sales-report__panel sales-report__analysis-panel">
+            <div class="sales-report__panel-heading">
+                <h2><i class="fa-solid fa-table" aria-hidden="true"></i> تحليل الأداء: @GroupTitle(_report.Filter.GroupBy)</h2>
+                <span>@_report.Breakdown.Count.ToString("N0") مجموعة معروضة</span>
+            </div>
             @if (_report.BreakdownTruncated)
             {
-                <p class="sales-report__message">تم عرض أول 200 مجموعة فقط. قلل الفترة أو استخدم التصفية لمراجعة بقية النتائج.</p>
+                <p class="sales-report__message">@(_report.Filter.GroupBy is SalesReportGroupBy.Day or SalesReportGroupBy.Month ? "تم عرض آخر 200 فترة زمنية." : "تم عرض أعلى 200 مجموعة حسب صافي الإيراد.") إجماليات البطاقات تشمل كل البيانات، أما الجدول والرسم فيقتصران على المجموعات المعروضة.</p>
             }
             <div class="sales-report__scroll">
                 <table>
                     <thead><tr><th>المجموعة</th><th>إيرادات الفواتير</th><th>المرتجعات</th><th>صافي الإيراد</th><th>التكلفة</th><th>الربح الإجمالي</th><th>الهامش</th></tr></thead>
                     <tbody>
+                    @if (_report.Breakdown.Count == 0)
+                    {
+                        <tr><td colspan="7" class="sales-report__empty">لا توجد عمليات مرحلة في هذه الفترة.</td></tr>
+                    }
                     @foreach (var item in _report.Breakdown)
                     {
-                        <tr><td>@item.Label</td><td>@Number(item.Totals.InvoiceRevenueBase)</td><td>@Number(item.Totals.ReturnedRevenueBase)</td><td>@Number(item.Totals.NetRevenueBase)</td><td>@Number(item.Totals.NetCogsBase)</td><td>@Number(item.Totals.GrossProfitBase)</td><td>@(item.Totals.GrossMarginPercent.ToString("N2"))%</td></tr>
+                        <tr><td class="sales-report__row-label">@item.Label</td><td>@Number(item.Totals.InvoiceRevenueBase)</td><td>@Number(item.Totals.ReturnedRevenueBase)</td><td>@Number(item.Totals.NetRevenueBase)</td><td>@Number(item.Totals.NetCogsBase)</td><td class="@(item.Totals.GrossProfitBase < 0 ? "sales-report__negative" : "")">@Number(item.Totals.GrossProfitBase)</td><td>@MarginText(item.Totals)</td></tr>
                     }
                     </tbody>
                 </table>
             </div>
         </section>
-        <section class="sales-report__panel">
-            <h2>المستندات المرحلة — @_report.TotalDocumentCount.ToString("N0") مستند</h2>
+
+            <aside class="sales-report__panel sales-report__customers-panel" aria-label="أعلى العملاء حسب صافي المبيعات">
+                <div class="sales-report__panel-heading">
+                    <h2><i class="fa-solid fa-users" aria-hidden="true"></i> العملاء حسب صافي المبيعات</h2>
+                    <span>أعلى 5 عملاء</span>
+                </div>
+                @if (_customerReport is null)
+                {
+                    <p class="sales-report__empty">تعذر تحميل تحليل العملاء.</p>
+                }
+                else if (TopCustomers.Count == 0)
+                {
+                    <p class="sales-report__empty">لا توجد مبيعات للعملاء في الفترة المحددة.</p>
+                }
+                else
+                {
+                    <ol class="sales-report__customer-list">
+                        @foreach (var customer in TopCustomers)
+                        {
+                            <li>
+                                <div class="sales-report__customer-info">
+                                    <span title="@customer.Label">@customer.Label</span>
+                                    <strong class="@NegativeClass(customer.Totals.NetRevenueBase)" dir="ltr">@Amount(customer.Totals.NetRevenueBase)</strong>
+                                </div>
+                                <div class="sales-report__customer-track" aria-hidden="true">
+                                    <span class="@(customer.Totals.NetRevenueBase < 0 ? "sales-report__customer-fill--negative" : "")"
+                                          style="width:@CustomerBarWidth(customer)%"></span>
+                                </div>
+                            </li>
+                        }
+                    </ol>
+                    <p class="sales-report__customer-hint">ترتيب بالقيمة الصافية بعد المرتجعات؛ تظهر القيم السالبة بوضوح.</p>
+                    @if (_customerReport.BreakdownTruncated)
+                    {
+                        <p class="sales-report__customer-hint">يعرض التقرير أعلى المجموعات المتاحة فقط؛ قد لا يشمل كل العملاء.</p>
+                    }
+                }
+            </aside>
+        </div>
+        <div class="sales-report__tables sales-report__tables--documents @(_activeView == "documents" ? "" : "sales-report__tables--screen-hidden")">
+            <section class="sales-report__panel sales-report__panel--documents">
+            <div class="sales-report__panel-heading">
+                <h2><i class="fa-regular fa-file-lines" aria-hidden="true"></i> المستندات المرحلة</h2>
+                <span>@_report.TotalDocumentCount.ToString("N0") مستند</span>
+            </div>
             <div class="sales-report__scroll">
                 <table>
                     <thead><tr><th>تاريخ الترحيل</th><th>نوع المستند</th><th>الرقم</th><th>صافي الإيراد</th><th>صافي التكلفة</th><th>الربح</th></tr></thead>
                     <tbody>
+                    @if (_report.Documents.Count == 0)
+                    {
+                        <tr><td colspan="6" class="sales-report__empty">لا توجد مستندات في هذه الصفحة.</td></tr>
+                    }
                     @foreach (var document in _report.Documents)
                     {
                         <tr>
-                            <td>@document.PostingDate.ToString("yyyy-MM-dd")</td>
-                            <td>@(document.DocumentKind == "SalesInvoice" ? "فاتورة" : "مرتجع")</td>
+                            <td>@document.PostingDate.ToString("yyyy/MM/dd")</td>
+                            <td><span class="sales-report__kind @(document.DocumentKind == "SalesInvoice" ? "" : "sales-report__kind--return")">@(document.DocumentKind == "SalesInvoice" ? "فاتورة مبيعات" : "مرتجع مبيعات")</span></td>
                             <td><button type="button" class="sales-report__link" @onclick="@(() => OpenDocument(document))">@document.DocumentCode</button></td>
-                            <td>@Number(document.Totals.NetRevenueBase)</td><td>@Number(document.Totals.NetCogsBase)</td><td>@Number(document.Totals.GrossProfitBase)</td>
+                            <td>@Number(document.Totals.NetRevenueBase)</td>
+                            <td>@Number(document.Totals.NetCogsBase)</td>
+                            <td class="@(document.Totals.GrossProfitBase < 0 ? "sales-report__negative" : "")">@Number(document.Totals.GrossProfitBase)</td>
                         </tr>
                     }
                     </tbody>
@@ -102,84 +287,434 @@
             <div class="sales-report__pagination">
                 <button type="button" disabled="@(_busy || _page <= 1)" @onclick="PreviousAsync">السابق</button>
                 <span>صفحة @_page من @Math.Max(1, (int)Math.Ceiling((double)_report.TotalDocumentCount / _report.PageSize))</span>
-                <button type="button" disabled="@(_busy || _page * _report.PageSize >= _report.TotalDocumentCount)" @onclick="NextAsync">التالي</button>
+                <button type="button" disabled="@(_busy || (long)_page * _report.PageSize >= _report.TotalDocumentCount)" @onclick="NextAsync">التالي</button>
             </div>
         </section>
+
+        </div>
+        @if (_activeView == "comparison")
+        {
+            <section class="sales-report__panel sales-report__comparison-panel">
+                <div class="sales-report__panel-heading"><h2>مقارنة بالفترة السابقة</h2><span>الفترة السابقة بنفس عدد الأيام</span></div>
+                @if (_comparisonReport is null)
+                {
+                    <p class="sales-report__empty">@(_comparisonBusy ? "جارٍ حساب المقارنة..." : "لم تتوفر بيانات المقارنة لهذه الفترة.")</p>
+                }
+                else
+                {
+                    <div class="sales-report__scroll">
+                        <table><thead><tr><th>المؤشر</th><th>الفترة الحالية</th><th>الفترة السابقة</th><th>التغير</th></tr></thead>
+                        <tbody>
+                            <tr><td>صافي المبيعات</td><td>@Number(_report.Totals.NetRevenueBase)</td><td>@Number(_comparisonReport.Totals.NetRevenueBase)</td><td>@ChangePercent(_report.Totals.NetRevenueBase, _comparisonReport.Totals.NetRevenueBase)</td></tr>
+                            <tr><td>الربح الإجمالي</td><td>@Number(_report.Totals.GrossProfitBase)</td><td>@Number(_comparisonReport.Totals.GrossProfitBase)</td><td>@ChangePercent(_report.Totals.GrossProfitBase, _comparisonReport.Totals.GrossProfitBase)</td></tr>
+                            <tr><td>تكلفة المبيعات</td><td>@Number(_report.Totals.NetCogsBase)</td><td>@Number(_comparisonReport.Totals.NetCogsBase)</td><td>@ChangePercent(_report.Totals.NetCogsBase, _comparisonReport.Totals.NetCogsBase)</td></tr>
+                            <tr><td>المرتجعات</td><td>@Number(_report.Totals.ReturnedRevenueBase)</td><td>@Number(_comparisonReport.Totals.ReturnedRevenueBase)</td><td>@ChangePercent(_report.Totals.ReturnedRevenueBase, _comparisonReport.Totals.ReturnedRevenueBase)</td></tr>
+                            <tr><td>هامش الربح</td><td>@MarginText(_report.Totals)</td><td>@MarginText(_comparisonReport.Totals)</td><td>@MarginChange(_report.Totals, _comparisonReport.Totals)</td></tr>
+                        </tbody></table>
+                    </div>
+                }
+            </section>
+        }
+        <section class="sales-report__print-documents">
+            <h2>ملحق المستندات المرحلة — @_printDocuments.Count.ToString("N0") من @_report.TotalDocumentCount.ToString("N0") مستند</h2>
+            @if (_report.TotalDocumentCount > MaximumPrintedDocuments)
+            {
+                <p class="sales-report__print-warning">للحفاظ على وضوح ملف الطباعة وأدائه، يعرض الملحق أول @MaximumPrintedDocuments مستند فقط من أصل @_report.TotalDocumentCount.ToString("N0"). استخدم تصدير Excel للحصول على التفاصيل الكاملة ضمن حد التصدير المسموح.</p>
+            }
+            <table>
+                <thead><tr><th>التاريخ</th><th>نوع المستند</th><th>الرقم</th><th>صافي الإيراد</th><th>التكلفة</th><th>الربح</th></tr></thead>
+                <tbody>
+                @foreach (var document in _printDocuments)
+                {
+                    <tr><td>@document.PostingDate.ToString("yyyy/MM/dd")</td><td>@(document.DocumentKind == "SalesInvoice" ? "فاتورة مبيعات" : "مرتجع مبيعات")</td><td>@document.DocumentCode</td><td>@Number(document.Totals.NetRevenueBase)</td><td>@Number(document.Totals.NetCogsBase)</td><td>@Number(document.Totals.GrossProfitBase)</td></tr>
+                }
+                </tbody>
+            </table>
+        </section>
+        <footer class="sales-report__print-footer">OAS System · تقرير المبيعات والربحية · جميع المبالغ بالعملة الأساسية @_report.BaseCurrencyCode · مستند إداري غير بديل عن القوائم المالية الرسمية</footer>
     }
 </section>
 
 @code {
+    private const int MaximumPrintedDocuments = 500;
     private DateOnly _from = new(DateTime.Today.Year, DateTime.Today.Month, 1);
     private DateOnly _to = DateOnly.FromDateTime(DateTime.Today);
     private string _groupBy = nameof(SalesReportGroupBy.Day);
     private SalesReportDto? _report;
+    private SalesReportDto? _categoryReport;
+    private SalesReportDto? _timelineReport;
+    private SalesReportDto? _customerReport;
+    private bool _categoryBusy;
+    private bool _showCategoryDonut;
+    private SalesReportDto? _comparisonReport;
+    private bool _comparisonBusy;
+    private string _activeView = "analysis";
+    private bool _advancedOpen;
+    private bool _lookupsBusy;
+    private string _lookupSearch = "";
+    private Guid? _customerId, _employeeId, _productVariantId, _categoryId, _warehouseId;
+    private IReadOnlyList<SalesCustomerLookupDto> _customers = [];
+    private IReadOnlyList<SalesProductVariantLookupDto> _products = [];
+    private IReadOnlyList<SalesProductCategoryLookupDto> _categories = [];
+    private IReadOnlyList<SalesWarehouseLookupDto> _warehouses = [];
+    private IReadOnlyList<SalesReportBreakdownDto> _employees = [];
     private bool _busy;
+    private int _reportLoadVersion;
+    private bool _printRequested;
     private string? _message;
     private int _page = 1;
+    private DateTime _printCreatedAt;
+    private IReadOnlyList<SalesReportDocumentDto> _printDocuments = Array.Empty<SalesReportDocumentDto>();
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
-    private string Url(bool export = false, string? format = null)
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_printRequested) return;
+        _printRequested = false;
+        try { await Js.InvokeVoidAsync("print"); }
+        catch { _message = "تعذر فتح نافذة الطباعة في المتصفح."; await InvokeAsync(StateHasChanged); }
+    }
+
+    private string Url(bool export = false, string? format = null, int? page = null, int pageSize = 25, bool applied = false, SalesReportGroupBy? groupOverride = null, DateOnly? fromOverride = null, DateOnly? toOverride = null)
     {
         var group = Enum.TryParse<SalesReportGroupBy>(_groupBy, out var parsed)
             ? parsed : SalesReportGroupBy.Day;
-        var query = $"fromDate={_from:yyyy-MM-dd}&toDate={_to:yyyy-MM-dd}&groupBy={group}&pageNumber={_page}&pageSize=25";
+        var from = _from;
+        var to = _to;
+        if (applied && _report is not null)
+        {
+            from = _report.Filter.FromDate;
+            to = _report.Filter.ToDate;
+            group = _report.Filter.GroupBy;
+        }
+        var customer = applied && _report is not null ? _report.Filter.CustomerId : _customerId;
+        var employee = applied && _report is not null ? _report.Filter.EmployeeId : _employeeId;
+        var product = applied && _report is not null ? _report.Filter.ProductVariantId : _productVariantId;
+        var category = applied && _report is not null ? _report.Filter.CategoryId : _categoryId;
+        var warehouse = applied && _report is not null ? _report.Filter.WarehouseId : _warehouseId;
+        group = groupOverride ?? group;
+        from = fromOverride ?? from;
+        to = toOverride ?? to;
+        var query = $"fromDate={from:yyyy-MM-dd}&toDate={to:yyyy-MM-dd}&groupBy={group}&pageNumber={page ?? _page}&pageSize={pageSize}";
+        if (customer.HasValue) query += $"&customerId={customer:D}";
+        if (employee.HasValue) query += $"&employeeId={employee:D}";
+        if (product.HasValue) query += $"&productVariantId={product:D}";
+        if (category.HasValue) query += $"&categoryId={category:D}";
+        if (warehouse.HasValue) query += $"&warehouseId={warehouse:D}";
         return "api/sales/reports" + (export ? "/export?" + query + $"&format={format}" : "?" + query);
     }
 
-    private async Task LoadAsync()
+    private async Task ApplyFiltersAsync()
     {
-        if (_to < _from)
+        _page = 1;
+        _activeView = "analysis";
+        _comparisonReport = null;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync(bool applied = false)
+    {
+        // Each filter selection may start another request before the prior one finishes.
+        // Only the latest request is allowed to publish data or clear the loading state.
+        var version = ++_reportLoadVersion;
+        if (!applied && _to < _from)
         {
+            _report = null;
+            _categoryReport = null;
+            _timelineReport = null;
+            _customerReport = null;
+            _busy = false;
             _message = "تاريخ نهاية الفترة يجب ألا يسبق بدايتها.";
             return;
         }
+
         _busy = true;
         _message = null;
+        // Snapshot the query before awaiting anything, to avoid filter mixing.
+        var requestedUrl = Url(applied: applied);
         try
         {
-            var response = await Api.GetResultAsync<SalesReportDto>(Url());
+            var response = await Api.GetResultAsync<SalesReportDto>(requestedUrl);
+            if (version != _reportLoadVersion) return;
             if (!response.Succeeded)
             {
+                _report = null;
+                _categoryReport = null;
+                _timelineReport = null;
+                _customerReport = null;
                 if (response.Error is not null) ApiFeedback.Show(response.Error);
                 _message = "تعذر تحميل تقرير المبيعات.";
                 return;
             }
+
             _report = response.Value;
+            if (!applied && _report is not null)
+            {
+                _timelineReport = null;
+                _customerReport = null;
+                _categoryReport = null;
+                // Independent aggregations: changing the main breakdown never replaces the trend.
+                // Take URLs from the applied response before yielding, so filter changes cannot mix.
+                var temporal = TemporalGroup;
+                var timelineUrl = Url(page: 1, pageSize: 1, applied: true, groupOverride: temporal);
+                var customerUrl = Url(page: 1, pageSize: 1, applied: true, groupOverride: SalesReportGroupBy.Customer);
+                var timelineTask = _report.Filter.GroupBy == temporal
+                    ? Task.FromResult<SalesReportDto?>(_report)
+                    : FetchSupplementaryAsync(timelineUrl);
+                var customerTask = _report.Filter.GroupBy == SalesReportGroupBy.Customer
+                    ? Task.FromResult<SalesReportDto?>(_report)
+                    : FetchSupplementaryAsync(customerUrl);
+                Task<SalesReportDto?>? categoryTask = null;
+                if (_showCategoryDonut)
+                {
+                    var categoryUrl = Url(page: 1, pageSize: 1, applied: true,
+                        groupOverride: SalesReportGroupBy.Category);
+                    categoryTask = _report.Filter.GroupBy == SalesReportGroupBy.Category
+                        ? Task.FromResult<SalesReportDto?>(_report)
+                        : FetchSupplementaryAsync(categoryUrl);
+                }
+                if (categoryTask is null)
+                    await Task.WhenAll(timelineTask, customerTask);
+                else
+                    await Task.WhenAll(timelineTask, customerTask, categoryTask);
+                if (version != _reportLoadVersion) return;
+                _timelineReport = timelineTask.Result;
+                _customerReport = customerTask.Result;
+                if (categoryTask is not null) _categoryReport = categoryTask.Result;
+            }
         }
         catch
         {
+            if (version != _reportLoadVersion) return;
+            _report = null;
+            _categoryReport = null;
+            _timelineReport = null;
+            _customerReport = null;
             _message = "تعذر الاتصال بخدمة تقارير المبيعات.";
         }
-        finally { _busy = false; }
+        finally
+        {
+            if (version == _reportLoadVersion) _busy = false;
+        }
     }
 
-    private async Task PreviousAsync() { if (_page > 1) { _page--; await LoadAsync(); } }
-    private async Task NextAsync() { _page++; await LoadAsync(); }
+    private SalesReportGroupBy TemporalGroup =>
+        (_to.DayNumber - _from.DayNumber + 1) <= 45 ? SalesReportGroupBy.Day : SalesReportGroupBy.Month;
+
+    private IReadOnlyList<SalesReportBreakdownDto> TopCustomers => _customerReport?.Breakdown
+        .OrderByDescending(x => x.Totals.NetRevenueBase).ThenBy(x => x.Label)
+        .Take(5).ToArray() ?? Array.Empty<SalesReportBreakdownDto>();
+
+    private string CustomerBarWidth(SalesReportBreakdownDto customer)
+    {
+        var max = Math.Max(1m, TopCustomers.Max(x => Math.Abs(x.Totals.NetRevenueBase)));
+        return ((double)(Math.Abs(customer.Totals.NetRevenueBase) / max) * 100d)
+            .ToString("0.##", CultureInfo.InvariantCulture);
+    }
+
+    private async Task<SalesReportDto?> FetchSupplementaryAsync(string url)
+    {
+        try
+        {
+            var result = await Api.GetResultAsync<SalesReportDto>(url);
+            return result.Succeeded ? result.Value : null;
+        }
+        catch { return null; }
+    }
+
+    private async Task ToggleCategoryAsync()
+    {
+        _showCategoryDonut = !_showCategoryDonut;
+        if (!_showCategoryDonut || _categoryReport is not null || _report is null) return;
+        _categoryBusy = true;
+        var version = _reportLoadVersion;
+        try
+        {
+            var url = Url(page: 1, pageSize: 1, applied: true, groupOverride: SalesReportGroupBy.Category);
+            var result = await FetchSupplementaryAsync(url);
+            if (version == _reportLoadVersion) _categoryReport = result;
+        }
+        finally { if (version == _reportLoadVersion) _categoryBusy = false; }
+    }
+
+    private string PrintFilterSummary
+    {
+        get
+        {
+            if (_report is null) return string.Empty;
+            var f = _report.Filter;
+            var items = new List<string>();
+            if (f.CustomerId.HasValue) items.Add("عميل محدد");
+            if (f.EmployeeId.HasValue) items.Add("موظف محدد");
+            if (f.ProductVariantId.HasValue) items.Add("صنف محدد");
+            if (f.CategoryId.HasValue) items.Add("تصنيف محدد");
+            if (f.WarehouseId.HasValue) items.Add("مخزن محدد");
+            return items.Count == 0 ? string.Empty : string.Join("، ", items);
+        }
+    }
+
+    private static string MarginText(SalesReportTotalsDto totals) => totals.NetRevenueBase <= 0m
+        ? "غير معبّر"
+        : totals.GrossMarginPercent.ToString("N2", CultureInfo.GetCultureInfo("en-US")) + "%";
+
+    private static string MarginClass(SalesReportTotalsDto totals) => totals.NetRevenueBase <= 0m
+        ? "sales-report__unavailable"
+        : NegativeClass(totals.GrossMarginPercent);
+
+    private static string MarginChange(SalesReportTotalsDto current, SalesReportTotalsDto previous) =>
+        current.NetRevenueBase <= 0m || previous.NetRevenueBase <= 0m
+            ? "غير قابل للمقارنة"
+            : (current.GrossMarginPercent - previous.GrossMarginPercent)
+                .ToString("+0.00;-0.00;0.00", CultureInfo.GetCultureInfo("en-US")) + " نقطة";
+
+    private async Task PreviousAsync() { if (_page > 1) { _page--; await LoadAsync(applied: true); } }
+    private async Task NextAsync() { if (_report is not null && (long)_page * _report.PageSize < _report.TotalDocumentCount) { _page++; await LoadAsync(applied: true); } }
     private Task ExportExcelAsync() => ExportAsync("xlsx");
     private Task ExportCsvAsync() => ExportAsync("csv");
 
     private async Task ExportAsync(string format)
     {
+        if (_report is null) return;
         _busy = true;
         _message = null;
         try
         {
-            var bytes = await Api.GetFileAsync(Url(true, format));
-            await Downloads.DownloadAsync(bytes, $"SalesReport_{_from:yyyyMMdd}_{_to:yyyyMMdd}.{format}",
+            var bytes = await Api.GetFileAsync(Url(true, format, applied: true));
+            await Downloads.DownloadAsync(bytes, $"SalesReport_{_report.Filter.FromDate:yyyyMMdd}_{_report.Filter.ToDate:yyyyMMdd}.{format}",
                 format == "csv" ? "text/csv" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         }
         catch { _message = "تعذر تصدير التقرير. يمكنك تضييق نطاق التواريخ أو مراجعة صلاحياتك."; }
         finally { _busy = false; }
     }
-    private Task PrintAsync() => Js.InvokeVoidAsync("print").AsTask();
-    private void OpenDocument(SalesReportDocumentDto doc) => Navigation.NavigateTo(
-        doc.DocumentKind == "SalesInvoice" ? "/sales/invoices" : $"/sales/returns/{doc.DocumentId:D}/print");
-    private string Amount(decimal value) => $"{value:N2} {_report?.BaseCurrencyCode}";
-    private static string Number(decimal value) => value.ToString("N2");
-    private string GroupTitle() => _groupBy switch
+
+    private async Task PrintAsync()
     {
-        "Month" => "الشهر", "Customer" => "العميل", "Employee" => "الموظف",
-        "Product" => "المنتج", "Category" => "الفئة", "Warehouse" => "المخزن", _ => "اليوم"
+        if (_report is null || _busy) return;
+        _busy = true;
+        _message = null;
+        try
+        {
+            // A dedicated print dataset: print all documents for ordinary reports,
+            // up to an explicitly disclosed limit for large reports. Never silently
+            // print only the current on-screen page of 25 documents.
+            var first = await Api.GetResultAsync<SalesReportDto>(Url(page: 1, pageSize: 100, applied: true));
+            if (!first.Succeeded || first.Value is null)
+            {
+                _message = "تعذر تجهيز بيانات الطباعة.";
+                return;
+            }
+            var printable = first.Value;
+            if (_report.TotalDocumentCount != printable.TotalDocumentCount || _report.Totals != printable.Totals)
+            {
+                _message = "تغيرت المستندات منذ آخر تحديث؛ حدّث التقرير ثم أعد الطباعة.";
+                return;
+            }
+            var rows = new List<SalesReportDocumentDto>(printable.Documents);
+            var target = Math.Min(printable.TotalDocumentCount, MaximumPrintedDocuments);
+            for (var page = 2; rows.Count < target; page++)
+            {
+                var response = await Api.GetResultAsync<SalesReportDto>(Url(page: page, pageSize: 100, applied: true));
+                if (!response.Succeeded || response.Value is null || (response.Value.TotalDocumentCount != printable.TotalDocumentCount || response.Value.Totals != printable.Totals))
+                {
+                    _message = "تغيرت بيانات التقرير أثناء الطباعة؛ أعد المحاولة بعد تحديث التقرير.";
+                    return;
+                }
+                if (response.Value.Documents.Count == 0) break;
+                rows.AddRange(response.Value.Documents);
+            }
+            if (rows.Count < target)
+            {
+                _message = "لم تكتمل بيانات ملحق المستندات للطباعة؛ يرجى إعادة المحاولة.";
+                return;
+            }
+            _printDocuments = rows.Take(MaximumPrintedDocuments).ToArray();
+            _printCreatedAt = DateTime.Now;
+            _printRequested = true; // Called after Blazor has rendered the print-only appendix.
+        }
+        catch { _message = "تعذر تجهيز التقرير للطباعة. يرجى إعادة المحاولة."; }
+        finally { _busy = false; }
+    }
+
+    private async Task ToggleAdvancedAsync()
+    {
+        _advancedOpen = !_advancedOpen;
+        if (_advancedOpen && _customers.Count == 0 && _products.Count == 0)
+            await LoadLookupsAsync();
+    }
+    private async Task LoadLookupsAsync()
+    {
+        _lookupsBusy = true;
+        try
+        {
+            var search = string.IsNullOrWhiteSpace(_lookupSearch) ? null : _lookupSearch.Trim();
+            var customerTask = SalesLookups.SearchCustomersAsync(search, 50);
+            var productsTask = SalesLookups.SearchProductVariantsAsync(null, null, search, 50);
+            var categoriesTask = SalesLookups.SearchProductCategoriesAsync(null, search, 50);
+            var warehousesTask = SalesLookups.SearchWarehousesAsync(null, search, 50, includeNonSellable: true);
+            await Task.WhenAll(customerTask, productsTask, categoriesTask, warehousesTask);
+            _customers = await customerTask;
+            _products = await productsTask;
+            _categories = await categoriesTask;
+            _warehouses = await warehousesTask;
+            if (_report is not null)
+            {
+                var employees = await Api.GetResultAsync<SalesReportDto>(Url(applied: true,
+                    page: 1, pageSize: 1, groupOverride: SalesReportGroupBy.Employee));
+                _employees = employees.Succeeded && employees.Value is not null
+                    ? employees.Value.Breakdown.Where(x => Guid.TryParse(x.Key, out _)).ToArray()
+                    : [];
+            }
+        }
+        catch { _message = "تعذر تحميل بعض خيارات الفلاتر المتقدمة؛ تحقق من الاتصال وأعد البحث."; }
+        finally { _lookupsBusy = false; }
+    }
+    private async Task ResetAdvancedAsync()
+    {
+        _customerId = _employeeId = _productVariantId = _categoryId = _warehouseId = null;
+        _lookupSearch = "";
+        await ApplyFiltersAsync();
+    }
+    private string AdvancedChevronClass => _advancedOpen ? "fa-chevron-up" : "fa-chevron-down";
+    private string AnalysisViewClass => ViewClass("analysis");
+    private string DocumentsViewClass => ViewClass("documents");
+    private string ComparisonViewClass => ViewClass("comparison");
+    private string ViewClass(string name) => _activeView == name
+        ? "sales-report__view sales-report__view--active" : "sales-report__view";
+    private Task ShowAnalysisAsync() => SelectViewAsync("analysis");
+    private Task ShowDocumentsAsync() => SelectViewAsync("documents");
+    private Task ShowComparisonAsync() => SelectViewAsync("comparison");
+    private async Task SelectViewAsync(string name)
+    {
+        _activeView = name;
+        if (name != "comparison" || _comparisonReport is not null || _report is null) return;
+        _comparisonBusy = true;
+        var version = _reportLoadVersion;
+        try
+        {
+            var days = _report.Filter.ToDate.DayNumber - _report.Filter.FromDate.DayNumber + 1;
+            var priorTo = _report.Filter.FromDate.AddDays(-1);
+            var priorFrom = priorTo.AddDays(1 - days);
+            var response = await Api.GetResultAsync<SalesReportDto>(Url(applied: true, page: 1, pageSize: 1,
+                fromOverride: priorFrom, toOverride: priorTo));
+            if (version == _reportLoadVersion && _activeView == "comparison" && response.Succeeded) _comparisonReport = response.Value;
+        }
+        catch (ArgumentOutOfRangeException) { _message = "لا يمكن حساب الفترة السابقة لهذا النطاق الزمني."; }
+        catch { _message = "تعذر تحميل بيانات المقارنة للفترة السابقة."; }
+        finally { if (version == _reportLoadVersion) _comparisonBusy = false; }
+    }
+    private static string ChangePercent(decimal current, decimal previous) => previous == 0m
+        ? "غير متاح (السابقة صفر)"
+        : ((current - previous) / Math.Abs(previous) * 100m).ToString("+0.00;-0.00;0.00", CultureInfo.GetCultureInfo("en-US")) + "%";
+    private static string NegativeClass(decimal value) => value < 0 ? "sales-report__negative" : "";
+    private void OpenDocument(SalesReportDocumentDto doc) => Navigation.NavigateTo(
+        doc.DocumentKind == "SalesInvoice" ? $"/sales/invoices?invoiceId={doc.DocumentId:D}" : $"/sales/returns/{doc.DocumentId:D}/print");
+    private string Amount(decimal value) => $"{Number(value)} {_report?.BaseCurrencyCode}";
+    private static string Number(decimal value) => value.ToString("N2", CultureInfo.GetCultureInfo("en-US"));
+    private static string GroupTitle(SalesReportGroupBy group) => group switch
+    {
+        SalesReportGroupBy.Month => "الشهر", SalesReportGroupBy.Customer => "العميل",
+        SalesReportGroupBy.Employee => "الموظف", SalesReportGroupBy.Product => "الصنف",
+        SalesReportGroupBy.Category => "التصنيف", SalesReportGroupBy.Warehouse => "المخزن", _ => "اليوم"
     };
 }

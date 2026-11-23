@@ -1,0 +1,93 @@
+@using System.Globalization
+@using OAS.Contracts.Sales.Reports
+
+<section class="sales-report-donut" dir="rtl" aria-label="توزيع إيرادات الفواتير حسب التصنيف">
+    <header class="sales-report-donut__heading">
+        <h2><i class="fa-solid fa-chart-pie" aria-hidden="true"></i> توزيع الفواتير حسب التصنيف</h2>
+        <span>قبل خصم المرتجعات</span>
+    </header>
+    @if (Segments.Count == 0)
+    {
+        <div class="sales-report-donut__empty">لا توجد مبيعات موجبة موزعة على التصنيفات في هذه الفترة.</div>
+    }
+    else
+    {
+        <div class="sales-report-donut__layout">
+            <div class="sales-report-donut__ring" style="@Gradient" role="img" aria-label="توزيع إيرادات الفواتير على @Segments.Count تصنيفات">
+                <div class="sales-report-donut__center">
+                    <span>إجمالي المعروض</span>
+                    <strong dir="ltr">@Total.ToString("N0", CultureInfo.GetCultureInfo("en-US"))</strong>
+                    <small>@Currency</small>
+                </div>
+            </div>
+            <div class="sales-report-donut__legend">
+                @for (var index = 0; index < Segments.Count; index++)
+                {
+                    var segment = Segments[index];
+                    <div class="sales-report-donut__legend-item" title="@SegmentTitle(segment.Name, segment.Amount)">
+                        <span class="sales-report-donut__swatch sales-report-donut__swatch--@index"></span>
+                        <span class="sales-report-donut__name">@segment.Name</span>
+                        <strong dir="ltr">@segment.Percent.ToString("N1", CultureInfo.GetCultureInfo("en-US"))%</strong>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    @if (Truncated)
+    {
+        <p class="sales-report-donut__note">التوزيع للمجموعات الظاهرة فقط، ولا يمثل جميع التصنيفات بسبب حد التقرير.</p>
+    }
+    else if (ExcludedNonPositive)
+    {
+        <p class="sales-report-donut__note">التوزيع النسبي يقتصر على التصنيفات ذات إيرادات فواتير موجبة؛ القيم الصفرية أو السالبة لا تدخل في الرسم الدائري.</p>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<SalesReportBreakdownDto> Rows { get; set; } = Array.Empty<SalesReportBreakdownDto>();
+    [Parameter] public string Currency { get; set; } = "";
+    [Parameter] public bool Truncated { get; set; }
+
+    private string SegmentTitle(string name, decimal amount) =>
+        $"{name}: {amount.ToString("N2", CultureInfo.GetCultureInfo("en-US"))} {Currency}";
+    private sealed record Segment(string Name, decimal Amount, decimal Percent);
+    private static readonly string[] Colors = [
+        "var(--sr-donut-0)", "var(--sr-donut-1)", "var(--sr-donut-2)", "var(--sr-donut-3)", "var(--sr-donut-4)"
+    ];
+    private bool ExcludedNonPositive => Rows.Any(x => x.Totals.InvoiceRevenueBase <= 0);
+    private decimal Total => Rows.Where(x => x.Totals.InvoiceRevenueBase > 0).Sum(x => x.Totals.InvoiceRevenueBase);
+    private IReadOnlyList<Segment> Segments
+    {
+        get
+        {
+            var positive = Rows.Where(x => x.Totals.InvoiceRevenueBase > 0)
+                .OrderByDescending(x => x.Totals.InvoiceRevenueBase).ToArray();
+            var total = positive.Sum(x => x.Totals.InvoiceRevenueBase);
+            if (total <= 0) return Array.Empty<Segment>();
+            var top = positive.Take(4).Select(x => new Segment(x.Label, x.Totals.InvoiceRevenueBase,
+                x.Totals.InvoiceRevenueBase * 100m / total)).ToList();
+            var remaining = positive.Skip(4).Sum(x => x.Totals.InvoiceRevenueBase);
+            if (remaining > 0)
+                top.Add(new Segment("تصنيفات أخرى", remaining, remaining * 100m / total));
+            return top;
+        }
+    }
+    private string Gradient
+    {
+        get
+        {
+            var segments = Segments;
+            if (segments.Count == 0) return string.Empty;
+            var angle = 0m;
+            var stops = new List<string>();
+            for (var i = 0; i < segments.Count; i++)
+            {
+                var start = angle;
+                angle = i == segments.Count - 1 ? 360m : angle + segments[i].Percent * 3.6m;
+                var color = Colors[i];
+                stops.Add($"{color} {start.ToString("0.###", CultureInfo.InvariantCulture)}deg {angle.ToString("0.###", CultureInfo.InvariantCulture)}deg");
+            }
+            return $"background: conic-gradient({string.Join(", ", stops)});";
+        }
+    }
+}
