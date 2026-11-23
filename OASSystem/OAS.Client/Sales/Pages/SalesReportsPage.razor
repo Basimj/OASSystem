@@ -132,38 +132,38 @@
             <article class="sales-report__card sales-report__card--main sales-report__card--featured"><div><span>صافي المبيعات</span><strong class="@NegativeClass(_report.Totals.NetRevenueBase)" dir="ltr">@Amount(_report.Totals.NetRevenueBase)</strong></div><i class="fa-solid fa-coins" aria-hidden="true"></i></article>
             <article class="sales-report__card sales-report__card--main sales-report__card--featured"><div><span>@(_report.Totals.GrossProfitBase < 0 ? "الخسارة الإجمالية" : "الربح الإجمالي")</span><strong class="@NegativeClass(_report.Totals.GrossProfitBase)" dir="ltr">@Amount(_report.Totals.GrossProfitBase)</strong></div><i class="fa-solid fa-chart-line" aria-hidden="true"></i></article>
             <article class="sales-report__card sales-report__card--main"><div><span>تكلفة المبيعات الصافية</span><strong class="@NegativeClass(_report.Totals.NetCogsBase)" dir="ltr">@Amount(_report.Totals.NetCogsBase)</strong></div><i class="fa-solid fa-box" aria-hidden="true"></i></article>
-            <article class="sales-report__card sales-report__card--main sales-report__card--margin"><div><span>هامش الربح</span><strong class="@MarginClass(_report.Totals)" dir="ltr">@MarginText(_report.Totals)</strong></div><i class="fa-solid fa-percent" aria-hidden="true"></i></article>
-            <article class="sales-report__card sales-report__card--secondary"><div><span>إيرادات الفواتير</span><strong class="@NegativeClass(_report.Totals.InvoiceRevenueBase)" dir="ltr">@Amount(_report.Totals.InvoiceRevenueBase)</strong></div><i class="fa-regular fa-file-lines" aria-hidden="true"></i></article>
+            <article class="sales-report__card sales-report__card--main sales-report__card--margin" title="@MarginTooltip(_report.Totals)"><div><span>هامش الربح @if (_report.Totals.NetRevenueBase <= 0m) { <i class="fa-solid fa-circle-info sales-report__margin-info" aria-hidden="true"></i> }</span><strong class="@MarginClass(_report.Totals)" dir="ltr">@(_report.Totals.NetRevenueBase <= 0m ? "—" : MarginText(_report.Totals))</strong></div><i class="fa-solid fa-percent" aria-hidden="true"></i></article>
             <article class="sales-report__card sales-report__card--secondary"><div><span>المرتجعات</span><strong class="@NegativeClass(_report.Totals.ReturnedRevenueBase)" dir="ltr">@Amount(_report.Totals.ReturnedRevenueBase)</strong></div><i class="fa-solid fa-arrow-rotate-left" aria-hidden="true"></i></article>
             <article class="sales-report__card sales-report__card--secondary"><div><span>خصومات الفواتير</span><strong class="@NegativeClass(_report.Totals.InvoiceDiscountsBase)" dir="ltr">@Amount(_report.Totals.InvoiceDiscountsBase)</strong></div><i class="fa-solid fa-tag" aria-hidden="true"></i></article>
-            <article class="sales-report__card sales-report__card--secondary"><div><span>ضريبة المبيعات الصافية</span><strong class="@NegativeClass(_report.Totals.NetSalesTaxBase)" dir="ltr">@Amount(_report.Totals.NetSalesTaxBase)</strong></div><i class="fa-solid fa-layer-group" aria-hidden="true"></i></article>
+            <article class="sales-report__card sales-report__card--secondary"><div><span>عدد الفواتير</span><strong dir="ltr">@_report.Totals.InvoiceCount.ToString("N0")</strong></div><i class="fa-regular fa-file-lines" aria-hidden="true"></i></article>
+            <article class="sales-report__card sales-report__card--secondary"><div><span>متوسط قيمة الفاتورة</span><strong dir="ltr">@Amount(_report.Totals.InvoiceCount > 0 ? _report.Totals.InvoiceRevenueBase / _report.Totals.InvoiceCount : 0m)</strong></div><i class="fa-solid fa-receipt" aria-hidden="true"></i></article>
         </section>
-        @if (_report.Totals.NetRevenueBase <= 0m)
-        {
-            <p class="sales-report__margin-notice" role="note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> هامش الربح غير معبّر عندما يكون صافي الإيرادات صفرًا أو سالبًا؛ وقد تتضمن الفترة مرتجعات لفواتير من فترات سابقة.</p>
-        }
         <div class="sales-report__caption">
             <span><i class="fa-solid fa-coins" aria-hidden="true"></i> العملة الأساسية: <b>@_report.BaseCurrencyCode</b></span>
             <span><i class="fa-regular fa-file-lines" aria-hidden="true"></i> @_report.Totals.InvoiceCount.ToString("N0") فاتورة، @_report.Totals.ReturnCount.ToString("N0") مرتجع</span>
-            <span>الربح الإجمالي قبل المصروفات الإدارية والتشغيلية؛ إيرادات الفواتير بعد الخصومات.</span>
+            <span title="إيرادات الفواتير بعد الخصومات">إيرادات الفواتير: <b dir="ltr">@Amount(_report.Totals.InvoiceRevenueBase)</b></span>
+            <span title="ضريبة المبيعات بعد المرتجعات">الضريبة الصافية: <b dir="ltr">@Amount(_report.Totals.NetSalesTaxBase)</b></span>
         </div>
 
-        <section class="sales-report__visuals" aria-label="اتجاه المبيعات والأرباح">
+        @* The primary chart uses the EXACT breakdown shown in the analysis table.
+           Day/month => timeline; customer/employee/product/category/warehouse => grouped bars. *@
+        <section class="sales-report__visuals" aria-label="الرسم البياني حسب التجميع المحدد">
             <div class="sales-report__panel sales-report__chart-panel">
-                @if (_timelineReport is not null)
-                {
-                    <SalesReportChart Rows="@_timelineReport.Breakdown" GroupBy="@_timelineReport.Filter.GroupBy"
-                                      BaseCurrencyCode="@_report.BaseCurrencyCode" Truncated="@_timelineReport.BreakdownTruncated"
-                                      FromDate="@_report.Filter.FromDate" ToDate="@_report.Filter.ToDate" />
-                }
-                else
-                {
-                    <h2>اتجاه المبيعات والأرباح</h2>
-                    <p class="sales-report__empty">تعذر تحميل الاتجاه الزمني لهذه الفترة. بقية التقرير متاحة.</p>
-                }
+                <SalesReportChart Rows="@_report.Breakdown" GroupBy="@_report.Filter.GroupBy"
+                                  BaseCurrencyCode="@_report.BaseCurrencyCode" Truncated="@_report.BreakdownTruncated"
+                                  FromDate="@_report.Filter.FromDate" ToDate="@_report.Filter.ToDate" />
             </div>
         </section>
         <div class="sales-report__optional-actions">
+            @if (!IsTemporalGrouping)
+            {
+                <button type="button" class="sales-report__trend-toggle" @onclick="ToggleTrendAsync"
+                        disabled="@(_busy || _trendBusy)" aria-expanded="@_showTrend">
+                    <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+                    @(_showTrend ? "إخفاء الاتجاه الزمني" : "عرض الاتجاه الزمني للفترة")
+                    <i class="fa-solid @(_showTrend ? "fa-chevron-up" : "fa-chevron-down")" aria-hidden="true"></i>
+                </button>
+            }
             <button type="button" class="sales-report__category-toggle" @onclick="ToggleCategoryAsync" disabled="@_busy"
                     aria-expanded="@_showCategoryDonut">
                 <i class="fa-solid fa-chart-pie" aria-hidden="true"></i>
@@ -171,6 +171,23 @@
                 <i class="fa-solid @(_showCategoryDonut ? "fa-chevron-up" : "fa-chevron-down")" aria-hidden="true"></i>
             </button>
         </div>
+        @if (_showTrend && !IsTemporalGrouping)
+        {
+            <section class="sales-report__visuals sales-report__temporal-visuals" aria-label="الاتجاه الزمني الاختياري">
+                <div class="sales-report__panel sales-report__chart-panel">
+                    @if (_timelineReport is not null)
+                    {
+                        <SalesReportChart Rows="@_timelineReport.Breakdown" GroupBy="@_timelineReport.Filter.GroupBy"
+                                          BaseCurrencyCode="@_report.BaseCurrencyCode" Truncated="@_timelineReport.BreakdownTruncated"
+                                          FromDate="@_report.Filter.FromDate" ToDate="@_report.Filter.ToDate" />
+                    }
+                    else
+                    {
+                        <p class="sales-report__empty" role="status">@(_trendBusy ? "جارٍ تحميل الاتجاه الزمني..." : "تعذر تحميل الاتجاه الزمني. أعد المحاولة بإغلاق القسم وفتحه.")</p>
+                    }
+                </div>
+            </section>
+        }
         @if (_showCategoryDonut)
         {
             <section class="sales-report__panel sales-report__donut-panel">
@@ -346,6 +363,8 @@
     private SalesReportDto? _customerReport;
     private bool _categoryBusy;
     private bool _showCategoryDonut;
+    private bool _showTrend;
+    private bool _trendBusy;
     private SalesReportDto? _comparisonReport;
     private bool _comparisonBusy;
     private string _activeView = "analysis";
@@ -410,6 +429,9 @@
         _page = 1;
         _activeView = "analysis";
         _comparisonReport = null;
+        if (Enum.TryParse<SalesReportGroupBy>(_groupBy, out var selected) &&
+            selected is SalesReportGroupBy.Day or SalesReportGroupBy.Month)
+            _showTrend = false; // The primary chart is already a time series.
         await LoadAsync();
     }
 
@@ -418,6 +440,7 @@
         // Each filter selection may start another request before the prior one finishes.
         // Only the latest request is allowed to publish data or clear the loading state.
         var version = ++_reportLoadVersion;
+        _trendBusy = false;
         if (!applied && _to < _from)
         {
             _report = null;
@@ -454,14 +477,14 @@
                 _timelineReport = null;
                 _customerReport = null;
                 _categoryReport = null;
-                // Independent aggregations: changing the main breakdown never replaces the trend.
-                // Take URLs from the applied response before yielding, so filter changes cannot mix.
-                var temporal = TemporalGroup;
-                var timelineUrl = Url(page: 1, pageSize: 1, applied: true, groupOverride: temporal);
+                // The primary chart now uses _report.Breakdown and follows the selected group.
+                // Only fetch a second time series when its optional section is expanded.
+                // All supplementary URLs reuse the APPLIED server filter snapshot.
+                var temporal = SuggestedTimeGroup(_report.Filter.FromDate, _report.Filter.ToDate);
+                var timelineTask = _showTrend && !IsTemporalGrouping
+                    ? FetchSupplementaryAsync(Url(page: 1, pageSize: 1, applied: true, groupOverride: temporal))
+                    : Task.FromResult<SalesReportDto?>(null);
                 var customerUrl = Url(page: 1, pageSize: 1, applied: true, groupOverride: SalesReportGroupBy.Customer);
-                var timelineTask = _report.Filter.GroupBy == temporal
-                    ? Task.FromResult<SalesReportDto?>(_report)
-                    : FetchSupplementaryAsync(timelineUrl);
                 var customerTask = _report.Filter.GroupBy == SalesReportGroupBy.Customer
                     ? Task.FromResult<SalesReportDto?>(_report)
                     : FetchSupplementaryAsync(customerUrl);
@@ -499,8 +522,30 @@
         }
     }
 
-    private SalesReportGroupBy TemporalGroup =>
-        (_to.DayNumber - _from.DayNumber + 1) <= 45 ? SalesReportGroupBy.Day : SalesReportGroupBy.Month;
+    private bool IsTemporalGrouping => _report?.Filter.GroupBy is SalesReportGroupBy.Day or SalesReportGroupBy.Month;
+
+    private static SalesReportGroupBy SuggestedTimeGroup(DateOnly from, DateOnly to) =>
+        (to.DayNumber - from.DayNumber + 1) <= 45 ? SalesReportGroupBy.Day : SalesReportGroupBy.Month;
+
+    private async Task ToggleTrendAsync()
+    {
+        _showTrend = !_showTrend;
+        if (!_showTrend || _timelineReport is not null || _report is null || IsTemporalGrouping) return;
+
+        _trendBusy = true;
+        var version = _reportLoadVersion;
+        try
+        {
+            var grouping = SuggestedTimeGroup(_report.Filter.FromDate, _report.Filter.ToDate);
+            var url = Url(page: 1, pageSize: 1, applied: true, groupOverride: grouping);
+            var result = await FetchSupplementaryAsync(url);
+            if (version == _reportLoadVersion && _showTrend) _timelineReport = result;
+        }
+        finally
+        {
+            if (version == _reportLoadVersion) _trendBusy = false;
+        }
+    }
 
     private IReadOnlyList<SalesReportBreakdownDto> TopCustomers => _customerReport?.Breakdown
         .OrderByDescending(x => x.Totals.NetRevenueBase).ThenBy(x => x.Label)
@@ -553,6 +598,10 @@
             return items.Count == 0 ? string.Empty : string.Join("، ", items);
         }
     }
+
+    private static string MarginTooltip(SalesReportTotalsDto totals) => totals.NetRevenueBase <= 0m
+        ? "هامش الربح غير قابل للحساب عندما تكون المبيعات الصافية صفرًا أو أقل."
+        : "هامش الربح الإجمالي للفترة، قبل المصروفات التشغيلية.";
 
     private static string MarginText(SalesReportTotalsDto totals) => totals.NetRevenueBase <= 0m
         ? "غير معبّر"

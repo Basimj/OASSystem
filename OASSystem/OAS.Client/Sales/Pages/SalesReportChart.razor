@@ -4,8 +4,10 @@
 <section class="sales-report-chart" aria-label="الرسم البياني التفاعلي للمبيعات والربحية" dir="rtl">
     <div class="sales-report-chart__header">
         <div>
-            <h2><i class="fa-solid fa-chart-line" aria-hidden="true"></i> @ChartTitle</h2>
-            <p>مقارنة فعلية بحسب @GroupName، من نفس بيانات التحليل المحاسبي.</p>
+            <h2><i class="fa-solid @(IsTimeline ? "fa-chart-line" : "fa-chart-column")" aria-hidden="true"></i> @ChartTitle</h2>
+            <p>@(IsTimeline
+                ? $"اتجاه {GroupName} من بيانات الفواتير والمرتجعات المرحلة."
+                : $"أبرز {Math.Min(10, Rows.Count)} مجموعات حسب {GroupName}، مرتبة وفق القيمة المطلقة للمؤشر.")</p>
         </div>
         <div class="sales-report-chart__controls">
         @if (IsTimeline)
@@ -46,21 +48,40 @@
             }
         </div>
         <div class="sales-report-chart__svg-scroll">
-            <svg viewBox="0 0 920 305" role="img" aria-label="@ChartTitle بحسب @GroupName — @VisibleRows.Count فترات" preserveAspectRatio="xMidYMid meet">
+            <svg viewBox="0 0 1080 300" role="img" aria-label="@ChartTitle بحسب @GroupName — @VisibleRows.Count فترات" preserveAspectRatio="xMidYMid meet">
                 <defs>
                     <linearGradient id="oas-report-bar-fill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stop-color="var(--oas-color-primary, #26b2ff)" stop-opacity=".95" />
-                        <stop offset="100%" stop-color="var(--oas-color-primary, #26b2ff)" stop-opacity=".38" />
+                        <stop offset="0%" stop-color="var(--oas-color-primary, #1f94ff)" stop-opacity=".95" />
+                        <stop offset="100%" stop-color="var(--oas-color-primary, #1f94ff)" stop-opacity=".38" />
+                    </linearGradient>
+                    <linearGradient id="oas-report-main-area" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#1f94ff" stop-opacity=".23" />
+                        <stop offset="100%" stop-color="#1f94ff" stop-opacity=".04" />
+                    </linearGradient>
+                    <linearGradient id="oas-report-profit-area" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#f0c400" stop-opacity=".22" />
+                        <stop offset="100%" stop-color="#f0c400" stop-opacity=".03" />
                     </linearGradient>
                 </defs>
                 @for (var tick = 0; tick <= 4; tick++)
                 {
-                    <line x1="75" y1="@N(TickY(tick))" x2="885" y2="@N(TickY(tick))" class="sales-report-chart__grid-line" />
+                    <line x1="75" y1="@N(TickY(tick))" x2="1040" y2="@N(TickY(tick))" class="sales-report-chart__grid-line" />
                     @SvgAxisLabel("67", N(TickY(tick) + 4), "end", "sales-report-chart__tick", AxisLabel(tick))
                 }
-                <line x1="75" y1="@N(ValueY(0m))" x2="885" y2="@N(ValueY(0m))" class="sales-report-chart__zero" />
+                <line x1="75" y1="@N(ValueY(0m))" x2="1040" y2="@N(ValueY(0m))" class="sales-report-chart__zero" />
                 @if (IsLineView)
                 {
+                    @foreach (var segment in MainAreaSegments)
+                    {
+                        <polygon points="@segment" class="sales-report-chart__main-area" />
+                    }
+                    @if (!IsPercent)
+                    {
+                        @foreach (var segment in OtherAreaSegments)
+                        {
+                            <polygon points="@segment" class="sales-report-chart__profit-area" />
+                        }
+                    }
                     @foreach (var segment in MainLineSegments)
                     {
                         <polyline points="@segment" class="sales-report-chart__main-line" />
@@ -113,7 +134,10 @@
                 {
                     @if (VisibleRows.Count > 1)
                     {
-                        <polyline points="@OtherLinePoints" class="sales-report-chart__profit-line" />
+                        @foreach (var segment in OtherLineSegments)
+                        {
+                            <polyline points="@segment" class="sales-report-chart__profit-line" />
+                        }
                     }
                     else if (VisibleRows.Count == 1)
                     {
@@ -140,10 +164,13 @@
                 <div class="sales-report-chart__bar-row" title="@($"{row.Label}: {FormattedValue(row)}")">
                     <span class="sales-report-chart__bar-label" title="@row.Label">@row.Label</span>
                     <div class="sales-report-chart__bar-track">
-                        <div class="sales-report-chart__bar @(MetricValue(row) < 0 ? "sales-report-chart__bar--negative" : "")"
-                             style="width: @N(BarPercent(row))%"></div>
+                        @if (IsMetricValid(row))
+                        {
+                            <div class="sales-report-chart__bar @(_metric is Metric.GrossProfit or Metric.GrossMargin ? "sales-report-chart__bar--profit" : "") @(MetricValue(row) < 0 ? "sales-report-chart__bar--negative" : "")"
+                                 style="width: @N(BarPercent(row))%"></div>
+                        }
                     </div>
-                    <strong class="sales-report-chart__bar-value" dir="ltr">@FormattedValue(row)</strong>
+                    <strong class="sales-report-chart__bar-value @(IsMetricValid(row) && MetricValue(row) < 0 ? "sales-report-chart__bar-value--negative" : "")" dir="ltr">@FormattedValue(row)</strong>
                 </div>
             }
         </div>
@@ -225,7 +252,8 @@
     private static readonly SalesReportTotalsDto EmptyTotals = new(0m, 0m, 0m, 0m, 0m, 0m, 0m, 0m, 0L, 0L);
     private IReadOnlyList<SalesReportBreakdownDto> VisibleRows => IsTimeline
         ? TimelineRows()
-        : Rows.OrderByDescending(MetricValue).ThenBy(x => x.Label).Take(10).ToArray();
+        : Rows.OrderByDescending(x => IsMetricValid(x) ? Math.Abs(MetricValue(x)) : -1m)
+            .ThenBy(x => x.Label).Take(10).ToArray();
 
     // Periods without posted documents genuinely contribute zero. Fill those dates
     // only inside the selected interval, never outside it or for truncated results.
@@ -309,10 +337,15 @@
     private decimal ChartMax => ValidMetricRows.Count == 0 ? 1m : Math.Max(1m,
         IsPercent ? ValidMetricRows.Max(MetricValue) : Math.Max(VisibleRows.Max(MetricValue), VisibleRows.Max(OtherMetricValue)));
     private decimal ChartSpan => ChartMax - ChartMin;
-    private double PointX(int index) => VisibleRows.Count <= 1 ? 480 : 85 + index * 790d / (VisibleRows.Count - 1);
-    private double ValueY(decimal value) => 235d - (double)((value - ChartMin) / ChartSpan) * 190d;
-    private double TickY(int tick) => 45d + tick * 47.5d;
-    private string AxisLabel(int tick) => (ChartMax - ChartSpan * tick / 4m).ToString(IsPercent ? "N1" : "N0");
+    private double PointX(int index) => VisibleRows.Count <= 1 ? 550 : 95 + index * 930d / (VisibleRows.Count - 1);
+    private double ValueY(decimal value) => 228d - (double)((value - ChartMin) / ChartSpan) * 165d;
+    private double TickY(int tick) => 55d + tick * 41.25d;
+    private string AxisLabel(int tick)
+    {
+        var value = ChartMax - ChartSpan * tick / 4m;
+        var digits = Math.Abs(value).ToString(IsPercent ? "N1" : "N0", CultureInfo.GetCultureInfo("en-US"));
+        return value < 0m ? "−" + digits : digits;
+    }
     private IReadOnlyList<string> MainLineSegments
     {
         get
@@ -334,8 +367,60 @@
             return segments;
         }
     }
+    private IReadOnlyList<string> MainAreaSegments => BuildAreaSegments((row, _) => MetricValue(row), (row, _) => IsMetricValid(row));
+    private IReadOnlyList<string> OtherAreaSegments => BuildAreaSegments((row, _) => OtherMetricValue(row), (_, _) => true);
+    private IReadOnlyList<string> OtherLineSegments => BuildLineSegments((row, _) => OtherMetricValue(row), (_, _) => true);
     private string OtherLinePoints => string.Join(" ", VisibleRows.Select((row, index) =>
         $"{N(PointX(index))},{N(ValueY(OtherMetricValue(row)))}"));
+
+    private IReadOnlyList<string> BuildAreaSegments(Func<SalesReportBreakdownDto, int, decimal> selector, Func<SalesReportBreakdownDto, int, bool> include)
+    {
+        var segments = new List<string>();
+        var points = new List<(double x, double y)>();
+        var zeroY = N(ValueY(0m));
+
+        void Flush()
+        {
+            if (points.Count >= 2)
+            {
+                var polygon = $"{N(points[0].x)},{zeroY} " + string.Join(" ", points.Select(p => $"{N(p.x)},{N(p.y)}")) + $" {N(points[^1].x)},{zeroY}";
+                segments.Add(polygon);
+            }
+            points.Clear();
+        }
+
+        for (var index = 0; index < VisibleRows.Count; index++)
+        {
+            var row = VisibleRows[index];
+            if (!include(row, index))
+            {
+                Flush();
+                continue;
+            }
+            points.Add((PointX(index), ValueY(selector(row, index))));
+        }
+        Flush();
+        return segments;
+    }
+
+    private IReadOnlyList<string> BuildLineSegments(Func<SalesReportBreakdownDto, int, decimal> selector, Func<SalesReportBreakdownDto, int, bool> include)
+    {
+        var segments = new List<string>();
+        var points = new List<string>();
+        for (var index = 0; index < VisibleRows.Count; index++)
+        {
+            var row = VisibleRows[index];
+            if (!include(row, index))
+            {
+                if (points.Count >= 2) segments.Add(string.Join(" ", points));
+                points.Clear();
+                continue;
+            }
+            points.Add($"{N(PointX(index))},{N(ValueY(selector(row, index)))}");
+        }
+        if (points.Count >= 2) segments.Add(string.Join(" ", points));
+        return segments;
+    }
     private double BarWidth => Math.Clamp(580d / Math.Max(1, VisibleRows.Count), 16d, 70d);
     private double BarTop(decimal value) => Math.Min(ValueY(value), ValueY(0m));
     private double BarHeight(decimal value) => Math.Max(1d, Math.Abs(ValueY(value) - ValueY(0m)));

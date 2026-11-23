@@ -1,74 +1,310 @@
-.sales-report-chart { display: grid; gap: .85rem; min-width: 0; }
-.sales-report-chart__header { display: flex; justify-content: space-between; align-items: center; gap: .85rem; flex-wrap: wrap; }
-.sales-report-chart h2 { margin: 0; font-size: 1.08rem; font-weight: 800; }
-.sales-report-chart h2 i { color: var(--oas-color-primary); margin-inline-end: .35rem; }
-.sales-report-chart p { margin: .3rem 0 0; font-size: .78rem; color: var(--oas-color-text-muted); }
-.sales-report-chart__metric { display: grid; gap: .3rem; min-width: 11rem; font-size: .8rem; color: var(--oas-color-text-muted); }
-.sales-report-chart__metric select { background: var(--oas-color-surface); color: var(--oas-color-text); border: 1px solid var(--oas-color-border); border-radius: .6rem; padding: .55rem .65rem; min-height: 2.5rem; }
-.sales-report-chart__svg-scroll { width: 100%; overflow-x: auto; }
-.sales-report-chart svg { display: block; width: 100%; min-width: 650px; max-height: 330px; }
-.sales-report-chart__grid-line { stroke: var(--oas-color-border); stroke-width: 1; }
-.sales-report-chart__zero { stroke: var(--oas-color-text-muted); stroke-width: 1.4; stroke-opacity: .55; }
-.sales-report-chart__line { stroke: var(--oas-color-primary); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; fill: none; }
-.sales-report-chart__area { fill: url(#oas-report-chart-area); }
-.sales-report-chart__point { fill: var(--oas-color-surface); stroke: var(--oas-color-primary); stroke-width: 3; }
-.sales-report-chart__tick, .sales-report-chart__x-label { fill: var(--oas-color-text-muted); font-size: 12px; }
-.sales-report-chart__bars { display: grid; gap: .65rem; padding: .25rem 0; }
-.sales-report-chart__bar-row { display: grid; grid-template-columns: minmax(105px, 1.25fr) minmax(80px, 3fr) minmax(100px, 1fr); gap: .75rem; align-items: center; }
-.sales-report-chart__bar-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .83rem; }
-.sales-report-chart__bar-track { height: .95rem; border-radius: 100px; background: var(--oas-color-subtle); overflow: hidden; }
-.sales-report-chart__bar { height: 100%; min-width: 0; border-radius: inherit; background: var(--oas-color-primary); }
-.sales-report-chart__bar--negative { background: var(--oas-color-danger); }
-.sales-report-chart__bar-value { text-align: left; font-size: .82rem; font-variant-numeric: tabular-nums; }
-.sales-report-chart__empty { border: 1px dashed var(--oas-color-border); border-radius: .7rem; padding: 2.5rem 1rem; text-align: center; color: var(--oas-color-text-muted); }
-.sales-report-chart__footnote { font-size: .76rem; line-height: 1.65; }
-@media (max-width: 650px) { .sales-report-chart__bar-row { grid-template-columns: minmax(85px, 1fr) minmax(80px, 2fr) minmax(75px, 1fr); gap: .4rem; } }
-@media print { .sales-report-chart__metric { display: none; } .sales-report-chart svg { min-width: 0; max-height: 220px; } .sales-report-chart__footnote { font-size: 8pt; } .sales-report-chart__bar-row { break-inside: avoid; } }
-
-/* Visual parity: metric columns + gross-profit trend line. */
-.sales-report-chart__legend { display:flex; align-items:center; justify-content:flex-start; gap:1rem; flex-wrap:wrap; font-size:.75rem; color:var(--oas-color-text-muted); }
-.sales-report-chart__legend span { display:inline-flex; gap:.4rem; align-items:center; }
-.sales-report-chart__legend-bar { width:12px; height:12px; border-radius:3px; background:var(--oas-color-primary); }
-.sales-report-chart__legend-line { width:16px; border-top:3px solid var(--oas-color-warning,#f1bd09); position:relative; }
-.sales-report-chart__legend-line::after { position:absolute; content:""; top:-6px; right:5px; width:7px; height:7px; border-radius:50%; background:var(--oas-color-warning,#f1bd09); }
-.sales-report-chart__column { fill:url(#oas-report-bar-fill); }
-.sales-report-chart__column--negative { fill:var(--oas-color-danger,#dc4b4b); }
-.sales-report-chart__profit-line { stroke:var(--oas-color-warning,#efc000); stroke-width:3.2; stroke-linejoin:round; stroke-linecap:round; fill:none; }
-.sales-report-chart__profit-point { fill:var(--oas-color-surface); stroke:var(--oas-color-warning,#efc000); stroke-width:3; }
-.sales-report-chart__value-label { fill:var(--oas-color-text); font-size:11px; font-weight:750; }
-@media print { .sales-report-chart svg { width:100%; max-height:60mm; } .sales-report-chart__legend { font-size:7pt; } .sales-report-chart__column,.sales-report-chart__profit-line { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
-
-/* Layout inside the isolated Blazor chart component. */
-.sales-report-chart__header { gap:.5rem; }
-.sales-report-chart__metric { display:flex; align-items:center; min-width:0; gap:.4rem; font-size:.72rem; }
-.sales-report-chart__metric select { min-height:2rem; width:auto; max-width:11rem; padding:.25rem .5rem; }
-.sales-report-chart__svg-scroll svg { min-width:0; width:100%; height:auto; max-height:260px; }
-.sales-report-chart h2 { font-size:1rem; }
-.sales-report-chart { gap:.5rem; }
-@media(max-width:560px) { .sales-report-chart__header { align-items:start; } .sales-report-chart__metric { display:grid; } .sales-report-chart__svg-scroll { overflow-x:auto; } .sales-report-chart__svg-scroll svg { min-width:560px; } }
-
-
-/* V3: a true two-series line chart is the default for day/month grouping. */
-.sales-report-chart { gap:.3rem; }
-.sales-report-chart__header { gap:.25rem; }
-.sales-report-chart h2 { font-size:.81rem; }
-.sales-report-chart p { margin:.12rem 0 0; font-size:.66rem; }
-.sales-report-chart__controls { display:flex; align-items:center; gap:.35rem; flex-wrap:wrap; }
-.sales-report-chart__metric { gap:.2rem; font-size:.65rem; }
-.sales-report-chart__metric select { font-size:.68rem; min-height:1.7rem; height:1.7rem; max-width:9rem; border-radius:.38rem; padding:.12rem .3rem; }
-.sales-report-chart__legend { gap:.65rem; font-size:.67rem; }
-.sales-report-chart__legend-mainline { width:17px; border-top:3px solid var(--oas-color-primary); position:relative; }
-.sales-report-chart__legend-mainline::after { content:""; position:absolute; top:-5px; left:5px; width:6px; height:6px; border-radius:50%; background:var(--oas-color-primary); }
-.sales-report-chart__main-line,.sales-report-chart__single-line { fill:none; stroke:var(--oas-color-primary); stroke-width:3.6; stroke-linecap:round; stroke-linejoin:round; }
-.sales-report-chart__main-point { fill:var(--oas-color-surface); stroke:var(--oas-color-primary); stroke-width:3.2; }
-.sales-report-chart__svg-scroll svg { max-height:198px; min-width:0; width:100%; }
-.sales-report-chart__tick,.sales-report-chart__x-label { font-size:13px; }
-.sales-report-chart__footnote { font-size:.61rem !important; line-height:1.3; }
-@media screen and (max-width:580px) {
-    .sales-report-chart__controls { width:100%; }
-    .sales-report-chart__svg-scroll svg { min-width:480px; }
+.sales-report-chart {
+    display: grid;
+    gap: .55rem;
+    min-width: 0;
 }
+
+.sales-report-chart__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: .55rem;
+    flex-wrap: wrap;
+}
+
+.sales-report-chart h2 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 900;
+    color: var(--oas-color-text);
+}
+
+.sales-report-chart h2 i {
+    color: var(--oas-color-primary, #1f94ff);
+    margin-inline-end: .35rem;
+}
+
+.sales-report-chart p {
+    margin: .15rem 0 0;
+    font-size: .68rem;
+    color: var(--oas-color-text-muted);
+}
+
+.sales-report-chart__controls {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    flex-wrap: wrap;
+}
+
+.sales-report-chart__metric {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: .35rem;
+    font-size: .7rem;
+    color: var(--oas-color-text-muted);
+}
+
+.sales-report-chart__metric select {
+    background: var(--oas-color-surface);
+    color: var(--oas-color-text);
+    border: 1px solid var(--oas-color-border);
+    border-radius: .45rem;
+    min-height: 1.85rem;
+    height: 1.85rem;
+    padding: .14rem .42rem;
+    max-width: 9rem;
+    font-size: .72rem;
+}
+
+.sales-report-chart__legend {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 1rem;
+    flex-wrap: wrap;
+    font-size: .72rem;
+    color: var(--oas-color-text-muted);
+}
+
+.sales-report-chart__legend span {
+    display: inline-flex;
+    gap: .42rem;
+    align-items: center;
+}
+
+.sales-report-chart__legend-mainline,
+.sales-report-chart__legend-line {
+    position: relative;
+    width: 20px;
+    border-top-width: 3.25px;
+    border-top-style: solid;
+}
+
+.sales-report-chart__legend-mainline {
+    border-top-color: #1f94ff;
+}
+
+.sales-report-chart__legend-line {
+    border-top-color: #f0c400;
+}
+
+.sales-report-chart__legend-mainline::after,
+.sales-report-chart__legend-line::after {
+    position: absolute;
+    content: "";
+    top: -6px;
+    left: 7px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #fff;
+    border: 2.5px solid currentColor;
+    box-sizing: border-box;
+}
+
+.sales-report-chart__legend-mainline { color: #1f94ff; }
+.sales-report-chart__legend-line { color: #f0c400; }
+.sales-report-chart__legend-bar {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    background: linear-gradient(180deg, rgba(31,148,255,.92) 0%, rgba(31,148,255,.35) 100%);
+}
+
+.sales-report-chart__svg-scroll {
+    width: 100%;
+    overflow-x: hidden;
+}
+
+.sales-report-chart svg {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-height: none;
+    height: auto;
+}
+
+.sales-report-chart__grid-line {
+    stroke: #d7e2ef;
+    stroke-width: 1.15;
+}
+
+.sales-report-chart__zero {
+    stroke: #c7d5e5;
+    stroke-width: 1.35;
+}
+
+.sales-report-chart__main-area {
+    fill: url(#oas-report-main-area);
+}
+
+.sales-report-chart__profit-area {
+    fill: url(#oas-report-profit-area);
+}
+
+.sales-report-chart__main-line,
+.sales-report-chart__single-line {
+    fill: none;
+    stroke: #1f94ff;
+    stroke-width: 3.9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.sales-report-chart__profit-line {
+    fill: none;
+    stroke: #f0c400;
+    stroke-width: 3.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.sales-report-chart__main-point,
+.sales-report-chart__profit-point {
+    fill: #ffffff;
+    stroke-width: 3.2;
+}
+
+.sales-report-chart__main-point { stroke: #1f94ff; }
+.sales-report-chart__profit-point { stroke: #f0c400; }
+
+.sales-report-chart__column {
+    fill: url(#oas-report-bar-fill);
+}
+
+.sales-report-chart__column--negative,
+.sales-report-chart__bar--negative {
+    fill: var(--oas-color-danger, #dc4b4b);
+    background: var(--oas-color-danger, #dc4b4b);
+}
+
+.sales-report-chart__tick,
+.sales-report-chart__x-label {
+    fill: #7a8ea6;
+    font-size: 13px;
+}
+
+.sales-report-chart__value-label {
+    fill: var(--oas-color-text);
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.sales-report-chart__bars {
+    display: grid;
+    gap: .65rem;
+    padding: .25rem 0;
+}
+
+.sales-report-chart__bar-row {
+    display: grid;
+    grid-template-columns: minmax(105px, 1.25fr) minmax(80px, 3fr) minmax(100px, 1fr);
+    gap: .75rem;
+    align-items: center;
+}
+
+.sales-report-chart__bar-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: .83rem;
+}
+
+.sales-report-chart__bar-track {
+    height: .95rem;
+    border-radius: 100px;
+    background: var(--oas-color-subtle);
+    overflow: hidden;
+}
+
+.sales-report-chart__bar {
+    height: 100%;
+    min-width: 0;
+    border-radius: inherit;
+    background: #1f94ff;
+}
+
+.sales-report-chart__bar-value {
+    text-align: left;
+    font-size: .82rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.sales-report-chart__empty {
+    border: 1px dashed var(--oas-color-border);
+    border-radius: .7rem;
+    padding: 2.5rem 1rem;
+    text-align: center;
+    color: var(--oas-color-text-muted);
+}
+
+.sales-report-chart__footnote {
+    display: none;
+}
+
+@media screen and (max-width: 570px) {
+    .sales-report-chart__header {
+        align-items: start;
+    }
+
+    .sales-report-chart__controls {
+        width: 100%;
+    }
+
+    .sales-report-chart__svg-scroll {
+        overflow-x: auto;
+    }
+
+    .sales-report-chart__svg-scroll svg {
+        min-width: 700px;
+    }
+}
+
 @media print {
-    .sales-report-chart__controls { display:none !important; }
-    .sales-report-chart__main-line,.sales-report-chart__single-line,.sales-report-chart__main-point { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .sales-report-chart__metric,
+    .sales-report-chart__controls {
+        display: none !important;
+    }
+
+    .sales-report-chart svg {
+        width: 100%;
+        max-height: 65mm;
+        min-width: 0;
+    }
+
+    .sales-report-chart__main-area,
+    .sales-report-chart__profit-area,
+    .sales-report-chart__main-line,
+    .sales-report-chart__profit-line,
+    .sales-report-chart__main-point,
+    .sales-report-chart__profit-point,
+    .sales-report-chart__column {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .sales-report-chart__legend {
+        font-size: 7pt;
+    }
+
+    .sales-report-chart__footnote {
+        display: none;
+    }
 }
+
+/* V6: grouped comparisons stay readable with signed values. */
+.sales-report-chart__bar-row { grid-template-columns:minmax(100px,1.5fr) minmax(90px,3fr) minmax(90px,1.1fr); }
+.sales-report-chart__bar-track { height:.85rem; border:1px solid #d8e6f3; background:#f0f6fc; }
+.sales-report-chart__bar { background:linear-gradient(90deg,#1f94ff,#8acbff); }
+.sales-report-chart__bar--negative { background:linear-gradient(90deg,#ef9a9a,#d83f45); }
+.sales-report-chart__bar-value--negative { color:var(--oas-color-danger,#d83f45); }
+@media print {
+    .sales-report-chart__bar-track { border:1px solid #d8e6f3; background:#f0f6fc !important; }
+    .sales-report-chart__bar,.sales-report-chart__bar--negative { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+}
+
+/* Profit comparison bars use the same yellow as the profit trend line. */
+.sales-report-chart__bar--profit { background:linear-gradient(90deg,#e5bb00,#ffeb80); }
+.sales-report-chart__bar--negative { background:linear-gradient(90deg,#ef9a9a,#d83f45); }
