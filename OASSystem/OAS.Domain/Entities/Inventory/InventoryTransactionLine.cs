@@ -35,4 +35,12 @@ public class InventoryTransactionLine : Entity<Guid>
 
         Notes = notes;
     }
+
+    public void ApplyPostedUnitCost(decimal unitCost)
+    {
+        if (unitCost < 0m)
+            throw new ArgumentOutOfRangeException(nameof(unitCost));
+        UnitCost = unitCost;
+        TotalCost = Quantity * unitCost;
+    }
 }

@@ -1,3 +1,4 @@
+using OAS.Application.Inventory.Balances.Workspace;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -28,6 +29,17 @@ public sealed class InventoryBalancesController(ISender sender) : ControllerBase
             cancellationToken);
         return Ok(result);
     }
+
+    [HttpGet("workspace")]
+    public async Task<ActionResult<InventoryBalanceWorkspaceDto>> Workspace([FromQuery] PageRequest request,
+        [FromQuery] InventoryBalanceFilters filters, CancellationToken cancellationToken) =>
+        Ok(await sender.Send(new GetBalanceWorkspaceQuery(request, filters), cancellationToken));
+
+    [HttpGet("workspace/export")]
+    public async Task<IActionResult> ExportWorkspace([FromQuery] PageRequest request,
+        [FromQuery] InventoryBalanceFilters filters, CancellationToken cancellationToken) =>
+        File(await sender.Send(new ExportBalanceWorkspaceQuery(request, filters), cancellationToken),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "inventory-balances.xlsx");
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<InventoryBalanceDto>> GetById(

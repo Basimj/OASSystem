@@ -170,3 +170,15 @@
         overflow: visible; clip: auto; white-space: normal;
     }
 }
+
+/* Warehouse stock is displayed under each variant without widening the editor. */
+.inventory-transactions__balance-hint {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .2rem .65rem;
+    margin-block-start: .3rem;
+    font-size: .75rem;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+.inventory-transactions__line-editor { align-items: start; }

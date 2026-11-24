@@ -15,7 +15,8 @@ public sealed class CreateInventoryTransactionCommandHandler(
     IReadRepository<Warehouse, Guid> warehouseRepository,
     IReadRepository<ProductVariant, Guid> variantRepository,
     IReadRepository<Product, Guid> productRepository,
-    ISequenceNumberGenerator sequenceNumberGenerator)
+    ISequenceNumberGenerator sequenceNumberGenerator,
+    IInventoryBalanceRepository balanceRepository)
     : IRequestHandler<CreateInventoryTransactionCommand, Guid>
 {
     public async Task<Guid> Handle(
@@ -44,6 +45,33 @@ public sealed class CreateInventoryTransactionCommandHandler(
             EnsureActiveWarehouse(destination);
         }
 
+        if (request.SourceWarehouseId is not { } sourceId || sourceId == Guid.Empty)
+            throw new ConflictException("source_warehouse_required", "يجب تحديد المخزن المصدر.");
+
+        // Validate every line before allocating a number or adding any entities.
+        // A draft is not a reservation; stock must be checked again at posting.
+        var validatedLines = new List<(OAS.Contracts.Inventory.Transactions.CreateInventoryTransactionLineRequest Request, decimal UnitCost)>();
+        foreach (var lineReq in request.Lines)
+        {
+            var variant = await variantRepository.GetByIdAsync(lineReq.ProductVariantId, cancellationToken)
+                ?? throw new NotFoundException(nameof(ProductVariant), lineReq.ProductVariantId);
+            EnsureVariantActive(variant);
+            var product = await productRepository.GetByIdAsync(variant.ProductId, cancellationToken)
+                ?? throw new NotFoundException(nameof(Product), variant.ProductId);
+            EnsureProductEligible(product);
+
+            var balance = await balanceRepository.GetByWarehouseAndVariantAsync(sourceId, variant.Id, cancellationToken);
+            var available = balance?.AvailableQuantity ?? 0m;
+            if (balance is null || available < lineReq.Quantity || balance.OnHandQuantity < lineReq.Quantity)
+                throw new ConflictException("insufficient_stock",
+                    $"الصنف {variant.SKU}: الكمية المتاحة في المخزن المصدر {available:0.###}، والمطلوبة {lineReq.Quantity:0.###}.");
+
+            var unitCost = balance.AverageUnitCost;
+            if (unitCost > 0m && lineReq.Quantity > 9999999999999999.99m / unitCost)
+                throw new ConflictException("line_total_cost_precision_invalid", "إجمالي تكلفة البند أكبر من الحد المسموح به.");
+            validatedLines.Add((lineReq, unitCost));
+        }
+
         var transactionNumber = request.TransactionNumber;
         if (string.IsNullOrWhiteSpace(transactionNumber))
         {
@@ -63,26 +91,10 @@ public sealed class CreateInventoryTransactionCommandHandler(
             request.Notes);
 
         await transactionRepository.AddAsync(transaction, cancellationToken);
-
-        foreach (var lineReq in request.Lines)
+        foreach (var (lineReq, unitCost) in validatedLines)
         {
-            var variant = await variantRepository.GetByIdAsync(lineReq.ProductVariantId, cancellationToken);
-            if (variant is null)
-                throw new NotFoundException(nameof(ProductVariant), lineReq.ProductVariantId);
-            EnsureVariantActive(variant);
-
-            var product = await productRepository.GetByIdAsync(variant.ProductId, cancellationToken);
-            if (product is null)
-                throw new NotFoundException(nameof(Product), variant.ProductId);
-            EnsureProductEligible(product);
-
             var line = new InventoryTransactionLine(
-                transaction.Id,
-                lineReq.ProductVariantId,
-                lineReq.Quantity,
-                lineReq.UnitCost,
-                lineReq.Notes);
-
+                transaction.Id, lineReq.ProductVariantId, lineReq.Quantity, unitCost, lineReq.Notes);
             await lineRepository.AddAsync(line, cancellationToken);
         }
 

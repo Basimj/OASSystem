@@ -85,7 +85,13 @@ public class EfRepository<TEntity, TKey>(OasDbContext dbContext) : IRepository<T
         if (property.GetIndexParameters().Length != 0)
             throw new InvalidOperationException($"Indexed property '{propertyName}' cannot be used for sorting.");
         var parameter = Expression.Parameter(typeof(TEntity), "entity");
-        var selector = Expression.Lambda(Expression.Property(parameter, property), parameter);
+        // AvailableQuantity is an unmapped computed domain property; translate its arithmetic to SQL.
+        Expression body = typeof(TEntity) == typeof(OAS.Domain.Entities.Inventory.InventoryBalance)
+            && property.Name == nameof(OAS.Domain.Entities.Inventory.InventoryBalance.AvailableQuantity)
+            ? Expression.Subtract(Expression.Property(parameter, nameof(OAS.Domain.Entities.Inventory.InventoryBalance.OnHandQuantity)),
+                Expression.Property(parameter, nameof(OAS.Domain.Entities.Inventory.InventoryBalance.ReservedQuantity)))
+            : Expression.Property(parameter, property);
+        var selector = Expression.Lambda(body, parameter);
         var methodName = first
             ? (direction == OAS.Contracts.Common.Pagination.SortDirection.Descending ? nameof(Queryable.OrderByDescending) : nameof(Queryable.OrderBy))
             : (direction == OAS.Contracts.Common.Pagination.SortDirection.Descending ? nameof(Queryable.ThenByDescending) : nameof(Queryable.ThenBy));

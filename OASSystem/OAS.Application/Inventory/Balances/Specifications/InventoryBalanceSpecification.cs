@@ -29,6 +29,7 @@ public static class InventoryBalanceSpecification
 
         var sortBy = ResolveSortProperty(normalized.SortBy);
         specification.AddSort(sortBy, normalized.SortDirection);
+        specification.AddSort(nameof(InventoryBalance.Id), SortDirection.Ascending);
 
         specification.ApplyPaging(
             (normalized.PageNumber - 1) * normalized.PageSize,
@@ -46,7 +47,7 @@ public static class InventoryBalanceSpecification
         {
             "onhand" => nameof(InventoryBalance.OnHandQuantity),
             "onhandquantity" => nameof(InventoryBalance.OnHandQuantity),
-            "available" => nameof(InventoryBalance.OnHandQuantity),
+            "available" or "availablequantity" => nameof(InventoryBalance.AvailableQuantity),
             "averageunitcost" => nameof(InventoryBalance.AverageUnitCost),
             "inventoryvalue" => nameof(InventoryBalance.InventoryValue),
             "lastmovement" => nameof(InventoryBalance.LastMovementAtUtc),

@@ -50,10 +50,10 @@ public sealed class InventoryPostingService(
         }
         else if (movementType == InventoryMovementType.Out)
         {
-            if (balance is null || balance.AvailableQuantity < quantity)
+            if (balance is null || balance.AvailableQuantity < quantity || balance.OnHandQuantity < quantity)
             {
                 var available = balance?.AvailableQuantity ?? 0;
-                throw new ConflictException("insufficient_stock", $"Insufficient available stock. Available: {available}, Required: {quantity}");
+                throw new ConflictException("insufficient_stock", $"الكمية المتاحة في المخزن غير كافية. المتاح: {available:0.###}، المطلوب: {quantity:0.###}.");
             }
 
             appliedUnitCost = balance.AverageUnitCost;

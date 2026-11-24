@@ -17,7 +17,8 @@ public sealed class PostInventoryTransactionCommandHandler(
     IReadRepository<ProductVariant, Guid> variantRepository,
     IReadRepository<Product, Guid> productRepository,
     ICurrentUser currentUser,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IRepository<InventoryTransactionLine, Guid> lineRepository)
     : IRequestHandler<PostInventoryTransactionCommand, Guid>
 {
     public async Task<Guid> Handle(
@@ -96,7 +97,7 @@ public sealed class PostInventoryTransactionCommandHandler(
                         throw new ConflictException("source_warehouse_required", "Source warehouse is required for outbound transactions.");
                     await EnsureWarehouseActiveAsync(warehouseId.Value, cancellationToken);
 
-                    await postingService.PostMovementAsync(
+                    var (_, outgoingLedger) = await postingService.PostMovementAsync(
                         warehouseId.Value,
                         line.ProductVariantId,
                         InventoryMovementType.Out,
@@ -107,6 +108,7 @@ public sealed class PostInventoryTransactionCommandHandler(
                         transaction.TransactionDate,
                         userId,
                         cancellationToken);
+                    ApplyPostedCost(line, outgoingLedger.UnitCost);
                     break;
                 }
 
@@ -132,6 +134,7 @@ public sealed class PostInventoryTransactionCommandHandler(
                         cancellationToken);
 
                     var transferCost = outgoingLedger.UnitCost;
+                    ApplyPostedCost(line, transferCost);
 
                     await postingService.PostMovementAsync(
                         transaction.DestinationWarehouseId.Value,
@@ -156,6 +159,14 @@ public sealed class PostInventoryTransactionCommandHandler(
         transactionRepository.Update(transaction);
 
         return transaction.Id;
+    }
+
+    private void ApplyPostedCost(InventoryTransactionLine line, decimal unitCost)
+    {
+        if (unitCost > 0m && line.Quantity > 9999999999999999.99m / unitCost)
+            throw new ConflictException("line_total_cost_precision_invalid", "إجمالي تكلفة البند أكبر من الحد المسموح به.");
+        line.ApplyPostedUnitCost(unitCost);
+        lineRepository.Update(line);
     }
 
     private async Task EnsureWarehouseActiveAsync(Guid warehouseId, CancellationToken cancellationToken)

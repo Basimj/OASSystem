@@ -69,13 +69,14 @@ public sealed class InventoryTransactionTests
     [Test]
     public async Task CreateTransaction_GeneratesTransactionAndLines()
     {
+        await _balanceRepository.AddAsync(new InventoryBalance(_warehouseAId, _variantId, 30m, averageUnitCost: 40m));
         var handler = new CreateInventoryTransactionCommandHandler(
             _transactionRepository,
             _lineRepository,
             _warehouseRepository,
             _variantRepository,
             _productRepository,
-            _sequenceGenerator);
+            _sequenceGenerator, _balanceRepository);
 
         var request = new CreateInventoryTransactionRequest(
             TransactionNumber: "TXN-TEST-01",
@@ -106,7 +107,8 @@ public sealed class InventoryTransactionTests
         Assert.That(lines.Count, Is.EqualTo(1));
         Assert.That(lines[0].ProductVariantId, Is.EqualTo(_variantId));
         Assert.That(lines[0].Quantity, Is.EqualTo(20));
-        Assert.That(lines[0].UnitCost, Is.EqualTo(25m));
+        Assert.That(lines[0].UnitCost, Is.EqualTo(40m));
+        Assert.That(lines[0].TotalCost, Is.EqualTo(800m));
     }
 
 
@@ -225,7 +227,7 @@ public sealed class InventoryTransactionTests
 
     private PostInventoryTransactionCommandHandler PostTransactionHandler() => new(
         _transactionRepository, _postingService, _warehouseRepository,
-        _variantRepository, _productRepository, _currentUser, TimeProvider.System);
+        _variantRepository, _productRepository, _currentUser, TimeProvider.System, _lineRepository);
 
     [Test]
     public async Task PostTransaction_OutboundIssue_DecreasesBalanceAndCreatesLedger()
@@ -243,7 +245,7 @@ public sealed class InventoryTransactionTests
             destinationWarehouseId: null);
         await _transactionRepository.AddAsync(txn);
 
-        var line = new InventoryTransactionLine(txn.Id, _variantId, 10, 40m);
+        var line = new InventoryTransactionLine(txn.Id, _variantId, 10, 25m);
         _lineRepository.Items.Add(line);
 
         var postHandler = new PostInventoryTransactionCommandHandler(
@@ -253,7 +255,7 @@ public sealed class InventoryTransactionTests
             _variantRepository,
             _productRepository,
             _currentUser,
-            TimeProvider.System);
+            TimeProvider.System, _lineRepository);
 
         await postHandler.Handle(new PostInventoryTransactionCommand(txn.Id), CancellationToken.None);
 
@@ -267,6 +269,8 @@ public sealed class InventoryTransactionTests
         Assert.That(ledger.MovementType, Is.EqualTo(InventoryMovementType.Out));
         Assert.That(ledger.QuantityOut, Is.EqualTo(10));
         Assert.That(ledger.BalanceAfter, Is.EqualTo(20));
+        Assert.That(line.UnitCost, Is.EqualTo(40m));
+        Assert.That(line.TotalCost, Is.EqualTo(400m));
     }
 
     [Test]
@@ -295,7 +299,7 @@ public sealed class InventoryTransactionTests
             _variantRepository,
             _productRepository,
             _currentUser,
-            TimeProvider.System);
+            TimeProvider.System, _lineRepository);
 
         await postHandler.Handle(new PostInventoryTransactionCommand(txn.Id), CancellationToken.None);
 
@@ -332,7 +336,7 @@ public sealed class InventoryTransactionTests
             _variantRepository,
             _productRepository,
             _currentUser,
-            TimeProvider.System);
+            TimeProvider.System, _lineRepository);
 
         var ex = Assert.ThrowsAsync<ConflictException>(() =>
             postHandler.Handle(new PostInventoryTransactionCommand(txn.Id), CancellationToken.None));
@@ -364,11 +368,49 @@ public sealed class InventoryTransactionTests
             _variantRepository,
             _productRepository,
             _currentUser,
-            TimeProvider.System);
+            TimeProvider.System, _lineRepository);
 
         var ex = Assert.ThrowsAsync<ConflictException>(() =>
             postHandler.Handle(new PostInventoryTransactionCommand(txn.Id), CancellationToken.None));
         Assert.That(ex!.Code, Is.EqualTo("insufficient_stock"));
+    }
+
+    [TestCase(ContractType.Issue)]
+    [TestCase(ContractType.Transfer)]
+    [TestCase(ContractType.AdjustmentDecrease)]
+    [TestCase(ContractType.Scrap)]
+    [TestCase(ContractType.PurchaseReturn)]
+    public async Task CreateTransaction_ReservedStock_IsRejectedBeforeSaving(ContractType type)
+    {
+        await _balanceRepository.AddAsync(new InventoryBalance(_warehouseAId, _variantId, 20m, 20m, averageUnitCost: 40m));
+        var request = CreateIssueRequest() with { TransactionType = type, DestinationWarehouseId = type == ContractType.Transfer ? _warehouseBId : null, Reason = "test" };
+        var ex = Assert.ThrowsAsync<ConflictException>(() => CreateTransactionHandler().Handle(new CreateInventoryTransactionCommand(request), CancellationToken.None));
+        Assert.That(ex!.Code, Is.EqualTo("insufficient_stock"));
+        Assert.That(_transactionItems, Is.Empty);
+        Assert.That(_lineItems, Is.Empty);
+    }
+
+    [Test]
+    public async Task CreateTransaction_StockInOtherWarehouse_IsRejected()
+    {
+        await _balanceRepository.AddAsync(new InventoryBalance(_warehouseBId, _variantId, 50m, averageUnitCost: 40m));
+        var ex = Assert.ThrowsAsync<ConflictException>(() => CreateTransactionHandler().Handle(new CreateInventoryTransactionCommand(CreateIssueRequest()), CancellationToken.None));
+        Assert.That(ex!.Code, Is.EqualTo("insufficient_stock"));
+        Assert.That(_transactionItems, Is.Empty);
+    }
+
+    [Test]
+    public async Task CreateThenPost_StockReservedAfterSaving_IsRejected()
+    {
+        var balance = new InventoryBalance(_warehouseAId, _variantId, 1m, averageUnitCost: 40m);
+        await _balanceRepository.AddAsync(balance);
+        var txnId = await CreateTransactionHandler().Handle(new CreateInventoryTransactionCommand(CreateIssueRequest()), CancellationToken.None);
+        balance.Reserve(1m);
+        var ex = Assert.ThrowsAsync<ConflictException>(() => PostTransactionHandler().Handle(new PostInventoryTransactionCommand(txnId), CancellationToken.None));
+        Assert.That(ex!.Code, Is.EqualTo("insufficient_stock"));
+        Assert.That(_transactionItems.Single().Status, Is.EqualTo(InventoryTransactionStatus.Draft));
+        Assert.That(_ledgerRepository.Items, Is.Empty);
+        Assert.That(balance.OnHandQuantity, Is.EqualTo(1m));
     }
 
     private CreateInventoryTransactionCommandHandler CreateTransactionHandler() => new(
@@ -377,7 +419,7 @@ public sealed class InventoryTransactionTests
         _warehouseRepository,
         _variantRepository,
         _productRepository,
-        _sequenceGenerator);
+        _sequenceGenerator, _balanceRepository);
 
     private CreateInventoryTransactionRequest CreateIssueRequest() => new(
         TransactionNumber: null,

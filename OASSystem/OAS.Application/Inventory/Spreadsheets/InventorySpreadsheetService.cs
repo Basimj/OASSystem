@@ -4,7 +4,8 @@ using OAS.Application.Abstractions.Security;
 using OAS.Application.Common.Exceptions;
 using OAS.Application.CRUD.Abstractions;
 using OAS.Application.Inventory.Authorization;
-using OAS.Application.Inventory.Balances.Services;
+using OAS.Application.Inventory.Balances.Workspace;
+using MediatR;
 using OAS.Application.Inventory.Ledger.Services;
 using OAS.Application.Inventory.StockCounts.Services;
 using OAS.Application.Inventory.Transactions.Services;
@@ -60,6 +61,11 @@ public sealed partial class InventorySpreadsheetService(
 
         await AuthorizeAsync(section, cancellationToken);
 
+        // Keep the legacy balances export route aligned with the workspace rules.
+        if (section == "balances")
+            return await services.GetRequiredService<ISender>().Send(new ExportBalanceWorkspaceQuery(request,
+                new InventoryBalanceFilters { WarehouseId = warehouseId, ProductVariantId = productVariantId }), cancellationToken);
+
         var tables = section switch
         {
             "product-categories" => await ExportCategoriesAsync(request, cancellationToken),
@@ -69,7 +75,6 @@ public sealed partial class InventorySpreadsheetService(
             "products" => await ExportProductsAsync(request, cancellationToken),
             "product-variants" => await ExportVariantsAsync(request, cancellationToken),
             "warehouses" => await ExportWarehousesAsync(request, cancellationToken),
-            "balances" => await ExportBalancesAsync(request, warehouseId, productVariantId, cancellationToken),
             "transactions" => await ExportTransactionsAsync(request, warehouseId, transactionType, transactionStatus, fromDate, toDate, cancellationToken),
             "ledger" => await ExportLedgerAsync(request, warehouseId, productVariantId, transactionId, movementType, fromDate, toDate, cancellationToken),
             "stock-counts" => await ExportStockCountsAsync(request, warehouseId, stockCountStatus, cancellationToken),
@@ -280,66 +285,6 @@ public sealed partial class InventorySpreadsheetService(
             items.Select(x => Row(
                 ("الكود", x.Code), ("الاسم", x.Name), ("الوصف", x.Description),
                 ("المخزن الافتراضي", YesNo(x.IsDefault)), ("الحالة", Active(x.IsActive)))))];
-    }
-
-    private async Task<IReadOnlyList<SpreadsheetTable>> ExportBalancesAsync(
-        PageRequest request, Guid? warehouseId, Guid? productVariantId, CancellationToken ct)
-    {
-        var service = services.GetRequiredService<IInventoryBalanceService>();
-        var sourceRequest = request with { Search = null };
-        var items = await ReadAllAsync(p => service.GetPageAsync(p, warehouseId, productVariantId, ct), sourceRequest);
-        var products = await ProductsAsync(new PageRequest(), ct);
-        var variants = await VariantsAsync(new PageRequest(), ct);
-        var warehouses = await WarehousesAsync(new PageRequest(), ct);
-        var productMap = products.ToDictionary(x => x.Id);
-        var variantMap = variants.ToDictionary(x => x.Id);
-        var warehouseMap = warehouses.ToDictionary(x => x.Id);
-
-        // Match the selected-warehouse screen, including active stock variants that
-        // have never moved. These DTOs are display-only; no balance rows are inserted.
-        if (warehouseId.HasValue)
-        {
-            var balancesByVariant = items.ToDictionary(x => x.ProductVariantId);
-            items = variants
-                .Where(x => x.IsActive && (!productVariantId.HasValue || x.Id == productVariantId.Value) &&
-                    productMap.TryGetValue(x.ProductId, out var product) && product.IsActive && product.IsStockItem)
-                .Select(x => balancesByVariant.GetValueOrDefault(x.Id) ?? new InventoryBalanceDto(
-                    Guid.Empty, warehouseId.Value, x.Id, 0m, 0m, 0m, 0m, 0m, 0m, null))
-                .ToArray();
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.Search))
-        {
-            var term = request.Search.Trim();
-            items = items.Where(x =>
-            {
-                variantMap.TryGetValue(x.ProductVariantId, out var variant);
-                ProductDto? product = variant is null ? null : productMap.GetValueOrDefault(variant.ProductId);
-                var warehouse = warehouseMap.GetValueOrDefault(x.WarehouseId);
-                return Match(term, variant?.SKU, variant?.Barcode, variant?.VariantName, product?.ProductCode, product?.Name, warehouse?.Name);
-            }).ToArray();
-        }
-
-        return [Table("أرصدة المخزون",
-            [Text("المنتج"), Text("الصنف"), Text("رمز SKU"), Text("الباركود"), Text("المخزن"), Number("المتوفر فعليًا"), Number("المحجوز"), Number("المتاح"), Number("قيد الطلب"), Number("متوسط التكلفة"), Number("قيمة المخزون"), Text("آخر حركة")],
-            items.Select(x =>
-            {
-                variantMap.TryGetValue(x.ProductVariantId, out var variant);
-                var product = variant is null ? null : productMap.GetValueOrDefault(variant.ProductId);
-                return Row(
-                    ("المنتج", product is null ? null : $"{product.ProductCode} - {product.Name}"),
-                    ("الصنف", variant?.VariantName),
-                    ("رمز SKU", variant?.SKU),
-                    ("الباركود", variant?.Barcode),
-                    ("المخزن", warehouseMap.GetValueOrDefault(x.WarehouseId)?.Name),
-                    ("المتوفر فعليًا", F(x.OnHandQuantity)),
-                    ("المحجوز", F(x.ReservedQuantity)),
-                    ("المتاح", F(x.AvailableQuantity)),
-                    ("قيد الطلب", F(x.OnOrderQuantity)),
-                    ("متوسط التكلفة", F(x.AverageUnitCost)),
-                    ("قيمة المخزون", F(x.InventoryValue)),
-                    ("آخر حركة", DateTimeText(x.LastMovementAtUtc)));
-            }))];
     }
 
     private async Task<IReadOnlyList<SpreadsheetTable>> ExportTransactionsAsync(

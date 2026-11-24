@@ -2,12 +2,8 @@
 @page "/inventory/balances"
 @attribute [Authorize]
 @using OAS.Client.Inventory.Common
-@using OAS.Client.Inventory.Services
 @using OAS.Client.Services.Browser
-@using OAS.Contracts.Inventory.Products
 @using OAS.Contracts.Inventory.Stock
-@using OAS.Contracts.Inventory.Warehouses
-
 @using OAS.UiLib.Components.Spreadsheets
 <PageTitle>أرصدة المخزون | OAS</PageTitle>
 <span class="oas-inventory-view" hidden aria-hidden="true"></span>
@@ -15,69 +11,108 @@
 <UiWorkspaceLayout ShowAside="false" ShowFilters="true">
     <Actions>
         <UiWorkspaceActionBar>
-            <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary"
-                      Size="ControlSize.Small" Loading="@(_loading || _loadingBalances)" OnClick="RefreshAsync" />
-            <UiSpreadsheetActions CanImport="false" Busy="@(_exporting || _loading || _loadingBalances || _balanceLoadFailed)" OnExport="ExportAsync" />
-            <UiSearchInput @bind-Value="_search" Placeholder="ابحث بالمنتج أو رمز الصنف أو الباركود..."
-                           AriaLabel="البحث في أرصدة المخزون" ClearText="مسح البحث"
-                           DebounceMilliseconds="250" OnSearch="SearchChangedAsync" />
+            <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Loading="@_loading" OnClick="@(_ => LoadAsync())" />
+            <UiSpreadsheetActions CanImport="false" Busy="@(_exporting || _loading || _failed)" OnExport="ExportAsync" />
+            <UiSearchInput @bind-Value="_search" Placeholder="ابحث بالمنتج أو رمز الصنف أو الباركود..." AriaLabel="البحث في أرصدة المخزون" ClearText="مسح البحث" DebounceMilliseconds="250" OnSearch="SearchChangedAsync" />
         </UiWorkspaceActionBar>
     </Actions>
-
     <Filters>
         <div class="inventory-balance__filters">
-            <UiSearchableSelect Value="@(_warehouseFilter ?? string.Empty)"
-                      ValueExpression="@(() => _warehouseFilter)"
-                      ValueChanged="OnWarehouseChangedAsync"
-                      Label="المخزن"
-                      Options="@WarehouseFilterOptions"
-                      Placeholder="اختر مخزنًا..." Required="true"
-                      Size="ControlSize.Small" />
+            <label>المخزن
+                <select value="@_warehouse" @onchange="WarehouseChanged"><option value="">جميع المخازن</option>@foreach (var item in Lookups.Warehouses) { <option value="@item.Id">@item.Name</option> }</select>
+            </label>
+            <label>نوع المنتج
+                <select value="@_type" @onchange="TypeChanged"><option value="">جميع الأنواع</option>@foreach (var item in Lookups.Types) { <option value="@item.Id">@item.Name</option> }</select>
+            </label>
+            <label>التصنيف
+                <select value="@_category" @onchange="CategoryChanged"><option value="">جميع التصنيفات</option>@foreach (var item in Lookups.Categories.Where(x => string.IsNullOrEmpty(_type) || x.ParentId == Parse(_type))) { <option value="@item.Id">@item.Name</option> }</select>
+            </label>
+            <label>العلامة التجارية
+                <select value="@_brand" @onchange="BrandChanged"><option value="">جميع العلامات</option>@foreach (var item in Lookups.Brands) { <option value="@item.Id">@item.Name</option> }</select>
+            </label>
+            <label>المنتج (الاسم أو الرمز)
+                <input type="search" value="@_productSearch" @onchange="ProductChanged" placeholder="اسم المنتج أو رمزه" />
+            </label>
+            <label>حالة الرصيد
+                <select value="@_balanceStatus" @onchange="BalanceChanged"><option value="">الكل</option><option value="available">متوفر</option><option value="zero">نافد (الرصيد الفعلي صفر)</option><option value="reserved">محجوز بالكامل</option></select>
+            </label>
+            <label>حالة الشراء
+                <select value="@_purchaseStatus" @onchange="PurchaseChanged"><option value="">الكل</option><option value="ordered">قيد الطلب</option><option value="notordered">غير مطلوب</option></select>
+            </label>
+            <label>حالة الصنف
+                <select value="@_activityStatus" @onchange="ActivityChanged"><option value="">الكل</option><option value="active">نشط</option><option value="inactive">غير نشط (له رصيد)</option></select>
+            </label>
+            <button type="button" class="balance-reset" @onclick="ResetAsync">إعادة تعيين الفلاتر</button>
         </div>
     </Filters>
-
     <Content>
-        <UiDataGridPanel Title="أرصدة المخزون" Subtitle="@($"{FilteredBalances.Count} صنف")">
+        <UiDataGridPanel Title="أرصدة المخزون" Subtitle="@(_result is null || _loading || _failed ? "" : $"{_result.Summary.RowCount} رصيد")">
             <Body>
-                @if (_loading || _loadingBalances)
+                @if (_loading)
                 {
                     <UiAlert Message="جاري تحميل أرصدة المخزون..." />
                 }
-                else if (!Guid.TryParse(_warehouseFilter, out _))
+                else if (_failed || _result is null)
                 {
-                    <UiAlert Message="اختر مخزنًا لعرض جميع الأصناف المخزنية وأرصدتها، بما فيها الأرصدة الصفرية." />
-                }
-                else if (_balanceLoadFailed)
-                {
-                    <UiAlert Message="تعذر تحميل أرصدة المخزن. اضغط تحديث لإعادة المحاولة." />
+                    <UiAlert Message="تعذر تحميل أرصدة المخزون. اضغط تحديث لإعادة المحاولة." />
                 }
                 else
                 {
-                    <UiDataTable TItem="InventoryDisplayRow" Items="@FilteredBalances" PageSize="12" Headers="@BalanceHeaders" EmptyText="لا توجد أصناف مخزنية مطابقة للفلتر الحالي."
-                                 SidebarTypography="true"
-                                 UniformCellTypography="true" Compact="true" FitToContainer="true">
-                        <RowTemplate Context="row">
-                            <td>@row.Product.Name<br /><UiTextLabel Text="@row.Product.ProductCode" Size="ControlSize.Small" Tone="TextTone.Muted" /></td>
-                            <td>@(row.Variant.VariantName ?? "—")<br /><UiTextLabel Text="@VariantIdentity(row.Variant)" Size="ControlSize.Small" Tone="TextTone.Muted" /></td>
-                            <td>@WarehouseName(row.WarehouseId)</td>
-                            <td>@InventoryDisplayFormat.Number(row.OnHandQuantity)</td>
-                            <td>@InventoryDisplayFormat.Number(row.ReservedQuantity)</td>
-                            <td>@InventoryDisplayFormat.Number(row.AvailableQuantity)</td>
-                            <td>@InventoryDisplayFormat.Number(row.OnOrderQuantity)</td>
-                            <td>@InventoryDisplayFormat.Number(row.AverageUnitCost)</td>
-                            <td>@InventoryDisplayFormat.Number(row.InventoryValue)</td>
-                            <td>
-                                <div class="inventory-balance__actions">
-                                    <UiButton IconCssClass="fa-solid fa-box" Variant="ButtonVariant.Ghost" Size="ControlSize.Small"
-                                              title="فتح الصنف" aria-label="فتح الصنف"
-                                              OnClick="@(_ => OpenProduct(row.Variant.Id))" />
-                                    <UiButton IconCssClass="fa-solid fa-list" Variant="ButtonVariant.Ghost" Size="ControlSize.Small"
-                                              title="فتح الحركات" aria-label="فتح الحركات"
-                                              OnClick="@(_ => OpenMovements(row.Variant.Id))" />
-                                </div>
-                            </td>
-                        </RowTemplate>
-                    </UiDataTable>
+                    <div class="balance-workspace" dir="rtl">
+                        <div class="balance-summary">
+                            <div><span>عدد الأصناف</span><strong>@_result.Summary.VariantCount</strong></div>
+                            <div><span>عدد سجلات العرض</span><strong>@_result.Summary.RowCount</strong></div>
+                            <div><span>قيمة المخزون (@Currency)</span><strong>@N(_result.Summary.InventoryValue)</strong></div>
+                            <div><span>العملة الأساسية</span><strong>@(_result.CurrencyName ?? "غير محددة")</strong></div>
+                        </div>
+                        <div class="balance-table-wrap">
+                            <table class="balance-table">
+                                <thead><tr>
+                                    @foreach (var header in Headers)
+                                    {
+                                        <th scope="col" aria-sort="@(header.Key == _sort ? (_direction == SortDirection.Ascending ? "ascending" : "descending") : "none")">
+                                            @if (header.Key == "actions") { <span>@header.Label</span> }
+                                            else { <button type="button" @onclick="() => SortAsync(header.Key)">@header.Label <span aria-hidden="true">@(header.Key == _sort ? (_direction == SortDirection.Ascending ? "↑" : "↓") : "↕")</span></button> }
+                                        </th>
+                                    }
+                                </tr></thead>
+                                <tbody>
+                                    @if (_result.Page.Items.Count == 0)
+                                    { <tr><td colspan="@Headers.Count" class="balance-empty">لا توجد أرصدة مطابقة للفلاتر.</td></tr> }
+                                    @foreach (var row in _result.Page.Items)
+                                    {
+                                        <tr @key="(row.WarehouseId, row.VariantId)">
+                                            <td>@row.ProductName<small>@row.ProductCode</small></td>
+                                            <td>@(row.VariantName ?? "—")<small>@row.SKU · @(row.Barcode ?? "—")</small>@if (!row.IsActive) { <small class="balance-inactive">غير نشط</small> }</td>
+                                            @if (AllWarehouses) { <td>@row.WarehouseName @if (!row.WarehouseActive) { <small class="balance-inactive">غير نشط</small> }</td> }
+                                            <td>@(row.UnitName ?? "—")</td>
+                                            <td class="balance-num">@N(row.OnHand)</td><td class="balance-num">@N(row.Reserved)</td>
+                                            <td class="balance-num @(row.Available <= 0 ? "balance-inactive" : "balance-available")">@N(row.Available)</td>
+                                            <td class="balance-num">@N(row.OnOrder)</td><td class="balance-num">@N(row.AverageCost)</td><td class="balance-num">@N(row.Value)</td>
+                                            <td class="balance-date">@InventoryDisplayFormat.DateTime(row.LastMovement?.ToLocalTime())</td>
+                                            <td><div class="inventory-balance__actions">
+                                                <UiButton IconCssClass="fa-solid fa-box" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" title="فتح المنتج" aria-label="فتح المنتج" OnClick="@(_ => OpenProduct(row))" />
+                                                <UiButton IconCssClass="fa-solid fa-list" Variant="ButtonVariant.Ghost" Size="ControlSize.Small" title="فتح حركات الصنف في المخزن" aria-label="فتح حركات الصنف في المخزن" OnClick="@(_ => OpenMovements(row))" />
+                                            </div></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                                <tfoot><tr><td colspan="@(AllWarehouses ? 8 : 7)">إجمالي قيمة المخزون لجميع النتائج</td><td colspan="1">—</td><td class="balance-num">@N(_result.Summary.InventoryValue)</td><td colspan="2"></td></tr></tfoot>
+                            </table>
+                        </div>
+                        <nav class="balance-pager" aria-label="التنقل بين صفحات الأرصدة">
+                            <button type="button" disabled="@(!_result.Page.HasPreviousPage)" @onclick="() => GoPageAsync(-1)">السابق</button>
+                            <span>صفحة @_result.Page.PageNumber من @Math.Max(1, _result.Page.TotalPages)</span>
+                            <button type="button" disabled="@(!_result.Page.HasNextPage)" @onclick="() => GoPageAsync(1)">التالي</button>
+                            <label>عدد الصفوف <select value="@_pageSize" @onchange="PageSizeChanged"><option value="12">12</option><option value="25">25</option><option value="50">50</option></select></label>
+                        </nav>
+                        <details class="balance-unit-totals">
+                            <summary>إجماليات الكميات حسب وحدة القياس (جميع النتائج المطابقة)</summary>
+                            <table class="balance-table"><thead><tr><th>الوحدة</th><th>الفعلي</th><th>المحجوز</th><th>المتاح</th><th>قيد الطلب</th></tr></thead><tbody>
+                                @foreach (var total in _result.Summary.Units) { <tr><td>@(total.UnitName ?? "غير محددة")</td><td>@N(total.OnHand)</td><td>@N(total.Reserved)</td><td>@N(total.Available)</td><td>@N(total.OnOrder)</td></tr> }
+                            </tbody></table>
+                        </details>
+                    </div>
                 }
             </Body>
         </UiDataGridPanel>
@@ -85,210 +120,67 @@
 </UiWorkspaceLayout>
 
 @code {
-    [Inject] private IInventoryClientService Inventory { get; set; } = default!;
-    [Inject] private InventorySpreadsheetClient SpreadsheetClient { get; set; } = default!;
+    [Inject] private OasApiClient Api { get; set; } = default!;
     [Inject] private BrowserFileDownloadService SpreadsheetDownload { get; set; } = default!;
     [Inject] private IApiFeedbackService ApiFeedback { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
-
-    private bool _loading = true;
-    private bool _exporting;
-    private bool _loadingBalances;
-    private bool _balanceLoadFailed;
-    private int _balanceLoadVersion;
-    private string? _search;
-    private string? _warehouseFilter;
-    private IReadOnlyList<InventoryBalanceDto> _balances = [];
-    private static readonly IReadOnlyList<string> BalanceHeaders = ["المنتج", "الصنف / الرمز / الباركود", "المخزن", "الكمية الفعلية", "المحجوز", "المتاح", "قيد الطلب", "متوسط التكلفة", "القيمة", "إجراءات"];
-    private IReadOnlyList<WarehouseDto> _warehouses = [];
-    private IReadOnlyList<ProductDto> _products = [];
-    private IReadOnlyList<ProductVariantDto> _variants = [];
-
-    private IReadOnlyList<UiSelectOption> WarehouseFilterOptions =>
-        _warehouses.Where(x => x.IsActive)
-            .OrderByDescending(x => x.IsDefault)
-            .ThenBy(x => x.Name)
-            .Select(x => new UiSelectOption(x.Id.ToString("D"), x.IsDefault ? $"{x.Name} (افتراضي)" : x.Name))
-            .ToArray();
-
-    private sealed record InventoryDisplayRow(Guid WarehouseId, ProductDto Product, ProductVariantDto Variant, InventoryBalanceDto? Balance)
+    private InventoryBalanceWorkspaceDto? _result;
+    private static readonly BalanceWorkspaceLookups EmptyLookups = new([], [], [], []);
+    private BalanceWorkspaceLookups Lookups => _result?.Lookups ?? EmptyLookups;
+    private bool _loading = true, _exporting, _failed;
+    private int _version, _page = 1, _pageSize = 12;
+    private string? _search, _productSearch;
+    private string _warehouse = "", _type = "", _category = "", _brand = "", _balanceStatus = "", _purchaseStatus = "", _activityStatus = "";
+    private string _sort = "product";
+    private SortDirection _direction = SortDirection.Ascending;
+    private bool AllWarehouses => string.IsNullOrEmpty(_warehouse);
+    private string Currency => _result?.CurrencyCode ?? "غير محددة";
+    private IReadOnlyList<(string Key, string Label)> Headers => [ ("product", "المنتج"), ("sku", "الصنف / الرمز / الباركود"), .. (AllWarehouses ? new[] { ("warehouse", "المخزن") } : Array.Empty<(string,string)>()), ("unit", "الوحدة"), ("onhand", "الفعلي"), ("reserved", "المحجوز"), ("available", "المتاح"), ("onorder", "قيد الطلب"), ("cost", $"متوسط التكلفة ({Currency})"), ("value", $"القيمة ({Currency})"), ("lastmovement", "آخر حركة"), ("actions", "إجراءات") ];
+    private static Guid? Parse(string? value) => Guid.TryParse(value, out var id) ? id : null;
+    private static string N(decimal value) => InventoryDisplayFormat.Number(value);
+    private static string V(ChangeEventArgs e) => e.Value?.ToString() ?? "";
+    private string Url(bool export = false)
     {
-        public decimal OnHandQuantity => Balance?.OnHandQuantity ?? 0m;
-        public decimal ReservedQuantity => Balance?.ReservedQuantity ?? 0m;
-        public decimal OnOrderQuantity => Balance?.OnOrderQuantity ?? 0m;
-        public decimal AvailableQuantity => Balance?.AvailableQuantity ?? 0m;
-        public decimal AverageUnitCost => Balance?.AverageUnitCost ?? 0m;
-        public decimal InventoryValue => Balance?.InventoryValue ?? 0m;
+        var parameters = new Dictionary<string,string?> { ["pageNumber"] = _page.ToString(), ["pageSize"] = _pageSize.ToString(), ["sortBy"] = _sort, ["sortDirection"] = _direction.ToString(), ["search"] = _search, ["warehouseId"] = _warehouse, ["productTypeId"] = _type, ["categoryId"] = _category, ["brandId"] = _brand, ["productSearch"] = _productSearch, ["balanceStatus"] = _balanceStatus, ["purchaseStatus"] = _purchaseStatus, ["activityStatus"] = _activityStatus };
+        return "api/inventory/balances/workspace" + (export ? "/export" : "") + "?" + string.Join("&", parameters.Where(p => !string.IsNullOrWhiteSpace(p.Value)).Select(p => $"{p.Key}={Uri.EscapeDataString(p.Value!)}"));
     }
-
-    private IReadOnlyList<InventoryDisplayRow> FilteredBalances
-    {
-        get
-        {
-            if (!Guid.TryParse(_warehouseFilter, out var warehouseId))
-                return [];
-
-            var balances = _balances
-                .Where(x => x.WarehouseId == warehouseId)
-                .ToDictionary(x => x.ProductVariantId);
-            var products = _products
-                .Where(x => x.IsActive && x.IsStockItem)
-                .ToDictionary(x => x.Id);
-
-            return _variants
-                .Where(x => x.IsActive && products.ContainsKey(x.ProductId))
-                .Select(variant => new InventoryDisplayRow(
-                    warehouseId,
-                    products[variant.ProductId],
-                    variant,
-                    balances.GetValueOrDefault(variant.Id)))
-                .Where(row =>
-                {
-                    if (string.IsNullOrWhiteSpace(_search)) return true;
-                    var term = _search.Trim();
-                    return new[] { row.Variant.SKU, row.Variant.Barcode, row.Variant.VariantName, row.Product.ProductCode, row.Product.Name }
-                        .Any(x => x?.Contains(term, StringComparison.CurrentCultureIgnoreCase) == true);
-                })
-                .OrderBy(x => x.Product.Name)
-                .ThenBy(x => x.Variant.SKU)
-                .ToArray();
-        }
-    }
-
-    protected override async Task OnInitializedAsync() => await LoadAsync();
-
+    protected override Task OnInitializedAsync() => LoadAsync();
     private async Task LoadAsync()
     {
-        _loading = true;
-        _balances = [];
-        _balanceLoadFailed = false;
+        var version = ++_version;
+        _loading = true; _failed = false;
         try
         {
-            var warehousesTask = LoadAllPagesAsync(page => Inventory.GetWarehousesAsync(page));
-            var productsTask = LoadAllPagesAsync(page => Inventory.GetProductsAsync(page));
-            var variantsTask = LoadAllPagesAsync(page => Inventory.GetProductVariantsAsync(page));
-
-            await Task.WhenAll(warehousesTask, productsTask, variantsTask);
-
-            _warehouses = warehousesTask.Result;
-            _products = productsTask.Result;
-            _variants = variantsTask.Result;
-
-            if (!Guid.TryParse(_warehouseFilter, out var selectedWarehouseId) || !_warehouses.Any(x => x.Id == selectedWarehouseId && x.IsActive))
-                _warehouseFilter = _warehouses.FirstOrDefault(x => x.IsActive && x.IsDefault)?.Id.ToString("D")
-                    ?? (_warehouses.Count(x => x.IsActive) == 1 ? _warehouses.First(x => x.IsActive).Id.ToString("D") : null);
-
-            await LoadBalancesForSelectedWarehouseAsync();
+            var result = await Api.GetAsync<InventoryBalanceWorkspaceDto>(Url());
+            if (version != _version) return;
+            _result = result ?? throw new InvalidOperationException("Empty balance response.");
+            _page = _result.Page.PageNumber;
         }
-        catch (ApiClientException ex)
-        {
-            _balanceLoadFailed = true;
-            ApiFeedback.Show(ex.Error);
-        }
-        catch (Exception)
-        {
-            _balanceLoadFailed = true;
-            ApiFeedback.ShowUnexpected();
-        }
-        finally
-        {
-            _loading = false;
-        }
+        catch (ApiClientException ex) { if (version == _version) { _failed = true; ApiFeedback.Show(ex.Error); } }
+        catch (Exception) { if (version == _version) { _failed = true; ApiFeedback.ShowUnexpected(); } }
+        finally { if (version == _version) _loading = false; }
     }
-
-    private static async Task<IReadOnlyList<T>> LoadAllPagesAsync<T>(Func<PageRequest, Task<PagedResult<T>>> loader)
-    {
-        var items = new List<T>();
-        var pageNumber = 1;
-
-        while (true)
-        {
-            var result = await loader(new PageRequest
-            {
-                PageNumber = pageNumber,
-                PageSize = PageRequest.MaximumPageSize
-            });
-
-            items.AddRange(result.Items);
-
-            if (!result.HasNextPage)
-                break;
-
-            pageNumber++;
-        }
-
-        return items;
-    }
-
-    private Task RefreshAsync(MouseEventArgs args) => LoadAsync();
-
-    private async Task OnWarehouseChangedAsync(string? value)
-    {
-        _warehouseFilter = value;
-        await LoadBalancesForSelectedWarehouseAsync();
-    }
-
-    private async Task LoadBalancesForSelectedWarehouseAsync()
-    {
-        var version = ++_balanceLoadVersion;
-        _balances = [];
-        _balanceLoadFailed = false;
-        _loadingBalances = false;
-        if (!Guid.TryParse(_warehouseFilter, out var warehouseId)) return;
-
-        _loadingBalances = true;
-        try
-        {
-            var balances = await LoadAllPagesAsync(page => Inventory.GetInventoryBalancesAsync(page, warehouseId));
-            if (version == _balanceLoadVersion)
-                _balances = balances;
-        }
-        catch (ApiClientException ex)
-        {
-            if (version == _balanceLoadVersion)
-            {
-                _balanceLoadFailed = true;
-                ApiFeedback.Show(ex.Error);
-            }
-        }
-        catch (Exception)
-        {
-            if (version == _balanceLoadVersion)
-            {
-                _balanceLoadFailed = true;
-                ApiFeedback.ShowUnexpected();
-            }
-        }
-        finally
-        {
-            if (version == _balanceLoadVersion)
-                _loadingBalances = false;
-        }
-    }
-
-    private Task SearchChangedAsync(string? _) => Task.CompletedTask;
-    private ProductVariantDto? FindVariant(Guid id) => _variants.FirstOrDefault(x => x.Id == id);
-    private string VariantIdentity(ProductVariantDto variant) => $"{variant.SKU} · {variant.Barcode ?? "—"}";
-    private string WarehouseName(Guid id) => _warehouses.FirstOrDefault(x => x.Id == id)?.Name ?? "—";
-
-    private void OpenProduct(Guid variantId)
-    {
-        var variant = FindVariant(variantId);
-        if (variant is not null) Navigation.NavigateTo($"/products?productId={variant.ProductId:D}");
-    }
-
-    private void OpenMovements(Guid variantId) => Navigation.NavigateTo($"/inventory/ledger?variantId={variantId:D}");
-
+    private Task Changed() { _page = 1; return LoadAsync(); }
+    private Task WarehouseChanged(ChangeEventArgs e) { _warehouse = V(e); if (!AllWarehouses && _sort == "warehouse") _sort = "product"; return Changed(); }
+    private Task TypeChanged(ChangeEventArgs e) { _type = V(e); _category = ""; return Changed(); }
+    private Task CategoryChanged(ChangeEventArgs e) { _category = V(e); return Changed(); }
+    private Task BrandChanged(ChangeEventArgs e) { _brand = V(e); return Changed(); }
+    private Task ProductChanged(ChangeEventArgs e) { _productSearch = V(e); return Changed(); }
+    private Task BalanceChanged(ChangeEventArgs e) { _balanceStatus = V(e); return Changed(); }
+    private Task PurchaseChanged(ChangeEventArgs e) { _purchaseStatus = V(e); return Changed(); }
+    private Task ActivityChanged(ChangeEventArgs e) { _activityStatus = V(e); return Changed(); }
+    private Task SearchChangedAsync(string? value) { _search = value; return Changed(); }
+    private Task PageSizeChanged(ChangeEventArgs e) { if (int.TryParse(V(e), out var size)) _pageSize = size; return Changed(); }
+    private Task GoPageAsync(int delta) { _page = Math.Max(1, _page + delta); return LoadAsync(); }
+    private Task SortAsync(string key) { _direction = _sort == key && _direction == SortDirection.Ascending ? SortDirection.Descending : SortDirection.Ascending; _sort = key; return Changed(); }
+    private Task ResetAsync() { _warehouse = _type = _category = _brand = _balanceStatus = _purchaseStatus = _activityStatus = ""; _search = _productSearch = null; _sort = "product"; _direction = SortDirection.Ascending; return Changed(); }
+    private void OpenProduct(InventoryBalanceWorkspaceRow row) => Navigation.NavigateTo($"/products?productId={row.ProductId:D}");
+    private void OpenMovements(InventoryBalanceWorkspaceRow row) => Navigation.NavigateTo($"/inventory/ledger?variantId={row.VariantId:D}&warehouseId={row.WarehouseId:D}");
     private async Task ExportAsync()
     {
-        if (_exporting || _loading || _loadingBalances || _balanceLoadFailed || !Guid.TryParse(_warehouseFilter, out _)) return;
+        if (_exporting || _loading || _failed || _result is null) return;
         _exporting = true;
-        try
-        {
-            var warehouseId = Guid.TryParse(_warehouseFilter, out var parsedWarehouseId) ? parsedWarehouseId : (Guid?)null;
-            var bytes = await SpreadsheetClient.ExportAsync("balances", new PageRequest { Search = _search }, warehouseId: warehouseId);
-            await SpreadsheetDownload.SaveAsync(bytes, "inventory-balances.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-        }
+        try { var bytes = await Api.GetFileAsync(Url(true)); await SpreadsheetDownload.SaveAsync(bytes, "inventory-balances.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); }
         catch (ApiClientException ex) { ApiFeedback.Show(ex.Error); }
         catch (Exception) { ApiFeedback.ShowUnexpected(); }
         finally { _exporting = false; }

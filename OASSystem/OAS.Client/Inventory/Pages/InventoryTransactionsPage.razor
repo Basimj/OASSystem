@@ -8,6 +8,7 @@
 @using OAS.Client.Services.Browser
 @using OAS.Contracts.Enums.Inventory
 @using OAS.Contracts.Inventory.Products
+@using OAS.Contracts.Inventory.Stock
 @using OAS.UiLib.Core.Formatting
 @using OAS.Contracts.Inventory.Transactions
 @using OAS.Contracts.Inventory.Warehouses
@@ -24,7 +25,7 @@
             {
                 <UiButton Text="العودة إلى القائمة" IconCssClass="fa-solid fa-arrow-right" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="BackToListAsync" />
                 <UiButton Text="حفظ المسودة" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small"
-                      Disabled="@(_mode != ViewMode.Create)" Loading="@_saving" OnClick="SaveAsync" />
+                      Disabled="@(_mode != ViewMode.Create || _balancesLoading)" Loading="@_saving" OnClick="SaveAsync" />
                 <UiButton Text="ترحيل" IconCssClass="fa-solid fa-check-double" Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
                       Disabled="@(!CanPost)" Loading="@_posting" OnClick="PostAsync" />
             }
@@ -98,6 +99,7 @@
                                           Value="@_transactionType"
                                           ValueExpression="@(() => _transactionType)"
                                           ValueChanged="OnTransactionTypeChanged"
+                                          Disabled="@_saving"
                                           Options="@InventoryArabicPresenter.TransactionTypeOptions"
                                           ErrorText="@_transactionTypeError"
                                           Required="true"
@@ -120,6 +122,7 @@
                                               Value="@_sourceWarehouseId"
                                               ValueExpression="@(() => _sourceWarehouseId)"
                                               ValueChanged="OnSourceWarehouseChanged"
+                                              Disabled="@_saving"
                                               Options="@WarehouseOptions"
                                               ErrorText="@_sourceWarehouseError"
                                               Required="true"
@@ -172,8 +175,21 @@
                                     <span class="inventory-transactions__line-count">@_draftLines.Count بند</span>
                                 </div>
                                 <UiButton Text="إضافة صنف" IconCssClass="fa-solid fa-plus"
-                                          Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="@(_ => AddLine())" />
+                                          Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@_saving" OnClick="@(_ => AddLine())" />
                             </div>
+                            @if (_balancesLoading)
+                            {
+                                <div class="inventory-transactions__balance-hint" role="status">جارٍ تحميل أرصدة المخزن...</div>
+                            }
+                            else if (_balanceLoadError is not null)
+                            {
+                                <UiAlert Tone="AlertTone.Danger" Message="@_balanceLoadError" />
+                                <UiButton Text="إعادة تحميل الأرصدة" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="@(_ => LoadSourceBalancesAsync())" />
+                            }
+                            else if (ParseGuid(_sourceWarehouseId).HasValue && !AvailableVariants.Any())
+                            {
+                                <UiAlert Tone="AlertTone.Warning" Message="لا توجد أصناف متاحة للإخراج في المخزن المحدد." />
+                            }
                             <div class="inventory-transactions__table-head" aria-hidden="true">
                                 <span>#</span><span>الصنف</span><span>الكمية</span><span>تكلفة الوحدة</span><span></span>
                             </div>
@@ -188,10 +204,20 @@
                                                   Value="@line.ProductVariantId"
                                                   ValueExpression="@(() => line.ProductVariantId)"
                                                   ValueChanged="@(v => OnLineVariantChanged(line, v))"
-                                                  Options="@VariantOptions"
+                                                  Options="@VariantOptions(line)"
+                                                  Disabled="@(_balancesLoading || _saving || !ParseGuid(_sourceWarehouseId).HasValue || _balanceLoadError is not null)"
                                                   ErrorText="@line.ProductVariantError"
                                                   Required="true"
                                                   Size="ControlSize.Small" />
+                                        @if (ParseGuid(line.ProductVariantId).HasValue && !_balancesLoading && _balanceLoadError is null && ParseGuid(_sourceWarehouseId).HasValue)
+                                        {
+                                            var balance = BalanceFor(line);
+                                            <div class="inventory-transactions__balance-hint">
+                                                <span>الفعلي: @StockNumber(balance?.OnHandQuantity ?? 0m)</span>
+                                                <span>المحجوز: @StockNumber(balance?.ReservedQuantity ?? 0m)</span>
+                                                <strong>المتاح: @StockNumber(balance?.AvailableQuantity ?? 0m)</strong>
+                                            </div>
+                                        }
                                     </div>
                                     <div class="inventory-transactions__line-quantity">
                                         <UiInputText Label="الكمية"
@@ -199,6 +225,8 @@
                                                      ValueExpression="@(() => line.Quantity)"
                                                      ValueChanged="@(v => OnLineQuantityChanged(line, v))"
                                                      ErrorText="@line.QuantityError"
+                                                     Disabled="@(_saving || _balancesLoading)"
+                                                     max="@(BalanceFor(line)?.AvailableQuantity.ToString(CultureInfo.InvariantCulture))"
                                                      Type="number"
                                                      InputMode="@(UsesWholeQuantity(line) ? "numeric" : "decimal")"
                                                      step="@(UsesWholeQuantity(line) ? "1" : "0.001")" min="@(UsesWholeQuantity(line) ? "1" : "0.001")"
@@ -206,10 +234,10 @@
                                                      Size="ControlSize.Small" />
                                     </div>
                                     <div class="inventory-transactions__line-cost">
-                                        <UiInputText Label="تكلفة الوحدة"
+                                        <UiInputText Label="متوسط تكلفة الوحدة"
+                                                     ReadOnly="true"
                                                      Value="@line.UnitCost"
                                                      ValueExpression="@(() => line.UnitCost)"
-                                                     ValueChanged="@(v => OnLineUnitCostChanged(line, v))"
                                                      ErrorText="@line.UnitCostError"
                                                      Type="number"
                                                      InputMode="decimal"
@@ -220,13 +248,13 @@
                                     <div class="inventory-transactions__line-remove">
                                         <UiButton Text="حذف" IconCssClass="fa-solid fa-trash"
                                                   Variant="ButtonVariant.Ghost" Size="ControlSize.Small"
-                                                  Disabled="@(_draftLines.Count == 1)" OnClick="@(_ => RemoveLine(line))" />
+                                                  Disabled="@(_draftLines.Count == 1 || _saving)" OnClick="@(_ => RemoveLine(line))" />
                                     </div>
                                 </div>
                             }
                         </div>
                             <div class="inventory-transactions__items-bottom">
-                                <span>تُحفظ العملية كمسودة، ثم يمكن ترحيلها بعد المراجعة.</span>
+                                <span>التكلفة تقديرية حسب متوسط المخزن؛ تُعتمد التكلفة الفعلية عند الترحيل. المسودة لا تحجز المخزون.</span>
                             </div>
                         </section>
                     </div>
@@ -427,6 +455,10 @@
     private string? _reasonError;
     private string? _notesError;
     private readonly List<TransactionLineForm> _draftLines = [];
+    private Dictionary<Guid, InventoryBalanceDto> _sourceBalances = [];
+    private bool _balancesLoading;
+    private string? _balanceLoadError;
+    private long _balanceLoadVersion;
 
     // Offer proven historic values alongside common reasons. The operator can always enter a new reason.
     private IReadOnlyList<string> CommonReasons => new[] { "صرف للمبيعات", "نقل بين المخازن", "مرتجع", "تصحيح رصيد" }
@@ -446,9 +478,78 @@
     private IReadOnlyList<UiSelectOption> WarehouseOptions =>
         [new UiSelectOption(string.Empty, "اختر المخزن"), .. _warehouses.Where(x => x.IsActive).Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.Name}"))];
 
-    private IReadOnlyList<UiSelectOption> VariantOptions => _variants.Where(IsUsableVariant)
+    private IEnumerable<ProductVariantDto> AvailableVariants => _variants.Where(x => IsUsableVariant(x)
+        && _sourceBalances.TryGetValue(x.Id, out var balance) && balance.AvailableQuantity > 0m);
+
+    // Keep a previously selected variant visible if stock changes, so its error can be corrected.
+    private IReadOnlyList<UiSelectOption> VariantOptions(TransactionLineForm line) => _variants
+        .Where(x => IsUsableVariant(x) && (ParseGuid(line.ProductVariantId) == x.Id ||
+            (_sourceBalances.TryGetValue(x.Id, out var balance) && balance.AvailableQuantity > 0m)))
         .Select(x => new UiSelectOption(x.Id.ToString("D"), $"{ProductName(x.ProductId)} - {x.SKU}{(string.IsNullOrWhiteSpace(x.VariantName) ? string.Empty : $" - {x.VariantName}")}"))
         .ToArray();
+
+    private InventoryBalanceDto? BalanceFor(TransactionLineForm line) =>
+        ParseGuid(line.ProductVariantId) is { } id && _sourceBalances.TryGetValue(id, out var balance) ? balance : null;
+
+    private static string StockNumber(decimal quantity) => quantity.ToString("0.###", CultureInfo.CurrentCulture);
+
+    private void RefreshLineStock(TransactionLineForm line)
+    {
+        line.UnitCost = (BalanceFor(line)?.AverageUnitCost ?? 0m).ToString("0.##", CultureInfo.InvariantCulture);
+        line.UnitCostError = null;
+        line.QuantityError = null;
+        if (_balancesLoading || _balanceLoadError is not null || !ParseGuid(_sourceWarehouseId).HasValue || !ParseGuid(line.ProductVariantId).HasValue)
+            return;
+        if (TryParseDecimal(line.Quantity, out var quantity) && quantity > 0m)
+            line.QuantityError = StockQuantityError(line, quantity);
+    }
+
+    private string? StockQuantityError(TransactionLineForm line, decimal quantity)
+    {
+        var available = BalanceFor(line)?.AvailableQuantity ?? 0m;
+        return quantity > available
+            ? $"الكمية المطلوبة تتجاوز المتاح في المخزن ({StockNumber(available)})."
+            : null;
+    }
+
+    private async Task<bool> LoadSourceBalancesAsync()
+    {
+        var version = ++_balanceLoadVersion;
+        var sourceId = ParseGuid(_sourceWarehouseId);
+        _sourceBalances = [];
+        _balanceLoadError = null;
+        _balancesLoading = sourceId.HasValue;
+        try
+        {
+            if (sourceId.HasValue)
+            {
+                var balances = await LoadAllPagesAsync(page => Inventory.GetInventoryBalancesAsync(page, warehouseId: sourceId.Value));
+                if (version != _balanceLoadVersion) return false;
+                _sourceBalances = balances.ToDictionary(x => x.ProductVariantId);
+            }
+            return true;
+        }
+        catch (ApiClientException ex) when (ex.StatusCode == 403)
+        {
+            if (version == _balanceLoadVersion)
+                _balanceLoadError = "لا تملك صلاحية عرض أرصدة المخزون. راجع مسؤول الصلاحيات.";
+            return false;
+        }
+        catch (Exception)
+        {
+            if (version == _balanceLoadVersion)
+                _balanceLoadError = "تعذر تحميل أرصدة المخزن. أعد المحاولة قبل حفظ العملية.";
+            return false;
+        }
+        finally
+        {
+            if (version == _balanceLoadVersion)
+            {
+                _balancesLoading = false;
+                foreach (var line in _draftLines) RefreshLineStock(line);
+            }
+        }
+    }
 
     private InventoryTransactionType CurrentType => Enum.TryParse<InventoryTransactionType>(_transactionType, out var parsedByName)
         ? parsedByName
@@ -549,7 +650,7 @@
     private Task RefreshAsync(MouseEventArgs args) => LoadAsync();
     private Task SearchChangedAsync(string? _) => Task.CompletedTask;
 
-    private Task BeginCreateAsync(MouseEventArgs args)
+    private async Task BeginCreateAsync(MouseEventArgs args)
     {
         _mode = ViewMode.Create;
         _selectedId = null;
@@ -564,7 +665,7 @@
         ClearValidationErrors();
         _draftLines.Clear();
         _draftLines.Add(new TransactionLineForm());
-        return Task.CompletedTask;
+        await LoadSourceBalancesAsync();
     }
 
     private Task CancelCreateAsync(MouseEventArgs args)
@@ -575,8 +676,9 @@
         return Task.CompletedTask;
     }
 
-    private void OnTransactionTypeChanged(string? value)
+    private async Task OnTransactionTypeChanged(string? value)
     {
+        var previousSource = _sourceWarehouseId;
         _transactionType = value ?? string.Empty;
         _transactionTypeError = null;
 
@@ -604,6 +706,8 @@
             _destinationWarehouseId = _warehouses.FirstOrDefault(x => x.IsActive && x.Id.ToString("D") != _sourceWarehouseId)?.Id.ToString("D");
         if (!IsAdjustment)
             _reasonError = null;
+        if (previousSource != _sourceWarehouseId)
+            await LoadSourceBalancesAsync();
     }
 
     private void OnTransactionDateChanged(DateOnly? value)
@@ -612,12 +716,13 @@
         _transactionDateError = null;
     }
 
-    private void OnSourceWarehouseChanged(string? value)
+    private async Task OnSourceWarehouseChanged(string? value)
     {
         _sourceWarehouseId = value;
         _sourceWarehouseError = null;
         if (_sourceWarehouseId != _destinationWarehouseId)
             _destinationWarehouseError = null;
+        await LoadSourceBalancesAsync();
     }
 
     private void OnDestinationWarehouseChanged(string? value)
@@ -652,13 +757,7 @@
     {
         line.ProductVariantId = value;
         line.ProductVariantError = null;
-        if (Guid.TryParse(value, out var variantId) && _variants.FirstOrDefault(x => x.Id == variantId) is { } selected)
-        {
-            // Purchase price is a suggestion only; the operator can change it before saving.
-            if ((CurrentType is InventoryTransactionType.Receipt or InventoryTransactionType.Opening or InventoryTransactionType.AdjustmentIncrease)
-                && (string.IsNullOrWhiteSpace(line.UnitCost) || line.UnitCost == "0"))
-                line.UnitCost = selected.PurchasePrice.ToString("0.##", CultureInfo.InvariantCulture);
-        }
+        RefreshLineStock(line);
     }
 
     private bool UsesWholeQuantity(TransactionLineForm line)
@@ -672,41 +771,51 @@
     private void OnLineQuantityChanged(TransactionLineForm line, string? value)
     {
         line.Quantity = value ?? string.Empty;
-        line.QuantityError = null;
-        line.UnitCostError = null;
-    }
-
-    private void OnLineUnitCostChanged(TransactionLineForm line, string? value)
-    {
-        line.UnitCost = value ?? string.Empty;
-        line.UnitCostError = null;
-        line.QuantityError = null;
+        RefreshLineStock(line);
+        if (!TryParseDecimal(line.Quantity, out var quantity) || quantity <= 0m)
+            line.QuantityError = "أدخل كمية أكبر من صفر.";
+        else if (UsesWholeQuantity(line) && !QuantityInputRules.IsWhole(quantity))
+            line.QuantityError = QuantityInputRules.WholeNumberMessage;
     }
 
     private async Task SaveAsync(MouseEventArgs args)
     {
-        if (_mode != ViewMode.Create || _saving)
+        if (_mode != ViewMode.Create || _saving || _balancesLoading)
             return;
-
-        if (!TryBuildCreateRequest(out var request, out var hasRequiredErrors))
-        {
-            Snackbar.Error(hasRequiredErrors
-                ? "هناك بيانات إجبارية لم يتم إدخالها."
-                : "توجد قيم غير صحيحة. يرجى مراجعة الحقول المميزة باللون الأحمر.");
-            return;
-        }
 
         _saving = true;
         try
         {
+            // Fetch the latest warehouse balances before building the request.
+            if (!await LoadSourceBalancesAsync())
+            {
+                Snackbar.Error(_balanceLoadError ?? "تعذر التحقق من الرصيد المتاح. أعد المحاولة.");
+                return;
+            }
+            if (!TryBuildCreateRequest(out var request, out var hasRequiredErrors))
+            {
+                Snackbar.Error(hasRequiredErrors
+                    ? "هناك بيانات إجبارية لم يتم إدخالها."
+                    : "توجد قيم غير صحيحة. يرجى مراجعة الحقول المميزة باللون الأحمر.");
+                return;
+            }
             var saved = await Inventory.CreateInventoryTransactionAsync(request);
             if (saved is null)
                 return;
 
+            // Once creation succeeds, leave create mode even if loading details fails.
+            _selectedId = saved.Id;
+            _selectedTransaction = saved;
+            _selectedLines = [];
+            _mode = ViewMode.View;
             await LoadAsync();
-            await SelectAsync(saved.Id);
             Snackbar.Success("تم إنشاء عملية المخزون.");
             OpenDetailsScreen(saved.Id);
+        }
+        catch (ApiClientException ex) when (ex.Error.Code == "insufficient_stock")
+        {
+            await LoadSourceBalancesAsync();
+            Snackbar.Error(ex.Error.Message);
         }
         catch (ApiClientException ex)
         {
@@ -853,6 +962,12 @@
                 isValid = false;
             }
 
+            if (variantId.HasValue && sourceWarehouseId.HasValue && line.QuantityError is null)
+            {
+                line.QuantityError = StockQuantityError(line, quantity);
+                if (line.QuantityError is not null) isValid = false;
+            }
+
             decimal unitCost = 0;
             if (string.IsNullOrWhiteSpace(line.UnitCost))
             {
@@ -933,7 +1048,7 @@
 
     private async Task SelectAsync(Guid id)
     {
-        if (_mode == ViewMode.Create || _saving)
+        if (_mode == ViewMode.Create)
             return;
 
         try
@@ -968,6 +1083,10 @@
             await LoadAsync();
             await SelectAsync(posted.Id);
             Snackbar.Success("تم ترحيل عملية المخزون بنجاح.");
+        }
+        catch (ApiClientException ex) when (ex.Error.Code == "insufficient_stock")
+        {
+            Snackbar.Error(ex.Error.Message);
         }
         catch (ApiClientException ex)
         {
