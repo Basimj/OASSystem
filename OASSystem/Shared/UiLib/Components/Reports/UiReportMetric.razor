@@ -1,0 +1,10 @@
+@namespace OAS.UiLib.Components.Reports
+<div class="oas-report__metric oas-report__metric--@Tone">
+    <i class="@Icon" aria-hidden="true"></i><span><b>@Label</b><strong>@Value</strong></span>
+</div>
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public string Tone { get; set; } = "blue";
+    [Parameter] public string Icon { get; set; } = "fa-solid fa-list";
+}

@@ -36,7 +36,8 @@ public sealed record GeneralLedgerLineDto(
     decimal? TransactionDebit = null,
     decimal? TransactionCredit = null,
     decimal? ExchangeRate = null,
-    string? Reference = null);
+    string? Reference = null,
+    string? StatementDescription = null);
 
 public sealed record GeneralLedgerAccountDto(
     Guid AccountId,

@@ -6,6 +6,7 @@ using OAS.Contracts.Accounting.Reports;
 using OAS.Domain.Accounting.Entities;
 using OAS.Domain.Accounting.Enums;
 using OAS.Domain.Purchasing.Entities;
+using OAS.Domain.Entities.Inventory;
 using OAS.Domain.Purchasing.Enums;
 using OAS.Domain.Sales.Entities;
 using OAS.Domain.Sales.Enums;
@@ -358,6 +359,10 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
         }
 
         var movements = await query.ToListAsync(cancellationToken);
+        // Resolve document codes in batches, never expose source entity GUIDs in customer-facing reports.
+        var sourceDocuments = await ResolveLedgerDocumentsAsync(
+            movements.Where(x => x.PostingDate >= fromDate)
+                .Select(x => (x.SourceDocumentType, x.SourceDocumentId)), cancellationToken);
         var accounts = allAccounts
             .Where(x => selectedIds is null || selectedIds.Contains(x.Id))
             .ToList();
@@ -395,9 +400,10 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
                     movement.JournalNumber,
                     movement.PostingDate,
                     movement.DocumentDate,
-                    string.IsNullOrWhiteSpace(movement.Description)
-                        ? movement.JournalDescription
-                        : movement.Description!,
+                    ResolveLedgerDescription(
+                        movement.Description, movement.JournalDescription,
+                        movement.SourceDocumentType, movement.SourceDocumentId,
+                        sourceDocuments),
                     movement.SourceModule,
                     movement.SourceDocumentType,
                     movement.SourceDocumentId,
@@ -412,7 +418,13 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
                     movement.TransactionDebitAmount,
                     movement.TransactionCreditAmount,
                     movement.ExchangeRate,
-                    FormatReference(movement.SourceDocumentType, movement.SourceDocumentId)));
+                    GetDocumentReference(movement.SourceDocumentType, movement.SourceDocumentId,
+                        sourceDocuments),
+                    StatementNarrativeFormatter.Resolve(
+                        GetDocumentInfo(movement.SourceDocumentType, movement.SourceDocumentId, sourceDocuments)?.Narrative,
+                        GetDocumentReference(movement.SourceDocumentType, movement.SourceDocumentId, sourceDocuments),
+                        movement.SourceDocumentType, movement.Description, movement.JournalDescription,
+                        movement.JournalType == JournalType.Manual)));
             }
 
             var debit = period.Sum(x => x.DebitAmount);
@@ -739,6 +751,133 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
             periodCredit += movement.PeriodCredit;
         }
         return new AccountMovement(Guid.Empty, openingDebit, openingCredit, periodDebit, periodCredit);
+    }
+
+    // The key includes the document type to prevent accidentally resolving an unrelated entity.
+    private async Task<Dictionary<(string Type, Guid Id), LedgerDocumentInfo>> ResolveLedgerDocumentsAsync(
+        IEnumerable<(string? Type, Guid? Id)> sources, CancellationToken ct)
+    {
+        var keys = sources.Where(x => x.Id.HasValue && !string.IsNullOrWhiteSpace(x.Type))
+            .Select(x => (Type: x.Type!.Trim().ToLowerInvariant(), Id: x.Id!.Value))
+            .Distinct().ToArray();
+        var resolved = new Dictionary<(string Type, Guid Id), LedgerDocumentInfo>();
+        async Task AddAsync(string type, Func<Guid[], Task<Dictionary<Guid, LedgerDocumentInfo>>> loader)
+        {
+            var ids = keys.Where(x => x.Type == type).Select(x => x.Id).ToArray();
+            if (ids.Length == 0) return;
+            var codes = await loader(ids);
+            foreach (var pair in codes)
+                resolved[(type, pair.Key)] = pair.Value;
+        }
+
+        await AddAsync("salesinvoice", async ids => await db.Set<SalesInvoice>().AsNoTracking()
+            .Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => new LedgerDocumentInfo(x.InvoiceCode, x.Description), ct));
+        await AddAsync("salesreturn", async ids => await db.Set<SalesReturn>().AsNoTracking()
+            .Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => new LedgerDocumentInfo(x.ReturnCode, x.Reason), ct));
+        await AddAsync("purchasereceipt", async ids => await db.Set<PurchaseReceipt>().AsNoTracking()
+            .Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => new LedgerDocumentInfo(x.ReceiptCode, x.Notes), ct));
+        await AddAsync("purchaseinvoice", async ids => await db.Set<PurchaseInvoice>().AsNoTracking()
+            .Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => new LedgerDocumentInfo(x.PurchaseInvoiceCode, x.Notes), ct));
+        await AddAsync("purchasereturn", async ids => await db.Set<PurchaseReturn>().AsNoTracking()
+            .Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => new LedgerDocumentInfo(x.ReturnCode, x.Reason), ct));
+        await AddAsync("receiptvoucher", async ids => await db.Set<ReceiptVoucher>().AsNoTracking()
+            .Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => new LedgerDocumentInfo(x.VoucherNumber, x.Description), ct));
+        await AddAsync("paymentvoucher", async ids => await db.Set<PaymentVoucher>().AsNoTracking()
+            .Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => new LedgerDocumentInfo(x.VoucherNumber, x.Description), ct));
+        await AddAsync("inventorytransaction", async ids => await db.Set<InventoryTransaction>().AsNoTracking()
+            .Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id,
+                x => new LedgerDocumentInfo(x.TransactionNumber,
+                    string.IsNullOrWhiteSpace(x.Notes) ? x.Reason : x.Notes), ct));
+        return resolved;
+    }
+
+    private sealed record LedgerDocumentInfo(string Code, string? Narrative);
+
+    private static LedgerDocumentInfo? GetDocumentInfo(
+        string? type, Guid? id, IReadOnlyDictionary<(string Type, Guid Id), LedgerDocumentInfo> documents)
+    {
+        if (!id.HasValue || string.IsNullOrWhiteSpace(type)) return null;
+        return documents.TryGetValue((type.Trim().ToLowerInvariant(), id.Value), out var info) ? info : null;
+    }
+
+    private static string? GetDocumentReference(
+        string? type, Guid? id, IReadOnlyDictionary<(string Type, Guid Id), LedgerDocumentInfo> documents)
+    {
+        if (!id.HasValue || string.IsNullOrWhiteSpace(type)) return null;
+        var code = GetDocumentInfo(type, id, documents)?.Code;
+        return string.IsNullOrWhiteSpace(code) ? null : code; // Never expose a source GUID.
+    }
+
+    private static string ResolveLedgerDescription(
+        string? lineDescription, string journalDescription, string? sourceType, Guid? sourceId,
+        IReadOnlyDictionary<(string Type, Guid Id), LedgerDocumentInfo> documents)
+    {
+        var original = string.IsNullOrWhiteSpace(lineDescription)
+            ? journalDescription : lineDescription.Trim();
+        var reference = GetDocumentReference(sourceType, sourceId, documents);
+        if (reference is null) return original;
+        var normalized = (original ?? string.Empty).Trim();
+        // Preserve meaningful accounting narratives. Only replace generated posting labels.
+        var type = sourceType!.Trim().ToLowerInvariant();
+        // Translate only known generated posting labels, while retaining the
+        // original meaning and the source line number for auditability.
+        if (normalized.StartsWith("COGS reversal /", StringComparison.OrdinalIgnoreCase))
+            return $"عكس تكلفة البضاعة المباعة — مرتجع مبيعات رقم {reference}{FormatSourceLineSuffix(normalized)}";
+        if (normalized.StartsWith("COGS /", StringComparison.OrdinalIgnoreCase) ||
+            normalized.StartsWith("OGS /", StringComparison.OrdinalIgnoreCase))
+            return $"تكلفة البضاعة المباعة — فاتورة رقم {reference}{FormatSourceLineSuffix(normalized)}";
+        if (normalized.StartsWith("Customer return /", StringComparison.OrdinalIgnoreCase))
+            return $"تخفيض ذمم العملاء — مرتجع مبيعات رقم {reference}";
+        if (normalized.StartsWith("Sales revenue reversal /", StringComparison.OrdinalIgnoreCase))
+            return $"عكس إيرادات مبيعات — مرتجع رقم {reference}";
+        if (normalized.StartsWith("Sales tax reversal /", StringComparison.OrdinalIgnoreCase))
+            return $"عكس ضريبة المبيعات — مرتجع رقم {reference}";
+        if (normalized.StartsWith("Sales tax /", StringComparison.OrdinalIgnoreCase))
+            return $"ضريبة مبيعات — فاتورة رقم {reference}";
+        if (normalized.StartsWith("Inventory /", StringComparison.OrdinalIgnoreCase))
+            return $"حركة مخزون مرتبطة بالمستند {reference}{FormatSourceLineSuffix(normalized)}";
+        if (normalized.StartsWith("Inventory receipt", StringComparison.OrdinalIgnoreCase))
+            return $"إثبات استلام مشتريات رقم {reference}";
+        if (normalized.StartsWith("Inventory return", StringComparison.OrdinalIgnoreCase))
+            return $"إثبات مرتجع مخزون رقم {reference}";
+        if (normalized.StartsWith("Customer /", StringComparison.OrdinalIgnoreCase))
+            return $"ذمم العملاء — المستند {reference}";
+        if (normalized.StartsWith("Sales revenue /", StringComparison.OrdinalIgnoreCase))
+            return $"إيرادات مبيعات — المستند {reference}";
+        if (normalized.StartsWith("Sales invoice ", StringComparison.OrdinalIgnoreCase))
+            return $"إثبات فاتورة مبيعات رقم {reference}";
+        if (normalized.StartsWith("Sales return ", StringComparison.OrdinalIgnoreCase))
+            return $"إثبات مرتجع مبيعات رقم {reference}";
+        if (normalized.StartsWith("Receipt voucher ", StringComparison.OrdinalIgnoreCase))
+            return $"سند قبض رقم {reference}";
+        if (normalized.StartsWith("Payment voucher ", StringComparison.OrdinalIgnoreCase))
+            return $"سند صرف رقم {reference}";
+        if (string.IsNullOrWhiteSpace(normalized))
+            return type switch
+            {
+                "salesinvoice" => $"فاتورة مبيعات رقم {reference}",
+                "salesreturn" => $"مرتجع مبيعات رقم {reference}",
+                "purchasereceipt" => $"استلام مشتريات رقم {reference}",
+                "purchaseinvoice" => $"فاتورة مشتريات رقم {reference}",
+                "purchasereturn" => $"مرتجع مشتريات رقم {reference}",
+                "receiptvoucher" => $"سند قبض رقم {reference}",
+                "paymentvoucher" => $"سند صرف رقم {reference}",
+                _ => $"المستند {reference}"
+            };
+        return original;
+    }
+
+    // Preserve generated line numbers to distinguish entries for the same invoice.
+    private static string FormatSourceLineSuffix(string description)
+    {
+        const string marker = " / line ";
+        var index = description.LastIndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        if (index < 0) return string.Empty;
+        var numberText = description[(index + marker.Length)..].Trim();
+        return int.TryParse(numberText,
+            System.Globalization.NumberStyles.None,
+            System.Globalization.CultureInfo.InvariantCulture, out var number) && number > 0
+            ? $" — البند {number}" : string.Empty;
     }
 
     private static string? FormatReference(string? sourceDocumentType, Guid? sourceDocumentId) =>

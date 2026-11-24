@@ -1,0 +1,99 @@
+@namespace OAS.UiLib.Components.Reports
+@using Microsoft.AspNetCore.Components
+@using Microsoft.JSInterop
+@using OAS.UiLib.Core.Models
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<div class="oas-report-picker" dir="rtl">
+    <label for="@_triggerId" class="oas-report-picker__label">@Label</label>
+    <button id="@_triggerId" type="button" class="oas-report-picker__trigger" aria-haspopup="dialog"
+            aria-controls="@_dialogId" title="@SelectedText" @onclick="OpenAsync">
+        <span class="oas-report-picker__selected">@SelectedText</span>
+        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+    </button>
+    <dialog @ref="_dialog" id="@_dialogId" class="oas-report-picker__dialog" aria-labelledby="@_titleId" dir="rtl">
+        <div class="oas-report-picker__header">
+            <strong id="@_titleId">@DialogTitle</strong>
+            <button type="button" class="oas-report-picker__close" aria-label="إغلاق" @onclick="CloseAsync">×</button>
+        </div>
+        <div class="oas-report-picker__search-wrap">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <input type="search" class="oas-report-picker__search" aria-label="@SearchPlaceholder"
+                   placeholder="@SearchPlaceholder" @bind="_search" @bind:event="oninput" autofocus />
+        </div>
+        @{ var matches = FilteredOptions; }
+        <div class="oas-report-picker__options" role="group" aria-label="@DialogTitle">
+            @if (matches.Count == 0)
+            {
+                <div class="oas-report-picker__empty" role="status">@EmptyText</div>
+            }
+            @foreach (var option in matches)
+            {
+                var selected = IsSelected(option.Value);
+                <button type="button" @key="option.Value" class="oas-report-picker__option @(selected ? "is-selected" : "")"
+                        aria-pressed="@(selected ? "true" : "false")" @onclick="() => SelectAsync(option.Value)">
+                    <span>@option.Text</span>
+                    @if (selected) { <i class="fa-solid fa-check" aria-hidden="true"></i> }
+                </button>
+            }
+        </div>
+        <div class="oas-report-picker__count" aria-live="polite">@matches.Count من @Options.Count حساب</div>
+    </dialog>
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "الحساب";
+    [Parameter] public string DialogTitle { get; set; } = "اختيار عنصر";
+    [Parameter] public string SearchPlaceholder { get; set; } = "ابحث في الخيارات...";
+    [Parameter] public string Placeholder { get; set; } = "اختر...";
+    [Parameter] public string EmptyText { get; set; } = "لا توجد نتائج مطابقة.";
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter] public IReadOnlyList<UiSelectOption> Options { get; set; } = [];
+
+    private readonly string _triggerId = $"report-picker-trigger-{Guid.NewGuid():N}";
+    private readonly string _dialogId = $"report-picker-dialog-{Guid.NewGuid():N}";
+    private readonly string _titleId = $"report-picker-title-{Guid.NewGuid():N}";
+    private ElementReference _dialog;
+    private IJSObjectReference? _module;
+    private string _search = string.Empty;
+    private bool IsSelected(string? optionValue) => string.Equals(optionValue ?? "", Value ?? "", StringComparison.Ordinal);
+    private string SelectedText => Options.FirstOrDefault(x => IsSelected(x.Value))?.Text ?? Placeholder;
+    private IReadOnlyList<UiSelectOption> FilteredOptions
+    {
+        get
+        {
+            var query = NormalizeDigits(_search.Trim());
+            return query.Length == 0 ? Options : Options.Where(x => NormalizeDigits(x.Text).Contains(query, StringComparison.CurrentCultureIgnoreCase)).ToArray();
+        }
+    }
+    private static string NormalizeDigits(string value) => new string(value.Select(c => c switch
+    {
+        >= '\u0660' and <= '\u0669' => (char)('0' + c - '\u0660'),
+        >= '\u06F0' and <= '\u06F9' => (char)('0' + c - '\u06F0'),
+        _ => c
+    }).ToArray());
+
+    private async Task OpenAsync()
+    {
+        _search = string.Empty;
+        _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/OAS.UiLib/js/oas-report-picker.js");
+        await _module.InvokeVoidAsync("open", _dialog);
+    }
+    private async Task CloseAsync()
+    {
+        if (_module is not null) await _module.InvokeVoidAsync("close", _dialog);
+    }
+    private async Task SelectAsync(string value)
+    {
+        await CloseAsync();
+        await ValueChanged.InvokeAsync(value);
+    }
+    public async ValueTask DisposeAsync()
+    {
+        if (_module is null) return;
+        try { await _module.DisposeAsync(); }
+        catch (JSDisconnectedException) { }
+    }
+}

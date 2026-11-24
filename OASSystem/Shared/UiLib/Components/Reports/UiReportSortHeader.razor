@@ -1,0 +1,19 @@
+@namespace OAS.UiLib.Components.Reports
+@using Microsoft.AspNetCore.Components
+
+<th scope="col" class="oas-report__sortable-th" aria-sort="@(Active ? (Descending ? "descending" : "ascending") : null)">
+    <button type="button" class="oas-report__sort-button @(Active ? "oas-report__sort-button--active" : "")"
+            title="@NextAction" aria-label="@NextAction" @onclick="SortAsync">
+        <span>@Label</span>
+        <i class="fa-solid @(Active ? (Descending ? "fa-sort-down" : "fa-sort-up") : "fa-sort")" aria-hidden="true"></i>
+    </button>
+</th>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter] public bool Active { get; set; }
+    [Parameter] public bool Descending { get; set; }
+    [Parameter, EditorRequired] public EventCallback OnSort { get; set; }
+    private string NextAction => $"ترتيب {Label} {(Active && !Descending ? "تنازليًا" : "تصاعديًا")}";
+    private Task SortAsync() => OnSort.InvokeAsync();
+}

@@ -1,0 +1,46 @@
+<link rel="stylesheet" href="_content/OAS.UiLib/css/oas-report-workspace.css" />
+@namespace OAS.UiLib.Components.Reports
+@using Microsoft.AspNetCore.Components
+
+<section class="oas-report" dir="rtl">
+    <div class="oas-report__head">
+        <div class="oas-report__identity"><i class="fa-solid fa-database" aria-hidden="true"></i><h1>@Title</h1>@if (!string.IsNullOrWhiteSpace(StatusText)){<span class="oas-report__status"><i class="fa-solid fa-filter"></i> @StatusText</span>}</div>
+        <div class="oas-report__toolbar">
+            <div class="oas-report__search"><i class="fa-solid fa-magnifying-glass"></i><input aria-label="بحث في البيانات" placeholder="بحث في البيانات ..." value="@Search" @oninput="SearchChangedInternal" /></div>
+            @if (Toolbar is not null) { @Toolbar }
+        </div>
+    </div>
+    <div class="oas-report__quick-filters">@QuickFilters</div>
+    <div class="oas-report__main @(FiltersOpen ? "oas-report__main--filters" : "")">
+        <div class="oas-report__data">
+            @if (!FiltersOpen)
+            {
+                <button type="button" class="oas-report__filter-reopen" title="إظهار لوحة الفلاتر" aria-label="إظهار لوحة الفلاتر" @onclick="ToggleFilters"><i class="fa-solid fa-filter"></i></button>
+            }
+            <div class="oas-report__table-scroll">@TableContent</div>
+            <div class="oas-report__pagination">@Pagination</div>
+        </div>
+        @if (FiltersOpen)
+        {
+            <aside class="oas-report__aside"><div class="oas-report__aside-header"><span><i class="fa-solid fa-filter"></i> <b>تصفية البيانات</b></span><button type="button" title="إخفاء لوحة الفلاتر" aria-label="إخفاء لوحة الفلاتر" @onclick="ToggleFilters"><i class="fa-solid fa-angles-left"></i></button></div>@FilterPanel</aside>
+        }
+    </div>
+    <div class="oas-report__metrics">@Metrics</div>
+</section>
+
+@code {
+    [Parameter] public string Title { get; set; } = "كشف حساب";
+    [Parameter] public string? StatusText { get; set; }
+    [Parameter] public string Search { get; set; } = "";
+    [Parameter] public EventCallback<string> SearchChanged { get; set; }
+    [Parameter] public bool FiltersOpen { get; set; }
+    [Parameter] public EventCallback<bool> FiltersOpenChanged { get; set; }
+    [Parameter] public RenderFragment? Toolbar { get; set; }
+    [Parameter, EditorRequired] public RenderFragment? QuickFilters { get; set; }
+    [Parameter] public RenderFragment? FilterPanel { get; set; }
+    [Parameter, EditorRequired] public RenderFragment? TableContent { get; set; }
+    [Parameter] public RenderFragment? Pagination { get; set; }
+    [Parameter] public RenderFragment? Metrics { get; set; }
+    private Task ToggleFilters() => FiltersOpenChanged.InvokeAsync(!FiltersOpen);
+    private Task SearchChangedInternal(ChangeEventArgs e) => SearchChanged.InvokeAsync(e.Value?.ToString() ?? "");
+}
