@@ -1,0 +1,134 @@
+.warehouse-report { min-width: 0; }
+.warehouse-report ::deep .oas-report__search,
+.warehouse-report ::deep .oas-report__tool,
+.warehouse-report ::deep .oas-report__chip,
+.warehouse-report ::deep .oas-report__field > :is(select, input),
+.warehouse-report ::deep .oas-report-picker__trigger { background: #fff; }
+/* The panel stays in the report grid; only the field list scrolls. */
+.warehouse-report ::deep .oas-report .oas-report__aside {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    max-width: none;
+    min-height: 0;
+    padding: 7px;
+    overflow: hidden;
+    background: #fff;
+    --r-filter-font: 11px;
+}
+.warehouse-report ::deep .oas-report__aside-header {
+    flex: 0 0 auto;
+    padding-bottom: 6px;
+    margin-bottom: 6px;
+}
+.warehouse-report ::deep .oas-report__aside-header button { min-height: 23px; min-width: 25px; padding: 0 3px; }
+.warehouse-report ::deep .oas-report .warehouse-fields {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+    min-width: 0;
+    gap: 7px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-gutter: stable;
+    overscroll-behavior-y: contain;
+    padding: 2px 2px 7px;
+}
+.warehouse-report ::deep .warehouse-fields > * { flex: 0 0 auto; min-width: 0; }
+.warehouse-report ::deep .oas-report .oas-report__aside .warehouse-fields .oas-report__field {
+    margin: 0;
+    gap: 3px;
+    min-width: 0;
+    width: 100%;
+    font-weight: 600;
+    line-height: 15px !important;
+}
+.warehouse-report ::deep .oas-report .oas-report__aside .warehouse-fields .oas-report-picker { gap: 3px; }
+.warehouse-report ::deep .oas-report .oas-report__aside .warehouse-fields .oas-report-picker__label {
+    line-height: 15px !important;
+}
+.warehouse-report ::deep .oas-report .oas-report__aside .warehouse-fields .oas-report__field > :is(select, input),
+.warehouse-report ::deep .oas-report .oas-report__aside .warehouse-fields .oas-report-picker__trigger {
+    width: 100%;
+    min-width: 0;
+    height: 27px;
+    min-height: 27px;
+    padding: 0 5px;
+    font-size: 11px !important;
+    line-height: 1.35 !important;
+    border-radius: 5px;
+}
+.warehouse-report ::deep .oas-report .oas-report__aside .warehouse-fields .oas-report__date-pair {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+.warehouse-report ::deep .oas-report .oas-report__aside .warehouse-fields .oas-report__field-check {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 18px;
+    line-height: 15px !important;
+}
+.warehouse-report ::deep .oas-report .oas-report__aside .warehouse-fields .oas-report__field-check input {
+    margin: 0;
+    width: 13px;
+    height: 13px;
+    flex: 0 0 13px;
+}
+.warehouse-report ::deep .warehouse-warning { color: #bd2634; font-size: 10px; line-height: 1.35; }
+.warehouse-report ::deep .oas-report .oas-report__aside .oas-report__apply {
+    flex: 0 0 auto;
+    margin-top: auto;
+    gap: 5px;
+    padding-top: 7px;
+    border-top: 1px solid #e0e5eb;
+    background: #fff;
+}
+.warehouse-report ::deep .oas-report .oas-report__aside .oas-report__apply button {
+    min-height: 28px;
+    padding: 3px 2px;
+    font-size: 10px;
+    line-height: 1.3;
+}
+.warehouse-report ::deep .warehouse-table { table-layout: auto; width: 100%; min-width: 980px; }
+.warehouse-report ::deep .warehouse-table thead { position: sticky; top: 0; z-index: 2; }
+.warehouse-report ::deep .warehouse-table thead th { white-space: normal; min-width: 68px; }
+.warehouse-report ::deep .warehouse-table,
+.warehouse-report ::deep .warehouse-table tbody,
+.warehouse-report ::deep .warehouse-table tbody tr,
+.warehouse-report ::deep .warehouse-table tbody td { background: #fff; }
+.warehouse-report ::deep .warehouse-table td,
+.warehouse-report ::deep .warehouse-table th { font-variant-numeric: tabular-nums; }
+.warehouse-report ::deep .warehouse-table tbody tr:hover > td { background: #f4f6f8 !important; }
+.warehouse-report ::deep .warehouse-table tbody tr.warehouse-total > td,
+.warehouse-report ::deep .warehouse-table tbody tr.warehouse-total:hover > td,
+.warehouse-report ::deep .warehouse-table thead th { background: #e8edf5 !important; font-weight: 700; }
+.warehouse-report ::deep .warehouse-table td.pos { color: #1f8b47; font-weight: 700; }
+.warehouse-report ::deep .warehouse-table td.neg { color: #d22d38; font-weight: 700; }
+.warehouse-report ::deep .warehouse-table td.info { color: #2465d1; font-weight: 700; }
+.warehouse-report ::deep .oas-report__metric strong { white-space: nowrap; font-size: clamp(10px, 1.1vw, 14px); }
+.warehouse-report ::deep .oas-report__metric b { font-size: 10px; }
+
+@media print {
+    .warehouse-report ::deep .warehouse-table thead { position: static; }
+}
+.warehouse-report ::deep .oas-report .warehouse-table.warehouse-summary { min-width: 780px; }
+.warehouse-report ::deep .oas-report .warehouse-table thead th { position: static; }
+.warehouse-report ::deep .oas-report .warehouse-table .warehouse-group-head th { text-align: center; padding: 5px; }
+.warehouse-report ::deep .oas-report .warehouse-table tbody tr.warehouse-group > td,
+.warehouse-report ::deep .oas-report .warehouse-table tbody tr.warehouse-group:hover > td { background: #f4f6f8 !important; text-align: center; font-weight: 700; padding: 5px; }
+.warehouse-report ::deep .oas-report .warehouse-table tbody tr.warehouse-total > td,
+.warehouse-report ::deep .oas-report .warehouse-table tbody tr.warehouse-total:hover > td { background: #e8edf5 !important; font-weight: 700; }
+.warehouse-report ::deep .warehouse-table td { white-space: nowrap; text-overflow: clip; overflow: visible; }
+.warehouse-report ::deep .warehouse-table td:nth-child(2) { white-space: normal; }
+.warehouse-report ::deep .warehouse-link { background: transparent; color: #2459aa; border: 0; font: inherit; cursor: pointer; padding: 0; }
+.warehouse-report ::deep .warehouse-link:hover { text-decoration: underline; }
+.warehouse-report ::deep .warehouse-state { display: inline-block; border-radius: 12px; padding: 2px 8px; font-size: 10px; font-weight: 700; }
+.warehouse-report ::deep .warehouse-state.good { background: #e1f7e9; color: #16813c; }
+.warehouse-report ::deep .warehouse-state.bad { background: #fce4e8; color: #c52b41; }
+.warehouse-report ::deep .warehouse-state.pending { background: #fff0d9; color: #96600b; }
+.warehouse-report ::deep .oas-report .oas-report__quick-filters .oas-report__chip { background: #f4f6f8; }
