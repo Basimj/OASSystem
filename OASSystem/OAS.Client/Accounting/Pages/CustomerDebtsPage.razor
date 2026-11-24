@@ -1,0 +1,248 @@
+@page "/accounting/reports/customer-debts"
+@attribute [Authorize]
+@using System.Globalization
+@using OAS.Client.Accounting.Pages
+@using OAS.Contracts.Accounting.Reports
+@using OAS.Contracts.Accounting.Currencies
+@using OAS.Contracts.Accounting.Enums
+@using OAS.UiLib.Components.Reports
+@inject IAccountingClientService Accounting
+@inject OasApiClient Api
+@inject IJSRuntime JS
+@inject IApiFeedbackService ApiFeedback
+
+<PageTitle>أسماء العملاء | OAS</PageTitle>
+<div class="customer-debts-report">
+<UiReportWorkspace Title="أسماء العملاء" StatusText="@(_busy ? "جارٍ التحميل" : _error is null ? "مديونية العملاء" : "تعذر التحميل")" Search="@_search" SearchChanged="OnSearch" FiltersOpen="@_filtersOpen" FiltersOpenChanged="@(v => _filtersOpen = v)">
+    <Toolbar>
+        <button type="button" class="oas-report__tool" title="تحديث" disabled="@_busy" @onclick="RefreshAsync"><i class="fa-solid fa-rotate"></i></button>
+        <button type="button" class="oas-report__tool oas-report__tool--pdf" title="طباعة أو حفظ PDF" disabled="@(!CanExport)" @onclick="PrintAsync"><i class="fa-regular fa-file-pdf"></i></button>
+        <button type="button" class="oas-report__tool oas-report__tool--excel" title="تصدير Excel" disabled="@(!CanExport)" @onclick="ExportAsync"><i class="fa-regular fa-file-excel"></i></button>
+        <button type="button" class="oas-report__tool" title="طباعة جميع النتائج" disabled="@(!CanExport)" @onclick="PrintAsync"><i class="fa-solid fa-print"></i></button>
+        <button type="button" class="oas-report__tool" title="إظهار أو إخفاء الفلاتر" @onclick="@(() => _filtersOpen = !_filtersOpen)"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+    </Toolbar>
+    <QuickFilters>
+        @foreach (var chip in Chips)
+        {
+            <div class="oas-report__chip" title="@($"{chip.Label}: {chip.Value}")"><i class="@chip.Icon"></i><span class="oas-report__chip-label">@chip.Label:</span><strong>@chip.Value</strong></div>
+        }
+    </QuickFilters>
+    <FilterPanel>
+        <div class="debt-filter-fields">
+            <div class="oas-report__field">
+                <UiReportSearchPicker Label="العميل" ItemLabel="عميل" DialogTitle="اختيار العميل" SearchPlaceholder="ابحث باسم العميل أو رقمه..." Value="@_draft.Customer" ValueChanged="OnCustomer" Options="@_options" Placeholder="جميع العملاء" />
+            </div>
+            <label class="oas-report__field">إلى تاريخ<input type="date" @bind="_draft.AsOf" @bind:format="yyyy-MM-dd" /></label>
+            <label class="oas-report__field">الفرع<select disabled title="بيانات الذمم الحالية لا تدعم التصفية حسب الفرع"><option>جميع الفروع</option></select></label>
+            <label class="oas-report__field">العملة<select @bind="_draft.Currency"><option value="">@_baseName (الأساسية)</option>@foreach (var c in _currencies.Where(x => x.IsActive && x.Id != _baseId)){<option value="@c.Id">@c.NameAr (@c.Code)</option>}</select></label>
+            <label class="oas-report__field">نوع التقرير<select @bind="_draft.Mode"><option value="summary">إجمالي حسب العميل</option><option value="detail">تفصيلي حسب الفاتورة</option><option value="aging">أعمار الديون</option></select></label>
+            <label class="oas-report__field">حالة الرصيد<select @bind="_draft.Balance"><option value="debit">مدين</option><option value="credit">دائن</option><option value="all">الكل</option><option value="nonzero">غير صفري</option><option value="zero">صفري</option></select></label>
+            <label class="oas-report__field" title="اختيار العملاء الذين لديهم فواتير بالحالة المحددة">حالة الاستحقاق<select @bind="_draft.Due"><option value="all">الكل</option><option value="due">مستحق</option><option value="future">غير مستحق</option><option value="today">مستحق اليوم</option><option value="overdue">متأخر</option><option value="unknown">استحقاق غير محدد</option></select></label>
+            <div class="oas-report__date-pair">
+                <label class="oas-report__field">من مبلغ<input type="number" min="0" step="any" @bind="_draft.Min" placeholder="بدون حد" /></label>
+                <label class="oas-report__field">إلى مبلغ<input type="number" min="0" step="any" @bind="_draft.Max" placeholder="بدون حد" /></label>
+            </div>
+            <label class="oas-report__field-check"><input type="checkbox" @bind="_draft.IncludeInactive" /> تضمين العملاء غير النشطين</label>
+            @if (_validation is not null){<div role="alert" class="debt-validation">@_validation</div>}
+        </div>
+        <div class="oas-report__apply"><button type="button" class="primary" disabled="@_busy" @onclick="ApplyAsync"><i class="fa-solid fa-filter"></i> تطبيق</button><button type="button" disabled="@_busy" @onclick="ResetAsync"><i class="fa-solid fa-rotate-left"></i> إعادة تعيين</button></div>
+    </FilterPanel>
+    <TableContent>
+        <table class="oas-report__table debt-table debt-table--@_applied.Mode">
+            <thead><tr>
+                @foreach (var col in Columns)
+                {
+                    <UiReportSortHeader @key="col.Key" Label="@col.Label" Active="@(_sortKey == col.Key)" Descending="@_descending" OnSort="@(() => SortBy(col.Key))" />
+                }
+            </tr></thead>
+            <tbody>
+                @if (_busy){<tr><td colspan="@Columns.Length" class="oas-report__empty">جارٍ تحميل مديونية العملاء...</td></tr>}
+                else if (_error is not null){<tr><td colspan="@Columns.Length" class="oas-report__empty" role="alert">@_error</td></tr>}
+                else if (_rows.Count == 0){<tr><td colspan="@Columns.Length" class="oas-report__empty">لا توجد نتائج مطابقة للفلاتر.</td></tr>}
+                else
+                {
+                    @foreach (var row in _rows.Skip((_page-1)*_pageSize).Take(_pageSize))
+                    {
+                        <tr @key="row.Id">
+                            @for (var i=0; i<Columns.Length; i++)
+                            {
+                                var col = Columns[i]; var cell = row.Cells[i];
+                                <td class="@col.Css" title="@Display(cell)">
+                                    @if (col.Key == "name") { <a href="@($"/accounting/customers/{row.CustomerId:D}/account")">@Display(cell)</a> }
+                                    else if (col.Key == "state") { <span class="debt-state @(Display(cell)=="متأخر" ? "debt-state--late" : Display(cell)=="دائن" || Display(cell)=="غير محدد" ? "debt-state--credit" : "")">@Display(cell)</span> }
+                                    else { @Display(cell) }
+                                </td>
+                            }
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </TableContent>
+    <Pagination>
+        <div class="oas-report__pager"><button @onclick="@(() => GoPage(1))" disabled="@(_page==1)">»</button><button @onclick="@(() => GoPage(_page-1))" disabled="@(_page==1)">‹</button><button class="active" disabled>@_page</button><button @onclick="@(() => GoPage(_page+1))" disabled="@(_page>=TotalPages)">›</button><button @onclick="@(() => GoPage(TotalPages))" disabled="@(_page>=TotalPages)">«</button></div>
+        <span title="الأرصدة من القيود المرحلة؛ التأخر والاستحقاق من الفواتير المفتوحة وقد يختلفان عن الرصيد المحاسبي.">عرض @(_rows.Count==0?0:(_page-1)*_pageSize+1) - @Math.Min(_page*_pageSize,_rows.Count) من @_rows.Count نتيجة</span>
+        <label>لكل صفحة <select value="@_pageSize" @onchange="ChangePageSize"><option>10</option><option>25</option><option>50</option><option>100</option></select></label>
+    </Pagination>
+    <Metrics>
+        <UiReportMetric Label="العملاء المدينون" Value="@MetricCount(_scope.Count(x=>x.Ledger.BalanceBase>0))" Tone="blue" Icon="fa-solid fa-users" />
+        <UiReportMetric Label="العملاء المتأخرون" Value="@MetricCount(_open.Where(IsOverdue).Select(x=>x.CustomerId).Distinct().Count())" Tone="violet" Icon="fa-solid fa-user-clock" />
+        <UiReportMetric Label="متأخر على الفواتير" Value="@MetricMoney(_open.Where(IsOverdue).Sum(x=>x.OutstandingBase))" Tone="red" Icon="fa-solid fa-clock" />
+        <UiReportMetric Label="غير مستحق (فواتير)" Value="@MetricMoney(_open.Where(x=>x.DaysPastDue<0).Sum(x=>x.OutstandingBase))" Tone="green" Icon="fa-solid fa-calendar-check" />
+        <UiReportMetric Label="أرصدة لصالح العملاء" Value="@MetricMoney(-_scope.Where(x=>x.Ledger.BalanceBase<0).Sum(x=>x.Ledger.BalanceBase))" Tone="orange" Icon="fa-solid fa-wallet" />
+        <UiReportMetric Label="إجمالي الأرصدة المدينة" Value="@MetricMoney(_scope.Where(x=>x.Ledger.BalanceBase>0).Sum(x=>x.Ledger.BalanceBase))" Tone="purple" Icon="fa-solid fa-coins" />
+    </Metrics>
+</UiReportWorkspace>
+</div>
+
+@code {
+    private sealed record Filters
+    {
+        public string Customer {get;set;} = "";
+        public DateTime AsOf {get;set;} = DateTime.Today;
+        public Guid? Currency {get;set;}
+        public string Mode {get;set;} = "summary";
+        public string Balance {get;set;} = "debit";
+        public string Due {get;set;} = "all";
+        public decimal? Min {get;set;}
+        public decimal? Max {get;set;}
+        public bool IncludeInactive {get;set;} = true;
+    }
+    private sealed record Column(string Key,string Label,string Css="");
+    private sealed record Row(Guid Id,Guid CustomerId,object?[] Cells);
+    private static readonly Column[] SummaryColumns = [new("code","رقم العميل"),new("name","اسم العميل"),new("debit","المدين","oas-report__amount oas-report__debit"),new("credit","الدائن","oas-report__amount oas-report__credit"),new("balance","الرصيد","oas-report__amount"),new("overdue","المتأخر","oas-report__amount oas-report__debit"),new("state","الحالة")];
+    private static readonly Column[] DetailColumns = [new("code","رقم العميل"),new("name","اسم العميل"),new("invoice","رقم الفاتورة"),new("date","تاريخ الفاتورة"),new("due","الاستحقاق"),new("original","قيمة الفاتورة","oas-report__amount"),new("paid","المسدد","oas-report__amount oas-report__credit"),new("returns","المرتجعات","oas-report__amount"),new("applied","التسويات","oas-report__amount"),new("outstanding","المتبقي","oas-report__amount oas-report__debit"),new("days","أيام التأخير"),new("state","الحالة")];
+    private static readonly Column[] AgingColumns = [new("code","رقم العميل"),new("name","اسم العميل"),new("future","غير مستحق","oas-report__amount"),new("today","مستحق اليوم","oas-report__amount"),new("30","1–30 يومًا","oas-report__amount"),new("60","31–60 يومًا","oas-report__amount"),new("90","61–90 يومًا","oas-report__amount"),new("over90","أكثر من 90","oas-report__amount oas-report__debit"),new("unknown","غير محدد","oas-report__amount"),new("outstanding","إجمالي الفواتير","oas-report__amount")];
+    private Column[] Columns => _applied.Mode switch {"detail"=>DetailColumns,"aging"=>AgingColumns,_=>SummaryColumns};
+    private Filters _draft = new(), _applied = new();
+    private CustomerDebtSnapshotDto? _snapshot;
+    private List<CurrencyDto> _currencies = [];
+    private IReadOnlyList<UiSelectOption> _options = [new("","جميع العملاء")];
+    private List<CustomerDebtCustomerDto> _scope = [];
+    private List<CustomerAgingLineDto> _open = [];
+    private List<Row> _rows = [];
+    private Guid? _baseId;
+    private string _baseName="العملة الأساسية", _currencyName="العملة الأساسية", _search="", _sortKey="balance";
+    private bool _descending=true,_busy,_filtersOpen=true;
+    private int _page=1,_pageSize=25;
+    private decimal _rate=1m;
+    private string? _error,_validation;
+    private int TotalPages=>Math.Max(1,(int)Math.Ceiling(_rows.Count/(double)_pageSize));
+    private bool CanExport=>!_busy && _error is null && _snapshot is not null && _rows.Count>0;
+    private static string ModeName(string v)=>v switch{"detail"=>"تفصيلي","aging"=>"أعمار الديون",_=>"إجمالي"};
+    private static string BalanceName(string v)=>v switch{"debit"=>"مدين","credit"=>"دائن","zero"=>"صفري","nonzero"=>"غير صفري",_=>"الكل"};
+    private static string DueName(string v)=>v switch{"due"=>"مستحق","future"=>"غير مستحق","today"=>"مستحق اليوم","overdue"=>"متأخر","unknown"=>"غير محدد",_=>"الكل"};
+    private (string Label,string Value,string Icon)[] Chips => [
+        ("العميل",_options.FirstOrDefault(x=>x.Value==_applied.Customer)?.Text??"جميع العملاء","fa-solid fa-users"),
+        ("إلى تاريخ",_applied.AsOf.ToString("dd/MM/yyyy",CultureInfo.InvariantCulture),"fa-regular fa-calendar"),
+        ("الفرع","جميع الفروع","fa-solid fa-building"),("العملة",_currencyName,"fa-solid fa-coins"),("نوع التقرير",ModeName(_applied.Mode),"fa-regular fa-file-lines"),
+        ("الرصيد",BalanceName(_applied.Balance),"fa-solid fa-wallet"),("الاستحقاق",DueName(_applied.Due),"fa-solid fa-clock")];
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var settings=await Accounting.GetAccountingSettingsAsync(); _baseId=settings?.BaseCurrencyId;
+            for(int page=1;;page++) { var result=await Accounting.GetCurrenciesPageAsync(new PageRequest{PageNumber=page,PageSize=100}); _currencies.AddRange(result.Items); if(!result.HasNextPage) break; }
+            _baseName=_currencies.FirstOrDefault(x=>x.Id==_baseId)?.NameAr??settings?.BaseCurrencyCode??"العملة الأساسية";
+        }
+        catch { _currencies=[]; } // Base-currency report remains available.
+        await ApplyAsync();
+    }
+    private void OnCustomer(string? value)=>_draft.Customer=value??"";
+    private Task RefreshAsync()=>LoadAsync(_applied with {},true);
+    private Task ApplyAsync()
+    {
+        _validation=null;
+        if(_draft.Min is < 0 || _draft.Max is < 0 || (_draft.Min.HasValue && _draft.Max.HasValue && _draft.Min>_draft.Max)){_validation="تحقق من نطاق المديونية.";return Task.CompletedTask;}
+        return LoadAsync(_draft with {},false);
+    }
+    private async Task ResetAsync(){_draft=new();_search="";await ApplyAsync();}
+    private async Task LoadAsync(Filters filters,bool force)
+    {
+        if(_busy)return;
+        _busy=true; _error=null; _validation=null;
+        try
+        {
+            var date=DateOnly.FromDateTime(filters.AsOf);
+            var dateText=date.ToString("yyyy-MM-dd",CultureInfo.InvariantCulture);
+            var rate=1m; var currencyName=_baseName;
+            if(filters.Currency is Guid id && id!=_baseId)
+            {
+                var currency=_currencies.FirstOrDefault(c=>c.Id==id && c.IsActive)??throw new InvalidOperationException("العملة غير متاحة.");
+                var effective=await Accounting.GetEffectiveExchangeRateAsync(id,date,ExchangeRateType.Accounting);
+                if(effective is null || effective.Rate<=0)throw new InvalidOperationException("لا يوجد سعر صرف محاسبي صالح حتى تاريخ التقرير.");
+                rate=effective.Rate;currencyName=$"{currency.NameAr} ({currency.Code})";
+            }
+            var snapshot=_snapshot;
+            if(force || snapshot is null || snapshot.AsOf!=date)
+                snapshot=await Api.GetAsync<CustomerDebtSnapshotDto>($"api/accounting/reports/customers/debt-snapshot?asOfDate={dateText}")??throw new InvalidOperationException("لم يُرجع الخادم بيانات التقرير.");
+            if(_applied.Mode!=filters.Mode){_sortKey=filters.Mode=="summary"?"balance":"outstanding";_descending=true;}
+            _snapshot=snapshot; _applied=filters;_rate=rate;_currencyName=currencyName;
+            _options=new[]{new UiSelectOption("","جميع العملاء")}.Concat(snapshot.Customers.OrderBy(x=>x.Ledger.CustomerCode).Select(x=>new UiSelectOption(x.Ledger.CustomerId.ToString(),$"{x.Ledger.CustomerCode} - {x.Ledger.CustomerName}"))).ToArray();
+            BuildRows();
+        }
+        catch(ApiClientException ex){_error="تعذر تحميل بيانات التقرير من الخادم.";ApiFeedback.Show(ex.Error);ClearRows();}
+        catch(Exception ex){_error=ex.Message;ClearRows();}
+        finally{_busy=false;}
+    }
+    private void ClearRows(){_rows=[];_scope=[];_open=[];_page=1;}
+    private static bool IsOverdue(CustomerAgingLineDto x)=>x.DaysPastDue>0;
+    private bool DueMatches(CustomerAgingLineDto x)=>_applied.Due switch{"due"=>x.DaysPastDue>=0,"future"=>x.DaysPastDue<0,"today"=>x.DaysPastDue==0,"overdue"=>IsOverdue(x),"unknown"=>x.DaysPastDue is null,_=>true};
+    private static decimal Sum(IEnumerable<CustomerAgingLineDto> list,Func<CustomerAgingLineDto,bool> match)=>list.Where(match).Sum(x=>x.OutstandingBase);
+    private static string Normalize(string s)=>new(s.Select(c=>c is >= '\u0660' and <= '\u0669'?(char)('0'+c-'\u0660'):c is >= '\u06f0' and <= '\u06f9'?(char)('0'+c-'\u06f0'):c).ToArray());
+    private bool Matches(string text)=>Normalize(text).Contains(Normalize(_search.Trim()),StringComparison.CurrentCultureIgnoreCase);
+    private void BuildRows()
+    {
+        if(_snapshot is null || _error is not null)return;
+        var invoices=_snapshot.Invoices.ToLookup(x=>x.CustomerId);
+        _scope=_snapshot.Customers.Where(c=>{
+            var b=c.Ledger;var amount=b.BalanceBase;var magnitude=Math.Abs(amount/_rate);
+            return (_applied.IncludeInactive||c.IsActive) && (string.IsNullOrEmpty(_applied.Customer)||b.CustomerId.ToString()==_applied.Customer)
+            && (_applied.Balance switch{"debit"=>amount>0,"credit"=>amount<0,"zero"=>amount==0,"nonzero"=>amount!=0,_=>true})
+            && (!_applied.Min.HasValue||magnitude>=_applied.Min.Value) && (!_applied.Max.HasValue||magnitude<=_applied.Max.Value)
+            && (_applied.Due=="all"||invoices[b.CustomerId].Any(DueMatches))
+            && (Matches($"{b.CustomerCode} {b.CustomerName} {b.AccountCode}")||(_applied.Mode=="detail"&&invoices[b.CustomerId].Any(x=>DueMatches(x)&&Matches(x.InvoiceNumber))));
+        }).ToList();
+        // Balance filters select customers. In summary/aging, show all open invoices of matching customers.
+        _open=_scope.SelectMany(c=>invoices[c.Ledger.CustomerId]).ToList();
+        _rows=[];
+        foreach(var c in _scope)
+        {
+            var b=c.Ledger;var list=invoices[b.CustomerId];var overdue=Sum(list,IsOverdue);
+            if(_applied.Mode=="summary")
+            {
+                var state=overdue>0?"متأخر":b.BalanceBase<0?"دائن":b.BalanceBase==0?"صفري":list.Any(x=>x.DaysPastDue==0)?"مستحق اليوم":list.Any(x=>x.DaysPastDue is null)||!list.Any()?"غير محدد":"منتظم";
+                _rows.Add(new(b.CustomerId,b.CustomerId,[b.CustomerCode,b.CustomerName,b.DebitBase,b.CreditBase,b.BalanceBase,overdue,state]));
+            }
+            else if(_applied.Mode=="aging")
+            {
+                _rows.Add(new(b.CustomerId,b.CustomerId,[b.CustomerCode,b.CustomerName,Sum(list,x=>x.DaysPastDue<0),Sum(list,x=>x.DaysPastDue==0),Sum(list,x=>x.DaysPastDue is >0 and <=30),Sum(list,x=>x.DaysPastDue is >30 and <=60),Sum(list,x=>x.DaysPastDue is >60 and <=90),Sum(list,x=>x.DaysPastDue>90),Sum(list,x=>x.DaysPastDue is null),list.Sum(x=>x.OutstandingBase)]));
+            }
+            else foreach(var x in list.Where(x=>DueMatches(x)&&(Matches($"{b.CustomerCode} {b.CustomerName} {b.AccountCode}")||Matches(x.InvoiceNumber))))
+            {
+                var state=x.DaysPastDue switch{null=>"غير محدد",>0=>"متأخر",0=>"مستحق اليوم",_=>"غير مستحق"};
+                _rows.Add(new(x.InvoiceId,b.CustomerId,[b.CustomerCode,b.CustomerName,x.InvoiceNumber,x.InvoiceDate,x.DueDate,x.OriginalBase,x.PaymentBase,x.ReturnBase,x.CreditAppliedBase,x.OutstandingBase,x.DaysPastDue.HasValue?(int?)Math.Max(0,x.DaysPastDue.Value):null,state]));
+            }
+        }
+        if(_applied.Mode=="detail")
+        {
+            var visibleInvoiceIds=_rows.Select(r=>r.Id).ToHashSet();
+            _open=_open.Where(x=>visibleInvoiceIds.Contains(x.InvoiceId)).ToList();
+            var visibleCustomers=_rows.Select(r=>r.CustomerId).ToHashSet();
+            _scope=_scope.Where(c=>visibleCustomers.Contains(c.Ledger.CustomerId)).ToList();
+        }
+        Sort();_page=1;
+    }
+    private void OnSearch(string value){_search=value;BuildRows();}
+    private void SortBy(string key){_descending=_sortKey==key&&!_descending;_sortKey=key;Sort();_page=1;}
+    private void Sort(){var i=Array.FindIndex(Columns,c=>c.Key==_sortKey);if(i<0)return;_rows=(_descending?_rows.OrderByDescending(x=>x.Cells[i]):_rows.OrderBy(x=>x.Cells[i])).ThenBy(x=>x.Id).ToList();}
+    private void GoPage(int page)=>_page=Math.Clamp(page,1,TotalPages);
+    private void ChangePageSize(ChangeEventArgs e){if(int.TryParse(e.Value?.ToString(),out var n)&&n is 10 or 25 or 50 or 100)_pageSize=n;_page=1;}
+    private string Money(decimal v)=>(v/_rate).ToString("N2",CultureInfo.InvariantCulture);
+    private string MetricMoney(decimal v)=>_error is not null||_busy?"—":Money(v);
+    private string MetricCount(int v)=>_error is not null||_busy?"—":v.ToString("N0",CultureInfo.InvariantCulture);
+    private string Display(object? v)=>v switch{null=>"—",decimal d=>Money(d),DateOnly date=>date.ToString("dd/MM/yyyy",CultureInfo.InvariantCulture),_=>v.ToString()??""};
+    private string ReportSubtitle=>$"حتى {_applied.AsOf:dd/MM/yyyy} | {_currencyName} | {ModeName(_applied.Mode)} | الأرصدة من القيود المرحلة والاستحقاقات من الفواتير المفتوحة | نطاق الرصيد المطلق: {_applied.Min?.ToString()??"—"} – {_applied.Max?.ToString()??"—"} | غير النشطين: {(_applied.IncludeInactive?"نعم":"لا")} | البحث: {_search}";
+    private async Task PrintAsync(){if(!CanExport)return;await using var m=await JS.InvokeAsync<IJSObjectReference>("import","./js/customer-debts-export.js");await m.InvokeVoidAsync("printReport","مديونية العملاء",ReportSubtitle,Chips.Select(x=>$"{x.Label}: {x.Value}").ToArray(),Columns.Select(x=>x.Label).ToArray(),_rows.Select(r=>r.Cells.Select(Display).ToArray()).ToArray());}
+    private async Task ExportAsync(){if(!CanExport)return;var bytes=CustomerDebtsWorkbook.Create(ReportSubtitle,Columns.Select(x=>x.Label).ToArray(),_rows.Select(r=>r.Cells.Select(x=>x is decimal d?(object)(d/_rate):x is DateOnly date?date.ToString("yyyy-MM-dd",CultureInfo.InvariantCulture):x).ToArray()));await using var m=await JS.InvokeAsync<IJSObjectReference>("import","./js/customer-debts-export.js");await m.InvokeVoidAsync("saveWorkbook",Convert.ToBase64String(bytes),"customer-debts.xlsx");}
+}

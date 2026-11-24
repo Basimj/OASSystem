@@ -40,6 +40,16 @@ public sealed class CustomerArReportsController(
         return Ok(await Reports.StatementAsync(customerId, fromDate, toDate, pageNumber, pageSize, ct));
     }
 
+    [HttpGet("debt-snapshot")]
+    public async Task<ActionResult<CustomerDebtSnapshotDto>> DebtSnapshot(
+        [FromQuery] DateOnly asOfDate, CancellationToken ct = default)
+    {
+        if (!await Allowed(ct)) return Forbid();
+        if (asOfDate == DateOnly.MaxValue || asOfDate == DateOnly.MinValue)
+            return BadRequest("تاريخ التقرير غير صالح.");
+        return Ok(await Reports.DebtSnapshotAsync(asOfDate, ct));
+    }
+
     [HttpGet("balances")]
     public async Task<ActionResult<CustomerBalancesReportDto>> Balances(
         [FromQuery] DateOnly asOfDate, [FromQuery] string? search = null,

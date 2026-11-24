@@ -1,0 +1,76 @@
+/* Supplier-debts-specific layout; common report appearance lives in UiLib. */
+.supplier-debts-report { min-width: 0; }
+
+/* Shared UiReportWorkspace owns header/row colors, sort buttons and toolbar. */
+.supplier-debts-report ::deep .oas-report__sortable-th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+.supplier-debts-report ::deep .oas-report__table td:nth-child(2) { white-space: normal; min-width: 90px; max-width: 180px; overflow-wrap: anywhere; }
+.supplier-debts-report ::deep .oas-report__table td a { color: #2459aa; text-decoration: none; }
+.supplier-debts-report ::deep .oas-report__table td a:hover { text-decoration: underline; }
+.supplier-debts-report ::deep .debt-state { display: inline-block; background: #e1f7e9; color: #1c683c; border-radius: 14px; padding: 2px 6px; font-size: 10px; white-space: nowrap; }
+.supplier-debts-report ::deep .debt-state--late { background: #fbe4e8; color: #b82135; }
+.supplier-debts-report ::deep .debt-state--credit { background: #fff0d9; color: #96600b; }
+
+/* Compact sidebar: 7 fields, one amount row and checkbox fit the laptop layout.
+   On exceptionally short screens or with validation messages, only fields may
+   scroll; the action buttons remain visible. */
+.supplier-debts-report ::deep .oas-report__aside {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    padding: 5px 6px;
+    gap: 4px;
+}
+.supplier-debts-report ::deep .oas-report__aside-header {
+    flex: 0 0 auto;
+    padding: 0 0 3px;
+    min-height: 22px;
+    font-size: 10px;
+}
+.supplier-debts-report ::deep .oas-report__aside-header button { min-height: 20px; min-width: 23px; padding: 0 3px; }
+.supplier-debts-report ::deep .debt-filter-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 0;
+    flex: 0 1 auto;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+.supplier-debts-report ::deep .oas-report__aside .oas-report__field {
+    margin: 0;
+    gap: 1px;
+    font-size: 10px;
+    line-height: 12px;
+    font-weight: 600;
+    flex: 0 0 auto;
+    min-width: 0;
+}
+.supplier-debts-report ::deep .oas-report__aside .oas-report__field > :is(select, input) {
+    height: 21px;
+    min-height: 21px;
+    padding: 0 4px;
+    font-size: 10px;
+    line-height: 1.2;
+    margin: 0;
+}
+.supplier-debts-report ::deep .oas-report-picker { gap: 1px; }
+.supplier-debts-report ::deep .oas-report-picker__label { font-size: 10px; line-height: 12px; margin: 0; }
+.supplier-debts-report ::deep .oas-report-picker__trigger { height: 21px; min-height: 21px; padding: 0 4px; font-size: 10px; }
+.supplier-debts-report ::deep .oas-report__date-pair { gap: 4px; flex: 0 0 auto; }
+.supplier-debts-report ::deep .oas-report__aside .oas-report__field-check { margin: 0; font-size: 10px; line-height: 15px; min-height: 15px; flex: 0 0 auto; gap: 4px; }
+.supplier-debts-report ::deep .oas-report__field-check input { margin: 0; width: 13px; height: 13px; flex: none; }
+.supplier-debts-report ::deep .oas-report__apply { flex: 0 0 auto; margin-top: auto; gap: 4px; background: #fff; }
+.supplier-debts-report ::deep .oas-report__apply button { min-height: 25px; padding: 3px 2px; font-size: 10px; line-height: 1.3; }
+.supplier-debts-report ::deep .debt-validation { color: #bd2634; font-size: 10px; line-height: 1.3; margin: 0; }
+.supplier-debts-report ::deep .oas-report__metric strong { white-space: nowrap; font-size: clamp(10px,1.1vw,14px); }
+.supplier-debts-report ::deep .oas-report__metric b { font-size: 10px; }
+@media print {
+    .supplier-debts-report ::deep .oas-report__table th,
+    .supplier-debts-report ::deep .oas-report__table td { white-space: normal; }
+    .supplier-debts-report ::deep .oas-report__sortable-th { position: static; }
+}

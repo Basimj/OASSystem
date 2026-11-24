@@ -232,113 +232,118 @@ public sealed class SupplierApReportingQueryService(OasDbContext db) : ISupplier
         var pageNumber = Math.Max(1, filter.PageNumber);
         var pageSize = Math.Clamp(filter.PageSize, 1, PageRequest.MaximumPageSize);
 
-        var aggregates =
-            from line in db.Set<JournalEntryLine>().AsNoTracking()
-            join journal in db.Set<JournalEntry>().AsNoTracking()
-                on line.JournalEntryId equals journal.Id
-            where journal.Status == JournalEntryStatus.Posted
-                  && journal.PostingDate <= filter.AsOfDate
-            group line by line.AccountId
-            into g
-            select new
-            {
-                AccountId = g.Key,
-                Debit = g.Sum(x => x.DebitAmount),
-                Credit = g.Sum(x => x.CreditAmount)
-            };
-
-        var query =
+        // Keep metadata and posted-ledger aggregation separate. EF Core cannot
+        // reliably translate a second GROUP BY/SUM over the aggregate LEFT JOIN.
+        var suppliers =
             from supplier in db.Set<Supplier>().AsNoTracking()
             join account in db.Set<Account>().AsNoTracking()
                 on supplier.AccountId equals account.Id
-            join aggregate in aggregates
-                on account.Id equals aggregate.AccountId into aggregateJoin
-            from aggregate in aggregateJoin.DefaultIfEmpty()
-            // Filter directly on aggregate columns before projecting null aggregates as zero.
-            // Comparing the projected (CASE WHEN ... THEN 0 ELSE ...) columns in Where
-            // produced a non-translatable EF Core expression in supplier balance exports.
-            where filter.IncludeZeroBalance ||
-                (aggregate != null && aggregate.Credit != aggregate.Debit)
             select new
             {
                 SupplierId = supplier.Id,
                 supplier.SupplierCode,
+                supplier.IsActive,
                 SupplierName = supplier.NameAr,
                 AccountId = account.Id,
                 AccountCode = account.Code,
-                AccountName = account.NameAr,
-                Debit = aggregate == null ? 0m : aggregate.Debit,
-                Credit = aggregate == null ? 0m : aggregate.Credit
+                AccountName = account.NameAr
             };
 
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
             var term = filter.Search.Trim();
-            query = query.Where(x =>
+            suppliers = suppliers.Where(x =>
                 x.SupplierCode.Contains(term) ||
                 x.SupplierName.Contains(term) ||
                 x.AccountCode.Contains(term) ||
                 x.AccountName.Contains(term));
         }
-        // Zero balance filtering is applied in SQL before projection above.
 
-        var totalCount = await query.LongCountAsync(cancellationToken);
-        var totals = await query
-            .GroupBy(_ => 1)
-            .Select(g => new
-            {
-                Liability = g.Sum(x => x.Credit - x.Debit),
-                DebitBalance = g.Sum(x => x.Debit > x.Credit ? x.Debit - x.Credit : 0m),
-                CreditBalance = g.Sum(x => x.Credit > x.Debit ? x.Credit - x.Debit : 0m)
-            })
-            .SingleOrDefaultAsync(cancellationToken);
-
+        // Preserve database collation for textual sort keys. For balance sorting,
+        // load in supplier-code order to provide the same stable secondary key.
         var descending = filter.SortDirection == SortDirection.Descending;
         var sortBy = filter.SortBy?.Trim().ToLowerInvariant();
-        var ordered = sortBy switch
+        var orderedSuppliers = sortBy switch
         {
-            "balance" => descending
-                ? query.OrderByDescending(x => x.Credit - x.Debit).ThenBy(x => x.SupplierCode)
-                : query.OrderBy(x => x.Credit - x.Debit).ThenBy(x => x.SupplierCode),
             "accountcode" => descending
-                ? query.OrderByDescending(x => x.AccountCode).ThenBy(x => x.SupplierCode)
-                : query.OrderBy(x => x.AccountCode).ThenBy(x => x.SupplierCode),
+                ? suppliers.OrderByDescending(x => x.AccountCode).ThenBy(x => x.SupplierCode)
+                : suppliers.OrderBy(x => x.AccountCode).ThenBy(x => x.SupplierCode),
             "name" => descending
-                ? query.OrderByDescending(x => x.SupplierName).ThenBy(x => x.SupplierCode)
-                : query.OrderBy(x => x.SupplierName).ThenBy(x => x.SupplierCode),
+                ? suppliers.OrderByDescending(x => x.SupplierName).ThenBy(x => x.SupplierCode)
+                : suppliers.OrderBy(x => x.SupplierName).ThenBy(x => x.SupplierCode),
+            "balance" => suppliers.OrderBy(x => x.SupplierCode),
             _ => descending
-                ? query.OrderByDescending(x => x.SupplierCode)
-                : query.OrderBy(x => x.SupplierCode)
+                ? suppliers.OrderByDescending(x => x.SupplierCode)
+                : suppliers.OrderBy(x => x.SupplierCode)
         };
-
-        var page = await ordered
-            .Skip((pageNumber - 1) * pageSize)
-            .Take(pageSize)
+        var metadata = await orderedSuppliers.ThenBy(x => x.SupplierId)
             .ToListAsync(cancellationToken);
+
+        // A single server-side GROUP BY over inner joins; only two decimal sums
+        // per supplier cross the database boundary, never individual ledger lines.
+        var postedBalances =
+            from supplier in suppliers
+            join line in db.Set<JournalEntryLine>().AsNoTracking()
+                on supplier.AccountId equals line.AccountId
+            join journal in db.Set<JournalEntry>().AsNoTracking()
+                on line.JournalEntryId equals journal.Id
+            where journal.Status == JournalEntryStatus.Posted
+                  && journal.PostingDate <= filter.AsOfDate
+            group line by supplier.SupplierId into g
+            select new
+            {
+                SupplierId = g.Key,
+                Debit = g.Sum(x => x.DebitAmount),
+                Credit = g.Sum(x => x.CreditAmount)
+            };
+        var balances = await postedBalances.ToDictionaryAsync(x => x.SupplierId,
+            cancellationToken);
+
+        var combined = metadata.Select(x =>
+        {
+            var balance = balances.GetValueOrDefault(x.SupplierId);
+            return new { Meta = x, Debit = balance?.Debit ?? 0m, Credit = balance?.Credit ?? 0m };
+        }).Where(x => filter.IncludeZeroBalance || x.Credit != x.Debit).ToArray();
+
+        // Calculate totals on all matching suppliers, before paging and rounding.
+        var totalLiability = combined.Sum(x => x.Credit - x.Debit);
+        var totalDebit = combined.Sum(x => Math.Max(0m, x.Debit - x.Credit));
+        var totalCredit = combined.Sum(x => Math.Max(0m, x.Credit - x.Debit));
+        var totalCount = combined.LongLength;
+
+        // LINQ-to-Objects OrderBy is stable: equal balances retain the SQL code order.
+        var ordered = sortBy == "balance"
+            ? (descending
+                ? combined.OrderByDescending(x => x.Credit - x.Debit).ToArray()
+                : combined.OrderBy(x => x.Credit - x.Debit).ToArray())
+            : combined;
+        var page = filter.AllRows ? ordered : ordered
+            .Skip((int)Math.Min((long)(pageNumber - 1) * pageSize, int.MaxValue))
+            .Take(pageSize).ToArray();
 
         var rows = page.Select(x =>
         {
             var liability = Round(x.Credit - x.Debit);
             return new SupplierBalanceRowDto(
-                x.SupplierId,
-                x.SupplierCode,
-                x.SupplierName,
-                x.AccountId,
-                x.AccountCode,
-                x.AccountName,
+                x.Meta.SupplierId,
+                x.Meta.SupplierCode,
+                x.Meta.SupplierName,
+                x.Meta.AccountId,
+                x.Meta.AccountCode,
+                x.Meta.AccountName,
                 Round(x.Debit),
                 Round(x.Credit),
                 liability,
                 liability < 0m ? Math.Abs(liability) : 0m,
-                liability > 0m ? liability : 0m);
+                liability > 0m ? liability : 0m) { IsActive = x.Meta.IsActive };
         }).ToArray();
 
         return new SupplierBalancesDto(
             filter.AsOfDate,
             rows,
-            Round(totals?.Liability ?? 0m),
-            Round(totals?.DebitBalance ?? 0m),
-            Round(totals?.CreditBalance ?? 0m),
+            Round(totalLiability),
+            Round(totalDebit),
+            Round(totalCredit),
             totalCount,
             pageNumber,
             pageSize);

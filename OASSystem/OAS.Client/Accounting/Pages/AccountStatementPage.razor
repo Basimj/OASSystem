@@ -31,7 +31,7 @@
         <div class="oas-report__chip" title="كل المراكز"><i class="fa-solid fa-diagram-project"></i><span class="oas-report__chip-label">مركز التكلفة:</span><strong>كل المراكز</strong></div>
     </QuickFilters>
     <TableContent>
-        <table class="oas-report__table">
+        <table class="oas-report__table account-statement-table">
             <thead><tr>
                 <UiReportSortHeader Label="التاريخ" Active="@(_sortColumn == SortColumn.Date)" Descending="@_sortDescending" OnSort="@(() => SortBy(SortColumn.Date))" />
                 <UiReportSortHeader Label="نوع المستند" Active="@(_sortColumn == SortColumn.Kind)" Descending="@_sortDescending" OnSort="@(() => SortBy(SortColumn.Kind))" />

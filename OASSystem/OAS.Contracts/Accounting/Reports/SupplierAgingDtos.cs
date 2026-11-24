@@ -5,7 +5,11 @@ public sealed record SupplierAgingFilterDto(
     Guid? SupplierId = null,
     string? Search = null,
     int PageNumber = 1,
-    int PageSize = 100);
+    int PageSize = 100)
+{
+    // Used only by the authorized report snapshot query.
+    public bool AllRows { get; init; }
+}
 
 public sealed record SupplierAgingLineDto(
     string SourceType,
@@ -24,7 +28,12 @@ public sealed record SupplierAgingLineDto(
     decimal OriginalBaseAmount,
     decimal OutstandingBaseAmount,
     string? CurrencyCode,
-    decimal? OriginalDocumentAmount);
+    decimal? OriginalDocumentAmount)
+{
+    public decimal? PaymentBaseAmount { get; init; }
+    public decimal? CreditAppliedBaseAmount { get; init; }
+    public decimal? OpeningAppliedBaseAmount { get; init; }
+}
 
 public sealed record SupplierAgingSupplierSummaryDto(
     Guid SupplierId,

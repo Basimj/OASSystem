@@ -5,6 +5,7 @@ namespace OAS.Application.Accounting.Abstractions;
 /// <summary>Read-only customer AR reports; GL is authoritative for statements/reconciliation.</summary>
 public interface ICustomerArReportingQueryService
 {
+    Task<CustomerDebtSnapshotDto> DebtSnapshotAsync(DateOnly asOf, CancellationToken ct = default);
     Task<CustomerStatementReportDto> StatementAsync(Guid customerId, DateOnly from, DateOnly to,
         int pageNumber = 1, int pageSize = 50, CancellationToken ct = default);
     Task<CustomerBalancesReportDto> BalancesAsync(DateOnly asOf, string? search = null,

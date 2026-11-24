@@ -67,3 +67,8 @@ public sealed record CustomerArDocumentRowDto(
 public sealed record CustomerArDocumentPageDto(
     string Kind, IReadOnlyList<CustomerArDocumentRowDto> Rows,
     long TotalCount, int PageNumber, int PageSize);
+
+// Report snapshot, separate from the existing paged endpoints. Amounts in base currency.
+public sealed record CustomerDebtCustomerDto(CustomerBalanceRowDto Ledger, bool IsActive);
+public sealed record CustomerDebtSnapshotDto(DateOnly AsOf, string BaseCurrencyCode,
+    IReadOnlyList<CustomerDebtCustomerDto> Customers, IReadOnlyList<CustomerAgingLineDto> Invoices);

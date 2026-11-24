@@ -92,11 +92,28 @@ public sealed class CustomerArReportingQueryService(OasDbContext db) : ICustomer
             R(opening + debit - credit), page, total, pageNumber, pageSize);
     }
 
-    public async Task<CustomerBalancesReportDto> BalancesAsync(DateOnly asOf,
+    private const int DebtSnapshotLimit = 50000;
+
+    public async Task<CustomerDebtSnapshotDto> DebtSnapshotAsync(DateOnly asOf, CancellationToken ct = default)
+    {
+        var balances = await BalancesCoreAsync(asOf, null, 1, DebtSnapshotLimit, true, ct);
+        var aging = await AgingCoreAsync(asOf, null, 1, DebtSnapshotLimit, true, ct);
+        var activity = await db.Set<Customer>().AsNoTracking().Select(c => new { c.Id, c.IsActive })
+            .ToDictionaryAsync(c => c.Id, c => c.IsActive, ct);
+        return new CustomerDebtSnapshotDto(asOf, balances.BaseCurrencyCode,
+            balances.Customers.Select(c => new CustomerDebtCustomerDto(c, activity.GetValueOrDefault(c.CustomerId))).ToArray(),
+            aging.Invoices);
+    }
+
+    public Task<CustomerBalancesReportDto> BalancesAsync(DateOnly asOf,
         string? search = null, int pageNumber = 1, int pageSize = 50, CancellationToken ct = default)
+        => BalancesCoreAsync(asOf, search, pageNumber, pageSize, false, ct);
+
+    private async Task<CustomerBalancesReportDto> BalancesCoreAsync(DateOnly asOf,
+        string? search, int pageNumber, int pageSize, bool snapshot, CancellationToken ct)
     {
         pageNumber = Math.Max(1, pageNumber);
-        pageSize = Math.Clamp(pageSize, 1, 200);
+        pageSize = snapshot ? DebtSnapshotLimit : Math.Clamp(pageSize, 1, 200);
 
         // Query customer metadata independently of the ledger. In particular, avoid
         // materializing a non-nullable decimal from an aggregate LEFT JOIN whose
@@ -112,6 +129,8 @@ public sealed class CustomerArReportingQueryService(OasDbContext db) : ICustomer
         }
 
         var count = await customers.LongCountAsync(ct);
+        if (snapshot && count > DebtSnapshotLimit)
+            throw new ConflictException("CustomerDebtSnapshotLimit", "عدد العملاء يتجاوز سعة التقرير الحالية؛ يلزم تقرير بترقيم من الخادم.");
         var page = await customers.OrderBy(x => x.CustomerCode).ThenBy(x => x.Id)
             .Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync(ct);
         var visibleIds = page.Select(x => x.Id).ToHashSet();
@@ -168,11 +187,15 @@ public sealed class CustomerArReportingQueryService(OasDbContext db) : ICustomer
     /// Each aggregate below remains server-side SQL; only the final arithmetic on
     /// a 500-invoice batch runs in memory. No tracking, no mutable balances.
     /// </summary>
-    public async Task<CustomerAgingReportDto> AgingAsync(DateOnly asOf, Guid? customerId = null,
+    public Task<CustomerAgingReportDto> AgingAsync(DateOnly asOf, Guid? customerId = null,
         int pageNumber = 1, int pageSize = 50, CancellationToken ct = default)
+        => AgingCoreAsync(asOf, customerId, pageNumber, pageSize, false, ct);
+
+    private async Task<CustomerAgingReportDto> AgingCoreAsync(DateOnly asOf, Guid? customerId,
+        int pageNumber, int pageSize, bool snapshot, CancellationToken ct)
     {
         pageNumber = Math.Max(1, pageNumber);
-        pageSize = Math.Clamp(pageSize, 1, 200);
+        pageSize = snapshot ? DebtSnapshotLimit : Math.Clamp(pageSize, 1, 200);
         var cutoff = DateTime.SpecifyKind(asOf.AddDays(1).ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
         const int batchSize = 500;
         var pageOffset = ((long)pageNumber - 1L) * pageSize;
@@ -277,6 +300,8 @@ public sealed class CustomerArReportingQueryService(OasDbContext db) : ICustomer
                         remaining, invoice.CurrencyCodeSnapshot));
                 }
                 count++;
+                if (snapshot && count > DebtSnapshotLimit)
+                    throw new ConflictException("CustomerDebtSnapshotLimit", "عدد الفواتير المفتوحة يتجاوز سعة التقرير الحالية؛ يلزم تقرير بترقيم من الخادم.");
             }
         }
 

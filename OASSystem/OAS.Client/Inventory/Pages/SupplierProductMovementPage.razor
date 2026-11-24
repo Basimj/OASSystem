@@ -1,0 +1,229 @@
+@page "/inventory/reports/supplier-products"
+@attribute [Authorize]
+@using System.Globalization
+@using OAS.Contracts.Inventory.Reports
+@using OAS.Contracts.Accounting.Currencies
+@using OAS.Contracts.Accounting.Enums
+@using OAS.Client.Accounting.Pages
+@inject IAccountingClientService Accounting
+@inject OasApiClient Api
+@inject IJSRuntime JS
+@inject IApiFeedbackService ApiFeedback
+
+<PageTitle>المنتجات والموردون | OAS</PageTitle>
+<div class="supplier-products-report">
+<UiReportWorkspace Title="المنتجات والموردون" StatusText="@(_busy ? "جارٍ التحميل" : ModeName(_applied.Mode))" Search="@_search" SearchChanged="OnSearch" FiltersOpen="@_filtersOpen" FiltersOpenChanged="@(v=>_filtersOpen=v)">
+    <Toolbar>
+        <button type="button" class="oas-report__tool" title="تحديث" disabled="@_busy" @onclick="ApplyAsync"><i class="fa-solid fa-rotate"></i></button>
+        <button type="button" class="oas-report__tool oas-report__tool--pdf" title="حفظ PDF" disabled="@(!CanExport)" @onclick="PrintAsync"><i class="fa-regular fa-file-pdf"></i></button>
+        <button type="button" class="oas-report__tool oas-report__tool--excel" title="تصدير Excel" disabled="@(!CanExport)" @onclick="ExportAsync"><i class="fa-regular fa-file-excel"></i></button>
+        <button type="button" class="oas-report__tool" title="طباعة" disabled="@(!CanExport)" @onclick="PrintAsync"><i class="fa-solid fa-print"></i></button>
+        <button type="button" class="oas-report__tool" title="إظهار أو إخفاء الفلاتر" @onclick="@(()=>_filtersOpen=!_filtersOpen)"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+    </Toolbar>
+    <QuickFilters>
+        @foreach(var c in Chips){<div class="oas-report__chip" title="@($"{c.Label}: {c.Value}")"><span class="oas-report__chip-label">@c.Label:</span><strong>@c.Value</strong></div>}
+    </QuickFilters>
+    <FilterPanel>
+        <div class="movement-fields">
+            <div class="oas-report__field"><UiReportSearchPicker Label="المورد" ItemLabel="مورد" DialogTitle="اختيار المورد" Value="@_draft.Supplier" ValueChanged="OnSupplier" Options="@SupplierOptions" Placeholder="جميع الموردين" /></div>
+            <div class="oas-report__field"><UiReportSearchPicker Label="الصنف" ItemLabel="صنف" DialogTitle="اختيار الصنف" SearchPlaceholder="ابحث بالاسم أو رمز الصنف..." Value="@_draft.Variant" ValueChanged="OnVariant" Options="@VariantOptions" Placeholder="جميع الأصناف" /></div>
+            @if(string.IsNullOrEmpty(_draft.Variant))
+            {<label class="oas-report__field">المنتج<select disabled><option>اختر الصنف أولاً</option></select></label>}
+            else
+            {<div class="oas-report__field"><UiReportSearchPicker Label="المنتج" ItemLabel="منتج" DialogTitle="المنتج المرتبط بالصنف" Value="@_draft.Product" ValueChanged="OnProduct" Options="@ProductOptions" Placeholder="المنتج المرتبط" /></div>}
+            <label class="oas-report__field">التصنيف<select value="@_draft.Category" @onchange="OnCategory"><option value="">جميع التصنيفات</option>@foreach(var o in Categories){<option value="@o.Id">@o.Name</option>}</select></label>
+            <label class="oas-report__field">المستودع<select @bind="_draft.Warehouse"><option value="">جميع المستودعات</option>@foreach(var o in Warehouses){<option value="@o.Id">@o.Name</option>}</select></label>
+            <div class="oas-report__date-pair">
+                <label class="oas-report__field">من تاريخ<input type="date" @bind="_draft.From" @bind:format="yyyy-MM-dd" /></label>
+                <label class="oas-report__field">إلى تاريخ<input type="date" @bind="_draft.To" @bind:format="yyyy-MM-dd" /></label>
+            </div>
+            <label class="oas-report__field">العملة<select @bind="_draft.Currency" disabled="@(_draft.Mode=="qty")"><option value="">@_baseName (الأساسية)</option>@foreach(var c in _currencies.Where(x=>x.IsActive&&x.Id!=_baseId)){<option value="@c.Id">@c.NameAr (@c.Code)</option>}</select></label>
+            <label class="oas-report__field">نوع التقرير<select @bind="_draft.Mode"><option value="cost">تحليلي تكاليف</option><option value="qty">تحليلي كميات</option></select></label>
+            <label class="oas-report__field">التجميع حسب<select value="@_draft.Group" @onchange="OnGroup"><option value="supplier">المورد ثم الصنف</option><option value="item-supplier">الصنف ثم المورد</option><option value="item">الصنف فقط (جميع المصادر)</option></select></label>
+            <label class="oas-report__field-check"><input type="checkbox" @bind="_draft.HideEmpty" /> إخفاء الأصناف دون حركة أو رصيد</label>
+            @if(_validation is not null){<div role="alert" class="movement-warning">@_validation</div>}
+        </div>
+        <div class="oas-report__apply"><button type="button" class="primary" disabled="@_busy" @onclick="ApplyAsync"><i class="fa-solid fa-filter"></i> تطبيق</button><button type="button" disabled="@_busy" @onclick="ResetAsync"><i class="fa-solid fa-rotate-left"></i> إعادة تعيين</button></div>
+    </FilterPanel>
+    <TableContent>
+        @if(_busy){<div class="oas-report__empty">جارٍ تحميل حركات المخزون...</div>}
+        else if(_error is not null){<div class="oas-report__empty" role="alert">@_error</div>}
+        else
+        {
+            <div class="movement-note" role="note">@ScopeNote</div>
+            <table class="oas-report__table movement-table">
+                <thead>
+                    <tr class="movement-group-head"><th colspan="@IdentityCount" scope="colgroup">بيانات الصنف</th><th colspan="3" scope="colgroup" class="movement-in">@Prefix الوارد</th><th colspan="2" scope="colgroup" class="movement-out">@Prefix المرتجع والصرف</th><th colspan="2" scope="colgroup" class="movement-sales">@Prefix المبيعات</th><th scope="col">المتبقي</th></tr>
+                    <tr>@foreach(var col in Columns){<UiReportSortHeader @key="col.Key" Label="@col.Label" Active="@(_sortKey==col.Key)" Descending="@_descending" OnSort="@(()=>SortBy(col.Key))" />}</tr>
+                </thead>
+                <tbody>
+                    @if(_rows.Count==0){<tr><td colspan="@Columns.Length" class="oas-report__empty">لا توجد نتائج مطابقة للفلاتر.</td></tr>}
+                    @foreach(var group in PageRows.GroupBy(GroupKey))
+                    {
+                        var key=group.Key;
+                        var full=_groups[key];
+                        <tr class="movement-group"><td colspan="@Columns.Length"><button type="button" aria-expanded="@(!_collapsed.Contains(key))" @onclick="@(()=>ToggleGroup(key))"><i class="fa-solid @(_collapsed.Contains(key)?"fa-chevron-down":"fa-chevron-up")"></i> @GroupTitle(key)</button></td></tr>
+                        @if(!_collapsed.Contains(key))
+                        {
+                            @foreach(var row in group)
+                            {
+                                <tr>@foreach(var col in Columns){var v=Cell(row,col.Key);<td class="@col.Css" title="@Display(v)">@Display(v)</td>}</tr>
+                            }
+                        }
+                        <tr class="movement-subtotal"><td colspan="@IdentityCount">إجمالي المجموعة (كل النتائج)</td>@foreach(var col in Columns.Skip(IdentityCount)){<td class="@col.Css">@Display(Total(full,col.Key))</td>}</tr>
+                    }
+                    @if(_rows.Count>0){<tr class="movement-grand"><td colspan="@IdentityCount">الإجمالي العام</td>@foreach(var col in Columns.Skip(IdentityCount)){<td class="@col.Css">@Display(Total(_rows,col.Key))</td>}</tr>}
+                </tbody>
+            </table>
+        }
+    </TableContent>
+    <Pagination>
+        <div class="oas-report__pager"><button @onclick="@(()=>GoPage(1))" disabled="@(_page==1)">»</button><button @onclick="@(()=>GoPage(_page-1))" disabled="@(_page==1)">‹</button><button class="active" disabled>@_page</button><button @onclick="@(()=>GoPage(_page+1))" disabled="@(_page>=TotalPages)">›</button><button @onclick="@(()=>GoPage(TotalPages))" disabled="@(_page>=TotalPages)">«</button></div>
+        <span>عرض @(_rows.Count==0?0:(_page-1)*_pageSize+1) - @Math.Min(_page*_pageSize,_rows.Count) من @_rows.Count نتيجة</span>
+        <label>لكل صفحة <select value="@_pageSize" @onchange="ChangePageSize"><option>10</option><option>25</option><option>50</option><option>100</option></select></label>
+    </Pagination>
+    <Metrics>
+        <UiReportMetric Label="عدد الموردين" Value="@SupplierCount" Tone="blue" Icon="fa-solid fa-users" />
+        <UiReportMetric Label="عدد الأصناف" Value="@MetricCount(_rows.Select(x=>x.Item.Id).Distinct().Count())" Tone="violet" Icon="fa-solid fa-boxes-stacked" />
+        <UiReportMetric Label="الرصيد الافتتاحي" Value='@(Metric("opening"))' Tone="orange" Icon="fa-solid fa-box" />
+        <UiReportMetric Label="إجمالي الوارد" Value='@(Metric("in"))' Tone="green" Icon="fa-solid fa-arrow-down" />
+        <UiReportMetric Label="إجمالي الصادر" Value='@(Metric("out"))' Tone="red" Icon="fa-solid fa-arrow-up" />
+        <UiReportMetric Label="الرصيد المتبقي المحسوب" Value='@(Metric("closing"))' Tone="purple" Icon="fa-solid fa-coins" />
+    </Metrics>
+</UiReportWorkspace>
+</div>
+
+@code {
+    private sealed record Filters
+    {
+        public string Supplier {get;set;}=""; public string Variant {get;set;}=""; public string Product {get;set;}="";
+        public string Category {get;set;}=""; public string Warehouse {get;set;}="";
+        public DateTime From {get;set;}=new(DateTime.Today.Year,1,1); public DateTime To {get;set;}=DateTime.Today;
+        public Guid? Currency {get;set;} public string Mode {get;set;}="cost"; public string Group {get;set;}="supplier";
+        public bool HideEmpty {get;set;}=true;
+    }
+    private sealed record Column(string Key,string Label,string Css="");
+    private sealed record Row(SupplierProductMovementRow Data,MovementReportItem Item,string SupplierName,string SupplierCode);
+    private static readonly Column[] Identity=[new("code","رقم الصنف"),new("name","اسم الصنف"),new("unit","الوحدة")];
+    private static readonly Column[] Values=[new("opening","رصيد الافتتاح","oas-report__amount"),new("purchase","المشتريات","oas-report__amount oas-report__credit"),new("otherIn","توريد مخزني","oas-report__amount oas-report__credit"),new("purchaseReturn","مردود المشتريات","oas-report__amount oas-report__debit"),new("otherOut","صرف مخزني","oas-report__amount oas-report__debit"),new("sales","المبيعات","oas-report__amount oas-report__debit"),new("salesReturn","مردود المبيعات","oas-report__amount oas-report__credit"),new("closing","المتبقي","oas-report__amount")];
+    private Column[] Columns=>_applied.Group=="item-supplier"?[..Identity,new("supplier","المورد"),..Values]:[..Identity,..Values];
+    private int IdentityCount=>_applied.Group=="item-supplier"?4:3;
+    private Filters _draft=new(),_applied=new();
+    private SupplierProductMovementReportDto? _snapshot;
+    private List<CurrencyDto> _currencies=[];
+    private Guid? _baseId;
+    private string _baseName="العملة الأساسية",_currencyName="العملة الأساسية",_search="",_sortKey="code";
+    private bool _busy,_filtersOpen=true,_descending;
+    private decimal _rate=1m;
+    private int _page=1,_pageSize=25;
+    private string? _error,_validation;
+    private List<Row> _rows=[];
+    private Dictionary<string,List<Row>> _groups=new();
+    private HashSet<string> _collapsed=[];
+    private IEnumerable<Row> PageRows=>_rows.Skip((_page-1)*_pageSize).Take(_pageSize);
+    private int TotalPages=>Math.Max(1,(int)Math.Ceiling(_rows.Count/(double)_pageSize));
+    private bool CanExport=>!_busy&&_error is null&&_rows.Count>0;
+    private IReadOnlyList<MovementReportItem> Items=>_snapshot?.Items??[];
+    private IReadOnlyList<MovementReportOption> Suppliers=>_snapshot?.Suppliers??[];
+    private IReadOnlyList<MovementReportOption> Categories=>_snapshot?.Categories??[];
+    private IReadOnlyList<MovementReportOption> Warehouses=>_snapshot?.Warehouses??[];
+    private IReadOnlyList<UiSelectOption> SupplierOptions=>Options(Suppliers,"جميع الموردين");
+    private IReadOnlyList<UiSelectOption> VariantOptions=>new[]{new UiSelectOption("","جميع الأصناف")}.Concat(Items.Where(x=>string.IsNullOrEmpty(_draft.Category)||x.CategoryId.ToString()==_draft.Category).Select(x=>new UiSelectOption(x.Id.ToString(),$"{x.Code} - {x.Name}"))).ToArray();
+    private IReadOnlyList<UiSelectOption> ProductOptions=>Items.Where(x=>x.Id.ToString()==_draft.Variant).Select(x=>new UiSelectOption(x.ProductId.ToString(),$"{x.ProductCode} - {x.ProductName}")).Distinct().ToArray();
+    private static IReadOnlyList<UiSelectOption> Options(IEnumerable<MovementReportOption> items,string all)=>new[]{new UiSelectOption("",all)}.Concat(items.Select(x=>new UiSelectOption(x.Id.ToString(),$"{x.Code} - {x.Name}"))).ToArray();
+    private static string Name(IEnumerable<MovementReportOption> items,string id,string fallback)=>items.FirstOrDefault(x=>x.Id.ToString()==id)?.Name??fallback;
+    private static string ModeName(string mode)=>mode=="qty"?"تحليلي كميات":"تحليلي تكاليف";
+    private static string GroupName(string group)=>group switch{"item"=>"الصنف فقط","item-supplier"=>"الصنف ثم المورد",_=>"المورد ثم الصنف"};
+    private string Prefix=>_applied.Mode=="qty"?"كمية":"قيمة";
+    private string ScopeNote=>_applied.Group=="item"?"الحركة حسب تاريخ دفتر المخزون؛ المتبقي محسوب من صافي الحركات، وقد تختلف القيمة عن تقييم المخزون بسبب التقريب. لا تجمع الكميات بوحدات مختلفة.":"تُسند للمورد الاستلامات والمرتجعات المثبتة فقط. المبيعات والصرف والأرصدة غير قابلة للنسب للمورد؛ اختر «الصنف فقط» لرؤية الافتتاح والمتبقي لجميع المصادر. إجماليات الكميات لا تجمع وحدات مختلفة.";
+    private (string Label,string Value)[] Chips=>[("المورد",Name(Suppliers,_applied.Supplier,"الكل")),("الصنف",Items.FirstOrDefault(x=>x.Id.ToString()==_applied.Variant)?.Name??"الكل"),("المنتج",Items.FirstOrDefault(x=>x.ProductId.ToString()==_applied.Product)?.ProductName??"الكل"),("التصنيف",Name(Categories,_applied.Category,"الكل")),("المستودع",Name(Warehouses,_applied.Warehouse,"الكل")),("الفترة",$"{_applied.From:dd/MM/yyyy} – {_applied.To:dd/MM/yyyy}"),("العملة",_applied.Mode=="qty"?"—":_currencyName),("النوع",ModeName(_applied.Mode)),("التجميع",GroupName(_applied.Group))];
+    protected override async Task OnInitializedAsync()
+    {
+        try{var settings=await Accounting.GetAccountingSettingsAsync();_baseId=settings?.BaseCurrencyId;for(int p=1;;p++){var r=await Accounting.GetCurrenciesPageAsync(new PageRequest{PageNumber=p,PageSize=100});_currencies.AddRange(r.Items);if(!r.HasNextPage)break;}_baseName=_currencies.FirstOrDefault(x=>x.Id==_baseId)?.NameAr??settings?.BaseCurrencyCode??"العملة الأساسية";}catch{_currencies=[];}
+        await ApplyAsync();
+    }
+    private void OnSupplier(string? value){_draft.Supplier=value??"";if(_draft.Supplier!=""&&_draft.Group=="item")_draft.Group="supplier";}
+    private void OnVariant(string? value){_draft.Variant=value??"";_draft.Product=Items.FirstOrDefault(x=>x.Id.ToString()==_draft.Variant)?.ProductId.ToString()??"";}
+    private void OnProduct(string? value){if(ProductOptions.Any(x=>x.Value==value))_draft.Product=value!;}
+    private void OnCategory(ChangeEventArgs e){_draft.Category=e.Value?.ToString()??"";if(!VariantOptions.Any(x=>x.Value==_draft.Variant))OnVariant("");}
+    private void OnGroup(ChangeEventArgs e){_draft.Group=e.Value?.ToString()??"supplier";if(_draft.Group=="item")_draft.Supplier="";}
+    private async Task ResetAsync(){_draft=new();_search="";await ApplyAsync();}
+    private async Task ApplyAsync()
+    {
+        if(_busy)return;_validation=null;
+        if(_draft.From.Date>_draft.To.Date||_draft.To.Year==9999){_validation="تحقق من تاريخ بداية ونهاية الفترة.";return;}
+        _busy=true;_error=null;
+        try
+        {
+            var next=_draft with {};var from=DateOnly.FromDateTime(next.From);var to=DateOnly.FromDateTime(next.To);var rate=1m;var currency=_baseName;
+            if(next.Mode!="qty"&&next.Currency is Guid id&&id!=_baseId){var c=_currencies.FirstOrDefault(x=>x.Id==id&&x.IsActive)??throw new InvalidOperationException("العملة غير متاحة.");var r=await Accounting.GetEffectiveExchangeRateAsync(id,to,ExchangeRateType.Accounting);if(r is null||r.Rate<=0)throw new InvalidOperationException("لا يوجد سعر صرف محاسبي صالح.");rate=r.Rate;currency=$"{c.NameAr} ({c.Code})";}
+            var url=$"api/inventory/reports/supplier-product-movement?fromDate={from.ToString("yyyy-MM-dd",CultureInfo.InvariantCulture)}&toDate={to.ToString("yyyy-MM-dd",CultureInfo.InvariantCulture)}";
+            foreach(var x in new[]{("variantId",next.Variant),("productId",next.Product),("categoryId",next.Category),("warehouseId",next.Warehouse)})if(Guid.TryParse(x.Item2,out var g))url+=$"&{x.Item1}={g:D}";
+            _snapshot=await Api.GetAsync<SupplierProductMovementReportDto>(url)??throw new InvalidOperationException("لم يرجع الخادم بيانات التقرير.");
+            _rate=rate;_currencyName=currency;_applied=next;_collapsed.Clear();if(!Columns.Any(x=>x.Key==_sortKey))_sortKey="code";BuildRows();
+        }
+        catch(ApiClientException ex){_error="تعذر تحميل بيانات التقرير.";ApiFeedback.Show(ex.Error);_rows=[];_groups.Clear();}
+        catch(Exception ex){_error=ex.Message;_rows=[];_groups.Clear();}
+        finally{_busy=false;}
+    }
+    private MovementReportAmounts Amounts(Row r)=>_applied.Mode=="qty"?r.Data.Quantity:r.Data.Cost;
+    private static bool HasActivity(MovementReportAmounts a)=>a.Opening.GetValueOrDefault()!=0||a.Closing.GetValueOrDefault()!=0||a.In!=0||a.Out!=0;
+    private static string Normalize(string s)=>new(s.Select(c=>c is >= '\u0660' and <= '\u0669'?(char)('0'+c-'\u0660'):c is >= '\u06f0' and <= '\u06f9'?(char)('0'+c-'\u06f0'):c).ToArray());
+    private void BuildRows()
+    {
+        if(_snapshot is null||_error is not null)return;
+        var items=Items.ToDictionary(x=>x.Id);var suppliers=Suppliers.ToDictionary(x=>x.Id);
+        var source=_applied.Group=="item"?_snapshot.ProductRows:_snapshot.SupplierRows;
+        _rows=[];
+        foreach(var r in source)
+        {
+            if(!items.TryGetValue(r.VariantId,out var item))continue;
+            if(_applied.Supplier!=""&&r.SupplierId?.ToString()!=_applied.Supplier)continue;
+            if(_applied.HideEmpty&&!HasActivity(r.Quantity)&&!HasActivity(r.Cost))continue;
+            var supplier=r.SupplierId is Guid id&&suppliers.TryGetValue(id,out var s)?s:null;
+            var row=new Row(r,item,supplier?.Name??"حركات غير منسوبة لمورد",supplier?.Code??"—");
+            if(!Normalize($"{item.Code} {item.Name} {item.ProductCode} {item.ProductName} {row.SupplierCode} {row.SupplierName}").Contains(Normalize(_search.Trim()),StringComparison.CurrentCultureIgnoreCase))continue;
+            _rows.Add(row);
+        }
+        Sort();_page=1;
+    }
+    private string GroupKey(Row r)=>_applied.Group switch{"item"=>"all","item-supplier"=>r.Item.Id.ToString(),_=>r.Data.SupplierId?.ToString()??"unknown"};
+    private string GroupTitle(string key){var r=_groups[key][0];return _applied.Group switch{"item"=>"جميع الأصناف – جميع مصادر المخزون","item-supplier"=>$"الصنف: {r.Item.Code} - {r.Item.Name}",_=>r.Data.SupplierId.HasValue?$"المورد: {r.SupplierCode} - {r.SupplierName}":"حركات غير منسوبة لمورد"};}
+    private void ToggleGroup(string key){if(!_collapsed.Add(key))_collapsed.Remove(key);}
+    private object? Cell(Row r,string key)
+    {
+        var a=Amounts(r);var attributed=_applied.Group!="item"&&r.Data.SupplierId.HasValue;
+        return key switch{"code"=>r.Item.Code,"name"=>r.Item.Name,"unit"=>r.Item.UnitName,"supplier"=>r.SupplierName,"opening"=>a.Opening,"purchase"=>a.Purchases,"otherIn"=>attributed?null:a.OtherIn,"purchaseReturn"=>a.PurchaseReturns,"otherOut"=>attributed?null:a.OtherOut,"sales"=>attributed?null:a.Sales,"salesReturn"=>attributed?null:a.SalesReturns,"closing"=>a.Closing,"in"=>a.In,"out"=>a.Out,_=>null};
+    }
+    private decimal? Total(IReadOnlyCollection<Row> rows,string key)
+    {
+        if(rows.Count==0)return null;
+        if(_applied.Mode=="qty"&&(rows.Any(x=>!x.Item.UnitId.HasValue)||rows.Select(x=>x.Item.UnitId).Distinct().Count()!=1))return null;
+        if(_applied.Group!="item"&&(key=="opening"||key=="closing"))return null;
+        var values=rows.Select(r=>Cell(r,key)).OfType<decimal>().ToArray();return values.Length==0?null:values.Sum();
+    }
+    private void SortBy(string key){_descending=_sortKey==key&&!_descending;_sortKey=key;Sort();_page=1;}
+    private void Sort(){var groups=_rows.GroupBy(GroupKey).OrderBy(g=>g.Key=="unknown"?1:0).ThenBy(g=>_applied.Group=="supplier"?g.First().SupplierCode:g.First().Item.Code,StringComparer.CurrentCulture);_rows=groups.SelectMany(g=>(_descending?g.OrderByDescending(x=>Cell(x,_sortKey)):g.OrderBy(x=>Cell(x,_sortKey))).ThenBy(x=>x.Item.Code).ThenBy(x=>x.SupplierCode)).ToList();_groups=_rows.GroupBy(GroupKey).ToDictionary(g=>g.Key,g=>g.ToList());}
+    private void OnSearch(string value){_search=value;BuildRows();}
+    private void GoPage(int p)=>_page=Math.Clamp(p,1,TotalPages);
+    private void ChangePageSize(ChangeEventArgs e){if(int.TryParse(e.Value?.ToString(),out var n)&&n is 10 or 25 or 50 or 100)_pageSize=n;_page=1;}
+    private string Display(object? v)=>v switch{null=>"—",decimal d=>(_applied.Mode=="qty"?d:d/_rate).ToString(_applied.Mode=="qty"?"#,##0.###":"N2",CultureInfo.InvariantCulture),_=>v.ToString()??""};
+    private string Metric(string key)=>_busy||_error is not null?"—":Display(Total(_rows,key));
+    private string SupplierCount=>MetricCount(_applied.Group=="item"?null:_rows.Where(x=>x.Data.SupplierId.HasValue).Select(x=>x.Data.SupplierId).Distinct().Count());
+    private string MetricCount(int? n)=>_busy||_error is not null||n is null?"—":n.Value.ToString("N0",CultureInfo.InvariantCulture);
+    private string Subtitle=>$"{_applied.From:dd/MM/yyyy} – {_applied.To:dd/MM/yyyy} | {ModeName(_applied.Mode)} | {(_applied.Mode=="qty"?"كميات":_currencyName)} | {ScopeNote} | البحث: {_search}";
+    private string[] ExportHeaders=>["المجموعة",..Columns.Select(c=>c.Label)];
+    private IEnumerable<object?[]> ExportRows()
+    {
+        foreach(var g in _rows.GroupBy(GroupKey)){var name=GroupTitle(g.Key);foreach(var r in g)yield return [name,..Columns.Select(c=>Cell(r,c.Key))];yield return ["إجمالي "+name,..Columns.Select(c=>Values.Any(v=>v.Key==c.Key)?(object?)Total(_groups[g.Key],c.Key):null)];}
+        yield return ["الإجمالي العام",..Columns.Select(c=>Values.Any(v=>v.Key==c.Key)?(object?)Total(_rows,c.Key):null)];
+    }
+    private async Task PrintAsync()
+    {
+        if(!CanExport)return;
+        var groups=_rows.GroupBy(GroupKey).Select(g=>new { title=GroupTitle(g.Key), rows=g.Select(r=>Columns.Select(c=>Display(Cell(r,c.Key))).ToArray()).ToArray(), totals=Values.Select(c=>Display(Total(_groups[g.Key],c.Key))).ToArray() }).ToArray();
+        await using var m=await JS.InvokeAsync<IJSObjectReference>("import","./js/supplier-product-movement-print.js");
+        await m.InvokeVoidAsync("printGroupedReport","المنتجات والموردون",Subtitle,Chips.Select(c=>$"{c.Label}: {c.Value}").ToArray(),Columns.Select(c=>c.Label).ToArray(),IdentityCount,Prefix,groups,Values.Select(c=>Display(Total(_rows,c.Key))).ToArray());
+    }
+    private async Task ExportAsync(){if(!CanExport)return;var bytes=CustomerDebtsWorkbook.Create(Subtitle+" | "+string.Join(" | ",Chips.Select(c=>$"{c.Label}: {c.Value}")),ExportHeaders,ExportRows().Select(r=>r.Select(x=>x is decimal d?(object)(_applied.Mode=="qty"?d:d/_rate):x).ToArray()),sheetName:"حركة الموردين والأصناف");await using var m=await JS.InvokeAsync<IJSObjectReference>("import","./js/customer-debts-export.js");await m.InvokeVoidAsync("saveWorkbook",Convert.ToBase64String(bytes),"supplier-products.xlsx");}
+}

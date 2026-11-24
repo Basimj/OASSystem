@@ -82,7 +82,11 @@ public sealed record SupplierBalancesFilterDto(
     int PageSize = 50,
     string? SortBy = null,
     SortDirection SortDirection = SortDirection.Ascending,
-    bool IncludeZeroBalance = false);
+    bool IncludeZeroBalance = false)
+{
+    // Used only by the authorized report snapshot query.
+    public bool AllRows { get; init; }
+}
 
 public sealed record SupplierBalanceRowDto(
     Guid SupplierId,
@@ -95,7 +99,10 @@ public sealed record SupplierBalanceRowDto(
     decimal CreditToDateBaseAmount,
     decimal LiabilityBalanceBaseAmount,
     decimal DebitBalanceBaseAmount,
-    decimal CreditBalanceBaseAmount);
+    decimal CreditBalanceBaseAmount)
+{
+    public bool IsActive { get; init; }
+}
 
 public sealed record SupplierBalancesDto(
     DateOnly AsOfDate,

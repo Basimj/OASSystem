@@ -38,11 +38,12 @@
                 </button>
             }
         </div>
-        <div class="oas-report-picker__count" aria-live="polite">@matches.Count من @Options.Count حساب</div>
+        <div class="oas-report-picker__count" aria-live="polite">@matches.Count من @Options.Count @ItemLabel</div>
     </dialog>
 </div>
 
 @code {
+    [Parameter] public string ItemLabel { get; set; } = "حساب";
     [Parameter] public string Label { get; set; } = "الحساب";
     [Parameter] public string DialogTitle { get; set; } = "اختيار عنصر";
     [Parameter] public string SearchPlaceholder { get; set; } = "ابحث في الخيارات...";

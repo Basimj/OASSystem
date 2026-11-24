@@ -120,7 +120,8 @@ public sealed class SupplierAgingQueryService(OasDbContext db) : ISupplierAgingQ
                 string.IsNullOrWhiteSpace(invoice.SupplierInvoiceCode) ? invoice.PurchaseInvoiceCode : invoice.SupplierInvoiceCode!,
                 supplier, invoice.InvoiceDate, invoice.PostingDate, invoice.DueDate,
                 invoice.DueDateProvenance == PurchaseInvoiceDueDateProvenance.Unknown ? "Unknown" : invoice.DueDateProvenance.ToString(),
-                invoice.BaseTotalAmount, outstanding, invoice.CurrencyCode, invoice.TotalAmount, filter.AsOfDate));
+                invoice.BaseTotalAmount, outstanding, invoice.CurrencyCode, invoice.TotalAmount, filter.AsOfDate)
+                with { PaymentBaseAmount = Round(payments), CreditAppliedBaseAmount = Round(credits) });
         }
 
         foreach (var opening in openingRows)
@@ -134,7 +135,8 @@ public sealed class SupplierAgingQueryService(OasDbContext db) : ISupplierAgingQ
                 opening.LegacyReference ?? opening.BatchCode,
                 supplier, opening.DocumentDate, opening.PostingDate, opening.DueDate,
                 opening.DueDateProvenance == SupplierOpeningDueDateProvenance.Unknown ? "Unknown" : opening.DueDateProvenance.ToString(),
-                opening.BaseOpenAmount, outstanding, opening.CurrencyCodeSnapshot, opening.OriginalOpenAmount, filter.AsOfDate));
+                opening.BaseOpenAmount, outstanding, opening.CurrencyCodeSnapshot, opening.OriginalOpenAmount, filter.AsOfDate)
+                with { OpeningAppliedBaseAmount = Round(applied) });
         }
 
         var unappliedPayments = await BuildUnappliedPaymentsAsync(supplierIds, cutoffUtc, filter.AsOfDate, cancellationToken);
@@ -161,7 +163,7 @@ public sealed class SupplierAgingQueryService(OasDbContext db) : ISupplierAgingQ
             .ThenBy(x => x.Reference)
             .ToArray();
         var totalCount = ordered.LongLength;
-        var page = ordered.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToArray();
+        var page = filter.AllRows ? ordered : ordered.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToArray();
 
         return new SupplierAgingReportDto(
             filter.AsOfDate, page, supplierSummaries,

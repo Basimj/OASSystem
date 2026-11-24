@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using OAS.Application.Accounting.Reports.Queries.GetApReconciliation;
 using OAS.Application.Accounting.Reports.Queries.GetSupplierBalances;
+using OAS.Application.Accounting.Reports.Queries.GetSupplierDebtSnapshot;
 using OAS.Application.Accounting.Reports.Queries.GetSupplierStatement;
 using OAS.Contracts.Accounting.Reports;
 using OAS.Contracts.Common.Pagination;
@@ -42,6 +43,15 @@ public sealed class SupplierApReportsController(ISender sender) : ControllerBase
                 sortBy,
                 sortDirection),
             cancellationToken));
+
+    [HttpGet("debt-snapshot")]
+    public async Task<ActionResult<SupplierDebtSnapshotDto>> DebtSnapshot(
+        [FromQuery] DateOnly asOfDate, CancellationToken cancellationToken = default)
+    {
+        if (asOfDate == DateOnly.MinValue || asOfDate == DateOnly.MaxValue)
+            return BadRequest("تاريخ التقرير غير صالح.");
+        return Ok(await sender.Send(new GetSupplierDebtSnapshotQuery(asOfDate), cancellationToken));
+    }
 
     [HttpGet("balances")]
     public async Task<ActionResult<SupplierBalancesDto>> Balances(

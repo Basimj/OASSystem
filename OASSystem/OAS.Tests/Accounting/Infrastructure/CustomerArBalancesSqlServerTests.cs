@@ -73,6 +73,25 @@ public sealed class CustomerArBalancesSqlServerTests
     }
 
     [Test]
+    public async Task DebtSnapshot_ReturnsLedgerBalancesAndOpenInvoicesSeparately()
+    {
+        await using var db = Context();
+        var query = new CustomerArReportingQueryService(db);
+        var snapshot = await query.DebtSnapshotAsync(NovemberEnd);
+        var active = snapshot.Customers.Single(x => x.Ledger.CustomerCode == "AR-001");
+        var empty = snapshot.Customers.Single(x => x.Ledger.CustomerCode == "AR-002");
+        Assert.Multiple(() =>
+        {
+            Assert.That(snapshot.AsOf, Is.EqualTo(NovemberEnd));
+            Assert.That(snapshot.Customers.Count, Is.EqualTo(2));
+            Assert.That(active.Ledger.BalanceBase, Is.EqualTo(90000m));
+            Assert.That(empty.Ledger.BalanceBase, Is.Zero);
+            // This fixture creates posted GL entries, not invoice documents.
+            Assert.That(snapshot.Invoices, Is.Empty);
+        });
+    }
+
+    [Test]
     public async Task Balances_SearchAndPagination_DoNotChangeTotalsForMatchingCustomer()
     {
         await using var db = Context();
