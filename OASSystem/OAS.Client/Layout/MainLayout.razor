@@ -132,6 +132,7 @@ private static readonly IReadOnlyList<UiShellModuleItem> ShellModules =
     new("reports-products", "المنتجات", "/inventory/reports/products", "fa-solid fa-cube"),
     new("reports-warehouses", "المخازن", "/inventory/reports/warehouses", "fa-solid fa-warehouse"),
     new("reports-trial-balance", "ميزان المراجعة", "/accounting/reports/trial-balance", "fa-solid fa-scale-balanced"),
+    new("reports-general-journal", "اليومية العامة", "/accounting/reports/general-journal", "fa-solid fa-book-open"),
 
     // Administration
     new("employees", "الموظفون", "/employees", "fa-solid fa-user-tie"),
@@ -245,7 +246,7 @@ private static readonly IReadOnlyList<UiShellNavigationGroup> ShellGroups =
             "job-titles"
         ]),
 
-    new("reports-group", "التقارير", "fa-solid fa-chart-line", ["reports", "reports-account-statement", "reports-customer-debts", "reports-supplier-debts", "reports-supplier-products", "reports-products", "reports-warehouses", "reports-trial-balance"]),
+    new("reports-group", "التقارير", "fa-solid fa-chart-line", ["reports", "reports-account-statement", "reports-customer-debts", "reports-supplier-debts", "reports-supplier-products", "reports-products", "reports-warehouses", "reports-trial-balance", "reports-general-journal"]),
 
     new(
         "system",

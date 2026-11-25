@@ -119,7 +119,8 @@ public sealed record JournalReportFilterDto(
     string? JournalNumber = null,
     string? Reference = null,
     int PageNumber = 1,
-    int PageSize = 100);
+    int PageSize = 100,
+    bool IncludeCompleteEntries = false);
 
 public sealed record JournalReportLineDto(
     Guid JournalEntryId,
@@ -142,7 +143,8 @@ public sealed record JournalReportLineDto(
     Guid? PostedBy,
     Guid? CustomerId,
     Guid? SupplierId,
-    string? Reference);
+    string? Reference,
+    string? DisplayDescription = null);
 
 public sealed record JournalReportDto(
     DateOnly FromDate,

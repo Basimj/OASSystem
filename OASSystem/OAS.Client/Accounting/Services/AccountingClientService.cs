@@ -1688,6 +1688,7 @@ public sealed class AccountingClientService(
         AddText(query, "sourceModule", filter.SourceModule);
         AddText(query, "journalNumber", filter.JournalNumber);
         AddText(query, "reference", filter.Reference);
+        if (filter.IncludeCompleteEntries) query.Add("includeCompleteEntries=true");
 
         return apiClient.GetAsync<JournalReportDto>(
             $"api/accounting/reports/journal-report?{string.Join("&", query)}",

@@ -104,6 +104,7 @@ public sealed class AccountingReportsController(ISender sender) : ControllerBase
         [FromQuery] string? reference = null,
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 100,
+        [FromQuery] bool includeCompleteEntries = false,
         CancellationToken cancellationToken = default)
     {
         var filter = new JournalReportFilterDto(
@@ -119,7 +120,8 @@ public sealed class AccountingReportsController(ISender sender) : ControllerBase
             journalNumber,
             reference,
             pageNumber,
-            pageSize);
+            pageSize,
+            includeCompleteEntries);
 
         var result = await sender.Send(new GetJournalReportQuery(filter), cancellationToken);
         return Ok(result);

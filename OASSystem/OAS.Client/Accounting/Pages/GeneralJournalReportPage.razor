@@ -1,0 +1,92 @@
+@page "/accounting/reports/general-journal"
+@attribute [Authorize]
+@using OAS.Contracts.Accounting.Enums
+@using OAS.UiLib.Components.Reports
+<PageTitle>اليومية العامة | OAS</PageTitle>
+<div class="journal-report">
+<UiReportWorkspace Title="اليومية العامة" TitleIcon="fa-solid fa-book-open" StatusText="@Status" Search="@_search" SearchChanged="OnSearch" FiltersOpen="@_filtersOpen" FiltersOpenChanged="@(v => _filtersOpen = v)">
+    <Toolbar>
+        <button type="button" class="oas-report__tool" title="تحديث" disabled="@_busy" @onclick="ApplyAsync"><i class="fa-solid fa-rotate"></i></button>
+        <button type="button" class="oas-report__tool oas-report__tool--pdf" title="حفظ PDF" disabled="@(!CanExport)" @onclick="PrintAsync"><i class="fa-regular fa-file-pdf"></i></button>
+        <button type="button" class="oas-report__tool oas-report__tool--excel" title="تصدير Excel" disabled="@(!CanExport)" @onclick="ExportAsync"><i class="fa-regular fa-file-excel"></i></button>
+        <button type="button" class="oas-report__tool" title="طباعة" disabled="@(!CanExport)" @onclick="PrintAsync"><i class="fa-solid fa-print"></i></button>
+        <button type="button" class="oas-report__tool" title="إظهار أو إخفاء الفلاتر" @onclick="@(() => _filtersOpen = !_filtersOpen)"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+    </Toolbar>
+    <QuickFilters>
+        @foreach (var chip in Chips){<div class="oas-report__chip" title="@($"{chip.Label}: {chip.Value}")"><span class="oas-report__chip-label">@chip.Label:</span><strong>@chip.Value</strong></div>}
+    </QuickFilters>
+    <FilterPanel>
+        <div class="journal-fields">
+            <label class="oas-report__field">السنة المالية<select value="@_draft.Year" @onchange="OnYear"><option value="">الكل</option>@foreach(var y in _years){<option value="@y.Id">@y.Name</option>}</select></label>
+            <label class="oas-report__field">الفترة المالية<select value="@_draft.Period" @onchange="OnPeriod"><option value="">جميع الفترات</option>@foreach(var p in PeriodOptions){<option value="@p.Id">@p.Name</option>}</select></label>
+            <div class="oas-report__date-pair">
+                <label class="oas-report__field">من تاريخ<input type="date" @bind="_draft.From" @bind:format="yyyy-MM-dd" /></label>
+                <label class="oas-report__field">إلى تاريخ<input type="date" @bind="_draft.To" @bind:format="yyyy-MM-dd" /></label>
+            </div>
+            <div class="oas-report__field"><UiReportSearchPicker Label="الحساب" ItemLabel="حساب" DialogTitle="اختيار الحساب" SearchPlaceholder="ابحث باسم الحساب أو رقمه..." Value="@_draft.Account" ValueChanged="OnAccount" Options="@AccountOptions" Placeholder="جميع الحسابات" /></div>
+            <label class="oas-report__field">نطاق الحساب<select @bind="_draft.Scope" disabled="@string.IsNullOrEmpty(_draft.Account)"><option value="complete">القيود الكاملة</option><option value="lines">بنود الحساب فقط</option></select></label>
+            <label class="oas-report__field">نوع التقرير<select @bind="_draft.Mode"><option value="grouped">تفصيلي حسب القيد</option><option value="summary">إجمالي حسب القيد</option><option value="lines">تفصيلي حسب السطور</option><option value="source">إجمالي حسب المصدر</option></select></label>
+            <label class="oas-report__field">نوع القيد<select @bind="_draft.Type"><option value="">جميع الأنواع</option>@foreach(var t in Enum.GetValues<JournalType>()){<option value="@((byte)t)">@TypeName(t)</option>}</select></label>
+            <label class="oas-report__field">مصدر القيد<select @bind="_draft.Source"><option value="">جميع المصادر</option>@foreach(var s in SourceOptions){<option value="@s">@SourceName(s)</option>}</select></label>
+            <label class="oas-report__field">حالة القيد<select @bind="_draft.State"><option value="">جميع الحالات</option>@foreach(var s in Enum.GetValues<JournalEntryStatus>()){<option value="@((byte)s)">@StateName(s)</option>}</select></label>
+            @if (_users.Count > 0)
+            {
+            <div class="oas-report__field"><UiReportSearchPicker Label="المستخدم" ItemLabel="مستخدم" DialogTitle="اختيار المستخدم المنشئ أو المرحل" Value="@_draft.User" ValueChanged="OnUser" Options="@UserOptions" Placeholder="جميع المستخدمين" /></div>
+            }
+            <label class="oas-report__field">رقم القيد / المرجع<input type="text" @bind="_draft.Reference" maxlength="200" placeholder="رقم القيد أو المستند" /></label>
+            <label class="oas-report__field">العملة<select @bind="_draft.Currency"><option value="">@_baseName (الأساسية)</option>@foreach(var c in _currencies.Where(c=>c.IsActive && c.Id != _baseId)){<option value="@c.Id">@c.NameAr (@c.Code)</option>}</select></label>
+            @if (_validation is not null){<div class="journal-warning" role="alert">@_validation</div>}
+        </div>
+        <div class="oas-report__apply"><button type="button" class="primary" disabled="@_busy" @onclick="ApplyAsync"><i class="fa-solid fa-filter"></i> تطبيق</button><button type="button" disabled="@_busy" @onclick="ResetAsync"><i class="fa-solid fa-rotate-left"></i> إعادة تعيين</button></div>
+    </FilterPanel>
+    <TableContent>
+        <table class="oas-report__table journal-table @(_applied.Mode=="source" ? "journal-short" : "")">
+            <thead><tr>@foreach(var c in Columns){<UiReportSortHeader @key="c.Key" Label="@c.Label" Active="@(_sort==c.Key)" Descending="@_descending" OnSort="@(()=>SortBy(c.Key))" />}</tr></thead>
+            <tbody>
+            @if(_busy){<tr><td colspan="@Columns.Length" class="oas-report__empty">جارٍ تحميل اليومية العامة...</td></tr>}
+            else if(_error is not null){<tr><td colspan="@Columns.Length" class="oas-report__empty" role="alert">@_error</td></tr>}
+            else if(_units.Count==0){<tr><td colspan="@Columns.Length" class="oas-report__empty">لا توجد قيود مطابقة للفلاتر.</td></tr>}
+            else
+            {
+                @foreach(var unit in PageUnits)
+                {
+                    @foreach(var line in DisplayLines(unit))
+                    {
+                        <tr>
+                        @foreach(var col in Columns)
+                        {
+                            var value=Cell(unit,line,col.Key);
+                            <td class="@col.Css" title="@Format(value,col.Key)">
+                                @if(col.Key=="number" && line is not null){<button type="button" class="journal-link" @onclick="@(()=>OpenJournal(line.JournalEntryId))">@Format(value,col.Key)</button>}
+                                else if(col.Key=="account" && line is not null && (_applied.Mode is "grouped" or "lines")){<button type="button" class="journal-link" @onclick="@(()=>OpenStatement(line.AccountId))">@Format(value,col.Key)</button>}
+                                else if(col.Key=="status" && line is not null){<span class="journal-state @(line.Status==JournalEntryStatus.Posted ? "posted" : "pending")">@Format(value,col.Key)</span>}
+                                else{@Format(value,col.Key)}
+                            </td>
+                        }
+                        </tr>
+                    }
+                    @if(_applied.Mode=="grouped")
+                    {
+                        <tr class="journal-total"><td colspan="@(Columns.Length-3)">إجمالي القيد (@unit.Lines[0].JournalNumber)</td><td class="oas-report__debit">@Money(unit.Lines.Sum(l=>l.Debit))</td><td class="oas-report__credit">@Money(unit.Lines.Sum(l=>l.Credit))</td><td></td></tr>
+                    }
+                }
+                <tr class="journal-total"><td colspan="@(Columns.Length-3)">الإجمالي العام (كل النتائج)</td><td class="oas-report__debit">@Money(_debit)</td><td class="oas-report__credit">@Money(_credit)</td><td>@(_applied.Mode=="source" ? Money(_debit-_credit) : "")</td></tr>
+            }
+            </tbody>
+        </table>
+    </TableContent>
+    <Pagination>
+        <div class="oas-report__pager"><button @onclick="@(()=>GoPage(1))" disabled="@(_page==1)">»</button><button @onclick="@(()=>GoPage(_page-1))" disabled="@(_page==1)">‹</button><button class="active" disabled>@_page</button><button @onclick="@(()=>GoPage(_page+1))" disabled="@(_page>=TotalPages)">›</button><button @onclick="@(()=>GoPage(TotalPages))" disabled="@(_page>=TotalPages)">«</button></div>
+        <span>عرض @(_units.Count==0?0:(_page-1)*_pageSize+1) - @Math.Min(_page*_pageSize,_units.Count) من @_units.Count @UnitLabel</span>
+        <label>لكل صفحة <select value="@_pageSize" @onchange="ChangePageSize"><option>10</option><option>25</option><option>50</option><option>100</option></select></label>
+    </Pagination>
+    <Metrics>
+        <UiReportMetric Label="عدد القيود" Value="@Count(_journalCount)" Tone="blue" Icon="fa-solid fa-book-open" />
+        <UiReportMetric Label="عدد بنود القيود" Value="@Count(_lineCount)" Tone="violet" Icon="fa-solid fa-list" />
+        <UiReportMetric Label="القيود غير المرحلة" Value="@Count(_unpostedCount)" Tone="orange" Icon="fa-solid fa-clock" />
+        <UiReportMetric Label="إجمالي المدين" Value="@Metric(_debit)" Tone="red" Icon="fa-solid fa-arrow-up" />
+        <UiReportMetric Label="إجمالي الدائن" Value="@Metric(_credit)" Tone="green" Icon="fa-solid fa-arrow-down" />
+        <UiReportMetric Label="فرق النتائج" Value="@Metric(_debit-_credit)" Tone="purple" Icon="fa-solid fa-scale-balanced" />
+    </Metrics>
+</UiReportWorkspace>
+</div>

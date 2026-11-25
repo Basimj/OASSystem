@@ -619,8 +619,13 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
             var value = filter.SourceModule.Trim();
             query = query.Where(x => x.Journal.SourceModule == value);
         }
-        if (filter.AccountId.HasValue)
-            query = query.Where(x => x.Line.AccountId == filter.AccountId.Value);
+        if (filter.AccountId is Guid accountId)
+        {
+            if (filter.IncludeCompleteEntries)
+                query = query.Where(x => db.Set<JournalEntryLine>().Any(l => l.JournalEntryId == x.Journal.Id && l.AccountId == accountId));
+            else
+                query = query.Where(x => x.Line.AccountId == accountId);
+        }
         if (filter.UserId.HasValue)
         {
             var userText = filter.UserId.Value.ToString();
@@ -649,7 +654,9 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
         var page = await query
             .OrderBy(x => x.Journal.PostingDate)
             .ThenBy(x => x.Journal.JournalNumber)
+            .ThenBy(x => x.Journal.Id)
             .ThenBy(x => x.Line.LineNumber)
+            .ThenBy(x => x.Line.Id)
             .Skip((filter.PageNumber - 1) * filter.PageSize)
             .Take(filter.PageSize)
             .Select(x => new JournalReportLineDto(
@@ -673,12 +680,20 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
                 x.Journal.PostedBy,
                 x.Line.CustomerId,
                 x.Line.SupplierId,
-                null))
+                null, // Reference is resolved after materialization.
+                null)) // DisplayDescription is resolved after materialization.
             .ToListAsync(cancellationToken);
 
-        var lines = page.Select(x => x with
+        var documents = await ResolveLedgerDocumentsAsync(page.Select(x => (x.SourceDocumentType, x.SourceDocumentId)), cancellationToken);
+        var lines = page.Select(x =>
         {
-            Reference = FormatReference(x.SourceDocumentType, x.SourceDocumentId)
+            var reference = GetDocumentReference(x.SourceDocumentType, x.SourceDocumentId, documents);
+            return x with
+            {
+                Reference = reference,
+                DisplayDescription = StatementNarrativeFormatter.Resolve(null, reference, x.SourceDocumentType,
+                    x.Description, null, x.JournalType == OAS.Contracts.Accounting.Enums.JournalType.Manual)
+            };
         }).ToArray();
 
         return new JournalReportDto(
@@ -881,11 +896,6 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
             System.Globalization.CultureInfo.InvariantCulture, out var number) && number > 0
             ? $" — البند {number}" : string.Empty;
     }
-
-    private static string? FormatReference(string? sourceDocumentType, Guid? sourceDocumentId) =>
-        string.IsNullOrWhiteSpace(sourceDocumentType) && !sourceDocumentId.HasValue
-            ? null
-            : $"{sourceDocumentType}{(sourceDocumentId.HasValue ? $" / {sourceDocumentId:D}" : string.Empty)}";
 
     private static DateOnly Max(DateOnly left, DateOnly right) => left >= right ? left : right;
     private static DateOnly Min(DateOnly left, DateOnly right) => left <= right ? left : right;
