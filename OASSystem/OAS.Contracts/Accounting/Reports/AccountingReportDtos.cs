@@ -90,7 +90,9 @@ public sealed record TrialBalanceRowDto(
     byte Level = 1,
     Guid? ParentAccountId = null,
     AccountType AccountType = AccountType.Posting,
-    bool IsAggregate = false);
+    bool IsAggregate = false,
+    decimal? PreviousDebitTotal = null,
+    decimal? PreviousCreditTotal = null);
 
 public sealed record TrialBalanceReportDto(
     DateOnly FromDate,

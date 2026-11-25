@@ -542,7 +542,9 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
                 account.Level,
                 account.ParentAccountId,
                 (OAS.Contracts.Accounting.Enums.AccountType)(byte)account.AccountType,
-                aggregate));
+                aggregate,
+                movement.OpeningDebit,
+                movement.OpeningCredit));
         }
 
         // Totals are calculated from direct account movements, never from header rollups,

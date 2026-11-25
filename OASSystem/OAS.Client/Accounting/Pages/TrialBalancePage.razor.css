@@ -1,0 +1,118 @@
+.trial-report { min-width: 0; }
+.trial-report ::deep .oas-report__search,
+.trial-report ::deep .oas-report__tool,
+.trial-report ::deep .oas-report__field > :is(select, input),
+.trial-report ::deep .oas-report-picker__trigger { background: #fff; }
+/* The panel stays in the report grid; only the field list scrolls. */
+.trial-report ::deep .oas-report .oas-report__aside {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    max-width: none;
+    min-height: 0;
+    padding: 7px;
+    overflow: hidden;
+    background: #fff;
+    --r-filter-font: 11px;
+}
+.trial-report ::deep .oas-report__aside-header {
+    flex: 0 0 auto;
+    padding-bottom: 6px;
+    margin-bottom: 6px;
+}
+.trial-report ::deep .oas-report__aside-header button { min-height: 23px; min-width: 25px; padding: 0 3px; }
+.trial-report ::deep .oas-report .trial-fields {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+    min-width: 0;
+    gap: 7px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-gutter: stable;
+    overscroll-behavior-y: contain;
+    padding: 2px 2px 7px;
+}
+.trial-report ::deep .trial-fields > * { flex: 0 0 auto; min-width: 0; }
+.trial-report ::deep .oas-report .oas-report__aside .trial-fields .oas-report__field {
+    margin: 0;
+    gap: 3px;
+    min-width: 0;
+    width: 100%;
+    font-weight: 600;
+    line-height: 15px !important;
+}
+.trial-report ::deep .oas-report .oas-report__aside .trial-fields .oas-report-picker { gap: 3px; }
+.trial-report ::deep .oas-report .oas-report__aside .trial-fields .oas-report-picker__label {
+    line-height: 15px !important;
+}
+.trial-report ::deep .oas-report .oas-report__aside .trial-fields .oas-report__field > :is(select, input),
+.trial-report ::deep .oas-report .oas-report__aside .trial-fields .oas-report-picker__trigger {
+    width: 100%;
+    min-width: 0;
+    height: 27px;
+    min-height: 27px;
+    padding: 0 5px;
+    font-size: 11px !important;
+    line-height: 1.35 !important;
+    border-radius: 5px;
+}
+.trial-report ::deep .oas-report .oas-report__aside .trial-fields .oas-report__date-pair {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+.trial-report ::deep .oas-report .oas-report__aside .trial-fields .oas-report__field-check {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 18px;
+    line-height: 15px !important;
+}
+.trial-report ::deep .oas-report .oas-report__aside .trial-fields .oas-report__field-check input {
+    margin: 0;
+    width: 13px;
+    height: 13px;
+    flex: 0 0 13px;
+}
+.trial-report ::deep .trial-warning { color: #bd2634; font-size: 10px; line-height: 1.35; }
+.trial-report ::deep .oas-report .oas-report__aside .oas-report__apply {
+    flex: 0 0 auto;
+    margin-top: auto;
+    gap: 5px;
+    padding-top: 7px;
+    border-top: 1px solid #e0e5eb;
+    background: #fff;
+}
+.trial-report ::deep .oas-report .oas-report__aside .oas-report__apply button {
+    min-height: 28px;
+    padding: 3px 2px;
+    font-size: 10px;
+    line-height: 1.3;
+}
+
+.trial-report ::deep .oas-report .oas-report__main--filters { grid-template-columns: minmax(0,1fr) 204px; }
+.trial-report ::deep .trial-table { width:100%; min-width:740px; table-layout:auto; }
+.trial-report ::deep .trial-table.trial-short { min-width:480px; }
+.trial-report ::deep .trial-table thead { position:sticky; top:0; z-index:2; }
+.trial-report ::deep .oas-report .trial-table thead th { position:static; background:#e8edf5 !important; height:28px; text-align:center; padding:3px 5px; }
+.trial-report ::deep .trial-table thead th::after { content:none; }
+.trial-report ::deep .oas-report .trial-table .oas-report__sort-button { min-height:26px; }
+.trial-report ::deep .trial-table .trial-name { min-width:165px; white-space:normal; }
+.trial-report ::deep .trial-table .trial-code { direction:ltr; text-align:center; }
+.trial-report ::deep .trial-link { background:transparent; border:0; color:#2459aa; font:inherit; text-align:start; cursor:pointer; padding:0; }
+.trial-report ::deep .trial-link:hover { text-decoration:underline; }
+.trial-report ::deep .trial-link i { color:#73839b; margin-inline-end:4px; }
+.trial-report ::deep .trial-parent .trial-link { font-weight:800; color:#203654; }
+.trial-report ::deep .trial-parent .trial-link i { color:#c18a27; }
+.trial-report ::deep .oas-report .trial-table tbody tr.trial-total > td { background:#e8edf5 !important; font-weight:800; }
+.trial-report ::deep .trial-table .oas-report__amount { white-space:nowrap; font-variant-numeric:tabular-nums; }
+.trial-report ::deep .oas-report__metric strong { white-space:nowrap; font-size:clamp(10px,1.05vw,14px); }
+.trial-report ::deep .oas-report__metric b { font-size:10px; }
+.trial-report.trial-unbalanced ::deep .oas-report__status { color:#b42338; background:#fce4e8; }
+.trial-report.trial-pending ::deep .oas-report__status { color:#526176; background:#f4f6f8; }
+.trial-report ::deep .oas-report .oas-report__quick-filters .oas-report__chip { background:#f4f6f8; }
+@media (max-width:650px) { .trial-report ::deep .oas-report .oas-report__main--filters { grid-template-columns:minmax(0,1fr) 185px; } }

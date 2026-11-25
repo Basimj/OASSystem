@@ -103,6 +103,10 @@
 
 @code {
     [Parameter, SupplyParameterFromQuery(Name = "accountId")] public Guid? AccountFromQuery {get;set;}
+    [Parameter, SupplyParameterFromQuery(Name = "fromDate")] public string? FromDateFromQuery { get; set; }
+    [Parameter, SupplyParameterFromQuery(Name = "toDate")] public string? ToDateFromQuery { get; set; }
+    [Parameter, SupplyParameterFromQuery(Name = "includeChildren")] public bool? ChildrenFromQuery { get; set; }
+    [Parameter, SupplyParameterFromQuery(Name = "currencyId")] public Guid? CurrencyFromQuery { get; set; }
     private string SelectedAccountDisplay
     {
         get
@@ -171,6 +175,10 @@
             _baseCurrencyName = _currencies.FirstOrDefault(c => c.Id == _baseCurrencyId)?.NameAr ?? settings?.BaseCurrencyCode ?? "العملة الأساسية";
             _displayCurrencyName = _baseCurrencyName;
             if(AccountFromQuery.HasValue)_accountId=AccountFromQuery;
+            if (DateOnly.TryParseExact(FromDateFromQuery, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var from)) _from = from.ToDateTime(TimeOnly.MinValue);
+            if (DateOnly.TryParseExact(ToDateFromQuery, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var to)) _to = to.ToDateTime(TimeOnly.MinValue);
+            if (ChildrenFromQuery.HasValue) _includeChildren = ChildrenFromQuery.Value;
+            if (CurrencyFromQuery.HasValue) _currencyId = CurrencyFromQuery.Value;
             await LoadAsync();
         }catch(Exception ex){_error="تعذر تحميل بيانات الحسابات: "+ex.Message;}
     }
