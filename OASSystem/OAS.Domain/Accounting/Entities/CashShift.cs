@@ -50,11 +50,47 @@ public sealed class CashShift : AuditableEntity<Guid>
 
     public decimal OpeningBalance { get; private set; }
 
+    public decimal? BookOpeningBalance { get; private set; }
+    public decimal? ExpectedBookOpeningBalance { get; private set; }
+    public void ExpectBookOpeningBalance(decimal? balance) => ExpectedBookOpeningBalance = balance;
+    public string? OpeningDifferenceReason { get; private set; }
+
+    public void SetOpeningDifferenceReason(string? reason)
+    {
+        if (Status != CashShiftStatus.Open || BookOpeningBalance.HasValue)
+            throw new InvalidOperationException("Opening count is already recorded.");
+        if (reason?.Length > 500) throw new ArgumentException("Opening reason is too long.", nameof(reason));
+        OpeningDifferenceReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+    }
+
+    public void RecordBookOpeningBalance(decimal balance)
+    {
+        if (Status != CashShiftStatus.Open || BookOpeningBalance.HasValue)
+            throw new InvalidOperationException("Opening count is already recorded.");
+        if (balance != OpeningBalance && string.IsNullOrWhiteSpace(OpeningDifferenceReason))
+            throw new InvalidOperationException("Opening difference reason is required.");
+        BookOpeningBalance = balance;
+    }
+
     public decimal? ExpectedClosingBalance { get; private set; }
 
     public decimal? ActualClosingBalance { get; private set; }
 
     public decimal? DifferenceAmount { get; private set; }
+
+    public Guid? SettlementJournalEntryId { get; private set; }
+    public Guid? SettlementAccountId { get; private set; }
+    public DateOnly? SettlementDate { get; private set; }
+    public string? SettlementReason { get; private set; }
+
+    public void RecordSettlement(Guid journalId, Guid accountId, DateOnly date, string reason)
+    {
+        if (Status != CashShiftStatus.Approved || !DifferenceAmount.HasValue || DifferenceAmount.Value == 0 || SettlementJournalEntryId.HasValue)
+            throw new InvalidOperationException("Only an approved unsettled shift difference can be settled.");
+        if (journalId == Guid.Empty || accountId == Guid.Empty || string.IsNullOrWhiteSpace(reason))
+            throw new ArgumentException("Settlement details are required.");
+        SettlementJournalEntryId = journalId; SettlementAccountId = accountId; SettlementDate = date; SettlementReason = reason.Trim();
+    }
 
     public Guid? ClosedBy { get; private set; }
 

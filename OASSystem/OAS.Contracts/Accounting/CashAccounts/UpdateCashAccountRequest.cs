@@ -5,4 +5,5 @@ public sealed record UpdateCashAccountRequest(
     Guid CurrencyId,
     bool IsDefault,
     bool IsActive,
-    string RowVersion);
+    string RowVersion,
+    bool? RequiresOpenShift = null);

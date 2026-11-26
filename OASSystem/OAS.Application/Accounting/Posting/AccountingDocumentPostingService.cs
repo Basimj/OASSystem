@@ -64,6 +64,23 @@ public sealed class AccountingDocumentPostingService(
         await EnsurePostingAccountAsync(expense.ExpenseAccountId, cancellationToken);
         await EnsurePostingAccountAsync(settlementAccountId, cancellationToken);
         var (settings, baseCurrency) = await GetBaseCurrencyAsync(cancellationToken);
+        var settlementCurrencyId = expense.CashAccountId is Guid cashId
+            ? (await cashAccountRepository.GetByIdAsync(cashId, cancellationToken))?.CurrencyId
+            : (await bankAccountRepository.GetByIdAsync(expense.BankAccountId!.Value, cancellationToken))?.CurrencyId;
+        var txCurrencyId = expense.CurrencyId ?? baseCurrency.Id;
+        if (settlementCurrencyId != txCurrencyId || (expense.BaseCurrencyId.HasValue && expense.BaseCurrencyId != baseCurrency.Id))
+            throw new ConflictException("expense_currency_mismatch", "عملة المصروف لا تطابق حساب الدفع أو العملة الأساسية. راجع المستند قبل الترحيل.");
+        if (expense.CurrencyId.HasValue && (!expense.BaseAmount.HasValue || !expense.ExchangeRate.HasValue ||
+            !expense.ExchangeRateDate.HasValue || !expense.ExchangeRateType.HasValue || !expense.ExchangeRateSource.HasValue ||
+            string.IsNullOrWhiteSpace(expense.CurrencyCodeSnapshot) || !expense.CurrencyDecimalPlacesSnapshot.HasValue))
+            throw new ConflictException("expense_currency_snapshot_missing", "بيانات العملة التاريخية للمصروف غير مكتملة.");
+        var baseAmount = expense.BaseAmount ?? expense.Amount;
+        var code = expense.CurrencyCodeSnapshot ?? baseCurrency.Code;
+        var decimals = expense.CurrencyDecimalPlacesSnapshot ?? baseCurrency.DecimalPlaces;
+        var rate = expense.ExchangeRate ?? 1m;
+        var rateDate = expense.ExchangeRateDate ?? expense.ExpenseDate;
+        var rateType = expense.ExchangeRateType ?? ExchangeRateType.Accounting;
+        var rateSource = expense.ExchangeRateSource ?? ExchangeRateSource.System;
         var journal = await CreateAutomaticJournalAsync(
             expense.ExpenseDate, expense.ExpenseDate,
             BuildDescription("Expense", expense.ExpenseNumber, expense.Description),
@@ -73,13 +90,13 @@ public sealed class AccountingDocumentPostingService(
 
         journal.AddLine(JournalEntryLine.CreateMultiCurrency(
             Guid.NewGuid(), journal.Id, 1, expense.ExpenseAccountId,
-            expense.Amount, 0m, baseCurrency.Id, baseCurrency.Code, baseCurrency.DecimalPlaces,
-            expense.Amount, 0m, 1m, expense.ExpenseDate, ExchangeRateType.Accounting, ExchangeRateSource.System,
+            baseAmount, 0m, txCurrencyId, code, decimals,
+            expense.Amount, 0m, rate, rateDate, rateType, rateSource,
             expense.Description, null, null, null, null, null, null, null, expense.Id));
         journal.AddLine(JournalEntryLine.CreateMultiCurrency(
             Guid.NewGuid(), journal.Id, 2, settlementAccountId,
-            0m, expense.Amount, baseCurrency.Id, baseCurrency.Code, baseCurrency.DecimalPlaces,
-            0m, expense.Amount, 1m, expense.ExpenseDate, ExchangeRateType.Accounting, ExchangeRateSource.System,
+            0m, baseAmount, txCurrencyId, code, decimals,
+            0m, expense.Amount, rate, rateDate, rateType, rateSource,
             expense.Description, null, null, null, null, null, null, null, expense.Id));
 
         CompleteAutomaticPosting(journal, postedBy, postedAtUtc);

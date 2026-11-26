@@ -7,8 +7,30 @@ using OAS.Infrastructure.Persistence;
 
 namespace OAS.Infrastructure.Accounting.Persistence.Queries;
 
-public sealed class CashShiftBalanceService(OasDbContext db) : ICashShiftBalanceService
+public sealed class CashShiftBalanceService(OasDbContext db) : ICashShiftBalanceService, ICashShiftOpeningBalanceService
 {
+    public async Task<decimal> GetBookBalanceAsync(Guid cashAccountId, CancellationToken cancellationToken = default)
+    {
+        var cash = await db.Set<CashAccount>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == cashAccountId, cancellationToken)
+            ?? throw new NotFoundException(nameof(CashAccount), cashAccountId);
+        if (cash.CurrencyId is not Guid currencyId)
+            throw new ConflictException("cash_shift_currency_missing", "عملة الصندوق غير محددة.");
+        if (await db.Set<CashAccount>().AnyAsync(x => x.Id != cash.Id && x.AccountId == cash.AccountId, cancellationToken) ||
+            await db.Set<BankAccount>().AnyAsync(x => x.AccountId == cash.AccountId, cancellationToken))
+            throw new ConflictException("cash_shift_shared_ledger", "الحساب المحاسبي مشترك.");
+        var rows = await (from line in db.Set<JournalEntryLine>().AsNoTracking()
+                          join journal in db.Set<JournalEntry>().AsNoTracking() on line.JournalEntryId equals journal.Id
+                          where line.AccountId == cash.AccountId && journal.Status == JournalEntryStatus.Posted
+                          select new { journal.JournalNumber, journal.BaseCurrencyId, line.TransactionCurrencyId,
+                              line.TransactionDebitAmount, line.TransactionCreditAmount, line.DebitAmount, line.CreditAmount })
+                          .ToListAsync(cancellationToken);
+        decimal balance = 0m;
+        foreach (var row in rows)
+            balance += ResolveMovement(currencyId, row.BaseCurrencyId, row.TransactionCurrencyId,
+                row.TransactionDebitAmount, row.TransactionCreditAmount, row.DebitAmount, row.CreditAmount, row.JournalNumber);
+        return balance;
+    }
+
     public async Task<decimal> CalculateExpectedAsync(CashShift shift, DateTime throughUtc, CancellationToken cancellationToken = default)
     {
         if (throughUtc < shift.OpenedAtUtc)
@@ -69,11 +91,26 @@ public sealed class CashShiftBalanceService(OasDbContext db) : ICashShiftBalance
     public static decimal ResolveMovement(Guid cashCurrencyId, Guid? baseCurrencyId, Guid? transactionCurrencyId,
         decimal? transactionDebit, decimal? transactionCredit, decimal debit, decimal credit, string journalNumber)
     {
-        if (transactionCurrencyId == cashCurrencyId && transactionDebit.HasValue && transactionCredit.HasValue)
-            return transactionDebit.Value - transactionCredit.Value;
-        // Base-only legacy line: use it only when its historical base currency is known to be the cashbox currency.
-        if (transactionCurrencyId == null && baseCurrencyId == cashCurrencyId)
-            return debit - credit;
+        if (TryResolveMovement(cashCurrencyId, baseCurrencyId, transactionCurrencyId, transactionDebit, transactionCredit, debit, credit, out var movement))
+            return movement;
         throw new ConflictException("cash_shift_movement_currency_unknown", $"Journal {journalNumber} has no reliable amount in the cashbox currency. Reconcile it before closing.");
+    }
+
+    internal static bool TryResolveMovement(Guid cashCurrencyId, Guid? baseCurrencyId, Guid? transactionCurrencyId,
+        decimal? transactionDebit, decimal? transactionCredit, decimal debit, decimal credit, out decimal movement)
+    {
+        if (transactionCurrencyId == cashCurrencyId && transactionDebit.HasValue && transactionCredit.HasValue)
+        {
+            movement = transactionDebit.Value - transactionCredit.Value;
+            return true;
+        }
+        // Base-only legacy line: use only when the historical base currency is known.
+        if (transactionCurrencyId == null && baseCurrencyId == cashCurrencyId)
+        {
+            movement = debit - credit;
+            return true;
+        }
+        movement = 0m;
+        return false;
     }
 }

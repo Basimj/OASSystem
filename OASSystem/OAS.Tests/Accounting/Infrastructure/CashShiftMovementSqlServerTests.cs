@@ -44,6 +44,7 @@ public sealed class CashShiftMovementSqlServerTests
             await db.SaveChangesAsync();
             var actor = Guid.NewGuid();
             var shift = CashShift.Create(Guid.NewGuid(), "SHIFT-1", box.Id, actor, now, 100000m, CashShiftStatus.Open);
+            shift.SetOpeningDifferenceReason("Test opening cash count");
             db.Add(shift);
             await db.SaveChangesAsync();
 

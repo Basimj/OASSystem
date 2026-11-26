@@ -71,7 +71,7 @@ public class ExpenseCommandAndQueryTests
         var handler = new CreateExpenseCommandHandler(
             _repository,
             _accountRepository,
-            _sequenceGenerator);
+            _sequenceGenerator, new TestExpenseCurrencyService());
 
         var request = new CreateExpenseRequest(
             ExpenseDate: new DateOnly(2026, 1, 20),
@@ -137,7 +137,7 @@ public class ExpenseCommandAndQueryTests
         var handler = new CreateExpenseCommandHandler(
             _repository,
             _accountRepository,
-            _sequenceGenerator);
+            _sequenceGenerator, new TestExpenseCurrencyService());
 
         var request = new CreateExpenseRequest(
             ExpenseDate: new DateOnly(2026, 1, 20),
@@ -370,6 +370,16 @@ public class ExpenseCommandAndQueryTests
             LastPostedAtUtc = postedAtUtc;
 
             return Task.FromResult(JournalEntryId);
+        }
+    }
+    private sealed class TestExpenseCurrencyService : IExpenseCurrencyService
+    {
+        public Task ApplyAsync(Expense expense, Guid? currencyId, decimal? expectedRate, CancellationToken ct)
+        {
+            var id = Guid.NewGuid();
+            expense.SetCurrencySnapshot(id, "YER", 2, id, "YER", 2, expense.Amount, 1m, expense.ExpenseDate,
+                OAS.Domain.Accounting.Enums.ExchangeRateType.Accounting, OAS.Domain.Accounting.Enums.ExchangeRateSource.System);
+            return Task.CompletedTask;
         }
     }
 }

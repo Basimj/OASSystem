@@ -5,4 +5,8 @@
 
 <PageTitle>ورديات الصندوق | OAS</PageTitle>
 
-<AccountingWorkspaceHost Section="AccountingEntityType.CashShifts" />
+<AccountingWorkspaceHost Section="AccountingEntityType.CashShifts" InitialRecordId="ShiftIdFromQuery" />
+
+@code {
+    [Parameter, SupplyParameterFromQuery(Name = "shiftId")] public Guid? ShiftIdFromQuery { get; set; }
+}

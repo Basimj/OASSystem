@@ -26,6 +26,8 @@ public sealed class ExpenseMapper
             source.CreatedBy,
             source.CreatedAtUtc,
             source.PostedAtUtc,
-            source.RowVersion is not null ? Convert.ToBase64String(source.RowVersion) : string.Empty);
+            source.RowVersion is not null ? Convert.ToBase64String(source.RowVersion) : string.Empty,
+            source.CurrencyId, source.CurrencyCodeSnapshot, source.CurrencyDecimalPlacesSnapshot,
+            source.BaseAmount, source.BaseCurrencyCodeSnapshot, source.ExchangeRate, source.ExchangeRateDate, source.BaseCurrencyDecimalPlacesSnapshot);
     }
 }

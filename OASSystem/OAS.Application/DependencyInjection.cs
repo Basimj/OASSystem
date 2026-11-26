@@ -63,6 +63,7 @@ public static class DependencyInjection
         services.TryAddScoped<ICurrentUser, AnonymousCurrentUser>();
         services.TryAddScoped<IPermissionChecker, DenyAllPermissionChecker>();
         services.TryAddScoped<IAccountingDocumentPostingService, AccountingDocumentPostingService>();
+        services.TryAddScoped<IExpenseCurrencyService, OAS.Application.Accounting.Expenses.ExpenseCurrencyService>();
         services.TryAddScoped<IProfileAccountingPostingService, ProfileAccountingPostingService>();
         services.TryAddScoped<ISupplierSettlementFxPostingService, SupplierSettlementFxPostingService>();
         services.TryAddScoped<IFiscalYearClosingService, FiscalYearClosingService>();

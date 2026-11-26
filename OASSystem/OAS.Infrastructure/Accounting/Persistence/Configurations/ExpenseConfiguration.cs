@@ -38,6 +38,18 @@ public sealed class ExpenseConfiguration : IEntityTypeConfiguration<Expense>
             .IsRequired()
             .HasPrecision(19, 4);
 
+        builder.Property(x => x.CurrencyId);
+        builder.Property(x => x.CurrencyCodeSnapshot).HasMaxLength(16);
+        builder.Property(x => x.CurrencyDecimalPlacesSnapshot);
+        builder.Property(x => x.BaseCurrencyId);
+        builder.Property(x => x.BaseCurrencyCodeSnapshot).HasMaxLength(16);
+        builder.Property(x => x.BaseCurrencyDecimalPlacesSnapshot);
+        builder.Property(x => x.BaseAmount).HasPrecision(19, 4);
+        builder.Property(x => x.ExchangeRate).HasPrecision(19, 8);
+        builder.Property(x => x.ExchangeRateDate).HasColumnType("date");
+        builder.Property(x => x.ExchangeRateType);
+        builder.Property(x => x.ExchangeRateSource);
+
         builder.Property(x => x.PaymentMethod)
             .IsRequired()
             .HasConversion<byte>();

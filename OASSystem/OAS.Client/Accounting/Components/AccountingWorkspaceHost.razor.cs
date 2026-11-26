@@ -1778,6 +1778,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                             AccountId = dto.AccountId,
                             CurrencyId = dto.CurrencyId,
                             IsDefault = dto.IsDefault,
+                            RequiresOpenShift = dto.RequiresOpenShift,
                             IsActive = dto.IsActive,
                             RowVersion = dto.RowVersion
                         };
@@ -1816,6 +1817,12 @@ public partial class AccountingWorkspaceHost : IDisposable
                             ShiftNumber = dto.ShiftNumber,
                             CashAccountId = dto.CashAccountId,
                             OpeningBalance = dto.OpeningBalance,
+                            BookOpeningBalance = dto.BookOpeningBalance,
+                            OpeningDifferenceReason = dto.OpeningDifferenceReason,
+                            UsesLinkedMovements = dto.UsesLinkedMovements,
+                            SettlementJournalEntryId = dto.SettlementJournalEntryId,
+                            SettlementAccountId = dto.SettlementAccountId,
+                            SettlementDate = dto.SettlementDate, SettlementReason = dto.SettlementReason,
                             ExpectedClosingBalance = dto.ExpectedClosingBalance,
                             ActualClosingBalance = dto.ActualClosingBalance,
                             DifferenceAmount = dto.DifferenceAmount,
@@ -1842,6 +1849,9 @@ public partial class AccountingWorkspaceHost : IDisposable
                             ExpenseAccountId = dto.ExpenseAccountId,
                             Beneficiary = dto.Beneficiary,
                             Amount = dto.Amount,
+                            CurrencyId = dto.CurrencyId, CurrencyCode = dto.CurrencyCodeSnapshot,
+                            ExchangeRate = dto.ExchangeRate, BaseAmount = dto.BaseAmount, BaseCurrencyCode = dto.BaseCurrencyCodeSnapshot,
+                            BaseDecimalPlaces = dto.BaseCurrencyDecimalPlacesSnapshot ?? 2,
                             PaymentMethod = dto.PaymentMethod,
                             CashAccountId = dto.CashAccountId,
                             BankAccountId = dto.BankAccountId,
@@ -2851,12 +2861,12 @@ public partial class AccountingWorkspaceHost : IDisposable
                 return;
             }
 
-            result = await AccountingService.CreateCashAccountAsync(new CreateCashAccountRequest(model.Code.Trim(), model.Name.Trim(), model.CurrencyId.Value, model.IsDefault, model.IsActive));
+            result = await AccountingService.CreateCashAccountAsync(new CreateCashAccountRequest(model.Code.Trim(), model.Name.Trim(), model.CurrencyId.Value, model.IsDefault, model.IsActive, model.RequiresOpenShift));
         }
         else
         {
             EnsureEntityIdAndRowVersion(tab, model.RowVersion);
-            result = await AccountingService.UpdateCashAccountAsync(tab.EntityId!.Value, new UpdateCashAccountRequest(model.Name.Trim(), model.CurrencyId.Value, model.IsDefault, model.IsActive, model.RowVersion));
+            result = await AccountingService.UpdateCashAccountAsync(tab.EntityId!.Value, new UpdateCashAccountRequest(model.Name.Trim(), model.CurrencyId.Value, model.IsDefault, model.IsActive, model.RowVersion, model.RequiresOpenShift));
         }
         await CompleteSaveAsync(tab, result?.Id, result is null ? null : $"{result.Code} - {result.Name}", "تم حفظ الصندوق بنجاح.");
     }
@@ -2950,17 +2960,33 @@ public partial class AccountingWorkspaceHost : IDisposable
         if (model.CashAccountId != cashAccountId)
             return;
 
+        if (!model.BookOpeningBalance.HasValue)
+        {
+            model.OpeningBalanceError = "حدّث الرصيد الدفتري قبل فتح الوردية.";
+            return;
+        }
+        if (model.BookOpeningBalance != model.OpeningBalance && string.IsNullOrWhiteSpace(model.OpeningDifferenceReason))
+        {
+            model.OpeningBalanceError = "أدخل سبب فرق الافتتاح.";
+            return;
+        }
         CashShiftDto? result;
         try
         {
             result = await AccountingService.CreateCashShiftAsync(new CreateCashShiftRequest(
-                cashAccountId, model.OpeningBalance, model.ShiftNumber));
+                cashAccountId, model.OpeningBalance, model.ShiftNumber, model.OpeningDifferenceReason, model.BookOpeningBalance));
         }
         catch (ApiClientException ex) when (ex.Error.Code == "cash_shift_already_open")
         {
             // The server/unique index remains authoritative for concurrent requests.
             if (model.CashAccountId == cashAccountId)
                 model.CashAccountError = ActiveCashShiftError;
+            return;
+        }
+        catch (ApiClientException ex) when (ex.Error.Code is "cash_shift_opening_balance_changed" or "cash_shift_opening_reason_required")
+        {
+            model.OpeningBalanceError = "راجع الرصيد الدفتري وسبب الفرق ثم أعد المحاولة.";
+            if (ex.Error.Code == "cash_shift_opening_balance_changed") model.BookOpeningBalance = null;
             return;
         }
         await CompleteSaveAsync(tab, result?.Id, result is null ? null : $"وردية {result.ShiftNumber}", "تم فتح الوردية بنجاح.");
@@ -2987,13 +3013,18 @@ public partial class AccountingWorkspaceHost : IDisposable
             !await ValidateBankAccountSelectionAsync(model.BankAccountId.Value, null, "الحساب البنكي للمصروف"))
             return;
 
+        if (!model.CurrencyId.HasValue || !model.ExchangeRate.HasValue)
+        {
+            model.CurrencyError = "حدد حساب الدفع وحدّث عملة المصروف وسعر الصرف.";
+            return;
+        }
         ExpenseDto? result;
         if (tab.IsNew)
         {
             result = await AccountingService.CreateExpenseAsync(new CreateExpenseRequest(
                 model.ExpenseDate, model.ExpenseTypeId.Value, model.ExpenseAccountId.Value,
                 NullIfBlank(model.Beneficiary), model.Amount, model.PaymentMethod,
-                model.CashAccountId, model.BankAccountId, NullIfBlank(model.Description), model.ExpenseNumber));
+                model.CashAccountId, model.BankAccountId, NullIfBlank(model.Description), model.ExpenseNumber, model.CurrencyId, model.ExchangeRate));
         }
         else
         {
@@ -3001,7 +3032,7 @@ public partial class AccountingWorkspaceHost : IDisposable
             result = await AccountingService.UpdateExpenseAsync(tab.EntityId!.Value, new UpdateExpenseRequest(
                 model.ExpenseDate, model.ExpenseTypeId.Value, model.ExpenseAccountId.Value,
                 NullIfBlank(model.Beneficiary), model.Amount, model.PaymentMethod,
-                model.CashAccountId, model.BankAccountId, NullIfBlank(model.Description), model.RowVersion));
+                model.CashAccountId, model.BankAccountId, NullIfBlank(model.Description), model.RowVersion, model.CurrencyId, model.ExchangeRate));
         }
 
         await CompleteSaveAsync(tab, result?.Id, result?.ExpenseNumber, "تم حفظ المصروف بنجاح.");
@@ -5134,10 +5165,9 @@ public partial class AccountingWorkspaceHost : IDisposable
 
     private string ExpenseAmountText(ExpenseDto expense)
     {
-        var currencyId = ExpenseCurrencyId(expense);
-        if (currencyId.HasValue && _currencyDtos.TryGetValue(currencyId.Value, out var currency))
-            return $"{expense.Amount.ToString($"N{Math.Clamp((int)currency.DecimalPlaces, 0, 6)}")} {currency.Code}";
-        return $"{expense.Amount:N2} · العملة غير متاحة";
+        if (expense.CurrencyCodeSnapshot is string code)
+            return $"{expense.Amount.ToString($"N{Math.Clamp((int)(expense.CurrencyDecimalPlacesSnapshot ?? 2), 0, 4)}")} {code}";
+        return $"{expense.Amount:N2} · مبلغ قديم (العملة الأساسية عند التسجيل)";
     }
 
     private IReadOnlyList<AccountingRecordItem> BuildExpenseItems() => _expensesPage.Items.Select(x =>

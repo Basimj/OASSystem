@@ -68,6 +68,161 @@ namespace OAS.Infrastructure.Persistence.Migrations
 
             modelBuilder.HasSequence("WorkShiftCodeSequence", "hr");
 
+            modelBuilder.Entity("OAS.Domain.Accounting.Entities.CashTransfer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TransferNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateOnly>("TransferDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("SourceAccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("DestinationAccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("SourceCurrencyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("DestinationCurrencyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SourceName")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("DestinationName")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("SourceCurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("DestinationCurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<decimal>("SourceAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("decimal(19,4)");
+
+                    b.Property<decimal>("DestinationAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("decimal(19,4)");
+
+                    b.Property<decimal>("FeeAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("decimal(19,4)");
+
+                    b.Property<Guid?>("FeeAccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)");
+
+                    b.Property<byte>("Status")
+                        .HasColumnType("tinyint");
+
+                    b.Property<Guid?>("ApprovedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ApprovedAtUtc")
+                        .HasColumnType("datetime2(3)");
+
+                    b.Property<Guid?>("JournalEntryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ReversalJournalEntryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly?>("ReversalDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("ReversalReason")
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)");
+
+                    b.Property<decimal?>("SourceBaseAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("decimal(19,4)");
+
+                    b.Property<decimal?>("DestinationBaseAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("decimal(19,4)");
+
+                    b.Property<decimal?>("FeeBaseAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("decimal(19,4)");
+
+                    b.Property<decimal?>("FxDifferenceBase")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("decimal(19,4)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsRequired()
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("CreatedAt");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .HasColumnName("CreatedBy");
+
+                    b.Property<DateTimeOffset?>("LastModifiedAtUtc")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("UpdatedAt");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .HasColumnName("UpdatedBy");
+
+                    b.Property<string>("CreatedFromDevice")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)")
+                        .HasColumnName("CreatedFromDevice");
+
+                    b.Property<string>("UpdatedFromDevice")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)")
+                        .HasColumnName("UpdatedFromDevice");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SourceAccountId");
+                    b.HasIndex("DestinationAccountId");
+                    b.HasIndex("FeeAccountId");
+                    b.HasIndex("SourceCurrencyId");
+                    b.HasIndex("DestinationCurrencyId");
+                    b.HasIndex("JournalEntryId");
+                    b.HasIndex("ReversalJournalEntryId");
+                    b.HasIndex("TransferNumber").IsUnique().HasDatabaseName("UX_CashTransfers_Number");
+                    b.HasIndex("TransferDate").HasDatabaseName("IX_CashTransfers_Date");
+                    b.ToTable("tbl_CashTransfers", "dbo");
+                });
+
             modelBuilder.Entity("OAS.Domain.Accounting.Entities.Account", b =>
                 {
                     b.Property<Guid>("Id")
@@ -346,6 +501,7 @@ namespace OAS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AccountId")
+                        .IsUnique()
                         .HasDatabaseName("IX_BankAccounts_AccountId");
 
                     b.HasIndex("AccountNumber")
@@ -851,6 +1007,9 @@ namespace OAS.Infrastructure.Persistence.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
+                    b.Property<bool>("RequiresOpenShift")
+                        .HasColumnType("bit");
+
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .IsRequired()
@@ -865,6 +1024,7 @@ namespace OAS.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AccountId")
+                        .IsUnique()
                         .HasDatabaseName("IX_CashAccounts_AccountId");
 
                     b.HasIndex("Code")
@@ -938,6 +1098,19 @@ namespace OAS.Infrastructure.Persistence.Migrations
                         .HasPrecision(19, 4)
                         .HasColumnType("decimal(19,4)");
 
+                    b.Property<decimal?>("BookOpeningBalance")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("decimal(19,4)");
+
+                    b.Property<string>("OpeningDifferenceReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid?>("SettlementAccountId").HasColumnType("uniqueidentifier");
+                    b.Property<Guid?>("SettlementJournalEntryId").HasColumnType("uniqueidentifier");
+                    b.Property<DateOnly?>("SettlementDate").HasColumnType("date");
+                    b.Property<string>("SettlementReason").HasMaxLength(400).HasColumnType("nvarchar(400)");
+
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .IsRequired()
@@ -958,6 +1131,8 @@ namespace OAS.Infrastructure.Persistence.Migrations
                         .HasColumnName("UpdatedFromDevice");
 
                     b.HasKey("Id");
+                    b.HasIndex("SettlementAccountId");
+                    b.HasIndex("SettlementJournalEntryId");
 
                     b.HasIndex("CashAccountId")
                         .HasDatabaseName("IX_CashShifts_CashAccountId");
@@ -1649,6 +1824,43 @@ namespace OAS.Infrastructure.Persistence.Migrations
                     b.Property<decimal>("Amount")
                         .HasPrecision(19, 4)
                         .HasColumnType("decimal(19,4)");
+
+                    b.Property<Guid?>("CurrencyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CurrencyCodeSnapshot")
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<byte?>("CurrencyDecimalPlacesSnapshot")
+                        .HasColumnType("tinyint");
+
+                    b.Property<Guid?>("BaseCurrencyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("BaseCurrencyCodeSnapshot")
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<byte?>("BaseCurrencyDecimalPlacesSnapshot")
+                        .HasColumnType("tinyint");
+
+                    b.Property<decimal?>("BaseAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("decimal(19,4)");
+
+                    b.Property<decimal?>("ExchangeRate")
+                        .HasPrecision(19, 8)
+                        .HasColumnType("decimal(19,8)");
+
+                    b.Property<DateOnly?>("ExchangeRateDate")
+                        .HasColumnType("date");
+
+                    b.Property<byte?>("ExchangeRateType")
+                        .HasColumnType("tinyint");
+
+                    b.Property<byte?>("ExchangeRateSource")
+                        .HasColumnType("tinyint");
 
                     b.Property<Guid?>("BankAccountId")
                         .HasColumnType("uniqueidentifier");
@@ -12630,6 +12842,8 @@ namespace OAS.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("OAS.Domain.Accounting.Entities.CashShift", b =>
                 {
+                    b.HasOne("OAS.Domain.Accounting.Entities.Account", null).WithMany().HasForeignKey("SettlementAccountId").OnDelete(DeleteBehavior.Restrict);
+                    b.HasOne("OAS.Domain.Accounting.Entities.JournalEntry", null).WithMany().HasForeignKey("SettlementJournalEntryId").OnDelete(DeleteBehavior.Restrict);
                     b.HasOne("OAS.Domain.Accounting.Entities.CashAccount", null)
                         .WithMany()
                         .HasForeignKey("CashAccountId")
@@ -15191,6 +15405,17 @@ namespace OAS.Infrastructure.Persistence.Migrations
                 {
                     b.Navigation("Lines");
                 });
+            modelBuilder.Entity("OAS.Domain.Accounting.Entities.CashTransfer", b =>
+                {
+                    b.HasOne("OAS.Domain.Accounting.Entities.Account", null).WithMany().HasForeignKey("SourceAccountId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("OAS.Domain.Accounting.Entities.Account", null).WithMany().HasForeignKey("DestinationAccountId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("OAS.Domain.Accounting.Entities.Account", null).WithMany().HasForeignKey("FeeAccountId").OnDelete(DeleteBehavior.Restrict);
+                    b.HasOne("OAS.Domain.Accounting.Entities.Currency", null).WithMany().HasForeignKey("SourceCurrencyId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("OAS.Domain.Accounting.Entities.Currency", null).WithMany().HasForeignKey("DestinationCurrencyId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                    b.HasOne("OAS.Domain.Accounting.Entities.JournalEntry", null).WithMany().HasForeignKey("JournalEntryId").OnDelete(DeleteBehavior.Restrict);
+                    b.HasOne("OAS.Domain.Accounting.Entities.JournalEntry", null).WithMany().HasForeignKey("ReversalJournalEntryId").OnDelete(DeleteBehavior.Restrict);
+                });
+
 #pragma warning restore 612, 618
         }
     }

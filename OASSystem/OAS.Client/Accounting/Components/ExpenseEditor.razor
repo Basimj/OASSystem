@@ -1,5 +1,7 @@
 @namespace OAS.Client.Accounting.Components
 @using OAS.Contracts.Accounting.Expenses
+@using OAS.Client.Accounting.Services
+@inject IAccountingClientService AccountingService
 @using OAS.Contracts.Accounting.Enums
 @using OAS.Client.Accounting.Common
 @using OAS.UiLib.Components.Accounting.Workspace
@@ -103,7 +105,7 @@
 
         <UiAccountingFormGrid Columns="3">
 
-            <UiAccountingNumberField Label="مبلغ المصروف"
+            <UiAccountingNumberField Label="مبلغ المصروف بعملة الدفع"
                                      Value="@Model.Amount"
                                      ValueChanged="OnAmountChanged"
                                      Min="0.01"
@@ -147,6 +149,17 @@
                           DebounceMilliseconds="250" />
             }
 
+            <UiAccountingReadOnlyValue Label="عملة المصروف" Value="@(Model.CurrencyCode ?? "غير محددة / سجل قديم")" />
+            <UiAccountingReadOnlyValue Label="سعر الصرف المحاسبي" Value="@(Model.ExchangeRate?.ToString("N8") ?? "—")" />
+            <UiAccountingReadOnlyValue Label="القيمة الأساسية" Value="@BaseAmountText" />
+            @if (IsEditable)
+            {
+                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="RefreshCurrencyAsync">تحديث العملة وسعر الصرف</button>
+                @if (!string.IsNullOrWhiteSpace(Model.CurrencyError))
+                {
+                    <span class="text-danger" role="alert">@Model.CurrencyError</span>
+                }
+            }
         </UiAccountingFormGrid>
 
     </UiAccountingFormSection>
@@ -192,6 +205,14 @@
         public string? Beneficiary { get; set; }
 
         public decimal Amount { get; set; }
+        public Guid? CurrencyId { get; set; }
+        public string? CurrencyCode { get; set; }
+        public decimal? ExchangeRate { get; set; }
+        public decimal? BaseAmount { get; set; }
+        public string? BaseCurrencyCode { get; set; }
+        public byte BaseDecimalPlaces { get; set; } = 2;
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string? CurrencyError { get; set; }
 
 
         public PaymentMethod PaymentMethod { get; set; }
@@ -305,6 +326,49 @@
     public EventCallback OnModelChanged { get; set; }
 
 
+    private string BaseAmountText => Model.BaseAmount.HasValue
+        ? $"{Model.BaseAmount.Value:N4} {Model.BaseCurrencyCode}" : "—";
+
+    private void RecalculateBaseAmount()
+    {
+        Model.BaseAmount = Model.ExchangeRate.HasValue
+            ? Math.Round(Model.Amount * Model.ExchangeRate.Value, Model.BaseDecimalPlaces, MidpointRounding.AwayFromZero) : null;
+    }
+
+    private async Task RefreshCurrencyAsync()
+    {
+        var model = Model;
+        var cashId = model.CashAccountId;
+        var bankId = model.BankAccountId;
+        var date = model.ExpenseDate;
+        model.CurrencyId = null; model.CurrencyCode = null; model.ExchangeRate = null;
+        model.BaseAmount = null; model.CurrencyError = null;
+        if (cashId.HasValue || bankId.HasValue)
+        {
+            try
+            {
+                Guid? id = cashId is Guid cash ? (await AccountingService.GetCashAccountByIdAsync(cash))?.CurrencyId
+                    : (await AccountingService.GetBankAccountByIdAsync(bankId!.Value))?.CurrencyId;
+                if (id is not Guid currencyId) throw new InvalidOperationException();
+                var rate = await AccountingService.GetEffectiveExchangeRateAsync(currencyId, date);
+                var settings = await AccountingService.GetAccountingSettingsAsync();
+                var baseCurrency = settings is null ? null : await AccountingService.GetCurrencyByIdAsync(settings.BaseCurrencyId);
+                if (rate is null || baseCurrency is null || rate.DecimalPlaces > 4 || baseCurrency.DecimalPlaces > 4)
+                    throw new InvalidOperationException();
+                if (Model != model || model.CashAccountId != cashId || model.BankAccountId != bankId || model.ExpenseDate != date) return;
+                model.CurrencyId = id; model.CurrencyCode = rate.CurrencyCode; model.ExchangeRate = rate.Rate;
+                model.BaseCurrencyCode = baseCurrency.Code; model.BaseDecimalPlaces = baseCurrency.DecimalPlaces;
+                RecalculateBaseAmount();
+            }
+            catch (Exception)
+            {
+                if (Model != model || model.CashAccountId != cashId || model.BankAccountId != bankId || model.ExpenseDate != date) return;
+                model.CurrencyError = "تعذر جلب عملة الحساب أو سعر الصرف لتاريخ المصروف.";
+            }
+        }
+        await OnChanged();
+    }
+
     private Task OnChanged()
         => OnModelChanged.InvokeAsync();
 
@@ -317,7 +381,7 @@
             Model.ExpenseDate = value.Value;
         }
 
-        await OnChanged();
+        await RefreshCurrencyAsync();
     }
 
 
@@ -342,6 +406,7 @@
     private async Task OnAmountChanged(decimal amount)
     {
         Model.Amount = amount;
+        RecalculateBaseAmount();
         await OnChanged();
     }
 
@@ -380,7 +445,7 @@
         }
 
 
-        await OnChanged();
+        await RefreshCurrencyAsync();
     }
 
 
@@ -422,7 +487,7 @@
                 ? id
                 : null;
 
-        await OnChanged();
+        await RefreshCurrencyAsync();
     }
 
 
@@ -436,6 +501,6 @@
                 ? id
                 : null;
 
-        await OnChanged();
+        await RefreshCurrencyAsync();
     }
 }

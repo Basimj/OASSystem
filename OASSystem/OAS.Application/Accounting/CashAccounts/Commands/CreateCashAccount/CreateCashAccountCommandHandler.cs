@@ -63,6 +63,7 @@ public sealed class CreateCashAccountCommandHandler(
             data.IsDefault,
             data.IsActive);
 
+        entity.SetRequiresOpenShift(data.RequiresOpenShift);
         await repository.AddAsync(entity, cancellationToken);
         return entity;
     }

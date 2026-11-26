@@ -1,0 +1,36 @@
+.cash-transfer-page { display:flex; flex-direction:column; gap:12px; padding:12px; }
+.ct-toolbar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; }
+.ct-toolbar h3 { margin:0; font-size:1.15rem; }
+.ct-editor,.ct-table-panel { border:1px solid #cdd5e0; border-radius:8px; padding:12px; background:var(--bs-body-bg, #fff); }
+.ct-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; }
+.ct-grid label { display:flex; flex-direction:column; gap:4px; font-size:.85rem; }
+.ct-description { grid-column:span 2; }
+.ct-actions { display:flex; flex-wrap:wrap; gap:5px; align-items:center; }
+.ct-editor .ct-actions { margin-top:12px; }
+.ct-search { max-width:340px; }
+.ct-table-panel .table { margin-top:10px; font-size:.82rem; }
+.ct-table-panel th { white-space:nowrap; background:#e8edf5; color:#203654; }
+.ct-table-panel td { vertical-align:middle; }
+@media(max-width:600px){.ct-description{grid-column:span 1;}}
+
+.ct-filters { display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; width:100%; }
+.ct-filters label { display:flex; flex-direction:column; gap:4px; min-width:140px; font-size:.82rem; }
+.ct-filters .ct-search { flex:1 1 220px; max-width:none; }
+.ct-editor h5 { font-size:1rem; margin:0 0 12px; }
+.ct-grid .ct-error { color:var(--bs-danger,#dc3545); font-size:.78rem; }
+.ct-hint { opacity:.8; font-size:.78rem; }
+.ct-output { min-height:38px; background:var(--bs-tertiary-bg,#f3f4f6); }
+.ct-summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; margin-top:12px; }
+.ct-summary > div { border:1px solid var(--bs-border-color,#cdd5e0); border-radius:6px; padding:8px; display:flex; flex-direction:column; gap:4px; }
+.ct-summary strong { font-size:.95rem; }
+.ct-fx { display:block; font-size:.72rem; color:var(--bs-secondary-color,#64748b); }
+.ct-empty { text-align:center; padding:20px!important; }
+.ct-table-panel td { white-space:normal; }
+@media(max-width:600px){.ct-filters label,.ct-filters .ct-search{flex:1 1 100%;max-width:none;}.ct-grid{grid-template-columns:1fr;}.ct-description{grid-column:span 1;}}
+
+.ct-post-error { display:block; flex-basis:100%; color:var(--bs-danger,#dc3545); white-space:normal; }
+.ct-rate-reset { align-self:flex-start; }
+.ct-summary .ct-error { color:var(--bs-danger,#dc3545); }
+
+.ct-editor-heading { margin-bottom:12px; }
+.ct-editor-heading h5 { margin:0; }

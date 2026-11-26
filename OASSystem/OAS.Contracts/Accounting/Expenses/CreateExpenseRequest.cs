@@ -12,4 +12,6 @@ public sealed record CreateExpenseRequest(
     Guid? CashAccountId,
     Guid? BankAccountId,
     string? Description,
-    string? ExpenseNumber = null);
+    string? ExpenseNumber = null,
+    Guid? CurrencyId = null,
+    decimal? ExpectedExchangeRate = null);

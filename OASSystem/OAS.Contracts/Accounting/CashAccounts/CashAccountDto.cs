@@ -8,4 +8,5 @@ public sealed record CashAccountDto(
     Guid? CurrencyId,
     bool IsDefault,
     bool IsActive,
-    string RowVersion);
+    string RowVersion,
+    bool RequiresOpenShift = false);

@@ -49,7 +49,33 @@ public sealed class Expense : AuditableEntity<Guid>
 
     public string? Beneficiary { get; private set; }
 
+    // Amount is the original transaction amount for new documents. Legacy documents retain their original semantics.
     public decimal Amount { get; private set; }
+    public Guid? CurrencyId { get; private set; }
+    public string? CurrencyCodeSnapshot { get; private set; }
+    public byte? CurrencyDecimalPlacesSnapshot { get; private set; }
+    public Guid? BaseCurrencyId { get; private set; }
+    public string? BaseCurrencyCodeSnapshot { get; private set; }
+    public byte? BaseCurrencyDecimalPlacesSnapshot { get; private set; }
+    public decimal? BaseAmount { get; private set; }
+    public decimal? ExchangeRate { get; private set; }
+    public DateOnly? ExchangeRateDate { get; private set; }
+    public ExchangeRateType? ExchangeRateType { get; private set; }
+    public ExchangeRateSource? ExchangeRateSource { get; private set; }
+
+    public void SetCurrencySnapshot(Guid currencyId, string code, byte decimals, Guid baseCurrencyId,
+        string baseCode, byte baseDecimals, decimal baseAmount, decimal rate, DateOnly rateDate,
+        ExchangeRateType rateType, ExchangeRateSource rateSource)
+    {
+        EnsureDraft();
+        if (currencyId == Guid.Empty || baseCurrencyId == Guid.Empty || string.IsNullOrWhiteSpace(code) ||
+            string.IsNullOrWhiteSpace(baseCode) || baseAmount <= 0 || rate <= 0 || decimals > 4 || baseDecimals > 4)
+            throw new ArgumentException("Invalid expense currency snapshot.");
+        CurrencyId = currencyId; CurrencyCodeSnapshot = code; CurrencyDecimalPlacesSnapshot = decimals;
+        BaseCurrencyId = baseCurrencyId; BaseCurrencyCodeSnapshot = baseCode; BaseCurrencyDecimalPlacesSnapshot = baseDecimals;
+        BaseAmount = baseAmount; ExchangeRate = rate; ExchangeRateDate = rateDate;
+        ExchangeRateType = rateType; ExchangeRateSource = rateSource;
+    }
 
     public PaymentMethod PaymentMethod { get; private set; }
 

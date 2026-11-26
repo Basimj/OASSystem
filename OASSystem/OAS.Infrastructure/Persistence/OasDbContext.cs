@@ -21,7 +21,7 @@ public sealed class OasDbContext(DbContextOptions<OasDbContext> options) : DbCon
     {
         var postings = CashShiftPostingLinker.NewPostings(this);
         var shifts = CashShiftPostingLinker.ShiftChanges(this);
-        if (postings.Length == 0 && shifts.Length == 0) return base.SaveChanges(acceptAllChangesOnSuccess);
+        if (postings.Length == 0 && shifts.Length == 0 && !CashShiftPostingLinker.HasCashConfigurationChanges(this)) return base.SaveChanges(acceptAllChangesOnSuccess);
         return SaveChangesAsync(acceptAllChangesOnSuccess).GetAwaiter().GetResult();
     }
 
@@ -29,7 +29,7 @@ public sealed class OasDbContext(DbContextOptions<OasDbContext> options) : DbCon
     {
         var postings = CashShiftPostingLinker.NewPostings(this);
         var shifts = CashShiftPostingLinker.ShiftChanges(this);
-        if (postings.Length == 0 && shifts.Length == 0)
+        if (postings.Length == 0 && shifts.Length == 0 && !CashShiftPostingLinker.HasCashConfigurationChanges(this))
             return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
         if (!Database.IsSqlServer() || Database.CurrentTransaction is not null)
         {

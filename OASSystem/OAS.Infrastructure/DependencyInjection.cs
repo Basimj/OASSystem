@@ -112,6 +112,10 @@ public static class DependencyInjection
         services.AddScoped<IAccountingPartyQueryService, AccountingPartyQueryService>();
         services.AddScoped<IAccountingReportingQueryService, AccountingReportingQueryService>();
         services.AddScoped<ICashShiftBalanceService, CashShiftBalanceService>();
+        services.AddScoped<ICashShiftOpeningBalanceService, CashShiftBalanceService>();
+        services.AddScoped<ICashTransferService, CashTransferService>();
+        services.AddScoped<ICashBankReportQueryService, CashBankReportQueryService>();
+        services.AddScoped<ICashShiftSettlementService, CashTransferService>();
         services.AddScoped<ICashShiftMovementQueryService, CashShiftMovementQueryService>();
         services.AddScoped<ISupplierApReportingQueryService, SupplierApReportingQueryService>();
         services.AddScoped<OAS.Application.Inventory.Reports.ISupplierProductMovementReportService, OAS.Infrastructure.Inventory.Queries.SupplierProductMovementReportService>();

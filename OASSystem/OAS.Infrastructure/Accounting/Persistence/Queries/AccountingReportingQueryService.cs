@@ -232,7 +232,7 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
                 postedExpenses = await db.Set<Expense>().AsNoTracking()
                     .Where(x => x.Status == ExpenseStatus.Posted &&
                         x.ExpenseDate >= currentPeriod.StartDate && x.ExpenseDate <= today)
-                    .SumAsync(x => x.Amount, cancellationToken);
+                    .SumAsync(x => x.BaseAmount ?? x.Amount, cancellationToken);
             }
 
             financial = new AccountingDashboardFinancialDto(

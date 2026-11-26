@@ -60,6 +60,7 @@ public sealed class BankAccountConfiguration : IEntityTypeConfiguration<BankAcco
             .HasDatabaseName("IX_BankAccounts_CurrencyId");
 
         builder.HasIndex(x => x.AccountId)
+            .IsUnique()
             .HasDatabaseName("IX_BankAccounts_AccountId");
 
         builder.HasOne<Account>()
