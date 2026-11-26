@@ -4,6 +4,9 @@ namespace OAS.Application.Accounting.Abstractions;
 
 public interface IAccountingReportingQueryService
 {
+    Task<BalanceSheetReportDto> GetBalanceSheetAsync(BalanceSheetFilterDto filter, CancellationToken cancellationToken = default);
+    Task<IncomeStatementReportDto> GetIncomeStatementAsync(IncomeStatementFilterDto filter, CancellationToken cancellationToken = default);
+
     Task<AccountingDashboardDto> GetAccountingDashboardAsync(
         CancellationToken cancellationToken = default);
 

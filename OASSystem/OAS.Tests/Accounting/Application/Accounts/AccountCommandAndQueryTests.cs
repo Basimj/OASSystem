@@ -50,7 +50,8 @@ public class AccountCommandAndQueryTests
             AllowManualPosting: true,
             IsSystemAccount: false,
             IsActive: true,
-            EffectiveDate: null);
+            EffectiveDate: null,
+            FinancialStatementCategory: FinancialStatementCategory.CurrentAssets);
 
         var result = await handler.Handle(
             new CreateAccountCommand(request),
@@ -66,9 +67,52 @@ public class AccountCommandAndQueryTests
     }
 
     [Test]
+    public async Task CreatePostingAccount_InheritsParentClassificationWithoutStoringACopy()
+    {
+        var parent = CreateAccountEntity("11", "الأصول المتداولة");
+        parent.SetFinancialStatementCategory(OAS.Domain.Accounting.Enums.FinancialStatementCategory.CurrentAssets);
+        await _repository.AddAsync(parent);
+        var handler = new CreateAccountCommandHandler(_repository, _mapper, new AllowAllAccountIntegrityService());
+        var request = new CreateAccountRequest("1102", "صندوق", null, parent.Id, (byte)(parent.Level + 1), AccountClass.Asset, AccountType.Posting, NormalBalance.Debit, true, false, true, false);
+        var result = await handler.Handle(new CreateAccountCommand(request), CancellationToken.None);
+        Assert.That(result.FinancialStatementCategory, Is.Null);
+        Assert.That(result.ParentAccountId, Is.EqualTo(parent.Id));
+    }
+
+    [Test]
+    public void CreatePostingAccount_RejectsMissingOrIncompatibleCategory()
+    {
+        var handler = new CreateAccountCommandHandler(_repository, _mapper, new AllowAllAccountIntegrityService());
+        var request = new CreateAccountRequest("1102", "صندوق", null, null, 1, AccountClass.Asset, AccountType.Posting, NormalBalance.Debit, true, false, true, false);
+        Assert.ThrowsAsync<ConflictException>(async () => { await handler.Handle(new CreateAccountCommand(request), CancellationToken.None); });
+        Assert.ThrowsAsync<ConflictException>(async () => { await handler.Handle(new CreateAccountCommand(request with { FinancialStatementCategory = FinancialStatementCategory.OperatingExpenses }), CancellationToken.None); });
+        Assert.That(_repository.Items, Is.Empty);
+    }
+
+    [Test]
+    public void CreateHeaderAccount_RejectsMissingCategory()
+    {
+        var handler = new CreateAccountCommandHandler(_repository, _mapper, new AllowAllAccountIntegrityService());
+        var request = new CreateAccountRequest("1103", "رئيسي", null, null, 1, AccountClass.Asset, AccountType.Header, NormalBalance.Debit, false, false, false, false);
+        Assert.That(Assert.ThrowsAsync<ConflictException>(async () => await handler.Handle(new CreateAccountCommand(request), CancellationToken.None))!.Code, Is.EqualTo("accounting_financial_category_required"));
+    }
+
+    [Test]
+    public async Task CreateChildAccount_RejectsExplicitCategory()
+    {
+        var parent = CreateAccountEntity("11", "أب");
+        parent.SetFinancialStatementCategory(OAS.Domain.Accounting.Enums.FinancialStatementCategory.CurrentAssets);
+        await _repository.AddAsync(parent);
+        var handler = new CreateAccountCommandHandler(_repository, _mapper, new AllowAllAccountIntegrityService());
+        var request = new CreateAccountRequest("1103", "فرعي", null, parent.Id, 2, AccountClass.Asset, AccountType.Posting, NormalBalance.Debit, true, false, true, false, FinancialStatementCategory: FinancialStatementCategory.NonCurrentAssets);
+        Assert.That(Assert.ThrowsAsync<ConflictException>(async () => await handler.Handle(new CreateAccountCommand(request), CancellationToken.None))!.Code, Is.EqualTo("accounting_financial_category_inherited"));
+    }
+
+    [Test]
     public async Task UpdateAccountCommandHandler_UpdatesExistingAccountWithoutChangingCode()
     {
         var existing = CreateAccountEntity("1101", "الصندوق");
+        existing.SetFinancialStatementCategory(OAS.Domain.Accounting.Enums.FinancialStatementCategory.CurrentAssets);
         await _repository.AddAsync(existing);
 
         var handler = new UpdateAccountCommandHandler(_repository, _mapper, new UnmanagedAccountGuard(), new AllowAllAccountIntegrityService());

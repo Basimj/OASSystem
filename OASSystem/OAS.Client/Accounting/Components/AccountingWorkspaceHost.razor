@@ -39,6 +39,7 @@
                               Size="ControlSize.Small"
                               OnClick="OpenNewRecord" />
 
+
                     <UiButton Text="تحديث"
                               IconCssClass="fa-solid fa-rotate"
                               Variant="ButtonVariant.Ghost"
@@ -696,6 +697,9 @@
                                        ParentAccountLookupItem="@GetAccountLookup(accountModel.ParentAccountId)"
                                        AccountSearchAsync="SearchAccountsAsync"
                                        AccountLevelResolver="ResolveAccountLevel"
+                                       AccountResolver="ResolveAccountDto"
+                                       FinancialCategoryResolver="ResolveFinancialCategory"
+                                       LoadFinancialAncestorsAsync="LoadFinancialAncestorsAsync"
                                        OnModelChanged="MarkActiveDirty" />
                     }
                     else if (_isLoading)
@@ -727,6 +731,10 @@
                                    IsNew="@activeTab.IsNew"
                                    ParentAccountLookupItem="@GetAccountLookup(model.ParentAccountId)"
                                    AccountSearchAsync="SearchAccountsAsync"
+                                   AccountLevelResolver="ResolveAccountLevel"
+                                   AccountResolver="ResolveAccountDto"
+                                   FinancialCategoryResolver="ResolveFinancialCategory"
+                                       LoadFinancialAncestorsAsync="LoadFinancialAncestorsAsync"
                                    OnModelChanged="MarkActiveDirty" />
 
                     break;

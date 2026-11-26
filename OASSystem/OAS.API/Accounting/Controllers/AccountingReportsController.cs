@@ -19,6 +19,18 @@ namespace OAS.API.Accounting.Controllers;
 [Route("api/accounting/reports")]
 public sealed class AccountingReportsController(ISender sender) : ControllerBase
 {
+    [HttpGet("balance-sheet")]
+    public async Task<ActionResult<BalanceSheetReportDto>> BalanceSheet([FromQuery] DateOnly asOfDate,
+        [FromQuery] Guid? fiscalYearId = null, CancellationToken cancellationToken = default)
+        => Ok(await sender.Send(new OAS.Application.Accounting.Reports.Queries.GetBalanceSheet.GetBalanceSheetQuery(
+            new BalanceSheetFilterDto(asOfDate, fiscalYearId)), cancellationToken));
+
+    [HttpGet("income-statement")]
+    public async Task<ActionResult<IncomeStatementReportDto>> IncomeStatement([FromQuery] DateOnly fromDate, [FromQuery] DateOnly toDate,
+        [FromQuery] Guid? fiscalYearId = null, [FromQuery] Guid? fiscalPeriodId = null, [FromQuery] Guid? costCenterId = null, CancellationToken cancellationToken = default)
+        => Ok(await sender.Send(new OAS.Application.Accounting.Reports.Queries.GetIncomeStatement.GetIncomeStatementQuery(
+            new IncomeStatementFilterDto(fromDate, toDate, fiscalYearId, fiscalPeriodId, costCenterId)), cancellationToken));
+
     [HttpGet("dashboard")]
     public async Task<ActionResult<AccountingDashboardDto>> Dashboard(
         CancellationToken cancellationToken)

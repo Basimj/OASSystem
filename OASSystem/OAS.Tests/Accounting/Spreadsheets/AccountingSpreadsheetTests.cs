@@ -59,7 +59,7 @@ public sealed class AccountingSpreadsheetTests
         var definitions=AccountingSpreadsheetDefinitions.Get(section);
         return _workbook.Write(definitions.Select((d,i)=>new SpreadsheetTable(d,rows.Where(x=>i==0?!x.ContainsKey("ProfileCode"):x.ContainsKey("ProfileCode")).Cast<IReadOnlyDictionary<string,string>>().ToArray())).ToArray());
     }
-    private static Dictionary<string,string> AccountRow(string code,string parent="")=>Row("Code",code,"NameAr","حساب "+code,"ParentCode",parent,"AccountClass","Asset","AccountType","Posting","NormalBalance","Debit");
+    private static Dictionary<string,string> AccountRow(string code,string parent="")=>Row("Code",code,"NameAr","حساب "+code,"ParentCode",parent,"AccountClass","Asset","AccountType","Posting","NormalBalance","Debit","FinancialStatementCategory",string.IsNullOrEmpty(parent)?"CurrentAssets":"");
     private static Dictionary<string,string> JournalRow(string debit,string credit,string key="JV1",string account="1110")=>Row("JournalKey",key,"JournalType","Manual","PostingDate","2026-09-21","DocumentDate","2026-09-21","Description","قيد","AccountCode",account,"Debit",debit,"Credit",credit);
     [TestCase("accounts")][TestCase("cost-centers")][TestCase("cash-accounts")][TestCase("bank-accounts")][TestCase("expense-types")][TestCase("posting-profiles")][TestCase("journals")][TestCase("customers")][TestCase("suppliers")]
     public async Task TemplateContainsDefinedSheetsAndNoGuids(string section)

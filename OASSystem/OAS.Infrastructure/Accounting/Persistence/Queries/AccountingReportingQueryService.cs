@@ -18,6 +18,68 @@ namespace OAS.Infrastructure.Accounting.Persistence.Queries;
 
 public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvider timeProvider) : IAccountingReportingQueryService
 {
+    public async Task<BalanceSheetReportDto> GetBalanceSheetAsync(BalanceSheetFilterDto filter, CancellationToken cancellationToken = default)
+    {
+        var asOfDate = filter.AsOfDate;
+        if (filter.FiscalYearId is Guid yearId)
+        {
+            var year = await db.Set<FiscalYear>().AsNoTracking().FirstOrDefaultAsync(y => y.Id == yearId, cancellationToken)
+                ?? throw new NotFoundException(nameof(FiscalYear), yearId);
+            if (asOfDate < year.StartDate || asOfDate > year.EndDate)
+                throw new ConflictException("report_date_outside_year", "تاريخ الميزانية خارج السنة المالية المختارة.");
+        }
+        // A balance sheet is cumulative. Do not truncate to the selected year's start,
+        // and do not exclude closing entries or posted reversals.
+        var accounts = await db.Set<Account>().AsNoTracking().OrderBy(a => a.Code).ToListAsync(cancellationToken);
+        var directory = accounts.ToDictionary(a => a.Id);
+        var balances = await (from line in db.Set<JournalEntryLine>().AsNoTracking()
+                              join journal in db.Set<JournalEntry>().AsNoTracking() on line.JournalEntryId equals journal.Id
+                              where journal.Status == JournalEntryStatus.Posted && journal.PostingDate <= asOfDate
+                              group line by line.AccountId into g
+                              select new { AccountId = g.Key, Balance = g.Sum(l => l.DebitAmount - l.CreditAmount) })
+            .ToDictionaryAsync(x => x.AccountId, x => x.Balance, cancellationToken);
+        var rows = accounts.Select(a => new BalanceSheetAccountDto(a.Id, a.Code, a.NameAr, a.ParentAccountId, a.Level,
+            (OAS.Contracts.Accounting.Enums.AccountClass)a.AccountClass,
+            (OAS.Contracts.Accounting.Enums.FinancialStatementCategory?)FinancialStatementCategories.Resolve(a.AccountClass, a.FinancialStatementCategory, a.ParentAccountId, directory),
+            balances.GetValueOrDefault(a.Id))).ToArray();
+        return new BalanceSheetReportDto(asOfDate, rows, BalanceSheetTotalsDto.Calculate(rows));
+    }
+
+    public async Task<IncomeStatementReportDto> GetIncomeStatementAsync(IncomeStatementFilterDto filter, CancellationToken cancellationToken = default)
+    {
+        var (fromDate, toDate) = await ResolveRangeAsync(filter.FromDate, filter.ToDate, null, filter.FiscalYearId, filter.FiscalPeriodId, cancellationToken);
+        var accounts = await db.Set<Account>().AsNoTracking().ToListAsync(cancellationToken);
+        var directory = accounts.ToDictionary(a => a.Id);
+        var nominal = accounts.Where(a => a.AccountClass is AccountClass.Revenue or AccountClass.Expense)
+            .Select(a => new IncomeStatementAccountDto(a.Id, a.Code, a.NameAr, a.ParentAccountId, a.Level,
+                (OAS.Contracts.Accounting.Enums.AccountClass)a.AccountClass,
+                (OAS.Contracts.Accounting.Enums.FinancialStatementCategory?)FinancialStatementCategories.Resolve(a.AccountClass, a.FinancialStatementCategory, a.ParentAccountId, directory))).ToArray();
+        // Exclude annual closing entries and every linked reversal, including legacy chains.
+        var links = await db.Set<JournalEntry>().AsNoTracking()
+            .Where(j => j.JournalType == JournalType.Closing || j.SourceDocumentType == "FiscalYearClosing" || j.ReversedJournalId.HasValue)
+            .Select(j => new { j.Id, j.ReversedJournalId, j.JournalType, j.SourceDocumentType }).ToListAsync(cancellationToken);
+        var byId = links.ToDictionary(j => j.Id);
+        var excluded = new HashSet<Guid>();
+        foreach (var close in links.Where(j => j.JournalType == JournalType.Closing || j.SourceDocumentType == "FiscalYearClosing"))
+        {
+            Guid? id = close.Id;
+            while (id is Guid key && excluded.Add(key))
+                id = byId.TryGetValue(key, out var link) ? link.ReversedJournalId : null;
+        }
+        var excludedIds = excluded.ToArray();
+        var query = from line in db.Set<JournalEntryLine>().AsNoTracking()
+                    join journal in db.Set<JournalEntry>().AsNoTracking() on line.JournalEntryId equals journal.Id
+                    join account in db.Set<Account>().AsNoTracking() on line.AccountId equals account.Id
+                    where journal.Status == JournalEntryStatus.Posted && journal.PostingDate >= fromDate && journal.PostingDate <= toDate
+                        && (account.AccountClass == AccountClass.Revenue || account.AccountClass == AccountClass.Expense)
+                        && journal.JournalType != JournalType.Closing && !excludedIds.Contains(journal.Id)
+                        && (!filter.CostCenterId.HasValue || line.CostCenterId == filter.CostCenterId)
+                    group line by new { line.AccountId, journal.PostingDate.Year, journal.PostingDate.Month } into g
+                    select new IncomeStatementMovementDto(g.Key.AccountId, g.Key.Year, g.Key.Month, g.Sum(l => l.CreditAmount - l.DebitAmount));
+        var movements = await query.ToListAsync(cancellationToken);
+        return new IncomeStatementReportDto(fromDate, toDate, nominal, movements);
+    }
+
     public async Task<AccountingDashboardDto> GetAccountingDashboardAsync(
         CancellationToken cancellationToken = default)
     {

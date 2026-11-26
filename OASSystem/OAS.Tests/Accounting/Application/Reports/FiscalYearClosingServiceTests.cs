@@ -102,6 +102,8 @@ public sealed class FiscalYearClosingServiceTests
 
     private sealed class StubAccountingReports(TrialBalanceReportDto trialBalance) : IAccountingReportingQueryService
     {
+        public Task<BalanceSheetReportDto> GetBalanceSheetAsync(BalanceSheetFilterDto filter, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<IncomeStatementReportDto> GetIncomeStatementAsync(IncomeStatementFilterDto filter, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<AccountingDashboardDto> GetAccountingDashboardAsync(CancellationToken cancellationToken = default)
             => Task.FromResult(new AccountingDashboardDto(
                 0,

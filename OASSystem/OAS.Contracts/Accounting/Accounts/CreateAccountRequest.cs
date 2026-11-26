@@ -1,4 +1,4 @@
-﻿using OAS.Contracts.Accounting.Enums;
+using OAS.Contracts.Accounting.Enums;
 
 namespace OAS.Contracts.Accounting.Accounts;
 
@@ -16,4 +16,5 @@ public sealed record CreateAccountRequest(
     bool AllowManualPosting,
     bool IsSystemAccount,
     bool IsActive = true,
-    DateOnly? EffectiveDate = null);
+    DateOnly? EffectiveDate = null,
+    FinancialStatementCategory? FinancialStatementCategory = null);

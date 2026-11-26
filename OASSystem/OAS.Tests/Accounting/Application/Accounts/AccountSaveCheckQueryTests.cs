@@ -23,6 +23,7 @@ public sealed class AccountSaveCheckQueryTests
             Guid.NewGuid(), code, "حساب تجريبي", null, parentId, level,
             DomainAccountClass.Asset, DomainAccountType.Posting, DomainNormalBalance.Debit,
             true, false, true, system, true, null);
+        account.SetFinancialStatementCategory(OAS.Domain.Accounting.Enums.FinancialStatementCategory.CurrentAssets);
         typeof(Account).GetProperty(nameof(Account.RowVersion))!.SetValue(account, new byte[] { 1, 2, 3 });
         return account;
     }

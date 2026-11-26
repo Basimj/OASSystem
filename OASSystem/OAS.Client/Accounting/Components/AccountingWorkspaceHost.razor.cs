@@ -1468,7 +1468,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                 PeriodCaption = "سيُنشأ تحت الحساب المحدد"
             };
 
-            await EnsureAccountLookupAsync(parent.Id);
+            await LoadFinancialAncestorsAsync(parent.Id);
             await ReserveAutomaticNumberAsync(tab);
             tab.CaptureBaseline(SerializeModel(tab.Model));
             Workspace.NotifyStateChanged();
@@ -1513,7 +1513,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                 case AccountingEntityType.Accounts:
                     {
                         var dto = await AccountingService.GetAccountByIdAsync(id) ?? throw NotFound("الحساب");
-                        await EnsureAccountLookupAsync(dto.ParentAccountId);
+                        if (dto.ParentAccountId is Guid parentId) await LoadFinancialAncestorsAsync(parentId);
                         var model = new AccountEditor.FormModel
                         {
                             Code = dto.Code,
@@ -1522,6 +1522,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                             ParentAccountId = dto.ParentAccountId,
                             Level = dto.Level,
                             AccountClass = dto.AccountClass,
+                            FinancialStatementCategory = dto.FinancialStatementCategory,
                             AccountType = dto.AccountType,
                             NormalBalance = dto.NormalBalance,
                             IsPostingAccount = dto.IsPostingAccount,
@@ -2094,6 +2095,14 @@ public partial class AccountingWorkspaceHost : IDisposable
             return;
         }
 
+        model.FinancialCategoryError = null;
+        if (model.ParentAccountId is Guid financialParentId) await LoadFinancialAncestorsAsync(financialParentId);
+        if (ResolveFinancialCategory(model.AccountClass, model.FinancialStatementCategory, model.ParentAccountId) is null)
+        {
+            model.FinancialCategoryError = "حدد تصنيف القوائم المالية أو اختر حساباً أب مصنفاً.";
+            Snackbar.Warning(model.FinancialCategoryError);
+            return;
+        }
         AccountDto? result;
         if (tab.IsNew)
         {
@@ -2101,7 +2110,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                 model.Code.Trim(), model.NameAr.Trim(), NullIfBlank(model.NameEn), model.ParentAccountId,
                 checked((byte)model.Level), model.AccountClass, model.AccountType, model.NormalBalance,
                 model.IsPostingAccount, model.IsControlAccount, model.AllowManualPosting,
-                model.IsSystemAccount, model.IsActive, model.EffectiveDate));
+                model.IsSystemAccount, model.IsActive, model.EffectiveDate, model.FinancialStatementCategory));
         }
         else
         {
@@ -4412,6 +4421,24 @@ public partial class AccountingWorkspaceHost : IDisposable
         _accountTreeSearch = value?.Trim() ?? string.Empty;
         return Task.CompletedTask;
     }
+
+    private AccountDto? ResolveAccountDto(Guid? id) => id.HasValue && _accountDtos.TryGetValue(id.Value, out var account) ? account : null;
+
+    private async Task LoadFinancialAncestorsAsync(Guid parentId)
+    {
+        var seen = new HashSet<Guid>();
+        Guid? current = parentId;
+        while (current is Guid id && seen.Add(id))
+        {
+            var account = await AccountingService.GetAccountByIdAsync(id);
+            if (account is null) break;
+            RememberAccountLookups([account]);
+            current = account.ParentAccountId;
+        }
+    }
+
+    private FinancialStatementCategory? ResolveFinancialCategory(AccountClass cls, FinancialStatementCategory? own, Guid? parentId)
+        => FinancialStatementCategories.Resolve(cls, own, parentId, _accountDtos);
 
     private int ResolveAccountLevel(Guid? parentAccountId)
     {

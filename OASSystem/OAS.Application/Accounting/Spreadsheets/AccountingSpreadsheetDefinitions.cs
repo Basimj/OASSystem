@@ -39,7 +39,7 @@ public static class AccountingSpreadsheetDefinitions
     public static string Header(string key) => key switch
     {
         "Code"=>"الكود", "Name"=>"الاسم", "NameAr"=>"الاسم العربي", "NameEn"=>"الاسم الإنجليزي", "Level"=>"المستوى",
-        "ParentCode"=>"كود الأب", "AccountClass"=>"تصنيف الحساب", "AccountType"=>"نوع الحساب", "NormalBalance"=>"طبيعة الرصيد",
+        "ParentCode"=>"كود الأب", "AccountClass"=>"تصنيف الحساب", "FinancialStatementCategory"=>"تصنيف القوائم المالية", "AccountType"=>"نوع الحساب", "NormalBalance"=>"طبيعة الرصيد",
         "IsPostingAccount"=>"حساب ترحيل", "IsControlAccount"=>"حساب مراقبة", "AllowManualPosting"=>"يسمح بالقيد اليدوي", "IsSystemAccount"=>"حساب نظام", "IsActive"=>"نشط", "EffectiveDate"=>"تاريخ السريان",
         "AccountCode"=>"كود الحساب العام", "CurrencyCode"=>"كود العملة", "Symbol"=>"رمز العملة", "DecimalPlaces"=>"المنازل العشرية",
         "RateDate"=>"تاريخ السعر", "Rate"=>"سعر الصرف", "RateType"=>"نوع السعر", "ExchangeRate"=>"سعر الصرف", "BaseDebit"=>"مدين أساسي", "BaseCredit"=>"دائن أساسي",
@@ -67,7 +67,7 @@ public static class AccountingSpreadsheetDefinitions
 
     public static IReadOnlyList<SpreadsheetSheet> Get(string section) => section switch
     {
-        "accounts" => [new("Accounts",[Text("Code","كود الحساب",true),Text("NameAr",Header("NameAr"),true),Text("NameEn",Header("NameEn")),Text("ParentCode","كود الحساب الأب"),Enum<AccountClass>("AccountClass",Header("AccountClass")),Enum<AccountType>("AccountType",Header("AccountType")),Enum<NormalBalance>("NormalBalance",Header("NormalBalance")),Bool("IsPostingAccount",Header("IsPostingAccount"),true),Bool("IsControlAccount",Header("IsControlAccount")),Bool("AllowManualPosting",Header("AllowManualPosting"),true),Bool("IsSystemAccount",Header("IsSystemAccount")),Bool("IsActive",Header("IsActive"),true),Date("EffectiveDate",Header("EffectiveDate"))],SheetName(section))],
+        "accounts" => [new("Accounts",[Text("Code","كود الحساب",true),Text("NameAr",Header("NameAr"),true),Text("NameEn",Header("NameEn")),Text("ParentCode","كود الحساب الأب"),Enum<AccountClass>("AccountClass",Header("AccountClass")),Enum<AccountType>("AccountType",Header("AccountType")),Enum<NormalBalance>("NormalBalance",Header("NormalBalance")),Bool("IsPostingAccount",Header("IsPostingAccount"),true),Bool("IsControlAccount",Header("IsControlAccount")),Bool("AllowManualPosting",Header("AllowManualPosting"),true),Bool("IsSystemAccount",Header("IsSystemAccount")),Bool("IsActive",Header("IsActive"),true),Date("EffectiveDate",Header("EffectiveDate")),new("FinancialStatementCategory",false,"enum",null,System.Enum.GetNames<FinancialStatementCategory>(),Header:Header("FinancialStatementCategory"))],SheetName(section))],
         "cost-centers" => [new("CostCenters",[Text("Code","كود مركز التكلفة",true),Text("NameAr",Header("NameAr"),true),Text("NameEn",Header("NameEn")),Text("ParentCode","كود مركز التكلفة الأب"),Bool("IsActive",Header("IsActive"),true)],SheetName(section))],
         "cash-accounts" => [new("CashAccounts",[Text("Name",Header("Name"),true),Text("CurrencyCode",Header("CurrencyCode"),true),Bool("IsDefault",Header("IsDefault")),Bool("IsActive",Header("IsActive"),true)],SheetName(section))],
         "bank-accounts" => [new("BankAccounts",[Text("BankName",Header("BankName"),true),Text("AccountName",Header("AccountName"),true),Text("AccountNumber",Header("AccountNumber"),true),Text("IBAN",Header("IBAN")),Text("CurrencyCode",Header("CurrencyCode"),true),Bool("IsActive",Header("IsActive"),true)],SheetName(section))],

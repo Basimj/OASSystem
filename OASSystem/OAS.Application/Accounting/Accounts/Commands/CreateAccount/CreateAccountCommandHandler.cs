@@ -16,13 +16,32 @@ public sealed class CreateAccountCommandHandler(
         CreateAccountCommand request,
         CancellationToken cancellationToken)
     {
-        var entity = mapper.Create(request.Data);
+        var data = request.Data;
+        var accountClass = (OAS.Domain.Accounting.Enums.AccountClass)data.AccountClass;
+        var category = (OAS.Domain.Accounting.Enums.FinancialStatementCategory?)data.FinancialStatementCategory;
+        if (category.HasValue && !OAS.Domain.Accounting.Enums.FinancialStatementCategories.IsCompatible(accountClass, category.Value))
+            throw new OAS.Application.Common.Exceptions.ConflictException("accounting_financial_category_invalid", "تصنيف القوائم المالية لا يتوافق مع تصنيف الحساب.");
+        var entity = mapper.Create(data);
         await integrity.ValidateHierarchyAsync(
             entity.Id,
             entity.ParentAccountId,
             entity.Level,
             cancellationToken);
 
+        if (entity.ParentAccountId is Guid parentId)
+        {
+            var parent = await repository.GetByIdAsync(parentId, cancellationToken);
+            if (parent is not null && parent.AccountClass != entity.AccountClass)
+                throw new OAS.Application.Common.Exceptions.ConflictException("accounting_financial_category_parent_class", "تصنيف الحساب يجب أن يطابق تصنيف الحساب الأب.");
+        }
+        var accounts = (await repository.ListAsync(cancellationToken: cancellationToken)).ToDictionary(x => x.Id);
+        if (entity.ParentAccountId.HasValue)
+        {
+            if (category.HasValue)
+                throw new OAS.Application.Common.Exceptions.ConflictException("accounting_financial_category_inherited", "الحساب الفرعي يرث التصنيف المالي من الحساب الأب.");
+        }
+        if (OAS.Domain.Accounting.Enums.FinancialStatementCategories.Resolve(accountClass, category, entity.ParentAccountId, accounts) is null)
+            throw new OAS.Application.Common.Exceptions.ConflictException("accounting_financial_category_required", "حدد تصنيف القوائم المالية أو اختر حساباً أب مصنفاً.");
         await repository.AddAsync(entity, cancellationToken);
         return entity;
     }

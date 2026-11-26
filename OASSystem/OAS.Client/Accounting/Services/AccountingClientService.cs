@@ -198,6 +198,9 @@ public sealed class AccountingClientService(
                 cancellationToken);
 
 
+    public Task<UpdateFinancialStatementCategoriesResult?> UpdateFinancialStatementCategoriesAsync(UpdateFinancialStatementCategoriesRequest request, CancellationToken cancellationToken = default)
+        => apiClient.PostAsync<UpdateFinancialStatementCategoriesRequest, UpdateFinancialStatementCategoriesResult>("api/accounting/accounts/financial-statement-categories", request, cancellationToken);
+
     public Task<AccountDto?>
         GetAccountByIdAsync(
             Guid id,
@@ -1639,6 +1642,20 @@ public sealed class AccountingClientService(
         return apiClient.GetAsync<GeneralLedgerReportDto>(
             $"api/accounting/reports/general-ledger?{string.Join("&", query)}",
             cancellationToken);
+    }
+
+    public Task<BalanceSheetReportDto?> GetBalanceSheetAsync(BalanceSheetFilterDto filter, CancellationToken cancellationToken = default)
+    {
+        var query = new List<string> { $"asOfDate={filter.AsOfDate:yyyy-MM-dd}" };
+        AddGuid(query, "fiscalYearId", filter.FiscalYearId);
+        return apiClient.GetAsync<BalanceSheetReportDto>($"api/accounting/reports/balance-sheet?{string.Join("&", query)}", cancellationToken);
+    }
+
+    public Task<IncomeStatementReportDto?> GetIncomeStatementAsync(IncomeStatementFilterDto filter, CancellationToken cancellationToken = default)
+    {
+        var query = new List<string> { $"fromDate={filter.FromDate:yyyy-MM-dd}", $"toDate={filter.ToDate:yyyy-MM-dd}" };
+        AddGuid(query, "fiscalYearId", filter.FiscalYearId); AddGuid(query, "fiscalPeriodId", filter.FiscalPeriodId); AddGuid(query, "costCenterId", filter.CostCenterId);
+        return apiClient.GetAsync<IncomeStatementReportDto>($"api/accounting/reports/income-statement?{string.Join("&", query)}", cancellationToken);
     }
 
     public Task<TrialBalanceReportDto?> GetTrialBalanceAsync(

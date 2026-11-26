@@ -303,6 +303,27 @@ public sealed partial class AccountingSpreadsheetService(
                 if(depth>255) row.Errors.Add("تجاوز الحد الأقصى لمستوى الحساب.");
                 levels[row.Get("Code")]=depth;
             }
+            if(section=="accounts")
+            {
+                var directory=accounts.ToDictionary(x=>x.Id);
+                foreach(var row in headers.Where(x=>x.Errors.Count==0))
+                {
+                    var cls=row.Enum<AccountClass>("AccountClass");
+                    var parent=row.Get("ParentCode");
+                    var category=row.Optional("FinancialStatementCategory") is null ? (FinancialStatementCategory?)null : row.Enum<FinancialStatementCategory>("FinancialStatementCategory");
+                    if(parent.Length==0)
+                    {
+                        if(category is null && cls!=AccountClass.Equity) row.Errors.Add("تصنيف القوائم المالية مطلوب للحساب المستقل.");
+                        else if(category.HasValue && !OAS.Contracts.Accounting.Enums.FinancialStatementCategories.IsCompatible(cls,category.Value)) row.Errors.Add("تصنيف القوائم المالية غير متوافق مع تصنيف الحساب.");
+                    }
+                    else
+                    {
+                        if(category.HasValue) row.Errors.Add("اترك تصنيف القوائم المالية فارغاً للحساب الفرعي؛ يرث التصنيف من الأب.");
+                        if(parents.TryGetValue(parent,out var parentRow) && parentRow.Errors.Count==0 && parentRow.Enum<AccountClass>("AccountClass")!=cls) row.Errors.Add("تصنيف الحساب لا يطابق الحساب الأب.");
+                        if(accountMap.TryGetValue(parent,out var existingParent) && (existingParent.AccountClass!=(OAS.Domain.Accounting.Enums.AccountClass)cls || OAS.Domain.Accounting.Enums.FinancialStatementCategories.Resolve(existingParent.AccountClass,existingParent.FinancialStatementCategory,existingParent.ParentAccountId,directory) is null)) row.Errors.Add("الحساب الأب غير مصنف أو لا يطابق تصنيف الحساب.");
+                    }
+                }
+            }
             headers=headers.OrderBy(x=>levels[x.Get("Code")]).ToList();
         }
         Guid? Resolve(Row row,string field,bool optional=false)
@@ -385,7 +406,7 @@ public sealed partial class AccountingSpreadsheetService(
             var code=row.Get("Code");var parent=row.Get("ParentCode");
             object? command=section switch
             {
-                "accounts"=>new CreateAccountCommand(new(code,row.Get("NameAr"),row.Optional("NameEn"),accountMap.GetValueOrDefault(parent)?.Id,(byte)levels[code],row.Enum<AccountClass>("AccountClass"),row.Enum<AccountType>("AccountType"),row.Enum<NormalBalance>("NormalBalance"),row.Bool("IsPostingAccount",true),row.Bool("IsControlAccount"),row.Bool("AllowManualPosting",true),row.Bool("IsSystemAccount"),row.Bool("IsActive",true),row.Optional("EffectiveDate") is null?null:row.Date("EffectiveDate"))),
+                "accounts"=>new CreateAccountCommand(new(code,row.Get("NameAr"),row.Optional("NameEn"),accountMap.GetValueOrDefault(parent)?.Id,(byte)levels[code],row.Enum<AccountClass>("AccountClass"),row.Enum<AccountType>("AccountType"),row.Enum<NormalBalance>("NormalBalance"),row.Bool("IsPostingAccount",true),row.Bool("IsControlAccount"),row.Bool("AllowManualPosting",true),row.Bool("IsSystemAccount"),row.Bool("IsActive",true),row.Optional("EffectiveDate") is null?null:row.Date("EffectiveDate"),row.Optional("FinancialStatementCategory") is null?null:row.Enum<FinancialStatementCategory>("FinancialStatementCategory"))),
                 "cost-centers"=>new CreateCostCenterCommand(new(code,row.Get("NameAr"),row.Optional("NameEn"),centerMap.GetValueOrDefault(parent)?.Id,row.Bool("IsActive",true))),
                 "cash-accounts"=>new CreateCashAccountCommand(new(null,row.Get("Name"),currencyMap[row.Get("CurrencyCode")].Id,row.Bool("IsDefault"),row.Bool("IsActive",true))),
                 "bank-accounts"=>new CreateBankAccountCommand(new(null,row.Get("BankName"),row.Get("AccountName"),row.Get("AccountNumber"),row.Optional("IBAN"),currencyMap[row.Get("CurrencyCode")].Id,row.Bool("IsActive",true))),

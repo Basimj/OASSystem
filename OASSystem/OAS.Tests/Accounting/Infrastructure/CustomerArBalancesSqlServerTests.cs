@@ -217,6 +217,25 @@ public sealed class CustomerArBalancesSqlServerTests
         });
     }
 
+    [Test]
+    public async Task BalanceSheet_AsOf_UsesPostedBalancesAndIncludesUnclosedProfit()
+    {
+        await using var db = Context();
+        var service = new AccountingReportingQueryService(db, TimeProvider.System);
+        var early = await service.GetBalanceSheetAsync(new(new DateOnly(2026, 11, 5)));
+        var current = await service.GetBalanceSheetAsync(new(NovemberEnd));
+        var later = await service.GetBalanceSheetAsync(new(new DateOnly(2026, 12, 31)));
+        Assert.Multiple(() =>
+        {
+            Assert.That(early.Totals.Assets, Is.EqualTo(30000m));
+            Assert.That(current.Totals.Assets, Is.EqualTo(210000m));
+            Assert.That(current.Accounts.Single(a => a.Code == "AR-101").DebitMinusCredit, Is.EqualTo(90000m));
+            Assert.That(current.Totals.UnclosedResult, Is.EqualTo(210000m));
+            Assert.That(later.Totals.Assets, Is.EqualTo(310000m));
+            Assert.That(early.Totals.IsBalanced && current.Totals.IsBalanced && later.Totals.IsBalanced, Is.True);
+        });
+    }
+
     private OasDbContext Context() => new(
         new DbContextOptionsBuilder<OasDbContext>()
             .UseSqlServer(_connection)

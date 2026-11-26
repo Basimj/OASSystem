@@ -62,6 +62,24 @@ public sealed class UpdateAccountCommandHandler(
             request.Data.IsActive,
             cancellationToken);
 
+        if (request.Data.UpdateFinancialStatementCategory && request.Data.FinancialStatementCategory is { } category &&
+            !OAS.Domain.Accounting.Enums.FinancialStatementCategories.IsCompatible((DomainAccountClass)request.Data.AccountClass, (OAS.Domain.Accounting.Enums.FinancialStatementCategory)category))
+            throw new ConflictException("accounting_financial_category_invalid", "تصنيف القوائم المالية لا يتوافق مع تصنيف الحساب.");
+        if (request.Data.ParentAccountId is Guid parentId && (entity.ParentAccountId != parentId || entity.AccountClass != (DomainAccountClass)request.Data.AccountClass))
+        {
+            var parent = await repository.GetByIdAsync(parentId, cancellationToken);
+            if (parent is not null && parent.AccountClass != (DomainAccountClass)request.Data.AccountClass)
+                throw new ConflictException("accounting_financial_category_parent_class", "تصنيف الحساب يجب أن يطابق تصنيف الحساب الأب.");
+        }
+        var cls = (DomainAccountClass)request.Data.AccountClass;
+        var categoryValue = request.Data.UpdateFinancialStatementCategory
+            ? (OAS.Domain.Accounting.Enums.FinancialStatementCategory?)request.Data.FinancialStatementCategory : entity.FinancialStatementCategory;
+        if (request.Data.ParentAccountId.HasValue &&
+            (entity.ParentAccountId == request.Data.ParentAccountId ? categoryValue != entity.FinancialStatementCategory : categoryValue.HasValue))
+            throw new ConflictException("accounting_financial_category_inherited", "الحساب الفرعي يرث التصنيف المالي من الحساب الأب.");
+        var directory = (await repository.ListAsync(cancellationToken: cancellationToken)).ToDictionary(x => x.Id);
+        if (OAS.Domain.Accounting.Enums.FinancialStatementCategories.Resolve(cls, categoryValue, request.Data.ParentAccountId, directory) is null)
+            throw new ConflictException("accounting_financial_category_required", "حدد تصنيف القوائم المالية أو اختر حساباً أب مصنفاً.");
         mapper.Update(request.Data, entity);
         repository.Update(entity);
         return entity;

@@ -56,6 +56,8 @@ public sealed class Account : AuditableEntity<Guid>
 
     public AccountClass AccountClass { get; private set; }
 
+    public FinancialStatementCategory? FinancialStatementCategory { get; private set; }
+
     public AccountType AccountType { get; private set; }
 
     public NormalBalance NormalBalance { get; private set; }
@@ -160,12 +162,21 @@ public sealed class Account : AuditableEntity<Guid>
         ParentAccountId = parentAccountId;
         Level = level;
         AccountClass = accountClass;
+        if (FinancialStatementCategory.HasValue && !FinancialStatementCategories.IsCompatible(accountClass, FinancialStatementCategory.Value))
+            FinancialStatementCategory = null;
         AccountType = accountType;
         NormalBalance = normalBalance;
         IsPostingAccount = isPostingAccount;
         IsControlAccount = isControlAccount;
         AllowManualPosting = allowManualPosting;
         EffectiveDate = effectiveDate;
+    }
+
+    public void SetFinancialStatementCategory(FinancialStatementCategory? category)
+    {
+        if (category.HasValue && !FinancialStatementCategories.IsCompatible(AccountClass, category.Value))
+            throw new ArgumentException("Financial statement category is incompatible with account class.", nameof(category));
+        FinancialStatementCategory = category;
     }
 
     public void SetActive(bool isActive)

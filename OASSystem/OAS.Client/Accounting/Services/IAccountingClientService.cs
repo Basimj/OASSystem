@@ -25,7 +25,10 @@ namespace OAS.Client.Accounting.Services;
 
 public interface IAccountingClientService
 {
+    Task<BalanceSheetReportDto?> GetBalanceSheetAsync(BalanceSheetFilterDto filter, CancellationToken cancellationToken = default);
+    Task<IncomeStatementReportDto?> GetIncomeStatementAsync(IncomeStatementFilterDto filter, CancellationToken cancellationToken = default);
     Task<PagedResult<AccountDto>> GetAccountsPageAsync(PageRequest request, CancellationToken cancellationToken = default);
+    Task<UpdateFinancialStatementCategoriesResult?> UpdateFinancialStatementCategoriesAsync(UpdateFinancialStatementCategoriesRequest request, CancellationToken cancellationToken = default);
     Task<AccountDto?> GetAccountByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<AccountSaveCheckDto?> GetAccountSaveCheckAsync(Guid id, UpdateAccountRequest request, CancellationToken cancellationToken = default);
     Task<AccountDto?> CreateAccountAsync(CreateAccountRequest request, CancellationToken cancellationToken = default);

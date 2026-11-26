@@ -104,6 +104,9 @@ namespace OAS.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly?>("EffectiveDate")
                         .HasColumnType("date");
 
+                    b.Property<byte?>("FinancialStatementCategory")
+                        .HasColumnType("tinyint");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
