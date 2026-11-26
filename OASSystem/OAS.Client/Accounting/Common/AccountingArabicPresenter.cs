@@ -58,13 +58,28 @@ public static class AccountingArabicPresenter
         _ => value.ToString()
     };
 
+    public static string GetJournalReversalText(OAS.Contracts.Accounting.Journals.JournalReversalInfoDto? info)
+    {
+        if (info is null) return "—";
+        var outgoing = !info.ReversalJournalId.HasValue ? "" : info.ReversalJournalStatus switch
+        {
+            JournalEntryStatus.Posted => "معكوس",
+            JournalEntryStatus.Draft or JournalEntryStatus.PendingApproval or JournalEntryStatus.Approved => "عكس معلق",
+            _ => "عكس يحتاج مراجعة"
+        };
+        if (info.IsReversal) return outgoing.Length == 0 ? "قيد عكسي" : "قيد عكسي / " + outgoing;
+        return outgoing.Length == 0 ? "غير معكوس" : outgoing;
+    }
+
+    public static string GetJournalRelatedNumbers(OAS.Contracts.Accounting.Journals.JournalReversalInfoDto? info) => info is null ? "—" : string.Join(" / ", new[] { info.OriginalJournalNumber, info.ReversalJournalNumber }.Where(n => !string.IsNullOrWhiteSpace(n)).DefaultIfEmpty("—"));
+
     public static string GetJournalStatusText(JournalEntryStatus value) => value switch
     {
         JournalEntryStatus.Draft => "مسودة",
         JournalEntryStatus.PendingApproval => "بانتظار الاعتماد",
         JournalEntryStatus.Approved => "معتمد",
         JournalEntryStatus.Posted => "مرحّل",
-        JournalEntryStatus.Reversed => "معكوس",
+        JournalEntryStatus.Reversed => "معكوس (حالة قديمة)",
         _ => value.ToString()
     };
 

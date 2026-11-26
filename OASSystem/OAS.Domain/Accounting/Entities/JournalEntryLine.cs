@@ -108,6 +108,32 @@ public sealed class JournalEntryLine : AuditableEntity<Guid>
         };
     }
 
+    public JournalEntryLine CreateOpposite(Guid id, Guid reversalJournalId)
+    {
+        ValidateIdentity(id, reversalJournalId, LineNumber, AccountId);
+        return new JournalEntryLine
+        {
+            Id = id, JournalEntryId = reversalJournalId, LineNumber = LineNumber, AccountId = AccountId,
+            DebitAmount = CreditAmount, CreditAmount = DebitAmount,
+            TransactionCurrencyId = TransactionCurrencyId, TransactionCurrencyCodeSnapshot = TransactionCurrencyCodeSnapshot,
+            TransactionCurrencyDecimalPlacesSnapshot = TransactionCurrencyDecimalPlacesSnapshot,
+            TransactionDebitAmount = TransactionCreditAmount, TransactionCreditAmount = TransactionDebitAmount,
+            ExchangeRate = ExchangeRate, ExchangeRateDate = ExchangeRateDate, ExchangeRateType = ExchangeRateType, ExchangeRateSource = ExchangeRateSource,
+            SourceDocumentLineId = SourceDocumentLineId, PostingRole = PostingRole, Description = Description,
+            CustomerId = CustomerId, SupplierId = SupplierId, EmployeeId = EmployeeId, PartyNameSnapshot = PartyNameSnapshot,
+            CostCenterId = CostCenterId, ProductVariantId = ProductVariantId, WarehouseId = WarehouseId
+        };
+    }
+
+    public bool IsExactOppositeOf(JournalEntryLine original) =>
+        LineNumber == original.LineNumber && AccountId == original.AccountId && DebitAmount == original.CreditAmount && CreditAmount == original.DebitAmount &&
+        TransactionCurrencyId == original.TransactionCurrencyId && TransactionCurrencyCodeSnapshot == original.TransactionCurrencyCodeSnapshot && TransactionCurrencyDecimalPlacesSnapshot == original.TransactionCurrencyDecimalPlacesSnapshot &&
+        TransactionDebitAmount == original.TransactionCreditAmount && TransactionCreditAmount == original.TransactionDebitAmount &&
+        ExchangeRate == original.ExchangeRate && ExchangeRateDate == original.ExchangeRateDate && ExchangeRateType == original.ExchangeRateType && ExchangeRateSource == original.ExchangeRateSource &&
+        CustomerId == original.CustomerId && SupplierId == original.SupplierId && EmployeeId == original.EmployeeId && PartyNameSnapshot == original.PartyNameSnapshot &&
+        CostCenterId == original.CostCenterId && ProductVariantId == original.ProductVariantId && WarehouseId == original.WarehouseId &&
+        SourceDocumentLineId == original.SourceDocumentLineId && PostingRole == original.PostingRole;
+
     // Compatibility factory for historical/base-currency-only code.
     public static JournalEntryLine Create(
         Guid id,

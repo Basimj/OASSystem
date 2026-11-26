@@ -31,6 +31,8 @@ public sealed class CreateJournalEntryCommandHandler(
     public async Task<Guid> Handle(CreateJournalEntryCommand request, CancellationToken ct)
     {
         var data = request.Request;
+        if (data.JournalType != OAS.Contracts.Accounting.Enums.JournalType.Manual || data.SourceDocumentId.HasValue || !string.IsNullOrWhiteSpace(data.SourceDocumentType) || (!string.IsNullOrWhiteSpace(data.SourceModule) && !string.Equals(data.SourceModule, "Accounting", StringComparison.OrdinalIgnoreCase)))
+            throw new ConflictException("journal_manual_only", "يمكن إنشاء القيود اليدوية فقط من شاشة القيود اليومية.");
 
         await sourceIntegrity.ValidateUniqueSourceAsync(
             data.SourceModule,

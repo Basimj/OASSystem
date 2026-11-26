@@ -50,7 +50,7 @@ public interface IAccountingClientService
     Task<JournalEntryDto?> CreateJournalAsync(CreateJournalEntryRequest request, CancellationToken cancellationToken = default);
     Task<JournalEntryDto?> UpdateJournalAsync(Guid id, UpdateJournalEntryRequest request, CancellationToken cancellationToken = default);
     Task<JournalEntryDto?> SetJournalStatusAsync(Guid id, SetJournalEntryStatusRequest request, CancellationToken cancellationToken = default);
-    Task<JournalEntryDto?> ReverseJournalAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<JournalEntryDto?> ReverseJournalAsync(Guid id, ReverseJournalEntryRequest request, CancellationToken cancellationToken = default);
 
     Task<PagedResult<PostingProfileDto>> GetPostingProfilesPageAsync(PageRequest request, CancellationToken cancellationToken = default);
     Task<PostingProfileDto?> GetPostingProfileByIdAsync(Guid id, CancellationToken cancellationToken = default);

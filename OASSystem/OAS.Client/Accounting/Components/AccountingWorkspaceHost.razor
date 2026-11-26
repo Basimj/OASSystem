@@ -391,7 +391,7 @@
                                       Disabled="@(activeTab.IsNew || activeTab.IsDirty || activeTab.IsEditMode || activeTab.IsSaving)"
                                       OnClick="@(() => ChangeJournalStatusAsync(JournalEntryStatus.Posted))" />
                         }
-                        else if (journal.Status == JournalEntryStatus.Posted && !journal.ReversedJournalId.HasValue)
+                        else if (journal.Status == JournalEntryStatus.Posted && journal.IsManualStandalone && !journal.ReversedJournalId.HasValue)
                         {
                             <UiButton Text="عكس القيد"
                                       IconCssClass="fa-solid fa-arrow-rotate-left"
@@ -757,7 +757,7 @@
                     when activeTab.Model is JournalEntryEditor.FormModel model:
 
                     <JournalEntryEditor Model="@model"
-                                        IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
+                                        IsEditable="@((activeTab.IsNew || activeTab.IsEditMode) && model.IsManualStandalone && model.Status == JournalEntryStatus.Draft)"
                                         IsNew="@activeTab.IsNew"
                                         FiscalPeriodLookupItem="@GetFiscalPeriodLookup(model.FiscalPeriodId)"
                                         FiscalPeriodSearchAsync="SearchFiscalPeriodsAsync"

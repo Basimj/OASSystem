@@ -476,13 +476,14 @@ public sealed class AccountingClientService(
     public Task<JournalEntryDto?>
         ReverseJournalAsync(
             Guid id,
+            ReverseJournalEntryRequest request,
             CancellationToken cancellationToken = default)
         =>
             apiClient.PostAsync<
-                object,
+                ReverseJournalEntryRequest,
                 JournalEntryDto>(
                 $"api/accounting/journals/{id}/reverse",
-                new { },
+                request,
                 cancellationToken);
 
 

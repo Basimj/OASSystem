@@ -3,6 +3,8 @@
 @attribute [Authorize]
 @using System.Globalization
 @using OAS.Contracts.Accounting.Reports
+@using OAS.Contracts.Accounting.Journals
+@using OAS.Client.Accounting.Common
 @using OAS.Contracts.Accounting.Accounts
 @using OAS.Contracts.Accounting.Currencies
 @using OAS.Contracts.Accounting.Enums
@@ -41,7 +43,7 @@
                 <UiReportSortHeader Label="مدين" Active="@(_sortColumn == SortColumn.Debit)" Descending="@_sortDescending" OnSort="@(() => SortBy(SortColumn.Debit))" />
                 <UiReportSortHeader Label="دائن" Active="@(_sortColumn == SortColumn.Credit)" Descending="@_sortDescending" OnSort="@(() => SortBy(SortColumn.Credit))" />
                 <UiReportSortHeader Label="الرصيد" Active="@(_sortColumn == SortColumn.Balance)" Descending="@_sortDescending" OnSort="@(() => SortBy(SortColumn.Balance))" />
-                <th scope="col">الحالة</th>
+                <th scope="col">الحالة / العكس</th>
             </tr></thead>
             <tbody>
                 @if(_busy){<tr><td colspan="9" class="oas-report__empty">جارٍ تحميل كشف الحساب ...</td></tr>}
@@ -57,7 +59,7 @@
                             <td class="oas-report__amount oas-report__debit">@(row.Debit == 0 ? "-" : Money(row.Debit))</td>
                             <td class="oas-report__amount oas-report__credit">@(row.Credit == 0 ? "-" : Money(row.Credit))</td>
                             <td class="oas-report__amount">@Money(row.Balance)</td>
-                            <td><span class="oas-report__state">مرحل <i class="fa-solid fa-circle-check"></i></span></td>
+                            <td><span class="oas-report__state">مرحل <i class="fa-solid fa-circle-check"></i></span> @if(row.Reversal is { } info && (info.IsReversal || info.ReversalJournalId.HasValue)){<div title="@AccountingArabicPresenter.GetJournalRelatedNumbers(info)">@AccountingArabicPresenter.GetJournalReversalText(info) — @AccountingArabicPresenter.GetJournalRelatedNumbers(info)</div>}</td>
                         </tr>
                     }
                 }
@@ -149,7 +151,7 @@
     private List<StatementRow> _filtered = [];
     private IReadOnlyList<StatementRow> VisibleRows => _filtered.Skip((_page-1)*_pageSize).Take(_pageSize).ToArray();
     private int TotalPages => Math.Max(1,(int)Math.Ceiling(_filtered.Count/(double)_pageSize));
-    private sealed record StatementRow(Guid EntryId,DateOnly Date,string Kind,string Icon,string Number,string? Reference,string Description,decimal Debit,decimal Credit,decimal Balance);
+    private sealed record StatementRow(Guid EntryId,DateOnly Date,string Kind,string Icon,string Number,string? Reference,string Description,decimal Debit,decimal Credit,decimal Balance,JournalReversalInfoDto? Reversal = null);
     protected override async Task OnInitializedAsync(){
         _isDemo = Nav.Uri.Contains("/ui-lab/", StringComparison.OrdinalIgnoreCase);
         _filtersOpen = true;
@@ -205,8 +207,8 @@
             if(report is not null){
                 foreach(var account in report.Accounts){
                     foreach(var line in account.Lines){
-                        var kind=DocumentKind(line.SourceDocumentType,line.SourceModule);
-                        _all.Add(new StatementRow(line.JournalEntryId,line.PostingDate,kind.Item1,kind.Item2,line.JournalNumber,line.Reference,line.StatementDescription ?? line.Description,line.Debit/conversionRate,line.Credit/conversionRate,line.RunningBalance/conversionRate));
+                        var kind=line.Reversal?.IsReversal == true ? ("قيد عكسي", "fa-solid fa-arrow-rotate-left") : DocumentKind(line.SourceDocumentType,line.SourceModule);
+                        _all.Add(new StatementRow(line.JournalEntryId,line.PostingDate,kind.Item1,kind.Item2,line.JournalNumber,line.Reference,line.StatementDescription ?? line.Description,line.Debit/conversionRate,line.Credit/conversionRate,line.RunningBalance/conversionRate,line.Reversal));
                     }
                 }
                 _closingBalance = report.Accounts.Count == 1 ? report.Accounts[0].ClosingBalance/conversionRate : report.Accounts.Sum(a=>a.ClosingBalance)/conversionRate;
@@ -234,7 +236,7 @@
     private static string Money(decimal amount)=>amount.ToString("N2",CultureInfo.InvariantCulture);
     private void OnSearch(string v){_search=v;FilterRows();}
     private void FilterRows(){
-        _filtered=_all.Where(x=>string.IsNullOrWhiteSpace(_search)||($"{x.Kind} {x.Number} {x.Reference} {x.Description} {x.Date:dd/MM/yyyy}").Contains(_search,StringComparison.OrdinalIgnoreCase)).ToList();
+        _filtered=_all.Where(x=>string.IsNullOrWhiteSpace(_search)||($"{x.Kind} {x.Number} {x.Reference} {x.Description} {AccountingArabicPresenter.GetJournalReversalText(x.Reversal)} {AccountingArabicPresenter.GetJournalRelatedNumbers(x.Reversal)} {x.Date:dd/MM/yyyy}").Contains(_search,StringComparison.OrdinalIgnoreCase)).ToList();
         if(_detail=="false"){
             _filtered=_filtered.GroupBy(x=>x.EntryId).Select(g=>{var last=g.Last();return last with{Debit=g.Sum(x=>x.Debit),Credit=g.Sum(x=>x.Credit)};}).ToList();
         }
@@ -276,7 +278,7 @@
     private async Task ExportAsync(){
         var csv=new System.Text.StringBuilder("\uFEFFالتاريخ,نوع المستند,رقم السند,المرجع,البيان,مدين,دائن,الرصيد,الحالة\r\n");
         static string Q(object? value)=>"\""+(value?.ToString()??"").Replace("\"","\"\"")+"\"";
-        foreach(var x in _filtered)csv.AppendLine(string.Join(",",new[]{Q(x.Date.ToString("yyyy-MM-dd")),Q(x.Kind),Q(x.Number),Q(x.Reference),Q(x.Description),Q(x.Debit),Q(x.Credit),Q(x.Balance),Q("مرحل")}));
+        foreach(var x in _filtered)csv.AppendLine(string.Join(",",new[]{Q(x.Date.ToString("yyyy-MM-dd")),Q(x.Kind),Q(x.Number),Q(x.Reference),Q(x.Description),Q(x.Debit),Q(x.Credit),Q(x.Balance),Q("مرحل / " + AccountingArabicPresenter.GetJournalReversalText(x.Reversal) + " / " + AccountingArabicPresenter.GetJournalRelatedNumbers(x.Reversal))}));
         var base64=Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(csv.ToString()));
         await using var module=await JS.InvokeAsync<IJSObjectReference>("import", "./js/account-statement-export.js");
         await module.InvokeVoidAsync("saveCsv", base64, "account-statement.csv");

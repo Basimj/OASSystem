@@ -1,4 +1,5 @@
 using OAS.Contracts.Accounting.Enums;
+using OAS.Contracts.Accounting.Journals;
 
 namespace OAS.Contracts.Accounting.Reports;
 
@@ -37,7 +38,8 @@ public sealed record GeneralLedgerLineDto(
     decimal? TransactionCredit = null,
     decimal? ExchangeRate = null,
     string? Reference = null,
-    string? StatementDescription = null);
+    string? StatementDescription = null,
+    JournalReversalInfoDto? Reversal = null);
 
 public sealed record GeneralLedgerAccountDto(
     Guid AccountId,
@@ -144,7 +146,8 @@ public sealed record JournalReportLineDto(
     Guid? CustomerId,
     Guid? SupplierId,
     string? Reference,
-    string? DisplayDescription = null);
+    string? DisplayDescription = null,
+    JournalReversalInfoDto? Reversal = null);
 
 public sealed record JournalReportDto(
     DateOnly FromDate,

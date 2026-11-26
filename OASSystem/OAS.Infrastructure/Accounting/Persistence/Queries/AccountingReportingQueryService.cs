@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Accounting.Reports.Services;
+using OAS.Application.Accounting.Journals.Mapping;
+using OAS.Contracts.Accounting.Journals;
 using OAS.Application.Common.Exceptions;
 using OAS.Contracts.Accounting.Reports;
 using OAS.Domain.Accounting.Entities;
@@ -333,7 +335,11 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
         if (filter.JournalType.HasValue)
         {
             var journalType = (JournalType)(byte)filter.JournalType.Value;
-            query = query.Where(x => x.JournalType == journalType);
+            var originalLinks = db.Set<JournalEntry>().AsNoTracking().Where(j => j.ReversedJournalId.HasValue).Select(j => j.ReversedJournalId!.Value);
+            if (journalType == JournalType.Reversal)
+                query = query.Where(x => x.JournalType == JournalType.Reversal || originalLinks.Contains(x.JournalId) || x.SourceDocumentType == "JournalEntryReversal" || x.SourceDocumentType == "CustomerSettlementFxReversal" || x.SourceDocumentType == "SupplierSettlementFxReversal");
+            else
+                query = query.Where(x => x.JournalType == journalType && !originalLinks.Contains(x.JournalId) && (x.SourceDocumentType == null || (x.SourceDocumentType != "JournalEntryReversal" && x.SourceDocumentType != "CustomerSettlementFxReversal" && x.SourceDocumentType != "SupplierSettlementFxReversal")));
         }
 
         if (!string.IsNullOrWhiteSpace(filter.SourceModule))
@@ -359,6 +365,7 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
         }
 
         var movements = await query.ToListAsync(cancellationToken);
+        var reversalInfo = await ResolveJournalReversalsAsync(movements.Where(x => x.PostingDate >= fromDate).Select(x => x.JournalId), cancellationToken);
         // Resolve document codes in batches, never expose source entity GUIDs in customer-facing reports.
         var sourceDocuments = await ResolveLedgerDocumentsAsync(
             movements.Where(x => x.PostingDate >= fromDate)
@@ -411,7 +418,7 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
                     movement.DebitAmount,
                     movement.CreditAmount,
                     running,
-                    (OAS.Contracts.Accounting.Enums.JournalType)(byte)movement.JournalType,
+                    reversalInfo.TryGetValue(movement.JournalId, out var info) && info.IsReversal ? OAS.Contracts.Accounting.Enums.JournalType.Reversal : (OAS.Contracts.Accounting.Enums.JournalType)(byte)movement.JournalType,
                     movement.CustomerId,
                     movement.SupplierId,
                     movement.TransactionCurrencyCodeSnapshot,
@@ -424,7 +431,8 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
                         GetDocumentInfo(movement.SourceDocumentType, movement.SourceDocumentId, sourceDocuments)?.Narrative,
                         GetDocumentReference(movement.SourceDocumentType, movement.SourceDocumentId, sourceDocuments),
                         movement.SourceDocumentType, movement.Description, movement.JournalDescription,
-                        movement.JournalType == JournalType.Manual)));
+                        movement.JournalType == JournalType.Manual),
+                    info));
             }
 
             var debit = period.Sum(x => x.DebitAmount);
@@ -607,7 +615,11 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
         if (filter.JournalType.HasValue)
         {
             var value = (JournalType)(byte)filter.JournalType.Value;
-            query = query.Where(x => x.Journal.JournalType == value);
+            var originalLinks = db.Set<JournalEntry>().AsNoTracking().Where(j => j.ReversedJournalId.HasValue).Select(j => j.ReversedJournalId!.Value);
+            if (value == JournalType.Reversal)
+                query = query.Where(x => x.Journal.JournalType == JournalType.Reversal || originalLinks.Contains(x.Journal.Id) || x.Journal.SourceDocumentType == "JournalEntryReversal" || x.Journal.SourceDocumentType == "CustomerSettlementFxReversal" || x.Journal.SourceDocumentType == "SupplierSettlementFxReversal");
+            else
+                query = query.Where(x => x.Journal.JournalType == value && !originalLinks.Contains(x.Journal.Id) && (x.Journal.SourceDocumentType == null || (x.Journal.SourceDocumentType != "JournalEntryReversal" && x.Journal.SourceDocumentType != "CustomerSettlementFxReversal" && x.Journal.SourceDocumentType != "SupplierSettlementFxReversal")));
         }
         if (filter.Status.HasValue)
         {
@@ -681,15 +693,20 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
                 x.Line.CustomerId,
                 x.Line.SupplierId,
                 null, // Reference is resolved after materialization.
-                null)) // DisplayDescription is resolved after materialization.
+                null, // DisplayDescription is resolved after materialization.
+                null)) // Reversal information is resolved after materialization.
             .ToListAsync(cancellationToken);
 
+        var reversalInfo = await ResolveJournalReversalsAsync(page.Select(x => x.JournalEntryId), cancellationToken);
         var documents = await ResolveLedgerDocumentsAsync(page.Select(x => (x.SourceDocumentType, x.SourceDocumentId)), cancellationToken);
         var lines = page.Select(x =>
         {
             var reference = GetDocumentReference(x.SourceDocumentType, x.SourceDocumentId, documents);
+            reversalInfo.TryGetValue(x.JournalEntryId, out var info);
             return x with
             {
+                JournalType = info?.IsReversal == true ? OAS.Contracts.Accounting.Enums.JournalType.Reversal : x.JournalType,
+                Reversal = info,
                 Reference = reference,
                 DisplayDescription = StatementNarrativeFormatter.Resolve(null, reference, x.SourceDocumentType,
                     x.Description, null, x.JournalType == OAS.Contracts.Accounting.Enums.JournalType.Manual)
@@ -699,6 +716,19 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
         return new JournalReportDto(
             fromDate, toDate, lines, totalDebit, totalCredit, totalDebit - totalCredit,
             totalCount, filter.PageNumber, filter.PageSize);
+    }
+
+    private async Task<IReadOnlyDictionary<Guid, JournalReversalInfoDto>> ResolveJournalReversalsAsync(IEnumerable<Guid> journalIds, CancellationToken ct)
+    {
+        var result = new Dictionary<Guid, JournalReversalInfoDto>();
+        foreach (var ids in journalIds.Distinct().Chunk(500))
+        {
+            var headers = await db.Set<JournalEntry>().AsNoTracking().Where(j => ids.Contains(j.Id)).ToListAsync(ct);
+            var linkedIds = headers.Where(j => j.ReversedJournalId.HasValue).Select(j => j.ReversedJournalId!.Value).ToArray();
+            var related = await db.Set<JournalEntry>().AsNoTracking().Where(j => linkedIds.Contains(j.Id) || (j.ReversedJournalId.HasValue && ids.Contains(j.ReversedJournalId.Value))).ToListAsync(ct);
+            foreach (var pair in JournalReversalInfoResolver.Build(headers, related)) result[pair.Key] = pair.Value;
+        }
+        return result;
     }
 
     private async Task<(DateOnly FromDate, DateOnly ToDate)> ResolveRangeAsync(
@@ -787,6 +817,8 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
                 resolved[(type, pair.Key)] = pair.Value;
         }
 
+        await AddAsync("journalentryreversal", async ids => await db.Set<JournalEntry>().AsNoTracking()
+            .Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => new LedgerDocumentInfo(x.JournalNumber, null), ct));
         await AddAsync("salesinvoice", async ids => await db.Set<SalesInvoice>().AsNoTracking()
             .Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => new LedgerDocumentInfo(x.InvoiceCode, x.Description), ct));
         await AddAsync("salesreturn", async ids => await db.Set<SalesReturn>().AsNoTracking()

@@ -34,6 +34,7 @@ public partial class GeneralJournalReportPage
         public string Mode { get; set; } = "grouped";
         public string Type { get; set; } = "";
         public string Source { get; set; } = "";
+        public string Reversal { get; set; } = "";
         public string State { get; set; } = ((byte)JournalEntryStatus.Posted).ToString(CultureInfo.InvariantCulture);
         public string User { get; set; } = "";
         public string Reference { get; set; } = "";
@@ -43,8 +44,8 @@ public partial class GeneralJournalReportPage
     private sealed record Unit(IReadOnlyList<JournalReportLineDto> Lines);
     private static readonly Col Debit = new("debit", "مدين", "oas-report__debit");
     private static readonly Col Credit = new("credit", "دائن", "oas-report__credit");
-    private static readonly Col[] DetailColumns = [new("date","التاريخ"),new("number","رقم القيد"),new("type","نوع القيد"),new("document","نوع المستند"),new("reference","المرجع"),new("code","رقم الحساب"),new("account","اسم الحساب"),new("description","البيان"),Debit,Credit,new("status","الحالة")];
-    private static readonly Col[] SummaryColumns = [new("date","التاريخ"),new("number","رقم القيد"),new("type","نوع القيد"),new("document","نوع المستند"),new("reference","المرجع"),new("count","عدد البنود"),Debit,Credit,new("status","الحالة")];
+    private static readonly Col[] DetailColumns = [new("date","التاريخ"),new("number","رقم القيد"),new("type","نوع القيد"),new("document","نوع المستند"),new("reference","المرجع"),new("code","رقم الحساب"),new("account","اسم الحساب"),new("description","البيان"),new("reversal","حالة العكس"),new("related","القيد المرتبط"),Debit,Credit,new("status","الحالة")];
+    private static readonly Col[] SummaryColumns = [new("date","التاريخ"),new("number","رقم القيد"),new("type","نوع القيد"),new("document","نوع المستند"),new("reference","المرجع"),new("count","عدد البنود"),new("reversal","حالة العكس"),new("related","القيد المرتبط"),Debit,Credit,new("status","الحالة")];
     private static readonly Col[] SourceColumns = [new("source","مصدر القيد"),new("journals","عدد القيود"),new("count","عدد البنود"),Debit,Credit,new("difference","الفرق")];
     private Col[] Columns => _applied.Mode switch { "summary" => SummaryColumns, "source" => SourceColumns, _ => DetailColumns };
     private Filters _draft = new(), _applied = new();
@@ -76,6 +77,7 @@ public partial class GeneralJournalReportPage
         ("الحساب",_accounts.FirstOrDefault(a=>a.Id.ToString()==_applied.Account) is { } a ? a.Code+" - "+a.NameAr : "الكل"),
         ("العرض",ModeName(_applied.Mode)),("النوع",ParseEnum<JournalType>(_applied.Type) is { } t ? TypeName(t) : "الكل"),
         ("المصدر",_applied.Source=="" ? "الكل" : SourceName(_applied.Source)),("الحالة",_applied.State=="" ? "الكل" : StatusName()),("العملة",_currencyName),
+        ("حالة العكس",_applied.Reversal=="" ? "الكل" : ReversalFilterName(_applied.Reversal)),
         ("نطاق الحساب",_applied.Account=="" ? "الكل" : _applied.Scope=="complete" ? "القيود الكاملة" : "بنود الحساب فقط"),
         ("المستخدم",_users.FirstOrDefault(u=>u.Id.ToString()==_applied.User)?.DisplayName ?? "الكل"), ("المرجع",_applied.Reference=="" ? "الكل" : _applied.Reference)];
     private string StatusName() => ParseEnum<JournalEntryStatus>(_applied.State) is { } s ? StateName(s) : "الكل";
@@ -158,11 +160,21 @@ public partial class GeneralJournalReportPage
     private static string SourceKey(JournalReportLineDto l)=>string.IsNullOrWhiteSpace(l.SourceModule)?"__manual":l.SourceModule!;
     private static string Normalize(string value)=>new(value.Select(c=>c is >= '\u0660' and <= '\u0669'?(char)('0'+c-'\u0660'):c is >= '\u06f0' and <= '\u06f9'?(char)('0'+c-'\u06f0'):c).ToArray());
     private static bool Contains(string? value,string term)=>Normalize(value??"").Contains(Normalize(term.Trim()),StringComparison.OrdinalIgnoreCase);
-    private bool MatchText(JournalReportLineDto l)=>Contains($"{l.JournalNumber} {l.Reference} {l.AccountCode} {l.AccountNameAr} {l.DisplayDescription ?? l.Description} {TypeName(l.JournalType)} {DocumentName(l)} {SourceName(SourceKey(l))} {StateName(l.Status)}",_search);
-    private bool MatchReference(JournalReportLineDto l)=>Contains(l.JournalNumber,_applied.Reference)||Contains(l.Reference,_applied.Reference);
+    private bool MatchText(JournalReportLineDto l)=>Contains($"{l.JournalNumber} {l.Reference} {l.AccountCode} {l.AccountNameAr} {l.DisplayDescription ?? l.Description} {TypeName(l.JournalType)} {DocumentName(l)} {SourceName(SourceKey(l))} {StateName(l.Status)} {AccountingArabicPresenter.GetJournalReversalText(l.Reversal)} {AccountingArabicPresenter.GetJournalRelatedNumbers(l.Reversal)}",_search);
+    private bool MatchReference(JournalReportLineDto l)=>Contains(l.JournalNumber,_applied.Reference)||Contains(l.Reference,_applied.Reference)||Contains(AccountingArabicPresenter.GetJournalRelatedNumbers(l.Reversal),_applied.Reference);
+    private bool MatchReversal(JournalReportLineDto l) => _applied.Reversal switch
+    {
+        "normal" => l.Reversal is { IsReversal: false, ReversalJournalId: null },
+        "pending" => l.Reversal?.ReversalJournalStatus is JournalEntryStatus.Draft or JournalEntryStatus.PendingApproval or JournalEntryStatus.Approved,
+        "done" => l.Reversal?.ReversalJournalStatus == JournalEntryStatus.Posted,
+        "reversal" => l.Reversal?.IsReversal == true,
+        "review" => l.Reversal?.ReversalJournalId is not null && l.Reversal.ReversalJournalStatus is not (JournalEntryStatus.Draft or JournalEntryStatus.PendingApproval or JournalEntryStatus.Approved or JournalEntryStatus.Posted),
+        _ => true
+    };
+    private static string ReversalFilterName(string value) => value switch { "normal"=>"غير معكوس", "pending"=>"عكس معلق", "done"=>"معكوس", "reversal"=>"قيد عكسي", "review"=>"عكس يحتاج مراجعة", _=>"الكل" };
     private void BuildUnits()
     {
-        var scoped=_loaded.Where(l=>_applied.Source==""||string.Equals(SourceKey(l),_applied.Source,StringComparison.OrdinalIgnoreCase));
+        var scoped=_loaded.Where(l=>(_applied.Source==""||string.Equals(SourceKey(l),_applied.Source,StringComparison.OrdinalIgnoreCase)) && MatchReversal(l));
         var lines=_applied.Mode=="lines" ? scoped.Where(l=>MatchText(l)&&MatchReference(l)).ToArray() : scoped.GroupBy(l=>l.JournalEntryId).Where(g=>g.Any(MatchText)&&g.Any(MatchReference)).SelectMany(g=>g).ToArray();
         _debit=lines.Sum(l=>l.Debit);_credit=lines.Sum(l=>l.Credit);_lineCount=lines.Length;
         _journalCount=lines.Select(l=>l.JournalEntryId).Distinct().Count();_unpostedCount=lines.Where(l=>l.Status is JournalEntryStatus.Draft or JournalEntryStatus.PendingApproval or JournalEntryStatus.Approved).Select(l=>l.JournalEntryId).Distinct().Count();
@@ -173,7 +185,7 @@ public partial class GeneralJournalReportPage
     private object? Cell(Unit u,JournalReportLineDto? l,string key)
     {
         var first=l??u.Lines[0];var aggregate=_applied.Mode is "summary" or "source" || l is null;
-        return key switch {"date"=>first.PostingDate,"number"=>first.JournalNumber,"type"=>TypeName(first.JournalType),"document"=>DocumentName(first),"reference"=>first.Reference,"code"=>first.AccountCode,"account"=>first.AccountNameAr,"description"=>first.DisplayDescription??first.Description,"status"=>StateName(first.Status),"source"=>SourceName(SourceKey(first)),"count"=>u.Lines.Count,"journals"=>u.Lines.Select(x=>x.JournalEntryId).Distinct().Count(),"debit"=>aggregate?u.Lines.Sum(x=>x.Debit):first.Debit,"credit"=>aggregate?u.Lines.Sum(x=>x.Credit):first.Credit,"difference"=>u.Lines.Sum(x=>x.Debit-x.Credit),_=>null};
+        return key switch {"date"=>first.PostingDate,"number"=>first.JournalNumber,"type"=>TypeName(first.JournalType),"document"=>DocumentName(first),"reference"=>first.Reference,"code"=>first.AccountCode,"account"=>first.AccountNameAr,"description"=>first.DisplayDescription??first.Description,"status"=>StateName(first.Status),"reversal"=>AccountingArabicPresenter.GetJournalReversalText(first.Reversal),"related"=>AccountingArabicPresenter.GetJournalRelatedNumbers(first.Reversal),"source"=>SourceName(SourceKey(first)),"count"=>u.Lines.Count,"journals"=>u.Lines.Select(x=>x.JournalEntryId).Distinct().Count(),"debit"=>aggregate?u.Lines.Sum(x=>x.Debit):first.Debit,"credit"=>aggregate?u.Lines.Sum(x=>x.Credit):first.Credit,"difference"=>u.Lines.Sum(x=>x.Debit-x.Credit),_=>null};
     }
     private object? SortValue(Unit u)=>_sort is "debit" or "credit" or "difference" ? Cell(u,null,_sort) : Cell(u,u.Lines[0],_sort);
     private void SortUnits()=>_units=(_descending?_units.OrderByDescending(SortValue):_units.OrderBy(SortValue)).ThenBy(u=>u.Lines[0].PostingDate).ThenBy(u=>u.Lines[0].JournalNumber).ThenBy(u=>u.Lines[0].LineNumber).ToArray();
@@ -191,7 +203,7 @@ public partial class GeneralJournalReportPage
     private static string StateName(JournalEntryStatus t)=>AccountingArabicPresenter.GetJournalStatusText(t);
     private static string ModeName(string key)=>key switch{"summary"=>"إجمالي حسب القيد","lines"=>"تفصيلي حسب السطور","source"=>"إجمالي حسب المصدر",_=>"تفصيلي حسب القيد"};
     private static string SourceName(string key)=>key.ToLowerInvariant() switch{"accounting"=>"المحاسبة","sales"=>"المبيعات","purchasing"=>"المشتريات","inventory"=>"المخزون","__manual"=>"دون مصدر آلي",_=>key};
-    private static string DocumentName(JournalReportLineDto l)=>l.SourceDocumentType?.ToLowerInvariant() switch {"salesinvoice"=>"فاتورة مبيعات","salesreturn"=>"مرتجع مبيعات","purchaseinvoice"=>"فاتورة مشتريات","purchasereceipt"=>"استلام مشتريات","purchasereturn"=>"مرتجع مشتريات","receiptvoucher"=>"سند قبض","paymentvoucher"=>"سند صرف","inventorytransaction"=>"حركة مخزون","customersettlementfx" or "suppliersettlementfx"=>"تسوية فرق صرف","customersettlementfxreversal" or "suppliersettlementfxreversal"=>"عكس تسوية فرق صرف",_=>string.IsNullOrWhiteSpace(l.SourceDocumentType)?TypeName(l.JournalType):l.SourceDocumentType!};
+    private static string DocumentName(JournalReportLineDto l)=>l.SourceDocumentType?.ToLowerInvariant() switch {"salesinvoice"=>"فاتورة مبيعات","salesreturn"=>"مرتجع مبيعات","purchaseinvoice"=>"فاتورة مشتريات","purchasereceipt"=>"استلام مشتريات","purchasereturn"=>"مرتجع مشتريات","receiptvoucher"=>"سند قبض","paymentvoucher"=>"سند صرف","inventorytransaction"=>"حركة مخزون","customersettlementfx" or "suppliersettlementfx"=>"تسوية فرق صرف","customersettlementfxreversal" or "suppliersettlementfxreversal"=>"عكس تسوية فرق صرف","journalentryreversal"=>"عكس قيد يومية",_=>string.IsNullOrWhiteSpace(l.SourceDocumentType)?TypeName(l.JournalType):l.SourceDocumentType!};
     private string Subtitle=>string.Join(" | ",Chips.Select(c=>$"{c.Label}: {c.Value}"))+" | البحث: "+(_search==""?"الكل":_search);
     private string[] ExportHeaders=>Columns.Select(c=>c.Label).ToArray();
     private object?[] TotalRow(string title,decimal debit,decimal credit)=>Columns.Select((c,i)=>i==0?(object?)title:c.Key=="debit"?debit:c.Key=="credit"?credit:c.Key=="difference"?debit-credit:null).ToArray();

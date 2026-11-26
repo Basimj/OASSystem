@@ -35,6 +35,12 @@ public sealed class UpdateJournalEntryCommandHandler(
         if (!journal.RowVersion.SequenceEqual(requestedRowVersion))
             throw new ConcurrencyException("The journal entry has been modified by another user.");
 
+        if (journal.Status != OAS.Domain.Accounting.Enums.JournalEntryStatus.Draft || journal.JournalType != DomainJournalType.Manual || journal.SourceDocumentId.HasValue || !string.IsNullOrWhiteSpace(journal.SourceDocumentType) || (!string.IsNullOrWhiteSpace(journal.SourceModule) && !string.Equals(journal.SourceModule, "Accounting", StringComparison.OrdinalIgnoreCase)))
+            throw new ConflictException("journal_system_read_only", "لا يمكن تعديل القيود النظامية أو العكسية أو القيود التي غادرت المسودة.");
+        if (request.Request.JournalType != OAS.Contracts.Accounting.Enums.JournalType.Manual || request.Request.SourceDocumentId.HasValue || !string.IsNullOrWhiteSpace(request.Request.SourceDocumentType) || (!string.IsNullOrWhiteSpace(request.Request.SourceModule) && !string.Equals(request.Request.SourceModule, "Accounting", StringComparison.OrdinalIgnoreCase)))
+            throw new ConflictException("journal_manual_only", "لا يمكن تغيير القيد اليدوي إلى نوع نظامي أو ربطه بمستند مصدر.");
+        if (await repository.CountAsync(new Specification<JournalEntry>().Where(j => j.ReversedJournalId == journal.Id), ct) > 0)
+            throw new ConflictException("journal_system_read_only", "لا يمكن تعديل القيد العكسي.");
         journal.EnsureEditable();
 
         await sourceIntegrity.ValidateUniqueSourceAsync(

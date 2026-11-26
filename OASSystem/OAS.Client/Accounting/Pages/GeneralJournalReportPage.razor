@@ -29,6 +29,7 @@
             <label class="oas-report__field">نوع القيد<select @bind="_draft.Type"><option value="">جميع الأنواع</option>@foreach(var t in Enum.GetValues<JournalType>()){<option value="@((byte)t)">@TypeName(t)</option>}</select></label>
             <label class="oas-report__field">مصدر القيد<select @bind="_draft.Source"><option value="">جميع المصادر</option>@foreach(var s in SourceOptions){<option value="@s">@SourceName(s)</option>}</select></label>
             <label class="oas-report__field">حالة القيد<select @bind="_draft.State"><option value="">جميع الحالات</option>@foreach(var s in Enum.GetValues<JournalEntryStatus>()){<option value="@((byte)s)">@StateName(s)</option>}</select></label>
+            <label class="oas-report__field">حالة العكس<select @bind="_draft.Reversal"><option value="">جميع الحالات</option><option value="normal">غير معكوس</option><option value="pending">عكس معلق</option><option value="done">معكوس</option><option value="reversal">قيد عكسي</option><option value="review">عكس يحتاج مراجعة</option></select></label>
             @if (_users.Count > 0)
             {
             <div class="oas-report__field"><UiReportSearchPicker Label="المستخدم" ItemLabel="مستخدم" DialogTitle="اختيار المستخدم المنشئ أو المرحل" Value="@_draft.User" ValueChanged="OnUser" Options="@UserOptions" Placeholder="جميع المستخدمين" /></div>

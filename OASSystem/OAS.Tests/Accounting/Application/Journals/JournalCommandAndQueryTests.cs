@@ -3,6 +3,8 @@ using OAS.Application.Accounting.Journals.Commands.CreateJournalEntry;
 using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Accounting.CoreHardening.Services;
 using OAS.Application.Accounting.Journals.Commands.ReverseJournalEntry;
+using OAS.Application.Accounting.Journals.Mapping;
+using OAS.Application.Common.Exceptions;
 using OAS.Application.Accounting.Journals.Commands.SetJournalEntryStatus;
 using OAS.Application.Accounting.Journals.Queries.GetJournalEntryById;
 using OAS.Contracts.Accounting.Enums;
@@ -115,6 +117,9 @@ public class JournalCommandAndQueryTests
                     Description: "دائن")
             ]);
 
+        foreach (var type in new[] { JournalType.Automatic, JournalType.Opening, JournalType.Closing, JournalType.Reversal })
+            Assert.ThrowsAsync<ConflictException>(async () => await handler.Handle(new CreateJournalEntryCommand(request with { JournalType = type }), CancellationToken.None));
+        Assert.ThrowsAsync<ConflictException>(async () => await handler.Handle(new CreateJournalEntryCommand(request with { SourceDocumentType = "SalesInvoice", SourceDocumentId = Guid.NewGuid() }), CancellationToken.None));
         var journalId = await handler.Handle(
             new CreateJournalEntryCommand(request),
             CancellationToken.None);
@@ -354,9 +359,14 @@ public class JournalCommandAndQueryTests
         var handler = new ReverseJournalEntryCommandHandler(
             _journalRepository,
             _lineRepository,
-            _sequenceGenerator);
+            _sequenceGenerator,
+            _periodRepository);
 
-        var command = new ReverseJournalEntryCommand(journal.Id);
+        await _periodRepository.AddAsync(FiscalPeriod.Create(_fiscalPeriodId, Guid.NewGuid(), 1, "Period 01", new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 31), DomainFiscalPeriodStatus.Open, false, false, false));
+        Assert.ThrowsAsync<ConflictException>(async () => await handler.Handle(new ReverseJournalEntryCommand(journal.Id, new DateOnly(2026, 1, 14), "سبب"), CancellationToken.None));
+        Assert.ThrowsAsync<ConflictException>(async () => await handler.Handle(new ReverseJournalEntryCommand(journal.Id, new DateOnly(2026, 1, 20), " "), CancellationToken.None));
+        Assert.ThrowsAsync<ConflictException>(async () => await handler.Handle(new ReverseJournalEntryCommand(journal.Id, new DateOnly(2026, 2, 1), "سبب"), CancellationToken.None));
+        var command = new ReverseJournalEntryCommand(journal.Id, new DateOnly(2026, 1, 20), "تصحيح القيد");
 
         var reversalId = await handler.Handle(
             command,
@@ -381,9 +391,21 @@ public class JournalCommandAndQueryTests
             reversal.JournalType,
             Is.EqualTo(DomainJournalType.Reversal));
 
-        Assert.That(
-            reversal.Lines.Count,
-            Is.EqualTo(2));
+        Assert.That(reversal.PostingDate, Is.EqualTo(new DateOnly(2026, 1, 20)));
+        Assert.That(reversal.Description, Does.Contain("تصحيح القيد"));
+        Assert.That(journal.ReversedJournalId, Is.EqualTo(reversal.Id));
+        Assert.That(reversal.Lines.Count, Is.EqualTo(2));
+        Assert.That(reversal.Lines.OrderBy(x => x.LineNumber).Zip(journal.Lines.OrderBy(x => x.LineNumber)).All(p => p.First.IsExactOppositeOf(p.Second)), Is.True);
+        Assert.ThrowsAsync<ConflictException>(async () => await handler.Handle(command, CancellationToken.None));
+        var pending = await JournalReversalInfoResolver.ResolveAsync(_journalRepository, new[] { journal, reversal }, CancellationToken.None);
+        Assert.That(pending[journal.Id].ReversalJournalStatus, Is.EqualTo(JournalEntryStatus.Draft));
+        Assert.That(pending[reversal.Id].OriginalJournalNumber, Is.EqualTo(journal.JournalNumber));
+        reversal.SetPendingApproval();
+        reversal.Approve(Guid.Parse(_currentUser.UserId!), DateTime.UtcNow);
+        reversal.Post(Guid.Parse(_currentUser.UserId!), DateTime.UtcNow);
+        Assert.ThrowsAsync<ConflictException>(async () => await handler.Handle(new ReverseJournalEntryCommand(reversal.Id, new DateOnly(2026, 1, 21), "عكس مرة أخرى"), CancellationToken.None));
+        var completed = await JournalReversalInfoResolver.ResolveAsync(_journalRepository, new[] { journal }, CancellationToken.None);
+        Assert.That(completed[journal.Id].ReversalJournalStatus, Is.EqualTo(JournalEntryStatus.Posted));
 
         Assert.That(
             reversal.Lines.Sum(x => x.DebitAmount),
@@ -392,6 +414,25 @@ public class JournalCommandAndQueryTests
         Assert.That(
             reversal.Lines.Sum(x => x.CreditAmount),
             Is.EqualTo(1200m));
+    }
+
+    [TestCase(DomainJournalType.Automatic, null)]
+    [TestCase(DomainJournalType.Opening, null)]
+    [TestCase(DomainJournalType.Closing, null)]
+    [TestCase(DomainJournalType.Reversal, null)]
+    [TestCase(DomainJournalType.Manual, "SalesInvoice")]
+    public async Task ReverseJournalEntry_RejectsSystemOrSourceBoundJournal(DomainJournalType type, string? sourceType)
+    {
+        var entry = JournalEntry.Create(Guid.NewGuid(), "JV-BLOCK", type, new DateOnly(2026, 1, 15), new DateOnly(2026, 1, 15), _fiscalPeriodId, "test", sourceType is null ? null : "Sales", sourceType, sourceType is null ? null : Guid.NewGuid(), DomainJournalStatus.Draft);
+        entry.AddLine(JournalEntryLine.Create(Guid.NewGuid(), entry.Id, 1, _accountDebitId, 100m, 0m, null, null, null, null, null, null));
+        entry.AddLine(JournalEntryLine.Create(Guid.NewGuid(), entry.Id, 2, _accountCreditId, 0m, 100m, null, null, null, null, null, null));
+        entry.SetPendingApproval();
+        entry.Approve(Guid.Parse(_currentUser.UserId!), DateTime.UtcNow);
+        entry.Post(Guid.Parse(_currentUser.UserId!), DateTime.UtcNow);
+        await _journalRepository.AddAsync(entry);
+        var handler = new ReverseJournalEntryCommandHandler(_journalRepository, _lineRepository, _sequenceGenerator, _periodRepository);
+        Assert.ThrowsAsync<ConflictException>(async () => await handler.Handle(new ReverseJournalEntryCommand(entry.Id, new DateOnly(2026, 1, 20), "سبب"), CancellationToken.None));
+        Assert.That(entry.ReversedJournalId, Is.Null);
     }
 
     [Test]

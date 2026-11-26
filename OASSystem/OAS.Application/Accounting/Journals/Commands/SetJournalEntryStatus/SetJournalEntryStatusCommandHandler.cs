@@ -5,6 +5,8 @@ using OAS.Application.Abstractions.Security;
 using OAS.Application.Accounting.CoreHardening.Services;
 using OAS.Application.Common.Exceptions;
 using OAS.Domain.Accounting.Entities;
+using OAS.Application.Accounting.Journals.Mapping;
+using DomainJournalType = OAS.Domain.Accounting.Enums.JournalType;
 using DomainJournalEntryStatus = OAS.Domain.Accounting.Enums.JournalEntryStatus;
 
 namespace OAS.Application.Accounting.Journals.Commands.SetJournalEntryStatus;
@@ -50,6 +52,9 @@ public sealed class SetJournalEntryStatusCommandHandler(
         var status = (DomainJournalEntryStatus)(int)request.Request.Status;
         var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
 
+        if (status is DomainJournalEntryStatus.PendingApproval or DomainJournalEntryStatus.Approved or DomainJournalEntryStatus.Posted)
+            await ValidateReversalAsync(journal, cancellationToken);
+
         switch (status)
         {
             case DomainJournalEntryStatus.PendingApproval:
@@ -72,7 +77,7 @@ public sealed class SetJournalEntryStatusCommandHandler(
                 if (period is null)
                     throw new NotFoundException(nameof(FiscalPeriod), journal.FiscalPeriodId);
 
-                if (!period.CanPostAccounting())
+                if (!period.CanPostAccounting() || journal.PostingDate < period.StartDate || journal.PostingDate > period.EndDate)
                 {
                     throw new ConflictException(
                         "fiscal_period_closed",
@@ -125,5 +130,23 @@ public sealed class SetJournalEntryStatusCommandHandler(
 
         repository.Update(journal);
         return journal.Id;
+    }
+
+    private async Task ValidateReversalAsync(JournalEntry journal, CancellationToken ct)
+    {
+        var originals = await repository.ListAsync(new Specification<JournalEntry>().Where(x => x.ReversedJournalId == journal.Id), ct);
+        if (originals.Count == 0 && !JournalReversalInfoResolver.IsKnownReversal(journal)) return;
+        if (originals.Count != 1 || journal.JournalType != DomainJournalType.Reversal || journal.SourceDocumentType != "JournalEntryReversal" || journal.SourceDocumentId != originals[0].Id)
+            throw new ConflictException("journal_reversal_link_invalid", "القيد العكسي غير مرتبط بقيد أصلي صالح، أو يتبع مستندًا تشغيليًا. راجع مصدره قبل الترحيل.");
+        var original = originals[0];
+        if (original.Status != DomainJournalEntryStatus.Posted || original.JournalType != DomainJournalType.Manual || original.SourceDocumentId.HasValue || !string.IsNullOrWhiteSpace(original.SourceDocumentType) || (!string.IsNullOrWhiteSpace(original.SourceModule) && !string.Equals(original.SourceModule, "Accounting", StringComparison.OrdinalIgnoreCase)) ||
+            await repository.CountAsync(new Specification<JournalEntry>().Where(x => x.ReversedJournalId == original.Id), ct) > 0 || journal.PostingDate < original.PostingDate)
+            throw new ConflictException("journal_reverse_source_required", "لا يمكن ترحيل عكس مباشر لقيد غير يدوي مستقل أو لقيد عكسي آخر.");
+        var originalLines = await lineRepository.ListAsync(new Specification<JournalEntryLine>().Where(x => x.JournalEntryId == original.Id), ct);
+        var expected = originalLines.OrderBy(x => x.LineNumber).ToArray();
+        var actual = journal.Lines.OrderBy(x => x.LineNumber).ToArray();
+        if (expected.Length == 0 || expected.Length != actual.Length || journal.BaseCurrencyId != original.BaseCurrencyId || journal.BaseCurrencyCodeSnapshot != original.BaseCurrencyCodeSnapshot || journal.BaseCurrencyDecimalPlacesSnapshot != original.BaseCurrencyDecimalPlacesSnapshot ||
+            !actual.Zip(expected).All(pair => pair.First.IsExactOppositeOf(pair.Second)))
+            throw new ConflictException("journal_reversal_amount_mismatch", "بيانات القيد العكسي لا تطابق القيد الأصلي. لا يمكن اعتماده أو ترحيله قبل معالجة القيد بواسطة المسؤول.");
     }
 }

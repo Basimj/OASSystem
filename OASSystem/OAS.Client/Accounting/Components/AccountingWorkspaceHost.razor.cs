@@ -595,7 +595,7 @@ public partial class AccountingWorkspaceHost : IDisposable
 
     private bool IsRecordEditable(AccountingTabState tab) => tab.Model switch
     {
-        JournalEntryEditor.FormModel m => m.Status is not JournalEntryStatus.Posted and not JournalEntryStatus.Reversed,
+        JournalEntryEditor.FormModel m => m.Status == JournalEntryStatus.Draft && m.IsManualStandalone,
         ReceiptVoucherEditor.FormModel m => m.Status == ReceiptVoucherStatus.Draft,
         PaymentVoucherEditor.FormModel m => m.Status == PaymentVoucherStatus.Draft,
         ExpenseEditor.FormModel m => m.Status == ExpenseStatus.Draft,
@@ -1621,7 +1621,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                             dto.SourceDocumentType,
                             dto.SourceDocumentId);
 
-                        var reversedJournalCode = await ResolveJournalNumberAsync(dto.ReversedJournalId);
+                        var reversedJournalCode = dto.Reversal?.ReversalJournalNumber;
 
                         var model = new JournalEntryEditor.FormModel
                         {
@@ -1638,6 +1638,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                             Status = dto.Status,
                             ReversedJournalId = dto.ReversedJournalId,
                             ReversedJournalCode = reversedJournalCode,
+                            ReversalInfo = dto.Reversal,
                             RowVersion = dto.RowVersion,
                             Lines = lines
                         };
@@ -3141,6 +3142,11 @@ public partial class AccountingWorkspaceHost : IDisposable
             var result = await AccountingService.SetJournalStatusAsync(id, new SetJournalEntryStatusRequest(status, model.RowVersion));
             if (result is null) throw new InvalidOperationException("لم يُرجع الخادم القيد المحدث.");
             await LoadExistingRecordAsync(tab, result.Id);
+            if (status == JournalEntryStatus.Posted && result.Reversal?.OriginalJournalId is Guid originalId)
+            {
+                var originalTab = Workspace.Tabs.FirstOrDefault(t => t.EntityType == AccountingEntityType.Journals && t.EntityId == originalId && !t.IsDirty && !t.IsEditMode && !t.IsSaving);
+                if (originalTab is not null) await LoadExistingRecordAsync(originalTab, originalId);
+            }
             await RefreshListsForEntityAsync(AccountingEntityType.Journals);
             Snackbar.Success(status switch
             {
@@ -3156,23 +3162,18 @@ public partial class AccountingWorkspaceHost : IDisposable
 
     private async Task ReverseActiveJournalAsync()
     {
-        if (Workspace.ActiveTab is not { EntityId: Guid id } tab) return;
+        if (Workspace.ActiveTab is not { EntityId: Guid id, Model: JournalEntryEditor.FormModel model } tab || !model.IsManualStandalone || model.Status != JournalEntryStatus.Posted || model.ReversedJournalId.HasValue) return;
         if (tab.IsDirty || tab.IsEditMode || tab.IsSaving)
         {
             Snackbar.Warning("احفظ التعديلات أو ألغها قبل عكس القيد.");
             return;
         }
-        var confirmed = await Dialog.ConfirmAsync(
-            "عكس القيد",
-            "سيتم إنشاء قيد عكسي مستقل ولن يتم حذف القيد التاريخي. هل تريد المتابعة؟",
-            AlertTone.Warning,
-            "إنشاء القيد العكسي",
-            "إلغاء");
-        if (!confirmed) return;
+        var result = await Dialog.ShowAsync<JournalReversalDialog>("عكس القيد", new Dictionary<string, object> { [nameof(JournalReversalDialog.OriginalDate)] = model.PostingDate.ToDateTime(TimeOnly.MinValue) });
+        if (result.Cancelled || result.Value is not ReverseJournalEntryRequest request) return;
 
         try
         {
-            var reversal = await AccountingService.ReverseJournalAsync(id) ?? throw new InvalidOperationException("لم يُرجع الخادم القيد العكسي.");
+            var reversal = await AccountingService.ReverseJournalAsync(id, request) ?? throw new InvalidOperationException("لم يُرجع الخادم القيد العكسي.");
             await LoadExistingRecordAsync(tab, id);
             await LoadEntityListAsync(AccountingEntityType.Journals);
             var reversalTab = Workspace.OpenOrActivateEntityTab(AccountingEntityType.Journals, reversal.Id, reversal.JournalNumber);
