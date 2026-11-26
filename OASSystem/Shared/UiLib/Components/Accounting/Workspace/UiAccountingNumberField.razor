@@ -11,8 +11,14 @@
            value="@Value.ToString(CultureInfo.InvariantCulture)"
            min="@Min"
            step="@Step"
+           aria-invalid="@(!string.IsNullOrWhiteSpace(Error) ? "true" : "false")"
+           style="@(!string.IsNullOrWhiteSpace(Error) ? "border-color:#dc2626" : null)"
            disabled="@Disabled"
            @onchange="HandleChangeAsync" />
+    @if (!string.IsNullOrWhiteSpace(Error))
+    {
+        <span class="ui-acc-number-field__hint" style="color:#dc2626" role="alert">@Error</span>
+    }
     @if (!string.IsNullOrWhiteSpace(Hint))
     {
         <span class="ui-acc-number-field__hint">@Hint</span>
@@ -27,6 +33,7 @@
     [Parameter] public string Step { get; set; } = "0.01";
     [Parameter] public string Min { get; set; } = "0";
     [Parameter] public string? Hint { get; set; }
+    [Parameter] public string? Error { get; set; }
     [Parameter] public NumberTone Tone { get; set; }
 
     private string InputCssClass => Tone switch

@@ -30,6 +30,11 @@ public sealed class PaymentVouchersController(ISender sender) : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("balance")]
+    public async Task<ActionResult<PaymentVoucherBalanceDto>> GetBalance(
+        [FromQuery] Guid definitionId, [FromQuery] bool isBank, [FromQuery] DateOnly date, CancellationToken cancellationToken)
+        => Ok(await sender.Send(new OAS.Application.Accounting.PaymentVouchers.Queries.GetPaymentVoucherBalanceQuery(definitionId, isBank, date), cancellationToken));
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<PaymentVoucherDto>> GetById(
         Guid id,
@@ -63,6 +68,14 @@ public sealed class PaymentVouchersController(ISender sender) : ControllerBase
         var dto = await sender.Send(new GetPaymentVoucherByIdQuery(id), cancellationToken);
         return Ok(dto);
     }
+
+    [HttpPost("{id:guid}/reverse-preview")]
+    public async Task<ActionResult<OAS.Contracts.Accounting.Reports.VoucherReversalPreview>> PreviewReverse(Guid id, [FromBody] OAS.Contracts.Accounting.Reports.ReverseVoucherRequest request, CancellationToken ct)
+        => Ok(await sender.Send(new OAS.Application.Accounting.Reports.Queries.GetVoucherReport.PreviewVoucherReversalCommand(false,id,request),ct));
+
+    [HttpPost("{id:guid}/reverse")]
+    public async Task<ActionResult<Guid>> Reverse(Guid id, [FromBody] OAS.Contracts.Accounting.Reports.ReverseVoucherRequest request, CancellationToken ct)
+        => Ok(await sender.Send(new OAS.Application.Accounting.Reports.Queries.GetVoucherReport.ReverseVoucherCommand(false,id,request),ct));
 
     [HttpPost("{id:guid}/status")]
     public async Task<ActionResult<PaymentVoucherDto>> SetStatus(

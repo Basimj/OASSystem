@@ -44,6 +44,7 @@ internal static class CashShiftPostingLinker
                 """, ct);
 
         await ValidateCashConfigurationAsync(db, ct);
+        await PaymentVoucherBalanceQueryService.ValidatePostingsAsync(db, postings.Select(x => x.Entity).ToArray(), ct);
 
         // Re-read configuration after lock acquisition.
         if (accountIds.Length != 0)

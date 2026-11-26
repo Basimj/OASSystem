@@ -73,7 +73,13 @@ public sealed class CounterpartyAccountResolver(
     {
         var account = await accounts.GetByIdAsync(id, ct) ?? throw new NotFoundException(nameof(Account), id);
         var valid = requireManual ? account.CanReceiveManualPosting() : account.CanReceivePosting();
-        if (!valid) throw new ConflictException("counterparty_account_invalid", "Counterparty account is inactive or cannot receive posting.");
+        if (!valid)
+        {
+            var reason = !account.IsActive ? "الحساب غير نشط" :
+                !account.IsPostingAccount ? "الحساب لا يقبل الترحيل" :
+                requireManual && !account.AllowManualPosting ? "الحساب لا يسمح بالقيد اليدوي" : "نوع الحساب لا يقبل الترحيل";
+            throw new ConflictException("counterparty_account_invalid", $"الحساب المحاسبي المرتبط بالطرف ({account.Code} - {account.NameAr}): {reason}. راجع شجرة الحسابات وربط الطرف.");
+        }
         return account;
     }
 

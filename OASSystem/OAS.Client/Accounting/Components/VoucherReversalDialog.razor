@@ -1,0 +1,59 @@
+@namespace OAS.Client.Accounting.Components
+@using OAS.Contracts.Accounting.Reports
+@using OAS.UiLib.Services.Dialogs
+@using OAS.Client.Services.Http
+@inject IUiDialogService Dialog
+@inject OasApiClient Api
+
+<div dir="rtl" style="display:grid;gap:12px;padding:12px">
+    <p>سيتم الاحتفاظ بالسند والقيد الأصلي، وعكس التخصيصات المدعومة وفروق الصرف المرتبطة بها.</p>
+    <label>تاريخ العكس<input type="date" class="form-control" @bind="_date" @bind:format="yyyy-MM-dd" disabled="@_busy" /></label>
+    <label>سبب العكس<textarea class="form-control" rows="3" maxlength="400" @bind="_reason" @bind:event="oninput" disabled="@_busy"></textarea></label>
+    @if (_date.Date < OriginalDate.Date){<small role="alert">تاريخ العكس لا يجوز أن يسبق تاريخ القيد الأصلي.</small>}
+    @if (IsChecked && _preview is not null)
+    {
+        if (_preview.CanReverse)
+        {
+            <div class="alert alert-success" role="status">بنود السند: @_preview.LineCount — تخصيصات نشطة سيُعكس أثرها: @_preview.AllocationCount. سيعاد التحقق عند الترحيل.</div>
+        }
+        else { <div class="alert alert-danger" role="alert">@_preview.Error</div> }
+    }
+    @if (!string.IsNullOrWhiteSpace(_error)){<div class="alert alert-danger" role="alert">@_error</div>}
+    <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+        <button type="button" class="btn btn-secondary" disabled="@_busy" @onclick="Dialog.Cancel">إلغاء</button>
+        <button type="button" class="btn btn-outline-primary" disabled="@(_busy || !Valid)" @onclick="CheckAsync">التحقق من إمكانية العكس</button>
+        <button type="button" class="btn btn-primary" disabled="@(_busy || !Valid || !IsChecked || _preview?.CanReverse != true)" @onclick="Submit">تأكيد العكس والترحيل</button>
+    </div>
+</div>
+@code {
+    [Parameter] public DateTime OriginalDate { get; set; }
+    [Parameter] public Guid VoucherId { get; set; }
+    [Parameter] public bool IsReceipt { get; set; }
+    private DateTime _date = DateTime.Today;
+    private string _reason = "";
+    private bool _busy;
+    private string? _error;
+    private ReverseVoucherRequest? _checkedRequest;
+    private VoucherReversalPreview? _preview;
+    private ReverseVoucherRequest Request => new(DateOnly.FromDateTime(_date), _reason.Trim());
+    private bool Valid => _date.Date >= OriginalDate.Date && !string.IsNullOrWhiteSpace(_reason);
+    private bool IsChecked => _checkedRequest == Request;
+    protected override void OnInitialized() { if (_date < OriginalDate) _date = OriginalDate; }
+    private async Task CheckAsync()
+    {
+        if (!Valid || _busy) return;
+        _busy = true; _error = null; _preview = null; _checkedRequest = null;
+        var request = Request;
+        try
+        {
+            var kind = IsReceipt ? "receipt" : "payment";
+            _preview = await Api.PostAsync<ReverseVoucherRequest, VoucherReversalPreview>($"api/accounting/{kind}-vouchers/{VoucherId:D}/reverse-preview", request);
+            _checkedRequest = request;
+            if (_preview is null) _error = "تعذر التحقق من إمكانية العكس.";
+        }
+        catch (ApiClientException ex) { _error = ex.Message; }
+        catch (Exception) { _error = "تعذر الاتصال للتحقق من العكس. أعد المحاولة."; }
+        finally { _busy = false; }
+    }
+    private void Submit() { if (Valid && IsChecked && _preview?.CanReverse == true) Dialog.Close(Request); }
+}

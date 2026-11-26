@@ -114,7 +114,9 @@ public static class DependencyInjection
         services.AddScoped<ICashShiftBalanceService, CashShiftBalanceService>();
         services.AddScoped<ICashShiftOpeningBalanceService, CashShiftBalanceService>();
         services.AddScoped<ICashTransferService, CashTransferService>();
+        services.AddScoped<IPaymentVoucherBalanceQueryService, PaymentVoucherBalanceQueryService>();
         services.AddScoped<ICashBankReportQueryService, CashBankReportQueryService>();
+        services.AddScoped<IVoucherOperations, VoucherOperations>();
         services.AddScoped<ICashShiftSettlementService, CashTransferService>();
         services.AddScoped<ICashShiftMovementQueryService, CashShiftMovementQueryService>();
         services.AddScoped<ISupplierApReportingQueryService, SupplierApReportingQueryService>();

@@ -66,6 +66,7 @@ public sealed class SetPaymentVoucherStatusCommandHandler(
             case DomainPaymentVoucherStatus.Approved:
                 if (!await permissionChecker.HasPermissionAsync(AccountingPermissions.PaymentVouchers.Approve, cancellationToken))
                     throw new ForbiddenException();
+                await postingService.ValidatePaymentVoucherAsync(voucher, lines!, cancellationToken);
                 voucher.Approve(lines!);
                 break;
 

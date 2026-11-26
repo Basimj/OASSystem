@@ -24,7 +24,8 @@ public sealed class CreatePaymentAllocationCommandHandler(
     ICurrentUser currentUser,
     TimeProvider timeProvider,
     ICustomerSettlementFxPostingService? customerSettlementFxPosting = null,
-    ISalesPaymentAllocationConcurrencyPort? salesAllocationConcurrency = null)
+    ISalesPaymentAllocationConcurrencyPort? salesAllocationConcurrency = null,
+    IReadRepository<JournalEntry, Guid>? voucherJournals = null)
     : IRequestHandler<CreatePaymentAllocationCommand, Guid>
 {
     public async Task<Guid> Handle(CreatePaymentAllocationCommand request, CancellationToken ct)
@@ -245,6 +246,7 @@ public sealed class CreatePaymentAllocationCommandHandler(
             var voucher = await receiptVouchers.GetByIdAsync(line.ReceiptVoucherId, ct) ?? throw new NotFoundException(nameof(ReceiptVoucher), line.ReceiptVoucherId);
             if (voucher.Status != OAS.Domain.Accounting.Enums.ReceiptVoucherStatus.Posted)
                 throw new ConflictException("payment_allocation_receipt_not_posted", "لا يمكن تخصيص دفعة من سند قبض غير مرحل.");
+            await VoucherReversalGuard.EnsureNotReversedAsync(voucherJournals, voucher.JournalEntryId, ct);
             return ToSource(
                 line.CurrencyId,
                 line.CurrencyCodeSnapshot,
@@ -266,6 +268,7 @@ public sealed class CreatePaymentAllocationCommandHandler(
             var voucher = await paymentVouchers.GetByIdAsync(line.PaymentVoucherId, ct) ?? throw new NotFoundException(nameof(PaymentVoucher), line.PaymentVoucherId);
             if (voucher.Status != OAS.Domain.Accounting.Enums.PaymentVoucherStatus.Posted)
                 throw new ConflictException("payment_allocation_payment_not_posted", "لا يمكن تخصيص دفعة من سند صرف غير مرحل.");
+            await VoucherReversalGuard.EnsureNotReversedAsync(voucherJournals, voucher.JournalEntryId, ct);
             return ToSource(
                 line.CurrencyId,
                 line.CurrencyCodeSnapshot,

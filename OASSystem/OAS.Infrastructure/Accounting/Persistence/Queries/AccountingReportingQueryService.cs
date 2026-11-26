@@ -895,6 +895,10 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
             .Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => new LedgerDocumentInfo(x.VoucherNumber, x.Description), ct));
         await AddAsync("paymentvoucher", async ids => await db.Set<PaymentVoucher>().AsNoTracking()
             .Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => new LedgerDocumentInfo(x.VoucherNumber, x.Description), ct));
+        await AddAsync("receiptvoucherreversal", async ids => await db.Set<ReceiptVoucher>().AsNoTracking()
+            .Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => new LedgerDocumentInfo(x.VoucherNumber, x.Description), ct));
+        await AddAsync("paymentvoucherreversal", async ids => await db.Set<PaymentVoucher>().AsNoTracking()
+            .Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => new LedgerDocumentInfo(x.VoucherNumber, x.Description), ct));
         await AddAsync("inventorytransaction", async ids => await db.Set<InventoryTransaction>().AsNoTracking()
             .Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id,
                 x => new LedgerDocumentInfo(x.TransactionNumber,
@@ -930,6 +934,7 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
         var normalized = (original ?? string.Empty).Trim();
         // Preserve meaningful accounting narratives. Only replace generated posting labels.
         var type = sourceType!.Trim().ToLowerInvariant();
+        if (type is "receiptvoucherreversal" or "paymentvoucherreversal") return journalDescription;
         // Translate only known generated posting labels, while retaining the
         // original meaning and the source line number for auditability.
         if (normalized.StartsWith("COGS reversal /", StringComparison.OrdinalIgnoreCase))

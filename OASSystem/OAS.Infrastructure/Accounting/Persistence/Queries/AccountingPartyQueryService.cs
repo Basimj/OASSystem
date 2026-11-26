@@ -132,7 +132,10 @@ public sealed class AccountingPartyQueryService(OasDbContext db) : IAccountingPa
                 c.CustomerCode,
                 AccountCode = a.Code,
                 c.NameAr,
-                c.IsActive
+                c.IsActive,
+                AccountActive = a.IsActive,
+                a.IsPostingAccount,
+                a.AccountType
             })
             .Take(take)
             .ToListAsync(ct);
@@ -143,7 +146,11 @@ public sealed class AccountingPartyQueryService(OasDbContext db) : IAccountingPa
                 x.CustomerCode,
                 x.AccountCode,
                 x.NameAr,
-                x.IsActive))
+                x.IsActive)
+            {
+                PostingError = !x.AccountActive ? "الحساب المحاسبي المرتبط غير نشط." :
+                    !x.IsPostingAccount || x.AccountType == AccountType.Header ? "الحساب المحاسبي المرتبط لا يقبل الترحيل." : null
+            })
             .ToArray();
     }
 
@@ -298,7 +305,10 @@ public sealed class AccountingPartyQueryService(OasDbContext db) : IAccountingPa
                 s.SupplierCode,
                 AccountCode = a.Code,
                 s.NameAr,
-                s.IsActive
+                s.IsActive,
+                AccountActive = a.IsActive,
+                a.IsPostingAccount,
+                a.AccountType
             })
             .Take(take)
             .ToListAsync(ct);
@@ -309,7 +319,11 @@ public sealed class AccountingPartyQueryService(OasDbContext db) : IAccountingPa
                 x.SupplierCode,
                 x.AccountCode,
                 x.NameAr,
-                x.IsActive))
+                x.IsActive)
+            {
+                PostingError = !x.AccountActive ? "الحساب المحاسبي المرتبط غير نشط." :
+                    !x.IsPostingAccount || x.AccountType == AccountType.Header ? "الحساب المحاسبي المرتبط لا يقبل الترحيل." : null
+            })
             .ToArray();
     }
 

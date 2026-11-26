@@ -19,6 +19,11 @@ namespace OAS.API.Accounting.Controllers;
 [Route("api/accounting/reports")]
 public sealed class AccountingReportsController(ISender sender) : ControllerBase
 {
+    [HttpGet("vouchers")]
+    public async Task<ActionResult<CashBankReportDto>> Vouchers([FromQuery] DateOnly fromDate, [FromQuery] DateOnly toDate,
+        [FromQuery] string mode = "all", [FromQuery] string status = "posted", [FromQuery] string kind = "all", [FromQuery] Guid? currencyId = null, [FromQuery] Guid? accountId = null, [FromQuery] int? method = null, [FromQuery] int? partyType = null, [FromQuery] string? party = null, [FromQuery] Guid? postedBy = null, [FromQuery] Guid? cashAccountId = null, [FromQuery] Guid? bankAccountId = null, CancellationToken ct = default)
+        => Ok(await sender.Send(new OAS.Application.Accounting.Reports.Queries.GetVoucherReport.GetVoucherReportQuery(new VoucherReportFilter(fromDate,toDate,mode,status,kind,currencyId,accountId,method,partyType,party,postedBy,cashAccountId,bankAccountId)),ct));
+
     [HttpGet("cash-bank")]
     public async Task<ActionResult<CashBankReportDto>> CashBank([FromQuery] DateOnly fromDate, [FromQuery] DateOnly toDate,
         [FromQuery] string mode = "balances", [FromQuery] string kind = "all", [FromQuery] Guid? accountId = null,

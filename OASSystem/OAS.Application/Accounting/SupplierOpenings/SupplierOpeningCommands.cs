@@ -194,7 +194,8 @@ public sealed class ApplySupplierOpeningCommandHandler(
     IReadRepository<PaymentVoucher, Guid> paymentVouchers,
     IReadRepository<PaymentAllocation, Guid> paymentAllocations,
     ICurrentUser currentUser,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IReadRepository<JournalEntry, Guid>? voucherJournals = null)
     : IRequestHandler<ApplySupplierOpeningCommand, Guid>
 {
     public async Task<Guid> Handle(ApplySupplierOpeningCommand command, CancellationToken cancellationToken)
@@ -224,6 +225,7 @@ public sealed class ApplySupplierOpeningCommandHandler(
         if (voucher.Status != PaymentVoucherStatus.Posted)
             throw new ConflictException("supplier_opening_payment_not_posted", "يجب ترحيل سند الصرف قبل تخصيصه على الرصيد الافتتاحي.");
 
+        await OAS.Application.Accounting.Abstractions.VoucherReversalGuard.EnsureNotReversedAsync(voucherJournals, voucher.JournalEntryId, cancellationToken);
         var itemApps = await openings.GetApplicationsForItemAsync(item.Id, cancellationToken);
         var itemApplied = itemApps.Where(x => x.Status == SupplierOpeningApplicationStatus.Active).Sum(x => x.AppliedTargetBaseAmount);
         var targetAvailable = Math.Max(0m, item.BaseOpenAmount - itemApplied);

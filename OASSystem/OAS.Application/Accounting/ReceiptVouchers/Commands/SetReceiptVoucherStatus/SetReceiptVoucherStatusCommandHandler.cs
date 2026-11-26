@@ -66,6 +66,7 @@ public sealed class SetReceiptVoucherStatusCommandHandler(
             case DomainReceiptVoucherStatus.Approved:
                 if (!await permissionChecker.HasPermissionAsync(AccountingPermissions.ReceiptVouchers.Approve, cancellationToken))
                     throw new ForbiddenException();
+                await postingService.ValidateReceiptVoucherAsync(voucher, lines!, cancellationToken);
                 voucher.Approve(lines!);
                 break;
 

@@ -64,6 +64,14 @@ public sealed class ReceiptVouchersController(ISender sender) : ControllerBase
         return Ok(dto);
     }
 
+    [HttpPost("{id:guid}/reverse-preview")]
+    public async Task<ActionResult<OAS.Contracts.Accounting.Reports.VoucherReversalPreview>> PreviewReverse(Guid id, [FromBody] OAS.Contracts.Accounting.Reports.ReverseVoucherRequest request, CancellationToken ct)
+        => Ok(await sender.Send(new OAS.Application.Accounting.Reports.Queries.GetVoucherReport.PreviewVoucherReversalCommand(true,id,request),ct));
+
+    [HttpPost("{id:guid}/reverse")]
+    public async Task<ActionResult<Guid>> Reverse(Guid id, [FromBody] OAS.Contracts.Accounting.Reports.ReverseVoucherRequest request, CancellationToken ct)
+        => Ok(await sender.Send(new OAS.Application.Accounting.Reports.Queries.GetVoucherReport.ReverseVoucherCommand(true,id,request),ct));
+
     [HttpPost("{id:guid}/status")]
     public async Task<ActionResult<ReceiptVoucherDto>> SetStatus(
         Guid id,

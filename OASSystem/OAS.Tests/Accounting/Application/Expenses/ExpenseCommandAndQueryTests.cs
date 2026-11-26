@@ -334,6 +334,9 @@ public class ExpenseCommandAndQueryTests
 
         public DateTime? LastPostedAtUtc { get; private set; }
 
+        public Task ValidateReceiptVoucherAsync(ReceiptVoucher voucher, IReadOnlyCollection<ReceiptVoucherLine> lines, CancellationToken ct = default) => Task.CompletedTask;
+        public Task ValidatePaymentVoucherAsync(PaymentVoucher voucher, IReadOnlyCollection<PaymentVoucherLine> lines, CancellationToken ct = default) => Task.CompletedTask;
+
         public Task<Guid> PostReceiptVoucherAsync(
             ReceiptVoucher voucher,
             IReadOnlyCollection<ReceiptVoucherLine> lines,

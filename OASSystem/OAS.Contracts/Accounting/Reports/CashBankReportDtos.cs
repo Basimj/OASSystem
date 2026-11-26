@@ -16,6 +16,7 @@ public sealed record CashBankReportDto(Guid BaseCurrencyId, string BaseCurrencyC
     IReadOnlyList<string> Warnings)
 {
     public IReadOnlyList<CashBankReportOperatorDto> Operators { get; init; } = [];
+    public IReadOnlyList<CashBankReportAccountDto> SettlementAccounts { get; init; } = [];
     public CashBankReportRow? TotalRow { get; init; }
 }
 

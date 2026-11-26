@@ -326,9 +326,7 @@
                               OnClick="PrintActiveVoucherAsync" />
                 }
 
-                @if (activeTab is { IsNew: false, IsDirty: false } &&
-                     (activeTab.Model is ReceiptVoucherEditor.FormModel { Status: ReceiptVoucherStatus.Posted } ||
-                      activeTab.Model is PaymentVoucherEditor.FormModel { Status: PaymentVoucherStatus.Posted }))
+                @if (CanAllocateActiveVoucher)
                 {
                     <UiButton Text="تخصيص دفعة"
                               IconCssClass="fa-solid fa-link"
@@ -508,6 +506,22 @@
                                       Size="ControlSize.Small"
                                       OnClick="@(() => ChangeExpenseStatusAsync(ExpenseStatus.Posted))" />
                         }
+                    }
+                }
+
+                @if (IsActivePostedVoucher)
+                {
+                    @if (ActiveVoucherReversalId.HasValue)
+                    {
+                        <UiButton Text="عرض القيد العكسي" IconCssClass="fa-solid fa-book-open"
+                                  Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
+                                  Disabled="@(activeTab.IsSaving || activeTab.IsLoading)" OnClick="ViewVoucherReversalAsync" />
+                    }
+                    else
+                    {
+                        <UiButton Text="عكس السند" IconCssClass="fa-solid fa-arrow-rotate-left"
+                                  Variant="ButtonVariant.Danger" Size="ControlSize.Small"
+                                  Disabled="@(activeTab.IsSaving || activeTab.IsLoading || !ActiveVoucherJournalLoaded)" OnClick="ReverseActiveVoucherAsync" />
                     }
                 }
 
@@ -811,8 +825,8 @@
                     <ReceiptVoucherEditor Model="@model"
                                           IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
                                           IsNew="@activeTab.IsNew"
-                                          CustomerSearchAsync="SearchCustomersAsync"
-                                          SupplierSearchAsync="SearchSuppliersAsync"
+                                          CustomerSearchAsync="SearchVoucherCustomersAsync"
+                                          SupplierSearchAsync="SearchVoucherSuppliersAsync"
                                           EmployeeSearchAsync="SearchEmployeeAccountsAsync"
                                           CashAccountSearchAsync="SearchCashAccountsByCurrencyAsync"
                                           BankAccountSearchAsync="SearchBankAccountsByCurrencyAsync"
@@ -831,8 +845,8 @@
                     <PaymentVoucherEditor Model="@model"
                                           IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
                                           IsNew="@activeTab.IsNew"
-                                          CustomerSearchAsync="SearchCustomersAsync"
-                                          SupplierSearchAsync="SearchSuppliersAsync"
+                                          CustomerSearchAsync="SearchVoucherCustomersAsync"
+                                          SupplierSearchAsync="SearchVoucherSuppliersAsync"
                                           EmployeeSearchAsync="SearchEmployeeAccountsAsync"
                                           CashAccountSearchAsync="SearchCashAccountsByCurrencyAsync"
                                           BankAccountSearchAsync="SearchBankAccountsByCurrencyAsync"

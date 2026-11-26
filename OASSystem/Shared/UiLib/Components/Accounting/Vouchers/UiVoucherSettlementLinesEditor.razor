@@ -120,7 +120,9 @@
                                          ValueChanged="@(value => AmountChangedAsync(line, value))"
                                          Min="0.0001"
                                          Disabled="@(!IsEditable)"
-                                         Tone="@UiAccountingNumberField.NumberTone.Primary" />
+                                         Tone="@(string.IsNullOrWhiteSpace(line.FundsError) ? UiAccountingNumberField.NumberTone.Primary : UiAccountingNumberField.NumberTone.Danger)"
+                                         Error="@line.FundsError"
+                                         Hint="@FundsHint(line)" />
 
                 <div class="ui-acc-settlement-line__rate">
                     <span class="oas-voucher-lines__rate-label">سعر الصرف: @(line.ManualRatePending ? "سعر يدوي مطلوب" : line.EffectiveExchangeRate?.ToString("0.########") ?? "غير متاح")</span>
@@ -363,6 +365,14 @@
         public decimal Amount { get; set; }
         [System.Text.Json.Serialization.JsonIgnore]
         public string? ValidationError { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore]
+        public decimal? AvailableFunds { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore]
+        public decimal? RemainingFunds { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string? FundsCurrencyCode { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string? FundsError { get; set; }
         [System.Text.Json.Serialization.JsonIgnore]
         public bool ManualRatePending { get; set; }
         public decimal? ResolvedExchangeRate { get; set; }
@@ -697,6 +707,10 @@
         foreach (var line in Lines) line.ValidationError = null;
         return OnLinesChanged.InvokeAsync();
     }
+
+    private static string? FundsHint(EditableSettlementLine line) => line.AvailableFunds is decimal funds
+        ? $"المتاح: {funds:0.####} {line.FundsCurrencyCode} · المتبقي بعد جميع البنود: {line.RemainingFunds?.ToString("0.####") ?? "—"} {line.FundsCurrencyCode}"
+        : null;
 
     private static Guid? Parse(string? value) => Guid.TryParse(value, out var id) ? id : null;
 

@@ -30,7 +30,8 @@ public sealed class CustomerAdvanceService(
     ICustomerAdvanceAccountingPostingService posting,
     ICurrentUser currentUser,
     TimeProvider timeProvider,
-    ISalesPaymentAllocationConcurrencyPort? salesAllocationConcurrency = null) : ICustomerAdvanceService
+    ISalesPaymentAllocationConcurrencyPort? salesAllocationConcurrency = null,
+    IReadRepository<JournalEntry, Guid>? voucherJournals = null) : ICustomerAdvanceService
 {
     public async Task<CustomerAdvanceDto> CreateAsync(
         CreateCustomerAdvanceRequest request,
@@ -49,6 +50,7 @@ public sealed class CustomerAdvanceService(
             ?? throw new NotFoundException(nameof(ReceiptVoucher), line.ReceiptVoucherId);
         if (receipt.Status != ReceiptVoucherStatus.Posted)
             throw new ConflictException("customer_advance_receipt_not_posted", "يجب ترحيل سند القبض قبل إنشاء العربون.");
+        await VoucherReversalGuard.EnsureNotReversedAsync(voucherJournals, receipt.JournalEntryId, cancellationToken);
         if (line.CustomerId != customer.Id)
             throw new ConflictException("customer_advance_receipt_customer_mismatch", "سطر سند القبض لا يعود إلى العميل المحدد.");
         if (line.PartyType != SettlementPartyType.Customer)

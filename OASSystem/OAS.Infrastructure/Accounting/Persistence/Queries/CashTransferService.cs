@@ -49,7 +49,7 @@ public sealed class CashTransferService(OasDbContext db, ISequenceNumberGenerato
         if (date is DateOnly asOf && accounts.Count > 0)
         {
             // One ledger read for all eligible accounts; use the same calculation as posting.
-            var rows = (await ReadBalanceRowsAsync(accounts.Select(x => x.AccountId).ToList(), ct)).ToLookup(x => x.AccountId);
+            var rows = (await ReadBalanceRowsAsync(db, accounts.Select(x => x.AccountId).ToList(), ct)).ToLookup(x => x.AccountId);
             var currencyIds = accounts.Select(x => x.CurrencyId).Distinct().ToList();
             // Same active Accounting rate and date rule as ExchangeRateResolver.
             // Missing rates are a normal preview state, not an exception.
@@ -199,21 +199,24 @@ public sealed class CashTransferService(OasDbContext db, ISequenceNumberGenerato
     private sealed record BalanceRow(Guid AccountId, string JournalNumber, DateOnly PostingDate, Guid? BaseCurrencyId,
         Guid? TransactionCurrencyId, decimal? TransactionDebitAmount, decimal? TransactionCreditAmount, decimal DebitAmount, decimal CreditAmount);
 
-    private Task<List<BalanceRow>> ReadBalanceRowsAsync(List<Guid> accountIds, CancellationToken ct) =>
+    private static Task<List<BalanceRow>> ReadBalanceRowsAsync(OasDbContext db, List<Guid> accountIds, CancellationToken ct) =>
         (from l in db.Set<JournalEntryLine>().AsNoTracking()
          join j in db.Set<JournalEntry>().AsNoTracking() on l.JournalEntryId equals j.Id
          where accountIds.Contains(l.AccountId) && j.Status == JournalEntryStatus.Posted
          select new BalanceRow(l.AccountId, j.JournalNumber, j.PostingDate, j.BaseCurrencyId, l.TransactionCurrencyId,
              l.TransactionDebitAmount, l.TransactionCreditAmount, l.DebitAmount, l.CreditAmount)).ToListAsync(ct);
 
-    private sealed record BalanceResult(decimal Native, decimal Base, string? ErrorCode = null, string? ErrorMessage = null);
+    internal sealed record BalanceResult(decimal Native, decimal Base, string? ErrorCode = null, string? ErrorMessage = null);
 
     internal async Task<(decimal Native, decimal Base)> BalanceAsync(Guid account, Guid currency, Guid baseId, DateOnly date, CancellationToken ct)
     {
-        var balance = CalculateBalance(await ReadBalanceRowsAsync([account], ct), currency, baseId, date);
+        var balance = await ReadBalanceAsync(db, account, currency, baseId, date, ct);
         if (balance.ErrorCode is string code) throw Error(code, balance.ErrorMessage!);
         return (balance.Native, balance.Base);
     }
+
+    internal static async Task<BalanceResult> ReadBalanceAsync(OasDbContext db, Guid account, Guid currency, Guid baseId, DateOnly date, CancellationToken ct) =>
+        CalculateBalance(await ReadBalanceRowsAsync(db, [account], ct), currency, baseId, date);
 
     private static BalanceResult CalculateBalance(IEnumerable<BalanceRow> rows, Guid currency, Guid baseId, DateOnly date)
     {

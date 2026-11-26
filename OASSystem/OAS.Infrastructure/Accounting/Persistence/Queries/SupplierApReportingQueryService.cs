@@ -546,7 +546,7 @@ public sealed class SupplierApReportingQueryService(OasDbContext db) : ISupplier
             if (string.Equals(sourceDocumentType, PurchaseInvoiceDocumentType, StringComparison.OrdinalIgnoreCase)) return "Invoice";
             if (string.Equals(sourceDocumentType, PurchaseReturnDocumentType, StringComparison.OrdinalIgnoreCase)) return "Return";
         }
-        if (string.Equals(sourceDocumentType, "PaymentVoucher", StringComparison.OrdinalIgnoreCase)) return "Payment";
+        if (string.Equals(sourceDocumentType, "PaymentVoucher", StringComparison.OrdinalIgnoreCase) || string.Equals(sourceDocumentType, "PaymentVoucherReversal", StringComparison.OrdinalIgnoreCase)) return "Payment";
         if (string.Equals(sourceDocumentType, "SupplierSettlementFx", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(sourceDocumentType, "SupplierSettlementFxReversal", StringComparison.OrdinalIgnoreCase)) return "RealizedFx";
         return "Adjustment";

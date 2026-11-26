@@ -51,6 +51,7 @@ public partial class AccountingWorkspaceHost : IDisposable
     [Inject] private IAccountingWorkspaceState Workspace { get; set; } = default!;
     [Inject] private IPurchasingClientService PurchasingService { get; set; } = default!;
     [Inject] private IAccountingClientService AccountingService { get; set; } = default!;
+    [Inject] private OasApiClient VoucherFundsApi { get; set; } = default!;
     [Inject] private IUiSnackbarService Snackbar { get; set; } = default!;
     [Inject] private IUiDialogService Dialog { get; set; } = default!;
     [Inject] private IApiFeedbackService ApiFeedback { get; set; } = default!;
@@ -780,7 +781,7 @@ public partial class AccountingWorkspaceHost : IDisposable
     private async Task OpenAllocationForActiveVoucherAsync()
     {
         var current = Workspace.ActiveTab;
-        if (current is null || current.EntityId is null || current.IsDirty) return;
+        if (current is null || current.EntityId is null || current.IsDirty || !CanAllocateActiveVoucher) return;
         var sourceType = current.EntityType == AccountingEntityType.ReceiptVouchers
             ? PaymentSourceType.ReceiptVoucher : PaymentSourceType.PaymentVoucher;
         if (current.EntityType is not (AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers)) return;
@@ -1696,6 +1697,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                     {
                         var dto = await AccountingService.GetReceiptVoucherByIdAsync(id) ?? throw NotFound("سند القبض");
                         var lines = await MapReceiptSettlementLinesAsync(dto.Lines);
+                        var voucherJournal = await LoadVoucherJournalAsync(dto.JournalEntryId);
                         var model = new ReceiptVoucherEditor.FormModel
                         {
                             VoucherNumber = dto.VoucherNumber,
@@ -1707,7 +1709,11 @@ public partial class AccountingWorkspaceHost : IDisposable
                             Description = dto.Description ?? string.Empty,
                             Status = dto.Status,
                             JournalEntryId = dto.JournalEntryId,
-                            GeneratedJournalNumber = await ResolveJournalNumberAsync(dto.JournalEntryId),
+                            GeneratedJournalNumber = voucherJournal?.JournalNumber,
+                            ReversalJournalId = voucherJournal?.ReversedJournalId,
+                            ReversalPosted = voucherJournal?.Reversal?.ReversalJournalStatus == JournalEntryStatus.Posted,
+                            JournalLoaded = voucherJournal is not null,
+                            OriginalPostingDate = voucherJournal?.PostingDate,
                             RowVersion = dto.RowVersion,
                             Lines = lines
                         };
@@ -1719,6 +1725,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                     {
                         var dto = await AccountingService.GetPaymentVoucherByIdAsync(id) ?? throw NotFound("سند الصرف");
                         var lines = await MapPaymentSettlementLinesAsync(dto.Lines);
+                        var voucherJournal = await LoadVoucherJournalAsync(dto.JournalEntryId);
                         var model = new PaymentVoucherEditor.FormModel
                         {
                             VoucherNumber = dto.VoucherNumber,
@@ -1730,7 +1737,11 @@ public partial class AccountingWorkspaceHost : IDisposable
                             Description = dto.Description ?? string.Empty,
                             Status = dto.Status,
                             JournalEntryId = dto.JournalEntryId,
-                            GeneratedJournalNumber = await ResolveJournalNumberAsync(dto.JournalEntryId),
+                            GeneratedJournalNumber = voucherJournal?.JournalNumber,
+                            ReversalJournalId = voucherJournal?.ReversedJournalId,
+                            ReversalPosted = voucherJournal?.Reversal?.ReversalJournalStatus == JournalEntryStatus.Posted,
+                            JournalLoaded = voucherJournal is not null,
+                            OriginalPostingDate = voucherJournal?.PostingDate,
                             RowVersion = dto.RowVersion,
                             Lines = lines
                         };
@@ -2610,6 +2621,7 @@ public partial class AccountingWorkspaceHost : IDisposable
     {
         if (!ValidateSettlementLines(model.Lines)) return;
         if (!await ValidateSettlementAccountEligibilityAsync(model.Lines)) return;
+        if (!await ValidatePaymentFundsAsync(model)) return;
 
         var lines = model.Lines.Select(x =>
         {
@@ -2642,6 +2654,15 @@ public partial class AccountingWorkspaceHost : IDisposable
         await CompleteSaveAsync(tab, result?.Id, result?.VoucherNumber, "تم حفظ سند الصرف بنجاح.");
     }
 
+    private async Task<bool> ValidatePaymentFundsAsync(PaymentVoucherEditor.FormModel model, bool forPosting = false)
+    {
+        if (await PaymentVoucherFundsPreview.RefreshAsync(VoucherFundsApi, model.Lines, model.VoucherDate, forPosting: forPosting)) return true;
+        var index = model.Lines.FindIndex(x => !string.IsNullOrWhiteSpace(x.FundsError));
+        if (index >= 0) return RejectVoucherLine(model.Lines[index], index + 1, model.Lines[index].FundsError!);
+        Snackbar.Warning("تعذر التحقق من رصيد الصرف.");
+        return false;
+    }
+
     private bool ValidateSettlementLines(IReadOnlyList<UiVoucherSettlementLinesEditor.EditableSettlementLine> lines)
     {
         if (lines.Count == 0) { Snackbar.Warning("يجب إضافة سطر تسوية واحد على الأقل."); return false; }
@@ -2649,8 +2670,9 @@ public partial class AccountingWorkspaceHost : IDisposable
         for (var i = 0; i < lines.Count; i++)
         {
             var line = lines[i]; var number = i + 1;
-            if (line.Amount <= 0 || !line.CurrencyId.HasValue) return RejectVoucherLine(line, number, "العملة والمبلغ الأكبر من صفر مطلوبان.");
+            if (line.Amount <= 0 || line.Amount >= 1000000000000000m || !line.CurrencyId.HasValue) return RejectVoucherLine(line, number, "العملة ومبلغ صالح أكبر من صفر مطلوبان.");
             if (line.ManualRatePending) return RejectVoucherLine(line, number, "أدخل سعر صرف يدويًا صالحًا أو اختر السعر التلقائي.");
+            if (line.EffectiveExchangeRate is not > 0) return RejectVoucherLine(line, number, "لا يتوفر سعر صرف صالح للعملة في تاريخ السند. اختر سعرًا معتمدًا.");
             var invalidParty =
                 (line.PartyType == UiSettlementPartyKind.Customer && !line.CustomerId.HasValue) ||
                 (line.PartyType == UiSettlementPartyKind.Supplier && !line.SupplierId.HasValue) ||
@@ -2682,6 +2704,33 @@ public partial class AccountingWorkspaceHost : IDisposable
         {
             var line = lines[i];
             var label = $"السطر {i + 1}";
+
+            // A saved draft or a party prefilled by another screen may bypass the lookup.
+            Guid? partyAccountId = null;
+            if (line.PartyType == UiSettlementPartyKind.Supplier && line.SupplierId is Guid supplierId)
+            {
+                var supplier = await AccountingService.GetSupplierByIdAsync(supplierId);
+                if (supplier is null || !supplier.IsActive)
+                    return RejectVoucherLine(line, i + 1, "المورد غير موجود أو غير نشط.");
+                partyAccountId = supplier.AccountId;
+            }
+            else if (line.PartyType == UiSettlementPartyKind.Customer && line.CustomerId is Guid customerId)
+            {
+                var customer = await AccountingService.GetCustomerByIdAsync(customerId);
+                if (customer is null || !customer.IsActive)
+                    return RejectVoucherLine(line, i + 1, "العميل غير موجود أو غير نشط.");
+                partyAccountId = customer.AccountId;
+            }
+            if (partyAccountId is Guid accountId)
+            {
+                var partyAccount = await AccountingService.GetAccountByIdAsync(accountId);
+                if (partyAccount is null)
+                    return RejectVoucherLine(line, i + 1, "الحساب المحاسبي المرتبط بالطرف غير موجود.");
+                var eligibility = AccountingAccountEligibility.Evaluate(partyAccount, AccountingAccountEligibilityContext.AutomaticPosting);
+                if (!eligibility.IsEligible)
+                    return RejectVoucherLine(line, i + 1,
+                        $"الحساب المحاسبي المرتبط بالطرف ({partyAccount.Code} - {partyAccount.NameAr}): {eligibility.Reason}");
+            }
 
             if (line.PartyType == UiSettlementPartyKind.Other && line.CounterpartyAccountId.HasValue &&
                 !await ValidateAccountSelectionAsync(
@@ -3360,6 +3409,12 @@ public partial class AccountingWorkspaceHost : IDisposable
         if (!ValidateVoucherStatusAction(tab, model.RowVersion))
             return;
 
+        if (status is PaymentVoucherStatus.Approved or PaymentVoucherStatus.Posted)
+        {
+            // Legacy headers are validated on the server: their per-line form has no settlement ids.
+            if (model.BaseCurrencyId.HasValue && !await ValidatePaymentFundsAsync(model, status == PaymentVoucherStatus.Posted)) return;
+        }
+
         if (!await ConfirmVoucherStatusActionAsync("سند الصرف", status.ToString()))
             return;
 
@@ -3639,10 +3694,10 @@ public partial class AccountingWorkspaceHost : IDisposable
                 "Expense" =>
                     (await AccountingService.GetExpenseByIdAsync(sourceDocumentId.Value))?.ExpenseNumber,
 
-                "ReceiptVoucher" =>
+                "ReceiptVoucher" or "ReceiptVoucherReversal" =>
                     (await AccountingService.GetReceiptVoucherByIdAsync(sourceDocumentId.Value))?.VoucherNumber,
 
-                "PaymentVoucher" =>
+                "PaymentVoucher" or "PaymentVoucherReversal" =>
                     (await AccountingService.GetPaymentVoucherByIdAsync(sourceDocumentId.Value))?.VoucherNumber,
 
                 "JournalEntryReversal" =>
@@ -4033,6 +4088,22 @@ public partial class AccountingWorkspaceHost : IDisposable
         var result = await AccountingService.LookupSuppliersAsync(text, cancellationToken) ?? [];
         foreach (var supplier in result) _supplierLookups[supplier.Id] = ToSupplierLookup(supplier);
         return result.Select(ToSupplierLookup).ToArray();
+    }
+
+    private async Task<IReadOnlyList<UiLookupItem>> SearchVoucherCustomersAsync(string text, CancellationToken cancellationToken)
+    {
+        var result = await AccountingService.LookupCustomersAsync(text, cancellationToken) ?? [];
+        return result.Select(x => x.PostingError is string error
+            ? new UiLookupItem(x.Id.ToString("D"), x.DisplayText, error, "fa-solid fa-user-tie", Disabled: true)
+            : ToCustomerLookup(x)).ToArray();
+    }
+
+    private async Task<IReadOnlyList<UiLookupItem>> SearchVoucherSuppliersAsync(string text, CancellationToken cancellationToken)
+    {
+        var result = await AccountingService.LookupSuppliersAsync(text, cancellationToken) ?? [];
+        return result.Select(x => x.PostingError is string error
+            ? new UiLookupItem(x.Id.ToString("D"), x.DisplayText, error, "fa-solid fa-truck-field", Disabled: true)
+            : ToSupplierLookup(x)).ToArray();
     }
 
     private async Task<IReadOnlyList<UiLookupItem>> SearchCurrenciesAsync(string text, CancellationToken cancellationToken)
