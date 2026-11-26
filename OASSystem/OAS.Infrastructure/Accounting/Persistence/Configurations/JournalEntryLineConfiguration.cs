@@ -34,6 +34,9 @@ public sealed class JournalEntryLineConfiguration : IEntityTypeConfiguration<Jou
         builder.Property(x => x.Description).HasMaxLength(300);
 
         builder.HasIndex(x => new { x.JournalEntryId, x.LineNumber }).IsUnique().HasDatabaseName("UX_JournalEntryLines_Journal_LineNumber");
+        builder.HasIndex(x => x.CashShiftId).HasDatabaseName("IX_JournalEntryLines_CashShiftId");
+        builder.HasOne<CashShift>().WithMany().HasForeignKey(x => x.CashShiftId)
+            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_JournalEntryLines_CashShift");
         builder.HasIndex(x => x.AccountId).HasDatabaseName("IX_JournalEntryLines_AccountId");
         builder.HasIndex(x => x.TransactionCurrencyId).HasDatabaseName("IX_JournalEntryLines_TransactionCurrencyId");
         builder.HasIndex(x => x.CostCenterId).HasDatabaseName("IX_JournalEntryLines_CostCenterId");

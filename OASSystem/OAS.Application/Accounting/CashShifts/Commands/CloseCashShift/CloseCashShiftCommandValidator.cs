@@ -12,7 +12,8 @@ public sealed class CloseCashShiftCommandValidator
             .WithErrorCode("cash_shift_id_required");
 
         RuleFor(x => x.Request.ActualClosingBalance)
-            .GreaterThanOrEqualTo(0)
+            .NotNull().WithErrorCode("actual_closing_balance_required")
+            .GreaterThanOrEqualTo(0m)
             .WithErrorCode("actual_closing_balance_must_be_non_negative");
 
         RuleFor(x => x.Request.RowVersion)

@@ -972,6 +972,12 @@ namespace OAS.Infrastructure.Persistence.Migrations
                     b.HasIndex("Status")
                         .HasDatabaseName("IX_CashShifts_Status");
 
+                    b.Property<bool>("UsesLinkedMovements").HasColumnType("bit");
+
+                    b.HasIndex(new[] { "CashAccountId" }, "UX_CashShifts_OneActivePerCashAccount")
+                        .IsUnique().HasFilter("[Status] IN (1, 2)")
+                        .HasDatabaseName("UX_CashShifts_OneActivePerCashAccount");
+
                     b.ToTable("tbl_CashShifts", "dbo");
                 });
 
@@ -2247,6 +2253,9 @@ namespace OAS.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("JournalEntryId", "PostingRole")
                         .HasDatabaseName("IX_JournalEntryLines_Journal_Role");
+
+                    b.Property<Guid?>("CashShiftId").HasColumnType("uniqueidentifier");
+                    b.HasIndex("CashShiftId").HasDatabaseName("IX_JournalEntryLines_CashShiftId");
 
                     b.ToTable("tbl_JournalEntryLines", "dbo", t =>
                         {
@@ -12940,6 +12949,11 @@ namespace OAS.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("FK_JournalEntryLines_Account");
+
+                    b.HasOne("OAS.Domain.Accounting.Entities.CashShift", null)
+                        .WithMany().HasForeignKey("CashShiftId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_JournalEntryLines_CashShift");
 
                     b.HasOne("OAS.Domain.Accounting.Entities.CostCenter", null)
                         .WithMany()

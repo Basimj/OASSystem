@@ -1,5 +1,9 @@
 @namespace OAS.Client.Accounting.Components
 @using OAS.Contracts.Accounting.Enums
+@using OAS.Contracts.Accounting.CashShifts
+@using OAS.Client.Accounting.Services
+@inject IAccountingClientService AccountingService
+@using System.Globalization
 @using OAS.Client.Accounting.Common
 @using OAS.UiLib.Components.Accounting.Workspace
 @using OAS.UiLib.Components.Inputs
@@ -21,7 +25,9 @@
                          ReadOnly="true" Disabled="true" Placeholder="يُحجز تلقائيًا..." Size="ControlSize.Small" />
             <UiLookup Label="الصندوق / الخزينة" Value="@CashAccountValue"
                       ValueChanged="OnCashAccountChanged" SelectedItem="@CashAccountLookupItem"
-                      SearchAsync="@CashAccountSearchAsync" Placeholder="اختر الصندوق..."
+                      SearchAsync="@CashAccountSearchAsync" Placeholder="اختر صندوقاً متاحاً..."
+                      ErrorText="@Model.CashAccountError"
+                      EmptyText="لا توجد صناديق متاحة مطابقة للبحث. قد تكون الصناديق مشغولة بورديات نشطة."
                       Disabled="@(!IsEditable || !IsNew)" Required="true"
                       MinimumSearchLength="0" DebounceMilliseconds="250" />
             <UiAccountingNumberField Label="رصيد الافتتاح (العهدة المستلمة)"
@@ -44,17 +50,20 @@
         <UiAccountingFormSection Title="الجرد والإغلاق" IconCssClass="fa-solid fa-scale-balanced">
             <div class="oas-cashbank-warning" role="status">
                 <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-                <span>تنبيه محاسبي: الرصيد المتوقع الحالي غير مرتبط بجميع حركات القبض والصرف أثناء الوردية. الفارق المعروض مبدئي ولا يصلح وحده لإثبات عجز أو زيادة أو تسوية محاسبية.</span>
+                <span>يُحسب الرصيد المتوقع من الحركات النقدية المرتبطة بالوردية. الورديات السابقة للترقية تستخدم التوقيت للحركات القديمة غير المرتبطة؛ راجعها قبل الاعتماد.</span>
             </div>
             <UiAccountingFormGrid Columns="3">
                 <UiAccountingReadOnlyValue Label="الرصيد المتوقع المسجل (غير محقق)"
                                            Value="@ExpectedClosingBalanceText" />
-                @if (Model.Status == CashShiftStatus.Open)
+                @if (Model.Status is CashShiftStatus.Open or CashShiftStatus.Closing)
                 {
-                    <UiAccountingNumberField Label="الجرد الفعلي عند الإغلاق"
-                                             Value="@ActualClosingBalanceValue"
-                                             ValueChanged="OnActualClosingBalanceChanged"
-                                             Min="0" Tone="@UiAccountingNumberField.NumberTone.Primary" />
+                    <div class="ui-acc-number-field">
+                        <label class="ui-acc-number-field__label" for="cash-shift-actual-count">الجرد الفعلي عند الإغلاق *</label>
+                        <input id="cash-shift-actual-count" type="number" min="0" step="any"
+                               class="ui-acc-number-field__input ui-acc-number-field__input--primary"
+                               value="@(Model.ActualClosingBalance?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)"
+                               placeholder="أدخل الجرد الفعلي" @oninput="OnActualClosingBalanceChanged" />
+                    </div>
                 }
                 else
                 {
@@ -67,6 +76,38 @@
                                            Tone="@DifferenceTone" />
             </UiAccountingFormGrid>
         </UiAccountingFormSection>
+        @if (ShiftId.HasValue)
+        {
+            <UiAccountingFormSection Title="الحركات المرتبطة بالوردية" IconCssClass="fa-solid fa-list">
+                <button type="button" class="btn btn-outline-primary btn-sm" disabled="@_loadingMovements" @onclick="() => LoadMovementsAsync(1)">عرض / تحديث الحركات</button>
+                @if (!string.IsNullOrWhiteSpace(_movementError))
+                {
+                    <p role="alert" class="text-danger">@_movementError</p>
+                }
+                @if (_movements is not null)
+                {
+                    @if (!_movements.UsesLinkedMovements)
+                    {
+                        <p>وردية قديمة: تعرض القائمة الحركات المرتبطة فعليًا بعد الترقية فقط، ولا تشمل الحركات التاريخية المستنتجة بالتوقيت.</p>
+                    }
+                    <p>عدد الحركات المرتبطة: @_movements.TotalCount</p>
+                    <div style="overflow-x:auto">
+                        <table class="table table-sm table-hover" dir="rtl">
+                            <thead><tr><th>رقم القيد</th><th>البند</th><th>التاريخ</th><th>البيان</th><th>العملة</th><th>وارد</th><th>صادر</th><th>مدين أساسي</th><th>دائن أساسي</th></tr></thead>
+                            <tbody>
+                            @foreach (var movement in _movements.Rows)
+                            {
+                                <tr><td>@movement.JournalNumber</td><td>@movement.LineNumber</td><td>@movement.PostingDate.ToString("yyyy/MM/dd")</td><td>@movement.Description</td><td>@movement.CurrencyCode</td><td>@(movement.DebitOriginal?.ToString("N2") ?? "—")</td><td>@(movement.CreditOriginal?.ToString("N2") ?? "—")</td><td>@movement.DebitBase.ToString("N2")</td><td>@movement.CreditBase.ToString("N2")</td></tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@(_loadingMovements || _movementPage <= 1)" @onclick="() => LoadMovementsAsync(_movementPage - 1)">السابق</button>
+                    <span>الصفحة @_movementPage</span>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@(_loadingMovements || (long)_movementPage * 100 >= _movements.TotalCount)" @onclick="() => LoadMovementsAsync(_movementPage + 1)">التالي</button>
+                }
+            </UiAccountingFormSection>
+        }
     }
     else
     {
@@ -79,6 +120,8 @@
     {
         public string ShiftNumber { get; set; } = string.Empty;
         public Guid? CashAccountId { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string? CashAccountError { get; set; }
         public decimal OpeningBalance { get; set; }
         public decimal? ExpectedClosingBalance { get; set; }
         public decimal? ActualClosingBalance { get; set; }
@@ -87,6 +130,41 @@
         public DateTimeOffset? ClosedAtUtc { get; set; }
         public CashShiftStatus Status { get; set; } = CashShiftStatus.Open;
         public string RowVersion { get; set; } = string.Empty;
+    }
+
+    [Parameter] public Guid? ShiftId { get; set; }
+    private Guid? _movementShiftId;
+    private CashShiftMovementsDto? _movements;
+    private int _movementPage = 1;
+    private bool _loadingMovements;
+    private string? _movementError;
+
+    protected override void OnParametersSet()
+    {
+        if (_movementShiftId == ShiftId) return;
+        _movementShiftId = ShiftId;
+        _movements = null;
+        _movementPage = 1;
+        _movementError = null;
+    }
+
+    private async Task LoadMovementsAsync(int page)
+    {
+        if (ShiftId is not Guid id || _loadingMovements || page < 1) return;
+        _loadingMovements = true;
+        _movementError = null;
+        try
+        {
+            var data = await AccountingService.GetCashShiftMovementsAsync(id, page);
+            if (ShiftId != id) return;
+            _movements = data;
+            _movementPage = page;
+        }
+        catch (Exception)
+        {
+            if (ShiftId == id) _movementError = "تعذر تحميل الحركات. أعد المحاولة.";
+        }
+        finally { _loadingMovements = false; }
     }
 
     [Parameter] public FormModel Model { get; set; } = new();
@@ -100,7 +178,6 @@
 
     private string StatusCssClass => "oas-cashbank-state oas-cashbank-state--" + Model.Status.ToString().ToLowerInvariant();
     private string? CashAccountValue => Model.CashAccountId?.ToString("D");
-    private decimal ActualClosingBalanceValue => Model.ActualClosingBalance ?? 0m;
     private string Amount(decimal amount) => amount.ToString($"N{Math.Clamp(CurrencyDecimalPlaces, 0, 6)}");
     private string ExpectedClosingBalanceText => Model.ExpectedClosingBalance.HasValue ? Amount(Model.ExpectedClosingBalance.Value) : "لم يُحتسب";
     private string ActualClosingBalanceText => Model.ActualClosingBalance.HasValue ? Amount(Model.ActualClosingBalance.Value) : "لم يتم الجرد بعد";
@@ -115,7 +192,18 @@
         _ => UiAccountingReadOnlyValue.ValueTone.Default
     };
     private Task OnChanged() => OnModelChanged.InvokeAsync();
-    private async Task OnCashAccountChanged(string? value) { Model.CashAccountId = Guid.TryParse(value, out var id) ? id : null; await OnChanged(); }
+    private async Task OnCashAccountChanged(string? value)
+    {
+        Model.CashAccountError = null;
+        Model.CashAccountId = Guid.TryParse(value, out var id) ? id : null;
+        await OnChanged();
+    }
     private async Task OnOpeningBalanceChanged(decimal amount) { Model.OpeningBalance = amount; await OnChanged(); }
-    private async Task OnActualClosingBalanceChanged(decimal amount) { Model.ActualClosingBalance = amount; await OnChanged(); }
+    private async Task OnActualClosingBalanceChanged(ChangeEventArgs args)
+    {
+        var raw = args.Value?.ToString();
+        Model.ActualClosingBalance = decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out var amount) && amount >= 0m
+            ? amount : null;
+        await OnChanged();
+    }
 }

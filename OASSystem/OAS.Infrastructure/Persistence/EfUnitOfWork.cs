@@ -66,6 +66,11 @@ public sealed class EfUnitOfWork(OasDbContext dbContext) : IUnitOfWork
         }
 
         var message = sqlException.Message;
+        if (message.Contains("UX_CashShifts_OneActivePerCashAccount", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("cash_shift_already_open", "توجد وردية مفتوحة أو قيد الإغلاق لهذا الصندوق.");
+            return true;
+        }
         if (message.Contains("IX_Users_NormalizedUserName", StringComparison.OrdinalIgnoreCase))
         {
             conflict = new ConflictException("identity_username_exists", "User name already exists.");

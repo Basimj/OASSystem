@@ -10,6 +10,16 @@ public sealed class JournalEntryLine : AuditableEntity<Guid>
     public Guid JournalEntryId { get; private set; }
     public int LineNumber { get; private set; }
     public Guid AccountId { get; private set; }
+    // Assigned only when the journal is posted. Opposite lines deliberately do not copy it.
+    public Guid? CashShiftId { get; private set; }
+
+    public void AssignCashShift(Guid shiftId)
+    {
+        if (shiftId == Guid.Empty) throw new ArgumentException("Shift id is required.", nameof(shiftId));
+        if (CashShiftId.HasValue && CashShiftId != shiftId)
+            throw new InvalidOperationException("A cash movement cannot be reassigned to another shift.");
+        CashShiftId = shiftId;
+    }
 
     // Always base-currency amounts.
     public decimal DebitAmount { get; private set; }

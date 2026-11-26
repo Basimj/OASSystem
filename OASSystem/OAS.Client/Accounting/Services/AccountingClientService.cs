@@ -1213,6 +1213,9 @@ public sealed class AccountingClientService(
                 cancellationToken);
 
 
+    public Task<CashShiftMovementsDto?> GetCashShiftMovementsAsync(Guid id, int page, CancellationToken cancellationToken = default)
+        => apiClient.GetAsync<CashShiftMovementsDto>($"api/accounting/cash-shifts/{id}/movements?page={page}", cancellationToken);
+
     public Task<CashShiftDto?>
         GetCashShiftByIdAsync(
             Guid id,

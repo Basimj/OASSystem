@@ -2913,6 +2913,8 @@ public partial class AccountingWorkspaceHost : IDisposable
         await CompleteSaveAsync(tab, result?.Id, result is null ? null : $"{result.BankName} - {result.AccountName}", "تم حفظ الحساب البنكي بنجاح.");
     }
 
+    private const string ActiveCashShiftError = "توجد وردية مفتوحة أو قيد الإغلاق لهذا الصندوق. أغلقها أولاً أو اختر صندوقاً آخر.";
+
     private async Task SaveCashShiftAsync(AccountingTabState tab, CashShiftEditor.FormModel model)
     {
         if (!tab.IsNew)
@@ -2920,9 +2922,11 @@ public partial class AccountingWorkspaceHost : IDisposable
             Snackbar.Warning("الوردية الموجودة تُدار من خلال إجراءات الإغلاق والاعتماد، ولا تُعدل كتحديث عام.");
             return;
         }
-        if (!model.CashAccountId.HasValue)
+
+        model.CashAccountError = null;
+        if (model.CashAccountId is not Guid cashAccountId || cashAccountId == Guid.Empty)
         {
-            Snackbar.Warning("اختر الصندوق قبل فتح الوردية.");
+            model.CashAccountError = "اختر الصندوق قبل فتح الوردية.";
             return;
         }
         if (model.OpeningBalance < 0)
@@ -2930,11 +2934,35 @@ public partial class AccountingWorkspaceHost : IDisposable
             Snackbar.Warning("رصيد الافتتاح لا يمكن أن يكون سالباً.");
             return;
         }
-        if (!await ValidateCashAccountSelectionAsync(model.CashAccountId.Value, null, "الصندوق"))
+        if (!await ValidateCashAccountSelectionAsync(cashAccountId, null, "الصندوق"))
+        {
+            model.CashAccountError = "الصندوق المحدد لم يعد صالحاً لفتح وردية. اختر صندوقاً آخر.";
+            return;
+        }
+
+        // Always re-read the active shifts; the lookup may be stale after another user opens a shift.
+        if ((await GetActiveCashShiftAccountIdsAsync(CancellationToken.None)).Contains(cashAccountId))
+        {
+            model.CashAccountError = ActiveCashShiftError;
+            return;
+        }
+        // If the selection changed while awaiting validation, do not submit the stale selection.
+        if (model.CashAccountId != cashAccountId)
             return;
 
-        var result = await AccountingService.CreateCashShiftAsync(new CreateCashShiftRequest(
-            model.CashAccountId.Value, model.OpeningBalance, model.ShiftNumber));
+        CashShiftDto? result;
+        try
+        {
+            result = await AccountingService.CreateCashShiftAsync(new CreateCashShiftRequest(
+                cashAccountId, model.OpeningBalance, model.ShiftNumber));
+        }
+        catch (ApiClientException ex) when (ex.Error.Code == "cash_shift_already_open")
+        {
+            // The server/unique index remains authoritative for concurrent requests.
+            if (model.CashAccountId == cashAccountId)
+                model.CashAccountError = ActiveCashShiftError;
+            return;
+        }
         await CompleteSaveAsync(tab, result?.Id, result is null ? null : $"وردية {result.ShiftNumber}", "تم فتح الوردية بنجاح.");
     }
 
@@ -3655,7 +3683,7 @@ public partial class AccountingWorkspaceHost : IDisposable
 
         var confirmed = await Dialog.ConfirmAsync(
             "إغلاق الوردية",
-            $"الجرد الفعلي: {FormatShiftAmount(model.CashAccountId, model.ActualClosingBalance.Value)}. تنبيه: الرصيد المتوقع الحالي لا يجمع حركات الوردية، وقد يكون فرق الجرد المبدئي غير دقيق. هل تريد المتابعة؟",
+            $"الجرد الفعلي: {FormatShiftAmount(model.CashAccountId, model.ActualClosingBalance.Value)}. سيُحتسب الرصيد المتوقع من القيود المرحلة في وقت الوردية. تأكد من الجرد الفعلي قبل المتابعة.",
             AlertTone.Warning,
             "إغلاق الوردية",
             "إلغاء");
@@ -3680,7 +3708,7 @@ public partial class AccountingWorkspaceHost : IDisposable
         if (Workspace.ActiveTab is not { EntityId: Guid id, Model: CashShiftEditor.FormModel model } tab) return;
         var confirmed = await Dialog.ConfirmAsync(
             "مراجعة اعتماد الوردية",
-            "تنبيه: لم يُحتسب الرصيد المتوقع من جميع حركات الوردية بعد؛ لا تعتمد فرق الجرد على أنه تسوية محاسبية مؤكدة. هل راجعت الحركات يدويًا وتريد اعتماد الحالة؟",
+            "راجع الحركات النقدية والجرد الفعلي، خصوصًا الورديات القديمة. الاعتماد يثبت حالة الوردية ولا ينشئ تسوية محاسبية. هل تريد المتابعة؟",
             AlertTone.Warning,
             "اعتماد بعد المراجعة",
             "إلغاء");
@@ -3775,6 +3803,71 @@ public partial class AccountingWorkspaceHost : IDisposable
         var result = await AccountingService.GetFiscalPeriodsPageAsync(new PageRequest { PageNumber = 1, PageSize = PageRequest.MaximumPageSize, Search = text }, cancellationToken);
         RememberFiscalPeriodLookups(result.Items);
         return result.Items.Select(ToFiscalPeriodLookup).ToArray();
+    }
+
+    private async Task<HashSet<Guid>> GetActiveCashShiftAccountIdsAsync(CancellationToken cancellationToken)
+    {
+        var ids = new HashSet<Guid>();
+        // Use the existing paged API, not the currently displayed (possibly filtered) list.
+        // ShiftNumber is unique, so paging has a deterministic ordering.
+        foreach (var status in new[] { "open", "closing" })
+        {
+            for (var pageNumber = 1; ; pageNumber++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var page = await AccountingService.GetCashShiftsPageAsync(new PageRequest
+                {
+                    PageNumber = pageNumber,
+                    PageSize = PageRequest.MaximumPageSize,
+                    Status = status,
+                    SortBy = "ShiftNumber"
+                }, cancellationToken);
+                foreach (var shift in page.Items)
+                    if (shift.Status is CashShiftStatus.Open or CashShiftStatus.Closing)
+                        ids.Add(shift.CashAccountId);
+                if (!page.HasNextPage) break;
+            }
+        }
+        return ids;
+    }
+
+    private async Task<IReadOnlyList<UiLookupItem>> SearchAvailableCashShiftAccountsAsync(
+        string text, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var busy = await GetActiveCashShiftAccountIdsAsync(cancellationToken);
+            var available = new List<UiLookupItem>();
+            for (var pageNumber = 1; ; pageNumber++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var page = await AccountingService.GetCashAccountsPageAsync(new PageRequest
+                {
+                    PageNumber = pageNumber,
+                    PageSize = PageRequest.MaximumPageSize,
+                    Search = text,
+                    Status = "active",
+                    SortBy = "Code"
+                }, cancellationToken);
+                var candidates = page.Items.Where(x => x.IsActive && x.CurrencyId.HasValue && !busy.Contains(x.Id)).ToArray();
+                var lookups = await Task.WhenAll(candidates.Select(x => BuildCashAccountLookupAsync(x, null, cancellationToken)));
+                for (var i = 0; i < candidates.Length; i++)
+                {
+                    if (lookups[i].Disabled) continue;
+                    _cashAccountDtos[candidates[i].Id] = candidates[i];
+                    _cashAccountLookups[candidates[i].Id] = lookups[i];
+                    available.Add(lookups[i]);
+                }
+                if (!page.HasNextPage) break;
+            }
+            return available;
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception)
+        {
+            Snackbar.Warning("تعذر التحقق من الصناديق المتاحة. أعد فتح القائمة أو حاول البحث مرة أخرى.");
+            return Array.Empty<UiLookupItem>();
+        }
     }
 
     private async Task<IReadOnlyList<UiLookupItem>> SearchCashAccountsAsync(string text, CancellationToken cancellationToken)

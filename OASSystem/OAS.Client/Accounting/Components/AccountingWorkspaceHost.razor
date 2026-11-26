@@ -340,7 +340,7 @@
                 @if (activeTab is { EntityType: AccountingEntityType.CashShifts, EntityId: Guid, IsNew: false, IsSaving: false } &&
                      activeTab.Model is CashShiftEditor.FormModel activeShift)
                 {
-                    @if (activeShift.Status == CashShiftStatus.Open)
+                    @if (activeShift.Status is CashShiftStatus.Open or CashShiftStatus.Closing)
                     {
                         <UiButton Text="إغلاق الوردية" IconCssClass="fa-solid fa-lock"
                                   Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
@@ -888,10 +888,11 @@
                     when activeTab.Model is CashShiftEditor.FormModel model:
 
                     <CashShiftEditor Model="@model"
+                                     ShiftId="@activeTab.EntityId"
                                      IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
                                      IsNew="@activeTab.IsNew"
                                      CashAccountLookupItem="@GetCashAccountLookup(model.CashAccountId)"
-                                     CashAccountSearchAsync="SearchCashAccountsAsync"
+                                     CashAccountSearchAsync="SearchAvailableCashShiftAccountsAsync"
                                      CurrencyLabel="@GetShiftCurrencyLabel(model.CashAccountId)"
                                      CurrencyDecimalPlaces="@GetShiftCurrencyDecimals(model.CashAccountId)"
                                      OnModelChanged="OnCashShiftModelChangedAsync" />

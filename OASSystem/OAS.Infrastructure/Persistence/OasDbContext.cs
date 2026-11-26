@@ -17,6 +17,32 @@ namespace OAS.Infrastructure.Persistence;
 
 public sealed class OasDbContext(DbContextOptions<OasDbContext> options) : DbContext(options)
 {
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        var postings = CashShiftPostingLinker.NewPostings(this);
+        var shifts = CashShiftPostingLinker.ShiftChanges(this);
+        if (postings.Length == 0 && shifts.Length == 0) return base.SaveChanges(acceptAllChangesOnSuccess);
+        return SaveChangesAsync(acceptAllChangesOnSuccess).GetAwaiter().GetResult();
+    }
+
+    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        var postings = CashShiftPostingLinker.NewPostings(this);
+        var shifts = CashShiftPostingLinker.ShiftChanges(this);
+        if (postings.Length == 0 && shifts.Length == 0)
+            return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        if (!Database.IsSqlServer() || Database.CurrentTransaction is not null)
+        {
+            await CashShiftPostingLinker.PrepareAsync(this, postings, shifts, cancellationToken);
+            return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+        await using var transaction = await Database.BeginTransactionAsync(cancellationToken);
+        await CashShiftPostingLinker.PrepareAsync(this, postings, shifts, cancellationToken);
+        var result = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return result;
+    }
+
     public DbSet<UserAccount> Users => Set<UserAccount>();
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();

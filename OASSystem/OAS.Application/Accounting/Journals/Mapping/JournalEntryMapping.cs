@@ -25,5 +25,5 @@ public static class JournalEntryMapping
         line.ExchangeRateSource.HasValue ? (OAS.Contracts.Accounting.Enums.ExchangeRateSource?)(byte)line.ExchangeRateSource.Value : null,
         line.SourceDocumentLineId,
         line.Description, line.CustomerId, line.SupplierId, line.EmployeeId, line.PartyNameSnapshot,
-        line.CostCenterId, line.ProductVariantId, line.WarehouseId);
+        line.CostCenterId, line.ProductVariantId, line.WarehouseId, line.CashShiftId);
 }

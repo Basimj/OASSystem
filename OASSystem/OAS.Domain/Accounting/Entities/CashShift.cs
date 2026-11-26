@@ -25,11 +25,24 @@ public sealed class CashShift : AuditableEntity<Guid>
         OpenedAtUtc = openedAtUtc;
         OpeningBalance = openingBalance;
         Status = status;
+        UsesLinkedMovements = true;
     }
 
     public string ShiftNumber { get; private set; } = null!;
 
     public Guid CashAccountId { get; private set; }
+
+    // False for pre-migration shifts: their historical movements still need timestamp fallback.
+    public bool UsesLinkedMovements { get; private set; }
+
+    // Reconcile a just-closed shift under the same persistence lock as cash postings.
+    public void ReconcileClosingBalance(decimal expectedClosingBalance)
+    {
+        if (Status != CashShiftStatus.Closed || !ActualClosingBalance.HasValue)
+            throw new InvalidOperationException("Only a just-closed shift with a physical count can be reconciled.");
+        ExpectedClosingBalance = expectedClosingBalance;
+        DifferenceAmount = ActualClosingBalance.Value - expectedClosingBalance;
+    }
 
     public Guid OpenedBy { get; private set; }
 
@@ -97,12 +110,15 @@ public sealed class CashShift : AuditableEntity<Guid>
             throw new InvalidOperationException(
                 "Only an open cash shift can enter closing state.");
 
-        if (expectedClosingBalance < 0)
-            throw new ArgumentOutOfRangeException(
-                nameof(expectedClosingBalance));
-
         ExpectedClosingBalance = expectedClosingBalance;
         Status = CashShiftStatus.Closing;
+    }
+
+    public void RefreshExpectedClosingBalance(decimal expectedClosingBalance)
+    {
+        if (Status != CashShiftStatus.Closing)
+            throw new InvalidOperationException("Only a closing cash shift can refresh its expected balance.");
+        ExpectedClosingBalance = expectedClosingBalance;
     }
 
     public void Close(
@@ -123,10 +139,12 @@ public sealed class CashShift : AuditableEntity<Guid>
                 "Closed by is required.",
                 nameof(closedBy));
 
+        if (!ExpectedClosingBalance.HasValue)
+            throw new InvalidOperationException("The expected closing balance must be calculated before closing.");
+        if (closedAtUtc < OpenedAtUtc)
+            throw new ArgumentOutOfRangeException(nameof(closedAtUtc));
         ActualClosingBalance = actualClosingBalance;
-        DifferenceAmount = ExpectedClosingBalance.HasValue
-            ? actualClosingBalance - ExpectedClosingBalance.Value
-            : null;
+        DifferenceAmount = actualClosingBalance - ExpectedClosingBalance.Value;
 
         ClosedBy = closedBy;
         ClosedAtUtc = closedAtUtc;

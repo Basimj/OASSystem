@@ -7,4 +7,4 @@ public sealed record JournalEntryLineDto(
     decimal? TransactionDebitAmount,decimal? TransactionCreditAmount,decimal? ExchangeRate,DateOnly? ExchangeRateDate,
     ExchangeRateType? ExchangeRateType,ExchangeRateSource? ExchangeRateSource,Guid? SourceDocumentLineId,
     string? Description,Guid? CustomerId,Guid? SupplierId,Guid? EmployeeId,string? PartyNameSnapshot,
-    Guid? CostCenterId,Guid? ProductVariantId,Guid? WarehouseId);
+    Guid? CostCenterId,Guid? ProductVariantId,Guid? WarehouseId, Guid? CashShiftId = null);

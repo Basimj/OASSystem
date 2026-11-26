@@ -118,6 +118,7 @@ public interface IAccountingClientService
     Task<BankAccountDto?> SetBankAccountStatusAsync(Guid id, SetBankAccountStatusRequest request, CancellationToken cancellationToken = default);
 
     Task<PagedResult<CashShiftDto>> GetCashShiftsPageAsync(PageRequest request, CancellationToken cancellationToken = default);
+    Task<CashShiftMovementsDto?> GetCashShiftMovementsAsync(Guid id, int page, CancellationToken cancellationToken = default);
     Task<CashShiftDto?> GetCashShiftByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<CashShiftDto?> CreateCashShiftAsync(CreateCashShiftRequest request, CancellationToken cancellationToken = default);
     Task<CashShiftDto?> CloseCashShiftAsync(Guid id, SetCashShiftClosingRequest request, CancellationToken cancellationToken = default);

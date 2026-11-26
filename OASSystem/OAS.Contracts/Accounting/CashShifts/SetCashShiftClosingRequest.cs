@@ -1,5 +1,5 @@
-﻿namespace OAS.Contracts.Accounting.CashShifts;
+namespace OAS.Contracts.Accounting.CashShifts;
 
 public sealed record SetCashShiftClosingRequest(
-    decimal ActualClosingBalance,
+    decimal? ActualClosingBalance,
     string RowVersion);
