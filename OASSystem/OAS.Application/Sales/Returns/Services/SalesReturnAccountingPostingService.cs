@@ -35,6 +35,9 @@ public sealed class SalesReturnAccountingPostingService(
             throw new ConflictException("sales_return_journal_partial_posting", "توجد محاولة ترحيل غير مكتملة؛ يلزم مراجعة القيد قبل الإعادة.");
         }
 
+        if (salesReturn.Lines.Any(x => x.IsActive && x.RestoresInventoryAsset && (!x.UnitCostSnapshot.HasValue || !x.TotalCostSnapshot.HasValue)))
+            throw new ConflictException("sales_return_cost_snapshot_missing", "تكلفة أحد بنود المرتجع المخزني غير محفوظة؛ لا يمكن الترحيل.");
+
         var restoresInventory = salesReturn.Lines.Any(x => x.IsActive && x.RestoresInventoryAsset);
         var period = await postingPeriods.GetOpenPostingPeriodAsync(salesReturn.PostingDate, restoresInventory, cancellationToken);
         var customer = await customers.GetByIdAsync(salesReturn.CustomerId, cancellationToken)

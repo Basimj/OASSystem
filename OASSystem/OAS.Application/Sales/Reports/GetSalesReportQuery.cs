@@ -19,6 +19,25 @@ public sealed class GetSalesReportQueryHandler(ISalesReportQueryService reports)
         reports.GetAsync(query.Filter, cancellationToken);
 }
 
+/// <summary>Historical currency scope for the interactive report. No currency conversion is performed.</summary>
+public static class SalesReportCurrencyScope
+{
+    public const string Automatic = "*";
+    public static string Normalize(string? code) => (code ?? "").Trim().ToUpperInvariant();
+
+    public static string[] Available(IEnumerable<string?> codes) => codes.Select(Normalize)
+        .Where(code => code.Length > 0).Distinct(StringComparer.Ordinal).OrderBy(code => code, StringComparer.Ordinal).ToArray();
+
+    public static string Select(string requested, string configured, IReadOnlyList<string> available)
+    {
+        var choice = Normalize(requested);
+        var current = Normalize(configured);
+        if (choice != Automatic) return choice;
+        return available.Contains(current, StringComparer.Ordinal) || available.Count == 0
+            ? current : available[0];
+    }
+}
+
 /// <summary>Shared arithmetic for SQL projections and the report/export client.</summary>
 public static class SalesReportArithmetic
 {
@@ -27,9 +46,27 @@ public static class SalesReportArithmetic
     {
         var net = Round(invoiceRevenue - returnRevenue);
         var profit = Round(net - cogs);
-        var margin = net == 0m ? 0m : Round(100m * profit / net);
+        var margin = net <= 0m ? 0m : Round(100m * profit / net);
         return new(Round(invoiceRevenue), Round(returnRevenue), net, Round(discounts),
             Round(tax), Round(cogs), profit, margin, invoiceCount, returnCount);
+    }
+
+    // Assign the header rounding residual to one deterministic line before any report filter.
+    public static decimal[] ReconcileHeader(IReadOnlyList<decimal> lines, decimal header)
+    {
+        var result = lines.ToArray();
+        if (result.Length == 0) return result;
+        // Adjust the largest monetary line first; avoid negative line values when
+        // a negative residual exceeds the first candidate (legacy rounding).
+        var delta = header - result.Sum();
+        foreach (var index in Enumerable.Range(0, result.Length).OrderByDescending(i => result[i]).ThenBy(i => i))
+        {
+            if (delta >= 0m) { result[index] += delta; break; }
+            var change = Math.Min(result[index], -delta);
+            result[index] -= change; delta += change;
+            if (delta == 0m) break;
+        }
+        return result;
     }
 
     private static decimal Round(decimal amount) => Math.Round(amount, 4, MidpointRounding.AwayFromZero);

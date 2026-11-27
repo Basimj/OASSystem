@@ -24,10 +24,14 @@ public sealed class SalesReportsController(ISender sender) : ControllerBase
         [FromQuery] Guid? productVariantId = null, [FromQuery] Guid? categoryId = null,
         [FromQuery] Guid? warehouseId = null,
         [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 25,
+        [FromQuery] Guid? productTypeId = null, [FromQuery] Guid? brandId = null,
+        [FromQuery] string? operatorKey = null, [FromQuery] string? currencyCode = null,
+        [FromQuery] int? paymentPlan = null, [FromQuery] string? settlementStatus = null,
+        [FromQuery] string? historicalBaseCurrencyCode = null,
         CancellationToken ct = default)
         => Ok(await sender.Send(new GetSalesReportQuery(new(
             fromDate, toDate, groupBy, customerId, employeeId,
-            productVariantId, categoryId, warehouseId, pageNumber, pageSize)), ct));
+            productVariantId, categoryId, warehouseId, pageNumber, pageSize, productTypeId, brandId, operatorKey, currencyCode, paymentPlan, settlementStatus, historicalBaseCurrencyCode)), ct));
 
     [HttpGet("export")]
     public async Task<IActionResult> Export(
@@ -62,7 +66,7 @@ public sealed class SalesReportsController(ISender sender) : ControllerBase
             rows.AddRange(next.Documents);
         }
         var csv = string.Equals(format, "csv", StringComparison.OrdinalIgnoreCase);
-        var bytes = csv ? SalesReportExportFormatter.Csv(rows) : SalesReportExportFormatter.Excel(first, rows);
+        var bytes = csv ? SalesReportExportFormatter.Csv(rows) : SalesReportExportFormatter.Excel(rows);
         var ext = csv ? "csv" : "xlsx";
         var contentType = csv ? "text/csv; charset=utf-8" :
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
