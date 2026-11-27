@@ -15,7 +15,8 @@ public sealed record GeneralLedgerFilterDto(
     Guid? CustomerId = null,
     Guid? SupplierId = null,
     string? Reference = null,
-    bool IncludeOpeningBalance = true);
+    bool IncludeOpeningBalance = true,
+    Guid? CostCenterId = null);
 
 public sealed record GeneralLedgerLineDto(
     Guid JournalEntryId,

@@ -16,16 +16,16 @@
     </QuickFilters>
     <FilterPanel>
         <div class="trial-fields">
-            <label class="oas-report__field">السنة المالية<select value="@_draft.Year" @onchange="OnYear"><option value="">الكل</option>@foreach(var y in _years){<option value="@y.Id">@y.Name</option>}</select></label>
-            <label class="oas-report__field">الفترة المالية<select value="@_draft.Period" @onchange="OnPeriod"><option value="">جميع الفترات</option>@foreach(var p in PeriodOptions){<option value="@p.Id">@p.Name</option>}</select></label>
-            <label class="oas-report__field">من تاريخ<input type="date" @bind="_draft.From" @bind:format="yyyy-MM-dd" /></label>
-            <label class="oas-report__field">إلى تاريخ<input type="date" @bind="_draft.To" @bind:format="yyyy-MM-dd" /></label>
+            <label class="oas-report__field">السنة المالية<select value="@_draft.Year" @onchange="OnYear" disabled="@_busy"><option value="">نطاق مخصص</option>@foreach(var y in _years){<option value="@y.Id">@y.Name</option>}</select></label>
+            <label class="oas-report__field">الفترة المالية<select value="@_draft.Period" @onchange="OnPeriod" disabled="@(_busy || string.IsNullOrEmpty(_draft.Year))"><option value="">جميع الفترات</option>@foreach(var p in PeriodOptions){<option value="@p.Id">@p.Name</option>}</select></label>
+            <label class="oas-report__field">من تاريخ<input type="date" @bind="_draft.From" @bind:format="yyyy-MM-dd" disabled="@(_busy || !string.IsNullOrEmpty(_draft.Year))" /></label>
+            <label class="oas-report__field">إلى تاريخ<input type="date" @bind="_draft.To" @bind:format="yyyy-MM-dd" disabled="@(_busy || !string.IsNullOrEmpty(_draft.Year))" /></label>
             <label class="oas-report__field">نوع التقرير<select @bind="_draft.Mode"><option value="detail">تفصيلي</option><option value="summary">إجمالي</option><option value="compare">مقارنة الفترات</option><option value="monthly">شهري</option><option value="ratio">تحليل النسب</option></select></label>
             @if(_draft.Mode=="compare"){
                 <label class="oas-report__field">المقارنة من<input type="date" @bind="_draft.CompareFrom" @bind:format="yyyy-MM-dd" /></label>
                 <label class="oas-report__field">المقارنة إلى<input type="date" @bind="_draft.CompareTo" @bind:format="yyyy-MM-dd" /></label>
             }
-            <label class="oas-report__field">مستوى الحساب<select @bind="_draft.Level" disabled="@(_draft.Mode!="detail")"><option value="0">جميع المستويات</option>@foreach(var l in Levels){<option value="@l">حتى المستوى @l</option>}</select></label>
+            <label class="oas-report__field">مستوى الحساب<select @bind="_draft.Level" disabled="@(_draft.Mode!="detail" || !_draft.Children)"><option value="0">جميع المستويات</option>@foreach(var l in Levels){<option value="@l">حتى المستوى @l</option>}</select></label>
             <label class="oas-report__field">مركز التكلفة<select @bind="_draft.CostCenter"><option value="">جميع المراكز</option>@foreach(var c in _centers.OrderBy(c=>c.Code)){<option value="@c.Id">@c.NameAr</option>}</select></label>
             <label class="oas-report__field">العملة<select @bind="_draft.Currency"><option value="">@_baseName (الأساسية)</option>@foreach(var c in _currencies.Where(c=>c.IsActive&&c.Id!=_baseId)){<option value="@c.Id">@c.NameAr (@c.Code)</option>}</select></label>
             <label class="oas-report__field-check"><input type="checkbox" @bind="_draft.Children" disabled="@(_draft.Mode!="detail")" /> تضمين تفاصيل الحسابات</label>

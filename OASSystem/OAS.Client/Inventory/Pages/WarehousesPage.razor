@@ -8,46 +8,25 @@
 @using OAS.Contracts.Inventory.Warehouses
 
 @using OAS.UiLib.Components.Spreadsheets
-<PageTitle>@(IsFormRoute ? "نموذج المخزون" : "قائمة المخزون") - المخازن | OAS</PageTitle>
-<span class="oas-inventory-view" hidden aria-hidden="true"></span>
-
-<InventoryReportWorkspace Title="المخازن" TitleIcon="fa-solid fa-warehouse" StatusText="@($"{FilteredWarehouses.Count} مخزن")" ShowFilters="false" IsFormRoute="@IsFormRoute">
-    <Actions>
-        <UiWorkspaceActionBar>
-            @if (IsFormRoute)
-            {
-                <UiButton Text="العودة إلى القائمة" IconCssClass="fa-solid fa-arrow-right" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="BackToListAsync" />
-                <UiButton Text="حفظ" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small"
-                      Disabled="@(!IsEditing)" Loading="@_saving" OnClick="SaveAsync" />
-                <UiButton Text="تعديل" IconCssClass="fa-solid fa-pen" Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
-                      Disabled="@(!CanEdit)" OnClick="OpenEditScreenAsync" />
-            }
-            else
-            {
-                <UiButton Text="جديد" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small"
-                      Disabled="@IsEditing" OnClick="OpenCreateScreenAsync" />
-                <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
-                      Disabled="@IsEditing" Loading="@_loading" OnClick="RefreshAsync" />
-                <UiSpreadsheetActions CanImport="true" Busy="@(_exporting || _spreadsheetBusy)" OnImport="OpenSpreadsheetImportAsync" OnTemplate="DownloadTemplateAsync" OnExport="ExportAsync" />
-                <UiSearchInput @bind-Value="_search" Placeholder="ابحث بالكود أو اسم المخزن..."
-                           AriaLabel="البحث في المخازن" ClearText="مسح البحث"
-                           DebounceMilliseconds="250" OnSearch="SearchChangedAsync" />
-            }
-        </UiWorkspaceActionBar>
-    </Actions>
-    <Content>
-        @if (IsFormRoute)
-        {
-            <div class="oas-inventory-form-screen">
-                <div class="oas-inventory-form-screen__body">
-        <UiCard Title="@EditorTitle" Subtitle="@(_selectedId.HasValue ? _code : null)">
-            @if (_mode == EditorMode.Empty)
-            {
-                <UiAlert Message="اختر مخزنًا من القائمة أو اضغط «جديد»." />
-            }
-            else
-            {
-                <div class="inventory-warehouses__editor">
+@using OAS.UiLib.Components.Inventory
+<PageTitle>المخازن | OAS</PageTitle>
+@if (!_catalogReady)
+{
+    <div class="oas-inventory-workspace inv-catalog-loading" role="status" aria-live="polite">جاري تحميل البيانات…</div>
+}
+else
+{
+    <UiInventoryWorkspace Busy="@_loading" EditorTitle="بيانات المخزن" EditorKey="@CatalogEditorKey">
+        <Actions>
+            <UiInventoryCatalogToolbar Editing="@IsEditing" Saving="@_saving" Loading="@_loading"
+                                   SpreadsheetBusy="@(_exporting || _spreadsheetBusy || _spreadsheetImportOpen)"
+                                   CanEdit="@CanEdit" CanSave="@CanSave" CanPrevious="@CanMovePrevious" CanNext="@CanMoveNext"
+                                   @bind-Search="_search" OnSearch="SearchChangedAsync" OnNavigate="NavigateRecord"
+                                   OnCreate="BeginCreateAsync" OnEdit="BeginEditAsync" OnSave="SaveAsync" OnCancel="CancelAsync" OnRefresh="RefreshAsync"
+                                   OnImport="OpenSpreadsheetImportAsync" OnTemplate="DownloadTemplateAsync" OnExport="ExportAsync" />
+        </Actions>
+        <Editor>
+            <div class="inv-form-grid">
                     <UiInputText Label="كود المخزن"
                                  Value="@_code"
                                  ValueExpression="@(() => _code)"
@@ -55,7 +34,7 @@
                                  Required="true"
                                  ErrorText="@ErrorFor(CodeField)"
                                  MaxLength="32"
-                                 Disabled="@(!IsEditing)"
+                                 Disabled="@(!IsEditing || _saving)"
                                  Size="ControlSize.Small" />
 
                     <UiInputText Label="اسم المخزن"
@@ -65,7 +44,7 @@
                                  Required="true"
                                  ErrorText="@ErrorFor(NameField)"
                                  MaxLength="100"
-                                 Disabled="@(!IsEditing)"
+                                 Disabled="@(!IsEditing || _saving)"
                                  Size="ControlSize.Small" />
 
                     <UiInputText Label="الوصف"
@@ -75,67 +54,55 @@
                                  Placeholder="(اختياري)"
                                  ErrorText="@ErrorFor(DescriptionField)"
                                  MaxLength="500"
-                                 Disabled="@(!IsEditing)"
+                                 Disabled="@(!IsEditing || _saving)"
                                  Size="ControlSize.Small" />
 
                     <UiCheckbox Label="المخزن الافتراضي"
                                 Value="@_isDefault"
                                 ValueChanged="SetDefaultAsync"
                                 ErrorText="@ErrorFor(DefaultField)"
-                                Disabled="@(!IsEditing)" />
+                                Disabled="@(!IsEditing || _saving)" />
 
                     <UiCheckbox Label="يسمح بالحجز والبيع من هذا المخزن"
                                 Value="@_allowsSalesAllocation"
                                 ValueChanged="@(value => _allowsSalesAllocation = value)"
-                                Disabled="@(!IsEditing)" />
+                                Disabled="@(!IsEditing || _saving)" />
 
-                    <UiCheckbox Label="المخزن نشط"
+                    <UiCheckbox Label="متاح للاستخدام"
                                 Value="@_isActive"
                                 ValueChanged="SetActiveAsync"
                                 ErrorText="@ErrorFor(ActiveField)"
-                                Disabled="@(!IsEditing || _mode == EditorMode.Create)" />
+                                Disabled="@(!IsEditing || _saving || _mode == EditorMode.Create)" />
                 </div>
-            }
-        </UiCard>
-
-                </div>
-            </div>
-        }
-        else
-        {
-                        @if (_loading)
-                {
-                    <UiAlert Message="جاري تحميل المخازن..." />
-                }
-                else
-                {
-                    <InventoryReportTable TItem="WarehouseDto" Items="@FilteredWarehouses" PageSize="12" Headers="@WarehouseHeaders" EmptyText="لا توجد مخازن مطابقة."
-                                 SidebarTypography="true"
+        </Editor>
+        <Table>
+            <UiDataTable TItem="WarehouseDto" Items="@PageItems" Compact="true" Headers="@WarehouseHeaders" EmptyText="@(CatalogEmptyText("لا توجد مخازن مطابقة."))"
+                                 SidebarTypography="false"
                                  UniformCellTypography="true"
-                                 OnRowClick="@(x => OpenDetailsScreen(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
+                                 OnRowClick="@(x => Select(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
                         <RowTemplate Context="warehouse">
                             <td>@warehouse.Code</td>
                             <td>@warehouse.Name</td>
                             <td>
                                 @if (warehouse.IsDefault)
                                 {
-                                    <UiBadge Text="افتراضي" Tone="AlertTone.Info" />
+                                    <span>افتراضي</span>
                                 }
                                 else
                                 {
                                     <span>—</span>
                                 }
                             </td>
-                            <td><UiBadge Text="@(warehouse.AllowsSalesAllocation ? "متاح للبيع" : "حجر / غير مخصص للبيع")" Tone="@(warehouse.AllowsSalesAllocation ? AlertTone.Success : AlertTone.Warning)" /></td>
-                            <td><UiBadge Text="@(warehouse.IsActive ? "نشط" : "غير نشط")" Tone="@(warehouse.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
+                            <td>@(warehouse.AllowsSalesAllocation ? "متاح للبيع" : "حجر / غير مخصص للبيع")</td>
+                            <td>@(warehouse.IsActive ? "نشط" : "غير نشط")</td>
                         </RowTemplate>
-                    </InventoryReportTable>
-                }
-            
-
-        }
-    </Content>
-</InventoryReportWorkspace>
+                    </UiDataTable>
+        </Table>
+        <Footer>
+            <UiInventoryPagination Page="@CurrentPage" PageSize="@CatalogPageSize" TotalCount="@VisibleCount" Disabled="@(IsEditing || _loading || _saving)" OnPageChanged="ChangePage" />
+        </Footer>
+    </UiInventoryWorkspace>
+}
 
 @if (_spreadsheetImportOpen)
 {
@@ -146,57 +113,78 @@
 }
 
 @code {
-    // Each CRUD action has its own route. No editable form is mounted on the list screen.
-    [Microsoft.AspNetCore.Components.Inject]
-    private Microsoft.AspNetCore.Components.NavigationManager InventoryNavigation { get; set; } = default!;
-
-    [Microsoft.AspNetCore.Components.Parameter]
-    public string? Screen { get; set; }
-
-    [Microsoft.AspNetCore.Components.Parameter]
-    public Guid? RecordId { get; set; }
-
-    private const string InventoryListRoute = "/inventory/warehouses";
-    private bool IsFormRoute => Screen is "new" or "edit" or "details";
+    [Parameter] public string? Screen { get; set; }
+    [Parameter] public Guid? RecordId { get; set; }
     private string? _appliedInventoryRoute;
-
-    private Task OpenCreateScreenAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _) {
-        InventoryNavigation.NavigateTo($"{InventoryListRoute}/new");
-        return Task.CompletedTask;
+    private Task? _initialCatalogLoad;
+    private bool _catalogReady;
+    private object CatalogEditorKey => _mode;
+    private const int CatalogPageSize = 12;
+    private int _page = 1;
+    private int VisibleCount => FilteredWarehouses.Count;
+    private int CurrentPage => Math.Clamp(_page, 1, Math.Max(1, (VisibleCount + CatalogPageSize - 1) / CatalogPageSize));
+    private IReadOnlyList<WarehouseDto> PageItems => FilteredWarehouses.Skip((CurrentPage - 1) * CatalogPageSize).Take(CatalogPageSize).ToArray();
+    private Guid[] VisibleIds => FilteredWarehouses.Select(x => x.Id).ToArray();
+    private int SelectedIndex => Array.IndexOf(VisibleIds, _selectedId ?? Guid.Empty);
+    private bool CanSave => IsEditing && !_loading && !_saving;
+    private bool CanMovePrevious => !IsEditing && !_loading && !_saving && SelectedIndex > 0;
+    private bool CanMoveNext => !IsEditing && !_loading && !_saving && SelectedIndex < VisibleCount - 1;
+    private string CatalogEmptyText(string emptyText) => _loading ? "جاري تحميل البيانات..." : emptyText;
+    private void ChangePage(int page) { if (!IsEditing && !_saving && !_loading) _page = page; }
+    private void RevealSelected()
+    {
+        var index = SelectedIndex;
+        if (index >= 0) _page = index / CatalogPageSize + 1;
     }
-
-    private Task OpenEditScreenAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _) {
-        if (_selectedId is { } id)
-            InventoryNavigation.NavigateTo($"{InventoryListRoute}/edit/{id:D}");
-        return Task.CompletedTask;
+    private void NavigateRecord(int direction)
+    {
+        if (IsEditing || _saving || _loading) return;
+        var ids = VisibleIds;
+        if (ids.Length == 0) return;
+        var index = Array.IndexOf(ids, _selectedId ?? Guid.Empty);
+        index = direction switch { -2 => 0, 2 => ids.Length - 1, _ => Math.Clamp(index + direction, 0, ids.Length - 1) };
+        Select(ids[index]);
+        RevealSelected();
     }
-
-    private void OpenDetailsScreen(Guid id) =>
-        InventoryNavigation.NavigateTo($"{InventoryListRoute}/details/{id:D}");
-
-    private Task BackToListAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _) {
-        InventoryNavigation.NavigateTo($"{InventoryListRoute}");
-        return Task.CompletedTask;
-    }
-
     protected override async Task OnParametersSetAsync()
     {
         var key = $"{Screen}/{RecordId}";
         if (_appliedInventoryRoute == key) return;
         _appliedInventoryRoute = key;
-        if (Screen == "new")
-            await BeginCreateAsync(new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
-        else if (RecordId is { } id && Screen is ("details" or "edit"))
+        _catalogReady = false;
+        _mode = EditorMode.Empty;
+        _selectedId = null;
+        _page = 1;
+        _search = null;
+        ClearForm();
+        await (_initialCatalogLoad ??= LoadAsync());
+        if (_appliedInventoryRoute != key) return;
+        ClearForm();
+        if (Screen == "new") await BeginCreateAsync(new MouseEventArgs());
+        else if (RecordId is { } id && _warehouses.Any(x => x.Id == id) && Screen is ("details" or "edit"))
         {
-            _mode = EditorMode.Empty;
             Select(id);
-            if (Screen == "edit")
-                await BeginEditAsync(new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
+            if (Screen == "edit") await BeginEditAsync(new MouseEventArgs());
         }
-        else
+        else if (VisibleIds.FirstOrDefault() is var first && first != Guid.Empty) Select(first);
+        RevealSelected();
+        _catalogReady = true;
+    }
+    private async Task ReloadCatalogAsync()
+    {
+        await LoadAsync();
+        if (_selectedId is { } id && _warehouses.Any(x => x.Id == id)) LoadSelected(id);
+        else if (VisibleIds.FirstOrDefault() is var first && first != Guid.Empty) Select(first);
+        RevealSelected();
+    }
+    private static async Task<IReadOnlyList<T>> LoadAllPagesAsync<T>(Func<PageRequest, Task<PagedResult<T>>> loader)
+    {
+        var items = new List<T>();
+        for (var pageNumber = 1; ; pageNumber++)
         {
-            _selectedId = null;
-            _mode = EditorMode.Empty;
+            var page = await loader(new PageRequest { PageNumber = pageNumber, PageSize = PageRequest.MaximumPageSize });
+            items.AddRange(page.Items);
+            if (!page.HasNextPage) return items;
         }
     }
 
@@ -235,28 +223,20 @@
 
     private bool IsEditing => _mode is EditorMode.Create or EditorMode.Edit;
     private bool CanEdit => _mode == EditorMode.View && _selectedId.HasValue;
-    private string EditorTitle => _mode switch
-    {
-        EditorMode.Create => "مخزن جديد",
-        EditorMode.Edit => "تعديل المخزن",
-        EditorMode.View => "تفاصيل المخزن",
-        _ => "تفاصيل المخزن"
-    };
 
     private IReadOnlyList<WarehouseDto> FilteredWarehouses => _warehouses
         .Where(x => string.IsNullOrWhiteSpace(_search) ||
                     Match(_search, x.Code, x.Name, x.Description))
         .ToArray();
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+
 
     private async Task LoadAsync()
     {
         _loading = true;
         try
         {
-            var page = await Inventory.GetWarehousesAsync(new PageRequest { PageNumber = 1, PageSize = PageRequest.MaximumPageSize });
-            _warehouses = page.Items;
+            _warehouses = await LoadAllPagesAsync(page => Inventory.GetWarehousesAsync(page));
             if (_selectedId.HasValue && !_warehouses.Any(x => x.Id == _selectedId.Value))
             {
                 _selectedId = null;
@@ -278,12 +258,12 @@
         }
     }
 
-    private Task RefreshAsync(MouseEventArgs args) => LoadAsync();
-    private Task SearchChangedAsync(string? value) => Task.CompletedTask;
+    private async Task RefreshAsync(MouseEventArgs args) => await ReloadCatalogAsync();
+    private Task SearchChangedAsync(string? value) { _page = 1; return Task.CompletedTask; }
 
     private async Task BeginCreateAsync(MouseEventArgs args)
     {
-        if (IsEditing) return;
+        if (IsEditing || _saving || _loading) return;
         _selectedId = null;
         _mode = EditorMode.Create;
         ClearForm();
@@ -293,7 +273,7 @@
 
     private Task BeginEditAsync(MouseEventArgs args)
     {
-        if (CanEdit)
+        if (CanEdit && !_saving && !_loading)
         {
             ClearValidation();
             _mode = EditorMode.Edit;
@@ -303,6 +283,7 @@
 
     private Task CancelAsync(MouseEventArgs args)
     {
+        if (_saving) return Task.CompletedTask;
         ClearValidation();
         if (_selectedId.HasValue)
         {
@@ -319,7 +300,7 @@
 
     private async Task SaveAsync(MouseEventArgs args)
     {
-        if (!IsEditing || _saving) return;
+        if (!IsEditing || _saving || _loading) return;
         if (!ValidateForm()) return;
 
         _saving = true;
@@ -342,7 +323,7 @@
             _mode = EditorMode.View;
             await LoadAsync();
             LoadSelected(saved.Id);
-            Snackbar.Success("تم حفظ المخزن بنجاح."); InventoryNavigation.NavigateTo(InventoryListRoute);
+            Snackbar.Success("تم حفظ المخزن بنجاح."); _search = null; RevealSelected();
         }
         catch (ApiClientException ex)
         {
@@ -457,7 +438,7 @@
 
     private void Select(Guid id)
     {
-        if (IsEditing || _saving) return;
+        if (IsEditing || _saving || _loading) return;
         ClearValidation();
         _selectedId = id;
         _mode = EditorMode.View;
@@ -522,7 +503,7 @@
 
     private async Task ReloadAfterSpreadsheetImportAsync()
     {
-        await LoadAsync();
+        await ReloadCatalogAsync();
     }
 
     private async Task DownloadTemplateAsync()

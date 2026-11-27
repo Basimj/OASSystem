@@ -24,11 +24,11 @@
     </QuickFilters>
     <FilterPanel>
         <div class="trial-fields">
-            <label class="oas-report__field">السنة المالية<select value="@_draft.Year" @onchange="OnYear"><option value="">الكل</option>@foreach (var y in _years){<option value="@y.Id">@y.Name</option>}</select></label>
-            <label class="oas-report__field">الفترة المالية<select value="@_draft.Period" @onchange="OnPeriod"><option value="">جميع الفترات</option>@foreach (var p in PeriodOptions){<option value="@p.Id">@p.Name</option>}</select></label>
+            <label class="oas-report__field">السنة المالية<select value="@_draft.Year" @onchange="OnYear" disabled="@_busy"><option value="">نطاق مخصص</option>@foreach (var y in _years){<option value="@y.Id">@y.Name</option>}</select></label>
+            <label class="oas-report__field">الفترة المالية<select value="@_draft.Period" @onchange="OnPeriod" disabled="@(_busy || string.IsNullOrEmpty(_draft.Year))"><option value="">جميع الفترات</option>@foreach (var p in PeriodOptions){<option value="@p.Id">@p.Name</option>}</select></label>
             <div class="oas-report__date-pair">
-                <label class="oas-report__field">من تاريخ<input type="date" @bind="_draft.From" @bind:format="yyyy-MM-dd" /></label>
-                <label class="oas-report__field">إلى تاريخ<input type="date" @bind="_draft.To" @bind:format="yyyy-MM-dd" /></label>
+                <label class="oas-report__field">من تاريخ<input type="date" @bind="_draft.From" @bind:format="yyyy-MM-dd" disabled="@(_busy || !string.IsNullOrEmpty(_draft.Year))" /></label>
+                <label class="oas-report__field">إلى تاريخ<input type="date" @bind="_draft.To" @bind:format="yyyy-MM-dd" disabled="@(_busy || !string.IsNullOrEmpty(_draft.Year))" /></label>
             </div>
             <div class="oas-report__field"><UiReportSearchPicker Label="الحساب" ItemLabel="حساب" DialogTitle="اختيار الحساب" SearchPlaceholder="ابحث باسم الحساب أو رقمه..." Value="@_draft.Account" ValueChanged="OnAccount" Options="@AccountOptions" Placeholder="جميع الحسابات" /></div>
             <label class="oas-report__field">تصنيف الحساب<select @bind="_draft.Class"><option value="0">جميع التصنيفات</option>@foreach (var c in Enum.GetValues<AccountClass>()){<option value="@((int)c)">@ClassName((int)c)</option>}</select></label>
@@ -38,8 +38,8 @@
             <label class="oas-report__field">العملة<select @bind="_draft.Currency"><option value="">@_baseName (الأساسية)</option>@foreach (var c in _currencies.Where(c => c.IsActive && c.Id != _baseId)){<option value="@c.Id">@c.NameAr (@c.Code)</option>}</select></label>
             <label class="oas-report__field">طبيعة الرصيد<select @bind="_draft.Balance"><option value="all">الكل</option><option value="debit">مدين</option><option value="credit">دائن</option><option value="zero">صفري</option></select></label>
             <label class="oas-report__field-check"><input type="checkbox" @bind="_draft.Children" disabled="@string.IsNullOrEmpty(_draft.Account)" /> تضمين الحسابات الفرعية</label>
-            <label class="oas-report__field-check"><input type="checkbox" @bind="_draft.IncludeZero" /> إظهار الحسابات دون حركة أو رصيد</label>
-            <label class="oas-report__field-check"><input type="checkbox" @bind="_draft.HideClosingZero" disabled="@(_draft.Balance == "zero")" /> إخفاء الرصيد الختامي الصفري</label>
+            <label class="oas-report__field-check"><input type="checkbox" @bind="_draft.IncludeZero" /> إظهار الحسابات التي لا حركة ولا رصيد لها</label>
+            <label class="oas-report__field-check"><input type="checkbox" @bind="_draft.HideClosingZero" disabled="@(_draft.Balance == "zero")" /> إخفاء الحسابات ذات الرصيد الختامي الصفري</label>
             @if (_validation is not null){<div role="alert" class="trial-warning">@_validation</div>}
         </div>
         <div class="oas-report__apply"><button type="button" class="primary" disabled="@_busy" @onclick="ApplyAsync"><i class="fa-solid fa-filter"></i> تطبيق</button><button type="button" disabled="@_busy" @onclick="ResetAsync"><i class="fa-solid fa-rotate-left"></i> إعادة تعيين</button></div>

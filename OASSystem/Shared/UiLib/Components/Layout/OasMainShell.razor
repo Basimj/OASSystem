@@ -1,5 +1,8 @@
-<div class="oas-shell @(isSidebarCollapsed ? "sidebar-collapsed" : "") @(isMobileMenuOpen ? "mobile-menu-open" : "")">
-    <OasAppearanceBoot OnSidebarModeLoaded="ApplyStoredSidebarModeAsync" OnThemeModeLoaded="ApplyStoredThemeModeAsync" />
+<div class="oas-shell" data-sidebar-collapsed="@(isSidebarCollapsed ? "true" : "false")" data-mobile-menu-open="@(isMobileMenuOpen ? "true" : "false")">
+    @if (_restored)
+    {
+        <OasAppearanceBoot OnSidebarModeLoaded="ApplyStoredSidebarModeAsync" OnThemeModeLoaded="ApplyStoredThemeModeAsync" OnReady="MarkAppearanceReadyAsync" />
+    }
     <div class="oas-mobile-overlay" @onclick="CloseMobileMenu"></div>
 
     <header class="oas-workspace-topbar">
@@ -259,7 +262,14 @@
 
     <main class="oas-main-content" @onclick="CloseTransientMenus">
         <div class="oas-main-inner">
-            @ChildContent
+            @if (_appearanceReady)
+            {
+                @ChildContent
+            }
+            else
+            {
+                <div role="status" aria-live="polite">جاري تهيئة المظهر…</div>
+            }
         </div>
     </main>
 </div>

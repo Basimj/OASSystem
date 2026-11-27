@@ -11,5 +11,6 @@ public partial class UiWorkspaceLayout
     [Parameter] public RenderFragment? Aside { get; set; }
     [Parameter] public bool ShowAside { get; set; } = true;
     [Parameter] public bool ShowFilters { get; set; } = true;
+    [Parameter] public string? AdditionalCssClass { get; set; }
     [Parameter] public bool ScrollableMain { get; set; }
 }

@@ -19,6 +19,18 @@ public sealed class GetSalesReportQueryHandler(ISalesReportQueryService reports)
         reports.GetAsync(query.Filter, cancellationToken);
 }
 
+public sealed record GetSalesReportOptionsQuery(SalesReportOptionRequest Request)
+    : IQuery<SalesReportOptionPage>, IAuthorizedRequest
+{
+    public IReadOnlyCollection<string> RequiredPermissions { get; } = [SalesPermissions.View];
+}
+public sealed class GetSalesReportOptionsQueryHandler(ISalesReportQueryService reports)
+    : IRequestHandler<GetSalesReportOptionsQuery, SalesReportOptionPage>
+{
+    public Task<SalesReportOptionPage> Handle(GetSalesReportOptionsQuery query, CancellationToken cancellationToken) =>
+        reports.GetOptionsAsync(query.Request, cancellationToken);
+}
+
 /// <summary>Historical currency scope for the interactive report. No currency conversion is performed.</summary>
 public static class SalesReportCurrencyScope
 {

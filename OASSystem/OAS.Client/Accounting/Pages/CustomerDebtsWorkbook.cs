@@ -50,7 +50,7 @@ internal static class CustomerDebtsWorkbook
                 xml.WriteAttributeString("count", (pairedHeaderGroups.Count + 2).ToString(CultureInfo.InvariantCulture));
                 void Merge(string range) { xml.WriteStartElement("mergeCell", Ns); xml.WriteAttributeString("ref", range); xml.WriteEndElement(); }
                 Merge("A2:A3"); Merge("B2:B3");
-                for (var i = 0; i < pairedHeaderGroups.Count; i++) Merge($"{(char)('C'+i*2)}2:{(char)('D'+i*2)}2");
+                for (var i = 0; i < pairedHeaderGroups.Count; i++) Merge($"{ColumnName(3+i*2)}2:{ColumnName(4+i*2)}2");
                 xml.WriteEndElement();
             }
             xml.WriteEndElement(); xml.WriteEndDocument();
@@ -61,13 +61,19 @@ internal static class CustomerDebtsWorkbook
     {
         using var writer=new StreamWriter(zip.CreateEntry(path).Open(),new UTF8Encoding(false)); writer.Write(contents);
     }
+    private static string ColumnName(int column)
+    {
+        var name = string.Empty;
+        while (column > 0) { column--; name = (char)('A' + column % 26) + name; column /= 26; }
+        return name;
+    }
     private static void WriteRow(XmlWriter xml,int row,IEnumerable<object?> values)
     {
         xml.WriteStartElement("row",Ns);xml.WriteAttributeString("r",row.ToString(CultureInfo.InvariantCulture));
         var col=0;
         foreach(var value in values)
         {
-            col++;xml.WriteStartElement("c",Ns);xml.WriteAttributeString("r",$"{(char)('A'+col-1)}{row}");
+            col++;xml.WriteStartElement("c",Ns);xml.WriteAttributeString("r",$"{ColumnName(col)}{row}");
             if(value is decimal or int or long)
                 xml.WriteElementString("v",Ns,Convert.ToString(value,CultureInfo.InvariantCulture));
             else

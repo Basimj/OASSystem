@@ -1,0 +1,21 @@
+<div class="inv-pagination" aria-label="التنقل بين صفحات الجدول">
+    <span>عرض @(TotalCount == 0 ? 0 : (Page - 1) * PageSize + 1) - @Math.Min(Page * PageSize, TotalCount) من @TotalCount</span>
+    <nav dir="ltr">
+        <button type="button" aria-label="الصفحة الأولى" disabled="@(Disabled || Page <= 1)" @onclick="() => OnPageChanged.InvokeAsync(1)">«</button>
+        <button type="button" aria-label="الصفحة السابقة" disabled="@(Disabled || Page <= 1)" @onclick="() => OnPageChanged.InvokeAsync(Page - 1)">‹</button>
+        @foreach (var n in Enumerable.Range(Math.Max(1, Math.Min(Page - 2, TotalPages - 4)), Math.Min(5, TotalPages)))
+        {
+            <button type="button" @key="n" class="@(n == Page ? "inv-current-page" : null)" aria-current="@(n == Page ? "page" : null)" disabled="@Disabled" @onclick="() => OnPageChanged.InvokeAsync(n)">@n</button>
+        }
+        <button type="button" aria-label="الصفحة التالية" disabled="@(Disabled || Page >= TotalPages)" @onclick="() => OnPageChanged.InvokeAsync(Page + 1)">›</button>
+        <button type="button" aria-label="الصفحة الأخيرة" disabled="@(Disabled || Page >= TotalPages)" @onclick="() => OnPageChanged.InvokeAsync(TotalPages)">»</button>
+    </nav>
+</div>
+@code {
+    [Parameter] public int Page { get; set; } = 1;
+    [Parameter] public int PageSize { get; set; } = 12;
+    [Parameter] public int TotalCount { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public EventCallback<int> OnPageChanged { get; set; }
+    private int TotalPages => Math.Max(1, (TotalCount + PageSize - 1) / PageSize);
+}

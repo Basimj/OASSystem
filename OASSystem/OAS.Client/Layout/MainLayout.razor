@@ -78,6 +78,8 @@ private static readonly IReadOnlyList<UiShellModuleItem> ShellModules =
 
     // Inventory
     new("products", "المنتجات", "/products", "fa-solid fa-glasses", OpenBaseRouteFromMenu: true),
+    new("inventory-variants", "الأصناف", "/inventory/catalog/Variants", "fa-solid fa-barcode", OpenBaseRouteFromMenu: true),
+    new("inventory-units", "الوحدات", "/inventory/catalog/Units", "fa-solid fa-ruler", OpenBaseRouteFromMenu: true),
     new("inventory-product-categories", "تصنيفات المنتجات", "/inventory/product-categories", "fa-solid fa-layer-group", OpenBaseRouteFromMenu: true),
     new("inventory-brands", "العلامات التجارية", "/inventory/brands", "fa-solid fa-tags", OpenBaseRouteFromMenu: true),
     new("inventory-product-types", "أنواع المنتجات", "/inventory/product-types", "fa-solid fa-list", OpenBaseRouteFromMenu: true),
@@ -212,6 +214,8 @@ private static readonly IReadOnlyList<UiShellNavigationGroup> ShellGroups =
         "fa-solid fa-boxes-stacked",
         [
             "products",
+            "inventory-variants",
+            "inventory-units",
             "inventory-product-categories",
             "inventory-brands",
             "inventory-product-types",
@@ -265,9 +269,11 @@ private static readonly IReadOnlyList<UiShellNavigationGroup> ShellGroups =
     {
         if (!firstRender) return;
 
-        await JS.InvokeVoidAsync("hideOasStartup");
-
         var state = await AuthState.GetAuthenticationStateAsync();
+        // The authenticated shell dismisses the loader after its appearance is ready.
+        // Password setup and unauthenticated pages do not use that shell.
+        if (state.User.Identity?.IsAuthenticated != true || RequiresPasswordSetup(state.User))
+            await JS.InvokeVoidAsync("hideOasStartup");
         var relative = Navigation.ToBaseRelativePath(Navigation.Uri);
 
         if (state.User.Identity?.IsAuthenticated == true &&

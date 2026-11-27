@@ -17,11 +17,43 @@
     <meta http-equiv="Expires" content="0" />
     <base href="/" />
     <title>@systemName</title>
-    <link rel="stylesheet" href="_content/OAS.UiLib/css/oas-ui-bundle.css" />
+    @* Static styles are requested in parallel, in a deterministic cascade order.
+       The generated client stylesheet imports UiLib scoped styles automatically. *@
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/lib/bootstrap/css/bootstrap.min.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/lib/font-awesome/css/all.min.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/variables.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/colors.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/sizing.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/bootstrap-loader.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/features/employee-import-bulk.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/features/hr-foundation.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/features/accounting.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/features/purchasing.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/features/sales.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/oas-main-shell.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/oas-ocean-shell.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/oas-theme-studio.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/oas-theme-v8.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/oas-theme-v9.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/oas-theme-v10.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/oas-theme-v11-accounting.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/oas-seaglass-theme.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/oas-sky-sun-theme.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/oas-typography-standard.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/features/purchasing-theme.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/oas-global-appearance.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/features/prescriptions-approved.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/features/customer-orders-approved.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/features/checkout-approved.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/features/order-tracking-approved.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/features/lab-approved.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/features/customer-order-optical-prevalidation.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/features/invoices-approved.css"]" />
+    <link rel="stylesheet" href="@Assets["OAS.Client.styles.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/oas-report-workspace.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/features/inventory-modern.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/OAS.UiLib/css/sales-report-print.css"]" media="print" />
     <HeadOutlet @rendermode="new InteractiveWebAssemblyRenderMode(prerender: false)" />
-    <link rel="stylesheet"
-          href="@Assets["OAS.Client.styles.css"]" />
-    <link rel="stylesheet" href="_content/OAS.UiLib/css/sales-report-print.css" media="print" />
 </head>
 <body>
     <div id="oas-startup-loader" class="oas-boot-screen" data-state="loading" role="status" aria-live="polite">
@@ -137,6 +169,46 @@
 
             document.getElementById('oas-startup-retry')?.addEventListener('click', () => location.reload());
             renderProgress(1);
+        })();
+    </script>
+    @* Compatibility for browsers with native popovers but without CSS anchor positioning.
+       Only inventory dropdowns opt in through data-dropdown-anchor. *@
+    <script>
+        (() => {
+            if (CSS.supports('top', 'anchor(bottom)') &&
+                CSS.supports('width', 'anchor-size(width)') &&
+                CSS.supports('position-try-fallbacks', 'flip-block')) return;
+
+            const selector = '[popover][data-dropdown-anchor]';
+            const place = menu => {
+                const anchor = document.getElementById(menu.dataset.dropdownAnchor);
+                if (!anchor || !anchor.getClientRects().length) {
+                    if (menu.matches(':popover-open')) menu.hidePopover();
+                    return;
+                }
+                const r = anchor.getBoundingClientRect();
+                const gap = 4, edge = 8;
+                const vw = document.documentElement.clientWidth;
+                const vh = document.documentElement.clientHeight;
+                const desired = Math.min(280, vh * .45);
+                const below = Math.max(0, vh - r.bottom - gap - edge);
+                const above = Math.max(0, r.top - gap - edge);
+                const up = below < desired && above > below;
+                const width = Math.min(r.width, Math.max(0, vw - edge * 2));
+                Object.assign(menu.style, {
+                    left: `${Math.max(edge, Math.min(r.left, vw - edge - width))}px`,
+                    top: up ? 'auto' : `${r.bottom + gap}px`,
+                    bottom: up ? `${vh - r.top + gap}px` : 'auto',
+                    width: `${width}px`, maxHeight: `${Math.min(desired, up ? above : below)}px`,
+                    margin: '0', transform: 'none'
+                });
+            };
+            document.addEventListener('beforetoggle', e => {
+                if (e.newState === 'open' && e.target instanceof HTMLElement && e.target.matches(selector)) place(e.target);
+            }, true);
+            const reposition = () => document.querySelectorAll(selector + ':popover-open').forEach(place);
+            window.addEventListener('resize', reposition);
+            document.addEventListener('scroll', reposition, true);
         })();
     </script>
     <script src="_framework/blazor.web.js" autostart="false"></script>

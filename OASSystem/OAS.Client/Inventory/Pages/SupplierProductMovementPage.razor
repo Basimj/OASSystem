@@ -30,7 +30,7 @@
             @if(string.IsNullOrEmpty(_draft.Variant))
             {<label class="oas-report__field">المنتج<select disabled><option>اختر الصنف أولاً</option></select></label>}
             else
-            {<div class="oas-report__field"><UiReportSearchPicker Label="المنتج" ItemLabel="منتج" DialogTitle="المنتج المرتبط بالصنف" Value="@_draft.Product" ValueChanged="OnProduct" Options="@ProductOptions" Placeholder="المنتج المرتبط" /></div>}
+            {<div class="oas-report__field"><label class="oas-report__field">المنتج المرتبط<input readonly value="@(ProductOptions.FirstOrDefault()?.Text ?? "—")" /></label></div>}
             <label class="oas-report__field">التصنيف<select value="@_draft.Category" @onchange="OnCategory"><option value="">جميع التصنيفات</option>@foreach(var o in Categories){<option value="@o.Id">@o.Name</option>}</select></label>
             <label class="oas-report__field">المستودع<select @bind="_draft.Warehouse"><option value="">جميع المستودعات</option>@foreach(var o in Warehouses){<option value="@o.Id">@o.Name</option>}</select></label>
             <div class="oas-report__date-pair">
@@ -39,7 +39,7 @@
             </div>
             <label class="oas-report__field">العملة<select @bind="_draft.Currency" disabled="@(_draft.Mode=="qty")"><option value="">@_baseName (الأساسية)</option>@foreach(var c in _currencies.Where(x=>x.IsActive&&x.Id!=_baseId)){<option value="@c.Id">@c.NameAr (@c.Code)</option>}</select></label>
             <label class="oas-report__field">نوع التقرير<select @bind="_draft.Mode"><option value="cost">تحليلي تكاليف</option><option value="qty">تحليلي كميات</option></select></label>
-            <label class="oas-report__field">التجميع حسب<select value="@_draft.Group" @onchange="OnGroup"><option value="supplier">المورد ثم الصنف</option><option value="item-supplier">الصنف ثم المورد</option><option value="item">الصنف فقط (جميع المصادر)</option></select></label>
+            <label class="oas-report__field">التجميع حسب<select value="@_draft.Group" @onchange="OnGroup"><option value="supplier">المورد ثم الصنف</option><option value="item-supplier">الصنف ثم المورد</option><option value="item">الصنف فقط (جميع المصادر؛ يلغي اختيار المورد)</option></select></label>
             <label class="oas-report__field-check"><input type="checkbox" @bind="_draft.HideEmpty" /> إخفاء الأصناف دون حركة أو رصيد</label>
             @if(_validation is not null){<div role="alert" class="movement-warning">@_validation</div>}
         </div>
@@ -94,7 +94,7 @@
     {
         public string Supplier {get;set;}=""; public string Variant {get;set;}=""; public string Product {get;set;}="";
         public string Category {get;set;}=""; public string Warehouse {get;set;}="";
-        public DateTime From {get;set;}=new(DateTime.Today.Year,1,1); public DateTime To {get;set;}=DateTime.Today;
+        public DateTime From {get;set;}=new(DateTime.UtcNow.Date.Year,1,1); public DateTime To {get;set;}=DateTime.UtcNow.Date;
         public Guid? Currency {get;set;} public string Mode {get;set;}="cost"; public string Group {get;set;}="supplier";
         public bool HideEmpty {get;set;}=true;
     }
@@ -207,7 +207,7 @@
     private string Metric(string key)=>_busy||_error is not null?"—":Display(Total(_rows,key));
     private string SupplierCount=>MetricCount(_applied.Group=="item"?null:_rows.Where(x=>x.Data.SupplierId.HasValue).Select(x=>x.Data.SupplierId).Distinct().Count());
     private string MetricCount(int? n)=>_busy||_error is not null||n is null?"—":n.Value.ToString("N0",CultureInfo.InvariantCulture);
-    private string Subtitle=>$"{_applied.From:dd/MM/yyyy} – {_applied.To:dd/MM/yyyy} | {ModeName(_applied.Mode)} | {(_applied.Mode=="qty"?"كميات":_currencyName)} | {ScopeNote} | البحث: {_search}";
+    private string Subtitle=>$"{_applied.From:dd/MM/yyyy} – {_applied.To:dd/MM/yyyy} | {ModeName(_applied.Mode)} | {(_applied.Mode=="qty"?"كميات":_currencyName)} | {ScopeNote} | يوم UTC | إخفاء الخالي: {(_applied.HideEmpty?"نعم":"لا")} | البحث: {_search}";
     private string[] ExportHeaders=>["المجموعة",..Columns.Select(c=>c.Label)];
     private IEnumerable<object?[]> ExportRows()
     {

@@ -62,6 +62,8 @@ public sealed class WarehouseReportSqlServerTests
             Assert.That(transfers.Transfers.Count,Is.EqualTo(2));Assert.That(transfers.Transfers.Single(x=>x.Id==transfer.Id).Cost,Is.EqualTo(200m));
             Assert.That(transfers.Transfers.Single(x=>x.Id==draft.Id).Cost,Is.Null);
             Assert.That(counts.Counts.Single().CountedQuantity,Is.Null);Assert.That(counts.Counts.Single().Variance,Is.Null);
+            Assert.That(report.Stocks.Sum(x=>x.Value),Is.EqualTo(1500m));
+            Assert.That(report.Stocks.Sum(x=>x.OnHand),Is.EqualTo(150m));
             Assert.That(snapshot.Stocks.Sum(x=>x.Value),Is.EqualTo(1500m));Assert.That(snapshot.Stocks.All(x=>x.Reserved is null),Is.True);
         });
     }

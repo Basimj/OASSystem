@@ -14,15 +14,15 @@
 
 @using OAS.UiLib.Components.Spreadsheets
 <PageTitle>@(IsFormRoute ? "نموذج المخزون" : "قائمة المخزون") - الجرد المخزني | OAS</PageTitle>
-<span class="oas-inventory-view" hidden aria-hidden="true"></span>
 
-<InventoryReportWorkspace Title="الجرد المخزني" TitleIcon="fa-solid fa-clipboard-check" StatusText="@($"{FilteredCounts.Count} جرد")" ShowFilters="true" IsFormRoute="@IsFormRoute" ResetFilters="ResetListFilters">
+
+<UiWorkspaceLayout AdditionalCssClass="oas-inventory-workspace" ShowAside="false" ShowFilters="@(!IsFormRoute && true)" ScrollableMain="@IsFormRoute">
     <Actions>
         <UiWorkspaceActionBar>
             @if (IsFormRoute)
             {
                 <UiButton Text="العودة إلى القائمة" IconCssClass="fa-solid fa-arrow-right" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="BackToListAsync" />
-                <UiButton Text="حفظ" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small"
+                <UiButton Text="حفظ" AdditionalCssClass="inv-save" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small"
                       Disabled="@(_mode != ViewMode.Create)" Loading="@_busy" OnClick="SaveCreateAsync" />
                 <UiButton Text="بدء العد" IconCssClass="fa-solid fa-play" Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
                       Disabled="@(!CanStart)" Loading="@_busy" OnClick="StartAsync" />
@@ -39,7 +39,7 @@
             {
                 <UiButton Text="جرد جديد" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small"
                       Disabled="@(_mode == ViewMode.Create)" OnClick="OpenCreateScreenAsync" />
-                <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
+                <UiButton Text="تحديث" AdditionalCssClass="inv-refresh" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
                       Loading="@_loading" OnClick="RefreshAsync" />
                 <UiSpreadsheetActions CanImport="false" Busy="@_exporting" OnExport="ExportAsync" />
                 <UiSearchInput @bind-Value="_search" Placeholder="ابحث برقم الجرد أو المخزن..."
@@ -52,13 +52,13 @@
         @if (!IsFormRoute)
         {
         <div class="stock-counts__filters">
-            <UiSearchableSelect Label="المخزن"
+            <UiSearchableSelect InlineDropdown="true" UseAngleDownIcon="true" Label="المخزن"
                       Value="@_warehouseFilter"
                       ValueExpression="@(() => _warehouseFilter)"
                       ValueChanged="@(v => _warehouseFilter = v)"
                       Options="@WarehouseFilterOptions"
                       Size="ControlSize.Small" />
-            <UiSearchableSelect Label="الحالة"
+            <UiSearchableSelect InlineDropdown="true" UseAngleDownIcon="true" Label="الحالة"
                       Value="@_statusFilter"
                       ValueExpression="@(() => _statusFilter)"
                       ValueChanged="@(v => _statusFilter = v)"
@@ -67,11 +67,6 @@
         </div>
         }
     </Filters>
-    
-    <QuickFilters>
-        <div class="oas-report__chip"><span>المخزن:</span><strong>@(WarehouseFilterOptions.FirstOrDefault(x => x.Value == _warehouseFilter)?.Text ?? "الكل")</strong></div>
-        <div class="oas-report__chip"><span>الحالة:</span><strong>@(InventoryArabicPresenter.StockCountStatusOptions.FirstOrDefault(x => x.Value == _statusFilter)?.Text ?? "الكل")</strong></div>
-    </QuickFilters>
     <Content>
         @if (IsFormRoute)
         {
@@ -85,7 +80,7 @@
             else if (_mode == ViewMode.Create)
             {
                 <div class="stock-counts__editor">
-                    <UiSearchableSelect Label="المخزن"
+                    <UiSearchableSelect InlineDropdown="true" UseAngleDownIcon="true" Label="المخزن"
                               Value="@_createWarehouseId"
                               ValueExpression="@(() => _createWarehouseId)"
                               ValueChanged="CreateWarehouseChanged"
@@ -203,14 +198,16 @@
         }
         else
         {
-                        @if (_loading)
+        <UiDataGridPanel Title="الجرد المخزني" Subtitle="@($"{FilteredCounts.Count} جرد")">
+            <Body>
+                @if (_loading)
                 {
                     <UiAlert Message="جاري تحميل عمليات الجرد..." />
                 }
                 else
                 {
-                    <InventoryReportTable TItem="StockCountDto" Items="@FilteredCounts" PageSize="12" Headers="@StockCountHeaders" EmptyText="لا توجد عمليات جرد مطابقة."
-                                 SidebarTypography="true"
+                    <UiDataTable TItem="StockCountDto" Items="@FilteredCounts" PageSize="12" Headers="@StockCountHeaders" EmptyText="لا توجد عمليات جرد مطابقة."
+                                 SidebarTypography="false"
                                  OnRowClick="@(x => OpenDetailsScreen(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
                         <RowTemplate Context="count">
                             <td><strong>@count.CountNumber</strong></td>
@@ -220,17 +217,16 @@
                             <td>@FormatDate(count.StartedAtUtc)</td>
                             <td>@FormatDate(count.CompletedAtUtc)</td>
                         </RowTemplate>
-                    </InventoryReportTable>
+                    </UiDataTable>
                 }
-            
+            </Body>
+        </UiDataGridPanel>
 
         }
     </Content>
-</InventoryReportWorkspace>
+</UiWorkspaceLayout>
 
 @code {
-    private void ResetListFilters() => _search = _warehouseFilter = _statusFilter = null;
-
     // Each CRUD action has its own route. No editable form is mounted on the list screen.
     [Microsoft.AspNetCore.Components.Inject]
     private Microsoft.AspNetCore.Components.NavigationManager InventoryNavigation { get; set; } = default!;

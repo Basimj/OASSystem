@@ -17,11 +17,11 @@
     </QuickFilters>
     <FilterPanel>
         <div class="journal-fields">
-            <label class="oas-report__field">السنة المالية<select value="@_draft.Year" @onchange="OnYear"><option value="">الكل</option>@foreach(var y in _years){<option value="@y.Id">@y.Name</option>}</select></label>
-            <label class="oas-report__field">الفترة المالية<select value="@_draft.Period" @onchange="OnPeriod"><option value="">جميع الفترات</option>@foreach(var p in PeriodOptions){<option value="@p.Id">@p.Name</option>}</select></label>
+            <label class="oas-report__field">السنة المالية<select value="@_draft.Year" @onchange="OnYear" disabled="@_busy"><option value="">نطاق مخصص</option>@foreach(var y in _years){<option value="@y.Id">@y.Name</option>}</select></label>
+            <label class="oas-report__field">الفترة المالية<select value="@_draft.Period" @onchange="OnPeriod" disabled="@(_busy || string.IsNullOrEmpty(_draft.Year))"><option value="">جميع الفترات</option>@foreach(var p in PeriodOptions){<option value="@p.Id">@p.Name</option>}</select></label>
             <div class="oas-report__date-pair">
-                <label class="oas-report__field">من تاريخ<input type="date" @bind="_draft.From" @bind:format="yyyy-MM-dd" /></label>
-                <label class="oas-report__field">إلى تاريخ<input type="date" @bind="_draft.To" @bind:format="yyyy-MM-dd" /></label>
+                <label class="oas-report__field">من تاريخ<input type="date" @bind="_draft.From" @bind:format="yyyy-MM-dd" disabled="@(_busy || !string.IsNullOrEmpty(_draft.Year))" /></label>
+                <label class="oas-report__field">إلى تاريخ<input type="date" @bind="_draft.To" @bind:format="yyyy-MM-dd" disabled="@(_busy || !string.IsNullOrEmpty(_draft.Year))" /></label>
             </div>
             <div class="oas-report__field"><UiReportSearchPicker Label="الحساب" ItemLabel="حساب" DialogTitle="اختيار الحساب" SearchPlaceholder="ابحث باسم الحساب أو رقمه..." Value="@_draft.Account" ValueChanged="OnAccount" Options="@AccountOptions" Placeholder="جميع الحسابات" /></div>
             <label class="oas-report__field">نطاق الحساب<select @bind="_draft.Scope" disabled="@string.IsNullOrEmpty(_draft.Account)"><option value="complete">القيود الكاملة</option><option value="lines">بنود الحساب فقط</option></select></label>
@@ -34,7 +34,7 @@
             {
             <div class="oas-report__field"><UiReportSearchPicker Label="المستخدم" ItemLabel="مستخدم" DialogTitle="اختيار المستخدم المنشئ أو المرحل" Value="@_draft.User" ValueChanged="OnUser" Options="@UserOptions" Placeholder="جميع المستخدمين" /></div>
             }
-            <label class="oas-report__field">رقم القيد / المرجع<input type="text" @bind="_draft.Reference" maxlength="200" placeholder="رقم القيد أو المستند" /></label>
+            <label class="oas-report__field">تصفية برقم القيد / المرجع<input type="text" @bind="_draft.Reference" maxlength="200" placeholder="رقم القيد أو المستند" /></label>
             <label class="oas-report__field">العملة<select @bind="_draft.Currency"><option value="">@_baseName (الأساسية)</option>@foreach(var c in _currencies.Where(c=>c.IsActive && c.Id != _baseId)){<option value="@c.Id">@c.NameAr (@c.Code)</option>}</select></label>
             @if (_validation is not null){<div class="journal-warning" role="alert">@_validation</div>}
         </div>

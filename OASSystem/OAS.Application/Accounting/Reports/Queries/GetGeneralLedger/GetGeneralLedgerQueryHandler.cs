@@ -21,6 +21,7 @@ public sealed class GetGeneralLedgerQueryHandler(IAccountingReportingQueryServic
                 request.CustomerId,
                 request.SupplierId,
                 request.Reference,
-                request.IncludeOpeningBalance),
+                request.IncludeOpeningBalance,
+                request.CostCenterId),
             cancellationToken);
 }

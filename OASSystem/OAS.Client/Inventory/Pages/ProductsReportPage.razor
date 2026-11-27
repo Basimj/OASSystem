@@ -7,13 +7,13 @@
 @using OAS.Client.Services.Http
 @using OAS.Contracts.Common.Pagination
 @using OAS.Contracts.Inventory.Products
-@using OAS.Contracts.Inventory.Stock
-@using OAS.Contracts.Inventory.Transactions
+@using OAS.Contracts.Inventory.Reports
 @using OAS.Contracts.Inventory.Warehouses
 @using OAS.Contracts.Accounting.Currencies
 @using OAS.Contracts.Accounting.Enums
 @using OAS.Contracts.Enums.Inventory
 @using OAS.UiLib.Core.Models
+@inject OasApiClient Api
 @inject IInventoryClientService Inventory
 @inject IAccountingClientService Accounting
 @inject IJSRuntime JS
@@ -50,13 +50,13 @@
             else
             {
                 <div class="oas-report__field">
-                    <UiReportSearchPicker Label="المنتج" ItemLabel="منتج" DialogTitle="المنتج المرتبط بالصنف" Value="@_draft.Product" ValueChanged="OnProduct" Options="@ProductOptions" Placeholder="المنتج المرتبط" />
+                    <label class="oas-report__field">المنتج المرتبط<input readonly value="@(ProductOptions.FirstOrDefault()?.Text ?? "—")" /></label>
                 </div>
             }
             <label class="oas-report__field">التصنيف<select value="@_draft.Category" @onchange="OnCategory"><option value="">جميع التصنيفات</option>@foreach(var o in Categories){<option value="@o.Id">@o.Name</option>}</select></label>
             <label class="oas-report__field">العلامة التجارية<select @bind="_draft.Brand"><option value="">جميع العلامات</option>@foreach(var o in Brands){<option value="@o.Id">@o.Name</option>}</select></label>
-            <label class="oas-report__field">المستودع<select @bind="_draft.Warehouse"><option value="">جميع المستودعات</option>@foreach(var o in Warehouses){<option value="@o.Id">@o.Name</option>}</select></label>
-            <label class="oas-report__field">نوع التقرير<select @bind="_draft.ReportType"><option value="balances">أرصدة المنتجات</option><option value="movement-qty">حركة المنتجات - كميات</option><option value="movement-cost">حركة المنتجات - تكاليف</option><option value="prices">قائمة المنتجات والأسعار</option><option value="valuation">تقييم المخزون</option><option value="stagnant">المنتجات الراكدة والنوافد</option></select></label>
+            <label class="oas-report__field">المستودع<select @bind="_draft.Warehouse" disabled="@(_draft.ReportType == "prices")"><option value="">جميع المستودعات</option>@foreach(var o in Warehouses.Where(w=>_draft.IncludeInactiveWarehouses||w.IsActive)){<option value="@o.Id">@o.Name</option>}</select></label>
+            <label class="oas-report__field">نوع التقرير<select @bind="_draft.ReportType"><option value="balances">أرصدة المنتجات</option><option value="movement-qty">حركة المنتجات - كميات</option><option value="movement-cost">حركة المنتجات - تكاليف</option><option value="prices">قائمة الأسعار الحالية</option><option value="valuation">تقييم المخزون</option><option value="stagnant">المنتجات الراكدة والنوافد</option></select></label>
             @if (NeedsDateRange)
             {
                 <div class="oas-report__date-pair">
@@ -68,13 +68,18 @@
             {
                 <label class="oas-report__field">إلى تاريخ<input type="date" @bind="_draft.To" @bind:format="yyyy-MM-dd" /></label>
             }
-            @if (_draft.ReportType == "stagnant")
+            @if (_draft.ReportType != "prices" && (_draft.ReportType == "stagnant" || _draft.StockState == "stagnant"))
             {
                 <label class="oas-report__field">أيام الركود<select @bind="_draft.StagnantDays"><option value="30">30 يوم</option><option value="60">60 يوم</option><option value="90">90 يوم</option><option value="180">180 يوم</option></select></label>
             }
-            <label class="oas-report__field">حالة المخزون<select @bind="_draft.StockState"><option value="all">الكل</option><option value="available">متوفر</option><option value="out">نافد</option><option value="reserved">محجوز</option><option value="stagnant">راكد</option></select></label>
+            @if (_draft.ReportType != "prices")
+            {
+                <label class="oas-report__field">حالة المخزون<select @bind="_draft.StockState"><option value="all">الكل</option><option value="available">@(IsCurrent(_draft)?"متوفر":"رصيد موجب")</option><option value="out">نافد</option>@if(IsCurrent(_draft)){<option value="reserved">له حجز</option><option value="partial">محجوز جزئياً</option><option value="full">محجوز بالكامل</option>}<option value="stagnant">راكد</option></select></label>
+                @if(!IsCurrent(_draft)){<div class="product-warning">الحجوزات والمتاح وقيد الطلب غير متاحة تاريخياً؛ القيم غير الموثوقة تظهر بشرطة.</div>}
+            }
             <label class="oas-report__field">العملة<select @bind="_draft.Currency" disabled="@(!UsesCurrency)"><option value="">@_baseName (الأساسية)</option>@foreach(var c in _currencies.Where(x=>x.IsActive&&x.Id!=_baseId)){<option value="@c.Id">@c.NameAr (@c.Code)</option>}</select></label>
-            <label class="oas-report__field-check"><input type="checkbox" @bind="_draft.HideZero" /> إخفاء الصفوف الصفرية</label>
+            @if (_draft.ReportType != "prices"){<label class="oas-report__field-check"><input type="checkbox" @bind="_draft.HideZero" /> إخفاء الصفوف الصفرية</label>}
+            @if (_draft.ReportType != "prices"){<label class="oas-report__field-check"><input type="checkbox" @bind="_draft.IncludeInactiveWarehouses" /> تضمين المستودعات غير النشطة</label>}
             <label class="oas-report__field-check"><input type="checkbox" @bind="_draft.IncludeInactive" /> تضمين الأصناف غير النشطة</label>
             @if (_validation is not null)
             {
@@ -156,12 +161,13 @@
         public string Warehouse { get; set; } = "";
         public string ReportType { get; set; } = "balances";
         public string StockState { get; set; } = "all";
-        public DateTime From { get; set; } = new(DateTime.Today.Year, 1, 1);
-        public DateTime To { get; set; } = DateTime.Today;
+        public DateTime From { get; set; } = new(DateTime.UtcNow.Date.Year, 1, 1);
+        public DateTime To { get; set; } = DateTime.UtcNow.Date;
         public int StagnantDays { get; set; } = 90;
         public Guid? Currency { get; set; }
         public bool HideZero { get; set; }
         public bool IncludeInactive { get; set; }
+        public bool IncludeInactiveWarehouses { get; set; }
     }
 
     private sealed record VariantView(
@@ -187,20 +193,21 @@
         VariantView Item,
         string WarehouseName,
         decimal OnHand,
-        decimal Reserved,
-        decimal Available,
-        decimal OnOrder,
-        decimal AverageCost,
-        decimal InventoryValue,
+        decimal? Reserved,
+        decimal? Available,
+        decimal? OnOrder,
+        decimal? AverageCost,
+        decimal? InventoryValue,
+        decimal? ReservedValue,
         DateTimeOffset? LastMovementAt,
         decimal OpeningQty,
         decimal InQty,
         decimal OutQty,
         decimal ClosingQty,
-        decimal OpeningCost,
+        decimal? OpeningCost,
         decimal InCost,
         decimal OutCost,
-        decimal ClosingCost,
+        decimal? ClosingCost,
         int DaysIdle)
     {
         public string Status => OnHand <= 0 ? "نافد" : Reserved >= OnHand && OnHand > 0 ? "محجوز" : DaysIdle > 0 ? "متوفر" : "متوفر";
@@ -228,7 +235,7 @@
     private static readonly ColumnDef[] ValuationColumns =
     [
         new("code", "رقم الصنف"), new("name", "اسم الصنف"), new("product", "المنتج"), new("unit", "الوحدة"), new("warehouse", "المستودع"),
-        new("onHand", "الرصيد"), new("avgCost", "متوسط التكلفة"), new("value", "قيمة المخزون"), new("share", "نسبة القيمة"), new("last", "آخر حركة")
+        new("onHand", "الرصيد"), new("avgCost", "متوسط التكلفة"), new("value", "قيمة المخزون"), new("reservedValue", "قيمة المحجوز"), new("availableValue", "قيمة المتاح"), new("share", "نسبة القيمة"), new("last", "آخر حركة")
     ];
     private static readonly ColumnDef[] StagnantColumns =
     [
@@ -259,16 +266,15 @@
     private IReadOnlyList<BrandDto> _brands = [];
     private IReadOnlyList<UnitDto> _units = [];
     private IReadOnlyList<WarehouseDto> _warehouses = [];
-    private IReadOnlyList<InventoryBalanceDto> _balances = [];
-    private IReadOnlyList<InventoryLedgerDto> _ledger = [];
-    private IReadOnlyDictionary<Guid, InventoryTransactionDto> _transactions = new Dictionary<Guid, InventoryTransactionDto>();
+    private IReadOnlyList<WarehouseReportStock> _stocks = [];
+    private IReadOnlyList<WarehouseReportMovement> _movements = [];
     private IReadOnlyList<ProductReportRow> _rows = [];
 
     private IReadOnlyList<ProductCategoryDto> Categories => _categories.OrderBy(x => x.Name).ToArray();
     private IReadOnlyList<BrandDto> Brands => _brands.OrderBy(x => x.Name).ToArray();
     private IReadOnlyList<WarehouseDto> Warehouses => _warehouses.OrderBy(x => x.Name).ToArray();
     private IReadOnlyList<UiSelectOption> VariantOptions => VariantViews
-        .Where(x => _draft.IncludeInactive || x.IsActive)
+        .Where(x => (_draft.IncludeInactive || x.IsActive) && (_draft.Category == "" || x.Category?.Id.ToString() == _draft.Category))
         .OrderBy(x => x.VariantCode).ThenBy(x => x.VariantName)
         .Select(x => new UiSelectOption(x.Variant.Id.ToString(), $"{x.VariantCode} - {x.VariantName}"))
         .ToArray();
@@ -307,8 +313,9 @@
         _ => 5
     };
     private bool NeedsDateRange => _draft.ReportType is "movement-qty" or "movement-cost";
-    private bool NeedsToDate => _draft.ReportType is "balances" or "valuation" or "prices" or "stagnant";
+    private bool NeedsToDate => _draft.ReportType is "balances" or "valuation" or "stagnant";
     private bool UsesCurrency => _draft.ReportType is not "movement-qty" and not "prices";
+    private static bool IsCurrent(Filters f) => f.ReportType is not ("movement-qty" or "movement-cost" or "prices") && f.To.Date == DateTime.UtcNow.Date;
     private bool AppliedNeedsDateRange => _applied.ReportType is "movement-qty" or "movement-cost";
     private bool AppliedUsesCurrency => _applied.ReportType is not "movement-qty" and not "prices";
     private bool CanExport => !_busy && _error is null && _rows.Count > 0;
@@ -322,8 +329,12 @@
         ("العلامة", Name(Brands, _applied.Brand, "الكل")),
         ("المستودع", Name(Warehouses, _applied.Warehouse, "الكل")),
         ("النوع", ReportTypeName(_applied.ReportType)),
-        ("الحالة", StockStateName(_applied.StockState)),
-        (AppliedNeedsDateRange ? "الفترة" : "إلى تاريخ", AppliedNeedsDateRange ? $"{_applied.From:dd/MM/yyyy} – {_applied.To:dd/MM/yyyy}" : _applied.To.ToString("dd/MM/yyyy")),
+        ("الحالة", !IsCurrent(_applied) && _applied.StockState == "available" ? "رصيد موجب" : StockStateName(_applied.StockState)),
+        (AppliedNeedsDateRange ? "الفترة" : "التاريخ", _applied.ReportType == "prices" ? "الأسعار الحالية" : AppliedNeedsDateRange ? $"{_applied.From:dd/MM/yyyy} – {_applied.To:dd/MM/yyyy}" : _applied.To.ToString("dd/MM/yyyy")),
+        ("أيام الركود", _applied.ReportType == "stagnant" || _applied.StockState == "stagnant" ? _applied.StagnantDays.ToString() : "—"),
+        ("إخفاء الأصفار", _applied.HideZero ? "نعم" : "لا"),
+        ("الأصناف غير النشطة", _applied.IncludeInactive ? "نعم" : "لا"),
+        ("المستودعات غير النشطة", _applied.IncludeInactiveWarehouses ? "نعم" : "لا"),
         ("العملة", AppliedUsesCurrency ? _currencyName : "—")
     ];
     private string SelectedVariantLabel => VariantViews.FirstOrDefault(x => x.Variant.Id.ToString() == _applied.Variant) is { } item ? $"{item.VariantCode} - {item.VariantName}" : "الكل";
@@ -365,13 +376,13 @@
             new("متوسط التكلفة", Metric("avgCost"), "orange", "fa-solid fa-scale-balanced"),
             new("عدد الأصناف", CountText(_rows.Count), "violet", "fa-solid fa-boxes-stacked"),
             new("عدد المنتجات", CountText(_rows.Select(x => x.Item.Product.Id).Distinct().Count()), "blue", "fa-solid fa-cube"),
-            new("آخر تحديث", _rows.MaxBy(x => x.LastMovementAt)?.LastMovementAt?.ToLocalTime().ToString("dd/MM/yyyy") ?? "—", "red", "fa-solid fa-clock")
+            new("آخر تحديث", _rows.MaxBy(x => x.LastMovementAt)?.LastMovementAt?.UtcDateTime.ToString("dd/MM/yyyy") ?? "—", "red", "fa-solid fa-clock")
         ],
         "stagnant" =>
         [
             new("الأصناف الراكدة", CountText(_rows.Count(x => x.DaysIdle >= _applied.StagnantDays && x.OnHand > 0)), "red", "fa-solid fa-hourglass-end"),
             new("الأصناف النافدة", CountText(_rows.Count(x => x.OnHand <= 0)), "purple", "fa-solid fa-box-open"),
-            new("قيمة المخزون الراكد", FormatValue(_rows.Where(x => x.DaysIdle >= _applied.StagnantDays && x.OnHand > 0).Sum(x => x.InventoryValue), "value"), "orange", "fa-solid fa-coins"),
+            new("قيمة المخزون الراكد", FormatValue(WarehouseReportAggregation.SumKnown(_rows.Where(x => x.DaysIdle >= _applied.StagnantDays && x.OnHand > 0).Select(x => x.InventoryValue)), "value"), "orange", "fa-solid fa-coins"),
             new("عدد الأصناف", CountText(_rows.Count), "violet", "fa-solid fa-boxes-stacked"),
             new("عدد المنتجات", CountText(_rows.Select(x => x.Item.Product.Id).Distinct().Count()), "blue", "fa-solid fa-cube"),
             new("أعلى ركود", CountText(_rows.Where(x => x.DaysIdle < int.MaxValue).Select(x => x.DaysIdle).DefaultIfEmpty().Max()), "green", "fa-solid fa-calendar-xmark")
@@ -379,8 +390,8 @@
         _ =>
         [
             new("إجمالي قيمة المخزون", Metric("value"), "purple", "fa-solid fa-coins"),
-            new("قيمة المخزون المحجوز", FormatValue(_rows.Sum(x => x.Reserved * x.AverageCost), "value"), "orange", "fa-solid fa-lock"),
-            new("الأصناف المتوفرة", CountText(_rows.Count(x => x.Available > 0)), "green", "fa-solid fa-circle-check"),
+            new("قيمة المخزون المحجوز", Metric("reservedValue"), "orange", "fa-solid fa-lock"),
+            new(IsCurrent(_applied)?"الأصناف المتوفرة":"أصناف برصيد موجب", CountText(_rows.Count(x => WarehouseReportAggregation.MatchesStockState("available", x.OnHand, x.Reserved, IsCurrent(_applied)))), "green", "fa-solid fa-circle-check"),
             new("الأصناف النافدة", CountText(_rows.Count(x => x.OnHand <= 0)), "red", "fa-solid fa-circle-xmark"),
             new("عدد الأصناف", CountText(_rows.Count), "violet", "fa-solid fa-boxes-stacked"),
             new("عدد المنتجات", CountText(_rows.Select(x => x.Item.Product.Id).Distinct().Count()), "blue", "fa-solid fa-cube")
@@ -390,7 +401,7 @@
     protected override async Task OnInitializedAsync()
     {
         await LoadReferenceDataAsync();
-        await ApplyAsync();
+        if (_error is null) await ApplyAsync();
     }
 
     private async Task LoadReferenceDataAsync()
@@ -405,8 +416,7 @@
             var productsTask = LoadAllPagesAsync(page => Inventory.GetProductsAsync(page));
             var variantsTask = LoadAllPagesAsync(page => Inventory.GetProductVariantsAsync(page));
             var warehousesTask = LoadAllPagesAsync(page => Inventory.GetWarehousesAsync(page));
-            var balancesTask = LoadAllPagesAsync(page => Inventory.GetInventoryBalancesAsync(page));
-            await Task.WhenAll(settingsTask, categoriesTask, typesTask, brandsTask, unitsTask, productsTask, variantsTask, warehousesTask, balancesTask);
+            await Task.WhenAll(settingsTask, categoriesTask, typesTask, brandsTask, unitsTask, productsTask, variantsTask, warehousesTask);
             var settings = await settingsTask;
             _baseId = settings?.BaseCurrencyId;
             _products = await productsTask;
@@ -416,7 +426,6 @@
             _brands = await brandsTask;
             _units = await unitsTask;
             _warehouses = await warehousesTask;
-            _balances = await balancesTask;
             for (var p = 1; ; p++)
             {
                 var r = await Accounting.GetCurrenciesPageAsync(new PageRequest { PageNumber = p, PageSize = 100 });
@@ -468,7 +477,7 @@
         if (Guid.TryParse(_draft.Variant, out var variantId))
         {
             var item = VariantViews.FirstOrDefault(x => x.Variant.Id == variantId);
-            if (item is not null && item.Category?.Id.ToString() != _draft.Category)
+            if (_draft.Category != "" && item is not null && item.Category?.Id.ToString() != _draft.Category)
             {
                 OnVariant("");
             }
@@ -484,7 +493,9 @@
 
     private async Task ApplyAsync()
     {
+        if (_busy) return;
         _validation = null;
+        if (_draft.ReportType != "prices" && (_draft.To.Date > DateTime.UtcNow.Date || _draft.To.Date == DateTime.MaxValue.Date)) { _validation = "حدد تاريخاً صالحاً."; return; }
         if (NeedsDateRange && _draft.From.Date > _draft.To.Date)
         {
             _validation = "تحقق من تاريخ بداية ونهاية الفترة.";
@@ -508,9 +519,15 @@
                 StagnantDays = _draft.StagnantDays,
                 Currency = _draft.Currency,
                 HideZero = _draft.HideZero,
-                IncludeInactive = _draft.IncludeInactive
+                IncludeInactive = _draft.IncludeInactive,
+                IncludeInactiveWarehouses = _draft.IncludeInactiveWarehouses
             };
 
+            if (next.ReportType == "prices")
+                next = next with { Warehouse = "", StockState = "all", HideZero = false, Currency = null };
+            if (!IsCurrent(next) && WarehouseReportAggregation.IsReservationState(next.StockState)) next.StockState = "all";
+            if (!next.IncludeInactiveWarehouses && Guid.TryParse(next.Warehouse, out var selectedWarehouse) && Warehouses.Any(w=>w.Id==selectedWarehouse&&!w.IsActive))
+            { _validation = "المستودع المحدد غير نشط؛ فعّل تضمين المستودعات غير النشطة أو اختر مستودعاً آخر."; return; }
             var rate = 1m;
             var currency = _baseName;
             if (UsesCurrency && next.Currency is Guid currencyId && currencyId != _baseId)
@@ -522,11 +539,14 @@
                 currency = $"{c.NameAr} ({c.Code})";
             }
 
-            _ledger = [];
-            _transactions = new Dictionary<Guid, InventoryTransactionDto>();
-            if (next.ReportType is "movement-qty" or "movement-cost")
+            _stocks = [];
+            _movements = [];
+            if (next.ReportType != "prices")
             {
-                await LoadMovementDataAsync(next);
+                var mode = next.ReportType is "movement-qty" or "movement-cost" ? "qty" : "details";
+                var stock = await LoadWarehouseDataAsync(next, mode, IsCurrent(next));
+                _stocks = stock.Stocks;
+                _movements = stock.Movements;
             }
 
             _rate = rate;
@@ -551,59 +571,41 @@
         }
     }
 
-    private async Task LoadMovementDataAsync(Filters next)
+    private async Task<WarehouseReportDto> LoadWarehouseDataAsync(Filters f, string mode, bool current)
     {
-        var warehouseId = Guid.TryParse(next.Warehouse, out var parsedWarehouse) ? parsedWarehouse : (Guid?)null;
-        var variantId = Guid.TryParse(next.Variant, out var parsedVariant) ? parsedVariant : (Guid?)null;
-        var toDate = ToEndOfDay(next.To);
-        var ledger = await LoadAllPagesAsync(page => Inventory.GetInventoryLedgerAsync(page, warehouseId: warehouseId, productVariantId: variantId, fromDate: null, toDate: toDate));
-        var transactions = await LoadAllPagesAsync(page => Inventory.GetInventoryTransactionsAsync(page));
-        _ledger = ledger;
-        _transactions = transactions.ToDictionary(x => x.Id);
-    }
-
-    private static DateTimeOffset? ToEndOfDay(DateTime date)
-    {
-        var local = date.Date.AddDays(1).AddTicks(-1);
-        return new DateTimeOffset(local, TimeZoneInfo.Local.GetUtcOffset(local));
+        var from = mode == "details" ? f.To : f.From;
+        var url = $"api/inventory/reports/warehouses?mode={mode}&fromDate={from:yyyy-MM-dd}&toDate={f.To:yyyy-MM-dd}&current={current.ToString().ToLowerInvariant()}";
+        foreach (var pair in new[]{("warehouseId",f.Warehouse),("variantId",f.Variant),("productId",f.Product),("categoryId",f.Category)})
+            if (Guid.TryParse(pair.Item2, out var id)) url += $"&{pair.Item1}={id:D}";
+        return await Api.GetAsync<WarehouseReportDto>(url) ?? throw new InvalidOperationException("لم يرجع الخادم بيانات المخزون.");
     }
 
     private void BuildRows()
     {
-        var filteredItems = VariantViews.Where(MatchFilters).ToArray();
         var list = new List<ProductReportRow>();
-        var selectedWarehouseName = Name(Warehouses, _applied.Warehouse, "جميع المستودعات");
-        var balanceLookup = _balances
-            .Where(x => !Guid.TryParse(_applied.Warehouse, out var warehouseId) || x.WarehouseId == warehouseId)
-            .GroupBy(x => x.ProductVariantId)
-            .ToDictionary(g => g.Key, BuildBalanceAggregate);
-        var movementLookup = BuildMovementLookup();
-                foreach (var item in filteredItems)
+        var warehouseName = Name(Warehouses, _applied.Warehouse, "جميع المستودعات");
+        var allowedWarehouses = _warehouses.Where(w=>_applied.IncludeInactiveWarehouses||w.IsActive).Select(w=>w.Id).ToHashSet();
+        var stocks = _stocks.Where(x=>allowedWarehouses.Contains(x.WarehouseId)).ToLookup(x => x.VariantId);
+        var movements = _movements.Where(x=>allowedWarehouses.Contains(x.WarehouseId)).ToLookup(x => x.VariantId);
+        var current = IsCurrent(_applied);
+        foreach (var item in VariantViews.Where(MatchFilters))
         {
-            balanceLookup.TryGetValue(item.Variant.Id, out var bal);
-            movementLookup.TryGetValue(item.Variant.Id, out var mov);
-            var row = new ProductReportRow(
-                item,
-                selectedWarehouseName,
-                bal.OnHand,
-                bal.Reserved,
-                bal.Available,
-                bal.OnOrder,
-                bal.AverageCost,
-                bal.InventoryValue,
-                bal.LastMovement,
-                mov.OpeningQty,
-                mov.InQty,
-                mov.OutQty,
-                mov.ClosingQty,
-                mov.OpeningCost,
-                mov.InCost,
-                mov.OutCost,
-                mov.ClosingCost,
-                bal.LastMovement is DateTimeOffset dt ? Math.Max(0, (int)Math.Floor((DateTimeOffset.Now - dt).TotalDays)) : int.MaxValue);
+            var balances = stocks[item.Variant.Id].ToArray();
+            var moves = movements[item.Variant.Id].ToArray();
+            var qty = WarehouseReportAggregation.SumFlows(moves.Select(x=>x.Quantity));
+            var cost = WarehouseReportAggregation.SumFlows(moves.Select(x=>x.Cost));
+            var onHand = balances.Sum(x => x.OnHand);
+            var reserved = current ? WarehouseReportAggregation.SumKnown(balances.Select(x => x.Reserved)) : null;
+            var onOrder = current ? WarehouseReportAggregation.SumKnown(balances.Select(x => x.OnOrder)) : null;
+            var value = WarehouseReportAggregation.SumKnown(balances.Select(x => x.Value));
+            var reservedValue = current ? WarehouseReportAggregation.SumKnown(balances.Select(x => WarehouseReportAggregation.ReservedValue(x.Reserved, x.AverageCost))) : null;
+            var last = balances.Select(x => x.LastMovement).DefaultIfEmpty().Max();
+            var days = last.HasValue ? Math.Max(0, (_applied.To.Date - last.Value.UtcDateTime.Date).Days) : int.MaxValue;
+            var row = new ProductReportRow(item, warehouseName, onHand, reserved, onHand-reserved, onOrder,
+                onHand > 0 ? value / onHand : null, value, reservedValue, last,
+                qty.Opening ?? 0, qty.In, qty.Out, qty.Closing ?? 0, cost.Opening, cost.In, cost.Out, cost.Closing, days);
             if (_applied.HideZero && IsZeroRow(row)) continue;
-            if (!MatchesStockState(row)) continue;
-            if (!MatchesSearch(row)) continue;
+            if (!MatchesStockState(row) || !MatchesSearch(row)) continue;
             list.Add(row);
         }
         _rows = list;
@@ -623,60 +625,21 @@
         return true;
     }
 
-    private static (decimal OnHand, decimal Reserved, decimal Available, decimal OnOrder, decimal AverageCost, decimal InventoryValue, DateTimeOffset? LastMovement) BuildBalanceAggregate(IGrouping<Guid, InventoryBalanceDto> group)
-    {
-        var onHand = group.Sum(x => x.OnHandQuantity);
-        var inventoryValue = group.Sum(x => x.InventoryValue);
-        return (
-            onHand,
-            group.Sum(x => x.ReservedQuantity),
-            group.Sum(x => x.AvailableQuantity),
-            group.Sum(x => x.OnOrderQuantity),
-            onHand > 0 ? inventoryValue / onHand : group.Where(x => x.AverageUnitCost > 0).Select(x => x.AverageUnitCost).DefaultIfEmpty().Average(),
-            inventoryValue,
-            group.Max(x => x.LastMovementAtUtc));
-    }
-
-    private IReadOnlyDictionary<Guid, (decimal OpeningQty, decimal InQty, decimal OutQty, decimal ClosingQty, decimal OpeningCost, decimal InCost, decimal OutCost, decimal ClosingCost)> BuildMovementLookup()
-    {
-        var map = new Dictionary<Guid, (decimal, decimal, decimal, decimal, decimal, decimal, decimal, decimal)>();
-        if (_applied.ReportType is not "movement-qty" and not "movement-cost") return map;
-        var from = new DateTimeOffset(_applied.From.Date, TimeZoneInfo.Local.GetUtcOffset(_applied.From.Date));
-        var to = ToEndOfDay(_applied.To) ?? DateTimeOffset.Now;
-        foreach (var group in _ledger.GroupBy(x => x.ProductVariantId))
-        {
-            var ordered = group.OrderBy(x => x.MovementDate).ThenBy(x => x.SequenceNumber).ToArray();
-            var before = ordered.LastOrDefault(x => x.MovementDate < from);
-            var period = ordered.Where(x => x.MovementDate >= from && x.MovementDate <= to).ToArray();
-            var closing = ordered.LastOrDefault(x => x.MovementDate <= to);
-            var openingQty = before?.BalanceAfter ?? 0m;
-            var openingCost = before?.InventoryValueAfter ?? 0m;
-            var incomingQty = period.Sum(x => x.QuantityIn);
-            var outgoingQty = period.Sum(x => x.QuantityOut);
-            var incomingCost = period.Sum(x => x.QuantityIn * x.UnitCost);
-            var outgoingCost = period.Sum(x => x.QuantityOut * x.UnitCost);
-            var closingQty = closing?.BalanceAfter ?? (openingQty + incomingQty - outgoingQty);
-            var closingCost = closing?.InventoryValueAfter ?? (openingCost + incomingCost - outgoingCost);
-            map[group.Key] = (openingQty, incomingQty, outgoingQty, closingQty, openingCost, incomingCost, outgoingCost, closingCost);
-        }
-        return map;
-    }
-
     private bool IsZeroRow(ProductReportRow row) => _applied.ReportType switch
     {
         "movement-qty" => row.OpeningQty == 0 && row.InQty == 0 && row.OutQty == 0 && row.ClosingQty == 0,
         "movement-cost" => row.OpeningCost == 0 && row.InCost == 0 && row.OutCost == 0 && row.ClosingCost == 0,
         "prices" => false,
-        _ => row.OnHand == 0 && row.Reserved == 0 && row.Available == 0 && row.InventoryValue == 0
+        _ => row.OnHand == 0 && row.Reserved.GetValueOrDefault() == 0 && row.OnOrder.GetValueOrDefault() == 0 && row.InventoryValue == 0
     };
 
     private bool MatchesStockState(ProductReportRow row)
     {
+        if (_applied.ReportType == "prices") return true;
+        if (_applied.ReportType == "stagnant" && row.OnHand > 0 && row.DaysIdle < _applied.StagnantDays) return false;
         return _applied.StockState switch
         {
-            "available" => row.Available > 0,
-            "out" => row.OnHand <= 0,
-            "reserved" => row.Reserved > 0,
+            "available" or "out" or "reserved" or "partial" or "full" => WarehouseReportAggregation.MatchesStockState(_applied.StockState, row.OnHand, row.Reserved, IsCurrent(_applied)),
             "stagnant" => row.DaysIdle >= _applied.StagnantDays && row.OnHand > 0,
             _ => _applied.ReportType != "stagnant" || row.OnHand <= 0 || row.DaysIdle >= _applied.StagnantDays
         };
@@ -695,7 +658,7 @@
     private void OnSearch(string value)
     {
         _search = value;
-        BuildRows();
+        if (!_busy && _error is null) BuildRows();
     }
 
     private void SortBy(string key)
@@ -716,7 +679,7 @@
 
     private object? Cell(ProductReportRow row, string key)
     {
-        var totalValue = _rows.Sum(x => x.InventoryValue);
+        var totalValue = key == "share" ? WarehouseReportAggregation.SumKnown(_rows.Select(x => x.InventoryValue)) : null;
         return key switch
         {
             "code" => row.Item.VariantCode,
@@ -733,7 +696,9 @@
             "onOrder" => row.OnOrder,
             "avgCost" => row.AverageCost,
             "value" => row.InventoryValue,
-            "last" => row.LastMovementAt?.ToLocalTime().ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
+            "reservedValue" => row.ReservedValue,
+            "availableValue" => WarehouseReportAggregation.AvailableValue(row.InventoryValue, row.ReservedValue),
+            "last" => row.LastMovementAt?.UtcDateTime.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
             "opening" => _applied.ReportType == "movement-cost" ? row.OpeningCost : row.OpeningQty,
             "incoming" => _applied.ReportType == "movement-cost" ? row.InCost : row.InQty,
             "outgoing" => _applied.ReportType == "movement-cost" ? row.OutCost : row.OutQty,
@@ -741,9 +706,9 @@
             "purchasePrice" => row.Item.Variant.PurchasePrice,
             "sellingPrice" => row.Item.Variant.SellingPrice,
             "active" => row.Item.IsActive ? "نشط" : "غير نشط",
-            "share" => totalValue <= 0 ? 0m : row.InventoryValue / totalValue * 100m,
+            "share" => totalValue > 0 ? row.InventoryValue / totalValue * 100m : null,
             "daysIdle" => row.DaysIdle == int.MaxValue ? null : row.DaysIdle,
-            "stockStatus" => row.OnHand <= 0 ? "نافد" : row.DaysIdle >= _applied.StagnantDays ? "راكد" : row.Available > 0 ? "متوفر" : "محجوز",
+            "stockStatus" => row.OnHand <= 0 ? "نافد" : row.DaysIdle >= _applied.StagnantDays ? "راكد" : (row.Available ?? row.OnHand) > 0 ? (IsCurrent(_applied)?"متوفر":"رصيد موجب") : "محجوز",
             _ => null
         };
     }
@@ -751,21 +716,26 @@
     private object? Total(IReadOnlyCollection<ProductReportRow> rows, string key)
     {
         if (rows.Count == 0) return null;
+        var isQuantity = key is "onHand" or "reserved" or "available" or "onOrder" or "avgCost" ||
+            (_applied.ReportType == "movement-qty" && (key is "opening" or "incoming" or "outgoing" or "closing"));
+        if (isQuantity && (rows.Any(x=>!x.Item.Variant.UnitId.HasValue) || rows.Select(x=>x.Item.Variant.UnitId).Distinct().Count()!=1)) return null;
         return key switch
         {
             "onHand" => rows.Sum(x => x.OnHand),
-            "reserved" => rows.Sum(x => x.Reserved),
-            "available" => rows.Sum(x => x.Available),
-            "onOrder" => rows.Sum(x => x.OnOrder),
-            "avgCost" => rows.Sum(x => x.OnHand) > 0 ? rows.Sum(x => x.InventoryValue) / rows.Sum(x => x.OnHand) : null,
-            "value" => rows.Sum(x => x.InventoryValue),
-            "opening" => _applied.ReportType == "movement-cost" ? rows.Sum(x => x.OpeningCost) : rows.Sum(x => x.OpeningQty),
+            "reserved" => WarehouseReportAggregation.SumKnown(rows.Select(x => x.Reserved)),
+            "available" => WarehouseReportAggregation.SumKnown(rows.Select(x => x.Available)),
+            "onOrder" => WarehouseReportAggregation.SumKnown(rows.Select(x => x.OnOrder)),
+            "avgCost" => rows.Sum(x => x.OnHand) > 0 ? WarehouseReportAggregation.SumKnown(rows.Select(x => x.InventoryValue)) / rows.Sum(x => x.OnHand) : null,
+            "value" => WarehouseReportAggregation.SumKnown(rows.Select(x => x.InventoryValue)),
+            "reservedValue" => WarehouseReportAggregation.SumKnown(rows.Select(x => x.ReservedValue)),
+            "availableValue" => WarehouseReportAggregation.SumKnown(rows.Select(x => WarehouseReportAggregation.AvailableValue(x.InventoryValue, x.ReservedValue))),
+            "opening" => _applied.ReportType == "movement-cost" ? WarehouseReportAggregation.SumKnown(rows.Select(x => x.OpeningCost)) : rows.Sum(x => x.OpeningQty),
             "incoming" => _applied.ReportType == "movement-cost" ? rows.Sum(x => x.InCost) : rows.Sum(x => x.InQty),
             "outgoing" => _applied.ReportType == "movement-cost" ? rows.Sum(x => x.OutCost) : rows.Sum(x => x.OutQty),
-            "closing" => _applied.ReportType == "movement-cost" ? rows.Sum(x => x.ClosingCost) : rows.Sum(x => x.ClosingQty),
+            "closing" => _applied.ReportType == "movement-cost" ? WarehouseReportAggregation.SumKnown(rows.Select(x => x.ClosingCost)) : rows.Sum(x => x.ClosingQty),
             "purchasePrice" => rows.Average(x => x.Item.Variant.PurchasePrice),
             "sellingPrice" => rows.Average(x => x.Item.Variant.SellingPrice),
-            "share" => 100m,
+            "share" => WarehouseReportAggregation.SumKnown(rows.Select(x => x.InventoryValue)) > 0 ? 100m : null,
             _ => null
         };
     }
@@ -781,7 +751,7 @@
             decimal d when key == "share" => d.ToString("N2", CultureInfo.InvariantCulture) + "%",
             decimal d when _applied.ReportType == "movement-cost" => (d / _rate).ToString("N2", CultureInfo.InvariantCulture),
             decimal d when _applied.ReportType == "movement-qty" => d.ToString("#,##0.###", CultureInfo.InvariantCulture),
-            decimal d when key is "purchasePrice" or "sellingPrice" or "avgCost" or "value" => (d / _rate).ToString("N2", CultureInfo.InvariantCulture),
+            decimal d when key is "purchasePrice" or "sellingPrice" or "avgCost" or "value" or "reservedValue" or "availableValue" => (d / _rate).ToString("N2", CultureInfo.InvariantCulture),
             decimal d when key is "onHand" or "reserved" or "available" or "onOrder" or "opening" or "incoming" or "outgoing" or "closing" => d.ToString("#,##0.###", CultureInfo.InvariantCulture),
             decimal d when AppliedUsesCurrency => (d / _rate).ToString("N2", CultureInfo.InvariantCulture),
             decimal d => d.ToString("#,##0.###", CultureInfo.InvariantCulture),
@@ -792,16 +762,17 @@
 
     private string Metric(string key) => _busy || _error is not null ? "—" : FormatValue(Total(_rows, key), key);
     private string CountText(int n) => _busy || _error is not null ? "—" : n.ToString("N0", CultureInfo.InvariantCulture);
-    private string Subtitle => $"{ReportTypeName(_applied.ReportType)} | {(AppliedNeedsDateRange ? $"{_applied.From:dd/MM/yyyy} – {_applied.To:dd/MM/yyyy}" : $"حتى {_applied.To:dd/MM/yyyy}")} | {string.Join(" | ", Chips.Select(c => $"{c.Label}: {c.Value}"))}";
+    private string Subtitle => string.Join(" | ", Chips.Select(c => $"{c.Label}: {c.Value}")) + $" | البحث: {_search}" + (_applied.ReportType == "prices" ? " | الأسعار المرجعية الحالية" : " | حدود يوم UTC؛ الشرطة تعني قيمة غير متاحة أو كميات بوحدات مختلفة" + (!IsCurrent(_applied)?"؛ الحجوزات وقيد الطلب غير متاحين تاريخياً":""));
     private string[] ExportHeaders => CurrentColumns.Select(c => c.Label).ToArray();
     private IEnumerable<object?[]> ExportRows() => _rows.Select(r => CurrentColumns.Select(c => Cell(r, c.Key)).ToArray());
     private object? NormalizeExportValue(object? value, string key) => value is decimal d && ShouldConvertCurrency(key) ? d / _rate : value;
-    private bool ShouldConvertCurrency(string key) => _applied.ReportType == "movement-cost" || key is "purchasePrice" or "sellingPrice" or "avgCost" or "value";
+    private bool ShouldConvertCurrency(string key) => _applied.ReportType == "movement-cost" || key is "purchasePrice" or "sellingPrice" or "avgCost" or "value" or "reservedValue" or "availableValue";
 
     private async Task ExportAsync()
     {
         if (!CanExport) return;
-        var bytes = CustomerDebtsWorkbook.Create(Subtitle, ExportHeaders, _rows.Select(r => CurrentColumns.Select(c => NormalizeExportValue(Cell(r, c.Key), c.Key)).ToArray()), sheetName: "المنتجات");
+        var totals = CurrentColumns.Select((c,i)=>i==0?(object?)"إجمالي النتائج":i<IdentityCount?null:NormalizeExportValue(Total(_rows,c.Key),c.Key)).ToArray();
+        var bytes = CustomerDebtsWorkbook.Create(Subtitle, ExportHeaders, _rows.Select(r => CurrentColumns.Select(c => NormalizeExportValue(Cell(r, c.Key), c.Key)).ToArray()).Append(totals), sheetName: "المنتجات");
         await using var module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/customer-debts-export.js");
         await module.InvokeVoidAsync("saveWorkbook", Convert.ToBase64String(bytes), "products-report.xlsx");
     }
@@ -817,7 +788,7 @@
     {
         "movement-qty" => "حركة المنتجات - كميات",
         "movement-cost" => "حركة المنتجات - تكاليف",
-        "prices" => "قائمة المنتجات والأسعار",
+        "prices" => "قائمة الأسعار الحالية",
         "valuation" => "تقييم المخزون",
         "stagnant" => "المنتجات الراكدة والنوافد",
         _ => "أرصدة المنتجات"
@@ -826,7 +797,9 @@
     {
         "available" => "متوفر",
         "out" => "نافد",
-        "reserved" => "محجوز",
+        "reserved" => "له حجز",
+        "partial" => "محجوز جزئياً",
+        "full" => "محجوز بالكامل",
         "stagnant" => "راكد",
         _ => "الكل"
     };
@@ -836,6 +809,6 @@
         var propId = typeof(T).GetProperty("Id");
         var propName = typeof(T).GetProperty("Name") ?? typeof(T).GetProperty("NameAr");
         var item = items.FirstOrDefault(x => propId?.GetValue(x) is Guid g && g == parsed);
-        return propName?.GetValue(item)?.ToString() ?? fallback;
+        return item is null ? fallback : propName?.GetValue(item)?.ToString() ?? fallback;
     }
 }

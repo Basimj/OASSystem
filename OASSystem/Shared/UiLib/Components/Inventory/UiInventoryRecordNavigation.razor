@@ -1,0 +1,11 @@
+<nav class="inv-record-nav" dir="ltr" aria-label="التنقل بين السجلات">
+    <button type="button" title="السجل الأول" aria-label="السجل الأول" disabled="@(!CanPrevious)" @onclick="() => OnNavigate.InvokeAsync(-2)"><i class="fa-solid fa-angles-left" aria-hidden="true"></i></button>
+    <button type="button" title="السجل السابق" aria-label="السجل السابق" disabled="@(!CanPrevious)" @onclick="() => OnNavigate.InvokeAsync(-1)"><i class="fa-solid fa-angle-left" aria-hidden="true"></i></button>
+    <button type="button" title="السجل التالي" aria-label="السجل التالي" disabled="@(!CanNext)" @onclick="() => OnNavigate.InvokeAsync(1)"><i class="fa-solid fa-angle-right" aria-hidden="true"></i></button>
+    <button type="button" title="السجل الأخير" aria-label="السجل الأخير" disabled="@(!CanNext)" @onclick="() => OnNavigate.InvokeAsync(2)"><i class="fa-solid fa-angles-right" aria-hidden="true"></i></button>
+</nav>
+@code {
+    [Parameter] public bool CanPrevious { get; set; }
+    [Parameter] public bool CanNext { get; set; }
+    [Parameter] public EventCallback<int> OnNavigate { get; set; }
+}

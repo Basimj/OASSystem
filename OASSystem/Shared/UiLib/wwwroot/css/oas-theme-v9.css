@@ -29,7 +29,7 @@
 .oas-shell .oas-sidebar :is(.oas-nav-item,.oas-nav-group__header) {font-size:var(--oas-sidebar-nav-font-size,13px)}
 .oas-shell .oas-sidebar .oas-nav-item--child {font-size:var(--oas-sidebar-child-font-size,12px)}
 .oas-shell .oas-sidebar .oas-nav-text {font-size:inherit}
-.oas-shell.sidebar-collapsed .oas-sidebar .oas-nav-text {font-size:calc(8px * var(--oas-ui-font-scale,1))}
+.oas-shell[data-sidebar-collapsed="true"] .oas-sidebar .oas-nav-text {font-size:calc(8px * var(--oas-ui-font-scale,1))}
 /* Expanded settings group is a parent, not a duplicate standalone page. */
 .oas-sidebar .oas-nav-settings-group {margin-block:6px 10px}
 .oas-sidebar .oas-nav-settings-group > .oas-nav-group__header {font-weight:700}
@@ -110,13 +110,13 @@
 .oas-shell.oas-theme-dark .oas-main-inner :is(
   .form-control,.form-select,input:not([type=checkbox]):not([type=radio]):not([type=color]):not([type=range]),
   select,textarea,[class^="ui-"][class*="__input"]
-) {
+):not(.oas-inventory-catalog *) {
   background-color:var(--oas-theme-input-bg) !important;
   border-color:#464b54 !important;
   color:var(--oas-theme-text) !important;
   caret-color:var(--oas-theme-text);
 }
-.oas-shell.oas-theme-dark .oas-main-inner :is(input,textarea)::placeholder {color:#b5bec9 !important;opacity:1}
+.oas-shell.oas-theme-dark .oas-main-inner :is(input,textarea):not(.oas-inventory-catalog *)::placeholder {color:#b5bec9 !important;opacity:1}
 .oas-shell.oas-theme-dark .oas-main-inner :is(.btn-light,.btn-outline-secondary,.ui-action-button,.ui-toolbar-button) {
   background-color:#26292e !important;
   color:#f3f5f7 !important;

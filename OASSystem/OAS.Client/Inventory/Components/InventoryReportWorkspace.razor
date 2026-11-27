@@ -26,14 +26,18 @@ else
                     <h1>@Title</h1>
                     @if (!string.IsNullOrWhiteSpace(StatusText))
                     {
-                        <span class="oas-report__status"><i class="fa-solid fa-filter" aria-hidden="true"></i> @StatusText</span>
+                        <span class="oas-report__status">@StatusText</span>
                     }
                 </div>
                 <div class="oas-report__toolbar">
                     @Actions
+                    @if (Search is not null)
+                    {
+                        <div class="inventory-toolbar-search">@Search</div>
+                    }
                     @if (ShowFilters)
                     {
-                        <button type="button" class="oas-report__tool" title="إظهار أو إخفاء الفلاتر"
+                        <button type="button" class="oas-report__tool inventory-filter-toggle @(_filtersOpen ? "inventory-filter-toggle--active" : null)" title="إظهار أو إخفاء الفلاتر"
                                 aria-label="إظهار أو إخفاء الفلاتر" aria-expanded="@(_filtersOpen ? "true" : "false")"
                                 @onclick="ToggleFilters"><i class="fa-solid fa-filter" aria-hidden="true"></i></button>
                     }
@@ -84,6 +88,7 @@ else
     [Parameter] public bool ShowFilters { get; set; }
     [Parameter] public EventCallback ResetFilters { get; set; }
     [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public RenderFragment? Search { get; set; }
     [Parameter] public RenderFragment? Filters { get; set; }
     [Parameter] public RenderFragment? QuickFilters { get; set; }
     [Parameter, EditorRequired] public RenderFragment? Content { get; set; }

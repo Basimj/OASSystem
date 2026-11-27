@@ -10,12 +10,12 @@
 
 @using OAS.UiLib.Components.Spreadsheets
 <PageTitle>حركات المخزون | OAS</PageTitle>
-<span class="oas-inventory-view" hidden aria-hidden="true"></span>
 
-<InventoryReportWorkspace Title="حركات المخزون" TitleIcon="fa-solid fa-list" StatusText="@($"{FilteredEntries.Count} حركة")" ShowFilters="true" ResetFilters="ResetLedgerFilters">
+
+<UiWorkspaceLayout AdditionalCssClass="oas-inventory-workspace" ShowAside="false" ShowFilters="true">
     <Actions>
         <UiWorkspaceActionBar>
-            <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary"
+            <UiButton Text="تحديث" AdditionalCssClass="inv-refresh" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary"
                       Size="ControlSize.Small" Loading="@_loading" OnClick="RefreshAsync" />
             <UiSpreadsheetActions CanImport="false" Busy="@(_exporting || !string.IsNullOrWhiteSpace(_dateFilterError))" OnExport="ExportAsync" />
             @if (VariantIdFromQuery.HasValue || TransactionIdFromQuery.HasValue)
@@ -31,13 +31,13 @@
 
     <Filters>
         <UiWorkspaceFilterBar Compact="true">
-            <UiSearchableSelect Label="المخزن"
+            <UiSearchableSelect InlineDropdown="true" UseAngleDownIcon="true" Label="المخزن"
                       Value="@_warehouseFilter"
                       ValueExpression="@(() => _warehouseFilter)"
                       ValueChanged="@(v => _warehouseFilter = v)"
                       Options="@WarehouseFilterOptions"
                       Size="ControlSize.Small" />
-            <UiSearchableSelect Label="الحركة"
+            <UiSearchableSelect InlineDropdown="true" UseAngleDownIcon="true" Label="الحركة"
                       Value="@_movementFilter"
                       ValueExpression="@(() => _movementFilter)"
                       ValueChanged="@(v => _movementFilter = v)"
@@ -58,15 +58,10 @@
         </UiWorkspaceFilterBar>
     </Filters>
 
-    
-    <QuickFilters>
-        <div class="oas-report__chip"><span>المخزن:</span><strong>@(WarehouseFilterOptions.FirstOrDefault(x => x.Value == _warehouseFilter)?.Text ?? "الكل")</strong></div>
-        <div class="oas-report__chip"><span>الحركة:</span><strong>@(InventoryArabicPresenter.MovementTypeOptions.FirstOrDefault(x => x.Value == _movementFilter)?.Text ?? "الكل")</strong></div>
-        <div class="oas-report__chip"><span>من:</span><strong>@(_fromDate?.ToString("yyyy/MM/dd") ?? "الكل")</strong></div>
-        <div class="oas-report__chip"><span>إلى:</span><strong>@(_toDate?.ToString("yyyy/MM/dd") ?? "الكل")</strong></div>
-    </QuickFilters>
     <Content>
-                        @if (_loading)
+        <UiDataGridPanel Title="حركات المخزون" Subtitle="@($"{FilteredEntries.Count} حركة")">
+            <Body>
+                @if (_loading)
                 {
                     <UiAlert Message="جاري تحميل حركات المخزون..." />
                 }
@@ -76,8 +71,8 @@
                 }
                 else
                 {
-                    <InventoryReportTable TItem="InventoryLedgerDto" Items="@FilteredEntries" PageSize="12" Headers="@LedgerHeaders" EmptyText="لا توجد حركات مطابقة للفلاتر الحالية."
-                                 SidebarTypography="true"
+                    <UiDataTable TItem="InventoryLedgerDto" Items="@FilteredEntries" PageSize="12" Headers="@LedgerHeaders" EmptyText="لا توجد حركات مطابقة للفلاتر الحالية."
+                                 SidebarTypography="false"
                                  UniformCellTypography="true" Compact="true">
                         <RowTemplate Context="entry">
                             <td>@InventoryDisplayFormat.DateTime(entry.MovementDate.ToLocalTime())</td>
@@ -102,21 +97,14 @@
                                 </div>
                             </td>
                         </RowTemplate>
-                    </InventoryReportTable>
+                    </UiDataTable>
                 }
-            
+            </Body>
+        </UiDataGridPanel>
     </Content>
-</InventoryReportWorkspace>
+</UiWorkspaceLayout>
 
 @code {
-    private void ResetLedgerFilters()
-    {
-        _search = _movementFilter = null;
-        _warehouseFilter = WarehouseIdFromQuery?.ToString("D");
-        _fromDate = _toDate = null;
-        ValidateDateRange();
-    }
-
     [Inject] private IInventoryClientService Inventory { get; set; } = default!;
     [Inject] private InventorySpreadsheetClient SpreadsheetClient { get; set; } = default!;
     [Inject] private BrowserFileDownloadService SpreadsheetDownload { get; set; } = default!;
@@ -128,9 +116,6 @@
 
     [Parameter, SupplyParameterFromQuery(Name = "transactionId")]
     public Guid? TransactionIdFromQuery { get; set; }
-
-    [Parameter, SupplyParameterFromQuery(Name = "warehouseId")]
-    public Guid? WarehouseIdFromQuery { get; set; }
 
     private IReadOnlyList<InventoryLedgerDto> _entries = [];
     private static readonly IReadOnlyList<string> LedgerHeaders = ["التاريخ", "رقم الحركة", "النوع", "المنتج / SKU", "المخزن", "داخل", "خارج", "الرصيد", "التكلفة", "متوسط التكلفة", "القيمة", "المصدر", "إجراءات"];
@@ -171,15 +156,7 @@
         }).OrderByDescending(x => x.SequenceNumber).ToArray()
         : [];
 
-    private (Guid?, Guid?, Guid?)? _routeScope;
-    protected override async Task OnParametersSetAsync()
-    {
-        var scope = (VariantIdFromQuery, TransactionIdFromQuery, WarehouseIdFromQuery);
-        if (_routeScope == scope) return;
-        _routeScope = scope;
-        _warehouseFilter = WarehouseIdFromQuery?.ToString("D");
-        await LoadAsync();
-    }
+    protected override async Task OnInitializedAsync() => await LoadAsync();
 
     private async Task LoadAsync()
     {

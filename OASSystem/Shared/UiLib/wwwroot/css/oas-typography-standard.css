@@ -40,7 +40,7 @@
     font-size: var(--oas-type-subnav);
     line-height: 1.45;
 }
-.oas-shell.sidebar-collapsed .oas-sidebar .oas-nav-text {
+.oas-shell[data-sidebar-collapsed="true"] .oas-sidebar .oas-nav-text {
     font-size: calc(10.5px * var(--oas-ui-font-scale, 1));
     line-height: 1.3;
 }

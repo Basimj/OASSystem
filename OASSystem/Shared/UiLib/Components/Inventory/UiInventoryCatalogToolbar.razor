@@ -1,0 +1,46 @@
+@namespace OAS.UiLib.Components.Inventory
+@using OAS.UiLib.Components.Spreadsheets
+<div class="inv-actions">
+    <UiButton Text="إضافة جديد" AdditionalCssClass="inv-add" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small" Disabled="@(Editing || Saving || Loading || SpreadsheetBusy)" OnClick="OnCreate" />
+    <UiButton Text="تعديل" AdditionalCssClass="inv-edit" IconCssClass="fa-solid fa-pen" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(!CanEdit || Loading || Saving || SpreadsheetBusy)" OnClick="OnEdit" />
+    <UiButton Text="حفظ" AdditionalCssClass="inv-save" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small" Disabled="@(!CanSave || Saving || Loading)" Loading="@Saving" OnClick="OnSave" />
+    @if (Editing)
+    {
+        <UiButton Text="إلغاء" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@Saving" OnClick="OnCancel" />
+    }
+    <UiButton Text="تحديث" AdditionalCssClass="inv-refresh" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(Editing || Saving || SpreadsheetBusy)" Loading="@Loading" OnClick="OnRefresh" />
+    @ExtraActions
+    <details class="inv-excel">
+        <summary>ملفات Excel <i class="fa-solid fa-angle-down" aria-hidden="true"></i></summary>
+        <div class="inv-excel-menu">
+            <UiSpreadsheetActions CanImport="true" Busy="@(SpreadsheetBusy || Editing || Saving || Loading)" OnImport="OnImport" OnTemplate="OnTemplate" OnExport="OnExport" />
+        </div>
+    </details>
+</div>
+<div class="inv-toolbar-navigation">
+    <UiSearchInput Value="@Search" ValueChanged="SearchChanged" Placeholder="ابحث بالاسم أو الرمز..." AriaLabel="البحث في السجلات" ClearText="مسح البحث" Disabled="@(Editing || Saving || Loading)" DebounceMilliseconds="250" OnSearch="OnSearch" />
+    <UiInventoryRecordNavigation CanPrevious="@CanPrevious" CanNext="@CanNext" OnNavigate="OnNavigate" />
+</div>
+@code {
+    [Parameter] public bool Editing { get; set; }
+    [Parameter] public bool Saving { get; set; }
+    [Parameter] public bool Loading { get; set; }
+    [Parameter] public bool SpreadsheetBusy { get; set; }
+    [Parameter] public bool CanEdit { get; set; }
+    [Parameter] public bool CanSave { get; set; }
+    [Parameter] public bool CanPrevious { get; set; }
+    [Parameter] public bool CanNext { get; set; }
+    [Parameter] public string? Search { get; set; }
+    [Parameter] public EventCallback<string?> SearchChanged { get; set; }
+    [Parameter] public EventCallback<string?> OnSearch { get; set; }
+    [Parameter] public EventCallback<int> OnNavigate { get; set; }
+    [Parameter] public EventCallback<MouseEventArgs> OnCreate { get; set; }
+    [Parameter] public EventCallback<MouseEventArgs> OnEdit { get; set; }
+    [Parameter] public EventCallback<MouseEventArgs> OnSave { get; set; }
+    [Parameter] public EventCallback<MouseEventArgs> OnCancel { get; set; }
+    [Parameter] public EventCallback<MouseEventArgs> OnRefresh { get; set; }
+    [Parameter] public EventCallback OnImport { get; set; }
+    [Parameter] public EventCallback OnTemplate { get; set; }
+    [Parameter] public EventCallback OnExport { get; set; }
+    [Parameter] public RenderFragment? ExtraActions { get; set; }
+}

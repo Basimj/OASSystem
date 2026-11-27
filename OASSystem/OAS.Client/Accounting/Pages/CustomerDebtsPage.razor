@@ -11,9 +11,9 @@
 @inject IJSRuntime JS
 @inject IApiFeedbackService ApiFeedback
 
-<PageTitle>أسماء العملاء | OAS</PageTitle>
+<PageTitle>العملاء | OAS</PageTitle>
 <div class="customer-debts-report">
-<UiReportWorkspace Title="أسماء العملاء" StatusText="@(_busy ? "جارٍ التحميل" : _error is null ? "مديونية العملاء" : "تعذر التحميل")" Search="@_search" SearchChanged="OnSearch" FiltersOpen="@_filtersOpen" FiltersOpenChanged="@(v => _filtersOpen = v)">
+<UiReportWorkspace Title="العملاء" StatusText="@(_busy ? "جارٍ التحميل" : _error is null ? "مديونية العملاء" : "تعذر التحميل")" Search="@_search" SearchChanged="OnSearch" FiltersOpen="@_filtersOpen" FiltersOpenChanged="@(v => _filtersOpen = v)">
     <Toolbar>
         <button type="button" class="oas-report__tool" title="تحديث" disabled="@_busy" @onclick="RefreshAsync"><i class="fa-solid fa-rotate"></i></button>
         <button type="button" class="oas-report__tool oas-report__tool--pdf" title="طباعة أو حفظ PDF" disabled="@(!CanExport)" @onclick="PrintAsync"><i class="fa-regular fa-file-pdf"></i></button>
@@ -33,14 +33,13 @@
                 <UiReportSearchPicker Label="العميل" ItemLabel="عميل" DialogTitle="اختيار العميل" SearchPlaceholder="ابحث باسم العميل أو رقمه..." Value="@_draft.Customer" ValueChanged="OnCustomer" Options="@_options" Placeholder="جميع العملاء" />
             </div>
             <label class="oas-report__field">إلى تاريخ<input type="date" @bind="_draft.AsOf" @bind:format="yyyy-MM-dd" /></label>
-            <label class="oas-report__field">الفرع<select disabled title="بيانات الذمم الحالية لا تدعم التصفية حسب الفرع"><option>جميع الفروع</option></select></label>
             <label class="oas-report__field">العملة<select @bind="_draft.Currency"><option value="">@_baseName (الأساسية)</option>@foreach (var c in _currencies.Where(x => x.IsActive && x.Id != _baseId)){<option value="@c.Id">@c.NameAr (@c.Code)</option>}</select></label>
             <label class="oas-report__field">نوع التقرير<select @bind="_draft.Mode"><option value="summary">إجمالي حسب العميل</option><option value="detail">تفصيلي حسب الفاتورة</option><option value="aging">أعمار الديون</option></select></label>
             <label class="oas-report__field">حالة الرصيد<select @bind="_draft.Balance"><option value="debit">مدين</option><option value="credit">دائن</option><option value="all">الكل</option><option value="nonzero">غير صفري</option><option value="zero">صفري</option></select></label>
             <label class="oas-report__field" title="اختيار العملاء الذين لديهم فواتير بالحالة المحددة">حالة الاستحقاق<select @bind="_draft.Due"><option value="all">الكل</option><option value="due">مستحق</option><option value="future">غير مستحق</option><option value="today">مستحق اليوم</option><option value="overdue">متأخر</option><option value="unknown">استحقاق غير محدد</option></select></label>
             <div class="oas-report__date-pair">
-                <label class="oas-report__field">من مبلغ<input type="number" min="0" step="any" @bind="_draft.Min" placeholder="بدون حد" /></label>
-                <label class="oas-report__field">إلى مبلغ<input type="number" min="0" step="any" @bind="_draft.Max" placeholder="بدون حد" /></label>
+                <label class="oas-report__field">مطلق رصيد العميل من<input type="number" min="0" step="any" @bind="_draft.Min" placeholder="بدون حد" /></label>
+                <label class="oas-report__field">مطلق رصيد العميل إلى<input type="number" min="0" step="any" @bind="_draft.Max" placeholder="بدون حد" /></label>
             </div>
             <label class="oas-report__field-check"><input type="checkbox" @bind="_draft.IncludeInactive" /> تضمين العملاء غير النشطين</label>
             @if (_validation is not null){<div role="alert" class="debt-validation">@_validation</div>}
@@ -135,7 +134,7 @@
     private (string Label,string Value,string Icon)[] Chips => [
         ("العميل",_options.FirstOrDefault(x=>x.Value==_applied.Customer)?.Text??"جميع العملاء","fa-solid fa-users"),
         ("إلى تاريخ",_applied.AsOf.ToString("dd/MM/yyyy",CultureInfo.InvariantCulture),"fa-regular fa-calendar"),
-        ("الفرع","جميع الفروع","fa-solid fa-building"),("العملة",_currencyName,"fa-solid fa-coins"),("نوع التقرير",ModeName(_applied.Mode),"fa-regular fa-file-lines"),
+        ("العملة",_currencyName,"fa-solid fa-coins"),("نوع التقرير",ModeName(_applied.Mode),"fa-regular fa-file-lines"),
         ("الرصيد",BalanceName(_applied.Balance),"fa-solid fa-wallet"),("الاستحقاق",DueName(_applied.Due),"fa-solid fa-clock")];
     protected override async Task OnInitializedAsync()
     {
@@ -244,5 +243,5 @@
     private string Display(object? v)=>v switch{null=>"—",decimal d=>Money(d),DateOnly date=>date.ToString("dd/MM/yyyy",CultureInfo.InvariantCulture),_=>v.ToString()??""};
     private string ReportSubtitle=>$"حتى {_applied.AsOf:dd/MM/yyyy} | {_currencyName} | {ModeName(_applied.Mode)} | الأرصدة من القيود المرحلة والاستحقاقات من الفواتير المفتوحة | نطاق الرصيد المطلق: {_applied.Min?.ToString()??"—"} – {_applied.Max?.ToString()??"—"} | غير النشطين: {(_applied.IncludeInactive?"نعم":"لا")} | البحث: {_search}";
     private async Task PrintAsync(){if(!CanExport)return;await using var m=await JS.InvokeAsync<IJSObjectReference>("import","./js/customer-debts-export.js");await m.InvokeVoidAsync("printReport","مديونية العملاء",ReportSubtitle,Chips.Select(x=>$"{x.Label}: {x.Value}").ToArray(),Columns.Select(x=>x.Label).ToArray(),_rows.Select(r=>r.Cells.Select(Display).ToArray()).ToArray());}
-    private async Task ExportAsync(){if(!CanExport)return;var bytes=CustomerDebtsWorkbook.Create(ReportSubtitle,Columns.Select(x=>x.Label).ToArray(),_rows.Select(r=>r.Cells.Select(x=>x is decimal d?(object)(d/_rate):x is DateOnly date?date.ToString("yyyy-MM-dd",CultureInfo.InvariantCulture):x).ToArray()));await using var m=await JS.InvokeAsync<IJSObjectReference>("import","./js/customer-debts-export.js");await m.InvokeVoidAsync("saveWorkbook",Convert.ToBase64String(bytes),"customer-debts.xlsx");}
+    private async Task ExportAsync(){if(!CanExport)return;var bytes=CustomerDebtsWorkbook.Create(ReportSubtitle+" | "+string.Join(" | ",Chips.Select(x=>$"{x.Label}: {x.Value}")),Columns.Select(x=>x.Label).ToArray(),_rows.Select(r=>r.Cells.Select(x=>x is decimal d?(object)(d/_rate):x is DateOnly date?date.ToString("yyyy-MM-dd",CultureInfo.InvariantCulture):x).ToArray()));await using var m=await JS.InvokeAsync<IJSObjectReference>("import","./js/customer-debts-export.js");await m.InvokeVoidAsync("saveWorkbook",Convert.ToBase64String(bytes),"customer-debts.xlsx");}
 }

@@ -66,6 +66,7 @@ public sealed class AccountingReportsController(ISender sender) : ControllerBase
         [FromQuery] Guid? supplierId = null,
         [FromQuery] string? reference = null,
         [FromQuery] bool includeOpeningBalance = true,
+        [FromQuery] Guid? costCenterId = null,
         CancellationToken cancellationToken = default)
     {
         var result = await sender.Send(
@@ -81,7 +82,7 @@ public sealed class AccountingReportsController(ISender sender) : ControllerBase
                 customerId,
                 supplierId,
                 reference,
-                includeOpeningBalance),
+                includeOpeningBalance, costCenterId),
             cancellationToken);
         return Ok(result);
     }

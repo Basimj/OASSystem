@@ -100,9 +100,9 @@ public sealed class WarehouseReportService(OasDbContext db) : IWarehouseReportSe
                     qty.Add(g.TransactionType,g.Purchase,g.In,g.Out);cost.Add(g.TransactionType,g.Purchase,g.InCost,g.OutCost);
                 }
                 var closingCost=Snapshot(s.ClosingSeq,s.AfterEnd);
-                if(q.Mode is "summary" or "details")
-                    stocks.Add(new(s.WarehouseId,s.ProductVariantId,closing,null,null,closing>0?closingCost/closing:null,closingCost,s.Last));
-                else movements.Add(new(s.WarehouseId,s.ProductVariantId,qty.Output(opening,closing),cost.Output(Snapshot(s.BeforeSeq,s.AfterStart),closingCost)));
+                // Include cutoff stock with movement reports too; both views share the same snapshots.
+                stocks.Add(new(s.WarehouseId,s.ProductVariantId,closing,null,null,closing>0?closingCost/closing:null,closingCost,s.Last));
+                if(q.Mode is not ("summary" or "details")) movements.Add(new(s.WarehouseId,s.ProductVariantId,qty.Output(opening,closing),cost.Output(Snapshot(s.BeforeSeq,s.AfterStart),closingCost)));
             }
         }
         return new(warehouses,categories,items,stocks,movements,transfers,counts);

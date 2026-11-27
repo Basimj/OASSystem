@@ -1641,6 +1641,7 @@ public sealed class AccountingClientService(
         AddGuid(query, "accountId", filter.AccountId);
         AddGuid(query, "customerId", filter.CustomerId);
         AddGuid(query, "supplierId", filter.SupplierId);
+        AddGuid(query, "costCenterId", filter.CostCenterId);
         if (filter.JournalType.HasValue) query.Add($"journalType={(byte)filter.JournalType.Value}");
         AddText(query, "sourceModule", filter.SourceModule);
         AddText(query, "reference", filter.Reference);

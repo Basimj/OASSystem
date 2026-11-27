@@ -12,6 +12,7 @@ public partial class UiSearchableSelect
     private readonly string _popoverId = $"oas-searchable-options-{Guid.NewGuid():N}";
     private readonly string _errorId = $"oas-searchable-error-{Guid.NewGuid():N}";
     private string _search = string.Empty;
+    private string AnchorName => $"--{_triggerId}";
 
     [Parameter] public string? Label { get; set; }
     [Parameter] public string? Value { get; set; }
@@ -21,6 +22,8 @@ public partial class UiSearchableSelect
     [Parameter] public string? Placeholder { get; set; }
     [Parameter] public string? ErrorText { get; set; }
     [Parameter] public string EmptyText { get; set; } = "لا توجد عناصر مطابقة.";
+    [Parameter] public bool InlineDropdown { get; set; }
+    [Parameter] public bool UseAngleDownIcon { get; set; }
     [Parameter] public bool Required { get; set; }
     [Parameter] public bool Disabled { get; set; }
     [Parameter] public ControlSize Size { get; set; } = ControlSize.Small;

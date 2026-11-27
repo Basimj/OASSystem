@@ -8,12 +8,21 @@
             @Label @if (Required) { <span aria-hidden="true">*</span> }
         </label>
     }
-    <button id="@_triggerId" type="button" class="@TriggerClass"
+    <button id="@_triggerId" type="button" class="@TriggerClass" style="@(InlineDropdown ? $"anchor-name: {AnchorName}" : null)"
             popovertarget="@_popoverId" disabled="@Disabled" aria-haspopup="dialog"
             aria-controls="@_popoverId" aria-invalid="@HasError.ToString().ToLowerInvariant()"
             aria-describedby="@(HasError ? _errorId : null)" @onclick="ResetSearch">
         <span class="ui-searchable-select__selected">@SelectedText</span>
-        <span aria-hidden="true" class="ui-searchable-select__chevron">▾</span>
+        <span aria-hidden="true" class="ui-searchable-select__chevron">
+            @if (UseAngleDownIcon)
+            {
+                <i class="fa-solid fa-angle-down"></i>
+            }
+            else
+            {
+                <text>▾</text>
+            }
+        </span>
     </button>
     @if (HasError)
     {
@@ -23,14 +32,18 @@
 
 @* The native HTML popover enters the browser top layer. Unlike an inline menu,
    it is not clipped by UiCard or UiWorkspaceLayout's overflow:hidden rules. *@
-<div id="@_popoverId" class="ui-searchable-select__popover" popover="auto"
+<div id="@_popoverId" class="@(InlineDropdown ? "ui-searchable-select__popover ui-searchable-select__popover--dropdown" : "ui-searchable-select__popover")"
+     style="@(InlineDropdown ? $"position-anchor: {AnchorName}" : null)" data-dropdown-anchor="@(InlineDropdown ? _triggerId : null)" popover="auto"
      role="dialog" aria-label="@DialogTitle" dir="rtl">
-    <div class="ui-searchable-select__popover-header">
-        <strong>@DialogTitle</strong>
-        <button type="button" class="ui-searchable-select__close" popovertarget="@_popoverId"
-                popovertargetaction="hide" aria-label="إغلاق القائمة">×</button>
-    </div>
-    <input class="ui-searchable-select__search" type="search" value="@_search"
+    @if (!InlineDropdown)
+    {
+        <div class="ui-searchable-select__popover-header">
+            <strong>@DialogTitle</strong>
+            <button type="button" class="ui-searchable-select__close" popovertarget="@_popoverId"
+                    popovertargetaction="hide" aria-label="إغلاق القائمة">×</button>
+        </div>
+    }
+    <input autofocus="@InlineDropdown" class="ui-searchable-select__search" type="search" value="@_search"
            @oninput="OnSearchInput" placeholder="ابحث في الخيارات..." aria-label="البحث في خيارات @Label" />
     <div class="ui-searchable-select__options" role="group" aria-label="خيارات @Label" tabindex="0">
         @if (ShowClearOption && string.IsNullOrWhiteSpace(_search))
@@ -58,5 +71,8 @@
             }
         }
     </div>
-    <div class="ui-searchable-select__count">@FilteredOptions.Count من @Options.Count عنصر</div>
+    @if (!InlineDropdown)
+    {
+        <div class="ui-searchable-select__count">@FilteredOptions.Count من @Options.Count عنصر</div>
+    }
 </div>

@@ -37,6 +37,10 @@ public partial class SalesReportsPage
     private SalesReportDto? _report;
     private IReadOnlyList<SalesReportBreakdownDto> _visible = [];
     private IReadOnlyList<SalesReportOptionDto> _options = [];
+    private IReadOnlyList<SalesReportOptionDto> _historicalOptions = [];
+    private string? _optionsWarning;
+    private int _optionsVersion;
+    private const int OptionPageSize = 50;
     private IReadOnlyList<FiscalYearDto> _years = [];
     private IReadOnlyList<FiscalPeriodDto> _periods = [];
     private IReadOnlyList<CurrencyDto> _currencies = [];
@@ -52,14 +56,45 @@ public partial class SalesReportsPage
     private IEnumerable<SalesReportBreakdownDto> PageRows => _visible.Skip((_page-1)*_pageSize).Take(_pageSize);
     private IEnumerable<FiscalPeriodDto> PeriodOptions => _periods.Where(p=>p.FiscalYearId.ToString()==_draft.Year).OrderBy(p=>p.StartDate);
     private string[] Chips => [$"نوع التقرير: {Modes[_applied.Mode]}", $"السنة: {_years.FirstOrDefault(y=>y.Id.ToString()==_applied.Year)?.Name??"نطاق مخصص"}", $"الفترة: {_periods.FirstOrDefault(p=>p.Id.ToString()==_applied.Period)?.Name??"الكل"}", $"من: {_applied.From:dd/MM/yyyy}", $"إلى: {_applied.To:dd/MM/yyyy}", $"الأساسية التاريخية: {BaseCode}", $"عملة العرض: {_displayCode}", "المرحلة فقط"];
-    private IEnumerable<SalesReportOptionDto> Pick(string kind) => _options.Where(o => o.Kind == kind &&
-        (kind is not ("product" or "category") || string.IsNullOrEmpty(_draft.ProductType) || o.TypeKey==_draft.ProductType) &&
-        (kind!="product" || string.IsNullOrEmpty(_draft.Category) || o.ParentKey==_draft.Category));
-    private IReadOnlyList<UiSelectOption> Options(string kind) => new[]{new UiSelectOption("", "الكل")}.Concat(Pick(kind).Select(o=>new UiSelectOption(o.Key,o.Label))).ToArray();
+    private IReadOnlyList<UiSelectOption> Options(string kind) => new[]{new UiSelectOption("", "الكل")}.Concat(_options.Where(o=>o.Kind==kind).Select(o=>new UiSelectOption(o.Key,o.Label))).ToArray();
+    private async Task<SalesReportOptionPage> FetchOptionPageAsync(Filters f, string kind, string search, int page)
+    {
+        if (f.From.Date > f.To.Date || f.To.Date == DateTime.MaxValue.Date) throw new InvalidOperationException("حدد فترة صحيحة أولاً.");
+        var url = $"api/sales/reports/filter-options?fromDate={f.From:yyyy-MM-dd}&toDate={f.To:yyyy-MM-dd}&kind={Uri.EscapeDataString(kind)}&pageNumber={page}&pageSize={OptionPageSize}&historicalBaseCurrencyCode={Uri.EscapeDataString(f.HistoricalBaseCurrency)}&search={Uri.EscapeDataString(search)}";
+        if (kind is "product" or "category")
+        {
+            if (Guid.TryParse(f.ProductType,out var type)) url += $"&productTypeId={type:D}";
+            if (kind == "product" && Guid.TryParse(f.Category,out var category)) url += $"&categoryId={category:D}";
+        }
+        return await Api.GetAsync<SalesReportOptionPage>(url) ?? throw new InvalidOperationException("لم يرجع الخادم خيارات الفلاتر.");
+    }
+    private async Task<(IReadOnlyList<UiSelectOption> Items, int TotalCount)> LoadFilterPageAsync(string kind, string search, int page)
+    {
+        var result = await FetchOptionPageAsync(_draft with {}, kind, search, page);
+        return (result.Items.Select(o => new UiSelectOption(o.Key,o.Label)).ToArray(), result.TotalCount);
+    }
+    private async Task RefreshHistoricalAsync()
+    {
+        var version = ++_optionsVersion;
+        var f = _draft with {};
+        if (f.From.Date > f.To.Date || f.To.Date == DateTime.MaxValue.Date) return;
+        try
+        {
+            var all = new List<SalesReportOptionDto>();
+            for (var page=1;;page++)
+            {
+                var result = await FetchOptionPageAsync(f,"historicalBaseCurrency","",page);
+                all.AddRange(result.Items);
+                if (result.Items.Count == 0 || (long)page * result.PageSize >= result.TotalCount) break;
+            }
+            if (version == _optionsVersion) { _historicalOptions = all; _optionsWarning = null; }
+        }
+        catch (Exception ex) { if (version == _optionsVersion) _optionsWarning = "تعذر تحديث العملات التاريخية: " + ex.Message; }
+    }
     private void TypeChanged(){_draft.Category=""; _draft.Product="";}
     private void CategoryChanged()=>_draft.Product="";
     private void HistoricalBaseChanged(){_draft.DisplayCurrency=null;}
-    private IEnumerable<string> HistoricalBaseOptions => _options.Where(o=>o.Kind=="historicalBaseCurrency").Select(o=>o.Key)
+    private IEnumerable<string> HistoricalBaseOptions => _historicalOptions.Where(o=>o.Kind=="historicalBaseCurrency").Select(o=>o.Key)
         .Concat(_draft.HistoricalBaseCurrency=="*" ? Array.Empty<string>() : new[]{_draft.HistoricalBaseCurrency}).Distinct().OrderBy(x=>x);
     private void ModeChanged(){ if(_draft.Mode=="Collections"){_draft.Product="";_draft.Category="";_draft.ProductType="";_draft.Brand="";_draft.Warehouse="";} else _draft.Settlement=""; }
     protected override Task OnInitializedAsync()=>ApplyAsync();
@@ -73,9 +108,9 @@ public partial class SalesReportsPage
         catch(ApiClientException ex) when(ex.StatusCode is 401 or 403){_referenceWarning=(_referenceWarning??"")+" لا تتوفر صلاحية عرض العملات؛ استخدم العملة الأساسية.";}
         _referencesLoaded=true;
     }
-    private void OnYear(ChangeEventArgs e){_draft.Year=e.Value?.ToString()??"";_draft.Period="";SetYearDates();}
+    private async Task OnYear(ChangeEventArgs e){_draft.Year=e.Value?.ToString()??"";_draft.Period="";SetYearDates();await RefreshHistoricalAsync();}
     private void SetYearDates(){if(_years.FirstOrDefault(y=>y.Id.ToString()==_draft.Year) is {} y){_draft.From=y.StartDate.ToDateTime(TimeOnly.MinValue);_draft.To=y.EndDate.ToDateTime(TimeOnly.MinValue);}}
-    private void OnPeriod(ChangeEventArgs e){_draft.Period=e.Value?.ToString()??"";if(PeriodOptions.FirstOrDefault(p=>p.Id.ToString()==_draft.Period) is {} p){_draft.From=p.StartDate.ToDateTime(TimeOnly.MinValue);_draft.To=p.EndDate.ToDateTime(TimeOnly.MinValue);}else SetYearDates();}
+    private async Task OnPeriod(ChangeEventArgs e){_draft.Period=e.Value?.ToString()??"";if(PeriodOptions.FirstOrDefault(p=>p.Id.ToString()==_draft.Period) is {} p){_draft.From=p.StartDate.ToDateTime(TimeOnly.MinValue);_draft.To=p.EndDate.ToDateTime(TimeOnly.MinValue);}else SetYearDates();await RefreshHistoricalAsync();}
     private async Task ResetAsync(){if(_busy)return;_draft=new();_search="";await ApplyAsync();}
     private async Task ApplyAsync()
     {
@@ -85,8 +120,9 @@ public partial class SalesReportsPage
         try
         {
             if(!_referencesLoaded)await LoadReferencesAsync();
+            await RefreshHistoricalAsync();
             var mode=f.Mode=="Period"?f.PeriodGrouping:f.Mode;
-            var query=$"api/sales/reports?fromDate={f.From:yyyy-MM-dd}&toDate={f.To:yyyy-MM-dd}&groupBy={mode}&pageSize=1";
+            var query=$"api/sales/reports?fromDate={f.From:yyyy-MM-dd}&toDate={f.To:yyyy-MM-dd}&groupBy={mode}&pageSize=1&includeFilterOptions=false";
             foreach(var pair in new Dictionary<string,string>{["customerId"]=f.Customer,["employeeId"]=f.Employee,["productVariantId"]=f.Product,["categoryId"]=f.Category,["productTypeId"]=f.ProductType,["brandId"]=f.Brand,["warehouseId"]=f.Warehouse,["operatorKey"]=f.Operator,["currencyCode"]=f.Currency,["paymentPlan"]=f.Plan,["settlementStatus"]=f.Settlement,["historicalBaseCurrencyCode"]=f.HistoricalBaseCurrency})
                 if(!string.IsNullOrEmpty(pair.Value))query+=$"&{pair.Key}={Uri.EscapeDataString(pair.Value)}";
             var report=await Api.GetAsync<SalesReportDto>(query) ?? throw new InvalidOperationException("لم يرجع الخادم بيانات التقرير.");
@@ -166,7 +202,12 @@ public partial class SalesReportsPage
     private void ChangePageSize(ChangeEventArgs e){if(int.TryParse(e.Value?.ToString(),out var n))_pageSize=n;_page=1;}
     private void OpenDocument(SalesReportBreakdownDto r){if(r.DocumentId is Guid id)Nav.NavigateTo(r.DocumentKind=="SalesInvoice"?$"/sales/invoices?invoiceId={id:D}":$"/sales/returns?returnId={id:D}");}
     private void OpenJournal(SalesReportBreakdownDto r){if(r.JournalId is Guid id)Nav.NavigateTo($"/accounting/journals?journalId={id:D}");}
-    private string Subtitle=>string.Join(" | ",Chips)+" | الإجماليات لجميع الفلاتر (البحث للعرض فقط)"+(_rate!=1?$" | سعر عرض نهاية الفترة: {_rate}":"");
+    private string[] EffectiveFilterLabels => new[]{("customer", "العميل",_applied.Customer),("employee","موظف المبيعات",_applied.Employee),("product","الصنف",_applied.Product),("category","التصنيف",_applied.Category),("type","نوع المنتج",_applied.ProductType),("brand","العلامة",_applied.Brand),("warehouse","المخزن",_applied.Warehouse),("operator","المستخدم المرحّل",_applied.Operator),("currency","عملة الفاتورة",_applied.Currency)}
+        .Where(x=>!string.IsNullOrEmpty(x.Item3)).Select(x=>$"{x.Item2}: {_options.FirstOrDefault(o=>o.Kind==x.Item1 && o.Key==x.Item3)?.Label??x.Item3}")
+        .Concat(string.IsNullOrEmpty(_applied.Plan)?Array.Empty<string>():new[]{"خطة الدفع: "+(_applied.Plan switch {"1"=>"فوري كامل","2"=>"جزئي","4"=>"آجل",_=>_applied.Plan})})
+        .Concat(string.IsNullOrEmpty(_applied.Settlement)?Array.Empty<string>():new[]{"حالة التسوية: "+(_applied.Settlement switch {"paid"=>"مسددة","partial"=>"جزئية","unpaid"=>"غير مسددة",_=>_applied.Settlement})})
+        .Concat(_applied.Mode=="Period"?new[]{"التجميع: "+_applied.PeriodGrouping}:Array.Empty<string>()).ToArray();
+    private string Subtitle=>string.Join(" | ",Chips.Concat(EffectiveFilterLabels))+" | الإجماليات لجميع الفلاتر (البحث للعرض فقط)"+(_rate!=1?$" | سعر عرض نهاية الفترة: {_rate}":"");
     private IEnumerable<object?[]> ExportRows(){var cols=Columns;foreach(var row in _report!.Breakdown)yield return cols.Select(c=>c.Value(row)).ToArray();yield return cols.Select(c=>TotalValue(c.Key)).ToArray();}
     private async Task ExportAsync()
     {

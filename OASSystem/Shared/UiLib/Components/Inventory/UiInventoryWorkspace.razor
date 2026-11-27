@@ -1,0 +1,33 @@
+<section class="oas-inventory-workspace oas-inventory-catalog" dir="rtl">
+    <div class="inv-toolbar">@Actions</div>
+    @if (!string.IsNullOrWhiteSpace(EditorTitle))
+    {
+        <details class="inv-editor inv-editor-panel" @key="EditorKey" open>
+            <summary>
+                <span><i class="fa-solid fa-box" aria-hidden="true"></i> @EditorTitle</span>
+                <i class="fa-solid fa-angle-down inv-editor-chevron" aria-hidden="true"></i>
+            </summary>
+            <div class="inv-editor-content">@Editor</div>
+        </details>
+    }
+    else
+    {
+        <div class="inv-editor">@Editor</div>
+    }
+    @if (SearchAndDetails is not null)
+    {
+        <div class="inv-search-row">@SearchAndDetails</div>
+    }
+    <div class="inv-table-slot" aria-busy="@(Busy ? "true" : "false")">@Table</div>
+    <div class="inv-footer">@Footer</div>
+</section>
+@code {
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string? EditorTitle { get; set; }
+    [Parameter] public object? EditorKey { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public RenderFragment? Editor { get; set; }
+    [Parameter] public RenderFragment? SearchAndDetails { get; set; }
+    [Parameter] public RenderFragment? Table { get; set; }
+    [Parameter] public RenderFragment? Footer { get; set; }
+}

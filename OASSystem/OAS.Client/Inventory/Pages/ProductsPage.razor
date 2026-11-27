@@ -1,4 +1,5 @@
 @page "/products"
+@page "/inventory/catalog/{CatalogSection}"
 @page "/products/{Screen}"
 @page "/products/{Screen}/{RecordId:guid}"
 @attribute [Authorize]
@@ -8,60 +9,38 @@
 @using OAS.Contracts.Inventory.Products
 @using OAS.UiLib.Components.Spreadsheets
 
-<PageTitle>@(IsFormRoute ? "نموذج المخزون" : "قائمة المخزون") - المنتجات | OAS</PageTitle>
-<span class="oas-inventory-view" hidden aria-hidden="true"></span>
-
-<InventoryReportWorkspace Title="@SectionTitle" TitleIcon="fa-solid fa-box" StatusText="@SectionSubtitle" ShowFilters="false" IsFormRoute="@IsFormRoute">
+@using OAS.UiLib.Components.Inventory
+<PageTitle>@SectionTitle | OAS</PageTitle>
+@if (!_catalogReady)
+{
+    <div class="oas-inventory-workspace inv-catalog-loading" role="status" aria-live="polite">جاري تحميل البيانات…</div>
+}
+else
+{
+<UiInventoryWorkspace Busy="@_loading" EditorTitle="@CatalogEditorTitle" EditorKey="@CatalogEditorKey">
     <Actions>
-        <UiWorkspaceActionBar>
-            @if (IsFormRoute)
+        <UiInventoryCatalogToolbar Editing="@IsEditing" Saving="@_saving" Loading="@_loading"
+                                   SpreadsheetBusy="@(_exporting || _spreadsheetBusy || _spreadsheetImportOpen)"
+                                   CanEdit="@CanEdit" CanSave="@CanSave" CanPrevious="@CanMovePrevious" CanNext="@CanMoveNext"
+                                   @bind-Search="_search" OnSearch="SearchChangedAsync" OnNavigate="NavigateRecord"
+                                   OnCreate="BeginCreateAsync" OnEdit="BeginEditAsync" OnSave="SaveAsync" OnCancel="CancelEditAsync" OnRefresh="RefreshAsync"
+                                   OnImport="OpenSpreadsheetImportAsync" OnTemplate="DownloadTemplateAsync" OnExport="ExportAsync">
+            <ExtraActions>
+            @if (_section == ProductSection.Products)
             {
-                <UiButton Text="العودة إلى القائمة" IconCssClass="fa-solid fa-arrow-right" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="BackToListAsync" />
-                <UiButton Text="حفظ" IconCssClass="fa-solid fa-floppy-disk" Size="ControlSize.Small"
-                      Disabled="@(!CanSave)" Loading="@_saving" OnClick="SaveAsync" />
-                <UiButton Text="تعديل المحدد" IconCssClass="fa-solid fa-pen" Variant="ButtonVariant.Secondary"
-                      Size="ControlSize.Small" Disabled="@(!CanEdit)" OnClick="OpenEditScreenAsync" />
+                <UiButton Text="استلام مشتريات" AdditionalCssClass="inv-receipt" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Disabled="@(IsEditing || _saving)" OnClick="OpenPurchaseReceiptsAsync" />
             }
-            else
-            {
-                <UiButton Text="إضافة جديد" IconCssClass="fa-solid fa-plus" Size="ControlSize.Small"
-                      Disabled="@(IsEditing || _saving)" OnClick="OpenCreateScreenAsync" />
-                <UiButton Text="استلام مشتريات" IconCssClass="fa-solid fa-truck-ramp-box" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" OnClick="OpenPurchaseReceiptsAsync" />
-                <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary"
-                      Size="ControlSize.Small" Disabled="@(IsEditing || _saving)" Loading="@_loading" OnClick="RefreshAsync" />
-                <UiSpreadsheetActions CanImport="true" Busy="@(_exporting || _spreadsheetBusy)" OnImport="OpenSpreadsheetImportAsync" OnTemplate="DownloadTemplateAsync" OnExport="ExportAsync" />
-                <UiSearchInput @bind-Value="_search" Placeholder="ابحث باسم المنتج أو رمزه..."
-                           AriaLabel="البحث في المنتجات" ClearText="مسح البحث"
-                           DebounceMilliseconds="250" OnSearch="SearchChangedAsync" />
-            }
-        </UiWorkspaceActionBar>
+            </ExtraActions>
+        </UiInventoryCatalogToolbar>
     </Actions>
-    <QuickFilters><UiSectionTabStrip Tabs="@SectionTabs" OnSelect="ChangeSectionKeyAsync" /></QuickFilters>
-    <Content>
-        @if (IsFormRoute)
+    <Editor>
+        <div @key="_section">
+            @RenderEditor()
+        </div>
+        @if (ShowInitialVariantSection)
         {
-            <div class="oas-inventory-form-screen">
-                <div class="oas-inventory-form-screen__body">
-        <div class="inventory-products__aside">
-            <UiCard Title="@EditorTitle" Subtitle="@EditorSubtitle">
-                @if (_mode == EditorMode.Empty)
-                {
-                    <UiAlert Message="اختر سجلًا من القائمة أو اضغط «جديد»." />
-                }
-                else
-                {
-                    <div class="inventory-products__primary-fields">
-                        @RenderEditor()
-                    </div>
-
-                    @if (_section == ProductSection.Products && IsServiceProductType)
-                    {
-                        <UiAlert Tone="AlertTone.Info" Message="المنتج من نوع خدمة؛ لذلك لا يمكن تفعيله كصنف مخزني." />
-                    }
-
-                    @if (ShowInitialVariantSection)
-                    {
-                        <UiCard Title="بيانات البيع والتخزين" Subtitle="تُنشأ تلقائيًا مع المنتج ويمكن تعديلها">
+            <div class="inv-initial-variant">
+                <strong>بيانات الصنف الأول</strong>
                             <div class="inventory-products__variant-fields">
                                 <UiInputText Label="رمز الصنف (SKU)" Value="@_initialSku" ValueExpression="@(() => _initialSku)"
                                              ValueChanged="@(v => SetField(InitialSkuField, () => _initialSku = v ?? string.Empty))"
@@ -71,9 +50,9 @@
                                              Placeholder="(اختياري)" ErrorText="@ErrorFor(InitialBarcodeField)" MaxLength="64" Disabled="@((!IsEditing || _saving))" Size="ControlSize.Small" />
                                 <UiInputText Label="اسم الصنف عند البيع (اختياري)" Value="@_initialVariantName" ValueExpression="@(() => _initialVariantName)"
                                              ValueChanged="@(v => _initialVariantName = v)" Placeholder="(اختياري)" MaxLength="100" Disabled="@((!IsEditing || _saving))" Size="ControlSize.Small" />
-                                <InventorySuggestedInput Label="اللون" Value="@_initialColor" ValueChanged="@(v => _initialColor = v)" Suggestions="@ColorSuggestions" MaxLength="100" Disabled="@((!IsEditing || _saving))" />
-                                <InventorySuggestedInput Label="المقاس" Value="@_initialSize" ValueChanged="@(v => _initialSize = v)" Suggestions="@SizeSuggestions" MaxLength="100" Disabled="@((!IsEditing || _saving))" />
-                                <UiSearchableSelect Label="الوحدة" Value="@(_initialUnitId ?? string.Empty)" ValueExpression="@(() => _initialUnitId)"
+                                <InventorySuggestedInput UseAngleDownIcon="true" Label="اللون" Value="@_initialColor" ValueChanged="@(v => _initialColor = v)" Suggestions="@ColorSuggestions" MaxLength="100" Disabled="@((!IsEditing || _saving))" />
+                                <InventorySuggestedInput UseAngleDownIcon="true" Label="المقاس" Value="@_initialSize" ValueChanged="@(v => _initialSize = v)" Suggestions="@SizeSuggestions" MaxLength="100" Disabled="@((!IsEditing || _saving))" />
+                                <UiSearchableSelect InlineDropdown="true" UseAngleDownIcon="true" Label="الوحدة" Value="@(_initialUnitId ?? string.Empty)" ValueExpression="@(() => _initialUnitId)"
                                           ValueChanged="@(v => _initialUnitId = v)" Options="@UnitOptions.Where(x => !string.IsNullOrWhiteSpace(x.Value)).ToArray()"
                                           Placeholder="(اختياري)" Disabled="@((!IsEditing || _saving))" Size="ControlSize.Small" />
                                 <UiInputText Label="سعر الشراء" Value="@_initialPurchasePrice" ValueExpression="@(() => _initialPurchasePrice)"
@@ -83,27 +62,25 @@
                                                  ValueChanged="@(v => SetField(InitialSellingPriceField, () => _initialSellingPrice = v ?? string.Empty))" Type="number" InputMode="decimal" Required="true"
                                                  ErrorText="@ErrorFor(InitialSellingPriceField)" Disabled="@((!IsEditing || _saving))" Size="ControlSize.Small" />
                             </div>
-                        </UiCard>
-                    }
 
-                    @if (ShowInitialVariantSection)
-                    {
-                        <UiAlert Tone="AlertTone.Info" Message="يُنشأ المنتج والصنف دون كمية مخزنية. لإدخال البضاعة أنشئ سند استلام مشتريات ورحّله من قسم المشتريات؛ وسيُحدّث المخزون والقيد المحاسبي معًا." />
-                    }
-
+            </div>
+        }
+    </Editor>
+    <SearchAndDetails>
+        <div class="inv-specifications" @key="(_section, _selectedId, _mode)">
                     @if (ShowsFrameDetails)
                     {
                         <details class="inventory-products__specialized" open="@(_mode == EditorMode.Edit && HasFrameDetailsInput())">
-                            <summary>مواصفات الإطار <span>اختياري — اضغط لعرض التفاصيل</span></summary>
+                            <summary>مواصفات الإطار</summary>
                             <div class="inventory-products__specialized-fields">
                                 <UiInputText Label="الموديل" Value="@_frameModel" ValueExpression="@(() => _frameModel)"
                                          ValueChanged="@(v => SetField(FrameModelField, () => _frameModel = v ?? string.Empty))"
                                          Required="@HasFrameDetailsInput()" Placeholder="@OptionalPlaceholder(HasFrameDetailsInput())"
                                          ErrorText="@ErrorFor(FrameModelField)" MaxLength="100" Disabled="@((!IsEditing || _saving))" Size="ControlSize.Small" />
-                                <InventorySuggestedInput Label="الخامة" Value="@_frameMaterial" ValueChanged="@(v => SetField(FrameMaterialField, () => _frameMaterial = v))" Suggestions="@FrameMaterialSuggestions" ErrorText="@ErrorFor(FrameMaterialField)" MaxLength="100" Disabled="@((!IsEditing || _saving))" />
-                                <InventorySuggestedInput Label="تصميم الإطار" Value="@_frameRimType" ValueChanged="@(v => SetField(FrameRimField, () => _frameRimType = v))" Suggestions="@FrameRimSuggestions" ErrorText="@ErrorFor(FrameRimField)" MaxLength="100" Disabled="@((!IsEditing || _saving))" />
-                                <InventorySuggestedInput Label="الجنس" Value="@_frameGender" ValueChanged="@(v => SetField(FrameGenderField, () => _frameGender = v))" Suggestions="@FrameGenderSuggestions" ErrorText="@ErrorFor(FrameGenderField)" MaxLength="20" Disabled="@((!IsEditing || _saving))" />
-                                <InventorySuggestedInput Label="الشكل" Value="@_frameShape" ValueChanged="@(v => SetField(FrameShapeField, () => _frameShape = v))" Suggestions="@FrameShapeSuggestions" ErrorText="@ErrorFor(FrameShapeField)" MaxLength="100" Disabled="@((!IsEditing || _saving))" />
+                                <InventorySuggestedInput UseAngleDownIcon="true" Label="الخامة" Value="@_frameMaterial" ValueChanged="@(v => SetField(FrameMaterialField, () => _frameMaterial = v))" Suggestions="@FrameMaterialSuggestions" ErrorText="@ErrorFor(FrameMaterialField)" MaxLength="100" Disabled="@((!IsEditing || _saving))" />
+                                <InventorySuggestedInput UseAngleDownIcon="true" Label="تصميم الإطار" Value="@_frameRimType" ValueChanged="@(v => SetField(FrameRimField, () => _frameRimType = v))" Suggestions="@FrameRimSuggestions" ErrorText="@ErrorFor(FrameRimField)" MaxLength="100" Disabled="@((!IsEditing || _saving))" />
+                                <InventorySuggestedInput UseAngleDownIcon="true" Label="الجنس" Value="@_frameGender" ValueChanged="@(v => SetField(FrameGenderField, () => _frameGender = v))" Suggestions="@FrameGenderSuggestions" ErrorText="@ErrorFor(FrameGenderField)" MaxLength="20" Disabled="@((!IsEditing || _saving))" />
+                                <InventorySuggestedInput UseAngleDownIcon="true" Label="الشكل" Value="@_frameShape" ValueChanged="@(v => SetField(FrameShapeField, () => _frameShape = v))" Suggestions="@FrameShapeSuggestions" ErrorText="@ErrorFor(FrameShapeField)" MaxLength="100" Disabled="@((!IsEditing || _saving))" />
                                 <div class="inventory-products__specialized-grid">
                                     <UiInputText Label="طول ذراع النظارة (مم)" Value="@_templeLength" ValueExpression="@(() => _templeLength)"
                                              ValueChanged="@(v => SetField(TempleLengthField, () => _templeLength = v))" Type="number" InputMode="decimal" Placeholder="(اختياري)"
@@ -118,14 +95,24 @@
                             </div>
                         </details>
                     }
-                    @if (ShowsLensDetails)
+                    @if (ShowsLensSection)
                     {
-                        <details class="inventory-products__specialized" open="@(_mode == EditorMode.Edit && HasLensDetailsInput())">
-                            <summary>مواصفات العدسة <span>اختياري — اضغط لعرض التفاصيل</span></summary>
-                            <div class="inventory-products__specialized-fields">
-                                <InventorySuggestedInput Label="نوع العدسة" Value="@_lensType" ValueChanged="@(v => SetField(LensTypeField, () => _lensType = v ?? string.Empty))" Suggestions="@LensTypeSuggestions" Required="@HasLensDetailsInput()" ErrorText="@ErrorFor(LensTypeField)" MaxLength="100" Disabled="@((!IsEditing || _saving))" />
-                                <InventorySuggestedInput Label="خامة العدسة" Value="@_lensMaterial" ValueChanged="@(v => SetField(LensMaterialField, () => _lensMaterial = v))" Suggestions="@LensMaterialSuggestions" ErrorText="@ErrorFor(LensMaterialField)" MaxLength="100" Disabled="@((!IsEditing || _saving))" />
-                                <InventorySuggestedInput Label="طبقة حماية العدسة" Value="@_lensCoating" ValueChanged="@(v => SetField(LensCoatingField, () => _lensCoating = v))" Suggestions="@LensCoatingSuggestions" ErrorText="@ErrorFor(LensCoatingField)" MaxLength="100" Disabled="@((!IsEditing || _saving))" />
+                        <details class="inventory-products__specialized">
+                            <summary>مواصفات العدسة</summary>
+                            @if (_section == ProductSection.Products && _mode != EditorMode.Create && LensVariantOptions.Count > 0)
+                            {
+                                <div class="inventory-products__specialized-fields">
+                                    <UiSearchableSelect InlineDropdown="true" UseAngleDownIcon="true" Label="الصنف (SKU)" Value="@_lensVariantId" ValueExpression="@(() => _lensVariantId)"
+                                                        ValueChanged="SelectLensVariant" Options="@LensVariantOptions" Required="true"
+                                                        Disabled="@(IsEditing || _saving || _loading || LensVariantOptions.Count == 1)" Size="ControlSize.Small" />
+                                </div>
+                            }
+                            @if (ShowsLensDetails)
+                            {
+                            <div class="inventory-products__specialized-fields" @key="LensDetailsVariantId">
+                                <InventorySuggestedInput UseAngleDownIcon="true" Label="نوع العدسة" Value="@_lensType" ValueChanged="@(v => SetField(LensTypeField, () => _lensType = v ?? string.Empty))" Suggestions="@LensTypeSuggestions" Required="@HasLensDetailsInput()" ErrorText="@ErrorFor(LensTypeField)" MaxLength="100" Disabled="@((!IsEditing || _saving))" />
+                                <InventorySuggestedInput UseAngleDownIcon="true" Label="خامة العدسة" Value="@_lensMaterial" ValueChanged="@(v => SetField(LensMaterialField, () => _lensMaterial = v))" Suggestions="@LensMaterialSuggestions" ErrorText="@ErrorFor(LensMaterialField)" MaxLength="100" Disabled="@((!IsEditing || _saving))" />
+                                <InventorySuggestedInput UseAngleDownIcon="true" Label="طبقة حماية العدسة" Value="@_lensCoating" ValueChanged="@(v => SetField(LensCoatingField, () => _lensCoating = v))" Suggestions="@LensCoatingSuggestions" ErrorText="@ErrorFor(LensCoatingField)" MaxLength="100" Disabled="@((!IsEditing || _saving))" />
                                 <UiInputText Label="معامل الانكسار" Value="@_refractiveIndex" ValueExpression="@(() => _refractiveIndex)"
                                          ValueChanged="@(v => SetField(RefractiveIndexField, () => _refractiveIndex = v))" Type="number" InputMode="decimal" Placeholder="(اختياري)"
                                          ErrorText="@ErrorFor(RefractiveIndexField)" Disabled="@((!IsEditing || _saving))" Size="ControlSize.Small" />
@@ -138,110 +125,105 @@
                                 </div>
                             </div>
                             <UiCheckbox Label="عدسة طبية بوصفة" Value="@_isPrescriptionLens" ValueChanged="@(v => _isPrescriptionLens = v)" Disabled="@((!IsEditing || _saving))" />
+                            }
+                            else
+                            {
+                                <div class="inventory-products__specialized-fields">
+                                    <span>مواصفات العدسة مرتبطة بالصنف. يجب إضافة صنف للمنتج أولاً.</span>
+                                </div>
+                            }
                         </details>
                     }
-                }
-            </UiCard>
+
         </div>
-
-                </div>
-            </div>
-        }
-        else
-        {
-        <div class="inventory-products">
-            
-
-                                @if (_loading)
+    </SearchAndDetails>
+    <Table>
+                    @if (_section == ProductSection.Categories)
                     {
-                        <UiAlert Message="جاري تحميل البيانات..." />
-                    }
-                    else if (_section == ProductSection.Categories)
-                    {
-                        <InventoryReportTable TItem="ProductCategoryDto" Items="@FilterCategories()" PageSize="12" Headers="@SimpleHeaders" EmptyText="لا توجد تصنيفات مطابقة."
-                                     SidebarTypography="true"
-                                     OnRowClick="@(x => OpenDetailsScreen(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
+                        <UiDataTable TItem="ProductCategoryDto" Items="@PageItems(FilterCategories())" Compact="true" UniformCellTypography="true" Headers="@SimpleHeaders" EmptyText="@(CatalogEmptyText("لا توجد تصنيفات مطابقة."))"
+                                     
+                                     OnRowClick="@(x => Select(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
                             <RowTemplate Context="item">
-                                <td><strong>@item.Code</strong></td>
+                                <td>@item.Code</td>
                                 <td>@item.Name</td>
-                                <td><UiBadge Text="@StatusText(item.IsActive)" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
+                                <td>@StatusText(item.IsActive)</td>
                             </RowTemplate>
-                        </InventoryReportTable>
+                        </UiDataTable>
                     }
                     else if (_section == ProductSection.Brands)
                     {
-                        <InventoryReportTable TItem="BrandDto" Items="@FilterBrands()" PageSize="12" Headers="@SimpleHeaders" EmptyText="لا توجد علامات تجارية مطابقة."
-                                     SidebarTypography="true"
-                                     OnRowClick="@(x => OpenDetailsScreen(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
+                        <UiDataTable TItem="BrandDto" Items="@PageItems(FilterBrands())" Compact="true" UniformCellTypography="true" Headers="@SimpleHeaders" EmptyText="@(CatalogEmptyText("لا توجد علامات تجارية مطابقة."))"
+                                     
+                                     OnRowClick="@(x => Select(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
                             <RowTemplate Context="item">
-                                <td><strong>@item.Code</strong></td>
+                                <td>@item.Code</td>
                                 <td>@item.Name</td>
-                                <td><UiBadge Text="@StatusText(item.IsActive)" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
+                                <td>@StatusText(item.IsActive)</td>
                             </RowTemplate>
-                        </InventoryReportTable>
+                        </UiDataTable>
                     }
                     else if (_section == ProductSection.ProductTypes)
                     {
-                        <InventoryReportTable TItem="ProductTypeDto" Items="@FilterProductTypes()" PageSize="12" Headers="@SimpleHeaders" EmptyText="لا توجد أنواع منتجات مطابقة."
-                                     SidebarTypography="true"
-                                     OnRowClick="@(x => OpenDetailsScreen(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
+                        <UiDataTable TItem="ProductTypeDto" Items="@PageItems(FilterProductTypes())" Compact="true" UniformCellTypography="true" Headers="@SimpleHeaders" EmptyText="@(CatalogEmptyText("لا توجد أنواع منتجات مطابقة."))"
+                                     
+                                     OnRowClick="@(x => Select(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
                             <RowTemplate Context="item">
-                                <td><strong>@item.Code</strong></td>
+                                <td>@item.Code</td>
                                 <td>@item.Name</td>
-                                <td><UiBadge Text="@StatusText(item.IsActive)" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
+                                <td>@StatusText(item.IsActive)</td>
                             </RowTemplate>
-                        </InventoryReportTable>
+                        </UiDataTable>
                     }
                     else if (_section == ProductSection.Units)
                     {
-                        <InventoryReportTable TItem="UnitDto" Items="@FilterUnits()" PageSize="12" Headers="@SimpleHeaders" EmptyText="لا توجد وحدات مطابقة."
-                                     SidebarTypography="true"
-                                     OnRowClick="@(x => OpenDetailsScreen(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
+                        <UiDataTable TItem="UnitDto" Items="@PageItems(FilterUnits())" Compact="true" UniformCellTypography="true" Headers="@SimpleHeaders" EmptyText="@(CatalogEmptyText("لا توجد وحدات مطابقة."))"
+                                     
+                                     OnRowClick="@(x => Select(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
                             <RowTemplate Context="item">
-                                <td><strong>@item.Code</strong></td>
+                                <td>@item.Code</td>
                                 <td>@item.Name</td>
-                                <td><UiBadge Text="@StatusText(item.IsActive)" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
+                                <td>@StatusText(item.IsActive)</td>
                             </RowTemplate>
-                        </InventoryReportTable>
+                        </UiDataTable>
                     }
                     else if (_section == ProductSection.Products)
                     {
-                        <InventoryReportTable TItem="ProductDto" Items="@FilterProducts()" PageSize="12" Headers="@ProductHeaders" EmptyText="لا توجد منتجات مطابقة."
-                                     SidebarTypography="true"
+                        <UiDataTable TItem="ProductDto" Items="@PageItems(FilterProducts())" Compact="true" Headers="@ProductHeaders" EmptyText="@(CatalogEmptyText("لا توجد منتجات مطابقة."))"
+                                     
                                      UniformCellTypography="true"
-                                     OnRowClick="@(x => OpenDetailsScreen(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
+                                     OnRowClick="@(x => Select(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
                             <RowTemplate Context="item">
                                 <td>@item.ProductCode</td>
                                 <td>@item.Name</td>
                                 <td>@ProductTypeNameForCategory(item.CategoryId)</td>
-                                <td><UiBadge Text="@(item.IsStockItem ? "نعم" : "لا")" Tone="@(item.IsStockItem ? AlertTone.Success : AlertTone.Info)" /></td>
+                                <td>@(item.IsStockItem ? "نعم" : "لا")</td>
                                 <td>@ProductVariantCount(item.Id)</td>
                                 <td>@ProductInventoryStatus(item)</td>
-                                <td><UiBadge Text="@StatusText(item.IsActive)" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
+                                <td>@StatusText(item.IsActive)</td>
                             </RowTemplate>
-                        </InventoryReportTable>
+                        </UiDataTable>
                     }
                     else
                     {
-                        <InventoryReportTable TItem="ProductVariantDto" Items="@FilterVariants()" PageSize="12" Headers="@VariantHeaders" EmptyText="لا توجد أصناف مطابقة."
-                                     SidebarTypography="true"
-                                     OnRowClick="@(x => OpenDetailsScreen(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
+                        <UiDataTable TItem="ProductVariantDto" Items="@PageItems(FilterVariants())" Compact="true" UniformCellTypography="true" Headers="@VariantHeaders" EmptyText="@(CatalogEmptyText("لا توجد أصناف مطابقة."))"
+                                     
+                                     OnRowClick="@(x => Select(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
                             <RowTemplate Context="item">
-                                <td><strong>@item.SKU</strong></td>
+                                <td>@item.SKU</td>
                                 <td>@(item.VariantName ?? ProductName(item.ProductId))</td>
                                 <td>@(item.Barcode ?? "—")</td>
                                 <td>@InventoryDisplayFormat.Number(item.SellingPrice)</td>
-                                <td><UiBadge Text="@StatusText(item.IsActive)" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
+                                <td>@StatusText(item.IsActive)</td>
                             </RowTemplate>
-                        </InventoryReportTable>
+                        </UiDataTable>
                     }
-                
-        </div>
 
-        }
-    </Content>
-</InventoryReportWorkspace>
-
+    </Table>
+    <Footer>
+        <UiInventoryPagination Page="@CurrentPage" PageSize="@CatalogPageSize" TotalCount="@VisibleCount" Disabled="@(IsEditing || _loading || _saving)" OnPageChanged="ChangePage" />
+    </Footer>
+</UiInventoryWorkspace>
+}
 @if (_spreadsheetImportOpen)
 {
     <InventorySpreadsheetImportHost Section="@CurrentSpreadsheetSection"
@@ -251,72 +233,89 @@
 }
 
 @code {
-    // Each CRUD action has its own route. No editable form is mounted on the list screen.
-    [Microsoft.AspNetCore.Components.Inject]
-    private Microsoft.AspNetCore.Components.NavigationManager InventoryNavigation { get; set; } = default!;
-
-    [Microsoft.AspNetCore.Components.Parameter]
-    public string? Screen { get; set; }
-
-    [Microsoft.AspNetCore.Components.Parameter]
-    public Guid? RecordId { get; set; }
-
-    private const string InventoryListRoute = "/products";
-    private bool IsFormRoute => Screen is "new" or "edit" or "details";
+    [Inject] private NavigationManager InventoryNavigation { get; set; } = default!;
+    [Parameter] public string? Screen { get; set; }
+    [Parameter] public Guid? RecordId { get; set; }
+    [Parameter] public string? CatalogSection { get; set; }
+    [Parameter, SupplyParameterFromQuery(Name = "section")] public string? InventorySection { get; set; }
     private string? _appliedInventoryRoute;
-
-    private Task OpenCreateScreenAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _) {
-        InventoryNavigation.NavigateTo($"{InventoryListRoute}/new?section={_section}");
-        return Task.CompletedTask;
+    private Task? _initialCatalogLoad;
+    private bool _catalogReady;
+    private string CatalogEditorTitle => _section switch
+    {
+        ProductSection.Variants => "بيانات الصنف",
+        ProductSection.Units => "بيانات الوحدة",
+        ProductSection.Categories => "بيانات التصنيف",
+        ProductSection.Brands => "بيانات العلامة التجارية",
+        ProductSection.ProductTypes => "بيانات نوع المنتج",
+        _ => "بيانات المنتج"
+    };
+    private object CatalogEditorKey => (_section, _mode);
+    private string CatalogEmptyText(string emptyText) => _loading ? "جاري تحميل البيانات..." : emptyText;
+    private const int CatalogPageSize = 12;
+    private int _page = 1;
+    private int CurrentPage => Math.Clamp(_page, 1, Math.Max(1, (VisibleCount + CatalogPageSize - 1) / CatalogPageSize));
+    private IReadOnlyList<T> PageItems<T>(IReadOnlyList<T> items) => items.Skip((CurrentPage - 1) * CatalogPageSize).Take(CatalogPageSize).ToArray();
+    private void ChangePage(int page) => _page = page;
+    private Guid[] VisibleIds => _section switch
+    {
+        ProductSection.Categories => FilterCategories().Select(x => x.Id).ToArray(),
+        ProductSection.Brands => FilterBrands().Select(x => x.Id).ToArray(),
+        ProductSection.ProductTypes => FilterProductTypes().Select(x => x.Id).ToArray(),
+        ProductSection.Units => FilterUnits().Select(x => x.Id).ToArray(),
+        ProductSection.Variants => FilterVariants().Select(x => x.Id).ToArray(),
+        _ => FilterProducts().Select(x => x.Id).ToArray()
+    };
+    private int SelectedIndex => Array.IndexOf(VisibleIds, _selectedId ?? Guid.Empty);
+    private bool CanMovePrevious => !IsEditing && !_saving && !_loading && SelectedIndex > 0;
+    private bool CanMoveNext => !IsEditing && !_saving && !_loading && SelectedIndex < VisibleCount - 1;
+    private void NavigateRecord(int direction)
+    {
+        if (IsEditing || _saving || _loading) return;
+        var ids = VisibleIds;
+        if (ids.Length == 0) return;
+        var index = Array.IndexOf(ids, _selectedId ?? Guid.Empty);
+        index = direction switch { -2 => 0, 2 => ids.Length - 1, _ => Math.Clamp(index + direction, 0, ids.Length - 1) };
+        Select(ids[index]);
+        _page = index / CatalogPageSize + 1;
     }
-
-    private Task OpenEditScreenAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _) {
-        if (_selectedId is { } id)
-            InventoryNavigation.NavigateTo($"{InventoryListRoute}/edit/{id:D}?section={_section}");
-        return Task.CompletedTask;
+    private void RevealSelected()
+    {
+        var index = SelectedIndex;
+        if (index >= 0) _page = index / CatalogPageSize + 1;
     }
-
-    private void OpenDetailsScreen(Guid id) =>
-        InventoryNavigation.NavigateTo($"{InventoryListRoute}/details/{id:D}?section={_section}");
-
-    private Task OpenPurchaseReceiptsAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _) {
+    private Task OpenPurchaseReceiptsAsync(MouseEventArgs _)
+    {
         InventoryNavigation.NavigateTo("/purchases/receipts");
         return Task.CompletedTask;
     }
-
-    private Task BackToListAsync(Microsoft.AspNetCore.Components.Web.MouseEventArgs _) {
-        InventoryNavigation.NavigateTo($"{InventoryListRoute}?section={_section}");
-        return Task.CompletedTask;
-    }
-
     protected override async Task OnParametersSetAsync()
     {
-        var key = $"{Screen}/{RecordId}" + $"/{InventorySection}";
+        var key = $"{CatalogSection}/{Screen}/{RecordId}/{InventorySection}/{ProductIdFromQuery}";
         if (_appliedInventoryRoute == key) return;
         _appliedInventoryRoute = key;
-        if (!string.IsNullOrWhiteSpace(InventorySection) && Enum.TryParse<ProductSection>(InventorySection, true, out var requestedSection))
-            _section = requestedSection;
-        if (!IsFormRoute && ProductIdFromQuery.HasValue)
-        {
-            OpenDetailsScreen(ProductIdFromQuery.Value);
-            return;
-        }
-        if (Screen == "new")
-            await BeginCreateAsync(new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
-        else if (RecordId is { } id && Screen is ("details" or "edit"))
-        {
-            _mode = EditorMode.Empty;
-            Select(id);
-            if (Screen == "edit")
-                await BeginEditAsync(new Microsoft.AspNetCore.Components.Web.MouseEventArgs());
-        }
-        else
-        {
-            _selectedId = null;
-            _mode = EditorMode.Empty;
-        }
-    }
+        _catalogReady = false;
+        _section = Enum.TryParse<ProductSection>(CatalogSection ?? InventorySection, true, out var section) && Enum.IsDefined(section) ? section : ProductSection.Products;
+        _mode = EditorMode.Empty;
+        _selectedId = null;
+        _page = 1;
+        _search = null;
+        ClearForm();
 
-    [Microsoft.AspNetCore.Components.Parameter, Microsoft.AspNetCore.Components.SupplyParameterFromQuery(Name = "section")]
-    public string? InventorySection { get; set; }
+        // Resolve the route before starting the first asynchronous load. This prevents
+        // an initial products render when opening variants or units. Mount the
+        // workspace only after data and initial selection are ready.
+        await (_initialCatalogLoad ??= LoadAsync());
+        if (_appliedInventoryRoute != key) return;
+        ClearForm();
+        if (Screen == "new") await BeginCreateAsync(new MouseEventArgs());
+        else if ((RecordId ?? ProductIdFromQuery) is { } id && SelectionExists(id))
+        {
+            Select(id);
+            if (Screen == "edit") await BeginEditAsync(new MouseEventArgs());
+        }
+        else if (VisibleIds.FirstOrDefault() is var first && first != Guid.Empty) Select(first);
+        RevealSelected();
+        _catalogReady = true;
+    }
 }

@@ -42,6 +42,8 @@ public partial class OasMainShell : IAsyncDisposable
     private bool _themeChangeBusy;
     private bool _themeToggleError;
     private bool _restored;
+    private bool _appearanceReady;
+    private bool _startupDismissed;
     private string? _contextGroupKey;
 
     [Inject] private NavigationManager Navigation { get; set; } = default!;
@@ -109,10 +111,28 @@ public partial class OasMainShell : IAsyncDisposable
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender) return;
-        await RestoreStateAsync();
-        _restored = true;
-        SynchronizeWithLocation(Navigation.Uri);
+        if (firstRender)
+        {
+            await RestoreStateAsync();
+            _restored = true;
+            SynchronizeWithLocation(Navigation.Uri);
+            await PersistStateAsync();
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        if (_appearanceReady && !_startupDismissed)
+        {
+            _startupDismissed = true;
+            try { await JS.InvokeVoidAsync("hideOasStartup"); }
+            catch (JSException) { }
+        }
+    }
+
+    private async Task MarkAppearanceReadyAsync()
+    {
+        if (_appearanceReady) return;
+        _appearanceReady = true;
         await PersistStateAsync();
         await InvokeAsync(StateHasChanged);
     }

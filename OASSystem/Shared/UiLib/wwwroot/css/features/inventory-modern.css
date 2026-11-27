@@ -1,173 +1,239 @@
-/* OAS inventory workspaces | isolated to inventory routes using the page marker.
-   No layout changes leak into Accounting, Sales or Purchasing. */
-.oas-shell:has(.oas-inventory-view) {
-  --inv-surface: var(--oas-color-surface);
-  --inv-border: var(--oas-color-border);
-  --inv-text: var(--oas-color-text);
-  --inv-muted: var(--oas-color-text-muted);
-  --inv-accent: var(--oas-color-primary);
+/* Inventory identity. One source of styling; no body:has or shell-wide selectors.
+   The scope is explicitly attached to inventory workspaces, not reports or other modules. */
+.oas-inventory-workspace {
+    --inv-primary: #062344;
+    --inv-selected: #cfe5fa;
+    --inv-hover: #f3f6f9;
+    --inv-surface: #fff;
+    --inv-text: #17253b;
+    --inv-border: #d5dfeb;
+    --inv-input: #edf2f7;
+    --inv-control: 30px;
+    --inv-radius: 5px;
+    --inv-gap: 6px;
+    --oas-color-background: var(--inv-surface);
+    --oas-color-surface: var(--inv-surface);
+    --oas-color-border-subtle: var(--inv-border);
+    --oas-theme-content-bg: var(--inv-surface);
+    --oas-theme-card-bg: var(--inv-surface);
+    --oas-theme-input-bg: var(--inv-input);
+    --oas-theme-text: var(--inv-text);
+    --oas-theme-muted: #526174;
+    --oas-theme-border: var(--inv-border);
+    --oas-dark-panel: var(--inv-surface);
+    --oas-dark-panel-alt: var(--inv-input);
+    --oas-dark-header: var(--inv-primary);
+    --oas-dark-ink: var(--inv-text);
+    --oas-dark-border: var(--inv-border);
+    --oas-ui-accent: var(--inv-primary);
+    --oas-ui-accent-fg: #fff;
+    --oas-color-focus-ring: #2676ba40;
+    --oas-color-danger: #b91c1c;
+    --oas-color-danger-surface: #fff0f0;
+    --oas-color-success: #14532d;
+    --oas-color-success-surface: #e7f8f1;
+    --oas-appearance-ring: 0 0 0 2px var(--oas-color-focus-ring);
+    --oas-color-text: var(--inv-text);
+    --oas-color-text-muted: #526174;
+    --oas-color-border: var(--inv-border);
+    --oas-color-card-border: var(--inv-border);
+    --oas-color-card-shadow: none;
+    --oas-appearance-shadow: none;
+    --oas-appearance-input: var(--inv-input);
+    --oas-appearance-selected-text: var(--inv-text);
+    --oas-color-disabled-surface: var(--inv-input);
+    --oas-color-subtle: var(--inv-input);
+    --oas-color-primary: var(--inv-primary);
+    --oas-color-on-primary: #fff;
+    --oas-color-primary-hover: #123d69;
+    --oas-color-primary-soft: var(--inv-selected);
+    --oas-color-primary-border: #abc6de;
+    --oas-color-table-header: var(--inv-primary);
+    --oas-color-table-row-hover: var(--inv-hover);
+    --oas-color-table-row-selected: var(--inv-selected);
+    --oas-color-hover: var(--inv-hover);
+    --oas-type-table: calc(13px * var(--oas-ui-font-scale, 1));
+    color: var(--inv-text);
+    min-width: 0;
+    gap: var(--inv-gap);
+    font-family: inherit;
+    color-scheme: light;
 }
-body:has(.oas-inventory-view) .ui-workspace {
-  gap: 8px;
-  color: var(--inv-text);
+/* More specific than the shared theme rules, confined to the workspace. */
+.oas-shell .oas-main-inner .oas-inventory-workspace :is(.ui-card,.ui-data-grid-panel,.ui-data-table__container,.ui-workspace__actions,.ui-workspace__filters,.ui-workspace__tabs) {
+    background: var(--inv-surface);
+    border: 1px solid var(--inv-border);
+    border-radius: var(--inv-radius);
+    box-shadow: none;
+    color: var(--inv-text);
 }
-body:has(.oas-inventory-view) .ui-workspace__actions,
-body:has(.oas-inventory-view) .ui-workspace__filters,
-body:has(.oas-inventory-view) .ui-workspace__tabs {
-  border: 1px solid var(--inv-border);
-  background: var(--inv-surface);
-  border-radius: 12px;
-  box-shadow: 0 3px 16px rgb(0 0 0 / 3%);
+.oas-inventory-workspace :is(.ui-workspace__actions,.ui-workspace__filters) { padding: 5px 8px; }
+.oas-inventory-workspace .ui-workspace-actionbar { gap: var(--inv-gap); }
+.oas-inventory-workspace .ui-card__header { padding: 8px 10px 3px; }
+.oas-inventory-workspace .ui-card__body { padding: 8px 10px; }
+.oas-inventory-workspace .ui-data-grid-panel__toolbar { min-height: 32px; padding: 5px 8px; }
+.oas-shell .oas-main-inner .oas-inventory-workspace .ui-data-table {
+    width: 100%; background: var(--inv-surface); border-collapse: separate; border-spacing: 0;
 }
-body:has(.oas-inventory-view) .ui-workspace__actions {padding: 6px 9px;}
-body:has(.oas-inventory-view) .ui-workspace__filters {padding: 6px 9px;}
-body:has(.oas-inventory-view) .ui-workspace__body {gap: 9px;}
-body:has(.oas-inventory-view) .ui-workspace__body--split {
-  grid-template-columns: minmax(0, 1.65fr) minmax(355px, 1fr);
+/* Shared dark theme declares table colors !important; these scoped rules intentionally
+   override those declarations only inside inventory, including when the shell is dark. */
+.oas-shell .oas-main-inner .oas-inventory-workspace .ui-data-table thead th {
+    background: var(--inv-primary) !important; color: #fff !important;
+    position: sticky; top: 0; z-index: 1; font-weight: 700; text-shadow: none;
 }
-body:has(.oas-inventory-view) .ui-data-grid-panel,
-body:has(.oas-inventory-view) .ui-card {
-  color: var(--inv-text);
-  background: var(--inv-surface);
-  border: 1px solid var(--inv-border);
-  border-radius: 12px;
-  box-shadow: 0 5px 18px rgb(0 0 0 / 4%);
+.oas-shell .oas-main-inner .oas-inventory-workspace .ui-data-table :is(th,td) {
+    padding: 5px 9px; height: 32px; box-sizing: border-box;
+    border-bottom: 1px solid var(--inv-border); border-inline-end: 1px solid var(--inv-border);
+    line-height: 1.35; text-align: center; vertical-align: middle;
 }
-body:has(.oas-inventory-view) .ui-data-grid-panel__toolbar {
-  min-height: 44px;
-  background: var(--inv-surface);
-  border-bottom: 1px solid var(--inv-border);
-  padding: 6px 12px;
+.oas-shell .oas-main-inner .oas-inventory-workspace .ui-data-table :is(th,td):last-child { border-inline-end: 0; }
+.oas-shell .oas-main-inner .oas-inventory-workspace .ui-data-table tbody tr td {
+    background: var(--inv-surface) !important; color: var(--inv-text) !important; text-shadow: none;
 }
-body:has(.oas-inventory-view) .ui-data-grid-panel__title strong,
-body:has(.oas-inventory-view) .ui-card__header h2 {
-  font-size: clamp(12px, .89rem, 15px);
-  font-weight: 750;
-  color: var(--inv-text);
-  letter-spacing: 0;
+.oas-shell .oas-main-inner .oas-inventory-workspace .ui-data-table tbody tr:hover td { background: var(--inv-hover) !important; }
+.oas-shell .oas-main-inner .oas-inventory-workspace .ui-data-table tbody tr.ui-data-table__row--selected td {
+    background: var(--inv-selected) !important; color: var(--inv-text) !important; box-shadow: none; text-shadow: none !important;
 }
-body:has(.oas-inventory-view) .ui-data-grid-panel__title span,
-body:has(.oas-inventory-view) .ui-card__header p {
-  font-size: clamp(10px, .75rem, 12px);
-  color: var(--inv-muted);
+.oas-shell .oas-main-inner .oas-inventory-workspace .ui-data-table tbody tr.ui-data-table__row--selected td :is(span,strong,small,i,a) { color: var(--inv-text) !important; text-shadow: none !important; }
+.oas-shell .oas-main-inner .oas-inventory-workspace .ui-button {
+    border-radius: var(--inv-radius); min-height: var(--inv-control); padding: 4px 10px;
+    box-shadow: none; text-shadow: none; font-weight: 650;
 }
-body:has(.oas-inventory-view) .ui-data-grid-panel__header,
-body:has(.oas-inventory-view) .ui-data-grid-panel__footer {
-  background: var(--inv-surface);
-  border-color: var(--inv-border);
+/* Semantic action colors are resolved in the workspace itself. The global
+   Sky/Sun and dark preset selectors must not change these on late theme restore. */
+.oas-inventory-workspace .ui-button--primary { --inv-action-bg: #14532d; --inv-action-border: #14532d; --inv-action-ink: #fff; --inv-action-hover: #1a6738; }
+.oas-inventory-workspace .ui-button.inv-edit { --inv-action-bg: #fff0d6; --inv-action-border: #f4c981; --inv-action-ink: #92400e; }
+.oas-inventory-workspace .ui-button.inv-save { --inv-action-bg: #062344; --inv-action-border: #062344; --inv-action-ink: #fff; }
+.oas-inventory-workspace .ui-button.inv-refresh { --inv-action-bg: #dceafa; --inv-action-border: #afc8e8; --inv-action-ink: #123d79; }
+.oas-inventory-workspace .ui-button.inv-receipt { --inv-action-bg: #d5f4f1; --inv-action-border: #9edbd5; --inv-action-ink: #115e59; }
+.oas-shell .oas-main-inner .oas-inventory-workspace .ui-button:is(.ui-button--primary,.inv-edit,.inv-save,.inv-refresh,.inv-receipt) {
+    background: var(--inv-action-bg) !important; border-color: var(--inv-action-border) !important;
+    color: var(--inv-action-ink) !important; text-shadow: none !important;
 }
-body:has(.oas-inventory-view) .ui-data-table__container {border: 0; border-radius: 0;}
-body:has(.oas-inventory-view) .ui-data-table {font-size: clamp(11px, .76rem, 13px);}
-body:has(.oas-inventory-view) .ui-data-table th {
-  background: var(--oas-color-subtle);
-  color: var(--inv-text);
-  font-size: clamp(11px, .75rem, 13px) !important;
-  font-weight: 700;
-  border-color: var(--inv-border);
-  position: sticky;
-  top: 0;
-  z-index: 1;
+.oas-shell .oas-main-inner .oas-inventory-workspace .ui-button:is(.ui-button--primary,.inv-edit,.inv-save,.inv-refresh,.inv-receipt):hover:not(:disabled) {
+    background: var(--inv-action-hover,var(--inv-action-bg)) !important;
+    border-color: var(--inv-action-border) !important; color: var(--inv-action-ink) !important;
 }
-body:has(.oas-inventory-view) .ui-data-table th,
-body:has(.oas-inventory-view) .ui-data-table td {
-  padding: 9px 10px;
-  border-color: var(--inv-border);
-  line-height: 1.45 !important;
+.oas-shell .oas-main-inner .oas-inventory-workspace .ui-button:disabled {
+    background: #e5e7eb !important; border-color: #d5d9df !important; color: #6b7280 !important;
+    opacity: 1; cursor: default; text-shadow: none !important;
 }
-body:has(.oas-inventory-view) .ui-data-table td,
-body:has(.oas-inventory-view) .ui-data-table td strong,
-body:has(.oas-inventory-view) .ui-data-table td span {
-  font-size: clamp(11px, .76rem, 13px) !important;
-  color: var(--inv-text);
+.oas-shell .oas-main-inner .oas-inventory-workspace :is(.ui-input-text__control,.ui-searchable-select__trigger,.ui-select__control,.inventory-suggested-input__control input) {
+    min-height: var(--inv-control); background: var(--inv-input) !important;
+    border: 1px solid var(--inv-border); border-color: var(--inv-border) !important; color: var(--inv-text) !important; box-shadow: none;
 }
-body:has(.oas-inventory-view) .ui-card__header {padding: 11px 13px 3px;}
-body:has(.oas-inventory-view) .ui-card__body {padding: 10px 13px 13px;}
-body:has(.oas-inventory-view) .ui-workspace__aside { scrollbar-width: thin; }
-body:has(.oas-inventory-view) .ui-workspace-actionbar {gap: 6px;}
-body:has(.oas-inventory-view) .ui-workspace-actionbar .ui-button {
-  border-radius: 9px;
-  min-height: 32px;
+/* Standalone fields only; composite input corners are owned by InventorySuggestedInput. */
+.oas-shell .oas-main-inner .oas-inventory-workspace :is(.ui-input-text__control,.ui-searchable-select__trigger,.ui-select__control) { border-radius: var(--inv-radius); }
+.oas-shell .oas-main-inner .oas-inventory-workspace :is(.ui-input-text__control,.ui-searchable-select__trigger,.ui-select__control):disabled { opacity: 1; background: var(--inv-input) !important; color: var(--inv-text) !important; }
+.oas-shell .oas-main-inner .oas-inventory-workspace :is(.ui-input-text__control,.ui-searchable-select__trigger,.ui-select__control,.inventory-suggested-input__control input)[aria-invalid="true"] { border-color: #b91c1c !important; }
+.oas-shell .oas-main-inner .oas-inventory-workspace :is(.ui-input-text__control,.ui-searchable-select__trigger,.ui-select__control):focus-visible { outline: 2px solid #2676ba; outline-offset: 1px; }
+.oas-inventory-workspace input[type="checkbox"] { accent-color: var(--inv-primary); }
+.oas-inventory-workspace :is(input[type="date"],input[type="datetime-local"]) { direction: ltr; unicode-bidi: isolate; text-align: left; font-variant-numeric: tabular-nums; }
+.oas-inventory-workspace :is(.inventory-transactions__optional,.inventory-products__specialized) { border: 1px solid var(--inv-border); border-radius: var(--inv-radius); background: var(--inv-input); min-width: 0; }
+.oas-inventory-workspace :is(.inventory-transactions__optional,.inventory-products__specialized) > summary { cursor: pointer; padding: 6px 10px; font-weight: 700; color: var(--inv-primary); }
+/* Initial data readiness is a real status, not a hidden or unstyled workspace. */
+.oas-inventory-workspace.inv-catalog-loading {
+    background: var(--inv-surface); color: var(--inv-text);
+    padding: 12px; border: 1px solid var(--inv-border); border-radius: var(--inv-radius);
+    min-height: 100%; box-sizing: border-box;
 }
-body:has(.oas-inventory-view) :is(.inventory-master-editor,.inventory-warehouses__editor,.inventory-products__editor,.stock-counts__editor) {
-  display: grid;
-  grid-template-columns: repeat(2,minmax(0,1fr));
-  gap: 10px;
-  align-items: start;
+/* Integrated catalog layout (all inventory definitions). */
+.oas-shell .oas-main-inner .oas-inventory-catalog :is(.ui-button,.ui-input-text__control,.ui-searchable-select__trigger,.ui-search-input,.inv-record-nav button,.inv-pagination button) {
+    transition: none; transform: none;
 }
-body:has(.oas-inventory-view) :is(.inventory-master-editor,.inventory-warehouses__editor,.inventory-products__editor,.stock-counts__editor) > * {min-width: 0;}
-body:has(.oas-inventory-view) :is(.inventory-products__specialized,.inventory-transactions__optional) {
-  margin: 6px 0 0;
-  padding: 0;
-  background: color-mix(in srgb,var(--inv-accent) 3%,var(--inv-surface));
-  border: 1px solid var(--inv-border);
-  border-radius: 11px;
-  overflow: hidden;
+.oas-shell .oas-main-inner .oas-inventory-catalog .ui-button:hover:not(:disabled) { transform: none; }
+.oas-inventory-catalog .inv-table-slot .ui-data-table__empty { height: 32px; padding: 5px 9px !important; }
+
+.oas-inventory-catalog {
+    display: flex; flex-direction: column; container-type: inline-size;
+    min-height: 0; height: 100%; padding: 0px 8px 8px; box-sizing: border-box;
+    background: var(--inv-surface); border: 1px solid var(--inv-border); border-radius: var(--inv-radius);
+    /* Keep overflow within the catalog so the toolbar stays below the shell header. */
+    overflow: auto;
 }
-body:has(.oas-inventory-view) :is(.inventory-products__specialized,.inventory-transactions__optional) > summary {
-  cursor: pointer;
-  padding: 10px 12px;
-  color: var(--inv-text);
-  font-size: .84rem;
-  font-weight: 700;
-  list-style-position: inside;
+.oas-inventory-catalog > .inv-toolbar {
+    position: sticky; inset-block-start: 0; z-index: 20; flex: 0 0 auto;
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    flex-wrap: wrap; padding: 3px 0 6px; border-bottom: 1px solid var(--inv-border);
+    background: var(--inv-surface);
 }
-body:has(.oas-inventory-view) .inventory-products__specialized > summary span {
-  font-size: .69rem;
-  font-weight: 400;
-  color: var(--inv-muted);
-  margin-inline-start: 5px;
+.oas-inventory-catalog > :is(.inv-editor,.inv-search-row,.inv-footer) { flex: 0 0 auto; }
+.oas-inventory-catalog .inv-toolbar-navigation { display: flex; align-items: center; gap: 8px; flex: 1 1 290px; min-width: 0; max-width: 530px; margin-inline-start: auto; }
+.oas-inventory-catalog .inv-toolbar-navigation .inv-record-nav { flex: 0 0 auto; flex-wrap: nowrap; }
+.oas-inventory-catalog .inv-toolbar-navigation .ui-search-input { flex: 1 1 160px; min-width: 0; }
+.oas-inventory-catalog .inv-actions,.oas-inventory-catalog .inv-record-nav { display: flex; flex-wrap: wrap; gap: var(--inv-gap); align-items: center; }
+.oas-inventory-catalog :is(.inv-record-nav,.inv-pagination) button {
+    display: inline-grid; place-items: center; min-width: 30px; min-height: var(--inv-control);
+    padding: 0 6px; border: 1px solid var(--inv-border); border-radius: var(--inv-radius);
+    font: inherit; color: var(--inv-primary); background: #fff; cursor: pointer;
 }
-body:has(.oas-inventory-view) .inventory-products__specialized[open] {
-  display: grid;
-  grid-template-columns: repeat(2,minmax(0,1fr));
-  gap: 10px;
-  padding: 0 10px 10px;
+.oas-inventory-catalog .inv-record-nav button,.oas-inventory-catalog .inv-pagination button.inv-current-page { background: var(--inv-primary); color: #fff; border-color: var(--inv-primary); }
+.oas-inventory-catalog :is(.inv-record-nav,.inv-pagination) button:disabled { opacity: .45; cursor: default; }
+.oas-inventory-catalog .inv-excel { position: relative; }
+.oas-inventory-catalog .inv-excel > summary { display: flex; gap: 8px; align-items: center; min-height: var(--inv-control); padding: 4px 10px; color: #175321; background: #e0efd6; border: 1px solid #b5d3a4; border-radius: var(--inv-radius); cursor: pointer; font-weight: 650; list-style: none; }
+.oas-inventory-catalog .inv-excel > summary::-webkit-details-marker { display: none; }
+.oas-inventory-catalog .inv-excel-menu { position: absolute; z-index: 10; inset-inline-end: 0; top: calc(100% + 3px); background: #fff; border: 1px solid var(--inv-border); border-radius: var(--inv-radius); display: grid; gap: 4px; padding: 5px; min-width: 155px; }
+.oas-inventory-catalog .inv-editor { min-width: 0; }
+.oas-inventory-catalog .inv-editor-panel { border: 1px solid var(--inv-border); border-radius: var(--inv-radius); background: #f9fbfd; }
+.oas-inventory-catalog .inv-editor-panel > summary { display: flex; align-items: center; justify-content: space-between; padding: 5px 10px; min-height: 30px; box-sizing: border-box; background: #e6eef9; color: var(--inv-primary); font-size: var(--oas-type-section); font-weight: 700; cursor: pointer; list-style: none; border-radius: var(--inv-radius); }
+.oas-inventory-catalog .inv-editor-panel > summary::-webkit-details-marker { display: none; }
+.oas-inventory-catalog .inv-editor-panel > summary span { display: inline-flex; align-items: center; gap: 8px; }
+.oas-inventory-catalog .inv-editor-panel:not([open]) .inv-editor-chevron { transform: rotate(90deg); }
+.oas-inventory-catalog .inv-editor-content { padding: 8px 10px; }
+.oas-inventory-catalog :is(.inv-form-grid,.inventory-products__variant-fields,.inventory-products__specialized-fields,.inventory-products__specialized-grid) {
+    display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 7px 12px; align-items: start; min-width: 0;
 }
-body:has(.oas-inventory-view) .inventory-products__specialized[open] summary {grid-column: 1/-1; margin: 0 -10px;}
-body:has(.oas-inventory-view) .inventory-products__specialized-grid {grid-column: 1/-1; grid-template-columns: repeat(3,minmax(0,1fr));}
-body:has(.oas-inventory-view) .inventory-transactions__optional[open] {padding-bottom: 10px;}
-body:has(.oas-inventory-view) .inventory-transactions__optional[open] > .ui-input-text {margin:0 10px;}
-/* InventoryTransactionsPage.razor.css owns the split-pane and line grid.
-   Do not force the legacy four-column grid over its five-column editor. */
-body:has(.oas-inventory-view) .stock-counts__line {
-  border-radius: 10px;
-  border-color: var(--inv-border);
-  padding: 8px;
-  background: var(--inv-surface);
+.oas-inventory-catalog .inventory-products__specialized-grid { grid-column: 1/-1; }
+.oas-shell .oas-main-inner .oas-inventory-catalog :is(.ui-input-text,.ui-searchable-select,.inventory-suggested-input) { display: grid; grid-template-columns: minmax(0,1fr); gap: 3px; align-items: start; background: transparent !important; border: 0; box-shadow: none; min-width: 0; }
+.oas-inventory-catalog :is(.ui-input-text__error,.ui-searchable-select__error,.inventory-suggested-input__error,.validation-message) { grid-column: 1/-1; color: #b91c1c; }
+.oas-shell .oas-main-inner .oas-inventory-catalog :is(.ui-text-label,.ui-searchable-select__label,.inventory-suggested-input__label) { color: var(--inv-text); font-size: calc(13px * var(--oas-ui-font-scale,1)); font-weight: 700; text-shadow: none; }
+.oas-inventory-catalog :is(.ui-text-label__required,.ui-searchable-select__label > span) { color: #b91c1c; }
+.oas-inventory-catalog .ui-input-text__field { min-width: 0; width: 100%; }
+.oas-shell .oas-main-inner .oas-inventory-catalog :is(.ui-input-text__control,.ui-searchable-select__trigger) { min-height: 32px; width: 100%; }
+.oas-inventory-catalog .ui-checkbox-field { min-height: var(--inv-control); display: grid; align-content: center; align-self: center; }
+.oas-shell .oas-main-inner .oas-inventory-catalog .ui-checkbox { display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--inv-text); text-shadow: none; }
+.oas-inventory-catalog .ui-checkbox input { appearance: none; display: inline-grid; place-content: center; flex: none; width: 17px; height: 17px; border: 1px solid #8b9db0; border-radius: 4px; background: #fff; margin: 0; }
+.oas-inventory-catalog .ui-checkbox input:checked { background: var(--inv-primary); border-color: var(--inv-primary); }
+.oas-inventory-catalog .ui-checkbox input:checked::before { content: ""; width: 8px; height: 5px; border: solid white; border-width: 0 0 2px 2px; transform: rotate(-45deg); }
+.oas-inventory-catalog .ui-checkbox input:focus-visible { outline: 2px solid #2676ba; outline-offset: 2px; }
+.oas-inventory-catalog .ui-checkbox input:disabled { cursor: not-allowed; opacity: .9; }
+.oas-inventory-catalog :is(.inv-form-grid,.inventory-products__variant-fields,.inventory-products__specialized-fields) > * { min-width: 0; }
+.oas-inventory-catalog .inv-initial-variant { background: #f7f9fc; border: 1px solid var(--inv-border); padding: 6px; border-radius: var(--inv-radius); margin-top: 6px; }
+.oas-inventory-catalog .inv-initial-variant > strong { display: block; margin-bottom: 6px; }
+.oas-inventory-catalog .inv-search-row { min-width: 0; }
+.oas-inventory-catalog .inv-search-row:not(:has(details)) { display: none; }
+.oas-inventory-catalog .inv-specifications { display: grid; gap: var(--inv-gap); }
+.oas-inventory-catalog .inventory-products__specialized-fields { padding: 6px 10px; }
+.oas-inventory-catalog .inventory-products__specialized > .ui-checkbox-field { padding: 0 10px 6px; }
+.oas-shell .oas-main-inner .oas-inventory-catalog .ui-search-input { background: #fff !important; border: 1px solid var(--inv-border); border-radius: var(--inv-radius); min-height: var(--inv-control); width: 100%; box-shadow: none; }
+.oas-shell .oas-main-inner .oas-inventory-catalog .ui-search-input input { background: transparent !important; font-size: var(--oas-type-input); border: 0; }
+.oas-shell .oas-main-inner .oas-inventory-catalog .ui-search-input:focus-within { outline: 2px solid #2676ba; outline-offset: 1px; }
+.oas-inventory-catalog .inv-table-slot { flex: 1 1 180px; min-height: 180px; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.oas-inventory-catalog .inv-table-slot > .ui-data-table__container { flex: 1; min-height: 0; overflow: auto; }
+.oas-inventory-catalog .inv-table-slot .ui-data-table { height: auto; }
+.oas-shell .oas-main-inner .oas-inventory-catalog .inv-table-slot .ui-data-table :is(th,td) { text-align: center !important; vertical-align: middle; }
+.oas-shell .oas-main-inner .oas-inventory-catalog .inv-table-slot .ui-data-table thead th { height: 34px; font-weight: 700; }
+.oas-inventory-catalog .inv-footer { padding-top: 4px; }
+.oas-inventory-catalog .inv-pagination { display: flex; justify-content: space-between; align-items: center; gap: 6px; flex-wrap: wrap; }
+.oas-inventory-catalog .inv-pagination nav { display: flex; flex-wrap: wrap; gap: 4px; }
+.oas-inventory-catalog :is(button,summary):focus-visible { outline: 2px solid #2676ba; outline-offset: 2px; }
+@container (max-width: 850px) {
+    .oas-inventory-catalog :is(.inv-form-grid,.inventory-products__variant-fields,.inventory-products__specialized-fields,.inventory-products__specialized-grid) { grid-template-columns: repeat(2,minmax(0,1fr)); }
+    .oas-inventory-catalog .inv-toolbar-navigation { max-width: none; }
 }
-body:has(.oas-inventory-view) .stock-counts__count-input {grid-template-columns: 1fr auto;}
-body:has(.oas-inventory-view) .inventory-products__aside {min-width:0;}
-@media (max-width: 1350px) {
-  body:has(.oas-inventory-view) .ui-workspace__body--split {
-    grid-template-columns: minmax(0,1.4fr) minmax(315px, 1fr);
-  }
-  body:has(.oas-inventory-view) .inventory-products__editor {grid-template-columns:1fr;}
+@container (max-width: 480px) {
+    .oas-inventory-catalog :is(.inv-form-grid,.inventory-products__variant-fields,.inventory-products__specialized-fields,.inventory-products__specialized-grid) { grid-template-columns: minmax(0,1fr); }
+    .oas-inventory-catalog .inv-toolbar-navigation { flex-wrap: wrap; }
 }
-@media (max-width: 1050px) {
-  body:has(.oas-inventory-view) .ui-workspace {height:auto; min-height: 100%; overflow:visible;}
-  body:has(.oas-inventory-view) .ui-workspace__body--split {grid-template-columns: minmax(0,1fr);}
-  body:has(.oas-inventory-view) .ui-workspace__main,
-  body:has(.oas-inventory-view) .ui-workspace__aside {height:auto;overflow:visible;}
-  body:has(.oas-inventory-view) .ui-data-grid-panel {min-height:270px;max-height:55vh;}
-  body:has(.oas-inventory-view) .ui-workspace__aside {max-height:none;}
-}
-@media (max-width: 580px) {
-  body:has(.oas-inventory-view) .ui-workspace {gap:6px;}
-  body:has(.oas-inventory-view) .ui-data-grid-panel {max-height:45vh;}
-  body:has(.oas-inventory-view) .ui-workspace__actions {padding:6px;}
-  body:has(.oas-inventory-view) :is(.inventory-master-editor,.inventory-warehouses__editor,.inventory-products__editor,.stock-counts__editor) {grid-template-columns:1fr;}
-  body:has(.oas-inventory-view) .inventory-products__specialized[open] {grid-template-columns:1fr;}
-  body:has(.oas-inventory-view) .inventory-products__specialized-grid {grid-template-columns:repeat(2,minmax(0,1fr));}
-  body:has(.oas-inventory-view) .stock-counts__line {grid-template-columns:1fr 1fr;}
-  body:has(.oas-inventory-view) .stock-counts__line > div:nth-child(5),
-  body:has(.oas-inventory-view) .stock-counts__line > div:nth-child(6) {display:none;}
+@media (max-height: 650px), (max-width: 850px) {
+    .oas-inventory-catalog .inv-table-slot { min-height: 220px; max-height: 60vh; }
 }
 
-/* Inventory date pickers: keep native date segments ordered inside RTL screens.
-   This only affects presentation and never changes the HTML input value. */
-body:has(.oas-inventory-view) :is(input[type="date"],input[type="datetime-local"]) {
-  direction: ltr;
-  unicode-bidi: isolate;
-  text-align: left;
-  font-variant-numeric: tabular-nums;
+/* Shared definition forms (previously copied into four scoped stylesheets). */
+.oas-inventory-workspace .oas-inventory-form-screen { width: 100%; min-width: 0; display: grid; gap: 6px; }
+.oas-inventory-workspace .oas-inventory-form-screen__body,.oas-inventory-workspace .oas-inventory-form-screen__body > * { min-width: 0; }
+.oas-inventory-workspace :is(.stock-counts__editor) { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px 12px; align-items: start; }
+.oas-inventory-workspace :is(.stock-counts__editor) > * { min-width: 0; }
+@media (max-width: 760px) {
+    .oas-inventory-workspace :is(.stock-counts__editor,.stock-counts__summary) { grid-template-columns: minmax(0,1fr); }
 }

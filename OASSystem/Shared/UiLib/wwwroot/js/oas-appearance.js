@@ -282,7 +282,7 @@ export function apply(settings, notify = true) {
         node.style.order = String(ensureKeys(settings.headerOrder).indexOf(key));
     }
     if (notify && ['Expanded','Collapsed'].includes(settings.sidebarMode)) notifySidebar(settings.sidebarMode);
-    notifyTheme(darkMode ? 'Dark' : 'Light');
+    if (notify) notifyTheme(darkMode ? 'Dark' : 'Light');
     currentSettings = { ...settings };
 }
 
@@ -295,8 +295,19 @@ async function getServerSettings() {
 export async function initialize(reference) {
     dotNetRef = reference;
     window.oasAppearanceInterop = { persistSidebarMode, toggleThemeMode };
-    try { apply(await getServerSettings()); }
-    catch { /* Token-based Ocean defaults remain usable if the API is unavailable. */ }
+    try {
+        // A stalled network request must not block the first workspace indefinitely.
+        const response = await fetch(endpoint, {
+            credentials: 'same-origin', cache: 'no-store', signal: AbortSignal.timeout(10000)
+        });
+        if (!response.ok) throw new Error('تعذر تحميل إعدادات المظهر.');
+        const settings = await response.json();
+        apply(settings, false);
+        return [settings.sidebarMode ?? '', settings.themeMode === 'Dark' ? 'Dark' : 'Light'];
+    } catch {
+        // Keep the static defaults (no late application from the failed request).
+        return [];
+    }
 }
 
 // Keep the button in the global header in sync with the DB-backed appearance.

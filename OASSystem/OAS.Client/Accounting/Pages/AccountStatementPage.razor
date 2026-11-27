@@ -7,6 +7,7 @@
 @using OAS.Client.Accounting.Common
 @using OAS.Contracts.Accounting.Accounts
 @using OAS.Contracts.Accounting.Currencies
+@using OAS.Contracts.Accounting.CostCenters
 @using OAS.Contracts.Accounting.Enums
 @using OAS.Contracts.Common.Pagination
 @using OAS.UiLib.Components.Reports
@@ -17,24 +18,35 @@
 <PageTitle>كشف حساب | OAS</PageTitle>
 <UiReportWorkspace Title="كشف حساب" StatusText="@(_isDemo ? "عرض تجريبي" : "مرحل")" Search="@_search" SearchChanged="OnSearch" FiltersOpen="@_filtersOpen" FiltersOpenChanged="@(v => _filtersOpen = v)">
     <Toolbar>
-        <button class="oas-report__tool" title="تحديث" aria-label="تحديث" @onclick="LoadAsync"><i class="fa-solid fa-rotate"></i></button>
-        <button class="oas-report__tool oas-report__tool--pdf" title="طباعة أو حفظ PDF" aria-label="طباعة أو حفظ PDF" @onclick="PrintAsync"><i class="fa-regular fa-file-pdf"></i></button>
-        <button class="oas-report__tool oas-report__tool--excel" title="تصدير CSV قابل للفتح في Excel" aria-label="تصدير CSV" @onclick="ExportAsync"><i class="fa-regular fa-file-excel"></i></button>
-        <button class="oas-report__tool" title="طباعة" aria-label="طباعة" @onclick="PrintAsync"><i class="fa-solid fa-print"></i></button>
+        <button class="oas-report__tool" title="تحديث" aria-label="تحديث" disabled="@_busy" @onclick="LoadAsync"><i class="fa-solid fa-rotate"></i></button>
+        <button class="oas-report__tool oas-report__tool--pdf" title="طباعة جميع نتائج البحث أو حفظ PDF" aria-label="طباعة أو حفظ PDF" disabled="@(!CanExport)" @onclick="PrintAsync"><i class="fa-regular fa-file-pdf"></i></button>
+        <button class="oas-report__tool oas-report__tool--excel" title="تصدير نتائج البحث إلى Excel" aria-label="تصدير Excel" disabled="@(!CanExport)" @onclick="ExportAsync"><i class="fa-regular fa-file-excel"></i></button>
+        <button class="oas-report__tool" title="طباعة جميع نتائج البحث" aria-label="طباعة" disabled="@(!CanExport)" @onclick="PrintAsync"><i class="fa-solid fa-print"></i></button>
         <button class="oas-report__tool" title="إظهار أو إخفاء الفلاتر" aria-label="إظهار أو إخفاء الفلاتر" @onclick="@(() => _filtersOpen = !_filtersOpen)"><i class="fa-solid fa-ellipsis-vertical"></i></button>
     </Toolbar>
     <QuickFilters>
         <div class="oas-report__chip oas-report__chip--account" title="@SelectedAccountDisplay"><i class="fa-regular fa-file-lines"></i><span class="oas-report__chip-label">الحساب:</span><strong>@SelectedAccountDisplay</strong></div>
-        <div class="oas-report__chip" title="كل الفروع"><i class="fa-solid fa-building"></i><span class="oas-report__chip-label">الفرع:</span><strong>كل الفروع</strong></div>
         <div class="oas-report__chip" title="العملة الأساسية"><i class="fa-solid fa-coins"></i><span class="oas-report__chip-label">العملة:</span><strong>@_displayCurrencyName</strong></div>
-        <div class="oas-report__chip" title="من تاريخ"><i class="fa-regular fa-calendar"></i><span class="oas-report__chip-label">من تاريخ:</span><strong>@_from.ToString("dd/MM/yyyy")</strong></div>
-        <div class="oas-report__chip" title="إلى تاريخ"><i class="fa-regular fa-calendar"></i><span class="oas-report__chip-label">إلى تاريخ:</span><strong>@_to.ToString("dd/MM/yyyy")</strong></div>
-        <div class="oas-report__chip" title="نوع التقرير"><i class="fa-regular fa-file-lines"></i><span class="oas-report__chip-label">نوع التقرير:</span><strong>@(_detail == "true" ? "تفصيلي" : "إجمالي")</strong></div>
-        <div class="oas-report__chip" title="كل المراكز"><i class="fa-solid fa-diagram-project"></i><span class="oas-report__chip-label">مركز التكلفة:</span><strong>كل المراكز</strong></div>
+        <div class="oas-report__chip" title="من تاريخ"><i class="fa-regular fa-calendar"></i><span class="oas-report__chip-label">من تاريخ:</span><strong>@_applied.From.ToString("dd/MM/yyyy")</strong></div>
+        <div class="oas-report__chip" title="إلى تاريخ"><i class="fa-regular fa-calendar"></i><span class="oas-report__chip-label">إلى تاريخ:</span><strong>@_applied.To.ToString("dd/MM/yyyy")</strong></div>
+        <div class="oas-report__chip" title="نوع التقرير"><i class="fa-regular fa-file-lines"></i><span class="oas-report__chip-label">نوع التقرير:</span><strong>@(_applied.Detail == "true" ? "تفصيلي" : "إجمالي")</strong></div>
+        @if (_applied.CostCenterId.HasValue){<div class="oas-report__chip"><strong>مركز التكلفة: @CenterName</strong></div>}
+        @if (_applied.Source != ""){<div class="oas-report__chip"><strong>المصدر: @_applied.Source</strong></div>}
+        @if (_applied.Reference != ""){<div class="oas-report__chip"><strong>المرجع: @_applied.Reference</strong></div>}
     </QuickFilters>
     <TableContent>
+        @if (!_busy && _error is null && _accountBalances.Count > 0)
+        {
+            <details>
+                <summary>أرصدة الحسابات الافتتاحية والختامية (قبل البحث وتصفية المصدر والمرجع)</summary>
+                <table class="oas-report__table"><thead><tr><th>الحساب</th><th>افتتاحي</th><th>ختامي</th></tr></thead><tbody>
+                    @foreach(var balance in _accountBalances){<tr><td>@balance.Account</td><td>@Money(balance.Opening)</td><td>@Money(balance.Closing)</td></tr>}
+                </tbody></table>
+            </details>
+        }
         <table class="oas-report__table account-statement-table">
             <thead><tr>
+                @if (_multipleAccounts){<th scope="col">الحساب</th>}
                 <UiReportSortHeader Label="التاريخ" Active="@(_sortColumn == SortColumn.Date)" Descending="@_sortDescending" OnSort="@(() => SortBy(SortColumn.Date))" />
                 <UiReportSortHeader Label="نوع المستند" Active="@(_sortColumn == SortColumn.Kind)" Descending="@_sortDescending" OnSort="@(() => SortBy(SortColumn.Kind))" />
                 <UiReportSortHeader Label="رقم السند" Active="@(_sortColumn == SortColumn.Number)" Descending="@_sortDescending" OnSort="@(() => SortBy(SortColumn.Number))" />
@@ -46,12 +58,13 @@
                 <th scope="col">الحالة / العكس</th>
             </tr></thead>
             <tbody>
-                @if(_busy){<tr><td colspan="9" class="oas-report__empty">جارٍ تحميل كشف الحساب ...</td></tr>}
-                else if(!string.IsNullOrWhiteSpace(_error)){<tr><td colspan="9" class="oas-report__empty">@_error</td></tr>}
-                else if(VisibleRows.Count == 0){<tr><td colspan="9" class="oas-report__empty">لا توجد حركات ضمن نطاق البحث. اختر الحساب والتواريخ ثم اضغط تطبيق.</td></tr>}
+                @if(_busy){<tr><td colspan="@(_multipleAccounts ? 10 : 9)" class="oas-report__empty">جارٍ تحميل كشف الحساب ...</td></tr>}
+                else if(!string.IsNullOrWhiteSpace(_error)){<tr><td colspan="@(_multipleAccounts ? 10 : 9)" class="oas-report__empty">@_error</td></tr>}
+                else if(VisibleRows.Count == 0){<tr><td colspan="@(_multipleAccounts ? 10 : 9)" class="oas-report__empty">لا توجد حركات ضمن نطاق البحث. اختر الحساب والتواريخ ثم اضغط تطبيق.</td></tr>}
                 else {
                     @foreach(var row in VisibleRows){
                         <tr>
+                            @if (_multipleAccounts){<td>@row.AccountLabel</td>}
                             <td>@row.Date.ToString("dd/MM/yyyy",CultureInfo.InvariantCulture)</td>
                             <td><span class="oas-report__doc"><i class="@row.Icon"></i>@row.Kind</span></td>
                             <td>@row.Number</td><td>@(string.IsNullOrEmpty(row.Reference) ? "-" : row.Reference)</td>
@@ -86,20 +99,21 @@
             <label class="oas-report__field">من تاريخ<input type="date" @bind="_from" @bind:format="yyyy-MM-dd" /></label>
             <label class="oas-report__field">إلى تاريخ<input type="date" @bind="_to" @bind:format="yyyy-MM-dd" /></label>
         </div>
-        <label class="oas-report__field">الفرع<select disabled title="غير مدعوم في استعلام التقرير الحالي"><option>كل الفروع</option></select></label>
         <label class="oas-report__field">العملة<select @bind="_currencyId"><option value="">@_baseCurrencyName (الأساسية)</option>@foreach(var currency in _currencies.Where(c => c.IsActive && c.Id != _baseCurrencyId)){<option value="@currency.Id">@currency.NameAr (@currency.Code)</option>}</select></label>
-        <label class="oas-report__field">مركز التكلفة<select disabled title="غير مدعوم في استعلام التقرير الحالي"><option>كل المراكز</option></select></label>
-        <label class="oas-report__field">نوع التقرير<select @bind="_detail"><option value="true">تفصيلي (كل الحركات)</option><option value="false">إجمالي (حسب الحساب)</option></select></label>
+        <label class="oas-report__field">مركز التكلفة<select @bind="_costCenterId"><option value="">الكل</option>@foreach(var center in _centers){<option value="@center.Id">@center.NameAr</option>}@if(_costCenterId.HasValue && !_centers.Any(c=>c.Id==_costCenterId)){<option value="@_costCenterId">مركز التكلفة المحدد</option>}</select></label>
+        <label class="oas-report__field">نوع التقرير<select @bind="_detail"><option value="true">تفصيلي (كل الحركات)</option><option value="false">إجمالي (حسب الحساب والقيد)</option></select></label>
+        <label class="oas-report__field">مصدر القيد<select @bind="_source"><option value="">الكل</option>@foreach(var source in _sources){<option value="@source">@source</option>}</select></label>
+        <label class="oas-report__field">رقم القيد أو المرجع<input @bind="_reference" placeholder="الكل" /></label>
         <label class="oas-report__field-check"><input type="checkbox" @bind="_includeChildren" /> تضمين الحسابات الفرعية</label>
-        <div class="oas-report__apply"><button class="primary" @onclick="LoadAsync"><i class="fa-solid fa-filter"></i> تطبيق</button><button @onclick="ResetAsync"><i class="fa-solid fa-rotate-left"></i> إعادة تعيين</button></div>
+        <div class="oas-report__apply"><button class="primary" disabled="@_busy" @onclick="LoadAsync"><i class="fa-solid fa-filter"></i> تطبيق</button><button disabled="@_busy" @onclick="ResetAsync"><i class="fa-solid fa-rotate-left"></i> إعادة تعيين</button></div>
     </FilterPanel>
     <Metrics>
         <UiReportMetric Label="إجمالي الحركات" Value="@_filtered.Count.ToString(CultureInfo.InvariantCulture)" Tone="blue" Icon="fa-solid fa-list" />
         <UiReportMetric Label="عدد القيود" Value="@_filtered.Select(x=>x.EntryId).Distinct().Count().ToString(CultureInfo.InvariantCulture)" Tone="violet" Icon="fa-regular fa-file-lines" />
         <UiReportMetric Label="إجمالي المدين" Value="@Money(_filtered.Sum(x=>x.Debit))" Tone="red" Icon="fa-solid fa-arrow-up" />
         <UiReportMetric Label="إجمالي الدائن" Value="@Money(_filtered.Sum(x=>x.Credit))" Tone="green" Icon="fa-solid fa-arrow-down" />
-        <UiReportMetric Label="الخصومات" Value="غير متاح" Tone="orange" Icon="fa-solid fa-percent" />
-        <UiReportMetric Label="الرصيد الختامي" Value="@Money(_closingBalance)" Tone="purple" Icon="fa-solid fa-coins" />
+        <UiReportMetric Label="الرصيد الافتتاحي (قبل البحث)" Value="@(_multipleAccounts ? "لكل حساب" : Money(_openingBalance))" Tone="orange" Icon="fa-solid fa-coins" />
+        <UiReportMetric Label="الرصيد الختامي (قبل البحث)" Value="@(_multipleAccounts ? "لكل حساب" : Money(_closingBalance))" Tone="purple" Icon="fa-solid fa-coins" />
     </Metrics>
 </UiReportWorkspace>
 
@@ -109,15 +123,26 @@
     [Parameter, SupplyParameterFromQuery(Name = "toDate")] public string? ToDateFromQuery { get; set; }
     [Parameter, SupplyParameterFromQuery(Name = "includeChildren")] public bool? ChildrenFromQuery { get; set; }
     [Parameter, SupplyParameterFromQuery(Name = "currencyId")] public Guid? CurrencyFromQuery { get; set; }
+    [Parameter, SupplyParameterFromQuery(Name = "costCenterId")] public Guid? CostCenterFromQuery { get; set; }
+    private Guid? _costCenterId;
+    private List<CostCenterDto> _centers = [];
+    private string CenterName => _applied.CostCenterId is Guid id ? _centers.FirstOrDefault(c=>c.Id==id)?.NameAr ?? id.ToString() : "الكل";
     private string SelectedAccountDisplay
     {
         get
         {
-            if (!_accountId.HasValue) return "جميع الحسابات";
-            var account = _accounts.FirstOrDefault(a => a.Id == _accountId.Value);
+            if (!_applied.AccountId.HasValue) return "جميع الحسابات";
+            var account = _accounts.FirstOrDefault(a => a.Id == _applied.AccountId.Value);
             return account is null ? "الحساب المحدد" : $"{account.Code} - {account.NameAr}";
         }
     }
+    private sealed record AppliedFilters(Guid? AccountId, DateTime From, DateTime To, Guid? CurrencyId, bool Children, string Detail, string Source, string Reference, Guid? CostCenterId = null);
+    private AppliedFilters _applied = new(null, new DateTime(DateTime.Today.Year,1,1), DateTime.Today, null, false, "true", "", "");
+    private string _source = "", _reference = "";
+    private string[] _sources = [];
+    private bool _multipleAccounts;
+    private decimal _openingBalance;
+    private List<(string Account, decimal Opening, decimal Closing)> _accountBalances = [];
     private Guid? _currencyId;
     private Guid _baseCurrencyId;
     private string _baseCurrencyName = "العملة الأساسية";
@@ -151,7 +176,7 @@
     private List<StatementRow> _filtered = [];
     private IReadOnlyList<StatementRow> VisibleRows => _filtered.Skip((_page-1)*_pageSize).Take(_pageSize).ToArray();
     private int TotalPages => Math.Max(1,(int)Math.Ceiling(_filtered.Count/(double)_pageSize));
-    private sealed record StatementRow(Guid EntryId,DateOnly Date,string Kind,string Icon,string Number,string? Reference,string Description,decimal Debit,decimal Credit,decimal Balance,JournalReversalInfoDto? Reversal = null);
+    private sealed record StatementRow(Guid EntryId,DateOnly Date,string Kind,string Icon,string Number,string? Reference,string Description,decimal Debit,decimal Credit,decimal Balance,JournalReversalInfoDto? Reversal = null, Guid AccountId = default, string AccountLabel = "", string? Source = null);
     protected override async Task OnInitializedAsync(){
         _isDemo = Nav.Uri.Contains("/ui-lab/", StringComparison.OrdinalIgnoreCase);
         _filtersOpen = true;
@@ -181,43 +206,53 @@
             if (DateOnly.TryParseExact(ToDateFromQuery, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var to)) _to = to.ToDateTime(TimeOnly.MinValue);
             if (ChildrenFromQuery.HasValue) _includeChildren = ChildrenFromQuery.Value;
             if (CurrencyFromQuery.HasValue) _currencyId = CurrencyFromQuery.Value;
+            _costCenterId = CostCenterFromQuery;
+            try { for(var page=1;;page++){var centers=await Accounting.GetCostCentersPageAsync(new PageRequest{PageNumber=page,PageSize=100});_centers.AddRange(centers.Items);if(!centers.HasNextPage||centers.Items.Count==0)break;} } catch { _centers=[]; }
             await LoadAsync();
         }catch(Exception ex){_error="تعذر تحميل بيانات الحسابات: "+ex.Message;}
     }
     private async Task LoadAsync(){
-        if(_isDemo){LoadDemo();return;}
-        if(_from.Date>_to.Date){_error="تاريخ البداية يجب ألا يتجاوز تاريخ النهاية.";return;}
+        if(_busy)return;
+        var f = new AppliedFilters(_accountId,_from,_to,_currencyId,_includeChildren,_detail,_source,_reference.Trim(),_costCenterId);
+        if(_isDemo){_applied=f;LoadDemo();return;}
+        if(f.From.Date>f.To.Date){_error="تاريخ البداية يجب ألا يتجاوز تاريخ النهاية.";return;}
         _busy=true;_error=null;
         try{
             // Ledger amounts are in the base currency. The selected reporting currency uses
             // one effective accounting rate as of the report end date, preserving running balances.
             decimal conversionRate = 1m;
-            var selectedCurrency = _currencies.FirstOrDefault(c => c.Id == _currencyId);
-            if (_currencyId.HasValue && _currencyId != _baseCurrencyId)
+            var selectedCurrency = _currencies.FirstOrDefault(c => c.Id == f.CurrencyId);
+            if (f.CurrencyId.HasValue && f.CurrencyId != _baseCurrencyId)
             {
                 if (selectedCurrency is null || !selectedCurrency.IsActive)
                     throw new InvalidOperationException("العملة المحددة غير متاحة.");
-                var effective = await Accounting.GetEffectiveExchangeRateAsync(_currencyId.Value, DateOnly.FromDateTime(_to), ExchangeRateType.Accounting);
+                var effective = await Accounting.GetEffectiveExchangeRateAsync(f.CurrencyId.Value, DateOnly.FromDateTime(f.To), ExchangeRateType.Accounting);
                 if (effective is null || effective.Rate <= 0m)
                     throw new InvalidOperationException("لا يوجد سعر صرف محاسبي صالح للعملة المحددة حتى تاريخ نهاية التقرير. أضف سعر الصرف ثم أعد المحاولة.");
                 conversionRate = effective.Rate;
             }
-            var report=await Accounting.GetGeneralLedgerAsync(new GeneralLedgerFilterDto(DateOnly.FromDateTime(_from),DateOnly.FromDateTime(_to),AccountId:_accountId,IncludeAccountSubtree:_includeChildren));
-            _all=[];
+            var report=await Accounting.GetGeneralLedgerAsync(new GeneralLedgerFilterDto(DateOnly.FromDateTime(f.From),DateOnly.FromDateTime(f.To),AccountId:f.AccountId,IncludeAccountSubtree:f.Children,CostCenterId:f.CostCenterId));
+            _all=[]; _accountBalances=[]; _openingBalance=0; _multipleAccounts=false;
             if(report is not null){
+                _multipleAccounts = report.Accounts.Count > 1;
                 foreach(var account in report.Accounts){
+                    if (account.Lines.Count > 0 || account.OpeningBalance != 0 || account.ClosingBalance != 0)
+                        _accountBalances.Add(($"{account.AccountCode} - {account.AccountNameAr}", account.OpeningBalance/conversionRate, account.ClosingBalance/conversionRate));
                     foreach(var line in account.Lines){
                         var kind=line.Reversal?.IsReversal == true ? ("قيد عكسي", "fa-solid fa-arrow-rotate-left") : DocumentKind(line.SourceDocumentType,line.SourceModule);
-                        _all.Add(new StatementRow(line.JournalEntryId,line.PostingDate,kind.Item1,kind.Item2,line.JournalNumber,line.Reference,line.StatementDescription ?? line.Description,line.Debit/conversionRate,line.Credit/conversionRate,line.RunningBalance/conversionRate,line.Reversal));
+                        _all.Add(new StatementRow(line.JournalEntryId,line.PostingDate,kind.Item1,kind.Item2,line.JournalNumber,line.Reference,line.StatementDescription ?? line.Description,line.Debit/conversionRate,line.Credit/conversionRate,line.RunningBalance/conversionRate,line.Reversal,account.AccountId,$"{account.AccountCode} - {account.AccountNameAr}",line.SourceModule));
                     }
                 }
-                _closingBalance = report.Accounts.Count == 1 ? report.Accounts[0].ClosingBalance/conversionRate : report.Accounts.Sum(a=>a.ClosingBalance)/conversionRate;
+                _closingBalance = report.Accounts.Count == 1 ? report.Accounts[0].ClosingBalance/conversionRate : 0m;
+                _openingBalance = report.Accounts.Count == 1 ? report.Accounts[0].OpeningBalance/conversionRate : 0m;
             }else{_closingBalance=0;}
-            _displayCurrencyName = selectedCurrency is null || _currencyId == _baseCurrencyId
+            _displayCurrencyName = selectedCurrency is null || f.CurrencyId == _baseCurrencyId
                 ? _baseCurrencyName
-                : $"{selectedCurrency.NameAr} ({selectedCurrency.Code}) — بسعر {DateOnly.FromDateTime(_to):yyyy/MM/dd}";
+                : $"{selectedCurrency.NameAr} ({selectedCurrency.Code}) — بسعر {DateOnly.FromDateTime(f.To):yyyy/MM/dd}";
+            _applied=f;
+            _sources=_all.Select(x=>x.Source).OfType<string>().Where(x=>!string.IsNullOrWhiteSpace(x)).Append(f.Source).Where(x=>x!="").Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x=>x).ToArray();
             FilterRows();
-        }catch(Exception ex){_error="تعذر تحميل كشف الحساب: "+ex.Message;_all=[];_filtered=[];_closingBalance=0;}
+        }catch(Exception ex){_error="تعذر تحميل كشف الحساب: "+ex.Message;_all=[];_filtered=[];_accountBalances=[];_closingBalance=0;_openingBalance=0;}
         finally{_busy=false;}
     }
     private static (string,string) DocumentKind(string? type,string? source){
@@ -233,13 +268,16 @@
             _ => ("قيد يومية عام", "fa-regular fa-file-lines")
         };
     }
-    private static string Money(decimal amount)=>amount.ToString("N2",CultureInfo.InvariantCulture);
+    private static string Money(decimal amount)=>amount.ToString("#,##0.####;(#,##0.####);0",CultureInfo.InvariantCulture);
     private void OnSearch(string v){_search=v;FilterRows();}
     private void FilterRows(){
-        _filtered=_all.Where(x=>string.IsNullOrWhiteSpace(_search)||($"{x.Kind} {x.Number} {x.Reference} {x.Description} {AccountingArabicPresenter.GetJournalReversalText(x.Reversal)} {AccountingArabicPresenter.GetJournalRelatedNumbers(x.Reversal)} {x.Date:dd/MM/yyyy}").Contains(_search,StringComparison.OrdinalIgnoreCase)).ToList();
-        if(_detail=="false"){
-            _filtered=_filtered.GroupBy(x=>x.EntryId).Select(g=>{var last=g.Last();return last with{Debit=g.Sum(x=>x.Debit),Credit=g.Sum(x=>x.Credit)};}).ToList();
-        }
+        bool MatchScope(StatementRow x) => (_applied.Source == "" || string.Equals(x.Source,_applied.Source,StringComparison.OrdinalIgnoreCase)) &&
+            (_applied.Reference == "" || ($"{x.Number} {x.Reference}").Contains(_applied.Reference,StringComparison.OrdinalIgnoreCase));
+        bool MatchSearch(StatementRow x) => string.IsNullOrWhiteSpace(_search) || ($"{x.AccountLabel} {x.Kind} {x.Number} {x.Reference} {x.Description} {AccountingArabicPresenter.GetJournalReversalText(x.Reversal)} {AccountingArabicPresenter.GetJournalRelatedNumbers(x.Reversal)} {x.Date:dd/MM/yyyy}").Contains(_search,StringComparison.OrdinalIgnoreCase);
+        var scoped = _all.Where(MatchScope);
+        if (_applied.Detail == "false")
+            _filtered = scoped.GroupBy(x => (x.AccountId, x.EntryId)).Where(g=>g.Any(MatchSearch)).Select(g => { var last=g.Last(); return last with { Debit=g.Sum(x=>x.Debit), Credit=g.Sum(x=>x.Credit) }; }).ToList();
+        else _filtered = scoped.Where(MatchSearch).ToList();
         ApplySort();
         _page=1;
     }
@@ -273,15 +311,24 @@
             : _filtered.OrderBy(keySelector, comparer)).ToList();
     private void GoPage(int p)=>_page=Math.Clamp(p,1,TotalPages);
     private void ChangePageSize(ChangeEventArgs args){if(int.TryParse(args.Value?.ToString(),out var n))_pageSize=n;_page=1;}
-    private async Task ResetAsync(){_accountId=null;_from=new(DateTime.Today.Year,1,1);_to=DateTime.Today;_includeChildren=false;_search="";_detail="true";_currencyId=null;_sortColumn=null;_sortDescending=false;await LoadAsync();}
-    private Task PrintAsync()=>JS.InvokeVoidAsync("print").AsTask();
+    private async Task ResetAsync(){_accountId=null;_from=new(DateTime.Today.Year,1,1);_to=DateTime.Today;_includeChildren=false;_search="";_detail="true";_currencyId=null;_costCenterId=null;_source="";_reference="";_sortColumn=null;_sortDescending=false;await LoadAsync();}
+    private bool CanExport => !_busy && _error is null && (_filtered.Count > 0 || _accountBalances.Count > 0);
+    private string Subtitle => $"الحساب: {SelectedAccountDisplay} | مركز التكلفة: {CenterName} | الفروع الحسابية: {(_applied.Children?"نعم":"لا")} | من {_applied.From:dd/MM/yyyy} إلى {_applied.To:dd/MM/yyyy} | {_displayCurrencyName} | {(_applied.Detail=="true"?"تفصيلي":"إجمالي حسب الحساب والقيد")} | المصدر: {_applied.Source} | المرجع: {_applied.Reference} | البحث: {_search} | الرصيد الجاري والافتتاح والختام من كامل دفتر الحساب قبل البحث وتصفية المصدر والمرجع";
+    private string[] ExportHeaders => ["الحساب","التاريخ","نوع المستند","رقم السند","المرجع","البيان","مدين","دائن","الرصيد","الحالة / العكس"];
+    private object?[] ExportRow(StatementRow x) => [x.AccountLabel,x.Date.ToString("yyyy-MM-dd"),x.Kind,x.Number,x.Reference,x.Description,x.Debit,x.Credit,x.Balance,"مرحل / " + AccountingArabicPresenter.GetJournalReversalText(x.Reversal) + " / " + AccountingArabicPresenter.GetJournalRelatedNumbers(x.Reversal)];
+    private IEnumerable<object?[]> ExportRows() => _filtered.Select(ExportRow).Concat(_accountBalances.SelectMany(x => new object?[][] {
+        [x.Account,null,null,null,null,"الرصيد الافتتاحي (كامل الحساب)",null,null,x.Opening,null],
+        [x.Account,null,null,null,null,"الرصيد الختامي (كامل الحساب)",null,null,x.Closing,null] }));
+    private async Task PrintAsync(){
+        if(!CanExport)return;
+        await using var module=await JS.InvokeAsync<IJSObjectReference>("import", "./js/customer-debts-export.js");
+        await module.InvokeVoidAsync("printReport", "كشف حساب", Subtitle, Array.Empty<string>(), ExportHeaders, ExportRows().Select(r=>r.Select(v=>v is decimal d?Money(d):v?.ToString()??"—").ToArray()).ToArray());
+    }
     private async Task ExportAsync(){
-        var csv=new System.Text.StringBuilder("\uFEFFالتاريخ,نوع المستند,رقم السند,المرجع,البيان,مدين,دائن,الرصيد,الحالة\r\n");
-        static string Q(object? value)=>"\""+(value?.ToString()??"").Replace("\"","\"\"")+"\"";
-        foreach(var x in _filtered)csv.AppendLine(string.Join(",",new[]{Q(x.Date.ToString("yyyy-MM-dd")),Q(x.Kind),Q(x.Number),Q(x.Reference),Q(x.Description),Q(x.Debit),Q(x.Credit),Q(x.Balance),Q("مرحل / " + AccountingArabicPresenter.GetJournalReversalText(x.Reversal) + " / " + AccountingArabicPresenter.GetJournalRelatedNumbers(x.Reversal))}));
-        var base64=Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(csv.ToString()));
-        await using var module=await JS.InvokeAsync<IJSObjectReference>("import", "./js/account-statement-export.js");
-        await module.InvokeVoidAsync("saveCsv", base64, "account-statement.csv");
+        if(!CanExport)return;
+        var bytes=CustomerDebtsWorkbook.Create(Subtitle,ExportHeaders,ExportRows(),sheetName:"كشف حساب");
+        await using var module=await JS.InvokeAsync<IJSObjectReference>("import", "./js/customer-debts-export.js");
+        await module.InvokeVoidAsync("saveWorkbook",Convert.ToBase64String(bytes),"account-statement.xlsx");
     }
     private void LoadDemo(){
         var balance=30000m;var debit=new decimal[]{0,0,10000,5000,0,7000,0,2500,0,2000,4000,6000};var credit=new decimal[]{30000,9500,0,0,10000,0,5000,0,1500,0,0,0};

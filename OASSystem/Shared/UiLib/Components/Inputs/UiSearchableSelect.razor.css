@@ -47,3 +47,26 @@
     .ui-searchable-select__popover:popover-open { top: 5dvh; max-height: 90dvh; }
     .ui-searchable-select__options { max-height: 62dvh; }
 }
+
+/* Inventory dropdown: keep the native top layer, but anchor it to the field. */
+.ui-searchable-select__popover--dropdown:popover-open {
+    inset: auto; top: anchor(bottom); left: anchor(left); transform: none;
+    width: anchor-size(width); max-width: calc(100vw - 16px);
+    max-height: min(280px, 45dvh); position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline;
+    position-visibility: anchors-visible;
+    margin: 4px 0; padding: 5px; gap: 4px; border-radius: 5px;
+    background: var(--oas-color-surface, #fff); box-shadow: 0 4px 12px #0002;
+}
+.ui-searchable-select__popover--dropdown::backdrop { background: transparent; }
+.ui-searchable-select__popover--dropdown .ui-searchable-select__search {
+    flex: none; min-height: 30px; padding: 4px 7px; border-radius: 4px;
+}
+.ui-searchable-select__popover--dropdown .ui-searchable-select__options {
+    max-height: none; overflow-x: hidden;
+}
+.ui-searchable-select__popover--dropdown .ui-searchable-select__option {
+    min-height: 30px; padding: 4px 7px; border-radius: 3px;
+}
+.ui-searchable-select__popover--dropdown .ui-searchable-select__option--selected {
+    background: var(--oas-color-primary-soft, #cfe5fa);
+}

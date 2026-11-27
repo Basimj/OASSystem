@@ -86,3 +86,78 @@
 .inventory-report-list .ui-data-table__container { overflow-x:auto; }
 .inventory-report-list .ui-data-table__container--paged { overflow:visible; }
 .inventory-report-list .oas-report__table th::after { content:none; }
+
+
+/* Compact inventory toolbars: title, actions, flexible search and filters in one row.
+   Scoped to inventory so other modules retain their existing appearance. */
+.inventory-report-list .oas-report__head {
+    gap:6px; padding:3px 4px 6px; align-items:center; flex-wrap:wrap;
+}
+.inventory-report-list .oas-report__identity {
+    flex:0 0 auto; gap:5px; min-width:0; max-width:100%;
+}
+.inventory-report-list .oas-report .oas-report__identity h1 {
+    font-size:15px; line-height:1.4; white-space:normal;
+}
+.inventory-report-list .oas-report__identity > i { font-size:15px; color:#253654; flex:none; }
+.inventory-report-list .oas-report__status {
+    color:#526481; background:transparent; padding:0 3px; font-size:10px; white-space:nowrap;
+}
+.inventory-report-list .oas-report__toolbar {
+    flex:1 1 350px; gap:4px; align-items:center; justify-content:flex-end; min-width:0;
+}
+.inventory-report-list .oas-report__toolbar .ui-workspace-actionbar,
+.inventory-report-form .inventory-form-toolbar .ui-workspace-actionbar {
+    flex:0 1 auto; gap:4px; min-width:0; max-width:100%;
+}
+.inventory-report-list .inventory-toolbar-search {
+    flex:1 1 150px; min-width:min(150px,100%); max-width:100%;
+}
+.inventory-report-list .oas-report__toolbar .inventory-toolbar-search .ui-search-input {
+    width:100%; min-width:0; height:30px; margin:0; padding-inline:7px;
+}
+.inventory-report-list .oas-report__toolbar .ui-button,
+.inventory-report-form .inventory-form-toolbar .ui-button {
+    min-height:30px !important; padding:3px 7px; gap:4px;
+}
+.inventory-report-list .oas-report__toolbar .inventory-icon-tool,
+.inventory-report-form .inventory-form-toolbar .inventory-icon-tool {
+    flex:0 0 30px; width:30px; min-width:30px; height:30px; padding:0 !important;
+    color:#253654 !important;
+}
+.inventory-report-list .oas-report__toolbar .inventory-icon-tool > span:not(.ui-button__spinner),
+.inventory-report-form .inventory-form-toolbar .inventory-icon-tool > span:not(.ui-button__spinner) { display:none; }
+.inventory-report-list .oas-report__toolbar .inventory-icon-tool > i,
+.inventory-report-form .inventory-form-toolbar .inventory-icon-tool > i { font-size:12px; }
+.inventory-report-list .oas-report__toolbar .ui-button--primary:not(.inventory-icon-tool),
+.inventory-report-form .inventory-form-toolbar .ui-button--primary:not(.inventory-icon-tool) {
+    background:#17633d !important; color:#fff !important; border-color:#17633d !important;
+}
+.inventory-report-list .oas-report__toolbar .ui-button--primary:not(:disabled):hover,
+.inventory-report-form .inventory-form-toolbar .ui-button--primary:not(:disabled):hover {
+    background:#125332 !important; border-color:#125332 !important;
+}
+.inventory-report-list .oas-report__toolbar .inventory-filter-toggle {
+    flex:0 0 30px; width:30px; height:30px; min-width:30px; padding:0;
+}
+.inventory-report-list .oas-report__toolbar .inventory-filter-toggle--active {
+    color:#fff !important; background:#253654 !important; border-color:#253654 !important;
+}
+.inventory-report-list .oas-report__toolbar :is(.ui-button,.oas-report__tool):focus-visible,
+.inventory-report-form .inventory-form-toolbar .ui-button:focus-visible {
+    outline:2px solid #1553ef; outline-offset:2px;
+}
+.inventory-report-list .oas-report__quick-filters { padding:0 4px 5px; gap:4px; }
+.inventory-report-list .oas-report__quick-filters:not(:has(> *)) { display:none; }
+.inventory-report-list .oas-report__quick-filters .oas-report__chip { height:23px; }
+.inventory-report-form .inventory-form-toolbar { gap:6px; }
+.inventory-report-form .inventory-form-toolbar h1 { font-size:15px; line-height:1.4; }
+.inventory-report-form .inventory-form-toolbar h1 i { font-size:15px; color:#253654; }
+@media (max-width:750px) {
+    .inventory-report-list .oas-report__toolbar { flex:1 1 100%; justify-content:flex-start; }
+    .inventory-report-list .inventory-toolbar-search { flex:1 1 150px; }
+}
+@media (max-width:430px) {
+    .inventory-report-list .oas-report__toolbar .ui-workspace-actionbar { flex:1 1 100%; }
+    .inventory-report-list .inventory-toolbar-search { flex:1 1 120px; min-width:0; }
+}

@@ -35,7 +35,7 @@
 }
 /* All selected navigation surfaces follow the same white-on-sun rule. */
 .oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-sidebar .oas-nav-settings-child:is(.is-active,:hover),
-.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark).sidebar-collapsed .oas-nav-group.active > .oas-nav-group__header {
+.oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark)[data-sidebar-collapsed="true"] .oas-nav-group.active > .oas-nav-group__header {
     color:#FFFFFF;text-shadow:var(--oas-sun-white-ink-shadow);
 }
 .oas-shell.oas-preset-sky-yellow:not(.oas-theme-dark) .oas-sidebar .oas-nav-settings-child:is(.is-active,:hover) i {

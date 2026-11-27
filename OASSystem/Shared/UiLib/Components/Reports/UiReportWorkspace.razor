@@ -1,4 +1,3 @@
-<link rel="stylesheet" href="_content/OAS.UiLib/css/oas-report-workspace.css" />
 @namespace OAS.UiLib.Components.Reports
 @using Microsoft.AspNetCore.Components
 
@@ -6,7 +5,7 @@
     <div class="oas-report__head">
         <div class="oas-report__identity"><i class="@TitleIcon" aria-hidden="true"></i><h1>@Title</h1>@if (!string.IsNullOrWhiteSpace(StatusText)){<span class="oas-report__status"><i class="@StatusIcon"></i> @StatusText</span>}</div>
         <div class="oas-report__toolbar">
-            <div class="oas-report__search"><i class="fa-solid fa-magnifying-glass"></i><input aria-label="بحث في البيانات" placeholder="بحث في البيانات ..." value="@Search" @oninput="SearchChangedInternal" /></div>
+            <div class="oas-report__search"><i class="fa-solid fa-magnifying-glass"></i><input aria-label="بحث في النتائج" title="@(SearchDisplayOnly ? "البحث للعرض فقط؛ الطباعة والتصدير يشملان جميع نتائج الفلاتر" : "البحث يحدد الصفوف المعروضة والمصدرة")" placeholder="@(SearchDisplayOnly ? "بحث للعرض فقط..." : "بحث في النتائج...")" value="@Search" @oninput="SearchChangedInternal" /></div>
             @if (Toolbar is not null) { @Toolbar }
         </div>
     </div>
@@ -34,6 +33,7 @@
     [Parameter] public string TitleIcon { get; set; } = "fa-solid fa-database";
     [Parameter] public string StatusIcon { get; set; } = "fa-solid fa-filter";
     [Parameter] public string Search { get; set; } = "";
+    [Parameter] public bool SearchDisplayOnly { get; set; }
     [Parameter] public EventCallback<string> SearchChanged { get; set; }
     [Parameter] public bool FiltersOpen { get; set; }
     [Parameter] public EventCallback<bool> FiltersOpenChanged { get; set; }

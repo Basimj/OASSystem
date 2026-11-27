@@ -65,7 +65,7 @@ public partial class BalanceSheetPage
     {
         ("نوع التقرير", ModeName(_applied.Mode)), ("كما في", _applied.AsOf.ToString("dd/MM/yyyy")), ("العملة", _currencyName),
         ("السنة المالية", _years.FirstOrDefault(y => y.Id.ToString() == _applied.Year)?.Name ?? "الكل"),
-        ("المستوى", Details && _applied.Level != 0 ? $"حتى {_applied.Level}" : "الكل")
+        ("المستوى", Details && _applied.Level != 0 ? $"حتى {_applied.Level}" : "الكل"), ("تفاصيل الحسابات",Details?"نعم":"لا"), ("الحسابات الصفرية",_applied.IncludeZero?"ظاهرة":"مخفية")
     }.Concat(Compare ? new[] { ("تاريخ المقارنة", _applied.CompareAsOf.ToString("dd/MM/yyyy")) } : Array.Empty<(string,string)>()).ToArray();
 
     protected override async Task OnInitializedAsync() => await ApplyAsync();
@@ -253,7 +253,7 @@ public partial class BalanceSheetPage
         + $" | فرق التوازن بالعملة الأساسية: {Totals?.Difference.ToString("N2", CultureInfo.InvariantCulture)}"
         + (Compare ? $" | فرق المقارنة بالعملة الأساسية: {_compare?.Totals.Difference.ToString("N2", CultureInfo.InvariantCulture)}" : "")
         + (Unclassified ? " | توجد أرصدة غير مصنفة، المجاميع حسب الاستحقاق ورأس المال العامل غير مكتملة." : "")
-        + " | التحويل بسعر تاريخ الميزانية الحالية؛ الإجماليات لا تتأثر بالبحث.";
+        + " | التحويل بسعر تاريخ الميزانية الحالية؛ الإجماليات والمخرجات لا تتأثر بالبحث النصي.";
     private async Task ExportAsync()
     {
         if (!CanExport) return;

@@ -3,12 +3,12 @@
 @using OAS.UiLib.Components.Reports
 <PageTitle>سندات القبض والصرف | OAS</PageTitle>
 <div class="trial-report">
-<UiReportWorkspace Title="سندات القبض والصرف" TitleIcon="fa-solid fa-receipt" StatusText="@Status" Search="@_search" SearchChanged="OnSearch" FiltersOpen="@_filtersOpen" FiltersOpenChanged="@(v => _filtersOpen = v)">
+<UiReportWorkspace SearchDisplayOnly="true" Title="سندات القبض والصرف" TitleIcon="fa-solid fa-receipt" StatusText="@Status" Search="@_search" SearchChanged="OnSearch" FiltersOpen="@_filtersOpen" FiltersOpenChanged="@(v => _filtersOpen = v)">
     <Toolbar>
         <button type="button" class="oas-report__tool" title="تحديث" disabled="@_busy" @onclick="ApplyAsync"><i class="fa-solid fa-rotate"></i></button>
-        <button type="button" class="oas-report__tool oas-report__tool--pdf" title="حفظ PDF" disabled="@(!CanExport)" @onclick="PrintAsync"><i class="fa-regular fa-file-pdf"></i></button>
-        <button type="button" class="oas-report__tool oas-report__tool--excel" title="Excel" disabled="@(!CanExport)" @onclick="ExportAsync"><i class="fa-regular fa-file-excel"></i></button>
-        <button type="button" class="oas-report__tool" title="طباعة" disabled="@(!CanExport)" @onclick="PrintAsync"><i class="fa-solid fa-print"></i></button>
+        <button type="button" class="oas-report__tool oas-report__tool--pdf" title="حفظ PDF لجميع نتائج الفلاتر (دون البحث)" disabled="@(!CanExport)" @onclick="PrintAsync"><i class="fa-regular fa-file-pdf"></i></button>
+        <button type="button" class="oas-report__tool oas-report__tool--excel" title="Excel — جميع نتائج الفلاتر (دون البحث)" disabled="@(!CanExport)" @onclick="ExportAsync"><i class="fa-regular fa-file-excel"></i></button>
+        <button type="button" class="oas-report__tool" title="طباعة جميع نتائج الفلاتر (دون البحث)" disabled="@(!CanExport)" @onclick="PrintAsync"><i class="fa-solid fa-print"></i></button>
         <button type="button" class="oas-report__tool" title="إظهار أو إخفاء الفلاتر" @onclick="@(() => _filtersOpen = !_filtersOpen)"><i class="fa-solid fa-ellipsis-vertical"></i></button>
     </Toolbar>
     <QuickFilters>

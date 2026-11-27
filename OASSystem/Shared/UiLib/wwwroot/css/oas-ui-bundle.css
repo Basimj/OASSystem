@@ -5,7 +5,7 @@
 @import "./colors.css";
 @import "./sizing.css";
 @import "./bootstrap-loader.css";
-@import "../OAS.UiLib.bundle.scp.css";
+/* Component isolation is included automatically by OAS.Client.styles.css. */
 @import "./features/employee-import-bulk.css";
 @import "./features/hr-foundation.css";
 @import "./features/accounting.css";
@@ -19,7 +19,7 @@
 @import "./oas-theme-v10.css";
 @import "./oas-theme-v11-accounting.css";
 
-@import "./features/inventory-modern.css";
+
 
 /* Unified Sea Glass palette and global quick theme switch. */
 @import "./oas-seaglass-theme.css";
@@ -55,3 +55,5 @@
 
 /* Approved invoice list and independent invoice tabs, after all shared sales styles. */
 @import "./features/invoices-approved.css";
+
+/* Inventory is linked once in App.razor, after the generated component styles. */

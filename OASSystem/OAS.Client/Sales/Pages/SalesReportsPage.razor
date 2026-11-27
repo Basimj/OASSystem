@@ -5,12 +5,12 @@
 @using OAS.UiLib.Components.Reports
 <PageTitle>المبيعات | OAS</PageTitle>
 <div class="trial-report">
-<UiReportWorkspace Title="المبيعات" TitleIcon="fa-solid fa-chart-line" StatusText="@Status" Search="@_search" SearchChanged="OnSearch" FiltersOpen="@_filtersOpen" FiltersOpenChanged="@(v => _filtersOpen = v)">
+<UiReportWorkspace SearchDisplayOnly="true" Title="المبيعات" TitleIcon="fa-solid fa-chart-line" StatusText="@Status" Search="@_search" SearchChanged="OnSearch" FiltersOpen="@_filtersOpen" FiltersOpenChanged="@(v => _filtersOpen = v)">
     <Toolbar>
         <button type="button" class="oas-report__tool" title="تحديث" disabled="@_busy" @onclick="ApplyAsync"><i class="fa-solid fa-rotate"></i></button>
-        <button type="button" class="oas-report__tool oas-report__tool--pdf" title="حفظ PDF" disabled="@(!CanExport)" @onclick="PrintAsync"><i class="fa-regular fa-file-pdf"></i></button>
-        <button type="button" class="oas-report__tool oas-report__tool--excel" title="Excel" disabled="@(!CanExport)" @onclick="ExportAsync"><i class="fa-regular fa-file-excel"></i></button>
-        <button type="button" class="oas-report__tool" title="طباعة" disabled="@(!CanExport)" @onclick="PrintAsync"><i class="fa-solid fa-print"></i></button>
+        <button type="button" class="oas-report__tool oas-report__tool--pdf" title="حفظ PDF لجميع نتائج الفلاتر (دون البحث)" disabled="@(!CanExport)" @onclick="PrintAsync"><i class="fa-regular fa-file-pdf"></i></button>
+        <button type="button" class="oas-report__tool oas-report__tool--excel" title="Excel — جميع نتائج الفلاتر (دون البحث)" disabled="@(!CanExport)" @onclick="ExportAsync"><i class="fa-regular fa-file-excel"></i></button>
+        <button type="button" class="oas-report__tool" title="طباعة جميع نتائج الفلاتر (دون البحث)" disabled="@(!CanExport)" @onclick="PrintAsync"><i class="fa-solid fa-print"></i></button>
         <button type="button" class="oas-report__tool" title="إظهار أو إخفاء الفلاتر" @onclick="@(() => _filtersOpen = !_filtersOpen)"><i class="fa-solid fa-ellipsis-vertical"></i></button>
     </Toolbar>
     <QuickFilters>
@@ -25,23 +25,24 @@
             <label class="oas-report__field">الفترة المالية<select value="@_draft.Period" @onchange="OnPeriod" disabled="@(_busy || string.IsNullOrEmpty(_draft.Year) || !PeriodOptions.Any())"><option value="">جميع الفترات</option>@foreach(var p in PeriodOptions){<option value="@p.Id">@p.Name</option>}</select></label>
             @if (_referenceWarning is not null) { <div class="trial-warning">@_referenceWarning</div> }
             <div class="oas-report__date-pair">
-                <label class="oas-report__field">من تاريخ<input type="date" @bind="_draft.From" @bind:format="yyyy-MM-dd" disabled="@(!string.IsNullOrEmpty(_draft.Year))" /></label>
-                <label class="oas-report__field">إلى تاريخ<input type="date" @bind="_draft.To" @bind:format="yyyy-MM-dd" disabled="@(!string.IsNullOrEmpty(_draft.Year))" /></label>
+                <label class="oas-report__field">من تاريخ<input type="date" @bind="_draft.From" @bind:after="RefreshHistoricalAsync" @bind:format="yyyy-MM-dd" disabled="@(_busy || !string.IsNullOrEmpty(_draft.Year))" /></label>
+                <label class="oas-report__field">إلى تاريخ<input type="date" @bind="_draft.To" @bind:after="RefreshHistoricalAsync" @bind:format="yyyy-MM-dd" disabled="@(_busy || !string.IsNullOrEmpty(_draft.Year))" /></label>
             </div>
-            <div class="cashbank-notes">خيارات الأطراف والأصناف من الفترة المحملة؛ عند تغيير التاريخ اضغط تطبيق لتحديث القوائم.</div>
-            <div class="oas-report__field"><UiReportSearchPicker Label="العميل" DialogTitle="اختيار العميل" Value="@_draft.Customer" ValueChanged="@(v => _draft.Customer = v ?? string.Empty)" Options="@(Options("customer"))" Placeholder="الكل" /></div>
+            <div class="cashbank-notes">خيارات الفلاتر من الفترة المحددة، وتُحمّل عند فتح القائمة حتى لو تعذر تحميل التقرير.</div>
+            @if (_optionsWarning is not null){<div class="trial-warning" role="alert">@_optionsWarning</div>}
+            <div class="oas-report__field"><UiReportSearchPicker Label="العميل" DialogTitle="اختيار العميل" Value="@_draft.Customer" ValueChanged="@(v => _draft.Customer = v ?? string.Empty)" Options="@(Options("customer"))" LoadPage="@((search,page)=>LoadFilterPageAsync("customer",search,page))" RemotePageSize="@OptionPageSize" Placeholder="الكل" /></div>
             @if (_draft.Mode != "Collections")
             {
-                <label class="oas-report__field">نوع المنتج<select @bind="_draft.ProductType" @bind:after="TypeChanged"><option value="">الكل</option>@foreach(var o in Pick("type")){<option value="@o.Key">@o.Label</option>}</select></label>
-                <label class="oas-report__field">تصنيف المنتج<select @bind="_draft.Category" @bind:after="CategoryChanged"><option value="">الكل</option>@foreach(var o in Pick("category")){<option value="@o.Key">@o.Label</option>}</select></label>
-                <div class="oas-report__field"><UiReportSearchPicker Label="المنتج / الصنف" DialogTitle="اختيار الصنف" Value="@_draft.Product" ValueChanged="@(v => _draft.Product = v ?? string.Empty)" Options="@(Options("product"))" Placeholder="الكل" /></div>
-                <label class="oas-report__field">العلامة التجارية<select @bind="_draft.Brand"><option value="">الكل</option>@foreach(var o in Pick("brand")){<option value="@o.Key">@o.Label</option>}</select></label>
-                <label class="oas-report__field">مخزن البيع الأصلي<select @bind="_draft.Warehouse"><option value="">الكل</option>@foreach(var o in Pick("warehouse")){<option value="@o.Key">@o.Label</option>}</select></label>
+                <div class="oas-report__field"><UiReportSearchPicker Label="نوع المنتج" DialogTitle="اختيار نوع المنتج" Value="@_draft.ProductType" ValueChanged="@(v=>{_draft.ProductType=v??"";TypeChanged();})" Options="@(Options("type"))" LoadPage="@((search,page)=>LoadFilterPageAsync("type",search,page))" RemotePageSize="@OptionPageSize" Placeholder="الكل" /></div>
+                <div class="oas-report__field"><UiReportSearchPicker Label="تصنيف المنتج" DialogTitle="اختيار تصنيف المنتج" Value="@_draft.Category" ValueChanged="@(v=>{_draft.Category=v??"";CategoryChanged();})" Options="@(Options("category"))" LoadPage="@((search,page)=>LoadFilterPageAsync("category",search,page))" RemotePageSize="@OptionPageSize" Placeholder="الكل" /></div>
+                <div class="oas-report__field"><UiReportSearchPicker Label="المنتج / الصنف" DialogTitle="اختيار الصنف" Value="@_draft.Product" ValueChanged="@(v => _draft.Product = v ?? string.Empty)" Options="@(Options("product"))" LoadPage="@((search,page)=>LoadFilterPageAsync("product",search,page))" RemotePageSize="@OptionPageSize" Placeholder="الكل" /></div>
+                <div class="oas-report__field"><UiReportSearchPicker Label="العلامة التجارية" DialogTitle="اختيار العلامة التجارية" Value="@_draft.Brand" ValueChanged="@(v=>{_draft.Brand=v??"";})" Options="@(Options("brand"))" LoadPage="@((search,page)=>LoadFilterPageAsync("brand",search,page))" RemotePageSize="@OptionPageSize" Placeholder="الكل" /></div>
+                <div class="oas-report__field"><UiReportSearchPicker Label="مخزن البيع الأصلي" DialogTitle="اختيار مخزن البيع الأصلي" Value="@_draft.Warehouse" ValueChanged="@(v=>{_draft.Warehouse=v??"";})" Options="@(Options("warehouse"))" LoadPage="@((search,page)=>LoadFilterPageAsync("warehouse",search,page))" RemotePageSize="@OptionPageSize" Placeholder="الكل" /></div>
             }
-            <label class="oas-report__field">موظف المبيعات<select @bind="_draft.Employee"><option value="">الكل</option>@foreach(var o in Pick("employee")){<option value="@o.Key">@o.Label</option>}</select></label>
-            <label class="oas-report__field">المستخدم المرحّل<select @bind="_draft.Operator"><option value="">الكل</option>@foreach(var o in Pick("operator")){<option value="@o.Key">@o.Label</option>}</select></label>
+            <div class="oas-report__field"><UiReportSearchPicker Label="موظف المبيعات" DialogTitle="اختيار موظف المبيعات" Value="@_draft.Employee" ValueChanged="@(v=>{_draft.Employee=v??"";})" Options="@(Options("employee"))" LoadPage="@((search,page)=>LoadFilterPageAsync("employee",search,page))" RemotePageSize="@OptionPageSize" Placeholder="الكل" /></div>
+            <div class="oas-report__field"><UiReportSearchPicker Label="المستخدم المرحّل" DialogTitle="اختيار المستخدم المرحّل" Value="@_draft.Operator" ValueChanged="@(v=>{_draft.Operator=v??"";})" Options="@(Options("operator"))" LoadPage="@((search,page)=>LoadFilterPageAsync("operator",search,page))" RemotePageSize="@OptionPageSize" Placeholder="الكل" /></div>
             <label class="oas-report__field">العملة الأساسية التاريخية<select @bind="_draft.HistoricalBaseCurrency" @bind:after="HistoricalBaseChanged" disabled="@_busy"><option value="*">تلقائي</option>@foreach(var currencyCode in HistoricalBaseOptions){<option value="@currencyCode">@currencyCode</option>}</select></label>
-            <label class="oas-report__field">عملة الفاتورة<select @bind="_draft.Currency"><option value="">الكل</option>@foreach(var o in Pick("currency")){<option value="@o.Key">@o.Label</option>}</select></label>
+            <div class="oas-report__field"><UiReportSearchPicker Label="عملة الفاتورة" DialogTitle="اختيار عملة الفاتورة" Value="@_draft.Currency" ValueChanged="@(v=>{_draft.Currency=v??"";})" Options="@(Options("currency"))" LoadPage="@((search,page)=>LoadFilterPageAsync("currency",search,page))" RemotePageSize="@OptionPageSize" Placeholder="الكل" /></div>
             <label class="oas-report__field">خطة الدفع<select @bind="_draft.Plan"><option value="">الكل</option><option value="1">فوري كامل</option><option value="2">جزئي</option><option value="4">آجل</option></select></label>
             @if (_draft.Mode == "Collections")
             { <label class="oas-report__field">حالة التسوية<select @bind="_draft.Settlement"><option value="">الكل</option><option value="paid">مسددة / مسواة بالكامل</option><option value="partial">جزئية</option><option value="unpaid">غير مسددة</option></select></label> }
