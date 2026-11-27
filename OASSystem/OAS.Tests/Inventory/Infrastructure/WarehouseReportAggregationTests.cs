@@ -33,4 +33,40 @@ public sealed class WarehouseReportAggregationTests
             Assert.That(WarehouseReportAggregation.SumKnown(new decimal?[]{0,null}),Is.Null);
         });
     }
+    [Test]
+    public void ReservationUsesActualWarehouseCostAndAvailableValue()
+    {
+        var reserved = WarehouseReportAggregation.SumKnown(new[] {
+            WarehouseReportAggregation.ReservedValue(0, 100),
+            WarehouseReportAggregation.ReservedValue(5, 200) });
+        Assert.That(reserved, Is.EqualTo(1000m));
+        Assert.That(WarehouseReportAggregation.AvailableValue(3000m, reserved), Is.EqualTo(2000m));
+    }
+
+    [Test]
+    public void ZeroReservationDoesNotRequireCostButUnknownReservationDoes()
+    {
+        Assert.That(WarehouseReportAggregation.ReservedValue(0, null), Is.Zero);
+        Assert.That(WarehouseReportAggregation.ReservedValue(5, null), Is.Null);
+        Assert.That(WarehouseReportAggregation.ReservedValue(null, 100), Is.Null);
+        Assert.That(WarehouseReportAggregation.AvailableValue(3000, null), Is.Null);
+    }
+
+    [TestCase("reserved", true)]
+    [TestCase("partial", true)]
+    [TestCase("full", false)]
+    [TestCase("available", true)]
+    [TestCase("out", false)]
+    public void PartiallyReservedStockState(string state, bool expected)
+    {
+        Assert.That(WarehouseReportAggregation.MatchesStockState(state, 10, 3, true), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void HistoricalPositiveStockDoesNotImplyKnownReservation()
+    {
+        Assert.That(WarehouseReportAggregation.MatchesStockState("available", 10, null, false), Is.True);
+        Assert.That(WarehouseReportAggregation.MatchesStockState("reserved", 10, null, false), Is.False);
+        Assert.That(WarehouseReportAggregation.MatchesStockState("available", 10, null, true), Is.False);
+    }
 }

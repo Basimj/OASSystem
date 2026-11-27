@@ -31,7 +31,7 @@
             {<label class="oas-report__field">من تاريخ<input type="date" @bind="_draft.From" @bind:format="yyyy-MM-dd" /></label>}
             <label class="oas-report__field">إلى تاريخ<input type="date" @bind="_draft.To" @bind:format="yyyy-MM-dd" /></label>
             @if (IsBalance(_draft.Mode))
-            {<label class="oas-report__field">حالة المخزون<select @bind="_draft.StockState"><option value="all">الكل</option><option value="available">@(IsCurrent(_draft)?"متوفر":"رصيد موجب")</option><option value="out">نافد</option>@if(IsCurrent(_draft)){<option value="reserved">محجوز بالكامل</option>}</select></label>}
+            {<label class="oas-report__field">حالة المخزون<select @bind="_draft.StockState"><option value="all">الكل</option><option value="available">@(IsCurrent(_draft)?"متوفر":"رصيد موجب")</option><option value="out">نافد</option>@if(IsCurrent(_draft)){<option value="reserved">له حجز</option><option value="partial">محجوز جزئياً</option><option value="full">محجوز بالكامل</option>}</select></label>}
             @if (_draft.Mode == "transfers")
             {
                 <label class="oas-report__field">المخزن المصدر<select @bind="_draft.Source"><option value="">الكل</option>@foreach(var w in Warehouses){<option value="@w.Id">@w.Name</option>}</select></label>

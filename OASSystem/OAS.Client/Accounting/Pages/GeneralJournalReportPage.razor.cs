@@ -104,13 +104,19 @@ public partial class GeneralJournalReportPage
     private void OnUser(string? value)=>_draft.User=value??"";
     private void OnYear(ChangeEventArgs e)
     {
-        _draft.Year=e.Value?.ToString()??""; _draft.Period="";
-        if(_years.FirstOrDefault(y=>y.Id.ToString()==_draft.Year) is { } y){_draft.From=y.StartDate.ToDateTime(TimeOnly.MinValue);_draft.To=y.EndDate.ToDateTime(TimeOnly.MinValue);}
+        _draft.Year = e.Value?.ToString() ?? "";
+        _draft.Period = "";
+        SetFiscalDates();
     }
     private void OnPeriod(ChangeEventArgs e)
     {
-        _draft.Period=e.Value?.ToString()??"";
-        if(_periods.FirstOrDefault(p=>p.Id.ToString()==_draft.Period) is { } p){_draft.Year=p.FiscalYearId.ToString();_draft.From=p.StartDate.ToDateTime(TimeOnly.MinValue);_draft.To=p.EndDate.ToDateTime(TimeOnly.MinValue);}
+        _draft.Period = e.Value?.ToString() ?? "";
+        SetFiscalDates();
+    }
+    private void SetFiscalDates()
+    {
+        var range = OAS.Client.Accounting.Common.FiscalReportRange.Resolve(_years, _periods, _draft.Year, _draft.Period);
+        if (range.HasValue) (_draft.From, _draft.To) = range.Value;
     }
     private static Guid? Id(string value)=>Guid.TryParse(value,out var id)?id:null;
     private static T? ParseEnum<T>(string value) where T:struct,Enum => Enum.TryParse<T>(value,out var parsed)&&Enum.IsDefined(parsed)?parsed:null;

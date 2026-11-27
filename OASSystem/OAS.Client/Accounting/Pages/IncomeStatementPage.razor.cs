@@ -88,8 +88,22 @@ public partial class IncomeStatementPage
         _baseName=_currencies.FirstOrDefault(c=>c.Id==_baseId)?.NameAr ?? settings?.BaseCurrencyCode ?? "العملة الأساسية";
         _loaded=true;
     }
-    private void OnYear(ChangeEventArgs e) { _draft.Year=e.Value?.ToString()??""; _draft.Period=""; if(_years.FirstOrDefault(y=>y.Id.ToString()==_draft.Year) is {} y){ _draft.From=y.StartDate.ToDateTime(TimeOnly.MinValue); _draft.To=y.EndDate.ToDateTime(TimeOnly.MinValue); } }
-    private void OnPeriod(ChangeEventArgs e) { _draft.Period=e.Value?.ToString()??""; if(_periods.FirstOrDefault(p=>p.Id.ToString()==_draft.Period) is {} p){ _draft.Year=p.FiscalYearId.ToString(); _draft.From=p.StartDate.ToDateTime(TimeOnly.MinValue); _draft.To=p.EndDate.ToDateTime(TimeOnly.MinValue); } }
+    private void OnYear(ChangeEventArgs e)
+    {
+        _draft.Year = e.Value?.ToString() ?? "";
+        _draft.Period = "";
+        SetFiscalDates();
+    }
+    private void OnPeriod(ChangeEventArgs e)
+    {
+        _draft.Period = e.Value?.ToString() ?? "";
+        SetFiscalDates();
+    }
+    private void SetFiscalDates()
+    {
+        var range = OAS.Client.Accounting.Common.FiscalReportRange.Resolve(_years, _periods, _draft.Year, _draft.Period);
+        if (range.HasValue) (_draft.From, _draft.To) = range.Value;
+    }
     private static Guid? Id(string s)=>Guid.TryParse(s,out var id)?id:null;
     private async Task ResetAsync(){if(_busy)return; _draft=new();_search="";_sort="code";_descending=false;await ApplyAsync();}
     private async Task ApplyAsync()
@@ -173,7 +187,7 @@ public partial class IncomeStatementPage
         if(_applied.Mode=="compare"){var v=Change(r.Values[0],r.Values[1]);yield return(Percent(v),v<0,v.HasValue?(object)Percent(v):null);}
         if(_applied.Mode=="ratio"){var v=Ratio(r.Values[0]);yield return(Percent(v),v<0,v.HasValue?(object)Percent(v):null);}
     }
-    private void OpenStatement(Row r){if(r.AccountId is Guid id)Nav.NavigateTo($"/accounting/reports/account-statement?accountId={id:D}&fromDate={_applied.From:yyyy-MM-dd}&toDate={_applied.To:yyyy-MM-dd}&includeChildren={r.Aggregate.ToString().ToLowerInvariant()}{(_applied.Currency is Guid currency?$"&currencyId={currency:D}":"")}");}
+    private void OpenStatement(Row r){if(r.AccountId is Guid id)Nav.NavigateTo($"/accounting/reports/account-statement?accountId={id:D}&fromDate={_applied.From:yyyy-MM-dd}&toDate={_applied.To:yyyy-MM-dd}&includeChildren={r.Aggregate.ToString().ToLowerInvariant()}{(_applied.CostCenter is Guid center?$"&costCenterId={center:D}":"")}{(_applied.Currency is Guid currency?$"&currencyId={currency:D}":"")}");}
     private string Subtitle => string.Join(" | ",Chips.Select(c=>$"{c.Label}: {c.Value}"))+(_unclassified?" | توجد حسابات غير مصنفة؛ المجاميع الوسيطة مؤقتة":"")+" | التحويل بسعر نهاية الفترة الحالية؛ الإجماليات لا تتأثر بالبحث؛ المخرجات تشمل صفوف البحث: "+_search+"."+(_applied.CostCenter.HasValue?" | تشمل القيود المسندة للمركز فقط.":"");
     private async Task ExportAsync(){if(!CanExport)return;try{var bytes=CustomerDebtsWorkbook.Create(Subtitle,Headers,_visible.Select(r=>new object?[]{r.Code,r.Name}.Concat(Cells(r).Select(c=>c.Value)).ToArray()),sheetName:"قائمة الدخل");await using var module=await JS.InvokeAsync<IJSObjectReference>("import","./js/customer-debts-export.js");await module.InvokeVoidAsync("saveWorkbook",Convert.ToBase64String(bytes),"income-statement.xlsx");}catch(Exception ex){_validation="تعذر التصدير: "+ex.Message;}}
     private async Task PrintAsync(){if(!CanExport)return;try{await using var module=await JS.InvokeAsync<IJSObjectReference>("import","./js/income-statement-print.js");await module.InvokeVoidAsync("printIncomeStatement",Subtitle,Headers,_visible.Select(r=>new[]{r.Code,r.Name}.Concat(Cells(r).Select(c=>c.Text)).ToArray()).ToArray(),_visible.Select(r=>r.Summary).ToArray());}catch(Exception ex){_validation="تعذرت الطباعة: "+ex.Message;}}

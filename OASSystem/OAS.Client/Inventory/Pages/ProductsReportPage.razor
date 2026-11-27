@@ -74,7 +74,7 @@
             }
             @if (_draft.ReportType != "prices")
             {
-                <label class="oas-report__field">حالة المخزون<select @bind="_draft.StockState"><option value="all">الكل</option><option value="available">@(IsCurrent(_draft)?"متوفر":"رصيد موجب")</option><option value="out">نافد</option>@if(IsCurrent(_draft)){<option value="reserved">له حجز</option>}<option value="stagnant">راكد</option></select></label>
+                <label class="oas-report__field">حالة المخزون<select @bind="_draft.StockState"><option value="all">الكل</option><option value="available">@(IsCurrent(_draft)?"متوفر":"رصيد موجب")</option><option value="out">نافد</option>@if(IsCurrent(_draft)){<option value="reserved">له حجز</option><option value="partial">محجوز جزئياً</option><option value="full">محجوز بالكامل</option>}<option value="stagnant">راكد</option></select></label>
                 @if(!IsCurrent(_draft)){<div class="product-warning">الحجوزات والمتاح وقيد الطلب غير متاحة تاريخياً؛ القيم غير الموثوقة تظهر بشرطة.</div>}
             }
             <label class="oas-report__field">العملة<select @bind="_draft.Currency" disabled="@(!UsesCurrency)"><option value="">@_baseName (الأساسية)</option>@foreach(var c in _currencies.Where(x=>x.IsActive&&x.Id!=_baseId)){<option value="@c.Id">@c.NameAr (@c.Code)</option>}</select></label>
@@ -198,6 +198,7 @@
         decimal? OnOrder,
         decimal? AverageCost,
         decimal? InventoryValue,
+        decimal? ReservedValue,
         DateTimeOffset? LastMovementAt,
         decimal OpeningQty,
         decimal InQty,
@@ -234,7 +235,7 @@
     private static readonly ColumnDef[] ValuationColumns =
     [
         new("code", "رقم الصنف"), new("name", "اسم الصنف"), new("product", "المنتج"), new("unit", "الوحدة"), new("warehouse", "المستودع"),
-        new("onHand", "الرصيد"), new("avgCost", "متوسط التكلفة"), new("value", "قيمة المخزون"), new("share", "نسبة القيمة"), new("last", "آخر حركة")
+        new("onHand", "الرصيد"), new("avgCost", "متوسط التكلفة"), new("value", "قيمة المخزون"), new("reservedValue", "قيمة المحجوز"), new("availableValue", "قيمة المتاح"), new("share", "نسبة القيمة"), new("last", "آخر حركة")
     ];
     private static readonly ColumnDef[] StagnantColumns =
     [
@@ -389,8 +390,8 @@
         _ =>
         [
             new("إجمالي قيمة المخزون", Metric("value"), "purple", "fa-solid fa-coins"),
-            new("قيمة المخزون المحجوز", FormatValue(IsCurrent(_applied)?WarehouseReportAggregation.SumKnown(_rows.Select(x => x.Reserved * x.AverageCost)):null, "value"), "orange", "fa-solid fa-lock"),
-            new(IsCurrent(_applied)?"الأصناف المتوفرة":"أصناف برصيد موجب", CountText(_rows.Count(x => (x.Available ?? x.OnHand) > 0)), "green", "fa-solid fa-circle-check"),
+            new("قيمة المخزون المحجوز", Metric("reservedValue"), "orange", "fa-solid fa-lock"),
+            new(IsCurrent(_applied)?"الأصناف المتوفرة":"أصناف برصيد موجب", CountText(_rows.Count(x => WarehouseReportAggregation.MatchesStockState("available", x.OnHand, x.Reserved, IsCurrent(_applied)))), "green", "fa-solid fa-circle-check"),
             new("الأصناف النافدة", CountText(_rows.Count(x => x.OnHand <= 0)), "red", "fa-solid fa-circle-xmark"),
             new("عدد الأصناف", CountText(_rows.Count), "violet", "fa-solid fa-boxes-stacked"),
             new("عدد المنتجات", CountText(_rows.Select(x => x.Item.Product.Id).Distinct().Count()), "blue", "fa-solid fa-cube")
@@ -524,7 +525,7 @@
 
             if (next.ReportType == "prices")
                 next = next with { Warehouse = "", StockState = "all", HideZero = false, Currency = null };
-            if (!IsCurrent(next) && next.StockState == "reserved") next.StockState = "all";
+            if (!IsCurrent(next) && WarehouseReportAggregation.IsReservationState(next.StockState)) next.StockState = "all";
             if (!next.IncludeInactiveWarehouses && Guid.TryParse(next.Warehouse, out var selectedWarehouse) && Warehouses.Any(w=>w.Id==selectedWarehouse&&!w.IsActive))
             { _validation = "المستودع المحدد غير نشط؛ فعّل تضمين المستودعات غير النشطة أو اختر مستودعاً آخر."; return; }
             var rate = 1m;
@@ -597,10 +598,11 @@
             var reserved = current ? WarehouseReportAggregation.SumKnown(balances.Select(x => x.Reserved)) : null;
             var onOrder = current ? WarehouseReportAggregation.SumKnown(balances.Select(x => x.OnOrder)) : null;
             var value = WarehouseReportAggregation.SumKnown(balances.Select(x => x.Value));
+            var reservedValue = current ? WarehouseReportAggregation.SumKnown(balances.Select(x => WarehouseReportAggregation.ReservedValue(x.Reserved, x.AverageCost))) : null;
             var last = balances.Select(x => x.LastMovement).DefaultIfEmpty().Max();
             var days = last.HasValue ? Math.Max(0, (_applied.To.Date - last.Value.UtcDateTime.Date).Days) : int.MaxValue;
             var row = new ProductReportRow(item, warehouseName, onHand, reserved, onHand-reserved, onOrder,
-                onHand > 0 ? value / onHand : null, value, last,
+                onHand > 0 ? value / onHand : null, value, reservedValue, last,
                 qty.Opening ?? 0, qty.In, qty.Out, qty.Closing ?? 0, cost.Opening, cost.In, cost.Out, cost.Closing, days);
             if (_applied.HideZero && IsZeroRow(row)) continue;
             if (!MatchesStockState(row) || !MatchesSearch(row)) continue;
@@ -637,9 +639,7 @@
         if (_applied.ReportType == "stagnant" && row.OnHand > 0 && row.DaysIdle < _applied.StagnantDays) return false;
         return _applied.StockState switch
         {
-            "available" => (row.Available ?? row.OnHand) > 0,
-            "out" => row.OnHand <= 0,
-            "reserved" => row.Reserved > 0,
+            "available" or "out" or "reserved" or "partial" or "full" => WarehouseReportAggregation.MatchesStockState(_applied.StockState, row.OnHand, row.Reserved, IsCurrent(_applied)),
             "stagnant" => row.DaysIdle >= _applied.StagnantDays && row.OnHand > 0,
             _ => _applied.ReportType != "stagnant" || row.OnHand <= 0 || row.DaysIdle >= _applied.StagnantDays
         };
@@ -696,6 +696,8 @@
             "onOrder" => row.OnOrder,
             "avgCost" => row.AverageCost,
             "value" => row.InventoryValue,
+            "reservedValue" => row.ReservedValue,
+            "availableValue" => WarehouseReportAggregation.AvailableValue(row.InventoryValue, row.ReservedValue),
             "last" => row.LastMovementAt?.UtcDateTime.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
             "opening" => _applied.ReportType == "movement-cost" ? row.OpeningCost : row.OpeningQty,
             "incoming" => _applied.ReportType == "movement-cost" ? row.InCost : row.InQty,
@@ -725,6 +727,8 @@
             "onOrder" => WarehouseReportAggregation.SumKnown(rows.Select(x => x.OnOrder)),
             "avgCost" => rows.Sum(x => x.OnHand) > 0 ? WarehouseReportAggregation.SumKnown(rows.Select(x => x.InventoryValue)) / rows.Sum(x => x.OnHand) : null,
             "value" => WarehouseReportAggregation.SumKnown(rows.Select(x => x.InventoryValue)),
+            "reservedValue" => WarehouseReportAggregation.SumKnown(rows.Select(x => x.ReservedValue)),
+            "availableValue" => WarehouseReportAggregation.SumKnown(rows.Select(x => WarehouseReportAggregation.AvailableValue(x.InventoryValue, x.ReservedValue))),
             "opening" => _applied.ReportType == "movement-cost" ? WarehouseReportAggregation.SumKnown(rows.Select(x => x.OpeningCost)) : rows.Sum(x => x.OpeningQty),
             "incoming" => _applied.ReportType == "movement-cost" ? rows.Sum(x => x.InCost) : rows.Sum(x => x.InQty),
             "outgoing" => _applied.ReportType == "movement-cost" ? rows.Sum(x => x.OutCost) : rows.Sum(x => x.OutQty),
@@ -747,7 +751,7 @@
             decimal d when key == "share" => d.ToString("N2", CultureInfo.InvariantCulture) + "%",
             decimal d when _applied.ReportType == "movement-cost" => (d / _rate).ToString("N2", CultureInfo.InvariantCulture),
             decimal d when _applied.ReportType == "movement-qty" => d.ToString("#,##0.###", CultureInfo.InvariantCulture),
-            decimal d when key is "purchasePrice" or "sellingPrice" or "avgCost" or "value" => (d / _rate).ToString("N2", CultureInfo.InvariantCulture),
+            decimal d when key is "purchasePrice" or "sellingPrice" or "avgCost" or "value" or "reservedValue" or "availableValue" => (d / _rate).ToString("N2", CultureInfo.InvariantCulture),
             decimal d when key is "onHand" or "reserved" or "available" or "onOrder" or "opening" or "incoming" or "outgoing" or "closing" => d.ToString("#,##0.###", CultureInfo.InvariantCulture),
             decimal d when AppliedUsesCurrency => (d / _rate).ToString("N2", CultureInfo.InvariantCulture),
             decimal d => d.ToString("#,##0.###", CultureInfo.InvariantCulture),
@@ -762,7 +766,7 @@
     private string[] ExportHeaders => CurrentColumns.Select(c => c.Label).ToArray();
     private IEnumerable<object?[]> ExportRows() => _rows.Select(r => CurrentColumns.Select(c => Cell(r, c.Key)).ToArray());
     private object? NormalizeExportValue(object? value, string key) => value is decimal d && ShouldConvertCurrency(key) ? d / _rate : value;
-    private bool ShouldConvertCurrency(string key) => _applied.ReportType == "movement-cost" || key is "purchasePrice" or "sellingPrice" or "avgCost" or "value";
+    private bool ShouldConvertCurrency(string key) => _applied.ReportType == "movement-cost" || key is "purchasePrice" or "sellingPrice" or "avgCost" or "value" or "reservedValue" or "availableValue";
 
     private async Task ExportAsync()
     {
@@ -794,6 +798,8 @@
         "available" => "متوفر",
         "out" => "نافد",
         "reserved" => "له حجز",
+        "partial" => "محجوز جزئياً",
+        "full" => "محجوز بالكامل",
         "stagnant" => "راكد",
         _ => "الكل"
     };

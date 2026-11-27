@@ -20,6 +20,13 @@ public sealed class SalesReportExportTests
     }
 
     [Test]
+    public void FilterOptionsQuery_RequiresSameSalesViewPermission()
+    {
+        var query = new GetSalesReportOptionsQuery(new SalesReportOptionRequest(new(2026,10,1), new(2026,10,31), "customer"));
+        Assert.That(query.RequiredPermissions, Does.Contain(SalesPermissions.View));
+    }
+
+    [Test]
     public void Csv_UsesExactlyReportDtoValues_AndProtectsSpreadsheetFromFormulaInjection()
     {
         var totals = SalesReportArithmetic.Compose(100m, 0m, 15m, 5m, 40m, 1, 0);

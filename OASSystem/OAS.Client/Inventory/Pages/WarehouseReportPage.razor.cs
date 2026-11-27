@@ -54,7 +54,7 @@ public partial class WarehouseReportPage
     private List<Row> _rows=[];
     private static readonly Col[] SummaryCols=[new("warehouseCode","رمز المخزن"),new("warehouseName","اسم المخزن"),new("items","عدد الأصناف","int","",true),new("availableCount","الأصناف المتوفرة","int","pos",true),new("outCount","الأصناف النافدة","int","neg",true),new("reservedValue","قيمة المخزون المحجوز","money","",true),new("availableValue","قيمة المخزون المتاح","money","",true),new("value","إجمالي قيمة المخزون","money","",true),new("last","آخر حركة"),new("status","الحالة")];
     private static readonly Col[] ItemCols=[new("code","رمز الصنف"),new("name","اسم الصنف"),new("unit","الوحدة")];
-    private static readonly Col[] DetailCols=[new("code","رمز الصنف"),new("name","اسم الصنف"),new("product","المنتج"),new("unit","الوحدة"),new("onHand","الرصيد الفعلي","qty","",true),new("reserved","المحجوز","qty","neg",true),new("available","المتاح","qty","pos",true),new("onOrder","قيد الطلب","qty","info",true),new("avgCost","متوسط التكلفة","money"),new("value","قيمة المخزون","money","",true),new("last","آخر حركة")];
+    private static readonly Col[] DetailCols=[new("code","رمز الصنف"),new("name","اسم الصنف"),new("product","المنتج"),new("unit","الوحدة"),new("onHand","الرصيد الفعلي","qty","",true),new("reserved","المحجوز","qty","neg",true),new("available","المتاح","qty","pos",true),new("onOrder","قيد الطلب","qty","info",true),new("avgCost","متوسط التكلفة","money"),new("value","قيمة المخزون","money","",true),new("reservedValue","قيمة المحجوز","money","",true),new("availableValue","قيمة المتاح","money","",true),new("last","آخر حركة")];
     private Col[] FlowCols => [..ItemCols, new("opening","رصيد الافتتاح",FlowKind,"",true),new("purchase","المشتريات",FlowKind,"pos",true),new("salesReturn","مرتجع المبيعات",FlowKind,"pos",true),new("transferIn","تحويل وارد",FlowKind,"pos",true),new("otherIn","توريد وتسويات",FlowKind,"pos",true),new("sales","المبيعات",FlowKind,"neg",true),new("purchaseReturn","مرتجع المشتريات",FlowKind,"neg",true),new("transferOut","تحويل صادر",FlowKind,"neg",true),new("otherOut","صرف وتسويات",FlowKind,"neg",true),new("closing","الرصيد الختامي",FlowKind,"",true)];
     private static readonly Col[] TransferCols=[new("number","رقم التحويل"),new("date","التاريخ"),new("source","المخزن المصدر"),new("destination","المخزن المستلم"),new("code","رمز الصنف"),new("name","اسم الصنف"),new("unit","الوحدة"),new("quantity","الكمية","qty","",true),new("cost","تكلفة التحويل المرحلة","money","",true),new("status","الحالة")];
     private static readonly Col[] CountCols=[new("number","رقم الجرد"),new("date","تاريخ الجرد"),new("code","رمز الصنف"),new("name","اسم الصنف"),new("unit","الوحدة"),new("system","الرصيد الدفتري","qty"),new("counted","الكمية بالجرد","qty"),new("difference","فرق الكمية","qty"),new("avgCost","متوسط التكلفة","money"),new("variance","قيمة الفرق","money","",true),new("status","الحالة")];
@@ -113,7 +113,8 @@ public partial class WarehouseReportPage
         if(_busy)return;_validation=null;
         var next=_draft with {};
         if(next.To.Year==9999||next.To.Date>DateTime.UtcNow.Date|| (IsRange(next.Mode)&&next.From.Date>next.To.Date)){_validation="تحقق من التاريخ والفترة المحددة.";return;}
-        if(!IsCurrent(next)&&next.StockState=="reserved")next.StockState="all";
+        if(!IsCurrent(next)&&WarehouseReportAggregation.IsReservationState(next.StockState))next.StockState="all";
+        if(!next.IncludeInactive && Guid.TryParse(next.Warehouse,out var selectedWarehouse) && Warehouses.Any(w=>w.Id==selectedWarehouse&&!w.IsActive)){_validation="المستودع المحدد غير نشط؛ فعّل تضمين المخازن غير النشطة أو اختر مستودعاً آخر.";return;}
         _busy=true;_error=null;
         try
         {
@@ -141,11 +142,10 @@ public partial class WarehouseReportPage
     private static decimal? SumKnown(IEnumerable<decimal?> values)=>WarehouseReportAggregation.SumKnown(values);
     private bool StockMatches(WarehouseReportStock s)
     {
-        var available=s.Reserved.HasValue?s.OnHand-s.Reserved.Value:s.OnHand;
-        return (_applied.StockState switch{"available"=>available>0,"out"=>s.OnHand<=0,"reserved"=>s.OnHand>0&&s.Reserved>=s.OnHand,_=>true})&&
+        return WarehouseReportAggregation.MatchesStockState(_applied.StockState,s.OnHand,s.Reserved,IsCurrent(_applied))&&
             (!_applied.HideZero||s.OnHand!=0||s.Reserved.GetValueOrDefault()!=0||s.OnOrder.GetValueOrDefault()!=0||s.Value!=0);
     }
-    private static decimal? ReservedValue(WarehouseReportStock s)=>s.Reserved.HasValue&&s.AverageCost.HasValue?s.Reserved*s.AverageCost:null;
+    private static decimal? ReservedValue(WarehouseReportStock s)=>WarehouseReportAggregation.ReservedValue(s.Reserved,s.AverageCost);
     private void BuildRows()
     {
         if(_data is null||_error is not null)return;
@@ -159,11 +159,11 @@ public partial class WarehouseReportPage
             foreach(var w in Warehouses.Where(w=>Allowed(w.Id)&&(_applied.Warehouse==""||w.Id.ToString()==_applied.Warehouse)))
             {
                 var a=byWarehouse[w.Id].ToArray();
-                if(a.Length==0&&(_applied.HideZero||_applied.StockState!="all"||_applied.Variant!=""||_applied.Category!=""))continue;
+                if(a.Length==0&&(_applied.HideZero||_applied.StockState!="all"||_applied.Variant!=""||_applied.Product!=""||_applied.Category!=""))continue;
                 var rv=IsCurrent(_applied)?SumKnown(a.Select(ReservedValue)):null;
                 var value=SumKnown(a.Select(x=>x.Value));
-                var availableCount=IsCurrent(_applied)?a.Count(x=>x.OnHand-x.Reserved.GetValueOrDefault()>0):a.Count(x=>x.OnHand>0);
-                list.Add(new(w.Id,null,null,null,new(){["warehouseCode"]=w.Code,["warehouseName"]=w.Name,["items"]=a.Length,["availableCount"]=availableCount,["outCount"]=a.Count(x=>x.OnHand<=0),["reservedValue"]=rv,["availableValue"]=value-rv,["value"]=value,["last"]=a.Select(x=>x.LastMovement).DefaultIfEmpty().Max(),["status"]=w.IsActive?"نشط":"غير نشط"},$"{w.Code} {w.Name}",w.IsActive?2:1));
+                var availableCount=a.Count(x=>WarehouseReportAggregation.MatchesStockState("available",x.OnHand,x.Reserved,IsCurrent(_applied)));
+                list.Add(new(w.Id,null,null,null,new(){["warehouseCode"]=w.Code,["warehouseName"]=w.Name,["items"]=a.Length,["availableCount"]=availableCount,["outCount"]=a.Count(x=>x.OnHand<=0),["reservedValue"]=rv,["availableValue"]=WarehouseReportAggregation.AvailableValue(value,rv),["value"]=value,["last"]=a.Select(x=>x.LastMovement).DefaultIfEmpty().Max(),["status"]=w.IsActive?"نشط":"غير نشط"},$"{w.Code} {w.Name}",w.IsActive?2:1));
             }
         }
         else if(_applied.Mode=="details")
@@ -171,7 +171,7 @@ public partial class WarehouseReportPage
             foreach(var s in stocks)
             {
                 if(!items.TryGetValue(s.VariantId,out var i))continue;var c=ItemCells(i);
-                c["onHand"]=s.OnHand;c["reserved"]=s.Reserved;c["available"]=s.Reserved.HasValue?s.OnHand-s.Reserved.Value:null;c["onOrder"]=s.OnOrder;c["avgCost"]=s.AverageCost;c["value"]=s.Value;c["last"]=s.LastMovement;
+                c["onHand"]=s.OnHand;c["reserved"]=s.Reserved;c["available"]=s.Reserved.HasValue?s.OnHand-s.Reserved.Value:null;c["onOrder"]=s.OnOrder;c["avgCost"]=s.AverageCost;c["value"]=s.Value;c["reservedValue"]=IsCurrent(_applied)?ReservedValue(s):null;c["availableValue"]=WarehouseReportAggregation.AvailableValue(s.Value,(decimal?)c["reservedValue"]);c["last"]=s.LastMovement;
                 list.Add(new(s.WarehouseId,i.Id,i.UnitId,null,c,$"{WarehouseCaption(s.WarehouseId)} {SearchItem(i)}"));
             }
         }
@@ -240,12 +240,12 @@ public partial class WarehouseReportPage
         "qty" or "cost"=>[new("عدد المخازن",N(WarehouseCount),"blue","fa-solid fa-warehouse"),new("عدد الأصناف",N(ItemCount),"violet","fa-solid fa-boxes-stacked"),new("الرصيد الافتتاحي",M("opening",FlowKind),"orange","fa-solid fa-box"),new("إجمالي الوارد",M("in",FlowKind),"green","fa-solid fa-arrow-down"),new("إجمالي الصادر",M("out",FlowKind),"red","fa-solid fa-arrow-up"),new("الرصيد الختامي",M("closing",FlowKind),"purple","fa-solid fa-coins")],
         "transfers"=>[new("عدد التحويلات",N(Documents),"blue","fa-solid fa-right-left"),new("التحويلات المرحلة",N(DocStatus(2)),"green","fa-solid fa-check"),new("المسودات",N(DocStatus(1)),"orange","fa-solid fa-file"),new("المخازن المرسلة",N(_rows.Select(r=>r.Source).OfType<Guid>().Distinct().Count()),"violet","fa-solid fa-arrow-up"),new("المخازن المستلمة",N(_rows.Select(r=>r.Destination).OfType<Guid>().Distinct().Count()),"red","fa-solid fa-arrow-down"),new("قيمة التحويلات المرحلة",M("cost"),"purple","fa-solid fa-coins")],
         "counts"=>[new("عمليات الجرد",N(Documents),"blue","fa-solid fa-clipboard-list"),new("الأصناف المجرودة",N(_rows.Where(r=>D(r,"counted").HasValue).Select(r=>r.VariantId).Distinct().Count()),"violet","fa-solid fa-boxes-stacked"),new("البنود المطابقة",N(_rows.Count(r=>D(r,"difference")==0)),"green","fa-solid fa-check"),new("قيمة الزيادة",Money(_rows.Select(r=>D(r,"variance")).OfType<decimal>().Where(v=>v>0).Sum()),"orange","fa-solid fa-arrow-up"),new("قيمة العجز",Money(-_rows.Select(r=>D(r,"variance")).OfType<decimal>().Where(v=>v<0).Sum()),"red","fa-solid fa-arrow-down"),new("صافي الفروقات المسجلة",M("variance"),"purple","fa-solid fa-coins")],
-        "details"=>[new("عدد المخازن",N(WarehouseCount),"blue","fa-solid fa-warehouse"),new("عدد الأصناف",N(ItemCount),"violet","fa-solid fa-boxes-stacked"),new("أرصدة نافدة",N(_rows.Count(r=>D(r,"onHand")<=0)),"red","fa-solid fa-circle-xmark"),new(IsCurrent(_applied)?"أرصدة متوفرة":"أرصدة موجبة",N(_rows.Count(r=>(D(r,"available")??D(r,"onHand"))>0)),"green","fa-solid fa-circle-check"),new("قيمة المخزون المحجوز",Money(IsCurrent(_applied)?SumKnown(_rows.Select(r=>D(r,"reserved")*D(r,"avgCost"))):null),"orange","fa-solid fa-lock"),new("إجمالي قيمة المخزون",M("value"),"purple","fa-solid fa-coins")],
+        "details"=>[new("عدد المخازن",N(WarehouseCount),"blue","fa-solid fa-warehouse"),new("عدد الأصناف",N(ItemCount),"violet","fa-solid fa-boxes-stacked"),new("أرصدة نافدة",N(_rows.Count(r=>D(r,"onHand")<=0)),"red","fa-solid fa-circle-xmark"),new(IsCurrent(_applied)?"أرصدة متوفرة":"أرصدة موجبة",N(_rows.Count(r=>WarehouseReportAggregation.MatchesStockState("available",D(r,"onHand").GetValueOrDefault(),D(r,"reserved"),IsCurrent(_applied)))),"green","fa-solid fa-circle-check"),new("قيمة المخزون المحجوز",M("reservedValue"),"orange","fa-solid fa-lock"),new("إجمالي قيمة المخزون",M("value"),"purple","fa-solid fa-coins")],
         _=>[new("عدد المخازن",N(WarehouseCount),"blue","fa-solid fa-warehouse"),new("أرصدة الأصناف",M("items","int"),"violet","fa-solid fa-boxes-stacked"),new("أرصدة نافدة",M("outCount","int"),"red","fa-solid fa-circle-xmark"),new(IsCurrent(_applied)?"أرصدة متوفرة":"أرصدة موجبة",M("availableCount","int"),"green","fa-solid fa-circle-check"),new("قيمة المخزون المحجوز",M("reservedValue"),"orange","fa-solid fa-lock"),new("إجمالي قيمة المخزون",M("value"),"purple","fa-solid fa-coins")]
     };
     private string StatusCss(Row r)=>"warehouse-state "+(_applied.Mode=="counts"?(r.Status==5?"good":r.Status==6?"bad":"pending"):r.Status==2?"good":_applied.Mode=="summary"?"bad":"pending");
     private static string ModeName(string m)=>m switch{"details"=>"أرصدة المخازن حسب الأصناف","qty"=>"حركة المخازن - كميات","cost"=>"حركة المخازن - تكاليف","transfers"=>"التحويلات بين المخازن","counts"=>"الجرد والفروقات",_=>"إجمالي أرصدة المخازن"};
-    private static string StockName(string m)=>m switch{"available"=>"متوفر","out"=>"نافد","reserved"=>"محجوز بالكامل",_=>"الكل"};
+    private static string StockName(string m)=>m switch{"available"=>"متوفر","out"=>"نافد","reserved"=>"له حجز","partial"=>"محجوز جزئياً","full"=>"محجوز بالكامل",_=>"الكل"};
     private static string TransferState(int s)=>s==2?"مرحل":"مسودة";
     private static string CountState(int s)=>s switch{1=>"مسودة",2=>"قيد الجرد",3=>"قيد المراجعة",4=>"معتمد",5=>"مرحل",6=>"ملغى",_=>"غير محدد"};
     private static string VarianceName(string s)=>s switch{"plus"=>"زيادة","minus"=>"عجز","equal"=>"مطابق","pending"=>"لم يُجرد",_=>"الكل"};

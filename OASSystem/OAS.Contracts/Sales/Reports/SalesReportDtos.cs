@@ -19,7 +19,7 @@ public sealed record SalesReportFilterDto(
     Guid? ProductTypeId = null, Guid? BrandId = null, string? Operator = null,
     string? CurrencyCode = null, int? PaymentPlan = null, string? SettlementStatus = null,
     // null preserves strict legacy callers; "*" explicitly opts into automatic historical scope.
-    string? HistoricalBaseCurrencyCode = null);
+    string? HistoricalBaseCurrencyCode = null, bool IncludeFilterOptions = true);
 
 public sealed record SalesReportTotalsDto(
     decimal InvoiceRevenueBase, decimal ReturnedRevenueBase, decimal NetRevenueBase,
@@ -77,3 +77,9 @@ public sealed record SalesReportDto(
 
 public sealed record SalesReportOptionDto(string Kind, string Key, string Label,
     string? ParentKey = null, string? TypeKey = null);
+
+/// <summary>Independent, server-paged selector for the posted sales reporting scope.</summary>
+public sealed record SalesReportOptionRequest(DateOnly FromDate, DateOnly ToDate, string Kind,
+    string? HistoricalBaseCurrencyCode = "*", string? Search = null, int PageNumber = 1, int PageSize = 50,
+    Guid? ProductTypeId = null, Guid? CategoryId = null);
+public sealed record SalesReportOptionPage(IReadOnlyList<SalesReportOptionDto> Items, int TotalCount, int PageNumber, int PageSize);

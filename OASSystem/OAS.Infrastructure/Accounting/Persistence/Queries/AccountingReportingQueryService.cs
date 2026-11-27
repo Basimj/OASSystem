@@ -363,6 +363,7 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
                 on line.JournalEntryId equals journal.Id
             where journal.Status == JournalEntryStatus.Posted
                   && journal.PostingDate <= toDate
+                  && (!filter.CostCenterId.HasValue || line.CostCenterId == filter.CostCenterId)
                   && (!movementFrom.HasValue || journal.PostingDate >= movementFrom.Value)
             select new
             {

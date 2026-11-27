@@ -17,7 +17,8 @@ public sealed record GetGeneralLedgerQuery(
     Guid? CustomerId = null,
     Guid? SupplierId = null,
     string? Reference = null,
-    bool IncludeOpeningBalance = true)
+    bool IncludeOpeningBalance = true,
+    Guid? CostCenterId = null)
     : IQuery<GeneralLedgerReportDto>, IAuthorizedRequest
 {
     public IReadOnlyCollection<string> RequiredPermissions { get; } = [JournalPermissions.View];

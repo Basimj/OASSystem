@@ -7,6 +7,7 @@
 @using OAS.Client.Accounting.Common
 @using OAS.Contracts.Accounting.Accounts
 @using OAS.Contracts.Accounting.Currencies
+@using OAS.Contracts.Accounting.CostCenters
 @using OAS.Contracts.Accounting.Enums
 @using OAS.Contracts.Common.Pagination
 @using OAS.UiLib.Components.Reports
@@ -29,6 +30,7 @@
         <div class="oas-report__chip" title="من تاريخ"><i class="fa-regular fa-calendar"></i><span class="oas-report__chip-label">من تاريخ:</span><strong>@_applied.From.ToString("dd/MM/yyyy")</strong></div>
         <div class="oas-report__chip" title="إلى تاريخ"><i class="fa-regular fa-calendar"></i><span class="oas-report__chip-label">إلى تاريخ:</span><strong>@_applied.To.ToString("dd/MM/yyyy")</strong></div>
         <div class="oas-report__chip" title="نوع التقرير"><i class="fa-regular fa-file-lines"></i><span class="oas-report__chip-label">نوع التقرير:</span><strong>@(_applied.Detail == "true" ? "تفصيلي" : "إجمالي")</strong></div>
+        @if (_applied.CostCenterId.HasValue){<div class="oas-report__chip"><strong>مركز التكلفة: @CenterName</strong></div>}
         @if (_applied.Source != ""){<div class="oas-report__chip"><strong>المصدر: @_applied.Source</strong></div>}
         @if (_applied.Reference != ""){<div class="oas-report__chip"><strong>المرجع: @_applied.Reference</strong></div>}
     </QuickFilters>
@@ -98,6 +100,7 @@
             <label class="oas-report__field">إلى تاريخ<input type="date" @bind="_to" @bind:format="yyyy-MM-dd" /></label>
         </div>
         <label class="oas-report__field">العملة<select @bind="_currencyId"><option value="">@_baseCurrencyName (الأساسية)</option>@foreach(var currency in _currencies.Where(c => c.IsActive && c.Id != _baseCurrencyId)){<option value="@currency.Id">@currency.NameAr (@currency.Code)</option>}</select></label>
+        <label class="oas-report__field">مركز التكلفة<select @bind="_costCenterId"><option value="">الكل</option>@foreach(var center in _centers){<option value="@center.Id">@center.NameAr</option>}@if(_costCenterId.HasValue && !_centers.Any(c=>c.Id==_costCenterId)){<option value="@_costCenterId">مركز التكلفة المحدد</option>}</select></label>
         <label class="oas-report__field">نوع التقرير<select @bind="_detail"><option value="true">تفصيلي (كل الحركات)</option><option value="false">إجمالي (حسب الحساب والقيد)</option></select></label>
         <label class="oas-report__field">مصدر القيد<select @bind="_source"><option value="">الكل</option>@foreach(var source in _sources){<option value="@source">@source</option>}</select></label>
         <label class="oas-report__field">رقم القيد أو المرجع<input @bind="_reference" placeholder="الكل" /></label>
@@ -120,6 +123,10 @@
     [Parameter, SupplyParameterFromQuery(Name = "toDate")] public string? ToDateFromQuery { get; set; }
     [Parameter, SupplyParameterFromQuery(Name = "includeChildren")] public bool? ChildrenFromQuery { get; set; }
     [Parameter, SupplyParameterFromQuery(Name = "currencyId")] public Guid? CurrencyFromQuery { get; set; }
+    [Parameter, SupplyParameterFromQuery(Name = "costCenterId")] public Guid? CostCenterFromQuery { get; set; }
+    private Guid? _costCenterId;
+    private List<CostCenterDto> _centers = [];
+    private string CenterName => _applied.CostCenterId is Guid id ? _centers.FirstOrDefault(c=>c.Id==id)?.NameAr ?? id.ToString() : "الكل";
     private string SelectedAccountDisplay
     {
         get
@@ -129,7 +136,7 @@
             return account is null ? "الحساب المحدد" : $"{account.Code} - {account.NameAr}";
         }
     }
-    private sealed record AppliedFilters(Guid? AccountId, DateTime From, DateTime To, Guid? CurrencyId, bool Children, string Detail, string Source, string Reference);
+    private sealed record AppliedFilters(Guid? AccountId, DateTime From, DateTime To, Guid? CurrencyId, bool Children, string Detail, string Source, string Reference, Guid? CostCenterId = null);
     private AppliedFilters _applied = new(null, new DateTime(DateTime.Today.Year,1,1), DateTime.Today, null, false, "true", "", "");
     private string _source = "", _reference = "";
     private string[] _sources = [];
@@ -199,12 +206,14 @@
             if (DateOnly.TryParseExact(ToDateFromQuery, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var to)) _to = to.ToDateTime(TimeOnly.MinValue);
             if (ChildrenFromQuery.HasValue) _includeChildren = ChildrenFromQuery.Value;
             if (CurrencyFromQuery.HasValue) _currencyId = CurrencyFromQuery.Value;
+            _costCenterId = CostCenterFromQuery;
+            try { for(var page=1;;page++){var centers=await Accounting.GetCostCentersPageAsync(new PageRequest{PageNumber=page,PageSize=100});_centers.AddRange(centers.Items);if(!centers.HasNextPage||centers.Items.Count==0)break;} } catch { _centers=[]; }
             await LoadAsync();
         }catch(Exception ex){_error="تعذر تحميل بيانات الحسابات: "+ex.Message;}
     }
     private async Task LoadAsync(){
         if(_busy)return;
-        var f = new AppliedFilters(_accountId,_from,_to,_currencyId,_includeChildren,_detail,_source,_reference.Trim());
+        var f = new AppliedFilters(_accountId,_from,_to,_currencyId,_includeChildren,_detail,_source,_reference.Trim(),_costCenterId);
         if(_isDemo){_applied=f;LoadDemo();return;}
         if(f.From.Date>f.To.Date){_error="تاريخ البداية يجب ألا يتجاوز تاريخ النهاية.";return;}
         _busy=true;_error=null;
@@ -222,7 +231,7 @@
                     throw new InvalidOperationException("لا يوجد سعر صرف محاسبي صالح للعملة المحددة حتى تاريخ نهاية التقرير. أضف سعر الصرف ثم أعد المحاولة.");
                 conversionRate = effective.Rate;
             }
-            var report=await Accounting.GetGeneralLedgerAsync(new GeneralLedgerFilterDto(DateOnly.FromDateTime(f.From),DateOnly.FromDateTime(f.To),AccountId:f.AccountId,IncludeAccountSubtree:f.Children));
+            var report=await Accounting.GetGeneralLedgerAsync(new GeneralLedgerFilterDto(DateOnly.FromDateTime(f.From),DateOnly.FromDateTime(f.To),AccountId:f.AccountId,IncludeAccountSubtree:f.Children,CostCenterId:f.CostCenterId));
             _all=[]; _accountBalances=[]; _openingBalance=0; _multipleAccounts=false;
             if(report is not null){
                 _multipleAccounts = report.Accounts.Count > 1;
@@ -302,9 +311,9 @@
             : _filtered.OrderBy(keySelector, comparer)).ToList();
     private void GoPage(int p)=>_page=Math.Clamp(p,1,TotalPages);
     private void ChangePageSize(ChangeEventArgs args){if(int.TryParse(args.Value?.ToString(),out var n))_pageSize=n;_page=1;}
-    private async Task ResetAsync(){_accountId=null;_from=new(DateTime.Today.Year,1,1);_to=DateTime.Today;_includeChildren=false;_search="";_detail="true";_currencyId=null;_source="";_reference="";_sortColumn=null;_sortDescending=false;await LoadAsync();}
+    private async Task ResetAsync(){_accountId=null;_from=new(DateTime.Today.Year,1,1);_to=DateTime.Today;_includeChildren=false;_search="";_detail="true";_currencyId=null;_costCenterId=null;_source="";_reference="";_sortColumn=null;_sortDescending=false;await LoadAsync();}
     private bool CanExport => !_busy && _error is null && (_filtered.Count > 0 || _accountBalances.Count > 0);
-    private string Subtitle => $"الحساب: {SelectedAccountDisplay} | الفروع الحسابية: {(_applied.Children?"نعم":"لا")} | من {_applied.From:dd/MM/yyyy} إلى {_applied.To:dd/MM/yyyy} | {_displayCurrencyName} | {(_applied.Detail=="true"?"تفصيلي":"إجمالي حسب الحساب والقيد")} | المصدر: {_applied.Source} | المرجع: {_applied.Reference} | البحث: {_search} | الرصيد الجاري والافتتاح والختام من كامل دفتر الحساب قبل البحث وتصفية المصدر والمرجع";
+    private string Subtitle => $"الحساب: {SelectedAccountDisplay} | مركز التكلفة: {CenterName} | الفروع الحسابية: {(_applied.Children?"نعم":"لا")} | من {_applied.From:dd/MM/yyyy} إلى {_applied.To:dd/MM/yyyy} | {_displayCurrencyName} | {(_applied.Detail=="true"?"تفصيلي":"إجمالي حسب الحساب والقيد")} | المصدر: {_applied.Source} | المرجع: {_applied.Reference} | البحث: {_search} | الرصيد الجاري والافتتاح والختام من كامل دفتر الحساب قبل البحث وتصفية المصدر والمرجع";
     private string[] ExportHeaders => ["الحساب","التاريخ","نوع المستند","رقم السند","المرجع","البيان","مدين","دائن","الرصيد","الحالة / العكس"];
     private object?[] ExportRow(StatementRow x) => [x.AccountLabel,x.Date.ToString("yyyy-MM-dd"),x.Kind,x.Number,x.Reference,x.Description,x.Debit,x.Credit,x.Balance,"مرحل / " + AccountingArabicPresenter.GetJournalReversalText(x.Reversal) + " / " + AccountingArabicPresenter.GetJournalRelatedNumbers(x.Reversal)];
     private IEnumerable<object?[]> ExportRows() => _filtered.Select(ExportRow).Concat(_accountBalances.SelectMany(x => new object?[][] {

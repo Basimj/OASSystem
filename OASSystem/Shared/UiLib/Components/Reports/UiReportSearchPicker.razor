@@ -21,10 +21,16 @@
             <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
             <input type="search" class="oas-report-picker__search" aria-label="@SearchPlaceholder"
                    placeholder="@SearchPlaceholder" @bind="_search" @bind:event="oninput" autofocus />
+            @if (LoadPage is not null)
+            {
+                <button type="button" disabled="@_remoteBusy" @onclick="() => LoadRemotePageAsync(1)">بحث</button>
+            }
         </div>
-        @{ var matches = FilteredOptions; }
+        @{ var matches = LoadPage is null ? FilteredOptions : _remoteOptions; }
         <div class="oas-report-picker__options" role="group" aria-label="@DialogTitle">
-            @if (matches.Count == 0)
+            @if (_remoteBusy) { <div role="status">جارٍ تحميل الخيارات...</div> }
+            @if (_remoteError is not null) { <div role="alert">@_remoteError</div> }
+            @if (matches.Count == 0 && !_remoteBusy)
             {
                 <div class="oas-report-picker__empty" role="status">@EmptyText</div>
             }
@@ -32,13 +38,24 @@
             {
                 var selected = IsSelected(option.Value);
                 <button type="button" @key="option.Value" class="oas-report-picker__option @(selected ? "is-selected" : "")"
-                        aria-pressed="@(selected ? "true" : "false")" @onclick="() => SelectAsync(option.Value)">
+                        aria-pressed="@(selected ? "true" : "false")" @onclick="() => SelectAsync(option.Value, option.Text)" disabled="@_remoteBusy">
                     <span>@option.Text</span>
                     @if (selected) { <i class="fa-solid fa-check" aria-hidden="true"></i> }
                 </button>
             }
         </div>
-        <div class="oas-report-picker__count" aria-live="polite">@matches.Count من @Options.Count @ItemLabel</div>
+        @if (LoadPage is null)
+        {
+            <div class="oas-report-picker__count" aria-live="polite">@matches.Count من @Options.Count @ItemLabel</div>
+        }
+        else
+        {
+            <div class="oas-report-picker__count" aria-live="polite">
+                <button type="button" disabled="@(_remoteBusy || _remotePage <= 1)" @onclick="() => LoadRemotePageAsync(_remotePage - 1)">السابق</button>
+                صفحة @_remotePage — @_remoteTotal نتيجة
+                <button type="button" disabled="@(_remoteBusy || (long)_remotePage * RemotePageSize >= _remoteTotal)" @onclick="() => LoadRemotePageAsync(_remotePage + 1)">التالي</button>
+            </div>
+        }
     </dialog>
 </div>
 
@@ -52,6 +69,33 @@
     [Parameter] public string? Value { get; set; }
     [Parameter] public EventCallback<string?> ValueChanged { get; set; }
     [Parameter] public IReadOnlyList<UiSelectOption> Options { get; set; } = [];
+    [Parameter] public Func<string, int, Task<(IReadOnlyList<UiSelectOption> Items, int TotalCount)>>? LoadPage { get; set; }
+    [Parameter] public int RemotePageSize { get; set; } = 50;
+    private IReadOnlyList<UiSelectOption> _remoteOptions = [];
+    private string? _remoteError, _remoteSelectedValue, _remoteSelectedText;
+    private string _remoteSearch = "";
+    private int _remotePage = 1, _remoteTotal;
+    private bool _remoteBusy;
+    private async Task LoadRemotePageAsync(int page)
+    {
+        if (LoadPage is null || _remoteBusy) return;
+        _remoteBusy = true;
+        _remoteError = null;
+        if (page == 1) _remoteSearch = _search.Trim();
+        try
+        {
+            var result = await LoadPage(_remoteSearch, page);
+            _remoteOptions = new[] { new UiSelectOption("", Placeholder) }.Concat(result.Items).ToArray();
+            _remotePage = page; _remoteTotal = result.TotalCount;
+        }
+        catch (Exception ex)
+        {
+            _remoteError = "تعذر تحميل الخيارات: " + ex.Message;
+            _remoteOptions = [new UiSelectOption("", Placeholder)];
+            _remotePage = 1; _remoteTotal = 0;
+        }
+        finally { _remoteBusy = false; }
+    }
 
     private readonly string _triggerId = $"report-picker-trigger-{Guid.NewGuid():N}";
     private readonly string _dialogId = $"report-picker-dialog-{Guid.NewGuid():N}";
@@ -60,7 +104,8 @@
     private IJSObjectReference? _module;
     private string _search = string.Empty;
     private bool IsSelected(string? optionValue) => string.Equals(optionValue ?? "", Value ?? "", StringComparison.Ordinal);
-    private string SelectedText => Options.FirstOrDefault(x => IsSelected(x.Value))?.Text ?? Placeholder;
+    private string SelectedText => LoadPage is not null && IsSelected(_remoteSelectedValue) && _remoteSelectedText is not null
+        ? _remoteSelectedText : Options.FirstOrDefault(x => IsSelected(x.Value))?.Text ?? (LoadPage is null || string.IsNullOrEmpty(Value) ? Placeholder : Value);
     private IReadOnlyList<UiSelectOption> FilteredOptions
     {
         get
@@ -81,13 +126,15 @@
         _search = string.Empty;
         _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/OAS.UiLib/js/oas-report-picker.js");
         await _module.InvokeVoidAsync("open", _dialog);
+        if (LoadPage is not null) await LoadRemotePageAsync(1);
     }
     private async Task CloseAsync()
     {
         if (_module is not null) await _module.InvokeVoidAsync("close", _dialog);
     }
-    private async Task SelectAsync(string value)
+    private async Task SelectAsync(string value, string text)
     {
+        if (LoadPage is not null) { _remoteSelectedValue = value; _remoteSelectedText = text; }
         await CloseAsync();
         await ValueChanged.InvokeAsync(value);
     }

@@ -30,32 +30,7 @@ public sealed class SalesReportQueryService(OasDbContext db) : ISalesReportQuery
         if (filter.GroupBy == SalesReportGroupBy.Collections && (filter.ProductVariantId.HasValue || filter.CategoryId.HasValue || filter.WarehouseId.HasValue || filter.BrandId.HasValue || filter.ProductTypeId.HasValue))
             throw new ArgumentException("تقرير التحصيلات على مستوى الفاتورة؛ لا يدعم فلاتر البنود.");
         filter = filter with { PageNumber = Math.Max(1, filter.PageNumber), PageSize = Math.Clamp(filter.PageSize, 1, 100) };
-        var invoices = db.Set<SalesInvoice>().AsNoTracking().Where(x => x.Status == SalesInvoiceStatus.Posted && x.PostingDate >= filter.FromDate && x.PostingDate <= filter.ToDate);
-        var returns = db.Set<SalesReturn>().AsNoTracking().Where(x => x.Status == SalesReturnStatus.Posted && x.PostingDate >= filter.FromDate && x.PostingDate <= filter.ToDate);
-        var saleQuery = (from l in db.Set<SalesInvoiceLine>().AsNoTracking()
-                          join d in invoices on l.SalesInvoiceId equals d.Id
-                          where l.IsActive
-                          select new Fact { Kind = 1, Id = l.Id, DocId = d.Id, Code = d.InvoiceCode, Date = d.PostingDate, Number = l.LineNumber,
-                              Customer = d.CustomerId, Employee = d.SalesEmployeeId, Product = l.ProductVariantId, Warehouse = l.WarehouseId,
-                              Currency = d.CurrencyCodeSnapshot, BaseCurrency = d.BaseCurrencyCodeSnapshot, Operator = d.PostedBy, Plan = (int)d.PaymentPlan,
-                              Item = l.ProductNameSnapshot, Unit = l.UnitSnapshot, Quantity = l.Quantity, Net = l.BaseNetAmount, Tax = l.BaseTaxAmount,
-                              Discount = l.BaseHeaderDiscountAllocated + l.DiscountAmount * d.ExchangeRate,
-                              HeaderNet = d.BaseTotalAmount - d.BaseTaxAmount, HeaderTax = d.BaseTaxAmount, HeaderDiscount = d.BaseDiscountAmount + d.BaseHeaderDiscountAmount,
-                              Inventory = l.LineType != SalesLineType.Service && l.ProductVariantId.HasValue && l.WarehouseId.HasValue,
-                              CostSnapshot = l.TotalCostSnapshot, Journal = d.JournalEntryId });
-        var returnQuery = (from l in db.Set<SalesReturnLine>().AsNoTracking()
-                              join d in returns on l.SalesReturnId equals d.Id
-                              join i in db.Set<SalesInvoice>().AsNoTracking() on d.SalesInvoiceId equals i.Id
-                              join original in db.Set<SalesInvoiceLine>().AsNoTracking() on l.SalesInvoiceLineId equals original.Id
-                              where l.IsActive
-                              select new Fact { Kind = 2, Id = l.Id, DocId = d.Id, Code = d.ReturnCode, Date = d.PostingDate, Number = l.LineNumber,
-                                  Customer = d.CustomerId, Employee = i.SalesEmployeeId, Product = l.ProductVariantId, Warehouse = original.WarehouseId,
-                                  Currency = d.CurrencyCodeSnapshot, BaseCurrency = d.BaseCurrencyCodeSnapshot, Operator = d.PostedBy, Plan = (int)i.PaymentPlan,
-                                  Item = l.ProductNameSnapshot, Unit = original.UnitSnapshot, Quantity = l.Quantity, Net = l.BaseNetAmount, Tax = l.BaseTaxAmount,
-                                  HeaderNet = d.BaseNetAmount, HeaderTax = d.BaseTaxAmount, CostSnapshot = l.TotalCostSnapshot,
-                                  Inventory = l.LineType != SalesLineType.Service && l.ProductVariantId.HasValue && l.WarehouseId.HasValue &&
-                                     (l.StockDisposition == SalesReturnStockDisposition.Restock || l.StockDisposition == SalesReturnStockDisposition.Quarantine),
-                                  Journal = d.JournalEntryId });
+        var (saleQuery, returnQuery) = BuildFactQueries(filter.FromDate, filter.ToDate);
         // Currency scope is defined over the whole period, independent of the selected customer or item.
         // Count documents, not lines, without loading monetary facts.
         var saleCurrencies = await saleQuery.Select(x => new { x.DocId, x.BaseCurrency }).Distinct()
@@ -88,20 +63,6 @@ public sealed class SalesReportQueryService(OasDbContext db) : ISalesReportQuery
             if (baseCodes.Length == 1) baseCode = baseCodes[0];
         }
 
-        // Keep selectors independent of the applied customer/item filters. Only lightweight distinct metadata is loaded here.
-        async Task<T[]> Keys<T>(Expression<Func<Fact,T>> selector)
-        {
-            var sold = await saleQuery.Select(selector).Distinct().ToListAsync(ct);
-            var returned = await returnQuery.Select(selector).Distinct().ToListAsync(ct);
-            return sold.Concat(returned).Distinct().ToArray();
-        }
-        var optionCustomers = await Keys(x => (Guid?)x.Customer);
-        var optionEmployees = await Keys(x => x.Employee);
-        var optionProducts = await Keys(x => x.Product);
-        var optionWarehouses = await Keys(x => x.Warehouse);
-        var optionCurrencies = await Keys(x => x.Currency);
-        var optionOperators = await Keys(x => x.Operator);
-
         // Select documents with matching lines, then fetch ALL their active lines.
         // Reconciliation of header amounts below must happen before the final line filter.
         var matchingVariants = from v in db.Set<ProductVariant>().AsNoTracking()
@@ -131,6 +92,22 @@ public sealed class SalesReportQueryService(OasDbContext db) : ISalesReportQuery
         var all = sale.Concat(returned).ToList();
         if (!string.IsNullOrWhiteSpace(filter.HistoricalBaseCurrencyCode))
             all = all.Where(x => SalesReportCurrencyScope.Normalize(x.BaseCurrency) == baseCode).ToList();
+        // Legacy consumers may still request all options. The interactive report uses the separate,
+        // paged selector and only needs grouping labels for facts actually loaded (plus selections).
+        async Task<T[]> Keys<T>(Expression<Func<Fact,T>> selector, IEnumerable<T> selected)
+        {
+            if (!filter.IncludeFilterOptions)
+                return all.Select(selector.Compile()).Concat(selected).Distinct().ToArray();
+            var sold = await saleQuery.Select(selector).Distinct().ToListAsync(ct);
+            var returned = await returnQuery.Select(selector).Distinct().ToListAsync(ct);
+            return sold.Concat(returned).Concat(selected).Distinct().ToArray();
+        }
+        var optionCustomers = await Keys(x => (Guid?)x.Customer, new[] { filter.CustomerId });
+        var optionEmployees = await Keys(x => x.Employee, new[] { filter.EmployeeId });
+        var optionProducts = await Keys(x => x.Product, new[] { filter.ProductVariantId });
+        var optionWarehouses = await Keys(x => x.Warehouse, new[] { filter.WarehouseId });
+        var optionCurrencies = await Keys(x => x.Currency, string.IsNullOrEmpty(filter.CurrencyCode) ? Array.Empty<string>() : new[] { filter.CurrencyCode! });
+        var optionOperators = await Keys(x => x.Operator, new[] { filter.Operator });
         // Use stable semantic posting roles, not descriptions or the current stock disposition.
         var journalIds = all.Where(x => x.Journal.HasValue).Select(x => x.Journal!.Value).Distinct().ToArray();
         var ledger = await (from l in db.Set<JournalEntryLine>().AsNoTracking()
@@ -198,9 +175,14 @@ public sealed class SalesReportQueryService(OasDbContext db) : ISalesReportQuery
         AddOptions("customer", optionCustomers, id => customers.GetValueOrDefault(id, id.ToString()));
         AddOptions("employee", optionEmployees, id => employees.GetValueOrDefault(id, id.ToString()));
         AddOptions("warehouse", optionWarehouses, id => warehouses.GetValueOrDefault(id, id.ToString()));
-        AddOptions("brand", catalog.Values.Select(x => x.BrandId), id => brands.GetValueOrDefault(id, id.ToString()));
-        AddOptions("type", catalog.Values.Select(x => (Guid?)x.Type), id => types.GetValueOrDefault(id, id.ToString()));
+        AddOptions("brand", catalog.Values.Select(x => x.BrandId).Concat(new[] { filter.BrandId }), id => brands.GetValueOrDefault(id, id.ToString()));
+        AddOptions("type", catalog.Values.Select(x => (Guid?)x.Type).Concat(new[] { filter.ProductTypeId }), id => types.GetValueOrDefault(id, id.ToString()));
         options.AddRange(catalog.Values.GroupBy(x => x.Category).Select(g => new SalesReportOptionDto("category", g.Key.ToString("D"), g.First().CategoryName, TypeKey: g.First().Type.ToString("D"))));
+        if (filter.CategoryId is Guid selectedCategory && !options.Any(x => x.Kind == "category" && x.Key == selectedCategory.ToString("D")))
+        {
+            var category = await db.Set<ProductCategory>().AsNoTracking().FirstOrDefaultAsync(x => x.Id == selectedCategory, ct);
+            if (category is not null) options.Add(new("category", category.Id.ToString("D"), category.Name, TypeKey: category.ProductTypeId.ToString("D")));
+        }
         options.AddRange(catalog.Values.Select(x => new SalesReportOptionDto("product", x.Id.ToString("D"), $"{x.Name} - {x.SKU} {x.VariantName}", x.Category.ToString("D"), x.Type.ToString("D"))));
         options.AddRange(optionCurrencies.Select(x => new SalesReportOptionDto("currency", x, x)));
         options.AddRange(optionOperators.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().Select(x => new SalesReportOptionDto("operator", x!, UserLabel(x))));
@@ -250,7 +232,139 @@ public sealed class SalesReportQueryService(OasDbContext db) : ISalesReportQuery
         if (filter.GroupBy == SalesReportGroupBy.Collections) warnings.Add("التحصيلات هي تسويات الفواتير الصادرة خلال الفترة حتى تاريخ نهايتها (UTC للتخصيصات)، وليست حركة الصندوق خلال الفترة.");
         if (filter.GroupBy is SalesReportGroupBy.Category or SalesReportGroupBy.ProductType or SalesReportGroupBy.Brand || filter.CategoryId.HasValue || filter.ProductTypeId.HasValue || filter.BrandId.HasValue) warnings.Add("تصنيف المنتج ونوعه وعلامته من الكتالوج الحالي؛ قد يتغير التجميع التاريخي عند إعادة تصنيف المنتج.");
         rows = (filter.GroupBy is SalesReportGroupBy.Day or SalesReportGroupBy.Month or SalesReportGroupBy.Year or SalesReportGroupBy.Summary ? rows.OrderBy(x => x.Key) : detail ? rows.OrderByDescending(x => x.PostingDate).ThenBy(x => x.Label).ThenBy(x => x.Key) : rows.OrderByDescending(x => x.Totals.NetRevenueBase).ThenBy(x => x.Key)).ToList();
-        return new(filter, baseCode, totals, rows, documentRows, docs.Count, filter.PageNumber, filter.PageSize, false) { Options = options.OrderBy(x => x.Label).ToArray(), Warnings = warnings };
+        var selectedOptions = new Dictionary<string,string?> {
+            ["customer"] = filter.CustomerId?.ToString("D"), ["employee"] = filter.EmployeeId?.ToString("D"),
+            ["product"] = filter.ProductVariantId?.ToString("D"), ["category"] = filter.CategoryId?.ToString("D"),
+            ["type"] = filter.ProductTypeId?.ToString("D"), ["brand"] = filter.BrandId?.ToString("D"),
+            ["warehouse"] = filter.WarehouseId?.ToString("D"), ["operator"] = filter.Operator, ["currency"] = filter.CurrencyCode };
+        var responseOptions = filter.IncludeFilterOptions ? options : options.Where(o => selectedOptions.TryGetValue(o.Kind,out var key) && key == o.Key);
+        return new(filter, baseCode, totals, rows, documentRows, docs.Count, filter.PageNumber, filter.PageSize, false) { Options = responseOptions.OrderBy(x => x.Label).ToArray(), Warnings = warnings };
+    }
+
+    // Reuse exactly the same posted document / active line scope as the financial report.
+    private (IQueryable<Fact> Sales, IQueryable<Fact> Returns) BuildFactQueries(DateOnly fromDate, DateOnly toDate)
+    {
+        var invoices = db.Set<SalesInvoice>().AsNoTracking().Where(x => x.Status == SalesInvoiceStatus.Posted && x.PostingDate >= fromDate && x.PostingDate <= toDate);
+        var returns = db.Set<SalesReturn>().AsNoTracking().Where(x => x.Status == SalesReturnStatus.Posted && x.PostingDate >= fromDate && x.PostingDate <= toDate);
+        var saleQuery = (from l in db.Set<SalesInvoiceLine>().AsNoTracking()
+                          join d in invoices on l.SalesInvoiceId equals d.Id
+                          where l.IsActive
+                          select new Fact { Kind = 1, Id = l.Id, DocId = d.Id, Code = d.InvoiceCode, Date = d.PostingDate, Number = l.LineNumber,
+                              Customer = d.CustomerId, Employee = d.SalesEmployeeId, Product = l.ProductVariantId, Warehouse = l.WarehouseId,
+                              Currency = d.CurrencyCodeSnapshot, BaseCurrency = d.BaseCurrencyCodeSnapshot, Operator = d.PostedBy, Plan = (int)d.PaymentPlan,
+                              Item = l.ProductNameSnapshot, Unit = l.UnitSnapshot, Quantity = l.Quantity, Net = l.BaseNetAmount, Tax = l.BaseTaxAmount,
+                              Discount = l.BaseHeaderDiscountAllocated + l.DiscountAmount * d.ExchangeRate,
+                              HeaderNet = d.BaseTotalAmount - d.BaseTaxAmount, HeaderTax = d.BaseTaxAmount, HeaderDiscount = d.BaseDiscountAmount + d.BaseHeaderDiscountAmount,
+                              Inventory = l.LineType != SalesLineType.Service && l.ProductVariantId.HasValue && l.WarehouseId.HasValue,
+                              CostSnapshot = l.TotalCostSnapshot, Journal = d.JournalEntryId });
+        var returnQuery = (from l in db.Set<SalesReturnLine>().AsNoTracking()
+                              join d in returns on l.SalesReturnId equals d.Id
+                              join i in db.Set<SalesInvoice>().AsNoTracking() on d.SalesInvoiceId equals i.Id
+                              join original in db.Set<SalesInvoiceLine>().AsNoTracking() on l.SalesInvoiceLineId equals original.Id
+                              where l.IsActive
+                              select new Fact { Kind = 2, Id = l.Id, DocId = d.Id, Code = d.ReturnCode, Date = d.PostingDate, Number = l.LineNumber,
+                                  Customer = d.CustomerId, Employee = i.SalesEmployeeId, Product = l.ProductVariantId, Warehouse = original.WarehouseId,
+                                  Currency = d.CurrencyCodeSnapshot, BaseCurrency = d.BaseCurrencyCodeSnapshot, Operator = d.PostedBy, Plan = (int)i.PaymentPlan,
+                                  Item = l.ProductNameSnapshot, Unit = original.UnitSnapshot, Quantity = l.Quantity, Net = l.BaseNetAmount, Tax = l.BaseTaxAmount,
+                                  HeaderNet = d.BaseNetAmount, HeaderTax = d.BaseTaxAmount, CostSnapshot = l.TotalCostSnapshot,
+                                  Inventory = l.LineType != SalesLineType.Service && l.ProductVariantId.HasValue && l.WarehouseId.HasValue &&
+                                     (l.StockDisposition == SalesReturnStockDisposition.Restock || l.StockDisposition == SalesReturnStockDisposition.Quarantine),
+                                  Journal = d.JournalEntryId });
+        return (saleQuery, returnQuery);
+    }
+
+    private sealed class GuidOption
+    {
+        public Guid Id { get; set; }
+        public string Label { get; set; } = "";
+        public Guid? Parent { get; set; }
+        public Guid? Type { get; set; }
+    }
+    private sealed class TextOption
+    {
+        public string Key { get; set; } = "";
+        public string Label { get; set; } = "";
+    }
+
+    public async Task<SalesReportOptionPage> GetOptionsAsync(SalesReportOptionRequest request, CancellationToken ct = default)
+    {
+        if (request.FromDate == default || request.ToDate == default || request.ToDate < request.FromDate || request.ToDate == DateOnly.MaxValue)
+            throw new ArgumentException("حدد فترة صحيحة للفلاتر.");
+        var page = Math.Max(1, request.PageNumber);
+        var size = Math.Clamp(request.PageSize, 1, 100);
+        var skip = (int)Math.Min((long)(page - 1) * size, int.MaxValue);
+        var search = (request.Search ?? "").Trim();
+        if (search.Length > 200) throw new ArgumentException("البحث طويل جداً.");
+        var (sales, returns) = BuildFactQueries(request.FromDate, request.ToDate);
+        var historical = sales.Select(x => x.BaseCurrency).Union(returns.Select(x => x.BaseCurrency))
+            .Where(x => x != null && x.Trim() != "").Select(x => x.Trim().ToUpper()).Distinct();
+        if (request.Kind == "historicalBaseCurrency")
+        {
+            var q = historical.Where(x => search == "" || x.Contains(search));
+            var total = await q.CountAsync(ct);
+            var items = await q.OrderBy(x => x).Skip(skip).Take(size).ToListAsync(ct);
+            return new(items.Select(x => new SalesReportOptionDto(request.Kind, x, x)).ToArray(), total, page, size);
+        }
+        var baseCodes = SalesReportCurrencyScope.Available(await historical.ToListAsync(ct));
+        var configured = await (from st in db.Set<AccountingSettings>().AsNoTracking()
+                               join c in db.Set<Currency>().AsNoTracking() on st.BaseCurrencyId equals c.Id select c.Code).FirstOrDefaultAsync(ct) ?? "BASE";
+        var code = SalesReportCurrencyScope.Select(request.HistoricalBaseCurrencyCode ?? "*", configured, baseCodes);
+        sales = sales.Where(x => x.BaseCurrency.Trim().ToUpper() == code);
+        returns = returns.Where(x => x.BaseCurrency.Trim().ToUpper() == code);
+        IQueryable<Guid> Ids(Expression<Func<Fact, Guid?>> selector) => sales.Select(selector).Union(returns.Select(selector))
+            .Where(x => x.HasValue).Select(x => x!.Value);
+        var productIds = Ids(x => x.Product);
+        var customerIds = Ids(x => (Guid?)x.Customer);
+        var employeeIds = Ids(x => x.Employee);
+        var warehouseIds = Ids(x => x.Warehouse);
+        var catalog = from v in db.Set<ProductVariant>().AsNoTracking()
+                      join p in db.Set<Product>().AsNoTracking() on v.ProductId equals p.Id
+                      join c in db.Set<ProductCategory>().AsNoTracking() on p.CategoryId equals c.Id
+                      where productIds.Contains(v.Id)
+                      select new { v.Id, v.SKU, v.VariantName, p.Name, Category = c.Id, CategoryName = c.Name, Type = c.ProductTypeId, p.BrandId };
+        if (request.Kind is "currency" or "operator")
+        {
+            IQueryable<TextOption> query;
+            if (request.Kind == "currency")
+                query = sales.Select(x => x.Currency).Union(returns.Select(x => x.Currency))
+                    .Where(x => x != null && x != "").Select(x => new TextOption { Key = x, Label = x });
+            else
+            {
+                var operators = sales.Select(x => x.Operator).Union(returns.Select(x => x.Operator)).Where(x => x != null && x != "");
+                query = from key in operators
+                        join u in db.Set<UserAccount>().AsNoTracking() on key.ToUpper() equals u.Id.ToString().ToUpper() into users
+                        from u in users.DefaultIfEmpty()
+                        select new TextOption { Key = key!, Label = u == null ? key! : u.FirstName + " " + u.LastName };
+            }
+            query = query.Where(x => search == "" || x.Label.Contains(search) || x.Key.Contains(search));
+            var count = await query.CountAsync(ct);
+            var items = await query.OrderBy(x => x.Label).ThenBy(x => x.Key).Skip(skip).Take(size).ToListAsync(ct);
+            return new(items.Select(x => new SalesReportOptionDto(request.Kind, x.Key, x.Label)).ToArray(), count, page, size);
+        }
+        IQueryable<GuidOption> options = request.Kind switch
+        {
+            "customer" => db.Set<Customer>().AsNoTracking().Where(x => customerIds.Contains(x.Id))
+                .Select(x => new GuidOption { Id = x.Id, Label = x.NameAr + " - " + x.CustomerCode }),
+            "employee" => db.Set<Employee>().AsNoTracking().Where(x => employeeIds.Contains(x.Id))
+                .Select(x => new GuidOption { Id = x.Id, Label = x.FirstName + " " + x.LastName }),
+            "warehouse" => db.Set<Warehouse>().AsNoTracking().Where(x => warehouseIds.Contains(x.Id))
+                .Select(x => new GuidOption { Id = x.Id, Label = x.Name }),
+            "brand" => db.Set<Brand>().AsNoTracking().Where(x => catalog.Any(c => c.BrandId == x.Id))
+                .Select(x => new GuidOption { Id = x.Id, Label = x.Name }),
+            "type" => db.Set<ProductType>().AsNoTracking().Where(x => catalog.Any(c => c.Type == x.Id))
+                .Select(x => new GuidOption { Id = x.Id, Label = x.Name }),
+            "category" => catalog.Where(x => !request.ProductTypeId.HasValue || x.Type == request.ProductTypeId)
+                .Select(x => new GuidOption { Id = x.Category, Label = x.CategoryName, Type = x.Type }).Distinct(),
+            "product" => catalog.Where(x => (!request.ProductTypeId.HasValue || x.Type == request.ProductTypeId) &&
+                                             (!request.CategoryId.HasValue || x.Category == request.CategoryId))
+                .Select(x => new GuidOption { Id = x.Id, Label = x.Name + " - " + x.SKU + " " + (x.VariantName ?? ""), Parent = x.Category, Type = x.Type }),
+            _ => throw new ArgumentException("نوع فلتر المبيعات غير معروف.")
+        };
+        options = options.Where(x => search == "" || x.Label.Contains(search) || x.Id.ToString().Contains(search));
+        var totalCount = await options.CountAsync(ct);
+        var results = await options.OrderBy(x => x.Label).ThenBy(x => x.Id).Skip(skip).Take(size).ToListAsync(ct);
+        return new(results.Select(x => new SalesReportOptionDto(request.Kind, x.Id.ToString("D"), x.Label,
+            x.Parent?.ToString("D"), x.Type?.ToString("D"))).ToArray(), totalCount, page, size);
     }
 
     private async Task<List<SalesReportBreakdownDto>> CollectionsAsync(List<SalesReportBreakdownDto> rows, List<Fact> facts, SalesReportFilterDto filter, CancellationToken ct)

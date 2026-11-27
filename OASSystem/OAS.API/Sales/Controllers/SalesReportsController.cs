@@ -28,10 +28,21 @@ public sealed class SalesReportsController(ISender sender) : ControllerBase
         [FromQuery] string? operatorKey = null, [FromQuery] string? currencyCode = null,
         [FromQuery] int? paymentPlan = null, [FromQuery] string? settlementStatus = null,
         [FromQuery] string? historicalBaseCurrencyCode = null,
+        [FromQuery] bool includeFilterOptions = true,
         CancellationToken ct = default)
         => Ok(await sender.Send(new GetSalesReportQuery(new(
             fromDate, toDate, groupBy, customerId, employeeId,
-            productVariantId, categoryId, warehouseId, pageNumber, pageSize, productTypeId, brandId, operatorKey, currencyCode, paymentPlan, settlementStatus, historicalBaseCurrencyCode)), ct));
+            productVariantId, categoryId, warehouseId, pageNumber, pageSize, productTypeId, brandId, operatorKey, currencyCode, paymentPlan, settlementStatus, historicalBaseCurrencyCode, includeFilterOptions)), ct));
+
+    [HttpGet("filter-options")]
+    public async Task<ActionResult<SalesReportOptionPage>> GetOptions(
+        [FromQuery] DateOnly fromDate, [FromQuery] DateOnly toDate, [FromQuery] string kind,
+        [FromQuery] string? historicalBaseCurrencyCode = "*", [FromQuery] string? search = null,
+        [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 50,
+        [FromQuery] Guid? productTypeId = null, [FromQuery] Guid? categoryId = null,
+        CancellationToken ct = default)
+        => Ok(await sender.Send(new GetSalesReportOptionsQuery(new(fromDate, toDate, kind,
+            historicalBaseCurrencyCode, search, pageNumber, pageSize, productTypeId, categoryId)), ct));
 
     [HttpGet("export")]
     public async Task<IActionResult> Export(

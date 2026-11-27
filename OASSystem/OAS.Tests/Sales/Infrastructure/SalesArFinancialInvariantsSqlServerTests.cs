@@ -116,6 +116,74 @@ public sealed class SalesArFinancialInvariantsSqlServerTests
     }
 
     [Test]
+    public async Task SalesFilterOptions_AreIndependentAndPaged()
+    {
+        await using var db = new OasDbContext(new DbContextOptionsBuilder<OasDbContext>().UseSqlServer(_connectionString).Options);
+        var service = new SalesReportQueryService(db);
+        var from = new DateOnly(2000, 1, 1);
+        var through = DateOnly.FromDateTime(DateTime.UtcNow);
+        foreach (var kind in new[] { "historicalBaseCurrency", "customer", "employee", "product", "category", "type", "brand", "warehouse", "operator", "currency" })
+        {
+            var request = new SalesReportOptionRequest(from, through, kind, PageSize: 1);
+            var first = await service.GetOptionsAsync(request);
+            var second = await service.GetOptionsAsync(request with { PageNumber = 2 });
+            Assert.That(first.Items.Count, Is.LessThanOrEqualTo(1), kind);
+            Assert.That(second.Items.Count, Is.LessThanOrEqualTo(1), kind);
+            Assert.That(first.TotalCount, Is.GreaterThanOrEqualTo(first.Items.Count), kind);
+            if (first.Items.Count == 1 && second.Items.Count == 1)
+                Assert.That(second.Items[0].Key, Is.Not.EqualTo(first.Items[0].Key), kind);
+            if (first.Items.Count == 1)
+            {
+                var matching = await service.GetOptionsAsync(request with { Search = first.Items[0].Label, PageSize = 100 });
+                Assert.That(matching.TotalCount, Is.GreaterThanOrEqualTo(1), kind);
+            }
+        }
+    }
+
+    [Test]
+    public async Task SalesFilterOptions_RemainAvailableWhenReportExceedsLimit()
+    {
+        await using var db = new OasDbContext(new DbContextOptionsBuilder<OasDbContext>().UseSqlServer(_connectionString).Options);
+        var service = new SalesReportQueryService(db);
+        var from = new DateOnly(2000, 1, 1);
+        var through = DateOnly.FromDateTime(DateTime.UtcNow);
+        // The opt-in test database must contain a period exceeding one of the report guards.
+        try
+        {
+            await service.GetAsync(new SalesReportFilterDto(from, through, SalesReportGroupBy.Line,
+                HistoricalBaseCurrencyCode: "*", IncludeFilterOptions: false));
+            Assert.Ignore("Use a test dataset with more than 100,000 scoped lines or 50,000 breakdown rows.");
+        }
+        catch (ArgumentException ex) when (ex.Message.Contains("100,000") || ex.Message.Contains("50,000"))
+        {
+            var options = await service.GetOptionsAsync(new SalesReportOptionRequest(from, through, "customer", PageSize: 10));
+            Assert.That(options.Items, Is.Not.Empty);
+            Assert.That(options.Items.Count, Is.LessThanOrEqualTo(10));
+        }
+    }
+
+    [Test]
+    public async Task GeneralLedger_CostCenterMatchesPostedJournalLines()
+    {
+        await using var db = new OasDbContext(new DbContextOptionsBuilder<OasDbContext>().UseSqlServer(_connectionString).Options);
+        var from = new DateOnly(2000, 1, 1);
+        var through = DateOnly.FromDateTime(DateTime.UtcNow);
+        var entries = from l in db.Set<OAS.Domain.Accounting.Entities.JournalEntryLine>().AsNoTracking()
+                      join j in db.Set<OAS.Domain.Accounting.Entities.JournalEntry>().AsNoTracking() on l.JournalEntryId equals j.Id
+                      where l.CostCenterId.HasValue && j.Status == OAS.Domain.Accounting.Enums.JournalEntryStatus.Posted && j.PostingDate >= from && j.PostingDate <= through
+                      select new { l.AccountId, l.CostCenterId, l.DebitAmount, l.CreditAmount };
+        var selected = await entries.FirstOrDefaultAsync();
+        if (selected is null) { Assert.Ignore("Populate the test database with posted cost-center lines."); return; }
+        var scoped = entries.Where(x => x.AccountId == selected.AccountId && x.CostCenterId == selected.CostCenterId);
+        var debit = await scoped.SumAsync(x => x.DebitAmount);
+        var credit = await scoped.SumAsync(x => x.CreditAmount);
+        var report = await new AccountingReportingQueryService(db, TimeProvider.System).GetGeneralLedgerAsync(
+            new OAS.Contracts.Accounting.Reports.GeneralLedgerFilterDto(from, through, AccountId: selected.AccountId, CostCenterId: selected.CostCenterId));
+        Assert.That(report.TotalDebit, Is.EqualTo(debit));
+        Assert.That(report.TotalCredit, Is.EqualTo(credit));
+    }
+
+    [Test]
     public async Task SA06_SalesReport_TotalsMatchHistoricalPostedDocumentLines()
     {
         var from = new DateOnly(2000, 1, 1);
