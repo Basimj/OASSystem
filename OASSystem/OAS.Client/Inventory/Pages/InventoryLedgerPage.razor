@@ -12,7 +12,7 @@
 <PageTitle>حركات المخزون | OAS</PageTitle>
 <span class="oas-inventory-view" hidden aria-hidden="true"></span>
 
-<UiWorkspaceLayout ShowAside="false" ShowFilters="true">
+<InventoryReportWorkspace Title="حركات المخزون" TitleIcon="fa-solid fa-list" StatusText="@($"{FilteredEntries.Count} حركة")" ShowFilters="true" ResetFilters="ResetLedgerFilters">
     <Actions>
         <UiWorkspaceActionBar>
             <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary"
@@ -58,10 +58,15 @@
         </UiWorkspaceFilterBar>
     </Filters>
 
+    
+    <QuickFilters>
+        <div class="oas-report__chip"><span>المخزن:</span><strong>@(WarehouseFilterOptions.FirstOrDefault(x => x.Value == _warehouseFilter)?.Text ?? "الكل")</strong></div>
+        <div class="oas-report__chip"><span>الحركة:</span><strong>@(InventoryArabicPresenter.MovementTypeOptions.FirstOrDefault(x => x.Value == _movementFilter)?.Text ?? "الكل")</strong></div>
+        <div class="oas-report__chip"><span>من:</span><strong>@(_fromDate?.ToString("yyyy/MM/dd") ?? "الكل")</strong></div>
+        <div class="oas-report__chip"><span>إلى:</span><strong>@(_toDate?.ToString("yyyy/MM/dd") ?? "الكل")</strong></div>
+    </QuickFilters>
     <Content>
-        <UiDataGridPanel Title="حركات المخزون" Subtitle="@($"{FilteredEntries.Count} حركة")">
-            <Body>
-                @if (_loading)
+                        @if (_loading)
                 {
                     <UiAlert Message="جاري تحميل حركات المخزون..." />
                 }
@@ -71,7 +76,7 @@
                 }
                 else
                 {
-                    <UiDataTable TItem="InventoryLedgerDto" Items="@FilteredEntries" PageSize="12" Headers="@LedgerHeaders" EmptyText="لا توجد حركات مطابقة للفلاتر الحالية."
+                    <InventoryReportTable TItem="InventoryLedgerDto" Items="@FilteredEntries" PageSize="12" Headers="@LedgerHeaders" EmptyText="لا توجد حركات مطابقة للفلاتر الحالية."
                                  SidebarTypography="true"
                                  UniformCellTypography="true" Compact="true">
                         <RowTemplate Context="entry">
@@ -97,14 +102,21 @@
                                 </div>
                             </td>
                         </RowTemplate>
-                    </UiDataTable>
+                    </InventoryReportTable>
                 }
-            </Body>
-        </UiDataGridPanel>
+            
     </Content>
-</UiWorkspaceLayout>
+</InventoryReportWorkspace>
 
 @code {
+    private void ResetLedgerFilters()
+    {
+        _search = _movementFilter = null;
+        _warehouseFilter = WarehouseIdFromQuery?.ToString("D");
+        _fromDate = _toDate = null;
+        ValidateDateRange();
+    }
+
     [Inject] private IInventoryClientService Inventory { get; set; } = default!;
     [Inject] private InventorySpreadsheetClient SpreadsheetClient { get; set; } = default!;
     [Inject] private BrowserFileDownloadService SpreadsheetDownload { get; set; } = default!;

@@ -16,7 +16,11 @@ public sealed class AccountingDocumentPostingService(
     IReadRepository<BankAccount, Guid> bankAccountRepository,
     IReadRepository<AccountingSettings, Guid> settingsRepository,
     IReadRepository<Currency, Guid> currencyRepository,
-    ISequenceNumberGenerator sequenceNumberGenerator)
+    ISequenceNumberGenerator sequenceNumberGenerator,
+    ISettlementAccountResolver settlementResolver,
+    ICounterpartyAccountResolver counterpartyResolver,
+    ICurrencyRoundingService rounding,
+    IPaymentVoucherBalanceQueryService paymentBalances)
     : IAccountingDocumentPostingService
 {
     public async Task<Guid> PostReceiptVoucherAsync(
@@ -30,6 +34,7 @@ public sealed class AccountingDocumentPostingService(
         ArgumentNullException.ThrowIfNull(lines);
         if (lines.Count == 0) throw new ConflictException("receipt_voucher_lines_required", "A receipt voucher must contain at least one line before posting.");
 
+        await ValidateReceiptVoucherAsync(voucher, lines, cancellationToken);
         if (IsModern(lines))
             return await PostModernReceiptAsync(voucher, lines, postedBy, postedAtUtc, cancellationToken);
 
@@ -47,10 +52,102 @@ public sealed class AccountingDocumentPostingService(
         ArgumentNullException.ThrowIfNull(lines);
         if (lines.Count == 0) throw new ConflictException("payment_voucher_lines_required", "A payment voucher must contain at least one line before posting.");
 
+        await ValidatePaymentVoucherAsync(voucher, lines, cancellationToken);
         if (IsModern(lines))
             return await PostModernPaymentAsync(voucher, lines, postedBy, postedAtUtc, cancellationToken);
 
         return await PostLegacyPaymentAsync(voucher, lines, postedBy, postedAtUtc, cancellationToken);
+    }
+
+    public async Task ValidateReceiptVoucherAsync(ReceiptVoucher voucher, IReadOnlyCollection<ReceiptVoucherLine> lines, CancellationToken ct = default)
+    {
+        if (lines.Count == 0) throw new ConflictException("voucher_lines_required", "يجب إضافة بند واحد على الأقل.");
+        var (_, baseCurrency) = await GetBaseCurrencyAsync(ct);
+        if (!IsModern(lines))
+        {
+            if (voucher.BaseCurrencyId.HasValue || lines.Any(x => x.CurrencyId.HasValue || x.SettlementAccountId.HasValue || x.CounterpartyAccountId.HasValue || x.BaseAmount.HasValue))
+                throw new ConflictException("voucher_settlement_line_incomplete", "بيانات السند متعددة العملات غير مكتملة؛ لا يمكن ترحيلها كسند قديم.");
+            await ValidateLegacyCurrencyAsync(voucher.CashAccountId, voucher.BankAccountId, baseCurrency.Id, ct);
+            if (lines.Sum(x => x.Amount) != voucher.TotalAmount)
+                throw new ConflictException("voucher_total_mismatch", "إجمالي السند لا يطابق مجموع البنود.");
+            foreach (var line in lines) await EnsurePostingAccountAsync(line.AccountId, ct);
+            return;
+        }
+        if (voucher.BaseCurrencyId != baseCurrency.Id || voucher.BaseCurrencyDecimalPlacesSnapshot != baseCurrency.DecimalPlaces ||
+            voucher.BaseTotalAmount != lines.Sum(x => x.BaseAmount!.Value))
+            throw new ConflictException("voucher_base_total_mismatch", "العملة الأساسية أو إجمالي السند غير متوافق مع بيانات الترحيل.");
+        foreach (var line in lines)
+            await ValidateModernLineAsync(line.LineNumber, line.PartyType, line.CustomerId, line.SupplierId, line.EmployeeId,
+                line.PartyNameSnapshot, line.CounterpartyAccountId!.Value, line.PaymentMethod, line.CashAccountId,
+                line.BankAccountId, line.SettlementAccountId!.Value, line.CurrencyId!.Value, line.CurrencyDecimalPlacesSnapshot!.Value,
+                line.Amount, line.ExchangeRate!.Value, line.BaseAmount!.Value, line.ReferenceNumber, baseCurrency, ct);
+    }
+
+    public async Task ValidatePaymentVoucherAsync(PaymentVoucher voucher, IReadOnlyCollection<PaymentVoucherLine> lines, CancellationToken ct = default)
+    {
+        if (lines.Count == 0) throw new ConflictException("voucher_lines_required", "يجب إضافة بند واحد على الأقل.");
+        var (_, baseCurrency) = await GetBaseCurrencyAsync(ct);
+        if (!IsModern(lines))
+        {
+            if (voucher.BaseCurrencyId.HasValue || lines.Any(x => x.CurrencyId.HasValue || x.SettlementAccountId.HasValue || x.CounterpartyAccountId.HasValue || x.BaseAmount.HasValue))
+                throw new ConflictException("voucher_settlement_line_incomplete", "بيانات السند متعددة العملات غير مكتملة؛ لا يمكن ترحيلها كسند قديم.");
+            await ValidateLegacyCurrencyAsync(voucher.CashAccountId, voucher.BankAccountId, baseCurrency.Id, ct);
+            if (lines.Sum(x => x.Amount) != voucher.TotalAmount)
+                throw new ConflictException("voucher_total_mismatch", "إجمالي السند لا يطابق مجموع البنود.");
+            foreach (var line in lines) await EnsurePostingAccountAsync(line.AccountId, ct);
+            await EnsureFundsAsync(voucher.CashAccountId ?? voucher.BankAccountId!.Value,
+                voucher.BankAccountId.HasValue, baseCurrency.Id, voucher.TotalAmount, voucher.VoucherDate, ct);
+            return;
+        }
+        if (voucher.BaseCurrencyId != baseCurrency.Id || voucher.BaseCurrencyDecimalPlacesSnapshot != baseCurrency.DecimalPlaces ||
+            voucher.BaseTotalAmount != lines.Sum(x => x.BaseAmount!.Value))
+            throw new ConflictException("voucher_base_total_mismatch", "العملة الأساسية أو إجمالي السند غير متوافق مع بيانات الترحيل.");
+        foreach (var line in lines)
+            await ValidateModernLineAsync(line.LineNumber, line.PartyType, line.CustomerId, line.SupplierId, line.EmployeeId,
+                line.PartyNameSnapshot, line.CounterpartyAccountId!.Value, line.PaymentMethod, line.CashAccountId,
+                line.BankAccountId, line.SettlementAccountId!.Value, line.CurrencyId!.Value, line.CurrencyDecimalPlacesSnapshot!.Value,
+                line.Amount, line.ExchangeRate!.Value, line.BaseAmount!.Value, line.ReferenceNumber, baseCurrency, ct);
+        foreach (var group in lines.Where(x => x.CashAccountId.HasValue || x.BankAccountId.HasValue)
+            .GroupBy(x => (DefinitionId: x.CashAccountId ?? x.BankAccountId!.Value, IsBank: x.BankAccountId.HasValue)))
+            await EnsureFundsAsync(group.Key.DefinitionId, group.Key.IsBank, group.First().CurrencyId!.Value,
+                group.Sum(x => x.Amount), voucher.VoucherDate, ct);
+    }
+
+    private async Task EnsureFundsAsync(Guid definitionId, bool isBank, Guid currencyId, decimal amount, DateOnly date, CancellationToken ct)
+    {
+        var balance = await paymentBalances.GetAsync(definitionId, isBank, date, ct);
+        if (balance.AvailableAmount is not decimal available || balance.CurrencyId != currencyId)
+            throw new ConflictException("payment_voucher_balance_unavailable", balance.Error ?? "تعذر التحقق من رصيد حساب الصرف بعملته.");
+        if (amount > available)
+            throw new ConflictException("payment_voucher_insufficient_balance", $"الرصيد الدفتري المتاح لا يكفي للصرف. المتاح: {available:0.####} {balance.CurrencyCode}، المطلوب: {amount:0.####} {balance.CurrencyCode}.");
+    }
+
+    private async Task ValidateLegacyCurrencyAsync(Guid? cashId, Guid? bankId, Guid baseCurrencyId, CancellationToken ct)
+    {
+        var ledger = await ResolveLegacySettlementAccountIdAsync(cashId, bankId, ct);
+        var currency = cashId is Guid c ? (await cashAccountRepository.GetByIdAsync(c, ct))?.CurrencyId
+            : (await bankAccountRepository.GetByIdAsync(bankId!.Value, ct))?.CurrencyId;
+        if (currency != baseCurrencyId)
+            throw new ConflictException("voucher_legacy_currency_unknown", "لا يمكن ترحيل سند قديم على حساب بعملة غير أساسية دون بيانات الصرف الأصلية.");
+        await EnsurePostingAccountAsync(ledger, ct);
+    }
+
+    private async Task ValidateModernLineAsync(int number, SettlementPartyType? partyType, Guid? customerId, Guid? supplierId,
+        Guid? employeeId, string? name, Guid counterpartyId, PaymentMethod? method, Guid? cashId, Guid? bankId,
+        Guid settlementId, Guid currencyId, byte decimals, decimal amount, decimal rate, decimal baseAmount,
+        string? reference, Currency baseCurrency, CancellationToken ct)
+    {
+        if (!partyType.HasValue || !method.HasValue || amount <= 0 || rate <= 0 || baseAmount <= 0 || decimals > 4 || baseCurrency.DecimalPlaces > 4)
+            throw new ConflictException("voucher_settlement_line_incomplete", $"بيانات السطر {number} غير مكتملة.");
+        var currency = await currencyRepository.GetByIdAsync(currencyId, ct);
+        if (currency is null || !currency.IsActive || currency.DecimalPlaces != decimals ||
+            (currencyId == baseCurrency.Id && rate != 1m) || rounding.Round(amount, decimals) != amount ||
+            rounding.CalculateBaseAmount(amount, rate, decimals, baseCurrency.DecimalPlaces) != baseAmount)
+            throw new ConflictException("voucher_currency_snapshot_invalid", $"مبالغ أو بيانات عملة السطر {number} غير متوافقة مع سعر الصرف المحفوظ.");
+        var settlement = await settlementResolver.ResolveAsync(method.Value, currencyId, cashId, bankId, settlementId, reference, ct);
+        var party = await counterpartyResolver.ResolveAsync(partyType.Value, customerId, supplierId, employeeId, name, counterpartyId, ct);
+        if (settlement.AccountId != settlementId || party.AccountId != counterpartyId || settlementId == counterpartyId)
+            throw new ConflictException("voucher_account_mapping_changed", $"تغير الربط المحاسبي في السطر {number} أو تساوى حساب الطرف والتسوية. راجع السند.");
     }
 
     public async Task<Guid> PostExpenseAsync(
@@ -64,6 +161,23 @@ public sealed class AccountingDocumentPostingService(
         await EnsurePostingAccountAsync(expense.ExpenseAccountId, cancellationToken);
         await EnsurePostingAccountAsync(settlementAccountId, cancellationToken);
         var (settings, baseCurrency) = await GetBaseCurrencyAsync(cancellationToken);
+        var settlementCurrencyId = expense.CashAccountId is Guid cashId
+            ? (await cashAccountRepository.GetByIdAsync(cashId, cancellationToken))?.CurrencyId
+            : (await bankAccountRepository.GetByIdAsync(expense.BankAccountId!.Value, cancellationToken))?.CurrencyId;
+        var txCurrencyId = expense.CurrencyId ?? baseCurrency.Id;
+        if (settlementCurrencyId != txCurrencyId || (expense.BaseCurrencyId.HasValue && expense.BaseCurrencyId != baseCurrency.Id))
+            throw new ConflictException("expense_currency_mismatch", "عملة المصروف لا تطابق حساب الدفع أو العملة الأساسية. راجع المستند قبل الترحيل.");
+        if (expense.CurrencyId.HasValue && (!expense.BaseAmount.HasValue || !expense.ExchangeRate.HasValue ||
+            !expense.ExchangeRateDate.HasValue || !expense.ExchangeRateType.HasValue || !expense.ExchangeRateSource.HasValue ||
+            string.IsNullOrWhiteSpace(expense.CurrencyCodeSnapshot) || !expense.CurrencyDecimalPlacesSnapshot.HasValue))
+            throw new ConflictException("expense_currency_snapshot_missing", "بيانات العملة التاريخية للمصروف غير مكتملة.");
+        var baseAmount = expense.BaseAmount ?? expense.Amount;
+        var code = expense.CurrencyCodeSnapshot ?? baseCurrency.Code;
+        var decimals = expense.CurrencyDecimalPlacesSnapshot ?? baseCurrency.DecimalPlaces;
+        var rate = expense.ExchangeRate ?? 1m;
+        var rateDate = expense.ExchangeRateDate ?? expense.ExpenseDate;
+        var rateType = expense.ExchangeRateType ?? ExchangeRateType.Accounting;
+        var rateSource = expense.ExchangeRateSource ?? ExchangeRateSource.System;
         var journal = await CreateAutomaticJournalAsync(
             expense.ExpenseDate, expense.ExpenseDate,
             BuildDescription("Expense", expense.ExpenseNumber, expense.Description),
@@ -73,13 +187,13 @@ public sealed class AccountingDocumentPostingService(
 
         journal.AddLine(JournalEntryLine.CreateMultiCurrency(
             Guid.NewGuid(), journal.Id, 1, expense.ExpenseAccountId,
-            expense.Amount, 0m, baseCurrency.Id, baseCurrency.Code, baseCurrency.DecimalPlaces,
-            expense.Amount, 0m, 1m, expense.ExpenseDate, ExchangeRateType.Accounting, ExchangeRateSource.System,
+            baseAmount, 0m, txCurrencyId, code, decimals,
+            expense.Amount, 0m, rate, rateDate, rateType, rateSource,
             expense.Description, null, null, null, null, null, null, null, expense.Id));
         journal.AddLine(JournalEntryLine.CreateMultiCurrency(
             Guid.NewGuid(), journal.Id, 2, settlementAccountId,
-            0m, expense.Amount, baseCurrency.Id, baseCurrency.Code, baseCurrency.DecimalPlaces,
-            0m, expense.Amount, 1m, expense.ExpenseDate, ExchangeRateType.Accounting, ExchangeRateSource.System,
+            0m, baseAmount, txCurrencyId, code, decimals,
+            0m, expense.Amount, rate, rateDate, rateType, rateSource,
             expense.Description, null, null, null, null, null, null, null, expense.Id));
 
         CompleteAutomaticPosting(journal, postedBy, postedAtUtc);
@@ -162,10 +276,11 @@ public sealed class AccountingDocumentPostingService(
     private async Task<Guid> PostLegacyReceiptAsync(ReceiptVoucher voucher, IReadOnlyCollection<ReceiptVoucherLine> lines, Guid userId, DateTime nowUtc, CancellationToken ct)
     {
         var settlementId = await ResolveLegacySettlementAccountIdAsync(voucher.CashAccountId, voucher.BankAccountId, ct);
+        var (_, legacyBaseCurrency) = await GetBaseCurrencyAsync(ct);
         await EnsurePostingAccountAsync(settlementId, ct);
         foreach (var line in lines) await EnsurePostingAccountAsync(line.AccountId, ct);
         var journal = await CreateAutomaticJournalAsync(voucher.VoucherDate, voucher.VoucherDate,
-            BuildDescription("Receipt voucher", voucher.VoucherNumber, voucher.Description), "ReceiptVoucher", voucher.Id, null, null, null, ct);
+            BuildDescription("Receipt voucher", voucher.VoucherNumber, voucher.Description), "ReceiptVoucher", voucher.Id, legacyBaseCurrency.Id, legacyBaseCurrency.Code, legacyBaseCurrency.DecimalPlaces, ct);
         journal.AddLine(JournalEntryLine.Create(Guid.NewGuid(), journal.Id, 1, settlementId, voucher.TotalAmount, 0m, voucher.Description, voucher.CustomerId, null, null, null, null));
         var n = 2;
         foreach (var line in lines.OrderBy(x => x.LineNumber)) journal.AddLine(JournalEntryLine.Create(Guid.NewGuid(), journal.Id, n++, line.AccountId, 0m, line.Amount, line.Description, voucher.CustomerId, null, null, null, null));
@@ -175,10 +290,11 @@ public sealed class AccountingDocumentPostingService(
     private async Task<Guid> PostLegacyPaymentAsync(PaymentVoucher voucher, IReadOnlyCollection<PaymentVoucherLine> lines, Guid userId, DateTime nowUtc, CancellationToken ct)
     {
         var settlementId = await ResolveLegacySettlementAccountIdAsync(voucher.CashAccountId, voucher.BankAccountId, ct);
+        var (_, legacyBaseCurrency) = await GetBaseCurrencyAsync(ct);
         await EnsurePostingAccountAsync(settlementId, ct);
         foreach (var line in lines) await EnsurePostingAccountAsync(line.AccountId, ct);
         var journal = await CreateAutomaticJournalAsync(voucher.VoucherDate, voucher.VoucherDate,
-            BuildDescription("Payment voucher", voucher.VoucherNumber, voucher.Description), "PaymentVoucher", voucher.Id, null, null, null, ct);
+            BuildDescription("Payment voucher", voucher.VoucherNumber, voucher.Description), "PaymentVoucher", voucher.Id, legacyBaseCurrency.Id, legacyBaseCurrency.Code, legacyBaseCurrency.DecimalPlaces, ct);
         var n = 1;
         foreach (var line in lines.OrderBy(x => x.LineNumber)) journal.AddLine(JournalEntryLine.Create(Guid.NewGuid(), journal.Id, n++, line.AccountId, line.Amount, 0m, line.Description, null, voucher.SupplierId, null, null, null));
         journal.AddLine(JournalEntryLine.Create(Guid.NewGuid(), journal.Id, n, settlementId, 0m, voucher.TotalAmount, voucher.Description, null, voucher.SupplierId, null, null, null));

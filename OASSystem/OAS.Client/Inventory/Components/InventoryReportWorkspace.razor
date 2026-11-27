@@ -1,0 +1,94 @@
+@using OAS.UiLib.Components.Workspace
+<link rel="stylesheet" href="_content/OAS.UiLib/css/oas-report-workspace.css" />
+<link rel="stylesheet" href="_content/OAS.UiLib/css/oas-inventory-report-workspace.css" />
+
+@if (IsFormRoute)
+{
+    <div class="inventory-report-form" dir="rtl">
+        <UiWorkspaceLayout ShowAside="false" ShowFilters="false" ScrollableMain="true">
+            <Actions>
+                <div class="inventory-form-toolbar">
+                    <h1><i class="@TitleIcon" aria-hidden="true"></i> @Title</h1>
+                    @Actions
+                </div>
+            </Actions>
+            <Content>@Content</Content>
+        </UiWorkspaceLayout>
+    </div>
+}
+else
+{
+    <div class="inventory-report-list">
+        <section class="oas-report" dir="rtl">
+            <div class="oas-report__head">
+                <div class="oas-report__identity">
+                    <i class="@TitleIcon" aria-hidden="true"></i>
+                    <h1>@Title</h1>
+                    @if (!string.IsNullOrWhiteSpace(StatusText))
+                    {
+                        <span class="oas-report__status"><i class="fa-solid fa-filter" aria-hidden="true"></i> @StatusText</span>
+                    }
+                </div>
+                <div class="oas-report__toolbar">
+                    @Actions
+                    @if (ShowFilters)
+                    {
+                        <button type="button" class="oas-report__tool" title="إظهار أو إخفاء الفلاتر"
+                                aria-label="إظهار أو إخفاء الفلاتر" aria-expanded="@(_filtersOpen ? "true" : "false")"
+                                @onclick="ToggleFilters"><i class="fa-solid fa-filter" aria-hidden="true"></i></button>
+                    }
+                </div>
+            </div>
+            @if (QuickFilters is not null)
+            {
+                <div class="oas-report__quick-filters">@QuickFilters</div>
+            }
+            <div class="oas-report__main @((ShowFilters && _filtersOpen) ? "oas-report__main--filters" : "")">
+                <div class="oas-report__data">
+                    <div class="oas-report__table-scroll">@Content</div>
+                    @if (Pagination is not null)
+                    {
+                        <div class="oas-report__pagination">@Pagination</div>
+                    }
+                </div>
+                @if (ShowFilters && _filtersOpen)
+                {
+                    <aside class="oas-report__aside">
+                        <div class="oas-report__aside-header">
+                            <span><i class="fa-solid fa-filter" aria-hidden="true"></i> <b>تصفية البيانات</b></span>
+                            <button type="button" title="إخفاء لوحة الفلاتر" aria-label="إخفاء لوحة الفلاتر" @onclick="ToggleFilters"><i class="fa-solid fa-angles-left" aria-hidden="true"></i></button>
+                        </div>
+                        <div class="inventory-filter-fields">@Filters</div>
+                        @if (ResetFilters.HasDelegate)
+                        {
+                            <div class="oas-report__apply inventory-filter-footer">
+                                <button type="button" @onclick="ResetFilters"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i> إعادة تعيين</button>
+                            </div>
+                        }
+                    </aside>
+                }
+            </div>
+            @if (Metrics is not null)
+            {
+                <div class="oas-report__metrics">@Metrics</div>
+            }
+        </section>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "المخزون";
+    [Parameter] public string TitleIcon { get; set; } = "fa-solid fa-boxes-stacked";
+    [Parameter] public string? StatusText { get; set; }
+    [Parameter] public bool IsFormRoute { get; set; }
+    [Parameter] public bool ShowFilters { get; set; }
+    [Parameter] public EventCallback ResetFilters { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public RenderFragment? Filters { get; set; }
+    [Parameter] public RenderFragment? QuickFilters { get; set; }
+    [Parameter, EditorRequired] public RenderFragment? Content { get; set; }
+    [Parameter] public RenderFragment? Pagination { get; set; }
+    [Parameter] public RenderFragment? Metrics { get; set; }
+    private bool _filtersOpen = true;
+    private void ToggleFilters() => _filtersOpen = !_filtersOpen;
+}

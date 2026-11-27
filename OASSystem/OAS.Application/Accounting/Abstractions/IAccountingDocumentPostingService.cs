@@ -4,6 +4,9 @@ namespace OAS.Application.Accounting.Abstractions;
 
 public interface IAccountingDocumentPostingService
 {
+    Task ValidateReceiptVoucherAsync(ReceiptVoucher voucher, IReadOnlyCollection<ReceiptVoucherLine> lines, CancellationToken ct = default);
+    Task ValidatePaymentVoucherAsync(PaymentVoucher voucher, IReadOnlyCollection<PaymentVoucherLine> lines, CancellationToken ct = default);
+
     Task<Guid> PostReceiptVoucherAsync(
         ReceiptVoucher voucher,
         IReadOnlyCollection<ReceiptVoucherLine> lines,

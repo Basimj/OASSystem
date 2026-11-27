@@ -51,6 +51,7 @@ public partial class AccountingWorkspaceHost : IDisposable
     [Inject] private IAccountingWorkspaceState Workspace { get; set; } = default!;
     [Inject] private IPurchasingClientService PurchasingService { get; set; } = default!;
     [Inject] private IAccountingClientService AccountingService { get; set; } = default!;
+    [Inject] private OasApiClient VoucherFundsApi { get; set; } = default!;
     [Inject] private IUiSnackbarService Snackbar { get; set; } = default!;
     [Inject] private IUiDialogService Dialog { get; set; } = default!;
     [Inject] private IApiFeedbackService ApiFeedback { get; set; } = default!;
@@ -595,7 +596,7 @@ public partial class AccountingWorkspaceHost : IDisposable
 
     private bool IsRecordEditable(AccountingTabState tab) => tab.Model switch
     {
-        JournalEntryEditor.FormModel m => m.Status is not JournalEntryStatus.Posted and not JournalEntryStatus.Reversed,
+        JournalEntryEditor.FormModel m => m.Status == JournalEntryStatus.Draft && m.IsManualStandalone,
         ReceiptVoucherEditor.FormModel m => m.Status == ReceiptVoucherStatus.Draft,
         PaymentVoucherEditor.FormModel m => m.Status == PaymentVoucherStatus.Draft,
         ExpenseEditor.FormModel m => m.Status == ExpenseStatus.Draft,
@@ -780,7 +781,7 @@ public partial class AccountingWorkspaceHost : IDisposable
     private async Task OpenAllocationForActiveVoucherAsync()
     {
         var current = Workspace.ActiveTab;
-        if (current is null || current.EntityId is null || current.IsDirty) return;
+        if (current is null || current.EntityId is null || current.IsDirty || !CanAllocateActiveVoucher) return;
         var sourceType = current.EntityType == AccountingEntityType.ReceiptVouchers
             ? PaymentSourceType.ReceiptVoucher : PaymentSourceType.PaymentVoucher;
         if (current.EntityType is not (AccountingEntityType.ReceiptVouchers or AccountingEntityType.PaymentVouchers)) return;
@@ -1468,7 +1469,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                 PeriodCaption = "سيُنشأ تحت الحساب المحدد"
             };
 
-            await EnsureAccountLookupAsync(parent.Id);
+            await LoadFinancialAncestorsAsync(parent.Id);
             await ReserveAutomaticNumberAsync(tab);
             tab.CaptureBaseline(SerializeModel(tab.Model));
             Workspace.NotifyStateChanged();
@@ -1513,7 +1514,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                 case AccountingEntityType.Accounts:
                     {
                         var dto = await AccountingService.GetAccountByIdAsync(id) ?? throw NotFound("الحساب");
-                        await EnsureAccountLookupAsync(dto.ParentAccountId);
+                        if (dto.ParentAccountId is Guid parentId) await LoadFinancialAncestorsAsync(parentId);
                         var model = new AccountEditor.FormModel
                         {
                             Code = dto.Code,
@@ -1522,6 +1523,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                             ParentAccountId = dto.ParentAccountId,
                             Level = dto.Level,
                             AccountClass = dto.AccountClass,
+                            FinancialStatementCategory = dto.FinancialStatementCategory,
                             AccountType = dto.AccountType,
                             NormalBalance = dto.NormalBalance,
                             IsPostingAccount = dto.IsPostingAccount,
@@ -1621,7 +1623,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                             dto.SourceDocumentType,
                             dto.SourceDocumentId);
 
-                        var reversedJournalCode = await ResolveJournalNumberAsync(dto.ReversedJournalId);
+                        var reversedJournalCode = dto.Reversal?.ReversalJournalNumber;
 
                         var model = new JournalEntryEditor.FormModel
                         {
@@ -1638,6 +1640,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                             Status = dto.Status,
                             ReversedJournalId = dto.ReversedJournalId,
                             ReversedJournalCode = reversedJournalCode,
+                            ReversalInfo = dto.Reversal,
                             RowVersion = dto.RowVersion,
                             Lines = lines
                         };
@@ -1694,6 +1697,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                     {
                         var dto = await AccountingService.GetReceiptVoucherByIdAsync(id) ?? throw NotFound("سند القبض");
                         var lines = await MapReceiptSettlementLinesAsync(dto.Lines);
+                        var voucherJournal = await LoadVoucherJournalAsync(dto.JournalEntryId);
                         var model = new ReceiptVoucherEditor.FormModel
                         {
                             VoucherNumber = dto.VoucherNumber,
@@ -1705,7 +1709,11 @@ public partial class AccountingWorkspaceHost : IDisposable
                             Description = dto.Description ?? string.Empty,
                             Status = dto.Status,
                             JournalEntryId = dto.JournalEntryId,
-                            GeneratedJournalNumber = await ResolveJournalNumberAsync(dto.JournalEntryId),
+                            GeneratedJournalNumber = voucherJournal?.JournalNumber,
+                            ReversalJournalId = voucherJournal?.ReversedJournalId,
+                            ReversalPosted = voucherJournal?.Reversal?.ReversalJournalStatus == JournalEntryStatus.Posted,
+                            JournalLoaded = voucherJournal is not null,
+                            OriginalPostingDate = voucherJournal?.PostingDate,
                             RowVersion = dto.RowVersion,
                             Lines = lines
                         };
@@ -1717,6 +1725,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                     {
                         var dto = await AccountingService.GetPaymentVoucherByIdAsync(id) ?? throw NotFound("سند الصرف");
                         var lines = await MapPaymentSettlementLinesAsync(dto.Lines);
+                        var voucherJournal = await LoadVoucherJournalAsync(dto.JournalEntryId);
                         var model = new PaymentVoucherEditor.FormModel
                         {
                             VoucherNumber = dto.VoucherNumber,
@@ -1728,7 +1737,11 @@ public partial class AccountingWorkspaceHost : IDisposable
                             Description = dto.Description ?? string.Empty,
                             Status = dto.Status,
                             JournalEntryId = dto.JournalEntryId,
-                            GeneratedJournalNumber = await ResolveJournalNumberAsync(dto.JournalEntryId),
+                            GeneratedJournalNumber = voucherJournal?.JournalNumber,
+                            ReversalJournalId = voucherJournal?.ReversedJournalId,
+                            ReversalPosted = voucherJournal?.Reversal?.ReversalJournalStatus == JournalEntryStatus.Posted,
+                            JournalLoaded = voucherJournal is not null,
+                            OriginalPostingDate = voucherJournal?.PostingDate,
                             RowVersion = dto.RowVersion,
                             Lines = lines
                         };
@@ -1776,6 +1789,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                             AccountId = dto.AccountId,
                             CurrencyId = dto.CurrencyId,
                             IsDefault = dto.IsDefault,
+                            RequiresOpenShift = dto.RequiresOpenShift,
                             IsActive = dto.IsActive,
                             RowVersion = dto.RowVersion
                         };
@@ -1814,6 +1828,12 @@ public partial class AccountingWorkspaceHost : IDisposable
                             ShiftNumber = dto.ShiftNumber,
                             CashAccountId = dto.CashAccountId,
                             OpeningBalance = dto.OpeningBalance,
+                            BookOpeningBalance = dto.BookOpeningBalance,
+                            OpeningDifferenceReason = dto.OpeningDifferenceReason,
+                            UsesLinkedMovements = dto.UsesLinkedMovements,
+                            SettlementJournalEntryId = dto.SettlementJournalEntryId,
+                            SettlementAccountId = dto.SettlementAccountId,
+                            SettlementDate = dto.SettlementDate, SettlementReason = dto.SettlementReason,
                             ExpectedClosingBalance = dto.ExpectedClosingBalance,
                             ActualClosingBalance = dto.ActualClosingBalance,
                             DifferenceAmount = dto.DifferenceAmount,
@@ -1840,6 +1860,9 @@ public partial class AccountingWorkspaceHost : IDisposable
                             ExpenseAccountId = dto.ExpenseAccountId,
                             Beneficiary = dto.Beneficiary,
                             Amount = dto.Amount,
+                            CurrencyId = dto.CurrencyId, CurrencyCode = dto.CurrencyCodeSnapshot,
+                            ExchangeRate = dto.ExchangeRate, BaseAmount = dto.BaseAmount, BaseCurrencyCode = dto.BaseCurrencyCodeSnapshot,
+                            BaseDecimalPlaces = dto.BaseCurrencyDecimalPlacesSnapshot ?? 2,
                             PaymentMethod = dto.PaymentMethod,
                             CashAccountId = dto.CashAccountId,
                             BankAccountId = dto.BankAccountId,
@@ -2093,6 +2116,14 @@ public partial class AccountingWorkspaceHost : IDisposable
             return;
         }
 
+        model.FinancialCategoryError = null;
+        if (model.ParentAccountId is Guid financialParentId) await LoadFinancialAncestorsAsync(financialParentId);
+        if (ResolveFinancialCategory(model.AccountClass, model.FinancialStatementCategory, model.ParentAccountId) is null)
+        {
+            model.FinancialCategoryError = "حدد تصنيف القوائم المالية أو اختر حساباً أب مصنفاً.";
+            Snackbar.Warning(model.FinancialCategoryError);
+            return;
+        }
         AccountDto? result;
         if (tab.IsNew)
         {
@@ -2100,7 +2131,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                 model.Code.Trim(), model.NameAr.Trim(), NullIfBlank(model.NameEn), model.ParentAccountId,
                 checked((byte)model.Level), model.AccountClass, model.AccountType, model.NormalBalance,
                 model.IsPostingAccount, model.IsControlAccount, model.AllowManualPosting,
-                model.IsSystemAccount, model.IsActive, model.EffectiveDate));
+                model.IsSystemAccount, model.IsActive, model.EffectiveDate, model.FinancialStatementCategory));
         }
         else
         {
@@ -2590,6 +2621,7 @@ public partial class AccountingWorkspaceHost : IDisposable
     {
         if (!ValidateSettlementLines(model.Lines)) return;
         if (!await ValidateSettlementAccountEligibilityAsync(model.Lines)) return;
+        if (!await ValidatePaymentFundsAsync(model)) return;
 
         var lines = model.Lines.Select(x =>
         {
@@ -2622,6 +2654,15 @@ public partial class AccountingWorkspaceHost : IDisposable
         await CompleteSaveAsync(tab, result?.Id, result?.VoucherNumber, "تم حفظ سند الصرف بنجاح.");
     }
 
+    private async Task<bool> ValidatePaymentFundsAsync(PaymentVoucherEditor.FormModel model, bool forPosting = false)
+    {
+        if (await PaymentVoucherFundsPreview.RefreshAsync(VoucherFundsApi, model.Lines, model.VoucherDate, forPosting: forPosting)) return true;
+        var index = model.Lines.FindIndex(x => !string.IsNullOrWhiteSpace(x.FundsError));
+        if (index >= 0) return RejectVoucherLine(model.Lines[index], index + 1, model.Lines[index].FundsError!);
+        Snackbar.Warning("تعذر التحقق من رصيد الصرف.");
+        return false;
+    }
+
     private bool ValidateSettlementLines(IReadOnlyList<UiVoucherSettlementLinesEditor.EditableSettlementLine> lines)
     {
         if (lines.Count == 0) { Snackbar.Warning("يجب إضافة سطر تسوية واحد على الأقل."); return false; }
@@ -2629,8 +2670,9 @@ public partial class AccountingWorkspaceHost : IDisposable
         for (var i = 0; i < lines.Count; i++)
         {
             var line = lines[i]; var number = i + 1;
-            if (line.Amount <= 0 || !line.CurrencyId.HasValue) return RejectVoucherLine(line, number, "العملة والمبلغ الأكبر من صفر مطلوبان.");
+            if (line.Amount <= 0 || line.Amount >= 1000000000000000m || !line.CurrencyId.HasValue) return RejectVoucherLine(line, number, "العملة ومبلغ صالح أكبر من صفر مطلوبان.");
             if (line.ManualRatePending) return RejectVoucherLine(line, number, "أدخل سعر صرف يدويًا صالحًا أو اختر السعر التلقائي.");
+            if (line.EffectiveExchangeRate is not > 0) return RejectVoucherLine(line, number, "لا يتوفر سعر صرف صالح للعملة في تاريخ السند. اختر سعرًا معتمدًا.");
             var invalidParty =
                 (line.PartyType == UiSettlementPartyKind.Customer && !line.CustomerId.HasValue) ||
                 (line.PartyType == UiSettlementPartyKind.Supplier && !line.SupplierId.HasValue) ||
@@ -2662,6 +2704,33 @@ public partial class AccountingWorkspaceHost : IDisposable
         {
             var line = lines[i];
             var label = $"السطر {i + 1}";
+
+            // A saved draft or a party prefilled by another screen may bypass the lookup.
+            Guid? partyAccountId = null;
+            if (line.PartyType == UiSettlementPartyKind.Supplier && line.SupplierId is Guid supplierId)
+            {
+                var supplier = await AccountingService.GetSupplierByIdAsync(supplierId);
+                if (supplier is null || !supplier.IsActive)
+                    return RejectVoucherLine(line, i + 1, "المورد غير موجود أو غير نشط.");
+                partyAccountId = supplier.AccountId;
+            }
+            else if (line.PartyType == UiSettlementPartyKind.Customer && line.CustomerId is Guid customerId)
+            {
+                var customer = await AccountingService.GetCustomerByIdAsync(customerId);
+                if (customer is null || !customer.IsActive)
+                    return RejectVoucherLine(line, i + 1, "العميل غير موجود أو غير نشط.");
+                partyAccountId = customer.AccountId;
+            }
+            if (partyAccountId is Guid accountId)
+            {
+                var partyAccount = await AccountingService.GetAccountByIdAsync(accountId);
+                if (partyAccount is null)
+                    return RejectVoucherLine(line, i + 1, "الحساب المحاسبي المرتبط بالطرف غير موجود.");
+                var eligibility = AccountingAccountEligibility.Evaluate(partyAccount, AccountingAccountEligibilityContext.AutomaticPosting);
+                if (!eligibility.IsEligible)
+                    return RejectVoucherLine(line, i + 1,
+                        $"الحساب المحاسبي المرتبط بالطرف ({partyAccount.Code} - {partyAccount.NameAr}): {eligibility.Reason}");
+            }
 
             if (line.PartyType == UiSettlementPartyKind.Other && line.CounterpartyAccountId.HasValue &&
                 !await ValidateAccountSelectionAsync(
@@ -2841,12 +2910,12 @@ public partial class AccountingWorkspaceHost : IDisposable
                 return;
             }
 
-            result = await AccountingService.CreateCashAccountAsync(new CreateCashAccountRequest(model.Code.Trim(), model.Name.Trim(), model.CurrencyId.Value, model.IsDefault, model.IsActive));
+            result = await AccountingService.CreateCashAccountAsync(new CreateCashAccountRequest(model.Code.Trim(), model.Name.Trim(), model.CurrencyId.Value, model.IsDefault, model.IsActive, model.RequiresOpenShift));
         }
         else
         {
             EnsureEntityIdAndRowVersion(tab, model.RowVersion);
-            result = await AccountingService.UpdateCashAccountAsync(tab.EntityId!.Value, new UpdateCashAccountRequest(model.Name.Trim(), model.CurrencyId.Value, model.IsDefault, model.IsActive, model.RowVersion));
+            result = await AccountingService.UpdateCashAccountAsync(tab.EntityId!.Value, new UpdateCashAccountRequest(model.Name.Trim(), model.CurrencyId.Value, model.IsDefault, model.IsActive, model.RowVersion, model.RequiresOpenShift));
         }
         await CompleteSaveAsync(tab, result?.Id, result is null ? null : $"{result.Code} - {result.Name}", "تم حفظ الصندوق بنجاح.");
     }
@@ -2903,6 +2972,8 @@ public partial class AccountingWorkspaceHost : IDisposable
         await CompleteSaveAsync(tab, result?.Id, result is null ? null : $"{result.BankName} - {result.AccountName}", "تم حفظ الحساب البنكي بنجاح.");
     }
 
+    private const string ActiveCashShiftError = "توجد وردية مفتوحة أو قيد الإغلاق لهذا الصندوق. أغلقها أولاً أو اختر صندوقاً آخر.";
+
     private async Task SaveCashShiftAsync(AccountingTabState tab, CashShiftEditor.FormModel model)
     {
         if (!tab.IsNew)
@@ -2910,9 +2981,11 @@ public partial class AccountingWorkspaceHost : IDisposable
             Snackbar.Warning("الوردية الموجودة تُدار من خلال إجراءات الإغلاق والاعتماد، ولا تُعدل كتحديث عام.");
             return;
         }
-        if (!model.CashAccountId.HasValue)
+
+        model.CashAccountError = null;
+        if (model.CashAccountId is not Guid cashAccountId || cashAccountId == Guid.Empty)
         {
-            Snackbar.Warning("اختر الصندوق قبل فتح الوردية.");
+            model.CashAccountError = "اختر الصندوق قبل فتح الوردية.";
             return;
         }
         if (model.OpeningBalance < 0)
@@ -2920,11 +2993,51 @@ public partial class AccountingWorkspaceHost : IDisposable
             Snackbar.Warning("رصيد الافتتاح لا يمكن أن يكون سالباً.");
             return;
         }
-        if (!await ValidateCashAccountSelectionAsync(model.CashAccountId.Value, null, "الصندوق"))
+        if (!await ValidateCashAccountSelectionAsync(cashAccountId, null, "الصندوق"))
+        {
+            model.CashAccountError = "الصندوق المحدد لم يعد صالحاً لفتح وردية. اختر صندوقاً آخر.";
+            return;
+        }
+
+        // Always re-read the active shifts; the lookup may be stale after another user opens a shift.
+        if ((await GetActiveCashShiftAccountIdsAsync(CancellationToken.None)).Contains(cashAccountId))
+        {
+            model.CashAccountError = ActiveCashShiftError;
+            return;
+        }
+        // If the selection changed while awaiting validation, do not submit the stale selection.
+        if (model.CashAccountId != cashAccountId)
             return;
 
-        var result = await AccountingService.CreateCashShiftAsync(new CreateCashShiftRequest(
-            model.CashAccountId.Value, model.OpeningBalance, model.ShiftNumber));
+        if (!model.BookOpeningBalance.HasValue)
+        {
+            model.OpeningBalanceError = "حدّث الرصيد الدفتري قبل فتح الوردية.";
+            return;
+        }
+        if (model.BookOpeningBalance != model.OpeningBalance && string.IsNullOrWhiteSpace(model.OpeningDifferenceReason))
+        {
+            model.OpeningBalanceError = "أدخل سبب فرق الافتتاح.";
+            return;
+        }
+        CashShiftDto? result;
+        try
+        {
+            result = await AccountingService.CreateCashShiftAsync(new CreateCashShiftRequest(
+                cashAccountId, model.OpeningBalance, model.ShiftNumber, model.OpeningDifferenceReason, model.BookOpeningBalance));
+        }
+        catch (ApiClientException ex) when (ex.Error.Code == "cash_shift_already_open")
+        {
+            // The server/unique index remains authoritative for concurrent requests.
+            if (model.CashAccountId == cashAccountId)
+                model.CashAccountError = ActiveCashShiftError;
+            return;
+        }
+        catch (ApiClientException ex) when (ex.Error.Code is "cash_shift_opening_balance_changed" or "cash_shift_opening_reason_required")
+        {
+            model.OpeningBalanceError = "راجع الرصيد الدفتري وسبب الفرق ثم أعد المحاولة.";
+            if (ex.Error.Code == "cash_shift_opening_balance_changed") model.BookOpeningBalance = null;
+            return;
+        }
         await CompleteSaveAsync(tab, result?.Id, result is null ? null : $"وردية {result.ShiftNumber}", "تم فتح الوردية بنجاح.");
     }
 
@@ -2949,13 +3062,18 @@ public partial class AccountingWorkspaceHost : IDisposable
             !await ValidateBankAccountSelectionAsync(model.BankAccountId.Value, null, "الحساب البنكي للمصروف"))
             return;
 
+        if (!model.CurrencyId.HasValue || !model.ExchangeRate.HasValue)
+        {
+            model.CurrencyError = "حدد حساب الدفع وحدّث عملة المصروف وسعر الصرف.";
+            return;
+        }
         ExpenseDto? result;
         if (tab.IsNew)
         {
             result = await AccountingService.CreateExpenseAsync(new CreateExpenseRequest(
                 model.ExpenseDate, model.ExpenseTypeId.Value, model.ExpenseAccountId.Value,
                 NullIfBlank(model.Beneficiary), model.Amount, model.PaymentMethod,
-                model.CashAccountId, model.BankAccountId, NullIfBlank(model.Description), model.ExpenseNumber));
+                model.CashAccountId, model.BankAccountId, NullIfBlank(model.Description), model.ExpenseNumber, model.CurrencyId, model.ExchangeRate));
         }
         else
         {
@@ -2963,7 +3081,7 @@ public partial class AccountingWorkspaceHost : IDisposable
             result = await AccountingService.UpdateExpenseAsync(tab.EntityId!.Value, new UpdateExpenseRequest(
                 model.ExpenseDate, model.ExpenseTypeId.Value, model.ExpenseAccountId.Value,
                 NullIfBlank(model.Beneficiary), model.Amount, model.PaymentMethod,
-                model.CashAccountId, model.BankAccountId, NullIfBlank(model.Description), model.RowVersion));
+                model.CashAccountId, model.BankAccountId, NullIfBlank(model.Description), model.RowVersion, model.CurrencyId, model.ExchangeRate));
         }
 
         await CompleteSaveAsync(tab, result?.Id, result?.ExpenseNumber, "تم حفظ المصروف بنجاح.");
@@ -3141,6 +3259,11 @@ public partial class AccountingWorkspaceHost : IDisposable
             var result = await AccountingService.SetJournalStatusAsync(id, new SetJournalEntryStatusRequest(status, model.RowVersion));
             if (result is null) throw new InvalidOperationException("لم يُرجع الخادم القيد المحدث.");
             await LoadExistingRecordAsync(tab, result.Id);
+            if (status == JournalEntryStatus.Posted && result.Reversal?.OriginalJournalId is Guid originalId)
+            {
+                var originalTab = Workspace.Tabs.FirstOrDefault(t => t.EntityType == AccountingEntityType.Journals && t.EntityId == originalId && !t.IsDirty && !t.IsEditMode && !t.IsSaving);
+                if (originalTab is not null) await LoadExistingRecordAsync(originalTab, originalId);
+            }
             await RefreshListsForEntityAsync(AccountingEntityType.Journals);
             Snackbar.Success(status switch
             {
@@ -3156,23 +3279,18 @@ public partial class AccountingWorkspaceHost : IDisposable
 
     private async Task ReverseActiveJournalAsync()
     {
-        if (Workspace.ActiveTab is not { EntityId: Guid id } tab) return;
+        if (Workspace.ActiveTab is not { EntityId: Guid id, Model: JournalEntryEditor.FormModel model } tab || !model.IsManualStandalone || model.Status != JournalEntryStatus.Posted || model.ReversedJournalId.HasValue) return;
         if (tab.IsDirty || tab.IsEditMode || tab.IsSaving)
         {
             Snackbar.Warning("احفظ التعديلات أو ألغها قبل عكس القيد.");
             return;
         }
-        var confirmed = await Dialog.ConfirmAsync(
-            "عكس القيد",
-            "سيتم إنشاء قيد عكسي مستقل ولن يتم حذف القيد التاريخي. هل تريد المتابعة؟",
-            AlertTone.Warning,
-            "إنشاء القيد العكسي",
-            "إلغاء");
-        if (!confirmed) return;
+        var result = await Dialog.ShowAsync<JournalReversalDialog>("عكس القيد", new Dictionary<string, object> { [nameof(JournalReversalDialog.OriginalDate)] = model.PostingDate.ToDateTime(TimeOnly.MinValue) });
+        if (result.Cancelled || result.Value is not ReverseJournalEntryRequest request) return;
 
         try
         {
-            var reversal = await AccountingService.ReverseJournalAsync(id) ?? throw new InvalidOperationException("لم يُرجع الخادم القيد العكسي.");
+            var reversal = await AccountingService.ReverseJournalAsync(id, request) ?? throw new InvalidOperationException("لم يُرجع الخادم القيد العكسي.");
             await LoadExistingRecordAsync(tab, id);
             await LoadEntityListAsync(AccountingEntityType.Journals);
             var reversalTab = Workspace.OpenOrActivateEntityTab(AccountingEntityType.Journals, reversal.Id, reversal.JournalNumber);
@@ -3290,6 +3408,12 @@ public partial class AccountingWorkspaceHost : IDisposable
 
         if (!ValidateVoucherStatusAction(tab, model.RowVersion))
             return;
+
+        if (status is PaymentVoucherStatus.Approved or PaymentVoucherStatus.Posted)
+        {
+            // Legacy headers are validated on the server: their per-line form has no settlement ids.
+            if (model.BaseCurrencyId.HasValue && !await ValidatePaymentFundsAsync(model, status == PaymentVoucherStatus.Posted)) return;
+        }
 
         if (!await ConfirmVoucherStatusActionAsync("سند الصرف", status.ToString()))
             return;
@@ -3570,10 +3694,10 @@ public partial class AccountingWorkspaceHost : IDisposable
                 "Expense" =>
                     (await AccountingService.GetExpenseByIdAsync(sourceDocumentId.Value))?.ExpenseNumber,
 
-                "ReceiptVoucher" =>
+                "ReceiptVoucher" or "ReceiptVoucherReversal" =>
                     (await AccountingService.GetReceiptVoucherByIdAsync(sourceDocumentId.Value))?.VoucherNumber,
 
-                "PaymentVoucher" =>
+                "PaymentVoucher" or "PaymentVoucherReversal" =>
                     (await AccountingService.GetPaymentVoucherByIdAsync(sourceDocumentId.Value))?.VoucherNumber,
 
                 "JournalEntryReversal" =>
@@ -3645,7 +3769,7 @@ public partial class AccountingWorkspaceHost : IDisposable
 
         var confirmed = await Dialog.ConfirmAsync(
             "إغلاق الوردية",
-            $"الجرد الفعلي: {FormatShiftAmount(model.CashAccountId, model.ActualClosingBalance.Value)}. تنبيه: الرصيد المتوقع الحالي لا يجمع حركات الوردية، وقد يكون فرق الجرد المبدئي غير دقيق. هل تريد المتابعة؟",
+            $"الجرد الفعلي: {FormatShiftAmount(model.CashAccountId, model.ActualClosingBalance.Value)}. سيُحتسب الرصيد المتوقع من القيود المرحلة في وقت الوردية. تأكد من الجرد الفعلي قبل المتابعة.",
             AlertTone.Warning,
             "إغلاق الوردية",
             "إلغاء");
@@ -3670,7 +3794,7 @@ public partial class AccountingWorkspaceHost : IDisposable
         if (Workspace.ActiveTab is not { EntityId: Guid id, Model: CashShiftEditor.FormModel model } tab) return;
         var confirmed = await Dialog.ConfirmAsync(
             "مراجعة اعتماد الوردية",
-            "تنبيه: لم يُحتسب الرصيد المتوقع من جميع حركات الوردية بعد؛ لا تعتمد فرق الجرد على أنه تسوية محاسبية مؤكدة. هل راجعت الحركات يدويًا وتريد اعتماد الحالة؟",
+            "راجع الحركات النقدية والجرد الفعلي، خصوصًا الورديات القديمة. الاعتماد يثبت حالة الوردية ولا ينشئ تسوية محاسبية. هل تريد المتابعة؟",
             AlertTone.Warning,
             "اعتماد بعد المراجعة",
             "إلغاء");
@@ -3765,6 +3889,71 @@ public partial class AccountingWorkspaceHost : IDisposable
         var result = await AccountingService.GetFiscalPeriodsPageAsync(new PageRequest { PageNumber = 1, PageSize = PageRequest.MaximumPageSize, Search = text }, cancellationToken);
         RememberFiscalPeriodLookups(result.Items);
         return result.Items.Select(ToFiscalPeriodLookup).ToArray();
+    }
+
+    private async Task<HashSet<Guid>> GetActiveCashShiftAccountIdsAsync(CancellationToken cancellationToken)
+    {
+        var ids = new HashSet<Guid>();
+        // Use the existing paged API, not the currently displayed (possibly filtered) list.
+        // ShiftNumber is unique, so paging has a deterministic ordering.
+        foreach (var status in new[] { "open", "closing" })
+        {
+            for (var pageNumber = 1; ; pageNumber++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var page = await AccountingService.GetCashShiftsPageAsync(new PageRequest
+                {
+                    PageNumber = pageNumber,
+                    PageSize = PageRequest.MaximumPageSize,
+                    Status = status,
+                    SortBy = "ShiftNumber"
+                }, cancellationToken);
+                foreach (var shift in page.Items)
+                    if (shift.Status is CashShiftStatus.Open or CashShiftStatus.Closing)
+                        ids.Add(shift.CashAccountId);
+                if (!page.HasNextPage) break;
+            }
+        }
+        return ids;
+    }
+
+    private async Task<IReadOnlyList<UiLookupItem>> SearchAvailableCashShiftAccountsAsync(
+        string text, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var busy = await GetActiveCashShiftAccountIdsAsync(cancellationToken);
+            var available = new List<UiLookupItem>();
+            for (var pageNumber = 1; ; pageNumber++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var page = await AccountingService.GetCashAccountsPageAsync(new PageRequest
+                {
+                    PageNumber = pageNumber,
+                    PageSize = PageRequest.MaximumPageSize,
+                    Search = text,
+                    Status = "active",
+                    SortBy = "Code"
+                }, cancellationToken);
+                var candidates = page.Items.Where(x => x.IsActive && x.CurrencyId.HasValue && !busy.Contains(x.Id)).ToArray();
+                var lookups = await Task.WhenAll(candidates.Select(x => BuildCashAccountLookupAsync(x, null, cancellationToken)));
+                for (var i = 0; i < candidates.Length; i++)
+                {
+                    if (lookups[i].Disabled) continue;
+                    _cashAccountDtos[candidates[i].Id] = candidates[i];
+                    _cashAccountLookups[candidates[i].Id] = lookups[i];
+                    available.Add(lookups[i]);
+                }
+                if (!page.HasNextPage) break;
+            }
+            return available;
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception)
+        {
+            Snackbar.Warning("تعذر التحقق من الصناديق المتاحة. أعد فتح القائمة أو حاول البحث مرة أخرى.");
+            return Array.Empty<UiLookupItem>();
+        }
     }
 
     private async Task<IReadOnlyList<UiLookupItem>> SearchCashAccountsAsync(string text, CancellationToken cancellationToken)
@@ -3899,6 +4088,22 @@ public partial class AccountingWorkspaceHost : IDisposable
         var result = await AccountingService.LookupSuppliersAsync(text, cancellationToken) ?? [];
         foreach (var supplier in result) _supplierLookups[supplier.Id] = ToSupplierLookup(supplier);
         return result.Select(ToSupplierLookup).ToArray();
+    }
+
+    private async Task<IReadOnlyList<UiLookupItem>> SearchVoucherCustomersAsync(string text, CancellationToken cancellationToken)
+    {
+        var result = await AccountingService.LookupCustomersAsync(text, cancellationToken) ?? [];
+        return result.Select(x => x.PostingError is string error
+            ? new UiLookupItem(x.Id.ToString("D"), x.DisplayText, error, "fa-solid fa-user-tie", Disabled: true)
+            : ToCustomerLookup(x)).ToArray();
+    }
+
+    private async Task<IReadOnlyList<UiLookupItem>> SearchVoucherSuppliersAsync(string text, CancellationToken cancellationToken)
+    {
+        var result = await AccountingService.LookupSuppliersAsync(text, cancellationToken) ?? [];
+        return result.Select(x => x.PostingError is string error
+            ? new UiLookupItem(x.Id.ToString("D"), x.DisplayText, error, "fa-solid fa-truck-field", Disabled: true)
+            : ToSupplierLookup(x)).ToArray();
     }
 
     private async Task<IReadOnlyList<UiLookupItem>> SearchCurrenciesAsync(string text, CancellationToken cancellationToken)
@@ -4411,6 +4616,24 @@ public partial class AccountingWorkspaceHost : IDisposable
         _accountTreeSearch = value?.Trim() ?? string.Empty;
         return Task.CompletedTask;
     }
+
+    private AccountDto? ResolveAccountDto(Guid? id) => id.HasValue && _accountDtos.TryGetValue(id.Value, out var account) ? account : null;
+
+    private async Task LoadFinancialAncestorsAsync(Guid parentId)
+    {
+        var seen = new HashSet<Guid>();
+        Guid? current = parentId;
+        while (current is Guid id && seen.Add(id))
+        {
+            var account = await AccountingService.GetAccountByIdAsync(id);
+            if (account is null) break;
+            RememberAccountLookups([account]);
+            current = account.ParentAccountId;
+        }
+    }
+
+    private FinancialStatementCategory? ResolveFinancialCategory(AccountClass cls, FinancialStatementCategory? own, Guid? parentId)
+        => FinancialStatementCategories.Resolve(cls, own, parentId, _accountDtos);
 
     private int ResolveAccountLevel(Guid? parentAccountId)
     {
@@ -5013,10 +5236,9 @@ public partial class AccountingWorkspaceHost : IDisposable
 
     private string ExpenseAmountText(ExpenseDto expense)
     {
-        var currencyId = ExpenseCurrencyId(expense);
-        if (currencyId.HasValue && _currencyDtos.TryGetValue(currencyId.Value, out var currency))
-            return $"{expense.Amount.ToString($"N{Math.Clamp((int)currency.DecimalPlaces, 0, 6)}")} {currency.Code}";
-        return $"{expense.Amount:N2} · العملة غير متاحة";
+        if (expense.CurrencyCodeSnapshot is string code)
+            return $"{expense.Amount.ToString($"N{Math.Clamp((int)(expense.CurrencyDecimalPlacesSnapshot ?? 2), 0, 4)}")} {code}";
+        return $"{expense.Amount:N2} · مبلغ قديم (العملة الأساسية عند التسجيل)";
     }
 
     private IReadOnlyList<AccountingRecordItem> BuildExpenseItems() => _expensesPage.Items.Select(x =>

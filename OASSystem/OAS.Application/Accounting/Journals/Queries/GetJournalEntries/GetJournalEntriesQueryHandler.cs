@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Accounting.Journals.Mapping;
 using OAS.Application.Accounting.Journals.Specifications;
@@ -45,11 +45,12 @@ public sealed class GetJournalEntriesQueryHandler(
                 .ToDictionary(x => x.Key, x => x.ToArray());
         }
 
+        var reversalInfo = await JournalReversalInfoResolver.ResolveAsync(repository, page.Items.ToArray(), cancellationToken);
         var items = page.Items
-            .Select(journal => JournalEntryMapping.ToDto(journal,
+            .Select(journal => JournalReversalInfoResolver.Apply(JournalEntryMapping.ToDto(journal,
                 linesByJournal.TryGetValue(journal.Id, out var journalLines)
                     ? journalLines
-                    : Array.Empty<JournalEntryLine>()))
+                    : Array.Empty<JournalEntryLine>()), reversalInfo[journal.Id]))
             .ToArray();
 
         return new PagedResult<JournalEntryDto>

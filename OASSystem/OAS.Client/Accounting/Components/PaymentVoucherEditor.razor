@@ -5,6 +5,9 @@
 @using OAS.UiLib.Components.Accounting.Workspace
 @using OAS.UiLib.Components.Inputs
 @using OAS.UiLib.Core.Models
+@using OAS.Client.Services.Http
+@inject OasApiClient FundsApi
+@implements IDisposable
 
 <div class="oas-voucher-editor oas-voucher-editor--form oas-voucher-editor--reference" dir="rtl">
     <div class="oas-voucher-editor__heading">
@@ -13,7 +16,11 @@
             <h2><i class="fa-solid fa-file-circle-plus" aria-hidden="true"></i> @(IsNew ? "إضافة سند جديد" : "سند صرف " + Model.VoucherNumber)</h2>
             <p>إدخال سند صرف ومراجعة أسطره ومبالغه قبل الحفظ والاعتماد والترحيل.</p>
         </div>
-        <span class="oas-voucher-editor__status"><i class="fa-solid fa-circle" aria-hidden="true"></i> @(IsNew ? "مسودة" : AccountingArabicPresenter.GetPaymentVoucherStatusText(Model.Status))</span>
+        @if (IsEditable || Model.Status is PaymentVoucherStatus.Draft or PaymentVoucherStatus.Approved)
+        {
+            <button type="button" class="oas-voucher-lines__toggle" @onclick="ForceRefreshFundsAsync" disabled="@_fundsLoading">تحديث أرصدة الصرف</button>
+        }
+        <span class="oas-voucher-editor__status"><i class="fa-solid fa-circle" aria-hidden="true"></i> @(IsNew ? "مسودة" : Model.ReversalJournalId.HasValue ? (Model.ReversalPosted ? "معكوس" : "عكس غير مكتمل") : AccountingArabicPresenter.GetPaymentVoucherStatusText(Model.Status))</span>
     </div>
 
     <UiVoucherSettlementLinesEditor Lines="@Model.Lines"
@@ -62,7 +69,7 @@
                 </div>
                 <div class="oas-voucher-editor__readonly">
                     <span>حالة السند</span>
-                    <strong><i class="fa-solid fa-circle" aria-hidden="true"></i> @(IsNew ? "مسودة" : AccountingArabicPresenter.GetPaymentVoucherStatusText(Model.Status))</strong>
+                    <strong><i class="fa-solid fa-circle" aria-hidden="true"></i> @(IsNew ? "مسودة" : Model.ReversalJournalId.HasValue ? (Model.ReversalPosted ? "معكوس" : "عكس غير مكتمل") : AccountingArabicPresenter.GetPaymentVoucherStatusText(Model.Status))</strong>
                 </div>
             </div>
             <div class="oas-voucher-editor__kind-band">
@@ -99,7 +106,7 @@
                                    SavedBaseTotal="@Model.BaseTotalAmount"
                                    IsNew="@IsNew"
                                    VoucherDate="@Model.VoucherDate"
-                                   StatusText="@(IsNew ? "مسودة" : AccountingArabicPresenter.GetPaymentVoucherStatusText(Model.Status))" />
+                                   StatusText="@(IsNew ? "مسودة" : Model.ReversalJournalId.HasValue ? (Model.ReversalPosted ? "معكوس" : "عكس غير مكتمل") : AccountingArabicPresenter.GetPaymentVoucherStatusText(Model.Status))" />
         </SummaryContent>
     </UiVoucherSettlementLinesEditor>
     @if (LinkedSupplierInvoice is { } linkedSupplierInvoice)
@@ -145,6 +152,10 @@
         public PaymentVoucherStatus Status { get; set; } = PaymentVoucherStatus.Draft;
         public Guid? JournalEntryId { get; set; }
         public string? GeneratedJournalNumber { get; set; }
+        public Guid? ReversalJournalId { get; set; }
+        public bool ReversalPosted { get; set; }
+        public bool JournalLoaded { get; set; }
+        public DateOnly? OriginalPostingDate { get; set; }
         public string RowVersion { get; set; } = string.Empty;
         public List<UiVoucherSettlementLinesEditor.EditableSettlementLine> Lines { get; set; } =
             [new UiVoucherSettlementLinesEditor.EditableSettlementLine { PartyType = UiVoucherSettlementLinesEditor.SettlementPartyKind.Supplier }];
@@ -177,7 +188,76 @@
     private string _activePane = "details";
     private void SetPane(string pane) => _activePane = pane;
 
-    private Task OnChanged() => OnModelChanged.InvokeAsync();
+    private CancellationTokenSource? _fundsCancellation;
+    private FormModel? _fundsModel;
+    private bool _fundsLoading;
+    private DateOnly? _fundsDate;
+    private (Guid Id, bool Bank)[] _fundsKeys = [];
+    private Dictionary<(Guid Id, bool Bank), OAS.Contracts.Accounting.PaymentVouchers.PaymentVoucherBalanceDto?>? _fundsSnapshot;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!ReferenceEquals(_fundsModel, Model))
+        {
+            _fundsModel = Model;
+            await ForceRefreshFundsAsync();
+        }
+    }
+
+    private Task ForceRefreshFundsAsync() => RefreshFundsAsync(force: true);
+
+    private async Task RefreshFundsAsync(bool force = false)
+    {
+        if (!IsEditable && Model.Status is not (PaymentVoucherStatus.Draft or PaymentVoucherStatus.Approved))
+        {
+            _fundsCancellation?.Cancel();
+            _fundsDate = null;
+            _fundsSnapshot = null;
+            return;
+        }
+        var model = Model;
+        var date = model.VoucherDate;
+        var keys = PaymentVoucherFundsPreview.Keys(model.Lines);
+        if (!force && _fundsDate == date && _fundsKeys.SequenceEqual(keys))
+        {
+            // Typing descriptions or amounts must not restart the balance request.
+            // Apply the cached balance to the latest amounts instead.
+            if (_fundsSnapshot is not null)
+                PaymentVoucherFundsPreview.Apply(model.Lines, _fundsSnapshot);
+            return;
+        }
+        _fundsCancellation?.Cancel();
+        _fundsDate = date;
+        _fundsKeys = keys;
+        _fundsSnapshot = null;
+        PaymentVoucherFundsPreview.Clear(model.Lines);
+        var request = new CancellationTokenSource();
+        _fundsCancellation = request;
+        _fundsLoading = true;
+        try
+        {
+            var snapshot = await PaymentVoucherFundsPreview.LoadAsync(FundsApi, keys, date, request.Token);
+            if (!ReferenceEquals(_fundsCancellation, request) || !ReferenceEquals(Model, model) ||
+                request.IsCancellationRequested || model.VoucherDate != date ||
+                !PaymentVoucherFundsPreview.Keys(model.Lines).SequenceEqual(keys)) return;
+            _fundsSnapshot = snapshot;
+            PaymentVoucherFundsPreview.Apply(model.Lines, snapshot);
+        }
+        catch (OperationCanceledException) when (request.IsCancellationRequested) { }
+        finally
+        {
+            if (ReferenceEquals(_fundsCancellation, request)) { _fundsLoading = false; _fundsCancellation = null; }
+            request.Dispose();
+        }
+    }
+
+    private async Task OnChanged()
+    {
+        await OnModelChanged.InvokeAsync();
+        await RefreshFundsAsync();
+    }
+
+    public void Dispose() => _fundsCancellation?.Cancel();
 
     private async Task OnVoucherDateChanged(DateOnly? value)
     {
@@ -206,7 +286,7 @@
     private async Task OnDescriptionChanged(string? value)
     {
         Model.Description = value ?? string.Empty;
-        await OnChanged();
+        await OnModelChanged.InvokeAsync();
     }
 
     private string FormatBaseTotal()

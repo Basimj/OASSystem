@@ -35,6 +35,14 @@ public sealed class CashShiftConfiguration : IEntityTypeConfiguration<CashShift>
             .IsRequired()
             .HasPrecision(19, 4);
 
+        builder.Ignore(x => x.ExpectedBookOpeningBalance);
+        builder.Property(x => x.BookOpeningBalance).HasPrecision(19, 4);
+        builder.Property(x => x.OpeningDifferenceReason).HasMaxLength(500);
+        builder.Property(x => x.SettlementReason).HasMaxLength(400);
+        builder.Property(x => x.SettlementDate).HasColumnType("date");
+        builder.HasOne<Account>().WithMany().HasForeignKey(x => x.SettlementAccountId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<JournalEntry>().WithMany().HasForeignKey(x => x.SettlementJournalEntryId).OnDelete(DeleteBehavior.Restrict);
+
         builder.Property(x => x.ExpectedClosingBalance)
             .HasPrecision(19, 4);
 
@@ -63,6 +71,10 @@ public sealed class CashShiftConfiguration : IEntityTypeConfiguration<CashShift>
 
         builder.HasIndex(x => x.CashAccountId)
             .HasDatabaseName("IX_CashShifts_CashAccountId");
+
+        builder.HasIndex(x => x.CashAccountId, "UX_CashShifts_OneActivePerCashAccount")
+            .IsUnique().HasFilter("[Status] IN (1, 2)")
+            .HasDatabaseName("UX_CashShifts_OneActivePerCashAccount");
 
         builder.HasIndex(x => x.OpenedAtUtc)
             .HasDatabaseName("IX_CashShifts_OpenedAtUtc");

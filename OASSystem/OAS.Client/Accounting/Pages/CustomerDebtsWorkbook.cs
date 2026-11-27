@@ -9,7 +9,7 @@ namespace OAS.Client.Accounting.Pages;
 internal static class CustomerDebtsWorkbook
 {
     private const string Ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-    internal static byte[] Create(string subtitle, string[] headers, IEnumerable<object?[]> rows, bool suppliers = false, string? sheetName = null)
+    internal static byte[] Create(string subtitle, string[] headers, IEnumerable<object?[]> rows, bool suppliers = false, string? sheetName = null, IReadOnlyList<string>? pairedHeaderGroups = null)
     {
         using var memory = new MemoryStream();
         using (var zip = new ZipArchive(memory, ZipArchiveMode.Create, true))
@@ -33,9 +33,27 @@ internal static class CustomerDebtsWorkbook
             xml.WriteStartElement("sheetData", Ns);
             var index=1;
             WriteRow(xml,index++, [subtitle]);
-            WriteRow(xml,index++,headers.Cast<object?>());
+            if (pairedHeaderGroups is null)
+                WriteRow(xml,index++,headers.Cast<object?>());
+            else
+            {
+                if (headers.Length != 2 + pairedHeaderGroups.Count * 2)
+                    throw new ArgumentException("Invalid paired header dimensions.", nameof(pairedHeaderGroups));
+                WriteRow(xml,index++, new object?[] { headers[0], headers[1] }.Concat(pairedHeaderGroups.SelectMany(g => new object?[] { g, null })));
+                WriteRow(xml,index++, new object?[] { null, null }.Concat(pairedHeaderGroups.SelectMany(_ => new object?[] { "مدين", "دائن" })));
+            }
             foreach(var row in rows) WriteRow(xml,index++,row);
-            xml.WriteEndElement(); xml.WriteEndElement(); xml.WriteEndDocument();
+            xml.WriteEndElement();
+            if (pairedHeaderGroups is not null)
+            {
+                xml.WriteStartElement("mergeCells", Ns);
+                xml.WriteAttributeString("count", (pairedHeaderGroups.Count + 2).ToString(CultureInfo.InvariantCulture));
+                void Merge(string range) { xml.WriteStartElement("mergeCell", Ns); xml.WriteAttributeString("ref", range); xml.WriteEndElement(); }
+                Merge("A2:A3"); Merge("B2:B3");
+                for (var i = 0; i < pairedHeaderGroups.Count; i++) Merge($"{(char)('C'+i*2)}2:{(char)('D'+i*2)}2");
+                xml.WriteEndElement();
+            }
+            xml.WriteEndElement(); xml.WriteEndDocument();
         }
         return memory.ToArray();
     }

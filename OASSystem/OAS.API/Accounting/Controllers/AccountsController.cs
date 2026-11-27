@@ -30,6 +30,11 @@ public sealed class AccountsController(ISender sender) : ControllerBase
         return Ok(result);
     }
 
+    [HttpPost("financial-statement-categories")]
+    public async Task<ActionResult<UpdateFinancialStatementCategoriesResult>> UpdateFinancialStatementCategories(
+        [FromBody] UpdateFinancialStatementCategoriesRequest request, CancellationToken cancellationToken)
+        => Ok(await sender.Send(new OAS.Application.Accounting.Accounts.Commands.UpdateFinancialStatementCategories.UpdateFinancialStatementCategoriesCommand(request), cancellationToken));
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<AccountDto>> GetById(
         Guid id,

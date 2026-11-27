@@ -30,6 +30,8 @@ public sealed class CashAccountConfiguration : IEntityTypeConfiguration<CashAcco
 
         builder.Property(x => x.CurrencyId);
 
+        builder.Property(x => x.RequiresOpenShift).IsRequired();
+
         builder.Property(x => x.IsDefault)
             .IsRequired();
 
@@ -45,6 +47,7 @@ public sealed class CashAccountConfiguration : IEntityTypeConfiguration<CashAcco
             .HasDatabaseName("UX_CashAccounts_Code");
 
         builder.HasIndex(x => x.AccountId)
+            .IsUnique()
             .HasDatabaseName("IX_CashAccounts_AccountId");
 
         builder.HasIndex(x => x.CurrencyId)

@@ -16,7 +16,7 @@
 <PageTitle>@(IsFormRoute ? "نموذج المخزون" : "قائمة المخزون") - الجرد المخزني | OAS</PageTitle>
 <span class="oas-inventory-view" hidden aria-hidden="true"></span>
 
-<UiWorkspaceLayout ShowAside="false" ShowFilters="@(!IsFormRoute && true)">
+<InventoryReportWorkspace Title="الجرد المخزني" TitleIcon="fa-solid fa-clipboard-check" StatusText="@($"{FilteredCounts.Count} جرد")" ShowFilters="true" IsFormRoute="@IsFormRoute" ResetFilters="ResetListFilters">
     <Actions>
         <UiWorkspaceActionBar>
             @if (IsFormRoute)
@@ -67,17 +67,15 @@
         </div>
         }
     </Filters>
+    
+    <QuickFilters>
+        <div class="oas-report__chip"><span>المخزن:</span><strong>@(WarehouseFilterOptions.FirstOrDefault(x => x.Value == _warehouseFilter)?.Text ?? "الكل")</strong></div>
+        <div class="oas-report__chip"><span>الحالة:</span><strong>@(InventoryArabicPresenter.StockCountStatusOptions.FirstOrDefault(x => x.Value == _statusFilter)?.Text ?? "الكل")</strong></div>
+    </QuickFilters>
     <Content>
         @if (IsFormRoute)
         {
             <div class="oas-inventory-form-screen">
-                <div class="oas-inventory-form-screen__intro">
-                    <div>
-                        <div class="oas-inventory-form-screen__eyebrow">إدارة المخزون</div>
-                        <h2>@AsideTitle</h2>
-                        <p>راجع البيانات ثم احفظ التغييرات. الحقول الإضافية تظهر عند الحاجة.</p>
-                    </div>
-                </div>
                 <div class="oas-inventory-form-screen__body">
         <UiCard Title="@AsideTitle" Subtitle="@AsideSubtitle">
             @if (_mode == ViewMode.Empty)
@@ -205,15 +203,13 @@
         }
         else
         {
-        <UiDataGridPanel Title="الجرد المخزني" Subtitle="@($"{FilteredCounts.Count} جرد")">
-            <Body>
-                @if (_loading)
+                        @if (_loading)
                 {
                     <UiAlert Message="جاري تحميل عمليات الجرد..." />
                 }
                 else
                 {
-                    <UiDataTable TItem="StockCountDto" Items="@FilteredCounts" PageSize="12" Headers="@StockCountHeaders" EmptyText="لا توجد عمليات جرد مطابقة."
+                    <InventoryReportTable TItem="StockCountDto" Items="@FilteredCounts" PageSize="12" Headers="@StockCountHeaders" EmptyText="لا توجد عمليات جرد مطابقة."
                                  SidebarTypography="true"
                                  OnRowClick="@(x => OpenDetailsScreen(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
                         <RowTemplate Context="count">
@@ -224,16 +220,17 @@
                             <td>@FormatDate(count.StartedAtUtc)</td>
                             <td>@FormatDate(count.CompletedAtUtc)</td>
                         </RowTemplate>
-                    </UiDataTable>
+                    </InventoryReportTable>
                 }
-            </Body>
-        </UiDataGridPanel>
+            
 
         }
     </Content>
-</UiWorkspaceLayout>
+</InventoryReportWorkspace>
 
 @code {
+    private void ResetListFilters() => _search = _warehouseFilter = _statusFilter = null;
+
     // Each CRUD action has its own route. No editable form is mounted on the list screen.
     [Microsoft.AspNetCore.Components.Inject]
     private Microsoft.AspNetCore.Components.NavigationManager InventoryNavigation { get; set; } = default!;

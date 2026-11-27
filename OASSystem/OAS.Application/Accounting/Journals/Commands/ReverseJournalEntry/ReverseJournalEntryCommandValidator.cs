@@ -1,4 +1,4 @@
-﻿using FluentValidation;
+using FluentValidation;
 
 namespace OAS.Application.Accounting.Journals.Commands.ReverseJournalEntry;
 
@@ -10,5 +10,7 @@ public sealed class ReverseJournalEntryCommandValidator
         RuleFor(x => x.JournalEntryId)
             .NotEmpty()
             .WithErrorCode("journal_id_required");
+        RuleFor(x => x.PostingDate).NotEmpty();
+        RuleFor(x => x.Reason).NotEmpty().MaximumLength(400);
     }
 }

@@ -9,8 +9,6 @@ using OAS.Application.Database.Abstractions;
 using OAS.Application.Features.Employees.Abstractions;
 using OAS.Application.Identity.Abstractions;
 using OAS.Application.Sales.Abstractions;
-using OAS.Application.Inventory.Reports;
-using OAS.Infrastructure.Persistence.Queries.Inventory;
 using OAS.Infrastructure.Database.Configuration;
 using OAS.Infrastructure.Database.Services;
 using OAS.Infrastructure.Features.Employees.Export;
@@ -39,23 +37,8 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        services.AddScoped<
-            OAS.Application.Inventory.Balances.Workspace.IInventoryBalanceWorkspaceReader,
-            OAS.Infrastructure.Persistence.Queries.Inventory.InventoryBalanceWorkspaceReader>();
-
-        services.AddScoped<
-            OAS.Application.Spreadsheets.ISpreadsheetWorkbook,
-            OAS.Infrastructure.Spreadsheets.ClosedXmlSpreadsheetWorkbook>();
-
-        // Inventory Reports
-        services.AddScoped<
-            ISupplierProductMovementReportService,
-            SupplierProductMovementReportService>();
-
-        services.AddScoped<
-            IWarehouseReportService,
-            WarehouseReportService>();
-
+        services.AddScoped<OAS.Application.Inventory.Balances.Workspace.IInventoryBalanceWorkspaceReader, OAS.Infrastructure.Persistence.Queries.Inventory.InventoryBalanceWorkspaceReader>();
+        services.AddScoped<OAS.Application.Spreadsheets.ISpreadsheetWorkbook, OAS.Infrastructure.Spreadsheets.ClosedXmlSpreadsheetWorkbook>();
         services.Configure<DatabaseProfilesOptions>(
             configuration.GetSection(
                 DatabaseProfilesOptions.SectionName));
@@ -89,50 +72,17 @@ public static class DependencyInjection
         services.AddScoped<
             ISequenceNumberGenerator,
             SequenceNumberGenerator>();
-
-        services.AddScoped<
-            OAS.Application.Features.Employees.Abstractions.IHRAccountingReferencePort,
-            OAS.Infrastructure.Features.Employees.Services.HRAccountingReferencePort>();
-
-        services.AddScoped<
-            OAS.Application.Features.Employees.Abstractions.IEmployeeSalaryStructureRepository,
-            OAS.Infrastructure.Features.Employees.Services.EmployeeSalaryStructureRepository>();
-
-        services.AddScoped<
-            OAS.Application.Features.Employees.Abstractions.IHRTimeZoneService,
-            OAS.Infrastructure.Features.Employees.Services.HRTimeZoneService>();
-
-        services.AddScoped<
-            OAS.Application.Features.Employees.Abstractions.IEmployeeHrOperationLock,
-            OAS.Infrastructure.Features.Employees.Services.EmployeeHrOperationLock>();
-
-        services.AddScoped<
-            OAS.Application.Features.Employees.Abstractions.IHREmployeeLoanAccountingPort,
-            OAS.Infrastructure.Features.Employees.Services.EmployeeLoanAccountingPort>();
-
-        services.AddScoped<
-            OAS.Application.Features.Employees.Abstractions.IApprovedCommissionSource,
-            OAS.Infrastructure.Features.Employees.Services.NullApprovedCommissionSource>();
-
-        services.AddScoped<
-            OAS.Application.Features.Employees.Abstractions.IHRPayrollAccountingPort,
-            OAS.Infrastructure.Features.Employees.Services.HRPayrollAccountingPort>();
-
-        services.AddScoped<
-            OAS.Application.Features.Employees.Abstractions.IHRSalaryPaymentPort,
-            OAS.Infrastructure.Features.Employees.Services.HRSalaryPaymentPort>();
-
-        services.AddScoped<
-            OAS.Application.Features.Employees.Abstractions.IHREndOfServiceAccountingPort,
-            OAS.Infrastructure.Features.Employees.Services.HREndOfServiceAccountingPort>();
-
-        services.AddScoped<
-            OAS.Application.Features.Employees.Abstractions.IHREndOfServicePaymentPort,
-            OAS.Infrastructure.Features.Employees.Services.HREndOfServicePaymentPort>();
-
-        services.AddScoped<
-            OAS.Application.Features.Employees.Abstractions.IHREmployeeIdentityPort,
-            OAS.Infrastructure.Features.Employees.Services.HREmployeeIdentityPort>();
+        services.AddScoped<OAS.Application.Features.Employees.Abstractions.IHRAccountingReferencePort, OAS.Infrastructure.Features.Employees.Services.HRAccountingReferencePort>();
+        services.AddScoped<OAS.Application.Features.Employees.Abstractions.IEmployeeSalaryStructureRepository, OAS.Infrastructure.Features.Employees.Services.EmployeeSalaryStructureRepository>();
+        services.AddScoped<OAS.Application.Features.Employees.Abstractions.IHRTimeZoneService, OAS.Infrastructure.Features.Employees.Services.HRTimeZoneService>();
+        services.AddScoped<OAS.Application.Features.Employees.Abstractions.IEmployeeHrOperationLock, OAS.Infrastructure.Features.Employees.Services.EmployeeHrOperationLock>();
+        services.AddScoped<OAS.Application.Features.Employees.Abstractions.IHREmployeeLoanAccountingPort, OAS.Infrastructure.Features.Employees.Services.EmployeeLoanAccountingPort>();
+        services.AddScoped<OAS.Application.Features.Employees.Abstractions.IApprovedCommissionSource, OAS.Infrastructure.Features.Employees.Services.NullApprovedCommissionSource>();
+        services.AddScoped<OAS.Application.Features.Employees.Abstractions.IHRPayrollAccountingPort, OAS.Infrastructure.Features.Employees.Services.HRPayrollAccountingPort>();
+        services.AddScoped<OAS.Application.Features.Employees.Abstractions.IHRSalaryPaymentPort, OAS.Infrastructure.Features.Employees.Services.HRSalaryPaymentPort>();
+        services.AddScoped<OAS.Application.Features.Employees.Abstractions.IHREndOfServiceAccountingPort, OAS.Infrastructure.Features.Employees.Services.HREndOfServiceAccountingPort>();
+        services.AddScoped<OAS.Application.Features.Employees.Abstractions.IHREndOfServicePaymentPort, OAS.Infrastructure.Features.Employees.Services.HREndOfServicePaymentPort>();
+        services.AddScoped<OAS.Application.Features.Employees.Abstractions.IHREmployeeIdentityPort, OAS.Infrastructure.Features.Employees.Services.HREmployeeIdentityPort>();
 
         services.AddScoped(
             typeof(IReadRepository<,>),
@@ -142,107 +92,43 @@ public static class DependencyInjection
             typeof(IRepository<,>),
             typeof(EfRepository<,>));
 
-        services.AddScoped<
-            IPrescriptionAggregateRepository,
-            PrescriptionAggregateRepository>();
-
-        services.AddScoped<
-            ICustomerOrderAggregateRepository,
-            CustomerOrderAggregateRepository>();
-
-        services.AddScoped<
-            ISalesInvoiceAggregateRepository,
-            SalesInvoiceAggregateRepository>();
-
-        services.AddScoped<
-            ISalesInvoiceCollectionIdempotencyStore,
-            SalesInvoiceCollectionIdempotencyStore>();
-
-        services.AddScoped<
-            ISalesReturnAggregateRepository,
-            SalesReturnAggregateRepository>();
-
-        services.AddScoped<
-            ISalesReturnQueryService,
-            SalesReturnQueryService>();
-
-        services.AddScoped<
-            ISalesReportQueryService,
-            SalesReportQueryService>();
-
-        services.AddScoped<
-            ICommissionStatementRepository,
-            CommissionStatementRepository>();
-
-        services.AddScoped<
-            ICommissionSourceQueryService,
-            CommissionSourceQueryService>();
-
-        services.AddScoped<
-            ICommissionQueryService,
-            CommissionQueryService>();
-
-        services.AddScoped<
-            IOpticalProductionJobRepository,
-            OpticalProductionJobRepository>();
-
-        services.AddScoped<
-            IOpticalProductionQueryService,
-            OpticalProductionQueryService>();
-
-        services.AddScoped<
-            ICustomerOrderOperationsQueryService,
-            CustomerOrderOperationsQueryService>();
-
-        services.AddScoped<
-            IOpticalJobQueryService,
-            OpticalJobQueryService>();
-
-        services.AddScoped<
-            ISalesPaymentAllocationConcurrencyPort,
-            SalesPaymentAllocationConcurrencyPort>();
-
-        services.AddScoped<
-            ICustomerCreditConcurrencyPort,
-            CustomerCreditConcurrencyPort>();
+        services.AddScoped<IPrescriptionAggregateRepository, PrescriptionAggregateRepository>();
+        services.AddScoped<ICustomerOrderAggregateRepository, CustomerOrderAggregateRepository>();
+        services.AddScoped<ISalesInvoiceAggregateRepository, SalesInvoiceAggregateRepository>();
+        services.AddScoped<ISalesInvoiceCollectionIdempotencyStore, SalesInvoiceCollectionIdempotencyStore>();
+        services.AddScoped<ISalesReturnAggregateRepository, SalesReturnAggregateRepository>();
+        services.AddScoped<ISalesReturnQueryService, SalesReturnQueryService>();
+        services.AddScoped<ISalesReportQueryService, SalesReportQueryService>();
+        services.AddScoped<ICommissionStatementRepository, CommissionStatementRepository>();
+        services.AddScoped<ICommissionSourceQueryService, CommissionSourceQueryService>();
+        services.AddScoped<ICommissionQueryService, CommissionQueryService>();
+        services.AddScoped<IOpticalProductionJobRepository, OpticalProductionJobRepository>();
+        services.AddScoped<IOpticalProductionQueryService, OpticalProductionQueryService>();
+        services.AddScoped<ICustomerOrderOperationsQueryService, CustomerOrderOperationsQueryService>();
+        services.AddScoped<IOpticalJobQueryService, OpticalJobQueryService>();
+        services.AddScoped<ISalesPaymentAllocationConcurrencyPort, SalesPaymentAllocationConcurrencyPort>();
+        services.AddScoped<ICustomerCreditConcurrencyPort, CustomerCreditConcurrencyPort>();
 
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
-
-        services.AddScoped<
-            IAccountingPartyQueryService,
-            AccountingPartyQueryService>();
-
-        services.AddScoped<
-            IAccountingReportingQueryService,
-            AccountingReportingQueryService>();
-
-        services.AddScoped<
-            ISupplierApReportingQueryService,
-            SupplierApReportingQueryService>();
-
-        services.AddScoped<
-            ISupplierWorkspaceDocumentsService,
-            SupplierWorkspaceDocumentsService>();
-
-        services.AddScoped<
-            ISupplierAgingQueryService,
-            SupplierAgingQueryService>();
-
-        services.AddScoped<
-            ICustomerArReportingQueryService,
-            CustomerArReportingQueryService>();
-
-        services.AddScoped<
-            ISupplierOpeningRepository,
-            OAS.Infrastructure.Accounting.Persistence.SupplierOpeningRepository>();
-
-        services.AddScoped<
-            ISupplierOpeningJournalVerificationPort,
-            OAS.Infrastructure.Accounting.SupplierOpeningJournalVerificationPort>();
-
-        services.AddScoped<
-            ISupplierOpeningConcurrencyPort,
-            OAS.Infrastructure.Accounting.SupplierOpeningConcurrencyPort>();
+        services.AddScoped<IAccountingPartyQueryService, AccountingPartyQueryService>();
+        services.AddScoped<IAccountingReportingQueryService, AccountingReportingQueryService>();
+        services.AddScoped<ICashShiftBalanceService, CashShiftBalanceService>();
+        services.AddScoped<ICashShiftOpeningBalanceService, CashShiftBalanceService>();
+        services.AddScoped<ICashTransferService, CashTransferService>();
+        services.AddScoped<IPaymentVoucherBalanceQueryService, PaymentVoucherBalanceQueryService>();
+        services.AddScoped<ICashBankReportQueryService, CashBankReportQueryService>();
+        services.AddScoped<IVoucherOperations, VoucherOperations>();
+        services.AddScoped<ICashShiftSettlementService, CashTransferService>();
+        services.AddScoped<ICashShiftMovementQueryService, CashShiftMovementQueryService>();
+        services.AddScoped<ISupplierApReportingQueryService, SupplierApReportingQueryService>();
+        services.AddScoped<OAS.Application.Inventory.Reports.ISupplierProductMovementReportService, OAS.Infrastructure.Inventory.Queries.SupplierProductMovementReportService>();
+        services.AddScoped<OAS.Application.Inventory.Reports.IWarehouseReportService, OAS.Infrastructure.Inventory.Queries.WarehouseReportService>();
+        services.AddScoped<ISupplierWorkspaceDocumentsService, SupplierWorkspaceDocumentsService>();
+        services.AddScoped<ISupplierAgingQueryService, SupplierAgingQueryService>();
+        services.AddScoped<ICustomerArReportingQueryService, CustomerArReportingQueryService>();
+        services.AddScoped<ISupplierOpeningRepository, OAS.Infrastructure.Accounting.Persistence.SupplierOpeningRepository>();
+        services.AddScoped<ISupplierOpeningJournalVerificationPort, OAS.Infrastructure.Accounting.SupplierOpeningJournalVerificationPort>();
+        services.AddScoped<ISupplierOpeningConcurrencyPort, OAS.Infrastructure.Accounting.SupplierOpeningConcurrencyPort>();
 
         services.AddScoped<
             IIdentityRepository,
@@ -260,17 +146,9 @@ public static class DependencyInjection
             OAS.Application.Inventory.Repositories.IStockCountRepository,
             OAS.Infrastructure.Persistence.Repositories.Inventory.StockCountRepository>();
 
-        services.AddScoped<
-            IUserProfileImageStore,
-            UserProfileImageStore>();
-
-        services.AddScoped<
-            IEmployeeImageStore,
-            EmployeeImageStore>();
-
-        services.AddScoped<
-            OAS.Application.Features.Employees.Abstractions.IEmployeeDocumentStore,
-            OAS.Infrastructure.Features.Employees.Services.EmployeeDocumentStore>();
+        services.AddScoped<IUserProfileImageStore, UserProfileImageStore>();
+        services.AddScoped<IEmployeeImageStore, EmployeeImageStore>();
+        services.AddScoped<OAS.Application.Features.Employees.Abstractions.IEmployeeDocumentStore, OAS.Infrastructure.Features.Employees.Services.EmployeeDocumentStore>();
 
         services.AddScoped<
             IPasswordService,
@@ -288,73 +166,23 @@ public static class DependencyInjection
             IEmployeeExcelExporter,
             EmployeeExcelExporter>();
 
-        services.AddScoped<
-            ISupplierCatalogRepository,
-            SupplierCatalogRepository>();
-
-        services.AddScoped<
-            IPurchaseRequestRepository,
-            PurchaseRequestRepository>();
-
-        services.AddScoped<
-            IPurchaseOrderRepository,
-            PurchaseOrderRepository>();
-
-        services.AddScoped<
-            IPurchaseOrderProgressQueryService,
-            PurchaseOrderProgressQueryService>();
-
-        services.AddScoped<
-            IPurchaseReceiptRepository,
-            PurchaseReceiptRepository>();
-
-        services.AddScoped<
-            IPurchaseInvoiceRepository,
-            PurchaseInvoiceRepository>();
-
-        services.AddScoped<
-            IPurchaseReturnRepository,
-            PurchaseReturnRepository>();
-
-        services.AddScoped<
-            IPurchaseReturnDataPort,
-            PurchaseReturnDataPort>();
-
-        services.AddScoped<
-            ISupplierCreditConcurrencyPort,
-            SupplierCreditConcurrencyPort>();
-
-        services.AddScoped<
-            IPurchasePaymentAllocationConcurrencyPort,
-            PurchasePaymentAllocationConcurrencyPort>();
-
-        services.AddScoped<
-            ISupplierCreditSourcePort,
-            SupplierCreditSourcePort>();
-
-        services.AddScoped<
-            IPurchasingReferenceDataPort,
-            PurchasingReferenceDataPort>();
-
-        services.AddScoped<
-            IPurchaseMatchingDataPort,
-            PurchaseMatchingDataPort>();
-
-        services.AddScoped<
-            IPurchasingSettingsPort,
-            PurchasingSettingsPort>();
-
-        services.AddScoped<
-            IPurchasingInventoryPort,
-            PurchasingInventoryPort>();
-
-        services.AddScoped<
-            IPurchasingAccountingPort,
-            PurchasingAccountingPort>();
-
-        services.AddScoped<
-            ICustomerDemandTrackingQueryService,
-            CustomerDemandTrackingQueryService>();
+        services.AddScoped<ISupplierCatalogRepository, SupplierCatalogRepository>();
+        services.AddScoped<IPurchaseRequestRepository, PurchaseRequestRepository>();
+        services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>();
+        services.AddScoped<IPurchaseOrderProgressQueryService, PurchaseOrderProgressQueryService>();
+        services.AddScoped<IPurchaseReceiptRepository, PurchaseReceiptRepository>();
+        services.AddScoped<IPurchaseInvoiceRepository, PurchaseInvoiceRepository>();
+        services.AddScoped<IPurchaseReturnRepository, PurchaseReturnRepository>();
+        services.AddScoped<IPurchaseReturnDataPort, PurchaseReturnDataPort>();
+        services.AddScoped<ISupplierCreditConcurrencyPort, SupplierCreditConcurrencyPort>();
+        services.AddScoped<IPurchasePaymentAllocationConcurrencyPort, PurchasePaymentAllocationConcurrencyPort>();
+        services.AddScoped<ISupplierCreditSourcePort, SupplierCreditSourcePort>();
+        services.AddScoped<IPurchasingReferenceDataPort, PurchasingReferenceDataPort>();
+        services.AddScoped<IPurchaseMatchingDataPort, PurchaseMatchingDataPort>();
+        services.AddScoped<IPurchasingSettingsPort, PurchasingSettingsPort>();
+        services.AddScoped<IPurchasingInventoryPort, PurchasingInventoryPort>();
+        services.AddScoped<IPurchasingAccountingPort, PurchasingAccountingPort>();
+        services.AddScoped<ICustomerDemandTrackingQueryService, CustomerDemandTrackingQueryService>();
 
         services.AddPurchasingApplication();
 

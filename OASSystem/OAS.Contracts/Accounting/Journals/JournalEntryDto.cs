@@ -5,4 +5,4 @@ public sealed record JournalEntryDto(
     string? SourceModule,string? SourceDocumentType,Guid? SourceDocumentId,JournalEntryStatus Status,Guid? ReversedJournalId,
     Guid? BaseCurrencyId,string? BaseCurrencyCodeSnapshot,byte? BaseCurrencyDecimalPlacesSnapshot,
     string? CreatedBy,DateTimeOffset CreatedAtUtc,Guid? ApprovedBy,DateTimeOffset? ApprovedAtUtc,Guid? PostedBy,DateTimeOffset? PostedAtUtc,string RowVersion,
-    IReadOnlyList<JournalEntryLineDto> Lines);
+    IReadOnlyList<JournalEntryLineDto> Lines, JournalReversalInfoDto? Reversal = null);

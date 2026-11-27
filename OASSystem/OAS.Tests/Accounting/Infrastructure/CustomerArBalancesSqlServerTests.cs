@@ -186,6 +186,56 @@ public sealed class CustomerArBalancesSqlServerTests
         Assert.That(actual.NetReceivableBase, Is.EqualTo(90000m));
     }
 
+    [Test]
+    public async Task JournalReport_AccountScope_ReturnsCompleteEntries_AndStableTotalsAcrossPages()
+    {
+        await using var db = Context();
+        var accountId = await db.Set<Account>().Where(x => x.Code == "AR-101").Select(x => x.Id).SingleAsync();
+        var service = new AccountingReportingQueryService(db, TimeProvider.System);
+        var filter = new OAS.Contracts.Accounting.Reports.JournalReportFilterDto(
+            new DateOnly(2026, 11, 1), NovemberEnd,
+            Status: OAS.Contracts.Accounting.Enums.JournalEntryStatus.Posted,
+            AccountId: accountId, PageSize: 3);
+        var partial = await service.GetJournalReportAsync(filter);
+        var first = await service.GetJournalReportAsync(filter with { IncludeCompleteEntries = true });
+        var second = await service.GetJournalReportAsync(filter with { IncludeCompleteEntries = true, PageNumber = 2 });
+        var third = await service.GetJournalReportAsync(filter with { IncludeCompleteEntries = true, PageNumber = 3 });
+        var all = first.Lines.Concat(second.Lines).Concat(third.Lines).ToArray();
+        Assert.Multiple(() =>
+        {
+            Assert.That(partial.TotalCount, Is.EqualTo(4));
+            Assert.That(partial.Difference, Is.EqualTo(90000m));
+            Assert.That(first.TotalCount, Is.EqualTo(8));
+            Assert.That(first.TotalDebit, Is.EqualTo(370000m));
+            Assert.That(first.TotalCredit, Is.EqualTo(370000m));
+            Assert.That(second.TotalDebit, Is.EqualTo(first.TotalDebit));
+            Assert.That(third.TotalCredit, Is.EqualTo(first.TotalCredit));
+            Assert.That(all.Length, Is.EqualTo(8));
+            Assert.That(all.Select(l => (l.JournalEntryId, l.LineNumber)).Distinct().Count(), Is.EqualTo(8));
+            Assert.That(all.GroupBy(l => l.JournalEntryId).All(g => g.Count() == 2 && g.Sum(l => l.Debit - l.Credit) == 0m), Is.True);
+            Assert.That(all.All(l => l.Reference is null), Is.True);
+        });
+    }
+
+    [Test]
+    public async Task BalanceSheet_AsOf_UsesPostedBalancesAndIncludesUnclosedProfit()
+    {
+        await using var db = Context();
+        var service = new AccountingReportingQueryService(db, TimeProvider.System);
+        var early = await service.GetBalanceSheetAsync(new(new DateOnly(2026, 11, 5)));
+        var current = await service.GetBalanceSheetAsync(new(NovemberEnd));
+        var later = await service.GetBalanceSheetAsync(new(new DateOnly(2026, 12, 31)));
+        Assert.Multiple(() =>
+        {
+            Assert.That(early.Totals.Assets, Is.EqualTo(30000m));
+            Assert.That(current.Totals.Assets, Is.EqualTo(210000m));
+            Assert.That(current.Accounts.Single(a => a.Code == "AR-101").DebitMinusCredit, Is.EqualTo(90000m));
+            Assert.That(current.Totals.UnclosedResult, Is.EqualTo(210000m));
+            Assert.That(later.Totals.Assets, Is.EqualTo(310000m));
+            Assert.That(early.Totals.IsBalanced && current.Totals.IsBalanced && later.Totals.IsBalanced, Is.True);
+        });
+    }
+
     private OasDbContext Context() => new(
         new DbContextOptionsBuilder<OasDbContext>()
             .UseSqlServer(_connection)

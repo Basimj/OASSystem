@@ -8,7 +8,7 @@
 <PageTitle>أرصدة المخزون | OAS</PageTitle>
 <span class="oas-inventory-view" hidden aria-hidden="true"></span>
 
-<UiWorkspaceLayout ShowAside="false" ShowFilters="true">
+<InventoryReportWorkspace Title="أرصدة المخازن" TitleIcon="fa-solid fa-boxes-stacked" StatusText="@(_loading ? "جارٍ التحميل" : _failed ? "تعذر التحميل" : "الرصيد الحالي")" ShowFilters="true" ResetFilters="ResetAsync">
     <Actions>
         <UiWorkspaceActionBar>
             <UiButton Text="تحديث" IconCssClass="fa-solid fa-rotate" Variant="ButtonVariant.Secondary" Size="ControlSize.Small" Loading="@_loading" OnClick="@(_ => LoadAsync())" />
@@ -18,36 +18,39 @@
     </Actions>
     <Filters>
         <div class="inventory-balance__filters">
-            <label>المخزن
+            <label class="oas-report__field">المخزن
                 <select value="@_warehouse" @onchange="WarehouseChanged"><option value="">جميع المخازن</option>@foreach (var item in Lookups.Warehouses) { <option value="@item.Id">@item.Name</option> }</select>
             </label>
-            <label>نوع المنتج
+            <label class="oas-report__field">نوع المنتج
                 <select value="@_type" @onchange="TypeChanged"><option value="">جميع الأنواع</option>@foreach (var item in Lookups.Types) { <option value="@item.Id">@item.Name</option> }</select>
             </label>
-            <label>التصنيف
+            <label class="oas-report__field">التصنيف
                 <select value="@_category" @onchange="CategoryChanged"><option value="">جميع التصنيفات</option>@foreach (var item in Lookups.Categories.Where(x => string.IsNullOrEmpty(_type) || x.ParentId == Parse(_type))) { <option value="@item.Id">@item.Name</option> }</select>
             </label>
-            <label>العلامة التجارية
+            <label class="oas-report__field">العلامة التجارية
                 <select value="@_brand" @onchange="BrandChanged"><option value="">جميع العلامات</option>@foreach (var item in Lookups.Brands) { <option value="@item.Id">@item.Name</option> }</select>
             </label>
-            <label>المنتج (الاسم أو الرمز)
+            <label class="oas-report__field">المنتج (الاسم أو الرمز)
                 <input type="search" value="@_productSearch" @onchange="ProductChanged" placeholder="اسم المنتج أو رمزه" />
             </label>
-            <label>حالة الرصيد
+            <label class="oas-report__field">حالة الرصيد
                 <select value="@_balanceStatus" @onchange="BalanceChanged"><option value="">الكل</option><option value="available">متوفر</option><option value="zero">نافد (الرصيد الفعلي صفر)</option><option value="reserved">محجوز بالكامل</option></select>
             </label>
-            <label>حالة الشراء
+            <label class="oas-report__field">حالة الشراء
                 <select value="@_purchaseStatus" @onchange="PurchaseChanged"><option value="">الكل</option><option value="ordered">قيد الطلب</option><option value="notordered">غير مطلوب</option></select>
             </label>
-            <label>حالة الصنف
+            <label class="oas-report__field">حالة الصنف
                 <select value="@_activityStatus" @onchange="ActivityChanged"><option value="">الكل</option><option value="active">نشط</option><option value="inactive">غير نشط (له رصيد)</option></select>
             </label>
-            <button type="button" class="balance-reset" @onclick="ResetAsync">إعادة تعيين الفلاتر</button>
         </div>
     </Filters>
+    <QuickFilters>
+        <div class="oas-report__chip"><span>المخزن:</span><strong>@(AllWarehouses ? "جميع المخازن" : Lookups.Warehouses.FirstOrDefault(x => x.Id == Parse(_warehouse))?.Name ?? "المخزن المحدد")</strong></div>
+        <div class="oas-report__chip"><span>العملة:</span><strong>@Currency</strong></div>
+        <div class="oas-report__chip"><span>التصفية:</span><strong>تلقائية</strong></div>
+    </QuickFilters>
     <Content>
-        <UiDataGridPanel Title="أرصدة المخزون" Subtitle="@(_result is null || _loading || _failed ? "" : $"{_result.Summary.RowCount} رصيد")">
-            <Body>
+        
                 @if (_loading)
                 {
                     <UiAlert Message="جاري تحميل أرصدة المخزون..." />
@@ -59,21 +62,13 @@
                 else
                 {
                     <div class="balance-workspace" dir="rtl">
-                        <div class="balance-summary">
-                            <div><span>عدد الأصناف</span><strong>@_result.Summary.VariantCount</strong></div>
-                            <div><span>عدد سجلات العرض</span><strong>@_result.Summary.RowCount</strong></div>
-                            <div><span>قيمة المخزون (@Currency)</span><strong>@N(_result.Summary.InventoryValue)</strong></div>
-                            <div><span>العملة الأساسية</span><strong>@(_result.CurrencyName ?? "غير محددة")</strong></div>
-                        </div>
                         <div class="balance-table-wrap">
-                            <table class="balance-table">
+                            <table class="oas-report__table balance-table">
                                 <thead><tr>
                                     @foreach (var header in Headers)
                                     {
-                                        <th scope="col" aria-sort="@(header.Key == _sort ? (_direction == SortDirection.Ascending ? "ascending" : "descending") : "none")">
-                                            @if (header.Key == "actions") { <span>@header.Label</span> }
-                                            else { <button type="button" @onclick="() => SortAsync(header.Key)">@header.Label <span aria-hidden="true">@(header.Key == _sort ? (_direction == SortDirection.Ascending ? "↑" : "↓") : "↕")</span></button> }
-                                        </th>
+                                        if (header.Key == "actions") { <th scope="col">@header.Label</th> }
+                                        else { <UiReportSortHeader Label="@header.Label" Active="@(header.Key == _sort)" Descending="@(_direction == SortDirection.Descending)" OnSort="@(() => SortAsync(header.Key))" /> }
                                     }
                                 </tr></thead>
                                 <tbody>
@@ -100,24 +95,38 @@
                                 <tfoot><tr><td colspan="@(AllWarehouses ? 8 : 7)">إجمالي قيمة المخزون لجميع النتائج</td><td colspan="1">—</td><td class="balance-num">@N(_result.Summary.InventoryValue)</td><td colspan="2"></td></tr></tfoot>
                             </table>
                         </div>
-                        <nav class="balance-pager" aria-label="التنقل بين صفحات الأرصدة">
-                            <button type="button" disabled="@(!_result.Page.HasPreviousPage)" @onclick="() => GoPageAsync(-1)">السابق</button>
-                            <span>صفحة @_result.Page.PageNumber من @Math.Max(1, _result.Page.TotalPages)</span>
-                            <button type="button" disabled="@(!_result.Page.HasNextPage)" @onclick="() => GoPageAsync(1)">التالي</button>
-                            <label>عدد الصفوف <select value="@_pageSize" @onchange="PageSizeChanged"><option value="12">12</option><option value="25">25</option><option value="50">50</option></select></label>
-                        </nav>
+                        
                         <details class="balance-unit-totals">
                             <summary>إجماليات الكميات حسب وحدة القياس (جميع النتائج المطابقة)</summary>
-                            <table class="balance-table"><thead><tr><th>الوحدة</th><th>الفعلي</th><th>المحجوز</th><th>المتاح</th><th>قيد الطلب</th></tr></thead><tbody>
+                            <table class="oas-report__table balance-table"><thead><tr><th>الوحدة</th><th>الفعلي</th><th>المحجوز</th><th>المتاح</th><th>قيد الطلب</th></tr></thead><tbody>
                                 @foreach (var total in _result.Summary.Units) { <tr><td>@(total.UnitName ?? "غير محددة")</td><td>@N(total.OnHand)</td><td>@N(total.Reserved)</td><td>@N(total.Available)</td><td>@N(total.OnOrder)</td></tr> }
                             </tbody></table>
                         </details>
                     </div>
                 }
-            </Body>
-        </UiDataGridPanel>
+            
     </Content>
-</UiWorkspaceLayout>
+    <Pagination>
+        @if (!_loading && !_failed && _result is not null)
+        {
+            <nav class="balance-pager" aria-label="التنقل بين صفحات الأرصدة">
+                            <button type="button" disabled="@(!_result.Page.HasPreviousPage)" @onclick="() => GoPageAsync(-1)">السابق</button>
+                            <span>صفحة @_result.Page.PageNumber من @Math.Max(1, _result.Page.TotalPages)</span>
+                            <button type="button" disabled="@(!_result.Page.HasNextPage)" @onclick="() => GoPageAsync(1)">التالي</button>
+                            <label class="oas-report__field">عدد الصفوف <select value="@_pageSize" @onchange="PageSizeChanged"><option value="12">12</option><option value="25">25</option><option value="50">50</option></select></label>
+                        </nav>
+        }
+    </Pagination>
+    <Metrics>
+        @if (!_loading && !_failed && _result is not null)
+        {
+            <UiReportMetric Label="عدد الأصناف" Value="@_result.Summary.VariantCount.ToString()" Icon="fa-solid fa-box" />
+            <UiReportMetric Label="عدد سجلات العرض" Value="@_result.Summary.RowCount.ToString()" Icon="fa-solid fa-list" Tone="purple" />
+            <UiReportMetric Label="قيمة المخزون" Value="@($"{N(_result.Summary.InventoryValue)} {Currency}")" Icon="fa-solid fa-coins" Tone="green" />
+            <UiReportMetric Label="العملة الأساسية" Value="@(_result.CurrencyName ?? "غير محددة")" Icon="fa-solid fa-money-bill" Tone="orange" />
+        }
+    </Metrics>
+</InventoryReportWorkspace>
 
 @code {
     [Inject] private OasApiClient Api { get; set; } = default!;

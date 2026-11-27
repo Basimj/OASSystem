@@ -1,4 +1,4 @@
-﻿using OAS.Contracts.Accounting.Enums;
+using OAS.Contracts.Accounting.Enums;
 
 namespace OAS.Contracts.Accounting.Accounts;
 
@@ -17,4 +17,6 @@ public sealed record UpdateAccountRequest(
     bool IsSystemAccount,
     bool IsActive,
     DateOnly? EffectiveDate,
-    string RowVersion);
+    string RowVersion,
+    FinancialStatementCategory? FinancialStatementCategory = null,
+    bool UpdateFinancialStatementCategory = false);

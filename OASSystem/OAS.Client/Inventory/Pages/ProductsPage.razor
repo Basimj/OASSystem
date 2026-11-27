@@ -11,7 +11,7 @@
 <PageTitle>@(IsFormRoute ? "نموذج المخزون" : "قائمة المخزون") - المنتجات | OAS</PageTitle>
 <span class="oas-inventory-view" hidden aria-hidden="true"></span>
 
-<UiWorkspaceLayout ShowAside="false" ShowFilters="false" ScrollableMain="@IsFormRoute">
+<InventoryReportWorkspace Title="@SectionTitle" TitleIcon="fa-solid fa-box" StatusText="@SectionSubtitle" ShowFilters="false" IsFormRoute="@IsFormRoute">
     <Actions>
         <UiWorkspaceActionBar>
             @if (IsFormRoute)
@@ -36,6 +36,7 @@
             }
         </UiWorkspaceActionBar>
     </Actions>
+    <QuickFilters><UiSectionTabStrip Tabs="@SectionTabs" OnSelect="ChangeSectionKeyAsync" /></QuickFilters>
     <Content>
         @if (IsFormRoute)
         {
@@ -149,17 +150,15 @@
         else
         {
         <div class="inventory-products">
-            <UiSectionTabStrip Tabs="@SectionTabs" OnSelect="ChangeSectionKeyAsync" />
+            
 
-            <UiDataGridPanel Title="@SectionTitle" Subtitle="@SectionSubtitle">
-                <Body>
-                    @if (_loading)
+                                @if (_loading)
                     {
                         <UiAlert Message="جاري تحميل البيانات..." />
                     }
                     else if (_section == ProductSection.Categories)
                     {
-                        <UiDataTable TItem="ProductCategoryDto" Items="@FilterCategories()" PageSize="12" Headers="@SimpleHeaders" EmptyText="لا توجد تصنيفات مطابقة."
+                        <InventoryReportTable TItem="ProductCategoryDto" Items="@FilterCategories()" PageSize="12" Headers="@SimpleHeaders" EmptyText="لا توجد تصنيفات مطابقة."
                                      SidebarTypography="true"
                                      OnRowClick="@(x => OpenDetailsScreen(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
                             <RowTemplate Context="item">
@@ -167,11 +166,11 @@
                                 <td>@item.Name</td>
                                 <td><UiBadge Text="@StatusText(item.IsActive)" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
                             </RowTemplate>
-                        </UiDataTable>
+                        </InventoryReportTable>
                     }
                     else if (_section == ProductSection.Brands)
                     {
-                        <UiDataTable TItem="BrandDto" Items="@FilterBrands()" PageSize="12" Headers="@SimpleHeaders" EmptyText="لا توجد علامات تجارية مطابقة."
+                        <InventoryReportTable TItem="BrandDto" Items="@FilterBrands()" PageSize="12" Headers="@SimpleHeaders" EmptyText="لا توجد علامات تجارية مطابقة."
                                      SidebarTypography="true"
                                      OnRowClick="@(x => OpenDetailsScreen(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
                             <RowTemplate Context="item">
@@ -179,11 +178,11 @@
                                 <td>@item.Name</td>
                                 <td><UiBadge Text="@StatusText(item.IsActive)" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
                             </RowTemplate>
-                        </UiDataTable>
+                        </InventoryReportTable>
                     }
                     else if (_section == ProductSection.ProductTypes)
                     {
-                        <UiDataTable TItem="ProductTypeDto" Items="@FilterProductTypes()" PageSize="12" Headers="@SimpleHeaders" EmptyText="لا توجد أنواع منتجات مطابقة."
+                        <InventoryReportTable TItem="ProductTypeDto" Items="@FilterProductTypes()" PageSize="12" Headers="@SimpleHeaders" EmptyText="لا توجد أنواع منتجات مطابقة."
                                      SidebarTypography="true"
                                      OnRowClick="@(x => OpenDetailsScreen(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
                             <RowTemplate Context="item">
@@ -191,11 +190,11 @@
                                 <td>@item.Name</td>
                                 <td><UiBadge Text="@StatusText(item.IsActive)" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
                             </RowTemplate>
-                        </UiDataTable>
+                        </InventoryReportTable>
                     }
                     else if (_section == ProductSection.Units)
                     {
-                        <UiDataTable TItem="UnitDto" Items="@FilterUnits()" PageSize="12" Headers="@SimpleHeaders" EmptyText="لا توجد وحدات مطابقة."
+                        <InventoryReportTable TItem="UnitDto" Items="@FilterUnits()" PageSize="12" Headers="@SimpleHeaders" EmptyText="لا توجد وحدات مطابقة."
                                      SidebarTypography="true"
                                      OnRowClick="@(x => OpenDetailsScreen(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
                             <RowTemplate Context="item">
@@ -203,11 +202,11 @@
                                 <td>@item.Name</td>
                                 <td><UiBadge Text="@StatusText(item.IsActive)" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
                             </RowTemplate>
-                        </UiDataTable>
+                        </InventoryReportTable>
                     }
                     else if (_section == ProductSection.Products)
                     {
-                        <UiDataTable TItem="ProductDto" Items="@FilterProducts()" PageSize="12" Headers="@ProductHeaders" EmptyText="لا توجد منتجات مطابقة."
+                        <InventoryReportTable TItem="ProductDto" Items="@FilterProducts()" PageSize="12" Headers="@ProductHeaders" EmptyText="لا توجد منتجات مطابقة."
                                      SidebarTypography="true"
                                      UniformCellTypography="true"
                                      OnRowClick="@(x => OpenDetailsScreen(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
@@ -220,11 +219,11 @@
                                 <td>@ProductInventoryStatus(item)</td>
                                 <td><UiBadge Text="@StatusText(item.IsActive)" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
                             </RowTemplate>
-                        </UiDataTable>
+                        </InventoryReportTable>
                     }
                     else
                     {
-                        <UiDataTable TItem="ProductVariantDto" Items="@FilterVariants()" PageSize="12" Headers="@VariantHeaders" EmptyText="لا توجد أصناف مطابقة."
+                        <InventoryReportTable TItem="ProductVariantDto" Items="@FilterVariants()" PageSize="12" Headers="@VariantHeaders" EmptyText="لا توجد أصناف مطابقة."
                                      SidebarTypography="true"
                                      OnRowClick="@(x => OpenDetailsScreen(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
                             <RowTemplate Context="item">
@@ -234,15 +233,14 @@
                                 <td>@InventoryDisplayFormat.Number(item.SellingPrice)</td>
                                 <td><UiBadge Text="@StatusText(item.IsActive)" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
                             </RowTemplate>
-                        </UiDataTable>
+                        </InventoryReportTable>
                     }
-                </Body>
-            </UiDataGridPanel>
+                
         </div>
 
         }
     </Content>
-</UiWorkspaceLayout>
+</InventoryReportWorkspace>
 
 @if (_spreadsheetImportOpen)
 {

@@ -5,8 +5,11 @@ using Microsoft.AspNetCore.RateLimiting;
 using OAS.Application.Accounting.CashShifts.Commands.ApproveCashShift;
 using OAS.Application.Accounting.CashShifts.Commands.CloseCashShift;
 using OAS.Application.Accounting.CashShifts.Commands.CreateCashShift;
+using OAS.Application.Accounting.CashShifts.Commands.SettleCashShift;
 using OAS.Application.Accounting.CashShifts.Queries.GetCashShiftById;
+using OAS.Application.Accounting.CashShifts.Queries.GetCashShiftMovements;
 using OAS.Application.Accounting.CashShifts.Queries.GetCashShifts;
+using OAS.Application.Accounting.CashShifts.Queries.GetCashShiftOpeningBalance;
 using OAS.Application.Accounting.CashShifts.Commands.ReserveCashShiftNumber;
 using OAS.Contracts.Accounting.CashShifts;
 using OAS.Contracts.Common.Pagination;
@@ -39,6 +42,14 @@ public sealed class CashShiftsController(ISender sender) : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("{id:guid}/movements")]
+    public async Task<ActionResult<CashShiftMovementsDto>> GetMovements(Guid id, [FromQuery] int page = 1, CancellationToken cancellationToken = default)
+        => Ok(await sender.Send(new GetCashShiftMovementsQuery(id, page), cancellationToken));
+
+    [HttpGet("opening-balance/{cashAccountId:guid}")]
+    public async Task<ActionResult<CashShiftOpeningBalanceDto>> GetOpeningBalance(Guid cashAccountId, CancellationToken cancellationToken)
+        => Ok(await sender.Send(new GetCashShiftOpeningBalanceQuery(cashAccountId), cancellationToken));
+
     [HttpPost("number/reserve")]
     public async Task<ActionResult<OAS.Contracts.Accounting.Common.AccountingNumberReservationDto>> ReserveNumber(CancellationToken cancellationToken)
         => Ok(await sender.Send(new ReserveCashShiftNumberCommand(), cancellationToken));
@@ -62,6 +73,17 @@ public sealed class CashShiftsController(ISender sender) : ControllerBase
         await sender.Send(new CloseCashShiftCommand(id, request), cancellationToken);
         var dto = await sender.Send(new GetCashShiftByIdQuery(id), cancellationToken);
         return Ok(dto);
+    }
+
+    [HttpGet("{id:guid}/settlement-accounts")]
+    public async Task<ActionResult<IReadOnlyList<CashShiftSettlementAccountDto>>> SettlementAccounts(Guid id, CancellationToken ct)
+        => Ok(await sender.Send(new GetCashShiftSettlementAccountsQuery(id), ct));
+
+    [HttpPost("{id:guid}/settle")]
+    public async Task<ActionResult<CashShiftDto>> Settle(Guid id, CashShiftSettlementRequest request, CancellationToken ct)
+    {
+        await sender.Send(new SettleCashShiftCommand(id, request), ct);
+        return Ok(await sender.Send(new GetCashShiftByIdQuery(id), ct));
     }
 
     [HttpPost("{id:guid}/approve")]

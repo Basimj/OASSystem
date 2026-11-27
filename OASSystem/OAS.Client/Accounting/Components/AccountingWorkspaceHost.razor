@@ -39,6 +39,7 @@
                               Size="ControlSize.Small"
                               OnClick="OpenNewRecord" />
 
+
                     <UiButton Text="تحديث"
                               IconCssClass="fa-solid fa-rotate"
                               Variant="ButtonVariant.Ghost"
@@ -325,9 +326,7 @@
                               OnClick="PrintActiveVoucherAsync" />
                 }
 
-                @if (activeTab is { IsNew: false, IsDirty: false } &&
-                     (activeTab.Model is ReceiptVoucherEditor.FormModel { Status: ReceiptVoucherStatus.Posted } ||
-                      activeTab.Model is PaymentVoucherEditor.FormModel { Status: PaymentVoucherStatus.Posted }))
+                @if (CanAllocateActiveVoucher)
                 {
                     <UiButton Text="تخصيص دفعة"
                               IconCssClass="fa-solid fa-link"
@@ -339,7 +338,7 @@
                 @if (activeTab is { EntityType: AccountingEntityType.CashShifts, EntityId: Guid, IsNew: false, IsSaving: false } &&
                      activeTab.Model is CashShiftEditor.FormModel activeShift)
                 {
-                    @if (activeShift.Status == CashShiftStatus.Open)
+                    @if (activeShift.Status is CashShiftStatus.Open or CashShiftStatus.Closing)
                     {
                         <UiButton Text="إغلاق الوردية" IconCssClass="fa-solid fa-lock"
                                   Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
@@ -391,7 +390,7 @@
                                       Disabled="@(activeTab.IsNew || activeTab.IsDirty || activeTab.IsEditMode || activeTab.IsSaving)"
                                       OnClick="@(() => ChangeJournalStatusAsync(JournalEntryStatus.Posted))" />
                         }
-                        else if (journal.Status == JournalEntryStatus.Posted && !journal.ReversedJournalId.HasValue)
+                        else if (journal.Status == JournalEntryStatus.Posted && journal.IsManualStandalone && !journal.ReversedJournalId.HasValue)
                         {
                             <UiButton Text="عكس القيد"
                                       IconCssClass="fa-solid fa-arrow-rotate-left"
@@ -507,6 +506,22 @@
                                       Size="ControlSize.Small"
                                       OnClick="@(() => ChangeExpenseStatusAsync(ExpenseStatus.Posted))" />
                         }
+                    }
+                }
+
+                @if (IsActivePostedVoucher)
+                {
+                    @if (ActiveVoucherReversalId.HasValue)
+                    {
+                        <UiButton Text="عرض القيد العكسي" IconCssClass="fa-solid fa-book-open"
+                                  Variant="ButtonVariant.Secondary" Size="ControlSize.Small"
+                                  Disabled="@(activeTab.IsSaving || activeTab.IsLoading)" OnClick="ViewVoucherReversalAsync" />
+                    }
+                    else
+                    {
+                        <UiButton Text="عكس السند" IconCssClass="fa-solid fa-arrow-rotate-left"
+                                  Variant="ButtonVariant.Danger" Size="ControlSize.Small"
+                                  Disabled="@(activeTab.IsSaving || activeTab.IsLoading || !ActiveVoucherJournalLoaded)" OnClick="ReverseActiveVoucherAsync" />
                     }
                 }
 
@@ -696,6 +711,9 @@
                                        ParentAccountLookupItem="@GetAccountLookup(accountModel.ParentAccountId)"
                                        AccountSearchAsync="SearchAccountsAsync"
                                        AccountLevelResolver="ResolveAccountLevel"
+                                       AccountResolver="ResolveAccountDto"
+                                       FinancialCategoryResolver="ResolveFinancialCategory"
+                                       LoadFinancialAncestorsAsync="LoadFinancialAncestorsAsync"
                                        OnModelChanged="MarkActiveDirty" />
                     }
                     else if (_isLoading)
@@ -727,6 +745,10 @@
                                    IsNew="@activeTab.IsNew"
                                    ParentAccountLookupItem="@GetAccountLookup(model.ParentAccountId)"
                                    AccountSearchAsync="SearchAccountsAsync"
+                                   AccountLevelResolver="ResolveAccountLevel"
+                                   AccountResolver="ResolveAccountDto"
+                                   FinancialCategoryResolver="ResolveFinancialCategory"
+                                       LoadFinancialAncestorsAsync="LoadFinancialAncestorsAsync"
                                    OnModelChanged="MarkActiveDirty" />
 
                     break;
@@ -757,7 +779,7 @@
                     when activeTab.Model is JournalEntryEditor.FormModel model:
 
                     <JournalEntryEditor Model="@model"
-                                        IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
+                                        IsEditable="@((activeTab.IsNew || activeTab.IsEditMode) && model.IsManualStandalone && model.Status == JournalEntryStatus.Draft)"
                                         IsNew="@activeTab.IsNew"
                                         FiscalPeriodLookupItem="@GetFiscalPeriodLookup(model.FiscalPeriodId)"
                                         FiscalPeriodSearchAsync="SearchFiscalPeriodsAsync"
@@ -803,8 +825,8 @@
                     <ReceiptVoucherEditor Model="@model"
                                           IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
                                           IsNew="@activeTab.IsNew"
-                                          CustomerSearchAsync="SearchCustomersAsync"
-                                          SupplierSearchAsync="SearchSuppliersAsync"
+                                          CustomerSearchAsync="SearchVoucherCustomersAsync"
+                                          SupplierSearchAsync="SearchVoucherSuppliersAsync"
                                           EmployeeSearchAsync="SearchEmployeeAccountsAsync"
                                           CashAccountSearchAsync="SearchCashAccountsByCurrencyAsync"
                                           BankAccountSearchAsync="SearchBankAccountsByCurrencyAsync"
@@ -823,8 +845,8 @@
                     <PaymentVoucherEditor Model="@model"
                                           IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
                                           IsNew="@activeTab.IsNew"
-                                          CustomerSearchAsync="SearchCustomersAsync"
-                                          SupplierSearchAsync="SearchSuppliersAsync"
+                                          CustomerSearchAsync="SearchVoucherCustomersAsync"
+                                          SupplierSearchAsync="SearchVoucherSuppliersAsync"
                                           EmployeeSearchAsync="SearchEmployeeAccountsAsync"
                                           CashAccountSearchAsync="SearchCashAccountsByCurrencyAsync"
                                           BankAccountSearchAsync="SearchBankAccountsByCurrencyAsync"
@@ -880,10 +902,11 @@
                     when activeTab.Model is CashShiftEditor.FormModel model:
 
                     <CashShiftEditor Model="@model"
+                                     ShiftId="@activeTab.EntityId"
                                      IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
                                      IsNew="@activeTab.IsNew"
                                      CashAccountLookupItem="@GetCashAccountLookup(model.CashAccountId)"
-                                     CashAccountSearchAsync="SearchCashAccountsAsync"
+                                     CashAccountSearchAsync="SearchAvailableCashShiftAccountsAsync"
                                      CurrencyLabel="@GetShiftCurrencyLabel(model.CashAccountId)"
                                      CurrencyDecimalPlaces="@GetShiftCurrencyDecimals(model.CashAccountId)"
                                      OnModelChanged="OnCashShiftModelChangedAsync" />

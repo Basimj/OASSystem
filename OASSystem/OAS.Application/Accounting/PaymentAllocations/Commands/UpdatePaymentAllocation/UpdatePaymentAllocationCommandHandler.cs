@@ -15,7 +15,8 @@ public sealed class UpdatePaymentAllocationCommandHandler(
     IReadRepository<PaymentVoucherLine, Guid> paymentLines,
     IReadRepository<PaymentVoucher, Guid> paymentVouchers,
     IEnumerable<IPaymentAllocationTargetValidator> targetValidators,
-    IEnumerable<IPaymentAllocationSourceTargetValidator> sourceTargetValidators) : IRequestHandler<UpdatePaymentAllocationCommand>
+    IEnumerable<IPaymentAllocationSourceTargetValidator> sourceTargetValidators,
+    IReadRepository<JournalEntry, Guid>? voucherJournals = null) : IRequestHandler<UpdatePaymentAllocationCommand>
 {
     public async Task Handle(UpdatePaymentAllocationCommand request, CancellationToken ct)
     {
@@ -79,6 +80,7 @@ public sealed class UpdatePaymentAllocationCommandHandler(
             var voucher = await receiptVouchers.GetByIdAsync(line.ReceiptVoucherId, ct) ?? throw new NotFoundException(nameof(ReceiptVoucher), line.ReceiptVoucherId);
             if (voucher.Status != ReceiptVoucherStatus.Posted)
                 throw new ConflictException("payment_allocation_receipt_not_posted", "لا يمكن تعديل تخصيص مرتبط بسند قبض غير مرحل.");
+            await VoucherReversalGuard.EnsureNotReversedAsync(voucherJournals, voucher.JournalEntryId, ct);
             return new SourceInfo(
                 line.Amount,
                 new PaymentAllocationSourceContext(
@@ -95,6 +97,7 @@ public sealed class UpdatePaymentAllocationCommandHandler(
             var voucher = await paymentVouchers.GetByIdAsync(line.PaymentVoucherId, ct) ?? throw new NotFoundException(nameof(PaymentVoucher), line.PaymentVoucherId);
             if (voucher.Status != PaymentVoucherStatus.Posted)
                 throw new ConflictException("payment_allocation_payment_not_posted", "لا يمكن تعديل تخصيص مرتبط بسند صرف غير مرحل.");
+            await VoucherReversalGuard.EnsureNotReversedAsync(voucherJournals, voucher.JournalEntryId, ct);
             return new SourceInfo(
                 line.Amount,
                 new PaymentAllocationSourceContext(

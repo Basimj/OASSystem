@@ -198,6 +198,9 @@ public sealed class AccountingClientService(
                 cancellationToken);
 
 
+    public Task<UpdateFinancialStatementCategoriesResult?> UpdateFinancialStatementCategoriesAsync(UpdateFinancialStatementCategoriesRequest request, CancellationToken cancellationToken = default)
+        => apiClient.PostAsync<UpdateFinancialStatementCategoriesRequest, UpdateFinancialStatementCategoriesResult>("api/accounting/accounts/financial-statement-categories", request, cancellationToken);
+
     public Task<AccountDto?>
         GetAccountByIdAsync(
             Guid id,
@@ -476,13 +479,14 @@ public sealed class AccountingClientService(
     public Task<JournalEntryDto?>
         ReverseJournalAsync(
             Guid id,
+            ReverseJournalEntryRequest request,
             CancellationToken cancellationToken = default)
         =>
             apiClient.PostAsync<
-                object,
+                ReverseJournalEntryRequest,
                 JournalEntryDto>(
                 $"api/accounting/journals/{id}/reverse",
-                new { },
+                request,
                 cancellationToken);
 
 
@@ -1209,6 +1213,12 @@ public sealed class AccountingClientService(
                 cancellationToken);
 
 
+    public Task<CashShiftOpeningBalanceDto?> GetCashShiftOpeningBalanceAsync(Guid cashAccountId, CancellationToken cancellationToken = default)
+        => apiClient.GetAsync<CashShiftOpeningBalanceDto>($"api/accounting/cash-shifts/opening-balance/{cashAccountId}", cancellationToken);
+
+    public Task<CashShiftMovementsDto?> GetCashShiftMovementsAsync(Guid id, int page, CancellationToken cancellationToken = default)
+        => apiClient.GetAsync<CashShiftMovementsDto>($"api/accounting/cash-shifts/{id}/movements?page={page}", cancellationToken);
+
     public Task<CashShiftDto?>
         GetCashShiftByIdAsync(
             Guid id,
@@ -1640,6 +1650,20 @@ public sealed class AccountingClientService(
             cancellationToken);
     }
 
+    public Task<BalanceSheetReportDto?> GetBalanceSheetAsync(BalanceSheetFilterDto filter, CancellationToken cancellationToken = default)
+    {
+        var query = new List<string> { $"asOfDate={filter.AsOfDate:yyyy-MM-dd}" };
+        AddGuid(query, "fiscalYearId", filter.FiscalYearId);
+        return apiClient.GetAsync<BalanceSheetReportDto>($"api/accounting/reports/balance-sheet?{string.Join("&", query)}", cancellationToken);
+    }
+
+    public Task<IncomeStatementReportDto?> GetIncomeStatementAsync(IncomeStatementFilterDto filter, CancellationToken cancellationToken = default)
+    {
+        var query = new List<string> { $"fromDate={filter.FromDate:yyyy-MM-dd}", $"toDate={filter.ToDate:yyyy-MM-dd}" };
+        AddGuid(query, "fiscalYearId", filter.FiscalYearId); AddGuid(query, "fiscalPeriodId", filter.FiscalPeriodId); AddGuid(query, "costCenterId", filter.CostCenterId);
+        return apiClient.GetAsync<IncomeStatementReportDto>($"api/accounting/reports/income-statement?{string.Join("&", query)}", cancellationToken);
+    }
+
     public Task<TrialBalanceReportDto?> GetTrialBalanceAsync(
         DateOnly fromDate,
         DateOnly toDate,
@@ -1688,6 +1712,7 @@ public sealed class AccountingClientService(
         AddText(query, "sourceModule", filter.SourceModule);
         AddText(query, "journalNumber", filter.JournalNumber);
         AddText(query, "reference", filter.Reference);
+        if (filter.IncludeCompleteEntries) query.Add("includeCompleteEntries=true");
 
         return apiClient.GetAsync<JournalReportDto>(
             $"api/accounting/reports/journal-report?{string.Join("&", query)}",

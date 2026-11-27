@@ -439,6 +439,9 @@ public sealed class VoucherCommandAndQueryTests
         public int PostReceiptVoucherCallCount { get; private set; }
         public int PostPaymentVoucherCallCount { get; private set; }
 
+        public Task ValidateReceiptVoucherAsync(ReceiptVoucher voucher, IReadOnlyCollection<ReceiptVoucherLine> lines, CancellationToken ct = default) => Task.CompletedTask;
+        public Task ValidatePaymentVoucherAsync(PaymentVoucher voucher, IReadOnlyCollection<PaymentVoucherLine> lines, CancellationToken ct = default) => Task.CompletedTask;
+
         public Task<Guid> PostReceiptVoucherAsync(
             ReceiptVoucher voucher, IReadOnlyCollection<ReceiptVoucherLine> lines, Guid postedBy,
             DateTime postedAtUtc, CancellationToken cancellationToken = default)

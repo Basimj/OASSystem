@@ -13,12 +13,19 @@ public sealed class CreateCashShiftCommandHandler(
     IRepository<CashShift, Guid> repository,
     ISequenceNumberGenerator sequenceNumberGenerator,
     ICurrentUser currentUser,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IReadRepository<CashAccount, Guid> cashAccounts)
     : IRequestHandler<CreateCashShiftCommand, Guid>
 {
     public async Task<Guid> Handle(CreateCashShiftCommand request, CancellationToken cancellationToken)
     {
         if (!Guid.TryParse(currentUser.UserId, out var userId)) throw new ForbiddenException();
+        var cash = await cashAccounts.GetByIdAsync(request.Data.CashAccountId, cancellationToken)
+            ?? throw new NotFoundException(nameof(CashAccount), request.Data.CashAccountId);
+        if (!cash.IsActive)
+            throw new ConflictException("cash_account_inactive", "Cannot open a shift on an inactive cashbox.");
+        if (!cash.CurrencyId.HasValue)
+            throw new ConflictException("cash_shift_currency_missing", "Cashbox currency must be configured before opening a shift.");
         // Only one active handover at a time for the same cashbox.
         // A filtered unique index is still recommended to cover simultaneous requests.
         if (await repository.CountAsync(
@@ -29,6 +36,8 @@ public sealed class CreateCashShiftCommandHandler(
         var now=timeProvider.GetUtcNow().UtcDateTime;
         var number=await ResolveNumberAsync(request.Data.ShiftNumber,now.Year,cancellationToken);
         var shift=CashShift.Create(Guid.NewGuid(),number,request.Data.CashAccountId,userId,now,request.Data.OpeningBalance,DomainCashShiftStatus.Open);
+        shift.SetOpeningDifferenceReason(request.Data.OpeningDifferenceReason);
+        shift.ExpectBookOpeningBalance(request.Data.ExpectedBookOpeningBalance);
         await repository.AddAsync(shift,cancellationToken);
         return shift.Id;
     }

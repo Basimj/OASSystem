@@ -17,7 +17,7 @@ public sealed class AccountMapper
 {
     public Account Create(CreateAccountRequest source)
     {
-        return Account.Create(
+        var account = Account.Create(
             Guid.NewGuid(),
             source.Code,
             source.NameAr,
@@ -33,6 +33,8 @@ public sealed class AccountMapper
             source.IsSystemAccount,
             source.IsActive,
             source.EffectiveDate);
+        account.SetFinancialStatementCategory((OAS.Domain.Accounting.Enums.FinancialStatementCategory?)source.FinancialStatementCategory);
+        return account;
     }
 
     public void Update(
@@ -53,6 +55,8 @@ public sealed class AccountMapper
             source.AllowManualPosting,
             source.EffectiveDate);
 
+        if (source.UpdateFinancialStatementCategory)
+            destination.SetFinancialStatementCategory((OAS.Domain.Accounting.Enums.FinancialStatementCategory?)source.FinancialStatementCategory);
         destination.SetActive(source.IsActive);
     }
 
@@ -74,6 +78,7 @@ public sealed class AccountMapper
             source.IsSystemAccount,
             source.IsActive,
             source.EffectiveDate,
-            Convert.ToBase64String(source.RowVersion));
+            Convert.ToBase64String(source.RowVersion),
+            (OAS.Contracts.Accounting.Enums.FinancialStatementCategory?)source.FinancialStatementCategory);
     }
 }

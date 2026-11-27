@@ -1,5 +1,11 @@
 @namespace OAS.Client.Accounting.Components
 @using OAS.Contracts.Accounting.Enums
+@using OAS.Contracts.Accounting.CashShifts
+@using OAS.Client.Accounting.Services
+@inject IAccountingClientService AccountingService
+@using OAS.Client.Services.Http
+@inject OasApiClient Api
+@using System.Globalization
 @using OAS.Client.Accounting.Common
 @using OAS.UiLib.Components.Accounting.Workspace
 @using OAS.UiLib.Components.Inputs
@@ -21,7 +27,9 @@
                          ReadOnly="true" Disabled="true" Placeholder="يُحجز تلقائيًا..." Size="ControlSize.Small" />
             <UiLookup Label="الصندوق / الخزينة" Value="@CashAccountValue"
                       ValueChanged="OnCashAccountChanged" SelectedItem="@CashAccountLookupItem"
-                      SearchAsync="@CashAccountSearchAsync" Placeholder="اختر الصندوق..."
+                      SearchAsync="@CashAccountSearchAsync" Placeholder="اختر صندوقاً متاحاً..."
+                      ErrorText="@Model.CashAccountError"
+                      EmptyText="لا توجد صناديق متاحة مطابقة للبحث. قد تكون الصناديق مشغولة بورديات نشطة."
                       Disabled="@(!IsEditable || !IsNew)" Required="true"
                       MinimumSearchLength="0" DebounceMilliseconds="250" />
             <UiAccountingNumberField Label="رصيد الافتتاح (العهدة المستلمة)"
@@ -31,6 +39,23 @@
                 <span>عملة الصندوق</span>
                 <strong>@(string.IsNullOrWhiteSpace(CurrencyLabel) ? "حدد الصندوق لعرض عملته" : CurrencyLabel)</strong>
             </div>
+            <UiAccountingReadOnlyValue Label="الرصيد الدفتري عند الافتتاح" Value="@(Model.BookOpeningBalance is decimal book ? Amount(book) : "غير متاح")" />
+            @if (Model.BookOpeningBalance is decimal openingBook)
+            {
+                <UiAccountingReadOnlyValue Label="فرق الافتتاح" Value="@Amount(Model.OpeningBalance - openingBook)" />
+            }
+            @if (IsNew && Model.CashAccountId.HasValue)
+            {
+                <button type="button" class="btn btn-outline-primary btn-sm" disabled="@(!IsEditable)" @onclick="RefreshOpeningBalanceAsync">تحديث الرصيد الدفتري</button>
+                @if (!string.IsNullOrWhiteSpace(Model.OpeningBalanceError))
+                {
+                    <span class="text-danger" role="alert">@Model.OpeningBalanceError</span>
+                }
+            }
+            @if ((IsNew && Model.BookOpeningBalance.HasValue && Model.BookOpeningBalance != Model.OpeningBalance) || (!IsNew && !string.IsNullOrWhiteSpace(Model.OpeningDifferenceReason)))
+            {
+                <UiInputText Label="سبب فرق الافتتاح" Value="@Model.OpeningDifferenceReason" ValueChanged="OnOpeningReasonChanged" MaxLength="500" Required="true" Disabled="@(!IsNew || !IsEditable)" Size="ControlSize.Small" />
+            }
             @if (!IsNew)
             {
                 <div class="oas-cashbank-editor__readonly"><span>وقت فتح الوردية (UTC)</span><strong>@FormatUtc(Model.OpenedAtUtc)</strong></div>
@@ -44,17 +69,20 @@
         <UiAccountingFormSection Title="الجرد والإغلاق" IconCssClass="fa-solid fa-scale-balanced">
             <div class="oas-cashbank-warning" role="status">
                 <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-                <span>تنبيه محاسبي: الرصيد المتوقع الحالي غير مرتبط بجميع حركات القبض والصرف أثناء الوردية. الفارق المعروض مبدئي ولا يصلح وحده لإثبات عجز أو زيادة أو تسوية محاسبية.</span>
+                <span>يُحسب الرصيد المتوقع من الحركات النقدية المرتبطة بالوردية. الورديات السابقة للترقية تستخدم التوقيت للحركات القديمة غير المرتبطة؛ راجعها قبل الاعتماد.</span>
             </div>
             <UiAccountingFormGrid Columns="3">
                 <UiAccountingReadOnlyValue Label="الرصيد المتوقع المسجل (غير محقق)"
                                            Value="@ExpectedClosingBalanceText" />
-                @if (Model.Status == CashShiftStatus.Open)
+                @if (Model.Status is CashShiftStatus.Open or CashShiftStatus.Closing)
                 {
-                    <UiAccountingNumberField Label="الجرد الفعلي عند الإغلاق"
-                                             Value="@ActualClosingBalanceValue"
-                                             ValueChanged="OnActualClosingBalanceChanged"
-                                             Min="0" Tone="@UiAccountingNumberField.NumberTone.Primary" />
+                    <div class="ui-acc-number-field">
+                        <label class="ui-acc-number-field__label" for="cash-shift-actual-count">الجرد الفعلي عند الإغلاق *</label>
+                        <input id="cash-shift-actual-count" type="number" min="0" step="any"
+                               class="ui-acc-number-field__input ui-acc-number-field__input--primary"
+                               value="@(Model.ActualClosingBalance?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)"
+                               placeholder="أدخل الجرد الفعلي" @oninput="OnActualClosingBalanceChanged" />
+                    </div>
                 }
                 else
                 {
@@ -67,6 +95,66 @@
                                            Tone="@DifferenceTone" />
             </UiAccountingFormGrid>
         </UiAccountingFormSection>
+        @if (Model.SettlementJournalEntryId.HasValue)
+        {
+            <UiAccountingFormSection Title="تسوية فرق الوردية" IconCssClass="fa-solid fa-scale-balanced">
+                <UiAccountingReadOnlyValue Label="حالة التسوية" Value="تم الترحيل" />
+                <UiAccountingReadOnlyValue Label="سبب التسوية" Value="@Model.SettlementReason" />
+                <UiAccountingReadOnlyValue Label="تاريخ التسوية" Value="@(Model.SettlementDate?.ToString("yyyy/MM/dd") ?? "—")" />
+                <a href="@($"/accounting/journals?journalId={Model.SettlementJournalEntryId.Value:D}")">القيد المحاسبي للتسوية</a>
+            </UiAccountingFormSection>
+        }
+        else if (Model.Status == CashShiftStatus.Approved && Model.UsesLinkedMovements && Model.DifferenceAmount.GetValueOrDefault() != 0 && ShiftId.HasValue)
+        {
+            <UiAccountingFormSection Title="تسوية فرق الوردية" IconCssClass="fa-solid fa-scale-balanced">
+                <button type="button" class="btn btn-outline-primary btn-sm" disabled="@_settling" @onclick="LoadSettlementAccountsAsync">إعداد تسوية الفرق</button>
+                @if (_settlementAccounts is not null)
+                {
+                    <UiAccountingFormGrid Columns="2">
+                        <label>حساب التسوية<select class="form-select" @bind="_settlementAccount"><option value="">اختر الحساب</option>
+                        @foreach (var a in _settlementAccounts) { <option value="@a.AccountId">@a.Name</option> }
+                        </select></label>
+                        <label>تاريخ التسوية<input type="date" class="form-control" @bind="_settlementDate" /></label>
+                        <label>سبب التسوية<input class="form-control" maxlength="400" @bind="_settlementReason" /></label>
+                    </UiAccountingFormGrid>
+                    <p>يُثبت فرق الإغلاق فقط محاسبيًا، ولا يغيّر الجرد الفعلي أو رصيد الافتتاح. يجب ألا تكون للصندوق وردية نشطة.</p>
+                    <button type="button" class="btn btn-primary btn-sm" disabled="@_settling" @onclick="SettleAsync">اعتماد وترحيل التسوية</button>
+                }
+                @if (!string.IsNullOrWhiteSpace(_settlementError)) { <p class="text-danger" role="alert">@_settlementError</p> }
+            </UiAccountingFormSection>
+        }
+        @if (ShiftId.HasValue)
+        {
+            <UiAccountingFormSection Title="الحركات المرتبطة بالوردية" IconCssClass="fa-solid fa-list">
+                <button type="button" class="btn btn-outline-primary btn-sm" disabled="@_loadingMovements" @onclick="() => LoadMovementsAsync(1)">عرض / تحديث الحركات</button>
+                @if (!string.IsNullOrWhiteSpace(_movementError))
+                {
+                    <p role="alert" class="text-danger">@_movementError</p>
+                }
+                @if (_movements is not null)
+                {
+                    @if (!_movements.UsesLinkedMovements)
+                    {
+                        <p>وردية قديمة: تعرض القائمة الحركات المرتبطة فعليًا بعد الترقية فقط، ولا تشمل الحركات التاريخية المستنتجة بالتوقيت.</p>
+                    }
+                    <p>عدد الحركات المرتبطة: @_movements.TotalCount</p>
+                    <div style="overflow-x:auto">
+                        <table class="table table-sm table-hover" dir="rtl">
+                            <thead><tr><th>رقم القيد</th><th>البند</th><th>التاريخ</th><th>البيان</th><th>العملة</th><th>وارد</th><th>صادر</th><th>مدين أساسي</th><th>دائن أساسي</th></tr></thead>
+                            <tbody>
+                            @foreach (var movement in _movements.Rows)
+                            {
+                                <tr><td>@movement.JournalNumber</td><td>@movement.LineNumber</td><td>@movement.PostingDate.ToString("yyyy/MM/dd")</td><td>@movement.Description</td><td>@movement.CurrencyCode</td><td>@(movement.DebitOriginal?.ToString("N2") ?? "—")</td><td>@(movement.CreditOriginal?.ToString("N2") ?? "—")</td><td>@movement.DebitBase.ToString("N2")</td><td>@movement.CreditBase.ToString("N2")</td></tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@(_loadingMovements || _movementPage <= 1)" @onclick="() => LoadMovementsAsync(_movementPage - 1)">السابق</button>
+                    <span>الصفحة @_movementPage</span>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@(_loadingMovements || (long)_movementPage * 100 >= _movements.TotalCount)" @onclick="() => LoadMovementsAsync(_movementPage + 1)">التالي</button>
+                }
+            </UiAccountingFormSection>
+        }
     }
     else
     {
@@ -79,14 +167,92 @@
     {
         public string ShiftNumber { get; set; } = string.Empty;
         public Guid? CashAccountId { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string? CashAccountError { get; set; }
         public decimal OpeningBalance { get; set; }
+        public decimal? BookOpeningBalance { get; set; }
+        public string? OpeningDifferenceReason { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string? OpeningBalanceError { get; set; }
         public decimal? ExpectedClosingBalance { get; set; }
         public decimal? ActualClosingBalance { get; set; }
         public decimal? DifferenceAmount { get; set; }
         public DateTimeOffset? OpenedAtUtc { get; set; }
         public DateTimeOffset? ClosedAtUtc { get; set; }
+        public Guid? SettlementJournalEntryId { get; set; }
+        public Guid? SettlementAccountId { get; set; }
+        public DateOnly? SettlementDate { get; set; }
+        public string? SettlementReason { get; set; }
+        public bool UsesLinkedMovements { get; set; }
         public CashShiftStatus Status { get; set; } = CashShiftStatus.Open;
         public string RowVersion { get; set; } = string.Empty;
+    }
+
+    [Parameter] public Guid? ShiftId { get; set; }
+    private IReadOnlyList<CashShiftSettlementAccountDto>? _settlementAccounts;
+    private Guid? _settlementAccount;
+    private DateOnly _settlementDate = DateOnly.FromDateTime(DateTime.Today);
+    private string? _settlementReason, _settlementError;
+    private bool _settling;
+    private async Task LoadSettlementAccountsAsync()
+    {
+        if (ShiftId is not Guid id || _settling) return;
+        _settling = true; _settlementError = null;
+        try { var items = await Api.GetAsync<List<CashShiftSettlementAccountDto>>($"api/accounting/cash-shifts/{id}/settlement-accounts"); if (ShiftId == id) _settlementAccounts = items; }
+        catch (ApiClientException ex) { _settlementError = ex.Error.Message; }
+        catch (Exception) { _settlementError = "تعذر تحميل حسابات التسوية."; }
+        finally { _settling = false; }
+    }
+    private async Task SettleAsync()
+    {
+        if (ShiftId is not Guid id || _settling) return;
+        if (_settlementAccount is not Guid account || string.IsNullOrWhiteSpace(_settlementReason)) { _settlementError = "حدد الحساب وسبب التسوية."; return; }
+        _settling = true; _settlementError = null;
+        try
+        {
+            var result = await Api.PostAsync<CashShiftSettlementRequest, CashShiftDto>($"api/accounting/cash-shifts/{id}/settle", new(account, _settlementDate, _settlementReason, Model.RowVersion));
+            if (ShiftId != id || result is null) return;
+            Model.SettlementJournalEntryId = result.SettlementJournalEntryId; Model.SettlementAccountId = result.SettlementAccountId;
+            Model.SettlementDate = result.SettlementDate; Model.SettlementReason = result.SettlementReason; Model.RowVersion = result.RowVersion;
+            _settlementAccounts = null;
+        }
+        catch (ApiClientException ex) { _settlementError = ex.Error.Message; }
+        catch (Exception) { _settlementError = "تعذر ترحيل التسوية."; }
+        finally { _settling = false; }
+    }
+    private Guid? _movementShiftId;
+    private CashShiftMovementsDto? _movements;
+    private int _movementPage = 1;
+    private bool _loadingMovements;
+    private string? _movementError;
+
+    protected override void OnParametersSet()
+    {
+        if (_movementShiftId == ShiftId) return;
+        _movementShiftId = ShiftId;
+        _settlementAccounts = null; _settlementAccount = null; _settlementReason = null; _settlementError = null;
+        _movements = null;
+        _movementPage = 1;
+        _movementError = null;
+    }
+
+    private async Task LoadMovementsAsync(int page)
+    {
+        if (ShiftId is not Guid id || _loadingMovements || page < 1) return;
+        _loadingMovements = true;
+        _movementError = null;
+        try
+        {
+            var data = await AccountingService.GetCashShiftMovementsAsync(id, page);
+            if (ShiftId != id) return;
+            _movements = data;
+            _movementPage = page;
+        }
+        catch (Exception)
+        {
+            if (ShiftId == id) _movementError = "تعذر تحميل الحركات. أعد المحاولة.";
+        }
+        finally { _loadingMovements = false; }
     }
 
     [Parameter] public FormModel Model { get; set; } = new();
@@ -100,7 +266,6 @@
 
     private string StatusCssClass => "oas-cashbank-state oas-cashbank-state--" + Model.Status.ToString().ToLowerInvariant();
     private string? CashAccountValue => Model.CashAccountId?.ToString("D");
-    private decimal ActualClosingBalanceValue => Model.ActualClosingBalance ?? 0m;
     private string Amount(decimal amount) => amount.ToString($"N{Math.Clamp(CurrencyDecimalPlaces, 0, 6)}");
     private string ExpectedClosingBalanceText => Model.ExpectedClosingBalance.HasValue ? Amount(Model.ExpectedClosingBalance.Value) : "لم يُحتسب";
     private string ActualClosingBalanceText => Model.ActualClosingBalance.HasValue ? Amount(Model.ActualClosingBalance.Value) : "لم يتم الجرد بعد";
@@ -115,7 +280,44 @@
         _ => UiAccountingReadOnlyValue.ValueTone.Default
     };
     private Task OnChanged() => OnModelChanged.InvokeAsync();
-    private async Task OnCashAccountChanged(string? value) { Model.CashAccountId = Guid.TryParse(value, out var id) ? id : null; await OnChanged(); }
+    private async Task OnCashAccountChanged(string? value)
+    {
+        Model.CashAccountError = null;
+        Model.CashAccountId = Guid.TryParse(value, out var id) ? id : null;
+        Model.BookOpeningBalance = null;
+        Model.OpeningDifferenceReason = null;
+        await RefreshOpeningBalanceAsync();
+    }
+    private async Task RefreshOpeningBalanceAsync()
+    {
+        var model = Model;
+        var id = model.CashAccountId;
+        model.BookOpeningBalance = null;
+        model.OpeningBalanceError = null;
+        if (id is Guid selected)
+        {
+            try
+            {
+                var result = await AccountingService.GetCashShiftOpeningBalanceAsync(selected);
+                if (Model != model || model.CashAccountId != id) return;
+                model.BookOpeningBalance = result?.BookBalance;
+                if (result is null) model.OpeningBalanceError = "تعذر جلب الرصيد الدفتري.";
+            }
+            catch (Exception)
+            {
+                if (Model != model || model.CashAccountId != id) return;
+                model.OpeningBalanceError = "تعذر جلب الرصيد الدفتري. راجع عملة الصندوق وحركاته ثم أعد المحاولة.";
+            }
+        }
+        await OnChanged();
+    }
+    private async Task OnOpeningReasonChanged(string? value) { Model.OpeningDifferenceReason = value; await OnChanged(); }
     private async Task OnOpeningBalanceChanged(decimal amount) { Model.OpeningBalance = amount; await OnChanged(); }
-    private async Task OnActualClosingBalanceChanged(decimal amount) { Model.ActualClosingBalance = amount; await OnChanged(); }
+    private async Task OnActualClosingBalanceChanged(ChangeEventArgs args)
+    {
+        var raw = args.Value?.ToString();
+        Model.ActualClosingBalance = decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out var amount) && amount >= 0m
+            ? amount : null;
+        await OnChanged();
+    }
 }

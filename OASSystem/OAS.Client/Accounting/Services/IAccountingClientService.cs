@@ -25,7 +25,10 @@ namespace OAS.Client.Accounting.Services;
 
 public interface IAccountingClientService
 {
+    Task<BalanceSheetReportDto?> GetBalanceSheetAsync(BalanceSheetFilterDto filter, CancellationToken cancellationToken = default);
+    Task<IncomeStatementReportDto?> GetIncomeStatementAsync(IncomeStatementFilterDto filter, CancellationToken cancellationToken = default);
     Task<PagedResult<AccountDto>> GetAccountsPageAsync(PageRequest request, CancellationToken cancellationToken = default);
+    Task<UpdateFinancialStatementCategoriesResult?> UpdateFinancialStatementCategoriesAsync(UpdateFinancialStatementCategoriesRequest request, CancellationToken cancellationToken = default);
     Task<AccountDto?> GetAccountByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<AccountSaveCheckDto?> GetAccountSaveCheckAsync(Guid id, UpdateAccountRequest request, CancellationToken cancellationToken = default);
     Task<AccountDto?> CreateAccountAsync(CreateAccountRequest request, CancellationToken cancellationToken = default);
@@ -50,7 +53,7 @@ public interface IAccountingClientService
     Task<JournalEntryDto?> CreateJournalAsync(CreateJournalEntryRequest request, CancellationToken cancellationToken = default);
     Task<JournalEntryDto?> UpdateJournalAsync(Guid id, UpdateJournalEntryRequest request, CancellationToken cancellationToken = default);
     Task<JournalEntryDto?> SetJournalStatusAsync(Guid id, SetJournalEntryStatusRequest request, CancellationToken cancellationToken = default);
-    Task<JournalEntryDto?> ReverseJournalAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<JournalEntryDto?> ReverseJournalAsync(Guid id, ReverseJournalEntryRequest request, CancellationToken cancellationToken = default);
 
     Task<PagedResult<PostingProfileDto>> GetPostingProfilesPageAsync(PageRequest request, CancellationToken cancellationToken = default);
     Task<PostingProfileDto?> GetPostingProfileByIdAsync(Guid id, CancellationToken cancellationToken = default);
@@ -115,6 +118,8 @@ public interface IAccountingClientService
     Task<BankAccountDto?> SetBankAccountStatusAsync(Guid id, SetBankAccountStatusRequest request, CancellationToken cancellationToken = default);
 
     Task<PagedResult<CashShiftDto>> GetCashShiftsPageAsync(PageRequest request, CancellationToken cancellationToken = default);
+    Task<CashShiftOpeningBalanceDto?> GetCashShiftOpeningBalanceAsync(Guid cashAccountId, CancellationToken cancellationToken = default);
+    Task<CashShiftMovementsDto?> GetCashShiftMovementsAsync(Guid id, int page, CancellationToken cancellationToken = default);
     Task<CashShiftDto?> GetCashShiftByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<CashShiftDto?> CreateCashShiftAsync(CreateCashShiftRequest request, CancellationToken cancellationToken = default);
     Task<CashShiftDto?> CloseCashShiftAsync(Guid id, SetCashShiftClosingRequest request, CancellationToken cancellationToken = default);

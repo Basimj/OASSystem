@@ -5,4 +5,5 @@ public sealed record CreateCashAccountRequest(
     string Name,
     Guid CurrencyId,
     bool IsDefault = false,
-    bool IsActive = true);
+    bool IsActive = true,
+    bool RequiresOpenShift = false);

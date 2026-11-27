@@ -19,6 +19,31 @@ namespace OAS.API.Accounting.Controllers;
 [Route("api/accounting/reports")]
 public sealed class AccountingReportsController(ISender sender) : ControllerBase
 {
+    [HttpGet("vouchers")]
+    public async Task<ActionResult<CashBankReportDto>> Vouchers([FromQuery] DateOnly fromDate, [FromQuery] DateOnly toDate,
+        [FromQuery] string mode = "all", [FromQuery] string status = "posted", [FromQuery] string kind = "all", [FromQuery] Guid? currencyId = null, [FromQuery] Guid? accountId = null, [FromQuery] int? method = null, [FromQuery] int? partyType = null, [FromQuery] string? party = null, [FromQuery] Guid? postedBy = null, [FromQuery] Guid? cashAccountId = null, [FromQuery] Guid? bankAccountId = null, CancellationToken ct = default)
+        => Ok(await sender.Send(new OAS.Application.Accounting.Reports.Queries.GetVoucherReport.GetVoucherReportQuery(new VoucherReportFilter(fromDate,toDate,mode,status,kind,currencyId,accountId,method,partyType,party,postedBy,cashAccountId,bankAccountId)),ct));
+
+    [HttpGet("cash-bank")]
+    public async Task<ActionResult<CashBankReportDto>> CashBank([FromQuery] DateOnly fromDate, [FromQuery] DateOnly toDate,
+        [FromQuery] string mode = "balances", [FromQuery] string kind = "all", [FromQuery] Guid? accountId = null,
+        [FromQuery] Guid? currencyId = null, [FromQuery] string activity = "all", [FromQuery] bool includeZero = false,
+        [FromQuery] string shiftState = "all", [FromQuery] string settlementState = "all", [FromQuery] Guid? openedBy = null, CancellationToken ct = default)
+        => Ok(await sender.Send(new OAS.Application.Accounting.Reports.Queries.GetCashBankReport.GetCashBankReportQuery(
+            new CashBankReportFilterDto(fromDate, toDate, mode, kind, accountId, currencyId, activity, includeZero, shiftState, settlementState, openedBy)), ct));
+
+    [HttpGet("balance-sheet")]
+    public async Task<ActionResult<BalanceSheetReportDto>> BalanceSheet([FromQuery] DateOnly asOfDate,
+        [FromQuery] Guid? fiscalYearId = null, CancellationToken cancellationToken = default)
+        => Ok(await sender.Send(new OAS.Application.Accounting.Reports.Queries.GetBalanceSheet.GetBalanceSheetQuery(
+            new BalanceSheetFilterDto(asOfDate, fiscalYearId)), cancellationToken));
+
+    [HttpGet("income-statement")]
+    public async Task<ActionResult<IncomeStatementReportDto>> IncomeStatement([FromQuery] DateOnly fromDate, [FromQuery] DateOnly toDate,
+        [FromQuery] Guid? fiscalYearId = null, [FromQuery] Guid? fiscalPeriodId = null, [FromQuery] Guid? costCenterId = null, CancellationToken cancellationToken = default)
+        => Ok(await sender.Send(new OAS.Application.Accounting.Reports.Queries.GetIncomeStatement.GetIncomeStatementQuery(
+            new IncomeStatementFilterDto(fromDate, toDate, fiscalYearId, fiscalPeriodId, costCenterId)), cancellationToken));
+
     [HttpGet("dashboard")]
     public async Task<ActionResult<AccountingDashboardDto>> Dashboard(
         CancellationToken cancellationToken)
@@ -104,6 +129,7 @@ public sealed class AccountingReportsController(ISender sender) : ControllerBase
         [FromQuery] string? reference = null,
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 100,
+        [FromQuery] bool includeCompleteEntries = false,
         CancellationToken cancellationToken = default)
     {
         var filter = new JournalReportFilterDto(
@@ -119,7 +145,8 @@ public sealed class AccountingReportsController(ISender sender) : ControllerBase
             journalNumber,
             reference,
             pageNumber,
-            pageSize);
+            pageSize,
+            includeCompleteEntries);
 
         var result = await sender.Send(new GetJournalReportQuery(filter), cancellationToken);
         return Ok(result);

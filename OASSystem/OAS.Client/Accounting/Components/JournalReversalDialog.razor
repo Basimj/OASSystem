@@ -1,0 +1,22 @@
+@namespace OAS.Client.Accounting.Components
+@using OAS.Contracts.Accounting.Journals
+@using OAS.UiLib.Services.Dialogs
+@inject IUiDialogService Dialog
+
+<div dir="rtl" style="display:grid;gap:12px;padding:12px">
+    <p>سيتم إنشاء قيد عكسي مستقل كمسودة. لا يلغى الأثر المحاسبي للقيد الأصلي حتى ترحيل القيد العكسي.</p>
+    <label>تاريخ العكس<input type="date" class="form-control" @bind="_date" @bind:format="yyyy-MM-dd" /></label>
+    <label>سبب العكس<textarea class="form-control" rows="3" maxlength="400" @bind="_reason" @bind:event="oninput"></textarea></label>
+    @if (_date.Date < OriginalDate.Date){<small role="alert">تاريخ العكس لا يجوز أن يسبق تاريخ القيد الأصلي.</small>}
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button type="button" class="btn btn-secondary" @onclick="Dialog.Cancel">إلغاء</button>
+        <button type="button" class="btn btn-primary" disabled="@(_date.Date < OriginalDate.Date || string.IsNullOrWhiteSpace(_reason))" @onclick="Submit">إنشاء القيد العكسي</button>
+    </div>
+</div>
+@code {
+    [Parameter] public DateTime OriginalDate { get; set; }
+    private DateTime _date = DateTime.Today;
+    private string _reason = "";
+    protected override void OnInitialized() { if (_date < OriginalDate) _date = OriginalDate; }
+    private void Submit() { if (_date.Date >= OriginalDate.Date && !string.IsNullOrWhiteSpace(_reason)) Dialog.Close(new ReverseJournalEntryRequest(DateOnly.FromDateTime(_date), _reason.Trim())); }
+}

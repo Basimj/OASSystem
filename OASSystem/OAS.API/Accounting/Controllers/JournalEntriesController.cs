@@ -79,9 +79,10 @@ public sealed class JournalEntriesController(ISender sender) : ControllerBase
     [HttpPost("{id:guid}/reverse")]
     public async Task<ActionResult<JournalEntryDto>> Reverse(
         Guid id,
+        [FromBody] ReverseJournalEntryRequest request,
         CancellationToken cancellationToken)
     {
-        var reversalId = await sender.Send(new ReverseJournalEntryCommand(id), cancellationToken);
+        var reversalId = await sender.Send(new ReverseJournalEntryCommand(id, request.PostingDate, request.Reason), cancellationToken);
         var dto = await sender.Send(new GetJournalEntryByIdQuery(reversalId), cancellationToken);
         return CreatedAtAction(nameof(GetById), new { id = reversalId }, dto);
     }

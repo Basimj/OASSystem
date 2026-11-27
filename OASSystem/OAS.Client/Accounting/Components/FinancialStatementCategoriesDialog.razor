@@ -1,0 +1,70 @@
+@namespace OAS.Client.Accounting.Components
+@using OAS.Contracts.Accounting.Accounts
+@using OAS.Contracts.Accounting.Enums
+@using OAS.Client.Accounting.Common
+@using OAS.UiLib.Services.Dialogs
+@inject IUiDialogService Dialog
+
+<div class="financial-categories-dialog" dir="rtl">
+    <div class="fsc-summary">
+        <div>الحسابات <strong>@Accounts.Count</strong></div>
+        <div>مصنفة <strong>@(_rows.Count(x => Effective(x) is not null))</strong></div>
+        <div>غير مصنفة <strong>@(_rows.Count(x => Effective(x) is null))</strong></div>
+    </div>
+    <div class="fsc-tools">
+        <input class="form-control" placeholder="بحث بالاسم أو رقم الحساب" @bind="_search" @bind:event="oninput" />
+        <select class="form-select" @bind="_status">
+            <option value="all">جميع الحسابات</option><option value="unclassified">غير المصنفة</option>
+            <option value="inherited">الموروثة</option><option value="explicit">المخصصة</option>
+        </select>
+    </div>
+    <div class="fsc-notice">تغيير التصنيف يؤثر على عرض القوائم المالية للفترات السابقة أيضاً، ولا يغير القيود أو الأرصدة. اختر الوراثة لتطبيق أقرب تصنيف أب متوافق.</div>
+    <div class="fsc-table-wrap">
+        <table class="fsc-table">
+            <thead><tr><th>رقم الحساب</th><th>اسم الحساب</th><th>تصنيف الحساب</th><th>تصنيف القوائم المالية</th><th>التصنيف الفعلي</th></tr></thead>
+            <tbody>
+            @foreach (var account in VisibleRows)
+            {
+                <tr @key="account.Id">
+                    <td>@account.Code</td><td style="text-align:right">@account.NameAr</td><td>@ClassLabel(account.AccountClass)</td>
+                    <td><select class="form-select" value="@Value(account)" @onchange="e => Change(account.Id, e.Value?.ToString())">
+                        <option value="inherit">وراثة / غير مصنف</option>
+                        @foreach (var category in Enum.GetValues<FinancialStatementCategory>().Where(c => FinancialStatementCategories.IsCompatible(account.AccountClass,c)))
+                        { <option value="@category.ToString()">@FinancialStatementCategoryPresenter.Label(category)</option> }
+                    </select></td>
+                    <td class="@(Effective(account) is null ? "fsc-warning" : "")">@FinancialStatementCategoryPresenter.Label(Effective(account))</td>
+                </tr>
+            }
+            @if (!VisibleRows.Any()) { <tr><td colspan="5">لا توجد حسابات مطابقة</td></tr> }
+            </tbody>
+        </table>
+    </div>
+    <div class="fsc-footer"><span>تعديلات غير محفوظة: @Changes.Count</span><button class="btn btn-secondary" @onclick="Dialog.Cancel">إلغاء</button><button class="btn btn-primary" disabled="@(Changes.Count == 0 || Changes.Count > 5000)" @onclick="Submit">حفظ التصنيفات</button></div>
+</div>
+@code {
+    [Parameter] public IReadOnlyList<AccountDto> Accounts { get; set; } = [];
+    private IReadOnlyList<AccountDto> _rows = [];
+    private Dictionary<Guid, AccountDto> _draft = [];
+    private Dictionary<Guid, AccountDto> _original = [];
+    private string _search = "", _status = "all";
+    protected override void OnInitialized()
+    {
+        _rows = Accounts.OrderBy(x => x.Code, StringComparer.Ordinal).ToArray();
+        _original = _rows.ToDictionary(x => x.Id);
+        _draft = _rows.ToDictionary(x => x.Id);
+    }
+    private FinancialStatementCategory? Effective(AccountDto row) => FinancialStatementCategories.Resolve(row.AccountClass, _draft[row.Id].FinancialStatementCategory, row.ParentAccountId, _draft);
+    private string Value(AccountDto row) => _draft[row.Id].FinancialStatementCategory?.ToString() ?? "inherit";
+    private IEnumerable<AccountDto> VisibleRows => _rows.Where(x => (string.IsNullOrWhiteSpace(_search) || x.Code.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase) || x.NameAr.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase) || (x.NameEn?.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase) ?? false)) && (_status switch {
+        "unclassified" => Effective(x) is null, "inherited" => _draft[x.Id].FinancialStatementCategory is null && Effective(x) is not null,
+        "explicit" => _draft[x.Id].FinancialStatementCategory is not null, _ => true }));
+    private List<FinancialStatementCategoryChange> Changes => _draft.Values.Where(x => x.FinancialStatementCategory != _original[x.Id].FinancialStatementCategory).Select(x => new FinancialStatementCategoryChange(x.Id, x.RowVersion, x.FinancialStatementCategory)).ToList();
+    private void Change(Guid id, string? value)
+    {
+        if (Enum.TryParse<FinancialStatementCategory>(value, out var c) && FinancialStatementCategories.IsCompatible(_draft[id].AccountClass, c))
+            _draft[id] = _draft[id] with { FinancialStatementCategory = c };
+        else _draft[id] = _draft[id] with { FinancialStatementCategory = null };
+    }
+    private void Submit() { if (Changes.Count is > 0 and <= 5000) Dialog.Close(new UpdateFinancialStatementCategoriesRequest(Changes)); }
+    private static string ClassLabel(AccountClass cls) => cls switch { AccountClass.Asset => "الأصول", AccountClass.Liability => "الالتزامات", AccountClass.Equity => "حقوق الملكية", AccountClass.Revenue => "الإيرادات", AccountClass.Expense => "المصروفات", _ => "—" };
+}

@@ -26,7 +26,7 @@
             <option value="pending">بانتظار الاعتماد</option>
             <option value="approved">معتمد</option>
             <option value="posted">مرحّل</option>
-            <option value="reversed">معكوس</option>
+            <option value="reversed">معكوس (حالة قديمة)</option>
             <option value="unposted">غير مرحّل</option>
         </select>
         <span>يطبق المرشح على جميع النتائج في الخادم، وليس الصفحة المعروضة فقط.</span>
@@ -53,7 +53,10 @@
             GetSourceText(entry.SourceModule),
             "fa-solid fa-book-journal-whills",
             [
-                new("تاريخ الترحيل", entry.PostingDate.ToString("yyyy/MM/dd"))
+                new("تاريخ الترحيل", entry.PostingDate.ToString("yyyy/MM/dd")),
+                new("نوع القيد", AccountingArabicPresenter.GetJournalTypeText(entry.JournalType)),
+                new("حالة العكس", AccountingArabicPresenter.GetJournalReversalText(entry.Reversal)),
+                new("القيود المرتبطة", AccountingArabicPresenter.GetJournalRelatedNumbers(entry.Reversal))
             ],
             AccountingArabicPresenter.GetJournalStatusText(entry.Status),
             JournalState(entry.Status),

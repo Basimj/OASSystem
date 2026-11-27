@@ -13,7 +13,7 @@
             <h2><i class="fa-solid fa-file-circle-plus" aria-hidden="true"></i> @(IsNew ? "إضافة سند جديد" : "سند قبض " + Model.VoucherNumber)</h2>
             <p>إدخال سند قبض ومراجعة أسطره ومبالغه قبل الحفظ والاعتماد والترحيل.</p>
         </div>
-        <span class="oas-voucher-editor__status"><i class="fa-solid fa-circle" aria-hidden="true"></i> @(IsNew ? "مسودة" : AccountingArabicPresenter.GetReceiptVoucherStatusText(Model.Status))</span>
+        <span class="oas-voucher-editor__status"><i class="fa-solid fa-circle" aria-hidden="true"></i> @(IsNew ? "مسودة" : Model.ReversalJournalId.HasValue ? (Model.ReversalPosted ? "معكوس" : "عكس غير مكتمل") : AccountingArabicPresenter.GetReceiptVoucherStatusText(Model.Status))</span>
     </div>
 
     <UiVoucherSettlementLinesEditor Lines="@Model.Lines"
@@ -62,7 +62,7 @@
                 </div>
                 <div class="oas-voucher-editor__readonly">
                     <span>حالة السند</span>
-                    <strong><i class="fa-solid fa-circle" aria-hidden="true"></i> @(IsNew ? "مسودة" : AccountingArabicPresenter.GetReceiptVoucherStatusText(Model.Status))</strong>
+                    <strong><i class="fa-solid fa-circle" aria-hidden="true"></i> @(IsNew ? "مسودة" : Model.ReversalJournalId.HasValue ? (Model.ReversalPosted ? "معكوس" : "عكس غير مكتمل") : AccountingArabicPresenter.GetReceiptVoucherStatusText(Model.Status))</strong>
                 </div>
             </div>
             <div class="oas-voucher-editor__kind-band">
@@ -99,7 +99,7 @@
                                    SavedBaseTotal="@Model.BaseTotalAmount"
                                    IsNew="@IsNew"
                                    VoucherDate="@Model.VoucherDate"
-                                   StatusText="@(IsNew ? "مسودة" : AccountingArabicPresenter.GetReceiptVoucherStatusText(Model.Status))" />
+                                   StatusText="@(IsNew ? "مسودة" : Model.ReversalJournalId.HasValue ? (Model.ReversalPosted ? "معكوس" : "عكس غير مكتمل") : AccountingArabicPresenter.GetReceiptVoucherStatusText(Model.Status))" />
         </SummaryContent>
     </UiVoucherSettlementLinesEditor>
     <UiVoucherFinancialReview Lines="@Model.Lines"
@@ -136,6 +136,10 @@
         public ReceiptVoucherStatus Status { get; set; } = ReceiptVoucherStatus.Draft;
         public Guid? JournalEntryId { get; set; }
         public string? GeneratedJournalNumber { get; set; }
+        public Guid? ReversalJournalId { get; set; }
+        public bool ReversalPosted { get; set; }
+        public bool JournalLoaded { get; set; }
+        public DateOnly? OriginalPostingDate { get; set; }
         public string RowVersion { get; set; } = string.Empty;
         public List<UiVoucherSettlementLinesEditor.EditableSettlementLine> Lines { get; set; } =
             [new UiVoucherSettlementLinesEditor.EditableSettlementLine { PartyType = UiVoucherSettlementLinesEditor.SettlementPartyKind.Customer }];

@@ -1,0 +1,88 @@
+/* Inventory opts into the existing report workspace. Do not change report,
+   sales, purchasing, or accounting styles outside these two wrappers. */
+.inventory-report-list, .inventory-report-form { min-width:0; min-height:0; }
+.inventory-report-list .oas-report { height:calc(100dvh - 96px); min-height:470px; }
+.inventory-report-list .oas-report__head { gap:8px; }
+.inventory-report-list .oas-report__toolbar { min-width:0; justify-content:flex-end; }
+.inventory-report-list .oas-report__toolbar .ui-workspace-actionbar { gap:5px; min-width:0; }
+.inventory-report-list .oas-report__toolbar .ui-button,
+.inventory-report-form .inventory-form-toolbar .ui-button {
+    background:#fff !important; color:#253654 !important; border:1px solid #cbd6e6 !important;
+    border-radius:6px !important; box-shadow:none !important; min-height:30px !important;
+    padding:3px 8px; font-size:11px !important;
+}
+.inventory-report-list .oas-report__toolbar .ui-button:not(:disabled):hover,
+.inventory-report-form .inventory-form-toolbar .ui-button:not(:disabled):hover { border-color:#90a8c9 !important; }
+.inventory-report-list .oas-report__toolbar .ui-button:disabled,
+.inventory-report-form .inventory-form-toolbar .ui-button:disabled { opacity:.5; cursor:not-allowed; }
+.inventory-report-list .oas-report__toolbar .ui-search-input { width:min(255px,100%); margin-inline-start:0; background:#fff !important; border:1px solid #cbd6e6 !important; box-shadow:none !important; color:#677ca5; }
+.inventory-report-list .oas-report__toolbar .ui-search-input input { background:#fff !important; border:0 !important; color:#253654 !important; box-shadow:none !important; font-size:11px !important; }
+.inventory-report-list .oas-report__toolbar .ui-search-input:focus-within { border-color:#7698cd !important; }
+.inventory-report-list .oas-report__toolbar .ui-search-input button { color:#677ca5; }
+.inventory-report-list .oas-report__quick-filters { overflow-x:auto; scrollbar-width:thin; }
+.inventory-report-list .oas-report__quick-filters:empty,
+.inventory-report-list .oas-report__pagination:empty,
+.inventory-report-list .oas-report__metrics:empty { display:none; }
+.inventory-report-list .oas-report__filter-reopen { display:none; } /* toolbar toggle is always available */
+.inventory-report-list .oas-report__aside { display:flex; flex-direction:column; overflow:hidden; }
+.inventory-report-list .oas-report__aside-header { flex:none; }
+.inventory-report-list .inventory-filter-fields { flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden; scrollbar-width:thin; padding:4px 1px 8px; }
+.inventory-report-list .inventory-filter-footer { flex:none; padding-top:7px; border-top:1px solid #dce4f5; background:#fff; }
+.inventory-report-list .inventory-filter-fields :is(.ui-workspace-filterbar,.stock-counts__filters,.inventory-balance__filters) { display:grid !important; grid-template-columns:minmax(0,1fr) !important; gap:7px; width:100%; align-items:start; }
+.inventory-report-list .inventory-filter-fields :is(.ui-input-date,.ui-searchable-select,.oas-report__field) { min-width:0; width:100%; }
+.inventory-report-list .inventory-filter-fields :is(.ui-searchable-select__label,.ui-input-date label,.ui-text-label) { color:#253654; font-size:10px !important; font-weight:600; }
+.inventory-report-list .inventory-filter-fields :is(.ui-searchable-select__trigger,.ui-input-date input,.oas-report__field input,.oas-report__field select) { width:100%; min-width:0; min-height:27px; height:27px; border:1px solid #d5dff1; border-radius:5px; background:#fff; color:#253654; font-size:10px !important; padding:2px 5px; box-shadow:none; }
+.inventory-report-list .inventory-filter-fields .ui-searchable-select__selected { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:10px !important; }
+.inventory-report-list .inventory-filter-fields .ui-searchable-select__popover:popover-open { background:#fff; color:#253654; }
+/* Opt-in UiDataTable and native balances table share the real report header/row palette. */
+.inventory-report-list .oas-report .ui-data-table__container { background:#fff; border:0; border-radius:0; box-shadow:none; min-width:0; }
+.inventory-report-list .oas-report .ui-data-table__container--paged { display:flex; flex-direction:column; min-height:100%; overflow:visible; }
+.inventory-report-list .oas-report .ui-data-table__container--paged > table { flex:none; }
+.inventory-report-list .oas-report .oas-report__table { width:100%; font-size:11px !important; border-collapse:collapse; color:#253654; }
+.inventory-report-list .oas-report .oas-report__table thead th { position:sticky; top:0; z-index:1; background:var(--r-header-bg) !important; color:#1a243e !important; font-size:11px !important; font-weight:700; padding:4px 7px; text-align:center; line-height:1.35 !important; white-space:normal; border-color:#d9e0e9; }
+.inventory-report-list .oas-report .oas-report__table thead th.oas-report__sortable-th { padding:0; }
+.inventory-report-list .oas-report .oas-report__table tbody td { color:#253654; font-size:11px !important; padding:4px 7px; font-weight:500; line-height:1.4 !important; vertical-align:middle; }
+.inventory-report-list .oas-report .oas-report__table tbody td :is(strong,span,small,button) { font-size:inherit !important; line-height:inherit !important; }
+.inventory-report-list .oas-report .oas-report__table .ui-data-table__row--selected td:first-child { box-shadow:inset -2px 0 0 #1553ef; }
+.inventory-report-list .oas-report .ui-data-table__pager { position:sticky; bottom:0; inset-inline-start:0; flex:none; margin-top:auto; background:#fff; border-top:1px solid #ccd7ee; color:#253654; padding:5px 8px; font-size:11px; z-index:2; }
+.inventory-report-list .oas-report :is(.ui-data-table__pager,.balance-pager) button { min-height:25px; padding:3px 9px; border:1px solid #cbd8ef; border-radius:5px; background:#fff; color:#224170; font-size:11px; }
+.inventory-report-list .oas-report :is(.ui-data-table__pager,.balance-pager) button:disabled { opacity:.45; }
+.inventory-report-list .oas-report .balance-pager { display:flex; align-items:center; justify-content:space-between; width:100%; gap:7px; font-size:11px; }
+.inventory-report-list .oas-report .balance-pager label { display:flex; flex-direction:row; align-items:center; gap:5px; margin:0; }
+.inventory-report-list .oas-report .balance-pager select { width:auto; height:25px; padding:1px 4px; }
+.inventory-report-list .oas-report__pagination:has(.balance-pager) { height:auto; min-height:35px; }
+.inventory-report-list .oas-report__metrics { grid-template-columns:repeat(4,minmax(0,1fr)); }
+.inventory-report-list .oas-report__metric strong { white-space:normal; overflow-wrap:anywhere; text-align:center; }
+.inventory-report-list .oas-report__metric { min-width:0; box-shadow:none; }
+.inventory-report-list .oas-report__table tfoot td { background:var(--r-header-bg) !important; color:#1a243e !important; font-weight:700; padding:5px 7px; border:1px solid #d9e0e9; }
+.inventory-report-list .oas-report .balance-table td.balance-inactive,
+.inventory-report-list .oas-report .balance-table small.balance-inactive { color:#b42318 !important; }
+.inventory-report-list .oas-report .balance-table td.balance-available { color:#168049 !important; font-weight:700; }
+.inventory-report-list .oas-report .ui-badge { background:transparent !important; border:0 !important; box-shadow:none !important; }
+/* Keep edit/create routes as forms: white controls, clear headers and readable validation.
+   Do not set control colors for errors or disable native focus indicators. */
+.inventory-report-form { height:100%; font-family:"Cairo","Segoe UI",Tahoma,sans-serif; color:#253654;
+    --oas-color-surface:#fff; --oas-color-text:#253654; --oas-color-text-muted:#526481;
+    --oas-color-border:#d5dff1; --oas-color-subtle:#e8edf5; --oas-color-hover:#f3f4f6;
+    --inv-surface:#fff; --inv-border:#d5dff1; --inv-text:#253654; --inv-muted:#526481; }
+.inventory-report-form .inventory-form-toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:space-between; }
+.inventory-report-form .inventory-form-toolbar h1 { margin:0; color:#101b34; font-size:18px; font-weight:750; }
+.inventory-report-form .inventory-form-toolbar h1 i { color:#7945c6; }
+.inventory-report-form .ui-card { background:#fff; border:1px solid #d5dff1; box-shadow:none; }
+.inventory-report-form .ui-card__header { border-bottom:1px solid #e0e5eb; padding-bottom:8px; }
+.inventory-report-form .ui-card__header h2 { color:#1a243e; }
+.inventory-report-form :is(.inventory-transactions__table-head,.stock-counts__table-head) { background:#e8edf5; color:#1a243e; border-color:#d9e0e9; }
+@media(max-width:750px){ .inventory-report-list .oas-report__metrics {grid-template-columns:repeat(2,minmax(0,1fr));} .inventory-report-list .oas-report__head {align-items:flex-start;} .inventory-report-list .oas-report__toolbar {justify-content:flex-start;} }
+@media(max-width:560px){ .inventory-report-list .oas-report__main--filters {grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(100px,1fr) minmax(100px,40%);} .inventory-report-list .oas-report__aside {grid-column:1;grid-row:2;} }
+.inventory-report-list .oas-report .ui-data-table__pager--report { justify-content:space-between; flex-wrap:wrap; gap:5px; }
+.inventory-report-list .oas-report__quick-filters .ui-section-tabs { border:0; padding:0; max-width:100%; }
+.inventory-report-list .oas-report__quick-filters .ui-section-tab { background:#fff; color:#526481; border:1px solid #cbd6e6; padding:4px 9px; }
+.inventory-report-list .oas-report__quick-filters .ui-section-tab--active { background:#e8edf5; border-color:#aabbd4; color:#1553ef; }
+
+/* InventoryReportTable is a client-local component; no UiDataTable scoped CSS dependency. */
+.inventory-report-list .ui-data-table__row--clickable { cursor:pointer; }
+.inventory-report-list .ui-data-table__empty { text-align:center; padding:24px !important; color:#526481 !important; }
+.inventory-report-list .ui-data-table__pager--report { display:flex; align-items:center; }
+.inventory-report-list .ui-data-table__container { overflow-x:auto; }
+.inventory-report-list .ui-data-table__container--paged { overflow:visible; }
+.inventory-report-list .oas-report__table th::after { content:none; }

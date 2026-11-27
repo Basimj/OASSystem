@@ -1,0 +1,63 @@
+@typeparam TItem
+<div class="@ContainerCssClass">
+    <table class="@TableCssClass">
+        <thead>
+            <tr>
+                @if (Headers.Count > 0)
+                {
+                    @foreach (var header in Headers)
+                    {
+                        <th scope="col">@header</th>
+                    }
+                }
+                else
+                {
+                    @foreach (var column in Columns)
+                    {
+                        <th scope="col">@column.Header</th>
+                    }
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @if (Items.Count == 0)
+            {
+                <tr>
+                    <td colspan="@ColumnCount" class="ui-data-table__empty">@EmptyText</td>
+                </tr>
+            }
+            else
+            {
+                @foreach (var item in PagedItems)
+                {
+                    <tr class="@GetRowCss(item)" @onclick="() => HandleRowClickAsync(item)">
+                        @if (RowTemplate is not null)
+                        {
+                            @RowTemplate(item)
+                        }
+                        else
+                        {
+                            @foreach (var column in Columns)
+                            {
+                                <td>@column.ValueSelector(item)</td>
+                            }
+                        }
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+    @if (IsPaged)
+    {
+        <nav class="ui-data-table__pager ui-data-table__pager--report" aria-label="التنقل بين صفحات الجدول">
+            <div class="oas-report__pager">
+                <button type="button" @onclick="FirstPage" disabled="@(CurrentPage <= 1)" aria-label="الصفحة الأولى">»</button>
+                <button type="button" @onclick="PreviousPage" disabled="@(CurrentPage <= 1)" aria-label="الصفحة السابقة">‹</button>
+                <span>صفحة @CurrentPage من @TotalPages</span>
+                <button type="button" @onclick="NextPage" disabled="@(CurrentPage >= TotalPages)" aria-label="الصفحة التالية">›</button>
+                <button type="button" @onclick="LastPage" disabled="@(CurrentPage >= TotalPages)" aria-label="الصفحة الأخيرة">«</button>
+            </div>
+            <span>عرض @(Items.Count == 0 ? 0 : (CurrentPage - 1) * PageSize + 1) - @Math.Min(CurrentPage * PageSize, Items.Count) من @Items.Count نتيجة</span>
+        </nav>
+    }
+</div>

@@ -1,0 +1,77 @@
+@page "/accounting/reports/income-statement"
+@attribute [Authorize]
+@using OAS.UiLib.Components.Reports
+<PageTitle>قائمة الدخل | OAS</PageTitle>
+<div class="trial-report @(_unclassified ? "trial-unbalanced" : "")">
+<UiReportWorkspace Title="قائمة الدخل" TitleIcon="fa-solid fa-chart-line" StatusText="@Status" StatusIcon="@StatusIcon" Search="@_search" SearchChanged="OnSearch" FiltersOpen="@_filtersOpen" FiltersOpenChanged="@(v => _filtersOpen = v)">
+    <Toolbar>
+        <button type="button" class="oas-report__tool" title="تحديث" disabled="@_busy" @onclick="ApplyAsync"><i class="fa-solid fa-rotate"></i></button>
+        <button type="button" class="oas-report__tool oas-report__tool--pdf" title="حفظ PDF" disabled="@(!CanExport)" @onclick="PrintAsync"><i class="fa-regular fa-file-pdf"></i></button>
+        <button type="button" class="oas-report__tool oas-report__tool--excel" title="Excel" disabled="@(!CanExport)" @onclick="ExportAsync"><i class="fa-regular fa-file-excel"></i></button>
+        <button type="button" class="oas-report__tool" title="طباعة" disabled="@(!CanExport)" @onclick="PrintAsync"><i class="fa-solid fa-print"></i></button>
+        <button type="button" class="oas-report__tool" title="إظهار أو إخفاء الفلاتر" @onclick="@(() => _filtersOpen = !_filtersOpen)"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+    </Toolbar>
+    <QuickFilters>
+        @foreach(var chip in Chips){<div class="oas-report__chip"><span class="oas-report__chip-label">@chip.Label:</span><strong>@chip.Value</strong></div>}
+    </QuickFilters>
+    <FilterPanel>
+        <div class="trial-fields">
+            <label class="oas-report__field">السنة المالية<select value="@_draft.Year" @onchange="OnYear"><option value="">الكل</option>@foreach(var y in _years){<option value="@y.Id">@y.Name</option>}</select></label>
+            <label class="oas-report__field">الفترة المالية<select value="@_draft.Period" @onchange="OnPeriod"><option value="">جميع الفترات</option>@foreach(var p in PeriodOptions){<option value="@p.Id">@p.Name</option>}</select></label>
+            <label class="oas-report__field">من تاريخ<input type="date" @bind="_draft.From" @bind:format="yyyy-MM-dd" /></label>
+            <label class="oas-report__field">إلى تاريخ<input type="date" @bind="_draft.To" @bind:format="yyyy-MM-dd" /></label>
+            <label class="oas-report__field">نوع التقرير<select @bind="_draft.Mode"><option value="detail">تفصيلي</option><option value="summary">إجمالي</option><option value="compare">مقارنة الفترات</option><option value="monthly">شهري</option><option value="ratio">تحليل النسب</option></select></label>
+            @if(_draft.Mode=="compare"){
+                <label class="oas-report__field">المقارنة من<input type="date" @bind="_draft.CompareFrom" @bind:format="yyyy-MM-dd" /></label>
+                <label class="oas-report__field">المقارنة إلى<input type="date" @bind="_draft.CompareTo" @bind:format="yyyy-MM-dd" /></label>
+            }
+            <label class="oas-report__field">مستوى الحساب<select @bind="_draft.Level" disabled="@(_draft.Mode!="detail")"><option value="0">جميع المستويات</option>@foreach(var l in Levels){<option value="@l">حتى المستوى @l</option>}</select></label>
+            <label class="oas-report__field">مركز التكلفة<select @bind="_draft.CostCenter"><option value="">جميع المراكز</option>@foreach(var c in _centers.OrderBy(c=>c.Code)){<option value="@c.Id">@c.NameAr</option>}</select></label>
+            <label class="oas-report__field">العملة<select @bind="_draft.Currency"><option value="">@_baseName (الأساسية)</option>@foreach(var c in _currencies.Where(c=>c.IsActive&&c.Id!=_baseId)){<option value="@c.Id">@c.NameAr (@c.Code)</option>}</select></label>
+            <label class="oas-report__field-check"><input type="checkbox" @bind="_draft.Children" disabled="@(_draft.Mode!="detail")" /> تضمين تفاصيل الحسابات</label>
+            <label class="oas-report__field-check"><input type="checkbox" @bind="_draft.IncludeZero" /> إظهار الحسابات الصفرية</label>
+            @if(_validation is not null){<div role="alert" class="trial-warning">@_validation</div>}
+        </div>
+        <div class="oas-report__apply"><button type="button" class="primary" disabled="@_busy" @onclick="ApplyAsync"><i class="fa-solid fa-filter"></i> تطبيق</button><button type="button" disabled="@_busy" @onclick="ResetAsync"><i class="fa-solid fa-rotate-left"></i> إعادة تعيين</button></div>
+    </FilterPanel>
+    <TableContent>
+        @if(_unclassified){<div class="income-alert" role="alert">توجد حسابات ذات حركة غير مصنفة؛ صافي النتيجة يشملها، لكن مجمل الربح والربح التشغيلي قد لا يكونان مكتملين.</div>}
+        @if(_applied.CostCenter.HasValue){<div class="income-alert">النتيجة تشمل الحركات المسندة لمركز التكلفة المختار فقط.</div>}
+        <table class="oas-report__table trial-table">
+            <thead><tr>
+                <UiReportSortHeader Label="رقم الحساب" Active="@(_sort=="code")" Descending="@_descending" OnSort="@(()=>SortBy("code"))" />
+                <UiReportSortHeader Label="اسم الحساب / البيان" Active="@(_sort=="name")" Descending="@_descending" OnSort="@(()=>SortBy("name"))" />
+                <UiReportSortHeader Label="@(Headers[2])" Active="@(_sort=="amount")" Descending="@_descending" OnSort="@(()=>SortBy("amount"))" />
+                @foreach(var h in Headers.Skip(3)){<th>@h</th>}
+            </tr></thead>
+            <tbody>
+            @if(_busy){<tr><td colspan="@Headers.Length" class="oas-report__empty">جارٍ تحميل قائمة الدخل...</td></tr>}
+            else if(_error is not null){<tr><td colspan="@Headers.Length" class="oas-report__empty" role="alert">@_error</td></tr>}
+            else{ @foreach(var r in PageRows){
+                <tr class="@(r.Summary ? "trial-total" : "")">
+                    <td class="trial-code">@(string.IsNullOrEmpty(r.Code)?"—":r.Code)</td>
+                    <td class="trial-name">
+                        @if(r.AccountId.HasValue && !r.Aggregate && !_applied.CostCenter.HasValue){<button type="button" class="trial-link" title="كشف الحساب (يشمل قيود الإقفال إن وجدت)" style="@($"padding-inline-start:{Math.Min(r.Depth,10)*10}px")" @onclick="@(()=>OpenStatement(r))">@r.Name</button>}
+                        else{ @r.Name }
+                    </td>
+                    @foreach(var cell in Cells(r)){<td class="oas-report__amount @(cell.Negative?"oas-report__debit":"oas-report__credit")">@cell.Text</td>}
+                </tr>
+            }}
+            </tbody>
+        </table>
+    </TableContent>
+    <Pagination>
+        <div class="oas-report__pager"><button @onclick="@(()=>GoPage(1))" disabled="@(_page==1)">»</button><button @onclick="@(()=>GoPage(_page-1))" disabled="@(_page==1)">‹</button><button class="active" disabled>@_page</button><button @onclick="@(()=>GoPage(_page+1))" disabled="@(_page>=TotalPages)">›</button><button @onclick="@(()=>GoPage(TotalPages))" disabled="@(_page>=TotalPages)">«</button></div>
+        <span>عرض @(_visible.Count==0?0:(_page-1)*_pageSize+1) - @Math.Min(_page*_pageSize,_visible.Count) من @_visible.Count نتيجة</span>
+        <label>لكل صفحة <select value="@_pageSize" @onchange="ChangePageSize"><option>10</option><option>25</option><option>50</option><option>100</option></select></label>
+    </Pagination>
+    <Metrics>
+        <UiReportMetric Label="صافي الإيرادات" Value="@Metric(_totals.Revenue)" Tone="blue" Icon="fa-solid fa-database" />
+        <UiReportMetric Label="تكلفة المبيعات" Value="@Metric(-_totals.Cost)" Tone="red" Icon="fa-solid fa-layer-group" />
+        <UiReportMetric Label="مجمل الربح" Value="@Metric(_totals.Gross)" Tone="green" Icon="fa-solid fa-chart-line" />
+        <UiReportMetric Label="المصروفات التشغيلية" Value="@Metric(-_totals.OperatingExpenses)" Tone="orange" Icon="fa-solid fa-receipt" />
+        <UiReportMetric Label="@(_totals.Net < 0?"صافي الخسارة":"صافي الربح")" Value="@Metric(_totals.Net)" Tone="@(_totals.Net < 0?"red":"green")" Icon="fa-solid fa-coins" />
+        <UiReportMetric Label="هامش الربح الصافي" Value="@(CanExport?Percent(_totals.Margin):"—")" Tone="purple" Icon="fa-solid fa-percent" />
+    </Metrics>
+</UiReportWorkspace>
+</div>

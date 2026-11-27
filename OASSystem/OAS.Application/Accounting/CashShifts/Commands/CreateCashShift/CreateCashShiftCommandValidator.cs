@@ -11,6 +11,8 @@ public sealed class CreateCashShiftCommandValidator
             .NotEmpty()
             .WithErrorCode("cash_account_id_required");
 
+        RuleFor(x => x.Data.OpeningDifferenceReason).MaximumLength(500);
+
         RuleFor(x => x.Data.OpeningBalance)
             .GreaterThanOrEqualTo(0)
             .WithErrorCode("opening_balance_must_be_non_negative");

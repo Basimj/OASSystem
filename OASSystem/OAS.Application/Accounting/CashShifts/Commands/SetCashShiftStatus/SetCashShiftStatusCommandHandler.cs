@@ -2,6 +2,7 @@ using MediatR;
 using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Abstractions.Security;
 using OAS.Application.Accounting.Authorization;
+using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Common.Exceptions;
 using OAS.Contracts.Accounting.CashShifts;
 using OAS.Domain.Accounting.Entities;
@@ -12,8 +13,8 @@ namespace OAS.Application.Accounting.CashShifts.Commands.SetCashShiftStatus;
 public sealed class SetCashShiftStatusCommandHandler(
     IRepository<CashShift, Guid> repository,
     IPermissionChecker permissionChecker,
-    ICurrentUser currentUser,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    ICashShiftBalanceService balanceService)
     : IRequestHandler<SetCashShiftStatusCommand>
 {
     public async Task Handle(
@@ -37,18 +38,14 @@ public sealed class SetCashShiftStatusCommandHandler(
         switch (targetStatus)
         {
             case DomainCashShiftStatus.Closing:
-                shift.StartClosing(shift.ExpectedClosingBalance ?? shift.OpeningBalance);
+                if (shift.Status != DomainCashShiftStatus.Open)
+                    throw new ConflictException("cash_shift_not_open", "Only an open shift can start closing.");
+                shift.StartClosing(await balanceService.CalculateExpectedAsync(shift, timeProvider.GetUtcNow().UtcDateTime, cancellationToken));
                 break;
 
             case DomainCashShiftStatus.Closed:
-                if (!Guid.TryParse(currentUser.UserId, out var closedBy))
-                    throw new ForbiddenException();
-                if (shift.Status == DomainCashShiftStatus.Open)
-                {
-                    shift.StartClosing(shift.ExpectedClosingBalance ?? shift.OpeningBalance);
-                }
-                shift.Close(shift.ExpectedClosingBalance ?? shift.OpeningBalance, closedBy, timeProvider.GetUtcNow().UtcDateTime);
-                break;
+                // Status changes must never substitute expected cash for a physical count.
+                throw new ConflictException("actual_closing_balance_required", "Use the close shift operation and enter the actual cash count.");
 
             case DomainCashShiftStatus.Approved:
                 if (!await permissionChecker.HasPermissionAsync(AccountingPermissions.CashShifts.Approve, cancellationToken))

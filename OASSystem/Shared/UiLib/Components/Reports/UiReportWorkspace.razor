@@ -4,7 +4,7 @@
 
 <section class="oas-report" dir="rtl">
     <div class="oas-report__head">
-        <div class="oas-report__identity"><i class="fa-solid fa-database" aria-hidden="true"></i><h1>@Title</h1>@if (!string.IsNullOrWhiteSpace(StatusText)){<span class="oas-report__status"><i class="fa-solid fa-filter"></i> @StatusText</span>}</div>
+        <div class="oas-report__identity"><i class="@TitleIcon" aria-hidden="true"></i><h1>@Title</h1>@if (!string.IsNullOrWhiteSpace(StatusText)){<span class="oas-report__status"><i class="@StatusIcon"></i> @StatusText</span>}</div>
         <div class="oas-report__toolbar">
             <div class="oas-report__search"><i class="fa-solid fa-magnifying-glass"></i><input aria-label="بحث في البيانات" placeholder="بحث في البيانات ..." value="@Search" @oninput="SearchChangedInternal" /></div>
             @if (Toolbar is not null) { @Toolbar }
@@ -31,6 +31,8 @@
 @code {
     [Parameter] public string Title { get; set; } = "كشف حساب";
     [Parameter] public string? StatusText { get; set; }
+    [Parameter] public string TitleIcon { get; set; } = "fa-solid fa-database";
+    [Parameter] public string StatusIcon { get; set; } = "fa-solid fa-filter";
     [Parameter] public string Search { get; set; } = "";
     [Parameter] public EventCallback<string> SearchChanged { get; set; }
     [Parameter] public bool FiltersOpen { get; set; }

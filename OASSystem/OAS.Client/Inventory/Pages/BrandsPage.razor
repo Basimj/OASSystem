@@ -11,7 +11,7 @@
 <PageTitle>@(IsFormRoute ? "نموذج المخزون" : "قائمة المخزون") - العلامات التجارية | OAS</PageTitle>
 <span class="oas-inventory-view" hidden aria-hidden="true"></span>
 
-<UiWorkspaceLayout ShowAside="false" ShowFilters="false">
+<InventoryReportWorkspace Title="العلامات التجارية" TitleIcon="fa-solid fa-tag" StatusText="@($"{FilteredBrands.Count} علامة تجارية")" ShowFilters="false" IsFormRoute="@IsFormRoute">
     <Actions>
         <UiWorkspaceActionBar>
             @if (IsFormRoute)
@@ -39,13 +39,6 @@
         @if (IsFormRoute)
         {
             <div class="oas-inventory-form-screen">
-                <div class="oas-inventory-form-screen__intro">
-                    <div>
-                        <div class="oas-inventory-form-screen__eyebrow">إدارة المخزون</div>
-                        <h2>@EditorTitle</h2>
-                        <p>راجع البيانات ثم احفظ التغييرات. الحقول الإضافية تظهر عند الحاجة.</p>
-                    </div>
-                </div>
                 <div class="oas-inventory-form-screen__body">
         <UiCard Title="@EditorTitle" Subtitle="@(_selectedId.HasValue ? _code : null)">
             @if (_mode == EditorMode.Empty)
@@ -79,15 +72,13 @@
         }
         else
         {
-        <UiDataGridPanel Title="العلامات التجارية" Subtitle="@($"{FilteredBrands.Count} علامة تجارية")">
-            <Body>
-                @if (_loading)
+                        @if (_loading)
                 {
                     <UiAlert Message="جاري تحميل العلامات التجارية..." />
                 }
                 else
                 {
-                    <UiDataTable TItem="BrandDto" Items="@FilteredBrands" PageSize="12" Headers="@Headers" EmptyText="لا توجد علامات تجارية مطابقة."
+                    <InventoryReportTable TItem="BrandDto" Items="@FilteredBrands" PageSize="12" Headers="@Headers" EmptyText="لا توجد علامات تجارية مطابقة."
                                  SidebarTypography="true" UniformCellTypography="true"
                                  OnRowClick="@(x => OpenDetailsScreen(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
                         <RowTemplate Context="item">
@@ -95,14 +86,13 @@
                             <td>@item.Name</td>
                             <td><UiBadge Text="@(item.IsActive ? "نشط" : "غير نشط")" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
                         </RowTemplate>
-                    </UiDataTable>
+                    </InventoryReportTable>
                 }
-            </Body>
-        </UiDataGridPanel>
+            
 
         }
     </Content>
-</UiWorkspaceLayout>
+</InventoryReportWorkspace>
 
 @if (_spreadsheetImportOpen)
 {

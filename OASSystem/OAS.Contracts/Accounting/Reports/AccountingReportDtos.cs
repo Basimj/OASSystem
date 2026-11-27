@@ -1,4 +1,5 @@
 using OAS.Contracts.Accounting.Enums;
+using OAS.Contracts.Accounting.Journals;
 
 namespace OAS.Contracts.Accounting.Reports;
 
@@ -37,7 +38,8 @@ public sealed record GeneralLedgerLineDto(
     decimal? TransactionCredit = null,
     decimal? ExchangeRate = null,
     string? Reference = null,
-    string? StatementDescription = null);
+    string? StatementDescription = null,
+    JournalReversalInfoDto? Reversal = null);
 
 public sealed record GeneralLedgerAccountDto(
     Guid AccountId,
@@ -90,7 +92,9 @@ public sealed record TrialBalanceRowDto(
     byte Level = 1,
     Guid? ParentAccountId = null,
     AccountType AccountType = AccountType.Posting,
-    bool IsAggregate = false);
+    bool IsAggregate = false,
+    decimal? PreviousDebitTotal = null,
+    decimal? PreviousCreditTotal = null);
 
 public sealed record TrialBalanceReportDto(
     DateOnly FromDate,
@@ -117,7 +121,8 @@ public sealed record JournalReportFilterDto(
     string? JournalNumber = null,
     string? Reference = null,
     int PageNumber = 1,
-    int PageSize = 100);
+    int PageSize = 100,
+    bool IncludeCompleteEntries = false);
 
 public sealed record JournalReportLineDto(
     Guid JournalEntryId,
@@ -140,7 +145,9 @@ public sealed record JournalReportLineDto(
     Guid? PostedBy,
     Guid? CustomerId,
     Guid? SupplierId,
-    string? Reference);
+    string? Reference,
+    string? DisplayDescription = null,
+    JournalReversalInfoDto? Reversal = null);
 
 public sealed record JournalReportDto(
     DateOnly FromDate,

@@ -18,7 +18,7 @@
 <PageTitle>@(IsFormRoute ? "نموذج المخزون" : "قائمة المخزون") - عمليات المخزون | OAS</PageTitle>
 <span class="oas-inventory-view" hidden aria-hidden="true"></span>
 
-<UiWorkspaceLayout ShowAside="false" ShowFilters="@(!IsFormRoute && true)" ScrollableMain="@IsFormRoute">
+<InventoryReportWorkspace Title="عمليات المخزون" TitleIcon="fa-solid fa-arrow-right-arrow-left" StatusText="@($"{FilteredTransactions.Count} عملية")" ShowFilters="true" IsFormRoute="@IsFormRoute" ResetFilters="ResetListFilters">
     <Actions>
         <UiWorkspaceActionBar>
             @if (IsFormRoute)
@@ -68,6 +68,12 @@
         </UiWorkspaceFilterBar>
         }
     </Filters>
+    
+    <QuickFilters>
+        <div class="oas-report__chip"><span>المخزن:</span><strong>@(WarehouseFilterOptions.FirstOrDefault(x => x.Value == _warehouseFilter)?.Text ?? "الكل")</strong></div>
+        <div class="oas-report__chip"><span>النوع:</span><strong>@(TransactionTypeFilterOptions.FirstOrDefault(x => x.Value == _typeFilter)?.Text ?? "الكل")</strong></div>
+        <div class="oas-report__chip"><span>الحالة:</span><strong>@(InventoryArabicPresenter.TransactionStatusOptions.FirstOrDefault(x => x.Value == _statusFilter)?.Text ?? "الكل")</strong></div>
+    </QuickFilters>
     <Content>
         @if (IsFormRoute)
         {
@@ -313,15 +319,13 @@
         }
         else
         {
-        <UiDataGridPanel Title="عمليات المخزون" Subtitle="@($"{FilteredTransactions.Count} عملية")">
-            <Body>
-                @if (_loading)
+                        @if (_loading)
                 {
                     <UiAlert Message="جاري تحميل عمليات المخزون..." />
                 }
                 else
                 {
-                    <UiDataTable TItem="InventoryTransactionDto" Items="@FilteredTransactions" PageSize="12" Headers="@TransactionHeaders" EmptyText="لا توجد عمليات مطابقة."
+                    <InventoryReportTable TItem="InventoryTransactionDto" Items="@FilteredTransactions" PageSize="12" Headers="@TransactionHeaders" EmptyText="لا توجد عمليات مطابقة."
                                  SidebarTypography="true"
                                  UniformCellTypography="true"
                                  OnRowClick="@(x => OpenDetailsScreen(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
@@ -336,16 +340,17 @@
                                          Tone="@(transaction.Status == InventoryTransactionStatus.Posted ? AlertTone.Success : AlertTone.Info)" />
                             </td>
                         </RowTemplate>
-                    </UiDataTable>
+                    </InventoryReportTable>
                 }
-            </Body>
-        </UiDataGridPanel>
+            
 
         }
     </Content>
-</UiWorkspaceLayout>
+</InventoryReportWorkspace>
 
 @code {
+    private void ResetListFilters() => _search = _typeFilter = _statusFilter = _warehouseFilter = null;
+
     // Each CRUD action has its own route. No editable form is mounted on the list screen.
     [Microsoft.AspNetCore.Components.Inject]
     private Microsoft.AspNetCore.Components.NavigationManager InventoryNavigation { get; set; } = default!;

@@ -37,6 +37,8 @@ public sealed class AccountConfiguration : IEntityTypeConfiguration<Account>
             .IsRequired()
             .HasConversion<byte>();
 
+        builder.Property(x => x.FinancialStatementCategory).HasConversion<byte>().IsRequired(false);
+
         builder.Property(x => x.AccountType)
             .IsRequired()
             .HasConversion<byte>();

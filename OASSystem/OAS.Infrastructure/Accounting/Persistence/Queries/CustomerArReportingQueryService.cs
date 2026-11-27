@@ -325,6 +325,10 @@ public sealed class CustomerArReportingQueryService(OasDbContext db) : ICustomer
             join v in db.Set<ReceiptVoucher>().AsNoTracking() on l.ReceiptVoucherId equals v.Id
             where l.CustomerId.HasValue && v.Status == ReceiptVoucherStatus.Posted &&
                 v.VoucherDate <= asOf &&
+                !(from original in db.Set<JournalEntry>()
+                  join reversed in db.Set<JournalEntry>() on original.ReversedJournalId equals (Guid?)reversed.Id
+                  where original.Id == v.JournalEntryId && reversed.Status == JournalEntryStatus.Posted && reversed.PostingDate <= asOf
+                  select reversed.Id).Any() &&
                 (!customerId.HasValue || l.CustomerId == customerId.Value) &&
                 !db.Set<CustomerAdvance>().Any(a => a.ReceiptVoucherLineId == l.Id && a.IsActive)
             select new
@@ -560,12 +564,16 @@ public sealed class CustomerArReportingQueryService(OasDbContext db) : ICustomer
                 .Skip(skip).Take(size).Select(x => new {
                     x.line.Id, x.voucher.VoucherNumber, x.voucher.VoucherDate,
                     x.line.BaseAmount, x.line.Amount, x.line.ExchangeRate,
-                    x.line.CurrencyCodeSnapshot, x.voucher.JournalEntryId
+                    x.line.CurrencyCodeSnapshot, x.voucher.JournalEntryId,
+                    Reversed = (from original in db.Set<JournalEntry>()
+                                join reversed in db.Set<JournalEntry>() on original.ReversedJournalId equals (Guid?)reversed.Id
+                                where original.Id == x.voucher.JournalEntryId && reversed.Status == JournalEntryStatus.Posted && reversed.PostingDate <= asOf
+                                select reversed.Id).Any()
                 }).ToListAsync(ct);
             return new(kind, source.Select(x => new CustomerArDocumentRowDto(
                 x.Id, "ReceiptVoucherLine", x.VoucherNumber, x.VoucherDate,
                 R(x.BaseAmount ?? x.Amount * (x.ExchangeRate ?? 1m)),
-                x.CurrencyCodeSnapshot ?? "", "Posted", x.JournalEntryId)).ToArray(), count, page, size);
+                x.CurrencyCodeSnapshot ?? "", x.Reversed ? "Reversed" : "Posted", x.JournalEntryId)).ToArray(), count, page, size);
         }
         if (kind == "advances")
         {

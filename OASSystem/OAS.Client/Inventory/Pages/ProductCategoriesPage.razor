@@ -11,7 +11,7 @@
 <PageTitle>@(IsFormRoute ? "نموذج المخزون" : "قائمة المخزون") - تصنيفات المنتجات | OAS</PageTitle>
 <span class="oas-inventory-view" hidden aria-hidden="true"></span>
 
-<UiWorkspaceLayout ShowAside="false" ShowFilters="false">
+<InventoryReportWorkspace Title="تصنيفات المنتجات" TitleIcon="fa-solid fa-layer-group" StatusText="@($"{FilteredItems.Count} تصنيف")" ShowFilters="false" IsFormRoute="@IsFormRoute">
     <Actions>
         <UiWorkspaceActionBar>
             @if (IsFormRoute)
@@ -33,13 +33,6 @@
         @if (IsFormRoute)
         {
             <div class="oas-inventory-form-screen">
-                <div class="oas-inventory-form-screen__intro">
-                    <div>
-                        <div class="oas-inventory-form-screen__eyebrow">إدارة المخزون</div>
-                        <h2>@EditorTitle</h2>
-                        <p>راجع البيانات ثم احفظ التغييرات. الحقول الإضافية تظهر عند الحاجة.</p>
-                    </div>
-                </div>
                 <div class="oas-inventory-form-screen__body">
         <UiCard Title="@EditorTitle" Subtitle="@(_selectedId.HasValue ? _code : null)">
             @if (_mode == EditorMode.Empty) { <UiAlert Message="اختر تصنيفًا من القائمة أو اضغط «جديد»." /> }
@@ -59,26 +52,23 @@
         }
         else
         {
-        <UiDataGridPanel Title="تصنيفات المنتجات" Subtitle="@($"{FilteredItems.Count} تصنيف")">
-            <Body>
-                @if (_loading) { <UiAlert Message="جاري تحميل تصنيفات المنتجات..." /> }
+                        @if (_loading) { <UiAlert Message="جاري تحميل تصنيفات المنتجات..." /> }
                 else
                 {
-                    <UiDataTable TItem="ProductCategoryDto" Items="@FilteredItems" PageSize="12" Headers="@Headers" EmptyText="لا توجد تصنيفات منتجات مطابقة." SidebarTypography="true" UniformCellTypography="true" OnRowClick="@(x => OpenDetailsScreen(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
+                    <InventoryReportTable TItem="ProductCategoryDto" Items="@FilteredItems" PageSize="12" Headers="@Headers" EmptyText="لا توجد تصنيفات منتجات مطابقة." SidebarTypography="true" UniformCellTypography="true" OnRowClick="@(x => OpenDetailsScreen(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
                         <RowTemplate Context="item">
                             <td><strong>@item.Code</strong></td>
                             <td>@item.Name</td>
                             <td>@ProductTypeName(item.ProductTypeId)</td>
                             <td><UiBadge Text="@(item.IsActive ? "نشط" : "غير نشط")" Tone="@(item.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
                         </RowTemplate>
-                    </UiDataTable>
+                    </InventoryReportTable>
                 }
-            </Body>
-        </UiDataGridPanel>
+            
 
         }
     </Content>
-</UiWorkspaceLayout>
+</InventoryReportWorkspace>
 
 @if (_spreadsheetImportOpen)
 {

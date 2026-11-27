@@ -54,6 +54,8 @@
                         ValueChanged="OnDefaultChanged" Disabled="@(!IsEditable)" />
             <UiCheckbox Label="الصندوق نشط" Value="@Model.IsActive"
                         ValueChanged="OnActiveChanged" Disabled="@(!IsEditable)" />
+            <UiCheckbox Label="يتطلب وردية مفتوحة" Value="@Model.RequiresOpenShift"
+                        ValueChanged="OnRequiresOpenShiftChanged" Disabled="@(!IsEditable)" />
         </UiAccountingCheckGroup>
         <p class="oas-cashbank-editor__hint">يمكن تعيين صندوق افتراضي واحد نشط لكل عملة. لا يؤدي تغيير الافتراضي إلى تعديل حركة سابقة.</p>
     </UiAccountingFormSection>
@@ -67,6 +69,7 @@
         public string Name { get; set; } = string.Empty;
         public Guid? AccountId { get; set; }
         public Guid? CurrencyId { get; set; }
+        public bool RequiresOpenShift { get; set; }
         public bool IsDefault { get; set; }
         public bool IsActive { get; set; } = true;
         public string RowVersion { get; set; } = string.Empty;
@@ -86,5 +89,6 @@
     private async Task OnNameChanged(string? value) { Model.Name = value ?? string.Empty; await OnChanged(); }
     private async Task OnCurrencyChanged(string? value) { Model.CurrencyId = Guid.TryParse(value, out var id) ? id : null; await OnChanged(); }
     private async Task OnDefaultChanged(bool value) { Model.IsDefault = value; await OnChanged(); }
+    private async Task OnRequiresOpenShiftChanged(bool value) { Model.RequiresOpenShift = value; await OnChanged(); }
     private async Task OnActiveChanged(bool value) { Model.IsActive = value; await OnChanged(); }
 }

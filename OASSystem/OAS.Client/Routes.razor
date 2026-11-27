@@ -1,7 +1,10 @@
 @namespace OAS.Client
+@implements IDisposable
+@inject NavigationManager Navigation
+@inject Microsoft.AspNetCore.Components.WebAssembly.Hosting.IWebAssemblyHostEnvironment HostEnvironment
 
 <CascadingAuthenticationState>
-    <ErrorBoundary>
+    <ErrorBoundary @ref="_routeBoundary">
         <ChildContent>
             <Router AppAssembly="@typeof(ClientAssemblyMarker).Assembly">
                 <Found Context="routeData">
@@ -28,6 +31,17 @@
                 <UiPage>
                     <UiCard Width="SurfaceWidth.Medium">
                         <UiAlert Tone="AlertTone.Danger" Message="@L["Error_Generic"]" />
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+                            <button type="button" @onclick="RetryRoute">إعادة المحاولة</button>
+                            <a href="/">العودة إلى لوحة التحكم</a>
+                        </div>
+                        @if (string.Equals(HostEnvironment.Environment, "Development", StringComparison.OrdinalIgnoreCase))
+                        {
+                            <details style="margin-top:12px">
+                                <summary>تفاصيل الخطأ (بيئة التطوير)</summary>
+                                <pre dir="ltr" style="white-space:pre-wrap;overflow-wrap:anywhere;text-align:left">@renderError.ToString()</pre>
+                            </details>
+                        }
                     </UiCard>
                 </UiPage>
             </LayoutView>
@@ -37,3 +51,27 @@
 
 <UiDialogHost />
 <UiSnackbarHost />
+
+@code {
+    private ErrorBoundary? _routeBoundary;
+    private bool _disposed;
+
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+    }
+
+    private void RetryRoute() => _routeBoundary?.Recover();
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        if (!_disposed)
+            _ = InvokeAsync(() => { if (!_disposed) _routeBoundary?.Recover(); });
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
+}

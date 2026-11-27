@@ -21,6 +21,8 @@ public sealed class CashShiftMapper
             source.ClosedBy,
             source.ClosedAtUtc,
             (ContractCashShiftStatus)(int)source.Status,
-            source.RowVersion is not null ? Convert.ToBase64String(source.RowVersion) : string.Empty);
+            source.RowVersion is not null ? Convert.ToBase64String(source.RowVersion) : string.Empty,
+            source.BookOpeningBalance, source.OpeningDifferenceReason,
+            source.SettlementJournalEntryId, source.SettlementAccountId, source.SettlementDate, source.SettlementReason, source.UsesLinkedMovements);
     }
 }

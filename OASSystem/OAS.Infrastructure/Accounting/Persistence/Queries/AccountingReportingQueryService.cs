@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using OAS.Application.Accounting.Abstractions;
 using OAS.Application.Accounting.Reports.Services;
+using OAS.Application.Accounting.Journals.Mapping;
+using OAS.Contracts.Accounting.Journals;
 using OAS.Application.Common.Exceptions;
 using OAS.Contracts.Accounting.Reports;
 using OAS.Domain.Accounting.Entities;
@@ -16,6 +18,68 @@ namespace OAS.Infrastructure.Accounting.Persistence.Queries;
 
 public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvider timeProvider) : IAccountingReportingQueryService
 {
+    public async Task<BalanceSheetReportDto> GetBalanceSheetAsync(BalanceSheetFilterDto filter, CancellationToken cancellationToken = default)
+    {
+        var asOfDate = filter.AsOfDate;
+        if (filter.FiscalYearId is Guid yearId)
+        {
+            var year = await db.Set<FiscalYear>().AsNoTracking().FirstOrDefaultAsync(y => y.Id == yearId, cancellationToken)
+                ?? throw new NotFoundException(nameof(FiscalYear), yearId);
+            if (asOfDate < year.StartDate || asOfDate > year.EndDate)
+                throw new ConflictException("report_date_outside_year", "تاريخ الميزانية خارج السنة المالية المختارة.");
+        }
+        // A balance sheet is cumulative. Do not truncate to the selected year's start,
+        // and do not exclude closing entries or posted reversals.
+        var accounts = await db.Set<Account>().AsNoTracking().OrderBy(a => a.Code).ToListAsync(cancellationToken);
+        var directory = accounts.ToDictionary(a => a.Id);
+        var balances = await (from line in db.Set<JournalEntryLine>().AsNoTracking()
+                              join journal in db.Set<JournalEntry>().AsNoTracking() on line.JournalEntryId equals journal.Id
+                              where journal.Status == JournalEntryStatus.Posted && journal.PostingDate <= asOfDate
+                              group line by line.AccountId into g
+                              select new { AccountId = g.Key, Balance = g.Sum(l => l.DebitAmount - l.CreditAmount) })
+            .ToDictionaryAsync(x => x.AccountId, x => x.Balance, cancellationToken);
+        var rows = accounts.Select(a => new BalanceSheetAccountDto(a.Id, a.Code, a.NameAr, a.ParentAccountId, a.Level,
+            (OAS.Contracts.Accounting.Enums.AccountClass)a.AccountClass,
+            (OAS.Contracts.Accounting.Enums.FinancialStatementCategory?)FinancialStatementCategories.Resolve(a.AccountClass, a.FinancialStatementCategory, a.ParentAccountId, directory),
+            balances.GetValueOrDefault(a.Id))).ToArray();
+        return new BalanceSheetReportDto(asOfDate, rows, BalanceSheetTotalsDto.Calculate(rows));
+    }
+
+    public async Task<IncomeStatementReportDto> GetIncomeStatementAsync(IncomeStatementFilterDto filter, CancellationToken cancellationToken = default)
+    {
+        var (fromDate, toDate) = await ResolveRangeAsync(filter.FromDate, filter.ToDate, null, filter.FiscalYearId, filter.FiscalPeriodId, cancellationToken);
+        var accounts = await db.Set<Account>().AsNoTracking().ToListAsync(cancellationToken);
+        var directory = accounts.ToDictionary(a => a.Id);
+        var nominal = accounts.Where(a => a.AccountClass is AccountClass.Revenue or AccountClass.Expense)
+            .Select(a => new IncomeStatementAccountDto(a.Id, a.Code, a.NameAr, a.ParentAccountId, a.Level,
+                (OAS.Contracts.Accounting.Enums.AccountClass)a.AccountClass,
+                (OAS.Contracts.Accounting.Enums.FinancialStatementCategory?)FinancialStatementCategories.Resolve(a.AccountClass, a.FinancialStatementCategory, a.ParentAccountId, directory))).ToArray();
+        // Exclude annual closing entries and every linked reversal, including legacy chains.
+        var links = await db.Set<JournalEntry>().AsNoTracking()
+            .Where(j => j.JournalType == JournalType.Closing || j.SourceDocumentType == "FiscalYearClosing" || j.ReversedJournalId.HasValue)
+            .Select(j => new { j.Id, j.ReversedJournalId, j.JournalType, j.SourceDocumentType }).ToListAsync(cancellationToken);
+        var byId = links.ToDictionary(j => j.Id);
+        var excluded = new HashSet<Guid>();
+        foreach (var close in links.Where(j => j.JournalType == JournalType.Closing || j.SourceDocumentType == "FiscalYearClosing"))
+        {
+            Guid? id = close.Id;
+            while (id is Guid key && excluded.Add(key))
+                id = byId.TryGetValue(key, out var link) ? link.ReversedJournalId : null;
+        }
+        var excludedIds = excluded.ToArray();
+        var query = from line in db.Set<JournalEntryLine>().AsNoTracking()
+                    join journal in db.Set<JournalEntry>().AsNoTracking() on line.JournalEntryId equals journal.Id
+                    join account in db.Set<Account>().AsNoTracking() on line.AccountId equals account.Id
+                    where journal.Status == JournalEntryStatus.Posted && journal.PostingDate >= fromDate && journal.PostingDate <= toDate
+                        && (account.AccountClass == AccountClass.Revenue || account.AccountClass == AccountClass.Expense)
+                        && journal.JournalType != JournalType.Closing && !excludedIds.Contains(journal.Id)
+                        && (!filter.CostCenterId.HasValue || line.CostCenterId == filter.CostCenterId)
+                    group line by new { line.AccountId, journal.PostingDate.Year, journal.PostingDate.Month } into g
+                    select new IncomeStatementMovementDto(g.Key.AccountId, g.Key.Year, g.Key.Month, g.Sum(l => l.CreditAmount - l.DebitAmount));
+        var movements = await query.ToListAsync(cancellationToken);
+        return new IncomeStatementReportDto(fromDate, toDate, nominal, movements);
+    }
+
     public async Task<AccountingDashboardDto> GetAccountingDashboardAsync(
         CancellationToken cancellationToken = default)
     {
@@ -168,7 +232,7 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
                 postedExpenses = await db.Set<Expense>().AsNoTracking()
                     .Where(x => x.Status == ExpenseStatus.Posted &&
                         x.ExpenseDate >= currentPeriod.StartDate && x.ExpenseDate <= today)
-                    .SumAsync(x => x.Amount, cancellationToken);
+                    .SumAsync(x => x.BaseAmount ?? x.Amount, cancellationToken);
             }
 
             financial = new AccountingDashboardFinancialDto(
@@ -333,7 +397,11 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
         if (filter.JournalType.HasValue)
         {
             var journalType = (JournalType)(byte)filter.JournalType.Value;
-            query = query.Where(x => x.JournalType == journalType);
+            var originalLinks = db.Set<JournalEntry>().AsNoTracking().Where(j => j.ReversedJournalId.HasValue).Select(j => j.ReversedJournalId!.Value);
+            if (journalType == JournalType.Reversal)
+                query = query.Where(x => x.JournalType == JournalType.Reversal || originalLinks.Contains(x.JournalId) || x.SourceDocumentType == "JournalEntryReversal" || x.SourceDocumentType == "CustomerSettlementFxReversal" || x.SourceDocumentType == "SupplierSettlementFxReversal");
+            else
+                query = query.Where(x => x.JournalType == journalType && !originalLinks.Contains(x.JournalId) && (x.SourceDocumentType == null || (x.SourceDocumentType != "JournalEntryReversal" && x.SourceDocumentType != "CustomerSettlementFxReversal" && x.SourceDocumentType != "SupplierSettlementFxReversal")));
         }
 
         if (!string.IsNullOrWhiteSpace(filter.SourceModule))
@@ -359,6 +427,7 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
         }
 
         var movements = await query.ToListAsync(cancellationToken);
+        var reversalInfo = await ResolveJournalReversalsAsync(movements.Where(x => x.PostingDate >= fromDate).Select(x => x.JournalId), cancellationToken);
         // Resolve document codes in batches, never expose source entity GUIDs in customer-facing reports.
         var sourceDocuments = await ResolveLedgerDocumentsAsync(
             movements.Where(x => x.PostingDate >= fromDate)
@@ -411,7 +480,7 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
                     movement.DebitAmount,
                     movement.CreditAmount,
                     running,
-                    (OAS.Contracts.Accounting.Enums.JournalType)(byte)movement.JournalType,
+                    reversalInfo.TryGetValue(movement.JournalId, out var info) && info.IsReversal ? OAS.Contracts.Accounting.Enums.JournalType.Reversal : (OAS.Contracts.Accounting.Enums.JournalType)(byte)movement.JournalType,
                     movement.CustomerId,
                     movement.SupplierId,
                     movement.TransactionCurrencyCodeSnapshot,
@@ -424,7 +493,8 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
                         GetDocumentInfo(movement.SourceDocumentType, movement.SourceDocumentId, sourceDocuments)?.Narrative,
                         GetDocumentReference(movement.SourceDocumentType, movement.SourceDocumentId, sourceDocuments),
                         movement.SourceDocumentType, movement.Description, movement.JournalDescription,
-                        movement.JournalType == JournalType.Manual)));
+                        movement.JournalType == JournalType.Manual),
+                    info));
             }
 
             var debit = period.Sum(x => x.DebitAmount);
@@ -542,7 +612,9 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
                 account.Level,
                 account.ParentAccountId,
                 (OAS.Contracts.Accounting.Enums.AccountType)(byte)account.AccountType,
-                aggregate));
+                aggregate,
+                movement.OpeningDebit,
+                movement.OpeningCredit));
         }
 
         // Totals are calculated from direct account movements, never from header rollups,
@@ -605,7 +677,11 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
         if (filter.JournalType.HasValue)
         {
             var value = (JournalType)(byte)filter.JournalType.Value;
-            query = query.Where(x => x.Journal.JournalType == value);
+            var originalLinks = db.Set<JournalEntry>().AsNoTracking().Where(j => j.ReversedJournalId.HasValue).Select(j => j.ReversedJournalId!.Value);
+            if (value == JournalType.Reversal)
+                query = query.Where(x => x.Journal.JournalType == JournalType.Reversal || originalLinks.Contains(x.Journal.Id) || x.Journal.SourceDocumentType == "JournalEntryReversal" || x.Journal.SourceDocumentType == "CustomerSettlementFxReversal" || x.Journal.SourceDocumentType == "SupplierSettlementFxReversal");
+            else
+                query = query.Where(x => x.Journal.JournalType == value && !originalLinks.Contains(x.Journal.Id) && (x.Journal.SourceDocumentType == null || (x.Journal.SourceDocumentType != "JournalEntryReversal" && x.Journal.SourceDocumentType != "CustomerSettlementFxReversal" && x.Journal.SourceDocumentType != "SupplierSettlementFxReversal")));
         }
         if (filter.Status.HasValue)
         {
@@ -617,8 +693,13 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
             var value = filter.SourceModule.Trim();
             query = query.Where(x => x.Journal.SourceModule == value);
         }
-        if (filter.AccountId.HasValue)
-            query = query.Where(x => x.Line.AccountId == filter.AccountId.Value);
+        if (filter.AccountId is Guid accountId)
+        {
+            if (filter.IncludeCompleteEntries)
+                query = query.Where(x => db.Set<JournalEntryLine>().Any(l => l.JournalEntryId == x.Journal.Id && l.AccountId == accountId));
+            else
+                query = query.Where(x => x.Line.AccountId == accountId);
+        }
         if (filter.UserId.HasValue)
         {
             var userText = filter.UserId.Value.ToString();
@@ -647,7 +728,9 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
         var page = await query
             .OrderBy(x => x.Journal.PostingDate)
             .ThenBy(x => x.Journal.JournalNumber)
+            .ThenBy(x => x.Journal.Id)
             .ThenBy(x => x.Line.LineNumber)
+            .ThenBy(x => x.Line.Id)
             .Skip((filter.PageNumber - 1) * filter.PageSize)
             .Take(filter.PageSize)
             .Select(x => new JournalReportLineDto(
@@ -671,17 +754,43 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
                 x.Journal.PostedBy,
                 x.Line.CustomerId,
                 x.Line.SupplierId,
-                null))
+                null, // Reference is resolved after materialization.
+                null, // DisplayDescription is resolved after materialization.
+                null)) // Reversal information is resolved after materialization.
             .ToListAsync(cancellationToken);
 
-        var lines = page.Select(x => x with
+        var reversalInfo = await ResolveJournalReversalsAsync(page.Select(x => x.JournalEntryId), cancellationToken);
+        var documents = await ResolveLedgerDocumentsAsync(page.Select(x => (x.SourceDocumentType, x.SourceDocumentId)), cancellationToken);
+        var lines = page.Select(x =>
         {
-            Reference = FormatReference(x.SourceDocumentType, x.SourceDocumentId)
+            var reference = GetDocumentReference(x.SourceDocumentType, x.SourceDocumentId, documents);
+            reversalInfo.TryGetValue(x.JournalEntryId, out var info);
+            return x with
+            {
+                JournalType = info?.IsReversal == true ? OAS.Contracts.Accounting.Enums.JournalType.Reversal : x.JournalType,
+                Reversal = info,
+                Reference = reference,
+                DisplayDescription = StatementNarrativeFormatter.Resolve(null, reference, x.SourceDocumentType,
+                    x.Description, null, x.JournalType == OAS.Contracts.Accounting.Enums.JournalType.Manual)
+            };
         }).ToArray();
 
         return new JournalReportDto(
             fromDate, toDate, lines, totalDebit, totalCredit, totalDebit - totalCredit,
             totalCount, filter.PageNumber, filter.PageSize);
+    }
+
+    private async Task<IReadOnlyDictionary<Guid, JournalReversalInfoDto>> ResolveJournalReversalsAsync(IEnumerable<Guid> journalIds, CancellationToken ct)
+    {
+        var result = new Dictionary<Guid, JournalReversalInfoDto>();
+        foreach (var ids in journalIds.Distinct().Chunk(500))
+        {
+            var headers = await db.Set<JournalEntry>().AsNoTracking().Where(j => ids.Contains(j.Id)).ToListAsync(ct);
+            var linkedIds = headers.Where(j => j.ReversedJournalId.HasValue).Select(j => j.ReversedJournalId!.Value).ToArray();
+            var related = await db.Set<JournalEntry>().AsNoTracking().Where(j => linkedIds.Contains(j.Id) || (j.ReversedJournalId.HasValue && ids.Contains(j.ReversedJournalId.Value))).ToListAsync(ct);
+            foreach (var pair in JournalReversalInfoResolver.Build(headers, related)) result[pair.Key] = pair.Value;
+        }
+        return result;
     }
 
     private async Task<(DateOnly FromDate, DateOnly ToDate)> ResolveRangeAsync(
@@ -770,6 +879,8 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
                 resolved[(type, pair.Key)] = pair.Value;
         }
 
+        await AddAsync("journalentryreversal", async ids => await db.Set<JournalEntry>().AsNoTracking()
+            .Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => new LedgerDocumentInfo(x.JournalNumber, null), ct));
         await AddAsync("salesinvoice", async ids => await db.Set<SalesInvoice>().AsNoTracking()
             .Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => new LedgerDocumentInfo(x.InvoiceCode, x.Description), ct));
         await AddAsync("salesreturn", async ids => await db.Set<SalesReturn>().AsNoTracking()
@@ -783,6 +894,10 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
         await AddAsync("receiptvoucher", async ids => await db.Set<ReceiptVoucher>().AsNoTracking()
             .Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => new LedgerDocumentInfo(x.VoucherNumber, x.Description), ct));
         await AddAsync("paymentvoucher", async ids => await db.Set<PaymentVoucher>().AsNoTracking()
+            .Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => new LedgerDocumentInfo(x.VoucherNumber, x.Description), ct));
+        await AddAsync("receiptvoucherreversal", async ids => await db.Set<ReceiptVoucher>().AsNoTracking()
+            .Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => new LedgerDocumentInfo(x.VoucherNumber, x.Description), ct));
+        await AddAsync("paymentvoucherreversal", async ids => await db.Set<PaymentVoucher>().AsNoTracking()
             .Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => new LedgerDocumentInfo(x.VoucherNumber, x.Description), ct));
         await AddAsync("inventorytransaction", async ids => await db.Set<InventoryTransaction>().AsNoTracking()
             .Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id,
@@ -819,6 +934,7 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
         var normalized = (original ?? string.Empty).Trim();
         // Preserve meaningful accounting narratives. Only replace generated posting labels.
         var type = sourceType!.Trim().ToLowerInvariant();
+        if (type is "receiptvoucherreversal" or "paymentvoucherreversal") return journalDescription;
         // Translate only known generated posting labels, while retaining the
         // original meaning and the source line number for auditability.
         if (normalized.StartsWith("COGS reversal /", StringComparison.OrdinalIgnoreCase))
@@ -879,11 +995,6 @@ public sealed class AccountingReportingQueryService(OasDbContext db, TimeProvide
             System.Globalization.CultureInfo.InvariantCulture, out var number) && number > 0
             ? $" — البند {number}" : string.Empty;
     }
-
-    private static string? FormatReference(string? sourceDocumentType, Guid? sourceDocumentId) =>
-        string.IsNullOrWhiteSpace(sourceDocumentType) && !sourceDocumentId.HasValue
-            ? null
-            : $"{sourceDocumentType}{(sourceDocumentId.HasValue ? $" / {sourceDocumentId:D}" : string.Empty)}";
 
     private static DateOnly Max(DateOnly left, DateOnly right) => left >= right ? left : right;
     private static DateOnly Min(DateOnly left, DateOnly right) => left <= right ? left : right;

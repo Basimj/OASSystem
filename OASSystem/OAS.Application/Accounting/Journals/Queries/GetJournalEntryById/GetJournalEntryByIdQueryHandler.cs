@@ -27,6 +27,7 @@ public sealed class GetJournalEntryByIdQueryHandler(
                 .AddSort(nameof(JournalEntryLine.LineNumber), OAS.Contracts.Common.Pagination.SortDirection.Ascending),
             cancellationToken);
 
-        return JournalEntryMapping.ToDto(entity, lines);
+        var reversal = await JournalReversalInfoResolver.ResolveAsync(repository, new[] { entity }, cancellationToken);
+        return JournalReversalInfoResolver.Apply(JournalEntryMapping.ToDto(entity, lines), reversal[entity.Id]);
     }
 }

@@ -25,11 +25,24 @@ public sealed class CashShift : AuditableEntity<Guid>
         OpenedAtUtc = openedAtUtc;
         OpeningBalance = openingBalance;
         Status = status;
+        UsesLinkedMovements = true;
     }
 
     public string ShiftNumber { get; private set; } = null!;
 
     public Guid CashAccountId { get; private set; }
+
+    // False for pre-migration shifts: their historical movements still need timestamp fallback.
+    public bool UsesLinkedMovements { get; private set; }
+
+    // Reconcile a just-closed shift under the same persistence lock as cash postings.
+    public void ReconcileClosingBalance(decimal expectedClosingBalance)
+    {
+        if (Status != CashShiftStatus.Closed || !ActualClosingBalance.HasValue)
+            throw new InvalidOperationException("Only a just-closed shift with a physical count can be reconciled.");
+        ExpectedClosingBalance = expectedClosingBalance;
+        DifferenceAmount = ActualClosingBalance.Value - expectedClosingBalance;
+    }
 
     public Guid OpenedBy { get; private set; }
 
@@ -37,11 +50,47 @@ public sealed class CashShift : AuditableEntity<Guid>
 
     public decimal OpeningBalance { get; private set; }
 
+    public decimal? BookOpeningBalance { get; private set; }
+    public decimal? ExpectedBookOpeningBalance { get; private set; }
+    public void ExpectBookOpeningBalance(decimal? balance) => ExpectedBookOpeningBalance = balance;
+    public string? OpeningDifferenceReason { get; private set; }
+
+    public void SetOpeningDifferenceReason(string? reason)
+    {
+        if (Status != CashShiftStatus.Open || BookOpeningBalance.HasValue)
+            throw new InvalidOperationException("Opening count is already recorded.");
+        if (reason?.Length > 500) throw new ArgumentException("Opening reason is too long.", nameof(reason));
+        OpeningDifferenceReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+    }
+
+    public void RecordBookOpeningBalance(decimal balance)
+    {
+        if (Status != CashShiftStatus.Open || BookOpeningBalance.HasValue)
+            throw new InvalidOperationException("Opening count is already recorded.");
+        if (balance != OpeningBalance && string.IsNullOrWhiteSpace(OpeningDifferenceReason))
+            throw new InvalidOperationException("Opening difference reason is required.");
+        BookOpeningBalance = balance;
+    }
+
     public decimal? ExpectedClosingBalance { get; private set; }
 
     public decimal? ActualClosingBalance { get; private set; }
 
     public decimal? DifferenceAmount { get; private set; }
+
+    public Guid? SettlementJournalEntryId { get; private set; }
+    public Guid? SettlementAccountId { get; private set; }
+    public DateOnly? SettlementDate { get; private set; }
+    public string? SettlementReason { get; private set; }
+
+    public void RecordSettlement(Guid journalId, Guid accountId, DateOnly date, string reason)
+    {
+        if (Status != CashShiftStatus.Approved || !DifferenceAmount.HasValue || DifferenceAmount.Value == 0 || SettlementJournalEntryId.HasValue)
+            throw new InvalidOperationException("Only an approved unsettled shift difference can be settled.");
+        if (journalId == Guid.Empty || accountId == Guid.Empty || string.IsNullOrWhiteSpace(reason))
+            throw new ArgumentException("Settlement details are required.");
+        SettlementJournalEntryId = journalId; SettlementAccountId = accountId; SettlementDate = date; SettlementReason = reason.Trim();
+    }
 
     public Guid? ClosedBy { get; private set; }
 
@@ -97,12 +146,15 @@ public sealed class CashShift : AuditableEntity<Guid>
             throw new InvalidOperationException(
                 "Only an open cash shift can enter closing state.");
 
-        if (expectedClosingBalance < 0)
-            throw new ArgumentOutOfRangeException(
-                nameof(expectedClosingBalance));
-
         ExpectedClosingBalance = expectedClosingBalance;
         Status = CashShiftStatus.Closing;
+    }
+
+    public void RefreshExpectedClosingBalance(decimal expectedClosingBalance)
+    {
+        if (Status != CashShiftStatus.Closing)
+            throw new InvalidOperationException("Only a closing cash shift can refresh its expected balance.");
+        ExpectedClosingBalance = expectedClosingBalance;
     }
 
     public void Close(
@@ -123,10 +175,12 @@ public sealed class CashShift : AuditableEntity<Guid>
                 "Closed by is required.",
                 nameof(closedBy));
 
+        if (!ExpectedClosingBalance.HasValue)
+            throw new InvalidOperationException("The expected closing balance must be calculated before closing.");
+        if (closedAtUtc < OpenedAtUtc)
+            throw new ArgumentOutOfRangeException(nameof(closedAtUtc));
         ActualClosingBalance = actualClosingBalance;
-        DifferenceAmount = ExpectedClosingBalance.HasValue
-            ? actualClosingBalance - ExpectedClosingBalance.Value
-            : null;
+        DifferenceAmount = actualClosingBalance - ExpectedClosingBalance.Value;
 
         ClosedBy = closedBy;
         ClosedAtUtc = closedAtUtc;

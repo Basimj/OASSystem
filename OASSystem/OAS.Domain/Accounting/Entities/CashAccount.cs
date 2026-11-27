@@ -34,6 +34,10 @@ public sealed class CashAccount : AuditableEntity<Guid>
 
     public Guid? CurrencyId { get; private set; }
 
+    public bool RequiresOpenShift { get; private set; }
+
+    public void SetRequiresOpenShift(bool value) => RequiresOpenShift = value;
+
     public bool IsDefault { get; private set; }
 
     public bool IsActive { get; private set; }

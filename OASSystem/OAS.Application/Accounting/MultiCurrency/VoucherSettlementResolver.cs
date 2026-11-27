@@ -36,13 +36,23 @@ public sealed class VoucherSettlementResolver(
         string? referenceNumber,
         CancellationToken cancellationToken = default)
     {
-        if (amount <= 0) throw new ConflictException("settlement_amount_invalid", "Settlement line amount must be greater than zero.");
+        if (amount <= 0 || amount >= 1000000000000000m) throw new ConflictException("settlement_amount_invalid", "أدخل مبلغ تسوية أكبر من صفر وضمن الحدود المحاسبية.");
         var party = await counterparties.ResolveAsync(partyType, customerId, supplierId, employeeId, partyName, otherCounterpartyAccountId, cancellationToken);
         var settlement = await settlements.ResolveAsync(paymentMethod, currencyId, cashAccountId, bankAccountId, otherSettlementAccountId, referenceNumber, cancellationToken);
+        if (party.AccountId == settlement.AccountId)
+            throw new ConflictException("voucher_same_accounts", "لا يجوز أن يكون حساب الطرف هو حساب التسوية نفسه.");
         var allowManual = manualExchangeRate.HasValue && await permissions.HasPermissionAsync(AccountingPermissions.ExchangeRates.Override, cancellationToken);
         var rate = await rates.ResolveAsync(currencyId, voucherDate, exchangeRateType, manualExchangeRate, allowManual, cancellationToken);
         var baseDecimalPlaces = await ResolveBaseDecimalPlacesAsync(cancellationToken);
-        var baseAmount = rounding.CalculateBaseAmount(amount, rate.Rate, rate.CurrencyDecimalPlaces, baseDecimalPlaces);
+        if (rate.CurrencyDecimalPlaces > 4 || baseDecimalPlaces > 4 || rate.Rate != Math.Round(rate.Rate, 8))
+            throw new ConflictException("voucher_currency_precision", "دقة عملة السند أو سعر الصرف تتجاوز الدقة المحاسبية المخزنة.");
+        decimal baseAmount;
+        try { baseAmount = rounding.CalculateBaseAmount(amount, rate.Rate, rate.CurrencyDecimalPlaces, baseDecimalPlaces); }
+        catch (OverflowException) { throw new ConflictException("voucher_amount_overflow", "القيمة الأساسية تتجاوز الحدود المحاسبية."); }
+        if (baseAmount >= 1000000000000000m)
+            throw new ConflictException("voucher_amount_overflow", "القيمة الأساسية تتجاوز الحدود المحاسبية.");
+        if (baseAmount <= 0 || rounding.Round(amount, rate.CurrencyDecimalPlaces) <= 0)
+            throw new ConflictException("voucher_amount_rounds_to_zero", "المبلغ بعد التقريب أو قيمته الأساسية يساوي صفرًا.");
         return new(partyType, party.CustomerId, party.SupplierId, party.EmployeeId, party.PartyNameSnapshot, party.AccountId,
             paymentMethod, settlement.CashAccountId, settlement.BankAccountId, settlement.AccountId,
             rate.CurrencyId, rate.CurrencyCode, rate.CurrencySymbol, rate.CurrencyDecimalPlaces,

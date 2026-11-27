@@ -36,7 +36,8 @@ public sealed class GetSupplierAllocationCenterQueryHandler(
     IReadRepository<PurchaseReturn, Guid> returns,
     IReadRepository<Currency, Guid> currencies,
     IPurchaseInvoiceBalanceService invoiceBalances,
-    ISupplierCreditSettlementService supplierCredits)
+    ISupplierCreditSettlementService supplierCredits,
+    IReadRepository<JournalEntry, Guid>? voucherJournals = null)
     : IRequestHandler<GetSupplierAllocationCenterQuery, SupplierAllocationCenterDto>
 {
     public async Task<SupplierAllocationCenterDto> Handle(
@@ -83,6 +84,9 @@ public sealed class GetSupplierAllocationCenterQueryHandler(
 
             var voucher = await paymentVouchers.GetByIdAsync(line.PaymentVoucherId, ct);
             if (voucher is null || voucher.Status != PaymentVoucherStatus.Posted)
+                continue;
+            if (voucherJournals is not null && voucher.JournalEntryId is Guid journalId &&
+                (await voucherJournals.GetByIdAsync(journalId, ct))?.ReversedJournalId.HasValue == true)
                 continue;
 
             var active = await GetActiveLineAllocationsAsync(line.Id, ct);
@@ -205,6 +209,9 @@ public sealed class GetSupplierAllocationCenterQueryHandler(
         {
             var voucher = await paymentVouchers.GetByIdAsync(line.PaymentVoucherId, ct);
             if (voucher is null || voucher.Status != PaymentVoucherStatus.Posted)
+                continue;
+            if (voucherJournals is not null && voucher.JournalEntryId is Guid journalId &&
+                (await voucherJournals.GetByIdAsync(journalId, ct))?.ReversedJournalId.HasValue == true)
                 continue;
 
             var active = await GetActiveLineAllocationsAsync(line.Id, ct);

@@ -3,6 +3,7 @@ using OAS.Application.Abstractions.Numbering;
 using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Abstractions.Persistence.Specifications;
 using OAS.Application.Common.Exceptions;
+using OAS.Application.Accounting.Abstractions;
 using OAS.Domain.Accounting.Entities;
 using DomainExpenseStatus = OAS.Domain.Accounting.Enums.ExpenseStatus;
 using DomainPaymentMethod = OAS.Domain.Accounting.Enums.PaymentMethod;
@@ -12,7 +13,8 @@ namespace OAS.Application.Accounting.Expenses.Commands.CreateExpense;
 public sealed class CreateExpenseCommandHandler(
     IRepository<Expense, Guid> repository,
     IReadRepository<Account, Guid> accountRepository,
-    ISequenceNumberGenerator sequenceNumberGenerator)
+    ISequenceNumberGenerator sequenceNumberGenerator,
+    IExpenseCurrencyService expenseCurrency)
     : IRequestHandler<CreateExpenseCommand, Guid>
 {
     public async Task<Guid> Handle(CreateExpenseCommand request, CancellationToken cancellationToken)
@@ -24,6 +26,7 @@ public sealed class CreateExpenseCommandHandler(
         var expense = Expense.Create(Guid.NewGuid(), expenseNumber, data.ExpenseDate, data.ExpenseTypeId,
             data.ExpenseAccountId, data.Beneficiary, data.Amount, (DomainPaymentMethod)(int)data.PaymentMethod,
             data.CashAccountId, data.BankAccountId, data.Description, DomainExpenseStatus.Draft, null);
+        await expenseCurrency.ApplyAsync(expense, data.CurrencyId, data.ExpectedExchangeRate, cancellationToken);
         await repository.AddAsync(expense, cancellationToken);
         return expense.Id;
     }

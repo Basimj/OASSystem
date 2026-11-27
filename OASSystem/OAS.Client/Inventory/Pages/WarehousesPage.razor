@@ -11,7 +11,7 @@
 <PageTitle>@(IsFormRoute ? "نموذج المخزون" : "قائمة المخزون") - المخازن | OAS</PageTitle>
 <span class="oas-inventory-view" hidden aria-hidden="true"></span>
 
-<UiWorkspaceLayout ShowAside="false" ShowFilters="false">
+<InventoryReportWorkspace Title="المخازن" TitleIcon="fa-solid fa-warehouse" StatusText="@($"{FilteredWarehouses.Count} مخزن")" ShowFilters="false" IsFormRoute="@IsFormRoute">
     <Actions>
         <UiWorkspaceActionBar>
             @if (IsFormRoute)
@@ -39,13 +39,6 @@
         @if (IsFormRoute)
         {
             <div class="oas-inventory-form-screen">
-                <div class="oas-inventory-form-screen__intro">
-                    <div>
-                        <div class="oas-inventory-form-screen__eyebrow">إدارة المخزون</div>
-                        <h2>@EditorTitle</h2>
-                        <p>راجع البيانات ثم احفظ التغييرات. الحقول الإضافية تظهر عند الحاجة.</p>
-                    </div>
-                </div>
                 <div class="oas-inventory-form-screen__body">
         <UiCard Title="@EditorTitle" Subtitle="@(_selectedId.HasValue ? _code : null)">
             @if (_mode == EditorMode.Empty)
@@ -110,15 +103,13 @@
         }
         else
         {
-        <UiDataGridPanel Title="المخازن" Subtitle="@($"{FilteredWarehouses.Count} مخزن")">
-            <Body>
-                @if (_loading)
+                        @if (_loading)
                 {
                     <UiAlert Message="جاري تحميل المخازن..." />
                 }
                 else
                 {
-                    <UiDataTable TItem="WarehouseDto" Items="@FilteredWarehouses" PageSize="12" Headers="@WarehouseHeaders" EmptyText="لا توجد مخازن مطابقة."
+                    <InventoryReportTable TItem="WarehouseDto" Items="@FilteredWarehouses" PageSize="12" Headers="@WarehouseHeaders" EmptyText="لا توجد مخازن مطابقة."
                                  SidebarTypography="true"
                                  UniformCellTypography="true"
                                  OnRowClick="@(x => OpenDetailsScreen(x.Id))" IsRowSelected="@(x => x.Id == _selectedId)">
@@ -138,14 +129,13 @@
                             <td><UiBadge Text="@(warehouse.AllowsSalesAllocation ? "متاح للبيع" : "حجر / غير مخصص للبيع")" Tone="@(warehouse.AllowsSalesAllocation ? AlertTone.Success : AlertTone.Warning)" /></td>
                             <td><UiBadge Text="@(warehouse.IsActive ? "نشط" : "غير نشط")" Tone="@(warehouse.IsActive ? AlertTone.Success : AlertTone.Danger)" /></td>
                         </RowTemplate>
-                    </UiDataTable>
+                    </InventoryReportTable>
                 }
-            </Body>
-        </UiDataGridPanel>
+            
 
         }
     </Content>
-</UiWorkspaceLayout>
+</InventoryReportWorkspace>
 
 @if (_spreadsheetImportOpen)
 {

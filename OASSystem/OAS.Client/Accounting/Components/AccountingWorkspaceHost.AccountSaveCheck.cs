@@ -20,7 +20,9 @@ public partial class AccountingWorkspaceHost
             model.IsSystemAccount,
             model.IsActive,
             model.EffectiveDate,
-            model.RowVersion);
+            model.RowVersion,
+            model.FinancialStatementCategory,
+            true);
 
     /// <summary>
     /// Called immediately before PUT, using the very same captured UpdateAccountRequest
@@ -57,6 +59,10 @@ public partial class AccountingWorkspaceHost
 
     private static string GetAccountPrecheckMessage(string? reason) => reason switch
     {
+        "accounting_financial_category_required" => "حدد تصنيف القوائم المالية أو اختر حساباً أب مصنفاً.",
+        "accounting_financial_category_inherited" => "الحساب الفرعي يرث التصنيف المالي من الحساب الأب.",
+        "accounting_financial_category_invalid" => "تصنيف القوائم المالية لا يتوافق مع تصنيف الحساب.",
+        "accounting_financial_category_parent_class" => "تصنيف الحساب يجب أن يطابق تصنيف الحساب الأب.",
         "accounting_managed_account_edit_forbidden" => "هذا حساب مرتبط بعميل أو مورد أو موظف أو صندوق أو بنك؛ عدّله من شاشة السجل المرتبط به.",
         "accounting_system_account_deactivation_forbidden" => "لا يمكن تعطيل حساب نظامي. أبقِ خيار «نشط» مفعّلًا.",
         "accounting_mapped_account_deactivation_forbidden" => "لا يمكن تعطيل الحساب لأنه مستخدم في إعدادات الربط أو ملفات الترحيل؛ غيّر الربط أولًا.",

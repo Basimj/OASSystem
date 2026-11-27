@@ -131,10 +131,10 @@ public sealed class SalesArFinancialInvariantsSqlServerTests
         {
             await connection.OpenAsync();
             await using (var command = new SqlCommand("""
-                SELECT COALESCE(SUM(l.BaseNetAmount),0)
-                FROM dbo.tbl_SalesInvoiceLines l
-                JOIN dbo.tbl_SalesInvoices i ON i.Id=l.SalesInvoiceId
-                WHERE i.Status=3 AND l.IsActive=1 AND i.PostingDate>=@start AND i.PostingDate<=@through;
+                SELECT COALESCE(SUM(i.BaseTotalAmount-i.BaseTaxAmount),0)
+                FROM dbo.tbl_SalesInvoices i
+                WHERE i.Status=3 AND i.PostingDate>=@start AND i.PostingDate<=@through
+                  AND EXISTS (SELECT 1 FROM dbo.tbl_SalesInvoiceLines l WHERE l.SalesInvoiceId=i.Id AND l.IsActive=1);
                 """, connection))
             {
                 command.Parameters.Add(new SqlParameter("@start", System.Data.SqlDbType.Date)
@@ -144,10 +144,10 @@ public sealed class SalesArFinancialInvariantsSqlServerTests
                 invoiced = Convert.ToDecimal(await command.ExecuteScalarAsync());
             }
             await using (var command = new SqlCommand("""
-                SELECT COALESCE(SUM(l.BaseNetAmount),0)
-                FROM dbo.tbl_SalesReturnLines l
-                JOIN dbo.tbl_SalesReturns r ON r.Id=l.SalesReturnId
-                WHERE r.Status=3 AND l.IsActive=1 AND r.PostingDate>=@start AND r.PostingDate<=@through;
+                SELECT COALESCE(SUM(r.BaseNetAmount),0)
+                FROM dbo.tbl_SalesReturns r
+                WHERE r.Status=3 AND r.PostingDate>=@start AND r.PostingDate<=@through
+                  AND EXISTS (SELECT 1 FROM dbo.tbl_SalesReturnLines l WHERE l.SalesReturnId=r.Id AND l.IsActive=1);
                 """, connection))
             {
                 command.Parameters.Add(new SqlParameter("@start", System.Data.SqlDbType.Date)

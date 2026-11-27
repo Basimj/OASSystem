@@ -10,6 +10,16 @@ public sealed class JournalEntryLine : AuditableEntity<Guid>
     public Guid JournalEntryId { get; private set; }
     public int LineNumber { get; private set; }
     public Guid AccountId { get; private set; }
+    // Assigned only when the journal is posted. Opposite lines deliberately do not copy it.
+    public Guid? CashShiftId { get; private set; }
+
+    public void AssignCashShift(Guid shiftId)
+    {
+        if (shiftId == Guid.Empty) throw new ArgumentException("Shift id is required.", nameof(shiftId));
+        if (CashShiftId.HasValue && CashShiftId != shiftId)
+            throw new InvalidOperationException("A cash movement cannot be reassigned to another shift.");
+        CashShiftId = shiftId;
+    }
 
     // Always base-currency amounts.
     public decimal DebitAmount { get; private set; }
@@ -107,6 +117,32 @@ public sealed class JournalEntryLine : AuditableEntity<Guid>
             WarehouseId = Normalize(warehouseId)
         };
     }
+
+    public JournalEntryLine CreateOpposite(Guid id, Guid reversalJournalId)
+    {
+        ValidateIdentity(id, reversalJournalId, LineNumber, AccountId);
+        return new JournalEntryLine
+        {
+            Id = id, JournalEntryId = reversalJournalId, LineNumber = LineNumber, AccountId = AccountId,
+            DebitAmount = CreditAmount, CreditAmount = DebitAmount,
+            TransactionCurrencyId = TransactionCurrencyId, TransactionCurrencyCodeSnapshot = TransactionCurrencyCodeSnapshot,
+            TransactionCurrencyDecimalPlacesSnapshot = TransactionCurrencyDecimalPlacesSnapshot,
+            TransactionDebitAmount = TransactionCreditAmount, TransactionCreditAmount = TransactionDebitAmount,
+            ExchangeRate = ExchangeRate, ExchangeRateDate = ExchangeRateDate, ExchangeRateType = ExchangeRateType, ExchangeRateSource = ExchangeRateSource,
+            SourceDocumentLineId = SourceDocumentLineId, PostingRole = PostingRole, Description = Description,
+            CustomerId = CustomerId, SupplierId = SupplierId, EmployeeId = EmployeeId, PartyNameSnapshot = PartyNameSnapshot,
+            CostCenterId = CostCenterId, ProductVariantId = ProductVariantId, WarehouseId = WarehouseId
+        };
+    }
+
+    public bool IsExactOppositeOf(JournalEntryLine original) =>
+        LineNumber == original.LineNumber && AccountId == original.AccountId && DebitAmount == original.CreditAmount && CreditAmount == original.DebitAmount &&
+        TransactionCurrencyId == original.TransactionCurrencyId && TransactionCurrencyCodeSnapshot == original.TransactionCurrencyCodeSnapshot && TransactionCurrencyDecimalPlacesSnapshot == original.TransactionCurrencyDecimalPlacesSnapshot &&
+        TransactionDebitAmount == original.TransactionCreditAmount && TransactionCreditAmount == original.TransactionDebitAmount &&
+        ExchangeRate == original.ExchangeRate && ExchangeRateDate == original.ExchangeRateDate && ExchangeRateType == original.ExchangeRateType && ExchangeRateSource == original.ExchangeRateSource &&
+        CustomerId == original.CustomerId && SupplierId == original.SupplierId && EmployeeId == original.EmployeeId && PartyNameSnapshot == original.PartyNameSnapshot &&
+        CostCenterId == original.CostCenterId && ProductVariantId == original.ProductVariantId && WarehouseId == original.WarehouseId &&
+        SourceDocumentLineId == original.SourceDocumentLineId && PostingRole == original.PostingRole;
 
     // Compatibility factory for historical/base-currency-only code.
     public static JournalEntryLine Create(

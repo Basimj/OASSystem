@@ -51,6 +51,9 @@ public sealed class SalesReturnInventoryPostingService(
                 "تم العثور على ترحيل مخزني جزئي/غير متسق لهذا المرتجع. أوقف إعادة المحاولة وراجع الحركة قبل أي ترحيل إضافي.");
         }
 
+        if (inventoryLines.Any(x => !x.UnitCostSnapshot.HasValue || !x.TotalCostSnapshot.HasValue))
+            throw new ConflictException("sales_return_cost_snapshot_missing", "تكلفة أحد بنود المرتجع المخزني غير محفوظة؛ لا يمكن الترحيل.");
+
         foreach (var warehouseGroup in warehouseGroups)
         {
             var sequence = await sequences.NextAsync("InventoryTransaction", cancellationToken);

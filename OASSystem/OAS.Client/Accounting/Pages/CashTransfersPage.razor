@@ -1,0 +1,407 @@
+@page "/accounting/cash-transfers"
+@attribute [Authorize]
+@using OAS.Contracts.Accounting.CashTransfers
+@using OAS.Client.Services.Http
+@inject OasApiClient Api
+
+<PageTitle>التحويلات المالية | OAS</PageTitle>
+<div class="cash-transfer-page" dir="rtl">
+    <header class="ct-toolbar">
+        <h3><i class="fa-solid fa-arrow-right-arrow-left"></i> التحويلات المالية</h3>
+        <button class="btn btn-primary btn-sm" disabled="@_busy" @onclick="NewTransfer">تحويل جديد</button>
+    </header>
+    @if (!string.IsNullOrWhiteSpace(_error)) { <div class="alert alert-danger" role="alert">@_error</div> }
+    @if (!string.IsNullOrWhiteSpace(_message)) { <div class="alert alert-success" role="status">@_message</div> }
+    @if (_editing)
+    {
+        <section class="ct-editor">
+            <div class="ct-toolbar ct-editor-heading">
+                <h5>@(_id.HasValue ? "تعديل التحويل" : "تحويل جديد")</h5>
+                <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@_busy" @onclick="RefreshBalancesAsync"><i class="fa-solid fa-arrows-rotate"></i> تحديث الأرصدة والأسعار</button>
+            </div>
+            <div class="ct-grid">
+                <label>نوع التحويل *
+                    <select class="@("form-select " + InvalidClass("type"))" @bind="_transferType" @bind:after="TransferTypeChanged" disabled="@_busy">
+                        <option value="">اختر نوع التحويل</option>
+                        @foreach (var t in TransferTypes)
+                        { <option value="@t.Key">@t.Value</option> }
+                    </select>
+                    @if (FieldError("type") is string typeError) { <small class="ct-error">@typeError</small> }
+                </label>
+                <label>التاريخ * <input class="form-control" type="date" @bind="_date" @bind:after="DateChangedAsync" disabled="@_busy" /></label>
+                <label>@SourceLabel *
+                    <select class="@("form-select " + InvalidClass("source"))" @bind="_source" @bind:after="SourceChanged" disabled="@(_busy || string.IsNullOrEmpty(_transferType))">
+                        <option value="">اختر المصدر</option>
+                        @foreach (var a in SourceOptions)
+                        { <option value="@a.AccountId">@a.Name (@a.CurrencyCode) — @BalanceLabel(a)</option> }
+                    </select>
+                    @if (FieldError("source") is string sourceError) { <small class="ct-error">@sourceError</small> }
+                    @if (!string.IsNullOrEmpty(_transferType) && !SourceOptions.Any()) { <small class="ct-hint">لا توجد حسابات مصدر برصيد دفتري موجب ومتاح لهذا النوع في التاريخ المحدد.</small> }
+                </label>
+                <label>@DestinationLabel *
+                    <select class="@("form-select " + InvalidClass("destination"))" @bind="_destination" @bind:after="DestinationChanged" disabled="@(_busy || Source is null)">
+                        <option value="">اختر الوجهة</option>
+                        @foreach (var a in DestinationOptions)
+                        { <option value="@a.AccountId">@a.Name (@a.CurrencyCode)</option> }
+                    </select>
+                    @if (FieldError("destination") is string destinationError) { <small class="ct-error">@destinationError</small> }
+                    @if (Source is not null && !DestinationOptions.Any()) { <small class="ct-hint">لا توجد وجهة متاحة مطابقة للشروط.</small> }
+                </label>
+                @if (Source is not null)
+                {
+                    <label>الرصيد الدفتري المتاح (@SourceCode)
+                        <output class="form-control ct-output">@BalanceLabel(Source)</output>
+                        @if (Source.BalanceError is string balanceError) { <small class="ct-error">@balanceError</small> }
+                    </label>
+                }
+                @if (Source is not null && Destination is not null)
+                {
+                    <label>إجمالي المبلغ الصادر (@SourceCode) *
+                        <input class="@("form-control " + InvalidClass("amount"))" type="number" min="0" step="@AmountStep(Source)" @bind="_sourceAmount" @bind:event="oninput" @bind:after="UpdateDestination" disabled="@_busy" />
+                        @if (FieldError("amount") is string amountError) { <small class="ct-error">@amountError</small> }
+                    </label>
+                    <label>الرسوم المخصومة من الصادر (@SourceCode)
+                        <input class="@("form-control " + InvalidClass("fee"))" type="number" min="0" step="@AmountStep(Source)" @bind="_fee" @bind:event="oninput" @bind:after="UpdateDestination" disabled="@_busy" />
+                        @if (FieldError("fee") is string feeError) { <small class="ct-error">@feeError</small> }
+                    </label>
+                    <label>صافي المبلغ المستلم (@DestinationCode) *
+                        <input class="@("form-control " + InvalidClass("received"))" type="number" min="0" step="@AmountStep(Destination)" @bind="_destinationAmount" @bind:after="ReceivedChanged" disabled="@(_busy || SameCurrency)" />
+                        @if (FieldError("received") is string receivedError) { <small class="ct-error">@receivedError</small> }
+                    </label>
+                    @if (!SameCurrency)
+                    {
+                        <label>سعر التحويل (1 @DestinationCode = كم @SourceCode) *
+                            <input class="@("form-control " + InvalidClass("rate"))" type="number" min="0" step="any" @bind="_transferRate" @bind:after="UpdateDestination" disabled="@(_busy || SuggestedRate is null)" />
+                            @if (SuggestedRate is decimal suggested)
+                            {
+                                <small class="ct-hint">السعر المقترح: @suggested.ToString("0.###############") @SourceCode لكل @DestinationCode</small>
+                                <small class="ct-hint">تاريخ سعر المصدر: @(Source?.RateDate?.ToString("yyyy/MM/dd") ?? "—") | الوجهة: @(Destination?.RateDate?.ToString("yyyy/MM/dd") ?? "—")</small>
+                                <button type="button" class="btn btn-outline-secondary btn-sm ct-rate-reset" disabled="@_busy" @onclick="UseSuggestedRate">استخدام السعر المقترح</button>
+                            }
+                            @if (FieldError("rate") is string rateError) { <small class="ct-error">@rateError</small> }
+                            <small class="ct-hint">@EffectiveRate — سعر العملية الفعلي، وليس القيمة الدفترية.</small>
+                        </label>
+                    }
+                    @if (_fee > 0)
+                    {
+                        <label>حساب الرسوم *
+                            <select class="@("form-select " + InvalidClass("feeAccount"))" @bind="_feeAccount" disabled="@_busy">
+                                <option value="">اختر حساب مصروف الرسوم</option>
+                                @foreach (var a in _lookups?.FeeAccounts ?? Array.Empty<CashTransferFeeAccountDto>())
+                                { <option value="@a.AccountId">@a.Name</option> }
+                            </select>
+                            @if (FieldError("feeAccount") is string feeAccountError) { <small class="ct-error">@feeAccountError</small> }
+                        </label>
+                    }
+                }
+                <label>المرجع <input class="form-control" maxlength="100" @bind="_reference" disabled="@_busy" /></label>
+                <label class="ct-description">البيان * <input class="@("form-control " + InvalidClass("description"))" maxlength="400" @bind="_description" disabled="@_busy" />
+                    @if (FieldError("description") is string descriptionError) { <small class="ct-error">@descriptionError</small> }
+                </label>
+            </div>
+            @if (Source is not null && Destination is not null)
+            {
+                <div class="ct-summary">
+                    <div><small>صافي الصادر بعد الرسوم</small><strong>@FormatAmount(NetSource, Source) @SourceCode</strong></div>
+                    <div><small>صافي المستلم</small><strong>@FormatAmount(_destinationAmount, Destination) @DestinationCode</strong></div>
+                    <div><small>الرصيد بعد خصم إجمالي الصادر (شامل الرسوم)</small><strong class="@(RemainingBalance is < 0 ? "ct-error" : "")">@(RemainingBalance is decimal remaining ? FormatAmount(remaining, Source) : "—") @SourceCode</strong></div>
+                </div>
+                @if (!SameCurrency) { <small class="ct-hint">يحتسب المستلم تلقائيًا وفق السعر المقترح، ويمكن تعديل السعر أو المستلم الفعلي. تحسب القيمة الدفترية وفروق الصرف عند الترحيل.</small> }
+            }
+            <div class="ct-actions">
+                <button class="btn btn-primary btn-sm" disabled="@SaveBlocked" @onclick="SaveAsync">حفظ مسودة</button>
+                <button class="btn btn-outline-secondary btn-sm" disabled="@_busy" @onclick="() => _editing = false">إلغاء</button>
+            </div>
+        </section>
+    }
+    @if (_reverse is not null)
+    {
+        <section class="ct-editor">
+            <h5>عكس التحويل @_reverse.Number</h5>
+            <p class="text-danger small">العكس الكامل يفترض استرداد الأموال والرسوم الأصلية فعليًا. لا تستخدمه إذا لم تُسترد الرسوم.</p>
+            <div class="ct-grid">
+                <label>تاريخ العكس <input class="form-control" type="date" @bind="_reverseDate" /></label>
+                <label class="ct-description">سبب العكس <input class="form-control" maxlength="400" @bind="_reverseReason" /></label>
+            </div>
+            <div class="ct-actions">
+                <button class="btn btn-danger btn-sm" disabled="@_busy" @onclick="ReverseAsync">تأكيد العكس والترحيل</button>
+                <button class="btn btn-outline-secondary btn-sm" disabled="@_busy" @onclick="() => _reverse = null">إلغاء</button>
+            </div>
+        </section>
+    }
+    <section class="ct-table-panel">
+        <div class="ct-toolbar">
+            <div class="ct-filters">
+                <label>نوع التحويل
+                    <select class="form-select" @bind="_filterType" @bind:after="SearchAsync" disabled="@_busy">
+                        <option value="">الكل</option>
+                        @foreach (var t in TransferTypes) { <option value="@t.Key">@t.Value</option> }
+                    </select>
+                </label>
+                <label>الحالة
+                    <select class="form-select" @bind="_filterStatus" @bind:after="SearchAsync" disabled="@_busy">
+                        <option value="">الكل</option>
+                        @foreach (var status in Enumerable.Range(1, 5)) { <option value="@status">@StatusText(status)</option> }
+                    </select>
+                </label>
+                <label class="ct-search">البحث <input class="form-control" placeholder="الرقم، الحساب، المرجع، البيان" @bind="_search" disabled="@_busy" /></label>
+                <button class="btn btn-outline-secondary btn-sm" disabled="@_busy" @onclick="SearchAsync"><i class="fa-solid fa-magnifying-glass"></i> بحث / تحديث</button>
+                <button class="btn btn-outline-secondary btn-sm" disabled="@_busy" @onclick="ResetFiltersAsync">إعادة تعيين</button>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle">
+                <thead><tr><th>الرقم والتاريخ</th><th>نوع التحويل</th><th>من</th><th>إلى</th><th>الصادر</th><th>المستلم</th><th>الرسوم</th><th>فرق الصرف بالأساسية</th><th>الحالة</th><th>الإجراءات</th></tr></thead>
+                <tbody>
+                    @foreach (var x in _pageData?.Items ?? Array.Empty<CashTransferDto>())
+                    {
+                        <tr>
+                            <td>@x.Number<br /><small>@x.Date.ToString("yyyy/MM/dd")</small></td>
+                            <td>@TypeText(RouteType(x.SourceKind, x.DestinationKind))
+                                @if (x.IsCrossCurrency) { <small class="ct-fx">بين عملتين</small> }
+                            </td><td>@x.SourceName</td><td>@x.DestinationName</td>
+                            <td>@x.SourceAmount.ToString("#,0.####") @x.SourceCurrencyCode</td><td>@x.DestinationAmount.ToString("#,0.####") @x.DestinationCurrencyCode</td>
+                            <td>@x.FeeAmount.ToString("#,0.####") @x.SourceCurrencyCode</td><td>@(x.FxDifferenceBase?.ToString("#,0.####") ?? "—")</td><td>@StatusText(x.Status)</td>
+                            <td class="ct-actions">
+                                @if (x.Status == 1) { <button class="btn btn-outline-primary btn-sm" disabled="@_busy" @onclick="() => Edit(x)">تعديل</button><button class="btn btn-outline-success btn-sm" disabled="@_busy" @onclick="() => ApproveAsync(x)">اعتماد</button> }
+                                @if (x.Status == 2) { <button class="btn btn-primary btn-sm" disabled="@_busy" @onclick="() => PostAsync(x)">ترحيل</button> }
+                                @if (x.Status is 1 or 2) { <button class="btn btn-outline-danger btn-sm" disabled="@_busy" @onclick="() => CancelAsync(x)">إلغاء</button> }
+                                @if (x.Status == 3) { <button class="btn btn-outline-danger btn-sm" disabled="@_busy" @onclick="() => BeginReverse(x)">عكس</button> }
+                                @if (x.JournalEntryId is Guid journalId) { <a href="@($"/accounting/journals?journalId={journalId:D}")">القيد</a> }
+                                @if (x.ReversalJournalEntryId is Guid reversalId) { <a href="@($"/accounting/journals?journalId={reversalId:D}")">قيد العكس</a> }
+                                @if (_postErrorId == x.Id && _postError is not null) { <small class="ct-error ct-post-error" role="alert">@_postError</small> }
+                            </td>
+                        </tr>
+                    }
+                    @if (!_busy && _pageData?.Items.Count == 0)
+                    { <tr><td colspan="10" class="ct-empty">لا توجد تحويلات مطابقة للفلاتر الحالية.</td></tr> }
+                </tbody>
+            </table>
+        </div>
+        <div class="ct-toolbar"><span>عدد التحويلات: @(_pageData?.TotalCount ?? 0)</span><div class="ct-actions"><button class="btn btn-outline-secondary btn-sm" disabled="@(_busy || _page <= 1)" @onclick="PreviousAsync">السابق</button><span>@_page</span><button class="btn btn-outline-secondary btn-sm" disabled="@(_busy || _page * 50 >= (_pageData?.TotalCount ?? 0))" @onclick="NextAsync">التالي</button></div></div>
+    </section>
+</div>
+
+@code {
+    private CashTransferLookupsDto? _lookups;
+    private CashTransferPageDto? _pageData;
+    private int _page = 1;
+    private string? _search, _error, _message, _rowVersion, _reference, _reverseReason;
+    private string _description = string.Empty;
+    private bool _busy, _editing, _validate;
+    private string _transferType = string.Empty, _filterType = string.Empty;
+    private int? _filterStatus;
+    private static readonly Dictionary<string, string> TransferTypes = new()
+    {
+        ["cash-cash"] = "صندوق إلى صندوق", ["cash-bank"] = "صندوق إلى بنك",
+        ["bank-cash"] = "بنك إلى صندوق", ["bank-bank"] = "بنك إلى بنك", ["fx"] = "تحويل بين العملات"
+    };
+    private Guid? _id, _source, _destination, _feeAccount;
+    private DateOnly _date = DateOnly.FromDateTime(DateTime.Today), _reverseDate;
+    private decimal _sourceAmount, _destinationAmount, _fee;
+    private decimal? _transferRate;
+    private Guid? _postErrorId;
+    private string? _postError;
+    private CashTransferDto? _reverse;
+    private CashTransferAccountDto? Source => _lookups?.Accounts.FirstOrDefault(x => x.AccountId == _source);
+    private CashTransferAccountDto? Destination => _lookups?.Accounts.FirstOrDefault(x => x.AccountId == _destination);
+    private string SourceCode => Source?.CurrencyCode ?? "—";
+    private string DestinationCode => Destination?.CurrencyCode ?? "—";
+    private bool SameCurrency => Source is not null && Destination is not null && Source.CurrencyId == Destination.CurrencyId;
+    private IEnumerable<CashTransferAccountDto> AllAccounts => _lookups?.Accounts ?? Array.Empty<CashTransferAccountDto>();
+    private static string RouteType(string? source, string? destination) => (source, destination) switch
+    {
+        ("Cash", "Cash") => "cash-cash", ("Cash", "Bank") => "cash-bank",
+        ("Bank", "Cash") => "bank-cash", ("Bank", "Bank") => "bank-bank", _ => string.Empty
+    };
+    private static string TypeText(string type) => TransferTypes.TryGetValue(type, out var label) ? label : "غير محدد";
+    private string SourceLabel => _transferType.StartsWith("cash-") ? "من صندوق" : _transferType.StartsWith("bank-") ? "من بنك" : "الحساب المصدر";
+    private string DestinationLabel => _transferType.EndsWith("-cash") ? "إلى صندوق" : _transferType.EndsWith("-bank") ? "إلى بنك" : "الحساب الوجهة";
+    private IEnumerable<CashTransferAccountDto> SourceOptions => AllAccounts.Where(a =>
+        (HasSpendableBalance(a) || a.AccountId == _source) &&
+        (_transferType == "fx" ? AllAccounts.Any(b => b.AccountId != a.AccountId && b.CurrencyId != a.CurrencyId) :
+        _transferType.StartsWith("cash-") ? a.Kind == "Cash" : _transferType.StartsWith("bank-") && a.Kind == "Bank"));
+    private static bool HasSpendableBalance(CashTransferAccountDto a) => a.BalanceError is null && a.BookBalance > 0 && a.BookBaseBalance > 0;
+    private static string BalanceLabel(CashTransferAccountDto a) => a.BookBalance is decimal balance && a.BalanceError is null
+        ? FormatAmount(balance, a) : "غير متاح";
+    private decimal? RemainingBalance => Source?.BookBalance is decimal balance && _sourceAmount >= 0 && _sourceAmount < 1000000000000000m ? balance - _sourceAmount : null;
+    private decimal? SuggestedRate => CashTransferPreviewMath.SourceUnitsPerDestination(Source?.AccountingRate, Destination?.AccountingRate);
+    private bool SaveBlocked => _busy || SourceAmountBlocked || FieldError("rate") is not null;
+    private bool SourceAmountBlocked => Source is not null && (!HasSpendableBalance(Source) || (_sourceAmount > 0 && DebitError(Source, _sourceAmount, _lookups) is not null));
+    private static string? DebitError(CashTransferAccountDto? account, decimal amount, CashTransferLookupsDto? lookup)
+    {
+        if (account is null) return "الحساب المصدر غير متاح أو تغيرت بياناته.";
+        if (account.BalanceError is not null) return account.BalanceError;
+        if (account.BookBalance is not decimal native || account.BookBaseBalance is not decimal bookBase || lookup is null)
+            return "تعذر تحديد الرصيد الدفتري. أعد تحميل الحسابات.";
+        if (native <= 0 || bookBase <= 0 || amount > native)
+            return $"الرصيد الدفتري المتاح ({FormatAmount(native, account)} {account.CurrencyCode}) لا يكفي للتحويل.";
+        if (amount <= 0 || amount >= 1000000000000000m || !HasPrecision(amount, account)) return "أدخل مبلغًا موجبًا ضمن دقة العملة.";
+        try
+        {
+            var baseAmount = account.CurrencyCode == lookup.BaseCurrencyCode ? amount : amount == native ? bookBase :
+                Math.Round(amount * (bookBase / native), lookup.BaseDecimalPlaces, MidpointRounding.AwayFromZero);
+            if (baseAmount > bookBase) return "القيمة الدفترية بالعملة الأساسية لا تكفي للتحويل.";
+            if (baseAmount <= 0 || baseAmount >= 1000000000000000m) return "القيمة الدفترية خارج النطاق المحاسبي.";
+        }
+        catch (OverflowException) { return "القيمة الدفترية خارج النطاق المحاسبي."; }
+        return null;
+    }
+    private IEnumerable<CashTransferAccountDto> DestinationOptions => Source is not { } source ? Array.Empty<CashTransferAccountDto>() :
+        AllAccounts.Where(a => a.AccountId != source.AccountId && (_transferType == "fx" ? a.CurrencyId != source.CurrencyId : RouteType(source.Kind, a.Kind) == _transferType));
+    private decimal NetSource => _sourceAmount > 0 && _sourceAmount < 1000000000000000m && _fee >= 0 && _fee < _sourceAmount ? _sourceAmount - _fee : 0m;
+    private string EffectiveRate => NetSource >= 0.0001m && _destinationAmount > 0 && _destinationAmount < 1000000000000000m
+        ? $"1 {SourceCode} = {(_destinationAmount / NetSource):#,0.########} {DestinationCode}" : "—";
+    private static string AmountStep(CashTransferAccountDto? account) => (account?.DecimalPlaces ?? 0) switch { 1 => "0.1", 2 => "0.01", 3 => "0.001", 4 => "0.0001", _ => "1" };
+    private static string FormatAmount(decimal amount, CashTransferAccountDto? account) => amount.ToString($"N{account?.DecimalPlaces ?? 0}");
+    private static bool HasPrecision(decimal amount, CashTransferAccountDto? account) => decimal.Round(amount, Math.Min(4, (int)(account?.DecimalPlaces ?? 0))) == amount;
+    private string? FieldError(string field)
+    {
+        if (field == "source" && Source is { } source && !HasSpendableBalance(source))
+            return DebitError(source, _sourceAmount, _lookups);
+        if (field == "amount" && Source is { } selected && _sourceAmount > 0 && DebitError(selected, _sourceAmount, _lookups) is string debitError)
+            return debitError;
+        if (field == "rate" && Source is not null && Destination is not null && !SameCurrency)
+        {
+            if (SuggestedRate is null) return "لا يوجد سعر صرف محاسبي معتمد لإحدى العملتين حتى تاريخ التحويل.";
+            if (_transferRate is not decimal rate || rate <= 0) return "أدخل سعر تحويل موجبًا.";
+        }
+        if (!_validate) return null;
+        return field switch
+        {
+        "type" when !TransferTypes.ContainsKey(_transferType) => "اختر نوع التحويل.",
+        "source" when Source is null || !SourceOptions.Any(a => a.AccountId == _source) => "اختر مصدرًا صالحًا لهذا النوع.",
+        "destination" when Destination is null || !DestinationOptions.Any(a => a.AccountId == _destination) => "اختر وجهة مختلفة ومطابقة لنوع التحويل.",
+        "amount" when _sourceAmount <= 0 || _sourceAmount >= 1000000000000000m || !HasPrecision(_sourceAmount, Source) => "أدخل مبلغًا موجبًا ضمن دقة العملة.",
+        "fee" when _fee < 0 || _fee >= _sourceAmount || !HasPrecision(_fee, Source) => "الرسوم غير سالبة وأقل من الصادر، وضمن دقة العملة.",
+        "received" when _destinationAmount <= 0 || _destinationAmount >= 1000000000000000m || !HasPrecision(_destinationAmount, Destination) || (SameCurrency && _destinationAmount != NetSource) => "تحقق من المبلغ المستلم ودقة العملة.",
+        "feeAccount" when _fee > 0 && !(_lookups?.FeeAccounts.Any(a => a.AccountId == _feeAccount) ?? false) => "اختر حساب الرسوم.",
+        "description" when string.IsNullOrWhiteSpace(_description) || _description.Trim().Length > 400 => "أدخل بيان التحويل.",
+            _ => null
+        };
+    }
+    private string InvalidClass(string field) => FieldError(field) is null ? string.Empty : "is-invalid";
+    private const string Route = "api/accounting/cash-transfers";
+    [Parameter, SupplyParameterFromQuery(Name = "number")] public string? NumberFromQuery { get; set; }
+    protected override Task OnInitializedAsync() => RunAsync(async () => { _search = NumberFromQuery; _lookups = await Api.GetAsync<CashTransferLookupsDto>(Route + "/lookups"); await LoadAsync(); });
+    private async Task RunAsync(Func<Task> work)
+    {
+        if (_busy) return;
+        _busy = true; _error = null; _message = null;
+        try { await work(); }
+        catch (ApiClientException ex) { _error = ex.Error.Message; }
+        catch (Exception) { _error = "تعذر إتمام العملية. أعد المحاولة."; }
+        finally { _busy = false; }
+    }
+    private async Task LoadAsync()
+    {
+        var filters = $"&search={Uri.EscapeDataString(_search ?? string.Empty)}&type={Uri.EscapeDataString(_filterType)}";
+        if (_filterStatus.HasValue) filters += $"&status={_filterStatus.Value}";
+        _pageData = await Api.GetAsync<CashTransferPageDto>($"{Route}?page={_page}{filters}");
+        var lastPage = Math.Max(1, (int)Math.Ceiling((_pageData?.TotalCount ?? 0) / 50m));
+        if (_page > lastPage)
+        {
+            _page = lastPage;
+            _pageData = await Api.GetAsync<CashTransferPageDto>($"{Route}?page={_page}{filters}");
+        }
+    }
+    private Task SearchAsync() => RunAsync(async () => { _page = 1; await LoadAsync(); });
+    private Task ResetFiltersAsync() { _filterType = string.Empty; _filterStatus = null; _search = null; return SearchAsync(); }
+    private Task PreviousAsync() => RunAsync(async () => { _page--; await LoadAsync(); });
+    private Task NextAsync() => RunAsync(async () => { _page++; await LoadAsync(); });
+    private async Task<CashTransferLookupsDto> GetDatedLookupsAsync(DateOnly date) =>
+        await Api.GetAsync<CashTransferLookupsDto>($"{Route}/lookups?date={date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)}")
+            ?? throw new InvalidOperationException("Transfer lookups were not returned.");
+    private Task NewTransfer() => RunAsync(async () =>
+    {
+        _date = DateOnly.FromDateTime(DateTime.Today);
+        _lookups = await GetDatedLookupsAsync(_date);
+        _editing = true; _reverse = null; _validate = false; _transferType = string.Empty; _id = _source = _destination = _feeAccount = null; _rowVersion = _reference = null;
+        _sourceAmount = _destinationAmount = _fee = 0; _transferRate = null; _description = string.Empty; _error = null;
+    });
+    private Task Edit(CashTransferDto x) => RunAsync(async () =>
+    {
+        _lookups = await GetDatedLookupsAsync(x.Date);
+        _editing = true; _reverse = null; _validate = false; _transferType = x.IsCrossCurrency ? "fx" : RouteType(x.SourceKind, x.DestinationKind); _id = x.Id; _source = x.SourceAccountId; _destination = x.DestinationAccountId;
+        _feeAccount = x.FeeAccountId; _rowVersion = x.RowVersion; _reference = x.Reference; _description = x.Description;
+        _date = x.Date; _sourceAmount = x.SourceAmount; _destinationAmount = x.DestinationAmount; _fee = x.FeeAmount;
+        // Preserve the actual amount of an existing draft instead of silently repricing it.
+        _transferRate = SameCurrency ? 1m : NetSource > 0 && _destinationAmount > 0 ? NetSource / _destinationAmount : SuggestedRate;
+    });
+    private void TransferTypeChanged() { _source = _destination = _feeAccount = null; _sourceAmount = _destinationAmount = _fee = 0; _transferRate = null; _validate = false; }
+    private void SourceChanged() { _destination = _feeAccount = null; _sourceAmount = _destinationAmount = _fee = 0; _transferRate = null; }
+    private void DestinationChanged() { _destinationAmount = 0; UseSuggestedRate(); }
+    private Task DateChangedAsync() => RunAsync(async () =>
+    {
+        _lookups = null; // never show an old date's balance as current
+        _lookups = await GetDatedLookupsAsync(_date);
+        UseSuggestedRate();
+    });
+    private Task RefreshBalancesAsync() => RunAsync(async () =>
+    {
+        var previousRate = SuggestedRate;
+        var usingSuggested = _transferRate == previousRate || !_transferRate.HasValue;
+        _lookups = null;
+        _lookups = await GetDatedLookupsAsync(_date);
+        if (usingSuggested || SameCurrency) UseSuggestedRate();
+    });
+    private void UseSuggestedRate() { _transferRate = SameCurrency ? 1m : SuggestedRate; UpdateDestination(); }
+    private void ReceivedChanged()
+    {
+        if (!SameCurrency && NetSource > 0 && _destinationAmount > 0 && _destinationAmount < 1000000000000000m)
+            _transferRate = NetSource / _destinationAmount;
+        else if (SameCurrency) UpdateDestination();
+    }
+    private void UpdateDestination()
+    {
+        if (_fee == 0) _feeAccount = null;
+        if (SameCurrency) { _destinationAmount = NetSource; return; }
+        _destinationAmount = Destination is { } destination
+            ? CashTransferPreviewMath.Received(_sourceAmount, _fee, _transferRate, destination.DecimalPlaces)
+            : 0m;
+    }
+    private Task SaveAsync() => RunAsync(async () =>
+    {
+        _validate = true;
+        // Refresh before saving, not only when the user originally selected the source.
+        _lookups = await GetDatedLookupsAsync(_date);
+        if (new[] { "type", "source", "destination", "amount", "fee", "received", "rate", "feeAccount", "description" }.Any(f => FieldError(f) is not null)
+            || _source is not Guid a || _destination is not Guid b)
+        { _error = "راجع الحقول المطلوبة قبل الحفظ."; return; }
+        var data = new CashTransferRequest(_date, a, b, _sourceAmount, _destinationAmount, _fee, _fee > 0 ? _feeAccount : null, _reference, _description, _rowVersion);
+        if (_id is Guid id) await Api.PutAsync<CashTransferRequest, Guid>($"{Route}/{id}", data);
+        else await Api.PostAsync<CashTransferRequest, Guid>(Route, data);
+        _editing = false; _validate = false; _filterType = string.Empty; _filterStatus = null; _search = null; _page = 1; await LoadAsync(); _message = "تم حفظ التحويل.";
+    });
+    private Task ActAsync(CashTransferDto x, string action, DateOnly? date = null, string? reason = null) => RunAsync(async () =>
+    {
+        _postErrorId = null; _postError = null;
+        await Api.PostAsync<CashTransferActionRequest, Guid>($"{Route}/{x.Id}/{action}", new(x.RowVersion, date, reason));
+        _reverse = null; _editing = false; await LoadAsync(); _message = "تم تنفيذ الإجراء.";
+    });
+    private Task ApproveAsync(CashTransferDto x) => ActAsync(x, "approve");
+    private Task PostAsync(CashTransferDto x) => RunAsync(async () =>
+    {
+        _postErrorId = x.Id; _postError = null;
+        var lookup = await GetDatedLookupsAsync(x.Date);
+        var source = lookup.Accounts.FirstOrDefault(a => a.AccountId == x.SourceAccountId);
+        var destination = lookup.Accounts.FirstOrDefault(a => a.AccountId == x.DestinationAccountId);
+        _postError = DebitError(source, x.SourceAmount, lookup);
+        if (_postError is null && (destination is null || source!.CurrencyCode != x.SourceCurrencyCode || destination.CurrencyCode != x.DestinationCurrencyCode))
+            _postError = "تغيرت بيانات أحد الحسابات أو عملته. راجع التحويل.";
+        if (_postError is null && x.IsCrossCurrency && (source!.AccountingRate is null || destination!.AccountingRate is null))
+            _postError = "لا يوجد سعر صرف محاسبي معتمد لإحدى العملتين حتى تاريخ التحويل.";
+        if (_postError is not null) return;
+        try
+        {
+            await Api.PostAsync<CashTransferActionRequest, Guid>($"{Route}/{x.Id}/post", new(x.RowVersion));
+        }
+        catch (ApiClientException ex) { _postError = ex.Error.Message; return; }
+        _postErrorId = null; _reverse = null; _editing = false;
+        await LoadAsync(); _message = "تم ترحيل التحويل.";
+    });
+    private Task CancelAsync(CashTransferDto x) => ActAsync(x, "cancel");
+    private void BeginReverse(CashTransferDto x) { _editing = false; _reverse = x; _reverseDate = DateOnly.FromDateTime(DateTime.Today); _reverseReason = null; }
+    private Task ReverseAsync() => _reverse is null ? Task.CompletedTask : ActAsync(_reverse, "reverse", _reverseDate, _reverseReason);
+    private static string StatusText(int status) => status switch { 1 => "مسودة", 2 => "معتمد", 3 => "مرحل", 4 => "معكوس", 5 => "ملغى", _ => "غير معروف" };
+}

@@ -64,14 +64,23 @@
                              IconCssClass="fa-solid fa-chart-pie"
                              AdditionalCssClass="ui-acc-account-editor__section ui-acc-account-editor__section--classification">
 
-        <UiAccountingFormGrid Columns="3">
+        <UiAccountingFormGrid Columns="2">
 
             <UiSelect Label="تصنيف الحساب"
                       Value="@Model.AccountClassValue"
                       ValueExpression="@(() => Model.AccountClassValue)"
                       ValueChanged="OnClassChanged"
                       Options="@AccountingArabicPresenter.AccountClassOptions"
-                      Disabled="@(!IsEditable)"
+                      Disabled="@(!IsEditable || Model.ParentAccountId.HasValue)"
+                      Size="ControlSize.Small" />
+
+            <UiSelect Label="تصنيف القوائم المالية"
+                      Value="@DisplayedFinancialValue"
+                      ValueExpression="@(() => Model.FinancialCategoryValue)"
+                      ValueChanged="OnFinancialCategoryChanged"
+                      Options="@FinancialOptions"
+                      Required="true" ErrorText="@Model.FinancialCategoryError"
+                      Disabled="@(!IsEditable || Model.ParentAccountId.HasValue || Model.AccountClass == AccountClass.Equity)"
                       Size="ControlSize.Small" />
 
             <UiSelect Label="نوع الحساب"
@@ -180,6 +189,14 @@
         public AccountClass AccountClass { get; set; }
             = AccountClass.Asset;
 
+        public FinancialStatementCategory? FinancialStatementCategory { get; set; }
+        public string? FinancialCategoryError { get; set; }
+        public string FinancialCategoryValue
+        {
+            get => FinancialStatementCategory?.ToString() ?? "";
+            set => FinancialStatementCategory = Enum.TryParse<FinancialStatementCategory>(value, out var parsed) ? parsed : null;
+        }
+
         public AccountType AccountType { get; set; }
             = AccountType.Posting;
 
@@ -251,6 +268,26 @@
         }
     }
 
+
+    [Parameter] public Func<Guid?, OAS.Contracts.Accounting.Accounts.AccountDto?>? AccountResolver { get; set; }
+    [Parameter] public Func<AccountClass, FinancialStatementCategory?, Guid?, FinancialStatementCategory?>? FinancialCategoryResolver { get; set; }
+    [Parameter] public Func<Guid, Task>? LoadFinancialAncestorsAsync { get; set; }
+
+    private FinancialStatementCategory? InheritedCategory => FinancialCategoryResolver?.Invoke(Model.AccountClass, null, Model.ParentAccountId);
+    private FinancialStatementCategory? EffectiveCategory => Model.FinancialStatementCategory ?? InheritedCategory
+        ?? (Model.AccountClass == AccountClass.Equity ? FinancialStatementCategory.Equity : null);
+    private string DisplayedFinancialValue => EffectiveCategory?.ToString() ?? "";
+    private IReadOnlyList<UiSelectOption> FinancialOptions => new[] { new UiSelectOption("", Model.ParentAccountId.HasValue ? "الحساب الأب غير مصنف" : "اختر تصنيف القوائم المالية") }
+        .Concat(Enum.GetValues<FinancialStatementCategory>().Where(x => FinancialStatementCategories.IsCompatible(Model.AccountClass, x))
+            .Select(x => new UiSelectOption(x.ToString(), FinancialStatementCategoryPresenter.Label(x)))).ToArray();
+
+    private async Task OnFinancialCategoryChanged(string? value)
+    {
+        if (Model.ParentAccountId.HasValue) return;
+        Model.FinancialCategoryValue = value ?? "";
+        Model.FinancialCategoryError = null;
+        await OnChanged();
+    }
 
     private bool CanChangePostingAccount => IsEditable && Model.AccountType != AccountType.Header;
     private bool CanChangeManualPosting => IsEditable && Model.AccountType != AccountType.Header && Model.IsPostingAccount;
@@ -391,6 +428,8 @@
                 out var result))
         {
             Model.AccountClass = result;
+            Model.FinancialStatementCategory = result == AccountClass.Equity ? FinancialStatementCategory.Equity : null;
+            Model.FinancialCategoryError = null;
             Model.NormalBalance = GetSuggestedNormalBalance(result);
 
             await OnChanged();
@@ -452,12 +491,26 @@
     private async Task OnParentAccountChanged(
         string? value)
     {
+        var previousParent = Model.ParentAccountId;
         Model.ParentAccountId =
             Guid.TryParse(
                 value,
                 out var id)
                 ? id
                 : null;
+
+        if (Model.ParentAccountId is Guid parentId && LoadFinancialAncestorsAsync is not null)
+            await LoadFinancialAncestorsAsync(parentId);
+        var parent = AccountResolver?.Invoke(Model.ParentAccountId);
+        if (parent is not null)
+        {
+            Model.AccountClass = parent.AccountClass;
+            Model.NormalBalance = parent.NormalBalance;
+        }
+        // Choosing a different parent opts into dynamic inheritance again.
+        if (previousParent != Model.ParentAccountId)
+            Model.FinancialStatementCategory = null;
+        Model.FinancialCategoryError = null;
 
         if (AccountLevelResolver is not null)
         {

@@ -63,6 +63,8 @@ public sealed class GetSalesReturnPostingReadinessQueryHandler(
         if (pastJournals.Count > 0)
             Add("sales_return_journal_already_exists", "يوجد قيد سابق لهذا المرتجع ويجب مراجعته قبل إعادة الترحيل.");
 
+        foreach (var line in salesReturn.Lines.Where(x => x.IsActive && x.RestoresInventoryAsset && (!x.UnitCostSnapshot.HasValue || !x.TotalCostSnapshot.HasValue)))
+            Add("sales_return_cost_snapshot_missing", $"تكلفة البند {line.LineNumber} غير محفوظة؛ لا يمكن الترحيل.");
         var requiresInventory = salesReturn.Lines.Any(x => x.IsActive && x.RestoresInventoryAsset);
         var matchingPeriods = await periods.ListAsync(new Specification<FiscalPeriod>().Where(x =>
             x.StartDate <= salesReturn.PostingDate && x.EndDate >= salesReturn.PostingDate), ct);

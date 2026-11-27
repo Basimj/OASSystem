@@ -1,0 +1,115 @@
+.journal-report { min-width: 0; }
+.journal-report ::deep .oas-report__search,
+.journal-report ::deep .oas-report__tool,
+.journal-report ::deep .oas-report__field > :is(select, input),
+.journal-report ::deep .oas-report-picker__trigger { background: #fff; }
+/* The panel stays in the report grid; only the field list scrolls. */
+.journal-report ::deep .oas-report .oas-report__aside {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    max-width: none;
+    min-height: 0;
+    padding: 7px;
+    overflow: hidden;
+    background: #fff;
+    --r-filter-font: 11px;
+}
+.journal-report ::deep .oas-report__aside-header {
+    flex: 0 0 auto;
+    padding-bottom: 6px;
+    margin-bottom: 6px;
+}
+.journal-report ::deep .oas-report__aside-header button { min-height: 23px; min-width: 25px; padding: 0 3px; }
+.journal-report ::deep .oas-report .journal-fields {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+    min-width: 0;
+    gap: 7px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-gutter: stable;
+    overscroll-behavior-y: contain;
+    padding: 2px 2px 7px;
+}
+.journal-report ::deep .journal-fields > * { flex: 0 0 auto; min-width: 0; }
+.journal-report ::deep .oas-report .oas-report__aside .journal-fields .oas-report__field {
+    margin: 0;
+    gap: 3px;
+    min-width: 0;
+    width: 100%;
+    font-weight: 600;
+    line-height: 15px !important;
+}
+.journal-report ::deep .oas-report .oas-report__aside .journal-fields .oas-report-picker { gap: 3px; }
+.journal-report ::deep .oas-report .oas-report__aside .journal-fields .oas-report-picker__label {
+    line-height: 15px !important;
+}
+.journal-report ::deep .oas-report .oas-report__aside .journal-fields .oas-report__field > :is(select, input),
+.journal-report ::deep .oas-report .oas-report__aside .journal-fields .oas-report-picker__trigger {
+    width: 100%;
+    min-width: 0;
+    height: 27px;
+    min-height: 27px;
+    padding: 0 5px;
+    font-size: 11px !important;
+    line-height: 1.35 !important;
+    border-radius: 5px;
+}
+.journal-report ::deep .oas-report .oas-report__aside .journal-fields .oas-report__date-pair {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+.journal-report ::deep .oas-report .oas-report__aside .journal-fields .oas-report__field-check {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 18px;
+    line-height: 15px !important;
+}
+.journal-report ::deep .oas-report .oas-report__aside .journal-fields .oas-report__field-check input {
+    margin: 0;
+    width: 13px;
+    height: 13px;
+    flex: 0 0 13px;
+}
+.journal-report ::deep .journal-warning { color: #bd2634; font-size: 10px; line-height: 1.35; }
+.journal-report ::deep .oas-report .oas-report__aside .oas-report__apply {
+    flex: 0 0 auto;
+    margin-top: auto;
+    gap: 5px;
+    padding-top: 7px;
+    border-top: 1px solid #e0e5eb;
+    background: #fff;
+}
+.journal-report ::deep .oas-report .oas-report__aside .oas-report__apply button {
+    min-height: 28px;
+    padding: 3px 2px;
+    font-size: 10px;
+    line-height: 1.3;
+}
+
+.journal-report ::deep .oas-report .oas-report__main--filters { grid-template-columns: minmax(0,1fr) 204px; }
+.journal-report ::deep .journal-table { width:100%; min-width:920px; table-layout:auto; }
+.journal-report ::deep .journal-table th { white-space:normal; background:#e8edf5 !important; }
+.journal-report ::deep .oas-report .journal-table tbody tr > td { background:#fff; }
+.journal-report ::deep .oas-report .journal-table tbody tr:hover > td { background:#f4f6f8; }
+.journal-report ::deep .oas-report .journal-table tbody tr.journal-total > td { background:#e8edf5 !important; font-weight:700; }
+.journal-report ::deep .journal-table td { white-space:normal; overflow-wrap:anywhere; }
+.journal-report ::deep .journal-table :is(.oas-report__debit,.oas-report__credit) { white-space:nowrap; }
+.journal-report ::deep .journal-link { background:transparent; border:0; padding:0; color:#2459aa; font:inherit; cursor:pointer; }
+.journal-report ::deep .journal-link:hover { text-decoration:underline; }
+.journal-report ::deep .journal-state { border-radius:10px; padding:1px 6px; background:#fff0de; color:#9a5b0b; white-space:nowrap; }
+.journal-report ::deep .journal-state.posted { background:#dff5e7; color:#16843d; }
+.journal-report ::deep .oas-report .oas-report__quick-filters .oas-report__chip { background:#f4f6f8; }
+.journal-report ::deep .oas-report__metric strong { white-space:nowrap; font-size:clamp(10px,1.05vw,14px); }
+
+.journal-report ::deep .journal-table.journal-short { min-width:480px; }
+.journal-report ::deep .oas-report .journal-table tbody td { white-space:normal; }
+.journal-report ::deep .oas-report .journal-table tbody :is(.oas-report__debit,.oas-report__credit) { white-space:nowrap; text-align:center; font-variant-numeric:tabular-nums; }
+@media (max-width:650px) { .journal-report ::deep .oas-report .oas-report__main--filters { grid-template-columns:minmax(0,1fr) 185px; } }

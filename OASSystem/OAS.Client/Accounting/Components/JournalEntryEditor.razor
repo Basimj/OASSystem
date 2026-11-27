@@ -15,9 +15,9 @@
         </div>
         <div class="oas-journal-editor__heading-actions">
             <span class="oas-journal-editor__status">@AccountingArabicPresenter.GetJournalStatusText(Model.Status)</span>
-            @if (Model.ReversedJournalId.HasValue)
+            @if (Model.ReversalInfo is { } info && (info.IsReversal || info.ReversalJournalId.HasValue))
             {
-                <span class="oas-journal-editor__number">القيد العكسي: @ReversedJournalCodeText</span>
+                <span class="oas-journal-editor__number">@AccountingArabicPresenter.GetJournalReversalText(info) — @AccountingArabicPresenter.GetJournalRelatedNumbers(info)</span>
             }
             @if (!IsNew && (!string.IsNullOrWhiteSpace(Model.SourceModule) ||
                  !string.IsNullOrWhiteSpace(Model.SourceDocumentType) || Model.SourceDocumentId.HasValue))
@@ -67,7 +67,7 @@
                       ValueExpression="@(() => Model.JournalTypeValue)"
                       ValueChanged="OnTypeChanged"
                       Options="@AccountingArabicPresenter.JournalTypeOptions"
-                      Disabled="@(!IsEditable)" Size="ControlSize.Small" />
+                      Disabled="true" Size="ControlSize.Small" />
         </div>
         <div class="oas-journal-editor__description">
             <UiInputText Label="البيان العام للقيد"
@@ -179,6 +179,8 @@
             JournalEntryStatus.Draft;
 
         public Guid? ReversedJournalId { get; set; }
+        public JournalReversalInfoDto? ReversalInfo { get; set; }
+        public bool IsManualStandalone => JournalType == JournalType.Manual && !SourceDocumentId.HasValue && string.IsNullOrWhiteSpace(SourceDocumentType) && (string.IsNullOrWhiteSpace(SourceModule) || string.Equals(SourceModule, "Accounting", StringComparison.OrdinalIgnoreCase));
 
         /*
          * رقم القيد المرتبط بالعكس.
@@ -363,6 +365,9 @@
 
             "JournalEntry" =>
                 "قيد يومية",
+
+            "ReceiptVoucherReversal" => "عكس سند قبض",
+            "PaymentVoucherReversal" => "عكس سند صرف",
 
             "JournalEntryReversal" =>
                 "قيد عكسي",

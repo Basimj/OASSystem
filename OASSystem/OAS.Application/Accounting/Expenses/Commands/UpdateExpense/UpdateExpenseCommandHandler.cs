@@ -1,6 +1,7 @@
 using MediatR;
 using OAS.Application.Abstractions.Persistence;
 using OAS.Application.Common.Exceptions;
+using OAS.Application.Accounting.Abstractions;
 using OAS.Contracts.Accounting.Expenses;
 using OAS.Domain.Accounting.Entities;
 using DomainPaymentMethod = OAS.Domain.Accounting.Enums.PaymentMethod;
@@ -9,7 +10,8 @@ namespace OAS.Application.Accounting.Expenses.Commands.UpdateExpense;
 
 public sealed class UpdateExpenseCommandHandler(
     IRepository<Expense, Guid> repository,
-    IReadRepository<Account, Guid> accountRepository)
+    IReadRepository<Account, Guid> accountRepository,
+    IExpenseCurrencyService expenseCurrency)
     : IRequestHandler<UpdateExpenseCommand>
 {
     public async Task Handle(
@@ -48,6 +50,7 @@ public sealed class UpdateExpenseCommandHandler(
             data.BankAccountId,
             data.Description);
 
+        await expenseCurrency.ApplyAsync(expense, data.CurrencyId, data.ExpectedExchangeRate, cancellationToken);
         repository.Update(expense);
     }
 }

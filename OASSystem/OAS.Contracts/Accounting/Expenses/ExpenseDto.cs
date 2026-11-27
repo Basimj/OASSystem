@@ -19,4 +19,12 @@ public sealed record ExpenseDto(
     string? CreatedBy,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset? PostedAtUtc,
-    string RowVersion);
+    string RowVersion,
+    Guid? CurrencyId = null,
+    string? CurrencyCodeSnapshot = null,
+    byte? CurrencyDecimalPlacesSnapshot = null,
+    decimal? BaseAmount = null,
+    string? BaseCurrencyCodeSnapshot = null,
+    decimal? ExchangeRate = null,
+    DateOnly? ExchangeRateDate = null,
+    byte? BaseCurrencyDecimalPlacesSnapshot = null);

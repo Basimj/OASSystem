@@ -154,8 +154,13 @@ public sealed class SupplierSettlementFxPostingService(
             ?? throw new NotFoundException(nameof(JournalEntry), originals[0].Id);
         if (original.Status != JournalEntryStatus.Posted)
             throw new ConflictException("supplier_settlement_fx_not_posted", "قيد فرق الصرف الأصلي غير مرحل ولا يمكن عكسه.");
-        if (original.ReversedJournalId.HasValue)
+        if (original.ReversedJournalId is Guid linkedId)
+        {
+            var linked = await journals.GetByIdAsync(linkedId, cancellationToken);
+            if (linked is null || linked.Status != JournalEntryStatus.Posted || linked.SourceModule != SourceModule || linked.SourceDocumentType != ReversalSourceDocumentType || linked.SourceDocumentId != request.PaymentAllocationId)
+                throw new ConflictException("settlement_reversal_requires_review", "القيد المرتبط بالعكس ليس قيد عكس تشغيليًا مرحلًا صالحًا. راجع القيد قبل متابعة العملية.");
             return new SupplierSettlementFxReversalResult(original.Id, original.ReversedJournalId.Value);
+        }
 
         var existingReversal = await journals.ListAsync(
             new Specification<JournalEntry>()
@@ -167,6 +172,8 @@ public sealed class SupplierSettlementFxPostingService(
             cancellationToken);
         if (existingReversal.Count > 0)
         {
+            if (existingReversal.Count != 1 || existingReversal[0].Status != JournalEntryStatus.Posted)
+                throw new ConflictException("settlement_reversal_requires_review", "يوجد قيد عكس سابق غير صالح للمتابعة. راجع القيود المرتبطة.");
             original.MarkReversed(existingReversal[0].Id);
             journals.Update(original);
             return new SupplierSettlementFxReversalResult(original.Id, existingReversal[0].Id);
@@ -192,7 +199,7 @@ public sealed class SupplierSettlementFxPostingService(
         var reversal = JournalEntry.Create(
             Guid.NewGuid(),
             $"JV-{request.PostingDate.Year:0000}-{sequence:000000}",
-            JournalType.Automatic,
+            JournalType.Reversal,
             request.PostingDate,
             request.PostingDate,
             period.Id,

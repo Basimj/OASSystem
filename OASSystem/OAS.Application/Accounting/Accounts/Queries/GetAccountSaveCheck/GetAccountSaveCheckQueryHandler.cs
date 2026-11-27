@@ -55,6 +55,15 @@ public sealed class GetAccountSaveCheckQueryHandler(
         if (data.ParentAccountId == Guid.Empty)
             return Reject("accounting_account_parent_invalid");
 
+        if (data.UpdateFinancialStatementCategory && data.FinancialStatementCategory is { } category &&
+            !OAS.Domain.Accounting.Enums.FinancialStatementCategories.IsCompatible((DomainAccountClass)data.AccountClass, (OAS.Domain.Accounting.Enums.FinancialStatementCategory)category))
+            return Reject("accounting_financial_category_invalid");
+        if (data.ParentAccountId is Guid parentId && (current.ParentAccountId != parentId || current.AccountClass != (DomainAccountClass)data.AccountClass))
+        {
+            var parent = await accounts.GetByIdAsync(parentId, cancellationToken);
+            if (parent is not null && parent.AccountClass != (DomainAccountClass)data.AccountClass)
+                return Reject("accounting_financial_category_parent_class");
+        }
         var issue = await integrity.InspectUpdateAsync(
             current,
             data.ParentAccountId,
@@ -69,7 +78,17 @@ public sealed class GetAccountSaveCheckQueryHandler(
             data.IsActive,
             cancellationToken);
 
-        return issue is null ? new AccountSaveCheckDto(true, null) : Reject(issue);
+        if (issue is not null) return Reject(issue);
+        var cls = (DomainAccountClass)data.AccountClass;
+        var categoryValue = data.UpdateFinancialStatementCategory
+            ? (OAS.Domain.Accounting.Enums.FinancialStatementCategory?)data.FinancialStatementCategory : current.FinancialStatementCategory;
+        if (data.ParentAccountId.HasValue &&
+            (current.ParentAccountId == data.ParentAccountId ? categoryValue != current.FinancialStatementCategory : categoryValue.HasValue))
+            return Reject("accounting_financial_category_inherited");
+        var directory = (await accounts.ListAsync(cancellationToken: cancellationToken)).ToDictionary(x => x.Id);
+        if (OAS.Domain.Accounting.Enums.FinancialStatementCategories.Resolve(cls, categoryValue, data.ParentAccountId, directory) is null)
+            return Reject("accounting_financial_category_required");
+        return new AccountSaveCheckDto(true, null);
     }
 
     private static AccountSaveCheckDto Reject(string code) => new(false, code);
