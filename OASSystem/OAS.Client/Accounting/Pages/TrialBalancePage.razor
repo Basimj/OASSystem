@@ -38,8 +38,8 @@
             <label class="oas-report__field">العملة<select @bind="_draft.Currency"><option value="">@_baseName (الأساسية)</option>@foreach (var c in _currencies.Where(c => c.IsActive && c.Id != _baseId)){<option value="@c.Id">@c.NameAr (@c.Code)</option>}</select></label>
             <label class="oas-report__field">طبيعة الرصيد<select @bind="_draft.Balance"><option value="all">الكل</option><option value="debit">مدين</option><option value="credit">دائن</option><option value="zero">صفري</option></select></label>
             <label class="oas-report__field-check"><input type="checkbox" @bind="_draft.Children" disabled="@string.IsNullOrEmpty(_draft.Account)" /> تضمين الحسابات الفرعية</label>
-            <label class="oas-report__field-check"><input type="checkbox" @bind="_draft.IncludeZero" /> إظهار الحسابات دون حركة أو رصيد</label>
-            <label class="oas-report__field-check"><input type="checkbox" @bind="_draft.HideClosingZero" disabled="@(_draft.Balance == "zero")" /> إخفاء الرصيد الختامي الصفري</label>
+            <label class="oas-report__field-check"><input type="checkbox" @bind="_draft.IncludeZero" /> إظهار الحسابات التي لا حركة ولا رصيد لها</label>
+            <label class="oas-report__field-check"><input type="checkbox" @bind="_draft.HideClosingZero" disabled="@(_draft.Balance == "zero")" /> إخفاء الحسابات ذات الرصيد الختامي الصفري</label>
             @if (_validation is not null){<div role="alert" class="trial-warning">@_validation</div>}
         </div>
         <div class="oas-report__apply"><button type="button" class="primary" disabled="@_busy" @onclick="ApplyAsync"><i class="fa-solid fa-filter"></i> تطبيق</button><button type="button" disabled="@_busy" @onclick="ResetAsync"><i class="fa-solid fa-rotate-left"></i> إعادة تعيين</button></div>

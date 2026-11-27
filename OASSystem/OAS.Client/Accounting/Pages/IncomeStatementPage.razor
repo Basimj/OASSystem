@@ -25,7 +25,7 @@
                 <label class="oas-report__field">المقارنة من<input type="date" @bind="_draft.CompareFrom" @bind:format="yyyy-MM-dd" /></label>
                 <label class="oas-report__field">المقارنة إلى<input type="date" @bind="_draft.CompareTo" @bind:format="yyyy-MM-dd" /></label>
             }
-            <label class="oas-report__field">مستوى الحساب<select @bind="_draft.Level" disabled="@(_draft.Mode!="detail")"><option value="0">جميع المستويات</option>@foreach(var l in Levels){<option value="@l">حتى المستوى @l</option>}</select></label>
+            <label class="oas-report__field">مستوى الحساب<select @bind="_draft.Level" disabled="@(_draft.Mode!="detail" || !_draft.Children)"><option value="0">جميع المستويات</option>@foreach(var l in Levels){<option value="@l">حتى المستوى @l</option>}</select></label>
             <label class="oas-report__field">مركز التكلفة<select @bind="_draft.CostCenter"><option value="">جميع المراكز</option>@foreach(var c in _centers.OrderBy(c=>c.Code)){<option value="@c.Id">@c.NameAr</option>}</select></label>
             <label class="oas-report__field">العملة<select @bind="_draft.Currency"><option value="">@_baseName (الأساسية)</option>@foreach(var c in _currencies.Where(c=>c.IsActive&&c.Id!=_baseId)){<option value="@c.Id">@c.NameAr (@c.Code)</option>}</select></label>
             <label class="oas-report__field-check"><input type="checkbox" @bind="_draft.Children" disabled="@(_draft.Mode!="detail")" /> تضمين تفاصيل الحسابات</label>

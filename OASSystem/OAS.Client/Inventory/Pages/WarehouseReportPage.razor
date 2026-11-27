@@ -20,12 +20,12 @@
     <FilterPanel>
         <div class="warehouse-fields">
             <label class="oas-report__field">نوع التقرير<select @bind="_draft.Mode"><option value="summary">إجمالي أرصدة المخازن</option><option value="details">أرصدة المخازن حسب الأصناف</option><option value="qty">حركة المخازن - كميات</option><option value="cost">حركة المخازن - تكاليف</option><option value="transfers">التحويلات بين المخازن</option><option value="counts">الجرد والفروقات</option></select></label>
-            <div class="oas-report__field"><UiReportSearchPicker Label="المخزن" ItemLabel="مخزن" DialogTitle="اختيار المخزن" Value="@_draft.Warehouse" ValueChanged="OnWarehouse" Options="@WarehouseOptions" Placeholder="جميع المخازن" /></div>
+            <div class="oas-report__field"><UiReportSearchPicker Label="@(_draft.Mode == "transfers" ? "المخزن (أي طرف)" : "المخزن")" ItemLabel="مخزن" DialogTitle="اختيار المخزن" Value="@_draft.Warehouse" ValueChanged="OnWarehouse" Options="@WarehouseOptions" Placeholder="جميع المخازن" /></div>
             <div class="oas-report__field"><UiReportSearchPicker Label="الصنف" ItemLabel="صنف" DialogTitle="اختيار الصنف" Value="@_draft.Variant" ValueChanged="OnVariant" Options="@VariantOptions" Placeholder="جميع الأصناف" /></div>
             @if (string.IsNullOrEmpty(_draft.Variant))
             {<label class="oas-report__field">المنتج<select disabled><option>اختر الصنف أولاً</option></select></label>}
             else
-            {<div class="oas-report__field"><UiReportSearchPicker Label="المنتج" ItemLabel="منتج" DialogTitle="المنتج المرتبط بالصنف" Value="@_draft.Product" ValueChanged="OnProduct" Options="@ProductOptions" Placeholder="المنتج المرتبط" /></div>}
+            {<div class="oas-report__field"><label class="oas-report__field">المنتج المرتبط<input readonly value="@(ProductOptions.FirstOrDefault()?.Text ?? "—")" /></label></div>}
             <label class="oas-report__field">التصنيف<select value="@_draft.Category" @onchange="OnCategory"><option value="">جميع التصنيفات</option>@foreach(var c in Categories){<option value="@c.Id">@c.Name</option>}</select></label>
             @if (IsRange(_draft.Mode))
             {<label class="oas-report__field">من تاريخ<input type="date" @bind="_draft.From" @bind:format="yyyy-MM-dd" /></label>}

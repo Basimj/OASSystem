@@ -61,10 +61,10 @@ public partial class CashBankReportPage
     private static string ShiftLabel(string s) => s switch { "open"=>"مفتوحة", "closing"=>"قيد الإغلاق", "closed"=>"مغلقة", "approved"=>"معتمدة", _=>"الكل" };
     private static string SettlementLabel(string s) => s switch { "settled"=>"مسوّاة", "unsettled"=>"غير مسوّاة", _=>"الكل" };
     protected override Task OnInitializedAsync() => ApplyAsync();
-    private void ClearAccount() => _draft.Account = "";
+    private void ClearAccount() { if(!AccountOptions.Any(x=>x.Value==_draft.Account)) _draft.Account=""; }
     private void OnAccount(string? value) => _draft.Account = value ?? "";
     private void OnOperator(string? value) => _draft.Operator = value ?? "";
-    private void ModeChanged() { _draft.Operator = ""; _draft.Kind = "all"; _draft.Account = ""; _draft.ShiftState = "all"; _draft.Settlement = "all"; }
+    private void ModeChanged() { _draft.Operator = ""; _draft.Kind = "all"; ClearAccount(); _draft.ShiftState = "all"; _draft.Settlement = "all"; }
     private async Task ResetAsync() { if(_busy)return; _draft=new(); _search=""; await ApplyAsync(); }
     private async Task ApplyAsync()
     {
@@ -130,7 +130,7 @@ public partial class CashBankReportPage
         }
     }
     private IEnumerable<CashBankReportRow> AllExportRows => _report is null ? [] : _report.TotalRow is { } total ? _report.Rows.Append(total) : _report.Rows;
-    private string Subtitle=>string.Join(" | ",Chips)+" | القيم الدفترية بعملة العرض بسعر نهاية الفترة. المجاميع تشمل كامل نتائج الفلاتر ولا تتأثر بالبحث. | "+string.Join(" | ",_report?.Warnings??[]);
+    private string Subtitle=>string.Join(" | ",Chips)+$" | تضمين الحسابات الصفرية: {(_applied.IncludeZero?"نعم":"لا")}"+" | القيم الدفترية بعملة العرض بسعر نهاية الفترة. المجاميع تشمل كامل نتائج الفلاتر ولا تتأثر بالبحث. | "+string.Join(" | ",_report?.Warnings??[]);
     private async Task ExportAsync()
     {
         if(!CanExport)return;

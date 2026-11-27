@@ -166,7 +166,12 @@ public partial class SalesReportsPage
     private void ChangePageSize(ChangeEventArgs e){if(int.TryParse(e.Value?.ToString(),out var n))_pageSize=n;_page=1;}
     private void OpenDocument(SalesReportBreakdownDto r){if(r.DocumentId is Guid id)Nav.NavigateTo(r.DocumentKind=="SalesInvoice"?$"/sales/invoices?invoiceId={id:D}":$"/sales/returns?returnId={id:D}");}
     private void OpenJournal(SalesReportBreakdownDto r){if(r.JournalId is Guid id)Nav.NavigateTo($"/accounting/journals?journalId={id:D}");}
-    private string Subtitle=>string.Join(" | ",Chips)+" | الإجماليات لجميع الفلاتر (البحث للعرض فقط)"+(_rate!=1?$" | سعر عرض نهاية الفترة: {_rate}":"");
+    private string[] EffectiveFilterLabels => new[]{("customer", "العميل",_applied.Customer),("employee","موظف المبيعات",_applied.Employee),("product","الصنف",_applied.Product),("category","التصنيف",_applied.Category),("type","نوع المنتج",_applied.ProductType),("brand","العلامة",_applied.Brand),("warehouse","المخزن",_applied.Warehouse),("operator","المستخدم المرحّل",_applied.Operator),("currency","عملة الفاتورة",_applied.Currency)}
+        .Where(x=>!string.IsNullOrEmpty(x.Item3)).Select(x=>$"{x.Item2}: {_options.FirstOrDefault(o=>o.Kind==x.Item1 && o.Key==x.Item3)?.Label??x.Item3}")
+        .Concat(string.IsNullOrEmpty(_applied.Plan)?Array.Empty<string>():new[]{"خطة الدفع: "+(_applied.Plan switch {"1"=>"فوري كامل","2"=>"جزئي","4"=>"آجل",_=>_applied.Plan})})
+        .Concat(string.IsNullOrEmpty(_applied.Settlement)?Array.Empty<string>():new[]{"حالة التسوية: "+(_applied.Settlement switch {"paid"=>"مسددة","partial"=>"جزئية","unpaid"=>"غير مسددة",_=>_applied.Settlement})})
+        .Concat(_applied.Mode=="Period"?new[]{"التجميع: "+_applied.PeriodGrouping}:Array.Empty<string>()).ToArray();
+    private string Subtitle=>string.Join(" | ",Chips.Concat(EffectiveFilterLabels))+" | الإجماليات لجميع الفلاتر (البحث للعرض فقط)"+(_rate!=1?$" | سعر عرض نهاية الفترة: {_rate}":"");
     private IEnumerable<object?[]> ExportRows(){var cols=Columns;foreach(var row in _report!.Breakdown)yield return cols.Select(c=>c.Value(row)).ToArray();yield return cols.Select(c=>TotalValue(c.Key)).ToArray();}
     private async Task ExportAsync()
     {

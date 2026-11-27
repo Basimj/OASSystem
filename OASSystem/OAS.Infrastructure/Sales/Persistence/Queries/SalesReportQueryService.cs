@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using System.Linq.Expressions;
 using OAS.Application.Sales.Abstractions;
 using OAS.Application.Sales.Reports;
 using OAS.Contracts.Sales.Reports;
@@ -31,7 +32,7 @@ public sealed class SalesReportQueryService(OasDbContext db) : ISalesReportQuery
         filter = filter with { PageNumber = Math.Max(1, filter.PageNumber), PageSize = Math.Clamp(filter.PageSize, 1, 100) };
         var invoices = db.Set<SalesInvoice>().AsNoTracking().Where(x => x.Status == SalesInvoiceStatus.Posted && x.PostingDate >= filter.FromDate && x.PostingDate <= filter.ToDate);
         var returns = db.Set<SalesReturn>().AsNoTracking().Where(x => x.Status == SalesReturnStatus.Posted && x.PostingDate >= filter.FromDate && x.PostingDate <= filter.ToDate);
-        var sale = await (from l in db.Set<SalesInvoiceLine>().AsNoTracking()
+        var saleQuery = (from l in db.Set<SalesInvoiceLine>().AsNoTracking()
                           join d in invoices on l.SalesInvoiceId equals d.Id
                           where l.IsActive
                           select new Fact { Kind = 1, Id = l.Id, DocId = d.Id, Code = d.InvoiceCode, Date = d.PostingDate, Number = l.LineNumber,
@@ -41,8 +42,8 @@ public sealed class SalesReportQueryService(OasDbContext db) : ISalesReportQuery
                               Discount = l.BaseHeaderDiscountAllocated + l.DiscountAmount * d.ExchangeRate,
                               HeaderNet = d.BaseTotalAmount - d.BaseTaxAmount, HeaderTax = d.BaseTaxAmount, HeaderDiscount = d.BaseDiscountAmount + d.BaseHeaderDiscountAmount,
                               Inventory = l.LineType != SalesLineType.Service && l.ProductVariantId.HasValue && l.WarehouseId.HasValue,
-                              CostSnapshot = l.TotalCostSnapshot, Journal = d.JournalEntryId }).Take(MaxLines + 1).ToListAsync(ct);
-        var returned = await (from l in db.Set<SalesReturnLine>().AsNoTracking()
+                              CostSnapshot = l.TotalCostSnapshot, Journal = d.JournalEntryId });
+        var returnQuery = (from l in db.Set<SalesReturnLine>().AsNoTracking()
                               join d in returns on l.SalesReturnId equals d.Id
                               join i in db.Set<SalesInvoice>().AsNoTracking() on d.SalesInvoiceId equals i.Id
                               join original in db.Set<SalesInvoiceLine>().AsNoTracking() on l.SalesInvoiceLineId equals original.Id
@@ -54,37 +55,82 @@ public sealed class SalesReportQueryService(OasDbContext db) : ISalesReportQuery
                                   HeaderNet = d.BaseNetAmount, HeaderTax = d.BaseTaxAmount, CostSnapshot = l.TotalCostSnapshot,
                                   Inventory = l.LineType != SalesLineType.Service && l.ProductVariantId.HasValue && l.WarehouseId.HasValue &&
                                      (l.StockDisposition == SalesReturnStockDisposition.Restock || l.StockDisposition == SalesReturnStockDisposition.Quarantine),
-                                  Journal = d.JournalEntryId }).Take(MaxLines + 1).ToListAsync(ct);
-        if (sale.Count + returned.Count > MaxLines) throw new ArgumentException("الفترة تحتوي على أكثر من 100,000 بند؛ ضيق نطاق التاريخ.");
-        var all = sale.Concat(returned).ToList();
+                                  Journal = d.JournalEntryId });
+        // Currency scope is defined over the whole period, independent of the selected customer or item.
+        // Count documents, not lines, without loading monetary facts.
+        var saleCurrencies = await saleQuery.Select(x => new { x.DocId, x.BaseCurrency }).Distinct()
+            .GroupBy(x => x.BaseCurrency).Select(g => new { Code = g.Key, Count = g.Count() }).ToListAsync(ct);
+        var returnCurrencies = await returnQuery.Select(x => new { x.DocId, x.BaseCurrency }).Distinct()
+            .GroupBy(x => x.BaseCurrency).Select(g => new { Code = g.Key, Count = g.Count() }).ToListAsync(ct);
+        var currencyCounts = saleCurrencies.Concat(returnCurrencies).ToArray();
         var baseCode = await (from s in db.Set<AccountingSettings>().AsNoTracking()
                               join c in db.Set<Currency>().AsNoTracking() on s.BaseCurrencyId equals c.Id select c.Code).FirstOrDefaultAsync(ct) ?? "BASE";
         baseCode = SalesReportCurrencyScope.Normalize(baseCode);
-        var baseCodes = SalesReportCurrencyScope.Available(all.Select(x => x.BaseCurrency));
+        var baseCodes = SalesReportCurrencyScope.Available(currencyCounts.Select(x => x.Code));
         var warnings = new List<string>();
-        // Discover currencies from the entire period before applying the scope. Never sum different historical units.
         if (!string.IsNullOrWhiteSpace(filter.HistoricalBaseCurrencyCode))
         {
             baseCode = SalesReportCurrencyScope.Select(filter.HistoricalBaseCurrencyCode, baseCode, baseCodes);
-            var omitted = all.Where(x => SalesReportCurrencyScope.Normalize(x.BaseCurrency) != baseCode).ToArray();
-            var otherDocuments = omitted.Where(x => !string.IsNullOrWhiteSpace(x.BaseCurrency))
-                .Select(x => (x.Kind, x.DocId)).Distinct().Count();
-            var unknownDocuments = omitted.Where(x => string.IsNullOrWhiteSpace(x.BaseCurrency))
-                .Select(x => (x.Kind, x.DocId)).Distinct().Count();
+            var otherDocuments = currencyCounts.Where(x => !string.IsNullOrWhiteSpace(x.Code) && SalesReportCurrencyScope.Normalize(x.Code) != baseCode).Sum(x => x.Count);
+            var unknownDocuments = currencyCounts.Where(x => string.IsNullOrWhiteSpace(x.Code)).Sum(x => x.Count);
             if (otherDocuments > 0)
                 warnings.Add($"النتائج تخص العملة الأساسية التاريخية {baseCode} فقط؛ استُبعد {otherDocuments} مستند بعملات أساسية أخرى من كامل الفترة قبل باقي الفلاتر. اختر عملة أخرى من الفلاتر لعرضها. العملات الموجودة: {string.Join("، ", baseCodes)}.");
             if (unknownDocuments > 0)
                 warnings.Add($"استُبعد {unknownDocuments} مستند بلا عملة أساسية تاريخية محفوظة؛ لم تُفترض له عملة أو قيمة بديلة.");
-            all = all.Where(x => SalesReportCurrencyScope.Normalize(x.BaseCurrency) == baseCode).ToList();
-            if (all.Count == 0 && baseCodes.Length > 0)
+            saleQuery = saleQuery.Where(x => x.BaseCurrency.Trim().ToUpper() == baseCode);
+            returnQuery = returnQuery.Where(x => x.BaseCurrency.Trim().ToUpper() == baseCode);
+            if (!baseCodes.Contains(baseCode) && baseCodes.Length > 0)
                 warnings.Add($"لا توجد مستندات بالعملة الأساسية التاريخية {baseCode} في الفترة المحددة.");
         }
         else
         {
-            // Dashboard and older API clients still require a homogeneous scope; no silent partial totals.
             if (baseCodes.Length > 1) throw new ArgumentException("تحتوي الفترة على أكثر من عملة أساسية تاريخية؛ حدد فترة متجانسة.");
             if (baseCodes.Length == 1) baseCode = baseCodes[0];
         }
+
+        // Keep selectors independent of the applied customer/item filters. Only lightweight distinct metadata is loaded here.
+        async Task<T[]> Keys<T>(Expression<Func<Fact,T>> selector)
+        {
+            var sold = await saleQuery.Select(selector).Distinct().ToListAsync(ct);
+            var returned = await returnQuery.Select(selector).Distinct().ToListAsync(ct);
+            return sold.Concat(returned).Distinct().ToArray();
+        }
+        var optionCustomers = await Keys(x => (Guid?)x.Customer);
+        var optionEmployees = await Keys(x => x.Employee);
+        var optionProducts = await Keys(x => x.Product);
+        var optionWarehouses = await Keys(x => x.Warehouse);
+        var optionCurrencies = await Keys(x => x.Currency);
+        var optionOperators = await Keys(x => x.Operator);
+
+        // Select documents with matching lines, then fetch ALL their active lines.
+        // Reconciliation of header amounts below must happen before the final line filter.
+        var matchingVariants = from v in db.Set<ProductVariant>().AsNoTracking()
+                               join p in db.Set<Product>().AsNoTracking() on v.ProductId equals p.Id
+                               join c in db.Set<ProductCategory>().AsNoTracking() on p.CategoryId equals c.Id
+                               where (!filter.ProductVariantId.HasValue || v.Id == filter.ProductVariantId)
+                                  && (!filter.CategoryId.HasValue || c.Id == filter.CategoryId)
+                                  && (!filter.ProductTypeId.HasValue || c.ProductTypeId == filter.ProductTypeId)
+                                  && (!filter.BrandId.HasValue || p.BrandId == filter.BrandId)
+                               select v.Id;
+        var itemFilter = filter.ProductVariantId.HasValue || filter.CategoryId.HasValue || filter.ProductTypeId.HasValue || filter.BrandId.HasValue;
+        IQueryable<Fact> SelectDocuments(IQueryable<Fact> source)
+        {
+            var scoped = source.Where(x => (!filter.CustomerId.HasValue || x.Customer == filter.CustomerId)
+                && (!filter.EmployeeId.HasValue || x.Employee == filter.EmployeeId)
+                && (string.IsNullOrWhiteSpace(filter.Operator) || x.Operator == filter.Operator)
+                && (string.IsNullOrWhiteSpace(filter.CurrencyCode) || x.Currency == filter.CurrencyCode)
+                && (!filter.PaymentPlan.HasValue || x.Plan == filter.PaymentPlan));
+            if (!itemFilter && !filter.WarehouseId.HasValue) return scoped;
+            var matching = scoped.Where(x => (!filter.WarehouseId.HasValue || x.Warehouse == filter.WarehouseId)
+                && (!itemFilter || (x.Product.HasValue && matchingVariants.Contains(x.Product.Value)))).Select(x => x.DocId);
+            return scoped.Where(x => matching.Contains(x.DocId));
+        }
+        var sale = filter.GroupBy == SalesReportGroupBy.Return ? new List<Fact>() : await SelectDocuments(saleQuery).Take(MaxLines + 1).ToListAsync(ct);
+        var returned = filter.GroupBy is SalesReportGroupBy.Invoice or SalesReportGroupBy.Collections ? new List<Fact>() : await SelectDocuments(returnQuery).Take(MaxLines + 1).ToListAsync(ct);
+        if (sale.Count + returned.Count > MaxLines) throw new ArgumentException("التقرير يتجاوز 100,000 بند في المستندات المطابقة؛ ضيق الفترة أو اختر عميلاً أو صنفاً أو مخزناً.");
+        var all = sale.Concat(returned).ToList();
+        if (!string.IsNullOrWhiteSpace(filter.HistoricalBaseCurrencyCode))
+            all = all.Where(x => SalesReportCurrencyScope.Normalize(x.BaseCurrency) == baseCode).ToList();
         // Use stable semantic posting roles, not descriptions or the current stock disposition.
         var journalIds = all.Where(x => x.Journal.HasValue).Select(x => x.Journal!.Value).Distinct().ToArray();
         var ledger = await (from l in db.Set<JournalEntryLine>().AsNoTracking()
@@ -132,7 +178,7 @@ public sealed class SalesReportQueryService(OasDbContext db) : ISalesReportQuery
         if (fallback > 0) warnings.Add($"{fallback} مستند بلا أدوار إيراد تاريخية قابلة للتحقق؛ استخدمت قيم الرأس المحفوظة.");
         if (differences > 0) warnings.Add($"{differences} مستند يختلف رأسه عن القيد؛ استخدمت الإيراد والضريبة من القيد.");
         if (reversedJournals > 0) warnings.Add("توجد قيود مبيعات معكوسة خارج دورة المرتجعات؛ التقرير يعرض المستندات الأصلية ولا يمثل تلك القيود العكسية المستقلة.");
-        var productIds = all.Where(x => x.Product.HasValue).Select(x => x.Product!.Value).Distinct().ToArray();
+        var productIds = optionProducts.OfType<Guid>().ToArray();
         var catalog = await (from v in db.Set<ProductVariant>().AsNoTracking()
                              join p in db.Set<Product>().AsNoTracking() on v.ProductId equals p.Id
                              join c in db.Set<ProductCategory>().AsNoTracking() on p.CategoryId equals c.Id
@@ -149,15 +195,15 @@ public sealed class SalesReportQueryService(OasDbContext db) : ISalesReportQuery
         var options = new List<SalesReportOptionDto>();
         options.AddRange(baseCodes.Select(code => new SalesReportOptionDto("historicalBaseCurrency", code, code)));
         void AddOptions(string kind, IEnumerable<Guid?> keys, Func<Guid, string> label) => options.AddRange(keys.Where(x => x.HasValue).Select(x => x!.Value).Distinct().Select(x => new SalesReportOptionDto(kind, x.ToString("D"), label(x))));
-        AddOptions("customer", all.Select(x => (Guid?)x.Customer), id => customers.GetValueOrDefault(id, id.ToString()));
-        AddOptions("employee", all.Select(x => x.Employee), id => employees.GetValueOrDefault(id, id.ToString()));
-        AddOptions("warehouse", all.Select(x => x.Warehouse), id => warehouses.GetValueOrDefault(id, id.ToString()));
-        AddOptions("brand", all.Select(x => x.Brand), id => brands.GetValueOrDefault(id, id.ToString()));
-        AddOptions("type", all.Select(x => x.ProductType), id => types.GetValueOrDefault(id, id.ToString()));
+        AddOptions("customer", optionCustomers, id => customers.GetValueOrDefault(id, id.ToString()));
+        AddOptions("employee", optionEmployees, id => employees.GetValueOrDefault(id, id.ToString()));
+        AddOptions("warehouse", optionWarehouses, id => warehouses.GetValueOrDefault(id, id.ToString()));
+        AddOptions("brand", catalog.Values.Select(x => x.BrandId), id => brands.GetValueOrDefault(id, id.ToString()));
+        AddOptions("type", catalog.Values.Select(x => (Guid?)x.Type), id => types.GetValueOrDefault(id, id.ToString()));
         options.AddRange(catalog.Values.GroupBy(x => x.Category).Select(g => new SalesReportOptionDto("category", g.Key.ToString("D"), g.First().CategoryName, TypeKey: g.First().Type.ToString("D"))));
         options.AddRange(catalog.Values.Select(x => new SalesReportOptionDto("product", x.Id.ToString("D"), $"{x.Name} - {x.SKU} {x.VariantName}", x.Category.ToString("D"), x.Type.ToString("D"))));
-        options.AddRange(all.Select(x => x.Currency).Distinct().Select(x => new SalesReportOptionDto("currency", x, x)));
-        options.AddRange(all.Select(x => x.Operator).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().Select(x => new SalesReportOptionDto("operator", x!, UserLabel(x))));
+        options.AddRange(optionCurrencies.Select(x => new SalesReportOptionDto("currency", x, x)));
+        options.AddRange(optionOperators.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().Select(x => new SalesReportOptionDto("operator", x!, UserLabel(x))));
         var facts = all.Where(x => (!filter.CustomerId.HasValue || x.Customer == filter.CustomerId) && (!filter.EmployeeId.HasValue || x.Employee == filter.EmployeeId)
             && (!filter.ProductVariantId.HasValue || x.Product == filter.ProductVariantId) && (!filter.CategoryId.HasValue || x.Category == filter.CategoryId)
             && (!filter.WarehouseId.HasValue || x.Warehouse == filter.WarehouseId) && (!filter.ProductTypeId.HasValue || x.ProductType == filter.ProductTypeId)

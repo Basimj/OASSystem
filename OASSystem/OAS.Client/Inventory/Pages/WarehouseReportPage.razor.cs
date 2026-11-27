@@ -85,7 +85,7 @@ public partial class WarehouseReportPage
         get
         {
             var f=_applied;
-            var list=new List<(string,string)>{("المخزن",Guid.TryParse(f.Warehouse,out var w)?WarehouseName(w):"الكل"),("نوع التقرير",ModeName(f.Mode)),("الصنف",Items.FirstOrDefault(i=>i.Id.ToString()==f.Variant)?.Name??"الكل"),("المنتج",Items.FirstOrDefault(i=>i.ProductId.ToString()==f.Product)?.ProductName??"الكل"),("التصنيف",Categories.FirstOrDefault(c=>c.Id.ToString()==f.Category)?.Name??"الكل"),(IsRange(f.Mode)?"الفترة":"إلى تاريخ",IsRange(f.Mode)?$"{f.From:dd/MM/yyyy} – {f.To:dd/MM/yyyy}":$"{f.To:dd/MM/yyyy}" )};
+            var list=new List<(string,string)>{(f.Mode=="transfers"?"المخزن (أي طرف)":"المخزن",Guid.TryParse(f.Warehouse,out var w)?WarehouseName(w):"الكل"),("نوع التقرير",ModeName(f.Mode)),("الصنف",Items.FirstOrDefault(i=>i.Id.ToString()==f.Variant)?.Name??"الكل"),("المنتج",Items.FirstOrDefault(i=>i.ProductId.ToString()==f.Product)?.ProductName??"الكل"),("التصنيف",Categories.FirstOrDefault(c=>c.Id.ToString()==f.Category)?.Name??"الكل"),(IsRange(f.Mode)?"الفترة":"إلى تاريخ",IsRange(f.Mode)?$"{f.From:dd/MM/yyyy} – {f.To:dd/MM/yyyy}":$"{f.To:dd/MM/yyyy}" )};
             if(f.Mode!="qty")list.Add(("العملة",_currencyName));
             if(IsBalance(f.Mode))list.Add(("المخزون",!IsCurrent(f)&&f.StockState=="available"?"رصيد موجب":StockName(f.StockState)));
             if(f.Mode=="transfers"){list.Add(("المصدر",Guid.TryParse(f.Source,out var s)?WarehouseName(s):"الكل"));list.Add(("المستلم",Guid.TryParse(f.Destination,out var d)?WarehouseName(d):"الكل"));list.Add(("الحالة",f.TransferStatus==0?"الكل":TransferState(f.TransferStatus)));}
@@ -138,7 +138,7 @@ public partial class WarehouseReportPage
         finally{_busy=false;}
     }
     private bool Allowed(Guid? id)=>id.HasValue&&Warehouses.Any(w=>w.Id==id&&(_applied.IncludeInactive||w.IsActive));
-    private static decimal? SumKnown(IEnumerable<decimal?> values){var a=values.ToArray();return a.Any(v=>!v.HasValue)?null:a.Sum(v=>v.GetValueOrDefault());}
+    private static decimal? SumKnown(IEnumerable<decimal?> values)=>WarehouseReportAggregation.SumKnown(values);
     private bool StockMatches(WarehouseReportStock s)
     {
         var available=s.Reserved.HasValue?s.OnHand-s.Reserved.Value:s.OnHand;
@@ -249,7 +249,7 @@ public partial class WarehouseReportPage
     private static string TransferState(int s)=>s==2?"مرحل":"مسودة";
     private static string CountState(int s)=>s switch{1=>"مسودة",2=>"قيد الجرد",3=>"قيد المراجعة",4=>"معتمد",5=>"مرحل",6=>"ملغى",_=>"غير محدد"};
     private static string VarianceName(string s)=>s switch{"plus"=>"زيادة","minus"=>"عجز","equal"=>"مطابق","pending"=>"لم يُجرد",_=>"الكل"};
-    private string Subtitle=>string.Join(" | ",Chips.Select(c=>$"{c.Label}: {c.Value}")) + $" | البحث: {_search}" + (!IsCurrent(_applied)&&IsBalance(_applied.Mode)?" | الحجوزات وقيد الطلب غير متاحة تاريخياً":"") + " | الشرطة تعني قيمة غير متاحة أو غير قابلة للجمع";
+    private string Subtitle=>string.Join(" | ",Chips.Select(c=>$"{c.Label}: {c.Value}")) + $" | البحث: {_search}" + (!IsCurrent(_applied)&&IsBalance(_applied.Mode)?" | الحجوزات وقيد الطلب غير متاحة تاريخياً":"") + " | يوم UTC | الشرطة تعني قيمة غير متاحة أو غير قابلة للجمع";
     private object? ExportValue(object? value,Col c)=>value switch{decimal d when c.Kind=="money"=>d/_rate,DateTimeOffset dt=>dt.ToUniversalTime().ToString("yyyy-MM-dd"),DateOnly date=>date.ToString("yyyy-MM-dd"),_=>value};
     private IEnumerable<object?[]> ExportRows()
     {

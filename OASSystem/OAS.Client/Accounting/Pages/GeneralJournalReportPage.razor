@@ -34,7 +34,7 @@
             {
             <div class="oas-report__field"><UiReportSearchPicker Label="المستخدم" ItemLabel="مستخدم" DialogTitle="اختيار المستخدم المنشئ أو المرحل" Value="@_draft.User" ValueChanged="OnUser" Options="@UserOptions" Placeholder="جميع المستخدمين" /></div>
             }
-            <label class="oas-report__field">رقم القيد / المرجع<input type="text" @bind="_draft.Reference" maxlength="200" placeholder="رقم القيد أو المستند" /></label>
+            <label class="oas-report__field">تصفية برقم القيد / المرجع<input type="text" @bind="_draft.Reference" maxlength="200" placeholder="رقم القيد أو المستند" /></label>
             <label class="oas-report__field">العملة<select @bind="_draft.Currency"><option value="">@_baseName (الأساسية)</option>@foreach(var c in _currencies.Where(c=>c.IsActive && c.Id != _baseId)){<option value="@c.Id">@c.NameAr (@c.Code)</option>}</select></label>
             @if (_validation is not null){<div class="journal-warning" role="alert">@_validation</div>}
         </div>
