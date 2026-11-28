@@ -25,11 +25,26 @@ public sealed class CashAccount : AuditableEntity<Guid>
         CurrencyId = currencyId;
         IsDefault = isDefault;
         IsActive = isActive;
+        CashBoxId = id;
+        CashBox = new CashBox(id, code, name);
     }
 
     public string Code { get; private set; } = null!;
 
     public string Name { get; private set; } = null!;
+
+    public Guid CashBoxId { get; private set; }
+    public CashBox? CashBox { get; private set; }
+
+    // Only a newly created currency account may join an existing box.
+    public void JoinCashBox(Guid cashBoxId)
+    {
+        if (cashBoxId == Guid.Empty) throw new ArgumentException("Cash box id is required.", nameof(cashBoxId));
+        if (CashBoxId != Id || RowVersion.Length != 0 || CashBox is null)
+            throw new InvalidOperationException("Only a new cash account can join a cash box.");
+        CashBoxId = cashBoxId;
+        CashBox = null;
+    }
 
     public Guid AccountId { get; private set; }
 
@@ -115,6 +130,7 @@ public sealed class CashAccount : AuditableEntity<Guid>
 
         Code = code.Trim();
         Name = name.Trim();
+        if (CashBoxId == Id) CashBox?.Rename(Name);
         AccountId = accountId;
         CurrencyId = currencyId;
         IsDefault = isDefault;

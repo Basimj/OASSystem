@@ -24,7 +24,8 @@ public sealed class CashAccountPageSpecification
             (status != "active" || x.IsActive) &&
             (status != "inactive" || !x.IsActive) &&
             (search == string.Empty || x.Code.Contains(search) ||
-                x.Name.Contains(search)));
+                x.Name.Contains(search) || (x.CashBox != null &&
+                    (x.CashBox.Code.Contains(search) || x.CashBox.Name.Contains(search)))));
 
         var sortBy = ResolveSortProperty(normalized.SortBy);
         specification.AddSort(sortBy, normalized.SortDirection);

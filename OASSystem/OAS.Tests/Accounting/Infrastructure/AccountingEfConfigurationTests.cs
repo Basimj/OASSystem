@@ -43,6 +43,7 @@ public class AccountingEfConfigurationTests
             (typeof(PaymentVoucherLine), "tbl_PaymentVoucherLines"),
             (typeof(PaymentAllocation), "tbl_PaymentAllocations"),
             (typeof(CashAccount), "tbl_CashAccounts"),
+            (typeof(CashBox), "tbl_CashBoxes"),
             (typeof(BankAccount), "tbl_BankAccounts"),
             (typeof(BankStatement), "tbl_BankStatements"),
             (typeof(BankStatementLine), "tbl_BankStatementLines"),

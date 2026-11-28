@@ -46,7 +46,7 @@ public sealed class CashBankReportQueryService(OasDbContext db) : ICashBankRepor
             ?? throw new ConflictException("base_currency_missing", "العملة الأساسية غير محددة.");
         var cash = await db.Set<CashAccount>().AsNoTracking().ToListAsync(ct);
         var banks = await db.Set<BankAccount>().AsNoTracking().ToListAsync(ct);
-        var definitions = cash.Select(x => new CashBankReportAccountDto(x.AccountId, x.Code, x.Name, "cash", x.CurrencyId, x.IsActive, (byte)x.MovementType))
+        var definitions = cash.Select(x => new CashBankReportAccountDto(x.AccountId, x.CashBox?.Code ?? x.Code, x.CashBox?.Name ?? x.Name, "cash", x.CurrencyId, x.IsActive, (byte)x.MovementType, x.CashBoxId, x.CashBox?.Name ?? x.Name))
             .Concat(banks.Select(x => new CashBankReportAccountDto(x.AccountId, x.Code, x.BankName + " - " + x.AccountName, "bank", x.CurrencyId, x.IsActive))).ToArray();
         var warnings = new List<string>();
         var groups = definitions.GroupBy(x => x.AccountId).ToArray();
@@ -54,8 +54,8 @@ public sealed class CashBankReportQueryService(OasDbContext db) : ICashBankRepor
         var accounts = groups.Where(g => g.Count() == 1).Select(g => g.Single()).OrderBy(x => x.Kind).ThenBy(x => x.Name).ToArray();
         var selected = accounts.Where(x => (f.Kind == "all" || x.Kind == f.Kind) && (!f.AccountId.HasValue || x.AccountId == f.AccountId)
             && (f.Mode == "bank" || f.Kind == "bank" || !f.MovementType.HasValue || x.MovementType == f.MovementType)
-            && (!f.CurrencyId.HasValue || x.CurrencyId == f.CurrencyId) && (f.Activity == "all" || x.IsActive == (f.Activity == "active"))
-            && (f.Mode is not ("cash" or "shifts" or "differences") || x.Kind == "cash") && (f.Mode != "bank" || x.Kind == "bank")).ToArray();
+            && (!f.CashBoxId.HasValue || x.CashBoxId == f.CashBoxId) && (!f.CurrencyId.HasValue || x.CurrencyId == f.CurrencyId) && (f.Activity == "all" || x.IsActive == (f.Activity == "active"))
+            && (f.Mode is not ("cash" or "shifts" or "differences" or "boxes") || x.Kind == "cash") && (f.Mode != "bank" || x.Kind == "bank")).ToArray();
         var ids = selected.Select(x => x.AccountId).ToArray();
         string CurrencyCode(Guid? id) => currencies.FirstOrDefault(x => x.Id == id)?.Code ?? "غير محددة";
         CashBankReportDto Result(string[] headers, IReadOnlyList<CashBankReportRow> rows, CashBankReportMetric[] metrics)
@@ -66,7 +66,7 @@ public sealed class CashBankReportQueryService(OasDbContext db) : ICashBankRepor
         if (f.Mode == "transfers")
         {
             // Period membership is taken from posted journals, not the current document status.
-            var allTransferAccounts = f.Kind == "all" && !f.AccountId.HasValue && !f.CurrencyId.HasValue && f.Activity == "all" && !f.MovementType.HasValue;
+            var allTransferAccounts = f.Kind == "all" && !f.AccountId.HasValue && !f.CashBoxId.HasValue && !f.CurrencyId.HasValue && f.Activity == "all" && !f.MovementType.HasValue;
             var transfers = await db.Set<CashTransfer>().AsNoTracking().Where(x => (allTransferAccounts || ids.Contains(x.SourceAccountId) || ids.Contains(x.DestinationAccountId))
                 && ((x.TransferDate >= f.FromDate && x.TransferDate <= f.ToDate) || (x.ReversalDate >= f.FromDate && x.ReversalDate <= f.ToDate)))
                 .Take(MaxRows + 1).ToListAsync(ct);
@@ -137,12 +137,12 @@ public sealed class CashBankReportQueryService(OasDbContext db) : ICashBankRepor
             var rows = shifts.Select(s =>
             {
                 var a = lookup[s.CashAccountId];
-                var cells = new List<CashBankReportCell> { T(s.ShiftNumber, s.Id, "shift"), T(a.Name), T(CurrencyCode(a.CurrencyId)), T(DateTimeText(s.OpenedAtUtc)), T(DateTimeText(s.ClosedAtUtc)), T(operatorNames.GetValueOrDefault(s.OpenedBy) ?? s.OpenedBy.ToString()), T(Status(s)) };
+                var cells = new List<CashBankReportCell> { T(s.ShiftNumber, s.Id, "shift"), T(s.CashBoxShiftId?.ToString("N")), T(a.CashBox?.Name ?? a.Name), T(CurrencyCode(a.CurrencyId)), T(DateTimeText(s.OpenedAtUtc)), T(DateTimeText(s.ClosedAtUtc)), T(operatorNames.GetValueOrDefault(s.OpenedBy) ?? s.OpenedBy.ToString()), T(Status(s)) };
                 if (f.Mode == "shifts") cells.AddRange([N(s.BookOpeningBalance), N(s.OpeningBalance), N(s.BookOpeningBalance.HasValue ? s.OpeningBalance - s.BookOpeningBalance : null), T(s.OpeningDifferenceReason), s.UsesLinkedMovements ? C(movementCounts.GetValueOrDefault(s.Id)) : T("تاريخية")]);
                 cells.AddRange([N(s.ExpectedClosingBalance), N(s.ActualClosingBalance), N(s.DifferenceAmount), T(Settlement(s)), T(Settled(s) ? Date(s.SettlementDate!.Value) : null), T(Settled(s) ? "قيد التسوية" : null, Settled(s) ? s.SettlementJournalEntryId : null, "journal")]);
                 return new CashBankReportRow(cells);
             }).ToArray();
-            var headers = new List<string> { "رقم الوردية", "الصندوق", "العملة", "الافتتاح UTC", "الإغلاق UTC", "فتح بواسطة", "الحالة الحالية" };
+            var headers = new List<string> { "رقم الوردية", "معرف الوردية المجمعة", "الصندوق", "العملة", "الافتتاح UTC", "الإغلاق UTC", "فتح بواسطة", "الحالة الحالية" };
             if (f.Mode == "shifts") headers.AddRange(["الدفتري عند الافتتاح", "الجرد الافتتاحي", "فرق الافتتاح", "سبب الفرق", "الحركات المرتبطة"]);
             headers.AddRange(["المتوقع", "الجرد الفعلي", "فرق الإغلاق", "التسوية حتى التاريخ", "تاريخ التسوية", "قيد التسوية"]);
             warnings.Add("تواريخ الورديات بالتوقيت العالمي UTC. الورديات حسب تاريخ الافتتاح، والفروقات حسب تاريخ الإغلاق؛ حالة الوردية والجرد كما هو مسجل حالياً. التسوية حتى تاريخ نهاية التقرير.");
@@ -152,7 +152,7 @@ public sealed class CashBankReportQueryService(OasDbContext db) : ICashBankRepor
             var unit = single ? " (" + CurrencyCode(currencyIds[0]) + ")" : "";
             var differences = shifts.Where(s => s.DifferenceAmount is not null and not 0).ToArray();
             if (!single && shifts.Count > 0) warnings.Add("لا تجمع فروقات الورديات بعملات مختلفة أو غير محددة. اختر عملة واحدة لعرض إجماليات المبالغ.");
-            return Result(headers.ToArray(), rows, [M("عدد الورديات", C(shifts.Count)), M("ورديات مفتوحة أو قيد الإغلاق", C(shifts.Count(s => s.Status is CashShiftStatus.Open or CashShiftStatus.Closing))),
+            return Result(headers.ToArray(), rows, [M("عدد الورديات", C(shifts.Select(s=>s.CashBoxShiftId??s.Id).Distinct().Count())), M("ورديات مفتوحة أو قيد الإغلاق", C(shifts.Where(s => s.Status is CashShiftStatus.Open or CashShiftStatus.Closing).Select(s=>s.CashBoxShiftId??s.Id).Distinct().Count())),
                 M("فروقات مسوّاة", C(differences.Count(Settled))), M("فروقات غير مسوّاة", C(differences.Count(s => !Settled(s)))),
                 M("إجمالي العجز" + unit, N(single ? differences.Where(s => s.DifferenceAmount < 0).Sum(s => -s.DifferenceAmount) : null)),
                 M("إجمالي الزيادة" + unit, N(single ? differences.Where(s => s.DifferenceAmount > 0).Sum(s => s.DifferenceAmount) : null))]) with { Operators = operators };
@@ -204,6 +204,15 @@ public sealed class CashBankReportQueryService(OasDbContext db) : ICashBankRepor
         CashBankReportCell[] BalanceTotals() => [N(NativeTotal(b => b.Open)), N(NativeTotal(b => b.In)), N(NativeTotal(b => b.Out)), N(NativeTotal(b => b.Close)),
             B(Sum(balances.Select(b => b.BaseOpen))), B(Sum(balances.Select(b => b.BaseIn))), B(Sum(balances.Select(b => b.BaseOut))), B(Sum(balances.Select(b => b.BaseClose)))];
         var display = balances.Where(b => f.IncludeZero || b.Close != 0 || b.BaseOpen != 0 || b.BaseIn != 0 || b.BaseOut != 0).ToArray();
+        if (f.Mode == "boxes")
+        {
+            var rows = display.Where(b=>b.Account.CashBoxId.HasValue).GroupBy(b=>b.Account.CashBoxId).OrderBy(g=>g.First().Account.Name)
+                .Select(g=>R(T(g.First().Account.Code), T(g.First().Account.CashBoxName ?? g.First().Account.Name), C(g.Count()),
+                    B(Sum(g.Select(b=>b.BaseOpen))), B(Sum(g.Select(b=>b.BaseIn))), B(Sum(g.Select(b=>b.BaseOut))), B(Sum(g.Select(b=>b.BaseClose))))).ToArray();
+            warnings.Add("ملخص الصندوق التشغيلي بالعملة الدفترية فقط؛ اعرض الأرصدة الأصلية في تقرير إجمالي الأرصدة مع اختيار الصندوق.");
+            return Result(["الرمز", "الصندوق التشغيلي", "عدد حسابات العملات المعروضة", "افتتاحي دفتري", "وارد دفتري", "صادر دفتري", "ختامي دفتري"], rows, metrics) with
+            { TotalRow = R(T("الإجمالي"), T(null), C(display.Length), B(Sum(balances.Select(b=>b.BaseOpen))), B(Sum(balances.Select(b=>b.BaseIn))), B(Sum(balances.Select(b=>b.BaseOut))), B(Sum(balances.Select(b=>b.BaseClose)))) };
+        }
         if (f.Mode == "currency")
         {
             var rows = display.GroupBy(b => b.Account.CurrencyId).OrderBy(g => CurrencyCode(g.Key)).Select(g => R(T(CurrencyCode(g.Key)), C(g.Count()), N(Sum(g.Select(b => b.Open))), N(Sum(g.Select(b => b.In))), N(Sum(g.Select(b => b.Out))), N(Sum(g.Select(b => b.Close))), B(Sum(g.Select(b => b.BaseOpen))), B(Sum(g.Select(b => b.BaseIn))), B(Sum(g.Select(b => b.BaseOut))), B(Sum(g.Select(b => b.BaseClose))))).ToArray();

@@ -103,6 +103,13 @@ public interface IAccountingClientService
     Task<PaymentVoucherDto?> UpdatePaymentVoucherAsync(Guid id, UpdatePaymentVoucherRequest request, CancellationToken cancellationToken = default);
     Task<PaymentVoucherDto?> SetPaymentVoucherStatusAsync(Guid id, SetPaymentVoucherStatusRequest request, CancellationToken cancellationToken = default);
 
+    Task UpdateCashBoxAsync(Guid id, UpdateCashBoxRequest request, CancellationToken ct = default);
+    Task<Guid> CreateCashBoxAsync(CreateCashBoxRequest request, CancellationToken ct = default);
+    Task<CashShiftDto[]?> GetCashBoxShiftsAsync(Guid boxId, CancellationToken ct = default);
+    Task<decimal> GetCashShiftClosingPreviewAsync(Guid id, CancellationToken ct = default);
+    Task<Guid> OpenCashBoxShiftAsync(OpenCashBoxShiftRequest request, CancellationToken ct = default);
+    Task<bool> CloseCashBoxShiftAsync(Guid id, CloseCashBoxShiftRequest request, CancellationToken ct = default);
+    Task<bool> ApproveCashBoxShiftAsync(Guid id, ApproveCashBoxShiftRequest request, CancellationToken ct = default);
     Task<PagedResult<CashAccountDto>> GetCashAccountsPageAsync(PageRequest request, CancellationToken cancellationToken = default);
     Task<CashAccountDto?> GetCashAccountByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<CashAccountDto?> CreateCashAccountAsync(CreateCashAccountRequest request, CancellationToken cancellationToken = default);

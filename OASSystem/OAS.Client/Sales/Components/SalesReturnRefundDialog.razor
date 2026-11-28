@@ -80,7 +80,7 @@
                             <option value="@Guid.Empty">اختر الصندوق</option>
                             @foreach (var x in AvailableCashAccounts)
                             {
-                                <option value="@x.Id">@x.Code — @x.Name</option>
+                                <option value="@x.Id">@(x.CashBoxCode??x.Code) — @(x.CashBoxName??x.Name)</option>
                             }
                         </select>
                         @if (_currencyId != Guid.Empty && AvailableCashAccounts.Count == 0)

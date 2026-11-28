@@ -7,4 +7,5 @@ public sealed record CreateCashAccountRequest(
     bool IsDefault = false,
     bool IsActive = true,
     bool RequiresOpenShift = false,
-    CashAccountMovementType MovementType = CashAccountMovementType.ReceiptAndPayment);
+    CashAccountMovementType MovementType = CashAccountMovementType.ReceiptAndPayment,
+    Guid? ExistingCashAccountId = null);

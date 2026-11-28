@@ -49,7 +49,9 @@ public partial class VoucherReportPage
     private IEnumerable<FiscalPeriodDto> PeriodOptions => _periods.Where(p=>p.FiscalYearId.ToString()==_draft.Year).OrderBy(p=>p.StartDate);
     private bool PartyMode => _draft.Mode is "customers" or "suppliers" or "employees";
     private string PartyLabel => _draft.Mode switch { "customers"=>"اسم العميل", "suppliers"=>"اسم المورد", "employees"=>"اسم الموظف", _=>"اسم الطرف (في السند)" };
-    private IReadOnlyList<UiSelectOption> SettlementOptions => new[] { new UiSelectOption("", "الكل") }.Concat(_settlements.Select(a=>new UiSelectOption($"{a.Kind}:{a.AccountId:D}", $"{(a.Kind=="cash"?"صندوق":"بنك")} - {a.Code} - {a.Name}"))).ToArray();
+    private IReadOnlyList<UiSelectOption> SettlementOptions => new[] { new UiSelectOption("", "الكل") }
+        .Concat(_settlements.Where(a=>a.CashBoxId.HasValue).GroupBy(a=>a.CashBoxId).Select(g=>new UiSelectOption($"box:{g.Key:D}", $"صندوق - {g.First().CashBoxName} (كل العملات)")))
+        .Concat(_settlements.Select(a=>new UiSelectOption($"{a.Kind}:{a.AccountId:D}", $"{(a.Kind=="cash"?"صندوق":"بنك")} - {a.Code} - {a.Name} ({Currencies.FirstOrDefault(c=>c.Id==a.CurrencyId)?.Code??"—"})"))).ToArray();
     private IReadOnlyList<CashBankReportCurrencyDto> Currencies = [];
     private IReadOnlyList<CashBankReportOperatorDto> Operators = [];
     private bool _busy, _filtersOpen = true, _descending;
@@ -122,6 +124,7 @@ public partial class VoucherReportPage
             if(settlement.Length==2 && Guid.TryParse(settlement[1],out var definitionId))
             {
                 if(settlement[0]=="cash") query+=$"&cashAccountId={definitionId:D}";
+                else if(settlement[0]=="box") query+=$"&cashBoxId={definitionId:D}";
                 else if(settlement[0]=="bank") query+=$"&bankAccountId={definitionId:D}";
             }
             if(f.Currency is Guid currency)query+=$"&currencyId={currency:D}";

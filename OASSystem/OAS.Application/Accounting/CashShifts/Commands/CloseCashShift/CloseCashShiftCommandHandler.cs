@@ -25,6 +25,9 @@ public sealed class CloseCashShiftCommandHandler(
             throw new NotFoundException(nameof(CashShift), request.Id);
         }
 
+        if (shift.CashBoxShiftId != request.GroupId)
+            throw new ConflictException("cash_box_shift_group_required", "استخدم إدارة الوردية المجمعة لإجراء العملية على جميع العملات.");
+
         var requestedRowVersion = Convert.FromBase64String(request.Request.RowVersion);
         if (!shift.RowVersion.SequenceEqual(requestedRowVersion))
         {

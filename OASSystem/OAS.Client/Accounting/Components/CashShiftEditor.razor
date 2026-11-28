@@ -1,6 +1,8 @@
 @namespace OAS.Client.Accounting.Components
 @using OAS.Contracts.Accounting.Enums
 @using OAS.Contracts.Accounting.CashShifts
+@using OAS.Contracts.Accounting.CashAccounts
+@using OAS.Contracts.Common.Pagination
 @using OAS.Client.Accounting.Services
 @inject IAccountingClientService AccountingService
 @using OAS.Client.Services.Http
@@ -11,6 +13,102 @@
 @using OAS.UiLib.Components.Inputs
 @using OAS.UiLib.Core.Models
 
+@if (!IsCurrencyDetail && (IsNew || Model.CashBoxShiftId.HasValue))
+{
+    <UiAccountingEditorSurface AdditionalCssClass="oas-cashbank-editor oas-cashbank-editor--shift">
+        <div class="oas-cashbank-editor__intro">
+            <div class="oas-cashbank-editor__intro-icon"><i class="fa-solid fa-cash-register" aria-hidden="true"></i></div>
+            <div><h3>@(IsNew ? "فتح وردية صندوق" : "تفاصيل وردية الصندوق")</h3><p>@(IsNew ? "حدد الصندوق وأدخل العهدة لكل عملة." : "الوارد والصادر يشملان الحركات النقدية المرحلة والتحويلات والعكس. الجرد مستقل لكل عملة.")</p></div>
+            <span class="@StatusCssClass">@AccountingArabicPresenter.GetCashShiftStatusText(Model.Status)</span>
+        </div>
+        <UiAccountingFormSection Title="بيانات الوردية" IconCssClass="fa-solid fa-cash-register">
+            <UiAccountingFormGrid Columns="2">
+                <UiInputText Label="رقم الوردية (تلقائي)" Value="@Model.ShiftNumber" ReadOnly="true" Disabled="true" Placeholder="يُنشأ عند الفتح" Size="ControlSize.Small" />
+                @if (IsNew)
+                {
+                    <UiLookup Label="الصندوق / الخزينة" Value="@(Model.CashBoxId?.ToString("D"))" ValueChanged="OnBoxChangedAsync"
+                              SelectedItem="@SelectedBoxItem" SearchAsync="@CashAccountSearchAsync" Placeholder="اختر صندوقاً متاحاً..."
+                              ErrorText="@Model.CashAccountError" EmptyText="لا توجد صناديق متاحة" Disabled="@(!IsEditable || Model.LoadingCurrencies)" Required="true" MinimumSearchLength="0" DebounceMilliseconds="250" />
+                }
+                else
+                {
+                    <UiAccountingReadOnlyValue Label="الصندوق / الخزينة" Value="@Model.CashBoxName" />
+                    <UiAccountingReadOnlyValue Label="وقت الافتتاح (UTC)" Value="@FormatUtc(Model.OpenedAtUtc)" />
+                    <UiAccountingReadOnlyValue Label="وقت الإغلاق (UTC)" Value="@FormatUtc(Model.ClosedAtUtc)" />
+                }
+            </UiAccountingFormGrid>
+        </UiAccountingFormSection>
+        <UiAccountingFormSection Title="@(IsNew ? "الأرصدة الافتتاحية" : "الجرد والإغلاق")" IconCssClass="fa-solid fa-scale-balanced">
+            @if (Model.LoadingCurrencies) { <p role="status">جارٍ تحميل أرصدة العملات...</p> }
+            @if (!string.IsNullOrWhiteSpace(Model.OpeningBalanceError)) { <p class="text-danger" role="alert">@Model.OpeningBalanceError</p> }
+            @if (IsNew && Model.CashBoxId.HasValue)
+            {
+                <button type="button" class="btn btn-outline-primary btn-sm" disabled="@(!IsEditable || Model.LoadingCurrencies)" @onclick="ReloadBoxAsync">تحديث الأرصدة الدفترية</button>
+            }
+            @if (Model.CurrencyLines.Count > 0)
+            {
+                <div style="overflow-x:auto">
+                    <table class="table table-sm table-hover" dir="rtl">
+                        <thead>
+                            @if (IsNew) { <tr><th>العملة</th><th>نوع الحركة</th><th>الرصيد الدفتري</th><th>العهدة المستلمة *</th><th>الفرق</th><th>سبب فرق الافتتاح</th></tr> }
+                            else { <tr><th>العملة</th><th>الافتتاح</th><th>الوارد</th><th>الصادر</th><th>الرصيد المتوقع</th><th>الجرد الفعلي</th><th>الفرق</th><th>التسوية</th></tr> }
+                        </thead>
+                        <tbody>
+                        @foreach (var line in Model.CurrencyLines)
+                        {
+                            <tr @key="line.AccountId">
+                                <td>@line.Label</td>
+                                @if (IsNew)
+                                {
+                                    <td>@line.MovementLabel</td><td>@LineAmount(line.Book,line.Decimals)</td>
+                                }
+                                else
+                                {
+                                    <td>@LineAmount(line.Shift?.OpeningBalance,line.Decimals)</td>
+                                    <td>@LineAmount(line.Received,line.Decimals)</td><td>@LineAmount(line.Paid,line.Decimals)</td>
+                                    <td>@LineAmount(line.Expected,line.Decimals)</td>
+                                }
+                                <td>
+                                    @if ((IsNew && IsEditable) || (!IsNew && (Model.Status is CashShiftStatus.Open or CashShiftStatus.Closing)))
+                                    {
+                                        <input type="number" min="0" step="any" class="ui-acc-number-field__input ui-acc-number-field__input--primary" aria-label="الجرد الفعلي" value="@(line.Actual?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)" @oninput="e=>OnLineActualChanged(line,e)" disabled="@Model.LoadingCurrencies" />
+                                    }
+                                    else { @LineAmount(line.Actual,line.Decimals) }
+                                </td>
+                                @{ var difference = IsNew ? line.Actual-line.Book : (Model.Status is CashShiftStatus.Open or CashShiftStatus.Closing) ? line.Actual-line.Expected : line.Shift?.DifferenceAmount; }
+                                <td class="@(difference < 0 ? "text-danger" : difference > 0 ? "text-success" : "")">@LineAmount(difference,line.Decimals)</td>
+                                @if (IsNew)
+                                {
+                                    <td><input class="form-control form-control-sm" aria-label="سبب فرق الافتتاح" maxlength="500" @bind="line.Reason" @bind:after="OnChanged" disabled="@(!IsEditable || Model.LoadingCurrencies)" /></td>
+                                }
+                                else
+                                {
+                                    <td>@(line.Detail?.SettlementJournalEntryId.HasValue == true ? "مسوّاة" : line.Shift?.DifferenceAmount.GetValueOrDefault() is not (null or 0) ? "راجع التفاصيل" : "—")</td>
+                                }
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else if (!Model.LoadingCurrencies) { <p>@(IsNew ? "اختر الصندوق لعرض عملاته النشطة." : "لم تُحمّل تفاصيل العملات.")</p> }
+        </UiAccountingFormSection>
+        @if (!IsNew)
+        {
+            <UiAccountingFormSection Title="تفاصيل العملات والحركات والتسويات" IconCssClass="fa-solid fa-list">
+                @foreach (var line in Model.CurrencyLines.Where(x=>x.Shift is not null && x.Detail is not null))
+                {
+                    <details @key="(line.Shift!.Id)" class="mb-2">
+                        <summary>@line.Label — @(line.Shift!.ShiftNumber)</summary>
+                        <CashShiftEditor Model="@(line.Detail!)" ShiftId="@(line.Shift!.Id)" IsCurrencyDetail="true" IsNew="false" IsEditable="false" CurrencyLabel="@line.Label" CurrencyDecimalPlaces="@line.Decimals" />
+                    </details>
+                }
+            </UiAccountingFormSection>
+        }
+    </UiAccountingEditorSurface>
+}
+else
+{
 <UiAccountingEditorSurface AdditionalCssClass="oas-cashbank-editor oas-cashbank-editor--shift">
     <div class="oas-cashbank-editor__intro">
         <div class="oas-cashbank-editor__intro-icon"><i class="fa-solid fa-cash-register" aria-hidden="true"></i></div>
@@ -25,6 +123,12 @@
         <UiAccountingFormGrid Columns="2">
             <UiInputText Label="رقم الوردية (تلقائي)" Value="@Model.ShiftNumber"
                          ReadOnly="true" Disabled="true" Placeholder="يُحجز تلقائيًا..." Size="ControlSize.Small" />
+            @if (IsCurrencyDetail)
+            {
+                <UiAccountingReadOnlyValue Label="عملة الوردية" Value="@CurrencyLabel" />
+            }
+            else
+            {
             <UiLookup Label="الصندوق / الخزينة" Value="@CashAccountValue"
                       ValueChanged="OnCashAccountChanged" SelectedItem="@CashAccountLookupItem"
                       SearchAsync="@CashAccountSearchAsync" Placeholder="اختر صندوقاً متاحاً..."
@@ -32,6 +136,7 @@
                       EmptyText="لا توجد صناديق متاحة مطابقة للبحث. قد تكون الصناديق مشغولة بورديات نشطة."
                       Disabled="@(!IsEditable || !IsNew)" Required="true"
                       MinimumSearchLength="0" DebounceMilliseconds="250" />
+            }
             <UiAccountingNumberField Label="رصيد الافتتاح (العهدة المستلمة)"
                                      Value="@Model.OpeningBalance" ValueChanged="OnOpeningBalanceChanged"
                                      Min="0" Disabled="@(!IsEditable || !IsNew)" />
@@ -74,7 +179,7 @@
             <UiAccountingFormGrid Columns="3">
                 <UiAccountingReadOnlyValue Label="الرصيد المتوقع المسجل (غير محقق)"
                                            Value="@ExpectedClosingBalanceText" />
-                @if (Model.Status is CashShiftStatus.Open or CashShiftStatus.Closing)
+                @if (!IsCurrencyDetail && (Model.Status is CashShiftStatus.Open or CashShiftStatus.Closing))
                 {
                     <div class="ui-acc-number-field">
                         <label class="ui-acc-number-field__label" for="cash-shift-actual-count">الجرد الفعلي عند الإغلاق *</label>
@@ -144,7 +249,7 @@
                             <tbody>
                             @foreach (var movement in _movements.Rows)
                             {
-                                <tr><td>@movement.JournalNumber</td><td>@movement.LineNumber</td><td>@movement.PostingDate.ToString("yyyy/MM/dd")</td><td>@movement.Description</td><td>@movement.CurrencyCode</td><td>@(movement.DebitOriginal?.ToString("N2") ?? "—")</td><td>@(movement.CreditOriginal?.ToString("N2") ?? "—")</td><td>@movement.DebitBase.ToString("N2")</td><td>@movement.CreditBase.ToString("N2")</td></tr>
+                                <tr><td>@movement.JournalNumber</td><td>@movement.LineNumber</td><td>@movement.PostingDate.ToString("yyyy/MM/dd")</td><td>@movement.Description</td><td>@movement.CurrencyCode</td><td>@LineAmount(movement.DebitOriginal,CurrencyDecimalPlaces)</td><td>@LineAmount(movement.CreditOriginal,CurrencyDecimalPlaces)</td><td>@movement.DebitBase.ToString("N2")</td><td>@movement.CreditBase.ToString("N2")</td></tr>
                             }
                             </tbody>
                         </table>
@@ -161,10 +266,40 @@
         <p class="oas-cashbank-editor__note">سيتم احتساب أي تسوية وجرد عند إغلاق الوردية. تأكد من استلام العهدة فعليًا قبل الحفظ.</p>
     }
 </UiAccountingEditorSurface>
+}
 
 @code {
+    public sealed class CurrencyLine
+    {
+        public Guid AccountId { get; set; }
+        public string Label { get; set; } = "";
+        public string MovementLabel { get; set; } = "";
+        public int Decimals { get; set; } = 2;
+        public decimal? Book { get; set; }
+        public decimal? Actual { get; set; }
+        public decimal? Expected { get; set; }
+        public decimal? Received { get; set; }
+        public decimal? Paid { get; set; }
+        public string? Reason { get; set; }
+        public CashShiftDto? Shift { get; set; }
+        public FormModel? Detail { get; set; }
+    }
     public sealed class FormModel
     {
+        public Guid? CashBoxId { get; set; }
+        public string? CashBoxName { get; set; }
+        public List<CurrencyLine> CurrencyLines { get; set; } = [];
+        [System.Text.Json.Serialization.JsonIgnore]
+        public bool LoadingCurrencies { get; set; }
+        public static FormModel FromDto(CashShiftDto dto) => new()
+        {
+            ShiftNumber=dto.ShiftNumber, CashBoxShiftId=dto.CashBoxShiftId, CashAccountId=dto.CashAccountId,
+            OpeningBalance=dto.OpeningBalance, BookOpeningBalance=dto.BookOpeningBalance, OpeningDifferenceReason=dto.OpeningDifferenceReason,
+            UsesLinkedMovements=dto.UsesLinkedMovements, SettlementJournalEntryId=dto.SettlementJournalEntryId, SettlementAccountId=dto.SettlementAccountId,
+            SettlementDate=dto.SettlementDate, SettlementReason=dto.SettlementReason, ExpectedClosingBalance=dto.ExpectedClosingBalance,
+            ActualClosingBalance=dto.ActualClosingBalance, DifferenceAmount=dto.DifferenceAmount, OpenedAtUtc=dto.OpenedAtUtc,
+            ClosedAtUtc=dto.ClosedAtUtc, Status=dto.Status, RowVersion=dto.RowVersion
+        };
         public string ShiftNumber { get; set; } = string.Empty;
         public Guid? CashAccountId { get; set; }
         [System.Text.Json.Serialization.JsonIgnore]
@@ -184,8 +319,62 @@
         public DateOnly? SettlementDate { get; set; }
         public string? SettlementReason { get; set; }
         public bool UsesLinkedMovements { get; set; }
+        public Guid? CashBoxShiftId { get; set; }
         public CashShiftStatus Status { get; set; } = CashShiftStatus.Open;
         public string RowVersion { get; set; } = string.Empty;
+    }
+
+    [Parameter] public bool IsCurrencyDetail { get; set; }
+    private UiLookupItem? SelectedBoxItem => Model.CashBoxId.HasValue && !string.IsNullOrWhiteSpace(Model.CashBoxName)
+        ? new UiLookupItem(Model.CashBoxId.Value.ToString("D"), Model.CashBoxName) : null;
+    private static string LineAmount(decimal? value, int decimals) => value?.ToString($"N{Math.Clamp(decimals,0,6)}") ?? "—";
+    private async Task OnLineActualChanged(CurrencyLine line, ChangeEventArgs e)
+    {
+        line.Actual = decimal.TryParse(e.Value?.ToString(), NumberStyles.Number, CultureInfo.InvariantCulture, out var amount) && amount >= 0 ? amount : null;
+        Model.OpeningBalanceError=null;
+        await OnChanged();
+    }
+    private async Task OnBoxChangedAsync(string? value)
+    {
+        Model.CashBoxId=Guid.TryParse(value,out var id)?id:null;
+        Model.CashBoxName=null;
+        await ReloadBoxAsync();
+    }
+    private async Task ReloadBoxAsync()
+    {
+        var model=Model; var box=model.CashBoxId;
+        model.CurrencyLines=[]; model.OpeningBalanceError=null; model.CashAccountError=null;
+        if (!box.HasValue) { await OnChanged(); return; }
+        model.LoadingCurrencies=true;
+        try
+        {
+            var accounts=new List<CashAccountDto>();
+            for(var p=1;;p++)
+            {
+                var page=await AccountingService.GetCashAccountsPageAsync(new PageRequest { PageNumber=p,PageSize=PageRequest.MaximumPageSize });
+                accounts.AddRange(page.Items.Where(x=>x.CashBoxId==box && x.IsActive));
+                if(!page.HasNextPage || page.Items.Count==0) break;
+            }
+            if(accounts.Count==0 || accounts.Any(x=>!x.CurrencyId.HasValue)) throw new InvalidOperationException("لا توجد عملات نشطة محددة للصندوق.");
+            var shifts=await AccountingService.GetCashBoxShiftsAsync(box.Value) ?? [];
+            if(shifts.Any(x=>x.Status is CashShiftStatus.Open or CashShiftStatus.Closing)) throw new InvalidOperationException("توجد وردية نشطة للصندوق.");
+            var lines=new List<CurrencyLine>();
+            foreach(var account in accounts.OrderBy(x=>x.Code))
+            {
+                var currency=await AccountingService.GetCurrencyByIdAsync(account.CurrencyId!.Value);
+                var balance=await AccountingService.GetCashShiftOpeningBalanceAsync(account.Id) ?? throw new InvalidOperationException("تعذر تحميل الرصيد الدفتري.");
+                lines.Add(new CurrencyLine { AccountId=account.Id, Label=currency?.NameAr??account.Name,
+                    Decimals=currency is null?2:(int)currency.DecimalPlaces, Book=balance.BookBalance,
+                    MovementLabel=account.MovementType switch { CashAccountMovementType.ReceiptOnly=>"قبض فقط",CashAccountMovementType.PaymentOnly=>"صرف فقط",_=>"قبض وصرف" } });
+            }
+            if(Model!=model || model.CashBoxId!=box) return;
+            model.CashBoxName=accounts[0].CashBoxName??accounts[0].Name;
+            model.CurrencyLines=lines;
+        }
+        catch(ApiClientException ex) { if(Model==model && model.CashBoxId==box) model.OpeningBalanceError=ex.Error.Message; }
+        catch(Exception ex) { if(Model==model && model.CashBoxId==box) model.OpeningBalanceError=ex.Message; }
+        finally { model.LoadingCurrencies=false; }
+        if(Model==model) await OnChanged();
     }
 
     [Parameter] public Guid? ShiftId { get; set; }

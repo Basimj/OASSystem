@@ -1,4 +1,5 @@
 using OAS.Application.Accounting.Authorization;
+using OAS.Application.Accounting.CashAccounts;
 using OAS.Application.Accounting.Accounts.Commands.CreateAccount;
 using OAS.Contracts.Accounting.Accounts;
 using OAS.Application.Accounting.CostCenters.Commands.CreateCostCenter;
@@ -400,6 +401,24 @@ public sealed partial class AccountingSpreadsheetService(
                 if(group.Any(x=>x.Errors.Count>0)) continue;
                 await Add(first,new CreateJournalEntryCommand(new(first.Enum<JournalType>("JournalType"),first.Date("PostingDate"),first.Date("DocumentDate"),matching[0].Id,first.Get("Description"),null,null,null,lines)));
             }
+        }
+        else if(section=="cash-accounts")
+        {
+            // A supplied key groups rows in this import only. Never attach to an existing live box implicitly.
+            var grouped=headers.Where(x=>x.Get("CashBoxCode").Length>0).GroupBy(x=>x.Get("CashBoxCode"),StringComparer.OrdinalIgnoreCase);
+            CashAccountMovementType Movement(Row row)=>row.Optional("MovementType") is null?CashAccountMovementType.ReceiptAndPayment:row.Enum<CashAccountMovementType>("MovementType");
+            string BoxName(Row row)=>row.Optional("CashBoxName")??row.Get("Name");
+            foreach(var group in grouped)
+            {
+                var first=group.First();
+                if(group.Select(x=>x.Get("CurrencyCode")).Distinct(StringComparer.OrdinalIgnoreCase).Count()!=group.Count()||group.Any(x=>BoxName(x)!=BoxName(first)||x.Bool("RequiresOpenShift")!=first.Bool("RequiresOpenShift"))||
+                   (group.Count()>1&&!group.Any(x=>x.Bool("IsActive",true))))
+                    foreach(var row in group)row.Errors.Add("عملات الصندوق مكررة أو بيانات الصندوق المشترك غير متطابقة أو لا توجد عملة نشطة.");
+                if(group.Any(x=>x.Errors.Count>0))continue;
+                await Add(first,new CreateCashBoxCommand(new(BoxName(first),first.Bool("RequiresOpenShift"),group.Select(x=>new CashBoxCurrencyRequest(currencyMap[x.Get("CurrencyCode")].Id,Movement(x),x.Bool("IsDefault"),x.Bool("IsActive",true))).ToArray())));
+            }
+            foreach(var row in headers.Where(x=>x.Get("CashBoxCode").Length==0&&x.Errors.Count==0))
+                await Add(row,new CreateCashAccountCommand(new(null,BoxName(row),currencyMap[row.Get("CurrencyCode")].Id,row.Bool("IsDefault"),row.Bool("IsActive",true),row.Bool("RequiresOpenShift"),Movement(row))));
         }
         else foreach(var row in headers.Where(x=>x.Errors.Count==0))
         {

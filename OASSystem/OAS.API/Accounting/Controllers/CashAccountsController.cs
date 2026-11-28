@@ -1,4 +1,5 @@
 using MediatR;
+using OAS.Application.Accounting.CashAccounts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -19,6 +20,14 @@ namespace OAS.API.Accounting.Controllers;
 [Route("api/accounting/cash-accounts")]
 public sealed class CashAccountsController(ISender sender) : ControllerBase
 {
+    [HttpPost("box")]
+    public async Task<ActionResult<Guid>> CreateBox(CreateCashBoxRequest request, CancellationToken ct)
+        => Ok(await sender.Send(new CreateCashBoxCommand(request), ct));
+
+    [HttpPut("box/{id:guid}")]
+    public async Task<IActionResult> UpdateBox(Guid id, UpdateCashBoxRequest request, CancellationToken ct)
+    { await sender.Send(new UpdateCashBoxCommand(id, request), ct); return Ok(true); }
+
     [HttpGet]
     public async Task<ActionResult<PagedResult<CashAccountDto>>> Get(
         [FromQuery] PageRequest request,

@@ -42,10 +42,10 @@ public static class AccountingLookupEligibility
             glAccount,
             "الصندوق");
 
-        var secondary = reason ?? (cash.IsDefault ? "الصندوق الافتراضي" : "صندوق صالح للتسوية");
+        var secondary = reason ?? $"{(cash.IsDefault ? "الصندوق الافتراضي" : "صندوق صالح للتسوية")} · {cash.Code}";
         return new UiLookupItem(
             cash.Id.ToString("D"),
-            $"{cash.Code} - {cash.Name}",
+            $"{cash.CashBoxCode ?? cash.Code} - {cash.CashBoxName ?? cash.Name}",
             secondary,
             "fa-solid fa-vault",
             Disabled: reason is not null);

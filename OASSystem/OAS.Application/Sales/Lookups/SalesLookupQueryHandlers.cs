@@ -493,7 +493,7 @@ public sealed class SearchSalesCashAccountsQueryHandler(
         var search = request.Search?.Trim();
         var spec = new Specification<CashAccount>();
         if (!string.IsNullOrWhiteSpace(search))
-            spec.Where(x => x.IsActive && x.MovementType != OAS.Domain.Accounting.Enums.CashAccountMovementType.PaymentOnly && x.CurrencyId == request.CurrencyId && (x.Code.Contains(search) || x.Name.Contains(search)));
+            spec.Where(x => x.IsActive && x.MovementType != OAS.Domain.Accounting.Enums.CashAccountMovementType.PaymentOnly && x.CurrencyId == request.CurrencyId && (x.Code.Contains(search) || x.Name.Contains(search) || (x.CashBox != null && (x.CashBox.Name.Contains(search) || x.CashBox.Code.Contains(search)))));
         else
             spec.Where(x => x.IsActive && x.MovementType != OAS.Domain.Accounting.Enums.CashAccountMovementType.PaymentOnly && x.CurrencyId == request.CurrencyId);
 
@@ -501,7 +501,7 @@ public sealed class SearchSalesCashAccountsQueryHandler(
             .AddSort(nameof(CashAccount.Name), OAS.Contracts.Common.Pagination.SortDirection.Ascending)
             .ApplyPaging(0, SalesLookupLimit.Normalize(request.Take));
         var rows = await cashAccounts.ListAsync(spec, ct);
-        return rows.Select(x => new SalesCashAccountLookupDto(x.Id, x.Code, x.Name, x.CurrencyId!.Value, x.IsDefault, x.IsActive)).ToArray();
+        return rows.Select(x => new SalesCashAccountLookupDto(x.Id, x.CashBox?.Code ?? x.Code, x.CashBox?.Name ?? x.Name, x.CurrencyId!.Value, x.IsDefault, x.IsActive)).ToArray();
     }
 }
 

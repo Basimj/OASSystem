@@ -30,6 +30,21 @@ public sealed class CashShiftMovementQueryService(OasDbContext db) : ICashShiftM
                 x.line.TransactionDebitAmount ?? (x.line.TransactionCurrencyId == null ? x.line.DebitAmount : (decimal?)null),
                 x.line.TransactionCreditAmount ?? (x.line.TransactionCurrencyId == null ? x.line.CreditAmount : (decimal?)null)))
             .ToListAsync(ct);
-        return new CashShiftMovementsDto(shift.UsesLinkedMovements, count, rows);
+        CashShiftReconciliationDto? reconciliation = null;
+        if (shift.CashBoxShiftId.HasValue && page == 1)
+        {
+            // Resolve the currency from persisted account data, including inactive historical currencies.
+            var currency = await (from cash in db.Set<CashAccount>().AsNoTracking()
+                                  join c in db.Set<Currency>().AsNoTracking() on cash.CurrencyId equals (Guid?)c.Id
+                                  where cash.Id == shift.CashAccountId
+                                  select c).SingleOrDefaultAsync(ct)
+                ?? throw new ConflictException("cash_shift_currency_missing", "تعذر تحديد عملة حساب الوردية.");
+            var totals = await new CashShiftBalanceService(db).CalculateTotalsAsync(shift,
+                shift.ClosedAtUtc ?? DateTime.UtcNow, ct);
+            reconciliation = new CashShiftReconciliationDto(currency.Id, currency.Code, currency.NameAr,
+                currency.DecimalPlaces, totals.Received, totals.Paid,
+                shift.OpeningBalance + totals.Received - totals.Paid);
+        }
+        return new CashShiftMovementsDto(shift.UsesLinkedMovements, count, rows, reconciliation);
     }
 }

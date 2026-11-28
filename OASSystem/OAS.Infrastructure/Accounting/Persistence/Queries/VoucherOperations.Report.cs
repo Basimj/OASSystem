@@ -57,12 +57,12 @@ public sealed partial class VoucherOperations
         var ledger=await db.Set<JournalEntryLine>().AsNoTracking().Where(x=>ledgerIds.Contains(x.JournalEntryId)).Take(250001).ToListAsync(ct);
         if(ledger.Count>250000)throw Error("عدد القيود كبير؛ اختر فترة أقصر.");
         var byJournal=ledger.ToLookup(x=>x.JournalEntryId);
-        var accounts=await db.Set<Account>().AsNoTracking().Select(a=>new CashBankReportAccountDto(a.Id,a.Code,a.NameAr,"account",null,a.IsActive,null)).ToListAsync(ct);
+        var accounts=await db.Set<Account>().AsNoTracking().Select(a=>new CashBankReportAccountDto(a.Id,a.Code,a.NameAr,"account",null,a.IsActive,null,null,null)).ToListAsync(ct);
         var accountNames=accounts.ToDictionary(a=>a.AccountId,a=>a.Code+" - "+a.Name);
         var cash=await db.Set<CashAccount>().AsNoTracking().ToDictionaryAsync(x=>x.Id,ct);
         var banks=await db.Set<BankAccount>().AsNoTracking().ToDictionaryAsync(x=>x.Id,ct);
         string AccountName(Guid? id)=>id.HasValue?accountNames.GetValueOrDefault(id.Value,"غير متاح"):"غير محدد";
-        string Settlement(Detail d)=>d.CashId is Guid c&&cash.TryGetValue(c,out var ca)?ca.Name:d.BankId is Guid b&&banks.TryGetValue(b,out var ba)?ba.BankName+" - "+ba.AccountName:AccountName(d.SettlementId);
+        string Settlement(Detail d)=>d.CashId is Guid c&&cash.TryGetValue(c,out var ca)?(ca.CashBox?.Name??ca.Name):d.BankId is Guid b&&banks.TryGetValue(b,out var ba)?ba.BankName+" - "+ba.AccountName:AccountName(d.SettlementId);
         var warnings=new HashSet<string>{"المجاميع المالية تشمل القيود المرحلة فقط؛ العكس يعرض بقيمة سالبة في تاريخ ترحيله. القيم الأصلية لا تجمع بين عملات مختلفة.","قد تتضمن السندات تسويات غير نقدية؛ صافي السندات ليس إجمالي السيولة. أسماء الحسابات والصناديق من التعريفات الحالية. قيود فروق صرف تخصيصات الفواتير مستقلة وتظهر في اليومية وكشوف الحساب، وليست مبالغ قبض أو صرف إضافية."};
         var events=new List<Event>();
         foreach(var group in details.GroupBy(d=>new {d.Receipt,d.VoucherId}))
@@ -97,7 +97,7 @@ public sealed partial class VoucherOperations
                 }
             }
         }
-        var selected=events.Where(e=>e.Date>=f.FromDate&&e.Date<=f.ToDate&&(f.Status switch {"posted"=>e.Posted,"reversed"=>e.Status is "معكوس" or "عكس مرحل","draft"=>e.Status=="مسودة","approved"=>e.Status=="معتمد","cancelled"=>e.Status=="ملغى",_=>true})&&(!f.CurrencyId.HasValue||e.CurrencyId==f.CurrencyId)&&(!f.AccountId.HasValue||e.D.AccountId==f.AccountId||e.D.SettlementId==f.AccountId)&&(!f.CashAccountId.HasValue||e.D.CashId==f.CashAccountId)&&(!f.BankAccountId.HasValue||e.D.BankId==f.BankAccountId)&&(!f.Method.HasValue||e.D.Method==f.Method)&&(!f.PartyType.HasValue||e.D.PartyType==f.PartyType)&&(!f.PostedBy.HasValue||ActorId(e)==f.PostedBy)&&(string.IsNullOrWhiteSpace(f.Party)||(e.D.PartyName??Party(e.D.PartyType)).Contains(f.Party.Trim(),StringComparison.CurrentCultureIgnoreCase))&&(f.Mode switch {"customers"=>e.D.PartyType==1,"suppliers"=>e.D.PartyType==2,"employees"=>e.D.PartyType==3,_=>true})).OrderByDescending(e=>e.Date).ThenBy(e=>e.D.Number).ThenBy(e=>e.D.LineNo).ToArray();
+        var selected=events.Where(e=>e.Date>=f.FromDate&&e.Date<=f.ToDate&&(f.Status switch {"posted"=>e.Posted,"reversed"=>e.Status is "معكوس" or "عكس مرحل","draft"=>e.Status=="مسودة","approved"=>e.Status=="معتمد","cancelled"=>e.Status=="ملغى",_=>true})&&(!f.CurrencyId.HasValue||e.CurrencyId==f.CurrencyId)&&(!f.AccountId.HasValue||e.D.AccountId==f.AccountId||e.D.SettlementId==f.AccountId)&&(!f.CashAccountId.HasValue||e.D.CashId==f.CashAccountId)&&(!f.CashBoxId.HasValue||(e.D.CashId is Guid boxCash&&cash.TryGetValue(boxCash,out var member)&&member.CashBoxId==f.CashBoxId))&&(!f.BankAccountId.HasValue||e.D.BankId==f.BankAccountId)&&(!f.Method.HasValue||e.D.Method==f.Method)&&(!f.PartyType.HasValue||e.D.PartyType==f.PartyType)&&(!f.PostedBy.HasValue||ActorId(e)==f.PostedBy)&&(string.IsNullOrWhiteSpace(f.Party)||(e.D.PartyName??Party(e.D.PartyType)).Contains(f.Party.Trim(),StringComparison.CurrentCultureIgnoreCase))&&(f.Mode switch {"customers"=>e.D.PartyType==1,"suppliers"=>e.D.PartyType==2,"employees"=>e.D.PartyType==3,_=>true})).OrderByDescending(e=>e.Date).ThenBy(e=>e.D.Number).ThenBy(e=>e.D.LineNo).ToArray();
         var rows=new List<CashBankReportRow>(); string[] headers;
         int Count(IEnumerable<Event> es)=>es.Where(e=>!e.Reversal).Select(e=>(e.D.Receipt,e.D.VoucherId)).Distinct().Count();
         string DistinctText(IEnumerable<string?> values)=>string.Join("، ",values.Where(x=>!string.IsNullOrWhiteSpace(x)).Distinct());
@@ -131,6 +131,6 @@ public sealed partial class VoucherOperations
         if(f.Mode is "all" or "receipt" or "payment"){totalCells[5]=B(received);totalCells[6]=B(paid);}
         else if(f.Mode=="lines"){totalCells[10]=B(Sum(selected.Where(e=>e.Posted).Select(e=>e.Base)));}
         else {totalCells[1]=C(Count(selected));totalCells[2]=C(selected.Length);totalCells[3]=B(received);totalCells[4]=B(paid);totalCells[5]=B(received-paid);}
-        return new(baseCurrency.Id,baseCurrency.Code,baseCurrency.DecimalPlaces,accounts,currencies,headers,rows,metrics,warnings.ToArray()){TotalRow=R(totalCells),Operators=operators,SettlementAccounts=cash.Values.Select(c=>new CashBankReportAccountDto(c.Id,c.Code,c.Name,"cash",c.CurrencyId,c.IsActive)).Concat(banks.Values.Select(b=>new CashBankReportAccountDto(b.Id,b.Code,b.BankName+" - "+b.AccountName,"bank",b.CurrencyId,b.IsActive))).OrderBy(x=>x.Kind).ThenBy(x=>x.Code).ToArray()};
+        return new(baseCurrency.Id,baseCurrency.Code,baseCurrency.DecimalPlaces,accounts,currencies,headers,rows,metrics,warnings.ToArray()){TotalRow=R(totalCells),Operators=operators,SettlementAccounts=cash.Values.Select(c=>new CashBankReportAccountDto(c.Id,c.CashBox?.Code??c.Code,c.CashBox?.Name??c.Name,"cash",c.CurrencyId,c.IsActive,(byte)c.MovementType,c.CashBoxId,c.CashBox?.Name??c.Name)).Concat(banks.Values.Select(b=>new CashBankReportAccountDto(b.Id,b.Code,b.BankName+" - "+b.AccountName,"bank",b.CurrencyId,b.IsActive))).OrderBy(x=>x.Kind).ThenBy(x=>x.Code).ToArray()};
     }
 }

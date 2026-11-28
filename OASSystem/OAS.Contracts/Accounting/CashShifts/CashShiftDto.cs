@@ -22,4 +22,4 @@ public sealed record CashShiftDto(
     Guid? SettlementAccountId = null,
     DateOnly? SettlementDate = null,
     string? SettlementReason = null,
-    bool UsesLinkedMovements = false);
+    bool UsesLinkedMovements = false, Guid? CashBoxShiftId = null);

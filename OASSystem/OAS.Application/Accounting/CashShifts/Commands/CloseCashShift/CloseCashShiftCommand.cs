@@ -7,6 +7,8 @@ namespace OAS.Application.Accounting.CashShifts.Commands.CloseCashShift;
 public sealed record CloseCashShiftCommand(Guid Id, SetCashShiftClosingRequest Request)
     : ICommand, IAuthorizedRequest
 {
+    internal Guid? GroupId { get; init; }
+
     public IReadOnlyCollection<string> RequiredPermissions { get; } =
         [AccountingPermissions.CashShifts.Close];
 }

@@ -76,6 +76,8 @@ public sealed class CashShiftConfiguration : IEntityTypeConfiguration<CashShift>
             .IsUnique().HasFilter("[Status] IN (1, 2)")
             .HasDatabaseName("UX_CashShifts_OneActivePerCashAccount");
 
+        builder.HasIndex(x => x.CashBoxShiftId).HasDatabaseName("IX_CashShifts_CashBoxShiftId");
+
         builder.HasIndex(x => x.OpenedAtUtc)
             .HasDatabaseName("IX_CashShifts_OpenedAtUtc");
 

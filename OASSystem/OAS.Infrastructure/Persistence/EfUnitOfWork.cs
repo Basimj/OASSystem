@@ -56,25 +56,6 @@ public sealed class EfUnitOfWork(OasDbContext dbContext) : IUnitOfWork
         }
     }
 
-    public async Task<TResult> ExecuteSerializableAsync<TResult>(Func<CancellationToken, Task<TResult>> operation, CancellationToken cancellationToken = default)
-    {
-        if (dbContext.Database.CurrentTransaction is not null)
-            throw new InvalidOperationException("Opening balances require their own serializable transaction.");
-        await using var transaction = await dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
-        try
-        {
-            var result = await operation(cancellationToken);
-            await SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            return result;
-        }
-        catch
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
-    }
-
     private static bool TryMapUniqueConstraint(DbUpdateException exception, out ConflictException conflict)
     {
         conflict = null!;
@@ -158,6 +139,16 @@ public sealed class EfUnitOfWork(OasDbContext dbContext) : IUnitOfWork
             return true;
         }
 
+        if (message.Contains("UX_CashAccounts_BoxCurrency", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("cash_box_currency_duplicate", "هذه العملة موجودة بالفعل في الصندوق.");
+            return true;
+        }
+        if (message.Contains("UX_CashBoxes_Code", StringComparison.OrdinalIgnoreCase))
+        {
+            conflict = new ConflictException("accounting_cash_account_code_exists", "رمز الصندوق مستخدم مسبقًا.");
+            return true;
+        }
         if (message.Contains("UX_CashAccounts_Code", StringComparison.OrdinalIgnoreCase))
         {
             conflict = new ConflictException("accounting_cash_account_code_exists", "A cash account with this code already exists.");

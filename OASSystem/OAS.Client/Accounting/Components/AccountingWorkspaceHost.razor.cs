@@ -112,6 +112,7 @@ public partial class AccountingWorkspaceHost : IDisposable
     private PagedResult<ReceiptVoucherDto> _receiptsPage = new();
     private PagedResult<PaymentVoucherDto> _paymentsPage = new();
     private PagedResult<CashAccountDto> _cashAccountsPage = new();
+    private IReadOnlyList<IGrouping<Guid, CashAccountDto>> _cashBoxGroups = [];
     private PagedResult<BankAccountDto> _bankAccountsPage = new();
     private PagedResult<CashShiftDto> _cashShiftsPage = new();
     private PagedResult<ExpenseDto> _expensesPage = new();
@@ -880,7 +881,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                 model.ExpenseNumber = (await AccountingService.ReserveExpenseNumberAsync(model.ExpenseDate))?.Number ?? string.Empty;
                 break;
             case CashShiftEditor.FormModel model:
-                model.ShiftNumber = (await AccountingService.ReserveCashShiftNumberAsync())?.Number ?? string.Empty;
+                model.ShiftNumber = string.Empty; // Group member numbers are allocated atomically by the server.
                 break;
             case CashAccountEditor.FormModel model:
                 model.Code = (await AccountingService.ReserveCashAccountCodeAsync())?.CashAccountCode ?? string.Empty;
@@ -1205,15 +1206,14 @@ public partial class AccountingWorkspaceHost : IDisposable
                 _allocationsPage = await AccountingService.GetPaymentAllocationsPageAsync(request);
                 break;
             case AccountingEntityType.CashAccounts:
-                _cashAccountsPage = await AccountingService.GetCashAccountsPageAsync(request);
-                await RememberCashAccountLookupsAsync(_cashAccountsPage.Items);
+                await LoadCashBoxDirectoryAsync(request);
                 break;
             case AccountingEntityType.BankAccounts:
                 _bankAccountsPage = await AccountingService.GetBankAccountsPageAsync(request);
                 await RememberBankAccountLookupsAsync(_bankAccountsPage.Items);
                 break;
             case AccountingEntityType.CashShifts:
-                _cashShiftsPage = await AccountingService.GetCashShiftsPageAsync(request);
+                await LoadGroupedShiftDirectoryAsync(request);
                 break;
             case AccountingEntityType.Expenses:
                 _expensesPage = await AccountingService.GetExpensesPageAsync(request);
@@ -1778,23 +1778,29 @@ public partial class AccountingWorkspaceHost : IDisposable
                 case AccountingEntityType.CashAccounts:
                     {
                         var dto = await AccountingService.GetCashAccountByIdAsync(id) ?? throw NotFound("الصندوق");
-                        _cashAccountDtos[dto.Id] = dto;
-                        await EnsureAccountLookupAsync(dto.AccountId);
-                        await EnsureCurrencyLookupAsync(dto.CurrencyId);
-                        await RememberCashAccountLookupsAsync([dto]);
+                        var boxId = dto.CashBoxId ?? dto.Id;
+                        var members = (await FetchAllCashAccountsAsync()).Where(x => (x.CashBoxId ?? x.Id) == boxId).ToArray();
+                        if (members.Length == 0) throw NotFound("الصندوق");
+                        var root = members.FirstOrDefault(x => x.Id == boxId) ?? members[0];
+                        foreach (var member in members)
+                        {
+                            await EnsureAccountLookupAsync(member.AccountId);
+                            await EnsureCurrencyLookupAsync(member.CurrencyId);
+                        }
                         var model = new CashAccountEditor.FormModel
                         {
-                            Code = dto.Code,
-                            Name = dto.Name,
-                            AccountId = dto.AccountId,
-                            CurrencyId = dto.CurrencyId,
-                            IsDefault = dto.IsDefault,
-                            RequiresOpenShift = dto.RequiresOpenShift,
-                            MovementType = dto.MovementType,
-                            IsActive = dto.IsActive,
-                            RowVersion = dto.RowVersion
+                            CashBoxId = boxId,
+                            Code = root.CashBoxCode ?? root.Code,
+                            Name = root.CashBoxName ?? root.Name,
+                            RequiresOpenShift = root.RequiresOpenShift,
+                            Currencies = members.OrderBy(x => x.Code).Select(x => new CashAccountEditor.CurrencyLine
+                            {
+                                Id = x.Id, AccountId = x.AccountId, CurrencyId = x.CurrencyId,
+                                MovementType = x.MovementType, IsDefault = x.IsDefault,
+                                IsActive = x.IsActive, RowVersion = x.RowVersion
+                            }).ToList()
                         };
-                        CompleteLoadedTab(tab, dto.Id, $"{dto.Code} - {dto.Name}", model);
+                        CompleteLoadedTab(tab, root.Id, $"{model.Code} - {model.Name}", model);
                         break;
                     }
                 case AccountingEntityType.BankAccounts:
@@ -1824,26 +1830,8 @@ public partial class AccountingWorkspaceHost : IDisposable
                         await EnsureCashAccountLookupAsync(dto.CashAccountId);
                         if (_cashAccountDtos.TryGetValue(dto.CashAccountId, out var shiftCash))
                             await EnsureCurrencyLookupAsync(shiftCash.CurrencyId);
-                        var model = new CashShiftEditor.FormModel
-                        {
-                            ShiftNumber = dto.ShiftNumber,
-                            CashAccountId = dto.CashAccountId,
-                            OpeningBalance = dto.OpeningBalance,
-                            BookOpeningBalance = dto.BookOpeningBalance,
-                            OpeningDifferenceReason = dto.OpeningDifferenceReason,
-                            UsesLinkedMovements = dto.UsesLinkedMovements,
-                            SettlementJournalEntryId = dto.SettlementJournalEntryId,
-                            SettlementAccountId = dto.SettlementAccountId,
-                            SettlementDate = dto.SettlementDate, SettlementReason = dto.SettlementReason,
-                            ExpectedClosingBalance = dto.ExpectedClosingBalance,
-                            ActualClosingBalance = dto.ActualClosingBalance,
-                            DifferenceAmount = dto.DifferenceAmount,
-                            OpenedAtUtc = dto.OpenedAtUtc,
-                            ClosedAtUtc = dto.ClosedAtUtc,
-                            Status = dto.Status,
-                            RowVersion = dto.RowVersion
-                        };
-                        CompleteLoadedTab(tab, dto.Id, $"وردية {dto.ShiftNumber}", model);
+                        var model = await BuildShiftEditorModelAsync(dto);
+                        CompleteLoadedTab(tab, dto.Id, $"وردية {model.ShiftNumber}", model);
                         break;
                     }
                 case AccountingEntityType.Expenses:
@@ -2875,101 +2863,66 @@ public partial class AccountingWorkspaceHost : IDisposable
 
     private async Task SaveCashAccountAsync(AccountingTabState tab, CashAccountEditor.FormModel model)
     {
-        model.MovementError = null;
         model.ConfigurationError = null;
-        var movementChanged = false;
-        if (string.IsNullOrWhiteSpace(model.Name) || !model.CurrencyId.HasValue)
+        foreach (var line in model.Currencies) line.Error = null;
+        if (string.IsNullOrWhiteSpace(model.Name) || model.Currencies.Count == 0)
         {
-            Snackbar.Warning("اسم الصندوق وعملته مطلوبان.");
+            model.ConfigurationError = "أدخل اسم الصندوق وأضف عملة واحدة على الأقل.";
             return;
         }
-
-        if (!tab.IsNew && tab.EntityId.HasValue)
+        foreach (var line in model.Currencies)
         {
-            var current = await AccountingService.GetCashAccountByIdAsync(tab.EntityId.Value);
-            if (current is not null && current.CurrencyId != model.CurrencyId)
-            {
-                Snackbar.Warning("لا يمكن تغيير عملة صندوق موجود. أنشئ صندوقًا جديدًا عند الحاجة إلى عملة مختلفة.");
-                return;
-            }
-            if (current is not null)
-            {
-                movementChanged = current.MovementType != model.MovementType;
-                if (movementChanged || (current.IsActive && !model.IsActive))
-                {
-                    try
-                    {
-                        if ((await GetActiveCashShiftAccountIdsAsync(CancellationToken.None)).Contains(current.Id))
-                        {
-                            ShowCashConfigurationConflict(model, movementChanged);
-                            return;
-                        }
-                    }
-                    catch (ApiClientException ex) when (ex.StatusCode == 403)
-                    {
-                        // Users permitted to edit cash accounts may not have shift viewing rights.
-                        // In this case rely on the authoritative server check.
-                    }
-                }
-            }
+            if (!line.CurrencyId.HasValue || line.CurrencyId == Guid.Empty) line.Error = "حدد العملة. الحساب القديم غير محدد العملة يحتاج إلى مراجعة محاسبية.";
+            else if (model.Currencies.Count(x => x.CurrencyId == line.CurrencyId) > 1) line.Error = "لا يمكن تكرار العملة داخل الصندوق.";
+            else if (line.IsDefault && !line.IsActive) line.Error = "لا يمكن تعيين عملة غير نشطة كافتراضية.";
         }
-        if (model.IsDefault && model.IsActive)
+        if (model.Currencies.Any(x => x.Error is not null)) return;
+        if (tab.IsNew && model.Currencies.Count > 1 && !model.Currencies.Any(x => x.IsActive))
+        { model.ConfigurationError = "يجب تفعيل عملة واحدة على الأقل عند إنشاء صندوق متعدد العملات."; return; }
+        if (!tab.IsNew && model.Currencies.Any(x => !x.Id.HasValue) && !model.Currencies.Any(x => x.Id.HasValue && x.IsActive))
+        { model.ConfigurationError = "فعّل إحدى العملات المحفوظة قبل إضافة عملة جديدة للصندوق."; return; }
+        var current = await FetchAllCashAccountsAsync();
+        var members = model.CashBoxId is Guid boxId ? current.Where(x => (x.CashBoxId ?? x.Id) == boxId).ToArray() : [];
+        foreach (var line in model.Currencies)
         {
-            var duplicates = _cashAccountsPage.Items.Where(x => x.IsDefault && x.IsActive && x.CurrencyId == model.CurrencyId && x.Id != tab.EntityId).ToArray();
-            if (duplicates.Length > 0)
-            {
-                Snackbar.Warning($"يوجد صندوق افتراضي نشط لهذه العملة: {duplicates[0].Name}. ألغِ صفته الافتراضية أولًا.");
-                return;
-            }
+            if (line.IsActive && line.IsDefault && current.Any(x => x.CurrencyId == line.CurrencyId && x.IsActive && x.IsDefault && x.Id != line.Id))
+                line.Error = "يوجد صندوق افتراضي نشط لهذه العملة بالفعل.";
+            if (line.Id.HasValue && !members.Any(x => x.Id == line.Id && x.CurrencyId == line.CurrencyId && x.RowVersion == line.RowVersion))
+                line.Error = "تغيرت بيانات هذه العملة. حدّث الصندوق قبل الحفظ.";
         }
-
-        CashAccountDto? result;
-        if (tab.IsNew)
+        if (model.Currencies.Any(x => x.Error is not null)) return;
+        if (!tab.IsNew && members.Length != model.Currencies.Count(x => x.Id.HasValue))
+        { model.ConfigurationError = "تغيرت عملات الصندوق. حدّث البيانات."; return; }
+        var settingsChanged = model.Currencies.Any(line => !line.Id.HasValue || members.Any(x => x.Id == line.Id &&
+            (x.IsActive != line.IsActive || x.MovementType != line.MovementType || x.RequiresOpenShift != model.RequiresOpenShift)));
+        if (!tab.IsNew && settingsChanged)
         {
-            var settings = await AccountingService.GetAccountingSettingsAsync();
-            if (settings?.CashParentAccountId is null)
-            {
-                Snackbar.Warning("يجب تحديد الحساب الرئيسي للصناديق في إعدادات المحاسبة أولاً.");
-                return;
-            }
-
-            if (!await ValidateAccountSelectionAsync(
-                    settings.CashParentAccountId.Value,
-                    AccountingAccountEligibilityContext.AssetControlParent,
-                    "الحساب الرئيسي للصناديق"))
-            {
-                return;
-            }
-
-            result = await AccountingService.CreateCashAccountAsync(new CreateCashAccountRequest(model.Code.Trim(), model.Name.Trim(), model.CurrencyId.Value, model.IsDefault, model.IsActive, model.RequiresOpenShift, model.MovementType));
-        }
-        else
-        {
-            EnsureEntityIdAndRowVersion(tab, model.RowVersion);
             try
             {
-                result = await AccountingService.UpdateCashAccountAsync(tab.EntityId!.Value, new UpdateCashAccountRequest(model.Name.Trim(), model.CurrencyId.Value, model.IsDefault, model.IsActive, model.RowVersion, model.RequiresOpenShift, model.MovementType));
+                var active = await GetActiveCashShiftAccountIdsAsync(CancellationToken.None);
+                if (members.Any(x => active.Contains(x.Id)))
+                { model.ConfigurationError = "أغلق جميع الورديات النشطة قبل إضافة عملة أو تغيير نوع حركتها أو حالتها أو إعداد الوردية."; return; }
             }
-            catch (ApiClientException ex) when (ex.Error.Code == "cash_account_active_shift")
-            {
-                ShowCashConfigurationConflict(model, movementChanged);
-                return;
-            }
-            catch (ApiClientException ex) when (ex.Error.Code == "linked_account_header_invalid")
-            {
-                model.ConfigurationError = ex.Error.Message;
-                return;
-            }
+            catch (ApiClientException ex) when (ex.StatusCode == 403) { /* The server still enforces the rule. */ }
         }
-        await CompleteSaveAsync(tab, result?.Id, result is null ? null : $"{result.Code} - {result.Name}", "تم حفظ الصندوق بنجاح.");
-    }
-
-    private static void ShowCashConfigurationConflict(CashAccountEditor.FormModel model, bool movementChanged)
-    {
-        if (movementChanged)
-            model.MovementError = "أغلق الوردية المفتوحة أو قيد الإغلاق قبل تغيير نوع حركة الصندوق.";
-        else
-            model.ConfigurationError = "أغلق الوردية المفتوحة أو قيد الإغلاق قبل تعطيل الصندوق أو تغيير حسابه أو عملته.";
+        try
+        {
+            Guid id;
+            if (tab.IsNew)
+            {
+                id = await AccountingService.CreateCashBoxAsync(new CreateCashBoxRequest(model.Name.Trim(), model.RequiresOpenShift,
+                    model.Currencies.Select(x => new CashBoxCurrencyRequest(x.CurrencyId!.Value, x.MovementType, x.IsDefault, x.IsActive)).ToArray(), model.Code));
+            }
+            else
+            {
+                id = model.CashBoxId ?? throw new InvalidOperationException("معرف الصندوق غير متاح.");
+                await AccountingService.UpdateCashBoxAsync(id, new UpdateCashBoxRequest(model.Name.Trim(), model.RequiresOpenShift,
+                    model.Currencies.Select(x => new UpdateCashBoxCurrencyRequest(x.Id, x.CurrencyId!.Value, x.MovementType, x.IsActive, x.IsDefault, x.RowVersion)).ToArray()));
+            }
+            await CompleteSaveAsync(tab, id, model.Name.Trim(), "تم حفظ الصندوق وجميع عملاته بنجاح.");
+        }
+        catch (ApiClientException ex)
+        { model.ConfigurationError = ex.Error.Message; }
     }
 
     private async Task SaveBankAccountAsync(AccountingTabState tab, BankAccountEditor.FormModel model)
@@ -3035,62 +2988,35 @@ public partial class AccountingWorkspaceHost : IDisposable
         }
 
         model.CashAccountError = null;
-        if (model.CashAccountId is not Guid cashAccountId || cashAccountId == Guid.Empty)
+        model.OpeningBalanceError = null;
+        if (model.CashBoxId is not Guid boxId || model.CurrencyLines.Count == 0 || model.LoadingCurrencies)
         {
-            model.CashAccountError = "اختر الصندوق قبل فتح الوردية.";
+            model.CashAccountError = "اختر صندوقاً وحمّل جميع أرصدة عملاته قبل فتح الوردية.";
             return;
         }
-        if (model.OpeningBalance < 0)
+        if (model.CurrencyLines.Any(x => !x.Book.HasValue || x.Actual is null or < 0 ||
+            (x.Actual != x.Book && string.IsNullOrWhiteSpace(x.Reason))))
         {
-            Snackbar.Warning("رصيد الافتتاح لا يمكن أن يكون سالباً.");
+            model.OpeningBalanceError = "أدخل الجرد الفعلي لكل عملة وسبب أي فرق عن الرصيد الدفتري.";
             return;
         }
-        if (!await ValidateCashAccountSelectionAsync(cashAccountId, null, "الصندوق"))
+        var allMembers = (await FetchAllCashAccountsAsync()).Where(x => x.CashBoxId == boxId).ToArray();
+        var current = allMembers.Where(x=>x.IsActive).ToArray();
+        var active = await GetActiveCashShiftAccountIdsAsync(CancellationToken.None);
+        if (allMembers.Any(x => active.Contains(x.Id)) || !current.Select(x=>x.Id).ToHashSet().SetEquals(model.CurrencyLines.Select(x=>x.AccountId)))
         {
-            model.CashAccountError = "الصندوق المحدد لم يعد صالحاً لفتح وردية. اختر صندوقاً آخر.";
+            model.CashAccountError = "تغيرت عملات الصندوق أو توجد وردية نشطة. حدّث بيانات الصندوق قبل المتابعة.";
             return;
         }
-
-        // Always re-read the active shifts; the lookup may be stale after another user opens a shift.
-        if ((await GetActiveCashShiftAccountIdsAsync(CancellationToken.None)).Contains(cashAccountId))
-        {
-            model.CashAccountError = ActiveCashShiftError;
-            return;
-        }
-        // If the selection changed while awaiting validation, do not submit the stale selection.
-        if (model.CashAccountId != cashAccountId)
-            return;
-
-        if (!model.BookOpeningBalance.HasValue)
-        {
-            model.OpeningBalanceError = "حدّث الرصيد الدفتري قبل فتح الوردية.";
-            return;
-        }
-        if (model.BookOpeningBalance != model.OpeningBalance && string.IsNullOrWhiteSpace(model.OpeningDifferenceReason))
-        {
-            model.OpeningBalanceError = "أدخل سبب فرق الافتتاح.";
-            return;
-        }
-        CashShiftDto? result;
-        try
-        {
-            result = await AccountingService.CreateCashShiftAsync(new CreateCashShiftRequest(
-                cashAccountId, model.OpeningBalance, model.ShiftNumber, model.OpeningDifferenceReason, model.BookOpeningBalance));
-        }
-        catch (ApiClientException ex) when (ex.Error.Code == "cash_shift_already_open")
-        {
-            // The server/unique index remains authoritative for concurrent requests.
-            if (model.CashAccountId == cashAccountId)
-                model.CashAccountError = ActiveCashShiftError;
-            return;
-        }
-        catch (ApiClientException ex) when (ex.Error.Code is "cash_shift_opening_balance_changed" or "cash_shift_opening_reason_required")
-        {
-            model.OpeningBalanceError = "راجع الرصيد الدفتري وسبب الفرق ثم أعد المحاولة.";
-            if (ex.Error.Code == "cash_shift_opening_balance_changed") model.BookOpeningBalance = null;
-            return;
-        }
-        await CompleteSaveAsync(tab, result?.Id, result is null ? null : $"وردية {result.ShiftNumber}", "تم فتح الوردية بنجاح.");
+        foreach (var member in current)
+            if (!await ValidateCashAccountSelectionAsync(member.Id, null, "الصندوق")) return;
+        if (model.CashBoxId != boxId || model.LoadingCurrencies) return;
+        var group = await AccountingService.OpenCashBoxShiftAsync(new(boxId, model.CurrencyLines.Select(x =>
+            new CreateCashShiftRequest(x.AccountId, x.Actual!.Value, null, x.Reason, x.Book)).ToArray()));
+        var rows = await AccountingService.GetCashBoxShiftsAsync(boxId);
+        var result = rows?.Where(x => x.CashBoxShiftId == group).OrderBy(x => x.ShiftNumber).FirstOrDefault()
+            ?? throw new InvalidOperationException("تم إرسال طلب الفتح ولكن تعذر تحميل الوردية؛ حدّث القائمة قبل إعادة المحاولة.");
+        await CompleteSaveAsync(tab, result.Id, $"وردية {result.ShiftNumber}", "تم فتح الوردية لجميع العملات بنجاح.");
     }
 
     private async Task SaveExpenseAsync(AccountingTabState tab, ExpenseEditor.FormModel model)
@@ -3813,6 +3739,23 @@ public partial class AccountingWorkspaceHost : IDisposable
     private async Task CloseActiveCashShiftAsync()
     {
         if (Workspace.ActiveTab is not { EntityId: Guid id, Model: CashShiftEditor.FormModel model } tab) return;
+        if (model.CashBoxShiftId is Guid groupId)
+        {
+            if (model.CurrencyLines.Count == 0 || model.CurrencyLines.Any(x => x.Shift is null || x.Actual is null or < 0))
+            { Snackbar.Warning("أدخل الجرد الفعلي لكل عملة قبل إغلاق الوردية."); return; }
+            if (!await Dialog.ConfirmAsync("إغلاق الوردية", "سيتم إغلاق جميع العملات وتثبيت فروق الجرد بصورة مستقلة. هل تريد المتابعة؟", AlertTone.Warning, "إغلاق الوردية", "إلغاء")) return;
+            try
+            {
+                if (!await AccountingService.CloseCashBoxShiftAsync(groupId, new(model.CurrencyLines.Select(x => new CashBoxShiftCloseLine(x.Shift!.Id, x.Actual, x.Shift.RowVersion)).ToArray())))
+                    throw new InvalidOperationException("تعذر إغلاق الوردية.");
+                await LoadExistingRecordAsync(tab, id);
+                await LoadEntityListAsync(AccountingEntityType.CashShifts);
+                Snackbar.Success("تم إغلاق جميع عملات الوردية.");
+            }
+            catch (ApiClientException ex) { ShowAccountingError(ex.Error); }
+            catch (Exception) { ApiFeedback.ShowUnexpected(); }
+            return;
+        }
         if (!model.ActualClosingBalance.HasValue)
         {
             Snackbar.Warning("أدخل قيمة الجرد الفعلي قبل إغلاق الوردية.");
@@ -3853,6 +3796,17 @@ public partial class AccountingWorkspaceHost : IDisposable
         if (!confirmed) return;
         try
         {
+            if (model.CashBoxShiftId is Guid groupId)
+            {
+                if (model.CurrencyLines.Count == 0 || model.CurrencyLines.Any(x => x.Shift?.Status != CashShiftStatus.Closed))
+                { Snackbar.Warning("يجب إغلاق جميع عملات الوردية قبل الاعتماد."); return; }
+                if (!await AccountingService.ApproveCashBoxShiftAsync(groupId, new(model.CurrencyLines.Select(x => new CashBoxShiftVersion(x.Shift!.Id, x.Shift.RowVersion)).ToArray())))
+                    throw new InvalidOperationException("تعذر اعتماد الوردية.");
+                await LoadExistingRecordAsync(tab, id);
+                await LoadEntityListAsync(AccountingEntityType.CashShifts);
+                Snackbar.Success("تم اعتماد جميع عملات الوردية.");
+                return;
+            }
             EnsureEntityIdAndRowVersion(tab, model.RowVersion);
             var result = await AccountingService.ApproveCashShiftAsync(id, model.RowVersion);
             if (result is null) throw new InvalidOperationException("لم يُرجع الخادم الوردية المحدثة.");
@@ -3975,30 +3929,20 @@ public partial class AccountingWorkspaceHost : IDisposable
         try
         {
             var busy = await GetActiveCashShiftAccountIdsAsync(cancellationToken);
+            var allCash = await FetchAllCashAccountsAsync();
             var available = new List<UiLookupItem>();
-            for (var pageNumber = 1; ; pageNumber++)
+            foreach (var group in allCash.Where(x=>x.CashBoxId.HasValue).GroupBy(x=>x.CashBoxId!.Value))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var page = await AccountingService.GetCashAccountsPageAsync(new PageRequest
-                {
-                    PageNumber = pageNumber,
-                    PageSize = PageRequest.MaximumPageSize,
-                    Search = text,
-                    Status = "active",
-                    SortBy = "Code"
-                }, cancellationToken);
-                var candidates = page.Items.Where(x => x.IsActive && x.CurrencyId.HasValue && !busy.Contains(x.Id)).ToArray();
-                var lookups = await Task.WhenAll(candidates.Select(x => BuildCashAccountLookupAsync(x, null, cancellationToken)));
-                for (var i = 0; i < candidates.Length; i++)
-                {
-                    if (lookups[i].Disabled) continue;
-                    _cashAccountDtos[candidates[i].Id] = candidates[i];
-                    _cashAccountLookups[candidates[i].Id] = lookups[i];
-                    available.Add(lookups[i]);
-                }
-                if (!page.HasNextPage) break;
+                var members = group.Where(x=>x.IsActive).ToArray();
+                if (members.Length == 0 || members.Any(x=>!x.CurrencyId.HasValue) || group.Any(x=>busy.Contains(x.Id))) continue;
+                var root = members[0];
+                var name = root.CashBoxName ?? root.Name;
+                var code = root.CashBoxCode ?? root.Code;
+                if (!string.IsNullOrWhiteSpace(text) && !name.Contains(text, StringComparison.OrdinalIgnoreCase) && !code.Contains(text, StringComparison.OrdinalIgnoreCase)) continue;
+                available.Add(new UiLookupItem(group.Key.ToString("D"), name, $"{code} · {members.Length} عملة", "fa-solid fa-vault"));
             }
-            return available;
+            return available.OrderBy(x=>x.PrimaryText).ToArray();
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception)
@@ -4587,7 +4531,7 @@ public partial class AccountingWorkspaceHost : IDisposable
                 }
                 break;
             case AccountingEntityType.CashAccounts:
-                foreach (var x in _cashAccountsPage.Items) { await EnsureAccountLookupAsync(x.AccountId); await EnsureCurrencyLookupAsync(x.CurrencyId); }
+                foreach (var x in _cashBoxGroups.SelectMany(g => g)) await EnsureCurrencyLookupAsync(x.CurrencyId);
                 break;
             case AccountingEntityType.BankAccounts:
                 foreach (var x in _bankAccountsPage.Items) { await EnsureAccountLookupAsync(x.AccountId); await EnsureCurrencyLookupAsync(x.CurrencyId); }
@@ -5246,19 +5190,50 @@ public partial class AccountingWorkspaceHost : IDisposable
         return normalized.Length <= 4 ? normalized : $"•••• {normalized[^4..]}";
     }
 
-    private IReadOnlyList<AccountingRecordItem> BuildCashAccountItems() => _cashAccountsPage.Items.Select(x =>
-        new AccountingRecordItem(
-            x.Id, x.Name, x.Code,
+    private async Task<List<CashAccountDto>> FetchAllCashAccountsAsync()
+    {
+        var rows = new List<CashAccountDto>();
+        for (var p = 1; ; p++)
+        {
+            var page = await AccountingService.GetCashAccountsPageAsync(new PageRequest { PageNumber = p, PageSize = PageRequest.MaximumPageSize });
+            rows.AddRange(page.Items);
+            if (!page.HasNextPage || page.Items.Count == 0) break;
+        }
+        return rows;
+    }
+
+    private async Task LoadCashBoxDirectoryAsync(PageRequest request)
+    {
+        var rows = await FetchAllCashAccountsAsync();
+        var search = request.Search?.Trim();
+        var groups = rows.GroupBy(x => x.CashBoxId ?? x.Id)
+            .Where(g => (request.Status != "active" || g.Any(x => x.IsActive)) &&
+                        (request.Status != "inactive" || g.All(x => !x.IsActive)) &&
+                        (string.IsNullOrWhiteSpace(search) || g.Any(x => new[] { x.Code, x.Name, x.CashBoxCode, x.CashBoxName }.Any(v => v?.Contains(search, StringComparison.OrdinalIgnoreCase) == true))))
+            .OrderBy(g => g.First().CashBoxCode ?? g.First().Code).ThenBy(g => g.Key).ToArray();
+        var pageSize = Math.Max(1, request.PageSize);
+        var pageNumber = Math.Clamp(request.PageNumber, 1, Math.Max(1, (int)Math.Ceiling(groups.Length / (double)pageSize)));
+        _pageByEntity[AccountingEntityType.CashAccounts] = pageNumber;
+        _cashBoxGroups = groups.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToArray();
+        _cashAccountsPage = new PagedResult<CashAccountDto>
+        {
+            Items = _cashBoxGroups.Select(g => g.FirstOrDefault(x => x.Id == g.Key) ?? g.First()).ToArray(),
+            PageNumber = pageNumber, PageSize = pageSize, TotalCount = groups.Length
+        };
+        foreach (var member in _cashBoxGroups.SelectMany(g => g)) await EnsureCurrencyLookupAsync(member.CurrencyId);
+    }
+
+    private IReadOnlyList<AccountingRecordItem> BuildCashAccountItems() => _cashBoxGroups.Select(g =>
+    {
+        var root = g.FirstOrDefault(x => x.Id == g.Key) ?? g.First();
+        var active = g.Any(x => x.IsActive);
+        return new AccountingRecordItem(root.Id, root.CashBoxName ?? root.Name, root.CashBoxCode ?? root.Code,
             "fa-solid fa-vault",
-            [
-                new("الحساب المحاسبي", GetAccountLookup(x.AccountId)?.PrimaryText ?? "الحساب غير متاح"),
-                new("افتراضي", x.IsDefault ? "نعم" : "لا"),
-                new("نوع الحركة", x.MovementType switch { CashAccountMovementType.ReceiptOnly => "وارد فقط", CashAccountMovementType.PaymentOnly => "صادر فقط", _ => "وارد وصادر" })
-            ],
-            x.IsActive ? "نشط" : "غير نشط",
-            x.IsActive ? "active" : "inactive",
-            GetCurrencyLookup(x.CurrencyId)?.PrimaryText ?? "غير محددة",
-            "عملة الصندوق")).ToArray();
+            [new("العملات", string.Join("، ", g.Select(x => GetCurrencyLookup(x.CurrencyId)?.PrimaryText ?? "غير محددة"))),
+             new("العملات النشطة", $"{g.Count(x => x.IsActive)} / {g.Count()}"),
+             new("يتطلب وردية", root.RequiresOpenShift ? "نعم" : "لا")],
+            active ? "نشط" : "غير نشط", active ? "active" : "inactive", g.Count().ToString(), "عدد العملات");
+    }).ToArray();
 
     private IReadOnlyList<AccountingRecordItem> BuildBankAccountItems() => _bankAccountsPage.Items.Select(x =>
         new AccountingRecordItem(
@@ -5274,22 +5249,77 @@ public partial class AccountingWorkspaceHost : IDisposable
             GetCurrencyLookup(x.CurrencyId)?.PrimaryText ?? "غير محددة",
             "عملة الحساب")).ToArray();
 
+    private Dictionary<Guid, CashShiftDto[]> _shiftGroups = new();
+
+    private async Task LoadGroupedShiftDirectoryAsync(PageRequest request)
+    {
+        var rows = new List<CashShiftDto>();
+        // Group before pagination; a currency is never a separate directory record.
+        for (var p=1;;p++)
+        {
+            var page = await AccountingService.GetCashShiftsPageAsync(request with { PageNumber=p, PageSize=PageRequest.MaximumPageSize, Search=null, Status=null });
+            rows.AddRange(page.Items);
+            if (!page.HasNextPage || page.Items.Count == 0) break;
+        }
+        var accounts = (await FetchAllCashAccountsAsync()).ToDictionary(x=>x.Id);
+        var groups = rows.GroupBy(x=>x.CashBoxShiftId??x.Id).Select(g=>g.OrderBy(x=>x.ShiftNumber).ToArray())
+            .Where(g=> (string.IsNullOrWhiteSpace(request.Status) || g.Any(x=>x.Status.ToString().Equals(request.Status,StringComparison.OrdinalIgnoreCase))) &&
+                (string.IsNullOrWhiteSpace(request.Search) || g.Any(x=>x.ShiftNumber.Contains(request.Search,StringComparison.OrdinalIgnoreCase) ||
+                    (accounts.TryGetValue(x.CashAccountId,out var a) && (a.CashBoxName??a.Name).Contains(request.Search,StringComparison.OrdinalIgnoreCase)))))
+            .OrderByDescending(g=>g.Max(x=>x.OpenedAtUtc)).ThenBy(g=>g[0].Id).ToArray();
+        var size = Math.Max(1,request.PageSize);
+        var number = Math.Clamp(request.PageNumber,1,Math.Max(1,(int)Math.Ceiling(groups.Length/(double)size)));
+        _pageByEntity[AccountingEntityType.CashShifts] = number;
+        var visible = groups.Skip((number-1)*size).Take(size).ToArray();
+        _shiftGroups = visible.ToDictionary(g=>g[0].Id);
+        foreach (var member in visible.SelectMany(g=>g))
+        {
+            if (accounts.TryGetValue(member.CashAccountId,out var cash))
+            { _cashAccountDtos[cash.Id]=cash; await EnsureCurrencyLookupAsync(cash.CurrencyId); }
+        }
+        _cashShiftsPage = new PagedResult<CashShiftDto> { Items=visible.Select(g=>g[0]).ToArray(), PageNumber=number,PageSize=size,TotalCount=groups.Length };
+    }
+
+    private async Task<CashShiftEditor.FormModel> BuildShiftEditorModelAsync(CashShiftDto dto)
+    {
+        var model = CashShiftEditor.FormModel.FromDto(dto);
+        if (!dto.CashBoxShiftId.HasValue) return model;
+        var cash = await AccountingService.GetCashAccountByIdAsync(dto.CashAccountId) ?? throw NotFound("الصندوق");
+        if (cash.CashBoxId is not Guid boxId) throw new InvalidOperationException("تعذر تحديد الصندوق التشغيلي للوردية.");
+        model.CashBoxId=boxId; model.CashBoxName=cash.CashBoxName??cash.Name;
+        var rows = (await AccountingService.GetCashBoxShiftsAsync(boxId) ?? []).Where(x=>x.CashBoxShiftId==dto.CashBoxShiftId).OrderBy(x=>x.ShiftNumber).ToArray();
+        if (rows.Length==0) throw new InvalidOperationException("تعذر تحميل عملات الوردية.");
+        model.ShiftNumber=rows[0].ShiftNumber;
+        foreach (var row in rows)
+        {
+            var movements = await AccountingService.GetCashShiftMovementsAsync(row.Id, 1);
+            var reconciliation = movements?.Reconciliation ?? throw new InvalidOperationException("تعذر تحميل عملة الوردية وإجماليات حركاتها. حدّث المشروع وأعد المحاولة.");
+            decimal? expected = row.Status is CashShiftStatus.Open or CashShiftStatus.Closing
+                ? reconciliation.Expected : row.ExpectedClosingBalance;
+            var detail = CashShiftEditor.FormModel.FromDto(row);
+            detail.ExpectedClosingBalance = expected;
+            model.CurrencyLines.Add(new CashShiftEditor.CurrencyLine { AccountId=row.CashAccountId,
+                Label=$"{reconciliation.CurrencyCode} - {reconciliation.CurrencyName}",
+                Decimals=reconciliation.DecimalPlaces, Book=row.BookOpeningBalance, Actual=row.ActualClosingBalance,
+                Received=reconciliation.Received, Paid=reconciliation.Paid,
+                Expected=expected, Shift=row, Detail=detail });
+        }
+        return model;
+    }
+
     private IReadOnlyList<AccountingRecordItem> BuildCashShiftItems() => _cashShiftsPage.Items.Select(x =>
-        new AccountingRecordItem(
-            x.Id,
-            $"وردية {x.ShiftNumber}",
-            GetCashAccountLookup(x.CashAccountId)?.PrimaryText ?? "الصندوق غير متاح",
-            "fa-solid fa-cash-register",
-            [
-                new("الافتتاح (UTC)", x.OpenedAtUtc.ToUniversalTime().ToString("yyyy/MM/dd HH:mm")),
-                new("الفرق (مبدئي)", x.DifferenceAmount.HasValue ? FormatShiftAmount(x.CashAccountId, x.DifferenceAmount.Value) : "—"),
-                new("المتوقع (مبدئي)", x.ExpectedClosingBalance.HasValue ? FormatShiftAmount(x.CashAccountId, x.ExpectedClosingBalance.Value) : "غير محتسب"),
-                new("رصيد الافتتاح", FormatShiftAmount(x.CashAccountId, x.OpeningBalance))
-            ],
-            AccountingArabicPresenter.GetCashShiftStatusText(x.Status),
-            CashShiftState(x.Status),
-            x.ActualClosingBalance.HasValue ? $"{FormatShiftAmount(x.CashAccountId, x.ActualClosingBalance.Value)} {GetShiftCurrencyLabel(x.CashAccountId)}" : "لم يسجل جرد",
-            "الجرد الفعلي")).ToArray();
+    {
+        var members = _shiftGroups.GetValueOrDefault(x.Id) ?? [x];
+        _cashAccountDtos.TryGetValue(x.CashAccountId, out var cash);
+        var group = x.CashBoxShiftId.HasValue;
+        return new AccountingRecordItem(x.Id, $"وردية {x.ShiftNumber}", cash?.CashBoxName ?? cash?.Name ?? "الصندوق غير متاح", "fa-solid fa-cash-register",
+            [new("الافتتاح (UTC)", x.OpenedAtUtc.ToUniversalTime().ToString("yyyy/MM/dd HH:mm")),
+             new("العملات", string.Join("، ",members.Select(m=>GetShiftCurrencyLabel(m.CashAccountId)))),
+             new("الجرد", $"{members.Count(m=>m.ActualClosingBalance.HasValue)} / {members.Length}"),
+             new("فروق الجرد", members.Count(m=>m.DifferenceAmount.GetValueOrDefault()!=0).ToString())],
+            AccountingArabicPresenter.GetCashShiftStatusText(x.Status), CashShiftState(x.Status),
+            members.Length.ToString(), group?"عدد العملات":"وردية سابقة");
+    }).ToArray();
 
     private Guid? ExpenseCurrencyId(ExpenseDto expense)
     {

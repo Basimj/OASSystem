@@ -7,6 +7,8 @@ namespace OAS.Application.Accounting.CashShifts.Commands.CreateCashShift;
 public sealed record CreateCashShiftCommand(CreateCashShiftRequest Data)
     : ICommand<Guid>, IAuthorizedRequest
 {
+    internal Guid? GroupId { get; init; }
+
     public IReadOnlyCollection<string> RequiredPermissions { get; } =
         [AccountingPermissions.CashShifts.Create];
 }

@@ -32,7 +32,7 @@ public sealed class CashTransferService(OasDbContext db, ISequenceNumberGenerato
                           join c in db.Set<Currency>().AsNoTracking() on x.CurrencyId equals (Guid?)c.Id
                           join a in db.Set<Account>().AsNoTracking() on x.AccountId equals a.Id
                           where x.IsActive && c.IsActive && c.DecimalPlaces <= 4 && a.IsActive && a.IsPostingAccount && a.AccountClass == AccountClass.Asset
-                          select new CashTransferAccountDto(a.Id, x.Name, "Cash", c.Id, c.Code, c.DecimalPlaces)).ToListAsync(ct);
+                          select new CashTransferAccountDto(a.Id, x.CashBox != null ? x.CashBox.Name : x.Name, "Cash", c.Id, c.Code, c.DecimalPlaces)).ToListAsync(ct);
         var banks = await (from x in db.Set<BankAccount>().AsNoTracking()
                            join c in db.Set<Currency>().AsNoTracking() on x.CurrencyId equals (Guid?)c.Id
                            join a in db.Set<Account>().AsNoTracking() on x.AccountId equals a.Id

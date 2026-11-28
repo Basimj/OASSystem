@@ -1,0 +1,50 @@
+@using OAS.Client.Accounting.Services
+@using OAS.Contracts.Accounting.CashAccounts
+@using OAS.Contracts.Accounting.CashShifts
+@using OAS.Contracts.Accounting.Currencies
+@using OAS.Contracts.Accounting.Enums
+@using OAS.Contracts.Common.Pagination
+@inject IAccountingClientService Accounting
+<div class="cash-shift-panel" dir="rtl">
+    <div class="shift-toolbar"><strong>الورديات متعددة العملات</strong><button type="button" class="btn btn-sm btn-outline-primary" @onclick="Reload" disabled="@busy">تحديث</button></div>
+    @if(error is not null){<div role="alert" class="alert alert-danger">@error</div>}
+    <label>الصندوق<select value="@selected" @onchange="ChangeBox" disabled="@busy"><option value="">اختر الصندوق</option>@foreach(var g in Groups){<option value="@g.Key">@(g.First().CashBoxName??g.First().Name)</option>}</select></label>
+    @if(legacyActive){<div class="alert alert-warning">توجد وردية قديمة منفردة. أغلقها من واجهة تفاصيل الورديات أولًا.</div>}
+    @if(opening.Count>0)
+    {
+        <strong>جرد الافتتاح</strong><table><thead><tr><th>العملة</th><th>الدفتري</th><th>الجرد الفعلي</th><th>سبب الفرق</th></tr></thead><tbody>
+        @foreach(var line in opening){<tr><td>@CurrencyName(line.Account.Id)</td><td>@line.Book.ToString("N4")</td><td><input type="number" min="0" step="0.0001" @bind="line.Actual" disabled="@busy" /></td><td><input @bind="line.Reason" maxlength="500" disabled="@busy" /></td></tr>}
+        </tbody></table><button type="button" class="btn btn-success btn-sm" @onclick="Open" disabled="@busy">فتح الوردية</button>
+    }
+    @foreach(var g in rows.Where(x=>x.CashBoxShiftId.HasValue).GroupBy(x=>x.CashBoxShiftId!.Value).OrderByDescending(x=>x.Max(y=>y.OpenedAtUtc)))
+    {
+        var isOpen=g.All(x=>x.Status is CashShiftStatus.Open or CashShiftStatus.Closing);var isClosed=g.All(x=>x.Status==CashShiftStatus.Closed);
+        <details open="@(isOpen||isClosed)"><summary>وردية @g.OrderBy(x=>x.ShiftNumber).First().ShiftNumber — @State(g.First().Status) — @g.First().OpenedAtUtc.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</summary>
+        <table><thead><tr><th>العملة</th><th>الافتتاح</th><th>المتوقع عند الإغلاق</th><th>الجرد الفعلي</th><th>الفرق</th><th>التسوية والتفاصيل</th></tr></thead><tbody>
+        @foreach(var row in g){<tr><td>@CurrencyName(row.CashAccountId)</td><td>@row.OpeningBalance.ToString("N4")</td><td>@((isOpen && expected.TryGetValue(row.Id,out var preview) ? preview : row.ExpectedClosingBalance)?.ToString("N4")??"يحسب عند الإغلاق")</td><td>@if(isOpen){<input type="number" min="0" step="0.0001" value="@ClosingValue(row.Id)" @onchange="e=>SetClosing(row.Id,e)" disabled="@busy" />}else{@(row.ActualClosingBalance?.ToString("N4"))}</td><td>@Difference(row,isOpen)</td><td><a href="@($"/accounting/cash-shifts?shiftId={row.Id:D}")">@(row.SettlementJournalEntryId.HasValue?"مسوّاة":"عرض التفاصيل / التسوية")</a></td></tr>}
+        </tbody></table>
+        @if(isOpen){<button type="button" class="btn btn-warning btn-sm" disabled="@busy" @onclick="()=>Close(g.Key)">إغلاق جميع العملات</button>}
+        @if(isClosed){<button type="button" class="btn btn-primary btn-sm" disabled="@busy" @onclick="()=>Approve(g.Key)">اعتماد جميع العملات</button>}
+        </details>
+    }
+</div>
+@code {
+    private sealed class OpenLine { public CashAccountDto Account {get;init;}=default!; public decimal Book {get;init;} public decimal? Actual {get;set;} public string? Reason {get;set;} }
+    private List<CashAccountDto> accounts=[]; private List<CurrencyDto> currencies=[]; private List<OpenLine> opening=[]; private CashShiftDto[] rows=[];
+    private Dictionary<Guid,decimal> expected=[];
+    private Dictionary<Guid,decimal?> closing=[]; private string selected=""; private bool busy,legacyActive; private string? error;
+    private IEnumerable<IGrouping<Guid,CashAccountDto>> Groups=>accounts.GroupBy(x=>x.CashBoxId??x.Id).OrderBy(x=>x.First().CashBoxName??x.First().Name);
+    protected override Task OnInitializedAsync()=>Reload();
+    private async Task Reload(){if(busy)return;busy=true;error=null;try{accounts=[];currencies=[];for(int p=1;;p++){var page=await Accounting.GetCashAccountsPageAsync(new PageRequest{PageNumber=p,PageSize=200});accounts.AddRange(page.Items);if(!page.HasNextPage)break;}for(int p=1;;p++){var page=await Accounting.GetCurrenciesPageAsync(new PageRequest{PageNumber=p,PageSize=200});currencies.AddRange(page.Items);if(!page.HasNextPage)break;}await LoadBox();}catch(Exception ex){error=ex.Message;}finally{busy=false;}}
+    private string CurrencyName(Guid id)=>currencies.FirstOrDefault(c=>c.Id==accounts.FirstOrDefault(a=>a.Id==id)?.CurrencyId)?.NameAr??"غير محددة";
+    private static string State(CashShiftStatus s)=>s switch{CashShiftStatus.Open=>"مفتوحة",CashShiftStatus.Closing=>"قيد الإغلاق",CashShiftStatus.Closed=>"مغلقة",_=>"معتمدة"};
+    private async Task ChangeBox(ChangeEventArgs e){if(busy)return;selected=e.Value?.ToString()??"";await Run(LoadBox);}
+    private async Task LoadBox(){rows=[];opening=[];closing=[];expected=[];legacyActive=false;if(!Guid.TryParse(selected,out var id))return;rows=await Accounting.GetCashBoxShiftsAsync(id)??[];var active=rows.Where(x=>x.Status is CashShiftStatus.Open or CashShiftStatus.Closing).ToArray();legacyActive=active.Any(x=>!x.CashBoxShiftId.HasValue);if(active.Length>0){foreach(var shift in active.Where(x=>x.CashBoxShiftId.HasValue))expected[shift.Id]=await Accounting.GetCashShiftClosingPreviewAsync(shift.Id);return;}foreach(var a in accounts.Where(x=>(x.CashBoxId??x.Id)==id&&x.IsActive&&x.CurrencyId.HasValue)){var b=await Accounting.GetCashShiftOpeningBalanceAsync(a.Id)??throw new InvalidOperationException("تعذر تحميل الرصيد الدفتري.");opening.Add(new(){Account=a,Book=b.BookBalance});}}
+    private string Difference(CashShiftDto row,bool isOpen)=>isOpen && expected.TryGetValue(row.Id,out var book) ? (closing.GetValueOrDefault(row.Id)-book)?.ToString("N4")??"—" : row.DifferenceAmount?.ToString("N4")??"—";
+    private string ClosingValue(Guid id)=>closing.GetValueOrDefault(id)?.ToString(System.Globalization.CultureInfo.InvariantCulture)??"";
+    private void SetClosing(Guid id,ChangeEventArgs e)=>closing[id]=decimal.TryParse(e.Value?.ToString(),System.Globalization.NumberStyles.Number,System.Globalization.CultureInfo.InvariantCulture,out var v)?v:null;
+    private async Task Run(Func<Task> action){if(busy)return;busy=true;error=null;try{await action();}catch(Exception ex){error=ex.Message;}finally{busy=false;}}
+    private Task Open()=>Run(async()=>{if(opening.Any(x=>x.Actual is null or <0 || (x.Actual!=x.Book&&string.IsNullOrWhiteSpace(x.Reason))))throw new InvalidOperationException("أدخل جرد كل عملة وسبب أي فرق.");await Accounting.OpenCashBoxShiftAsync(new(Guid.Parse(selected),opening.Select(x=>new CreateCashShiftRequest(x.Account.Id,x.Actual!.Value,null,x.Reason,x.Book)).ToArray()));await LoadBox();});
+    private Task Close(Guid id)=>Run(async()=>{var members=rows.Where(x=>x.CashBoxShiftId==id).ToArray();if(members.Any(x=>closing.GetValueOrDefault(x.Id) is null or <0))throw new InvalidOperationException("أدخل الجرد الفعلي لكل عملة.");await Accounting.CloseCashBoxShiftAsync(id,new(members.Select(x=>new CashBoxShiftCloseLine(x.Id,closing[x.Id],x.RowVersion)).ToArray()));await LoadBox();});
+    private Task Approve(Guid id)=>Run(async()=>{await Accounting.ApproveCashBoxShiftAsync(id,new(rows.Where(x=>x.CashBoxShiftId==id).Select(x=>new CashBoxShiftVersion(x.Id,x.RowVersion)).ToArray()));await LoadBox();});
+}
