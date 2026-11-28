@@ -120,4 +120,95 @@ public sealed class CashShiftMovementSqlServerTests
             await db.Database.EnsureDeletedAsync();
         }
     }
+
+    [Test]
+    public async Task GroupedShiftReconciliationSeparatesCurrenciesAndIncludesReversal()
+    {
+        var configured = Environment.GetEnvironmentVariable("OAS_SALES_TEST_SQLSERVER");
+        if (string.IsNullOrWhiteSpace(configured)) { Assert.Ignore("Set OAS_SALES_TEST_SQLSERVER to run this isolated SQL Server test."); return; }
+        var connection = new SqlConnectionStringBuilder(configured) { InitialCatalog = $"OAS_Shift_{Guid.NewGuid():N}" }.ConnectionString;
+        await using var db = new OasDbContext(new DbContextOptionsBuilder<OasDbContext>().UseSqlServer(connection).Options);
+        try
+        {
+            await db.Database.MigrateAsync();
+            var now = DateTime.UtcNow.AddMinutes(-2);
+            var date = DateOnly.FromDateTime(now);
+            var actor = Guid.NewGuid();
+            var yer = Currency.Create(Guid.NewGuid(), "QYR", "يمني", null, null, 0);
+            var sar = Currency.Create(Guid.NewGuid(), "QSR", "سعودي", null, null, 2);
+            var usd = Currency.Create(Guid.NewGuid(), "QUS", "دولار", null, null, 2);
+            var year = FiscalYear.Create(Guid.NewGuid(), "GROUP-TEST", "Test year", date.AddDays(-1), date.AddDays(2), FiscalYearStatus.Open);
+            var period = FiscalPeriod.Create(Guid.NewGuid(), year.Id, 1, "Test period", date.AddDays(-1), date.AddDays(2), FiscalPeriodStatus.Open, false, false, false);
+            Account Ledger(string code, AccountClass cls, NormalBalance normal) => Account.Create(Guid.NewGuid(), code, code, null,
+                null, 1, cls, AccountType.Posting, normal, true, false, false, false, true, null);
+            var currencies = new[] { yer, sar, usd };
+            var ledgers = currencies.Select(c => Ledger("GROUP-" + c.Code, AccountClass.Asset, NormalBalance.Debit)).ToArray();
+            var counterpart = Ledger("GROUP-OFFSET", AccountClass.Revenue, NormalBalance.Credit);
+            db.AddRange(yer, sar, usd, year, period, counterpart);
+            db.AddRange(ledgers);
+            await db.SaveChangesAsync();
+            var boxes = currencies.Select((c, i) => CashAccount.Create(Guid.NewGuid(), "BOX-" + c.Code, c.NameAr, ledgers[i].Id, c.Id, false, true)).ToArray();
+            db.Add(boxes[0]); await db.SaveChangesAsync();
+            foreach (var box in boxes.Skip(1)) { box.JoinCashBox(boxes[0].CashBoxId); db.Add(box); }
+            await db.SaveChangesAsync();
+            var group = Guid.NewGuid();
+            var opening = new[] { 100000m, 1000m, 100m };
+            var shifts = boxes.Select((b, i) => CashShift.Create(Guid.NewGuid(), $"GROUP-SHIFT-{i}", b.Id, actor, now, opening[i], CashShiftStatus.Open)).ToArray();
+            foreach (var shift in shifts) { shift.JoinCashBoxShift(group); shift.SetOpeningDifferenceReason("Opening count for test"); db.Add(shift); }
+            await db.SaveChangesAsync();
+            JournalEntry Movement(int i, decimal amount, decimal rate, string suffix, JournalType type = JournalType.Manual)
+            {
+                var currency = currencies[i];
+                var journal = JournalEntry.Create(Guid.NewGuid(), $"GROUP-{i}-{suffix}", type, date, date, period.Id,
+                    "Test cash movement", null, null, null, JournalEntryStatus.Draft);
+                journal.SetBaseCurrencySnapshot(yer.Id, yer.Code, yer.DecimalPlaces);
+                JournalEntryLine Line(int number, Guid accountId, decimal signed) => JournalEntryLine.CreateMultiCurrency(
+                    Guid.NewGuid(), journal.Id, number, accountId, Math.Max(signed * rate, 0m), Math.Max(-signed * rate, 0m),
+                    currency.Id, currency.Code, currency.DecimalPlaces, Math.Max(signed, 0m), Math.Max(-signed, 0m),
+                    rate, date, ExchangeRateType.Accounting, ExchangeRateSource.Manual,
+                    null, null, null, null, null, null, null, null, null);
+                journal.AddLine(Line(1, ledgers[i].Id, amount)); journal.AddLine(Line(2, counterpart.Id, -amount));
+                journal.SetPendingApproval(); journal.Approve(actor, now.AddSeconds(1)); journal.Post(actor, now.AddSeconds(2));
+                return journal;
+            }
+            var receipts = new[] { Movement(0, 50000m, 1m, "IN"), Movement(1, 500m, 100m, "IN"), Movement(2, 50m, 500m, "IN") };
+            var payments = new[] { Movement(0, -20000m, 1m, "OUT"), Movement(1, -200m, 110m, "OUT"), Movement(2, -20m, 550m, "OUT") };
+            db.AddRange(receipts); db.AddRange(payments); await db.SaveChangesAsync();
+            var reversal = JournalEntry.Create(Guid.NewGuid(), "GROUP-2-REV", JournalType.Reversal, date, date, period.Id,
+                "Reverse payment", null, null, null, JournalEntryStatus.Draft);
+            reversal.SetBaseCurrencySnapshot(yer.Id, yer.Code, yer.DecimalPlaces);
+            foreach (var line in payments[2].Lines) reversal.AddLine(line.CreateOpposite(Guid.NewGuid(), reversal.Id));
+            reversal.SetPendingApproval(); reversal.Approve(actor, now.AddSeconds(3)); reversal.Post(actor, now.AddSeconds(4));
+            payments[2].MarkReversed(reversal.Id); db.Add(reversal); await db.SaveChangesAsync();
+            var expected = new[] { 130000m, 1300m, 150m };
+            var totalIn = new[] { 50000m, 500m, 70m };
+            var totalOut = new[] { 20000m, 200m, 20m };
+            var movements = new CashShiftMovementQueryService(db);
+            var balance = new CashShiftBalanceService(db);
+            for (var i = 0; i < shifts.Length; i++)
+            {
+                var summary = await movements.GetAsync(shifts[i].Id, 1, CancellationToken.None);
+                Assert.That(summary.Reconciliation, Is.Not.Null);
+                Assert.That(summary.Reconciliation!.CurrencyId, Is.EqualTo(currencies[i].Id));
+                Assert.That(summary.Reconciliation.CurrencyName, Is.EqualTo(currencies[i].NameAr));
+                Assert.That(summary.Reconciliation.DecimalPlaces, Is.EqualTo(currencies[i].DecimalPlaces));
+                Assert.That(summary.Reconciliation.Received, Is.EqualTo(totalIn[i]));
+                Assert.That(summary.Reconciliation.Paid, Is.EqualTo(totalOut[i]));
+                Assert.That(summary.Reconciliation.Expected, Is.EqualTo(expected[i]));
+                Assert.That(await balance.CalculateExpectedAsync(shifts[i], DateTime.UtcNow), Is.EqualTo(expected[i]));
+                Assert.That(summary.TotalCount, Is.EqualTo(i == 2 ? 3 : 2));
+                Assert.That(summary.Rows.All(x => x.CurrencyCode == currencies[i].Code), Is.True);
+            }
+            var actual = new[] { 125000m, 1300m, 155m };
+            var closeTime = DateTime.UtcNow;
+            for (var i = 0; i < shifts.Length; i++) { shifts[i].StartClosing(expected[i]); shifts[i].Close(actual[i], actor, closeTime); }
+            await db.SaveChangesAsync();
+            db.ChangeTracker.Clear();
+            var closed = await db.Set<CashShift>().AsNoTracking().Where(x => x.CashBoxShiftId == group).OrderBy(x => x.ShiftNumber).ToArrayAsync();
+            Assert.That(closed.Select(x => x.ExpectedClosingBalance), Is.EqualTo(expected.Select(x => (decimal?)x)));
+            Assert.That(closed.Select(x => x.DifferenceAmount), Is.EqualTo(new decimal?[] { -5000m, 0m, 5m }));
+        }
+        finally { await db.Database.EnsureDeletedAsync(); }
+    }
+
 }

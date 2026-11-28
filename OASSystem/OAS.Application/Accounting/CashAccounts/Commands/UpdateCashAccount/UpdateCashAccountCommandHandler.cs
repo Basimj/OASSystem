@@ -28,6 +28,10 @@ public sealed class UpdateCashAccountCommandHandler(
             throw new ConflictException("accounting_cash_currency_immutable",
                 "The currency of an existing cash account cannot be changed. Create a new account for a different currency.");
 
+        if (!request.IsGroupUpdate && request.Data.RequiresOpenShift is bool requires && requires != entity.RequiresOpenShift &&
+            await repository.CountAsync(new Specification<CashAccount>().Where(x => x.CashBoxId == entity.CashBoxId), cancellationToken) > 1)
+            throw new ConflictException("cash_box_group_settings_required", "عدّل اشتراط الوردية من شاشة الصندوق التشغيلي لجميع العملات.");
+
         var currency = await currencies.GetByIdAsync(request.Data.CurrencyId, cancellationToken)
             ?? throw new NotFoundException(nameof(Currency), request.Data.CurrencyId);
         if (!currency.IsActive) throw new ConflictException("cash_currency_inactive", "The selected currency is inactive.");

@@ -29,6 +29,11 @@ public sealed class CashAccountConfiguration : IEntityTypeConfiguration<CashAcco
             .IsRequired();
 
         builder.Property(x => x.CurrencyId);
+        builder.HasOne(x => x.CashBox).WithMany().HasForeignKey(x => x.CashBoxId)
+            .OnDelete(DeleteBehavior.Restrict).HasConstraintName("FK_CashAccounts_CashBox");
+        builder.Navigation(x => x.CashBox).AutoInclude();
+        builder.HasIndex(x => new { x.CashBoxId, x.CurrencyId }).IsUnique()
+            .HasFilter("[CurrencyId] IS NOT NULL").HasDatabaseName("UX_CashAccounts_BoxCurrency");
 
         builder.Property(x => x.RequiresOpenShift).IsRequired();
         builder.Property(x => x.MovementType).HasConversion<byte>().HasColumnType("tinyint").HasDefaultValue(OAS.Domain.Accounting.Enums.CashAccountMovementType.ReceiptAndPayment).IsRequired();

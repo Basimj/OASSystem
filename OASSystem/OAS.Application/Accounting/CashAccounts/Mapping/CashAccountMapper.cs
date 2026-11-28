@@ -20,5 +20,6 @@ public sealed class CashAccountMapper : ICrudMapper<CashAccount, Guid, CashAccou
     public CashAccountDto ToRead(CashAccount source) => new(
         source.Id, source.Code, source.Name, source.AccountId, source.CurrencyId,
         source.IsDefault, source.IsActive,
-        source.RowVersion is not null ? Convert.ToBase64String(source.RowVersion) : string.Empty, source.RequiresOpenShift, (CashAccountMovementType)(byte)source.MovementType);
+        source.RowVersion is not null ? Convert.ToBase64String(source.RowVersion) : string.Empty, source.RequiresOpenShift, (CashAccountMovementType)(byte)source.MovementType,
+        source.CashBoxId, source.CashBox?.Code, source.CashBox?.Name);
 }

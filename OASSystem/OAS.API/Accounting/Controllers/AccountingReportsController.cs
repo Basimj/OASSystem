@@ -21,16 +21,16 @@ public sealed class AccountingReportsController(ISender sender) : ControllerBase
 {
     [HttpGet("vouchers")]
     public async Task<ActionResult<CashBankReportDto>> Vouchers([FromQuery] DateOnly fromDate, [FromQuery] DateOnly toDate,
-        [FromQuery] string mode = "all", [FromQuery] string status = "posted", [FromQuery] string kind = "all", [FromQuery] Guid? currencyId = null, [FromQuery] Guid? accountId = null, [FromQuery] int? method = null, [FromQuery] int? partyType = null, [FromQuery] string? party = null, [FromQuery] Guid? postedBy = null, [FromQuery] Guid? cashAccountId = null, [FromQuery] Guid? bankAccountId = null, CancellationToken ct = default)
-        => Ok(await sender.Send(new OAS.Application.Accounting.Reports.Queries.GetVoucherReport.GetVoucherReportQuery(new VoucherReportFilter(fromDate,toDate,mode,status,kind,currencyId,accountId,method,partyType,party,postedBy,cashAccountId,bankAccountId)),ct));
+        [FromQuery] string mode = "all", [FromQuery] string status = "posted", [FromQuery] string kind = "all", [FromQuery] Guid? currencyId = null, [FromQuery] Guid? accountId = null, [FromQuery] int? method = null, [FromQuery] int? partyType = null, [FromQuery] string? party = null, [FromQuery] Guid? postedBy = null, [FromQuery] Guid? cashAccountId = null, [FromQuery] Guid? bankAccountId = null, CancellationToken ct = default, [FromQuery] Guid? cashBoxId = null)
+        => Ok(await sender.Send(new OAS.Application.Accounting.Reports.Queries.GetVoucherReport.GetVoucherReportQuery(new VoucherReportFilter(fromDate,toDate,mode,status,kind,currencyId,accountId,method,partyType,party,postedBy,cashAccountId,bankAccountId,cashBoxId)),ct));
 
     [HttpGet("cash-bank")]
     public async Task<ActionResult<CashBankReportDto>> CashBank([FromQuery] DateOnly fromDate, [FromQuery] DateOnly toDate,
         [FromQuery] string mode = "balances", [FromQuery] string kind = "all", [FromQuery] Guid? accountId = null,
         [FromQuery] Guid? currencyId = null, [FromQuery] string activity = "all", [FromQuery] bool includeZero = false,
-        [FromQuery] string shiftState = "all", [FromQuery] string settlementState = "all", [FromQuery] Guid? openedBy = null, CancellationToken ct = default, [FromQuery] byte? movementType = null)
+        [FromQuery] string shiftState = "all", [FromQuery] string settlementState = "all", [FromQuery] Guid? openedBy = null, CancellationToken ct = default, [FromQuery] byte? movementType = null, [FromQuery] Guid? cashBoxId = null)
         => Ok(await sender.Send(new OAS.Application.Accounting.Reports.Queries.GetCashBankReport.GetCashBankReportQuery(
-            new CashBankReportFilterDto(fromDate, toDate, mode, kind, accountId, currencyId, activity, includeZero, shiftState, settlementState, openedBy, movementType)), ct));
+            new CashBankReportFilterDto(fromDate, toDate, mode, kind, accountId, currencyId, activity, includeZero, shiftState, settlementState, openedBy, movementType, cashBoxId)), ct));
 
     [HttpGet("balance-sheet")]
     public async Task<ActionResult<BalanceSheetReportDto>> BalanceSheet([FromQuery] DateOnly asOfDate,

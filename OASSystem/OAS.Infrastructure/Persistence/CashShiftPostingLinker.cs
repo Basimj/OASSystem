@@ -45,6 +45,7 @@ internal static class CashShiftPostingLinker
                 """, ct);
 
         await ValidateCashConfigurationAsync(db, ct);
+        await ValidateGroupedShiftsAsync(db, changes, ct);
         await PaymentVoucherBalanceQueryService.ValidatePostingsAsync(db, postings.Select(x => x.Entity).ToArray(), ct);
 
         // Re-read configuration after lock acquisition.
@@ -146,6 +147,37 @@ internal static class CashShiftPostingLinker
                 shift.ReconcileClosingBalance(await new CashShiftBalanceService(db).CalculateExpectedAsync(shift, closedAt, ct));
         }
     }
+    private static async Task ValidateGroupedShiftsAsync(OasDbContext db, EntityEntry<CashShift>[] changes, CancellationToken ct)
+    {
+        var added = changes.Where(x => x.State == EntityState.Added).Select(x => x.Entity).ToArray();
+        var accountIds = added.Select(x => x.CashAccountId).ToArray();
+        if (accountIds.Length > 0)
+        {
+            var accounts = await db.Set<CashAccount>().AsNoTracking().Where(x => accountIds.Contains(x.Id)).ToListAsync(ct);
+            foreach (var box in accounts.GroupBy(x => x.CashBoxId))
+            {
+                var members = await db.Set<CashAccount>().AsNoTracking().Where(x => x.CashBoxId == box.Key).ToListAsync(ct);
+                var memberIds = members.Select(x => x.Id).ToArray();
+                var activeIds = members.Where(x => x.IsActive).Select(x => x.Id).ToHashSet();
+                var opening = added.Where(x => memberIds.Contains(x.CashAccountId)).ToArray();
+                if (await db.Set<CashShift>().AnyAsync(x => memberIds.Contains(x.CashAccountId) && (x.Status == CashShiftStatus.Open || x.Status == CashShiftStatus.Closing), ct))
+                    throw new ConflictException("cash_box_shift_already_open", "توجد وردية نشطة لإحدى عملات الصندوق.");
+                if (activeIds.Count > 1 || opening.Any(x => x.CashBoxShiftId.HasValue))
+                {
+                    if (opening.Any(x => !x.CashBoxShiftId.HasValue) || opening.Select(x => x.CashBoxShiftId).Distinct().Count() != 1 ||
+                        !activeIds.SetEquals(opening.Select(x => x.CashAccountId)))
+                        throw new ConflictException("cash_box_shift_group_required", "افتح وردية مجمعة لجميع العملات النشطة للصندوق.");
+                }
+            }
+        }
+        foreach (var group in changes.Where(x => x.State == EntityState.Modified && x.Entity.CashBoxShiftId.HasValue).GroupBy(x => x.Entity.CashBoxShiftId!.Value))
+        {
+            var stored = await db.Set<CashShift>().AsNoTracking().Where(x => x.CashBoxShiftId == group.Key).ToListAsync(ct);
+            if (!stored.Select(x => x.Id).ToHashSet().SetEquals(group.Select(x => x.Entity.Id)) ||
+                group.Select(x => x.Entity.Status).Distinct().Count() != 1)
+                throw new ConflictException("cash_box_shift_group_required", "يجب تغيير حالة جميع عملات الوردية في عملية واحدة.");
+        }
+    }
     private static async Task ValidateCashConfigurationAsync(OasDbContext db, CancellationToken ct)
     {
         var cash = db.ChangeTracker.Entries<CashAccount>()
@@ -157,18 +189,28 @@ internal static class CashShiftPostingLinker
         foreach (var entry in cash)
         {
             var box = entry.Entity;
-            if (!await db.Set<CashShift>().AnyAsync(x => x.CashAccountId == box.Id && activeStatuses.Contains(x.Status), ct))
+            var stored = entry.State == EntityState.Modified
+                ? await db.Set<CashAccount>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == box.Id, ct)
+                : null;
+            if (stored is not null && stored.CashBoxId != box.CashBoxId)
+                throw new ConflictException("cash_box_membership_immutable", "لا يمكن نقل حساب عملة موجود إلى صندوق آخر.");
+            if (entry.State == EntityState.Added && box.CashBoxId != box.Id &&
+                !await db.Set<CashAccount>().AnyAsync(x => x.CashBoxId == box.CashBoxId && x.IsActive, ct))
+                throw new ConflictException("cash_box_inactive", "الصندوق غير نشط.");
+            if (entry.State == EntityState.Added && box.CurrencyId.HasValue &&
+                await db.Set<CashAccount>().AnyAsync(x => x.CashBoxId == box.CashBoxId && x.CurrencyId == box.CurrencyId, ct))
+                throw new ConflictException("cash_box_currency_duplicate", "هذه العملة موجودة بالفعل في الصندوق.");
+            var groupIds = db.Set<CashAccount>().Where(x => x.CashBoxId == box.CashBoxId).Select(x => x.Id);
+            if (!await db.Set<CashShift>().AnyAsync(x => (x.CashAccountId == box.Id || groupIds.Contains(x.CashAccountId)) && activeStatuses.Contains(x.Status), ct))
                 continue;
 
             // DbSet.Update marks all properties modified, including unchanged keys.
             // Compare persisted values under the posting lock, also covering detached updates.
-            var stored = entry.State == EntityState.Modified
-                ? await db.Set<CashAccount>().AsNoTracking().SingleOrDefaultAsync(x => x.Id == box.Id, ct)
-                : null;
-            if (entry.State == EntityState.Deleted || !box.IsActive ||
-                (entry.State == EntityState.Modified && (stored is null || stored.AccountId != box.AccountId ||
-                    stored.CurrencyId != box.CurrencyId || stored.MovementType != box.MovementType)))
-                throw new ConflictException("cash_account_active_shift", "أغلق الوردية النشطة قبل تعطيل الصندوق أو تغيير حسابه أو عملته أو نوع حركته.");
+            if (entry.State is EntityState.Added or EntityState.Deleted ||
+                (entry.State == EntityState.Modified && (stored is null || stored.AccountId != box.AccountId || stored.CurrencyId != box.CurrencyId ||
+                    stored.MovementType != box.MovementType || stored.RequiresOpenShift != box.RequiresOpenShift ||
+                    stored.IsActive != box.IsActive)))
+                throw new ConflictException("cash_account_active_shift", "أغلق جميع الورديات النشطة للصندوق قبل إضافة عملة أو تغيير حالتها أو حسابها أو نوع حركتها أو إعداد الوردية.");
         }
         var cashIds = cash.Select(x => x.Entity.Id).ToArray();
         var bankIds = banks.Select(x => x.Entity.Id).ToArray();

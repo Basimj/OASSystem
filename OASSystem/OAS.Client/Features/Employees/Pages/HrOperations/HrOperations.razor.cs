@@ -292,7 +292,7 @@ public partial class HrOperations
     private IReadOnlyList<UiSelectOption> ShiftOptions => _shifts.Where(x => x.IsActive).OrderBy(x => x.NameAr).Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.ShiftCode} - {x.NameAr}")).ToArray();
     private IReadOnlyList<UiSelectOption> ActiveLeaveTypeOptions => _leaveTypes.Where(x => x.IsActive).OrderBy(x => x.NameAr).Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.LeaveTypeCode} - {x.NameAr}")).ToArray();
     private IReadOnlyList<UiSelectOption> SalaryComponentOptions => _salaryComponents.Where(x => x.IsActive && x.ComponentType != 3).OrderBy(x => x.DisplayOrder).Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.ComponentCode} - {x.NameAr}")).ToArray();
-    private IReadOnlyList<UiSelectOption> CashAccountOptions => _cashAccounts.Where(x => x.IsActive && x.MovementType != CashAccountMovementType.ReceiptOnly).Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.Name}")).ToArray();
+    private IReadOnlyList<UiSelectOption> CashAccountOptions => _cashAccounts.Where(x => x.IsActive && x.MovementType != CashAccountMovementType.ReceiptOnly).Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.CashBoxName ?? x.Name} ({x.Code})")).ToArray();
     private IReadOnlyList<UiSelectOption> BankAccountOptions => _bankAccounts.Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.BankName} / {x.AccountName}")).ToArray();
     private static readonly IReadOnlyList<UiSelectOption> LeaveAccrualOptions = [new("1", "منحة سنوية"), new("2", "استحقاق شهري"), new("3", "يدوي")];
     private static readonly IReadOnlyList<UiSelectOption> LeaveCountingOptions = [new("1", "أيام العمل"), new("2", "أيام تقويمية")];

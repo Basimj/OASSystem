@@ -10,4 +10,7 @@ public sealed record CashAccountDto(
     bool IsActive,
     string RowVersion,
     bool RequiresOpenShift = false,
-    CashAccountMovementType MovementType = CashAccountMovementType.ReceiptAndPayment);
+    CashAccountMovementType MovementType = CashAccountMovementType.ReceiptAndPayment,
+    Guid? CashBoxId = null,
+    string? CashBoxCode = null,
+    string? CashBoxName = null);

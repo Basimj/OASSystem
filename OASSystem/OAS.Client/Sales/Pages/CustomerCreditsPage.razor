@@ -135,7 +135,7 @@
                         <label class="cc-field"><span>الصندوق <b>*</b></span>
                             <select class="cc-control" @bind="_selectedCash">
                                 <option value="@Guid.Empty">اختر الصندوق</option>
-                                @foreach (var account in AvailableCashAccounts) { <option value="@account.Id">@account.Code — @account.Name</option> }
+                                @foreach (var account in AvailableCashAccounts) { <option value="@account.Id">@(account.CashBoxCode??account.Code) — @(account.CashBoxName??account.Name)</option> }
                             </select>
                             @if (_currencyId != Guid.Empty && AvailableCashAccounts.Count == 0)
                             {

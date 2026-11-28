@@ -1,0 +1,68 @@
+@using OAS.Client.Accounting.Services
+@using OAS.Contracts.Accounting.CashAccounts
+@using OAS.Contracts.Accounting.Currencies
+@using OAS.Contracts.Common.Pagination
+@inject IAccountingClientService Accounting
+<div class="cash-box-panel" dir="rtl">
+    <div class="cash-box-toolbar"><strong>الصناديق التشغيلية</strong><button type="button" class="btn btn-sm btn-outline-primary" disabled="@busy" @onclick="Reload">تحديث</button></div>
+    @if (error is not null) { <div class="alert alert-danger" role="alert">@error</div> }
+    @if (notice is not null) { <div class="alert alert-success" role="status">@notice</div> }
+    <div class="cash-box-fields">
+        <label>الصندوق<select value="@selected" @onchange="SelectBox" disabled="@busy"><option value="">صندوق جديد</option>@foreach(var g in Groups){<option value="@g.Key">@BoxName(g.First()) (@g.Count())</option>}</select></label>
+        <label>اسم الصندوق<input @bind="name" disabled="@busy" /></label>
+        <label class="cash-box-check"><input type="checkbox" @bind="requiresShift" disabled="@busy" /> يتطلب وردية مفتوحة</label>
+    </div>
+    <table class="cash-box-table"><thead><tr><th>العملة</th><th>نوع الحركة</th><th>نشط</th><th>افتراضي</th><th>الحساب المحاسبي</th><th></th></tr></thead><tbody>
+        @foreach(var line in lines)
+        {
+            <tr @key="line"><td><select @bind="line.CurrencyId" disabled="@(busy || line.Stored is not null)"><option value="@Guid.Empty">اختر العملة</option>@foreach(var c in currencies.Where(x=>x.IsActive || x.Id==line.CurrencyId)){<option value="@c.Id">@c.NameAr (@c.Code)</option>}</select></td>
+                <td><select @bind="line.Movement" disabled="@busy"><option value="@CashAccountMovementType.ReceiptOnly">قبض فقط</option><option value="@CashAccountMovementType.PaymentOnly">صرف فقط</option><option value="@CashAccountMovementType.ReceiptAndPayment">قبض وصرف</option></select></td>
+                <td><input type="checkbox" @bind="line.Active" disabled="@(busy || line.Stored is null)" /></td><td><input type="checkbox" @bind="line.Default" disabled="@busy" /></td>
+                <td>@(line.Stored is { } s ? ledgerCodes.GetValueOrDefault(s.AccountId)??"—" : "ينشأ عند الحفظ")</td><td>@if(line.Stored is null){<button type="button" class="btn btn-sm btn-outline-danger" disabled="@busy" @onclick="()=>RemoveLine(line)">حذف</button>}</td></tr>
+        }
+    </tbody></table>
+    <div class="cash-box-toolbar"><button type="button" class="btn btn-sm btn-outline-primary" disabled="@busy" @onclick="AddLine">إضافة عملة</button><button type="button" class="btn btn-sm btn-success" disabled="@busy" @onclick="Save">حفظ الصندوق</button></div>
+    <table class="cash-box-table"><thead><tr><th>الرمز</th><th>الصندوق</th><th>العملات</th></tr></thead><tbody>@foreach(var g in Groups){<tr><td>@(g.First().CashBoxCode??g.First().Code)</td><td><button type="button" class="btn btn-link btn-sm" disabled="@busy" @onclick="()=>LoadBox(g.Key)">@BoxName(g.First())</button></td><td>@string.Join("، ",g.Select(x=>CurrencyName(x.CurrencyId)))</td></tr>}</tbody></table>
+</div>
+@code {
+    private sealed class Line { public CashAccountDto? Stored {get;init;} public Guid CurrencyId {get;set;} public CashAccountMovementType Movement {get;set;} = CashAccountMovementType.ReceiptAndPayment; public bool Active {get;set;}=true; public bool Default {get;set;} }
+    private List<CashAccountDto> accounts=[];
+    private Dictionary<Guid,string> ledgerCodes=[];
+    private List<CurrencyDto> currencies=[];
+    private List<Line> lines=[];
+    private IEnumerable<IGrouping<Guid,CashAccountDto>> Groups => accounts.GroupBy(x=>x.CashBoxId??x.Id).OrderBy(x=>BoxName(x.First()));
+    private string name="", selected="";
+    private bool requiresShift=true, busy;
+    private string? error,notice;
+    private static string BoxName(CashAccountDto a)=>a.CashBoxName??a.Name;
+    private string CurrencyName(Guid? id)=>currencies.FirstOrDefault(x=>x.Id==id)?.NameAr??"غير محددة";
+    protected override Task OnInitializedAsync()=>Reload();
+    private async Task LoadData()
+    {
+        accounts=[]; currencies=[]; ledgerCodes=[];
+        for(int p=1;;p++){var page=await Accounting.GetCashAccountsPageAsync(new PageRequest{PageNumber=p,PageSize=200}); accounts.AddRange(page.Items); if(!page.HasNextPage)break;}
+        for(int p=1;;p++){var page=await Accounting.GetCurrenciesPageAsync(new PageRequest{PageNumber=p,PageSize=200}); currencies.AddRange(page.Items); if(!page.HasNextPage)break;}
+        foreach(var a in accounts){var ledger=await Accounting.GetAccountByIdAsync(a.AccountId);if(ledger is not null)ledgerCodes[a.AccountId]=ledger.Code;}
+    }
+    private async Task Reload(){if(busy)return;busy=true;error=null;try{await LoadData(); if(Guid.TryParse(selected,out var id)&&Groups.Any(g=>g.Key==id))LoadBox(id);else NewBox();}catch(Exception ex){error=ex.Message;}finally{busy=false;}}
+    private void NewBox(){selected="";name="";requiresShift=true;lines=[];AddLine();}
+    private void AddLine()=>lines.Add(new());
+    private void RemoveLine(Line line)=>lines.Remove(line);
+    private void SelectBox(ChangeEventArgs e){if(Guid.TryParse(e.Value?.ToString(),out var id))LoadBox(id);else NewBox();}
+    private void LoadBox(Guid id){var g=Groups.FirstOrDefault(x=>x.Key==id);if(g is null)return; selected=id.ToString();var root=g.FirstOrDefault(x=>x.Id==id)??g.First();name=BoxName(root);requiresShift=root.RequiresOpenShift;lines=g.Select(x=>new Line{Stored=x,CurrencyId=x.CurrencyId??Guid.Empty,Movement=x.MovementType,Active=x.IsActive,Default=x.IsDefault}).ToList();}
+    private async Task Save()
+    {
+        if(busy)return;error=null;notice=null;
+        if(string.IsNullOrWhiteSpace(name)||lines.Count==0||lines.Any(x=>x.CurrencyId==Guid.Empty)||lines.Select(x=>x.CurrencyId).Distinct().Count()!=lines.Count){error="أدخل اسم الصندوق وحدد عملاته دون تكرار.";return;}
+        busy=true;
+        try
+        {
+            Guid id;
+            if(!Guid.TryParse(selected,out id))
+                id=await Accounting.CreateCashBoxAsync(new(name,requiresShift,lines.Select(x=>new CashBoxCurrencyRequest(x.CurrencyId,x.Movement,x.Default)).ToArray()));
+            else
+                await Accounting.UpdateCashBoxAsync(id,new(name,requiresShift,lines.Select(x=>new UpdateCashBoxCurrencyRequest(x.Stored?.Id,x.CurrencyId,x.Movement,x.Active,x.Default,x.Stored?.RowVersion)).ToArray()));
+            selected=id.ToString();await LoadData();LoadBox(id);notice="تم حفظ الصندوق.";
+        }catch(Exception ex){error=ex.Message;}finally{busy=false;}
+    }
+}

@@ -36,6 +36,7 @@ public sealed class CreateCashShiftCommandHandler(
         var now=timeProvider.GetUtcNow().UtcDateTime;
         var number=await ResolveNumberAsync(request.Data.ShiftNumber,now.Year,cancellationToken);
         var shift=CashShift.Create(Guid.NewGuid(),number,request.Data.CashAccountId,userId,now,request.Data.OpeningBalance,DomainCashShiftStatus.Open);
+        if (request.GroupId is Guid groupId) shift.JoinCashBoxShift(groupId);
         shift.SetOpeningDifferenceReason(request.Data.OpeningDifferenceReason);
         shift.ExpectBookOpeningBalance(request.Data.ExpectedBookOpeningBalance);
         await repository.AddAsync(shift,cancellationToken);

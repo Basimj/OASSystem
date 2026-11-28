@@ -37,6 +37,18 @@ public sealed class CreateCashAccountCommandHandler(
                 cancellationToken) > 0)
             throw new ConflictException("cash_default_already_exists", "An active default cash account already exists for this currency.");
 
+        CashAccount? existing = null;
+        if (data.ExistingCashAccountId is Guid existingId)
+        {
+            existing = await repository.GetByIdAsync(existingId, cancellationToken)
+                ?? throw new NotFoundException(nameof(CashAccount), existingId);
+            if (!existing.IsActive || existing.CashBoxId == Guid.Empty)
+                throw new ConflictException("cash_box_inactive", "اختر صندوقًا نشطًا لإضافة عملة إليه.");
+            if (await repository.CountAsync(new Specification<CashAccount>().Where(x =>
+                    x.CashBoxId == existing.CashBoxId && x.CurrencyId == data.CurrencyId), cancellationToken) > 0)
+                throw new ConflictException("cash_box_currency_duplicate", "هذه العملة موجودة بالفعل في الصندوق.");
+        }
+
         var code = data.Code?.Trim();
 
         // The UI reserves a code when a new tab opens. If the request comes from
@@ -63,7 +75,8 @@ public sealed class CreateCashAccountCommandHandler(
             data.IsDefault,
             data.IsActive);
 
-        entity.SetRequiresOpenShift(data.RequiresOpenShift);
+        if (existing is not null) entity.JoinCashBox(existing.CashBoxId);
+        entity.SetRequiresOpenShift(existing?.RequiresOpenShift ?? data.RequiresOpenShift);
         entity.SetMovementType((OAS.Domain.Accounting.Enums.CashAccountMovementType)(byte)data.MovementType);
         await repository.AddAsync(entity, cancellationToken);
         return entity;

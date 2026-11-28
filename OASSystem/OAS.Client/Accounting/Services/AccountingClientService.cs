@@ -1040,6 +1040,24 @@ public sealed class AccountingClientService(
     // Cash Accounts
     // ============================================================
 
+    public async Task UpdateCashBoxAsync(Guid id, UpdateCashBoxRequest request, CancellationToken ct = default)
+    { await apiClient.PutAsync<UpdateCashBoxRequest, bool>($"api/accounting/cash-accounts/box/{id}", request, ct); }
+    public async Task<Guid> CreateCashBoxAsync(CreateCashBoxRequest request, CancellationToken ct = default)
+    {
+        await EnsureCashParentAccountConfiguredAsync(ct);
+        return await apiClient.PostAsync<CreateCashBoxRequest, Guid>("api/accounting/cash-accounts/box", request, ct);
+    }
+    public Task<CashShiftDto[]?> GetCashBoxShiftsAsync(Guid boxId, CancellationToken ct = default)
+        => apiClient.GetAsync<CashShiftDto[]>($"api/accounting/cash-shifts/box/{boxId}", ct);
+    public Task<decimal> GetCashShiftClosingPreviewAsync(Guid id, CancellationToken ct = default)
+        => apiClient.GetAsync<decimal>($"api/accounting/cash-shifts/{id}/closing-preview", ct);
+    public Task<Guid> OpenCashBoxShiftAsync(OpenCashBoxShiftRequest request, CancellationToken ct = default)
+        => apiClient.PostAsync<OpenCashBoxShiftRequest, Guid>("api/accounting/cash-shifts/box/open", request, ct);
+    public Task<bool> CloseCashBoxShiftAsync(Guid id, CloseCashBoxShiftRequest request, CancellationToken ct = default)
+        => apiClient.PostAsync<CloseCashBoxShiftRequest, bool>($"api/accounting/cash-shifts/box/{id}/close", request, ct);
+    public Task<bool> ApproveCashBoxShiftAsync(Guid id, ApproveCashBoxShiftRequest request, CancellationToken ct = default)
+        => apiClient.PostAsync<ApproveCashBoxShiftRequest, bool>($"api/accounting/cash-shifts/box/{id}/approve", request, ct);
+
     public Task<PagedResult<CashAccountDto>>
         GetCashAccountsPageAsync(
             PageRequest request,

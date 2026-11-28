@@ -1,0 +1,9 @@
+.cash-currency-toolbar { display:flex; justify-content:flex-start; margin-bottom:.65rem; }
+.cash-currency-scroll { overflow-x:auto; }
+.cash-currency-table { width:100%; border-collapse:collapse; text-align:start; font-size:inherit; }
+.cash-currency-table th,.cash-currency-table td { padding:.5rem .6rem; border-bottom:1px solid var(--bs-border-color,#d5dfeb); vertical-align:middle; }
+.cash-currency-table th { background:var(--bs-tertiary-bg,transparent); white-space:nowrap; }
+.cash-currency-table td:first-child { min-width:190px; width:29%; }
+.cash-currency-table td:nth-child(2) { min-width:170px; }
+.cash-currency-table td:nth-child(5) { min-width:140px; }
+.cash-currency-table th:nth-child(3),.cash-currency-table th:nth-child(4),.cash-currency-table td:nth-child(3),.cash-currency-table td:nth-child(4) { text-align:center; }

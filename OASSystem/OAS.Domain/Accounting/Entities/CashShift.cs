@@ -32,6 +32,15 @@ public sealed class CashShift : AuditableEntity<Guid>
 
     public Guid CashAccountId { get; private set; }
 
+    public Guid? CashBoxShiftId { get; private set; }
+
+    public void JoinCashBoxShift(Guid id)
+    {
+        if (id == Guid.Empty || CashBoxShiftId.HasValue || Status != CashShiftStatus.Open || RowVersion.Length != 0)
+            throw new InvalidOperationException("Only a new open shift can join an operational shift.");
+        CashBoxShiftId = id;
+    }
+
     // False for pre-migration shifts: their historical movements still need timestamp fallback.
     public bool UsesLinkedMovements { get; private set; }
 

@@ -25,7 +25,11 @@
             {
                 <label class="oas-report__field">نوع الحساب<select @bind="_draft.Kind" @bind:after="KindChanged"><option value="all">الكل</option><option value="cash">صناديق</option><option value="bank">بنوك</option></select></label>
             }
-            <div class="oas-report__field"><UiReportSearchPicker Label="الصندوق / البنك" DialogTitle="اختيار الحساب النقدي" Value="@_draft.Account" ValueChanged="OnAccount" Options="@AccountOptions" Placeholder="الكل" /></div>
+            @if (EffectiveKind != "bank")
+            {
+                <div class="oas-report__field"><UiReportSearchPicker Label="الصندوق" DialogTitle="اختيار الصندوق" Value="@(_draft.CashBoxId?.ToString() ?? string.Empty)" ValueChanged="OnBox" Options="@BoxPickerOptions" Placeholder="الكل" /></div>
+            }
+            <div class="oas-report__field"><UiReportSearchPicker Label="حساب العملة / البنك" DialogTitle="اختيار الحساب النقدي" Value="@_draft.Account" ValueChanged="OnAccount" Options="@AccountOptions" Placeholder="الكل" /></div>
             <label class="oas-report__field">عملة الحساب<select @bind="_draft.Currency" @bind:after="ClearAccount"><option value="">جميع العملات</option>@foreach(var c in Currencies){<option value="@c.Id">@c.Name (@c.Code)</option>}</select></label>
             @if (EffectiveKind != "bank")
             {
@@ -45,7 +49,7 @@
             {
                 <label class="oas-report__field">عملة عرض القيم الدفترية<select @bind="_draft.DisplayCurrency"><option value="">@BaseCode (الأساسية)</option>@foreach(var c in Currencies.Where(c=>c.Id!=_report?.BaseCurrencyId)){<option value="@c.Id">@c.Name (@c.Code)</option>}</select></label>
             }
-            @if (_draft.Mode is "balances" or "currency"){<label class="oas-report__field-check"><input type="checkbox" @bind="_draft.IncludeZero" /> إظهار الحسابات الصفرية</label>}
+            @if (_draft.Mode is "balances" or "currency" or "boxes"){<label class="oas-report__field-check"><input type="checkbox" @bind="_draft.IncludeZero" /> إظهار الحسابات الصفرية</label>}
             @if (_validation is not null){<div class="trial-warning" role="alert">@_validation</div>}
         </div>
         <div class="oas-report__apply"><button type="button" class="primary" disabled="@_busy" @onclick="ApplyAsync"><i class="fa-solid fa-filter"></i> تطبيق</button><button type="button" disabled="@_busy" @onclick="ResetAsync"><i class="fa-solid fa-rotate-left"></i> إعادة تعيين</button></div>

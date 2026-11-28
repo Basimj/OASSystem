@@ -33,6 +33,14 @@ public sealed class CashShiftBalanceService(OasDbContext db) : ICashShiftBalance
 
     public async Task<decimal> CalculateExpectedAsync(CashShift shift, DateTime throughUtc, CancellationToken cancellationToken = default)
     {
+        var totals = await CalculateTotalsAsync(shift, throughUtc, cancellationToken);
+        return shift.OpeningBalance + totals.Received - totals.Paid;
+    }
+
+    // Shared by the closing calculation and the reconciliation preview. All amounts
+    // are in the individual cash account currency, never the base currency by default.
+    internal async Task<(decimal Received, decimal Paid)> CalculateTotalsAsync(CashShift shift, DateTime throughUtc, CancellationToken cancellationToken = default)
+    {
         if (throughUtc < shift.OpenedAtUtc)
             throw new ConflictException("cash_shift_invalid_time", "Shift closing time precedes opening time.");
 
@@ -76,16 +84,17 @@ public sealed class CashShiftBalanceService(OasDbContext db) : ICashShiftBalance
                 x.line.DebitAmount, x.line.CreditAmount
             }).ToListAsync(cancellationToken);
 
-        decimal net = 0m;
+        decimal received = 0m, paid = 0m;
         foreach (var row in rows)
         {
             if (row.JournalType is JournalType.Opening or JournalType.Closing)
                 throw new ConflictException("cash_shift_non_operating_journal", $"Journal {row.JournalNumber} is an opening/closing entry on the cashbox. Reconcile it before closing.");
-            net += ResolveMovement(currencyId, row.BaseCurrencyId, row.TransactionCurrencyId,
+            var movement = ResolveMovement(currencyId, row.BaseCurrencyId, row.TransactionCurrencyId,
                 row.TransactionDebitAmount, row.TransactionCreditAmount, row.DebitAmount, row.CreditAmount, row.JournalNumber);
+            if (movement > 0m) received += movement;
+            else paid -= movement;
         }
-        // Keep negative expected amounts visible: they signal a bookkeeping/opening-count issue.
-        return shift.OpeningBalance + net;
+        return (received, paid);
     }
 
     public static decimal ResolveMovement(Guid cashCurrencyId, Guid? baseCurrencyId, Guid? transactionCurrencyId,

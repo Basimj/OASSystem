@@ -1,4 +1,5 @@
 using MediatR;
+using OAS.Application.Accounting.CashShifts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -22,6 +23,22 @@ namespace OAS.API.Accounting.Controllers;
 [Route("api/accounting/cash-shifts")]
 public sealed class CashShiftsController(ISender sender) : ControllerBase
 {
+    [HttpGet("box/{boxId:guid}")]
+    public async Task<ActionResult<IReadOnlyList<CashShiftDto>>> GetBoxShifts(Guid boxId, CancellationToken ct)
+        => Ok(await sender.Send(new GetCashBoxShiftsQuery(boxId), ct));
+
+    [HttpPost("box/open")]
+    public async Task<ActionResult<Guid>> OpenBox(OpenCashBoxShiftRequest request, CancellationToken ct)
+        => Ok(await sender.Send(new OpenCashBoxShiftCommand(request), ct));
+
+    [HttpPost("box/{id:guid}/close")]
+    public async Task<ActionResult<bool>> CloseBox(Guid id, CloseCashBoxShiftRequest request, CancellationToken ct)
+    { await sender.Send(new CloseCashBoxShiftCommand(id, request), ct); return Ok(true); }
+
+    [HttpPost("box/{id:guid}/approve")]
+    public async Task<ActionResult<bool>> ApproveBox(Guid id, ApproveCashBoxShiftRequest request, CancellationToken ct)
+    { await sender.Send(new ApproveCashBoxShiftCommand(id, request), ct); return Ok(true); }
+
     [HttpGet]
     public async Task<ActionResult<PagedResult<CashShiftDto>>> Get(
         [FromQuery] PageRequest request,
@@ -41,6 +58,10 @@ public sealed class CashShiftsController(ISender sender) : ControllerBase
         var result = await sender.Send(new GetCashShiftByIdQuery(id), cancellationToken);
         return Ok(result);
     }
+
+    [HttpGet("{id:guid}/closing-preview")]
+    public async Task<ActionResult<decimal>> ClosingPreview(Guid id, CancellationToken ct)
+        => Ok(await sender.Send(new GetCashShiftClosingPreviewQuery(id), ct));
 
     [HttpGet("{id:guid}/movements")]
     public async Task<ActionResult<CashShiftMovementsDto>> GetMovements(Guid id, [FromQuery] int page = 1, CancellationToken cancellationToken = default)

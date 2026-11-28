@@ -20,6 +20,7 @@ public partial class CashBankReportPage
         public string Mode { get; set; } = "balances";
         public string Kind { get; set; } = "all";
         public string Account { get; set; } = "";
+        public Guid? CashBoxId { get; set; }
         public Guid? Currency { get; set; }
         public Guid? DisplayCurrency { get; set; }
         public string Activity { get; set; } = "all";
@@ -29,7 +30,7 @@ public partial class CashBankReportPage
         public bool IncludeZero { get; set; }
         public string Operator { get; set; } = "";
     }
-    private static readonly Dictionary<string,string> Modes = new() { ["balances"]="إجمالي الأرصدة", ["cash"]="حركة الصناديق", ["bank"]="حركة البنوك", ["currency"]="الأرصدة حسب العملة", ["transfers"]="التحويلات المالية", ["shifts"]="الورديات", ["differences"]="العجز والزيادة" };
+    private static readonly Dictionary<string,string> Modes = new() { ["balances"]="إجمالي الأرصدة", ["boxes"]="ملخص الصناديق التشغيلية", ["cash"]="حركة الصناديق", ["bank"]="حركة البنوك", ["currency"]="الأرصدة حسب العملة", ["transfers"]="التحويلات المالية", ["shifts"]="الورديات", ["differences"]="العجز والزيادة" };
     private static readonly string[] DefaultMetricLabels = ["الرصيد الافتتاحي", "إجمالي الوارد", "إجمالي الصادر", "أرصدة الصناديق", "أرصدة البنوك", "إجمالي السيولة"];
     private static readonly string[] Tones = ["blue","green","red","orange","purple","green"];
     private static readonly string[] Icons = ["fa-solid fa-wallet","fa-solid fa-arrow-down","fa-solid fa-arrow-up","fa-solid fa-money-bill","fa-solid fa-landmark","fa-solid fa-coins"];
@@ -51,13 +52,17 @@ public partial class CashBankReportPage
     private int TotalPages => Math.Max(1, (_visible.Count + _pageSize - 1) / _pageSize);
     private IEnumerable<CashBankReportRow> PageRows => _visible.Skip((_page-1)*_pageSize).Take(_pageSize);
     private string[] Headers => _report?.Headers.ToArray() ?? ["الحساب", "البيان"];
-    private string EffectiveKind => _draft.Mode is "cash" or "shifts" or "differences" ? "cash" : _draft.Mode == "bank" ? "bank" : _draft.Kind;
+    private string EffectiveKind => _draft.Mode is "cash" or "shifts" or "differences" or "boxes" ? "cash" : _draft.Mode == "bank" ? "bank" : _draft.Kind;
     private IReadOnlyList<UiSelectOption> AccountOptions => new[] { new UiSelectOption("", "الكل") }.Concat(_accounts.Where(a => (EffectiveKind == "all" || a.Kind == EffectiveKind)
         && (EffectiveKind == "bank" || string.IsNullOrEmpty(_draft.MovementType) || a.MovementType?.ToString() == _draft.MovementType)
-        && (!_draft.Currency.HasValue || a.CurrencyId == _draft.Currency) && (_draft.Activity == "all" || a.IsActive == (_draft.Activity == "active")))
+        && (!_draft.CashBoxId.HasValue || a.CashBoxId == _draft.CashBoxId) && (!_draft.Currency.HasValue || a.CurrencyId == _draft.Currency) && (_draft.Activity == "all" || a.IsActive == (_draft.Activity == "active")))
         .Select(a => new UiSelectOption(a.AccountId.ToString(), $"{a.Code} - {a.Name} ({Currencies.FirstOrDefault(c=>c.Id==a.CurrencyId)?.Code??"غير محددة"})"))).ToArray();
+    private IEnumerable<CashBankReportAccountDto> BoxOptions => _accounts.Where(a=>a.CashBoxId.HasValue).GroupBy(a=>a.CashBoxId).Select(g=>g.First());
+    private IReadOnlyList<UiSelectOption> BoxPickerOptions => new[] { new UiSelectOption("", "الكل") }
+        .Concat(BoxOptions.OrderBy(a=>a.CashBoxName??a.Name).Select(a=>new UiSelectOption(a.CashBoxId!.Value.ToString(),a.CashBoxName??a.Name))).ToArray();
+    private void OnBox(string? value) { _draft.CashBoxId=Guid.TryParse(value,out var id)?id:null; ClearAccount(); }
     private string[] Chips => [$"نوع التقرير: {Modes[_applied.Mode]}", $"من: {_applied.From:dd/MM/yyyy}", $"إلى: {_applied.To:dd/MM/yyyy}",
-        $"الحساب: {_accounts.FirstOrDefault(a=>a.AccountId.ToString()==_applied.Account)?.Name??"الكل"}", $"نوع الحساب: {(_applied.Kind=="cash"?"صناديق":_applied.Kind=="bank"?"بنوك":"الكل")}",
+        $"الصندوق: {BoxOptions.FirstOrDefault(a=>a.CashBoxId==_applied.CashBoxId)?.CashBoxName??"الكل"}", $"الحساب: {_accounts.FirstOrDefault(a=>a.AccountId.ToString()==_applied.Account)?.Name??"الكل"}", $"نوع الحساب: {(_applied.Kind=="cash"?"صناديق":_applied.Kind=="bank"?"بنوك":"الكل")}",
         $"نوع حركة الصندوق: {(_applied.MovementType switch { "1"=>"وارد فقط", "2"=>"صادر فقط", "3"=>"وارد وصادر", _=>"الكل" })}",
         $"عملة الحساب: {Currencies.FirstOrDefault(c=>c.Id==_applied.Currency)?.Code??"الكل"}", $"حالة الحساب: {(_applied.Activity=="active"?"نشط":_applied.Activity=="inactive"?"غير نشط":"الكل")}",
         _applied.Mode is "shifts" or "differences" ? $"حالة الوردية: {ShiftLabel(_applied.ShiftState)} | التسوية: {SettlementLabel(_applied.Settlement)} | المستخدم: {Operators.FirstOrDefault(o=>o.Id.ToString()==_applied.Operator)?.Name??"الكل"}" : $"عرض الدفتري: {_displayCode}"];
@@ -67,8 +72,8 @@ public partial class CashBankReportPage
     private void ClearAccount() { if(!AccountOptions.Any(x=>x.Value==_draft.Account)) _draft.Account=""; }
     private void OnAccount(string? value) => _draft.Account = value ?? "";
     private void OnOperator(string? value) => _draft.Operator = value ?? "";
-    private void KindChanged() { if (EffectiveKind == "bank") _draft.MovementType = ""; ClearAccount(); }
-    private void ModeChanged() { _draft.MovementType = ""; _draft.Operator = ""; _draft.Kind = "all"; ClearAccount(); _draft.ShiftState = "all"; _draft.Settlement = "all"; }
+    private void KindChanged() { if (EffectiveKind == "bank") { _draft.MovementType = ""; _draft.CashBoxId = null; } ClearAccount(); }
+    private void ModeChanged() { _draft.MovementType = ""; _draft.Operator = ""; _draft.Kind = "all"; _draft.CashBoxId = null; ClearAccount(); _draft.ShiftState = "all"; _draft.Settlement = "all"; }
     private async Task ResetAsync() { if(_busy)return; _draft=new(); _search=""; await ApplyAsync(); }
     private async Task ApplyAsync()
     {
@@ -80,6 +85,7 @@ public partial class CashBankReportPage
         {
             var query=$"api/accounting/reports/cash-bank?fromDate={f.From:yyyy-MM-dd}&toDate={f.To:yyyy-MM-dd}&mode={f.Mode}&kind={f.Kind}&activity={f.Activity}&includeZero={f.IncludeZero.ToString().ToLowerInvariant()}&shiftState={f.ShiftState}&settlementState={f.Settlement}";
             if (f.Kind != "bank" && byte.TryParse(f.MovementType, out var movementType)) query += $"&movementType={movementType}";
+            if(f.CashBoxId is Guid boxId && f.Kind != "bank") query += $"&cashBoxId={boxId:D}";
             if(Guid.TryParse(f.Account,out var id))query+=$"&accountId={id:D}";
             if(Guid.TryParse(f.Operator,out var actor))query+=$"&openedBy={actor:D}";
             if(f.Currency is Guid currency)query+=$"&currencyId={currency:D}";

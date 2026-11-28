@@ -957,10 +957,22 @@ namespace OAS.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("OAS.Domain.Accounting.Entities.CashBox", b =>
+                {
+                    b.Property<Guid>("Id").HasColumnType("uniqueidentifier");
+                    b.Property<string>("Code").IsRequired().HasMaxLength(30).HasColumnType("nvarchar(30)");
+                    b.Property<string>("Name").IsRequired().HasMaxLength(150).HasColumnType("nvarchar(150)");
+                    b.HasKey("Id");
+                    b.HasIndex("Code").IsUnique().HasDatabaseName("UX_CashBoxes_Code");
+                    b.ToTable("tbl_CashBoxes", "dbo");
+                });
+
             modelBuilder.Entity("OAS.Domain.Accounting.Entities.CashAccount", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CashBoxId").HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("AccountId")
                         .HasColumnType("uniqueidentifier");
@@ -1031,6 +1043,8 @@ namespace OAS.Infrastructure.Persistence.Migrations
                     b.HasIndex("AccountId")
                         .IsUnique()
                         .HasDatabaseName("IX_CashAccounts_AccountId");
+
+                    b.HasIndex("CashBoxId", "CurrencyId").IsUnique().HasDatabaseName("UX_CashAccounts_BoxCurrency").HasFilter("[CurrencyId] IS NOT NULL");
 
                     b.HasIndex("Code")
                         .IsUnique()
@@ -1145,6 +1159,8 @@ namespace OAS.Infrastructure.Persistence.Migrations
                     b.HasIndex("CashAccountId")
                         .HasDatabaseName("IX_CashShifts_CashAccountId");
 
+                    b.Property<Guid?>("CashBoxShiftId").HasColumnType("uniqueidentifier");
+                    b.HasIndex("CashBoxShiftId").HasDatabaseName("IX_CashShifts_CashBoxShiftId");
                     b.HasIndex("OpenedAtUtc")
                         .HasDatabaseName("IX_CashShifts_OpenedAtUtc");
 
@@ -12834,6 +12850,11 @@ namespace OAS.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("OAS.Domain.Accounting.Entities.CashAccount", b =>
                 {
+                    b.HasOne("OAS.Domain.Accounting.Entities.CashBox", "CashBox")
+                        .WithMany().HasForeignKey("CashBoxId").OnDelete(DeleteBehavior.Restrict).IsRequired()
+                        .HasConstraintName("FK_CashAccounts_CashBox");
+                    b.Navigation("CashBox");
+
                     b.HasOne("OAS.Domain.Accounting.Entities.Account", null)
                         .WithMany()
                         .HasForeignKey("AccountId")

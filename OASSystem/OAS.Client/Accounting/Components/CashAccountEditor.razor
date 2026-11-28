@@ -7,113 +7,99 @@
 <UiAccountingEditorSurface AdditionalCssClass="oas-cashbank-editor">
     <div class="oas-cashbank-editor__intro">
         <div class="oas-cashbank-editor__intro-icon"><i class="fa-solid fa-vault" aria-hidden="true"></i></div>
-        <div>
-            <h3>@(IsNew ? "إضافة صندوق / خزينة" : "بيانات الصندوق / الخزينة")</h3>
-            <p>@(IsNew ? "تعريف صندوق نقدي جديد وربطه بحساب الأستاذ العام تلقائيًا." : "اعرض بيانات الصندوق، أو اختر تعديل من الشريط العلوي.")</p>
-        </div>
+        <div><h3>@(IsNew ? "إضافة صندوق / خزينة" : "بيانات الصندوق / الخزينة")</h3></div>
     </div>
     <UiAccountingFormSection Title="بيانات الصندوق" IconCssClass="fa-solid fa-vault">
         <UiAccountingFormGrid Columns="2">
-            <UiInputText Label="كود الصندوق (تلقائي)" Value="@Model.Code"
-                         ValueExpression="@(() => Model.Code)" ValueChanged="OnCodeChanged"
-                         ReadOnly="true" Disabled="true" Size="ControlSize.Small" />
-            <UiInputText Label="اسم الصندوق" Value="@Model.Name"
-                         ValueExpression="@(() => Model.Name)" ValueChanged="OnNameChanged"
-                         Required="true" MaxLength="150" Placeholder="مثال: الخزينة الرئيسية"
-                         Disabled="@(!IsEditable)" Size="ControlSize.Small" />
-            <UiLookup Label="عملة الصندوق" Value='@Model.CurrencyId?.ToString("D")'
-                      ValueChanged="OnCurrencyChanged" SelectedItem="@CurrencyLookupItem"
-                      SearchAsync="CurrencySearchAsync" Placeholder="اختر عملة الصندوق..."
-                      Disabled="@(!IsEditable || !IsNew)" Required="true"
-                      MinimumSearchLength="0" DebounceMilliseconds="250" />
-            @if (Model.AccountId.HasValue)
-            {
-                <UiAccountingReadOnlyValue Label="الحساب المحاسبي المرتبط"
-                                           Value="@(AccountLookupItem?.PrimaryText ?? "جارٍ جلب بيانات الحساب...")"
-                                           Tone="@UiAccountingReadOnlyValue.ValueTone.Primary" />
-            }
-            else
-            {
-                <div class="oas-cashbank-editor__readonly">
-                    <span>الحساب المحاسبي المرتبط</span>
-                    <strong>يُنشأ تلقائيًا عند الحفظ</strong>
-                </div>
-            }
-            <div>
-                <label for="cash-movement-type">نوع الحركة</label>
-                <select id="cash-movement-type" class="@(string.IsNullOrWhiteSpace(Model.MovementError) ? "form-select" : "form-select is-invalid")" aria-invalid="@(!string.IsNullOrWhiteSpace(Model.MovementError))" value="@Model.MovementType" @onchange="OnMovementChanged" disabled="@(!IsEditable)">
-                    <option value="ReceiptOnly">وارد فقط (قبض)</option>
-                    <option value="ReceiptAndPayment">وارد وصادر (قبض وصرف)</option>
-                    <option value="PaymentOnly">صادر فقط (صرف)</option>
-                </select>
-                @if (!string.IsNullOrWhiteSpace(Model.MovementError))
-                {
-                    <div class="text-danger" role="alert">@Model.MovementError</div>
-                }
-            </div>
+            <UiInputText Label="كود الصندوق (تلقائي)" Value="@Model.Code" ErrorText="@Model.CodeError" ReadOnly="true" Disabled="true" Size="ControlSize.Small" />
+            <UiInputText Label="اسم الصندوق" Value="@Model.Name" ValueExpression="@(() => Model.Name)" ValueChanged="OnNameChanged" Required="true" MaxLength="150" Disabled="@(!IsEditable)" Size="ControlSize.Small" />
         </UiAccountingFormGrid>
-        @if (Model.AccountId.HasValue)
+    </UiAccountingFormSection>
+    <UiAccountingFormSection Title="عملات الصندوق" IconCssClass="fa-solid fa-money-bill-transfer">
+        @if (IsEditable)
         {
-            <a class="oas-cashbank-editor__account-link" href="@AccountRoute"><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i> فتح الحساب المرتبط في شجرة الحسابات</a>
+            <div class="cash-currency-toolbar"><button type="button" class="btn btn-sm btn-success" @onclick="AddLine"><i class="fa-solid fa-plus"></i> إضافة عملة</button></div>
         }
-        @if (!IsNew)
-        {
-            <p class="oas-cashbank-editor__note"><i class="fa-solid fa-lock" aria-hidden="true"></i> عملة الصندوق ثابتة بعد الإنشاء؛ لا يتم تغييرها عبر التعديل المعتاد.</p>
-        }
+        <div class="cash-currency-scroll">
+            <table class="cash-currency-table">
+                <thead><tr><th>العملة</th><th>نوع الحركة</th><th>نشط</th><th>افتراضي</th><th>الحساب المحاسبي</th>@if(IsEditable){<th>إجراء</th>}</tr></thead>
+                <tbody>
+                @foreach (var line in Model.Currencies)
+                {
+                    <tr @key="line">
+                        <td>
+                            @if (line.Id.HasValue || !IsEditable)
+                            { <span>@(CurrencyLookup(line.CurrencyId)?.PrimaryText ?? "غير محددة")</span> }
+                            else
+                            {
+                                <UiLookup Value='@line.CurrencyId?.ToString("D")' ValueChanged="@(v => OnCurrencyChanged(line,v))" SelectedItem="@CurrencyLookup(line.CurrencyId)" SearchAsync="@((text,ct)=>SearchAvailableCurrenciesAsync(line,text,ct))" Placeholder="اختر العملة" UsePopover="true" ErrorText="@line.Error" Required="true" MinimumSearchLength="0" DebounceMilliseconds="250" />
+                            }
+                            @if (!string.IsNullOrEmpty(line.Error)) { <div class="text-danger" role="alert">@line.Error</div> }
+                        </td>
+                        <td><select aria-label="نوع الحركة" class="form-select form-select-sm" value="@line.MovementType" @onchange="@(e=>OnMovementChanged(line,e))" disabled="@(!IsEditable)"><option value="ReceiptOnly">وارد فقط (قبض)</option><option value="ReceiptAndPayment">وارد وصادر (قبض وصرف)</option><option value="PaymentOnly">صادر فقط (صرف)</option></select></td>
+                        <td><input type="checkbox" aria-label="عملة نشطة" checked="@line.IsActive" disabled="@(!IsEditable)" @onchange="@(e=>OnActiveChanged(line,e))" /></td>
+                        <td><input type="checkbox" aria-label="افتراضي للعملة" checked="@line.IsDefault" disabled="@(!IsEditable || !line.IsActive)" @onchange="@(e=>OnDefaultChanged(line,e))" /></td>
+                        <td>@if (line.AccountId is Guid accountId) { <a href="@($"/accounting/accounts/{accountId:D}")">@(AccountLookup(accountId)?.PrimaryText ?? "الحساب المرتبط")</a> } else { <span>يُنشأ عند الحفظ</span> }</td>
+                        @if(IsEditable){<td>@if(!line.Id.HasValue && Model.Currencies.Count>1){<button type="button" title="حذف العملة الجديدة" class="btn btn-sm btn-outline-danger" @onclick="()=>RemoveLine(line)"><i class="fa-solid fa-trash"></i></button>}</td>}
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(Model.ConfigurationError)) { <div class="text-danger" role="alert">@Model.ConfigurationError</div> }
     </UiAccountingFormSection>
     <UiAccountingFormSection Title="الإعدادات والحالة" IconCssClass="fa-solid fa-sliders">
         <UiAccountingCheckGroup>
-            <UiCheckbox Label="الصندوق الافتراضي لهذه العملة" Value="@Model.IsDefault"
-                        ValueChanged="OnDefaultChanged" Disabled="@(!IsEditable)" />
-            <UiCheckbox Label="الصندوق نشط" Value="@Model.IsActive"
-                        ValueChanged="OnActiveChanged" Disabled="@(!IsEditable)" />
-            <UiCheckbox Label="يتطلب وردية مفتوحة" Value="@Model.RequiresOpenShift"
-                        ValueChanged="OnRequiresOpenShiftChanged" Disabled="@(!IsEditable)" />
+            <UiCheckbox Label="الصندوق نشط" Value="@Model.Currencies.Any(x=>x.IsActive)" ValueChanged="OnBoxActiveChanged" Disabled="@(!IsEditable)" />
+            <UiCheckbox Label="يتطلب وردية مفتوحة" Value="@Model.RequiresOpenShift" ValueChanged="OnRequiresOpenShiftChanged" Disabled="@(!IsEditable)" />
         </UiAccountingCheckGroup>
-        @if (!string.IsNullOrWhiteSpace(Model.ConfigurationError))
-        {
-            <p class="text-danger" role="alert">@Model.ConfigurationError</p>
-        }
-        <p class="oas-cashbank-editor__hint">يمكن تعيين صندوق افتراضي واحد نشط لكل عملة. لا يؤدي تغيير الافتراضي إلى تعديل حركة سابقة.</p>
+        <p class="oas-cashbank-editor__hint">لكل عملة حساب محاسبي مستقل. لا يمكن تغيير عملة محفوظة، ويمكن تعطيلها بدل حذفها.</p>
     </UiAccountingFormSection>
 </UiAccountingEditorSurface>
 
 @code {
+    public sealed class CurrencyLine
+    {
+        public Guid? Id { get; set; }
+        public Guid? CurrencyId { get; set; }
+        public Guid? AccountId { get; set; }
+        public CashAccountMovementType MovementType { get; set; } = CashAccountMovementType.ReceiptAndPayment;
+        public bool IsDefault { get; set; }
+        public bool IsActive { get; set; } = true;
+        public string? RowVersion { get; set; }
+        public string? Error { get; set; }
+    }
     public sealed class FormModel
     {
+        public Guid? CashBoxId { get; set; }
         public string Code { get; set; } = string.Empty;
         public string? CodeError { get; set; }
         public string Name { get; set; } = string.Empty;
-        public Guid? AccountId { get; set; }
-        public Guid? CurrencyId { get; set; }
-        public CashAccountMovementType MovementType { get; set; } = CashAccountMovementType.ReceiptAndPayment;
-        public string? MovementError { get; set; }
         public string? ConfigurationError { get; set; }
         public bool RequiresOpenShift { get; set; }
-        public bool IsDefault { get; set; }
-        public bool IsActive { get; set; } = true;
-        public string RowVersion { get; set; } = string.Empty;
+        public List<CurrencyLine> Currencies { get; set; } = [new()];
     }
-
     [Parameter] public FormModel Model { get; set; } = new();
     [Parameter] public bool IsEditable { get; set; }
     [Parameter] public bool IsNew { get; set; }
-    [Parameter] public UiLookupItem? AccountLookupItem { get; set; }
-    [Parameter] public UiLookupItem? CurrencyLookupItem { get; set; }
-    [Parameter] public Func<string, CancellationToken, Task<IReadOnlyList<UiLookupItem>>>? CurrencySearchAsync { get; set; }
+    [Parameter] public Func<Guid?, UiLookupItem?> CurrencyLookup { get; set; } = _=>null;
+    [Parameter] public Func<Guid?, UiLookupItem?> AccountLookup { get; set; } = _=>null;
+    [Parameter] public Func<string,CancellationToken,Task<IReadOnlyList<UiLookupItem>>>? CurrencySearchAsync { get; set; }
     [Parameter] public EventCallback OnModelChanged { get; set; }
-
-    private string? AccountRoute => Model.AccountId.HasValue ? $"/accounting/accounts/{Model.AccountId.Value:D}" : null;
-    private Task OnChanged() => OnModelChanged.InvokeAsync();
-    private async Task OnCodeChanged(string? value) { Model.Code = value ?? string.Empty; Model.CodeError = null; await OnChanged(); }
-    private async Task OnNameChanged(string? value) { Model.Name = value ?? string.Empty; Model.ConfigurationError = null; await OnChanged(); }
-    private async Task OnCurrencyChanged(string? value) { Model.CurrencyId = Guid.TryParse(value, out var id) ? id : null; await OnChanged(); }
-    private async Task OnMovementChanged(ChangeEventArgs args)
+    private Task Changed() { Model.ConfigurationError=null; return OnModelChanged.InvokeAsync(); }
+    private Task OnNameChanged(string? value) { Model.Name=value??string.Empty; return Changed(); }
+    private Task AddLine() { Model.Currencies.Add(new()); return Changed(); }
+    private Task RemoveLine(CurrencyLine line) { if(!line.Id.HasValue && Model.Currencies.Count>1) Model.Currencies.Remove(line); return Changed(); }
+    private async Task<IReadOnlyList<UiLookupItem>> SearchAvailableCurrenciesAsync(CurrencyLine line,string text,CancellationToken ct)
     {
-        if (Enum.TryParse<CashAccountMovementType>(args.Value?.ToString(), out var value) && Enum.IsDefined(value))
-        { Model.MovementType = value; Model.MovementError = null; await OnChanged(); }
+        if(CurrencySearchAsync is null) return [];
+        var items=await CurrencySearchAsync(text,ct);
+        return items.Where(x=>Guid.TryParse(x.Value,out var id)&&!Model.Currencies.Any(y=>!ReferenceEquals(y,line)&&y.CurrencyId==id)).ToArray();
     }
-    private async Task OnDefaultChanged(bool value) { Model.IsDefault = value; await OnChanged(); }
-    private async Task OnRequiresOpenShiftChanged(bool value) { Model.RequiresOpenShift = value; await OnChanged(); }
-    private async Task OnActiveChanged(bool value) { Model.IsActive = value; Model.ConfigurationError = null; await OnChanged(); }
+    private Task OnCurrencyChanged(CurrencyLine line,string? value) { line.CurrencyId=Guid.TryParse(value,out var id)?id:null; line.Error=null; return Changed(); }
+    private Task OnMovementChanged(CurrencyLine line,ChangeEventArgs e) { if(Enum.TryParse<CashAccountMovementType>(e.Value?.ToString(),out var m)&&Enum.IsDefined(m))line.MovementType=m;line.Error=null;return Changed(); }
+    private Task OnActiveChanged(CurrencyLine line,ChangeEventArgs e) { line.IsActive=e.Value is true; if(!line.IsActive)line.IsDefault=false; line.Error=null;return Changed(); }
+    private Task OnDefaultChanged(CurrencyLine line,ChangeEventArgs e) { line.IsDefault=e.Value is true;line.Error=null;return Changed(); }
+    private Task OnBoxActiveChanged(bool value) { foreach(var line in Model.Currencies){line.IsActive=value;if(!value)line.IsDefault=false;}return Changed(); }
+    private Task OnRequiresOpenShiftChanged(bool value) { Model.RequiresOpenShift=value; return Changed(); }
 }

@@ -878,8 +878,8 @@
                     <CashAccountEditor Model="@model"
                                        IsEditable="@(activeTab.IsNew || activeTab.IsEditMode)"
                                        IsNew="@activeTab.IsNew"
-                                       AccountLookupItem="@GetAccountLookup(model.AccountId)"
-                                       CurrencyLookupItem="@GetCurrencyLookup(model.CurrencyId)"
+                                       AccountLookup="GetAccountLookup"
+                                       CurrencyLookup="GetCurrencyLookup"
                                        CurrencySearchAsync="SearchCurrenciesAsync"
                                        OnModelChanged="MarkActiveDirty" />
 
@@ -969,9 +969,9 @@
                     </div>
                     <div class="oas-cashbank-kpis">
                         <div class="oas-cashbank-kpi"><i class="fa-solid fa-vault"></i><div><span>إجمالي الصناديق المطابقة للبحث</span><strong>@_cashAccountsPage.TotalCount</strong></div></div>
-                        <div class="oas-cashbank-kpi"><i class="fa-solid fa-circle-check"></i><div><span>نشط في الصفحة</span><strong>@_cashAccountsPage.Items.Count(x => x.IsActive)</strong></div></div>
-                        <div class="oas-cashbank-kpi"><i class="fa-solid fa-circle-pause"></i><div><span>غير نشط في الصفحة</span><strong>@_cashAccountsPage.Items.Count(x => !x.IsActive)</strong></div></div>
-                        <div class="oas-cashbank-kpi"><i class="fa-solid fa-star"></i><div><span>افتراضي في الصفحة</span><strong>@_cashAccountsPage.Items.Count(x => x.IsDefault)</strong></div></div>
+                        <div class="oas-cashbank-kpi"><i class="fa-solid fa-circle-check"></i><div><span>نشط في الصفحة</span><strong>@_cashBoxGroups.Count(g => g.Any(x => x.IsActive))</strong></div></div>
+                        <div class="oas-cashbank-kpi"><i class="fa-solid fa-circle-pause"></i><div><span>غير نشط في الصفحة</span><strong>@_cashBoxGroups.Count(g => g.All(x => !x.IsActive))</strong></div></div>
+                        <div class="oas-cashbank-kpi"><i class="fa-solid fa-star"></i><div><span>افتراضي في الصفحة</span><strong>@_cashBoxGroups.Count(g => g.Any(x => x.IsDefault && x.IsActive))</strong></div></div>
                     </div>
                     <div class="oas-cashbank-directory__filter">
                         <label for="oas-cash-state">الحالة</label>

@@ -95,7 +95,7 @@ public partial class PurchasingWorkspaceHost
         return page.Items
             .Where(x=>x.IsActive&&x.MovementType!=OAS.Contracts.Accounting.CashAccounts.CashAccountMovementType.ReceiptOnly&&x.CurrencyId==currencyId)
             .Take(12)
-            .Select(x=>new UiLookupItem(x.Id.ToString("D"),x.Name,x.Code,"fa-solid fa-cash-register"))
+            .Select(x=>new UiLookupItem(x.Id.ToString("D"),x.CashBoxName??x.Name,x.CashBoxCode??x.Code,"fa-solid fa-cash-register"))
             .ToArray();
     }
 

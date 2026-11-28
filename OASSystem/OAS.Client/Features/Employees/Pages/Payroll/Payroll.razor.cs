@@ -119,7 +119,7 @@ public partial class Payroll
     private IReadOnlyList<UiSelectOption> CurrencyOptions => _currencies.Where(x => x.IsActive).OrderBy(x => x.Code).Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.NameAr}")).ToArray();
     private IReadOnlyList<UiSelectOption> DeductionComponentOptions => WithEmpty(_salaryComponents.Where(x => x.IsActive && x.ComponentType == 2).OrderBy(x => x.DisplayOrder).Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.ComponentCode} - {x.NameAr}")));
     private IReadOnlyList<UiSelectOption> EarningComponentOptions => WithEmpty(_salaryComponents.Where(x => x.IsActive && x.ComponentType == 1).OrderBy(x => x.DisplayOrder).Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.ComponentCode} - {x.NameAr}")));
-    private IReadOnlyList<UiSelectOption> CashAccountOptions => _cashAccounts.Where(x => x.IsActive && x.MovementType != CashAccountMovementType.ReceiptOnly && PaymentCurrencyMatches(x.CurrencyId)).Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.Name}")).ToArray();
+    private IReadOnlyList<UiSelectOption> CashAccountOptions => _cashAccounts.Where(x => x.IsActive && x.MovementType != CashAccountMovementType.ReceiptOnly && PaymentCurrencyMatches(x.CurrencyId)).Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.CashBoxName ?? x.Name} ({x.Code})")).ToArray();
     private IReadOnlyList<UiSelectOption> BankAccountOptions => _bankAccounts.Where(x => x.IsActive && PaymentCurrencyMatches(x.CurrencyId)).Select(x => new UiSelectOption(x.Id.ToString("D"), $"{x.Code} - {x.BankName} / {x.AccountName}")).ToArray();
     private IReadOnlyList<UiSelectOption> FinalPayrollOptions
     {

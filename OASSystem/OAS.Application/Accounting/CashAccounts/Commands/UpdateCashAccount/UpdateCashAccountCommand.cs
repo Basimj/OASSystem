@@ -10,6 +10,7 @@ public sealed record UpdateCashAccountCommand(Guid Id, UpdateCashAccountRequest 
     : UpdateEntityCommand<CashAccount, Guid, UpdateCashAccountRequest>(Id, Data),
       IAuthorizedRequest
 {
+    internal bool IsGroupUpdate { get; init; }
     public IReadOnlyCollection<string> RequiredPermissions { get; } =
         [AccountingPermissions.CashAccounts.Edit];
 }
